@@ -503,7 +503,7 @@ document.addEventListener('DOMContentLoaded', () => {
     const renderBatchResults = (results) => {
         let html = '';
         results.forEach(res => {
-            html += `<details><summary>${res.cable} | ${res.status} | Total ${res.total_length} | Field ${res.field_length} | Segments ${res.tray_segments_count}</summary>`;
+            html += `<details><summary>${res.cable} | ${res.status} | Total ${res.total_length} | Field ${res.field_length} | Segments ${res.segments_count}</summary>`;
             if (res.breakdown && res.breakdown.length > 0) {
                 html += '<table><thead><tr><th>Segment</th><th>Tray ID</th><th>Type</th><th>From</th><th>To</th><th>Length</th></tr></thead><tbody>';
                 res.breakdown.forEach(b => {
@@ -620,6 +620,7 @@ document.addEventListener('DOMContentLoaded', () => {
                     total_length: result.success ? result.total_length.toFixed(2) : 'N/A',
                     field_length: result.success ? result.field_routed_length.toFixed(2) : 'N/A',
                     tray_segments_count: result.success ? result.tray_segments.length : 0,
+                    segments_count: result.success ? result.route_segments.length : 0,
                     breakdown: result.success ? result.route_segments.map((seg, i) => ({
                         segment: i + 1,
                         tray_id: seg.type === 'field' ? 'Field Route' : (seg.tray_id || 'N/A'),
