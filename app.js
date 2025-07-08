@@ -78,6 +78,11 @@ document.addEventListener('DOMContentLoaded', () => {
         distance(p1, p2) {
             return Math.sqrt(Math.pow(p1[0] - p2[0], 2) + Math.pow(p1[1] - p2[1], 2) + Math.pow(p1[2] - p2[2], 2));
         }
+
+        // Manhattan distance used for field routing
+        manhattanDistance(p1, p2) {
+            return Math.abs(p1[0] - p2[0]) + Math.abs(p1[1] - p2[1]) + Math.abs(p1[2] - p2[2]);
+        }
         
         // Geometric helper: Project point p onto line segment [a, b]
         projectPointOnSegment(p, a, b) {
@@ -100,8 +105,8 @@ document.addEventListener('DOMContentLoaded', () => {
 
             for (let i = 1; i < segments.length; i++) {
                 const next = segments[i];
-                // Consolidate if same type AND (it's a field route OR it's the same tray ID)
-                if (next.type === current.type && (next.type === 'field' || next.tray_id === current.tray_id)) {
+                // Consolidate consecutive tray segments belonging to the same tray
+                if (next.type === current.type && next.type === 'tray' && next.tray_id === current.tray_id) {
                     current.end = next.end; // Extend the end point
                     current.length += next.length; // Add to the length
                 } else {
@@ -152,7 +157,7 @@ document.addEventListener('DOMContentLoaded', () => {
                     const isSameTray = id1.startsWith(id2.split('_')[0]) && id2.startsWith(id1.split('_')[0]);
                     if (graph.edges[id1][id2] || (id1.includes('_') && isSameTray)) continue;
 
-                    const dist = this.distance(p1, p2);
+                    const dist = this.manhattanDistance(p1, p2);
                     // Connect physically adjacent tray endpoints with minimal cost
                     const weight = dist < 0.1 ? 0.1 : dist * this.fieldPenalty;
                     const type = dist < 0.1 ? 'tray_connection' : 'field';
@@ -170,7 +175,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 
                 // Project cable's start point
                 const projStart = this.projectPointOnSegment(startPoint, a, b);
-                const distToProjStart = this.distance(startPoint, projStart);
+                const distToProjStart = this.manhattanDistance(startPoint, projStart);
                 if (distToProjStart <= this.proximityThreshold) {
                     const projId = `proj_start_on_${tray.tray_id}`;
                     addNode(projId, projStart, 'projection');
@@ -181,7 +186,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
                 // Project cable's end point
                 const projEnd = this.projectPointOnSegment(endPoint, a, b);
-                const distToProjEnd = this.distance(endPoint, projEnd);
+                const distToProjEnd = this.manhattanDistance(endPoint, projEnd);
                 if (distToProjEnd <= this.proximityThreshold) {
                     const projId = `proj_end_on_${tray.tray_id}`;
                     addNode(projId, projEnd, 'projection');
@@ -239,7 +244,9 @@ document.addEventListener('DOMContentLoaded', () => {
                 const u = path[i];
                 const v = path[i+1];
                 const edge = graph.edges[u][v] || graph.edges[v][u];
-                const length = this.distance(graph.nodes[u].point, graph.nodes[v].point);
+                const p1 = graph.nodes[u].point;
+                const p2 = graph.nodes[v].point;
+                const length = edge.type === 'field' ? this.manhattanDistance(p1, p2) : this.distance(p1, p2);
                 totalLength += length;
                 if (edge.type === 'field') {
                     fieldRoutedLength += length;
@@ -254,7 +261,26 @@ document.addEventListener('DOMContentLoaded', () => {
                 }
                 if (type === 'tray') traySegments.add(tray_id);
 
-                routeSegments.push({ type, start: graph.nodes[u].point, end: graph.nodes[v].point, length, tray_id });
+                if (edge.type === 'field') {
+                    let curr = p1.slice();
+                    if (p2[0] !== curr[0]) {
+                        const next = [p2[0], curr[1], curr[2]];
+                        routeSegments.push({ type, start: curr, end: next, length: Math.abs(p2[0]-curr[0]), tray_id });
+                        curr = next;
+                    }
+                    if (p2[1] !== curr[1]) {
+                        const next = [curr[0], p2[1], curr[2]];
+                        routeSegments.push({ type, start: curr, end: next, length: Math.abs(p2[1]-curr[1]), tray_id });
+                        curr = next;
+                    }
+                    if (p2[2] !== curr[2]) {
+                        const next = [curr[0], curr[1], p2[2]];
+                        routeSegments.push({ type, start: curr, end: next, length: Math.abs(p2[2]-curr[2]), tray_id });
+                        curr = next;
+                    }
+                } else {
+                    routeSegments.push({ type, start: p1, end: p2, length, tray_id });
+                }
             }
 
             return {
