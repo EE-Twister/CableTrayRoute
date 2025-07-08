@@ -1,0 +1,595 @@
+// Filename: app.js
+// (This is an improved version that adds route segment consolidation)
+
+document.addEventListener('DOMContentLoaded', () => {
+    // --- STATE MANAGEMENT ---
+    let state = {
+        manualTrays: [],
+        cableList: [],
+        trayData: [],
+    };
+
+    // --- ELEMENT REFERENCES ---
+    const elements = {
+        cableDiameterIn: document.getElementById('cable-diameter'),
+        cableAreaOut: document.getElementById('cable-area'),
+        fillLimitIn: document.getElementById('fill-limit'),
+        fillLimitOut: document.getElementById('fill-limit-value'),
+        calculateBtn: document.getElementById('calculate-route-btn'),
+        inputMethodRadios: document.querySelectorAll('input[name="input-method"]'),
+        routingModeRadios: document.querySelectorAll('input[name="routing-mode"]'),
+        manualEntrySection: document.getElementById('manual-entry-section'),
+        batchSection: document.getElementById('batch-section'),
+        addTrayBtn: document.getElementById('add-tray-btn'),
+        clearTraysBtn: document.getElementById('clear-trays-btn'),
+        manualTrayTableContainer: document.getElementById('manual-tray-table-container'),
+        trayUtilizationContainer: document.getElementById('tray-utilization-container'),
+        loadSampleCablesBtn: document.getElementById('load-sample-cables-btn'),
+        clearCablesBtn: document.getElementById('clear-cables-btn'),
+        cableListContainer: document.getElementById('cable-list-container'),
+        resultsSection: document.getElementById('results-section'),
+        messages: document.getElementById('messages'),
+        metrics: document.getElementById('metrics'),
+        routeBreakdownContainer: document.getElementById('route-breakdown-container'),
+        plot3d: document.getElementById('plot-3d'),
+        updatedUtilizationContainer: document.getElementById('updated-utilization-container'),
+        plotUtilization: document.getElementById('plot-utilization'),
+        exportJsonBtn: document.getElementById('export-json-btn'),
+    };
+    
+    // --- CORE ROUTING LOGIC (JavaScript implementation of your Python backend) ---
+
+    class CableRoutingSystem {
+        constructor(options) {
+            this.fillLimit = options.fillLimit || 0.4;
+            this.proximityThreshold = options.proximityThreshold || 15.0;
+            this.fieldPenalty = options.fieldPenalty || 3.0;
+            this.trays = new Map();
+        }
+
+        addTraySegment(tray) {
+            const maxFill = tray.width * tray.height * this.fillLimit;
+            this.trays.set(tray.tray_id, { ...tray, maxFill });
+        }
+
+        updateTrayFill(trayIds, cableArea) {
+             if (!Array.isArray(trayIds)) return;
+             trayIds.forEach(trayId => {
+                if (this.trays.has(trayId)) {
+                    this.trays.get(trayId).current_fill += cableArea;
+                }
+             });
+        }
+        
+        getTrayUtilization() {
+            const utilization = {};
+            for (const [id, tray] of this.trays.entries()) {
+                utilization[id] = {
+                    current_fill: tray.current_fill,
+                    max_fill: tray.maxFill,
+                    utilization_percentage: (tray.current_fill / tray.maxFill) * 100,
+                    available_capacity: tray.maxFill - tray.current_fill,
+                };
+            }
+            return utilization;
+        }
+
+        // Geometric helper: 3D distance
+        distance(p1, p2) {
+            return Math.sqrt(Math.pow(p1[0] - p2[0], 2) + Math.pow(p1[1] - p2[1], 2) + Math.pow(p1[2] - p2[2], 2));
+        }
+        
+        // Geometric helper: Project point p onto line segment [a, b]
+        projectPointOnSegment(p, a, b) {
+            const ab = [b[0] - a[0], b[1] - a[1], b[2] - a[2]];
+            const ap = [p[0] - a[0], p[1] - a[1], p[2] - a[2]];
+            const magAbSq = ab[0]*ab[0] + ab[1]*ab[1] + ab[2]*ab[2];
+            if (magAbSq === 0) return a;
+            
+            const dot = ap[0]*ab[0] + ap[1]*ab[1] + ap[2]*ab[2];
+            const t = Math.max(0, Math.min(1, dot / magAbSq));
+            
+            return [a[0] + t * ab[0], a[1] + t * ab[1], a[2] + t * ab[2]];
+        }
+
+        _consolidateSegments(segments) {
+            if (segments.length === 0) return [];
+
+            const consolidated = [];
+            let current = { ...segments[0] };
+
+            for (let i = 1; i < segments.length; i++) {
+                const next = segments[i];
+                // Consolidate if same type AND (it's a field route OR it's the same tray ID)
+                if (next.type === current.type && (next.type === 'field' || next.tray_id === current.tray_id)) {
+                    current.end = next.end; // Extend the end point
+                    current.length += next.length; // Add to the length
+                } else {
+                    consolidated.push(current);
+                    current = { ...next };
+                }
+            }
+            consolidated.push(current); // Add the last segment
+            return consolidated;
+        }
+
+        calculateRoute(startPoint, endPoint, cableArea) {
+            // 1. Build the graph
+            const graph = { nodes: {}, edges: {} };
+            const addNode = (id, point, type = 'generic') => {
+                graph.nodes[id] = { point, type };
+                graph.edges[id] = {};
+            };
+            const addEdge = (id1, id2, weight, type, trayId = null) => {
+                graph.edges[id1][id2] = { weight, type, trayId };
+                graph.edges[id2][id1] = { weight, type, trayId };
+            };
+
+            addNode('start', startPoint, 'start');
+            addNode('end', endPoint, 'end');
+
+            // Add tray endpoints as nodes if they have capacity
+            this.trays.forEach(tray => {
+                if (tray.current_fill + cableArea <= tray.maxFill) {
+                    const startId = `${tray.tray_id}_start`;
+                    const endId = `${tray.tray_id}_end`;
+                    addNode(startId, [tray.start_x, tray.start_y, tray.start_z], 'tray_endpoint');
+                    addNode(endId, [tray.end_x, tray.end_y, tray.end_z], 'tray_endpoint');
+                    const trayLength = this.distance(graph.nodes[startId].point, graph.nodes[endId].point);
+                    addEdge(startId, endId, trayLength, 'tray', tray.tray_id);
+                }
+            });
+
+            // Add edges between all nodes (field routing and tray-to-tray connections)
+            const nodeIds = Object.keys(graph.nodes);
+            for (let i = 0; i < nodeIds.length; i++) {
+                for (let j = i + 1; j < nodeIds.length; j++) {
+                    const id1 = nodeIds[i];
+                    const id2 = nodeIds[j];
+                    const p1 = graph.nodes[id1].point;
+                    const p2 = graph.nodes[id2].point;
+                    
+                    const isSameTray = id1.startsWith(id2.split('_')[0]) && id2.startsWith(id1.split('_')[0]);
+                    if (graph.edges[id1][id2] || (id1.includes('_') && isSameTray)) continue;
+
+                    const dist = this.distance(p1, p2);
+                    // Connect physically adjacent tray endpoints with minimal cost
+                    const weight = dist < 0.1 ? 0.1 : dist * this.fieldPenalty;
+                    const type = dist < 0.1 ? 'tray_connection' : 'field';
+                    addEdge(id1, id2, weight, type);
+                }
+            }
+            
+            // Add projection nodes for start/end points onto trays
+            this.trays.forEach(tray => {
+                const startId = `${tray.tray_id}_start`;
+                if (!graph.nodes[startId]) return; // Skip if tray was full
+                
+                const a = graph.nodes[startId].point;
+                const b = graph.nodes[`${tray.tray_id}_end`].point;
+                
+                // Project cable's start point
+                const projStart = this.projectPointOnSegment(startPoint, a, b);
+                const distToProjStart = this.distance(startPoint, projStart);
+                if (distToProjStart <= this.proximityThreshold) {
+                    const projId = `proj_start_on_${tray.tray_id}`;
+                    addNode(projId, projStart, 'projection');
+                    addEdge('start', projId, distToProjStart * this.fieldPenalty, 'field');
+                    addEdge(projId, startId, this.distance(projStart, a), 'tray', tray.tray_id);
+                    addEdge(projId, `${tray.tray_id}_end`, this.distance(projStart, b), 'tray', tray.tray_id);
+                }
+
+                // Project cable's end point
+                const projEnd = this.projectPointOnSegment(endPoint, a, b);
+                const distToProjEnd = this.distance(endPoint, projEnd);
+                if (distToProjEnd <= this.proximityThreshold) {
+                    const projId = `proj_end_on_${tray.tray_id}`;
+                    addNode(projId, projEnd, 'projection');
+                    addEdge('end', projId, distToProjEnd * this.fieldPenalty, 'field');
+                    addEdge(projId, startId, this.distance(projEnd, a), 'tray', tray.tray_id);
+                    addEdge(projId, `${tray.tray_id}_end`, this.distance(projEnd, b), 'tray', tray.tray_id);
+                }
+            });
+            
+            // 2. Dijkstra's Algorithm
+            const distances = {};
+            const prev = {};
+            const pq = new Set(Object.keys(graph.nodes));
+            Object.keys(graph.nodes).forEach(node => distances[node] = Infinity);
+            distances['start'] = 0;
+
+            while (pq.size > 0) {
+                let u = null;
+                for (const node of pq) {
+                    if (u === null || distances[node] < distances[u]) {
+                        u = node;
+                    }
+                }
+                if (u === 'end' || distances[u] === Infinity) break;
+                pq.delete(u);
+
+                for (const v in graph.edges[u]) {
+                    const edge = graph.edges[u][v];
+                    const alt = distances[u] + edge.weight;
+                    if (alt < distances[v]) {
+                        distances[v] = alt;
+                        prev[v] = { node: u, edge };
+                    }
+                }
+            }
+
+            // 3. Reconstruct path and results
+            if (distances['end'] === Infinity) {
+                return { success: false, error: "No valid path could be found." };
+            }
+
+            const path = [];
+            let current = 'end';
+            while (current) {
+                path.unshift(current);
+                current = prev[current] ? prev[current].node : null;
+            }
+            
+            let totalLength = 0;
+            let fieldRoutedLength = 0;
+            const routeSegments = [];
+            const traySegments = new Set();
+
+            for (let i = 0; i < path.length - 1; i++) {
+                const u = path[i];
+                const v = path[i+1];
+                const edge = graph.edges[u][v] || graph.edges[v][u];
+                const length = this.distance(graph.nodes[u].point, graph.nodes[v].point);
+                totalLength += length;
+                if (edge.type === 'field') {
+                    fieldRoutedLength += length;
+                }
+                let type = edge.type;
+                if (type === 'tray_connection') type = 'tray'; // Treat connections as trays for segment breakdown
+                
+                let tray_id = edge.trayId;
+                if (!tray_id) { // Infer tray_id if not on edge
+                    const node_id = u.includes('_') ? u : v;
+                    tray_id = node_id.split('_')[0]
+                }
+                if (type === 'tray') traySegments.add(tray_id);
+
+                routeSegments.push({ type, start: graph.nodes[u].point, end: graph.nodes[v].point, length, tray_id });
+            }
+
+            return {
+                success: true,
+                total_length: totalLength,
+                field_routed_length: fieldRoutedLength,
+                route_segments: this._consolidateSegments(routeSegments), // Use the new consolidation method
+                tray_segments: Array.from(traySegments),
+                warnings: [],
+            };
+        }
+    }
+
+    // --- EVENT HANDLERS & UI LOGIC (This part remains the same) ---
+    
+    const getSampleTrays = () => [
+        {"tray_id": "H1-A", "start_x": 0, "start_y": 0, "start_z": 10, "end_x": 40, "end_y": 0, "end_z": 10, "width": 400, "height": 100, "current_fill": 6000},
+        {"tray_id": "H1-B", "start_x": 40, "start_y": 0, "start_z": 10, "end_x": 80, "end_y": 0, "end_z": 10, "width": 400, "height": 100, "current_fill": 4500},
+        {"tray_id": "H1-C", "start_x": 80, "start_y": 0, "start_z": 10, "end_x": 120, "end_y": 0, "end_z": 10, "width": 400, "height": 100, "current_fill": 8200},
+        {"tray_id": "H2-A", "start_x": 0, "start_y": 0, "start_z": 30, "end_x": 40, "end_y": 0, "end_z": 30, "width": 300, "height": 80, "current_fill": 3200},
+        {"tray_id": "H2-B", "start_x": 40, "start_y": 0, "start_z": 30, "end_x": 80, "end_y": 0, "end_z": 30, "width": 300, "height": 80, "current_fill": 5800},
+        {"tray_id": "H2-C", "start_x": 80, "start_y": 0, "start_z": 30, "end_x": 120, "end_y": 0, "end_z": 30, "width": 300, "height": 80, "current_fill": 2100},
+        {"tray_id": "V1", "start_x": 40, "start_y": 0, "start_z": 10, "end_x": 40, "end_y": 0, "end_z": 30, "width": 200, "height": 60, "current_fill": 1800},
+        {"tray_id": "V2", "start_x": 80, "start_y": 0, "start_z": 10, "end_x": 80, "end_y": 0, "end_z": 30, "width": 200, "height": 60, "current_fill": 2200},
+        {"tray_id": "C1", "start_x": 60, "start_y": 0, "start_z": 10, "end_x": 60, "end_y": 40, "end_z": 10, "width": 250, "height": 75, "current_fill": 3500},
+        {"tray_id": "C2", "start_x": 100, "start_y": 0, "start_z": 30, "end_x": 100, "end_y": 60, "end_z": 30, "width": 250, "height": 75, "current_fill": 4100},
+        {"tray_id": "B1", "start_x": 60, "start_y": 40, "start_z": 10, "end_x": 60, "end_y": 80, "end_z": 10, "width": 150, "height": 50, "current_fill": 1200},
+        {"tray_id": "B2", "start_x": 100, "start_y": 60, "start_z": 30, "end_x": 100, "end_y": 100, "end_z": 30, "width": 150, "height": 50, "current_fill": 900},
+        {"tray_id": "TRUNK", "start_x": 0, "start_y": 20, "start_z": 50, "end_x": 120, "end_y": 20, "end_z": 50, "width": 600, "height": 150, "current_fill": 18000},
+        {"tray_id": "EQ1", "start_x": 20, "start_y": 0, "start_z": 10, "end_x": 20, "end_y": 15, "end_z": 5, "width": 100, "height": 40, "current_fill": 800},
+        {"tray_id": "EQ2", "start_x": 100, "start_y": 60, "start_z": 30, "end_x": 110, "end_y": 90, "end_z": 20, "width": 100, "height": 40, "current_fill": 600},
+        {"tray_id": "CONN1", "start_x": 120, "start_y": 0, "start_z": 10, "end_x": 120, "end_y": 20, "end_z": 25, "width": 200, "height": 75, "current_fill": 2000},
+        {"tray_id": "CONN2", "start_x": 120, "start_y": 20, "start_z": 25, "end_x": 120, "end_y": 20, "end_z": 50, "width": 200, "height": 75, "current_fill": 1500}
+    ];
+    
+    const getSampleCables = () => [
+        {"name": "Power Cable 1", "diameter": 32.0, "start": [5, 5, 5], "end": [110, 95, 45]},
+        {"name": "Control Cable 1", "diameter": 12.0, "start": [10, 0, 10], "end": [100, 80, 25]},
+        {"name": "Data Cable 1", "diameter": 8.0, "start": [15, 5, 15], "end": [105, 85, 30]},
+        {"name": "Power Cable 2", "diameter": 28.0, "start": [20, 10, 8], "end": [115, 90, 35]},
+        {"name": "Control Cable 2", "diameter": 15.0, "start": [25, 15, 12], "end": [95, 75, 28]},
+    ];
+
+    const updateCableArea = () => {
+        const d = parseFloat(elements.cableDiameterIn.value);
+        if (isNaN(d)) return;
+        elements.cableAreaOut.textContent = (Math.PI * (d/2)**2).toFixed(2);
+    };
+
+    const updateFillLimitDisplay = () => {
+        elements.fillLimitOut.textContent = `${elements.fillLimitIn.value}%`;
+    };
+
+    const renderTable = (container, headers, data, styleFn = null) => {
+        let table = '<table><thead><tr>';
+        headers.forEach(h => table += `<th>${h}</th>`);
+        table += '</tr></thead><tbody>';
+        data.forEach(row => {
+            const style = styleFn ? styleFn(row) : '';
+            table += `<tr class="${style}">`;
+            headers.forEach(h => {
+                const key = h.toLowerCase().replace(/ /g, '_').replace(/[\(\)%]/g,'');
+                table += `<td>${row[key] !== undefined ? row[key] : 'N/A'}</td>`;
+            });
+            table += '</tr>';
+        });
+        table += '</tbody></table>';
+        container.innerHTML = table;
+    };
+    
+    const utilizationStyle = (row) => {
+        const util = row.utilization_pct || row.utilization;
+        if (util > 80) return 'util-high';
+        if (util > 60) return 'util-medium';
+        return 'util-low';
+    };
+
+    const updateTrayDisplay = () => {
+        if (state.trayData.length === 0) {
+            elements.trayUtilizationContainer.innerHTML = '<p class="info-text">No tray data loaded.</p>';
+            return;
+        }
+        const displayData = state.trayData.map(tray => {
+            const maxCapacity = tray.width * tray.height * (parseFloat(elements.fillLimitIn.value) / 100);
+            return {
+                ...tray,
+                max_capacity: maxCapacity.toFixed(0),
+                utilization_pct: ((tray.current_fill / maxCapacity) * 100).toFixed(1),
+                available_space: (maxCapacity - tray.current_fill).toFixed(0),
+            };
+        });
+        renderTable(elements.trayUtilizationContainer, 
+            ['Tray ID', 'Max Capacity', 'Current Fill', 'Utilization %', 'Available Space'], 
+            displayData.map(d => ({
+                tray_id: d.tray_id, 
+                max_capacity: d.max_capacity,
+                current_fill: d.current_fill,
+                utilization_pct: d.utilization_pct,
+                available_space: d.available_space
+            })), 
+            utilizationStyle
+        );
+    };
+    
+    const handleInputMethodChange = () => {
+        if (document.getElementById('sample-data').checked) {
+            elements.manualEntrySection.style.display = 'none';
+            state.trayData = getSampleTrays();
+        } else {
+            elements.manualEntrySection.style.display = 'block';
+            state.trayData = state.manualTrays;
+        }
+        updateTrayDisplay();
+    };
+    
+    const handleRoutingModeChange = () => {
+        if(document.getElementById('batch-mode').checked) {
+            elements.batchSection.style.display = 'block';
+        } else {
+            elements.batchSection.style.display = 'none';
+        }
+    };
+
+    const addManualTray = () => {
+        const newTray = {
+            tray_id: document.getElementById('t-id').value,
+            start_x: parseFloat(document.getElementById('t-sx').value),
+            start_y: parseFloat(document.getElementById('t-sy').value),
+            start_z: parseFloat(document.getElementById('t-sz').value),
+            end_x: parseFloat(document.getElementById('t-ex').value),
+            end_y: parseFloat(document.getElementById('t-ey').value),
+            end_z: parseFloat(document.getElementById('t-ez').value),
+            width: parseFloat(document.getElementById('t-w').value),
+            height: parseFloat(document.getElementById('t-h').value),
+            current_fill: parseFloat(document.getElementById('t-fill').value),
+        };
+        if (!newTray.tray_id || isNaN(newTray.width)) {
+            alert("Please fill in at least Tray ID and Width.");
+            return;
+        }
+        state.manualTrays.push(newTray);
+        state.trayData = state.manualTrays;
+        renderTable(elements.manualTrayTableContainer, 
+            ['Tray ID', 'Start X', 'End X', 'Width', 'Height', 'Current Fill'], 
+            state.manualTrays.map(t => ({
+                tray_id: t.tray_id, start_x: t.start_x, end_x: t.end_x,
+                width: t.width, height: t.height, current_fill: t.current_fill
+            }))
+        );
+        updateTrayDisplay();
+    };
+
+    const clearManualTrays = () => {
+        state.manualTrays = [];
+        state.trayData = [];
+        elements.manualTrayTableContainer.innerHTML = '';
+        updateTrayDisplay();
+    };
+    
+    const updateCableListDisplay = () => {
+        if (state.cableList.length === 0) {
+            elements.cableListContainer.innerHTML = '';
+            return;
+        }
+        let html = '<h4>Cables to Route:</h4>';
+        state.cableList.forEach(c => {
+            const area = (Math.PI * (c.diameter / 2) ** 2).toFixed(1);
+            html += `<p><strong>${c.name}</strong> - Ø${c.diameter}mm (${area}mm²) - From ${c.start} to ${c.end}</p>`;
+        });
+        elements.cableListContainer.innerHTML = html;
+    };
+
+    const loadSampleCables = () => {
+        state.cableList = getSampleCables();
+        updateCableListDisplay();
+    };
+
+    const clearCableList = () => {
+        state.cableList = [];
+        updateCableListDisplay();
+    };
+
+    const showMessage = (type, text) => {
+        elements.messages.innerHTML += `<div class="message ${type}">${text}</div>`;
+    };
+
+    const formatPoint = (p) => `(${p[0].toFixed(1)}, ${p[1].toFixed(1)}, ${p[2].toFixed(1)})`;
+
+    const mainCalculation = () => {
+        elements.resultsSection.style.display = 'block';
+        elements.messages.innerHTML = ''; 
+        
+        const routingSystem = new CableRoutingSystem({
+            fillLimit: parseFloat(elements.fillLimitIn.value) / 100,
+            proximityThreshold: parseFloat(document.getElementById('proximity-threshold').value),
+            fieldPenalty: parseFloat(document.getElementById('field-route-penalty').value),
+        });
+        
+        // Deep copy tray data so original state isn't mutated during batch routing
+        const trayDataForRun = JSON.parse(JSON.stringify(state.trayData));
+        trayDataForRun.forEach(tray => routingSystem.addTraySegment(tray));
+        
+        const isBatchMode = document.getElementById('batch-mode').checked;
+
+        if (isBatchMode && state.cableList.length > 0) {
+            const batchResults = [];
+            const allRouteSegmentsForPlotting = [];
+
+            state.cableList.forEach(cable => {
+                const cableArea = Math.PI * (cable.diameter / 2) ** 2;
+                const result = routingSystem.calculateRoute(cable.start, cable.end, cableArea);
+                
+                if (result.success) {
+                    routingSystem.updateTrayFill(result.tray_segments, cableArea);
+                    allRouteSegmentsForPlotting.push(...result.route_segments);
+                }
+                
+                batchResults.push({
+                    cable: cable.name,
+                    status: result.success ? '✓ Routed' : '✗ Failed',
+                    total_length: result.success ? result.total_length.toFixed(2) : 'N/A',
+                    field_length: result.success ? result.field_routed_length.toFixed(2) : 'N/A',
+                    tray_segments_count: result.success ? result.tray_segments.length : 0,
+                });
+            });
+
+            renderTable(elements.routeBreakdownContainer, 
+                ['Cable', 'Status', 'Total Length', 'Field Length', 'Tray Segments Count'], 
+                batchResults
+            );
+            elements.metrics.innerHTML = '';
+            visualize(null, null, trayDataForRun, allRouteSegmentsForPlotting, "Batch Route Visualization");
+
+        } else {
+            const startPoint = [
+                parseFloat(document.getElementById('start-x').value),
+                parseFloat(document.getElementById('start-y').value),
+                parseFloat(document.getElementById('start-z').value),
+            ];
+            const endPoint = [
+                parseFloat(document.getElementById('end-x').value),
+                parseFloat(document.getElementById('end-y').value),
+                parseFloat(document.getElementById('end-z').value),
+            ];
+            const cableArea = parseFloat(elements.cableAreaOut.textContent);
+            
+            const result = routingSystem.calculateRoute(startPoint, endPoint, cableArea);
+
+            if (result.success) {
+                showMessage('success', 'Route calculated successfully!');
+                elements.metrics.innerHTML = `
+                    <div class="column"><strong>Total Length:</strong> ${result.total_length.toFixed(2)}</div>
+                    <div class="column"><strong>Field-Routed:</strong> ${result.field_routed_length.toFixed(2)}</div>
+                    <div class="column"><strong>Trays Used:</strong> ${result.tray_segments.length}</div>
+                `;
+                const breakdownData = result.route_segments.map((seg, i) => ({
+                    segment: i + 1, type: seg.type, from: formatPoint(seg.start),
+                    to: formatPoint(seg.end), length: seg.length.toFixed(2), tray_id: seg.tray_id || 'N/A'
+                }));
+                renderTable(elements.routeBreakdownContainer, ['Segment', 'Type', 'From', 'To', 'Length', 'Tray ID'], breakdownData);
+                visualize(startPoint, endPoint, trayDataForRun, result.route_segments, "3D Route Visualization");
+            } else {
+                showMessage('error', `Route calculation failed: ${result.error}`);
+                elements.metrics.innerHTML = '';
+                elements.routeBreakdownContainer.innerHTML = '';
+                elements.plot3d.innerHTML = '';
+            }
+        }
+        
+        const finalUtilization = routingSystem.getTrayUtilization();
+        const utilData = Object.entries(finalUtilization).map(([id, data]) => ({
+            tray_id: id,
+            utilization: data.utilization_percentage.toFixed(1),
+            available: data.available_capacity.toFixed(0),
+        }));
+        renderTable(elements.updatedUtilizationContainer, ['Tray ID', 'Utilization (%)', 'Available (mm²)'], utilData, (row) => utilizationStyle(row));
+        plotUtilization(finalUtilization);
+    };
+    
+    // --- VISUALIZATION ---
+    const visualize = (startPoint, endPoint, trays, routeSegments, title) => {
+        const traces = [];
+        trays.forEach(tray => {
+            traces.push({
+                x: [tray.start_x, tray.end_x], y: [tray.start_y, tray.end_y], z: [tray.start_z, tray.end_z],
+                mode: 'lines', type: 'scatter3d', name: tray.tray_id,
+                line: { color: 'grey', width: 8 }, hoverinfo: 'name'
+            });
+        });
+
+        if (routeSegments && routeSegments.length > 0) {
+            routeSegments.forEach(seg => {
+                traces.push({
+                    x: [seg.start[0], seg.end[0]], y: [seg.start[1], seg.end[1]], z: [seg.start[2], seg.end[2]],
+                    mode: 'lines', type: 'scatter3d', name: seg.type,
+                    line: { color: seg.type === 'tray' ? 'blue' : 'red', width: 5 }
+                });
+            });
+        }
+        
+        if (startPoint && endPoint) {
+            traces.push({
+                x: [startPoint[0], endPoint[0]], y: [startPoint[1], endPoint[1]], z: [startPoint[2], endPoint[2]],
+                mode: 'markers', type: 'scatter3d', name: 'Start/End',
+                marker: { color: ['green', 'purple'], size: 8 }
+            });
+        }
+
+        const layout = { title: title, scene: { aspectmode: 'data' }};
+        Plotly.newPlot(elements.plot3d, traces, layout);
+    };
+    
+    const plotUtilization = (utilizationData) => {
+        const ids = Object.keys(utilizationData);
+        const percentages = ids.map(id => utilizationData[id].utilization_percentage);
+        const data = [{
+            x: ids, y: percentages, type: 'bar',
+            marker: { color: percentages.map(p => p > 80 ? 'red' : p > 60 ? 'orange' : 'green') }
+        }];
+        const layout = { title: 'Tray Utilization After Routing', yaxis: { title: 'Utilization (%)' } };
+        Plotly.newPlot(elements.plotUtilization, data, layout);
+    }
+    
+    // --- INITIALIZATION & EVENT LISTENERS ---
+    elements.cableDiameterIn.addEventListener('input', updateCableArea);
+    elements.fillLimitIn.addEventListener('input', updateFillLimitDisplay);
+    elements.calculateBtn.addEventListener('click', mainCalculation);
+    elements.inputMethodRadios.forEach(radio => radio.addEventListener('change', handleInputMethodChange));
+    elements.routingModeRadios.forEach(radio => radio.addEventListener('change', handleRoutingModeChange));
+    elements.addTrayBtn.addEventListener('click', addManualTray);
+    elements.clearTraysBtn.addEventListener('click', clearManualTrays);
+    elements.loadSampleCablesBtn.addEventListener('click', loadSampleCables);
+    elements.clearCablesBtn.addEventListener('click', clearCableList);
+    
+    // Initial setup
+    updateCableArea();
+    handleInputMethodChange();
+});

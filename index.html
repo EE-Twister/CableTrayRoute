@@ -1,0 +1,137 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Optimal 3D Cable Routing System</title>
+    <link rel="stylesheet" href="style.css">
+    <script src="https://cdn.plot.ly/plotly-latest.min.js"></script>
+</head>
+<body>
+    <div class="container">
+        <aside class="sidebar">
+            <header>
+                <h2>Input Parameters</h2>
+            </header>
+            
+            <section>
+                <h3>Cable Specifications</h3>
+                <label for="cable-diameter">Cable Outer Diameter (in)</label>
+                <input type="number" id="cable-diameter" value="1.0" step="0.1">
+                <p class="info-text">Cable Area: <span id="cable-area"></span> in²</p>
+            </section>
+
+            <section>
+                <h3>Route Points</h3>
+                <div class="columns">
+                    <div class="column">
+                        <label>Point A (Start)</label>
+                        <input type="number" id="start-x" placeholder="X" value="5">
+                        <input type="number" id="start-y" placeholder="Y" value="2">
+                        <input type="number" id="start-z" placeholder="Z" value="4">
+                    </div>
+                    <div class="column">
+                        <label>Point B (End)</label>
+                        <input type="number" id="end-x" placeholder="X" value="45">
+                        <input type="number" id="end-y" placeholder="Y" value="14">
+                        <input type="number" id="end-z" placeholder="Z" value="4">
+                    </div>
+                </div>
+            </section>
+            
+            <section>
+                <h3>Routing Parameters</h3>
+                 <label for="fill-limit">Max Tray Fill (%)
+                    <span class="help-icon" title="The maximum allowed fill capacity for a cable tray, based on standards like the NEC 40% rule.">?</span>
+                 </label>
+                 <input type="range" id="fill-limit" min="20" max="80" value="40" step="5">
+                 <span id="fill-limit-value">40%</span>
+
+                 <label for="proximity-threshold">Tray Proximity Threshold (in)
+                    <span class="help-icon" title="The maximum distance a cable can jump from its start/end point to connect to a nearby tray segment.">?</span>
+                 </label>
+                 <input type="number" id="proximity-threshold" value="6.0" step="0.5">
+
+                 <label for="field-route-penalty">Field Route Cost Multiplier
+                    <span class="help-icon" title="This makes field routing (not in a tray) more 'expensive' than routing within a tray. A value of 3 means every inch of field routing costs as much as 3 inches of tray routing. This encourages the algorithm to use trays whenever possible.">?</span>
+                 </label>
+                 <input type="number" id="field-route-penalty" value="3.0" step="0.1">
+                 
+                 <button id="calculate-route-btn" class="primary-btn">▶ Calculate Optimal Route</button>
+            </section>
+        </aside>
+
+        <main class="main-content">
+            <header>
+                <h1>Optimal 3D Cable Routing System</h1>
+                <p>Find the most efficient path for routing cables through tray networks with capacity constraints.</p>
+            </header>
+
+            <section class="card">
+                <h2>Cable Tray Network</h2>
+                <div class="input-methods">
+                    <input type="radio" id="manual-entry" name="input-method" value="manual" checked>
+                    <label for="manual-entry">Manual Entry</label>
+                    <input type="radio" id="sample-data" name="input-method" value="sample">
+                    <label for="sample-data">Use Sample Data</label>
+                </div>
+
+                <div id="manual-entry-section">
+                    <details>
+                        <summary>Add New Tray Segment</summary>
+                        <div class="tray-form">
+                             <input type="text" id="t-id" placeholder="Tray ID">
+                             <input type="number" id="t-sx" placeholder="Start X">
+                             <input type="number" id="t-sy" placeholder="Start Y">
+                             <input type="number" id="t-sz" placeholder="Start Z">
+                             <input type="number" id="t-ex" placeholder="End X">
+                             <input type="number" id="t-ey" placeholder="End Y">
+                             <input type="number" id="t-ez" placeholder="End Z">
+                             <input type="number" id="t-w" placeholder="Width (in)">
+                             <input type="number" id="t-h" placeholder="Height (in)">
+                             <input type="number" id="t-fill" placeholder="Current Fill (in²)">
+                             <button id="add-tray-btn">Add Tray</button>
+                        </div>
+                    </details>
+                    <div id="manual-tray-table-container"></div>
+                    <button id="clear-trays-btn">Clear All Trays</button>
+                </div>
+
+                 <div id="tray-utilization-container"></div>
+            </section>
+
+            <section class="card">
+                <h2>Cable Routing Options</h2>
+                <div class="input-methods">
+                    <input type="radio" id="single-cable-mode" name="routing-mode" value="single" checked>
+                    <label for="single-cable-mode">Single Cable</label>
+                    <input type="radio" id="batch-mode" name="routing-mode" value="batch">
+                    <label for="batch-mode">Multiple Cables (Batch)</label>
+                </div>
+
+                <div id="batch-section" style="display:none;">
+                    <button id="load-sample-cables-btn">Load Sample Cable List</button>
+                    <div id="cable-list-container"></div>
+                    <button id="clear-cables-btn">Clear Cable List</button>
+                </div>
+            </section>
+            
+            <section id="results-section" class="card" style="display:none;">
+                <h2>Routing Results</h2>
+                <div id="messages"></div>
+                <div id="metrics" class="columns"></div>
+                <h3>Route Breakdown</h3>
+                <div id="route-breakdown-container"></div>
+                <h3>3D Route Visualization</h3>
+                <div id="plot-3d"></div>
+                <h3>Updated Tray Utilization</h3>
+                <div id="updated-utilization-container"></div>
+                <div id="plot-utilization"></div>
+                <button id="export-json-btn">Download Route Data (JSON)</button>
+            </section>
+        </main>
+    </div>
+
+    <script src="app.js"></script>
+</body>
+</html>

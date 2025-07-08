@@ -1,0 +1,180 @@
+/* --- Basic Setup --- */
+:root {
+    --primary-color: #007bff;
+    --secondary-color: #f8f9fa;
+    --border-color: #dee2e6;
+    --text-color: #212529;
+    --success-bg: #d4edda;
+    --success-text: #155724;
+    --warning-bg: #fff3cd;
+    --warning-text: #856404;
+    --error-bg: #f8d7da;
+    --error-text: #721c24;
+}
+
+body {
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+    margin: 0;
+    background-color: #f0f2f5;
+    color: var(--text-color);
+}
+
+.container {
+    display: flex;
+    height: 100vh;
+}
+
+/* --- Layout: Sidebar and Main Content --- */
+.sidebar {
+    width: 350px;
+    background-color: var(--secondary-color);
+    padding: 1rem;
+    overflow-y: auto;
+    border-right: 1px solid var(--border-color);
+}
+
+.main-content {
+    flex-grow: 1;
+    padding: 1.5rem;
+    overflow-y: auto;
+}
+
+header h1, header h2 {
+    margin-top: 0;
+}
+
+.sidebar header h2 {
+    font-size: 1.4rem;
+    color: var(--primary-color);
+    border-bottom: 2px solid var(--primary-color);
+    padding-bottom: 0.5rem;
+}
+
+.sidebar section {
+    margin-bottom: 2rem;
+}
+
+/* --- UI Components --- */
+.card {
+    background: #fff;
+    border-radius: 8px;
+    padding: 1.5rem;
+    margin-top: 1.5rem;
+    box-shadow: 0 2px 4px rgba(0,0,0,0.05);
+}
+
+.columns {
+    display: flex;
+    gap: 1rem;
+}
+.column {
+    flex: 1;
+}
+
+input[type="number"], input[type="text"], select {
+    width: 100%;
+    padding: 8px;
+    margin-bottom: 8px;
+    border: 1px solid var(--border-color);
+    border-radius: 4px;
+    box-sizing: border-box;
+}
+
+button, .primary-btn {
+    background-color: #6c757d;
+    color: white;
+    padding: 10px 15px;
+    border: none;
+    border-radius: 4px;
+    cursor: pointer;
+    font-size: 0.9rem;
+    margin-top: 10px;
+    transition: background-color 0.2s;
+}
+button:hover {
+    background-color: #5a6268;
+}
+
+.primary-btn {
+    background-color: var(--primary-color);
+    font-size: 1.1rem;
+    width: 100%;
+    padding: 12px;
+}
+.primary-btn:hover {
+    background-color: #0056b3;
+}
+
+.info-text {
+    font-size: 0.9em;
+    color: #555;
+    margin-top: -5px;
+}
+
+details {
+    margin-bottom: 1rem;
+}
+details > summary {
+    cursor: pointer;
+    font-weight: bold;
+    color: var(--primary-color);
+}
+
+.tray-form {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(120px, 1fr));
+    gap: 10px;
+    padding: 1rem 0;
+}
+
+/* --- Help Icon --- */
+.help-icon {
+    display: inline-block;
+    width: 16px;
+    height: 16px;
+    background-color: #aaa;
+    color: white;
+    border-radius: 50%;
+    text-align: center;
+    font-size: 12px;
+    line-height: 16px;
+    cursor: help;
+    margin-left: 8px;
+    font-weight: bold;
+}
+
+/* --- Tables --- */
+table {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: 0.9em;
+}
+th, td {
+    padding: 8px;
+    text-align: left;
+    border-bottom: 1px solid var(--border-color);
+}
+th {
+    background-color: var(--secondary-color);
+}
+.util-high { background-color: var(--error-bg); color: var(--error-text); }
+.util-medium { background-color: var(--warning-bg); color: var(--warning-text); }
+.util-low { background-color: var(--success-bg); color: var(--success-text); }
+
+
+/* --- Messages --- */
+.message {
+    padding: 1rem;
+    margin-bottom: 1rem;
+    border-radius: 4px;
+    border: 1px solid transparent;
+}
+.message.success { background-color: var(--success-bg); border-color: var(--success-text); color: var(--success-text); }
+.message.warning { background-color: var(--warning-bg); border-color: var(--warning-text); color: var(--warning-text); }
+.message.error { background-color: var(--error-bg); border-color: var(--error-text); color: var(--error-text); }
+
+/* --- Plots --- */
+#plot-3d, #plot-utilization {
+    width: 100%;
+    min-height: 450px;
+}
