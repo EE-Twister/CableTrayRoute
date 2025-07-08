@@ -548,16 +548,32 @@ document.addEventListener('DOMContentLoaded', () => {
             alert('No route data to export.');
             return;
         }
+
         const headers = Object.keys(state.latestRouteData[0]);
-        const rows = state.latestRouteData.map(row => headers.map(h => row[h]));
         let csv = headers.join(',') + '\n';
-        rows.forEach(r => {
-            const line = r.map(val => {
-                const str = String(val);
-                return str.includes(',') ? `"${str}"` : str;
+
+        state.latestRouteData.forEach(row => {
+            const line = headers.map(h => {
+                let val = row[h];
+                if (typeof val === 'object') {
+                    try {
+                        val = JSON.stringify(val);
+                    } catch (e) {
+                        val = '';
+                    }
+                }
+                let str = String(val);
+                if (str.includes('"')) {
+                    str = str.replace(/"/g, '""');
+                }
+                if (str.includes(',') || str.includes('\n')) {
+                    str = `"${str}"`;
+                }
+                return str;
             }).join(',');
             csv += line + '\n';
         });
+
         const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
         const url = URL.createObjectURL(blob);
         const a = document.createElement('a');
