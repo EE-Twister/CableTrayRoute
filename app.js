@@ -271,31 +271,31 @@ document.addEventListener('DOMContentLoaded', () => {
     // --- EVENT HANDLERS & UI LOGIC (This part remains the same) ---
     
     const getSampleTrays = () => [
-        {"tray_id": "H1-A", "start_x": 0, "start_y": 0, "start_z": 10, "end_x": 40, "end_y": 0, "end_z": 10, "width": 400, "height": 100, "current_fill": 6000},
-        {"tray_id": "H1-B", "start_x": 40, "start_y": 0, "start_z": 10, "end_x": 80, "end_y": 0, "end_z": 10, "width": 400, "height": 100, "current_fill": 4500},
-        {"tray_id": "H1-C", "start_x": 80, "start_y": 0, "start_z": 10, "end_x": 120, "end_y": 0, "end_z": 10, "width": 400, "height": 100, "current_fill": 8200},
-        {"tray_id": "H2-A", "start_x": 0, "start_y": 0, "start_z": 30, "end_x": 40, "end_y": 0, "end_z": 30, "width": 300, "height": 80, "current_fill": 3200},
-        {"tray_id": "H2-B", "start_x": 40, "start_y": 0, "start_z": 30, "end_x": 80, "end_y": 0, "end_z": 30, "width": 300, "height": 80, "current_fill": 5800},
-        {"tray_id": "H2-C", "start_x": 80, "start_y": 0, "start_z": 30, "end_x": 120, "end_y": 0, "end_z": 30, "width": 300, "height": 80, "current_fill": 2100},
-        {"tray_id": "V1", "start_x": 40, "start_y": 0, "start_z": 10, "end_x": 40, "end_y": 0, "end_z": 30, "width": 200, "height": 60, "current_fill": 1800},
-        {"tray_id": "V2", "start_x": 80, "start_y": 0, "start_z": 10, "end_x": 80, "end_y": 0, "end_z": 30, "width": 200, "height": 60, "current_fill": 2200},
-        {"tray_id": "C1", "start_x": 60, "start_y": 0, "start_z": 10, "end_x": 60, "end_y": 40, "end_z": 10, "width": 250, "height": 75, "current_fill": 3500},
-        {"tray_id": "C2", "start_x": 100, "start_y": 0, "start_z": 30, "end_x": 100, "end_y": 60, "end_z": 30, "width": 250, "height": 75, "current_fill": 4100},
-        {"tray_id": "B1", "start_x": 60, "start_y": 40, "start_z": 10, "end_x": 60, "end_y": 80, "end_z": 10, "width": 150, "height": 50, "current_fill": 1200},
-        {"tray_id": "B2", "start_x": 100, "start_y": 60, "start_z": 30, "end_x": 100, "end_y": 100, "end_z": 30, "width": 150, "height": 50, "current_fill": 900},
-        {"tray_id": "TRUNK", "start_x": 0, "start_y": 20, "start_z": 50, "end_x": 120, "end_y": 20, "end_z": 50, "width": 600, "height": 150, "current_fill": 18000},
-        {"tray_id": "EQ1", "start_x": 20, "start_y": 0, "start_z": 10, "end_x": 20, "end_y": 15, "end_z": 5, "width": 100, "height": 40, "current_fill": 800},
-        {"tray_id": "EQ2", "start_x": 100, "start_y": 60, "start_z": 30, "end_x": 110, "end_y": 90, "end_z": 20, "width": 100, "height": 40, "current_fill": 600},
-        {"tray_id": "CONN1", "start_x": 120, "start_y": 0, "start_z": 10, "end_x": 120, "end_y": 20, "end_z": 25, "width": 200, "height": 75, "current_fill": 2000},
-        {"tray_id": "CONN2", "start_x": 120, "start_y": 20, "start_z": 25, "end_x": 120, "end_y": 20, "end_z": 50, "width": 200, "height": 75, "current_fill": 1500}
+        {"tray_id": "H1-A", "start_x": 0, "start_y": 0, "start_z": 10, "end_x": 40, "end_y": 0, "end_z": 10, "width": 15.75, "height": 3.94, "current_fill": 9.30},
+        {"tray_id": "H1-B", "start_x": 40, "start_y": 0, "start_z": 10, "end_x": 80, "end_y": 0, "end_z": 10, "width": 15.75, "height": 3.94, "current_fill": 6.98},
+        {"tray_id": "H1-C", "start_x": 80, "start_y": 0, "start_z": 10, "end_x": 120, "end_y": 0, "end_z": 10, "width": 15.75, "height": 3.94, "current_fill": 12.71},
+        {"tray_id": "H2-A", "start_x": 0, "start_y": 0, "start_z": 30, "end_x": 40, "end_y": 0, "end_z": 30, "width": 11.81, "height": 3.15, "current_fill": 4.96},
+        {"tray_id": "H2-B", "start_x": 40, "start_y": 0, "start_z": 30, "end_x": 80, "end_y": 0, "end_z": 30, "width": 11.81, "height": 3.15, "current_fill": 8.99},
+        {"tray_id": "H2-C", "start_x": 80, "start_y": 0, "start_z": 30, "end_x": 120, "end_y": 0, "end_z": 30, "width": 11.81, "height": 3.15, "current_fill": 3.26},
+        {"tray_id": "V1", "start_x": 40, "start_y": 0, "start_z": 10, "end_x": 40, "end_y": 0, "end_z": 30, "width": 7.87, "height": 2.36, "current_fill": 2.79},
+        {"tray_id": "V2", "start_x": 80, "start_y": 0, "start_z": 10, "end_x": 80, "end_y": 0, "end_z": 30, "width": 7.87, "height": 2.36, "current_fill": 3.41},
+        {"tray_id": "C1", "start_x": 60, "start_y": 0, "start_z": 10, "end_x": 60, "end_y": 40, "end_z": 10, "width": 9.84, "height": 2.95, "current_fill": 5.43},
+        {"tray_id": "C2", "start_x": 100, "start_y": 0, "start_z": 30, "end_x": 100, "end_y": 60, "end_z": 30, "width": 9.84, "height": 2.95, "current_fill": 6.36},
+        {"tray_id": "B1", "start_x": 60, "start_y": 40, "start_z": 10, "end_x": 60, "end_y": 80, "end_z": 10, "width": 5.91, "height": 1.97, "current_fill": 1.86},
+        {"tray_id": "B2", "start_x": 100, "start_y": 60, "start_z": 30, "end_x": 100, "end_y": 100, "end_z": 30, "width": 5.91, "height": 1.97, "current_fill": 1.40},
+        {"tray_id": "TRUNK", "start_x": 0, "start_y": 20, "start_z": 50, "end_x": 120, "end_y": 20, "end_z": 50, "width": 23.62, "height": 5.91, "current_fill": 27.90},
+        {"tray_id": "EQ1", "start_x": 20, "start_y": 0, "start_z": 10, "end_x": 20, "end_y": 15, "end_z": 5, "width": 3.94, "height": 1.57, "current_fill": 1.24},
+        {"tray_id": "EQ2", "start_x": 100, "start_y": 60, "start_z": 30, "end_x": 110, "end_y": 90, "end_z": 20, "width": 3.94, "height": 1.57, "current_fill": 0.93},
+        {"tray_id": "CONN1", "start_x": 120, "start_y": 0, "start_z": 10, "end_x": 120, "end_y": 20, "end_z": 25, "width": 7.87, "height": 2.95, "current_fill": 3.10},
+        {"tray_id": "CONN2", "start_x": 120, "start_y": 20, "start_z": 25, "end_x": 120, "end_y": 20, "end_z": 50, "width": 7.87, "height": 2.95, "current_fill": 2.33}
     ];
     
     const getSampleCables = () => [
-        {"name": "Power Cable 1", "diameter": 32.0, "start": [5, 5, 5], "end": [110, 95, 45]},
-        {"name": "Control Cable 1", "diameter": 12.0, "start": [10, 0, 10], "end": [100, 80, 25]},
-        {"name": "Data Cable 1", "diameter": 8.0, "start": [15, 5, 15], "end": [105, 85, 30]},
-        {"name": "Power Cable 2", "diameter": 28.0, "start": [20, 10, 8], "end": [115, 90, 35]},
-        {"name": "Control Cable 2", "diameter": 15.0, "start": [25, 15, 12], "end": [95, 75, 28]},
+        {"name": "Power Cable 1", "diameter": 1.26, "start": [5, 5, 5], "end": [110, 95, 45]},
+        {"name": "Control Cable 1", "diameter": 0.47, "start": [10, 0, 10], "end": [100, 80, 25]},
+        {"name": "Data Cable 1", "diameter": 0.31, "start": [15, 5, 15], "end": [105, 85, 30]},
+        {"name": "Power Cable 2", "diameter": 1.10, "start": [20, 10, 8], "end": [115, 90, 35]},
+        {"name": "Control Cable 2", "diameter": 0.59, "start": [25, 15, 12], "end": [95, 75, 28]},
     ];
 
     const updateCableArea = () => {
@@ -346,8 +346,8 @@ document.addEventListener('DOMContentLoaded', () => {
                 available_space: (maxCapacity - tray.current_fill).toFixed(0),
             };
         });
-        renderTable(elements.trayUtilizationContainer, 
-            ['Tray ID', 'Max Capacity', 'Current Fill', 'Utilization %', 'Available Space'], 
+        renderTable(elements.trayUtilizationContainer,
+            ['Tray ID', 'Max Capacity (in²)', 'Current Fill (in²)', 'Utilization %', 'Available Space (in²)'],
             displayData.map(d => ({
                 tray_id: d.tray_id, 
                 max_capacity: d.max_capacity,
@@ -421,8 +421,8 @@ document.addEventListener('DOMContentLoaded', () => {
         }
         let html = '<h4>Cables to Route:</h4>';
         state.cableList.forEach(c => {
-            const area = (Math.PI * (c.diameter / 2) ** 2).toFixed(1);
-            html += `<p><strong>${c.name}</strong> - Ø${c.diameter}mm (${area}mm²) - From ${c.start} to ${c.end}</p>`;
+            const area = (Math.PI * (c.diameter / 2) ** 2).toFixed(2);
+            html += `<p><strong>${c.name}</strong> - Ø${c.diameter}in (${area}in²) - From ${c.start} to ${c.end}</p>`;
         });
         elements.cableListContainer.innerHTML = html;
     };
@@ -530,19 +530,48 @@ document.addEventListener('DOMContentLoaded', () => {
             utilization: data.utilization_percentage.toFixed(1),
             available: data.available_capacity.toFixed(0),
         }));
-        renderTable(elements.updatedUtilizationContainer, ['Tray ID', 'Utilization (%)', 'Available (mm²)'], utilData, (row) => utilizationStyle(row));
+        renderTable(elements.updatedUtilizationContainer, ['Tray ID', 'Utilization (%)', 'Available (in²)'], utilData, (row) => utilizationStyle(row));
         plotUtilization(finalUtilization);
     };
     
     // --- VISUALIZATION ---
     const visualize = (startPoint, endPoint, trays, routeSegments, title) => {
         const traces = [];
+
+        const trayMesh = (tray) => {
+            const w = tray.width / 12; // inches to ft
+            const h = tray.height / 12;
+            const sx = tray.start_x, sy = tray.start_y, sz = tray.start_z;
+            const ex = tray.end_x, ey = tray.end_y, ez = tray.end_z;
+            let verts;
+            if (sx !== ex) { // along X
+                const y1 = sy - w / 2, y2 = sy + w / 2;
+                const z1 = sz - h / 2, z2 = sz + h / 2;
+                verts = [[sx,y1,z1],[sx,y2,z1],[sx,y2,z2],[sx,y1,z2],[ex,y1,z1],[ex,y2,z1],[ex,y2,z2],[ex,y1,z2]];
+            } else if (sy !== ey) { // along Y
+                const x1 = sx - w / 2, x2 = sx + w / 2;
+                const z1 = sz - h / 2, z2 = sz + h / 2;
+                verts = [[x1,sy,z1],[x2,sy,z1],[x2,sy,z2],[x1,sy,z2],[x1,ey,z1],[x2,ey,z1],[x2,ey,z2],[x1,ey,z2]];
+            } else { // along Z
+                const x1 = sx - w / 2, x2 = sx + w / 2;
+                const y1 = sy - h / 2, y2 = sy + h / 2;
+                verts = [[x1,y1,sz],[x2,y1,sz],[x2,y2,sz],[x1,y2,sz],[x1,y1,ez],[x2,y1,ez],[x2,y2,ez],[x1,y2,ez]];
+            }
+            const x = verts.map(v => v[0]);
+            const y = verts.map(v => v[1]);
+            const z = verts.map(v => v[2]);
+            const i = [0,0,4,4,3,3,0,0,0,0,1,1];
+            const j = [1,2,5,6,2,6,1,5,3,7,2,6];
+            const k = [2,3,6,7,6,7,5,4,7,4,6,5];
+            return {type:'mesh3d', x, y, z, i, j, k, opacity:0.3, color:'lightgrey', name: tray.tray_id, hoverinfo:'name'};
+        };
+
         trays.forEach(tray => {
-            traces.push({
-                x: [tray.start_x, tray.end_x], y: [tray.start_y, tray.end_y], z: [tray.start_z, tray.end_z],
-                mode: 'lines', type: 'scatter3d', name: tray.tray_id,
-                line: { color: 'grey', width: 8 }, hoverinfo: 'name'
-            });
+            traces.push(trayMesh(tray));
+            const midX = (tray.start_x + tray.end_x) / 2;
+            const midY = (tray.start_y + tray.end_y) / 2;
+            const midZ = (tray.start_z + tray.end_z) / 2 + (tray.height / 12) / 2 + 0.5;
+            traces.push({type:'scatter3d', mode:'text', x:[midX], y:[midY], z:[midZ], text:[tray.tray_id], showlegend:false, hoverinfo:'none'});
         });
 
         if (routeSegments && routeSegments.length > 0) {
