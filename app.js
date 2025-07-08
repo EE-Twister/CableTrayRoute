@@ -7,6 +7,9 @@ document.addEventListener('DOMContentLoaded', () => {
         manualTrays: [],
         cableList: [],
         trayData: [],
+        latestRouteData: [],
+        startTag: '',
+        endTag: '',
     };
 
     // --- ELEMENT REFERENCES ---
@@ -15,6 +18,8 @@ document.addEventListener('DOMContentLoaded', () => {
         cableAreaOut: document.getElementById('cable-area'),
         fillLimitIn: document.getElementById('fill-limit'),
         fillLimitOut: document.getElementById('fill-limit-value'),
+        startTagIn: document.getElementById('start-tag'),
+        endTagIn: document.getElementById('end-tag'),
         calculateBtn: document.getElementById('calculate-route-btn'),
         inputMethodRadios: document.querySelectorAll('input[name="input-method"]'),
         routingModeRadios: document.querySelectorAll('input[name="routing-mode"]'),
@@ -34,7 +39,7 @@ document.addEventListener('DOMContentLoaded', () => {
         plot3d: document.getElementById('plot-3d'),
         updatedUtilizationContainer: document.getElementById('updated-utilization-container'),
         plotUtilization: document.getElementById('plot-utilization'),
-        exportJsonBtn: document.getElementById('export-json-btn'),
+        exportCsvBtn: document.getElementById('export-csv-btn'),
     };
     
     // --- CORE ROUTING LOGIC (JavaScript implementation of your Python backend) ---
@@ -467,6 +472,24 @@ document.addEventListener('DOMContentLoaded', () => {
         elements.messages.innerHTML += `<div class="message ${type}">${text}</div>`;
     };
 
+    const exportRouteCSV = () => {
+        if (!state.latestRouteData || state.latestRouteData.length === 0) {
+            alert('No route data to export.');
+            return;
+        }
+        const headers = Object.keys(state.latestRouteData[0]);
+        const rows = state.latestRouteData.map(row => headers.map(h => row[h]));
+        let csv = headers.join(',') + '\n';
+        rows.forEach(r => { csv += r.join(',') + '\n'; });
+        const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = 'route_data.csv';
+        a.click();
+        URL.revokeObjectURL(url);
+    };
+
     const formatPoint = (p) => `(${p[0].toFixed(1)}, ${p[1].toFixed(1)}, ${p[2].toFixed(1)})`;
 
     const mainCalculation = () => {
@@ -507,10 +530,11 @@ document.addEventListener('DOMContentLoaded', () => {
                 });
             });
 
-            renderTable(elements.routeBreakdownContainer, 
-                ['Cable', 'Status', 'Total Length', 'Field Length', 'Tray Segments Count'], 
+            renderTable(elements.routeBreakdownContainer,
+                ['Cable', 'Status', 'Total Length', 'Field Length', 'Tray Segments Count'],
                 batchResults
             );
+            state.latestRouteData = batchResults;
             elements.metrics.innerHTML = '';
             visualize(null, null, trayDataForRun, allRouteSegmentsForPlotting, "Batch Route Visualization");
 
@@ -525,6 +549,8 @@ document.addEventListener('DOMContentLoaded', () => {
                 parseFloat(document.getElementById('end-y').value),
                 parseFloat(document.getElementById('end-z').value),
             ];
+            state.startTag = elements.startTagIn.value;
+            state.endTag = elements.endTagIn.value;
             const cableArea = parseFloat(elements.cableAreaOut.textContent);
             
             const result = routingSystem.calculateRoute(startPoint, endPoint, cableArea);
@@ -537,10 +563,19 @@ document.addEventListener('DOMContentLoaded', () => {
                     <div class="column"><strong>Trays Used:</strong> ${result.tray_segments.length}</div>
                 `;
                 const breakdownData = result.route_segments.map((seg, i) => ({
-                    segment: i + 1, type: seg.type, from: formatPoint(seg.start),
-                    to: formatPoint(seg.end), length: seg.length.toFixed(2), tray_id: seg.tray_id || 'N/A'
+                    segment: i + 1,
+                    tray_id: seg.type === 'field' ? 'Field Route' : (seg.tray_id || 'N/A'),
+                    type: seg.type,
+                    from: formatPoint(seg.start),
+                    to: formatPoint(seg.end),
+                    length: seg.length.toFixed(2)
                 }));
-                renderTable(elements.routeBreakdownContainer, ['Segment', 'Type', 'From', 'To', 'Length', 'Tray ID'], breakdownData);
+                renderTable(
+                    elements.routeBreakdownContainer,
+                    ['Segment', 'Tray ID', 'Type', 'From', 'To', 'Length'],
+                    breakdownData
+                );
+                state.latestRouteData = breakdownData;
                 visualize(startPoint, endPoint, trayDataForRun, result.route_segments, "3D Route Visualization");
             } else {
                 showMessage('error', `Route calculation failed: ${result.error}`);
@@ -643,8 +678,8 @@ document.addEventListener('DOMContentLoaded', () => {
     elements.clearTraysBtn.addEventListener('click', clearManualTrays);
     elements.loadSampleCablesBtn.addEventListener('click', loadSampleCables);
     elements.clearCablesBtn.addEventListener('click', clearCableList);
+    elements.exportCsvBtn.addEventListener('click', exportRouteCSV);
     
     // Initial setup
     updateCableArea();
-    handleInputMethodChange();
-});
+    handleInputMethodChange();});
