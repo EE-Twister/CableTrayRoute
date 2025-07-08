@@ -12,4 +12,6 @@ the tag can be edited for each cable in the table.
 When batch mode is selected, you can now use the **Add Cable to List** button to
 add a cable using the current values from the Cable Specifications and Route
 Points fields. After filling in the details, click **Add Cable to List** and the
-cable will appear in the table for batch routing.
+cable will appear in the table for batch routing. Each row in the table allows
+you to edit not only the cable tag, but also the diameter and the start/end
+coordinates for that cable.

@@ -524,14 +524,21 @@ document.addEventListener('DOMContentLoaded', () => {
             elements.cableListContainer.innerHTML = '';
             return;
         }
-        let html = '<h4>Cables to Route:</h4><table><thead><tr><th>Tag</th><th>Diameter</th><th>Start</th><th>End</th></tr></thead><tbody>';
+        let html = '<h4>Cables to Route:</h4><table><thead><tr><th>Tag</th><th>Diameter (in)</th><th>Start (X,Y,Z)</th><th>End (X,Y,Z)</th></tr></thead><tbody>';
         state.cableList.forEach((c, idx) => {
-            const area = (Math.PI * (c.diameter / 2) ** 2).toFixed(2);
             html += `<tr>
                         <td><input type="text" class="cable-tag-input" data-idx="${idx}" value="${c.name}"></td>
-                        <td>Ø${c.diameter}in (${area}in²)</td>
-                        <td>${c.start}</td>
-                        <td>${c.end}</td>
+                        <td><input type="number" class="cable-diameter-input" data-idx="${idx}" value="${c.diameter}" step="0.01" style="width:60px;"></td>
+                        <td>
+                            <input type="number" class="cable-start-input" data-idx="${idx}" data-coord="0" value="${c.start[0]}" step="0.1" style="width:50px;">
+                            <input type="number" class="cable-start-input" data-idx="${idx}" data-coord="1" value="${c.start[1]}" step="0.1" style="width:50px;">
+                            <input type="number" class="cable-start-input" data-idx="${idx}" data-coord="2" value="${c.start[2]}" step="0.1" style="width:50px;">
+                        </td>
+                        <td>
+                            <input type="number" class="cable-end-input" data-idx="${idx}" data-coord="0" value="${c.end[0]}" step="0.1" style="width:50px;">
+                            <input type="number" class="cable-end-input" data-idx="${idx}" data-coord="1" value="${c.end[1]}" step="0.1" style="width:50px;">
+                            <input type="number" class="cable-end-input" data-idx="${idx}" data-coord="2" value="${c.end[2]}" step="0.1" style="width:50px;">
+                        </td>
                     </tr>`;
         });
         html += '</tbody></table>';
@@ -540,6 +547,26 @@ document.addEventListener('DOMContentLoaded', () => {
             input.addEventListener('input', e => {
                 const i = parseInt(e.target.dataset.idx, 10);
                 state.cableList[i].name = e.target.value;
+            });
+        });
+        elements.cableListContainer.querySelectorAll('.cable-diameter-input').forEach(input => {
+            input.addEventListener('input', e => {
+                const i = parseInt(e.target.dataset.idx, 10);
+                state.cableList[i].diameter = parseFloat(e.target.value);
+            });
+        });
+        elements.cableListContainer.querySelectorAll('.cable-start-input').forEach(input => {
+            input.addEventListener('input', e => {
+                const i = parseInt(e.target.dataset.idx, 10);
+                const coord = parseInt(e.target.dataset.coord, 10);
+                state.cableList[i].start[coord] = parseFloat(e.target.value);
+            });
+        });
+        elements.cableListContainer.querySelectorAll('.cable-end-input').forEach(input => {
+            input.addEventListener('input', e => {
+                const i = parseInt(e.target.dataset.idx, 10);
+                const coord = parseInt(e.target.dataset.coord, 10);
+                state.cableList[i].end[coord] = parseFloat(e.target.value);
             });
         });
     };
