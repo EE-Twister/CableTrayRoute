@@ -302,23 +302,23 @@ document.addEventListener('DOMContentLoaded', () => {
     // --- EVENT HANDLERS & UI LOGIC (This part remains the same) ---
     
     const getSampleTrays = () => [
-        {"tray_id": "H1-A", "start_x": 0, "start_y": 0, "start_z": 10, "end_x": 40, "end_y": 0, "end_z": 10, "width": 15.75, "height": 3.94, "current_fill": 9.30},
-        {"tray_id": "H1-B", "start_x": 40, "start_y": 0, "start_z": 10, "end_x": 80, "end_y": 0, "end_z": 10, "width": 15.75, "height": 3.94, "current_fill": 6.98},
-        {"tray_id": "H1-C", "start_x": 80, "start_y": 0, "start_z": 10, "end_x": 120, "end_y": 0, "end_z": 10, "width": 15.75, "height": 3.94, "current_fill": 12.71},
-        {"tray_id": "H2-A", "start_x": 0, "start_y": 0, "start_z": 30, "end_x": 40, "end_y": 0, "end_z": 30, "width": 11.81, "height": 3.15, "current_fill": 4.96},
-        {"tray_id": "H2-B", "start_x": 40, "start_y": 0, "start_z": 30, "end_x": 80, "end_y": 0, "end_z": 30, "width": 11.81, "height": 3.15, "current_fill": 8.99},
-        {"tray_id": "H2-C", "start_x": 80, "start_y": 0, "start_z": 30, "end_x": 120, "end_y": 0, "end_z": 30, "width": 11.81, "height": 3.15, "current_fill": 3.26},
-        {"tray_id": "V1", "start_x": 40, "start_y": 0, "start_z": 10, "end_x": 40, "end_y": 0, "end_z": 30, "width": 7.87, "height": 2.36, "current_fill": 2.79},
-        {"tray_id": "V2", "start_x": 80, "start_y": 0, "start_z": 10, "end_x": 80, "end_y": 0, "end_z": 30, "width": 7.87, "height": 2.36, "current_fill": 3.41},
-        {"tray_id": "C1", "start_x": 60, "start_y": 0, "start_z": 10, "end_x": 60, "end_y": 40, "end_z": 10, "width": 9.84, "height": 2.95, "current_fill": 5.43},
-        {"tray_id": "C2", "start_x": 100, "start_y": 0, "start_z": 30, "end_x": 100, "end_y": 60, "end_z": 30, "width": 9.84, "height": 2.95, "current_fill": 6.36},
-        {"tray_id": "B1", "start_x": 60, "start_y": 40, "start_z": 10, "end_x": 60, "end_y": 80, "end_z": 10, "width": 5.91, "height": 1.97, "current_fill": 1.86},
-        {"tray_id": "B2", "start_x": 100, "start_y": 60, "start_z": 30, "end_x": 100, "end_y": 100, "end_z": 30, "width": 5.91, "height": 1.97, "current_fill": 1.40},
-        {"tray_id": "TRUNK", "start_x": 0, "start_y": 20, "start_z": 50, "end_x": 120, "end_y": 20, "end_z": 50, "width": 23.62, "height": 5.91, "current_fill": 27.90},
-        {"tray_id": "EQ1", "start_x": 20, "start_y": 0, "start_z": 10, "end_x": 20, "end_y": 15, "end_z": 5, "width": 3.94, "height": 1.57, "current_fill": 1.24},
-        {"tray_id": "EQ2", "start_x": 100, "start_y": 60, "start_z": 30, "end_x": 110, "end_y": 90, "end_z": 20, "width": 3.94, "height": 1.57, "current_fill": 0.93},
-        {"tray_id": "CONN1", "start_x": 120, "start_y": 0, "start_z": 10, "end_x": 120, "end_y": 20, "end_z": 25, "width": 7.87, "height": 2.95, "current_fill": 3.10},
-        {"tray_id": "CONN2", "start_x": 120, "start_y": 20, "start_z": 25, "end_x": 120, "end_y": 20, "end_z": 50, "width": 7.87, "height": 2.95, "current_fill": 2.33}
+        {"tray_id": "H1-A", "start_x": 0, "start_y": 0, "start_z": 10, "end_x": 40, "end_y": 0, "end_z": 10, "width": 16, "height": 3.94, "current_fill": 9.30},
+        {"tray_id": "H1-B", "start_x": 40, "start_y": 0, "start_z": 10, "end_x": 80, "end_y": 0, "end_z": 10, "width": 16, "height": 3.94, "current_fill": 6.98},
+        {"tray_id": "H1-C", "start_x": 80, "start_y": 0, "start_z": 10, "end_x": 120, "end_y": 0, "end_z": 10, "width": 16, "height": 3.94, "current_fill": 12.71},
+        {"tray_id": "H2-A", "start_x": 0, "start_y": 0, "start_z": 30, "end_x": 40, "end_y": 0, "end_z": 30, "width": 12, "height": 3.15, "current_fill": 4.96},
+        {"tray_id": "H2-B", "start_x": 40, "start_y": 0, "start_z": 30, "end_x": 80, "end_y": 0, "end_z": 30, "width": 12, "height": 3.15, "current_fill": 8.99},
+        {"tray_id": "H2-C", "start_x": 80, "start_y": 0, "start_z": 30, "end_x": 120, "end_y": 0, "end_z": 30, "width": 12, "height": 3.15, "current_fill": 3.26},
+        {"tray_id": "V1", "start_x": 40, "start_y": 0, "start_z": 10, "end_x": 40, "end_y": 0, "end_z": 30, "width": 8, "height": 2.36, "current_fill": 2.79},
+        {"tray_id": "V2", "start_x": 80, "start_y": 0, "start_z": 10, "end_x": 80, "end_y": 0, "end_z": 30, "width": 8, "height": 2.36, "current_fill": 3.41},
+        {"tray_id": "C1", "start_x": 60, "start_y": 0, "start_z": 10, "end_x": 60, "end_y": 40, "end_z": 10, "width": 9, "height": 2.95, "current_fill": 5.43},
+        {"tray_id": "C2", "start_x": 100, "start_y": 0, "start_z": 30, "end_x": 100, "end_y": 60, "end_z": 30, "width": 9, "height": 2.95, "current_fill": 6.36},
+        {"tray_id": "B1", "start_x": 60, "start_y": 40, "start_z": 10, "end_x": 60, "end_y": 80, "end_z": 10, "width": 6, "height": 1.97, "current_fill": 1.86},
+        {"tray_id": "B2", "start_x": 100, "start_y": 60, "start_z": 30, "end_x": 100, "end_y": 100, "end_z": 30, "width": 6, "height": 1.97, "current_fill": 1.40},
+        {"tray_id": "TRUNK", "start_x": 0, "start_y": 20, "start_z": 50, "end_x": 120, "end_y": 20, "end_z": 50, "width": 24, "height": 5.91, "current_fill": 27.90},
+        {"tray_id": "EQ1", "start_x": 20, "start_y": 0, "start_z": 10, "end_x": 20, "end_y": 15, "end_z": 5, "width": 4, "height": 1.57, "current_fill": 1.24},
+        {"tray_id": "EQ2", "start_x": 100, "start_y": 60, "start_z": 30, "end_x": 110, "end_y": 90, "end_z": 20, "width": 4, "height": 1.57, "current_fill": 0.93},
+        {"tray_id": "CONN1", "start_x": 120, "start_y": 0, "start_z": 10, "end_x": 120, "end_y": 20, "end_z": 25, "width": 8, "height": 2.95, "current_fill": 3.10},
+        {"tray_id": "CONN2", "start_x": 120, "start_y": 20, "start_z": 25, "end_x": 120, "end_y": 20, "end_z": 50, "width": 8, "height": 2.95, "current_fill": 2.33}
     ];
     
     const getSampleCables = () => [
@@ -377,15 +377,18 @@ document.addEventListener('DOMContentLoaded', () => {
                 available_space: (maxCapacity - tray.current_fill).toFixed(0),
             };
         });
-        renderTable(elements.trayUtilizationContainer,
-            ['Tray ID', 'Max Capacity (in²)', 'Current Fill (in²)', 'Utilization %', 'Available Space (in²)'],
+        renderTable(
+            elements.trayUtilizationContainer,
+            ['Tray ID', 'Start (x,y,z)', 'End (x,y,z)', 'Max Capacity (in²)', 'Current Fill (in²)', 'Utilization %', 'Available Space (in²)'],
             displayData.map(d => ({
-                tray_id: d.tray_id, 
+                tray_id: d.tray_id,
+                start_xyz: `(${d.start_x}, ${d.start_y}, ${d.start_z})`,
+                end_xyz: `(${d.end_x}, ${d.end_y}, ${d.end_z})`,
                 max_capacity: d.max_capacity,
                 current_fill: d.current_fill,
                 utilization_pct: d.utilization_pct,
                 available_space: d.available_space
-            })), 
+            })),
             utilizationStyle
         );
     };
@@ -394,9 +397,11 @@ document.addEventListener('DOMContentLoaded', () => {
         if (document.getElementById('sample-data').checked) {
             elements.manualEntrySection.style.display = 'none';
             state.trayData = getSampleTrays();
+            elements.manualTrayTableContainer.innerHTML = '';
         } else {
             elements.manualEntrySection.style.display = 'block';
             state.trayData = state.manualTrays;
+            renderManualTrayTable();
         }
         updateTrayDisplay();
     };
@@ -428,13 +433,7 @@ document.addEventListener('DOMContentLoaded', () => {
         }
         state.manualTrays.push(newTray);
         state.trayData = state.manualTrays;
-        renderTable(elements.manualTrayTableContainer, 
-            ['Tray ID', 'Start X', 'End X', 'Width', 'Height', 'Current Fill'], 
-            state.manualTrays.map(t => ({
-                tray_id: t.tray_id, start_x: t.start_x, end_x: t.end_x,
-                width: t.width, height: t.height, current_fill: t.current_fill
-            }))
-        );
+        renderManualTrayTable();
         updateTrayDisplay();
     };
 
@@ -443,6 +442,78 @@ document.addEventListener('DOMContentLoaded', () => {
         state.trayData = [];
         elements.manualTrayTableContainer.innerHTML = '';
         updateTrayDisplay();
+    };
+
+    const renderManualTrayTable = () => {
+        if (state.manualTrays.length === 0) {
+            elements.manualTrayTableContainer.innerHTML = '';
+            return;
+        }
+        let table = '<table><thead><tr><th>Tray ID</th><th>Start X</th><th>End X</th><th>Width</th><th>Height</th><th>Current Fill</th><th>Actions</th></tr></thead><tbody>';
+        state.manualTrays.forEach((t, idx) => {
+            table += `<tr><td>${t.tray_id}</td><td>${t.start_x}</td><td>${t.end_x}</td><td>${t.width}</td><td>${t.height}</td><td>${t.current_fill}</td>` +
+                     `<td><button class="edit-tray" data-idx="${idx}">Edit</button>` +
+                     `<button class="delete-tray" data-idx="${idx}">Delete</button>` +
+                     `<button class="dup-tray" data-idx="${idx}">Duplicate</button></td></tr>`;
+        });
+        table += '</tbody></table>';
+        elements.manualTrayTableContainer.innerHTML = table;
+
+        elements.manualTrayTableContainer.querySelectorAll('.delete-tray').forEach(btn => {
+            btn.addEventListener('click', e => {
+                const i = parseInt(e.target.dataset.idx, 10);
+                state.manualTrays.splice(i, 1);
+                state.trayData = state.manualTrays;
+                renderManualTrayTable();
+                updateTrayDisplay();
+            });
+        });
+        elements.manualTrayTableContainer.querySelectorAll('.edit-tray').forEach(btn => {
+            btn.addEventListener('click', e => {
+                const i = parseInt(e.target.dataset.idx, 10);
+                const t = state.manualTrays[i];
+                document.getElementById('t-id').value = t.tray_id;
+                document.getElementById('t-sx').value = t.start_x;
+                document.getElementById('t-sy').value = t.start_y;
+                document.getElementById('t-sz').value = t.start_z;
+                document.getElementById('t-ex').value = t.end_x;
+                document.getElementById('t-ey').value = t.end_y;
+                document.getElementById('t-ez').value = t.end_z;
+                document.getElementById('t-w').value = t.width;
+                document.getElementById('t-h').value = t.height;
+                document.getElementById('t-fill').value = t.current_fill;
+                state.manualTrays.splice(i, 1);
+                state.trayData = state.manualTrays;
+                renderManualTrayTable();
+                updateTrayDisplay();
+            });
+        });
+        elements.manualTrayTableContainer.querySelectorAll('.dup-tray').forEach(btn => {
+            btn.addEventListener('click', e => {
+                const i = parseInt(e.target.dataset.idx, 10);
+                const copy = { ...state.manualTrays[i] };
+                state.manualTrays.push(copy);
+                state.trayData = state.manualTrays;
+                renderManualTrayTable();
+                updateTrayDisplay();
+            });
+        });
+    };
+
+    const renderBatchResults = (results) => {
+        let html = '';
+        results.forEach(res => {
+            html += `<details><summary>${res.cable} | ${res.status} | Total ${res.total_length} | Field ${res.field_length} | Segments ${res.tray_segments_count}</summary>`;
+            if (res.breakdown && res.breakdown.length > 0) {
+                html += '<table><thead><tr><th>Segment</th><th>Tray ID</th><th>Type</th><th>From</th><th>To</th><th>Length</th></tr></thead><tbody>';
+                res.breakdown.forEach(b => {
+                    html += `<tr><td>${b.segment}</td><td>${b.tray_id}</td><td>${b.type}</td><td>${b.from}</td><td>${b.to}</td><td>${b.length}</td></tr>`;
+                });
+                html += '</tbody></table>';
+            }
+            html += '</details>';
+        });
+        elements.routeBreakdownContainer.innerHTML = html;
     };
     
     const updateCableListDisplay = () => {
@@ -480,7 +551,13 @@ document.addEventListener('DOMContentLoaded', () => {
         const headers = Object.keys(state.latestRouteData[0]);
         const rows = state.latestRouteData.map(row => headers.map(h => row[h]));
         let csv = headers.join(',') + '\n';
-        rows.forEach(r => { csv += r.join(',') + '\n'; });
+        rows.forEach(r => {
+            const line = r.map(val => {
+                const str = String(val);
+                return str.includes(',') ? `"${str}"` : str;
+            }).join(',');
+            csv += line + '\n';
+        });
         const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
         const url = URL.createObjectURL(blob);
         const a = document.createElement('a');
@@ -527,13 +604,18 @@ document.addEventListener('DOMContentLoaded', () => {
                     total_length: result.success ? result.total_length.toFixed(2) : 'N/A',
                     field_length: result.success ? result.field_routed_length.toFixed(2) : 'N/A',
                     tray_segments_count: result.success ? result.tray_segments.length : 0,
+                    breakdown: result.success ? result.route_segments.map((seg, i) => ({
+                        segment: i + 1,
+                        tray_id: seg.type === 'field' ? 'Field Route' : (seg.tray_id || 'N/A'),
+                        type: seg.type,
+                        from: formatPoint(seg.start),
+                        to: formatPoint(seg.end),
+                        length: seg.length.toFixed(2)
+                    })) : []
                 });
             });
 
-            renderTable(elements.routeBreakdownContainer,
-                ['Cable', 'Status', 'Total Length', 'Field Length', 'Tray Segments Count'],
-                batchResults
-            );
+            renderBatchResults(batchResults);
             state.latestRouteData = batchResults;
             elements.metrics.innerHTML = '';
             visualize(null, null, trayDataForRun, allRouteSegmentsForPlotting, "Batch Route Visualization");
