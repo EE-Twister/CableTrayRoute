@@ -42,18 +42,24 @@
             <section>
                 <h3>Routing Parameters</h3>
                  <label for="fill-limit">Max Tray Fill (%)
-                    <span class="help-icon" title="The maximum allowed fill capacity for a cable tray, based on standards like the NEC 40% rule.">?</span>
+                    <span class="help-icon" tabindex="0">?
+                        <span class="tooltip">The maximum allowed fill capacity for a cable tray, based on standards like the NEC 40% rule.</span>
+                    </span>
                  </label>
                  <input type="range" id="fill-limit" min="20" max="80" value="40" step="5">
                  <span id="fill-limit-value">40%</span>
 
                  <label for="proximity-threshold">Tray Proximity Threshold (in)
-                    <span class="help-icon" title="The maximum distance a cable can jump from its start/end point to connect to a nearby tray segment.">?</span>
+                    <span class="help-icon" tabindex="0">?
+                        <span class="tooltip">The maximum distance a cable can jump from its start or end point to connect to a nearby tray segment.</span>
+                    </span>
                  </label>
                  <input type="number" id="proximity-threshold" value="6.0" step="0.5">
 
                  <label for="field-route-penalty">Field Route Cost Multiplier
-                    <span class="help-icon" title="This makes field routing (not in a tray) more 'expensive' than routing within a tray. A value of 3 means every inch of field routing costs as much as 3 inches of tray routing. This encourages the algorithm to use trays whenever possible.">?</span>
+                    <span class="help-icon" tabindex="0">?
+                        <span class="tooltip">This makes field routing (not in a tray) more expensive than routing within a tray. A value of 3 means every inch of field routing costs as much as 3 inches of tray routing, encouraging the algorithm to use trays whenever possible.</span>
+                    </span>
                  </label>
                  <input type="number" id="field-route-penalty" value="3.0" step="0.1">
                  
