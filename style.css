@@ -129,11 +129,12 @@ details > summary {
 
 /* --- Help Icon --- */
 .help-icon {
+    position: relative;
     display: inline-block;
     width: 16px;
     height: 16px;
     background-color: #aaa;
-    color: white;
+    color: #fff;
     border-radius: 50%;
     text-align: center;
     font-size: 12px;
@@ -141,6 +142,40 @@ details > summary {
     cursor: help;
     margin-left: 8px;
     font-weight: bold;
+}
+
+.help-icon .tooltip {
+    visibility: hidden;
+    width: 220px;
+    background-color: #333;
+    color: #fff;
+    text-align: left;
+    border-radius: 4px;
+    padding: 6px 8px;
+    position: absolute;
+    z-index: 10;
+    bottom: 125%;
+    left: 50%;
+    transform: translateX(-50%);
+    font-size: 0.75rem;
+    line-height: 1.2;
+    white-space: normal;
+}
+
+.help-icon .tooltip::after {
+    content: '';
+    position: absolute;
+    top: 100%;
+    left: 50%;
+    transform: translateX(-50%);
+    border-width: 5px;
+    border-style: solid;
+    border-color: #333 transparent transparent transparent;
+}
+
+.help-icon:hover .tooltip,
+.help-icon:focus .tooltip {
+    visibility: visible;
 }
 
 /* --- Tables --- */
