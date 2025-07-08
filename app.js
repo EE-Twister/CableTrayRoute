@@ -10,6 +10,7 @@ document.addEventListener('DOMContentLoaded', () => {
         latestRouteData: [],
         startTag: '',
         endTag: '',
+        cableTag: '',
     };
 
     // --- ELEMENT REFERENCES ---
@@ -18,6 +19,7 @@ document.addEventListener('DOMContentLoaded', () => {
         cableAreaOut: document.getElementById('cable-area'),
         fillLimitIn: document.getElementById('fill-limit'),
         fillLimitOut: document.getElementById('fill-limit-value'),
+        cableTagIn: document.getElementById('cable-tag'),
         startTagIn: document.getElementById('start-tag'),
         endTagIn: document.getElementById('end-tag'),
         calculateBtn: document.getElementById('calculate-route-btn'),
@@ -521,12 +523,24 @@ document.addEventListener('DOMContentLoaded', () => {
             elements.cableListContainer.innerHTML = '';
             return;
         }
-        let html = '<h4>Cables to Route:</h4>';
-        state.cableList.forEach(c => {
+        let html = '<h4>Cables to Route:</h4><table><thead><tr><th>Tag</th><th>Diameter</th><th>Start</th><th>End</th></tr></thead><tbody>';
+        state.cableList.forEach((c, idx) => {
             const area = (Math.PI * (c.diameter / 2) ** 2).toFixed(2);
-            html += `<p><strong>${c.name}</strong> - Ø${c.diameter}in (${area}in²) - From ${c.start} to ${c.end}</p>`;
+            html += `<tr>
+                        <td><input type="text" class="cable-tag-input" data-idx="${idx}" value="${c.name}"></td>
+                        <td>Ø${c.diameter}in (${area}in²)</td>
+                        <td>${c.start}</td>
+                        <td>${c.end}</td>
+                    </tr>`;
         });
+        html += '</tbody></table>';
         elements.cableListContainer.innerHTML = html;
+        elements.cableListContainer.querySelectorAll('.cable-tag-input').forEach(input => {
+            input.addEventListener('input', e => {
+                const i = parseInt(e.target.dataset.idx, 10);
+                state.cableList[i].name = e.target.value;
+            });
+        });
     };
 
     const loadSampleCables = () => {
@@ -650,6 +664,7 @@ document.addEventListener('DOMContentLoaded', () => {
             ];
             state.startTag = elements.startTagIn.value;
             state.endTag = elements.endTagIn.value;
+            state.cableTag = elements.cableTagIn.value;
             const cableArea = parseFloat(elements.cableAreaOut.textContent);
             
             const result = routingSystem.calculateRoute(startPoint, endPoint, cableArea);
@@ -662,6 +677,7 @@ document.addEventListener('DOMContentLoaded', () => {
                     <div class="column"><strong>Trays Used:</strong> ${result.tray_segments.length}</div>
                 `;
                 const breakdownData = result.route_segments.map((seg, i) => ({
+                    cable: state.cableTag || '',
                     segment: i + 1,
                     tray_id: seg.type === 'field' ? 'Field Route' : (seg.tray_id || 'N/A'),
                     type: seg.type,
@@ -671,11 +687,11 @@ document.addEventListener('DOMContentLoaded', () => {
                 }));
                 renderTable(
                     elements.routeBreakdownContainer,
-                    ['Segment', 'Tray ID', 'Type', 'From', 'To', 'Length'],
+                    ['Cable Tag', 'Segment', 'Tray ID', 'Type', 'From', 'To', 'Length'],
                     breakdownData
                 );
                 state.latestRouteData = breakdownData;
-                visualize(startPoint, endPoint, trayDataForRun, result.route_segments, "3D Route Visualization", state.startTag || 'Cable Route');
+                visualize(startPoint, endPoint, trayDataForRun, result.route_segments, "3D Route Visualization", state.cableTag || state.startTag || 'Cable Route');
             } else {
                 showMessage('error', `Route calculation failed: ${result.error}`);
                 elements.metrics.innerHTML = '';
