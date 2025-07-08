@@ -33,6 +33,7 @@ document.addEventListener('DOMContentLoaded', () => {
         trayUtilizationContainer: document.getElementById('tray-utilization-container'),
         loadSampleCablesBtn: document.getElementById('load-sample-cables-btn'),
         clearCablesBtn: document.getElementById('clear-cables-btn'),
+        addCableBtn: document.getElementById('add-cable-btn'),
         cableListContainer: document.getElementById('cable-list-container'),
         resultsSection: document.getElementById('results-section'),
         messages: document.getElementById('messages'),
@@ -548,6 +549,27 @@ document.addEventListener('DOMContentLoaded', () => {
         updateCableListDisplay();
     };
 
+    const addCableToBatch = () => {
+        const diameter = parseFloat(elements.cableDiameterIn.value);
+        const start = [
+            parseFloat(document.getElementById('start-x').value),
+            parseFloat(document.getElementById('start-y').value),
+            parseFloat(document.getElementById('start-z').value),
+        ];
+        const end = [
+            parseFloat(document.getElementById('end-x').value),
+            parseFloat(document.getElementById('end-y').value),
+            parseFloat(document.getElementById('end-z').value),
+        ];
+        const name = elements.cableTagIn.value || `Cable ${state.cableList.length + 1}`;
+        if (isNaN(diameter) || start.some(isNaN) || end.some(isNaN)) {
+            alert('Please provide valid cable diameter and route points.');
+            return;
+        }
+        state.cableList.push({ name, diameter, start, end });
+        updateCableListDisplay();
+    };
+
     const clearCableList = () => {
         state.cableList = [];
         updateCableListDisplay();
@@ -806,9 +828,9 @@ document.addEventListener('DOMContentLoaded', () => {
     elements.addTrayBtn.addEventListener('click', addManualTray);
     elements.clearTraysBtn.addEventListener('click', clearManualTrays);
     elements.loadSampleCablesBtn.addEventListener('click', loadSampleCables);
+    elements.addCableBtn.addEventListener('click', addCableToBatch);
     elements.clearCablesBtn.addEventListener('click', clearCableList);
     elements.exportCsvBtn.addEventListener('click', exportRouteCSV);
     
     // Initial setup
-    updateCableArea();
-    handleInputMethodChange();});
+    updateCableArea();    handleInputMethodChange();});
