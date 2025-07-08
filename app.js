@@ -675,7 +675,7 @@ document.addEventListener('DOMContentLoaded', () => {
                     breakdownData
                 );
                 state.latestRouteData = breakdownData;
-                visualize(startPoint, endPoint, trayDataForRun, result.route_segments, "3D Route Visualization");
+                visualize(startPoint, endPoint, trayDataForRun, result.route_segments, "3D Route Visualization", state.startTag || 'Cable Route');
             } else {
                 showMessage('error', `Route calculation failed: ${result.error}`);
                 elements.metrics.innerHTML = '';
@@ -695,7 +695,7 @@ document.addEventListener('DOMContentLoaded', () => {
     };
     
     // --- VISUALIZATION ---
-    const visualize = (startPoint, endPoint, trays, routeSegments, title) => {
+    const visualize = (startPoint, endPoint, trays, routeSegments, title, routeLabel = null) => {
         const traces = [];
 
         const trayMesh = (tray) => {
@@ -735,10 +735,24 @@ document.addEventListener('DOMContentLoaded', () => {
         });
 
         if (routeSegments && routeSegments.length > 0) {
+            if (routeLabel) {
+                const first = routeSegments[0].start;
+                const last = routeSegments[routeSegments.length - 1].end;
+                traces.push({
+                    x: [first[0], last[0]], y: [first[1], last[1]], z: [first[2], last[2]],
+                    mode: 'lines', type: 'scatter3d', name: routeLabel,
+                    legendgroup: routeLabel, showlegend: true, visible: 'legendonly',
+                    line: { color: 'black', width: 5 }
+                });
+            }
+
             routeSegments.forEach(seg => {
                 traces.push({
                     x: [seg.start[0], seg.end[0]], y: [seg.start[1], seg.end[1]], z: [seg.start[2], seg.end[2]],
-                    mode: 'lines', type: 'scatter3d', name: seg.type,
+                    mode: 'lines', type: 'scatter3d',
+                    name: routeLabel ? routeLabel : seg.type,
+                    legendgroup: routeLabel ? routeLabel : seg.type,
+                    showlegend: routeLabel ? false : true,
                     line: { color: seg.type === 'tray' ? 'blue' : 'red', width: 5 }
                 });
             });
