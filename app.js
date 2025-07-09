@@ -1146,8 +1146,11 @@ document.addEventListener('DOMContentLoaded', () => {
         if (!window.current3DPlot) return;
         const html = `<!DOCTYPE html>
 <html><head><title>3D Route Visualization</title>
-<meta charset="UTF-8"><script src="https://cdn.plot.ly/plotly-latest.min.js"><\/script>
-</head><body style="margin:0;"><div id="plot" style="width:100vw;height:100vh;"></div>
+<meta charset="UTF-8">
+<script src="https://cdn.plot.ly/plotly-latest.min.js"><\/script>
+<style>html,body{margin:0;height:100%;overflow:hidden;}#plot{width:100%;height:100%;}</style>
+</head><body>
+<div id="plot"></div>
 <script>const data = ${JSON.stringify(window.current3DPlot.traces)};
 const layout = ${JSON.stringify(window.current3DPlot.layout)};
 Plotly.newPlot(document.getElementById('plot'), data, layout);<\/script>
