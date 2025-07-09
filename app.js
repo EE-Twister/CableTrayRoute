@@ -21,6 +21,9 @@ document.addEventListener('DOMContentLoaded', () => {
         addTrayBtn: document.getElementById('add-tray-btn'),
         clearTraysBtn: document.getElementById('clear-trays-btn'),
         manualTrayTableContainer: document.getElementById('manual-tray-table-container'),
+        exportTraysBtn: document.getElementById('export-trays-btn'),
+        importTraysFile: document.getElementById('import-trays-file'),
+        importTraysBtn: document.getElementById('import-trays-btn'),
         trayUtilizationContainer: document.getElementById('tray-utilization-container'),
         loadSampleCablesBtn: document.getElementById('load-sample-cables-btn'),
         clearCablesBtn: document.getElementById('clear-cables-btn'),
@@ -523,6 +526,60 @@ document.addEventListener('DOMContentLoaded', () => {
         });
     };
 
+    const exportManualTraysCSV = () => {
+        const headers = ['tray_id','start_x','start_y','start_z','end_x','end_y','end_z','width','height','current_fill'];
+        let rows = state.manualTrays.length > 0 ? state.manualTrays : [{
+            tray_id:'', start_x:'', start_y:'', start_z:'', end_x:'', end_y:'', end_z:'', width:'', height:'', current_fill:''
+        }];
+        let csv = headers.join(',') + '\n';
+        rows.forEach(r => {
+            csv += headers.map(h => r[h] !== undefined ? r[h] : '').join(',') + '\n';
+        });
+        const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = 'tray_list.csv';
+        a.click();
+        URL.revokeObjectURL(url);
+    };
+
+    const importManualTraysCSV = () => {
+        const file = elements.importTraysFile.files[0];
+        if (!file) return;
+        const reader = new FileReader();
+        reader.onload = e => {
+            const text = e.target.result.trim();
+            const lines = text.split(/\r?\n/);
+            if (lines.length === 0) return;
+            const headers = lines[0].split(',');
+            const newTrays = [];
+            for (let i = 1; i < lines.length; i++) {
+                if (!lines[i].trim()) continue;
+                const vals = lines[i].split(',');
+                const t = {};
+                headers.forEach((h, idx) => { t[h.trim()] = vals[idx] !== undefined ? vals[idx].trim() : ''; });
+                newTrays.push({
+                    tray_id: t.tray_id,
+                    start_x: parseFloat(t.start_x) || 0,
+                    start_y: parseFloat(t.start_y) || 0,
+                    start_z: parseFloat(t.start_z) || 0,
+                    end_x: parseFloat(t.end_x) || 0,
+                    end_y: parseFloat(t.end_y) || 0,
+                    end_z: parseFloat(t.end_z) || 0,
+                    width: parseFloat(t.width) || 0,
+                    height: parseFloat(t.height) || 0,
+                    current_fill: parseFloat(t.current_fill) || 0
+                });
+            }
+            state.manualTrays = newTrays;
+            state.trayData = state.manualTrays;
+            renderManualTrayTable();
+            updateTrayDisplay();
+        };
+        reader.readAsText(file);
+    };
+
     const renderBatchResults = (results) => {
         let html = '';
         results.forEach(res => {
@@ -923,8 +980,9 @@ document.addEventListener('DOMContentLoaded', () => {
     elements.inputMethodRadios.forEach(radio => radio.addEventListener('change', handleInputMethodChange));
     elements.addTrayBtn.addEventListener('click', addManualTray);
     elements.clearTraysBtn.addEventListener('click', clearManualTrays);
+    elements.exportTraysBtn.addEventListener('click', exportManualTraysCSV);
+    elements.importTraysBtn.addEventListener('click', importManualTraysCSV);
     elements.loadSampleCablesBtn.addEventListener('click', loadSampleCables);
     elements.addCableBtn.addEventListener('click', addCableToBatch);
     elements.clearCablesBtn.addEventListener('click', clearCableList);
-    elements.exportCsvBtn.addEventListener('click', exportRouteCSV);
-        // Initial setup    updateCableArea();    handleInputMethodChange();});
+    elements.exportCsvBtn.addEventListener('click', exportRouteCSV);        // Initial setup    updateCableArea();    handleInputMethodChange();});
