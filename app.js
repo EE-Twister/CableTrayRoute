@@ -32,7 +32,6 @@ document.addEventListener('DOMContentLoaded', () => {
         routeBreakdownContainer: document.getElementById('route-breakdown-container'),
         plot3d: document.getElementById('plot-3d'),
         updatedUtilizationContainer: document.getElementById('updated-utilization-container'),
-        plotUtilization: document.getElementById('plot-utilization'),
         exportCsvBtn: document.getElementById('export-csv-btn'),
     };
     
@@ -350,7 +349,7 @@ document.addEventListener('DOMContentLoaded', () => {
         elements.fillLimitOut.textContent = `${elements.fillLimitIn.value}%`;
     };
 
-    const renderTable = (container, headers, data, styleFn = null) => {
+    const renderTable = (container, headers, data, styleFn = null, formatters = {}) => {
         const defs = headers.map(h => typeof h === 'string' ? {
             label: h,
             key: h.toLowerCase()
@@ -366,7 +365,12 @@ document.addEventListener('DOMContentLoaded', () => {
             const style = styleFn ? styleFn(row) : '';
             table += `<tr class="${style}">`;
             defs.forEach(h => {
-                table += `<td>${row[h.key] !== undefined ? row[h.key] : 'N/A'}</td>`;
+                const val = row[h.key];
+                if (formatters[h.key]) {
+                    table += `<td>${formatters[h.key](val, row)}</td>`;
+                } else {
+                    table += `<td>${val !== undefined ? val : 'N/A'}</td>`;
+                }
             });
             table += '</tr>';
         });
@@ -783,22 +787,41 @@ document.addEventListener('DOMContentLoaded', () => {
         }
         
         const finalUtilization = routingSystem.getTrayUtilization();
-        const utilData = Object.entries(finalUtilization).map(([id, data]) => ({
-            tray_id: id,
-            utilization: data.utilization_percentage.toFixed(1),
-            available: data.available_capacity.toFixed(2),
-        }));
+        const fillLimit = parseFloat(elements.fillLimitIn.value) / 100;
+        const fillLimitPct = fillLimit * 100;
+        const utilData = Object.entries(finalUtilization).map(([id, data]) => {
+            const fullPct = (data.current_fill * fillLimit / data.max_fill) * 100;
+            return {
+                tray_id: id,
+                full_pct: fullPct,
+                utilization: data.utilization_percentage.toFixed(1),
+                available: data.available_capacity.toFixed(2)
+            };
+        });
+        const formatters = {
+            full_pct: (val) => {
+                const pct = Math.min(val, 100).toFixed(1);
+                const color = val > 80 ? 'var(--error-bg)' : val > 60 ? 'var(--warning-bg)' : 'var(--success-bg)';
+                return `
+                    <div class="util-bar">
+                        <div class="util-bar-fill" style="width:${pct}%; background-color:${color};"></div>
+                        <div class="util-bar-marker" style="left:${fillLimitPct}%;"></div>
+                    </div>
+                    <span class="util-label">${pct}%</span>
+                `;
+            }
+        };
         renderTable(
             elements.updatedUtilizationContainer,
             [
                 { label: 'Tray ID', key: 'tray_id' },
-                { label: 'Utilization (%)', key: 'utilization' },
+                { label: 'Utilization', key: 'full_pct' },
                 { label: 'Available (in²)', key: 'available' }
             ],
             utilData,
-            (row) => utilizationStyle(row)
+            (row) => utilizationStyle(row),
+            formatters
         );
-        plotUtilization(finalUtilization);
     };
     
     // --- VISUALIZATION ---
@@ -893,16 +916,6 @@ document.addEventListener('DOMContentLoaded', () => {
         Plotly.newPlot(elements.plot3d, traces, layout);
     };
     
-    const plotUtilization = (utilizationData) => {
-        const ids = Object.keys(utilizationData);
-        const percentages = ids.map(id => utilizationData[id].utilization_percentage);
-        const data = [{
-            x: ids, y: percentages, type: 'bar',
-            marker: { color: percentages.map(p => p > 80 ? 'red' : p > 60 ? 'orange' : 'green') }
-        }];
-        const layout = { title: 'Tray Utilization After Routing', yaxis: { title: 'Utilization (%)' } };
-        Plotly.newPlot(elements.plotUtilization, data, layout);
-    }
     
     // --- INITIALIZATION & EVENT LISTENERS ---
     elements.fillLimitIn.addEventListener('input', updateFillLimitDisplay);
@@ -914,5 +927,4 @@ document.addEventListener('DOMContentLoaded', () => {
     elements.addCableBtn.addEventListener('click', addCableToBatch);
     elements.clearCablesBtn.addEventListener('click', clearCableList);
     elements.exportCsvBtn.addEventListener('click', exportRouteCSV);
-    
-    // Initial setup    updateCableArea();    handleInputMethodChange();});
+        // Initial setup    updateCableArea();    handleInputMethodChange();});
