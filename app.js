@@ -1016,6 +1016,4 @@ document.addEventListener('DOMContentLoaded', () => {
     elements.exportCsvBtn.addEventListener('click', exportRouteCSV);
     
     // Initial setup
-    updateCableArea();
-    handleInputMethodChange();
-});
+    updateCableArea();    handleInputMethodChange();});
