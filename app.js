@@ -29,6 +29,9 @@ document.addEventListener('DOMContentLoaded', () => {
         clearCablesBtn: document.getElementById('clear-cables-btn'),
         addCableBtn: document.getElementById('add-cable-btn'),
         cableListContainer: document.getElementById('cable-list-container'),
+        exportCablesBtn: document.getElementById('export-cables-btn'),
+        importCablesFile: document.getElementById('import-cables-file'),
+        importCablesBtn: document.getElementById('import-cables-btn'),
         resultsSection: document.getElementById('results-section'),
         messages: document.getElementById('messages'),
         metrics: document.getElementById('metrics'),
@@ -617,6 +620,62 @@ document.addEventListener('DOMContentLoaded', () => {
         reader.readAsText(file);
     };
 
+    const exportCableOptionsCSV = () => {
+        const headers = ['tag','start_tag','end_tag','diameter','start_x','start_y','start_z','end_x','end_y','end_z'];
+        const rows = state.cableList;
+        let csv = headers.join(',') + '\n';
+        if (rows.length > 0) {
+            rows.forEach(c => {
+                const row = [
+                    c.name || '',
+                    c.start_tag || '',
+                    c.end_tag || '',
+                    c.diameter !== undefined ? c.diameter : '',
+                    c.start[0], c.start[1], c.start[2],
+                    c.end[0], c.end[1], c.end[2]
+                ];
+                csv += row.join(',') + '\n';
+            });
+        }
+        const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = 'cable_options.csv';
+        a.click();
+        URL.revokeObjectURL(url);
+    };
+
+    const importCableOptionsCSV = () => {
+        const file = elements.importCablesFile.files[0];
+        if (!file) return;
+        const reader = new FileReader();
+        reader.onload = e => {
+            const text = e.target.result.trim();
+            const lines = text.split(/\r?\n/);
+            if (lines.length === 0) return;
+            const headers = lines[0].split(',');
+            const newCables = [];
+            for (let i = 1; i < lines.length; i++) {
+                if (!lines[i].trim()) continue;
+                const vals = lines[i].split(',');
+                const t = {};
+                headers.forEach((h, idx) => { t[h.trim()] = vals[idx] !== undefined ? vals[idx].trim() : ''; });
+                newCables.push({
+                    name: t.tag || '',
+                    start_tag: t.start_tag || '',
+                    end_tag: t.end_tag || '',
+                    diameter: parseFloat(t.diameter) || 0,
+                    start: [parseFloat(t.start_x) || 0, parseFloat(t.start_y) || 0, parseFloat(t.start_z) || 0],
+                    end: [parseFloat(t.end_x) || 0, parseFloat(t.end_y) || 0, parseFloat(t.end_z) || 0]
+                });
+            }
+            state.cableList = newCables;
+            updateCableListDisplay();
+        };
+        reader.readAsText(file);
+    };
+
     const renderBatchResults = (results) => {
         let html = '';
         results.forEach(res => {
@@ -1022,7 +1081,11 @@ document.addEventListener('DOMContentLoaded', () => {
     elements.importTraysFile.addEventListener('change', importManualTraysCSV);
     elements.loadSampleCablesBtn.addEventListener('click', loadSampleCables);
     elements.addCableBtn.addEventListener('click', addCableToBatch);
-    elements.clearCablesBtn.addEventListener('click', clearCableList);    elements.exportCsvBtn.addEventListener('click', exportRouteCSV);    
+    elements.clearCablesBtn.addEventListener('click', clearCableList);
+    elements.exportCablesBtn.addEventListener('click', exportCableOptionsCSV);
+    elements.importCablesBtn.addEventListener('click', () => elements.importCablesFile.click());
+    elements.importCablesFile.addEventListener('change', importCableOptionsCSV);
+    elements.exportCsvBtn.addEventListener('click', exportRouteCSV);
     // Initial setup
     updateCableArea();
     handleInputMethodChange();
