@@ -666,7 +666,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
         if (isBatchMode && state.cableList.length > 0) {
             const batchResults = [];
-            const allRouteSegmentsForPlotting = [];
+            const allRoutesForPlotting = [];
 
             state.cableList.forEach(cable => {
                 const cableArea = Math.PI * (cable.diameter / 2) ** 2;
@@ -674,7 +674,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 
                 if (result.success) {
                     routingSystem.updateTrayFill(result.tray_segments, cableArea);
-                    allRouteSegmentsForPlotting.push(...result.route_segments);
+                    allRoutesForPlotting.push({ label: cable.name, segments: result.route_segments });
                 }
                 
                 batchResults.push({
@@ -698,7 +698,7 @@ document.addEventListener('DOMContentLoaded', () => {
             renderBatchResults(batchResults);
             state.latestRouteData = batchResults;
             elements.metrics.innerHTML = '';
-            visualize(null, null, trayDataForRun, allRouteSegmentsForPlotting, "Batch Route Visualization");
+            visualize(null, null, trayDataForRun, allRoutesForPlotting, "Batch Route Visualization");
 
         } else {
             const startPoint = [
@@ -760,7 +760,7 @@ document.addEventListener('DOMContentLoaded', () => {
     };
     
     // --- VISUALIZATION ---
-    const visualize = (startPoint, endPoint, trays, routeSegments, title, routeLabel = null) => {
+    const visualize = (startPoint, endPoint, trays, routeData, title, routeLabel = null) => {
         const traces = [];
 
         const trayMesh = (tray) => {
@@ -799,26 +799,29 @@ document.addEventListener('DOMContentLoaded', () => {
             traces.push({type:'scatter3d', mode:'text', x:[midX], y:[midY], z:[midZ], text:[tray.tray_id], showlegend:false, hoverinfo:'none'});
         });
 
-        if (routeSegments && routeSegments.length > 0) {
-            if (routeLabel) {
-                const first = routeSegments[0].start;
-                const last = routeSegments[routeSegments.length - 1].end;
-                traces.push({
-                    x: [first[0], last[0]], y: [first[1], last[1]], z: [first[2], last[2]],
-                    mode: 'lines', type: 'scatter3d', name: routeLabel,
-                    legendgroup: routeLabel, showlegend: true, visible: 'legendonly',
-                    line: { color: 'black', width: 5 }
-                });
-            }
+        if (routeData && routeData.length > 0) {
+            const palette = ['blue', 'green', 'orange', 'purple', 'brown', 'cyan', 'magenta', 'olive'];
+            const routes = (routeData[0] && routeData[0].segments) ? routeData : [{ label: routeLabel || 'Route', segments: routeData }];
 
-            routeSegments.forEach(seg => {
+            routes.forEach((route, idx) => {
+                const color = palette[idx % palette.length];
+                const label = route.label || `Route ${idx+1}`;
+
+                // Placeholder trace to show legend entry without drawing a line
                 traces.push({
-                    x: [seg.start[0], seg.end[0]], y: [seg.start[1], seg.end[1]], z: [seg.start[2], seg.end[2]],
+                    x: [null], y: [null], z: [null],
                     mode: 'lines', type: 'scatter3d',
-                    name: routeLabel ? routeLabel : seg.type,
-                    legendgroup: routeLabel ? routeLabel : seg.type,
-                    showlegend: routeLabel ? false : true,
-                    line: { color: seg.type === 'tray' ? 'blue' : 'red', width: 5 }
+                    name: label, legendgroup: label, showlegend: true,
+                    line: { color, width: 5 }, hoverinfo: 'skip'
+                });
+
+                route.segments.forEach(seg => {
+                    traces.push({
+                        x: [seg.start[0], seg.end[0]], y: [seg.start[1], seg.end[1]], z: [seg.start[2], seg.end[2]],
+                        mode: 'lines', type: 'scatter3d',
+                        name: label, legendgroup: label, showlegend: false,
+                        line: { color: seg.type === 'tray' ? color : 'red', width: 5 }
+                    });
                 });
             });
         }
