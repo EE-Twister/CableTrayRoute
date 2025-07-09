@@ -254,7 +254,7 @@ th {
 /* --- Plots --- */
 #plot-3d {
     width: 100%;
-    min-height: 1800px;
+    height: 600px;
 }
 
 #popout-plot-btn {
