@@ -1137,8 +1137,8 @@ document.addEventListener('DOMContentLoaded', () => {
             });
         }
 
-    const layout = { title: title, scene: { aspectmode: 'data' }};
-    Plotly.newPlot(elements.plot3d, traces, layout);
+    const layout = { title: title, scene: { aspectmode: 'data' }, autosize: true, margin: {l:0, r:0, t:0, b:0} };
+    Plotly.newPlot(elements.plot3d, traces, layout, {responsive: true});
     window.current3DPlot = { traces: traces, layout: layout };
     };
 
@@ -1153,7 +1153,7 @@ document.addEventListener('DOMContentLoaded', () => {
 <div id="plot"></div>
 <script>const data = ${JSON.stringify(window.current3DPlot.traces)};
 const layout = ${JSON.stringify(window.current3DPlot.layout)};
-Plotly.newPlot(document.getElementById('plot'), data, layout);<\/script>
+Plotly.newPlot(document.getElementById('plot'), data, layout, {responsive: true});<\/script>
 </body></html>`;
         const pop = window.open('', '_blank');
         if (pop) { pop.document.write(html); pop.document.close(); }
