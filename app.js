@@ -842,14 +842,14 @@ document.addEventListener('DOMContentLoaded', () => {
                         <td><input type="text" class="cable-end-tag-input" data-idx="${idx}" value="${c.end_tag || ''}" style="width:80px;"></td>
                         <td><input type="number" class="cable-diameter-input" data-idx="${idx}" value="${c.diameter}" step="0.01" style="width:60px;"></td>
                         <td>
-                            <input type="number" class="cable-start-input" data-idx="${idx}" data-coord="0" value="${c.start[0]}" step="0.1" style="width:50px;">
-                            <input type="number" class="cable-start-input" data-idx="${idx}" data-coord="1" value="${c.start[1]}" step="0.1" style="width:50px;">
-                            <input type="number" class="cable-start-input" data-idx="${idx}" data-coord="2" value="${c.start[2]}" step="0.1" style="width:50px;">
+                            <input type="number" class="cable-start-input" data-idx="${idx}" data-coord="0" value="${c.start[0]}" step="0.1" style="width:80px;">
+                            <input type="number" class="cable-start-input" data-idx="${idx}" data-coord="1" value="${c.start[1]}" step="0.1" style="width:80px;">
+                            <input type="number" class="cable-start-input" data-idx="${idx}" data-coord="2" value="${c.start[2]}" step="0.1" style="width:80px;">
                         </td>
                         <td>
-                            <input type="number" class="cable-end-input" data-idx="${idx}" data-coord="0" value="${c.end[0]}" step="0.1" style="width:50px;">
-                            <input type="number" class="cable-end-input" data-idx="${idx}" data-coord="1" value="${c.end[1]}" step="0.1" style="width:50px;">
-                            <input type="number" class="cable-end-input" data-idx="${idx}" data-coord="2" value="${c.end[2]}" step="0.1" style="width:50px;">
+                            <input type="number" class="cable-end-input" data-idx="${idx}" data-coord="0" value="${c.end[0]}" step="0.1" style="width:80px;">
+                            <input type="number" class="cable-end-input" data-idx="${idx}" data-coord="1" value="${c.end[1]}" step="0.1" style="width:80px;">
+                            <input type="number" class="cable-end-input" data-idx="${idx}" data-coord="2" value="${c.end[2]}" step="0.1" style="width:80px;">
                         </td>
                         <td><button class="dup-cable" data-idx="${idx}">Duplicate</button></td>
                         <td><button class="del-cable" data-idx="${idx}">Delete</button></td>
