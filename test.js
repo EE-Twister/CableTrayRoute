@@ -42,6 +42,8 @@ class CableRoutingSystem {
     this.fillLimit = options.fillLimit || 0.4;
     this.proximityThreshold = options.proximityThreshold || 72.0;
     this.fieldPenalty = options.fieldPenalty || 3.0;
+    this.sharedPenalty = options.sharedPenalty || 0.5;
+    this.sharedFieldSegments = [];
     this.trays = new Map();
   }
 
@@ -143,6 +145,21 @@ class CableRoutingSystem {
     return overlaps;
   }
 
+  _isSharedSegment(seg, tol = 0.1) {
+    for (const existing of this.sharedFieldSegments) {
+      if (this._segmentsOverlap(seg, existing, tol)) return true;
+    }
+    return false;
+  }
+
+  recordSharedFieldSegments(segments) {
+    segments.forEach(s => {
+      if (s.type === 'field') {
+        this.sharedFieldSegments.push({ start: s.start.slice(), end: s.end.slice() });
+      }
+    });
+  }
+
   calculateRoute(startPoint, endPoint, cableArea) {
     const graph = { nodes: {}, edges: {} };
     const addNode = (id, point, type='generic') => { graph.nodes[id] = { point, type }; graph.edges[id] = {}; };
@@ -200,8 +217,16 @@ class CableRoutingSystem {
         const isSameTray=id1.startsWith(id2.split('_')[0]) && id2.startsWith(id1.split('_')[0]);
         if (graph.edges[id1][id2] || (id1.includes('_') && isSameTray)) continue;
         const dist=this.manhattanDistance(p1,p2);
-        const weight=dist<0.1?0.1:dist*this.fieldPenalty;
-        const type=dist<0.1?'tray_connection':'field';
+        let weight,type;
+        if(dist<0.1){
+          weight=0.1;
+          type='tray_connection';
+        } else {
+          const seg={start:p1,end:p2};
+          const penalty=this._isSharedSegment(seg)?this.fieldPenalty*this.sharedPenalty:this.fieldPenalty;
+          weight=dist*penalty;
+          type='field';
+        }
         addEdge(id1,id2,weight,type);
       }
     }
@@ -216,7 +241,8 @@ class CableRoutingSystem {
       if (distToProjStart<=this.proximityThreshold) {
         const projId=`proj_start_on_${tray.tray_id}`;
         addNode(projId,projStart,'projection');
-        addEdge('start',projId,distToProjStart*this.fieldPenalty,'field');
+        const penStart=this._isSharedSegment({start:startPoint,end:projStart})?this.fieldPenalty*this.sharedPenalty:this.fieldPenalty;
+        addEdge('start',projId,distToProjStart*penStart,'field');
         addEdge(projId,startId,this.distance(projStart,a),'tray',tray.tray_id);
         addEdge(projId,`${tray.tray_id}_end`,this.distance(projStart,b),'tray',tray.tray_id);
       }
@@ -225,7 +251,8 @@ class CableRoutingSystem {
       if (distToProjEnd<=this.proximityThreshold) {
         const projId=`proj_end_on_${tray.tray_id}`;
         addNode(projId,projEnd,'projection');
-        addEdge('end',projId,distToProjEnd*this.fieldPenalty,'field');
+        const penEnd=this._isSharedSegment({start:endPoint,end:projEnd})?this.fieldPenalty*this.sharedPenalty:this.fieldPenalty;
+        addEdge('end',projId,distToProjEnd*penEnd,'field');
         addEdge(projId,startId,this.distance(projEnd,a),'tray',tray.tray_id);
         addEdge(projId,`${tray.tray_id}_end`,this.distance(projEnd,b),'tray',tray.tray_id);
       }
@@ -305,7 +332,7 @@ const getSampleCables = () => [
 ];
 
 function runBatch(count) {
-  const system = new CableRoutingSystem({});
+  const system = new CableRoutingSystem({ sharedPenalty: 0.5 });
   getSampleTrays().forEach(t => system.addTraySegment({...t}));
   const cables = getSampleCables();
   const routes = [];
@@ -317,6 +344,7 @@ function runBatch(count) {
       console.log(`Cable ${i+1}:`, res.success ? 'routed' : 'failed');
       if (res.success) {
         system.updateTrayFill(res.tray_segments, area);
+        system.recordSharedFieldSegments(res.route_segments);
         routes.push({ name: cable.name, segments: res.route_segments });
       }
     } catch (err) {
