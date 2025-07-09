@@ -1137,7 +1137,13 @@ document.addEventListener('DOMContentLoaded', () => {
             });
         }
 
-    const layout = { title: title, scene: { aspectmode: 'data' }, autosize: true, margin: {l:0, r:0, t:0, b:0} };
+    const layout = {
+        title: title,
+        scene: { aspectmode: 'data' },
+        legend: { x: 1, y: 0, xanchor: 'right', yanchor: 'bottom' },
+        autosize: true,
+        margin: { l: 0, r: 0, t: 0, b: 0 }
+    };
     Plotly.newPlot(elements.plot3d, traces, layout, {responsive: true});
     window.current3DPlot = { traces: traces, layout: layout };
     };
