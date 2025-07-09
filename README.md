@@ -26,3 +26,4 @@ coordinates for that cable.
 - Start and end tags are displayed in the 3D view (duplicates shown once).
 - Cable specification fields are now located in the **Cable Routing Options** panel.
 - Manual tray entry now has a single **Import Trays CSV** button. Clicking it opens a file dialog and loads trays immediately after you choose a file.
+- Cable lists in **Cable Routing Options** can now be imported from or exported to CSV files.
