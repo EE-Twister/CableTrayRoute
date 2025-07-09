@@ -8,23 +8,14 @@ document.addEventListener('DOMContentLoaded', () => {
         cableList: [],
         trayData: [],
         latestRouteData: [],
-        startTag: '',
-        endTag: '',
-        cableTag: '',
     };
 
     // --- ELEMENT REFERENCES ---
     const elements = {
-        cableDiameterIn: document.getElementById('cable-diameter'),
-        cableAreaOut: document.getElementById('cable-area'),
         fillLimitIn: document.getElementById('fill-limit'),
         fillLimitOut: document.getElementById('fill-limit-value'),
-        cableTagIn: document.getElementById('cable-tag'),
-        startTagIn: document.getElementById('start-tag'),
-        endTagIn: document.getElementById('end-tag'),
         calculateBtn: document.getElementById('calculate-route-btn'),
         inputMethodRadios: document.querySelectorAll('input[name="input-method"]'),
-        routingModeRadios: document.querySelectorAll('input[name="routing-mode"]'),
         manualEntrySection: document.getElementById('manual-entry-section'),
         batchSection: document.getElementById('batch-section'),
         addTrayBtn: document.getElementById('add-tray-btn'),
@@ -355,12 +346,6 @@ document.addEventListener('DOMContentLoaded', () => {
         { name: "Control Cable 2", diameter: 0.59, start: [25, 15, 12], end: [95, 75, 28], start_tag: "", end_tag: "" },
     ];
 
-    const updateCableArea = () => {
-        const d = parseFloat(elements.cableDiameterIn.value);
-        if (isNaN(d)) return;
-        elements.cableAreaOut.textContent = (Math.PI * (d/2)**2).toFixed(2);
-    };
-
     const updateFillLimitDisplay = () => {
         elements.fillLimitOut.textContent = `${elements.fillLimitIn.value}%`;
     };
@@ -447,13 +432,6 @@ document.addEventListener('DOMContentLoaded', () => {
         updateTrayDisplay();
     };
     
-    const handleRoutingModeChange = () => {
-        if(document.getElementById('batch-mode').checked) {
-            elements.batchSection.style.display = 'block';
-        } else {
-            elements.batchSection.style.display = 'none';
-        }
-    };
 
     const addManualTray = () => {
         const newTray = {
@@ -646,25 +624,15 @@ document.addEventListener('DOMContentLoaded', () => {
     };
 
     const addCableToBatch = () => {
-        const diameter = parseFloat(elements.cableDiameterIn.value);
-        const start = [
-            parseFloat(document.getElementById('start-x').value),
-            parseFloat(document.getElementById('start-y').value),
-            parseFloat(document.getElementById('start-z').value),
-        ];
-        const end = [
-            parseFloat(document.getElementById('end-x').value),
-            parseFloat(document.getElementById('end-y').value),
-            parseFloat(document.getElementById('end-z').value),
-        ];
-        const name = elements.cableTagIn.value || `Cable ${state.cableList.length + 1}`;
-        const startTag = elements.startTagIn.value;
-        const endTag = elements.endTagIn.value;
-        if (isNaN(diameter) || start.some(isNaN) || end.some(isNaN)) {
-            alert('Please provide valid cable diameter and route points.');
-            return;
-        }
-        state.cableList.push({ name, diameter, start, end, start_tag: startTag, end_tag: endTag });
+        const newCable = {
+            name: `Cable ${state.cableList.length + 1}`,
+            diameter: 1.0,
+            start: [0, 0, 0],
+            end: [0, 0, 0],
+            start_tag: '',
+            end_tag: ''
+        };
+        state.cableList.push(newCable);
         updateCableListDisplay();
     };
 
@@ -767,9 +735,7 @@ document.addEventListener('DOMContentLoaded', () => {
         const trayDataForRun = JSON.parse(JSON.stringify(state.trayData));
         trayDataForRun.forEach(tray => routingSystem.addTraySegment(tray));
         
-        const isBatchMode = document.getElementById('batch-mode').checked;
-
-        if (isBatchMode && state.cableList.length > 0) {
+        if (state.cableList.length > 0) {
             const batchResults = [];
             const allRoutesForPlotting = [];
 
@@ -811,73 +777,9 @@ document.addEventListener('DOMContentLoaded', () => {
             state.latestRouteData = batchResults;
             elements.metrics.innerHTML = '';
             visualize(trayDataForRun, allRoutesForPlotting, "Batch Route Visualization");
-
         } else {
-            const startPoint = [
-                parseFloat(document.getElementById('start-x').value),
-                parseFloat(document.getElementById('start-y').value),
-                parseFloat(document.getElementById('start-z').value),
-            ];
-            const endPoint = [
-                parseFloat(document.getElementById('end-x').value),
-                parseFloat(document.getElementById('end-y').value),
-                parseFloat(document.getElementById('end-z').value),
-            ];
-            state.startTag = elements.startTagIn.value;
-            state.endTag = elements.endTagIn.value;
-            state.cableTag = elements.cableTagIn.value;
-            const cableArea = parseFloat(elements.cableAreaOut.textContent);
-            
-            const result = routingSystem.calculateRoute(startPoint, endPoint, cableArea);
-
-            if (result.success) {
-                showMessage('success', 'Route calculated successfully!');
-                elements.metrics.innerHTML = `
-                    <div class="column"><strong>Total Length:</strong> ${result.total_length.toFixed(2)}</div>
-                    <div class="column"><strong>Field-Routed:</strong> ${result.field_routed_length.toFixed(2)}</div>
-                    <div class="column"><strong>Trays Used:</strong> ${result.tray_segments.length}</div>
-                `;
-                const breakdownData = result.route_segments.map((seg, i) => ({
-                    cable: state.cableTag || '',
-                    segment: i + 1,
-                    tray_id: seg.type === 'field' ? 'Field Route' : (seg.tray_id || 'N/A'),
-                    type: seg.type,
-                    from: formatPoint(seg.start),
-                    to: formatPoint(seg.end),
-                    length: seg.length.toFixed(2)
-                }));
-                renderTable(
-                    elements.routeBreakdownContainer,
-                    [
-                        { label: 'Cable Tag', key: 'cable' },
-                        { label: 'Segment', key: 'segment' },
-                        { label: 'Tray ID', key: 'tray_id' },
-                        { label: 'Type', key: 'type' },
-                        { label: 'From', key: 'from' },
-                        { label: 'To', key: 'to' },
-                        { label: 'Length', key: 'length' }
-                    ],
-                    breakdownData
-                );
-                state.latestRouteData = breakdownData;
-                visualize(
-                    trayDataForRun,
-                    [{
-                        label: state.cableTag || state.startTag || 'Cable Route',
-                        segments: result.route_segments,
-                        startPoint,
-                        endPoint,
-                        startTag: state.startTag,
-                        endTag: state.endTag
-                    }],
-                    "3D Route Visualization"
-                );
-            } else {
-                showMessage('error', `Route calculation failed: ${result.error}`);
-                elements.metrics.innerHTML = '';
-                elements.routeBreakdownContainer.innerHTML = '';
-                elements.plot3d.innerHTML = '';
-            }
+            alert('Please add at least one cable to route.');
+            return;
         }
         
         const finalUtilization = routingSystem.getTrayUtilization();
@@ -1003,11 +905,9 @@ document.addEventListener('DOMContentLoaded', () => {
     }
     
     // --- INITIALIZATION & EVENT LISTENERS ---
-    elements.cableDiameterIn.addEventListener('input', updateCableArea);
     elements.fillLimitIn.addEventListener('input', updateFillLimitDisplay);
     elements.calculateBtn.addEventListener('click', mainCalculation);
     elements.inputMethodRadios.forEach(radio => radio.addEventListener('change', handleInputMethodChange));
-    elements.routingModeRadios.forEach(radio => radio.addEventListener('change', handleRoutingModeChange));
     elements.addTrayBtn.addEventListener('click', addManualTray);
     elements.clearTraysBtn.addEventListener('click', clearManualTrays);
     elements.loadSampleCablesBtn.addEventListener('click', loadSampleCables);
@@ -1015,5 +915,4 @@ document.addEventListener('DOMContentLoaded', () => {
     elements.clearCablesBtn.addEventListener('click', clearCableList);
     elements.exportCsvBtn.addEventListener('click', exportRouteCSV);
     
-    // Initial setup
-    updateCableArea();    handleInputMethodChange();});
+    // Initial setup    updateCableArea();    handleInputMethodChange();});
