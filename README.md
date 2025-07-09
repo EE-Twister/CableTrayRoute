@@ -15,3 +15,10 @@ Points fields. After filling in the details, click **Add Cable to List** and the
 cable will appear in the table for batch routing. Each row in the table allows
 you to edit not only the cable tag, but also the diameter and the start/end
 coordinates for that cable.
+
+## Updates
+
+- Default *Tray Proximity Threshold* is now **72 in**.
+- Each cable row in batch mode includes **Duplicate** and **Delete** controls.
+- Tray utilization tables show **Available Space** to two decimal places.
+- CSV export flattens the breakdown so each segment is a separate row.
