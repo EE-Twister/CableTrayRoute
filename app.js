@@ -341,11 +341,46 @@ document.addEventListener('DOMContentLoaded', () => {
     ];
     
     const getSampleCables = () => [
-        { name: "Power Cable 1", diameter: 1.26, start: [5, 5, 5], end: [110, 95, 45], start_tag: "", end_tag: "" },
-        { name: "Control Cable 1", diameter: 0.47, start: [10, 0, 10], end: [100, 80, 25], start_tag: "", end_tag: "" },
-        { name: "Data Cable 1", diameter: 0.31, start: [15, 5, 15], end: [105, 85, 30], start_tag: "", end_tag: "" },
-        { name: "Power Cable 2", diameter: 1.10, start: [20, 10, 8], end: [115, 90, 35], start_tag: "", end_tag: "" },
-        { name: "Control Cable 2", diameter: 0.59, start: [25, 15, 12], end: [95, 75, 28], start_tag: "", end_tag: "" },
+        {
+            name: "Power Cable 1",
+            diameter: 1.26,
+            start: [5, 5, 5],
+            end: [110, 95, 45],
+            start_tag: "ST1",
+            end_tag: "ET1"
+        },
+        {
+            name: "Control Cable 1",
+            diameter: 0.47,
+            start: [10, 0, 10],
+            end: [100, 80, 25],
+            start_tag: "ST2",
+            end_tag: "ET2"
+        },
+        {
+            name: "Data Cable 1",
+            diameter: 0.31,
+            start: [15, 5, 15],
+            end: [105, 85, 30],
+            start_tag: "ST3",
+            end_tag: "ET3"
+        },
+        {
+            name: "Power Cable 2",
+            diameter: 1.10,
+            start: [20, 10, 8],
+            end: [115, 90, 35],
+            start_tag: "ST4",
+            end_tag: "ET4"
+        },
+        {
+            name: "Control Cable 2",
+            diameter: 0.59,
+            start: [25, 15, 12],
+            end: [95, 75, 28],
+            start_tag: "ST5",
+            end_tag: "ET5"
+        },
     ];
 
     const updateFillLimitDisplay = () => {
