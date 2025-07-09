@@ -37,6 +37,7 @@ document.addEventListener('DOMContentLoaded', () => {
         metrics: document.getElementById('metrics'),
         routeBreakdownContainer: document.getElementById('route-breakdown-container'),
         plot3d: document.getElementById('plot-3d'),
+        popoutPlotBtn: document.getElementById('popout-plot-btn'),
         updatedUtilizationContainer: document.getElementById('updated-utilization-container'),
         exportCsvBtn: document.getElementById('export-csv-btn'),
         progressContainer: document.getElementById('progress-container'),
@@ -1136,8 +1137,23 @@ document.addEventListener('DOMContentLoaded', () => {
             });
         }
 
-        const layout = { title: title, scene: { aspectmode: 'data' }};
-        Plotly.newPlot(elements.plot3d, traces, layout);
+    const layout = { title: title, scene: { aspectmode: 'data' }};
+    Plotly.newPlot(elements.plot3d, traces, layout);
+    window.current3DPlot = { traces: traces, layout: layout };
+    };
+
+    const popOutPlot = () => {
+        if (!window.current3DPlot) return;
+        const html = `<!DOCTYPE html>
+<html><head><title>3D Route Visualization</title>
+<meta charset="UTF-8"><script src="https://cdn.plot.ly/plotly-latest.min.js"><\/script>
+</head><body style="margin:0;"><div id="plot" style="width:100vw;height:100vh;"></div>
+<script>const data = ${JSON.stringify(window.current3DPlot.traces)};
+const layout = ${JSON.stringify(window.current3DPlot.layout)};
+Plotly.newPlot(document.getElementById('plot'), data, layout);<\/script>
+</body></html>`;
+        const pop = window.open('', '_blank');
+        if (pop) { pop.document.write(html); pop.document.close(); }
     };
     
     
@@ -1157,6 +1173,7 @@ document.addEventListener('DOMContentLoaded', () => {
     elements.importCablesBtn.addEventListener('click', () => elements.importCablesFile.click());
     elements.importCablesFile.addEventListener('change', importCableOptionsCSV);
     elements.exportCsvBtn.addEventListener('click', exportRouteCSV);
+    elements.popoutPlotBtn.addEventListener('click', popOutPlot);
     // Initial setup
     updateCableArea();
     handleInputMethodChange();
