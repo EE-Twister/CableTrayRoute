@@ -1084,4 +1084,4 @@ document.addEventListener('DOMContentLoaded', () => {
     // Initial setup
     updateCableArea();
     handleInputMethodChange();
-});    updateCableArea();    handleInputMethodChange();});
+});
