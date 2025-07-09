@@ -528,19 +528,21 @@ document.addEventListener('DOMContentLoaded', () => {
 
     const exportManualTraysCSV = () => {
         const headers = ['tray_id','start_x','start_y','start_z','end_x','end_y','end_z','width','height','current_fill'];
-        let rows = state.manualTrays.length > 0 ? state.manualTrays : [{
-            tray_id:'', start_x:'', start_y:'', start_z:'', end_x:'', end_y:'', end_z:'', width:'', height:'', current_fill:''
-        }];
+        const rows = state.manualTrays;
         let csv = headers.join(',') + '\n';
-        rows.forEach(r => {
-            csv += headers.map(h => r[h] !== undefined ? r[h] : '').join(',') + '\n';
-        });
+        if (rows.length > 0) {
+            rows.forEach(r => {
+                csv += headers.map(h => r[h] !== undefined ? r[h] : '').join(',') + '\n';
+            });
+        }
         const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
         const url = URL.createObjectURL(blob);
         const a = document.createElement('a');
         a.href = url;
         a.download = 'tray_list.csv';
+        document.body.appendChild(a);
         a.click();
+        document.body.removeChild(a);
         URL.revokeObjectURL(url);
     };
 
@@ -981,8 +983,8 @@ document.addEventListener('DOMContentLoaded', () => {
     elements.addTrayBtn.addEventListener('click', addManualTray);
     elements.clearTraysBtn.addEventListener('click', clearManualTrays);
     elements.exportTraysBtn.addEventListener('click', exportManualTraysCSV);
-    elements.importTraysBtn.addEventListener('click', importManualTraysCSV);
+    elements.importTraysBtn.addEventListener('click', () => elements.importTraysFile.click());
+    elements.importTraysFile.addEventListener('change', importManualTraysCSV);
     elements.loadSampleCablesBtn.addEventListener('click', loadSampleCables);
     elements.addCableBtn.addEventListener('click', addCableToBatch);
-    elements.clearCablesBtn.addEventListener('click', clearCableList);
-    elements.exportCsvBtn.addEventListener('click', exportRouteCSV);        // Initial setup    updateCableArea();    handleInputMethodChange();});
+    elements.clearCablesBtn.addEventListener('click', clearCableList);    elements.exportCsvBtn.addEventListener('click', exportRouteCSV);        // Initial setup    updateCableArea();    handleInputMethodChange();});
