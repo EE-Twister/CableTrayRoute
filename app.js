@@ -45,6 +45,48 @@ document.addEventListener('DOMContentLoaded', () => {
     
     // --- CORE ROUTING LOGIC (JavaScript implementation of your Python backend) ---
 
+    class MinHeap {
+        constructor() {
+            this.heap = [];
+        }
+
+        push(node, priority) {
+            this.heap.push({ node, priority });
+            let i = this.heap.length - 1;
+            while (i > 0) {
+                const p = Math.floor((i - 1) / 2);
+                if (this.heap[p].priority <= this.heap[i].priority) break;
+                [this.heap[i], this.heap[p]] = [this.heap[p], this.heap[i]];
+                i = p;
+            }
+        }
+
+        pop() {
+            if (this.heap.length === 0) return null;
+            const min = this.heap[0];
+            const last = this.heap.pop();
+            if (this.heap.length > 0) {
+                this.heap[0] = last;
+                let i = 0;
+                while (true) {
+                    let l = 2 * i + 1;
+                    let r = 2 * i + 2;
+                    let smallest = i;
+                    if (l < this.heap.length && this.heap[l].priority < this.heap[smallest].priority) smallest = l;
+                    if (r < this.heap.length && this.heap[r].priority < this.heap[smallest].priority) smallest = r;
+                    if (smallest === i) break;
+                    [this.heap[i], this.heap[smallest]] = [this.heap[smallest], this.heap[i]];
+                    i = smallest;
+                }
+            }
+            return min.node;
+        }
+
+        isEmpty() {
+            return this.heap.length === 0;
+        }
+    }
+
     class CableRoutingSystem {
         constructor(options) {
             this.fillLimit = options.fillLimit || 0.4;
@@ -228,19 +270,18 @@ document.addEventListener('DOMContentLoaded', () => {
             // 2. Dijkstra's Algorithm
             const distances = {};
             const prev = {};
-            const pq = new Set(Object.keys(graph.nodes));
             Object.keys(graph.nodes).forEach(node => distances[node] = Infinity);
             distances['start'] = 0;
 
-            while (pq.size > 0) {
-                let u = null;
-                for (const node of pq) {
-                    if (u === null || distances[node] < distances[u]) {
-                        u = node;
-                    }
-                }
-                if (u === 'end' || distances[u] === Infinity) break;
-                pq.delete(u);
+            const pq = new MinHeap();
+            pq.push('start', 0);
+            const visited = new Set();
+
+            while (!pq.isEmpty()) {
+                const u = pq.pop();
+                if (visited.has(u)) continue;
+                visited.add(u);
+                if (u === 'end') break;
 
                 for (const v in graph.edges[u]) {
                     const edge = graph.edges[u][v];
@@ -248,6 +289,7 @@ document.addEventListener('DOMContentLoaded', () => {
                     if (alt < distances[v]) {
                         distances[v] = alt;
                         prev[v] = { node: u, edge };
+                        pq.push(v, alt);
                     }
                 }
             }
