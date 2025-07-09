@@ -95,6 +95,54 @@ class CableRoutingSystem {
     return consolidated;
   }
 
+  _segmentOrientation(seg) {
+    if (seg.start[0] !== seg.end[0]) return { axis: 0, const1: 1, const2: 2 };
+    if (seg.start[1] !== seg.end[1]) return { axis: 1, const1: 0, const2: 2 };
+    return { axis: 2, const1: 0, const2: 1 };
+  }
+
+  _segmentsOverlap(segA, segB, tol) {
+    const oA = this._segmentOrientation(segA);
+    const oB = this._segmentOrientation(segB);
+    if (oA.axis !== oB.axis) return null;
+    if (Math.abs(segA.start[oA.const1] - segB.start[oB.const1]) > tol) return null;
+    if (Math.abs(segA.start[oA.const2] - segB.start[oB.const2]) > tol) return null;
+
+    const a1 = Math.min(segA.start[oA.axis], segA.end[oA.axis]);
+    const a2 = Math.max(segA.start[oA.axis], segA.end[oA.axis]);
+    const b1 = Math.min(segB.start[oB.axis], segB.end[oB.axis]);
+    const b2 = Math.max(segB.start[oB.axis], segB.end[oB.axis]);
+
+    const start = Math.max(a1, b1);
+    const end = Math.min(a2, b2);
+    if (end + tol < start) return null;
+
+    const ps = segA.start.slice();
+    const pe = segA.start.slice();
+    ps[oA.axis] = start;
+    pe[oA.axis] = end;
+    return { start: ps, end: pe };
+  }
+
+  findCommonFieldRoutes(routes, tolerance = 1) {
+    const overlaps = [];
+    for (let i=0; i<routes.length; i++) {
+      const a = routes[i];
+      for (let j=i+1; j<routes.length; j++) {
+        const b = routes[j];
+        for (const segA of a.segments) {
+          if (segA.type !== 'field') continue;
+          for (const segB of b.segments) {
+            if (segB.type !== 'field') continue;
+            const ov = this._segmentsOverlap(segA, segB, tolerance);
+            if (ov) overlaps.push({ cables:[a.label||a.name,b.label||b.name], start:ov.start, end:ov.end });
+          }
+        }
+      }
+    }
+    return overlaps;
+  }
+
   calculateRoute(startPoint, endPoint, cableArea) {
     const graph = { nodes: {}, edges: {} };
     const addNode = (id, point, type='generic') => { graph.nodes[id] = { point, type }; graph.edges[id] = {}; };
@@ -260,17 +308,28 @@ function runBatch(count) {
   const system = new CableRoutingSystem({});
   getSampleTrays().forEach(t => system.addTraySegment({...t}));
   const cables = getSampleCables();
+  const routes = [];
   for (let i=0; i<count; i++) {
     const cable = cables[i % cables.length];
     const area = Math.PI * (cable.diameter/2)**2;
     try {
       const res = system.calculateRoute(cable.start, cable.end, area);
       console.log(`Cable ${i+1}:`, res.success ? 'routed' : 'failed');
-      if (res.success) system.updateTrayFill(res.tray_segments, area);
+      if (res.success) {
+        system.updateTrayFill(res.tray_segments, area);
+        routes.push({ name: cable.name, segments: res.route_segments });
+      }
     } catch (err) {
       console.error(`Cable ${i+1} error:`, err.message);
       return;
     }
+  }
+  const common = system.findCommonFieldRoutes(routes, 6);
+  if (common.length > 0) {
+    console.log('Common field route segments:');
+    common.forEach(c => console.log(`  ${c.cables.join(' & ')} from ${c.start} to ${c.end}`));
+  } else {
+    console.log('No common field routes detected');
   }
   console.log('Batch completed');
 }

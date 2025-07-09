@@ -168,6 +168,56 @@ document.addEventListener('DOMContentLoaded', () => {
             return consolidated;
         }
 
+        _segmentOrientation(seg) {
+            if (seg.start[0] !== seg.end[0]) return { axis: 0, const1: 1, const2: 2 };
+            if (seg.start[1] !== seg.end[1]) return { axis: 1, const1: 0, const2: 2 };
+            return { axis: 2, const1: 0, const2: 1 };
+        }
+
+        _segmentsOverlap(segA, segB, tol) {
+            const oA = this._segmentOrientation(segA);
+            const oB = this._segmentOrientation(segB);
+            if (oA.axis !== oB.axis) return null;
+            if (Math.abs(segA.start[oA.const1] - segB.start[oB.const1]) > tol) return null;
+            if (Math.abs(segA.start[oA.const2] - segB.start[oB.const2]) > tol) return null;
+
+            const a1 = Math.min(segA.start[oA.axis], segA.end[oA.axis]);
+            const a2 = Math.max(segA.start[oA.axis], segA.end[oA.axis]);
+            const b1 = Math.min(segB.start[oB.axis], segB.end[oB.axis]);
+            const b2 = Math.max(segB.start[oB.axis], segB.end[oB.axis]);
+
+            const start = Math.max(a1, b1);
+            const end = Math.min(a2, b2);
+            if (end + tol < start) return null;
+
+            const pointStart = segA.start.slice();
+            const pointEnd = segA.start.slice();
+            pointStart[oA.axis] = start;
+            pointEnd[oA.axis] = end;
+            return { start: pointStart, end: pointEnd };
+        }
+
+        findCommonFieldRoutes(routes, tolerance = 1) {
+            const overlaps = [];
+            for (let i = 0; i < routes.length; i++) {
+                const a = routes[i];
+                for (let j = i + 1; j < routes.length; j++) {
+                    const b = routes[j];
+                    for (const segA of a.segments) {
+                        if (segA.type !== 'field') continue;
+                        for (const segB of b.segments) {
+                            if (segB.type !== 'field') continue;
+                            const ov = this._segmentsOverlap(segA, segB, tolerance);
+                            if (ov) {
+                                overlaps.push({ cables: [a.label || a.name, b.label || b.name], start: ov.start, end: ov.end });
+                            }
+                        }
+                    }
+                }
+            }
+            return overlaps;
+        }
+
         calculateRoute(startPoint, endPoint, cableArea) {
             // 1. Build the graph
             const graph = { nodes: {}, edges: {} };
@@ -1001,7 +1051,17 @@ document.addEventListener('DOMContentLoaded', () => {
 
             renderBatchResults(batchResults);
             state.latestRouteData = batchResults;
-            elements.metrics.innerHTML = '';
+            const common = routingSystem.findCommonFieldRoutes(allRoutesForPlotting, 6);
+            if (common.length > 0) {
+                let html = '<h4>Potential Shared Field Routes</h4><ul>';
+                common.forEach(c => {
+                    html += `<li>${c.cables.join(' & ')}: ${formatPoint(c.start)} to ${formatPoint(c.end)}</li>`;
+                });
+                html += '</ul>';
+                elements.metrics.innerHTML = html;
+            } else {
+                elements.metrics.innerHTML = '<p>No common field routes detected.</p>';
+            }
             visualize(trayDataForRun, allRoutesForPlotting, "Batch Route Visualization");
         } else {
             alert('Please add at least one cable to route.');
