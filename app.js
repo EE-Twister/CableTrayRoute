@@ -153,6 +153,29 @@ document.addEventListener('DOMContentLoaded', () => {
                 }
             });
 
+            // Connect tray endpoints that lie on other trays
+            this.trays.forEach(trayA => {
+                const endpoints = [
+                    { id: `${trayA.tray_id}_start`, point: [trayA.start_x, trayA.start_y, trayA.start_z] },
+                    { id: `${trayA.tray_id}_end`, point: [trayA.end_x, trayA.end_y, trayA.end_z] }
+                ];
+                this.trays.forEach(trayB => {
+                    if (trayA.tray_id === trayB.tray_id) return;
+                    const a = [trayB.start_x, trayB.start_y, trayB.start_z];
+                    const b = [trayB.end_x, trayB.end_y, trayB.end_z];
+                    endpoints.forEach(ep => {
+                        const proj = this.projectPointOnSegment(ep.point, a, b);
+                        if (this.distance(ep.point, proj) < 0.1) {
+                            const projId = `${ep.id}_on_${trayB.tray_id}`;
+                            addNode(projId, proj, 'projection');
+                            addEdge(ep.id, projId, 0.1, 'tray_connection', trayB.tray_id);
+                            addEdge(projId, `${trayB.tray_id}_start`, this.distance(proj, a), 'tray', trayB.tray_id);
+                            addEdge(projId, `${trayB.tray_id}_end`, this.distance(proj, b), 'tray', trayB.tray_id);
+                        }
+                    });
+                });
+            });
+
             // Add edges between all nodes (field routing and tray-to-tray connections)
             const nodeIds = Object.keys(graph.nodes);
             for (let i = 0; i < nodeIds.length; i++) {
@@ -325,11 +348,11 @@ document.addEventListener('DOMContentLoaded', () => {
     ];
     
     const getSampleCables = () => [
-        {"name": "Power Cable 1", "diameter": 1.26, "start": [5, 5, 5], "end": [110, 95, 45]},
-        {"name": "Control Cable 1", "diameter": 0.47, "start": [10, 0, 10], "end": [100, 80, 25]},
-        {"name": "Data Cable 1", "diameter": 0.31, "start": [15, 5, 15], "end": [105, 85, 30]},
-        {"name": "Power Cable 2", "diameter": 1.10, "start": [20, 10, 8], "end": [115, 90, 35]},
-        {"name": "Control Cable 2", "diameter": 0.59, "start": [25, 15, 12], "end": [95, 75, 28]},
+        { name: "Power Cable 1", diameter: 1.26, start: [5, 5, 5], end: [110, 95, 45], start_tag: "", end_tag: "" },
+        { name: "Control Cable 1", diameter: 0.47, start: [10, 0, 10], end: [100, 80, 25], start_tag: "", end_tag: "" },
+        { name: "Data Cable 1", diameter: 0.31, start: [15, 5, 15], end: [105, 85, 30], start_tag: "", end_tag: "" },
+        { name: "Power Cable 2", diameter: 1.10, start: [20, 10, 8], end: [115, 90, 35], start_tag: "", end_tag: "" },
+        { name: "Control Cable 2", diameter: 0.59, start: [25, 15, 12], end: [95, 75, 28], start_tag: "", end_tag: "" },
     ];
 
     const updateCableArea = () => {
@@ -343,15 +366,22 @@ document.addEventListener('DOMContentLoaded', () => {
     };
 
     const renderTable = (container, headers, data, styleFn = null) => {
+        const defs = headers.map(h => typeof h === 'string' ? {
+            label: h,
+            key: h.toLowerCase()
+                    .replace(/²/g, '2')
+                    .replace(/[^a-z0-9]+/g, '_')
+                    .replace(/^_|_$/g, '')
+        } : h);
+
         let table = '<table><thead><tr>';
-        headers.forEach(h => table += `<th>${h}</th>`);
+        defs.forEach(h => table += `<th>${h.label}</th>`);
         table += '</tr></thead><tbody>';
         data.forEach(row => {
             const style = styleFn ? styleFn(row) : '';
             table += `<tr class="${style}">`;
-            headers.forEach(h => {
-                const key = h.toLowerCase().replace(/ /g, '_').replace(/[\(\)%]/g,'');
-                table += `<td>${row[key] !== undefined ? row[key] : 'N/A'}</td>`;
+            defs.forEach(h => {
+                table += `<td>${row[h.key] !== undefined ? row[h.key] : 'N/A'}</td>`;
             });
             table += '</tr>';
         });
@@ -382,7 +412,15 @@ document.addEventListener('DOMContentLoaded', () => {
         });
         renderTable(
             elements.trayUtilizationContainer,
-            ['Tray ID', 'Start (x,y,z)', 'End (x,y,z)', 'Max Capacity (in²)', 'Current Fill (in²)', 'Utilization %', 'Available Space (in²)'],
+            [
+                { label: 'Tray ID', key: 'tray_id' },
+                { label: 'Start (x,y,z)', key: 'start_xyz' },
+                { label: 'End (x,y,z)', key: 'end_xyz' },
+                { label: 'Max Capacity (in²)', key: 'max_capacity' },
+                { label: 'Current Fill (in²)', key: 'current_fill' },
+                { label: 'Utilization %', key: 'utilization_pct' },
+                { label: 'Available Space (in²)', key: 'available_space' }
+            ],
             displayData.map(d => ({
                 tray_id: d.tray_id,
                 start_xyz: `(${d.start_x}, ${d.start_y}, ${d.start_z})`,
@@ -524,10 +562,12 @@ document.addEventListener('DOMContentLoaded', () => {
             elements.cableListContainer.innerHTML = '';
             return;
         }
-        let html = '<h4>Cables to Route:</h4><table><thead><tr><th>Tag</th><th>Diameter (in)</th><th>Start (X,Y,Z)</th><th>End (X,Y,Z)</th></tr></thead><tbody>';
+        let html = '<h4>Cables to Route:</h4><table><thead><tr><th>Tag</th><th>Start Tag</th><th>End Tag</th><th>Diameter (in)</th><th>Start (X,Y,Z)</th><th>End (X,Y,Z)</th></tr></thead><tbody>';
         state.cableList.forEach((c, idx) => {
             html += `<tr>
                         <td><input type="text" class="cable-tag-input" data-idx="${idx}" value="${c.name}"></td>
+                        <td><input type="text" class="cable-start-tag-input" data-idx="${idx}" value="${c.start_tag || ''}" style="width:80px;"></td>
+                        <td><input type="text" class="cable-end-tag-input" data-idx="${idx}" value="${c.end_tag || ''}" style="width:80px;"></td>
                         <td><input type="number" class="cable-diameter-input" data-idx="${idx}" value="${c.diameter}" step="0.01" style="width:60px;"></td>
                         <td>
                             <input type="number" class="cable-start-input" data-idx="${idx}" data-coord="0" value="${c.start[0]}" step="0.1" style="width:50px;">
@@ -547,6 +587,18 @@ document.addEventListener('DOMContentLoaded', () => {
             input.addEventListener('input', e => {
                 const i = parseInt(e.target.dataset.idx, 10);
                 state.cableList[i].name = e.target.value;
+            });
+        });
+        elements.cableListContainer.querySelectorAll('.cable-start-tag-input').forEach(input => {
+            input.addEventListener('input', e => {
+                const i = parseInt(e.target.dataset.idx, 10);
+                state.cableList[i].start_tag = e.target.value;
+            });
+        });
+        elements.cableListContainer.querySelectorAll('.cable-end-tag-input').forEach(input => {
+            input.addEventListener('input', e => {
+                const i = parseInt(e.target.dataset.idx, 10);
+                state.cableList[i].end_tag = e.target.value;
             });
         });
         elements.cableListContainer.querySelectorAll('.cable-diameter-input').forEach(input => {
@@ -589,11 +641,13 @@ document.addEventListener('DOMContentLoaded', () => {
             parseFloat(document.getElementById('end-z').value),
         ];
         const name = elements.cableTagIn.value || `Cable ${state.cableList.length + 1}`;
+        const startTag = elements.startTagIn.value;
+        const endTag = elements.endTagIn.value;
         if (isNaN(diameter) || start.some(isNaN) || end.some(isNaN)) {
             alert('Please provide valid cable diameter and route points.');
             return;
         }
-        state.cableList.push({ name, diameter, start, end });
+        state.cableList.push({ name, diameter, start, end, start_tag: startTag, end_tag: endTag });
         updateCableListDisplay();
     };
 
@@ -736,7 +790,15 @@ document.addEventListener('DOMContentLoaded', () => {
                 }));
                 renderTable(
                     elements.routeBreakdownContainer,
-                    ['Cable Tag', 'Segment', 'Tray ID', 'Type', 'From', 'To', 'Length'],
+                    [
+                        { label: 'Cable Tag', key: 'cable' },
+                        { label: 'Segment', key: 'segment' },
+                        { label: 'Tray ID', key: 'tray_id' },
+                        { label: 'Type', key: 'type' },
+                        { label: 'From', key: 'from' },
+                        { label: 'To', key: 'to' },
+                        { label: 'Length', key: 'length' }
+                    ],
                     breakdownData
                 );
                 state.latestRouteData = breakdownData;
@@ -755,7 +817,16 @@ document.addEventListener('DOMContentLoaded', () => {
             utilization: data.utilization_percentage.toFixed(1),
             available: data.available_capacity.toFixed(0),
         }));
-        renderTable(elements.updatedUtilizationContainer, ['Tray ID', 'Utilization (%)', 'Available (in²)'], utilData, (row) => utilizationStyle(row));
+        renderTable(
+            elements.updatedUtilizationContainer,
+            [
+                { label: 'Tray ID', key: 'tray_id' },
+                { label: 'Utilization (%)', key: 'utilization' },
+                { label: 'Available (in²)', key: 'available' }
+            ],
+            utilData,
+            (row) => utilizationStyle(row)
+        );
         plotUtilization(finalUtilization);
     };
     
