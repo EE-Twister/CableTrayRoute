@@ -39,6 +39,13 @@
                     </span>
                  </label>
                  <input type="number" id="field-route-penalty" value="3.0" step="0.1">
+
+                 <label for="shared-field-penalty">Shared Field Route Cost Multiplier
+                    <span class="help-icon" tabindex="0">?
+                        <span class="tooltip">Multiplier applied when a cable uses an existing field-routed path from a previous cable. Use a value less than 1 to make shared field routes cheaper than new field routes.</span>
+                    </span>
+                 </label>
+                 <input type="number" id="shared-field-penalty" value="0.5" step="0.1">
                  
                  <button id="calculate-route-btn" class="primary-btn">▶ Calculate Optimal Route</button>
                  <div id="progress-container" style="display:none;">

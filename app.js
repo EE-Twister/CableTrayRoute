@@ -94,6 +94,8 @@ document.addEventListener('DOMContentLoaded', () => {
             this.fillLimit = options.fillLimit || 0.4;
             this.proximityThreshold = options.proximityThreshold || 72.0;
             this.fieldPenalty = options.fieldPenalty || 3.0;
+            this.sharedPenalty = options.sharedPenalty || 0.5;
+            this.sharedFieldSegments = [];
             this.trays = new Map();
         }
 
@@ -218,6 +220,21 @@ document.addEventListener('DOMContentLoaded', () => {
             return overlaps;
         }
 
+        _isSharedSegment(seg, tol = 0.1) {
+            for (const existing of this.sharedFieldSegments) {
+                if (this._segmentsOverlap(seg, existing, tol)) return true;
+            }
+            return false;
+        }
+
+        recordSharedFieldSegments(segments) {
+            segments.forEach(s => {
+                if (s.type === 'field') {
+                    this.sharedFieldSegments.push({ start: s.start.slice(), end: s.end.slice() });
+                }
+            });
+        }
+
         calculateRoute(startPoint, endPoint, cableArea) {
             // 1. Build the graph
             const graph = { nodes: {}, edges: {} };
@@ -290,9 +307,16 @@ document.addEventListener('DOMContentLoaded', () => {
                     if (graph.edges[id1][id2] || (id1.includes('_') && isSameTray)) continue;
 
                     const dist = this.manhattanDistance(p1, p2);
-                    // Connect physically adjacent tray endpoints with minimal cost
-                    const weight = dist < 0.1 ? 0.1 : dist * this.fieldPenalty;
-                    const type = dist < 0.1 ? 'tray_connection' : 'field';
+                    let weight, type;
+                    if (dist < 0.1) {
+                        weight = 0.1;
+                        type = 'tray_connection';
+                    } else {
+                        const seg = { start: p1, end: p2 };
+                        const penalty = this._isSharedSegment(seg) ? this.fieldPenalty * this.sharedPenalty : this.fieldPenalty;
+                        weight = dist * penalty;
+                        type = 'field';
+                    }
                     addEdge(id1, id2, weight, type);
                 }
             }
@@ -311,7 +335,8 @@ document.addEventListener('DOMContentLoaded', () => {
                 if (distToProjStart <= this.proximityThreshold) {
                     const projId = `proj_start_on_${tray.tray_id}`;
                     addNode(projId, projStart, 'projection');
-                    addEdge('start', projId, distToProjStart * this.fieldPenalty, 'field');
+                    const penStart = this._isSharedSegment({ start: startPoint, end: projStart }) ? this.fieldPenalty * this.sharedPenalty : this.fieldPenalty;
+                    addEdge('start', projId, distToProjStart * penStart, 'field');
                     addEdge(projId, startId, this.distance(projStart, a), 'tray', tray.tray_id);
                     addEdge(projId, `${tray.tray_id}_end`, this.distance(projStart, b), 'tray', tray.tray_id);
                 }
@@ -322,7 +347,8 @@ document.addEventListener('DOMContentLoaded', () => {
                 if (distToProjEnd <= this.proximityThreshold) {
                     const projId = `proj_end_on_${tray.tray_id}`;
                     addNode(projId, projEnd, 'projection');
-                    addEdge('end', projId, distToProjEnd * this.fieldPenalty, 'field');
+                    const penEnd = this._isSharedSegment({ start: endPoint, end: projEnd }) ? this.fieldPenalty * this.sharedPenalty : this.fieldPenalty;
+                    addEdge('end', projId, distToProjEnd * penEnd, 'field');
                     addEdge(projId, startId, this.distance(projEnd, a), 'tray', tray.tray_id);
                     addEdge(projId, `${tray.tray_id}_end`, this.distance(projEnd, b), 'tray', tray.tray_id);
                 }
@@ -1000,6 +1026,7 @@ document.addEventListener('DOMContentLoaded', () => {
             fillLimit: parseFloat(elements.fillLimitIn.value) / 100,
             proximityThreshold: parseFloat(document.getElementById('proximity-threshold').value),
             fieldPenalty: parseFloat(document.getElementById('field-route-penalty').value),
+            sharedPenalty: parseFloat(document.getElementById('shared-field-penalty').value),
         });
         
         // Deep copy tray data so original state isn't mutated during batch routing
@@ -1017,6 +1044,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
                 if (result.success) {
                     routingSystem.updateTrayFill(result.tray_segments, cableArea);
+                    routingSystem.recordSharedFieldSegments(result.route_segments);
                     allRoutesForPlotting.push({
                         label: cable.name,
                         segments: result.route_segments,
