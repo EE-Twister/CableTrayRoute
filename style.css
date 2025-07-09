@@ -135,6 +135,14 @@ details > summary {
     margin-top: 10px;
 }
 
+.cable-import-export {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 10px;
+    align-items: center;
+    margin-top: 10px;
+}
+
 /* --- Help Icon --- */
 .help-icon {
     position: relative;
