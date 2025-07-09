@@ -254,7 +254,11 @@ th {
 /* --- Plots --- */
 #plot-3d {
     width: 100%;
-    min-height: 900px;
+    min-height: 1800px;
+}
+
+#popout-plot-btn {
+    margin-top: 10px;
 }
 
 /* Progress Bar */
