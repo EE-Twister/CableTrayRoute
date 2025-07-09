@@ -50,7 +50,7 @@ document.addEventListener('DOMContentLoaded', () => {
     class CableRoutingSystem {
         constructor(options) {
             this.fillLimit = options.fillLimit || 0.4;
-            this.proximityThreshold = options.proximityThreshold || 15.0;
+            this.proximityThreshold = options.proximityThreshold || 72.0;
             this.fieldPenalty = options.fieldPenalty || 3.0;
             this.trays = new Map();
         }
@@ -407,7 +407,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 ...tray,
                 max_capacity: maxCapacity.toFixed(0),
                 utilization_pct: ((tray.current_fill / maxCapacity) * 100).toFixed(1),
-                available_space: (maxCapacity - tray.current_fill).toFixed(0),
+                available_space: (maxCapacity - tray.current_fill).toFixed(2),
             };
         });
         renderTable(
@@ -562,7 +562,7 @@ document.addEventListener('DOMContentLoaded', () => {
             elements.cableListContainer.innerHTML = '';
             return;
         }
-        let html = '<h4>Cables to Route:</h4><table><thead><tr><th>Tag</th><th>Start Tag</th><th>End Tag</th><th>Diameter (in)</th><th>Start (X,Y,Z)</th><th>End (X,Y,Z)</th></tr></thead><tbody>';
+        let html = '<h4>Cables to Route:</h4><table><thead><tr><th>Tag</th><th>Start Tag</th><th>End Tag</th><th>Diameter (in)</th><th>Start (X,Y,Z)</th><th>End (X,Y,Z)</th><th></th><th></th></tr></thead><tbody>';
         state.cableList.forEach((c, idx) => {
             html += `<tr>
                         <td><input type="text" class="cable-tag-input" data-idx="${idx}" value="${c.name}"></td>
@@ -579,6 +579,8 @@ document.addEventListener('DOMContentLoaded', () => {
                             <input type="number" class="cable-end-input" data-idx="${idx}" data-coord="1" value="${c.end[1]}" step="0.1" style="width:50px;">
                             <input type="number" class="cable-end-input" data-idx="${idx}" data-coord="2" value="${c.end[2]}" step="0.1" style="width:50px;">
                         </td>
+                        <td><button class="dup-cable" data-idx="${idx}">Duplicate</button></td>
+                        <td><button class="del-cable" data-idx="${idx}">Delete</button></td>
                     </tr>`;
         });
         html += '</tbody></table>';
@@ -619,6 +621,21 @@ document.addEventListener('DOMContentLoaded', () => {
                 const i = parseInt(e.target.dataset.idx, 10);
                 const coord = parseInt(e.target.dataset.coord, 10);
                 state.cableList[i].end[coord] = parseFloat(e.target.value);
+            });
+        });
+        elements.cableListContainer.querySelectorAll('.dup-cable').forEach(btn => {
+            btn.addEventListener('click', e => {
+                const i = parseInt(e.target.dataset.idx, 10);
+                const copy = JSON.parse(JSON.stringify(state.cableList[i]));
+                state.cableList.splice(i + 1, 0, copy);
+                updateCableListDisplay();
+            });
+        });
+        elements.cableListContainer.querySelectorAll('.del-cable').forEach(btn => {
+            btn.addEventListener('click', e => {
+                const i = parseInt(e.target.dataset.idx, 10);
+                state.cableList.splice(i, 1);
+                updateCableListDisplay();
             });
         });
     };
@@ -666,20 +683,50 @@ document.addEventListener('DOMContentLoaded', () => {
             return;
         }
 
-        const headers = Object.keys(state.latestRouteData[0]);
+        let data = state.latestRouteData;
+
+        if (data[0].breakdown !== undefined) {
+            const flat = [];
+            data.forEach(row => {
+                if (Array.isArray(row.breakdown) && row.breakdown.length > 0) {
+                    row.breakdown.forEach(b => {
+                        flat.push({
+                            cable: row.cable,
+                            status: row.status,
+                            total_length: row.total_length,
+                            field_length: row.field_length,
+                            tray_segments_count: row.tray_segments_count,
+                            segments_count: row.segments_count,
+                            segment: b.segment,
+                            tray_id: b.tray_id,
+                            type: b.type,
+                            from: b.from,
+                            to: b.to,
+                            length: b.length
+                        });
+                    });
+                } else {
+                    flat.push({
+                        cable: row.cable,
+                        status: row.status,
+                        total_length: row.total_length,
+                        field_length: row.field_length,
+                        tray_segments_count: row.tray_segments_count,
+                        segments_count: row.segments_count,
+                        segment: '', tray_id: '', type: '', from: '', to: '', length: ''
+                    });
+                }
+            });
+            data = flat;
+        }
+
+        const headers = Object.keys(data[0]);
         let csv = headers.join(',') + '\n';
 
-        state.latestRouteData.forEach(row => {
+        data.forEach(row => {
             const line = headers.map(h => {
                 let val = row[h];
-                if (typeof val === 'object') {
-                    try {
-                        val = JSON.stringify(val);
-                    } catch (e) {
-                        val = '';
-                    }
-                }
-                let str = String(val);
+                let str = String(val === undefined ? '' : val);
                 if (str.includes('"')) {
                     str = str.replace(/"/g, '""');
                 }
@@ -815,7 +862,7 @@ document.addEventListener('DOMContentLoaded', () => {
         const utilData = Object.entries(finalUtilization).map(([id, data]) => ({
             tray_id: id,
             utilization: data.utilization_percentage.toFixed(1),
-            available: data.available_capacity.toFixed(0),
+            available: data.available_capacity.toFixed(2),
         }));
         renderTable(
             elements.updatedUtilizationContainer,
