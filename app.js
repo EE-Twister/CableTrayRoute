@@ -39,6 +39,8 @@ document.addEventListener('DOMContentLoaded', () => {
         plot3d: document.getElementById('plot-3d'),
         updatedUtilizationContainer: document.getElementById('updated-utilization-container'),
         exportCsvBtn: document.getElementById('export-csv-btn'),
+        progressContainer: document.getElementById('progress-container'),
+        progressBar: document.getElementById('progress-bar'),
     };
     
     // --- CORE ROUTING LOGIC (JavaScript implementation of your Python backend) ---
@@ -592,11 +594,12 @@ document.addEventListener('DOMContentLoaded', () => {
             const text = e.target.result.trim();
             const lines = text.split(/\r?\n/);
             if (lines.length === 0) return;
-            const headers = lines[0].split(',');
+            const delim = lines[0].includes(',') ? ',' : /\t/;
+            const headers = lines[0].split(delim);
             const newTrays = [];
             for (let i = 1; i < lines.length; i++) {
                 if (!lines[i].trim()) continue;
-                const vals = lines[i].split(',');
+                const vals = lines[i].split(delim);
                 const t = {};
                 headers.forEach((h, idx) => { t[h.trim()] = vals[idx] !== undefined ? vals[idx].trim() : ''; });
                 newTrays.push({
@@ -654,11 +657,12 @@ document.addEventListener('DOMContentLoaded', () => {
             const text = e.target.result.trim();
             const lines = text.split(/\r?\n/);
             if (lines.length === 0) return;
-            const headers = lines[0].split(',');
+            const delim = lines[0].includes(',') ? ',' : /\t/;
+            const headers = lines[0].split(delim);
             const newCables = [];
             for (let i = 1; i < lines.length; i++) {
                 if (!lines[i].trim()) continue;
-                const vals = lines[i].split(',');
+                const vals = lines[i].split(delim);
                 const t = {};
                 headers.forEach((h, idx) => { t[h.trim()] = vals[idx] !== undefined ? vals[idx].trim() : ''; });
                 newCables.push({
@@ -878,9 +882,11 @@ document.addEventListener('DOMContentLoaded', () => {
 
     const formatPoint = (p) => `(${p[0].toFixed(1)}, ${p[1].toFixed(1)}, ${p[2].toFixed(1)})`;
 
-    const mainCalculation = () => {
+    const mainCalculation = async () => {
         elements.resultsSection.style.display = 'block';
-        elements.messages.innerHTML = ''; 
+        elements.messages.innerHTML = '';
+        elements.progressContainer.style.display = 'block';
+        elements.progressBar.style.width = '0%';
         
         const routingSystem = new CableRoutingSystem({
             fillLimit: parseFloat(elements.fillLimitIn.value) / 100,
@@ -896,10 +902,11 @@ document.addEventListener('DOMContentLoaded', () => {
             const batchResults = [];
             const allRoutesForPlotting = [];
 
-            state.cableList.forEach(cable => {
+            for (let i = 0; i < state.cableList.length; i++) {
+                const cable = state.cableList[i];
                 const cableArea = Math.PI * (cable.diameter / 2) ** 2;
                 const result = routingSystem.calculateRoute(cable.start, cable.end, cableArea);
-                
+
                 if (result.success) {
                     routingSystem.updateTrayFill(result.tray_segments, cableArea);
                     allRoutesForPlotting.push({
@@ -911,7 +918,7 @@ document.addEventListener('DOMContentLoaded', () => {
                         endTag: cable.end_tag
                     });
                 }
-                
+
                 batchResults.push({
                     cable: cable.name,
                     status: result.success ? '✓ Routed' : '✗ Failed',
@@ -928,7 +935,10 @@ document.addEventListener('DOMContentLoaded', () => {
                         length: seg.length.toFixed(2)
                     })) : []
                 });
-            });
+
+                elements.progressBar.style.width = `${((i + 1) / state.cableList.length) * 100}%`;
+                await new Promise(r => setTimeout(r, 0));
+            }
 
             renderBatchResults(batchResults);
             state.latestRouteData = batchResults;
@@ -975,6 +985,8 @@ document.addEventListener('DOMContentLoaded', () => {
             (row) => utilizationStyle(row),
             formatters
         );
+
+        elements.progressContainer.style.display = 'none';
     };
     
     // --- VISUALIZATION ---
