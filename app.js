@@ -692,7 +692,6 @@ document.addEventListener('DOMContentLoaded', () => {
                     row.breakdown.forEach(b => {
                         flat.push({
                             cable: row.cable,
-                            status: row.status,
                             total_length: row.total_length,
                             field_length: row.field_length,
                             tray_segments_count: row.tray_segments_count,
@@ -708,7 +707,6 @@ document.addEventListener('DOMContentLoaded', () => {
                 } else {
                     flat.push({
                         cable: row.cable,
-                        status: row.status,
                         total_length: row.total_length,
                         field_length: row.field_length,
                         tray_segments_count: row.tray_segments_count,
@@ -719,6 +717,12 @@ document.addEventListener('DOMContentLoaded', () => {
             });
             data = flat;
         }
+
+        // remove status column if present
+        data = data.map(row => {
+            const { status, ...rest } = row;
+            return rest;
+        });
 
         const headers = Object.keys(data[0]);
         let csv = headers.join(',') + '\n';
@@ -775,7 +779,14 @@ document.addEventListener('DOMContentLoaded', () => {
                 
                 if (result.success) {
                     routingSystem.updateTrayFill(result.tray_segments, cableArea);
-                    allRoutesForPlotting.push({ label: cable.name, segments: result.route_segments });
+                    allRoutesForPlotting.push({
+                        label: cable.name,
+                        segments: result.route_segments,
+                        startPoint: cable.start,
+                        endPoint: cable.end,
+                        startTag: cable.start_tag,
+                        endTag: cable.end_tag
+                    });
                 }
                 
                 batchResults.push({
@@ -799,7 +810,7 @@ document.addEventListener('DOMContentLoaded', () => {
             renderBatchResults(batchResults);
             state.latestRouteData = batchResults;
             elements.metrics.innerHTML = '';
-            visualize(null, null, trayDataForRun, allRoutesForPlotting, "Batch Route Visualization");
+            visualize(trayDataForRun, allRoutesForPlotting, "Batch Route Visualization");
 
         } else {
             const startPoint = [
@@ -849,7 +860,18 @@ document.addEventListener('DOMContentLoaded', () => {
                     breakdownData
                 );
                 state.latestRouteData = breakdownData;
-                visualize(startPoint, endPoint, trayDataForRun, result.route_segments, "3D Route Visualization", state.cableTag || state.startTag || 'Cable Route');
+                visualize(
+                    trayDataForRun,
+                    [{
+                        label: state.cableTag || state.startTag || 'Cable Route',
+                        segments: result.route_segments,
+                        startPoint,
+                        endPoint,
+                        startTag: state.startTag,
+                        endTag: state.endTag
+                    }],
+                    "3D Route Visualization"
+                );
             } else {
                 showMessage('error', `Route calculation failed: ${result.error}`);
                 elements.metrics.innerHTML = '';
@@ -878,7 +900,7 @@ document.addEventListener('DOMContentLoaded', () => {
     };
     
     // --- VISUALIZATION ---
-    const visualize = (startPoint, endPoint, trays, routeData, title, routeLabel = null) => {
+    const visualize = (trays, routes, title) => {
         const traces = [];
 
         const trayMesh = (tray) => {
@@ -917,9 +939,9 @@ document.addEventListener('DOMContentLoaded', () => {
             traces.push({type:'scatter3d', mode:'text', x:[midX], y:[midY], z:[midZ], text:[tray.tray_id], showlegend:false, hoverinfo:'none'});
         });
 
-        if (routeData && routeData.length > 0) {
+        if (routes && routes.length > 0) {
             const palette = ['blue', 'green', 'orange', 'purple', 'brown', 'cyan', 'magenta', 'olive'];
-            const routes = (routeData[0] && routeData[0].segments) ? routeData : [{ label: routeLabel || 'Route', segments: routeData }];
+            const seenTags = new Set();
 
             routes.forEach((route, idx) => {
                 const color = palette[idx % palette.length];
@@ -941,14 +963,27 @@ document.addEventListener('DOMContentLoaded', () => {
                         line: { color: seg.type === 'tray' ? color : 'red', width: 5 }
                     });
                 });
-            });
-        }
-        
-        if (startPoint && endPoint) {
-            traces.push({
-                x: [startPoint[0], endPoint[0]], y: [startPoint[1], endPoint[1]], z: [startPoint[2], endPoint[2]],
-                mode: 'markers', type: 'scatter3d', name: 'Start/End',
-                marker: { color: ['green', 'purple'], size: 8 }
+
+                if (route.startPoint && route.endPoint) {
+                    traces.push({
+                        x: [route.startPoint[0]], y: [route.startPoint[1]], z: [route.startPoint[2]],
+                        mode: 'markers', type: 'scatter3d', showlegend: false,
+                        marker: { color: 'green', size: 8 }
+                    });
+                    traces.push({
+                        x: [route.endPoint[0]], y: [route.endPoint[1]], z: [route.endPoint[2]],
+                        mode: 'markers', type: 'scatter3d', showlegend: false,
+                        marker: { color: 'purple', size: 8 }
+                    });
+                    if (route.startTag && !seenTags.has(`s-${route.startTag}`)) {
+                        traces.push({type:'scatter3d', mode:'text', x:[route.startPoint[0]], y:[route.startPoint[1]], z:[route.startPoint[2]], text:[route.startTag], showlegend:false, hoverinfo:'none'});
+                        seenTags.add(`s-${route.startTag}`);
+                    }
+                    if (route.endTag && !seenTags.has(`e-${route.endTag}`)) {
+                        traces.push({type:'scatter3d', mode:'text', x:[route.endPoint[0]], y:[route.endPoint[1]], z:[route.endPoint[2]], text:[route.endTag], showlegend:false, hoverinfo:'none'});
+                        seenTags.add(`e-${route.endTag}`);
+                    }
+                }
             });
         }
 

@@ -22,3 +22,6 @@ coordinates for that cable.
 - Each cable row in batch mode includes **Duplicate** and **Delete** controls.
 - Tray utilization tables show **Available Space** to two decimal places.
 - CSV export flattens the breakdown so each segment is a separate row.
+- CSV export no longer includes the **Status** column.
+- Start and end tags are displayed in the 3D view (duplicates shown once).
+- Cable specification fields are now located in the **Cable Routing Options** panel.
