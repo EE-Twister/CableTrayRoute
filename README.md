@@ -25,3 +25,6 @@ coordinates for that cable.
 - CSV export no longer includes the **Status** column.
 - Start and end tags are displayed in the 3D view (duplicates shown once).
 - Cable specification fields are now located in the **Cable Routing Options** panel.
+- Cable routing always uses the batch list. Add a single cable by adding one row.
+- Tray network tables can now be **imported** or **exported** as CSV.
+- Updated tray utilization table shows a progress bar with a marker for the maximum allowed fill.

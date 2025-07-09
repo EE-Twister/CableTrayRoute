@@ -78,6 +78,9 @@
                     </details>
                     <div id="manual-tray-table-container"></div>
                     <button id="clear-trays-btn">Clear All Trays</button>
+                    <input type="file" id="import-trays-file" accept=".csv" style="display:none">
+                    <button id="import-trays-btn">Import Network CSV</button>
+                    <button id="export-trays-btn">Export Network CSV</button>
                 </div>
 
                  <div id="tray-utilization-container"></div>
@@ -85,12 +88,6 @@
 
             <section class="card">
                 <h2>Cable Routing Options</h2>
-                <div class="input-methods">
-                    <input type="radio" id="single-cable-mode" name="routing-mode" value="single" checked>
-                    <label for="single-cable-mode">Single Cable</label>
-                    <input type="radio" id="batch-mode" name="routing-mode" value="batch">
-                    <label for="batch-mode">Multiple Cables (Batch)</label>
-                </div>
 
                 <section>
                     <h3>Cable Specifications</h3>
@@ -121,7 +118,7 @@
                     </div>
                 </section>
 
-                <div id="batch-section" style="display:none;">
+                <div id="batch-section">
                     <button id="add-cable-btn">Add Cable to List</button>
                     <button id="load-sample-cables-btn">Load Sample Cable List</button>
                     <div id="cable-list-container"></div>
@@ -139,10 +136,8 @@
                 <div id="plot-3d"></div>
                 <h3>Updated Tray Utilization</h3>
                 <div id="updated-utilization-container"></div>
-                <div id="plot-utilization"></div>
                 <button id="export-csv-btn">Download Route Data (CSV)</button>
             </section>
         </main>
     </div>
-
-    <script src="app.js"></script></body></html>
+    <script src="app.js"></script></body></html>
