@@ -995,9 +995,10 @@ document.addEventListener('DOMContentLoaded', () => {
     elements.importTraysFile.addEventListener('change', e => {
         if (e.target.files[0]) importTrayCSV(e.target.files[0]);
     });
-
+    // Initial setup
+    updateCableArea();
     handleInputMethodChange();
-    
-    // Initial setup    updateCableArea();    handleInputMethodChange();});
+});
+    handleInputMethodChange();});
 
     handleInputMethodChange();});
