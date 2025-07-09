@@ -1020,5 +1020,10 @@ document.addEventListener('DOMContentLoaded', () => {
     elements.exportTraysBtn.addEventListener('click', exportManualTraysCSV);
     elements.importTraysBtn.addEventListener('click', () => elements.importTraysFile.click());
     elements.importTraysFile.addEventListener('change', importManualTraysCSV);
-    elements.loadSampleCablesBtn.addEventListener('click', loadSampleCables);    elements.addCableBtn.addEventListener('click', addCableToBatch);
-    elements.clearCablesBtn.addEventListener('click', clearCableList);    elements.exportCsvBtn.addEventListener('click', exportRouteCSV);        // Initial setup    updateCableArea();    handleInputMethodChange();});    updateCableArea();    handleInputMethodChange();});
+    elements.loadSampleCablesBtn.addEventListener('click', loadSampleCables);
+    elements.addCableBtn.addEventListener('click', addCableToBatch);
+    elements.clearCablesBtn.addEventListener('click', clearCableList);    elements.exportCsvBtn.addEventListener('click', exportRouteCSV);    
+    // Initial setup
+    updateCableArea();
+    handleInputMethodChange();
+});
