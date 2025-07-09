@@ -41,6 +41,7 @@ document.addEventListener('DOMContentLoaded', () => {
         exportCsvBtn: document.getElementById('export-csv-btn'),
         progressContainer: document.getElementById('progress-container'),
         progressBar: document.getElementById('progress-bar'),
+        progressLabel: document.getElementById('progress-label'),
     };
     
     // --- CORE ROUTING LOGIC (JavaScript implementation of your Python backend) ---
@@ -933,6 +934,7 @@ document.addEventListener('DOMContentLoaded', () => {
         elements.messages.innerHTML = '';
         elements.progressContainer.style.display = 'block';
         elements.progressBar.style.width = '0%';
+        elements.progressLabel.textContent = 'Starting...';
         
         const routingSystem = new CableRoutingSystem({
             fillLimit: parseFloat(elements.fillLimitIn.value) / 100,
@@ -983,6 +985,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 });
 
                 elements.progressBar.style.width = `${((i + 1) / state.cableList.length) * 100}%`;
+                elements.progressLabel.textContent = `Routing ${cable.name} (${i + 1}/${state.cableList.length})`;
                 await new Promise(r => setTimeout(r, 0));
             }
 
@@ -1032,6 +1035,7 @@ document.addEventListener('DOMContentLoaded', () => {
             formatters
         );
 
+        elements.progressLabel.textContent = 'Complete';
         elements.progressContainer.style.display = 'none';
     };
     
