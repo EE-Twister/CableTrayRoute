@@ -24,6 +24,7 @@ document.addEventListener('DOMContentLoaded', () => {
         endTagIn: document.getElementById('end-tag'),
         calculateBtn: document.getElementById('calculate-route-btn'),
         inputMethodRadios: document.querySelectorAll('input[name="input-method"]'),
+        routingModeRadios: document.querySelectorAll('input[name="routing-mode"]'),
         manualEntrySection: document.getElementById('manual-entry-section'),
         batchSection: document.getElementById('batch-section'),
         addTrayBtn: document.getElementById('add-tray-btn'),
@@ -40,10 +41,8 @@ document.addEventListener('DOMContentLoaded', () => {
         routeBreakdownContainer: document.getElementById('route-breakdown-container'),
         plot3d: document.getElementById('plot-3d'),
         updatedUtilizationContainer: document.getElementById('updated-utilization-container'),
+        plotUtilization: document.getElementById('plot-utilization'),
         exportCsvBtn: document.getElementById('export-csv-btn'),
-        importTraysBtn: document.getElementById('import-trays-btn'),
-        importTraysFile: document.getElementById('import-trays-file'),
-        exportTraysBtn: document.getElementById('export-trays-btn'),
     };
     
     // --- CORE ROUTING LOGIC (JavaScript implementation of your Python backend) ---
@@ -389,19 +388,6 @@ document.addEventListener('DOMContentLoaded', () => {
         table += '</tbody></table>';
         container.innerHTML = table;
     };
-
-    const renderUtilizationTable = (container, data, limit) => {
-        let table = '<table><thead><tr><th>Tray ID</th><th>Utilization</th><th>Available (in²)</th></tr></thead><tbody>';
-        data.forEach(row => {
-            const cls = utilizationStyle(row);
-            table += `<tr class="${cls}"><td>${row.tray_id}</td><td>` +
-                `<div class="progress-bar"><div class="progress-fill" style="width:${row.utilization}%"></div>` +
-                `<div class="progress-marker" style="left:${limit}%"></div></div> ${row.utilization}%` +
-                `</td><td>${row.available}</td></tr>`;
-        });
-        table += '</tbody></table>';
-        container.innerHTML = table;
-    };
     
     const utilizationStyle = (row) => {
         const util = row.utilization_pct || row.utilization;
@@ -461,6 +447,13 @@ document.addEventListener('DOMContentLoaded', () => {
         updateTrayDisplay();
     };
     
+    const handleRoutingModeChange = () => {
+        if(document.getElementById('batch-mode').checked) {
+            elements.batchSection.style.display = 'block';
+        } else {
+            elements.batchSection.style.display = 'none';
+        }
+    };
 
     const addManualTray = () => {
         const newTray = {
@@ -490,58 +483,6 @@ document.addEventListener('DOMContentLoaded', () => {
         state.trayData = [];
         elements.manualTrayTableContainer.innerHTML = '';
         updateTrayDisplay();
-    };
-
-    const exportTrayCSV = () => {
-        const trays = state.trayData.length > 0 ? state.trayData : state.manualTrays;
-        if (trays.length === 0) {
-            alert('No tray data to export.');
-            return;
-        }
-        const headers = ['tray_id','start_x','start_y','start_z','end_x','end_y','end_z','width','height','current_fill'];
-        let csv = headers.join(',') + '\n';
-        trays.forEach(t => {
-            csv += headers.map(h => t[h]).join(',') + '\n';
-        });
-        const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
-        const url = URL.createObjectURL(blob);
-        const a = document.createElement('a');
-        a.href = url;
-        a.download = 'tray_network.csv';
-        a.click();
-        URL.revokeObjectURL(url);
-    };
-
-    const importTrayCSV = (file) => {
-        const reader = new FileReader();
-        reader.onload = e => {
-            const lines = e.target.result.trim().split(/\r?\n/);
-            if (lines.length < 2) return;
-            const headers = lines[0].split(',');
-            const idx = h => headers.indexOf(h);
-            const trays = lines.slice(1).filter(l=>l.trim()).map(line => {
-                const parts = line.split(',');
-                return {
-                    tray_id: parts[idx('tray_id')],
-                    start_x: parseFloat(parts[idx('start_x')]),
-                    start_y: parseFloat(parts[idx('start_y')]),
-                    start_z: parseFloat(parts[idx('start_z')]),
-                    end_x: parseFloat(parts[idx('end_x')]),
-                    end_y: parseFloat(parts[idx('end_y')]),
-                    end_z: parseFloat(parts[idx('end_z')]),
-                    width: parseFloat(parts[idx('width')]),
-                    height: parseFloat(parts[idx('height')]),
-                    current_fill: parseFloat(parts[idx('current_fill')])
-                };
-            });
-            state.manualTrays = trays;
-            if (document.getElementById('manual-entry').checked) {
-                state.trayData = state.manualTrays;
-                renderManualTrayTable();
-            }
-            updateTrayDisplay();
-        };
-        reader.readAsText(file);
     };
 
     const renderManualTrayTable = () => {
@@ -826,7 +767,9 @@ document.addEventListener('DOMContentLoaded', () => {
         const trayDataForRun = JSON.parse(JSON.stringify(state.trayData));
         trayDataForRun.forEach(tray => routingSystem.addTraySegment(tray));
         
-        if (state.cableList.length > 0) {
+        const isBatchMode = document.getElementById('batch-mode').checked;
+
+        if (isBatchMode && state.cableList.length > 0) {
             const batchResults = [];
             const allRoutesForPlotting = [];
 
@@ -868,9 +811,73 @@ document.addEventListener('DOMContentLoaded', () => {
             state.latestRouteData = batchResults;
             elements.metrics.innerHTML = '';
             visualize(trayDataForRun, allRoutesForPlotting, "Batch Route Visualization");
+
         } else {
-            alert('Please add at least one cable to the list.');
-            return;
+            const startPoint = [
+                parseFloat(document.getElementById('start-x').value),
+                parseFloat(document.getElementById('start-y').value),
+                parseFloat(document.getElementById('start-z').value),
+            ];
+            const endPoint = [
+                parseFloat(document.getElementById('end-x').value),
+                parseFloat(document.getElementById('end-y').value),
+                parseFloat(document.getElementById('end-z').value),
+            ];
+            state.startTag = elements.startTagIn.value;
+            state.endTag = elements.endTagIn.value;
+            state.cableTag = elements.cableTagIn.value;
+            const cableArea = parseFloat(elements.cableAreaOut.textContent);
+            
+            const result = routingSystem.calculateRoute(startPoint, endPoint, cableArea);
+
+            if (result.success) {
+                showMessage('success', 'Route calculated successfully!');
+                elements.metrics.innerHTML = `
+                    <div class="column"><strong>Total Length:</strong> ${result.total_length.toFixed(2)}</div>
+                    <div class="column"><strong>Field-Routed:</strong> ${result.field_routed_length.toFixed(2)}</div>
+                    <div class="column"><strong>Trays Used:</strong> ${result.tray_segments.length}</div>
+                `;
+                const breakdownData = result.route_segments.map((seg, i) => ({
+                    cable: state.cableTag || '',
+                    segment: i + 1,
+                    tray_id: seg.type === 'field' ? 'Field Route' : (seg.tray_id || 'N/A'),
+                    type: seg.type,
+                    from: formatPoint(seg.start),
+                    to: formatPoint(seg.end),
+                    length: seg.length.toFixed(2)
+                }));
+                renderTable(
+                    elements.routeBreakdownContainer,
+                    [
+                        { label: 'Cable Tag', key: 'cable' },
+                        { label: 'Segment', key: 'segment' },
+                        { label: 'Tray ID', key: 'tray_id' },
+                        { label: 'Type', key: 'type' },
+                        { label: 'From', key: 'from' },
+                        { label: 'To', key: 'to' },
+                        { label: 'Length', key: 'length' }
+                    ],
+                    breakdownData
+                );
+                state.latestRouteData = breakdownData;
+                visualize(
+                    trayDataForRun,
+                    [{
+                        label: state.cableTag || state.startTag || 'Cable Route',
+                        segments: result.route_segments,
+                        startPoint,
+                        endPoint,
+                        startTag: state.startTag,
+                        endTag: state.endTag
+                    }],
+                    "3D Route Visualization"
+                );
+            } else {
+                showMessage('error', `Route calculation failed: ${result.error}`);
+                elements.metrics.innerHTML = '';
+                elements.routeBreakdownContainer.innerHTML = '';
+                elements.plot3d.innerHTML = '';
+            }
         }
         
         const finalUtilization = routingSystem.getTrayUtilization();
@@ -879,11 +886,17 @@ document.addEventListener('DOMContentLoaded', () => {
             utilization: data.utilization_percentage.toFixed(1),
             available: data.available_capacity.toFixed(2),
         }));
-        renderUtilizationTable(
+        renderTable(
             elements.updatedUtilizationContainer,
+            [
+                { label: 'Tray ID', key: 'tray_id' },
+                { label: 'Utilization (%)', key: 'utilization' },
+                { label: 'Available (in²)', key: 'available' }
+            ],
             utilData,
-            parseFloat(elements.fillLimitIn.value)
+            (row) => utilizationStyle(row)
         );
+        plotUtilization(finalUtilization);
     };
     
     // --- VISUALIZATION ---
@@ -978,24 +991,31 @@ document.addEventListener('DOMContentLoaded', () => {
         Plotly.newPlot(elements.plot3d, traces, layout);
     };
     
+    const plotUtilization = (utilizationData) => {
+        const ids = Object.keys(utilizationData);
+        const percentages = ids.map(id => utilizationData[id].utilization_percentage);
+        const data = [{
+            x: ids, y: percentages, type: 'bar',
+            marker: { color: percentages.map(p => p > 80 ? 'red' : p > 60 ? 'orange' : 'green') }
+        }];
+        const layout = { title: 'Tray Utilization After Routing', yaxis: { title: 'Utilization (%)' } };
+        Plotly.newPlot(elements.plotUtilization, data, layout);
+    }
     
     // --- INITIALIZATION & EVENT LISTENERS ---
     elements.cableDiameterIn.addEventListener('input', updateCableArea);
     elements.fillLimitIn.addEventListener('input', updateFillLimitDisplay);
     elements.calculateBtn.addEventListener('click', mainCalculation);
     elements.inputMethodRadios.forEach(radio => radio.addEventListener('change', handleInputMethodChange));
+    elements.routingModeRadios.forEach(radio => radio.addEventListener('change', handleRoutingModeChange));
     elements.addTrayBtn.addEventListener('click', addManualTray);
     elements.clearTraysBtn.addEventListener('click', clearManualTrays);
     elements.loadSampleCablesBtn.addEventListener('click', loadSampleCables);
     elements.addCableBtn.addEventListener('click', addCableToBatch);
     elements.clearCablesBtn.addEventListener('click', clearCableList);
     elements.exportCsvBtn.addEventListener('click', exportRouteCSV);
-    elements.exportTraysBtn.addEventListener('click', exportTrayCSV);
-    elements.importTraysBtn.addEventListener('click', () => elements.importTraysFile.click());
-    elements.importTraysFile.addEventListener('change', e => {
-        if (e.target.files[0]) importTrayCSV(e.target.files[0]);
-    });
+    
     // Initial setup
     updateCableArea();
     handleInputMethodChange();
-});    handleInputMethodChange();});
+});
