@@ -196,22 +196,31 @@ document.addEventListener('DOMContentLoaded', () => {
 
             // Connect tray endpoints that lie on other trays
             this.trays.forEach(trayA => {
+                const startA = `${trayA.tray_id}_start`;
+                const endA = `${trayA.tray_id}_end`;
+                if (!graph.nodes[startA] || !graph.nodes[endA]) return; // Skip if trayA not in graph
+
                 const endpoints = [
-                    { id: `${trayA.tray_id}_start`, point: [trayA.start_x, trayA.start_y, trayA.start_z] },
-                    { id: `${trayA.tray_id}_end`, point: [trayA.end_x, trayA.end_y, trayA.end_z] }
+                    { id: startA, point: graph.nodes[startA].point },
+                    { id: endA, point: graph.nodes[endA].point }
                 ];
+
                 this.trays.forEach(trayB => {
                     if (trayA.tray_id === trayB.tray_id) return;
-                    const a = [trayB.start_x, trayB.start_y, trayB.start_z];
-                    const b = [trayB.end_x, trayB.end_y, trayB.end_z];
+                    const startB = `${trayB.tray_id}_start`;
+                    const endB = `${trayB.tray_id}_end`;
+                    if (!graph.nodes[startB] || !graph.nodes[endB]) return; // Skip if trayB not in graph
+
+                    const a = graph.nodes[startB].point;
+                    const b = graph.nodes[endB].point;
                     endpoints.forEach(ep => {
                         const proj = this.projectPointOnSegment(ep.point, a, b);
                         if (this.distance(ep.point, proj) < 0.1) {
                             const projId = `${ep.id}_on_${trayB.tray_id}`;
                             addNode(projId, proj, 'projection');
                             addEdge(ep.id, projId, 0.1, 'tray_connection', trayB.tray_id);
-                            addEdge(projId, `${trayB.tray_id}_start`, this.distance(proj, a), 'tray', trayB.tray_id);
-                            addEdge(projId, `${trayB.tray_id}_end`, this.distance(proj, b), 'tray', trayB.tray_id);
+                            addEdge(projId, startB, this.distance(proj, a), 'tray', trayB.tray_id);
+                            addEdge(projId, endB, this.distance(proj, b), 'tray', trayB.tray_id);
                         }
                     });
                 });
