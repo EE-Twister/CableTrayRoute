@@ -621,6 +621,8 @@ document.addEventListener('DOMContentLoaded', () => {
             updateTrayDisplay();
         };
         reader.readAsText(file);
+        // Reset the file input so importing the same file again triggers the change event
+        elements.importTraysFile.value = '';
     };
 
     const exportCableOptionsCSV = () => {
@@ -678,6 +680,8 @@ document.addEventListener('DOMContentLoaded', () => {
             updateCableListDisplay();
         };
         reader.readAsText(file);
+        // Reset the file input so importing the same file again triggers the change event
+        elements.importCablesFile.value = '';
     };
 
     const renderBatchResults = (results) => {
