@@ -156,6 +156,19 @@ details > summary {
     margin-top: 10px;
 }
 
+.tray-controls, .cable-controls {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 10px;
+    margin-bottom: 10px;
+}
+
+.tray-controls .tray-import-export,
+.cable-controls .cable-import-export {
+    margin-top: 0;
+}
+
 /* --- Help Icon --- */
 .help-icon {
     position: relative;
