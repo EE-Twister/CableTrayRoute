@@ -95,6 +95,18 @@ button:hover {
     background-color: #5a6268;
 }
 
+/* Icon style buttons */
+.icon-button {
+    background: none;
+    border: none;
+    padding: 0 4px;
+    cursor: pointer;
+    font-size: 1rem;
+}
+.icon-delete {
+    color: red;
+}
+
 .primary-btn {
     background-color: var(--primary-color);
     font-size: 1.1rem;

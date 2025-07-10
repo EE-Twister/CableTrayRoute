@@ -647,9 +647,9 @@ document.addEventListener('DOMContentLoaded', () => {
         let table = '<table><thead><tr><th>Tray ID</th><th>Start X</th><th>End X</th><th>Width</th><th>Height</th><th>Current Fill</th><th>Actions</th></tr></thead><tbody>';
         state.manualTrays.forEach((t, idx) => {
             table += `<tr><td>${t.tray_id}</td><td>${t.start_x}</td><td>${t.end_x}</td><td>${t.width}</td><td>${t.height}</td><td>${t.current_fill}</td>` +
-                     `<td><button class="edit-tray" data-idx="${idx}">Edit</button>` +
-                     `<button class="delete-tray" data-idx="${idx}">Delete</button>` +
-                     `<button class="dup-tray" data-idx="${idx}">Duplicate</button></td></tr>`;
+                     `<td><button class="icon-button edit-tray" data-idx="${idx}" title="Edit">\u270F</button>` +
+                     `<button class="icon-button delete-tray icon-delete" data-idx="${idx}" title="Delete">\u274C</button>` +
+                     `<button class="icon-button dup-tray" data-idx="${idx}" title="Duplicate">📋</button></td></tr>`;
         });
         table += '</tbody></table>';
         elements.manualTrayTableContainer.innerHTML = table;
