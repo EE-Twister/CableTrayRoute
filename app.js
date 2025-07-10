@@ -44,7 +44,12 @@ document.addEventListener('DOMContentLoaded', () => {
         progressContainer: document.getElementById('progress-container'),
         progressBar: document.getElementById('progress-bar'),
         progressLabel: document.getElementById('progress-label'),
+        cancelRoutingBtn: document.getElementById('cancel-routing-btn'),
     };
+
+    let cancelRouting = false;
+    let currentWorker = null;
+    let resolveCurrent = null;
     
     // --- CORE ROUTING LOGIC (JavaScript implementation of your Python backend) ---
 
@@ -1101,13 +1106,30 @@ document.addEventListener('DOMContentLoaded', () => {
 
     const formatPoint = (p) => `(${p[0].toFixed(1)}, ${p[1].toFixed(1)}, ${p[2].toFixed(1)})`;
 
+    const cancelCurrentRouting = () => {
+        cancelRouting = true;
+        elements.cancelRoutingBtn.disabled = true;
+        elements.progressLabel.textContent = 'Cancelling...';
+        if (currentWorker) {
+            currentWorker.terminate();
+            if (resolveCurrent) {
+                resolveCurrent({ cancelled: true });
+                resolveCurrent = null;
+            }
+            currentWorker = null;
+        }
+    };
+
     const mainCalculation = async () => {
         elements.resultsSection.style.display = 'block';
         elements.messages.innerHTML = '';
         elements.progressContainer.style.display = 'block';
         elements.progressBar.style.width = '0%';
         elements.progressLabel.textContent = 'Starting...';
-        
+        elements.cancelRoutingBtn.style.display = 'block';
+        elements.cancelRoutingBtn.disabled = false;
+        cancelRouting = false;
+
         const routingSystem = new CableRoutingSystem({
             fillLimit: parseFloat(elements.fillLimitIn.value) / 100,
             proximityThreshold: parseFloat(document.getElementById('proximity-threshold').value),
@@ -1125,12 +1147,16 @@ document.addEventListener('DOMContentLoaded', () => {
             const allRoutesForPlotting = [];
 
             for (let i = 0; i < state.cableList.length; i++) {
+                if (cancelRouting) break;
                 const cable = state.cableList[i];
                 const cableArea = Math.PI * (cable.diameter / 2) ** 2;
                 const result = await new Promise((resolve, reject) => {
+                    if (cancelRouting) { resolve({ cancelled: true }); return; }
                     const worker = new Worker('routeWorker.js');
-                    worker.onmessage = e => { worker.terminate(); resolve(e.data); };
-                    worker.onerror = err => { worker.terminate(); reject(err); };
+                    currentWorker = worker;
+                    resolveCurrent = resolve;
+                    worker.onmessage = e => { worker.terminate(); currentWorker = null; resolveCurrent = null; resolve(e.data); };
+                    worker.onerror = err => { worker.terminate(); currentWorker = null; resolveCurrent = null; reject(err); };
                     worker.postMessage({
                         trays: Array.from(routingSystem.trays.values()),
                         options: {
@@ -1144,6 +1170,8 @@ document.addEventListener('DOMContentLoaded', () => {
                         cableArea
                     });
                 });
+
+                if (cancelRouting || result.cancelled) break;
 
                 if (result.success) {
                     routingSystem.updateTrayFill(result.tray_segments, cableArea);
@@ -1177,7 +1205,15 @@ document.addEventListener('DOMContentLoaded', () => {
 
                 elements.progressBar.style.width = `${((i + 1) / state.cableList.length) * 100}%`;
                 elements.progressLabel.textContent = `Routing ${cable.name} (${i + 1}/${state.cableList.length})`;
+
                 await new Promise(r => setTimeout(r, 0));
+            }
+
+            if (cancelRouting) {
+                elements.progressLabel.textContent = 'Cancelled';
+                elements.progressContainer.style.display = 'none';
+                elements.cancelRoutingBtn.style.display = 'none';
+                return;
             }
 
             renderBatchResults(batchResults);
@@ -1196,6 +1232,8 @@ document.addEventListener('DOMContentLoaded', () => {
             visualize(trayDataForRun, allRoutesForPlotting, "Batch Route Visualization");
         } else {
             alert('Please add at least one cable to route.');
+            elements.cancelRoutingBtn.style.display = 'none';
+            elements.progressContainer.style.display = 'none';
             return;
         }
         
@@ -1238,6 +1276,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
         elements.progressLabel.textContent = 'Complete';
         elements.progressContainer.style.display = 'none';
+        elements.cancelRoutingBtn.style.display = 'none';
     };
     
     // --- VISUALIZATION ---
@@ -1374,6 +1413,7 @@ Plotly.newPlot(document.getElementById('plot'), data, layout, {responsive: true}
     elements.importCablesFile.addEventListener('change', importCableOptionsCSV);
     elements.exportCsvBtn.addEventListener('click', exportRouteCSV);
     elements.popoutPlotBtn.addEventListener('click', popOutPlot);
+    elements.cancelRoutingBtn.addEventListener('click', cancelCurrentRouting);
     // Initial setup
     updateCableArea();
     handleInputMethodChange();
