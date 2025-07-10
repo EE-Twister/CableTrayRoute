@@ -8,6 +8,7 @@ document.addEventListener('DOMContentLoaded', () => {
         cableList: [],
         trayData: [],
         latestRouteData: [],
+        editingTrayIndex: null,
     };
 
     // --- ELEMENT REFERENCES ---
@@ -695,10 +696,25 @@ document.addEventListener('DOMContentLoaded', () => {
         }
         let table = '<table><thead><tr><th>Tray ID</th><th>Start X</th><th>End X</th><th>Width</th><th>Height</th><th>Current Fill</th><th>Actions</th></tr></thead><tbody>';
         state.manualTrays.forEach((t, idx) => {
-            table += `<tr><td>${t.tray_id}</td><td>${t.start_x}</td><td>${t.end_x}</td><td>${t.width}</td><td>${t.height}</td><td>${t.current_fill}</td>` +
-                     `<td><button class="icon-button edit-tray" data-idx="${idx}" title="Edit">\u270F</button>` +
-                     `<button class="icon-button delete-tray icon-delete" data-idx="${idx}" title="Delete">\u274C</button>` +
-                     `<button class="icon-button dup-tray" data-idx="${idx}" title="Duplicate">📋</button></td></tr>`;
+            if (state.editingTrayIndex === idx) {
+                table += `<tr data-idx="${idx}">
+                            <td><input type="text" class="edit-tray-id" value="${t.tray_id}" style="width:80px;"></td>
+                            <td><input type="number" class="edit-start-x" value="${t.start_x}" style="width:80px;"></td>
+                            <td><input type="number" class="edit-end-x" value="${t.end_x}" style="width:80px;"></td>
+                            <td><input type="number" class="edit-width" value="${t.width}" style="width:60px;"></td>
+                            <td><input type="number" class="edit-height" value="${t.height}" style="width:60px;"></td>
+                            <td><input type="number" class="edit-fill" value="${t.current_fill}" style="width:80px;"></td>
+                            <td>
+                                <button class="icon-button save-tray" data-idx="${idx}" title="Save">\u2714</button>
+                                <button class="icon-button cancel-tray" data-idx="${idx}" title="Cancel">\u274C</button>
+                            </td>
+                         </tr>`;
+            } else {
+                table += `<tr><td>${t.tray_id}</td><td>${t.start_x}</td><td>${t.end_x}</td><td>${t.width}</td><td>${t.height}</td><td>${t.current_fill}</td>` +
+                         `<td><button class="icon-button edit-tray" data-idx="${idx}" title="Edit">\u270F</button>` +
+                         `<button class="icon-button delete-tray icon-delete" data-idx="${idx}" title="Delete">\u274C</button>` +
+                         `<button class="icon-button dup-tray" data-idx="${idx}" title="Duplicate">📋</button></td></tr>`;
+            }
         });
         table += '</tbody></table>';
         elements.manualTrayTableContainer.innerHTML = table;
@@ -712,26 +728,47 @@ document.addEventListener('DOMContentLoaded', () => {
                 updateTrayDisplay();
             });
         });
+
         elements.manualTrayTableContainer.querySelectorAll('.edit-tray').forEach(btn => {
             btn.addEventListener('click', e => {
                 const i = parseInt(e.target.dataset.idx, 10);
-                const t = state.manualTrays[i];
-                document.getElementById('t-id').value = t.tray_id;
-                document.getElementById('t-sx').value = t.start_x;
-                document.getElementById('t-sy').value = t.start_y;
-                document.getElementById('t-sz').value = t.start_z;
-                document.getElementById('t-ex').value = t.end_x;
-                document.getElementById('t-ey').value = t.end_y;
-                document.getElementById('t-ez').value = t.end_z;
-                document.getElementById('t-w').value = t.width;
-                document.getElementById('t-h').value = t.height;
-                document.getElementById('t-fill').value = t.current_fill;
-                state.manualTrays.splice(i, 1);
+                state.editingTrayIndex = i;
+                renderManualTrayTable();
+            });
+        });
+
+        elements.manualTrayTableContainer.querySelectorAll('.save-tray').forEach(btn => {
+            btn.addEventListener('click', e => {
+                const i = parseInt(e.target.dataset.idx, 10);
+                const row = elements.manualTrayTableContainer.querySelector(`tr[data-idx="${i}"]`);
+                const updated = {
+                    tray_id: row.querySelector('.edit-tray-id').value,
+                    start_x: parseFloat(row.querySelector('.edit-start-x').value),
+                    end_x: parseFloat(row.querySelector('.edit-end-x').value),
+                    width: parseFloat(row.querySelector('.edit-width').value),
+                    height: parseFloat(row.querySelector('.edit-height').value),
+                    current_fill: parseFloat(row.querySelector('.edit-fill').value),
+                    start_y: state.manualTrays[i].start_y,
+                    start_z: state.manualTrays[i].start_z,
+                    end_y: state.manualTrays[i].end_y,
+                    end_z: state.manualTrays[i].end_z
+                };
+                // Preserve y/z values from existing row (not editable here)
+                state.manualTrays[i] = { ...state.manualTrays[i], ...updated };
                 state.trayData = state.manualTrays;
+                state.editingTrayIndex = null;
                 renderManualTrayTable();
                 updateTrayDisplay();
             });
         });
+
+        elements.manualTrayTableContainer.querySelectorAll('.cancel-tray').forEach(btn => {
+            btn.addEventListener('click', () => {
+                state.editingTrayIndex = null;
+                renderManualTrayTable();
+            });
+        });
+
         elements.manualTrayTableContainer.querySelectorAll('.dup-tray').forEach(btn => {
             btn.addEventListener('click', e => {
                 const i = parseInt(e.target.dataset.idx, 10);
