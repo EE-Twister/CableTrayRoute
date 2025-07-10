@@ -102,6 +102,7 @@ button:hover {
     padding: 0 4px;
     cursor: pointer;
     font-size: 1rem;
+    color: var(--text-color); /* Ensure icons are visible */
 }
 .icon-delete {
     color: red;
