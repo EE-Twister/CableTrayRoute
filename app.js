@@ -50,6 +50,8 @@ document.addEventListener('DOMContentLoaded', () => {
     let cancelRouting = false;
     let currentWorkers = [];
     let workerResolvers = new Map();
+    const taskQueue = [];
+    const maxWorkers = navigator.hardwareConcurrency || 4;
     
     // --- CORE ROUTING LOGIC (JavaScript implementation of your Python backend) ---
 
@@ -1117,6 +1119,7 @@ document.addEventListener('DOMContentLoaded', () => {
         });
         currentWorkers = [];
         workerResolvers.clear();
+        taskQueue.length = 0;
     };
 
     const mainCalculation = async () => {
@@ -1148,23 +1151,22 @@ document.addEventListener('DOMContentLoaded', () => {
             let completed = 0;
             const runCable = (cable, index) => {
                 const cableArea = Math.PI * (cable.diameter / 2) ** 2;
-                return new Promise((resolve, reject) => {
+                const startTask = (resolve, reject) => {
                     if (cancelRouting) { resolve({ cancelled: true }); return; }
                     const worker = new Worker('routeWorker.js');
                     currentWorkers.push(worker);
                     workerResolvers.set(worker, resolve);
-                    worker.onmessage = e => {
+                    const cleanup = () => {
                         worker.terminate();
                         currentWorkers = currentWorkers.filter(w => w !== worker);
                         workerResolvers.delete(worker);
-                        resolve(e.data);
+                        if (taskQueue.length > 0 && !cancelRouting) {
+                            const next = taskQueue.shift();
+                            next();
+                        }
                     };
-                    worker.onerror = err => {
-                        worker.terminate();
-                        currentWorkers = currentWorkers.filter(w => w !== worker);
-                        workerResolvers.delete(worker);
-                        reject(err);
-                    };
+                    worker.onmessage = e => { cleanup(); resolve(e.data); };
+                    worker.onerror = err => { cleanup(); reject(err); };
                     worker.postMessage({
                         trays: Array.from(routingSystem.trays.values()),
                         options: {
@@ -1177,6 +1179,14 @@ document.addEventListener('DOMContentLoaded', () => {
                         cable,
                         cableArea
                     });
+                };
+                return new Promise((resolve, reject) => {
+                    const task = () => startTask(resolve, reject);
+                    if (currentWorkers.length < maxWorkers) {
+                        task();
+                    } else {
+                        taskQueue.push(task);
+                    }
                 }).then(result => {
                     completed++;
                     elements.progressBar.style.width = `${(completed / state.cableList.length) * 100}%`;
