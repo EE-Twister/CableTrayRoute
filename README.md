@@ -23,6 +23,8 @@ coordinates for that cable.
 - Tray utilization tables show **Available Space** to two decimal places.
 - CSV export flattens the breakdown so each segment is a separate row.
 - CSV export no longer includes the **Status** column.
+- Route data download now generates an **XLSX** file with an additional
+  worksheet mapping trays to the cables routed through them.
 - Start and end tags are displayed in the 3D view (duplicates shown once).
 - Cable specification fields are now located in the **Cable Routing Options** panel.
 - Manual tray entry now has a single **Import Trays CSV** button. Clicking it opens a file dialog and loads trays immediately after you choose a file.

@@ -1075,7 +1075,7 @@ document.addEventListener('DOMContentLoaded', () => {
         elements.messages.innerHTML += `<div class="message ${type}">${text}</div>`;
     };
 
-    const exportRouteCSV = () => {
+    const exportRouteXLSX = () => {
         if (!state.latestRouteData || state.latestRouteData.length === 0) {
             alert('No route data to export.');
             return;
@@ -1122,31 +1122,29 @@ document.addEventListener('DOMContentLoaded', () => {
             return rest;
         });
 
-        const headers = Object.keys(data[0]);
-        let csv = headers.join(',') + '\n';
-
-        data.forEach(row => {
-            const line = headers.map(h => {
-                let val = row[h];
-                let str = String(val === undefined ? '' : val);
-                if (str.includes('"')) {
-                    str = str.replace(/"/g, '""');
-                }
-                if (str.includes(',') || str.includes('\n')) {
-                    str = `"${str}"`;
-                }
-                return str;
-            }).join(',');
-            csv += line + '\n';
+        const trayMap = new Map();
+        state.latestRouteData.forEach(row => {
+            if (Array.isArray(row.breakdown)) {
+                row.breakdown.forEach(b => {
+                    if (b.tray_id && b.tray_id !== 'Field Route' && b.tray_id !== 'N/A') {
+                        if (!trayMap.has(b.tray_id)) trayMap.set(b.tray_id, new Set());
+                        trayMap.get(b.tray_id).add(row.cable);
+                    }
+                });
+            }
         });
 
-        const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
-        const url = URL.createObjectURL(blob);
-        const a = document.createElement('a');
-        a.href = url;
-        a.download = 'route_data.csv';
-        a.click();
-        URL.revokeObjectURL(url);
+        const trayList = Array.from(trayMap.entries()).map(([tray_id, cables]) => ({
+            tray_id,
+            cables: Array.from(cables).join(', ')
+        }));
+
+        const wb = XLSX.utils.book_new();
+        const ws1 = XLSX.utils.json_to_sheet(data);
+        XLSX.utils.book_append_sheet(wb, ws1, 'Route Data');
+        const ws2 = XLSX.utils.json_to_sheet(trayList);
+        XLSX.utils.book_append_sheet(wb, ws2, 'Tray Cable Map');
+        XLSX.writeFile(wb, 'route_data.xlsx');
     };
 
     const formatPoint = (p) => `(${p[0].toFixed(1)}, ${p[1].toFixed(1)}, ${p[2].toFixed(1)})`;
@@ -1476,7 +1474,7 @@ Plotly.newPlot(document.getElementById('plot'), data, layout, {responsive: true}
     elements.exportCablesBtn.addEventListener('click', exportCableOptionsCSV);
     elements.importCablesBtn.addEventListener('click', () => elements.importCablesFile.click());
     elements.importCablesFile.addEventListener('change', importCableOptionsCSV);
-    elements.exportCsvBtn.addEventListener('click', exportRouteCSV);
+    elements.exportCsvBtn.addEventListener('click', exportRouteXLSX);
     elements.popoutPlotBtn.addEventListener('click', popOutPlot);
     elements.cancelRoutingBtn.addEventListener('click', cancelCurrentRouting);
     // Initial setup
