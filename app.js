@@ -48,8 +48,8 @@ document.addEventListener('DOMContentLoaded', () => {
     };
 
     let cancelRouting = false;
-    let currentWorker = null;
-    let resolveCurrent = null;
+    let currentWorkers = [];
+    let workerResolvers = new Map();
     
     // --- CORE ROUTING LOGIC (JavaScript implementation of your Python backend) ---
 
@@ -1110,14 +1110,13 @@ document.addEventListener('DOMContentLoaded', () => {
         cancelRouting = true;
         elements.cancelRoutingBtn.disabled = true;
         elements.progressLabel.textContent = 'Cancelling...';
-        if (currentWorker) {
-            currentWorker.terminate();
-            if (resolveCurrent) {
-                resolveCurrent({ cancelled: true });
-                resolveCurrent = null;
-            }
-            currentWorker = null;
-        }
+        currentWorkers.forEach(w => {
+            w.terminate();
+            const res = workerResolvers.get(w);
+            if (res) res({ cancelled: true });
+        });
+        currentWorkers = [];
+        workerResolvers.clear();
     };
 
     const mainCalculation = async () => {
@@ -1146,17 +1145,26 @@ document.addEventListener('DOMContentLoaded', () => {
             const batchResults = [];
             const allRoutesForPlotting = [];
 
-            for (let i = 0; i < state.cableList.length; i++) {
-                if (cancelRouting) break;
-                const cable = state.cableList[i];
+            let completed = 0;
+            const runCable = (cable, index) => {
                 const cableArea = Math.PI * (cable.diameter / 2) ** 2;
-                const result = await new Promise((resolve, reject) => {
+                return new Promise((resolve, reject) => {
                     if (cancelRouting) { resolve({ cancelled: true }); return; }
                     const worker = new Worker('routeWorker.js');
-                    currentWorker = worker;
-                    resolveCurrent = resolve;
-                    worker.onmessage = e => { worker.terminate(); currentWorker = null; resolveCurrent = null; resolve(e.data); };
-                    worker.onerror = err => { worker.terminate(); currentWorker = null; resolveCurrent = null; reject(err); };
+                    currentWorkers.push(worker);
+                    workerResolvers.set(worker, resolve);
+                    worker.onmessage = e => {
+                        worker.terminate();
+                        currentWorkers = currentWorkers.filter(w => w !== worker);
+                        workerResolvers.delete(worker);
+                        resolve(e.data);
+                    };
+                    worker.onerror = err => {
+                        worker.terminate();
+                        currentWorkers = currentWorkers.filter(w => w !== worker);
+                        workerResolvers.delete(worker);
+                        reject(err);
+                    };
                     worker.postMessage({
                         trays: Array.from(routingSystem.trays.values()),
                         options: {
@@ -1169,45 +1177,45 @@ document.addEventListener('DOMContentLoaded', () => {
                         cable,
                         cableArea
                     });
+                }).then(result => {
+                    completed++;
+                    elements.progressBar.style.width = `${(completed / state.cableList.length) * 100}%`;
+                    elements.progressLabel.textContent = `Routing (${completed}/${state.cableList.length})`;
+                    if (!cancelRouting && !result.cancelled) {
+                        if (result.success) {
+                            routingSystem.updateTrayFill(result.tray_segments, cableArea);
+                            routingSystem.recordSharedFieldSegments(result.route_segments);
+                            allRoutesForPlotting.push({
+                                label: cable.name,
+                                segments: result.route_segments,
+                                startPoint: cable.start,
+                                endPoint: cable.end,
+                                startTag: cable.start_tag,
+                                endTag: cable.end_tag
+                            });
+                        }
+                        batchResults[index] = {
+                            cable: cable.name,
+                            status: result.success ? '✓ Routed' : '✗ Failed',
+                            total_length: result.success ? result.total_length.toFixed(2) : 'N/A',
+                            field_length: result.success ? result.field_routed_length.toFixed(2) : 'N/A',
+                            tray_segments_count: result.success ? result.tray_segments.length : 0,
+                            segments_count: result.success ? result.route_segments.length : 0,
+                            breakdown: result.success ? result.route_segments.map((seg, i) => ({
+                                segment: i + 1,
+                                tray_id: seg.type === 'field' ? 'Field Route' : (seg.tray_id || 'N/A'),
+                                type: seg.type,
+                                from: formatPoint(seg.start),
+                                to: formatPoint(seg.end),
+                                length: seg.length.toFixed(2)
+                            })) : []
+                        };
+                    }
                 });
+            };
 
-                if (cancelRouting || result.cancelled) break;
-
-                if (result.success) {
-                    routingSystem.updateTrayFill(result.tray_segments, cableArea);
-                    routingSystem.recordSharedFieldSegments(result.route_segments);
-                    allRoutesForPlotting.push({
-                        label: cable.name,
-                        segments: result.route_segments,
-                        startPoint: cable.start,
-                        endPoint: cable.end,
-                        startTag: cable.start_tag,
-                        endTag: cable.end_tag
-                    });
-                }
-
-                batchResults.push({
-                    cable: cable.name,
-                    status: result.success ? '✓ Routed' : '✗ Failed',
-                    total_length: result.success ? result.total_length.toFixed(2) : 'N/A',
-                    field_length: result.success ? result.field_routed_length.toFixed(2) : 'N/A',
-                    tray_segments_count: result.success ? result.tray_segments.length : 0,
-                    segments_count: result.success ? result.route_segments.length : 0,
-                    breakdown: result.success ? result.route_segments.map((seg, i) => ({
-                        segment: i + 1,
-                        tray_id: seg.type === 'field' ? 'Field Route' : (seg.tray_id || 'N/A'),
-                        type: seg.type,
-                        from: formatPoint(seg.start),
-                        to: formatPoint(seg.end),
-                        length: seg.length.toFixed(2)
-                    })) : []
-                });
-
-                elements.progressBar.style.width = `${((i + 1) / state.cableList.length) * 100}%`;
-                elements.progressLabel.textContent = `Routing ${cable.name} (${i + 1}/${state.cableList.length})`;
-
-                await new Promise(r => setTimeout(r, 0));
-            }
+            const workerPromises = state.cableList.map((c, idx) => runCable(c, idx));
+            await Promise.all(workerPromises);
 
             if (cancelRouting) {
                 elements.progressLabel.textContent = 'Cancelled';
