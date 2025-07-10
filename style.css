@@ -304,3 +304,8 @@ th {
     color: #fff;
     pointer-events: none;
 }
+
+#cancel-routing-btn {
+    width: 100%;
+    margin-top: 10px;
+}
