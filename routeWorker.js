@@ -49,6 +49,8 @@ class CableRoutingSystem {
         // Limit distance between generic field nodes to keep the graph from
         // growing quadratically when many trays are present
         this.maxFieldEdge = options.maxFieldEdge || 150;
+        // Limit the number of field connections per node to cap memory usage
+        this.maxFieldNeighbors = options.maxFieldNeighbors || 8;
         this.sharedFieldSegments = [];
         this.trays = new Map();
     }
@@ -230,6 +232,9 @@ class CableRoutingSystem {
         });
 
         const nodeIds = Object.keys(graph.nodes);
+        const candidates = {};
+        nodeIds.forEach(id => candidates[id] = []);
+
         for (let i = 0; i < nodeIds.length; i++) {
             for (let j = i + 1; j < nodeIds.length; j++) {
                 const id1 = nodeIds[i];
@@ -241,7 +246,16 @@ class CableRoutingSystem {
                 if (graph.edges[id1][id2] || (id1.includes('_') && isSameTray)) continue;
 
                 const dist = this.manhattanDistance(p1, p2);
-                if (dist > this.maxFieldEdge) continue; // avoid very long field edges
+                if (dist > this.maxFieldEdge) continue;
+                candidates[id1].push({ id: id2, dist });
+                candidates[id2].push({ id: id1, dist });
+            }
+        }
+
+        nodeIds.forEach(id1 => {
+            candidates[id1].sort((a,b) => a.dist - b.dist);
+            candidates[id1].slice(0, this.maxFieldNeighbors).forEach(({id: id2, dist}) => {
+                if (graph.edges[id1][id2]) return;
                 let weight, type;
                 if (dist < 0.1) {
                     weight = 0.1;
@@ -251,8 +265,8 @@ class CableRoutingSystem {
                     type = 'field';
                 }
                 addEdge(id1, id2, weight, type);
-            }
-        }
+            });
+        });
 
         this.baseGraph = graph;
     }
