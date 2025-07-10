@@ -127,7 +127,11 @@ class CableRoutingSystem {
   }
 
   findCommonFieldRoutes(routes, tolerance = 1) {
-    const overlaps = [];
+    const map = {};
+    const keyFor = (s, e) => {
+      const r = arr => arr.map(v => v.toFixed(2)).join(',');
+      return `${r(s)}|${r(e)}`;
+    };
     for (let i=0; i<routes.length; i++) {
       const a = routes[i];
       for (let j=i+1; j<routes.length; j++) {
@@ -137,12 +141,18 @@ class CableRoutingSystem {
           for (const segB of b.segments) {
             if (segB.type !== 'field') continue;
             const ov = this._segmentsOverlap(segA, segB, tolerance);
-            if (ov) overlaps.push({ cables:[a.label||a.name,b.label||b.name], start:ov.start, end:ov.end });
+            if (ov) {
+              const key = keyFor(ov.start, ov.end);
+              if (!map[key]) map[key] = { start: ov.start, end: ov.end, cables: new Set() };
+              map[key].cables.add(a.label||a.name);
+              map[key].cables.add(b.label||b.name);
+            }
           }
         }
       }
     }
-    return overlaps;
+    let count = 1;
+    return Object.values(map).map(r => ({ name: `Route ${count++}`, start:r.start, end:r.end, cables:Array.from(r.cables) }));
   }
 
   _isSharedSegment(seg, tol = 0.1) {
@@ -355,7 +365,9 @@ function runBatch(count) {
   const common = system.findCommonFieldRoutes(routes, 6);
   if (common.length > 0) {
     console.log('Common field route segments:');
-    common.forEach(c => console.log(`  ${c.cables.join(' & ')} from ${c.start} to ${c.end}`));
+    common.forEach(c => {
+      console.log(`  ${c.name} from ${c.start} to ${c.end}: ${c.cables.join(', ')}`);
+    });
   } else {
     console.log('No common field routes detected');
   }

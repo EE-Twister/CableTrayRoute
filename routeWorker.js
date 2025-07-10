@@ -156,7 +156,11 @@ class CableRoutingSystem {
     }
 
     findCommonFieldRoutes(routes, tolerance = 1) {
-        const overlaps = [];
+        const map = {};
+        const keyFor = (s, e) => {
+            const rounded = arr => arr.map(v => v.toFixed(2)).join(',');
+            return `${rounded(s)}|${rounded(e)}`;
+        };
         for (let i = 0; i < routes.length; i++) {
             const a = routes[i];
             for (let j = i + 1; j < routes.length; j++) {
@@ -167,13 +171,24 @@ class CableRoutingSystem {
                         if (segB.type !== 'field') continue;
                         const ov = this._segmentsOverlap(segA, segB, tolerance);
                         if (ov) {
-                            overlaps.push({ cables: [a.label || a.name, b.label || b.name], start: ov.start, end: ov.end });
+                            const key = keyFor(ov.start, ov.end);
+                            if (!map[key]) {
+                                map[key] = { start: ov.start, end: ov.end, cables: new Set() };
+                            }
+                            map[key].cables.add(a.label || a.name);
+                            map[key].cables.add(b.label || b.name);
                         }
                     }
                 }
             }
         }
-        return overlaps;
+        let count = 1;
+        return Object.values(map).map(r => ({
+            name: `Route ${count++}`,
+            start: r.start,
+            end: r.end,
+            cables: Array.from(r.cables)
+        }));
     }
 
     _isSharedSegment(seg, tol = 0.1) {
