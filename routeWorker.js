@@ -46,6 +46,9 @@ class CableRoutingSystem {
         this.proximityThreshold = options.proximityThreshold || 72.0;
         this.fieldPenalty = options.fieldPenalty || 3.0;
         this.sharedPenalty = options.sharedPenalty || 0.5;
+        // Limit distance between generic field nodes to keep the graph from
+        // growing quadratically when many trays are present
+        this.maxFieldEdge = options.maxFieldEdge || 150;
         this.sharedFieldSegments = [];
         this.trays = new Map();
     }
@@ -238,6 +241,7 @@ class CableRoutingSystem {
                 if (graph.edges[id1][id2] || (id1.includes('_') && isSameTray)) continue;
 
                 const dist = this.manhattanDistance(p1, p2);
+                if (dist > this.maxFieldEdge) continue; // avoid very long field edges
                 let weight, type;
                 if (dist < 0.1) {
                     weight = 0.1;
