@@ -227,58 +227,39 @@ document.addEventListener('DOMContentLoaded', () => {
             return false;
         }
 
-        recordSharedFieldSegments(segments) {
-            segments.forEach(s => {
-                if (s.type === 'field') {
-                    this.sharedFieldSegments.push({ start: s.start.slice(), end: s.end.slice() });
-                }
-            });
-        }
-
-        calculateRoute(startPoint, endPoint, cableArea) {
-            // 1. Build the graph
+        prepareBaseGraph() {
             const graph = { nodes: {}, edges: {} };
             const addNode = (id, point, type = 'generic') => {
                 graph.nodes[id] = { point, type };
                 graph.edges[id] = {};
             };
             const addEdge = (id1, id2, weight, type, trayId = null) => {
+                if (!graph.edges[id1]) graph.edges[id1] = {};
+                if (!graph.edges[id2]) graph.edges[id2] = {};
                 graph.edges[id1][id2] = { weight, type, trayId };
                 graph.edges[id2][id1] = { weight, type, trayId };
             };
 
-            addNode('start', startPoint, 'start');
-            addNode('end', endPoint, 'end');
-
-            // Add tray endpoints as nodes if they have capacity
             this.trays.forEach(tray => {
-                if (tray.current_fill + cableArea <= tray.maxFill) {
-                    const startId = `${tray.tray_id}_start`;
-                    const endId = `${tray.tray_id}_end`;
-                    addNode(startId, [tray.start_x, tray.start_y, tray.start_z], 'tray_endpoint');
-                    addNode(endId, [tray.end_x, tray.end_y, tray.end_z], 'tray_endpoint');
-                    const trayLength = this.distance(graph.nodes[startId].point, graph.nodes[endId].point);
-                    addEdge(startId, endId, trayLength, 'tray', tray.tray_id);
-                }
+                const startId = `${tray.tray_id}_start`;
+                const endId = `${tray.tray_id}_end`;
+                addNode(startId, [tray.start_x, tray.start_y, tray.start_z], 'tray_endpoint');
+                addNode(endId, [tray.end_x, tray.end_y, tray.end_z], 'tray_endpoint');
+                const trayLength = this.distance(graph.nodes[startId].point, graph.nodes[endId].point);
+                addEdge(startId, endId, trayLength, 'tray', tray.tray_id);
             });
 
-            // Connect tray endpoints that lie on other trays
             this.trays.forEach(trayA => {
                 const startA = `${trayA.tray_id}_start`;
                 const endA = `${trayA.tray_id}_end`;
-                if (!graph.nodes[startA] || !graph.nodes[endA]) return; // Skip if trayA not in graph
-
                 const endpoints = [
                     { id: startA, point: graph.nodes[startA].point },
                     { id: endA, point: graph.nodes[endA].point }
                 ];
-
                 this.trays.forEach(trayB => {
                     if (trayA.tray_id === trayB.tray_id) return;
                     const startB = `${trayB.tray_id}_start`;
                     const endB = `${trayB.tray_id}_end`;
-                    if (!graph.nodes[startB] || !graph.nodes[endB]) return; // Skip if trayB not in graph
-
                     const a = graph.nodes[startB].point;
                     const b = graph.nodes[endB].point;
                     endpoints.forEach(ep => {
@@ -294,7 +275,6 @@ document.addEventListener('DOMContentLoaded', () => {
                 });
             });
 
-            // Add edges between all nodes (field routing and tray-to-tray connections)
             const nodeIds = Object.keys(graph.nodes);
             for (let i = 0; i < nodeIds.length; i++) {
                 for (let j = i + 1; j < nodeIds.length; j++) {
@@ -302,7 +282,7 @@ document.addEventListener('DOMContentLoaded', () => {
                     const id2 = nodeIds[j];
                     const p1 = graph.nodes[id1].point;
                     const p2 = graph.nodes[id2].point;
-                    
+
                     const isSameTray = id1.startsWith(id2.split('_')[0]) && id2.startsWith(id1.split('_')[0]);
                     if (graph.edges[id1][id2] || (id1.includes('_') && isSameTray)) continue;
 
@@ -312,14 +292,83 @@ document.addEventListener('DOMContentLoaded', () => {
                         weight = 0.1;
                         type = 'tray_connection';
                     } else {
-                        const seg = { start: p1, end: p2 };
-                        const penalty = this._isSharedSegment(seg) ? this.fieldPenalty * this.sharedPenalty : this.fieldPenalty;
-                        weight = dist * penalty;
+                        weight = dist * this.fieldPenalty;
                         type = 'field';
                     }
                     addEdge(id1, id2, weight, type);
                 }
             }
+
+            this.baseGraph = graph;
+        }
+
+        recordSharedFieldSegments(segments) {
+            segments.forEach(s => {
+                if (s.type === 'field') {
+                    this.sharedFieldSegments.push({ start: s.start.slice(), end: s.end.slice() });
+                }
+            });
+        }
+
+        calculateRoute(startPoint, endPoint, cableArea) {
+            if (!this.baseGraph) this.prepareBaseGraph();
+            // 1. Start from the precomputed graph
+            const cloneGraph = (base) => {
+                const g = { nodes: {}, edges: {} };
+                for (const [id, n] of Object.entries(base.nodes)) {
+                    g.nodes[id] = { point: n.point.slice(), type: n.type };
+                }
+                for (const [id, edges] of Object.entries(base.edges)) {
+                    g.edges[id] = {};
+                    for (const [k, e] of Object.entries(edges)) {
+                        g.edges[id][k] = { weight: e.weight, type: e.type, trayId: e.trayId };
+                    }
+                }
+                return g;
+            };
+            const graph = cloneGraph(this.baseGraph);
+
+            // Remove trays without remaining capacity
+            this.trays.forEach(tray => {
+                if (tray.current_fill + cableArea > tray.maxFill) {
+                    const remove = Object.keys(graph.nodes).filter(n => n.includes(tray.tray_id));
+                    remove.forEach(n => {
+                        delete graph.nodes[n];
+                        delete graph.edges[n];
+                        Object.keys(graph.edges).forEach(k => { if (graph.edges[k]) delete graph.edges[k][n]; });
+                    });
+                }
+            });
+
+            const addNode = (id, point, type = 'generic') => {
+                graph.nodes[id] = { point, type };
+                graph.edges[id] = {};
+            };
+            const addEdge = (id1, id2, weight, type, trayId = null) => {
+                if (!graph.edges[id1]) graph.edges[id1] = {};
+                if (!graph.edges[id2]) graph.edges[id2] = {};
+                graph.edges[id1][id2] = { weight, type, trayId };
+                graph.edges[id2][id1] = { weight, type, trayId };
+            };
+
+            addNode('start', startPoint, 'start');
+            addNode('end', endPoint, 'end');
+
+            const nodeIds = Object.keys(graph.nodes);
+            nodeIds.forEach(id => {
+                if (id === 'start' || id === 'end') return;
+                const p = graph.nodes[id].point;
+                const segS = { start: startPoint, end: p };
+                const segE = { start: endPoint, end: p };
+                const penS = this._isSharedSegment(segS) ? this.fieldPenalty * this.sharedPenalty : this.fieldPenalty;
+                const penE = this._isSharedSegment(segE) ? this.fieldPenalty * this.sharedPenalty : this.fieldPenalty;
+                addEdge('start', id, this.manhattanDistance(startPoint, p) * penS, 'field');
+                addEdge('end', id, this.manhattanDistance(endPoint, p) * penE, 'field');
+            });
+
+            const segSE = { start: startPoint, end: endPoint };
+            const penSE = this._isSharedSegment(segSE) ? this.fieldPenalty * this.sharedPenalty : this.fieldPenalty;
+            addEdge('start', 'end', this.manhattanDistance(startPoint, endPoint) * penSE, 'field');
             
             // Add projection nodes for start/end points onto trays
             this.trays.forEach(tray => {
@@ -1032,6 +1081,7 @@ document.addEventListener('DOMContentLoaded', () => {
         // Deep copy tray data so original state isn't mutated during batch routing
         const trayDataForRun = JSON.parse(JSON.stringify(state.trayData));
         trayDataForRun.forEach(tray => routingSystem.addTraySegment(tray));
+        routingSystem.prepareBaseGraph();
         
         if (state.cableList.length > 0) {
             const batchResults = [];
@@ -1040,7 +1090,23 @@ document.addEventListener('DOMContentLoaded', () => {
             for (let i = 0; i < state.cableList.length; i++) {
                 const cable = state.cableList[i];
                 const cableArea = Math.PI * (cable.diameter / 2) ** 2;
-                const result = routingSystem.calculateRoute(cable.start, cable.end, cableArea);
+                const result = await new Promise((resolve, reject) => {
+                    const worker = new Worker('routeWorker.js');
+                    worker.onmessage = e => { worker.terminate(); resolve(e.data); };
+                    worker.onerror = err => { worker.terminate(); reject(err); };
+                    worker.postMessage({
+                        trays: Array.from(routingSystem.trays.values()),
+                        options: {
+                            fillLimit: routingSystem.fillLimit,
+                            proximityThreshold: routingSystem.proximityThreshold,
+                            fieldPenalty: routingSystem.fieldPenalty,
+                            sharedPenalty: routingSystem.sharedPenalty
+                        },
+                        baseGraph: routingSystem.baseGraph,
+                        cable,
+                        cableArea
+                    });
+                });
 
                 if (result.success) {
                     routingSystem.updateTrayFill(result.tray_segments, cableArea);
