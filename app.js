@@ -103,6 +103,9 @@ document.addEventListener('DOMContentLoaded', () => {
             this.proximityThreshold = options.proximityThreshold || 72.0;
             this.fieldPenalty = options.fieldPenalty || 3.0;
             this.sharedPenalty = options.sharedPenalty || 0.5;
+            // Limit how far apart generic field edges can be created to avoid
+            // generating a fully connected graph for large datasets
+            this.maxFieldEdge = options.maxFieldEdge || 150;
             this.sharedFieldSegments = [];
             this.trays = new Map();
         }
@@ -295,6 +298,7 @@ document.addEventListener('DOMContentLoaded', () => {
                     if (graph.edges[id1][id2] || (id1.includes('_') && isSameTray)) continue;
 
                     const dist = this.manhattanDistance(p1, p2);
+                    if (dist > this.maxFieldEdge) continue; // skip extremely distant nodes
                     let weight, type;
                     if (dist < 0.1) {
                         weight = 0.1;
@@ -1137,6 +1141,7 @@ document.addEventListener('DOMContentLoaded', () => {
             proximityThreshold: parseFloat(document.getElementById('proximity-threshold').value),
             fieldPenalty: parseFloat(document.getElementById('field-route-penalty').value),
             sharedPenalty: parseFloat(document.getElementById('shared-field-penalty').value),
+            maxFieldEdge: 150
         });
         
         // Deep copy tray data so original state isn't mutated during batch routing
@@ -1173,7 +1178,8 @@ document.addEventListener('DOMContentLoaded', () => {
                             fillLimit: routingSystem.fillLimit,
                             proximityThreshold: routingSystem.proximityThreshold,
                             fieldPenalty: routingSystem.fieldPenalty,
-                            sharedPenalty: routingSystem.sharedPenalty
+                            sharedPenalty: routingSystem.sharedPenalty,
+                            maxFieldEdge: routingSystem.maxFieldEdge
                         },
                         baseGraph: routingSystem.baseGraph,
                         cable,
