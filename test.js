@@ -332,7 +332,7 @@ const getSampleCables = () => [
 ];
 
 function runBatch(count) {
-  const system = new CableRoutingSystem({ sharedPenalty: 0.5 });
+  const system = new CableRoutingSystem({ sharedPenalty: 0.5, maxFieldNeighbors: 8 });
   getSampleTrays().forEach(t => system.addTraySegment({...t}));
   const cables = getSampleCables();
   const routes = [];

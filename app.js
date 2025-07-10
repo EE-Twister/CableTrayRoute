@@ -106,6 +106,9 @@ document.addEventListener('DOMContentLoaded', () => {
             // Limit how far apart generic field edges can be created to avoid
             // generating a fully connected graph for large datasets
             this.maxFieldEdge = options.maxFieldEdge || 150;
+            // Limit how many field connections each node keeps to further
+            // reduce graph density and memory usage
+            this.maxFieldNeighbors = options.maxFieldNeighbors || 8;
             this.sharedFieldSegments = [];
             this.trays = new Map();
         }
@@ -287,6 +290,9 @@ document.addEventListener('DOMContentLoaded', () => {
             });
 
             const nodeIds = Object.keys(graph.nodes);
+            const candidates = {};
+            nodeIds.forEach(id => candidates[id] = []);
+
             for (let i = 0; i < nodeIds.length; i++) {
                 for (let j = i + 1; j < nodeIds.length; j++) {
                     const id1 = nodeIds[i];
@@ -298,7 +304,16 @@ document.addEventListener('DOMContentLoaded', () => {
                     if (graph.edges[id1][id2] || (id1.includes('_') && isSameTray)) continue;
 
                     const dist = this.manhattanDistance(p1, p2);
-                    if (dist > this.maxFieldEdge) continue; // skip extremely distant nodes
+                    if (dist > this.maxFieldEdge) continue;
+                    candidates[id1].push({ id: id2, dist });
+                    candidates[id2].push({ id: id1, dist });
+                }
+            }
+
+            nodeIds.forEach(id1 => {
+                candidates[id1].sort((a,b) => a.dist - b.dist);
+                candidates[id1].slice(0, this.maxFieldNeighbors).forEach(({id: id2, dist}) => {
+                    if (graph.edges[id1][id2]) return;
                     let weight, type;
                     if (dist < 0.1) {
                         weight = 0.1;
@@ -308,8 +323,8 @@ document.addEventListener('DOMContentLoaded', () => {
                         type = 'field';
                     }
                     addEdge(id1, id2, weight, type);
-                }
-            }
+                });
+            });
 
             this.baseGraph = graph;
         }
@@ -1141,7 +1156,8 @@ document.addEventListener('DOMContentLoaded', () => {
             proximityThreshold: parseFloat(document.getElementById('proximity-threshold').value),
             fieldPenalty: parseFloat(document.getElementById('field-route-penalty').value),
             sharedPenalty: parseFloat(document.getElementById('shared-field-penalty').value),
-            maxFieldEdge: 150
+            maxFieldEdge: 150,
+            maxFieldNeighbors: 8
         });
         
         // Deep copy tray data so original state isn't mutated during batch routing
@@ -1179,7 +1195,8 @@ document.addEventListener('DOMContentLoaded', () => {
                             proximityThreshold: routingSystem.proximityThreshold,
                             fieldPenalty: routingSystem.fieldPenalty,
                             sharedPenalty: routingSystem.sharedPenalty,
-                            maxFieldEdge: routingSystem.maxFieldEdge
+                            maxFieldEdge: routingSystem.maxFieldEdge,
+                            maxFieldNeighbors: routingSystem.maxFieldNeighbors
                         },
                         baseGraph: routingSystem.baseGraph,
                         cable,
