@@ -978,8 +978,8 @@ document.addEventListener('DOMContentLoaded', () => {
                             <input type="number" class="cable-end-input" data-idx="${idx}" data-coord="1" value="${c.end[1]}" step="0.1" style="width:80px;">
                             <input type="number" class="cable-end-input" data-idx="${idx}" data-coord="2" value="${c.end[2]}" step="0.1" style="width:80px;">
                         </td>
-                        <td><button class="dup-cable" data-idx="${idx}">Duplicate</button></td>
-                        <td><button class="del-cable" data-idx="${idx}">Delete</button></td>
+                        <td><button class="icon-button dup-cable" data-idx="${idx}" title="Duplicate">📋</button></td>
+                        <td><button class="icon-button del-cable icon-delete" data-idx="${idx}" title="Delete">\u274C</button></td>
                     </tr>`;
         });
         html += '</tbody></table>';
