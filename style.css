@@ -27,6 +27,7 @@ body {
 /* --- Layout: Sidebar and Main Content --- */
 .sidebar {
     width: 350px;
+    flex-shrink: 0; /* Prevent sidebar from shrinking when results are shown */
     background-color: var(--secondary-color);
     padding: 1rem;
     overflow-y: auto;
