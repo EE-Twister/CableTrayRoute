@@ -620,6 +620,7 @@ document.addEventListener('DOMContentLoaded', () => {
         {
             name: "Power Cable 1",
             cable_type: "Power",
+            conductors: 3,
             diameter: 1.26,
             weight: 1.5,
             start: [5, 5, 5],
@@ -631,6 +632,7 @@ document.addEventListener('DOMContentLoaded', () => {
         {
             name: "Control Cable 1",
             cable_type: "Control",
+            conductors: 3,
             diameter: 0.47,
             weight: 0.8,
             start: [10, 0, 10],
@@ -642,6 +644,7 @@ document.addEventListener('DOMContentLoaded', () => {
         {
             name: "Data Cable 1",
             cable_type: "Signal",
+            conductors: 3,
             diameter: 0.31,
             weight: 0.5,
             start: [15, 5, 15],
@@ -653,6 +656,7 @@ document.addEventListener('DOMContentLoaded', () => {
         {
             name: "Power Cable 2",
             cable_type: "Power",
+            conductors: 3,
             diameter: 1.10,
             weight: 1.3,
             start: [20, 10, 8],
@@ -664,6 +668,7 @@ document.addEventListener('DOMContentLoaded', () => {
         {
             name: "Control Cable 2",
             cable_type: "Control",
+            conductors: 3,
             diameter: 0.59,
             weight: 0.9,
             start: [25, 15, 12],
@@ -991,7 +996,7 @@ document.addEventListener('DOMContentLoaded', () => {
     };
 
     const exportCableOptionsCSV = () => {
-        const headers = ['tag','start_tag','end_tag','cable_type','diameter','weight','allowed_cable_group','start_x','start_y','start_z','end_x','end_y','end_z'];
+        const headers = ['tag','start_tag','end_tag','cable_type','conductors','diameter','weight','allowed_cable_group','start_x','start_y','start_z','end_x','end_y','end_z'];
         const rows = state.cableList;
         let csv = headers.join(',') + '\n';
         if (rows.length > 0) {
@@ -1001,6 +1006,7 @@ document.addEventListener('DOMContentLoaded', () => {
                     c.start_tag || '',
                     c.end_tag || '',
                     c.cable_type || '',
+                    c.conductors !== undefined ? c.conductors : '',
                     c.diameter !== undefined ? c.diameter : '',
                     c.weight !== undefined ? c.weight : '',
                     c.allowed_cable_group || '',
@@ -1040,6 +1046,7 @@ document.addEventListener('DOMContentLoaded', () => {
                     start_tag: t.start_tag || '',
                     end_tag: t.end_tag || '',
                     cable_type: t.cable_type || 'Power',
+                    conductors: parseInt(t.conductors) || 0,
                     diameter: parseFloat(t.diameter) || 0,
                     weight: parseFloat(t.weight) || 0,
                     allowed_cable_group: t.allowed_cable_group || '',
@@ -1078,7 +1085,7 @@ document.addEventListener('DOMContentLoaded', () => {
             updateTableCounts();
             return;
         }
-        let html = '<h4>Cables to Route:</h4><table class="sticky-table"><thead><tr><th>Tag</th><th>Start Tag</th><th>End Tag</th><th>Cable Type</th><th>Diameter (in)</th><th>Weight (lbs/ft)</th><th>Allowed Group</th><th>Start (X,Y,Z)</th><th>End (X,Y,Z)</th><th></th><th></th></tr></thead><tbody>';
+        let html = '<h4>Cables to Route:</h4><table class="sticky-table"><thead><tr><th>Tag</th><th>Start Tag</th><th>End Tag</th><th>Cable Type</th><th>Conductors</th><th>Diameter (in)</th><th>Weight (lbs/ft)</th><th>Allowed Group</th><th>Start (X,Y,Z)</th><th>End (X,Y,Z)</th><th></th><th></th></tr></thead><tbody>';
         state.cableList.forEach((c, idx) => {
             html += `<tr>
                         <td><input type="text" class="cable-tag-input" data-idx="${idx}" value="${c.name}"></td>
@@ -1091,6 +1098,7 @@ document.addEventListener('DOMContentLoaded', () => {
                                 <option value="Signal" ${c.cable_type === 'Signal' ? 'selected' : ''}>Signal</option>
                             </select>
                         </td>
+                        <td><input type="number" class="cable-conductors-input" data-idx="${idx}" value="${c.conductors || 0}" step="1" style="width:60px;"></td>
                         <td><input type="number" class="cable-diameter-input" data-idx="${idx}" value="${c.diameter}" step="0.01" style="width:60px;"></td>
                         <td><input type="number" class="cable-weight-input" data-idx="${idx}" value="${c.weight || 0}" step="0.01" style="width:80px;"></td>
                         <td><input type="text" class="cable-group-input" data-idx="${idx}" value="${c.allowed_cable_group || ''}" style="width:120px;"></td>
@@ -1133,6 +1141,12 @@ document.addEventListener('DOMContentLoaded', () => {
             input.addEventListener('input', e => {
                 const i = parseInt(e.target.dataset.idx, 10);
                 state.cableList[i].diameter = parseFloat(e.target.value);
+            });
+        });
+        elements.cableListContainer.querySelectorAll('.cable-conductors-input').forEach(input => {
+            input.addEventListener('input', e => {
+                const i = parseInt(e.target.dataset.idx, 10);
+                state.cableList[i].conductors = parseInt(e.target.value);
             });
         });
         elements.cableListContainer.querySelectorAll('.cable-weight-input').forEach(input => {
@@ -1195,6 +1209,7 @@ document.addEventListener('DOMContentLoaded', () => {
         const newCable = {
             name: `Cable ${state.cableList.length + 1}`,
             cable_type: 'Power',
+            conductors: 1,
             diameter: 1.0,
             weight: 0,
             start: [0, 0, 0],
