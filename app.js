@@ -8,6 +8,7 @@ document.addEventListener('DOMContentLoaded', () => {
         cableList: [],
         trayData: [],
         latestRouteData: [],
+        sharedFieldRoutes: [],
     };
 
     // --- ELEMENT REFERENCES ---
@@ -1247,11 +1248,23 @@ document.addEventListener('DOMContentLoaded', () => {
             cables: Array.from(cables).join(', ')
         }));
 
+        const sharedRoutes = (state.sharedFieldRoutes || []).map(r => ({
+            route_name: r.name,
+            allowed_cable_group: r.allowed_cable_group || '',
+            start: formatPoint(r.start),
+            end: formatPoint(r.end),
+            cables: r.cables.join(', ')
+        }));
+
         const wb = XLSX.utils.book_new();
         const ws1 = XLSX.utils.json_to_sheet(data);
         XLSX.utils.book_append_sheet(wb, ws1, 'Route Data');
         const ws2 = XLSX.utils.json_to_sheet(trayList);
         XLSX.utils.book_append_sheet(wb, ws2, 'Tray Cable Map');
+        if (sharedRoutes.length > 0) {
+            const ws3 = XLSX.utils.json_to_sheet(sharedRoutes);
+            XLSX.utils.book_append_sheet(wb, ws3, 'Shared Field Routes');
+        }
         XLSX.writeFile(wb, 'route_data.xlsx');
     };
 
@@ -1394,6 +1407,7 @@ document.addEventListener('DOMContentLoaded', () => {
             renderBatchResults(batchResults);
             state.latestRouteData = batchResults;
             const common = routingSystem.findCommonFieldRoutes(allRoutesForPlotting, 6);
+            state.sharedFieldRoutes = common;
             if (common.length > 0) {
                 let html = '<h4>Potential Shared Field Routes</h4><ul>';
                 common.forEach(c => {

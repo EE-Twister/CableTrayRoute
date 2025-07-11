@@ -30,6 +30,8 @@ coordinates for that cable.
 - Route data download now generates an **XLSX** file with an additional
   worksheet mapping trays to the cables routed through them.
 - The **Tray Cable Map** worksheet now also lists the tray's **Allowed Cable Group**.
+- The XLSX export includes a **Shared Field Routes** worksheet showing
+  potential field runs shared between cables.
 - Start and end tags are displayed in the 3D view (duplicates shown once).
 - Cable specification fields are now located in the **Cable Routing Options** panel.
 - Manual tray entry now has a single **Import Trays CSV** button. Clicking it opens a file dialog and loads trays immediately after you choose a file.
