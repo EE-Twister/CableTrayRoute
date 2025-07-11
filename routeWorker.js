@@ -157,23 +157,24 @@ class CableRoutingSystem {
 
     findCommonFieldRoutes(routes, tolerance = 1) {
         const map = {};
-        const keyFor = (s, e) => {
+        const keyFor = (s, e, group) => {
             const rounded = arr => arr.map(v => v.toFixed(2)).join(',');
-            return `${rounded(s)}|${rounded(e)}`;
+            return `${rounded(s)}|${rounded(e)}|${group || ''}`;
         };
         for (let i = 0; i < routes.length; i++) {
             const a = routes[i];
             for (let j = i + 1; j < routes.length; j++) {
                 const b = routes[j];
+                if (a.allowed_cable_group && b.allowed_cable_group && a.allowed_cable_group !== b.allowed_cable_group) continue;
                 for (const segA of a.segments) {
                     if (segA.type !== 'field') continue;
                     for (const segB of b.segments) {
                         if (segB.type !== 'field') continue;
                         const ov = this._segmentsOverlap(segA, segB, tolerance);
                         if (ov) {
-                            const key = keyFor(ov.start, ov.end);
+                            const key = keyFor(ov.start, ov.end, a.allowed_cable_group);
                             if (!map[key]) {
-                                map[key] = { start: ov.start, end: ov.end, cables: new Set() };
+                                map[key] = { start: ov.start, end: ov.end, group: a.allowed_cable_group, cables: new Set() };
                             }
                             map[key].cables.add(a.label || a.name);
                             map[key].cables.add(b.label || b.name);
@@ -187,6 +188,7 @@ class CableRoutingSystem {
             name: `Route ${count++}`,
             start: r.start,
             end: r.end,
+            allowed_cable_group: r.group,
             cables: Array.from(r.cables)
         }));
     }
