@@ -1046,11 +1046,11 @@ document.addEventListener('DOMContentLoaded', () => {
         results.forEach(res => {
             html += `<details><summary>${res.cable} | ${res.status} | Total ${res.total_length} | Field ${res.field_length} | Segments ${res.segments_count}</summary>`;
             if (res.breakdown && res.breakdown.length > 0) {
-                html += '<table><thead><tr><th>Segment</th><th>Tray ID</th><th>Type</th><th>From</th><th>To</th><th>Length</th></tr></thead><tbody>';
+                html += '<div class="table-scroll"><table class="sticky-table"><thead><tr><th>Segment</th><th>Tray ID</th><th>Type</th><th>From</th><th>To</th><th>Length</th></tr></thead><tbody>';
                 res.breakdown.forEach(b => {
                     html += `<tr><td>${b.segment}</td><td>${b.tray_id}</td><td>${b.type}</td><td>${b.from}</td><td>${b.to}</td><td>${b.length}</td></tr>`;
                 });
-                html += '</tbody></table>';
+                html += '</tbody></table></div>';
             }
             html += '</details>';
         });
