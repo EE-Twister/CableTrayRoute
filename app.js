@@ -1222,8 +1222,10 @@ document.addEventListener('DOMContentLoaded', () => {
             }
         });
 
+        const groupMap = new Map(state.trayData.map(t => [t.tray_id, t.allowed_cable_group || '']));
         const trayList = Array.from(trayMap.entries()).map(([tray_id, cables]) => ({
             tray_id,
+            allowed_cable_group: groupMap.get(tray_id) || '',
             cables: Array.from(cables).join(', ')
         }));
 
@@ -1473,6 +1475,13 @@ document.addEventListener('DOMContentLoaded', () => {
         });
 
         if (routes && routes.length > 0) {
+            // Sort routes alphanumerically by label so the legend order is predictable
+            routes = routes.slice().sort((a, b) => {
+                const la = a.label || '';
+                const lb = b.label || '';
+                return la.localeCompare(lb, undefined, { numeric: true, sensitivity: 'base' });
+            });
+
             const palette = ['blue', 'green', 'orange', 'purple', 'brown', 'cyan', 'magenta', 'olive'];
             const seenTags = new Set();
 
