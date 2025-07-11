@@ -270,6 +270,41 @@ document.addEventListener('DOMContentLoaded', () => {
             return false;
         }
 
+        _removeTrayBacktracking(segments) {
+            const result = [];
+            let i = 0;
+            while (i < segments.length) {
+                const curr = { ...segments[i] };
+                if (curr.type === 'tray' && i + 1 < segments.length) {
+                    const next = { ...segments[i + 1] };
+                    if (next.type === 'field') {
+                        const oTray = this._segmentOrientation(curr);
+                        const oField = this._segmentOrientation(next);
+                        if (oTray.axis === oField.axis) {
+                            const trayDir = Math.sign(curr.end[oTray.axis] - curr.start[oTray.axis]);
+                            const fieldDir = Math.sign(next.end[oField.axis] - next.start[oField.axis]);
+                            if (trayDir !== 0 && fieldDir !== 0 && trayDir !== fieldDir) {
+                                const overshoot = Math.min(Math.abs(next.end[oField.axis] - next.start[oField.axis]), curr.length);
+                                curr.end[oTray.axis] -= trayDir * overshoot;
+                                curr.length -= overshoot;
+                                next.start[oField.axis] -= trayDir * overshoot;
+                                next.length -= overshoot;
+                                if (curr.length > 0.0001) result.push(curr);
+                                if (next.length > 0.0001) {
+                                    result.push(next);
+                                }
+                                i += 2;
+                                continue;
+                            }
+                        }
+                    }
+                }
+                result.push(curr);
+                i++;
+            }
+            return result;
+        }
+
         prepareBaseGraph() {
             const graph = { nodes: {}, edges: {} };
             const addNode = (id, point, type = 'generic') => {
@@ -546,11 +581,12 @@ document.addEventListener('DOMContentLoaded', () => {
                 }
             }
 
+            const cleaned = this._removeTrayBacktracking(routeSegments);
             return {
                 success: true,
                 total_length: totalLength,
                 field_routed_length: fieldRoutedLength,
-                route_segments: this._consolidateSegments(routeSegments), // Use the new consolidation method
+                route_segments: this._consolidateSegments(cleaned),
                 tray_segments: Array.from(traySegments),
                 warnings: [],
             };
