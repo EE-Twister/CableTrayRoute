@@ -81,6 +81,11 @@ input[type="number"], input[type="text"], select {
     box-sizing: border-box;
 }
 
+/* Highlight invalid fields */
+.input-error {
+    border-color: red;
+}
+
 button, .primary-btn {
     background-color: #6c757d;
     color: white;
@@ -221,6 +226,11 @@ details > summary {
     visibility: visible;
 }
 
+/* Focus outline for accessibility */
+.help-icon:focus {
+    outline: 2px solid var(--primary-color);
+}
+
 /* --- Tables --- */
 table {
     width: 100%;
@@ -238,6 +248,19 @@ th {
 .util-high { background-color: var(--error-bg); color: var(--error-text); }
 .util-medium { background-color: var(--warning-bg); color: var(--warning-text); }
 .util-low { background-color: var(--success-bg); color: var(--success-text); }
+
+/* Scrollable tables with sticky headers */
+.table-scroll {
+    max-height: 300px;
+    overflow-y: auto;
+}
+
+.sticky-table thead th {
+    position: sticky;
+    top: 0;
+    background-color: var(--secondary-color);
+    z-index: 1;
+}
 
 /* Utilization Bars */
 .util-bar {
@@ -322,4 +345,21 @@ th {
 #cancel-routing-btn {
     width: 100%;
     margin-top: 10px;
+}
+
+/* Responsive layout for smaller screens */
+@media (max-width: 768px) {
+    .container {
+        flex-direction: column;
+        height: auto;
+    }
+    .sidebar {
+        width: 100%;
+        order: 2;
+        border-right: none;
+        border-bottom: 1px solid var(--border-color);
+    }
+    .main-content {
+        order: 1;
+    }
 }

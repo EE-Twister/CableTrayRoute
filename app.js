@@ -757,6 +757,26 @@ document.addEventListener('DOMContentLoaded', () => {
     
 
     const addManualTray = () => {
+        const required = ['t-id','t-sx','t-sy','t-sz','t-ex','t-ey','t-ez','t-w','t-h'];
+        let valid = true;
+        required.forEach(id => {
+            const el = document.getElementById(id);
+            if (el.type === 'number') {
+                if (el.value === '' || isNaN(parseFloat(el.value))) {
+                    el.classList.add('input-error');
+                    valid = false;
+                } else {
+                    el.classList.remove('input-error');
+                }
+            } else if (!el.value) {
+                el.classList.add('input-error');
+                valid = false;
+            } else {
+                el.classList.remove('input-error');
+            }
+        });
+        if (!valid) return;
+
         const newTray = {
             tray_id: document.getElementById('t-id').value,
             start_x: parseFloat(document.getElementById('t-sx').value),
@@ -770,10 +790,6 @@ document.addEventListener('DOMContentLoaded', () => {
             current_fill: parseFloat(document.getElementById('t-fill').value),
             allowed_cable_group: document.getElementById('t-group').value
         };
-        if (!newTray.tray_id || isNaN(newTray.width)) {
-            alert("Please fill in at least Tray ID and Width.");
-            return;
-        }
         state.manualTrays.push(newTray);
         state.trayData = state.manualTrays;
         renderManualTrayTable();
@@ -795,7 +811,7 @@ document.addEventListener('DOMContentLoaded', () => {
             updateTableCounts();
             return;
         }
-        let table = '<table><thead><tr><th>Tray ID</th><th>Start (X,Y,Z)</th><th>End (X,Y,Z)</th><th>Width</th><th>Height</th><th>Current Fill</th><th>Allowed Group</th><th></th><th></th></tr></thead><tbody>';
+        let table = '<table class="sticky-table"><thead><tr><th>Tray ID</th><th>Start (X,Y,Z)</th><th>End (X,Y,Z)</th><th>Width</th><th>Height</th><th>Current Fill</th><th>Allowed Group</th><th></th><th></th></tr></thead><tbody>';
         state.manualTrays.forEach((t, idx) => {
             table += `<tr data-idx="${idx}">
                         <td><input type="text" class="tray-id-input" data-idx="${idx}" value="${t.tray_id}" style="width:80px;"></td>
@@ -819,6 +835,7 @@ document.addEventListener('DOMContentLoaded', () => {
         });
         table += '</tbody></table>';
         elements.manualTrayTableContainer.innerHTML = table;
+        elements.manualTrayTableContainer.classList.add('table-scroll');
         
         const updateTrayData = () => { state.trayData = state.manualTrays; updateTrayDisplay(); };
 
@@ -1046,7 +1063,7 @@ document.addEventListener('DOMContentLoaded', () => {
             updateTableCounts();
             return;
         }
-        let html = '<h4>Cables to Route:</h4><table><thead><tr><th>Tag</th><th>Start Tag</th><th>End Tag</th><th>Diameter (in)</th><th>Allowed Group</th><th>Start (X,Y,Z)</th><th>End (X,Y,Z)</th><th></th><th></th></tr></thead><tbody>';
+        let html = '<h4>Cables to Route:</h4><table class="sticky-table"><thead><tr><th>Tag</th><th>Start Tag</th><th>End Tag</th><th>Diameter (in)</th><th>Allowed Group</th><th>Start (X,Y,Z)</th><th>End (X,Y,Z)</th><th></th><th></th></tr></thead><tbody>';
         state.cableList.forEach((c, idx) => {
             html += `<tr>
                         <td><input type="text" class="cable-tag-input" data-idx="${idx}" value="${c.name}"></td>
@@ -1070,6 +1087,7 @@ document.addEventListener('DOMContentLoaded', () => {
         });
         html += '</tbody></table>';
         elements.cableListContainer.innerHTML = html;
+        elements.cableListContainer.classList.add('table-scroll');
         elements.cableListContainer.querySelectorAll('.cable-tag-input').forEach(input => {
             input.addEventListener('input', e => {
                 const i = parseInt(e.target.dataset.idx, 10);
@@ -1258,6 +1276,7 @@ document.addEventListener('DOMContentLoaded', () => {
         elements.messages.innerHTML = '';
         elements.progressContainer.style.display = 'block';
         elements.progressBar.style.width = '0%';
+        elements.progressBar.setAttribute('aria-valuenow', '0');
         elements.progressLabel.textContent = 'Starting...';
         elements.cancelRoutingBtn.style.display = 'block';
         elements.cancelRoutingBtn.disabled = false;
@@ -1324,7 +1343,9 @@ document.addEventListener('DOMContentLoaded', () => {
                     }
                 }).then(result => {
                     completed++;
-                    elements.progressBar.style.width = `${(completed / state.cableList.length) * 100}%`;
+                    const pct = (completed / state.cableList.length) * 100;
+                    elements.progressBar.style.width = `${pct}%`;
+                    elements.progressBar.setAttribute('aria-valuenow', Math.round(pct).toString());
                     elements.progressLabel.textContent = `Routing (${completed}/${state.cableList.length})`;
                     if (!cancelRouting && !result.cancelled) {
                         if (result.success) {
@@ -1576,6 +1597,14 @@ Plotly.newPlot(document.getElementById('plot'), data, layout, {responsive: true}
     elements.exportCsvBtn.addEventListener('click', exportRouteXLSX);
     elements.popoutPlotBtn.addEventListener('click', popOutPlot);
     elements.cancelRoutingBtn.addEventListener('click', cancelCurrentRouting);
+
+    // remove validation error highlight when typing
+    ['t-id','t-sx','t-sy','t-sz','t-ex','t-ey','t-ez','t-w','t-h','t-fill','t-group'].forEach(id => {
+        const el = document.getElementById(id);
+        if (el) {
+            el.addEventListener('input', () => el.classList.remove('input-error'));
+        }
+    });
     // Initial setup
     updateCableArea();
     handleInputMethodChange();

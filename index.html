@@ -20,37 +20,37 @@
             <section>
                 <h3>Routing Parameters</h3>
                  <label for="fill-limit">Max Tray Fill (%)
-                    <span class="help-icon" tabindex="0">?
-                        <span class="tooltip">The maximum allowed fill capacity for a cable tray, based on standards like the NEC 40% rule.</span>
+                    <span class="help-icon" tabindex="0" role="button" aria-describedby="fill-limit-help">?
+                        <span id="fill-limit-help" class="tooltip">The maximum allowed fill capacity for a cable tray, based on standards like the NEC 40% rule.</span>
                     </span>
                  </label>
                  <input type="range" id="fill-limit" min="20" max="80" value="40" step="5">
                  <span id="fill-limit-value">40%</span>
 
                  <label for="proximity-threshold">Tray Proximity Threshold (in)
-                    <span class="help-icon" tabindex="0">?
-                        <span class="tooltip">The maximum distance a cable can jump from its start or end point to connect to a nearby tray segment.</span>
+                    <span class="help-icon" tabindex="0" role="button" aria-describedby="proximity-help">?
+                        <span id="proximity-help" class="tooltip">The maximum distance a cable can jump from its start or end point to connect to a nearby tray segment.</span>
                     </span>
                  </label>
                  <input type="number" id="proximity-threshold" value="72" step="1">
 
                  <label for="field-route-penalty">Field Route Cost Multiplier
-                    <span class="help-icon" tabindex="0">?
-                        <span class="tooltip">This makes field routing (not in a tray) more expensive than routing within a tray. A value of 3 means every inch of field routing costs as much as 3 inches of tray routing, encouraging the algorithm to use trays whenever possible.</span>
+                    <span class="help-icon" tabindex="0" role="button" aria-describedby="field-penalty-help">?
+                        <span id="field-penalty-help" class="tooltip">This makes field routing (not in a tray) more expensive than routing within a tray. A value of 3 means every inch of field routing costs as much as 3 inches of tray routing, encouraging the algorithm to use trays whenever possible.</span>
                     </span>
                  </label>
                  <input type="number" id="field-route-penalty" value="3.0" step="0.1">
 
                  <label for="shared-field-penalty">Shared Field Route Cost Multiplier
-                    <span class="help-icon" tabindex="0">?
-                        <span class="tooltip">Multiplier applied when a cable uses an existing field-routed path from a previous cable. Use a value less than 1 to make shared field routes cheaper than new field routes.</span>
+                    <span class="help-icon" tabindex="0" role="button" aria-describedby="shared-field-help">?
+                        <span id="shared-field-help" class="tooltip">Multiplier applied when a cable uses an existing field-routed path from a previous cable. Use a value less than 1 to make shared field routes cheaper than new field routes.</span>
                     </span>
                  </label>
                  <input type="number" id="shared-field-penalty" value="0.5" step="0.1">
                  
                  <button id="calculate-route-btn" class="primary-btn">▶ Calculate Optimal Route</button>
                  <div id="progress-container" style="display:none;">
-                     <div id="progress-bar"></div>
+                     <div id="progress-bar" role="progressbar" aria-valuemin="0" aria-valuemax="100" aria-valuenow="0"></div>
                      <span id="progress-label"></span>
                  </div>
                  <button id="cancel-routing-btn" style="display:none;">Cancel Routing</button>
@@ -100,7 +100,7 @@
                     </details>
                     <details id="manual-tray-table-details">
                         <summary id="manual-tray-summary">Manual Cable Tray Entry Table</summary>
-                        <div id="manual-tray-table-container"></div>
+                        <div id="manual-tray-table-container" class="table-scroll"></div>
                     </details>
                 </div>
 
@@ -126,7 +126,7 @@
                     </div>
                     <details id="cable-list-details">
                         <summary id="cable-list-summary">Cables to Route Table</summary>
-                        <div id="cable-list-container"></div>
+                        <div id="cable-list-container" class="table-scroll"></div>
                     </details>
                 </div>
             </section>
