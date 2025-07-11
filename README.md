@@ -37,3 +37,4 @@ coordinates for that cable.
 - Manual tray entry now has a single **Import Trays CSV** button. Clicking it opens a file dialog and loads trays immediately after you choose a file.
 - Cable Routing Options now has **Import Cables CSV** and **Export Cables CSV** buttons for managing the cable list.
 - New **Shared Field Route Cost Multiplier** input lets successive cables reuse existing field runs at a reduced cost.
+- The **Cables to Route** table now includes a **Cable Type** drop-down (Power, Control, Signal) and a **Weight (lbs/ft)** column.
