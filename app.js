@@ -44,6 +44,8 @@ document.addEventListener('DOMContentLoaded', () => {
         progressBar: document.getElementById('progress-bar'),
         progressLabel: document.getElementById('progress-label'),
         cancelRoutingBtn: document.getElementById('cancel-routing-btn'),
+        manualTraySummary: document.getElementById('manual-tray-summary'),
+        cableListSummary: document.getElementById('cable-list-summary'),
     };
 
     let cancelRouting = false;
@@ -51,6 +53,17 @@ document.addEventListener('DOMContentLoaded', () => {
     let workerResolvers = new Map();
     const taskQueue = [];
     const maxWorkers = navigator.hardwareConcurrency || 4;
+
+    const updateTableCounts = () => {
+        if (elements.manualTraySummary) {
+            elements.manualTraySummary.textContent =
+                `Manual Cable Tray Entry Table (${state.manualTrays.length})`;
+        }
+        if (elements.cableListSummary) {
+            elements.cableListSummary.textContent =
+                `Cables to Route Table (${state.cableList.length})`;
+        }
+    };
     
     // --- CORE ROUTING LOGIC (JavaScript implementation of your Python backend) ---
 
@@ -696,6 +709,7 @@ document.addEventListener('DOMContentLoaded', () => {
             renderManualTrayTable();
         }
         updateTrayDisplay();
+        updateTableCounts();
     };
     
 
@@ -720,6 +734,7 @@ document.addEventListener('DOMContentLoaded', () => {
         state.trayData = state.manualTrays;
         renderManualTrayTable();
         updateTrayDisplay();
+        updateTableCounts();
     };
 
     const clearManualTrays = () => {
@@ -727,11 +742,13 @@ document.addEventListener('DOMContentLoaded', () => {
         state.trayData = [];
         elements.manualTrayTableContainer.innerHTML = '';
         updateTrayDisplay();
+        updateTableCounts();
     };
 
     const renderManualTrayTable = () => {
         if (state.manualTrays.length === 0) {
             elements.manualTrayTableContainer.innerHTML = '';
+            updateTableCounts();
             return;
         }
         let table = '<table><thead><tr><th>Tray ID</th><th>Start (X,Y,Z)</th><th>End (X,Y,Z)</th><th>Width</th><th>Height</th><th>Current Fill</th><th></th><th></th></tr></thead><tbody>';
@@ -757,7 +774,7 @@ document.addEventListener('DOMContentLoaded', () => {
         });
         table += '</tbody></table>';
         elements.manualTrayTableContainer.innerHTML = table;
-
+        
         const updateTrayData = () => { state.trayData = state.manualTrays; updateTrayDisplay(); };
 
         elements.manualTrayTableContainer.querySelectorAll('.tray-id-input').forEach(input => {
@@ -829,6 +846,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 updateTrayDisplay();
             });
         });
+        updateTableCounts();
     };
 
     const exportManualTraysCSV = () => {
@@ -884,6 +902,7 @@ document.addEventListener('DOMContentLoaded', () => {
             state.trayData = state.manualTrays;
             renderManualTrayTable();
             updateTrayDisplay();
+            updateTableCounts();
         };
         reader.readAsText(file);
         // Reset the file input so importing the same file again triggers the change event
@@ -943,6 +962,7 @@ document.addEventListener('DOMContentLoaded', () => {
             }
             state.cableList = newCables;
             updateCableListDisplay();
+            updateTableCounts();
         };
         reader.readAsText(file);
         // Reset the file input so importing the same file again triggers the change event
@@ -968,6 +988,7 @@ document.addEventListener('DOMContentLoaded', () => {
     const updateCableListDisplay = () => {
         if (state.cableList.length === 0) {
             elements.cableListContainer.innerHTML = '';
+            updateTableCounts();
             return;
         }
         let html = '<h4>Cables to Route:</h4><table><thead><tr><th>Tag</th><th>Start Tag</th><th>End Tag</th><th>Diameter (in)</th><th>Start (X,Y,Z)</th><th>End (X,Y,Z)</th><th></th><th></th></tr></thead><tbody>';
@@ -1046,11 +1067,13 @@ document.addEventListener('DOMContentLoaded', () => {
                 updateCableListDisplay();
             });
         });
+        updateTableCounts();
     };
 
     const loadSampleCables = () => {
         state.cableList = getSampleCables();
         updateCableListDisplay();
+        updateTableCounts();
     };
 
     const addCableToBatch = () => {
@@ -1064,11 +1087,13 @@ document.addEventListener('DOMContentLoaded', () => {
         };
         state.cableList.push(newCable);
         updateCableListDisplay();
+        updateTableCounts();
     };
 
     const clearCableList = () => {
         state.cableList = [];
         updateCableListDisplay();
+        updateTableCounts();
     };
 
     const showMessage = (type, text) => {
