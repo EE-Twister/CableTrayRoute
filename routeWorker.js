@@ -294,7 +294,7 @@ class CableRoutingSystem {
         });
     }
 
-    calculateRoute(startPoint, endPoint, cableArea) {
+    calculateRoute(startPoint, endPoint, cableArea, allowedGroup) {
         if (!this.baseGraph) this.prepareBaseGraph();
         // 1. Start from the precomputed graph
         const cloneGraph = (base) => {
@@ -314,7 +314,7 @@ class CableRoutingSystem {
 
         // Remove trays without remaining capacity
         this.trays.forEach(tray => {
-            if (tray.current_fill + cableArea > tray.maxFill) {
+            if (tray.current_fill + cableArea > tray.maxFill || tray.allowed_cable_group !== allowedGroup) {
                 const remove = Object.keys(graph.nodes).filter(n => n.includes(tray.tray_id));
                 remove.forEach(n => {
                     delete graph.nodes[n];
@@ -491,6 +491,6 @@ self.onmessage = function(e) {
     const system = new CableRoutingSystem(options);
     trays.forEach(t => system.addTraySegment(t));
     system.baseGraph = baseGraph;
-    const result = system.calculateRoute(cable.start, cable.end, cableArea);
+    const result = system.calculateRoute(cable.start, cable.end, cableArea, cable.allowed_cable_group);
     self.postMessage(result);
 };

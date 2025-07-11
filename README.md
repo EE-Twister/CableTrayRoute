@@ -7,6 +7,10 @@ You can now specify a **Cable Tag** when routing cables. Use the text field in t
 "Cable Specifications" section to assign a tag for a single cable. In batch mode
 the tag can be edited for each cable in the table.
 
+## New Feature: Allowed Cable Group
+
+Cable trays and cables now include an **Allowed Cable Group** property. During routing, a cable will only use trays whose allowed group matches the cable's group. This helps ensure voltage-rated cables are routed appropriately.
+
 ## New Feature: Manual Batch Cable Entry
 
 When batch mode is selected, you can now use the **Add Cable to List** button to
