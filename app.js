@@ -41,6 +41,7 @@ document.addEventListener('DOMContentLoaded', () => {
         routeBreakdownContainer: document.getElementById('route-breakdown-container'),
         plot3d: document.getElementById('plot-3d'),
         popoutPlotBtn: document.getElementById('popout-plot-btn'),
+        resetViewBtn: document.getElementById('reset-view-btn'),
         updatedUtilizationContainer: document.getElementById('updated-utilization-container'),
         exportCsvBtn: document.getElementById('export-csv-btn'),
         openFillBtn: document.getElementById('open-fill-btn'),
@@ -1840,6 +1841,10 @@ const openTrayFill = (trayId) => {
     };
     Plotly.newPlot(elements.plot3d, traces, layout, {responsive: true});
     window.current3DPlot = { traces: traces, layout: layout };
+    window.base3DPlot = {
+        traces: JSON.parse(JSON.stringify(traces)),
+        layout: JSON.parse(JSON.stringify(layout))
+    };
     };
 
     const highlightSharedRoute = (idx) => {
@@ -1851,7 +1856,7 @@ const openTrayFill = (trayId) => {
             y: [route.start[1], route.end[1]],
             z: [route.start[2], route.end[2]],
             mode: 'lines', type: 'scatter3d',
-            line: { color: 'yellow', width: 12 },
+            line: { color: 'hotpink', width: 15 },
             name: '__shared_highlight__', showlegend: false
         });
         const layout = window.current3DPlot.layout;
@@ -1891,6 +1896,14 @@ const openTrayFill = (trayId) => {
         Plotly.react(elements.plot3d, traces, layout);
         window.current3DPlot.traces = traces;
         window.current3DPlot.layout = layout;
+    };
+
+    const reset3DView = () => {
+        if (!window.base3DPlot) return;
+        const traces = JSON.parse(JSON.stringify(window.base3DPlot.traces));
+        const layout = JSON.parse(JSON.stringify(window.base3DPlot.layout));
+        Plotly.react(elements.plot3d, traces, layout);
+        window.current3DPlot = { traces, layout };
     };
 
     const popOutPlot = () => {
@@ -1935,6 +1948,9 @@ Plotly.newPlot(document.getElementById('plot'), data, layout, {responsive: true}
         });
     }
     elements.popoutPlotBtn.addEventListener('click', popOutPlot);
+    if (elements.resetViewBtn) {
+        elements.resetViewBtn.addEventListener('click', reset3DView);
+    }
     elements.cancelRoutingBtn.addEventListener('click', cancelCurrentRouting);
     if (elements.darkToggle) {
         elements.darkToggle.addEventListener('change', () => {
