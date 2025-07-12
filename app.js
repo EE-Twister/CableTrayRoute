@@ -41,6 +41,7 @@ document.addEventListener('DOMContentLoaded', () => {
         popoutPlotBtn: document.getElementById('popout-plot-btn'),
         updatedUtilizationContainer: document.getElementById('updated-utilization-container'),
         exportCsvBtn: document.getElementById('export-csv-btn'),
+        openFillBtn: document.getElementById('open-fill-btn'),
         progressContainer: document.getElementById('progress-container'),
         progressBar: document.getElementById('progress-bar'),
         progressLabel: document.getElementById('progress-label'),
@@ -1699,6 +1700,11 @@ Plotly.newPlot(document.getElementById('plot'), data, layout, {responsive: true}
     elements.importCablesBtn.addEventListener('click', () => elements.importCablesFile.click());
     elements.importCablesFile.addEventListener('change', importCableOptionsCSV);
     elements.exportCsvBtn.addEventListener('click', exportRouteXLSX);
+    if (elements.openFillBtn) {
+        elements.openFillBtn.addEventListener('click', () => {
+            window.open('cabletrayfill.html', '_blank');
+        });
+    }
     elements.popoutPlotBtn.addEventListener('click', popOutPlot);
     elements.cancelRoutingBtn.addEventListener('click', cancelCurrentRouting);
 

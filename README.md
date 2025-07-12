@@ -40,3 +40,11 @@ coordinates for that cable.
 - The **Cables to Route** table now includes a **Cable Type** drop-down (Power, Control, Signal) and a **Weight (lbs/ft)** column.
 - A new **Conductors** column lets you specify the number of conductors for each cable.
 - A new **Conductor Size** column lets you choose an AWG or kcmil size for each cable.
+
+## Tray Fill Visualization
+
+The repository now includes `cabletrayfill.html`, a standalone page that draws
+a cross-sectional view of a cable tray. After calculating routes, click
+**Download Route Data (XLSX)** and then **Open Tray Fill Tool** to launch the
+viewer. Import the exported `route_data.xlsx` file to display the tray fill
+diagram with the cables placed according to their properties.
