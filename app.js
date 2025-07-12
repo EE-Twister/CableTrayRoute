@@ -1854,6 +1854,13 @@ const openTrayFill = (trayId) => {
             line: { color: 'red', width: 8, dash: 'dot' },
             name: '__shared_highlight__', showlegend: false
         });
+        const cam = window.current3DPlot.layout.scene.camera || {};
+        const center = {
+            x: (route.start[0] + route.end[0]) / 2,
+            y: (route.start[1] + route.end[1]) / 2,
+            z: (route.start[2] + route.end[2]) / 2
+        };
+        window.current3DPlot.layout.scene.camera = { ...cam, center };
         Plotly.react(elements.plot3d, traces, window.current3DPlot.layout);
         window.current3DPlot.traces = traces;
     };
