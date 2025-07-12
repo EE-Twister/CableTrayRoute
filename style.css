@@ -381,6 +381,13 @@ th {
     margin-top: 10px;
 }
 
+.plot-controls {
+    display: flex;
+    gap: 10px;
+    align-items: center;
+    margin-bottom: 10px;
+}
+
 /* Progress Bar */
 #progress-container {
     width: 100%;
