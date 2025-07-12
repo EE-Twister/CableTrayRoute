@@ -53,19 +53,6 @@ document.addEventListener('DOMContentLoaded', () => {
         traySearch: document.getElementById('tray-search'),
         cableSearch: document.getElementById('cable-search'),
     };
-
-    loadSession();
-    if ((state.manualTrays.length > 0 || state.cableList.length > 0) && confirm('Resume previous session?')) {
-        renderManualTrayTable();
-        updateCableListDisplay();
-        state.trayData = state.manualTrays;
-        updateTrayDisplay();
-    } else if (state.manualTrays.length > 0 || state.cableList.length > 0) {
-        state.manualTrays = [];
-        state.cableList = [];
-        saveSession();
-    }
-
     let cancelRouting = false;
     let currentWorkers = [];
     let workerResolvers = new Map();
@@ -1913,5 +1900,17 @@ Plotly.newPlot(document.getElementById('plot'), data, layout, {responsive: true}
         }
     });
     // Initial setup
+    loadSession();
+    if ((state.manualTrays.length > 0 || state.cableList.length > 0) && confirm("Resume previous session?")) {
+        renderManualTrayTable();
+        updateCableListDisplay();
+        state.trayData = state.manualTrays;
+        updateTrayDisplay();
+    } else if (state.manualTrays.length > 0 || state.cableList.length > 0) {
+        state.manualTrays = [];
+        state.cableList = [];
+        saveSession();
+    }
+
     handleInputMethodChange();
 });
