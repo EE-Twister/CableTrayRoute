@@ -48,3 +48,28 @@ a cross-sectional view of a cable tray. After calculating routes, click
 **Download Route Data (XLSX)** and then **Open Tray Fill Tool** to launch the
 viewer. Import the exported `route_data.xlsx` file to display the tray fill
 diagram with the cables placed according to their properties.
+
+## Import and Export Guide
+
+### Tray CSV Format
+A tray CSV used for import must include the following headers:
+
+```
+tray_id,start_x,start_y,start_z,end_x,end_y,end_z,width,height,current_fill,allowed_cable_group
+```
+
+All coordinates are in **feet**. Width and height are in **inches** and `current_fill` is the occupied area in square inches. A sample file is available at `examples/trays_template.csv`.
+
+### Cable CSV Format
+Cables can be imported with these column headers:
+
+```
+tag,start_tag,end_tag,cable_type,conductors,conductor_size,diameter,weight,allowed_cable_group,start_x,start_y,start_z,end_x,end_y,end_z
+```
+
+Start and end coordinates use **feet**. Diameter is in **inches** and weight is in **lbs/ft**. See `examples/cables_template.csv` for a template.
+
+Exported routing results are written to `route_data.xlsx`. Load this file in `cabletrayfill.html` to view tray utilization.
+
+## Clearing Saved Sessions
+The application stores your trays, cables and theme preference in browser storage. Open the settings menu (⚙) and click **Delete Saved Data** to clear this information.
