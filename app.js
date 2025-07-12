@@ -1913,6 +1913,5 @@ Plotly.newPlot(document.getElementById('plot'), data, layout, {responsive: true}
         }
     });
     // Initial setup
-    updateCableArea();
     handleInputMethodChange();
 });
