@@ -9,6 +9,7 @@ document.addEventListener('DOMContentLoaded', () => {
         trayData: [],
         latestRouteData: [],
         sharedFieldRoutes: [],
+        trayCableMap: {},
     };
 
     // --- ELEMENT REFERENCES ---
@@ -737,6 +738,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 max_capacity: maxCapacity.toFixed(0),
                 utilization_pct: ((tray.current_fill / maxCapacity) * 100).toFixed(1),
                 available_space: (maxCapacity - tray.current_fill).toFixed(2),
+                fill: `<button class="fill-btn" data-tray="${tray.tray_id}">Open</button>`
             };
         });
         renderTable(
@@ -748,7 +750,8 @@ document.addEventListener('DOMContentLoaded', () => {
                 { label: 'Max Capacity (in²)', key: 'max_capacity' },
                 { label: 'Current Fill (in²)', key: 'current_fill' },
                 { label: 'Utilization %', key: 'utilization_pct' },
-                { label: 'Available Space (in²)', key: 'available_space' }
+                { label: 'Available Space (in²)', key: 'available_space' },
+                { label: 'Tray Fill', key: 'fill' }
             ],
             displayData.map(d => ({
                 tray_id: d.tray_id,
@@ -757,10 +760,26 @@ document.addEventListener('DOMContentLoaded', () => {
                 max_capacity: d.max_capacity,
                 current_fill: d.current_fill,
                 utilization_pct: d.utilization_pct,
-                available_space: d.available_space
+                available_space: d.available_space,
+                fill: d.fill
             })),
             utilizationStyle
         );
+        elements.trayUtilizationContainer.querySelectorAll('.fill-btn').forEach(btn => {
+            btn.addEventListener('click', () => openTrayFill(btn.dataset.tray));
+        });
+    };
+
+    const openTrayFill = (trayId) => {
+        const tray = state.trayData.find(t => t.tray_id === trayId);
+        if (!tray) return;
+        const cables = (state.trayCableMap && state.trayCableMap[trayId]) ? state.trayCableMap[trayId] : [];
+        try {
+            localStorage.setItem('trayFillData', JSON.stringify({ tray, cables }));
+        } catch (e) {
+            console.error('Failed to store tray fill data', e);
+        }
+        window.open('cabletrayfill.html', '_blank');
     };
     
     const handleInputMethodChange = () => {
@@ -1497,6 +1516,20 @@ document.addEventListener('DOMContentLoaded', () => {
 
             renderBatchResults(batchResults);
             state.latestRouteData = batchResults;
+            const nameMap = new Map(state.cableList.map(c => [c.name, c]));
+            state.trayCableMap = {};
+            batchResults.forEach(row => {
+                const cableObj = nameMap.get(row.cable);
+                if (!cableObj || !Array.isArray(row.breakdown)) return;
+                row.breakdown.forEach(b => {
+                    if (b.tray_id && b.tray_id !== 'Field Route' && b.tray_id !== 'N/A') {
+                        if (!state.trayCableMap[b.tray_id]) state.trayCableMap[b.tray_id] = [];
+                        if (!state.trayCableMap[b.tray_id].includes(cableObj)) {
+                            state.trayCableMap[b.tray_id].push(cableObj);
+                        }
+                    }
+                });
+            });
             const common = routingSystem.findCommonFieldRoutes(allRoutesForPlotting, 6);
             state.sharedFieldRoutes = common;
             if (common.length > 0) {
@@ -1527,7 +1560,8 @@ document.addEventListener('DOMContentLoaded', () => {
                 tray_id: id,
                 full_pct: fullPct,
                 utilization: data.utilization_percentage.toFixed(1),
-                available: data.available_capacity.toFixed(2)
+                available: data.available_capacity.toFixed(2),
+                fill: `<button class="fill-btn" data-tray="${id}">Open</button>`
             };
         });
         const formatters = {
@@ -1548,12 +1582,16 @@ document.addEventListener('DOMContentLoaded', () => {
             [
                 { label: 'Tray ID', key: 'tray_id' },
                 { label: 'Utilization', key: 'full_pct' },
-                { label: 'Available (in²)', key: 'available' }
+                { label: 'Available (in²)', key: 'available' },
+                { label: 'Tray Fill', key: 'fill' }
             ],
             utilData,
             (row) => utilizationStyle(row),
             formatters
         );
+        elements.updatedUtilizationContainer.querySelectorAll('.fill-btn').forEach(btn => {
+            btn.addEventListener('click', () => openTrayFill(btn.dataset.tray));
+        });
 
         elements.progressLabel.textContent = 'Complete';
         elements.progressContainer.style.display = 'none';
