@@ -11,6 +11,7 @@ document.addEventListener('DOMContentLoaded', () => {
         sharedFieldRoutes: [],
         trayCableMap: {},
         updatedUtilData: [],
+        highlightTraceIndex: null,
     };
 
     // --- ELEMENT REFERENCES ---
@@ -773,7 +774,7 @@ document.addEventListener('DOMContentLoaded', () => {
         } : h);
 
         let table = '<table><thead><tr>';
-        defs.forEach(h => table += `<th>${h.label}</th>`);
+        defs.forEach(h => table += `<th data-key="${h.key}">${h.label}</th>`);
         table += '</tr></thead><tbody>';
         data.forEach(row => {
             const style = styleFn ? styleFn(row) : '';
@@ -1694,12 +1695,16 @@ const openTrayFill = (trayId) => {
             state.sharedFieldRoutes = common;
             if (common.length > 0) {
                 let html = '<h4>Potential Shared Field Routes</h4><ul>';
-                common.forEach(c => {
+                common.forEach((c, idx) => {
                     const group = c.allowed_cable_group ? ` (Group ${c.allowed_cable_group})` : '';
-                    html += `<li>${c.name}${group}: ${formatPoint(c.start)} to ${formatPoint(c.end)} - ${c.cables.join(', ')}</li>`;
+                    html += `<li class="shared-route-item" data-route-index="${idx}">${c.name}${group}: ${formatPoint(c.start)} to ${formatPoint(c.end)} - ${c.cables.join(', ')}</li>`;
                 });
                 html += '</ul>';
                 elements.metrics.innerHTML = html;
+                elements.metrics.querySelectorAll('.shared-route-item').forEach(li => {
+                    li.style.cursor = 'pointer';
+                    li.addEventListener('click', () => highlightSharedRoute(parseInt(li.dataset.routeIndex, 10)));
+                });
             } else {
                 elements.metrics.innerHTML = '<p>No common field routes detected.</p>';
             }
@@ -1835,6 +1840,22 @@ const openTrayFill = (trayId) => {
     };
     Plotly.newPlot(elements.plot3d, traces, layout, {responsive: true});
     window.current3DPlot = { traces: traces, layout: layout };
+    };
+
+    const highlightSharedRoute = (idx) => {
+        if (!window.current3DPlot || !state.sharedFieldRoutes[idx]) return;
+        const route = state.sharedFieldRoutes[idx];
+        let traces = window.current3DPlot.traces.filter(t => t.name !== '__shared_highlight__');
+        traces.push({
+            x: [route.start[0], route.end[0]],
+            y: [route.start[1], route.end[1]],
+            z: [route.start[2], route.end[2]],
+            mode: 'lines', type: 'scatter3d',
+            line: { color: 'red', width: 8, dash: 'dot' },
+            name: '__shared_highlight__', showlegend: false
+        });
+        Plotly.react(elements.plot3d, traces, window.current3DPlot.layout);
+        window.current3DPlot.traces = traces;
     };
 
     const popOutPlot = () => {
