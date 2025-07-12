@@ -55,6 +55,7 @@ document.addEventListener('DOMContentLoaded', () => {
         settingsBtn: document.getElementById('settings-btn'),
         settingsMenu: document.getElementById('settings-menu'),
         helpBtn: document.getElementById('help-btn'),
+        deleteDataBtn: document.getElementById('delete-data-btn'),
         traySearch: document.getElementById('tray-search'),
         cableSearch: document.getElementById('cable-search'),
     };
@@ -1450,6 +1451,19 @@ const openTrayFill = (trayId) => {
         saveSession();
     };
 
+    const deleteSavedData = () => {
+        localStorage.removeItem('ctrSession');
+        state.manualTrays = [];
+        state.cableList = [];
+        if (elements.manualTrayTableContainer) {
+            elements.manualTrayTableContainer.innerHTML = '';
+        }
+        updateCableListDisplay();
+        updateTrayDisplay();
+        updateTableCounts();
+        alert('Saved session data cleared.');
+    };
+
     const showMessage = (type, text) => {
         elements.messages.innerHTML += `<div class="message ${type}">${text}</div>`;
     };
@@ -1979,6 +1993,9 @@ Plotly.newPlot(document.getElementById('plot'), data, layout, {responsive: true}
         elements.helpBtn.addEventListener('click', () => {
             window.open('README.md', '_blank');
         });
+    }
+    if (elements.deleteDataBtn) {
+        elements.deleteDataBtn.addEventListener('click', deleteSavedData);
     }
     if (elements.traySearch) {
         elements.traySearch.addEventListener('input', () => filterTable(elements.manualTrayTableContainer, elements.traySearch.value));
