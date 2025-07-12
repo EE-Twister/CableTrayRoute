@@ -1089,8 +1089,8 @@ document.addEventListener('DOMContentLoaded', () => {
         state.cableList.forEach((c, idx) => {
             html += `<tr>
                         <td><input type="text" class="cable-tag-input" data-idx="${idx}" value="${c.name}"></td>
-                        <td><input type="text" class="cable-start-tag-input" data-idx="${idx}" value="${c.start_tag || ''}" style="width:240px;"></td>
-                        <td><input type="text" class="cable-end-tag-input" data-idx="${idx}" value="${c.end_tag || ''}" style="width:240px;"></td>
+                        <td><input type="text" class="cable-start-tag-input" data-idx="${idx}" value="${c.start_tag || ''}" style="width:180px;"></td>
+                        <td><input type="text" class="cable-end-tag-input" data-idx="${idx}" value="${c.end_tag || ''}" style="width:180px;"></td>
                         <td>
                             <select class="cable-type-select" data-idx="${idx}">
                                 <option value="Power" ${c.cable_type === 'Power' ? 'selected' : ''}>Power</option>
