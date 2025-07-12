@@ -1854,15 +1854,26 @@ const openTrayFill = (trayId) => {
             line: { color: 'red', width: 8, dash: 'dot' },
             name: '__shared_highlight__', showlegend: false
         });
-        const cam = window.current3DPlot.layout.scene.camera || {};
-        const center = {
-            x: (route.start[0] + route.end[0]) / 2,
-            y: (route.start[1] + route.end[1]) / 2,
-            z: (route.start[2] + route.end[2]) / 2
-        };
-        window.current3DPlot.layout.scene.camera = { ...cam, center };
-        Plotly.react(elements.plot3d, traces, window.current3DPlot.layout);
+        const layout = window.current3DPlot.layout;
+        const cx = (route.start[0] + route.end[0]) / 2;
+        const cy = (route.start[1] + route.end[1]) / 2;
+        const cz = (route.start[2] + route.end[2]) / 2;
+
+        const xr = layout.scene.xaxis.range || [layout.scene.xaxis.min, layout.scene.xaxis.max];
+        const yr = layout.scene.yaxis.range || [layout.scene.yaxis.min, layout.scene.yaxis.max];
+        const zr = layout.scene.zaxis.range || [layout.scene.zaxis.min, layout.scene.zaxis.max];
+
+        const xw = xr[1] - xr[0];
+        const yw = yr[1] - yr[0];
+        const zw = zr[1] - zr[0];
+
+        layout.scene.xaxis.range = [cx - xw/2, cx + xw/2];
+        layout.scene.yaxis.range = [cy - yw/2, cy + yw/2];
+        layout.scene.zaxis.range = [cz - zw/2, cz + zw/2];
+
+        Plotly.react(elements.plot3d, traces, layout);
         window.current3DPlot.traces = traces;
+        window.current3DPlot.layout = layout;
     };
 
     const popOutPlot = () => {
