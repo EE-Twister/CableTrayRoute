@@ -49,7 +49,22 @@ document.addEventListener('DOMContentLoaded', () => {
         cancelRoutingBtn: document.getElementById('cancel-routing-btn'),
         manualTraySummary: document.getElementById('manual-tray-summary'),
         cableListSummary: document.getElementById('cable-list-summary'),
+        darkToggle: document.getElementById('dark-toggle'),
+        traySearch: document.getElementById('tray-search'),
+        cableSearch: document.getElementById('cable-search'),
     };
+
+    loadSession();
+    if ((state.manualTrays.length > 0 || state.cableList.length > 0) && confirm('Resume previous session?')) {
+        renderManualTrayTable();
+        updateCableListDisplay();
+        state.trayData = state.manualTrays;
+        updateTrayDisplay();
+    } else if (state.manualTrays.length > 0 || state.cableList.length > 0) {
+        state.manualTrays = [];
+        state.cableList = [];
+        saveSession();
+    }
 
     let cancelRouting = false;
     let currentWorkers = [];
@@ -67,6 +82,69 @@ document.addEventListener('DOMContentLoaded', () => {
                 `Cables to Route Table (${state.cableList.length})`;
         }
     };
+
+    const saveSession = () => {
+        try {
+            const data = {
+                manualTrays: state.manualTrays,
+                cableList: state.cableList,
+                darkMode: document.body.classList.contains('dark-mode')
+            };
+            localStorage.setItem('ctrSession', JSON.stringify(data));
+        } catch (e) {
+            console.error('Failed to save session', e);
+        }
+    };
+
+    const loadSession = () => {
+        try {
+            const data = JSON.parse(localStorage.getItem('ctrSession'));
+            if (data) {
+                state.manualTrays = data.manualTrays || [];
+                state.cableList = data.cableList || [];
+                if (data.darkMode) document.body.classList.add('dark-mode');
+            }
+        } catch (e) {
+            console.error('Failed to load session', e);
+        }
+    };
+
+    const filterTable = (container, query) => {
+        if (!container) return;
+        const q = query.toLowerCase();
+        container.querySelectorAll('tbody tr').forEach(row => {
+            row.style.display = row.textContent.toLowerCase().includes(q) ? '' : 'none';
+        });
+    };
+
+    const addSortHandlers = (container, dataArr, renderFn, sortState) => {
+        const headers = container.querySelectorAll('th[data-key]');
+        headers.forEach(th => {
+            th.style.cursor = 'pointer';
+            th.addEventListener('click', () => {
+                const key = th.dataset.key;
+                sortState.asc = sortState.key === key ? !sortState.asc : true;
+                sortState.key = key;
+                dataArr.sort((a,b) => {
+                    const va = getSortVal(a, key);
+                    const vb = getSortVal(b, key);
+                    if (va < vb) return sortState.asc ? -1 : 1;
+                    if (va > vb) return sortState.asc ? 1 : -1;
+                    return 0;
+                });
+                renderFn();
+            });
+        });
+    };
+
+    const getSortVal = (obj, key) => {
+        if (key === 'start0') return obj.start[0];
+        if (key === 'end0') return obj.end[0];
+        return obj[key];
+    };
+
+    const traySort = { key: '', asc: true };
+    const cableSort = { key: '', asc: true };
     
     // --- CORE ROUTING LOGIC (JavaScript implementation of your Python backend) ---
 
@@ -836,6 +914,7 @@ document.addEventListener('DOMContentLoaded', () => {
         renderManualTrayTable();
         updateTrayDisplay();
         updateTableCounts();
+        saveSession();
     };
 
     const clearManualTrays = () => {
@@ -844,6 +923,7 @@ document.addEventListener('DOMContentLoaded', () => {
         elements.manualTrayTableContainer.innerHTML = '';
         updateTrayDisplay();
         updateTableCounts();
+        saveSession();
     };
 
     const renderManualTrayTable = () => {
@@ -852,7 +932,15 @@ document.addEventListener('DOMContentLoaded', () => {
             updateTableCounts();
             return;
         }
-        let table = '<table class="sticky-table"><thead><tr><th>Tray ID</th><th>Start (X,Y,Z)</th><th>End (X,Y,Z)</th><th>Width</th><th>Height</th><th>Current Fill</th><th>Allowed Group</th><th></th><th></th></tr></thead><tbody>';
+        let table = '<table class="sticky-table"><thead><tr>' +
+            '<th data-key="tray_id">Tray ID</th>' +
+            '<th data-key="start_x">Start (X,Y,Z)</th>' +
+            '<th data-key="end_x">End (X,Y,Z)</th>' +
+            '<th data-key="width">Width</th>' +
+            '<th data-key="height">Height</th>' +
+            '<th data-key="current_fill">Current Fill</th>' +
+            '<th data-key="allowed_cable_group">Allowed Group</th>' +
+            '<th></th><th></th></tr></thead><tbody>';
         state.manualTrays.forEach((t, idx) => {
             table += `<tr data-idx="${idx}">
                         <td><input type="text" class="tray-id-input" data-idx="${idx}" value="${t.tray_id}" style="width:80px;"></td>
@@ -885,6 +973,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 const i = parseInt(e.target.dataset.idx, 10);
                 state.manualTrays[i].tray_id = e.target.value;
                 updateTrayData();
+                saveSession();
             });
         });
         elements.manualTrayTableContainer.querySelectorAll('.tray-start-input').forEach(input => {
@@ -896,6 +985,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 if (c === 1) state.manualTrays[i].start_y = val;
                 if (c === 2) state.manualTrays[i].start_z = val;
                 updateTrayData();
+                saveSession();
             });
         });
         elements.manualTrayTableContainer.querySelectorAll('.tray-end-input').forEach(input => {
@@ -907,6 +997,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 if (c === 1) state.manualTrays[i].end_y = val;
                 if (c === 2) state.manualTrays[i].end_z = val;
                 updateTrayData();
+                saveSession();
             });
         });
         elements.manualTrayTableContainer.querySelectorAll('.tray-width-input').forEach(input => {
@@ -914,6 +1005,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 const i = parseInt(e.target.dataset.idx, 10);
                 state.manualTrays[i].width = parseFloat(e.target.value);
                 updateTrayData();
+                saveSession();
             });
         });
         elements.manualTrayTableContainer.querySelectorAll('.tray-height-input').forEach(input => {
@@ -921,6 +1013,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 const i = parseInt(e.target.dataset.idx, 10);
                 state.manualTrays[i].height = parseFloat(e.target.value);
                 updateTrayData();
+                saveSession();
             });
         });
         elements.manualTrayTableContainer.querySelectorAll('.tray-fill-input').forEach(input => {
@@ -928,6 +1021,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 const i = parseInt(e.target.dataset.idx, 10);
                 state.manualTrays[i].current_fill = parseFloat(e.target.value);
                 updateTrayData();
+                saveSession();
             });
         });
         elements.manualTrayTableContainer.querySelectorAll('.tray-group-input').forEach(input => {
@@ -935,6 +1029,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 const i = parseInt(e.target.dataset.idx, 10);
                 state.manualTrays[i].allowed_cable_group = e.target.value;
                 updateTrayData();
+                saveSession();
             });
         });
         elements.manualTrayTableContainer.querySelectorAll('.delete-tray').forEach(btn => {
@@ -944,6 +1039,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 state.trayData = state.manualTrays;
                 renderManualTrayTable();
                 updateTrayDisplay();
+                saveSession();
             });
         });
         elements.manualTrayTableContainer.querySelectorAll('.dup-tray').forEach(btn => {
@@ -954,9 +1050,12 @@ document.addEventListener('DOMContentLoaded', () => {
                 state.trayData = state.manualTrays;
                 renderManualTrayTable();
                 updateTrayDisplay();
+                saveSession();
             });
         });
         updateTableCounts();
+        addSortHandlers(elements.manualTrayTableContainer, state.manualTrays, renderManualTrayTable, traySort);
+        filterTable(elements.manualTrayTableContainer, elements.traySearch.value);
     };
 
     const exportManualTraysCSV = () => {
@@ -1014,6 +1113,7 @@ document.addEventListener('DOMContentLoaded', () => {
             renderManualTrayTable();
             updateTrayDisplay();
             updateTableCounts();
+            saveSession();
         };
         reader.readAsText(file);
         // Reset the file input so importing the same file again triggers the change event
@@ -1084,6 +1184,7 @@ document.addEventListener('DOMContentLoaded', () => {
             state.cableList = newCables;
             updateCableListDisplay();
             updateTableCounts();
+            saveSession();
         };
         reader.readAsText(file);
         // Reset the file input so importing the same file again triggers the change event
@@ -1112,7 +1213,19 @@ document.addEventListener('DOMContentLoaded', () => {
             updateTableCounts();
             return;
         }
-        let html = '<h4>Cables to Route:</h4><table class="sticky-table"><thead><tr><th>Tag</th><th>Start Tag</th><th>End Tag</th><th>Cable Type</th><th>Conductors</th><th>Conductor Size</th><th>Diameter (in)</th><th>Weight (lbs/ft)</th><th>Allowed Group</th><th>Start (X,Y,Z)</th><th>End (X,Y,Z)</th><th></th><th></th></tr></thead><tbody>';
+        let html = '<h4>Cables to Route:</h4><table class="sticky-table"><thead><tr>' +
+            '<th data-key="name">Tag</th>' +
+            '<th data-key="start_tag">Start Tag</th>' +
+            '<th data-key="end_tag">End Tag</th>' +
+            '<th data-key="cable_type">Cable Type</th>' +
+            '<th data-key="conductors">Conductors</th>' +
+            '<th data-key="conductor_size">Conductor Size</th>' +
+            '<th data-key="diameter">Diameter (in)</th>' +
+            '<th data-key="weight">Weight (lbs/ft)</th>' +
+            '<th data-key="allowed_cable_group">Allowed Group</th>' +
+            '<th data-key="start0">Start (X,Y,Z)</th>' +
+            '<th data-key="end0">End (X,Y,Z)</th>' +
+            '<th></th><th></th></tr></thead><tbody>';
         state.cableList.forEach((c, idx) => {
             html += `<tr>
                         <td><input type="text" class="cable-tag-input" data-idx="${idx}" value="${c.name}"></td>
@@ -1175,54 +1288,63 @@ document.addEventListener('DOMContentLoaded', () => {
             input.addEventListener('input', e => {
                 const i = parseInt(e.target.dataset.idx, 10);
                 state.cableList[i].name = e.target.value;
+                saveSession();
             });
         });
         elements.cableListContainer.querySelectorAll('.cable-start-tag-input').forEach(input => {
             input.addEventListener('input', e => {
                 const i = parseInt(e.target.dataset.idx, 10);
                 state.cableList[i].start_tag = e.target.value;
+                saveSession();
             });
         });
         elements.cableListContainer.querySelectorAll('.cable-end-tag-input').forEach(input => {
             input.addEventListener('input', e => {
                 const i = parseInt(e.target.dataset.idx, 10);
                 state.cableList[i].end_tag = e.target.value;
+                saveSession();
             });
         });
         elements.cableListContainer.querySelectorAll('.cable-diameter-input').forEach(input => {
             input.addEventListener('input', e => {
                 const i = parseInt(e.target.dataset.idx, 10);
                 state.cableList[i].diameter = parseFloat(e.target.value);
+                saveSession();
             });
         });
         elements.cableListContainer.querySelectorAll('.cable-conductors-input').forEach(input => {
             input.addEventListener('input', e => {
                 const i = parseInt(e.target.dataset.idx, 10);
                 state.cableList[i].conductors = parseInt(e.target.value);
+                saveSession();
             });
         });
         elements.cableListContainer.querySelectorAll('.cable-size-select').forEach(sel => {
             sel.addEventListener('change', e => {
                 const i = parseInt(e.target.dataset.idx, 10);
                 state.cableList[i].conductor_size = e.target.value;
+                saveSession();
             });
         });
         elements.cableListContainer.querySelectorAll('.cable-weight-input').forEach(input => {
             input.addEventListener('input', e => {
                 const i = parseInt(e.target.dataset.idx, 10);
                 state.cableList[i].weight = parseFloat(e.target.value);
+                saveSession();
             });
         });
         elements.cableListContainer.querySelectorAll('.cable-type-select').forEach(sel => {
             sel.addEventListener('change', e => {
                 const i = parseInt(e.target.dataset.idx, 10);
                 state.cableList[i].cable_type = e.target.value;
+                saveSession();
             });
         });
         elements.cableListContainer.querySelectorAll('.cable-group-input').forEach(input => {
             input.addEventListener('input', e => {
                 const i = parseInt(e.target.dataset.idx, 10);
                 state.cableList[i].allowed_cable_group = e.target.value;
+                saveSession();
             });
         });
         elements.cableListContainer.querySelectorAll('.cable-start-input').forEach(input => {
@@ -1230,6 +1352,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 const i = parseInt(e.target.dataset.idx, 10);
                 const coord = parseInt(e.target.dataset.coord, 10);
                 state.cableList[i].start[coord] = parseFloat(e.target.value);
+                saveSession();
             });
         });
         elements.cableListContainer.querySelectorAll('.cable-end-input').forEach(input => {
@@ -1237,6 +1360,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 const i = parseInt(e.target.dataset.idx, 10);
                 const coord = parseInt(e.target.dataset.coord, 10);
                 state.cableList[i].end[coord] = parseFloat(e.target.value);
+                saveSession();
             });
         });
         elements.cableListContainer.querySelectorAll('.dup-cable').forEach(btn => {
@@ -1245,6 +1369,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 const copy = JSON.parse(JSON.stringify(state.cableList[i]));
                 state.cableList.splice(i + 1, 0, copy);
                 updateCableListDisplay();
+                saveSession();
             });
         });
         elements.cableListContainer.querySelectorAll('.del-cable').forEach(btn => {
@@ -1252,15 +1377,19 @@ document.addEventListener('DOMContentLoaded', () => {
                 const i = parseInt(e.target.dataset.idx, 10);
                 state.cableList.splice(i, 1);
                 updateCableListDisplay();
+                saveSession();
             });
         });
         updateTableCounts();
+        addSortHandlers(elements.cableListContainer, state.cableList, updateCableListDisplay, cableSort);
+        filterTable(elements.cableListContainer, elements.cableSearch.value);
     };
 
     const loadSampleCables = () => {
         state.cableList = getSampleCables();
         updateCableListDisplay();
         updateTableCounts();
+        saveSession();
     };
 
     const addCableToBatch = () => {
@@ -1280,12 +1409,14 @@ document.addEventListener('DOMContentLoaded', () => {
         state.cableList.push(newCable);
         updateCableListDisplay();
         updateTableCounts();
+        saveSession();
     };
 
     const clearCableList = () => {
         state.cableList = [];
         updateCableListDisplay();
         updateTableCounts();
+        saveSession();
     };
 
     const showMessage = (type, text) => {
@@ -1745,6 +1876,34 @@ Plotly.newPlot(document.getElementById('plot'), data, layout, {responsive: true}
     }
     elements.popoutPlotBtn.addEventListener('click', popOutPlot);
     elements.cancelRoutingBtn.addEventListener('click', cancelCurrentRouting);
+    if (elements.darkToggle) {
+        elements.darkToggle.addEventListener('change', () => {
+            if (elements.darkToggle.checked) {
+                document.body.classList.add('dark-mode');
+            } else {
+                document.body.classList.remove('dark-mode');
+            }
+            saveSession();
+        });
+        if (document.body.classList.contains('dark-mode')) {
+            elements.darkToggle.checked = true;
+        }
+    }
+    if (elements.traySearch) {
+        elements.traySearch.addEventListener('input', () => filterTable(elements.manualTrayTableContainer, elements.traySearch.value));
+    }
+    if (elements.cableSearch) {
+        elements.cableSearch.addEventListener('input', () => filterTable(elements.cableListContainer, elements.cableSearch.value));
+    }
+
+    document.addEventListener('keydown', e => {
+        if (e.target.tagName === 'INPUT' || e.target.tagName === 'TEXTAREA') return;
+        if (e.key === 'r') elements.calculateBtn.click();
+        if (e.key === 'c') document.getElementById('cable-list-details').open = !document.getElementById('cable-list-details').open;
+        if (e.key === 't') document.getElementById('manual-tray-table-details').open = !document.getElementById('manual-tray-table-details').open;
+    });
+
+    window.addEventListener('beforeunload', saveSession);
 
     // remove validation error highlight when typing
     ['t-id','t-sx','t-sy','t-sz','t-ex','t-ey','t-ez','t-w','t-h','t-fill','t-group'].forEach(id => {

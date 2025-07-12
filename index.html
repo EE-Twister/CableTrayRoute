@@ -13,6 +13,9 @@
         <aside class="sidebar">
             <header>
                 <h2>Input Parameters</h2>
+                <div class="dark-toggle">
+                    <label><input type="checkbox" id="dark-toggle"> Dark Mode</label>
+                </div>
             </header>
             
             <!-- Cable specification fields moved to the routing options card -->
@@ -96,10 +99,13 @@
                              <input type="number" id="t-fill" placeholder="Current Fill (in²)">
                              <input type="text" id="t-group" placeholder="Allowed Cable Group">
                              <button id="add-tray-btn">Add Tray</button>
+                             <span class="help-icon" tabindex="0" aria-describedby="add-tray-help">?</span>
+                             <span id="add-tray-help" class="tooltip">Add the tray segment above to the list.</span>
                         </div>
                     </details>
                     <details id="manual-tray-table-details">
                         <summary id="manual-tray-summary">Manual Cable Tray Entry Table</summary>
+                        <input type="text" id="tray-search" class="table-search" placeholder="Filter trays">
                         <div id="manual-tray-table-container" class="table-scroll"></div>
                     </details>
                 </div>
@@ -115,6 +121,8 @@
 
                 <div id="batch-section">
                     <button id="add-cable-btn">Add Cable to List</button>
+                    <span class="help-icon" tabindex="0" aria-describedby="add-cable-help">?</span>
+                    <span id="add-cable-help" class="tooltip">Add a new cable row using the current settings.</span>
                     <div class="cable-controls">
                         <button id="load-sample-cables-btn">Load Sample Cable List</button>
                         <div class="cable-import-export">
@@ -126,6 +134,7 @@
                     </div>
                     <details id="cable-list-details">
                         <summary id="cable-list-summary">Cables to Route Table</summary>
+                        <input type="text" id="cable-search" class="table-search" placeholder="Filter cables">
                         <div id="cable-list-container" class="table-scroll"></div>
                     </details>
                 </div>
