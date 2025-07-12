@@ -621,6 +621,7 @@ document.addEventListener('DOMContentLoaded', () => {
             name: "Power Cable 1",
             cable_type: "Power",
             conductors: 3,
+            conductor_size: '#12 AWG',
             diameter: 1.26,
             weight: 1.5,
             start: [5, 5, 5],
@@ -633,6 +634,7 @@ document.addEventListener('DOMContentLoaded', () => {
             name: "Control Cable 1",
             cable_type: "Control",
             conductors: 3,
+            conductor_size: '#12 AWG',
             diameter: 0.47,
             weight: 0.8,
             start: [10, 0, 10],
@@ -645,6 +647,7 @@ document.addEventListener('DOMContentLoaded', () => {
             name: "Data Cable 1",
             cable_type: "Signal",
             conductors: 3,
+            conductor_size: '#12 AWG',
             diameter: 0.31,
             weight: 0.5,
             start: [15, 5, 15],
@@ -657,6 +660,7 @@ document.addEventListener('DOMContentLoaded', () => {
             name: "Power Cable 2",
             cable_type: "Power",
             conductors: 3,
+            conductor_size: '#12 AWG',
             diameter: 1.10,
             weight: 1.3,
             start: [20, 10, 8],
@@ -669,6 +673,7 @@ document.addEventListener('DOMContentLoaded', () => {
             name: "Control Cable 2",
             cable_type: "Control",
             conductors: 3,
+            conductor_size: '#12 AWG',
             diameter: 0.59,
             weight: 0.9,
             start: [25, 15, 12],
@@ -996,7 +1001,7 @@ document.addEventListener('DOMContentLoaded', () => {
     };
 
     const exportCableOptionsCSV = () => {
-        const headers = ['tag','start_tag','end_tag','cable_type','conductors','diameter','weight','allowed_cable_group','start_x','start_y','start_z','end_x','end_y','end_z'];
+        const headers = ['tag','start_tag','end_tag','cable_type','conductors','conductor_size','diameter','weight','allowed_cable_group','start_x','start_y','start_z','end_x','end_y','end_z'];
         const rows = state.cableList;
         let csv = headers.join(',') + '\n';
         if (rows.length > 0) {
@@ -1007,6 +1012,7 @@ document.addEventListener('DOMContentLoaded', () => {
                     c.end_tag || '',
                     c.cable_type || '',
                     c.conductors !== undefined ? c.conductors : '',
+                    c.conductor_size || '',
                     c.diameter !== undefined ? c.diameter : '',
                     c.weight !== undefined ? c.weight : '',
                     c.allowed_cable_group || '',
@@ -1047,6 +1053,7 @@ document.addEventListener('DOMContentLoaded', () => {
                     end_tag: t.end_tag || '',
                     cable_type: t.cable_type || 'Power',
                     conductors: parseInt(t.conductors) || 0,
+                    conductor_size: t.conductor_size || '#12 AWG',
                     diameter: parseFloat(t.diameter) || 0,
                     weight: parseFloat(t.weight) || 0,
                     allowed_cable_group: t.allowed_cable_group || '',
@@ -1085,7 +1092,7 @@ document.addEventListener('DOMContentLoaded', () => {
             updateTableCounts();
             return;
         }
-        let html = '<h4>Cables to Route:</h4><table class="sticky-table"><thead><tr><th>Tag</th><th>Start Tag</th><th>End Tag</th><th>Cable Type</th><th>Conductors</th><th>Diameter (in)</th><th>Weight (lbs/ft)</th><th>Allowed Group</th><th>Start (X,Y,Z)</th><th>End (X,Y,Z)</th><th></th><th></th></tr></thead><tbody>';
+        let html = '<h4>Cables to Route:</h4><table class="sticky-table"><thead><tr><th>Tag</th><th>Start Tag</th><th>End Tag</th><th>Cable Type</th><th>Conductors</th><th>Conductor Size</th><th>Diameter (in)</th><th>Weight (lbs/ft)</th><th>Allowed Group</th><th>Start (X,Y,Z)</th><th>End (X,Y,Z)</th><th></th><th></th></tr></thead><tbody>';
         state.cableList.forEach((c, idx) => {
             html += `<tr>
                         <td><input type="text" class="cable-tag-input" data-idx="${idx}" value="${c.name}"></td>
@@ -1099,6 +1106,31 @@ document.addEventListener('DOMContentLoaded', () => {
                             </select>
                         </td>
                         <td><input type="number" class="cable-conductors-input" data-idx="${idx}" value="${c.conductors || 0}" step="1" style="width:60px;"></td>
+                        <td>
+                            <select class="cable-size-select" data-idx="${idx}">
+                                <option value="#22 AWG" ${c.conductor_size === '#22 AWG' ? 'selected' : ''}>#22 AWG</option>
+                                <option value="#20 AWG" ${c.conductor_size === '#20 AWG' ? 'selected' : ''}>#20 AWG</option>
+                                <option value="#18 AWG" ${c.conductor_size === '#18 AWG' ? 'selected' : ''}>#18 AWG</option>
+                                <option value="#16 AWG" ${c.conductor_size === '#16 AWG' ? 'selected' : ''}>#16 AWG</option>
+                                <option value="#14 AWG" ${c.conductor_size === '#14 AWG' ? 'selected' : ''}>#14 AWG</option>
+                                <option value="#12 AWG" ${c.conductor_size === '#12 AWG' ? 'selected' : ''}>#12 AWG</option>
+                                <option value="#10 AWG" ${c.conductor_size === '#10 AWG' ? 'selected' : ''}>#10 AWG</option>
+                                <option value="#8 AWG" ${c.conductor_size === '#8 AWG' ? 'selected' : ''}>#8 AWG</option>
+                                <option value="#6 AWG" ${c.conductor_size === '#6 AWG' ? 'selected' : ''}>#6 AWG</option>
+                                <option value="#4 AWG" ${c.conductor_size === '#4 AWG' ? 'selected' : ''}>#4 AWG</option>
+                                <option value="#2 AWG" ${c.conductor_size === '#2 AWG' ? 'selected' : ''}>#2 AWG</option>
+                                <option value="#1 AWG" ${c.conductor_size === '#1 AWG' ? 'selected' : ''}>#1 AWG</option>
+                                <option value="1/0 AWG" ${c.conductor_size === '1/0 AWG' ? 'selected' : ''}>1/0 AWG</option>
+                                <option value="2/0 AWG" ${c.conductor_size === '2/0 AWG' ? 'selected' : ''}>2/0 AWG</option>
+                                <option value="3/0 AWG" ${c.conductor_size === '3/0 AWG' ? 'selected' : ''}>3/0 AWG</option>
+                                <option value="4/0 AWG" ${c.conductor_size === '4/0 AWG' ? 'selected' : ''}>4/0 AWG</option>
+                                <option value="250 kcmil" ${c.conductor_size === '250 kcmil' ? 'selected' : ''}>250 kcmil</option>
+                                <option value="350 kcmil" ${c.conductor_size === '350 kcmil' ? 'selected' : ''}>350 kcmil</option>
+                                <option value="500 kcmil" ${c.conductor_size === '500 kcmil' ? 'selected' : ''}>500 kcmil</option>
+                                <option value="750 kcmil" ${c.conductor_size === '750 kcmil' ? 'selected' : ''}>750 kcmil</option>
+                                <option value="1000 kcmil" ${c.conductor_size === '1000 kcmil' ? 'selected' : ''}>1000 kcmil</option>
+                            </select>
+                        </td>
                         <td><input type="number" class="cable-diameter-input" data-idx="${idx}" value="${c.diameter}" step="0.01" style="width:60px;"></td>
                         <td><input type="number" class="cable-weight-input" data-idx="${idx}" value="${c.weight || 0}" step="0.01" style="width:80px;"></td>
                         <td><input type="text" class="cable-group-input" data-idx="${idx}" value="${c.allowed_cable_group || ''}" style="width:120px;"></td>
@@ -1147,6 +1179,12 @@ document.addEventListener('DOMContentLoaded', () => {
             input.addEventListener('input', e => {
                 const i = parseInt(e.target.dataset.idx, 10);
                 state.cableList[i].conductors = parseInt(e.target.value);
+            });
+        });
+        elements.cableListContainer.querySelectorAll('.cable-size-select').forEach(sel => {
+            sel.addEventListener('change', e => {
+                const i = parseInt(e.target.dataset.idx, 10);
+                state.cableList[i].conductor_size = e.target.value;
             });
         });
         elements.cableListContainer.querySelectorAll('.cable-weight-input').forEach(input => {
@@ -1210,6 +1248,7 @@ document.addEventListener('DOMContentLoaded', () => {
             name: `Cable ${state.cableList.length + 1}`,
             cable_type: 'Power',
             conductors: 1,
+            conductor_size: '#12 AWG',
             diameter: 1.0,
             weight: 0,
             start: [0, 0, 0],

@@ -39,3 +39,4 @@ coordinates for that cable.
 - New **Shared Field Route Cost Multiplier** input lets successive cables reuse existing field runs at a reduced cost.
 - The **Cables to Route** table now includes a **Cable Type** drop-down (Power, Control, Signal) and a **Weight (lbs/ft)** column.
 - A new **Conductors** column lets you specify the number of conductors for each cable.
+- A new **Conductor Size** column lets you choose an AWG or kcmil size for each cable.
