@@ -44,6 +44,8 @@ body.dark-mode {
     border-radius: 4px;
     padding: 0.5rem 1rem;
     display: none;
+    flex-direction: column;
+    gap: 0.5rem;
     z-index: 100;
 }
 
