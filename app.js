@@ -1859,9 +1859,9 @@ const openTrayFill = (trayId) => {
         const cy = (route.start[1] + route.end[1]) / 2;
         const cz = (route.start[2] + route.end[2]) / 2;
 
-        const xr = layout.scene.xaxis.range;
-        const yr = layout.scene.yaxis.range;
-        const zr = layout.scene.zaxis.range;
+        const xr = layout.scene.xaxis ? layout.scene.xaxis.range : undefined;
+        const yr = layout.scene.yaxis ? layout.scene.yaxis.range : undefined;
+        const zr = layout.scene.zaxis ? layout.scene.zaxis.range : undefined;
 
         const def = (a, b) => (Array.isArray(a) && a[0] != null && a[1] != null) ? a : b;
 
@@ -1881,6 +1881,9 @@ const openTrayFill = (trayId) => {
         const yw = yrFinal[1] - yrFinal[0];
         const zw = zrFinal[1] - zrFinal[0];
 
+        layout.scene.xaxis = layout.scene.xaxis || {};
+        layout.scene.yaxis = layout.scene.yaxis || {};
+        layout.scene.zaxis = layout.scene.zaxis || {};
         layout.scene.xaxis.range = [cx - xw / 2, cx + xw / 2];
         layout.scene.yaxis.range = [cy - yw / 2, cy + yw / 2];
         layout.scene.zaxis.range = [cz - zw / 2, cz + zw / 2];
