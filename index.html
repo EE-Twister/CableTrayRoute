@@ -13,9 +13,6 @@
         <aside class="sidebar">
             <header>
                 <h2>Input Parameters</h2>
-                <div class="dark-toggle">
-                    <label><input type="checkbox" id="dark-toggle"> Dark Mode</label>
-                </div>
             </header>
             
             <!-- Cable specification fields moved to the routing options card -->
@@ -61,20 +58,20 @@
         </aside>
 
         <main class="main-content">
-            <header>
+            <header class="page-header">
                 <h1>Optimal 3D Cable Routing System</h1>
+                <button id="settings-btn" class="settings-btn" aria-label="Settings">⚙</button>
                 <p>Find the most efficient path for routing cables through tray networks with capacity constraints.</p>
+                <div id="settings-menu" class="settings-menu">
+                    <label><input type="checkbox" id="dark-toggle"> Dark Mode</label>
+                    <button id="help-btn">Site Help</button>
+                </div>
             </header>
 
             <section class="card">
                 <h2>Cable Tray Network</h2>
                 <div class="tray-controls">
-                    <div class="input-methods">
-                        <input type="radio" id="manual-entry" name="input-method" value="manual" checked>
-                        <label for="manual-entry">Manual Entry</label>
-                        <input type="radio" id="sample-data" name="input-method" value="sample">
-                        <label for="sample-data">Use Sample Data</label>
-                    </div>
+                    <button id="load-sample-trays-btn">Load Sample Tray Network</button>
                     <div class="tray-import-export">
                         <button id="export-trays-btn">Export Trays CSV</button>
                         <input type="file" id="import-trays-file" accept=".csv" style="display:none;">

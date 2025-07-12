@@ -20,17 +20,43 @@ body.dark-mode {
     background-color: #212529;
 }
 
+.page-header {
+    position: relative;
+}
+
+.settings-btn {
+    position: absolute;
+    top: 0;
+    right: 0;
+    background: none;
+    border: none;
+    font-size: 1.4rem;
+    cursor: pointer;
+    color: var(--text-color);
+}
+
+.settings-menu {
+    position: absolute;
+    top: 2.2rem;
+    right: 0;
+    background: var(--secondary-color);
+    border: 1px solid var(--border-color);
+    border-radius: 4px;
+    padding: 0.5rem 1rem;
+    display: none;
+    z-index: 100;
+}
+
+body.dark-mode .settings-menu {
+    background: var(--secondary-color);
+}
+
 body {
     font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
     margin: 0;
     background-color: #f0f2f5;
     color: var(--text-color);
 }
-
-.dark-toggle {
-    margin-top: 8px;
-}
-
 
 .container {
     display: flex;
@@ -75,6 +101,16 @@ header h1, header h2 {
     padding: 1.5rem;
     margin-top: 1.5rem;
     box-shadow: 0 2px 4px rgba(0,0,0,0.05);
+}
+
+body.dark-mode .card {
+    background: #2c3034;
+}
+
+body.dark-mode h2,
+body.dark-mode h3,
+body.dark-mode h4 {
+    color: var(--primary-color);
 }
 
 .columns {

@@ -17,8 +17,7 @@ document.addEventListener('DOMContentLoaded', () => {
         fillLimitIn: document.getElementById('fill-limit'),
         fillLimitOut: document.getElementById('fill-limit-value'),
         calculateBtn: document.getElementById('calculate-route-btn'),
-        inputMethodRadios: document.querySelectorAll('input[name="input-method"]'),
-        manualEntrySection: document.getElementById('manual-entry-section'),
+        loadSampleTraysBtn: document.getElementById('load-sample-trays-btn'),
         batchSection: document.getElementById('batch-section'),
         addTrayBtn: document.getElementById('add-tray-btn'),
         clearTraysBtn: document.getElementById('clear-trays-btn'),
@@ -50,6 +49,9 @@ document.addEventListener('DOMContentLoaded', () => {
         manualTraySummary: document.getElementById('manual-tray-summary'),
         cableListSummary: document.getElementById('cable-list-summary'),
         darkToggle: document.getElementById('dark-toggle'),
+        settingsBtn: document.getElementById('settings-btn'),
+        settingsMenu: document.getElementById('settings-menu'),
+        helpBtn: document.getElementById('help-btn'),
         traySearch: document.getElementById('tray-search'),
         cableSearch: document.getElementById('cable-search'),
     };
@@ -847,19 +849,6 @@ document.addEventListener('DOMContentLoaded', () => {
         window.open('cabletrayfill.html', '_blank');
     };
     
-    const handleInputMethodChange = () => {
-        if (document.getElementById('sample-data').checked) {
-            elements.manualEntrySection.style.display = 'none';
-            state.trayData = getSampleTrays();
-            elements.manualTrayTableContainer.innerHTML = '';
-        } else {
-            elements.manualEntrySection.style.display = 'block';
-            state.trayData = state.manualTrays;
-            renderManualTrayTable();
-        }
-        updateTrayDisplay();
-        updateTableCounts();
-    };
     
 
     const addManualTray = () => {
@@ -908,6 +897,15 @@ document.addEventListener('DOMContentLoaded', () => {
         state.manualTrays = [];
         state.trayData = [];
         elements.manualTrayTableContainer.innerHTML = '';
+        updateTrayDisplay();
+        updateTableCounts();
+        saveSession();
+    };
+
+    const loadSampleTrays = () => {
+        state.manualTrays = getSampleTrays();
+        state.trayData = state.manualTrays;
+        renderManualTrayTable();
         updateTrayDisplay();
         updateTableCounts();
         saveSession();
@@ -1843,7 +1841,9 @@ Plotly.newPlot(document.getElementById('plot'), data, layout, {responsive: true}
     // --- INITIALIZATION & EVENT LISTENERS ---
     elements.fillLimitIn.addEventListener('input', updateFillLimitDisplay);
     elements.calculateBtn.addEventListener('click', mainCalculation);
-    elements.inputMethodRadios.forEach(radio => radio.addEventListener('change', handleInputMethodChange));
+    if (elements.loadSampleTraysBtn) {
+        elements.loadSampleTraysBtn.addEventListener('click', loadSampleTrays);
+    }
     elements.addTrayBtn.addEventListener('click', addManualTray);
     elements.clearTraysBtn.addEventListener('click', clearManualTrays);
     elements.exportTraysBtn.addEventListener('click', exportManualTraysCSV);
@@ -1875,6 +1875,21 @@ Plotly.newPlot(document.getElementById('plot'), data, layout, {responsive: true}
         if (document.body.classList.contains('dark-mode')) {
             elements.darkToggle.checked = true;
         }
+    }
+    if (elements.settingsBtn && elements.settingsMenu) {
+        elements.settingsBtn.addEventListener('click', () => {
+            elements.settingsMenu.style.display = elements.settingsMenu.style.display === 'block' ? 'none' : 'block';
+        });
+        document.addEventListener('click', (e) => {
+            if (!elements.settingsMenu.contains(e.target) && e.target !== elements.settingsBtn) {
+                elements.settingsMenu.style.display = 'none';
+            }
+        });
+    }
+    if (elements.helpBtn) {
+        elements.helpBtn.addEventListener('click', () => {
+            alert('Refer to the README for help.');
+        });
     }
     if (elements.traySearch) {
         elements.traySearch.addEventListener('input', () => filterTable(elements.manualTrayTableContainer, elements.traySearch.value));
@@ -1912,5 +1927,5 @@ Plotly.newPlot(document.getElementById('plot'), data, layout, {responsive: true}
         saveSession();
     }
 
-    handleInputMethodChange();
+    updateTrayDisplay();
 });
