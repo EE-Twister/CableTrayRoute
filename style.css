@@ -114,6 +114,19 @@ button:hover {
     color: red;
 }
 
+.fill-btn {
+    background-color: var(--primary-color);
+    color: #fff;
+    border: none;
+    border-radius: 4px;
+    padding: 4px 8px;
+    font-size: 0.8rem;
+    cursor: pointer;
+}
+.fill-btn:hover {
+    background-color: #0056b3;
+}
+
 .primary-btn {
     background-color: var(--primary-color);
     font-size: 1.1rem;

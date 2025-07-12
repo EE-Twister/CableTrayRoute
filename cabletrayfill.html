@@ -2058,6 +2058,43 @@ Wt: ${m.weight.toFixed(2)} lbs/ft
       // Initialize profile dropdown
       refreshProfileList();
 
+      const stored = localStorage.getItem('trayFillData');
+      if (stored) {
+        try {
+          const { tray, cables } = JSON.parse(stored);
+          document.getElementById('trayWidth').value = tray.width;
+          document.getElementById('trayDepth').value = tray.height;
+          document.getElementById('trayName').value = tray.tray_id || '';
+          cableTbody.innerHTML = '';
+          if (Array.isArray(cables)) {
+            cables.forEach(c => {
+              const row = createCableRow();
+              row.children[0].querySelector('input').value = c.name || c.tag || '';
+              row.children[1].querySelector('select').value = c.cable_type || '';
+              row.children[2].querySelector('input').value = c.conductors || c.count || 1;
+              const sizeInput = row.children[3].querySelector('input');
+              sizeInput.value = c.conductor_size || c.size || '';
+              row.children[4].querySelector('input').value = c.rating || '';
+              row.children[5].querySelector('input').value = c.voltage || '';
+              sizeInput.dispatchEvent(new Event('input'));
+              const odInput = row.children[6].querySelector('input');
+              const wtInput = row.children[7].querySelector('input');
+              if (cableOptions.findIndex(o => o.conductors === parseInt(row.children[2].querySelector('input').value) && o.size === sizeInput.value) < 0) {
+                odInput.value = (c.diameter || c.OD || 0).toFixed(2);
+                wtInput.value = (c.weight || 0).toFixed(2);
+                odInput.readOnly = false;
+                wtInput.readOnly = false;
+              }
+              cableTbody.appendChild(row);
+            });
+          }
+          document.getElementById('drawBtn').click();
+        } catch (e) {
+          console.error('Failed to load trayFillData', e);
+        }
+        localStorage.removeItem('trayFillData');
+      }
+
       // Global help overlay
       document.getElementById("globalHelpBtn").addEventListener("click", () => {
         document.getElementById("helpOverlay").style.display = "flex";
