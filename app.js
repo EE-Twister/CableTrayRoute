@@ -10,6 +10,7 @@ document.addEventListener('DOMContentLoaded', () => {
         latestRouteData: [],
         sharedFieldRoutes: [],
         trayCableMap: {},
+        updatedUtilData: [],
     };
 
     // --- ELEMENT REFERENCES ---
@@ -102,7 +103,11 @@ document.addEventListener('DOMContentLoaded', () => {
         if (!container) return;
         const q = query.toLowerCase();
         container.querySelectorAll('tbody tr').forEach(row => {
-            row.style.display = row.textContent.toLowerCase().includes(q) ? '' : 'none';
+            let text = row.textContent.toLowerCase();
+            row.querySelectorAll('input').forEach(inp => {
+                text += ' ' + (inp.value || '').toLowerCase();
+            });
+            row.style.display = text.includes(q) ? '' : 'none';
         });
     };
 
@@ -134,6 +139,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
     const traySort = { key: '', asc: true };
     const cableSort = { key: '', asc: true };
+    const updatedUtilSort = { key: '', asc: true };
     
     // --- CORE ROUTING LOGIC (JavaScript implementation of your Python backend) ---
 
@@ -837,17 +843,55 @@ document.addEventListener('DOMContentLoaded', () => {
         });
     };
 
-    const openTrayFill = (trayId) => {
-        const tray = state.trayData.find(t => t.tray_id === trayId);
-        if (!tray) return;
-        const cables = (state.trayCableMap && state.trayCableMap[trayId]) ? state.trayCableMap[trayId] : [];
-        try {
-            localStorage.setItem('trayFillData', JSON.stringify({ tray, cables }));
-        } catch (e) {
-            console.error('Failed to store tray fill data', e);
-        }
-        window.open('cabletrayfill.html', '_blank');
-    };
+const openTrayFill = (trayId) => {
+    const tray = state.trayData.find(t => t.tray_id === trayId);
+    if (!tray) return;
+    const cables = (state.trayCableMap && state.trayCableMap[trayId]) ? state.trayCableMap[trayId] : [];
+    try {
+        localStorage.setItem('trayFillData', JSON.stringify({ tray, cables }));
+    } catch (e) {
+        console.error('Failed to store tray fill data', e);
+    }
+    window.open('cabletrayfill.html', '_blank');
+};
+
+ const renderUpdatedUtilizationTable = () => {
+     if (!state.updatedUtilData || state.updatedUtilData.length === 0) {
+         elements.updatedUtilizationContainer.innerHTML = '';
+         return;
+     }
+     const fillLimit = parseFloat(elements.fillLimitIn.value) / 100;
+     const fillLimitPct = fillLimit * 100;
+     const formatters = {
+         full_pct: (val) => {
+             const pct = Math.min(val, 100).toFixed(1);
+             const color = val > 80 ? 'var(--error-bg)' : val > 60 ? 'var(--warning-bg)' : 'var(--success-bg)';
+             return `
+                 <div class="util-bar">
+                     <div class="util-bar-fill" style="width:${pct}%; background-color:${color};"></div>
+                     <div class="util-bar-marker" style="left:${fillLimitPct}%;"></div>
+                 </div>
+                 <span class="util-label">${pct}%</span>
+             `;
+         }
+     };
+     renderTable(
+         elements.updatedUtilizationContainer,
+         [
+             { label: 'Tray ID', key: 'tray_id' },
+             { label: 'Utilization', key: 'full_pct' },
+             { label: 'Available (in²)', key: 'available' },
+             { label: 'Tray Fill', key: 'fill' }
+         ],
+         state.updatedUtilData,
+         (row) => utilizationStyle(row),
+         formatters
+     );
+     elements.updatedUtilizationContainer.querySelectorAll('.fill-btn').forEach(btn => {
+         btn.addEventListener('click', () => openTrayFill(btn.dataset.tray));
+     });
+     addSortHandlers(elements.updatedUtilizationContainer, state.updatedUtilData, renderUpdatedUtilizationTable, updatedUtilSort);
+ };
     
     
 
@@ -1669,7 +1713,6 @@ document.addEventListener('DOMContentLoaded', () => {
         
         const finalUtilization = routingSystem.getTrayUtilization();
         const fillLimit = parseFloat(elements.fillLimitIn.value) / 100;
-        const fillLimitPct = fillLimit * 100;
         const utilData = Object.entries(finalUtilization).map(([id, data]) => {
             const fullPct = (data.current_fill * fillLimit / data.max_fill) * 100;
             return {
@@ -1680,34 +1723,8 @@ document.addEventListener('DOMContentLoaded', () => {
                 fill: `<button class="fill-btn" data-tray="${id}">Open</button>`
             };
         });
-        const formatters = {
-            full_pct: (val) => {
-                const pct = Math.min(val, 100).toFixed(1);
-                const color = val > 80 ? 'var(--error-bg)' : val > 60 ? 'var(--warning-bg)' : 'var(--success-bg)';
-                return `
-                    <div class="util-bar">
-                        <div class="util-bar-fill" style="width:${pct}%; background-color:${color};"></div>
-                        <div class="util-bar-marker" style="left:${fillLimitPct}%;"></div>
-                    </div>
-                    <span class="util-label">${pct}%</span>
-                `;
-            }
-        };
-        renderTable(
-            elements.updatedUtilizationContainer,
-            [
-                { label: 'Tray ID', key: 'tray_id' },
-                { label: 'Utilization', key: 'full_pct' },
-                { label: 'Available (in²)', key: 'available' },
-                { label: 'Tray Fill', key: 'fill' }
-            ],
-            utilData,
-            (row) => utilizationStyle(row),
-            formatters
-        );
-        elements.updatedUtilizationContainer.querySelectorAll('.fill-btn').forEach(btn => {
-            btn.addEventListener('click', () => openTrayFill(btn.dataset.tray));
-        });
+        state.updatedUtilData = utilData;
+        renderUpdatedUtilizationTable();
 
         elements.progressLabel.textContent = 'Complete';
         elements.progressContainer.style.display = 'none';
@@ -1878,7 +1895,7 @@ Plotly.newPlot(document.getElementById('plot'), data, layout, {responsive: true}
     }
     if (elements.settingsBtn && elements.settingsMenu) {
         elements.settingsBtn.addEventListener('click', () => {
-            elements.settingsMenu.style.display = elements.settingsMenu.style.display === 'block' ? 'none' : 'block';
+            elements.settingsMenu.style.display = elements.settingsMenu.style.display === 'flex' ? 'none' : 'flex';
         });
         document.addEventListener('click', (e) => {
             if (!elements.settingsMenu.contains(e.target) && e.target !== elements.settingsBtn) {
@@ -1888,7 +1905,7 @@ Plotly.newPlot(document.getElementById('plot'), data, layout, {responsive: true}
     }
     if (elements.helpBtn) {
         elements.helpBtn.addEventListener('click', () => {
-            alert('Refer to the README for help.');
+            window.open('README.md', '_blank');
         });
     }
     if (elements.traySearch) {
