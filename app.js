@@ -167,6 +167,61 @@ document.addEventListener('DOMContentLoaded', () => {
     const traySort = { key: '', asc: true };
     const cableSort = { key: '', asc: true };
     const updatedUtilSort = { key: '', asc: true };
+
+    // --- Tray Sizing Helpers (from cabletrayfill) ---
+    const ALLOWABLE_AREA_BY_WIDTH = { 6:7.0, 9:10.5, 12:14.0, 18:21.0, 24:28.0, 30:32.5, 36:39.0 };
+    const STANDARD_WIDTHS = [6, 9, 12, 18, 24, 30, 36];
+
+    const sizeRank = (sizeStr) => {
+        if (!sizeStr) return -Infinity;
+        const s = sizeStr.trim().toUpperCase();
+        if (s.endsWith('KCMIL')) return 2000 + parseFloat(s);
+        const m = s.match(/(\d+)\/0\s*AWG/);
+        if (m) return 1000 + parseInt(m[1]);
+        const m2 = s.match(/#(\d+)\s*AWG/);
+        if (m2) return -parseInt(m2[1]);
+        return NaN;
+    };
+
+    const splitLargeSmall = (cables) => {
+        const large = [], small = [];
+        const rank1_0 = sizeRank('1/0 AWG');
+        const rank4_0 = sizeRank('4/0 AWG');
+        cables.forEach(c => {
+            const r = sizeRank(c.conductor_size);
+            if (c.isGroup || c.diameter >= 1.55 || (c.conductors === 1 && r >= rank1_0 && r <= rank4_0)) {
+                large.push(c);
+            } else {
+                small.push(c);
+            }
+        });
+        return { large, small };
+    };
+
+    const sumDiameters = arr => arr.reduce((s, c) => s + c.diameter, 0);
+    const sumAreas = arr => arr.reduce((s, c) => s + Math.PI * (c.diameter/2)**2, 0);
+    const getAllowableArea = (width, trayType) => {
+        const base = ALLOWABLE_AREA_BY_WIDTH[width] || 0;
+        return trayType === 'solid' ? base * 0.78 : base;
+    };
+
+    const computeNeededTrayWidth = (cables, trayType='ladder') => {
+        const { large, small } = splitLargeSmall(cables);
+        let widthNeededLarge = 0;
+        if (large.length > 0) {
+            const sumD = sumDiameters(large);
+            widthNeededLarge = trayType === 'solid' ? (sumD / 0.9) : sumD;
+        }
+        const areaNeededSmall = sumAreas(small);
+        for (const W of STANDARD_WIDTHS) {
+            if (W < widthNeededLarge) continue;
+            const allowA = getAllowableArea(W, trayType);
+            if (small.length === 0 || areaNeededSmall <= allowA) {
+                return W;
+            }
+        }
+        return null;
+    };
     
     // --- CORE ROUTING LOGIC (JavaScript implementation of your Python backend) ---
 
@@ -1575,7 +1630,10 @@ const openTrayFill = (trayId) => {
             allowed_cable_group: r.allowed_cable_group || '',
             start: formatPoint(r.start),
             end: formatPoint(r.end),
-            cables: r.cables.join(', ')
+            cables: r.cables.join(', '),
+            recommendation: r.recommendation,
+            trade_size: r.trade_size || '',
+            tray_size: r.tray_size || ''
         }));
 
         const wb = XLSX.utils.book_new();
@@ -1743,6 +1801,7 @@ const openTrayFill = (trayId) => {
                 });
             });
             const cableMapForArea = new Map(state.cableList.map(c => [c.name, c.diameter]));
+            const cableMapForObj = new Map(state.cableList.map(c => [c.name, c]));
             const commonRaw = routingSystem.findCommonFieldRoutes(allRoutesForPlotting, 6, cableMapForArea);
             const common = commonRaw.map(r => {
                 const areas = r.cables.map(n => {
@@ -1756,6 +1815,7 @@ const openTrayFill = (trayId) => {
                 else if (count <= CONTAINMENT_RULES.thresholds.channel) recommendation = 'channel';
                 else recommendation = 'tray';
                 let tradeSize = null;
+                let traySize = null;
                 if (recommendation === 'conduit') {
                     const conduitType = elements.conduitType.value;
                     const spec = CONDUIT_SPECS[conduitType] || {};
@@ -1764,16 +1824,24 @@ const openTrayFill = (trayId) => {
                         if (totalArea <= spec[size] * fillPct) { tradeSize = size; break; }
                     }
                     if (!tradeSize) tradeSize = 'N/A';
+                } else {
+                    const cableObjs = r.cables.map(n => cableMapForObj.get(n)).filter(Boolean);
+                    traySize = computeNeededTrayWidth(cableObjs) || null;
                 }
-                return { ...r, total_area: totalArea, cable_count: count, recommendation, trade_size: tradeSize };
+                return { ...r, total_area: totalArea, cable_count: count, recommendation, trade_size: tradeSize, tray_size: traySize };
             });
             state.sharedFieldRoutes = common;
             if (common.length > 0) {
                 let html = '<h4>Potential Shared Field Routes</h4><ul>';
                 common.forEach((c, idx) => {
                     const group = c.allowed_cable_group ? ` (Group ${c.allowed_cable_group})` : '';
-                    const trade = c.trade_size && c.trade_size !== 'N/A' ? ` ${c.trade_size}` : '';
-                    html += `<li class="shared-route-item" data-route-index="${idx}">${c.name}${group}: ${formatPoint(c.start)} to ${formatPoint(c.end)} - ${c.cables.join(', ')} | ${c.recommendation}${trade}</li>`;
+                    let recText = c.recommendation;
+                    if (c.recommendation === 'conduit' && c.trade_size && c.trade_size !== 'N/A') {
+                        recText = `${c.trade_size}" Conduit`;
+                    } else if ((c.recommendation === 'tray' || c.recommendation === 'channel') && c.tray_size) {
+                        recText = `${c.tray_size}" Tray`;
+                    }
+                    html += `<li class="shared-route-item" data-route-index="${idx}">${c.name}${group}: ${formatPoint(c.start)} to ${formatPoint(c.end)} - ${c.cables.join(', ')} | ${recText}</li>`;
                 });
                 html += '</ul>';
                 elements.metrics.innerHTML = html;
