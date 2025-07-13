@@ -155,7 +155,7 @@ class CableRoutingSystem {
         return { start: pointStart, end: pointEnd };
     }
 
-    findCommonFieldRoutes(routes, tolerance = 1) {
+    findCommonFieldRoutes(routes, tolerance = 1, cableMap = null) {
         const map = {};
         const keyFor = (s, e, group) => {
             const rounded = arr => arr.map(v => v.toFixed(2)).join(',');
@@ -184,13 +184,25 @@ class CableRoutingSystem {
             }
         }
         let count = 1;
-        return Object.values(map).map(r => ({
-            name: `Route ${count++}`,
-            start: r.start,
-            end: r.end,
-            allowed_cable_group: r.group,
-            cables: Array.from(r.cables)
-        }));
+        return Object.values(map).map(r => {
+            const cables = Array.from(r.cables);
+            let totalArea = 0;
+            if (cableMap) {
+                cables.forEach(n => {
+                    const d = cableMap.get(n);
+                    if (d) totalArea += Math.PI * (d / 2) ** 2;
+                });
+            }
+            return {
+                name: `Route ${count++}`,
+                start: r.start,
+                end: r.end,
+                allowed_cable_group: r.group,
+                cables,
+                total_area: totalArea,
+                cable_count: cables.length
+            };
+        });
     }
 
     _isSharedSegment(seg, tol = 0.1) {
