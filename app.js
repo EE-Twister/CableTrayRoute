@@ -222,7 +222,36 @@ document.addEventListener('DOMContentLoaded', () => {
         }
         return null;
     };
-    
+
+    const getRacewayRecommendation = (cables) => {
+        const count = cables.length;
+        let rec = 'conduit';
+        if (count <= CONTAINMENT_RULES.thresholds.conduit) {
+            rec = 'conduit';
+        } else if (count <= CONTAINMENT_RULES.thresholds.channel) {
+            rec = 'channel';
+        } else {
+            rec = 'tray';
+        }
+        let text = 'Recommended: ';
+        if (rec === 'conduit') {
+            const conduitType = elements.conduitType.value;
+            const spec = CONDUIT_SPECS[conduitType] || {};
+            const totalArea = cables.reduce((s, c) => s + Math.PI * (c.diameter/2)**2, 0);
+            const fillPct = count === 1 ? 0.53 : count === 2 ? 0.31 : 0.40;
+            let tradeSize = null;
+            for (const size of Object.keys(spec)) {
+                if (totalArea <= spec[size] * fillPct) { tradeSize = size; break; }
+            }
+            text += tradeSize ? `${tradeSize}" Conduit` : 'Conduit';
+        } else {
+            const width = computeNeededTrayWidth(cables) || null;
+            const label = rec === 'tray' ? 'Tray' : 'Channel';
+            text += width ? `${width}" ${label}` : label;
+        }
+        return text;
+    };
+
     // --- CORE ROUTING LOGIC (JavaScript implementation of your Python backend) ---
 
     class MinHeap {
@@ -1319,9 +1348,9 @@ const openTrayFill = (trayId) => {
         results.forEach(res => {
             html += `<details><summary>${res.cable} | ${res.status} | Total ${res.total_length} | Field ${res.field_length} | Segments ${res.segments_count}</summary>`;
             if (res.breakdown && res.breakdown.length > 0) {
-                html += '<div class="table-scroll"><table class="sticky-table"><thead><tr><th>Segment</th><th>Tray ID</th><th>Type</th><th>From</th><th>To</th><th>Length</th></tr></thead><tbody>';
+                html += '<div class="table-scroll"><table class="sticky-table"><thead><tr><th>Segment</th><th>Tray ID</th><th>Type</th><th>From</th><th>To</th><th>Length</th><th>Recommended Raceway</th></tr></thead><tbody>';
                 res.breakdown.forEach(b => {
-                    html += `<tr><td>${b.segment}</td><td>${b.tray_id}</td><td>${b.type}</td><td>${b.from}</td><td>${b.to}</td><td>${b.length}</td></tr>`;
+                    html += `<tr><td>${b.segment}</td><td>${b.tray_id}</td><td>${b.type}</td><td>${b.from}</td><td>${b.to}</td><td>${b.length}</td><td>${b.raceway || ''}</td></tr>`;
                 });
                 html += '</tbody></table></div>';
             }
@@ -1583,7 +1612,8 @@ const openTrayFill = (trayId) => {
                             type: b.type,
                             from: b.from,
                             to: b.to,
-                            length: b.length
+                            length: b.length,
+                            recommended_raceway: b.raceway || ''
                         });
                     });
                 } else {
@@ -1593,7 +1623,8 @@ const openTrayFill = (trayId) => {
                         field_length: row.field_length,
                         tray_segments_count: row.tray_segments_count,
                         segments_count: row.segments_count,
-                        segment: '', tray_id: '', type: '', from: '', to: '', length: ''
+                        segment: '', tray_id: '', type: '', from: '', to: '', length: '',
+                        recommended_raceway: ''
                     });
                 }
             });
@@ -1767,7 +1798,8 @@ const openTrayFill = (trayId) => {
                                 type: seg.type,
                                 from: formatPoint(seg.start),
                                 to: formatPoint(seg.end),
-                                length: seg.length.toFixed(2)
+                                length: seg.length.toFixed(2),
+                                raceway: seg.type === 'field' ? getRacewayRecommendation([cable]) : ''
                             })) : []
                         };
                     }
@@ -1837,9 +1869,13 @@ const openTrayFill = (trayId) => {
                     const group = c.allowed_cable_group ? ` (Group ${c.allowed_cable_group})` : '';
                     let recText = c.recommendation;
                     if (c.recommendation === 'conduit' && c.trade_size && c.trade_size !== 'N/A') {
-                        recText = `${c.trade_size}" Conduit`;
+                        recText = `Recommended: ${c.trade_size}" Conduit`;
                     } else if ((c.recommendation === 'tray' || c.recommendation === 'channel') && c.tray_size) {
-                        recText = `${c.tray_size}" Tray`;
+                        const label = c.recommendation === 'tray' ? 'Tray' : 'Channel';
+                        recText = `Recommended: ${c.tray_size}" ${label}`;
+                    } else {
+                        const label = c.recommendation.charAt(0).toUpperCase() + c.recommendation.slice(1);
+                        recText = `Recommended: ${label}`;
                     }
                     html += `<li class="shared-route-item" data-route-index="${idx}">${c.name}${group}: ${formatPoint(c.start)} to ${formatPoint(c.end)} - ${c.cables.join(', ')} | ${recText}</li>`;
                 });
