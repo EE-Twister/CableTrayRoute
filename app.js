@@ -1,6 +1,25 @@
 // Filename: app.js
 // (This is an improved version that adds route segment consolidation)
 
+const CONDUIT_SPECS = {
+    "EMT": {"1/2":0.304,"3/4":0.533,"1":0.864,"1-1/4":1.496,"1-1/2":2.036,"2":3.356,"2-1/2":5.858,"3":8.846,"3-1/2":11.545,"4":14.753},
+    "ENT": {"1/2":0.285,"3/4":0.508,"1":0.832,"1-1/4":1.453,"1-1/2":1.986,"2":3.291},
+    "FMC": {"3/8":0.116,"1/2":0.317,"3/4":0.533,"1":0.817,"1-1/4":1.277,"1-1/2":1.858,"2":3.269,"2-1/2":4.909,"3":7.069,"3-1/2":9.621,"4":12.566},
+    "IMC": {"1/2":0.342,"3/4":0.586,"1":0.959,"1-1/4":1.647,"1-1/2":2.225,"2":3.63,"2-1/2":5.135,"3":7.922,"3-1/2":10.584,"4":13.631},
+    "LFNC-A": {"3/8":0.192,"1/2":0.312,"3/4":0.535,"1":0.854,"1-1/4":1.502,"1-1/2":2.018,"2":3.343},
+    "LFNC-B": {"3/8":0.192,"1/2":0.314,"3/4":0.541,"1":0.873,"1-1/4":1.528,"1-1/2":1.981,"2":3.246},
+    "LFMC": {"3/8":0.192,"1/2":0.314,"3/4":0.541,"1":0.873,"1-1/4":1.277,"1-1/2":1.858,"2":3.269,"2-1/2":4.881,"3":7.475,"3-1/2":9.731,"4":12.692},
+    "RMC": {"1/2":0.314,"3/4":0.549,"1":0.887,"1-1/4":1.526,"1-1/2":2.071,"2":3.408,"2-1/2":4.866,"3":7.499,"3-1/2":10.01,"4":12.882,"5":20.212,"6":29.158},
+    "PVC Sch 80": {"1/2":0.217,"3/4":0.409,"1":0.688,"1-1/4":1.237,"1-1/2":1.711,"2":2.874,"2-1/2":4.119,"3":6.442,"3-1/2":8.688,"4":11.258,"5":17.855,"6":25.598},
+    "PVC Sch 40": {"1/2":0.285,"3/4":0.508,"1":0.832,"1-1/4":1.453,"1-1/2":1.986,"2":3.291,"2-1/2":4.695,"3":7.268,"3-1/2":9.737,"4":12.554,"5":19.761,"6":28.567},
+    "PVC Type A": {"1/2":0.385,"3/4":0.65,"1":1.084,"1-1/4":1.767,"1-1/2":2.324,"2":3.647,"2-1/2":5.453,"3":8.194,"3-1/2":10.694,"4":13.723},
+    "PVC Type EB": {"2":3.874,"3":8.709,"3-1/2":11.365,"4":14.448,"5":22.195,"6":31.53}
+};
+
+const CONTAINMENT_RULES = {
+    thresholds: { conduit: 3, channel: 6 } // 1-3 cables conduit, 4-6 channel, >6 tray
+};
+
 document.addEventListener('DOMContentLoaded', () => {
     // --- STATE MANAGEMENT ---
     let state = {
@@ -58,6 +77,7 @@ document.addEventListener('DOMContentLoaded', () => {
         deleteDataBtn: document.getElementById('delete-data-btn'),
         traySearch: document.getElementById('tray-search'),
         cableSearch: document.getElementById('cable-search'),
+        conduitType: document.getElementById('conduit-type'),
     };
     let cancelRouting = false;
     let currentWorkers = [];
@@ -81,7 +101,8 @@ document.addEventListener('DOMContentLoaded', () => {
             const data = {
                 manualTrays: state.manualTrays,
                 cableList: state.cableList,
-                darkMode: document.body.classList.contains('dark-mode')
+                darkMode: document.body.classList.contains('dark-mode'),
+                conduitType: elements.conduitType ? elements.conduitType.value : 'EMT'
             };
             localStorage.setItem('ctrSession', JSON.stringify(data));
         } catch (e) {
@@ -96,6 +117,9 @@ document.addEventListener('DOMContentLoaded', () => {
                 state.manualTrays = data.manualTrays || [];
                 state.cableList = data.cableList || [];
                 if (data.darkMode) document.body.classList.add('dark-mode');
+                if (data.conduitType && elements.conduitType) {
+                    elements.conduitType.value = data.conduitType;
+                }
             }
         } catch (e) {
             console.error('Failed to load session', e);
@@ -304,7 +328,7 @@ document.addEventListener('DOMContentLoaded', () => {
             return { start: pointStart, end: pointEnd };
         }
 
-        findCommonFieldRoutes(routes, tolerance = 1) {
+        findCommonFieldRoutes(routes, tolerance = 1, cableMap = null) {
             const map = {};
             const keyFor = (s, e, group) => {
                 const rounded = arr => arr.map(v => v.toFixed(2)).join(',');
@@ -333,13 +357,25 @@ document.addEventListener('DOMContentLoaded', () => {
                 }
             }
             let count = 1;
-            return Object.values(map).map(r => ({
-                name: `Route ${count++}`,
-                start: r.start,
-                end: r.end,
-                allowed_cable_group: r.group,
-                cables: Array.from(r.cables)
-            }));
+            return Object.values(map).map(r => {
+                const cables = Array.from(r.cables);
+                let totalArea = 0;
+                if (cableMap) {
+                    cables.forEach(n => {
+                        const d = cableMap.get(n);
+                        if (d) totalArea += Math.PI * (d / 2) ** 2;
+                    });
+                }
+                return {
+                    name: `Route ${count++}`,
+                    start: r.start,
+                    end: r.end,
+                    allowed_cable_group: r.group,
+                    cables,
+                    total_area: totalArea,
+                    cable_count: cables.length
+                };
+            });
         }
 
         _isSharedSegment(seg, tol = 0.1) {
@@ -1706,13 +1742,38 @@ const openTrayFill = (trayId) => {
                     }
                 });
             });
-            const common = routingSystem.findCommonFieldRoutes(allRoutesForPlotting, 6);
+            const cableMapForArea = new Map(state.cableList.map(c => [c.name, c.diameter]));
+            const commonRaw = routingSystem.findCommonFieldRoutes(allRoutesForPlotting, 6, cableMapForArea);
+            const common = commonRaw.map(r => {
+                const areas = r.cables.map(n => {
+                    const d = cableMapForArea.get(n);
+                    return d ? Math.PI * (d / 2) ** 2 : 0;
+                });
+                const totalArea = areas.reduce((a,b) => a + b, 0);
+                const count = r.cables.length;
+                let recommendation;
+                if (count <= CONTAINMENT_RULES.thresholds.conduit) recommendation = 'conduit';
+                else if (count <= CONTAINMENT_RULES.thresholds.channel) recommendation = 'channel';
+                else recommendation = 'tray';
+                let tradeSize = null;
+                if (recommendation === 'conduit') {
+                    const conduitType = elements.conduitType.value;
+                    const spec = CONDUIT_SPECS[conduitType] || {};
+                    const fillPct = count === 1 ? 0.53 : count === 2 ? 0.31 : 0.40;
+                    for (const size of Object.keys(spec)) {
+                        if (totalArea <= spec[size] * fillPct) { tradeSize = size; break; }
+                    }
+                    if (!tradeSize) tradeSize = 'N/A';
+                }
+                return { ...r, total_area: totalArea, cable_count: count, recommendation, trade_size: tradeSize };
+            });
             state.sharedFieldRoutes = common;
             if (common.length > 0) {
                 let html = '<h4>Potential Shared Field Routes</h4><ul>';
                 common.forEach((c, idx) => {
                     const group = c.allowed_cable_group ? ` (Group ${c.allowed_cable_group})` : '';
-                    html += `<li class="shared-route-item" data-route-index="${idx}">${c.name}${group}: ${formatPoint(c.start)} to ${formatPoint(c.end)} - ${c.cables.join(', ')}</li>`;
+                    const trade = c.trade_size && c.trade_size !== 'N/A' ? ` ${c.trade_size}` : '';
+                    html += `<li class="shared-route-item" data-route-index="${idx}">${c.name}${group}: ${formatPoint(c.start)} to ${formatPoint(c.end)} - ${c.cables.join(', ')} | ${c.recommendation}${trade}</li>`;
                 });
                 html += '</ul>';
                 elements.metrics.innerHTML = html;

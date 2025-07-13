@@ -126,7 +126,7 @@ class CableRoutingSystem {
     return { start: ps, end: pe };
   }
 
-  findCommonFieldRoutes(routes, tolerance = 1) {
+  findCommonFieldRoutes(routes, tolerance = 1, cableMap = null) {
     const map = {};
     const keyFor = (s, e) => {
       const r = arr => arr.map(v => v.toFixed(2)).join(',');
@@ -152,7 +152,17 @@ class CableRoutingSystem {
       }
     }
     let count = 1;
-    return Object.values(map).map(r => ({ name: `Route ${count++}`, start:r.start, end:r.end, cables:Array.from(r.cables) }));
+    return Object.values(map).map(r => {
+      const cables = Array.from(r.cables);
+      let totalArea = 0;
+      if (cableMap) {
+        cables.forEach(n => {
+          const d = cableMap.get(n);
+          if (d) totalArea += Math.PI * (d/2)**2;
+        });
+      }
+      return { name:`Route ${count++}`, start:r.start, end:r.end, cables, total_area: totalArea, cable_count: cables.length };
+    });
   }
 
   _isSharedSegment(seg, tol = 0.1) {
@@ -398,11 +408,12 @@ function runBatch(count) {
       return;
     }
   }
-  const common = system.findCommonFieldRoutes(routes, 6);
+  const cableMap = new Map(cables.map(c => [c.name, c.diameter]));
+  const common = system.findCommonFieldRoutes(routes, 6, cableMap);
   if (common.length > 0) {
     console.log('Common field route segments:');
     common.forEach(c => {
-      console.log(`  ${c.name} from ${c.start} to ${c.end}: ${c.cables.join(', ')}`);
+      console.log(`  ${c.name} from ${c.start} to ${c.end}: ${c.cables.join(', ')} | area ${c.total_area.toFixed(2)}`);
     });
   } else {
     console.log('No common field routes detected');
