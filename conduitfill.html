@@ -429,11 +429,15 @@
         const center = margin + R*SCALE;
         let svg = `<svg width="${size}" height="${size}" viewBox="0 0 ${size} ${size}" xmlns="http://www.w3.org/2000/svg">`;
         svg += `<circle cx="${center}" cy="${center}" r="${R*SCALE}" fill="none" stroke="black" stroke-width="2"/>`;
+        svg += `<text x="${center}" y="${center - R*SCALE + 12}" font-size="12" text-anchor="middle">ID: ${(2*R).toFixed(2)}\"</text>`;
         placed.forEach(p=>{
           svg += `<circle cx="${center + p.x*SCALE}" cy="${center + p.y*SCALE}" r="${p.r*SCALE}" fill="lightblue" stroke="black" stroke-width="1"/>`;
           if(p.tag){
             const fs = calcFont(p.tag, p.r, SCALE, 8);
-            svg += `<text x="${center + p.x*SCALE}" y="${center + p.y*SCALE}" font-size="${fs}" text-anchor="middle" dominant-baseline="middle">${p.tag}</text>`;
+            const cx = center + p.x*SCALE;
+            const cy = center + p.y*SCALE;
+            svg += `<text x="${cx}" y="${cy}" font-size="${fs}" text-anchor="middle" dominant-baseline="middle">${p.tag}</text>`;
+            svg += `<text x="${cx}" y="${cy + fs*0.8}" font-size="${Math.max(6,fs*0.7)}" text-anchor="middle" dominant-baseline="hanging">${(2*p.r).toFixed(2)}\"</text>`;
           }
         });
         svg += `</svg>`;
@@ -463,18 +467,19 @@
         const sumArea = cables.reduce((s,c)=> s + Math.PI*(c.r**2),0);
         const fillPct = (sumArea / area) * 100;
         const allowed = cables.length===1?53:(cables.length===2?31:40);
-        let results = `<p><strong>Conduit:</strong> ${type} ${size}"</p>`;
+        let results = `<p><strong>Conduit:</strong> ${type} ${size}" (ID ${(2*R).toFixed(2)}")</p>`;
         results += `<p><strong>Fill:</strong> ${fillPct.toFixed(1)} % (Allowed ${allowed}% )</p>`;
         if(fillPct > allowed){
           results += `<p class="warning">WARNING: Fill exceeds allowable limit.</p>`;
         }
 
-        const jamWarning = cables.some(c => {
+        let jamRatioVal = null;
+        for(const c of cables){
           const jr = R / c.r;
-          return jr >= 2.8 && jr <= 3.2;
-        });
-        if(jamWarning){
-          results += `<p class="warning">WARNING: Jam ratio between 2.8 and 3.2 for one or more cables.</p>`;
+          if(jr >= 2.8 && jr <= 3.2){ jamRatioVal = jr; break; }
+        }
+        if(jamRatioVal!==null){
+          results += `<p class="warning">WARNING: Jam ratio ${jamRatioVal.toFixed(2)} (between 2.8 and 3.2) for one or more cables.</p>`;
         }
 
         document.getElementById('results').innerHTML = results;
@@ -493,11 +498,15 @@
         const center = margin + lastR*SCALE;
         let svg = `<svg width="${size}" height="${size}" viewBox="0 0 ${size} ${size}" xmlns="http://www.w3.org/2000/svg">`;
         svg += `<circle cx="${center}" cy="${center}" r="${lastR*SCALE}" fill="none" stroke="black" stroke-width="2"/>`;
+        svg += `<text x="${center}" y="${center - lastR*SCALE + 20}" font-size="20" text-anchor="middle">ID: ${(2*lastR).toFixed(2)}\"</text>`;
         lastPlaced.forEach(p=>{
           svg += `<circle cx="${center + p.x*SCALE}" cy="${center + p.y*SCALE}" r="${p.r*SCALE}" fill="lightblue" stroke="black" stroke-width="1"/>`;
           if(p.tag){
             const fs = calcFont(p.tag, p.r, SCALE, 16);
-            svg += `<text x="${center + p.x*SCALE}" y="${center + p.y*SCALE}" font-size="${fs}" text-anchor="middle" dominant-baseline="middle">${p.tag}</text>`;
+            const cx = center + p.x*SCALE;
+            const cy = center + p.y*SCALE;
+            svg += `<text x="${cx}" y="${cy}" font-size="${fs}" text-anchor="middle" dominant-baseline="middle">${p.tag}</text>`;
+            svg += `<text x="${cx}" y="${cy + fs*0.9}" font-size="${Math.max(8,fs*0.8)}" text-anchor="middle" dominant-baseline="hanging">${(2*p.r).toFixed(2)}\"</text>`;
           }
         });
         svg += `</svg>`;
