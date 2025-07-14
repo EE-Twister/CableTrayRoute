@@ -106,6 +106,86 @@
     .duplicateBtn:hover {
       background-color: #7f8c8d;
     }
+
+    .warning {
+      color: orange;
+      font-weight: bold;
+    }
+
+    /* OVERLAY + POPUP STYLES */
+    #overlay {
+      position: fixed;
+      top: 0;
+      left: 0;
+      width: 100%;
+      height: 100%;
+      background: rgba(0,0,0,0.5);
+      display: none;
+      justify-content: center;
+      align-items: center;
+      z-index: 1000;
+    }
+    #popup {
+      position: relative;
+      background: white;
+      padding: 12px;
+      border-radius: 8px;
+      max-width: 90%;
+      max-height: 90%;
+      overflow: auto;
+      box-shadow: 0 0 10px rgba(0,0,0,0.5);
+    }
+    body.dark-mode #popup {
+      background: #2c3034;
+      color: #f8f9fa;
+    }
+    #popupClose {
+      position: absolute;
+      top: 8px;
+      right: 8px;
+      background: #e74c3c;
+      color: white;
+      border: none;
+      font-size: 1rem;
+      padding: 4px 8px;
+      cursor: pointer;
+      border-radius: 4px;
+    }
+    #copyBtn, #printBtn, #copyPngBtn {
+      position: absolute;
+      top: 8px;
+      font-size: 0.9rem;
+      padding: 4px 8px;
+      border-radius: 4px;
+    }
+    #copyBtn {
+      right: 80px;
+      background: #2ecc71;
+      color: white;
+      border: none;
+      cursor: pointer;
+    }
+    #copyBtn:hover { background: #27ae60; }
+    #printBtn {
+      right: 160px;
+      background: #3498db;
+      color: white;
+      border: none;
+      cursor: pointer;
+    }
+    #printBtn:hover { background: #2980b9; }
+    #copyPngBtn {
+      right: 240px;
+      background: #9b59b6;
+      color: white;
+      border: none;
+      cursor: pointer;
+    }
+    #copyPngBtn:hover { background: #8e44ad; }
+    #expandedSVG {
+      display: block;
+      margin-top: 48px; /* room for buttons */
+    }
   </style>
 </head>
 <body>
@@ -138,10 +218,22 @@
 
   <div id="controls">
     <button id="drawBtn" type="button">Draw Conduit</button>
+    <button id="expandBtn" type="button">Expand Image</button>
   </div>
 
   <div id="results"></div>
   <div id="svgContainer"></div>
+
+  <!-- OVERLAY + POPUP FOR EXPANDED VIEW -->
+  <div id="overlay">
+    <div id="popup">
+      <button id="popupClose" type="button">Close</button>
+      <button id="copyPngBtn" type="button">Copy PNG</button>
+      <button id="printBtn" type="button">Print SVG</button>
+      <button id="copyBtn" type="button">Copy SVG</button>
+      <div id="expandedSVG"></div>
+    </div>
+  </div>
 
   <script>
     const CONDUIT_SPECS = {
@@ -304,6 +396,9 @@
         return placed;
       }
 
+      let lastR = null;
+      let lastPlaced = null;
+
       function drawSVG(R, placed){
         const SCALE = 40;
         const margin = 10;
@@ -319,6 +414,8 @@
         });
         svg += `</svg>`;
         document.getElementById('svgContainer').innerHTML = svg;
+        lastR = R;
+        lastPlaced = placed;
       }
 
       document.getElementById('drawBtn').addEventListener('click', () => {
@@ -344,8 +441,105 @@
         const allowed = cables.length===1?53:(cables.length===2?31:40);
         let results = `<p><strong>Conduit:</strong> ${type} ${size}"</p>`;
         results += `<p><strong>Fill:</strong> ${fillPct.toFixed(1)} % (Allowed ${allowed}% )</p>`;
+        if(fillPct > allowed){
+          results += `<p class="warning">WARNING: Fill exceeds allowable limit.</p>`;
+        }
+
+        const jamWarning = cables.some(c => {
+          const jr = R / c.r;
+          return jr >= 2.8 && jr <= 3.2;
+        });
+        if(jamWarning){
+          results += `<p class="warning">WARNING: Jam ratio between 2.8 and 3.2 for one or more cables.</p>`;
+        }
+
         document.getElementById('results').innerHTML = results;
         drawSVG(R, placed);
+      });
+
+      // Expand Image button
+      document.getElementById('expandBtn').addEventListener('click', () => {
+        if(!lastPlaced){
+          alert('Please draw the conduit first, then expand.');
+          return;
+        }
+        const SCALE = 160;
+        const margin = 10;
+        const size = 2*lastR*SCALE + margin*2;
+        const center = margin + lastR*SCALE;
+        let svg = `<svg width="${size}" height="${size}" viewBox="0 0 ${size} ${size}" xmlns="http://www.w3.org/2000/svg">`;
+        svg += `<circle cx="${center}" cy="${center}" r="${lastR*SCALE}" fill="none" stroke="black" stroke-width="2"/>`;
+        lastPlaced.forEach(p=>{
+          svg += `<circle cx="${center + p.x*SCALE}" cy="${center + p.y*SCALE}" r="${p.r*SCALE}" fill="lightblue" stroke="black" stroke-width="1"/>`;
+          if(p.tag){
+            svg += `<text x="${center + p.x*SCALE}" y="${center + p.y*SCALE}" font-size="${Math.max(16,p.r*SCALE/1.5)}" text-anchor="middle" dominant-baseline="middle">${p.tag}</text>`;
+          }
+        });
+        svg += `</svg>`;
+        document.getElementById('expandedSVG').innerHTML = svg;
+        document.getElementById('overlay').style.display = 'flex';
+      });
+
+      // Copy SVG
+      document.getElementById('copyBtn').addEventListener('click', () => {
+        const svgElem = document.getElementById('expandedSVG').querySelector('svg');
+        if(!svgElem){ alert('No expanded SVG found to copy.'); return; }
+        const svgText = svgElem.outerHTML;
+        navigator.clipboard.writeText(svgText).then(()=>{
+          alert('SVG markup copied to clipboard!');
+        }).catch(err=>{
+          alert('Error copying SVG: ' + err);
+        });
+      });
+
+      // Print SVG
+      document.getElementById('printBtn').addEventListener('click', () => {
+        const svgElem = document.getElementById('expandedSVG').querySelector('svg');
+        if(!svgElem){ alert('No expanded SVG found to print.'); return; }
+        const svgText = svgElem.outerHTML;
+        const w = window.open('', '_blank');
+        w.document.write(`<!DOCTYPE html><html><head><title>Print Conduit</title></head><body style="margin:0;">${svgText}</body></html>`);
+        w.document.close();
+        w.focus();
+        setTimeout(()=>{ w.print(); }, 200);
+      });
+
+      // Copy PNG
+      document.getElementById('copyPngBtn').addEventListener('click', () => {
+        const svgElem = document.getElementById('expandedSVG').querySelector('svg');
+        if(!svgElem){ alert('No expanded SVG found to copy as PNG.'); return; }
+        const serializer = new XMLSerializer();
+        const svgString = serializer.serializeToString(svgElem);
+        const blob = new Blob([svgString], {type:'image/svg+xml;charset=utf-8'});
+        const url = URL.createObjectURL(blob);
+        const img = new Image();
+        img.onload = () => {
+          const canvas = document.createElement('canvas');
+          canvas.width = svgElem.getAttribute('width');
+          canvas.height = svgElem.getAttribute('height');
+          const ctx = canvas.getContext('2d');
+          ctx.fillStyle = '#ffffff';
+          ctx.fillRect(0,0,canvas.width,canvas.height);
+          ctx.drawImage(img,0,0);
+          canvas.toBlob(pngBlob => {
+            if(!pngBlob){ alert('Failed to create PNG blob.'); URL.revokeObjectURL(url); return; }
+            const item = new ClipboardItem({'image/png': pngBlob});
+            navigator.clipboard.write([item]).then(()=>{
+              alert('PNG copied to clipboard!');
+              URL.revokeObjectURL(url);
+            }).catch(err=>{
+              alert('Error copying PNG: ' + err);
+              URL.revokeObjectURL(url);
+            });
+          }, 'image/png');
+        };
+        img.onerror = () => { alert('Failed to load SVG for PNG conversion.'); URL.revokeObjectURL(url); };
+        img.src = url;
+      });
+
+      // Close overlay
+      document.getElementById('popupClose').addEventListener('click', () => {
+        document.getElementById('overlay').style.display = 'none';
       });
     });
   </script>
