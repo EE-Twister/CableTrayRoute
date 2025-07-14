@@ -80,9 +80,17 @@
     #svgContainer {
       border: 1px solid #ccc;
       margin-top: 12px;
+      background: #fff;
     }
     body.dark-mode #svgContainer {
       border-color: #495057;
+      background: #fff;
+    }
+    #expandedSVG {
+      background: #fff;
+    }
+    body.dark-mode #expandedSVG {
+      background: #fff;
     }
     .removeBtn {
       background-color: #e74c3c;
@@ -185,6 +193,7 @@
     #expandedSVG {
       display: block;
       margin-top: 48px; /* room for buttons */
+      background: #fff;
     }
   </style>
 </head>
@@ -372,7 +381,7 @@
           let best = null;
           let bestY = -Infinity;
           const maxX = R - c.r;
-          const step = c.r / 2;
+          const step = Math.max(0.05, c.r / 4);
           for (let x = -maxX; x <= maxX; x += step) {
             let y = yAtBoundary(x, c.r);
             for (const p of placed) {
@@ -388,7 +397,15 @@
             }
           }
           if (best) {
-            placed.push({ x: best.x, y: best.y, r: c.r, tag: c.tag });
+            let y = yAtBoundary(best.x, c.r);
+            for (const p of placed) {
+              const dx = best.x - p.x;
+              if (Math.abs(dx) < p.r + c.r) {
+                const dy = Math.sqrt((p.r + c.r) * (p.r + c.r) - dx * dx);
+                y = Math.min(y, p.y - dy);
+              }
+            }
+            placed.push({ x: best.x, y, r: c.r, tag: c.tag });
           } else {
             placed.push({ x: 0, y: 0, r: c.r, tag: c.tag });
           }
@@ -398,6 +415,12 @@
 
       let lastR = null;
       let lastPlaced = null;
+
+      function calcFont(tag, r, scale, min) {
+        const maxSize = r * scale;
+        const fit = (2 * r * scale * 0.8) / (Math.max(1, tag.length) * 0.6);
+        return Math.max(min, Math.min(maxSize, fit));
+      }
 
       function drawSVG(R, placed){
         const SCALE = 40;
@@ -409,7 +432,8 @@
         placed.forEach(p=>{
           svg += `<circle cx="${center + p.x*SCALE}" cy="${center + p.y*SCALE}" r="${p.r*SCALE}" fill="lightblue" stroke="black" stroke-width="1"/>`;
           if(p.tag){
-            svg += `<text x="${center + p.x*SCALE}" y="${center + p.y*SCALE}" font-size="${Math.max(8,p.r*SCALE/1.5)}" text-anchor="middle" dominant-baseline="middle">${p.tag}</text>`;
+            const fs = calcFont(p.tag, p.r, SCALE, 8);
+            svg += `<text x="${center + p.x*SCALE}" y="${center + p.y*SCALE}" font-size="${fs}" text-anchor="middle" dominant-baseline="middle">${p.tag}</text>`;
           }
         });
         svg += `</svg>`;
@@ -472,7 +496,8 @@
         lastPlaced.forEach(p=>{
           svg += `<circle cx="${center + p.x*SCALE}" cy="${center + p.y*SCALE}" r="${p.r*SCALE}" fill="lightblue" stroke="black" stroke-width="1"/>`;
           if(p.tag){
-            svg += `<text x="${center + p.x*SCALE}" y="${center + p.y*SCALE}" font-size="${Math.max(16,p.r*SCALE/1.5)}" text-anchor="middle" dominant-baseline="middle">${p.tag}</text>`;
+            const fs = calcFont(p.tag, p.r, SCALE, 16);
+            svg += `<text x="${center + p.x*SCALE}" y="${center + p.y*SCALE}" font-size="${fs}" text-anchor="middle" dominant-baseline="middle">${p.tag}</text>`;
           }
         });
         svg += `</svg>`;
