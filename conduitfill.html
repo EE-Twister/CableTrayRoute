@@ -1,0 +1,317 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Conduit Fill Visualization</title>
+  <style>
+    body {
+      font-family: Arial, sans-serif;
+      margin: 16px;
+    }
+    body.dark-mode {
+      background-color: #212529;
+      color: #f8f9fa;
+    }
+    h1 {
+      margin-bottom: 8px;
+      font-size: 1.4rem;
+    }
+    label {
+      display: inline-block;
+      margin-bottom: 4px;
+      font-size: 0.9rem;
+    }
+    input[type="text"],
+    input[type="number"],
+    select {
+      padding: 2px 4px;
+      font-size: 0.9rem;
+      margin-right: 8px;
+    }
+    body.dark-mode input[type="text"],
+    body.dark-mode input[type="number"],
+    body.dark-mode select {
+      background: #343a40;
+      color: #f8f9fa;
+      border: 1px solid #495057;
+    }
+    button {
+      padding: 6px 12px;
+      font-size: 0.9rem;
+      margin: 8px 4px 16px 0;
+      cursor: pointer;
+    }
+    table {
+      border-collapse: collapse;
+      width: 100%;
+      margin-top: 12px;
+    }
+    table, th, td {
+      border: 1px solid #999;
+    }
+    body.dark-mode table,
+    body.dark-mode th,
+    body.dark-mode td {
+      border-color: #495057;
+    }
+    th, td {
+      padding: 6px;
+      text-align: center;
+      font-size: 0.9rem;
+    }
+    th {
+      background: #f0f0f0;
+    }
+    body.dark-mode th {
+      background: #343a40;
+      color: #f8f9fa;
+    }
+    body.dark-mode td {
+      background: #2c3034;
+    }
+    #controls {
+      margin-bottom: 12px;
+    }
+    #results {
+      margin-top: 16px;
+      font-size: 0.95rem;
+    }
+    #svgContainer {
+      border: 1px solid #ccc;
+      margin-top: 12px;
+    }
+    body.dark-mode #svgContainer {
+      border-color: #495057;
+    }
+    .removeBtn {
+      background-color: #e74c3c;
+      color: white;
+      border: none;
+      padding: 4px 8px;
+      font-size: 0.85rem;
+      cursor: pointer;
+    }
+    .removeBtn:hover {
+      background-color: #c0392b;
+    }
+    .duplicateBtn {
+      background-color: #95a5a6;
+      color: white;
+      border: none;
+      padding: 4px 8px;
+      font-size: 0.85rem;
+      cursor: pointer;
+    }
+    .duplicateBtn:hover {
+      background-color: #7f8c8d;
+    }
+  </style>
+</head>
+<body>
+  <h1>Conduit Fill Visualization</h1>
+
+  <fieldset>
+    <legend><strong>Conduit Parameters</strong></legend>
+    <label for="conduitType">Type:</label>
+    <select id="conduitType"></select>
+
+    <label for="tradeSize">Trade Size:</label>
+    <select id="tradeSize"></select>
+  </fieldset>
+
+  <fieldset>
+    <legend><strong>Enter Cables</strong></legend>
+    <button id="addCableBtn" type="button">Add Cable</button>
+    <table id="cableTable">
+      <thead>
+        <tr>
+          <th>Tag</th>
+          <th>OD (in)</th>
+          <th>Duplicate</th>
+          <th>Remove</th>
+        </tr>
+      </thead>
+      <tbody></tbody>
+    </table>
+  </fieldset>
+
+  <div id="controls">
+    <button id="drawBtn" type="button">Draw Conduit</button>
+  </div>
+
+  <div id="results"></div>
+  <div id="svgContainer"></div>
+
+  <script>
+    const CONDUIT_SPECS = {
+      "EMT": {"1/2":0.304,"3/4":0.533,"1":0.864,"1-1/4":1.496,"1-1/2":2.036,"2":3.356,"2-1/2":5.858,"3":8.846,"3-1/2":11.545,"4":14.753},
+      "ENT": {"1/2":0.285,"3/4":0.508,"1":0.832,"1-1/4":1.453,"1-1/2":1.986,"2":3.291},
+      "FMC": {"3/8":0.116,"1/2":0.317,"3/4":0.533,"1":0.817,"1-1/4":1.277,"1-1/2":1.858,"2":3.269,"2-1/2":4.909,"3":7.069,"3-1/2":9.621,"4":12.566},
+      "IMC": {"1/2":0.342,"3/4":0.586,"1":0.959,"1-1/4":1.647,"1-1/2":2.225,"2":3.63,"2-1/2":5.135,"3":7.922,"3-1/2":10.584,"4":13.631},
+      "LFNC-A": {"3/8":0.192,"1/2":0.312,"3/4":0.535,"1":0.854,"1-1/4":1.502,"1-1/2":2.018,"2":3.343},
+      "LFNC-B": {"3/8":0.192,"1/2":0.314,"3/4":0.541,"1":0.873,"1-1/4":1.528,"1-1/2":1.981,"2":3.246},
+      "LFMC": {"3/8":0.192,"1/2":0.314,"3/4":0.541,"1":0.873,"1-1/4":1.277,"1-1/2":1.858,"2":3.269,"2-1/2":4.881,"3":7.475,"3-1/2":9.731,"4":12.692},
+      "RMC": {"1/2":0.314,"3/4":0.549,"1":0.887,"1-1/4":1.526,"1-1/2":2.071,"2":3.408,"2-1/2":4.866,"3":7.499,"3-1/2":10.01,"4":12.882,"5":20.212,"6":29.158},
+      "PVC Sch 80": {"1/2":0.217,"3/4":0.409,"1":0.688,"1-1/4":1.237,"1-1/2":1.711,"2":2.874,"2-1/2":4.119,"3":6.442,"3-1/2":8.688,"4":11.258,"5":17.855,"6":25.598},
+      "PVC Sch 40": {"1/2":0.285,"3/4":0.508,"1":0.832,"1-1/4":1.453,"1-1/2":1.986,"2":3.291,"2-1/2":4.695,"3":7.268,"3-1/2":9.737,"4":12.554,"5":19.761,"6":28.567},
+      "PVC Type A": {"1/2":0.385,"3/4":0.65,"1":1.084,"1-1/4":1.767,"1-1/2":2.324,"2":3.647,"2-1/2":5.453,"3":8.194,"3-1/2":10.694,"4":13.723},
+      "PVC Type EB": {"2":3.874,"3":8.709,"3-1/2":11.365,"4":14.448,"5":22.195,"6":31.53}
+    };
+
+    document.addEventListener('DOMContentLoaded', () => {
+      const typeSel = document.getElementById('conduitType');
+      const sizeSel = document.getElementById('tradeSize');
+      const tableBody = document.querySelector('#cableTable tbody');
+
+      function populateTypes() {
+        Object.keys(CONDUIT_SPECS).forEach(t => {
+          const opt = document.createElement('option');
+          opt.value = t;
+          opt.textContent = t;
+          typeSel.appendChild(opt);
+        });
+      }
+
+      function populateSizes() {
+        sizeSel.innerHTML = '';
+        const sizes = CONDUIT_SPECS[typeSel.value] || {};
+        Object.keys(sizes).forEach(sz => {
+          const opt = document.createElement('option');
+          opt.value = sz;
+          opt.textContent = sz;
+          sizeSel.appendChild(opt);
+        });
+      }
+
+      function createCableRow() {
+        const tr = document.createElement('tr');
+        const tdTag = document.createElement('td');
+        const inpTag = document.createElement('input');
+        inpTag.type = 'text';
+        inpTag.style.width = '120px';
+        tdTag.appendChild(inpTag);
+        tr.appendChild(tdTag);
+
+        const tdOD = document.createElement('td');
+        const inpOD = document.createElement('input');
+        inpOD.type = 'number';
+        inpOD.step = '0.01';
+        inpOD.style.width = '80px';
+        tdOD.appendChild(inpOD);
+        tr.appendChild(tdOD);
+
+        const tdDup = document.createElement('td');
+        const btnDup = document.createElement('button');
+        btnDup.type = 'button';
+        btnDup.textContent = '⧉';
+        btnDup.className = 'duplicateBtn';
+        btnDup.addEventListener('click', () => {
+          const clone = createCableRow();
+          clone.children[0].querySelector('input').value = inpTag.value;
+          clone.children[1].querySelector('input').value = inpOD.value;
+          tableBody.insertBefore(clone, tr.nextSibling);
+        });
+        tdDup.appendChild(btnDup);
+        tr.appendChild(tdDup);
+
+        const tdRm = document.createElement('td');
+        const btnRm = document.createElement('button');
+        btnRm.type = 'button';
+        btnRm.textContent = '✖';
+        btnRm.className = 'removeBtn';
+        btnRm.addEventListener('click', () => {
+          tableBody.removeChild(tr);
+        });
+        tdRm.appendChild(btnRm);
+        tr.appendChild(tdRm);
+        return tr;
+      }
+
+      document.getElementById('addCableBtn').addEventListener('click', () => {
+        tableBody.appendChild(createCableRow());
+      });
+
+      populateTypes();
+      populateSizes();
+      document.getElementById('addCableBtn').click();
+      typeSel.addEventListener('change', populateSizes);
+
+      function packCircles(cables, R) {
+        const placed = [];
+        cables.sort((a,b) => b.r - a.r);
+        const radialStep = R / 20;
+        const angStep = Math.PI / 18; // 10 deg
+        function canPlace(x,y,r){
+          if (Math.hypot(x,y) + r > R + 1e-6) return false;
+          for (const p of placed){
+            if (Math.hypot(x-p.x,y-p.y) < p.r + r - 1e-6) return false;
+          }
+          return true;
+        }
+        for(const c of cables){
+          let placedFlag = false;
+          for(let rad=c.r; rad<=R-c.r && !placedFlag; rad+=radialStep/2){
+            for(let ang=0; ang<2*Math.PI && !placedFlag; ang+=angStep){
+              const x = rad*Math.cos(ang);
+              const y = rad*Math.sin(ang);
+              if(canPlace(x,y,c.r)){
+                placed.push({x,y,r:c.r,tag:c.tag});
+                placedFlag = true;
+              }
+            }
+          }
+          if(!placedFlag){
+            placed.push({x:0,y:0,r:c.r,tag:c.tag});
+          }
+        }
+        return placed;
+      }
+
+      function drawSVG(R, placed){
+        const SCALE = 20;
+        const margin = 10;
+        const size = 2*R*SCALE + margin*2;
+        const center = margin + R*SCALE;
+        let svg = `<svg width="${size}" height="${size}" viewBox="0 0 ${size} ${size}" xmlns="http://www.w3.org/2000/svg">`;
+        svg += `<circle cx="${center}" cy="${center}" r="${R*SCALE}" fill="none" stroke="black" stroke-width="2"/>`;
+        placed.forEach(p=>{
+          svg += `<circle cx="${center + p.x*SCALE}" cy="${center + p.y*SCALE}" r="${p.r*SCALE}" fill="lightblue" stroke="black" stroke-width="1"/>`;
+          if(p.tag){
+            svg += `<text x="${center + p.x*SCALE}" y="${center + p.y*SCALE}" font-size="${Math.max(8,p.r*SCALE/1.5)}" text-anchor="middle" dominant-baseline="middle">${p.tag}</text>`;
+          }
+        });
+        svg += `</svg>`;
+        document.getElementById('svgContainer').innerHTML = svg;
+      }
+
+      document.getElementById('drawBtn').addEventListener('click', () => {
+        const type = typeSel.value;
+        const size = sizeSel.value;
+        const area = CONDUIT_SPECS[type][size];
+        const R = Math.sqrt(area / Math.PI);
+
+        const rows = Array.from(tableBody.querySelectorAll('tr'));
+        const cables = [];
+        for(const row of rows){
+          const tag = row.children[0].querySelector('input').value.trim();
+          const od = parseFloat(row.children[1].querySelector('input').value);
+          if(!tag){ alert('Each cable requires a Tag.'); return; }
+          if(isNaN(od)){ alert('Each cable requires an OD.'); return; }
+          cables.push({tag,r:od/2});
+        }
+        if(cables.length===0){ alert('Add at least one cable.'); return; }
+        const placed = packCircles(cables,R);
+
+        const sumArea = cables.reduce((s,c)=> s + Math.PI*(c.r**2),0);
+        const fillPct = (sumArea / area) * 100;
+        const allowed = cables.length===1?53:(cables.length===2?31:40);
+        let results = `<p><strong>Conduit:</strong> ${type} ${size}"</p>`;
+        results += `<p><strong>Fill:</strong> ${fillPct.toFixed(1)} % (Allowed ${allowed}% )</p>`;
+        document.getElementById('results').innerHTML = results;
+        drawSVG(R, placed);
+      });
+    });
+  </script>
+</body>
+</html>
