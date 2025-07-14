@@ -978,6 +978,30 @@ const openTrayFill = (trayId) => {
     window.open('cabletrayfill.html', '_blank');
 };
 
+const openConduitFill = (cables) => {
+    const conduitType = elements.conduitType.value;
+    const cableObjs = cables.map(c => {
+        if (typeof c === 'string') {
+            return state.cableList.find(cb => cb.name === c);
+        }
+        return c;
+    }).filter(Boolean);
+    const spec = CONDUIT_SPECS[conduitType] || {};
+    const count = cableObjs.length;
+    const totalArea = cableObjs.reduce((s, c) => s + Math.PI * Math.pow(c.diameter / 2, 2), 0);
+    const fillPct = count === 1 ? 0.53 : count === 2 ? 0.31 : 0.40;
+    let tradeSize = null;
+    for (const size of Object.keys(spec)) {
+        if (totalArea <= spec[size] * fillPct) { tradeSize = size; break; }
+    }
+    try {
+        localStorage.setItem('conduitFillData', JSON.stringify({ type: conduitType, tradeSize, cables: cableObjs }));
+    } catch (e) {
+        console.error('Failed to store conduit fill data', e);
+    }
+    window.open('conduitfill.html', '_blank');
+};
+
  const renderUpdatedUtilizationTable = () => {
      if (!state.updatedUtilData || state.updatedUtilData.length === 0) {
          elements.updatedUtilizationContainer.innerHTML = '';
@@ -1348,15 +1372,29 @@ const openTrayFill = (trayId) => {
         results.forEach(res => {
             html += `<details><summary>${res.cable} | ${res.status} | Total ${res.total_length} | Field ${res.field_length} | Segments ${res.segments_count}</summary>`;
             if (res.breakdown && res.breakdown.length > 0) {
-                html += '<div class="table-scroll"><table class="sticky-table"><thead><tr><th>Segment</th><th>Tray ID</th><th>Type</th><th>From</th><th>To</th><th>Length</th><th>Recommended Raceway</th></tr></thead><tbody>';
+                html += '<div class="table-scroll"><table class="sticky-table"><thead><tr><th>Segment</th><th>Tray ID</th><th>Type</th><th>From</th><th>To</th><th>Length</th><th>Recommended Raceway</th><th>Fill</th></tr></thead><tbody>';
                 res.breakdown.forEach(b => {
-                    html += `<tr><td>${b.segment}</td><td>${b.tray_id}</td><td>${b.type}</td><td>${b.from}</td><td>${b.to}</td><td>${b.length}</td><td>${b.raceway || ''}</td></tr>`;
+                    let link = '';
+                    if (b.type === 'field') {
+                        link = `<button class="conduit-fill-btn" data-cable="${res.cable}">Open</button>`;
+                    }
+                    html += `<tr><td>${b.segment}</td><td>${b.tray_id}</td><td>${b.type}</td><td>${b.from}</td><td>${b.to}</td><td>${b.length}</td><td>${b.raceway || ''}</td><td>${link}</td></tr>`;
                 });
                 html += '</tbody></table></div>';
             }
             html += '</details>';
         });
         elements.routeBreakdownContainer.innerHTML = html;
+        elements.routeBreakdownContainer.querySelectorAll('.conduit-fill-btn').forEach(btn => {
+            btn.addEventListener('click', (e) => {
+                e.stopPropagation();
+                const cableName = btn.dataset.cable;
+                const cableObj = state.cableList.find(c => c.name === cableName);
+                if (cableObj) {
+                    openConduitFill([cableObj]);
+                }
+            });
+        });
     };
     
     const updateCableListDisplay = () => {
@@ -1877,13 +1915,29 @@ const openTrayFill = (trayId) => {
                         const label = c.recommendation.charAt(0).toUpperCase() + c.recommendation.slice(1);
                         recText = `Recommended: ${label}`;
                     }
-                    html += `<li class="shared-route-item" data-route-index="${idx}">${c.name}${group}: ${formatPoint(c.start)} to ${formatPoint(c.end)} - ${c.cables.join(', ')} | ${recText}</li>`;
+                    let fillLink = '';
+                    if (c.recommendation === 'conduit') {
+                        fillLink = ` <a href="#" class="conduit-fill-link" data-route-index="${idx}">Fill</a>`;
+                    }
+                    html += `<li class="shared-route-item" data-route-index="${idx}">${c.name}${group}: ${formatPoint(c.start)} to ${formatPoint(c.end)} - ${c.cables.join(', ')} | ${recText}${fillLink}</li>`;
                 });
                 html += '</ul>';
                 elements.metrics.innerHTML = html;
                 elements.metrics.querySelectorAll('.shared-route-item').forEach(li => {
                     li.style.cursor = 'pointer';
                     li.addEventListener('click', () => highlightSharedRoute(parseInt(li.dataset.routeIndex, 10)));
+                });
+                elements.metrics.querySelectorAll('.conduit-fill-link').forEach(link => {
+                    link.addEventListener('click', (e) => {
+                        e.preventDefault();
+                        e.stopPropagation();
+                        const idx = parseInt(link.dataset.routeIndex, 10);
+                        const route = state.sharedFieldRoutes[idx];
+                        if (route) {
+                            const cables = route.cables.map(n => state.cableList.find(c => c.name === n)).filter(Boolean);
+                            openConduitFill(cables);
+                        }
+                    });
                 });
             } else {
                 elements.metrics.innerHTML = '<p>No common field routes detected.</p>';

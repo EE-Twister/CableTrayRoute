@@ -566,6 +566,33 @@
       document.getElementById('popupClose').addEventListener('click', () => {
         document.getElementById('overlay').style.display = 'none';
       });
+
+      const stored = localStorage.getItem('conduitFillData');
+      if (stored) {
+        try {
+          const { type, tradeSize, cables } = JSON.parse(stored);
+          if (type) {
+            typeSel.value = type;
+            populateSizes();
+          }
+          if (tradeSize) {
+            sizeSel.value = tradeSize;
+          }
+          if (Array.isArray(cables)) {
+            tableBody.innerHTML = '';
+            cables.forEach(c => {
+              const row = createCableRow();
+              row.children[0].querySelector('input').value = c.name || c.tag || '';
+              row.children[1].querySelector('input').value = (c.diameter || c.od || c.OD || 0).toFixed(2);
+              tableBody.appendChild(row);
+            });
+          }
+          document.getElementById('drawBtn').click();
+        } catch (e) {
+          console.error('Failed to load conduitFillData', e);
+        }
+        localStorage.removeItem('conduitFillData');
+      }
     });
   </script>
 </body>
