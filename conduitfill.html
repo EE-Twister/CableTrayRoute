@@ -160,6 +160,23 @@
     };
 
     document.addEventListener('DOMContentLoaded', () => {
+      const session = JSON.parse(localStorage.getItem('ctrSession') || '{}');
+      if (session.darkMode) {
+        document.body.classList.add('dark-mode');
+      }
+      window.addEventListener('storage', (e) => {
+        if (e.key === 'ctrSession') {
+          try {
+            const data = JSON.parse(e.newValue);
+            if (data && data.darkMode) {
+              document.body.classList.add('dark-mode');
+            } else {
+              document.body.classList.remove('dark-mode');
+            }
+          } catch {}
+        }
+      });
+
       const typeSel = document.getElementById('conduitType');
       const sizeSel = document.getElementById('tradeSize');
       const tableBody = document.querySelector('#cableTable tbody');
@@ -173,15 +190,29 @@
         });
       }
 
+      function parseSize(sz) {
+        if (sz.includes('-')) {
+          const [whole, frac] = sz.split('-');
+          const [num, den] = frac.split('/');
+          return parseFloat(whole) + parseFloat(num) / parseFloat(den);
+        } else if (sz.includes('/')) {
+          const [num, den] = sz.split('/');
+          return parseFloat(num) / parseFloat(den);
+        }
+        return parseFloat(sz);
+      }
+
       function populateSizes() {
         sizeSel.innerHTML = '';
         const sizes = CONDUIT_SPECS[typeSel.value] || {};
-        Object.keys(sizes).forEach(sz => {
-          const opt = document.createElement('option');
-          opt.value = sz;
-          opt.textContent = sz;
-          sizeSel.appendChild(opt);
-        });
+        Object.keys(sizes)
+          .sort((a, b) => parseSize(a) - parseSize(b))
+          .forEach((sz) => {
+            const opt = document.createElement('option');
+            opt.value = sz;
+            opt.textContent = sz;
+            sizeSel.appendChild(opt);
+          });
       }
 
       function createCableRow() {
@@ -239,37 +270,42 @@
 
       function packCircles(cables, R) {
         const placed = [];
-        cables.sort((a,b) => b.r - a.r);
-        const radialStep = R / 20;
-        const angStep = Math.PI / 18; // 10 deg
-        function canPlace(x,y,r){
-          if (Math.hypot(x,y) + r > R + 1e-6) return false;
-          for (const p of placed){
-            if (Math.hypot(x-p.x,y-p.y) < p.r + r - 1e-6) return false;
-          }
-          return true;
+        cables.sort((a, b) => b.r - a.r);
+
+        function yAtBoundary(x, r) {
+          return Math.sqrt(Math.max(0, (R - r) * (R - r) - x * x));
         }
-        for(const c of cables){
-          let placedFlag = false;
-          for(let rad=c.r; rad<=R-c.r && !placedFlag; rad+=radialStep/2){
-            for(let ang=0; ang<2*Math.PI && !placedFlag; ang+=angStep){
-              const x = rad*Math.cos(ang);
-              const y = rad*Math.sin(ang);
-              if(canPlace(x,y,c.r)){
-                placed.push({x,y,r:c.r,tag:c.tag});
-                placedFlag = true;
+
+        for (const c of cables) {
+          let best = null;
+          let bestY = -Infinity;
+          const maxX = R - c.r;
+          const step = c.r / 2;
+          for (let x = -maxX; x <= maxX; x += step) {
+            let y = yAtBoundary(x, c.r);
+            for (const p of placed) {
+              const dx = x - p.x;
+              if (Math.abs(dx) < p.r + c.r) {
+                const dy = Math.sqrt((p.r + c.r) * (p.r + c.r) - dx * dx);
+                y = Math.min(y, p.y - dy);
               }
             }
+            if (y > bestY) {
+              bestY = y;
+              best = { x, y };
+            }
           }
-          if(!placedFlag){
-            placed.push({x:0,y:0,r:c.r,tag:c.tag});
+          if (best) {
+            placed.push({ x: best.x, y: best.y, r: c.r, tag: c.tag });
+          } else {
+            placed.push({ x: 0, y: 0, r: c.r, tag: c.tag });
           }
         }
         return placed;
       }
 
       function drawSVG(R, placed){
-        const SCALE = 20;
+        const SCALE = 40;
         const margin = 10;
         const size = 2*R*SCALE + margin*2;
         const center = margin + R*SCALE;
