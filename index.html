@@ -177,6 +177,20 @@
             </section>
         </main>
     </div>
+    <div id="help-modal" class="modal" aria-hidden="true" role="dialog" aria-labelledby="help-title">
+        <div class="modal-content">
+            <button id="close-help-btn" class="close-btn" aria-label="Close Help">&times;</button>
+            <h2 id="help-title">CableTrayRoute Help</h2>
+            <p>This application finds optimal routes through tray networks while respecting fill limits and separation rules.</p>
+            <ul>
+                <li><strong>Cable Tag</strong> identifies each cable in the results.</li>
+                <li><strong>Allowed Cable Group</strong> keeps voltage classes separated.</li>
+                <li>Use the <strong>Import/Export</strong> buttons to manage trays and cables via CSV.</li>
+                <li>The <strong>Tray Fill Tool</strong> visualizes cable placement after routing.</li>
+                <li>Tray fill calculations reference the <em>NEC 40% rule</em>.</li>
+            </ul>
+        </div>
+    </div>
     <script src="app.js"></script>
 </body>
 </html>
