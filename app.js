@@ -1830,21 +1830,42 @@ const openConduitFill = (cables) => {
 
         const doc = new jsPDF();
         let y = 20;
+        const getDims = (url) => new Promise(res => {
+            const img = new Image();
+            img.onload = () => res({ width: img.width, height: img.height });
+            img.onerror = () => res({ width: 0, height: 0 });
+            img.src = url;
+        });
         for (const info of traysWithCables) {
             const trayId = info.tray_id;
             const tray = state.trayData.find(t => t.tray_id === trayId);
             if (!tray) continue;
             const cables = (state.trayCableMap && state.trayCableMap[trayId]) ? state.trayCableMap[trayId] : [];
             const png = await renderTrayToPNG(tray, cables);
-            if (y > doc.internal.pageSize.getHeight() - 200) {
+            if (!png) continue;
+            const dims = await getDims(png);
+            let w = dims.width;
+            let h = dims.height;
+            const max = 170;
+            if (w > h) {
+                if (w > max) {
+                    h = h * (max / w);
+                    w = max;
+                }
+            } else {
+                if (h > max) {
+                    w = w * (max / h);
+                    h = max;
+                }
+            }
+            const pageH = doc.internal.pageSize.getHeight();
+            if (y > pageH - (h + 20)) {
                 doc.addPage();
                 y = 20;
             }
             doc.text(`Tray ${trayId}`, 20, y);
-            if (png) {
-                doc.addImage(png, 'PNG', 20, y + 10, 170, 170);
-            }
-            y += 190;
+            doc.addImage(png, 'PNG', 20, y + 10, w, h);
+            y += h + 20;
         }
         doc.save('tray_fills.pdf');
     };
