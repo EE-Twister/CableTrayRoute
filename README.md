@@ -20,6 +20,13 @@ cable will appear in the table for batch routing. Each row in the table allows
 you to edit not only the cable tag, but also the diameter and the start/end
 coordinates for that cable.
 
+## New Feature: In-App Help Modal
+
+Click **Site Help** in the settings menu to open a help dialog without leaving
+the page. The modal highlights key functions like cable tagging and allowed
+cable groups, explains how to import or export CSV files, and references the
+NEC 40% fill guideline used for tray capacity calculations.
+
 ## Updates
 
 - Default *Tray Proximity Threshold* is now **72 in**.

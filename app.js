@@ -74,6 +74,8 @@ document.addEventListener('DOMContentLoaded', () => {
         settingsBtn: document.getElementById('settings-btn'),
         settingsMenu: document.getElementById('settings-menu'),
         helpBtn: document.getElementById('help-btn'),
+        helpModal: document.getElementById('help-modal'),
+        closeHelpBtn: document.getElementById('close-help-btn'),
         deleteDataBtn: document.getElementById('delete-data-btn'),
         traySearch: document.getElementById('tray-search'),
         cableSearch: document.getElementById('cable-search'),
@@ -2219,9 +2221,20 @@ Plotly.newPlot(document.getElementById('plot'), data, layout, {responsive: true}
             }
         });
     }
-    if (elements.helpBtn) {
+    if (elements.helpBtn && elements.helpModal && elements.closeHelpBtn) {
         elements.helpBtn.addEventListener('click', () => {
-            window.open('README.md', '_blank');
+            elements.helpModal.style.display = 'flex';
+            elements.helpModal.setAttribute('aria-hidden', 'false');
+        });
+        elements.closeHelpBtn.addEventListener('click', () => {
+            elements.helpModal.style.display = 'none';
+            elements.helpModal.setAttribute('aria-hidden', 'true');
+        });
+        elements.helpModal.addEventListener('click', (e) => {
+            if (e.target === elements.helpModal) {
+                elements.helpModal.style.display = 'none';
+                elements.helpModal.setAttribute('aria-hidden', 'true');
+            }
         });
     }
     if (elements.deleteDataBtn) {
