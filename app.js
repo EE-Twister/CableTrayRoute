@@ -1817,9 +1817,20 @@ const openConduitFill = (cables) => {
             return;
         }
         const { jsPDF } = window.jspdf;
+
+        const traysWithCables = state.updatedUtilData.filter(info => {
+            const cables = state.trayCableMap && state.trayCableMap[info.tray_id];
+            return cables && cables.length > 0;
+        });
+
+        if (traysWithCables.length === 0) {
+            alert('No tray fills to export.');
+            return;
+        }
+
         const doc = new jsPDF();
         let y = 20;
-        for (const info of state.updatedUtilData) {
+        for (const info of traysWithCables) {
             const trayId = info.tray_id;
             const tray = state.trayData.find(t => t.tray_id === trayId);
             if (!tray) continue;
