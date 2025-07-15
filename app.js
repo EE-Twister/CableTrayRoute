@@ -1140,7 +1140,7 @@ const openConduitFill = (cables) => {
             '<th data-key="height">Height</th>' +
             '<th data-key="current_fill">Current Fill</th>' +
             '<th data-key="allowed_cable_group">Allowed Group</th>' +
-            '<th data-key="shape">Shape</th>' +
+            '<th data-key="shape">Shape <span class="help-icon" tabindex="0" aria-describedby="shape-help">?<span id="shape-help" class="tooltip">STR: Straight<br>90B: 90\u00B0 Bend<br>45B: 45\u00B0 Bend<br>30B/60B: 30\u00B0/60\u00B0 Bend<br>TEE: Tee<br>X: Cross<br>VI: Vertical Inside<br>VO: Vertical Outside<br>45VI: 45\u00B0 Vertical Inside<br>45VO: 45\u00B0 Vertical Outside<br>RED-C: Center Reducer<br>RED-S: Side Reducer<br>Z: Z-Bend<br>OFFSET: Offset<br>SPIRAL: Spiral</span></span></th>' +
             '<th></th><th></th></tr></thead><tbody>';
         state.manualTrays.forEach((t, idx) => {
             table += `<tr data-idx="${idx}">
