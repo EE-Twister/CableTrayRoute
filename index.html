@@ -111,6 +111,23 @@
                              <input type="number" id="t-w" placeholder="Width (in)">
                              <input type="number" id="t-h" placeholder="Height (in)">
                              <input type="number" id="t-fill" placeholder="Current Fill (in²)">
+                             <select id="t-shape">
+                                 <option value="STR">Straight</option>
+                                 <option value="90B">90° Bend</option>
+                                 <option value="45B">45° Bend</option>
+                                 <option value="30B/60B">30°/60° Bend</option>
+                                 <option value="TEE">Tee</option>
+                                 <option value="X">Cross</option>
+                                 <option value="VI">Vertical Inside</option>
+                                 <option value="VO">Vertical Outside</option>
+                                 <option value="45VI">45° Vertical Inside</option>
+                                 <option value="45VO">45° Vertical Outside</option>
+                                 <option value="RED-C">Center Reducer</option>
+                                 <option value="RED-S">Side Reducer</option>
+                                 <option value="Z">Z-Bend</option>
+                                 <option value="OFFSET">Offset</option>
+                                 <option value="SPIRAL">Spiral</option>
+                             </select>
                              <input type="text" id="t-group" placeholder="Allowed Cable Group">
                              <button id="add-tray-btn">Add Tray</button>
                              <span class="help-icon" tabindex="0" aria-describedby="add-tray-help">?</span>
