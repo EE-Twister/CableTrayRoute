@@ -429,11 +429,12 @@
         const center = margin + R*SCALE;
         let svg = `<svg width="${size}" height="${size}" viewBox="0 0 ${size} ${size}" xmlns="http://www.w3.org/2000/svg">`;
         svg += `<circle cx="${center}" cy="${center}" r="${R*SCALE}" fill="none" stroke="black" stroke-width="2"/>`;
-        svg += `<text x="${center}" y="${center - R*SCALE + 12}" font-size="12" text-anchor="middle">ID: ${(2*R).toFixed(2)}\"</text>`;
+        svg += `<text x="${center}" y="${center - R*SCALE + 16}" font-size="12" text-anchor="middle">ID: ${(2*R).toFixed(2)}\"</text>`;
         placed.forEach(p=>{
           svg += `<circle cx="${center + p.x*SCALE}" cy="${center + p.y*SCALE}" r="${p.r*SCALE}" fill="lightblue" stroke="black" stroke-width="1"/>`;
           if(p.tag){
-            const fs = calcFont(p.tag, p.r, SCALE, 8);
+            let fs = calcFont(p.tag, p.r, SCALE, 8);
+            fs = Math.min(fs, p.r * SCALE * 0.9);
             const cx = center + p.x*SCALE;
             const cy = center + p.y*SCALE;
             svg += `<text x="${cx}" y="${cy}" font-size="${fs}" text-anchor="middle" dominant-baseline="middle">${p.tag}</text>`;
@@ -474,9 +475,11 @@
         }
 
         let jamRatioVal = null;
-        for(const c of cables){
-          const jr = R / c.r;
-          if(jr >= 2.8 && jr <= 3.2){ jamRatioVal = jr; break; }
+        if(cables.length === 3){
+          for(const c of cables){
+            const jr = R / c.r;
+            if(jr >= 2.8 && jr <= 3.2){ jamRatioVal = jr; break; }
+          }
         }
         if(jamRatioVal!==null){
           results += `<p class="warning">WARNING: Jam ratio ${jamRatioVal.toFixed(2)} (between 2.8 and 3.2) for one or more cables.</p>`;
