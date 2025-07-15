@@ -85,6 +85,7 @@ document.addEventListener('DOMContentLoaded', () => {
         updatedUtilizationContainer: document.getElementById('updated-utilization-container'),
         exportCsvBtn: document.getElementById('export-csv-btn'),
         openFillBtn: document.getElementById('open-fill-btn'),
+        exportTrayFillsBtn: document.getElementById('export-tray-fills-btn'),
         progressContainer: document.getElementById('progress-container'),
         progressBar: document.getElementById('progress-bar'),
         progressLabel: document.getElementById('progress-label'),
@@ -1769,6 +1770,74 @@ const openConduitFill = (cables) => {
 
     const formatPoint = (p) => `(${p[0].toFixed(1)}, ${p[1].toFixed(1)}, ${p[2].toFixed(1)})`;
 
+    const renderTrayToPNG = (tray, cables) => {
+        return new Promise(resolve => {
+            const iframe = document.createElement('iframe');
+            iframe.style.display = 'none';
+            document.body.appendChild(iframe);
+            const cleanup = () => document.body.removeChild(iframe);
+            iframe.onload = () => {
+                const doc = iframe.contentDocument;
+                const grab = () => {
+                    const svgEl = doc && doc.querySelector('#svgContainer svg');
+                    if (svgEl) {
+                        const svgStr = new XMLSerializer().serializeToString(svgEl);
+                        const img = new Image();
+                        img.onload = () => {
+                            const canvas = document.createElement('canvas');
+                            canvas.width = img.width;
+                            canvas.height = img.height;
+                            const ctx = canvas.getContext('2d');
+                            ctx.drawImage(img, 0, 0);
+                            const png = canvas.toDataURL('image/png');
+                            cleanup();
+                            resolve(png);
+                        };
+                        img.src = 'data:image/svg+xml;charset=utf-8,' + encodeURIComponent(svgStr);
+                    } else {
+                        setTimeout(grab, 100);
+                    }
+                };
+                grab();
+            };
+            try {
+                localStorage.setItem('trayFillData', JSON.stringify({ tray, cables }));
+            } catch {}
+            iframe.src = 'cabletrayfill.html';
+        });
+    };
+
+    const exportTrayFills = async () => {
+        if (!state.updatedUtilData || state.updatedUtilData.length === 0) {
+            alert('No tray fill data available.');
+            return;
+        }
+        if (!window.jspdf || !window.jspdf.jsPDF) {
+            alert('jsPDF library not loaded.');
+            return;
+        }
+        const { jsPDF } = window.jspdf;
+        const doc = new jsPDF();
+        let y = 20;
+        for (const info of state.updatedUtilData) {
+            const trayId = info.tray_id;
+            const tray = state.trayData.find(t => t.tray_id === trayId);
+            if (!tray) continue;
+            const cables = (state.trayCableMap && state.trayCableMap[trayId]) ? state.trayCableMap[trayId] : [];
+            const png = await renderTrayToPNG(tray, cables);
+            if (y > doc.internal.pageSize.getHeight() - 200) {
+                doc.addPage();
+                y = 20;
+            }
+            doc.text(`Tray ${trayId}`, 20, y);
+            if (png) {
+                doc.addImage(png, 'PNG', 20, y + 10, 170, 170);
+            }
+            y += 190;
+        }
+        doc.save('tray_fills.pdf');
+    };
+
     const cancelCurrentRouting = () => {
         cancelRouting = true;
         elements.cancelRoutingBtn.disabled = true;
@@ -2243,6 +2312,9 @@ Plotly.newPlot(document.getElementById('plot'), data, layout, {responsive: true}
         elements.openFillBtn.addEventListener('click', () => {
             window.open('cabletrayfill.html', '_blank');
         });
+    }
+    if (elements.exportTrayFillsBtn) {
+        elements.exportTrayFillsBtn.addEventListener('click', exportTrayFills);
     }
     elements.popoutPlotBtn.addEventListener('click', popOutPlot);
     if (elements.resetViewBtn) {
