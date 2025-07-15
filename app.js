@@ -1779,9 +1779,9 @@ const openConduitFill = (cables) => {
             iframe.onload = () => {
                 const doc = iframe.contentDocument;
                 const grab = () => {
-                    const svgEl = doc && doc.querySelector('#svgContainer svg');
-                    if (svgEl) {
-                        const svgStr = new XMLSerializer().serializeToString(svgEl);
+                    const expanded = doc && doc.querySelector('#expandedSVG svg');
+                    if (expanded) {
+                        const svgStr = new XMLSerializer().serializeToString(expanded);
                         const img = new Image();
                         img.onload = () => {
                             const canvas = document.createElement('canvas');
@@ -1794,9 +1794,15 @@ const openConduitFill = (cables) => {
                             resolve(png);
                         };
                         img.src = 'data:image/svg+xml;charset=utf-8,' + encodeURIComponent(svgStr);
-                    } else {
-                        setTimeout(grab, 100);
+                        return;
                     }
+
+                    const svgEl = doc && doc.querySelector('#svgContainer svg');
+                    if (svgEl) {
+                        const expandBtn = doc.getElementById('expandBtn');
+                        if (expandBtn) expandBtn.click();
+                    }
+                    setTimeout(grab, 100);
                 };
                 grab();
             };
@@ -1846,19 +1852,18 @@ const openConduitFill = (cables) => {
             const dims = await getDims(png);
             let w = dims.width;
             let h = dims.height;
-            const max = 170;
-            if (w > h) {
-                if (w > max) {
-                    h = h * (max / w);
-                    w = max;
-                }
-            } else {
-                if (h > max) {
-                    w = w * (max / h);
-                    h = max;
-                }
-            }
+            const pageW = doc.internal.pageSize.getWidth();
             const pageH = doc.internal.pageSize.getHeight();
+            const maxW = pageW - 40; // 20mm margins
+            const maxH = pageH - 40;
+            if (w > maxW) {
+                h = h * (maxW / w);
+                w = maxW;
+            }
+            if (h > maxH) {
+                w = w * (maxH / h);
+                h = maxH;
+            }
             if (y > pageH - (h + 20)) {
                 doc.addPage();
                 y = 20;
