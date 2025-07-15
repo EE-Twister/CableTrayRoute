@@ -1377,6 +1377,8 @@ const openConduitFill = (cables) => {
                     let link = '';
                     if (b.type === 'field') {
                         link = `<button class="conduit-fill-btn" data-cable="${res.cable}">Open</button>`;
+                    } else if (b.tray_id && b.tray_id !== 'Field Route' && b.tray_id !== 'N/A') {
+                        link = `<button class="tray-fill-btn" data-tray="${b.tray_id}">Fill</button>`;
                     }
                     html += `<tr><td>${b.segment}</td><td>${b.tray_id}</td><td>${b.type}</td><td>${b.from}</td><td>${b.to}</td><td>${b.length}</td><td>${b.raceway || ''}</td><td>${link}</td></tr>`;
                 });
@@ -1392,6 +1394,15 @@ const openConduitFill = (cables) => {
                 const cableObj = state.cableList.find(c => c.name === cableName);
                 if (cableObj) {
                     openConduitFill([cableObj]);
+                }
+            });
+        });
+        elements.routeBreakdownContainer.querySelectorAll('.tray-fill-btn').forEach(btn => {
+            btn.addEventListener('click', (e) => {
+                e.stopPropagation();
+                const trayId = btn.dataset.tray;
+                if (trayId) {
+                    openTrayFill(trayId);
                 }
             });
         });
