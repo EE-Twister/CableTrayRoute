@@ -2376,21 +2376,7 @@ const openConduitFill = (cables) => {
         state.updatedUtilData = utilData;
         renderUpdatedUtilizationTable();
 
-        finalUtilization = await rerouteOverfilledTrays(routingSystem, allRoutesForPlotting);
         state.routeObjs = allRoutesForPlotting;
-        fillLimit = parseFloat(elements.fillLimitIn.value) / 100;
-        utilData = Object.entries(finalUtilization).map(([id, data]) => {
-            const fullPct = (data.current_fill * fillLimit / data.max_fill) * 100;
-            return {
-                tray_id: id,
-                full_pct: fullPct,
-                utilization: data.utilization_percentage.toFixed(1),
-                available: data.available_capacity.toFixed(2),
-                fill: `<button class="fill-btn" data-tray="${id}">Open</button>`
-            };
-        });
-        state.updatedUtilData = utilData;
-        renderUpdatedUtilizationTable();
         visualize(trayDataForRun, allRoutesForPlotting, "Batch Route Visualization");
 
         elements.progressLabel.textContent = 'Complete';
