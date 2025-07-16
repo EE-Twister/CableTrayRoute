@@ -1871,8 +1871,9 @@ const openConduitFill = (cables) => {
 
             const trayText = String(row.tray_id);
             const pageNum = pageMap && pageMap[row.tray_id] ? pageMap[row.tray_id] : '';
+            const utilColorVal = parseFloat(row.utilization || row.utilization_pct || row.full_pct);
+            const colors = colorForUtil(utilColorVal);
             const utilPct = parseFloat(row.full_pct);
-            const colors = colorForUtil(utilPct);
 
             doc.setFillColor(...colors.fill);
             doc.setDrawColor(0);
