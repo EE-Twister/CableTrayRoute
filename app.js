@@ -1829,10 +1829,19 @@ const openConduitFill = (cables) => {
         const pageW = doc.internal.pageSize.getWidth();
         const pageH = doc.internal.pageSize.getHeight();
         let y = margin;
+        let currentPage = doc.internal.getCurrentPageInfo().pageNumber;
 
-        doc.setFontSize(14);
-        doc.text('Updated Tray Utilization', pageW / 2, y, { align: 'center' });
-        y += 8;
+        const renderHeader = () => {
+            doc.setFontSize(14);
+            doc.text('Updated Tray Utilization', pageW / 2, y, { align: 'center' });
+            y += 8;
+            doc.setFontSize(10);
+            doc.text('Tray ID', col1, y);
+            doc.text('Util %', col2, y);
+            doc.text('Available (in\u00b2)', col3, y);
+            doc.text('Page', col4, y);
+            y += rowHeight;
+        };
 
         doc.setFontSize(10);
         const col1 = margin;
@@ -1842,24 +1851,16 @@ const openConduitFill = (cables) => {
         const rowHeight = 6;
         const rowWidth = pageW - margin * 2;
 
-        doc.text('Tray ID', col1, y);
-        doc.text('Util %', col2, y);
-        doc.text('Available (in\u00b2)', col3, y);
-        doc.text('Page', col4, y);
-        y += rowHeight;
+        renderHeader();
 
         utilData.forEach(row => {
             if (y > pageH - margin) {
                 // draw bottom border before breaking
                 doc.line(margin, y, pageW - margin, y);
-                doc.addPage();
+                currentPage++;
+                doc.setPage(currentPage);
                 y = margin;
-                doc.setFontSize(10);
-                doc.text('Tray ID', col1, y);
-                doc.text('Util %', col2, y);
-                doc.text('Available (in\u00b2)', col3, y);
-                doc.text('Page', col4, y);
-                y += rowHeight;
+                renderHeader();
             }
 
             const trayText = String(row.tray_id);
@@ -1901,6 +1902,7 @@ const openConduitFill = (cables) => {
             const cables = state.trayCableMap && state.trayCableMap[info.tray_id];
             return cables && cables.length > 0;
         });
+        const utilDataForExport = traysWithCables;
 
         if (traysWithCables.length === 0) {
             alert('No tray fills to export.');
@@ -1922,7 +1924,7 @@ const openConduitFill = (cables) => {
         // calculate how many pages the utilization table will need
         let tempY = margin + 8 + rowHeight; // title + header
         let tablePages = 1;
-        state.updatedUtilData.forEach(() => {
+        utilDataForExport.forEach(() => {
             if (tempY > pageH - margin) {
                 tablePages++;
                 tempY = margin + rowHeight;
@@ -1989,7 +1991,7 @@ const openConduitFill = (cables) => {
 
         doc.setPage(1);
         doc.outline.add(null, 'Tray Utilization', { pageNumber: 1 });
-        addUtilizationTableToPDF(doc, state.updatedUtilData, pageMap);
+        addUtilizationTableToPDF(doc, utilDataForExport, pageMap);
         doc.save('tray_fills.pdf');
         elements.progressContainer.style.display = 'none';
         elements.exportTrayFillsBtn.disabled = false;
