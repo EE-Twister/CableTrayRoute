@@ -1838,31 +1838,52 @@ const openConduitFill = (cables) => {
         const col1 = margin;
         const col2 = margin + 50;
         const col3 = margin + 100;
+        const col4 = margin + 150;
+        const rowHeight = 6;
+        const rowWidth = pageW - margin * 2;
+
         doc.text('Tray ID', col1, y);
         doc.text('Util %', col2, y);
         doc.text('Available (in\u00b2)', col3, y);
-        y += 6;
+        doc.text('Page', col4, y);
+        y += rowHeight;
 
         utilData.forEach(row => {
             if (y > pageH - margin) {
+                // draw bottom border before breaking
+                doc.line(margin, y, pageW - margin, y);
                 doc.addPage();
                 y = margin;
                 doc.setFontSize(10);
                 doc.text('Tray ID', col1, y);
                 doc.text('Util %', col2, y);
                 doc.text('Available (in\u00b2)', col3, y);
-                y += 6;
+                doc.text('Page', col4, y);
+                y += rowHeight;
             }
+
             const trayText = String(row.tray_id);
+            const pageNum = pageMap && pageMap[row.tray_id] ? pageMap[row.tray_id] : '';
+
             doc.text(trayText, col1, y);
             if (pageMap && pageMap[row.tray_id]) {
                 const textWidth = doc.getTextWidth(trayText);
-                doc.link(col1, y - 3, textWidth, 4, { pageNumber: pageMap[row.tray_id] });
+                doc.link(col1, y - 3, textWidth, 4, { pageNumber: pageNum });
             }
             doc.text(parseFloat(row.full_pct).toFixed(1) + '%', col2, y);
             doc.text(String(row.available), col3, y);
-            y += 6;
+            if (pageNum) {
+                const txt = String(pageNum);
+                doc.text(txt, col4, y);
+                const width = doc.getTextWidth(txt);
+                doc.link(col4, y - 3, width, 4, { pageNumber: pageNum });
+            }
+
+            doc.rect(margin, y - rowHeight + 2, rowWidth, rowHeight, 'S');
+            y += rowHeight;
         });
+        // bottom border for last row
+        doc.line(margin, y, pageW - margin, y);
     };
 
     const exportTrayFills = async () => {
@@ -1893,11 +1914,23 @@ const openConduitFill = (cables) => {
         elements.progressLabel.textContent = 'Generating PDF...';
 
         const doc = new jsPDF({ compress: true });
-        doc.addPage(); // reserve first page for table
-        doc.setPage(2);
-        let y = 20;
+        const margin = 20;
+        const rowHeight = 6;
         const pageW = doc.internal.pageSize.getWidth();
         const pageH = doc.internal.pageSize.getHeight();
+
+        // calculate how many pages the utilization table will need
+        let tempY = margin + 8 + rowHeight; // title + header
+        let tablePages = 1;
+        state.updatedUtilData.forEach(() => {
+            if (tempY > pageH - margin) {
+                tablePages++;
+                tempY = margin + rowHeight;
+            }
+            tempY += rowHeight;
+        });
+
+        let y = 20;
         const pageMap = {};
 
         const getDims = (url) => new Promise(res => {
@@ -1945,6 +1978,14 @@ const openConduitFill = (cables) => {
             elements.progressBar.setAttribute('aria-valuenow', String(pct));
             elements.progressLabel.textContent = `Generating PDF (${i + 1}/${traysWithCables.length})`;
         }
+
+        // insert table pages at the front and update page numbers
+        for (let i = 0; i < tablePages; i++) {
+            doc.insertPage(1);
+        }
+        Object.keys(pageMap).forEach(id => {
+            pageMap[id] += tablePages;
+        });
 
         doc.setPage(1);
         doc.outline.add(null, 'Tray Utilization', { pageNumber: 1 });
