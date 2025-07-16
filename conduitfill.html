@@ -216,6 +216,9 @@
       <thead>
         <tr>
           <th>Tag</th>
+          <th>Cable Type</th>
+          <th>Conductors</th>
+          <th>Conductor Size</th>
           <th>OD (in)</th>
           <th>Duplicate</th>
           <th>Remove</th>
@@ -223,6 +226,29 @@
       </thead>
       <tbody></tbody>
     </table>
+    <datalist id="sizeList">
+      <option value="#22 AWG"></option>
+      <option value="#20 AWG"></option>
+      <option value="#18 AWG"></option>
+      <option value="#16 AWG"></option>
+      <option value="#14 AWG"></option>
+      <option value="#12 AWG"></option>
+      <option value="#10 AWG"></option>
+      <option value="#8 AWG"></option>
+      <option value="#6 AWG"></option>
+      <option value="#4 AWG"></option>
+      <option value="#2 AWG"></option>
+      <option value="#1 AWG"></option>
+      <option value="1/0 AWG"></option>
+      <option value="2/0 AWG"></option>
+      <option value="3/0 AWG"></option>
+      <option value="4/0 AWG"></option>
+      <option value="250 kcmil"></option>
+      <option value="350 kcmil"></option>
+      <option value="500 kcmil"></option>
+      <option value="750 kcmil"></option>
+      <option value="1000 kcmil"></option>
+    </datalist>
   </fieldset>
 
   <div id="controls">
@@ -318,12 +344,40 @@
 
       function createCableRow() {
         const tr = document.createElement('tr');
+
         const tdTag = document.createElement('td');
         const inpTag = document.createElement('input');
         inpTag.type = 'text';
         inpTag.style.width = '120px';
         tdTag.appendChild(inpTag);
         tr.appendChild(tdTag);
+
+        const tdType = document.createElement('td');
+        const selType = document.createElement('select');
+        ['Power','Control','Signal'].forEach(t => {
+          const o = document.createElement('option');
+          o.value = t; o.textContent = t; selType.appendChild(o);
+        });
+        selType.style.width = '100px';
+        tdType.appendChild(selType);
+        tr.appendChild(tdType);
+
+        const tdCount = document.createElement('td');
+        const inpCount = document.createElement('input');
+        inpCount.type = 'number';
+        inpCount.min = '1';
+        inpCount.step = '1';
+        inpCount.style.width = '60px';
+        tdCount.appendChild(inpCount);
+        tr.appendChild(tdCount);
+
+        const tdSize = document.createElement('td');
+        const inpSize = document.createElement('input');
+        inpSize.type = 'text';
+        inpSize.setAttribute('list','sizeList');
+        inpSize.style.width = '100px';
+        tdSize.appendChild(inpSize);
+        tr.appendChild(tdSize);
 
         const tdOD = document.createElement('td');
         const inpOD = document.createElement('input');
@@ -341,7 +395,10 @@
         btnDup.addEventListener('click', () => {
           const clone = createCableRow();
           clone.children[0].querySelector('input').value = inpTag.value;
-          clone.children[1].querySelector('input').value = inpOD.value;
+          clone.children[1].querySelector('select').value = selType.value;
+          clone.children[2].querySelector('input').value = inpCount.value;
+          clone.children[3].querySelector('input').value = inpSize.value;
+          clone.children[4].querySelector('input').value = inpOD.value;
           tableBody.insertBefore(clone, tr.nextSibling);
         });
         tdDup.appendChild(btnDup);
@@ -357,6 +414,7 @@
         });
         tdRm.appendChild(btnRm);
         tr.appendChild(tdRm);
+
         return tr;
       }
 
@@ -595,7 +653,10 @@
             cables.forEach(c => {
               const row = createCableRow();
               row.children[0].querySelector('input').value = c.name || c.tag || '';
-              row.children[1].querySelector('input').value = (c.diameter || c.od || c.OD || 0).toFixed(2);
+              row.children[1].querySelector('select').value = c.cable_type || '';
+              row.children[2].querySelector('input').value = c.conductors || '';
+              row.children[3].querySelector('input').value = c.conductor_size || '';
+              row.children[4].querySelector('input').value = (c.diameter || c.od || c.OD || 0).toFixed(2);
               tableBody.appendChild(row);
             });
           }
