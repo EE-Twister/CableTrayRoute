@@ -1824,7 +1824,7 @@ const openConduitFill = (cables) => {
         });
     };
 
-    const addUtilizationTableToPDF = (doc, utilData) => {
+    const addUtilizationTableToPDF = (doc, utilData, pageMap = null) => {
         const margin = 20;
         const pageW = doc.internal.pageSize.getWidth();
         const pageH = doc.internal.pageSize.getHeight();
@@ -1853,7 +1853,12 @@ const openConduitFill = (cables) => {
                 doc.text('Available (in\u00b2)', col3, y);
                 y += 6;
             }
-            doc.text(String(row.tray_id), col1, y);
+            const trayText = String(row.tray_id);
+            doc.text(trayText, col1, y);
+            if (pageMap && pageMap[row.tray_id]) {
+                const textWidth = doc.getTextWidth(trayText);
+                doc.link(col1, y - 3, textWidth, 4, { pageNumber: pageMap[row.tray_id] });
+            }
             doc.text(parseFloat(row.full_pct).toFixed(1) + '%', col2, y);
             doc.text(String(row.available), col3, y);
             y += 6;
@@ -1888,10 +1893,12 @@ const openConduitFill = (cables) => {
         elements.progressLabel.textContent = 'Generating PDF...';
 
         const doc = new jsPDF({ compress: true });
-
-        doc.outline.add(null, 'Tray Utilization', { pageNumber: 1 });
-        addUtilizationTableToPDF(doc, state.updatedUtilData);
-        doc.addPage();
+        doc.addPage(); // reserve first page for table
+        doc.setPage(2);
+        let y = 20;
+        const pageW = doc.internal.pageSize.getWidth();
+        const pageH = doc.internal.pageSize.getHeight();
+        const pageMap = {};
 
         const getDims = (url) => new Promise(res => {
             const img = new Image();
@@ -1911,8 +1918,6 @@ const openConduitFill = (cables) => {
             const dims = await getDims(jpg);
             let w = dims.width;
             let h = dims.height;
-            const pageW = doc.internal.pageSize.getWidth();
-            const pageH = doc.internal.pageSize.getHeight();
             const maxW = pageW - 40; // 20mm margins
             const maxH = pageH - 40;
             if (w > maxW) {
@@ -1924,11 +1929,16 @@ const openConduitFill = (cables) => {
                 h = maxH;
             }
 
-            if (i > 0) doc.addPage();
+            if (y > pageH - (h + 20)) {
+                doc.addPage();
+                y = 20;
+            }
             const pageNum = doc.getNumberOfPages();
+            pageMap[trayId] = pageNum;
             doc.outline.add(null, `Tray ${trayId}`, { pageNumber: pageNum });
-            doc.text(`Tray ${trayId}`, 20, 20);
-            doc.addImage(jpg, 'JPEG', 20, 30, w, h);
+            doc.text(`Tray ${trayId}`, 20, y);
+            doc.addImage(jpg, 'JPEG', 20, y + 10, w, h);
+            y += h + 20;
 
             const pct = Math.round(((i + 1) / traysWithCables.length) * 100);
             elements.progressBar.style.width = pct + '%';
@@ -1936,6 +1946,9 @@ const openConduitFill = (cables) => {
             elements.progressLabel.textContent = `Generating PDF (${i + 1}/${traysWithCables.length})`;
         }
 
+        doc.setPage(1);
+        doc.outline.add(null, 'Tray Utilization', { pageNumber: 1 });
+        addUtilizationTableToPDF(doc, state.updatedUtilData, pageMap);
         doc.save('tray_fills.pdf');
         elements.progressContainer.style.display = 'none';
         elements.exportTrayFillsBtn.disabled = false;
