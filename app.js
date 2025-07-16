@@ -1824,6 +1824,42 @@ const openConduitFill = (cables) => {
         });
     };
 
+    const addUtilizationTableToPDF = (doc, utilData) => {
+        const margin = 20;
+        const pageW = doc.internal.pageSize.getWidth();
+        const pageH = doc.internal.pageSize.getHeight();
+        let y = margin;
+
+        doc.setFontSize(14);
+        doc.text('Updated Tray Utilization', pageW / 2, y, { align: 'center' });
+        y += 8;
+
+        doc.setFontSize(10);
+        const col1 = margin;
+        const col2 = margin + 50;
+        const col3 = margin + 100;
+        doc.text('Tray ID', col1, y);
+        doc.text('Util %', col2, y);
+        doc.text('Available (in\u00b2)', col3, y);
+        y += 6;
+
+        utilData.forEach(row => {
+            if (y > pageH - margin) {
+                doc.addPage();
+                y = margin;
+                doc.setFontSize(10);
+                doc.text('Tray ID', col1, y);
+                doc.text('Util %', col2, y);
+                doc.text('Available (in\u00b2)', col3, y);
+                y += 6;
+            }
+            doc.text(String(row.tray_id), col1, y);
+            doc.text(parseFloat(row.full_pct).toFixed(1) + '%', col2, y);
+            doc.text(String(row.available), col3, y);
+            y += 6;
+        });
+    };
+
     const exportTrayFills = async () => {
         if (!state.updatedUtilData || state.updatedUtilData.length === 0) {
             alert('No tray fill data available.');
@@ -1852,7 +1888,11 @@ const openConduitFill = (cables) => {
         elements.progressLabel.textContent = 'Generating PDF...';
 
         const doc = new jsPDF({ compress: true });
-        let y = 20;
+
+        doc.outline.add(null, 'Tray Utilization', { pageNumber: 1 });
+        addUtilizationTableToPDF(doc, state.updatedUtilData);
+        doc.addPage();
+
         const getDims = (url) => new Promise(res => {
             const img = new Image();
             img.onload = () => res({ width: img.width, height: img.height });
@@ -1883,13 +1923,12 @@ const openConduitFill = (cables) => {
                 w = w * (maxH / h);
                 h = maxH;
             }
-            if (y > pageH - (h + 20)) {
-                doc.addPage();
-                y = 20;
-            }
-            doc.text(`Tray ${trayId}`, 20, y);
-            doc.addImage(jpg, 'JPEG', 20, y + 10, w, h);
-            y += h + 20;
+
+            if (i > 0) doc.addPage();
+            const pageNum = doc.getNumberOfPages();
+            doc.outline.add(null, `Tray ${trayId}`, { pageNumber: pageNum });
+            doc.text(`Tray ${trayId}`, 20, 20);
+            doc.addImage(jpg, 'JPEG', 20, 30, w, h);
 
             const pct = Math.round(((i + 1) / traysWithCables.length) * 100);
             elements.progressBar.style.width = pct + '%';
