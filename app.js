@@ -1770,7 +1770,10 @@ const openConduitFill = (cables) => {
 
     const formatPoint = (p) => `(${p[0].toFixed(1)}, ${p[1].toFixed(1)}, ${p[2].toFixed(1)})`;
 
-    const renderTrayToPNG = (tray, cables) => {
+    // Render a tray/cable combo to an image. We use JPEG instead of PNG so the
+    // PDF export has a much smaller file size while retaining good quality.
+    // The quality parameter can be tuned if needed.
+    const renderTrayToPNG = (tray, cables, quality = 0.92) => {
         return new Promise(resolve => {
             const iframe = document.createElement('iframe');
             iframe.style.display = 'none';
@@ -1789,9 +1792,9 @@ const openConduitFill = (cables) => {
                             canvas.height = img.height;
                             const ctx = canvas.getContext('2d');
                             ctx.drawImage(img, 0, 0);
-                            const png = canvas.toDataURL('image/png');
+                            const jpg = canvas.toDataURL('image/jpeg', quality);
                             cleanup();
-                            resolve(png);
+                            resolve(jpg);
                         };
                         img.src = 'data:image/svg+xml;charset=utf-8,' + encodeURIComponent(svgStr);
                         return;
@@ -1834,7 +1837,8 @@ const openConduitFill = (cables) => {
             return;
         }
 
-        const doc = new jsPDF();
+        // Enable compression for smaller PDF output
+        const doc = new jsPDF({ compress: true });
         let y = 20;
         const getDims = (url) => new Promise(res => {
             const img = new Image();
@@ -1847,9 +1851,9 @@ const openConduitFill = (cables) => {
             const tray = state.trayData.find(t => t.tray_id === trayId);
             if (!tray) continue;
             const cables = (state.trayCableMap && state.trayCableMap[trayId]) ? state.trayCableMap[trayId] : [];
-            const png = await renderTrayToPNG(tray, cables);
-            if (!png) continue;
-            const dims = await getDims(png);
+            const jpg = await renderTrayToPNG(tray, cables);
+            if (!jpg) continue;
+            const dims = await getDims(jpg);
             let w = dims.width;
             let h = dims.height;
             const pageW = doc.internal.pageSize.getWidth();
@@ -1869,7 +1873,7 @@ const openConduitFill = (cables) => {
                 y = 20;
             }
             doc.text(`Tray ${trayId}`, 20, y);
-            doc.addImage(png, 'PNG', 20, y + 10, w, h);
+            doc.addImage(jpg, 'JPEG', 20, y + 10, w, h);
             y += h + 20;
         }
         doc.save('tray_fills.pdf');
