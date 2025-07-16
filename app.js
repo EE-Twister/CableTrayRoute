@@ -1781,7 +1781,9 @@ const openConduitFill = (cables) => {
             const cleanup = () => document.body.removeChild(iframe);
             iframe.onload = () => {
                 const doc = iframe.contentDocument;
+                let attempts = 0;
                 const grab = () => {
+                    attempts++;
                     const expanded = doc && doc.querySelector('#expandedSVG svg');
                     if (expanded) {
                         const svgStr = new XMLSerializer().serializeToString(expanded);
@@ -1804,6 +1806,12 @@ const openConduitFill = (cables) => {
                     if (svgEl) {
                         const expandBtn = doc.getElementById('expandBtn');
                         if (expandBtn) expandBtn.click();
+                    }
+                    if (attempts > 50) {
+                        console.warn('renderTrayToPNG timed out');
+                        cleanup();
+                        resolve(null);
+                        return;
                     }
                     setTimeout(grab, 100);
                 };
@@ -1837,7 +1845,12 @@ const openConduitFill = (cables) => {
             return;
         }
 
-        // Enable compression for smaller PDF output
+        elements.exportTrayFillsBtn.disabled = true;
+        elements.progressContainer.style.display = 'block';
+        elements.progressBar.style.width = '0%';
+        elements.progressBar.setAttribute('aria-valuenow', '0');
+        elements.progressLabel.textContent = 'Generating PDF...';
+
         const doc = new jsPDF({ compress: true });
         let y = 20;
         const getDims = (url) => new Promise(res => {
@@ -1846,7 +1859,9 @@ const openConduitFill = (cables) => {
             img.onerror = () => res({ width: 0, height: 0 });
             img.src = url;
         });
-        for (const info of traysWithCables) {
+
+        for (let i = 0; i < traysWithCables.length; i++) {
+            const info = traysWithCables[i];
             const trayId = info.tray_id;
             const tray = state.trayData.find(t => t.tray_id === trayId);
             if (!tray) continue;
@@ -1875,8 +1890,16 @@ const openConduitFill = (cables) => {
             doc.text(`Tray ${trayId}`, 20, y);
             doc.addImage(jpg, 'JPEG', 20, y + 10, w, h);
             y += h + 20;
+
+            const pct = Math.round(((i + 1) / traysWithCables.length) * 100);
+            elements.progressBar.style.width = pct + '%';
+            elements.progressBar.setAttribute('aria-valuenow', String(pct));
+            elements.progressLabel.textContent = `Generating PDF (${i + 1}/${traysWithCables.length})`;
         }
+
         doc.save('tray_fills.pdf');
+        elements.progressContainer.style.display = 'none';
+        elements.exportTrayFillsBtn.disabled = false;
     };
 
     const cancelCurrentRouting = () => {
