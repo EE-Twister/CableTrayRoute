@@ -1853,6 +1853,12 @@ const openConduitFill = (cables) => {
 
         renderHeader();
 
+        const colorForUtil = (util) => {
+            if (util > 80) return { fill: [248, 215, 218], text: [114, 28, 36] }; // error colors
+            if (util > 60) return { fill: [255, 243, 205], text: [133, 100, 4] }; // warning colors
+            return { fill: [212, 237, 218], text: [21, 87, 36] }; // success colors
+        };
+
         utilData.forEach(row => {
             if (y > pageH - margin) {
                 // draw bottom border before breaking
@@ -1865,13 +1871,20 @@ const openConduitFill = (cables) => {
 
             const trayText = String(row.tray_id);
             const pageNum = pageMap && pageMap[row.tray_id] ? pageMap[row.tray_id] : '';
+            const utilPct = parseFloat(row.full_pct);
+            const colors = colorForUtil(utilPct);
 
+            doc.setFillColor(...colors.fill);
+            doc.setDrawColor(0);
+            doc.rect(margin, y - rowHeight + 2, rowWidth, rowHeight, 'FD');
+
+            doc.setTextColor(...colors.text);
             doc.text(trayText, col1, y);
             if (pageMap && pageMap[row.tray_id]) {
                 const textWidth = doc.getTextWidth(trayText);
                 doc.link(col1, y - 3, textWidth, 4, { pageNumber: pageNum });
             }
-            doc.text(parseFloat(row.full_pct).toFixed(1) + '%', col2, y);
+            doc.text(utilPct.toFixed(1) + '%', col2, y);
             doc.text(String(row.available), col3, y);
             if (pageNum) {
                 const txt = String(pageNum);
@@ -1879,8 +1892,8 @@ const openConduitFill = (cables) => {
                 const width = doc.getTextWidth(txt);
                 doc.link(col4, y - 3, width, 4, { pageNumber: pageNum });
             }
+            doc.setTextColor(0);
 
-            doc.rect(margin, y - rowHeight + 2, rowWidth, rowHeight, 'S');
             y += rowHeight;
         });
         // bottom border for last row
