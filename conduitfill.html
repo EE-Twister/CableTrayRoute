@@ -515,7 +515,8 @@
         const cables = [];
         for(const row of rows){
           const tag = row.children[0].querySelector('input').value.trim();
-          const od = parseFloat(row.children[1].querySelector('input').value);
+          // OD input is in the fifth column (index 4) of each row
+          const od = parseFloat(row.children[4].querySelector('input').value);
           if(!tag){ alert('Each cable requires a Tag.'); return; }
           if(isNaN(od)){ alert('Each cable requires an OD.'); return; }
           cables.push({tag,r:od/2});
