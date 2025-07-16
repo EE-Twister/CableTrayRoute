@@ -1922,15 +1922,8 @@ const openConduitFill = (cables) => {
         const pageH = doc.internal.pageSize.getHeight();
 
         // calculate how many pages the utilization table will need
-        let tempY = margin + 8 + rowHeight; // title + header
-        let tablePages = 1;
-        utilDataForExport.forEach(() => {
-            if (tempY > pageH - margin) {
-                tablePages++;
-                tempY = margin + rowHeight;
-            }
-            tempY += rowHeight;
-        });
+        const rowsPerPage = Math.max(1, Math.floor((pageH - margin - (margin + 8 + rowHeight)) / rowHeight));
+        const tablePages = Math.max(1, Math.ceil(utilDataForExport.length / rowsPerPage));
 
         let y = 20;
         const pageMap = {};
