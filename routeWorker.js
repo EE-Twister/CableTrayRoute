@@ -68,6 +68,16 @@ class CableRoutingSystem {
             }
          });
     }
+
+    removeTrayFill(trayIds, cableArea) {
+         if (!Array.isArray(trayIds)) return;
+         trayIds.forEach(trayId => {
+            if (this.trays.has(trayId)) {
+                const t = this.trays.get(trayId);
+                t.current_fill = Math.max(0, t.current_fill - cableArea);
+            }
+         });
+    }
     
     getTrayUtilization() {
         const utilization = {};

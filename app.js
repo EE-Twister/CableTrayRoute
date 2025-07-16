@@ -349,6 +349,16 @@ document.addEventListener('DOMContentLoaded', () => {
                 }
              });
         }
+
+        removeTrayFill(trayIds, cableArea) {
+             if (!Array.isArray(trayIds)) return;
+             trayIds.forEach(trayId => {
+                if (this.trays.has(trayId)) {
+                    const t = this.trays.get(trayId);
+                    t.current_fill = Math.max(0, t.current_fill - cableArea);
+                }
+             });
+        }
         
         getTrayUtilization() {
             const utilization = {};
@@ -2018,6 +2028,83 @@ const openConduitFill = (cables) => {
         taskQueue.length = 0;
     };
 
+    const rerouteOverfilledTrays = async (routingSystem, routeObjs) => {
+        let util = routingSystem.getTrayUtilization();
+        let over = Object.entries(util).filter(([id, d]) => d.current_fill > d.max_fill);
+        let attempts = 0;
+        while (over.length > 0 && attempts < 20) {
+            over.sort((a,b) => (b[1].current_fill - b[1].max_fill) - (a[1].current_fill - a[1].max_fill));
+            const [trayId] = over[0];
+            const cables = state.trayCableMap[trayId] || [];
+            if (cables.length === 0) { over.shift(); attempts++; continue; }
+            let cable = cables[0];
+            let area = Math.PI * (cable.diameter / 2) ** 2;
+            cables.forEach(c => {
+                const a = Math.PI * (c.diameter / 2) ** 2;
+                if (a > area) { cable = c; area = a; }
+            });
+            const rowIdx = state.latestRouteData.findIndex(r => r.cable === cable.name);
+            if (rowIdx === -1) { cables.splice(cables.indexOf(cable),1); attempts++; continue; }
+            const row = state.latestRouteData[rowIdx];
+            const prevTrays = Array.from(new Set(row.breakdown.filter(b => b.type === 'tray' && b.tray_id !== 'N/A').map(b => b.tray_id)));
+            routingSystem.removeTrayFill(prevTrays, area);
+            prevTrays.forEach(id => {
+                if (state.trayCableMap[id]) {
+                    state.trayCableMap[id] = state.trayCableMap[id].filter(c => c !== cable);
+                }
+            });
+            const blocked = over.map(([id]) => id);
+            const originals = {};
+            blocked.forEach(id => {
+                const t = routingSystem.trays.get(id);
+                if (t) { originals[id] = t.current_fill; t.current_fill = t.maxFill + area + 1; }
+            });
+            const result = routingSystem.calculateRoute(cable.start, cable.end, area, cable.allowed_cable_group);
+            blocked.forEach(id => {
+                const t = routingSystem.trays.get(id);
+                if (t && originals[id] !== undefined) t.current_fill = originals[id];
+            });
+            if (!result.success) {
+                routingSystem.updateTrayFill(prevTrays, area);
+                prevTrays.forEach(id => {
+                    if (!state.trayCableMap[id]) state.trayCableMap[id] = [];
+                    state.trayCableMap[id].push(cable);
+                });
+                over.shift();
+                attempts++;
+                continue;
+            }
+            routingSystem.updateTrayFill(result.tray_segments, area);
+            result.tray_segments.forEach(id => {
+                if (!state.trayCableMap[id]) state.trayCableMap[id] = [];
+                if (!state.trayCableMap[id].includes(cable)) state.trayCableMap[id].push(cable);
+            });
+            state.latestRouteData[rowIdx] = {
+                cable: cable.name,
+                status: '✓ Routed',
+                total_length: result.total_length.toFixed(2),
+                field_length: result.field_routed_length.toFixed(2),
+                tray_segments_count: result.tray_segments.length,
+                segments_count: result.route_segments.length,
+                breakdown: result.route_segments.map((seg,i) => ({
+                    segment: i + 1,
+                    tray_id: seg.type === 'field' ? 'Field Route' : (seg.tray_id || 'N/A'),
+                    type: seg.type,
+                    from: formatPoint(seg.start),
+                    to: formatPoint(seg.end),
+                    length: seg.length.toFixed(2),
+                    raceway: seg.type === 'field' ? getRacewayRecommendation([cable]) : ''
+                }))
+            };
+            const obj = routeObjs.find(r => r.label === cable.name);
+            if (obj) obj.segments = result.route_segments;
+            util = routingSystem.getTrayUtilization();
+            over = Object.entries(util).filter(([id, d]) => d.current_fill > d.max_fill);
+            attempts++;
+        }
+        return util;
+    };
+
     const mainCalculation = async () => {
         elements.resultsSection.style.display = 'block';
         elements.messages.innerHTML = '';
@@ -2227,7 +2314,6 @@ const openConduitFill = (cables) => {
             } else {
                 elements.metrics.innerHTML = '<p>No common field routes detected.</p>';
             }
-            visualize(trayDataForRun, allRoutesForPlotting, "Batch Route Visualization");
         } else {
             alert('Please add at least one cable to route.');
             elements.cancelRoutingBtn.style.display = 'none';
@@ -2235,9 +2321,9 @@ const openConduitFill = (cables) => {
             return;
         }
         
-        const finalUtilization = routingSystem.getTrayUtilization();
-        const fillLimit = parseFloat(elements.fillLimitIn.value) / 100;
-        const utilData = Object.entries(finalUtilization).map(([id, data]) => {
+        let finalUtilization = routingSystem.getTrayUtilization();
+        let fillLimit = parseFloat(elements.fillLimitIn.value) / 100;
+        let utilData = Object.entries(finalUtilization).map(([id, data]) => {
             const fullPct = (data.current_fill * fillLimit / data.max_fill) * 100;
             return {
                 tray_id: id,
@@ -2249,6 +2335,22 @@ const openConduitFill = (cables) => {
         });
         state.updatedUtilData = utilData;
         renderUpdatedUtilizationTable();
+
+        finalUtilization = await rerouteOverfilledTrays(routingSystem, allRoutesForPlotting);
+        fillLimit = parseFloat(elements.fillLimitIn.value) / 100;
+        utilData = Object.entries(finalUtilization).map(([id, data]) => {
+            const fullPct = (data.current_fill * fillLimit / data.max_fill) * 100;
+            return {
+                tray_id: id,
+                full_pct: fullPct,
+                utilization: data.utilization_percentage.toFixed(1),
+                available: data.available_capacity.toFixed(2),
+                fill: `<button class="fill-btn" data-tray="${id}">Open</button>`
+            };
+        });
+        state.updatedUtilData = utilData;
+        renderUpdatedUtilizationTable();
+        visualize(trayDataForRun, allRoutesForPlotting, "Batch Route Visualization");
 
         elements.progressLabel.textContent = 'Complete';
         elements.progressContainer.style.display = 'none';
