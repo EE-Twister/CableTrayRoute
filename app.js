@@ -2191,7 +2191,11 @@ const openConduitFill = (cables) => {
                         }
                     };
                     worker.onmessage = e => { cleanup(); resolve(e.data); };
-                    worker.onerror = err => { cleanup(); reject(err); };
+                    worker.onerror = err => {
+                        console.error('Worker error:', err);
+                        cleanup();
+                        resolve({ success: false, error: err.message });
+                    };
                     worker.postMessage({
                         trays: Array.from(routingSystem.trays.values()),
                         options: {
@@ -2256,7 +2260,11 @@ const openConduitFill = (cables) => {
             };
 
             const workerPromises = state.cableList.map((c, idx) => runCable(c, idx));
-            await Promise.all(workerPromises);
+            try {
+                await Promise.all(workerPromises);
+            } catch (err) {
+                console.error('Routing error:', err);
+            }
             state.routeObjs = allRoutesForPlotting;
 
             if (cancelRouting) {
