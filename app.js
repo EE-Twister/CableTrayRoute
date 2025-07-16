@@ -52,6 +52,9 @@ document.addEventListener('DOMContentLoaded', () => {
         trayCableMap: {},
         updatedUtilData: [],
         highlightTraceIndex: null,
+        routingSystem: null,
+        routeObjs: null,
+        trayDataForRun: null
     };
 
     // --- ELEMENT REFERENCES ---
@@ -86,6 +89,7 @@ document.addEventListener('DOMContentLoaded', () => {
         exportCsvBtn: document.getElementById('export-csv-btn'),
         openFillBtn: document.getElementById('open-fill-btn'),
         exportTrayFillsBtn: document.getElementById('export-tray-fills-btn'),
+        rebalanceBtn: document.getElementById('rebalance-btn'),
         progressContainer: document.getElementById('progress-container'),
         progressBar: document.getElementById('progress-bar'),
         progressLabel: document.getElementById('progress-label'),
@@ -2105,6 +2109,39 @@ const openConduitFill = (cables) => {
         return util;
     };
 
+    const rebalanceTrayFill = async () => {
+        if (!state.routingSystem || !state.routeObjs) {
+            alert('Please run the routing calculation first.');
+            return;
+        }
+        elements.rebalanceBtn.disabled = true;
+        elements.progressContainer.style.display = 'block';
+        elements.progressBar.style.width = '0%';
+        elements.progressBar.setAttribute('aria-valuenow', '0');
+        elements.progressLabel.textContent = 'Rebalancing...';
+
+        const util = await rerouteOverfilledTrays(state.routingSystem, state.routeObjs);
+        const fillLimit = parseFloat(elements.fillLimitIn.value) / 100;
+        const utilData = Object.entries(util).map(([id, data]) => {
+            const fullPct = (data.current_fill * fillLimit / data.max_fill) * 100;
+            return {
+                tray_id: id,
+                full_pct: fullPct,
+                utilization: data.utilization_percentage.toFixed(1),
+                available: data.available_capacity.toFixed(2),
+                fill: `<button class="fill-btn" data-tray="${id}">Open</button>`
+            };
+        });
+        state.updatedUtilData = utilData;
+        renderUpdatedUtilizationTable();
+        renderBatchResults(state.latestRouteData);
+        visualize(state.trayDataForRun, state.routeObjs, "Batch Route Visualization");
+
+        elements.progressLabel.textContent = 'Complete';
+        elements.progressContainer.style.display = 'none';
+        elements.rebalanceBtn.disabled = false;
+    };
+
     const mainCalculation = async () => {
         elements.resultsSection.style.display = 'block';
         elements.messages.innerHTML = '';
@@ -2129,6 +2166,8 @@ const openConduitFill = (cables) => {
         const trayDataForRun = JSON.parse(JSON.stringify(state.trayData));
         trayDataForRun.forEach(tray => routingSystem.addTraySegment(tray));
         routingSystem.prepareBaseGraph();
+        state.routingSystem = routingSystem;
+        state.trayDataForRun = trayDataForRun;
         
         if (state.cableList.length > 0) {
             const batchResults = [];
@@ -2218,6 +2257,7 @@ const openConduitFill = (cables) => {
 
             const workerPromises = state.cableList.map((c, idx) => runCable(c, idx));
             await Promise.all(workerPromises);
+            state.routeObjs = allRoutesForPlotting;
 
             if (cancelRouting) {
                 elements.progressLabel.textContent = 'Cancelled';
@@ -2337,6 +2377,7 @@ const openConduitFill = (cables) => {
         renderUpdatedUtilizationTable();
 
         finalUtilization = await rerouteOverfilledTrays(routingSystem, allRoutesForPlotting);
+        state.routeObjs = allRoutesForPlotting;
         fillLimit = parseFloat(elements.fillLimitIn.value) / 100;
         utilData = Object.entries(finalUtilization).map(([id, data]) => {
             const fullPct = (data.current_fill * fillLimit / data.max_fill) * 100;
@@ -2583,6 +2624,9 @@ Plotly.newPlot(document.getElementById('plot'), data, layout, {responsive: true}
     }
     if (elements.exportTrayFillsBtn) {
         elements.exportTrayFillsBtn.addEventListener('click', exportTrayFills);
+    }
+    if (elements.rebalanceBtn) {
+        elements.rebalanceBtn.addEventListener('click', rebalanceTrayFill);
     }
     elements.popoutPlotBtn.addEventListener('click', popOutPlot);
     if (elements.resetViewBtn) {
