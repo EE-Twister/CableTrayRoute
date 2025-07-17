@@ -112,6 +112,14 @@ document.addEventListener('DOMContentLoaded', () => {
     let workerResolvers = new Map();
     const taskQueue = [];
     const maxWorkers = navigator.hardwareConcurrency || 4;
+    const plotlyReady = new Promise(resolve => {
+        if (window.Plotly) resolve();
+        else {
+            const script = document.querySelector('script[src*="plotly"]');
+            if (script) script.addEventListener('load', resolve);
+            else resolve();
+        }
+    });
 
     const updateTableCounts = () => {
         if (elements.manualTraySummary) {
@@ -2135,7 +2143,7 @@ const openConduitFill = (cables) => {
         state.updatedUtilData = utilData;
         renderUpdatedUtilizationTable();
         renderBatchResults(state.latestRouteData);
-        visualize(state.trayDataForRun, state.routeObjs, "Batch Route Visualization");
+        await visualize(state.trayDataForRun, state.routeObjs, "Batch Route Visualization");
 
         elements.progressLabel.textContent = 'Complete';
         elements.progressContainer.style.display = 'none';
@@ -2385,7 +2393,7 @@ const openConduitFill = (cables) => {
         renderUpdatedUtilizationTable();
 
         state.routeObjs = allRoutesForPlotting;
-        visualize(trayDataForRun, allRoutesForPlotting, "Batch Route Visualization");
+        await visualize(trayDataForRun, allRoutesForPlotting, "Batch Route Visualization");
 
         elements.progressLabel.textContent = 'Complete';
         elements.progressContainer.style.display = 'none';
@@ -2393,7 +2401,8 @@ const openConduitFill = (cables) => {
     };
     
     // --- VISUALIZATION ---
-    const visualize = (trays, routes, title) => {
+    const visualize = async (trays, routes, title) => {
+        await plotlyReady;
         const traces = [];
 
         const meshForSegment = (s, e, tray) => {
