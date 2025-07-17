@@ -1410,8 +1410,14 @@ const openConduitFill = (cables) => {
     };
 
     const renderBatchResults = (results) => {
+        let totalLength = 0;
+        let totalField = 0;
         let html = '';
         results.forEach(res => {
+            const tl = parseFloat(res.total_length);
+            const fl = parseFloat(res.field_length);
+            if (!isNaN(tl)) totalLength += tl;
+            if (!isNaN(fl)) totalField += fl;
             html += `<details><summary>${res.cable} | ${res.status} | Total ${res.total_length} | Field ${res.field_length} | Segments ${res.segments_count}</summary>`;
             if (res.breakdown && res.breakdown.length > 0) {
                 html += '<div class="table-scroll"><table class="sticky-table"><thead><tr><th>Segment</th><th>Tray ID</th><th>Type</th><th>From</th><th>To</th><th>Length</th><th>Recommended Raceway</th><th>Fill</th></tr></thead><tbody>';
@@ -1428,7 +1434,8 @@ const openConduitFill = (cables) => {
             }
             html += '</details>';
         });
-        elements.routeBreakdownContainer.innerHTML = html;
+        const overall = `<p class="overall-stats"><strong>Overall Total Length:</strong> ${totalLength.toFixed(2)} ft | <strong>Overall Field Length:</strong> ${totalField.toFixed(2)} ft</p>`;
+        elements.routeBreakdownContainer.innerHTML = overall + html;
         elements.routeBreakdownContainer.querySelectorAll('.conduit-fill-btn').forEach(btn => {
             btn.addEventListener('click', (e) => {
                 e.stopPropagation();
