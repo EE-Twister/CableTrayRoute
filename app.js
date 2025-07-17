@@ -51,6 +51,7 @@ document.addEventListener('DOMContentLoaded', () => {
         sharedFieldRoutes: [],
         trayCableMap: {},
         updatedUtilData: [],
+        finalTrays: [],
         highlightTraceIndex: null,
     };
 
@@ -84,6 +85,7 @@ document.addEventListener('DOMContentLoaded', () => {
         resetViewBtn: document.getElementById('reset-view-btn'),
         updatedUtilizationContainer: document.getElementById('updated-utilization-container'),
         exportCsvBtn: document.getElementById('export-csv-btn'),
+        rebalanceBtn: document.getElementById('rebalance-btn'),
         openFillBtn: document.getElementById('open-fill-btn'),
         exportTrayFillsBtn: document.getElementById('export-tray-fills-btn'),
         progressContainer: document.getElementById('progress-container'),
@@ -2114,6 +2116,8 @@ const openConduitFill = (cables) => {
                             field_length: result.success ? result.field_routed_length.toFixed(2) : 'N/A',
                             tray_segments_count: result.success ? result.tray_segments.length : 0,
                             segments_count: result.success ? result.route_segments.length : 0,
+                            tray_segments: result.success ? result.tray_segments : [],
+                            route_segments: result.success ? result.route_segments : [],
                             breakdown: result.success ? result.route_segments.map((seg, i) => ({
                                 segment: i + 1,
                                 tray_id: seg.type === 'field' ? 'Field Route' : (seg.tray_id || 'N/A'),
@@ -2246,12 +2250,130 @@ const openConduitFill = (cables) => {
                 fill: `<button class="fill-btn" data-tray="${id}">Open</button>`
             };
         });
+        state.finalTrays = Array.from(routingSystem.trays.values()).map(t => ({ ...t }));
         state.updatedUtilData = utilData;
         renderUpdatedUtilizationTable();
 
         elements.progressLabel.textContent = 'Complete';
         elements.progressContainer.style.display = 'none';
         elements.cancelRoutingBtn.style.display = 'none';
+    };
+
+    const rebalanceTrayFill = () => {
+        if (!state.finalTrays || state.finalTrays.length === 0) {
+            alert('Run routing first.');
+            return;
+        }
+
+        const fillLimit = parseFloat(elements.fillLimitIn.value) / 100;
+        const routingSystem = new CableRoutingSystem({
+            fillLimit,
+            proximityThreshold: parseFloat(document.getElementById('proximity-threshold').value),
+            fieldPenalty: parseFloat(document.getElementById('field-route-penalty').value),
+            sharedPenalty: parseFloat(document.getElementById('shared-field-penalty').value),
+            maxFieldEdge: 150,
+            maxFieldNeighbors: 8
+        });
+
+        const trayData = state.finalTrays.map(t => ({ ...t }));
+        trayData.forEach(t => routingSystem.addTraySegment(t));
+        routingSystem.prepareBaseGraph();
+
+        const overfilled = trayData.filter(t => t.current_fill > t.maxFill);
+        if (overfilled.length === 0) {
+            alert('No overfilled trays detected.');
+            return;
+        }
+
+        const cableMap = new Map(state.cableList.map(c => [c.name, c]));
+        const resultMap = new Map(state.latestRouteData.map((r, i) => [r.cable, { row: r, index: i }]));
+        const cablesToReroute = new Set();
+        overfilled.forEach(t => {
+            const cabs = state.trayCableMap[t.tray_id] || [];
+            cabs.forEach(c => cablesToReroute.add(c.name));
+        });
+
+        cablesToReroute.forEach(name => {
+            const cable = cableMap.get(name);
+            const info = resultMap.get(name);
+            if (!cable || !info) return;
+            const area = Math.PI * (cable.diameter / 2) ** 2;
+            if (Array.isArray(info.row.tray_segments)) {
+                routingSystem.updateTrayFill(info.row.tray_segments, -area);
+            }
+            const res = routingSystem.calculateRoute(cable.start, cable.end, area, cable.allowed_cable_group);
+            if (res.success) {
+                routingSystem.updateTrayFill(res.tray_segments, area);
+                routingSystem.recordSharedFieldSegments(res.route_segments);
+                info.row = {
+                    cable: cable.name,
+                    status: '✓ Routed',
+                    total_length: res.total_length.toFixed(2),
+                    field_length: res.field_routed_length.toFixed(2),
+                    tray_segments_count: res.tray_segments.length,
+                    segments_count: res.route_segments.length,
+                    tray_segments: res.tray_segments,
+                    route_segments: res.route_segments,
+                    breakdown: res.route_segments.map((seg, i) => ({
+                        segment: i + 1,
+                        tray_id: seg.type === 'field' ? 'Field Route' : (seg.tray_id || 'N/A'),
+                        type: seg.type,
+                        from: formatPoint(seg.start),
+                        to: formatPoint(seg.end),
+                        length: seg.length.toFixed(2),
+                        raceway: seg.type === 'field' ? getRacewayRecommendation([cable]) : ''
+                    }))
+                };
+                resultMap.set(name, info);
+            } else {
+                routingSystem.updateTrayFill(info.row.tray_segments, area);
+            }
+        });
+
+        state.latestRouteData = Array.from(resultMap.values()).sort((a,b) => a.index - b.index).map(v => v.row);
+
+        const nameMap = new Map(state.cableList.map(c => [c.name, c]));
+        state.trayCableMap = {};
+        state.latestRouteData.forEach(row => {
+            const cableObj = nameMap.get(row.cable);
+            if (!cableObj || !Array.isArray(row.breakdown)) return;
+            row.breakdown.forEach(b => {
+                if (b.tray_id && b.tray_id !== 'Field Route' && b.tray_id !== 'N/A') {
+                    if (!state.trayCableMap[b.tray_id]) state.trayCableMap[b.tray_id] = [];
+                    if (!state.trayCableMap[b.tray_id].includes(cableObj)) {
+                        state.trayCableMap[b.tray_id].push(cableObj);
+                    }
+                }
+            });
+        });
+
+        const finalUtilization = routingSystem.getTrayUtilization();
+        const utilData = Object.entries(finalUtilization).map(([id, data]) => {
+            const fullPct = (data.current_fill * fillLimit / data.max_fill) * 100;
+            return {
+                tray_id: id,
+                full_pct: fullPct,
+                utilization: data.utilization_percentage.toFixed(1),
+                available: data.available_capacity.toFixed(2),
+                fill: `<button class="fill-btn" data-tray="${id}">Open</button>`
+            };
+        });
+
+        state.finalTrays = Array.from(routingSystem.trays.values()).map(t => ({ ...t }));
+        state.updatedUtilData = utilData;
+        renderBatchResults(state.latestRouteData);
+        renderUpdatedUtilizationTable();
+
+        const plotRoutes = state.latestRouteData.map(row => ({
+            label: row.cable,
+            segments: row.route_segments,
+            startPoint: cableMap.get(row.cable).start,
+            endPoint: cableMap.get(row.cable).end,
+            startTag: cableMap.get(row.cable).start_tag,
+            endTag: cableMap.get(row.cable).end_tag,
+            allowed_cable_group: cableMap.get(row.cable).allowed_cable_group
+        }));
+        visualize(state.finalTrays, plotRoutes, 'Rebalanced Routes');
     };
     
     // --- VISUALIZATION ---
@@ -2473,6 +2595,9 @@ Plotly.newPlot(document.getElementById('plot'), data, layout, {responsive: true}
     elements.importCablesBtn.addEventListener('click', () => elements.importCablesFile.click());
     elements.importCablesFile.addEventListener('change', importCableOptionsCSV);
     elements.exportCsvBtn.addEventListener('click', exportRouteXLSX);
+    if (elements.rebalanceBtn) {
+        elements.rebalanceBtn.addEventListener('click', rebalanceTrayFill);
+    }
     if (elements.openFillBtn) {
         elements.openFillBtn.addEventListener('click', () => {
             window.open('cabletrayfill.html', '_blank');

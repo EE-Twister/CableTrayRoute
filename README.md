@@ -1,6 +1,13 @@
 # CableTrayRoute
 Designed to find the optimal cable route for your cable.
 
+## New Feature: Rebalance Tray Fill
+
+After running the standard routing process, click **Rebalance Tray Fill** to
+automatically reroute cables in trays that exceed the allowed fill percentage.
+The script tries alternative paths for those cables until each tray is back
+under its limit.
+
 ## New Feature: Cable Tag Input
 
 You can now specify a **Cable Tag** when routing cables. Use the text field in the
