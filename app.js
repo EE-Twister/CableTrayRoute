@@ -2403,6 +2403,8 @@ const openConduitFill = (cables) => {
     // --- VISUALIZATION ---
     const visualize = async (trays, routes, title) => {
         await plotlyReady;
+        // ensure the container is visible and sized before plotting
+        await new Promise(r => requestAnimationFrame(r));
         const traces = [];
 
         const meshForSegment = (s, e, tray) => {
@@ -2520,6 +2522,8 @@ const openConduitFill = (cables) => {
     elements.plot3d.innerHTML = '';
     Plotly.newPlot(elements.plot3d, traces, layout, {responsive: true}).then(() => {
         Plotly.Plots.resize(elements.plot3d);
+        // extra resize after a tick for browsers that compute size late
+        setTimeout(() => Plotly.Plots.resize(elements.plot3d), 50);
     });
     window.current3DPlot = { traces: traces, layout: layout };
     window.base3DPlot = {
