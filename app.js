@@ -2508,7 +2508,10 @@ const openConduitFill = (cables) => {
         autosize: true,
         margin: { l: 0, r: 0, t: 0, b: 0 }
     };
-    Plotly.newPlot(elements.plot3d, traces, layout, {responsive: true});
+    elements.plot3d.innerHTML = '';
+    Plotly.newPlot(elements.plot3d, traces, layout, {responsive: true}).then(() => {
+        Plotly.Plots.resize(elements.plot3d);
+    });
     window.current3DPlot = { traces: traces, layout: layout };
     window.base3DPlot = {
         traces: JSON.parse(JSON.stringify(traces)),
