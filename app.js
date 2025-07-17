@@ -89,6 +89,7 @@ document.addEventListener('DOMContentLoaded', () => {
         exportCsvBtn: document.getElementById('export-csv-btn'),
         openFillBtn: document.getElementById('open-fill-btn'),
         exportTrayFillsBtn: document.getElementById('export-tray-fills-btn'),
+        rebalanceBtn: document.getElementById('rebalance-btn'),
         progressContainer: document.getElementById('progress-container'),
         progressBar: document.getElementById('progress-bar'),
         progressLabel: document.getElementById('progress-label'),
@@ -111,14 +112,6 @@ document.addEventListener('DOMContentLoaded', () => {
     let workerResolvers = new Map();
     const taskQueue = [];
     const maxWorkers = navigator.hardwareConcurrency || 4;
-    const plotlyReady = new Promise(resolve => {
-        if (window.Plotly) resolve();
-        else {
-            const script = document.querySelector('script[src*="plotly"]');
-            if (script) script.addEventListener('load', resolve);
-            else resolve();
-        }
-    });
 
     const updateTableCounts = () => {
         if (elements.manualTraySummary) {
@@ -2039,6 +2032,115 @@ const openConduitFill = (cables) => {
         taskQueue.length = 0;
     };
 
+    const rerouteOverfilledTrays = async (routingSystem, routeObjs) => {
+        let util = routingSystem.getTrayUtilization();
+        let over = Object.entries(util).filter(([id, d]) => d.current_fill > d.max_fill);
+        let attempts = 0;
+        while (over.length > 0 && attempts < 20) {
+            over.sort((a,b) => (b[1].current_fill - b[1].max_fill) - (a[1].current_fill - a[1].max_fill));
+            const [trayId] = over[0];
+            const cables = state.trayCableMap[trayId] || [];
+            if (cables.length === 0) { over.shift(); attempts++; continue; }
+            let cable = cables[0];
+            let area = Math.PI * (cable.diameter / 2) ** 2;
+            cables.forEach(c => {
+                const a = Math.PI * (c.diameter / 2) ** 2;
+                if (a > area) { cable = c; area = a; }
+            });
+            const rowIdx = state.latestRouteData.findIndex(r => r.cable === cable.name);
+            if (rowIdx === -1) { cables.splice(cables.indexOf(cable),1); attempts++; continue; }
+            const row = state.latestRouteData[rowIdx];
+            const prevTrays = Array.from(new Set(row.breakdown.filter(b => b.type === 'tray' && b.tray_id !== 'N/A').map(b => b.tray_id)));
+            routingSystem.removeTrayFill(prevTrays, area);
+            prevTrays.forEach(id => {
+                if (state.trayCableMap[id]) {
+                    state.trayCableMap[id] = state.trayCableMap[id].filter(c => c !== cable);
+                }
+            });
+            const blocked = over.map(([id]) => id);
+            const originals = {};
+            blocked.forEach(id => {
+                const t = routingSystem.trays.get(id);
+                if (t) { originals[id] = t.current_fill; t.current_fill = t.maxFill + area + 1; }
+            });
+            const result = routingSystem.calculateRoute(cable.start, cable.end, area, cable.allowed_cable_group);
+            blocked.forEach(id => {
+                const t = routingSystem.trays.get(id);
+                if (t && originals[id] !== undefined) t.current_fill = originals[id];
+            });
+            if (!result.success) {
+                routingSystem.updateTrayFill(prevTrays, area);
+                prevTrays.forEach(id => {
+                    if (!state.trayCableMap[id]) state.trayCableMap[id] = [];
+                    state.trayCableMap[id].push(cable);
+                });
+                over.shift();
+                attempts++;
+                continue;
+            }
+            routingSystem.updateTrayFill(result.tray_segments, area);
+            result.tray_segments.forEach(id => {
+                if (!state.trayCableMap[id]) state.trayCableMap[id] = [];
+                if (!state.trayCableMap[id].includes(cable)) state.trayCableMap[id].push(cable);
+            });
+            state.latestRouteData[rowIdx] = {
+                cable: cable.name,
+                status: '✓ Routed',
+                total_length: result.total_length.toFixed(2),
+                field_length: result.field_routed_length.toFixed(2),
+                tray_segments_count: result.tray_segments.length,
+                segments_count: result.route_segments.length,
+                breakdown: result.route_segments.map((seg,i) => ({
+                    segment: i + 1,
+                    tray_id: seg.type === 'field' ? 'Field Route' : (seg.tray_id || 'N/A'),
+                    type: seg.type,
+                    from: formatPoint(seg.start),
+                    to: formatPoint(seg.end),
+                    length: seg.length.toFixed(2),
+                    raceway: seg.type === 'field' ? getRacewayRecommendation([cable]) : ''
+                }))
+            };
+            const obj = routeObjs.find(r => r.label === cable.name);
+            if (obj) obj.segments = result.route_segments;
+            util = routingSystem.getTrayUtilization();
+            over = Object.entries(util).filter(([id, d]) => d.current_fill > d.max_fill);
+            attempts++;
+        }
+        return util;
+    };
+
+    const rebalanceTrayFill = async () => {
+        if (!state.routingSystem || !state.routeObjs) {
+            alert('Please run the routing calculation first.');
+            return;
+        }
+        elements.rebalanceBtn.disabled = true;
+        elements.progressContainer.style.display = 'block';
+        elements.progressBar.style.width = '0%';
+        elements.progressBar.setAttribute('aria-valuenow', '0');
+        elements.progressLabel.textContent = 'Rebalancing...';
+
+        const util = await rerouteOverfilledTrays(state.routingSystem, state.routeObjs);
+        const fillLimit = parseFloat(elements.fillLimitIn.value) / 100;
+        const utilData = Object.entries(util).map(([id, data]) => {
+            const fullPct = (data.current_fill * fillLimit / data.max_fill) * 100;
+            return {
+                tray_id: id,
+                full_pct: fullPct,
+                utilization: data.utilization_percentage.toFixed(1),
+                available: data.available_capacity.toFixed(2),
+                fill: `<button class="fill-btn" data-tray="${id}">Open</button>`
+            };
+        });
+        state.updatedUtilData = utilData;
+        renderUpdatedUtilizationTable();
+        renderBatchResults(state.latestRouteData);
+        visualize(state.trayDataForRun, state.routeObjs, "Batch Route Visualization");
+
+        elements.progressLabel.textContent = 'Complete';
+        elements.progressContainer.style.display = 'none';
+        elements.rebalanceBtn.disabled = false;
+    };
 
     const mainCalculation = async () => {
         elements.resultsSection.style.display = 'block';
@@ -2089,11 +2191,7 @@ const openConduitFill = (cables) => {
                         }
                     };
                     worker.onmessage = e => { cleanup(); resolve(e.data); };
-                    worker.onerror = err => {
-                        console.error('Worker error:', err);
-                        cleanup();
-                        resolve({ success: false, error: err.message });
-                    };
+                    worker.onerror = err => { cleanup(); reject(err); };
                     worker.postMessage({
                         trays: Array.from(routingSystem.trays.values()),
                         options: {
@@ -2158,11 +2256,7 @@ const openConduitFill = (cables) => {
             };
 
             const workerPromises = state.cableList.map((c, idx) => runCable(c, idx));
-            try {
-                await Promise.all(workerPromises);
-            } catch (err) {
-                console.error('Routing error:', err);
-            }
+            await Promise.all(workerPromises);
             state.routeObjs = allRoutesForPlotting;
 
             if (cancelRouting) {
@@ -2282,8 +2376,22 @@ const openConduitFill = (cables) => {
         state.updatedUtilData = utilData;
         renderUpdatedUtilizationTable();
 
+        finalUtilization = await rerouteOverfilledTrays(routingSystem, allRoutesForPlotting);
         state.routeObjs = allRoutesForPlotting;
-        await visualize(trayDataForRun, allRoutesForPlotting, "Batch Route Visualization");
+        fillLimit = parseFloat(elements.fillLimitIn.value) / 100;
+        utilData = Object.entries(finalUtilization).map(([id, data]) => {
+            const fullPct = (data.current_fill * fillLimit / data.max_fill) * 100;
+            return {
+                tray_id: id,
+                full_pct: fullPct,
+                utilization: data.utilization_percentage.toFixed(1),
+                available: data.available_capacity.toFixed(2),
+                fill: `<button class="fill-btn" data-tray="${id}">Open</button>`
+            };
+        });
+        state.updatedUtilData = utilData;
+        renderUpdatedUtilizationTable();
+        visualize(trayDataForRun, allRoutesForPlotting, "Batch Route Visualization");
 
         elements.progressLabel.textContent = 'Complete';
         elements.progressContainer.style.display = 'none';
@@ -2291,10 +2399,7 @@ const openConduitFill = (cables) => {
     };
     
     // --- VISUALIZATION ---
-    const visualize = async (trays, routes, title) => {
-        await plotlyReady;
-        // ensure the container is visible and sized before plotting
-        await new Promise(r => requestAnimationFrame(r));
+    const visualize = (trays, routes, title) => {
         const traces = [];
 
         const meshForSegment = (s, e, tray) => {
@@ -2409,12 +2514,7 @@ const openConduitFill = (cables) => {
         autosize: true,
         margin: { l: 0, r: 0, t: 0, b: 0 }
     };
-    elements.plot3d.innerHTML = '';
-    Plotly.newPlot(elements.plot3d, traces, layout, {responsive: true}).then(() => {
-        Plotly.Plots.resize(elements.plot3d);
-        // extra resize after a tick for browsers that compute size late
-        setTimeout(() => Plotly.Plots.resize(elements.plot3d), 50);
-    });
+    Plotly.newPlot(elements.plot3d, traces, layout, {responsive: true});
     window.current3DPlot = { traces: traces, layout: layout };
     window.base3DPlot = {
         traces: JSON.parse(JSON.stringify(traces)),
@@ -2524,6 +2624,9 @@ Plotly.newPlot(document.getElementById('plot'), data, layout, {responsive: true}
     }
     if (elements.exportTrayFillsBtn) {
         elements.exportTrayFillsBtn.addEventListener('click', exportTrayFills);
+    }
+    if (elements.rebalanceBtn) {
+        elements.rebalanceBtn.addEventListener('click', rebalanceTrayFill);
     }
     elements.popoutPlotBtn.addEventListener('click', popOutPlot);
     if (elements.resetViewBtn) {
