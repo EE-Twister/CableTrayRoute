@@ -2266,7 +2266,9 @@ const openConduitFill = (cables) => {
         elements.cancelRoutingBtn.style.display = 'none';
     };
 
-    const rebalanceTrayFill = () => {
+    const sleep = (ms = 0) => new Promise(res => setTimeout(res, ms));
+
+    const rebalanceTrayFill = async () => {
         if (!state.finalTrays || state.finalTrays.length === 0) {
             alert('Run routing first.');
             return;
@@ -2292,6 +2294,11 @@ const openConduitFill = (cables) => {
             return;
         }
 
+        elements.progressContainer.style.display = 'block';
+        elements.progressBar.style.width = '0%';
+        elements.progressBar.setAttribute('aria-valuenow', '0');
+        elements.progressLabel.textContent = 'Rebalancing...';
+
         const cableMap = new Map(state.cableList.map(c => [c.name, c]));
         const resultMap = new Map(state.latestRouteData.map((r, i) => [r.cable, { row: r, index: i }]));
         const cablesToReroute = new Set();
@@ -2300,7 +2307,9 @@ const openConduitFill = (cables) => {
             cabs.forEach(c => cablesToReroute.add(c.name));
         });
 
-        cablesToReroute.forEach(name => {
+        let completed = 0;
+        const total = cablesToReroute.size;
+        for (const name of cablesToReroute) {
             const cable = cableMap.get(name);
             const info = resultMap.get(name);
             if (!cable || !info) return;
@@ -2335,7 +2344,13 @@ const openConduitFill = (cables) => {
             } else {
                 routingSystem.updateTrayFill(info.row.tray_segments, area);
             }
-        });
+            completed++;
+            const pct = Math.round((completed / total) * 100);
+            elements.progressBar.style.width = pct + '%';
+            elements.progressBar.setAttribute('aria-valuenow', String(pct));
+            elements.progressLabel.textContent = `Rebalancing (${completed}/${total})`;
+            await sleep();
+        }
 
         state.latestRouteData = Array.from(resultMap.values()).sort((a,b) => a.index - b.index).map(v => v.row);
 
@@ -2381,6 +2396,9 @@ const openConduitFill = (cables) => {
             allowed_cable_group: cableMap.get(row.cable).allowed_cable_group
         }));
         visualize(state.finalTrays, plotRoutes, 'Rebalanced Routes');
+
+        elements.progressLabel.textContent = 'Complete';
+        elements.progressContainer.style.display = 'none';
     };
     
     // --- VISUALIZATION ---

@@ -6,7 +6,8 @@ Designed to find the optimal cable route for your cable.
 After running the standard routing process, click **Rebalance Tray Fill** to
 automatically reroute cables in trays that exceed the allowed fill percentage.
 The script tries alternative paths for those cables until each tray is back
-under its limit.
+under its limit. A progress bar now displays the rerouting progress so you can
+see the operation working.
 
 ## New Feature: Cable Tag Input
 
