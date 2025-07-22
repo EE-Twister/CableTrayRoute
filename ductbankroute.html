@@ -65,15 +65,12 @@ body.dark-mode #helpPopup{background:#2c3034;color:#f8f9fa;}
   </thead>
   <tbody></tbody>
  </table>
-</details>
+ </details>
 
-<fieldset style="margin-top:8px;">
- <legend><strong>Thermal &amp; Environmental Parameters</strong></legend>
- <label>Ambient Earth Temperature<input type="number" id="earthTemp" style="width:60px;"></label>
- <label style="margin-left:8px;">Thermal Resistivity of Soil<input type="number" id="soilResistivity" style="width:60px;"></label>
- <label style="margin-left:8px;">Moisture Content<input type="number" id="moistureContent" style="width:60px;"></label>
- <label style="margin-left:8px;">Presence of Adjacent Heat Sources<input type="checkbox" id="heatSources" style="margin-left:4px;"></label>
-</fieldset>
+
+
+
+
 
 <details open>
  <summary><strong>Cables</strong></summary>
@@ -101,6 +98,13 @@ body.dark-mode #helpPopup{background:#2c3034;color:#f8f9fa;}
   <tbody></tbody>
  </table>
 </details>
+<fieldset style="margin-top:8px;">
+ <legend><strong>Thermal &amp; Environmental Parameters</strong></legend>
+ <label>Ambient Earth Temperature<input type="number" id="earthTemp" style="width:60px;"></label>
+ <label style="margin-left:8px;">Thermal Resistivity of Soil<input type="number" id="soilResistivity" style="width:60px;"></label>
+ <label style="margin-left:8px;">Moisture Content<input type="number" id="moistureContent" style="width:60px;"></label>
+ <label style="margin-left:8px;">Presence of Adjacent Heat Sources<input type="checkbox" id="heatSources" style="margin-left:4px;"></label>
+</fieldset>
 
 <div style="margin-top:8px;">
   <label>Horiz Spacing (in)<input type="number" id="hSpacing" value="3" style="width:60px;"></label>
@@ -113,6 +117,8 @@ body.dark-mode #helpPopup{background:#2c3034;color:#f8f9fa;}
 </div>
 
 <svg id="grid" width="500" height="500"></svg>
+
+<div id="ampacityReport" style="margin-top:8px;"></div>
 
 <div class="db-button-panel">
  <button id="calc">Calculate Fill</button>
@@ -256,7 +262,8 @@ function addConduitRow(data={}){
  typeSel.addEventListener('change',()=>{const old=sizeSel;sizeSel=conduitSizeOptions(typeSel.value);sizeTd.replaceChild(sizeSel,old);});
  ['x','y'].forEach(k=>{const td=document.createElement('td');const inp=document.createElement('input');inp.type='number';inp.value=data[k]||0;if(k==='x'||k==='y')inp.readOnly=true;td.appendChild(inp);tr.appendChild(td);});
  const dupTd=document.createElement('td');dupTd.appendChild(createButton('⧉','duplicateBtn',()=>{const cloneData=rowToConduit(tr);addConduitRow(cloneData);}));tr.appendChild(dupTd);
- const delTd=document.createElement('td');delTd.appendChild(createButton('✖','removeBtn',()=>{tr.remove();drawGrid();}));tr.appendChild(delTd);
+ const delTd=document.createElement('td');delTd.appendChild(createButton('✖','removeBtn',()=>{tr.remove();drawGrid();
+ updateAmpacityReport();}));tr.appendChild(delTd);
  document.querySelector('#conduitTable tbody').appendChild(tr);
  autoPlaceConduits();
 }
@@ -360,6 +367,43 @@ function fillResults(){
  cables.forEach(cb=>{const cid=cb.conduit_id;if(fillMap[cid])fillMap[cid].cables.push(cb);});
  Object.values(fillMap).forEach(c=>{c.fillArea=c.cables.reduce((s,cb)=>s+Math.PI*Math.pow(cb.diameter/2,2),0);c.fillPct=(c.fillArea/c.area)*100;});
  return fillMap;
+}
+
+const AWG_AREA={"18":1624,"16":2583,"14":4107,"12":6530,"10":10380,"8":16510,"6":26240,"4":41740,"3":52620,"2":66360,"1":83690,"1/0":105600,"2/0":133100,"3/0":167800,"4/0":211600};
+
+function sizeToArea(size){
+ if(!size)return 0;
+ const s=size.toString().trim();
+ if(/kcmil/i.test(s))return parseFloat(s)*1000;
+ const m=s.match(/#?(\d+(?:\/0)?)/);
+ if(!m)return 0;
+ return AWG_AREA[m[1]]||0;
+}
+
+function estimateAmpacity(cable,params){
+ const areaCM=sizeToArea(cable.conductor_size);
+ if(!areaCM)return 0;
+ const areaMM2=areaCM*0.0005067;
+ const rho=cable.conductor_material&&cable.conductor_material.toLowerCase().includes('al')?0.034:0.022;
+ const Rdc=rho*1.2/areaMM2; // approx at 90C
+ const Rth=(params.soilResistivity||90)/90*0.5*(params.heatSources?1.2:1);
+ const dT=90-(params.earthTemp||20);
+ return Math.sqrt(dT/(Rdc*Rth));
+}
+
+function updateAmpacityReport(){
+ const params={
+  earthTemp:parseFloat(document.getElementById('earthTemp').value)||20,
+  soilResistivity:parseFloat(document.getElementById('soilResistivity').value)||90,
+  moistureContent:parseFloat(document.getElementById('moistureContent').value)||0,
+  heatSources:document.getElementById('heatSources').checked
+ };
+ const rows=getAllCables().map(c=>{
+  const a=estimateAmpacity(c,params);
+  const val=isFinite(a)?a.toFixed(0):'N/A';
+  return `<tr><td>${c.tag}</td><td>${val}</td></tr>`;
+ }).join('');
+ document.getElementById('ampacityReport').innerHTML=`<h3>Ampacity Estimates (Neher-McGrath)</h3><table><thead><tr><th>Cable</th><th>Ampacity (A)</th></tr></thead><tbody>${rows}</tbody></table>`;
 }
 
 function drawGrid(){
@@ -566,17 +610,19 @@ document.getElementById('sampleConduits').addEventListener('click',()=>{
  document.querySelector('#conduitTable tbody').innerHTML='';
  SAMPLE_CONDUITS.forEach(addConduitRow);
  drawGrid();
+ updateAmpacityReport();
 });
 document.getElementById('sampleCables').addEventListener('click',()=>{
  document.querySelector('#cableTable tbody').innerHTML='';
  SAMPLE_CABLES.forEach(addCableRow);
  drawGrid();
+ updateAmpacityReport();
 });
 
-document.getElementById('importConduits').addEventListener('change',e=>{const f=e.target.files[0];if(f)importCSV(f,data=>{document.querySelector('#conduitTable tbody').innerHTML='';data.forEach(addConduitRow);drawGrid();});});
-document.getElementById('importCables').addEventListener('change',e=>{const f=e.target.files[0];if(f)importCSV(f,data=>{document.querySelector('#cableTable tbody').innerHTML='';data.forEach(addCableRow);drawGrid();});});
+document.getElementById('importConduits').addEventListener('change',e=>{const f=e.target.files[0];if(f)importCSV(f,data=>{document.querySelector('#conduitTable tbody').innerHTML='';data.forEach(addConduitRow);drawGrid();updateAmpacityReport();});});
+document.getElementById('importCables').addEventListener('change',e=>{const f=e.target.files[0];if(f)importCSV(f,data=>{document.querySelector('#cableTable tbody').innerHTML='';data.forEach(addCableRow);drawGrid();updateAmpacityReport();});});
 
-document.getElementById('calc').addEventListener('click',drawGrid);
+document.getElementById('calc').addEventListener('click',()=>{drawGrid();updateAmpacityReport();});
 
 document.getElementById('exportBtn').addEventListener('click',()=>{
  const wb=XLSX.utils.book_new();
