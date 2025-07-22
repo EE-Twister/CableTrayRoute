@@ -37,6 +37,7 @@ body.dark-mode #helpPopup{background:#2c3034;color:#f8f9fa;}
  <legend><strong>Ductbank Conduits</strong></legend>
  <input type="file" id="importConduits" accept=".csv"/>
  <button type="button" id="addConduit">Add Conduit</button>
+ <button type="button" id="sampleConduits">Load Sample Data</button>
  <table id="conduitTable">
   <thead>
    <tr>
@@ -59,6 +60,7 @@ body.dark-mode #helpPopup{background:#2c3034;color:#f8f9fa;}
  <legend><strong>Cables</strong></legend>
  <input type="file" id="importCables" accept=".csv"/>
  <button type="button" id="addCable">Add Cable</button>
+ <button type="button" id="sampleCables">Load Sample Data</button>
  <table id="cableTable">
   <thead>
    <tr>
@@ -86,12 +88,72 @@ body.dark-mode #helpPopup{background:#2c3034;color:#f8f9fa;}
 <div id="helpOverlay">
  <div id="helpPopup">
   <button id="helpClose">Close</button>
-  <h2>NEC Fill Rules</h2>
-  <p>NEC Chapter 9 Table 1 limits conduit fill to 53% with one cable, 31% with two cables, and 40% with three or more cables. Table 4 provides areas for each conduit type and size.</p>
+  <h2>Ductbank Route Help</h2>
+  <p>Use the <strong>Ductbank Conduits</strong> table to define each conduit by ID, type, trade size and its X/Y/Z position. Angle is optional rotation.</p>
+  <p>The <strong>Cables</strong> table lists every cable to be pulled. Diameter is the outside diameter in inches. Specify which conduit each cable starts and ends in.</p>
+  <p>Click <em>Add Conduit</em> or <em>Add Cable</em> to create rows manually, or use <em>Import&nbsp;CSV</em> to load your own files. <em>Load Sample Data</em> fills the tables with example values.</p>
+  <p>After entering data, press <strong>Calculate Fill</strong> to draw the ductbank. Conduits are colored by fill percentage and display individual cable circles. Hover over a conduit to see its fill and cable tags.</p>
+  <p>The <strong>Download Ductbank Data</strong> button exports all conduits, cables and fill results to an XLSX file.</p>
+  <h3>NEC Fill Rules</h3>
+  <p>NEC Chapter&nbsp;9 Table&nbsp;1 limits conduit fill to 53% with one cable, 31% with two cables and 40% with three or more cables. Table&nbsp;4 provides areas for each conduit type and size.</p>
  </div>
 </div>
 
 <script>
+const SAMPLE_CONDUITS=[
+ {conduit_id:"C1",conduit_type:"PVC Sch 40",trade_size:"4",x:0,y:0,z:0,angle:0},
+ {conduit_id:"C2",conduit_type:"PVC Sch 40",trade_size:"4",x:2,y:0,z:0,angle:0},
+ {conduit_id:"C3",conduit_type:"PVC Sch 40",trade_size:"4",x:4,y:0,z:0,angle:0},
+ {conduit_id:"C4",conduit_type:"PVC Sch 40",trade_size:"4",x:6,y:0,z:0,angle:0},
+ {conduit_id:"C5",conduit_type:"PVC Sch 40",trade_size:"4",x:0,y:2,z:0,angle:0},
+ {conduit_id:"C6",conduit_type:"PVC Sch 40",trade_size:"4",x:2,y:2,z:0,angle:0},
+ {conduit_id:"C7",conduit_type:"PVC Sch 40",trade_size:"4",x:4,y:2,z:0,angle:0},
+ {conduit_id:"C8",conduit_type:"PVC Sch 40",trade_size:"4",x:6,y:2,z:0,angle:0},
+ {conduit_id:"C9",conduit_type:"PVC Sch 40",trade_size:"4",x:0,y:4,z:0,angle:0},
+ {conduit_id:"C10",conduit_type:"PVC Sch 40",trade_size:"4",x:2,y:4,z:0,angle:0},
+ {conduit_id:"C11",conduit_type:"PVC Sch 40",trade_size:"4",x:4,y:4,z:0,angle:0},
+ {conduit_id:"C12",conduit_type:"PVC Sch 40",trade_size:"4",x:6,y:4,z:0,angle:0},
+ {conduit_id:"C13",conduit_type:"PVC Sch 40",trade_size:"4",x:0,y:6,z:0,angle:0},
+ {conduit_id:"C14",conduit_type:"PVC Sch 40",trade_size:"4",x:2,y:6,z:0,angle:0},
+ {conduit_id:"C15",conduit_type:"PVC Sch 40",trade_size:"4",x:4,y:6,z:0,angle:0},
+ {conduit_id:"C16",conduit_type:"PVC Sch 40",trade_size:"4",x:6,y:6,z:0,angle:0},
+];
+
+const SAMPLE_CABLES=[
+ {tag:'CBL1_1',cable_type:'Power',diameter:1.5,conductors:3,conductor_size:'#2 AWG',weight:5,start_conduit_id:'C1',end_conduit_id:'C1'},
+ {tag:'CBL1_2',cable_type:'Power',diameter:1.0,conductors:3,conductor_size:'#2 AWG',weight:5,start_conduit_id:'C1',end_conduit_id:'C1'},
+ {tag:'CBL2_1',cable_type:'Power',diameter:1.5,conductors:3,conductor_size:'#2 AWG',weight:5,start_conduit_id:'C2',end_conduit_id:'C2'},
+ {tag:'CBL2_2',cable_type:'Power',diameter:1.0,conductors:3,conductor_size:'#2 AWG',weight:5,start_conduit_id:'C2',end_conduit_id:'C2'},
+ {tag:'CBL2_3',cable_type:'Power',diameter:0.75,conductors:3,conductor_size:'#2 AWG',weight:5,start_conduit_id:'C2',end_conduit_id:'C2'},
+ {tag:'CBL3_1',cable_type:'Power',diameter:1.5,conductors:3,conductor_size:'#2 AWG',weight:5,start_conduit_id:'C3',end_conduit_id:'C3'},
+ {tag:'CBL4_1',cable_type:'Power',diameter:1.5,conductors:3,conductor_size:'#2 AWG',weight:5,start_conduit_id:'C4',end_conduit_id:'C4'},
+ {tag:'CBL4_2',cable_type:'Power',diameter:1.0,conductors:3,conductor_size:'#2 AWG',weight:5,start_conduit_id:'C4',end_conduit_id:'C4'},
+ {tag:'CBL5_1',cable_type:'Power',diameter:1.5,conductors:3,conductor_size:'#2 AWG',weight:5,start_conduit_id:'C5',end_conduit_id:'C5'},
+ {tag:'CBL5_2',cable_type:'Power',diameter:1.0,conductors:3,conductor_size:'#2 AWG',weight:5,start_conduit_id:'C5',end_conduit_id:'C5'},
+ {tag:'CBL5_3',cable_type:'Power',diameter:0.75,conductors:3,conductor_size:'#2 AWG',weight:5,start_conduit_id:'C5',end_conduit_id:'C5'},
+ {tag:'CBL6_1',cable_type:'Power',diameter:1.5,conductors:3,conductor_size:'#2 AWG',weight:5,start_conduit_id:'C6',end_conduit_id:'C6'},
+ {tag:'CBL7_1',cable_type:'Power',diameter:1.5,conductors:3,conductor_size:'#2 AWG',weight:5,start_conduit_id:'C7',end_conduit_id:'C7'},
+ {tag:'CBL7_2',cable_type:'Power',diameter:1.0,conductors:3,conductor_size:'#2 AWG',weight:5,start_conduit_id:'C7',end_conduit_id:'C7'},
+ {tag:'CBL8_1',cable_type:'Power',diameter:1.5,conductors:3,conductor_size:'#2 AWG',weight:5,start_conduit_id:'C8',end_conduit_id:'C8'},
+ {tag:'CBL8_2',cable_type:'Power',diameter:1.0,conductors:3,conductor_size:'#2 AWG',weight:5,start_conduit_id:'C8',end_conduit_id:'C8'},
+ {tag:'CBL8_3',cable_type:'Power',diameter:0.75,conductors:3,conductor_size:'#2 AWG',weight:5,start_conduit_id:'C8',end_conduit_id:'C8'},
+ {tag:'CBL9_1',cable_type:'Power',diameter:1.5,conductors:3,conductor_size:'#2 AWG',weight:5,start_conduit_id:'C9',end_conduit_id:'C9'},
+ {tag:'CBL10_1',cable_type:'Power',diameter:1.5,conductors:3,conductor_size:'#2 AWG',weight:5,start_conduit_id:'C10',end_conduit_id:'C10'},
+ {tag:'CBL10_2',cable_type:'Power',diameter:1.0,conductors:3,conductor_size:'#2 AWG',weight:5,start_conduit_id:'C10',end_conduit_id:'C10'},
+ {tag:'CBL11_1',cable_type:'Power',diameter:1.5,conductors:3,conductor_size:'#2 AWG',weight:5,start_conduit_id:'C11',end_conduit_id:'C11'},
+ {tag:'CBL11_2',cable_type:'Power',diameter:1.0,conductors:3,conductor_size:'#2 AWG',weight:5,start_conduit_id:'C11',end_conduit_id:'C11'},
+ {tag:'CBL11_3',cable_type:'Power',diameter:0.75,conductors:3,conductor_size:'#2 AWG',weight:5,start_conduit_id:'C11',end_conduit_id:'C11'},
+ {tag:'CBL12_1',cable_type:'Power',diameter:1.5,conductors:3,conductor_size:'#2 AWG',weight:5,start_conduit_id:'C12',end_conduit_id:'C12'},
+ {tag:'CBL13_1',cable_type:'Power',diameter:1.5,conductors:3,conductor_size:'#2 AWG',weight:5,start_conduit_id:'C13',end_conduit_id:'C13'},
+ {tag:'CBL13_2',cable_type:'Power',diameter:1.0,conductors:3,conductor_size:'#2 AWG',weight:5,start_conduit_id:'C13',end_conduit_id:'C13'},
+ {tag:'CBL14_1',cable_type:'Power',diameter:1.5,conductors:3,conductor_size:'#2 AWG',weight:5,start_conduit_id:'C14',end_conduit_id:'C14'},
+ {tag:'CBL14_2',cable_type:'Power',diameter:1.0,conductors:3,conductor_size:'#2 AWG',weight:5,start_conduit_id:'C14',end_conduit_id:'C14'},
+ {tag:'CBL14_3',cable_type:'Power',diameter:0.75,conductors:3,conductor_size:'#2 AWG',weight:5,start_conduit_id:'C14',end_conduit_id:'C14'},
+ {tag:'CBL15_1',cable_type:'Power',diameter:1.5,conductors:3,conductor_size:'#2 AWG',weight:5,start_conduit_id:'C15',end_conduit_id:'C15'},
+ {tag:'CBL16_1',cable_type:'Power',diameter:1.5,conductors:3,conductor_size:'#2 AWG',weight:5,start_conduit_id:'C16',end_conduit_id:'C16'},
+ {tag:'CBL16_2',cable_type:'Power',diameter:1.0,conductors:3,conductor_size:'#2 AWG',weight:5,start_conduit_id:'C16',end_conduit_id:'C16'},
+];
+
 const CONDUIT_SPECS={
  "EMT":{"1/2":0.304,"3/4":0.533,"1":0.864,"1-1/4":1.496,"1-1/2":2.036,"2":3.356,"2-1/2":5.858,"3":8.846,"3-1/2":11.545,"4":14.753},
  "RMC":{"1/2":0.314,"3/4":0.549,"1":0.887,"1-1/4":1.526,"1-1/2":2.071,"2":3.408,"2-1/2":4.866,"3":7.499,"3-1/2":10.01,"4":12.882,"5":20.212,"6":29.158},
@@ -112,6 +174,32 @@ function conduitSizeOptions(type){
 
 function createButton(text,cls,handler){
  const b=document.createElement('button');b.type='button';b.textContent=text;b.className=cls;b.addEventListener('click',handler);return b;
+}
+
+function packCircles(cables,R){
+ const placed=[];
+ cables.sort((a,b)=>b.r-a.r);
+ function yAtBoundary(x,r){return Math.sqrt(Math.max(0,(R-r)*(R-r)-x*x));}
+ for(const c of cables){
+  let best=null;let bestY=-Infinity;const maxX=R-c.r;const step=Math.max(0.05,c.r/4);
+  for(let x=-maxX;x<=maxX;x+=step){
+   let y=yAtBoundary(x,c.r);
+   for(const p of placed){
+     const dx=x-p.x;if(Math.abs(dx)<p.r+c.r){const dy=Math.sqrt((p.r+c.r)*(p.r+c.r)-dx*dx);y=Math.min(y,p.y-dy);}
+   }
+   if(y>bestY){bestY=y;best={x,y};}
+  }
+  if(best){
+   let y=yAtBoundary(best.x,c.r);
+   for(const p of placed){
+     const dx=best.x-p.x;if(Math.abs(dx)<p.r+c.r){const dy=Math.sqrt((p.r+c.r)*(p.r+c.r)-dx*dx);y=Math.min(y,p.y-dy);}
+   }
+   placed.push({x:best.x,y,r:c.r,tag:c.tag});
+  }else{
+   placed.push({x:0,y:0,r:c.r,tag:c.tag});
+  }
+ }
+ return placed;
 }
 
 function addConduitRow(data={}){
@@ -174,7 +262,8 @@ function drawGrid(){
  const scale=40; // pixels per unit
  const fillMap=fillResults();
  conduits.forEach(c=>{
-   const R=Math.sqrt(CONDUIT_SPECS[c.conduit_type][c.trade_size]/Math.PI)*scale;
+   const Rin=Math.sqrt(CONDUIT_SPECS[c.conduit_type][c.trade_size]/Math.PI);
+   const R=Rin*scale;
    const cx=c.x*scale+R+10;
    const cy=c.y*scale+R+10;
    const data=fillMap[c.conduit_id];
@@ -192,8 +281,20 @@ function drawGrid(){
     const names=data.cables.map(c=>c.tag).join(', ');
     circle.setAttribute('title',`${c.conduit_id}: ${data.fillPct.toFixed(1)}% - ${names}`);
   }
-   svg.appendChild(circle);
- });
+  svg.appendChild(circle);
+  if(data){
+    const placed=packCircles(data.cables.map(cb=>({tag:cb.tag,r:cb.diameter/2})),Rin);
+    placed.forEach(p=>{
+      const sc=document.createElementNS('http://www.w3.org/2000/svg','circle');
+      sc.setAttribute('cx',cx+p.x*scale);
+      sc.setAttribute('cy',cy+p.y*scale);
+      sc.setAttribute('r',p.r*scale);
+      sc.setAttribute('fill','lightblue');
+      sc.setAttribute('stroke','black');
+      svg.appendChild(sc);
+    });
+  }
+  });
  svg.setAttribute('width',maxX*scale+100);
  svg.setAttribute('height',maxY*scale+100);
 }
@@ -206,6 +307,16 @@ function importCSV(file,callback){
 
 document.getElementById('addConduit').addEventListener('click',()=>{addConduitRow();});
 document.getElementById('addCable').addEventListener('click',()=>{addCableRow();});
+document.getElementById('sampleConduits').addEventListener('click',()=>{
+ document.querySelector('#conduitTable tbody').innerHTML='';
+ SAMPLE_CONDUITS.forEach(addConduitRow);
+ drawGrid();
+});
+document.getElementById('sampleCables').addEventListener('click',()=>{
+ document.querySelector('#cableTable tbody').innerHTML='';
+ SAMPLE_CABLES.forEach(addCableRow);
+ drawGrid();
+});
 
 document.getElementById('importConduits').addEventListener('change',e=>{const f=e.target.files[0];if(f)importCSV(f,data=>{document.querySelector('#conduitTable tbody').innerHTML='';data.forEach(addConduitRow);drawGrid();});});
 document.getElementById('importCables').addEventListener('change',e=>{const f=e.target.files[0];if(f)importCSV(f,data=>{document.querySelector('#cableTable tbody').innerHTML='';data.forEach(addCableRow);drawGrid();});});
