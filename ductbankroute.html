@@ -1,0 +1,242 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+<title>Ductbank Route</title>
+<script src="https://cdn.jsdelivr.net/npm/xlsx/dist/xlsx.full.min.js"></script>
+<style>
+body{font-family:Arial,sans-serif;margin:16px;}
+body.dark-mode{background:#212529;color:#f8f9fa;}
+label{display:inline-block;margin-bottom:4px;font-size:0.9rem;}
+input,select{padding:2px 4px;font-size:0.9rem;margin-right:8px;}
+body.dark-mode input,body.dark-mode select{background:#343a40;color:#f8f9fa;border:1px solid #495057;}
+table{border-collapse:collapse;width:100%;margin-top:8px;}
+table,th,td{border:1px solid #999;}
+body.dark-mode table,body.dark-mode th,body.dark-mode td{border-color:#495057;}
+th,td{padding:4px;text-align:center;font-size:0.85rem;}
+th{background:#f0f0f0;}
+body.dark-mode th{background:#343a40;color:#f8f9fa;}
+body.dark-mode td{background:#2c3034;}
+button{padding:4px 8px;margin:4px 2px;cursor:pointer;}
+#grid{border:1px solid #aaa;margin-top:12px;}
+.removeBtn{background:#e74c3c;color:#fff;border:none;}
+.duplicateBtn{background:#95a5a6;color:#fff;border:none;}
+#helpOverlay{position:fixed;top:0;left:0;width:100%;height:100%;background:rgba(0,0,0,0.5);display:none;justify-content:center;align-items:center;z-index:1000;}
+#helpPopup{background:#fff;padding:12px;border-radius:8px;max-width:90%;max-height:90%;overflow:auto;position:relative;}
+body.dark-mode #helpPopup{background:#2c3034;color:#f8f9fa;}
+#helpClose{position:absolute;top:8px;right:8px;background:#e74c3c;color:#fff;border:none;padding:4px 8px;}
+</style>
+</head>
+<body>
+<h1>Ductbank Route</h1>
+<button id="themeToggle">Toggle Theme</button>
+<button id="helpBtn">Help</button>
+
+<fieldset>
+ <legend><strong>Ductbank Conduits</strong></legend>
+ <input type="file" id="importConduits" accept=".csv"/>
+ <button type="button" id="addConduit">Add Conduit</button>
+ <table id="conduitTable">
+  <thead>
+   <tr>
+    <th>ID</th>
+    <th>Type</th>
+    <th>Trade Size</th>
+    <th>X</th>
+    <th>Y</th>
+    <th>Z</th>
+    <th>Angle</th>
+    <th>Dup</th>
+    <th>Del</th>
+   </tr>
+  </thead>
+  <tbody></tbody>
+ </table>
+</fieldset>
+
+<fieldset>
+ <legend><strong>Cables</strong></legend>
+ <input type="file" id="importCables" accept=".csv"/>
+ <button type="button" id="addCable">Add Cable</button>
+ <table id="cableTable">
+  <thead>
+   <tr>
+    <th>Tag</th>
+    <th>Type</th>
+    <th>Diameter (in)</th>
+    <th>Cond.</th>
+    <th>Size</th>
+    <th>Weight</th>
+    <th>Start</th>
+    <th>End</th>
+    <th>Dup</th>
+    <th>Del</th>
+   </tr>
+  </thead>
+  <tbody></tbody>
+ </table>
+</fieldset>
+
+<button id="calc">Calculate Fill</button>
+<button id="exportBtn">Download Ductbank Data</button>
+
+<svg id="grid" width="500" height="500"></svg>
+
+<div id="helpOverlay">
+ <div id="helpPopup">
+  <button id="helpClose">Close</button>
+  <h2>NEC Fill Rules</h2>
+  <p>NEC Chapter 9 Table 1 limits conduit fill to 53% with one cable, 31% with two cables, and 40% with three or more cables. Table 4 provides areas for each conduit type and size.</p>
+ </div>
+</div>
+
+<script>
+const CONDUIT_SPECS={
+ "EMT":{"1/2":0.304,"3/4":0.533,"1":0.864,"1-1/4":1.496,"1-1/2":2.036,"2":3.356,"2-1/2":5.858,"3":8.846,"3-1/2":11.545,"4":14.753},
+ "RMC":{"1/2":0.314,"3/4":0.549,"1":0.887,"1-1/4":1.526,"1-1/2":2.071,"2":3.408,"2-1/2":4.866,"3":7.499,"3-1/2":10.01,"4":12.882,"5":20.212,"6":29.158},
+ "PVC Sch 40":{"1/2":0.285,"3/4":0.508,"1":0.832,"1-1/4":1.453,"1-1/2":1.986,"2":3.291,"2-1/2":4.695,"3":7.268,"3-1/2":9.737,"4":12.554,"5":19.761,"6":28.567}
+};
+
+function parseSize(sz){
+ if(sz.includes('-')){const[w,f]=sz.split('-');const[n,d]=f.split('/');return parseFloat(w)+parseFloat(n)/parseFloat(d);} 
+ if(sz.includes('/')){const[n,d]=sz.split('/');return parseFloat(n)/parseFloat(d);} 
+ return parseFloat(sz);
+}
+
+function conduitSizeOptions(type){
+ const sel=document.createElement('select');
+ Object.keys(CONDUIT_SPECS[type]||{}).sort((a,b)=>parseSize(a)-parseSize(b)).forEach(s=>{const o=document.createElement('option');o.value=s;o.textContent=s;sel.appendChild(o);});
+ return sel;
+}
+
+function createButton(text,cls,handler){
+ const b=document.createElement('button');b.type='button';b.textContent=text;b.className=cls;b.addEventListener('click',handler);return b;
+}
+
+function addConduitRow(data={}){
+ const tr=document.createElement('tr');
+ const idTd=document.createElement('td');const idInput=document.createElement('input');idInput.value=data.conduit_id||'';idTd.appendChild(idInput);tr.appendChild(idTd);
+ const typeTd=document.createElement('td');const typeSel=document.createElement('select');Object.keys(CONDUIT_SPECS).forEach(t=>{const o=document.createElement('option');o.value=t;o.textContent=t;typeSel.appendChild(o);});typeSel.value=data.conduit_type||Object.keys(CONDUIT_SPECS)[0];typeTd.appendChild(typeSel);tr.appendChild(typeTd);
+ const sizeTd=document.createElement('td');let sizeSel=conduitSizeOptions(typeSel.value);sizeTd.appendChild(sizeSel);sizeSel.value=data.trade_size||sizeSel.options[0].value;tr.appendChild(sizeTd);
+ typeSel.addEventListener('change',()=>{const old=sizeSel;sizeSel=conduitSizeOptions(typeSel.value);sizeTd.replaceChild(sizeSel,old);});
+ ['x','y','z','angle'].forEach(k=>{const td=document.createElement('td');const inp=document.createElement('input');inp.type='number';inp.value=data[k]||0;td.appendChild(inp);tr.appendChild(td);});
+ const dupTd=document.createElement('td');dupTd.appendChild(createButton('⧉','duplicateBtn',()=>{const cloneData=rowToConduit(tr);addConduitRow(cloneData);}));tr.appendChild(dupTd);
+ const delTd=document.createElement('td');delTd.appendChild(createButton('✖','removeBtn',()=>{tr.remove();drawGrid();}));tr.appendChild(delTd);
+ document.querySelector('#conduitTable tbody').appendChild(tr);
+}
+
+function addCableRow(data={}){
+ const tr=document.createElement('tr');
+ const cols=['tag','cable_type','diameter','conductors','conductor_size','weight','start_conduit_id','end_conduit_id'];
+ cols.forEach((c,i)=>{const td=document.createElement('td');const inp=document.createElement('input');inp.type=(c==='diameter'||c==='weight')?'number':'text';if(c==='conductors')inp.type='number';inp.value=data[c]||'';td.appendChild(inp);tr.appendChild(td);});
+ const dupTd=document.createElement('td');dupTd.appendChild(createButton('⧉','duplicateBtn',()=>{const clone=rowToCable(tr);addCableRow(clone);}));tr.appendChild(dupTd);
+ const delTd=document.createElement('td');delTd.appendChild(createButton('✖','removeBtn',()=>{tr.remove();drawGrid();}));tr.appendChild(delTd);
+ document.querySelector('#cableTable tbody').appendChild(tr);
+}
+
+function rowToConduit(tr){
+ const [id,type,size,x,y,z,angle]=Array.from(tr.children).slice(0,7).map(td=>td.querySelector('input,select').value);
+ return {conduit_id:id,conduit_type:type,trade_size:size,x:parseFloat(x),y:parseFloat(y),z:parseFloat(z),angle:parseFloat(angle)};
+}
+
+function rowToCable(tr){
+ const vals=Array.from(tr.children).slice(0,8).map(td=>td.querySelector('input').value);
+ const [tag,cable_type,diameter,conductors,conductor_size,weight,start_conduit_id,end_conduit_id]=vals;
+ return {tag,cable_type,diameter:parseFloat(diameter),conductors:parseInt(conductors||0),conductor_size,weight:parseFloat(weight)||0,start_conduit_id,end_conduit_id};
+}
+
+function getAllConduits(){
+ return Array.from(document.querySelectorAll('#conduitTable tbody tr')).map(rowToConduit);
+}
+
+function getAllCables(){
+ return Array.from(document.querySelectorAll('#cableTable tbody tr')).map(rowToCable);
+}
+
+function fillResults(){
+ const conduits=getAllConduits();
+ const cables=getAllCables();
+ const fillMap={};
+ conduits.forEach(c=>{fillMap[c.conduit_id]={area:CONDUIT_SPECS[c.conduit_type][c.trade_size],cables:[]};});
+ cables.forEach(cb=>{const cid=cb.start_conduit_id;if(fillMap[cid])fillMap[cid].cables.push(cb);});
+ Object.values(fillMap).forEach(c=>{c.fillArea=c.cables.reduce((s,cb)=>s+Math.PI*Math.pow(cb.diameter/2,2),0);c.fillPct=(c.fillArea/c.area)*100;});
+ return fillMap;
+}
+
+function drawGrid(){
+ const svg=document.getElementById('grid');
+ svg.innerHTML='';
+ const conduits=getAllConduits();
+ if(conduits.length===0)return;
+ const maxX=Math.max(...conduits.map(c=>c.x));
+ const maxY=Math.max(...conduits.map(c=>c.y));
+ const scale=40; // pixels per unit
+ const fillMap=fillResults();
+ conduits.forEach(c=>{
+   const R=Math.sqrt(CONDUIT_SPECS[c.conduit_type][c.trade_size]/Math.PI)*scale;
+   const cx=c.x*scale+R+10;
+   const cy=c.y*scale+R+10;
+   const data=fillMap[c.conduit_id];
+   let color='green';
+   if(data){
+     const count=data.cables.length;
+     const limit=count===1?53:count===2?31:40;
+     if(data.fillPct>limit)color='red';else if(data.fillPct>0.8*limit)color='yellow';
+   }
+  const circle=document.createElementNS('http://www.w3.org/2000/svg','circle');
+  circle.setAttribute('cx',cx);circle.setAttribute('cy',cy);circle.setAttribute('r',R);
+  circle.setAttribute('fill',color);
+  circle.setAttribute('stroke','black');
+  if(data){
+    const names=data.cables.map(c=>c.tag).join(', ');
+    circle.setAttribute('title',`${c.conduit_id}: ${data.fillPct.toFixed(1)}% - ${names}`);
+  }
+   svg.appendChild(circle);
+ });
+ svg.setAttribute('width',maxX*scale+100);
+ svg.setAttribute('height',maxY*scale+100);
+}
+
+function importCSV(file,callback){
+ const reader=new FileReader();
+ reader.onload=e=>{const rows=e.target.result.trim().split(/\r?\n/).map(r=>r.split(','));const headers=rows.shift();const objs=rows.map(r=>{const o={};headers.forEach((h,i)=>o[h.trim()]=r[i]);return o;});callback(objs);};
+ reader.readAsText(file);
+}
+
+document.getElementById('addConduit').addEventListener('click',()=>{addConduitRow();});
+document.getElementById('addCable').addEventListener('click',()=>{addCableRow();});
+
+document.getElementById('importConduits').addEventListener('change',e=>{const f=e.target.files[0];if(f)importCSV(f,data=>{document.querySelector('#conduitTable tbody').innerHTML='';data.forEach(addConduitRow);drawGrid();});});
+document.getElementById('importCables').addEventListener('change',e=>{const f=e.target.files[0];if(f)importCSV(f,data=>{document.querySelector('#cableTable tbody').innerHTML='';data.forEach(addCableRow);drawGrid();});});
+
+document.getElementById('calc').addEventListener('click',drawGrid);
+
+document.getElementById('exportBtn').addEventListener('click',()=>{
+ const wb=XLSX.utils.book_new();
+ const conduits=getAllConduits();
+ const cables=getAllCables();
+ const fill=fillResults();
+ XLSX.utils.book_append_sheet(wb,XLSX.utils.json_to_sheet(conduits),'conduits');
+ XLSX.utils.book_append_sheet(wb,XLSX.utils.json_to_sheet(cables),'cables');
+ const compliance=Object.keys(fill).map(k=>{const f=fill[k];return{conduit_id:k,fill_pct:f.fillPct.toFixed(2),cable_count:f.cables.length};});
+ XLSX.utils.book_append_sheet(wb,XLSX.utils.json_to_sheet(compliance),'fill');
+ XLSX.writeFile(wb,'ductbank_data.xlsx');
+});
+
+document.getElementById('themeToggle').addEventListener('click',()=>{
+ document.body.classList.toggle('dark-mode');
+ const session=JSON.parse(localStorage.getItem('ctrSession')||'{}');
+ session.darkMode=document.body.classList.contains('dark-mode');
+ localStorage.setItem('ctrSession',JSON.stringify(session));
+});
+const stored=JSON.parse(localStorage.getItem('ctrSession')||'{}');
+if(stored.darkMode)document.body.classList.add('dark-mode');
+
+window.addEventListener('storage',e=>{if(e.key==='ctrSession'){const d=JSON.parse(e.newValue);if(d.darkMode)document.body.classList.add('dark-mode');else document.body.classList.remove('dark-mode');}});
+
+document.getElementById('helpBtn').addEventListener('click',()=>{document.getElementById('helpOverlay').style.display='flex';});
+document.getElementById('helpClose').addEventListener('click',()=>{document.getElementById('helpOverlay').style.display='none';});
+</script>
+</body>
+</html>
