@@ -85,6 +85,8 @@ body.dark-mode #helpPopup{background:#2c3034;color:#f8f9fa;}
   <label>Vert Spacing (in)<input type="number" id="vSpacing" value="4" style="width:60px;"></label>
   <label>Top Clear (in)<input type="number" id="topPad" value="0" style="width:60px;"></label>
   <label>Bottom Clear (in)<input type="number" id="bottomPad" value="0" style="width:60px;"></label>
+  <label>Left Clear (in)<input type="number" id="leftPad" value="0" style="width:60px;"></label>
+  <label>Right Clear (in)<input type="number" id="rightPad" value="0" style="width:60px;"></label>
   <label>Conduits/Row<input type="number" id="perRow" value="4" style="width:60px;"></label>
 </div>
 
@@ -256,6 +258,7 @@ function autoPlaceConduits(){
  const h=parseFloat(document.getElementById('hSpacing').value)||3;
  const v=parseFloat(document.getElementById('vSpacing').value)||4;
  const bottomPad=parseFloat(document.getElementById('bottomPad').value)||0;
+ const leftPad=parseFloat(document.getElementById('leftPad').value)||0;
  const perRow=parseInt(document.getElementById('perRow').value)||Math.ceil(Math.sqrt(rows.length));
 
  const numRows=Math.ceil(rows.length/perRow);
@@ -274,7 +277,7 @@ function autoPlaceConduits(){
 
  let yCursor=bottomPad;
  for(let r=0;r<numRows;r++){
-   let xCursor=0;
+   let xCursor=leftPad;
    for(let c=0;c<perRow;c++){
      const idx=r*perRow+c;
      if(idx>=rows.length)break;
@@ -312,15 +315,18 @@ function drawGrid(){
  if(conduits.length===0)return;
  const topPad=parseFloat(document.getElementById('topPad').value)||0;
  const bottomPad=parseFloat(document.getElementById('bottomPad').value)||0;
+ const leftPad=parseFloat(document.getElementById('leftPad').value)||0;
+ const rightPad=parseFloat(document.getElementById('rightPad').value)||0;
  const scale=40; // pixels per unit
  const fillMap=fillResults();
- let maxX=0,maxY=0;
- conduits.forEach(c=>{
-   const Rin=Math.sqrt(CONDUIT_SPECS[c.conduit_type][c.trade_size]/Math.PI);
-   maxX=Math.max(maxX,c.x+2*Rin);
-   maxY=Math.max(maxY,c.y+2*Rin);
- });
- maxY+=topPad;
+let maxX=0,maxY=0;
+conduits.forEach(c=>{
+  const Rin=Math.sqrt(CONDUIT_SPECS[c.conduit_type][c.trade_size]/Math.PI);
+  maxX=Math.max(maxX,c.x+2*Rin);
+  maxY=Math.max(maxY,c.y+2*Rin);
+});
+maxY+=topPad;
+ maxX+=rightPad;
 
  const defs=document.createElementNS('http://www.w3.org/2000/svg','defs');
  svg.appendChild(defs);
@@ -333,7 +339,71 @@ function drawGrid(){
  rect.setAttribute('fill','none');
  rect.setAttribute('stroke','gray');
  rect.setAttribute('stroke-dasharray','4 2');
- svg.appendChild(rect);
+svg.appendChild(rect);
+
+ // overall dimension lines
+ const widthY=10+maxY*scale+15;
+ const wStart=10, wEnd=10+maxX*scale;
+ const widthLine=document.createElementNS('http://www.w3.org/2000/svg','line');
+ widthLine.setAttribute('x1',wStart);
+ widthLine.setAttribute('x2',wEnd);
+ widthLine.setAttribute('y1',widthY);
+ widthLine.setAttribute('y2',widthY);
+ widthLine.setAttribute('stroke','black');
+ svg.appendChild(widthLine);
+ const tick1=document.createElementNS('http://www.w3.org/2000/svg','line');
+ tick1.setAttribute('x1',wStart);
+ tick1.setAttribute('x2',wStart);
+ tick1.setAttribute('y1',widthY-4);
+ tick1.setAttribute('y2',widthY+4);
+ tick1.setAttribute('stroke','black');
+ svg.appendChild(tick1);
+ const tick2=document.createElementNS('http://www.w3.org/2000/svg','line');
+ tick2.setAttribute('x1',wEnd);
+ tick2.setAttribute('x2',wEnd);
+ tick2.setAttribute('y1',widthY-4);
+ tick2.setAttribute('y2',widthY+4);
+ tick2.setAttribute('stroke','black');
+ svg.appendChild(tick2);
+ const widthText=document.createElementNS('http://www.w3.org/2000/svg','text');
+ widthText.setAttribute('x',(wStart+wEnd)/2);
+ widthText.setAttribute('y',widthY-6);
+ widthText.setAttribute('font-size','10');
+ widthText.setAttribute('text-anchor','middle');
+ widthText.textContent=maxX.toFixed(2)+'"';
+ svg.appendChild(widthText);
+
+ const heightX=10+maxX*scale+15;
+ const hStart=10, hEnd=10+maxY*scale;
+ const heightLine=document.createElementNS('http://www.w3.org/2000/svg','line');
+ heightLine.setAttribute('x1',heightX);
+ heightLine.setAttribute('x2',heightX);
+ heightLine.setAttribute('y1',hStart);
+ heightLine.setAttribute('y2',hEnd);
+ heightLine.setAttribute('stroke','black');
+ svg.appendChild(heightLine);
+ const hTick1=document.createElementNS('http://www.w3.org/2000/svg','line');
+ hTick1.setAttribute('x1',heightX-4);
+ hTick1.setAttribute('x2',heightX+4);
+ hTick1.setAttribute('y1',hStart);
+ hTick1.setAttribute('y2',hStart);
+ hTick1.setAttribute('stroke','black');
+ svg.appendChild(hTick1);
+ const hTick2=document.createElementNS('http://www.w3.org/2000/svg','line');
+ hTick2.setAttribute('x1',heightX-4);
+ hTick2.setAttribute('x2',heightX+4);
+ hTick2.setAttribute('y1',hEnd);
+ hTick2.setAttribute('y2',hEnd);
+ hTick2.setAttribute('stroke','black');
+ svg.appendChild(hTick2);
+ const heightText=document.createElementNS('http://www.w3.org/2000/svg','text');
+ heightText.setAttribute('x',heightX+6);
+ heightText.setAttribute('y',(hStart+hEnd)/2);
+ heightText.setAttribute('font-size','10');
+ heightText.setAttribute('text-anchor','start');
+ heightText.setAttribute('dominant-baseline','middle');
+ heightText.textContent=maxY.toFixed(2)+'"';
+ svg.appendChild(heightText);
 
  conduits.forEach(c=>{
    const Rin=Math.sqrt(CONDUIT_SPECS[c.conduit_type][c.trade_size]/Math.PI);
@@ -393,14 +463,21 @@ function drawGrid(){
    circle.setAttribute('fill',color);
    circle.setAttribute('fill-opacity','0.4');
    circle.setAttribute('stroke','black');
-   if(data){
-     const names=data.cables.map(c=>c.tag).join(', ');
-     circle.setAttribute('title',`${c.conduit_id}: ${data.fillPct.toFixed(1)}% - ${names}`);
-   }
-   svg.appendChild(circle);
-  });
- svg.setAttribute('width',maxX*scale+20);
- svg.setAttribute('height',maxY*scale+20);
+  if(data){
+    const names=data.cables.map(c=>c.tag).join(', ');
+    circle.setAttribute('title',`${c.conduit_id}: ${data.fillPct.toFixed(1)}% - ${names}`);
+  }
+  svg.appendChild(circle);
+  const cidText=document.createElementNS('http://www.w3.org/2000/svg','text');
+  cidText.setAttribute('x',cx);
+  cidText.setAttribute('y',cy-R-4);
+  cidText.setAttribute('font-size','10');
+  cidText.setAttribute('text-anchor','middle');
+  cidText.textContent=c.conduit_id;
+  svg.appendChild(cidText);
+ });
+ svg.setAttribute('width',maxX*scale+40);
+ svg.setAttribute('height',maxY*scale+40);
 }
 
 function importCSV(file,callback){
