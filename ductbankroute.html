@@ -80,6 +80,12 @@ body.dark-mode #helpPopup{background:#2c3034;color:#f8f9fa;}
  </table>
 </fieldset>
 
+<div style="margin-top:8px;">
+  <label>Horiz Spacing (in)<input type="number" id="hSpacing" value="3" style="width:60px;"></label>
+  <label>Vert Spacing (in)<input type="number" id="vSpacing" value="4" style="width:60px;"></label>
+  <label>Conduits/Row<input type="number" id="perRow" value="4" style="width:60px;"></label>
+</div>
+
 <button id="calc">Calculate Fill</button>
 <button id="exportBtn">Download Ductbank Data</button>
 
@@ -208,10 +214,11 @@ function addConduitRow(data={}){
  const typeTd=document.createElement('td');const typeSel=document.createElement('select');Object.keys(CONDUIT_SPECS).forEach(t=>{const o=document.createElement('option');o.value=t;o.textContent=t;typeSel.appendChild(o);});typeSel.value=data.conduit_type||Object.keys(CONDUIT_SPECS)[0];typeTd.appendChild(typeSel);tr.appendChild(typeTd);
  const sizeTd=document.createElement('td');let sizeSel=conduitSizeOptions(typeSel.value);sizeTd.appendChild(sizeSel);sizeSel.value=data.trade_size||sizeSel.options[0].value;tr.appendChild(sizeTd);
  typeSel.addEventListener('change',()=>{const old=sizeSel;sizeSel=conduitSizeOptions(typeSel.value);sizeTd.replaceChild(sizeSel,old);});
- ['x','y','z','angle'].forEach(k=>{const td=document.createElement('td');const inp=document.createElement('input');inp.type='number';inp.value=data[k]||0;td.appendChild(inp);tr.appendChild(td);});
+ ['x','y','z','angle'].forEach(k=>{const td=document.createElement('td');const inp=document.createElement('input');inp.type='number';inp.value=data[k]||0;if(k==='x'||k==='y')inp.readOnly=true;td.appendChild(inp);tr.appendChild(td);});
  const dupTd=document.createElement('td');dupTd.appendChild(createButton('⧉','duplicateBtn',()=>{const cloneData=rowToConduit(tr);addConduitRow(cloneData);}));tr.appendChild(dupTd);
  const delTd=document.createElement('td');delTd.appendChild(createButton('✖','removeBtn',()=>{tr.remove();drawGrid();}));tr.appendChild(delTd);
  document.querySelector('#conduitTable tbody').appendChild(tr);
+ autoPlaceConduits();
 }
 
 function addCableRow(data={}){
@@ -242,6 +249,21 @@ function getAllCables(){
  return Array.from(document.querySelectorAll('#cableTable tbody tr')).map(rowToCable);
 }
 
+function autoPlaceConduits(){
+ const rows=document.querySelectorAll('#conduitTable tbody tr');
+ const h=parseFloat(document.getElementById('hSpacing').value)||3;
+ const v=parseFloat(document.getElementById('vSpacing').value)||4;
+ const perRow=parseInt(document.getElementById('perRow').value)||Math.ceil(Math.sqrt(rows.length));
+ rows.forEach((tr,i)=>{
+   const col=i%perRow;const row=Math.floor(i/perRow);
+   const cells=tr.querySelectorAll('td');
+   const x=cells[3].querySelector('input');
+   const y=cells[4].querySelector('input');
+   x.value=col*h;
+   y.value=row*v;
+ });
+}
+
 function fillResults(){
  const conduits=getAllConduits();
  const cables=getAllCables();
@@ -255,12 +277,15 @@ function fillResults(){
 function drawGrid(){
  const svg=document.getElementById('grid');
  svg.innerHTML='';
+ autoPlaceConduits();
  const conduits=getAllConduits();
  if(conduits.length===0)return;
  const maxX=Math.max(...conduits.map(c=>c.x));
  const maxY=Math.max(...conduits.map(c=>c.y));
  const scale=40; // pixels per unit
  const fillMap=fillResults();
+ const defs=document.createElementNS('http://www.w3.org/2000/svg','defs');
+ svg.appendChild(defs);
  conduits.forEach(c=>{
    const Rin=Math.sqrt(CONDUIT_SPECS[c.conduit_type][c.trade_size]/Math.PI);
    const R=Rin*scale;
@@ -273,27 +298,36 @@ function drawGrid(){
      const limit=count===1?53:count===2?31:40;
      if(data.fillPct>limit)color='red';else if(data.fillPct>0.8*limit)color='yellow';
    }
-  const circle=document.createElementNS('http://www.w3.org/2000/svg','circle');
-  circle.setAttribute('cx',cx);circle.setAttribute('cy',cy);circle.setAttribute('r',R);
-  circle.setAttribute('fill',color);
-  circle.setAttribute('stroke','black');
-  if(data){
-    const names=data.cables.map(c=>c.tag).join(', ');
-    circle.setAttribute('title',`${c.conduit_id}: ${data.fillPct.toFixed(1)}% - ${names}`);
-  }
-  svg.appendChild(circle);
-  if(data){
-    const placed=packCircles(data.cables.map(cb=>({tag:cb.tag,r:cb.diameter/2})),Rin);
-    placed.forEach(p=>{
-      const sc=document.createElementNS('http://www.w3.org/2000/svg','circle');
-      sc.setAttribute('cx',cx+p.x*scale);
-      sc.setAttribute('cy',cy+p.y*scale);
-      sc.setAttribute('r',p.r*scale);
-      sc.setAttribute('fill','lightblue');
-      sc.setAttribute('stroke','black');
-      svg.appendChild(sc);
-    });
-  }
+   const clip=document.createElementNS('http://www.w3.org/2000/svg','clipPath');
+   const clipId=`clip-${c.conduit_id}`;
+   clip.setAttribute('id',clipId);
+   const clipCircle=document.createElementNS('http://www.w3.org/2000/svg','circle');
+   clipCircle.setAttribute('cx',cx);clipCircle.setAttribute('cy',cy);clipCircle.setAttribute('r',R);
+   clip.appendChild(clipCircle);
+   defs.appendChild(clip);
+   if(data){
+     const placed=packCircles(data.cables.map(cb=>({tag:cb.tag,r:cb.diameter/2})),Rin);
+     placed.forEach(p=>{
+       const sc=document.createElementNS('http://www.w3.org/2000/svg','circle');
+       sc.setAttribute('cx',cx+p.x*scale);
+       sc.setAttribute('cy',cy+p.y*scale);
+       sc.setAttribute('r',p.r*scale);
+       sc.setAttribute('fill','lightblue');
+       sc.setAttribute('stroke','black');
+       sc.setAttribute('clip-path',`url(#${clipId})`);
+       svg.appendChild(sc);
+     });
+   }
+   const circle=document.createElementNS('http://www.w3.org/2000/svg','circle');
+   circle.setAttribute('cx',cx);circle.setAttribute('cy',cy);circle.setAttribute('r',R);
+   circle.setAttribute('fill',color);
+   circle.setAttribute('fill-opacity','0.4');
+   circle.setAttribute('stroke','black');
+   if(data){
+     const names=data.cables.map(c=>c.tag).join(', ');
+     circle.setAttribute('title',`${c.conduit_id}: ${data.fillPct.toFixed(1)}% - ${names}`);
+   }
+   svg.appendChild(circle);
   });
  svg.setAttribute('width',maxX*scale+100);
  svg.setAttribute('height',maxY*scale+100);
