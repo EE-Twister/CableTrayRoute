@@ -57,8 +57,6 @@ body.dark-mode #helpPopup{background:#2c3034;color:#f8f9fa;}
     <th>Trade Size</th>
     <th>X</th>
     <th>Y</th>
-    <th>Z</th>
-    <th>Angle</th>
     <th>Dup</th>
     <th>Del</th>
    </tr>
@@ -81,8 +79,7 @@ body.dark-mode #helpPopup{background:#2c3034;color:#f8f9fa;}
     <th>Cond.</th>
     <th>Size</th>
     <th>Weight</th>
-    <th>Start</th>
-    <th>End</th>
+    <th>Conduit</th>
     <th>Dup</th>
     <th>Del</th>
    </tr>
@@ -115,8 +112,8 @@ body.dark-mode #helpPopup{background:#2c3034;color:#f8f9fa;}
  <div id="helpPopup">
   <button id="helpClose">Close</button>
   <h2>Ductbank Route Help</h2>
-  <p>Use the <strong>Ductbank Conduits</strong> table to define each conduit by ID, type, trade size and its X/Y/Z position. Angle is optional rotation.</p>
-  <p>The <strong>Cables</strong> table lists every cable to be pulled. Diameter is the outside diameter in inches. Specify which conduit each cable starts and ends in.</p>
+  <p>Use the <strong>Ductbank Conduits</strong> table to define each conduit by ID, type, trade size and its X/Y position.</p>
+  <p>The <strong>Cables</strong> table lists every cable to be pulled. Diameter is the outside diameter in inches. Specify which conduit each cable is installed in.</p>
   <p>Click <em>Add Conduit</em> or <em>Add Cable</em> to create rows manually, or use <em>Import&nbsp;CSV</em> to load your own files. <em>Load Sample Data</em> fills the tables with example values.</p>
   <p>After entering data, press <strong>Calculate Fill</strong> to draw the ductbank. Conduits are colored by fill percentage and display individual cable circles. Hover over a conduit to see its fill and cable tags.</p>
   <p>The <strong>Download Ductbank Data</strong> button exports all conduits, cables and fill results to an XLSX file.</p>
@@ -128,57 +125,57 @@ body.dark-mode #helpPopup{background:#2c3034;color:#f8f9fa;}
 
 <script>
 const SAMPLE_CONDUITS=[
- {conduit_id:"C1",conduit_type:"PVC Sch 40",trade_size:"4",x:0,y:0,z:0,angle:0},
- {conduit_id:"C2",conduit_type:"PVC Sch 40",trade_size:"4",x:2,y:0,z:0,angle:0},
- {conduit_id:"C3",conduit_type:"PVC Sch 40",trade_size:"4",x:4,y:0,z:0,angle:0},
- {conduit_id:"C4",conduit_type:"PVC Sch 40",trade_size:"4",x:6,y:0,z:0,angle:0},
- {conduit_id:"C5",conduit_type:"PVC Sch 40",trade_size:"4",x:0,y:2,z:0,angle:0},
- {conduit_id:"C6",conduit_type:"PVC Sch 40",trade_size:"4",x:2,y:2,z:0,angle:0},
- {conduit_id:"C7",conduit_type:"PVC Sch 40",trade_size:"4",x:4,y:2,z:0,angle:0},
- {conduit_id:"C8",conduit_type:"PVC Sch 40",trade_size:"4",x:6,y:2,z:0,angle:0},
- {conduit_id:"C9",conduit_type:"PVC Sch 40",trade_size:"4",x:0,y:4,z:0,angle:0},
- {conduit_id:"C10",conduit_type:"PVC Sch 40",trade_size:"4",x:2,y:4,z:0,angle:0},
- {conduit_id:"C11",conduit_type:"PVC Sch 40",trade_size:"4",x:4,y:4,z:0,angle:0},
- {conduit_id:"C12",conduit_type:"PVC Sch 40",trade_size:"4",x:6,y:4,z:0,angle:0},
- {conduit_id:"C13",conduit_type:"PVC Sch 40",trade_size:"4",x:0,y:6,z:0,angle:0},
- {conduit_id:"C14",conduit_type:"PVC Sch 40",trade_size:"4",x:2,y:6,z:0,angle:0},
- {conduit_id:"C15",conduit_type:"PVC Sch 40",trade_size:"4",x:4,y:6,z:0,angle:0},
- {conduit_id:"C16",conduit_type:"PVC Sch 40",trade_size:"4",x:6,y:6,z:0,angle:0},
+ {conduit_id:"C1",conduit_type:"PVC Sch 40",trade_size:"4",x:0,y:0},
+ {conduit_id:"C2",conduit_type:"PVC Sch 40",trade_size:"4",x:2,y:0},
+ {conduit_id:"C3",conduit_type:"PVC Sch 40",trade_size:"4",x:4,y:0},
+ {conduit_id:"C4",conduit_type:"PVC Sch 40",trade_size:"4",x:6,y:0},
+ {conduit_id:"C5",conduit_type:"PVC Sch 40",trade_size:"4",x:0,y:2},
+ {conduit_id:"C6",conduit_type:"PVC Sch 40",trade_size:"4",x:2,y:2},
+ {conduit_id:"C7",conduit_type:"PVC Sch 40",trade_size:"4",x:4,y:2},
+ {conduit_id:"C8",conduit_type:"PVC Sch 40",trade_size:"4",x:6,y:2},
+ {conduit_id:"C9",conduit_type:"PVC Sch 40",trade_size:"4",x:0,y:4},
+ {conduit_id:"C10",conduit_type:"PVC Sch 40",trade_size:"4",x:2,y:4},
+ {conduit_id:"C11",conduit_type:"PVC Sch 40",trade_size:"4",x:4,y:4},
+ {conduit_id:"C12",conduit_type:"PVC Sch 40",trade_size:"4",x:6,y:4},
+ {conduit_id:"C13",conduit_type:"PVC Sch 40",trade_size:"4",x:0,y:6},
+ {conduit_id:"C14",conduit_type:"PVC Sch 40",trade_size:"4",x:2,y:6},
+ {conduit_id:"C15",conduit_type:"PVC Sch 40",trade_size:"4",x:4,y:6},
+ {conduit_id:"C16",conduit_type:"PVC Sch 40",trade_size:"4",x:6,y:6},
 ];
 
 const SAMPLE_CABLES=[
- {tag:'CBL1_1',cable_type:'Power',diameter:1.5,conductors:3,conductor_size:'#2 AWG',weight:5,start_conduit_id:'C1',end_conduit_id:'C1'},
- {tag:'CBL1_2',cable_type:'Power',diameter:1.0,conductors:3,conductor_size:'#2 AWG',weight:5,start_conduit_id:'C1',end_conduit_id:'C1'},
- {tag:'CBL2_1',cable_type:'Power',diameter:1.5,conductors:3,conductor_size:'#2 AWG',weight:5,start_conduit_id:'C2',end_conduit_id:'C2'},
- {tag:'CBL2_2',cable_type:'Power',diameter:1.0,conductors:3,conductor_size:'#2 AWG',weight:5,start_conduit_id:'C2',end_conduit_id:'C2'},
- {tag:'CBL2_3',cable_type:'Power',diameter:0.75,conductors:3,conductor_size:'#2 AWG',weight:5,start_conduit_id:'C2',end_conduit_id:'C2'},
- {tag:'CBL3_1',cable_type:'Power',diameter:1.5,conductors:3,conductor_size:'#2 AWG',weight:5,start_conduit_id:'C3',end_conduit_id:'C3'},
- {tag:'CBL4_1',cable_type:'Power',diameter:1.5,conductors:3,conductor_size:'#2 AWG',weight:5,start_conduit_id:'C4',end_conduit_id:'C4'},
- {tag:'CBL4_2',cable_type:'Power',diameter:1.0,conductors:3,conductor_size:'#2 AWG',weight:5,start_conduit_id:'C4',end_conduit_id:'C4'},
- {tag:'CBL5_1',cable_type:'Power',diameter:1.5,conductors:3,conductor_size:'#2 AWG',weight:5,start_conduit_id:'C5',end_conduit_id:'C5'},
- {tag:'CBL5_2',cable_type:'Power',diameter:1.0,conductors:3,conductor_size:'#2 AWG',weight:5,start_conduit_id:'C5',end_conduit_id:'C5'},
- {tag:'CBL5_3',cable_type:'Power',diameter:0.75,conductors:3,conductor_size:'#2 AWG',weight:5,start_conduit_id:'C5',end_conduit_id:'C5'},
- {tag:'CBL6_1',cable_type:'Power',diameter:1.5,conductors:3,conductor_size:'#2 AWG',weight:5,start_conduit_id:'C6',end_conduit_id:'C6'},
- {tag:'CBL7_1',cable_type:'Power',diameter:1.5,conductors:3,conductor_size:'#2 AWG',weight:5,start_conduit_id:'C7',end_conduit_id:'C7'},
- {tag:'CBL7_2',cable_type:'Power',diameter:1.0,conductors:3,conductor_size:'#2 AWG',weight:5,start_conduit_id:'C7',end_conduit_id:'C7'},
- {tag:'CBL8_1',cable_type:'Power',diameter:1.5,conductors:3,conductor_size:'#2 AWG',weight:5,start_conduit_id:'C8',end_conduit_id:'C8'},
- {tag:'CBL8_2',cable_type:'Power',diameter:1.0,conductors:3,conductor_size:'#2 AWG',weight:5,start_conduit_id:'C8',end_conduit_id:'C8'},
- {tag:'CBL8_3',cable_type:'Power',diameter:0.75,conductors:3,conductor_size:'#2 AWG',weight:5,start_conduit_id:'C8',end_conduit_id:'C8'},
- {tag:'CBL9_1',cable_type:'Power',diameter:1.5,conductors:3,conductor_size:'#2 AWG',weight:5,start_conduit_id:'C9',end_conduit_id:'C9'},
- {tag:'CBL10_1',cable_type:'Power',diameter:1.5,conductors:3,conductor_size:'#2 AWG',weight:5,start_conduit_id:'C10',end_conduit_id:'C10'},
- {tag:'CBL10_2',cable_type:'Power',diameter:1.0,conductors:3,conductor_size:'#2 AWG',weight:5,start_conduit_id:'C10',end_conduit_id:'C10'},
- {tag:'CBL11_1',cable_type:'Power',diameter:1.5,conductors:3,conductor_size:'#2 AWG',weight:5,start_conduit_id:'C11',end_conduit_id:'C11'},
- {tag:'CBL11_2',cable_type:'Power',diameter:1.0,conductors:3,conductor_size:'#2 AWG',weight:5,start_conduit_id:'C11',end_conduit_id:'C11'},
- {tag:'CBL11_3',cable_type:'Power',diameter:0.75,conductors:3,conductor_size:'#2 AWG',weight:5,start_conduit_id:'C11',end_conduit_id:'C11'},
- {tag:'CBL12_1',cable_type:'Power',diameter:1.5,conductors:3,conductor_size:'#2 AWG',weight:5,start_conduit_id:'C12',end_conduit_id:'C12'},
- {tag:'CBL13_1',cable_type:'Power',diameter:1.5,conductors:3,conductor_size:'#2 AWG',weight:5,start_conduit_id:'C13',end_conduit_id:'C13'},
- {tag:'CBL13_2',cable_type:'Power',diameter:1.0,conductors:3,conductor_size:'#2 AWG',weight:5,start_conduit_id:'C13',end_conduit_id:'C13'},
- {tag:'CBL14_1',cable_type:'Power',diameter:1.5,conductors:3,conductor_size:'#2 AWG',weight:5,start_conduit_id:'C14',end_conduit_id:'C14'},
- {tag:'CBL14_2',cable_type:'Power',diameter:1.0,conductors:3,conductor_size:'#2 AWG',weight:5,start_conduit_id:'C14',end_conduit_id:'C14'},
- {tag:'CBL14_3',cable_type:'Power',diameter:0.75,conductors:3,conductor_size:'#2 AWG',weight:5,start_conduit_id:'C14',end_conduit_id:'C14'},
- {tag:'CBL15_1',cable_type:'Power',diameter:1.5,conductors:3,conductor_size:'#2 AWG',weight:5,start_conduit_id:'C15',end_conduit_id:'C15'},
- {tag:'CBL16_1',cable_type:'Power',diameter:1.5,conductors:3,conductor_size:'#2 AWG',weight:5,start_conduit_id:'C16',end_conduit_id:'C16'},
- {tag:'CBL16_2',cable_type:'Power',diameter:1.0,conductors:3,conductor_size:'#2 AWG',weight:5,start_conduit_id:'C16',end_conduit_id:'C16'},
+ {tag:'CBL1_1',cable_type:'Power',diameter:1.5,conductors:3,conductor_size:'#2 AWG',weight:5,conduit_id:'C1'},
+ {tag:'CBL1_2',cable_type:'Power',diameter:1.0,conductors:3,conductor_size:'#2 AWG',weight:5,conduit_id:'C1'},
+ {tag:'CBL2_1',cable_type:'Power',diameter:1.5,conductors:3,conductor_size:'#2 AWG',weight:5,conduit_id:'C2'},
+ {tag:'CBL2_2',cable_type:'Power',diameter:1.0,conductors:3,conductor_size:'#2 AWG',weight:5,conduit_id:'C2'},
+ {tag:'CBL2_3',cable_type:'Power',diameter:0.75,conductors:3,conductor_size:'#2 AWG',weight:5,conduit_id:'C2'},
+ {tag:'CBL3_1',cable_type:'Power',diameter:1.5,conductors:3,conductor_size:'#2 AWG',weight:5,conduit_id:'C3'},
+ {tag:'CBL4_1',cable_type:'Power',diameter:1.5,conductors:3,conductor_size:'#2 AWG',weight:5,conduit_id:'C4'},
+ {tag:'CBL4_2',cable_type:'Power',diameter:1.0,conductors:3,conductor_size:'#2 AWG',weight:5,conduit_id:'C4'},
+ {tag:'CBL5_1',cable_type:'Power',diameter:1.5,conductors:3,conductor_size:'#2 AWG',weight:5,conduit_id:'C5'},
+ {tag:'CBL5_2',cable_type:'Power',diameter:1.0,conductors:3,conductor_size:'#2 AWG',weight:5,conduit_id:'C5'},
+ {tag:'CBL5_3',cable_type:'Power',diameter:0.75,conductors:3,conductor_size:'#2 AWG',weight:5,conduit_id:'C5'},
+ {tag:'CBL6_1',cable_type:'Power',diameter:1.5,conductors:3,conductor_size:'#2 AWG',weight:5,conduit_id:'C6'},
+ {tag:'CBL7_1',cable_type:'Power',diameter:1.5,conductors:3,conductor_size:'#2 AWG',weight:5,conduit_id:'C7'},
+ {tag:'CBL7_2',cable_type:'Power',diameter:1.0,conductors:3,conductor_size:'#2 AWG',weight:5,conduit_id:'C7'},
+ {tag:'CBL8_1',cable_type:'Power',diameter:1.5,conductors:3,conductor_size:'#2 AWG',weight:5,conduit_id:'C8'},
+ {tag:'CBL8_2',cable_type:'Power',diameter:1.0,conductors:3,conductor_size:'#2 AWG',weight:5,conduit_id:'C8'},
+ {tag:'CBL8_3',cable_type:'Power',diameter:0.75,conductors:3,conductor_size:'#2 AWG',weight:5,conduit_id:'C8'},
+ {tag:'CBL9_1',cable_type:'Power',diameter:1.5,conductors:3,conductor_size:'#2 AWG',weight:5,conduit_id:'C9'},
+ {tag:'CBL10_1',cable_type:'Power',diameter:1.5,conductors:3,conductor_size:'#2 AWG',weight:5,conduit_id:'C10'},
+ {tag:'CBL10_2',cable_type:'Power',diameter:1.0,conductors:3,conductor_size:'#2 AWG',weight:5,conduit_id:'C10'},
+ {tag:'CBL11_1',cable_type:'Power',diameter:1.5,conductors:3,conductor_size:'#2 AWG',weight:5,conduit_id:'C11'},
+ {tag:'CBL11_2',cable_type:'Power',diameter:1.0,conductors:3,conductor_size:'#2 AWG',weight:5,conduit_id:'C11'},
+ {tag:'CBL11_3',cable_type:'Power',diameter:0.75,conductors:3,conductor_size:'#2 AWG',weight:5,conduit_id:'C11'},
+ {tag:'CBL12_1',cable_type:'Power',diameter:1.5,conductors:3,conductor_size:'#2 AWG',weight:5,conduit_id:'C12'},
+ {tag:'CBL13_1',cable_type:'Power',diameter:1.5,conductors:3,conductor_size:'#2 AWG',weight:5,conduit_id:'C13'},
+ {tag:'CBL13_2',cable_type:'Power',diameter:1.0,conductors:3,conductor_size:'#2 AWG',weight:5,conduit_id:'C13'},
+ {tag:'CBL14_1',cable_type:'Power',diameter:1.5,conductors:3,conductor_size:'#2 AWG',weight:5,conduit_id:'C14'},
+ {tag:'CBL14_2',cable_type:'Power',diameter:1.0,conductors:3,conductor_size:'#2 AWG',weight:5,conduit_id:'C14'},
+ {tag:'CBL14_3',cable_type:'Power',diameter:0.75,conductors:3,conductor_size:'#2 AWG',weight:5,conduit_id:'C14'},
+ {tag:'CBL15_1',cable_type:'Power',diameter:1.5,conductors:3,conductor_size:'#2 AWG',weight:5,conduit_id:'C15'},
+ {tag:'CBL16_1',cable_type:'Power',diameter:1.5,conductors:3,conductor_size:'#2 AWG',weight:5,conduit_id:'C16'},
+ {tag:'CBL16_2',cable_type:'Power',diameter:1.0,conductors:3,conductor_size:'#2 AWG',weight:5,conduit_id:'C16'},
 ];
 
 const CONDUIT_SPECS={
@@ -235,7 +232,7 @@ function addConduitRow(data={}){
  const typeTd=document.createElement('td');const typeSel=document.createElement('select');Object.keys(CONDUIT_SPECS).forEach(t=>{const o=document.createElement('option');o.value=t;o.textContent=t;typeSel.appendChild(o);});typeSel.value=data.conduit_type||Object.keys(CONDUIT_SPECS)[0];typeTd.appendChild(typeSel);tr.appendChild(typeTd);
  const sizeTd=document.createElement('td');let sizeSel=conduitSizeOptions(typeSel.value);sizeTd.appendChild(sizeSel);sizeSel.value=data.trade_size||sizeSel.options[0].value;tr.appendChild(sizeTd);
  typeSel.addEventListener('change',()=>{const old=sizeSel;sizeSel=conduitSizeOptions(typeSel.value);sizeTd.replaceChild(sizeSel,old);});
- ['x','y','z','angle'].forEach(k=>{const td=document.createElement('td');const inp=document.createElement('input');inp.type='number';inp.value=data[k]||0;if(k==='x'||k==='y')inp.readOnly=true;td.appendChild(inp);tr.appendChild(td);});
+ ['x','y'].forEach(k=>{const td=document.createElement('td');const inp=document.createElement('input');inp.type='number';inp.value=data[k]||0;if(k==='x'||k==='y')inp.readOnly=true;td.appendChild(inp);tr.appendChild(td);});
  const dupTd=document.createElement('td');dupTd.appendChild(createButton('⧉','duplicateBtn',()=>{const cloneData=rowToConduit(tr);addConduitRow(cloneData);}));tr.appendChild(dupTd);
  const delTd=document.createElement('td');delTd.appendChild(createButton('✖','removeBtn',()=>{tr.remove();drawGrid();}));tr.appendChild(delTd);
  document.querySelector('#conduitTable tbody').appendChild(tr);
@@ -244,7 +241,7 @@ function addConduitRow(data={}){
 
 function addCableRow(data={}){
  const tr=document.createElement('tr');
- const cols=['tag','cable_type','diameter','conductors','conductor_size','weight','start_conduit_id','end_conduit_id'];
+ const cols=['tag','cable_type','diameter','conductors','conductor_size','weight','conduit_id'];
  cols.forEach((c,i)=>{const td=document.createElement('td');const inp=document.createElement('input');inp.type=(c==='diameter'||c==='weight')?'number':'text';if(c==='conductors')inp.type='number';inp.value=data[c]||'';td.appendChild(inp);tr.appendChild(td);});
  const dupTd=document.createElement('td');dupTd.appendChild(createButton('⧉','duplicateBtn',()=>{const clone=rowToCable(tr);addCableRow(clone);}));tr.appendChild(dupTd);
  const delTd=document.createElement('td');delTd.appendChild(createButton('✖','removeBtn',()=>{tr.remove();drawGrid();}));tr.appendChild(delTd);
@@ -252,14 +249,14 @@ function addCableRow(data={}){
 }
 
 function rowToConduit(tr){
- const [id,type,size,x,y,z,angle]=Array.from(tr.children).slice(0,7).map(td=>td.querySelector('input,select').value);
- return {conduit_id:id,conduit_type:type,trade_size:size,x:parseFloat(x),y:parseFloat(y),z:parseFloat(z),angle:parseFloat(angle)};
+ const [id,type,size,x,y]=Array.from(tr.children).slice(0,5).map(td=>td.querySelector('input,select').value);
+ return {conduit_id:id,conduit_type:type,trade_size:size,x:parseFloat(x),y:parseFloat(y)};
 }
 
 function rowToCable(tr){
- const vals=Array.from(tr.children).slice(0,8).map(td=>td.querySelector('input').value);
- const [tag,cable_type,diameter,conductors,conductor_size,weight,start_conduit_id,end_conduit_id]=vals;
- return {tag,cable_type,diameter:parseFloat(diameter),conductors:parseInt(conductors||0),conductor_size,weight:parseFloat(weight)||0,start_conduit_id,end_conduit_id};
+ const vals=Array.from(tr.children).slice(0,7).map(td=>td.querySelector('input').value);
+ const [tag,cable_type,diameter,conductors,conductor_size,weight,conduit_id]=vals;
+ return {tag,cable_type,diameter:parseFloat(diameter),conductors:parseInt(conductors||0),conductor_size,weight:parseFloat(weight)||0,conduit_id};
 }
 
 function getAllConduits(){
@@ -321,7 +318,7 @@ function fillResults(){
  const cables=getAllCables();
  const fillMap={};
  conduits.forEach(c=>{fillMap[c.conduit_id]={area:CONDUIT_SPECS[c.conduit_type][c.trade_size],cables:[]};});
- cables.forEach(cb=>{const cid=cb.start_conduit_id;if(fillMap[cid])fillMap[cid].cables.push(cb);});
+ cables.forEach(cb=>{const cid=cb.conduit_id;if(fillMap[cid])fillMap[cid].cables.push(cb);});
  Object.values(fillMap).forEach(c=>{c.fillArea=c.cables.reduce((s,cb)=>s+Math.PI*Math.pow(cb.diameter/2,2),0);c.fillPct=(c.fillArea/c.area)*100;});
  return fillMap;
 }
@@ -514,7 +511,7 @@ svg.appendChild(widthText);
   typeText.textContent=`${c.conduit_type} ${c.trade_size}\"`;
   svg.appendChild(typeText);
 });
- svg.setAttribute('width',maxX*scale+2*margin+20);
+ svg.setAttribute('width',maxX*scale+2*margin+80);
  svg.setAttribute('height',maxY*scale+2*margin+20);
 }
 
@@ -564,13 +561,13 @@ function exportCSV(filename,headers,rows){
 
 function exportConduits(){
  const rows=getAllConduits();
- const headers=['conduit_id','conduit_type','trade_size','x','y','z','angle'];
+ const headers=['conduit_id','conduit_type','trade_size','x','y'];
  exportCSV('ductbank_conduits.csv',headers,rows);
 }
 
 function exportCables(){
  const rows=getAllCables();
- const headers=['tag','cable_type','diameter','conductors','conductor_size','weight','start_conduit_id','end_conduit_id'];
+ const headers=['tag','cable_type','diameter','conductors','conductor_size','weight','conduit_id'];
  exportCSV('ductbank_cables.csv',headers,rows);
 }
 
