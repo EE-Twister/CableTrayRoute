@@ -32,6 +32,7 @@ body.dark-mode #helpPopup{background:#2c3034;color:#f8f9fa;}
 <h1>Ductbank Route</h1>
 <button id="themeToggle">Toggle Theme</button>
 <button id="helpBtn">Help</button>
+<label style="margin-left:8px;">Ductbank Tag<input type="text" id="ductbankTag" style="margin-left:4px;"></label>
 
 <fieldset>
  <legend><strong>Ductbank Conduits</strong></legend>
@@ -92,6 +93,8 @@ body.dark-mode #helpPopup{background:#2c3034;color:#f8f9fa;}
 
 <button id="calc">Calculate Fill</button>
 <button id="exportBtn">Download Ductbank Data</button>
+<button id="exportConduitsBtn">Export Ductbank Conduits</button>
+<button id="exportCablesBtn">Export Ductbank Cables</button>
 
 <svg id="grid" width="500" height="500"></svg>
 
@@ -104,6 +107,7 @@ body.dark-mode #helpPopup{background:#2c3034;color:#f8f9fa;}
   <p>Click <em>Add Conduit</em> or <em>Add Cable</em> to create rows manually, or use <em>Import&nbsp;CSV</em> to load your own files. <em>Load Sample Data</em> fills the tables with example values.</p>
   <p>After entering data, press <strong>Calculate Fill</strong> to draw the ductbank. Conduits are colored by fill percentage and display individual cable circles. Hover over a conduit to see its fill and cable tags.</p>
   <p>The <strong>Download Ductbank Data</strong> button exports all conduits, cables and fill results to an XLSX file.</p>
+  <p><strong>Export Ductbank Conduits</strong> and <strong>Export Ductbank Cables</strong> create CSV files compatible with the import buttons.</p>
   <h3>NEC Fill Rules</h3>
   <p>NEC Chapter&nbsp;9 Table&nbsp;1 limits conduit fill to 53% with one cable, 31% with two cables and 40% with three or more cables. Table&nbsp;4 provides areas for each conduit type and size.</p>
  </div>
@@ -365,13 +369,24 @@ svg.appendChild(rect);
  tick2.setAttribute('y2',widthY+4);
  tick2.setAttribute('stroke','black');
  svg.appendChild(tick2);
- const widthText=document.createElementNS('http://www.w3.org/2000/svg','text');
- widthText.setAttribute('x',(wStart+wEnd)/2);
- widthText.setAttribute('y',widthY-6);
- widthText.setAttribute('font-size','10');
- widthText.setAttribute('text-anchor','middle');
- widthText.textContent=maxX.toFixed(2)+'"';
- svg.appendChild(widthText);
+const widthText=document.createElementNS('http://www.w3.org/2000/svg','text');
+widthText.setAttribute('x',(wStart+wEnd)/2);
+widthText.setAttribute('y',widthY-6);
+widthText.setAttribute('font-size','10');
+widthText.setAttribute('text-anchor','middle');
+widthText.textContent=maxX.toFixed(2)+'"';
+svg.appendChild(widthText);
+
+ const tag=document.getElementById('ductbankTag').value.trim();
+ if(tag){
+   const tagText=document.createElementNS('http://www.w3.org/2000/svg','text');
+   tagText.setAttribute('x',10+maxX*scale/2);
+   tagText.setAttribute('y',8);
+   tagText.setAttribute('font-size','14');
+   tagText.setAttribute('text-anchor','middle');
+   tagText.textContent=tag;
+   svg.appendChild(tagText);
+ }
 
  const heightX=10+maxX*scale+15;
  const hStart=10, hEnd=10+maxY*scale;
@@ -475,7 +490,14 @@ svg.appendChild(rect);
   cidText.setAttribute('text-anchor','middle');
   cidText.textContent=c.conduit_id;
   svg.appendChild(cidText);
- });
+  const typeText=document.createElementNS('http://www.w3.org/2000/svg','text');
+  typeText.setAttribute('x',cx);
+  typeText.setAttribute('y',cy-R+8);
+  typeText.setAttribute('font-size','8');
+  typeText.setAttribute('text-anchor','middle');
+  typeText.textContent=`${c.conduit_type} ${c.trade_size}\"`;
+  svg.appendChild(typeText);
+});
  svg.setAttribute('width',maxX*scale+40);
  svg.setAttribute('height',maxY*scale+40);
 }
@@ -515,6 +537,29 @@ document.getElementById('exportBtn').addEventListener('click',()=>{
  XLSX.utils.book_append_sheet(wb,XLSX.utils.json_to_sheet(compliance),'fill');
  XLSX.writeFile(wb,'ductbank_data.xlsx');
 });
+
+function exportCSV(filename,headers,rows){
+ const csv=[headers.join(',')];
+ rows.forEach(r=>{csv.push(headers.map(h=>r[h]!==undefined?r[h]:'').join(','));});
+ const blob=new Blob([csv.join('\n')],{type:'text/csv;charset=utf-8;'});
+ const url=URL.createObjectURL(blob);
+ const a=document.createElement('a');a.href=url;a.download=filename;document.body.appendChild(a);a.click();document.body.removeChild(a);URL.revokeObjectURL(url);
+}
+
+function exportConduits(){
+ const rows=getAllConduits();
+ const headers=['conduit_id','conduit_type','trade_size','x','y','z','angle'];
+ exportCSV('ductbank_conduits.csv',headers,rows);
+}
+
+function exportCables(){
+ const rows=getAllCables();
+ const headers=['tag','cable_type','diameter','conductors','conductor_size','weight','start_conduit_id','end_conduit_id'];
+ exportCSV('ductbank_cables.csv',headers,rows);
+}
+
+document.getElementById('exportConduitsBtn').addEventListener('click',exportConduits);
+document.getElementById('exportCablesBtn').addEventListener('click',exportCables);
 
 document.getElementById('themeToggle').addEventListener('click',()=>{
  document.body.classList.toggle('dark-mode');
