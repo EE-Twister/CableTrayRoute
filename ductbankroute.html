@@ -83,6 +83,8 @@ body.dark-mode #helpPopup{background:#2c3034;color:#f8f9fa;}
 <div style="margin-top:8px;">
   <label>Horiz Spacing (in)<input type="number" id="hSpacing" value="3" style="width:60px;"></label>
   <label>Vert Spacing (in)<input type="number" id="vSpacing" value="4" style="width:60px;"></label>
+  <label>Top Clear (in)<input type="number" id="topPad" value="0" style="width:60px;"></label>
+  <label>Bottom Clear (in)<input type="number" id="bottomPad" value="0" style="width:60px;"></label>
   <label>Conduits/Row<input type="number" id="perRow" value="4" style="width:60px;"></label>
 </div>
 
@@ -253,15 +255,43 @@ function autoPlaceConduits(){
  const rows=document.querySelectorAll('#conduitTable tbody tr');
  const h=parseFloat(document.getElementById('hSpacing').value)||3;
  const v=parseFloat(document.getElementById('vSpacing').value)||4;
+ const bottomPad=parseFloat(document.getElementById('bottomPad').value)||0;
  const perRow=parseInt(document.getElementById('perRow').value)||Math.ceil(Math.sqrt(rows.length));
- rows.forEach((tr,i)=>{
-   const col=i%perRow;const row=Math.floor(i/perRow);
-   const cells=tr.querySelectorAll('td');
-   const x=cells[3].querySelector('input');
-   const y=cells[4].querySelector('input');
-   x.value=col*h;
-   y.value=row*v;
- });
+
+ const numRows=Math.ceil(rows.length/perRow);
+ const rowMaxR=new Array(numRows).fill(0);
+ for(let r=0;r<numRows;r++){
+   for(let c=0;c<perRow;c++){
+     const idx=r*perRow+c;
+     if(idx>=rows.length)break;
+     const tr=rows[idx];
+     const type=tr.children[1].querySelector('select').value;
+     const size=tr.children[2].querySelector('select').value;
+     const Rin=Math.sqrt(CONDUIT_SPECS[type][size]/Math.PI);
+     rowMaxR[r]=Math.max(rowMaxR[r],Rin);
+   }
+ }
+
+ let yCursor=bottomPad;
+ for(let r=0;r<numRows;r++){
+   let xCursor=0;
+   for(let c=0;c<perRow;c++){
+     const idx=r*perRow+c;
+     if(idx>=rows.length)break;
+     const tr=rows[idx];
+     const type=tr.children[1].querySelector('select').value;
+     const size=tr.children[2].querySelector('select').value;
+     const Rin=Math.sqrt(CONDUIT_SPECS[type][size]/Math.PI);
+     const cells=tr.querySelectorAll('td');
+     const x=cells[3].querySelector('input');
+     const y=cells[4].querySelector('input');
+     x.value=xCursor;
+     y.value=yCursor+(rowMaxR[r]-Rin);
+     xCursor+=2*Rin+h;
+   }
+   yCursor+=2*rowMaxR[r];
+   if(r<numRows-1) yCursor+=v;
+ }
 }
 
 function fillResults(){
@@ -280,12 +310,31 @@ function drawGrid(){
  autoPlaceConduits();
  const conduits=getAllConduits();
  if(conduits.length===0)return;
- const maxX=Math.max(...conduits.map(c=>c.x));
- const maxY=Math.max(...conduits.map(c=>c.y));
+ const topPad=parseFloat(document.getElementById('topPad').value)||0;
+ const bottomPad=parseFloat(document.getElementById('bottomPad').value)||0;
  const scale=40; // pixels per unit
  const fillMap=fillResults();
+ let maxX=0,maxY=0;
+ conduits.forEach(c=>{
+   const Rin=Math.sqrt(CONDUIT_SPECS[c.conduit_type][c.trade_size]/Math.PI);
+   maxX=Math.max(maxX,c.x+2*Rin);
+   maxY=Math.max(maxY,c.y+2*Rin);
+ });
+ maxY+=topPad;
+
  const defs=document.createElementNS('http://www.w3.org/2000/svg','defs');
  svg.appendChild(defs);
+
+ const rect=document.createElementNS('http://www.w3.org/2000/svg','rect');
+ rect.setAttribute('x',10);
+ rect.setAttribute('y',10);
+ rect.setAttribute('width',maxX*scale);
+ rect.setAttribute('height',maxY*scale);
+ rect.setAttribute('fill','none');
+ rect.setAttribute('stroke','gray');
+ rect.setAttribute('stroke-dasharray','4 2');
+ svg.appendChild(rect);
+
  conduits.forEach(c=>{
    const Rin=Math.sqrt(CONDUIT_SPECS[c.conduit_type][c.trade_size]/Math.PI);
    const R=Rin*scale;
@@ -307,7 +356,7 @@ function drawGrid(){
    defs.appendChild(clip);
    if(data){
      const placed=packCircles(data.cables.map(cb=>({tag:cb.tag,r:cb.diameter/2})),Rin);
-     placed.forEach(p=>{
+    placed.forEach(p=>{
        const sc=document.createElementNS('http://www.w3.org/2000/svg','circle');
        sc.setAttribute('cx',cx+p.x*scale);
        sc.setAttribute('cy',cy+p.y*scale);
@@ -316,6 +365,27 @@ function drawGrid(){
        sc.setAttribute('stroke','black');
        sc.setAttribute('clip-path',`url(#${clipId})`);
        svg.appendChild(sc);
+       if(p.tag){
+         const fs=Math.max(6,Math.min(p.r*scale,(2*p.r*scale*0.8)/(p.tag.length*0.6)));
+         const text=document.createElementNS('http://www.w3.org/2000/svg','text');
+         text.setAttribute('x',cx+p.x*scale);
+         text.setAttribute('y',cy+p.y*scale);
+         text.setAttribute('font-size',fs);
+         text.setAttribute('text-anchor','middle');
+         text.setAttribute('dominant-baseline','middle');
+         text.setAttribute('clip-path',`url(#${clipId})`);
+         text.textContent=p.tag;
+         svg.appendChild(text);
+         const text2=document.createElementNS('http://www.w3.org/2000/svg','text');
+         text2.setAttribute('x',cx+p.x*scale);
+         text2.setAttribute('y',cy+p.y*scale+fs*0.8);
+         text2.setAttribute('font-size',Math.max(6,fs*0.7));
+         text2.setAttribute('text-anchor','middle');
+         text2.setAttribute('dominant-baseline','hanging');
+         text2.setAttribute('clip-path',`url(#${clipId})`);
+         text2.textContent=(2*p.r).toFixed(2)+'"';
+         svg.appendChild(text2);
+       }
      });
    }
    const circle=document.createElementNS('http://www.w3.org/2000/svg','circle');
@@ -329,8 +399,8 @@ function drawGrid(){
    }
    svg.appendChild(circle);
   });
- svg.setAttribute('width',maxX*scale+100);
- svg.setAttribute('height',maxY*scale+100);
+ svg.setAttribute('width',maxX*scale+20);
+ svg.setAttribute('height',maxY*scale+20);
 }
 
 function importCSV(file,callback){
