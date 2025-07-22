@@ -4,6 +4,7 @@
 <meta charset="UTF-8"/>
 <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
 <title>Ductbank Route</title>
+<link rel="stylesheet" href="style.css">
 <script src="https://cdn.jsdelivr.net/npm/xlsx/dist/xlsx.full.min.js"></script>
 <style>
 body{font-family:Arial,sans-serif;margin:16px;}
@@ -29,9 +30,14 @@ body.dark-mode #helpPopup{background:#2c3034;color:#f8f9fa;}
 </style>
 </head>
 <body>
-<h1>Ductbank Route</h1>
-<button id="themeToggle">Toggle Theme</button>
-<button id="helpBtn">Help</button>
+<header class="page-header">
+ <h1>Ductbank Route</h1>
+ <button id="settings-btn" class="settings-btn" aria-label="Settings">⚙</button>
+ <div id="settings-menu" class="settings-menu">
+  <button id="themeToggle">Toggle Theme</button>
+  <button id="helpBtn">Help</button>
+ </div>
+</header>
 <label style="margin-left:8px;">Ductbank Tag<input type="text" id="ductbankTag" style="margin-left:4px;"></label>
 
 <fieldset>
@@ -91,12 +97,12 @@ body.dark-mode #helpPopup{background:#2c3034;color:#f8f9fa;}
   <label>Conduits/Row<input type="number" id="perRow" value="4" style="width:60px;"></label>
 </div>
 
+<svg id="grid" width="500" height="500"></svg>
+
 <button id="calc">Calculate Fill</button>
 <button id="exportBtn">Download Ductbank Data</button>
 <button id="exportConduitsBtn">Export Ductbank Conduits</button>
 <button id="exportCablesBtn">Export Ductbank Cables</button>
-
-<svg id="grid" width="500" height="500"></svg>
 
 <div id="helpOverlay">
  <div id="helpPopup">
@@ -321,6 +327,7 @@ function drawGrid(){
  const bottomPad=parseFloat(document.getElementById('bottomPad').value)||0;
  const leftPad=parseFloat(document.getElementById('leftPad').value)||0;
  const rightPad=parseFloat(document.getElementById('rightPad').value)||0;
+ const margin=20;
  const scale=40; // pixels per unit
  const fillMap=fillResults();
 let maxX=0,maxY=0;
@@ -336,8 +343,8 @@ maxY+=topPad;
  svg.appendChild(defs);
 
  const rect=document.createElementNS('http://www.w3.org/2000/svg','rect');
- rect.setAttribute('x',10);
- rect.setAttribute('y',10);
+ rect.setAttribute('x',margin);
+ rect.setAttribute('y',margin);
  rect.setAttribute('width',maxX*scale);
  rect.setAttribute('height',maxY*scale);
  rect.setAttribute('fill','none');
@@ -346,8 +353,8 @@ maxY+=topPad;
 svg.appendChild(rect);
 
  // overall dimension lines
- const widthY=10+maxY*scale+15;
- const wStart=10, wEnd=10+maxX*scale;
+ const widthY=margin+maxY*scale+15;
+ const wStart=margin, wEnd=margin+maxX*scale;
  const widthLine=document.createElementNS('http://www.w3.org/2000/svg','line');
  widthLine.setAttribute('x1',wStart);
  widthLine.setAttribute('x2',wEnd);
@@ -380,16 +387,16 @@ svg.appendChild(widthText);
  const tag=document.getElementById('ductbankTag').value.trim();
  if(tag){
    const tagText=document.createElementNS('http://www.w3.org/2000/svg','text');
-   tagText.setAttribute('x',10+maxX*scale/2);
-   tagText.setAttribute('y',8);
+   tagText.setAttribute('x',margin+maxX*scale/2);
+   tagText.setAttribute('y',margin-4);
    tagText.setAttribute('font-size','14');
    tagText.setAttribute('text-anchor','middle');
    tagText.textContent=tag;
    svg.appendChild(tagText);
  }
 
- const heightX=10+maxX*scale+15;
- const hStart=10, hEnd=10+maxY*scale;
+ const heightX=margin+maxX*scale+15;
+ const hStart=margin, hEnd=margin+maxY*scale;
  const heightLine=document.createElementNS('http://www.w3.org/2000/svg','line');
  heightLine.setAttribute('x1',heightX);
  heightLine.setAttribute('x2',heightX);
@@ -423,8 +430,8 @@ svg.appendChild(widthText);
  conduits.forEach(c=>{
    const Rin=Math.sqrt(CONDUIT_SPECS[c.conduit_type][c.trade_size]/Math.PI);
    const R=Rin*scale;
-   const cx=c.x*scale+R+10;
-   const cy=c.y*scale+R+10;
+   const cx=c.x*scale+R+margin;
+   const cy=c.y*scale+R+margin;
    const data=fillMap[c.conduit_id];
    let color='green';
    if(data){
@@ -485,21 +492,21 @@ svg.appendChild(widthText);
   svg.appendChild(circle);
   const cidText=document.createElementNS('http://www.w3.org/2000/svg','text');
   cidText.setAttribute('x',cx);
-  cidText.setAttribute('y',cy-R-4);
+  cidText.setAttribute('y',cy-R-10);
   cidText.setAttribute('font-size','10');
   cidText.setAttribute('text-anchor','middle');
   cidText.textContent=c.conduit_id;
   svg.appendChild(cidText);
   const typeText=document.createElementNS('http://www.w3.org/2000/svg','text');
   typeText.setAttribute('x',cx);
-  typeText.setAttribute('y',cy-R+8);
+  typeText.setAttribute('y',cy-R-22);
   typeText.setAttribute('font-size','8');
   typeText.setAttribute('text-anchor','middle');
   typeText.textContent=`${c.conduit_type} ${c.trade_size}\"`;
   svg.appendChild(typeText);
 });
- svg.setAttribute('width',maxX*scale+40);
- svg.setAttribute('height',maxY*scale+40);
+ svg.setAttribute('width',maxX*scale+2*margin+20);
+ svg.setAttribute('height',maxY*scale+2*margin+20);
 }
 
 function importCSV(file,callback){
@@ -572,8 +579,24 @@ if(stored.darkMode)document.body.classList.add('dark-mode');
 
 window.addEventListener('storage',e=>{if(e.key==='ctrSession'){const d=JSON.parse(e.newValue);if(d.darkMode)document.body.classList.add('dark-mode');else document.body.classList.remove('dark-mode');}});
 
-document.getElementById('helpBtn').addEventListener('click',()=>{document.getElementById('helpOverlay').style.display='flex';});
-document.getElementById('helpClose').addEventListener('click',()=>{document.getElementById('helpOverlay').style.display='none';});
+document.getElementById('helpBtn').addEventListener('click',()=>{
+ document.getElementById('settings-menu').style.display='none';
+ document.getElementById('helpOverlay').style.display='flex';
+});
+document.getElementById('helpClose').addEventListener('click',()=>{
+ document.getElementById('helpOverlay').style.display='none';
+});
+
+document.getElementById('settings-btn').addEventListener('click',()=>{
+ const menu=document.getElementById('settings-menu');
+ menu.style.display=menu.style.display==='flex'?'none':'flex';
+});
+document.addEventListener('click',e=>{
+ const menu=document.getElementById('settings-menu');
+ if(!menu.contains(e.target)&&e.target!==document.getElementById('settings-btn')){
+  menu.style.display='none';
+ }
+});
 </script>
 </body>
 </html>
