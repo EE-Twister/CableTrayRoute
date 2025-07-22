@@ -1,0 +1,3 @@
+conduit_id,conduit_type,trade_size,x,y,z,angle
+C1,EMT,2,0,0,0,0
+C2,EMT,2,12,0,0,0
