@@ -103,6 +103,7 @@ body.dark-mode #helpPopup{background:#2c3034;color:#f8f9fa;}
 <button id="exportBtn">Download Ductbank Data</button>
 <button id="exportConduitsBtn">Export Ductbank Conduits</button>
 <button id="exportCablesBtn">Export Ductbank Cables</button>
+<button id="exportImgBtn">Export Image</button>
 
 <div id="helpOverlay">
  <div id="helpPopup">
@@ -273,6 +274,7 @@ function autoPlaceConduits(){
 
  const numRows=Math.ceil(rows.length/perRow);
  const rowMaxR=new Array(numRows).fill(0);
+ const colMaxR=new Array(perRow).fill(0);
  for(let r=0;r<numRows;r++){
    for(let c=0;c<perRow;c++){
      const idx=r*perRow+c;
@@ -282,6 +284,7 @@ function autoPlaceConduits(){
      const size=tr.children[2].querySelector('select').value;
      const Rin=Math.sqrt(CONDUIT_SPECS[type][size]/Math.PI);
      rowMaxR[r]=Math.max(rowMaxR[r],Rin);
+     colMaxR[c]=Math.max(colMaxR[c],Rin);
    }
  }
 
@@ -298,9 +301,9 @@ function autoPlaceConduits(){
      const cells=tr.querySelectorAll('td');
      const x=cells[3].querySelector('input');
      const y=cells[4].querySelector('input');
-     x.value=xCursor;
+     x.value=xCursor+(colMaxR[c]-Rin);
      y.value=yCursor+(rowMaxR[r]-Rin);
-     xCursor+=2*Rin+h;
+     xCursor+=2*colMaxR[c]+h;
    }
    yCursor+=2*rowMaxR[r];
    if(r<numRows-1) yCursor+=v;
@@ -565,8 +568,31 @@ function exportCables(){
  exportCSV('ductbank_cables.csv',headers,rows);
 }
 
+function exportImage(){
+ const svg=document.getElementById('grid');
+ const serializer=new XMLSerializer();
+ const source=serializer.serializeToString(svg);
+ const img=new Image();
+ img.onload=()=>{
+   const canvas=document.createElement('canvas');
+   canvas.width=img.width;
+   canvas.height=img.height;
+   const ctx=canvas.getContext('2d');
+   ctx.drawImage(img,0,0);
+   const url=canvas.toDataURL('image/png');
+   const a=document.createElement('a');
+   a.href=url;
+   a.download='ductbank.png';
+   document.body.appendChild(a);
+   a.click();
+   document.body.removeChild(a);
+ };
+ img.src='data:image/svg+xml;charset=utf-8,'+encodeURIComponent(source);
+}
+
 document.getElementById('exportConduitsBtn').addEventListener('click',exportConduits);
 document.getElementById('exportCablesBtn').addEventListener('click',exportCables);
+document.getElementById('exportImgBtn').addEventListener('click',exportImage);
 
 document.getElementById('themeToggle').addEventListener('click',()=>{
  document.body.classList.toggle('dark-mode');
