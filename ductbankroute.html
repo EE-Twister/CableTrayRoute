@@ -42,6 +42,8 @@ body.dark-mode #helpPopup{background:#2c3034;color:#f8f9fa;}
 <fieldset>
  <legend><strong>Ductbank Information</strong></legend>
  <label>Ductbank Tag<input type="text" id="ductbankTag" style="margin-left:4px;"></label>
+ <label style="margin-left:8px;">Concrete Encasement<input type="checkbox" id="concreteEncasement" style="margin-left:4px;"></label>
+ <label style="margin-left:8px;">Ductbank Depth (in)<input type="number" id="ductbankDepth" style="width:60px;"></label>
 </fieldset>
 
 <details open>
@@ -65,6 +67,14 @@ body.dark-mode #helpPopup{background:#2c3034;color:#f8f9fa;}
  </table>
 </details>
 
+<fieldset style="margin-top:8px;">
+ <legend><strong>Thermal &amp; Environmental Parameters</strong></legend>
+ <label>Ambient Earth Temperature<input type="number" id="earthTemp" style="width:60px;"></label>
+ <label style="margin-left:8px;">Thermal Resistivity of Soil<input type="number" id="soilResistivity" style="width:60px;"></label>
+ <label style="margin-left:8px;">Moisture Content<input type="number" id="moistureContent" style="width:60px;"></label>
+ <label style="margin-left:8px;">Presence of Adjacent Heat Sources<input type="checkbox" id="heatSources" style="margin-left:4px;"></label>
+</fieldset>
+
 <details open>
  <summary><strong>Cables</strong></summary>
  <input type="file" id="importCables" accept=".csv"/>
@@ -80,6 +90,10 @@ body.dark-mode #helpPopup{background:#2c3034;color:#f8f9fa;}
     <th>Size</th>
     <th>Weight</th>
     <th>Conduit</th>
+    <th>Conductor Material</th>
+    <th>Insulation Type</th>
+    <th>Voltage Rating</th>
+    <th>Shielding / Jacket Type</th>
     <th>Dup</th>
     <th>Del</th>
    </tr>
@@ -174,9 +188,17 @@ const SAMPLE_CABLES=[
  {tag:'CBL14_2',cable_type:'Power',diameter:1.0,conductors:3,conductor_size:'#2 AWG',weight:5,conduit_id:'C14'},
  {tag:'CBL14_3',cable_type:'Power',diameter:0.75,conductors:3,conductor_size:'#2 AWG',weight:5,conduit_id:'C14'},
  {tag:'CBL15_1',cable_type:'Power',diameter:1.5,conductors:3,conductor_size:'#2 AWG',weight:5,conduit_id:'C15'},
- {tag:'CBL16_1',cable_type:'Power',diameter:1.5,conductors:3,conductor_size:'#2 AWG',weight:5,conduit_id:'C16'},
- {tag:'CBL16_2',cable_type:'Power',diameter:1.0,conductors:3,conductor_size:'#2 AWG',weight:5,conduit_id:'C16'},
+{tag:'CBL16_1',cable_type:'Power',diameter:1.5,conductors:3,conductor_size:'#2 AWG',weight:5,conduit_id:'C16'},
+{tag:'CBL16_2',cable_type:'Power',diameter:1.0,conductors:3,conductor_size:'#2 AWG',weight:5,conduit_id:'C16'},
 ];
+
+// add additional cable properties for sample data
+SAMPLE_CABLES.forEach(c=>{
+ c.conductor_material='Copper';
+ c.insulation_type='THHN';
+ c.voltage_rating='600V';
+ c.shielding_jacket='';
+});
 
 const CONDUIT_SPECS={
  "EMT":{"1/2":0.304,"3/4":0.533,"1":0.864,"1-1/4":1.496,"1-1/2":2.036,"2":3.356,"2-1/2":5.858,"3":8.846,"3-1/2":11.545,"4":14.753},
@@ -241,8 +263,13 @@ function addConduitRow(data={}){
 
 function addCableRow(data={}){
  const tr=document.createElement('tr');
- const cols=['tag','cable_type','diameter','conductors','conductor_size','weight','conduit_id'];
- cols.forEach((c,i)=>{const td=document.createElement('td');const inp=document.createElement('input');inp.type=(c==='diameter'||c==='weight')?'number':'text';if(c==='conductors')inp.type='number';inp.value=data[c]||'';td.appendChild(inp);tr.appendChild(td);});
+ const cols=['tag','cable_type','diameter','conductors','conductor_size','weight','conduit_id','conductor_material','insulation_type','voltage_rating','shielding_jacket'];
+ cols.forEach(c=>{const td=document.createElement('td');const inp=document.createElement('input');
+  if(c==='diameter'||c==='weight')inp.type='number';
+  else if(c==='conductors')inp.type='number';
+  else inp.type='text';
+  inp.value=data[c]||'';
+  td.appendChild(inp);tr.appendChild(td);});
  const dupTd=document.createElement('td');dupTd.appendChild(createButton('⧉','duplicateBtn',()=>{const clone=rowToCable(tr);addCableRow(clone);}));tr.appendChild(dupTd);
  const delTd=document.createElement('td');delTd.appendChild(createButton('✖','removeBtn',()=>{tr.remove();drawGrid();}));tr.appendChild(delTd);
  document.querySelector('#cableTable tbody').appendChild(tr);
@@ -254,9 +281,21 @@ function rowToConduit(tr){
 }
 
 function rowToCable(tr){
- const vals=Array.from(tr.children).slice(0,7).map(td=>td.querySelector('input').value);
- const [tag,cable_type,diameter,conductors,conductor_size,weight,conduit_id]=vals;
- return {tag,cable_type,diameter:parseFloat(diameter),conductors:parseInt(conductors||0),conductor_size,weight:parseFloat(weight)||0,conduit_id};
+ const vals=Array.from(tr.children).slice(0,11).map(td=>td.querySelector('input').value);
+ const [tag,cable_type,diameter,conductors,conductor_size,weight,conduit_id,conductor_material,insulation_type,voltage_rating,shielding_jacket]=vals;
+ return {
+  tag,
+  cable_type,
+  diameter:parseFloat(diameter),
+  conductors:parseInt(conductors||0),
+  conductor_size,
+  weight:parseFloat(weight)||0,
+  conduit_id,
+  conductor_material,
+  insulation_type,
+  voltage_rating,
+  shielding_jacket
+ };
 }
 
 function getAllConduits(){
@@ -567,7 +606,7 @@ function exportConduits(){
 
 function exportCables(){
  const rows=getAllCables();
- const headers=['tag','cable_type','diameter','conductors','conductor_size','weight','conduit_id'];
+ const headers=['tag','cable_type','diameter','conductors','conductor_size','weight','conduit_id','conductor_material','insulation_type','voltage_rating','shielding_jacket'];
  exportCSV('ductbank_cables.csv',headers,rows);
 }
 
