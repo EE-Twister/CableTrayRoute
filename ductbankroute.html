@@ -142,7 +142,7 @@ body.dark-mode #helpPopup{background:#2c3034;color:#f8f9fa;}
 
 <div id="gridContainer" style="position:relative;display:inline-block;">
  <svg id="grid" width="500" height="500"></svg>
- <canvas id="tempCanvas" width="500" height="500" style="position:absolute;top:0;left:0;pointer-events:none;"></canvas>
+ <canvas id="tempCanvas" width="500" height="500" style="position:absolute;top:0;left:0;pointer-events:none;z-index:1;"></canvas>
 </div>
 
 <div id="finiteReport" style="margin-top:8px;"></div>
@@ -686,7 +686,7 @@ function runFiniteThermalAnalysis(){
  const cables=getAllCables();
  const canvas=document.getElementById('tempCanvas');
  const svg=document.getElementById('grid');
- const width=parseFloat(svg.getAttribute('width')); 
+ const width=parseFloat(svg.getAttribute('width'));
  const height=parseFloat(svg.getAttribute('height'));
  canvas.width=width;
  canvas.height=height;
@@ -694,16 +694,47 @@ function runFiniteThermalAnalysis(){
  ctx.clearRect(0,0,width,height);
  const scale=40,margin=20;
  const ambient=parseFloat(document.getElementById('earthTemp').value)||20;
+ const params={
+  soilResistivity:parseFloat(document.getElementById('soilResistivity').value)||90,
+  moistureContent:parseFloat(document.getElementById('moistureContent').value)||0,
+  heatSources:document.getElementById('heatSources').checked,
+  hSpacing:parseFloat(document.getElementById('hSpacing').value)||3,
+  vSpacing:parseFloat(document.getElementById('vSpacing').value)||4,
+  concreteEncasement:document.getElementById('concreteEncasement').checked,
+  ductbankDepth:parseFloat(document.getElementById('ductbankDepth').value)||0
+ };
+ const countMap={};
+ cables.forEach(cb=>{countMap[cb.conduit_id]=(countMap[cb.conduit_id]||0)+1;});
+ const total=cables.length;
+ const heatSourcesArr=cables.map(c=>{
+   const cd=conduits.find(d=>d.conduit_id===c.conduit_id);
+   if(!cd)return null;
+   const Rin=Math.sqrt(CONDUIT_SPECS[cd.conduit_type][cd.trade_size]/Math.PI);
+   const cx=cd.x+Rin,cy=cd.y+Rin;
+   const spacing=(params.hSpacing+params.vSpacing)/2||3;
+   const spacingAdj=3/spacing;
+   let Rth=(params.soilResistivity||90)/90*0.5;
+   const moistAdj=1-Math.min(params.moistureContent||0,100)/200;
+   Rth*=moistAdj;
+   if(total>countMap[c.conduit_id])Rth*=(1+(total-countMap[c.conduit_id])*0.05);
+   if(params.heatSources)Rth*=1.2;
+   Rth*=spacingAdj;
+   if(params.concreteEncasement)Rth*=0.8;
+   Rth*=(1+(params.ductbankDepth||0)/100);
+   const ins=(c.insulation_type||'').toUpperCase();
+   if(ins.includes('XLPE'))Rth*=0.95;else if(ins.includes('PVC'))Rth*=1.05;
+   const volt=parseFloat(c.voltage_rating)||600;
+   if(volt>2000)Rth*=1.1;else if(volt<600)Rth*=0.95;
+   if(c.shielding_jacket)Rth*=1.05;
+   const heat=5*Rth*countMap[c.conduit_id];
+   return {cx,cy,heat,conduit:c.conduit_id,cable:c};
+ }).filter(Boolean);
  function tempAt(x,y){
    let t=ambient;
-   for(const c of conduits){
-     const cnt=cables.filter(cb=>cb.conduit_id===c.conduit_id).length;
-     if(!cnt)continue;
-     const Rin=Math.sqrt(CONDUIT_SPECS[c.conduit_type][c.trade_size]/Math.PI);
-     const cx=c.x+Rin,cy=c.y+Rin;
-     const dx=x-cx,dy=y-cy;
+   for(const h of heatSourcesArr){
+     const dx=x-h.cx,dy=y-h.cy;
      const dist=Math.sqrt(dx*dx+dy*dy);
-     t+=cnt*10/(dist*dist+0.5);
+     t+=h.heat/(dist*dist+0.5);
    }
    return t;
  }
@@ -724,9 +755,6 @@ function runFiniteThermalAnalysis(){
    }
  }
  ctx.putImageData(img,0,0);
-
- const countMap={};
- cables.forEach(cb=>{countMap[cb.conduit_id]=(countMap[cb.conduit_id]||0)+1;});
  const rows=cables.map(c=>{
    const areaCM=sizeToArea(c.conductor_size);
    if(!areaCM)return `<tr><td>${c.tag}</td><td>N/A</td></tr>`;
