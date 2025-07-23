@@ -142,10 +142,8 @@ body.dark-mode #helpPopup{background:#2c3034;color:#f8f9fa;}
 
 <div id="gridContainer" style="position:relative;display:inline-block;">
  <svg id="grid" width="500" height="500"></svg>
- <canvas id="tempCanvas" width="500" height="500" style="position:absolute;top:0;left:0;pointer-events:none;z-index:1;"></canvas>
+ <canvas id="tempCanvas" width="500" height="500" style="position:absolute;top:0;left:0;pointer-events:none;z-index:10;"></canvas>
 </div>
-
-<div id="finiteReport" style="margin-top:8px;"></div>
 
 <div id="ampacityReport" style="margin-top:8px;"></div>
 
@@ -481,11 +479,13 @@ function updateAmpacityReport(){
  const total=cables.length;
  const rows=cables.map(c=>{
   const res=estimateAmpacity(c,params,countMap[c.conduit_id],total);
-  const val=isFinite(res.ampacity)?res.ampacity.toFixed(0):'N/A';
+  const neher=isFinite(res.ampacity)?res.ampacity.toFixed(0):'N/A';
+  const finite=window.finiteAmpacity?window.finiteAmpacity[c.tag]||'N/A':'N/A';
   const f=isFinite(res.ampacity)?res.formula:'N/A';
-  return `<tr><td>${c.tag}</td><td>${val}</td><td>${f}</td></tr>`;
+  return `<tr><td>${c.tag}</td><td>${neher}</td><td>${f}</td><td>${finite}</td></tr>`;
  }).join('');
- document.getElementById('ampacityReport').innerHTML=`<h3>Ampacity Estimates (Neher-McGrath)</h3><table><thead><tr><th>Cable</th><th>Ampacity (A)</th><th>Formula</th></tr></thead><tbody>${rows}</tbody></table>`;
+ document.getElementById('ampacityReport').innerHTML=
+   `<h3>Ampacity Estimates</h3><table><thead><tr><th>Cable</th><th>Ampacity (A) - Neher McGrath</th><th>Formula</th><th>Ampacity (A) - Finite Element</th></tr></thead><tbody>${rows}</tbody></table>`;
 }
 
 function drawGrid(){
@@ -687,12 +687,14 @@ function runFiniteThermalAnalysis(){
  const conduits=getAllConduits();
  const cables=getAllCables();
  const canvas=document.getElementById('tempCanvas');
- const svg=document.getElementById('grid');
-const width=parseFloat(svg.getAttribute('width'));
-const height=parseFloat(svg.getAttribute('height'));
+const svg=document.getElementById('grid');
+const width=parseFloat(svg.getAttribute('width')) || svg.clientWidth;
+const height=parseFloat(svg.getAttribute('height')) || svg.clientHeight;
 canvas.width=width;
 canvas.height=height;
- canvas.style.display=heatVisible?'block':'none';
+canvas.style.width = width + 'px';
+canvas.style.height = height + 'px';
+canvas.style.display=heatVisible?'block':'none';
 const ctx=canvas.getContext('2d');
  ctx.clearRect(0,0,width,height);
  const scale=40,margin=20;
@@ -768,22 +770,28 @@ const ctx=canvas.getContext('2d');
    }
  }
  ctx.putImageData(img,0,0);
- const rows=cables.map(c=>{
-   const areaCM=sizeToArea(c.conductor_size);
-   if(!areaCM)return `<tr><td>${c.tag}</td><td>N/A</td></tr>`;
-   const areaMM2=areaCM*0.0005067;
-   const rho=c.conductor_material&&c.conductor_material.toLowerCase().includes('al')?0.034:0.022;
-   const Rdc=rho*1.2/areaMM2;
-   const cd=conduits.find(d=>d.conduit_id===c.conduit_id);
-   if(!cd)return `<tr><td>${c.tag}</td><td>N/A</td></tr>`;
-   const Rin=Math.sqrt(CONDUIT_SPECS[cd.conduit_type][cd.trade_size]/Math.PI);
-   const T=tempAt(cd.x+Rin,cd.y+Rin);
-   const Rth=(T-ambient)/(10*countMap[c.conduit_id]);
-   const amp=Math.sqrt((90-ambient)/(Rdc*Rth));
-   const val=isFinite(amp)?amp.toFixed(0):'N/A';
-   return `<tr><td>${c.tag}</td><td>${val}</td></tr>`;
- }).join('');
- document.getElementById('finiteReport').innerHTML=`<h3>Ampacity Estimates (Finite)</h3><table><thead><tr><th>Cable</th><th>Ampacity (A)</th></tr></thead><tbody>${rows}</tbody></table>`;
+ window.finiteAmpacity = {};
+ cables.forEach(c => {
+   const areaCM = sizeToArea(c.conductor_size);
+   if(!areaCM){
+     window.finiteAmpacity[c.tag] = 'N/A';
+     return;
+   }
+   const areaMM2 = areaCM * 0.0005067;
+   const rho = c.conductor_material && c.conductor_material.toLowerCase().includes('al') ? 0.034 : 0.022;
+   const Rdc = rho * 1.2 / areaMM2;
+   const cd = conduits.find(d => d.conduit_id === c.conduit_id);
+   if(!cd){
+     window.finiteAmpacity[c.tag] = 'N/A';
+     return;
+   }
+   const Rin = Math.sqrt(CONDUIT_SPECS[cd.conduit_type][cd.trade_size] / Math.PI);
+   const T = tempAt(cd.x + Rin, cd.y + Rin);
+   const Rth = (T - ambient) / (10 * countMap[c.conduit_id]);
+   const amp = Math.sqrt((90 - ambient) / (Rdc * Rth));
+   window.finiteAmpacity[c.tag] = isFinite(amp) ? amp.toFixed(0) : 'N/A';
+ });
+ updateAmpacityReport();
 }
 
 function importCSV(file,callback){
