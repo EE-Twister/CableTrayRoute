@@ -258,6 +258,10 @@ const CONDUIT_SPECS={
  "PVC Sch 40":{"1/2":0.285,"3/4":0.508,"1":0.832,"1-1/4":1.453,"1-1/2":1.986,"2":3.291,"2-1/2":4.695,"3":7.268,"3-1/2":9.737,"4":12.554,"5":19.761,"6":28.567}
 };
 
+function fToC(f){
+  return (f-32)/1.8;
+}
+
 function parseSize(sz){
  if(sz.includes('-')){const[w,f]=sz.split('-');const[n,d]=f.split('/');return parseFloat(w)+parseFloat(n)/parseFloat(d);} 
  if(sz.includes('/')){const[n,d]=sz.split('/');return parseFloat(n)/parseFloat(d);} 
@@ -459,16 +463,18 @@ function estimateAmpacity(cable,params,count=1,total=0){
 
  Rth*=count;
  const amb=Math.max(params.earthTemp||20,
-                   isNaN(params.airTemp)?-Infinity:(params.airTemp-32)/1.8);
+                   isNaN(params.airTemp)?-Infinity:params.airTemp);
  const dT=90-amb;
  const ampacity=Math.sqrt(dT/(Rdc*Rth));
  return {ampacity};
 }
 
 function updateAmpacityReport(){
+ const earthF=parseFloat(document.getElementById('earthTemp').value);
+ const airF=parseFloat(document.getElementById('airTemp').value);
  const params={
-  earthTemp:parseFloat(document.getElementById('earthTemp').value)||20,
-  airTemp:parseFloat(document.getElementById('airTemp').value),
+  earthTemp:isNaN(earthF)?20:fToC(earthF),
+  airTemp:isNaN(airF)?NaN:fToC(airF),
   soilResistivity:parseFloat(document.getElementById('soilResistivity').value)||90,
   moistureContent:parseFloat(document.getElementById('moistureContent').value)||0,
   heatSources:document.getElementById('heatSources').checked,
@@ -701,7 +707,12 @@ canvas.style.display=heatVisible?'block':'none';
 const ctx=canvas.getContext('2d');
  ctx.clearRect(0,0,width,height);
  const scale=40,margin=20;
- const ambient=parseFloat(document.getElementById('earthTemp').value)||20;
+ const earthF=parseFloat(document.getElementById('earthTemp').value);
+ const airF=parseFloat(document.getElementById('airTemp').value);
+ const ambient=Math.max(
+   isNaN(earthF)?20:fToC(earthF),
+   isNaN(airF)?-Infinity:fToC(airF)
+ );
  const params={
   soilResistivity:parseFloat(document.getElementById('soilResistivity').value)||90,
   moistureContent:parseFloat(document.getElementById('moistureContent').value)||0,
@@ -958,11 +969,12 @@ document.addEventListener('keydown',e=>{
  const selector='#conduitTable input, #conduitTable select, #conduitTable button, '+
  '#cableTable input, #cableTable select, #cableTable button';
  if(!e.target.matches(selector))return;
- if(e.key!=='ArrowUp'&&e.key!=='ArrowDown')return;
+ const key=e.key;
+ if(key!=='ArrowUp'&&key!=='ArrowDown'&&key!=='Enter')return;
  const cell=e.target.closest('td');
  const row=cell.parentElement;
  const index=Array.prototype.indexOf.call(row.children,cell);
- const targetRow=e.key==='ArrowUp'?row.previousElementSibling:row.nextElementSibling;
+ const targetRow=key==='ArrowUp'?row.previousElementSibling:row.nextElementSibling;
  if(targetRow){
   const focusable=targetRow.children[index].querySelector('input,select,button');
   if(focusable){
