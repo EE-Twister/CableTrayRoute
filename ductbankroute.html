@@ -181,6 +181,8 @@ body.dark-mode #helpPopup{background:#2c3034;color:#f8f9fa;}
        &times; insulationAdj &times; voltageAdj &times; jacketAdj
        &times; spacingAdj</pre>
   <p>&#x3c1; is the soil resistivity, N is the cables in the conduit, D is ductbank depth (in), <em>moistureAdj</em> reduces resistance for wetter soil, <em>adjCableFactor</em> accounts for heat from neighboring conduits, and <em>spacingAdj</em>=3/spacing. <em>insulationAdj</em>, <em>voltageAdj</em> and <em>jacketAdj</em> adjust for cable construction. The DC resistance R<sub>dc</sub> depends on conductor material and size.</p>
+  <h3>Thermal Analysis</h3>
+  <p>The <em>Thermal Analysis</em> button overlays a heat map on the drawing. Each conduit center is marked with a yellow dot labeled with the estimated earth temperature in Fahrenheit and the hottest point is highlighted in red.</p>
 </div>
 </div>
 
@@ -778,8 +780,24 @@ ctx.putImageData(img,0,0);
  ctx.strokeStyle='red';
  ctx.stroke();
  ctx.font='12px sans-serif';
- ctx.fillStyle='black';
- ctx.fillText(maxTF.toFixed(1)+'\u00B0F',maxPx+8,maxPy-8);
+ctx.fillStyle='black';
+ctx.fillText(maxTF.toFixed(1)+'\u00B0F',maxPx+8,maxPy-8);
+ // draw temperature marker for each conduit
+ conduits.forEach(cd=>{
+   const Rin=Math.sqrt(CONDUIT_SPECS[cd.conduit_type][cd.trade_size]/Math.PI);
+   const px=(cd.x+Rin)*scale+margin;
+   const py=(cd.y+Rin)*scale+margin;
+   const t=tempAt(cd.x+Rin,cd.y+Rin);
+   const tf=t*9/5+32;
+   ctx.beginPath();
+   ctx.arc(px,py,4,0,Math.PI*2);
+   ctx.fillStyle='yellow';
+   ctx.fill();
+   ctx.strokeStyle='black';
+   ctx.stroke();
+   ctx.fillStyle='black';
+   ctx.fillText(tf.toFixed(1)+'\u00B0F',px+6,py+4);
+ });
  window.finiteAmpacity = {};
  cables.forEach(c => {
    const areaCM = sizeToArea(c.conductor_size);
