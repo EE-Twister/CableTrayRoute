@@ -952,6 +952,25 @@ document.addEventListener('click',e=>{
   menu.style.display='none';
  }
 });
+
+// keyboard navigation within conduit and cable tables
+document.addEventListener('keydown',e=>{
+ const selector='#conduitTable input, #conduitTable select, #conduitTable button, '+
+ '#cableTable input, #cableTable select, #cableTable button';
+ if(!e.target.matches(selector))return;
+ if(e.key!=='ArrowUp'&&e.key!=='ArrowDown')return;
+ const cell=e.target.closest('td');
+ const row=cell.parentElement;
+ const index=Array.prototype.indexOf.call(row.children,cell);
+ const targetRow=e.key==='ArrowUp'?row.previousElementSibling:row.nextElementSibling;
+ if(targetRow){
+  const focusable=targetRow.children[index].querySelector('input,select,button');
+  if(focusable){
+   e.preventDefault();
+   focusable.focus();
+  }
+ }
+});
 </script>
 </body>
 </html>
