@@ -431,7 +431,7 @@ function sizeToArea(size){
 
 function estimateAmpacity(cable,params,count=1,total=0){
  const areaCM=sizeToArea(cable.conductor_size);
- if(!areaCM)return {ampacity:0,formula:'N/A'};
+ if(!areaCM)return {ampacity:0};
  const areaMM2=areaCM*0.0005067;
  const rho=cable.conductor_material&&cable.conductor_material.toLowerCase().includes('al')?0.034:0.022;
  const Rdc=rho*1.2/areaMM2; // approx at 90C
@@ -457,8 +457,7 @@ function estimateAmpacity(cable,params,count=1,total=0){
                    isNaN(params.airTemp)?-Infinity:(params.airTemp-32)/1.8);
  const dT=90-amb;
  const ampacity=Math.sqrt(dT/(Rdc*Rth));
- const formula=`sqrt(${dT.toFixed(1)}/(${Rdc.toFixed(4)}*${Rth.toFixed(3)}))`;
- return {ampacity,formula};
+ return {ampacity};
 }
 
 function updateAmpacityReport(){
@@ -481,11 +480,10 @@ function updateAmpacityReport(){
   const res=estimateAmpacity(c,params,countMap[c.conduit_id],total);
   const neher=isFinite(res.ampacity)?res.ampacity.toFixed(0):'N/A';
   const finite=window.finiteAmpacity?window.finiteAmpacity[c.tag]||'N/A':'N/A';
-  const f=isFinite(res.ampacity)?res.formula:'N/A';
-  return `<tr><td>${c.tag}</td><td>${neher}</td><td>${f}</td><td>${finite}</td></tr>`;
+  return `<tr><td>${c.tag}</td><td>${neher}</td><td>${finite}</td></tr>`;
  }).join('');
  document.getElementById('ampacityReport').innerHTML=
-   `<h3>Ampacity Estimates</h3><table><thead><tr><th>Cable</th><th>Ampacity (A) - Neher McGrath</th><th>Formula</th><th>Ampacity (A) - Finite Element</th></tr></thead><tbody>${rows}</tbody></table>`;
+   `<h3>Ampacity Estimates</h3><table><thead><tr><th>Cable</th><th>Ampacity (A) - Neher McGrath</th><th>Ampacity (A) - Finite Element</th></tr></thead><tbody>${rows}</tbody></table>`;
 }
 
 function drawGrid(){
@@ -754,22 +752,34 @@ const ctx=canvas.getContext('2d');
     return t;
   }
  const img=ctx.createImageData(width,height);
- for(let j=0;j<height;j++){
-   for(let i=0;i<width;i++){
+ let maxT=-Infinity,maxPx=0,maxPy=0;
+for(let j=0;j<height;j++){
+  for(let i=0;i<width;i++){
      const x=(i-margin)/scale;
      const y=(j-margin)/scale;
      if(x<0||y<0)continue;
      const T=tempAt(x,y);
-     const r=Math.min(255,Math.max(0,Math.round(255*Math.min(1,(T-ambient)/50))));
+     if(T>maxT){maxT=T;maxPx=i;maxPy=j;}
+     const r=Math.min(255,Math.max(0,Math.round(255*Math.min(1,(T-ambient)/30))));
      const b=255-r;
      const idx=(j*width+i)*4;
      img.data[idx]=r;
      img.data[idx+1]=0;
      img.data[idx+2]=b;
-     img.data[idx+3]=150;
-   }
- }
- ctx.putImageData(img,0,0);
+     img.data[idx+3]=200;
+  }
+}
+ctx.putImageData(img,0,0);
+ const maxTF=maxT*9/5+32;
+ ctx.beginPath();
+ ctx.arc(maxPx,maxPy,5,0,Math.PI*2);
+ ctx.fillStyle='yellow';
+ ctx.fill();
+ ctx.strokeStyle='red';
+ ctx.stroke();
+ ctx.font='12px sans-serif';
+ ctx.fillStyle='black';
+ ctx.fillText(maxTF.toFixed(1)+'\u00B0F',maxPx+8,maxPy-8);
  window.finiteAmpacity = {};
  cables.forEach(c => {
    const areaCM = sizeToArea(c.conductor_size);
