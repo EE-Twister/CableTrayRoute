@@ -140,12 +140,18 @@ body.dark-mode #helpPopup{background:#2c3034;color:#f8f9fa;}
   <label>Conduits/Row<input type="number" id="perRow" value="4" style="width:60px;"></label>
 </div>
 
-<svg id="grid" width="500" height="500"></svg>
+<div id="gridContainer" style="position:relative;display:inline-block;">
+ <svg id="grid" width="500" height="500"></svg>
+ <canvas id="tempCanvas" width="500" height="500" style="position:absolute;top:0;left:0;pointer-events:none;"></canvas>
+</div>
+
+<div id="finiteReport" style="margin-top:8px;"></div>
 
 <div id="ampacityReport" style="margin-top:8px;"></div>
 
 <div class="db-button-panel">
  <button id="calc">Calculate Fill</button>
+ <button id="thermalBtn">Thermal Analysis</button>
  <button id="exportBtn">Download Ductbank Data</button>
  <button id="exportConduitsBtn">Export Ductbank Conduits</button>
  <button id="exportCablesBtn">Export Ductbank Cables</button>
@@ -482,6 +488,8 @@ function updateAmpacityReport(){
 
 function drawGrid(){
  const svg=document.getElementById('grid');
+ const heat=document.getElementById('tempCanvas');
+ if(heat){const ctx=heat.getContext('2d');ctx.clearRect(0,0,heat.width,heat.height);} 
  svg.innerHTML='';
  autoPlaceConduits();
  const conduits=getAllConduits();
@@ -668,8 +676,73 @@ svg.appendChild(widthText);
   typeText.textContent=`${c.conduit_type} ${c.trade_size}\"`;
   svg.appendChild(typeText);
 });
- svg.setAttribute('width',maxX*scale+2*margin+80);
- svg.setAttribute('height',maxY*scale+2*margin+20);
+svg.setAttribute('width',maxX*scale+2*margin+80);
+svg.setAttribute('height',maxY*scale+2*margin+20);
+}
+
+function runFiniteThermalAnalysis(){
+ drawGrid();
+ const conduits=getAllConduits();
+ const cables=getAllCables();
+ const canvas=document.getElementById('tempCanvas');
+ const svg=document.getElementById('grid');
+ const width=parseFloat(svg.getAttribute('width')); 
+ const height=parseFloat(svg.getAttribute('height'));
+ canvas.width=width;
+ canvas.height=height;
+ const ctx=canvas.getContext('2d');
+ ctx.clearRect(0,0,width,height);
+ const scale=40,margin=20;
+ const ambient=parseFloat(document.getElementById('earthTemp').value)||20;
+ function tempAt(x,y){
+   let t=ambient;
+   for(const c of conduits){
+     const cnt=cables.filter(cb=>cb.conduit_id===c.conduit_id).length;
+     if(!cnt)continue;
+     const Rin=Math.sqrt(CONDUIT_SPECS[c.conduit_type][c.trade_size]/Math.PI);
+     const cx=c.x+Rin,cy=c.y+Rin;
+     const dx=x-cx,dy=y-cy;
+     const dist=Math.sqrt(dx*dx+dy*dy);
+     t+=cnt*10/(dist*dist+0.5);
+   }
+   return t;
+ }
+ const img=ctx.createImageData(width,height);
+ for(let j=0;j<height;j++){
+   for(let i=0;i<width;i++){
+     const x=(i-margin)/scale;
+     const y=(j-margin)/scale;
+     if(x<0||y<0)continue;
+     const T=tempAt(x,y);
+     const r=Math.min(255,Math.max(0,Math.round(255*Math.min(1,(T-ambient)/50))));
+     const b=255-r;
+     const idx=(j*width+i)*4;
+     img.data[idx]=r;
+     img.data[idx+1]=0;
+     img.data[idx+2]=b;
+     img.data[idx+3]=150;
+   }
+ }
+ ctx.putImageData(img,0,0);
+
+ const countMap={};
+ cables.forEach(cb=>{countMap[cb.conduit_id]=(countMap[cb.conduit_id]||0)+1;});
+ const rows=cables.map(c=>{
+   const areaCM=sizeToArea(c.conductor_size);
+   if(!areaCM)return `<tr><td>${c.tag}</td><td>N/A</td></tr>`;
+   const areaMM2=areaCM*0.0005067;
+   const rho=c.conductor_material&&c.conductor_material.toLowerCase().includes('al')?0.034:0.022;
+   const Rdc=rho*1.2/areaMM2;
+   const cd=conduits.find(d=>d.conduit_id===c.conduit_id);
+   if(!cd)return `<tr><td>${c.tag}</td><td>N/A</td></tr>`;
+   const Rin=Math.sqrt(CONDUIT_SPECS[cd.conduit_type][cd.trade_size]/Math.PI);
+   const T=tempAt(cd.x+Rin,cd.y+Rin);
+   const Rth=(T-ambient)/(10*countMap[c.conduit_id]);
+   const amp=Math.sqrt((90-ambient)/(Rdc*Rth));
+   const val=isFinite(amp)?amp.toFixed(0):'N/A';
+   return `<tr><td>${c.tag}</td><td>${val}</td></tr>`;
+ }).join('');
+ document.getElementById('finiteReport').innerHTML=`<h3>Ampacity Estimates (Finite)</h3><table><thead><tr><th>Cable</th><th>Ampacity (A)</th></tr></thead><tbody>${rows}</tbody></table>`;
 }
 
 function importCSV(file,callback){
@@ -762,6 +835,7 @@ function exportImage(){
 document.getElementById('exportConduitsBtn').addEventListener('click',exportConduits);
 document.getElementById('exportCablesBtn').addEventListener('click',exportCables);
 document.getElementById('exportImgBtn').addEventListener('click',exportImage);
+document.getElementById('thermalBtn').addEventListener('click',runFiniteThermalAnalysis);
 
 document.getElementById('themeToggle').addEventListener('click',()=>{
  document.body.classList.toggle('dark-mode');
