@@ -97,6 +97,29 @@ body.dark-mode #helpPopup{background:#2c3034;color:#f8f9fa;}
   </thead>
   <tbody></tbody>
  </table>
+ <datalist id="sizeList">
+  <option value="#22 AWG"></option>
+  <option value="#20 AWG"></option>
+  <option value="#18 AWG"></option>
+  <option value="#16 AWG"></option>
+  <option value="#14 AWG"></option>
+  <option value="#12 AWG"></option>
+  <option value="#10 AWG"></option>
+  <option value="#8 AWG"></option>
+  <option value="#6 AWG"></option>
+  <option value="#4 AWG"></option>
+  <option value="#2 AWG"></option>
+  <option value="#1 AWG"></option>
+  <option value="1/0 AWG"></option>
+  <option value="2/0 AWG"></option>
+  <option value="3/0 AWG"></option>
+  <option value="4/0 AWG"></option>
+  <option value="250 kcmil"></option>
+  <option value="350 kcmil"></option>
+  <option value="500 kcmil"></option>
+  <option value="750 kcmil"></option>
+  <option value="1000 kcmil"></option>
+ </datalist>
 </details>
 <fieldset style="margin-top:8px;">
  <legend><strong>Thermal &amp; Environmental Parameters</strong></legend>
@@ -271,15 +294,22 @@ function addConduitRow(data={}){
 function addCableRow(data={}){
  const tr=document.createElement('tr');
  const cols=['tag','cable_type','diameter','conductors','conductor_size','weight','conduit_id','conductor_material','insulation_type','voltage_rating','shielding_jacket'];
- cols.forEach(c=>{const td=document.createElement('td');const inp=document.createElement('input');
-  if(c==='diameter'||c==='weight')inp.type='number';
-  else if(c==='conductors')inp.type='number';
+ cols.forEach(c=>{
+  const td=document.createElement('td');
+  const inp=document.createElement('input');
+  if(c==='diameter'||c==='weight') inp.type='number';
+  else if(c==='conductors') inp.type='number';
   else inp.type='text';
+  if(c==='conductor_size') inp.setAttribute('list','sizeList');
   inp.value=data[c]||'';
-  td.appendChild(inp);tr.appendChild(td);});
+  td.appendChild(inp);
+  tr.appendChild(td);
+ });
  const dupTd=document.createElement('td');dupTd.appendChild(createButton('⧉','duplicateBtn',()=>{const clone=rowToCable(tr);addCableRow(clone);}));tr.appendChild(dupTd);
- const delTd=document.createElement('td');delTd.appendChild(createButton('✖','removeBtn',()=>{tr.remove();drawGrid();}));tr.appendChild(delTd);
+ const delTd=document.createElement('td');delTd.appendChild(createButton('✖','removeBtn',()=>{tr.remove();drawGrid();updateAmpacityReport();}));tr.appendChild(delTd);
  document.querySelector('#cableTable tbody').appendChild(tr);
+ drawGrid();
+ updateAmpacityReport();
 }
 
 function rowToConduit(tr){
@@ -386,7 +416,9 @@ function estimateAmpacity(cable,params){
  const areaMM2=areaCM*0.0005067;
  const rho=cable.conductor_material&&cable.conductor_material.toLowerCase().includes('al')?0.034:0.022;
  const Rdc=rho*1.2/areaMM2; // approx at 90C
- const Rth=(params.soilResistivity||90)/90*0.5*(params.heatSources?1.2:1);
+ const spacing=(params.hSpacing+params.vSpacing)/2||3;
+ const spacingAdj=3/spacing; // tighter spacing -> higher thermal resistance
+ const Rth=(params.soilResistivity||90)/90*0.5*(params.heatSources?1.2:1)*spacingAdj;
  const dT=90-(params.earthTemp||20);
  return Math.sqrt(dT/(Rdc*Rth));
 }
@@ -396,7 +428,9 @@ function updateAmpacityReport(){
   earthTemp:parseFloat(document.getElementById('earthTemp').value)||20,
   soilResistivity:parseFloat(document.getElementById('soilResistivity').value)||90,
   moistureContent:parseFloat(document.getElementById('moistureContent').value)||0,
-  heatSources:document.getElementById('heatSources').checked
+  heatSources:document.getElementById('heatSources').checked,
+  hSpacing:parseFloat(document.getElementById('hSpacing').value)||3,
+  vSpacing:parseFloat(document.getElementById('vSpacing').value)||4
  };
  const rows=getAllCables().map(c=>{
   const a=estimateAmpacity(c,params);
@@ -623,6 +657,13 @@ document.getElementById('importConduits').addEventListener('change',e=>{const f=
 document.getElementById('importCables').addEventListener('change',e=>{const f=e.target.files[0];if(f)importCSV(f,data=>{document.querySelector('#cableTable tbody').innerHTML='';data.forEach(addCableRow);drawGrid();updateAmpacityReport();});});
 
 document.getElementById('calc').addEventListener('click',()=>{drawGrid();updateAmpacityReport();});
+
+['hSpacing','vSpacing'].forEach(id=>{
+ document.getElementById(id).addEventListener('input',()=>{
+  drawGrid();
+  updateAmpacityReport();
+ });
+});
 
 document.getElementById('exportBtn').addEventListener('click',()=>{
  const wb=XLSX.utils.book_new();
