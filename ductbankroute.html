@@ -706,11 +706,11 @@ function runFiniteThermalAnalysis(){
  const countMap={};
  cables.forEach(cb=>{countMap[cb.conduit_id]=(countMap[cb.conduit_id]||0)+1;});
  const total=cables.length;
- const heatSourcesArr=cables.map(c=>{
-   const cd=conduits.find(d=>d.conduit_id===c.conduit_id);
-   if(!cd)return null;
-   const Rin=Math.sqrt(CONDUIT_SPECS[cd.conduit_type][cd.trade_size]/Math.PI);
-   const cx=cd.x+Rin,cy=cd.y+Rin;
+  const heatSourcesArr=cables.map(c=>{
+    const cd=conduits.find(d=>d.conduit_id===c.conduit_id);
+    if(!cd)return null;
+    const Rin=Math.sqrt(CONDUIT_SPECS[cd.conduit_type][cd.trade_size]/Math.PI);
+    const cx=cd.x+Rin,cy=cd.y+Rin;
    const spacing=(params.hSpacing+params.vSpacing)/2||3;
    const spacingAdj=3/spacing;
    let Rth=(params.soilResistivity||90)/90*0.5;
@@ -728,16 +728,26 @@ function runFiniteThermalAnalysis(){
    if(c.shielding_jacket)Rth*=1.05;
    const heat=5*Rth*countMap[c.conduit_id];
    return {cx,cy,heat,conduit:c.conduit_id,cable:c};
- }).filter(Boolean);
- function tempAt(x,y){
-   let t=ambient;
-   for(const h of heatSourcesArr){
-     const dx=x-h.cx,dy=y-h.cy;
-     const dist=Math.sqrt(dx*dx+dy*dy);
-     t+=h.heat/(dist*dist+0.5);
-   }
-   return t;
- }
+  }).filter(Boolean);
+  let minCy=Infinity,maxCy=-Infinity;
+  heatSourcesArr.forEach(h=>{minCy=Math.min(minCy,h.cy);maxCy=Math.max(maxCy,h.cy);});
+  const halfHeight=(maxCy-minCy)/2||1;
+  function boundaryFactor(y){
+    const distBottom=y-minCy;
+    const distTop=maxCy-y;
+    const minDist=Math.min(distBottom,distTop);
+    return 1+1.5*(minDist/halfHeight);
+  }
+  function tempAt(x,y){
+    let t=ambient;
+    const bf=boundaryFactor(y);
+    for(const h of heatSourcesArr){
+      const dx=x-h.cx,dy=y-h.cy;
+      const dist=Math.sqrt(dx*dx+dy*dy);
+      t+=h.heat/(dist*dist+0.5)/bf;
+    }
+    return t;
+  }
  const img=ctx.createImageData(width,height);
  for(let j=0;j<height;j++){
    for(let i=0;i<width;i++){
