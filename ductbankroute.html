@@ -152,6 +152,7 @@ body.dark-mode #helpPopup{background:#2c3034;color:#f8f9fa;}
 <div class="db-button-panel">
  <button id="calc">Calculate Fill</button>
  <button id="thermalBtn">Thermal Analysis</button>
+ <button id="heatToggleBtn">Toggle Heat Map</button>
  <button id="exportBtn">Download Ductbank Data</button>
  <button id="exportConduitsBtn">Export Ductbank Conduits</button>
  <button id="exportCablesBtn">Export Ductbank Cables</button>
@@ -186,6 +187,7 @@ body.dark-mode #helpPopup{background:#2c3034;color:#f8f9fa;}
 </div>
 
 <script>
+let heatVisible=true;
 const SAMPLE_CONDUITS=[
  {conduit_id:"C1",conduit_type:"PVC Sch 40",trade_size:"4",x:0,y:0},
  {conduit_id:"C2",conduit_type:"PVC Sch 40",trade_size:"4",x:2,y:0},
@@ -686,11 +688,12 @@ function runFiniteThermalAnalysis(){
  const cables=getAllCables();
  const canvas=document.getElementById('tempCanvas');
  const svg=document.getElementById('grid');
- const width=parseFloat(svg.getAttribute('width'));
- const height=parseFloat(svg.getAttribute('height'));
- canvas.width=width;
- canvas.height=height;
- const ctx=canvas.getContext('2d');
+const width=parseFloat(svg.getAttribute('width'));
+const height=parseFloat(svg.getAttribute('height'));
+canvas.width=width;
+canvas.height=height;
+ canvas.style.display=heatVisible?'block':'none';
+const ctx=canvas.getContext('2d');
  ctx.clearRect(0,0,width,height);
  const scale=40,margin=20;
  const ambient=parseFloat(document.getElementById('earthTemp').value)||20;
@@ -874,6 +877,11 @@ document.getElementById('exportConduitsBtn').addEventListener('click',exportCond
 document.getElementById('exportCablesBtn').addEventListener('click',exportCables);
 document.getElementById('exportImgBtn').addEventListener('click',exportImage);
 document.getElementById('thermalBtn').addEventListener('click',runFiniteThermalAnalysis);
+document.getElementById('heatToggleBtn').addEventListener('click',()=>{
+ heatVisible=!heatVisible;
+ const canvas=document.getElementById('tempCanvas');
+ canvas.style.display=heatVisible?'block':'none';
+});
 
 document.getElementById('themeToggle').addEventListener('click',()=>{
  document.body.classList.toggle('dark-mode');
