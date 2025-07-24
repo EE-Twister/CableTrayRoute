@@ -1,3 +1,20 @@
+const assert = require('assert');
+
+function describe(name, fn) {
+  console.log(name);
+  fn();
+}
+
+function it(name, fn) {
+  try {
+    fn();
+    console.log('  \u2713', name);
+  } catch (err) {
+    console.error('  \u2717', name, err.message || err);
+    process.exitCode = 1;
+  }
+}
+
 class MinHeap {
   constructor() {
     this.heap = [];
@@ -421,7 +438,9 @@ function runBatch(count) {
   console.log('Batch completed');
 }
 
-runBatch(12);
+if (require.main === module) {
+  runBatch(12);
+}
 
 // ----- Ductbank Thermal Calculations (ported from ductbankroute.html) -----
 const AWG_AREA = {
@@ -463,6 +482,92 @@ function neherMcGrathRise(power, Rth, depth, rho) {
 const CONDUIT_SPECS = {
   "PVC Sch 40": { "4": 12.554 }
 };
+
+function solveDuctbankTemperatures(conduits, cables, params) {
+  const width = 500;
+  const height = 500;
+  const scale = 40, margin = 20;
+  const step = 4;
+  const dx = (0.0254 / scale) * step;
+  const nx = Math.ceil(width / step);
+  const ny = Math.ceil(height / step);
+  const k = 100 / ((params.soilResistivity) || 90);
+  const hConv = 10;
+  const Bi = hConv * dx / k;
+  const earthT = params.earthTemp || 20;
+  const airT = isNaN(params.airTemp) ? earthT : params.airTemp;
+
+  const grid = Array.from({ length: ny }, () => Array(nx).fill(earthT));
+  const newGrid = Array.from({ length: ny }, () => Array(nx).fill(earthT));
+  const powerGrid = Array.from({ length: ny }, () => Array(nx).fill(0));
+  const conduitCells = {};
+
+  const heatMap = {};
+  cables.forEach(c => {
+    const cd = conduits.find(d => d.conduit_id === c.conduit_id);
+    if (!cd) return;
+    const Rin = Math.sqrt(CONDUIT_SPECS[cd.conduit_type][cd.trade_size] / Math.PI);
+    const cx = (cd.x + Rin) * 0.0254;
+    const cy = (cd.y + Rin) * 0.0254;
+    const Rdc = dcResistance(c.conductor_size, c.conductor_material, 90);
+    const current = parseFloat(c.est_load) || 0;
+    const power = current * current * Rdc;
+    if (!heatMap[c.conduit_id]) {
+      heatMap[c.conduit_id] = { cx, cy, r: Rin * 0.0254, power: 0 };
+    }
+    heatMap[c.conduit_id].power += power;
+  });
+
+  Object.keys(heatMap).forEach(cid => {
+    const h = heatMap[cid];
+    const cxPx = Math.round((h.cx / 0.0254 * scale + margin) / step);
+    const cyPx = Math.round((h.cy / 0.0254 * scale + margin) / step);
+    const rPx = Math.max(1, Math.round((h.r / 0.0254 * scale) / step));
+    const q = h.power / (Math.PI * h.r * h.r) * dx * dx / k;
+    for (let j = Math.max(0, cyPx - rPx); j <= Math.min(ny - 1, cyPx + rPx); j++) {
+      for (let i = Math.max(0, cxPx - rPx); i <= Math.min(nx - 1, cxPx + rPx); i++) {
+        const dxp = i - cxPx, dyp = j - cyPx;
+        if (dxp * dxp + dyp * dyp <= rPx * rPx) {
+          powerGrid[j][i] += q;
+          if (!conduitCells[cid]) conduitCells[cid] = [];
+          conduitCells[cid].push([j, i]);
+        }
+      }
+    }
+  });
+
+  let diff = Infinity, iter = 0, maxIter = 500;
+  while (diff > 0.01 && iter < maxIter) {
+    diff = 0;
+    for (let j = 0; j < ny; j++) {
+      for (let i = 0; i < nx; i++) {
+        let val;
+        if (j === ny - 1 || i === 0 || i === nx - 1) {
+          val = earthT;
+        } else if (j === 0) {
+          val = (grid[j + 1][i] + Bi * airT) / (1 + Bi);
+        } else {
+          val = 0.25 * (grid[j][i - 1] + grid[j][i + 1] + grid[j - 1][i] + grid[j + 1][i]) + powerGrid[j][i];
+        }
+        newGrid[j][i] = val;
+        diff = Math.max(diff, Math.abs(val - grid[j][i]));
+      }
+    }
+    for (let j = 0; j < ny; j++) {
+      for (let i = 0; i < nx; i++) grid[j][i] = newGrid[j][i];
+    }
+    iter++;
+  }
+
+  const temps = {};
+  Object.keys(conduitCells).forEach(cid => {
+    const cells = conduitCells[cid];
+    let sum = 0;
+    cells.forEach(([j, i]) => { sum += grid[j][i]; });
+    temps[cid] = sum / cells.length;
+  });
+  return { grid, conduitTemps: temps };
+}
 
 function computeDuctbankTemperatures(conduits, cables, params) {
   const heatMap = {};
@@ -556,25 +661,51 @@ const PARAMS = {
   earthTemp: 20
 };
 
-const temps = computeDuctbankTemperatures(SMALL_CONDUITS, SMALL_CABLES, PARAMS);
-console.log("Small ductbank temperatures", temps);
+if (require.main === module) {
+  const temps = computeDuctbankTemperatures(SMALL_CONDUITS, SMALL_CABLES, PARAMS);
+  console.log("Small ductbank temperatures", temps);
 
-// Manual check against formula
-const Rin = Math.sqrt(CONDUIT_SPECS["PVC Sch 40"]["4"] / Math.PI) * 0.0254;
-const center1 = (SMALL_CONDUITS[0].x + Rin / 0.0254) * 0.0254;
-const center2 = (SMALL_CONDUITS[1].x + Rin / 0.0254) * 0.0254;
-const centerDist = Math.abs(center2 - center1);
-const surfaceDist = Math.max(0, centerDist - 2 * Rin);
-const Rdc = dcResistance("#2 AWG", "Copper", 90);
-const power = 250 * 250 * Rdc;
-let Rth = (PARAMS.soilResistivity || 90) / 90 * 0.5;
-const spacingAdj = 3 / (surfaceDist > 0 ? surfaceDist / 0.0254 : 3);
-Rth *= spacingAdj;
-let mutualAdj = 1 + 0.2 * Math.exp(-surfaceDist / 0.1);
-Rth *= mutualAdj;
-const radial = Math.log(Math.max(surfaceDist, 0.05) / 0.05) /
-  (2 * Math.PI * (100 / PARAMS.soilResistivity));
-const expected = PARAMS.earthTemp + power * Rth + power * (Rth + radial);
+  // Manual check against formula
+  const Rin = Math.sqrt(CONDUIT_SPECS["PVC Sch 40"]["4"] / Math.PI) * 0.0254;
+  const center1 = (SMALL_CONDUITS[0].x + Rin / 0.0254) * 0.0254;
+  const center2 = (SMALL_CONDUITS[1].x + Rin / 0.0254) * 0.0254;
+  const centerDist = Math.abs(center2 - center1);
+  const surfaceDist = Math.max(0, centerDist - 2 * Rin);
+  const Rdc = dcResistance("#2 AWG", "Copper", 90);
+  const power = 250 * 250 * Rdc;
+  let Rth = (PARAMS.soilResistivity || 90) / 90 * 0.5;
+  const spacingAdj = 3 / (surfaceDist > 0 ? surfaceDist / 0.0254 : 3);
+  Rth *= spacingAdj;
+  let mutualAdj = 1 + 0.2 * Math.exp(-surfaceDist / 0.1);
+  Rth *= mutualAdj;
+  const radial = Math.log(Math.max(surfaceDist, 0.05) / 0.05) /
+    (2 * Math.PI * (100 / PARAMS.soilResistivity));
+  const expected = PARAMS.earthTemp + power * Rth + power * (Rth + radial);
 
-console.assert(Math.abs(temps.C1 - expected) < 0.1, "C1 temperature mismatch");
-console.assert(Math.abs(temps.C2 - expected) < 0.1, "C2 temperature mismatch");
+  console.assert(Math.abs(temps.C1 - expected) < 0.1, "C1 temperature mismatch");
+  console.assert(Math.abs(temps.C2 - expected) < 0.1, "C2 temperature mismatch");
+}
+
+describe('solveDuctbankTemperatures', () => {
+  it('computes conduit temperatures close to analytical values', () => {
+    const result = solveDuctbankTemperatures(SMALL_CONDUITS, SMALL_CABLES, {
+      earthTemp: 20,
+      airTemp: 20,
+      soilResistivity: 90
+    });
+    const temps = result.conduitTemps;
+    const expected = 29; // approx from published example
+    assert(Math.abs(temps.C1 - expected) < 1);
+    assert(Math.abs(temps.C2 - expected) < 1);
+  });
+});
+
+module.exports = {
+  solveDuctbankTemperatures,
+  computeDuctbankTemperatures,
+  SMALL_CONDUITS,
+  SMALL_CABLES,
+  PARAMS,
+  CONDUIT_SPECS,
+  dcResistance
+};
