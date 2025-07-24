@@ -780,10 +780,15 @@ const heatSourcesArr=cables.map(c=>{
   if(c.shielding_jacket)Rth*=1.05;
   return {cx,cy,power,Rth,current,Rdc,conduit:c.conduit_id,cable:c};
 }).filter(Boolean);
- console.log('heatSourcesArr',heatSourcesArr);
- heatSourcesArr.forEach(h=>{
-   console.assert(isFinite(h.power)&&isFinite(h.Rth)&&isFinite(h.cx)&&isFinite(h.cy),'Invalid heat source',h);
- });
+console.log('heatSourcesArr',heatSourcesArr);
+heatSourcesArr.forEach(h=>{
+  console.assert(isFinite(h.power)&&isFinite(h.Rth)&&isFinite(h.cx)&&isFinite(h.cy),'Invalid heat source',h);
+});
+ if(heatSourcesArr.length===0){
+   ctx.clearRect(0,0,width,height);
+   updateAmpacityReport();
+   return;
+ }
   let minCy=Infinity,maxCy=-Infinity;
   heatSourcesArr.forEach(h=>{minCy=Math.min(minCy,h.cy);maxCy=Math.max(maxCy,h.cy);});
   const halfHeight=(maxCy-minCy)/2||1;
@@ -827,48 +832,36 @@ function boundaryFactor(y, hH=halfHeight, alpha=boundaryAlpha){
  const endX=Math.min(width,Math.ceil(maxCx/0.0254*scale)+margin);
  const startY=Math.max(0,Math.floor(minCy/0.0254*scale)+margin);
  const endY=Math.min(height,Math.ceil(maxCy/0.0254*scale)+margin);
-const gpu = new GPU();
-const hData=heatSourcesArr.map(h=>[h.cx,h.cy,h.power,h.Rth]);
-const nx=Math.ceil((endX-startX)/step);
-const ny=Math.ceil((endY-startY)/step);
-const tempKernel=gpu.createKernel(function(h,count,ambient,k,alpha,center,halfH,margin,scaleInv,startX,startY,step){
-  const i=this.thread.x*step+startX;
-  const j=this.thread.y*step+startY;
-  const x=(i-margin)*scaleInv;
-  const y=(j-margin)*scaleInv;
-  let t=ambient;
-  const bf=1.0+alpha*Math.pow(Math.abs(y-center)/halfH,2);
-  for(let n=0;n<count;n++){
-    const dx=x-h[n][0];
-    const dy=y-h[n][1];
-    const dist=Math.sqrt(dx*dx+dy*dy);
-    t+=h[n][2]*(h[n][3]*bf + Math.log(Math.max(dist,0.01)/0.05)/(2*Math.PI*k));
-  }
-  return t;
-},{output:[nx,ny]});
-const temps=tempKernel(hData,hData.length,ambient,k,boundaryAlpha,(maxCy+minCy)/2,halfHeight,margin,0.0254/scale,startX,startY,step);
-
-let cpuTemps=null;
-if(tempKernel.mode==='gpu'){
-  cpuTemps=[];
-  for(let j=startY;j<endY;j+=step){
-    const row=[];
-    for(let i=startX;i<endX;i+=step){
-      const x=(i-margin)*0.0254/scale;
-      const y=(j-margin)*0.0254/scale;
-      row.push(tempAt(x,y));
-    }
-    cpuTemps.push(row);
-  }
-  outer:for(let y=0;y<ny;y++){
-    for(let x=0;x<nx;x++){
-      if(Math.abs(cpuTemps[y][x]-temps[y][x])>0.1){
-        console.log('CPU/GPU mismatch at',startX+x*step,startY+y*step);
-        break outer;
+let temps;
+let drawStep=1;
+if(typeof GPU!=='undefined'){
+  try{
+    const gpu=new GPU();
+    const hData=heatSourcesArr.map(h=>[h.cx,h.cy,h.power,h.Rth]);
+    const nx=Math.ceil((endX-startX)/step);
+    const ny=Math.ceil((endY-startY)/step);
+    const tempKernel=gpu.createKernel(function(h,count,ambient,k,alpha,center,halfH,margin,scaleInv,startX,startY,step){
+      const i=this.thread.x*step+startX;
+      const j=this.thread.y*step+startY;
+      const x=(i-margin)*scaleInv;
+      const y=(j-margin)*scaleInv;
+      let t=ambient;
+      const bf=1.0+alpha*Math.pow(Math.abs(y-center)/halfH,2);
+      for(let n=0;n<count;n++){
+        const dx=x-h[n][0];
+        const dy=y-h[n][1];
+        const dist=Math.sqrt(dx*dx+dy*dy);
+        t+=h[n][2]*(h[n][3]*bf + Math.log(Math.max(dist,0.01)/0.05)/(2*Math.PI*k));
       }
-    }
+      return t;
+    },{output:[nx,ny]});
+    temps=tempKernel(hData,hData.length,ambient,k,boundaryAlpha,(maxCy+minCy)/2,halfHeight,margin,0.0254/scale,startX,startY,step);
+    drawStep=step;
+  }catch(e){
+    console.warn('GPU.js unavailable, falling back to CPU.',e);
   }
-}else{
+}
+if(!temps){
   temps=[];
   for(let j=startY;j<endY;j++){
     const row=[];
@@ -880,8 +873,6 @@ if(tempKernel.mode==='gpu'){
     temps.push(row);
   }
 }
-
-const drawStep=tempKernel.mode==='gpu'?step:1;
 for(let yIdx=0;yIdx<temps.length;yIdx++){
   for(let xIdx=0;xIdx<temps[yIdx].length;xIdx++){
     const i=startX+xIdx*drawStep;
