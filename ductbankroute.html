@@ -844,32 +844,22 @@ heatSourcesArr.forEach(h=>{
  }
   let minCy=Infinity,maxCy=-Infinity;
   heatSourcesArr.forEach(h=>{minCy=Math.min(minCy,h.cy);maxCy=Math.max(maxCy,h.cy);});
-  const halfHeight=(maxCy-minCy)/2||1;
  let minCx=Infinity,maxCx=-Infinity;
  heatSourcesArr.forEach(h=>{minCx=Math.min(minCx,h.cx);maxCx=Math.max(maxCx,h.cx);});
  const k=100/(params.soilResistivity||90);
- const boundaryAlpha=1.5;
- const centerY=(maxCy+minCy)/2;
-function boundaryFactor(y, hH=halfHeight, alpha=boundaryAlpha){
-  const d=Math.abs(y-centerY);
-  return 1+alpha*Math.pow(d/hH,2);
+
+function neherMcGrathRise(power,Rth,depth,rho){
+  const k=100/(rho||90);
+  const r0=0.05;
+  const radial=Math.log(Math.max(depth,r0)/r0)/(2*Math.PI*k);
+  return power*(Rth+radial);
 }
-
- function deltaT(power,Rth,k,dist,alpha,halfH){
-   const bf=1+alpha*Math.pow(dist/halfH,2);
-   return power*(Rth*bf + Math.log(Math.max(dist,0.01)/0.05)/(2*Math.PI*k));
- }
-
- console.assert(Math.abs(deltaT(10,0.5,0.011,0.05,1.5,0.028)-28)<2,'deltaT case1');
- console.assert(deltaT(10,0.5,0.011,0.2,1.5,0.028)<deltaT(10,0.5,0.011,0.05,1.5,0.028),'deltaT dist');
- console.assert(Math.abs(deltaT(10,0.5,0.011,0.05,0,0.028)-5)<0.1,'alpha zero');
   function tempAt(x,y){
     let t=ambient;
-    const bf=boundaryFactor(y,halfHeight,boundaryAlpha);
     for(const h of heatSourcesArr){
       const dx=x-h.cx,dy=y-h.cy;
       const dist=Math.sqrt(dx*dx+dy*dy);
-      t+=deltaT(h.power,h.Rth*bf,k,dist,0,halfHeight);
+      t+=neherMcGrathRise(h.power,h.Rth,dist,params.soilResistivity||90);
     }
     return t;
   }
@@ -887,33 +877,33 @@ function boundaryFactor(y, hH=halfHeight, alpha=boundaryAlpha){
  const endY=Math.min(height,Math.ceil(maxCy/0.0254*scale)+margin);
 let temps;
 let drawStep=1;
-if(typeof GPU!=='undefined'){
-  try{
-    const gpu=new GPU();
-    const hData=heatSourcesArr.map(h=>[h.cx,h.cy,h.power,h.Rth]);
-    const nx=Math.ceil((endX-startX)/step);
-    const ny=Math.ceil((endY-startY)/step);
-    const tempKernel=gpu.createKernel(function(h,count,ambient,k,alpha,center,halfH,margin,scaleInv,startX,startY,step){
-      const i=this.thread.x*step+startX;
-      const j=this.thread.y*step+startY;
-      const x=(i-margin)*scaleInv;
-      const y=(j-margin)*scaleInv;
-      let t=ambient;
-      const bf=1.0+alpha*Math.pow(Math.abs(y-center)/halfH,2);
-      for(let n=0;n<count;n++){
-        const dx=x-h[n][0];
-        const dy=y-h[n][1];
-        const dist=Math.sqrt(dx*dx+dy*dy);
-        t+=h[n][2]*(h[n][3]*bf + Math.log(Math.max(dist,0.01)/0.05)/(2*Math.PI*k));
-      }
-      return t;
-    },{output:[nx,ny]});
-    temps=tempKernel(hData,hData.length,ambient,k,boundaryAlpha,(maxCy+minCy)/2,halfHeight,margin,0.0254/scale,startX,startY,step);
-    drawStep=step;
-  }catch(e){
-    console.warn('GPU.js unavailable, falling back to CPU.',e);
+  if(typeof GPU!=='undefined'){
+    try{
+      const gpu=new GPU();
+      const hData=heatSourcesArr.map(h=>[h.cx,h.cy,h.power,h.Rth]);
+      const nx=Math.ceil((endX-startX)/step);
+      const ny=Math.ceil((endY-startY)/step);
+      const tempKernel=gpu.createKernel(function(h,count,ambient,k,margin,scaleInv,startX,startY,step){
+        const i=this.thread.x*step+startX;
+        const j=this.thread.y*step+startY;
+        const x=(i-margin)*scaleInv;
+        const y=(j-margin)*scaleInv;
+        let t=ambient;
+        for(let n=0;n<count;n++){
+          const dx=x-h[n][0];
+          const dy=y-h[n][1];
+          const dist=Math.sqrt(dx*dx+dy*dy);
+          const radial=Math.log(Math.max(dist,0.01)/0.05)/(2*Math.PI*k);
+          t+=h[n][2]*(h[n][3] + radial);
+        }
+        return t;
+      },{output:[nx,ny]});
+      temps=tempKernel(hData,hData.length,ambient,k,margin,0.0254/scale,startX,startY,step);
+      drawStep=step;
+    }catch(e){
+      console.warn('GPU.js unavailable, falling back to CPU.',e);
+    }
   }
-}
 if(!temps){
   temps=[];
   for(let j=startY;j<endY;j++){
