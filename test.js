@@ -422,3 +422,157 @@ function runBatch(count) {
 }
 
 runBatch(12);
+
+// ----- Ductbank Thermal Calculations (ported from ductbankroute.html) -----
+const AWG_AREA = {
+  "18":1624,"16":2583,"14":4107,"12":6530,"10":10380,
+  "8":16510,"6":26240,"4":41740,"3":52620,"2":66360,
+  "1":83690,"1/0":105600,"2/0":133100,"3/0":167800,
+  "4/0":211600
+};
+
+const BASE_RESISTIVITY = { cu: 0.017241, al: 0.028264 }; // ohm-mm^2/m @20C
+const TEMP_COEFF = { cu: 0.00393, al: 0.00403 };
+
+function sizeToArea(size) {
+  if (!size) return 0;
+  const s = size.toString().trim();
+  if (/kcmil/i.test(s)) return parseFloat(s) * 1000;
+  const m = s.match(/#?(\d+(?:\/0)?)/);
+  if (!m) return 0;
+  return AWG_AREA[m[1]] || 0;
+}
+
+function dcResistance(size, material, temp = 20) {
+  const key = size ? size.toString().trim() : "";
+  const mat = material && material.toLowerCase().includes("al") ? "al" : "cu";
+  const areaCM = sizeToArea(key);
+  if (!areaCM) return 0;
+  const areaMM2 = areaCM * 0.0005067;
+  const base = BASE_RESISTIVITY[mat] / areaMM2;
+  return base * (1 + TEMP_COEFF[mat] * (temp - 20));
+}
+
+function neherMcGrathRise(power, Rth, depth, rho) {
+  const k = 100 / (rho || 90);
+  const r0 = 0.05;
+  const radial = Math.log(Math.max(depth, r0) / r0) / (2 * Math.PI * k);
+  return power * (Rth + radial);
+}
+
+const CONDUIT_SPECS = {
+  "PVC Sch 40": { "4": 12.554 }
+};
+
+function computeDuctbankTemperatures(conduits, cables, params) {
+  const heatMap = {};
+  cables.forEach(c => {
+    const cd = conduits.find(d => d.conduit_id === c.conduit_id);
+    if (!cd) return;
+    const Rin = Math.sqrt(CONDUIT_SPECS[cd.conduit_type][cd.trade_size] / Math.PI);
+    const cx = (cd.x + Rin) * 0.0254;
+    const cy = (cd.y + Rin) * 0.0254;
+    const Rdc = dcResistance(c.conductor_size, c.conductor_material, 90);
+    const current = parseFloat(c.est_load) || 0;
+    const power = current * current * Rdc;
+    if (!heatMap[c.conduit_id]) {
+      heatMap[c.conduit_id] = { cx, cy, power: 0, count: 0, cables: [], r: Rin * 0.0254 };
+    }
+    heatMap[c.conduit_id].power += power;
+    heatMap[c.conduit_id].count++;
+    heatMap[c.conduit_id].cables.push(c);
+  });
+
+  const sources = Object.keys(heatMap).map(cid => {
+    const h = heatMap[cid];
+    const others = Object.keys(heatMap).filter(id => id !== cid);
+    const distances = others.map(id => {
+      const o = heatMap[id];
+      return Math.max(0, Math.sqrt((h.cx - o.cx) ** 2 + (h.cy - o.cy) ** 2) - (h.r + o.r));
+    });
+    const avgSpacingIn = distances.length
+      ? distances.reduce((s, d) => s + d, 0) / distances.length / 0.0254
+      : (params.hSpacing + params.vSpacing) / 2 || 3;
+    const spacingAdj = 3 / Math.max(avgSpacingIn, 0.1);
+    let Rth = (params.soilResistivity || 90) / 90 * 0.5;
+    const moistAdj = 1 - Math.min(params.moistureContent || 0, 100) / 200;
+    Rth *= moistAdj;
+    if (params.heatSources) Rth *= 1.2;
+    Rth *= spacingAdj;
+    if (params.concreteEncasement) Rth *= 0.8;
+    Rth *= 1 + (params.ductbankDepth || 0) / 100;
+    const c0 = h.cables[0] || {};
+    const ins = (c0.insulation_type || "").toUpperCase();
+    if (ins.includes("XLPE")) Rth *= 0.95; else if (ins.includes("PVC")) Rth *= 1.05;
+    const volt = parseFloat(c0.voltage_rating) || 600;
+    if (volt > 2000) Rth *= 1.1; else if (volt < 600) Rth *= 0.95;
+    if (c0.shielding_jacket) Rth *= 1.05;
+    let mutualAdj = 1;
+    distances.forEach(d => { mutualAdj += 0.2 * Math.exp(-d / 0.1); });
+    Rth *= mutualAdj;
+    Rth *= h.count;
+    return { ...h, Rth, conduit: cid };
+  }).filter(Boolean);
+
+  function tempAt(x, y) {
+    let t = params.earthTemp || 20;
+    for (const h of sources) {
+      const dx = x - h.cx;
+      const dy = y - h.cy;
+      const dist = Math.sqrt(dx * dx + dy * dy);
+      t += neherMcGrathRise(h.power, h.Rth, dist, params.soilResistivity || 90);
+    }
+    return t;
+  }
+
+  const temps = {};
+  for (const s of sources) temps[s.conduit] = tempAt(s.cx, s.cy);
+  return temps;
+}
+
+// ----- Example small ductbank -----
+const SMALL_CONDUITS = [
+  { conduit_id: "C1", conduit_type: "PVC Sch 40", trade_size: "4", x: 0, y: 0 },
+  { conduit_id: "C2", conduit_type: "PVC Sch 40", trade_size: "4", x: 7, y: 0 }
+];
+
+const SMALL_CABLES = [
+  { conduit_id: "C1", conductor_size: "#2 AWG", conductor_material: "Copper",
+    insulation_type: "THHN", voltage_rating: "600V", shielding_jacket: "",
+    est_load: 250 },
+  { conduit_id: "C2", conductor_size: "#2 AWG", conductor_material: "Copper",
+    insulation_type: "THHN", voltage_rating: "600V", shielding_jacket: "",
+    est_load: 250 }
+];
+
+const PARAMS = {
+  soilResistivity: 90,
+  moistureContent: 0,
+  heatSources: false,
+  hSpacing: 3,
+  vSpacing: 4,
+  concreteEncasement: false,
+  ductbankDepth: 0,
+  earthTemp: 20
+};
+
+const temps = computeDuctbankTemperatures(SMALL_CONDUITS, SMALL_CABLES, PARAMS);
+console.log("Small ductbank temperatures", temps);
+
+// Manual check against formula
+const Rin = Math.sqrt(CONDUIT_SPECS["PVC Sch 40"]["4"] / Math.PI) * 0.0254;
+const center1 = (SMALL_CONDUITS[0].x + Rin / 0.0254) * 0.0254;
+const center2 = (SMALL_CONDUITS[1].x + Rin / 0.0254) * 0.0254;
+const centerDist = Math.abs(center2 - center1);
+const Rdc = dcResistance("#2 AWG", "Copper", 90);
+const power = 250 * 250 * Rdc;
+let Rth = (PARAMS.soilResistivity || 90) / 90 * 0.5;
+const spacingAdj = 3 / (centerDist - 2 * Rin > 0 ? (centerDist - 2 * Rin) / 0.0254 : 3);
+Rth *= spacingAdj;
+let mutualAdj = 1 + 0.2 * Math.exp(-(centerDist - 2 * Rin) / 0.1);
+Rth *= mutualAdj;
+const radial = Math.log(centerDist / 0.05) / (2 * Math.PI * (100 / PARAMS.soilResistivity));
+const expected = PARAMS.earthTemp + power * Rth + power * (Rth + radial);
+
+console.assert(Math.abs(temps.C1 - expected) < 0.1, "C1 temperature mismatch");
+console.assert(Math.abs(temps.C2 - expected) < 0.1, "C2 temperature mismatch");
