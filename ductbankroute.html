@@ -796,6 +796,92 @@ function validateThermalInputs(){
  if(warnings.length)alert('Input warnings:\n'+warnings.join('\n'));
 }
 
+function solveDuctbankTemperatures(conduits,cables,params){
+  const svg=document.getElementById('grid');
+  const width=parseFloat(svg.getAttribute('width'))||svg.clientWidth;
+  const height=parseFloat(svg.getAttribute('height'))||svg.clientHeight;
+  const scale=40,margin=20;
+  const step=4; // pixel step for solver grid
+  const dx=(0.0254/scale)*step;
+  const nx=Math.ceil(width/step);
+  const ny=Math.ceil(height/step);
+  const k=100/((params.soilResistivity)||90);
+  const hConv=10; // W/(m^2*K)
+  const Bi=hConv*dx/k;
+  const earthT=params.earthTemp||20;
+  const airT=isNaN(params.airTemp)?earthT:params.airTemp;
+
+  const grid=new Array(ny).fill(0).map(()=>new Array(nx).fill(earthT));
+  const newGrid=new Array(ny).fill(0).map(()=>new Array(nx).fill(earthT));
+  const powerGrid=new Array(ny).fill(0).map(()=>new Array(nx).fill(0));
+  const conduitCells={};
+
+  const heatMap={};
+  cables.forEach(c=>{
+    const cd=conduits.find(d=>d.conduit_id===c.conduit_id);
+    if(!cd)return;
+    const Rin=Math.sqrt(CONDUIT_SPECS[cd.conduit_type][cd.trade_size]/Math.PI);
+    const cx=(cd.x+Rin)*0.0254,cy=(cd.y+Rin)*0.0254;
+    const Rdc=dcResistance(c.conductor_size,c.conductor_material,90);
+    const current=parseFloat(c.est_load)||0;
+    const power=current*current*Rdc;
+    if(!heatMap[c.conduit_id]){
+      heatMap[c.conduit_id]={cx,cy,r:Rin*0.0254,power:0};
+    }
+    heatMap[c.conduit_id].power+=power;
+  });
+
+  Object.keys(heatMap).forEach(cid=>{
+    const h=heatMap[cid];
+    const cxPx=Math.round((h.cx/0.0254*scale+margin)/step);
+    const cyPx=Math.round((h.cy/0.0254*scale+margin)/step);
+    const rPx=Math.max(1,Math.round((h.r/0.0254*scale)/step));
+    const q=h.power/(Math.PI*h.r*h.r)*dx*dx/k;
+    for(let j=Math.max(0,cyPx-rPx);j<=Math.min(ny-1,cyPx+rPx);j++){
+      for(let i=Math.max(0,cxPx-rPx);i<=Math.min(nx-1,cxPx+rPx);i++){
+        const dxp=i-cxPx,dyp=j-cyPx;
+        if(dxp*dxp+dyp*dyp<=rPx*rPx){
+          powerGrid[j][i]+=q;
+          if(!conduitCells[cid])conduitCells[cid]=[];
+          conduitCells[cid].push([j,i]);
+        }
+      }
+    }
+  });
+
+  let diff=Infinity,iter=0,maxIter=500;
+  while(diff>0.01&&iter<maxIter){
+    diff=0;
+    for(let j=0;j<ny;j++){
+      for(let i=0;i<nx;i++){
+        let val;
+        if(j===ny-1||i===0||i===nx-1){
+          val=earthT;
+        }else if(j===0){
+          val=(grid[j+1][i]+Bi*airT)/(1+Bi);
+        }else{
+          val=0.25*(grid[j][i-1]+grid[j][i+1]+grid[j-1][i]+grid[j+1][i])+powerGrid[j][i];
+        }
+        newGrid[j][i]=val;
+        diff=Math.max(diff,Math.abs(val-grid[j][i]));
+      }
+    }
+    for(let j=0;j<ny;j++){
+      for(let i=0;i<nx;i++)grid[j][i]=newGrid[j][i];
+    }
+    iter++;
+  }
+
+  const temps={};
+  Object.keys(conduitCells).forEach(cid=>{
+    const cells=conduitCells[cid];
+    let sum=0;
+    cells.forEach(([j,i])=>{sum+=grid[j][i];});
+    temps[cid]=sum/cells.length;
+  });
+  return {grid,conduitTemps:temps};
+}
+
 function runFiniteThermalAnalysis(){
   drawGrid();
   const conduits=getAllConduits();
