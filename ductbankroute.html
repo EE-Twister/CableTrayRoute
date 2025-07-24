@@ -789,21 +789,29 @@ const heatSourcesArr=cables.map(c=>{
   const halfHeight=(maxCy-minCy)/2||1;
  let minCx=Infinity,maxCx=-Infinity;
  heatSourcesArr.forEach(h=>{minCx=Math.min(minCx,h.cx);maxCx=Math.max(maxCx,h.cx);});
- const k=1/(params.soilResistivity||90);
+ const k=100/(params.soilResistivity||90);
  const boundaryAlpha=1.5;
- function boundaryFactor(y,alpha=boundaryAlpha){
-   const center=(maxCy+minCy)/2;
-   const dist=Math.abs(y-center);
-   return 1+alpha*(dist/halfHeight);
+ const centerY=(maxCy+minCy)/2;
+function boundaryFactor(y, hH=halfHeight, alpha=boundaryAlpha){
+  const d=Math.abs(y-centerY);
+  return 1+alpha*Math.pow(d/hH,2);
+}
+
+ function deltaT(power,Rth,k,dist,alpha,halfH){
+   const bf=1+alpha*Math.pow(dist/halfH,2);
+   return power*(Rth*bf + Math.log(Math.max(dist,0.01)/0.05)/(2*Math.PI*k));
  }
+
+ console.assert(Math.abs(deltaT(10,0.5,0.011,0.05,1.5,0.028)-28)<2,'deltaT case1');
+ console.assert(deltaT(10,0.5,0.011,0.2,1.5,0.028)<deltaT(10,0.5,0.011,0.05,1.5,0.028),'deltaT dist');
+ console.assert(Math.abs(deltaT(10,0.5,0.011,0.05,0,0.028)-5)<0.1,'alpha zero');
   function tempAt(x,y){
     let t=ambient;
-    const bf=boundaryFactor(y);
+    const bf=boundaryFactor(y,halfHeight,boundaryAlpha);
     for(const h of heatSourcesArr){
       const dx=x-h.cx,dy=y-h.cy;
       const dist=Math.sqrt(dx*dx+dy*dy);
-      const dT=h.power*(h.Rth*bf + Math.log(Math.max(dist,0.01)/0.05)/(2*Math.PI*k));
-      t+=dT;
+      t+=deltaT(h.power,h.Rth*bf,k,dist,0,halfHeight);
     }
     return t;
   }
@@ -829,7 +837,7 @@ const tempKernel=gpu.createKernel(function(h,count,ambient,k,alpha,center,halfH,
   const x=(i-margin)*scaleInv;
   const y=(j-margin)*scaleInv;
   let t=ambient;
-  const bf=1.0+alpha*(Math.abs(y-center)/halfH);
+  const bf=1.0+alpha*Math.pow(Math.abs(y-center)/halfH,2);
   for(let n=0;n<count;n++){
     const dx=x-h[n][0];
     const dy=y-h[n][1];
@@ -839,16 +847,51 @@ const tempKernel=gpu.createKernel(function(h,count,ambient,k,alpha,center,halfH,
   return t;
 },{output:[nx,ny]});
 const temps=tempKernel(hData,hData.length,ambient,k,boundaryAlpha,(maxCy+minCy)/2,halfHeight,margin,0.0254/scale,startX,startY,step);
-for(let yIdx=0;yIdx<ny;yIdx++){
-  for(let xIdx=0;xIdx<nx;xIdx++){
-    const i=startX+xIdx*step;
-    const j=startY+yIdx*step;
+
+let cpuTemps=null;
+if(tempKernel.mode==='gpu'){
+  cpuTemps=[];
+  for(let j=startY;j<endY;j+=step){
+    const row=[];
+    for(let i=startX;i<endX;i+=step){
+      const x=(i-margin)*0.0254/scale;
+      const y=(j-margin)*0.0254/scale;
+      row.push(tempAt(x,y));
+    }
+    cpuTemps.push(row);
+  }
+  outer:for(let y=0;y<ny;y++){
+    for(let x=0;x<nx;x++){
+      if(Math.abs(cpuTemps[y][x]-temps[y][x])>0.1){
+        console.log('CPU/GPU mismatch at',startX+x*step,startY+y*step);
+        break outer;
+      }
+    }
+  }
+}else{
+  temps=[];
+  for(let j=startY;j<endY;j++){
+    const row=[];
+    for(let i=startX;i<endX;i++){
+      const x=(i-margin)*0.0254/scale;
+      const y=(j-margin)*0.0254/scale;
+      row.push(tempAt(x,y));
+    }
+    temps.push(row);
+  }
+}
+
+const drawStep=tempKernel.mode==='gpu'?step:1;
+for(let yIdx=0;yIdx<temps.length;yIdx++){
+  for(let xIdx=0;xIdx<temps[yIdx].length;xIdx++){
+    const i=startX+xIdx*drawStep;
+    const j=startY+yIdx*drawStep;
     const T=temps[yIdx][xIdx];
     if(T>maxT){maxT=T;maxPx=i;maxPy=j;}
     const r=Math.min(255,Math.max(0,Math.round(255*Math.min(1,(T-ambient)/30))));
     const b=255-r;
-    for(let dy=0;dy<step;dy++){
-      for(let dx=0;dx<step;dx++){
+    for(let dy=0;dy<drawStep;dy++){
+      for(let dx=0;dx<drawStep;dx++){
         const idxPx=((j+dy)*width+(i+dx))*4;
         img.data[idxPx]=r;
         img.data[idxPx+1]=0;
