@@ -866,7 +866,7 @@ const heatSourcesArr=Object.keys(heatMap).map(cid=>{
   distances.forEach(d=>{mutualAdj+=0.2*Math.exp(-d/0.1);});
   Rth*=mutualAdj;
   Rth*=h.count;
-  return {cx:h.cx,cy:h.cy,power:h.power,Rth,conduit:cid};
+  return {cx:h.cx,cy:h.cy,power:h.power,Rth,conduit:cid,r:h.r};
 }).filter(Boolean);
 console.log('heatSourcesArr',heatSourcesArr);
 heatSourcesArr.forEach(h=>{
@@ -889,17 +889,17 @@ function neherMcGrathRise(power,Rth,depth,rho){
   const radial=Math.log(Math.max(depth,r0)/r0)/(2*Math.PI*k);
   return power*(Rth+radial);
 }
-  function tempAt(x,y){
+  function tempAt(x,y,targetR=0){
     let t=ambient;
     for(const h of heatSourcesArr){
       const dx=x-h.cx,dy=y-h.cy;
-      const dist=Math.sqrt(dx*dx+dy*dy);
+      const dist=Math.max(0,Math.sqrt(dx*dx+dy*dy)-(h.r+targetR));
       t+=neherMcGrathRise(h.power,h.Rth,dist,params.soilResistivity||90);
     }
     return t;
   }
  if(heatSourcesArr.length){
-   const testT=tempAt(heatSourcesArr[0].cx,heatSourcesArr[0].cy);
+   const testT=tempAt(heatSourcesArr[0].cx,heatSourcesArr[0].cy,heatSourcesArr[0].r);
    console.log('tempAt self',testT);
    console.assert(testT>ambient,'tempAt should exceed ambient');
  }
@@ -915,7 +915,7 @@ let drawStep=1;
   if(typeof GPU!=='undefined'){
     try{
       const gpu=new GPU();
-      const hData=heatSourcesArr.map(h=>[h.cx,h.cy,h.power,h.Rth]);
+      const hData=heatSourcesArr.map(h=>[h.cx,h.cy,h.power,h.Rth,h.r]);
       const nx=Math.ceil((endX-startX)/step);
       const ny=Math.ceil((endY-startY)/step);
       const tempKernel=gpu.createKernel(function(h,count,ambient,k,margin,scaleInv,startX,startY,step){
@@ -927,7 +927,7 @@ let drawStep=1;
         for(let n=0;n<count;n++){
           const dx=x-h[n][0];
           const dy=y-h[n][1];
-          const dist=Math.sqrt(dx*dx+dy*dy);
+          const dist=Math.max(0,Math.sqrt(dx*dx+dy*dy)-h[n][4]);
           const radial=Math.log(Math.max(dist,0.01)/0.05)/(2*Math.PI*k);
           t+=h[n][2]*(h[n][3] + radial);
         }
@@ -990,7 +990,7 @@ ctx.fillText(maxTF.toFixed(1)+'\u00B0F',maxPx+8,maxPy-8);
    const Rin=Math.sqrt(CONDUIT_SPECS[cd.conduit_type][cd.trade_size]/Math.PI);
    const px=(cd.x+Rin)*scale+margin;
    const py=(cd.y+Rin)*scale+margin;
-   const t=tempAt((cd.x+Rin)*0.0254,(cd.y+Rin)*0.0254);
+  const t=tempAt((cd.x+Rin)*0.0254,(cd.y+Rin)*0.0254,Rin*0.0254);
    const tf=t*9/5+32;
    const cb=cables.filter(c=>c.conduit_id===cd.conduit_id);
    let rating=0;
@@ -1022,7 +1022,7 @@ ctx.fillText(maxTF.toFixed(1)+'\u00B0F',maxPx+8,maxPy-8);
     return;
   }
   const Rin = Math.sqrt(CONDUIT_SPECS[cd.conduit_type][cd.trade_size] / Math.PI);
-  const T = tempAt((cd.x + Rin)*0.0254, (cd.y + Rin)*0.0254);
+  const T = tempAt((cd.x + Rin)*0.0254, (cd.y + Rin)*0.0254, Rin*0.0254);
   const Rdc = dcResistance(c.conductor_size,c.conductor_material,T);
   const current=parseFloat(c.est_load)||0;
   if(current<=0){

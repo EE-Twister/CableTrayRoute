@@ -511,22 +511,22 @@ function computeDuctbankTemperatures(conduits, cables, params) {
     distances.forEach(d => { mutualAdj += 0.2 * Math.exp(-d / 0.1); });
     Rth *= mutualAdj;
     Rth *= h.count;
-    return { ...h, Rth, conduit: cid };
+    return { ...h, Rth, conduit: cid, r: h.r };
   }).filter(Boolean);
 
-  function tempAt(x, y) {
+  function tempAt(x, y, targetR = 0) {
     let t = params.earthTemp || 20;
     for (const h of sources) {
       const dx = x - h.cx;
       const dy = y - h.cy;
-      const dist = Math.sqrt(dx * dx + dy * dy);
+      const dist = Math.max(0, Math.sqrt(dx * dx + dy * dy) - (h.r + targetR));
       t += neherMcGrathRise(h.power, h.Rth, dist, params.soilResistivity || 90);
     }
     return t;
   }
 
   const temps = {};
-  for (const s of sources) temps[s.conduit] = tempAt(s.cx, s.cy);
+  for (const s of sources) temps[s.conduit] = tempAt(s.cx, s.cy, s.r);
   return temps;
 }
 
@@ -564,14 +564,16 @@ const Rin = Math.sqrt(CONDUIT_SPECS["PVC Sch 40"]["4"] / Math.PI) * 0.0254;
 const center1 = (SMALL_CONDUITS[0].x + Rin / 0.0254) * 0.0254;
 const center2 = (SMALL_CONDUITS[1].x + Rin / 0.0254) * 0.0254;
 const centerDist = Math.abs(center2 - center1);
+const surfaceDist = Math.max(0, centerDist - 2 * Rin);
 const Rdc = dcResistance("#2 AWG", "Copper", 90);
 const power = 250 * 250 * Rdc;
 let Rth = (PARAMS.soilResistivity || 90) / 90 * 0.5;
-const spacingAdj = 3 / (centerDist - 2 * Rin > 0 ? (centerDist - 2 * Rin) / 0.0254 : 3);
+const spacingAdj = 3 / (surfaceDist > 0 ? surfaceDist / 0.0254 : 3);
 Rth *= spacingAdj;
-let mutualAdj = 1 + 0.2 * Math.exp(-(centerDist - 2 * Rin) / 0.1);
+let mutualAdj = 1 + 0.2 * Math.exp(-surfaceDist / 0.1);
 Rth *= mutualAdj;
-const radial = Math.log(centerDist / 0.05) / (2 * Math.PI * (100 / PARAMS.soilResistivity));
+const radial = Math.log(Math.max(surfaceDist, 0.05) / 0.05) /
+  (2 * Math.PI * (100 / PARAMS.soilResistivity));
 const expected = PARAMS.earthTemp + power * Rth + power * (Rth + radial);
 
 console.assert(Math.abs(temps.C1 - expected) < 0.1, "C1 temperature mismatch");
