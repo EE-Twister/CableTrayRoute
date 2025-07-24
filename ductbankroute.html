@@ -505,6 +505,8 @@ function updateAmpacityReport(){
  };
  const cables=getAllCables();
  const total=cables.length;
+ const countMap={};
+ cables.forEach(c=>{countMap[c.conduit_id]=(countMap[c.conduit_id]||0)+1;});
  const rows=cables.map(c=>{
   const res=estimateAmpacity(c,params,countMap[c.conduit_id],total);
   const neher=isFinite(res.ampacity)?res.ampacity.toFixed(0):'N/A';
@@ -768,7 +770,6 @@ const ctx=canvas.getContext('2d');
   heatSourcesArr.forEach(h=>{minCy=Math.min(minCy,h.cy);maxCy=Math.max(maxCy,h.cy);});
   const halfHeight=(maxCy-minCy)/2||1;
   const k=100/(params.soilResistivity||90);
-  const REF_DIST=1.0;
   function boundaryFactor(y){
     const distBottom=y-minCy;
     const distTop=maxCy-y;
@@ -781,7 +782,7 @@ const ctx=canvas.getContext('2d');
     for(const h of heatSourcesArr){
       const dx=x-h.cx,dy=y-h.cy;
       const dist=Math.sqrt(dx*dx+dy*dy);
-      const inc=h.power*h.Rth/(2*Math.PI*k)*Math.log(REF_DIST/(dist+0.001));
+      const inc=h.power*h.Rth/(2*Math.PI*k*(dist+0.05));
       t+=inc/bf;
     }
     return t;
