@@ -321,13 +321,30 @@ function addConduitRow(data={}){
 function addCableRow(data={}){
  const tr=document.createElement('tr');
  const cols=['tag','cable_type','diameter','conductors','conductor_size','weight','est_load','conduit_id','conductor_material','insulation_type','voltage_rating','shielding_jacket'];
+ const selectOptions={
+  cable_type:['Power','Control','Signal'],
+  conductor_material:['Copper','Aluminum'],
+  insulation_type:['THHN','XLPE','PVC'],
+  shielding_jacket:['','Lead','Copper Tape']
+ };
  cols.forEach(c=>{
   const td=document.createElement('td');
-  const inp=document.createElement('input');
-  if(c==='diameter'||c==='weight'||c==='est_load') inp.type='number';
-  else if(c==='conductors') inp.type='number';
-  else inp.type='text';
-  if(c==='conductor_size') inp.setAttribute('list','sizeList');
+  let inp;
+  if(selectOptions[c]){
+    inp=document.createElement('select');
+    selectOptions[c].forEach(opt=>{
+      const o=document.createElement('option');
+      o.value=opt;
+      o.textContent=opt||'None';
+      inp.appendChild(o);
+    });
+  }else{
+    inp=document.createElement('input');
+    if(c==='diameter'||c==='weight'||c==='est_load') inp.type='number';
+    else if(c==='conductors') inp.type='number';
+    else inp.type='text';
+    if(c==='conductor_size') inp.setAttribute('list','sizeList');
+  }
   inp.value=data[c]||'';
   td.appendChild(inp);
   tr.appendChild(td);
@@ -345,7 +362,10 @@ function rowToConduit(tr){
 }
 
 function rowToCable(tr){
- const vals=Array.from(tr.children).slice(0,12).map(td=>td.querySelector('input').value);
+ const vals=Array.from(tr.children).slice(0,12).map(td=>{
+  const el=td.querySelector('input,select');
+  return el?el.value:'';
+ });
  const [tag,cable_type,diameter,conductors,conductor_size,weight,est_load,conduit_id,conductor_material,insulation_type,voltage_rating,shielding_jacket]=vals;
   return {
    tag,
@@ -709,10 +729,12 @@ const ctx=canvas.getContext('2d');
  const scale=40,margin=20;
  const earthF=parseFloat(document.getElementById('earthTemp').value);
  const airF=parseFloat(document.getElementById('airTemp').value);
- const ambient=Math.max(
-   isNaN(earthF)?20:fToC(earthF),
+ const ambientBase=isNaN(earthF)?20:fToC(earthF);
+ const hasLoad=cables.some(c=>parseFloat(c.est_load)>0);
+ const ambient=hasLoad?Math.max(
+   ambientBase,
    isNaN(airF)?-Infinity:fToC(airF)
- );
+ ):ambientBase;
  const params={
   soilResistivity:parseFloat(document.getElementById('soilResistivity').value)||90,
   moistureContent:parseFloat(document.getElementById('moistureContent').value)||0,
@@ -980,6 +1002,9 @@ document.addEventListener('keydown',e=>{
   if(focusable){
    e.preventDefault();
    focusable.focus();
+   if(key==='Enter'&&typeof focusable.select==='function'){
+     focusable.select();
+   }
   }
  }
 });
