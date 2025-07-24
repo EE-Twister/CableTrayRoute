@@ -185,6 +185,7 @@ body.dark-mode #helpPopup{background:#2c3034;color:#f8f9fa;}
   <p>&#x3c1; is the soil resistivity, N is the cables in the conduit, D is ductbank depth (in), <em>moistureAdj</em> reduces resistance for wetter soil, <em>adjCableFactor</em> accounts for heat from neighboring conduits, and <em>spacingAdj</em>=3/spacing. <em>insulationAdj</em>, <em>voltageAdj</em> and <em>jacketAdj</em> adjust for cable construction. The DC resistance R<sub>dc</sub> depends on conductor material and size.</p>
   <h3>Thermal Analysis</h3>
   <p>The <em>Thermal Analysis</em> button overlays a heat map on the drawing. Each conduit center is marked with a yellow dot labeled with the estimated earth temperature in Fahrenheit and the hottest point is highlighted in red.</p>
+  <p>Inputs are validated before running the analysis. Ductbank depth is limited to 0–120&nbsp;in, spacing between 1–24&nbsp;in and cable estimated load up to 2000&nbsp;A. Values outside these ranges will be clamped.</p>
 </div>
 </div>
 
@@ -722,12 +723,54 @@ svg.appendChild(widthText);
   svg.appendChild(typeText);
 });
 svg.setAttribute('width',maxX*scale+2*margin+80);
+
 svg.setAttribute('height',maxY*scale+2*margin+20);
 }
 
+function validateThermalInputs(){
+  const warnings=[];
+  const depthEl=document.getElementById('ductbankDepth');
+  let depth=parseFloat(depthEl.value);
+  if(isFinite(depth)){
+    if(depth>120){
+      warnings.push('Ductbank depth capped at 120 in (10 ft).');
+      depthEl.value=120;
+    }else if(depth<0){
+      warnings.push('Ductbank depth cannot be negative.');
+      depthEl.value=0;
+    }
+  }
+  const hEl=document.getElementById('hSpacing');
+  let h=parseFloat(hEl.value);
+  if(isFinite(h)){
+    if(h>24){warnings.push('Horiz spacing capped at 24 in.');hEl.value=24;}
+    else if(h<1){warnings.push('Horiz spacing raised to 1 in.');hEl.value=1;}
+  }
+  const vEl=document.getElementById('vSpacing');
+  let v=parseFloat(vEl.value);
+  if(isFinite(v)){
+    if(v>24){warnings.push('Vert spacing capped at 24 in.');vEl.value=24;}
+    else if(v<1){warnings.push('Vert spacing raised to 1 in.');vEl.value=1;}
+  }
+  document.querySelectorAll('#cableTable tbody tr').forEach(tr=>{
+    const loadCell=tr.children[6];
+    if(!loadCell)return;
+    const inp=loadCell.querySelector('input');
+    if(!inp)return;
+    let val=parseFloat(inp.value);
+    const tagCell=tr.children[0];
+    const tag=tagCell?tagCell.querySelector('input')?.value||'Cable':'Cable';
+    if(isFinite(val)){
+      if(val>2000){warnings.push(`${tag} load capped at 2000 A.`);inp.value=2000;}
+      else if(val<0){warnings.push(`${tag} load cannot be negative.`);inp.value=0;}
+    }
+  });
+ if(warnings.length)alert('Input warnings:\n'+warnings.join('\n'));
+}
+
 function runFiniteThermalAnalysis(){
- drawGrid();
- const conduits=getAllConduits();
+  drawGrid();
+  const conduits=getAllConduits();
  const cables=getAllCables();
  const canvas=document.getElementById('tempCanvas');
 const svg=document.getElementById('grid');
@@ -893,8 +936,11 @@ for(let yIdx=0;yIdx<temps.length;yIdx++){
   }
 }
 ctx.putImageData(img,0,0);
- const maxTF=maxT*9/5+32;
- ctx.beginPath();
+const maxTF=maxT*9/5+32;
+ if(maxT>90){
+   console.warn(`Maximum temperature ${maxT.toFixed(1)}\u00B0C exceeds 90\u00B0C rating.`);
+ }
+ctx.beginPath();
  ctx.arc(maxPx,maxPy,5,0,Math.PI*2);
  ctx.fillStyle='yellow';
  ctx.fill();
@@ -909,8 +955,11 @@ ctx.fillText(maxTF.toFixed(1)+'\u00B0F',maxPx+8,maxPy-8);
    const px=(cd.x+Rin)*scale+margin;
    const py=(cd.y+Rin)*scale+margin;
   const t=tempAt((cd.x+Rin)*0.0254,(cd.y+Rin)*0.0254);
-   const tf=t*9/5+32;
-   ctx.beginPath();
+  const tf=t*9/5+32;
+  if(t>90){
+    console.warn(`Temperature at conduit ${cd.conduit_id} reaches ${t.toFixed(1)}\u00B0C`);
+  }
+  ctx.beginPath();
    ctx.arc(px,py,4,0,Math.PI*2);
    ctx.fillStyle='yellow';
    ctx.fill();
@@ -1038,7 +1087,10 @@ function exportImage(){
 document.getElementById('exportConduitsBtn').addEventListener('click',exportConduits);
 document.getElementById('exportCablesBtn').addEventListener('click',exportCables);
 document.getElementById('exportImgBtn').addEventListener('click',exportImage);
-document.getElementById('thermalBtn').addEventListener('click',runFiniteThermalAnalysis);
+document.getElementById('thermalBtn').addEventListener('click',()=>{
+  validateThermalInputs();
+  runFiniteThermalAnalysis();
+});
 document.getElementById('heatToggleBtn').addEventListener('click',()=>{
  heatVisible=!heatVisible;
  const canvas=document.getElementById('tempCanvas');
