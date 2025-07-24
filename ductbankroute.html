@@ -464,6 +464,28 @@ function fillResults(){
 
 const AWG_AREA={"18":1624,"16":2583,"14":4107,"12":6530,"10":10380,"8":16510,"6":26240,"4":41740,"3":52620,"2":66360,"1":83690,"1/0":105600,"2/0":133100,"3/0":167800,"4/0":211600};
 
+const BASE_RESISTIVITY={cu:0.017241,al:0.028264}; // ohm-mm^2/m @20C
+const TEMP_COEFF={cu:0.00393,al:0.00403};
+const RESISTANCE_TABLE={cu:{},al:{}};
+for(const sz in AWG_AREA){
+  const areaMM2=AWG_AREA[sz]*0.0005067;
+  RESISTANCE_TABLE.cu[sz]=BASE_RESISTIVITY.cu/areaMM2;
+  RESISTANCE_TABLE.al[sz]=BASE_RESISTIVITY.al/areaMM2;
+}
+
+function dcResistance(size,material,temp=20){
+  const key=size?size.toString().trim():'';
+  const mat=material&&material.toLowerCase().includes('al')?'al':'cu';
+  let base=RESISTANCE_TABLE[mat][key];
+  if(base===undefined){
+    const areaCM=sizeToArea(size);
+    if(!areaCM)return 0;
+    const areaMM2=areaCM*0.0005067;
+    base=BASE_RESISTIVITY[mat]/areaMM2;
+  }
+  return base*(1+TEMP_COEFF[mat]*(temp-20));
+}
+
 function sizeToArea(size){
  if(!size)return 0;
  const s=size.toString().trim();
@@ -476,9 +498,7 @@ function sizeToArea(size){
 function estimateAmpacity(cable,params,count=1,total=0){
  const areaCM=sizeToArea(cable.conductor_size);
  if(!areaCM)return {ampacity:0};
- const areaMM2=areaCM*0.0005067;
- const rho=cable.conductor_material&&cable.conductor_material.toLowerCase().includes('al')?0.034:0.022;
- const Rdc=rho*1.2/areaMM2; // approx at 90C
+ const Rdc=dcResistance(cable.conductor_size,cable.conductor_material,90);
  const spacing=(params.hSpacing+params.vSpacing)/2||3;
  const spacingAdj=3/spacing; // tighter spacing -> higher thermal resistance
  let Rth=(params.soilResistivity||90)/90*0.5;
@@ -803,9 +823,7 @@ cables.forEach(c=>{
   const cx=(cd.x+Rin)*0.0254,cy=(cd.y+Rin)*0.0254;
   const areaCM=sizeToArea(c.conductor_size);
   if(!areaCM)return;
-  const areaMM2=areaCM*0.0005067;
-  const rho=c.conductor_material&&c.conductor_material.toLowerCase().includes('al')?0.034:0.022;
-  const Rdc=rho*1.2/areaMM2;
+  const Rdc=dcResistance(c.conductor_size,c.conductor_material,90);
   const current=parseFloat(c.est_load)||0;
   const power=current*current*Rdc;
   if(!heatMap[c.conduit_id])heatMap[c.conduit_id]={cx,cy,power:0,count:0,cables:[],r:Rin*0.0254};
@@ -984,16 +1002,14 @@ ctx.fillText(maxTF.toFixed(1)+'\u00B0F',maxPx+8,maxPy-8);
      window.finiteAmpacity[c.tag] = 'N/A';
      return;
    }
-   const areaMM2 = areaCM * 0.0005067;
-   const rho = c.conductor_material && c.conductor_material.toLowerCase().includes('al') ? 0.034 : 0.022;
-   const Rdc = rho * 1.2 / areaMM2;
-   const cd = conduits.find(d => d.conduit_id === c.conduit_id);
-   if(!cd){
-     window.finiteAmpacity[c.tag] = 'N/A';
-     return;
-   }
+  const cd = conduits.find(d => d.conduit_id === c.conduit_id);
+  if(!cd){
+    window.finiteAmpacity[c.tag] = 'N/A';
+    return;
+  }
   const Rin = Math.sqrt(CONDUIT_SPECS[cd.conduit_type][cd.trade_size] / Math.PI);
   const T = tempAt((cd.x + Rin)*0.0254, (cd.y + Rin)*0.0254);
+  const Rdc = dcResistance(c.conductor_size,c.conductor_material,T);
   const current=parseFloat(c.est_load)||0;
   if(current<=0){
     window.finiteAmpacity[c.tag]='N/A';
