@@ -60,6 +60,21 @@ body {
     color: var(--text-color);
 }
 
+/* --- Top Navigation --- */
+.top-nav {
+    background: var(--secondary-color);
+    border-bottom: 1px solid var(--border-color);
+    padding: 0.5rem 1rem;
+}
+.top-nav a {
+    margin-right: 1rem;
+    text-decoration: none;
+    color: var(--text-color);
+}
+.top-nav a:hover {
+    text-decoration: underline;
+}
+
 .container {
     display: flex;
     height: 100vh;
