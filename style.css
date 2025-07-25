@@ -408,6 +408,8 @@ th {
 .message.warning { background-color: var(--warning-bg); border-color: var(--warning-text); color: var(--warning-text); }
 .message.error { background-color: var(--error-bg); border-color: var(--error-text); color: var(--error-text); }
 
+#warning-area { margin-top: 8px; }
+
 /* --- Plots --- */
 #plot-3d {
     width: 100%;
