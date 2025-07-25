@@ -333,9 +333,10 @@ function addConduitRow(data={}){
  ['x','y'].forEach(k=>{const td=document.createElement('td');const inp=document.createElement('input');inp.type='number';inp.value=data[k]||0;if(k==='x'||k==='y')inp.readOnly=true;td.appendChild(inp);tr.appendChild(td);});
  const dupTd=document.createElement('td');dupTd.appendChild(createButton('⧉','duplicateBtn',()=>{const cloneData=rowToConduit(tr);addConduitRow(cloneData);}));tr.appendChild(dupTd);
  const delTd=document.createElement('td');delTd.appendChild(createButton('✖','removeBtn',()=>{tr.remove();drawGrid();
- updateAmpacityReport();}));tr.appendChild(delTd);
+ updateAmpacityReport();saveDuctbankSession();}));tr.appendChild(delTd);
  document.querySelector('#conduitTable tbody').appendChild(tr);
  autoPlaceConduits();
+ saveDuctbankSession();
 }
 
 function addCableRow(data={}){
@@ -370,10 +371,11 @@ function addCableRow(data={}){
   tr.appendChild(td);
  });
  const dupTd=document.createElement('td');dupTd.appendChild(createButton('⧉','duplicateBtn',()=>{const clone=rowToCable(tr);addCableRow(clone);}));tr.appendChild(dupTd);
- const delTd=document.createElement('td');delTd.appendChild(createButton('✖','removeBtn',()=>{tr.remove();drawGrid();updateAmpacityReport();}));tr.appendChild(delTd);
+ const delTd=document.createElement('td');delTd.appendChild(createButton('✖','removeBtn',()=>{tr.remove();drawGrid();updateAmpacityReport();saveDuctbankSession();}));tr.appendChild(delTd);
  document.querySelector('#cableTable tbody').appendChild(tr);
  drawGrid();
  updateAmpacityReport();
+ saveDuctbankSession();
 }
 
 function rowToConduit(tr){
@@ -409,6 +411,65 @@ function getAllConduits(){
 
 function getAllCables(){
  return Array.from(document.querySelectorAll('#cableTable tbody tr')).map(rowToCable);
+}
+
+function saveDuctbankSession(){
+ const session={
+  ductbankTag:document.getElementById('ductbankTag').value,
+  concreteEncasement:document.getElementById('concreteEncasement').checked,
+  ductbankDepth:document.getElementById('ductbankDepth').value,
+  earthTemp:document.getElementById('earthTemp').value,
+  airTemp:document.getElementById('airTemp').value,
+  soilResistivity:document.getElementById('soilResistivity').value,
+  moistureContent:document.getElementById('moistureContent').value,
+  heatSources:document.getElementById('heatSources').checked,
+  hSpacing:document.getElementById('hSpacing').value,
+  vSpacing:document.getElementById('vSpacing').value,
+  topPad:document.getElementById('topPad').value,
+  bottomPad:document.getElementById('bottomPad').value,
+  leftPad:document.getElementById('leftPad').value,
+  rightPad:document.getElementById('rightPad').value,
+  perRow:document.getElementById('perRow').value,
+  conduits:getAllConduits(),
+  cables:getAllCables(),
+  darkMode:document.body.classList.contains('dark-mode')
+ };
+ try{localStorage.setItem('ductbankSession',JSON.stringify(session));}catch(e){console.error('save session failed',e);}
+}
+
+function loadDuctbankSession(){
+ const stored=localStorage.getItem('ductbankSession');
+ if(!stored) return;
+ try{
+  const s=JSON.parse(stored);
+  if(s.ductbankTag!==undefined)document.getElementById('ductbankTag').value=s.ductbankTag;
+  if(s.concreteEncasement!==undefined)document.getElementById('concreteEncasement').checked=s.concreteEncasement;
+  if(s.ductbankDepth!==undefined)document.getElementById('ductbankDepth').value=s.ductbankDepth;
+  if(s.earthTemp!==undefined)document.getElementById('earthTemp').value=s.earthTemp;
+  if(s.airTemp!==undefined)document.getElementById('airTemp').value=s.airTemp;
+  if(s.soilResistivity!==undefined)document.getElementById('soilResistivity').value=s.soilResistivity;
+  if(s.moistureContent!==undefined)document.getElementById('moistureContent').value=s.moistureContent;
+  if(s.heatSources!==undefined)document.getElementById('heatSources').checked=s.heatSources;
+  if(s.hSpacing!==undefined)document.getElementById('hSpacing').value=s.hSpacing;
+  if(s.vSpacing!==undefined)document.getElementById('vSpacing').value=s.vSpacing;
+  if(s.topPad!==undefined)document.getElementById('topPad').value=s.topPad;
+  if(s.bottomPad!==undefined)document.getElementById('bottomPad').value=s.bottomPad;
+  if(s.leftPad!==undefined)document.getElementById('leftPad').value=s.leftPad;
+  if(s.rightPad!==undefined)document.getElementById('rightPad').value=s.rightPad;
+  if(s.perRow!==undefined)document.getElementById('perRow').value=s.perRow;
+  if(Array.isArray(s.conduits)){
+    document.querySelector('#conduitTable tbody').innerHTML='';
+    s.conduits.forEach(addConduitRow);
+  }
+  if(Array.isArray(s.cables)){
+    document.querySelector('#cableTable tbody').innerHTML='';
+    s.cables.forEach(addCableRow);
+  }
+  if(s.darkMode){document.body.classList.add('dark-mode');}
+  else{document.body.classList.remove('dark-mode');}
+  drawGrid();
+  updateAmpacityReport();
+ }catch(e){console.error('load session failed',e);}
 }
 
 function autoPlaceConduits(){
@@ -1016,16 +1077,18 @@ document.getElementById('sampleConduits').addEventListener('click',()=>{
  SAMPLE_CONDUITS.forEach(addConduitRow);
  drawGrid();
  updateAmpacityReport();
+ saveDuctbankSession();
 });
 document.getElementById('sampleCables').addEventListener('click',()=>{
  document.querySelector('#cableTable tbody').innerHTML='';
  SAMPLE_CABLES.forEach(addCableRow);
  drawGrid();
  updateAmpacityReport();
+ saveDuctbankSession();
 });
 
-document.getElementById('importConduits').addEventListener('change',e=>{const f=e.target.files[0];if(f)importCSV(f,data=>{document.querySelector('#conduitTable tbody').innerHTML='';data.forEach(addConduitRow);drawGrid();updateAmpacityReport();});});
-document.getElementById('importCables').addEventListener('change',e=>{const f=e.target.files[0];if(f)importCSV(f,data=>{document.querySelector('#cableTable tbody').innerHTML='';data.forEach(addCableRow);drawGrid();updateAmpacityReport();});});
+document.getElementById('importConduits').addEventListener('change',e=>{const f=e.target.files[0];if(f)importCSV(f,data=>{document.querySelector('#conduitTable tbody').innerHTML='';data.forEach(addConduitRow);drawGrid();updateAmpacityReport();saveDuctbankSession();});});
+document.getElementById('importCables').addEventListener('change',e=>{const f=e.target.files[0];if(f)importCSV(f,data=>{document.querySelector('#cableTable tbody').innerHTML='';data.forEach(addCableRow);drawGrid();updateAmpacityReport();saveDuctbankSession();});});
 
 document.getElementById('calc').addEventListener('click',()=>{drawGrid();updateAmpacityReport();});
 
@@ -1108,6 +1171,7 @@ document.getElementById('themeToggle').addEventListener('click',()=>{
  const session=JSON.parse(localStorage.getItem('ctrSession')||'{}');
  session.darkMode=document.body.classList.contains('dark-mode');
  localStorage.setItem('ctrSession',JSON.stringify(session));
+ saveDuctbankSession();
 });
 const stored=JSON.parse(localStorage.getItem('ctrSession')||'{}');
 if(stored.darkMode)document.body.classList.add('dark-mode');
@@ -1155,6 +1219,18 @@ document.addEventListener('keydown',e=>{
   }
  }
 });
+
+['ductbankTag','concreteEncasement','ductbankDepth','earthTemp','airTemp','soilResistivity','moistureContent','heatSources','hSpacing','vSpacing','topPad','bottomPad','leftPad','rightPad','perRow'].forEach(id=>{
+ const el=document.getElementById(id);
+ if(el){
+  el.addEventListener('input',saveDuctbankSession);
+  el.addEventListener('change',saveDuctbankSession);
+ }
+});
+document.querySelector('#conduitTable').addEventListener('input',saveDuctbankSession);
+document.querySelector('#cableTable').addEventListener('input',saveDuctbankSession);
+window.addEventListener('beforeunload',saveDuctbankSession);
+loadDuctbankSession();
 </script>
 </body>
 </html>
