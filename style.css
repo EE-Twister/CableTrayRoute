@@ -575,3 +575,12 @@ body.dark-mode #helpPopup {
     border: none;
     padding: 4px 8px;
 }
+
+.legalDisclaimer {
+    font-size: 0.8rem;
+    color: #555;
+    margin-top: 16px;
+}
+body.dark-mode .legalDisclaimer {
+    color: #ccc;
+}
