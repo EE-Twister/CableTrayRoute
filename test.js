@@ -1,4 +1,5 @@
 const assert = require('assert');
+const CONDUCTOR_DATA = require('./data/conductor_properties.json');
 
 function describe(name, fn) {
   console.log(name);
@@ -479,15 +480,16 @@ function sizeToArea(size) {
 
 function dcResistance(size, material, temp = 20) {
   const key = size ? size.toString().trim() : "";
-  const mat = material && material.toLowerCase().includes("al") ? "al" : "cu";
-  let base = RESISTANCE_TABLE[mat][key];
+  const matName = material && material.toLowerCase().includes("al") ? "Aluminum" : "Copper";
+  const coeffKey = matName === "Aluminum" ? "al" : "cu";
+  let base = CONDUCTOR_DATA[matName]?.[key]?.R20;
   if (base === undefined) {
     const areaCM = sizeToArea(key);
     if (!areaCM) return 0;
     const areaMM2 = areaCM * 0.0005067;
-    base = BASE_RESISTIVITY[mat] / areaMM2;
+    base = BASE_RESISTIVITY[coeffKey] / areaMM2;
   }
-  return base * (1 + TEMP_COEFF[mat] * (temp - 20));
+  return base * (1 + TEMP_COEFF[coeffKey] * (temp - 20));
 }
 
 function neherMcGrathRise(power, Rth, depth, rho) {
@@ -506,13 +508,23 @@ function skinEffect(size) {
   return 0;
 }
 
+function conductorThermalResistance(size, material, thick) {
+  const key = size ? size.toString().trim() : "";
+  const matName = material && material.toLowerCase().includes("al") ? "Aluminum" : "Copper";
+  const radius = CONDUCTOR_DATA[matName]?.[key]?.radius_m;
+  const k = matName === "Aluminum" ? 237 : 401;
+  const t = parseFloat(thick) || 0;
+  if (!radius) return 0.05;
+  return Math.log((radius + t * 0.0254) / radius) / (2 * Math.PI * k);
+}
+
 function dielectricRise(voltage) {
   const v = parseFloat(voltage) || 0;
   return v < 2000 ? 0 : (v - 2000) / 1000;
 }
 
 function calcRca(cable, params, count = 1, total = 1) {
-  let Rcond = 0.05;
+  let Rcond = conductorThermalResistance(cable.conductor_size, cable.conductor_material, cable.insulation_thickness);
   let Rins = 0.1;
   let Rduct = params.concreteEncasement ? 0.08 : 0.1;
   let Rsoil = (params.soilResistivity || 90) / 90 * 0.25;
@@ -727,10 +739,10 @@ const SMALL_CONDUITS = [
 
 const SMALL_CABLES = [
   { conduit_id: "C1", conductor_size: "#2 AWG", conductor_material: "Copper",
-    insulation_type: "THHN", insulation_rating: "90", voltage_rating: "600V", shielding_jacket: "",
+    insulation_type: "THHN", insulation_rating: "90", insulation_thickness: "0.05", voltage_rating: "600V", shielding_jacket: "",
     est_load: 250 },
   { conduit_id: "C2", conductor_size: "#2 AWG", conductor_material: "Copper",
-    insulation_type: "THHN", insulation_rating: "90", voltage_rating: "600V", shielding_jacket: "",
+    insulation_type: "THHN", insulation_rating: "90", insulation_thickness: "0.05", voltage_rating: "600V", shielding_jacket: "",
     est_load: 250 }
 ];
 
@@ -814,6 +826,7 @@ module.exports = {
   CONDUIT_SPECS,
   dcResistance,
   skinEffect,
+  conductorThermalResistance,
   dielectricRise,
   calcRca,
   calcFiniteAmpacity

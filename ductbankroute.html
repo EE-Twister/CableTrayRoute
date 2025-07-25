@@ -85,9 +85,10 @@ button{padding:4px 8px;margin:4px 2px;cursor:pointer;}
     <th data-idx="7">Conduit</th>
     <th data-idx="8">Conductor Material</th>
     <th data-idx="9">Insulation Type</th>
-    <th data-idx="10">Insul. Rating (°C)</th>
-    <th data-idx="11">Voltage Rating</th>
-    <th data-idx="12">Shielding / Jacket Type</th>
+   <th data-idx="10">Insul. Rating (°C)</th>
+   <th data-idx="11">Insul. Thick (in)</th>
+   <th data-idx="12">Voltage Rating</th>
+   <th data-idx="13">Shielding / Jacket Type</th>
     <th>Dup</th>
     <th>Del</th>
    </tr>
@@ -245,6 +246,11 @@ button{padding:4px 8px;margin:4px 2px;cursor:pointer;}
 
 <script>
 let heatVisible=true;
+let CONDUCTOR_DATA={};
+fetch('data/conductor_properties.json')
+ .then(r=>r.json())
+ .then(d=>{CONDUCTOR_DATA=d;})
+ .catch(e=>console.error('failed to load conductor data',e));
 const SAMPLE_CONDUITS=[
  {conduit_id:"C1",conduit_type:"PVC Sch 40",trade_size:"4",x:0,y:0},
  {conduit_id:"C2",conduit_type:"PVC Sch 40",trade_size:"4",x:2,y:0},
@@ -302,6 +308,7 @@ SAMPLE_CABLES.forEach(c=>{
  c.conductor_material='Copper';
  c.insulation_type='THHN';
  c.insulation_rating='90';
+ c.insulation_thickness='0.05';
  c.voltage_rating='600V';
  c.shielding_jacket='';
  if(c.est_load===undefined) c.est_load=250;
@@ -440,7 +447,7 @@ function addConduitRow(data={}){
 
 function addCableRow(data={}){
  const tr=document.createElement('tr');
- const cols=['tag','cable_type','diameter','conductors','conductor_size','weight','est_load','conduit_id','conductor_material','insulation_type','insulation_rating','voltage_rating','shielding_jacket'];
+ const cols=['tag','cable_type','diameter','conductors','conductor_size','weight','est_load','conduit_id','conductor_material','insulation_type','insulation_rating','insulation_thickness','voltage_rating','shielding_jacket'];
  const selectOptions={
   cable_type:['Power','Control','Signal'],
   conductor_material:['Copper','Aluminum'],
@@ -448,6 +455,11 @@ function addCableRow(data={}){
   insulation_rating:['60','75','90'],
   shielding_jacket:['','Lead','Copper Tape']
 };
+ const defaults={
+  conductor_material:'Copper',
+  conductor_size:'#12 AWG',
+  insulation_thickness:'0.05'
+ };
  cols.forEach(c=>{
   const td=document.createElement('td');
   let inp;
@@ -461,12 +473,12 @@ function addCableRow(data={}){
     });
   }else{
     inp=document.createElement('input');
-    if(c==='diameter'||c==='weight'||c==='est_load') inp.type='number';
+    if(c==='diameter'||c==='weight'||c==='est_load'||c==='insulation_thickness') inp.type='number';
     else if(c==='conductors') inp.type='number';
     else inp.type='text';
     if(c==='conductor_size') inp.setAttribute('list','sizeList');
   }
-  inp.value=data[c]||'';
+  inp.value=data[c]??defaults[c]??'';
   td.appendChild(inp);
   tr.appendChild(td);
  });
@@ -484,11 +496,11 @@ function rowToConduit(tr){
 }
 
 function rowToCable(tr){
- const vals=Array.from(tr.children).slice(0,13).map(td=>{
+ const vals=Array.from(tr.children).slice(0,14).map(td=>{
   const el=td.querySelector('input,select');
   return el?el.value:'';
 });
- const [tag,cable_type,diameter,conductors,conductor_size,weight,est_load,conduit_id,conductor_material,insulation_type,insulation_rating,voltage_rating,shielding_jacket]=vals;
+ const [tag,cable_type,diameter,conductors,conductor_size,weight,est_load,conduit_id,conductor_material,insulation_type,insulation_rating,insulation_thickness,voltage_rating,shielding_jacket]=vals;
   return {
    tag,
    cable_type,
@@ -501,6 +513,7 @@ function rowToCable(tr){
    conductor_material,
    insulation_type,
    insulation_rating,
+   insulation_thickness:parseFloat(insulation_thickness)||0,
    voltage_rating,
    shielding_jacket
   };
@@ -676,15 +689,16 @@ for(const sz in AWG_AREA){
 
 function dcResistance(size,material,temp=20){
   const key=size?size.toString().trim():'';
-  const mat=material&&material.toLowerCase().includes('al')?'al':'cu';
-  let base=RESISTANCE_TABLE[mat][key];
+  const matName=(material&&material.toLowerCase().includes('al'))?'Aluminum':'Copper';
+  const coeffKey=matName==='Aluminum'?'al':'cu';
+  let base=CONDUCTOR_DATA[matName]?.[key]?.R20;
   if(base===undefined){
     const areaCM=sizeToArea(size);
     if(!areaCM)return 0;
     const areaMM2=areaCM*0.0005067;
-    base=BASE_RESISTIVITY[mat]/areaMM2;
+    base=BASE_RESISTIVITY[coeffKey]/areaMM2;
   }
-  return base*(1+TEMP_COEFF[mat]*(temp-20));
+  return base*(1+TEMP_COEFF[coeffKey]*(temp-20));
 }
 
 function sizeToArea(size){
@@ -705,13 +719,23 @@ function skinEffect(size){
  return 0;
 }
 
+function conductorThermalResistance(size,material,thick){
+ const key=size?size.toString().trim():'';
+ const matName=(material&&material.toLowerCase().includes('al'))?'Aluminum':'Copper';
+ const radius=CONDUCTOR_DATA[matName]?.[key]?.radius_m;
+ const k=matName==='Aluminum'?237:401;
+ const t=parseFloat(thick)||0;
+ if(!radius) return 0.05;
+ return Math.log((radius+t*0.0254)/radius)/(2*Math.PI*k);
+}
+
 function dielectricRise(voltage){
  const v=parseFloat(voltage)||0;
  return v<2000?0:(v-2000)/1000;
 }
 
 function calcRca(cable,params,count=1,total=1){
- let Rcond=0.05;
+ let Rcond=conductorThermalResistance(cable.conductor_size,cable.conductor_material,cable.insulation_thickness);
  let Rins=0.1;
  let Rduct=params.concreteEncasement?0.08:0.1;
  let Rsoil=(params.soilResistivity||90)/90*0.25;
@@ -1363,7 +1387,7 @@ function exportConduits(){
 
 function exportCables(){
  const rows=getAllCables();
- const headers=['tag','cable_type','diameter','conductors','conductor_size','weight','est_load','conduit_id','conductor_material','insulation_type','insulation_rating','voltage_rating','shielding_jacket'];
+ const headers=['tag','cable_type','diameter','conductors','conductor_size','weight','est_load','conduit_id','conductor_material','insulation_type','insulation_rating','insulation_thickness','voltage_rating','shielding_jacket'];
  exportCSV('ductbank_cables.csv',headers,rows);
 }
 
