@@ -709,7 +709,7 @@ function estimateAmpacity(cable,params,count=1,total=0){
  if(volt>2000)Rth*=1.1;else if(volt<600)Rth*=0.95;
  if(cable.shielding_jacket)Rth*=1.05;
 
- Rth*=count;
+ Rth*=count*(cable.conductors||1);
  const amb=Math.max(params.earthTemp||20,
                    isNaN(params.airTemp)?-Infinity:params.airTemp);
  const dT=rating-amb;
@@ -1025,7 +1025,7 @@ function solveDuctbankTemperatures(conduits,cables,params,progress){
     if(!heatMap[c.conduit_id]){
       heatMap[c.conduit_id]={cx,cy,r:Rin*0.0254,power:0};
     }
-    heatMap[c.conduit_id].power+=power;
+    heatMap[c.conduit_id].power+=power*(c.conductors||1);
   });
 
   Object.keys(heatMap).forEach(cid=>{
@@ -1220,8 +1220,9 @@ const ctx=canvas.getContext('2d');
      window.finiteAmpacity[c.tag]='N/A';
      return;
    }
-   const Rth = (T - ambient) / (current*current*Rdc);
-  const amp = Math.sqrt((rating - ambient) / (Rdc * Rth));
+   const nCond = parseInt(c.conductors)||1;
+   const Rth = (T - ambient) / (current*current*Rdc*nCond);
+  const amp = Math.sqrt((rating - ambient) / (Rdc * Rth * nCond));
   window.finiteAmpacity[c.tag] = isFinite(amp) ? amp.toFixed(0) : 'N/A';
 });
  updateAmpacityReport();
