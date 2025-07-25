@@ -461,6 +461,12 @@ const INSULATION_TEMP_LIMIT = {
 
 const BASE_RESISTIVITY = { cu: 0.017241, al: 0.028264 }; // ohm-mm^2/m @20C
 const TEMP_COEFF = { cu: 0.00393, al: 0.00403 };
+const RESISTANCE_TABLE = { cu: {}, al: {} };
+for (const sz in AWG_AREA) {
+  const areaMM2 = AWG_AREA[sz] * 0.0005067;
+  RESISTANCE_TABLE.cu[sz] = BASE_RESISTIVITY.cu / areaMM2;
+  RESISTANCE_TABLE.al[sz] = BASE_RESISTIVITY.al / areaMM2;
+}
 
 function sizeToArea(size) {
   if (!size) return 0;
@@ -474,10 +480,13 @@ function sizeToArea(size) {
 function dcResistance(size, material, temp = 20) {
   const key = size ? size.toString().trim() : "";
   const mat = material && material.toLowerCase().includes("al") ? "al" : "cu";
-  const areaCM = sizeToArea(key);
-  if (!areaCM) return 0;
-  const areaMM2 = areaCM * 0.0005067;
-  const base = BASE_RESISTIVITY[mat] / areaMM2;
+  let base = RESISTANCE_TABLE[mat][key];
+  if (base === undefined) {
+    const areaCM = sizeToArea(key);
+    if (!areaCM) return 0;
+    const areaMM2 = areaCM * 0.0005067;
+    base = BASE_RESISTIVITY[mat] / areaMM2;
+  }
   return base * (1 + TEMP_COEFF[mat] * (temp - 20));
 }
 
@@ -486,6 +495,37 @@ function neherMcGrathRise(power, Rth, depth, rho) {
   const r0 = 0.05;
   const radial = Math.log(Math.max(depth, r0) / r0) / (2 * Math.PI * k);
   return power * (Rth + radial);
+}
+
+function skinEffect(size) {
+  const area = sizeToArea(size);
+  if (area >= 1000) return 0.2;
+  if (area >= 500) return 0.15;
+  if (area >= 250) return 0.1;
+  if (area >= 100) return 0.05;
+  return 0;
+}
+
+function dielectricRise(voltage) {
+  const v = parseFloat(voltage) || 0;
+  return v < 2000 ? 0 : (v - 2000) / 1000;
+}
+
+function calcRca(cable, params, count = 1, total = 1) {
+  let Rcond = 0.05;
+  let Rins = 0.1;
+  let Rduct = params.concreteEncasement ? 0.08 : 0.1;
+  let Rsoil = (params.soilResistivity || 90) / 90 * 0.25;
+  const moistAdj = 1 - Math.min(params.moistureContent || 0, 100) / 200;
+  Rsoil *= moistAdj;
+  const spacing = (params.hSpacing + params.vSpacing) / 2 || 3;
+  Rsoil *= 3 / spacing;
+  if (total > count) Rsoil *= 1 + (total - count) * 0.05;
+  if (params.heatSources) Rsoil *= 1.2;
+  Rsoil *= 1 + (params.ductbankDepth || 0) / 100;
+  if (cable.shielding_jacket) Rsoil *= 1.05;
+  Rsoil *= count * (cable.conductors || 1);
+  return Rcond + Rins + Rduct + Rsoil;
 }
 
 const CONDUIT_SPECS = {
@@ -687,10 +727,10 @@ const SMALL_CONDUITS = [
 
 const SMALL_CABLES = [
   { conduit_id: "C1", conductor_size: "#2 AWG", conductor_material: "Copper",
-    insulation_type: "THHN", voltage_rating: "600V", shielding_jacket: "",
+    insulation_type: "THHN", insulation_rating: "90", voltage_rating: "600V", shielding_jacket: "",
     est_load: 250 },
   { conduit_id: "C2", conductor_size: "#2 AWG", conductor_material: "Copper",
-    insulation_type: "THHN", voltage_rating: "600V", shielding_jacket: "",
+    insulation_type: "THHN", insulation_rating: "90", voltage_rating: "600V", shielding_jacket: "",
     est_load: 250 }
 ];
 
@@ -750,12 +790,17 @@ describe('calcFiniteAmpacity', () => {
     const cables = JSON.parse(JSON.stringify(SMALL_CABLES));
     const params = { ...PARAMS };
     const amp = calcFiniteAmpacity(cables[0], conduits, cables, params);
-    // expected approximate ampacity using simple Neher-McGrath estimate
+    // expected ampacity using full Neher-McGrath formula
     const result = solveDuctbankTemperatures(conduits, cables, params);
     const T = result.conduitTemps[cables[0].conduit_id];
     const Rdc = dcResistance(cables[0].conductor_size, cables[0].conductor_material, T);
-    const Rth = (T - params.earthTemp) / (cables[0].est_load * cables[0].est_load * Rdc);
-    const expected = Math.sqrt((90 - params.earthTemp) / (Rdc * Rth));
+    const Yc = skinEffect(cables[0].conductor_size);
+    const dTd = dielectricRise(cables[0].voltage_rating);
+    const Rca = (T - params.earthTemp - dTd) /
+      (cables[0].est_load * cables[0].est_load * Rdc * (1 + Yc));
+    const Tc = parseFloat(cables[0].insulation_rating);
+    const expected = Math.sqrt((Tc - (params.earthTemp + dTd)) /
+      (Rdc * (1 + Yc) * Rca));
     assert(Math.abs(amp - expected) < 5);
   });
 });
@@ -768,5 +813,8 @@ module.exports = {
   PARAMS,
   CONDUIT_SPECS,
   dcResistance,
+  skinEffect,
+  dielectricRise,
+  calcRca,
   calcFiniteAmpacity
 };
