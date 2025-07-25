@@ -145,7 +145,12 @@ button{padding:4px 8px;margin:4px 2px;cursor:pointer;}
  <button id="exportBtn">Download Ductbank Data</button>
  <button id="exportConduitsBtn">Export Ductbank Conduits</button>
  <button id="exportCablesBtn">Export Ductbank Cables</button>
- <button id="exportImgBtn">Export Image</button>
+<button id="exportImgBtn">Export Image</button>
+</div>
+
+<div id="analysis-progress-container" style="display:none;">
+  <div id="analysis-progress-bar" role="progressbar" aria-valuemin="0" aria-valuemax="100" aria-valuenow="0"></div>
+  <span id="analysis-progress-label"></span>
 </div>
 
 <div id="helpOverlay">
@@ -871,7 +876,7 @@ function validateThermalInputs(){
  }
 }
 
-function solveDuctbankTemperatures(conduits,cables,params){
+function solveDuctbankTemperatures(conduits,cables,params,progress){
   const svg=document.getElementById('grid');
   const width=parseFloat(svg.getAttribute('width'))||svg.clientWidth;
   const height=parseFloat(svg.getAttribute('height'))||svg.clientHeight;
@@ -925,39 +930,50 @@ function solveDuctbankTemperatures(conduits,cables,params){
   });
 
   let diff=Infinity,iter=0,maxIter=500;
-  while(diff>0.01&&iter<maxIter){
-    diff=0;
-    for(let j=0;j<ny;j++){
-      for(let i=0;i<nx;i++){
-        let val;
-        if(j===ny-1||i===0||i===nx-1){
-          val=earthT;
-        }else if(j===0){
-          val=(grid[j+1][i]+Bi*airT)/(1+Bi);
-        }else{
-          val=0.25*(grid[j][i-1]+grid[j][i+1]+grid[j-1][i]+grid[j+1][i]+powerGrid[j][i]);
+  return new Promise(resolve=>{
+    function step(){
+      let count=0;
+      while(diff>0.01&&iter<maxIter&&count<10){
+        diff=0;
+        for(let j=0;j<ny;j++){
+          for(let i=0;i<nx;i++){
+            let val;
+            if(j===ny-1||i===0||i===nx-1){
+              val=earthT;
+            }else if(j===0){
+              val=(grid[j+1][i]+Bi*airT)/(1+Bi);
+            }else{
+              val=0.25*(grid[j][i-1]+grid[j][i+1]+grid[j-1][i]+grid[j+1][i]+powerGrid[j][i]);
+            }
+            newGrid[j][i]=val;
+            diff=Math.max(diff,Math.abs(val-grid[j][i]));
+          }
         }
-        newGrid[j][i]=val;
-        diff=Math.max(diff,Math.abs(val-grid[j][i]));
+        for(let j=0;j<ny;j++){
+          for(let i=0;i<nx;i++)grid[j][i]=newGrid[j][i];
+        }
+        iter++;
+        count++;
+      }
+      if(typeof progress==='function') progress(iter,maxIter);
+      if(diff>0.01&&iter<maxIter){
+        requestAnimationFrame(step);
+      }else{
+        const temps={};
+        Object.keys(conduitCells).forEach(cid=>{
+          const cells=conduitCells[cid];
+          let sum=0;
+          cells.forEach(([j,i])=>{sum+=grid[j][i];});
+          temps[cid]=sum/cells.length;
+        });
+        resolve({grid,conduitTemps:temps});
       }
     }
-    for(let j=0;j<ny;j++){
-      for(let i=0;i<nx;i++)grid[j][i]=newGrid[j][i];
-    }
-    iter++;
-  }
-
-  const temps={};
-  Object.keys(conduitCells).forEach(cid=>{
-    const cells=conduitCells[cid];
-    let sum=0;
-    cells.forEach(([j,i])=>{sum+=grid[j][i];});
-    temps[cid]=sum/cells.length;
+    step();
   });
-  return {grid,conduitTemps:temps};
 }
 
-function runFiniteThermalAnalysis(){
+async function runFiniteThermalAnalysis(){
   drawGrid();
   const conduits=getAllConduits();
  const cables=getAllCables();
@@ -988,7 +1004,20 @@ const ctx=canvas.getContext('2d');
   airTemp:isNaN(airF)?NaN:fToC(airF)
  };
 
- const result=solveDuctbankTemperatures(conduits,cables,params);
+ const pc=document.getElementById('analysis-progress-container');
+ const pb=document.getElementById('analysis-progress-bar');
+ const pl=document.getElementById('analysis-progress-label');
+ pc.style.display='block';
+ pb.style.width='0%';
+ pb.setAttribute('aria-valuenow','0');
+ pl.textContent='Solving...';
+ const result=await solveDuctbankTemperatures(conduits,cables,params,(it,max)=>{
+  const pct=Math.round(it/max*100);
+  pb.style.width=pct+'%';
+  pb.setAttribute('aria-valuenow',pct);
+  pl.textContent=`Solving (${it}/${max})`;
+ });
+ pc.style.display='none';
  const grid=result.grid;
  const conduitTemps=result.conduitTemps;
 
