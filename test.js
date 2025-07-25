@@ -450,6 +450,15 @@ const AWG_AREA = {
   "4/0":211600
 };
 
+const INSULATION_TEMP_LIMIT = {
+  THHN:90,
+  XLPE:90,
+  PVC:75,
+  XHHW:90,
+  'XHHW-2':90,
+  'THWN-2':90
+};
+
 const BASE_RESISTIVITY = { cu: 0.017241, al: 0.028264 }; // ohm-mm^2/m @20C
 const TEMP_COEFF = { cu: 0.00393, al: 0.00403 };
 
@@ -639,6 +648,37 @@ function computeDuctbankTemperatures(conduits, cables, params) {
   return temps;
 }
 
+function calcFiniteAmpacity(cable, conduits, cables, params){
+  const cd = conduits.find(d => d.conduit_id === cable.conduit_id);
+  if(!cd) return NaN;
+  const rating = INSULATION_TEMP_LIMIT[(cable.insulation_type||'').toUpperCase()] || 90;
+  const original = cable.est_load;
+  let low = 0;
+  let high = Math.max(parseFloat(original)||1,1);
+  const getTemp = load => {
+    cable.est_load = load;
+    const res = solveDuctbankTemperatures(conduits, cables, params);
+    return res.conduitTemps[cable.conduit_id];
+  };
+  let temp = getTemp(high);
+  for(let i=0;i<6 && temp < rating && high < 2000;i++){
+    low = high;
+    high *= 2;
+    temp = getTemp(high);
+  }
+  for(let i=0;i<12;i++){
+    const mid = (low + high)/2;
+    temp = getTemp(mid);
+    if(Math.abs(temp - rating) <= 0.5){
+      low = high = mid;
+      break;
+    }
+    if(temp > rating) high = mid; else low = mid;
+  }
+  cable.est_load = original;
+  return (low + high)/2;
+}
+
 // ----- Example small ductbank -----
 const SMALL_CONDUITS = [
   { conduit_id: "C1", conduit_type: "PVC Sch 40", trade_size: "4", x: 0, y: 0 },
@@ -704,6 +744,22 @@ describe('solveDuctbankTemperatures', () => {
   });
 });
 
+describe('calcFiniteAmpacity', () => {
+  it('iteratively finds ampacity near expected', () => {
+    const conduits = JSON.parse(JSON.stringify(SMALL_CONDUITS));
+    const cables = JSON.parse(JSON.stringify(SMALL_CABLES));
+    const params = { ...PARAMS };
+    const amp = calcFiniteAmpacity(cables[0], conduits, cables, params);
+    // expected approximate ampacity using simple Neher-McGrath estimate
+    const result = solveDuctbankTemperatures(conduits, cables, params);
+    const T = result.conduitTemps[cables[0].conduit_id];
+    const Rdc = dcResistance(cables[0].conductor_size, cables[0].conductor_material, T);
+    const Rth = (T - params.earthTemp) / (cables[0].est_load * cables[0].est_load * Rdc);
+    const expected = Math.sqrt((90 - params.earthTemp) / (Rdc * Rth));
+    assert(Math.abs(amp - expected) < 5);
+  });
+});
+
 module.exports = {
   solveDuctbankTemperatures,
   computeDuctbankTemperatures,
@@ -711,5 +767,6 @@ module.exports = {
   SMALL_CABLES,
   PARAMS,
   CONDUIT_SPECS,
-  dcResistance
+  dcResistance,
+  calcFiniteAmpacity
 };

@@ -713,8 +713,40 @@ function estimateAmpacity(cable,params,count=1,total=0){
  const amb=Math.max(params.earthTemp||20,
                    isNaN(params.airTemp)?-Infinity:params.airTemp);
  const dT=rating-amb;
- const ampacity=Math.sqrt(dT/(Rdc*Rth));
- return {ampacity};
+const ampacity=Math.sqrt(dT/(Rdc*Rth));
+return {ampacity};
+}
+
+async function calcFiniteAmpacity(cable, conduits, cables, params){
+ const cd=conduits.find(d=>d.conduit_id===cable.conduit_id);
+ if(!cd) return NaN;
+ const rating=INSULATION_TEMP_LIMIT[(cable.insulation_type||'').toUpperCase()]||90;
+ const original=cable.est_load;
+ let low=0;
+ let high=Math.max(parseFloat(original)||1,1);
+ let temp=params.earthTemp||20;
+ // increase upper bound until temperature exceeds rating or limit reached
+ for(let i=0;i<6;i++){
+   cable.est_load=high;
+   const res=await solveDuctbankTemperatures(conduits,cables,params);
+   temp=res.conduitTemps[cable.conduit_id]??temp;
+   if(temp>=rating||high>=2000) break;
+   low=high;
+   high*=2;
+ }
+ for(let i=0;i<12;i++){
+   const mid=(low+high)/2;
+   cable.est_load=mid;
+   const res=await solveDuctbankTemperatures(conduits,cables,params);
+   temp=res.conduitTemps[cable.conduit_id]??temp;
+   if(Math.abs(temp-rating)<=0.5){
+     low=high=mid;
+     break;
+   }
+   if(temp>rating) high=mid; else low=mid;
+ }
+ cable.est_load=original;
+ return (low+high)/2;
 }
 
 function updateAmpacityReport(){
@@ -1200,31 +1232,15 @@ const ctx=canvas.getContext('2d');
  });
 
  window.finiteAmpacity = {};
- cables.forEach(c => {
-   const areaCM = sizeToArea(c.conductor_size);
+ for(const c of cables){
+   const areaCM=sizeToArea(c.conductor_size);
    if(!areaCM){
-     window.finiteAmpacity[c.tag] = 'N/A';
-     return;
-   }
-   const cd = conduits.find(d => d.conduit_id === c.conduit_id);
-   if(!cd){
-     window.finiteAmpacity[c.tag] = 'N/A';
-     return;
-   }
-   const T = conduitTemps[cd.conduit_id]??ambient;
-  const insType=(c.insulation_type||'').toUpperCase();
-  const rating=INSULATION_TEMP_LIMIT[insType]||90;
-  const Rdc = dcResistance(c.conductor_size,c.conductor_material,T);
-   const current=parseFloat(c.est_load)||0;
-   if(current<=0){
      window.finiteAmpacity[c.tag]='N/A';
-     return;
+     continue;
    }
-   const nCond = parseInt(c.conductors)||1;
-   const Rth = (T - ambient) / (current*current*Rdc*nCond);
-  const amp = Math.sqrt((rating - ambient) / (Rdc * Rth * nCond));
-  window.finiteAmpacity[c.tag] = isFinite(amp) ? amp.toFixed(0) : 'N/A';
-});
+   const amp=await calcFiniteAmpacity(c,conduits,cables,params);
+   window.finiteAmpacity[c.tag]=isFinite(amp)?amp.toFixed(0):'N/A';
+ }
  updateAmpacityReport();
 }
 
