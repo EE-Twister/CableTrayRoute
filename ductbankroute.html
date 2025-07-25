@@ -38,6 +38,7 @@ body.dark-mode #helpPopup{background:#2c3034;color:#f8f9fa;}
  <div id="settings-menu" class="settings-menu">
   <button id="themeToggle">Toggle Theme</button>
   <button id="helpBtn">Help</button>
+  <button id="deleteDataBtn">Delete Saved Data</button>
  </div>
 </header>
 <fieldset>
@@ -1150,7 +1151,23 @@ function exportImage(){
    a.click();
    document.body.removeChild(a);
  };
- img.src='data:image/svg+xml;charset=utf-8,'+encodeURIComponent(source);
+img.src='data:image/svg+xml;charset=utf-8,'+encodeURIComponent(source);
+}
+
+function deleteSavedData(){
+ localStorage.removeItem('ductbankSession');
+ document.querySelector('#conduitTable tbody').innerHTML='';
+ document.querySelector('#cableTable tbody').innerHTML='';
+ ['ductbankTag','ductbankDepth','earthTemp','airTemp','soilResistivity','moistureContent','hSpacing','vSpacing','topPad','bottomPad','leftPad','rightPad','perRow'].forEach(id=>{
+  const el=document.getElementById(id);
+  if(el) el.value='';
+ });
+ ['concreteEncasement','heatSources'].forEach(id=>{
+  const el=document.getElementById(id);
+  if(el) el.checked=false;
+ });
+ drawGrid();
+ updateAmpacityReport();
 }
 
 document.getElementById('exportConduitsBtn').addEventListener('click',exportConduits);
@@ -1185,6 +1202,7 @@ document.getElementById('helpBtn').addEventListener('click',()=>{
 document.getElementById('helpClose').addEventListener('click',()=>{
  document.getElementById('helpOverlay').style.display='none';
 });
+document.getElementById('deleteDataBtn').addEventListener('click',deleteSavedData);
 
 document.getElementById('settings-btn').addEventListener('click',()=>{
  const menu=document.getElementById('settings-menu');
