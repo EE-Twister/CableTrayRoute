@@ -37,6 +37,7 @@ button{padding:4px 8px;margin:4px 2px;cursor:pointer;}
  <input type="file" id="importConduits" accept=".csv"/>
  <button type="button" id="addConduit">Add Conduit</button>
  <button type="button" id="sampleConduits">Load Sample Data</button>
+ <input type="text" id="conduit-search" class="table-search" placeholder="Filter conduits">
  <table id="conduitTable" class="db-table">
   <thead>
    <tr>
@@ -63,6 +64,7 @@ button{padding:4px 8px;margin:4px 2px;cursor:pointer;}
  <input type="file" id="importCables" accept=".csv"/>
  <button type="button" id="addCable">Add Cable</button>
  <button type="button" id="sampleCables">Load Sample Data</button>
+ <input type="text" id="cable-search" class="table-search" placeholder="Filter cables">
  <table id="cableTable" class="db-table">
   <thead>
    <tr>
@@ -281,6 +283,17 @@ function conduitSizeOptions(type){
 
 function createButton(text,cls,handler){
  const b=document.createElement('button');b.type='button';b.textContent=text;b.className=cls;b.addEventListener('click',handler);return b;
+}
+
+function filterTable(table, query){
+ const q = query.toLowerCase();
+ table.querySelectorAll('tbody tr').forEach(row => {
+   let text = row.textContent.toLowerCase();
+   row.querySelectorAll('input').forEach(inp => {
+     text += ' ' + (inp.value || '').toLowerCase();
+   });
+   row.style.display = text.includes(q) ? '' : 'none';
+ });
 }
 
 function packCircles(cables,R){
@@ -1232,6 +1245,18 @@ document.addEventListener('keydown',e=>{
 document.querySelector('#conduitTable').addEventListener('input',saveDuctbankSession);
 document.querySelector('#cableTable').addEventListener('input',saveDuctbankSession);
 window.addEventListener('beforeunload',saveDuctbankSession);
+const conduitSearch=document.getElementById('conduit-search');
+if(conduitSearch){
+ conduitSearch.addEventListener('input',()=>{
+  filterTable(document.getElementById('conduitTable'), conduitSearch.value);
+ });
+}
+const cableSearch=document.getElementById('cable-search');
+if(cableSearch){
+ cableSearch.addEventListener('input',()=>{
+  filterTable(document.getElementById('cableTable'), cableSearch.value);
+ });
+}
 loadDuctbankSession();
 </script>
 </body>
