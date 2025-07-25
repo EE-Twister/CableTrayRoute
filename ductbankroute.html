@@ -752,7 +752,7 @@ async function calcFiniteAmpacity(cable, conduits, cables, params){
  // increase upper bound until temperature exceeds rating or limit reached
  for(let i=0;i<6;i++){
    cable.est_load=high;
-   const res=await solveDuctbankTemperatures(conduits,cables,params);
+  const res=await solveDuctbankTemperaturesWorker(conduits,cables,params);
    temp=res.conduitTemps[cable.conduit_id]??temp;
    if(temp>=rating||high>=2000) break;
    low=high;
@@ -761,7 +761,7 @@ async function calcFiniteAmpacity(cable, conduits, cables, params){
  for(let i=0;i<12;i++){
    const mid=(low+high)/2;
    cable.est_load=mid;
-   const res=await solveDuctbankTemperatures(conduits,cables,params);
+   const res=await solveDuctbankTemperaturesWorker(conduits,cables,params);
    temp=res.conduitTemps[cable.conduit_id]??temp;
    if(Math.abs(temp-rating)<=0.5){
      low=high=mid;
@@ -1147,6 +1147,25 @@ function solveDuctbankTemperatures(conduits,cables,params,progress){
   });
 }
 
+function solveDuctbankTemperaturesWorker(conduits,cables,params,progress){
+  const svg=document.getElementById('grid');
+  const width=parseFloat(svg.getAttribute('width'))||svg.clientWidth;
+  const height=parseFloat(svg.getAttribute('height'))||svg.clientHeight;
+  return new Promise(resolve=>{
+    const worker=new Worker('thermalWorker.js');
+    worker.onmessage=e=>{
+      const data=e.data;
+      if(data.type==='progress'){
+        if(typeof progress==='function') progress(data.iter,data.maxIter);
+      }else if(data.type==='result'){
+        worker.terminate();
+        resolve(data);
+      }
+    };
+    worker.postMessage({conduits,cables,params,width,height});
+  });
+}
+
 async function runFiniteThermalAnalysis(){
   drawGrid();
   const conduits=getAllConduits();
@@ -1185,7 +1204,7 @@ const ctx=canvas.getContext('2d');
  pb.style.width='0%';
  pb.setAttribute('aria-valuenow','0');
  pl.textContent='Solving...';
- const result=await solveDuctbankTemperatures(conduits,cables,params,(it,max)=>{
+ const result=await solveDuctbankTemperaturesWorker(conduits,cables,params,(it,max)=>{
   const pct=Math.round(it/max*100);
   pb.style.width=pct+'%';
   pb.setAttribute('aria-valuenow',pct);
