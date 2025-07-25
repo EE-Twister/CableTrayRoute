@@ -26,7 +26,7 @@ button{padding:4px 8px;margin:4px 2px;cursor:pointer;}
  <h1>Ductbank Route</h1>
  <button id="settings-btn" class="settings-btn" aria-label="Settings">⚙</button>
  <div id="settings-menu" class="settings-menu">
-  <button id="themeToggle">Toggle Theme</button>
+  <label><input type="checkbox" id="dark-toggle"> Dark Mode</label>
   <button id="helpBtn">Help</button>
   <button id="deleteDataBtn">Delete Saved Data</button>
  </div>
@@ -1232,15 +1232,27 @@ document.getElementById('heatToggleBtn').addEventListener('click',()=>{
  canvas.style.display=heatVisible?'block':'none';
 });
 
-document.getElementById('themeToggle').addEventListener('click',()=>{
- document.body.classList.toggle('dark-mode');
- const session=JSON.parse(localStorage.getItem('ctrSession')||'{}');
- session.darkMode=document.body.classList.contains('dark-mode');
- localStorage.setItem('ctrSession',JSON.stringify(session));
- saveDuctbankSession();
-});
+const darkToggle = document.getElementById('dark-toggle');
 const stored=JSON.parse(localStorage.getItem('ctrSession')||'{}');
-if(stored.darkMode)document.body.classList.add('dark-mode');
+if(stored.darkMode){
+  document.body.classList.add('dark-mode');
+}
+if(darkToggle){
+  if(document.body.classList.contains('dark-mode')){
+    darkToggle.checked=true;
+  }
+  darkToggle.addEventListener('change',()=>{
+    if(darkToggle.checked){
+      document.body.classList.add('dark-mode');
+    }else{
+      document.body.classList.remove('dark-mode');
+    }
+    const session=JSON.parse(localStorage.getItem('ctrSession')||'{}');
+    session.darkMode=document.body.classList.contains('dark-mode');
+    localStorage.setItem('ctrSession',JSON.stringify(session));
+    saveDuctbankSession();
+  });
+}
 
 window.addEventListener('storage',e=>{if(e.key==='ctrSession'){const d=JSON.parse(e.newValue);if(d.darkMode)document.body.classList.add('dark-mode');else document.body.classList.remove('dark-mode');}});
 
