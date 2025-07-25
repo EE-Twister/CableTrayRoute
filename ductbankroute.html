@@ -128,7 +128,7 @@ button{padding:4px 8px;margin:4px 2px;cursor:pointer;}
 
 <details id="soilRef" style="margin-top:8px;">
  <summary><strong>Typical Soil Properties</strong></summary>
- <table class="db-table">
+ <table class="db-table" style="width:auto;">
   <thead>
    <tr><th>Soil Type</th><th>Thermal Resistivity (°C·cm/W)</th></tr>
   </thead>
@@ -140,7 +140,7 @@ button{padding:4px 8px;margin:4px 2px;cursor:pointer;}
    <tr><td>Dry Sand &amp; Gravel</td><td>150</td></tr>
   </tbody>
  </table>
- <table class="db-table" style="margin-top:8px;">
+ <table class="db-table" style="margin-top:8px;width:auto;">
   <thead>
    <tr><th>Condition</th><th>Moisture Content (%)</th></tr>
   </thead>
@@ -311,7 +311,9 @@ const INSULATION_TEMP_LIMIT={
   THHN:90,
   XLPE:90,
   PVC:75,
-  XHHW:90
+  XHHW:90,
+  'XHHW-2':90,
+  'THWN-2':90
 };
 
 function fToC(f){
@@ -436,7 +438,7 @@ function addCableRow(data={}){
  const selectOptions={
   cable_type:['Power','Control','Signal'],
   conductor_material:['Copper','Aluminum'],
-  insulation_type:['THHN','XLPE','PVC'],
+  insulation_type:['THHN','XLPE','PVC','XHHW-2','THWN-2'],
   shielding_jacket:['','Lead','Copper Tape']
  };
  cols.forEach(c=>{
