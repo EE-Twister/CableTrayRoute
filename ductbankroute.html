@@ -1141,7 +1141,7 @@ document.addEventListener('keydown',e=>{
  '#cableTable input, #cableTable select, #cableTable button';
  if(!e.target.matches(selector))return;
  const key=e.key;
- if(key!=='ArrowUp'&&key!=='ArrowDown'&&key!=='Enter')return;
+   if(key!=='ArrowUp'&&key!=='ArrowDown'&&key!=='Enter')return;
  const cell=e.target.closest('td');
  const row=cell.parentElement;
  const index=Array.prototype.indexOf.call(row.children,cell);
@@ -1151,7 +1151,7 @@ document.addEventListener('keydown',e=>{
   if(focusable){
    e.preventDefault();
    focusable.focus();
-   if(key==='Enter'&&typeof focusable.select==='function'){
+   if((key==='Enter'||key==='ArrowUp')&&typeof focusable.select==='function'){
      focusable.select();
    }
   }
