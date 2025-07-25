@@ -211,6 +211,7 @@ button{padding:4px 8px;margin:4px 2px;cursor:pointer;}
  <button id="exportConduitsBtn">Export Ductbank Conduits</button>
  <button id="exportCablesBtn">Export Ductbank Cables</button>
 <button id="exportImgBtn">Export Image</button>
+ <button id="copyCalcReportBtn">Copy Calculation Report</button>
 </div>
 
 <div id="analysis-progress-container" style="display:none;">
@@ -358,6 +359,8 @@ function runNeherMcGrathTests(){
   console.assert(Math.abs(t-28.7)<0.5, 'neherMcGrathTemp basic test');
   console.log('neherMcGrathTemp(10W,0.5m,Rth=0.5,k=1) ->', t.toFixed(2),'°C');
 }
+
+const CTR_VERSION='1.0.0';
 runNeherMcGrathTests();
 
 function parseSize(sz){
@@ -753,7 +756,7 @@ function dielectricRise(voltage){
  return v<2000?0:(v-2000)/1000;
 }
 
-function calcRca(cable,params,count=1,total=1){
+function calcRcaComponents(cable,params,count=1,total=1){
  let Rcond=0.05;
  let Rins=0.1;
  let Rduct=params.concreteEncasement?0.08:0.1;
@@ -767,7 +770,11 @@ function calcRca(cable,params,count=1,total=1){
  Rsoil*=1+(params.ductbankDepth||0)/100;
  if(cable.shielding_jacket)Rsoil*=1.05;
  Rsoil*=count*(cable.conductors||1);
- return Rcond+Rins+Rduct+Rsoil;
+ return {Rcond,Rins,Rduct,Rsoil,Rca:Rcond+Rins+Rduct+Rsoil};
+}
+
+function calcRca(cable,params,count=1,total=1){
+  return calcRcaComponents(cable,params,count,total).Rca;
 }
 
 /* Ampacity via full Neher-McGrath equation */
@@ -782,8 +789,24 @@ function estimateAmpacity(cable,params,count=1,total=0){
  const amb=Math.max(params.earthTemp||20,
                    isNaN(params.airTemp)?-Infinity:params.airTemp);
  const num=rating-(amb+dTd);
+const ampacity=Math.sqrt(num/(Rdc*(1+Yc)*Rca));
+return {ampacity};
+}
+
+function ampacityDetails(cable,params,count=1,total=0){
+ const areaCM=sizeToArea(cable.conductor_size);
+ if(!areaCM) return {ampacity:0};
+ const rating=getConductorRating();
+ const Rdc=dcResistance(cable.conductor_size,cable.conductor_material,rating);
+ const Yc=skinEffect(cable.conductor_size);
+ const dTd=dielectricRise(cable.voltage_rating);
+ const comps=calcRcaComponents(cable,params,count,total);
+ const Rca=comps.Rca;
+ const amb=Math.max(params.earthTemp||20,
+                   isNaN(params.airTemp)?-Infinity:params.airTemp);
+ const num=rating-(amb+dTd);
  const ampacity=Math.sqrt(num/(Rdc*(1+Yc)*Rca));
- return {ampacity};
+ return {Rdc,Yc,deltaTd:dTd,Rcond:comps.Rcond,Rins:comps.Rins,Rduct:comps.Rduct,Rsoil:comps.Rsoil,Rca,ampacity};
 }
 
 async function calcFiniteAmpacity(cable, conduits, cables, params){
@@ -1399,6 +1422,7 @@ document.getElementById('exportBtn').addEventListener('click',()=>{
  const compliance=Object.keys(fill).map(k=>{const f=fill[k];return{conduit_id:k,fill_pct:f.fillPct.toFixed(2),cable_count:f.cables.length};});
  XLSX.utils.book_append_sheet(wb,XLSX.utils.json_to_sheet(compliance),'fill');
  XLSX.writeFile(wb,'ductbank_data.xlsx');
+ exportCalcData(conduits,cables);
 });
 
 function exportCSV(filename,headers,rows){
@@ -1419,6 +1443,67 @@ function exportCables(){
  const rows=getAllCables();
  const headers=['tag','cable_type','diameter','conductors','conductor_size','weight','est_load','conduit_id','conductor_material','insulation_type','insulation_rating','voltage_rating','shielding_jacket'];
  exportCSV('ductbank_cables.csv',headers,rows);
+}
+
+function gatherInputParams(){
+ return {
+  ductbankTag:document.getElementById('ductbankTag').value,
+  concreteEncasement:document.getElementById('concreteEncasement').checked,
+  ductbankDepth:parseFloat(document.getElementById('ductbankDepth').value)||0,
+  earthTemp:parseFloat(document.getElementById('earthTemp').value)||0,
+  airTemp:parseFloat(document.getElementById('airTemp').value)||0,
+  soilResistivity:parseFloat(document.getElementById('soilResistivity').value)||90,
+  moistureContent:parseFloat(document.getElementById('moistureContent').value)||0,
+  heatSources:document.getElementById('heatSources').checked,
+  hSpacing:parseFloat(document.getElementById('hSpacing').value)||3,
+  vSpacing:parseFloat(document.getElementById('vSpacing').value)||4,
+  topPad:parseFloat(document.getElementById('topPad').value)||0,
+  bottomPad:parseFloat(document.getElementById('bottomPad').value)||0,
+  leftPad:parseFloat(document.getElementById('leftPad').value)||0,
+  rightPad:parseFloat(document.getElementById('rightPad').value)||0,
+  perRow:parseInt(document.getElementById('perRow').value)||0,
+  conductorRating:getConductorRating()
+ };
+}
+
+function exportCalcData(conduits,cables){
+ const params=gatherInputParams();
+ const total=cables.length;
+ const countMap={};
+ cables.forEach(c=>{countMap[c.conduit_id]=(countMap[c.conduit_id]||0)+1;});
+ const details=cables.map(c=>{
+   const d=ampacityDetails(c,{...params,earthTemp:fToC(params.earthTemp),airTemp:isNaN(params.airTemp)?NaN:fToC(params.airTemp)},countMap[c.conduit_id],total);
+   return {tag:c.tag,...d};
+ });
+ const exportObj={version:CTR_VERSION,timestamp:new Date().toISOString(),inputs:{params,conduits,cables},results:details};
+ const blob=new Blob([JSON.stringify(exportObj,null,2)],{type:'application/json'});
+ const a=document.createElement('a');
+ a.href=URL.createObjectURL(blob);
+ a.download='ductbank_analysis.json';
+ document.body.appendChild(a);a.click();document.body.removeChild(a);
+ URL.revokeObjectURL(a.href);
+ const csvHeaders=['tag','Rdc','Yc','Rcond','Rins','Rduct','Rsoil','Rca','deltaTd','ampacity'];
+ exportCSV('ductbank_analysis.csv',csvHeaders,details);
+}
+
+function buildCalcReport(){
+ const params=gatherInputParams();
+ const conduits=getAllConduits();
+ const cables=getAllCables();
+ const total=cables.length;
+ const countMap={};
+ cables.forEach(c=>{countMap[c.conduit_id]=(countMap[c.conduit_id]||0)+1;});
+ let report=`Cable Ampacity Calculation Report\nVersion: ${CTR_VERSION}\nTimestamp: ${new Date().toISOString()}\n`;
+ report+=`Ductbank Tag: ${params.ductbankTag}\nConduits: ${conduits.length}  Cables: ${cables.length}\n`;
+ report+=`Earth Temp: ${params.earthTemp}F  Air Temp: ${params.airTemp}F\n`;
+ report+=`Soil Resistivity: ${params.soilResistivity}\nMoisture: ${params.moistureContent}%\n`;
+ report+=`Spacing H:${params.hSpacing}in V:${params.vSpacing}in\n\nResults:\n`;
+ cables.forEach(c=>{
+  const d=ampacityDetails(c,{...params,earthTemp:fToC(params.earthTemp),airTemp:isNaN(params.airTemp)?NaN:fToC(params.airTemp)},countMap[c.conduit_id],total);
+  report+=`${c.tag}: ${d.ampacity.toFixed(1)} A (Rdc ${d.Rdc.toFixed(4)}, Yc ${d.Yc.toFixed(3)}, Rca ${d.Rca.toFixed(3)}, ΔTd ${d.deltaTd.toFixed(2)})\n`;
+ });
+ report+=`\nAssumptions: Simplified Neher-McGrath per NEC 310-15(C) and IEEE 835.`;
+ return report;
 }
 
 function exportImage(){
@@ -1462,6 +1547,10 @@ function deleteSavedData(){
 document.getElementById('exportConduitsBtn').addEventListener('click',exportConduits);
 document.getElementById('exportCablesBtn').addEventListener('click',exportCables);
 document.getElementById('exportImgBtn').addEventListener('click',exportImage);
+document.getElementById('copyCalcReportBtn').addEventListener('click',()=>{
+ const txt=buildCalcReport();
+ navigator.clipboard.writeText(txt).then(()=>{alert('Calculation report copied to clipboard.');});
+});
 document.getElementById('thermalBtn').addEventListener('click',()=>{
   validateThermalInputs();
   runFiniteThermalAnalysis();
