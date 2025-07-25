@@ -124,8 +124,10 @@ button{padding:4px 8px;margin:4px 2px;cursor:pointer;}
   <label>Bottom Clear (in)<input type="number" id="bottomPad" value="0" style="width:60px;"></label>
   <label>Left Clear (in)<input type="number" id="leftPad" value="0" style="width:60px;"></label>
   <label>Right Clear (in)<input type="number" id="rightPad" value="0" style="width:60px;"></label>
-  <label>Conduits/Row<input type="number" id="perRow" value="4" style="width:60px;"></label>
+ <label>Conduits/Row<input type="number" id="perRow" value="4" style="width:60px;"></label>
 </div>
+
+<div id="warning-area" style="display:none;"></div>
 
 <div id="gridContainer" style="position:relative;display:inline-block;">
  <svg id="grid" width="500" height="500"></svg>
@@ -838,7 +840,16 @@ function validateThermalInputs(){
       else if(val<0){warnings.push(`${tag} load cannot be negative.`);inp.value=0;}
     }
   });
- if(warnings.length)alert('Input warnings:\n'+warnings.join('\n'));
+ const warnEl=document.getElementById('warning-area');
+ if(warnEl){
+   if(warnings.length){
+     warnEl.innerHTML=`<div class="message warning"><ul>${warnings.map(w=>`<li>${w}</li>`).join('')}</ul></div>`;
+     warnEl.style.display='block';
+   }else{
+     warnEl.innerHTML='';
+     warnEl.style.display='none';
+   }
+ }
 }
 
 function solveDuctbankTemperatures(conduits,cables,params){
