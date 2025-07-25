@@ -202,6 +202,7 @@ button{padding:4px 8px;margin:4px 2px;cursor:pointer;}
  <button id="exportConduitsBtn">Export Ductbank Conduits</button>
  <button id="exportCablesBtn">Export Ductbank Cables</button>
 <button id="exportImgBtn">Export Image</button>
+ <button id="copyReportBtn">Copy Calculation Report</button>
 </div>
 
 <div id="analysis-progress-container" style="display:none;">
@@ -242,6 +243,7 @@ button{padding:4px 8px;margin:4px 2px;cursor:pointer;}
 
 <script>
 let heatVisible=true;
+const SOFTWARE_VERSION='1.0.0';
 const SAMPLE_CONDUITS=[
  {conduit_id:"C1",conduit_type:"PVC Sch 40",trade_size:"4",x:0,y:0},
  {conduit_id:"C2",conduit_type:"PVC Sch 40",trade_size:"4",x:2,y:0},
@@ -660,6 +662,22 @@ function fillResults(){
  return fillMap;
 }
 
+function getCalcParams(){
+ const earthF=parseFloat(document.getElementById('earthTemp').value);
+ const airF=parseFloat(document.getElementById('airTemp').value);
+ return {
+  earthTemp:isNaN(earthF)?20:fToC(earthF),
+  airTemp:isNaN(airF)?NaN:fToC(airF),
+  soilResistivity:parseFloat(document.getElementById('soilResistivity').value)||90,
+  moistureContent:parseFloat(document.getElementById('moistureContent').value)||0,
+  heatSources:document.getElementById('heatSources').checked,
+  hSpacing:parseFloat(document.getElementById('hSpacing').value)||3,
+  vSpacing:parseFloat(document.getElementById('vSpacing').value)||4,
+  concreteEncasement:document.getElementById('concreteEncasement').checked,
+  ductbankDepth:parseFloat(document.getElementById('ductbankDepth').value)||0
+ };
+}
+
 const AWG_AREA={"18":1624,"16":2583,"14":4107,"12":6530,"10":10380,"8":16510,"6":26240,"4":41740,"3":52620,"2":66360,"1":83690,"1/0":105600,"2/0":133100,"3/0":167800,"4/0":211600};
 
 const BASE_RESISTIVITY={cu:0.017241,al:0.028264}; // ohm-mm^2/m @20C
@@ -707,7 +725,7 @@ function dielectricRise(voltage){
  return v<2000?0:(v-2000)/1000;
 }
 
-function calcRca(cable,params,count=1,total=1){
+function calcRcaDetails(cable,params,count=1,total=1){
  let Rcond=0.05;
  let Rins=0.1;
  let Rduct=params.concreteEncasement?0.08:0.1;
@@ -721,24 +739,25 @@ function calcRca(cable,params,count=1,total=1){
  Rsoil*=1+(params.ductbankDepth||0)/100;
  if(cable.shielding_jacket)Rsoil*=1.05;
  Rsoil*=count*(cable.conductors||1);
- return Rcond+Rins+Rduct+Rsoil;
+ const Rca=Rcond+Rins+Rduct+Rsoil;
+ return {Rca,Rcond,Rins,Rduct,Rsoil};
 }
 
 /* Ampacity via full Neher-McGrath equation */
 function estimateAmpacity(cable,params,count=1,total=0){
  const areaCM=sizeToArea(cable.conductor_size);
- if(!areaCM)return {ampacity:0};
+ if(!areaCM)return {ampacity:0,Rdc:0,Yc:0,deltaTd:0,Rca:0,Rcond:0,Rins:0,Rduct:0,Rsoil:0};
  const insType=(cable.insulation_type||'').toUpperCase();
  const rating=parseFloat(cable.insulation_rating)||INSULATION_TEMP_LIMIT[insType]||90;
  const Rdc=dcResistance(cable.conductor_size,cable.conductor_material,rating);
  const Yc=skinEffect(cable.conductor_size);
  const dTd=dielectricRise(cable.voltage_rating);
- const Rca=calcRca(cable,params,count,total);
+ const {Rca,Rcond,Rins,Rduct,Rsoil}=calcRcaDetails(cable,params,count,total);
  const amb=Math.max(params.earthTemp||20,
                    isNaN(params.airTemp)?-Infinity:params.airTemp);
  const num=rating-(amb+dTd);
  const ampacity=Math.sqrt(num/(Rdc*(1+Yc)*Rca));
- return {ampacity};
+ return {ampacity,Rdc,Yc,deltaTd:dTd,Rca,Rcond,Rins,Rduct,Rsoil};
 }
 
 async function calcFiniteAmpacity(cable, conduits, cables, params){
@@ -792,8 +811,10 @@ function updateAmpacityReport(){
  const countMap={};
  cables.forEach(c=>{countMap[c.conduit_id]=(countMap[c.conduit_id]||0)+1;});
  const rows=cables.map(c=>{
-  const res=estimateAmpacity(c,params,countMap[c.conduit_id],total);
-  const neher=isFinite(res.ampacity)?res.ampacity.toFixed(0):'N/A';
+ const res=estimateAmpacity(c,params,countMap[c.conduit_id],total);
+ if(!window.calcData) window.calcData={};
+ window.calcData[c.tag]=res;
+ const neher=isFinite(res.ampacity)?res.ampacity.toFixed(0):'N/A';
   const finite=window.finiteAmpacity?window.finiteAmpacity[c.tag]||'N/A':'N/A';
   const overObj=window.conduitOverLimit&&window.conduitOverLimit[c.conduit_id];
   const rating=parseFloat(c.insulation_rating)||INSULATION_TEMP_LIMIT[(c.insulation_type||'').toUpperCase()]||90;
@@ -1333,12 +1354,46 @@ document.getElementById('exportBtn').addEventListener('click',()=>{
  const compliance=Object.keys(fill).map(k=>{const f=fill[k];return{conduit_id:k,fill_pct:f.fillPct.toFixed(2),cable_count:f.cables.length};});
  XLSX.utils.book_append_sheet(wb,XLSX.utils.json_to_sheet(compliance),'fill');
  XLSX.writeFile(wb,'ductbank_data.xlsx');
+
+ const params=getCalcParams();
+ const total=cables.length;
+ const countMap={};
+ cables.forEach(c=>{countMap[c.conduit_id]=(countMap[c.conduit_id]||0)+1;});
+ const results=cables.map(c=>{
+   const r=estimateAmpacity(c,params,countMap[c.conduit_id],total);
+   return {cable:c.tag,...r};
+ });
+ const report={
+   version:SOFTWARE_VERSION,
+   timestamp:new Date().toISOString(),
+   inputs:{
+     ductbankTag:document.getElementById('ductbankTag').value,
+     concreteEncasement:document.getElementById('concreteEncasement').checked,
+     ductbankDepth:document.getElementById('ductbankDepth').value,
+     params,
+     conduits,
+     cables
+   },
+   results
+ };
+ exportJSON('ductbank_calculations.json',report);
+ const csvHeaders=['cable','Rdc','Yc','Rcond','Rins','Rduct','Rsoil','Rca','deltaTd','ampacity'];
+ const csvRows=results.map(r=>({
+   cable:r.cable,Rdc:r.Rdc,Yc:r.Yc,Rcond:r.Rcond,Rins:r.Rins,Rduct:r.Rduct,Rsoil:r.Rsoil,Rca:r.Rca,deltaTd:r.deltaTd,ampacity:r.ampacity
+ }));
+ exportCSV('ductbank_calculations.csv',csvHeaders,csvRows);
 });
 
 function exportCSV(filename,headers,rows){
  const csv=[headers.join(',')];
  rows.forEach(r=>{csv.push(headers.map(h=>r[h]!==undefined?r[h]:'').join(','));});
  const blob=new Blob([csv.join('\n')],{type:'text/csv;charset=utf-8;'});
+ const url=URL.createObjectURL(blob);
+ const a=document.createElement('a');a.href=url;a.download=filename;document.body.appendChild(a);a.click();document.body.removeChild(a);URL.revokeObjectURL(url);
+}
+
+function exportJSON(filename,obj){
+ const blob=new Blob([JSON.stringify(obj,null,2)],{type:'application/json'});
  const url=URL.createObjectURL(blob);
  const a=document.createElement('a');a.href=url;a.download=filename;document.body.appendChild(a);a.click();document.body.removeChild(a);URL.revokeObjectURL(url);
 }
@@ -1377,6 +1432,31 @@ function exportImage(){
 img.src='data:image/svg+xml;charset=utf-8,'+encodeURIComponent(source);
 }
 
+function copyCalculationReport(){
+ const params=getCalcParams();
+ const cables=getAllCables();
+ const total=cables.length;
+ const countMap={};
+ cables.forEach(c=>{countMap[c.conduit_id]=(countMap[c.conduit_id]||0)+1;});
+ const lines=[];
+ lines.push(`CableTrayRoute v${SOFTWARE_VERSION}`);
+ lines.push(`Timestamp: ${new Date().toISOString()}`);
+ lines.push(`Earth Temp: ${document.getElementById('earthTemp').value} F`);
+ lines.push(`Air Temp: ${document.getElementById('airTemp').value} F`);
+ lines.push(`Soil Resistivity: ${document.getElementById('soilResistivity').value}`);
+ lines.push(`Moisture: ${document.getElementById('moistureContent').value}%`);
+ lines.push(`Concrete Encasement: ${document.getElementById('concreteEncasement').checked}`);
+ lines.push(`Depth: ${document.getElementById('ductbankDepth').value} in`);
+ cables.forEach(c=>{
+   const r=estimateAmpacity(c,params,countMap[c.conduit_id],total);
+   lines.push(`${c.tag}: ampacity ${r.ampacity.toFixed(0)} A, Rdc ${r.Rdc.toFixed(4)}, Rca ${r.Rca.toFixed(3)}`);
+ });
+ lines.push('Assumptions: simplified Neher-McGrath method with typical constants.');
+ lines.push('References: NEC 310-15(C), IEEE Std 835, Neher-McGrath paper.');
+ const text=lines.join('\n');
+ navigator.clipboard.writeText(text).then(()=>alert('Calculation report copied to clipboard!'));
+}
+
 function deleteSavedData(){
  localStorage.removeItem('ductbankSession');
  document.querySelector('#conduitTable tbody').innerHTML='';
@@ -1396,6 +1476,7 @@ function deleteSavedData(){
 document.getElementById('exportConduitsBtn').addEventListener('click',exportConduits);
 document.getElementById('exportCablesBtn').addEventListener('click',exportCables);
 document.getElementById('exportImgBtn').addEventListener('click',exportImage);
+document.getElementById('copyReportBtn').addEventListener('click',copyCalculationReport);
 document.getElementById('thermalBtn').addEventListener('click',()=>{
   validateThermalInputs();
   runFiniteThermalAnalysis();
