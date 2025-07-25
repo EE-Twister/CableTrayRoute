@@ -86,5 +86,9 @@ Start and end coordinates use **feet**. Diameter is in **inches** and weight is 
 
 Exported routing results are written to `route_data.xlsx`. Load this file in `cabletrayfill.html` to view tray utilization.
 
+## Ductbank Analysis
+
+`ductbankroute.html` analyzes underground ductbanks. You can manually enter each conduit and cable or import them from CSV files. Example formats are available at `examples/ductbank_template.csv` and `examples/cables_ductbank.csv`. The **Thermal Analysis** tool overlays a heat map showing estimated earth temperatures. Use **Download Ductbank Data** for an XLSX report, **Export Ductbank Conduits** and **Export Ductbank Cables** for CSVs, or **Export Image** to save the drawing. Ductbank data is saved between sessions; select **Delete Saved Data** from the settings menu to clear it.
+
 ## Clearing Saved Sessions
 The application stores your trays, cables and theme preference in browser storage. Open the settings menu (⚙) and click **Delete Saved Data** to clear this information.
