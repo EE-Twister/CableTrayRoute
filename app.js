@@ -264,6 +264,7 @@ document.addEventListener('DOMContentLoaded', () => {
             const conduitType = elements.conduitType.value;
             const spec = CONDUIT_SPECS[conduitType] || {};
             const totalArea = cables.reduce((s, c) => s + Math.PI * (c.diameter/2)**2, 0);
+            /* NEC Chapter 9 Table 1 fill limits (see docs/standards.md) */
             const fillPct = count === 1 ? 0.53 : count === 2 ? 0.31 : 0.40;
             let tradeSize = null;
             for (const size of Object.keys(spec)) {
@@ -1015,6 +1016,7 @@ const openConduitFill = (cables) => {
     const spec = CONDUIT_SPECS[conduitType] || {};
     const count = cableObjs.length;
     const totalArea = cableObjs.reduce((s, c) => s + Math.PI * Math.pow(c.diameter / 2, 2), 0);
+    /* NEC Chapter 9 Table 1 fill limits (see docs/standards.md) */
     const fillPct = count === 1 ? 0.53 : count === 2 ? 0.31 : 0.40;
     let tradeSize = null;
     for (const size of Object.keys(spec)) {
@@ -2184,6 +2186,7 @@ const openConduitFill = (cables) => {
                 if (recommendation === 'conduit') {
                     const conduitType = elements.conduitType.value;
                     const spec = CONDUIT_SPECS[conduitType] || {};
+                    /* NEC Chapter 9 Table 1 fill limits (see docs/standards.md) */
                     const fillPct = count === 1 ? 0.53 : count === 2 ? 0.31 : 0.40;
                     for (const size of Object.keys(spec)) {
                         if (totalArea <= spec[size] * fillPct) { tradeSize = size; break; }

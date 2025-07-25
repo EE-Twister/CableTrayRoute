@@ -235,6 +235,7 @@ button{padding:4px 8px;margin:4px 2px;cursor:pointer;}
   <h3>Thermal Analysis</h3>
   <p>The <em>Thermal Analysis</em> button overlays a heat map on the drawing. Each conduit center is marked with a yellow dot labeled with the estimated earth temperature in Fahrenheit and the hottest point is highlighted in red.</p>
   <p>Inputs are validated before running the analysis. Ductbank depth is limited to 0–120&nbsp;in, spacing between 1–24&nbsp;in and cable estimated load up to 2000&nbsp;A. Values outside these ranges will be clamped.</p>
+  <p>Conduit fill limits come from NEC Chapter&nbsp;9, while ampacity adjustments use the simplified Neher-McGrath method from NEC 310-15(C) and IEEE Std&nbsp;835. Thermal resistivity calculations reference the original Neher-McGrath paper. See <a href="docs/standards.md" target="_blank">documentation</a> for details.</p>
 </div>
 </div>
 
@@ -644,6 +645,7 @@ function autoPlaceConduits(){
  }
 }
 
+/* Conduit fill limits per NEC Chapter 9 Tables 1 & 4 (see docs/standards.md) */
 function fillResults(){
  const conduits=getAllConduits();
  const cables=getAllCables();
@@ -687,6 +689,7 @@ function sizeToArea(size){
  return AWG_AREA[m[1]]||0;
 }
 
+/* Ampacity via simplified Neher-McGrath from NEC 310-15(C) and IEEE Std 835 (see docs/standards.md) */
 function estimateAmpacity(cable,params,count=1,total=0){
  const areaCM=sizeToArea(cable.conductor_size);
  if(!areaCM)return {ampacity:0};
@@ -1034,6 +1037,7 @@ function solveDuctbankTemperatures(conduits,cables,params,progress){
   const dx=(0.0254/scale)*step;
   const nx=Math.ceil(width/step);
   const ny=Math.ceil(height/step);
+  /* Thermal resistivity model based on Neher-McGrath and IEEE Std 835 - see docs/standards.md */
   const k=100/((params.soilResistivity)||90);
   const hConv=10; // W/(m^2*K)
   const Bi=hConv*dx/k;
