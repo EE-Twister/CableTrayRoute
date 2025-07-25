@@ -861,7 +861,7 @@ function solveDuctbankTemperatures(conduits,cables,params){
         }else if(j===0){
           val=(grid[j+1][i]+Bi*airT)/(1+Bi);
         }else{
-          val=0.25*(grid[j][i-1]+grid[j][i+1]+grid[j-1][i]+grid[j+1][i])+powerGrid[j][i];
+          val=0.25*(grid[j][i-1]+grid[j][i+1]+grid[j-1][i]+grid[j+1][i]+powerGrid[j][i]);
         }
         newGrid[j][i]=val;
         diff=Math.max(diff,Math.abs(val-grid[j][i]));
