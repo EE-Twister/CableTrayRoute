@@ -523,7 +523,7 @@ function solveDuctbankTemperatures(conduits, cables, params) {
     const cxPx = Math.round((h.cx / 0.0254 * scale + margin) / step);
     const cyPx = Math.round((h.cy / 0.0254 * scale + margin) / step);
     const rPx = Math.max(1, Math.round((h.r / 0.0254 * scale) / step));
-    const q = h.power / (Math.PI * h.r * h.r) * dx * dx / k;
+    const q = 4 * h.power / (Math.PI * h.r * h.r) * dx * dx / k;
     for (let j = Math.max(0, cyPx - rPx); j <= Math.min(ny - 1, cyPx + rPx); j++) {
       for (let i = Math.max(0, cxPx - rPx); i <= Math.min(nx - 1, cxPx + rPx); i++) {
         const dxp = i - cxPx, dyp = j - cyPx;
@@ -547,7 +547,11 @@ function solveDuctbankTemperatures(conduits, cables, params) {
         } else if (j === 0) {
           val = (grid[j + 1][i] + Bi * airT) / (1 + Bi);
         } else {
-          val = 0.25 * (grid[j][i - 1] + grid[j][i + 1] + grid[j - 1][i] + grid[j + 1][i]) + powerGrid[j][i];
+          val = 0.25 * (
+            grid[j][i - 1] + grid[j][i + 1] +
+            grid[j - 1][i] + grid[j + 1][i] +
+            powerGrid[j][i]
+          );
         }
         newGrid[j][i] = val;
         diff = Math.max(diff, Math.abs(val - grid[j][i]));
