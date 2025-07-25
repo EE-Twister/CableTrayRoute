@@ -279,8 +279,14 @@ function conduitSizeOptions(type){
  return sel;
 }
 
-function createButton(text,cls,handler){
- const b=document.createElement('button');b.type='button';b.textContent=text;b.className=cls;b.addEventListener('click',handler);return b;
+function createButton(text,cls,label,handler){
+ const b=document.createElement('button');
+ b.type='button';
+ b.textContent=text;
+ b.className=cls;
+ if(label){b.setAttribute('aria-label',label);b.title=label;}
+ b.addEventListener('click',handler);
+ return b;
 }
 
 function packCircles(cables,R){
@@ -316,8 +322,8 @@ function addConduitRow(data={}){
  const sizeTd=document.createElement('td');let sizeSel=conduitSizeOptions(typeSel.value);sizeTd.appendChild(sizeSel);sizeSel.value=data.trade_size||sizeSel.options[0].value;tr.appendChild(sizeTd);
  typeSel.addEventListener('change',()=>{const old=sizeSel;sizeSel=conduitSizeOptions(typeSel.value);sizeTd.replaceChild(sizeSel,old);});
  ['x','y'].forEach(k=>{const td=document.createElement('td');const inp=document.createElement('input');inp.type='number';inp.value=data[k]||0;if(k==='x'||k==='y')inp.readOnly=true;td.appendChild(inp);tr.appendChild(td);});
- const dupTd=document.createElement('td');dupTd.appendChild(createButton('⧉','duplicateBtn',()=>{const cloneData=rowToConduit(tr);addConduitRow(cloneData);}));tr.appendChild(dupTd);
- const delTd=document.createElement('td');delTd.appendChild(createButton('✖','removeBtn',()=>{tr.remove();drawGrid();
+ const dupTd=document.createElement('td');dupTd.appendChild(createButton('⧉','duplicateBtn','Duplicate row',()=>{const cloneData=rowToConduit(tr);addConduitRow(cloneData);}));tr.appendChild(dupTd);
+ const delTd=document.createElement('td');delTd.appendChild(createButton('✖','removeBtn','Delete row',()=>{tr.remove();drawGrid();
  updateAmpacityReport();saveDuctbankSession();}));tr.appendChild(delTd);
  document.querySelector('#conduitTable tbody').appendChild(tr);
  autoPlaceConduits();
@@ -355,8 +361,8 @@ function addCableRow(data={}){
   td.appendChild(inp);
   tr.appendChild(td);
  });
- const dupTd=document.createElement('td');dupTd.appendChild(createButton('⧉','duplicateBtn',()=>{const clone=rowToCable(tr);addCableRow(clone);}));tr.appendChild(dupTd);
- const delTd=document.createElement('td');delTd.appendChild(createButton('✖','removeBtn',()=>{tr.remove();drawGrid();updateAmpacityReport();saveDuctbankSession();}));tr.appendChild(delTd);
+ const dupTd=document.createElement('td');dupTd.appendChild(createButton('⧉','duplicateBtn','Duplicate row',()=>{const clone=rowToCable(tr);addCableRow(clone);}));tr.appendChild(dupTd);
+ const delTd=document.createElement('td');delTd.appendChild(createButton('✖','removeBtn','Delete row',()=>{tr.remove();drawGrid();updateAmpacityReport();saveDuctbankSession();}));tr.appendChild(delTd);
  document.querySelector('#cableTable tbody').appendChild(tr);
  drawGrid();
  updateAmpacityReport();
