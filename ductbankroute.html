@@ -122,9 +122,36 @@ button{padding:4px 8px;margin:4px 2px;cursor:pointer;}
  <label style="margin-left:8px;">Ambient Air Temperature (&#176;F)<input type="number" id="airTemp" style="width:60px;"></label>
  <label style="margin-left:8px;">Thermal Resistivity of Soil (&#176;C&#183;cm/W)<input type="number" id="soilResistivity" style="width:60px;"></label>
  <label style="margin-left:8px;">Moisture Content (%)<input type="number" id="moistureContent" min="0" max="100" style="width:60px;"></label>
- <label style="margin-left:8px;">Presence of Adjacent Heat Sources<input type="checkbox" id="heatSources" style="margin-left:4px;"></label>
- <button type="button" id="addHeatSource" style="display:none;margin-left:4px;">Add Heat Source</button>
+<label style="margin-left:8px;">Presence of Adjacent Heat Sources<input type="checkbox" id="heatSources" style="margin-left:4px;"></label>
+<button type="button" id="addHeatSource" style="display:none;margin-left:4px;">Add Heat Source</button>
 </fieldset>
+
+<details id="soilRef" style="margin-top:8px;">
+ <summary><strong>Typical Soil Properties</strong></summary>
+ <table class="db-table">
+  <thead>
+   <tr><th>Soil Type</th><th>Thermal Resistivity (°C·cm/W)</th></tr>
+  </thead>
+  <tbody>
+   <tr><td>Very Wet Clay</td><td>40</td></tr>
+   <tr><td>Moist Clay / Sand</td><td>60</td></tr>
+   <tr><td>Average Soil</td><td>90</td></tr>
+   <tr><td>Dry Sand</td><td>120</td></tr>
+   <tr><td>Dry Sand &amp; Gravel</td><td>150</td></tr>
+  </tbody>
+ </table>
+ <table class="db-table" style="margin-top:8px;">
+  <thead>
+   <tr><th>Condition</th><th>Moisture Content (%)</th></tr>
+  </thead>
+  <tbody>
+   <tr><td>Dry</td><td>2&#8211;5</td></tr>
+   <tr><td>Damp</td><td>5&#8211;10</td></tr>
+   <tr><td>Moist</td><td>10&#8211;20</td></tr>
+   <tr><td>Wet / Saturated</td><td>20+</td></tr>
+  </tbody>
+ </table>
+</details>
 
 <details id="heatSourceDetails" open style="display:none;margin-top:8px;">
  <summary><strong>Adjacent Heat Sources</strong></summary>
@@ -232,46 +259,46 @@ const SAMPLE_CONDUITS=[
  {conduit_id:"C16",conduit_type:"PVC Sch 40",trade_size:"4",x:6,y:6},
 ];
 
-const SAMPLE_CABLES=[
- {tag:'CBL01',cable_type:'Power',diameter:1.8,conductors:3,conductor_size:'#500 kcmil',weight:6.0,conduit_id:'C1'},
- {tag:'CBL02',cable_type:'Control',diameter:0.5,conductors:4,conductor_size:'#14 AWG',weight:0.8,conduit_id:'C1'},
- {tag:'CBL03',cable_type:'Signal',diameter:0.4,conductors:1,conductor_size:'#18 AWG',weight:0.5,conduit_id:'C2'},
- {tag:'CBL04',cable_type:'Power',diameter:1.2,conductors:3,conductor_size:'#2 AWG',weight:3.0,conduit_id:'C2'},
- {tag:'CBL05',cable_type:'Power',diameter:1.5,conductors:3,conductor_size:'#4/0 AWG',weight:5.0,conduit_id:'C3'},
- {tag:'CBL06',cable_type:'Control',diameter:0.6,conductors:8,conductor_size:'#12 AWG',weight:1.2,conduit_id:'C3'},
- {tag:'CBL07',cable_type:'Signal',diameter:0.4,conductors:2,conductor_size:'#16 AWG',weight:0.6,conduit_id:'C4'},
- {tag:'CBL08',cable_type:'Power',diameter:1.0,conductors:3,conductor_size:'#1/0 AWG',weight:3.2,conduit_id:'C4'},
- {tag:'CBL09',cable_type:'Control',diameter:0.7,conductors:4,conductor_size:'#10 AWG',weight:1.5,conduit_id:'C5'},
- {tag:'CBL10',cable_type:'Signal',diameter:0.3,conductors:1,conductor_size:'#22 AWG',weight:0.2,conduit_id:'C5'},
- {tag:'CBL11',cable_type:'Power',diameter:1.4,conductors:3,conductor_size:'#1/0 AWG',weight:4.2,conduit_id:'C5'},
- {tag:'CBL12',cable_type:'Power',diameter:1.1,conductors:3,conductor_size:'#2 AWG',weight:3.5,conduit_id:'C6'},
- {tag:'CBL13',cable_type:'Control',diameter:0.5,conductors:6,conductor_size:'#14 AWG',weight:1.0,conduit_id:'C6'},
- {tag:'CBL14',cable_type:'Signal',diameter:0.35,conductors:2,conductor_size:'#18 AWG',weight:0.3,conduit_id:'C7'},
- {tag:'CBL15',cable_type:'Power',diameter:0.9,conductors:3,conductor_size:'#4 AWG',weight:2.8,conduit_id:'C7'},
- {tag:'CBL16',cable_type:'Signal',diameter:0.6,conductors:2,conductor_size:'#16 AWG',weight:0.7,conduit_id:'C8'},
- {tag:'CBL17',cable_type:'Control',diameter:0.8,conductors:8,conductor_size:'#12 AWG',weight:1.8,conduit_id:'C8'},
- {tag:'CBL18',cable_type:'Power',diameter:1.3,conductors:3,conductor_size:'#1/0 AWG',weight:4.8,conduit_id:'C9'},
- {tag:'CBL19',cable_type:'Signal',diameter:0.4,conductors:1,conductor_size:'#20 AWG',weight:0.3,conduit_id:'C9'},
- {tag:'CBL20',cable_type:'Control',diameter:0.6,conductors:8,conductor_size:'#16 AWG',weight:1.2,conduit_id:'C10'},
- {tag:'CBL21',cable_type:'Power',diameter:1.2,conductors:3,conductor_size:'#2 AWG',weight:3.6,conduit_id:'C10'},
- {tag:'CBL22',cable_type:'Control',diameter:0.5,conductors:4,conductor_size:'#14 AWG',weight:0.9,conduit_id:'C11'},
- {tag:'CBL23',cable_type:'Signal',diameter:0.3,conductors:1,conductor_size:'#22 AWG',weight:0.2,conduit_id:'C11'},
- {tag:'CBL24',cable_type:'Power',diameter:1.0,conductors:3,conductor_size:'#1 AWG',weight:3.0,conduit_id:'C12'},
- {tag:'CBL25',cable_type:'Control',diameter:0.6,conductors:6,conductor_size:'#12 AWG',weight:1.1,conduit_id:'C12'},
- {tag:'CBL26',cable_type:'Power',diameter:1.1,conductors:3,conductor_size:'#2 AWG',weight:3.5,conduit_id:'C13'},
- {tag:'CBL27',cable_type:'Signal',diameter:0.4,conductors:2,conductor_size:'#18 AWG',weight:0.4,conduit_id:'C13'},
- {tag:'CBL28',cable_type:'Control',diameter:0.7,conductors:4,conductor_size:'#14 AWG',weight:1.3,conduit_id:'C14'},
- {tag:'CBL29',cable_type:'Power',diameter:1.3,conductors:3,conductor_size:'#1/0 AWG',weight:4.0,conduit_id:'C15'},
- {tag:'CBL30',cable_type:'Signal',diameter:0.5,conductors:1,conductor_size:'#16 AWG',weight:0.6,conduit_id:'C16'},
-];
 
+const SAMPLE_CABLES=[
+ {tag:'CBL01',cable_type:'Power',diameter:2.6,conductors:3,conductor_size:'#500 kcmil',weight:6.0,conduit_id:'C1',est_load:400},
+ {tag:'CBL02',cable_type:'Control',diameter:0.6,conductors:4,conductor_size:'#14 AWG',weight:0.8,conduit_id:'C1',est_load:15},
+ {tag:'CBL03',cable_type:'Signal',diameter:0.16,conductors:1,conductor_size:'#18 AWG',weight:0.5,conduit_id:'C2',est_load:5},
+ {tag:'CBL04',cable_type:'Power',diameter:1.3,conductors:3,conductor_size:'#2 AWG',weight:3.0,conduit_id:'C2',est_load:115},
+ {tag:'CBL05',cable_type:'Power',diameter:2.1,conductors:3,conductor_size:'#4/0 AWG',weight:5.0,conduit_id:'C3',est_load:260},
+ {tag:'CBL06',cable_type:'Control',diameter:0.9,conductors:8,conductor_size:'#12 AWG',weight:1.2,conduit_id:'C3',est_load:20},
+ {tag:'CBL07',cable_type:'Signal',diameter:0.35,conductors:2,conductor_size:'#16 AWG',weight:0.6,conduit_id:'C4',est_load:5},
+ {tag:'CBL08',cable_type:'Power',diameter:1.8,conductors:3,conductor_size:'#1/0 AWG',weight:3.2,conduit_id:'C4',est_load:150},
+ {tag:'CBL09',cable_type:'Control',diameter:0.7,conductors:4,conductor_size:'#10 AWG',weight:1.5,conduit_id:'C5',est_load:40},
+ {tag:'CBL10',cable_type:'Signal',diameter:0.1,conductors:1,conductor_size:'#22 AWG',weight:0.2,conduit_id:'C5',est_load:2},
+ {tag:'CBL11',cable_type:'Power',diameter:1.8,conductors:3,conductor_size:'#1/0 AWG',weight:4.2,conduit_id:'C5',est_load:150},
+ {tag:'CBL12',cable_type:'Power',diameter:1.3,conductors:3,conductor_size:'#2 AWG',weight:3.5,conduit_id:'C6',est_load:115},
+ {tag:'CBL13',cable_type:'Control',diameter:0.6,conductors:6,conductor_size:'#14 AWG',weight:1.0,conduit_id:'C6',est_load:15},
+ {tag:'CBL14',cable_type:'Signal',diameter:0.3,conductors:2,conductor_size:'#18 AWG',weight:0.3,conduit_id:'C7',est_load:5},
+ {tag:'CBL15',cable_type:'Power',diameter:1.1,conductors:3,conductor_size:'#4 AWG',weight:2.8,conduit_id:'C7',est_load:85},
+ {tag:'CBL16',cable_type:'Signal',diameter:0.3,conductors:2,conductor_size:'#16 AWG',weight:0.7,conduit_id:'C8',est_load:5},
+ {tag:'CBL17',cable_type:'Control',diameter:0.9,conductors:8,conductor_size:'#12 AWG',weight:1.8,conduit_id:'C8',est_load:20},
+ {tag:'CBL18',cable_type:'Power',diameter:1.8,conductors:3,conductor_size:'#1/0 AWG',weight:4.8,conduit_id:'C9',est_load:150},
+ {tag:'CBL19',cable_type:'Signal',diameter:0.12,conductors:1,conductor_size:'#20 AWG',weight:0.3,conduit_id:'C9',est_load:3},
+ {tag:'CBL20',cable_type:'Control',diameter:0.8,conductors:8,conductor_size:'#16 AWG',weight:1.2,conduit_id:'C10',est_load:10},
+ {tag:'CBL21',cable_type:'Power',diameter:1.3,conductors:3,conductor_size:'#2 AWG',weight:3.6,conduit_id:'C10',est_load:115},
+ {tag:'CBL22',cable_type:'Control',diameter:0.6,conductors:4,conductor_size:'#14 AWG',weight:0.9,conduit_id:'C11',est_load:15},
+ {tag:'CBL23',cable_type:'Signal',diameter:0.1,conductors:1,conductor_size:'#22 AWG',weight:0.2,conduit_id:'C11',est_load:2},
+ {tag:'CBL24',cable_type:'Power',diameter:1.5,conductors:3,conductor_size:'#1 AWG',weight:3.0,conduit_id:'C12',est_load:130},
+ {tag:'CBL25',cable_type:'Control',diameter:0.8,conductors:6,conductor_size:'#12 AWG',weight:1.1,conduit_id:'C12',est_load:20},
+ {tag:'CBL26',cable_type:'Power',diameter:1.3,conductors:3,conductor_size:'#2 AWG',weight:3.5,conduit_id:'C13',est_load:115},
+ {tag:'CBL27',cable_type:'Signal',diameter:0.3,conductors:2,conductor_size:'#18 AWG',weight:0.4,conduit_id:'C13',est_load:5},
+ {tag:'CBL28',cable_type:'Control',diameter:0.6,conductors:4,conductor_size:'#14 AWG',weight:1.3,conduit_id:'C14',est_load:15},
+ {tag:'CBL29',cable_type:'Power',diameter:1.8,conductors:3,conductor_size:'#1/0 AWG',weight:4.0,conduit_id:'C15',est_load:150},
+ {tag:'CBL30',cable_type:'Signal',diameter:0.15,conductors:1,conductor_size:'#16 AWG',weight:0.6,conduit_id:'C16',est_load:3},
+];
 // add additional cable properties for sample data
 SAMPLE_CABLES.forEach(c=>{
  c.conductor_material='Copper';
  c.insulation_type='THHN';
  c.voltage_rating='600V';
  c.shielding_jacket='';
- c.est_load=250;
+ if(c.est_load===undefined) c.est_load=250;
 });
 
 const CONDUIT_SPECS={
