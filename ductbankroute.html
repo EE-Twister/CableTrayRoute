@@ -1670,9 +1670,18 @@ function buildCalcReport(){
  report+=`Conduits: ${conduits.length}  Cables: ${cables.length}\n\nResults:\n`;
  cables.forEach(c=>{
   const d=ampacityDetails(c,{...params,earthTemp:fToC(params.earthTemp),airTemp:isNaN(params.airTemp)?NaN:fToC(params.airTemp)},countMap[c.conduit_id],total);
-  report+=`${c.tag}: ${d.ampacity.toFixed(1)} A (Rdc ${d.Rdc.toFixed(4)}, Yc ${d.Yc.toFixed(3)}, Rca ${d.Rca.toFixed(3)}, ΔTd ${d.deltaTd.toFixed(2)})\n`;
+  const finite=parseFloat(window.finiteAmpacity?.[c.tag]);
+  const finiteStr=isNaN(finite)?'N/A':finite.toFixed(1);
+  const load=parseFloat(c.est_load)||0;
+  const over=(load>(isNaN(d.ampacity)?Infinity:d.ampacity)) || (load>(isNaN(finite)?Infinity:finite));
+  report+=`${c.tag}: load ${load} A, Neher ${d.ampacity.toFixed(1)} A, Finite ${finiteStr}, Overloaded: ${over?'Yes':'No'}\n`+
+          `  Rdc=${d.Rdc.toFixed(4)}, Yc=${d.Yc.toFixed(3)}, ΔTd=${d.deltaTd.toFixed(2)}, `+
+          `Rcond=${d.Rcond.toFixed(3)}, Rins=${d.Rins.toFixed(3)}, Rduct=${d.Rduct.toFixed(3)}, `+
+          `Rsoil=${d.Rsoil.toFixed(3)}, Rca=${d.Rca.toFixed(3)}\n`;
  });
- report+=`\nSee docs/AMPACITY_METHOD.md for calculation details.`;
+ report+=`\nAmpacity calculations use the Neher-McGrath method. `+
+         `Yc values come from IEEE 835 Table 4, ΔTd from Table 9, and soil resistivity ranges from Table 1. `+
+         `See docs/AMPACITY_METHOD.md for details.`;
  return report;
 }
 
