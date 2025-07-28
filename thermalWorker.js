@@ -79,34 +79,38 @@ function solve(conduits,cables,params,width,height,gridSize,ductRes,progressCb){
   const powerGrid=Array.from({length:ny},()=>Array(nx).fill(0));
   const conduitCells={};
   const heatMap={};
-  cables.forEach(c=>{
-    const cd=conduits.find(d=>d.conduit_id===c.conduit_id);
-    if(!cd) return;
+
+  // Precompute cell locations for each conduit
+  conduits.forEach(cd=>{
     const Rin=Math.sqrt(CONDUIT_SPECS[cd.conduit_type][cd.trade_size]/Math.PI);
     const cx=(cd.x+Rin)*0.0254;
     const cy=(cd.y+Rin)*0.0254;
-    const Rdc=dcResistance(c.conductor_size,c.conductor_material,90);
-    const current=parseFloat(c.est_load)||0;
-    const power=current*current*Rdc;
-    if(!heatMap[c.conduit_id]) heatMap[c.conduit_id]={cx,cy,r:Rin*0.0254,power:0};
-    heatMap[c.conduit_id].power+=power*(c.conductors||1);
-  });
-  Object.keys(heatMap).forEach(cid=>{
-    const h=heatMap[cid];
-    const cxPx=Math.round((h.cx/0.0254*scale+margin)/step);
-    const cyPx=Math.round((h.cy/0.0254*scale+margin)/step);
-    const rPx=Math.max(1,Math.round((h.r/0.0254*scale)/step));
-    const q=h.power/(Math.PI*h.r*h.r)*dx*dx/k;
+    const cxPx=Math.round((cx/0.0254*scale+margin)/step);
+    const cyPx=Math.round((cy/0.0254*scale+margin)/step);
+    const rPx=Math.max(1,Math.round((Rin*scale)/step));
+    const cells=[];
     for(let j=Math.max(0,cyPx-rPx);j<=Math.min(ny-1,cyPx+rPx);j++){
       for(let i=Math.max(0,cxPx-rPx);i<=Math.min(nx-1,cxPx+rPx);i++){
         const dxp=i-cxPx,dyp=j-cyPx;
         if(dxp*dxp+dyp*dyp<=rPx*rPx){
-          powerGrid[j][i]+=q;
-          if(!conduitCells[cid]) conduitCells[cid]=[];
-          conduitCells[cid].push([j,i]);
+          cells.push([j,i]);
         }
       }
     }
+    conduitCells[cd.conduit_id]=cells;
+    heatMap[cd.conduit_id]={cx,cy,r:Rin*0.0254,power:0};
+  });
+
+  // Distribute heat generation from each cable
+  cables.forEach(c=>{
+    const h=heatMap[c.conduit_id];
+    if(!h) return;
+    const Rdc=dcResistance(c.conductor_size,c.conductor_material,90);
+    const current=parseFloat(c.est_load)||0;
+    const power=current*current*Rdc*(c.conductors||1);
+    h.power+=power;
+    const q=power/(Math.PI*h.r*h.r)*dx*dx/k;
+    conduitCells[c.conduit_id].forEach(([j,i])=>{ powerGrid[j][i]+=q; });
   });
   let diff=Infinity,iter=0,maxIter=500;
   while(diff>0.01&&iter<maxIter){
