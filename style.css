@@ -556,6 +556,23 @@ body.dark-mode .db-table td {
     margin: auto;
 }
 
+#gridContainer {
+    overflow-x: auto;
+}
+
+#gridContainer::-webkit-scrollbar {
+    height: 12px;
+}
+
+#gridContainer::-webkit-scrollbar-thumb {
+    background: #ccc;
+    border-radius: 6px;
+}
+
+#scrollTopBtn {
+    margin-top: 4px;
+}
+
 #gridContainer.collapsed {
     height: 200px;
     overflow: hidden;
