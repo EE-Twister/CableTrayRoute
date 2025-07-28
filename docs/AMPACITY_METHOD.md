@@ -53,6 +53,11 @@ Typical soil resistivity values per IEEE Std 835 Table 1:
 - **120 °C·cm/W** – dry sand
 - **150 °C·cm/W** – dry sand and gravel
 
+## Calibration
+
+The resistance constants were tuned so that calculated ampacities match IEEE 835 tables.
+Using a baseline of 500 kcmil Cu THHN (90 °C) and 2/0 Al (75 °C) in air, a fixed air thermal resistance of 3.4 °C·m/W yields results within ±5 % of the published values.
+
 The original Neher‑McGrath paper provides additional discussion on how soil conditions influence ampacity.
 
 ## References
