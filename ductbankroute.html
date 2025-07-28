@@ -1644,11 +1644,27 @@ function drawHeatMap(grid, conduitTemps, conduits, ambient){
  const svg=document.getElementById('grid');
  const width=parseFloat(svg.getAttribute('width'))||svg.clientWidth;
  const height=parseFloat(svg.getAttribute('height'))||svg.clientHeight;
- const stepX=Math.ceil(width/(grid[0]?.length||1));
- const stepY=Math.ceil(height/(grid.length||1));
- const img=ctx.createImageData(Math.round(width),Math.round(height));
- let maxT=-Infinity,maxPx=0,maxPy=0;
- let minT=Infinity;
+const stepX=Math.ceil(width/(grid[0]?.length||1));
+const stepY=Math.ceil(height/(grid.length||1));
+const img=ctx.createImageData(Math.round(width),Math.round(height));
+let maxT=-Infinity,maxPx=0,maxPy=0;
+let minT=Infinity;
+
+ const VIRIDIS=[[68,1,84],[71,44,122],[59,81,139],[44,113,142],[33,144,141],
+                [39,173,129],[92,200,99],[170,220,50],[253,231,37]];
+ function viridisColor(f){
+   f=Math.min(Math.max(f,0),1);
+   const n=VIRIDIS.length-1;
+   const idx=Math.floor(f*n);
+   const t=f*n-idx;
+   const c1=VIRIDIS[idx];
+   const c2=VIRIDIS[Math.min(idx+1,n)];
+   return [
+     Math.round(c1[0]+(c2[0]-c1[0])*t),
+     Math.round(c1[1]+(c2[1]-c1[1])*t),
+     Math.round(c1[2]+(c2[2]-c1[2])*t)
+   ];
+ }
  for(let j=0;j<grid.length;j++){
    for(let i=0;i<grid[j].length;i++){
      const T=grid[j][i];
@@ -1661,13 +1677,12 @@ function drawHeatMap(grid, conduitTemps, conduits, ambient){
    for(let i=0;i<grid[j].length;i++){
      const T=grid[j][i];
      const frac=(T-minT)/range;
-     const r=Math.round(255*frac);
-     const b=Math.round(255*(1-frac));
+     const [r,g,b]=viridisColor(frac);
      for(let dy=0;dy<stepY;dy++){
        for(let dx=0;dx<stepX;dx++){
          const idx=((j*stepY+dy)*width+(i*stepX+dx))*4;
          img.data[idx]=r;
-         img.data[idx+1]=0;
+         img.data[idx+1]=g;
          img.data[idx+2]=b;
          img.data[idx+3]=200;
        }
@@ -1684,9 +1699,8 @@ function drawHeatMap(grid, conduitTemps, conduits, ambient){
  const legendY=10;
  for(let y=0;y<legendH;y++){
    const frac=1-y/(legendH-1);
-   const r=Math.round(255*frac);
-   const b=Math.round(255*(1-frac));
-   octx.fillStyle=`rgb(${r},0,${b})`;
+   const [r,g,b]=viridisColor(frac);
+   octx.fillStyle=`rgb(${r},${g},${b})`;
    octx.fillRect(legendX,legendY+y,legendW,1);
  }
  octx.fillStyle='black';
