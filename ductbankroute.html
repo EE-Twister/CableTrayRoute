@@ -250,6 +250,7 @@ button{padding:4px 8px;margin:4px 2px;cursor:pointer;}
  <summary><strong>Ampacity Estimates</strong></summary>
  <div id="ampacityReport"></div>
 </details>
+<button id="scrollTopBtn" style="margin-top:4px;">Scroll to Top</button>
 
 <div class="db-button-panel">
  <button id="calc">Calculate Fill</button>
@@ -1968,9 +1969,16 @@ document.getElementById('copyCalcReportBtn').addEventListener('click',()=>{
  navigator.clipboard.writeText(txt)
    .then(()=>{showToast('Report copied: see clipboard for details.');});
 });
-document.getElementById('thermalBtn').addEventListener('click',()=>{
+document.getElementById('thermalBtn').addEventListener('click',async()=>{
   validateThermalInputs();
-  runFiniteThermalAnalysis();
+  await runFiniteThermalAnalysis();
+  const param=document.getElementById('paramSection');
+  const soil=document.getElementById('soilRef');
+  if(param) param.open=false;
+  if(soil) soil.open=false;
+});
+document.getElementById('scrollTopBtn').addEventListener('click',()=>{
+  window.scrollTo({top:0,behavior:'smooth'});
 });
 document.getElementById('heatToggleBtn').addEventListener('click',toggleHeatMap);
 
