@@ -142,7 +142,7 @@ function solve(conduits,cables,params,width,height,gridSize,ductRes,progressCb){
     const rduct=getRduct(cd,params)+(ductRes||0);
     temps[cid]=base+p*rduct;
   });
-  return {grid,conduitTemps:temps,iter,residual:diff};
+  return {grid,conduitTemps:temps,iter,residual:diff,ambient:earthT};
 }
 
 self.onmessage=e=>{
@@ -151,5 +151,5 @@ self.onmessage=e=>{
   const res=solve(conduits,cables,params,width,height,gridSize,ductThermRes,(it,max)=>{
     self.postMessage({type:'progress',iter:it,maxIter:max});
   });
-  self.postMessage({type:'result',grid:res.grid,conduitTemps:res.conduitTemps,iter:res.iter,residual:res.residual});
+  self.postMessage({type:'result',grid:res.grid,conduitTemps:res.conduitTemps,iter:res.iter,residual:res.residual,ambient:res.ambient});
 };

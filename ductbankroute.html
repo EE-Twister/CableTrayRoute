@@ -1504,7 +1504,7 @@ function solveDuctbankTemperatures(conduits,cables,params,progress){
           const rduct=getRduct(cd,params)+(params.ductThermRes||0);
           temps[cid]=base+p*rduct;
         });
-        resolve({grid,conduitTemps:temps,iter,diff});
+        resolve({grid,conduitTemps:temps,iter,diff,ambient:earthT});
       }
     }
     step();
@@ -1585,10 +1585,11 @@ const ctx=canvas.getContext('2d');
   `Iterations: ${result.iter}  Residual: ${result.residual.toFixed(3)}`;
 const grid=result.grid;
 const conduitTemps=result.conduitTemps;
+const ambientRes=result.ambient;
 window.lastHeatGrid=grid;
 window.lastConduitTemps=conduitTemps;
-window.lastAmbient=ambient;
-if(heatVisible) drawHeatMap(grid,conduitTemps,conduits,ambient);
+window.lastAmbient=ambientRes;
+if(heatVisible) drawHeatMap(grid,conduitTemps,conduits,ambientRes);
 
  window.finiteAmpacity = {};
  window.cableOverLimit = {};
@@ -1892,6 +1893,20 @@ function showToast(msg){
  setTimeout(()=>t.classList.remove('show'),3000);
 }
 
+function toggleHeatMap(){
+ const canvas=document.getElementById('tempCanvas');
+ if(!canvas)return;
+ const ctx=canvas.getContext('2d');
+ if(heatVisible){
+   ctx.clearRect(0,0,canvas.width,canvas.height);
+   canvas.style.display='none';
+ }else if(window.lastHeatGrid){
+   drawHeatMap(window.lastHeatGrid, window.lastConduitTemps||{}, getAllConduits(), window.lastAmbient||0);
+   canvas.style.display='block';
+ }
+ heatVisible=!heatVisible;
+}
+
 document.getElementById('exportConduitsBtn').addEventListener('click',exportConduits);
 document.getElementById('exportCablesBtn').addEventListener('click',exportCables);
 document.getElementById('exportImgBtn').addEventListener('click',exportImage);
@@ -1904,14 +1919,7 @@ document.getElementById('thermalBtn').addEventListener('click',()=>{
   validateThermalInputs();
   runFiniteThermalAnalysis();
 });
-document.getElementById('heatToggleBtn').addEventListener('click',()=>{
-  heatVisible=!heatVisible;
-  const canvas=document.getElementById('tempCanvas');
-  canvas.style.display=heatVisible?'block':'none';
-  if(heatVisible && window.lastHeatGrid){
-    drawHeatMap(window.lastHeatGrid, window.lastConduitTemps||{}, getAllConduits(), window.lastAmbient||0);
-  }
-});
+document.getElementById('heatToggleBtn').addEventListener('click',toggleHeatMap);
 
 const darkToggle = document.getElementById('dark-toggle');
 const stored=JSON.parse(localStorage.getItem('ctrSession')||'{}');
