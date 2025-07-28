@@ -33,6 +33,16 @@ where `R_ca = R_cond + R_ins + R_duct + R_soil`.
 
 These terms follow the notation of NEC 310‑15(C) and Clause 4 of IEEE Std 835.
 
+## AC Resistance Correction
+
+The factor **Y_c** is derived from IEEE Std 835 Table 4. The implementation
+converts the conductor size to kcmil and linearly interpolates the table so
+that **Y_c** varies smoothly with cross‑sectional area.
+
+The dielectric loss temperature rise **ΔT_d** follows IEEE Std 835 Table 9 with
+simple interpolation. Typical values are around 5 °C at 5 kV and 10 °C at
+15 kV.
+
 ## Soil Resistivity Ranges
 
 Typical soil resistivity values per IEEE Std 835 Table 1:

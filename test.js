@@ -498,17 +498,38 @@ function neherMcGrathRise(power, Rth, depth, rho) {
 }
 
 function skinEffect(size) {
-  const area = sizeToArea(size);
-  if (area >= 1000) return 0.2;
-  if (area >= 500) return 0.15;
-  if (area >= 250) return 0.1;
-  if (area >= 100) return 0.05;
-  return 0;
+  const area = sizeToArea(size) / 1000; // kcmil
+  if (!area) return 0;
+  const table = [
+    [0, 0], [100, 0], [250, 0.05], [500, 0.1],
+    [1000, 0.15], [2000, 0.2]
+  ];
+  for (let i = 1; i < table.length; i++) {
+    const a = table[i - 1];
+    const b = table[i];
+    if (area <= b[0]) {
+      const t = (area - a[0]) / (b[0] - a[0]);
+      return a[1] + t * (b[1] - a[1]);
+    }
+  }
+  return table[table.length - 1][1];
 }
 
 function dielectricRise(voltage) {
-  const v = parseFloat(voltage) || 0;
-  return v < 2000 ? 0 : (v - 2000) / 1000;
+  const v = (parseFloat(voltage) || 0) / 1000; // kV
+  const table = [
+    [0, 0], [2, 0], [5, 5], [15, 10], [25, 15], [35, 20]
+  ];
+  if (v <= table[0][0]) return table[0][1];
+  for (let i = 1; i < table.length; i++) {
+    const a = table[i - 1];
+    const b = table[i];
+    if (v <= b[0]) {
+      const t = (v - a[0]) / (b[0] - a[0]);
+      return a[1] + t * (b[1] - a[1]);
+    }
+  }
+  return table[table.length - 1][1];
 }
 
 function calcRca(cable, params, count = 1, total = 1) {
