@@ -241,7 +241,7 @@ button{padding:4px 8px;margin:4px 2px;cursor:pointer;}
   <h3>Thermal Analysis</h3>
   <p>The <em>Thermal Analysis</em> button overlays a heat map on the drawing. Each conduit center is marked with a yellow dot labeled with the estimated earth temperature in Fahrenheit and the hottest point is highlighted in red.</p>
   <p>Inputs are validated before running the analysis. Ductbank depth is limited to 0–120&nbsp;in, spacing between 1–24&nbsp;in and cable estimated load up to 2000&nbsp;A. Values outside these ranges will be clamped.</p>
-  <p>Conduit fill limits come from NEC Chapter&nbsp;9, while ampacity calculations follow the Neher-McGrath approach from NEC&nbsp;310‑15(C) and IEEE Std&nbsp;835. Thermal resistivity calculations reference the original Neher-McGrath paper. See <a href="docs/standards.md" target="_blank">documentation</a> for details.</p>
+  <p>Conduit fill limits come from NEC Chapter&nbsp;9, while ampacity calculations follow the Neher‑McGrath approach from NEC&nbsp;310‑15(C) and IEEE&nbsp;Std&nbsp;835. For a breakdown of the equation and variable meanings see <a href="docs/AMPACITY_METHOD.md#equation" target="_blank">Ampacity Method</a>. Soil resistivity guidance is summarized in <a href="docs/AMPACITY_METHOD.md#soil-resistivity-ranges" target="_blank">Soil Resistivity Ranges</a>. Additional references are listed in <a href="docs/standards.md" target="_blank">documentation</a>.</p>
 </div>
 </div>
 
@@ -343,6 +343,8 @@ function insulationTypesForRating(rating){
   return types.length?types:Object.keys(INSULATION_TEMP_LIMIT);
 }
 
+// Conductor temperature rise per Neher‑McGrath thermal model
+// See docs/AMPACITY_METHOD.md#equation for context
 function neherMcGrathTemp(power, Rth, ambient, k, r){
   const r0 = 0.05; // reference radius in meters
   const radial = Math.log(Math.max(r, r0)/r0)/(2*Math.PI*k);
@@ -738,6 +740,8 @@ function sizeToArea(size){
 }
 
 function skinEffect(size){
+ // AC skin effect per Neher‑McGrath
+ // docs/AMPACITY_METHOD.md#equation
  const area=sizeToArea(size);
  if(area>=1000) return 0.2;
  if(area>=500) return 0.15;
@@ -747,10 +751,14 @@ function skinEffect(size){
 }
 
 function dielectricRise(voltage){
+ // Dielectric loss temperature rise
+ // docs/AMPACITY_METHOD.md#equation
  const v=parseFloat(voltage)||0;
  return v<2000?0:(v-2000)/1000;
 }
 
+// Thermal resistance components for Neher‑McGrath
+// see docs/AMPACITY_METHOD.md#equation
 function calcRcaComponents(cable,params,count=1,total=1){
  let Rcond=0.05;
  let Rins=0.1;
@@ -769,10 +777,12 @@ function calcRcaComponents(cable,params,count=1,total=1){
 }
 
 function calcRca(cable,params,count=1,total=1){
+  // helper for Neher‑McGrath ampacity, see docs/AMPACITY_METHOD.md
   return calcRcaComponents(cable,params,count,total).Rca;
 }
 
-/* Ampacity via full Neher-McGrath equation */
+/* Ampacity via full Neher-McGrath equation
+   See docs/AMPACITY_METHOD.md#equation */
 function estimateAmpacity(cable,params,count=1,total=0){
  const areaCM=sizeToArea(cable.conductor_size);
  if(!areaCM)return {ampacity:0};
@@ -804,6 +814,8 @@ function ampacityDetails(cable,params,count=1,total=0){
  return {Rdc,Yc,deltaTd:dTd,Rcond:comps.Rcond,Rins:comps.Rins,Rduct:comps.Rduct,Rsoil:comps.Rsoil,Rca,ampacity};
 }
 
+// Iterative ampacity search using Neher‑McGrath temps
+// See docs/AMPACITY_METHOD.md#equation
 async function calcFiniteAmpacity(cable, conduits, cables, params){
  const cd=conduits.find(d=>d.conduit_id===cable.conduit_id);
  if(!cd) return NaN;
@@ -1143,7 +1155,8 @@ function solveDuctbankTemperatures(conduits,cables,params,progress){
   const dx=(0.0254/scale)*step;
   const nx=Math.ceil(width/step);
   const ny=Math.ceil(height/step);
-  /* Thermal resistivity model based on Neher-McGrath and IEEE Std 835 - see docs/standards.md */
+  /* Thermal resistivity model based on Neher-McGrath and IEEE Std 835
+     see docs/AMPACITY_METHOD.md#soil-resistivity-ranges */
   const k=100/((params.soilResistivity)||90);
   const hConv=10; // W/(m^2*K)
   const Bi=hConv*dx/k;
