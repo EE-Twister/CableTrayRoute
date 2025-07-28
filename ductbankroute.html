@@ -807,16 +807,18 @@ function dielectricRise(voltage){
 function conductorThermalResistance(cable){
   const props=CONDUCTOR_PROPS[cable.conductor_size];
   if(!props){
-    return {Rcond:0.05,Rins:0.1};
+    throw new Error('Invalid conductor size: '+cable.conductor_size);
   }
   const areaM2=props.area_cm*5.067e-10;
-  const r=Math.sqrt(areaM2/Math.PI);
+  const r=Math.sqrt(areaM2/Math.PI); // conductor radius (m)
   const t=(parseFloat(cable.insulation_thickness)||props.insulation_thickness||0)*0.0254;
-  const rOut=r+t;
+  const r_i=r;
+  const r_o=r+t;
+  const r_inner_equivalent=r*0.001;
   const kCond=cable.conductor_material&&cable.conductor_material.toLowerCase().includes('al')?237:401;
-  const kIns=0.3;
-  const Rcond=Math.log(r/(r*0.5))/(2*Math.PI*kCond);
-  const Rins=Math.log(rOut/r)/(2*Math.PI*kIns);
+  const kIns=parseFloat(cable.insulation_k)||0.3;
+  const Rcond=Math.log(r_i/r_inner_equivalent)/(2*Math.PI*kCond);
+  const Rins=Math.log(r_o/r_i)/(2*Math.PI*kIns);
   return {Rcond,Rins};
 }
 
