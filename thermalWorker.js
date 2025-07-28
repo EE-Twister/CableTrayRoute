@@ -1,4 +1,5 @@
 // Worker for finite-difference ductbank thermal solver
+const GRID_SIZE = 20; // number of grid nodes across the ductbank
 const CONDUIT_SPECS={
  "EMT":{"1/2":0.304,"3/4":0.533,"1":0.864,"1-1/4":1.496,"1-1/2":2.036,"2":3.356,"2-1/2":5.858,"3":8.846,"3-1/2":11.545,"4":14.753},
  "RMC":{"1/2":0.314,"3/4":0.549,"1":0.887,"1-1/4":1.526,"1-1/2":2.071,"2":3.408,"2-1/2":4.866,"3":7.499,"3-1/2":10.01,"4":12.882,"5":20.212,"6":29.158},
@@ -36,7 +37,7 @@ function dcResistance(size,material,temp=20){
 
 function solve(conduits,cables,params,width,height,progressCb){
   const scale=40,margin=20;
-  const step=4;
+  const step=Math.ceil(Math.max(width,height)/GRID_SIZE);
   const dx=(0.0254/scale)*step;
   const nx=Math.ceil(width/step);
   const ny=Math.ceil(height/step);

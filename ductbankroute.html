@@ -247,6 +247,7 @@ button{padding:4px 8px;margin:4px 2px;cursor:pointer;}
 
 <script>
 let heatVisible=true;
+const GRID_SIZE = 20; // number of grid nodes across the ductbank for thermal solver
 const SAMPLE_CONDUITS=[
  {conduit_id:"C1",conduit_type:"PVC Sch 40",trade_size:"4",x:0,y:0},
  {conduit_id:"C2",conduit_type:"PVC Sch 40",trade_size:"4",x:2,y:0},
@@ -1138,7 +1139,7 @@ function solveDuctbankTemperatures(conduits,cables,params,progress){
   const width=parseFloat(svg.getAttribute('width'))||svg.clientWidth;
   const height=parseFloat(svg.getAttribute('height'))||svg.clientHeight;
   const scale=40,margin=20;
-  const step=4; // pixel step for solver grid
+  const step=Math.ceil(Math.max(width,height)/GRID_SIZE); // pixel step for solver grid
   const dx=(0.0254/scale)*step;
   const nx=Math.ceil(width/step);
   const ny=Math.ceil(height/step);
@@ -1298,7 +1299,7 @@ const ctx=canvas.getContext('2d');
  const grid=result.grid;
  const conduitTemps=result.conduitTemps;
 
- const step=4; // same as solver
+ const step=Math.ceil(Math.max(width,height)/GRID_SIZE); // match solver grid
  const img=ctx.createImageData(width,height);
  let maxT=-Infinity,maxPx=0,maxPy=0;
  for(let j=0;j<grid.length;j++){
