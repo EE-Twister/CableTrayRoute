@@ -573,8 +573,8 @@ body.dark-mode .db-table td {
     margin-top: 4px;
 }
 
-#gridContainer.collapsed {
-    height: 200px;
+#gridContainer.hidden {
+    height: 0;
     overflow: hidden;
 }
 

@@ -1984,8 +1984,9 @@ if(hideDrawing){
   hideDrawing.addEventListener('change',()=>{
     const gc=document.getElementById('gridContainer');
     if(gc){
-      gc.classList.toggle('collapsed', hideDrawing.checked);
+      gc.classList.toggle('hidden', hideDrawing.checked);
     }
+    updateAmpacityReport();
   });
 }
 
