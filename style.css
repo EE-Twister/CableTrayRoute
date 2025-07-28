@@ -444,6 +444,7 @@ body.dark-mode .toast { background: #2c3034; color: #f8f9fa; }
 
 #warning-area { margin-top: 8px; }
 #soilWarning { margin-top:4px; font-size:0.8rem; color: var(--warning-text); }
+#moistureWarning { margin-top:4px; font-size:0.8rem; color: var(--warning-text); }
 
 /* --- Plots --- */
 #plot-3d {
