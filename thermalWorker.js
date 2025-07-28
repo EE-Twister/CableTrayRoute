@@ -50,7 +50,9 @@ function solve(conduits,cables,params,width,height,gridSize,ductRes,progressCb){
   const dx=(0.0254/scale)*step;
   const nx=Math.ceil(width/step);
   const ny=Math.ceil(height/step);
-  const k=100/((params.soilResistivity)||90);
+  let soil=(params.soilResistivity)||90;
+  soil*=1-Math.min(params.moistureContent||0,100)/200;
+  const k=100/soil;
   const hConv=10;
   const Bi=hConv*dx/k;
   const earthT=params.earthTemp||20;

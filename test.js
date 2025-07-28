@@ -515,9 +515,9 @@ function calcRca(cable, params, count = 1, total = 1) {
   let Rcond = 0.05;
   let Rins = 0.1;
   let Rduct = params.concreteEncasement ? 0.08 : 0.1;
-  let Rsoil = (params.soilResistivity || 90) / 90 * 0.25;
-  const moistAdj = 1 - Math.min(params.moistureContent || 0, 100) / 200;
-  Rsoil *= moistAdj;
+  let soil = (params.soilResistivity || 90);
+  soil *= 1 - Math.min(params.moistureContent || 0, 100) / 200;
+  let Rsoil = soil / 90 * 0.25;
   const spacing = (params.hSpacing + params.vSpacing) / 2 || 3;
   Rsoil *= 3 / spacing;
   if (total > count) Rsoil *= 1 + (total - count) * 0.05;
@@ -641,6 +641,8 @@ function computeDuctbankTemperatures(conduits, cables, params) {
     heatMap[c.conduit_id].cables.push(c);
   });
 
+  const adjSoil = (params.soilResistivity || 90) *
+    (1 - Math.min(params.moistureContent || 0, 100) / 200);
   const sources = Object.keys(heatMap).map(cid => {
     const h = heatMap[cid];
     const others = Object.keys(heatMap).filter(id => id !== cid);
@@ -652,9 +654,7 @@ function computeDuctbankTemperatures(conduits, cables, params) {
       ? distances.reduce((s, d) => s + d, 0) / distances.length / 0.0254
       : (params.hSpacing + params.vSpacing) / 2 || 3;
     const spacingAdj = 3 / Math.max(avgSpacingIn, 0.1);
-    let Rth = (params.soilResistivity || 90) / 90 * 0.5;
-    const moistAdj = 1 - Math.min(params.moistureContent || 0, 100) / 200;
-    Rth *= moistAdj;
+    let Rth = adjSoil / 90 * 0.5;
     if (params.heatSources) Rth *= 1.2;
     Rth *= spacingAdj;
     if (params.concreteEncasement) Rth *= 0.8;
@@ -678,7 +678,7 @@ function computeDuctbankTemperatures(conduits, cables, params) {
       const dx = x - h.cx;
       const dy = y - h.cy;
       const dist = Math.max(0, Math.sqrt(dx * dx + dy * dy) - (h.r + targetR));
-      t += neherMcGrathRise(h.power, h.Rth, dist, params.soilResistivity || 90);
+      t += neherMcGrathRise(h.power, h.Rth, dist, adjSoil);
     }
     return t;
   }
