@@ -1,5 +1,5 @@
 // Worker for finite-difference ductbank thermal solver
-const GRID_SIZE = 20; // number of grid nodes across the ductbank
+let GRID_SIZE = 20; // number of grid nodes across the ductbank
 const CONDUIT_SPECS={
  "EMT":{"1/2":0.304,"3/4":0.533,"1":0.864,"1-1/4":1.496,"1-1/2":2.036,"2":3.356,"2-1/2":5.858,"3":8.846,"3-1/2":11.545,"4":14.753},
  "RMC":{"1/2":0.314,"3/4":0.549,"1":0.887,"1-1/4":1.526,"1-1/2":2.071,"2":3.408,"2-1/2":4.866,"3":7.499,"3-1/2":10.01,"4":12.882,"5":20.212,"6":29.158},
@@ -43,8 +43,9 @@ function dcResistance(size,material,temp=20){
   return base*(1+TEMP_COEFF[mat]*(temp-20));
 }
 
-function solve(conduits,cables,params,width,height,progressCb){
+function solve(conduits,cables,params,width,height,gridSize,ductRes,progressCb){
   const scale=40,margin=20;
+  GRID_SIZE=gridSize||GRID_SIZE;
   const step=Math.ceil(Math.max(width,height)/GRID_SIZE);
   const dx=(0.0254/scale)*step;
   const nx=Math.ceil(width/step);
@@ -112,20 +113,23 @@ function solve(conduits,cables,params,width,height,progressCb){
     if(progressCb && iter%25===0) progressCb(iter,maxIter);
   }
   const temps={};
+  const Rextra=(params.concreteEncasement?0.08:0.1)+(ductRes||0);
   Object.keys(conduitCells).forEach(cid=>{
     const cells=conduitCells[cid];
     let sum=0;
     cells.forEach(([j,i])=>{sum+=grid[j][i];});
-    temps[cid]=sum/cells.length;
+    const base=sum/cells.length;
+    const p=heatMap[cid].power||0;
+    temps[cid]=base+p*Rextra;
   });
-  return {grid,conduitTemps:temps,iter};
+  return {grid,conduitTemps:temps,iter,residual:diff};
 }
 
 self.onmessage=e=>{
-  const {conduits,cables,params,width,height,conductorProps}=e.data;
+  const {conduits,cables,params,width,height,gridSize,ductThermRes,conductorProps}=e.data;
   if(conductorProps) CONDUCTOR_PROPS=conductorProps;
-  const res=solve(conduits,cables,params,width,height,(it,max)=>{
+  const res=solve(conduits,cables,params,width,height,gridSize,ductThermRes,(it,max)=>{
     self.postMessage({type:'progress',iter:it,maxIter:max});
   });
-  self.postMessage({type:'result',grid:res.grid,conduitTemps:res.conduitTemps});
+  self.postMessage({type:'result',grid:res.grid,conduitTemps:res.conduitTemps,iter:res.iter,residual:res.residual});
 };
