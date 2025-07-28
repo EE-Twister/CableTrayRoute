@@ -981,11 +981,16 @@ function updateAmpacityReport(){
  const countMap={};
  cables.forEach(c=>{countMap[c.conduit_id]=(countMap[c.conduit_id]||0)+1;});
  const rows=cables.map(c=>{
-  const res=estimateAmpacity(c,params,countMap[c.conduit_id],total);
-  const neher=isFinite(res.ampacity)?res.ampacity.toFixed(0):'N/A';
-  const finite=window.finiteAmpacity?window.finiteAmpacity[c.tag]||'N/A':'N/A';
-  const over=window.cableOverLimit&&window.cableOverLimit[c.tag];
-  return `<tr class="${over?'over-limit-row':''}"><td>${c.tag}</td><td>${neher}</td><td>${finite}</td><td>${over?'Yes':''}</td></tr>`;
+ const res=estimateAmpacity(c,params,countMap[c.conduit_id],total);
+ const neher=isFinite(res.ampacity)?res.ampacity.toFixed(0):'N/A';
+ const finite=window.finiteAmpacity?window.finiteAmpacity[c.tag]||'N/A':'N/A';
+ const load=parseFloat(c.est_load)||0;
+ const neherNum=parseFloat(neher);
+ const finiteNum=parseFloat(finite);
+ const over=(load>(isNaN(neherNum)?Infinity:neherNum)) ||
+             (load>(isNaN(finiteNum)?Infinity:finiteNum));
+ if(window.cableOverLimit) window.cableOverLimit[c.tag]=over;
+ return `<tr class="${over?'over-limit-row':''}"><td>${c.tag}</td><td>${neher}</td><td>${finite}</td><td>${over?'Yes':''}</td></tr>`;
 }).join('');
 document.getElementById('ampacityReport').innerHTML=
    `<table><thead><tr><th>Cable</th><th>Ampacity (A) - Neher‑McGrath</th><th>Ampacity (A) - Finite Element</th><th>Over Limit</th></tr></thead><tbody>${rows}</tbody></table>`;
@@ -1448,11 +1453,36 @@ const ctx=canvas.getContext('2d');
  });
  pc.style.display='none';
  document.getElementById('solver-info').textContent=
-   `Iterations: ${result.iter}  Residual: ${result.residual.toFixed(3)}`;
+  `Iterations: ${result.iter}  Residual: ${result.residual.toFixed(3)}`;
  const grid=result.grid;
  const conduitTemps=result.conduitTemps;
+ drawHeatMap(grid,conduitTemps,conduits,ambient);
 
- const step=Math.ceil(Math.max(width,height)/GRID_SIZE); // match solver grid
+ window.finiteAmpacity = {};
+ window.cableOverLimit = {};
+ for(const c of cables){
+  const areaCM=sizeToArea(c.conductor_size);
+  if(!areaCM){
+    window.finiteAmpacity[c.tag]='N/A';
+    window.cableOverLimit[c.tag]=false;
+    continue;
+  }
+  const amp=await calcFiniteAmpacity(c,conduits,cables,params);
+  window.finiteAmpacity[c.tag]=isFinite(amp)?amp.toFixed(0):'N/A';
+  window.cableOverLimit[c.tag]=isFinite(amp)&&parseFloat(c.est_load)>amp;
+ }
+ updateAmpacityReport();
+ updateCableRowStyles();
+}
+
+function drawHeatMap(grid, conduitTemps, conduits, ambient){
+ const canvas=document.getElementById('tempCanvas');
+ if(!canvas)return;
+ const ctx=canvas.getContext('2d');
+ const svg=document.getElementById('grid');
+ const width=parseFloat(svg.getAttribute('width'))||svg.clientWidth;
+ const height=parseFloat(svg.getAttribute('height'))||svg.clientHeight;
+ const step=Math.ceil(Math.max(width,height)/GRID_SIZE);
  const img=ctx.createImageData(width,height);
  let maxT=-Infinity,maxPx=0,maxPy=0;
  for(let j=0;j<grid.length;j++){
@@ -1472,12 +1502,13 @@ const ctx=canvas.getContext('2d');
      }
    }
  }
+ ctx.clearRect(0,0,width,height);
  ctx.putImageData(img,0,0);
  const maxTF=maxT*9/5+32;
  const Tc=getConductorRating();
  if(maxT>Tc){
    console.warn(`Maximum temperature ${maxT.toFixed(1)}\u00B0C exceeds ${Tc}\u00B0C rating.`);
-}
+ }
  ctx.beginPath();
  ctx.arc(maxPx,maxPy,5,0,Math.PI*2);
  ctx.fillStyle='yellow';
@@ -1488,20 +1519,20 @@ const ctx=canvas.getContext('2d');
  ctx.fillStyle='black';
  ctx.fillText(maxTF.toFixed(1)+'\u00B0F',maxPx+8,maxPy-8);
 
- // draw temperature marker for each conduit
  window.conduitOverLimit={};
+ const scale=40,margin=20;
  conduits.forEach(cd=>{
    const Rin=Math.sqrt(CONDUIT_SPECS[cd.conduit_type][cd.trade_size]/Math.PI);
    const px=(cd.x+Rin)*scale+margin;
    const py=(cd.y+Rin)*scale+margin;
    const t=conduitTemps[cd.conduit_id]??ambient;
    const tf=t*9/5+32;
-  const rating=getConductorRating();
-  const over=t>rating;
-  window.conduitOverLimit[cd.conduit_id]={temp:t,over};
-  if(over){
+   const rating=getConductorRating();
+   const over=t>rating;
+   window.conduitOverLimit[cd.conduit_id]={temp:t,over};
+   if(over){
      console.warn(`Temperature at conduit ${cd.conduit_id} reaches ${t.toFixed(1)}\u00B0C > rating ${rating}\u00B0C`);
-  }
+   }
    ctx.beginPath();
    ctx.arc(px,py,4,0,Math.PI*2);
    ctx.fillStyle=over?'red':'yellow';
@@ -1511,22 +1542,6 @@ const ctx=canvas.getContext('2d');
    ctx.fillStyle='black';
    ctx.fillText(tf.toFixed(1)+'\u00B0F'+(over?' ⚠':''),px+6,py+4);
  });
-
- window.finiteAmpacity = {};
- window.cableOverLimit = {};
- for(const c of cables){
-  const areaCM=sizeToArea(c.conductor_size);
-  if(!areaCM){
-    window.finiteAmpacity[c.tag]='N/A';
-    window.cableOverLimit[c.tag]=false;
-    continue;
-  }
-  const amp=await calcFiniteAmpacity(c,conduits,cables,params);
-  window.finiteAmpacity[c.tag]=isFinite(amp)?amp.toFixed(0):'N/A';
-  window.cableOverLimit[c.tag]=isFinite(amp)&&parseFloat(c.est_load)>amp;
- }
- updateAmpacityReport();
- updateCableRowStyles();
 }
 
 function importCSV(file,callback){
