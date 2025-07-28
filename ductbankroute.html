@@ -125,27 +125,62 @@ button{padding:4px 8px;margin:4px 2px;cursor:pointer;}
 <details id="paramSection" open style="margin-top:8px;">
  <summary><strong>Parameters</strong></summary>
  <div>
- <label>Ambient Earth Temperature (&#176;F)<input type="number" id="earthTemp" style="width:60px;"></label>
- <label style="margin-left:8px;">Ambient Air Temperature (&#176;F)<input type="number" id="airTemp" style="width:60px;"></label>
- <label style="margin-left:8px;">Thermal Resistivity of Soil (&#176;C&#183;cm/W)<input type="number" id="soilResistivity" list="soilResList" style="width:60px;"></label>
+ <label>Ambient Earth Temperature (&#176;F)
+  <span class="help-icon" tabindex="0" aria-describedby="earthTempHelp">?
+   <span id="earthTempHelp" class="tooltip">Degrees Fahrenheit of the surrounding soil. Typical 50–80°F.</span>
+  </span>
+  <input type="number" id="earthTemp" style="width:60px;">
+ </label>
+<label style="margin-left:8px;">Ambient Air Temperature (&#176;F)
+  <span class="help-icon" tabindex="0" aria-describedby="airTempHelp">?
+   <span id="airTempHelp" class="tooltip">Air temperature around the installation in °F. Usually 50–110°F.</span>
+  </span>
+  <input type="number" id="airTemp" style="width:60px;">
+ </label>
+<label style="margin-left:8px;">Thermal Resistivity of Soil (&#176;C&#183;cm/W)
+  <span class="help-icon" tabindex="0" aria-describedby="soilResHelp">?
+   <span id="soilResHelp" class="tooltip">Typical soil ranges from 40–150 °C·cm/W.</span>
+  </span>
+  <input type="number" id="soilResistivity" list="soilResList" style="width:100px;">
+ </label>
+ <div id="soilWarning" style="display:none;font-size:0.8rem;color:var(--warning-text);"></div>
  <datalist id="soilResList"></datalist>
- <label style="margin-left:8px;">Moisture Content (%)<input type="number" id="moistureContent" min="0" max="100" style="width:60px;"></label>
- <label style="margin-left:8px;">Allowable Conductor Temperature Tc
+ <label style="margin-left:8px;">Moisture Content (%)
+  <span class="help-icon" tabindex="0" aria-describedby="moistureHelp">?
+   <span id="moistureHelp" class="tooltip">Percent water by weight in soil.</span>
+  </span>
+  <input type="number" id="moistureContent" min="0" max="100" style="width:60px;">
+ </label>
+<label style="margin-left:8px;">Allowable Conductor Temperature Tc
+  <span class="help-icon" tabindex="0" aria-describedby="ratingHelp">?
+   <span id="ratingHelp" class="tooltip">Select the design insulation rating (°C).</span>
+  </span>
   <select id="conductorRating" style="margin-left:4px;">
    <option value="60">60&#176;C</option>
    <option value="75">75&#176;C</option>
    <option value="90" selected>90&#176;C</option>
   </select>
  </label>
- <label style="margin-left:8px;">Presence of Adjacent Heat Sources<input type="checkbox" id="heatSources" style="margin-left:4px;"></label>
+<label style="margin-left:8px;">Presence of Adjacent Heat Sources
+  <span class="help-icon" tabindex="0" aria-describedby="heatHelp">?
+   <span id="heatHelp" class="tooltip">Toggle additional heat sources near the ductbank.</span>
+  </span>
+  <input type="checkbox" id="heatSources" style="margin-left:4px;">
+ </label>
  <button type="button" id="addHeatSource" style="display:none;margin-left:4px;">Add Heat Source</button>
  <label style="margin-left:8px;">Grid Resolution
+  <span class="help-icon" tabindex="0" aria-describedby="gridHelp">?
+   <span id="gridHelp" class="tooltip">Number of nodes used for the thermal solver.</span>
+  </span>
   <select id="gridRes" style="margin-left:4px;">
    <option value="20" selected>20×20</option>
    <option value="40">40×40</option>
   </select>
  </label>
- <label style="margin-left:8px;">Duct Thermal Resistance (&#176;C·m/W)
+<label style="margin-left:8px;">Duct Thermal Resistance (&#176;C·m/W)
+  <span class="help-icon" tabindex="0" aria-describedby="ductResHelp">?
+   <span id="ductResHelp" class="tooltip">Thermal resistance of the duct wall, typical 0.05–0.15 °C·m/W.</span>
+  </span>
   <input type="number" id="ductThermRes" value="0.0" style="width:60px;">
  </label>
 </div>
@@ -483,7 +518,7 @@ function addCableRow(data={}){
  const selectOptions={
   cable_type:['Power','Control','Signal'],
   conductor_material:['Copper','Aluminum'],
-  insulation_type:insulationTypesForRating(getConductorRating()),
+  insulation_type:Object.keys(INSULATION_TEMP_LIMIT),
   insulation_rating:['60','75','90'],
   shielding_jacket:['','Lead','Copper Tape']
 };
@@ -540,19 +575,19 @@ saveDuctbankSession();
 
 function updateInsulationOptions(){
  const rating=getConductorRating();
- const opts=insulationTypesForRating(rating);
+ const allowed=insulationTypesForRating(rating);
  document.querySelectorAll('#cableTable tbody tr').forEach(tr=>{
   const sel=tr.children[10]?.querySelector('select');
   if(!sel) return;
-  const current=sel.value;
-  sel.innerHTML='';
-  opts.forEach(t=>{
-   const o=document.createElement('option');
-   o.value=t;
-   o.textContent=t;
-   sel.appendChild(o);
+  Array.from(sel.options).forEach(opt=>{
+    const type=opt.value;
+    const limit=INSULATION_TEMP_LIMIT[type];
+    opt.disabled=limit!==undefined && limit!==rating;
   });
-  if(opts.includes(current)) sel.value=current;
+  if(sel.options[sel.selectedIndex]?.disabled){
+    const first=Array.from(sel.options).find(o=>!o.disabled);
+    if(first) sel.value=first.value;
+  }
  });
 }
 
@@ -1276,6 +1311,29 @@ function validateThermalInputs(){
  }
 }
 
+function validateSoilResistivity(){
+  const el=document.getElementById('soilResistivity');
+  const warn=document.getElementById('soilWarning');
+  if(!el||!warn) return;
+  let val=parseFloat(el.value);
+  const min=40, max=150;
+  if(isNaN(val)){
+    warn.textContent='Enter a numeric value.';
+    warn.style.display='block';
+    return;
+  }
+  if(val<min){
+    warn.textContent=`Value raised to ${min} \u00B0C\u00B7cm/W.`;
+    val=min;
+  }else if(val>max){
+    warn.textContent=`Value reduced to ${max} \u00B0C\u00B7cm/W.`;
+    val=max;
+  }else{
+    warn.style.display='none';
+  }
+  el.value=val;
+}
+
 function solveDuctbankTemperatures(conduits,cables,params,progress){
   const svg=document.getElementById('grid');
   const width=parseFloat(svg.getAttribute('width'))||svg.clientWidth;
@@ -1551,7 +1609,7 @@ function importCSV(file,callback){
 }
 
 document.getElementById('addConduit').addEventListener('click',()=>{addConduitRow();});
-document.getElementById('addCable').addEventListener('click',()=>{addCableRow();});
+document.getElementById('addCable').addEventListener('click',()=>{addCableRow();updateInsulationOptions();});
 document.getElementById('sampleConduits').addEventListener('click',()=>{
  document.querySelector('#conduitTable tbody').innerHTML='';
  SAMPLE_CONDUITS.forEach(addConduitRow);
@@ -1562,13 +1620,14 @@ document.getElementById('sampleConduits').addEventListener('click',()=>{
 document.getElementById('sampleCables').addEventListener('click',()=>{
  document.querySelector('#cableTable tbody').innerHTML='';
  SAMPLE_CABLES.forEach(addCableRow);
+ updateInsulationOptions();
  drawGrid();
  updateAmpacityReport();
  saveDuctbankSession();
 });
 
 document.getElementById('importConduits').addEventListener('change',e=>{const f=e.target.files[0];if(f)importCSV(f,data=>{document.querySelector('#conduitTable tbody').innerHTML='';data.forEach(addConduitRow);drawGrid();updateAmpacityReport();saveDuctbankSession();});});
-document.getElementById('importCables').addEventListener('change',e=>{const f=e.target.files[0];if(f)importCSV(f,data=>{document.querySelector('#cableTable tbody').innerHTML='';data.forEach(addCableRow);drawGrid();updateAmpacityReport();saveDuctbankSession();});});
+document.getElementById('importCables').addEventListener('change',e=>{const f=e.target.files[0];if(f)importCSV(f,data=>{document.querySelector('#cableTable tbody').innerHTML='';data.forEach(addCableRow);updateInsulationOptions();drawGrid();updateAmpacityReport();saveDuctbankSession();});});
 
 document.getElementById('calc').addEventListener('click',()=>{drawGrid();updateAmpacityReport();});
 
@@ -1873,7 +1932,9 @@ loadSoilResistivityData().then(data=>{
   populateSoilReferences(data);
   validateThermalInputs();
 });
-document.getElementById('soilResistivity').addEventListener('change',validateThermalInputs);
+const soilInput=document.getElementById('soilResistivity');
+soilInput.addEventListener('change',validateThermalInputs);
+soilInput.addEventListener('blur',validateSoilResistivity);
 </script>
 <div id="toast" class="toast" role="status" aria-live="polite"></div>
   <p class="legalDisclaimer">
