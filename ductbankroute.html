@@ -33,12 +33,14 @@ button{padding:4px 8px;margin:4px 2px;cursor:pointer;}
   <button id="deleteDataBtn">Delete Saved Data</button>
  </div>
 </header>
-<fieldset>
- <legend><strong>Ductbank Information</strong></legend>
- <label>Ductbank Tag<input type="text" id="ductbankTag" style="margin-left:4px;"></label>
- <label style="margin-left:8px;">Concrete Encasement<input type="checkbox" id="concreteEncasement" style="margin-left:4px;"></label>
- <label style="margin-left:8px;">Ductbank Depth (in)<input type="number" id="ductbankDepth" style="width:60px;"></label>
-</fieldset>
+<details id="infoSection" open>
+ <summary><strong>Ductbank Info</strong></summary>
+ <div>
+  <label>Ductbank Tag<input type="text" id="ductbankTag" style="margin-left:4px;"></label>
+  <label style="margin-left:8px;">Concrete Encasement<input type="checkbox" id="concreteEncasement" style="margin-left:4px;"></label>
+  <label style="margin-left:8px;">Ductbank Depth (in)<input type="number" id="ductbankDepth" style="width:60px;"></label>
+ </div>
+</details>
 
 <details open>
  <summary><strong>Ductbank Conduits</strong></summary>
@@ -120,8 +122,9 @@ button{padding:4px 8px;margin:4px 2px;cursor:pointer;}
   <option value="1000 kcmil"></option>
  </datalist>
 </details>
- <fieldset style="margin-top:8px;">
- <legend><strong>Thermal &amp; Environmental Parameters</strong></legend>
+<details id="paramSection" open style="margin-top:8px;">
+ <summary><strong>Parameters</strong></summary>
+ <div>
  <label>Ambient Earth Temperature (&#176;F)<input type="number" id="earthTemp" style="width:60px;"></label>
  <label style="margin-left:8px;">Ambient Air Temperature (&#176;F)<input type="number" id="airTemp" style="width:60px;"></label>
  <label style="margin-left:8px;">Thermal Resistivity of Soil (&#176;C&#183;cm/W)<input type="number" id="soilResistivity" list="soilResList" style="width:60px;"></label>
@@ -145,7 +148,7 @@ button{padding:4px 8px;margin:4px 2px;cursor:pointer;}
  <label style="margin-left:8px;">Duct Thermal Resistance (&#176;C·m/W)
   <input type="number" id="ductThermRes" value="0.0" style="width:60px;">
  </label>
-</fieldset>
+</div>
 
 <details id="soilRef" style="margin-top:8px;">
  <summary><strong>Typical Soil Properties</strong></summary>
@@ -192,9 +195,10 @@ button{padding:4px 8px;margin:4px 2px;cursor:pointer;}
   <label>Top Clear (in)<input type="number" id="topPad" value="0" style="width:60px;"></label>
   <label>Bottom Clear (in)<input type="number" id="bottomPad" value="0" style="width:60px;"></label>
   <label>Left Clear (in)<input type="number" id="leftPad" value="0" style="width:60px;"></label>
-  <label>Right Clear (in)<input type="number" id="rightPad" value="0" style="width:60px;"></label>
+ <label>Right Clear (in)<input type="number" id="rightPad" value="0" style="width:60px;"></label>
  <label>Conduits/Row<input type="number" id="perRow" value="4" style="width:60px;"></label>
 </div>
+</details>
 
 <div id="warning-area" style="display:none;"></div>
 
@@ -932,13 +936,21 @@ function updateAmpacityReport(){
   const res=estimateAmpacity(c,params,countMap[c.conduit_id],total);
   const neher=isFinite(res.ampacity)?res.ampacity.toFixed(0):'N/A';
   const finite=window.finiteAmpacity?window.finiteAmpacity[c.tag]||'N/A':'N/A';
-  const overObj=window.conduitOverLimit&&window.conduitOverLimit[c.conduit_id];
-  const rating=getConductorRating();
-  const over=overObj?overObj.temp>rating:false;
-  return `<tr><td>${c.tag}</td><td>${neher}</td><td>${finite}</td><td>${over?'Yes':''}</td></tr>`;
+  const over=window.cableOverLimit&&window.cableOverLimit[c.tag];
+  return `<tr class="${over?'over-limit-row':''}"><td>${c.tag}</td><td>${neher}</td><td>${finite}</td><td>${over?'Yes':''}</td></tr>`;
 }).join('');
- document.getElementById('ampacityReport').innerHTML=
+document.getElementById('ampacityReport').innerHTML=
    `<table><thead><tr><th>Cable</th><th>Ampacity (A) - Neher‑McGrath</th><th>Ampacity (A) - Finite Element</th><th>Over Limit</th></tr></thead><tbody>${rows}</tbody></table>`;
+ updateCableRowStyles();
+}
+
+function updateCableRowStyles(){
+ const rows=document.querySelectorAll('#cableTable tbody tr');
+ rows.forEach(r=>{
+  const tag=r.children[0]?.querySelector('input')?.value||'';
+  if(window.cableOverLimit&&window.cableOverLimit[tag]) r.classList.add('over-limit-row');
+  else r.classList.remove('over-limit-row');
+ });
 }
 
 function drawGrid(){
@@ -1452,16 +1464,20 @@ const ctx=canvas.getContext('2d');
  });
 
  window.finiteAmpacity = {};
+ window.cableOverLimit = {};
  for(const c of cables){
-   const areaCM=sizeToArea(c.conductor_size);
-   if(!areaCM){
-     window.finiteAmpacity[c.tag]='N/A';
-     continue;
-   }
-   const amp=await calcFiniteAmpacity(c,conduits,cables,params);
-   window.finiteAmpacity[c.tag]=isFinite(amp)?amp.toFixed(0):'N/A';
+  const areaCM=sizeToArea(c.conductor_size);
+  if(!areaCM){
+    window.finiteAmpacity[c.tag]='N/A';
+    window.cableOverLimit[c.tag]=false;
+    continue;
+  }
+  const amp=await calcFiniteAmpacity(c,conduits,cables,params);
+  window.finiteAmpacity[c.tag]=isFinite(amp)?amp.toFixed(0):'N/A';
+  window.cableOverLimit[c.tag]=isFinite(amp)&&parseFloat(c.est_load)>amp;
  }
  updateAmpacityReport();
+ updateCableRowStyles();
 }
 
 function importCSV(file,callback){
@@ -1512,8 +1528,10 @@ document.getElementById('exportBtn').addEventListener('click',()=>{
  exportCalcData(conduits,cables);
 });
 
-function exportCSV(filename,headers,rows){
- const csv=[headers.join(',')];
+function exportCSV(filename,headers,rows,meta={}){
+ const csv=[];
+ Object.keys(meta).forEach(k=>{csv.push(`# ${k}: ${meta[k]}`);});
+ csv.push(headers.join(','));
  rows.forEach(r=>{csv.push(headers.map(h=>r[h]!==undefined?r[h]:'').join(','));});
  const blob=new Blob([csv.join('\n')],{type:'text/csv;charset=utf-8;'});
  const url=URL.createObjectURL(blob);
@@ -1523,13 +1541,15 @@ function exportCSV(filename,headers,rows){
 function exportConduits(){
  const rows=getAllConduits();
  const headers=['conduit_id','conduit_type','trade_size','x','y'];
- exportCSV('ductbank_conduits.csv',headers,rows);
+ const meta={version:CTR_VERSION,timestamp:new Date().toISOString()};
+ exportCSV('ductbank_conduits.csv',headers,rows,meta);
 }
 
 function exportCables(){
  const rows=getAllCables();
  const headers=['tag','cable_type','diameter','conductors','conductor_size','weight','est_load','conduit_id','conductor_material','insulation_type','insulation_rating','voltage_rating','shielding_jacket'];
- exportCSV('ductbank_cables.csv',headers,rows);
+ const meta={version:CTR_VERSION,timestamp:new Date().toISOString()};
+ exportCSV('ductbank_cables.csv',headers,rows,meta);
 }
 
 function gatherInputParams(){
@@ -1562,7 +1582,7 @@ function exportCalcData(conduits,cables){
    const d=ampacityDetails(c,{...params,earthTemp:fToC(params.earthTemp),airTemp:isNaN(params.airTemp)?NaN:fToC(params.airTemp)},countMap[c.conduit_id],total);
    return {tag:c.tag,...d};
  });
- const exportObj={version:CTR_VERSION,timestamp:new Date().toISOString(),inputs:{params,conduits,cables},results:details};
+const exportObj={version:CTR_VERSION,timestamp:new Date().toISOString(),inputs:{params,conduits,cables},results:details};
  const blob=new Blob([JSON.stringify(exportObj,null,2)],{type:'application/json'});
  const a=document.createElement('a');
  a.href=URL.createObjectURL(blob);
@@ -1570,7 +1590,8 @@ function exportCalcData(conduits,cables){
  document.body.appendChild(a);a.click();document.body.removeChild(a);
  URL.revokeObjectURL(a.href);
  const csvHeaders=['tag','Rdc','Yc','Rcond','Rins','Rduct','Rsoil','Rca','deltaTd','ampacity'];
- exportCSV('ductbank_analysis.csv',csvHeaders,details);
+ const meta={version:CTR_VERSION,timestamp:new Date().toISOString(),inputs:JSON.stringify(params)};
+ exportCSV('ductbank_analysis.csv',csvHeaders,details,meta);
 }
 
 function buildCalcReport(){
@@ -1581,15 +1602,13 @@ function buildCalcReport(){
  const countMap={};
  cables.forEach(c=>{countMap[c.conduit_id]=(countMap[c.conduit_id]||0)+1;});
  let report=`Cable Ampacity Calculation Report\nVersion: ${CTR_VERSION}\nTimestamp: ${new Date().toISOString()}\n`;
- report+=`Ductbank Tag: ${params.ductbankTag}\nConduits: ${conduits.length}  Cables: ${cables.length}\n`;
- report+=`Earth Temp: ${params.earthTemp}F  Air Temp: ${params.airTemp}F\n`;
- report+=`Soil Resistivity: ${params.soilResistivity}\nMoisture: ${params.moistureContent}%\n`;
- report+=`Spacing H:${params.hSpacing}in V:${params.vSpacing}in\n\nResults:\n`;
+ Object.keys(params).forEach(k=>{report+=`${k}: ${params[k]}\n`;});
+ report+=`Conduits: ${conduits.length}  Cables: ${cables.length}\n\nResults:\n`;
  cables.forEach(c=>{
   const d=ampacityDetails(c,{...params,earthTemp:fToC(params.earthTemp),airTemp:isNaN(params.airTemp)?NaN:fToC(params.airTemp)},countMap[c.conduit_id],total);
   report+=`${c.tag}: ${d.ampacity.toFixed(1)} A (Rdc ${d.Rdc.toFixed(4)}, Yc ${d.Yc.toFixed(3)}, Rca ${d.Rca.toFixed(3)}, ΔTd ${d.deltaTd.toFixed(2)})\n`;
  });
- report+=`\nAssumptions: Simplified Neher-McGrath per NEC 310-15(C) and IEEE 835.`;
+ report+=`\nSee docs/AMPACITY_METHOD.md for calculation details.`;
  return report;
 }
 
@@ -1631,12 +1650,20 @@ function deleteSavedData(){
  updateAmpacityReport();
 }
 
+function showToast(msg){
+ const t=document.getElementById('toast');
+ if(!t)return;
+ t.textContent=msg;
+ t.classList.add('show');
+ setTimeout(()=>t.classList.remove('show'),3000);
+}
+
 document.getElementById('exportConduitsBtn').addEventListener('click',exportConduits);
 document.getElementById('exportCablesBtn').addEventListener('click',exportCables);
 document.getElementById('exportImgBtn').addEventListener('click',exportImage);
 document.getElementById('copyCalcReportBtn').addEventListener('click',()=>{
  const txt=buildCalcReport();
- navigator.clipboard.writeText(txt).then(()=>{alert('Calculation report copied to clipboard.');});
+ navigator.clipboard.writeText(txt).then(()=>{showToast('Report copied to clipboard');});
 });
 document.getElementById('thermalBtn').addEventListener('click',()=>{
   validateThermalInputs();
@@ -1784,6 +1811,7 @@ loadSoilResistivityData().then(data=>{
 });
 document.getElementById('soilResistivity').addEventListener('change',validateThermalInputs);
 </script>
+<div id="toast" class="toast" role="status" aria-live="polite"></div>
   <p class="legalDisclaimer">
     Disclaimer: The calculations and diagrams generated by this tool are provided for reference only. Users are responsible for verifying the accuracy and applicability of all results. The creator of this website assumes no legal liability for their use.
   </p>
