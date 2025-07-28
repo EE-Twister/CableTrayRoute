@@ -932,18 +932,19 @@ function calcRca(cable,params,count=1,total=1){
 /* Ampacity via full Neher-McGrath equation
    See docs/AMPACITY_METHOD.md#equation */
 function estimateAmpacity(cable,params,count=1,total=0){
- const areaCM=sizeToArea(cable.conductor_size);
- if(!areaCM)return {ampacity:0};
  const rating=getConductorRating();
  const Rdc=dcResistance(cable.conductor_size,cable.conductor_material,rating);
  const Yc=skinEffect(cable.conductor_size);
  const dTd=dielectricRise(cable.voltage_rating);
- const Rca=calcRca(cable,params,count,total);
+ const comps=calcRcaComponents(cable,params,count,total);
+ const Rca=(+comps.Rcond)+(+comps.Rins)+(+comps.Rduct)+(+comps.Rsoil);
+ if(!Number.isFinite(Rca)||Rca<=0) return {ampacity:NaN};
  const amb=Math.max(params.earthTemp||20,
                    isNaN(params.airTemp)?-Infinity:params.airTemp);
  const num=rating-(amb+dTd);
-const ampacity=Math.sqrt(num/(Rdc*(1+Yc)*Rca));
-return {ampacity};
+ const ampacity=num<0?Infinity:
+   Math.sqrt(num/(Rdc*(1+Yc)*Rca));
+ return {ampacity};
 }
 
 function ampacityDetails(cable,params,count=1,total=0){
