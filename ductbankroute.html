@@ -253,10 +253,11 @@ button{padding:4px 8px;margin:4px 2px;cursor:pointer;}
  <button id="heatToggleBtn">Toggle Heat Map</button>
  <button id="exportBtn">Download Ductbank Data</button>
  <button id="exportConduitsBtn">Export Ductbank Conduits</button>
- <button id="exportCablesBtn">Export Ductbank Cables</button>
-<button id="exportImgBtn">Export Image</button>
- <button id="copyCalcReportBtn">Copy Calculation Report</button>
-</div>
+  <button id="exportCablesBtn">Export Ductbank Cables</button>
+  <button id="exportImgBtn">Export Image</button>
+  <button id="copyCalcReportBtn">Copy Calculation Report</button>
+  <button id="resetBtn">Reset Inputs</button>
+ </div>
 
 <div id="analysis-progress-container" style="display:none;">
   <div id="analysis-progress-bar" role="progressbar" aria-valuemin="0" aria-valuemax="100" aria-valuenow="0"></div>
@@ -282,9 +283,9 @@ button{padding:4px 8px;margin:4px 2px;cursor:pointer;}
   <p>Ampacity is estimated using the full Neher-McGrath equation:</p>
   <pre>I = sqrt( (T<sub>c</sub> - (T<sub>a</sub> + &Delta;T<sub>d</sub>)) /
              (R<sub>dc</sub> &times; (1 + Y<sub>c</sub>) &times; R<sub>ca</sub>) )</pre>
-  <p>Here T<sub>c</sub> is the allowable conductor temperature from the rating selection, T<sub>a</sub> is the higher of earth or air temperature, and &Delta;T<sub>d</sub> is the dielectric-loss rise (0 when voltage is below 2&nbsp;kV). Y<sub>c</sub> corrects for AC skin and proximity effects. R<sub>ca</sub> is the sum R<sub>cond</sub> + R<sub>ins</sub> + R<sub>duct</sub> + R<sub>soil</sub>.</p>
-  <p>&#x3c1; is the soil resistivity, N is the cables in the conduit, D is ductbank depth (in). Moisture content modifies &#x3c1; (wetter soil lowers resistance). <em>adjCableFactor</em> accounts for heat from neighboring conduits, and <em>spacingAdj</em>=3/spacing. <em>insulationAdj</em>, <em>voltageAdj</em> and <em>jacketAdj</em> adjust for cable construction. The DC resistance R<sub>dc</sub> depends on conductor material and size.</p>
-  <p>Soil resistivity (&#x3c1;) influences the R<sub>soil</sub> term of the equation. Lower values dissipate heat more easily and raise cable ampacity. Typical IEEE&nbsp;835 values (40–150&nbsp;&deg;C·cm/W) populate the drop-down. See <a href="docs/soil_resistivity.md" target="_blank">soil resistivity reference</a> for details.</p>
+  <p>Here T<sub>c</sub> is the allowable conductor temperature in &deg;C. T<sub>a</sub> comes from the entered earth and air temperatures&mdash;those values are input in &deg;F and converted to &deg;C for the calculation. &Delta;T<sub>d</sub> is the dielectric-loss rise and Y<sub>c</sub> accounts for AC skin effect.</p>
+  <p>The soil resistance uses <code>R<sub>soil</sub> = (&#x03c1;<sub>m</sub> / (2&pi;)) &middot; ln(4&nbsp;d / D)</code> with &#x03c1;<sub>m</sub> = &#x03c1;/100, burial depth <em>d</em> and conduit diameter <em>D</em> in meters. Duct resistance comes from a material and trade-size table and increases when concrete encased.</p>
+  <p>See <a href="docs/AMPACITY_METHOD.md#ac-resistance-correction" target="_blank">AC Resistance Correction</a> for details on skin effect and dielectric loss. Typical soils appear in <a href="docs/AMPACITY_METHOD.md#soil-resistivity-ranges" target="_blank">Soil Resistivity Ranges</a>.</p>
   <h3>Thermal Analysis</h3>
   <p>The <em>Thermal Analysis</em> button overlays a heat map on the drawing. Each conduit center is marked with a yellow dot labeled with the estimated earth temperature in Fahrenheit and the hottest point is highlighted in red.</p>
   <p>Inputs are validated before running the analysis. Ductbank depth is limited to 0–120&nbsp;in, spacing between 1–24&nbsp;in and cable estimated load up to 2000&nbsp;A. Values outside these ranges will be clamped.</p>
@@ -1839,6 +1840,7 @@ document.getElementById('helpClose').addEventListener('click',()=>{
  document.getElementById('helpOverlay').style.display='none';
 });
 document.getElementById('deleteDataBtn').addEventListener('click',deleteSavedData);
+document.getElementById('resetBtn').addEventListener('click',deleteSavedData);
 
 document.getElementById('settings-btn').addEventListener('click',()=>{
  const menu=document.getElementById('settings-menu');
