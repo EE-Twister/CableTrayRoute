@@ -136,6 +136,15 @@ button{padding:4px 8px;margin:4px 2px;cursor:pointer;}
  </label>
  <label style="margin-left:8px;">Presence of Adjacent Heat Sources<input type="checkbox" id="heatSources" style="margin-left:4px;"></label>
  <button type="button" id="addHeatSource" style="display:none;margin-left:4px;">Add Heat Source</button>
+ <label style="margin-left:8px;">Grid Resolution
+  <select id="gridRes" style="margin-left:4px;">
+   <option value="20" selected>20×20</option>
+   <option value="40">40×40</option>
+  </select>
+ </label>
+ <label style="margin-left:8px;">Duct Thermal Resistance (&#176;C·m/W)
+  <input type="number" id="ductThermRes" value="0.0" style="width:60px;">
+ </label>
 </fieldset>
 
 <details id="soilRef" style="margin-top:8px;">
@@ -214,6 +223,7 @@ button{padding:4px 8px;margin:4px 2px;cursor:pointer;}
   <div id="analysis-progress-bar" role="progressbar" aria-valuemin="0" aria-valuemax="100" aria-valuenow="0"></div>
   <span id="analysis-progress-label"></span>
 </div>
+<div id="solver-info" style="font-size:0.9rem;margin-top:4px;"></div>
 
 <div id="helpOverlay">
  <div id="helpPopup">
@@ -245,7 +255,7 @@ button{padding:4px 8px;margin:4px 2px;cursor:pointer;}
 
 <script>
 let heatVisible=true;
-const GRID_SIZE = 20; // number of grid nodes across the ductbank for thermal solver
+let GRID_SIZE = 20; // number of grid nodes across the ductbank for thermal solver
 const SAMPLE_CONDUITS=[
  {conduit_id:"C1",conduit_type:"PVC Sch 40",trade_size:"4",x:0,y:0},
  {conduit_id:"C2",conduit_type:"PVC Sch 40",trade_size:"4",x:2,y:0},
@@ -618,6 +628,8 @@ function saveDuctbankSession(){
   leftPad:document.getElementById('leftPad').value,
   rightPad:document.getElementById('rightPad').value,
   perRow:document.getElementById('perRow').value,
+  gridRes:document.getElementById('gridRes').value,
+  ductThermRes:document.getElementById('ductThermRes').value,
   conduits:getAllConduits(),
   cables:getAllCables(),
   conductorRating:document.getElementById('conductorRating').value,
@@ -651,6 +663,8 @@ function loadDuctbankSession(){
   if(s.leftPad!==undefined)document.getElementById('leftPad').value=s.leftPad;
   if(s.rightPad!==undefined)document.getElementById('rightPad').value=s.rightPad;
   if(s.perRow!==undefined)document.getElementById('perRow').value=s.perRow;
+  if(s.gridRes!==undefined)document.getElementById('gridRes').value=s.gridRes;
+  if(s.ductThermRes!==undefined)document.getElementById('ductThermRes').value=s.ductThermRes;
   if(Array.isArray(s.conduits)){
     document.querySelector('#conduitTable tbody').innerHTML='';
     s.conduits.forEach(addConduitRow);
@@ -663,6 +677,7 @@ function loadDuctbankSession(){
   if(s.darkMode){document.body.classList.add('dark-mode');}
   else{document.body.classList.remove('dark-mode');}
   updateHeatSourceVisibility();
+  GRID_SIZE=parseInt(document.getElementById('gridRes').value)||20;
   drawGrid();
   updateAmpacityReport();
   updateInsulationOptions();
@@ -905,7 +920,9 @@ function updateAmpacityReport(){
   hSpacing:parseFloat(document.getElementById('hSpacing').value)||3,
   vSpacing:parseFloat(document.getElementById('vSpacing').value)||4,
   concreteEncasement:document.getElementById('concreteEncasement').checked,
-  ductbankDepth:parseFloat(document.getElementById('ductbankDepth').value)||0
+  ductbankDepth:parseFloat(document.getElementById('ductbankDepth').value)||0,
+  gridSize:parseInt(document.getElementById('gridRes').value)||20,
+  ductThermRes:parseFloat(document.getElementById('ductThermRes').value)||0
  };
  const cables=getAllCables();
  const total=cables.length;
@@ -1199,6 +1216,7 @@ function solveDuctbankTemperatures(conduits,cables,params,progress){
   const width=parseFloat(svg.getAttribute('width'))||svg.clientWidth;
   const height=parseFloat(svg.getAttribute('height'))||svg.clientHeight;
   const scale=40,margin=20;
+  GRID_SIZE=params.gridSize||GRID_SIZE;
   const step=Math.ceil(Math.max(width,height)/GRID_SIZE); // pixel step for solver grid
   const dx=(0.0254/scale)*step;
   const nx=Math.ceil(width/step);
@@ -1280,13 +1298,16 @@ function solveDuctbankTemperatures(conduits,cables,params,progress){
         requestAnimationFrame(step);
       }else{
         const temps={};
+        const Rextra=(params.concreteEncasement?0.08:0.1)+(params.ductThermRes||0);
         Object.keys(conduitCells).forEach(cid=>{
           const cells=conduitCells[cid];
           let sum=0;
           cells.forEach(([j,i])=>{sum+=grid[j][i];});
-          temps[cid]=sum/cells.length;
+          const base=sum/cells.length;
+          const p=heatMap[cid].power||0;
+          temps[cid]=base+p*Rextra;
         });
-        resolve({grid,conduitTemps:temps});
+        resolve({grid,conduitTemps:temps,iter,diff});
       }
     }
     step();
@@ -1308,7 +1329,9 @@ function solveDuctbankTemperaturesWorker(conduits,cables,params,progress){
         resolve(data);
       }
     };
-    worker.postMessage({conduits,cables,params,width,height,conductorProps:window.CONDUCTOR_PROPS});
+    worker.postMessage({conduits,cables,params,width,height,gridSize:GRID_SIZE,
+                       ductThermRes:params.ductThermRes,
+                       conductorProps:window.CONDUCTOR_PROPS});
   });
 }
 
@@ -1331,6 +1354,8 @@ const ctx=canvas.getContext('2d');
  const earthF=parseFloat(document.getElementById('earthTemp').value);
  const airF=parseFloat(document.getElementById('airTemp').value);
  const ambient=isNaN(earthF)?20:fToC(earthF);
+ GRID_SIZE=parseInt(document.getElementById('gridRes').value)||20;
+ const ductRes=parseFloat(document.getElementById('ductThermRes').value)||0;
  const params={
   soilResistivity:parseFloat(document.getElementById('soilResistivity').value)||90,
   moistureContent:parseFloat(document.getElementById('moistureContent').value)||0,
@@ -1340,7 +1365,9 @@ const ctx=canvas.getContext('2d');
   concreteEncasement:document.getElementById('concreteEncasement').checked,
   ductbankDepth:parseFloat(document.getElementById('ductbankDepth').value)||0,
   earthTemp:ambient,
-  airTemp:isNaN(airF)?NaN:fToC(airF)
+  airTemp:isNaN(airF)?NaN:fToC(airF),
+  gridSize:GRID_SIZE,
+  ductThermRes:ductRes
  };
 
  const pc=document.getElementById('analysis-progress-container');
@@ -1357,6 +1384,8 @@ const ctx=canvas.getContext('2d');
   pl.textContent=`Solving (${it}/${max})`;
  });
  pc.style.display='none';
+ document.getElementById('solver-info').textContent=
+   `Iterations: ${result.iter}  Residual: ${result.residual.toFixed(3)}`;
  const grid=result.grid;
  const conduitTemps=result.conduitTemps;
 
@@ -1588,7 +1617,7 @@ function deleteSavedData(){
  localStorage.removeItem('ductbankSession');
  document.querySelector('#conduitTable tbody').innerHTML='';
  document.querySelector('#cableTable tbody').innerHTML='';
- ['ductbankTag','ductbankDepth','earthTemp','airTemp','soilResistivity','moistureContent','hSpacing','vSpacing','topPad','bottomPad','leftPad','rightPad','perRow','conductorRating'].forEach(id=>{
+ ['ductbankTag','ductbankDepth','earthTemp','airTemp','soilResistivity','moistureContent','hSpacing','vSpacing','topPad','bottomPad','leftPad','rightPad','perRow','conductorRating','gridRes','ductThermRes'].forEach(id=>{
   const el=document.getElementById(id);
   if(el) el.value='';
 });
@@ -1684,7 +1713,7 @@ document.addEventListener('keydown',e=>{
  }
 });
 
-['ductbankTag','concreteEncasement','ductbankDepth','earthTemp','airTemp','soilResistivity','moistureContent','heatSources','hSpacing','vSpacing','topPad','bottomPad','leftPad','rightPad','perRow','conductorRating'].forEach(id=>{
+['ductbankTag','concreteEncasement','ductbankDepth','earthTemp','airTemp','soilResistivity','moistureContent','heatSources','hSpacing','vSpacing','topPad','bottomPad','leftPad','rightPad','perRow','conductorRating','gridRes','ductThermRes'].forEach(id=>{
  const el=document.getElementById(id);
  if(el){
   el.addEventListener('input',saveDuctbankSession);
