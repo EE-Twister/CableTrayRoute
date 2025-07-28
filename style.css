@@ -428,7 +428,8 @@ th {
 .toast {
     position: fixed;
     bottom: 10px;
-    right: 10px;
+    left: 50%;
+    transform: translateX(-50%);
     background: var(--secondary-color);
     color: var(--text-color);
     border: 1px solid var(--border-color);

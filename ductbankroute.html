@@ -1964,9 +1964,9 @@ document.getElementById('exportConduitsBtn').addEventListener('click',exportCond
 document.getElementById('exportCablesBtn').addEventListener('click',exportCables);
 document.getElementById('exportImgBtn').addEventListener('click',exportImage);
 document.getElementById('copyCalcReportBtn').addEventListener('click',()=>{
- const txt=buildCalcReport();
- navigator.clipboard.writeText(txt)
-   .then(()=>{showToast('Report copied: see clipboard for details.');});
+  const txt=buildCalcReport();
+  navigator.clipboard.writeText(txt)
+    .then(() => { showToast('Report copied to clipboard.'); });
 });
 document.getElementById('thermalBtn').addEventListener('click',()=>{
   validateThermalInputs();
