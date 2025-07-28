@@ -8,6 +8,7 @@
 <script src="https://cdn.jsdelivr.net/npm/xlsx/dist/xlsx.full.min.js"></script>
 <script src="https://unpkg.com/gpu.js@2.10.4/dist/gpu-browser.min.js"></script>
 <script src="soilResistivityConfig.js"></script>
+<script src="conductorProperties.js"></script>
 <style>
 body{font-family:Arial,sans-serif;margin:16px;}
 label{display:inline-block;margin-bottom:4px;font-size:0.9rem;}
@@ -80,14 +81,15 @@ button{padding:4px 8px;margin:4px 2px;cursor:pointer;}
     <th data-idx="2">Diameter (in)</th>
     <th data-idx="3">Cond.</th>
     <th data-idx="4">Size</th>
-    <th data-idx="5">Weight</th>
-    <th data-idx="6">Est. Load (A)</th>
-    <th data-idx="7">Conduit</th>
-    <th data-idx="8">Conductor Material</th>
-    <th data-idx="9">Insulation Type</th>
-    <th data-idx="10">Insul. Rating (°C)</th>
-    <th data-idx="11">Voltage Rating</th>
-    <th data-idx="12">Shielding / Jacket Type</th>
+    <th data-idx="5">Insul. Thick (in)</th>
+    <th data-idx="6">Weight</th>
+    <th data-idx="7">Est. Load (A)</th>
+    <th data-idx="8">Conduit</th>
+    <th data-idx="9">Conductor Material</th>
+    <th data-idx="10">Insulation Type</th>
+    <th data-idx="11">Insul. Rating (°C)</th>
+    <th data-idx="12">Voltage Rating</th>
+    <th data-idx="13">Shielding / Jacket Type</th>
     <th>Dup</th>
     <th>Del</th>
    </tr>
@@ -457,7 +459,7 @@ function addConduitRow(data={}){
 
 function addCableRow(data={}){
   const tr=document.createElement('tr');
- const cols=['tag','cable_type','diameter','conductors','conductor_size','weight','est_load','conduit_id','conductor_material','insulation_type','insulation_rating','voltage_rating','shielding_jacket'];
+ const cols=['tag','cable_type','diameter','conductors','conductor_size','insulation_thickness','weight','est_load','conduit_id','conductor_material','insulation_type','insulation_rating','voltage_rating','shielding_jacket'];
  const selectOptions={
   cable_type:['Power','Control','Signal'],
   conductor_material:['Copper','Aluminum'],
@@ -478,7 +480,7 @@ function addCableRow(data={}){
     });
   }else{
     inp=document.createElement('input');
-    if(c==='diameter'||c==='weight'||c==='est_load') inp.type='number';
+    if(c==='diameter'||c==='weight'||c==='est_load'||c==='insulation_thickness') inp.type='number';
     else if(c==='conductors') inp.type='number';
     else inp.type='text';
     if(c==='conductor_size') inp.setAttribute('list','sizeList');
@@ -487,6 +489,27 @@ function addCableRow(data={}){
   td.appendChild(inp);
   tr.appendChild(td);
 });
+ function applyDefaults(){
+   const sizeInput=tr.children[4]?.querySelector('input');
+   const thickInput=tr.children[5]?.querySelector('input');
+   const weightInput=tr.children[6]?.querySelector('input');
+   const matSel=tr.children[9]?.querySelector('select');
+   const size=sizeInput?.value.trim();
+   const props=window.CONDUCTOR_PROPS&&window.CONDUCTOR_PROPS[size];
+   if(props){
+     if(thickInput&&!(thickInput.value)) thickInput.value=props.insulation_thickness;
+     if(weightInput){
+       const areaIn2=props.area_cm*7.854e-7;
+       const density=(matSel&&matSel.value&&matSel.value.toLowerCase().includes('al'))?0.0975:0.323;
+       weightInput.value=(areaIn2*density*12).toFixed(3);
+     }
+   }
+ }
+ const sizeInput=tr.children[4]?.querySelector('input');
+ const matSel=tr.children[9]?.querySelector('select');
+ sizeInput&&sizeInput.addEventListener('change',applyDefaults);
+ matSel&&matSel.addEventListener('change',applyDefaults);
+ applyDefaults();
 const dupTd=document.createElement('td');dupTd.appendChild(createButton('⧉','duplicateBtn','Duplicate row',()=>{const clone=rowToCable(tr);addCableRow(clone);}));tr.appendChild(dupTd);
 const delTd=document.createElement('td');delTd.appendChild(createButton('✖','removeBtn','Delete row',()=>{tr.remove();drawGrid();updateAmpacityReport();saveDuctbankSession();}));tr.appendChild(delTd);
 document.querySelector('#cableTable tbody').appendChild(tr);
@@ -499,7 +522,7 @@ function updateInsulationOptions(){
  const rating=getConductorRating();
  const opts=insulationTypesForRating(rating);
  document.querySelectorAll('#cableTable tbody tr').forEach(tr=>{
-  const sel=tr.children[9]?.querySelector('select');
+  const sel=tr.children[10]?.querySelector('select');
   if(!sel) return;
   const current=sel.value;
   sel.innerHTML='';
@@ -519,17 +542,18 @@ function rowToConduit(tr){
 }
 
 function rowToCable(tr){
- const vals=Array.from(tr.children).slice(0,13).map(td=>{
+ const vals=Array.from(tr.children).slice(0,14).map(td=>{
   const el=td.querySelector('input,select');
   return el?el.value:'';
 });
- const [tag,cable_type,diameter,conductors,conductor_size,weight,est_load,conduit_id,conductor_material,insulation_type,insulation_rating,voltage_rating,shielding_jacket]=vals;
+ const [tag,cable_type,diameter,conductors,conductor_size,insulation_thickness,weight,est_load,conduit_id,conductor_material,insulation_type,insulation_rating,voltage_rating,shielding_jacket]=vals;
   return {
    tag,
    cable_type,
    diameter:parseFloat(diameter),
    conductors:parseInt(conductors||0),
    conductor_size,
+   insulation_thickness:parseFloat(insulation_thickness)||0,
    weight:parseFloat(weight)||0,
    est_load:parseFloat(est_load)||0,
    conduit_id,
@@ -702,6 +726,7 @@ function fillResults(){
  return fillMap;
 }
 
+let CONDUCTOR_PROPS={};
 const AWG_AREA={"18":1624,"16":2583,"14":4107,"12":6530,"10":10380,"8":16510,"6":26240,"4":41740,"3":52620,"2":66360,"1":83690,"1/0":105600,"2/0":133100,"3/0":167800,"4/0":211600};
 
 const BASE_RESISTIVITY={cu:0.017241,al:0.028264}; // ohm-mm^2/m @20C
@@ -716,12 +741,18 @@ for(const sz in AWG_AREA){
 function dcResistance(size,material,temp=20){
   const key=size?size.toString().trim():'';
   const mat=material&&material.toLowerCase().includes('al')?'al':'cu';
-  let base=RESISTANCE_TABLE[mat][key];
-  if(base===undefined){
-    const areaCM=sizeToArea(size);
-    if(!areaCM)return 0;
-    const areaMM2=areaCM*0.0005067;
-    base=BASE_RESISTIVITY[mat]/areaMM2;
+  let base;
+  const props=CONDUCTOR_PROPS[key];
+  if(props){
+    base=(mat==='al'?props.rdc_al:props.rdc_cu);
+  }else{
+    base=RESISTANCE_TABLE[mat][key];
+    if(base===undefined){
+      const areaCM=sizeToArea(size);
+      if(!areaCM)return 0;
+      const areaMM2=areaCM*0.0005067;
+      base=BASE_RESISTIVITY[mat]/areaMM2;
+    }
   }
   return base*(1+TEMP_COEFF[mat]*(temp-20));
 }
@@ -729,6 +760,7 @@ function dcResistance(size,material,temp=20){
 function sizeToArea(size){
  if(!size)return 0;
  const s=size.toString().trim();
+ if(CONDUCTOR_PROPS[s]) return CONDUCTOR_PROPS[s].area_cm;
  if(/kcmil/i.test(s))return parseFloat(s)*1000;
  const m=s.match(/#?(\d+(?:\/0)?)/);
  if(!m)return 0;
@@ -747,17 +779,34 @@ function skinEffect(size){
 }
 
 function dielectricRise(voltage){
- // Dielectric loss temperature rise
- // docs/AMPACITY_METHOD.md#equation
- const v=parseFloat(voltage)||0;
- return v<2000?0:(v-2000)/1000;
+  // Dielectric loss temperature rise
+  // docs/AMPACITY_METHOD.md#equation
+  const v=parseFloat(voltage)||0;
+  return v<2000?0:(v-2000)/1000;
+}
+
+function conductorThermalResistance(cable){
+  const props=CONDUCTOR_PROPS[cable.conductor_size];
+  if(!props){
+    return {Rcond:0.05,Rins:0.1};
+  }
+  const areaM2=props.area_cm*5.067e-10;
+  const r=Math.sqrt(areaM2/Math.PI);
+  const t=(parseFloat(cable.insulation_thickness)||props.insulation_thickness||0)*0.0254;
+  const rOut=r+t;
+  const kCond=cable.conductor_material&&cable.conductor_material.toLowerCase().includes('al')?237:401;
+  const kIns=0.3;
+  const Rcond=Math.log(r/(r*0.5))/(2*Math.PI*kCond);
+  const Rins=Math.log(rOut/r)/(2*Math.PI*kIns);
+  return {Rcond,Rins};
 }
 
 // Thermal resistance components for Neher‑McGrath
 // see docs/AMPACITY_METHOD.md#equation
 function calcRcaComponents(cable,params,count=1,total=1){
- let Rcond=0.05;
- let Rins=0.1;
+ const cr=conductorThermalResistance(cable);
+ let Rcond=cr.Rcond;
+ let Rins=cr.Rins;
  let Rduct=params.concreteEncasement?0.08:0.1;
  let Rsoil=(params.soilResistivity||90)/90*0.25;
  const moistAdj=1-Math.min(params.moistureContent||0,100)/200;
@@ -1108,7 +1157,7 @@ function validateThermalInputs(){
     else if(v<1){warnings.push('Vert spacing raised to 1 in.');vEl.value=1;}
   }
   document.querySelectorAll('#cableTable tbody tr').forEach(tr=>{
-    const loadCell=tr.children[6];
+    const loadCell=tr.children[7];
     if(!loadCell)return;
     const inp=loadCell.querySelector('input');
     if(!inp)return;
@@ -1123,8 +1172,8 @@ function validateThermalInputs(){
  const Tc=getConductorRating();
  document.querySelectorAll('#cableTable tbody tr').forEach(tr=>{
    const tag=tr.children[0]?.querySelector('input')?.value||'Cable';
-   const type=tr.children[9]?.querySelector('select')?.value||'';
-   const rateEl=tr.children[10]?.querySelector('select,input');
+   const type=tr.children[10]?.querySelector('select')?.value||'';
+   const rateEl=tr.children[11]?.querySelector('select,input');
    const rating=parseFloat(rateEl?.value);
    const typeRating=INSULATION_TEMP_LIMIT[(type||'').toUpperCase()];
    if(isFinite(rating)&&rating!==Tc){
@@ -1259,7 +1308,7 @@ function solveDuctbankTemperaturesWorker(conduits,cables,params,progress){
         resolve(data);
       }
     };
-    worker.postMessage({conduits,cables,params,width,height});
+    worker.postMessage({conduits,cables,params,width,height,conductorProps:window.CONDUCTOR_PROPS});
   });
 }
 
@@ -1696,6 +1745,7 @@ function populateSoilReferences(data){
   }
 }
 updateHeatSourceVisibility();
+loadConductorProperties().then(()=>{updateInsulationOptions();});
 loadDuctbankSession();
 loadSoilResistivityData().then(data=>{
   populateSoilReferences(data);

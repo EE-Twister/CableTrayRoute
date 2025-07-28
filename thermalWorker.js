@@ -5,6 +5,7 @@ const CONDUIT_SPECS={
  "RMC":{"1/2":0.314,"3/4":0.549,"1":0.887,"1-1/4":1.526,"1-1/2":2.071,"2":3.408,"2-1/2":4.866,"3":7.499,"3-1/2":10.01,"4":12.882,"5":20.212,"6":29.158},
  "PVC Sch 40":{"1/2":0.285,"3/4":0.508,"1":0.832,"1-1/4":1.453,"1-1/2":1.986,"2":3.291,"2-1/2":4.695,"3":7.268,"3-1/2":9.737,"4":12.554,"5":19.761,"6":28.567}
 };
+let CONDUCTOR_PROPS={};
 const AWG_AREA={"18":1624,"16":2583,"14":4107,"12":6530,"10":10380,"8":16510,"6":26240,"4":41740,"3":52620,"2":66360,"1":83690,"1/0":105600,"2/0":133100,"3/0":167800,"4/0":211600};
 const BASE_RESISTIVITY={cu:0.017241,al:0.028264};
 const TEMP_COEFF={cu:0.00393,al:0.00403};
@@ -17,6 +18,7 @@ for(const sz in AWG_AREA){
 function sizeToArea(size){
   if(!size) return 0;
   const s=size.toString().trim();
+  if(CONDUCTOR_PROPS[s]) return CONDUCTOR_PROPS[s].area_cm;
   if(/kcmil/i.test(s)) return parseFloat(s)*1000;
   const m=s.match(/#?(\d+(?:\/0)?)/);
   if(!m) return 0;
@@ -25,12 +27,18 @@ function sizeToArea(size){
 function dcResistance(size,material,temp=20){
   const key=size?size.toString().trim():'';
   const mat=material&&material.toLowerCase().includes('al')?'al':'cu';
-  let base=RESISTANCE_TABLE[mat][key];
-  if(base===undefined){
-    const areaCM=sizeToArea(size);
-    if(!areaCM) return 0;
-    const areaMM2=areaCM*0.0005067;
-    base=BASE_RESISTIVITY[mat]/areaMM2;
+  let base;
+  const props=CONDUCTOR_PROPS[key];
+  if(props){
+    base=(mat==='al'?props.rdc_al:props.rdc_cu);
+  }else{
+    base=RESISTANCE_TABLE[mat][key];
+    if(base===undefined){
+      const areaCM=sizeToArea(size);
+      if(!areaCM) return 0;
+      const areaMM2=areaCM*0.0005067;
+      base=BASE_RESISTIVITY[mat]/areaMM2;
+    }
   }
   return base*(1+TEMP_COEFF[mat]*(temp-20));
 }
@@ -114,7 +122,8 @@ function solve(conduits,cables,params,width,height,progressCb){
 }
 
 self.onmessage=e=>{
-  const {conduits,cables,params,width,height}=e.data;
+  const {conduits,cables,params,width,height,conductorProps}=e.data;
+  if(conductorProps) CONDUCTOR_PROPS=conductorProps;
   const res=solve(conduits,cables,params,width,height,(it,max)=>{
     self.postMessage({type:'progress',iter:it,maxIter:max});
   });
