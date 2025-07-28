@@ -555,6 +555,11 @@ body.dark-mode .db-table td {
     margin: auto;
 }
 
+#gridContainer.collapsed {
+    height: 200px;
+    overflow: hidden;
+}
+
 .db-button-panel {
     margin-top: 8px;
     display: flex;

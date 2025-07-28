@@ -244,6 +244,7 @@ button{padding:4px 8px;margin:4px 2px;cursor:pointer;}
  <svg id="grid" width="500" height="500" style="position:relative;z-index:1;"></svg>
  <canvas id="tempCanvas" width="500" height="500" style="position:absolute;top:0;left:0;pointer-events:none;z-index:0;"></canvas>
 </div>
+<label style="display:block;margin-top:4px;"><input type="checkbox" id="hideDrawing"> Hide Drawing</label>
 
 <details id="ampacityDetails" open style="margin-top:8px;">
  <summary><strong>Ampacity Estimates</strong></summary>
@@ -1050,6 +1051,11 @@ function updateAmpacityReport(){
 document.getElementById('ampacityReport').innerHTML=
    `<table><thead><tr><th>Cable</th><th>Ampacity (A) - Neher‑McGrath</th><th>Ampacity (A) - Finite Element</th><th>Over Limit</th></tr></thead><tbody>${rows}</tbody></table>`;
  updateCableRowStyles();
+ const det=document.getElementById('ampacityDetails');
+ if(det){
+  det.open=true;
+  det.scrollIntoView({behavior:'smooth'});
+ }
 }
 
 function updateCableRowStyles(){
@@ -1926,6 +1932,16 @@ if(darkToggle){
     session.darkMode=document.body.classList.contains('dark-mode');
     localStorage.setItem('ctrSession',JSON.stringify(session));
     saveDuctbankSession();
+  });
+}
+
+const hideDrawing=document.getElementById('hideDrawing');
+if(hideDrawing){
+  hideDrawing.addEventListener('change',()=>{
+    const gc=document.getElementById('gridContainer');
+    if(gc){
+      gc.classList.toggle('collapsed', hideDrawing.checked);
+    }
   });
 }
 
