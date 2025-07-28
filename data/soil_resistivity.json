@@ -1,7 +1,7 @@
 {
-  "Very Wet Clay": 40,
-  "Moist Clay/Sand": 60,
-  "Average Soil": 90,
-  "Dry Sand": 120,
-  "Dry Sand & Gravel": 150
+  "veryWetClay": { "desc": "Very Wet Clay", "resistivity": 40 },
+  "moistClayOrSand": { "desc": "Moist Clay or Sand", "resistivity": 60 },
+  "averageSoil": { "desc": "Average Soil", "resistivity": 90 },
+  "drySand": { "desc": "Dry Sand", "resistivity": 120 },
+  "drySandGravel": { "desc": "Dry Sand & Gravel", "resistivity": 150 }
 }
