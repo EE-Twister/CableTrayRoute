@@ -111,6 +111,27 @@ document.addEventListener('DOMContentLoaded', () => {
     const taskQueue = [];
     const maxWorkers = navigator.hardwareConcurrency || 4;
 
+    const nextCableName = (sample) => {
+        let prefix = 'Cable ';
+        let digits = 1;
+        if (sample) {
+            const m = sample.match(/^(.*?)(\d+)$/);
+            if (m) { prefix = m[1]; digits = m[2].length; }
+        } else if (state.cableList.length > 0) {
+            const m = state.cableList[0].name.match(/^(.*?)(\d+)$/);
+            if (m) { prefix = m[1]; digits = m[2].length; }
+        }
+        let max = 0;
+        state.cableList.forEach(c => {
+            const m = c.name && c.name.match(new RegExp('^'+prefix+'(\\d+)$'));
+            if (m) {
+                max = Math.max(max, parseInt(m[1],10));
+                digits = Math.max(digits, m[1].length);
+            }
+        });
+        return prefix + String(max + 1).padStart(digits, '0');
+    };
+
     const updateTableCounts = () => {
         if (elements.manualTraySummary) {
             elements.manualTraySummary.textContent =
@@ -1619,6 +1640,7 @@ const openConduitFill = (cables) => {
             btn.addEventListener('click', e => {
                 const i = parseInt(e.target.dataset.idx, 10);
                 const copy = JSON.parse(JSON.stringify(state.cableList[i]));
+                copy.name = nextCableName(copy.name);
                 state.cableList.splice(i + 1, 0, copy);
                 updateCableListDisplay();
                 saveSession();
@@ -1646,7 +1668,7 @@ const openConduitFill = (cables) => {
 
     const addCableToBatch = () => {
         const newCable = {
-            name: `Cable ${state.cableList.length + 1}`,
+            name: nextCableName(),
             cable_type: 'Power',
             conductors: 1,
             conductor_size: '#12 AWG',

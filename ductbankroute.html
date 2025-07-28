@@ -505,6 +505,30 @@ function packCircles(cables,R){
  return placed;
 }
 
+function generateNextCableTag(sample){
+  let prefix='CBL', digits=2, max=0;
+  if(sample){
+    const m=sample.match(/^(.*?)(\d+)$/);
+    if(m){ prefix=m[1]; digits=m[2].length; }
+  } else {
+    document.querySelectorAll('#cableTable tbody tr').forEach(tr=>{
+      const val=tr.children[0]?.querySelector('input')?.value.trim();
+      const m=val&&val.match(/^(.*?)(\d+)$/);
+      if(m){ prefix=m[1]; digits=m[2].length; }
+    });
+  }
+  document.querySelectorAll('#cableTable tbody tr').forEach(tr=>{
+    const val=tr.children[0]?.querySelector('input')?.value.trim();
+    const regex=new RegExp('^'+prefix+'(\\d+)$');
+    const m=val&&val.match(regex);
+    if(m){
+      max=Math.max(max,parseInt(m[1],10));
+      digits=Math.max(digits,m[1].length);
+    }
+  });
+  return prefix + String(max+1).padStart(digits,'0');
+}
+
 function addConduitRow(data={}){
  const tr=document.createElement('tr');
  const idTd=document.createElement('td');const idInput=document.createElement('input');idInput.value=data.conduit_id||'';idTd.appendChild(idInput);tr.appendChild(idTd);
@@ -552,6 +576,12 @@ function addCableRow(data={}){
   td.appendChild(inp);
   tr.appendChild(td);
 });
+ const tagInput=tr.children[0]?.querySelector('input');
+ if(tagInput){
+  if(data.autoTag || !data.tag){
+    tagInput.value=generateNextCableTag(data.tag||tagInput.value);
+  }
+ }
 function applyDefaults(){
   const sizeInput=tr.children[4]?.querySelector('input');
   const thickInput=tr.children[5]?.querySelector('input');
@@ -581,7 +611,7 @@ sizeInput&&sizeInput.addEventListener('change',applyDefaults);
 thickInput&&thickInput.addEventListener('input',applyDefaults);
 matSel&&matSel.addEventListener('change',applyDefaults);
  applyDefaults();
-const dupTd=document.createElement('td');dupTd.appendChild(createButton('⧉','duplicateBtn','Duplicate row',()=>{const clone=rowToCable(tr);addCableRow(clone);}));tr.appendChild(dupTd);
+const dupTd=document.createElement('td');dupTd.appendChild(createButton('⧉','duplicateBtn','Duplicate row',()=>{const clone=rowToCable(tr);clone.autoTag=true;addCableRow(clone);}));tr.appendChild(dupTd);
 const delTd=document.createElement('td');delTd.appendChild(createButton('✖','removeBtn','Delete row',()=>{tr.remove();drawGrid();updateAmpacityReport();saveDuctbankSession();}));tr.appendChild(delTd);
 document.querySelector('#cableTable tbody').appendChild(tr);
 drawGrid();
@@ -1710,7 +1740,7 @@ function importCSV(file,callback){
 }
 
 document.getElementById('addConduit').addEventListener('click',()=>{addConduitRow();});
-document.getElementById('addCable').addEventListener('click',()=>{addCableRow();updateInsulationOptions();});
+document.getElementById('addCable').addEventListener('click',()=>{addCableRow({autoTag:true});updateInsulationOptions();});
 document.getElementById('sampleConduits').addEventListener('click',()=>{
  document.querySelector('#conduitTable tbody').innerHTML='';
  SAMPLE_CONDUITS.forEach(addConduitRow);
