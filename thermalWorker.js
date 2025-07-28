@@ -5,6 +5,11 @@ const CONDUIT_SPECS={
  "RMC":{"1/2":0.314,"3/4":0.549,"1":0.887,"1-1/4":1.526,"1-1/2":2.071,"2":3.408,"2-1/2":4.866,"3":7.499,"3-1/2":10.01,"4":12.882,"5":20.212,"6":29.158},
  "PVC Sch 40":{"1/2":0.285,"3/4":0.508,"1":0.832,"1-1/4":1.453,"1-1/2":1.986,"2":3.291,"2-1/2":4.695,"3":7.268,"3-1/2":9.737,"4":12.554,"5":19.761,"6":28.567}
 };
+const RDUCT_TABLE={
+  PVC:{"1/2":0.12,"3/4":0.115,"1":0.11,"1-1/4":0.105,"1-1/2":0.10,"2":0.095,"2-1/2":0.09,"3":0.085,"3-1/2":0.082,"4":0.08,"5":0.078,"6":0.075},
+  steel:{"1/2":0.09,"3/4":0.085,"1":0.08,"1-1/4":0.075,"1-1/2":0.07,"2":0.065,"2-1/2":0.06,"3":0.058,"3-1/2":0.056,"4":0.055,"5":0.053,"6":0.05},
+  concrete:{"1/2":0.10,"3/4":0.10,"1":0.095,"1-1/4":0.09,"1-1/2":0.088,"2":0.085,"2-1/2":0.082,"3":0.08,"3-1/2":0.078,"4":0.075,"5":0.072,"6":0.07}
+};
 let CONDUCTOR_PROPS={};
 const AWG_AREA={"18":1624,"16":2583,"14":4107,"12":6530,"10":10380,"8":16510,"6":26240,"4":41740,"3":52620,"2":66360,"1":83690,"1/0":105600,"2/0":133100,"3/0":167800,"4/0":211600};
 const BASE_RESISTIVITY={cu:0.017241,al:0.028264};
@@ -41,6 +46,18 @@ function dcResistance(size,material,temp=20){
     }
   }
   return base*(1+TEMP_COEFF[mat]*(temp-20));
+}
+
+function getRduct(conduit,params){
+  if(!conduit||!conduit.conduit_type)return params.concreteEncasement?0.1:0.08;
+  const mat=conduit.conduit_type.includes('PVC')?'PVC':'steel';
+  const base=(RDUCT_TABLE[mat]||{})[conduit.trade_size];
+  let val=base!==undefined?base:(mat==='PVC'?0.1:0.08);
+  if(params.concreteEncasement){
+    const extra=RDUCT_TABLE.concrete[conduit.trade_size];
+    val+=(extra!==undefined?extra:0.05);
+  }
+  return val;
 }
 
 function solve(conduits,cables,params,width,height,gridSize,ductRes,progressCb){
@@ -115,14 +132,15 @@ function solve(conduits,cables,params,width,height,gridSize,ductRes,progressCb){
     if(progressCb && iter%25===0) progressCb(iter,maxIter);
   }
   const temps={};
-  const Rextra=(params.concreteEncasement?0.08:0.1)+(ductRes||0);
   Object.keys(conduitCells).forEach(cid=>{
     const cells=conduitCells[cid];
     let sum=0;
     cells.forEach(([j,i])=>{sum+=grid[j][i];});
     const base=sum/cells.length;
     const p=heatMap[cid].power||0;
-    temps[cid]=base+p*Rextra;
+    const cd=conduits.find(c=>c.conduit_id===cid)||{};
+    const rduct=getRduct(cd,params)+(ductRes||0);
+    temps[cid]=base+p*rduct;
   });
   return {grid,conduitTemps:temps,iter,residual:diff};
 }

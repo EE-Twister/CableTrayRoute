@@ -514,17 +514,21 @@ function dielectricRise(voltage) {
 function calcRca(cable, params, count = 1, total = 1) {
   let Rcond = 0.05;
   let Rins = 0.1;
-  let Rduct = params.concreteEncasement ? 0.08 : 0.1;
-  let soil = (params.soilResistivity || 90);
-  soil *= 1 - Math.min(params.moistureContent || 0, 100) / 200;
-  let Rsoil = soil / 90 * 0.25;
-  const spacing = (params.hSpacing + params.vSpacing) / 2 || 3;
-  Rsoil *= 3 / spacing;
-  if (total > count) Rsoil *= 1 + (total - count) * 0.05;
-  if (params.heatSources) Rsoil *= 1.2;
-  Rsoil *= 1 + (params.ductbankDepth || 0) / 100;
-  if (cable.shielding_jacket) Rsoil *= 1.05;
-  Rsoil *= count * (cable.conductors || 1);
+  const conduit = SMALL_CONDUITS.find(c => c.conduit_id === cable.conduit_id) || {};
+  const mat = conduit.conduit_type && conduit.conduit_type.includes('PVC') ? 'PVC' : 'steel';
+  const base = RDUCT_TABLE[mat] && RDUCT_TABLE[mat][conduit.trade_size];
+  let Rduct = base !== undefined ? base : (mat === 'PVC' ? 0.1 : 0.08);
+  if (params.concreteEncasement) {
+    const extra = RDUCT_TABLE.concrete[conduit.trade_size];
+    Rduct += extra !== undefined ? extra : 0.05;
+  }
+  let rho = params.soilResistivity || 90;
+  rho = Math.min(150, Math.max(40, rho));
+  const rho_m = rho / 100;
+  const burial = (params.ductbankDepth || 0) * 0.0254;
+  const cd = CONDUIT_SPECS[conduit.conduit_type] && CONDUIT_SPECS[conduit.conduit_type][conduit.trade_size];
+  const dia = cd ? cd * 0.0254 : 0.1;
+  const Rsoil = burial && dia ? (rho_m / (2 * Math.PI)) * Math.log(4 * burial / dia) : 0;
   return Rcond + Rins + Rduct + Rsoil;
 }
 
@@ -532,6 +536,11 @@ const CONDUIT_SPECS = {
   "PVC Sch 40": { "4": 12.554 }
 };
 
+const RDUCT_TABLE = {
+  PVC:{"1/2":0.12,"3/4":0.115,"1":0.11,"1-1/4":0.105,"1-1/2":0.10,"2":0.095,"2-1/2":0.09,"3":0.085,"3-1/2":0.082,"4":0.08},
+  steel:{"1/2":0.09,"3/4":0.085,"1":0.08,"1-1/4":0.075,"1-1/2":0.07,"2":0.065,"2-1/2":0.06,"3":0.058,"3-1/2":0.056,"4":0.055},
+  concrete:{"1/2":0.10,"3/4":0.10,"1":0.095,"1-1/4":0.09,"1-1/2":0.088,"2":0.085,"2-1/2":0.082,"3":0.08,"3-1/2":0.078,"4":0.075}
+};
 function solveDuctbankTemperatures(conduits, cables, params) {
   const width = 500;
   const height = 500;

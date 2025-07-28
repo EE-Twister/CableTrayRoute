@@ -327,6 +327,12 @@ const CONDUIT_SPECS={
  "RMC":{"1/2":0.314,"3/4":0.549,"1":0.887,"1-1/4":1.526,"1-1/2":2.071,"2":3.408,"2-1/2":4.866,"3":7.499,"3-1/2":10.01,"4":12.882,"5":20.212,"6":29.158},
  "PVC Sch 40":{"1/2":0.285,"3/4":0.508,"1":0.832,"1-1/4":1.453,"1-1/2":1.986,"2":3.291,"2-1/2":4.695,"3":7.268,"3-1/2":9.737,"4":12.554,"5":19.761,"6":28.567}
 };
+const RDUCT_TABLE={
+  PVC:{"1/2":0.12,"3/4":0.115,"1":0.11,"1-1/4":0.105,"1-1/2":0.10,"2":0.095,"2-1/2":0.09,"3":0.085,"3-1/2":0.082,"4":0.08,"5":0.078,"6":0.075},
+  steel:{"1/2":0.09,"3/4":0.085,"1":0.08,"1-1/4":0.075,"1-1/2":0.07,"2":0.065,"2-1/2":0.06,"3":0.058,"3-1/2":0.056,"4":0.055,"5":0.053,"6":0.05},
+  concrete:{"1/2":0.10,"3/4":0.10,"1":0.095,"1-1/4":0.09,"1-1/2":0.088,"2":0.085,"2-1/2":0.082,"3":0.08,"3-1/2":0.078,"4":0.075,"5":0.072,"6":0.07}
+};
+
 
 const INSULATION_TEMP_LIMIT={
   THHN:90,
@@ -822,23 +828,43 @@ function conductorThermalResistance(cable){
   return {Rcond,Rins};
 }
 
+function findConduit(id){
+  if(typeof getAllConduits==='function'){
+    return getAllConduits().find(c=>c.conduit_id===id)||{};
+  }
+  return {};
+}
+
+function getRduct(conduit,params){
+  if(!conduit||!conduit.conduit_type)return params.concreteEncasement?0.1:0.08;
+  const mat=conduit.conduit_type.includes('PVC')?'PVC':'steel';
+  const base=(RDUCT_TABLE[mat]||{})[conduit.trade_size];
+  let val=base!==undefined?base:(mat==='PVC'?0.1:0.08);
+  if(params.concreteEncasement){
+    const extra=RDUCT_TABLE.concrete[conduit.trade_size];
+    val+=(extra!==undefined?extra:0.05);
+  }
+  return val;
+}
+
 // Thermal resistance components for Neher‑McGrath
 // see docs/AMPACITY_METHOD.md#equation
 function calcRcaComponents(cable,params,count=1,total=1){
  const cr=conductorThermalResistance(cable);
  let Rcond=cr.Rcond;
  let Rins=cr.Rins;
- let Rduct=params.concreteEncasement?0.08:0.1;
- let soil=(params.soilResistivity||90);
- soil*=1-Math.min(params.moistureContent||0,100)/200;
- let Rsoil=soil/90*0.25;
- const spacing=(params.hSpacing+params.vSpacing)/2||3;
- Rsoil*=3/spacing;
- if(total>count)Rsoil*=(1+(total-count)*0.05);
- if(params.heatSources)Rsoil*=1.2;
- Rsoil*=1+(params.ductbankDepth||0)/100;
- if(cable.shielding_jacket)Rsoil*=1.05;
- Rsoil*=count*(cable.conductors||1);
+ const conduit=findConduit(cable.conduit_id);
+ let Rduct=getRduct(conduit,params);
+ let rho=params.soilResistivity||90;
+ rho=Math.min(150,Math.max(40,rho));
+ const rho_m=rho/100;
+ const burialDepth=(params.ductbankDepth||0)*0.0254;
+ const cd=CONDUIT_SPECS[conduit.conduit_type]&&CONDUIT_SPECS[conduit.conduit_type][conduit.trade_size];
+ const conduitDiameter=cd?cd*0.0254:0;
+ let Rsoil=0;
+ if(burialDepth>0&&conduitDiameter>0){
+  Rsoil=(rho_m/(2*Math.PI))*Math.log(4*burialDepth/conduitDiameter);
+ }
  return {Rcond,Rins,Rduct,Rsoil,Rca:Rcond+Rins+Rduct+Rsoil};
 }
 
@@ -1314,14 +1340,15 @@ function solveDuctbankTemperatures(conduits,cables,params,progress){
         requestAnimationFrame(step);
       }else{
         const temps={};
-        const Rextra=(params.concreteEncasement?0.08:0.1)+(params.ductThermRes||0);
         Object.keys(conduitCells).forEach(cid=>{
           const cells=conduitCells[cid];
           let sum=0;
           cells.forEach(([j,i])=>{sum+=grid[j][i];});
           const base=sum/cells.length;
           const p=heatMap[cid].power||0;
-          temps[cid]=base+p*Rextra;
+          const cd=conduits.find(d=>d.conduit_id===cid)||{};
+          const rduct=getRduct(cd,params)+(params.ductThermRes||0);
+          temps[cid]=base+p*rduct;
         });
         resolve({grid,conduitTemps:temps,iter,diff});
       }
