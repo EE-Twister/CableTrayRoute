@@ -150,8 +150,9 @@ button{padding:4px 8px;margin:4px 2px;cursor:pointer;}
   <span class="help-icon" tabindex="0" aria-describedby="moistureHelp">?
    <span id="moistureHelp" class="tooltip">Percent water by weight in soil.</span>
   </span>
-  <input type="number" id="moistureContent" min="0" max="100" style="width:60px;">
+  <input type="number" id="moistureContent" min="0" max="40" style="width:60px;">
  </label>
+ <div id="moistureWarning" style="display:none;font-size:0.8rem;color:var(--warning-text);"></div>
 <label style="margin-left:8px;">Allowable Conductor Temperature Tc
   <span class="help-icon" tabindex="0" aria-describedby="ratingHelp">?
    <span id="ratingHelp" class="tooltip">Select the design insulation rating (°C).</span>
@@ -1375,6 +1376,29 @@ function validateSoilResistivity(){
   el.value=val;
 }
 
+function validateMoistureContent(){
+  const el=document.getElementById('moistureContent');
+  const warn=document.getElementById('moistureWarning');
+  if(!el||!warn) return;
+  let val=parseFloat(el.value);
+  const min=0, max=40;
+  if(isNaN(val)){
+    warn.textContent='Enter a numeric value.';
+    warn.style.display='block';
+    return;
+  }
+  if(val<min){
+    warn.textContent=`Value raised to ${min}%.`;
+    val=min;
+  }else if(val>max){
+    warn.textContent=`Value reduced to ${max}%.`;
+    val=max;
+  }else{
+    warn.style.display='none';
+  }
+  el.value=val;
+}
+
 function solveDuctbankTemperatures(conduits,cables,params,progress){
   const svg=document.getElementById('grid');
   const width=parseFloat(svg.getAttribute('width'))||svg.clientWidth;
@@ -2021,6 +2045,9 @@ loadSoilResistivityData().then(data=>{
 const soilInput=document.getElementById('soilResistivity');
 soilInput.addEventListener('change',validateThermalInputs);
 soilInput.addEventListener('blur',validateSoilResistivity);
+const moistureInput=document.getElementById('moistureContent');
+moistureInput.addEventListener('change',validateThermalInputs);
+moistureInput.addEventListener('blur',validateMoistureContent);
 </script>
 <div id="toast" class="toast" role="status" aria-live="polite"></div>
   <p class="legalDisclaimer">
