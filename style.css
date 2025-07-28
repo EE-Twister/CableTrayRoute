@@ -554,10 +554,14 @@ body.dark-mode .db-table td {
     margin-top: 12px;
     display: block;
     margin: auto;
+    position: relative;
+    z-index: 1;
 }
 
 #gridContainer {
-    overflow-x: auto;
+    position: relative;
+    display: inline-block;
+    overflow: visible;
 }
 
 #gridContainer::-webkit-scrollbar {
@@ -577,6 +581,19 @@ body.dark-mode .db-table td {
     height: 0;
     overflow: hidden;
 }
+
+#tempCanvas,
+#tempOverlay {
+    position: absolute;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    pointer-events: none;
+}
+
+#tempCanvas { z-index: 2; }
+#tempOverlay { z-index: 3; }
 
 .db-button-panel {
     margin-top: 8px;
