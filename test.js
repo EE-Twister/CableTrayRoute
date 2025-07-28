@@ -791,6 +791,7 @@ describe('calcFiniteAmpacity', () => {
     const params = { ...PARAMS };
     const amp = calcFiniteAmpacity(cables[0], conduits, cables, params);
     // expected ampacity using full Neher-McGrath formula
+    // see docs/AMPACITY_METHOD.md#equation
     const result = solveDuctbankTemperatures(conduits, cables, params);
     const T = result.conduitTemps[cables[0].conduit_id];
     const Rdc = dcResistance(cables[0].conductor_size, cables[0].conductor_material, T);
