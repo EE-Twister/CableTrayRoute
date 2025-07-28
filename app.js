@@ -862,73 +862,80 @@ document.addEventListener('DOMContentLoaded', () => {
         {"tray_id": "CONN2", "start_x": 120, "start_y": 20, "start_z": 25, "end_x": 120, "end_y": 20, "end_z": 50, "width": 8, "height": 2.95, "current_fill": 2.33,"allowed_cable_group": "HV", "shape": "STR"}
     ];
     
-    const getSampleCables = () => [
-        {
-            name: "Power Cable 1",
-            cable_type: "Power",
-            conductors: 3,
-            conductor_size: '#12 AWG',
-            diameter: 1.26,
-            weight: 1.5,
-            start: [5, 5, 5],
-            end: [110, 95, 45],
-            start_tag: "ST1",
-            end_tag: "ET1",
-            allowed_cable_group: "HV"
-        },
-        {
-            name: "Control Cable 1",
-            cable_type: "Control",
-            conductors: 3,
-            conductor_size: '#12 AWG',
-            diameter: 0.47,
-            weight: 0.8,
-            start: [10, 0, 10],
-            end: [100, 80, 25],
-            start_tag: "ST2",
-            end_tag: "ET2",
-            allowed_cable_group: "LV"
-        },
-        {
-            name: "Data Cable 1",
-            cable_type: "Signal",
-            conductors: 3,
-            conductor_size: '#12 AWG',
-            diameter: 0.31,
-            weight: 0.5,
-            start: [15, 5, 15],
-            end: [105, 85, 30],
-            start_tag: "ST3",
-            end_tag: "ET3",
-            allowed_cable_group: "LV"
-        },
-        {
-            name: "Power Cable 2",
-            cable_type: "Power",
-            conductors: 3,
-            conductor_size: '#12 AWG',
-            diameter: 1.10,
-            weight: 1.3,
-            start: [20, 10, 8],
-            end: [115, 90, 35],
-            start_tag: "ST4",
-            end_tag: "ET4",
-            allowed_cable_group: "HV"
-        },
-        {
-            name: "Control Cable 2",
-            cable_type: "Control",
-            conductors: 3,
-            conductor_size: '#12 AWG',
-            diameter: 0.59,
-            weight: 0.9,
-            start: [25, 15, 12],
-            end: [95, 75, 28],
-            start_tag: "ST5",
-            end_tag: "ET5",
-            allowed_cable_group: "LV"
-        },
-    ];
+    const getSampleCables = () => {
+        const templates = [
+            {
+                cable_type: "Power",
+                conductors: 3,
+                conductor_size: '#12 AWG',
+                diameter: 1.26,
+                weight: 1.5,
+                start: [5, 5, 5],
+                end: [110, 95, 45],
+                allowed_cable_group: "HV"
+            },
+            {
+                cable_type: "Control",
+                conductors: 3,
+                conductor_size: '#12 AWG',
+                diameter: 0.47,
+                weight: 0.8,
+                start: [10, 0, 10],
+                end: [100, 80, 25],
+                allowed_cable_group: "LV"
+            },
+            {
+                cable_type: "Signal",
+                conductors: 3,
+                conductor_size: '#12 AWG',
+                diameter: 0.31,
+                weight: 0.5,
+                start: [15, 5, 15],
+                end: [105, 85, 30],
+                allowed_cable_group: "LV"
+            },
+            {
+                cable_type: "Power",
+                conductors: 3,
+                conductor_size: '#12 AWG',
+                diameter: 1.10,
+                weight: 1.3,
+                start: [20, 10, 8],
+                end: [115, 90, 35],
+                allowed_cable_group: "HV"
+            },
+            {
+                cable_type: "Control",
+                conductors: 3,
+                conductor_size: '#12 AWG',
+                diameter: 0.59,
+                weight: 0.9,
+                start: [25, 15, 12],
+                end: [95, 75, 28],
+                allowed_cable_group: "LV"
+            }
+        ];
+
+        const cables = [];
+        for (let i = 0; i < 30; i++) {
+            const t = templates[i % templates.length];
+            const offset = Math.floor(i / templates.length) * 5;
+            cables.push({
+                name: `Cable ${String(i + 1).padStart(2, '0')}`,
+                cable_type: t.cable_type,
+                conductors: t.conductors,
+                conductor_size: t.conductor_size,
+                diameter: t.diameter,
+                weight: t.weight,
+                start: t.start.map(v => v + offset),
+                end: t.end.map(v => v + offset),
+                start_tag: `ST${i + 1}`,
+                end_tag: `ET${i + 1}`,
+                allowed_cable_group: t.allowed_cable_group
+            });
+        }
+        return cables;
+    };
 
     const updateFillLimitDisplay = () => {
         elements.fillLimitOut.textContent = `${elements.fillLimitIn.value}%`;
