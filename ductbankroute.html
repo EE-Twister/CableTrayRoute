@@ -137,11 +137,11 @@ button{padding:4px 8px;margin:4px 2px;cursor:pointer;}
   </span>
   <input type="number" id="airTemp" style="width:60px;">
  </label>
-<label style="margin-left:8px;">Thermal Resistivity of Soil
+<label style="margin-left:8px;">Thermal Resistivity of Soil (&#176;C&#183;cm/W)
   <span class="help-icon" tabindex="0" aria-describedby="soilResHelp">?
    <span id="soilResHelp" class="tooltip">Typical soil ranges from 40–150 &#176;C&#183;cm/W.</span>
   </span>
-  <input type="number" id="soilResistivity" list="soilResList" style="width:100px;">
+  <input type="number" id="soilResistivity" list="soilResList" style="width:120px;">
   <span class="unit-label" title="Typical soils 40–150 °C·cm/W">&#176;C&#183;cm/W</span>
  </label>
  <div id="soilWarning" style="display:none;font-size:0.8rem;color:var(--warning-text);"></div>
@@ -179,13 +179,13 @@ button{padding:4px 8px;margin:4px 2px;cursor:pointer;}
    <option value="40">40×40</option>
   </select>
  </label>
-<label style="margin-left:8px;">Duct Thermal Resistance
+<label style="margin-left:8px;">Duct Thermal Resistance (&#176;C·m/W)
   <span class="help-icon" tabindex="0" aria-describedby="ductResHelp">?
-   <span id="ductResHelp" class="tooltip">Typical range 0–0.2 &#176;C·m/W.</span>
+   <span id="ductResHelp" class="tooltip">Thermal resistance of the conduit itself. Leave 0 when using the preset table. Typical range 0–0.2 &#176;C·m/W.</span>
   </span>
-  <input type="number" id="ductThermRes" value="0.0" style="width:60px;">
+  <input type="number" id="ductThermRes" value="0.0" placeholder="0.05" style="width:60px;">
   <span class="unit-label" title="Typical range 0–0.2 °C·m/W">&#176;C·m/W</span>
- </label>
+</label>
 </div>
 
 <details id="soilRef" style="margin-top:8px;">
@@ -1370,16 +1370,12 @@ function validateSoilResistivity(){
     warn.style.display='block';
     return;
   }
-  if(val<min){
-    warn.textContent=`Value raised to ${min} \u00B0C\u00B7cm/W.`;
-    val=min;
-  }else if(val>max){
-    warn.textContent=`Value reduced to ${max} \u00B0C\u00B7cm/W.`;
-    val=max;
+  if(val < min || val > max){
+    warn.textContent=`Value outside ${min}-${max} \u00B0C\u00B7cm/W typical range.`;
+    warn.style.display='block';
   }else{
     warn.style.display='none';
   }
-  el.value=val;
 }
 
 function validateMoistureContent(){
