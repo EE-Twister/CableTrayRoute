@@ -1718,12 +1718,65 @@ document.getElementById('sampleConduits').addEventListener('click',()=>{
  saveDuctbankSession();
 });
 document.getElementById('sampleCables').addEventListener('click',()=>{
- document.querySelector('#cableTable tbody').innerHTML='';
- SAMPLE_CABLES.forEach(addCableRow);
- updateInsulationOptions();
- drawGrid();
- updateAmpacityReport();
- saveDuctbankSession();
+  const tbody=document.querySelector('#cableTable tbody');
+  tbody.innerHTML='';
+
+  const samples=[
+    {
+      tag:'SAMP1',
+      cable_type:'Power',
+      diameter:2.6,
+      conductors:3,
+      conductor_size:'#500 kcmil',
+      insulation_thickness:0.095,
+      weight:6.0,
+      est_load:400,
+      conduit_id:'C1',
+      conductor_material:'Copper',
+      insulation_type:'THHN',
+      insulation_rating:'90',
+      voltage_rating:'600V',
+      shielding_jacket:''
+    },
+    {
+      tag:'SAMP2',
+      cable_type:'Power',
+      diameter:2.3,
+      conductors:3,
+      conductor_size:'#350 kcmil',
+      insulation_thickness:0.09,
+      weight:4.5,
+      est_load:300,
+      conduit_id:'C2',
+      conductor_material:'Aluminum',
+      insulation_type:'THHN',
+      insulation_rating:'90',
+      voltage_rating:'600V',
+      shielding_jacket:''
+    },
+    {
+      tag:'SAMP3',
+      cable_type:'Power',
+      diameter:1.9,
+      conductors:3,
+      conductor_size:'#2/0 AWG',
+      insulation_thickness:0.06,
+      weight:3.0,
+      est_load:150,
+      conduit_id:'C3',
+      conductor_material:'Copper',
+      insulation_type:'THHN',
+      insulation_rating:'90',
+      voltage_rating:'600V',
+      shielding_jacket:''
+    }
+  ];
+
+  samples.forEach(addCableRow);
+  updateInsulationOptions();
+  drawGrid();
+  updateAmpacityReport();
+  saveDuctbankSession();
 });
 
 document.getElementById('importConduits').addEventListener('change',e=>{const f=e.target.files[0];if(f)importCSV(f,data=>{document.querySelector('#conduitTable tbody').innerHTML='';data.forEach(addConduitRow);drawGrid();updateAmpacityReport();saveDuctbankSession();});});
