@@ -3,6 +3,18 @@ const conductorProps = require('./data/conductor_properties.json');
 const AWG_AREA = {"18":1624,"16":2583,"14":4107,"12":6530,"10":10380,"8":16510,"6":26240,"4":41740,"3":52620,"2":66360,"1":83690,"1/0":105600,"2/0":133100,"3/0":167800,"4/0":211600};
 const BASE_RESISTIVITY = { cu: 0.017241, al: 0.028264 };
 const TEMP_COEFF = { cu: 0.00393, al: 0.00403 };
+
+// Tunable model parameters. These may be adjusted by the calibration routine
+// to better match published ampacity tables.
+const modelParams = {
+  // thermal resistance of a cable in air (°C·m/W)
+  airThermalResistance: 3.4,
+  // insulation thermal conductivity when no value is supplied (W/m·°C)
+  insulationThermalConductivity: 0.3,
+  // baseline duct thermal resistance values (°C·m/W)
+  defaultDuctRthPVC: 0.1,
+  defaultDuctRthSteel: 0.08
+};
 const RESISTANCE_TABLE = { cu: {}, al: {} };
 for (const sz in AWG_AREA) {
   const areaMM2 = AWG_AREA[sz] * 0.0005067;
@@ -84,20 +96,19 @@ function conductorThermalResistance(cable) {
   const r_o = r + t;
   const r_ie = r * 0.001;
   const kCond = cable.conductor_material && cable.conductor_material.toLowerCase().includes('al') ? 237 : 401;
-  const kIns = parseFloat(cable.insulation_k) || 0.3;
+  const kIns = parseFloat(cable.insulation_k) || modelParams.insulationThermalConductivity;
   const Rcond = Math.log(r_i / r_ie) / (2 * Math.PI * kCond);
   const Rins = Math.log(r_o / r_i) / (2 * Math.PI * kIns);
   return { Rcond, Rins };
 }
 
-const AIR_RTH = 3.4; // calibrated air thermal resistance (°C·m/W)
 
 function calcRcaComponents(cable, params = {}) {
   const { Rcond, Rins } = conductorThermalResistance(cable);
   let Rduct = 0;
   let Rsoil = 0;
   if (params.medium === 'air') {
-    Rduct = AIR_RTH;
+    Rduct = modelParams.airThermalResistance;
   } else {
     const mat = (params.conduit_type || '').includes('PVC') ? 'PVC' : 'steel';
     const tables = {
@@ -105,7 +116,12 @@ function calcRcaComponents(cable, params = {}) {
       steel: { "4": 0.055 }
     };
     const base = tables[mat] && tables[mat][params.trade_size];
-    Rduct = base !== undefined ? base : (mat === 'PVC' ? 0.1 : 0.08);
+    if (base !== undefined) {
+      Rduct = base;
+    } else {
+      Rduct = mat === 'PVC' ? modelParams.defaultDuctRthPVC
+                            : modelParams.defaultDuctRthSteel;
+    }
     let rho = params.soilResistivity || 90;
     rho = Math.min(150, Math.max(40, rho));
     const rho_m = rho / 100;
@@ -130,6 +146,61 @@ function ampacity(cable, params = {}) {
   return { ampacity: I, components: comps };
 }
 
+function getModelParams() {
+  return { ...modelParams };
+}
+
+function setModelParams(overrides = {}) {
+  Object.assign(modelParams, overrides);
+}
+
+function calibrateAmpacityModel() {
+  const targets = [
+    {
+      cable: { conductor_size: '4/0 AWG', conductor_material: 'Copper', insulation_rating: 90, voltage_rating: 600 },
+      params: { medium: 'air' },
+      reference: 260
+    },
+    {
+      cable: { conductor_size: '500 kcmil', conductor_material: 'Copper', insulation_rating: 90, voltage_rating: 600 },
+      params: { medium: 'air' },
+      reference: 430
+    },
+    {
+      cable: { conductor_size: '250 kcmil', conductor_material: 'Aluminum', insulation_rating: 75, voltage_rating: 600 },
+      params: { medium: 'air' },
+      reference: 215
+    }
+  ];
+
+  let bestErr = Infinity;
+  let best = getModelParams();
+  for (let air = 3.0; air <= 3.8; air += 0.1) {
+    for (let kIns = 0.26; kIns <= 0.34; kIns += 0.01) {
+      for (let duct = 0.08; duct <= 0.12; duct += 0.01) {
+        setModelParams({
+          airThermalResistance: air,
+          insulationThermalConductivity: kIns,
+          defaultDuctRthPVC: duct,
+          defaultDuctRthSteel: duct - 0.02
+        });
+        let maxErr = 0;
+        for (const t of targets) {
+          const I = ampacity(t.cable, t.params).ampacity;
+          const err = Math.abs(I - t.reference) / t.reference;
+          if (err > maxErr) maxErr = err;
+        }
+        if (maxErr < bestErr) {
+          bestErr = maxErr;
+          best = getModelParams();
+        }
+      }
+    }
+  }
+  setModelParams(best);
+  return { maxError: bestErr, params: getModelParams() };
+}
+
 module.exports = {
   sizeToArea,
   dcResistance,
@@ -137,5 +208,8 @@ module.exports = {
   dielectricRise,
   conductorThermalResistance,
   calcRcaComponents,
-  ampacity
+  ampacity,
+  getModelParams,
+  setModelParams,
+  calibrateAmpacityModel
 };

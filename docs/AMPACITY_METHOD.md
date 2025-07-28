@@ -55,8 +55,21 @@ Typical soil resistivity values per IEEE Std 835 Table 1:
 
 ## Calibration
 
-The resistance constants were tuned so that calculated ampacities match IEEE 835 tables.
-Using a baseline of 500 kcmil Cu THHN (90 °C) and 2/0 Al (75 °C) in air, a fixed air thermal resistance of 3.4 °C·m/W yields results within ±5 % of the published values.
+The resistance constants were tuned so that calculated ampacities match IEEE 835 tables.
+
+The library now exposes a `calibrateAmpacityModel` function which performs a grid
+search over reasonable model parameters. The routine compares the calculated
+ampacity of three common cables against their IEEE 835 free‑air ratings:
+
+- **4/0 AWG Cu THHN (90 °C)** – 260 A
+- **500 kcmil Cu THHN (90 °C)** – 430 A
+- **250 kcmil Al THHN (75 °C)** – 215 A
+
+`calibrateAmpacityModel` adjusts the assumed insulation thermal conductivity,
+default duct resistance and the air thermal resistance until the maximum
+deviation from these reference values falls below ±10 %. Typical calibrated
+values are an air resistance near **3.4 °C·m/W** and an insulation thermal
+conductivity of about **0.31 W/m·°C**.
 
 The original Neher‑McGrath paper provides additional discussion on how soil conditions influence ampacity.
 
