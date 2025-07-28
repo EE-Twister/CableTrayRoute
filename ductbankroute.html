@@ -278,7 +278,7 @@ button{padding:4px 8px;margin:4px 2px;cursor:pointer;}
   <p>The <strong>Download Ductbank Data</strong> button exports all conduits, cables and fill results to an XLSX file.</p>
   <p><strong>Export Ductbank Conduits</strong> and <strong>Export Ductbank Cables</strong> create CSV files compatible with the import buttons.</p>
   <h3>Reporting and Export</h3>
-  <p>The <em>Copy Calculation Report</em> button copies a text summary to your clipboard—although the application does not display a success message. <em>Export Ductbank Conduits</em> and <em>Export Ductbank Cables</em> produce CSV or JSON files, while <em>Export Image</em> saves an SVG of the cross‑section. These downloads include the current version and note the assumptions used so results remain traceable.</p>
+  <p>The <em>Copy Calculation Report</em> button copies a text summary to your clipboard and shows a confirmation toast. <em>Export Ductbank Conduits</em> and <em>Export Ductbank Cables</em> produce CSV or JSON files, while <em>Export Image</em> saves an SVG of the cross‑section. These downloads include the current version and note the assumptions used so results remain traceable.</p>
   <h3>NEC Fill Rules</h3>
   <p>NEC Chapter&nbsp;9 Table&nbsp;1 limits conduit fill to 53% with one cable, 31% with two cables and 40% with three or more cables. Table&nbsp;4 provides areas for each conduit type and size.</p>
   <h3>Ampacity Calculation</h3>
@@ -1807,9 +1807,12 @@ function buildCalcReport(){
           `Rcond=${d.Rcond.toFixed(3)}, Rins=${d.Rins.toFixed(3)}, Rduct=${d.Rduct.toFixed(3)}, `+
           `Rsoil=${d.Rsoil.toFixed(3)}, Rca=${d.Rca.toFixed(3)}\n`;
  });
- report+=`\nAmpacity calculations use the Neher-McGrath method. `+
-         `Yc values come from IEEE 835 Table 4, ΔTd from Table 9, and soil resistivity ranges from Table 1. `+
-         `See docs/AMPACITY_METHOD.md for details.`;
+ report+=`\nAmpacity calculations use the `+
+         `[Neher-McGrath equation](docs/AMPACITY_METHOD.md#equation). `+
+         `Formulas for Yc and ΔTd appear in `+
+         `[AC Resistance Correction](docs/AMPACITY_METHOD.md#ac-resistance-correction). `+
+         `Rdc, Rcond, Rins, Rduct, Rsoil and Rca are defined in `+
+         `[Variable Definitions](docs/AMPACITY_METHOD.md#variable-definitions).`;
  return report;
 }
 
@@ -1864,7 +1867,8 @@ document.getElementById('exportCablesBtn').addEventListener('click',exportCables
 document.getElementById('exportImgBtn').addEventListener('click',exportImage);
 document.getElementById('copyCalcReportBtn').addEventListener('click',()=>{
  const txt=buildCalcReport();
- navigator.clipboard.writeText(txt).then(()=>{showToast('Report copied to clipboard');});
+ navigator.clipboard.writeText(txt)
+   .then(()=>{showToast('Report copied: see clipboard for details.');});
 });
 document.getElementById('thermalBtn').addEventListener('click',()=>{
   validateThermalInputs();
