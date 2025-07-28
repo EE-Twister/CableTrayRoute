@@ -598,27 +598,27 @@ function rowToConduit(tr){
 }
 
 function rowToCable(tr){
- const vals=Array.from(tr.children).slice(0,14).map(td=>{
-  const el=td.querySelector('input,select');
-  return el?el.value:'';
-});
- const [tag,cable_type,diameter,conductors,conductor_size,insulation_thickness,weight,est_load,conduit_id,conductor_material,insulation_type,insulation_rating,voltage_rating,shielding_jacket]=vals;
-  return {
-   tag,
-   cable_type,
-   diameter:parseFloat(diameter),
-   conductors:parseInt(conductors||0),
-   conductor_size,
-   insulation_thickness:parseFloat(insulation_thickness)||0,
-   weight:parseFloat(weight)||0,
-   est_load:parseFloat(est_load)||0,
-   conduit_id,
-   conductor_material,
-   insulation_type,
-   insulation_rating,
-   voltage_rating,
-   shielding_jacket
-  };
+ const cells=Array.from(tr.children);
+ const getVal=idx=>{
+   const el=cells[idx]?.querySelector('input,select');
+   return el?el.value.trim():'';
+ };
+ return {
+   tag:getVal(0),
+   cable_type:getVal(1),
+   diameter:parseFloat(getVal(2))||0,
+   conductors:parseInt(getVal(3))||0,
+   conductor_size:getVal(4),
+   insulation_thickness:parseFloat(getVal(5))||0,
+   weight:parseFloat(getVal(6))||0,
+   est_load:parseFloat(getVal(7))||0,
+   conduit_id:getVal(8),
+   conductor_material:getVal(9),
+   insulation_type:getVal(10),
+   insulation_rating:getVal(11),
+   voltage_rating:getVal(12),
+   shielding_jacket:getVal(13)
+ };
 }
 
 function addHeatSourceRow(data={}){
@@ -653,7 +653,7 @@ function getAllConduits(){
 }
 
 function getAllCables(){
- return Array.from(document.querySelectorAll('#cableTable tbody tr')).map(rowToCable);
+ return Array.from(document.querySelectorAll('#cableTable tbody tr')).map(tr=>rowToCable(tr));
 }
 
 function saveDuctbankSession(){
@@ -1023,8 +1023,8 @@ function updateAmpacityReport(){
  const load=parseFloat(c.est_load)||0;
  const neherNum=parseFloat(neher);
  const finiteNum=parseFloat(finite);
- const over=(load>(isNaN(neherNum)?Infinity:neherNum)) ||
-             (load>(isNaN(finiteNum)?Infinity:finiteNum));
+ const over=(isFinite(neherNum)&&load>neherNum) ||
+             (isFinite(finiteNum)&&load>finiteNum);
  if(window.cableOverLimit) window.cableOverLimit[c.tag]=over;
  return `<tr class="${over?'over-limit-row':''}"><td>${c.tag}</td><td>${neher}</td><td>${finite}</td><td>${over?'Yes':''}</td></tr>`;
 }).join('');
