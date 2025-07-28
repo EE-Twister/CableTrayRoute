@@ -137,11 +137,12 @@ button{padding:4px 8px;margin:4px 2px;cursor:pointer;}
   </span>
   <input type="number" id="airTemp" style="width:60px;">
  </label>
-<label style="margin-left:8px;">Thermal Resistivity of Soil (&#176;C&#183;cm/W)
+<label style="margin-left:8px;">Thermal Resistivity of Soil
   <span class="help-icon" tabindex="0" aria-describedby="soilResHelp">?
-   <span id="soilResHelp" class="tooltip">Typical soil ranges from 40–150 °C·cm/W.</span>
+   <span id="soilResHelp" class="tooltip">Typical soil ranges from 40–150 &#176;C&#183;cm/W.</span>
   </span>
   <input type="number" id="soilResistivity" list="soilResList" style="width:100px;">
+  <span class="unit-label" title="Typical soils 40–150 °C·cm/W">&#176;C&#183;cm/W</span>
  </label>
  <div id="soilWarning" style="display:none;font-size:0.8rem;color:var(--warning-text);"></div>
  <datalist id="soilResList"></datalist>
@@ -177,11 +178,12 @@ button{padding:4px 8px;margin:4px 2px;cursor:pointer;}
    <option value="40">40×40</option>
   </select>
  </label>
-<label style="margin-left:8px;">Duct Thermal Resistance (&#176;C·m/W)
+<label style="margin-left:8px;">Duct Thermal Resistance
   <span class="help-icon" tabindex="0" aria-describedby="ductResHelp">?
-   <span id="ductResHelp" class="tooltip">Thermal resistance of the duct wall, typical 0.05–0.15 °C·m/W.</span>
+   <span id="ductResHelp" class="tooltip">Typical range 0–0.2 &#176;C·m/W.</span>
   </span>
   <input type="number" id="ductThermRes" value="0.0" style="width:60px;">
+  <span class="unit-label" title="Typical range 0–0.2 °C·m/W">&#176;C·m/W</span>
  </label>
 </div>
 
@@ -545,26 +547,34 @@ function addCableRow(data={}){
   td.appendChild(inp);
   tr.appendChild(td);
 });
- function applyDefaults(){
-   const sizeInput=tr.children[4]?.querySelector('input');
-   const thickInput=tr.children[5]?.querySelector('input');
-   const weightInput=tr.children[6]?.querySelector('input');
-   const matSel=tr.children[9]?.querySelector('select');
-   const size=sizeInput?.value.trim();
-   const props=window.CONDUCTOR_PROPS&&window.CONDUCTOR_PROPS[size];
-   if(props){
-     if(thickInput&&!(thickInput.value)) thickInput.value=props.insulation_thickness;
-     if(weightInput){
-       const areaIn2=props.area_cm*7.854e-7;
-       const density=(matSel&&matSel.value&&matSel.value.toLowerCase().includes('al'))?0.0975:0.323;
-       weightInput.value=(areaIn2*density*12).toFixed(3);
-     }
-   }
+function applyDefaults(){
+  const sizeInput=tr.children[4]?.querySelector('input');
+  const thickInput=tr.children[5]?.querySelector('input');
+  const weightInput=tr.children[6]?.querySelector('input');
+  const matSel=tr.children[9]?.querySelector('select');
+  const size=sizeInput?.value.trim();
+  const props=window.CONDUCTOR_PROPS && window.CONDUCTOR_PROPS[size];
+  if(props){
+    if(thickInput && !thickInput.value) thickInput.value=props.insulation_thickness;
+    if(thickInput){
+      if(isNaN(parseFloat(thickInput.value))) tr.children[5].classList.add('missing-value');
+      else tr.children[5].classList.remove('missing-value');
+    }
+    if(weightInput){
+      const areaIn2=props.area_cm*7.854e-7;
+      const density=(matSel&&matSel.value&&matSel.value.toLowerCase().includes('al'))?0.0975:0.323;
+      weightInput.value=(areaIn2*density*12).toFixed(3);
+    }
+  }else if(thickInput && !thickInput.value){
+    tr.children[5].classList.add('missing-value');
+  }
  }
- const sizeInput=tr.children[4]?.querySelector('input');
- const matSel=tr.children[9]?.querySelector('select');
- sizeInput&&sizeInput.addEventListener('change',applyDefaults);
- matSel&&matSel.addEventListener('change',applyDefaults);
+const sizeInput=tr.children[4]?.querySelector('input');
+const matSel=tr.children[9]?.querySelector('select');
+const thickInput=tr.children[5]?.querySelector('input');
+sizeInput&&sizeInput.addEventListener('change',applyDefaults);
+thickInput&&thickInput.addEventListener('input',applyDefaults);
+matSel&&matSel.addEventListener('change',applyDefaults);
  applyDefaults();
 const dupTd=document.createElement('td');dupTd.appendChild(createButton('⧉','duplicateBtn','Duplicate row',()=>{const clone=rowToCable(tr);addCableRow(clone);}));tr.appendChild(dupTd);
 const delTd=document.createElement('td');delTd.appendChild(createButton('✖','removeBtn','Delete row',()=>{tr.remove();drawGrid();updateAmpacityReport();saveDuctbankSession();}));tr.appendChild(delTd);
@@ -997,6 +1007,10 @@ async function calcFiniteAmpacity(cable, conduits, cables, params){
 }
 
 function updateAmpacityReport(){
+ if(checkInsulationThickness()){
+   document.getElementById('ampacityReport').innerHTML='<div class="message warning">Enter insulation thickness for highlighted cables.</div>';
+   return;
+ }
  const earthF=parseFloat(document.getElementById('earthTemp').value);
  const airF=parseFloat(document.getElementById('airTemp').value);
  const params={
@@ -1237,6 +1251,22 @@ svg.setAttribute('width',maxX*scale+2*margin+80);
 svg.setAttribute('height',maxY*scale+2*margin+20);
 }
 
+function checkInsulationThickness(){
+  let missing=false;
+  document.querySelectorAll('#cableTable tbody tr').forEach(tr=>{
+    const td=tr.children[5];
+    const inp=td?.querySelector('input');
+    if(!inp) return;
+    if(isNaN(parseFloat(inp.value))){
+      td.classList.add('missing-value');
+      missing=true;
+    }else{
+      td.classList.remove('missing-value');
+    }
+  });
+  return missing;
+}
+
 function validateThermalInputs(){
   const warnings=[];
   const soilEl=document.getElementById('soilResistivity');
@@ -1273,6 +1303,9 @@ function validateThermalInputs(){
   if(isFinite(v)){
     if(v>24){warnings.push('Vert spacing capped at 24 in.');vEl.value=24;}
     else if(v<1){warnings.push('Vert spacing raised to 1 in.');vEl.value=1;}
+  }
+  if(checkInsulationThickness()){
+    warnings.push('Enter insulation thickness for all cables.');
   }
   document.querySelectorAll('#cableTable tbody tr').forEach(tr=>{
     const loadCell=tr.children[7];
@@ -1937,7 +1970,7 @@ function populateSoilReferences(data){
   }
 }
 updateHeatSourceVisibility();
-loadConductorProperties().then(()=>{updateInsulationOptions();});
+loadConductorProperties().then(()=>{updateInsulationOptions();checkInsulationThickness();});
 loadDuctbankSession();
 loadSoilResistivityData().then(data=>{
   populateSoilReferences(data);

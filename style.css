@@ -619,3 +619,11 @@ body.dark-mode #helpPopup {
 body.dark-mode .legalDisclaimer {
     color: #ccc;
 }
+
+/* Input unit label */
+.unit-label{margin-left:4px;font-size:0.85rem;}
+.unit-label[title]{text-decoration:underline dotted;cursor:help;}
+
+/* Highlight missing values */
+.missing-value{background-color:var(--warning-bg);}
+
