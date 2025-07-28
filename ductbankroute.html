@@ -1307,7 +1307,8 @@ function checkInsulationThickness(){
     const td=tr.children[5];
     const inp=td?.querySelector('input');
     if(!inp) return;
-    if(isNaN(parseFloat(inp.value))){
+    const val=parseFloat(inp.value);
+    if(!isFinite(val) || val<=0){
       td.classList.add('missing-value');
       missing=true;
     }else{
@@ -1786,7 +1787,13 @@ document.getElementById('sampleCables').addEventListener('click',()=>{
     });
   });
   samples.forEach(addCableRow);
+  const search=document.getElementById('cable-search');
+  if(search){
+    search.value='';
+    filterTable(document.getElementById('cableTable'), '');
+  }
   updateInsulationOptions();
+  checkInsulationThickness();
   drawGrid();
   updateAmpacityReport();
   saveDuctbankSession();
