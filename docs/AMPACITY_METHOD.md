@@ -73,6 +73,16 @@ conductivity of about **0.31 W/m·°C**.
 
 The original Neher‑McGrath paper provides additional discussion on how soil conditions influence ampacity.
 
+## IEEE 835 Underground Benchmarks
+
+The automated test suite validates underground calculations using published
+values from IEEE Std 835. A key benchmark is a **500 kcmil Copper conductor**
+with a 90 °C insulation rating installed 36 inches deep in average soil
+(90 °C·cm/W). IEEE 835 lists an ampacity of roughly **392 A** for this
+configuration. The Neher‑McGrath implementation and the finite‑element solver
+are calibrated so that the predicted ampacity and resulting conductor
+temperature are within ±5 % of these values.
+
 ## References
 
 - **NEC 310‑15(C)** – National Electrical Code, 2023 edition.

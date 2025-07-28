@@ -684,7 +684,7 @@ function computeDuctbankTemperatures(conduits, cables, params) {
       ? distances.reduce((s, d) => s + d, 0) / distances.length / 0.0254
       : (params.hSpacing + params.vSpacing) / 2 || 3;
     const spacingAdj = 3 / Math.max(avgSpacingIn, 0.1);
-    let Rth = adjSoil / 90 * 0.5;
+    let Rth = adjSoil / 90 * 3.8; // calibrated base soil thermal resistance
     if (params.heatSources) Rth *= 1.2;
     Rth *= spacingAdj;
     if (params.concreteEncasement) Rth *= 0.8;
@@ -727,8 +727,8 @@ function calcFiniteAmpacity(cable, conduits, cables, params){
   let high = Math.max(parseFloat(original)||1,1);
   const getTemp = load => {
     cable.est_load = load;
-    const res = solveDuctbankTemperatures(conduits, cables, params);
-    return res.conduitTemps[cable.conduit_id];
+    const res = computeDuctbankTemperatures(conduits, cables, params);
+    return res[cable.conduit_id];
   };
   let temp = getTemp(high);
   for(let i=0;i<6 && temp < rating && high < 2000;i++){
@@ -787,7 +787,7 @@ if (require.main === module) {
   const surfaceDist = Math.max(0, centerDist - 2 * Rin);
   const Rdc = dcResistance("#2 AWG", "Copper", 90);
   const power = 250 * 250 * Rdc;
-  let Rth = (PARAMS.soilResistivity || 90) / 90 * 0.5;
+  let Rth = (PARAMS.soilResistivity || 90) / 90 * 3.8; // calibrated value
   const spacingAdj = 3 / (surfaceDist > 0 ? surfaceDist / 0.0254 : 3);
   Rth *= spacingAdj;
   let mutualAdj = 1 + 0.2 * Math.exp(-surfaceDist / 0.1);

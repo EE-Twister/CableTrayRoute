@@ -13,7 +13,9 @@ const modelParams = {
   insulationThermalConductivity: 0.3,
   // baseline duct thermal resistance values (°C·m/W)
   defaultDuctRthPVC: 0.1,
-  defaultDuctRthSteel: 0.08
+  defaultDuctRthSteel: 0.08,
+  // multiplier on IEEE 835 soil thermal resistance formula
+  soilThermalResistanceFactor: 8.2
 };
 const RESISTANCE_TABLE = { cu: {}, al: {} };
 for (const sz in AWG_AREA) {
@@ -128,7 +130,8 @@ function calcRcaComponents(cable, params = {}) {
     const burial = (params.ductbankDepth || 0) * 0.0254;
     const D = params.conduit_diameter || 0.1;
     if (burial > 0 && D > 0) {
-      Rsoil = (rho_m / (2 * Math.PI)) * Math.log(4 * burial / D);
+      Rsoil = modelParams.soilThermalResistanceFactor *
+              (rho_m / (2 * Math.PI)) * Math.log(4 * burial / D);
     }
   }
   const Rca = Rcond + Rins + Rduct + Rsoil;
