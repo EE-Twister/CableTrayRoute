@@ -22,7 +22,14 @@ where `R_ca = R_cond + R_ins + R_duct + R_soil`.
 - **R_cond** – thermal resistance internal to the conductor.
 - **R_ins** – thermal resistance of insulation.
 - **R_duct** – thermal resistance of any raceway or duct.
-- **R_soil** – thermal resistance of the soil determined from resistivity `ρ`.
+- **R_soil** – thermal resistance of the surrounding soil. It is calculated using
+  a cylindrical model:
+
+  `R_soil = (ρ_m / (2π)) · ln(4·d / D)`
+
+  where `ρ_m = ρ / 100` converts resistivity from °C·cm/W to °C·m/W,
+  `d` is the burial depth of the conduit in meters and `D` is the conduit
+  diameter in meters.
 
 These terms follow the notation of NEC 310‑15(C) and Clause 4 of IEEE Std 835.
 
