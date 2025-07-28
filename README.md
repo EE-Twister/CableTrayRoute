@@ -92,3 +92,27 @@ Exported routing results are written to `route_data.xlsx`. Load this file in `ca
 
 ## Clearing Saved Sessions
 The application stores your trays, cables and theme preference in browser storage. Open the settings menu (⚙) and click **Delete Saved Data** to clear this information.
+
+## Building and Running
+
+This repository is entirely client side and no build step is required. To try the interface locally you can serve the files with any static web server, for example:
+
+```bash
+npx http-server
+```
+
+and then open `http://localhost:8080/index.html` in your browser. Unit tests for the ampacity and thermal solver functions can be run with Node.js:
+
+```bash
+node test.js
+```
+
+## Calculation Methods
+
+The underlying equations for ampacity and thermal resistance are documented in [docs/AMPACITY_METHOD.md](docs/AMPACITY_METHOD.md) and the references listed in [docs/standards.md](docs/standards.md). Soil resistivity assumptions are described in [docs/soil_resistivity.md](docs/soil_resistivity.md).
+
+## Current Limitations
+
+- The routing algorithm ignores physical obstructions other than trays and conduits.
+- Thermal calculations rely on simplified resistivity adjustments and should not be used for final engineering without verification.
+- The UI has only been tested in modern Chromium based browsers.
