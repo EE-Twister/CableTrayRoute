@@ -142,8 +142,7 @@ button{padding:4px 8px;margin:4px 2px;cursor:pointer;}
    <span id="soilResHelp" class="tooltip">Typical soil ranges from 40–150 &#176;C&#183;cm/W.</span>
   </span>
   <input type="number" id="soilResistivity" list="soilResList" style="width:120px;">
-  <span class="unit-label" title="Typical soils 40–150 °C·cm/W">&#176;C&#183;cm/W</span>
- </label>
+</label>
  <div id="soilWarning" style="display:none;font-size:0.8rem;color:var(--warning-text);"></div>
  <datalist id="soilResList"></datalist>
  <label style="margin-left:8px;">Moisture Content (%)
@@ -184,7 +183,6 @@ button{padding:4px 8px;margin:4px 2px;cursor:pointer;}
    <span id="ductResHelp" class="tooltip">Thermal resistance of the conduit itself. Leave 0 when using the preset table. Typical range 0–0.2 &#176;C·m/W.</span>
   </span>
   <input type="number" id="ductThermRes" value="0.0" placeholder="0.05" style="width:60px;">
-  <span class="unit-label" title="Typical range 0–0.2 °C·m/W">&#176;C·m/W</span>
 </label>
 </div>
 
@@ -243,6 +241,7 @@ button{padding:4px 8px;margin:4px 2px;cursor:pointer;}
 <div id="gridContainer" style="position:relative;display:inline-block;">
  <svg id="grid" width="500" height="500" style="position:relative;z-index:1;"></svg>
  <canvas id="tempCanvas" width="500" height="500" style="position:absolute;top:0;left:0;pointer-events:none;z-index:0;"></canvas>
+ <canvas id="tempOverlay" width="500" height="500" style="position:absolute;top:0;left:0;pointer-events:none;z-index:2;"></canvas>
 </div>
 <label style="display:block;margin-top:4px;"><input type="checkbox" id="hideDrawing"> Hide Drawing</label>
 
@@ -1013,7 +1012,7 @@ async function calcFiniteAmpacity(cable, conduits, cables, params){
  return (low+high)/2;
 }
 
-function updateAmpacityReport(){
+function updateAmpacityReport(scroll=true){
  if(checkInsulationThickness()){
    document.getElementById('ampacityReport').innerHTML='<div class="message warning">Enter insulation thickness for highlighted cables.</div>';
    return;
@@ -1055,7 +1054,7 @@ document.getElementById('ampacityReport').innerHTML=
  const det=document.getElementById('ampacityDetails');
  if(det){
   det.open=true;
-  det.scrollIntoView({behavior:'smooth'});
+  if(scroll) det.scrollIntoView({behavior:'smooth'});
  }
 }
 
@@ -1071,7 +1070,9 @@ function updateCableRowStyles(){
 function drawGrid(){
  const svg=document.getElementById('grid');
  const heat=document.getElementById('tempCanvas');
+ const overlay=document.getElementById('tempOverlay');
  if(heat){const ctx=heat.getContext('2d');ctx.clearRect(0,0,heat.width,heat.height);} 
+ if(overlay){const octx=overlay.getContext('2d');octx.clearRect(0,0,overlay.width,overlay.height);} 
  svg.innerHTML='';
  autoPlaceConduits();
  const conduits=getAllConduits();
@@ -1534,16 +1535,15 @@ async function runFiniteThermalAnalysis(){
   const conduits=getAllConduits();
  const cables=getAllCables();
  const canvas=document.getElementById('tempCanvas');
-const svg=document.getElementById('grid');
-const width=parseFloat(svg.getAttribute('width')) || svg.clientWidth;
-const height=parseFloat(svg.getAttribute('height')) || svg.clientHeight;
-canvas.width=width;
-canvas.height=height;
-canvas.style.width = width + 'px';
-canvas.style.height = height + 'px';
-canvas.style.display=heatVisible?'block':'none';
-const ctx=canvas.getContext('2d');
+ const overlay=document.getElementById('tempOverlay');
+ const svg=document.getElementById('grid');
+ const width=parseFloat(svg.getAttribute('width')) || svg.clientWidth;
+ const height=parseFloat(svg.getAttribute('height')) || svg.clientHeight;
+ [canvas,overlay].forEach(cv=>{if(!cv)return;cv.width=width;cv.height=height;cv.style.width=width+'px';cv.style.height=height+'px';cv.style.display=heatVisible?'block':'none';});
+ const ctx=canvas.getContext('2d');
  ctx.clearRect(0,0,width,height);
+ const octx=overlay.getContext('2d');
+ octx.clearRect(0,0,width,height);
  const scale=40,margin=20;
  const earthF=parseFloat(document.getElementById('earthTemp').value);
  const airF=parseFloat(document.getElementById('airTemp').value);
@@ -1607,19 +1607,22 @@ if(heatVisible) drawHeatMap(grid,conduitTemps,conduits,ambientRes);
 
 function drawHeatMap(grid, conduitTemps, conduits, ambient){
  const canvas=document.getElementById('tempCanvas');
- if(!canvas)return;
+ const overlay=document.getElementById('tempOverlay');
+ if(!canvas||!overlay)return;
  const ctx=canvas.getContext('2d');
+ const octx=overlay.getContext('2d');
  const svg=document.getElementById('grid');
  const width=parseFloat(svg.getAttribute('width'))||svg.clientWidth;
  const height=parseFloat(svg.getAttribute('height'))||svg.clientHeight;
- const step=Math.ceil(Math.max(width,height)/GRID_SIZE);
- const img=ctx.createImageData(width,height);
+ const stepX=Math.ceil(width/(grid[0]?.length||1));
+ const stepY=Math.ceil(height/(grid.length||1));
+ const img=ctx.createImageData(Math.round(width),Math.round(height));
  let maxT=-Infinity,maxPx=0,maxPy=0;
  let minT=Infinity;
  for(let j=0;j<grid.length;j++){
    for(let i=0;i<grid[j].length;i++){
      const T=grid[j][i];
-     if(T>maxT){maxT=T;maxPx=i*step;maxPy=j*step;}
+     if(T>maxT){maxT=T;maxPx=i*stepX+stepX/2;maxPy=j*stepY+stepY/2;}
      if(T<minT)minT=T;
    }
  }
@@ -1630,9 +1633,9 @@ function drawHeatMap(grid, conduitTemps, conduits, ambient){
      const frac=(T-minT)/range;
      const r=Math.round(255*frac);
      const b=Math.round(255*(1-frac));
-     for(let dy=0;dy<step;dy++){
-       for(let dx=0;dx<step;dx++){
-         const idx=((j*step+dy)*width+(i*step+dx))*4;
+     for(let dy=0;dy<stepY;dy++){
+       for(let dx=0;dx<stepX;dx++){
+         const idx=((j*stepY+dy)*width+(i*stepX+dx))*4;
          img.data[idx]=r;
          img.data[idx+1]=0;
          img.data[idx+2]=b;
@@ -1643,6 +1646,7 @@ function drawHeatMap(grid, conduitTemps, conduits, ambient){
  }
  ctx.clearRect(0,0,width,height);
  ctx.putImageData(img,0,0);
+ octx.clearRect(0,0,width,height);
 
  // legend
  const legendH=80, legendW=12;
@@ -1652,27 +1656,27 @@ function drawHeatMap(grid, conduitTemps, conduits, ambient){
    const frac=1-y/(legendH-1);
    const r=Math.round(255*frac);
    const b=Math.round(255*(1-frac));
-   ctx.fillStyle=`rgb(${r},0,${b})`;
-   ctx.fillRect(legendX,legendY+y,legendW,1);
+   octx.fillStyle=`rgb(${r},0,${b})`;
+   octx.fillRect(legendX,legendY+y,legendW,1);
  }
- ctx.fillStyle='black';
- ctx.font='10px sans-serif';
- ctx.fillText((maxT*9/5+32).toFixed(0)+'\u00B0F',legendX-4,legendY+8);
- ctx.fillText((minT*9/5+32).toFixed(0)+'\u00B0F',legendX-4,legendY+legendH-2);
+ octx.fillStyle='black';
+ octx.font='10px sans-serif';
+ octx.fillText((maxT*9/5+32).toFixed(0)+'\u00B0F',legendX-4,legendY+8);
+ octx.fillText((minT*9/5+32).toFixed(0)+'\u00B0F',legendX-4,legendY+legendH-2);
  const maxTF=maxT*9/5+32;
  const Tc=getConductorRating();
  if(maxT>Tc){
    console.warn(`Maximum temperature ${maxT.toFixed(1)}\u00B0C exceeds ${Tc}\u00B0C rating.`);
  }
- ctx.beginPath();
- ctx.arc(maxPx,maxPy,5,0,Math.PI*2);
- ctx.fillStyle='yellow';
- ctx.fill();
- ctx.strokeStyle='red';
- ctx.stroke();
- ctx.font='12px sans-serif';
- ctx.fillStyle='black';
- ctx.fillText(maxTF.toFixed(1)+'\u00B0F',maxPx+8,maxPy-8);
+ octx.beginPath();
+ octx.arc(maxPx,maxPy,5,0,Math.PI*2);
+ octx.fillStyle='yellow';
+ octx.fill();
+ octx.strokeStyle='red';
+ octx.stroke();
+ octx.font='12px sans-serif';
+ octx.fillStyle='black';
+ octx.fillText(maxTF.toFixed(1)+'\u00B0F',maxPx+8,maxPy-8);
 
  window.conduitOverLimit={};
  const scale=40,margin=20;
@@ -1688,15 +1692,15 @@ function drawHeatMap(grid, conduitTemps, conduits, ambient){
    if(over){
      console.warn(`Temperature at conduit ${cd.conduit_id} reaches ${t.toFixed(1)}\u00B0C > rating ${rating}\u00B0C`);
    }
-   ctx.beginPath();
-   ctx.arc(px,py,4,0,Math.PI*2);
-   ctx.fillStyle=over?'red':'yellow';
-   ctx.fill();
-   ctx.strokeStyle='black';
-   ctx.stroke();
-   ctx.fillStyle='black';
-   ctx.fillText(tf.toFixed(1)+'\u00B0F'+(over?' ⚠':''),px+6,py+4);
- });
+   octx.beginPath();
+   octx.arc(px,py,4,0,Math.PI*2);
+   octx.fillStyle=over?'red':'yellow';
+   octx.fill();
+   octx.strokeStyle='black';
+   octx.stroke();
+   octx.fillStyle='black';
+   octx.fillText(tf.toFixed(1)+'\u00B0F'+(over?' ⚠':''),px+6,py+4);
+});
 }
 
 function importCSV(file,callback){
@@ -1711,64 +1715,20 @@ document.getElementById('sampleConduits').addEventListener('click',()=>{
  document.querySelector('#conduitTable tbody').innerHTML='';
  SAMPLE_CONDUITS.forEach(addConduitRow);
  drawGrid();
- updateAmpacityReport();
+ updateAmpacityReport(false);
  saveDuctbankSession();
 });
 document.getElementById('sampleCables').addEventListener('click',()=>{
   const tbody=document.querySelector('#cableTable tbody');
   tbody.innerHTML='';
 
-  const samples=[
-    {
-      tag:'SAMP1',
-      cable_type:'Power',
-      diameter:2.6,
-      conductors:3,
-      conductor_size:'#500 kcmil',
-      insulation_thickness:0.095,
-      weight:6.0,
-      est_load:400,
-      conduit_id:'C1',
-      conductor_material:'Copper',
-      insulation_type:'THHN',
-      insulation_rating:'90',
-      voltage_rating:'600V',
-      shielding_jacket:''
-    },
-    {
-      tag:'SAMP2',
-      cable_type:'Power',
-      diameter:2.3,
-      conductors:3,
-      conductor_size:'#350 kcmil',
-      insulation_thickness:0.09,
-      weight:4.5,
-      est_load:300,
-      conduit_id:'C2',
-      conductor_material:'Aluminum',
-      insulation_type:'THHN',
-      insulation_rating:'90',
-      voltage_rating:'600V',
-      shielding_jacket:''
-    },
-    {
-      tag:'SAMP3',
-      cable_type:'Power',
-      diameter:1.9,
-      conductors:3,
-      conductor_size:'#2/0 AWG',
-      insulation_thickness:0.06,
-      weight:3.0,
-      est_load:150,
-      conduit_id:'C3',
-      conductor_material:'Copper',
-      insulation_type:'THHN',
-      insulation_rating:'90',
-      voltage_rating:'600V',
-      shielding_jacket:''
-    }
-  ];
-
+  const samples=SAMPLE_CABLES.map(c=>{
+    const props=window.CONDUCTOR_PROPS?.[c.conductor_size];
+    return Object.assign({},c,{
+      insulation_thickness:c.insulation_thickness??props?.insulation_thickness??0.05,
+      weight:c.weight??(props?((props.area_cm*7.854e-7)*0.323*12).toFixed(3):'')
+    });
+  });
   samples.forEach(addCableRow);
   updateInsulationOptions();
   drawGrid();
@@ -1945,14 +1905,19 @@ function showToast(msg){
 
 function toggleHeatMap(){
  const canvas=document.getElementById('tempCanvas');
- if(!canvas)return;
+ const overlay=document.getElementById('tempOverlay');
+ if(!canvas||!overlay)return;
  const ctx=canvas.getContext('2d');
+ const octx=overlay.getContext('2d');
  if(heatVisible){
    ctx.clearRect(0,0,canvas.width,canvas.height);
+   octx.clearRect(0,0,overlay.width,overlay.height);
    canvas.style.display='none';
+   overlay.style.display='none';
  }else if(window.lastHeatGrid){
    drawHeatMap(window.lastHeatGrid, window.lastConduitTemps||{}, getAllConduits(), window.lastAmbient||0);
    canvas.style.display='block';
+   overlay.style.display='block';
  }
  heatVisible=!heatVisible;
 }
@@ -1960,10 +1925,24 @@ function toggleHeatMap(){
 document.getElementById('exportConduitsBtn').addEventListener('click',exportConduits);
 document.getElementById('exportCablesBtn').addEventListener('click',exportCables);
 document.getElementById('exportImgBtn').addEventListener('click',exportImage);
+function fallbackCopy(text){
+  const ta=document.createElement('textarea');
+  ta.value=text;
+  ta.style.position='fixed';
+  ta.style.left='-9999px';
+  document.body.appendChild(ta);
+  ta.select();
+  try{document.execCommand('copy');showToast('Report copied to clipboard.');}
+  catch(e){alert('Copy failed');}
+  document.body.removeChild(ta);
+}
 document.getElementById('copyCalcReportBtn').addEventListener('click',()=>{
   const txt=buildCalcReport();
-  navigator.clipboard.writeText(txt)
-    .then(() => { showToast('Report copied to clipboard.'); });
+  if(navigator.clipboard&&navigator.clipboard.writeText){
+    navigator.clipboard.writeText(txt)
+      .then(()=>{showToast('Report copied to clipboard.');})
+      .catch(()=>fallbackCopy(txt));
+  }else{ fallbackCopy(txt); }
 });
 document.getElementById('thermalBtn').addEventListener('click',async()=>{
   validateThermalInputs();
