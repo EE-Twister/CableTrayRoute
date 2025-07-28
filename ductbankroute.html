@@ -125,7 +125,7 @@ button{padding:4px 8px;margin:4px 2px;cursor:pointer;}
  <label style="margin-left:8px;">Thermal Resistivity of Soil (&#176;C&#183;cm/W)<input type="number" id="soilResistivity" list="soilResList" style="width:60px;"></label>
  <datalist id="soilResList"></datalist>
  <label style="margin-left:8px;">Moisture Content (%)<input type="number" id="moistureContent" min="0" max="100" style="width:60px;"></label>
- <label style="margin-left:8px;">Conductor Rating
+ <label style="margin-left:8px;">Allowable Conductor Temperature Tc
   <select id="conductorRating" style="margin-left:4px;">
    <option value="60">60&#176;C</option>
    <option value="75">75&#176;C</option>
@@ -232,22 +232,16 @@ button{padding:4px 8px;margin:4px 2px;cursor:pointer;}
   <h3>NEC Fill Rules</h3>
   <p>NEC Chapter&nbsp;9 Table&nbsp;1 limits conduit fill to 53% with one cable, 31% with two cables and 40% with three or more cables. Table&nbsp;4 provides areas for each conduit type and size.</p>
   <h3>Ampacity Calculation</h3>
-  <p>Ampacity is estimated using a simplified Neher-McGrath method:</p>
-  <pre>I = sqrt(&Delta;T / (R<sub>dc</sub> &times; R<sub>th</sub>))</pre>
-  <p>Where &Delta;T = 90&nbsp;&minus; max(T<sub>earth</sub>,T<sub>air</sub>) and R<sub>th</sub> is computed as:</p>
-  <pre>R<sub>th</sub> = (&#x3c1;/90) &times; 0.5 &times; N &times; (1 + D/100)
-       &times; moistureAdj
-       &times; adjCableFactor
-       &times; (heatSources ? 1.2 : 1)
-       &times; (encased ? 0.8 : 1)
-       &times; insulationAdj &times; voltageAdj &times; jacketAdj
-       &times; spacingAdj</pre>
+  <p>Ampacity is estimated using the full Neher-McGrath equation:</p>
+  <pre>I = sqrt( T<sub>c</sub> - (T<sub>a</sub> + &Delta;T<sub>d</sub>) ) /
+           (R<sub>dc</sub> &times; (1 + Y<sub>c</sub>) &times; R<sub>ca</sub>)</pre>
+  <p>Here T<sub>c</sub> is the allowable conductor temperature from the rating selection, T<sub>a</sub> is the higher of earth or air temperature, and &Delta;T<sub>d</sub> is the dielectric-loss rise (0 when voltage is below 2&nbsp;kV). Y<sub>c</sub> corrects for AC skin and proximity effects. R<sub>ca</sub> is the sum R<sub>cond</sub> + R<sub>ins</sub> + R<sub>duct</sub> + R<sub>soil</sub>.</p>
   <p>&#x3c1; is the soil resistivity, N is the cables in the conduit, D is ductbank depth (in), <em>moistureAdj</em> reduces resistance for wetter soil, <em>adjCableFactor</em> accounts for heat from neighboring conduits, and <em>spacingAdj</em>=3/spacing. <em>insulationAdj</em>, <em>voltageAdj</em> and <em>jacketAdj</em> adjust for cable construction. The DC resistance R<sub>dc</sub> depends on conductor material and size.</p>
   <p>Lower soil resistivity allows heat to dissipate more easily and therefore increases cable ampacity. See <a href="docs/soil_resistivity.md" target="_blank">soil resistivity reference</a> for typical IEEE&nbsp;835 values.</p>
   <h3>Thermal Analysis</h3>
   <p>The <em>Thermal Analysis</em> button overlays a heat map on the drawing. Each conduit center is marked with a yellow dot labeled with the estimated earth temperature in Fahrenheit and the hottest point is highlighted in red.</p>
   <p>Inputs are validated before running the analysis. Ductbank depth is limited to 0–120&nbsp;in, spacing between 1–24&nbsp;in and cable estimated load up to 2000&nbsp;A. Values outside these ranges will be clamped.</p>
-  <p>Conduit fill limits come from NEC Chapter&nbsp;9, while ampacity adjustments use the simplified Neher-McGrath method from NEC 310-15(C) and IEEE Std&nbsp;835. Thermal resistivity calculations reference the original Neher-McGrath paper. See <a href="docs/standards.md" target="_blank">documentation</a> for details.</p>
+  <p>Conduit fill limits come from NEC Chapter&nbsp;9, while ampacity calculations follow the Neher-McGrath approach from NEC&nbsp;310‑15(C) and IEEE Std&nbsp;835. Thermal resistivity calculations reference the original Neher-McGrath paper. See <a href="docs/standards.md" target="_blank">documentation</a> for details.</p>
 </div>
 </div>
 
@@ -869,7 +863,7 @@ function updateAmpacityReport(){
   return `<tr><td>${c.tag}</td><td>${neher}</td><td>${finite}</td><td>${over?'Yes':''}</td></tr>`;
 }).join('');
  document.getElementById('ampacityReport').innerHTML=
-   `<table><thead><tr><th>Cable</th><th>Ampacity (A) - Neher McGrath</th><th>Ampacity (A) - Finite Element</th><th>Over Limit</th></tr></thead><tbody>${rows}</tbody></table>`;
+   `<table><thead><tr><th>Cable</th><th>Ampacity (A) - Neher‑McGrath</th><th>Ampacity (A) - Finite Element</th><th>Over Limit</th></tr></thead><tbody>${rows}</tbody></table>`;
 }
 
 function drawGrid(){
