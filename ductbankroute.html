@@ -780,11 +780,13 @@ function loadDuctbankSession(){
 
 function autoPlaceConduits(){
  const rows=document.querySelectorAll('#conduitTable tbody tr');
+ if(rows.length===0) return;
  const h=parseFloat(document.getElementById('hSpacing').value)||3;
  const v=parseFloat(document.getElementById('vSpacing').value)||4;
  const bottomPad=parseFloat(document.getElementById('bottomPad').value)||0;
  const leftPad=parseFloat(document.getElementById('leftPad').value)||0;
- const perRow=parseInt(document.getElementById('perRow').value)||Math.ceil(Math.sqrt(rows.length));
+ let perRow=parseInt(document.getElementById('perRow').value);
+ if(!perRow) perRow=Math.ceil(Math.sqrt(rows.length))||1;
 
  const numRows=Math.ceil(rows.length/perRow);
  const rowMaxR=new Array(numRows).fill(0);
@@ -2191,8 +2193,11 @@ function populateSoilReferences(data){
   }
 }
 updateHeatSourceVisibility();
-loadConductorProperties().then(()=>{updateInsulationOptions();checkInsulationThickness();});
-loadDuctbankSession();
+loadConductorProperties().then(()=>{
+  updateInsulationOptions();
+  checkInsulationThickness();
+  loadDuctbankSession();
+});
 loadSoilResistivityData().then(data=>{
   populateSoilReferences(data);
   validateThermalInputs();
