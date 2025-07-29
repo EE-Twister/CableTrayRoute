@@ -240,8 +240,8 @@ button{padding:4px 8px;margin:4px 2px;cursor:pointer;}
 
 <div id="gridContainer" style="position:relative;display:inline-block;">
  <svg id="grid" width="500" height="500" style="position:relative;z-index:1;"></svg>
- <canvas id="tempCanvas" width="500" height="500" style="position:absolute;top:0;left:0;pointer-events:none;z-index:0;"></canvas>
- <canvas id="tempOverlay" width="500" height="500" style="position:absolute;top:0;left:0;pointer-events:none;z-index:2;"></canvas>
+ <canvas id="tempCanvas" width="500" height="500" style="position:absolute;top:0;left:0;pointer-events:none;z-index:0;display:none;"></canvas>
+ <canvas id="tempOverlay" width="500" height="500" style="position:absolute;top:0;left:0;pointer-events:none;z-index:2;display:none;"></canvas>
 </div>
 <label style="display:block;margin-top:4px;"><input type="checkbox" id="hideDrawing"> Hide Drawing</label>
 
@@ -298,7 +298,7 @@ button{padding:4px 8px;margin:4px 2px;cursor:pointer;}
 </div>
 
 <script>
-let heatVisible=true;
+let heatVisible=false;
 window.lastHeatGrid=null;
 window.lastConduitTemps=null;
 window.lastAmbient=0;
@@ -1576,6 +1576,7 @@ function solveDuctbankTemperaturesWorker(conduits,cables,params,progress){
 }
 
 async function runFiniteThermalAnalysis(){
+  heatVisible=true;
   drawGrid();
   const conduits=getAllConduits();
  const cables=getAllCables();
@@ -1584,7 +1585,7 @@ async function runFiniteThermalAnalysis(){
  const svg=document.getElementById('grid');
  const width=parseFloat(svg.getAttribute('width')) || svg.clientWidth;
  const height=parseFloat(svg.getAttribute('height')) || svg.clientHeight;
- [canvas,overlay].forEach(cv=>{if(!cv)return;cv.width=width;cv.height=height;cv.style.width=width+'px';cv.style.height=height+'px';cv.style.display=heatVisible?'block':'none';});
+ [canvas,overlay].forEach(cv=>{if(!cv)return;cv.width=width;cv.height=height;cv.style.width=width+'px';cv.style.height=height+'px';cv.style.display='block';});
  const ctx=canvas.getContext('2d');
  ctx.clearRect(0,0,width,height);
  const octx=overlay.getContext('2d');
