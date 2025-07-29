@@ -1809,6 +1809,7 @@ document.getElementById('sampleCables').addEventListener('click', async ()=>{
   if(!Object.keys(window.CONDUCTOR_PROPS||{}).length){
     await loadConductorProperties();
   }
+  if(window.CONDUCTOR_PROPS) CONDUCTOR_PROPS = window.CONDUCTOR_PROPS;
   const tbody=document.querySelector('#cableTable tbody');
   tbody.innerHTML='';
 
@@ -2194,6 +2195,8 @@ function populateSoilReferences(data){
 }
 updateHeatSourceVisibility();
 loadConductorProperties().then(()=>{
+  // sync local copy used by inline functions
+  if(window.CONDUCTOR_PROPS) CONDUCTOR_PROPS = window.CONDUCTOR_PROPS;
   updateInsulationOptions();
   checkInsulationThickness();
   loadDuctbankSession();
