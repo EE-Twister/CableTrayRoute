@@ -324,24 +324,24 @@ const SAMPLE_CONDUITS=[
 
 
 const SAMPLE_CABLES=[
- {tag:'CBL01',cable_type:'Power',diameter:2.6,conductors:3,conductor_size:'#500 kcmil',weight:6.0,conduit_id:'C1',est_load:400},
+ {tag:'CBL01',cable_type:'Power',diameter:2.6,conductors:3,conductor_size:'500 kcmil',weight:6.0,conduit_id:'C1',est_load:400},
  {tag:'CBL02',cable_type:'Control',diameter:0.6,conductors:4,conductor_size:'#14 AWG',weight:0.8,conduit_id:'C1',est_load:15},
  {tag:'CBL03',cable_type:'Signal',diameter:0.16,conductors:1,conductor_size:'#18 AWG',weight:0.5,conduit_id:'C2',est_load:5},
  {tag:'CBL04',cable_type:'Power',diameter:1.3,conductors:3,conductor_size:'#2 AWG',weight:3.0,conduit_id:'C2',est_load:115},
- {tag:'CBL05',cable_type:'Power',diameter:2.1,conductors:3,conductor_size:'#4/0 AWG',weight:5.0,conduit_id:'C3',est_load:260},
+ {tag:'CBL05',cable_type:'Power',diameter:2.1,conductors:3,conductor_size:'4/0 AWG',weight:5.0,conduit_id:'C3',est_load:260},
  {tag:'CBL06',cable_type:'Control',diameter:0.9,conductors:8,conductor_size:'#12 AWG',weight:1.2,conduit_id:'C3',est_load:20},
  {tag:'CBL07',cable_type:'Signal',diameter:0.35,conductors:2,conductor_size:'#16 AWG',weight:0.6,conduit_id:'C4',est_load:5},
- {tag:'CBL08',cable_type:'Power',diameter:1.8,conductors:3,conductor_size:'#1/0 AWG',weight:3.2,conduit_id:'C4',est_load:150},
+ {tag:'CBL08',cable_type:'Power',diameter:1.8,conductors:3,conductor_size:'1/0 AWG',weight:3.2,conduit_id:'C4',est_load:150},
  {tag:'CBL09',cable_type:'Control',diameter:0.7,conductors:4,conductor_size:'#10 AWG',weight:1.5,conduit_id:'C5',est_load:40},
  {tag:'CBL10',cable_type:'Signal',diameter:0.1,conductors:1,conductor_size:'#22 AWG',weight:0.2,conduit_id:'C5',est_load:2},
- {tag:'CBL11',cable_type:'Power',diameter:1.8,conductors:3,conductor_size:'#1/0 AWG',weight:4.2,conduit_id:'C5',est_load:150},
+ {tag:'CBL11',cable_type:'Power',diameter:1.8,conductors:3,conductor_size:'1/0 AWG',weight:4.2,conduit_id:'C5',est_load:150},
  {tag:'CBL12',cable_type:'Power',diameter:1.3,conductors:3,conductor_size:'#2 AWG',weight:3.5,conduit_id:'C6',est_load:115},
  {tag:'CBL13',cable_type:'Control',diameter:0.6,conductors:6,conductor_size:'#14 AWG',weight:1.0,conduit_id:'C6',est_load:15},
  {tag:'CBL14',cable_type:'Signal',diameter:0.3,conductors:2,conductor_size:'#18 AWG',weight:0.3,conduit_id:'C7',est_load:5},
  {tag:'CBL15',cable_type:'Power',diameter:1.1,conductors:3,conductor_size:'#4 AWG',weight:2.8,conduit_id:'C7',est_load:85},
  {tag:'CBL16',cable_type:'Signal',diameter:0.3,conductors:2,conductor_size:'#16 AWG',weight:0.7,conduit_id:'C8',est_load:5},
  {tag:'CBL17',cable_type:'Control',diameter:0.9,conductors:8,conductor_size:'#12 AWG',weight:1.8,conduit_id:'C8',est_load:20},
- {tag:'CBL18',cable_type:'Power',diameter:1.8,conductors:3,conductor_size:'#1/0 AWG',weight:4.8,conduit_id:'C9',est_load:150},
+ {tag:'CBL18',cable_type:'Power',diameter:1.8,conductors:3,conductor_size:'1/0 AWG',weight:4.8,conduit_id:'C9',est_load:150},
  {tag:'CBL19',cable_type:'Signal',diameter:0.12,conductors:1,conductor_size:'#20 AWG',weight:0.3,conduit_id:'C9',est_load:3},
  {tag:'CBL20',cable_type:'Control',diameter:0.8,conductors:8,conductor_size:'#16 AWG',weight:1.2,conduit_id:'C10',est_load:10},
  {tag:'CBL21',cable_type:'Power',diameter:1.3,conductors:3,conductor_size:'#2 AWG',weight:3.6,conduit_id:'C10',est_load:115},
@@ -352,7 +352,7 @@ const SAMPLE_CABLES=[
  {tag:'CBL26',cable_type:'Power',diameter:1.3,conductors:3,conductor_size:'#2 AWG',weight:3.5,conduit_id:'C13',est_load:115},
  {tag:'CBL27',cable_type:'Signal',diameter:0.3,conductors:2,conductor_size:'#18 AWG',weight:0.4,conduit_id:'C13',est_load:5},
  {tag:'CBL28',cable_type:'Control',diameter:0.6,conductors:4,conductor_size:'#14 AWG',weight:1.3,conduit_id:'C14',est_load:15},
- {tag:'CBL29',cable_type:'Power',diameter:1.8,conductors:3,conductor_size:'#1/0 AWG',weight:4.0,conduit_id:'C15',est_load:150},
+ {tag:'CBL29',cable_type:'Power',diameter:1.8,conductors:3,conductor_size:'1/0 AWG',weight:4.0,conduit_id:'C15',est_load:150},
  {tag:'CBL30',cable_type:'Signal',diameter:0.15,conductors:1,conductor_size:'#16 AWG',weight:0.6,conduit_id:'C16',est_load:3},
 ];
 // add additional cable properties for sample data
@@ -588,7 +588,8 @@ function applyDefaults(){
   const weightInput=tr.children[6]?.querySelector('input');
   const matSel=tr.children[9]?.querySelector('select');
   const size=sizeInput?.value.trim();
-  const props=window.CONDUCTOR_PROPS && window.CONDUCTOR_PROPS[size];
+  const key=normalizeSizeKey(size);
+  const props=window.CONDUCTOR_PROPS && window.CONDUCTOR_PROPS[key];
   if(props){
     if(thickInput && !thickInput.value) thickInput.value=props.insulation_thickness;
     if(thickInput){
