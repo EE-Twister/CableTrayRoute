@@ -531,11 +531,11 @@ function generateNextCableTag(sample){
 
 function addConduitRow(data={}){
  const tr=document.createElement('tr');
- const idTd=document.createElement('td');const idInput=document.createElement('input');idInput.value=data.conduit_id||'';idTd.appendChild(idInput);tr.appendChild(idTd);
- const typeTd=document.createElement('td');const typeSel=document.createElement('select');Object.keys(CONDUIT_SPECS).forEach(t=>{const o=document.createElement('option');o.value=t;o.textContent=t;typeSel.appendChild(o);});typeSel.value=data.conduit_type||Object.keys(CONDUIT_SPECS)[0];typeTd.appendChild(typeSel);tr.appendChild(typeTd);
- const sizeTd=document.createElement('td');let sizeSel=conduitSizeOptions(typeSel.value);sizeTd.appendChild(sizeSel);sizeSel.value=data.trade_size||sizeSel.options[0].value;tr.appendChild(sizeTd);
+ const idTd=document.createElement('td');const idInput=document.createElement('input');idInput.name='conduit_id';idInput.value=data.conduit_id||'';idTd.appendChild(idInput);tr.appendChild(idTd);
+ const typeTd=document.createElement('td');const typeSel=document.createElement('select');typeSel.name='conduit_type';Object.keys(CONDUIT_SPECS).forEach(t=>{const o=document.createElement('option');o.value=t;o.textContent=t;typeSel.appendChild(o);});typeSel.value=data.conduit_type||Object.keys(CONDUIT_SPECS)[0];typeTd.appendChild(typeSel);tr.appendChild(typeTd);
+ const sizeTd=document.createElement('td');let sizeSel=conduitSizeOptions(typeSel.value);sizeSel.name='trade_size';sizeTd.appendChild(sizeSel);sizeSel.value=data.trade_size||sizeSel.options[0].value;tr.appendChild(sizeTd);
  typeSel.addEventListener('change',()=>{const old=sizeSel;sizeSel=conduitSizeOptions(typeSel.value);sizeTd.replaceChild(sizeSel,old);});
- ['x','y'].forEach(k=>{const td=document.createElement('td');const inp=document.createElement('input');inp.type='number';inp.value=data[k]||0;if(k==='x'||k==='y')inp.readOnly=true;td.appendChild(inp);tr.appendChild(td);});
+ ['x','y'].forEach(k=>{const td=document.createElement('td');const inp=document.createElement('input');inp.name=k;inp.type='number';inp.value=data[k]||0;if(k==='x'||k==='y')inp.readOnly=true;td.appendChild(inp);tr.appendChild(td);});
  const dupTd=document.createElement('td');dupTd.appendChild(createButton('⧉','duplicateBtn','Duplicate row',()=>{const cloneData=rowToConduit(tr);addConduitRow(cloneData);}));tr.appendChild(dupTd);
  const delTd=document.createElement('td');delTd.appendChild(createButton('✖','removeBtn','Delete row',()=>{tr.remove();drawGrid();
  updateAmpacityReport();saveDuctbankSession();}));tr.appendChild(delTd);
@@ -559,6 +559,7 @@ function addCableRow(data={}, opts={}){
   let inp;
   if(selectOptions[c]){
     inp=document.createElement('select');
+    inp.name=c;
     selectOptions[c].forEach(opt=>{
       const o=document.createElement('option');
       o.value=opt;
@@ -567,6 +568,7 @@ function addCableRow(data={}, opts={}){
     });
   }else{
     inp=document.createElement('input');
+    inp.name=c;
     if(c==='diameter'||c==='weight'||c==='est_load'||c==='insulation_thickness') inp.type='number';
     else if(c==='conductors') inp.type='number';
     else inp.type='text';
@@ -675,6 +677,7 @@ function addHeatSourceRow(data={}){
  fields.forEach(f=>{
   const td=document.createElement('td');
   const inp=document.createElement('input');
+  inp.name=f;
   inp.value=data[f]||'';
   if(f!=='shape') inp.type='number';
   td.appendChild(inp);
