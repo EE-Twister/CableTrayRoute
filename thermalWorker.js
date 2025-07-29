@@ -20,17 +20,26 @@ for(const sz in AWG_AREA){
   RESISTANCE_TABLE.cu[sz]=BASE_RESISTIVITY.cu/areaMM2;
   RESISTANCE_TABLE.al[sz]=BASE_RESISTIVITY.al/areaMM2;
 }
+
+function normalizeSizeKey(size){
+  const s=size?size.toString().trim():'';
+  if(CONDUCTOR_PROPS[s]) return s;
+  const alt=s.replace(/^#/, '');
+  if(CONDUCTOR_PROPS[alt]) return alt;
+  return s;
+}
 function sizeToArea(size){
   if(!size) return 0;
-  const s=size.toString().trim();
+  let s=size.toString().trim();
   if(CONDUCTOR_PROPS[s]) return CONDUCTOR_PROPS[s].area_cm;
+  s=s.replace(/^#/, '');
   if(/kcmil/i.test(s)) return parseFloat(s)*1000;
-  const m=s.match(/#?(\d+(?:\/0)?)/);
+  const m=s.match(/(\d+(?:\/0)?)/);
   if(!m) return 0;
   return AWG_AREA[m[1]]||0;
 }
 function dcResistance(size,material,temp=20){
-  const key=size?size.toString().trim():'';
+  const key=normalizeSizeKey(size);
   const mat=material&&material.toLowerCase().includes('al')?'al':'cu';
   let base;
   const props=CONDUCTOR_PROPS[key];
