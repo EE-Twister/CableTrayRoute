@@ -1803,7 +1803,10 @@ document.getElementById('sampleConduits').addEventListener('click',()=>{
  updateAmpacityReport(false);
  saveDuctbankSession();
 });
-document.getElementById('sampleCables').addEventListener('click',()=>{
+document.getElementById('sampleCables').addEventListener('click', async ()=>{
+  if(!Object.keys(window.CONDUCTOR_PROPS||{}).length){
+    await loadConductorProperties();
+  }
   const tbody=document.querySelector('#cableTable tbody');
   tbody.innerHTML='';
 
