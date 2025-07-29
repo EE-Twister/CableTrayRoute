@@ -1057,7 +1057,7 @@ async function calcFiniteAmpacity(cable, conduits, cables, params){
  return (low+high)/2;
 }
 
-function updateAmpacityReport(scroll=true){
+function updateAmpacityReport(scroll=false){
  if(checkInsulationThickness()){
    document.getElementById('ampacityReport').innerHTML='<div class="message warning">Enter insulation thickness for highlighted cables.</div>';
    return;
