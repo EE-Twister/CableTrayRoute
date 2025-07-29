@@ -1117,8 +1117,8 @@ function drawGrid(){
  const bottomPad=parseFloat(document.getElementById('bottomPad').value)||0;
  const leftPad=parseFloat(document.getElementById('leftPad').value)||0;
  const rightPad=parseFloat(document.getElementById('rightPad').value)||0;
- const margin=20;
- const scale=40; // pixels per unit
+const margin=20;
+const scale=40; // pixels per unit
  const fillMap=fillResults();
 let maxX=0,maxY=0;
 conduits.forEach(c=>{
@@ -1295,9 +1295,23 @@ svg.appendChild(widthText);
   typeText.textContent=`${c.conduit_type} ${c.trade_size}\"`;
   svg.appendChild(typeText);
 });
-svg.setAttribute('width',maxX*scale+2*margin+80);
-
-svg.setAttribute('height',maxY*scale+2*margin+20);
+const width=maxX*scale+2*margin+80;
+const height=maxY*scale+2*margin+20;
+svg.setAttribute('width',width);
+svg.setAttribute('height',height);
+svg.style.background='white';
+if(heat){
+  heat.width=width;
+  heat.height=height;
+  heat.style.width=width+'px';
+  heat.style.height=height+'px';
+}
+if(overlay){
+  overlay.width=width;
+  overlay.height=height;
+  overlay.style.width=width+'px';
+  overlay.style.height=height+'px';
+}
  if(heatVisible && window.lastHeatGrid){
    drawHeatMap(window.lastHeatGrid, window.lastConduitTemps || {}, conduits, window.lastAmbient||0);
  }
