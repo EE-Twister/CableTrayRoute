@@ -544,7 +544,7 @@ function addConduitRow(data={}){
  saveDuctbankSession();
 }
 
-function addCableRow(data={}){
+function addCableRow(data={}, opts={}){
   const tr=document.createElement('tr');
  const cols=['tag','cable_type','diameter','conductors','conductor_size','insulation_thickness','weight','est_load','conduit_id','conductor_material','insulation_type','insulation_rating','voltage_rating','shielding_jacket'];
  const selectOptions={
@@ -614,9 +614,11 @@ matSel&&matSel.addEventListener('change',applyDefaults);
 const dupTd=document.createElement('td');dupTd.appendChild(createButton('⧉','duplicateBtn','Duplicate row',()=>{const clone=rowToCable(tr);clone.autoTag=true;addCableRow(clone);}));tr.appendChild(dupTd);
 const delTd=document.createElement('td');delTd.appendChild(createButton('✖','removeBtn','Delete row',()=>{tr.remove();drawGrid();updateAmpacityReport();saveDuctbankSession();}));tr.appendChild(delTd);
 document.querySelector('#cableTable tbody').appendChild(tr);
-drawGrid();
-updateAmpacityReport();
-saveDuctbankSession();
+if(!opts.defer){
+  drawGrid();
+  updateAmpacityReport();
+  saveDuctbankSession();
+}
 }
 
 function updateInsulationOptions(){
@@ -762,7 +764,7 @@ function loadDuctbankSession(){
   }
   if(Array.isArray(s.cables)){
     document.querySelector('#cableTable tbody').innerHTML='';
-    s.cables.forEach(addCableRow);
+    s.cables.forEach(c=>addCableRow(c,{defer:true}));
     updateInsulationOptions();
   }
   if(s.darkMode){document.body.classList.add('dark-mode');}
@@ -1786,7 +1788,7 @@ document.getElementById('sampleCables').addEventListener('click',()=>{
       weight:c.weight??(props?((props.area_cm*7.854e-7)*0.323*12).toFixed(3):'')
     });
   });
-  samples.forEach(addCableRow);
+  samples.forEach(s=>addCableRow(s,{defer:true}));
   const search=document.getElementById('cable-search');
   if(search){
     search.value='';
@@ -1800,7 +1802,7 @@ document.getElementById('sampleCables').addEventListener('click',()=>{
 });
 
 document.getElementById('importConduits').addEventListener('change',e=>{const f=e.target.files[0];if(f)importCSV(f,data=>{document.querySelector('#conduitTable tbody').innerHTML='';data.forEach(addConduitRow);drawGrid();updateAmpacityReport();saveDuctbankSession();});});
-document.getElementById('importCables').addEventListener('change',e=>{const f=e.target.files[0];if(f)importCSV(f,data=>{document.querySelector('#cableTable tbody').innerHTML='';data.forEach(addCableRow);updateInsulationOptions();drawGrid();updateAmpacityReport();saveDuctbankSession();});});
+document.getElementById('importCables').addEventListener('change',e=>{const f=e.target.files[0];if(f)importCSV(f,data=>{document.querySelector('#cableTable tbody').innerHTML='';data.forEach(d=>addCableRow(d,{defer:true}));updateInsulationOptions();drawGrid();updateAmpacityReport();saveDuctbankSession();});});
 
 document.getElementById('calc').addEventListener('click',()=>{drawGrid();updateAmpacityReport();});
 
