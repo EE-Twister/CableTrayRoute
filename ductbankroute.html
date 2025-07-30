@@ -1321,8 +1321,8 @@ svg.appendChild(widthText);
   typeText.textContent=`${c.conduit_type} ${c.trade_size}\"`;
   svg.appendChild(typeText);
 });
-const width=maxX*scale+2*margin+80;
-const height=maxY*scale+2*margin+20;
+const width=Math.round(maxX*scale+2*margin+80);
+const height=Math.round(maxY*scale+2*margin+20);
 svg.setAttribute('width',width);
 svg.setAttribute('height',height);
 svg.style.background='white';
@@ -1482,8 +1482,8 @@ function validateMoistureContent(){
 
 function solveDuctbankTemperatures(conduits,cables,params,progress){
   const svg=document.getElementById('grid');
-  const width=parseFloat(svg.getAttribute('width'))||svg.clientWidth;
-  const height=parseFloat(svg.getAttribute('height'))||svg.clientHeight;
+  const width=Math.round(parseFloat(svg.getAttribute('width'))||svg.clientWidth);
+  const height=Math.round(parseFloat(svg.getAttribute('height'))||svg.clientHeight);
   const scale=40,margin=20;
   GRID_SIZE=params.gridSize||GRID_SIZE;
   const step=Math.ceil(Math.max(width,height)/GRID_SIZE); // pixel step for solver grid
@@ -1588,8 +1588,8 @@ function solveDuctbankTemperatures(conduits,cables,params,progress){
 
 function solveDuctbankTemperaturesWorker(conduits,cables,params,progress){
   const svg=document.getElementById('grid');
-  const width=parseFloat(svg.getAttribute('width'))||svg.clientWidth;
-  const height=parseFloat(svg.getAttribute('height'))||svg.clientHeight;
+  const width=Math.round(parseFloat(svg.getAttribute('width'))||svg.clientWidth);
+  const height=Math.round(parseFloat(svg.getAttribute('height'))||svg.clientHeight);
   return new Promise(resolve=>{
     let worker;
     try{
@@ -1623,8 +1623,8 @@ async function runFiniteThermalAnalysis(){
  const canvas=document.getElementById('tempCanvas');
  const overlay=document.getElementById('tempOverlay');
  const svg=document.getElementById('grid');
- const width=parseFloat(svg.getAttribute('width')) || svg.clientWidth;
- const height=parseFloat(svg.getAttribute('height')) || svg.clientHeight;
+ const width=Math.round(parseFloat(svg.getAttribute('width')) || svg.clientWidth);
+ const height=Math.round(parseFloat(svg.getAttribute('height')) || svg.clientHeight);
  [canvas,overlay].forEach(cv=>{if(!cv)return;cv.width=width;cv.height=height;cv.style.width=width+'px';cv.style.height=height+'px';cv.style.display='block';});
  const ctx=canvas.getContext('2d');
  ctx.clearRect(0,0,width,height);
@@ -1699,11 +1699,11 @@ function drawHeatMap(grid, conduitTemps, conduits, ambient){
  const ctx=canvas.getContext('2d');
  const octx=overlay.getContext('2d');
  const svg=document.getElementById('grid');
- const width=parseFloat(svg.getAttribute('width'))||svg.clientWidth;
- const height=parseFloat(svg.getAttribute('height'))||svg.clientHeight;
+ const width=Math.round(parseFloat(svg.getAttribute('width'))||svg.clientWidth);
+ const height=Math.round(parseFloat(svg.getAttribute('height'))||svg.clientHeight);
 const stepX=Math.ceil(width/(grid[0]?.length||1));
 const stepY=Math.ceil(height/(grid.length||1));
-const img=ctx.createImageData(Math.round(width),Math.round(height));
+const img=ctx.createImageData(width,height);
 let maxT=-Infinity,maxPx=0,maxPy=0;
 let minT=Infinity;
 
