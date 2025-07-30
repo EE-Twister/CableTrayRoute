@@ -1170,22 +1170,27 @@ conduits.forEach(c=>{
   maxX=Math.max(maxX,c.x+2*Rin);
   maxY=Math.max(maxY,c.y+2*Rin);
 });
+maxY+=topPad;
+maxX+=rightPad;
+const ductWidth=maxX;
+const ductHeight=maxY;
+
+let overallMaxX=ductWidth;
+let overallMaxY=ductHeight;
 if(document.getElementById('heatSources').checked){
   getAllHeatSources().forEach(h=>{
     const w=parseFloat(h.width)||0;
     const ht=parseFloat(h.height)||0;
     if((h.shape||'').toLowerCase()==='circle'){
       const r=Math.max(w,ht)/2;
-      maxX=Math.max(maxX,(parseFloat(h.x)||0)+2*r);
-      maxY=Math.max(maxY,(parseFloat(h.y)||0)+2*r);
+      overallMaxX=Math.max(overallMaxX,(parseFloat(h.x)||0)+2*r);
+      overallMaxY=Math.max(overallMaxY,(parseFloat(h.y)||0)+2*r);
     }else{
-      maxX=Math.max(maxX,(parseFloat(h.x)||0)+w);
-      maxY=Math.max(maxY,(parseFloat(h.y)||0)+ht);
+      overallMaxX=Math.max(overallMaxX,(parseFloat(h.x)||0)+w);
+      overallMaxY=Math.max(overallMaxY,(parseFloat(h.y)||0)+ht);
     }
   });
 }
-maxY+=topPad;
- maxX+=rightPad;
 
  const defs=document.createElementNS('http://www.w3.org/2000/svg','defs');
  svg.appendChild(defs);
@@ -1193,16 +1198,16 @@ maxY+=topPad;
  const rect=document.createElementNS('http://www.w3.org/2000/svg','rect');
  rect.setAttribute('x',margin);
  rect.setAttribute('y',margin);
- rect.setAttribute('width',maxX*scale);
- rect.setAttribute('height',maxY*scale);
+ rect.setAttribute('width',ductWidth*scale);
+ rect.setAttribute('height',ductHeight*scale);
  rect.setAttribute('fill','none');
  rect.setAttribute('stroke','gray');
  rect.setAttribute('stroke-dasharray','4 2');
 svg.appendChild(rect);
 
  // overall dimension lines
- const widthY=margin+maxY*scale+15;
- const wStart=margin, wEnd=margin+maxX*scale;
+ const widthY=margin+ductHeight*scale+15;
+ const wStart=margin, wEnd=margin+ductWidth*scale;
  const widthLine=document.createElementNS('http://www.w3.org/2000/svg','line');
  widthLine.setAttribute('x1',wStart);
  widthLine.setAttribute('x2',wEnd);
@@ -1229,13 +1234,13 @@ widthText.setAttribute('x',(wStart+wEnd)/2);
 widthText.setAttribute('y',widthY-6);
 widthText.setAttribute('font-size','10');
 widthText.setAttribute('text-anchor','middle');
-widthText.textContent=maxX.toFixed(2)+'"';
+widthText.textContent=ductWidth.toFixed(2)+'"';
 svg.appendChild(widthText);
 
  const tag=document.getElementById('ductbankTag').value.trim();
  if(tag){
    const tagText=document.createElementNS('http://www.w3.org/2000/svg','text');
-   tagText.setAttribute('x',margin+maxX*scale/2);
+   tagText.setAttribute('x',margin+ductWidth*scale/2);
    tagText.setAttribute('y',margin-4);
    tagText.setAttribute('font-size','14');
    tagText.setAttribute('text-anchor','middle');
@@ -1243,8 +1248,8 @@ svg.appendChild(widthText);
    svg.appendChild(tagText);
  }
 
- const heightX=margin+maxX*scale+15;
- const hStart=margin, hEnd=margin+maxY*scale;
+ const heightX=margin+ductWidth*scale+15;
+ const hStart=margin, hEnd=margin+ductHeight*scale;
  const heightLine=document.createElementNS('http://www.w3.org/2000/svg','line');
  heightLine.setAttribute('x1',heightX);
  heightLine.setAttribute('x2',heightX);
@@ -1272,7 +1277,7 @@ svg.appendChild(widthText);
  heightText.setAttribute('font-size','10');
  heightText.setAttribute('text-anchor','start');
  heightText.setAttribute('dominant-baseline','middle');
- heightText.textContent=maxY.toFixed(2)+'"';
+heightText.textContent=ductHeight.toFixed(2)+'"';
  svg.appendChild(heightText);
 
  conduits.forEach(c=>{
@@ -1363,10 +1368,17 @@ svg.appendChild(widthText);
      const ht=parseFloat(h.height)||0;
      const shape=(h.shape||'').toLowerCase();
      const color='orange';
+     let hx=x*scale+margin;
+     let hy=y*scale+margin;
+     let wScaled=w*scale;
+     let hScaled=ht*scale;
      if(shape==='circle'){
        const r=Math.max(w,ht)/2*scale;
-       const cx=x*scale+margin+r;
-       const cy=y*scale+margin+r;
+       hx=x*scale+margin;
+       hy=y*scale+margin;
+       wScaled=hScaled=2*r;
+       const cx=hx+r;
+       const cy=hy+r;
        const c=document.createElementNS('http://www.w3.org/2000/svg','circle');
        c.setAttribute('cx',cx);
        c.setAttribute('cy',cy);
@@ -1387,18 +1399,18 @@ svg.appendChild(widthText);
        }
      }else{
        const rect=document.createElementNS('http://www.w3.org/2000/svg','rect');
-       rect.setAttribute('x',x*scale+margin);
-       rect.setAttribute('y',y*scale+margin);
-       rect.setAttribute('width',w*scale);
-       rect.setAttribute('height',ht*scale);
+       rect.setAttribute('x',hx);
+       rect.setAttribute('y',hy);
+       rect.setAttribute('width',wScaled);
+       rect.setAttribute('height',hScaled);
        rect.setAttribute('fill','none');
        rect.setAttribute('stroke',color);
        rect.setAttribute('stroke-dasharray','4 2');
        svg.appendChild(rect);
        if(h.temperature){
          const t=document.createElementNS('http://www.w3.org/2000/svg','text');
-         t.setAttribute('x',x*scale+margin+w*scale/2);
-         t.setAttribute('y',y*scale+margin+ht*scale/2);
+         t.setAttribute('x',hx+wScaled/2);
+         t.setAttribute('y',hy+hScaled/2);
          t.setAttribute('font-size','10');
          t.setAttribute('text-anchor','middle');
          t.setAttribute('dominant-baseline','middle');
@@ -1406,10 +1418,74 @@ svg.appendChild(widthText);
          svg.appendChild(t);
        }
      }
+     const rightEdge=margin+ductWidth*scale;
+     const bottomEdge=margin+ductHeight*scale;
+     // horizontal dimension
+     const dx=x-ductWidth;
+     const lineH=document.createElementNS('http://www.w3.org/2000/svg','line');
+     lineH.setAttribute('x1',rightEdge);
+     lineH.setAttribute('x2',hx);
+     lineH.setAttribute('y1',hy+hScaled/2);
+     lineH.setAttribute('y2',hy+hScaled/2);
+     lineH.setAttribute('stroke','black');
+     svg.appendChild(lineH);
+     const ht1=document.createElementNS('http://www.w3.org/2000/svg','line');
+     ht1.setAttribute('x1',rightEdge);
+     ht1.setAttribute('x2',rightEdge);
+     ht1.setAttribute('y1',hy+hScaled/2-4);
+     ht1.setAttribute('y2',hy+hScaled/2+4);
+     ht1.setAttribute('stroke','black');
+     svg.appendChild(ht1);
+     const ht2=document.createElementNS('http://www.w3.org/2000/svg','line');
+     ht2.setAttribute('x1',hx);
+     ht2.setAttribute('x2',hx);
+     ht2.setAttribute('y1',hy+hScaled/2-4);
+     ht2.setAttribute('y2',hy+hScaled/2+4);
+     ht2.setAttribute('stroke','black');
+     svg.appendChild(ht2);
+     const textH=document.createElementNS('http://www.w3.org/2000/svg','text');
+     textH.setAttribute('x',(rightEdge+hx)/2);
+     textH.setAttribute('y',hy+hScaled/2-6);
+     textH.setAttribute('font-size','10');
+     textH.setAttribute('text-anchor','middle');
+     textH.textContent=Math.max(0,dx).toFixed(2)+'"';
+     svg.appendChild(textH);
+
+     // vertical dimension
+     const dy=y-ductHeight;
+     const lineV=document.createElementNS('http://www.w3.org/2000/svg','line');
+     lineV.setAttribute('x1',hx+wScaled/2);
+     lineV.setAttribute('x2',hx+wScaled/2);
+     lineV.setAttribute('y1',bottomEdge);
+     lineV.setAttribute('y2',hy);
+     lineV.setAttribute('stroke','black');
+     svg.appendChild(lineV);
+     const vt1=document.createElementNS('http://www.w3.org/2000/svg','line');
+     vt1.setAttribute('x1',hx+wScaled/2-4);
+     vt1.setAttribute('x2',hx+wScaled/2+4);
+     vt1.setAttribute('y1',bottomEdge);
+     vt1.setAttribute('y2',bottomEdge);
+     vt1.setAttribute('stroke','black');
+     svg.appendChild(vt1);
+     const vt2=document.createElementNS('http://www.w3.org/2000/svg','line');
+     vt2.setAttribute('x1',hx+wScaled/2-4);
+     vt2.setAttribute('x2',hx+wScaled/2+4);
+     vt2.setAttribute('y1',hy);
+     vt2.setAttribute('y2',hy);
+     vt2.setAttribute('stroke','black');
+     svg.appendChild(vt2);
+     const textV=document.createElementNS('http://www.w3.org/2000/svg','text');
+     textV.setAttribute('x',hx+wScaled/2+6);
+     textV.setAttribute('y',(bottomEdge+hy)/2);
+     textV.setAttribute('font-size','10');
+     textV.setAttribute('text-anchor','start');
+     textV.setAttribute('dominant-baseline','middle');
+     textV.textContent=Math.max(0,dy).toFixed(2)+'"';
+     svg.appendChild(textV);
    });
  }
-const width=Math.round(maxX*scale+2*margin+80);
-const height=Math.round(maxY*scale+2*margin+20);
+const width=Math.round(overallMaxX*scale+2*margin+80);
+const height=Math.round(overallMaxY*scale+2*margin+20);
 svg.setAttribute('width',width);
 svg.setAttribute('height',height);
 svg.style.background='white';
