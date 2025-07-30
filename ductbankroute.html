@@ -260,6 +260,7 @@ button{padding:4px 8px;margin:4px 2px;cursor:pointer;}
   <button id="exportCablesBtn">Export Ductbank Cables</button>
   <button id="exportImgBtn">Export Image</button>
   <button id="exportThermalBtn">Download Thermal Data</button>
+  <button id="exportCanvasDataBtn">Download Canvas Data</button>
   <button id="copyCalcReportBtn">Copy Calculation Report</button>
   <button id="resetBtn">Reset Inputs</button>
  </div>
@@ -2005,6 +2006,22 @@ function downloadThermalData(){
  URL.revokeObjectURL(a.href);
 }
 
+function downloadCanvasData(){
+ const data={
+   grid:window.lastHeatGrid,
+   conduitTemps:window.lastConduitTemps,
+   ambient:window.lastAmbient
+ };
+ const blob=new Blob([JSON.stringify(data,null,2)],{type:'application/json'});
+ const a=document.createElement('a');
+ a.href=URL.createObjectURL(blob);
+ a.download='tempCanvas_data.json';
+ document.body.appendChild(a);
+ a.click();
+ document.body.removeChild(a);
+ URL.revokeObjectURL(a.href);
+}
+
 function deleteSavedData(){
  localStorage.removeItem('ductbankSession');
  document.querySelector('#conduitTable tbody').innerHTML='';
@@ -2052,6 +2069,7 @@ document.getElementById('exportConduitsBtn').addEventListener('click',exportCond
 document.getElementById('exportCablesBtn').addEventListener('click',exportCables);
 document.getElementById('exportImgBtn').addEventListener('click',exportImage);
 document.getElementById('exportThermalBtn').addEventListener('click',downloadThermalData);
+document.getElementById('exportCanvasDataBtn').addEventListener('click',downloadCanvasData);
 function fallbackCopy(text){
   const ta=document.createElement('textarea');
   ta.value=text;
