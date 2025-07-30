@@ -259,6 +259,7 @@ button{padding:4px 8px;margin:4px 2px;cursor:pointer;}
  <button id="exportConduitsBtn">Export Ductbank Conduits</button>
   <button id="exportCablesBtn">Export Ductbank Cables</button>
   <button id="exportImgBtn">Export Image</button>
+  <button id="exportThermalBtn">Download Thermal Data</button>
   <button id="copyCalcReportBtn">Copy Calculation Report</button>
   <button id="resetBtn">Reset Inputs</button>
  </div>
@@ -302,6 +303,13 @@ let heatVisible=false;
 window.lastHeatGrid=null;
 window.lastConduitTemps=null;
 window.lastAmbient=0;
+window.thermalLogs=[];
+(function(){
+ const warn=console.warn;
+ const error=console.error;
+ console.warn=function(...args){window.thermalLogs.push('WARN: '+args.join(' '));warn.apply(console,args);};
+ console.error=function(...args){window.thermalLogs.push('ERROR: '+args.join(' '));error.apply(console,args);};
+})();
 let GRID_SIZE = 20; // number of grid nodes across the ductbank for thermal solver
 const SAMPLE_CONDUITS=[
  {conduit_id:"C1",conduit_type:"PVC Sch 40",trade_size:"4",x:0,y:0},
@@ -1979,6 +1987,23 @@ function exportImage(){
 img.src='data:image/svg+xml;charset=utf-8,'+encodeURIComponent(source);
 }
 
+function downloadThermalData(){
+ const data={
+   grid:window.lastHeatGrid,
+   conduitTemps:window.lastConduitTemps,
+   ambient:window.lastAmbient,
+   logs:window.thermalLogs||[]
+ };
+ const blob=new Blob([JSON.stringify(data,null,2)],{type:'text/plain'});
+ const a=document.createElement('a');
+ a.href=URL.createObjectURL(blob);
+ a.download='thermal_data.txt';
+ document.body.appendChild(a);
+ a.click();
+ document.body.removeChild(a);
+ URL.revokeObjectURL(a.href);
+}
+
 function deleteSavedData(){
  localStorage.removeItem('ductbankSession');
  document.querySelector('#conduitTable tbody').innerHTML='';
@@ -2025,6 +2050,7 @@ function toggleHeatMap(){
 document.getElementById('exportConduitsBtn').addEventListener('click',exportConduits);
 document.getElementById('exportCablesBtn').addEventListener('click',exportCables);
 document.getElementById('exportImgBtn').addEventListener('click',exportImage);
+document.getElementById('exportThermalBtn').addEventListener('click',downloadThermalData);
 function fallbackCopy(text){
   const ta=document.createElement('textarea');
   ta.value=text;
