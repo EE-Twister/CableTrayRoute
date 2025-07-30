@@ -176,6 +176,7 @@ button{padding:4px 8px;margin:4px 2px;cursor:pointer;}
   <select id="gridRes" style="margin-left:4px;">
    <option value="20" selected>20×20</option>
    <option value="40">40×40</option>
+   <option value="80">80×80</option>
   </select>
  </label>
 <label style="margin-left:8px;">Duct Thermal Resistance (&#176;C·m/W)
@@ -1851,7 +1852,12 @@ document.getElementById('sampleCables').addEventListener('click', async ()=>{
 document.getElementById('importConduits').addEventListener('change',e=>{const f=e.target.files[0];if(f)importCSV(f,data=>{document.querySelector('#conduitTable tbody').innerHTML='';data.forEach(addConduitRow);drawGrid();updateAmpacityReport();saveDuctbankSession();});});
 document.getElementById('importCables').addEventListener('change',e=>{const f=e.target.files[0];if(f)importCSV(f,data=>{document.querySelector('#cableTable tbody').innerHTML='';data.forEach(d=>addCableRow(d,{defer:true}));updateInsulationOptions();drawGrid();updateAmpacityReport();saveDuctbankSession();});});
 
-document.getElementById('calc').addEventListener('click',()=>{drawGrid();updateAmpacityReport();});
+document.getElementById('calc').addEventListener('click',()=>{
+  drawGrid();
+  updateAmpacityReport();
+  const param=document.getElementById('paramSection');
+  if(param) param.open=true;
+});
 
 ['hSpacing','vSpacing'].forEach(id=>{
  document.getElementById(id).addEventListener('input',()=>{
