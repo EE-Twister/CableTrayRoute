@@ -1662,8 +1662,9 @@ async function runFiniteThermalAnalysis(){
   pl.textContent=`Solving (${it}/${max})`;
  });
  pc.style.display='none';
- document.getElementById('solver-info').textContent=
-  `Iterations: ${result.iter}  Residual: ${result.residual.toFixed(3)}`;
+ const residual = result.residual !== undefined ? result.residual : result.diff;
+ document.getElementById('solver-info').textContent =
+  `Iterations: ${result.iter}  Residual: ${Number(residual).toFixed(3)}`;
 const grid=result.grid;
 const conduitTemps=result.conduitTemps;
 const ambientRes=result.ambient;
