@@ -304,6 +304,7 @@ let heatVisible=false;
 window.lastHeatGrid=null;
 window.lastConduitTemps=null;
 window.lastAmbient=0;
+window.lastHeatImgData=null;
 window.thermalLogs=[];
 (function(){
  const warn=console.warn;
@@ -1745,9 +1746,10 @@ let minT=Infinity;
      }
    }
  }
- ctx.clearRect(0,0,width,height);
- ctx.putImageData(img,0,0);
- octx.clearRect(0,0,width,height);
+ctx.clearRect(0,0,width,height);
+ctx.putImageData(img,0,0);
+window.lastHeatImgData = img;
+octx.clearRect(0,0,width,height);
 
  // legend
  const legendH=80, legendW=12;
@@ -2007,15 +2009,19 @@ function downloadThermalData(){
 }
 
 function downloadCanvasData(){
- const data={
-   grid:window.lastHeatGrid,
-   conduitTemps:window.lastConduitTemps,
-   ambient:window.lastAmbient
- };
- const blob=new Blob([JSON.stringify(data,null,2)],{type:'application/json'});
+ const canvas=document.getElementById('tempCanvas');
+ if(!canvas) return;
+ const ctx=canvas.getContext('2d');
+ const img=window.lastHeatImgData || ctx.getImageData(0,0,canvas.width,canvas.height);
+ if(!img){
+   showToast('No canvas data available');
+   return;
+ }
+ const out={width:img.width,height:img.height,data:Array.from(img.data)};
+ const blob=new Blob([JSON.stringify(out)],{type:'application/json'});
  const a=document.createElement('a');
  a.href=URL.createObjectURL(blob);
- a.download='tempCanvas_data.json';
+ a.download='tempCanvas_imagedata.json';
  document.body.appendChild(a);
  a.click();
  document.body.removeChild(a);
