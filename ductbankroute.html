@@ -682,15 +682,28 @@ function rowToCable(tr){
  };
 }
 
+const HEAT_SOURCE_SHAPES=['Circle','Square'];
 function addHeatSourceRow(data={}){
  const tr=document.createElement('tr');
  const fields=['shape','width','height','temperature','x','y'];
  fields.forEach(f=>{
   const td=document.createElement('td');
-  const inp=document.createElement('input');
-  inp.name=f;
+  let inp;
+  if(f==='shape'){
+    inp=document.createElement('select');
+    inp.name=f;
+    HEAT_SOURCE_SHAPES.forEach(opt=>{
+      const o=document.createElement('option');
+      o.value=opt;
+      o.textContent=opt;
+      inp.appendChild(o);
+    });
+  }else{
+    inp=document.createElement('input');
+    inp.type='number';
+    inp.name=f;
+  }
   inp.value=data[f]||'';
-  if(f!=='shape') inp.type='number';
   td.appendChild(inp);
   tr.appendChild(td);
  });
@@ -702,8 +715,12 @@ function addHeatSourceRow(data={}){
 }
 
 function rowToHeatSource(tr){
- const [shape,width,height,temperature,x,y]=Array.from(tr.children).slice(0,6).map(td=>td.querySelector('input').value);
- return {shape,width:parseFloat(width)||0,height:parseFloat(height)||0,temperature:parseFloat(temperature)||0,x:parseFloat(x)||0,y:parseFloat(y)||0};
+ const vals=Array.from(tr.children).slice(0,6)
+                .map(td=>td.querySelector('input,select')?.value);
+ const [shape,width,height,temperature,x,y]=vals;
+ return {shape,width:parseFloat(width)||0,height:parseFloat(height)||0,
+         temperature:parseFloat(temperature)||0,
+         x:parseFloat(x)||0,y:parseFloat(y)||0};
 }
 
 function getAllHeatSources(){
@@ -1146,13 +1163,27 @@ function drawGrid(){
  const rightPad=parseFloat(document.getElementById('rightPad').value)||0;
 const margin=20;
 const scale=40; // pixels per unit
- const fillMap=fillResults();
+const fillMap=fillResults();
 let maxX=0,maxY=0;
 conduits.forEach(c=>{
   const Rin=Math.sqrt(CONDUIT_SPECS[c.conduit_type][c.trade_size]/Math.PI);
   maxX=Math.max(maxX,c.x+2*Rin);
   maxY=Math.max(maxY,c.y+2*Rin);
 });
+if(document.getElementById('heatSources').checked){
+  getAllHeatSources().forEach(h=>{
+    const w=parseFloat(h.width)||0;
+    const ht=parseFloat(h.height)||0;
+    if((h.shape||'').toLowerCase()==='circle'){
+      const r=Math.max(w,ht)/2;
+      maxX=Math.max(maxX,(parseFloat(h.x)||0)+2*r);
+      maxY=Math.max(maxY,(parseFloat(h.y)||0)+2*r);
+    }else{
+      maxX=Math.max(maxX,(parseFloat(h.x)||0)+w);
+      maxY=Math.max(maxY,(parseFloat(h.y)||0)+ht);
+    }
+  });
+}
 maxY+=topPad;
  maxX+=rightPad;
 
@@ -1322,6 +1353,61 @@ svg.appendChild(widthText);
   typeText.textContent=`${c.conduit_type} ${c.trade_size}\"`;
   svg.appendChild(typeText);
 });
+
+ if(document.getElementById('heatSources').checked){
+   const heatSources=getAllHeatSources();
+   heatSources.forEach(h=>{
+     const x=parseFloat(h.x)||0;
+     const y=parseFloat(h.y)||0;
+     const w=parseFloat(h.width)||0;
+     const ht=parseFloat(h.height)||0;
+     const shape=(h.shape||'').toLowerCase();
+     const color='orange';
+     if(shape==='circle'){
+       const r=Math.max(w,ht)/2*scale;
+       const cx=x*scale+margin+r;
+       const cy=y*scale+margin+r;
+       const c=document.createElementNS('http://www.w3.org/2000/svg','circle');
+       c.setAttribute('cx',cx);
+       c.setAttribute('cy',cy);
+       c.setAttribute('r',r);
+       c.setAttribute('fill','none');
+       c.setAttribute('stroke',color);
+       c.setAttribute('stroke-dasharray','4 2');
+       svg.appendChild(c);
+       if(h.temperature){
+         const t=document.createElementNS('http://www.w3.org/2000/svg','text');
+         t.setAttribute('x',cx);
+         t.setAttribute('y',cy);
+         t.setAttribute('font-size','10');
+         t.setAttribute('text-anchor','middle');
+         t.setAttribute('dominant-baseline','middle');
+         t.textContent=h.temperature;
+         svg.appendChild(t);
+       }
+     }else{
+       const rect=document.createElementNS('http://www.w3.org/2000/svg','rect');
+       rect.setAttribute('x',x*scale+margin);
+       rect.setAttribute('y',y*scale+margin);
+       rect.setAttribute('width',w*scale);
+       rect.setAttribute('height',ht*scale);
+       rect.setAttribute('fill','none');
+       rect.setAttribute('stroke',color);
+       rect.setAttribute('stroke-dasharray','4 2');
+       svg.appendChild(rect);
+       if(h.temperature){
+         const t=document.createElementNS('http://www.w3.org/2000/svg','text');
+         t.setAttribute('x',x*scale+margin+w*scale/2);
+         t.setAttribute('y',y*scale+margin+ht*scale/2);
+         t.setAttribute('font-size','10');
+         t.setAttribute('text-anchor','middle');
+         t.setAttribute('dominant-baseline','middle');
+         t.textContent=h.temperature;
+         svg.appendChild(t);
+       }
+     }
+   });
+ }
 const width=Math.round(maxX*scale+2*margin+80);
 const height=Math.round(maxY*scale+2*margin+20);
 svg.setAttribute('width',width);
