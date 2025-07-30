@@ -283,7 +283,7 @@ button{padding:4px 8px;margin:4px 2px;cursor:pointer;}
   <p>The <strong>Download Ductbank Data</strong> button exports all conduits, cables and fill results to an XLSX file.</p>
   <p><strong>Export Ductbank Conduits</strong> and <strong>Export Ductbank Cables</strong> create CSV files compatible with the import buttons.</p>
   <h3>Reporting and Export</h3>
-  <p>The <em>Copy Calculation Report</em> button copies a text summary to your clipboard and shows a confirmation toast. <em>Export Ductbank Conduits</em> and <em>Export Ductbank Cables</em> produce CSV or JSON files, while <em>Export Image</em> saves an SVG of the cross‑section. These downloads include the current version and note the assumptions used so results remain traceable.</p>
+  <p>The <em>Copy Calculation Report</em> button copies a text summary to your clipboard and shows a confirmation toast. The report includes a legend describing each calculation variable and its units. <em>Export Ductbank Conduits</em> and <em>Export Ductbank Cables</em> produce CSV or JSON files, while <em>Export Image</em> saves an SVG of the cross‑section. These downloads include the current version and note the assumptions used so results remain traceable.</p>
   <h3>NEC Fill Rules</h3>
   <p>NEC Chapter&nbsp;9 Table&nbsp;1 limits conduit fill to 53% with one cable, 31% with two cables and 40% with three or more cables. Table&nbsp;4 provides areas for each conduit type and size.</p>
   <h3>Ampacity Calculation</h3>
@@ -1952,8 +1952,18 @@ function buildCalcReport(){
  const total=cables.length;
  const countMap={};
  cables.forEach(c=>{countMap[c.conduit_id]=(countMap[c.conduit_id]||0)+1;});
- let report=`Cable Ampacity Calculation Report\nVersion: ${CTR_VERSION}\nTimestamp: ${new Date().toISOString()}\n`;
- Object.keys(params).forEach(k=>{report+=`${k}: ${params[k]}\n`;});
+ const info={
+  ductbankDepth:{unit:'in'},earthTemp:{unit:'\u00B0F'},
+  airTemp:{unit:'\u00B0F'},soilResistivity:{unit:'\u00B0C\u00B7cm/W'},
+  moistureContent:{unit:'%'},hSpacing:{unit:'in'},vSpacing:{unit:'in'},
+  topPad:{unit:'in'},bottomPad:{unit:'in'},leftPad:{unit:'in'},rightPad:{unit:'in'},
+  conductorRating:{unit:'\u00B0C'}
+ };
+ let report=`Cable Ampacity Calculation Report\nVersion: ${CTR_VERSION}\nTimestamp: ${new Date().toISOString()}\nInputs:\n`;
+ Object.keys(params).forEach(k=>{
+  const unit=info[k]?.unit||'';
+  report+=`${k}: ${params[k]}${unit?` ${unit}`:''}\n`;
+ });
  report+=`Conduits: ${conduits.length}  Cables: ${cables.length}\n\nResults:\n`;
  cables.forEach(c=>{
   const d=ampacityDetails(c,{...params,earthTemp:fToC(params.earthTemp),airTemp:isNaN(params.airTemp)?NaN:fToC(params.airTemp)},countMap[c.conduit_id],total);
@@ -1971,7 +1981,19 @@ function buildCalcReport(){
          `Formulas for Yc and ΔTd appear in `+
          `[AC Resistance Correction](docs/AMPACITY_METHOD.md#ac-resistance-correction). `+
          `Rdc, Rcond, Rins, Rduct, Rsoil and Rca are defined in `+
-         `[Variable Definitions](docs/AMPACITY_METHOD.md#variable-definitions).`;
+         `[Variable Definitions](docs/AMPACITY_METHOD.md#variable-definitions).`+
+         `\n\nVariable Legend:\n`+
+         `load - estimated cable load (A)\n`+
+         `Neher - ampacity via Neher-McGrath (A)\n`+
+         `Finite - ampacity from finite-element solver (A)\n`+
+         `Rdc - dc conductor resistance at T_c (\u03A9/m)\n`+
+         `Yc - ac resistance factor (dimensionless)\n`+
+         `ΔTd - dielectric-loss temperature rise (\u00B0C)\n`+
+         `Rcond - conductor thermal resistance (\u00B0C·m/W)\n`+
+         `Rins - insulation thermal resistance (\u00B0C·m/W)\n`+
+         `Rduct - raceway thermal resistance (\u00B0C·m/W)\n`+
+         `Rsoil - soil thermal resistance (\u00B0C·m/W)\n`+
+         `Rca - total external thermal resistance (\u00B0C·m/W)`;
  return report;
 }
 
