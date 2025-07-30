@@ -2126,9 +2126,7 @@ document.getElementById('copyCalcReportBtn').addEventListener('click',()=>{
 document.getElementById('thermalBtn').addEventListener('click',async()=>{
   validateThermalInputs();
   await runFiniteThermalAnalysis();
-  const param=document.getElementById('paramSection');
   const soil=document.getElementById('soilRef');
-  if(param) param.open=false;
   if(soil) soil.open=false;
 });
 document.getElementById('scrollTopBtn').addEventListener('click',()=>{
