@@ -1402,9 +1402,11 @@ heightText.textContent=ductHeight.toFixed(2)+'"';
        if(h.tag){
          const tagText=document.createElementNS('http://www.w3.org/2000/svg','text');
          tagText.setAttribute('x',cx);
-         tagText.setAttribute('y',hy-6);
+         // place the tag inside the circle above the temperature value
+         tagText.setAttribute('y',cy - r/2);
          tagText.setAttribute('font-size','10');
          tagText.setAttribute('text-anchor','middle');
+         tagText.setAttribute('dominant-baseline','middle');
          tagText.textContent=h.tag;
          svg.appendChild(tagText);
        }
@@ -1431,9 +1433,11 @@ heightText.textContent=ductHeight.toFixed(2)+'"';
        if(h.tag){
          const tagText=document.createElementNS('http://www.w3.org/2000/svg','text');
          tagText.setAttribute('x',hx+wScaled/2);
-         tagText.setAttribute('y',hy-6);
+         // place the tag inside the rectangle above the temperature value
+         tagText.setAttribute('y',hy+hScaled/2-6);
          tagText.setAttribute('font-size','10');
          tagText.setAttribute('text-anchor','middle');
+         tagText.setAttribute('dominant-baseline','middle');
          tagText.textContent=h.tag;
          svg.appendChild(tagText);
        }
@@ -2238,10 +2242,91 @@ function buildCalcReport(){
 }
 
 function downloadCalcReportDocx(){
- const lines=buildCalcReport().split('\n');
- const doc=new docx.Document({sections:[{properties:{},children:lines.map((line,i)=>
-   i===0?new docx.Paragraph({text:line,heading:docx.HeadingLevel.HEADING_1}):
-         new docx.Paragraph(line))}]});
+ const params=gatherInputParams();
+ const conduits=getAllConduits();
+ const cables=getAllCables();
+ const total=cables.length;
+ const countMap={};
+ cables.forEach(c=>{countMap[c.conduit_id]=(countMap[c.conduit_id]||0)+1;});
+ const info={
+  ductbankDepth:{unit:'in'},earthTemp:{unit:'\u00B0F'},
+  airTemp:{unit:'\u00B0F'},soilResistivity:{unit:'\u00B0C\u00B7cm/W'},
+  moistureContent:{unit:'%'},hSpacing:{unit:'in'},vSpacing:{unit:'in'},
+  topPad:{unit:'in'},bottomPad:{unit:'in'},leftPad:{unit:'in'},rightPad:{unit:'in'},
+  conductorRating:{unit:'\u00B0C'}
+ };
+
+ const children=[];
+ children.push(new docx.Paragraph({text:'Cable Ampacity Calculation Report',heading:docx.HeadingLevel.HEADING_1}));
+ children.push(new docx.Paragraph(`Version: ${CTR_VERSION}`));
+ children.push(new docx.Paragraph(`Timestamp: ${new Date().toISOString()}`));
+ children.push(new docx.Paragraph(''));
+ children.push(new docx.Paragraph('Input Parameters'));
+ children.push(new docx.Paragraph('----------------'));
+ Object.keys(params).forEach(k=>{
+  const unit=info[k]?.unit||'';
+  children.push(new docx.Paragraph(`${k}: ${params[k]}${unit?` ${unit}`:''}`));
+ });
+ children.push(new docx.Paragraph(''));
+ children.push(new docx.Paragraph(`Conduits: ${conduits.length}`));
+ children.push(new docx.Paragraph(`Cables: ${cables.length}`));
+ children.push(new docx.Paragraph(''));
+ children.push(new docx.Paragraph('Ampacity Results'));
+ children.push(new docx.Paragraph('----------------'));
+
+ const rows=[new docx.TableRow({children:['Cable','Load','Neher','Finite','Overload'].map(t=>
+   new docx.TableCell({children:[new docx.Paragraph(t)]}))})];
+
+ cables.forEach(c=>{
+  const d=ampacityDetails(c,{...params,earthTemp:fToC(params.earthTemp),airTemp:isNaN(params.airTemp)?NaN:fToC(params.airTemp)},countMap[c.conduit_id],total);
+  const finite=parseFloat(window.finiteAmpacity?.[c.tag]);
+  const finiteStr=isNaN(finite)?'N/A':finite.toFixed(1);
+  const load=parseFloat(c.est_load)||0;
+  const over=(load>(isNaN(d.ampacity)?Infinity:d.ampacity))||(load>(isNaN(finite)?Infinity:finite));
+  rows.push(new docx.TableRow({children:[
+    new docx.TableCell({children:[new docx.Paragraph(c.tag||'')]}),
+    new docx.TableCell({children:[new docx.Paragraph(load.toFixed(1))]}),
+    new docx.TableCell({children:[new docx.Paragraph(d.ampacity.toFixed(1))]}),
+    new docx.TableCell({children:[new docx.Paragraph(finiteStr)]}),
+    new docx.TableCell({children:[new docx.Paragraph(over?'Yes':'No')]}),
+  ]}));
+ });
+ children.push(new docx.Table({rows}));
+
+ children.push(new docx.Paragraph(''));
+ children.push(new docx.Paragraph('Ampacity calculations use the Neher-McGrath equation:'));
+ children.push(new docx.Paragraph({
+   children:[
+     new docx.Math({
+       children:[
+         new docx.MathRadical({
+           children:[
+             new docx.MathFraction({
+               numerator:[new docx.MathRun('T_c - (T_a + \u0394T_d)')],
+               denominator:[new docx.MathRun('R_dc \u00D7 (1 + Y_c) \u00D7 R_ca')]
+             })
+           ]
+         })
+       ]
+     })
+   ]
+ }));
+ children.push(new docx.Paragraph(''));
+ children.push(new docx.Paragraph('Variable Legend'));
+ children.push(new docx.Paragraph('---------------'));
+ children.push(new docx.Paragraph('load - estimated cable load (A)'));
+ children.push(new docx.Paragraph('Neher - ampacity via Neher-McGrath (A)'));
+ children.push(new docx.Paragraph('Finite - ampacity from finite-element solver (A)'));
+ children.push(new docx.Paragraph('Rdc - dc conductor resistance at T_c (\u03A9/m)'));
+ children.push(new docx.Paragraph('Yc - ac resistance factor (dimensionless)'));
+ children.push(new docx.Paragraph('\u0394Td - dielectric-loss temperature rise (\u00B0C)'));
+ children.push(new docx.Paragraph('Rcond - conductor thermal resistance (\u00B0C\u00B7m/W)'));
+ children.push(new docx.Paragraph('Rins - insulation thermal resistance (\u00B0C\u00B7m/W)'));
+ children.push(new docx.Paragraph('Rduct - raceway thermal resistance (\u00B0C\u00B7m/W)'));
+ children.push(new docx.Paragraph('Rsoil - soil thermal resistance (\u00B0C\u00B7m/W)'));
+ children.push(new docx.Paragraph('Rca - total external thermal resistance (\u00B0C\u00B7m/W)'));
+
+ const doc=new docx.Document({sections:[{properties:{},children}]});
  docx.Packer.toBlob(doc).then(blob=>{
    const a=document.createElement('a');
    a.href=URL.createObjectURL(blob);
