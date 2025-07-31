@@ -549,6 +549,16 @@ body.dark-mode .db-table td {
     background: #2c3034;
 }
 
+.ampacity-container {
+    overflow-x: auto;
+}
+
+.ampacity-table th,
+.ampacity-table td {
+    white-space: nowrap;
+    min-width: 60px;
+}
+
 #grid {
     border: 1px solid #aaa;
     margin-top: 12px;
