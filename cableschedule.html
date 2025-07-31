@@ -1,0 +1,193 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Cable Schedule</title>
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+  <nav class="top-nav">
+    <a href="index.html">Home</a>
+    <a href="ductbankroute.html">Ductbank</a>
+    <a href="cabletrayfill.html">Tray Fill</a>
+    <a href="conduitfill.html">Conduit Fill</a>
+    <a href="cableschedule.html">Cable Schedule</a>
+  </nav>
+  <div class="container">
+    <main class="main-content">
+      <header class="page-header">
+        <h1>Cable Schedule</h1>
+        <p>Centralized table for managing cable data.</p>
+      </header>
+
+      <section class="card">
+        <div style="margin-bottom:10px;">
+          <button id="add-row-btn" class="primary-btn">Add Cable</button>
+          <button id="save-schedule-btn">Save Schedule</button>
+          <button id="load-schedule-btn">Load Schedule</button>
+        </div>
+        <div style="overflow-x:auto;">
+          <table id="cableScheduleTable" class="sticky-table">
+            <thead></thead>
+            <tbody></tbody>
+          </table>
+        </div>
+      </section>
+    </main>
+  </div>
+
+<script>
+const INSULATION_TEMP_LIMIT = {
+  THHN:90,
+  XLPE:90,
+  PVC:75,
+  XHHW:90,
+  'XHHW-2':90,
+  'THWN-2':90,
+  THW:75,
+  THWN:75,
+  TW:60,
+  UF:60
+};
+
+const conductorSizes = ['#22 AWG','#20 AWG','#18 AWG','#16 AWG','#14 AWG','#12 AWG','#10 AWG','#8 AWG','#6 AWG','#4 AWG','#2 AWG','#1 AWG','1/0 AWG','2/0 AWG','3/0 AWG','4/0 AWG','250 kcmil','350 kcmil','500 kcmil','750 kcmil','1000 kcmil'];
+const cableTypes = ['Power','Control','Signal'];
+const conductorMaterials = ['Copper','Aluminum'];
+const insulationRatings = ['60','75','90'];
+const shieldingOptions = ['','Lead','Copper Tape'];
+
+const columns = [
+  {key:'tag',label:'Tag',type:'text'},
+  {key:'start_tag',label:'Start Tag',type:'text'},
+  {key:'end_tag',label:'End Tag',type:'text'},
+  {key:'cable_type',label:'Cable Type',type:'select',options:cableTypes},
+  {key:'conductors',label:'Conductors',type:'number'},
+  {key:'conductor_size',label:'Conductor Size',type:'select',options:conductorSizes},
+  {key:'cable_rating',label:'Cable Rating (V)',type:'number'},
+  {key:'operating_voltage',label:'Operating Voltage (V)',type:'number'},
+  {key:'diameter',label:'OD (in)',type:'number'},
+  {key:'weight',label:'Weight (lbs/ft)',type:'number'},
+  {key:'zone',label:'Cable Zone',type:'number'},
+  {key:'circuit_group',label:'Circuit Group',type:'number'},
+  {key:'allowed_cable_group',label:'Allowed Group',type:'text'},
+  {key:'start_x',label:'Start X',type:'number'},
+  {key:'start_y',label:'Start Y',type:'number'},
+  {key:'start_z',label:'Start Z',type:'number'},
+  {key:'end_x',label:'End X',type:'number'},
+  {key:'end_y',label:'End Y',type:'number'},
+  {key:'end_z',label:'End Z',type:'number'},
+  {key:'insulation_thickness',label:'Insul Thick (in)',type:'number'},
+  {key:'est_load',label:'Est Load (A)',type:'number'},
+  {key:'conduit_id',label:'Conduit',type:'text'},
+  {key:'conductor_material',label:'Conductor Material',type:'select',options:conductorMaterials},
+  {key:'insulation_type',label:'Insulation Type',type:'select',options:Object.keys(INSULATION_TEMP_LIMIT)},
+  {key:'insulation_rating',label:'Insul Rating (°C)',type:'select',options:insulationRatings},
+  {key:'voltage_rating',label:'Voltage Rating',type:'number'},
+  {key:'shielding_jacket',label:'Shielding/Jacket',type:'select',options:shieldingOptions}
+];
+
+const table = document.getElementById('cableScheduleTable');
+const thead = table.tHead || table.createTHead();
+const tbody = table.tBodies[0];
+
+function buildTableHeader(){
+  const headerRow = thead.insertRow();
+  const filterRow = thead.insertRow();
+  columns.forEach((col, idx)=>{
+    const th = document.createElement('th');
+    th.textContent = col.label;
+    th.style.cursor = 'pointer';
+    th.addEventListener('click', ()=>sortTable(idx, col.type));
+    headerRow.appendChild(th);
+
+    const filterTh = document.createElement('th');
+    const inp = document.createElement('input');
+    inp.type = 'text';
+    inp.dataset.idx = idx;
+    inp.addEventListener('input', applyFilters);
+    filterTh.appendChild(inp);
+    filterRow.appendChild(filterTh);
+  });
+}
+
+function addRow(data={}){
+  const tr = document.createElement('tr');
+  columns.forEach(col=>{
+    const td = document.createElement('td');
+    let input;
+    if(col.type==='select'){
+      input=document.createElement('select');
+      col.options.forEach(opt=>{
+        const o=document.createElement('option');
+        o.value=opt;
+        o.textContent=opt||'None';
+        input.appendChild(o);
+      });
+    }else{
+      input=document.createElement('input');
+      input.type=col.type==='number'?'number':'text';
+    }
+    input.value=data[col.key]||'';
+    td.appendChild(input);
+    tr.appendChild(td);
+  });
+  tbody.appendChild(tr);
+}
+
+function getData(){
+  return Array.from(tbody.rows).map(row=>{
+    const obj={};
+    columns.forEach((col,i)=>{
+      const el=row.cells[i].querySelector('input,select');
+      obj[col.key]=el?el.value:'';
+    });
+    return obj;
+  });
+}
+
+function saveSchedule(){
+  localStorage.setItem('cableSchedule', JSON.stringify(getData()));
+}
+
+function loadSchedule(){
+  const data=JSON.parse(localStorage.getItem('cableSchedule')||'[]');
+  tbody.innerHTML='';
+  data.forEach(d=>addRow(d));
+}
+
+let sortDir={};
+function sortTable(idx,type){
+  const dir=sortDir[idx]=-(sortDir[idx]||1);
+  const rows=Array.from(tbody.rows);
+  rows.sort((a,b)=>{
+    const av=a.cells[idx].querySelector('input,select').value;
+    const bv=b.cells[idx].querySelector('input,select').value;
+    if(type==='number') return dir*((parseFloat(av)||0)-(parseFloat(bv)||0));
+    return dir*av.localeCompare(bv);
+  });
+  rows.forEach(r=>tbody.appendChild(r));
+}
+
+function applyFilters(){
+  const filters=Array.from(thead.rows[1].cells).map(th=>th.querySelector('input').value.toLowerCase());
+  Array.from(tbody.rows).forEach(row=>{
+    let visible=true;
+    columns.forEach((col,i)=>{
+      const val=row.cells[i].querySelector('input,select').value.toLowerCase();
+      if(!val.includes(filters[i])) visible=false;
+    });
+    row.style.display=visible?'':'none';
+  });
+}
+
+document.getElementById('add-row-btn').addEventListener('click',()=>addRow());
+document.getElementById('save-schedule-btn').addEventListener('click',saveSchedule);
+document.getElementById('load-schedule-btn').addEventListener('click',loadSchedule);
+
+buildTableHeader();
+loadSchedule();
+</script>
+</body>
+</html>
+
