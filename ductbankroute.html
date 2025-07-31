@@ -2308,9 +2308,9 @@ const children=[];
  }
  const imgData=await captureLayout();
  if(imgData){
-  const image=new docx.ImageRun({data:imgData.buffer,transformation:{width:imgData.width,height:imgData.height}});
-  children.push(new docx.Paragraph(image));
-  children.push(new docx.Paragraph(''));
+ const image=new docx.ImageRun({data:imgData.buffer,transformation:{width:imgData.width,height:imgData.height}});
+ children.push(new docx.Paragraph({children:[image]}));
+ children.push(new docx.Paragraph(''));
  }
  children.push(new docx.Paragraph('Ampacity Results'));
  children.push(new docx.Paragraph('----------------'));
