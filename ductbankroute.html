@@ -2288,7 +2288,10 @@ const children=[];
   const svg=document.getElementById('grid');
   if(!svg) return null;
   const serializer=new XMLSerializer();
-  const source=serializer.serializeToString(svg);
+  let source=serializer.serializeToString(svg);
+  if(!source.match(/^<svg[^>]+xmlns=/)){
+   source=source.replace('<svg','<svg xmlns="http://www.w3.org/2000/svg"');
+  }
   const svgBlob=new Blob([source],{type:'image/svg+xml;charset=utf-8'});
   const url=URL.createObjectURL(svgBlob);
   const img=new Image();
@@ -2298,7 +2301,9 @@ const children=[];
   const ctx=canvas.getContext('2d');
   ctx.drawImage(img,0,0);
   URL.revokeObjectURL(url);
-  const buffer=await new Promise(resolve=>canvas.toBlob(b=>b?b.arrayBuffer().then(resolve):resolve(null)));
+  const buffer=await new Promise(resolve=>
+   canvas.toBlob(b=>b?b.arrayBuffer().then(buf=>resolve(new Uint8Array(buf))):resolve(null),'image/png')
+  );
   return buffer?{buffer,width:img.width,height:img.height}:null;
  }
  const imgData=await captureLayout();
