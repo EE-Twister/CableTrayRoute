@@ -1119,8 +1119,8 @@ function updateAmpacityReport(scroll=false){
  const countMap={};
  cables.forEach(c=>{countMap[c.conduit_id]=(countMap[c.conduit_id]||0)+1;});
  const rows=cables.map(c=>{
- const res=estimateAmpacity(c,params,countMap[c.conduit_id],total);
- const neher=isFinite(res.ampacity)?res.ampacity.toFixed(0):'N/A';
+ const d=ampacityDetails(c,params,countMap[c.conduit_id],total);
+ const neher=isFinite(d.ampacity)?d.ampacity.toFixed(0):'N/A';
  const finite=window.finiteAmpacity?window.finiteAmpacity[c.tag]||'N/A':'N/A';
  const load=parseFloat(c.est_load)||0;
  const neherNum=parseFloat(neher);
@@ -1128,10 +1128,17 @@ function updateAmpacityReport(scroll=false){
  const over=(isFinite(neherNum)&&load>neherNum) ||
              (isFinite(finiteNum)&&load>finiteNum);
  if(window.cableOverLimit) window.cableOverLimit[c.tag]=over;
- return `<tr class="${over?'over-limit-row':''}"><td>${c.tag}</td><td>${neher}</td><td>${finite}</td><td>${over?'Yes':''}</td></tr>`;
+ return `<tr class="${over?'over-limit-row':''}"><td>${c.tag}</td>`+
+        `<td>${d.Rdc.toFixed(4)}</td><td>${d.Yc.toFixed(3)}</td><td>${d.deltaTd.toFixed(2)}</td>`+
+        `<td>${d.Rcond.toFixed(3)}</td><td>${d.Rins.toFixed(3)}</td><td>${d.Rduct.toFixed(3)}</td>`+
+        `<td>${d.Rsoil.toFixed(3)}</td><td>${d.Rca.toFixed(3)}</td>`+
+        `<td>${neher}</td><td>${finite}</td><td>${over?'Yes':''}</td></tr>`;
 }).join('');
 document.getElementById('ampacityReport').innerHTML=
-   `<table><thead><tr><th>Cable</th><th>Ampacity (A) - Neher‑McGrath</th><th>Ampacity (A) - Finite Element</th><th>Over Limit</th></tr></thead><tbody>${rows}</tbody></table>`;
+   `<div class="ampacity-container"><table class="db-table ampacity-table"><thead><tr>`+
+   `<th>Cable</th><th>Rdc</th><th>Yc</th><th>&Delta;Td</th><th>Rcond</th><th>Rins</th><th>Rduct</th>`+
+   `<th>Rsoil</th><th>Rca</th><th>Neher (A)</th><th>Finite (A)</th><th>Over</th></tr>`+
+   `</thead><tbody>${rows}</tbody></table></div>`;
  updateCableRowStyles();
  const det=document.getElementById('ampacityDetails');
  if(det){
@@ -2241,7 +2248,7 @@ function buildCalcReport(){
  return lines.join('\n');
 }
 
-function downloadCalcReportDocx(){
+async function downloadCalcReportDocx(){
  const params=gatherInputParams();
  const conduits=getAllConduits();
  const cables=getAllCables();
@@ -2256,6 +2263,7 @@ function downloadCalcReportDocx(){
   conductorRating:{unit:'\u00B0C'}
  };
 
+ const doc=new docx.Document();
  const children=[];
  children.push(new docx.Paragraph({text:'Cable Ampacity Calculation Report',heading:docx.HeadingLevel.HEADING_1}));
  children.push(new docx.Paragraph(`Version: ${CTR_VERSION}`));
@@ -2271,27 +2279,57 @@ function downloadCalcReportDocx(){
  children.push(new docx.Paragraph(`Conduits: ${conduits.length}`));
  children.push(new docx.Paragraph(`Cables: ${cables.length}`));
  children.push(new docx.Paragraph(''));
+ async function captureLayout(){
+  const svg=document.getElementById('grid');
+  if(!svg) return null;
+  const serializer=new XMLSerializer();
+  const source=serializer.serializeToString(svg);
+  const svgBlob=new Blob([source],{type:'image/svg+xml;charset=utf-8'});
+  const url=URL.createObjectURL(svgBlob);
+  const img=new Image();
+  await new Promise(res=>{img.onload=res; img.src=url;});
+  const canvas=document.createElement('canvas');
+  canvas.width=img.width; canvas.height=img.height;
+  const ctx=canvas.getContext('2d');
+  ctx.drawImage(img,0,0);
+  URL.revokeObjectURL(url);
+  return await new Promise(resolve=>canvas.toBlob(b=>b?b.arrayBuffer().then(resolve):resolve(null)));
+ }
+ const imgBuf=await captureLayout();
+ if(imgBuf){
+  const image=docx.Media.addImage(doc,imgBuf);
+  children.push(new docx.Paragraph(image));
+  children.push(new docx.Paragraph(''));
+ }
  children.push(new docx.Paragraph('Ampacity Results'));
  children.push(new docx.Paragraph('----------------'));
 
- const rows=[new docx.TableRow({children:['Cable','Load','Neher','Finite','Overload'].map(t=>
-   new docx.TableCell({children:[new docx.Paragraph(t)]}))})];
+  const rows=[new docx.TableRow({children:['Cable','Load','Rdc','Yc','\u0394Td','Rcond','Rins','Rduct','Rsoil','Rca','Neher','Finite','Overload'].map(t=>
+    new docx.TableCell({children:[new docx.Paragraph(t)]}))})];
 
- cables.forEach(c=>{
-  const d=ampacityDetails(c,{...params,earthTemp:fToC(params.earthTemp),airTemp:isNaN(params.airTemp)?NaN:fToC(params.airTemp)},countMap[c.conduit_id],total);
-  const finite=parseFloat(window.finiteAmpacity?.[c.tag]);
-  const finiteStr=isNaN(finite)?'N/A':finite.toFixed(1);
-  const load=parseFloat(c.est_load)||0;
-  const over=(load>(isNaN(d.ampacity)?Infinity:d.ampacity))||(load>(isNaN(finite)?Infinity:finite));
-  rows.push(new docx.TableRow({children:[
-    new docx.TableCell({children:[new docx.Paragraph(c.tag||'')]}),
-    new docx.TableCell({children:[new docx.Paragraph(load.toFixed(1))]}),
-    new docx.TableCell({children:[new docx.Paragraph(d.ampacity.toFixed(1))]}),
-    new docx.TableCell({children:[new docx.Paragraph(finiteStr)]}),
-    new docx.TableCell({children:[new docx.Paragraph(over?'Yes':'No')]}),
-  ]}));
- });
- children.push(new docx.Table({rows}));
+  cables.forEach(c=>{
+   const d=ampacityDetails(c,{...params,earthTemp:fToC(params.earthTemp),airTemp:isNaN(params.airTemp)?NaN:fToC(params.airTemp)},countMap[c.conduit_id],total);
+   const finite=parseFloat(window.finiteAmpacity?.[c.tag]);
+   const finiteStr=isNaN(finite)?'N/A':finite.toFixed(1);
+   const load=parseFloat(c.est_load)||0;
+   const over=(load>(isNaN(d.ampacity)?Infinity:d.ampacity))||(load>(isNaN(finite)?Infinity:finite));
+   rows.push(new docx.TableRow({children:[
+     new docx.TableCell({children:[new docx.Paragraph(c.tag||'')]}),
+     new docx.TableCell({children:[new docx.Paragraph(load.toFixed(1))]}),
+     new docx.TableCell({children:[new docx.Paragraph(d.Rdc.toFixed(4))]}),
+     new docx.TableCell({children:[new docx.Paragraph(d.Yc.toFixed(3))]}),
+     new docx.TableCell({children:[new docx.Paragraph(d.deltaTd.toFixed(2))]}),
+     new docx.TableCell({children:[new docx.Paragraph(d.Rcond.toFixed(3))]}),
+     new docx.TableCell({children:[new docx.Paragraph(d.Rins.toFixed(3))]}),
+     new docx.TableCell({children:[new docx.Paragraph(d.Rduct.toFixed(3))]}),
+     new docx.TableCell({children:[new docx.Paragraph(d.Rsoil.toFixed(3))]}),
+     new docx.TableCell({children:[new docx.Paragraph(d.Rca.toFixed(3))]}),
+     new docx.TableCell({children:[new docx.Paragraph(d.ampacity.toFixed(1))]}),
+     new docx.TableCell({children:[new docx.Paragraph(finiteStr)]}),
+     new docx.TableCell({children:[new docx.Paragraph(over?'Yes':'No')]})
+   ]}));
+  });
+  children.push(new docx.Table({rows}));
 
  children.push(new docx.Paragraph(''));
  children.push(new docx.Paragraph('Ampacity calculations use the Neher-McGrath equation:'));
@@ -2326,16 +2364,15 @@ function downloadCalcReportDocx(){
  children.push(new docx.Paragraph('Rsoil - soil thermal resistance (\u00B0C\u00B7m/W)'));
  children.push(new docx.Paragraph('Rca - total external thermal resistance (\u00B0C\u00B7m/W)'));
 
- const doc=new docx.Document({sections:[{properties:{},children}]});
- docx.Packer.toBlob(doc).then(blob=>{
-   const a=document.createElement('a');
-   a.href=URL.createObjectURL(blob);
-   a.download='ampacity_report.docx';
-   document.body.appendChild(a);
-   a.click();
-   document.body.removeChild(a);
-   URL.revokeObjectURL(a.href);
- });
+ doc.addSection({properties:{},children});
+ const blob=await docx.Packer.toBlob(doc);
+ const a=document.createElement('a');
+ a.href=URL.createObjectURL(blob);
+ a.download='ampacity_report.docx';
+ document.body.appendChild(a);
+ a.click();
+ document.body.removeChild(a);
+ URL.revokeObjectURL(a.href);
 }
 
 function exportImage(){
