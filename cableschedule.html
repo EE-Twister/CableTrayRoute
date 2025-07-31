@@ -58,33 +58,38 @@ const insulationRatings = ['60','75','90'];
 const shieldingOptions = ['','Lead','Copper Tape'];
 
 const columns = [
-  {key:'tag',label:'Tag',type:'text'},
-  {key:'start_tag',label:'Start Tag',type:'text'},
-  {key:'end_tag',label:'End Tag',type:'text'},
-  {key:'cable_type',label:'Cable Type',type:'select',options:cableTypes},
-  {key:'conductors',label:'Conductors',type:'number'},
-  {key:'conductor_size',label:'Conductor Size',type:'select',options:conductorSizes},
-  {key:'cable_rating',label:'Cable Rating (V)',type:'number'},
-  {key:'operating_voltage',label:'Operating Voltage (V)',type:'number'},
-  {key:'diameter',label:'OD (in)',type:'number'},
-  {key:'weight',label:'Weight (lbs/ft)',type:'number'},
-  {key:'zone',label:'Cable Zone',type:'number'},
-  {key:'circuit_group',label:'Circuit Group',type:'number'},
-  {key:'allowed_cable_group',label:'Allowed Group',type:'text'},
-  {key:'start_x',label:'Start X',type:'number'},
-  {key:'start_y',label:'Start Y',type:'number'},
-  {key:'start_z',label:'Start Z',type:'number'},
-  {key:'end_x',label:'End X',type:'number'},
-  {key:'end_y',label:'End Y',type:'number'},
-  {key:'end_z',label:'End Z',type:'number'},
-  {key:'insulation_thickness',label:'Insul Thick (in)',type:'number'},
-  {key:'est_load',label:'Est Load (A)',type:'number'},
-  {key:'conduit_id',label:'Conduit',type:'text'},
-  {key:'conductor_material',label:'Conductor Material',type:'select',options:conductorMaterials},
-  {key:'insulation_type',label:'Insulation Type',type:'select',options:Object.keys(INSULATION_TEMP_LIMIT)},
-  {key:'insulation_rating',label:'Insul Rating (°C)',type:'select',options:insulationRatings},
-  {key:'voltage_rating',label:'Voltage Rating',type:'number'},
-  {key:'shielding_jacket',label:'Shielding/Jacket',type:'select',options:shieldingOptions}
+  // Identification
+  {key:'tag',label:'Tag',type:'text',group:'Identification'},
+  {key:'service_description',label:'Service Description',type:'text',group:'Identification'},
+  // Routing / Termination
+  {key:'from_tag',label:'From Tag',type:'text',group:'Routing / Termination'},
+  {key:'to_tag',label:'To Tag',type:'text',group:'Routing / Termination'},
+  {key:'start_x',label:'Start X',type:'number',group:'Routing / Termination'},
+  {key:'start_y',label:'Start Y',type:'number',group:'Routing / Termination'},
+  {key:'start_z',label:'Start Z',type:'number',group:'Routing / Termination'},
+  {key:'end_x',label:'End X',type:'number',group:'Routing / Termination'},
+  {key:'end_y',label:'End Y',type:'number',group:'Routing / Termination'},
+  {key:'end_z',label:'End Z',type:'number',group:'Routing / Termination'},
+  {key:'zone',label:'Cable Zone',type:'number',group:'Routing / Termination'},
+  {key:'conduit_id',label:'Conduit',type:'text',group:'Routing / Termination'},
+  {key:'circuit_group',label:'Circuit Group',type:'number',group:'Routing / Termination'},
+  {key:'allowed_cable_group',label:'Allowed Group',type:'text',group:'Routing / Termination'},
+  // Cable Construction & Specs
+  {key:'cable_type',label:'Cable Type',type:'select',options:cableTypes,group:'Cable Construction & Specs'},
+  {key:'conductors',label:'Conductors',type:'number',group:'Cable Construction & Specs'},
+  {key:'conductor_size',label:'Conductor Size',type:'select',options:conductorSizes,group:'Cable Construction & Specs'},
+  {key:'conductor_material',label:'Conductor Material',type:'select',options:conductorMaterials,group:'Cable Construction & Specs'},
+  {key:'insulation_type',label:'Insulation Type',type:'select',options:Object.keys(INSULATION_TEMP_LIMIT),group:'Cable Construction & Specs'},
+  {key:'insulation_rating',label:'Insul Rating (°C)',type:'select',options:insulationRatings,group:'Cable Construction & Specs'},
+  {key:'insulation_thickness',label:'Insul Thick (in)',type:'number',group:'Cable Construction & Specs'},
+  {key:'shielding_jacket',label:'Shielding/Jacket',type:'select',options:shieldingOptions,group:'Cable Construction & Specs'},
+  // Electrical Characteristics
+  {key:'cable_rating',label:'Cable Rating (V)',type:'number',group:'Electrical Characteristics'},
+  {key:'operating_voltage',label:'Operating Voltage (V)',type:'number',group:'Electrical Characteristics'},
+  {key:'est_load',label:'Est Load (A)',type:'number',group:'Electrical Characteristics'},
+  // Physical Properties
+  {key:'diameter',label:'OD (in)',type:'number',group:'Physical Properties'},
+  {key:'weight',label:'Weight (lbs/ft)',type:'number',group:'Physical Properties'},
 ];
 
 const table = document.getElementById('cableScheduleTable');
@@ -92,8 +97,26 @@ const thead = table.tHead || table.createTHead();
 const tbody = table.tBodies[0];
 
 function buildTableHeader(){
+  const groupRow = thead.insertRow();
   const headerRow = thead.insertRow();
   const filterRow = thead.insertRow();
+
+  const groupCounts = {};
+  columns.forEach(col => {
+    groupCounts[col.group] = (groupCounts[col.group] || 0) + 1;
+  });
+
+  const addedGroups = new Set();
+  columns.forEach(col => {
+    if(!addedGroups.has(col.group)){
+      const th = document.createElement('th');
+      th.textContent = col.group;
+      th.colSpan = groupCounts[col.group];
+      groupRow.appendChild(th);
+      addedGroups.add(col.group);
+    }
+  });
+
   columns.forEach((col, idx)=>{
     const th = document.createElement('th');
     th.textContent = col.label;
@@ -170,7 +193,7 @@ function sortTable(idx,type){
 }
 
 function applyFilters(){
-  const filters=Array.from(thead.rows[1].cells).map(th=>th.querySelector('input').value.toLowerCase());
+  const filters=Array.from(thead.rows[2].cells).map(th=>th.querySelector('input').value.toLowerCase());
   Array.from(tbody.rows).forEach(row=>{
     let visible=true;
     columns.forEach((col,i)=>{
