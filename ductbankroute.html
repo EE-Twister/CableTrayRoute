@@ -2298,11 +2298,12 @@ const children=[];
   const ctx=canvas.getContext('2d');
   ctx.drawImage(img,0,0);
   URL.revokeObjectURL(url);
-  return await new Promise(resolve=>canvas.toBlob(b=>b?b.arrayBuffer().then(resolve):resolve(null)));
+  const buffer=await new Promise(resolve=>canvas.toBlob(b=>b?b.arrayBuffer().then(resolve):resolve(null)));
+  return buffer?{buffer,width:img.width,height:img.height}:null;
  }
- const imgBuf=await captureLayout();
- if(imgBuf){
-  const image=docx.Media.addImage(doc,imgBuf);
+ const imgData=await captureLayout();
+ if(imgData){
+  const image=new docx.ImageRun({data:imgData.buffer,transformation:{width:imgData.width,height:imgData.height}});
   children.push(new docx.Paragraph(image));
   children.push(new docx.Paragraph(''));
  }
