@@ -211,14 +211,15 @@ button{padding:4px 8px;margin:4px 2px;cursor:pointer;}
 <details id="heatSourceDetails" open style="display:none;margin-top:8px;">
  <summary><strong>Adjacent Heat Sources</strong></summary>
  <table id="heatSourceTable" class="db-table">
-  <thead>
-   <tr>
-    <th>Shape</th>
-    <th>Width (in)</th>
-    <th>Height (in)</th>
-    <th>Temp (°F)</th>
-    <th>X</th>
-    <th>Y</th>
+ <thead>
+  <tr>
+   <th>Tag</th>
+   <th>Shape</th>
+   <th>Width (in)</th>
+   <th>Height (in)</th>
+   <th>Temp (°F)</th>
+   <th>X</th>
+   <th>Y</th>
     <th>Del</th>
    </tr>
   </thead>
@@ -685,7 +686,7 @@ function rowToCable(tr){
 const HEAT_SOURCE_SHAPES=['Circle','Square'];
 function addHeatSourceRow(data={}){
  const tr=document.createElement('tr');
- const fields=['shape','width','height','temperature','x','y'];
+ const fields=['tag','shape','width','height','temperature','x','y'];
  fields.forEach(f=>{
   const td=document.createElement('td');
   let inp;
@@ -700,7 +701,7 @@ function addHeatSourceRow(data={}){
     });
   }else{
     inp=document.createElement('input');
-    inp.type='number';
+    inp.type=f==='tag'?'text':'number';
     inp.name=f;
   }
   inp.value=data[f]||'';
@@ -715,10 +716,10 @@ function addHeatSourceRow(data={}){
 }
 
 function rowToHeatSource(tr){
- const vals=Array.from(tr.children).slice(0,6)
+ const vals=Array.from(tr.children).slice(0,7)
                 .map(td=>td.querySelector('input,select')?.value);
- const [shape,width,height,temperature,x,y]=vals;
- return {shape,width:parseFloat(width)||0,height:parseFloat(height)||0,
+ const [tag,shape,width,height,temperature,x,y]=vals;
+ return {tag,shape,width:parseFloat(width)||0,height:parseFloat(height)||0,
          temperature:parseFloat(temperature)||0,
          x:parseFloat(x)||0,y:parseFloat(y)||0};
 }
@@ -2170,42 +2171,51 @@ function buildCalcReport(){
   topPad:{unit:'in'},bottomPad:{unit:'in'},leftPad:{unit:'in'},rightPad:{unit:'in'},
   conductorRating:{unit:'\u00B0C'}
  };
- let report=`Cable Ampacity Calculation Report\nVersion: ${CTR_VERSION}\nTimestamp: ${new Date().toISOString()}\nInputs:\n`;
+ const lines=[];
+ lines.push('Cable Ampacity Calculation Report');
+ lines.push(`Version: ${CTR_VERSION}`);
+ lines.push(`Timestamp: ${new Date().toISOString()}`);
+ lines.push('');
+ lines.push('Input Parameters');
+ lines.push('----------------');
  Object.keys(params).forEach(k=>{
   const unit=info[k]?.unit||'';
-  report+=`${k}: ${params[k]}${unit?` ${unit}`:''}\n`;
+  lines.push(`${k}: ${params[k]}${unit?` ${unit}`:''}`);
  });
- report+=`Conduits: ${conduits.length}  Cables: ${cables.length}\n\nResults:\n`;
+ lines.push('');
+ lines.push(`Conduits: ${conduits.length}`);
+ lines.push(`Cables: ${cables.length}`);
+ lines.push('');
+ lines.push('Ampacity Results');
+ lines.push('----------------');
+ lines.push('Cable             Load  Neher  Finite  Overload');
+ lines.push('------------------------------------------------');
  cables.forEach(c=>{
   const d=ampacityDetails(c,{...params,earthTemp:fToC(params.earthTemp),airTemp:isNaN(params.airTemp)?NaN:fToC(params.airTemp)},countMap[c.conduit_id],total);
   const finite=parseFloat(window.finiteAmpacity?.[c.tag]);
   const finiteStr=isNaN(finite)?'N/A':finite.toFixed(1);
   const load=parseFloat(c.est_load)||0;
-  const over=(load>(isNaN(d.ampacity)?Infinity:d.ampacity)) || (load>(isNaN(finite)?Infinity:finite));
-  report+=`${c.tag}: load ${load} A, Neher ${d.ampacity.toFixed(1)} A, Finite ${finiteStr}, Overloaded: ${over?'Yes':'No'}\n`+
-          `  Rdc=${d.Rdc.toFixed(4)}, Yc=${d.Yc.toFixed(3)}, ΔTd=${d.deltaTd.toFixed(2)}, `+
-          `Rcond=${d.Rcond.toFixed(3)}, Rins=${d.Rins.toFixed(3)}, Rduct=${d.Rduct.toFixed(3)}, `+
-          `Rsoil=${d.Rsoil.toFixed(3)}, Rca=${d.Rca.toFixed(3)}\n`;
+  const over=(load>(isNaN(d.ampacity)?Infinity:d.ampacity))||(load>(isNaN(finite)?Infinity:finite));
+  lines.push(`${(c.tag||'').padEnd(16)}${load.toFixed(1).padStart(5)} ${(d.ampacity.toFixed(1)).padStart(6)} ${finiteStr.padStart(7)} ${over?'Yes':'No'}`);
+  lines.push(`  Rdc=${d.Rdc.toFixed(4)}, Yc=${d.Yc.toFixed(3)}, \u0394Td=${d.deltaTd.toFixed(2)}, Rcond=${d.Rcond.toFixed(3)}, Rins=${d.Rins.toFixed(3)}, Rduct=${d.Rduct.toFixed(3)}, Rsoil=${d.Rsoil.toFixed(3)}, Rca=${d.Rca.toFixed(3)}`);
  });
- report+=`\nAmpacity calculations use the `+
-         `[Neher-McGrath equation](docs/AMPACITY_METHOD.md#equation). `+
-         `Formulas for Yc and ΔTd appear in `+
-         `[AC Resistance Correction](docs/AMPACITY_METHOD.md#ac-resistance-correction). `+
-         `Rdc, Rcond, Rins, Rduct, Rsoil and Rca are defined in `+
-         `[Variable Definitions](docs/AMPACITY_METHOD.md#variable-definitions).`+
-         `\n\nVariable Legend:\n`+
-         `load - estimated cable load (A)\n`+
-         `Neher - ampacity via Neher-McGrath (A)\n`+
-         `Finite - ampacity from finite-element solver (A)\n`+
-         `Rdc - dc conductor resistance at T_c (\u03A9/m)\n`+
-         `Yc - ac resistance factor (dimensionless)\n`+
-         `ΔTd - dielectric-loss temperature rise (\u00B0C)\n`+
-         `Rcond - conductor thermal resistance (\u00B0C·m/W)\n`+
-         `Rins - insulation thermal resistance (\u00B0C·m/W)\n`+
-         `Rduct - raceway thermal resistance (\u00B0C·m/W)\n`+
-         `Rsoil - soil thermal resistance (\u00B0C·m/W)\n`+
-         `Rca - total external thermal resistance (\u00B0C·m/W)`;
- return report;
+ lines.push('');
+ lines.push('Ampacity calculations use the Neher-McGrath equation. Formulas for Yc and \u0394Td appear in the AC Resistance Correction documentation. Rdc, Rcond, Rins, Rduct, Rsoil and Rca are defined in Variable Definitions.');
+ lines.push('');
+ lines.push('Variable Legend');
+ lines.push('---------------');
+ lines.push('load - estimated cable load (A)');
+ lines.push('Neher - ampacity via Neher-McGrath (A)');
+ lines.push('Finite - ampacity from finite-element solver (A)');
+ lines.push('Rdc - dc conductor resistance at T_c (\u03A9/m)');
+ lines.push('Yc - ac resistance factor (dimensionless)');
+ lines.push('\u0394Td - dielectric-loss temperature rise (\u00B0C)');
+ lines.push('Rcond - conductor thermal resistance (\u00B0C·m/W)');
+ lines.push('Rins - insulation thermal resistance (\u00B0C·m/W)');
+ lines.push('Rduct - raceway thermal resistance (\u00B0C·m/W)');
+ lines.push('Rsoil - soil thermal resistance (\u00B0C·m/W)');
+ lines.push('Rca - total external thermal resistance (\u00B0C·m/W)');
+ return lines.join('\n');
 }
 
 function exportImage(){
