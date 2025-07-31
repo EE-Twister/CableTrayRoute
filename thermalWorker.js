@@ -69,7 +69,10 @@ function getRduct(conduit,params){
   return val;
 }
 
-function solve(conduits,cables,params,width,height,gridSize,ductRes,progressCb){
+function fToC(f){ return (f-32)/1.8; }
+
+function solve(conduits,cables,params,width,height,gridSize,ductRes,progressCb,heatSources){
+  heatSources=heatSources||[];
   const scale=40,margin=20;
   GRID_SIZE=gridSize||GRID_SIZE;
   const step=Math.ceil(Math.max(width,height)/GRID_SIZE);
@@ -87,6 +90,8 @@ function solve(conduits,cables,params,width,height,gridSize,ductRes,progressCb){
   const newGrid=Array.from({length:ny},()=>Array(nx).fill(earthT));
   const powerGrid=Array.from({length:ny},()=>Array(nx).fill(0));
   const conduitCells={};
+  const sourceMask=Array.from({length:ny},()=>Array(nx).fill(false));
+  const sourceTemp=Array.from({length:ny},()=>Array(nx).fill(earthT));
   const heatMap={};
 
   // Precompute cell locations for each conduit
@@ -121,13 +126,55 @@ function solve(conduits,cables,params,width,height,gridSize,ductRes,progressCb){
     const q=power/(Math.PI*h.r*h.r)*dx*dx/k;
     conduitCells[c.conduit_id].forEach(([j,i])=>{ powerGrid[j][i]+=q; });
   });
+
+  (heatSources||[]).forEach(src=>{
+    const tempC=isNaN(parseFloat(src.temperature))?earthT:fToC(parseFloat(src.temperature));
+    const shape=(src.shape||'').toLowerCase();
+    const x=parseFloat(src.x)||0;
+    const y=parseFloat(src.y)||0;
+    const w=parseFloat(src.width)||0;
+    const ht=parseFloat(src.height)||0;
+    if(shape==='circle'){
+      const r=Math.max(w,ht)/2;
+      const cx=x+r, cy=y+r;
+      const cxPx=Math.round((cx*scale+margin)/step);
+      const cyPx=Math.round((cy*scale+margin)/step);
+      const rPx=Math.max(1,Math.round((r*scale)/step));
+      for(let j=Math.max(0,cyPx-rPx);j<=Math.min(ny-1,cyPx+rPx);j++){
+        for(let i=Math.max(0,cxPx-rPx);i<=Math.min(nx-1,cxPx+rPx);i++){
+          const dxp=i-cxPx,dyp=j-cyPx;
+          if(dxp*dxp+dyp*dyp<=rPx*rPx){
+            sourceMask[j][i]=true;
+            sourceTemp[j][i]=tempC;
+            grid[j][i]=tempC;
+            newGrid[j][i]=tempC;
+          }
+        }
+      }
+    }else{
+      const x1=Math.round((x*scale+margin)/step);
+      const y1=Math.round((y*scale+margin)/step);
+      const x2=Math.round(((x+w)*scale+margin)/step);
+      const y2=Math.round(((y+ht)*scale+margin)/step);
+      for(let j=Math.max(0,y1);j<=Math.min(ny-1,y2);j++){
+        for(let i=Math.max(0,x1);i<=Math.min(nx-1,x2);i++){
+          sourceMask[j][i]=true;
+          sourceTemp[j][i]=tempC;
+          grid[j][i]=tempC;
+          newGrid[j][i]=tempC;
+        }
+      }
+    }
+  });
   let diff=Infinity,iter=0,maxIter=500;
   while(diff>0.01&&iter<maxIter){
     diff=0;
     for(let j=0;j<ny;j++){
       for(let i=0;i<nx;i++){
         let val;
-        if(j===ny-1||i===0||i===nx-1){
+        if(sourceMask[j][i]){
+          val=sourceTemp[j][i];
+        }else if(j===ny-1||i===0||i===nx-1){
           val=earthT;
         }else if(j===0){
           val=(grid[j+1][i]+Bi*airT)/(1+Bi);
@@ -159,10 +206,10 @@ function solve(conduits,cables,params,width,height,gridSize,ductRes,progressCb){
 }
 
 self.onmessage=e=>{
-  const {conduits,cables,params,width,height,gridSize,ductThermRes,conductorProps}=e.data;
+  const {conduits,cables,params,width,height,gridSize,ductThermRes,conductorProps,heatSources}=e.data;
   if(conductorProps) CONDUCTOR_PROPS=conductorProps;
   const res=solve(conduits,cables,params,width,height,gridSize,ductThermRes,(it,max)=>{
     self.postMessage({type:'progress',iter:it,maxIter:max});
-  });
+  },heatSources);
   self.postMessage({type:'result',grid:res.grid,conduitTemps:res.conduitTemps,iter:res.iter,residual:res.residual,ambient:res.ambient});
 };
