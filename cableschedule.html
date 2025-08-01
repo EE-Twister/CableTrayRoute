@@ -23,9 +23,10 @@
 
       <section class="card">
         <div style="margin-bottom:10px;">
-          <button id="add-row-btn" class="primary-btn">Add Cable</button>
           <button id="save-schedule-btn">Save Schedule</button>
           <button id="load-schedule-btn">Load Schedule</button>
+          <button id="clear-filters-btn">Clear Filters</button>
+          <button id="load-sample-data-btn">Load Sample Data</button>
         </div>
         <div id="column-controls" style="margin-bottom:10px;"></div>
         <div style="overflow-x:auto;">
@@ -33,6 +34,9 @@
             <thead></thead>
             <tbody></tbody>
           </table>
+        </div>
+        <div style="margin-top:10px;">
+          <button id="add-row-btn" class="primary-btn add-row-btn">Add Cable</button>
         </div>
       </section>
     </main>
@@ -109,6 +113,7 @@ const groupHeaders = {};
 const groupVisibility = {};
 Object.keys(groupColumnIndexes).forEach(g => groupVisibility[g] = true);
 const filters = Array(columns.length).fill('');
+const filterButtons = [];
 
 function isGroupStart(idx){
   return idx > 0 && columns[idx].group !== columns[idx-1].group;
@@ -149,10 +154,11 @@ function buildTableHeader(){
 
     const filterBtn = document.createElement('button');
     filterBtn.type = 'button';
-    filterBtn.textContent = '\u25BC';
+    filterBtn.textContent = '▼';
     filterBtn.className = 'filter-btn';
     filterBtn.addEventListener('click', (e)=>openFilterPopup(e, idx));
     th.appendChild(filterBtn);
+    filterButtons[idx] = filterBtn;
 
     headerRow.appendChild(th);
 
@@ -303,6 +309,8 @@ function loadSchedule(){
   const data=JSON.parse(localStorage.getItem('cableSchedule')||'[]');
   tbody.innerHTML='';
   data.forEach(d=>addRow(d));
+  filters.fill('');
+  applyFilters();
 }
 
 let sortDir={};
@@ -327,6 +335,7 @@ function applyFilters(){
     });
     row.style.display=visible?'':'none';
   });
+  updateFilterIndicators();
 }
 
 let currentFilterPopup=null;
@@ -364,6 +373,14 @@ document.addEventListener('click', (e)=>{
     currentFilterPopup=null;
   }
 });
+
+function updateFilterIndicators(){
+  filterButtons.forEach((btn,i)=>{
+    const active = !!filters[i];
+    btn.classList.toggle('filtered', active);
+    btn.textContent = active ? '🔍' : '▼';
+  });
+}
 
 function buildColumnControls(){
   const container = document.getElementById('column-controls');
@@ -415,6 +432,21 @@ table.addEventListener('keydown', navigateCell);
 document.getElementById('add-row-btn').addEventListener('click',()=>addRow());
 document.getElementById('save-schedule-btn').addEventListener('click',saveSchedule);
 document.getElementById('load-schedule-btn').addEventListener('click',loadSchedule);
+document.getElementById('clear-filters-btn').addEventListener('click',()=>{
+  filters.fill('');
+  applyFilters();
+});
+
+const sampleData=[
+  {tag:'C1',service_description:'Sample 1',from_tag:'A',to_tag:'B',cable_type:'Power',conductors:3,conductor_size:'#4 AWG',conductor_material:'Copper',insulation_type:'THHN',insulation_rating:'90',diameter:'0.5',weight:'0.1'},
+  {tag:'C2',service_description:'Sample 2',from_tag:'B',to_tag:'C',cable_type:'Control',conductors:2,conductor_size:'#6 AWG',conductor_material:'Copper',insulation_type:'PVC',insulation_rating:'75',diameter:'0.3',weight:'0.05'}
+];
+document.getElementById('load-sample-data-btn').addEventListener('click',()=>{
+  tbody.innerHTML='';
+  sampleData.forEach(d=>addRow(d));
+  filters.fill('');
+  applyFilters();
+});
 
 buildTableHeader();
 buildColumnControls();
