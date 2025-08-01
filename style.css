@@ -361,6 +361,9 @@ th, td {
 th {
     background-color: var(--secondary-color);
 }
+.category-separator {
+    border-left: 2px solid var(--border-color);
+}
 .util-high { background-color: var(--error-bg); color: var(--error-text); }
 .util-medium { background-color: var(--warning-bg); color: var(--warning-text); }
 .util-low { background-color: var(--success-bg); color: var(--success-text); }
