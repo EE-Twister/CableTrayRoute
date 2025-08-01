@@ -5,6 +5,7 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Cable Schedule</title>
   <link rel="stylesheet" href="style.css">
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
 </head>
 <body>
   <nav class="top-nav">
@@ -18,7 +19,12 @@
     <main class="main-content">
       <header class="page-header">
         <h1>Cable Schedule</h1>
+        <button id="settings-btn" class="settings-btn" aria-label="Settings">⚙</button>
         <p>Centralized table for managing cable data.</p>
+        <div id="settings-menu" class="settings-menu">
+          <label><input type="checkbox" id="dark-toggle"> Dark Mode</label>
+          <button id="help-btn">Site Help</button>
+        </div>
       </header>
 
       <section class="card">
@@ -27,6 +33,10 @@
           <button id="load-schedule-btn">Load Schedule</button>
           <button id="clear-filters-btn">Clear Filters</button>
           <button id="load-sample-data-btn">Load Sample Data</button>
+          <button id="export-xlsx-btn">Export XLSX</button>
+          <input type="file" id="import-xlsx-input" accept=".xlsx" style="display:none;">
+          <button id="import-xlsx-btn">Import XLSX</button>
+          <button id="delete-all-btn">Delete All Rows</button>
         </div>
         <div id="column-controls" style="margin-bottom:10px;"></div>
         <div style="overflow-x:auto;">
@@ -40,6 +50,14 @@
         </div>
       </section>
     </main>
+  </div>
+
+  <div id="help-modal" class="modal" aria-hidden="true" role="dialog" aria-labelledby="help-title">
+    <div class="modal-content">
+      <button id="close-help-btn" class="close-btn" aria-label="Close Help">&times;</button>
+      <h2 id="help-title">Cable Schedule Help</h2>
+      <p>This table allows managing cable data. Use the import/export buttons to work with Excel files.</p>
+    </div>
   </div>
 
 <script>
@@ -447,11 +465,107 @@ document.getElementById('load-sample-data-btn').addEventListener('click',()=>{
   filters.fill('');
   applyFilters();
 });
+document.getElementById('export-xlsx-btn').addEventListener('click',exportXlsx);
+document.getElementById('import-xlsx-btn').addEventListener('click',()=>document.getElementById('import-xlsx-input').click());
+document.getElementById('import-xlsx-input').addEventListener('change',importXlsx);
+document.getElementById('delete-all-btn').addEventListener('click',()=>{
+  if(confirm('Delete all rows?')){
+    tbody.innerHTML='';
+    saveSchedule();
+  }
+});
+
+const darkToggle=document.getElementById('dark-toggle');
+const settingsBtn=document.getElementById('settings-btn');
+const settingsMenu=document.getElementById('settings-menu');
+if(settingsBtn&&settingsMenu){
+  settingsBtn.addEventListener('click',()=>{
+    settingsMenu.style.display=settingsMenu.style.display==='flex'?'none':'flex';
+  });
+  document.addEventListener('click',e=>{
+    if(!settingsMenu.contains(e.target)&&e.target!==settingsBtn){
+      settingsMenu.style.display='none';
+    }
+  });
+}
+if(darkToggle){
+  const sess=JSON.parse(localStorage.getItem('ctrSession')||'{}');
+  if(sess.darkMode){
+    document.body.classList.add('dark-mode');
+    darkToggle.checked=true;
+  }
+  darkToggle.addEventListener('change',()=>{
+    if(darkToggle.checked){
+      document.body.classList.add('dark-mode');
+    }else{
+      document.body.classList.remove('dark-mode');
+    }
+    sess.darkMode=darkToggle.checked;
+    localStorage.setItem('ctrSession',JSON.stringify(sess));
+  });
+}
+const helpBtn=document.getElementById('help-btn');
+const helpModal=document.getElementById('help-modal');
+const closeHelpBtn=document.getElementById('close-help-btn');
+if(helpBtn&&helpModal&&closeHelpBtn){
+  helpBtn.addEventListener('click',()=>{
+    helpModal.style.display='flex';
+    helpModal.setAttribute('aria-hidden','false');
+  });
+  closeHelpBtn.addEventListener('click',()=>{
+    helpModal.style.display='none';
+    helpModal.setAttribute('aria-hidden','true');
+  });
+  helpModal.addEventListener('click',e=>{
+    if(e.target===helpModal){
+      helpModal.style.display='none';
+      helpModal.setAttribute('aria-hidden','true');
+    }
+  });
+}
 
 buildTableHeader();
 buildColumnControls();
 loadSchedule();
 if(!tbody.rows.length) addRow();
+
+function exportXlsx(){
+  const data=[columns.map(c=>c.label)];
+  Array.from(tbody.rows).forEach(row=>{
+    data.push(columns.map((col,i)=>{
+      const el=row.cells[i].querySelector('input,select');
+      return el?el.value:'';
+    }));
+  });
+  const wb=XLSX.utils.book_new();
+  const ws=XLSX.utils.aoa_to_sheet(data);
+  XLSX.utils.book_append_sheet(wb,ws,'CableSchedule');
+  XLSX.writeFile(wb,'cable_schedule.xlsx');
+}
+
+function importXlsx(e){
+  const file=e.target.files[0];
+  if(!file) return;
+  const reader=new FileReader();
+  reader.onload=evt=>{
+    const wb=XLSX.read(evt.target.result,{type:'binary'});
+    const sheet=wb.Sheets[wb.SheetNames[0]];
+    const json=XLSX.utils.sheet_to_json(sheet,{defval:''});
+    tbody.innerHTML='';
+    const labelKeyMap=Object.fromEntries(columns.map(c=>[c.label,c.key]));
+    json.forEach(obj=>{
+      const rowData={};
+      Object.keys(labelKeyMap).forEach(label=>{
+        rowData[labelKeyMap[label]]=obj[label]||'';
+      });
+      addRow(rowData);
+    });
+    filters.fill('');
+    applyFilters();
+  };
+  reader.readAsBinaryString(file);
+  e.target.value='';
+}
 </script>
 </body>
 </html>
