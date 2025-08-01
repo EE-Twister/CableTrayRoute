@@ -611,6 +611,28 @@ body.dark-mode .db-table td {
     border: none;
 }
 
+.insertAboveBtn,
+.insertBelowBtn {
+    background: #3498db;
+    color: #fff;
+    border: none;
+}
+
+.filter-btn {
+    margin-left: 4px;
+    background: none;
+    border: none;
+    cursor: pointer;
+}
+
+.filter-popup {
+    position: absolute;
+    background: var(--secondary-color);
+    border: 1px solid var(--border-color);
+    padding: 4px;
+    z-index: 1000;
+}
+
 #helpOverlay {
     position: fixed;
     top: 0;
