@@ -203,6 +203,10 @@ button:hover {
     background-color: #0056b3;
 }
 
+.add-row-btn {
+    width: auto;
+}
+
 .info-text {
     font-size: 0.9em;
     color: #555;
@@ -623,6 +627,10 @@ body.dark-mode .db-table td {
     background: none;
     border: none;
     cursor: pointer;
+}
+
+.filter-btn.filtered {
+    color: var(--primary-color);
 }
 
 .filter-popup {
