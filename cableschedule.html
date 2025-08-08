@@ -82,37 +82,37 @@ const shieldingOptions = ['','Lead','Copper Tape'];
 
 const columns = [
   // Identification
-  {key:'tag',label:'Tag',type:'text',group:'Identification'},
-  {key:'service_description',label:'Service Description',type:'text',group:'Identification'},
+  {key:'tag', label:'Tag', type:'text', group:'Identification', tooltip:'Unique identifier for the cable'},
+  {key:'service_description', label:'Service Description', type:'text', group:'Identification', tooltip:'Description of the cable\'s purpose'},
   // Routing / Termination
-  {key:'from_tag',label:'From Tag',type:'text',group:'Routing / Termination'},
-  {key:'to_tag',label:'To Tag',type:'text',group:'Routing / Termination'},
-  {key:'start_x',label:'Start X',type:'number',group:'Routing / Termination'},
-  {key:'start_y',label:'Start Y',type:'number',group:'Routing / Termination'},
-  {key:'start_z',label:'Start Z',type:'number',group:'Routing / Termination'},
-  {key:'end_x',label:'End X',type:'number',group:'Routing / Termination'},
-  {key:'end_y',label:'End Y',type:'number',group:'Routing / Termination'},
-  {key:'end_z',label:'End Z',type:'number',group:'Routing / Termination'},
-  {key:'zone',label:'Cable Zone',type:'number',group:'Routing / Termination'},
-  {key:'conduit_id',label:'Conduit',type:'text',group:'Routing / Termination'},
-  {key:'circuit_group',label:'Circuit Group',type:'number',group:'Routing / Termination'},
-  {key:'allowed_cable_group',label:'Allowed Group',type:'text',group:'Routing / Termination'},
+  {key:'from_tag', label:'From Tag', type:'text', group:'Routing / Termination', tooltip:'Starting equipment or location tag'},
+  {key:'to_tag', label:'To Tag', type:'text', group:'Routing / Termination', tooltip:'Ending equipment or location tag'},
+  {key:'start_x', label:'Start X', type:'number', group:'Routing / Termination', tooltip:'X-coordinate of cable start'},
+  {key:'start_y', label:'Start Y', type:'number', group:'Routing / Termination', tooltip:'Y-coordinate of cable start'},
+  {key:'start_z', label:'Start Z', type:'number', group:'Routing / Termination', tooltip:'Z-coordinate of cable start'},
+  {key:'end_x', label:'End X', type:'number', group:'Routing / Termination', tooltip:'X-coordinate of cable end'},
+  {key:'end_y', label:'End Y', type:'number', group:'Routing / Termination', tooltip:'Y-coordinate of cable end'},
+  {key:'end_z', label:'End Z', type:'number', group:'Routing / Termination', tooltip:'Z-coordinate of cable end'},
+  {key:'zone', label:'Cable Zone', type:'number', group:'Routing / Termination', tooltip:'Routing zone or area number'},
+  {key:'conduit_id', label:'Conduit', type:'text', group:'Routing / Termination', tooltip:'Conduit identifier if routed through conduit'},
+  {key:'circuit_group', label:'Circuit Group', type:'number', group:'Routing / Termination', tooltip:'Circuit grouping number'},
+  {key:'allowed_cable_group', label:'Allowed Group', type:'text', group:'Routing / Termination', tooltip:'Permitted cable grouping identifier'},
   // Cable Construction & Specs
-  {key:'cable_type',label:'Cable Type',type:'select',options:cableTypes,group:'Cable Construction & Specs'},
-  {key:'conductors',label:'Conductors',type:'number',group:'Cable Construction & Specs'},
-  {key:'conductor_size',label:'Conductor Size',type:'select',options:conductorSizes,group:'Cable Construction & Specs'},
-  {key:'conductor_material',label:'Conductor Material',type:'select',options:conductorMaterials,group:'Cable Construction & Specs'},
-  {key:'insulation_type',label:'Insulation Type',type:'select',options:Object.keys(INSULATION_TEMP_LIMIT),group:'Cable Construction & Specs'},
-  {key:'insulation_rating',label:'Insul Rating (°C)',type:'select',options:insulationRatings,group:'Cable Construction & Specs'},
-  {key:'insulation_thickness',label:'Insul Thick (in)',type:'number',group:'Cable Construction & Specs'},
-  {key:'shielding_jacket',label:'Shielding/Jacket',type:'select',options:shieldingOptions,group:'Cable Construction & Specs'},
+  {key:'cable_type', label:'Cable Type', type:'select', options:cableTypes, group:'Cable Construction & Specs', tooltip:'Category such as Power, Control, or Signal'},
+  {key:'conductors', label:'Conductors', type:'number', group:'Cable Construction & Specs', tooltip:'Number of conductors within the cable'},
+  {key:'conductor_size', label:'Conductor Size', type:'select', options:conductorSizes, group:'Cable Construction & Specs', tooltip:'Size of each conductor'},
+  {key:'conductor_material', label:'Conductor Material', type:'select', options:conductorMaterials, group:'Cable Construction & Specs', tooltip:'Material of the conductors'},
+  {key:'insulation_type', label:'Insulation Type', type:'select', options:Object.keys(INSULATION_TEMP_LIMIT), group:'Cable Construction & Specs', tooltip:'Insulation material type'},
+  {key:'insulation_rating', label:'Insul Rating (°C)', type:'select', options:insulationRatings, group:'Cable Construction & Specs', tooltip:'Maximum temperature rating of insulation'},
+  {key:'insulation_thickness', label:'Insul Thick (in)', type:'number', group:'Cable Construction & Specs', tooltip:'Insulation thickness in inches'},
+  {key:'shielding_jacket', label:'Shielding/Jacket', type:'select', options:shieldingOptions, group:'Cable Construction & Specs', tooltip:'Shielding or outer jacket type'},
   // Electrical Characteristics
-  {key:'cable_rating',label:'Cable Rating (V)',type:'number',group:'Electrical Characteristics'},
-  {key:'operating_voltage',label:'Operating Voltage (V)',type:'number',group:'Electrical Characteristics'},
-  {key:'est_load',label:'Est Load (A)',type:'number',group:'Electrical Characteristics'},
+  {key:'cable_rating', label:'Cable Rating (V)', type:'number', group:'Electrical Characteristics', tooltip:'Maximum voltage rating of cable'},
+  {key:'operating_voltage', label:'Operating Voltage (V)', type:'number', group:'Electrical Characteristics', tooltip:'Expected operating voltage'},
+  {key:'est_load', label:'Est Load (A)', type:'number', group:'Electrical Characteristics', tooltip:'Estimated current load in amperes'},
   // Physical Properties
-  {key:'diameter',label:'OD (in)',type:'number',group:'Physical Properties'},
-  {key:'weight',label:'Weight (lbs/ft)',type:'number',group:'Physical Properties'},
+  {key:'diameter', label:'OD (in)', type:'number', group:'Physical Properties', tooltip:'Outer diameter of cable in inches'},
+  {key:'weight', label:'Weight (lbs/ft)', type:'number', group:'Physical Properties', tooltip:'Cable weight per foot'},
 ];
 
 const table = document.getElementById('cableScheduleTable');
@@ -163,6 +163,7 @@ function buildTableHeader(){
   columns.forEach((col, idx)=>{
     const th = document.createElement('th');
     if (isGroupStart(idx)) th.classList.add('category-separator');
+    if (col.tooltip) th.title = col.tooltip;
 
     const labelSpan = document.createElement('span');
     labelSpan.textContent = col.label;
@@ -190,11 +191,13 @@ function buildTableHeader(){
   actionsTh.textContent = 'Actions';
   actionsTh.colSpan = 4;
   actionsTh.classList.add('category-separator');
+  actionsTh.title = 'Row actions';
   groupRow.appendChild(actionsTh);
 
   const dupTh = document.createElement('th');
   dupTh.textContent = 'Duplicate';
   dupTh.classList.add('category-separator');
+  dupTh.title = 'Duplicate this row';
   headerRow.appendChild(dupTh);
   const dupFilter = document.createElement('th');
   dupFilter.classList.add('category-separator');
@@ -202,18 +205,21 @@ function buildTableHeader(){
 
   const insAboveTh = document.createElement('th');
   insAboveTh.textContent = 'Insert Above';
+  insAboveTh.title = 'Insert a new row above this one';
   headerRow.appendChild(insAboveTh);
   const insAboveFilter = document.createElement('th');
   filterRow.appendChild(insAboveFilter);
 
   const insBelowTh = document.createElement('th');
   insBelowTh.textContent = 'Insert Below';
+  insBelowTh.title = 'Insert a new row below this one';
   headerRow.appendChild(insBelowTh);
   const insBelowFilter = document.createElement('th');
   filterRow.appendChild(insBelowFilter);
 
   const delTh = document.createElement('th');
   delTh.textContent = 'Delete';
+  delTh.title = 'Delete this row';
   headerRow.appendChild(delTh);
   const delFilter = document.createElement('th');
   filterRow.appendChild(delFilter);
@@ -248,6 +254,7 @@ function addRow(data={}){
   dupBtn.type = 'button';
   dupBtn.textContent = '⧉';
   dupBtn.className = 'duplicateBtn';
+  dupBtn.title = 'Duplicate this row';
   dupBtn.addEventListener('click', () => {
     const rowData = {};
     columns.forEach((col,i)=>{
@@ -265,6 +272,7 @@ function addRow(data={}){
   insAboveBtn.type = 'button';
   insAboveBtn.textContent = '↑+'
   insAboveBtn.className = 'insertAboveBtn';
+  insAboveBtn.title = 'Insert a new row above';
   insAboveBtn.addEventListener('click', () => {
     const newRow = addRow();
     tbody.insertBefore(newRow, tr);
@@ -277,6 +285,7 @@ function addRow(data={}){
   insBelowBtn.type = 'button';
   insBelowBtn.textContent = '↓+'
   insBelowBtn.className = 'insertBelowBtn';
+  insBelowBtn.title = 'Insert a new row below';
   insBelowBtn.addEventListener('click', () => {
     const newRow = addRow();
     tbody.insertBefore(newRow, tr.nextSibling);
@@ -289,6 +298,7 @@ function addRow(data={}){
   delBtn.type = 'button';
   delBtn.textContent = '✖';
   delBtn.className = 'removeBtn';
+  delBtn.title = 'Delete this row';
   delBtn.addEventListener('click', () => tbody.removeChild(tr));
   delTd.appendChild(delBtn);
   tr.appendChild(delTd);

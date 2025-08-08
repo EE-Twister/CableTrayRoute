@@ -365,6 +365,18 @@ th, td {
 th {
     background-color: var(--secondary-color);
 }
+.sticky-table tbody tr:nth-child(even) {
+    background-color: var(--secondary-color);
+}
+.sticky-table tbody tr:hover {
+    background-color: #e9ecef;
+}
+body.dark-mode .sticky-table tbody tr:nth-child(even) {
+    background-color: #343a40;
+}
+body.dark-mode .sticky-table tbody tr:hover {
+    background-color: #495057;
+}
 .category-separator {
     border-left: 2px solid var(--border-color);
 }
