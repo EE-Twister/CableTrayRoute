@@ -125,7 +125,21 @@ class TableManager {
       const row = {};
       this.columns.forEach((col,i) => {
         const el = tr.cells[i].firstChild;
-        row[col.key] = el ? el.value : '';
+        if (el) {
+          const val = el.value;
+          if (col.type === 'number') {
+            const num = parseFloat(val);
+            if (val === '') {
+              row[col.key] = '';
+            } else {
+              row[col.key] = isNaN(num) ? null : num;
+            }
+          } else {
+            row[col.key] = val;
+          }
+        } else {
+          row[col.key] = '';
+        }
       });
       rows.push(row);
     });
