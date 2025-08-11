@@ -173,6 +173,7 @@ if(helpBtn&&helpModal&&closeHelpBtn){
 
 const ductbankTbody=document.querySelector('#ductbankTable tbody');
 let ductbanks=[];
+const DUCTBANK_KEY = TableUtils.STORAGE_KEYS.ductbankSchedule;
 
 function renderDuctbanks(){
   ductbankTbody.innerHTML='';
@@ -280,11 +281,11 @@ function deleteConduit(i,j){
 }
 
 function saveDuctbanks(){
-  try{localStorage.setItem('ductbankHierarchy',JSON.stringify(ductbanks));}catch(e){}
+  try{localStorage.setItem(DUCTBANK_KEY,JSON.stringify(ductbanks));}catch(e){}
 }
 
 function loadDuctbanks(){
-  try{ductbanks=JSON.parse(localStorage.getItem('ductbankHierarchy'))||[];}catch(e){ductbanks=[];}
+  try{ductbanks=JSON.parse(localStorage.getItem(DUCTBANK_KEY))||[];}catch(e){ductbanks=[];}
   ductbanks.forEach(db=>{if(db.expanded===undefined) db.expanded=false; if(!db.conduits) db.conduits=[];});
   renderDuctbanks();
 }
@@ -342,7 +343,7 @@ const trayColumns=[
 ];
 TableUtils.createTable({
   tableId:'trayTable',
-  storageKey:'traySchedule',
+  storageKey:TableUtils.STORAGE_KEYS.traySchedule,
   addRowBtnId:'add-tray-btn',
   saveBtnId:'save-tray-btn',
   loadBtnId:'load-tray-btn',
@@ -368,7 +369,7 @@ const conduitColumns=[
 ];
 TableUtils.createTable({
   tableId:'conduitTable',
-  storageKey:'conduitSchedule',
+  storageKey:TableUtils.STORAGE_KEYS.conduitSchedule,
   addRowBtnId:'add-conduit-btn',
   saveBtnId:'save-conduit-btn',
   loadBtnId:'load-conduit-btn',

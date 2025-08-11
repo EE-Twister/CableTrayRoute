@@ -1745,7 +1745,8 @@ const openConduitFill = (cables) => {
     };
 
     const deleteSavedData = () => {
-        localStorage.removeItem('ctrSession');
+        ['ctrSession','cableSchedule','ductbankSchedule','traySchedule','conduitSchedule']
+            .forEach(k => localStorage.removeItem(k));
         state.manualTrays = [];
         state.cableList = [];
         if (elements.manualTrayTableContainer) {
@@ -1754,7 +1755,7 @@ const openConduitFill = (cables) => {
         updateCableListDisplay();
         updateTrayDisplay();
         updateTableCounts();
-        alert('Saved session data cleared.');
+        alert('All saved data cleared.');
     };
 
     const showMessage = (type, text) => {

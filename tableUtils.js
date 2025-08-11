@@ -1,3 +1,10 @@
+const STORAGE_KEYS = {
+  cableSchedule: 'cableSchedule',
+  ductbankSchedule: 'ductbankSchedule',
+  traySchedule: 'traySchedule',
+  conduitSchedule: 'conduitSchedule'
+};
+
 class TableManager {
   constructor(opts) {
     this.table = document.getElementById(opts.tableId);
@@ -242,4 +249,4 @@ function applyValidation(el, rules = []) {
   }
 }
 
-window.TableUtils = { createTable, saveToStorage, loadFromStorage, applyValidation };
+window.TableUtils = { createTable, saveToStorage, loadFromStorage, applyValidation, STORAGE_KEYS };
