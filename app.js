@@ -122,7 +122,7 @@ document.addEventListener('DOMContentLoaded', () => {
     initHelpIcons();
     if (elements.sidebarToggle && elements.sidebar) {
         elements.sidebarToggle.addEventListener('click', () => {
-            elements.sidebar.classList.toggle('open');
+            elements.sidebar.classList.toggle('collapsed');
         });
     }
     let cancelRouting = false;
