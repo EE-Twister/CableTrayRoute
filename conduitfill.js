@@ -1,0 +1,407 @@
+  (function(){
+const prereqs=[{key:'conduitSchedule',page:'racewayschedule.html',label:'Raceway Schedule'}];
+const missing=prereqs.filter(p=>!localStorage.getItem(p.key));
+if(missing.length){
+  document.addEventListener('DOMContentLoaded',()=>{
+    const notice=document.createElement('div');
+    notice.style.cssText='background:#fee;border:1px solid #f99;padding:10px;margin:10px;';
+    notice.innerHTML='Missing required data: '+missing.map(m=>`<a href="${m.page}">${m.label}</a>`).join(', ')+'.';
+    document.body.prepend(notice);
+    document.querySelectorAll('main button, aside button').forEach(btn=>btn.disabled=true);
+  });
+}
+  })();
+const CONDUIT_SPECS = {
+  "EMT": {"1/2":0.304,"3/4":0.533,"1":0.864,"1-1/4":1.496,"1-1/2":2.036,"2":3.356,"2-1/2":5.858,"3":8.846,"3-1/2":11.545,"4":14.753},
+  "ENT": {"1/2":0.285,"3/4":0.508,"1":0.832,"1-1/4":1.453,"1-1/2":1.986,"2":3.291},
+  "FMC": {"3/8":0.116,"1/2":0.317,"3/4":0.533,"1":0.817,"1-1/4":1.277,"1-1/2":1.858,"2":3.269,"2-1/2":4.909,"3":7.069,"3-1/2":9.621,"4":12.566},
+  "IMC": {"1/2":0.342,"3/4":0.586,"1":0.959,"1-1/4":1.647,"1-1/2":2.225,"2":3.63,"2-1/2":5.135,"3":7.922,"3-1/2":10.584,"4":13.631},
+  "LFNC-A": {"3/8":0.192,"1/2":0.312,"3/4":0.535,"1":0.854,"1-1/4":1.502,"1-1/2":2.018,"2":3.343},
+  "LFNC-B": {"3/8":0.192,"1/2":0.314,"3/4":0.541,"1":0.873,"1-1/4":1.528,"1-1/2":1.981,"2":3.246},
+  "LFMC": {"3/8":0.192,"1/2":0.314,"3/4":0.541,"1":0.873,"1-1/4":1.277,"1-1/2":1.858,"2":3.269,"2-1/2":4.881,"3":7.475,"3-1/2":9.731,"4":12.692},
+  "RMC": {"1/2":0.314,"3/4":0.549,"1":0.887,"1-1/4":1.526,"1-1/2":2.071,"2":3.408,"2-1/2":4.866,"3":7.499,"3-1/2":10.01,"4":12.882,"5":20.212,"6":29.158},
+  "PVC Sch 80": {"1/2":0.217,"3/4":0.409,"1":0.688,"1-1/4":1.237,"1-1/2":1.711,"2":2.874,"2-1/2":4.119,"3":6.442,"3-1/2":8.688,"4":11.258,"5":17.855,"6":25.598},
+  "PVC Sch 40": {"1/2":0.285,"3/4":0.508,"1":0.832,"1-1/4":1.453,"1-1/2":1.986,"2":3.291,"2-1/2":4.695,"3":7.268,"3-1/2":9.737,"4":12.554,"5":19.761,"6":28.567},
+  "PVC Type A": {"1/2":0.385,"3/4":0.65,"1":1.084,"1-1/4":1.767,"1-1/2":2.324,"2":3.647,"2-1/2":5.453,"3":8.194,"3-1/2":10.694,"4":13.723},
+  "PVC Type EB": {"2":3.874,"3":8.709,"3-1/2":11.365,"4":14.448,"5":22.195,"6":31.53}
+};
+
+document.addEventListener('DOMContentLoaded', () => {
+  initSettings();
+  initDarkMode();
+  initHelpModal('help-btn','help-modal','close-help-btn');
+  let saved = true;
+  const markSaved = () => { saved = true; };
+  const markUnsaved = () => { saved = false; };
+  window.addEventListener('beforeunload', e => { if(!saved){ e.preventDefault(); e.returnValue=''; }});
+
+  const typeSel = document.getElementById('conduitType');
+  const sizeSel = document.getElementById('tradeSize');
+  const tableBody = document.querySelector('#cableTable tbody');
+
+  function populateTypes() {
+    Object.keys(CONDUIT_SPECS).forEach(t => {
+      const opt = document.createElement('option');
+      opt.value = t;
+      opt.textContent = t;
+      typeSel.appendChild(opt);
+    });
+  }
+
+  function parseSize(sz) {
+    if (sz.includes('-')) {
+      const [whole, frac] = sz.split('-');
+      const [num, den] = frac.split('/');
+      return parseFloat(whole) + parseFloat(num) / parseFloat(den);
+    } else if (sz.includes('/')) {
+      const [num, den] = sz.split('/');
+      return parseFloat(num) / parseFloat(den);
+    }
+    return parseFloat(sz);
+  }
+
+  function populateSizes() {
+    sizeSel.innerHTML = '';
+    const sizes = CONDUIT_SPECS[typeSel.value] || {};
+    Object.keys(sizes)
+      .sort((a, b) => parseSize(a) - parseSize(b))
+      .forEach((sz) => {
+        const opt = document.createElement('option');
+        opt.value = sz;
+        opt.textContent = sz;
+        sizeSel.appendChild(opt);
+      });
+  }
+
+  function createCableRow() {
+    const tr = document.createElement('tr');
+
+    const tdTag = document.createElement('td');
+    const inpTag = document.createElement('input');
+    inpTag.type = 'text';
+    inpTag.style.width = '120px';
+    tdTag.appendChild(inpTag);
+    tr.appendChild(tdTag);
+
+    const tdType = document.createElement('td');
+    const selType = document.createElement('select');
+    ['Power','Control','Signal'].forEach(t => {
+      const o = document.createElement('option');
+      o.value = t; o.textContent = t; selType.appendChild(o);
+    });
+    selType.style.width = '100px';
+    tdType.appendChild(selType);
+    tr.appendChild(tdType);
+
+    const tdCount = document.createElement('td');
+    const inpCount = document.createElement('input');
+    inpCount.type = 'number';
+    inpCount.min = '1';
+    inpCount.step = '1';
+    inpCount.style.width = '60px';
+    tdCount.appendChild(inpCount);
+    tr.appendChild(tdCount);
+
+    const tdSize = document.createElement('td');
+    const inpSize = document.createElement('input');
+    inpSize.type = 'text';
+    inpSize.setAttribute('list','sizeList');
+    inpSize.style.width = '100px';
+    tdSize.appendChild(inpSize);
+    tr.appendChild(tdSize);
+
+    const tdOD = document.createElement('td');
+    const inpOD = document.createElement('input');
+    inpOD.type = 'number';
+    inpOD.step = '0.01';
+    inpOD.style.width = '80px';
+    tdOD.appendChild(inpOD);
+    tr.appendChild(tdOD);
+
+    const tdDup = document.createElement('td');
+    const btnDup = document.createElement('button');
+    btnDup.type = 'button';
+    btnDup.textContent = '⧉';
+    btnDup.className = 'duplicateBtn';
+    btnDup.addEventListener('click', () => {
+      const clone = createCableRow();
+      clone.children[0].querySelector('input').value = inpTag.value;
+      clone.children[1].querySelector('select').value = selType.value;
+      clone.children[2].querySelector('input').value = inpCount.value;
+      clone.children[3].querySelector('input').value = inpSize.value;
+      clone.children[4].querySelector('input').value = inpOD.value;
+      tableBody.insertBefore(clone, tr.nextSibling);
+    });
+    tdDup.appendChild(btnDup);
+    tr.appendChild(tdDup);
+
+    const tdRm = document.createElement('td');
+    const btnRm = document.createElement('button');
+    btnRm.type = 'button';
+    btnRm.textContent = '✖';
+    btnRm.className = 'removeBtn';
+    btnRm.addEventListener('click', () => {
+      tableBody.removeChild(tr);
+    });
+    tdRm.appendChild(btnRm);
+    tr.appendChild(tdRm);
+
+    return tr;
+  }
+
+  document.getElementById('addCableBtn').addEventListener('click', () => {
+    tableBody.appendChild(createCableRow());
+    markUnsaved();
+  });
+
+  populateTypes();
+  populateSizes();
+  document.getElementById('addCableBtn').click();
+  typeSel.addEventListener('change', e=>{populateSizes(); markUnsaved();});
+
+  function packCircles(cables, R) {
+    const placed = [];
+    cables.sort((a, b) => b.r - a.r);
+
+    function yAtBoundary(x, r) {
+      return Math.sqrt(Math.max(0, (R - r) * (R - r) - x * x));
+    }
+
+    for (const c of cables) {
+      let best = null;
+      let bestY = -Infinity;
+      const maxX = R - c.r;
+      const step = Math.max(0.05, c.r / 4);
+      for (let x = -maxX; x <= maxX; x += step) {
+        let y = yAtBoundary(x, c.r);
+        for (const p of placed) {
+          const dx = x - p.x;
+          if (Math.abs(dx) < p.r + c.r) {
+            const dy = Math.sqrt((p.r + c.r) * (p.r + c.r) - dx * dx);
+            y = Math.min(y, p.y - dy);
+          }
+        }
+        if (y > bestY) {
+          bestY = y;
+          best = { x, y };
+        }
+      }
+      if (best) {
+        let y = yAtBoundary(best.x, c.r);
+        for (const p of placed) {
+          const dx = best.x - p.x;
+          if (Math.abs(dx) < p.r + c.r) {
+            const dy = Math.sqrt((p.r + c.r) * (p.r + c.r) - dx * dx);
+            y = Math.min(y, p.y - dy);
+          }
+        }
+        placed.push({ x: best.x, y, r: c.r, tag: c.tag });
+      } else {
+        placed.push({ x: 0, y: 0, r: c.r, tag: c.tag });
+      }
+    }
+    return placed;
+  }
+
+  let lastR = null;
+  let lastPlaced = null;
+
+  function calcFont(tag, r, scale, min) {
+    const maxSize = r * scale;
+    const fit = (2 * r * scale * 0.8) / (Math.max(1, tag.length) * 0.6);
+    return Math.max(min, Math.min(maxSize, fit));
+  }
+
+  function drawSVG(R, placed){
+    const SCALE = 40;
+    const margin = 10;
+    const size = 2*R*SCALE + margin*2;
+    const center = margin + R*SCALE;
+    let svg = `<svg width="${size}" height="${size}" viewBox="0 0 ${size} ${size}" xmlns="http://www.w3.org/2000/svg">`;
+    svg += `<circle cx="${center}" cy="${center}" r="${R*SCALE}" fill="none" stroke="black" stroke-width="2"/>`;
+    svg += `<text x="${center}" y="${center - R*SCALE + 16}" font-size="12" text-anchor="middle">ID: ${(2*R).toFixed(2)}\"</text>`;
+    placed.forEach(p=>{
+      svg += `<circle cx="${center + p.x*SCALE}" cy="${center + p.y*SCALE}" r="${p.r*SCALE}" fill="lightblue" stroke="black" stroke-width="1"/>`;
+      if(p.tag){
+        let fs = calcFont(p.tag, p.r, SCALE, 8);
+        fs = Math.min(fs, p.r * SCALE * 0.9);
+        const cx = center + p.x*SCALE;
+        const cy = center + p.y*SCALE;
+        svg += `<text x="${cx}" y="${cy}" font-size="${fs}" text-anchor="middle" dominant-baseline="middle">${p.tag}</text>`;
+        svg += `<text x="${cx}" y="${cy + fs*0.8}" font-size="${Math.max(6,fs*0.7)}" text-anchor="middle" dominant-baseline="hanging">${(2*p.r).toFixed(2)}\"</text>`;
+      }
+    });
+    svg += `</svg>`;
+    document.getElementById('svgContainer').innerHTML = svg;
+    lastR = R;
+    lastPlaced = placed;
+  }
+
+  document.getElementById('drawBtn').addEventListener('click', () => {
+    const type = typeSel.value;
+    const size = sizeSel.value;
+    const area = CONDUIT_SPECS[type][size];
+    const R = Math.sqrt(area / Math.PI);
+
+    const rows = Array.from(tableBody.querySelectorAll('tr'));
+    const cables = [];
+    for(const row of rows){
+      const tag = row.children[0].querySelector('input').value.trim();
+      // OD input is in the fifth column (index 4) of each row
+      const od = parseFloat(row.children[4].querySelector('input').value);
+      if(!tag){ alert('Each cable requires a Tag.'); return; }
+      if(isNaN(od)){ alert('Each cable requires an OD.'); return; }
+      cables.push({tag,r:od/2});
+    }
+    if(cables.length===0){ alert('Add at least one cable.'); return; }
+    const placed = packCircles(cables,R);
+
+    const sumArea = cables.reduce((s,c)=> s + Math.PI*(c.r**2),0);
+    const fillPct = (sumArea / area) * 100;
+    const allowed = cables.length===1?53:(cables.length===2?31:40);
+    let results = `<p><strong>Conduit:</strong> ${type} ${size}" (ID ${(2*R).toFixed(2)}")</p>`;
+    results += `<p><strong>Fill:</strong> ${fillPct.toFixed(1)} % (Allowed ${allowed}% )</p>`;
+    if(fillPct > allowed){
+      results += `<p class="warning">WARNING: Fill exceeds allowable limit.</p>`;
+    }
+
+    let jamRatioVal = null;
+    if(cables.length === 3){
+      for(const c of cables){
+        const jr = R / c.r;
+        if(jr >= 2.8 && jr <= 3.2){ jamRatioVal = jr; break; }
+      }
+    }
+    if(jamRatioVal!==null){
+      results += `<p class="warning">WARNING: Jam ratio ${jamRatioVal.toFixed(2)} (between 2.8 and 3.2) for one or more cables.</p>`;
+    }
+
+    document.getElementById('results').innerHTML = results;
+    drawSVG(R, placed);
+  });
+
+  // Expand Image button
+  document.getElementById('expandBtn').addEventListener('click', () => {
+    if(!lastPlaced){
+      alert('Please draw the conduit first, then expand.');
+      return;
+    }
+    const SCALE = 160;
+    const margin = 10;
+    const size = 2*lastR*SCALE + margin*2;
+    const center = margin + lastR*SCALE;
+    let svg = `<svg width="${size}" height="${size}" viewBox="0 0 ${size} ${size}" xmlns="http://www.w3.org/2000/svg">`;
+    svg += `<circle cx="${center}" cy="${center}" r="${lastR*SCALE}" fill="none" stroke="black" stroke-width="2"/>`;
+    svg += `<text x="${center}" y="${center - lastR*SCALE + 20}" font-size="20" text-anchor="middle">ID: ${(2*lastR).toFixed(2)}\"</text>`;
+    lastPlaced.forEach(p=>{
+      svg += `<circle cx="${center + p.x*SCALE}" cy="${center + p.y*SCALE}" r="${p.r*SCALE}" fill="lightblue" stroke="black" stroke-width="1"/>`;
+      if(p.tag){
+        const fs = calcFont(p.tag, p.r, SCALE, 16);
+        const cx = center + p.x*SCALE;
+        const cy = center + p.y*SCALE;
+        svg += `<text x="${cx}" y="${cy}" font-size="${fs}" text-anchor="middle" dominant-baseline="middle">${p.tag}</text>`;
+        svg += `<text x="${cx}" y="${cy + fs*0.9}" font-size="${Math.max(8,fs*0.8)}" text-anchor="middle" dominant-baseline="hanging">${(2*p.r).toFixed(2)}\"</text>`;
+      }
+    });
+    svg += `</svg>`;
+    document.getElementById('expandedSVG').innerHTML = svg;
+    document.getElementById('overlay').style.display = 'flex';
+  });
+
+  // Copy SVG
+  document.getElementById('copyBtn').addEventListener('click', () => {
+    const svgElem = document.getElementById('expandedSVG').querySelector('svg');
+    if(!svgElem){ alert('No expanded SVG found to copy.'); return; }
+    const svgText = svgElem.outerHTML;
+    navigator.clipboard.writeText(svgText).then(()=>{
+      alert('SVG markup copied to clipboard!');
+    }).catch(err=>{
+      alert('Error copying SVG: ' + err);
+    });
+  });
+
+  // Print SVG
+  document.getElementById('printBtn').addEventListener('click', () => {
+    const svgElem = document.getElementById('expandedSVG').querySelector('svg');
+    if(!svgElem){ alert('No expanded SVG found to print.'); return; }
+    const svgText = svgElem.outerHTML;
+    const w = window.open('', '_blank');
+    w.document.write(`<!DOCTYPE html><html><head><title>Print Conduit</title></head><body style="margin:0;">${svgText}</body></html>`);
+    w.document.close();
+    w.focus();
+    setTimeout(()=>{ w.print(); }, 200);
+  });
+
+  // Copy PNG
+  document.getElementById('copyPngBtn').addEventListener('click', () => {
+    const svgElem = document.getElementById('expandedSVG').querySelector('svg');
+    if(!svgElem){ alert('No expanded SVG found to copy as PNG.'); return; }
+    const serializer = new XMLSerializer();
+    const svgString = serializer.serializeToString(svgElem);
+    const blob = new Blob([svgString], {type:'image/svg+xml;charset=utf-8'});
+    const url = URL.createObjectURL(blob);
+    const img = new Image();
+    img.onload = () => {
+      const canvas = document.createElement('canvas');
+      canvas.width = svgElem.getAttribute('width');
+      canvas.height = svgElem.getAttribute('height');
+      const ctx = canvas.getContext('2d');
+      ctx.fillStyle = '#ffffff';
+      ctx.fillRect(0,0,canvas.width,canvas.height);
+      ctx.drawImage(img,0,0);
+      canvas.toBlob(pngBlob => {
+        if(!pngBlob){ alert('Failed to create PNG blob.'); URL.revokeObjectURL(url); return; }
+        const item = new ClipboardItem({'image/png': pngBlob});
+        navigator.clipboard.write([item]).then(()=>{
+          alert('PNG copied to clipboard!');
+          URL.revokeObjectURL(url);
+        }).catch(err=>{
+          alert('Error copying PNG: ' + err);
+          URL.revokeObjectURL(url);
+        });
+      }, 'image/png');
+    };
+    img.onerror = () => { alert('Failed to load SVG for PNG conversion.'); URL.revokeObjectURL(url); };
+    img.src = url;
+  });
+
+  // Close overlay
+  document.getElementById('popupClose').addEventListener('click', () => {
+    document.getElementById('overlay').style.display = 'none';
+  });
+  ['conduitType','tradeSize'].forEach(id=>{const el=document.getElementById(id);if(el){el.addEventListener('input',markUnsaved);el.addEventListener('change',markUnsaved);}});
+  tableBody.addEventListener('input',markUnsaved);
+  tableBody.addEventListener('click',e=>{if(e.target.tagName==='BUTTON') markUnsaved();});
+  ['copyPngBtn','printBtn','copyBtn'].forEach(id=>{const el=document.getElementById(id);if(el)el.addEventListener('click',markSaved);});
+
+  const stored = localStorage.getItem('conduitFillData');
+  if (stored) {
+    try {
+      const { type, tradeSize, cables } = JSON.parse(stored);
+      if (type) {
+        typeSel.value = type;
+        populateSizes();
+      }
+      if (tradeSize) {
+        sizeSel.value = tradeSize;
+      }
+      if (Array.isArray(cables)) {
+        tableBody.innerHTML = '';
+        cables.forEach(c => {
+          const row = createCableRow();
+          row.children[0].querySelector('input').value = c.name || c.tag || '';
+          row.children[1].querySelector('select').value = c.cable_type || '';
+          row.children[2].querySelector('input').value = c.conductors || '';
+          row.children[3].querySelector('input').value = c.conductor_size || '';
+          row.children[4].querySelector('input').value = (c.diameter || c.od || c.OD || 0).toFixed(2);
+          tableBody.appendChild(row);
+        });
+      }
+      document.getElementById('drawBtn').click();
+    } catch (e) {
+      console.error('Failed to load conduitFillData', e);
+    }
+    localStorage.removeItem('conduitFillData');
+  }
+});
+
