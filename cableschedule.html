@@ -9,6 +9,7 @@
   <link rel="stylesheet" href="style.css">
   <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js" defer></script>
   <script src="tableUtils.js" defer></script>
+  <script src="site.js" defer></script>
 </head>
 <body>
   <nav class="top-nav">
@@ -62,57 +63,7 @@
   </div>
 <script>
 window.addEventListener('DOMContentLoaded',()=>{
-const darkToggle=document.getElementById('dark-toggle');
-const settingsBtn=document.getElementById('settings-btn');
-const settingsMenu=document.getElementById('settings-menu');
-if(settingsBtn&&settingsMenu){
-  settingsBtn.addEventListener('click',()=>{
-    const expanded=settingsMenu.style.display==='flex';
-    settingsMenu.style.display=expanded?'none':'flex';
-    settingsBtn.setAttribute('aria-expanded',String(!expanded));
-  });
-  document.addEventListener('click',e=>{
-    if(!settingsMenu.contains(e.target)&&e.target!==settingsBtn){
-      settingsMenu.style.display='none';
-      settingsBtn.setAttribute('aria-expanded','false');
-    }
-  });
-}
-if(darkToggle){
-  const sess=JSON.parse(localStorage.getItem('ctrSession')||'{}');
-  if(sess.darkMode){
-    document.body.classList.add('dark-mode');
-    darkToggle.checked=true;
-  }
-  darkToggle.addEventListener('change',()=>{
-    if(darkToggle.checked){
-      document.body.classList.add('dark-mode');
-    }else{
-      document.body.classList.remove('dark-mode');
-    }
-    sess.darkMode=darkToggle.checked;
-    localStorage.setItem('ctrSession',JSON.stringify(sess));
-  });
-}
-const helpBtn=document.getElementById('help-btn');
-const helpModal=document.getElementById('help-modal');
-const closeHelpBtn=document.getElementById('close-help-btn');
-if(helpBtn&&helpModal&&closeHelpBtn){
-  const openModal=()=>{
-    helpModal.style.display='flex';
-    helpModal.setAttribute('aria-hidden','false');
-    helpBtn.setAttribute('aria-expanded','true');
-    closeHelpBtn.focus();
-  };
-  const closeModal=()=>{
-    helpModal.style.display='none';
-    helpModal.setAttribute('aria-hidden','true');
-    helpBtn.setAttribute('aria-expanded','false');
-  };
-  helpBtn.addEventListener('click',openModal);
-  closeHelpBtn.addEventListener('click',closeModal);
-  helpModal.addEventListener('click',e=>{ if(e.target===helpModal) closeModal(); });
-}
+initSite();
 
 const INSULATION_TEMP_LIMIT={THHN:90,XLPE:90,PVC:75,XHHW:90,'XHHW-2':90,'THWN-2':90,THW:75,THWN:75,TW:60,UF:60};
 const conductorSizes=['#22 AWG','#20 AWG','#18 AWG','#16 AWG','#14 AWG','#12 AWG','#10 AWG','#8 AWG','#6 AWG','#4 AWG','#2 AWG','#1 AWG','1/0 AWG','2/0 AWG','3/0 AWG','4/0 AWG','250 kcmil','350 kcmil','500 kcmil','750 kcmil','1000 kcmil'];

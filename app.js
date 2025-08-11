@@ -42,6 +42,7 @@ const SHAPE_COLORS = {
 };
 
 document.addEventListener('DOMContentLoaded', () => {
+    initSite();
     // --- STATE MANAGEMENT ---
     let state = {
         manualTrays: [],
@@ -94,12 +95,6 @@ document.addEventListener('DOMContentLoaded', () => {
         cancelRoutingBtn: document.getElementById('cancel-routing-btn'),
         manualTraySummary: document.getElementById('manual-tray-summary'),
         cableListSummary: document.getElementById('cable-list-summary'),
-        darkToggle: document.getElementById('dark-toggle'),
-        settingsBtn: document.getElementById('settings-btn'),
-        settingsMenu: document.getElementById('settings-menu'),
-        helpBtn: document.getElementById('help-btn'),
-        helpModal: document.getElementById('help-modal'),
-        closeHelpBtn: document.getElementById('close-help-btn'),
         deleteDataBtn: document.getElementById('delete-data-btn'),
         traySearch: document.getElementById('tray-search'),
         cableSearch: document.getElementById('cable-search'),
@@ -2714,76 +2709,6 @@ Plotly.newPlot(document.getElementById('plot'), data, layout, {responsive: true}
         elements.resetViewBtn.addEventListener('click', reset3DView);
     }
     elements.cancelRoutingBtn.addEventListener('click', cancelCurrentRouting);
-    if (elements.darkToggle) {
-        elements.darkToggle.addEventListener('change', () => {
-            if (elements.darkToggle.checked) {
-                document.body.classList.add('dark-mode');
-            } else {
-                document.body.classList.remove('dark-mode');
-            }
-            saveSession();
-        });
-        if (document.body.classList.contains('dark-mode')) {
-            elements.darkToggle.checked = true;
-        }
-    }
-    if (elements.settingsBtn && elements.settingsMenu) {
-        elements.settingsBtn.addEventListener('click', () => {
-            const expanded = elements.settingsMenu.style.display === 'flex';
-            elements.settingsMenu.style.display = expanded ? 'none' : 'flex';
-            elements.settingsBtn.setAttribute('aria-expanded', String(!expanded));
-        });
-        document.addEventListener('click', (e) => {
-            if (!elements.settingsMenu.contains(e.target) && e.target !== elements.settingsBtn) {
-                elements.settingsMenu.style.display = 'none';
-                elements.settingsBtn.setAttribute('aria-expanded', 'false');
-            }
-        });
-    }
-    if (elements.helpBtn && elements.helpModal && elements.closeHelpBtn) {
-        const focusableSelector = 'a[href], button:not([disabled]), textarea, input, select, [tabindex]:not([tabindex="-1"])';
-        let firstFocusable, lastFocusable, previousFocus;
-        const trapFocus = (e) => {
-            if (e.key === 'Tab') {
-                if (e.shiftKey) {
-                    if (document.activeElement === firstFocusable) {
-                        e.preventDefault();
-                        lastFocusable.focus();
-                    }
-                } else if (document.activeElement === lastFocusable) {
-                    e.preventDefault();
-                    firstFocusable.focus();
-                }
-            } else if (e.key === 'Escape') {
-                closeModal();
-            }
-        };
-        const openModal = () => {
-            previousFocus = document.activeElement;
-            elements.helpModal.style.display = 'flex';
-            elements.helpModal.setAttribute('aria-hidden', 'false');
-            elements.helpBtn.setAttribute('aria-expanded', 'true');
-            const focusables = elements.helpModal.querySelectorAll(focusableSelector);
-            firstFocusable = focusables[0];
-            lastFocusable = focusables[focusables.length - 1];
-            firstFocusable && firstFocusable.focus();
-            elements.helpModal.addEventListener('keydown', trapFocus);
-        };
-        const closeModal = () => {
-            elements.helpModal.style.display = 'none';
-            elements.helpModal.setAttribute('aria-hidden', 'true');
-            elements.helpBtn.setAttribute('aria-expanded', 'false');
-            elements.helpModal.removeEventListener('keydown', trapFocus);
-            previousFocus && previousFocus.focus();
-        };
-        elements.helpBtn.addEventListener('click', openModal);
-        elements.closeHelpBtn.addEventListener('click', closeModal);
-        elements.helpModal.addEventListener('click', (e) => {
-            if (e.target === elements.helpModal) {
-                closeModal();
-            }
-        });
-    }
     if (elements.deleteDataBtn) {
         elements.deleteDataBtn.addEventListener('click', deleteSavedData);
     }

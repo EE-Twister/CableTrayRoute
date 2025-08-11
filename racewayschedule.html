@@ -10,6 +10,7 @@
   <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js" defer></script>
   <script src="tableUtils.js" defer></script>
   <script src="ductbankTable.js" defer></script>
+  <script src="site.js" defer></script>
 </head>
 <body>
   <nav class="top-nav">
@@ -148,38 +149,9 @@
   </div>
 
 <script>
-const darkToggle=document.getElementById('dark-toggle');
-const settingsBtn=document.getElementById('settings-btn');
-const settingsMenu=document.getElementById('settings-menu');
-if(settingsBtn&&settingsMenu){
-  settingsBtn.addEventListener('click',()=>{
-    const expanded=settingsMenu.style.display==='flex';
-    settingsMenu.style.display=expanded?'none':'flex';
-    settingsBtn.setAttribute('aria-expanded',String(!expanded));
-  });
-  document.addEventListener('click',e=>{
-    if(!settingsMenu.contains(e.target)&&e.target!==settingsBtn){
-      settingsMenu.style.display='none';
-      settingsBtn.setAttribute('aria-expanded','false');
-    }
-  });
-}
-if(darkToggle){
-  const sess=JSON.parse(localStorage.getItem('ctrSession')||'{}');
-  if(sess.darkMode){
-    document.body.classList.add('dark-mode');
-    darkToggle.checked=true;
-  }
-  darkToggle.addEventListener('change',()=>{
-    if(darkToggle.checked){
-      document.body.classList.add('dark-mode');
-    }else{
-      document.body.classList.remove('dark-mode');
-    }
-    sess.darkMode=darkToggle.checked;
-    localStorage.setItem('ctrSession',JSON.stringify(sess));
-  });
-}
+window.addEventListener('DOMContentLoaded',()=>{
+initSite();
+});
 
 function setupHelpModal(btnId,modalId){
   const btn=document.getElementById(btnId);
@@ -202,7 +174,6 @@ function setupHelpModal(btnId,modalId){
   modal.addEventListener('click',e=>{ if(e.target===modal) close(); });
 }
 
-setupHelpModal('help-btn','help-modal');
 setupHelpModal('ductbank-help-btn','ductbank-help-modal');
   setupHelpModal('tray-help-btn','tray-help-modal');
   setupHelpModal('conduit-help-btn','conduit-help-modal');
