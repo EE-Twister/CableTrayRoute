@@ -68,6 +68,14 @@ body {
     display: flex;
     align-items: center;
 }
+.nav-toggle {
+    display: none;
+}
+.top-nav .nav-links {
+    display: flex;
+    align-items: center;
+    width: 100%;
+}
 .top-nav .settings-btn {
     margin-left: auto;
 }
@@ -84,6 +92,33 @@ body {
 .top-nav a[aria-current="page"] {
     font-weight: bold;
     text-decoration: underline;
+}
+
+@media (max-width: 700px) {
+    .nav-toggle {
+        display: block;
+        background: none;
+        border: none;
+        font-size: 1.5rem;
+        cursor: pointer;
+        color: var(--text-color);
+        margin-right: 1rem;
+    }
+    .top-nav {
+        flex-direction: column;
+        align-items: flex-start;
+    }
+    .top-nav .nav-links {
+        display: none;
+        flex-direction: column;
+        width: 100%;
+    }
+    .top-nav.open .nav-links {
+        display: flex;
+    }
+    .top-nav .settings-btn {
+        margin-left: 0;
+    }
 }
 
 .sidebar-toggle {

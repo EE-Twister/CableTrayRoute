@@ -45,6 +45,7 @@ document.addEventListener('DOMContentLoaded', () => {
     initSettings();
     initDarkMode();
     initHelpModal('help-btn','help-modal','close-help-btn');
+    initNavToggle();
     // --- UNSAVED CHANGES TRACKING ---
     let saved = true;
     const markSaved = () => { saved = true; };
