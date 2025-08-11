@@ -48,3 +48,11 @@ Columns (in order): `tray_id`, `start_x`, `start_y`, `start_z`, `end_x`, `end_y`
 ## Stand-alone Conduits (`conduit_schedule.csv`)
 
 Columns (in order): `conduit_id`, `type`, `trade_size`, `start_x`, `start_y`, `start_z`, `end_x`, `end_y`, `end_z`, `capacity`
+
+## Tray Import Template (`trays_template.csv`)
+
+Columns (in order): `tray_id`, `start_x`, `start_y`, `start_z`, `end_x`, `end_y`, `end_z`, `width`, `height`, `current_fill`, `allowed_cable_group`
+
+## Cable Import Template (`cables_template.csv`)
+
+Columns (in order): `tag`, `start_tag`, `end_tag`, `cable_type`, `conductors`, `conductor_size`, `diameter`, `weight`, `allowed_cable_group`, `start_x`, `start_y`, `start_z`, `end_x`, `end_y`, `end_z`
