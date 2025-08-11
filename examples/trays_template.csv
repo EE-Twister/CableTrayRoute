@@ -1,3 +1,0 @@
-tray_id,start_x,start_y,start_z,end_x,end_y,end_z,width,height,current_fill,allowed_cable_group
-H1-A,0,0,10,40,0,10,16,3.94,9.30,HV
-H1-B,40,0,10,80,0,10,16,3.94,6.98,

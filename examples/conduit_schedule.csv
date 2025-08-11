@@ -1,0 +1,3 @@
+conduit_id,type,trade_size,start_x,start_y,start_z,end_x,end_y,end_z,capacity
+S1,EMT,2,0,0,0,50,0,0,40
+S2,PVC,1,0,5,0,0,5,20,20
