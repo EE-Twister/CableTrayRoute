@@ -148,7 +148,7 @@ const columns=[
   {key:'notes',label:'Notes',type:'text',group:'Notes',tooltip:'Additional comments or notes'}
 ];
 
-TableUtils.createTable({
+const cableTable=TableUtils.createTable({
   tableId:'cableScheduleTable',
   storageKey:TableUtils.STORAGE_KEYS.cableSchedule,
   addRowBtnId:'add-row-btn',
@@ -161,6 +161,12 @@ TableUtils.createTable({
   deleteAllBtnId:'delete-all-btn',
   columns
 });
+
+function getCableSchedule(){
+  cableTable.save();
+  return cableTable.getData();
+}
+window.getCableSchedule=getCableSchedule;
 </script>
 </body>
 </html>
