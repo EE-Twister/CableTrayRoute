@@ -127,6 +127,10 @@
     };
 
     document.addEventListener('DOMContentLoaded', () => {
+      let saved = true;
+      const markSaved = () => { saved = true; };
+      const markUnsaved = () => { saved = false; };
+      window.addEventListener('beforeunload', e => { if(!saved){ e.preventDefault(); e.returnValue=''; }});
       const session = JSON.parse(localStorage.getItem('ctrSession') || '{}');
       if (session.darkMode) {
         document.body.classList.add('dark-mode');
@@ -260,12 +264,13 @@
 
       document.getElementById('addCableBtn').addEventListener('click', () => {
         tableBody.appendChild(createCableRow());
+        markUnsaved();
       });
 
       populateTypes();
       populateSizes();
       document.getElementById('addCableBtn').click();
-      typeSel.addEventListener('change', populateSizes);
+      typeSel.addEventListener('change', e=>{populateSizes(); markUnsaved();});
 
       function packCircles(cables, R) {
         const placed = [];
@@ -477,6 +482,10 @@
       document.getElementById('popupClose').addEventListener('click', () => {
         document.getElementById('overlay').style.display = 'none';
       });
+      ['conduitType','tradeSize'].forEach(id=>{const el=document.getElementById(id);if(el){el.addEventListener('input',markUnsaved);el.addEventListener('change',markUnsaved);}});
+      tableBody.addEventListener('input',markUnsaved);
+      tableBody.addEventListener('click',e=>{if(e.target.tagName==='BUTTON') markUnsaved();});
+      ['copyPngBtn','printBtn','copyBtn'].forEach(id=>{const el=document.getElementById(id);if(el)el.addEventListener('click',markSaved);});
       const darkToggle = document.getElementById('dark-toggle');
       const settingsBtn = document.getElementById('settings-btn');
       const settingsMenu = document.getElementById('settings-menu');

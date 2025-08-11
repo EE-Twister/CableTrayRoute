@@ -62,6 +62,10 @@
   </div>
 <script>
 window.addEventListener('DOMContentLoaded',()=>{
+let saved=true;
+const markSaved=()=>{saved=true;};
+const markUnsaved=()=>{saved=false;};
+window.addEventListener('beforeunload',e=>{if(!saved){e.preventDefault();e.returnValue='';}});
 const darkToggle=document.getElementById('dark-toggle');
 const settingsBtn=document.getElementById('settings-btn');
 const settingsMenu=document.getElementById('settings-menu');
@@ -162,7 +166,9 @@ const cableTable=TableUtils.createTable({
   importInputId:'import-xlsx-input',
   importBtnId:'import-xlsx-btn',
   deleteAllBtnId:'delete-all-btn',
-  columns
+  columns,
+  onChange:markUnsaved,
+  onSave:markSaved
 });
 
 function getCableSchedule(){
