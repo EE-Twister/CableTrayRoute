@@ -204,8 +204,11 @@ setupHelpModal('help-btn','help-modal');
 setupHelpModal('ductbank-help-btn','ductbank-help-modal');
 setupHelpModal('tray-help-btn','tray-help-modal');
 setupHelpModal('conduit-help-btn','conduit-help-modal');
-
-initDuctbankTable();
+document.addEventListener('DOMContentLoaded',()=>{
+  if(typeof initDuctbankTable==='function'){
+    initDuctbankTable();
+  }
+});
 
 const trayColumns=[
   {key:'tray_id',label:'Tray ID',type:'text',validate:['required']},
