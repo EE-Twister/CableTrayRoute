@@ -4,22 +4,58 @@ class TableManager {
     this.thead = this.table.createTHead();
     this.tbody = this.table.tBodies[0] || this.table.createTBody();
     this.columns = opts.columns || [];
-    this.storageKey = opts.storageKey;
+    this.storageKey = opts.storageKey || opts.tableId;
     this.buildHeader();
-    document.getElementById(opts.addRowBtnId).addEventListener('click', () => this.addRow());
-    document.getElementById(opts.saveBtnId).addEventListener('click', () => this.save());
-    document.getElementById(opts.loadBtnId).addEventListener('click', () => { this.tbody.innerHTML=''; this.load(); });
-    document.getElementById(opts.clearFiltersBtnId).addEventListener('click', () => this.clearFilters());
-    document.getElementById(opts.exportBtnId).addEventListener('click', () => this.exportXlsx());
-    document.getElementById(opts.importBtnId).addEventListener('click', () => document.getElementById(opts.importInputId).click());
-    document.getElementById(opts.importInputId).addEventListener('change', e => { this.importXlsx(e.target.files[0]); e.target.value=''; });
-    document.getElementById(opts.deleteAllBtnId).addEventListener('click', () => { this.deleteAll(); });
+    this.initButtons(opts);
     this.load();
   }
+
+  initButtons(opts){
+    if (opts.addRowBtnId) document.getElementById(opts.addRowBtnId).addEventListener('click', () => this.addRow());
+    if (opts.saveBtnId) document.getElementById(opts.saveBtnId).addEventListener('click', () => this.save());
+    if (opts.loadBtnId) document.getElementById(opts.loadBtnId).addEventListener('click', () => { this.tbody.innerHTML=''; this.load(); });
+    if (opts.clearFiltersBtnId) document.getElementById(opts.clearFiltersBtnId).addEventListener('click', () => this.clearFilters());
+    if (opts.exportBtnId) document.getElementById(opts.exportBtnId).addEventListener('click', () => this.exportXlsx());
+    if (opts.importBtnId && opts.importInputId){
+      document.getElementById(opts.importBtnId).addEventListener('click', () => document.getElementById(opts.importInputId).click());
+      document.getElementById(opts.importInputId).addEventListener('change', e => { this.importXlsx(e.target.files[0]); e.target.value=''; });
+    }
+    if (opts.deleteAllBtnId) document.getElementById(opts.deleteAllBtnId).addEventListener('click', () => this.deleteAll());
+  }
+
   buildHeader() {
+    this.thead.innerHTML='';
+    const hasGroups = this.columns.some(c=>c.group);
+    let groupRow;
+    if (hasGroups) groupRow = this.thead.insertRow();
     const headerRow = this.thead.insertRow();
     const filterRow = this.thead.insertRow();
     this.filters = [];
+
+    if (hasGroups){
+      const groups = [];
+      let current = null;
+      this.columns.forEach(col => {
+        if (col.group){
+          if (!current || current.name !== col.group){
+            current = {name:col.group, span:1};
+            groups.push(current);
+          } else {
+            current.span++;
+          }
+        } else {
+          groups.push({name:'', span:1});
+          current = null;
+        }
+      });
+      groups.forEach(g => {
+        const th = document.createElement('th');
+        th.textContent = g.name;
+        th.colSpan = g.span;
+        groupRow.appendChild(th);
+      });
+    }
+
     this.columns.forEach(col => {
       const th = document.createElement('th');
       th.textContent = col.label;
@@ -32,7 +68,18 @@ class TableManager {
       fth.appendChild(input);
       filterRow.appendChild(fth);
     });
+
+    if (hasGroups){
+      const blank = document.createElement('th');
+      blank.rowSpan = 1;
+      groupRow.appendChild(blank);
+    }
+    const actTh = document.createElement('th');
+    actTh.textContent = 'Actions';
+    headerRow.appendChild(actTh);
+    filterRow.appendChild(document.createElement('th'));
   }
+
   addRow(data = {}) {
     const tr = this.tbody.insertRow();
     this.columns.forEach(col => {
@@ -53,7 +100,13 @@ class TableManager {
       if (data[col.key] !== undefined) el.value = data[col.key];
       td.appendChild(el);
     });
+    const actTd = tr.insertCell();
+    const delBtn = document.createElement('button');
+    delBtn.textContent = 'Delete';
+    delBtn.addEventListener('click', () => { tr.remove(); this.save(); });
+    actTd.appendChild(delBtn);
   }
+
   getData() {
     const rows = [];
     Array.from(this.tbody.rows).forEach(tr => {
@@ -66,24 +119,24 @@ class TableManager {
     });
     return rows;
   }
+
   save() {
     try {
       localStorage.setItem(this.storageKey, JSON.stringify(this.getData()));
-    } catch(e) {
-      console.error('save failed', e);
-    }
+    } catch(e) { console.error('save failed', e); }
   }
+
   load() {
     let data = [];
-    try {
-      data = JSON.parse(localStorage.getItem(this.storageKey) || '[]');
-    } catch(e) {}
+    try { data = JSON.parse(localStorage.getItem(this.storageKey) || '[]'); } catch(e) {}
     data.forEach(row => this.addRow(row));
   }
+
   clearFilters() {
     this.filters.forEach(f => f.value='');
     this.applyFilters();
   }
+
   applyFilters() {
     Array.from(this.tbody.rows).forEach(row => {
       let visible = true;
@@ -94,10 +147,12 @@ class TableManager {
       row.style.display = visible ? '' : 'none';
     });
   }
+
   deleteAll() {
     this.tbody.innerHTML='';
     this.save();
   }
+
   exportXlsx() {
     const data = [this.columns.map(c=>c.label)];
     this.getData().forEach(row => {
@@ -108,6 +163,7 @@ class TableManager {
     XLSX.utils.book_append_sheet(wb, ws, 'Sheet1');
     XLSX.writeFile(wb, `${this.storageKey}.xlsx`);
   }
+
   importXlsx(file) {
     if (!file) return;
     const reader = new FileReader();
@@ -127,5 +183,14 @@ class TableManager {
     reader.readAsBinaryString(file);
   }
 }
-function initTable(opts){ return new TableManager(opts); }
-window.initTable = initTable;
+
+function saveToStorage(key, data){
+  try { localStorage.setItem(key, JSON.stringify(data)); } catch(e){}
+}
+function loadFromStorage(key){
+  try { return JSON.parse(localStorage.getItem(key) || '[]'); } catch(e){ return []; }
+}
+
+function createTable(opts){ return new TableManager(opts); }
+
+window.TableUtils = { createTable, saveToStorage, loadFromStorage };

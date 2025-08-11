@@ -7,7 +7,7 @@
   <title>Raceway Schedule</title>
   <link rel="stylesheet" href="style.css">
   <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js" defer></script>
-  <script src="table-utils.js" defer></script>
+  <script src="tableUtils.js" defer></script>
 </head>
 <body>
   <nav class="top-nav">
@@ -167,7 +167,7 @@ const ductbankColumns=[
   {key:'from',label:'From',type:'text'},
   {key:'to',label:'To',type:'text'}
 ];
-initTable({
+TableUtils.createTable({
   tableId:'ductbankTable',
   storageKey:'ductbankSchedule',
   addRowBtnId:'add-ductbank-row-btn',
@@ -187,7 +187,7 @@ const trayColumns=[
   {key:'from',label:'From',type:'text'},
   {key:'to',label:'To',type:'text'}
 ];
-initTable({
+TableUtils.createTable({
   tableId:'trayTable',
   storageKey:'traySchedule',
   addRowBtnId:'add-tray-row-btn',
@@ -208,7 +208,7 @@ const conduitColumns=[
   {key:'from',label:'From',type:'text'},
   {key:'to',label:'To',type:'text'}
 ];
-initTable({
+TableUtils.createTable({
   tableId:'conduitTable',
   storageKey:'conduitSchedule',
   addRowBtnId:'add-conduit-row-btn',
