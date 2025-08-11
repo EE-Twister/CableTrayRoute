@@ -99,6 +99,11 @@ class TableManager {
       }
       if (data[col.key] !== undefined) el.value = data[col.key];
       td.appendChild(el);
+      if (col.validate) {
+        const rules = Array.isArray(col.validate) ? col.validate : [col.validate];
+        el.addEventListener('input', () => applyValidation(el, rules));
+        applyValidation(el, rules);
+      }
     });
     const actTd = tr.insertCell();
     const delBtn = document.createElement('button');
@@ -121,6 +126,7 @@ class TableManager {
   }
 
   save() {
+    this.validateAll();
     try {
       localStorage.setItem(this.storageKey, JSON.stringify(this.getData()));
     } catch(e) { console.error('save failed', e); }
@@ -182,6 +188,17 @@ class TableManager {
     };
     reader.readAsBinaryString(file);
   }
+
+  validateAll() {
+    let valid = true;
+    Array.from(this.tbody.rows).forEach(row => {
+      this.columns.forEach((col,i) => {
+        const el = row.cells[i].firstChild;
+        if (col.validate && !applyValidation(el, Array.isArray(col.validate) ? col.validate : [col.validate])) valid = false;
+      });
+    });
+    return valid;
+  }
 }
 
 function saveToStorage(key, data){
@@ -193,4 +210,36 @@ function loadFromStorage(key){
 
 function createTable(opts){ return new TableManager(opts); }
 
-window.TableUtils = { createTable, saveToStorage, loadFromStorage };
+function applyValidation(el, rules = []) {
+  const value = (el.value || '').trim();
+  let error = '';
+  rules.forEach(rule => {
+    if (error) return;
+    if (typeof rule === 'function') {
+      const msg = rule(value);
+      if (msg) error = msg;
+    } else if (rule === 'required') {
+      if (!value) error = 'Required';
+    } else if (rule === 'numeric') {
+      if (value === '' || isNaN(Number(value))) error = 'Must be numeric';
+    }
+  });
+  const existing = el.nextElementSibling;
+  if (error) {
+    el.classList.add('input-error');
+    let msg = existing && existing.classList && existing.classList.contains('error-message') ? existing : null;
+    if (!msg) {
+      msg = document.createElement('span');
+      msg.className = 'error-message';
+      el.insertAdjacentElement('afterend', msg);
+    }
+    msg.textContent = error;
+    return false;
+  } else {
+    el.classList.remove('input-error');
+    if (existing && existing.classList && existing.classList.contains('error-message')) existing.remove();
+    return true;
+  }
+}
+
+window.TableUtils = { createTable, saveToStorage, loadFromStorage, applyValidation };
