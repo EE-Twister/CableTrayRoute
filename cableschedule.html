@@ -59,6 +59,7 @@
     </div>
   </div>
 <script>
+window.addEventListener('DOMContentLoaded',()=>{
 const darkToggle=document.getElementById('dark-toggle');
 const settingsBtn=document.getElementById('settings-btn');
 const settingsMenu=document.getElementById('settings-menu');
@@ -167,6 +168,7 @@ function getCableSchedule(){
   return cableTable.getData();
 }
 window.getCableSchedule=getCableSchedule;
+});
 </script>
 </body>
 </html>
