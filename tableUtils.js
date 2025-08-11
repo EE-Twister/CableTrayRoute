@@ -36,8 +36,8 @@ class TableManager {
     let groupRow;
     if (hasGroups) groupRow = this.thead.insertRow();
     const headerRow = this.thead.insertRow();
-    const filterRow = this.thead.insertRow();
-    this.filters = [];
+    this.filters = Array(this.columns.length).fill('');
+    this.filterButtons = [];
 
     if (hasGroups){
       const groups = [];
@@ -63,17 +63,18 @@ class TableManager {
       });
     }
 
-    this.columns.forEach(col => {
+    this.columns.forEach((col,idx) => {
       const th = document.createElement('th');
-      th.textContent = col.label;
+      const labelSpan=document.createElement('span');
+      labelSpan.textContent=col.label;
+      th.appendChild(labelSpan);
+      const btn=document.createElement('button');
+      btn.className='filter-btn';
+      btn.innerHTML='\u25BC';
+      btn.addEventListener('click',e=>{e.stopPropagation();this.showFilterPopup(btn,idx);});
+      th.appendChild(btn);
       headerRow.appendChild(th);
-      const fth = document.createElement('th');
-      const input = document.createElement('input');
-      input.type = 'text';
-      input.addEventListener('input', () => this.applyFilters());
-      this.filters.push(input);
-      fth.appendChild(input);
-      filterRow.appendChild(fth);
+      this.filterButtons.push(btn);
     });
 
     if (hasGroups){
@@ -84,7 +85,41 @@ class TableManager {
     const actTh = document.createElement('th');
     actTh.textContent = 'Actions';
     headerRow.appendChild(actTh);
-    filterRow.appendChild(document.createElement('th'));
+  }
+
+  showFilterPopup(btn, index){
+    document.querySelectorAll('.filter-popup').forEach(p=>p.remove());
+    const popup=document.createElement('div');
+    popup.className='filter-popup';
+    const inp=document.createElement('input');
+    inp.type='text';
+    inp.value=this.filters[index];
+    popup.appendChild(inp);
+    const apply=document.createElement('button');
+    apply.textContent='Apply';
+    apply.addEventListener('click',()=>{
+      this.filters[index]=inp.value.trim();
+      if(this.filters[index]) btn.classList.add('filtered'); else btn.classList.remove('filtered');
+      this.applyFilters();
+      popup.remove();
+    });
+    popup.appendChild(apply);
+    const clear=document.createElement('button');
+    clear.textContent='Clear';
+    clear.addEventListener('click',()=>{
+      inp.value='';
+      this.filters[index]='';
+      btn.classList.remove('filtered');
+      this.applyFilters();
+      popup.remove();
+    });
+    popup.appendChild(clear);
+    const rect=btn.getBoundingClientRect();
+    popup.style.top=(rect.bottom+window.scrollY)+'px';
+    popup.style.left=(rect.left+window.scrollX)+'px';
+    document.body.appendChild(popup);
+    const close=e=>{if(!popup.contains(e.target)){popup.remove();document.removeEventListener('click',close);}};
+    setTimeout(()=>document.addEventListener('click',close),0);
   }
 
   addRow(data = {}) {
@@ -168,16 +203,17 @@ class TableManager {
   }
 
   clearFilters() {
-    this.filters.forEach(f => f.value='');
+    this.filters=this.filters.map(()=> '');
+    this.filterButtons.forEach(btn=>btn.classList.remove('filtered'));
     this.applyFilters();
   }
 
   applyFilters() {
     Array.from(this.tbody.rows).forEach(row => {
       let visible = true;
-      this.filters.forEach((f,i) => {
-        const val = f.value.toLowerCase();
-        if (val && !String(row.cells[i].firstChild.value).toLowerCase().includes(val)) visible = false;
+      this.filters.forEach((val,i) => {
+        const v = val.toLowerCase();
+        if (v && !String(row.cells[i].firstChild.value).toLowerCase().includes(v)) visible = false;
       });
       row.style.display = visible ? '' : 'none';
     });
