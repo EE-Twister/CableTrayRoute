@@ -5,6 +5,7 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
   <meta name="description" content="Calculator for packing cables into trays and checking fill levels."/>
   <title>Cable Tray Packing</title>
+  <link rel="stylesheet" href="style.css">
 
   <!-- SheetJS / xlsx for Excel import/export -->
   <script src="https://cdn.jsdelivr.net/npm/xlsx/dist/xlsx.full.min.js" defer></script>
@@ -12,7 +13,7 @@
   <style>
     body {
       font-family: Arial, sans-serif;
-      margin: 16px;
+      margin: 0;
     }
     body.dark-mode {
       background-color: #212529;
@@ -247,24 +248,10 @@
       margin-top: 48px;  /* room for buttons */
     }
 
-    /* GLOBAL HELP STYLES */
-    #globalHelpBtn {
-      position: fixed;
-      top: 8px;
-      right: 8px;
-      background: #3498db;
-      color: white;
-      border: none;
-      border-radius: 4px;
-      padding: 6px 12px;
-      font-size: 0.9rem;
-      cursor: pointer;
-      z-index: 1100;
-    }
-    #helpOverlay {
-      position: fixed;
-      top: 0;
-      left: 0;
+      #helpOverlay {
+        position: fixed;
+        top: 0;
+        left: 0;
       width: 100%;
       height: 100%;
       background: rgba(0,0,0,0.5);
@@ -301,19 +288,27 @@
     }
   </style>
 </head>
-<body>
-  <nav class="top-nav">
-    <a href="index.html">Home</a>
-    <a href="ductbankroute.html">Ductbank</a>
-    <a href="cabletrayfill.html">Tray Fill</a>
-    <a href="conduitfill.html">Conduit Fill</a>
-    <a href="cableschedule.html">Cable Schedule</a>
-  </nav>
-  <h1>Cable Tray Packing</h1>
-  <button id="globalHelpBtn" type="button">Help</button>
+  <body>
+    <nav class="top-nav">
+      <a href="index.html">Home</a>
+      <a href="ductbankroute.html">Ductbank</a>
+      <a href="cabletrayfill.html">Tray Fill</a>
+      <a href="conduitfill.html">Conduit Fill</a>
+      <a href="cableschedule.html">Cable Schedule</a>
+    </nav>
+    <div class="container">
+      <main class="main-content">
+        <header class="page-header">
+          <h1>Cable Tray Packing</h1>
+          <button id="settings-btn" class="settings-btn" aria-label="Settings" aria-expanded="false">⚙</button>
+          <div id="settings-menu" class="settings-menu">
+            <label><input type="checkbox" id="dark-toggle"> Dark Mode</label>
+            <button id="help-btn" aria-expanded="false">Help</button>
+          </div>
+        </header>
 
-  <!-- TRAY PARAMETERS -->
-  <fieldset>
+        <!-- TRAY PARAMETERS -->
+        <fieldset>
     <legend><strong>Tray Parameters</strong></legend>
 
     <label for="trayWidth">Inside Width (in):</label>
@@ -417,19 +412,22 @@
   <div id="svgContainer"></div>
 
   <!-- OVERLAY + POPUP FOR EXPANDED VIEW -->
-  <div id="overlay">
-    <div id="popup">
-      <button id="popupClose" type="button">Close</button>
-      <button id="copyPngBtn" type="button">Copy PNG</button>
-      <button id="printBtn" type="button">Print SVG</button>
-      <button id="copyBtn" type="button">Copy SVG</button>
-      <!-- Expanded SVG will be injected here -->
-      <div id="expandedSVG"></div>
+    <div id="overlay">
+      <div id="popup">
+        <button id="popupClose" type="button">Close</button>
+        <button id="copyPngBtn" type="button">Copy PNG</button>
+        <button id="printBtn" type="button">Print SVG</button>
+        <button id="copyBtn" type="button">Copy SVG</button>
+        <!-- Expanded SVG will be injected here -->
+        <div id="expandedSVG"></div>
+      </div>
     </div>
-  </div>
 
-  <!-- HELP OVERLAY -->
-  <div id="helpOverlay">
+      </main>
+    </div>
+
+    <!-- HELP OVERLAY -->
+    <div id="helpOverlay">
     <div id="helpPopup">
       <button id="helpClose" type="button">Close</button>
       <div id="helpContent">
@@ -474,6 +472,36 @@
           } catch {}
         }
       });
+      const darkToggle = document.getElementById('dark-toggle');
+      const settingsBtn = document.getElementById('settings-btn');
+      const settingsMenu = document.getElementById('settings-menu');
+      if (settingsBtn && settingsMenu) {
+        settingsBtn.addEventListener('click', () => {
+          const expanded = settingsMenu.style.display === 'flex';
+          settingsMenu.style.display = expanded ? 'none' : 'flex';
+          settingsBtn.setAttribute('aria-expanded', String(!expanded));
+        });
+        document.addEventListener('click', e => {
+          if (!settingsMenu.contains(e.target) && e.target !== settingsBtn) {
+            settingsMenu.style.display = 'none';
+            settingsBtn.setAttribute('aria-expanded', 'false');
+          }
+        });
+      }
+      if (darkToggle) {
+        if (session.darkMode) {
+          darkToggle.checked = true;
+        }
+        darkToggle.addEventListener('change', () => {
+          if (darkToggle.checked) {
+            document.body.classList.add('dark-mode');
+          } else {
+            document.body.classList.remove('dark-mode');
+          }
+          session.darkMode = darkToggle.checked;
+          localStorage.setItem('ctrSession', JSON.stringify(session));
+        });
+      }
       // ─────────────────────────────────────────────────────────────
       // (A) Default Configurations (3 conductors + ground) :contentReference[oaicite:0]{index=0}
       // ─────────────────────────────────────────────────────────────
@@ -2168,7 +2196,7 @@ Wt: ${m.weight.toFixed(2)} lbs/ft
       }
 
       // Global help overlay
-      document.getElementById("globalHelpBtn").addEventListener("click", () => {
+      document.getElementById("help-btn").addEventListener("click", () => {
         document.getElementById("helpOverlay").style.display = "flex";
       });
       document.getElementById("helpClose").addEventListener("click", () => {
