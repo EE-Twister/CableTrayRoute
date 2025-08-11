@@ -40,6 +40,7 @@
           <input type="file" id="import-ductbank-xlsx-input" accept=".xlsx" style="display:none;">
           <button id="import-ductbank-xlsx-btn">Import XLSX</button>
           <button id="delete-ductbank-btn">Delete All</button>
+          <button id="ductbank-help-btn" aria-expanded="false">Help</button>
         </div>
         <div class="table-scroll">
           <table id="ductbankTable" class="sticky-table">
@@ -71,6 +72,7 @@
           <input type="file" id="import-tray-xlsx-input" accept=".xlsx" style="display:none;">
           <button id="import-tray-xlsx-btn">Import XLSX</button>
           <button id="delete-tray-btn">Delete All Rows</button>
+          <button id="tray-help-btn" aria-expanded="false">Help</button>
         </div>
         <div class="table-scroll">
           <table id="trayTable" class="sticky-table">
@@ -94,6 +96,7 @@
           <input type="file" id="import-conduit-xlsx-input" accept=".xlsx" style="display:none;">
           <button id="import-conduit-xlsx-btn">Import XLSX</button>
           <button id="delete-conduit-btn">Delete All Rows</button>
+          <button id="conduit-help-btn" aria-expanded="false">Help</button>
         </div>
         <div class="table-scroll">
           <table id="conduitTable" class="sticky-table">
@@ -113,7 +116,31 @@
     <div class="modal-content">
       <button id="close-help-btn" class="close-btn" aria-label="Close Help">&times;</button>
       <h2 id="help-title">Raceway Schedule Help</h2>
-      <p>Use these tables to manage raceway information. Import or export data using Excel files.</p>
+      <p>Use these tables to manage raceway information. Each section offers a Help button with usage tips and example templates for import/export.</p>
+    </div>
+  </div>
+
+  <div id="ductbank-help-modal" class="modal" aria-hidden="true" role="dialog" aria-labelledby="ductbank-help-title">
+    <div class="modal-content">
+      <button class="close-btn" aria-label="Close Help">&times;</button>
+      <h2 id="ductbank-help-title">Ductbank Schedule Help</h2>
+      <p>Add ductbanks and expand rows to include conduits. Export to XLSX to create a workbook with <em>Ductbanks</em> and <em>Conduits</em> sheets. Templates: <a href="examples/ductbank_schedule_ductbanks.csv" download>Ductbanks CSV</a>, <a href="examples/ductbank_schedule_conduits.csv" download>Conduits CSV</a>.</p>
+    </div>
+  </div>
+
+  <div id="tray-help-modal" class="modal" aria-hidden="true" role="dialog" aria-labelledby="tray-help-title">
+    <div class="modal-content">
+      <button class="close-btn" aria-label="Close Help">&times;</button>
+      <h2 id="tray-help-title">Tray Schedule Help</h2>
+      <p>List tray segments with start/end coordinates and dimensions. Use Import/Export to work with Excel files. Template: <a href="examples/tray_schedule.csv" download>tray_schedule.csv</a>.</p>
+    </div>
+  </div>
+
+  <div id="conduit-help-modal" class="modal" aria-hidden="true" role="dialog" aria-labelledby="conduit-help-title">
+    <div class="modal-content">
+      <button class="close-btn" aria-label="Close Help">&times;</button>
+      <h2 id="conduit-help-title">Conduit Schedule Help</h2>
+      <p>Record stand-alone conduits with start/end coordinates, type, trade size, and capacity. Template: <a href="examples/conduit_schedule.csv" download>conduit_schedule.csv</a>.</p>
     </div>
   </div>
 
@@ -151,25 +178,31 @@ if(darkToggle){
   });
 }
 
-const helpBtn=document.getElementById('help-btn');
-const helpModal=document.getElementById('help-modal');
-const closeHelpBtn=document.getElementById('close-help-btn');
-if(helpBtn&&helpModal&&closeHelpBtn){
-  const openModal=()=>{
-    helpModal.style.display='flex';
-    helpModal.setAttribute('aria-hidden','false');
-    helpBtn.setAttribute('aria-expanded','true');
-    closeHelpBtn.focus();
+function setupHelpModal(btnId,modalId){
+  const btn=document.getElementById(btnId);
+  const modal=document.getElementById(modalId);
+  if(!btn||!modal) return;
+  const closeBtn=modal.querySelector('.close-btn');
+  const open=()=>{
+    modal.style.display='flex';
+    modal.setAttribute('aria-hidden','false');
+    btn.setAttribute('aria-expanded','true');
+    if(closeBtn) closeBtn.focus();
   };
-  const closeModal=()=>{
-    helpModal.style.display='none';
-    helpModal.setAttribute('aria-hidden','true');
-    helpBtn.setAttribute('aria-expanded','false');
+  const close=()=>{
+    modal.style.display='none';
+    modal.setAttribute('aria-hidden','true');
+    btn.setAttribute('aria-expanded','false');
   };
-  helpBtn.addEventListener('click',openModal);
-  closeHelpBtn.addEventListener('click',closeModal);
-  helpModal.addEventListener('click',e=>{ if(e.target===helpModal) closeModal(); });
+  btn.addEventListener('click',open);
+  if(closeBtn) closeBtn.addEventListener('click',close);
+  modal.addEventListener('click',e=>{ if(e.target===modal) close(); });
 }
+
+setupHelpModal('help-btn','help-modal');
+setupHelpModal('ductbank-help-btn','ductbank-help-modal');
+setupHelpModal('tray-help-btn','tray-help-modal');
+setupHelpModal('conduit-help-btn','conduit-help-modal');
 
 const ductbankTbody=document.querySelector('#ductbankTable tbody');
 let ductbanks=[];
