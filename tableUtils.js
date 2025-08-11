@@ -94,7 +94,8 @@ class TableManager {
       let el;
       if (col.type === 'select') {
         el = document.createElement('select');
-        (col.options || []).forEach(opt => {
+        const opts = typeof col.options === 'function' ? col.options(tr, data) : (col.options || []);
+        opts.forEach(opt => {
           const o = document.createElement('option');
           o.value = opt;
           o.textContent = opt;
@@ -104,8 +105,15 @@ class TableManager {
         el = document.createElement('input');
         el.type = col.type || 'text';
       }
-      if (data[col.key] !== undefined) el.value = data[col.key];
+      el.name = col.key;
+      const val = data[col.key] !== undefined ? data[col.key] : col.default;
+      if (val !== undefined) {
+        el.value = val;
+      } else if (el.tagName === 'SELECT' && el.options.length) {
+        el.value = el.options[0].value;
+      }
       td.appendChild(el);
+      if (col.onChange) el.addEventListener('change', () => col.onChange(el, tr));
       if (col.validate) {
         const rules = Array.isArray(col.validate) ? col.validate : [col.validate];
         el.addEventListener('input', () => applyValidation(el, rules));

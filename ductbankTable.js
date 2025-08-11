@@ -3,6 +3,12 @@
   const DUCTBANK_KEY = TableUtils.STORAGE_KEYS.ductbankSchedule;
   let ductbankTbody;
 
+  function parseSize(sz){
+    if(sz.includes('-')){const[w,f]=sz.split('-');const[n,d]=f.split('/');return parseFloat(w)+parseFloat(n)/parseFloat(d);}
+    if(sz.includes('/')){const[n,d]=sz.split('/');return parseFloat(n)/parseFloat(d);}
+    return parseFloat(sz);
+  }
+
   function renderDuctbanks(){
     ductbankTbody.innerHTML='';
     ductbanks.forEach((db,i)=>{
@@ -65,7 +71,45 @@
       const cBody=cTable.createTBody();
       db.conduits.forEach((c,j)=>{
         const r=cBody.insertRow();
-        ['conduit_id','type','trade_size','from','to'].forEach(key=>{
+
+        // Conduit ID
+        let cell=r.insertCell();
+        const idInp=document.createElement('input');
+        idInp.value=c.conduit_id||'';
+        const idRules=['required'];
+        idInp.addEventListener('input',e=>{c.conduit_id=e.target.value;TableUtils.applyValidation(idInp,idRules);saveDuctbanks();});
+        TableUtils.applyValidation(idInp,idRules);
+        cell.appendChild(idInp);
+
+        // Type select
+        cell=r.insertCell();
+        const typeSel=document.createElement('select');
+        Object.keys(CONDUIT_SPECS).forEach(t=>{const o=document.createElement('option');o.value=t;o.textContent=t;typeSel.appendChild(o);});
+        typeSel.value=c.type||Object.keys(CONDUIT_SPECS)[0];
+        c.type=typeSel.value;
+        const typeRules=['required'];
+        cell.appendChild(typeSel);
+
+        // Trade size select
+        cell=r.insertCell();
+        const sizeSel=document.createElement('select');
+        function populateSizes(){
+          sizeSel.innerHTML='';
+          Object.keys(CONDUIT_SPECS[typeSel.value]||{}).sort((a,b)=>parseSize(a)-parseSize(b)).forEach(sz=>{const o=document.createElement('option');o.value=sz;o.textContent=sz;sizeSel.appendChild(o);});
+        }
+        populateSizes();
+        sizeSel.value=c.trade_size||sizeSel.options[0].value;
+        c.trade_size=sizeSel.value;
+        const sizeRules=['required'];
+        cell.appendChild(sizeSel);
+
+        typeSel.addEventListener('change',e=>{c.type=e.target.value;populateSizes();c.trade_size=sizeSel.value;TableUtils.applyValidation(typeSel,typeRules);saveDuctbanks();});
+        sizeSel.addEventListener('change',e=>{c.trade_size=e.target.value;TableUtils.applyValidation(sizeSel,sizeRules);saveDuctbanks();});
+        TableUtils.applyValidation(typeSel,typeRules);
+        TableUtils.applyValidation(sizeSel,sizeRules);
+
+        // From and To inputs
+        ['from','to'].forEach(key=>{
           const cell=r.insertCell();
           const inp=document.createElement('input');
           inp.value=c[key]||'';
@@ -74,6 +118,7 @@
           TableUtils.applyValidation(inp,rules);
           cell.appendChild(inp);
         });
+
         const actc=r.insertCell();
         const delc=document.createElement('button');
         delc.textContent='Delete';
