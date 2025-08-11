@@ -1,0 +1,2 @@
+ductbank_id,conduit_id,type,trade_size,from,to
+DB1,C1,PVC,4,Substation A,Substation B

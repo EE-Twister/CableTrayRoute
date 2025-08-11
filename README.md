@@ -86,6 +86,16 @@ Start and end coordinates use **feet**. Diameter is in **inches** and weight is 
 
 Exported routing results are written to `route_data.xlsx`. Load this file in `cabletrayfill.html` to view tray utilization.
 
+## Raceway Schedule
+
+`racewayschedule.html` centralizes raceway data in three editable tables.
+
+- **Ductbank Schedule** – list each ductbank by `Tag`, `From`, and `To`. Expand a row to add its conduits (`Conduit ID`, `Type`, `Trade Size`, `From`, `To`).
+- **Tray Schedule** – record tray segments with start and end coordinates plus `Width`, `Height`, and optional `Capacity`.
+- **Conduit Schedule** – catalog stand-alone conduits with start/end coordinates, `Type`, `Trade Size`, and `Capacity`.
+
+Use the buttons above each table to **Save** to browser storage, **Load** saved data, and **Import/Export XLSX** files. Templates are available in the `examples` folder (`ductbank_schedule_ductbanks.csv`, `ductbank_schedule_conduits.csv`, `tray_schedule.csv`, and `conduit_schedule.csv`). Save these CSV files as `.xlsx` with matching sheet names before importing.
+
 ## Ductbank Analysis
 
 `ductbankroute.html` analyzes underground ductbanks. You can manually enter each conduit and cable or import them from CSV files. Example formats are available at `examples/ductbank_template.csv` and `examples/cables_ductbank.csv`. The **Thermal Analysis** tool overlays a heat map showing estimated earth temperatures. Use **Download Ductbank Data** for an XLSX report, **Export Ductbank Conduits** and **Export Ductbank Cables** for CSVs, or **Export Image** to save the drawing. Ductbank data is saved between sessions; select **Delete Saved Data** from the settings menu to clear it.
