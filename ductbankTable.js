@@ -136,8 +136,34 @@
       const wb=XLSX.read(e.target.result,{type:'binary'});
       const dbSheet=wb.Sheets['Ductbanks']||wb.Sheets[wb.SheetNames[0]];
       const cSheet=wb.Sheets['Conduits']||wb.Sheets[wb.SheetNames[1]];
+
+      if(!dbSheet){
+        alert('Ductbanks sheet not found');
+        return;
+      }
+      if(!cSheet){
+        alert('Conduits sheet not found');
+        return;
+      }
+
+      const requiredDbHeaders=['ductbank_id','tag','from','to'];
+      const dbHeaders=(XLSX.utils.sheet_to_json(dbSheet,{header:1})[0]||[]).map(h=>String(h).toLowerCase());
+      const missingDb=requiredDbHeaders.filter(h=>!dbHeaders.includes(h));
+      if(missingDb.length){
+        alert('Missing required Ductbanks headers: '+missingDb.join(', '));
+        return;
+      }
+
+      const requiredCHeaders=['ductbank_id','conduit_id','type','trade_size','from','to'];
+      const cHeaders=(XLSX.utils.sheet_to_json(cSheet,{header:1})[0]||[]).map(h=>String(h).toLowerCase());
+      const missingC=requiredCHeaders.filter(h=>!cHeaders.includes(h));
+      if(missingC.length){
+        alert('Missing required Conduits headers: '+missingC.join(', '));
+        return;
+      }
+
       const dbJson=XLSX.utils.sheet_to_json(dbSheet,{defval:''});
-      const cJson=cSheet?XLSX.utils.sheet_to_json(cSheet,{defval:''}):[];
+      const cJson=XLSX.utils.sheet_to_json(cSheet,{defval:''});
       const map={};
       ductbanks=dbJson.map(r=>{const db={id:r['ductbank_id']||r['id']||Date.now()+Math.random(),tag:r['tag']||'',from:r['from']||'',to:r['to']||'',conduits:[],expanded:false};map[db.id]=db;return db;});
       cJson.forEach(r=>{const p=map[r['ductbank_id']];if(p){p.conduits.push({conduit_id:r['conduit_id']||'',type:r['type']||'',trade_size:r['trade_size']||'',from:r['from']||'',to:r['to']||''});}});
