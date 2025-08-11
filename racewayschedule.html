@@ -225,6 +225,7 @@ function renderDuctbanks(){
     const cCell=cRow.insertCell();
     cCell.colSpan=5;
     const cTable=document.createElement('table');
+    cTable.className='nested-table';
     const cHead=cTable.createTHead();
     const h=cHead.insertRow();
     ['Conduit ID','Type','Trade Size','From','To','Actions'].forEach(txt=>{

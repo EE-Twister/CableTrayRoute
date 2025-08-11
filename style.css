@@ -248,7 +248,7 @@ details > summary {
     padding: 1rem 0;
 }
 
-.tray-import-export {
+.table-import-export {
     display: flex;
     flex-wrap: wrap;
     gap: 10px;
@@ -256,15 +256,7 @@ details > summary {
     margin-top: 10px;
 }
 
-.cable-import-export {
-    display: flex;
-    flex-wrap: wrap;
-    gap: 10px;
-    align-items: center;
-    margin-top: 10px;
-}
-
-.tray-controls, .cable-controls {
+.table-controls {
     display: flex;
     flex-wrap: wrap;
     align-items: center;
@@ -272,8 +264,7 @@ details > summary {
     margin-bottom: 10px;
 }
 
-.tray-controls .tray-import-export,
-.cable-controls .cable-import-export {
+.table-controls .table-import-export {
     margin-top: 0;
 }
 
@@ -749,6 +740,27 @@ body.dark-mode .legalDisclaimer {
 
 /* Highlight missing values */
 .missing-value{background-color:var(--warning-bg);}
+
+/* --- Raceway Schedule Page --- */
+.ductbank-row > td {
+    background-color: var(--secondary-color);
+    font-weight: bold;
+}
+
+.conduit-container {
+    background-color: var(--secondary-color);
+}
+
+.conduit-container table {
+    margin-left: 1.5rem;
+    width: 100%;
+    border-collapse: collapse;
+}
+
+.nested-table th, .nested-table td {
+    padding: 4px;
+    border-bottom: 1px solid var(--border-color);
+}
 
 /* --- Ductbank Route Page --- */
 body.ductbank-page {
