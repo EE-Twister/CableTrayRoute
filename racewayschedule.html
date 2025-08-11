@@ -208,67 +208,67 @@ document.addEventListener('DOMContentLoaded',()=>{
   if(typeof initDuctbankTable==='function'){
     initDuctbankTable();
   }
-});
 
-const trayColumns=[
-  {key:'tray_id',label:'Tray ID',type:'text',validate:['required']},
-  {key:'start_x',label:'Start X',type:'number',validate:['required','numeric']},
-  {key:'start_y',label:'Start Y',type:'number',validate:['required','numeric']},
-  {key:'start_z',label:'Start Z',type:'number',validate:['required','numeric']},
-  {key:'end_x',label:'End X',type:'number',validate:['required','numeric']},
-  {key:'end_y',label:'End Y',type:'number',validate:['required','numeric']},
-  {key:'end_z',label:'End Z',type:'number',validate:['required','numeric']},
-  {key:'width',label:'Width (in)',type:'number',validate:['required','numeric']},
-  {key:'height',label:'Height (in)',type:'number',validate:['required','numeric']},
-  {key:'capacity',label:'Capacity',type:'number',validate:['numeric']}
-];
-const trayTable=TableUtils.createTable({
-  tableId:'trayTable',
-  storageKey:TableUtils.STORAGE_KEYS.traySchedule,
-  addRowBtnId:'add-tray-btn',
-  saveBtnId:'save-tray-btn',
-  loadBtnId:'load-tray-btn',
-  clearFiltersBtnId:'clear-tray-filters-btn',
-  exportBtnId:'export-tray-xlsx-btn',
-  importInputId:'import-tray-xlsx-input',
-  importBtnId:'import-tray-xlsx-btn',
-  deleteAllBtnId:'delete-tray-btn',
-  columns:trayColumns
-});
+  const trayColumns=[
+    {key:'tray_id',label:'Tray ID',type:'text',validate:['required']},
+    {key:'start_x',label:'Start X',type:'number',validate:['required','numeric']},
+    {key:'start_y',label:'Start Y',type:'number',validate:['required','numeric']},
+    {key:'start_z',label:'Start Z',type:'number',validate:['required','numeric']},
+    {key:'end_x',label:'End X',type:'number',validate:['required','numeric']},
+    {key:'end_y',label:'End Y',type:'number',validate:['required','numeric']},
+    {key:'end_z',label:'End Z',type:'number',validate:['required','numeric']},
+    {key:'width',label:'Width (in)',type:'number',validate:['required','numeric']},
+    {key:'height',label:'Height (in)',type:'number',validate:['required','numeric']},
+    {key:'capacity',label:'Capacity',type:'number',validate:['numeric']}
+  ];
+  const trayTable=TableUtils.createTable({
+    tableId:'trayTable',
+    storageKey:TableUtils.STORAGE_KEYS.traySchedule,
+    addRowBtnId:'add-tray-btn',
+    saveBtnId:'save-tray-btn',
+    loadBtnId:'load-tray-btn',
+    clearFiltersBtnId:'clear-tray-filters-btn',
+    exportBtnId:'export-tray-xlsx-btn',
+    importInputId:'import-tray-xlsx-input',
+    importBtnId:'import-tray-xlsx-btn',
+    deleteAllBtnId:'delete-tray-btn',
+    columns:trayColumns
+  });
 
-const conduitColumns=[
-  {key:'conduit_id',label:'Conduit ID',type:'text',validate:['required']},
-  {key:'type',label:'Type',type:'text',validate:['required']},
-  {key:'trade_size',label:'Trade Size',type:'text',validate:['required']},
-  {key:'start_x',label:'Start X',type:'number',validate:['required','numeric']},
-  {key:'start_y',label:'Start Y',type:'number',validate:['required','numeric']},
-  {key:'start_z',label:'Start Z',type:'number',validate:['required','numeric']},
-  {key:'end_x',label:'End X',type:'number',validate:['required','numeric']},
-  {key:'end_y',label:'End Y',type:'number',validate:['required','numeric']},
-  {key:'end_z',label:'End Z',type:'number',validate:['required','numeric']},
-  {key:'capacity',label:'Capacity',type:'number',validate:['numeric']}
-];
-const conduitTable=TableUtils.createTable({
-  tableId:'conduitTable',
-  storageKey:TableUtils.STORAGE_KEYS.conduitSchedule,
-  addRowBtnId:'add-conduit-btn',
-  saveBtnId:'save-conduit-btn',
-  loadBtnId:'load-conduit-btn',
-  clearFiltersBtnId:'clear-conduit-filters-btn',
-  exportBtnId:'export-conduit-xlsx-btn',
-  importInputId:'import-conduit-xlsx-input',
-  importBtnId:'import-conduit-xlsx-btn',
-  deleteAllBtnId:'delete-conduit-btn',
-  columns:conduitColumns
-});
+  const conduitColumns=[
+    {key:'conduit_id',label:'Conduit ID',type:'text',validate:['required']},
+    {key:'type',label:'Type',type:'text',validate:['required']},
+    {key:'trade_size',label:'Trade Size',type:'text',validate:['required']},
+    {key:'start_x',label:'Start X',type:'number',validate:['required','numeric']},
+    {key:'start_y',label:'Start Y',type:'number',validate:['required','numeric']},
+    {key:'start_z',label:'Start Z',type:'number',validate:['required','numeric']},
+    {key:'end_x',label:'End X',type:'number',validate:['required','numeric']},
+    {key:'end_y',label:'End Y',type:'number',validate:['required','numeric']},
+    {key:'end_z',label:'End Z',type:'number',validate:['required','numeric']},
+    {key:'capacity',label:'Capacity',type:'number',validate:['numeric']}
+  ];
+  const conduitTable=TableUtils.createTable({
+    tableId:'conduitTable',
+    storageKey:TableUtils.STORAGE_KEYS.conduitSchedule,
+    addRowBtnId:'add-conduit-btn',
+    saveBtnId:'save-conduit-btn',
+    loadBtnId:'load-conduit-btn',
+    clearFiltersBtnId:'clear-conduit-filters-btn',
+    exportBtnId:'export-conduit-xlsx-btn',
+    importInputId:'import-conduit-xlsx-input',
+    importBtnId:'import-conduit-xlsx-btn',
+    deleteAllBtnId:'delete-conduit-btn',
+    columns:conduitColumns
+  });
 
-function getRacewaySchedule(){
-  saveDuctbanks();
-  trayTable.save();
-  conduitTable.save();
-  return {ductbanks:getDuctbanks(),trays:trayTable.getData(),conduits:conduitTable.getData()};
-}
-window.getRacewaySchedule=getRacewaySchedule;
+  function getRacewaySchedule(){
+    saveDuctbanks();
+    trayTable.save();
+    conduitTable.save();
+    return {ductbanks:getDuctbanks(),trays:trayTable.getData(),conduits:conduitTable.getData()};
+  }
+  window.getRacewaySchedule=getRacewaySchedule;
+});
 </script>
 </body>
 </html>
