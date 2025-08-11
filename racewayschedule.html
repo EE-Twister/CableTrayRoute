@@ -78,7 +78,30 @@
           </table>
         </div>
         <div style="margin-top:10px;">
-          <button id="add-tray-row-btn" class="primary-btn add-row-btn">Add Row</button>
+          <button id="add-tray-btn" class="primary-btn add-row-btn">Add Tray</button>
+        </div>
+      </section>
+
+      <!-- Conduit Table -->
+      <section class="card">
+        <h2>Conduit Schedule</h2>
+        <div style="margin-bottom:10px;">
+          <button id="save-conduit-btn">Save</button>
+          <button id="load-conduit-btn">Load</button>
+          <button id="clear-conduit-filters-btn">Clear Filters</button>
+          <button id="export-conduit-xlsx-btn">Export XLSX</button>
+          <input type="file" id="import-conduit-xlsx-input" accept=".xlsx" style="display:none;">
+          <button id="import-conduit-xlsx-btn">Import XLSX</button>
+          <button id="delete-conduit-btn">Delete All Rows</button>
+        </div>
+        <div class="table-scroll">
+          <table id="conduitTable" class="sticky-table">
+            <thead></thead>
+            <tbody></tbody>
+          </table>
+        </div>
+        <div style="margin-top:10px;">
+          <button id="add-conduit-btn" class="primary-btn add-row-btn">Add Conduit</button>
         </div>
       </section>
 
@@ -297,14 +320,20 @@ loadDuctbanks();
 
 const trayColumns=[
   {key:'tray_id',label:'Tray ID',type:'text'},
-  {key:'type',label:'Type',type:'text'},
-  {key:'from',label:'From',type:'text'},
-  {key:'to',label:'To',type:'text'}
+  {key:'start_x',label:'Start X',type:'number'},
+  {key:'start_y',label:'Start Y',type:'number'},
+  {key:'start_z',label:'Start Z',type:'number'},
+  {key:'end_x',label:'End X',type:'number'},
+  {key:'end_y',label:'End Y',type:'number'},
+  {key:'end_z',label:'End Z',type:'number'},
+  {key:'width',label:'Width (in)',type:'number'},
+  {key:'height',label:'Height (in)',type:'number'},
+  {key:'capacity',label:'Capacity',type:'number'}
 ];
 TableUtils.createTable({
   tableId:'trayTable',
   storageKey:'traySchedule',
-  addRowBtnId:'add-tray-row-btn',
+  addRowBtnId:'add-tray-btn',
   saveBtnId:'save-tray-btn',
   loadBtnId:'load-tray-btn',
   clearFiltersBtnId:'clear-tray-filters-btn',
@@ -313,6 +342,32 @@ TableUtils.createTable({
   importBtnId:'import-tray-xlsx-btn',
   deleteAllBtnId:'delete-tray-btn',
   columns:trayColumns
+});
+
+const conduitColumns=[
+  {key:'conduit_id',label:'Conduit ID',type:'text'},
+  {key:'type',label:'Type',type:'text'},
+  {key:'trade_size',label:'Trade Size',type:'text'},
+  {key:'start_x',label:'Start X',type:'number'},
+  {key:'start_y',label:'Start Y',type:'number'},
+  {key:'start_z',label:'Start Z',type:'number'},
+  {key:'end_x',label:'End X',type:'number'},
+  {key:'end_y',label:'End Y',type:'number'},
+  {key:'end_z',label:'End Z',type:'number'},
+  {key:'capacity',label:'Capacity',type:'number'}
+];
+TableUtils.createTable({
+  tableId:'conduitTable',
+  storageKey:'conduitSchedule',
+  addRowBtnId:'add-conduit-btn',
+  saveBtnId:'save-conduit-btn',
+  loadBtnId:'load-conduit-btn',
+  clearFiltersBtnId:'clear-conduit-filters-btn',
+  exportBtnId:'export-conduit-xlsx-btn',
+  importInputId:'import-conduit-xlsx-input',
+  importBtnId:'import-conduit-xlsx-btn',
+  deleteAllBtnId:'delete-conduit-btn',
+  columns:conduitColumns
 });
 </script>
 </body>
