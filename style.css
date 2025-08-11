@@ -24,10 +24,8 @@ body.dark-mode {
     position: relative;
 }
 
+
 .settings-btn {
-    position: absolute;
-    top: 0;
-    right: 0;
     background: none;
     border: none;
     font-size: 1.4rem;
@@ -37,8 +35,8 @@ body.dark-mode {
 
 .settings-menu {
     position: absolute;
-    top: 2.2rem;
-    right: 0;
+    top: 3rem;
+    right: 1rem;
     background: var(--secondary-color);
     border: 1px solid var(--border-color);
     border-radius: 4px;
@@ -65,6 +63,11 @@ body {
     background: var(--secondary-color);
     border-bottom: 1px solid var(--border-color);
     padding: 0.5rem 1rem;
+    display: flex;
+    align-items: center;
+}
+.top-nav .settings-btn {
+    margin-left: auto;
 }
 .top-nav a {
     margin-right: 1rem;
