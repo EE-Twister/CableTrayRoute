@@ -1,16 +1,61 @@
+const FOCUSABLE="a[href],button:not([disabled]),textarea:not([disabled]),input:not([disabled]),select:not([disabled]),[tabindex]:not([tabindex='-1'])";
+
+function trapFocus(e,container){
+  if(e.key!=='Tab')return;
+  const focusables=container.querySelectorAll(FOCUSABLE);
+  if(!focusables.length)return;
+  const first=focusables[0];
+  const last=focusables[focusables.length-1];
+  if(e.shiftKey&&document.activeElement===first){
+    e.preventDefault();
+    last.focus();
+  }else if(!e.shiftKey&&document.activeElement===last){
+    e.preventDefault();
+    first.focus();
+  }
+}
+
 function initSettings(){
   const settingsBtn=document.getElementById('settings-btn');
   const settingsMenu=document.getElementById('settings-menu');
   if(settingsBtn&&settingsMenu){
+    settingsMenu.setAttribute('role','dialog');
+    settingsMenu.setAttribute('aria-modal','true');
+    settingsMenu.setAttribute('aria-hidden','true');
+    let open=false;
+
+    const handleKey=e=>{
+      if(e.key==='Escape')close();
+      else trapFocus(e,settingsMenu);
+    };
+
+    const openMenu=()=>{
+      open=true;
+      settingsMenu.style.display='flex';
+      settingsMenu.setAttribute('aria-hidden','false');
+      settingsBtn.setAttribute('aria-expanded','true');
+      document.addEventListener('keydown',handleKey);
+      const focusables=settingsMenu.querySelectorAll(FOCUSABLE);
+      if(focusables.length)focusables[0].focus();
+    };
+
+    const close=()=>{
+      if(!open)return;
+      open=false;
+      settingsMenu.style.display='none';
+      settingsMenu.setAttribute('aria-hidden','true');
+      settingsBtn.setAttribute('aria-expanded','false');
+      document.removeEventListener('keydown',handleKey);
+      settingsBtn.focus();
+    };
+
     settingsBtn.addEventListener('click',()=>{
-      const expanded=settingsMenu.style.display==='flex';
-      settingsMenu.style.display=expanded?'none':'flex';
-      settingsBtn.setAttribute('aria-expanded',String(!expanded));
+      open?close():openMenu();
     });
+
     document.addEventListener('click',e=>{
-      if(!settingsMenu.contains(e.target)&&e.target!==settingsBtn){
-        settingsMenu.style.display='none';
-        settingsBtn.setAttribute('aria-expanded','false');
+      if(open&&!settingsMenu.contains(e.target)&&e.target!==settingsBtn){
+        close();
       }
     });
   }
@@ -48,16 +93,29 @@ function initHelpModal(btnId='help-btn',modalId='help-modal',closeId){
   const modal=document.getElementById(modalId);
   const closeBtn=closeId?document.getElementById(closeId):(modal?modal.querySelector('.close-btn'):null);
   if(btn&&modal&&closeBtn){
+    modal.setAttribute('role','dialog');
+    modal.setAttribute('aria-modal','true');
+    modal.setAttribute('aria-hidden','true');
+
+    const handleKey=e=>{
+      if(e.key==='Escape')close();
+      else trapFocus(e,modal);
+    };
+
     const open=()=>{
       modal.style.display='flex';
       modal.setAttribute('aria-hidden','false');
       btn.setAttribute('aria-expanded','true');
-      closeBtn.focus();
+      document.addEventListener('keydown',handleKey);
+      const focusables=modal.querySelectorAll(FOCUSABLE);
+      if(focusables.length)focusables[0].focus();
     };
     const close=()=>{
       modal.style.display='none';
       modal.setAttribute('aria-hidden','true');
       btn.setAttribute('aria-expanded','false');
+      document.removeEventListener('keydown',handleKey);
+      btn.focus();
     };
     btn.addEventListener('click',open);
     closeBtn.addEventListener('click',close);
