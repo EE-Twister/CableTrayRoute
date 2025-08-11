@@ -1,0 +1,3 @@
+tag,start_tag,end_tag,cable_type,conductors,conductor_size,diameter,weight,allowed_cable_group,start_x,start_y,start_z,end_x,end_y,end_z
+CABLE-1,START1,END1,Power,3,500 kcmil,1.5,2.0,HV,0,0,0,40,0,0
+CABLE-2,START2,END2,Control,2,#12 AWG,0.5,0.1,LV,0,0,10,40,0,10
