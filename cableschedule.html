@@ -20,11 +20,11 @@
     <main class="main-content">
       <header class="page-header">
         <h1>Cable Schedule</h1>
-        <button id="settings-btn" class="settings-btn" aria-label="Settings">⚙</button>
+        <button id="settings-btn" class="settings-btn" aria-label="Settings" aria-expanded="false">⚙</button>
         <p>Centralized table for managing cable data.</p>
         <div id="settings-menu" class="settings-menu">
           <label><input type="checkbox" id="dark-toggle"> Dark Mode</label>
-          <button id="help-btn">Site Help</button>
+          <button id="help-btn" aria-expanded="false">Site Help</button>
         </div>
       </header>
 
@@ -491,11 +491,14 @@ const settingsBtn=document.getElementById('settings-btn');
 const settingsMenu=document.getElementById('settings-menu');
 if(settingsBtn&&settingsMenu){
   settingsBtn.addEventListener('click',()=>{
-    settingsMenu.style.display=settingsMenu.style.display==='flex'?'none':'flex';
+    const expanded=settingsMenu.style.display==='flex';
+    settingsMenu.style.display=expanded?'none':'flex';
+    settingsBtn.setAttribute('aria-expanded',String(!expanded));
   });
   document.addEventListener('click',e=>{
     if(!settingsMenu.contains(e.target)&&e.target!==settingsBtn){
       settingsMenu.style.display='none';
+      settingsBtn.setAttribute('aria-expanded','false');
     }
   });
 }
@@ -519,19 +522,45 @@ const helpBtn=document.getElementById('help-btn');
 const helpModal=document.getElementById('help-modal');
 const closeHelpBtn=document.getElementById('close-help-btn');
 if(helpBtn&&helpModal&&closeHelpBtn){
-  helpBtn.addEventListener('click',()=>{
+  const focusableSelector='a[href],button:not([disabled]),textarea,input,select,[tabindex]:not([tabindex="-1"])';
+  let firstFocusable,lastFocusable,previousFocus;
+  const trapFocus=e=>{
+    if(e.key==='Tab'){
+      if(e.shiftKey){
+        if(document.activeElement===firstFocusable){
+          e.preventDefault();
+          lastFocusable.focus();
+        }
+      }else if(document.activeElement===lastFocusable){
+        e.preventDefault();
+        firstFocusable.focus();
+      }
+    }else if(e.key==='Escape'){
+      closeModal();
+    }
+  };
+  const openModal=()=>{
+    previousFocus=document.activeElement;
     helpModal.style.display='flex';
     helpModal.setAttribute('aria-hidden','false');
-  });
-  closeHelpBtn.addEventListener('click',()=>{
+    helpBtn.setAttribute('aria-expanded','true');
+    const focusables=helpModal.querySelectorAll(focusableSelector);
+    firstFocusable=focusables[0];
+    lastFocusable=focusables[focusables.length-1];
+    firstFocusable&&firstFocusable.focus();
+    helpModal.addEventListener('keydown',trapFocus);
+  };
+  const closeModal=()=>{
     helpModal.style.display='none';
     helpModal.setAttribute('aria-hidden','true');
-  });
+    helpBtn.setAttribute('aria-expanded','false');
+    helpModal.removeEventListener('keydown',trapFocus);
+    previousFocus&&previousFocus.focus();
+  };
+  helpBtn.addEventListener('click',openModal);
+  closeHelpBtn.addEventListener('click',closeModal);
   helpModal.addEventListener('click',e=>{
-    if(e.target===helpModal){
-      helpModal.style.display='none';
-      helpModal.setAttribute('aria-hidden','true');
-    }
+    if(e.target===helpModal)closeModal();
   });
 }
 

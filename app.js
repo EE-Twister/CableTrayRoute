@@ -105,6 +105,19 @@ document.addEventListener('DOMContentLoaded', () => {
         cableSearch: document.getElementById('cable-search'),
         conduitType: document.getElementById('conduit-type'),
     };
+
+    const initHelpIcons = (root = document) => {
+        root.querySelectorAll('.help-icon').forEach(icon => {
+            icon.setAttribute('role', 'button');
+            if (!icon.hasAttribute('aria-label')) icon.setAttribute('aria-label', 'Help');
+            if (!icon.hasAttribute('aria-expanded')) icon.setAttribute('aria-expanded', 'false');
+            icon.addEventListener('mouseenter', () => icon.setAttribute('aria-expanded', 'true'));
+            icon.addEventListener('mouseleave', () => icon.setAttribute('aria-expanded', 'false'));
+            icon.addEventListener('focus', () => icon.setAttribute('aria-expanded', 'true'));
+            icon.addEventListener('blur', () => icon.setAttribute('aria-expanded', 'false'));
+        });
+    };
+    initHelpIcons();
     let cancelRouting = false;
     let currentWorkers = [];
     let workerResolvers = new Map();
@@ -1196,7 +1209,7 @@ const openConduitFill = (cables) => {
             '<th data-key="height">Height</th>' +
             '<th data-key="current_fill">Current Fill</th>' +
             '<th data-key="allowed_cable_group">Allowed Group</th>' +
-            '<th data-key="shape">Shape <span class="help-icon" tabindex="0" aria-describedby="shape-help">?<span id="shape-help" class="tooltip">STR: Straight<br>90B: 90\u00B0 Bend<br>45B: 45\u00B0 Bend<br>30B/60B: 30\u00B0/60\u00B0 Bend<br>TEE: Tee<br>X: Cross<br>VI: Vertical Inside<br>VO: Vertical Outside<br>45VI: 45\u00B0 Vertical Inside<br>45VO: 45\u00B0 Vertical Outside<br>RED-C: Center Reducer<br>RED-S: Side Reducer<br>Z: Z-Bend<br>OFFSET: Offset<br>SPIRAL: Spiral</span></span></th>' +
+            '<th data-key="shape">Shape <span class="help-icon" tabindex="0" role="button" aria-label="Help" aria-expanded="false" aria-describedby="shape-help">?<span id="shape-help" class="tooltip">STR: Straight<br>90B: 90\u00B0 Bend<br>45B: 45\u00B0 Bend<br>30B/60B: 30\u00B0/60\u00B0 Bend<br>TEE: Tee<br>X: Cross<br>VI: Vertical Inside<br>VO: Vertical Outside<br>45VI: 45\u00B0 Vertical Inside<br>45VO: 45\u00B0 Vertical Outside<br>RED-C: Center Reducer<br>RED-S: Side Reducer<br>Z: Z-Bend<br>OFFSET: Offset<br>SPIRAL: Spiral</span></span></th>' +
             '<th></th><th></th></tr></thead><tbody>';
         state.manualTrays.forEach((t, idx) => {
             table += `<tr data-idx="${idx}">
@@ -1226,6 +1239,7 @@ const openConduitFill = (cables) => {
         });
         table += '</tbody></table>';
         elements.manualTrayTableContainer.innerHTML = table;
+        initHelpIcons(elements.manualTrayTableContainer);
         elements.manualTrayTableContainer.classList.add('table-scroll');
         
         const updateTrayData = () => { state.trayData = state.manualTrays; updateTrayDisplay(); };
@@ -2707,27 +2721,58 @@ Plotly.newPlot(document.getElementById('plot'), data, layout, {responsive: true}
     }
     if (elements.settingsBtn && elements.settingsMenu) {
         elements.settingsBtn.addEventListener('click', () => {
-            elements.settingsMenu.style.display = elements.settingsMenu.style.display === 'flex' ? 'none' : 'flex';
+            const expanded = elements.settingsMenu.style.display === 'flex';
+            elements.settingsMenu.style.display = expanded ? 'none' : 'flex';
+            elements.settingsBtn.setAttribute('aria-expanded', String(!expanded));
         });
         document.addEventListener('click', (e) => {
             if (!elements.settingsMenu.contains(e.target) && e.target !== elements.settingsBtn) {
                 elements.settingsMenu.style.display = 'none';
+                elements.settingsBtn.setAttribute('aria-expanded', 'false');
             }
         });
     }
     if (elements.helpBtn && elements.helpModal && elements.closeHelpBtn) {
-        elements.helpBtn.addEventListener('click', () => {
+        const focusableSelector = 'a[href], button:not([disabled]), textarea, input, select, [tabindex]:not([tabindex="-1"])';
+        let firstFocusable, lastFocusable, previousFocus;
+        const trapFocus = (e) => {
+            if (e.key === 'Tab') {
+                if (e.shiftKey) {
+                    if (document.activeElement === firstFocusable) {
+                        e.preventDefault();
+                        lastFocusable.focus();
+                    }
+                } else if (document.activeElement === lastFocusable) {
+                    e.preventDefault();
+                    firstFocusable.focus();
+                }
+            } else if (e.key === 'Escape') {
+                closeModal();
+            }
+        };
+        const openModal = () => {
+            previousFocus = document.activeElement;
             elements.helpModal.style.display = 'flex';
             elements.helpModal.setAttribute('aria-hidden', 'false');
-        });
-        elements.closeHelpBtn.addEventListener('click', () => {
+            elements.helpBtn.setAttribute('aria-expanded', 'true');
+            const focusables = elements.helpModal.querySelectorAll(focusableSelector);
+            firstFocusable = focusables[0];
+            lastFocusable = focusables[focusables.length - 1];
+            firstFocusable && firstFocusable.focus();
+            elements.helpModal.addEventListener('keydown', trapFocus);
+        };
+        const closeModal = () => {
             elements.helpModal.style.display = 'none';
             elements.helpModal.setAttribute('aria-hidden', 'true');
-        });
+            elements.helpBtn.setAttribute('aria-expanded', 'false');
+            elements.helpModal.removeEventListener('keydown', trapFocus);
+            previousFocus && previousFocus.focus();
+        };
+        elements.helpBtn.addEventListener('click', openModal);
+        elements.closeHelpBtn.addEventListener('click', closeModal);
         elements.helpModal.addEventListener('click', (e) => {
             if (e.target === elements.helpModal) {
-                elements.helpModal.style.display = 'none';
-                elements.helpModal.setAttribute('aria-hidden', 'true');
+                closeModal();
             }
         });
     }
