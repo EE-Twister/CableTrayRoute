@@ -341,7 +341,7 @@ const trayColumns=[
   {key:'height',label:'Height (in)',type:'number',validate:['required','numeric']},
   {key:'capacity',label:'Capacity',type:'number',validate:['numeric']}
 ];
-TableUtils.createTable({
+const trayTable=TableUtils.createTable({
   tableId:'trayTable',
   storageKey:TableUtils.STORAGE_KEYS.traySchedule,
   addRowBtnId:'add-tray-btn',
@@ -367,7 +367,7 @@ const conduitColumns=[
   {key:'end_z',label:'End Z',type:'number',validate:['required','numeric']},
   {key:'capacity',label:'Capacity',type:'number',validate:['numeric']}
 ];
-TableUtils.createTable({
+const conduitTable=TableUtils.createTable({
   tableId:'conduitTable',
   storageKey:TableUtils.STORAGE_KEYS.conduitSchedule,
   addRowBtnId:'add-conduit-btn',
@@ -380,6 +380,14 @@ TableUtils.createTable({
   deleteAllBtnId:'delete-conduit-btn',
   columns:conduitColumns
 });
+
+function getRacewaySchedule(){
+  saveDuctbanks();
+  trayTable.save();
+  conduitTable.save();
+  return {ductbanks:ductbanks,trays:trayTable.getData(),conduits:conduitTable.getData()};
+}
+window.getRacewaySchedule=getRacewaySchedule;
 </script>
 </body>
 </html>
