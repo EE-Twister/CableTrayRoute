@@ -1,0 +1,226 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="description" content="Interactive tables for organizing raceway data and exporting schedules.">
+  <title>Raceway Schedule</title>
+  <link rel="stylesheet" href="style.css">
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js" defer></script>
+  <script src="table-utils.js" defer></script>
+</head>
+<body>
+  <nav class="top-nav">
+    <a href="index.html">Home</a>
+    <a href="ductbankroute.html">Ductbank</a>
+    <a href="cabletrayfill.html">Tray Fill</a>
+    <a href="conduitfill.html">Conduit Fill</a>
+    <a href="racewayschedule.html">Raceway Schedule</a>
+    <button id="settings-btn" class="settings-btn" aria-label="Settings" aria-expanded="false">⚙</button>
+  </nav>
+  <div id="settings-menu" class="settings-menu">
+    <label><input type="checkbox" id="dark-toggle"> Dark Mode</label>
+    <button id="help-btn" aria-expanded="false">Site Help</button>
+  </div>
+  <div class="container">
+    <main class="main-content">
+      <header class="page-header">
+        <h1>Raceway Schedule</h1>
+        <p>Centralized tables for managing raceway data.</p>
+      </header>
+
+      <!-- Ductbank Table -->
+      <section class="card">
+        <h2>Ductbank Schedule</h2>
+        <div style="margin-bottom:10px;">
+          <button id="save-ductbank-btn">Save</button>
+          <button id="load-ductbank-btn">Load</button>
+          <button id="clear-ductbank-filters-btn">Clear Filters</button>
+          <button id="export-ductbank-xlsx-btn">Export XLSX</button>
+          <input type="file" id="import-ductbank-xlsx-input" accept=".xlsx" style="display:none;">
+          <button id="import-ductbank-xlsx-btn">Import XLSX</button>
+          <button id="delete-ductbank-btn">Delete All Rows</button>
+        </div>
+        <div class="table-scroll">
+          <table id="ductbankTable" class="sticky-table">
+            <thead></thead>
+            <tbody></tbody>
+          </table>
+        </div>
+        <div style="margin-top:10px;">
+          <button id="add-ductbank-row-btn" class="primary-btn add-row-btn">Add Row</button>
+        </div>
+      </section>
+
+      <!-- Tray Table -->
+      <section class="card">
+        <h2>Tray Schedule</h2>
+        <div style="margin-bottom:10px;">
+          <button id="save-tray-btn">Save</button>
+          <button id="load-tray-btn">Load</button>
+          <button id="clear-tray-filters-btn">Clear Filters</button>
+          <button id="export-tray-xlsx-btn">Export XLSX</button>
+          <input type="file" id="import-tray-xlsx-input" accept=".xlsx" style="display:none;">
+          <button id="import-tray-xlsx-btn">Import XLSX</button>
+          <button id="delete-tray-btn">Delete All Rows</button>
+        </div>
+        <div class="table-scroll">
+          <table id="trayTable" class="sticky-table">
+            <thead></thead>
+            <tbody></tbody>
+          </table>
+        </div>
+        <div style="margin-top:10px;">
+          <button id="add-tray-row-btn" class="primary-btn add-row-btn">Add Row</button>
+        </div>
+      </section>
+
+      <!-- Conduit Table -->
+      <section class="card">
+        <h2>Conduit Schedule</h2>
+        <div style="margin-bottom:10px;">
+          <button id="save-conduit-btn">Save</button>
+          <button id="load-conduit-btn">Load</button>
+          <button id="clear-conduit-filters-btn">Clear Filters</button>
+          <button id="export-conduit-xlsx-btn">Export XLSX</button>
+          <input type="file" id="import-conduit-xlsx-input" accept=".xlsx" style="display:none;">
+          <button id="import-conduit-xlsx-btn">Import XLSX</button>
+          <button id="delete-conduit-btn">Delete All Rows</button>
+        </div>
+        <div class="table-scroll">
+          <table id="conduitTable" class="sticky-table">
+            <thead></thead>
+            <tbody></tbody>
+          </table>
+        </div>
+        <div style="margin-top:10px;">
+          <button id="add-conduit-row-btn" class="primary-btn add-row-btn">Add Row</button>
+        </div>
+      </section>
+    </main>
+  </div>
+
+  <div id="help-modal" class="modal" aria-hidden="true" role="dialog" aria-labelledby="help-title">
+    <div class="modal-content">
+      <button id="close-help-btn" class="close-btn" aria-label="Close Help">&times;</button>
+      <h2 id="help-title">Raceway Schedule Help</h2>
+      <p>Use these tables to manage raceway information. Import or export data using Excel files.</p>
+    </div>
+  </div>
+
+<script>
+const darkToggle=document.getElementById('dark-toggle');
+const settingsBtn=document.getElementById('settings-btn');
+const settingsMenu=document.getElementById('settings-menu');
+if(settingsBtn&&settingsMenu){
+  settingsBtn.addEventListener('click',()=>{
+    const expanded=settingsMenu.style.display==='flex';
+    settingsMenu.style.display=expanded?'none':'flex';
+    settingsBtn.setAttribute('aria-expanded',String(!expanded));
+  });
+  document.addEventListener('click',e=>{
+    if(!settingsMenu.contains(e.target)&&e.target!==settingsBtn){
+      settingsMenu.style.display='none';
+      settingsBtn.setAttribute('aria-expanded','false');
+    }
+  });
+}
+if(darkToggle){
+  const sess=JSON.parse(localStorage.getItem('ctrSession')||'{}');
+  if(sess.darkMode){
+    document.body.classList.add('dark-mode');
+    darkToggle.checked=true;
+  }
+  darkToggle.addEventListener('change',()=>{
+    if(darkToggle.checked){
+      document.body.classList.add('dark-mode');
+    }else{
+      document.body.classList.remove('dark-mode');
+    }
+    sess.darkMode=darkToggle.checked;
+    localStorage.setItem('ctrSession',JSON.stringify(sess));
+  });
+}
+
+const helpBtn=document.getElementById('help-btn');
+const helpModal=document.getElementById('help-modal');
+const closeHelpBtn=document.getElementById('close-help-btn');
+if(helpBtn&&helpModal&&closeHelpBtn){
+  const openModal=()=>{
+    helpModal.style.display='flex';
+    helpModal.setAttribute('aria-hidden','false');
+    helpBtn.setAttribute('aria-expanded','true');
+    closeHelpBtn.focus();
+  };
+  const closeModal=()=>{
+    helpModal.style.display='none';
+    helpModal.setAttribute('aria-hidden','true');
+    helpBtn.setAttribute('aria-expanded','false');
+  };
+  helpBtn.addEventListener('click',openModal);
+  closeHelpBtn.addEventListener('click',closeModal);
+  helpModal.addEventListener('click',e=>{ if(e.target===helpModal) closeModal(); });
+}
+
+const ductbankColumns=[
+  {key:'tag',label:'Tag',type:'text'},
+  {key:'from',label:'From',type:'text'},
+  {key:'to',label:'To',type:'text'}
+];
+initTable({
+  tableId:'ductbankTable',
+  storageKey:'ductbankSchedule',
+  addRowBtnId:'add-ductbank-row-btn',
+  saveBtnId:'save-ductbank-btn',
+  loadBtnId:'load-ductbank-btn',
+  clearFiltersBtnId:'clear-ductbank-filters-btn',
+  exportBtnId:'export-ductbank-xlsx-btn',
+  importInputId:'import-ductbank-xlsx-input',
+  importBtnId:'import-ductbank-xlsx-btn',
+  deleteAllBtnId:'delete-ductbank-btn',
+  columns:ductbankColumns
+});
+
+const trayColumns=[
+  {key:'tray_id',label:'Tray ID',type:'text'},
+  {key:'type',label:'Type',type:'text'},
+  {key:'from',label:'From',type:'text'},
+  {key:'to',label:'To',type:'text'}
+];
+initTable({
+  tableId:'trayTable',
+  storageKey:'traySchedule',
+  addRowBtnId:'add-tray-row-btn',
+  saveBtnId:'save-tray-btn',
+  loadBtnId:'load-tray-btn',
+  clearFiltersBtnId:'clear-tray-filters-btn',
+  exportBtnId:'export-tray-xlsx-btn',
+  importInputId:'import-tray-xlsx-input',
+  importBtnId:'import-tray-xlsx-btn',
+  deleteAllBtnId:'delete-tray-btn',
+  columns:trayColumns
+});
+
+const conduitColumns=[
+  {key:'conduit_id',label:'Conduit ID',type:'text'},
+  {key:'type',label:'Type',type:'text'},
+  {key:'trade_size',label:'Trade Size',type:'text'},
+  {key:'from',label:'From',type:'text'},
+  {key:'to',label:'To',type:'text'}
+];
+initTable({
+  tableId:'conduitTable',
+  storageKey:'conduitSchedule',
+  addRowBtnId:'add-conduit-row-btn',
+  saveBtnId:'save-conduit-btn',
+  loadBtnId:'load-conduit-btn',
+  clearFiltersBtnId:'clear-conduit-filters-btn',
+  exportBtnId:'export-conduit-xlsx-btn',
+  importInputId:'import-conduit-xlsx-input',
+  importBtnId:'import-conduit-xlsx-btn',
+  deleteAllBtnId:'delete-conduit-btn',
+  columns:conduitColumns
+});
+</script>
+</body>
+</html>
