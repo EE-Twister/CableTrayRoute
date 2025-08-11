@@ -10,14 +10,17 @@
 </head>
 <body>
   <nav class="top-nav">
-    <a href="index.html" class="active" aria-current="page">Home</a>
-    <a href="cableschedule.html">Cable Schedule</a>
-    <a href="racewayschedule.html">Raceway Schedule</a>
-    <a href="ductbankroute.html">Ductbank</a>
-    <a href="cabletrayfill.html">Tray Fill</a>
-    <a href="conduitfill.html">Conduit Fill</a>
-    <a href="optimalRoute.html">Optimal Route</a>
-    <button id="settings-btn" class="settings-btn" aria-label="Settings" aria-expanded="false">⚙</button>
+    <button class="nav-toggle" aria-label="Toggle navigation">☰</button>
+    <div class="nav-links">
+      <a href="index.html" class="active" aria-current="page">Home</a>
+      <a href="cableschedule.html">Cable Schedule</a>
+      <a href="racewayschedule.html">Raceway Schedule</a>
+      <a href="ductbankroute.html">Ductbank</a>
+      <a href="cabletrayfill.html">Tray Fill</a>
+      <a href="conduitfill.html">Conduit Fill</a>
+      <a href="optimalRoute.html">Optimal Route</a>
+      <button id="settings-btn" class="settings-btn" aria-label="Settings" aria-expanded="false">⚙</button>
+    </div>
   </nav>
   <div id="settings-menu" class="settings-menu">
     <label><input type="checkbox" id="dark-toggle"> Dark Mode</label>
@@ -96,6 +99,7 @@
       initSettings();
       initDarkMode();
       initHelpModal('help-btn','help-modal','close-help-btn');
+      initNavToggle();
     });
   </script>
 </body>

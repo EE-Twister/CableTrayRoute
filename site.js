@@ -65,6 +65,17 @@ function initHelpModal(btnId='help-btn',modalId='help-modal',closeId){
   }
 }
 
+function initNavToggle(){
+  const nav=document.querySelector('.top-nav');
+  if(!nav) return;
+  const toggle=nav.querySelector('.nav-toggle');
+  if(!toggle) return;
+  toggle.addEventListener('click',()=>{
+    nav.classList.toggle('open');
+  });
+}
+
 window.initSettings=initSettings;
 window.initDarkMode=initDarkMode;
 window.initHelpModal=initHelpModal;
+window.initNavToggle=initNavToggle;
