@@ -90,54 +90,13 @@
     </nav>
   </footer>
   <script src="workflowStatus.js"></script>
+  <script src="site.js" defer></script>
   <script>
-  window.addEventListener('DOMContentLoaded', () => {
-    const darkToggle = document.getElementById('dark-toggle');
-    const settingsBtn = document.getElementById('settings-btn');
-    const settingsMenu = document.getElementById('settings-menu');
-    const helpBtn = document.getElementById('help-btn');
-    const helpModal = document.getElementById('help-modal');
-    const closeHelpBtn = document.getElementById('close-help-btn');
-
-    if(settingsBtn && settingsMenu){
-      settingsBtn.addEventListener('click', () => {
-        const expanded = settingsMenu.style.display === 'flex';
-        settingsMenu.style.display = expanded ? 'none' : 'flex';
-        settingsBtn.setAttribute('aria-expanded', String(!expanded));
-      });
-      document.addEventListener('click', e => {
-        if(!settingsMenu.contains(e.target) && e.target !== settingsBtn){
-          settingsMenu.style.display = 'none';
-          settingsBtn.setAttribute('aria-expanded', 'false');
-        }
-      });
-    }
-
-    if(darkToggle){
-      const sess = JSON.parse(localStorage.getItem('ctrSession') || '{}');
-      if(sess.darkMode){
-        document.body.classList.add('dark-mode');
-        darkToggle.checked = true;
-      }
-      darkToggle.addEventListener('change', () => {
-        document.body.classList.toggle('dark-mode', darkToggle.checked);
-        const sess = JSON.parse(localStorage.getItem('ctrSession') || '{}');
-        sess.darkMode = darkToggle.checked;
-        localStorage.setItem('ctrSession', JSON.stringify(sess));
-      });
-    }
-
-    if(helpBtn && helpModal && closeHelpBtn){
-      helpBtn.addEventListener('click', () => {
-        helpModal.style.display = 'flex';
-        helpModal.setAttribute('aria-hidden','false');
-      });
-      closeHelpBtn.addEventListener('click', () => {
-        helpModal.style.display = 'none';
-        helpModal.setAttribute('aria-hidden','true');
-      });
-    }
-  });
+    window.addEventListener('DOMContentLoaded', () => {
+      initSettings();
+      initDarkMode();
+      initHelpModal('help-btn','help-modal','close-help-btn');
+    });
   </script>
 </body>
 </html>

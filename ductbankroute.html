@@ -12,6 +12,7 @@
 <script src="soilResistivityConfig.js" defer></script>
 <script src="conductorProperties.js" defer></script>
 <script src="https://cdn.jsdelivr.net/npm/docx@8.5.0/build/index.umd.js" defer></script>
+<script src="site.js" defer></script>
 </head>
 <body class="ductbank-page">
 <script>
@@ -326,6 +327,11 @@
 </div>
 
 <script>
+document.addEventListener('DOMContentLoaded',()=>{
+  initSettings();
+  initDarkMode();
+  initHelpModal('helpBtn','helpOverlay','helpClose');
+});
 let heatVisible=false;
 window.lastHeatGrid=null;
 window.lastConduitTemps=null;
@@ -2528,28 +2534,6 @@ document.getElementById('scrollTopBtn').addEventListener('click',()=>{
 });
 document.getElementById('heatToggleBtn').addEventListener('click',toggleHeatMap);
 
-const darkToggle = document.getElementById('dark-toggle');
-const stored=JSON.parse(localStorage.getItem('ctrSession')||'{}');
-if(stored.darkMode){
-  document.body.classList.add('dark-mode');
-}
-if(darkToggle){
-  if(document.body.classList.contains('dark-mode')){
-    darkToggle.checked=true;
-  }
-  darkToggle.addEventListener('change',()=>{
-    if(darkToggle.checked){
-      document.body.classList.add('dark-mode');
-    }else{
-      document.body.classList.remove('dark-mode');
-    }
-    const session=JSON.parse(localStorage.getItem('ctrSession')||'{}');
-    session.darkMode=document.body.classList.contains('dark-mode');
-    localStorage.setItem('ctrSession',JSON.stringify(session));
-    saveDuctbankSession();
-  });
-}
-
 const hideDrawing=document.getElementById('hideDrawing');
 if(hideDrawing){
   hideDrawing.addEventListener('change',()=>{
@@ -2561,70 +2545,8 @@ if(hideDrawing){
   });
 }
 
-window.addEventListener('storage',e=>{if(e.key==='ctrSession'){const d=JSON.parse(e.newValue);if(d.darkMode)document.body.classList.add('dark-mode');else document.body.classList.remove('dark-mode');}});
-
-const helpBtn=document.getElementById('helpBtn');
-const helpOverlay=document.getElementById('helpOverlay');
-const helpClose=document.getElementById('helpClose');
-if(helpBtn&&helpOverlay&&helpClose){
- const focusableSelector='a[href],button:not([disabled]),textarea,input,select,[tabindex]:not([tabindex="-1"])';
- let firstFocusable,lastFocusable,previousFocus;
- const trapFocus=e=>{
-  if(e.key==='Tab'){
-   if(e.shiftKey){
-    if(document.activeElement===firstFocusable){
-     e.preventDefault();
-     lastFocusable.focus();
-    }
-   }else if(document.activeElement===lastFocusable){
-    e.preventDefault();
-    firstFocusable.focus();
-   }
-  }else if(e.key==='Escape'){
-   closeHelp();
-  }
- };
- const openHelp=()=>{
-  document.getElementById('settings-menu').style.display='none';
-  previousFocus=document.activeElement;
-  helpOverlay.style.display='flex';
-  helpOverlay.setAttribute('aria-hidden','false');
-  helpBtn.setAttribute('aria-expanded','true');
-  const focusables=helpOverlay.querySelectorAll(focusableSelector);
-  firstFocusable=focusables[0];
-  lastFocusable=focusables[focusables.length-1];
-  firstFocusable&&firstFocusable.focus();
-  helpOverlay.addEventListener('keydown',trapFocus);
- };
- const closeHelp=()=>{
-  helpOverlay.style.display='none';
-  helpOverlay.setAttribute('aria-hidden','true');
-  helpBtn.setAttribute('aria-expanded','false');
-  helpOverlay.removeEventListener('keydown',trapFocus);
-  previousFocus&&previousFocus.focus();
- };
- helpBtn.addEventListener('click',openHelp);
- helpClose.addEventListener('click',closeHelp);
- helpOverlay.addEventListener('click',e=>{if(e.target===helpOverlay)closeHelp();});
-}
 document.getElementById('deleteDataBtn').addEventListener('click',deleteSavedData);
 document.getElementById('resetBtn').addEventListener('click',deleteSavedData);
-
-const settingsBtn=document.getElementById('settings-btn');
-const settingsMenu=document.getElementById('settings-menu');
-if(settingsBtn&&settingsMenu){
- settingsBtn.addEventListener('click',()=>{
-  const expanded=settingsMenu.style.display==='flex';
-  settingsMenu.style.display=expanded?'none':'flex';
-  settingsBtn.setAttribute('aria-expanded',String(!expanded));
- });
- document.addEventListener('click',e=>{
-  if(!settingsMenu.contains(e.target)&&e.target!==settingsBtn){
-   settingsMenu.style.display='none';
-   settingsBtn.setAttribute('aria-expanded','false');
-  }
- });
-}
 
 const initHelpIcons=(root=document)=>{
  root.querySelectorAll('.help-icon').forEach(icon=>{

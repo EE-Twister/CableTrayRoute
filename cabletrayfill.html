@@ -10,6 +10,7 @@
 
   <!-- SheetJS / xlsx for Excel import/export -->
   <script src="https://cdn.jsdelivr.net/npm/xlsx/dist/xlsx.full.min.js" defer></script>
+  <script src="site.js" defer></script>
 </head>
   <body class="cabletrayfill-page">
     <script>
@@ -201,56 +202,13 @@
 
   <script>
     document.addEventListener("DOMContentLoaded", function() {
+      initSettings();
+      initDarkMode();
+      initHelpModal('help-btn','helpOverlay','helpClose');
       let saved = true;
       const markSaved = () => { saved = true; };
       const markUnsaved = () => { saved = false; };
       window.addEventListener('beforeunload', e => { if (!saved) { e.preventDefault(); e.returnValue=''; } });
-      const session = JSON.parse(localStorage.getItem('ctrSession') || '{}');
-      if (session.darkMode) {
-        document.body.classList.add('dark-mode');
-      }
-      window.addEventListener('storage', (e) => {
-        if (e.key === 'ctrSession') {
-          try {
-            const data = JSON.parse(e.newValue);
-            if (data && data.darkMode) {
-              document.body.classList.add('dark-mode');
-            } else {
-              document.body.classList.remove('dark-mode');
-            }
-          } catch {}
-        }
-      });
-      const darkToggle = document.getElementById('dark-toggle');
-      const settingsBtn = document.getElementById('settings-btn');
-      const settingsMenu = document.getElementById('settings-menu');
-      if (settingsBtn && settingsMenu) {
-        settingsBtn.addEventListener('click', () => {
-          const expanded = settingsMenu.style.display === 'flex';
-          settingsMenu.style.display = expanded ? 'none' : 'flex';
-          settingsBtn.setAttribute('aria-expanded', String(!expanded));
-        });
-        document.addEventListener('click', e => {
-          if (!settingsMenu.contains(e.target) && e.target !== settingsBtn) {
-            settingsMenu.style.display = 'none';
-            settingsBtn.setAttribute('aria-expanded', 'false');
-          }
-        });
-      }
-      if (darkToggle) {
-        if (session.darkMode) {
-          darkToggle.checked = true;
-        }
-        darkToggle.addEventListener('change', () => {
-          if (darkToggle.checked) {
-            document.body.classList.add('dark-mode');
-          } else {
-            document.body.classList.remove('dark-mode');
-          }
-          session.darkMode = darkToggle.checked;
-          localStorage.setItem('ctrSession', JSON.stringify(session));
-        });
-      }
       // ─────────────────────────────────────────────────────────────
       // (A) Default Configurations (3 conductors + ground) :contentReference[oaicite:0]{index=0}
       // ─────────────────────────────────────────────────────────────
@@ -1955,14 +1913,6 @@ Wt: ${m.weight.toFixed(2)} lbs/ft
         }
         localStorage.removeItem('trayFillData');
       }
-
-      // Global help overlay
-      document.getElementById("help-btn").addEventListener("click", () => {
-        document.getElementById("helpOverlay").style.display = "flex";
-      });
-      document.getElementById("helpClose").addEventListener("click", () => {
-        document.getElementById("helpOverlay").style.display = "none";
-      });
 
       // Attach help popups for table headers
       document.querySelectorAll('.helpBtn').forEach(btn => {
