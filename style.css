@@ -754,6 +754,11 @@ body.dark-mode .legalDisclaimer {
 body.ductbank-page {
     margin: 0;
 }
+body.ductbank-page h1 {
+    margin-bottom: 8px;
+    font-size: 1.4rem;
+    font-family: inherit;
+}
 body.ductbank-page label {
     display: inline-block;
     margin-bottom: 4px;
