@@ -28,10 +28,10 @@ button{padding:4px 8px;margin:4px 2px;cursor:pointer;}
 </nav>
 <header class="page-header">
  <h1>Ductbank Route</h1>
- <button id="settings-btn" class="settings-btn" aria-label="Settings">⚙</button>
+ <button id="settings-btn" class="settings-btn" aria-label="Settings" aria-expanded="false">⚙</button>
  <div id="settings-menu" class="settings-menu">
   <label><input type="checkbox" id="dark-toggle"> Dark Mode</label>
-  <button id="helpBtn">Help</button>
+  <button id="helpBtn" aria-expanded="false">Help</button>
   <button id="deleteDataBtn">Delete Saved Data</button>
  </div>
 </header>
@@ -128,19 +128,19 @@ button{padding:4px 8px;margin:4px 2px;cursor:pointer;}
  <summary><strong>Parameters</strong></summary>
  <div>
  <label>Ambient Earth Temperature (&#176;F)
-  <span class="help-icon" tabindex="0" aria-describedby="earthTempHelp">?
+  <span class="help-icon" tabindex="0" role="button" aria-label="Help" aria-expanded="false" aria-describedby="earthTempHelp">?
    <span id="earthTempHelp" class="tooltip">Degrees Fahrenheit of the surrounding soil. Typical 50–80°F.</span>
   </span>
   <input type="number" id="earthTemp" style="width:60px;">
  </label>
 <label style="margin-left:8px;">Ambient Air Temperature (&#176;F)
-  <span class="help-icon" tabindex="0" aria-describedby="airTempHelp">?
+  <span class="help-icon" tabindex="0" role="button" aria-label="Help" aria-expanded="false" aria-describedby="airTempHelp">?
    <span id="airTempHelp" class="tooltip">Air temperature around the installation in °F. Usually 50–110°F.</span>
   </span>
   <input type="number" id="airTemp" style="width:60px;">
  </label>
 <label style="margin-left:8px;">Thermal Resistivity of Soil (&#176;C&#183;cm/W)
-  <span class="help-icon" tabindex="0" aria-describedby="soilResHelp">?
+  <span class="help-icon" tabindex="0" role="button" aria-label="Help" aria-expanded="false" aria-describedby="soilResHelp">?
    <span id="soilResHelp" class="tooltip">Typical soil ranges from 40–150 &#176;C&#183;cm/W.</span>
   </span>
   <input type="number" id="soilResistivity" list="soilResList" style="width:120px;">
@@ -148,14 +148,14 @@ button{padding:4px 8px;margin:4px 2px;cursor:pointer;}
  <div id="soilWarning" style="display:none;font-size:0.8rem;color:var(--warning-text);"></div>
  <datalist id="soilResList"></datalist>
  <label style="margin-left:8px;">Moisture Content (%)
-  <span class="help-icon" tabindex="0" aria-describedby="moistureHelp">?
+  <span class="help-icon" tabindex="0" role="button" aria-label="Help" aria-expanded="false" aria-describedby="moistureHelp">?
    <span id="moistureHelp" class="tooltip">Percent water by weight in soil.</span>
   </span>
   <input type="number" id="moistureContent" min="0" max="40" style="width:60px;">
  </label>
  <div id="moistureWarning" style="display:none;font-size:0.8rem;color:var(--warning-text);"></div>
 <label style="margin-left:8px;">Allowable Conductor Temperature Tc
-  <span class="help-icon" tabindex="0" aria-describedby="ratingHelp">?
+  <span class="help-icon" tabindex="0" role="button" aria-label="Help" aria-expanded="false" aria-describedby="ratingHelp">?
    <span id="ratingHelp" class="tooltip">Select the design insulation rating (°C).</span>
   </span>
   <select id="conductorRating" style="margin-left:4px;">
@@ -165,14 +165,14 @@ button{padding:4px 8px;margin:4px 2px;cursor:pointer;}
   </select>
  </label>
 <label style="margin-left:8px;">Presence of Adjacent Heat Sources
-  <span class="help-icon" tabindex="0" aria-describedby="heatHelp">?
+  <span class="help-icon" tabindex="0" role="button" aria-label="Help" aria-expanded="false" aria-describedby="heatHelp">?
    <span id="heatHelp" class="tooltip">Toggle additional heat sources near the ductbank.</span>
   </span>
   <input type="checkbox" id="heatSources" style="margin-left:4px;">
  </label>
  <button type="button" id="addHeatSource" style="display:none;margin-left:4px;">Add Heat Source</button>
  <label style="margin-left:8px;">Grid Resolution
-  <span class="help-icon" tabindex="0" aria-describedby="gridHelp">?
+  <span class="help-icon" tabindex="0" role="button" aria-label="Help" aria-expanded="false" aria-describedby="gridHelp">?
    <span id="gridHelp" class="tooltip">Number of nodes used for the thermal solver.</span>
   </span>
   <select id="gridRes" style="margin-left:4px;">
@@ -182,7 +182,7 @@ button{padding:4px 8px;margin:4px 2px;cursor:pointer;}
   </select>
  </label>
 <label style="margin-left:8px;">Duct Thermal Resistance (&#176;C·m/W)
-  <span class="help-icon" tabindex="0" aria-describedby="ductResHelp">?
+  <span class="help-icon" tabindex="0" role="button" aria-label="Help" aria-expanded="false" aria-describedby="ductResHelp">?
    <span id="ductResHelp" class="tooltip">Thermal resistance of the conduit itself. Leave 0 when using the preset table. Typical range 0–0.2 &#176;C·m/W.</span>
   </span>
   <input type="number" id="ductThermRes" value="0.0" placeholder="0.05" style="width:60px;">
@@ -275,7 +275,7 @@ button{padding:4px 8px;margin:4px 2px;cursor:pointer;}
 </div>
 <div id="solver-info" style="font-size:0.9rem;margin-top:4px;"></div>
 
-<div id="helpOverlay">
+<div id="helpOverlay" aria-hidden="true" role="dialog">
  <div id="helpPopup">
   <button id="helpClose">Close</button>
   <h2>Ductbank Route Help</h2>
@@ -2541,26 +2541,81 @@ if(hideDrawing){
 
 window.addEventListener('storage',e=>{if(e.key==='ctrSession'){const d=JSON.parse(e.newValue);if(d.darkMode)document.body.classList.add('dark-mode');else document.body.classList.remove('dark-mode');}});
 
-document.getElementById('helpBtn').addEventListener('click',()=>{
- document.getElementById('settings-menu').style.display='none';
- document.getElementById('helpOverlay').style.display='flex';
-});
-document.getElementById('helpClose').addEventListener('click',()=>{
- document.getElementById('helpOverlay').style.display='none';
-});
+const helpBtn=document.getElementById('helpBtn');
+const helpOverlay=document.getElementById('helpOverlay');
+const helpClose=document.getElementById('helpClose');
+if(helpBtn&&helpOverlay&&helpClose){
+ const focusableSelector='a[href],button:not([disabled]),textarea,input,select,[tabindex]:not([tabindex="-1"])';
+ let firstFocusable,lastFocusable,previousFocus;
+ const trapFocus=e=>{
+  if(e.key==='Tab'){
+   if(e.shiftKey){
+    if(document.activeElement===firstFocusable){
+     e.preventDefault();
+     lastFocusable.focus();
+    }
+   }else if(document.activeElement===lastFocusable){
+    e.preventDefault();
+    firstFocusable.focus();
+   }
+  }else if(e.key==='Escape'){
+   closeHelp();
+  }
+ };
+ const openHelp=()=>{
+  document.getElementById('settings-menu').style.display='none';
+  previousFocus=document.activeElement;
+  helpOverlay.style.display='flex';
+  helpOverlay.setAttribute('aria-hidden','false');
+  helpBtn.setAttribute('aria-expanded','true');
+  const focusables=helpOverlay.querySelectorAll(focusableSelector);
+  firstFocusable=focusables[0];
+  lastFocusable=focusables[focusables.length-1];
+  firstFocusable&&firstFocusable.focus();
+  helpOverlay.addEventListener('keydown',trapFocus);
+ };
+ const closeHelp=()=>{
+  helpOverlay.style.display='none';
+  helpOverlay.setAttribute('aria-hidden','true');
+  helpBtn.setAttribute('aria-expanded','false');
+  helpOverlay.removeEventListener('keydown',trapFocus);
+  previousFocus&&previousFocus.focus();
+ };
+ helpBtn.addEventListener('click',openHelp);
+ helpClose.addEventListener('click',closeHelp);
+ helpOverlay.addEventListener('click',e=>{if(e.target===helpOverlay)closeHelp();});
+}
 document.getElementById('deleteDataBtn').addEventListener('click',deleteSavedData);
 document.getElementById('resetBtn').addEventListener('click',deleteSavedData);
 
-document.getElementById('settings-btn').addEventListener('click',()=>{
- const menu=document.getElementById('settings-menu');
- menu.style.display=menu.style.display==='flex'?'none':'flex';
-});
-document.addEventListener('click',e=>{
- const menu=document.getElementById('settings-menu');
- if(!menu.contains(e.target)&&e.target!==document.getElementById('settings-btn')){
-  menu.style.display='none';
- }
-});
+const settingsBtn=document.getElementById('settings-btn');
+const settingsMenu=document.getElementById('settings-menu');
+if(settingsBtn&&settingsMenu){
+ settingsBtn.addEventListener('click',()=>{
+  const expanded=settingsMenu.style.display==='flex';
+  settingsMenu.style.display=expanded?'none':'flex';
+  settingsBtn.setAttribute('aria-expanded',String(!expanded));
+ });
+ document.addEventListener('click',e=>{
+  if(!settingsMenu.contains(e.target)&&e.target!==settingsBtn){
+   settingsMenu.style.display='none';
+   settingsBtn.setAttribute('aria-expanded','false');
+  }
+ });
+}
+
+const initHelpIcons=(root=document)=>{
+ root.querySelectorAll('.help-icon').forEach(icon=>{
+  icon.setAttribute('role','button');
+  if(!icon.hasAttribute('aria-label'))icon.setAttribute('aria-label','Help');
+  if(!icon.hasAttribute('aria-expanded'))icon.setAttribute('aria-expanded','false');
+  icon.addEventListener('mouseenter',()=>icon.setAttribute('aria-expanded','true'));
+  icon.addEventListener('mouseleave',()=>icon.setAttribute('aria-expanded','false'));
+  icon.addEventListener('focus',()=>icon.setAttribute('aria-expanded','true'));
+  icon.addEventListener('blur',()=>icon.setAttribute('aria-expanded','false'));
+ });
+};
+initHelpIcons();
 
 // keyboard navigation within conduit and cable tables
 document.addEventListener('keydown',e=>{
