@@ -7,6 +7,7 @@
   <title>Conduit Fill Visualization</title>
   <link rel="icon" href="icons/favicon.svg" type="image/svg+xml">
   <link rel="stylesheet" href="style.css" />
+  <script src="site.js" defer></script>
 </head>
 <body class="conduitfill-page">
   <script>
@@ -147,26 +148,13 @@
     };
 
     document.addEventListener('DOMContentLoaded', () => {
+      initSettings();
+      initDarkMode();
+      initHelpModal('help-btn','help-modal','close-help-btn');
       let saved = true;
       const markSaved = () => { saved = true; };
       const markUnsaved = () => { saved = false; };
       window.addEventListener('beforeunload', e => { if(!saved){ e.preventDefault(); e.returnValue=''; }});
-      const session = JSON.parse(localStorage.getItem('ctrSession') || '{}');
-      if (session.darkMode) {
-        document.body.classList.add('dark-mode');
-      }
-      window.addEventListener('storage', (e) => {
-        if (e.key === 'ctrSession') {
-          try {
-            const data = JSON.parse(e.newValue);
-            if (data && data.darkMode) {
-              document.body.classList.add('dark-mode');
-            } else {
-              document.body.classList.remove('dark-mode');
-            }
-          } catch {}
-        }
-      });
 
       const typeSel = document.getElementById('conduitType');
       const sizeSel = document.getElementById('tradeSize');
@@ -506,79 +494,6 @@
       tableBody.addEventListener('input',markUnsaved);
       tableBody.addEventListener('click',e=>{if(e.target.tagName==='BUTTON') markUnsaved();});
       ['copyPngBtn','printBtn','copyBtn'].forEach(id=>{const el=document.getElementById(id);if(el)el.addEventListener('click',markSaved);});
-      const darkToggle = document.getElementById('dark-toggle');
-      const settingsBtn = document.getElementById('settings-btn');
-      const settingsMenu = document.getElementById('settings-menu');
-      if (settingsBtn && settingsMenu) {
-        settingsBtn.addEventListener('click', () => {
-          const expanded = settingsMenu.style.display === 'flex';
-          settingsMenu.style.display = expanded ? 'none' : 'flex';
-          settingsBtn.setAttribute('aria-expanded', String(!expanded));
-        });
-        document.addEventListener('click', e => {
-          if (!settingsMenu.contains(e.target) && e.target !== settingsBtn) {
-            settingsMenu.style.display = 'none';
-            settingsBtn.setAttribute('aria-expanded', 'false');
-          }
-        });
-      }
-      if (darkToggle) {
-        if (session.darkMode) {
-          darkToggle.checked = true;
-        }
-        darkToggle.addEventListener('change', () => {
-          if (darkToggle.checked) {
-            document.body.classList.add('dark-mode');
-          } else {
-            document.body.classList.remove('dark-mode');
-          }
-          session.darkMode = darkToggle.checked;
-          localStorage.setItem('ctrSession', JSON.stringify(session));
-        });
-      }
-      const helpBtn = document.getElementById('help-btn');
-      const helpModal = document.getElementById('help-modal');
-      const closeHelpBtn = document.getElementById('close-help-btn');
-      if (helpBtn && helpModal && closeHelpBtn) {
-        const focusableSelector = 'a[href],button:not([disabled]),textarea,input,select,[tabindex]:not([tabindex="-1"])';
-        let firstFocusable, lastFocusable, previousFocus;
-        const trapFocus = e => {
-          if (e.key === 'Tab') {
-            if (e.shiftKey) {
-              if (document.activeElement === firstFocusable) {
-                e.preventDefault();
-                lastFocusable.focus();
-              }
-            } else if (document.activeElement === lastFocusable) {
-              e.preventDefault();
-              firstFocusable.focus();
-            }
-          } else if (e.key === 'Escape') {
-            closeModal();
-          }
-        };
-        const openModal = () => {
-          previousFocus = document.activeElement;
-          helpModal.style.display = 'flex';
-          helpModal.setAttribute('aria-hidden', 'false');
-          helpBtn.setAttribute('aria-expanded', 'true');
-          const focusables = helpModal.querySelectorAll(focusableSelector);
-          firstFocusable = focusables[0];
-          lastFocusable = focusables[focusables.length - 1];
-          firstFocusable && firstFocusable.focus();
-          helpModal.addEventListener('keydown', trapFocus);
-        };
-        const closeModal = () => {
-          helpModal.style.display = 'none';
-          helpModal.setAttribute('aria-hidden', 'true');
-          helpBtn.setAttribute('aria-expanded', 'false');
-          helpModal.removeEventListener('keydown', trapFocus);
-          previousFocus && previousFocus.focus();
-        };
-        helpBtn.addEventListener('click', openModal);
-        closeHelpBtn.addEventListener('click', closeModal);
-        helpModal.addEventListener('click', e => { if (e.target === helpModal) closeModal(); });
-      }
 
       const stored = localStorage.getItem('conduitFillData');
       if (stored) {
