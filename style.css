@@ -1247,7 +1247,7 @@ body.cabletrayfill-page #helpClose {
 .hero-tagline {
     font-size: 1.25rem;
     margin: 0;
-    color: #fff;
+    color: rgba(255, 255, 255, 0.9);
 }
 
 body.dark-mode .hero {
