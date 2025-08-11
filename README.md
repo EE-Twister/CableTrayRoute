@@ -1,6 +1,21 @@
 # CableTrayRoute
 Designed to find the optimal cable route for your cable.
 
+## Landing Page and Workflow
+
+The new landing page (`index.html`) links to every tool in the suite and outlines
+the recommended end-to-end workflow:
+
+1. **Cable Schedule** – define cables to be routed.
+2. **Raceway Schedule** – set up trays, conduits, and ductbanks.
+3. **Ductbank** – analyze underground ductbanks.
+4. **Tray Fill** – visualize tray utilization.
+5. **Conduit Fill** – evaluate conduit loading.
+6. **Optimal Cable Route** – generate the final route.
+
+Each tool can be used independently, but the homepage lets you access the
+entire sequence from one place.
+
 ## New Feature: Rebalance Tray Fill
 
 After running the standard routing process, click **Rebalance Tray Fill** to
