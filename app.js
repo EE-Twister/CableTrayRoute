@@ -104,6 +104,8 @@ document.addEventListener('DOMContentLoaded', () => {
         traySearch: document.getElementById('tray-search'),
         cableSearch: document.getElementById('cable-search'),
         conduitType: document.getElementById('conduit-type'),
+        sidebar: document.querySelector('.sidebar'),
+        sidebarToggle: document.getElementById('sidebar-toggle'),
     };
 
     const initHelpIcons = (root = document) => {
@@ -118,6 +120,11 @@ document.addEventListener('DOMContentLoaded', () => {
         });
     };
     initHelpIcons();
+    if (elements.sidebarToggle && elements.sidebar) {
+        elements.sidebarToggle.addEventListener('click', () => {
+            elements.sidebar.classList.toggle('open');
+        });
+    }
     let cancelRouting = false;
     let currentWorkers = [];
     let workerResolvers = new Map();
