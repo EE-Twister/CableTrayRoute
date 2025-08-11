@@ -1325,3 +1325,52 @@ body.dark-mode .workflow-card img {
 body.dark-mode .workflow-card-title {
     color: var(--text-color);
 }
+
+/* --- Footer --- */
+.site-footer {
+    background: var(--secondary-color);
+    color: var(--text-color);
+    border-top: 1px solid var(--border-color);
+    padding: 1rem;
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    justify-content: space-between;
+    gap: 0.5rem;
+}
+
+.footer-left {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+}
+
+.footer-logo {
+    width: 24px;
+    height: 24px;
+}
+
+.footer-links {
+    display: flex;
+    gap: 1rem;
+    flex-wrap: wrap;
+}
+
+.footer-links a {
+    color: var(--text-color);
+    text-decoration: none;
+}
+
+.footer-links a:hover {
+    text-decoration: underline;
+}
+
+@media (max-width: 600px) {
+    .site-footer {
+        flex-direction: column;
+        text-align: center;
+    }
+    .footer-links {
+        justify-content: center;
+    }
+}
