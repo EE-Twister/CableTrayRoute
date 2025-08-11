@@ -17,6 +17,8 @@ body.dark-mode {
     --secondary-color: #343a40;
     --border-color: #495057;
     --text-color: #f8f9fa;
+    --success-text: #28a745;
+    --warning-text: #ffc107;
     background-color: #212529;
 }
 
@@ -1293,6 +1295,7 @@ body.dark-mode .hero-tagline {
     align-items: center;
     justify-content: center;
     gap: 0.75rem;
+    flex-direction: column;
     transition: background 0.3s, box-shadow 0.3s, transform 0.3s;
 }
 
@@ -1311,6 +1314,15 @@ body.dark-mode .hero-tagline {
 .workflow-card-title {
     font-size: 1rem;
     margin: 0;
+}
+
+.workflow-card .status {
+    font-size: 0.85rem;
+    color: var(--warning-text);
+}
+
+.workflow-card.complete .status {
+    color: var(--success-text);
 }
 
 body.dark-mode .workflow-card {

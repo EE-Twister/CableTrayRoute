@@ -36,29 +36,35 @@
       <section class="card">
         <h2>Workflow</h2>
         <div class="workflow-grid">
-          <a href="cableschedule.html" class="workflow-card">
+          <a href="cableschedule.html" class="workflow-card" data-storage-key="cableSchedule">
             <img src="icons/cable.svg" alt="Cable icon" class="workflow-icon">
             <span>1. Cable Schedule</span>
+            <span class="status">Incomplete</span>
           </a>
-          <a href="racewayschedule.html" class="workflow-card">
+          <a href="racewayschedule.html" class="workflow-card" data-storage-key="racewaySchedule">
             <img src="icons/raceway.svg" alt="Raceway icon" class="workflow-icon">
             <span>2. Raceway Schedule</span>
+            <span class="status">Incomplete</span>
           </a>
-          <a href="ductbankroute.html" class="workflow-card">
+          <a href="ductbankroute.html" class="workflow-card" data-storage-key="ductbankSchedule">
             <img src="icons/ductbank.svg" alt="Ductbank icon" class="workflow-icon">
             <span>3. Ductbank</span>
+            <span class="status">Incomplete</span>
           </a>
-          <a href="cabletrayfill.html" class="workflow-card">
+          <a href="cabletrayfill.html" class="workflow-card" data-storage-key="traySchedule">
             <img src="icons/tray.svg" alt="Tray icon" class="workflow-icon">
             <span>4. Tray Fill</span>
+            <span class="status">Incomplete</span>
           </a>
-          <a href="conduitfill.html" class="workflow-card">
+          <a href="conduitfill.html" class="workflow-card" data-storage-key="conduitSchedule">
             <img src="icons/conduit.svg" alt="Conduit icon" class="workflow-icon">
             <span>5. Conduit Fill</span>
+            <span class="status">Incomplete</span>
           </a>
           <a href="optimalRoute.html" class="workflow-card">
             <img src="icons/route.svg" alt="Route icon" class="workflow-icon">
             <span>6. Optimal Cable Route</span>
+            <span class="status">Incomplete</span>
           </a>
         </div>
       </section>
@@ -82,6 +88,7 @@
       <a href="mailto:contact@example.com">Contact</a>
     </nav>
   </footer>
+  <script src="workflowStatus.js"></script>
   <script>
   window.addEventListener('DOMContentLoaded', () => {
     const darkToggle = document.getElementById('dark-toggle');
