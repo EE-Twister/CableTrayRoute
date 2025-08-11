@@ -1,6 +1,10 @@
 # CableTrayRoute
 Designed to find the optimal cable route for your cable.
 
+## Quick Start
+
+For a step-by-step overview of the workflow, see the [Quick Start](docs/quickstart.html) guide. Each tool can run on its own, but following the six steps in sequence provides a smoother experience.
+
 ## Landing Page and Workflow
 
 The new landing page (`index.html`) links to every tool in the suite and outlines
