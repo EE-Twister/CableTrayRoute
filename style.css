@@ -1259,10 +1259,18 @@ body.cabletrayfill-page #helpClose {
     padding: 1.5rem;
     border-radius: 8px;
     box-shadow: 0 2px 4px rgba(0,0,0,0.05);
-    text-align: center;
     font-weight: bold;
     transition: background 0.3s;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 0.5rem;
 }
 .workflow-card:hover {
     background: var(--border-color);
+}
+
+.workflow-card img {
+    width: 32px;
+    height: 32px;
 }
