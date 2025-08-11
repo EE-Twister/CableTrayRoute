@@ -78,6 +78,12 @@ body {
     text-decoration: underline;
 }
 
+.top-nav a.active,
+.top-nav a[aria-current="page"] {
+    font-weight: bold;
+    text-decoration: underline;
+}
+
 .sidebar-toggle {
     display: none;
 }
