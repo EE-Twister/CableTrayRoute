@@ -1,226 +1,100 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <meta name="description" content="Landing page for configuring the optimal 3D cable routing system.">
-    <title>Optimal 3D Cable Routing System</title>
-    <link rel="stylesheet" href="style.css">
-    <script src="https://cdn.plot.ly/plotly-latest.min.js" defer></script>
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js" defer></script>
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js" defer></script>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="description" content="Homepage for Cable Tray Route workflow.">
+  <title>Cable Tray Route</title>
+  <link rel="stylesheet" href="style.css">
 </head>
 <body>
-    <nav class="top-nav">
-        <button id="sidebar-toggle" class="sidebar-toggle" aria-label="Toggle Sidebar">☰</button>
-        <a href="index.html">Home</a>
-        <a href="ductbankroute.html">Ductbank</a>
-        <a href="cabletrayfill.html">Tray Fill</a>
-        <a href="conduitfill.html">Conduit Fill</a>
-        <a href="cableschedule.html">Cable Schedule</a>
-        <a href="racewayschedule.html">Raceway Schedule</a>
-        <button id="settings-btn" class="settings-btn" aria-label="Settings" aria-expanded="false">⚙</button>
-    </nav>
-    <div id="settings-menu" class="settings-menu">
-        <label><input type="checkbox" id="dark-toggle"> Dark Mode</label>
-        <button id="help-btn" aria-expanded="false">Site Help</button>
-        <button id="delete-data-btn">Delete All Saved Data</button>
-    </div>
-    <div class="container">
-        <aside class="sidebar">
-            <header>
-                <h2>Input Parameters</h2>
-            </header>
-            
-            <!-- Cable specification fields moved to the routing options card -->
-            
-            <section>
-                <h3>Routing Parameters</h3>
-                 <label for="fill-limit">Max Tray Fill (%)
-                    <span class="help-icon" tabindex="0" role="button" aria-label="Help" aria-expanded="false" aria-describedby="fill-limit-help">?
-                        <span id="fill-limit-help" class="tooltip">The maximum allowed fill capacity for a cable tray, based on standards like the NEC 40% rule.</span>
-                    </span>
-                 </label>
-                 <input type="range" id="fill-limit" min="20" max="80" value="40" step="5">
-                 <span id="fill-limit-value">40%</span>
-
-                 <label for="proximity-threshold">Tray Proximity Threshold (in)
-                    <span class="help-icon" tabindex="0" role="button" aria-label="Help" aria-expanded="false" aria-describedby="proximity-help">?
-                        <span id="proximity-help" class="tooltip">The maximum distance a cable can jump from its start or end point to connect to a nearby tray segment.</span>
-                    </span>
-                 </label>
-                 <input type="number" id="proximity-threshold" value="72" min="0" step="1">
-
-                 <label for="field-route-penalty">Field Route Cost Multiplier
-                    <span class="help-icon" tabindex="0" role="button" aria-label="Help" aria-expanded="false" aria-describedby="field-penalty-help">?
-                        <span id="field-penalty-help" class="tooltip">This makes field routing (not in a tray) more expensive than routing within a tray. A value of 3 means every inch of field routing costs as much as 3 inches of tray routing, encouraging the algorithm to use trays whenever possible.</span>
-                    </span>
-                 </label>
-                 <input type="number" id="field-route-penalty" value="3.0" min="0" step="0.1">
-
-                 <label for="shared-field-penalty">Shared Field Route Cost Multiplier
-                    <span class="help-icon" tabindex="0" role="button" aria-label="Help" aria-expanded="false" aria-describedby="shared-field-help">?
-                        <span id="shared-field-help" class="tooltip">Multiplier applied when a cable uses an existing field-routed path from a previous cable. Use a value less than 1 to make shared field routes cheaper than new field routes.</span>
-                    </span>
-                 </label>
-                 <input type="number" id="shared-field-penalty" value="0.5" min="0" step="0.1">
-
-                 <label for="conduit-type">Preferred Conduit Type</label>
-                 <select id="conduit-type">
-                    <option value="EMT">EMT</option>
-                    <option value="ENT">ENT</option>
-                    <option value="FMC">FMC</option>
-                    <option value="IMC">IMC</option>
-                    <option value="LFNC-A">LFNC-A</option>
-                    <option value="LFNC-B">LFNC-B</option>
-                    <option value="LFMC">LFMC</option>
-                    <option value="RMC">RMC</option>
-                    <option value="PVC Sch 80">PVC Sch 80</option>
-                    <option value="PVC Sch 40">PVC Sch 40</option>
-                    <option value="PVC Type A">PVC Type A</option>
-                    <option value="PVC Type EB">PVC Type EB</option>
-                 </select>
-                 
-                 <button id="calculate-route-btn" class="primary-btn">▶ Calculate Optimal Route</button>
-                 <div id="progress-container" style="display:none;">
-                     <div id="progress-bar" role="progressbar" aria-valuemin="0" aria-valuemax="100" aria-valuenow="0"></div>
-                     <span id="progress-label"></span>
-                 </div>
-                 <button id="cancel-routing-btn" style="display:none;">Cancel Routing</button>
-            </section>
-        </aside>
-
-        <main class="main-content">
-            <header class="page-header">
-                <h1>Optimal 3D Cable Routing System</h1>
-                <p>Find the most efficient path for routing cables through tray networks with capacity constraints.</p>
-            </header>
-
-            <section class="card">
-                <h2>Cable Tray Network</h2>
-                <div class="table-controls">
-                    <button id="load-sample-trays-btn">Load Sample Tray Network</button>
-                    <div class="table-import-export">
-                        <button id="export-trays-btn">Export Trays CSV</button>
-                        <input type="file" id="import-trays-file" accept=".csv" style="display:none;">
-                        <button id="import-trays-btn">Import Trays CSV</button>
-                        <button id="clear-trays-btn">Clear All Trays</button>
-                    </div>
-                </div>
-
-                <div id="manual-entry-section">
-                    <details>
-                        <summary>Add New Tray Segment</summary>
-                        <div class="tray-form">
-                             <input type="text" id="t-id" placeholder="Tray ID">
-                             <input type="number" id="t-sx" placeholder="Start X (ft)" step="0.1">
-                             <input type="number" id="t-sy" placeholder="Start Y (ft)" step="0.1">
-                             <input type="number" id="t-sz" placeholder="Start Z (ft)" step="0.1">
-                             <input type="number" id="t-ex" placeholder="End X (ft)" step="0.1">
-                             <input type="number" id="t-ey" placeholder="End Y (ft)" step="0.1">
-                             <input type="number" id="t-ez" placeholder="End Z (ft)" step="0.1">
-                             <input type="number" id="t-w" placeholder="Width (in)" min="0" step="0.1">
-                             <input type="number" id="t-h" placeholder="Height (in)" min="0" step="0.1">
-                             <input type="number" id="t-fill" placeholder="Current Fill (in²)" min="0" step="0.1">
-                             <select id="t-shape">
-                                 <option value="STR">Straight</option>
-                                 <option value="90B">90° Bend</option>
-                                 <option value="45B">45° Bend</option>
-                                 <option value="30B/60B">30°/60° Bend</option>
-                                 <option value="TEE">Tee</option>
-                                 <option value="X">Cross</option>
-                                 <option value="VI">Vertical Inside</option>
-                                 <option value="VO">Vertical Outside</option>
-                                 <option value="45VI">45° Vertical Inside</option>
-                                 <option value="45VO">45° Vertical Outside</option>
-                                 <option value="RED-C">Center Reducer</option>
-                                 <option value="RED-S">Side Reducer</option>
-                                 <option value="Z">Z-Bend</option>
-                                 <option value="OFFSET">Offset</option>
-                                 <option value="SPIRAL">Spiral</option>
-                             </select>
-                             <input type="text" id="t-group" placeholder="Allowed Cable Group">
-                             <button id="add-tray-btn">Add Tray</button>
-                             <span class="help-icon" tabindex="0" role="button" aria-label="Help" aria-expanded="false" aria-describedby="add-tray-help">?</span>
-                             <span id="add-tray-help" class="tooltip">Add the tray segment above to the list.</span>
-                        </div>
-                    </details>
-                    <details id="manual-tray-table-details">
-                        <summary id="manual-tray-summary">Manual Cable Tray Entry Table</summary>
-                        <input type="text" id="tray-search" class="table-search" placeholder="Filter trays">
-                        <div id="manual-tray-table-container" class="table-scroll"></div>
-                    </details>
-                </div>
-
-                <details id="tray-utilization-details">
-                    <summary>Tray Utilization</summary>
-                    <div id="tray-utilization-container"></div>
-                </details>
-            </section>
-
-            <section class="card">
-                <h2>Cable Routing Options</h2>
-
-                <div id="batch-section">
-                    <button id="add-cable-btn">Add Cable to List</button>
-                    <span class="help-icon" tabindex="0" role="button" aria-label="Help" aria-expanded="false" aria-describedby="add-cable-help">?</span>
-                    <span id="add-cable-help" class="tooltip">Add a new cable row using the current settings.</span>
-                    <div class="table-controls">
-                        <button id="load-sample-cables-btn">Load Sample Cable List</button>
-                        <div class="table-import-export">
-                            <button id="export-cables-btn">Export Cables CSV</button>
-                            <input type="file" id="import-cables-file" accept=".csv" style="display:none;">
-                            <button id="import-cables-btn">Import Cables CSV</button>
-                        </div>
-                        <button id="clear-cables-btn">Clear Cable List</button>
-                    </div>
-                    <details id="cable-list-details">
-                        <summary id="cable-list-summary">Cables to Route Table</summary>
-                        <input type="text" id="cable-search" class="table-search" placeholder="Filter cables">
-                        <div id="cable-list-container" class="table-scroll"></div>
-                    </details>
-                </div>
-            </section>
-            
-            <section id="results-section" class="card" style="display:none;">
-                <h2>Routing Results</h2>
-                <div id="messages"></div>
-                <div id="metrics" class="columns"></div>
-                <details id="route-breakdown-details">
-                    <summary>Route Breakdown</summary>
-                    <div id="route-breakdown-container"></div>
-                </details>
-                <h3>3D Route Visualization</h3>
-                <div id="plot-3d"></div>
-                <div class="plot-controls">
-                    <button id="popout-plot-btn">Open Full Screen</button>
-                    <button id="reset-view-btn">Reset View</button>
-                </div>
-                <details id="updated-utilization-details">
-                    <summary>Updated Tray Utilization</summary>
-                    <div id="updated-utilization-container"></div>
-                </details>
-                <button id="export-csv-btn">Download Route Data (XLSX)</button>
-                <button id="rebalance-btn">Rebalance Tray Fill</button>
-                <button id="open-fill-btn">Open Tray Fill Tool</button>
-                <button id="export-tray-fills-btn">Export Tray Fills</button>
-            </section>
-        </main>
-    </div>
-    <div id="help-modal" class="modal" aria-hidden="true" role="dialog" aria-labelledby="help-title">
-        <div class="modal-content">
-            <button id="close-help-btn" class="close-btn" aria-label="Close Help">&times;</button>
-            <h2 id="help-title">CableTrayRoute Help</h2>
-            <p>This application finds optimal routes through tray networks while respecting fill limits and separation rules.</p>
-            <ul>
-                <li><strong>Cable Tag</strong> identifies each cable in the results.</li>
-                <li><strong>Allowed Cable Group</strong> keeps voltage classes separated.</li>
-                <li>Use the <strong>Import/Export</strong> buttons to manage trays and cables via CSV.</li>
-                <li>The <strong>Tray Fill Tool</strong> visualizes cable placement after routing.</li>
-                <li>Tray fill calculations reference the <em>NEC 40% rule</em>.</li>
-            </ul>
+  <nav class="top-nav">
+    <a href="index.html">Home</a>
+    <a href="ductbankroute.html">Ductbank</a>
+    <a href="cabletrayfill.html">Tray Fill</a>
+    <a href="conduitfill.html">Conduit Fill</a>
+    <a href="cableschedule.html">Cable Schedule</a>
+    <a href="racewayschedule.html">Raceway Schedule</a>
+    <button id="settings-btn" class="settings-btn" aria-label="Settings" aria-expanded="false">⚙</button>
+  </nav>
+  <div id="settings-menu" class="settings-menu">
+    <label><input type="checkbox" id="dark-toggle"> Dark Mode</label>
+    <button id="help-btn" aria-expanded="false">Site Help</button>
+  </div>
+  <div class="container">
+    <main class="main-content">
+      <header class="page-header">
+        <h1>Welcome</h1>
+        <p>Follow the steps below to plan cable routes.</p>
+      </header>
+      <section class="card">
+        <h2>Workflow</h2>
+        <div class="workflow-grid">
+          <a href="cableschedule.html" class="workflow-card">1. Cable Schedule</a>
+          <a href="racewayschedule.html" class="workflow-card">2. Raceway Schedule</a>
+          <a href="ductbankroute.html" class="workflow-card">3. Ductbank</a>
+          <a href="cabletrayfill.html" class="workflow-card">4. Tray Fill</a>
+          <a href="conduitfill.html" class="workflow-card">5. Conduit Fill</a>
+          <a href="optimalRoute.html" class="workflow-card">6. Optimal Cable Route</a>
         </div>
+      </section>
+    </main>
+  </div>
+  <div id="help-modal" class="modal" aria-hidden="true" role="dialog" aria-labelledby="help-title">
+    <div class="modal-content">
+      <button id="close-help-btn" class="close-btn" aria-label="Close Help">&times;</button>
+      <h2 id="help-title">CableTrayRoute</h2>
+      <p>Select a step to begin the workflow.</p>
     </div>
-    <script src="app.js"></script>
+  </div>
+  <script>
+  window.addEventListener('DOMContentLoaded', () => {
+    const darkToggle = document.getElementById('dark-toggle');
+    const settingsBtn = document.getElementById('settings-btn');
+    const settingsMenu = document.getElementById('settings-menu');
+    const helpBtn = document.getElementById('help-btn');
+    const helpModal = document.getElementById('help-modal');
+    const closeHelpBtn = document.getElementById('close-help-btn');
+
+    if(settingsBtn && settingsMenu){
+      settingsBtn.addEventListener('click', () => {
+        const expanded = settingsMenu.style.display === 'flex';
+        settingsMenu.style.display = expanded ? 'none' : 'flex';
+        settingsBtn.setAttribute('aria-expanded', String(!expanded));
+      });
+      document.addEventListener('click', e => {
+        if(!settingsMenu.contains(e.target) && e.target !== settingsBtn){
+          settingsMenu.style.display = 'none';
+          settingsBtn.setAttribute('aria-expanded', 'false');
+        }
+      });
+    }
+
+    if(darkToggle){
+      const sess = JSON.parse(localStorage.getItem('ctrSession') || '{}');
+      if(sess.darkMode){
+        document.body.classList.add('dark-mode');
+        darkToggle.checked = true;
+      }
+      darkToggle.addEventListener('change', () => {
+        document.body.classList.toggle('dark-mode', darkToggle.checked);
+        const sess = JSON.parse(localStorage.getItem('ctrSession') || '{}');
+        sess.darkMode = darkToggle.checked;
+        localStorage.setItem('ctrSession', JSON.stringify(sess));
+      });
+    }
+
+    if(helpBtn && helpModal && closeHelpBtn){
+      helpBtn.addEventListener('click', () => {
+        helpModal.style.display = 'flex';
+        helpModal.setAttribute('aria-hidden','false');
+      });
+      closeHelpBtn.addEventListener('click', () => {
+        helpModal.style.display = 'none';
+        helpModal.setAttribute('aria-hidden','true');
+      });
+    }
+  });
+  </script>
 </body>
 </html>
