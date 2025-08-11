@@ -29,24 +29,24 @@
       </header>
 
       <section class="card">
-        <div style="margin-bottom:10px;">
+        <div class="mb-10">
           <button id="save-schedule-btn">Save Schedule</button>
           <button id="load-schedule-btn">Load Schedule</button>
           <button id="clear-filters-btn">Clear Filters</button>
           <button id="load-sample-data-btn">Load Sample Data</button>
           <button id="export-xlsx-btn">Export XLSX</button>
-          <input type="file" id="import-xlsx-input" accept=".xlsx" style="display:none;">
+          <input type="file" id="import-xlsx-input" accept=".xlsx" class="hidden">
           <button id="import-xlsx-btn">Import XLSX</button>
           <button id="delete-all-btn">Delete All Rows</button>
         </div>
-        <div id="column-controls" style="margin-bottom:10px;"></div>
-        <div style="overflow-x:auto;">
+        <div id="column-controls" class="mb-10"></div>
+        <div class="overflow-x-auto">
           <table id="cableScheduleTable" class="sticky-table">
             <thead></thead>
             <tbody></tbody>
           </table>
         </div>
-        <div style="margin-top:10px;">
+        <div class="mt-10">
           <button id="add-row-btn" class="primary-btn add-row-btn">Add Cable</button>
         </div>
       </section>

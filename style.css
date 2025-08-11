@@ -947,3 +947,30 @@ body.conduitfill-page #copyPngBtn {
 body.conduitfill-page #copyPngBtn:hover {
     background: #8e44ad;
 }
+
+/* Utility classes */
+.ml-4 { margin-left: 4px; }
+.ml-8 { margin-left: 8px; }
+.mt-4 { margin-top: 4px; }
+.mt-8 { margin-top: 8px; }
+.mt-10 { margin-top: 10px; }
+.mb-10 { margin-bottom: 10px; }
+.w-60 { width: 60px; }
+.w-120 { width: 120px; }
+.w-auto { width: auto; }
+.hidden { display: none; }
+.inline-block { display: inline-block; }
+.block { display: block; }
+.text-warning { color: var(--warning-text); }
+.text-xs { font-size: 0.8rem; }
+.text-sm { font-size: 0.9rem; }
+.relative { position: relative; }
+.absolute { position: absolute; }
+.top-0 { top: 0; }
+.left-0 { left: 0; }
+.z-1 { z-index: 1; }
+.z-2 { z-index: 2; }
+.z-3 { z-index: 3; }
+.pointer-events-none { pointer-events: none; }
+.opacity-70 { opacity: 0.7; }
+.overflow-x-auto { overflow-x: auto; }

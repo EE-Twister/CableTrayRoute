@@ -32,9 +32,9 @@
 <details id="infoSection" open>
  <summary><strong>Ductbank Info</strong></summary>
  <div>
-  <label>Ductbank Tag<input type="text" id="ductbankTag" style="margin-left:4px;"></label>
-  <label style="margin-left:8px;">Concrete Encasement<input type="checkbox" id="concreteEncasement" style="margin-left:4px;"></label>
- <label style="margin-left:8px;">Ductbank Depth (in)<input type="number" id="ductbankDepth" min="0" step="1" style="width:60px;"></label>
+  <label>Ductbank Tag<input type="text" id="ductbankTag" class="ml-4"></label>
+  <label class="ml-8">Concrete Encasement<input type="checkbox" id="concreteEncasement" class="ml-4"></label>
+ <label class="ml-8">Ductbank Depth (in)<input type="number" id="ductbankDepth" min="0" step="1" class="w-60"></label>
  </div>
 </details>
 
@@ -118,80 +118,80 @@
   <option value="1000 kcmil"></option>
  </datalist>
 </details>
-<details id="paramSection" open style="margin-top:8px;">
+<details id="paramSection" open class="mt-8">
  <summary><strong>Parameters</strong></summary>
  <div>
  <label>Ambient Earth Temperature (&#176;F)
   <span class="help-icon" tabindex="0" role="button" aria-label="Help" aria-expanded="false" aria-describedby="earthTempHelp">?
    <span id="earthTempHelp" class="tooltip">Degrees Fahrenheit of the surrounding soil. Typical 50–80°F.</span>
   </span>
-  <input type="number" id="earthTemp" min="0" step="1" style="width:60px;">
+  <input type="number" id="earthTemp" min="0" step="1" class="w-60">
  </label>
-<label style="margin-left:8px;">Ambient Air Temperature (&#176;F)
+<label class="ml-8">Ambient Air Temperature (&#176;F)
   <span class="help-icon" tabindex="0" role="button" aria-label="Help" aria-expanded="false" aria-describedby="airTempHelp">?
    <span id="airTempHelp" class="tooltip">Air temperature around the installation in °F. Usually 50–110°F.</span>
   </span>
-  <input type="number" id="airTemp" min="0" step="1" style="width:60px;">
+  <input type="number" id="airTemp" min="0" step="1" class="w-60">
  </label>
-<label style="margin-left:8px;">Thermal Resistivity of Soil (&#176;C&#183;cm/W)
+<label class="ml-8">Thermal Resistivity of Soil (&#176;C&#183;cm/W)
   <span class="help-icon" tabindex="0" role="button" aria-label="Help" aria-expanded="false" aria-describedby="soilResHelp">?
    <span id="soilResHelp" class="tooltip">Typical soil ranges from 40–150 &#176;C&#183;cm/W.</span>
   </span>
-  <input type="number" id="soilResistivity" list="soilResList" min="0" step="1" style="width:120px;">
+  <input type="number" id="soilResistivity" list="soilResList" min="0" step="1" class="w-120">
 </label>
- <div id="soilWarning" style="display:none;font-size:0.8rem;color:var(--warning-text);"></div>
+ <div id="soilWarning" class="hidden text-xs text-warning"></div>
  <datalist id="soilResList"></datalist>
- <label style="margin-left:8px;">Moisture Content (%)
+ <label class="ml-8">Moisture Content (%)
   <span class="help-icon" tabindex="0" role="button" aria-label="Help" aria-expanded="false" aria-describedby="moistureHelp">?
    <span id="moistureHelp" class="tooltip">Percent water by weight in soil.</span>
   </span>
-  <input type="number" id="moistureContent" min="0" max="40" step="1" style="width:60px;">
+  <input type="number" id="moistureContent" min="0" max="40" step="1" class="w-60">
  </label>
- <div id="moistureWarning" style="display:none;font-size:0.8rem;color:var(--warning-text);"></div>
-<label style="margin-left:8px;">Allowable Conductor Temperature Tc
+ <div id="moistureWarning" class="hidden text-xs text-warning"></div>
+<label class="ml-8">Allowable Conductor Temperature Tc
   <span class="help-icon" tabindex="0" role="button" aria-label="Help" aria-expanded="false" aria-describedby="ratingHelp">?
    <span id="ratingHelp" class="tooltip">Select the design insulation rating (°C).</span>
   </span>
-  <select id="conductorRating" style="margin-left:4px;">
+  <select id="conductorRating" class="ml-4">
    <option value="60">60&#176;C</option>
    <option value="75">75&#176;C</option>
    <option value="90" selected>90&#176;C</option>
   </select>
  </label>
-<label style="margin-left:8px;">Presence of Adjacent Heat Sources
+<label class="ml-8">Presence of Adjacent Heat Sources
   <span class="help-icon" tabindex="0" role="button" aria-label="Help" aria-expanded="false" aria-describedby="heatHelp">?
    <span id="heatHelp" class="tooltip">Toggle additional heat sources near the ductbank.</span>
   </span>
-  <input type="checkbox" id="heatSources" style="margin-left:4px;">
+  <input type="checkbox" id="heatSources" class="ml-4">
  </label>
- <button type="button" id="addHeatSource" style="display:none;margin-left:4px;">Add Heat Source</button>
- <label style="margin-left:8px;">Grid Resolution
+ <button type="button" id="addHeatSource" class="hidden ml-4">Add Heat Source</button>
+<label class="ml-8">Grid Resolution
   <span class="help-icon" tabindex="0" role="button" aria-label="Help" aria-expanded="false" aria-describedby="gridHelp">?
    <span id="gridHelp" class="tooltip">Number of nodes used for the thermal solver.</span>
   </span>
-  <select id="gridRes" style="margin-left:4px;">
+  <select id="gridRes" class="ml-4">
    <option value="20" selected>20×20</option>
    <option value="40">40×40</option>
    <option value="80">80×80</option>
   </select>
  </label>
-<label style="margin-left:8px;">Duct Thermal Resistance (&#176;C·m/W)
+<label class="ml-8">Duct Thermal Resistance (&#176;C·m/W)
   <span class="help-icon" tabindex="0" role="button" aria-label="Help" aria-expanded="false" aria-describedby="ductResHelp">?
    <span id="ductResHelp" class="tooltip">Thermal resistance of the conduit itself. Leave 0 when using the preset table. Typical range 0–0.2 &#176;C·m/W.</span>
   </span>
-  <input type="number" id="ductThermRes" value="0.0" placeholder="0.05" min="0" step="0.01" style="width:60px;">
+  <input type="number" id="ductThermRes" value="0.0" placeholder="0.05" min="0" step="0.01" class="w-60">
 </label>
 </div>
 
-<details id="soilRef" style="margin-top:8px;">
+<details id="soilRef" class="mt-8">
  <summary><strong>Typical Soil Properties</strong></summary>
- <table class="db-table" style="width:auto;">
+ <table class="db-table w-auto">
   <thead>
    <tr><th>Soil Type</th><th>Thermal Resistivity (°C·cm/W)</th></tr>
   </thead>
   <tbody id="soilTableBody"></tbody>
  </table>
- <table class="db-table" style="margin-top:8px;width:auto;">
+ <table class="db-table mt-8 w-auto">
   <thead>
    <tr><th>Condition</th><th>Moisture Content (%)</th></tr>
   </thead>
@@ -204,7 +204,7 @@
  </table>
 </details>
 
-<details id="heatSourceDetails" open style="display:none;margin-top:8px;">
+<details id="heatSourceDetails" open class="hidden mt-8">
  <summary><strong>Adjacent Heat Sources</strong></summary>
  <table id="heatSourceTable" class="db-table">
  <thead>
@@ -223,31 +223,31 @@
  </table>
 </details>
 
-<div style="margin-top:8px;">
-  <label>Horiz Spacing (in)<input type="number" id="hSpacing" value="3" min="0" step="1" style="width:60px;"></label>
-  <label>Vert Spacing (in)<input type="number" id="vSpacing" value="4" min="0" step="1" style="width:60px;"></label>
-  <label>Top Clear (in)<input type="number" id="topPad" value="0" min="0" step="1" style="width:60px;"></label>
-  <label>Bottom Clear (in)<input type="number" id="bottomPad" value="0" min="0" step="1" style="width:60px;"></label>
-  <label>Left Clear (in)<input type="number" id="leftPad" value="0" min="0" step="1" style="width:60px;"></label>
- <label>Right Clear (in)<input type="number" id="rightPad" value="0" min="0" step="1" style="width:60px;"></label>
- <label>Conduits/Row<input type="number" id="perRow" value="4" min="1" step="1" style="width:60px;"></label>
+<div class="mt-8">
+  <label>Horiz Spacing (in)<input type="number" id="hSpacing" value="3" min="0" step="1" class="w-60"></label>
+  <label>Vert Spacing (in)<input type="number" id="vSpacing" value="4" min="0" step="1" class="w-60"></label>
+  <label>Top Clear (in)<input type="number" id="topPad" value="0" min="0" step="1" class="w-60"></label>
+  <label>Bottom Clear (in)<input type="number" id="bottomPad" value="0" min="0" step="1" class="w-60"></label>
+  <label>Left Clear (in)<input type="number" id="leftPad" value="0" min="0" step="1" class="w-60"></label>
+ <label>Right Clear (in)<input type="number" id="rightPad" value="0" min="0" step="1" class="w-60"></label>
+ <label>Conduits/Row<input type="number" id="perRow" value="4" min="1" step="1" class="w-60"></label>
 </div>
 </details>
 
-<div id="warning-area" style="display:none;"></div>
+<div id="warning-area" class="hidden"></div>
 
-<div id="gridContainer" style="position:relative;display:inline-block;">
-    <svg id="grid" width="500" height="500" style="position:relative;z-index:1;"></svg>
-    <canvas id="tempCanvas" width="500" height="500" style="position:absolute;top:0;left:0;pointer-events:none;z-index:2;display:none;opacity:0.7;"></canvas>
-    <canvas id="tempOverlay" width="500" height="500" style="position:absolute;top:0;left:0;pointer-events:none;z-index:3;display:none;"></canvas>
+<div id="gridContainer" class="relative inline-block">
+    <svg id="grid" width="500" height="500" class="relative z-1"></svg>
+    <canvas id="tempCanvas" width="500" height="500" class="absolute top-0 left-0 pointer-events-none z-2 hidden opacity-70"></canvas>
+    <canvas id="tempOverlay" width="500" height="500" class="absolute top-0 left-0 pointer-events-none z-3 hidden"></canvas>
   </div>
-<label style="display:block;margin-top:4px;"><input type="checkbox" id="hideDrawing"> Hide Drawing</label>
+<label class="block mt-4"><input type="checkbox" id="hideDrawing"> Hide Drawing</label>
 
-<details id="ampacityDetails" open style="margin-top:8px;">
+<details id="ampacityDetails" open class="mt-8">
  <summary><strong>Ampacity Estimates</strong></summary>
  <div id="ampacityReport"></div>
 </details>
-<button id="scrollTopBtn" style="margin-top:4px;">Scroll to Top</button>
+<button id="scrollTopBtn" class="mt-4">Scroll to Top</button>
 
 <div class="db-button-panel">
  <button id="calc">Calculate Fill</button>
@@ -263,11 +263,11 @@
   <button id="resetBtn">Reset Inputs</button>
  </div>
 
-<div id="analysis-progress-container" style="display:none;">
+<div id="analysis-progress-container" class="hidden">
   <div id="analysis-progress-bar" role="progressbar" aria-valuemin="0" aria-valuemax="100" aria-valuenow="0"></div>
   <span id="analysis-progress-label"></span>
 </div>
-<div id="solver-info" style="font-size:0.9rem;margin-top:4px;"></div>
+<div id="solver-info" class="text-sm mt-4"></div>
 
 <div id="helpOverlay" aria-hidden="true" role="dialog">
  <div id="helpPopup">
