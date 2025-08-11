@@ -42,6 +42,12 @@ const SHAPE_COLORS = {
 };
 
 document.addEventListener('DOMContentLoaded', () => {
+    // --- UNSAVED CHANGES TRACKING ---
+    let saved = true;
+    const markSaved = () => { saved = true; };
+    const markUnsaved = () => { saved = false; };
+    window.addEventListener('beforeunload', e => { if(!saved){ e.preventDefault(); e.returnValue=''; }});
+
     // --- STATE MANAGEMENT ---
     let state = {
         manualTrays: [],
@@ -107,6 +113,14 @@ document.addEventListener('DOMContentLoaded', () => {
         sidebar: document.querySelector('.sidebar'),
         sidebarToggle: document.getElementById('sidebar-toggle'),
     };
+
+    document.querySelectorAll('input, select, textarea').forEach(el=>{if(!el.classList.contains('table-search')){el.addEventListener('input',markUnsaved);el.addEventListener('change',markUnsaved);}});
+    ['addTrayBtn','clearTraysBtn','importTraysBtn','loadSampleTraysBtn','addCableBtn','clearCablesBtn','importCablesBtn','loadSampleCablesBtn'].forEach(k=>{const btn=elements[k];if(btn)btn.addEventListener('click',markUnsaved);});
+    if(elements.importTraysFile) elements.importTraysFile.addEventListener('change',markUnsaved);
+    if(elements.importCablesFile) elements.importCablesFile.addEventListener('change',markUnsaved);
+    if(elements.exportTraysBtn) elements.exportTraysBtn.addEventListener('click',markSaved);
+    if(elements.exportCablesBtn) elements.exportCablesBtn.addEventListener('click',markSaved);
+    ['export-csv-btn','export-tray-fills-btn'].forEach(id=>{const b=document.getElementById(id);if(b)b.addEventListener('click',markSaved);});
 
     const initHelpIcons = (root = document) => {
         root.querySelectorAll('.help-icon').forEach(icon => {

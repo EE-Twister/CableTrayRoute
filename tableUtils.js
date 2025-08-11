@@ -12,22 +12,24 @@ class TableManager {
     this.tbody = this.table.tBodies[0] || this.table.createTBody();
     this.columns = opts.columns || [];
     this.storageKey = opts.storageKey || opts.tableId;
+    this.onChange = opts.onChange || null;
+    this.onSave = opts.onSave || null;
     this.buildHeader();
     this.initButtons(opts);
     this.load();
   }
 
   initButtons(opts){
-    if (opts.addRowBtnId) document.getElementById(opts.addRowBtnId).addEventListener('click', () => this.addRow());
-    if (opts.saveBtnId) document.getElementById(opts.saveBtnId).addEventListener('click', () => this.save());
-    if (opts.loadBtnId) document.getElementById(opts.loadBtnId).addEventListener('click', () => { this.tbody.innerHTML=''; this.load(); });
+    if (opts.addRowBtnId) document.getElementById(opts.addRowBtnId).addEventListener('click', () => { this.addRow(); if (this.onChange) this.onChange(); });
+    if (opts.saveBtnId) document.getElementById(opts.saveBtnId).addEventListener('click', () => { this.save(); if (this.onSave) this.onSave(); });
+    if (opts.loadBtnId) document.getElementById(opts.loadBtnId).addEventListener('click', () => { this.tbody.innerHTML=''; this.load(); if (this.onSave) this.onSave(); });
     if (opts.clearFiltersBtnId) document.getElementById(opts.clearFiltersBtnId).addEventListener('click', () => this.clearFilters());
-    if (opts.exportBtnId) document.getElementById(opts.exportBtnId).addEventListener('click', () => this.exportXlsx());
+    if (opts.exportBtnId) document.getElementById(opts.exportBtnId).addEventListener('click', () => { this.exportXlsx(); if (this.onSave) this.onSave(); });
     if (opts.importBtnId && opts.importInputId){
       document.getElementById(opts.importBtnId).addEventListener('click', () => document.getElementById(opts.importInputId).click());
-      document.getElementById(opts.importInputId).addEventListener('change', e => { this.importXlsx(e.target.files[0]); e.target.value=''; });
+      document.getElementById(opts.importInputId).addEventListener('change', e => { this.importXlsx(e.target.files[0]); e.target.value=''; if (this.onChange) this.onChange(); });
     }
-    if (opts.deleteAllBtnId) document.getElementById(opts.deleteAllBtnId).addEventListener('click', () => this.deleteAll());
+    if (opts.deleteAllBtnId) document.getElementById(opts.deleteAllBtnId).addEventListener('click', () => { this.deleteAll(); if (this.onChange) this.onChange(); });
   }
 
   buildHeader() {
@@ -148,7 +150,8 @@ class TableManager {
         el.value = el.options[0].value;
       }
       td.appendChild(el);
-      if (col.onChange) el.addEventListener('change', () => col.onChange(el, tr));
+      if (col.onChange) el.addEventListener('change', () => { col.onChange(el, tr); });
+      el.addEventListener('input', () => { if (this.onChange) this.onChange(); });
       if (col.validate) {
         const rules = Array.isArray(col.validate) ? col.validate : [col.validate];
         el.addEventListener('input', () => applyValidation(el, rules));
@@ -158,7 +161,7 @@ class TableManager {
     const actTd = tr.insertCell();
     const delBtn = document.createElement('button');
     delBtn.textContent = 'Delete';
-    delBtn.addEventListener('click', () => { tr.remove(); this.save(); });
+    delBtn.addEventListener('click', () => { tr.remove(); this.save(); if (this.onChange) this.onChange(); });
     actTd.appendChild(delBtn);
   }
 
@@ -222,6 +225,7 @@ class TableManager {
   deleteAll() {
     this.tbody.innerHTML='';
     this.save();
+    if (this.onChange) this.onChange();
   }
 
   exportXlsx() {
@@ -250,6 +254,7 @@ class TableManager {
       });
       this.applyFilters();
       this.save();
+      if (this.onChange) this.onChange();
     };
     reader.readAsBinaryString(file);
   }

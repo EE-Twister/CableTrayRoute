@@ -224,8 +224,21 @@ const TRAY_WIDTH_OPTIONS=['2','3','4','6','8','9','12','16','18','20','24','30',
 const TRAY_DEPTH_OPTIONS=['2','3','4','5','6','7','8','9','10','11','12'];
 
   document.addEventListener('DOMContentLoaded',()=>{
+  let saved=true;
+  const markSaved=()=>{saved=true;};
+  const markUnsaved=()=>{saved=false;};
+  window.addEventListener('beforeunload',e=>{if(!saved){e.preventDefault();e.returnValue='';}});
   if(typeof initDuctbankTable==='function'){
     initDuctbankTable();
+    const dbTable=document.getElementById('ductbankTable');
+    if(dbTable){
+      dbTable.addEventListener('input',markUnsaved);
+      dbTable.addEventListener('click',e=>{if(e.target.tagName==='BUTTON'&&(['Add Conduit','Delete'].includes(e.target.textContent))) markUnsaved();});
+    }
+    ['add-ductbank-btn','delete-ductbank-btn'].forEach(id=>{const el=document.getElementById(id);if(el) el.addEventListener('click',markUnsaved);});
+    const importDb=document.getElementById('import-ductbank-xlsx-input');
+    if(importDb) importDb.addEventListener('change',markUnsaved);
+    ['save-ductbank-btn','load-ductbank-btn','export-ductbank-xlsx-btn'].forEach(id=>{const el=document.getElementById(id);if(el) el.addEventListener('click',markSaved);});
   }
 
   const trayColumns=[
@@ -251,7 +264,9 @@ const TRAY_DEPTH_OPTIONS=['2','3','4','5','6','7','8','9','10','11','12'];
     importInputId:'import-tray-xlsx-input',
     importBtnId:'import-tray-xlsx-btn',
     deleteAllBtnId:'delete-tray-btn',
-    columns:trayColumns
+    columns:trayColumns,
+    onChange:markUnsaved,
+    onSave:markSaved
   });
 
   const conduitColumns=[
@@ -277,7 +292,9 @@ const TRAY_DEPTH_OPTIONS=['2','3','4','5','6','7','8','9','10','11','12'];
     importInputId:'import-conduit-xlsx-input',
     importBtnId:'import-conduit-xlsx-btn',
     deleteAllBtnId:'delete-conduit-btn',
-    columns:conduitColumns
+    columns:conduitColumns,
+    onChange:markUnsaved,
+    onSave:markSaved
   });
 
   function getRacewaySchedule(){

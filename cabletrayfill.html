@@ -181,6 +181,10 @@
 
   <script>
     document.addEventListener("DOMContentLoaded", function() {
+      let saved = true;
+      const markSaved = () => { saved = true; };
+      const markUnsaved = () => { saved = false; };
+      window.addEventListener('beforeunload', e => { if (!saved) { e.preventDefault(); e.returnValue=''; } });
       const session = JSON.parse(localStorage.getItem('ctrSession') || '{}');
       if (session.darkMode) {
         document.body.classList.add('dark-mode');
@@ -1882,6 +1886,18 @@ Wt: ${m.weight.toFixed(2)} lbs/ft
 
       // Initialize profile dropdown
       refreshProfileList();
+
+      ['trayWidth','trayDepth','trayType','trayName','largeSpacing'].forEach(id=>{const el=document.getElementById(id);if(el){el.addEventListener('input',markUnsaved);el.addEventListener('change',markUnsaved);}});
+      const cableTbl=document.getElementById('cableTable');
+      if(cableTbl){
+        cableTbl.addEventListener('input',markUnsaved);
+        cableTbl.addEventListener('click',e=>{if(e.target.tagName==='BUTTON') markUnsaved();});
+      }
+      const addCableBtn=document.getElementById('addCableBtn');
+      if(addCableBtn) addCableBtn.addEventListener('click',markUnsaved);
+      const importExcelInput=document.getElementById('importExcelInput');
+      if(importExcelInput) importExcelInput.addEventListener('change',markUnsaved);
+      ['saveProfileBtn','loadProfileBtn','exportExcelBtn'].forEach(id=>{const el=document.getElementById(id);if(el) el.addEventListener('click',markSaved);});
 
       const stored = localStorage.getItem('trayFillData');
       if (stored) {
