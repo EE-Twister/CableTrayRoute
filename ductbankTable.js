@@ -63,7 +63,7 @@
       cTable.className='nested-table';
       const cHead=cTable.createTHead();
       const h=cHead.insertRow();
-      ['Conduit ID','Type','Trade Size','From','To','Actions'].forEach(txt=>{
+      ['Conduit ID','Type','Trade Size','Actions'].forEach(txt=>{
         const th=document.createElement('th');
         th.textContent=txt;
         h.appendChild(th);
@@ -108,17 +108,6 @@
         TableUtils.applyValidation(typeSel,typeRules);
         TableUtils.applyValidation(sizeSel,sizeRules);
 
-        // From and To inputs
-        ['from','to'].forEach(key=>{
-          const cell=r.insertCell();
-          const inp=document.createElement('input');
-          inp.value=c[key]||'';
-          const rules=['required'];
-          inp.addEventListener('input',e=>{c[key]=e.target.value;TableUtils.applyValidation(inp,rules);saveDuctbanks();});
-          TableUtils.applyValidation(inp,rules);
-          cell.appendChild(inp);
-        });
-
         const actc=r.insertCell();
         const delc=document.createElement('button');
         delc.textContent='Delete';
@@ -136,7 +125,7 @@
   }
 
   function addConduit(i){
-    ductbanks[i].conduits.push({conduit_id:'',type:'',trade_size:'',from:'',to:''});
+    ductbanks[i].conduits.push({conduit_id:'',type:'',trade_size:''});
     renderDuctbanks();
     saveDuctbanks();
   }
@@ -166,8 +155,8 @@
   function exportDuctbankXlsx(){
     const dbData=[['ductbank_id','tag','from','to']];
     ductbanks.forEach(db=>dbData.push([db.id,db.tag,db.from,db.to]));
-    const cData=[['ductbank_id','conduit_id','type','trade_size','from','to']];
-    ductbanks.forEach(db=>db.conduits.forEach(c=>cData.push([db.id,c.conduit_id,c.type,c.trade_size,c.from,c.to])));
+    const cData=[['ductbank_id','conduit_id','type','trade_size']];
+    ductbanks.forEach(db=>db.conduits.forEach(c=>cData.push([db.id,c.conduit_id,c.type,c.trade_size])));
     const wb=XLSX.utils.book_new();
     XLSX.utils.book_append_sheet(wb,XLSX.utils.aoa_to_sheet(dbData),'Ductbanks');
     XLSX.utils.book_append_sheet(wb,XLSX.utils.aoa_to_sheet(cData),'Conduits');
@@ -199,7 +188,7 @@
         return;
       }
 
-      const requiredCHeaders=['ductbank_id','conduit_id','type','trade_size','from','to'];
+      const requiredCHeaders=['ductbank_id','conduit_id','type','trade_size'];
       const cHeaders=(XLSX.utils.sheet_to_json(cSheet,{header:1})[0]||[]).map(h=>String(h).toLowerCase());
       const missingC=requiredCHeaders.filter(h=>!cHeaders.includes(h));
       if(missingC.length){
@@ -211,7 +200,7 @@
       const cJson=XLSX.utils.sheet_to_json(cSheet,{defval:''});
       const map={};
       ductbanks=dbJson.map(r=>{const db={id:r['ductbank_id']||r['id']||Date.now()+Math.random(),tag:r['tag']||'',from:r['from']||'',to:r['to']||'',conduits:[],expanded:false};map[db.id]=db;return db;});
-      cJson.forEach(r=>{const p=map[r['ductbank_id']];if(p){p.conduits.push({conduit_id:r['conduit_id']||'',type:r['type']||'',trade_size:r['trade_size']||'',from:r['from']||'',to:r['to']||''});}});
+      cJson.forEach(r=>{const p=map[r['ductbank_id']];if(p){p.conduits.push({conduit_id:r['conduit_id']||'',type:r['type']||'',trade_size:r['trade_size']||''});}});
       renderDuctbanks();
       saveDuctbanks();
     };
