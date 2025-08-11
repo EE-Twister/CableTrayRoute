@@ -7,6 +7,7 @@
   <title>Cable Schedule</title>
   <link rel="stylesheet" href="style.css">
   <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js" defer></script>
+  <script src="tableUtils.js" defer></script>
 </head>
 <body>
   <nav class="top-nav">
@@ -27,19 +28,16 @@
         <h1>Cable Schedule</h1>
         <p>Centralized table for managing cable data.</p>
       </header>
-
       <section class="card">
         <div style="margin-bottom:10px;">
           <button id="save-schedule-btn">Save Schedule</button>
           <button id="load-schedule-btn">Load Schedule</button>
           <button id="clear-filters-btn">Clear Filters</button>
-          <button id="load-sample-data-btn">Load Sample Data</button>
           <button id="export-xlsx-btn">Export XLSX</button>
           <input type="file" id="import-xlsx-input" accept=".xlsx" style="display:none;">
           <button id="import-xlsx-btn">Import XLSX</button>
           <button id="delete-all-btn">Delete All Rows</button>
         </div>
-        <div id="column-controls" style="margin-bottom:10px;"></div>
         <div style="overflow-x:auto;">
           <table id="cableScheduleTable" class="sticky-table">
             <thead></thead>
@@ -52,7 +50,6 @@
       </section>
     </main>
   </div>
-
   <div id="help-modal" class="modal" aria-hidden="true" role="dialog" aria-labelledby="help-title">
     <div class="modal-content">
       <button id="close-help-btn" class="close-btn" aria-label="Close Help">&times;</button>
@@ -60,432 +57,7 @@
       <p>This table allows managing cable data. Use the import/export buttons to work with Excel files.</p>
     </div>
   </div>
-
 <script>
-const INSULATION_TEMP_LIMIT = {
-  THHN:90,
-  XLPE:90,
-  PVC:75,
-  XHHW:90,
-  'XHHW-2':90,
-  'THWN-2':90,
-  THW:75,
-  THWN:75,
-  TW:60,
-  UF:60
-};
-
-const conductorSizes = ['#22 AWG','#20 AWG','#18 AWG','#16 AWG','#14 AWG','#12 AWG','#10 AWG','#8 AWG','#6 AWG','#4 AWG','#2 AWG','#1 AWG','1/0 AWG','2/0 AWG','3/0 AWG','4/0 AWG','250 kcmil','350 kcmil','500 kcmil','750 kcmil','1000 kcmil'];
-const cableTypes = ['Power','Control','Signal'];
-const conductorMaterials = ['Copper','Aluminum'];
-const insulationRatings = ['60','75','90'];
-const shieldingOptions = ['','Lead','Copper Tape'];
-
-const columns = [
-  // Identification
-  {key:'tag', label:'Tag', type:'text', group:'Identification', tooltip:'Unique identifier for the cable'},
-  {key:'service_description', label:'Service Description', type:'text', group:'Identification', tooltip:'Description of the cable\'s purpose'},
-  // Routing / Termination
-  {key:'from_tag', label:'From Tag', type:'text', group:'Routing / Termination', tooltip:'Starting equipment or location tag'},
-  {key:'to_tag', label:'To Tag', type:'text', group:'Routing / Termination', tooltip:'Ending equipment or location tag'},
-  {key:'start_x', label:'Start X', type:'number', group:'Routing / Termination', tooltip:'X-coordinate of cable start'},
-  {key:'start_y', label:'Start Y', type:'number', group:'Routing / Termination', tooltip:'Y-coordinate of cable start'},
-  {key:'start_z', label:'Start Z', type:'number', group:'Routing / Termination', tooltip:'Z-coordinate of cable start'},
-  {key:'end_x', label:'End X', type:'number', group:'Routing / Termination', tooltip:'X-coordinate of cable end'},
-  {key:'end_y', label:'End Y', type:'number', group:'Routing / Termination', tooltip:'Y-coordinate of cable end'},
-  {key:'end_z', label:'End Z', type:'number', group:'Routing / Termination', tooltip:'Z-coordinate of cable end'},
-  {key:'zone', label:'Cable Zone', type:'number', group:'Routing / Termination', tooltip:'Routing zone or area number'},
-  {key:'conduit_id', label:'Conduit', type:'text', group:'Routing / Termination', tooltip:'Conduit identifier if routed through conduit'},
-  {key:'circuit_group', label:'Circuit Group', type:'number', group:'Routing / Termination', tooltip:'Circuit grouping number'},
-  {key:'allowed_cable_group', label:'Allowed Group', type:'text', group:'Routing / Termination', tooltip:'Permitted cable grouping identifier'},
-  // Cable Construction & Specs
-  {key:'cable_type', label:'Cable Type', type:'select', options:cableTypes, group:'Cable Construction & Specs', tooltip:'Category such as Power, Control, or Signal'},
-  {key:'conductors', label:'Conductors', type:'number', group:'Cable Construction & Specs', tooltip:'Number of conductors within the cable'},
-  {key:'conductor_size', label:'Conductor Size', type:'select', options:conductorSizes, group:'Cable Construction & Specs', tooltip:'Size of each conductor'},
-  {key:'conductor_material', label:'Conductor Material', type:'select', options:conductorMaterials, group:'Cable Construction & Specs', tooltip:'Material of the conductors'},
-  {key:'insulation_type', label:'Insulation Type', type:'select', options:Object.keys(INSULATION_TEMP_LIMIT), group:'Cable Construction & Specs', tooltip:'Insulation material type'},
-  {key:'insulation_rating', label:'Insul Rating (°C)', type:'select', options:insulationRatings, group:'Cable Construction & Specs', tooltip:'Maximum temperature rating of insulation'},
-  {key:'insulation_thickness', label:'Insul Thick (in)', type:'number', group:'Cable Construction & Specs', tooltip:'Insulation thickness in inches'},
-  {key:'shielding_jacket', label:'Shielding/Jacket', type:'select', options:shieldingOptions, group:'Cable Construction & Specs', tooltip:'Shielding or outer jacket type'},
-  // Electrical Characteristics
-  {key:'cable_rating', label:'Cable Rating (V)', type:'number', group:'Electrical Characteristics', tooltip:'Maximum voltage rating of cable'},
-  {key:'operating_voltage', label:'Operating Voltage (V)', type:'number', group:'Electrical Characteristics', tooltip:'Expected operating voltage'},
-  {key:'est_load', label:'Est Load (A)', type:'number', group:'Electrical Characteristics', tooltip:'Estimated current load in amperes'},
-  // Physical Properties
-  {key:'diameter', label:'OD (in)', type:'number', group:'Physical Properties', tooltip:'Outer diameter of cable in inches'},
-  {key:'weight', label:'Weight (lbs/ft)', type:'number', group:'Physical Properties', tooltip:'Cable weight per foot'},
-];
-
-const table = document.getElementById('cableScheduleTable');
-const thead = table.tHead || table.createTHead();
-const tbody = table.tBodies[0];
-
-let groupRow, headerRow, filterRow;
-
-// mappings for grouping
-const groupColumnIndexes = {};
-columns.forEach((col, idx) => {
-  if(!groupColumnIndexes[col.group]) groupColumnIndexes[col.group] = [];
-  groupColumnIndexes[col.group].push(idx);
-});
-const groupHeaders = {};
-const groupVisibility = {};
-Object.keys(groupColumnIndexes).forEach(g => groupVisibility[g] = true);
-const filters = Array(columns.length).fill('');
-const filterButtons = [];
-
-function isGroupStart(idx){
-  return idx > 0 && columns[idx].group !== columns[idx-1].group;
-}
-
-function buildTableHeader(){
-  groupRow = thead.insertRow();
-  headerRow = thead.insertRow();
-  filterRow = thead.insertRow();
-
-  const groupCounts = {};
-  columns.forEach(col => {
-    groupCounts[col.group] = (groupCounts[col.group] || 0) + 1;
-  });
-
-  const addedGroups = new Set();
-  columns.forEach(col => {
-    if(!addedGroups.has(col.group)){
-      const th = document.createElement('th');
-      th.textContent = col.group;
-      th.colSpan = groupCounts[col.group];
-      if (groupRow.children.length > 0) th.classList.add('category-separator');
-      groupRow.appendChild(th);
-      groupHeaders[col.group] = th;
-      addedGroups.add(col.group);
-    }
-  });
-
-  columns.forEach((col, idx)=>{
-    const th = document.createElement('th');
-    if (isGroupStart(idx)) th.classList.add('category-separator');
-    if (col.tooltip) th.title = col.tooltip;
-
-    const labelSpan = document.createElement('span');
-    labelSpan.textContent = col.label;
-    labelSpan.style.cursor = 'pointer';
-    labelSpan.addEventListener('click', ()=>sortTable(idx, col.type));
-    th.appendChild(labelSpan);
-
-    const filterBtn = document.createElement('button');
-    filterBtn.type = 'button';
-    filterBtn.textContent = '▼';
-    filterBtn.className = 'filter-btn';
-    filterBtn.addEventListener('click', (e)=>openFilterPopup(e, idx));
-    th.appendChild(filterBtn);
-    filterButtons[idx] = filterBtn;
-
-    headerRow.appendChild(th);
-
-    const filterTh = document.createElement('th');
-    if (isGroupStart(idx)) filterTh.classList.add('category-separator');
-    filterRow.appendChild(filterTh);
-  });
-
-  // Actions group headers
-  const actionsTh = document.createElement('th');
-  actionsTh.textContent = 'Actions';
-  actionsTh.colSpan = 4;
-  actionsTh.classList.add('category-separator');
-  actionsTh.title = 'Row actions';
-  groupRow.appendChild(actionsTh);
-
-  const dupTh = document.createElement('th');
-  dupTh.textContent = 'Duplicate';
-  dupTh.classList.add('category-separator');
-  dupTh.title = 'Duplicate this row';
-  headerRow.appendChild(dupTh);
-  const dupFilter = document.createElement('th');
-  dupFilter.classList.add('category-separator');
-  filterRow.appendChild(dupFilter);
-
-  const insAboveTh = document.createElement('th');
-  insAboveTh.textContent = 'Insert Above';
-  insAboveTh.title = 'Insert a new row above this one';
-  headerRow.appendChild(insAboveTh);
-  const insAboveFilter = document.createElement('th');
-  filterRow.appendChild(insAboveFilter);
-
-  const insBelowTh = document.createElement('th');
-  insBelowTh.textContent = 'Insert Below';
-  insBelowTh.title = 'Insert a new row below this one';
-  headerRow.appendChild(insBelowTh);
-  const insBelowFilter = document.createElement('th');
-  filterRow.appendChild(insBelowFilter);
-
-  const delTh = document.createElement('th');
-  delTh.textContent = 'Delete';
-  delTh.title = 'Delete this row';
-  headerRow.appendChild(delTh);
-  const delFilter = document.createElement('th');
-  filterRow.appendChild(delFilter);
-}
-
-function addRow(data={}){
-  const tr = document.createElement('tr');
-  columns.forEach((col, idx)=>{
-    const td = document.createElement('td');
-    if (isGroupStart(idx)) td.classList.add('category-separator');
-    let input;
-    if(col.type==='select'){
-      input=document.createElement('select');
-      col.options.forEach(opt=>{
-        const o=document.createElement('option');
-        o.value=opt;
-        o.textContent=opt||'None';
-        input.appendChild(o);
-      });
-    }else{
-      input=document.createElement('input');
-      input.type=col.type==='number'?'number':'text';
-    }
-    input.value=data[col.key]||'';
-    td.appendChild(input);
-    tr.appendChild(td);
-  });
-
-  const dupTd = document.createElement('td');
-  dupTd.classList.add('category-separator');
-  const dupBtn = document.createElement('button');
-  dupBtn.type = 'button';
-  dupBtn.textContent = '⧉';
-  dupBtn.className = 'duplicateBtn';
-  dupBtn.title = 'Duplicate this row';
-  dupBtn.addEventListener('click', () => {
-    const rowData = {};
-    columns.forEach((col,i)=>{
-      const el = tr.cells[i].querySelector('input,select');
-      rowData[col.key] = el ? el.value : '';
-    });
-    const newRow = addRow(rowData);
-    tbody.insertBefore(newRow, tr.nextSibling);
-  });
-  dupTd.appendChild(dupBtn);
-  tr.appendChild(dupTd);
-
-  const insAboveTd = document.createElement('td');
-  const insAboveBtn = document.createElement('button');
-  insAboveBtn.type = 'button';
-  insAboveBtn.textContent = '↑+'
-  insAboveBtn.className = 'insertAboveBtn';
-  insAboveBtn.title = 'Insert a new row above';
-  insAboveBtn.addEventListener('click', () => {
-    const newRow = addRow();
-    tbody.insertBefore(newRow, tr);
-  });
-  insAboveTd.appendChild(insAboveBtn);
-  tr.appendChild(insAboveTd);
-
-  const insBelowTd = document.createElement('td');
-  const insBelowBtn = document.createElement('button');
-  insBelowBtn.type = 'button';
-  insBelowBtn.textContent = '↓+'
-  insBelowBtn.className = 'insertBelowBtn';
-  insBelowBtn.title = 'Insert a new row below';
-  insBelowBtn.addEventListener('click', () => {
-    const newRow = addRow();
-    tbody.insertBefore(newRow, tr.nextSibling);
-  });
-  insBelowTd.appendChild(insBelowBtn);
-  tr.appendChild(insBelowTd);
-
-  const delTd = document.createElement('td');
-  const delBtn = document.createElement('button');
-  delBtn.type = 'button';
-  delBtn.textContent = '✖';
-  delBtn.className = 'removeBtn';
-  delBtn.title = 'Delete this row';
-  delBtn.addEventListener('click', () => tbody.removeChild(tr));
-  delTd.appendChild(delBtn);
-  tr.appendChild(delTd);
-
-  tbody.appendChild(tr);
-
-  // apply current visibility
-  Object.keys(groupVisibility).forEach(g => {
-    if(!groupVisibility[g]){
-      groupColumnIndexes[g].forEach(idx => {
-        tr.cells[idx].style.display = 'none';
-      });
-    }
-  });
-
-  applyFilters();
-  return tr;
-}
-
-function getData(){
-  return Array.from(tbody.rows).map(row=>{
-    const obj={};
-    columns.forEach((col,i)=>{
-      const el=row.cells[i].querySelector('input,select');
-      obj[col.key]=el?el.value:'';
-    });
-    return obj;
-  });
-}
-
-function saveSchedule(){
-  localStorage.setItem('cableSchedule', JSON.stringify(getData()));
-}
-
-function loadSchedule(){
-  const data=JSON.parse(localStorage.getItem('cableSchedule')||'[]');
-  tbody.innerHTML='';
-  data.forEach(d=>addRow(d));
-  filters.fill('');
-  applyFilters();
-}
-
-let sortDir={};
-function sortTable(idx,type){
-  const dir=sortDir[idx]=-(sortDir[idx]||1);
-  const rows=Array.from(tbody.rows);
-  rows.sort((a,b)=>{
-    const av=a.cells[idx].querySelector('input,select').value;
-    const bv=b.cells[idx].querySelector('input,select').value;
-    if(type==='number') return dir*((parseFloat(av)||0)-(parseFloat(bv)||0));
-    return dir*av.localeCompare(bv);
-  });
-  rows.forEach(r=>tbody.appendChild(r));
-}
-
-function applyFilters(){
-  Array.from(tbody.rows).forEach(row=>{
-    let visible=true;
-    columns.forEach((col,i)=>{
-      const val=row.cells[i].querySelector('input,select').value.toLowerCase();
-      if(filters[i] && !val.includes(filters[i])) visible=false;
-    });
-    row.style.display=visible?'':'none';
-  });
-  updateFilterIndicators();
-}
-
-let currentFilterPopup=null;
-function openFilterPopup(e, idx){
-  e.stopPropagation();
-  if(currentFilterPopup) currentFilterPopup.remove();
-  const th = e.target.closest('th');
-  const rect = th.getBoundingClientRect();
-  const popup = document.createElement('div');
-  popup.className = 'filter-popup';
-  const input = document.createElement('input');
-  input.type = 'text';
-  input.value = filters[idx];
-  popup.appendChild(input);
-  const applyBtn = document.createElement('button');
-  applyBtn.textContent = 'Apply';
-  applyBtn.addEventListener('click', ()=>{
-    filters[idx] = input.value.toLowerCase();
-    applyFilters();
-    popup.remove();
-    currentFilterPopup=null;
-  });
-  popup.appendChild(applyBtn);
-  document.body.appendChild(popup);
-  popup.style.left = rect.left + 'px';
-  popup.style.top = rect.bottom + 'px';
-  input.focus();
-  input.select();
-  currentFilterPopup = popup;
-}
-
-document.addEventListener('click', (e)=>{
-  if(currentFilterPopup && !currentFilterPopup.contains(e.target)){
-    currentFilterPopup.remove();
-    currentFilterPopup=null;
-  }
-});
-
-function updateFilterIndicators(){
-  filterButtons.forEach((btn,i)=>{
-    const active = !!filters[i];
-    btn.classList.toggle('filtered', active);
-    btn.textContent = active ? '🔍' : '▼';
-  });
-}
-
-function buildColumnControls(){
-  const container = document.getElementById('column-controls');
-  Object.keys(groupColumnIndexes).forEach(group => {
-    const label = document.createElement('label');
-    label.style.marginRight = '8px';
-    const cb = document.createElement('input');
-    cb.type = 'checkbox';
-    cb.checked = true;
-    cb.addEventListener('change', () => toggleGroupVisibility(group, cb.checked));
-    label.appendChild(cb);
-    label.appendChild(document.createTextNode(' ' + group));
-    container.appendChild(label);
-  });
-}
-
-function toggleGroupVisibility(group, show){
-  groupVisibility[group] = show;
-  const display = show ? '' : 'none';
-  if (groupHeaders[group]) groupHeaders[group].style.display = display;
-  groupColumnIndexes[group].forEach(idx => {
-    headerRow.cells[idx].style.display = display;
-    filterRow.cells[idx].style.display = display;
-    Array.from(tbody.rows).forEach(row => {
-      row.cells[idx].style.display = display;
-    });
-  });
-}
-
-function navigateCell(e){
-  if(!['ArrowUp','ArrowDown','Enter'].includes(e.key)) return;
-  if(!['INPUT','SELECT'].includes(e.target.tagName)) return;
-  const cell = e.target.closest('td');
-  if(!cell) return;
-  const row = cell.parentElement;
-  let targetRow = e.key === 'ArrowUp' ? row.previousElementSibling : row.nextElementSibling;
-  if(!targetRow) return;
-  const targetCell = targetRow.cells[cell.cellIndex];
-  if(!targetCell) return;
-  const el = targetCell.querySelector('input,select');
-  if(el){
-    el.focus();
-    if(el.select) el.select();
-    e.preventDefault();
-  }
-}
-table.addEventListener('keydown', navigateCell);
-
-document.getElementById('add-row-btn').addEventListener('click',()=>addRow());
-document.getElementById('save-schedule-btn').addEventListener('click',saveSchedule);
-document.getElementById('load-schedule-btn').addEventListener('click',loadSchedule);
-document.getElementById('clear-filters-btn').addEventListener('click',()=>{
-  filters.fill('');
-  applyFilters();
-});
-
-const sampleData=[
-  {tag:'C1',service_description:'Sample 1',from_tag:'A',to_tag:'B',cable_type:'Power',conductors:3,conductor_size:'#4 AWG',conductor_material:'Copper',insulation_type:'THHN',insulation_rating:'90',diameter:'0.5',weight:'0.1'},
-  {tag:'C2',service_description:'Sample 2',from_tag:'B',to_tag:'C',cable_type:'Control',conductors:2,conductor_size:'#6 AWG',conductor_material:'Copper',insulation_type:'PVC',insulation_rating:'75',diameter:'0.3',weight:'0.05'}
-];
-document.getElementById('load-sample-data-btn').addEventListener('click',()=>{
-  tbody.innerHTML='';
-  sampleData.forEach(d=>addRow(d));
-  filters.fill('');
-  applyFilters();
-});
-document.getElementById('export-xlsx-btn').addEventListener('click',exportXlsx);
-document.getElementById('import-xlsx-btn').addEventListener('click',()=>document.getElementById('import-xlsx-input').click());
-document.getElementById('import-xlsx-input').addEventListener('change',importXlsx);
-document.getElementById('delete-all-btn').addEventListener('click',()=>{
-  if(confirm('Delete all rows?')){
-    tbody.innerHTML='';
-    saveSchedule();
-  }
-});
-
 const darkToggle=document.getElementById('dark-toggle');
 const settingsBtn=document.getElementById('settings-btn');
 const settingsMenu=document.getElementById('settings-menu');
@@ -522,91 +94,72 @@ const helpBtn=document.getElementById('help-btn');
 const helpModal=document.getElementById('help-modal');
 const closeHelpBtn=document.getElementById('close-help-btn');
 if(helpBtn&&helpModal&&closeHelpBtn){
-  const focusableSelector='a[href],button:not([disabled]),textarea,input,select,[tabindex]:not([tabindex="-1"])';
-  let firstFocusable,lastFocusable,previousFocus;
-  const trapFocus=e=>{
-    if(e.key==='Tab'){
-      if(e.shiftKey){
-        if(document.activeElement===firstFocusable){
-          e.preventDefault();
-          lastFocusable.focus();
-        }
-      }else if(document.activeElement===lastFocusable){
-        e.preventDefault();
-        firstFocusable.focus();
-      }
-    }else if(e.key==='Escape'){
-      closeModal();
-    }
-  };
   const openModal=()=>{
-    previousFocus=document.activeElement;
     helpModal.style.display='flex';
     helpModal.setAttribute('aria-hidden','false');
     helpBtn.setAttribute('aria-expanded','true');
-    const focusables=helpModal.querySelectorAll(focusableSelector);
-    firstFocusable=focusables[0];
-    lastFocusable=focusables[focusables.length-1];
-    firstFocusable&&firstFocusable.focus();
-    helpModal.addEventListener('keydown',trapFocus);
+    closeHelpBtn.focus();
   };
   const closeModal=()=>{
     helpModal.style.display='none';
     helpModal.setAttribute('aria-hidden','true');
     helpBtn.setAttribute('aria-expanded','false');
-    helpModal.removeEventListener('keydown',trapFocus);
-    previousFocus&&previousFocus.focus();
   };
   helpBtn.addEventListener('click',openModal);
   closeHelpBtn.addEventListener('click',closeModal);
-  helpModal.addEventListener('click',e=>{
-    if(e.target===helpModal)closeModal();
-  });
+  helpModal.addEventListener('click',e=>{ if(e.target===helpModal) closeModal(); });
 }
 
-buildTableHeader();
-buildColumnControls();
-loadSchedule();
-if(!tbody.rows.length) addRow();
+const INSULATION_TEMP_LIMIT={THHN:90,XLPE:90,PVC:75,XHHW:90,'XHHW-2':90,'THWN-2':90,THW:75,THWN:75,TW:60,UF:60};
+const conductorSizes=['#22 AWG','#20 AWG','#18 AWG','#16 AWG','#14 AWG','#12 AWG','#10 AWG','#8 AWG','#6 AWG','#4 AWG','#2 AWG','#1 AWG','1/0 AWG','2/0 AWG','3/0 AWG','4/0 AWG','250 kcmil','350 kcmil','500 kcmil','750 kcmil','1000 kcmil'];
+const cableTypes=['Power','Control','Signal'];
+const conductorMaterials=['Copper','Aluminum'];
+const insulationRatings=['60','75','90'];
+const shieldingOptions=['','Lead','Copper Tape'];
 
-function exportXlsx(){
-  const data=[columns.map(c=>c.label)];
-  Array.from(tbody.rows).forEach(row=>{
-    data.push(columns.map((col,i)=>{
-      const el=row.cells[i].querySelector('input,select');
-      return el?el.value:'';
-    }));
-  });
-  const wb=XLSX.utils.book_new();
-  const ws=XLSX.utils.aoa_to_sheet(data);
-  XLSX.utils.book_append_sheet(wb,ws,'CableSchedule');
-  XLSX.writeFile(wb,'cable_schedule.xlsx');
-}
+const columns=[
+  {key:'tag',label:'Tag',type:'text',group:'Identification',tooltip:'Unique identifier for the cable'},
+  {key:'service_description',label:'Service Description',type:'text',group:'Identification',tooltip:'Description of the cable\'s purpose'},
+  {key:'from_tag',label:'From Tag',type:'text',group:'Routing / Termination',tooltip:'Starting equipment or location tag'},
+  {key:'to_tag',label:'To Tag',type:'text',group:'Routing / Termination',tooltip:'Ending equipment or location tag'},
+  {key:'start_x',label:'Start X',type:'number',group:'Routing / Termination',tooltip:'X-coordinate of cable start'},
+  {key:'start_y',label:'Start Y',type:'number',group:'Routing / Termination',tooltip:'Y-coordinate of cable start'},
+  {key:'start_z',label:'Start Z',type:'number',group:'Routing / Termination',tooltip:'Z-coordinate of cable start'},
+  {key:'end_x',label:'End X',type:'number',group:'Routing / Termination',tooltip:'X-coordinate of cable end'},
+  {key:'end_y',label:'End Y',type:'number',group:'Routing / Termination',tooltip:'Y-coordinate of cable end'},
+  {key:'end_z',label:'End Z',type:'number',group:'Routing / Termination',tooltip:'Z-coordinate of cable end'},
+  {key:'zone',label:'Cable Zone',type:'number',group:'Routing / Termination',tooltip:'Routing zone or area number'},
+  {key:'conduit_id',label:'Conduit',type:'text',group:'Routing / Termination',tooltip:'Conduit identifier if routed through conduit'},
+  {key:'circuit_group',label:'Circuit Group',type:'number',group:'Routing / Termination',tooltip:'Circuit grouping number'},
+  {key:'allowed_cable_group',label:'Allowed Group',type:'text',group:'Routing / Termination',tooltip:'Permitted cable grouping identifier'},
+  {key:'cable_type',label:'Cable Type',type:'select',options:cableTypes,group:'Cable Construction & Specs',tooltip:'Category such as Power, Control, or Signal'},
+  {key:'conductors',label:'Conductors',type:'number',group:'Cable Construction & Specs',tooltip:'Number of conductors within the cable'},
+  {key:'conductor_size',label:'Conductor Size',type:'select',options:conductorSizes,group:'Cable Construction & Specs',tooltip:'Size of each conductor'},
+  {key:'conductor_material',label:'Conductor Material',type:'select',options:conductorMaterials,group:'Cable Construction & Specs',tooltip:'Material of the conductors'},
+  {key:'insulation_type',label:'Insulation Type',type:'select',options:Object.keys(INSULATION_TEMP_LIMIT),group:'Cable Construction & Specs',tooltip:'Insulation material type'},
+  {key:'insulation_rating',label:'Insul Rating (°C)',type:'select',options:insulationRatings,group:'Cable Construction & Specs',tooltip:'Maximum temperature rating of insulation'},
+  {key:'insulation_thickness',label:'Insul Thick (in)',type:'number',group:'Cable Construction & Specs',tooltip:'Insulation thickness in inches'},
+  {key:'shielding_jacket',label:'Shielding/Jacket',type:'select',options:shieldingOptions,group:'Cable Construction & Specs',tooltip:'Shielding or outer jacket type'},
+  {key:'cable_rating',label:'Cable Rating (V)',type:'number',group:'Electrical Characteristics',tooltip:'Maximum voltage rating'},
+  {key:'est_load',label:'Est Load (A)',type:'number',group:'Electrical Characteristics',tooltip:'Estimated operating current'},
+  {key:'duty_cycle',label:'Duty Cycle (%)',type:'number',group:'Electrical Characteristics',tooltip:'Duty cycle percentage'},
+  {key:'length',label:'Length (ft)',type:'number',group:'Electrical Characteristics',tooltip:'Length of cable run'},
+  {key:'notes',label:'Notes',type:'text',group:'Notes',tooltip:'Additional comments or notes'}
+];
 
-function importXlsx(e){
-  const file=e.target.files[0];
-  if(!file) return;
-  const reader=new FileReader();
-  reader.onload=evt=>{
-    const wb=XLSX.read(evt.target.result,{type:'binary'});
-    const sheet=wb.Sheets[wb.SheetNames[0]];
-    const json=XLSX.utils.sheet_to_json(sheet,{defval:''});
-    tbody.innerHTML='';
-    const labelKeyMap=Object.fromEntries(columns.map(c=>[c.label,c.key]));
-    json.forEach(obj=>{
-      const rowData={};
-      Object.keys(labelKeyMap).forEach(label=>{
-        rowData[labelKeyMap[label]]=obj[label]||'';
-      });
-      addRow(rowData);
-    });
-    filters.fill('');
-    applyFilters();
-  };
-  reader.readAsBinaryString(file);
-  e.target.value='';
-}
+TableUtils.createTable({
+  tableId:'cableScheduleTable',
+  storageKey:'cableSchedule',
+  addRowBtnId:'add-row-btn',
+  saveBtnId:'save-schedule-btn',
+  loadBtnId:'load-schedule-btn',
+  clearFiltersBtnId:'clear-filters-btn',
+  exportBtnId:'export-xlsx-btn',
+  importInputId:'import-xlsx-input',
+  importBtnId:'import-xlsx-btn',
+  deleteAllBtnId:'delete-all-btn',
+  columns
+});
 </script>
 </body>
 </html>
-
