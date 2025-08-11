@@ -15,21 +15,30 @@
     <a href="conduitfill.html">Conduit Fill</a>
     <a href="cableschedule.html">Cable Schedule</a>
   </nav>
-  <h1>Conduit Fill Visualization</h1>
+  <div class="container">
+    <main class="main-content">
+      <header class="page-header">
+        <h1>Conduit Fill Visualization</h1>
+        <button id="settings-btn" class="settings-btn" aria-label="Settings" aria-expanded="false">⚙</button>
+        <div id="settings-menu" class="settings-menu">
+          <label><input type="checkbox" id="dark-toggle"> Dark Mode</label>
+          <button id="help-btn" aria-expanded="false">Help</button>
+        </div>
+      </header>
 
-  <fieldset>
-    <legend><strong>Conduit Parameters</strong></legend>
-    <label for="conduitType">Type:</label>
-    <select id="conduitType"></select>
+      <fieldset>
+        <legend><strong>Conduit Parameters</strong></legend>
+        <label for="conduitType">Type:</label>
+        <select id="conduitType"></select>
 
-    <label for="tradeSize">Trade Size:</label>
-    <select id="tradeSize"></select>
-  </fieldset>
+        <label for="tradeSize">Trade Size:</label>
+        <select id="tradeSize"></select>
+      </fieldset>
 
-  <fieldset>
-    <legend><strong>Enter Cables</strong></legend>
-    <button id="addCableBtn" type="button">Add Cable</button>
-    <table id="cableTable">
+      <fieldset>
+        <legend><strong>Enter Cables</strong></legend>
+        <button id="addCableBtn" type="button">Add Cable</button>
+        <table id="cableTable">
       <thead>
         <tr>
           <th>Tag</th>
@@ -68,22 +77,33 @@
     </datalist>
   </fieldset>
 
-  <div id="controls">
-    <button id="drawBtn" type="button">Draw Conduit</button>
-    <button id="expandBtn" type="button">Expand Image</button>
+      <div id="controls">
+        <button id="drawBtn" type="button">Draw Conduit</button>
+        <button id="expandBtn" type="button">Expand Image</button>
+      </div>
+
+      <div id="results"></div>
+      <div id="svgContainer"></div>
+
+      <!-- OVERLAY + POPUP FOR EXPANDED VIEW -->
+      <div id="overlay">
+        <div id="popup">
+          <button id="popupClose" type="button">Close</button>
+          <button id="copyPngBtn" type="button">Copy PNG</button>
+          <button id="printBtn" type="button">Print SVG</button>
+          <button id="copyBtn" type="button">Copy SVG</button>
+          <div id="expandedSVG"></div>
+        </div>
+      </div>
+
+    </main>
   </div>
 
-  <div id="results"></div>
-  <div id="svgContainer"></div>
-
-  <!-- OVERLAY + POPUP FOR EXPANDED VIEW -->
-  <div id="overlay">
-    <div id="popup">
-      <button id="popupClose" type="button">Close</button>
-      <button id="copyPngBtn" type="button">Copy PNG</button>
-      <button id="printBtn" type="button">Print SVG</button>
-      <button id="copyBtn" type="button">Copy SVG</button>
-      <div id="expandedSVG"></div>
+  <div id="help-modal" class="modal" aria-hidden="true" role="dialog" aria-labelledby="help-title">
+    <div class="modal-content">
+      <button id="close-help-btn" class="close-btn" aria-label="Close Help">&times;</button>
+      <h2 id="help-title">Conduit Fill Help</h2>
+      <p>This tool visualizes conduit fill based on cable sizes.</p>
     </div>
   </div>
 
@@ -454,6 +474,79 @@
       document.getElementById('popupClose').addEventListener('click', () => {
         document.getElementById('overlay').style.display = 'none';
       });
+      const darkToggle = document.getElementById('dark-toggle');
+      const settingsBtn = document.getElementById('settings-btn');
+      const settingsMenu = document.getElementById('settings-menu');
+      if (settingsBtn && settingsMenu) {
+        settingsBtn.addEventListener('click', () => {
+          const expanded = settingsMenu.style.display === 'flex';
+          settingsMenu.style.display = expanded ? 'none' : 'flex';
+          settingsBtn.setAttribute('aria-expanded', String(!expanded));
+        });
+        document.addEventListener('click', e => {
+          if (!settingsMenu.contains(e.target) && e.target !== settingsBtn) {
+            settingsMenu.style.display = 'none';
+            settingsBtn.setAttribute('aria-expanded', 'false');
+          }
+        });
+      }
+      if (darkToggle) {
+        if (session.darkMode) {
+          darkToggle.checked = true;
+        }
+        darkToggle.addEventListener('change', () => {
+          if (darkToggle.checked) {
+            document.body.classList.add('dark-mode');
+          } else {
+            document.body.classList.remove('dark-mode');
+          }
+          session.darkMode = darkToggle.checked;
+          localStorage.setItem('ctrSession', JSON.stringify(session));
+        });
+      }
+      const helpBtn = document.getElementById('help-btn');
+      const helpModal = document.getElementById('help-modal');
+      const closeHelpBtn = document.getElementById('close-help-btn');
+      if (helpBtn && helpModal && closeHelpBtn) {
+        const focusableSelector = 'a[href],button:not([disabled]),textarea,input,select,[tabindex]:not([tabindex="-1"])';
+        let firstFocusable, lastFocusable, previousFocus;
+        const trapFocus = e => {
+          if (e.key === 'Tab') {
+            if (e.shiftKey) {
+              if (document.activeElement === firstFocusable) {
+                e.preventDefault();
+                lastFocusable.focus();
+              }
+            } else if (document.activeElement === lastFocusable) {
+              e.preventDefault();
+              firstFocusable.focus();
+            }
+          } else if (e.key === 'Escape') {
+            closeModal();
+          }
+        };
+        const openModal = () => {
+          previousFocus = document.activeElement;
+          helpModal.style.display = 'flex';
+          helpModal.setAttribute('aria-hidden', 'false');
+          helpBtn.setAttribute('aria-expanded', 'true');
+          const focusables = helpModal.querySelectorAll(focusableSelector);
+          firstFocusable = focusables[0];
+          lastFocusable = focusables[focusables.length - 1];
+          firstFocusable && firstFocusable.focus();
+          helpModal.addEventListener('keydown', trapFocus);
+        };
+        const closeModal = () => {
+          helpModal.style.display = 'none';
+          helpModal.setAttribute('aria-hidden', 'true');
+          helpBtn.setAttribute('aria-expanded', 'false');
+          helpModal.removeEventListener('keydown', trapFocus);
+          previousFocus && previousFocus.focus();
+        };
+        helpBtn.addEventListener('click', openModal);
+        closeHelpBtn.addEventListener('click', closeModal);
+        helpModal.addEventListener('click', e => { if (e.target === helpModal) closeModal(); });
+      }
 
       const stored = localStorage.getItem('conduitFillData');
       if (stored) {
