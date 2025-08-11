@@ -187,19 +187,25 @@ function renderDuctbanks(){
     const tag=row.insertCell();
     const tagInput=document.createElement('input');
     tagInput.value=db.tag||'';
-    tagInput.addEventListener('input',e=>{db.tag=e.target.value;saveDuctbanks();});
+    const tagRules=['required'];
+    tagInput.addEventListener('input',e=>{db.tag=e.target.value;TableUtils.applyValidation(tagInput,tagRules);saveDuctbanks();});
+    TableUtils.applyValidation(tagInput,tagRules);
     tag.appendChild(tagInput);
 
     const from=row.insertCell();
     const fromInput=document.createElement('input');
     fromInput.value=db.from||'';
-    fromInput.addEventListener('input',e=>{db.from=e.target.value;saveDuctbanks();});
+    const fromRules=['required'];
+    fromInput.addEventListener('input',e=>{db.from=e.target.value;TableUtils.applyValidation(fromInput,fromRules);saveDuctbanks();});
+    TableUtils.applyValidation(fromInput,fromRules);
     from.appendChild(fromInput);
 
     const to=row.insertCell();
     const toInput=document.createElement('input');
     toInput.value=db.to||'';
-    toInput.addEventListener('input',e=>{db.to=e.target.value;saveDuctbanks();});
+    const toRules=['required'];
+    toInput.addEventListener('input',e=>{db.to=e.target.value;TableUtils.applyValidation(toInput,toRules);saveDuctbanks();});
+    TableUtils.applyValidation(toInput,toRules);
     to.appendChild(toInput);
 
     const act=row.insertCell();
@@ -232,7 +238,9 @@ function renderDuctbanks(){
         const cell=r.insertCell();
         const inp=document.createElement('input');
         inp.value=c[key]||'';
-        inp.addEventListener('input',e=>{c[key]=e.target.value;saveDuctbanks();});
+        const rules=['required'];
+        inp.addEventListener('input',e=>{c[key]=e.target.value;TableUtils.applyValidation(inp,rules);saveDuctbanks();});
+        TableUtils.applyValidation(inp,rules);
         cell.appendChild(inp);
       });
       const actc=r.insertCell();
@@ -319,16 +327,16 @@ document.getElementById('import-ductbank-xlsx-input').addEventListener('change',
 loadDuctbanks();
 
 const trayColumns=[
-  {key:'tray_id',label:'Tray ID',type:'text'},
-  {key:'start_x',label:'Start X',type:'number'},
-  {key:'start_y',label:'Start Y',type:'number'},
-  {key:'start_z',label:'Start Z',type:'number'},
-  {key:'end_x',label:'End X',type:'number'},
-  {key:'end_y',label:'End Y',type:'number'},
-  {key:'end_z',label:'End Z',type:'number'},
-  {key:'width',label:'Width (in)',type:'number'},
-  {key:'height',label:'Height (in)',type:'number'},
-  {key:'capacity',label:'Capacity',type:'number'}
+  {key:'tray_id',label:'Tray ID',type:'text',validate:['required']},
+  {key:'start_x',label:'Start X',type:'number',validate:['required','numeric']},
+  {key:'start_y',label:'Start Y',type:'number',validate:['required','numeric']},
+  {key:'start_z',label:'Start Z',type:'number',validate:['required','numeric']},
+  {key:'end_x',label:'End X',type:'number',validate:['required','numeric']},
+  {key:'end_y',label:'End Y',type:'number',validate:['required','numeric']},
+  {key:'end_z',label:'End Z',type:'number',validate:['required','numeric']},
+  {key:'width',label:'Width (in)',type:'number',validate:['required','numeric']},
+  {key:'height',label:'Height (in)',type:'number',validate:['required','numeric']},
+  {key:'capacity',label:'Capacity',type:'number',validate:['numeric']}
 ];
 TableUtils.createTable({
   tableId:'trayTable',
@@ -345,16 +353,16 @@ TableUtils.createTable({
 });
 
 const conduitColumns=[
-  {key:'conduit_id',label:'Conduit ID',type:'text'},
-  {key:'type',label:'Type',type:'text'},
-  {key:'trade_size',label:'Trade Size',type:'text'},
-  {key:'start_x',label:'Start X',type:'number'},
-  {key:'start_y',label:'Start Y',type:'number'},
-  {key:'start_z',label:'Start Z',type:'number'},
-  {key:'end_x',label:'End X',type:'number'},
-  {key:'end_y',label:'End Y',type:'number'},
-  {key:'end_z',label:'End Z',type:'number'},
-  {key:'capacity',label:'Capacity',type:'number'}
+  {key:'conduit_id',label:'Conduit ID',type:'text',validate:['required']},
+  {key:'type',label:'Type',type:'text',validate:['required']},
+  {key:'trade_size',label:'Trade Size',type:'text',validate:['required']},
+  {key:'start_x',label:'Start X',type:'number',validate:['required','numeric']},
+  {key:'start_y',label:'Start Y',type:'number',validate:['required','numeric']},
+  {key:'start_z',label:'Start Z',type:'number',validate:['required','numeric']},
+  {key:'end_x',label:'End X',type:'number',validate:['required','numeric']},
+  {key:'end_y',label:'End Y',type:'number',validate:['required','numeric']},
+  {key:'end_z',label:'End Z',type:'number',validate:['required','numeric']},
+  {key:'capacity',label:'Capacity',type:'number',validate:['numeric']}
 ];
 TableUtils.createTable({
   tableId:'conduitTable',
