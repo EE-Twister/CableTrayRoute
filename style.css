@@ -1221,14 +1221,36 @@ body.cabletrayfill-page #helpClose {
 
 /* Homepage hero and workflow */
 .hero {
-    background: url('data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1600 900"><linearGradient id="g" x1="0" y1="0" x2="1" y2="1"><stop stop-color="%23007bff" offset="0%"/><stop stop-color="%2317a2b8" offset="100%"/></linearGradient><rect width="1600" height="900" fill="url(%23g)"/></svg>') center/cover no-repeat;
+    background: linear-gradient(135deg, var(--primary-color), #17a2b8);
     color: #fff;
     display: flex;
+    flex-direction: column;
     align-items: center;
     justify-content: center;
     text-align: center;
-    min-height: 40vh;
-    padding: 2rem 1rem;
+    padding: 4rem 1rem;
+    margin-bottom: 2rem;
+}
+
+.hero-title {
+    font-size: 2.5rem;
+    margin: 0 0 0.5rem 0;
+    color: #fff;
+}
+
+.hero-tagline {
+    font-size: 1.25rem;
+    margin: 0;
+    color: #fff;
+}
+
+body.dark-mode .hero {
+    background: linear-gradient(135deg, #0b3954, var(--primary-color));
+}
+
+body.dark-mode .hero-title,
+body.dark-mode .hero-tagline {
+    color: var(--text-color);
 }
 
 .about {
@@ -1249,28 +1271,57 @@ body.cabletrayfill-page #helpClose {
 .workflow-grid {
     display: grid;
     grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
-    gap: 1rem;
-    margin-top: 1rem;
+    gap: 1.5rem;
+    margin-top: 2rem;
 }
+
 .workflow-card {
     text-decoration: none;
     color: var(--text-color);
     background: var(--secondary-color);
     padding: 1.5rem;
     border-radius: 8px;
-    box-shadow: 0 2px 4px rgba(0,0,0,0.05);
+    box-shadow: 0 2px 4px rgba(0,0,0,0.08);
     font-weight: bold;
-    transition: background 0.3s;
     display: flex;
     align-items: center;
     justify-content: center;
-    gap: 0.5rem;
+    gap: 0.75rem;
+    transition: background 0.3s, box-shadow 0.3s, transform 0.3s;
 }
+
 .workflow-card:hover {
     background: var(--border-color);
+    box-shadow: 0 4px 8px rgba(0,0,0,0.12);
+    transform: translateY(-2px);
 }
 
 .workflow-card img {
-    width: 32px;
-    height: 32px;
+    width: 40px;
+    height: 40px;
+    flex-shrink: 0;
+}
+
+.workflow-card-title {
+    font-size: 1rem;
+    margin: 0;
+}
+
+body.dark-mode .workflow-card {
+    background: var(--secondary-color);
+    color: var(--text-color);
+    box-shadow: 0 2px 4px rgba(0,0,0,0.3);
+}
+
+body.dark-mode .workflow-card:hover {
+    background: var(--border-color);
+    box-shadow: 0 4px 8px rgba(0,0,0,0.4);
+}
+
+body.dark-mode .workflow-card img {
+    filter: brightness(0.9);
+}
+
+body.dark-mode .workflow-card-title {
+    color: var(--text-color);
 }
