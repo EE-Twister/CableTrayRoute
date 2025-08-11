@@ -152,6 +152,14 @@ input[type="number"], input[type="text"], select {
     border-color: red;
 }
 
+.error-message {
+    color: red;
+    font-size: 0.85em;
+    margin-top: -4px;
+    margin-bottom: 8px;
+    display: block;
+}
+
 button, .primary-btn {
     background-color: #6c757d;
     color: white;

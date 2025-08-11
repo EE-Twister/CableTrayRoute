@@ -40,7 +40,7 @@ button{padding:4px 8px;margin:4px 2px;cursor:pointer;}
  <div>
   <label>Ductbank Tag<input type="text" id="ductbankTag" style="margin-left:4px;"></label>
   <label style="margin-left:8px;">Concrete Encasement<input type="checkbox" id="concreteEncasement" style="margin-left:4px;"></label>
-  <label style="margin-left:8px;">Ductbank Depth (in)<input type="number" id="ductbankDepth" style="width:60px;"></label>
+ <label style="margin-left:8px;">Ductbank Depth (in)<input type="number" id="ductbankDepth" min="0" step="1" style="width:60px;"></label>
  </div>
 </details>
 
@@ -131,19 +131,19 @@ button{padding:4px 8px;margin:4px 2px;cursor:pointer;}
   <span class="help-icon" tabindex="0" aria-describedby="earthTempHelp">?
    <span id="earthTempHelp" class="tooltip">Degrees Fahrenheit of the surrounding soil. Typical 50–80°F.</span>
   </span>
-  <input type="number" id="earthTemp" style="width:60px;">
+  <input type="number" id="earthTemp" min="0" step="1" style="width:60px;">
  </label>
 <label style="margin-left:8px;">Ambient Air Temperature (&#176;F)
   <span class="help-icon" tabindex="0" aria-describedby="airTempHelp">?
    <span id="airTempHelp" class="tooltip">Air temperature around the installation in °F. Usually 50–110°F.</span>
   </span>
-  <input type="number" id="airTemp" style="width:60px;">
+  <input type="number" id="airTemp" min="0" step="1" style="width:60px;">
  </label>
 <label style="margin-left:8px;">Thermal Resistivity of Soil (&#176;C&#183;cm/W)
   <span class="help-icon" tabindex="0" aria-describedby="soilResHelp">?
    <span id="soilResHelp" class="tooltip">Typical soil ranges from 40–150 &#176;C&#183;cm/W.</span>
   </span>
-  <input type="number" id="soilResistivity" list="soilResList" style="width:120px;">
+  <input type="number" id="soilResistivity" list="soilResList" min="0" step="1" style="width:120px;">
 </label>
  <div id="soilWarning" style="display:none;font-size:0.8rem;color:var(--warning-text);"></div>
  <datalist id="soilResList"></datalist>
@@ -151,7 +151,7 @@ button{padding:4px 8px;margin:4px 2px;cursor:pointer;}
   <span class="help-icon" tabindex="0" aria-describedby="moistureHelp">?
    <span id="moistureHelp" class="tooltip">Percent water by weight in soil.</span>
   </span>
-  <input type="number" id="moistureContent" min="0" max="40" style="width:60px;">
+  <input type="number" id="moistureContent" min="0" max="40" step="1" style="width:60px;">
  </label>
  <div id="moistureWarning" style="display:none;font-size:0.8rem;color:var(--warning-text);"></div>
 <label style="margin-left:8px;">Allowable Conductor Temperature Tc
@@ -185,7 +185,7 @@ button{padding:4px 8px;margin:4px 2px;cursor:pointer;}
   <span class="help-icon" tabindex="0" aria-describedby="ductResHelp">?
    <span id="ductResHelp" class="tooltip">Thermal resistance of the conduit itself. Leave 0 when using the preset table. Typical range 0–0.2 &#176;C·m/W.</span>
   </span>
-  <input type="number" id="ductThermRes" value="0.0" placeholder="0.05" style="width:60px;">
+  <input type="number" id="ductThermRes" value="0.0" placeholder="0.05" min="0" step="0.01" style="width:60px;">
 </label>
 </div>
 
@@ -230,13 +230,13 @@ button{padding:4px 8px;margin:4px 2px;cursor:pointer;}
 </details>
 
 <div style="margin-top:8px;">
-  <label>Horiz Spacing (in)<input type="number" id="hSpacing" value="3" style="width:60px;"></label>
-  <label>Vert Spacing (in)<input type="number" id="vSpacing" value="4" style="width:60px;"></label>
-  <label>Top Clear (in)<input type="number" id="topPad" value="0" style="width:60px;"></label>
-  <label>Bottom Clear (in)<input type="number" id="bottomPad" value="0" style="width:60px;"></label>
-  <label>Left Clear (in)<input type="number" id="leftPad" value="0" style="width:60px;"></label>
- <label>Right Clear (in)<input type="number" id="rightPad" value="0" style="width:60px;"></label>
- <label>Conduits/Row<input type="number" id="perRow" value="4" style="width:60px;"></label>
+  <label>Horiz Spacing (in)<input type="number" id="hSpacing" value="3" min="0" step="1" style="width:60px;"></label>
+  <label>Vert Spacing (in)<input type="number" id="vSpacing" value="4" min="0" step="1" style="width:60px;"></label>
+  <label>Top Clear (in)<input type="number" id="topPad" value="0" min="0" step="1" style="width:60px;"></label>
+  <label>Bottom Clear (in)<input type="number" id="bottomPad" value="0" min="0" step="1" style="width:60px;"></label>
+  <label>Left Clear (in)<input type="number" id="leftPad" value="0" min="0" step="1" style="width:60px;"></label>
+ <label>Right Clear (in)<input type="number" id="rightPad" value="0" min="0" step="1" style="width:60px;"></label>
+ <label>Conduits/Row<input type="number" id="perRow" value="4" min="1" step="1" style="width:60px;"></label>
 </div>
 </details>
 
