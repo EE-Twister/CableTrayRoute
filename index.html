@@ -41,21 +41,21 @@
                         <span id="proximity-help" class="tooltip">The maximum distance a cable can jump from its start or end point to connect to a nearby tray segment.</span>
                     </span>
                  </label>
-                 <input type="number" id="proximity-threshold" value="72" step="1">
+                 <input type="number" id="proximity-threshold" value="72" min="0" step="1">
 
                  <label for="field-route-penalty">Field Route Cost Multiplier
                     <span class="help-icon" tabindex="0" role="button" aria-describedby="field-penalty-help">?
                         <span id="field-penalty-help" class="tooltip">This makes field routing (not in a tray) more expensive than routing within a tray. A value of 3 means every inch of field routing costs as much as 3 inches of tray routing, encouraging the algorithm to use trays whenever possible.</span>
                     </span>
                  </label>
-                 <input type="number" id="field-route-penalty" value="3.0" step="0.1">
+                 <input type="number" id="field-route-penalty" value="3.0" min="0" step="0.1">
 
                  <label for="shared-field-penalty">Shared Field Route Cost Multiplier
                     <span class="help-icon" tabindex="0" role="button" aria-describedby="shared-field-help">?
                         <span id="shared-field-help" class="tooltip">Multiplier applied when a cable uses an existing field-routed path from a previous cable. Use a value less than 1 to make shared field routes cheaper than new field routes.</span>
                     </span>
                  </label>
-                 <input type="number" id="shared-field-penalty" value="0.5" step="0.1">
+                 <input type="number" id="shared-field-penalty" value="0.5" min="0" step="0.1">
 
                  <label for="conduit-type">Preferred Conduit Type</label>
                  <select id="conduit-type">
@@ -111,15 +111,15 @@
                         <summary>Add New Tray Segment</summary>
                         <div class="tray-form">
                              <input type="text" id="t-id" placeholder="Tray ID">
-                             <input type="number" id="t-sx" placeholder="Start X (ft)">
-                             <input type="number" id="t-sy" placeholder="Start Y (ft)">
-                             <input type="number" id="t-sz" placeholder="Start Z (ft)">
-                             <input type="number" id="t-ex" placeholder="End X (ft)">
-                             <input type="number" id="t-ey" placeholder="End Y (ft)">
-                             <input type="number" id="t-ez" placeholder="End Z (ft)">
-                             <input type="number" id="t-w" placeholder="Width (in)">
-                             <input type="number" id="t-h" placeholder="Height (in)">
-                             <input type="number" id="t-fill" placeholder="Current Fill (in²)">
+                             <input type="number" id="t-sx" placeholder="Start X (ft)" step="0.1">
+                             <input type="number" id="t-sy" placeholder="Start Y (ft)" step="0.1">
+                             <input type="number" id="t-sz" placeholder="Start Z (ft)" step="0.1">
+                             <input type="number" id="t-ex" placeholder="End X (ft)" step="0.1">
+                             <input type="number" id="t-ey" placeholder="End Y (ft)" step="0.1">
+                             <input type="number" id="t-ez" placeholder="End Z (ft)" step="0.1">
+                             <input type="number" id="t-w" placeholder="Width (in)" min="0" step="0.1">
+                             <input type="number" id="t-h" placeholder="Height (in)" min="0" step="0.1">
+                             <input type="number" id="t-fill" placeholder="Current Fill (in²)" min="0" step="0.1">
                              <select id="t-shape">
                                  <option value="STR">Straight</option>
                                  <option value="90B">90° Bend</option>

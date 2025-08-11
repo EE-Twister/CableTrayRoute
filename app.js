@@ -215,6 +215,46 @@ document.addEventListener('DOMContentLoaded', () => {
     const cableSort = { key: '', asc: true };
     const updatedUtilSort = { key: '', asc: true };
 
+    const validateInputs = (ids = []) => {
+        let valid = true;
+        ids.map(id => document.getElementById(id)).forEach(el => {
+            if (!el) return;
+            const value = el.value.trim();
+            let error = '';
+            if (el.type === 'number') {
+                const num = parseFloat(value);
+                const min = el.min !== '' ? parseFloat(el.min) : -Infinity;
+                const max = el.max !== '' ? parseFloat(el.max) : Infinity;
+                if (value === '' || isNaN(num)) {
+                    error = 'Value required';
+                } else if (num < min) {
+                    error = `Min ${min}`;
+                } else if (num > max) {
+                    error = `Max ${max}`;
+                }
+            } else if (!value) {
+                error = 'Value required';
+            }
+
+            const existing = el.nextElementSibling;
+            if (error) {
+                valid = false;
+                el.classList.add('input-error');
+                let msg = existing && existing.classList.contains('error-message') ? existing : null;
+                if (!msg) {
+                    msg = document.createElement('span');
+                    msg.className = 'error-message';
+                    el.insertAdjacentElement('afterend', msg);
+                }
+                msg.textContent = error;
+            } else {
+                el.classList.remove('input-error');
+                if (existing && existing.classList.contains('error-message')) existing.remove();
+            }
+        });
+        return valid;
+    };
+
     // --- Tray Sizing Helpers (from cabletrayfill) ---
     const ALLOWABLE_AREA_BY_WIDTH = { 6:7.0, 9:10.5, 12:14.0, 18:21.0, 24:28.0, 30:32.5, 36:39.0 };
     const STANDARD_WIDTHS = [6, 9, 12, 18, 24, 30, 36];
@@ -1100,24 +1140,7 @@ const openConduitFill = (cables) => {
 
     const addManualTray = () => {
         const required = ['t-id','t-sx','t-sy','t-sz','t-ex','t-ey','t-ez','t-w','t-h'];
-        let valid = true;
-        required.forEach(id => {
-            const el = document.getElementById(id);
-            if (el.type === 'number') {
-                if (el.value === '' || isNaN(parseFloat(el.value))) {
-                    el.classList.add('input-error');
-                    valid = false;
-                } else {
-                    el.classList.remove('input-error');
-                }
-            } else if (!el.value) {
-                el.classList.add('input-error');
-                valid = false;
-            } else {
-                el.classList.remove('input-error');
-            }
-        });
-        if (!valid) return;
+        if (!validateInputs(required)) return;
 
         const newTray = {
             tray_id: document.getElementById('t-id').value,
@@ -1179,18 +1202,18 @@ const openConduitFill = (cables) => {
             table += `<tr data-idx="${idx}">
                         <td><input type="text" class="tray-id-input" data-idx="${idx}" value="${t.tray_id}" style="width:80px;"></td>
                         <td>
-                            <input type="number" class="tray-start-input" data-idx="${idx}" data-coord="0" value="${t.start_x}" style="width:70px;">
-                            <input type="number" class="tray-start-input" data-idx="${idx}" data-coord="1" value="${t.start_y}" style="width:70px;">
-                            <input type="number" class="tray-start-input" data-idx="${idx}" data-coord="2" value="${t.start_z}" style="width:70px;">
+                            <input type="number" class="tray-start-input" data-idx="${idx}" data-coord="0" value="${t.start_x}" step="0.1" style="width:70px;">
+                            <input type="number" class="tray-start-input" data-idx="${idx}" data-coord="1" value="${t.start_y}" step="0.1" style="width:70px;">
+                            <input type="number" class="tray-start-input" data-idx="${idx}" data-coord="2" value="${t.start_z}" step="0.1" style="width:70px;">
                         </td>
                         <td>
-                            <input type="number" class="tray-end-input" data-idx="${idx}" data-coord="0" value="${t.end_x}" style="width:70px;">
-                            <input type="number" class="tray-end-input" data-idx="${idx}" data-coord="1" value="${t.end_y}" style="width:70px;">
-                            <input type="number" class="tray-end-input" data-idx="${idx}" data-coord="2" value="${t.end_z}" style="width:70px;">
+                            <input type="number" class="tray-end-input" data-idx="${idx}" data-coord="0" value="${t.end_x}" step="0.1" style="width:70px;">
+                            <input type="number" class="tray-end-input" data-idx="${idx}" data-coord="1" value="${t.end_y}" step="0.1" style="width:70px;">
+                            <input type="number" class="tray-end-input" data-idx="${idx}" data-coord="2" value="${t.end_z}" step="0.1" style="width:70px;">
                         </td>
-                        <td><input type="number" class="tray-width-input" data-idx="${idx}" value="${t.width}" style="width:60px;"></td>
-                        <td><input type="number" class="tray-height-input" data-idx="${idx}" value="${t.height}" style="width:60px;"></td>
-                        <td><input type="number" class="tray-fill-input" data-idx="${idx}" value="${t.current_fill}" style="width:80px;"></td>
+                        <td><input type="number" class="tray-width-input" data-idx="${idx}" value="${t.width}" min="0" step="0.1" style="width:60px;"></td>
+                        <td><input type="number" class="tray-height-input" data-idx="${idx}" value="${t.height}" min="0" step="0.1" style="width:60px;"></td>
+                        <td><input type="number" class="tray-fill-input" data-idx="${idx}" value="${t.current_fill}" min="0" step="0.1" style="width:80px;"></td>
                         <td><input type="text" class="tray-group-input" data-idx="${idx}" value="${t.allowed_cable_group || ''}" style="width:100px;"></td>
                         <td>
                             <select class="tray-shape-select" data-idx="${idx}" style="width:100px;">
@@ -1518,7 +1541,7 @@ const openConduitFill = (cables) => {
                                 <option value="Signal" ${c.cable_type === 'Signal' ? 'selected' : ''}>Signal</option>
                             </select>
                         </td>
-                        <td><input type="number" class="cable-conductors-input" data-idx="${idx}" value="${c.conductors || 0}" step="1" style="width:60px;"></td>
+                        <td><input type="number" class="cable-conductors-input" data-idx="${idx}" value="${c.conductors || 0}" min="1" step="1" style="width:60px;"></td>
                         <td>
                             <select class="cable-size-select" data-idx="${idx}">
                                 <option value="#22 AWG" ${c.conductor_size === '#22 AWG' ? 'selected' : ''}>#22 AWG</option>
@@ -1544,8 +1567,8 @@ const openConduitFill = (cables) => {
                                 <option value="1000 kcmil" ${c.conductor_size === '1000 kcmil' ? 'selected' : ''}>1000 kcmil</option>
                             </select>
                         </td>
-                        <td><input type="number" class="cable-diameter-input" data-idx="${idx}" value="${c.diameter}" step="0.01" style="width:60px;"></td>
-                        <td><input type="number" class="cable-weight-input" data-idx="${idx}" value="${c.weight || 0}" step="0.01" style="width:80px;"></td>
+                        <td><input type="number" class="cable-diameter-input" data-idx="${idx}" value="${c.diameter}" min="0" step="0.01" style="width:60px;"></td>
+                        <td><input type="number" class="cable-weight-input" data-idx="${idx}" value="${c.weight || 0}" min="0" step="0.01" style="width:80px;"></td>
                         <td><input type="text" class="cable-group-input" data-idx="${idx}" value="${c.allowed_cable_group || ''}" style="width:120px;"></td>
                         <td>
                             <input type="number" class="cable-start-input" data-idx="${idx}" data-coord="0" value="${c.start[0]}" step="0.1" style="width:60px;">
@@ -2058,6 +2081,7 @@ const openConduitFill = (cables) => {
     };
 
     const mainCalculation = async () => {
+        if (!validateInputs(['proximity-threshold','field-route-penalty','shared-field-penalty'])) return;
         elements.resultsSection.style.display = 'block';
         elements.messages.innerHTML = '';
         elements.progressContainer.style.display = 'block';
@@ -2727,11 +2751,12 @@ Plotly.newPlot(document.getElementById('plot'), data, layout, {responsive: true}
     window.addEventListener('beforeunload', saveSession);
 
     // remove validation error highlight when typing
-    ['t-id','t-sx','t-sy','t-sz','t-ex','t-ey','t-ez','t-w','t-h','t-fill','t-group'].forEach(id => {
-        const el = document.getElementById(id);
-        if (el) {
-            el.addEventListener('input', () => el.classList.remove('input-error'));
-        }
+    document.querySelectorAll('input, select').forEach(el => {
+        el.addEventListener('input', () => {
+            el.classList.remove('input-error');
+            const err = el.nextElementSibling;
+            if (err && err.classList.contains('error-message')) err.remove();
+        });
     });
     // Initial setup
     loadSession();
