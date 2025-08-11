@@ -1344,6 +1344,26 @@ body.dark-mode .workflow-card-title {
     color: var(--text-color);
 }
 
+/* --- Step Navigation --- */
+.step-nav {
+    margin-top: 2rem;
+    padding-top: 1rem;
+    border-top: 1px solid var(--border-color);
+    display: flex;
+    justify-content: space-between;
+    flex-wrap: wrap;
+    gap: 1rem;
+}
+
+.step-nav a {
+    color: var(--primary-color);
+    text-decoration: none;
+}
+
+.step-nav a:hover {
+    text-decoration: underline;
+}
+
 /* --- Footer --- */
 .site-footer {
     background: var(--secondary-color);
