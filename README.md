@@ -121,3 +121,7 @@ Use the buttons above each table to **Save** to browser storage, **Load** saved 
 
 ## Clearing Saved Sessions
 The application stores your trays, cables and theme preference in browser storage. Open the settings menu (⚙) and click **Delete Saved Data** to clear this information.
+
+## Missing Pages
+
+A custom [`404.html`](404.html) page displays a short message and navigation when a route isn't found. GitHub Pages will automatically serve this file for unknown paths so visitors can return to the [home page](index.html).
