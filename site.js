@@ -149,6 +149,29 @@ function checkPrereqs(prereqs=[]){
   }
 }
 
+function initTableNav(){
+  document.addEventListener('keydown',e=>{
+    if(e.key!=='ArrowUp'&&e.key!=='ArrowDown')return;
+    const target=e.target;
+    if(!['INPUT','SELECT','TEXTAREA'].includes(target.tagName))return;
+    const cell=target.closest('td');
+    if(!cell||!cell.closest('table'))return;
+    const row=cell.parentElement;
+    const idx=cell.cellIndex;
+    const targetRow=e.key==='ArrowUp'?row.previousElementSibling:row.nextElementSibling;
+    if(!targetRow)return;
+    const targetCell=targetRow.cells[idx];
+    if(!targetCell)return;
+    const focusable=targetCell.querySelector('input, select, textarea');
+    if(!focusable)return;
+    e.preventDefault();
+    focusable.focus();
+    if(typeof focusable.select==='function') focusable.select();
+  });
+}
+
+document.addEventListener('DOMContentLoaded',initTableNav);
+
 window.initSettings=initSettings;
 window.initDarkMode=initDarkMode;
 window.initHelpModal=initHelpModal;

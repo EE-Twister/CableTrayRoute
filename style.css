@@ -60,6 +60,17 @@ body {
     color: var(--text-color);
 }
 
+/* Remove spin buttons from number inputs in tables */
+table input[type="number"] {
+    -moz-appearance: textfield;
+}
+
+table input[type="number"]::-webkit-inner-spin-button,
+table input[type="number"]::-webkit-outer-spin-button {
+    -webkit-appearance: none;
+    margin: 0;
+}
+
 .skip-link {
     position: absolute;
     top: -40px;
