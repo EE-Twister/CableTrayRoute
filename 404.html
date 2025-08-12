@@ -1,0 +1,55 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="description" content="404 page for missing routes.">
+  <title>Page Not Found</title>
+  <link rel="icon" href="icons/favicon.svg" type="image/svg+xml">
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+  <nav class="top-nav">
+    <button class="nav-toggle" aria-label="Toggle navigation">☰</button>
+    <div class="nav-links">
+      <a href="index.html">Home</a>
+      <a href="cableschedule.html">Cable Schedule</a>
+      <a href="racewayschedule.html">Raceway Schedule</a>
+      <a href="ductbankroute.html">Ductbank</a>
+      <a href="cabletrayfill.html">Tray Fill</a>
+      <a href="conduitfill.html">Conduit Fill</a>
+      <a href="optimalRoute.html">Optimal Route</a>
+      <button id="settings-btn" class="settings-btn" aria-label="Settings" aria-expanded="false">⚙</button>
+    </div>
+  </nav>
+  <div id="settings-menu" class="settings-menu">
+    <label><input type="checkbox" id="dark-toggle"> Dark Mode</label>
+    <button id="help-btn" aria-expanded="false">Site Help</button>
+  </div>
+  <div class="container">
+    <main class="main-content">
+      <section class="card">
+        <h1>Page Not Found</h1>
+        <p>The page you requested could not be found.</p>
+        <p><a href="index.html">Return to the homepage</a></p>
+      </section>
+    </main>
+  </div>
+  <div id="help-modal" class="modal" aria-hidden="true" role="dialog" aria-labelledby="help-title">
+    <div class="modal-content">
+      <button id="close-help-btn" class="close-btn" aria-label="Close Help">&times;</button>
+      <h2 id="help-title">Need Help?</h2>
+      <p>Use the navigation links above to find your way.</p>
+    </div>
+  </div>
+  <script src="site.js" defer></script>
+  <script>
+    window.addEventListener('DOMContentLoaded', () => {
+      initSettings();
+      initDarkMode();
+      initHelpModal('help-btn','help-modal','close-help-btn');
+      initNavToggle();
+    });
+  </script>
+</body>
+</html>
