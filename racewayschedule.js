@@ -97,6 +97,23 @@ document.addEventListener('DOMContentLoaded',()=>{
     onSave:markSaved
   });
 
+  const loadSampleBtn=document.getElementById('load-sample-raceway-btn');
+  if(loadSampleBtn){
+    loadSampleBtn.addEventListener('click',async()=>{
+      try{
+        const res=await fetch('examples/sample_raceways.json');
+        const data=await res.json();
+        localStorage.setItem(TableUtils.STORAGE_KEYS.ductbankSchedule,JSON.stringify(data.ductbanks));
+        localStorage.setItem(TableUtils.STORAGE_KEYS.traySchedule,JSON.stringify(data.trays));
+        localStorage.setItem(TableUtils.STORAGE_KEYS.conduitSchedule,JSON.stringify(data.conduits));
+        document.getElementById('load-ductbank-btn').click();
+        document.getElementById('load-tray-btn').click();
+        document.getElementById('load-conduit-btn').click();
+        markSaved();
+      }catch(e){console.error('Failed to load sample raceway data',e);}
+    });
+  }
+
   function getRacewaySchedule(){
     saveDuctbanks();
     trayTable.save();
