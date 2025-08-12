@@ -130,15 +130,38 @@ class TableManager {
       const td = tr.insertCell();
       let el;
       if (col.type === 'select') {
-        el = document.createElement('select');
-        if (col.multiple) el.multiple = true;
         const opts = typeof col.options === 'function' ? col.options(tr, data) : (col.options || []);
-        opts.forEach(opt => {
-          const o = document.createElement('option');
-          o.value = opt;
-          o.textContent = opt;
-          el.appendChild(o);
-        });
+        if (col.multiple) {
+          el = document.createElement('div');
+          el.className = 'multi-checkbox';
+          if (col.size) {
+            el.style.maxHeight = (col.size * 1.5) + 'em';
+            el.style.overflowY = 'auto';
+          }
+          opts.forEach(opt => {
+            const label = document.createElement('label');
+            label.style.display = 'block';
+            const cb = document.createElement('input');
+            cb.type = 'checkbox';
+            cb.value = opt;
+            label.appendChild(cb);
+            label.appendChild(document.createTextNode(opt));
+            el.appendChild(label);
+          });
+          el.getSelectedValues = () => Array.from(el.querySelectorAll('input:checked')).map(c => c.value);
+          el.setSelectedValues = vals => {
+            Array.from(el.querySelectorAll('input')).forEach(c => { c.checked = (vals || []).includes(c.value); });
+          };
+          Object.defineProperty(el, 'value', { get() { return el.getSelectedValues().join(','); } });
+        } else {
+          el = document.createElement('select');
+          opts.forEach(opt => {
+            const o = document.createElement('option');
+            o.value = opt;
+            o.textContent = opt;
+            el.appendChild(o);
+          });
+        }
       } else {
         el = document.createElement('input');
         el.type = col.type || 'text';
@@ -146,8 +169,13 @@ class TableManager {
       el.name = col.key;
       const val = data[col.key] !== undefined ? data[col.key] : col.default;
       if (val !== undefined) {
-        if (col.multiple && Array.isArray(val)) {
-          Array.from(el.options).forEach(o => { o.selected = val.includes(o.value); });
+        if (col.multiple) {
+          const vals = Array.isArray(val) ? val : [val];
+          if (el.setSelectedValues) {
+            el.setSelectedValues(vals);
+          } else if (el.options) {
+            Array.from(el.options).forEach(o => { o.selected = vals.includes(o.value); });
+          }
         } else {
           el.value = val;
         }
@@ -156,10 +184,10 @@ class TableManager {
       }
       td.appendChild(el);
       if (col.onChange) el.addEventListener('change', () => { col.onChange(el, tr); });
-      el.addEventListener('input', () => { if (this.onChange) this.onChange(); });
+      el.addEventListener(col.multiple ? 'change' : 'input', () => { if (this.onChange) this.onChange(); });
       if (col.validate) {
         const rules = Array.isArray(col.validate) ? col.validate : [col.validate];
-        el.addEventListener('input', () => applyValidation(el, rules));
+        el.addEventListener(col.multiple ? 'change' : 'input', () => applyValidation(el, rules));
         applyValidation(el, rules);
       }
     });
@@ -179,7 +207,11 @@ class TableManager {
         if (el) {
           const val = el.value;
           if (col.multiple) {
-            row[col.key] = Array.from(el.selectedOptions).map(o=>o.value);
+            if (typeof el.getSelectedValues === 'function') {
+              row[col.key] = el.getSelectedValues();
+            } else {
+              row[col.key] = Array.from(el.selectedOptions || []).map(o => o.value);
+            }
           } else if (col.type === 'number') {
             const num = parseFloat(val);
             if (val === '') {
