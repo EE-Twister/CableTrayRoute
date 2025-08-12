@@ -149,6 +149,36 @@ function checkPrereqs(prereqs=[]){
   }
 }
 
+// Enable spreadsheet-style navigation in tables
+document.addEventListener('keydown',e=>{
+  if(!e.target.matches('table input[type="text"], table input[type="number"]')) return;
+  if(e.key!=='ArrowUp'&&e.key!=='ArrowDown') return;
+  if(e.shiftKey||e.altKey||e.ctrlKey||e.metaKey) return;
+  e.preventDefault();
+  const cell=e.target.closest('td');
+  if(!cell) return;
+  const colIdx=cell.cellIndex;
+  const row=cell.parentElement;
+  const targetRow=e.key==='ArrowUp'?row.previousElementSibling:row.nextElementSibling;
+  if(targetRow){
+    const targetCell=targetRow.cells[colIdx];
+    if(targetCell){
+      const targetInput=targetCell.querySelector('input[type="text"], input[type="number"]');
+      if(targetInput){
+        targetInput.focus();
+        targetInput.select();
+      }
+    }
+  }
+});
+
+// Select all text when focusing table inputs
+document.addEventListener('focus',e=>{
+  if(e.target.matches('table input[type="text"], table input[type="number"]')){
+    e.target.select();
+  }
+},true);
+
 window.initSettings=initSettings;
 window.initDarkMode=initDarkMode;
 window.initHelpModal=initHelpModal;
