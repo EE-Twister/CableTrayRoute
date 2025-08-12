@@ -66,7 +66,7 @@
     <div class="modal-content">
       <button id="close-help-btn" class="close-btn" aria-label="Close Help">&times;</button>
       <h2 id="help-title">Cable Schedule Help</h2>
-      <p>This table allows managing cable data. Use the import/export buttons to work with Excel files.</p>
+      <p>This table allows managing cable data. Use the import/export buttons to work with Excel files. Select one or more raceway IDs in the "Raceway(s)" column; options are pulled from the Raceway Schedule page.</p>
     </div>
   </div>
 <script>
@@ -84,7 +84,15 @@ const conductorSizes=['#22 AWG','#20 AWG','#18 AWG','#16 AWG','#14 AWG','#12 AWG
 const cableTypes=['Power','Control','Signal'];
 const conductorMaterials=['Copper','Aluminum'];
 const insulationRatings=['60','75','90'];
-const shieldingOptions=['','Lead','Copper Tape'];
+  const shieldingOptions=['','Lead','Copper Tape'];
+
+  function getRacewayOptions(){
+    const ids=new Set();
+    try{(JSON.parse(localStorage.getItem(TableUtils.STORAGE_KEYS.traySchedule))||[]).forEach(t=>{if(t.tray_id) ids.add(t.tray_id);});}catch(e){}
+    try{(JSON.parse(localStorage.getItem(TableUtils.STORAGE_KEYS.conduitSchedule))||[]).forEach(c=>{if(c.conduit_id) ids.add(c.conduit_id);});}catch(e){}
+    try{(JSON.parse(localStorage.getItem(TableUtils.STORAGE_KEYS.ductbankSchedule))||[]).forEach(db=>{if(db.tag) ids.add(db.tag);(db.conduits||[]).forEach(c=>{if(c.conduit_id) ids.add(c.conduit_id);});});}catch(e){}
+    return Array.from(ids);
+  }
 
 const columns=[
   {key:'tag',label:'Tag',type:'text',group:'Identification',tooltip:'Unique identifier for the cable'},
@@ -99,6 +107,7 @@ const columns=[
   {key:'end_z',label:'End Z',type:'number',group:'Routing / Termination',tooltip:'Z-coordinate of cable end'},
   {key:'zone',label:'Cable Zone',type:'number',group:'Routing / Termination',tooltip:'Routing zone or area number'},
   {key:'conduit_id',label:'Conduit',type:'text',group:'Routing / Termination',tooltip:'Conduit identifier if routed through conduit'},
+  {key:'raceway_ids',label:'Raceway(s)',type:'select',multiple:true,options:()=>getRacewayOptions(),group:'Routing / Termination',tooltip:'Select raceway IDs from Raceway Schedule'},
   {key:'circuit_group',label:'Circuit Group',type:'number',group:'Routing / Termination',tooltip:'Circuit grouping number'},
   {key:'allowed_cable_group',label:'Allowed Group',type:'text',group:'Routing / Termination',tooltip:'Permitted cable grouping identifier'},
   {key:'cable_type',label:'Cable Type',type:'select',options:cableTypes,group:'Cable Construction & Specs',tooltip:'Category such as Power, Control, or Signal'},
