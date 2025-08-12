@@ -353,12 +353,12 @@ class CableRoutingSystem {
             let prev = startPoint.slice();
             for (const id of trayIds) {
                 const tray = this.trays.get(id);
-                if (!tray) return { success: false, manual: true, message: `Tray ${id} not found` };
+                if (!tray) return { success: false, manual: true, manual_raceway: false, message: `Tray ${id} not found` };
                 if (tray.allowed_cable_group && allowedGroup && tray.allowed_cable_group !== allowedGroup) {
-                    return { success: false, manual: true, message: `Tray ${id} not allowed` };
+                    return { success: false, manual: true, manual_raceway: false, message: `Tray ${id} not allowed` };
                 }
                 if (tray.current_fill + cableArea > tray.maxFill) {
-                    return { success: false, manual: true, message: `Tray ${id} over capacity` };
+                    return { success: false, manual: true, manual_raceway: false, message: `Tray ${id} over capacity` };
                 }
                 const a = [tray.start_x, tray.start_y, tray.start_z];
                 const b = [tray.end_x, tray.end_y, tray.end_z];
@@ -369,7 +369,7 @@ class CableRoutingSystem {
                 } else {
                     const last = segments[segments.length - 1].end;
                     if (this.distance(last, a) > 0.1) {
-                        return { success: false, manual: true, message: `Tray sequence mismatch at ${id}` };
+                        return { success: false, manual: true, manual_raceway: false, message: `Tray sequence mismatch at ${id}` };
                     }
                 }
                 const len = this.distance(a, b);
@@ -385,6 +385,7 @@ class CableRoutingSystem {
             return {
                 success: true,
                 manual: true,
+                manual_raceway: false,
                 route_segments: segments,
                 tray_segments: traySegments,
                 total_length: total,
@@ -393,7 +394,7 @@ class CableRoutingSystem {
         } else {
             const points = path.split(/\s*;\s*/).filter(Boolean).map(p => p.split(',').map(Number));
             if (points.some(pt => pt.length !== 3 || pt.some(isNaN))) {
-                return { success: false, manual: true, message: 'Invalid waypoint format' };
+                return { success: false, manual: true, manual_raceway: false, message: 'Invalid waypoint format' };
             }
             const segments = [];
             let prev = startPoint.slice();
@@ -406,6 +407,7 @@ class CableRoutingSystem {
             return {
                 success: true,
                 manual: true,
+                manual_raceway: false,
                 route_segments: segments,
                 tray_segments: [],
                 total_length: total,
@@ -413,9 +415,51 @@ class CableRoutingSystem {
             };
         }
     }
-    calculateRoute(startPoint, endPoint, cableArea, allowedGroup, manualPath = '') {
+    _racewayRoute(startPoint, endPoint, cableArea, allowedGroup, racewayIds) {
+        if (!Array.isArray(racewayIds) || racewayIds.length === 0) return null;
+        const segments = [];
+        const traySegments = [];
+        let prev = startPoint.slice();
+        for (const id of racewayIds) {
+            const tray = this.trays.get(id);
+            if (!tray) return { success: false, manual: true, manual_raceway: true, message: `Tray ${id} not found` };
+            if (tray.allowed_cable_group && allowedGroup && tray.allowed_cable_group !== allowedGroup) {
+                return { success: false, manual: true, manual_raceway: true, message: `Tray ${id} not allowed` };
+            }
+            if (tray.current_fill + cableArea > tray.maxFill) {
+                return { success: false, manual: true, manual_raceway: true, message: `Tray ${id} over capacity` };
+            }
+            const a = [tray.start_x, tray.start_y, tray.start_z];
+            const b = [tray.end_x, tray.end_y, tray.end_z];
+            if (this.distance(prev, a) > 0) {
+                segments.push({ start: prev, end: a, length: this.distance(prev, a), type: 'field' });
+            }
+            const len = this.distance(a, b);
+            segments.push({ start: a, end: b, length: len, type: 'tray', tray_id: id });
+            traySegments.push(id);
+            prev = b;
+        }
+        if (this.distance(prev, endPoint) > 0) {
+            segments.push({ start: prev, end: endPoint, length: this.distance(prev, endPoint), type: 'field' });
+        }
+        const total = segments.reduce((s, seg) => s + seg.length, 0);
+        const fieldLen = segments.filter(seg => seg.type === 'field').reduce((s, seg) => s + seg.length, 0);
+        return {
+            success: true,
+            manual: true,
+            manual_raceway: true,
+            route_segments: segments,
+            tray_segments: traySegments,
+            total_length: total,
+            field_routed_length: fieldLen,
+        };
+    }
+    calculateRoute(startPoint, endPoint, cableArea, allowedGroup, manualPath = '', racewayIds = []) {
         if (manualPath && manualPath.trim()) {
             return this._manualRoute(startPoint, endPoint, cableArea, allowedGroup, manualPath);
+        }
+        if (racewayIds && racewayIds.length > 0) {
+            return this._racewayRoute(startPoint, endPoint, cableArea, allowedGroup, racewayIds);
         }
         if (!this.baseGraph) this.prepareBaseGraph();
         // 1. Start from the precomputed graph
@@ -606,6 +650,7 @@ class CableRoutingSystem {
             tray_segments: Array.from(traySegments),
             warnings: [],
             manual: false,
+            manual_raceway: false,
         };
     }
 }
@@ -616,6 +661,13 @@ self.onmessage = function(e) {
     const system = new CableRoutingSystem(options);
     trays.forEach(t => system.addTraySegment(t));
     system.baseGraph = baseGraph;
-    const result = system.calculateRoute(cable.start, cable.end, cableArea, cable.allowed_cable_group, cable.manual_path || '');
+    const result = system.calculateRoute(
+        cable.start,
+        cable.end,
+        cableArea,
+        cable.allowed_cable_group,
+        cable.manual_path || '',
+        cable.raceway_ids || []
+    );
     self.postMessage(result);
 };

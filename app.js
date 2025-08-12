@@ -229,7 +229,10 @@ document.addEventListener('DOMContentLoaded', () => {
             if (data) {
                 state.manualTrays = data.manualTrays || [];
                 state.cableList = data.cableList || [];
-                state.cableList.forEach(c => { if (!('manual_path' in c)) c.manual_path = ''; });
+                state.cableList.forEach(c => {
+                    if (!('manual_path' in c)) c.manual_path = '';
+                    if (!('raceway_ids' in c)) c.raceway_ids = [];
+                });
                 if (data.darkMode) document.body.classList.add('dark-mode');
                 if (data.conduitType && elements.conduitType) {
                     elements.conduitType.value = data.conduitType;
@@ -1039,7 +1042,8 @@ document.addEventListener('DOMContentLoaded', () => {
                 start_tag: `ST${i + 1}`,
                 end_tag: `ET${i + 1}`,
                 allowed_cable_group: t.allowed_cable_group,
-                manual_path: ''
+                manual_path: '',
+                raceway_ids: []
             });
         }
         return cables;
@@ -1519,6 +1523,9 @@ const openConduitFill = (cables) => {
                     allowed_cable_group: t.allowed_cable_group || '',
                     start: [parseFloat(t.start_x) || 0, parseFloat(t.start_y) || 0, parseFloat(t.start_z) || 0],
                     end: [parseFloat(t.end_x) || 0, parseFloat(t.end_y) || 0, parseFloat(t.end_z) || 0]
+                ,
+                    manual_path: '',
+                    raceway_ids: []
                 });
             }
             state.cableList = newCables;
@@ -1787,7 +1794,8 @@ const openConduitFill = (cables) => {
             start_tag: '',
             end_tag: '',
             allowed_cable_group: '',
-            manual_path: ''
+            manual_path: '',
+            raceway_ids: []
         };
         state.cableList.push(newCable);
         updateCableListDisplay();
@@ -2254,7 +2262,10 @@ const openConduitFill = (cables) => {
                             batchResults[index] = {
                                 cable: cable.name,
                                 status: result.success ? '✓ Routed' : '✗ Failed',
-                                mode: result.manual ? 'Manual' : 'Automatic',
+                                mode: result.manual
+                                    ? (result.manual_raceway ? 'Manual Raceway' : 'Manual Path')
+                                    : 'Automatic',
+                                manual_raceway: !!result.manual_raceway,
                                 total_length: result.success ? result.total_length.toFixed(2) : 'N/A',
                                 field_length: result.success ? result.field_routed_length.toFixed(2) : 'N/A',
                                 tray_segments_count: result.success ? result.tray_segments.length : 0,
