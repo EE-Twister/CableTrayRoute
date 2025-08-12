@@ -60,6 +60,16 @@ body {
     color: var(--text-color);
 }
 
+/* Hide number input spinners */
+input[type="number"]::-webkit-outer-spin-button,
+input[type="number"]::-webkit-inner-spin-button {
+    -webkit-appearance: none;
+    margin: 0;
+}
+input[type="number"] {
+    -moz-appearance: textfield;
+}
+
 .skip-link {
     position: absolute;
     top: -40px;
