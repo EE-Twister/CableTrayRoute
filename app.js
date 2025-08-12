@@ -1,6 +1,19 @@
 // Filename: app.js
 // (This is an improved version that adds route segment consolidation)
 
+// Ensure Canvas 2D contexts are optimized for repeated pixel reads.
+// This avoids Chrome warnings about frequent getImageData usage.
+const originalGetContext = HTMLCanvasElement.prototype.getContext;
+HTMLCanvasElement.prototype.getContext = function(type, options) {
+    if (type === '2d') {
+        options = options || {};
+        if (options.willReadFrequently === undefined) {
+            options.willReadFrequently = true;
+        }
+    }
+    return originalGetContext.call(this, type, options);
+};
+
 const CONDUIT_SPECS = {
     "EMT": {"1/2":0.304,"3/4":0.533,"1":0.864,"1-1/4":1.496,"1-1/2":2.036,"2":3.356,"2-1/2":5.858,"3":8.846,"3-1/2":11.545,"4":14.753},
     "ENT": {"1/2":0.285,"3/4":0.508,"1":0.832,"1-1/4":1.453,"1-1/2":1.986,"2":3.291},
