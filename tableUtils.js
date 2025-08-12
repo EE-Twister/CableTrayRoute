@@ -131,6 +131,7 @@ class TableManager {
       let el;
       if (col.type === 'select') {
         el = document.createElement('select');
+        if (col.multiple) el.multiple = true;
         const opts = typeof col.options === 'function' ? col.options(tr, data) : (col.options || []);
         opts.forEach(opt => {
           const o = document.createElement('option');
@@ -145,8 +146,12 @@ class TableManager {
       el.name = col.key;
       const val = data[col.key] !== undefined ? data[col.key] : col.default;
       if (val !== undefined) {
-        el.value = val;
-      } else if (el.tagName === 'SELECT' && el.options.length) {
+        if (col.multiple && Array.isArray(val)) {
+          Array.from(el.options).forEach(o => { o.selected = val.includes(o.value); });
+        } else {
+          el.value = val;
+        }
+      } else if (el.tagName === 'SELECT' && el.options.length && !col.multiple) {
         el.value = el.options[0].value;
       }
       td.appendChild(el);
@@ -173,7 +178,9 @@ class TableManager {
         const el = tr.cells[i].firstChild;
         if (el) {
           const val = el.value;
-          if (col.type === 'number') {
+          if (col.multiple) {
+            row[col.key] = Array.from(el.selectedOptions).map(o=>o.value);
+          } else if (col.type === 'number') {
             const num = parseFloat(val);
             if (val === '') {
               row[col.key] = '';
