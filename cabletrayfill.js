@@ -54,6 +54,79 @@ checkPrereqs([{key:'traySchedule',page:'racewayschedule.html',label:'Raceway Sch
 
       // Reference to <tbody> in the cable table
       const cableTbody = document.querySelector("#cableTable tbody");
+      const cableTable = document.getElementById('cableTable');
+      const headerCells = cableTable.querySelectorAll('thead th');
+      const filters = [];
+      const filterBtns = [];
+      headerCells.forEach((th, idx) => {
+        if (idx < headerCells.length - 2) {
+          const btn = document.createElement('button');
+          btn.className = 'filter-btn';
+          btn.innerHTML = '\u25BC';
+          btn.addEventListener('click', e => { e.stopPropagation(); showFilterPopup(btn, idx); });
+          th.appendChild(btn);
+          filters[idx] = '';
+          filterBtns[idx] = btn;
+        }
+      });
+
+      function showFilterPopup(btn, index){
+        document.querySelectorAll('.filter-popup').forEach(p=>p.remove());
+        const popup=document.createElement('div');
+        popup.className='filter-popup';
+        const inp=document.createElement('input');
+        inp.type='text';
+        inp.value=filters[index];
+        popup.appendChild(inp);
+        const apply=document.createElement('button');
+        apply.textContent='Apply';
+        apply.addEventListener('click',()=>{
+          filters[index]=inp.value.trim().toLowerCase();
+          if(filters[index]) btn.classList.add('filtered'); else btn.classList.remove('filtered');
+          applyFilters();
+          popup.remove();
+        });
+        popup.appendChild(apply);
+        const clear=document.createElement('button');
+        clear.textContent='Clear';
+        clear.addEventListener('click',()=>{
+          inp.value='';
+          filters[index]='';
+          btn.classList.remove('filtered');
+          applyFilters();
+          popup.remove();
+        });
+        popup.appendChild(clear);
+        const rect=btn.getBoundingClientRect();
+        popup.style.top=(rect.bottom+window.scrollY)+'px';
+        popup.style.left=(rect.left+window.scrollX)+'px';
+        document.body.appendChild(popup);
+        const close=e=>{if(!popup.contains(e.target)){popup.remove();document.removeEventListener('click',close);}};
+        setTimeout(()=>document.addEventListener('click',close),0);
+      }
+
+      function applyFilters(){
+        Array.from(cableTbody.rows).forEach(row=>{
+          let visible=true;
+          filters.forEach((val,i)=>{
+            if(!visible) return;
+            const cell=row.cells[i];
+            if(!cell) return;
+            const input=cell.querySelector('input, select');
+            const cellVal=input?String(input.value).toLowerCase():'';
+            if(val && !cellVal.includes(val)) visible=false;
+          });
+          row.style.display=visible?'':'none';
+        });
+      }
+
+      function clearFilters(){
+        filters.forEach((_,i)=>{filters[i]=''; if(filterBtns[i]) filterBtns[i].classList.remove('filtered');});
+        applyFilters();
+      }
+
+      const clearFiltersBtn=document.getElementById('clearCableFiltersBtn');
+      if(clearFiltersBtn) clearFiltersBtn.addEventListener('click',clearFilters);
 
       // ─────────────────────────────────────────────────────────────
       // (B) Helper: create one cable‐entry <tr> (Tag / Cable Type / Configuration / OD / Weight / Remove)
@@ -196,6 +269,7 @@ checkPrereqs([{key:'traySchedule',page:'racewayschedule.html',label:'Raceway Sch
           odClone.readOnly = inpOD.readOnly;
           wtClone.readOnly = inpWt.readOnly;
           cableTbody.insertBefore(clone, tr.nextSibling);
+          applyFilters();
         });
         tdDup.appendChild(btnDup);
         tr.appendChild(tdDup);
@@ -208,6 +282,7 @@ checkPrereqs([{key:'traySchedule',page:'racewayschedule.html',label:'Raceway Sch
         btnRm.className = "removeBtn";
         btnRm.addEventListener("click", () => {
           cableTbody.removeChild(tr);
+          applyFilters();
         });
         tdRm.appendChild(btnRm);
         tr.appendChild(tdRm);
@@ -238,6 +313,7 @@ checkPrereqs([{key:'traySchedule',page:'racewayschedule.html',label:'Raceway Sch
       // “Add Cable” button → append a blank row
       document.getElementById("addCableBtn").addEventListener("click", () => {
         cableTbody.appendChild(createCableRow());
+        applyFilters();
       });
       // Start with one empty row
       document.getElementById("addCableBtn").click();
@@ -1510,6 +1586,7 @@ Wt: ${m.weight.toFixed(2)} lbs/ft
             groupInput.value = obj["Circuit Group"] || "";
             cableTbody.appendChild(newRow);
           });
+          applyFilters();
           alert("Excel imported. Correct any unrecognized conductor details if needed.");
           document.getElementById("importExcelInput").value = "";
         };
@@ -1646,6 +1723,7 @@ Wt: ${m.weight.toFixed(2)} lbs/ft
           groupInput.value = cable.circuitGroup || "";
           cableTbody.appendChild(newRow);
         });
+        applyFilters();
         alert(`Profile "${profileName}" loaded.`);
       });
 
@@ -1707,6 +1785,7 @@ Wt: ${m.weight.toFixed(2)} lbs/ft
               cableTbody.appendChild(row);
             });
           }
+          applyFilters();
           document.getElementById('drawBtn').click();
         } catch (e) {
           console.error('Failed to load trayFillData', e);
