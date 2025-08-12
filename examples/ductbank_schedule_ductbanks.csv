@@ -1,2 +1,2 @@
-ductbank_id,tag,from,to
-DB1,DB-1,Substation A,Substation B
+ductbank_id,tag,from,to,start_x,start_y,start_z,end_x,end_y,end_z
+DB1,DB-1,Substation A,Substation B,0,0,0,100,0,0

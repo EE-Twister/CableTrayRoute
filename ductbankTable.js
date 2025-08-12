@@ -45,6 +45,60 @@
       TableUtils.applyValidation(toInput,toRules);
       to.appendChild(toInput);
 
+      const sx=row.insertCell();
+      const sxInput=document.createElement('input');
+      sxInput.type='number';
+      sxInput.value=db.start_x||'';
+      const sxRules=['required','numeric'];
+      sxInput.addEventListener('input',e=>{db.start_x=e.target.value;db.conduits.forEach(c=>c.start_x=db.start_x);TableUtils.applyValidation(sxInput,sxRules);saveDuctbanks();});
+      TableUtils.applyValidation(sxInput,sxRules);
+      sx.appendChild(sxInput);
+
+      const sy=row.insertCell();
+      const syInput=document.createElement('input');
+      syInput.type='number';
+      syInput.value=db.start_y||'';
+      const syRules=['required','numeric'];
+      syInput.addEventListener('input',e=>{db.start_y=e.target.value;db.conduits.forEach(c=>c.start_y=db.start_y);TableUtils.applyValidation(syInput,syRules);saveDuctbanks();});
+      TableUtils.applyValidation(syInput,syRules);
+      sy.appendChild(syInput);
+
+      const sz=row.insertCell();
+      const szInput=document.createElement('input');
+      szInput.type='number';
+      szInput.value=db.start_z||'';
+      const szRules=['required','numeric'];
+      szInput.addEventListener('input',e=>{db.start_z=e.target.value;db.conduits.forEach(c=>c.start_z=db.start_z);TableUtils.applyValidation(szInput,szRules);saveDuctbanks();});
+      TableUtils.applyValidation(szInput,szRules);
+      sz.appendChild(szInput);
+
+      const ex=row.insertCell();
+      const exInput=document.createElement('input');
+      exInput.type='number';
+      exInput.value=db.end_x||'';
+      const exRules=['required','numeric'];
+      exInput.addEventListener('input',e=>{db.end_x=e.target.value;db.conduits.forEach(c=>c.end_x=db.end_x);TableUtils.applyValidation(exInput,exRules);saveDuctbanks();});
+      TableUtils.applyValidation(exInput,exRules);
+      ex.appendChild(exInput);
+
+      const ey=row.insertCell();
+      const eyInput=document.createElement('input');
+      eyInput.type='number';
+      eyInput.value=db.end_y||'';
+      const eyRules=['required','numeric'];
+      eyInput.addEventListener('input',e=>{db.end_y=e.target.value;db.conduits.forEach(c=>c.end_y=db.end_y);TableUtils.applyValidation(eyInput,eyRules);saveDuctbanks();});
+      TableUtils.applyValidation(eyInput,eyRules);
+      ey.appendChild(eyInput);
+
+      const ez=row.insertCell();
+      const ezInput=document.createElement('input');
+      ezInput.type='number';
+      ezInput.value=db.end_z||'';
+      const ezRules=['required','numeric'];
+      ezInput.addEventListener('input',e=>{db.end_z=e.target.value;db.conduits.forEach(c=>c.end_z=db.end_z);TableUtils.applyValidation(ezInput,ezRules);saveDuctbanks();});
+      TableUtils.applyValidation(ezInput,ezRules);
+      ez.appendChild(ezInput);
+
       const act=row.insertCell();
       const addC=document.createElement('button');
       addC.textContent='Add Conduit';
@@ -59,7 +113,7 @@
       cRow.className='conduit-container';
       cRow.style.display=db.expanded?'':'none';
       const cCell=cRow.insertCell();
-      cCell.colSpan=5;
+      cCell.colSpan=11;
       const cTable=document.createElement('table');
       cTable.className='nested-table';
       const cHead=cTable.createTHead();
@@ -120,13 +174,14 @@
   }
 
   function addDuctbank(){
-    ductbanks.push({id:Date.now(),tag:'',from:'',to:'',conduits:[],expanded:true});
+    ductbanks.push({id:Date.now(),tag:'',from:'',to:'',start_x:'',start_y:'',start_z:'',end_x:'',end_y:'',end_z:'',conduits:[],expanded:true});
     renderDuctbanks();
     saveDuctbanks();
   }
 
   function addConduit(i){
-    ductbanks[i].conduits.push({conduit_id:'',type:'',trade_size:''});
+    const db=ductbanks[i];
+    ductbanks[i].conduits.push({conduit_id:'',type:'',trade_size:'',start_x:db.start_x,start_y:db.start_y,start_z:db.start_z,end_x:db.end_x,end_y:db.end_y,end_z:db.end_z});
     renderDuctbanks();
     saveDuctbanks();
   }
@@ -149,15 +204,22 @@
 
   function loadDuctbanks(){
     try{ductbanks=JSON.parse(localStorage.getItem(DUCTBANK_KEY))||[];}catch(e){ductbanks=[];}
-    ductbanks.forEach(db=>{if(db.expanded===undefined) db.expanded=false; if(!db.conduits) db.conduits=[];});
+    ductbanks.forEach(db=>{
+      if(db.expanded===undefined) db.expanded=false;
+      if(!db.conduits) db.conduits=[];
+      ['start_x','start_y','start_z','end_x','end_y','end_z'].forEach(k=>{if(db[k]===undefined) db[k]='';});
+      db.conduits.forEach(c=>{
+        ['start_x','start_y','start_z','end_x','end_y','end_z'].forEach(k=>{if(c[k]===undefined) c[k]=db[k];});
+      });
+    });
     renderDuctbanks();
   }
 
   function exportDuctbankXlsx(){
-    const dbData=[['ductbank_id','tag','from','to']];
-    ductbanks.forEach(db=>dbData.push([db.id,db.tag,db.from,db.to]));
-    const cData=[['ductbank_id','conduit_id','type','trade_size']];
-    ductbanks.forEach(db=>db.conduits.forEach(c=>cData.push([db.id,c.conduit_id,c.type,c.trade_size])));
+    const dbData=[['ductbank_id','tag','from','to','start_x','start_y','start_z','end_x','end_y','end_z']];
+    ductbanks.forEach(db=>dbData.push([db.id,db.tag,db.from,db.to,db.start_x,db.start_y,db.start_z,db.end_x,db.end_y,db.end_z]));
+    const cData=[['ductbank_id','conduit_id','type','trade_size','start_x','start_y','start_z','end_x','end_y','end_z']];
+    ductbanks.forEach(db=>db.conduits.forEach(c=>cData.push([db.id,c.conduit_id,c.type,c.trade_size,c.start_x,c.start_y,c.start_z,c.end_x,c.end_y,c.end_z])));
     const wb=XLSX.utils.book_new();
     XLSX.utils.book_append_sheet(wb,XLSX.utils.aoa_to_sheet(dbData),'Ductbanks');
     XLSX.utils.book_append_sheet(wb,XLSX.utils.aoa_to_sheet(cData),'Conduits');
@@ -181,7 +243,7 @@
         return;
       }
 
-      const requiredDbHeaders=['ductbank_id','tag','from','to'];
+      const requiredDbHeaders=['ductbank_id','tag','from','to','start_x','start_y','start_z','end_x','end_y','end_z'];
       const dbHeaders=(XLSX.utils.sheet_to_json(dbSheet,{header:1})[0]||[]).map(h=>String(h).toLowerCase());
       const missingDb=requiredDbHeaders.filter(h=>!dbHeaders.includes(h));
       if(missingDb.length){
@@ -189,7 +251,7 @@
         return;
       }
 
-      const requiredCHeaders=['ductbank_id','conduit_id','type','trade_size'];
+      const requiredCHeaders=['ductbank_id','conduit_id','type','trade_size','start_x','start_y','start_z','end_x','end_y','end_z'];
       const cHeaders=(XLSX.utils.sheet_to_json(cSheet,{header:1})[0]||[]).map(h=>String(h).toLowerCase());
       const missingC=requiredCHeaders.filter(h=>!cHeaders.includes(h));
       if(missingC.length){
@@ -200,8 +262,40 @@
       const dbJson=XLSX.utils.sheet_to_json(dbSheet,{defval:''});
       const cJson=XLSX.utils.sheet_to_json(cSheet,{defval:''});
       const map={};
-      ductbanks=dbJson.map(r=>{const db={id:r['ductbank_id']||r['id']||Date.now()+Math.random(),tag:r['tag']||'',from:r['from']||'',to:r['to']||'',conduits:[],expanded:false};map[db.id]=db;return db;});
-      cJson.forEach(r=>{const p=map[r['ductbank_id']];if(p){p.conduits.push({conduit_id:r['conduit_id']||'',type:r['type']||'',trade_size:r['trade_size']||''});}});
+      ductbanks=dbJson.map(r=>{
+        const db={
+          id:r['ductbank_id']||r['id']||Date.now()+Math.random(),
+          tag:r['tag']||'',
+          from:r['from']||'',
+          to:r['to']||'',
+          start_x:r['start_x']||'',
+          start_y:r['start_y']||'',
+          start_z:r['start_z']||'',
+          end_x:r['end_x']||'',
+          end_y:r['end_y']||'',
+          end_z:r['end_z']||'',
+          conduits:[],
+          expanded:false
+        };
+        map[db.id]=db;
+        return db;
+      });
+      cJson.forEach(r=>{
+        const p=map[r['ductbank_id']];
+        if(p){
+          p.conduits.push({
+            conduit_id:r['conduit_id']||'',
+            type:r['type']||'',
+            trade_size:r['trade_size']||'',
+            start_x:r['start_x']||p.start_x,
+            start_y:r['start_y']||p.start_y,
+            start_z:r['start_z']||p.start_z,
+            end_x:r['end_x']||p.end_x,
+            end_y:r['end_y']||p.end_y,
+            end_z:r['end_z']||p.end_z
+          });
+        }
+      });
       renderDuctbanks();
       saveDuctbanks();
     };

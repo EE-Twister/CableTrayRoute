@@ -1,2 +1,2 @@
-ductbank_id,conduit_id,type,trade_size,from,to
-DB1,C1,PVC,4,Substation A,Substation B
+ductbank_id,conduit_id,type,trade_size,start_x,start_y,start_z,end_x,end_y,end_z
+DB1,C1,PVC,4,0,0,0,100,0,0
