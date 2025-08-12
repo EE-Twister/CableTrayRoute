@@ -39,6 +39,7 @@
         <div style="margin-bottom:10px;">
           <button id="save-schedule-btn">Save Schedule</button>
           <button id="load-schedule-btn">Load Schedule</button>
+          <button id="load-sample-cables-btn">Load Sample Data</button>
           <button id="clear-filters-btn">Clear Filters</button>
           <button id="export-xlsx-btn">Export XLSX</button>
           <input type="file" id="import-xlsx-input" accept=".xlsx" style="display:none;">
@@ -129,6 +130,17 @@ const cableTable=TableUtils.createTable({
   columns,
   onChange:markUnsaved,
   onSave:markSaved
+});
+
+document.getElementById('load-sample-cables-btn').addEventListener('click',async()=>{
+  try{
+    const res=await fetch('examples/sample_cables.json');
+    const data=await res.json();
+    cableTable.deleteAll();
+    data.forEach(row=>cableTable.addRow(row));
+    cableTable.save();
+    markSaved();
+  }catch(e){console.error('Failed to load sample cables',e);}
 });
 
 function getCableSchedule(){

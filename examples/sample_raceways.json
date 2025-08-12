@@ -1,0 +1,948 @@
+{
+  "ductbanks": [
+    {
+      "id": "DB-001",
+      "tag": "DB-01",
+      "from": "SUBSTA-1",
+      "to": "BLDG-01",
+      "conduits": [
+        {
+          "conduit_id": "DB-001-C1",
+          "type": "PVC Sch 40",
+          "trade_size": "4"
+        },
+        {
+          "conduit_id": "DB-001-C2",
+          "type": "PVC Sch 40",
+          "trade_size": "4"
+        },
+        {
+          "conduit_id": "DB-001-C3",
+          "type": "PVC Sch 40",
+          "trade_size": "4"
+        }
+      ]
+    },
+    {
+      "id": "DB-002",
+      "tag": "DB-02",
+      "from": "SUBSTA-1",
+      "to": "BLDG-02",
+      "conduits": [
+        {
+          "conduit_id": "DB-002-C1",
+          "type": "PVC Sch 40",
+          "trade_size": "4"
+        },
+        {
+          "conduit_id": "DB-002-C2",
+          "type": "PVC Sch 40",
+          "trade_size": "4"
+        },
+        {
+          "conduit_id": "DB-002-C3",
+          "type": "PVC Sch 40",
+          "trade_size": "4"
+        }
+      ]
+    },
+    {
+      "id": "DB-003",
+      "tag": "DB-03",
+      "from": "SUBSTA-1",
+      "to": "BLDG-03",
+      "conduits": [
+        {
+          "conduit_id": "DB-003-C1",
+          "type": "PVC Sch 40",
+          "trade_size": "4"
+        },
+        {
+          "conduit_id": "DB-003-C2",
+          "type": "PVC Sch 40",
+          "trade_size": "4"
+        },
+        {
+          "conduit_id": "DB-003-C3",
+          "type": "PVC Sch 40",
+          "trade_size": "4"
+        }
+      ]
+    },
+    {
+      "id": "DB-004",
+      "tag": "DB-04",
+      "from": "SUBSTA-1",
+      "to": "BLDG-04",
+      "conduits": [
+        {
+          "conduit_id": "DB-004-C1",
+          "type": "PVC Sch 40",
+          "trade_size": "4"
+        },
+        {
+          "conduit_id": "DB-004-C2",
+          "type": "PVC Sch 40",
+          "trade_size": "4"
+        },
+        {
+          "conduit_id": "DB-004-C3",
+          "type": "PVC Sch 40",
+          "trade_size": "4"
+        }
+      ]
+    },
+    {
+      "id": "DB-005",
+      "tag": "DB-05",
+      "from": "SUBSTA-1",
+      "to": "BLDG-05",
+      "conduits": [
+        {
+          "conduit_id": "DB-005-C1",
+          "type": "PVC Sch 40",
+          "trade_size": "4"
+        },
+        {
+          "conduit_id": "DB-005-C2",
+          "type": "PVC Sch 40",
+          "trade_size": "4"
+        },
+        {
+          "conduit_id": "DB-005-C3",
+          "type": "PVC Sch 40",
+          "trade_size": "4"
+        }
+      ]
+    },
+    {
+      "id": "DB-006",
+      "tag": "DB-06",
+      "from": "SUBSTA-2",
+      "to": "BLDG-06",
+      "conduits": [
+        {
+          "conduit_id": "DB-006-C1",
+          "type": "PVC Sch 40",
+          "trade_size": "4"
+        },
+        {
+          "conduit_id": "DB-006-C2",
+          "type": "PVC Sch 40",
+          "trade_size": "4"
+        },
+        {
+          "conduit_id": "DB-006-C3",
+          "type": "PVC Sch 40",
+          "trade_size": "4"
+        }
+      ]
+    },
+    {
+      "id": "DB-007",
+      "tag": "DB-07",
+      "from": "SUBSTA-2",
+      "to": "BLDG-07",
+      "conduits": [
+        {
+          "conduit_id": "DB-007-C1",
+          "type": "PVC Sch 40",
+          "trade_size": "4"
+        },
+        {
+          "conduit_id": "DB-007-C2",
+          "type": "PVC Sch 40",
+          "trade_size": "4"
+        },
+        {
+          "conduit_id": "DB-007-C3",
+          "type": "PVC Sch 40",
+          "trade_size": "4"
+        }
+      ]
+    },
+    {
+      "id": "DB-008",
+      "tag": "DB-08",
+      "from": "SUBSTA-2",
+      "to": "BLDG-08",
+      "conduits": [
+        {
+          "conduit_id": "DB-008-C1",
+          "type": "PVC Sch 40",
+          "trade_size": "4"
+        },
+        {
+          "conduit_id": "DB-008-C2",
+          "type": "PVC Sch 40",
+          "trade_size": "4"
+        },
+        {
+          "conduit_id": "DB-008-C3",
+          "type": "PVC Sch 40",
+          "trade_size": "4"
+        }
+      ]
+    },
+    {
+      "id": "DB-009",
+      "tag": "DB-09",
+      "from": "SUBSTA-2",
+      "to": "BLDG-09",
+      "conduits": [
+        {
+          "conduit_id": "DB-009-C1",
+          "type": "PVC Sch 40",
+          "trade_size": "4"
+        },
+        {
+          "conduit_id": "DB-009-C2",
+          "type": "PVC Sch 40",
+          "trade_size": "4"
+        },
+        {
+          "conduit_id": "DB-009-C3",
+          "type": "PVC Sch 40",
+          "trade_size": "4"
+        }
+      ]
+    },
+    {
+      "id": "DB-010",
+      "tag": "DB-10",
+      "from": "SUBSTA-2",
+      "to": "BLDG-10",
+      "conduits": [
+        {
+          "conduit_id": "DB-010-C1",
+          "type": "PVC Sch 40",
+          "trade_size": "4"
+        },
+        {
+          "conduit_id": "DB-010-C2",
+          "type": "PVC Sch 40",
+          "trade_size": "4"
+        },
+        {
+          "conduit_id": "DB-010-C3",
+          "type": "PVC Sch 40",
+          "trade_size": "4"
+        }
+      ]
+    },
+    {
+      "id": "DB-011",
+      "tag": "DB-11",
+      "from": "SUBSTA-3",
+      "to": "BLDG-11",
+      "conduits": [
+        {
+          "conduit_id": "DB-011-C1",
+          "type": "PVC Sch 40",
+          "trade_size": "4"
+        },
+        {
+          "conduit_id": "DB-011-C2",
+          "type": "PVC Sch 40",
+          "trade_size": "4"
+        },
+        {
+          "conduit_id": "DB-011-C3",
+          "type": "PVC Sch 40",
+          "trade_size": "4"
+        }
+      ]
+    },
+    {
+      "id": "DB-012",
+      "tag": "DB-12",
+      "from": "SUBSTA-3",
+      "to": "BLDG-12",
+      "conduits": [
+        {
+          "conduit_id": "DB-012-C1",
+          "type": "PVC Sch 40",
+          "trade_size": "4"
+        },
+        {
+          "conduit_id": "DB-012-C2",
+          "type": "PVC Sch 40",
+          "trade_size": "4"
+        },
+        {
+          "conduit_id": "DB-012-C3",
+          "type": "PVC Sch 40",
+          "trade_size": "4"
+        }
+      ]
+    },
+    {
+      "id": "DB-013",
+      "tag": "DB-13",
+      "from": "SUBSTA-3",
+      "to": "BLDG-13",
+      "conduits": [
+        {
+          "conduit_id": "DB-013-C1",
+          "type": "PVC Sch 40",
+          "trade_size": "4"
+        },
+        {
+          "conduit_id": "DB-013-C2",
+          "type": "PVC Sch 40",
+          "trade_size": "4"
+        },
+        {
+          "conduit_id": "DB-013-C3",
+          "type": "PVC Sch 40",
+          "trade_size": "4"
+        }
+      ]
+    },
+    {
+      "id": "DB-014",
+      "tag": "DB-14",
+      "from": "SUBSTA-3",
+      "to": "BLDG-14",
+      "conduits": [
+        {
+          "conduit_id": "DB-014-C1",
+          "type": "PVC Sch 40",
+          "trade_size": "4"
+        },
+        {
+          "conduit_id": "DB-014-C2",
+          "type": "PVC Sch 40",
+          "trade_size": "4"
+        },
+        {
+          "conduit_id": "DB-014-C3",
+          "type": "PVC Sch 40",
+          "trade_size": "4"
+        }
+      ]
+    },
+    {
+      "id": "DB-015",
+      "tag": "DB-15",
+      "from": "SUBSTA-3",
+      "to": "BLDG-15",
+      "conduits": [
+        {
+          "conduit_id": "DB-015-C1",
+          "type": "PVC Sch 40",
+          "trade_size": "4"
+        },
+        {
+          "conduit_id": "DB-015-C2",
+          "type": "PVC Sch 40",
+          "trade_size": "4"
+        },
+        {
+          "conduit_id": "DB-015-C3",
+          "type": "PVC Sch 40",
+          "trade_size": "4"
+        }
+      ]
+    },
+    {
+      "id": "DB-016",
+      "tag": "DB-16",
+      "from": "SUBSTA-4",
+      "to": "BLDG-16",
+      "conduits": [
+        {
+          "conduit_id": "DB-016-C1",
+          "type": "PVC Sch 40",
+          "trade_size": "4"
+        },
+        {
+          "conduit_id": "DB-016-C2",
+          "type": "PVC Sch 40",
+          "trade_size": "4"
+        },
+        {
+          "conduit_id": "DB-016-C3",
+          "type": "PVC Sch 40",
+          "trade_size": "4"
+        }
+      ]
+    },
+    {
+      "id": "DB-017",
+      "tag": "DB-17",
+      "from": "SUBSTA-4",
+      "to": "BLDG-17",
+      "conduits": [
+        {
+          "conduit_id": "DB-017-C1",
+          "type": "PVC Sch 40",
+          "trade_size": "4"
+        },
+        {
+          "conduit_id": "DB-017-C2",
+          "type": "PVC Sch 40",
+          "trade_size": "4"
+        },
+        {
+          "conduit_id": "DB-017-C3",
+          "type": "PVC Sch 40",
+          "trade_size": "4"
+        }
+      ]
+    },
+    {
+      "id": "DB-018",
+      "tag": "DB-18",
+      "from": "SUBSTA-4",
+      "to": "BLDG-18",
+      "conduits": [
+        {
+          "conduit_id": "DB-018-C1",
+          "type": "PVC Sch 40",
+          "trade_size": "4"
+        },
+        {
+          "conduit_id": "DB-018-C2",
+          "type": "PVC Sch 40",
+          "trade_size": "4"
+        },
+        {
+          "conduit_id": "DB-018-C3",
+          "type": "PVC Sch 40",
+          "trade_size": "4"
+        }
+      ]
+    },
+    {
+      "id": "DB-019",
+      "tag": "DB-19",
+      "from": "SUBSTA-4",
+      "to": "BLDG-19",
+      "conduits": [
+        {
+          "conduit_id": "DB-019-C1",
+          "type": "PVC Sch 40",
+          "trade_size": "4"
+        },
+        {
+          "conduit_id": "DB-019-C2",
+          "type": "PVC Sch 40",
+          "trade_size": "4"
+        },
+        {
+          "conduit_id": "DB-019-C3",
+          "type": "PVC Sch 40",
+          "trade_size": "4"
+        }
+      ]
+    },
+    {
+      "id": "DB-020",
+      "tag": "DB-20",
+      "from": "SUBSTA-4",
+      "to": "BLDG-20",
+      "conduits": [
+        {
+          "conduit_id": "DB-020-C1",
+          "type": "PVC Sch 40",
+          "trade_size": "4"
+        },
+        {
+          "conduit_id": "DB-020-C2",
+          "type": "PVC Sch 40",
+          "trade_size": "4"
+        },
+        {
+          "conduit_id": "DB-020-C3",
+          "type": "PVC Sch 40",
+          "trade_size": "4"
+        }
+      ]
+    }
+  ],
+  "trays": [
+    {
+      "tray_id": "TR-001",
+      "start_x": 0,
+      "start_y": 0,
+      "start_z": 10,
+      "end_x": 10,
+      "end_y": 0,
+      "end_z": 10,
+      "inside_width": 18,
+      "tray_depth": 4,
+      "capacity": 80
+    },
+    {
+      "tray_id": "TR-002",
+      "start_x": 10,
+      "start_y": 0,
+      "start_z": 10,
+      "end_x": 20,
+      "end_y": 0,
+      "end_z": 10,
+      "inside_width": 24,
+      "tray_depth": 4,
+      "capacity": 80
+    },
+    {
+      "tray_id": "TR-003",
+      "start_x": 20,
+      "start_y": 0,
+      "start_z": 10,
+      "end_x": 30,
+      "end_y": 0,
+      "end_z": 10,
+      "inside_width": 18,
+      "tray_depth": 4,
+      "capacity": 80
+    },
+    {
+      "tray_id": "TR-004",
+      "start_x": 30,
+      "start_y": 0,
+      "start_z": 10,
+      "end_x": 40,
+      "end_y": 0,
+      "end_z": 10,
+      "inside_width": 24,
+      "tray_depth": 4,
+      "capacity": 80
+    },
+    {
+      "tray_id": "TR-005",
+      "start_x": 40,
+      "start_y": 0,
+      "start_z": 10,
+      "end_x": 50,
+      "end_y": 0,
+      "end_z": 10,
+      "inside_width": 18,
+      "tray_depth": 4,
+      "capacity": 80
+    },
+    {
+      "tray_id": "TR-006",
+      "start_x": 50,
+      "start_y": 0,
+      "start_z": 10,
+      "end_x": 60,
+      "end_y": 0,
+      "end_z": 10,
+      "inside_width": 24,
+      "tray_depth": 4,
+      "capacity": 80
+    },
+    {
+      "tray_id": "TR-007",
+      "start_x": 60,
+      "start_y": 0,
+      "start_z": 10,
+      "end_x": 70,
+      "end_y": 0,
+      "end_z": 10,
+      "inside_width": 18,
+      "tray_depth": 4,
+      "capacity": 80
+    },
+    {
+      "tray_id": "TR-008",
+      "start_x": 70,
+      "start_y": 0,
+      "start_z": 10,
+      "end_x": 80,
+      "end_y": 0,
+      "end_z": 10,
+      "inside_width": 24,
+      "tray_depth": 4,
+      "capacity": 80
+    },
+    {
+      "tray_id": "TR-009",
+      "start_x": 80,
+      "start_y": 0,
+      "start_z": 10,
+      "end_x": 90,
+      "end_y": 0,
+      "end_z": 10,
+      "inside_width": 18,
+      "tray_depth": 4,
+      "capacity": 80
+    },
+    {
+      "tray_id": "TR-010",
+      "start_x": 90,
+      "start_y": 0,
+      "start_z": 10,
+      "end_x": 100,
+      "end_y": 0,
+      "end_z": 10,
+      "inside_width": 24,
+      "tray_depth": 4,
+      "capacity": 80
+    },
+    {
+      "tray_id": "TR-011",
+      "start_x": 100,
+      "start_y": 0,
+      "start_z": 10,
+      "end_x": 110,
+      "end_y": 0,
+      "end_z": 10,
+      "inside_width": 18,
+      "tray_depth": 4,
+      "capacity": 80
+    },
+    {
+      "tray_id": "TR-012",
+      "start_x": 110,
+      "start_y": 0,
+      "start_z": 10,
+      "end_x": 120,
+      "end_y": 0,
+      "end_z": 10,
+      "inside_width": 24,
+      "tray_depth": 4,
+      "capacity": 80
+    },
+    {
+      "tray_id": "TR-013",
+      "start_x": 120,
+      "start_y": 0,
+      "start_z": 10,
+      "end_x": 130,
+      "end_y": 0,
+      "end_z": 10,
+      "inside_width": 18,
+      "tray_depth": 4,
+      "capacity": 80
+    },
+    {
+      "tray_id": "TR-014",
+      "start_x": 130,
+      "start_y": 0,
+      "start_z": 10,
+      "end_x": 140,
+      "end_y": 0,
+      "end_z": 10,
+      "inside_width": 24,
+      "tray_depth": 4,
+      "capacity": 80
+    },
+    {
+      "tray_id": "TR-015",
+      "start_x": 140,
+      "start_y": 0,
+      "start_z": 10,
+      "end_x": 150,
+      "end_y": 0,
+      "end_z": 10,
+      "inside_width": 18,
+      "tray_depth": 4,
+      "capacity": 80
+    },
+    {
+      "tray_id": "TR-016",
+      "start_x": 150,
+      "start_y": 0,
+      "start_z": 10,
+      "end_x": 160,
+      "end_y": 0,
+      "end_z": 10,
+      "inside_width": 24,
+      "tray_depth": 4,
+      "capacity": 80
+    },
+    {
+      "tray_id": "TR-017",
+      "start_x": 160,
+      "start_y": 0,
+      "start_z": 10,
+      "end_x": 170,
+      "end_y": 0,
+      "end_z": 10,
+      "inside_width": 18,
+      "tray_depth": 4,
+      "capacity": 80
+    },
+    {
+      "tray_id": "TR-018",
+      "start_x": 170,
+      "start_y": 0,
+      "start_z": 10,
+      "end_x": 180,
+      "end_y": 0,
+      "end_z": 10,
+      "inside_width": 24,
+      "tray_depth": 4,
+      "capacity": 80
+    },
+    {
+      "tray_id": "TR-019",
+      "start_x": 180,
+      "start_y": 0,
+      "start_z": 10,
+      "end_x": 190,
+      "end_y": 0,
+      "end_z": 10,
+      "inside_width": 18,
+      "tray_depth": 4,
+      "capacity": 80
+    },
+    {
+      "tray_id": "TR-020",
+      "start_x": 190,
+      "start_y": 0,
+      "start_z": 10,
+      "end_x": 200,
+      "end_y": 0,
+      "end_z": 10,
+      "inside_width": 24,
+      "tray_depth": 4,
+      "capacity": 80
+    }
+  ],
+  "conduits": [
+    {
+      "conduit_id": "C-001",
+      "type": "RMC",
+      "trade_size": "3",
+      "start_x": 50,
+      "start_y": 0,
+      "start_z": 0,
+      "end_x": 50,
+      "end_y": 5,
+      "end_z": 0,
+      "capacity": 80
+    },
+    {
+      "conduit_id": "C-002",
+      "type": "EMT",
+      "trade_size": "2",
+      "start_x": 50,
+      "start_y": 5,
+      "start_z": 0,
+      "end_x": 50,
+      "end_y": 10,
+      "end_z": 0,
+      "capacity": 40
+    },
+    {
+      "conduit_id": "C-003",
+      "type": "RMC",
+      "trade_size": "3",
+      "start_x": 50,
+      "start_y": 10,
+      "start_z": 0,
+      "end_x": 50,
+      "end_y": 15,
+      "end_z": 0,
+      "capacity": 80
+    },
+    {
+      "conduit_id": "C-004",
+      "type": "EMT",
+      "trade_size": "2",
+      "start_x": 50,
+      "start_y": 15,
+      "start_z": 0,
+      "end_x": 50,
+      "end_y": 20,
+      "end_z": 0,
+      "capacity": 40
+    },
+    {
+      "conduit_id": "C-005",
+      "type": "RMC",
+      "trade_size": "3",
+      "start_x": 50,
+      "start_y": 20,
+      "start_z": 0,
+      "end_x": 50,
+      "end_y": 25,
+      "end_z": 0,
+      "capacity": 80
+    },
+    {
+      "conduit_id": "C-006",
+      "type": "EMT",
+      "trade_size": "2",
+      "start_x": 50,
+      "start_y": 25,
+      "start_z": 0,
+      "end_x": 50,
+      "end_y": 30,
+      "end_z": 0,
+      "capacity": 40
+    },
+    {
+      "conduit_id": "C-007",
+      "type": "RMC",
+      "trade_size": "3",
+      "start_x": 50,
+      "start_y": 30,
+      "start_z": 0,
+      "end_x": 50,
+      "end_y": 35,
+      "end_z": 0,
+      "capacity": 80
+    },
+    {
+      "conduit_id": "C-008",
+      "type": "EMT",
+      "trade_size": "2",
+      "start_x": 50,
+      "start_y": 35,
+      "start_z": 0,
+      "end_x": 50,
+      "end_y": 40,
+      "end_z": 0,
+      "capacity": 40
+    },
+    {
+      "conduit_id": "C-009",
+      "type": "RMC",
+      "trade_size": "3",
+      "start_x": 50,
+      "start_y": 40,
+      "start_z": 0,
+      "end_x": 50,
+      "end_y": 45,
+      "end_z": 0,
+      "capacity": 80
+    },
+    {
+      "conduit_id": "C-010",
+      "type": "EMT",
+      "trade_size": "2",
+      "start_x": 50,
+      "start_y": 45,
+      "start_z": 0,
+      "end_x": 50,
+      "end_y": 50,
+      "end_z": 0,
+      "capacity": 40
+    },
+    {
+      "conduit_id": "C-011",
+      "type": "RMC",
+      "trade_size": "3",
+      "start_x": 50,
+      "start_y": 50,
+      "start_z": 0,
+      "end_x": 50,
+      "end_y": 55,
+      "end_z": 0,
+      "capacity": 80
+    },
+    {
+      "conduit_id": "C-012",
+      "type": "EMT",
+      "trade_size": "2",
+      "start_x": 50,
+      "start_y": 55,
+      "start_z": 0,
+      "end_x": 50,
+      "end_y": 60,
+      "end_z": 0,
+      "capacity": 40
+    },
+    {
+      "conduit_id": "C-013",
+      "type": "RMC",
+      "trade_size": "3",
+      "start_x": 50,
+      "start_y": 60,
+      "start_z": 0,
+      "end_x": 50,
+      "end_y": 65,
+      "end_z": 0,
+      "capacity": 80
+    },
+    {
+      "conduit_id": "C-014",
+      "type": "EMT",
+      "trade_size": "2",
+      "start_x": 50,
+      "start_y": 65,
+      "start_z": 0,
+      "end_x": 50,
+      "end_y": 70,
+      "end_z": 0,
+      "capacity": 40
+    },
+    {
+      "conduit_id": "C-015",
+      "type": "RMC",
+      "trade_size": "3",
+      "start_x": 50,
+      "start_y": 70,
+      "start_z": 0,
+      "end_x": 50,
+      "end_y": 75,
+      "end_z": 0,
+      "capacity": 80
+    },
+    {
+      "conduit_id": "C-016",
+      "type": "EMT",
+      "trade_size": "2",
+      "start_x": 50,
+      "start_y": 75,
+      "start_z": 0,
+      "end_x": 50,
+      "end_y": 80,
+      "end_z": 0,
+      "capacity": 40
+    },
+    {
+      "conduit_id": "C-017",
+      "type": "RMC",
+      "trade_size": "3",
+      "start_x": 50,
+      "start_y": 80,
+      "start_z": 0,
+      "end_x": 50,
+      "end_y": 85,
+      "end_z": 0,
+      "capacity": 80
+    },
+    {
+      "conduit_id": "C-018",
+      "type": "EMT",
+      "trade_size": "2",
+      "start_x": 50,
+      "start_y": 85,
+      "start_z": 0,
+      "end_x": 50,
+      "end_y": 90,
+      "end_z": 0,
+      "capacity": 40
+    },
+    {
+      "conduit_id": "C-019",
+      "type": "RMC",
+      "trade_size": "3",
+      "start_x": 50,
+      "start_y": 90,
+      "start_z": 0,
+      "end_x": 50,
+      "end_y": 95,
+      "end_z": 0,
+      "capacity": 80
+    },
+    {
+      "conduit_id": "C-020",
+      "type": "EMT",
+      "trade_size": "2",
+      "start_x": 50,
+      "start_y": 95,
+      "start_z": 0,
+      "end_x": 50,
+      "end_y": 100,
+      "end_z": 0,
+      "capacity": 40
+    }
+  ]
+}
