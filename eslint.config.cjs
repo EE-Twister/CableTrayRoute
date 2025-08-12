@@ -1,4 +1,4 @@
-export default [
+module.exports = [
   {
     files: ['**/*.js'],
     ignores: ['dist/**', 'node_modules/**'],
