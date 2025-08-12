@@ -241,8 +241,23 @@ class TableManager {
         el.value = el.options[0].value;
       }
       td.appendChild(el);
+      let summaryEl, updateSummary;
+      if (col.multiple) {
+        summaryEl = document.createElement('span');
+        summaryEl.className = 'raceway-summary';
+        td.appendChild(summaryEl);
+        updateSummary = () => {
+          summaryEl.textContent = (el.getSelectedValues ? el.getSelectedValues() : []).join(', ');
+        };
+        el.addEventListener('change', () => {
+          updateSummary();
+          if (this.onChange) this.onChange();
+        });
+        updateSummary();
+      } else {
+        el.addEventListener('input', () => { if (this.onChange) this.onChange(); });
+      }
       if (col.onChange) el.addEventListener('change', () => { col.onChange(el, tr); });
-      el.addEventListener(col.multiple ? 'change' : 'input', () => { if (this.onChange) this.onChange(); });
       if (col.validate) {
         const rules = Array.isArray(col.validate) ? col.validate : [col.validate];
         el.addEventListener(col.multiple ? 'change' : 'input', () => applyValidation(el, rules));

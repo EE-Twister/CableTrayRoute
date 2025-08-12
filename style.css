@@ -1488,6 +1488,15 @@ body.dark-mode .workflow-card-title {
     text-decoration: underline;
 }
 
+/* Displays selected IDs for multi-checkbox raceway fields */
+.raceway-summary {
+    display: block;
+    font-size: 0.8em;
+    margin-top: 0.25rem;
+    color: var(--text-color);
+    word-break: break-word;
+}
+
 @media (max-width: 600px) {
     .site-footer {
         flex-direction: column;
