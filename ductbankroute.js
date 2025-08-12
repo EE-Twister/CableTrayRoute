@@ -2235,29 +2235,6 @@ const initHelpIcons=(root=document)=>{
 };
 initHelpIcons();
 
-// keyboard navigation within conduit and cable tables
-document.addEventListener('keydown',e=>{
- const selector='#conduitTable input, #conduitTable select, #conduitTable button, '+
- '#cableTable input, #cableTable select, #cableTable button';
- if(!e.target.matches(selector))return;
- const key=e.key;
-   if(key!=='ArrowUp'&&key!=='ArrowDown'&&key!=='Enter')return;
- const cell=e.target.closest('td');
- const row=cell.parentElement;
- const index=Array.prototype.indexOf.call(row.children,cell);
- const targetRow=key==='ArrowUp'?row.previousElementSibling:row.nextElementSibling;
- if(targetRow){
-  const focusable=targetRow.children[index].querySelector('input,select,button');
-  if(focusable){
-   e.preventDefault();
-   focusable.focus();
-   if((key==='Enter'||key==='ArrowUp'||key==='ArrowDown')&&typeof focusable.select==='function'){
-     focusable.select();
-   }
-  }
- }
-});
-
 ['ductbankTag','concreteEncasement','ductbankDepth','earthTemp','airTemp','soilResistivity','moistureContent','heatSources','hSpacing','vSpacing','topPad','bottomPad','leftPad','rightPad','perRow','conductorRating','gridRes','ductThermRes'].forEach(id=>{
  const el=document.getElementById(id);
  if(el){

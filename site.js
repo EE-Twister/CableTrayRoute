@@ -154,3 +154,24 @@ window.initDarkMode=initDarkMode;
 window.initHelpModal=initHelpModal;
 window.initNavToggle=initNavToggle;
 window.checkPrereqs=checkPrereqs;
+
+// enable arrow key navigation between table rows
+document.addEventListener('keydown',e=>{
+  const selector='table input, table select, table button';
+  if(!e.target.matches(selector)) return;
+  const key=e.key;
+  if(key!=='ArrowUp'&&key!=='ArrowDown'&&key!=='Enter') return;
+  const cell=e.target.closest('td');
+  if(!cell) return;
+  const row=cell.parentElement;
+  const index=Array.prototype.indexOf.call(row.children,cell);
+  const targetRow=key==='ArrowUp'?row.previousElementSibling:row.nextElementSibling;
+  if(targetRow){
+    const focusable=targetRow.children[index].querySelector('input,select,button');
+    if(focusable){
+      e.preventDefault();
+      focusable.focus();
+      if(typeof focusable.select==='function') focusable.select();
+    }
+  }
+});
