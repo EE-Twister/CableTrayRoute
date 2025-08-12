@@ -2685,7 +2685,7 @@ const openConduitFill = (cables) => {
         const html = `<!DOCTYPE html>
 <html><head><title>3D Route Visualization</title>
 <meta charset="UTF-8">
-<script src="https://cdn.plot.ly/plotly-latest.min.js"><\/script>
+<script src="https://cdn.plot.ly/plotly-2.27.0.min.js"><\/script>
 <style>html,body{margin:0;height:100%;overflow:hidden;}#plot{width:100%;height:100%;}</style>
 </head><body>
 <div id="plot"></div>
