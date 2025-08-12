@@ -2,7 +2,8 @@ const STORAGE_KEYS = {
   cableSchedule: 'cableSchedule',
   ductbankSchedule: 'ductbankSchedule',
   traySchedule: 'traySchedule',
-  conduitSchedule: 'conduitSchedule'
+  conduitSchedule: 'conduitSchedule',
+  collapsedGroups: 'collapsedGroups'
 };
 
 class TableManager {
@@ -17,6 +18,8 @@ class TableManager {
     this.buildHeader();
     this.initButtons(opts);
     this.load();
+    this.hiddenGroups = new Set();
+    this.loadGroupState();
   }
 
   initButtons(opts){
@@ -36,14 +39,22 @@ class TableManager {
     this.thead.innerHTML='';
     const hasGroups = this.columns.some(c=>c.group);
     let groupRow;
-    if (hasGroups) groupRow = this.thead.insertRow();
+    if (hasGroups) {
+      groupRow = this.thead.insertRow();
+      this.groupRow = groupRow;
+    }
     const headerRow = this.thead.insertRow();
+    this.headerRow = headerRow;
     this.filters = Array(this.columns.length).fill('');
     this.filterButtons = [];
+    this.groupCols = {};
+    this.groupThs = {};
+    this.groupToggles = {};
 
     if (hasGroups){
       const groups = [];
       let current = null;
+      let colIndex = 0;
       this.columns.forEach(col => {
         if (col.group){
           if (!current || current.name !== col.group){
@@ -52,15 +63,29 @@ class TableManager {
           } else {
             current.span++;
           }
+          if (!this.groupCols[col.group]) this.groupCols[col.group] = [];
+          this.groupCols[col.group].push(colIndex);
         } else {
           groups.push({name:'', span:1});
           current = null;
         }
+        colIndex++;
       });
       groups.forEach(g => {
         const th = document.createElement('th');
-        th.textContent = g.name;
         th.colSpan = g.span;
+        if (g.name){
+          const label = document.createElement('span');
+          label.textContent = g.name;
+          th.appendChild(label);
+          const toggle = document.createElement('button');
+          toggle.className = 'group-toggle';
+          toggle.textContent = '-';
+          toggle.addEventListener('click', e => { e.stopPropagation(); this.toggleGroup(g.name); });
+          th.appendChild(toggle);
+          this.groupThs[g.name] = th;
+          this.groupToggles[g.name] = toggle;
+        }
         groupRow.appendChild(th);
       });
     }
@@ -87,6 +112,39 @@ class TableManager {
     const actTh = document.createElement('th');
     actTh.textContent = 'Actions';
     headerRow.appendChild(actTh);
+  }
+
+  setGroupVisibility(name, hide) {
+    const indices = this.groupCols[name] || [];
+    indices.forEach(i => {
+      if (this.headerRow && this.headerRow.cells[i]) this.headerRow.cells[i].classList.toggle('group-hidden', hide);
+      Array.from(this.tbody.rows).forEach(row => {
+        if (row.cells[i]) row.cells[i].classList.toggle('group-hidden', hide);
+      });
+    });
+    if (this.groupThs[name]) this.groupThs[name].classList.toggle('group-hidden', hide);
+    if (this.groupToggles[name]) this.groupToggles[name].textContent = hide ? '+' : '-';
+    if (hide) this.hiddenGroups.add(name); else this.hiddenGroups.delete(name);
+  }
+
+  toggleGroup(name) {
+    const hide = !this.hiddenGroups.has(name);
+    this.setGroupVisibility(name, hide);
+    this.saveGroupState();
+  }
+
+  saveGroupState() {
+    let all = {};
+    try { all = JSON.parse(localStorage.getItem(STORAGE_KEYS.collapsedGroups) || '{}'); } catch(e) {}
+    all[this.storageKey] = Array.from(this.hiddenGroups);
+    try { localStorage.setItem(STORAGE_KEYS.collapsedGroups, JSON.stringify(all)); } catch(e) {}
+  }
+
+  loadGroupState() {
+    let all = {};
+    try { all = JSON.parse(localStorage.getItem(STORAGE_KEYS.collapsedGroups) || '{}'); } catch(e) {}
+    const hidden = all[this.storageKey] || [];
+    hidden.forEach(g => this.setGroupVisibility(g, true));
   }
 
   showFilterPopup(btn, index){
@@ -196,6 +254,14 @@ class TableManager {
     delBtn.textContent = 'Delete';
     delBtn.addEventListener('click', () => { tr.remove(); this.save(); if (this.onChange) this.onChange(); });
     actTd.appendChild(delBtn);
+
+    Object.keys(this.groupCols || {}).forEach(g => {
+      if (this.hiddenGroups && this.hiddenGroups.has(g)) {
+        (this.groupCols[g] || []).forEach(i => {
+          if (tr.cells[i]) tr.cells[i].classList.add('group-hidden');
+        });
+      }
+    });
   }
 
   getData() {

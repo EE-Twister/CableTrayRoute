@@ -443,6 +443,9 @@ th, td {
 th {
     background-color: var(--secondary-color);
 }
+.group-hidden {
+    display: none;
+}
 .sticky-table tbody tr:nth-child(even) {
     background-color: var(--secondary-color);
 }
