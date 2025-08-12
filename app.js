@@ -214,6 +214,7 @@ document.addEventListener('DOMContentLoaded', () => {
             if (data) {
                 state.manualTrays = data.manualTrays || [];
                 state.cableList = data.cableList || [];
+                state.cableList.forEach(c => { if (!('manual_path' in c)) c.manual_path = ''; });
                 if (data.darkMode) document.body.classList.add('dark-mode');
                 if (data.conduitType && elements.conduitType) {
                     elements.conduitType.value = data.conduitType;
@@ -1022,7 +1023,8 @@ document.addEventListener('DOMContentLoaded', () => {
                 end: t.end.map(v => v + offset),
                 start_tag: `ST${i + 1}`,
                 end_tag: `ET${i + 1}`,
-                allowed_cable_group: t.allowed_cable_group
+                allowed_cable_group: t.allowed_cable_group,
+                manual_path: ''
             });
         }
         return cables;
@@ -1523,7 +1525,7 @@ const openConduitFill = (cables) => {
             const fl = parseFloat(res.field_length);
             if (!isNaN(tl)) totalLength += tl;
             if (!isNaN(fl)) totalField += fl;
-            html += `<details><summary>${res.cable} | ${res.status} | Total ${res.total_length} | Field ${res.field_length} | Segments ${res.segments_count}</summary>`;
+            html += `<details><summary>${res.cable} | ${res.status} | ${res.mode} | Total ${res.total_length} | Field ${res.field_length} | Segments ${res.segments_count}</summary>`;
             if (res.breakdown && res.breakdown.length > 0) {
                 html += '<div class="table-scroll"><table class="sticky-table"><thead><tr><th>Segment</th><th>Tray ID</th><th>Type</th><th>From</th><th>To</th><th>Length</th><th>Recommended Raceway</th><th>Fill</th></tr></thead><tbody>';
                 res.breakdown.forEach(b => {
@@ -1580,6 +1582,7 @@ const openConduitFill = (cables) => {
             '<th data-key="allowed_cable_group">Allowed Group</th>' +
             '<th data-key="start0">Start (X,Y,Z)</th>' +
             '<th data-key="end0">End (X,Y,Z)</th>' +
+            '<th data-key="manual_path">Manual Path</th>' +
             '<th></th><th></th></tr></thead><tbody>';
         state.cableList.forEach((c, idx) => {
             html += `<tr>
@@ -1632,6 +1635,7 @@ const openConduitFill = (cables) => {
                             <input type="number" class="cable-end-input" data-idx="${idx}" data-coord="1" value="${c.end[1]}" step="0.1" style="width:60px;">
                             <input type="number" class="cable-end-input" data-idx="${idx}" data-coord="2" value="${c.end[2]}" step="0.1" style="width:60px;">
                         </td>
+                        <td><input type="text" class="cable-manual-input" data-idx="${idx}" value="${c.manual_path || ''}" placeholder="Tray1>Tray2 or x,y,z;..." style="width:180px;"></td>
                         <td><button class="icon-button dup-cable" data-idx="${idx}" title="Duplicate">📋</button></td>
                         <td><button class="icon-button del-cable icon-delete" data-idx="${idx}" title="Delete">\u274C</button></td>
                     </tr>`;
@@ -1718,6 +1722,13 @@ const openConduitFill = (cables) => {
                 saveSession();
             });
         });
+        elements.cableListContainer.querySelectorAll('.cable-manual-input').forEach(input => {
+            input.addEventListener('input', e => {
+                const i = parseInt(e.target.dataset.idx, 10);
+                state.cableList[i].manual_path = e.target.value;
+                saveSession();
+            });
+        });
         elements.cableListContainer.querySelectorAll('.dup-cable').forEach(btn => {
             btn.addEventListener('click', e => {
                 const i = parseInt(e.target.dataset.idx, 10);
@@ -1760,7 +1771,8 @@ const openConduitFill = (cables) => {
             end: [0, 0, 0],
             start_tag: '',
             end_tag: '',
-            allowed_cable_group: ''
+            allowed_cable_group: '',
+            manual_path: ''
         };
         state.cableList.push(newCable);
         updateCableListDisplay();
@@ -2224,14 +2236,15 @@ const openConduitFill = (cables) => {
                                 allowed_cable_group: cable.allowed_cable_group
                             });
                         }
-                        batchResults[index] = {
-                            cable: cable.name,
-                            status: result.success ? '✓ Routed' : '✗ Failed',
-                            total_length: result.success ? result.total_length.toFixed(2) : 'N/A',
-                            field_length: result.success ? result.field_routed_length.toFixed(2) : 'N/A',
-                            tray_segments_count: result.success ? result.tray_segments.length : 0,
-                            segments_count: result.success ? result.route_segments.length : 0,
-                            tray_segments: result.success ? result.tray_segments : [],
+                            batchResults[index] = {
+                                cable: cable.name,
+                                status: result.success ? '✓ Routed' : '✗ Failed',
+                                mode: result.manual ? 'Manual' : 'Automatic',
+                                total_length: result.success ? result.total_length.toFixed(2) : 'N/A',
+                                field_length: result.success ? result.field_routed_length.toFixed(2) : 'N/A',
+                                tray_segments_count: result.success ? result.tray_segments.length : 0,
+                                segments_count: result.success ? result.route_segments.length : 0,
+                                tray_segments: result.success ? result.tray_segments : [],
                             route_segments: result.success ? result.route_segments : [],
                             breakdown: result.success ? result.route_segments.map((seg, i) => ({
                                 segment: i + 1,
