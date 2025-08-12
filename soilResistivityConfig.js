@@ -17,3 +17,6 @@ function loadSoilResistivityData(){
       return {};
     });
 }
+
+// Expose loader globally for bundled scripts
+window.loadSoilResistivityData = loadSoilResistivityData;
