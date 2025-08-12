@@ -10,6 +10,7 @@
   }
 
   function renderDuctbanks(){
+    const specs = globalThis.CONDUIT_SPECS || {};
     ductbankTbody.innerHTML='';
     ductbanks.forEach((db,i)=>{
       const row=ductbankTbody.insertRow();
@@ -84,8 +85,8 @@
         // Type select
         cell=r.insertCell();
         const typeSel=document.createElement('select');
-        Object.keys(CONDUIT_SPECS).forEach(t=>{const o=document.createElement('option');o.value=t;o.textContent=t;typeSel.appendChild(o);});
-        typeSel.value=c.type||Object.keys(CONDUIT_SPECS)[0];
+        Object.keys(specs).forEach(t=>{const o=document.createElement('option');o.value=t;o.textContent=t;typeSel.appendChild(o);});
+        typeSel.value=c.type||Object.keys(specs)[0];
         c.type=typeSel.value;
         const typeRules=['required'];
         cell.appendChild(typeSel);
@@ -95,7 +96,7 @@
         const sizeSel=document.createElement('select');
         function populateSizes(){
           sizeSel.innerHTML='';
-          Object.keys(CONDUIT_SPECS[typeSel.value]||{}).sort((a,b)=>parseSize(a)-parseSize(b)).forEach(sz=>{const o=document.createElement('option');o.value=sz;o.textContent=sz;sizeSel.appendChild(o);});
+          Object.keys(specs[typeSel.value]||{}).sort((a,b)=>parseSize(a)-parseSize(b)).forEach(sz=>{const o=document.createElement('option');o.value=sz;o.textContent=sz;sizeSel.appendChild(o);});
         }
         populateSizes();
         sizeSel.value=c.trade_size||sizeSel.options[0].value;
