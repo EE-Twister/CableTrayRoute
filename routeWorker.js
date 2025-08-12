@@ -343,7 +343,80 @@ class CableRoutingSystem {
         });
     }
 
-    calculateRoute(startPoint, endPoint, cableArea, allowedGroup) {
+    _manualRoute(startPoint, endPoint, cableArea, allowedGroup, manualPath) {
+        const path = manualPath.trim();
+        if (!path) return null;
+        if (/[a-zA-Z]/.test(path)) {
+            const trayIds = path.split(/[>\s]+/).filter(Boolean);
+            const segments = [];
+            const traySegments = [];
+            let prev = startPoint.slice();
+            for (const id of trayIds) {
+                const tray = this.trays.get(id);
+                if (!tray) return { success: false, manual: true, message: `Tray ${id} not found` };
+                if (tray.allowed_cable_group && allowedGroup && tray.allowed_cable_group !== allowedGroup) {
+                    return { success: false, manual: true, message: `Tray ${id} not allowed` };
+                }
+                if (tray.current_fill + cableArea > tray.maxFill) {
+                    return { success: false, manual: true, message: `Tray ${id} over capacity` };
+                }
+                const a = [tray.start_x, tray.start_y, tray.start_z];
+                const b = [tray.end_x, tray.end_y, tray.end_z];
+                if (segments.length === 0) {
+                    if (this.distance(prev, a) > 0) {
+                        segments.push({ start: prev, end: a, length: this.distance(prev, a), type: 'field' });
+                    }
+                } else {
+                    const last = segments[segments.length - 1].end;
+                    if (this.distance(last, a) > 0.1) {
+                        return { success: false, manual: true, message: `Tray sequence mismatch at ${id}` };
+                    }
+                }
+                const len = this.distance(a, b);
+                segments.push({ start: a, end: b, length: len, type: 'tray', tray_id: id });
+                traySegments.push(id);
+                prev = b;
+            }
+            if (this.distance(prev, endPoint) > 0) {
+                segments.push({ start: prev, end: endPoint, length: this.distance(prev, endPoint), type: 'field' });
+            }
+            const total = segments.reduce((s, seg) => s + seg.length, 0);
+            const fieldLen = segments.filter(seg => seg.type === 'field').reduce((s, seg) => s + seg.length, 0);
+            return {
+                success: true,
+                manual: true,
+                route_segments: segments,
+                tray_segments: traySegments,
+                total_length: total,
+                field_routed_length: fieldLen,
+            };
+        } else {
+            const points = path.split(/\s*;\s*/).filter(Boolean).map(p => p.split(',').map(Number));
+            if (points.some(pt => pt.length !== 3 || pt.some(isNaN))) {
+                return { success: false, manual: true, message: 'Invalid waypoint format' };
+            }
+            const segments = [];
+            let prev = startPoint.slice();
+            points.forEach(pt => {
+                segments.push({ start: prev, end: pt, length: this.distance(prev, pt), type: 'field' });
+                prev = pt;
+            });
+            segments.push({ start: prev, end: endPoint, length: this.distance(prev, endPoint), type: 'field' });
+            const total = segments.reduce((s, seg) => s + seg.length, 0);
+            return {
+                success: true,
+                manual: true,
+                route_segments: segments,
+                tray_segments: [],
+                total_length: total,
+                field_routed_length: total,
+            };
+        }
+    }
+    calculateRoute(startPoint, endPoint, cableArea, allowedGroup, manualPath = '') {
+        if (manualPath && manualPath.trim()) {
+            return this._manualRoute(startPoint, endPoint, cableArea, allowedGroup, manualPath);
+        }
         if (!this.baseGraph) this.prepareBaseGraph();
         // 1. Start from the precomputed graph
         const cloneGraph = (base) => {
@@ -532,6 +605,7 @@ class CableRoutingSystem {
             route_segments: this._consolidateSegments(cleaned),
             tray_segments: Array.from(traySegments),
             warnings: [],
+            manual: false,
         };
     }
 }
@@ -542,6 +616,6 @@ self.onmessage = function(e) {
     const system = new CableRoutingSystem(options);
     trays.forEach(t => system.addTraySegment(t));
     system.baseGraph = baseGraph;
-    const result = system.calculateRoute(cable.start, cable.end, cableArea, cable.allowed_cable_group);
+    const result = system.calculateRoute(cable.start, cable.end, cableArea, cable.allowed_cable_group, cable.manual_path || '');
     self.postMessage(result);
 };
