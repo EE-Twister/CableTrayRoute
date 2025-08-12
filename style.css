@@ -1032,6 +1032,27 @@ body.cabletrayfill-page h1 {
     margin-bottom: 8px;
     font-size: 1.4rem;
 }
+body.cabletrayfill-page #trayParameters {
+    display: inline-block;
+}
+body.cabletrayfill-page .tray-param-group {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px 16px;
+    max-width: 600px;
+}
+body.cabletrayfill-page .tray-param-group .tray-param {
+    display: flex;
+    flex-direction: column;
+    flex: 0 1 140px;
+}
+body.cabletrayfill-page .tray-param-group .tray-param label {
+    display: block;
+}
+body.cabletrayfill-page .tray-param-group .tray-param input,
+body.cabletrayfill-page .tray-param-group .tray-param select {
+    width: 100%;
+}
 body.cabletrayfill-page label {
     display: inline-block;
     margin-bottom: 4px;
