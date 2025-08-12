@@ -64,10 +64,13 @@ function initSettings(){
 function initDarkMode(){
   const darkToggle=document.getElementById('dark-toggle');
   const session=JSON.parse(localStorage.getItem('ctrSession')||'{}');
-  if(session.darkMode){
-    document.body.classList.add('dark-mode');
-    if(darkToggle) darkToggle.checked=true;
+  if(session.darkMode===undefined){
+    const prefersDark=window.matchMedia&&window.matchMedia('(prefers-color-scheme: dark)').matches;
+    session.darkMode=prefersDark;
+    localStorage.setItem('ctrSession',JSON.stringify(session));
   }
+  document.body.classList.toggle('dark-mode',session.darkMode);
+  if(darkToggle) darkToggle.checked=!!session.darkMode;
   if(darkToggle){
     darkToggle.addEventListener('change',()=>{
       document.body.classList.toggle('dark-mode',darkToggle.checked);
