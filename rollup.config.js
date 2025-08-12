@@ -1,20 +1,22 @@
-const { terser } = require('@rollup/plugin-terser');
+const terser = require('@rollup/plugin-terser');
 
-module.exports = {
-  input: {
-    index: 'src/index.js',
-    cableschedule: 'src/cableschedule.js',
-    racewayschedule: 'src/racewayschedule.js',
-    ductbankroute: 'src/ductbankroute.js',
-    cabletrayfill: 'src/cabletrayfill.js',
-    conduitfill: 'src/conduitfill.js',
-    optimalRoute: 'src/optimalRoute.js',
-    '404': 'src/404.js'
-  },
+const entries = {
+  index: 'src/index.js',
+  cableschedule: 'src/cableschedule.js',
+  racewayschedule: 'src/racewayschedule.js',
+  ductbankroute: 'src/ductbankroute.js',
+  cabletrayfill: 'src/cabletrayfill.js',
+  conduitfill: 'src/conduitfill.js',
+  optimalRoute: 'src/optimalRoute.js',
+  '404': 'src/404.js'
+};
+
+module.exports = Object.entries(entries).map(([name, input]) => ({
+  input,
   output: {
-    dir: 'dist',
+    file: `dist/${name}.js`,
     format: 'iife',
     sourcemap: false
   },
   plugins: [terser()]
-};
+}));
