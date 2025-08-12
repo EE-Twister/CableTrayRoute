@@ -119,6 +119,26 @@ Use the buttons above each table to **Save** to browser storage, **Load** saved 
 
 `ductbankroute.html` analyzes underground ductbanks. You can manually enter each conduit and cable or import them from CSV files. Example formats are available at `examples/ductbank_template.csv` and `examples/cables_ductbank.csv`. The **Thermal Analysis** tool overlays a heat map showing estimated earth temperatures. Use **Download Ductbank Data** for an XLSX report, **Export Ductbank Conduits** and **Export Ductbank Cables** for CSVs, or **Export Image** to save the drawing. Ductbank data is saved between sessions; select **Delete Saved Data** from the settings menu to clear it.
 
+## Ductbank Geometry Integration
+
+Underground ductbanks can be displayed alongside tray routes in the 3D viewer. Export geometry from `ductbankroute.html` using a JSON file placed in `data/` (e.g. `data/ductbank_geometry.json`) with the structure:
+
+```json
+{
+  "ductbanks": [
+    {
+      "id": "DB1",
+      "outline": [[x, y, z], ...],
+      "conduits": [
+        { "id": "C1", "path": [[x1, y1, z1], [x2, y2, z2]], "diameter": 4 }
+      ]
+    }
+  ]
+}
+```
+
+`app.js` loads this data when rendering the 3D route and adds Plotly traces for the ductbank outline and each conduit. In `optimalRoute.html` a **Show Ductbanks** checkbox below the 3D plot toggles their visibility.
+
 ## Clearing Saved Sessions
 The application stores your trays, cables and theme preference in browser storage. Open the settings menu (⚙) and click **Delete Saved Data** to clear this information.
 

@@ -76,6 +76,9 @@ document.addEventListener('DOMContentLoaded', () => {
         updatedUtilData: [],
         finalTrays: [],
         highlightTraceIndex: null,
+        ductbankData: null,
+        ductbankTraceIndices: [],
+        ductbankVisible: true,
     };
 
     // --- ELEMENT REFERENCES ---
@@ -106,6 +109,7 @@ document.addEventListener('DOMContentLoaded', () => {
         plot3d: document.getElementById('plot-3d'),
         popoutPlotBtn: document.getElementById('popout-plot-btn'),
         resetViewBtn: document.getElementById('reset-view-btn'),
+        ductbankToggle: document.getElementById('ductbank-toggle'),
         updatedUtilizationContainer: document.getElementById('updated-utilization-container'),
         exportCsvBtn: document.getElementById('export-csv-btn'),
         rebalanceBtn: document.getElementById('rebalance-btn'),
@@ -150,7 +154,18 @@ document.addEventListener('DOMContentLoaded', () => {
             icon.addEventListener('blur', () => icon.setAttribute('aria-expanded', 'false'));
         });
     };
+    const loadDuctbankData = async () => {
+        try {
+            const res = await fetch('data/ductbank_geometry.json');
+            if (res.ok) {
+                state.ductbankData = await res.json();
+            }
+        } catch (e) {
+            console.warn('Unable to load ductbank geometry', e);
+        }
+    };
     initHelpIcons();
+    loadDuctbankData();
     if (elements.sidebarToggle && elements.sidebar) {
         elements.sidebarToggle.addEventListener('click', () => {
             elements.sidebar.classList.toggle('collapsed');
@@ -2632,6 +2647,43 @@ const openConduitFill = (cables) => {
             });
         }
 
+        state.ductbankTraceIndices = [];
+        if (state.ductbankData && state.ductbankData.ductbanks) {
+            state.ductbankData.ductbanks.forEach(db => {
+                if (Array.isArray(db.outline)) {
+                    const ox = db.outline.map(p => p[0]);
+                    const oy = db.outline.map(p => p[1]);
+                    const oz = db.outline.map(p => p[2]);
+                    const ot = {
+                        x: ox, y: oy, z: oz,
+                        mode: 'lines', type: 'scatter3d',
+                        line: { color: 'saddlebrown', width: 2 },
+                        name: `Ductbank ${db.id}`,
+                        showlegend: false,
+                        visible: state.ductbankVisible
+                    };
+                    state.ductbankTraceIndices.push(traces.length);
+                    traces.push(ot);
+                }
+                (db.conduits || []).forEach(cond => {
+                    if (!Array.isArray(cond.path)) return;
+                    const cx = cond.path.map(p => p[0]);
+                    const cy = cond.path.map(p => p[1]);
+                    const cz = cond.path.map(p => p[2]);
+                    const ct = {
+                        x: cx, y: cy, z: cz,
+                        mode: 'lines', type: 'scatter3d',
+                        line: { color: 'black', width: 2 },
+                        name: `Conduit ${cond.id}`,
+                        showlegend: false,
+                        visible: state.ductbankVisible
+                    };
+                    state.ductbankTraceIndices.push(traces.length);
+                    traces.push(ct);
+                });
+            });
+        }
+
     const layout = {
         title: title,
         scene: { aspectmode: 'data' },
@@ -2698,12 +2750,25 @@ const openConduitFill = (cables) => {
         window.current3DPlot.layout = layout;
     };
 
+    const updateDuctbankVisibility = (visible) => {
+        if (!window.current3DPlot || state.ductbankTraceIndices.length === 0) return;
+        const vis = visible ? true : false;
+        Plotly.restyle(elements.plot3d, { visible: vis }, state.ductbankTraceIndices);
+        state.ductbankVisible = visible;
+        state.ductbankTraceIndices.forEach(i => {
+            if (window.current3DPlot.traces[i]) {
+                window.current3DPlot.traces[i].visible = vis;
+            }
+        });
+    };
+
     const reset3DView = () => {
         if (!window.base3DPlot) return;
         const traces = JSON.parse(JSON.stringify(window.base3DPlot.traces));
         const layout = JSON.parse(JSON.stringify(window.base3DPlot.layout));
         Plotly.react(elements.plot3d, traces, layout);
         window.current3DPlot = { traces, layout };
+        updateDuctbankVisibility(state.ductbankVisible);
     };
 
     const popOutPlot = () => {
@@ -2756,6 +2821,9 @@ Plotly.newPlot(document.getElementById('plot'), data, layout, {responsive: true}
     elements.popoutPlotBtn.addEventListener('click', popOutPlot);
     if (elements.resetViewBtn) {
         elements.resetViewBtn.addEventListener('click', reset3DView);
+    }
+    if (elements.ductbankToggle) {
+        elements.ductbankToggle.addEventListener('change', e => updateDuctbankVisibility(e.target.checked));
     }
     elements.cancelRoutingBtn.addEventListener('click', cancelCurrentRouting);
     if (elements.deleteDataBtn) {
