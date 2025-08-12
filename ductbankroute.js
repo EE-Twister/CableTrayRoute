@@ -2131,7 +2131,7 @@ function downloadThermalData(){
 function downloadCanvasData(){
  const canvas=document.getElementById('tempCanvas');
  if(!canvas) return;
- const ctx=canvas.getContext('2d');
+ const ctx=canvas.getContext('2d',{willReadFrequently:true});
  const img=window.lastHeatImgData || ctx.getImageData(0,0,canvas.width,canvas.height);
  if(!img){
    showToast('No canvas data available');
