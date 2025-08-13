@@ -155,6 +155,10 @@ document.addEventListener('DOMContentLoaded', () => {
         });
     };
     const loadDuctbankData = async () => {
+        if (state.ductbankData && state.ductbankData.ductbanks && state.ductbankData.ductbanks.length) {
+            update3DPlot();
+            return;
+        }
         try {
             const res = await fetch('data/ductbank_geometry.json');
             if (res.ok) {
@@ -163,9 +167,11 @@ document.addEventListener('DOMContentLoaded', () => {
         } catch (e) {
             console.warn('Unable to load ductbank geometry', e);
         }
+        if (state.ductbankData) {
+            update3DPlot();
+        }
     };
     initHelpIcons();
-    loadDuctbankData();
     if (elements.sidebarToggle && elements.sidebar) {
         elements.sidebarToggle.addEventListener('click', () => {
             elements.sidebar.classList.toggle('collapsed');
@@ -246,10 +252,18 @@ document.addEventListener('DOMContentLoaded', () => {
     const loadSchedulesIntoSession = () => {
         let trays = [];
         let cables = [];
+        let ductbanks = [];
+        let conduits = [];
+
         const trayKey = globalThis.TableUtils?.STORAGE_KEYS?.traySchedule || 'traySchedule';
         const cableKey = globalThis.TableUtils?.STORAGE_KEYS?.cableSchedule || 'cableSchedule';
+        const dbKey = globalThis.TableUtils?.STORAGE_KEYS?.ductbankSchedule || 'ductbankSchedule';
+        const condKey = globalThis.TableUtils?.STORAGE_KEYS?.conduitSchedule || 'conduitSchedule';
+
         try { trays = JSON.parse(localStorage.getItem(trayKey) || '[]'); } catch (e) {}
         try { cables = JSON.parse(localStorage.getItem(cableKey) || '[]'); } catch (e) {}
+        try { ductbanks = JSON.parse(localStorage.getItem(dbKey) || '[]'); } catch (e) {}
+        try { conduits = JSON.parse(localStorage.getItem(condKey) || '[]'); } catch (e) {}
 
         if (trays.length > 0 && state.manualTrays.length === 0) {
             state.manualTrays = trays.map(t => ({
@@ -286,6 +300,32 @@ document.addEventListener('DOMContentLoaded', () => {
                 };
             });
             updateCableListDisplay();
+        }
+
+        if (ductbanks.length > 0) {
+            const conduitMap = conduits.reduce((acc, c) => {
+                const id = c.ductbank_id || c.ductbank;
+                if (!acc[id]) acc[id] = [];
+                acc[id].push(c);
+                return acc;
+            }, {});
+
+            state.ductbankData = {
+                ductbanks: ductbanks.map(db => ({
+                    id: db.ductbank_id || db.id || db.tag,
+                    outline: [
+                        [parseFloat(db.start_x), parseFloat(db.start_y), parseFloat(db.start_z)],
+                        [parseFloat(db.end_x), parseFloat(db.end_y), parseFloat(db.end_z)]
+                    ],
+                    conduits: (conduitMap[db.ductbank_id] || []).map(c => ({
+                        id: c.conduit_id || c.id,
+                        path: [
+                            [parseFloat(c.start_x), parseFloat(c.start_y), parseFloat(c.start_z)],
+                            [parseFloat(c.end_x), parseFloat(c.end_y), parseFloat(c.end_z)]
+                        ]
+                    }))
+                }))
+            };
         }
     };
 
@@ -2756,6 +2796,18 @@ const openConduitFill = (cables) => {
     };
     };
 
+    const update3DPlot = () => {
+        const trays = state.finalTrays.length ? state.finalTrays : state.trayData;
+        let routes = [];
+        if (state.latestRouteData && state.latestRouteData.length) {
+            routes = state.latestRouteData.map(r => ({
+                label: r.cable,
+                segments: r.route_segments
+            }));
+        }
+        visualize(trays, routes, '3D View');
+    };
+
     const highlightSharedRoute = (idx) => {
         if (!window.current3DPlot || !state.sharedFieldRoutes[idx]) return;
         const route = state.sharedFieldRoutes[idx];
@@ -2926,4 +2978,5 @@ Plotly.newPlot(document.getElementById('plot'), data, layout, {responsive: true}
     }
 
     updateTrayDisplay();
+    loadDuctbankData();
 });
