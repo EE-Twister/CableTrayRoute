@@ -243,6 +243,52 @@ document.addEventListener('DOMContentLoaded', () => {
         }
     };
 
+    const loadSchedulesIntoSession = () => {
+        let trays = [];
+        let cables = [];
+        const trayKey = globalThis.TableUtils?.STORAGE_KEYS?.traySchedule || 'traySchedule';
+        const cableKey = globalThis.TableUtils?.STORAGE_KEYS?.cableSchedule || 'cableSchedule';
+        try { trays = JSON.parse(localStorage.getItem(trayKey) || '[]'); } catch (e) {}
+        try { cables = JSON.parse(localStorage.getItem(cableKey) || '[]'); } catch (e) {}
+
+        if (trays.length > 0 && state.manualTrays.length === 0) {
+            state.manualTrays = trays.map(t => ({
+                tray_id: t.tray_id,
+                start_x: parseFloat(t.start_x),
+                start_y: parseFloat(t.start_y),
+                start_z: parseFloat(t.start_z),
+                end_x: parseFloat(t.end_x),
+                end_y: parseFloat(t.end_y),
+                end_z: parseFloat(t.end_z),
+                width: parseFloat(t.inside_width),
+                height: parseFloat(t.tray_depth),
+                current_fill: 0,
+                shape: 'STR',
+                allowed_cable_group: t.allowed_cable_group || '',
+            }));
+            state.trayData = state.manualTrays;
+            renderManualTrayTable();
+            updateTrayDisplay();
+        }
+
+        if (cables.length > 0 && state.cableList.length === 0) {
+            state.cableList = cables.map(c => {
+                const { tag, from_tag, to_tag, start_x, start_y, start_z, end_x, end_y, end_z, raceway_ids, ...rest } = c;
+                return {
+                    name: tag,
+                    start_tag: from_tag,
+                    end_tag: to_tag,
+                    start: [parseFloat(start_x), parseFloat(start_y), parseFloat(start_z)],
+                    end: [parseFloat(end_x), parseFloat(end_y), parseFloat(end_z)],
+                    raceway_ids: raceway_ids || [],
+                    manual_path: '',
+                    ...rest,
+                };
+            });
+            updateCableListDisplay();
+        }
+    };
+
     const filterTable = (container, query) => {
         if (!container) return;
         const q = query.toLowerCase();
@@ -2866,12 +2912,14 @@ Plotly.newPlot(document.getElementById('plot'), data, layout, {responsive: true}
     });
     // Initial setup
     loadSession();
-    if ((state.manualTrays.length > 0 || state.cableList.length > 0) && confirm("Resume previous session?")) {
+    const hadSession = state.manualTrays.length > 0 || state.cableList.length > 0;
+    loadSchedulesIntoSession();
+    if (hadSession && (state.manualTrays.length > 0 || state.cableList.length > 0) && confirm("Resume previous session?")) {
         renderManualTrayTable();
         updateCableListDisplay();
         state.trayData = state.manualTrays;
         updateTrayDisplay();
-    } else if (state.manualTrays.length > 0 || state.cableList.length > 0) {
+    } else if (hadSession && (state.manualTrays.length > 0 || state.cableList.length > 0)) {
         state.manualTrays = [];
         state.cableList = [];
         saveSession();
