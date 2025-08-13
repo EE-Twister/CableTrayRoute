@@ -1521,6 +1521,12 @@ body.dark-mode .workflow-card-title {
     margin-top: 0.25rem;
     color: var(--text-color);
     word-break: break-word;
+    cursor: pointer;
+}
+
+.raceway-summary.placeholder {
+    color: #6c757d;
+    font-style: italic;
 }
 
 @media (max-width: 600px) {
