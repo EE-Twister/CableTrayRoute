@@ -447,6 +447,8 @@ th:has(.group-toggle) {
     display: flex;
     align-items: center;
     justify-content: flex-start;
+    padding-left: 0;
+    gap: 0.25rem;
 }
 .group-hidden {
     display: none;
@@ -456,12 +458,11 @@ th:has(.group-toggle) {
     align-items: center;
     justify-content: flex-start;
     width: 1.5em;
+    padding-left: 0;
+    gap: 0.25rem;
 }
 .group-collapsed span {
     display: none;
-}
-.group-collapsed .group-toggle {
-    margin-left: 0;
 }
 .sticky-table tbody tr:nth-child(even) {
     background-color: var(--secondary-color);
@@ -768,7 +769,6 @@ body.dark-mode .db-table td {
 }
 
 .group-toggle {
-    margin-left: 4px;
     background: none;
     border: 1px solid var(--border-color);
     cursor: pointer;
