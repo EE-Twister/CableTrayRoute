@@ -446,6 +446,15 @@ th {
 .group-hidden {
     display: none;
 }
+.group-collapsed {
+    width: 1.5em;
+}
+.group-collapsed span {
+    display: none;
+}
+.group-collapsed .group-toggle {
+    margin-left: 0;
+}
 .sticky-table tbody tr:nth-child(even) {
     background-color: var(--secondary-color);
 }
@@ -755,8 +764,8 @@ body.dark-mode .db-table td {
     background: none;
     border: 1px solid var(--border-color);
     cursor: pointer;
-    padding: 0 4px;
-    font-size: 0.8rem;
+    padding: 0 2px;
+    font-size: 0.7rem;
 }
 
 .filter-popup {
