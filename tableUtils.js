@@ -80,6 +80,7 @@ class TableManager {
       groups.forEach(g => {
         const th = document.createElement('th');
         th.colSpan = g.span;
+        th.classList.add('group-header');
         if (g.name){
           const label = document.createElement('span');
           label.textContent = g.name;
