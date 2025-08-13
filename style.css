@@ -443,10 +443,18 @@ th, td {
 th {
     background-color: var(--secondary-color);
 }
+th:has(.group-toggle) {
+    display: flex;
+    align-items: center;
+    justify-content: flex-start;
+}
 .group-hidden {
     display: none;
 }
 .group-collapsed {
+    display: flex;
+    align-items: center;
+    justify-content: flex-start;
     width: 1.5em;
 }
 .group-collapsed span {
