@@ -51,6 +51,7 @@ class TableManager {
     this.groupThs = {};
     this.groupToggles = {};
     this.groupFirstIndex = {};
+    this.groupLastIndex = {};
     this.groupOrder = [];
     
     if (hasGroups){
@@ -71,6 +72,7 @@ class TableManager {
             current.span++;
           }
           this.groupCols[col.group].push(colIndex);
+          this.groupLastIndex[col.group] = colIndex;
         } else {
           groups.push({name:'', span:1});
           current = null;
@@ -93,6 +95,7 @@ class TableManager {
           this.groupThs[g.name] = th;
           this.groupToggles[g.name] = toggle;
           if (this.groupOrder.indexOf(g.name) > 0) th.classList.add('category-separator');
+          th.classList.add('category-separator-right');
         }
         groupRow.appendChild(th);
       });
@@ -110,6 +113,9 @@ class TableManager {
       th.appendChild(btn);
       if (col.group && idx === this.groupFirstIndex[col.group] && this.groupOrder.indexOf(col.group) > 0) {
         th.classList.add('category-separator');
+      }
+      if (col.group && idx === this.groupLastIndex[col.group]) {
+        th.classList.add('category-separator-right');
       }
       headerRow.appendChild(th);
       this.filterButtons.push(btn);
@@ -310,6 +316,9 @@ class TableManager {
       const td = tr.insertCell();
       if (col.group && idx === this.groupFirstIndex[col.group] && this.groupOrder.indexOf(col.group) > 0) {
         td.classList.add('category-separator');
+      }
+      if (col.group && idx === this.groupLastIndex[col.group]) {
+        td.classList.add('category-separator-right');
       }
       let el;
       if (col.type === 'select') {
