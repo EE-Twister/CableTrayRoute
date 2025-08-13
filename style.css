@@ -444,23 +444,26 @@ th {
     background-color: var(--secondary-color);
 }
 .group-header {
-    display:flex;
-    align-items:center;
-    justify-content:flex-start;
-    padding-left:0;
-    gap:0.25rem;
+    padding-left: 0;
 }
+
+.group-header .group-toggle {
+    margin-left: 0.25rem;
+}
+
 .group-hidden {
     display: none;
 }
+
 .group-collapsed {
-    display: flex;
-    align-items: center;
-    justify-content: flex-start;
     width: 1.5em;
     padding-left: 0;
-    gap: 0.25rem;
 }
+
+.group-collapsed .group-toggle {
+    margin-left: 0;
+}
+
 .group-collapsed span {
     display: none;
 }
