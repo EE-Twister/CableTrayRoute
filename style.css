@@ -750,7 +750,24 @@ body.dark-mode .db-table td {
     color: var(--primary-color);
 }
 
+.group-toggle {
+    margin-left: 4px;
+    background: none;
+    border: 1px solid var(--border-color);
+    cursor: pointer;
+    padding: 0 4px;
+    font-size: 0.8rem;
+}
+
 .filter-popup {
+    position: absolute;
+    background: var(--secondary-color);
+    border: 1px solid var(--border-color);
+    padding: 4px;
+    z-index: 1000;
+}
+
+.listbox-popup {
     position: absolute;
     background: var(--secondary-color);
     border: 1px solid var(--border-color);

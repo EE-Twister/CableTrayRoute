@@ -182,6 +182,37 @@ class TableManager {
     setTimeout(()=>document.addEventListener('click',close),0);
   }
 
+  showListboxPopup(el, td){
+    document.querySelectorAll('.listbox-popup').forEach(p=>{
+      const sel = p.querySelector('select');
+      const parent = p._parentCell;
+      if(sel && parent){
+        parent.appendChild(sel);
+        sel.style.display = 'none';
+      }
+      p.remove();
+    });
+    const popup = document.createElement('div');
+    popup.className = 'listbox-popup';
+    popup._parentCell = td;
+    popup.appendChild(el);
+    const rect = td.getBoundingClientRect();
+    popup.style.top = (rect.bottom + window.scrollY) + 'px';
+    popup.style.left = (rect.left + window.scrollX) + 'px';
+    document.body.appendChild(popup);
+    el.style.display = 'block';
+    el.focus();
+    const close = e => {
+      if(!popup.contains(e.target)){
+        td.appendChild(el);
+        el.style.display = 'none';
+        popup.remove();
+        document.removeEventListener('click', close);
+      }
+    };
+    setTimeout(()=>document.addEventListener('click', close),0);
+  }
+
   addRow(data = {}) {
     const tr = this.tbody.insertRow();
     this.columns.forEach(col => {
@@ -190,27 +221,20 @@ class TableManager {
       if (col.type === 'select') {
         const opts = typeof col.options === 'function' ? col.options(tr, data) : (col.options || []);
         if (col.multiple) {
-          el = document.createElement('div');
-          el.className = 'multi-checkbox';
-          if (col.size) {
-            el.style.maxHeight = (col.size * 1.5) + 'em';
-            el.style.overflowY = 'auto';
-          }
+          el = document.createElement('select');
+          el.multiple = true;
+          if (col.size) el.size = col.size;
           opts.forEach(opt => {
-            const label = document.createElement('label');
-            label.style.display = 'block';
-            const cb = document.createElement('input');
-            cb.type = 'checkbox';
-            cb.value = opt;
-            label.appendChild(cb);
-            label.appendChild(document.createTextNode(opt));
-            el.appendChild(label);
+            const o = document.createElement('option');
+            o.value = opt;
+            o.textContent = opt;
+            el.appendChild(o);
           });
-          el.getSelectedValues = () => Array.from(el.querySelectorAll('input:checked')).map(c => c.value);
+          el.style.display = 'none';
+          el.getSelectedValues = () => Array.from(el.selectedOptions).map(o => o.value);
           el.setSelectedValues = vals => {
-            Array.from(el.querySelectorAll('input')).forEach(c => { c.checked = (vals || []).includes(c.value); });
+            Array.from(el.options).forEach(o => { o.selected = (vals || []).includes(o.value); });
           };
-          Object.defineProperty(el, 'value', { get() { return el.getSelectedValues().join(','); } });
         } else {
           el = document.createElement('select');
           opts.forEach(opt => {
@@ -245,6 +269,17 @@ class TableManager {
       if (col.multiple) {
         summaryEl = document.createElement('span');
         summaryEl.className = 'raceway-summary';
+        summaryEl.tabIndex = 0;
+        summaryEl.addEventListener('click', e => {
+          e.stopPropagation();
+          this.showListboxPopup(el, td);
+        });
+        summaryEl.addEventListener('keydown', e => {
+          if (e.key === 'Enter' || e.key === ' ') {
+            e.preventDefault();
+            this.showListboxPopup(el, td);
+          }
+        });
         td.appendChild(summaryEl);
         updateSummary = () => {
           summaryEl.textContent = (el.getSelectedValues ? el.getSelectedValues() : []).join(', ');
