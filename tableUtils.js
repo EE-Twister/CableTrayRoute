@@ -267,9 +267,9 @@ class TableManager {
       td.appendChild(el);
       let summaryEl, updateSummary;
       if (col.multiple) {
-        summaryEl = document.createElement('span');
+        summaryEl = document.createElement('button');
+        summaryEl.type = 'button';
         summaryEl.className = 'raceway-summary';
-        summaryEl.tabIndex = 0;
         summaryEl.addEventListener('click', e => {
           e.stopPropagation();
           this.showListboxPopup(el, td);

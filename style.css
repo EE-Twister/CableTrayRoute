@@ -1516,11 +1516,14 @@ body.dark-mode .workflow-card-title {
 
 /* Displays selected IDs for multi-checkbox raceway fields */
 .raceway-summary {
-    display: block;
+    display: inline-block;
     font-size: 0.8em;
     margin-top: 0.25rem;
-    color: var(--text-color);
+    color: var(--primary-color);
+    text-decoration: underline;
     word-break: break-word;
+    background: none;
+    border: none;
     cursor: pointer;
 }
 
