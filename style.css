@@ -477,7 +477,11 @@ body.dark-mode .sticky-table tbody tr:hover {
     background-color: #495057;
 }
 .category-separator {
-    border-left: 2px solid var(--border-color);
+    border-left: 3px solid var(--primary-color);
+}
+
+.category-separator-right {
+    border-right: 3px solid var(--primary-color);
 }
 .util-high { background-color: var(--error-bg); color: var(--error-text); }
 .util-medium { background-color: var(--warning-bg); color: var(--warning-text); }
