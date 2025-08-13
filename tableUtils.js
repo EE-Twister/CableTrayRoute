@@ -301,6 +301,25 @@ class TableManager {
         updateSummary();
       } else {
         el.addEventListener('input', () => { if (this.onChange) this.onChange(); });
+        el.addEventListener('keydown', e => {
+          if (e.key === 'ArrowLeft' || e.key === 'ArrowRight') {
+            const start = e.target.selectionStart ?? 0;
+            const end = e.target.selectionEnd ?? 0;
+            const len = (e.target.value || '').length;
+            if (start === 0 && end === len) {
+              e.preventDefault();
+              const cell = td;
+              const sib = e.key === 'ArrowLeft' ? cell.previousElementSibling : cell.nextElementSibling;
+              if (sib) {
+                const next = sib.querySelector('input,select');
+                if (next) {
+                  next.focus();
+                  if (typeof next.select === 'function') next.select();
+                }
+              }
+            }
+          }
+        });
       }
       if (col.onChange) el.addEventListener('change', () => { col.onChange(el, tr); });
       if (col.validate) {
