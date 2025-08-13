@@ -1522,6 +1522,10 @@ body.dark-mode .workflow-card-title {
     color: var(--text-color);
     word-break: break-word;
 }
+.raceway-summary.placeholder {
+    opacity: 0.6;
+    font-style: italic;
+}
 
 @media (max-width: 600px) {
     .site-footer {

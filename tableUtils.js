@@ -270,19 +270,32 @@ class TableManager {
         summaryEl = document.createElement('span');
         summaryEl.className = 'raceway-summary';
         summaryEl.tabIndex = 0;
-        summaryEl.addEventListener('click', e => {
+        const openList = e => {
           e.stopPropagation();
           this.showListboxPopup(el, td);
-        });
+        };
+        summaryEl.addEventListener('click', openList);
         summaryEl.addEventListener('keydown', e => {
           if (e.key === 'Enter' || e.key === ' ') {
             e.preventDefault();
-            this.showListboxPopup(el, td);
+            openList(e);
+          }
+        });
+        td.addEventListener('click', e => {
+          if (e.target === td) {
+            openList(e);
           }
         });
         td.appendChild(summaryEl);
         updateSummary = () => {
-          summaryEl.textContent = (el.getSelectedValues ? el.getSelectedValues() : []).join(', ');
+          const vals = el.getSelectedValues ? el.getSelectedValues() : [];
+          if (vals.length) {
+            summaryEl.textContent = vals.join(', ');
+            summaryEl.classList.remove('placeholder');
+          } else {
+            summaryEl.textContent = 'Select raceway(s)';
+            summaryEl.classList.add('placeholder');
+          }
         };
         el.addEventListener('change', () => {
           updateSummary();
