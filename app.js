@@ -286,9 +286,60 @@ document.addEventListener('DOMContentLoaded', () => {
         }
 
         if (cables.length > 0 && state.cableList.length === 0) {
+            const conductorProps = globalThis.CONDUCTOR_PROPS || {};
+            const parseThickness = v => {
+                if (v === undefined || v === null || v === '') return undefined;
+                if (typeof v === 'number') return v;
+                const str = String(v).trim().toLowerCase();
+                const num = parseFloat(str);
+                if (Number.isNaN(num)) return undefined;
+                if (str.endsWith('mm')) return num / 25.4;
+                if (str.endsWith('cm')) return num / 2.54;
+                return num;
+            };
+
             state.cableList = cables.map(c => {
                 const { tag, from_tag, to_tag, start_x, start_y, start_z, end_x, end_y, end_z, raceway_ids, ...rest } = c;
-                return {
+                let diameter = parseFloat(rest.diameter);
+                let weight = parseFloat(rest.weight);
+
+                if (!diameter) {
+                    const size = (rest.conductor_size || '').trim();
+                    const prop = conductorProps[size];
+                    let bare = 0.25; // default bare conductor diameter in inches
+                    if (prop && prop.area_cm) {
+                        bare = Math.sqrt(prop.area_cm) / 1000;
+                    } else {
+                        console.warn(`Unknown conductor size '${size}' for cable ${tag}; using ${bare} in.`);
+                    }
+
+                    let ins = parseThickness(rest.insulation_thickness);
+                    if (ins === undefined) {
+                        if (prop && prop.insulation_thickness !== undefined) {
+                            ins = prop.insulation_thickness;
+                        } else {
+                            ins = 0.03;
+                            console.warn(`Missing insulation thickness for cable ${tag}; assuming ${ins} in.`);
+                        }
+                    }
+
+                    let shield = parseThickness(rest.shielding_jacket);
+                    if (rest.shielding_jacket && shield === undefined) {
+                        console.warn(`Unrecognized shielding/jacket value '${rest.shielding_jacket}' for cable ${tag}; assuming 0 in.`);
+                    }
+                    shield = shield || 0;
+
+                    diameter = bare + 2 * (ins + shield);
+                }
+
+                if (Number.isNaN(weight)) {
+                    weight = 0;
+                    if (rest.weight === undefined) {
+                        console.warn(`Missing weight for cable ${tag}; defaulting to 0.`);
+                    }
+                }
+
+                const mapped = {
                     name: tag,
                     start_tag: from_tag,
                     end_tag: to_tag,
@@ -297,7 +348,10 @@ document.addEventListener('DOMContentLoaded', () => {
                     raceway_ids: raceway_ids || [],
                     manual_path: '',
                     ...rest,
+                    diameter,
+                    weight,
                 };
+                return mapped;
             });
             updateCableListDisplay();
         }
