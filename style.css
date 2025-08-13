@@ -443,12 +443,12 @@ th, td {
 th {
     background-color: var(--secondary-color);
 }
-th:has(.group-toggle) {
-    display: flex;
-    align-items: center;
-    justify-content: flex-start;
-    padding-left: 0;
-    gap: 0.25rem;
+.group-header {
+    display:flex;
+    align-items:center;
+    justify-content:flex-start;
+    padding-left:0;
+    gap:0.25rem;
 }
 .group-hidden {
     display: none;
