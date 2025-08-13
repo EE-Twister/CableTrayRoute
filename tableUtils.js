@@ -50,7 +50,9 @@ class TableManager {
     this.groupCols = {};
     this.groupThs = {};
     this.groupToggles = {};
-
+    this.groupFirstIndex = {};
+    this.groupOrder = [];
+    
     if (hasGroups){
       const groups = [];
       let current = null;
@@ -60,10 +62,14 @@ class TableManager {
           if (!current || current.name !== col.group){
             current = {name:col.group, span:1};
             groups.push(current);
+            if (!this.groupCols[col.group]){
+              this.groupCols[col.group] = [];
+              this.groupFirstIndex[col.group] = colIndex;
+              this.groupOrder.push(col.group);
+            }
           } else {
             current.span++;
           }
-          if (!this.groupCols[col.group]) this.groupCols[col.group] = [];
           this.groupCols[col.group].push(colIndex);
         } else {
           groups.push({name:'', span:1});
@@ -85,6 +91,7 @@ class TableManager {
           th.appendChild(toggle);
           this.groupThs[g.name] = th;
           this.groupToggles[g.name] = toggle;
+          if (this.groupOrder.indexOf(g.name) > 0) th.classList.add('category-separator');
         }
         groupRow.appendChild(th);
       });
@@ -100,6 +107,9 @@ class TableManager {
       btn.innerHTML='\u25BC';
       btn.addEventListener('click',e=>{e.stopPropagation();this.showFilterPopup(btn,idx);});
       th.appendChild(btn);
+      if (col.group && idx === this.groupFirstIndex[col.group] && this.groupOrder.indexOf(col.group) > 0) {
+        th.classList.add('category-separator');
+      }
       headerRow.appendChild(th);
       this.filterButtons.push(btn);
     });
@@ -295,8 +305,11 @@ class TableManager {
 
   addRow(data = {}) {
     const tr = this.tbody.insertRow();
-    this.columns.forEach(col => {
+    this.columns.forEach((col, idx) => {
       const td = tr.insertCell();
+      if (col.group && idx === this.groupFirstIndex[col.group] && this.groupOrder.indexOf(col.group) > 0) {
+        td.classList.add('category-separator');
+      }
       let el;
       if (col.type === 'select') {
         const opts = typeof col.options === 'function' ? col.options(tr, data) : (col.options || []);
