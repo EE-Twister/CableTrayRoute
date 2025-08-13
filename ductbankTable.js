@@ -45,6 +45,13 @@
       TableUtils.applyValidation(toInput,toRules);
       to.appendChild(toInput);
 
+      const ce=row.insertCell();
+      const ceInput=document.createElement('input');
+      ceInput.type='checkbox';
+      ceInput.checked=db.concrete_encasement||false;
+      ceInput.addEventListener('change',e=>{db.concrete_encasement=e.target.checked;saveDuctbanks();});
+      ce.appendChild(ceInput);
+
       const sx=row.insertCell();
       const sxInput=document.createElement('input');
       sxInput.type='number';
@@ -113,7 +120,7 @@
       cRow.className='conduit-container';
       cRow.style.display=db.expanded?'':'none';
       const cCell=cRow.insertCell();
-      cCell.colSpan=11;
+      cCell.colSpan=12;
       const cTable=document.createElement('table');
       cTable.className='nested-table';
       const cHead=cTable.createTHead();
@@ -174,7 +181,7 @@
   }
 
   function addDuctbank(){
-    ductbanks.push({id:Date.now(),tag:'',from:'',to:'',start_x:'',start_y:'',start_z:'',end_x:'',end_y:'',end_z:'',conduits:[],expanded:true});
+    ductbanks.push({id:Date.now(),tag:'',from:'',to:'',concrete_encasement:false,start_x:'',start_y:'',start_z:'',end_x:'',end_y:'',end_z:'',conduits:[],expanded:true});
     renderDuctbanks();
     saveDuctbanks();
   }
@@ -207,6 +214,7 @@
     ductbanks.forEach(db=>{
       if(db.expanded===undefined) db.expanded=false;
       if(!db.conduits) db.conduits=[];
+      if(db.concrete_encasement===undefined) db.concrete_encasement=false;
       ['start_x','start_y','start_z','end_x','end_y','end_z'].forEach(k=>{if(db[k]===undefined) db[k]='';});
       db.conduits.forEach(c=>{
         ['start_x','start_y','start_z','end_x','end_y','end_z'].forEach(k=>{if(c[k]===undefined) c[k]=db[k];});
@@ -216,8 +224,8 @@
   }
 
   function exportDuctbankXlsx(){
-    const dbData=[['ductbank_id','tag','from','to','start_x','start_y','start_z','end_x','end_y','end_z']];
-    ductbanks.forEach(db=>dbData.push([db.id,db.tag,db.from,db.to,db.start_x,db.start_y,db.start_z,db.end_x,db.end_y,db.end_z]));
+    const dbData=[['ductbank_id','tag','from','to','concrete_encasement','start_x','start_y','start_z','end_x','end_y','end_z']];
+    ductbanks.forEach(db=>dbData.push([db.id,db.tag,db.from,db.to,db.concrete_encasement?1:0,db.start_x,db.start_y,db.start_z,db.end_x,db.end_y,db.end_z]));
     const cData=[['ductbank_id','conduit_id','type','trade_size','start_x','start_y','start_z','end_x','end_y','end_z']];
     ductbanks.forEach(db=>db.conduits.forEach(c=>cData.push([db.id,c.conduit_id,c.type,c.trade_size,c.start_x,c.start_y,c.start_z,c.end_x,c.end_y,c.end_z])));
     const wb=XLSX.utils.book_new();
@@ -243,7 +251,7 @@
         return;
       }
 
-      const requiredDbHeaders=['ductbank_id','tag','from','to','start_x','start_y','start_z','end_x','end_y','end_z'];
+      const requiredDbHeaders=['ductbank_id','tag','from','to','concrete_encasement','start_x','start_y','start_z','end_x','end_y','end_z'];
       const dbHeaders=(XLSX.utils.sheet_to_json(dbSheet,{header:1})[0]||[]).map(h=>String(h).toLowerCase());
       const missingDb=requiredDbHeaders.filter(h=>!dbHeaders.includes(h));
       if(missingDb.length){
@@ -268,6 +276,7 @@
           tag:r['tag']||'',
           from:r['from']||'',
           to:r['to']||'',
+          concrete_encasement:r['concrete_encasement']==='1'||r['concrete_encasement']==='true'||r['concrete_encasement']===true,
           start_x:r['start_x']||'',
           start_y:r['start_y']||'',
           start_z:r['start_z']||'',

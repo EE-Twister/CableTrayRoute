@@ -20,6 +20,7 @@ function tradeSizeOptions(type){
 
 const TRAY_WIDTH_OPTIONS=['2','3','4','6','8','9','12','16','18','20','24','30','36'];
 const TRAY_DEPTH_OPTIONS=['2','3','4','5','6','7','8','9','10','11','12'];
+const TRAY_TYPE_OPTIONS=['Ladder (50 % fill)','Solid Bottom (40 % fill)'];
 
 document.addEventListener('DOMContentLoaded',()=>{
   initSettings();
@@ -56,7 +57,7 @@ document.addEventListener('DOMContentLoaded',()=>{
     {key:'end_z',label:'End Z',type:'number',validate:['required','numeric']},
     {key:'inside_width',label:'Inside Width (in)',type:'select',options:TRAY_WIDTH_OPTIONS,default:TRAY_WIDTH_OPTIONS[0],validate:['required']},
     {key:'tray_depth',label:'Tray Depth (in)',type:'select',options:TRAY_DEPTH_OPTIONS,default:TRAY_DEPTH_OPTIONS[0],validate:['required']},
-    {key:'capacity',label:'Capacity',type:'number',validate:['numeric']}
+    {key:'tray_type',label:'Tray Type',type:'select',options:TRAY_TYPE_OPTIONS,default:TRAY_TYPE_OPTIONS[0],validate:['required']}
   ];
   const trayTable=TableUtils.createTable({
     tableId:'trayTable',

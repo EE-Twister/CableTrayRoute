@@ -21,7 +21,14 @@
           "type": "PVC Sch 40",
           "trade_size": "4"
         }
-      ]
+      ],
+      "start_x": 0,
+      "start_y": 0,
+      "start_z": 0,
+      "end_x": 100,
+      "end_y": 0,
+      "end_z": 0,
+      "concrete_encasement": false
     },
     {
       "id": "DB-002",
@@ -44,7 +51,14 @@
           "type": "PVC Sch 40",
           "trade_size": "4"
         }
-      ]
+      ],
+      "start_x": 0,
+      "start_y": 10,
+      "start_z": 0,
+      "end_x": 100,
+      "end_y": 10,
+      "end_z": 0,
+      "concrete_encasement": false
     },
     {
       "id": "DB-003",
@@ -67,7 +81,14 @@
           "type": "PVC Sch 40",
           "trade_size": "4"
         }
-      ]
+      ],
+      "start_x": 0,
+      "start_y": 20,
+      "start_z": 0,
+      "end_x": 100,
+      "end_y": 20,
+      "end_z": 0,
+      "concrete_encasement": false
     },
     {
       "id": "DB-004",
@@ -90,7 +111,14 @@
           "type": "PVC Sch 40",
           "trade_size": "4"
         }
-      ]
+      ],
+      "start_x": 0,
+      "start_y": 30,
+      "start_z": 0,
+      "end_x": 100,
+      "end_y": 30,
+      "end_z": 0,
+      "concrete_encasement": false
     },
     {
       "id": "DB-005",
@@ -113,7 +141,14 @@
           "type": "PVC Sch 40",
           "trade_size": "4"
         }
-      ]
+      ],
+      "start_x": 0,
+      "start_y": 40,
+      "start_z": 0,
+      "end_x": 100,
+      "end_y": 40,
+      "end_z": 0,
+      "concrete_encasement": false
     },
     {
       "id": "DB-006",
@@ -136,7 +171,14 @@
           "type": "PVC Sch 40",
           "trade_size": "4"
         }
-      ]
+      ],
+      "start_x": 0,
+      "start_y": 50,
+      "start_z": 0,
+      "end_x": 100,
+      "end_y": 50,
+      "end_z": 0,
+      "concrete_encasement": false
     },
     {
       "id": "DB-007",
@@ -159,7 +201,14 @@
           "type": "PVC Sch 40",
           "trade_size": "4"
         }
-      ]
+      ],
+      "start_x": 0,
+      "start_y": 60,
+      "start_z": 0,
+      "end_x": 100,
+      "end_y": 60,
+      "end_z": 0,
+      "concrete_encasement": false
     },
     {
       "id": "DB-008",
@@ -182,7 +231,14 @@
           "type": "PVC Sch 40",
           "trade_size": "4"
         }
-      ]
+      ],
+      "start_x": 0,
+      "start_y": 70,
+      "start_z": 0,
+      "end_x": 100,
+      "end_y": 70,
+      "end_z": 0,
+      "concrete_encasement": false
     },
     {
       "id": "DB-009",
@@ -205,7 +261,14 @@
           "type": "PVC Sch 40",
           "trade_size": "4"
         }
-      ]
+      ],
+      "start_x": 0,
+      "start_y": 80,
+      "start_z": 0,
+      "end_x": 100,
+      "end_y": 80,
+      "end_z": 0,
+      "concrete_encasement": false
     },
     {
       "id": "DB-010",
@@ -228,7 +291,14 @@
           "type": "PVC Sch 40",
           "trade_size": "4"
         }
-      ]
+      ],
+      "start_x": 0,
+      "start_y": 90,
+      "start_z": 0,
+      "end_x": 100,
+      "end_y": 90,
+      "end_z": 0,
+      "concrete_encasement": false
     },
     {
       "id": "DB-011",
@@ -251,7 +321,14 @@
           "type": "PVC Sch 40",
           "trade_size": "4"
         }
-      ]
+      ],
+      "start_x": 0,
+      "start_y": 100,
+      "start_z": 0,
+      "end_x": 100,
+      "end_y": 100,
+      "end_z": 0,
+      "concrete_encasement": false
     },
     {
       "id": "DB-012",
@@ -274,7 +351,14 @@
           "type": "PVC Sch 40",
           "trade_size": "4"
         }
-      ]
+      ],
+      "start_x": 0,
+      "start_y": 110,
+      "start_z": 0,
+      "end_x": 100,
+      "end_y": 110,
+      "end_z": 0,
+      "concrete_encasement": false
     },
     {
       "id": "DB-013",
@@ -297,7 +381,14 @@
           "type": "PVC Sch 40",
           "trade_size": "4"
         }
-      ]
+      ],
+      "start_x": 0,
+      "start_y": 120,
+      "start_z": 0,
+      "end_x": 100,
+      "end_y": 120,
+      "end_z": 0,
+      "concrete_encasement": false
     },
     {
       "id": "DB-014",
@@ -320,7 +411,14 @@
           "type": "PVC Sch 40",
           "trade_size": "4"
         }
-      ]
+      ],
+      "start_x": 0,
+      "start_y": 130,
+      "start_z": 0,
+      "end_x": 100,
+      "end_y": 130,
+      "end_z": 0,
+      "concrete_encasement": false
     },
     {
       "id": "DB-015",
@@ -343,7 +441,14 @@
           "type": "PVC Sch 40",
           "trade_size": "4"
         }
-      ]
+      ],
+      "start_x": 0,
+      "start_y": 140,
+      "start_z": 0,
+      "end_x": 100,
+      "end_y": 140,
+      "end_z": 0,
+      "concrete_encasement": false
     },
     {
       "id": "DB-016",
@@ -366,7 +471,14 @@
           "type": "PVC Sch 40",
           "trade_size": "4"
         }
-      ]
+      ],
+      "start_x": 0,
+      "start_y": 150,
+      "start_z": 0,
+      "end_x": 100,
+      "end_y": 150,
+      "end_z": 0,
+      "concrete_encasement": false
     },
     {
       "id": "DB-017",
@@ -389,7 +501,14 @@
           "type": "PVC Sch 40",
           "trade_size": "4"
         }
-      ]
+      ],
+      "start_x": 0,
+      "start_y": 160,
+      "start_z": 0,
+      "end_x": 100,
+      "end_y": 160,
+      "end_z": 0,
+      "concrete_encasement": false
     },
     {
       "id": "DB-018",
@@ -412,7 +531,14 @@
           "type": "PVC Sch 40",
           "trade_size": "4"
         }
-      ]
+      ],
+      "start_x": 0,
+      "start_y": 170,
+      "start_z": 0,
+      "end_x": 100,
+      "end_y": 170,
+      "end_z": 0,
+      "concrete_encasement": false
     },
     {
       "id": "DB-019",
@@ -435,7 +561,14 @@
           "type": "PVC Sch 40",
           "trade_size": "4"
         }
-      ]
+      ],
+      "start_x": 0,
+      "start_y": 180,
+      "start_z": 0,
+      "end_x": 100,
+      "end_y": 180,
+      "end_z": 0,
+      "concrete_encasement": false
     },
     {
       "id": "DB-020",
@@ -458,7 +591,14 @@
           "type": "PVC Sch 40",
           "trade_size": "4"
         }
-      ]
+      ],
+      "start_x": 0,
+      "start_y": 190,
+      "start_z": 0,
+      "end_x": 100,
+      "end_y": 190,
+      "end_z": 0,
+      "concrete_encasement": false
     }
   ],
   "trays": [
@@ -472,7 +612,7 @@
       "end_z": 10,
       "inside_width": 18,
       "tray_depth": 4,
-      "capacity": 80
+      "tray_type": "Ladder (50 % fill)"
     },
     {
       "tray_id": "TR-002",
@@ -484,7 +624,7 @@
       "end_z": 10,
       "inside_width": 24,
       "tray_depth": 4,
-      "capacity": 80
+      "tray_type": "Ladder (50 % fill)"
     },
     {
       "tray_id": "TR-003",
@@ -496,7 +636,7 @@
       "end_z": 10,
       "inside_width": 18,
       "tray_depth": 4,
-      "capacity": 80
+      "tray_type": "Ladder (50 % fill)"
     },
     {
       "tray_id": "TR-004",
@@ -508,7 +648,7 @@
       "end_z": 10,
       "inside_width": 24,
       "tray_depth": 4,
-      "capacity": 80
+      "tray_type": "Ladder (50 % fill)"
     },
     {
       "tray_id": "TR-005",
@@ -520,7 +660,7 @@
       "end_z": 10,
       "inside_width": 18,
       "tray_depth": 4,
-      "capacity": 80
+      "tray_type": "Ladder (50 % fill)"
     },
     {
       "tray_id": "TR-006",
@@ -532,7 +672,7 @@
       "end_z": 10,
       "inside_width": 24,
       "tray_depth": 4,
-      "capacity": 80
+      "tray_type": "Ladder (50 % fill)"
     },
     {
       "tray_id": "TR-007",
@@ -544,7 +684,7 @@
       "end_z": 10,
       "inside_width": 18,
       "tray_depth": 4,
-      "capacity": 80
+      "tray_type": "Ladder (50 % fill)"
     },
     {
       "tray_id": "TR-008",
@@ -556,7 +696,7 @@
       "end_z": 10,
       "inside_width": 24,
       "tray_depth": 4,
-      "capacity": 80
+      "tray_type": "Ladder (50 % fill)"
     },
     {
       "tray_id": "TR-009",
@@ -568,7 +708,7 @@
       "end_z": 10,
       "inside_width": 18,
       "tray_depth": 4,
-      "capacity": 80
+      "tray_type": "Ladder (50 % fill)"
     },
     {
       "tray_id": "TR-010",
@@ -580,7 +720,7 @@
       "end_z": 10,
       "inside_width": 24,
       "tray_depth": 4,
-      "capacity": 80
+      "tray_type": "Ladder (50 % fill)"
     },
     {
       "tray_id": "TR-011",
@@ -592,7 +732,7 @@
       "end_z": 10,
       "inside_width": 18,
       "tray_depth": 4,
-      "capacity": 80
+      "tray_type": "Ladder (50 % fill)"
     },
     {
       "tray_id": "TR-012",
@@ -604,7 +744,7 @@
       "end_z": 10,
       "inside_width": 24,
       "tray_depth": 4,
-      "capacity": 80
+      "tray_type": "Ladder (50 % fill)"
     },
     {
       "tray_id": "TR-013",
@@ -616,7 +756,7 @@
       "end_z": 10,
       "inside_width": 18,
       "tray_depth": 4,
-      "capacity": 80
+      "tray_type": "Ladder (50 % fill)"
     },
     {
       "tray_id": "TR-014",
@@ -628,7 +768,7 @@
       "end_z": 10,
       "inside_width": 24,
       "tray_depth": 4,
-      "capacity": 80
+      "tray_type": "Ladder (50 % fill)"
     },
     {
       "tray_id": "TR-015",
@@ -640,7 +780,7 @@
       "end_z": 10,
       "inside_width": 18,
       "tray_depth": 4,
-      "capacity": 80
+      "tray_type": "Ladder (50 % fill)"
     },
     {
       "tray_id": "TR-016",
@@ -652,7 +792,7 @@
       "end_z": 10,
       "inside_width": 24,
       "tray_depth": 4,
-      "capacity": 80
+      "tray_type": "Ladder (50 % fill)"
     },
     {
       "tray_id": "TR-017",
@@ -664,7 +804,7 @@
       "end_z": 10,
       "inside_width": 18,
       "tray_depth": 4,
-      "capacity": 80
+      "tray_type": "Ladder (50 % fill)"
     },
     {
       "tray_id": "TR-018",
@@ -676,7 +816,7 @@
       "end_z": 10,
       "inside_width": 24,
       "tray_depth": 4,
-      "capacity": 80
+      "tray_type": "Ladder (50 % fill)"
     },
     {
       "tray_id": "TR-019",
@@ -688,7 +828,7 @@
       "end_z": 10,
       "inside_width": 18,
       "tray_depth": 4,
-      "capacity": 80
+      "tray_type": "Ladder (50 % fill)"
     },
     {
       "tray_id": "TR-020",
@@ -700,7 +840,7 @@
       "end_z": 10,
       "inside_width": 24,
       "tray_depth": 4,
-      "capacity": 80
+      "tray_type": "Ladder (50 % fill)"
     }
   ],
   "conduits": [
