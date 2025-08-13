@@ -182,35 +182,115 @@ class TableManager {
     setTimeout(()=>document.addEventListener('click',close),0);
   }
 
-  showListboxPopup(el, td){
-    document.querySelectorAll('.listbox-popup').forEach(p=>{
-      const sel = p.querySelector('select');
-      const parent = p._parentCell;
-      if(sel && parent){
-        parent.appendChild(sel);
-        sel.style.display = 'none';
-      }
-      p.remove();
-    });
-    const popup = document.createElement('div');
-    popup.className = 'listbox-popup';
-    popup._parentCell = td;
-    popup.appendChild(el);
-    const rect = td.getBoundingClientRect();
-    popup.style.top = (rect.bottom + window.scrollY) + 'px';
-    popup.style.left = (rect.left + window.scrollX) + 'px';
-    document.body.appendChild(popup);
-    el.style.display = 'block';
-    el.focus();
-    const close = e => {
-      if(!popup.contains(e.target)){
-        td.appendChild(el);
-        el.style.display = 'none';
-        popup.remove();
-        document.removeEventListener('click', close);
-      }
+  showRacewayModal(selectEl, originBtn){
+    const modal=document.createElement('div');
+    modal.className='modal';
+    modal.setAttribute('role','dialog');
+    modal.setAttribute('aria-modal','true');
+    modal.setAttribute('aria-hidden','false');
+    const content=document.createElement('div');
+    content.className='modal-content';
+    modal.appendChild(content);
+
+    const dual=document.createElement('div');
+    dual.className='dual-listbox';
+    content.appendChild(dual);
+
+    const buildSection=title=>{
+      const wrap=document.createElement('div');
+      wrap.className='list-container';
+      const hdr=document.createElement('h3');
+      hdr.textContent=title;
+      wrap.appendChild(hdr);
+      const search=document.createElement('input');
+      search.type='text';
+      search.placeholder='Search';
+      wrap.appendChild(search);
+      const list=document.createElement('select');
+      list.multiple=true;
+      list.setAttribute('role','listbox');
+      list.setAttribute('aria-multiselectable','true');
+      wrap.appendChild(list);
+      return {wrap,search,list};
     };
-    setTimeout(()=>document.addEventListener('click', close),0);
+
+    const avail=buildSection('Available Raceways');
+    const chosen=buildSection('Selected Raceways');
+
+    const opts=Array.from(selectEl.options).map(o=>({value:o.value,text:o.text,selected:o.selected}));
+    opts.forEach(o=>{
+      const opt=document.createElement('option');
+      opt.value=o.value;opt.textContent=o.text;
+      (o.selected?chosen.list:avail.list).appendChild(opt);
+    });
+
+    dual.appendChild(avail.wrap);
+
+    const btnCol=document.createElement('div');
+    btnCol.className='button-column';
+    const mkBtn=txt=>{
+      const b=document.createElement('button');
+      b.type='button';
+      b.textContent=txt;
+      b.addEventListener('keydown',e=>{if(e.key==='Enter'||e.key===' '){e.preventDefault();b.click();}});
+      return b;
+    };
+    const allR=mkBtn('>>');
+    const someR=mkBtn('>');
+    const someL=mkBtn('<');
+    const allL=mkBtn('<<');
+    [allR,someR,someL,allL].forEach(b=>btnCol.appendChild(b));
+    dual.appendChild(btnCol);
+    dual.appendChild(chosen.wrap);
+
+    const moveSelected=(from,to)=>{Array.from(from.selectedOptions).forEach(o=>to.appendChild(o));};
+    const moveAll=(from,to)=>{Array.from(from.options).forEach(o=>to.appendChild(o));};
+    allR.addEventListener('click',()=>moveAll(avail.list,chosen.list));
+    someR.addEventListener('click',()=>moveSelected(avail.list,chosen.list));
+    someL.addEventListener('click',()=>moveSelected(chosen.list,avail.list));
+    allL.addEventListener('click',()=>moveAll(chosen.list,avail.list));
+
+    const filter=(list,term)=>{
+      const t=term.toLowerCase();
+      Array.from(list.options).forEach(o=>o.style.display=o.text.toLowerCase().includes(t)?'':'none');
+    };
+    avail.search.addEventListener('input',()=>filter(avail.list,avail.search.value));
+    chosen.search.addEventListener('input',()=>filter(chosen.list,chosen.search.value));
+
+    const actions=document.createElement('div');
+    actions.style.marginTop='1rem';
+    actions.style.textAlign='right';
+    const saveBtn=document.createElement('button');
+    saveBtn.type='button';
+    saveBtn.textContent='Save';
+    const cancelBtn=document.createElement('button');
+    cancelBtn.type='button';
+    cancelBtn.textContent='Cancel';
+    actions.appendChild(saveBtn);
+    actions.appendChild(cancelBtn);
+    content.appendChild(actions);
+
+    const close=()=>{
+      modal.remove();
+      document.removeEventListener('keydown',handleKey);
+      if(originBtn) originBtn.focus();
+    };
+    cancelBtn.addEventListener('click',close);
+    modal.addEventListener('click',e=>{if(e.target===modal)close();});
+
+    saveBtn.addEventListener('click',()=>{
+      const values=Array.from(chosen.list.options).map(o=>o.value);
+      Array.from(selectEl.options).forEach(o=>o.selected=values.includes(o.value));
+      selectEl.dispatchEvent(new Event('change',{bubbles:true}));
+      close();
+    });
+
+    const handleKey=e=>{if(e.key==='Escape'){e.preventDefault();close();}else trapFocus(e,content);};
+    document.addEventListener('keydown',handleKey);
+
+    document.body.appendChild(modal);
+    modal.style.display='flex';
+    avail.search.focus();
   }
 
   addRow(data = {}) {
@@ -272,16 +352,16 @@ class TableManager {
         summaryEl.className = 'raceway-summary';
         summaryEl.addEventListener('click', e => {
           e.stopPropagation();
-          this.showListboxPopup(el, td);
+          this.showRacewayModal(el, summaryEl);
         });
         summaryEl.addEventListener('keydown', e => {
           if (e.key === 'Enter' || e.key === ' ') {
             e.preventDefault();
-            this.showListboxPopup(el, td);
+            this.showRacewayModal(el, summaryEl);
           }
         });
         td.addEventListener('click', () => {
-          this.showListboxPopup(el, td);
+          this.showRacewayModal(el, summaryEl);
         });
         td.appendChild(summaryEl);
         updateSummary = () => {
