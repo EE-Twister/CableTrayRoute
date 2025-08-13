@@ -144,7 +144,6 @@ function checkPrereqs(prereqs=[]){
       notice.style.cssText='background:#fee;border:1px solid #f99;padding:10px;margin:10px;';
       notice.innerHTML='Missing required data: '+missing.map(m=>`<a href="${m.page}">${m.label}</a>`).join(', ')+'.';
       document.body.prepend(notice);
-      document.querySelectorAll('main button, aside button').forEach(btn=>btn.disabled=true);
     });
   }
 }

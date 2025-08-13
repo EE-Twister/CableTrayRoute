@@ -260,32 +260,59 @@ document.addEventListener('DOMContentLoaded', () => {
         const dbKey = globalThis.TableUtils?.STORAGE_KEYS?.ductbankSchedule || 'ductbankSchedule';
         const condKey = globalThis.TableUtils?.STORAGE_KEYS?.conduitSchedule || 'conduitSchedule';
 
-        try { trays = JSON.parse(localStorage.getItem(trayKey) || '[]'); } catch (e) {}
-        try { cables = JSON.parse(localStorage.getItem(cableKey) || '[]'); } catch (e) {}
-        try { ductbanks = JSON.parse(localStorage.getItem(dbKey) || '[]'); } catch (e) {}
-        try { conduits = JSON.parse(localStorage.getItem(condKey) || '[]'); } catch (e) {}
-
-        if (trays.length > 0 && state.manualTrays.length === 0) {
-            state.manualTrays = trays.map(t => ({
-                tray_id: t.tray_id,
-                start_x: parseFloat(t.start_x),
-                start_y: parseFloat(t.start_y),
-                start_z: parseFloat(t.start_z),
-                end_x: parseFloat(t.end_x),
-                end_y: parseFloat(t.end_y),
-                end_z: parseFloat(t.end_z),
-                width: parseFloat(t.inside_width),
-                height: parseFloat(t.tray_depth),
-                current_fill: 0,
-                shape: 'STR',
-                allowed_cable_group: t.allowed_cable_group || '',
-            }));
-            state.trayData = state.manualTrays;
-            renderManualTrayTable();
-            updateTrayDisplay();
+        const trayJson = localStorage.getItem(trayKey);
+        if (trayJson) {
+            try { trays = JSON.parse(trayJson); } catch (e) {}
+        }
+        const cableJson = localStorage.getItem(cableKey);
+        if (cableJson) {
+            try { cables = JSON.parse(cableJson); } catch (e) {}
+        }
+        const dbJson = localStorage.getItem(dbKey);
+        if (dbJson) {
+            try { ductbanks = JSON.parse(dbJson); } catch (e) {}
+        }
+        const condJson = localStorage.getItem(condKey);
+        if (condJson) {
+            try { conduits = JSON.parse(condJson); } catch (e) {}
         }
 
-        if (cables.length > 0 && state.cableList.length === 0) {
+        if (trays.length > 0) {
+            let overwrite = false;
+            if (state.manualTrays.length === 0) {
+                overwrite = true;
+            } else if (confirm("Replace existing tray network with saved schedule?")) {
+                overwrite = true;
+            }
+            if (overwrite) {
+                state.manualTrays = trays.map(t => ({
+                    tray_id: t.tray_id,
+                    start_x: parseFloat(t.start_x),
+                    start_y: parseFloat(t.start_y),
+                    start_z: parseFloat(t.start_z),
+                    end_x: parseFloat(t.end_x),
+                    end_y: parseFloat(t.end_y),
+                    end_z: parseFloat(t.end_z),
+                    width: parseFloat(t.inside_width),
+                    height: parseFloat(t.tray_depth),
+                    current_fill: 0,
+                    shape: 'STR',
+                    allowed_cable_group: t.allowed_cable_group || '',
+                }));
+                state.trayData = state.manualTrays;
+                renderManualTrayTable();
+                updateTrayDisplay();
+            }
+        }
+
+        if (cables.length > 0) {
+            let overwrite = false;
+            if (state.cableList.length === 0) {
+                overwrite = true;
+            } else if (confirm("Replace existing cable list with saved schedule?")) {
+                overwrite = true;
+            }
+            if (overwrite) {
             const conductorProps = globalThis.CONDUCTOR_PROPS || {};
             const parseThickness = v => {
                 if (v === undefined || v === null || v === '') return undefined;
@@ -354,6 +381,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 return mapped;
             });
             updateCableListDisplay();
+            }
         }
 
         if (ductbanks.length > 0) {
