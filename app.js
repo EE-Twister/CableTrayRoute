@@ -393,20 +393,25 @@ document.addEventListener('DOMContentLoaded', () => {
             }, {});
 
             state.ductbankData = {
-                ductbanks: ductbanks.map(db => ({
-                    id: db.ductbank_id || db.id || db.tag,
-                    outline: [
-                        [parseFloat(db.start_x), parseFloat(db.start_y), parseFloat(db.start_z)],
-                        [parseFloat(db.end_x), parseFloat(db.end_y), parseFloat(db.end_z)]
-                    ],
-                    conduits: (conduitMap[db.ductbank_id] || []).map(c => ({
-                        id: c.conduit_id || c.id,
-                        path: [
-                            [parseFloat(c.start_x), parseFloat(c.start_y), parseFloat(c.start_z)],
-                            [parseFloat(c.end_x), parseFloat(c.end_y), parseFloat(c.end_z)]
-                        ]
-                    }))
-                }))
+                ductbanks: ductbanks.map(db => {
+                    const dbId = db.ductbank_id || db.id || db.tag;
+                    return {
+                        id: dbId,
+                        tag: db.tag,
+                        outline: [
+                            [parseFloat(db.start_x), parseFloat(db.start_y), parseFloat(db.start_z)],
+                            [parseFloat(db.end_x), parseFloat(db.end_y), parseFloat(db.end_z)]
+                        ],
+                        conduits: (conduitMap[dbId] || []).map(c => ({
+                            id: c.conduit_id || c.id,
+                            tag: c.conduit_id || c.id,
+                            path: [
+                                [parseFloat(c.start_x), parseFloat(c.start_y), parseFloat(c.start_z)],
+                                [parseFloat(c.end_x), parseFloat(c.end_y), parseFloat(c.end_z)]
+                            ]
+                        }))
+                    };
+                })
             };
         }
     };
@@ -2833,32 +2838,58 @@ const openConduitFill = (cables) => {
                     const ox = db.outline.map(p => p[0]);
                     const oy = db.outline.map(p => p[1]);
                     const oz = db.outline.map(p => p[2]);
+                    const dbLabel = db.tag || db.id;
                     const ot = {
                         x: ox, y: oy, z: oz,
                         mode: 'lines', type: 'scatter3d',
                         line: { color: 'saddlebrown', width: 2 },
-                        name: `Ductbank ${db.id}`,
+                        name: `Ductbank ${dbLabel}`,
                         showlegend: false,
-                        visible: state.ductbankVisible
+                        visible: state.ductbankVisible,
+                        hoverinfo: 'text',
+                        text: db.outline.map(() => dbLabel)
                     };
                     state.ductbankTraceIndices.push(traces.length);
                     traces.push(ot);
+
+                    const mid = db.outline.reduce((acc, p) => [acc[0] + p[0], acc[1] + p[1], acc[2] + p[2]], [0, 0, 0]).map(v => v / db.outline.length);
+                    const textTrace = {
+                        type: 'scatter3d', mode: 'text',
+                        x: [mid[0]], y: [mid[1]], z: [mid[2]],
+                        text: [dbLabel], showlegend: false, hoverinfo: 'none',
+                        visible: state.ductbankVisible
+                    };
+                    state.ductbankTraceIndices.push(traces.length);
+                    traces.push(textTrace);
                 }
                 (db.conduits || []).forEach(cond => {
                     if (!Array.isArray(cond.path)) return;
                     const cx = cond.path.map(p => p[0]);
                     const cy = cond.path.map(p => p[1]);
                     const cz = cond.path.map(p => p[2]);
+                    const condLabel = cond.tag || cond.id;
                     const ct = {
                         x: cx, y: cy, z: cz,
                         mode: 'lines', type: 'scatter3d',
                         line: { color: 'black', width: 2 },
-                        name: `Conduit ${cond.id}`,
+                        name: `Conduit ${condLabel}`,
                         showlegend: false,
-                        visible: state.ductbankVisible
+                        visible: state.ductbankVisible,
+                        hoverinfo: 'text',
+                        text: cond.path.map(() => condLabel)
                     };
                     state.ductbankTraceIndices.push(traces.length);
                     traces.push(ct);
+
+                    const cmid = cond.path.reduce((acc, p) => [acc[0] + p[0], acc[1] + p[1], acc[2] + p[2]], [0, 0, 0]).map(v => v / cond.path.length);
+                    const cTextTrace = {
+                        type: 'scatter3d', mode: 'text',
+                        x: [cmid[0]], y: [cmid[1]], z: [cmid[2]],
+                        text: [condLabel], showlegend: false, hoverinfo: 'none',
+                        visible: state.ductbankVisible
+                    };
+                    state.ductbankTraceIndices.push(traces.length);
+                    traces.push(cTextTrace);
                 });
             });
         }
