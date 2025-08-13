@@ -280,9 +280,19 @@ class TableManager {
             this.showListboxPopup(el, td);
           }
         });
+        td.addEventListener('click', () => {
+          this.showListboxPopup(el, td);
+        });
         td.appendChild(summaryEl);
         updateSummary = () => {
-          summaryEl.textContent = (el.getSelectedValues ? el.getSelectedValues() : []).join(', ');
+          const vals = el.getSelectedValues ? el.getSelectedValues() : [];
+          if (vals.length) {
+            summaryEl.textContent = vals.join(', ');
+            summaryEl.classList.remove('placeholder');
+          } else {
+            summaryEl.textContent = 'Select Raceways';
+            summaryEl.classList.add('placeholder');
+          }
         };
         el.addEventListener('change', () => {
           updateSummary();
