@@ -133,6 +133,9 @@ document.addEventListener('DOMContentLoaded', () => {
         conduitType: document.getElementById('conduit-type'),
         sidebar: document.querySelector('.sidebar'),
         sidebarToggle: document.getElementById('sidebar-toggle'),
+        resumeModal: document.getElementById('resume-modal'),
+        resumeYesBtn: document.getElementById('resume-yes-btn'),
+        resumeNoBtn: document.getElementById('resume-no-btn'),
     };
 
     document.querySelectorAll('input, select, textarea').forEach(el=>{if(!el.classList.contains('table-search')){el.addEventListener('input',markUnsaved);el.addEventListener('change',markUnsaved);}});
@@ -276,43 +279,25 @@ document.addEventListener('DOMContentLoaded', () => {
         if (condJson) {
             try { conduits = JSON.parse(condJson); } catch (e) {}
         }
-
         if (trays.length > 0) {
-            let overwrite = false;
-            if (state.manualTrays.length === 0) {
-                overwrite = true;
-            } else if (confirm("Replace existing tray network with saved schedule?")) {
-                overwrite = true;
-            }
-            if (overwrite) {
-                state.manualTrays = trays.map(t => ({
-                    tray_id: t.tray_id,
-                    start_x: parseFloat(t.start_x),
-                    start_y: parseFloat(t.start_y),
-                    start_z: parseFloat(t.start_z),
-                    end_x: parseFloat(t.end_x),
-                    end_y: parseFloat(t.end_y),
-                    end_z: parseFloat(t.end_z),
-                    width: parseFloat(t.inside_width),
-                    height: parseFloat(t.tray_depth),
-                    current_fill: 0,
-                    shape: 'STR',
-                    allowed_cable_group: t.allowed_cable_group || '',
-                }));
-                state.trayData = state.manualTrays;
-                renderManualTrayTable();
-                updateTrayDisplay();
-            }
+            state.manualTrays = trays.map(t => ({
+                tray_id: t.tray_id,
+                start_x: parseFloat(t.start_x),
+                start_y: parseFloat(t.start_y),
+                start_z: parseFloat(t.start_z),
+                end_x: parseFloat(t.end_x),
+                end_y: parseFloat(t.end_y),
+                end_z: parseFloat(t.end_z),
+                width: parseFloat(t.inside_width),
+                height: parseFloat(t.tray_depth),
+                current_fill: 0,
+                shape: 'STR',
+                allowed_cable_group: t.allowed_cable_group || '',
+            }));
+            state.trayData = state.manualTrays;
         }
 
         if (cables.length > 0) {
-            let overwrite = false;
-            if (state.cableList.length === 0) {
-                overwrite = true;
-            } else if (confirm("Replace existing cable list with saved schedule?")) {
-                overwrite = true;
-            }
-            if (overwrite) {
             const conductorProps = globalThis.CONDUCTOR_PROPS || {};
             const parseThickness = v => {
                 if (v === undefined || v === null || v === '') return undefined;
@@ -380,8 +365,6 @@ document.addEventListener('DOMContentLoaded', () => {
                 };
                 return mapped;
             });
-            updateCableListDisplay();
-            }
         }
 
         if (ductbanks.length > 0) {
@@ -3078,18 +3061,55 @@ Plotly.newPlot(document.getElementById('plot'), data, layout, {responsive: true}
     // Initial setup
     loadSession();
     const hadSession = state.manualTrays.length > 0 || state.cableList.length > 0;
-    loadSchedulesIntoSession();
-    if (hadSession && (state.manualTrays.length > 0 || state.cableList.length > 0) && confirm("Resume previous session?")) {
+    const trayKey = globalThis.TableUtils?.STORAGE_KEYS?.traySchedule || 'traySchedule';
+    const cableKey = globalThis.TableUtils?.STORAGE_KEYS?.cableSchedule || 'cableSchedule';
+    const hasSaved = hadSession || localStorage.getItem(trayKey) || localStorage.getItem(cableKey);
+
+    const finalizeLoad = () => {
         renderManualTrayTable();
         updateCableListDisplay();
         state.trayData = state.manualTrays;
         updateTrayDisplay();
-    } else if (hadSession && (state.manualTrays.length > 0 || state.cableList.length > 0)) {
-        state.manualTrays = [];
-        state.cableList = [];
-        saveSession();
-    }
+        loadDuctbankData();
+    };
 
-    updateTrayDisplay();
-    loadDuctbankData();
+    if (hasSaved) {
+        const modal = elements.resumeModal;
+        const yesBtn = elements.resumeYesBtn;
+        const noBtn = elements.resumeNoBtn;
+        if (modal && yesBtn && noBtn) {
+            modal.style.display = 'flex';
+            modal.setAttribute('aria-hidden', 'false');
+            yesBtn.focus();
+            const close = () => {
+                modal.style.display = 'none';
+                modal.setAttribute('aria-hidden', 'true');
+            };
+            yesBtn.addEventListener('click', () => {
+                close();
+                loadSchedulesIntoSession();
+                finalizeLoad();
+            }, { once: true });
+            noBtn.addEventListener('click', () => {
+                close();
+                state.manualTrays = [];
+                state.cableList = [];
+                saveSession();
+                localStorage.removeItem(trayKey);
+                localStorage.removeItem(cableKey);
+                renderManualTrayTable();
+                updateCableListDisplay();
+                updateTrayDisplay();
+                loadDuctbankData();
+            }, { once: true });
+        } else {
+            loadSchedulesIntoSession();
+            finalizeLoad();
+        }
+    } else {
+        renderManualTrayTable();
+        updateCableListDisplay();
+        updateTrayDisplay();
+        loadDuctbankData();
+    }
 });
