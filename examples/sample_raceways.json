@@ -612,7 +612,8 @@
       "end_z": 10,
       "inside_width": 18,
       "tray_depth": 4,
-      "tray_type": "Ladder (50 % fill)"
+      "tray_type": "Ladder (50 % fill)",
+      "allowed_cable_group": "Control"
     },
     {
       "tray_id": "TR-002",
@@ -624,7 +625,8 @@
       "end_z": 10,
       "inside_width": 24,
       "tray_depth": 4,
-      "tray_type": "Ladder (50 % fill)"
+      "tray_type": "Ladder (50 % fill)",
+      "allowed_cable_group": "Lighting"
     },
     {
       "tray_id": "TR-003",
@@ -636,7 +638,8 @@
       "end_z": 10,
       "inside_width": 18,
       "tray_depth": 4,
-      "tray_type": "Ladder (50 % fill)"
+      "tray_type": "Ladder (50 % fill)",
+      "allowed_cable_group": "HV"
     },
     {
       "tray_id": "TR-004",
@@ -648,7 +651,8 @@
       "end_z": 10,
       "inside_width": 24,
       "tray_depth": 4,
-      "tray_type": "Ladder (50 % fill)"
+      "tray_type": "Ladder (50 % fill)",
+      "allowed_cable_group": "Control"
     },
     {
       "tray_id": "TR-005",
@@ -660,7 +664,8 @@
       "end_z": 10,
       "inside_width": 18,
       "tray_depth": 4,
-      "tray_type": "Ladder (50 % fill)"
+      "tray_type": "Ladder (50 % fill)",
+      "allowed_cable_group": "Lighting"
     },
     {
       "tray_id": "TR-006",
@@ -672,7 +677,8 @@
       "end_z": 10,
       "inside_width": 24,
       "tray_depth": 4,
-      "tray_type": "Ladder (50 % fill)"
+      "tray_type": "Ladder (50 % fill)",
+      "allowed_cable_group": "HV"
     },
     {
       "tray_id": "TR-007",
@@ -684,7 +690,8 @@
       "end_z": 10,
       "inside_width": 18,
       "tray_depth": 4,
-      "tray_type": "Ladder (50 % fill)"
+      "tray_type": "Ladder (50 % fill)",
+      "allowed_cable_group": "Control"
     },
     {
       "tray_id": "TR-008",
@@ -696,7 +703,8 @@
       "end_z": 10,
       "inside_width": 24,
       "tray_depth": 4,
-      "tray_type": "Ladder (50 % fill)"
+      "tray_type": "Ladder (50 % fill)",
+      "allowed_cable_group": "Lighting"
     },
     {
       "tray_id": "TR-009",
@@ -708,7 +716,8 @@
       "end_z": 10,
       "inside_width": 18,
       "tray_depth": 4,
-      "tray_type": "Ladder (50 % fill)"
+      "tray_type": "Ladder (50 % fill)",
+      "allowed_cable_group": "HV"
     },
     {
       "tray_id": "TR-010",
@@ -720,7 +729,8 @@
       "end_z": 10,
       "inside_width": 24,
       "tray_depth": 4,
-      "tray_type": "Ladder (50 % fill)"
+      "tray_type": "Ladder (50 % fill)",
+      "allowed_cable_group": "Control"
     },
     {
       "tray_id": "TR-011",
@@ -732,7 +742,8 @@
       "end_z": 10,
       "inside_width": 18,
       "tray_depth": 4,
-      "tray_type": "Ladder (50 % fill)"
+      "tray_type": "Ladder (50 % fill)",
+      "allowed_cable_group": "Lighting"
     },
     {
       "tray_id": "TR-012",
@@ -744,7 +755,8 @@
       "end_z": 10,
       "inside_width": 24,
       "tray_depth": 4,
-      "tray_type": "Ladder (50 % fill)"
+      "tray_type": "Ladder (50 % fill)",
+      "allowed_cable_group": "HV"
     },
     {
       "tray_id": "TR-013",
@@ -756,7 +768,8 @@
       "end_z": 10,
       "inside_width": 18,
       "tray_depth": 4,
-      "tray_type": "Ladder (50 % fill)"
+      "tray_type": "Ladder (50 % fill)",
+      "allowed_cable_group": "Control"
     },
     {
       "tray_id": "TR-014",
@@ -768,7 +781,8 @@
       "end_z": 10,
       "inside_width": 24,
       "tray_depth": 4,
-      "tray_type": "Ladder (50 % fill)"
+      "tray_type": "Ladder (50 % fill)",
+      "allowed_cable_group": "Lighting"
     },
     {
       "tray_id": "TR-015",
@@ -780,7 +794,8 @@
       "end_z": 10,
       "inside_width": 18,
       "tray_depth": 4,
-      "tray_type": "Ladder (50 % fill)"
+      "tray_type": "Ladder (50 % fill)",
+      "allowed_cable_group": "HV"
     },
     {
       "tray_id": "TR-016",
@@ -792,7 +807,8 @@
       "end_z": 10,
       "inside_width": 24,
       "tray_depth": 4,
-      "tray_type": "Ladder (50 % fill)"
+      "tray_type": "Ladder (50 % fill)",
+      "allowed_cable_group": "Control"
     },
     {
       "tray_id": "TR-017",
@@ -804,7 +820,8 @@
       "end_z": 10,
       "inside_width": 18,
       "tray_depth": 4,
-      "tray_type": "Ladder (50 % fill)"
+      "tray_type": "Ladder (50 % fill)",
+      "allowed_cable_group": "Lighting"
     },
     {
       "tray_id": "TR-018",
@@ -816,7 +833,8 @@
       "end_z": 10,
       "inside_width": 24,
       "tray_depth": 4,
-      "tray_type": "Ladder (50 % fill)"
+      "tray_type": "Ladder (50 % fill)",
+      "allowed_cable_group": "HV"
     },
     {
       "tray_id": "TR-019",
@@ -828,7 +846,8 @@
       "end_z": 10,
       "inside_width": 18,
       "tray_depth": 4,
-      "tray_type": "Ladder (50 % fill)"
+      "tray_type": "Ladder (50 % fill)",
+      "allowed_cable_group": "Control"
     },
     {
       "tray_id": "TR-020",
@@ -840,7 +859,8 @@
       "end_z": 10,
       "inside_width": 24,
       "tray_depth": 4,
-      "tray_type": "Ladder (50 % fill)"
+      "tray_type": "Ladder (50 % fill)",
+      "allowed_cable_group": "Lighting"
     }
   ],
   "conduits": [
