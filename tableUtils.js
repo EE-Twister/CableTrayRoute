@@ -171,7 +171,10 @@ class TableManager {
         if (row.cells[i]) row.cells[i].classList.toggle('group-hidden', hide);
       });
     });
-    if (this.groupThs[name]) this.groupThs[name].classList.toggle('group-collapsed', hide);
+    if (this.groupThs[name]) {
+      this.groupThs[name].classList.toggle('group-collapsed', hide);
+      this.groupThs[name].colSpan = hide ? 1 : indices.length;
+    }
     if (this.groupToggles[name]) this.groupToggles[name].textContent = hide ? '+' : '-';
     if (hide) this.hiddenGroups.add(name); else this.hiddenGroups.delete(name);
   }
