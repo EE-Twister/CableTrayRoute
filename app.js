@@ -432,7 +432,8 @@ document.addEventListener('DOMContentLoaded', () => {
                         const start = cond.path[0];
                         const end = cond.path[cond.path.length - 1];
                         const area = (CONDUIT_SPECS[cond.type] || {})[cond.trade_size];
-                        const dia = area ? Math.sqrt((4 * area) / Math.PI) : 0;
+                        const dia = area ? Math.sqrt((4 * area) / Math.PI)
+                                         : parseFloat(cond.diameter) || 0;
                         state.trayData.push({
                             tray_id: cond.id || cond.conduit_id,
                             start_x: start[0],
@@ -458,7 +459,8 @@ document.addEventListener('DOMContentLoaded', () => {
                 const start = [parseFloat(cond.start_x), parseFloat(cond.start_y), parseFloat(cond.start_z)];
                 const end = [parseFloat(cond.end_x), parseFloat(cond.end_y), parseFloat(cond.end_z)];
                 const area = (CONDUIT_SPECS[cond.type] || {})[cond.trade_size];
-                const dia = area ? Math.sqrt((4 * area) / Math.PI) : 0;
+                const dia = area ? Math.sqrt((4 * area) / Math.PI)
+                                 : parseFloat(cond.diameter) || 0;
                 state.trayData.push({
                     tray_id: cond.conduit_id || cond.id,
                     start_x: start[0],
