@@ -15,6 +15,7 @@ class TableManager {
     this.storageKey = opts.storageKey || opts.tableId;
     this.onChange = opts.onChange || null;
     this.onSave = opts.onSave || null;
+    this.onView = opts.onView || null;
     this.rowCountEl = opts.rowCountId ? document.getElementById(opts.rowCountId) : null;
     this.buildHeader();
     this.initButtons(opts);
@@ -477,6 +478,28 @@ class TableManager {
     const actTd = tr.insertCell();
     if (this.headerRow && this.headerRow.cells[this.columns.length] && this.headerRow.cells[this.columns.length].style.width) {
       actTd.style.width = this.headerRow.cells[this.columns.length].style.width;
+    }
+    if(this.onView){
+      const viewBtn=document.createElement('button');
+      viewBtn.textContent='👁';
+      viewBtn.className='viewBtn';
+      viewBtn.title='View row';
+      viewBtn.setAttribute('aria-label','View row');
+      viewBtn.addEventListener('click',()=>{
+        const row={};
+        this.columns.forEach((col,i)=>{
+          const el=tr.cells[i].firstChild;
+          if(!el) return;
+          if(col.multiple){
+            if(typeof el.getSelectedValues==='function') row[col.key]=el.getSelectedValues();
+            else row[col.key]=Array.from(el.selectedOptions||[]).map(o=>o.value);
+          }else{
+            row[col.key]=el.value;
+          }
+        });
+        this.onView(row,tr);
+      });
+      actTd.appendChild(viewBtn);
     }
     const addBtn=document.createElement('button');
     addBtn.textContent='\u2795';

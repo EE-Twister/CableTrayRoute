@@ -238,6 +238,7 @@
 
       const act=row.insertCell();
       setWidth(act,11);
+      act.appendChild(iconBtn('👁','viewBtn','View Ductbank',()=>{viewDuctbank(i);}));
       act.appendChild(iconBtn('\u2795','insertBelowBtn','Add Conduit',()=>{addConduit(i);}));
       act.appendChild(iconBtn('\u29C9','duplicateBtn','Duplicate Ductbank',()=>{duplicateDuctbank(i);}));
       act.appendChild(iconBtn('\u2716','removeBtn','Delete Ductbank',()=>{deleteDuctbank(i);}));
@@ -330,6 +331,17 @@
     ductbanks[i].conduits.splice(j,1);
     renderDuctbanks();
     saveDuctbanks();
+  }
+
+  function viewDuctbank(i){
+    const db=ductbanks[i];
+    const session={
+      ductbankTag:db.tag,
+      concreteEncasement:db.concrete_encasement,
+      conduits:db.conduits.map(c=>({conduit_id:c.conduit_id,conduit_type:c.type,trade_size:c.trade_size}))
+    };
+    try{localStorage.setItem('ductbankSession',JSON.stringify(session));}catch(e){console.error('Failed to store ductbank session',e);}
+    window.location.href='ductbankroute.html';
   }
 
   function duplicateDuctbank(i){
