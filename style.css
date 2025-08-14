@@ -503,6 +503,18 @@ body.dark-mode .sticky-table tbody tr:hover {
     overflow-y: auto;
 }
 
+.table-footer {
+    margin-top: 10px;
+    display: flex;
+    align-items: center;
+}
+
+.row-count {
+    margin-left: auto;
+    text-align: right;
+    font-size: 0.9rem;
+}
+
 .table-search {
     width: 100%;
     margin-bottom: 4px;

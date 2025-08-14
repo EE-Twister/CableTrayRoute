@@ -34,6 +34,29 @@ document.addEventListener('DOMContentLoaded',()=>{
   const markSaved=()=>{saved=true;};
   const markUnsaved=()=>{saved=false;};
   window.addEventListener('beforeunload',e=>{if(!saved){e.preventDefault();e.returnValue='';}});
+
+  document.addEventListener('keydown',e=>{
+    if((e.key==='ArrowUp'||e.key==='ArrowDown')&&['INPUT','SELECT'].includes(e.target.tagName)){
+      const td=e.target.closest('td');
+      if(!td) return;
+      const tr=td.parentElement;
+      const tbody=tr.parentElement;
+      const rows=Array.from(tbody.rows);
+      let idx=rows.indexOf(tr);
+      const dir=e.key==='ArrowUp'?-1:1;
+      let targetRow;
+      do{
+        idx+=dir;
+        targetRow=rows[idx];
+      }while(targetRow&&(targetRow.style.display==='none'||targetRow.classList.contains('conduit-container')));
+      if(targetRow&&targetRow.cells[td.cellIndex]){
+        const next=targetRow.cells[td.cellIndex].querySelector('input,select');
+        if(next){e.preventDefault();next.focus();if(typeof next.select==='function')next.select();}
+      }else{
+        e.preventDefault();
+      }
+    }
+  });
   if(typeof initDuctbankTable==='function'){
     initDuctbankTable();
     const dbTable=document.getElementById('ductbankTable');
@@ -72,7 +95,8 @@ document.addEventListener('DOMContentLoaded',()=>{
     deleteAllBtnId:'delete-tray-btn',
     columns:trayColumns,
     onChange:markUnsaved,
-    onSave:markSaved
+    onSave:markSaved,
+    rowCountId:'tray-row-count'
   });
 
   const conduitColumns=[
@@ -100,7 +124,8 @@ document.addEventListener('DOMContentLoaded',()=>{
     deleteAllBtnId:'delete-conduit-btn',
     columns:conduitColumns,
     onChange:markUnsaved,
-    onSave:markSaved
+    onSave:markSaved,
+    rowCountId:'conduit-row-count'
   });
 
   const loadSampleBtn=document.getElementById('load-sample-raceway-btn');

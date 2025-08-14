@@ -15,11 +15,13 @@ class TableManager {
     this.storageKey = opts.storageKey || opts.tableId;
     this.onChange = opts.onChange || null;
     this.onSave = opts.onSave || null;
+    this.rowCountEl = opts.rowCountId ? document.getElementById(opts.rowCountId) : null;
     this.buildHeader();
     this.initButtons(opts);
     this.load();
     this.hiddenGroups = new Set();
     this.loadGroupState();
+    this.updateRowCount();
   }
 
   initButtons(opts){
@@ -162,6 +164,12 @@ class TableManager {
     try { all = JSON.parse(localStorage.getItem(STORAGE_KEYS.collapsedGroups) || '{}'); } catch(e) {}
     const hidden = all[this.storageKey] || [];
     hidden.forEach(g => this.setGroupVisibility(g, true));
+  }
+
+  updateRowCount() {
+    if (this.rowCountEl) {
+      this.rowCountEl.textContent = `Rows: ${this.tbody.querySelectorAll('tr').length}`;
+    }
   }
 
   showFilterPopup(btn, index){
@@ -432,9 +440,32 @@ class TableManager {
       }
     });
     const actTd = tr.insertCell();
+    const dupBtn = document.createElement('button');
+    dupBtn.textContent = 'Duplicate';
+    dupBtn.addEventListener('click', () => {
+      const row = {};
+      this.columns.forEach((col,i) => {
+        const el = tr.cells[i].firstChild;
+        if (!el) return;
+        if (col.multiple) {
+          if (typeof el.getSelectedValues === 'function') {
+            row[col.key] = el.getSelectedValues();
+          } else {
+            row[col.key] = Array.from(el.selectedOptions || []).map(o=>o.value);
+          }
+        } else {
+          row[col.key] = el.value;
+        }
+      });
+      const newRow = this.addRow(row);
+      if (newRow) this.tbody.insertBefore(newRow, tr.nextSibling);
+      if (this.onChange) this.onChange();
+    });
+    actTd.appendChild(dupBtn);
+
     const delBtn = document.createElement('button');
     delBtn.textContent = 'Delete';
-    delBtn.addEventListener('click', () => { tr.remove(); this.save(); if (this.onChange) this.onChange(); });
+    delBtn.addEventListener('click', () => { tr.remove(); this.save(); this.updateRowCount(); if (this.onChange) this.onChange(); });
     actTd.appendChild(delBtn);
 
     Object.keys(this.groupCols || {}).forEach(g => {
@@ -444,6 +475,8 @@ class TableManager {
         });
       }
     });
+    this.updateRowCount();
+    return tr;
   }
 
   getData() {
@@ -490,6 +523,7 @@ class TableManager {
     let data = [];
     try { data = JSON.parse(localStorage.getItem(this.storageKey) || '[]'); } catch(e) {}
     data.forEach(row => this.addRow(row));
+    this.updateRowCount();
   }
 
   clearFilters() {
@@ -512,6 +546,7 @@ class TableManager {
   deleteAll() {
     this.tbody.innerHTML='';
     this.save();
+    this.updateRowCount();
     if (this.onChange) this.onChange();
   }
 
