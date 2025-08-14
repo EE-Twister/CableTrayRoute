@@ -810,6 +810,17 @@ body.dark-mode .db-table td {
     z-index: 1000;
 }
 
+th { position: relative; }
+.col-resizer {
+    position: absolute;
+    top: 0;
+    right: 0;
+    width: 5px;
+    height: 100%;
+    cursor: col-resize;
+    user-select: none;
+}
+
 .listbox-popup {
     position: absolute;
     background: var(--secondary-color);

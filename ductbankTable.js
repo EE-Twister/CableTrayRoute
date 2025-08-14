@@ -3,6 +3,16 @@
   const DUCTBANK_KEY = TableUtils.STORAGE_KEYS.ductbankSchedule;
   let ductbankTbody;
 
+  function iconBtn(sym,cls,label,handler){
+    const b=document.createElement('button');
+    b.textContent=sym;
+    b.className=cls;
+    b.title=label;
+    b.setAttribute('aria-label',label);
+    b.addEventListener('click',handler);
+    return b;
+  }
+
   function parseSize(sz){
     if(sz.includes('-')){const[w,f]=sz.split('-');const[n,d]=f.split('/');return parseFloat(w)+parseFloat(n)/parseFloat(d);}
     if(sz.includes('/')){const[n,d]=sz.split('/');return parseFloat(n)/parseFloat(d);}
@@ -107,18 +117,9 @@
       ez.appendChild(ezInput);
 
       const act=row.insertCell();
-      const addC=document.createElement('button');
-      addC.textContent='Add Conduit';
-      addC.addEventListener('click',()=>{addConduit(i);});
-      const dup=document.createElement('button');
-      dup.textContent='Duplicate';
-      dup.addEventListener('click',()=>{duplicateDuctbank(i);});
-      const del=document.createElement('button');
-      del.textContent='Delete';
-      del.addEventListener('click',()=>{deleteDuctbank(i);});
-      act.appendChild(addC);
-      act.appendChild(dup);
-      act.appendChild(del);
+      act.appendChild(iconBtn('\u2795','insertBelowBtn','Add Conduit',()=>{addConduit(i);}));
+      act.appendChild(iconBtn('\u29C9','duplicateBtn','Duplicate Ductbank',()=>{duplicateDuctbank(i);}));
+      act.appendChild(iconBtn('\u2716','removeBtn','Delete Ductbank',()=>{deleteDuctbank(i);}));
 
       const cRow=ductbankTbody.insertRow();
       cRow.className='conduit-container';
@@ -175,14 +176,8 @@
         TableUtils.applyValidation(sizeSel,sizeRules);
 
         const actc=r.insertCell();
-        const dupe=document.createElement('button');
-        dupe.textContent='Duplicate';
-        dupe.addEventListener('click',()=>{duplicateConduit(i,j);});
-        const delc=document.createElement('button');
-        delc.textContent='Delete';
-        delc.addEventListener('click',()=>{deleteConduit(i,j);});
-        actc.appendChild(dupe);
-        actc.appendChild(delc);
+        actc.appendChild(iconBtn('\u29C9','duplicateBtn','Duplicate Conduit',()=>{duplicateConduit(i,j);}));
+        actc.appendChild(iconBtn('\u2716','removeBtn','Delete Conduit',()=>{deleteConduit(i,j);}));
       });
       cCell.appendChild(cTable);
     });
