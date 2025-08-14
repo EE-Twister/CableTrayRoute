@@ -17,22 +17,21 @@ Columns (in order):
 9. `end_y`
 10. `end_z`
 11. `zone`
-12. `conduit_id`
-13. `circuit_group`
-14. `allowed_cable_group`
-15. `cable_type`
-16. `conductors`
-17. `conductor_size`
-18. `conductor_material`
-19. `insulation_type`
-20. `insulation_rating`
-21. `insulation_thickness`
-22. `shielding_jacket`
-23. `cable_rating`
-24. `est_load`
-25. `duty_cycle`
-26. `length`
-27. `notes`
+12. `circuit_group`
+13. `allowed_cable_group`
+14. `cable_type`
+15. `conductors`
+16. `conductor_size`
+17. `conductor_material`
+18. `insulation_type`
+19. `insulation_rating`
+20. `insulation_thickness`
+21. `shielding_jacket`
+22. `cable_rating`
+23. `est_load`
+24. `duty_cycle`
+25. `length`
+26. `notes`
 
 ## Ductbanks
 
