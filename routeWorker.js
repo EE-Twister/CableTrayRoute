@@ -417,12 +417,16 @@ class CableRoutingSystem {
     }
     _racewayRoute(startPoint, endPoint, cableArea, allowedGroup, racewayIds) {
         if (!Array.isArray(racewayIds) || racewayIds.length === 0) return null;
+        const knownIds = racewayIds.filter(id => this.trays.has(id));
+        if (knownIds.length === 0) return null;
+        if (knownIds.length < racewayIds.length) {
+            console.warn(`Unknown raceway IDs: ${racewayIds.filter(id => !this.trays.has(id)).join(', ')}`);
+        }
         const segments = [];
         const traySegments = [];
         let prev = startPoint.slice();
-        for (const id of racewayIds) {
+        for (const id of knownIds) {
             const tray = this.trays.get(id);
-            if (!tray) return { success: false, manual: true, manual_raceway: true, message: `Tray ${id} not found` };
             if (tray.allowed_cable_group && allowedGroup && tray.allowed_cable_group !== allowedGroup) {
                 return { success: false, manual: true, manual_raceway: true, message: `Tray ${id} not allowed` };
             }
@@ -459,7 +463,8 @@ class CableRoutingSystem {
             return this._manualRoute(startPoint, endPoint, cableArea, allowedGroup, manualPath);
         }
         if (racewayIds && racewayIds.length > 0) {
-            return this._racewayRoute(startPoint, endPoint, cableArea, allowedGroup, racewayIds);
+            const manualResult = this._racewayRoute(startPoint, endPoint, cableArea, allowedGroup, racewayIds);
+            if (manualResult) return manualResult;
         }
         if (!this.baseGraph) this.prepareBaseGraph();
         // 1. Start from the precomputed graph
