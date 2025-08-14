@@ -58,6 +58,13 @@
                  </label>
                  <input type="number" id="proximity-threshold" value="72" min="0" step="1">
 
+                 <label for="max-field-edge">Max Field Connection Distance (in)
+                    <span class="help-icon" tabindex="0" role="button" aria-label="Help" aria-expanded="false" aria-describedby="max-field-help">?
+                        <span id="max-field-help" class="tooltip">Maximum distance between automatically generated field nodes. Increase for large networks to keep them connectable.</span>
+                    </span>
+                 </label>
+                 <input type="number" id="max-field-edge" value="1000" min="0" max="10000" step="1">
+
                  <label for="field-route-penalty">Field Route Cost Multiplier
                     <span class="help-icon" tabindex="0" role="button" aria-label="Help" aria-expanded="false" aria-describedby="field-penalty-help">?
                         <span id="field-penalty-help" class="tooltip">This makes field routing (not in a tray) more expensive than routing within a tray. A value of 3 means every inch of field routing costs as much as 3 inches of tray routing, encouraging the algorithm to use trays whenever possible.</span>
