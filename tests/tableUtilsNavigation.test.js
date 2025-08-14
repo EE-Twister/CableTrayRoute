@@ -158,7 +158,11 @@ describe("tableUtils arrow navigation", () => {
 
   it("Enter moves to cell below and selects text", () => {
     const row1 = { cells: [], nextElementSibling: null };
-    const row2 = { cells: [], previousElementSibling: row1, nextElementSibling: null };
+    const row2 = {
+      cells: [],
+      previousElementSibling: row1,
+      nextElementSibling: null,
+    };
     row1.nextElementSibling = row2;
     const topInput = makeInput("top");
     const topCell = makeCell(topInput, row1, 0);
