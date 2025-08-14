@@ -1783,6 +1783,8 @@ Wt: ${m.weight.toFixed(2)} lbs/ft
                   odInput.readOnly = false;
                   wtInput.readOnly = false;
                 }
+              row.children[8].querySelector('input').value = c.zone || c.cable_zone || 1;
+              row.children[9].querySelector('input').value = c.circuitGroup || c.circuit_group || '';
               cableTbody.appendChild(row);
             });
           }

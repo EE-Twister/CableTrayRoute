@@ -50,7 +50,11 @@ document.addEventListener('DOMContentLoaded',()=>{
             cable_od:c.cable_od??val,
             OD:c.OD??val,
             od:c.od??val,
-            diameter:c.diameter??val
+            diameter:c.diameter??val,
+            rating:c.rating??c.cable_rating,
+            voltage:c.voltage??c.operating_voltage,
+            circuitGroup:c.circuitGroup??c.circuit_group,
+            zone:c.zone??c.cable_zone
           };
         });
     }catch(e){console.error('Failed to load cables for',id,e);return[];}
