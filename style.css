@@ -776,6 +776,12 @@ body.dark-mode .db-table td {
     border: none;
 }
 
+.viewBtn {
+    background: #2ecc71;
+    color: #fff;
+    border: none;
+}
+
 .insertAboveBtn,
 .insertBelowBtn {
     background: #3498db;
@@ -787,7 +793,8 @@ body.dark-mode .db-table td {
 .removeBtn,
 .duplicateBtn,
 .insertAboveBtn,
-.insertBelowBtn {
+.insertBelowBtn,
+.viewBtn {
     width: 28px;
     height: 28px;
     padding: 0;

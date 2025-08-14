@@ -30,6 +30,18 @@ document.addEventListener('DOMContentLoaded',()=>{
   initHelpModal('tray-help-btn','tray-help-modal');
   initHelpModal('conduit-help-btn','conduit-help-modal');
   initNavToggle();
+  function cablesForRaceway(id){
+    try{
+      const json=localStorage.getItem(TableUtils.STORAGE_KEYS.cableSchedule);
+      if(!json) return [];
+      const arr=JSON.parse(json);
+      return arr.filter(c=>{
+        let ids=c.raceway_ids;
+        if(typeof ids==='string') ids=ids.split(',').map(s=>s.trim()).filter(Boolean);
+        return Array.isArray(ids)&&ids.includes(id);
+      });
+    }catch(e){console.error('Failed to load cables for',id,e);return[];}
+  }
   let saved=true;
   const markSaved=()=>{saved=true;};
   const markUnsaved=()=>{saved=false;};
@@ -96,7 +108,15 @@ document.addEventListener('DOMContentLoaded',()=>{
     columns:trayColumns,
     onChange:markUnsaved,
     onSave:markSaved,
-    rowCountId:'tray-row-count'
+    rowCountId:'tray-row-count',
+    onView:(row)=>{
+      try{
+        const tray={tray_id:row.tray_id,width:parseFloat(row.inside_width),height:parseFloat(row.tray_depth)};
+        const cables=cablesForRaceway(row.tray_id);
+        localStorage.setItem('trayFillData',JSON.stringify({tray,cables}));
+      }catch(e){console.error('Failed to store tray fill data',e);}
+      window.location.href='cabletrayfill.html';
+    }
   });
 
   const conduitColumns=[
@@ -125,7 +145,14 @@ document.addEventListener('DOMContentLoaded',()=>{
     columns:conduitColumns,
     onChange:markUnsaved,
     onSave:markSaved,
-    rowCountId:'conduit-row-count'
+    rowCountId:'conduit-row-count',
+    onView:(row)=>{
+      try{
+        const cables=cablesForRaceway(row.conduit_id);
+        localStorage.setItem('conduitFillData',JSON.stringify({type:row.type,tradeSize:row.trade_size,cables}));
+      }catch(e){console.error('Failed to store conduit fill data',e);}
+      window.location.href='conduitfill.html';
+    }
   });
 
   const loadSampleBtn=document.getElementById('load-sample-raceway-btn');
