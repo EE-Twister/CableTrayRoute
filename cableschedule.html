@@ -90,7 +90,7 @@ const insulationRatings=['60','75','90'];
     const ids=new Set();
     try{(JSON.parse(localStorage.getItem(TableUtils.STORAGE_KEYS.traySchedule))||[]).forEach(t=>{if(t.tray_id) ids.add(t.tray_id);});}catch(e){}
     try{(JSON.parse(localStorage.getItem(TableUtils.STORAGE_KEYS.conduitSchedule))||[]).forEach(c=>{if(c.conduit_id) ids.add(c.conduit_id);});}catch(e){}
-    try{(JSON.parse(localStorage.getItem(TableUtils.STORAGE_KEYS.ductbankSchedule))||[]).forEach(db=>{if(db.tag) ids.add(db.tag);(db.conduits||[]).forEach(c=>{if(c.conduit_id) ids.add(c.conduit_id);});});}catch(e){}
+    try{(JSON.parse(localStorage.getItem(TableUtils.STORAGE_KEYS.ductbankSchedule))||[]).forEach(db=>{(db.conduits||[]).forEach(c=>{if(c.conduit_id) ids.add(c.conduit_id);});});}catch(e){}
     return Array.from(ids);
   }
 
