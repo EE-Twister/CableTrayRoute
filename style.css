@@ -418,6 +418,13 @@ details > summary {
     position: relative;
 }
 
+.modal-actions {
+    margin-top: 1rem;
+    display: flex;
+    gap: 0.5rem;
+    justify-content: flex-end;
+}
+
 .close-btn {
     position: absolute;
     top: 0.5rem;
