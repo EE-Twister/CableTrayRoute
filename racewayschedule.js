@@ -42,12 +42,15 @@ document.addEventListener('DOMContentLoaded',()=>{
           return Array.isArray(ids)&&ids.includes(id);
         })
         .map(c=>{
-          const od=c.cable_od??c.OD??c.od??c.diameter;
+          const rawOd=c.cable_od??c.OD??c.od??c.diameter;
+          const od=parseFloat(rawOd);
+          const val=Number.isFinite(od)?od:undefined;
           return {
             ...c,
-            OD:c.OD??od,
-            od:c.od??od,
-            diameter:c.diameter??od
+            cable_od:c.cable_od??val,
+            OD:c.OD??val,
+            od:c.od??val,
+            diameter:c.diameter??val
           };
         });
     }catch(e){console.error('Failed to load cables for',id,e);return[];}

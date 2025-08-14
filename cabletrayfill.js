@@ -1776,12 +1776,13 @@ Wt: ${m.weight.toFixed(2)} lbs/ft
               sizeInput.dispatchEvent(new Event('input'));
               const odInput = row.children[6].querySelector('input');
               const wtInput = row.children[7].querySelector('input');
-              if (cableOptions.findIndex(o => o.conductors === parseInt(row.children[2].querySelector('input').value) && o.size === sizeInput.value) < 0) {
-                odInput.value = (c.diameter || c.OD || 0).toFixed(2);
-                wtInput.value = (c.weight || 0).toFixed(2);
-                odInput.readOnly = false;
-                wtInput.readOnly = false;
-              }
+                if (cableOptions.findIndex(o => o.conductors === parseInt(row.children[2].querySelector('input').value) && o.size === sizeInput.value) < 0) {
+                  const dia = parseFloat(c.cable_od ?? c.diameter ?? c.OD ?? c.od);
+                  odInput.value = Number.isFinite(dia) ? dia.toFixed(2) : '';
+                  wtInput.value = (parseFloat(c.weight) || 0).toFixed(2);
+                  odInput.readOnly = false;
+                  wtInput.readOnly = false;
+                }
               cableTbody.appendChild(row);
             });
           }

@@ -383,7 +383,8 @@ checkPrereqs([{key:'conduitSchedule',page:'racewayschedule.html',label:'Raceway 
               row.children[1].querySelector('select').value = c.cable_type || '';
               row.children[2].querySelector('input').value = c.conductors || '';
               row.children[3].querySelector('input').value = c.conductor_size || '';
-              row.children[4].querySelector('input').value = (c.diameter || c.od || c.OD || 0).toFixed(2);
+                const od = parseFloat(c.cable_od ?? c.diameter ?? c.od ?? c.OD);
+                row.children[4].querySelector('input').value = Number.isFinite(od) ? od.toFixed(2) : '';
               tableBody.appendChild(row);
             });
           }
