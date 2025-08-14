@@ -38,6 +38,10 @@ the tag can be edited for each cable in the table.
 
 Cable trays and cables now include an **Allowed Cable Group** property. During routing, a cable will only use trays whose allowed group matches the cable's group. This helps ensure voltage-rated cables are routed appropriately.
 
+## Manual Raceway vs Automatic Routing
+
+Supplying specific **Raceway IDs** on a cable forces the router to follow those tray segments in order. Any IDs that do not match trays in the schedule are ignored. If none of the provided IDs exist, the router automatically reverts to its standard pathfinding. Leaving the field empty always triggers automatic routing.
+
 ## New Feature: Manual Batch Cable Entry
 
 When batch mode is selected, you can now use the **Add Cable to List** button to
