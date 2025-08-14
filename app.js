@@ -79,6 +79,7 @@ document.addEventListener('DOMContentLoaded', () => {
         ductbankData: null,
         ductbankTraceIndices: [],
         ductbankVisible: true,
+        conduitData: [],
     };
 
     // --- ELEMENT REFERENCES ---
@@ -236,7 +237,7 @@ document.addEventListener('DOMContentLoaded', () => {
         try {
             const data = JSON.parse(localStorage.getItem('ctrSession'));
             if (data) {
-                state.manualTrays = data.manualTrays || [];
+                state.manualTrays = (data.manualTrays || []).map(t => ({ ...t, raceway_type: t.raceway_type || 'tray' }));
                 state.cableList = data.cableList || [];
                 state.cableList.forEach(c => {
                     if (!('manual_path' in c)) c.manual_path = '';
@@ -293,8 +294,8 @@ document.addEventListener('DOMContentLoaded', () => {
                 current_fill: 0,
                 shape: 'STR',
                 allowed_cable_group: t.allowed_cable_group || '',
+                raceway_type: 'tray',
             }));
-            state.trayData = state.manualTrays;
         }
 
         if (cables.length > 0) {
@@ -396,6 +397,84 @@ document.addEventListener('DOMContentLoaded', () => {
                     };
                 })
             };
+        }
+
+        state.conduitData = conduits.filter(c => !(c.ductbank_id || c.ductbank));
+        rebuildTrayData();
+    };
+
+    const rebuildTrayData = () => {
+        state.trayData = state.manualTrays.map(t => ({ ...t }));
+
+        if (state.ductbankData && state.ductbankData.ductbanks) {
+            state.ductbankData.ductbanks.forEach(db => {
+                if (Array.isArray(db.outline) && db.outline.length >= 2) {
+                    const start = db.outline[0];
+                    const end = db.outline[db.outline.length - 1];
+                    state.trayData.push({
+                        tray_id: db.id || db.tag,
+                        start_x: start[0],
+                        start_y: start[1],
+                        start_z: start[2],
+                        end_x: end[0],
+                        end_y: end[1],
+                        end_z: end[2],
+                        width: parseFloat(db.width) || 12,
+                        height: parseFloat(db.height) || 12,
+                        current_fill: 0,
+                        shape: 'STR',
+                        allowed_cable_group: '',
+                        raceway_type: 'ductbank',
+                    });
+                }
+                (db.conduits || []).forEach(cond => {
+                    if (Array.isArray(cond.path) && cond.path.length >= 2) {
+                        const start = cond.path[0];
+                        const end = cond.path[cond.path.length - 1];
+                        const area = (CONDUIT_SPECS[cond.type] || {})[cond.trade_size];
+                        const dia = area ? Math.sqrt((4 * area) / Math.PI) : 0;
+                        state.trayData.push({
+                            tray_id: cond.id || cond.conduit_id,
+                            start_x: start[0],
+                            start_y: start[1],
+                            start_z: start[2],
+                            end_x: end[0],
+                            end_y: end[1],
+                            end_z: end[2],
+                            width: dia,
+                            height: dia,
+                            current_fill: 0,
+                            shape: 'STR',
+                            allowed_cable_group: '',
+                            raceway_type: 'conduit',
+                        });
+                    }
+                });
+            });
+        }
+
+        if (state.conduitData && state.conduitData.length) {
+            state.conduitData.forEach(cond => {
+                const start = [parseFloat(cond.start_x), parseFloat(cond.start_y), parseFloat(cond.start_z)];
+                const end = [parseFloat(cond.end_x), parseFloat(cond.end_y), parseFloat(cond.end_z)];
+                const area = (CONDUIT_SPECS[cond.type] || {})[cond.trade_size];
+                const dia = area ? Math.sqrt((4 * area) / Math.PI) : 0;
+                state.trayData.push({
+                    tray_id: cond.conduit_id || cond.id,
+                    start_x: start[0],
+                    start_y: start[1],
+                    start_z: start[2],
+                    end_x: end[0],
+                    end_y: end[1],
+                    end_z: end[2],
+                    width: dia,
+                    height: dia,
+                    current_fill: 0,
+                    shape: 'STR',
+                    allowed_cable_group: '',
+                    raceway_type: 'conduit',
+                });
+            });
         }
     };
 
@@ -1382,10 +1461,11 @@ const openConduitFill = (cables) => {
             height: parseFloat(document.getElementById('t-h').value),
             current_fill: parseFloat(document.getElementById('t-fill').value),
             allowed_cable_group: document.getElementById('t-group').value,
-            shape: document.getElementById('t-shape').value || 'STR'
+            shape: document.getElementById('t-shape').value || 'STR',
+            raceway_type: 'tray'
         };
         state.manualTrays.push(newTray);
-        state.trayData = state.manualTrays;
+        rebuildTrayData();
         renderManualTrayTable();
         updateTrayDisplay();
         updateTableCounts();
@@ -1394,7 +1474,7 @@ const openConduitFill = (cables) => {
 
     const clearManualTrays = () => {
         state.manualTrays = [];
-        state.trayData = [];
+        rebuildTrayData();
         elements.manualTrayTableContainer.innerHTML = '';
         updateTrayDisplay();
         updateTableCounts();
@@ -1402,8 +1482,8 @@ const openConduitFill = (cables) => {
     };
 
     const loadSampleTrays = () => {
-        state.manualTrays = getSampleTrays();
-        state.trayData = state.manualTrays;
+        state.manualTrays = getSampleTrays().map(t => ({ ...t, raceway_type: 'tray' }));
+        rebuildTrayData();
         renderManualTrayTable();
         updateTrayDisplay();
         updateTableCounts();
@@ -1457,7 +1537,7 @@ const openConduitFill = (cables) => {
         initHelpIcons(elements.manualTrayTableContainer);
         elements.manualTrayTableContainer.classList.add('table-scroll');
         
-        const updateTrayData = () => { state.trayData = state.manualTrays; updateTrayDisplay(); };
+        const updateTrayData = () => { rebuildTrayData(); updateTrayDisplay(); };
 
         elements.manualTrayTableContainer.querySelectorAll('.tray-id-input').forEach(input => {
             input.addEventListener('input', e => {
@@ -1535,7 +1615,7 @@ const openConduitFill = (cables) => {
             btn.addEventListener('click', e => {
                 const i = parseInt(e.target.dataset.idx, 10);
                 state.manualTrays.splice(i, 1);
-                state.trayData = state.manualTrays;
+                rebuildTrayData();
                 renderManualTrayTable();
                 updateTrayDisplay();
                 saveSession();
@@ -1546,7 +1626,7 @@ const openConduitFill = (cables) => {
                 const i = parseInt(e.target.dataset.idx, 10);
                 const copy = { ...state.manualTrays[i] };
                 state.manualTrays.push(copy);
-                state.trayData = state.manualTrays;
+                rebuildTrayData();
                 renderManualTrayTable();
                 updateTrayDisplay();
                 saveSession();
@@ -1605,11 +1685,12 @@ const openConduitFill = (cables) => {
                     height: parseFloat(t.height) || 0,
                     current_fill: parseFloat(t.current_fill) || 0,
                     allowed_cable_group: t.allowed_cable_group || '',
-                    shape: t.shape || 'STR'
+                    shape: t.shape || 'STR',
+                    raceway_type: 'tray'
                 });
             }
             state.manualTrays = newTrays;
-            state.trayData = state.manualTrays;
+            rebuildTrayData();
             renderManualTrayTable();
             updateTrayDisplay();
             updateTableCounts();
@@ -2335,6 +2416,7 @@ const openConduitFill = (cables) => {
         elements.cancelRoutingBtn.style.display = 'block';
         elements.cancelRoutingBtn.disabled = false;
         cancelRouting = false;
+        rebuildTrayData();
 
         const routingSystem = new CableRoutingSystem({
             fillLimit: parseFloat(elements.fillLimitIn.value) / 100,
@@ -2734,8 +2816,13 @@ const openConduitFill = (cables) => {
             const i = [0,0,4,4,3,3,0,0,0,0,1,1];
             const j = [1,2,5,6,2,6,1,5,3,7,2,6];
             const k = [2,3,6,7,6,7,5,4,7,4,6,5];
-            const color = SHAPE_COLORS[tray.shape] || 'lightgrey';
-            const text = `${tray.tray_id} (${tray.shape || 'STR'})`;
+            const color = tray.raceway_type === 'conduit'
+                ? 'black'
+                : tray.raceway_type === 'ductbank'
+                    ? 'saddlebrown'
+                    : SHAPE_COLORS[tray.shape] || 'lightgrey';
+            const typeText = tray.raceway_type || tray.shape || 'STR';
+            const text = `${tray.tray_id} (${typeText})`;
             return {type:'mesh3d', x, y, z, i, j, k, opacity:0.3, color, name: tray.tray_id, hoverinfo:'text', text:[text]};
         };
 
@@ -2814,68 +2901,7 @@ const openConduitFill = (cables) => {
             });
         }
 
-        state.ductbankTraceIndices = [];
-        if (state.ductbankData && state.ductbankData.ductbanks) {
-            state.ductbankData.ductbanks.forEach(db => {
-                if (Array.isArray(db.outline)) {
-                    const ox = db.outline.map(p => p[0]);
-                    const oy = db.outline.map(p => p[1]);
-                    const oz = db.outline.map(p => p[2]);
-                    const dbLabel = db.tag || db.id;
-                    const ot = {
-                        x: ox, y: oy, z: oz,
-                        mode: 'lines', type: 'scatter3d',
-                        line: { color: 'saddlebrown', width: 2 },
-                        name: `Ductbank ${dbLabel}`,
-                        showlegend: false,
-                        visible: state.ductbankVisible,
-                        hoverinfo: 'text',
-                        text: db.outline.map(() => dbLabel)
-                    };
-                    state.ductbankTraceIndices.push(traces.length);
-                    traces.push(ot);
-
-                    const mid = db.outline.reduce((acc, p) => [acc[0] + p[0], acc[1] + p[1], acc[2] + p[2]], [0, 0, 0]).map(v => v / db.outline.length);
-                    const textTrace = {
-                        type: 'scatter3d', mode: 'text',
-                        x: [mid[0]], y: [mid[1]], z: [mid[2]],
-                        text: [dbLabel], showlegend: false, hoverinfo: 'none',
-                        visible: state.ductbankVisible
-                    };
-                    state.ductbankTraceIndices.push(traces.length);
-                    traces.push(textTrace);
-                }
-                (db.conduits || []).forEach(cond => {
-                    if (!Array.isArray(cond.path)) return;
-                    const cx = cond.path.map(p => p[0]);
-                    const cy = cond.path.map(p => p[1]);
-                    const cz = cond.path.map(p => p[2]);
-                    const condLabel = cond.tag || cond.id;
-                    const ct = {
-                        x: cx, y: cy, z: cz,
-                        mode: 'lines', type: 'scatter3d',
-                        line: { color: 'black', width: 2 },
-                        name: `Conduit ${condLabel}`,
-                        showlegend: false,
-                        visible: state.ductbankVisible,
-                        hoverinfo: 'text',
-                        text: cond.path.map(() => condLabel)
-                    };
-                    state.ductbankTraceIndices.push(traces.length);
-                    traces.push(ct);
-
-                    const cmid = cond.path.reduce((acc, p) => [acc[0] + p[0], acc[1] + p[1], acc[2] + p[2]], [0, 0, 0]).map(v => v / cond.path.length);
-                    const cTextTrace = {
-                        type: 'scatter3d', mode: 'text',
-                        x: [cmid[0]], y: [cmid[1]], z: [cmid[2]],
-                        text: [condLabel], showlegend: false, hoverinfo: 'none',
-                        visible: state.ductbankVisible
-                    };
-                    state.ductbankTraceIndices.push(traces.length);
-                    traces.push(cTextTrace);
-                });
-            });
-        }
+        // ductbank and conduit geometries are rendered as tray segments now
 
     const layout = {
         title: title,
@@ -3068,7 +3094,7 @@ Plotly.newPlot(document.getElementById('plot'), data, layout, {responsive: true}
     const finalizeLoad = () => {
         renderManualTrayTable();
         updateCableListDisplay();
-        state.trayData = state.manualTrays;
+        rebuildTrayData();
         updateTrayDisplay();
         loadDuctbankData();
     };
@@ -3099,6 +3125,7 @@ Plotly.newPlot(document.getElementById('plot'), data, layout, {responsive: true}
                 localStorage.removeItem(cableKey);
                 renderManualTrayTable();
                 updateCableListDisplay();
+                rebuildTrayData();
                 updateTrayDisplay();
                 loadDuctbankData();
             }, { once: true });
@@ -3109,6 +3136,7 @@ Plotly.newPlot(document.getElementById('plot'), data, layout, {responsive: true}
     } else {
         renderManualTrayTable();
         updateCableListDisplay();
+        rebuildTrayData();
         updateTrayDisplay();
         loadDuctbankData();
     }
