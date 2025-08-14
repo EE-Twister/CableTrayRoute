@@ -48,7 +48,7 @@ class CableRoutingSystem {
         this.sharedPenalty = options.sharedPenalty || 0.5;
         // Limit distance between generic field nodes to keep the graph from
         // growing quadratically when many trays are present
-        this.maxFieldEdge = options.maxFieldEdge || 150;
+        this.maxFieldEdge = options.maxFieldEdge || 1000;
         // Limit the number of field connections per node to cap memory usage
         this.maxFieldNeighbors = options.maxFieldNeighbors || 8;
         this.sharedFieldSegments = [];

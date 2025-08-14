@@ -697,7 +697,7 @@ document.addEventListener('DOMContentLoaded', () => {
             this.sharedPenalty = options.sharedPenalty || 0.5;
             // Limit how far apart generic field edges can be created to avoid
             // generating a fully connected graph for large datasets
-            this.maxFieldEdge = options.maxFieldEdge || 150;
+            this.maxFieldEdge = options.maxFieldEdge || 1000;
             // Limit how many field connections each node keeps to further
             // reduce graph density and memory usage
             this.maxFieldNeighbors = options.maxFieldNeighbors || 8;
@@ -2406,7 +2406,7 @@ const openConduitFill = (cables) => {
     };
 
     const mainCalculation = async () => {
-        if (!validateInputs(['proximity-threshold','field-route-penalty','shared-field-penalty'])) return;
+        if (!validateInputs(['proximity-threshold','max-field-edge','field-route-penalty','shared-field-penalty'])) return;
         elements.resultsSection.style.display = 'block';
         elements.messages.innerHTML = '';
         elements.progressContainer.style.display = 'block';
@@ -2423,7 +2423,7 @@ const openConduitFill = (cables) => {
             proximityThreshold: parseFloat(document.getElementById('proximity-threshold').value),
             fieldPenalty: parseFloat(document.getElementById('field-route-penalty').value),
             sharedPenalty: parseFloat(document.getElementById('shared-field-penalty').value),
-            maxFieldEdge: 150,
+            maxFieldEdge: parseFloat(document.getElementById('max-field-edge').value),
             maxFieldNeighbors: 8
         });
         
@@ -2666,7 +2666,7 @@ const openConduitFill = (cables) => {
             proximityThreshold: parseFloat(document.getElementById('proximity-threshold').value),
             fieldPenalty: parseFloat(document.getElementById('field-route-penalty').value),
             sharedPenalty: parseFloat(document.getElementById('shared-field-penalty').value),
-            maxFieldEdge: 150,
+            maxFieldEdge: parseFloat(document.getElementById('max-field-edge').value),
             maxFieldNeighbors: 8
         });
 
