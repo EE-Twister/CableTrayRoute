@@ -2,6 +2,9 @@
   let ductbanks=[];
   const DUCTBANK_KEY = TableUtils.STORAGE_KEYS.ductbankSchedule;
   let ductbankTbody;
+  let filters=[];
+  let filterButtons=[];
+  let headerCells;
 
   function iconBtn(sym,cls,label,handler){
     const b=document.createElement('button');
@@ -19,6 +22,112 @@
     return parseFloat(sz);
   }
 
+  function setWidth(cell,idx){
+    if(headerCells&&headerCells[idx]&&headerCells[idx].style.width){
+      cell.style.width=headerCells[idx].style.width;
+    }
+  }
+
+  function showFilterPopup(btn,index){
+    document.querySelectorAll('.filter-popup').forEach(p=>p.remove());
+    const popup=document.createElement('div');
+    popup.className='filter-popup';
+    const inp=document.createElement('input');
+    inp.type='text';
+    inp.value=filters[index]||'';
+    popup.appendChild(inp);
+    const apply=document.createElement('button');
+    apply.textContent='Apply';
+    apply.addEventListener('click',()=>{
+      filters[index]=inp.value.trim();
+      if(filters[index]) btn.classList.add('filtered'); else btn.classList.remove('filtered');
+      applyFilters();
+      popup.remove();
+    });
+    popup.appendChild(apply);
+    const clear=document.createElement('button');
+    clear.textContent='Clear';
+    clear.addEventListener('click',()=>{
+      inp.value='';
+      filters[index]='';
+      btn.classList.remove('filtered');
+      applyFilters();
+      popup.remove();
+    });
+    popup.appendChild(clear);
+    const rect=btn.getBoundingClientRect();
+    popup.style.top=(rect.bottom+window.scrollY)+'px';
+    popup.style.left=(rect.left+window.scrollX)+'px';
+    document.body.appendChild(popup);
+    const close=e=>{if(!popup.contains(e.target)){popup.remove();document.removeEventListener('click',close);}};
+    setTimeout(()=>document.addEventListener('click',close),0);
+  }
+
+  function applyFilters(){
+    const rows=Array.from(ductbankTbody.querySelectorAll('tr.ductbank-row'));
+    rows.forEach((row,i)=>{
+      let visible=true;
+      for(let c=1;c<headerCells.length-1;c++){
+        const f=filters[c];
+        if(f){
+          const cell=row.cells[c];
+          let val='';
+          if(cell){
+            const inp=cell.querySelector('input');
+            if(inp){
+              if(inp.type==='checkbox') val=inp.checked?'true':'false';
+              else val=inp.value;
+            }else{val=cell.textContent;}
+          }
+          if(!String(val).toLowerCase().includes(f.toLowerCase())){visible=false;break;}
+        }
+      }
+      row.style.display=visible?'':'none';
+      const cRow=row.nextElementSibling;
+      if(cRow&&cRow.classList.contains('conduit-container')){
+        cRow.style.display=visible&&ductbanks[i].expanded?'':'none';
+      }
+    });
+  }
+
+  function clearFilters(){
+    filters=filters.map(()=> '');
+    filterButtons.forEach(b=>{if(b) b.classList.remove('filtered');});
+    applyFilters();
+  }
+
+  function initHeader(){
+    const table=document.getElementById('ductbankTable');
+    headerCells=table.tHead.rows[0].cells;
+    filters=Array(headerCells.length).fill('');
+    filterButtons=[];
+    Array.from(headerCells).forEach((th,idx)=>{
+      th.style.position='relative';
+      if(idx>0&&idx<headerCells.length-1){
+        const btn=document.createElement('button');
+        btn.className='filter-btn';
+        btn.innerHTML='\u25BC';
+        btn.addEventListener('click',e=>{e.stopPropagation();showFilterPopup(btn,idx);});
+        th.appendChild(btn);
+        filterButtons[idx]=btn;
+      }
+      const res=document.createElement('span');
+      res.className='col-resizer';
+      th.appendChild(res);
+      let startX,startWidth;
+      const onMove=e=>{
+        const newWidth=Math.max(30,startWidth+e.pageX-startX);
+        th.style.width=newWidth+'px';
+        Array.from(ductbankTbody.rows).forEach(r=>{if(r.cells[idx]) r.cells[idx].style.width=newWidth+'px';});
+      };
+      res.addEventListener('mousedown',e=>{
+        startX=e.pageX;startWidth=th.offsetWidth;
+        document.addEventListener('mousemove',onMove);
+        document.addEventListener('mouseup',()=>{document.removeEventListener('mousemove',onMove);},{once:true});
+      });
+    });
+  }
+
   function renderDuctbanks(){
     const specs = globalThis.CONDUIT_SPECS || {};
     ductbankTbody.innerHTML='';
@@ -26,12 +135,14 @@
       const row=ductbankTbody.insertRow();
       row.className='ductbank-row';
       const tgl=row.insertCell();
+      setWidth(tgl,0);
       const tglBtn=document.createElement('button');
       tglBtn.textContent=db.expanded?'\u25BC':'\u25B6';
       tglBtn.addEventListener('click',()=>{db.expanded=!db.expanded;renderDuctbanks();});
       tgl.appendChild(tglBtn);
 
       const tag=row.insertCell();
+      setWidth(tag,1);
       const tagInput=document.createElement('input');
       tagInput.value=db.tag||'';
       const tagRules=['required'];
@@ -40,6 +151,7 @@
       tag.appendChild(tagInput);
 
       const from=row.insertCell();
+      setWidth(from,2);
       const fromInput=document.createElement('input');
       fromInput.value=db.from||'';
       const fromRules=['required'];
@@ -48,6 +160,7 @@
       from.appendChild(fromInput);
 
       const to=row.insertCell();
+      setWidth(to,3);
       const toInput=document.createElement('input');
       toInput.value=db.to||'';
       const toRules=['required'];
@@ -56,6 +169,7 @@
       to.appendChild(toInput);
 
       const ce=row.insertCell();
+      setWidth(ce,4);
       const ceInput=document.createElement('input');
       ceInput.type='checkbox';
       ceInput.checked=db.concrete_encasement||false;
@@ -63,6 +177,7 @@
       ce.appendChild(ceInput);
 
       const sx=row.insertCell();
+      setWidth(sx,5);
       const sxInput=document.createElement('input');
       sxInput.type='number';
       sxInput.value=db.start_x||'';
@@ -72,6 +187,7 @@
       sx.appendChild(sxInput);
 
       const sy=row.insertCell();
+      setWidth(sy,6);
       const syInput=document.createElement('input');
       syInput.type='number';
       syInput.value=db.start_y||'';
@@ -81,6 +197,7 @@
       sy.appendChild(syInput);
 
       const sz=row.insertCell();
+      setWidth(sz,7);
       const szInput=document.createElement('input');
       szInput.type='number';
       szInput.value=db.start_z||'';
@@ -90,6 +207,7 @@
       sz.appendChild(szInput);
 
       const ex=row.insertCell();
+      setWidth(ex,8);
       const exInput=document.createElement('input');
       exInput.type='number';
       exInput.value=db.end_x||'';
@@ -99,6 +217,7 @@
       ex.appendChild(exInput);
 
       const ey=row.insertCell();
+      setWidth(ey,9);
       const eyInput=document.createElement('input');
       eyInput.type='number';
       eyInput.value=db.end_y||'';
@@ -108,6 +227,7 @@
       ey.appendChild(eyInput);
 
       const ez=row.insertCell();
+      setWidth(ez,10);
       const ezInput=document.createElement('input');
       ezInput.type='number';
       ezInput.value=db.end_z||'';
@@ -117,6 +237,7 @@
       ez.appendChild(ezInput);
 
       const act=row.insertCell();
+      setWidth(act,11);
       act.appendChild(iconBtn('\u2795','insertBelowBtn','Add Conduit',()=>{addConduit(i);}));
       act.appendChild(iconBtn('\u29C9','duplicateBtn','Duplicate Ductbank',()=>{duplicateDuctbank(i);}));
       act.appendChild(iconBtn('\u2716','removeBtn','Delete Ductbank',()=>{deleteDuctbank(i);}));
@@ -183,6 +304,7 @@
     });
     const rc=document.getElementById('ductbank-row-count');
     if(rc) rc.textContent=`Rows: ${ductbanks.length}`;
+    applyFilters();
   }
 
   function addDuctbank(){
@@ -227,6 +349,7 @@
 
   function saveDuctbanks(){
     try{localStorage.setItem(DUCTBANK_KEY,JSON.stringify(ductbanks));}catch(e){}
+    applyFilters();
   }
 
   function loadDuctbanks(){
@@ -340,6 +463,8 @@
     document.getElementById('export-ductbank-xlsx-btn').addEventListener('click',exportDuctbankXlsx);
     document.getElementById('import-ductbank-xlsx-btn').addEventListener('click',()=>document.getElementById('import-ductbank-xlsx-input').click());
     document.getElementById('import-ductbank-xlsx-input').addEventListener('change',e=>{importDuctbankXlsx(e.target.files[0]);e.target.value='';});
+    initHeader();
+    document.getElementById('clear-ductbank-filters-btn').addEventListener('click',clearFilters);
     loadDuctbanks();
   }
 

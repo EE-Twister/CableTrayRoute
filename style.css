@@ -783,6 +783,21 @@ body.dark-mode .db-table td {
     border: none;
 }
 
+/* Ensure action buttons share consistent sizing and icon color */
+.removeBtn,
+.duplicateBtn,
+.insertAboveBtn,
+.insertBelowBtn {
+    width: 28px;
+    height: 28px;
+    padding: 0;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 0.9rem;
+    color: #fff;
+}
+
 .filter-btn {
     margin-left: 4px;
     background: none;
