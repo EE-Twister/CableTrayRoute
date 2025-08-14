@@ -803,6 +803,7 @@ body.dark-mode .db-table td {
     justify-content: center;
     font-size: 0.9rem;
     color: #fff;
+    vertical-align: middle;
 }
 
 .filter-btn {
