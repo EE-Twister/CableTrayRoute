@@ -514,6 +514,37 @@ function loadDuctbankSession(){
  }catch(e){console.error('load session failed',e);}
 }
 
+function loadCablesFromSchedule(){
+  const tbody=document.querySelector('#cableTable tbody');
+  if(!tbody||tbody.children.length>0) return;
+  const key=globalThis.TableUtils?.STORAGE_KEYS?.cableSchedule||'cableSchedule';
+  const json=localStorage.getItem(key);
+  if(!json) return;
+  let cables;
+  try{cables=JSON.parse(json);}catch(e){console.error('Failed to parse cable schedule',e);return;}
+  const conduitSet=new Set(getAllConduits().map(c=>c.conduit_id));
+  let added=false;
+  cables.forEach(c=>{
+    let ids=c.raceway_ids;
+    if(typeof ids==='string') ids=ids.split(',').map(s=>s.trim()).filter(Boolean);
+    ids=Array.isArray(ids)?ids:[];
+    const matches=ids.filter(id=>conduitSet.has(id));
+    if(matches.length===0) return;
+    let conduit_id='';
+    if(matches.length===1) conduit_id=matches[0];
+    else console.warn(`Cable ${c.tag||''} matches multiple raceways: ${matches.join(', ')}; leaving conduit blank`);
+    const row=Object.assign({},c,{conduit_id});
+    addCableRow(row,{defer:true});
+    added=true;
+  });
+  if(added){
+    updateInsulationOptions();
+    drawGrid();
+    updateAmpacityReport();
+    saveDuctbankSession();
+  }
+}
+
 function autoPlaceConduits(){
  const rows=document.querySelectorAll('#conduitTable tbody tr');
  if(rows.length===0) return;
@@ -2339,6 +2370,7 @@ loadConductorProperties().then(()=>{
   updateInsulationOptions();
   checkInsulationThickness();
   loadDuctbankSession();
+  loadCablesFromSchedule();
 });
 loadSoilResistivityData().then(data=>{
   populateSoilReferences(data);
