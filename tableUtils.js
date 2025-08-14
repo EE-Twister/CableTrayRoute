@@ -105,6 +105,7 @@ class TableManager {
 
     this.columns.forEach((col,idx) => {
       const th = document.createElement('th');
+      th.style.position = 'relative';
       const labelSpan=document.createElement('span');
       labelSpan.textContent=col.label;
       th.appendChild(labelSpan);
@@ -113,6 +114,22 @@ class TableManager {
       btn.innerHTML='\u25BC';
       btn.addEventListener('click',e=>{e.stopPropagation();this.showFilterPopup(btn,idx);});
       th.appendChild(btn);
+      const resizer=document.createElement('span');
+      resizer.className='col-resizer';
+      th.appendChild(resizer);
+      let startX,startWidth;
+      const onMove=e=>{
+        const newWidth=Math.max(30,startWidth+e.pageX-startX);
+        th.style.width=newWidth+'px';
+        Array.from(this.tbody.rows).forEach(r=>{if(r.cells[idx]) r.cells[idx].style.width=newWidth+'px';});
+      };
+      resizer.addEventListener('mousedown',e=>{
+        startX=e.pageX;startWidth=th.offsetWidth;
+        document.addEventListener('mousemove',onMove);
+        document.addEventListener('mouseup',()=>{
+          document.removeEventListener('mousemove',onMove);
+        },{once:true});
+      });
       if (col.group && idx === this.groupFirstIndex[col.group] && this.groupOrder.indexOf(col.group) > 0) {
         th.classList.add('category-separator');
       }
@@ -126,10 +143,22 @@ class TableManager {
     if (hasGroups){
       const blank = document.createElement('th');
       blank.rowSpan = 1;
+      blank.style.position='relative';
       groupRow.appendChild(blank);
     }
     const actTh = document.createElement('th');
     actTh.textContent = 'Actions';
+    actTh.style.position='relative';
+    const res=document.createElement('span');
+    res.className='col-resizer';
+    actTh.appendChild(res);
+    let startX,startWidth;
+    const move=e=>{
+      const newWidth=Math.max(30,startWidth+e.pageX-startX);
+      actTh.style.width=newWidth+'px';
+      Array.from(this.tbody.rows).forEach(r=>{if(r.cells[this.columns.length]) r.cells[this.columns.length].style.width=newWidth+'px';});
+    };
+    res.addEventListener('mousedown',e=>{startX=e.pageX;startWidth=actTh.offsetWidth;document.addEventListener('mousemove',move);document.addEventListener('mouseup',()=>{document.removeEventListener('mousemove',move);},{once:true});});
     headerRow.appendChild(actTh);
   }
 
@@ -375,6 +404,9 @@ class TableManager {
       } else if (el.tagName === 'SELECT' && el.options.length && !col.multiple) {
         el.value = el.options[0].value;
       }
+      if (this.headerRow && this.headerRow.cells[idx] && this.headerRow.cells[idx].style.width) {
+        td.style.width = this.headerRow.cells[idx].style.width;
+      }
       td.appendChild(el);
       let summaryEl, updateSummary;
       if (col.multiple) {
@@ -412,26 +444,29 @@ class TableManager {
         updateSummary();
       } else {
         el.addEventListener('input', () => { if (this.onChange) this.onChange(); });
-        el.addEventListener('keydown', e => {
-          if (e.key === 'ArrowLeft' || e.key === 'ArrowRight') {
+      }
+      el.addEventListener('keydown', e => {
+        if (e.key === 'ArrowLeft' || e.key === 'ArrowRight') {
+          let allSelected = true;
+          if (e.target.tagName === 'INPUT' || e.target.tagName === 'TEXTAREA') {
             const start = e.target.selectionStart ?? 0;
             const end = e.target.selectionEnd ?? 0;
             const len = (e.target.value || '').length;
-            if (start === 0 && end === len) {
-              e.preventDefault();
-              const cell = td;
-              const sib = e.key === 'ArrowLeft' ? cell.previousElementSibling : cell.nextElementSibling;
-              if (sib) {
-                const next = sib.querySelector('input,select');
-                if (next) {
-                  next.focus();
-                  if (typeof next.select === 'function') next.select();
-                }
+            allSelected = start === 0 && end === len;
+          }
+          if (allSelected) {
+            e.preventDefault();
+            const sib = e.key === 'ArrowLeft' ? td.previousElementSibling : td.nextElementSibling;
+            if (sib) {
+              const next = sib.querySelector('input,select,textarea');
+              if (next) {
+                next.focus();
+                if (typeof next.select === 'function') next.select();
               }
             }
           }
-        });
-      }
+        }
+      });
       if (col.onChange) el.addEventListener('change', () => { col.onChange(el, tr); });
       if (col.validate) {
         const rules = Array.isArray(col.validate) ? col.validate : [col.validate];
@@ -440,8 +475,22 @@ class TableManager {
       }
     });
     const actTd = tr.insertCell();
+    if (this.headerRow && this.headerRow.cells[this.columns.length] && this.headerRow.cells[this.columns.length].style.width) {
+      actTd.style.width = this.headerRow.cells[this.columns.length].style.width;
+    }
+    const addBtn=document.createElement('button');
+    addBtn.textContent='\u2795';
+    addBtn.className='insertBelowBtn';
+    addBtn.title='Add row';
+    addBtn.setAttribute('aria-label','Add row');
+    addBtn.addEventListener('click',()=>{const newRow=this.addRow();if(newRow) this.tbody.insertBefore(newRow,tr.nextSibling);if(this.onChange) this.onChange();});
+    actTd.appendChild(addBtn);
+
     const dupBtn = document.createElement('button');
-    dupBtn.textContent = 'Duplicate';
+    dupBtn.textContent = '\u29C9';
+    dupBtn.className='duplicateBtn';
+    dupBtn.title='Duplicate row';
+    dupBtn.setAttribute('aria-label','Duplicate row');
     dupBtn.addEventListener('click', () => {
       const row = {};
       this.columns.forEach((col,i) => {
@@ -464,7 +513,10 @@ class TableManager {
     actTd.appendChild(dupBtn);
 
     const delBtn = document.createElement('button');
-    delBtn.textContent = 'Delete';
+    delBtn.textContent = '\u2716';
+    delBtn.className='removeBtn';
+    delBtn.title='Delete row';
+    delBtn.setAttribute('aria-label','Delete row');
     delBtn.addEventListener('click', () => { tr.remove(); this.save(); this.updateRowCount(); if (this.onChange) this.onChange(); });
     actTd.appendChild(delBtn);
 

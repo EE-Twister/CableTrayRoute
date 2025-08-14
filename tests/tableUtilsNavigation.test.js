@@ -60,17 +60,21 @@ function keyEvent(key) {
 function attach(el, td) {
   el.onkeydown = (e) => {
     if (e.key === "ArrowLeft" || e.key === "ArrowRight") {
-      const start = e.target.selectionStart ?? 0;
-      const end = e.target.selectionEnd ?? 0;
-      const len = (e.target.value || "").length;
-      if (start === 0 && end === len) {
+      let allSelected = true;
+      if (e.target.tagName === "INPUT" || e.target.tagName === "TEXTAREA") {
+        const start = e.target.selectionStart ?? 0;
+        const end = e.target.selectionEnd ?? 0;
+        const len = (e.target.value || "").length;
+        allSelected = start === 0 && end === len;
+      }
+      if (allSelected) {
         e.preventDefault();
         const sib =
           e.key === "ArrowLeft"
             ? td.previousElementSibling
             : td.nextElementSibling;
         if (sib) {
-          const next = sib.querySelector("input,select");
+          const next = sib.querySelector("input,select,textarea");
           if (next) {
             next.focus();
             if (typeof next.select === "function") next.select();
