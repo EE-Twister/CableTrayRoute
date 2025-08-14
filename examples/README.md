@@ -30,8 +30,11 @@ Columns (in order):
 22. `cable_rating`
 23. `est_load`
 24. `duty_cycle`
-25. `length`
-26. `notes`
+25. `raceway_ids`
+26. `length`
+27. `notes`
+
+The `raceway_ids` column contains one or more conduit or tray tags separated by semicolons.
 
 ## Ductbanks
 
