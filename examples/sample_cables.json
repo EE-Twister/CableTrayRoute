@@ -25,7 +25,11 @@
     "est_load": 51,
     "duty_cycle": 100,
     "length": 205,
-    "notes": ""
+    "notes": "",
+    "raceway_ids": [
+      "C-001",
+      "C-002"
+    ]
   },
   {
     "tag": "CBL-002",
@@ -53,7 +57,10 @@
     "est_load": 52,
     "duty_cycle": 100,
     "length": 210,
-    "notes": ""
+    "notes": "",
+    "raceway_ids": [
+      "C-002"
+    ]
   },
   {
     "tag": "CBL-003",
@@ -81,7 +88,10 @@
     "est_load": 53,
     "duty_cycle": 100,
     "length": 215,
-    "notes": ""
+    "notes": "",
+    "raceway_ids": [
+      "C-003"
+    ]
   },
   {
     "tag": "CBL-004",
@@ -109,7 +119,10 @@
     "est_load": 54,
     "duty_cycle": 100,
     "length": 220,
-    "notes": ""
+    "notes": "",
+    "raceway_ids": [
+      "C-004"
+    ]
   },
   {
     "tag": "CBL-005",
@@ -137,7 +150,10 @@
     "est_load": 55,
     "duty_cycle": 100,
     "length": 225,
-    "notes": ""
+    "notes": "",
+    "raceway_ids": [
+      "C-005"
+    ]
   },
   {
     "tag": "CBL-006",
@@ -165,7 +181,11 @@
     "est_load": 56,
     "duty_cycle": 100,
     "length": 230,
-    "notes": ""
+    "notes": "",
+    "raceway_ids": [
+      "C-006",
+      "C-007"
+    ]
   },
   {
     "tag": "CBL-007",
@@ -193,7 +213,10 @@
     "est_load": 57,
     "duty_cycle": 100,
     "length": 235,
-    "notes": ""
+    "notes": "",
+    "raceway_ids": [
+      "C-007"
+    ]
   },
   {
     "tag": "CBL-008",
@@ -221,7 +244,10 @@
     "est_load": 58,
     "duty_cycle": 100,
     "length": 240,
-    "notes": ""
+    "notes": "",
+    "raceway_ids": [
+      "C-008"
+    ]
   },
   {
     "tag": "CBL-009",
@@ -249,7 +275,10 @@
     "est_load": 59,
     "duty_cycle": 100,
     "length": 245,
-    "notes": ""
+    "notes": "",
+    "raceway_ids": [
+      "C-009"
+    ]
   },
   {
     "tag": "CBL-010",
@@ -277,7 +306,10 @@
     "est_load": 60,
     "duty_cycle": 100,
     "length": 250,
-    "notes": ""
+    "notes": "",
+    "raceway_ids": [
+      "C-010"
+    ]
   },
   {
     "tag": "CBL-011",
@@ -305,7 +337,11 @@
     "est_load": 61,
     "duty_cycle": 100,
     "length": 255,
-    "notes": ""
+    "notes": "",
+    "raceway_ids": [
+      "C-011",
+      "C-012"
+    ]
   },
   {
     "tag": "CBL-012",
@@ -333,7 +369,10 @@
     "est_load": 62,
     "duty_cycle": 100,
     "length": 260,
-    "notes": ""
+    "notes": "",
+    "raceway_ids": [
+      "C-012"
+    ]
   },
   {
     "tag": "CBL-013",
@@ -361,7 +400,10 @@
     "est_load": 63,
     "duty_cycle": 100,
     "length": 265,
-    "notes": ""
+    "notes": "",
+    "raceway_ids": [
+      "C-013"
+    ]
   },
   {
     "tag": "CBL-014",
@@ -389,7 +431,10 @@
     "est_load": 64,
     "duty_cycle": 100,
     "length": 270,
-    "notes": ""
+    "notes": "",
+    "raceway_ids": [
+      "C-014"
+    ]
   },
   {
     "tag": "CBL-015",
@@ -417,7 +462,10 @@
     "est_load": 65,
     "duty_cycle": 100,
     "length": 275,
-    "notes": ""
+    "notes": "",
+    "raceway_ids": [
+      "C-015"
+    ]
   },
   {
     "tag": "CBL-016",
@@ -445,7 +493,11 @@
     "est_load": 66,
     "duty_cycle": 100,
     "length": 280,
-    "notes": ""
+    "notes": "",
+    "raceway_ids": [
+      "C-016",
+      "C-017"
+    ]
   },
   {
     "tag": "CBL-017",
@@ -473,7 +525,10 @@
     "est_load": 67,
     "duty_cycle": 100,
     "length": 285,
-    "notes": ""
+    "notes": "",
+    "raceway_ids": [
+      "C-017"
+    ]
   },
   {
     "tag": "CBL-018",
@@ -501,7 +556,10 @@
     "est_load": 68,
     "duty_cycle": 100,
     "length": 290,
-    "notes": ""
+    "notes": "",
+    "raceway_ids": [
+      "C-018"
+    ]
   },
   {
     "tag": "CBL-019",
@@ -529,7 +587,10 @@
     "est_load": 69,
     "duty_cycle": 100,
     "length": 295,
-    "notes": ""
+    "notes": "",
+    "raceway_ids": [
+      "C-019"
+    ]
   },
   {
     "tag": "CBL-020",
@@ -557,7 +618,10 @@
     "est_load": 70,
     "duty_cycle": 100,
     "length": 300,
-    "notes": ""
+    "notes": "",
+    "raceway_ids": [
+      "C-020"
+    ]
   },
   {
     "tag": "CBL-021",
@@ -585,7 +649,11 @@
     "est_load": 71,
     "duty_cycle": 100,
     "length": 305,
-    "notes": ""
+    "notes": "",
+    "raceway_ids": [
+      "C-001",
+      "C-002"
+    ]
   },
   {
     "tag": "CBL-022",
@@ -613,7 +681,10 @@
     "est_load": 72,
     "duty_cycle": 100,
     "length": 310,
-    "notes": ""
+    "notes": "",
+    "raceway_ids": [
+      "C-002"
+    ]
   },
   {
     "tag": "CBL-023",
@@ -641,7 +712,10 @@
     "est_load": 73,
     "duty_cycle": 100,
     "length": 315,
-    "notes": ""
+    "notes": "",
+    "raceway_ids": [
+      "C-003"
+    ]
   },
   {
     "tag": "CBL-024",
@@ -669,7 +743,10 @@
     "est_load": 74,
     "duty_cycle": 100,
     "length": 320,
-    "notes": ""
+    "notes": "",
+    "raceway_ids": [
+      "C-004"
+    ]
   },
   {
     "tag": "CBL-025",
@@ -697,7 +774,10 @@
     "est_load": 75,
     "duty_cycle": 100,
     "length": 325,
-    "notes": ""
+    "notes": "",
+    "raceway_ids": [
+      "C-005"
+    ]
   },
   {
     "tag": "CBL-026",
@@ -725,7 +805,11 @@
     "est_load": 76,
     "duty_cycle": 100,
     "length": 330,
-    "notes": ""
+    "notes": "",
+    "raceway_ids": [
+      "C-006",
+      "C-007"
+    ]
   },
   {
     "tag": "CBL-027",
@@ -753,7 +837,10 @@
     "est_load": 77,
     "duty_cycle": 100,
     "length": 335,
-    "notes": ""
+    "notes": "",
+    "raceway_ids": [
+      "C-007"
+    ]
   },
   {
     "tag": "CBL-028",
@@ -781,7 +868,10 @@
     "est_load": 78,
     "duty_cycle": 100,
     "length": 340,
-    "notes": ""
+    "notes": "",
+    "raceway_ids": [
+      "C-008"
+    ]
   },
   {
     "tag": "CBL-029",
@@ -809,7 +899,10 @@
     "est_load": 79,
     "duty_cycle": 100,
     "length": 345,
-    "notes": ""
+    "notes": "",
+    "raceway_ids": [
+      "C-009"
+    ]
   },
   {
     "tag": "CBL-030",
@@ -837,7 +930,10 @@
     "est_load": 80,
     "duty_cycle": 100,
     "length": 350,
-    "notes": ""
+    "notes": "",
+    "raceway_ids": [
+      "C-010"
+    ]
   },
   {
     "tag": "CBL-031",
@@ -865,7 +961,11 @@
     "est_load": 81,
     "duty_cycle": 100,
     "length": 355,
-    "notes": ""
+    "notes": "",
+    "raceway_ids": [
+      "C-011",
+      "C-012"
+    ]
   },
   {
     "tag": "CBL-032",
@@ -893,7 +993,10 @@
     "est_load": 82,
     "duty_cycle": 100,
     "length": 360,
-    "notes": ""
+    "notes": "",
+    "raceway_ids": [
+      "C-012"
+    ]
   },
   {
     "tag": "CBL-033",
@@ -921,7 +1024,10 @@
     "est_load": 83,
     "duty_cycle": 100,
     "length": 365,
-    "notes": ""
+    "notes": "",
+    "raceway_ids": [
+      "C-013"
+    ]
   },
   {
     "tag": "CBL-034",
@@ -949,7 +1055,10 @@
     "est_load": 84,
     "duty_cycle": 100,
     "length": 370,
-    "notes": ""
+    "notes": "",
+    "raceway_ids": [
+      "C-014"
+    ]
   },
   {
     "tag": "CBL-035",
@@ -977,7 +1086,10 @@
     "est_load": 85,
     "duty_cycle": 100,
     "length": 375,
-    "notes": ""
+    "notes": "",
+    "raceway_ids": [
+      "C-015"
+    ]
   },
   {
     "tag": "CBL-036",
@@ -1005,7 +1117,11 @@
     "est_load": 86,
     "duty_cycle": 100,
     "length": 380,
-    "notes": ""
+    "notes": "",
+    "raceway_ids": [
+      "C-016",
+      "C-017"
+    ]
   },
   {
     "tag": "CBL-037",
@@ -1033,7 +1149,10 @@
     "est_load": 87,
     "duty_cycle": 100,
     "length": 385,
-    "notes": ""
+    "notes": "",
+    "raceway_ids": [
+      "C-017"
+    ]
   },
   {
     "tag": "CBL-038",
@@ -1061,7 +1180,10 @@
     "est_load": 88,
     "duty_cycle": 100,
     "length": 390,
-    "notes": ""
+    "notes": "",
+    "raceway_ids": [
+      "C-018"
+    ]
   },
   {
     "tag": "CBL-039",
@@ -1089,7 +1211,10 @@
     "est_load": 89,
     "duty_cycle": 100,
     "length": 395,
-    "notes": ""
+    "notes": "",
+    "raceway_ids": [
+      "C-019"
+    ]
   },
   {
     "tag": "CBL-040",
@@ -1117,7 +1242,10 @@
     "est_load": 90,
     "duty_cycle": 100,
     "length": 400,
-    "notes": ""
+    "notes": "",
+    "raceway_ids": [
+      "C-020"
+    ]
   },
   {
     "tag": "CBL-041",
@@ -1145,7 +1273,11 @@
     "est_load": 91,
     "duty_cycle": 100,
     "length": 405,
-    "notes": ""
+    "notes": "",
+    "raceway_ids": [
+      "C-001",
+      "C-002"
+    ]
   },
   {
     "tag": "CBL-042",
@@ -1173,7 +1305,10 @@
     "est_load": 92,
     "duty_cycle": 100,
     "length": 410,
-    "notes": ""
+    "notes": "",
+    "raceway_ids": [
+      "C-002"
+    ]
   },
   {
     "tag": "CBL-043",
@@ -1201,7 +1336,10 @@
     "est_load": 93,
     "duty_cycle": 100,
     "length": 415,
-    "notes": ""
+    "notes": "",
+    "raceway_ids": [
+      "C-003"
+    ]
   },
   {
     "tag": "CBL-044",
@@ -1229,7 +1367,10 @@
     "est_load": 94,
     "duty_cycle": 100,
     "length": 420,
-    "notes": ""
+    "notes": "",
+    "raceway_ids": [
+      "C-004"
+    ]
   },
   {
     "tag": "CBL-045",
@@ -1257,7 +1398,10 @@
     "est_load": 95,
     "duty_cycle": 100,
     "length": 425,
-    "notes": ""
+    "notes": "",
+    "raceway_ids": [
+      "C-005"
+    ]
   },
   {
     "tag": "CBL-046",
@@ -1285,7 +1429,11 @@
     "est_load": 96,
     "duty_cycle": 100,
     "length": 430,
-    "notes": ""
+    "notes": "",
+    "raceway_ids": [
+      "C-006",
+      "C-007"
+    ]
   },
   {
     "tag": "CBL-047",
@@ -1313,7 +1461,10 @@
     "est_load": 97,
     "duty_cycle": 100,
     "length": 435,
-    "notes": ""
+    "notes": "",
+    "raceway_ids": [
+      "C-007"
+    ]
   },
   {
     "tag": "CBL-048",
@@ -1341,7 +1492,10 @@
     "est_load": 98,
     "duty_cycle": 100,
     "length": 440,
-    "notes": ""
+    "notes": "",
+    "raceway_ids": [
+      "C-008"
+    ]
   },
   {
     "tag": "CBL-049",
@@ -1369,7 +1523,10 @@
     "est_load": 99,
     "duty_cycle": 100,
     "length": 445,
-    "notes": ""
+    "notes": "",
+    "raceway_ids": [
+      "C-009"
+    ]
   },
   {
     "tag": "CBL-050",
@@ -1397,6 +1554,9 @@
     "est_load": 100,
     "duty_cycle": 100,
     "length": 450,
-    "notes": ""
+    "notes": "",
+    "raceway_ids": [
+      "C-010"
+    ]
   }
 ]
