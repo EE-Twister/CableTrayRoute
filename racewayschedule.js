@@ -35,11 +35,21 @@ document.addEventListener('DOMContentLoaded',()=>{
       const json=localStorage.getItem(TableUtils.STORAGE_KEYS.cableSchedule);
       if(!json) return [];
       const arr=JSON.parse(json);
-      return arr.filter(c=>{
-        let ids=c.raceway_ids;
-        if(typeof ids==='string') ids=ids.split(',').map(s=>s.trim()).filter(Boolean);
-        return Array.isArray(ids)&&ids.includes(id);
-      });
+      return arr
+        .filter(c=>{
+          let ids=c.raceway_ids;
+          if(typeof ids==='string') ids=ids.split(',').map(s=>s.trim()).filter(Boolean);
+          return Array.isArray(ids)&&ids.includes(id);
+        })
+        .map(c=>{
+          const od=c.cable_od??c.OD??c.od??c.diameter;
+          return {
+            ...c,
+            OD:c.OD??od,
+            od:c.od??od,
+            diameter:c.diameter??od
+          };
+        });
     }catch(e){console.error('Failed to load cables for',id,e);return[];}
   }
   let saved=true;

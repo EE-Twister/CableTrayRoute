@@ -777,14 +777,14 @@ body.dark-mode .db-table td {
 }
 
 .viewBtn {
-    background: #2ecc71;
+    background: #3498db;
     color: #fff;
     border: none;
 }
 
 .insertAboveBtn,
 .insertBelowBtn {
-    background: #3498db;
+    background: #2ecc71;
     color: #fff;
     border: none;
 }
