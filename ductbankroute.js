@@ -533,7 +533,13 @@ function loadCablesFromSchedule(){
     let conduit_id='';
     if(matches.length===1) conduit_id=matches[0];
     else console.warn(`Cable ${c.tag||''} matches multiple raceways: ${matches.join(', ')}; leaving conduit blank`);
-    const row=Object.assign({},c,{conduit_id});
+    const diameter=c.diameter??c.cable_od??c.OD??c.od;
+    const voltageRating=c.voltage_rating??c.cable_rating??c.rating;
+    const row=Object.assign({},c,{
+      conduit_id,
+      diameter,
+      voltage_rating:voltageRating
+    });
     addCableRow(row,{defer:true});
     added=true;
   });
