@@ -110,10 +110,14 @@
       const addC=document.createElement('button');
       addC.textContent='Add Conduit';
       addC.addEventListener('click',()=>{addConduit(i);});
+      const dup=document.createElement('button');
+      dup.textContent='Duplicate';
+      dup.addEventListener('click',()=>{duplicateDuctbank(i);});
       const del=document.createElement('button');
       del.textContent='Delete';
       del.addEventListener('click',()=>{deleteDuctbank(i);});
       act.appendChild(addC);
+      act.appendChild(dup);
       act.appendChild(del);
 
       const cRow=ductbankTbody.insertRow();
@@ -171,13 +175,19 @@
         TableUtils.applyValidation(sizeSel,sizeRules);
 
         const actc=r.insertCell();
+        const dupe=document.createElement('button');
+        dupe.textContent='Duplicate';
+        dupe.addEventListener('click',()=>{duplicateConduit(i,j);});
         const delc=document.createElement('button');
         delc.textContent='Delete';
         delc.addEventListener('click',()=>{deleteConduit(i,j);});
+        actc.appendChild(dupe);
         actc.appendChild(delc);
       });
       cCell.appendChild(cTable);
     });
+    const rc=document.getElementById('ductbank-row-count');
+    if(rc) rc.textContent=`Rows: ${ductbanks.length}`;
   }
 
   function addDuctbank(){
@@ -201,6 +211,21 @@
 
   function deleteConduit(i,j){
     ductbanks[i].conduits.splice(j,1);
+    renderDuctbanks();
+    saveDuctbanks();
+  }
+
+  function duplicateDuctbank(i){
+    const copy=JSON.parse(JSON.stringify(ductbanks[i]));
+    copy.id=Date.now()+Math.random();
+    ductbanks.splice(i+1,0,copy);
+    renderDuctbanks();
+    saveDuctbanks();
+  }
+
+  function duplicateConduit(i,j){
+    const copy=JSON.parse(JSON.stringify(ductbanks[i].conduits[j]));
+    ductbanks[i].conduits.splice(j+1,0,copy);
     renderDuctbanks();
     saveDuctbanks();
   }
