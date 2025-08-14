@@ -109,7 +109,8 @@ document.addEventListener('DOMContentLoaded',()=>{
     {key:'end_z',label:'End Z',type:'number',validate:['required','numeric']},
     {key:'inside_width',label:'Inside Width (in)',type:'select',options:TRAY_WIDTH_OPTIONS,default:TRAY_WIDTH_OPTIONS[0],validate:['required']},
     {key:'tray_depth',label:'Tray Depth (in)',type:'select',options:TRAY_DEPTH_OPTIONS,default:TRAY_DEPTH_OPTIONS[0],validate:['required']},
-    {key:'tray_type',label:'Tray Type',type:'select',options:TRAY_TYPE_OPTIONS,default:TRAY_TYPE_OPTIONS[0],validate:['required']}
+    {key:'tray_type',label:'Tray Type',type:'select',options:TRAY_TYPE_OPTIONS,default:TRAY_TYPE_OPTIONS[0],validate:['required']},
+    {key:'allowed_cable_group',label:'Allowed Group',type:'text'}
   ];
   const trayTable=TableUtils.createTable({
     tableId:'trayTable',
@@ -128,7 +129,8 @@ document.addEventListener('DOMContentLoaded',()=>{
     rowCountId:'tray-row-count',
     onView:(row)=>{
       try{
-        const tray={tray_id:row.tray_id,width:parseFloat(row.inside_width),height:parseFloat(row.tray_depth)};
+        trayTable.save();
+        const tray={tray_id:row.tray_id,width:parseFloat(row.inside_width),height:parseFloat(row.tray_depth),allowed_cable_group:row.allowed_cable_group};
         const cables=cablesForRaceway(row.tray_id);
         localStorage.setItem('trayFillData',JSON.stringify({tray,cables}));
       }catch(e){console.error('Failed to store tray fill data',e);}
