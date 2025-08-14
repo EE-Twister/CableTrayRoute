@@ -30,7 +30,8 @@
     "raceway_ids": [
       "C-001",
       "C-002"
-    ]
+    ],
+    "operating_voltage": 480
   },
   {
     "tag": "CBL-002",
@@ -62,7 +63,8 @@
     "notes": "",
     "raceway_ids": [
       "C-002"
-    ]
+    ],
+    "operating_voltage": 480
   },
   {
     "tag": "CBL-003",
@@ -94,7 +96,8 @@
     "notes": "",
     "raceway_ids": [
       "C-003"
-    ]
+    ],
+    "operating_voltage": 480
   },
   {
     "tag": "CBL-004",
@@ -126,7 +129,8 @@
     "notes": "",
     "raceway_ids": [
       "C-004"
-    ]
+    ],
+    "operating_voltage": 480
   },
   {
     "tag": "CBL-005",
@@ -158,7 +162,8 @@
     "notes": "",
     "raceway_ids": [
       "C-005"
-    ]
+    ],
+    "operating_voltage": 480
   },
   {
     "tag": "CBL-006",
@@ -191,7 +196,8 @@
     "raceway_ids": [
       "C-006",
       "C-007"
-    ]
+    ],
+    "operating_voltage": 480
   },
   {
     "tag": "CBL-007",
@@ -223,7 +229,8 @@
     "notes": "",
     "raceway_ids": [
       "C-007"
-    ]
+    ],
+    "operating_voltage": 480
   },
   {
     "tag": "CBL-008",
@@ -255,7 +262,8 @@
     "notes": "",
     "raceway_ids": [
       "C-008"
-    ]
+    ],
+    "operating_voltage": 480
   },
   {
     "tag": "CBL-009",
@@ -287,7 +295,8 @@
     "notes": "",
     "raceway_ids": [
       "C-009"
-    ]
+    ],
+    "operating_voltage": 480
   },
   {
     "tag": "CBL-010",
@@ -319,7 +328,8 @@
     "notes": "",
     "raceway_ids": [
       "C-010"
-    ]
+    ],
+    "operating_voltage": 480
   },
   {
     "tag": "CBL-011",
@@ -352,7 +362,8 @@
     "raceway_ids": [
       "C-011",
       "C-012"
-    ]
+    ],
+    "operating_voltage": 480
   },
   {
     "tag": "CBL-012",
@@ -384,7 +395,8 @@
     "notes": "",
     "raceway_ids": [
       "C-012"
-    ]
+    ],
+    "operating_voltage": 480
   },
   {
     "tag": "CBL-013",
@@ -416,7 +428,8 @@
     "notes": "",
     "raceway_ids": [
       "C-013"
-    ]
+    ],
+    "operating_voltage": 480
   },
   {
     "tag": "CBL-014",
@@ -448,7 +461,8 @@
     "notes": "",
     "raceway_ids": [
       "C-014"
-    ]
+    ],
+    "operating_voltage": 480
   },
   {
     "tag": "CBL-015",
@@ -480,7 +494,8 @@
     "notes": "",
     "raceway_ids": [
       "C-015"
-    ]
+    ],
+    "operating_voltage": 480
   },
   {
     "tag": "CBL-016",
@@ -513,7 +528,8 @@
     "raceway_ids": [
       "C-016",
       "C-017"
-    ]
+    ],
+    "operating_voltage": 480
   },
   {
     "tag": "CBL-017",
@@ -545,7 +561,8 @@
     "notes": "",
     "raceway_ids": [
       "C-017"
-    ]
+    ],
+    "operating_voltage": 480
   },
   {
     "tag": "CBL-018",
@@ -577,7 +594,8 @@
     "notes": "",
     "raceway_ids": [
       "C-018"
-    ]
+    ],
+    "operating_voltage": 480
   },
   {
     "tag": "CBL-019",
@@ -609,7 +627,8 @@
     "notes": "",
     "raceway_ids": [
       "C-019"
-    ]
+    ],
+    "operating_voltage": 480
   },
   {
     "tag": "CBL-020",
@@ -641,7 +660,8 @@
     "notes": "",
     "raceway_ids": [
       "C-020"
-    ]
+    ],
+    "operating_voltage": 480
   },
   {
     "tag": "CBL-021",
@@ -674,7 +694,8 @@
     "raceway_ids": [
       "C-001",
       "C-002"
-    ]
+    ],
+    "operating_voltage": 480
   },
   {
     "tag": "CBL-022",
@@ -706,7 +727,8 @@
     "notes": "",
     "raceway_ids": [
       "C-002"
-    ]
+    ],
+    "operating_voltage": 480
   },
   {
     "tag": "CBL-023",
@@ -738,7 +760,8 @@
     "notes": "",
     "raceway_ids": [
       "C-003"
-    ]
+    ],
+    "operating_voltage": 480
   },
   {
     "tag": "CBL-024",
@@ -770,7 +793,8 @@
     "notes": "",
     "raceway_ids": [
       "C-004"
-    ]
+    ],
+    "operating_voltage": 480
   },
   {
     "tag": "CBL-025",
@@ -802,7 +826,8 @@
     "notes": "",
     "raceway_ids": [
       "C-005"
-    ]
+    ],
+    "operating_voltage": 480
   },
   {
     "tag": "CBL-026",
@@ -835,7 +860,8 @@
     "raceway_ids": [
       "C-006",
       "C-007"
-    ]
+    ],
+    "operating_voltage": 480
   },
   {
     "tag": "CBL-027",
@@ -867,7 +893,8 @@
     "notes": "",
     "raceway_ids": [
       "C-007"
-    ]
+    ],
+    "operating_voltage": 480
   },
   {
     "tag": "CBL-028",
@@ -899,7 +926,8 @@
     "notes": "",
     "raceway_ids": [
       "C-008"
-    ]
+    ],
+    "operating_voltage": 480
   },
   {
     "tag": "CBL-029",
@@ -931,7 +959,8 @@
     "notes": "",
     "raceway_ids": [
       "C-009"
-    ]
+    ],
+    "operating_voltage": 480
   },
   {
     "tag": "CBL-030",
@@ -963,7 +992,8 @@
     "notes": "",
     "raceway_ids": [
       "C-010"
-    ]
+    ],
+    "operating_voltage": 480
   },
   {
     "tag": "CBL-031",
@@ -996,7 +1026,8 @@
     "raceway_ids": [
       "C-011",
       "C-012"
-    ]
+    ],
+    "operating_voltage": 480
   },
   {
     "tag": "CBL-032",
@@ -1028,7 +1059,8 @@
     "notes": "",
     "raceway_ids": [
       "C-012"
-    ]
+    ],
+    "operating_voltage": 480
   },
   {
     "tag": "CBL-033",
@@ -1060,7 +1092,8 @@
     "notes": "",
     "raceway_ids": [
       "C-013"
-    ]
+    ],
+    "operating_voltage": 480
   },
   {
     "tag": "CBL-034",
@@ -1092,7 +1125,8 @@
     "notes": "",
     "raceway_ids": [
       "C-014"
-    ]
+    ],
+    "operating_voltage": 480
   },
   {
     "tag": "CBL-035",
@@ -1124,7 +1158,8 @@
     "notes": "",
     "raceway_ids": [
       "C-015"
-    ]
+    ],
+    "operating_voltage": 480
   },
   {
     "tag": "CBL-036",
@@ -1157,7 +1192,8 @@
     "raceway_ids": [
       "C-016",
       "C-017"
-    ]
+    ],
+    "operating_voltage": 480
   },
   {
     "tag": "CBL-037",
@@ -1189,7 +1225,8 @@
     "notes": "",
     "raceway_ids": [
       "C-017"
-    ]
+    ],
+    "operating_voltage": 480
   },
   {
     "tag": "CBL-038",
@@ -1221,7 +1258,8 @@
     "notes": "",
     "raceway_ids": [
       "C-018"
-    ]
+    ],
+    "operating_voltage": 480
   },
   {
     "tag": "CBL-039",
@@ -1253,7 +1291,8 @@
     "notes": "",
     "raceway_ids": [
       "C-019"
-    ]
+    ],
+    "operating_voltage": 480
   },
   {
     "tag": "CBL-040",
@@ -1285,7 +1324,8 @@
     "notes": "",
     "raceway_ids": [
       "C-020"
-    ]
+    ],
+    "operating_voltage": 480
   },
   {
     "tag": "CBL-041",
@@ -1318,7 +1358,8 @@
     "raceway_ids": [
       "C-001",
       "C-002"
-    ]
+    ],
+    "operating_voltage": 480
   },
   {
     "tag": "CBL-042",
@@ -1350,7 +1391,8 @@
     "notes": "",
     "raceway_ids": [
       "C-002"
-    ]
+    ],
+    "operating_voltage": 480
   },
   {
     "tag": "CBL-043",
@@ -1382,7 +1424,8 @@
     "notes": "",
     "raceway_ids": [
       "C-003"
-    ]
+    ],
+    "operating_voltage": 480
   },
   {
     "tag": "CBL-044",
@@ -1414,7 +1457,8 @@
     "notes": "",
     "raceway_ids": [
       "C-004"
-    ]
+    ],
+    "operating_voltage": 480
   },
   {
     "tag": "CBL-045",
@@ -1446,7 +1490,8 @@
     "notes": "",
     "raceway_ids": [
       "C-005"
-    ]
+    ],
+    "operating_voltage": 480
   },
   {
     "tag": "CBL-046",
@@ -1479,7 +1524,8 @@
     "raceway_ids": [
       "C-006",
       "C-007"
-    ]
+    ],
+    "operating_voltage": 480
   },
   {
     "tag": "CBL-047",
@@ -1511,7 +1557,8 @@
     "notes": "",
     "raceway_ids": [
       "C-007"
-    ]
+    ],
+    "operating_voltage": 480
   },
   {
     "tag": "CBL-048",
@@ -1543,7 +1590,8 @@
     "notes": "",
     "raceway_ids": [
       "C-008"
-    ]
+    ],
+    "operating_voltage": 480
   },
   {
     "tag": "CBL-049",
@@ -1575,7 +1623,8 @@
     "notes": "",
     "raceway_ids": [
       "C-009"
-    ]
+    ],
+    "operating_voltage": 480
   },
   {
     "tag": "CBL-050",
@@ -1607,6 +1656,7 @@
     "notes": "",
     "raceway_ids": [
       "C-010"
-    ]
+    ],
+    "operating_voltage": 480
   }
 ]

@@ -146,6 +146,7 @@ class TableManager {
       blank.rowSpan = 1;
       blank.style.position='relative';
       groupRow.appendChild(blank);
+      this.groupBlankTh = blank;
     }
     const actTh = document.createElement('th');
     actTh.textContent = 'Actions';
@@ -158,9 +159,11 @@ class TableManager {
       const newWidth=Math.max(30,startWidth+e.pageX-startX);
       actTh.style.width=newWidth+'px';
       Array.from(this.tbody.rows).forEach(r=>{if(r.cells[this.columns.length]) r.cells[this.columns.length].style.width=newWidth+'px';});
+      if(this.groupBlankTh) this.groupBlankTh.style.width=newWidth+'px';
     };
     res.addEventListener('mousedown',e=>{startX=e.pageX;startWidth=actTh.offsetWidth;document.addEventListener('mousemove',move);document.addEventListener('mouseup',()=>{document.removeEventListener('mousemove',move);},{once:true});});
     headerRow.appendChild(actTh);
+    this.syncGroupBlankWidth();
   }
 
   setGroupVisibility(name, hide) {
@@ -177,6 +180,7 @@ class TableManager {
     }
     if (this.groupToggles[name]) this.groupToggles[name].textContent = hide ? '+' : '-';
     if (hide) this.hiddenGroups.add(name); else this.hiddenGroups.delete(name);
+    this.syncGroupBlankWidth();
   }
 
   toggleGroup(name) {
@@ -197,6 +201,13 @@ class TableManager {
     try { all = JSON.parse(localStorage.getItem(STORAGE_KEYS.collapsedGroups) || '{}'); } catch(e) {}
     const hidden = all[this.storageKey] || [];
     hidden.forEach(g => this.setGroupVisibility(g, true));
+  }
+
+  syncGroupBlankWidth(){
+    if(this.groupBlankTh && this.headerRow && this.headerRow.cells[this.columns.length]){
+      const w=this.headerRow.cells[this.columns.length].offsetWidth;
+      this.groupBlankTh.style.width=w+'px';
+    }
   }
 
   updateRowCount() {
@@ -469,6 +480,20 @@ class TableManager {
               }
             }
           }
+        } else if (e.key === 'Enter') {
+          e.preventDefault();
+          let nextRow = tr.nextElementSibling;
+          if (!nextRow) {
+            nextRow = this.addRow();
+            if (this.onChange) this.onChange();
+          }
+          if (nextRow && nextRow.cells[idx]) {
+            const next = nextRow.cells[idx].querySelector('input,select,textarea');
+            if (next) {
+              next.focus();
+              if (typeof next.select === 'function') next.select();
+            }
+          }
         }
       });
       if (col.onChange) el.addEventListener('change', () => { col.onChange(el, tr); });
@@ -505,7 +530,7 @@ class TableManager {
       actTd.appendChild(viewBtn);
     }
     const addBtn=document.createElement('button');
-    addBtn.textContent='\u2795';
+    addBtn.textContent='+';
     addBtn.className='insertBelowBtn';
     addBtn.title='Add row';
     addBtn.setAttribute('aria-label','Add row');
