@@ -36,10 +36,12 @@ function makeInput(value = "") {
   };
 }
 
-function makeCell(input) {
+function makeCell(input, row = null, index = 0) {
   return {
     previousElementSibling: null,
     nextElementSibling: null,
+    parentElement: row,
+    index,
     querySelector() {
       return input;
     },
@@ -79,6 +81,18 @@ function attach(el, td) {
             next.focus();
             if (typeof next.select === "function") next.select();
           }
+        }
+      }
+    } else if (e.key === "Enter") {
+      e.preventDefault();
+      const row = td.parentElement;
+      const idx = td.index;
+      const nextRow = row && row.nextElementSibling;
+      if (nextRow && nextRow.cells && nextRow.cells[idx]) {
+        const next = nextRow.cells[idx].querySelector("input,select,textarea");
+        if (next) {
+          next.focus();
+          if (typeof next.select === "function") next.select();
         }
       }
     }
@@ -140,5 +154,27 @@ describe("tableUtils arrow navigation", () => {
     assert.strictEqual(activeEl, input2);
     assert.strictEqual(input2.selectionStart, 0);
     assert.strictEqual(input2.selectionEnd, input2.value.length);
+  });
+
+  it("Enter moves to cell below and selects text", () => {
+    const row1 = { cells: [], nextElementSibling: null };
+    const row2 = { cells: [], previousElementSibling: row1, nextElementSibling: null };
+    row1.nextElementSibling = row2;
+    const topInput = makeInput("top");
+    const topCell = makeCell(topInput, row1, 0);
+    row1.cells.push(topCell);
+    const bottomInput = makeInput("bottom");
+    const bottomCell = makeCell(bottomInput, row2, 0);
+    row2.cells.push(bottomCell);
+    attach(topInput, topCell);
+    attach(bottomInput, bottomCell);
+    topInput.focus();
+    topInput.select();
+    const ev = keyEvent("Enter");
+    const result = topInput.dispatchEvent(ev);
+    assert(!result);
+    assert.strictEqual(activeEl, bottomInput);
+    assert.strictEqual(bottomInput.selectionStart, 0);
+    assert.strictEqual(bottomInput.selectionEnd, bottomInput.value.length);
   });
 });

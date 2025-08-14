@@ -239,7 +239,7 @@
       const act=row.insertCell();
       setWidth(act,11);
       act.appendChild(iconBtn('👁','viewBtn','View Ductbank',()=>{viewDuctbank(i);}));
-      act.appendChild(iconBtn('\u2795','insertBelowBtn','Add Conduit',()=>{addConduit(i);}));
+      act.appendChild(iconBtn('+','insertBelowBtn','Add Conduit',()=>{addConduit(i);}));
       act.appendChild(iconBtn('\u29C9','duplicateBtn','Duplicate Ductbank',()=>{duplicateDuctbank(i);}));
       act.appendChild(iconBtn('\u2716','removeBtn','Delete Ductbank',()=>{deleteDuctbank(i);}));
 
