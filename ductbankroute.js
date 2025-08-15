@@ -2376,6 +2376,40 @@ loadConductorProperties().then(()=>{
   updateInsulationOptions();
   checkInsulationThickness();
   loadDuctbankSession();
+  const storedRoute = localStorage.getItem('ductbankRouteData');
+  if (storedRoute) {
+    try {
+      const { ductbank, cables } = JSON.parse(storedRoute);
+      if (ductbank && ductbank.tag !== undefined) {
+        const tagEl = document.getElementById('ductbankTag');
+        if (tagEl) tagEl.value = ductbank.tag;
+      }
+      if (Array.isArray(cables)) {
+        const tbody = document.querySelector('#cableTable tbody');
+        if (tbody) {
+          tbody.innerHTML = '';
+          cables.forEach(c => {
+            addCableRow({
+              tag: c.name || c.tag || '',
+              cable_type: c.cable_type || '',
+              diameter: c.diameter || '',
+              conductors: c.conductors || c.count || '',
+              conductor_size: c.conductor_size || c.size || '',
+              weight: c.weight || '',
+              est_load: c.est_load || c.load || '',
+              conduit_id: c.conduit_id || c.conduit || ''
+            }, { defer: true });
+          });
+          updateInsulationOptions();
+        }
+      }
+    } catch (e) {
+      console.error('Failed to load ductbankRouteData', e);
+    }
+    localStorage.removeItem('ductbankRouteData');
+    drawGrid();
+    updateAmpacityReport();
+  }
   loadCablesFromSchedule();
 });
 loadSoilResistivityData().then(data=>{

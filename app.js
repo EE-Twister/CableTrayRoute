@@ -1410,6 +1410,18 @@ const openConduitFill = (cables) => {
     window.open('conduitfill.html', '_blank');
 };
 
+const openDuctbankRoute = (dbId) => {
+    const ductbank = state.ductbankData?.ductbanks?.find(db => (db.id || db.tag) === dbId);
+    const cables = (state.trayCableMap && state.trayCableMap[dbId]) ? state.trayCableMap[dbId] : [];
+    if (!ductbank) return;
+    try {
+        localStorage.setItem('ductbankRouteData', JSON.stringify({ ductbank, cables }));
+    } catch (e) {
+        console.error('Failed to store ductbank route data', e);
+    }
+    window.open('ductbankroute.html', '_blank');
+};
+
  const renderUpdatedUtilizationTable = () => {
      if (!state.updatedUtilData || state.updatedUtilData.length === 0) {
          elements.updatedUtilizationContainer.innerHTML = '';
@@ -1796,6 +1808,8 @@ const openConduitFill = (cables) => {
                     let link = '';
                     if (b.type === 'field') {
                         link = `<button class="conduit-fill-btn" data-cable="${res.cable}">Open</button>`;
+                    } else if (b.type === 'duct bank') {
+                        link = `<button class="ductbank-fill-btn" data-ductbank="${b.tray_id}">Fill</button>`;
                     } else if (b.tray_id && b.tray_id !== 'Field Route' && b.tray_id !== 'N/A') {
                         link = `<button class="tray-fill-btn" data-tray="${b.tray_id}">Fill</button>`;
                     }
@@ -1823,6 +1837,15 @@ const openConduitFill = (cables) => {
                 const trayId = btn.dataset.tray;
                 if (trayId) {
                     openTrayFill(trayId);
+                }
+            });
+        });
+        elements.routeBreakdownContainer.querySelectorAll('.ductbank-fill-btn').forEach(btn => {
+            btn.addEventListener('click', (e) => {
+                e.stopPropagation();
+                const dbId = btn.dataset.ductbank;
+                if (dbId) {
+                    openDuctbankRoute(dbId);
                 }
             });
         });
@@ -2162,6 +2185,13 @@ const openConduitFill = (cables) => {
     };
 
     const formatPoint = (p) => `(${p[0].toFixed(1)}, ${p[1].toFixed(1)}, ${p[2].toFixed(1)})`;
+
+    const getSegmentType = (seg) => {
+        if (seg.type !== 'tray') return seg.type;
+        const tray = state.trayData.find(t => t.tray_id === seg.tray_id);
+        const rt = tray && tray.raceway_type ? tray.raceway_type : 'tray';
+        return rt === 'ductbank' ? 'duct bank' : rt;
+    };
 
     // Render a tray/cable combo to an image. We use JPEG instead of PNG so the
     // PDF export has a much smaller file size while retaining good quality.
@@ -2518,7 +2548,7 @@ const openConduitFill = (cables) => {
                             breakdown: result.success ? result.route_segments.map((seg, i) => ({
                                 segment: i + 1,
                                 tray_id: seg.type === 'field' ? 'Field Route' : (seg.tray_id || 'N/A'),
-                                type: seg.type,
+                                type: getSegmentType(seg),
                                 from: formatPoint(seg.start),
                                 to: formatPoint(seg.end),
                                 length: seg.length.toFixed(2),
@@ -2588,7 +2618,7 @@ const openConduitFill = (cables) => {
             });
             state.sharedFieldRoutes = common;
             if (common.length > 0) {
-                let html = '<h4>Potential Shared Field Routes</h4><ul>';
+                let html = '<details><summary>Potential Shared Field Routes</summary><ul>';
                 common.forEach((c, idx) => {
                     const group = c.allowed_cable_group ? ` (Group ${c.allowed_cable_group})` : '';
                     let recText = c.recommendation;
@@ -2607,7 +2637,7 @@ const openConduitFill = (cables) => {
                     }
                     html += `<li class="shared-route-item" data-route-index="${idx}">${c.name}${group}: ${formatPoint(c.start)} to ${formatPoint(c.end)} - ${c.cables.join(', ')} | ${recText}${fillLink}</li>`;
                 });
-                html += '</ul>';
+                html += '</ul></details>';
                 elements.metrics.innerHTML = html;
                 elements.metrics.querySelectorAll('.shared-route-item').forEach(li => {
                     li.style.cursor = 'pointer';
@@ -2724,7 +2754,7 @@ const openConduitFill = (cables) => {
                     breakdown: res.route_segments.map((seg, i) => ({
                         segment: i + 1,
                         tray_id: seg.type === 'field' ? 'Field Route' : (seg.tray_id || 'N/A'),
-                        type: seg.type,
+                        type: getSegmentType(seg),
                         from: formatPoint(seg.start),
                         to: formatPoint(seg.end),
                         length: seg.length.toFixed(2),

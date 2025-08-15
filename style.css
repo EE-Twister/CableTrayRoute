@@ -425,6 +425,10 @@ details > summary {
     justify-content: flex-end;
 }
 
+.modal-actions .primary-btn {
+    width: auto;
+}
+
 .close-btn {
     position: absolute;
     top: 0.5rem;
