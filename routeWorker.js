@@ -485,7 +485,9 @@ class CableRoutingSystem {
 
         // Remove trays without remaining capacity
         this.trays.forEach(tray => {
-            if (tray.current_fill + cableArea > tray.maxFill || tray.allowed_cable_group !== allowedGroup) {
+            if (tray.current_fill + cableArea > tray.maxFill ||
+                (tray.allowed_cable_group &&
+                 tray.allowed_cable_group !== allowedGroup)) {
                 const remove = Object.keys(graph.nodes).filter(n => n.includes(tray.tray_id));
                 remove.forEach(n => {
                     delete graph.nodes[n];
