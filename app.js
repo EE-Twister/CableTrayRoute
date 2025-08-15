@@ -1452,7 +1452,7 @@ const openConduitFill = (cables) => {
 };
 
 const openDuctbankRoute = (dbId, conduitId) => {
-    const ductbank = state.ductbankData?.ductbanks?.find(db => (db.id || db.tag) === dbId);
+    const ductbank = state.ductbankData?.ductbanks?.find(db => db.id === dbId || db.tag === dbId);
     const key = conduitId ? `${dbId} - ${conduitId}` : dbId;
     const cables = (state.trayCableMap && state.trayCableMap[key]) ? state.trayCableMap[key] : [];
     if (!ductbank) return;
