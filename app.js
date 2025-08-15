@@ -249,8 +249,24 @@ document.addEventListener('DOMContentLoaded', async () => {
         }
     };
 
+    const syncManualPath = cable => {
+        if (!cable) return;
+        if (!('manual_path' in cable)) cable.manual_path = '';
+        if (!('raceway_ids' in cable)) cable.raceway_ids = [];
+        if (!cable.manual_path && Array.isArray(cable.raceway_ids) && cable.raceway_ids.length) {
+            cable.manual_path = cable.raceway_ids.join('>');
+        }
+    };
+
+    const setRacewayIds = (cable, ids) => {
+        if (!cable) return;
+        cable.raceway_ids = Array.isArray(ids) ? ids : [];
+        syncManualPath(cable);
+    };
+
     const saveSession = () => {
         try {
+            state.cableList.forEach(syncManualPath);
             const data = {
                 manualTrays: state.manualTrays,
                 cableList: state.cableList,
@@ -269,10 +285,7 @@ document.addEventListener('DOMContentLoaded', async () => {
             if (data) {
                 state.manualTrays = (data.manualTrays || []).map(t => ({ ...t, raceway_type: t.raceway_type || 'tray' }));
                 state.cableList = data.cableList || [];
-                state.cableList.forEach(c => {
-                    if (!('manual_path' in c)) c.manual_path = '';
-                    if (!('raceway_ids' in c)) c.raceway_ids = [];
-                });
+                state.cableList.forEach(syncManualPath);
                 if (data.darkMode) document.body.classList.add('dark-mode');
                 if (data.conduitType && elements.conduitType) {
                     elements.conduitType.value = data.conduitType;
@@ -394,12 +407,12 @@ document.addEventListener('DOMContentLoaded', async () => {
                     end_tag: to_tag,
                     start: [parseFloat(start_x), parseFloat(start_y), parseFloat(start_z)],
                     end: [parseFloat(end_x), parseFloat(end_y), parseFloat(end_z)],
-                    raceway_ids: raceway_ids || [],
                     manual_path: '',
                     ...rest,
                     diameter,
                     weight,
                 };
+                setRacewayIds(mapped, raceway_ids || []);
                 return mapped;
             });
         }
@@ -1859,9 +1872,9 @@ const openDuctbankRoute = (dbId, conduitId) => {
                     start: [parseFloat(t.start_x) || 0, parseFloat(t.start_y) || 0, parseFloat(t.start_z) || 0],
                     end: [parseFloat(t.end_x) || 0, parseFloat(t.end_y) || 0, parseFloat(t.end_z) || 0]
                 ,
-                    manual_path: '',
-                    raceway_ids: []
+                    manual_path: ''
                 });
+                setRacewayIds(newCables[newCables.length - 1], []);
             }
             state.cableList = newCables;
             updateCableListDisplay();
@@ -2145,9 +2158,9 @@ const openDuctbankRoute = (dbId, conduitId) => {
             start_tag: '',
             end_tag: '',
             allowed_cable_group: '',
-            manual_path: '',
-            raceway_ids: []
+            manual_path: ''
         };
+        setRacewayIds(newCable, []);
         state.cableList.push(newCable);
         updateCableListDisplay();
         updateTableCounts();
