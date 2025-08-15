@@ -421,15 +421,37 @@ class CableRoutingSystem {
     }
     _racewayRoute(startPoint, endPoint, cableArea, allowedGroup, racewayIds) {
         if (!Array.isArray(racewayIds) || racewayIds.length === 0) return null;
-        const knownIds = racewayIds.filter(id => this.trays.has(id));
-        if (knownIds.length === 0) return null;
-        if (knownIds.length < racewayIds.length) {
-            console.warn(`Unknown raceway IDs: ${racewayIds.filter(id => !this.trays.has(id)).join(', ')}`);
+
+        const resolvedIds = [];
+        const unknownIds = [];
+
+        for (const id of racewayIds) {
+            if (this.trays.has(id)) {
+                resolvedIds.push(id);
+                continue;
+            }
+            let trayId = null;
+            for (const [tId, tray] of this.trays.entries()) {
+                if (tray.conduit_id === id) {
+                    trayId = tId;
+                    break;
+                }
+            }
+            if (trayId) {
+                resolvedIds.push(trayId);
+            } else {
+                unknownIds.push(id);
+            }
+        }
+
+        if (resolvedIds.length === 0) return null;
+        if (unknownIds.length > 0) {
+            console.warn(`Unknown raceway IDs: ${unknownIds.join(', ')}`);
         }
         const segments = [];
         const traySegments = [];
         let prev = startPoint.slice();
-        for (const id of knownIds) {
+        for (const id of resolvedIds) {
             const tray = this.trays.get(id);
             if (tray.allowed_cable_group && allowedGroup && tray.allowed_cable_group !== allowedGroup) {
                 return { success: false, manual: true, manual_raceway: true, message: `Tray ${id} not allowed` };
