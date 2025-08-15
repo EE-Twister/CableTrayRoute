@@ -360,12 +360,12 @@ class CableRoutingSystem {
             let prev = startPoint.slice();
             for (const id of trayIds) {
                 const tray = this.trays.get(id);
-                if (!tray) return { success: false, manual: true, manual_raceway: false, message: `Tray ${id} not found` };
+                if (!tray) return { success: false, manual: true, manual_raceway: false, message: `Tray ${id} not found`, error: { tray_id: id, reason: 'not_found' } };
                 if (tray.allowed_cable_group && allowedGroup && tray.allowed_cable_group !== allowedGroup) {
-                    return { success: false, manual: true, manual_raceway: false, message: `Tray ${id} not allowed` };
+                    return { success: false, manual: true, manual_raceway: false, message: `Tray ${id} not allowed`, error: { tray_id: id, reason: 'not_allowed' } };
                 }
                 if (tray.current_fill + cableArea > tray.maxFill) {
-                    return { success: false, manual: true, manual_raceway: false, message: `Tray ${id} over capacity` };
+                    return { success: false, manual: true, manual_raceway: false, message: `Tray ${id} over capacity`, error: { tray_id: id, reason: 'over_capacity' } };
                 }
                 const a = [tray.start_x, tray.start_y, tray.start_z];
                 const b = [tray.end_x, tray.end_y, tray.end_z];
@@ -376,7 +376,7 @@ class CableRoutingSystem {
                 } else {
                     const last = segments[segments.length - 1].end;
                     if (this.distance(last, a) > 0.1) {
-                        return { success: false, manual: true, manual_raceway: false, message: `Tray sequence mismatch at ${id}` };
+                        return { success: false, manual: true, manual_raceway: false, message: `Tray sequence mismatch at ${id}`, error: { tray_id: id, reason: 'sequence_mismatch' } };
                     }
                 }
                 const len = this.distance(a, b);
@@ -401,7 +401,7 @@ class CableRoutingSystem {
         } else {
             const points = path.split(/\s*;\s*/).filter(Boolean).map(p => p.split(',').map(Number));
             if (points.some(pt => pt.length !== 3 || pt.some(isNaN))) {
-                return { success: false, manual: true, manual_raceway: false, message: 'Invalid waypoint format' };
+                return { success: false, manual: true, manual_raceway: false, message: 'Invalid waypoint format', error: { reason: 'invalid_waypoint' } };
             }
             const segments = [];
             let prev = startPoint.slice();

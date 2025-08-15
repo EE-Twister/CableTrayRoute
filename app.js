@@ -1654,6 +1654,7 @@ const openDuctbankRoute = (dbId, conduitId) => {
             input.addEventListener('input', e => {
                 const i = parseInt(e.target.dataset.idx, 10);
                 state.manualTrays[i].tray_id = e.target.value;
+                e.target.classList.remove('input-error');
                 updateTrayData();
                 saveSession();
             });
@@ -2112,6 +2113,9 @@ const openDuctbankRoute = (dbId, conduitId) => {
             input.addEventListener('input', e => {
                 const i = parseInt(e.target.dataset.idx, 10);
                 state.cableList[i].manual_path = e.target.value;
+                e.target.classList.remove('input-error');
+                const err = e.target.nextElementSibling;
+                if (err && err.classList.contains('error-message')) err.remove();
                 saveSession();
             });
         });
@@ -2553,6 +2557,18 @@ const openDuctbankRoute = (dbId, conduitId) => {
         cancelRouting = false;
         rebuildTrayData();
 
+        // clear previous manual path validation errors
+        if (elements.cableListContainer) {
+            elements.cableListContainer.querySelectorAll('.cable-manual-input').forEach(input => {
+                input.classList.remove('input-error');
+                const err = input.nextElementSibling;
+                if (err && err.classList.contains('error-message')) err.remove();
+            });
+        }
+        if (elements.manualTrayTableContainer) {
+            elements.manualTrayTableContainer.querySelectorAll('.tray-id-input').forEach(inp => inp.classList.remove('input-error'));
+        }
+
         const routingSystem = new CableRoutingSystem({
             fillLimit: parseFloat(elements.fillLimitIn.value) / 100,
             proximityThreshold: parseFloat(document.getElementById('proximity-threshold').value),
@@ -2566,7 +2582,42 @@ const openDuctbankRoute = (dbId, conduitId) => {
         const trayDataForRun = JSON.parse(JSON.stringify(state.trayData));
         trayDataForRun.forEach(tray => routingSystem.addTraySegment(tray));
         routingSystem.prepareBaseGraph();
-        
+
+        const showManualPathError = (idx, message, trayId) => {
+            const input = elements.cableListContainer.querySelector(`.cable-manual-input[data-idx='${idx}']`);
+            if (input) {
+                input.classList.add('input-error');
+                let msg = input.nextElementSibling;
+                if (!msg || !msg.classList.contains('error-message')) {
+                    msg = document.createElement('span');
+                    msg.className = 'error-message';
+                    input.insertAdjacentElement('afterend', msg);
+                }
+                msg.textContent = message;
+            }
+            if (trayId && elements.manualTrayTableContainer) {
+                const trayInput = elements.manualTrayTableContainer.querySelector(`.tray-id-input[value='${trayId}']`);
+                if (trayInput) trayInput.classList.add('input-error');
+            }
+        };
+
+        const validateManualPath = (manualPath, cableArea, allowedGroup) => {
+            const path = (manualPath || '').trim();
+            if (!path || !/[a-zA-Z]/.test(path)) return null;
+            const trayIds = path.split(/[>\s]+/).filter(Boolean);
+            for (const id of trayIds) {
+                const tray = routingSystem.trays.get(id);
+                if (!tray) return { message: `Tray ${id} not found`, trayId: id, reason: 'not_found' };
+                if (tray.allowed_cable_group && allowedGroup && tray.allowed_cable_group !== allowedGroup) {
+                    return { message: `Tray ${id} not allowed`, trayId: id, reason: 'not_allowed' };
+                }
+                if (tray.current_fill + cableArea > tray.maxFill) {
+                    return { message: `Tray ${id} over capacity`, trayId: id, reason: 'over_capacity' };
+                }
+            }
+            return null;
+        };
+
         if (state.cableList.length > 0) {
             const batchResults = [];
             const allRoutesForPlotting = [];
@@ -2574,45 +2625,59 @@ const openDuctbankRoute = (dbId, conduitId) => {
             let completed = 0;
             const runCable = (cable, index) => {
                 const cableArea = Math.PI * (cable.diameter / 2) ** 2;
-                const startTask = (resolve, reject) => {
-                    if (cancelRouting) { resolve({ cancelled: true }); return; }
-                    const worker = new Worker('routeWorker.js');
-                    currentWorkers.push(worker);
-                    workerResolvers.set(worker, resolve);
-                    const cleanup = () => {
-                        worker.terminate();
-                        currentWorkers = currentWorkers.filter(w => w !== worker);
-                        workerResolvers.delete(worker);
-                        if (taskQueue.length > 0 && !cancelRouting) {
-                            const next = taskQueue.shift();
-                            next();
-                        }
-                    };
-                    worker.onmessage = e => { cleanup(); resolve(e.data); };
-                    worker.onerror = err => { cleanup(); reject(err); };
-                    worker.postMessage({
-                        trays: Array.from(routingSystem.trays.values()),
-                        options: {
-                            fillLimit: routingSystem.fillLimit,
-                            proximityThreshold: routingSystem.proximityThreshold,
-                            fieldPenalty: routingSystem.fieldPenalty,
-                            sharedPenalty: routingSystem.sharedPenalty,
-                            maxFieldEdge: routingSystem.maxFieldEdge,
-                            maxFieldNeighbors: routingSystem.maxFieldNeighbors
-                        },
-                        baseGraph: routingSystem.baseGraph,
-                        cable,
-                        cableArea
+                const validationError = validateManualPath(cable.manual_path, cableArea, cable.allowed_cable_group);
+                let promise;
+                if (validationError) {
+                    showManualPathError(index, validationError.message, validationError.trayId);
+                    promise = Promise.resolve({
+                        success: false,
+                        manual: true,
+                        manual_raceway: false,
+                        message: validationError.message,
+                        error: { tray_id: validationError.trayId, reason: validationError.reason }
                     });
-                };
-                return new Promise((resolve, reject) => {
-                    const task = () => startTask(resolve, reject);
-                    if (currentWorkers.length < maxWorkers) {
-                        task();
-                    } else {
-                        taskQueue.push(task);
-                    }
-                }).then(result => {
+                } else {
+                    const startTask = (resolve, reject) => {
+                        if (cancelRouting) { resolve({ cancelled: true }); return; }
+                        const worker = new Worker('routeWorker.js');
+                        currentWorkers.push(worker);
+                        workerResolvers.set(worker, resolve);
+                        const cleanup = () => {
+                            worker.terminate();
+                            currentWorkers = currentWorkers.filter(w => w !== worker);
+                            workerResolvers.delete(worker);
+                            if (taskQueue.length > 0 && !cancelRouting) {
+                                const next = taskQueue.shift();
+                                next();
+                            }
+                        };
+                        worker.onmessage = e => { cleanup(); resolve(e.data); };
+                        worker.onerror = err => { cleanup(); reject(err); };
+                        worker.postMessage({
+                            trays: Array.from(routingSystem.trays.values()),
+                            options: {
+                                fillLimit: routingSystem.fillLimit,
+                                proximityThreshold: routingSystem.proximityThreshold,
+                                fieldPenalty: routingSystem.fieldPenalty,
+                                sharedPenalty: routingSystem.sharedPenalty,
+                                maxFieldEdge: routingSystem.maxFieldEdge,
+                                maxFieldNeighbors: routingSystem.maxFieldNeighbors
+                            },
+                            baseGraph: routingSystem.baseGraph,
+                            cable,
+                            cableArea
+                        });
+                    };
+                    promise = new Promise((resolve, reject) => {
+                        const task = () => startTask(resolve, reject);
+                        if (currentWorkers.length < maxWorkers) {
+                            task();
+                        } else {
+                            taskQueue.push(task);
+                        }
+                    });
+                }
+                return promise.then(result => {
                     completed++;
                     const pct = (completed / state.cableList.length) * 100;
                     elements.progressBar.style.width = `${pct}%`;
@@ -2631,8 +2696,10 @@ const openDuctbankRoute = (dbId, conduitId) => {
                                 endTag: cable.end_tag,
                                 allowed_cable_group: cable.allowed_cable_group
                             });
+                        } else {
+                            showManualPathError(index, result.message, result.error && result.error.tray_id);
                         }
-                            batchResults[index] = {
+                        batchResults[index] = {
                                 cable: cable.name,
                                 status: result.success ? '✓ Routed' : '✗ Failed',
                                 mode: result.manual
@@ -2644,8 +2711,8 @@ const openDuctbankRoute = (dbId, conduitId) => {
                                 tray_segments_count: result.success ? result.tray_segments.length : 0,
                                 segments_count: result.success ? result.route_segments.length : 0,
                                 tray_segments: result.success ? result.tray_segments : [],
-                            route_segments: result.success ? result.route_segments : [],
-                            breakdown: result.success ? result.route_segments.map((seg, i) => {
+                                route_segments: result.success ? result.route_segments : [],
+                                breakdown: result.success ? result.route_segments.map((seg, i) => {
                                 let tray_id = seg.type === 'field' ? 'Field Route' : (seg.tray_id || 'N/A');
                                 let type = getSegmentType(seg);
                                 let raceway = '';
