@@ -389,6 +389,10 @@ document.addEventListener('DOMContentLoaded', () => {
                         conduits: (conduitMap[dbId] || []).map(c => ({
                             id: c.conduit_id || c.id,
                             tag: c.conduit_id || c.id,
+                            conduit_id: c.conduit_id || c.id,
+                            type: c.type,
+                            conduit_type: c.type,
+                            trade_size: c.trade_size,
                             path: [
                                 [parseFloat(c.start_x), parseFloat(c.start_y), parseFloat(c.start_z)],
                                 [parseFloat(c.end_x), parseFloat(c.end_y), parseFloat(c.end_z)]
@@ -2193,6 +2197,17 @@ const openDuctbankRoute = (dbId) => {
         return rt === 'ductbank' ? 'duct bank' : rt;
     };
 
+    const findDuctbankForConduit = (conduitId) => {
+        if (!state.ductbankData || !Array.isArray(state.ductbankData.ductbanks)) {
+            return null;
+        }
+        return state.ductbankData.ductbanks.find(db =>
+            Array.isArray(db.conduits) && db.conduits.some(c =>
+                c.id === conduitId || c.conduit_id === conduitId
+            )
+        );
+    };
+
     // Render a tray/cable combo to an image. We use JPEG instead of PNG so the
     // PDF export has a much smaller file size while retaining good quality.
     // The quality parameter can be tuned if needed.
@@ -2545,15 +2560,28 @@ const openDuctbankRoute = (dbId) => {
                                 segments_count: result.success ? result.route_segments.length : 0,
                                 tray_segments: result.success ? result.tray_segments : [],
                             route_segments: result.success ? result.route_segments : [],
-                            breakdown: result.success ? result.route_segments.map((seg, i) => ({
-                                segment: i + 1,
-                                tray_id: seg.type === 'field' ? 'Field Route' : (seg.tray_id || 'N/A'),
-                                type: getSegmentType(seg),
-                                from: formatPoint(seg.start),
-                                to: formatPoint(seg.end),
-                                length: seg.length.toFixed(2),
-                                raceway: seg.type === 'field' ? getRacewayRecommendation([cable]) : ''
-                            })) : []
+                            breakdown: result.success ? result.route_segments.map((seg, i) => {
+                                let tray_id = seg.type === 'field' ? 'Field Route' : (seg.tray_id || 'N/A');
+                                let type = getSegmentType(seg);
+                                let raceway = seg.type === 'field' ? getRacewayRecommendation([cable]) : '';
+                                if (type === 'conduit') {
+                                    const db = findDuctbankForConduit(seg.tray_id);
+                                    if (db) {
+                                        raceway = seg.tray_id;
+                                        tray_id = db.id || db.tag;
+                                        type = 'duct bank';
+                                    }
+                                }
+                                return {
+                                    segment: i + 1,
+                                    tray_id,
+                                    type,
+                                    from: formatPoint(seg.start),
+                                    to: formatPoint(seg.end),
+                                    length: seg.length.toFixed(2),
+                                    raceway
+                                };
+                            }) : []
                         };
                     }
                 });
@@ -2579,8 +2607,12 @@ const openDuctbankRoute = (dbId) => {
                 row.breakdown.forEach(b => {
                     if (b.tray_id && b.tray_id !== 'Field Route' && b.tray_id !== 'N/A') {
                         if (!state.trayCableMap[b.tray_id]) state.trayCableMap[b.tray_id] = [];
-                        if (!state.trayCableMap[b.tray_id].includes(cableObj)) {
-                            state.trayCableMap[b.tray_id].push(cableObj);
+                        const entry = b.raceway ? { ...cableObj, conduit_id: b.raceway } : cableObj;
+                        const exists = state.trayCableMap[b.tray_id].some(c =>
+                            c.name === entry.name && (!entry.conduit_id || c.conduit_id === entry.conduit_id)
+                        );
+                        if (!exists) {
+                            state.trayCableMap[b.tray_id].push(entry);
                         }
                     }
                 });
@@ -2751,15 +2783,28 @@ const openDuctbankRoute = (dbId) => {
                     segments_count: res.route_segments.length,
                     tray_segments: res.tray_segments,
                     route_segments: res.route_segments,
-                    breakdown: res.route_segments.map((seg, i) => ({
-                        segment: i + 1,
-                        tray_id: seg.type === 'field' ? 'Field Route' : (seg.tray_id || 'N/A'),
-                        type: getSegmentType(seg),
-                        from: formatPoint(seg.start),
-                        to: formatPoint(seg.end),
-                        length: seg.length.toFixed(2),
-                        raceway: seg.type === 'field' ? getRacewayRecommendation([cable]) : ''
-                    }))
+                    breakdown: res.route_segments.map((seg, i) => {
+                        let tray_id = seg.type === 'field' ? 'Field Route' : (seg.tray_id || 'N/A');
+                        let type = getSegmentType(seg);
+                        let raceway = seg.type === 'field' ? getRacewayRecommendation([cable]) : '';
+                        if (type === 'conduit') {
+                            const db = findDuctbankForConduit(seg.tray_id);
+                            if (db) {
+                                raceway = seg.tray_id;
+                                tray_id = db.id || db.tag;
+                                type = 'duct bank';
+                            }
+                        }
+                        return {
+                            segment: i + 1,
+                            tray_id,
+                            type,
+                            from: formatPoint(seg.start),
+                            to: formatPoint(seg.end),
+                            length: seg.length.toFixed(2),
+                            raceway
+                        };
+                    })
                 };
                 resultMap.set(name, info);
             } else {
@@ -2783,8 +2828,12 @@ const openDuctbankRoute = (dbId) => {
             row.breakdown.forEach(b => {
                 if (b.tray_id && b.tray_id !== 'Field Route' && b.tray_id !== 'N/A') {
                     if (!state.trayCableMap[b.tray_id]) state.trayCableMap[b.tray_id] = [];
-                    if (!state.trayCableMap[b.tray_id].includes(cableObj)) {
-                        state.trayCableMap[b.tray_id].push(cableObj);
+                    const entry = b.raceway ? { ...cableObj, conduit_id: b.raceway } : cableObj;
+                    const exists = state.trayCableMap[b.tray_id].some(c =>
+                        c.name === entry.name && (!entry.conduit_id || c.conduit_id === entry.conduit_id)
+                    );
+                    if (!exists) {
+                        state.trayCableMap[b.tray_id].push(entry);
                     }
                 }
             });

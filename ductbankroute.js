@@ -2384,6 +2384,21 @@ loadConductorProperties().then(()=>{
         const tagEl = document.getElementById('ductbankTag');
         if (tagEl) tagEl.value = ductbank.tag;
       }
+      if (ductbank && Array.isArray(ductbank.conduits)) {
+        const cbody = document.querySelector('#conduitTable tbody');
+        if (cbody) {
+          cbody.innerHTML = '';
+          ductbank.conduits.forEach(cd => {
+            addConduitRow({
+              conduit_id: cd.conduit_id || cd.id || cd.tag || '',
+              conduit_type: cd.conduit_type || cd.type || '',
+              trade_size: cd.trade_size || '',
+              x: cd.x || cd.offset_x || 0,
+              y: cd.y || cd.offset_y || 0
+            });
+          });
+        }
+      }
       if (Array.isArray(cables)) {
         const tbody = document.querySelector('#cableTable tbody');
         if (tbody) {
