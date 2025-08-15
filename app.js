@@ -1887,11 +1887,10 @@ const openDuctbankRoute = (dbId, conduitId) => {
                     let conduit = '';
                     if (b.type === 'field') {
                         link = `<button class="conduit-fill-btn" data-seg="${b.segment_key}">Open</button>`;
-                    } else if (b.type === 'duct bank') {
-                        const [dbId] = b.tray_id.split(' - ');
-                        racewayId = dbId;
+                    } else if (b.ductbank_id) {
+                        racewayId = b.ductbank_id;
                         conduit = b.conduit_id || '';
-                        link = `<button class="ductbank-fill-btn" data-ductbank="${dbId}" data-conduit="${b.conduit_id}">Fill</button>`;
+                        link = `<button class="ductbank-fill-btn" data-ductbank="${b.ductbank_id}" data-conduit="${b.conduit_id}">Fill</button>`;
                     } else if (b.tray_id && b.tray_id !== 'Field Route' && b.tray_id !== 'N/A') {
                         link = `<button class="tray-fill-btn" data-tray="${b.tray_id}">Fill</button>`;
                     }
@@ -2633,7 +2632,7 @@ const openDuctbankRoute = (dbId, conduitId) => {
                                 let tray_id = seg.type === 'field' ? 'Field Route' : (seg.tray_id || 'N/A');
                                 let type = getSegmentType(seg);
                                 let raceway = '';
-                                let conduit_id = seg.conduit_id || tray_id.split(' - ').slice(1).join(' - ');
+                                let conduit_id = seg.conduit_id || '';
                                 return {
                                     segment: i + 1,
                                     tray_id,
@@ -2852,7 +2851,7 @@ const openDuctbankRoute = (dbId, conduitId) => {
                         let tray_id = seg.type === 'field' ? 'Field Route' : (seg.tray_id || 'N/A');
                         let type = getSegmentType(seg);
                         let raceway = '';
-                        let conduit_id = seg.conduit_id || tray_id.split(' - ').slice(1).join(' - ');
+                        let conduit_id = seg.conduit_id || '';
                         return {
                             segment: i + 1,
                             tray_id,
