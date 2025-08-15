@@ -780,7 +780,8 @@ document.addEventListener('DOMContentLoaded', async () => {
 
         addTraySegment(tray) {
             const maxFill = tray.width * tray.height * this.fillLimit;
-            this.trays.set(tray.tray_id, { ...tray, maxFill });
+            // Preserve ductbank association for later use
+            this.trays.set(tray.tray_id, { ...tray, ductbank_id: tray.ductbank_id, maxFill });
         }
 
         updateTrayFill(trayIds, cableArea) {
@@ -1228,26 +1229,28 @@ document.addEventListener('DOMContentLoaded', async () => {
                     tray_id = node_id.split('_')[0]
                 }
                 if (type === 'tray') traySegments.add(tray_id);
+                const conduit_id = this.trays.get(tray_id)?.conduit_id;
+                const ductbank_id = this.trays.get(tray_id)?.ductbank_id;
 
                 if (edge.type === 'field') {
                     let curr = p1.slice();
                     if (p2[0] !== curr[0]) {
                         const next = [p2[0], curr[1], curr[2]];
-                        routeSegments.push({ type, start: curr, end: next, length: Math.abs(p2[0]-curr[0]), tray_id });
+                        routeSegments.push({ type, start: curr, end: next, length: Math.abs(p2[0]-curr[0]), tray_id, conduit_id, ductbank_id });
                         curr = next;
                     }
                     if (p2[1] !== curr[1]) {
                         const next = [curr[0], p2[1], curr[2]];
-                        routeSegments.push({ type, start: curr, end: next, length: Math.abs(p2[1]-curr[1]), tray_id });
+                        routeSegments.push({ type, start: curr, end: next, length: Math.abs(p2[1]-curr[1]), tray_id, conduit_id, ductbank_id });
                         curr = next;
                     }
                     if (p2[2] !== curr[2]) {
                         const next = [curr[0], curr[1], p2[2]];
-                        routeSegments.push({ type, start: curr, end: next, length: Math.abs(p2[2]-curr[2]), tray_id });
+                        routeSegments.push({ type, start: curr, end: next, length: Math.abs(p2[2]-curr[2]), tray_id, conduit_id, ductbank_id });
                         curr = next;
                     }
                 } else {
-                    routeSegments.push({ type, start: p1, end: p2, length, tray_id });
+                    routeSegments.push({ type, start: p1, end: p2, length, tray_id, conduit_id, ductbank_id });
                 }
             }
 
@@ -2639,7 +2642,8 @@ const openDuctbankRoute = (dbId, conduitId) => {
                                     to: formatPoint(seg.end),
                                     length: seg.length.toFixed(2),
                                     raceway,
-                                    conduit_id
+                                    conduit_id,
+                                    ductbank_id: seg.ductbank_id
                                 };
                             }) : []
                         };
@@ -2857,7 +2861,8 @@ const openDuctbankRoute = (dbId, conduitId) => {
                             to: formatPoint(seg.end),
                             length: seg.length.toFixed(2),
                             raceway,
-                            conduit_id
+                            conduit_id,
+                            ductbank_id: seg.ductbank_id
                         };
                     })
                 };
