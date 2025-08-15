@@ -1856,7 +1856,11 @@ const openDuctbankRoute = (dbId, conduitId) => {
                     } else if (b.tray_id && b.tray_id !== 'Field Route' && b.tray_id !== 'N/A') {
                         link = `<button class="tray-fill-btn" data-tray="${b.tray_id}">Fill</button>`;
                     }
-                    const racewayId = b.tray_id;
+                    // Include conduit identifier for duct bank segments so the
+                    // "Raceway ID" column displays both the duct bank and the
+                    // specific conduit used. This helps distinguish individual
+                    // conduit paths within a duct bank.
+                    const racewayId = b.conduit_id ? `${b.tray_id} - ${b.conduit_id}` : b.tray_id;
                     html += `<tr><td>${b.segment}</td><td>${racewayId}</td><td>${b.type}</td><td>${b.from}</td><td>${b.to}</td><td>${b.length}</td><td>${b.raceway || ''}</td><td>${link}</td></tr>`;
                 });
                 html += '</tbody></table></div>';
