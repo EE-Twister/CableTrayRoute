@@ -475,11 +475,13 @@ document.addEventListener('DOMContentLoaded', async () => {
                         const area = (CONDUIT_SPECS[cond.type] || {})[cond.trade_size];
                         const dia = area ? Math.sqrt((4 * area) / Math.PI)
                                          : parseFloat(cond.diameter) || 0;
-                        const conduitId = cond.id || cond.conduit_id;
                         const dbId = db.id || db.tag;
+                        const rawId = cond.id ?? cond.conduit_id;
+                        const trayId = rawId.includes(dbId) ? rawId : `${dbId}-${rawId}`;
                         state.trayData.push({
-                            tray_id: `${dbId} - ${conduitId}`,
-                            conduit_id: conduitId,
+                            tray_id: trayId,
+                            ductbank_id: dbId,
+                            conduit_id: rawId,
                             start_x: start[0],
                             start_y: start[1],
                             start_z: start[2],
