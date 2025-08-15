@@ -981,7 +981,10 @@ document.addEventListener('DOMContentLoaded', async () => {
                 graph.edges[id2][id1] = { weight, type, trayId };
             };
 
-            this.trays.forEach(tray => {
+            const trays = Array.from(this.trays.values())
+                .filter(t => !(t.raceway_type === 'ductbank' && !t.conduit_id));
+
+            trays.forEach(tray => {
                 const startId = `${tray.tray_id}_start`;
                 const endId = `${tray.tray_id}_end`;
                 addNode(startId, [tray.start_x, tray.start_y, tray.start_z], 'tray_endpoint');
@@ -990,14 +993,14 @@ document.addEventListener('DOMContentLoaded', async () => {
                 addEdge(startId, endId, trayLength, 'tray', tray.tray_id);
             });
 
-            this.trays.forEach(trayA => {
+            trays.forEach(trayA => {
                 const startA = `${trayA.tray_id}_start`;
                 const endA = `${trayA.tray_id}_end`;
                 const endpoints = [
                     { id: startA, point: graph.nodes[startA].point },
                     { id: endA, point: graph.nodes[endA].point }
                 ];
-                this.trays.forEach(trayB => {
+                trays.forEach(trayB => {
                     if (trayA.tray_id === trayB.tray_id) return;
                     const startB = `${trayB.tray_id}_start`;
                     const endB = `${trayB.tray_id}_end`;
