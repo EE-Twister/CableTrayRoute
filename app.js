@@ -13,6 +13,35 @@ HTMLCanvasElement.prototype.getContext = function(type, options) {
     }
     return originalGetContext.call(this, type, options);
 };
+// Some libraries (e.g. Plotly) may use OffscreenCanvas; patch it as well.
+if (typeof OffscreenCanvas !== 'undefined') {
+    const originalOffscreenGetContext = OffscreenCanvas.prototype.getContext;
+    OffscreenCanvas.prototype.getContext = function(type, options) {
+        if (type === '2d') {
+            options = options || {};
+            if (options.willReadFrequently === undefined) {
+                options.willReadFrequently = true;
+            }
+        }
+        return originalOffscreenGetContext.call(this, type, options);
+    };
+}
+
+// Lazy-load conductor property data when needed.
+async function ensureConductorProps() {
+    if (!globalThis.CONDUCTOR_PROPS) {
+        try {
+            const resp = await fetch('data/conductor_properties.json');
+            globalThis.CONDUCTOR_PROPS = await resp.json();
+        } catch (err) {
+            console.error('Failed to load conductor properties', err);
+            globalThis.CONDUCTOR_PROPS = {};
+        }
+    }
+    return globalThis.CONDUCTOR_PROPS;
+}
+// start loading early
+ensureConductorProps();
 
 const CONDUIT_SPECS = {
     "EMT": {"1/2":0.304,"3/4":0.533,"1":0.864,"1-1/4":1.496,"1-1/2":2.036,"2":3.356,"2-1/2":5.858,"3":8.846,"3-1/2":11.545,"4":14.753},
@@ -54,7 +83,7 @@ const SHAPE_COLORS = {
     'SPIRAL': '#17becf'
 };
 
-document.addEventListener('DOMContentLoaded', () => {
+document.addEventListener('DOMContentLoaded', async () => {
     initSettings();
     initDarkMode();
     initHelpModal('help-btn','help-modal','close-help-btn');
@@ -253,7 +282,7 @@ document.addEventListener('DOMContentLoaded', () => {
         }
     };
 
-    const loadSchedulesIntoSession = () => {
+    const loadSchedulesIntoSession = async () => {
         let trays = [];
         let cables = [];
         let ductbanks = [];
@@ -299,7 +328,7 @@ document.addEventListener('DOMContentLoaded', () => {
         }
 
         if (cables.length > 0) {
-            const conductorProps = globalThis.CONDUCTOR_PROPS || {};
+            const conductorProps = await ensureConductorProps();
             const parseThickness = v => {
                 if (v === undefined || v === null || v === '') return undefined;
                 if (typeof v === 'number') return v;
@@ -315,10 +344,10 @@ document.addEventListener('DOMContentLoaded', () => {
                 const { tag, from_tag, to_tag, start_x, start_y, start_z, end_x, end_y, end_z, raceway_ids, ...rest } = c;
                 let diameter = parseFloat(rest.diameter);
                 let weight = parseFloat(rest.weight);
+                const size = (rest.conductor_size || '').trim();
+                const prop = conductorProps[size];
 
                 if (!diameter) {
-                    const size = (rest.conductor_size || '').trim();
-                    const prop = conductorProps[size];
                     let bare = 0.25; // default bare conductor diameter in inches
                     if (prop && prop.area_cm) {
                         bare = Math.sqrt(prop.area_cm) / 1000;
@@ -346,9 +375,14 @@ document.addEventListener('DOMContentLoaded', () => {
                 }
 
                 if (Number.isNaN(weight)) {
-                    weight = 0;
-                    if (rest.weight === undefined) {
-                        console.warn(`Missing weight for cable ${tag}; defaulting to 0.`);
+                    if (prop && prop.area_cm) {
+                        const areaSqIn = prop.area_cm * 7.8539816e-7;
+                        const conductors = parseFloat(rest.conductors) || 1;
+                        const mat = String(rest.conductor_material || 'copper').toLowerCase();
+                        const density = mat.startsWith('al') ? 0.0975 : 0.321; // lb/in^3
+                        weight = areaSqIn * density * 12 * conductors;
+                    } else {
+                        weight = 0;
                     }
                 }
 
@@ -3204,13 +3238,16 @@ Plotly.newPlot(document.getElementById('plot'), data, layout, {responsive: true}
             const close = () => {
                 modal.style.display = 'none';
                 modal.setAttribute('aria-hidden', 'true');
+                if (modal.contains(document.activeElement)) {
+                    document.activeElement.blur();
+                }
             };
-            yesBtn.addEventListener('click', () => {
+            yesBtn.addEventListener('click', async () => {
                 close();
-                loadSchedulesIntoSession();
+                await loadSchedulesIntoSession();
                 finalizeLoad();
             }, { once: true });
-            noBtn.addEventListener('click', () => {
+            noBtn.addEventListener('click', async () => {
                 close();
                 state.manualTrays = [];
                 state.cableList = [];
@@ -3221,10 +3258,10 @@ Plotly.newPlot(document.getElementById('plot'), data, layout, {responsive: true}
                 updateCableListDisplay();
                 rebuildTrayData();
                 updateTrayDisplay();
-                loadDuctbankData();
+                await loadDuctbankData();
             }, { once: true });
         } else {
-            loadSchedulesIntoSession();
+            await loadSchedulesIntoSession();
             finalizeLoad();
         }
     } else {
