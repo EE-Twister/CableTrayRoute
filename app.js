@@ -1852,7 +1852,8 @@ const openDuctbankRoute = (dbId, conduitId) => {
                         link = `<button class="conduit-fill-btn" data-cable="${res.cable}">Open</button>`;
                     } else if (b.type === 'duct bank') {
                         const [dbId] = b.tray_id.split(' - ');
-                        link = `<button class="ductbank-fill-btn" data-ductbank="${dbId}" data-conduit="${b.conduit_id}">Fill</button>`;
+                        const conduitAttr = b.conduit_id ? ` data-conduit="${b.conduit_id}"` : '';
+                        link = `<button class="ductbank-fill-btn" data-ductbank="${dbId}"${conduitAttr}>Fill</button>`;
                     } else if (b.tray_id && b.tray_id !== 'Field Route' && b.tray_id !== 'N/A') {
                         link = `<button class="tray-fill-btn" data-tray="${b.tray_id}">Fill</button>`;
                     }
