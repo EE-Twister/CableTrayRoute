@@ -392,7 +392,8 @@ document.addEventListener('DOMContentLoaded', () => {
                             path: [
                                 [parseFloat(c.start_x), parseFloat(c.start_y), parseFloat(c.start_z)],
                                 [parseFloat(c.end_x), parseFloat(c.end_y), parseFloat(c.end_z)]
-                            ]
+                            ],
+                            allowed_cable_group: c.allowed_cable_group
                         }))
                     };
                 })
@@ -446,7 +447,7 @@ document.addEventListener('DOMContentLoaded', () => {
                             height: dia,
                             current_fill: 0,
                             shape: 'STR',
-                            allowed_cable_group: '',
+                            allowed_cable_group: cond.allowed_cable_group || '',
                             raceway_type: 'conduit',
                         });
                     }
@@ -473,7 +474,7 @@ document.addEventListener('DOMContentLoaded', () => {
                     height: dia,
                     current_fill: 0,
                     shape: 'STR',
-                    allowed_cable_group: '',
+                    allowed_cable_group: cond.allowed_cable_group || '',
                     raceway_type: 'conduit',
                 });
             });
