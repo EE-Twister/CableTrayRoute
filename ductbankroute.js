@@ -2379,7 +2379,7 @@ loadConductorProperties().then(()=>{
   const storedRoute = localStorage.getItem('ductbankRouteData');
   if (storedRoute) {
     try {
-      const { ductbank, cables } = JSON.parse(storedRoute);
+      const { ductbank, cables, conduitId } = JSON.parse(storedRoute);
       if (ductbank && ductbank.tag !== undefined) {
         const tagEl = document.getElementById('ductbankTag');
         if (tagEl) tagEl.value = ductbank.tag;
@@ -2397,6 +2397,13 @@ loadConductorProperties().then(()=>{
               y: cd.y || cd.offset_y || 0
             });
           });
+        }
+        if (conduitId) {
+          const searchInput = document.getElementById('conduit-search');
+          if (searchInput) {
+            searchInput.value = conduitId;
+            filterTable(document.getElementById('conduitTable'), conduitId);
+          }
         }
       }
       if (Array.isArray(cables)) {
@@ -2416,6 +2423,13 @@ loadConductorProperties().then(()=>{
             }, { defer: true });
           });
           updateInsulationOptions();
+          if (conduitId) {
+            const cableSearch = document.getElementById('cable-search');
+            if (cableSearch) {
+              cableSearch.value = conduitId;
+              filterTable(document.getElementById('cableTable'), conduitId);
+            }
+          }
         }
       }
     } catch (e) {

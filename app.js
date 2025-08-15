@@ -1414,12 +1414,12 @@ const openConduitFill = (cables) => {
     window.open('conduitfill.html', '_blank');
 };
 
-const openDuctbankRoute = (dbId) => {
+const openDuctbankRoute = (dbId, conduitId) => {
     const ductbank = state.ductbankData?.ductbanks?.find(db => (db.id || db.tag) === dbId);
     const cables = (state.trayCableMap && state.trayCableMap[dbId]) ? state.trayCableMap[dbId] : [];
     if (!ductbank) return;
     try {
-        localStorage.setItem('ductbankRouteData', JSON.stringify({ ductbank, cables }));
+        localStorage.setItem('ductbankRouteData', JSON.stringify({ ductbank, cables, conduitId }));
     } catch (e) {
         console.error('Failed to store ductbank route data', e);
     }
@@ -1807,17 +1807,21 @@ const openDuctbankRoute = (dbId) => {
             if (!isNaN(fl)) totalField += fl;
             html += `<details><summary>${res.cable} | ${res.status} | ${res.mode} | Total ${res.total_length} | Field ${res.field_length} | Segments ${res.segments_count}</summary>`;
             if (res.breakdown && res.breakdown.length > 0) {
-                html += '<div class="table-scroll"><table class="sticky-table"><thead><tr><th>Segment</th><th>Tray ID</th><th>Type</th><th>From</th><th>To</th><th>Length</th><th>Recommended Raceway</th><th>Fill</th></tr></thead><tbody>';
+                html += '<div class="table-scroll"><table class="sticky-table"><thead><tr><th>Segment</th><th>Raceway ID</th><th>Type</th><th>From</th><th>To</th><th>Length</th><th>Recommended Raceway</th><th>Fill</th></tr></thead><tbody>';
                 res.breakdown.forEach(b => {
                     let link = '';
                     if (b.type === 'field') {
                         link = `<button class="conduit-fill-btn" data-cable="${res.cable}">Open</button>`;
                     } else if (b.type === 'duct bank') {
-                        link = `<button class="ductbank-fill-btn" data-ductbank="${b.tray_id}">Fill</button>`;
+                        link = `<button class="ductbank-fill-btn" data-ductbank="${b.tray_id}" data-conduit="${b.conduit_id}">Fill</button>`;
                     } else if (b.tray_id && b.tray_id !== 'Field Route' && b.tray_id !== 'N/A') {
                         link = `<button class="tray-fill-btn" data-tray="${b.tray_id}">Fill</button>`;
                     }
-                    html += `<tr><td>${b.segment}</td><td>${b.tray_id}</td><td>${b.type}</td><td>${b.from}</td><td>${b.to}</td><td>${b.length}</td><td>${b.raceway || ''}</td><td>${link}</td></tr>`;
+                    let racewayId = b.tray_id;
+                    if (b.type === 'duct bank' && b.conduit_id) {
+                        racewayId = `${b.tray_id} - ${b.conduit_id}`;
+                    }
+                    html += `<tr><td>${b.segment}</td><td>${racewayId}</td><td>${b.type}</td><td>${b.from}</td><td>${b.to}</td><td>${b.length}</td><td>${b.raceway || ''}</td><td>${link}</td></tr>`;
                 });
                 html += '</tbody></table></div>';
             }
@@ -1848,8 +1852,9 @@ const openDuctbankRoute = (dbId) => {
             btn.addEventListener('click', (e) => {
                 e.stopPropagation();
                 const dbId = btn.dataset.ductbank;
+                const conduitId = btn.dataset.conduit;
                 if (dbId) {
-                    openDuctbankRoute(dbId);
+                    openDuctbankRoute(dbId, conduitId);
                 }
             });
         });
@@ -2118,6 +2123,7 @@ const openDuctbankRoute = (dbId) => {
                             segments_count: row.segments_count,
                             segment: b.segment,
                             tray_id: b.tray_id,
+                            conduit_id: b.conduit_id || '',
                             type: b.type,
                             from: b.from,
                             to: b.to,
@@ -2564,10 +2570,11 @@ const openDuctbankRoute = (dbId) => {
                                 let tray_id = seg.type === 'field' ? 'Field Route' : (seg.tray_id || 'N/A');
                                 let type = getSegmentType(seg);
                                 let raceway = seg.type === 'field' ? getRacewayRecommendation([cable]) : '';
+                                let conduit_id = '';
                                 if (type === 'conduit') {
                                     const db = findDuctbankForConduit(seg.tray_id);
                                     if (db) {
-                                        raceway = seg.tray_id;
+                                        conduit_id = seg.tray_id;
                                         tray_id = db.id || db.tag;
                                         type = 'duct bank';
                                     }
@@ -2579,7 +2586,8 @@ const openDuctbankRoute = (dbId) => {
                                     from: formatPoint(seg.start),
                                     to: formatPoint(seg.end),
                                     length: seg.length.toFixed(2),
-                                    raceway
+                                    raceway,
+                                    conduit_id
                                 };
                             }) : []
                         };
@@ -2607,7 +2615,7 @@ const openDuctbankRoute = (dbId) => {
                 row.breakdown.forEach(b => {
                     if (b.tray_id && b.tray_id !== 'Field Route' && b.tray_id !== 'N/A') {
                         if (!state.trayCableMap[b.tray_id]) state.trayCableMap[b.tray_id] = [];
-                        const entry = b.raceway ? { ...cableObj, conduit_id: b.raceway } : cableObj;
+                        const entry = b.conduit_id ? { ...cableObj, conduit_id: b.conduit_id } : cableObj;
                         const exists = state.trayCableMap[b.tray_id].some(c =>
                             c.name === entry.name && (!entry.conduit_id || c.conduit_id === entry.conduit_id)
                         );
@@ -2787,10 +2795,11 @@ const openDuctbankRoute = (dbId) => {
                         let tray_id = seg.type === 'field' ? 'Field Route' : (seg.tray_id || 'N/A');
                         let type = getSegmentType(seg);
                         let raceway = seg.type === 'field' ? getRacewayRecommendation([cable]) : '';
+                        let conduit_id = '';
                         if (type === 'conduit') {
                             const db = findDuctbankForConduit(seg.tray_id);
                             if (db) {
-                                raceway = seg.tray_id;
+                                conduit_id = seg.tray_id;
                                 tray_id = db.id || db.tag;
                                 type = 'duct bank';
                             }
@@ -2802,7 +2811,8 @@ const openDuctbankRoute = (dbId) => {
                             from: formatPoint(seg.start),
                             to: formatPoint(seg.end),
                             length: seg.length.toFixed(2),
-                            raceway
+                            raceway,
+                            conduit_id
                         };
                     })
                 };
@@ -2828,7 +2838,7 @@ const openDuctbankRoute = (dbId) => {
             row.breakdown.forEach(b => {
                 if (b.tray_id && b.tray_id !== 'Field Route' && b.tray_id !== 'N/A') {
                     if (!state.trayCableMap[b.tray_id]) state.trayCableMap[b.tray_id] = [];
-                    const entry = b.raceway ? { ...cableObj, conduit_id: b.raceway } : cableObj;
+                    const entry = b.conduit_id ? { ...cableObj, conduit_id: b.conduit_id } : cableObj;
                     const exists = state.trayCableMap[b.tray_id].some(c =>
                         c.name === entry.name && (!entry.conduit_id || c.conduit_id === entry.conduit_id)
                     );
