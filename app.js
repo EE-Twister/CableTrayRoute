@@ -987,10 +987,11 @@ document.addEventListener('DOMContentLoaded', async () => {
             const trays = Array.from(this.trays.values())
                 // Exclude only ductbank outline segments. Conduits within a ductbank may
                 // legitimately have an empty or numeric conduit_id, so explicitly check for
-                // undefined/null before filtering. The previous check dropped these conduits
-                // from the graph, causing optimal routing to ignore the ductbank.
+                // null/undefined before filtering. The previous truthiness check dropped
+                // valid conduits from the graph, causing optimal routing to ignore the
+                // ductbank.
                 .filter(t => t.raceway_type !== 'ductbank' ||
-                             (t.conduit_id !== undefined && t.conduit_id !== null && t.conduit_id !== ''));
+                             (t.conduit_id != null && t.conduit_id !== ''));
 
             trays.forEach(tray => {
                 const startId = `${tray.tray_id}_start`;

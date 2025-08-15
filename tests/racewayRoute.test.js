@@ -44,4 +44,24 @@ describe('_racewayRoute', () => {
     assert(res.success);
     assert.deepStrictEqual(Array.from(res.tray_segments), ['tray-1']);
   });
+
+  it('includes numeric ductbank conduit ids in base graph', () => {
+    const system = new CableRoutingSystem({});
+    system.addTraySegment({
+      tray_id: 'tray-2',
+      conduit_id: 0,
+      raceway_type: 'ductbank',
+      start_x: 0,
+      start_y: 0,
+      start_z: 0,
+      end_x: 10,
+      end_y: 0,
+      end_z: 0,
+      width: 10,
+      height: 10,
+      current_fill: 0,
+    });
+    system.prepareBaseGraph();
+    assert(system.baseGraph.edges['tray-2_start']?.['tray-2_end'], 'ductbank conduit missing from graph');
+  });
 });

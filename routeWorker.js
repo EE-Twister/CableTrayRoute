@@ -267,7 +267,7 @@ class CableRoutingSystem {
             // valid conduits to be filtered out, removing them from the graph and preventing
             // cables from routing through ductbanks.
             .filter(t => t.raceway_type !== 'ductbank' ||
-                         (t.conduit_id !== undefined && t.conduit_id !== null && t.conduit_id !== ''));
+                         (t.conduit_id != null && t.conduit_id !== ''));
 
         trays.forEach(tray => {
             const startId = `${tray.tray_id}_start`;
