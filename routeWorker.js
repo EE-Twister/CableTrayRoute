@@ -262,12 +262,10 @@ class CableRoutingSystem {
         };
 
         const trays = Array.from(this.trays.values())
-            // Skip ductbank outline segments that do not correspond to a specific conduit
-            // while retaining actual conduit records. A blank conduit_id previously caused
-            // valid conduits to be filtered out, removing them from the graph and preventing
-            // cables from routing through ductbanks.
+            // Remove only ductbank outline segments while keeping conduit records, even if
+            // their IDs are empty or numeric.
             .filter(t => t.raceway_type !== 'ductbank' ||
-                         (t.conduit_id != null && t.conduit_id !== ''));
+                (t.conduit_id != null && t.conduit_id !== ''));
 
         trays.forEach(tray => {
             const startId = `${tray.tray_id}_start`;
