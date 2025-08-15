@@ -252,7 +252,7 @@
       cTable.className='nested-table';
       const cHead=cTable.createTHead();
       const h=cHead.insertRow();
-      ['Conduit ID','Type','Trade Size','Actions'].forEach(txt=>{
+      ['Conduit ID','Type','Trade Size','Allowed Group','Actions'].forEach(txt=>{
         const th=document.createElement('th');
         th.textContent=txt;
         h.appendChild(th);
@@ -297,6 +297,14 @@
         TableUtils.applyValidation(typeSel,typeRules);
         TableUtils.applyValidation(sizeSel,sizeRules);
 
+        // Allowed group
+        cell=r.insertCell();
+        const agInp=document.createElement('input');
+        agInp.type='text';
+        agInp.value=c.allowed_cable_group||'';
+        agInp.addEventListener('input',e=>{c.allowed_cable_group=e.target.value;saveDuctbanks();});
+        cell.appendChild(agInp);
+
         const actc=r.insertCell();
         actc.appendChild(iconBtn('\u29C9','duplicateBtn','Duplicate Conduit',()=>{duplicateConduit(i,j);}));
         actc.appendChild(iconBtn('\u2716','removeBtn','Delete Conduit',()=>{deleteConduit(i,j);}));
@@ -316,7 +324,7 @@
 
   function addConduit(i){
     const db=ductbanks[i];
-    ductbanks[i].conduits.push({conduit_id:'',type:'',trade_size:'',start_x:db.start_x,start_y:db.start_y,start_z:db.start_z,end_x:db.end_x,end_y:db.end_y,end_z:db.end_z});
+    ductbanks[i].conduits.push({conduit_id:'',type:'',trade_size:'',allowed_cable_group:'',start_x:db.start_x,start_y:db.start_y,start_z:db.start_z,end_x:db.end_x,end_y:db.end_y,end_z:db.end_z});
     renderDuctbanks();
     saveDuctbanks();
   }
@@ -373,6 +381,7 @@
       ['start_x','start_y','start_z','end_x','end_y','end_z'].forEach(k=>{if(db[k]===undefined) db[k]='';});
       db.conduits.forEach(c=>{
         ['start_x','start_y','start_z','end_x','end_y','end_z'].forEach(k=>{if(c[k]===undefined) c[k]=db[k];});
+        if(c.allowed_cable_group===undefined) c.allowed_cable_group='';
       });
     });
     renderDuctbanks();
@@ -381,8 +390,8 @@
   function exportDuctbankXlsx(){
     const dbData=[['ductbank_id','tag','from','to','concrete_encasement','start_x','start_y','start_z','end_x','end_y','end_z']];
     ductbanks.forEach(db=>dbData.push([db.id,db.tag,db.from,db.to,db.concrete_encasement?1:0,db.start_x,db.start_y,db.start_z,db.end_x,db.end_y,db.end_z]));
-    const cData=[['ductbank_id','conduit_id','type','trade_size','start_x','start_y','start_z','end_x','end_y','end_z']];
-    ductbanks.forEach(db=>db.conduits.forEach(c=>cData.push([db.id,c.conduit_id,c.type,c.trade_size,c.start_x,c.start_y,c.start_z,c.end_x,c.end_y,c.end_z])));
+    const cData=[['ductbank_id','conduit_id','type','trade_size','start_x','start_y','start_z','end_x','end_y','end_z','allowed_cable_group']];
+    ductbanks.forEach(db=>db.conduits.forEach(c=>cData.push([db.id,c.conduit_id,c.type,c.trade_size,c.start_x,c.start_y,c.start_z,c.end_x,c.end_y,c.end_z,c.allowed_cable_group])));
     const wb=XLSX.utils.book_new();
     XLSX.utils.book_append_sheet(wb,XLSX.utils.aoa_to_sheet(dbData),'Ductbanks');
     XLSX.utils.book_append_sheet(wb,XLSX.utils.aoa_to_sheet(cData),'Conduits');
@@ -451,6 +460,7 @@
             conduit_id:r['conduit_id']||'',
             type:r['type']||'',
             trade_size:r['trade_size']||'',
+            allowed_cable_group:r['allowed_cable_group']||'',
             start_x:r['start_x']||p.start_x,
             start_y:r['start_y']||p.start_y,
             start_z:r['start_z']||p.start_z,

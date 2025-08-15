@@ -148,7 +148,8 @@ document.addEventListener('DOMContentLoaded',()=>{
     {key:'end_x',label:'End X',type:'number',validate:['required','numeric']},
     {key:'end_y',label:'End Y',type:'number',validate:['required','numeric']},
     {key:'end_z',label:'End Z',type:'number',validate:['required','numeric']},
-    {key:'capacity',label:'Capacity',type:'number',validate:['numeric']}
+    {key:'capacity',label:'Capacity',type:'number',validate:['numeric']},
+    {key:'allowed_cable_group',label:'Allowed Group',type:'text'}
   ];
   const conduitTable=TableUtils.createTable({
     tableId:'conduitTable',
