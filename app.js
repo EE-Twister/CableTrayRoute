@@ -102,6 +102,7 @@ document.addEventListener('DOMContentLoaded', async () => {
         latestRouteData: [],
         sharedFieldRoutes: [],
         trayCableMap: {},
+        fieldSegmentCableMap: new Map(),
         updatedUtilData: [],
         finalTrays: [],
         highlightTraceIndex: null,
@@ -687,6 +688,31 @@ document.addEventListener('DOMContentLoaded', async () => {
             text += width ? `${width}" ${label}` : label;
         }
         return text;
+    };
+
+    const buildFieldSegmentCableMap = (results) => {
+        const nameMap = new Map(state.cableList.map(c => [c.name, c]));
+        const map = new Map();
+        results.forEach(row => {
+            const cableObj = nameMap.get(row.cable);
+            if (!cableObj || !Array.isArray(row.breakdown)) return;
+            row.breakdown.forEach(b => {
+                if (b.type === 'field') {
+                    const key = [b.from, b.to].sort().join('|');
+                    b.segment_key = key;
+                    if (!map.has(key)) map.set(key, []);
+                    map.get(key).push(cableObj);
+                }
+            });
+        });
+        results.forEach(row => {
+            row.breakdown.forEach(b => {
+                if (b.type === 'field') {
+                    b.raceway = getRacewayRecommendation(map.get(b.segment_key) || []);
+                }
+            });
+        });
+        state.fieldSegmentCableMap = map;
     };
 
     // --- CORE ROUTING LOGIC (JavaScript implementation of your Python backend) ---
@@ -1849,7 +1875,7 @@ const openDuctbankRoute = (dbId, conduitId) => {
                 res.breakdown.forEach(b => {
                     let link = '';
                     if (b.type === 'field') {
-                        link = `<button class="conduit-fill-btn" data-cable="${res.cable}">Open</button>`;
+                        link = `<button class="conduit-fill-btn" data-seg="${b.segment_key}">Open</button>`;
                     } else if (b.type === 'duct bank') {
                         const [dbId] = b.tray_id.split(' - ');
                         const conduitAttr = b.conduit_id ? ` data-conduit="${b.conduit_id}"` : '';
@@ -1873,10 +1899,10 @@ const openDuctbankRoute = (dbId, conduitId) => {
         elements.routeBreakdownContainer.querySelectorAll('.conduit-fill-btn').forEach(btn => {
             btn.addEventListener('click', (e) => {
                 e.stopPropagation();
-                const cableName = btn.dataset.cable;
-                const cableObj = state.cableList.find(c => c.name === cableName);
-                if (cableObj) {
-                    openConduitFill([cableObj]);
+                const segKey = btn.dataset.seg;
+                const cables = state.fieldSegmentCableMap.get(segKey);
+                if (cables && cables.length) {
+                    openConduitFill(cables);
                 }
             });
         });
@@ -2599,7 +2625,7 @@ const openDuctbankRoute = (dbId, conduitId) => {
                             breakdown: result.success ? result.route_segments.map((seg, i) => {
                                 let tray_id = seg.type === 'field' ? 'Field Route' : (seg.tray_id || 'N/A');
                                 let type = getSegmentType(seg);
-                                let raceway = seg.type === 'field' ? getRacewayRecommendation([cable]) : '';
+                                let raceway = '';
                                 let conduit_id = '';
                                 if (type === 'duct bank') {
                                     const parts = tray_id.split(' - ');
@@ -2631,8 +2657,9 @@ const openDuctbankRoute = (dbId, conduitId) => {
                 return;
             }
 
-            renderBatchResults(batchResults);
+            buildFieldSegmentCableMap(batchResults);
             state.latestRouteData = batchResults;
+            renderBatchResults(batchResults);
             const nameMap = new Map(state.cableList.map(c => [c.name, c]));
             state.trayCableMap = {};
             batchResults.forEach(row => {
@@ -2820,7 +2847,7 @@ const openDuctbankRoute = (dbId, conduitId) => {
                     breakdown: res.route_segments.map((seg, i) => {
                         let tray_id = seg.type === 'field' ? 'Field Route' : (seg.tray_id || 'N/A');
                         let type = getSegmentType(seg);
-                        let raceway = seg.type === 'field' ? getRacewayRecommendation([cable]) : '';
+                        let raceway = '';
                         let conduit_id = '';
                         if (type === 'duct bank') {
                             const parts = tray_id.split(' - ');
@@ -2851,6 +2878,7 @@ const openDuctbankRoute = (dbId, conduitId) => {
         }
 
         state.latestRouteData = Array.from(resultMap.values()).sort((a,b) => a.index - b.index).map(v => v.row);
+        buildFieldSegmentCableMap(state.latestRouteData);
 
         const nameMap = new Map(state.cableList.map(c => [c.name, c]));
         state.trayCableMap = {};
