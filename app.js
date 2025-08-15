@@ -2627,11 +2627,7 @@ const openDuctbankRoute = (dbId, conduitId) => {
                                 let tray_id = seg.type === 'field' ? 'Field Route' : (seg.tray_id || 'N/A');
                                 let type = getSegmentType(seg);
                                 let raceway = '';
-                                let conduit_id = '';
-                                if (type === 'duct bank') {
-                                    const parts = tray_id.split(' - ');
-                                    if (parts.length === 2) conduit_id = parts[1];
-                                }
+                                let conduit_id = seg.conduit_id || tray_id.split(' - ').slice(1).join(' - ');
                                 return {
                                     segment: i + 1,
                                     tray_id,
@@ -2849,11 +2845,7 @@ const openDuctbankRoute = (dbId, conduitId) => {
                         let tray_id = seg.type === 'field' ? 'Field Route' : (seg.tray_id || 'N/A');
                         let type = getSegmentType(seg);
                         let raceway = '';
-                        let conduit_id = '';
-                        if (type === 'duct bank') {
-                            const parts = tray_id.split(' - ');
-                            if (parts.length === 2) conduit_id = parts[1];
-                        }
+                        let conduit_id = seg.conduit_id || tray_id.split(' - ').slice(1).join(' - ');
                         return {
                             segment: i + 1,
                             tray_id,
