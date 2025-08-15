@@ -342,8 +342,9 @@ document.addEventListener('DOMContentLoaded', async () => {
             };
 
             state.cableList = cables.map(c => {
-                const { tag, from_tag, to_tag, start_x, start_y, start_z, end_x, end_y, end_z, raceway_ids, ...rest } = c;
-                let diameter = parseFloat(rest.diameter);
+                const { tag, from_tag, to_tag, start_x, start_y, start_z, end_x, end_y, end_z, raceway_ids,
+                        cable_od, diameter: diameterRaw, OD, od, ...rest } = c;
+                let diameter = parseFloat(diameterRaw ?? cable_od ?? OD ?? od);
                 let weight = parseFloat(rest.weight);
                 const size = (rest.conductor_size || '').trim();
                 const prop = conductorProps[size];
