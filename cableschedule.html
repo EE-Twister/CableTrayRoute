@@ -89,8 +89,17 @@ const insulationRatings=['60','75','90'];
   function getRacewayOptions(){
     const ids=new Set();
     try{(JSON.parse(localStorage.getItem(TableUtils.STORAGE_KEYS.traySchedule))||[]).forEach(t=>{if(t.tray_id) ids.add(t.tray_id);});}catch(e){}
-    try{(JSON.parse(localStorage.getItem(TableUtils.STORAGE_KEYS.conduitSchedule))||[]).forEach(c=>{if(c.conduit_id) ids.add(c.conduit_id);});}catch(e){}
-    try{(JSON.parse(localStorage.getItem(TableUtils.STORAGE_KEYS.ductbankSchedule))||[]).forEach(db=>{(db.conduits||[]).forEach(c=>{if(c.conduit_id) ids.add(c.conduit_id);});});}catch(e){}
+    try{(JSON.parse(localStorage.getItem(TableUtils.STORAGE_KEYS.conduitSchedule))||[]).forEach(c=>{
+      const id=c.tray_id||(c.ductbank_id&&c.conduit_id?`${c.ductbank_id}-${c.conduit_id}`:c.conduit_id);
+      if(id) ids.add(id);
+    });}catch(e){}
+    try{(JSON.parse(localStorage.getItem(TableUtils.STORAGE_KEYS.ductbankSchedule))||[]).forEach(db=>{
+      const dbId=db.ductbank_id||db.id||db.tag;
+      (db.conduits||[]).forEach(c=>{
+        const id=c.tray_id||(dbId&&c.conduit_id?`${dbId}-${c.conduit_id}`:c.conduit_id);
+        if(id) ids.add(id);
+      });
+    });}catch(e){}
     return Array.from(ids);
   }
 
@@ -107,6 +116,7 @@ const columns=[
   {key:'end_z',label:'End Z',type:'number',group:'Routing / Termination',tooltip:'Z-coordinate of cable end'},
   {key:'zone',label:'Cable Zone',type:'number',group:'Routing / Termination',tooltip:'Routing zone or area number'},
   {key:'raceway_ids',label:'Raceway(s)',type:'select',multiple:true,size:5,options:()=>getRacewayOptions(),group:'Routing / Termination',tooltip:'Select raceway IDs from Raceway Schedule'},
+  {key:'manual_path',label:'Manual Path',type:'text',datalist:()=>getRacewayOptions(),group:'Routing / Termination',tooltip:'Tray IDs separated by > to override route'},
   {key:'circuit_group',label:'Circuit Group',type:'number',group:'Routing / Termination',tooltip:'Circuit grouping number'},
   {key:'allowed_cable_group',label:'Allowed Group',type:'text',group:'Routing / Termination',tooltip:'Permitted cable grouping identifier'},
   {key:'cable_type',label:'Cable Type',type:'select',options:cableTypes,group:'Cable Construction & Specs',tooltip:'Category such as Power, Control, or Signal'},

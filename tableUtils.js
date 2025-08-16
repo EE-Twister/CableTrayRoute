@@ -402,6 +402,23 @@ class TableManager {
       } else {
         el = document.createElement('input');
         el.type = col.type || 'text';
+        if (col.datalist) {
+          const listId = `${col.key}-datalist`;
+          el.setAttribute('list', listId);
+          let dl = document.getElementById(listId);
+          if (!dl) {
+            dl = document.createElement('datalist');
+            dl.id = listId;
+            document.body.appendChild(dl);
+          }
+          const opts = typeof col.datalist === 'function' ? col.datalist(tr, data) : col.datalist;
+          dl.innerHTML = '';
+          (opts || []).forEach(opt => {
+            const o = document.createElement('option');
+            o.value = opt;
+            dl.appendChild(o);
+          });
+        }
       }
       el.name = col.key;
       const val = data[col.key] !== undefined ? data[col.key] : col.default;
