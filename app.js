@@ -1953,6 +1953,16 @@ const openDuctbankRoute = (dbId, conduitId) => {
                 });
                 html += '</ul>';
             }
+            if (res.mismatched_records && res.mismatched_records.length > 0) {
+                html += '<p class="exclusions-title"><strong>Mismatched Raceways:</strong></p><ul class="exclusions-list">';
+                res.mismatched_records.forEach(m => {
+                    const id = m.tray_id || m.id || 'unknown';
+                    const reason = m.reason.replace(/_/g, ' ');
+                    const cable = m.cable_id ? ` (cable ${m.cable_id})` : '';
+                    html += `<li>${id}: ${reason}${cable}</li>`;
+                });
+                html += '</ul>';
+            }
             if (res.breakdown && res.breakdown.length > 0) {
                 html += '<div class="table-scroll"><table class="sticky-table"><thead><tr><th>Segment</th><th>Raceway ID</th><th>Conduit</th><th>Type</th><th>From</th><th>To</th><th>Length</th><th>Recommended Raceway</th><th>Fill</th></tr></thead><tbody>';
                 res.breakdown.forEach(b => {
@@ -1976,7 +1986,7 @@ const openDuctbankRoute = (dbId, conduitId) => {
         });
         const overall = `<p class="overall-stats"><strong>Overall Total Length:</strong> ${totalLength.toFixed(2)} ft | <strong>Overall Field Length:</strong> ${totalField.toFixed(2)} ft</p>`;
         elements.routeBreakdownContainer.innerHTML = overall + html;
-        if (results.some(r => r.exclusions && r.exclusions.length > 0)) {
+        if (results.some(r => (r.exclusions && r.exclusions.length > 0) || (r.mismatched_records && r.mismatched_records.length > 0))) {
             document.dispatchEvent(new CustomEvent('exclusions-found'));
         }
         elements.routeBreakdownContainer.querySelectorAll('.conduit-fill-btn').forEach(btn => {

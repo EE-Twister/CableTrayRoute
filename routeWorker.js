@@ -55,6 +55,7 @@ class CableRoutingSystem {
         this.includeDuctbankOutlines = options.includeDuctbankOutlines || false;
         this.sharedFieldSegments = [];
         this.trays = new Map();
+        this.mismatchedRecords = [];
     }
 
     addTraySegment(tray) {
@@ -358,6 +359,9 @@ class CableRoutingSystem {
         });
 
         this.baseGraph = graph;
+        if (this.mismatchedRecords.length) {
+            console.warn('Mismatched raceway segments:', this.mismatchedRecords);
+        }
     }
 
     recordSharedFieldSegments(segments) {
@@ -442,7 +446,7 @@ class CableRoutingSystem {
             };
         }
     }
-    _racewayRoute(startPoint, endPoint, cableArea, allowedGroup, racewayIds) {
+    _racewayRoute(startPoint, endPoint, cableArea, allowedGroup, racewayIds, cableId = null) {
         if (!Array.isArray(racewayIds) || racewayIds.length === 0) return null;
 
         const resolvedIds = [];
@@ -481,12 +485,16 @@ class CableRoutingSystem {
         for (const id of resolvedIds) {
             const tray = this.trays.get(id);
             if (tray.allowed_cable_group && allowedGroup && tray.allowed_cable_group !== allowedGroup) {
-                exclusions.push({ tray_id: id, reason: 'group_mismatch' });
-                return { success: false, manual: true, manual_raceway: true, message: `Tray ${id} not allowed`, exclusions };
+                const record = { tray_id: id, reason: 'group_mismatch', cable_id: cableId };
+                exclusions.push(record);
+                this.mismatchedRecords.push(record);
+                return { success: false, manual: true, manual_raceway: true, message: `Tray ${id} not allowed`, exclusions, mismatched_records: this.mismatchedRecords.slice() };
             }
             if (tray.current_fill + cableArea > tray.maxFill) {
-                exclusions.push({ tray_id: id, reason: 'over_capacity' });
-                return { success: false, manual: true, manual_raceway: true, message: `Tray ${id} over capacity`, exclusions };
+                const record = { tray_id: id, reason: 'over_capacity', cable_id: cableId };
+                exclusions.push(record);
+                this.mismatchedRecords.push(record);
+                return { success: false, manual: true, manual_raceway: true, message: `Tray ${id} over capacity`, exclusions, mismatched_records: this.mismatchedRecords.slice() };
             }
             const a = [tray.start_x, tray.start_y, tray.start_z];
             const b = [tray.end_x, tray.end_y, tray.end_z];
@@ -512,15 +520,17 @@ class CableRoutingSystem {
             total_length: total,
             field_routed_length: fieldLen,
             exclusions,
+            mismatched_records: this.mismatchedRecords.slice(),
         };
     }
-    calculateRoute(startPoint, endPoint, cableArea, allowedGroup, manualPath = '', racewayIds = []) {
+    calculateRoute(startPoint, endPoint, cableArea, allowedGroup, manualPath = '', racewayIds = [], cableId = null) {
+        this.mismatchedRecords = [];
         if (manualPath && manualPath.trim()) {
             return this._manualRoute(startPoint, endPoint, cableArea, allowedGroup, manualPath);
         }
         let exclusions = [];
         if (racewayIds && racewayIds.length > 0) {
-            const manualResult = this._racewayRoute(startPoint, endPoint, cableArea, allowedGroup, racewayIds);
+            const manualResult = this._racewayRoute(startPoint, endPoint, cableArea, allowedGroup, racewayIds, cableId);
             if (manualResult && !manualResult.fallback) return manualResult;
             if (manualResult && manualResult.exclusions) exclusions = exclusions.concat(manualResult.exclusions);
         }
@@ -544,9 +554,13 @@ class CableRoutingSystem {
         // Remove trays without remaining capacity
         this.trays.forEach(tray => {
             if (tray.current_fill + cableArea > tray.maxFill) {
-                exclusions.push({ tray_id: tray.tray_id, reason: 'over_capacity' });
+                const record = { tray_id: tray.tray_id, reason: 'over_capacity', cable_id: cableId };
+                exclusions.push(record);
+                this.mismatchedRecords.push(record);
             } else if (tray.allowed_cable_group && tray.allowed_cable_group !== allowedGroup) {
-                exclusions.push({ tray_id: tray.tray_id, reason: 'group_mismatch' });
+                const record = { tray_id: tray.tray_id, reason: 'group_mismatch', cable_id: cableId };
+                exclusions.push(record);
+                this.mismatchedRecords.push(record);
             } else {
                 return; // tray is usable
             }
@@ -557,6 +571,10 @@ class CableRoutingSystem {
                 Object.keys(graph.edges).forEach(k => { if (graph.edges[k]) delete graph.edges[k][n]; });
             });
         });
+
+        if (this.mismatchedRecords.length) {
+            console.warn('Mismatched raceway segments:', this.mismatchedRecords);
+        }
 
         const addNode = (id, point, type = 'generic') => {
             graph.nodes[id] = { point, type };
@@ -727,6 +745,7 @@ class CableRoutingSystem {
             manual: false,
             manual_raceway: false,
             exclusions,
+            mismatched_records: this.mismatchedRecords.slice(),
         };
     }
 }
@@ -743,7 +762,8 @@ self.onmessage = function(e) {
         cableArea,
         cable.allowed_cable_group,
         cable.manual_path || '',
-        cable.raceway_ids || []
+        cable.raceway_ids || [],
+        cable.id || cable.name || null
     );
     self.postMessage(result);
 };
