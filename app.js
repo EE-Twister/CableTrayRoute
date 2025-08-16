@@ -532,7 +532,7 @@ document.addEventListener('DOMContentLoaded', async () => {
                             current_fill: 0,
                             shape: 'STR',
                             allowed_cable_group: cond.allowed_cable_group || '',
-                            raceway_type: 'ductbank',
+                            raceway_type: 'conduit',
                         });
                     }
                 });
@@ -1474,40 +1474,57 @@ document.addEventListener('DOMContentLoaded', async () => {
             elements.trayUtilizationContainer.innerHTML = '<p class="info-text">No tray data loaded.</p>';
             return;
         }
-        const displayData = state.trayData.map(tray => {
-            const maxCapacity = tray.width * tray.height * (parseFloat(elements.fillLimitIn.value) / 100);
-            return {
-                ...tray,
-                max_capacity: maxCapacity.toFixed(0),
-                utilization_pct: ((tray.current_fill / maxCapacity) * 100).toFixed(1),
-                available_space: (maxCapacity - tray.current_fill).toFixed(2),
-                fill: `<button class="fill-btn" data-tray="${tray.tray_id}">Open</button>`
-            };
+        const filtered = state.trayData.filter(t => !(t.raceway_type === 'ductbank' && (t.conduit_id == null || t.conduit_id === '')));
+        const groups = filtered.reduce((acc, tray) => {
+            const key = tray.ductbank_id || '_none';
+            acc[key] = acc[key] || [];
+            acc[key].push(tray);
+            return acc;
+        }, {});
+
+        const headers = [
+            { label: 'Tray ID', key: 'tray_id' },
+            { label: 'Start (x,y,z)', key: 'start_xyz' },
+            { label: 'End (x,y,z)', key: 'end_xyz' },
+            { label: 'Max Capacity (in²)', key: 'max_capacity' },
+            { label: 'Current Fill (in²)', key: 'current_fill' },
+            { label: 'Utilization %', key: 'utilization_pct' },
+            { label: 'Available Space (in²)', key: 'available_space' },
+            { label: 'Tray Fill', key: 'fill' }
+        ];
+
+        elements.trayUtilizationContainer.innerHTML = '';
+        Object.entries(groups).forEach(([dbId, items]) => {
+            const rows = items.map(tray => {
+                const maxCapacity = tray.width * tray.height * (parseFloat(elements.fillLimitIn.value) / 100);
+                return {
+                    tray_id: tray.tray_id,
+                    start_xyz: `(${tray.start_x}, ${tray.start_y}, ${tray.start_z})`,
+                    end_xyz: `(${tray.end_x}, ${tray.end_y}, ${tray.end_z})`,
+                    max_capacity: maxCapacity.toFixed(0),
+                    current_fill: tray.current_fill,
+                    utilization_pct: ((tray.current_fill / maxCapacity) * 100).toFixed(1),
+                    available_space: (maxCapacity - tray.current_fill).toFixed(2),
+                    fill: `<button class="fill-btn" data-tray="${tray.tray_id}">Open</button>`
+                };
+            });
+
+            if (dbId !== '_none') {
+                const details = document.createElement('details');
+                const summary = document.createElement('summary');
+                summary.textContent = dbId;
+                details.appendChild(summary);
+                const div = document.createElement('div');
+                renderTable(div, headers, rows, utilizationStyle);
+                details.appendChild(div);
+                elements.trayUtilizationContainer.appendChild(details);
+            } else {
+                const div = document.createElement('div');
+                renderTable(div, headers, rows, utilizationStyle);
+                elements.trayUtilizationContainer.appendChild(div);
+            }
         });
-        renderTable(
-            elements.trayUtilizationContainer,
-            [
-                { label: 'Tray ID', key: 'tray_id' },
-                { label: 'Start (x,y,z)', key: 'start_xyz' },
-                { label: 'End (x,y,z)', key: 'end_xyz' },
-                { label: 'Max Capacity (in²)', key: 'max_capacity' },
-                { label: 'Current Fill (in²)', key: 'current_fill' },
-                { label: 'Utilization %', key: 'utilization_pct' },
-                { label: 'Available Space (in²)', key: 'available_space' },
-                { label: 'Tray Fill', key: 'fill' }
-            ],
-            displayData.map(d => ({
-                tray_id: d.tray_id,
-                start_xyz: `(${d.start_x}, ${d.start_y}, ${d.start_z})`,
-                end_xyz: `(${d.end_x}, ${d.end_y}, ${d.end_z})`,
-                max_capacity: d.max_capacity,
-                current_fill: d.current_fill,
-                utilization_pct: d.utilization_pct,
-                available_space: d.available_space,
-                fill: d.fill
-            })),
-            utilizationStyle
-        );
+
         elements.trayUtilizationContainer.querySelectorAll('.fill-btn').forEach(btn => {
             btn.addEventListener('click', () => openTrayFill(btn.dataset.tray));
         });
