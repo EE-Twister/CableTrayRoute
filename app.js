@@ -323,6 +323,20 @@ document.addEventListener('DOMContentLoaded', async () => {
         if (condJson) {
             try { conduits = JSON.parse(condJson); } catch (e) {}
         }
+        conduits = conduits.map(c => {
+            if ((!c.ductbank_id && !c.ductbank) && c.tag) {
+                const parts = String(c.tag).split('-');
+                if (parts.length > 1) {
+                    const condId = parts.pop();
+                    c.ductbank_id = parts.join('-');
+                    if (!c.conduit_id) c.conduit_id = condId;
+                }
+            }
+            if (c.ductbank_id && c.conduit_id && !c.tray_id) {
+                c.tray_id = `${c.ductbank_id}-${c.conduit_id}`;
+            }
+            return c;
+        });
         if (trays.length > 0) {
             state.manualTrays = trays.map(t => ({
                 tray_id: t.tray_id,
@@ -435,19 +449,25 @@ document.addEventListener('DOMContentLoaded', async () => {
                             [parseFloat(db.start_x), parseFloat(db.start_y), parseFloat(db.start_z)],
                             [parseFloat(db.end_x), parseFloat(db.end_y), parseFloat(db.end_z)]
                         ],
-                        conduits: (conduitMap[dbId] || []).map(c => ({
-                            id: c.conduit_id || c.id,
-                            tag: c.conduit_id || c.id,
-                            conduit_id: c.conduit_id || c.id,
-                            type: c.type,
-                            conduit_type: c.type,
-                            trade_size: c.trade_size,
-                            path: [
-                                [parseFloat(c.start_x), parseFloat(c.start_y), parseFloat(c.start_z)],
-                                [parseFloat(c.end_x), parseFloat(c.end_y), parseFloat(c.end_z)]
-                            ],
-                            allowed_cable_group: c.allowed_cable_group
-                        }))
+                        conduits: (conduitMap[dbId] || []).map(c => {
+                            const condId = c.conduit_id || c.id;
+                            const trayId = c.tray_id || `${dbId}-${condId}`;
+                            return {
+                                id: condId,
+                                tag: trayId,
+                                tray_id: trayId,
+                                conduit_id: condId,
+                                ductbank_id: dbId,
+                                type: c.type,
+                                conduit_type: c.type,
+                                trade_size: c.trade_size,
+                                path: [
+                                    [parseFloat(c.start_x), parseFloat(c.start_y), parseFloat(c.start_z)],
+                                    [parseFloat(c.end_x), parseFloat(c.end_y), parseFloat(c.end_z)]
+                                ],
+                                allowed_cable_group: c.allowed_cable_group
+                            };
+                        })
                     };
                 })
             };
@@ -488,13 +508,14 @@ document.addEventListener('DOMContentLoaded', async () => {
                         const area = (CONDUIT_SPECS[cond.type] || {})[cond.trade_size];
                         const dia = area ? Math.sqrt((4 * area) / Math.PI)
                                          : parseFloat(cond.diameter) || 0;
-                        const dbId = db.id || db.tag;
-                        const rawId = cond.id ?? cond.conduit_id;
-                        const trayId = rawId.includes(dbId) ? rawId : `${dbId}-${rawId}`;
+                        const dbId = cond.ductbank_id || db.id || db.tag;
+                        const condId = cond.conduit_id || cond.id;
+                        const trayId = cond.tray_id || `${dbId}-${condId}`;
+                        cond.tray_id = trayId;
                         state.trayData.push({
                             tray_id: trayId,
                             ductbank_id: dbId,
-                            conduit_id: rawId,
+                            conduit_id: condId,
                             start_x: start[0],
                             start_y: start[1],
                             start_z: start[2],
@@ -520,8 +541,12 @@ document.addEventListener('DOMContentLoaded', async () => {
                 const area = (CONDUIT_SPECS[cond.type] || {})[cond.trade_size];
                 const dia = area ? Math.sqrt((4 * area) / Math.PI)
                                  : parseFloat(cond.diameter) || 0;
+                const condId = cond.conduit_id || cond.id;
+                const trayId = cond.tray_id || condId;
                 state.trayData.push({
-                    tray_id: cond.conduit_id || cond.id,
+                    tray_id: trayId,
+                    ductbank_id: cond.ductbank_id || cond.ductbank,
+                    conduit_id: condId,
                     start_x: start[0],
                     start_y: start[1],
                     start_z: start[2],
@@ -2620,7 +2645,7 @@ const openDuctbankRoute = (dbId, conduitId) => {
 
         const validateManualPath = (manualPath, cableArea, allowedGroup) => {
             const path = (manualPath || '').trim();
-            if (!path || !/[a-zA-Z]/.test(path)) return null;
+            if (!path) return null;
             const trayIds = path.split(/[>\s]+/).filter(Boolean);
             for (const id of trayIds) {
                 const tray = routingSystem.trays.get(id);
