@@ -787,6 +787,8 @@ document.addEventListener('DOMContentLoaded', async () => {
             // Limit how many field connections each node keeps to further
             // reduce graph density and memory usage
             this.maxFieldNeighbors = options.maxFieldNeighbors || 8;
+            // Optionally include ductbank outline segments lacking conduit IDs
+            this.includeDuctbankOutlines = options.includeDuctbankOutlines || false;
             this.sharedFieldSegments = [];
             this.trays = new Map();
         }
@@ -997,12 +999,27 @@ document.addEventListener('DOMContentLoaded', async () => {
                 graph.edges[id2][id1] = { weight, type, trayId };
             };
 
-            const trays = Array.from(this.trays.values())
-                // Remove only ductbank outline segments while keeping conduit records.
-                // Conduit IDs may be empty or numeric, so only filter when the ID is
-                // completely missing.
-                .filter(t => t.raceway_type !== 'ductbank' ||
+            const allTrays = Array.from(this.trays.values());
+            const missingDuctbank = allTrays.filter(t => t.raceway_type === 'ductbank' &&
+                (t.conduit_id == null || t.conduit_id === ''));
+            if (missingDuctbank.length) {
+                console.warn(`${missingDuctbank.length} ductbank segment(s) without conduit_id; ` +
+                    (this.includeDuctbankOutlines ? 'treated as generic raceways.' : 'ignored.'));
+            }
+            let trays;
+            if (this.includeDuctbankOutlines) {
+                let placeholder = 0;
+                trays = allTrays.map(t => {
+                    if (t.raceway_type === 'ductbank' && (t.conduit_id == null || t.conduit_id === '')) {
+                        const tray_id = t.tray_id || `ductbank_outline_${placeholder++}`;
+                        return { ...t, tray_id };
+                    }
+                    return t;
+                });
+            } else {
+                trays = allTrays.filter(t => t.raceway_type !== 'ductbank' ||
                     (t.conduit_id != null && t.conduit_id !== ''));
+            }
 
             trays.forEach(tray => {
                 const startId = `${tray.tray_id}_start`;

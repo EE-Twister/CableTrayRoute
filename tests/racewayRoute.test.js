@@ -75,4 +75,61 @@ describe("_racewayRoute", () => {
       "ductbank conduit missing from graph",
     );
   });
+
+  it("warns and ignores ductbank outlines without conduit ids", () => {
+    const system = new CableRoutingSystem({});
+    system.addTraySegment({
+      tray_id: "outline-1",
+      raceway_type: "ductbank",
+      start_x: 0,
+      start_y: 0,
+      start_z: 0,
+      end_x: 5,
+      end_y: 0,
+      end_z: 0,
+      width: 1,
+      height: 1,
+      current_fill: 0,
+    });
+    let warned = false;
+    const origWarn = console.warn;
+    console.warn = () => {
+      warned = true;
+    };
+    system.prepareBaseGraph();
+    console.warn = origWarn;
+    assert(warned, "missing ductbank warning not emitted");
+    assert(
+      !system.baseGraph.edges["outline-1_start"]?.["outline-1_end"],
+      "outline segment should be ignored",
+    );
+  });
+
+  it("includes ductbank outlines when configured", () => {
+    const system = new CableRoutingSystem({ includeDuctbankOutlines: true });
+    system.addTraySegment({
+      raceway_type: "ductbank",
+      start_x: 0,
+      start_y: 0,
+      start_z: 0,
+      end_x: 5,
+      end_y: 0,
+      end_z: 0,
+      width: 1,
+      height: 1,
+      current_fill: 0,
+    });
+    let warned = false;
+    const origWarn = console.warn;
+    console.warn = () => {
+      warned = true;
+    };
+    system.prepareBaseGraph();
+    console.warn = origWarn;
+    assert(warned, "missing ductbank warning not emitted");
+    assert(
+      system.baseGraph.edges["ductbank_outline_0_start"]?.["ductbank_outline_0_end"],
+      "ductbank outline not included",
+    );
+  });
 });
