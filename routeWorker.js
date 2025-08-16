@@ -265,7 +265,7 @@ class CableRoutingSystem {
         };
 
         const allTrays = Array.from(this.trays.values());
-        const missingDuctbank = allTrays.filter(t => t.raceway_type === 'ductbank' &&
+        const missingDuctbank = allTrays.filter(t => (t.raceway_type === 'ductbank' || t.ductbank_id) &&
             (t.conduit_id == null || t.conduit_id === ''));
         if (missingDuctbank.length) {
             console.warn(`${missingDuctbank.length} ductbank segment(s) without conduit_id; ` +
