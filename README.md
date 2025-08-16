@@ -64,7 +64,7 @@ NEC 40% fill guideline used for tray capacity calculations.
 
 ## Updates
 
-- Default *Tray Proximity Threshold* is now **72 in**.
+ - Default *Tray Proximity Threshold* is now **72 in**. Increase this value to let the router connect endpoints to trays or ductbank conduits that are slightly farther away.
 - Each cable row in batch mode includes **Duplicate** and **Delete** controls.
 - Tray utilization tables show **Available Space** to two decimal places.
 - CSV export flattens the breakdown so each segment is a separate row.

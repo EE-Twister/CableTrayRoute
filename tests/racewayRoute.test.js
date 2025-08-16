@@ -152,4 +152,34 @@ describe("_racewayRoute", () => {
     assert.strictEqual(res.exclusions[0].tray_id, "tray-over");
     assert.strictEqual(res.exclusions[0].reason, "over_capacity");
   });
+
+  it("routes when proximity threshold is increased", () => {
+    const tray = {
+      tray_id: "tray-prox",
+      start_x: 0,
+      start_y: 0,
+      start_z: 0,
+      end_x: 0,
+      end_y: 10,
+      end_z: 0,
+      width: 10,
+      height: 10,
+      current_fill: 0,
+    };
+    const start = [0, -73, 0];
+    const end = [0, 83, 0];
+
+    let system = new CableRoutingSystem({ proximityThreshold: 72 });
+    system.addTraySegment(tray);
+    let result = system.calculateRoute(start, end, 1, null);
+    const reasons = result.exclusions.map(e => e.reason);
+    assert(reasons.includes("start_beyond_proximity"));
+    assert(reasons.includes("end_beyond_proximity"));
+
+    system = new CableRoutingSystem({ proximityThreshold: 80 });
+    system.addTraySegment(tray);
+    result = system.calculateRoute(start, end, 1, null);
+    assert(result.success, "route should succeed with higher threshold");
+    assert.strictEqual(result.exclusions.length, 0);
+  });
 });
