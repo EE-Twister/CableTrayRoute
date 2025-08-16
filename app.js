@@ -271,7 +271,8 @@ document.addEventListener('DOMContentLoaded', async () => {
                 manualTrays: state.manualTrays,
                 cableList: state.cableList,
                 darkMode: document.body.classList.contains('dark-mode'),
-                conduitType: elements.conduitType ? elements.conduitType.value : 'EMT'
+                conduitType: elements.conduitType ? elements.conduitType.value : 'EMT',
+                proximityThreshold: parseFloat(document.getElementById('proximity-threshold')?.value) || 72
             };
             localStorage.setItem('ctrSession', JSON.stringify(data));
         } catch (e) {
@@ -289,6 +290,10 @@ document.addEventListener('DOMContentLoaded', async () => {
                 if (data.darkMode) document.body.classList.add('dark-mode');
                 if (data.conduitType && elements.conduitType) {
                     elements.conduitType.value = data.conduitType;
+                }
+                const prox = document.getElementById('proximity-threshold');
+                if (prox && data.proximityThreshold !== undefined) {
+                    prox.value = data.proximityThreshold;
                 }
             }
         } catch (e) {
@@ -3305,6 +3310,8 @@ Plotly.newPlot(document.getElementById('plot'), data, layout, {responsive: true}
     
     // --- INITIALIZATION & EVENT LISTENERS ---
     elements.fillLimitIn.addEventListener('input', updateFillLimitDisplay);
+    const proximityInput = document.getElementById('proximity-threshold');
+    if (proximityInput) proximityInput.addEventListener('change', saveSession);
     elements.calculateBtn.addEventListener('click', mainCalculation);
     if (elements.loadSampleTraysBtn) {
         elements.loadSampleTraysBtn.addEventListener('click', loadSampleTrays);
