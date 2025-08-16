@@ -153,6 +153,35 @@ describe("_racewayRoute", () => {
     assert.strictEqual(res.exclusions[0].reason, "over_capacity");
   });
 
+  it("warns with mismatched record details", () => {
+    const system = new CableRoutingSystem({ fillLimit: 0.4 });
+    system.addTraySegment({
+      tray_id: "tray-over",
+      start_x: 0,
+      start_y: 0,
+      start_z: 0,
+      end_x: 0,
+      end_y: 10,
+      end_z: 0,
+      width: 10,
+      height: 10,
+      current_fill: 40,
+    });
+    let warned = null;
+    const origWarn = console.warn;
+    console.warn = (...args) => {
+      warned = args;
+    };
+    system.calculateRoute([0, 0, 0], [0, 10, 0], 1, null, '', [], 'cable-1');
+    console.warn = origWarn;
+    assert(warned, 'mismatch warning not emitted');
+    const records = warned[1];
+    assert(Array.isArray(records) && records.length === 1);
+    assert.strictEqual(records[0].tray_id, 'tray-over');
+    assert.strictEqual(records[0].reason, 'over_capacity');
+    assert.strictEqual(records[0].cable_id, 'cable-1');
+  });
+
   it("routes when proximity threshold is increased", () => {
     const tray = {
       tray_id: "tray-prox",
