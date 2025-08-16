@@ -415,6 +415,7 @@ class CableRoutingSystem {
                 tray_segments: traySegments,
                 total_length: total,
                 field_routed_length: fieldLen,
+                exclusions: [],
             };
         } else {
             const points = path.split(/\s*;\s*/).filter(Boolean).map(p => p.split(',').map(Number));
@@ -437,6 +438,7 @@ class CableRoutingSystem {
                 tray_segments: [],
                 total_length: total,
                 field_routed_length: total,
+                exclusions: [],
             };
         }
     }
@@ -445,6 +447,7 @@ class CableRoutingSystem {
 
         const resolvedIds = [];
         const unknownIds = [];
+        const exclusions = [];
 
         for (const id of racewayIds) {
             if (this.trays.has(id)) {
@@ -462,12 +465,15 @@ class CableRoutingSystem {
                 resolvedIds.push(trayId);
             } else {
                 unknownIds.push(id);
+                exclusions.push({ id, reason: 'not_found' });
             }
         }
 
-        if (resolvedIds.length === 0) return null;
         if (unknownIds.length > 0) {
             console.warn(`Unknown raceway IDs: ${unknownIds.join(', ')}`);
+        }
+        if (resolvedIds.length === 0) {
+            return { success: false, manual: true, manual_raceway: true, exclusions, fallback: true };
         }
         const segments = [];
         const traySegments = [];
@@ -475,10 +481,12 @@ class CableRoutingSystem {
         for (const id of resolvedIds) {
             const tray = this.trays.get(id);
             if (tray.allowed_cable_group && allowedGroup && tray.allowed_cable_group !== allowedGroup) {
-                return { success: false, manual: true, manual_raceway: true, message: `Tray ${id} not allowed` };
+                exclusions.push({ tray_id: id, reason: 'group_mismatch' });
+                return { success: false, manual: true, manual_raceway: true, message: `Tray ${id} not allowed`, exclusions };
             }
             if (tray.current_fill + cableArea > tray.maxFill) {
-                return { success: false, manual: true, manual_raceway: true, message: `Tray ${id} over capacity` };
+                exclusions.push({ tray_id: id, reason: 'over_capacity' });
+                return { success: false, manual: true, manual_raceway: true, message: `Tray ${id} over capacity`, exclusions };
             }
             const a = [tray.start_x, tray.start_y, tray.start_z];
             const b = [tray.end_x, tray.end_y, tray.end_z];
@@ -503,15 +511,18 @@ class CableRoutingSystem {
             tray_segments: traySegments,
             total_length: total,
             field_routed_length: fieldLen,
+            exclusions,
         };
     }
     calculateRoute(startPoint, endPoint, cableArea, allowedGroup, manualPath = '', racewayIds = []) {
         if (manualPath && manualPath.trim()) {
             return this._manualRoute(startPoint, endPoint, cableArea, allowedGroup, manualPath);
         }
+        let exclusions = [];
         if (racewayIds && racewayIds.length > 0) {
             const manualResult = this._racewayRoute(startPoint, endPoint, cableArea, allowedGroup, racewayIds);
-            if (manualResult) return manualResult;
+            if (manualResult && !manualResult.fallback) return manualResult;
+            if (manualResult && manualResult.exclusions) exclusions = exclusions.concat(manualResult.exclusions);
         }
         if (!this.baseGraph) this.prepareBaseGraph();
         // 1. Start from the precomputed graph
@@ -532,16 +543,19 @@ class CableRoutingSystem {
 
         // Remove trays without remaining capacity
         this.trays.forEach(tray => {
-            if (tray.current_fill + cableArea > tray.maxFill ||
-                (tray.allowed_cable_group &&
-                 tray.allowed_cable_group !== allowedGroup)) {
-                const remove = Object.keys(graph.nodes).filter(n => n.includes(tray.tray_id));
-                remove.forEach(n => {
-                    delete graph.nodes[n];
-                    delete graph.edges[n];
-                    Object.keys(graph.edges).forEach(k => { if (graph.edges[k]) delete graph.edges[k][n]; });
-                });
+            if (tray.current_fill + cableArea > tray.maxFill) {
+                exclusions.push({ tray_id: tray.tray_id, reason: 'over_capacity' });
+            } else if (tray.allowed_cable_group && tray.allowed_cable_group !== allowedGroup) {
+                exclusions.push({ tray_id: tray.tray_id, reason: 'group_mismatch' });
+            } else {
+                return; // tray is usable
             }
+            const remove = Object.keys(graph.nodes).filter(n => n.includes(tray.tray_id));
+            remove.forEach(n => {
+                delete graph.nodes[n];
+                delete graph.edges[n];
+                Object.keys(graph.edges).forEach(k => { if (graph.edges[k]) delete graph.edges[k][n]; });
+            });
         });
 
         const addNode = (id, point, type = 'generic') => {
@@ -592,6 +606,8 @@ class CableRoutingSystem {
                 addEdge('start', projId, distToProjStart * penStart, 'field');
                 addEdge(projId, startId, this.distance(projStart, a), 'tray', tray.tray_id);
                 addEdge(projId, `${tray.tray_id}_end`, this.distance(projStart, b), 'tray', tray.tray_id);
+            } else {
+                exclusions.push({ tray_id: tray.tray_id, reason: 'start_beyond_proximity' });
             }
 
             // Project cable's end point
@@ -604,6 +620,8 @@ class CableRoutingSystem {
                 addEdge('end', projId, distToProjEnd * penEnd, 'field');
                 addEdge(projId, startId, this.distance(projEnd, a), 'tray', tray.tray_id);
                 addEdge(projId, `${tray.tray_id}_end`, this.distance(projEnd, b), 'tray', tray.tray_id);
+            } else {
+                exclusions.push({ tray_id: tray.tray_id, reason: 'end_beyond_proximity' });
             }
         });
         
@@ -708,6 +726,7 @@ class CableRoutingSystem {
             warnings: [],
             manual: false,
             manual_raceway: false,
+            exclusions,
         };
     }
 }

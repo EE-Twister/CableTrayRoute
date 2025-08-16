@@ -42,6 +42,10 @@ Cable trays and cables now include an **Allowed Cable Group** property. During r
 
 Supplying specific **Raceway IDs** on a cable forces the router to follow those tray segments in order. Any IDs that do not match trays in the schedule are ignored. If none of the provided IDs exist, the router automatically reverts to its standard pathfinding. Leaving the field empty always triggers automatic routing.
 
+## New Feature: Conduit Exclusion Diagnostics
+
+When routing, any raceway that cannot be used—because it is over capacity, belongs to a different cable group, or sits beyond the start/end proximity threshold—is recorded with a reason. The Route Breakdown now lists these exclusions so you can see why particular conduits were skipped.
+
 ## New Feature: Manual Batch Cable Entry
 
 When batch mode is selected, you can now use the **Add Cable to List** button to

@@ -1939,6 +1939,15 @@ const openDuctbankRoute = (dbId, conduitId) => {
             if (!isNaN(tl)) totalLength += tl;
             if (!isNaN(fl)) totalField += fl;
             html += `<details><summary>${res.cable} | ${res.status} | ${res.mode} | Total ${res.total_length} | Field ${res.field_length} | Segments ${res.segments_count}</summary>`;
+            if (res.exclusions && res.exclusions.length > 0) {
+                html += '<p class="exclusions-title"><strong>Excluded Conduits:</strong></p><ul class="exclusions-list">';
+                res.exclusions.forEach(ex => {
+                    const id = ex.tray_id || ex.id || 'unknown';
+                    const reason = ex.reason.replace(/_/g, ' ');
+                    html += `<li>${id}: ${reason}</li>`;
+                });
+                html += '</ul>';
+            }
             if (res.breakdown && res.breakdown.length > 0) {
                 html += '<div class="table-scroll"><table class="sticky-table"><thead><tr><th>Segment</th><th>Raceway ID</th><th>Conduit</th><th>Type</th><th>From</th><th>To</th><th>Length</th><th>Recommended Raceway</th><th>Fill</th></tr></thead><tbody>';
                 res.breakdown.forEach(b => {
@@ -1962,6 +1971,9 @@ const openDuctbankRoute = (dbId, conduitId) => {
         });
         const overall = `<p class="overall-stats"><strong>Overall Total Length:</strong> ${totalLength.toFixed(2)} ft | <strong>Overall Field Length:</strong> ${totalField.toFixed(2)} ft</p>`;
         elements.routeBreakdownContainer.innerHTML = overall + html;
+        if (results.some(r => r.exclusions && r.exclusions.length > 0)) {
+            document.dispatchEvent(new CustomEvent('exclusions-found'));
+        }
         elements.routeBreakdownContainer.querySelectorAll('.conduit-fill-btn').forEach(btn => {
             btn.addEventListener('click', (e) => {
                 e.stopPropagation();
@@ -2754,6 +2766,7 @@ const openDuctbankRoute = (dbId, conduitId) => {
                                 segments_count: result.success ? result.route_segments.length : 0,
                                 tray_segments: result.success ? result.tray_segments : [],
                                 route_segments: result.success ? result.route_segments : [],
+                        exclusions: result.exclusions || [],
                                 breakdown: result.success ? result.route_segments.map((seg, i) => {
                                 let tray_id = seg.type === 'field' ? 'Field Route' : (seg.tray_id || 'N/A');
                                 let type = getSegmentType(seg);

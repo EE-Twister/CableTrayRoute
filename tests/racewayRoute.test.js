@@ -132,4 +132,24 @@ describe("_racewayRoute", () => {
       "ductbank outline not included",
     );
   });
+
+  it("reports exclusions for overfilled trays", () => {
+    const system = new CableRoutingSystem({ fillLimit: 0.4 });
+    system.addTraySegment({
+      tray_id: "tray-over",
+      start_x: 0,
+      start_y: 0,
+      start_z: 0,
+      end_x: 0,
+      end_y: 10,
+      end_z: 0,
+      width: 10,
+      height: 10,
+      current_fill: 40,
+    });
+    const res = system.calculateRoute([0, 0, 0], [0, 10, 0], 1, null);
+    assert.strictEqual(res.exclusions.length, 1);
+    assert.strictEqual(res.exclusions[0].tray_id, "tray-over");
+    assert.strictEqual(res.exclusions[0].reason, "over_capacity");
+  });
 });
