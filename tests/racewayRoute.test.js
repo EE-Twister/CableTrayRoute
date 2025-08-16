@@ -105,6 +105,46 @@ describe("_racewayRoute", () => {
     );
   });
 
+  it("includes full list of ignored ductbank segments in warning", () => {
+    const system = new CableRoutingSystem({});
+    system.addTraySegment({
+      tray_id: "outline-1",
+      raceway_type: "ductbank",
+      start_x: 0,
+      start_y: 0,
+      start_z: 0,
+      end_x: 5,
+      end_y: 0,
+      end_z: 0,
+      width: 1,
+      height: 1,
+      current_fill: 0,
+    });
+    system.addTraySegment({
+      tray_id: "outline-2",
+      raceway_type: "ductbank",
+      start_x: 5,
+      start_y: 0,
+      start_z: 0,
+      end_x: 10,
+      end_y: 0,
+      end_z: 0,
+      width: 1,
+      height: 1,
+      current_fill: 0,
+    });
+    let warnMsg = "";
+    const origWarn = console.warn;
+    console.warn = (msg) => {
+      warnMsg = msg;
+    };
+    system.prepareBaseGraph();
+    console.warn = origWarn;
+    assert(warnMsg.includes("2 ductbank segment"));
+    assert(warnMsg.includes("outline-1"));
+    assert(warnMsg.includes("outline-2"));
+  });
+
   it("includes ductbank outlines when configured", () => {
     const system = new CableRoutingSystem({ includeDuctbankOutlines: true });
     system.addTraySegment({

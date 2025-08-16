@@ -268,8 +268,15 @@ class CableRoutingSystem {
         const missingDuctbank = allTrays.filter(t => t.raceway_type === 'ductbank' &&
             (t.conduit_id == null || t.conduit_id === ''));
         if (missingDuctbank.length) {
-            console.warn(`${missingDuctbank.length} ductbank segment(s) without conduit_id; ` +
-                (this.includeDuctbankOutlines ? 'treated as generic raceways.' : 'ignored.'));
+            const ids = missingDuctbank.map((t) =>
+                t.tag || t.ductbank_id || t.tray_id ||
+                `[${t.start_x},${t.start_y},${t.start_z}]→[${t.end_x},${t.end_y},${t.end_z}]`);
+            const list = ids.map(id => ` - ${id}`).join('\n');
+            console.warn(
+                `${missingDuctbank.length} ductbank segment(s) without conduit_id; ` +
+                (this.includeDuctbankOutlines ? 'treated as generic raceways.' : 'ignored.') +
+                `\nMissing segments:\n${list}`
+            );
         }
         let trays;
         if (this.includeDuctbankOutlines) {
