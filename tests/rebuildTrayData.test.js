@@ -40,7 +40,7 @@ vm.runInContext(workerCode + '\nthis.CableRoutingSystem = CableRoutingSystem;', 
 const { CableRoutingSystem } = sandbox;
 
 describe('rebuildTrayData', () => {
-  it('assigns ductbank coordinates to conduits without paths', () => {
+  it('skips conduits without paths and warns', () => {
     const state = {
       manualTrays: [],
       trayData: [],
@@ -65,14 +65,16 @@ describe('rebuildTrayData', () => {
       conduitData: [],
     };
     const CONDUIT_SPECS = { RMC: { '1': 0.887 } };
+    let warned = false;
+    const origWarn = console.warn;
+    console.warn = () => { warned = true; };
     rebuildTrayData(state, CONDUIT_SPECS);
-    const seg = state.trayData.find(t => t.tray_id === 'DB1-C1');
-    assert(seg, 'conduit segment missing');
-    assert.deepStrictEqual([seg.start_x, seg.start_y, seg.start_z], [0, 0, 0]);
-    assert.deepStrictEqual([seg.end_x, seg.end_y, seg.end_z], [10, 0, 0]);
+    console.warn = origWarn;
+    assert.strictEqual(state.trayData.length, 0);
+    assert(warned, 'warning not emitted');
   });
 
-  it('routes through generated conduit segments', () => {
+  it('routes through conduit segments when path provided', () => {
     const state = {
       manualTrays: [],
       trayData: [],
@@ -89,7 +91,7 @@ describe('rebuildTrayData', () => {
             width: 12,
             height: 12,
             conduits: [
-              { conduit_id: 'C1', type: 'RMC', trade_size: '1' },
+              { conduit_id: 'C1', type: 'RMC', trade_size: '1', path: [[0,0,0],[10,0,0]] },
             ],
           },
         ],
@@ -123,7 +125,7 @@ describe('rebuildTrayData', () => {
             width: 12,
             height: 12,
             conduits: [
-              { conduit_id: 'C1', type: 'RMC', trade_size: '1' },
+              { conduit_id: 'C1', type: 'RMC', trade_size: '1', path: [[0,0,0],[10,0,0]] },
             ],
           },
         ],
@@ -154,7 +156,7 @@ describe('rebuildTrayData', () => {
             width: 12,
             height: 12,
             conduits: [
-              { conduit_id: 'C1', type: 'RMC', trade_size: '1' },
+              { conduit_id: 'C1', type: 'RMC', trade_size: '1', path: [[0,0,0],[10,0,0]] },
             ],
           },
         ],

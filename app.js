@@ -112,6 +112,7 @@ document.addEventListener('DOMContentLoaded', async () => {
         conduitData: [],
         ductbanksWithoutConduits: [],
         includeDuctbankOutlines: false,
+        geometryWarnings: { ductbanks: [], conduits: [] },
     };
 
     // --- ELEMENT REFERENCES ---
@@ -192,11 +193,24 @@ document.addEventListener('DOMContentLoaded', async () => {
             icon.addEventListener('blur', () => icon.setAttribute('aria-expanded', 'false'));
         });
     };
+    const displayGeometryWarnings = () => {
+        const gw = state.geometryWarnings || {};
+        if (!(gw.ductbanks?.length || gw.conduits?.length)) return;
+        const parts = [];
+        if (gw.ductbanks?.length) parts.push(`ductbanks ${gw.ductbanks.join(', ')}`);
+        if (gw.conduits?.length) parts.push(`conduits ${gw.conduits.join(', ')}`);
+        if (typeof elements !== 'undefined' && elements.messages) {
+            const link = '<a href="docs/geometry-fields.html" target="_blank">Required geometry fields</a>';
+            elements.messages.innerHTML += `<div class="message warning">Skipped ${parts.join('; ')}. ${link}</div>`;
+        }
+    };
+
     const loadDuctbankData = async () => {
         if (state.ductbankData && state.ductbankData.ductbanks && state.ductbankData.ductbanks.length) {
             update3DPlot();
             return;
         }
+        state.geometryWarnings = { ductbanks: [], conduits: [] };
         try {
             const res = await fetch('data/ductbank_geometry.json');
             if (res.ok) {
@@ -205,7 +219,31 @@ document.addEventListener('DOMContentLoaded', async () => {
         } catch (e) {
             console.warn('Unable to load ductbank geometry', e);
         }
-        if (state.ductbankData) {
+        if (state.ductbankData && Array.isArray(state.ductbankData.ductbanks)) {
+            state.ductbankData.ductbanks = state.ductbankData.ductbanks.filter(db => {
+                const hasOutline = Array.isArray(db.outline) && db.outline.length >= 2;
+                const start = [parseFloat(db.start_x), parseFloat(db.start_y), parseFloat(db.start_z)];
+                const end = [parseFloat(db.end_x), parseFloat(db.end_y), parseFloat(db.end_z)];
+                const hasCoords = start.every(v => !isNaN(v)) && end.every(v => !isNaN(v));
+                if (!hasOutline && !hasCoords) {
+                    state.geometryWarnings.ductbanks.push(db.id || db.tag || '(unnamed)');
+                    console.warn(`Skipping ductbank ${db.id || db.tag || '(unnamed)'}: missing outline and coordinates.`);
+                    return false;
+                }
+                if (Array.isArray(db.conduits)) {
+                    db.conduits = db.conduits.filter(cond => {
+                        const hasPath = Array.isArray(cond.path) && cond.path.length >= 2;
+                        if (!hasPath) {
+                            state.geometryWarnings.conduits.push(cond.conduit_id || cond.id || '(unnamed)');
+                            console.warn(`Skipping conduit ${cond.conduit_id || cond.id || '(unnamed)'}: missing path.`);
+                            return false;
+                        }
+                        return true;
+                    });
+                }
+                return true;
+            });
+            displayGeometryWarnings();
             update3DPlot();
         }
     };
@@ -507,25 +545,33 @@ document.addEventListener('DOMContentLoaded', async () => {
 
     const rebuildTrayData = () => {
         state.trayData = state.manualTrays.map(t => ({ ...t }));
+        state.geometryWarnings = { ductbanks: [], conduits: [] };
 
         if (state.ductbankData && state.ductbankData.ductbanks) {
             state.ductbankData.ductbanks.forEach(db => {
-                const dbStart = Array.isArray(db.outline) && db.outline.length >= 2
+                const hasOutline = Array.isArray(db.outline) && db.outline.length >= 2;
+                const dbStart = hasOutline
                     ? db.outline[0]
                     : [
                         parseFloat(db.start_x),
                         parseFloat(db.start_y),
                         parseFloat(db.start_z)
                     ];
-                const dbEnd = Array.isArray(db.outline) && db.outline.length >= 2
+                const dbEnd = hasOutline
                     ? db.outline[db.outline.length - 1]
                     : [
                         parseFloat(db.end_x),
                         parseFloat(db.end_y),
                         parseFloat(db.end_z)
                     ];
+                const coordsValid = dbStart.every(v => !isNaN(v)) && dbEnd.every(v => !isNaN(v));
+                if (!hasOutline && !coordsValid) {
+                    state.geometryWarnings.ductbanks.push(db.id || db.tag || '(unnamed)');
+                    console.warn(`Skipping ductbank ${db.id || db.tag || '(unnamed)'}: missing outline and coordinates.`);
+                    return;
+                }
 
-                if (state.includeDuctbankOutlines && dbStart.every(v => !isNaN(v)) && dbEnd.every(v => !isNaN(v))) {
+                if (state.includeDuctbankOutlines && coordsValid) {
                     state.trayData.push({
                         tray_id: db.id || db.tag,
                         start_x: dbStart[0],
@@ -545,7 +591,9 @@ document.addEventListener('DOMContentLoaded', async () => {
 
                 (db.conduits || []).forEach(cond => {
                     if (!Array.isArray(cond.path) || cond.path.length < 2) {
-                        cond.path = [dbStart, dbEnd];
+                        state.geometryWarnings.conduits.push(cond.conduit_id || cond.id || '(unnamed)');
+                        console.warn(`Skipping conduit ${cond.conduit_id || cond.id || '(unnamed)'}: missing path.`);
+                        return;
                     }
                     const start = cond.path[0];
                     const end = cond.path[cond.path.length - 1];
@@ -604,6 +652,10 @@ document.addEventListener('DOMContentLoaded', async () => {
                     raceway_type: 'conduit',
                 });
             });
+        }
+
+        if ((state.geometryWarnings.ductbanks.length || state.geometryWarnings.conduits.length) && typeof displayGeometryWarnings === 'function') {
+            displayGeometryWarnings();
         }
     };
 

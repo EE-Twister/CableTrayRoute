@@ -15,6 +15,20 @@ vm.runInContext(
 );
 const { CableRoutingSystem } = sandbox;
 
+// Extract rebuildTrayData from app.js for geometry warning tests
+const appCode = fs.readFileSync(path.join(__dirname, '..', 'app.js'), 'utf8');
+const startMarker = 'const rebuildTrayData = () => {';
+const startIdx = appCode.indexOf(startMarker) + startMarker.length;
+let idx = startIdx;
+let depth = 1;
+while (idx < appCode.length && depth > 0) {
+  const ch = appCode[idx++];
+  if (ch === '{') depth++;
+  else if (ch === '}') depth--;
+}
+const rtBody = appCode.slice(startIdx, idx - 1);
+const rebuildTrayData = new Function('state', 'CONDUIT_SPECS', rtBody);
+
 function describe(name, fn) {
   console.log(name);
   fn();
@@ -298,5 +312,55 @@ describe("_racewayRoute", () => {
     assert(warned, "missing conduit warning not emitted");
     assert.strictEqual(state.ductbanksWithoutConduits.length, 1);
     assert.strictEqual(state.ductbanksWithoutConduits[0], "DB1");
+  });
+
+  it('warns and skips ductbanks lacking geometry', () => {
+    const state = {
+      manualTrays: [],
+      trayData: [],
+      ductbankData: { ductbanks: [{ id: 'DB-missing' }] },
+      conduitData: [],
+    };
+    let warned = false;
+    const origWarn = console.warn;
+    console.warn = () => { warned = true; };
+    rebuildTrayData(state, {});
+    console.warn = origWarn;
+    assert(warned, 'warning not emitted');
+    assert.strictEqual(state.trayData.length, 0);
+  });
+
+  it('warns and skips conduits without paths', () => {
+    const state = {
+      manualTrays: [],
+      trayData: [],
+      ductbankData: {
+        ductbanks: [
+          {
+            id: 'DB1',
+            start_x: 0,
+            start_y: 0,
+            start_z: 0,
+            end_x: 1,
+            end_y: 0,
+            end_z: 0,
+            width: 12,
+            height: 12,
+            conduits: [
+              { conduit_id: 'C1', type: 'RMC', trade_size: '1' },
+            ],
+          },
+        ],
+      },
+      conduitData: [],
+    };
+    const specs = { RMC: { '1': 0.887 } };
+    let warned = false;
+    const origWarn = console.warn;
+    console.warn = () => { warned = true; };
+    rebuildTrayData(state, specs);
+    console.warn = origWarn;
+    assert(warned, 'warning not emitted');
+    assert.strictEqual(state.trayData.length, 0);
   });
 });
