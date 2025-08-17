@@ -3,7 +3,7 @@
   "version": "1.0.0",
   "scripts": {
     "build": "rollup -c",
-    "test": "node tests/ampacity.test.js && node tests/ductbankSolver.test.js && node tests/ieee835.test.js && node tests/tableUtilsNavigation.test.js && node tests/racewayRoute.test.js && node tests/rebuildTrayData.test.js"
+    "test": "node tests/ampacity.test.js && node tests/ductbankSolver.test.js && node tests/ieee835.test.js && node tests/tableUtilsNavigation.test.js && node tests/racewayRoute.test.js && node tests/rebuildTrayData.test.js && node tests/conduitCount.test.js"
   },
   "devDependencies": {
     "@rollup/plugin-terser": "^0.4.3",
