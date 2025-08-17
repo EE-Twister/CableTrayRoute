@@ -110,6 +110,7 @@ document.addEventListener('DOMContentLoaded', async () => {
         ductbankTraceIndices: [],
         ductbankVisible: true,
         conduitData: [],
+        ductbanksWithoutConduits: [],
     };
 
     // --- ELEMENT REFERENCES ---
@@ -307,6 +308,8 @@ document.addEventListener('DOMContentLoaded', async () => {
         let ductbanks = [];
         let conduits = [];
 
+        state.ductbanksWithoutConduits = [];
+
         const trayKey = globalThis.TableUtils?.STORAGE_KEYS?.traySchedule || 'traySchedule';
         const cableKey = globalThis.TableUtils?.STORAGE_KEYS?.cableSchedule || 'cableSchedule';
         const dbKey = globalThis.TableUtils?.STORAGE_KEYS?.ductbankSchedule || 'ductbankSchedule';
@@ -476,6 +479,19 @@ document.addEventListener('DOMContentLoaded', async () => {
                     };
                 })
             };
+
+            state.ductbanksWithoutConduits = state.ductbankData.ductbanks
+                .filter(db => !db.conduits || db.conduits.length === 0)
+                .map(db => db.id || db.tag);
+            if (state.ductbanksWithoutConduits.length > 0) {
+                console.warn('Ductbank(s) missing conduits will be ignored:', state.ductbanksWithoutConduits);
+                const warnEl = typeof document !== 'undefined' && document.getElementById('ductbank-no-conduits-warning');
+                if (warnEl) {
+                    const listEl = warnEl.querySelector('.db-list');
+                    if (listEl) listEl.textContent = state.ductbanksWithoutConduits.join(', ');
+                    warnEl.style.display = '';
+                }
+            }
         }
 
         state.conduitData = conduits.filter(c => !(c.ductbank_id || c.ductbank));
