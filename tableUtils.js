@@ -224,12 +224,21 @@ class TableManager {
     inp.type='text';
     inp.value=this.filters[index];
     popup.appendChild(inp);
-    const apply=document.createElement('button');
-    apply.textContent='Apply';
-    apply.addEventListener('click',()=>{
+    let debounceTimer;
+    const applyFilter=()=>{
       this.filters[index]=inp.value.trim();
       if(this.filters[index]) btn.classList.add('filtered'); else btn.classList.remove('filtered');
       this.applyFilters();
+    };
+    inp.addEventListener('input',()=>{
+      clearTimeout(debounceTimer);
+      debounceTimer=setTimeout(applyFilter,300);
+    });
+    const apply=document.createElement('button');
+    apply.textContent='Apply';
+    apply.addEventListener('click',()=>{
+      clearTimeout(debounceTimer);
+      applyFilter();
       popup.remove();
     });
     popup.appendChild(apply);
@@ -402,6 +411,7 @@ class TableManager {
       } else {
         el = document.createElement('input');
         el.type = col.type || 'text';
+        if(el.type==='number') el.step = col.step || '1';
         if (col.datalist) {
           const listId = `${col.key}-datalist`;
           el.setAttribute('list', listId);
@@ -477,6 +487,7 @@ class TableManager {
       } else {
         el.addEventListener('input', () => { if (this.onChange) this.onChange(); });
       }
+      el.addEventListener('focus',()=>{el.dataset.prevValue=el.value;});
       el.addEventListener('keydown', e => {
         if (e.key === 'ArrowLeft' || e.key === 'ArrowRight') {
           let allSelected = true;
@@ -497,6 +508,15 @@ class TableManager {
               }
             }
           }
+        } else if (e.key === 'ArrowUp' || e.key === 'ArrowDown') {
+          e.preventDefault();
+          let targetRow = tr;
+          const dir = e.key === 'ArrowUp' ? 'previousElementSibling' : 'nextElementSibling';
+          do{targetRow = targetRow[dir];}while(targetRow && targetRow.style.display==='none');
+          if(targetRow && targetRow.cells[idx]){
+            const next = targetRow.cells[idx].querySelector('input,select,textarea');
+            if(next){next.focus(); if(typeof next.select==='function') next.select();}
+          }
         } else if (e.key === 'Enter') {
           e.preventDefault();
           let nextRow = tr.nextElementSibling;
@@ -510,6 +530,12 @@ class TableManager {
               next.focus();
               if (typeof next.select === 'function') next.select();
             }
+          }
+        } else if (e.key === 'Escape') {
+          e.preventDefault();
+          if(el.dataset.prevValue!==undefined){
+            el.value = el.dataset.prevValue;
+            if (this.onChange) this.onChange();
           }
         }
       });
