@@ -590,6 +590,10 @@ body.dark-mode .sticky-table tbody tr:hover {
 }
 .toast.show { opacity: 1; }
 body.dark-mode .toast { background: #2c3034; color: #f8f9fa; }
+.toast-success { background: #28a745; color: #fff; }
+.toast-error { background: #dc3545; color: #fff; }
+body.dark-mode .toast-success { background: #28a745; }
+body.dark-mode .toast-error { background: #dc3545; }
 
 #warning-area { margin-top: 8px; }
 #soilWarning { margin-top:4px; font-size:0.8rem; color: var(--warning-text); }

@@ -9,6 +9,7 @@
     <link rel="stylesheet" href="style.css">
     <script src="https://cdn.plot.ly/plotly-2.27.0.min.js" defer></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js" defer></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/PapaParse/5.4.1/papaparse.min.js" defer></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js" defer></script>
     <script src="dirtyTracker.js" defer></script>
     <script src="dist/optimalRoute.js" defer></script>
@@ -127,8 +128,9 @@
                     <button id="load-sample-trays-btn">Load Sample Tray Network</button>
                     <div class="table-import-export">
                         <button id="export-trays-btn">Export Trays CSV</button>
-                        <input type="file" id="import-trays-file" accept=".csv" style="display:none;">
-                        <button id="import-trays-btn">Import Trays CSV</button>
+                        <button id="download-trays-template-btn">Download Sample</button>
+                        <input type="file" id="import-trays-file" accept=".csv,.xlsx" style="display:none;">
+                        <button id="import-trays-btn">Import Trays</button>
                         <button id="clear-trays-btn">Clear All Trays</button>
                     </div>
                 </div>
@@ -194,8 +196,9 @@
                         <button id="load-sample-cables-btn">Load Sample Cable List</button>
                         <div class="table-import-export">
                             <button id="export-cables-btn">Export Cables CSV</button>
-                            <input type="file" id="import-cables-file" accept=".csv" style="display:none;">
-                            <button id="import-cables-btn">Import Cables CSV</button>
+                            <button id="download-cables-template-btn">Download Sample</button>
+                            <input type="file" id="import-cables-file" accept=".csv,.xlsx" style="display:none;">
+                            <button id="import-cables-btn">Import Cables</button>
                         </div>
                         <button id="clear-cables-btn">Clear Cable List</button>
                     </div>
@@ -265,6 +268,7 @@
             </div>
         </div>
     </div>
+    <div id="toast" class="toast" role="status" aria-live="polite"></div>
     <script src="app.js" defer></script>
 </body>
 </html>

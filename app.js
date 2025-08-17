@@ -127,6 +127,7 @@ document.addEventListener('DOMContentLoaded', async () => {
         exportTraysBtn: document.getElementById('export-trays-btn'),
         importTraysFile: document.getElementById('import-trays-file'),
         importTraysBtn: document.getElementById('import-trays-btn'),
+        downloadTraysTemplateBtn: document.getElementById('download-trays-template-btn'),
         trayUtilizationContainer: document.getElementById('tray-utilization-container'),
         loadSampleCablesBtn: document.getElementById('load-sample-cables-btn'),
         clearCablesBtn: document.getElementById('clear-cables-btn'),
@@ -135,6 +136,7 @@ document.addEventListener('DOMContentLoaded', async () => {
         exportCablesBtn: document.getElementById('export-cables-btn'),
         importCablesFile: document.getElementById('import-cables-file'),
         importCablesBtn: document.getElementById('import-cables-btn'),
+        downloadCablesTemplateBtn: document.getElementById('download-cables-template-btn'),
         resultsSection: document.getElementById('results-section'),
         messages: document.getElementById('messages'),
         metrics: document.getElementById('metrics'),
@@ -180,6 +182,66 @@ document.addEventListener('DOMContentLoaded', async () => {
     if(elements.exportTraysBtn) elements.exportTraysBtn.addEventListener('click',markSaved);
     if(elements.exportCablesBtn) elements.exportCablesBtn.addEventListener('click',markSaved);
     ['export-csv-btn','export-tray-fills-btn'].forEach(id=>{const b=document.getElementById(id);if(b)b.addEventListener('click',markSaved);});
+
+    const trayTemplateHeaders=['tray_id','start_x','start_y','start_z','end_x','end_y','end_z','width','height','current_fill','allowed_cable_group','shape'];
+    const cableTemplateHeaders=['tag','start_tag','end_tag','cable_type','conductors','conductor_size','diameter','weight','allowed_cable_group','start_x','start_y','start_z','end_x','end_y','end_z'];
+
+    function showToast(msg,type='success'){
+        const t=document.getElementById('toast');
+        if(!t)return;
+        t.textContent=msg;
+        t.classList.remove('toast-error','toast-success','show');
+        t.classList.add(type==='error'?'toast-error':'toast-success');
+        requestAnimationFrame(()=>t.classList.add('show'));
+        setTimeout(()=>t.classList.remove('show'),3000);
+    }
+
+    const parseFile=(file,cb)=>{
+        const reader=new FileReader();
+        reader.onload=e=>{
+            try{
+                let rows=[];
+                if(file.name.toLowerCase().endsWith('.xlsx')||file.name.toLowerCase().endsWith('.xls')){
+                    const wb=XLSX.read(e.target.result,{type:'binary'});
+                    const ws=wb.Sheets[wb.SheetNames[0]];
+                    rows=XLSX.utils.sheet_to_json(ws,{defval:''});
+                }else{
+                    rows=Papa.parse(e.target.result,{header:true,skipEmptyLines:true}).data;
+                }
+                rows=rows.map(r=>{const o={};Object.keys(r).forEach(k=>{o[k.trim().toLowerCase()]=r[k];});return o;});
+                cb(rows);
+            }catch(err){
+                console.error('Import failed',err);
+                showToast('Failed to parse file','error');
+            }
+        };
+        if(file.name.toLowerCase().endsWith('.xlsx')||file.name.toLowerCase().endsWith('.xls')) reader.readAsBinaryString(file); else reader.readAsText(file);
+    };
+
+    const validateHeaders=(data,required)=>{
+        if(!data.length)return required.slice();
+        const headers=Object.keys(data[0]);
+        return required.filter(r=>!headers.includes(r));
+    };
+
+    const handleImport=(file,required,onValid)=>{
+        parseFile(file,rows=>{
+            const missing=validateHeaders(rows,required);
+            if(missing.length){
+                showToast(`Missing columns: ${missing.join(', ')}`,'error');
+                return;
+            }
+            onValid(rows);
+            showToast('Import successful','success');
+        });
+    };
+
+    const downloadSampleTemplate=(headers,filename)=>{
+        const wb=XLSX.utils.book_new();
+        const ws=XLSX.utils.aoa_to_sheet([headers]);
+        XLSX.utils.book_append_sheet(wb,ws,'Template');
+        XLSX.writeFile(wb,filename);
+    };
 
     const initHelpIcons = (root = document) => {
         root.querySelectorAll('.help-icon').forEach(icon => {
@@ -1964,48 +2026,33 @@ const openDuctbankRoute = (dbId, conduitId) => {
         URL.revokeObjectURL(url);
     };
 
-    const importManualTraysCSV = () => {
+    const importManualTrays = () => {
         const file = elements.importTraysFile.files[0];
-        if (!file) return;
-        const reader = new FileReader();
-        reader.onload = e => {
-            const text = e.target.result.trim();
-            const lines = text.split(/\r?\n/);
-            if (lines.length === 0) return;
-            const delim = lines[0].includes(',') ? ',' : /\t/;
-            const headers = lines[0].split(delim);
-            const newTrays = [];
-            for (let i = 1; i < lines.length; i++) {
-                if (!lines[i].trim()) continue;
-                const vals = lines[i].split(delim);
-                const t = {};
-                headers.forEach((h, idx) => { t[h.trim()] = vals[idx] !== undefined ? vals[idx].trim() : ''; });
-                newTrays.push({
-                    tray_id: t.tray_id,
-                    start_x: parseFloat(t.start_x) || 0,
-                    start_y: parseFloat(t.start_y) || 0,
-                    start_z: parseFloat(t.start_z) || 0,
-                    end_x: parseFloat(t.end_x) || 0,
-                    end_y: parseFloat(t.end_y) || 0,
-                    end_z: parseFloat(t.end_z) || 0,
-                    width: parseFloat(t.width) || 0,
-                    height: parseFloat(t.height) || 0,
-                    current_fill: parseFloat(t.current_fill) || 0,
-                    allowed_cable_group: t.allowed_cable_group || '',
-                    shape: t.shape || 'STR',
-                    raceway_type: 'tray'
-                });
-            }
-            state.manualTrays = newTrays;
+        if(!file)return;
+        handleImport(file,trayTemplateHeaders,rows=>{
+            const newTrays=rows.map(t=>({
+                tray_id:t.tray_id,
+                start_x:parseFloat(t.start_x)||0,
+                start_y:parseFloat(t.start_y)||0,
+                start_z:parseFloat(t.start_z)||0,
+                end_x:parseFloat(t.end_x)||0,
+                end_y:parseFloat(t.end_y)||0,
+                end_z:parseFloat(t.end_z)||0,
+                width:parseFloat(t.width)||0,
+                height:parseFloat(t.height)||0,
+                current_fill:parseFloat(t.current_fill)||0,
+                allowed_cable_group:t.allowed_cable_group||'',
+                shape:t.shape||'STR',
+                raceway_type:'tray'
+            }));
+            state.manualTrays=newTrays;
             rebuildTrayData();
             renderManualTrayTable();
             updateTrayDisplay();
             updateTableCounts();
             saveSession();
-        };
-        reader.readAsText(file);
-        // Reset the file input so importing the same file again triggers the change event
-        elements.importTraysFile.value = '';
+        });
+        elements.importTraysFile.value='';
     };
 
     const exportCableOptionsCSV = () => {
@@ -2039,48 +2086,35 @@ const openDuctbankRoute = (dbId, conduitId) => {
         URL.revokeObjectURL(url);
     };
 
-    const importCableOptionsCSV = () => {
-        const file = elements.importCablesFile.files[0];
-        if (!file) return;
-        const reader = new FileReader();
-        reader.onload = e => {
-            const text = e.target.result.trim();
-            const lines = text.split(/\r?\n/);
-            if (lines.length === 0) return;
-            const delim = lines[0].includes(',') ? ',' : /\t/;
-            const headers = lines[0].split(delim);
-            const newCables = [];
-            for (let i = 1; i < lines.length; i++) {
-                if (!lines[i].trim()) continue;
-                const vals = lines[i].split(delim);
-                const t = {};
-                headers.forEach((h, idx) => { t[h.trim()] = vals[idx] !== undefined ? vals[idx].trim() : ''; });
-                newCables.push({
-                    name: t.tag || '',
-                    start_tag: t.start_tag || '',
-                    end_tag: t.end_tag || '',
-                    cable_type: t.cable_type || 'Power',
-                    conductors: parseInt(t.conductors) || 0,
-                    conductor_size: t.conductor_size || '#12 AWG',
-                    diameter: parseFloat(t.diameter) || 0,
-                    weight: parseFloat(t.weight) || 0,
-                    allowed_cable_group: t.allowed_cable_group || '',
-                    start: [parseFloat(t.start_x) || 0, parseFloat(t.start_y) || 0, parseFloat(t.start_z) || 0],
-                    end: [parseFloat(t.end_x) || 0, parseFloat(t.end_y) || 0, parseFloat(t.end_z) || 0]
-                ,
-                    manual_path: ''
-                });
-                setRacewayIds(newCables[newCables.length - 1], []);
-            }
-            state.cableList = newCables;
+    const importCableOptions = () => {
+        const file=elements.importCablesFile.files[0];
+        if(!file)return;
+        handleImport(file,cableTemplateHeaders,rows=>{
+            const newCables=rows.map(t=>({
+                name:t.tag||'',
+                start_tag:t.start_tag||'',
+                end_tag:t.end_tag||'',
+                cable_type:t.cable_type||'Power',
+                conductors:parseInt(t.conductors)||0,
+                conductor_size:t.conductor_size||'#12 AWG',
+                diameter:parseFloat(t.diameter)||0,
+                weight:parseFloat(t.weight)||0,
+                allowed_cable_group:t.allowed_cable_group||'',
+                start:[parseFloat(t.start_x)||0,parseFloat(t.start_y)||0,parseFloat(t.start_z)||0],
+                end:[parseFloat(t.end_x)||0,parseFloat(t.end_y)||0,parseFloat(t.end_z)||0],
+                manual_path:''
+            }));
+            newCables.forEach(c=>setRacewayIds(c,[]));
+            state.cableList=newCables;
             updateCableListDisplay();
             updateTableCounts();
             saveSession();
-        };
-        reader.readAsText(file);
-        // Reset the file input so importing the same file again triggers the change event
-        elements.importCablesFile.value = '';
+        });
+        elements.importCablesFile.value='';
     };
+
+    const downloadTraySample=()=>downloadSampleTemplate(trayTemplateHeaders,'tray_list_template.xlsx');
+    const downloadCableSample=()=>downloadSampleTemplate(cableTemplateHeaders,'cable_options_template.xlsx');
 
     const renderBatchResults = (results) => {
         let totalLength = 0;
@@ -3497,14 +3531,16 @@ Plotly.newPlot(document.getElementById('plot'), data, layout, {responsive: true}
     elements.addTrayBtn.addEventListener('click', addManualTray);
     elements.clearTraysBtn.addEventListener('click', clearManualTrays);
     elements.exportTraysBtn.addEventListener('click', exportManualTraysCSV);
+    elements.downloadTraysTemplateBtn.addEventListener('click', downloadTraySample);
     elements.importTraysBtn.addEventListener('click', () => elements.importTraysFile.click());
-    elements.importTraysFile.addEventListener('change', importManualTraysCSV);
+    elements.importTraysFile.addEventListener('change', importManualTrays);
     elements.loadSampleCablesBtn.addEventListener('click', loadSampleCables);
     elements.addCableBtn.addEventListener('click', addCableToBatch);
     elements.clearCablesBtn.addEventListener('click', clearCableList);
     elements.exportCablesBtn.addEventListener('click', exportCableOptionsCSV);
+    elements.downloadCablesTemplateBtn.addEventListener('click', downloadCableSample);
     elements.importCablesBtn.addEventListener('click', () => elements.importCablesFile.click());
-    elements.importCablesFile.addEventListener('change', importCableOptionsCSV);
+    elements.importCablesFile.addEventListener('change', importCableOptions);
     elements.exportCsvBtn.addEventListener('click', exportRouteXLSX);
     if (elements.rebalanceBtn) {
         elements.rebalanceBtn.addEventListener('click', rebalanceTrayFill);
