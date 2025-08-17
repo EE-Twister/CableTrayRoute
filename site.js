@@ -1,20 +1,23 @@
+import "./units.js";
 const FOCUSABLE="a[href],button:not([disabled]),textarea:not([disabled]),input:not([disabled]),select:not([disabled]),[tabindex]:not([tabindex='-1'])";
 const PROJECT_KEY='CTR_PROJECT_V1';
 
 function defaultProject(){
-  return {ductbanks:[],conduits:[],trays:[],cables:[],settings:{}};
+  return {ductbanks:[],conduits:[],trays:[],cables:[],settings:{session:{},collapsedGroups:{},units:'imperial'}};
 }
 
 function migrateProject(old={}){
+  const settings = old.settings || {
+    session: old.session || old.ctrSession || {},
+    collapsedGroups: old.collapsedGroups || {}
+  };
+  if(!settings.units) settings.units='imperial';
   return {
     ductbanks: old.ductbanks || old.ductbankSchedule || [],
     conduits: old.conduits || old.conduitSchedule || [],
     trays: old.trays || old.traySchedule || [],
     cables: old.cables || old.cableSchedule || [],
-    settings: old.settings || {
-      session: old.session || old.ctrSession || {},
-      collapsedGroups: old.collapsedGroups || {}
-    }
+    settings
   };
 }
 
@@ -265,6 +268,20 @@ function initSettings(){
       }
     });
   }
+  const unitSelect=document.getElementById('unit-select');
+  if(unitSelect){
+    try{ unitSelect.value=getProject().settings?.units||'imperial'; }catch{}
+    unitSelect.addEventListener('change',e=>{
+      try{
+        const proj=getProject();
+        proj.settings=proj.settings||{};
+        proj.settings.units=e.target.value;
+        setProject(proj);
+      }catch{}
+      applyUnitLabels();
+    });
+  }
+  applyUnitLabels();
   if(!globalThis.__ctrHistoryInit){
     initHistory();
     globalThis.__ctrHistoryInit=true;
@@ -452,6 +469,14 @@ function initProjectIO(){
 
 globalThis.addEventListener?.('DOMContentLoaded',initProjectIO);
 
+function applyUnitLabels(){
+  const sys=globalThis.units?.getUnitSystem()?globalThis.units.getUnitSystem():'imperial';
+  const d=sys==='imperial'?'ft':'m';
+  const c=sys==='imperial'?'in':'mm';
+  document.querySelectorAll('[data-unit="distance"]').forEach(el=>el.textContent=d);
+  document.querySelectorAll('[data-unit="conduit"]').forEach(el=>el.textContent=c);
+}
+
 globalThis.initSettings=initSettings;
 globalThis.initDarkMode=initDarkMode;
 globalThis.initHelpModal=initHelpModal;
@@ -459,3 +484,4 @@ globalThis.initNavToggle=initNavToggle;
 globalThis.checkPrereqs=checkPrereqs;
 globalThis.persistConduits=persistConduits;
 globalThis.loadConduits=loadConduits;
+globalThis.applyUnitLabels=applyUnitLabels;
