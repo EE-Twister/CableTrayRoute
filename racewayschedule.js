@@ -63,28 +63,6 @@ document.addEventListener('DOMContentLoaded',()=>{
   const markSaved = () => dirty.markClean();
   const markUnsaved = () => dirty.markDirty();
 
-  document.addEventListener('keydown',e=>{
-    if((e.key==='ArrowUp'||e.key==='ArrowDown')&&['INPUT','SELECT'].includes(e.target.tagName)){
-      const td=e.target.closest('td');
-      if(!td) return;
-      const tr=td.parentElement;
-      const tbody=tr.parentElement;
-      const rows=Array.from(tbody.rows);
-      let idx=rows.indexOf(tr);
-      const dir=e.key==='ArrowUp'?-1:1;
-      let targetRow;
-      do{
-        idx+=dir;
-        targetRow=rows[idx];
-      }while(targetRow&&(targetRow.style.display==='none'||targetRow.classList.contains('conduit-container')));
-      if(targetRow&&targetRow.cells[td.cellIndex]){
-        const next=targetRow.cells[td.cellIndex].querySelector('input,select');
-        if(next){e.preventDefault();next.focus();if(typeof next.select==='function')next.select();}
-      }else{
-        e.preventDefault();
-      }
-    }
-  });
   if(typeof initDuctbankTable==='function'){
     initDuctbankTable();
     const dbTable=document.getElementById('ductbankTable');
