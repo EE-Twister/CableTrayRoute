@@ -674,7 +674,7 @@ document.addEventListener('DOMContentLoaded', async () => {
         if ((state.geometryWarnings.ductbanks.length || state.geometryWarnings.conduits.length) && typeof displayGeometryWarnings === 'function') {
             displayGeometryWarnings();
         }
-        const conduitCount = state.trayData.filter(t => t.raceway_type === 'ductbank').length;
+        const conduitCount = state.trayData.filter(t => t.raceway_type === 'conduit').length;
         const hasSchedule = !!(
             (state.ductbankData && state.ductbankData.ductbanks && state.ductbankData.ductbanks.some(db => (db.conduits || []).length)) ||
             (state.conduitData && state.conduitData.length)
