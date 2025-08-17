@@ -20,10 +20,9 @@ checkPrereqs([{key:'conduitSchedule',page:'racewayschedule.html',label:'Raceway 
       initDarkMode();
       initHelpModal('help-btn','help-modal','close-help-btn');
       initNavToggle();
-      let saved = true;
-      const markSaved = () => { saved = true; };
-      const markUnsaved = () => { saved = false; };
-      window.addEventListener('beforeunload', e => { if(!saved){ e.preventDefault(); e.returnValue=''; }});
+      const dirty = createDirtyTracker();
+      const markSaved = () => { dirty.markClean(); };
+      const markUnsaved = () => { dirty.markDirty(); };
 
       const typeSel = document.getElementById('conduitType');
       const sizeSel = document.getElementById('tradeSize');

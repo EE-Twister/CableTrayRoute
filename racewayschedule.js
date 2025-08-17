@@ -59,10 +59,9 @@ document.addEventListener('DOMContentLoaded',()=>{
         });
     }catch(e){console.error('Failed to load cables for',id,e);return[];}
   }
-  let saved=true;
-  const markSaved=()=>{saved=true;};
-  const markUnsaved=()=>{saved=false;};
-  window.addEventListener('beforeunload',e=>{if(!saved){e.preventDefault();e.returnValue='';}});
+  const dirty = createDirtyTracker();
+  const markSaved = () => dirty.markClean();
+  const markUnsaved = () => dirty.markDirty();
 
   document.addEventListener('keydown',e=>{
     if((e.key==='ArrowUp'||e.key==='ArrowDown')&&['INPUT','SELECT'].includes(e.target.tagName)){

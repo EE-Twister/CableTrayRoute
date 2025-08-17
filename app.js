@@ -89,10 +89,9 @@ document.addEventListener('DOMContentLoaded', async () => {
     initHelpModal('help-btn','help-modal','close-help-btn');
     initNavToggle();
     // --- UNSAVED CHANGES TRACKING ---
-    let saved = true;
-    const markSaved = () => { saved = true; };
-    const markUnsaved = () => { saved = false; };
-    window.addEventListener('beforeunload', e => { if(!saved){ e.preventDefault(); e.returnValue=''; }});
+    const dirty = createDirtyTracker();
+    const markSaved = () => { dirty.markClean(); };
+    const markUnsaved = () => { dirty.markDirty(); };
 
     // --- STATE MANAGEMENT ---
     let state = {
