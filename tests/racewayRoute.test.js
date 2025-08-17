@@ -195,8 +195,34 @@ describe("_racewayRoute", () => {
     assert.strictEqual(records[0].tray_id, 'tray-over');
     assert.strictEqual(records[0].reason, 'over_capacity');
     assert.strictEqual(records[0].cable_id, 'cable-1');
-    assert.deepStrictEqual(Object.keys(records[0]).sort(), ['cable_id','reason','tray_id']);
-  });
+      assert.deepStrictEqual(Object.keys(records[0]).sort(), ['cable_id','filter','reason','tray_id']);
+    });
+
+    it("details ductbank group mismatch with filter", () => {
+      const system = new CableRoutingSystem({ fillLimit: 0.4 });
+      system.addTraySegment({
+        tray_id: 'DB1-1',
+        start_x: 0,
+        start_y: 0,
+        start_z: 0,
+        end_x: 0,
+        end_y: 10,
+        end_z: 0,
+        width: 10,
+        height: 10,
+        current_fill: 0,
+        allowed_cable_group: 'A',
+        conduit_id: '1',
+        ductbankTag: 'DB1',
+      });
+      const res = system.calculateRoute([0, 0, 0], [0, 10, 0], 1, 'B', '', ['DB1-1'], 'cable-3');
+      assert(!res.success);
+      assert(res.mismatched_records && res.mismatched_records.length === 1);
+      const rec = res.mismatched_records[0];
+      assert.strictEqual(rec.conduit_id, '1');
+      assert.strictEqual(rec.ductbank_tag, 'DB1');
+      assert(rec.filter.includes('DB1'));
+    });
 
   it("warns for group mismatches with formatted record", () => {
     const system = new CableRoutingSystem({ fillLimit: 0.4 });
@@ -227,8 +253,8 @@ describe("_racewayRoute", () => {
     assert.strictEqual(records[0].tray_id, 'tray-group');
     assert.strictEqual(records[0].reason, 'group_mismatch');
     assert.strictEqual(records[0].cable_id, 'cable-2');
-    assert.deepStrictEqual(Object.keys(records[0]).sort(), ['cable_id','reason','tray_id']);
-  });
+      assert.deepStrictEqual(Object.keys(records[0]).sort(), ['cable_id','filter','reason','tray_id']);
+    });
 
   it("routes when proximity threshold is increased", () => {
     const tray = {
