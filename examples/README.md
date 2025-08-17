@@ -40,6 +40,8 @@ The `raceway_ids` column contains one or more conduit or tray tags separated by 
 
 Two files represent the different sheets:
 
+- `ductbank_schedule_ductbanks.csv` — `ductbank_id`, `tag`, `from`, `to`, `concrete_encasement`, `start_x`, `start_y`, `start_z`, `end_x`, `end_y`, `end_z`
+- `ductbank_schedule_conduits.csv` — `ductbank_id`, `ductbankTag`, `conduit_id`, `type`, `trade_size`, `start_x`, `start_y`, `start_z`, `end_x`, `end_y`, `end_z`
 - `ductbank_conduits.csv` — `conduit_id`, `conduit_type`, `trade_size`, `x`, `y`, `z`, `angle`
 - `ductbank_cables.csv` — `tag`, `cable_type`, `diameter`, `conductors`, `conductor_size`, `weight`, `start_conduit_id`, `end_conduit_id`
 

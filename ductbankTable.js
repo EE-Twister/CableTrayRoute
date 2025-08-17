@@ -414,8 +414,8 @@
   function exportDuctbankXlsx(){
     const dbData=[['ductbank_id','tag','from','to','concrete_encasement','start_x','start_y','start_z','end_x','end_y','end_z']];
     ductbanks.forEach(db=>dbData.push([db.id,db.tag,db.from,db.to,db.concrete_encasement?1:0,db.start_x,db.start_y,db.start_z,db.end_x,db.end_y,db.end_z]));
-    const cData=[['ductbank_id','conduit_id','type','trade_size','start_x','start_y','start_z','end_x','end_y','end_z','allowed_cable_group']];
-    ductbanks.forEach(db=>db.conduits.forEach(c=>cData.push([db.id,c.conduit_id,c.type,c.trade_size,c.start_x,c.start_y,c.start_z,c.end_x,c.end_y,c.end_z,c.allowed_cable_group])));
+    const cData=[['ductbank_id','ductbankTag','conduit_id','type','trade_size','start_x','start_y','start_z','end_x','end_y','end_z','allowed_cable_group']];
+    ductbanks.forEach(db=>db.conduits.forEach(c=>cData.push([db.id,db.tag||db.id,c.conduit_id,c.type,c.trade_size,c.start_x,c.start_y,c.start_z,c.end_x,c.end_y,c.end_z,c.allowed_cable_group])));
     const wb=XLSX.utils.book_new();
     XLSX.utils.book_append_sheet(wb,XLSX.utils.aoa_to_sheet(dbData),'Ductbanks');
     XLSX.utils.book_append_sheet(wb,XLSX.utils.aoa_to_sheet(cData),'Conduits');
