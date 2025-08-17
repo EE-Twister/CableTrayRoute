@@ -307,7 +307,7 @@ describe("_racewayRoute", () => {
       'async function loadSchedulesIntoSession(){' + fnBody + '}; loadSchedulesIntoSession;',
       sandbox,
     );
-    storage.setItem("db", JSON.stringify([{ ductbank_id: "DB1", start_x: 0, start_y: 0, start_z: 0, end_x: 1, end_y: 0, end_z: 0 }]));
+    storage.setItem("db", JSON.stringify([{ tag: "DB1", start_x: 0, start_y: 0, start_z: 0, end_x: 1, end_y: 0, end_z: 0 }]));
     loadSchedulesIntoSession();
     assert(warned, "missing conduit warning not emitted");
     assert.strictEqual(state.ductbanksWithoutConduits.length, 1);

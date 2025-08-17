@@ -47,7 +47,7 @@ describe('rebuildTrayData', () => {
       ductbankData: {
         ductbanks: [
           {
-            id: 'DB1',
+            tag: 'DB1',
             start_x: 0,
             start_y: 0,
             start_z: 0,
@@ -81,7 +81,7 @@ describe('rebuildTrayData', () => {
       ductbankData: {
         ductbanks: [
           {
-            id: 'DB1',
+            tag: 'DB1',
             start_x: 0,
             start_y: 0,
             start_z: 0,
@@ -115,7 +115,7 @@ describe('rebuildTrayData', () => {
       ductbankData: {
         ductbanks: [
           {
-            id: 'DB1',
+            tag: 'DB1',
             start_x: 0,
             start_y: 0,
             start_z: 0,
@@ -146,7 +146,7 @@ describe('rebuildTrayData', () => {
       ductbankData: {
         ductbanks: [
           {
-            id: 'DB1',
+            tag: 'DB1',
             start_x: 0,
             start_y: 0,
             start_z: 0,
@@ -178,7 +178,7 @@ describe('rebuildTrayData', () => {
       ductbankData: {
         ductbanks: [
           {
-            id: 'DB1',
+            tag: 'DB1',
             start_x: 0,
             start_y: 0,
             start_z: 0,
@@ -214,7 +214,7 @@ describe('rebuildTrayData', () => {
       ductbankData: {
         ductbanks: [
           {
-            id: 'DB1',
+            tag: 'DB1',
             conduits: [ { conduit_id: 'C1' } ],
           },
         ],
