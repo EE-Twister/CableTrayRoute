@@ -169,5 +169,64 @@ describe('rebuildTrayData', () => {
     assert(types.includes('ductbank'), 'ductbank outline missing');
     assert(types.includes('conduit'), 'conduit segment missing');
   });
+
+  it('reports conduit count after rebuild', () => {
+    const state = {
+      manualTrays: [],
+      trayData: [],
+      includeDuctbankOutlines: true,
+      ductbankData: {
+        ductbanks: [
+          {
+            id: 'DB1',
+            start_x: 0,
+            start_y: 0,
+            start_z: 0,
+            end_x: 10,
+            end_y: 0,
+            end_z: 0,
+            width: 12,
+            height: 12,
+            conduits: [ { conduit_id: 'C1', path: [[0,0,0],[10,0,0]] } ],
+          },
+          {
+            id: 'DB2',
+            conduits: [ { conduit_id: 'C2' } ],
+          },
+        ],
+      },
+      conduitData: [],
+    };
+    let captured = {};
+    global.displayConduitCount = (count, hasSchedule) => { captured = { count, hasSchedule }; };
+    rebuildTrayData(state, {});
+    delete global.displayConduitCount;
+    const expected = state.trayData.filter(t => t.raceway_type === 'ductbank').length;
+    assert.strictEqual(captured.count, expected);
+    assert.strictEqual(captured.hasSchedule, true);
+  });
+
+  it('warns when no conduits are added despite schedule', () => {
+    const state = {
+      manualTrays: [],
+      trayData: [],
+      includeDuctbankOutlines: true,
+      ductbankData: {
+        ductbanks: [
+          {
+            id: 'DB1',
+            conduits: [ { conduit_id: 'C1' } ],
+          },
+        ],
+      },
+      conduitData: [],
+    };
+    let captured = {};
+    global.displayConduitCount = (count, hasSchedule) => { captured = { count, hasSchedule }; };
+    rebuildTrayData(state, {});
+    delete global.displayConduitCount;
+    assert.strictEqual(captured.count, 0);
+    assert.strictEqual(captured.hasSchedule, true);
+  });
 });
 

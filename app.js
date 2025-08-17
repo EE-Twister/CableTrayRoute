@@ -205,6 +205,23 @@ document.addEventListener('DOMContentLoaded', async () => {
         }
     };
 
+    const displayConduitCount = (count, hasSchedule) => {
+        console.log(`Conduits added: ${count}`);
+        const el = typeof document !== 'undefined' && document.getElementById('conduit-count');
+        if (el) {
+            el.textContent = `Conduits added: ${count}`;
+            if (count === 0 && hasSchedule) {
+                el.textContent += ' (No valid conduits found; check geometry or IDs)';
+            }
+        }
+        if (count === 0 && hasSchedule) {
+            console.warn('No valid conduits were loaded. Check geometry fields or conduit IDs.');
+            if (typeof elements !== 'undefined' && elements.messages) {
+                elements.messages.innerHTML += '<div class="message warning">No valid conduits were loaded. Verify geometry fields or conduit identifiers.</div>';
+            }
+        }
+    };
+
     const loadDuctbankData = async () => {
         if (state.ductbankData && state.ductbankData.ductbanks && state.ductbankData.ductbanks.length) {
             update3DPlot();
@@ -656,6 +673,14 @@ document.addEventListener('DOMContentLoaded', async () => {
 
         if ((state.geometryWarnings.ductbanks.length || state.geometryWarnings.conduits.length) && typeof displayGeometryWarnings === 'function') {
             displayGeometryWarnings();
+        }
+        const conduitCount = state.trayData.filter(t => t.raceway_type === 'ductbank').length;
+        const hasSchedule = !!(
+            (state.ductbankData && state.ductbankData.ductbanks && state.ductbankData.ductbanks.some(db => (db.conduits || []).length)) ||
+            (state.conduitData && state.conduitData.length)
+        );
+        if (typeof displayConduitCount === 'function') {
+            displayConduitCount(conduitCount, hasSchedule);
         }
     };
 
