@@ -86,6 +86,10 @@ class CableRoutingSystem {
         return utilization;
     }
 
+    _formatMismatchedRecords() {
+        return this.mismatchedRecords.map(({ tray_id, reason, cable_id }) => ({ tray_id, reason, cable_id }));
+    }
+
     // Geometric helper: 3D distance
     distance(p1, p2) {
         return Math.sqrt(Math.pow(p1[0] - p2[0], 2) + Math.pow(p1[1] - p2[1], 2) + Math.pow(p1[2] - p2[2], 2));
@@ -360,7 +364,8 @@ class CableRoutingSystem {
 
         this.baseGraph = graph;
         if (this.mismatchedRecords.length) {
-            console.warn('Mismatched raceway segments:', this.mismatchedRecords);
+            const formatted = this._formatMismatchedRecords();
+            console.warn('Mismatched raceway segments:', formatted);
         }
     }
 
@@ -488,13 +493,13 @@ class CableRoutingSystem {
                 const record = { tray_id: id, reason: 'group_mismatch', cable_id: cableId };
                 exclusions.push(record);
                 this.mismatchedRecords.push(record);
-                return { success: false, manual: true, manual_raceway: true, message: `Tray ${id} not allowed`, exclusions, mismatched_records: this.mismatchedRecords.slice() };
+                return { success: false, manual: true, manual_raceway: true, message: `Tray ${id} not allowed`, exclusions, mismatched_records: this._formatMismatchedRecords() };
             }
             if (tray.current_fill + cableArea > tray.maxFill) {
                 const record = { tray_id: id, reason: 'over_capacity', cable_id: cableId };
                 exclusions.push(record);
                 this.mismatchedRecords.push(record);
-                return { success: false, manual: true, manual_raceway: true, message: `Tray ${id} over capacity`, exclusions, mismatched_records: this.mismatchedRecords.slice() };
+                return { success: false, manual: true, manual_raceway: true, message: `Tray ${id} over capacity`, exclusions, mismatched_records: this._formatMismatchedRecords() };
             }
             const a = [tray.start_x, tray.start_y, tray.start_z];
             const b = [tray.end_x, tray.end_y, tray.end_z];
@@ -520,7 +525,7 @@ class CableRoutingSystem {
             total_length: total,
             field_routed_length: fieldLen,
             exclusions,
-            mismatched_records: this.mismatchedRecords.slice(),
+            mismatched_records: this._formatMismatchedRecords(),
         };
     }
     calculateRoute(startPoint, endPoint, cableArea, allowedGroup, manualPath = '', racewayIds = [], cableId = null) {
@@ -573,7 +578,8 @@ class CableRoutingSystem {
         });
 
         if (this.mismatchedRecords.length) {
-            console.warn('Mismatched raceway segments:', this.mismatchedRecords);
+            const formatted = this._formatMismatchedRecords();
+            console.warn('Mismatched raceway segments:', formatted);
         }
 
         const addNode = (id, point, type = 'generic') => {
@@ -745,7 +751,7 @@ class CableRoutingSystem {
             manual: false,
             manual_raceway: false,
             exclusions,
-            mismatched_records: this.mismatchedRecords.slice(),
+            mismatched_records: this._formatMismatchedRecords(),
         };
     }
 }

@@ -139,6 +139,8 @@ document.addEventListener('DOMContentLoaded', async () => {
         messages: document.getElementById('messages'),
         metrics: document.getElementById('metrics'),
         routeBreakdownContainer: document.getElementById('route-breakdown-container'),
+        mismatchedRacewaysDetails: document.getElementById('mismatched-raceways-details'),
+        mismatchedRacewaysList: document.getElementById('mismatched-raceways-list'),
         plot3d: document.getElementById('plot-3d'),
         popoutPlotBtn: document.getElementById('popout-plot-btn'),
         resetViewBtn: document.getElementById('reset-view-btn'),
@@ -2041,6 +2043,24 @@ const openDuctbankRoute = (dbId, conduitId) => {
         });
         const overall = `<p class="overall-stats"><strong>Overall Total Length:</strong> ${totalLength.toFixed(2)} ft | <strong>Overall Field Length:</strong> ${totalField.toFixed(2)} ft</p>`;
         elements.routeBreakdownContainer.innerHTML = overall + html;
+        const mismatches = [];
+        results.forEach(r => {
+            if (r.mismatched_records && r.mismatched_records.length) {
+                mismatches.push(...r.mismatched_records);
+            }
+        });
+        if (mismatches.length) {
+            elements.mismatchedRacewaysList.innerHTML = mismatches.map(m => {
+                const id = m.tray_id || m.id || 'unknown';
+                const reason = m.reason.replace(/_/g, ' ');
+                const cable = m.cable_id ? ` (cable ${m.cable_id})` : '';
+                return `<li>${id}: ${reason}${cable}</li>`;
+            }).join('');
+            elements.mismatchedRacewaysDetails.style.display = '';
+        } else {
+            elements.mismatchedRacewaysList.innerHTML = '';
+            elements.mismatchedRacewaysDetails.style.display = 'none';
+        }
         if (results.some(r => (r.exclusions && r.exclusions.length > 0) || (r.mismatched_records && r.mismatched_records.length > 0))) {
             document.dispatchEvent(new CustomEvent('exclusions-found'));
         }
