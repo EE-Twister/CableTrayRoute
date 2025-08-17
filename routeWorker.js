@@ -60,8 +60,11 @@ class CableRoutingSystem {
 
     addTraySegment(tray) {
         const maxFill = tray.width * tray.height * this.fillLimit;
-        // Ensure ductbank_id persists for later lookups
-        this.trays.set(tray.tray_id, { ...tray, ductbank_id: tray.ductbank_id, maxFill });
+        // Preserve ductbank association for later lookups
+        this.trays.set(
+            tray.tray_id,
+            { ...tray, ductbank_id: tray.ductbank_id, ductbankTag: tray.ductbankTag, maxFill },
+        );
     }
 
     updateTrayFill(trayIds, cableArea) {
@@ -87,7 +90,13 @@ class CableRoutingSystem {
     }
 
     _formatMismatchedRecords() {
-        return this.mismatchedRecords.map(({ tray_id, reason, cable_id }) => ({ tray_id, reason, cable_id }));
+        return this.mismatchedRecords.map(r => {
+            const base = { tray_id: r.tray_id, reason: r.reason, cable_id: r.cable_id };
+            if (r.conduit_id) base.conduit_id = r.conduit_id;
+            if (r.ductbank_tag) base.ductbank_tag = r.ductbank_tag;
+            if (r.filter) base.filter = r.filter;
+            return base;
+        });
     }
 
     // Geometric helper: 3D distance
@@ -388,11 +397,25 @@ class CableRoutingSystem {
             for (const id of trayIds) {
                 const tray = this.trays.get(id);
                 if (!tray) return { success: false, manual: true, manual_raceway: false, message: `Tray ${id} not found`, error: { tray_id: id, reason: 'not_found' } };
+                const segment = tray.ductbankTag ? `Conduit ${tray.conduit_id} in ductbank ${tray.ductbankTag}` : `Tray ${id}`;
+                const filter = tray.ductbankTag ? `racewayschedule.html?db=${encodeURIComponent(tray.ductbankTag)}` : `racewayschedule.html?tray=${encodeURIComponent(id)}`;
                 if (tray.allowed_cable_group && allowedGroup && tray.allowed_cable_group !== allowedGroup) {
-                    return { success: false, manual: true, manual_raceway: false, message: `Tray ${id} not allowed`, error: { tray_id: id, reason: 'not_allowed' } };
+                    return {
+                        success: false,
+                        manual: true,
+                        manual_raceway: false,
+                        message: `${segment} not allowed`,
+                        error: { tray_id: id, reason: 'not_allowed', conduit_id: tray.conduit_id, ductbank_tag: tray.ductbankTag, filter },
+                    };
                 }
                 if (tray.current_fill + cableArea > tray.maxFill) {
-                    return { success: false, manual: true, manual_raceway: false, message: `Tray ${id} over capacity`, error: { tray_id: id, reason: 'over_capacity' } };
+                    return {
+                        success: false,
+                        manual: true,
+                        manual_raceway: false,
+                        message: `${segment} over capacity`,
+                        error: { tray_id: id, reason: 'over_capacity', conduit_id: tray.conduit_id, ductbank_tag: tray.ductbankTag, filter },
+                    };
                 }
                 const a = [tray.start_x, tray.start_y, tray.start_z];
                 const b = [tray.end_x, tray.end_y, tray.end_z];
@@ -489,17 +512,19 @@ class CableRoutingSystem {
         let prev = startPoint.slice();
         for (const id of resolvedIds) {
             const tray = this.trays.get(id);
+            const segment = tray.ductbankTag ? `conduit ${tray.conduit_id} in ductbank ${tray.ductbankTag}` : `tray ${id}`;
+            const filter = tray.ductbankTag ? `racewayschedule.html?db=${encodeURIComponent(tray.ductbankTag)}` : `racewayschedule.html?tray=${encodeURIComponent(id)}`;
             if (tray.allowed_cable_group && allowedGroup && tray.allowed_cable_group !== allowedGroup) {
-                const record = { tray_id: id, reason: 'group_mismatch', cable_id: cableId };
+                const record = { tray_id: id, reason: 'group_mismatch', cable_id: cableId, conduit_id: tray.conduit_id, ductbank_tag: tray.ductbankTag, filter };
                 exclusions.push(record);
                 this.mismatchedRecords.push(record);
-                return { success: false, manual: true, manual_raceway: true, message: `Tray ${id} not allowed`, exclusions, mismatched_records: this._formatMismatchedRecords() };
+                return { success: false, manual: true, manual_raceway: true, message: `${segment} not allowed`, exclusions, mismatched_records: this._formatMismatchedRecords() };
             }
             if (tray.current_fill + cableArea > tray.maxFill) {
-                const record = { tray_id: id, reason: 'over_capacity', cable_id: cableId };
+                const record = { tray_id: id, reason: 'over_capacity', cable_id: cableId, conduit_id: tray.conduit_id, ductbank_tag: tray.ductbankTag, filter };
                 exclusions.push(record);
                 this.mismatchedRecords.push(record);
-                return { success: false, manual: true, manual_raceway: true, message: `Tray ${id} over capacity`, exclusions, mismatched_records: this._formatMismatchedRecords() };
+                return { success: false, manual: true, manual_raceway: true, message: `${segment} over capacity`, exclusions, mismatched_records: this._formatMismatchedRecords() };
             }
             const a = [tray.start_x, tray.start_y, tray.start_z];
             const b = [tray.end_x, tray.end_y, tray.end_z];
@@ -556,14 +581,16 @@ class CableRoutingSystem {
         };
         const graph = cloneGraph(this.baseGraph);
 
-        // Remove trays without remaining capacity
+        // Remove trays without remaining capacity or group mismatch
         this.trays.forEach(tray => {
+            const segment = tray.ductbankTag ? `conduit ${tray.conduit_id} in ductbank ${tray.ductbankTag}` : `tray ${tray.tray_id}`;
+            const filter = tray.ductbankTag ? `racewayschedule.html?db=${encodeURIComponent(tray.ductbankTag)}` : `racewayschedule.html?tray=${encodeURIComponent(tray.tray_id)}`;
             if (tray.current_fill + cableArea > tray.maxFill) {
-                const record = { tray_id: tray.tray_id, reason: 'over_capacity', cable_id: cableId };
+                const record = { tray_id: tray.tray_id, reason: 'over_capacity', cable_id: cableId, conduit_id: tray.conduit_id, ductbank_tag: tray.ductbankTag, filter };
                 exclusions.push(record);
                 this.mismatchedRecords.push(record);
             } else if (tray.allowed_cable_group && tray.allowed_cable_group !== allowedGroup) {
-                const record = { tray_id: tray.tray_id, reason: 'group_mismatch', cable_id: cableId };
+                const record = { tray_id: tray.tray_id, reason: 'group_mismatch', cable_id: cableId, conduit_id: tray.conduit_id, ductbank_tag: tray.ductbankTag, filter };
                 exclusions.push(record);
                 this.mismatchedRecords.push(record);
             } else {
@@ -715,27 +742,27 @@ class CableRoutingSystem {
             if (type === 'tray') traySegments.add(tray_id);
 
             const conduit_id = this.trays.get(tray_id)?.conduit_id;
-            const ductbank_id = this.trays.get(tray_id)?.ductbank_id;
+            const ductbankTag = this.trays.get(tray_id)?.ductbankTag;
 
             if (edge.type === 'field') {
                 let curr = p1.slice();
                 if (p2[0] !== curr[0]) {
                     const next = [p2[0], curr[1], curr[2]];
-                    routeSegments.push({ type, start: curr, end: next, length: Math.abs(p2[0]-curr[0]), tray_id, conduit_id, ductbank_id });
+                    routeSegments.push({ type, start: curr, end: next, length: Math.abs(p2[0]-curr[0]), tray_id, conduit_id, ductbankTag });
                     curr = next;
                 }
                 if (p2[1] !== curr[1]) {
                     const next = [curr[0], p2[1], curr[2]];
-                    routeSegments.push({ type, start: curr, end: next, length: Math.abs(p2[1]-curr[1]), tray_id, conduit_id, ductbank_id });
+                    routeSegments.push({ type, start: curr, end: next, length: Math.abs(p2[1]-curr[1]), tray_id, conduit_id, ductbankTag });
                     curr = next;
                 }
                 if (p2[2] !== curr[2]) {
                     const next = [curr[0], curr[1], p2[2]];
-                    routeSegments.push({ type, start: curr, end: next, length: Math.abs(p2[2]-curr[2]), tray_id, conduit_id, ductbank_id });
+                    routeSegments.push({ type, start: curr, end: next, length: Math.abs(p2[2]-curr[2]), tray_id, conduit_id, ductbankTag });
                     curr = next;
                 }
             } else {
-                routeSegments.push({ type, start: p1, end: p2, length, tray_id, conduit_id, ductbank_id });
+                routeSegments.push({ type, start: p1, end: p2, length, tray_id, conduit_id, ductbankTag });
             }
         }
 

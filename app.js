@@ -2144,7 +2144,8 @@ const openDuctbankRoute = (dbId, conduitId) => {
                 res.exclusions.forEach(ex => {
                     const id = ex.tray_id || ex.id || 'unknown';
                     const reason = ex.reason.replace(/_/g, ' ');
-                    html += `<li>${id}: ${reason}</li>`;
+                    const link = ex.filter ? ` <a href="${ex.filter}">Filter</a>` : '';
+                    html += `<li>${id}: ${reason}${link}</li>`;
                 });
                 html += '</ul>';
             }
@@ -2154,7 +2155,8 @@ const openDuctbankRoute = (dbId, conduitId) => {
                     const id = m.tray_id || m.id || 'unknown';
                     const reason = m.reason.replace(/_/g, ' ');
                     const cable = m.cable_id ? ` (cable ${m.cable_id})` : '';
-                    html += `<li>${id}: ${reason}${cable}</li>`;
+                    const link = m.filter ? ` <a href="${m.filter}">Filter</a>` : '';
+                    html += `<li>${id}: ${reason}${cable}${link}</li>`;
                 });
                 html += '</ul>';
             }
@@ -2192,7 +2194,8 @@ const openDuctbankRoute = (dbId, conduitId) => {
                 const id = m.tray_id || m.id || 'unknown';
                 const reason = m.reason.replace(/_/g, ' ');
                 const cable = m.cable_id ? ` (cable ${m.cable_id})` : '';
-                return `<li>${id}: ${reason}${cable}</li>`;
+                const link = m.filter ? ` <a href="${m.filter}">Filter</a>` : '';
+                return `<li>${id}: ${reason}${cable}${link}</li>`;
             }).join('');
             elements.mismatchedRacewaysDetails.style.display = '';
         } else {
