@@ -447,17 +447,22 @@
         return;
       }
 
-      const requiredCHeaders=['ductbank_id','conduit_id','type','trade_size','start_x','start_y','start_z','end_x','end_y','end_z'];
+      const requiredCHeaders=['ductbanktag','conduit_id','type','trade_size','start_x','start_y','start_z','end_x','end_y','end_z'];
       const cHeaders=(XLSX.utils.sheet_to_json(cSheet,{header:1})[0]||[]).map(h=>String(h).toLowerCase());
       const missingC=requiredCHeaders.filter(h=>!cHeaders.includes(h));
+      const hasLegacyId=cHeaders.includes('ductbank_id');
       if(missingC.length){
-        alert('Missing required Conduits headers: '+missingC.join(', '));
-        return;
+        if(!(missingC.length===1&&missingC[0]==='ductbanktag'&&hasLegacyId)){
+          alert('Missing required Conduits headers: '+missingC.join(', '));
+          return;
+        }
       }
 
       const dbJson=XLSX.utils.sheet_to_json(dbSheet,{defval:''});
       const cJson=XLSX.utils.sheet_to_json(cSheet,{defval:''});
-      const map={};
+      const normalizeTag=s=>String(s||'').trim().toLowerCase();
+      const mapByTag={};
+      const mapById={};
       ductbanks=dbJson.map(r=>{
         const db={
           id:r['ductbank_id']||r['id']||Date.now()+Math.random(),
@@ -474,18 +479,19 @@
           conduits:[],
           expanded:false
         };
-        map[db.id]=db;
+        mapByTag[normalizeTag(db.tag)]=db;
+        mapById[String(db.id)]=db;
         return db;
       });
       cJson.forEach(r=>{
-        const p=map[r['ductbank_id']];
+        const p=mapByTag[normalizeTag(r['ductbankTag'])]||mapById[String(r['ductbank_id'])];
         if(p){
           p.conduits.push({
             conduit_id:r['conduit_id']||'',
             type:r['type']||'',
             trade_size:r['trade_size']||'',
             allowed_cable_group:r['allowed_cable_group']||'',
-            ductbankTag:p.tag,
+            ductbankTag:r['ductbankTag']||p.tag,
             start_x:r['start_x']||p.start_x,
             start_y:r['start_y']||p.start_y,
             start_z:r['start_z']||p.start_z,
