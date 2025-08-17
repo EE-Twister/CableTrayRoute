@@ -164,7 +164,7 @@ document.addEventListener('DOMContentLoaded',()=>{
     deleteAllBtnId:'delete-conduit-btn',
     columns:conduitColumns,
     onChange:markUnsaved,
-    onSave:markSaved,
+    onSave:()=>{markSaved();persistAllConduits();},
     rowCountId:'conduit-row-count',
     onView:(row)=>{
       try{
@@ -174,6 +174,11 @@ document.addEventListener('DOMContentLoaded',()=>{
       window.location.href='conduitfill.html';
     }
   });
+
+  if(typeof window.saveDuctbanks==='function'){
+    const origSave=window.saveDuctbanks;
+    window.saveDuctbanks=()=>{origSave();persistAllConduits();};
+  }
 
   const loadSampleBtn=document.getElementById('load-sample-raceway-btn');
   if(loadSampleBtn){
@@ -187,17 +192,52 @@ document.addEventListener('DOMContentLoaded',()=>{
         document.getElementById('load-ductbank-btn').click();
         document.getElementById('load-tray-btn').click();
         document.getElementById('load-conduit-btn').click();
+        persistAllConduits();
         markSaved();
       }catch(e){console.error('Failed to load sample raceway data',e);}
     });
+  }
+
+  function serializeDuctbankSchedule(){
+    const nested=getDuctbanks();
+    const ductbanks=nested.map(({conduits,...db})=>db);
+    const conduits=[];
+    nested.forEach(db=>{
+      (db.conduits||[]).forEach(c=>{
+        conduits.push({
+          ductbankTag:db.tag,
+          conduit_id:c.conduit_id,
+          tray_id:`${db.tag}-${c.conduit_id}`,
+          type:c.type,
+          trade_size:c.trade_size,
+          start_x:c.start_x,
+          start_y:c.start_y,
+          start_z:c.start_z,
+          end_x:c.end_x,
+          end_y:c.end_y,
+          end_z:c.end_z,
+          allowed_cable_group:c.allowed_cable_group
+        });
+      });
+    });
+    return {ductbanks,conduits};
+  }
+
+  function persistAllConduits(){
+    const {ductbanks,conduits:dbConduits}=serializeDuctbankSchedule();
+    const standalone=conduitTable.getData();
+    persistConduits({ductbanks,conduits:[...dbConduits,...standalone]});
   }
 
   function getRacewaySchedule(){
     saveDuctbanks();
     trayTable.save();
     conduitTable.save();
-    return {ductbanks:getDuctbanks(),trays:trayTable.getData(),conduits:conduitTable.getData()};
+    const {ductbanks,conduits:dbConduits}=serializeDuctbankSchedule();
+    const conduits=[...dbConduits,...conduitTable.getData()];
+    return {ductbanks,trays:trayTable.getData(),conduits};
   }
   window.getRacewaySchedule=getRacewaySchedule;
+  persistAllConduits();
 });
 

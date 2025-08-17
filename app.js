@@ -374,8 +374,6 @@ document.addEventListener('DOMContentLoaded', async () => {
 
         const trayKey = globalThis.TableUtils?.STORAGE_KEYS?.traySchedule || 'traySchedule';
         const cableKey = globalThis.TableUtils?.STORAGE_KEYS?.cableSchedule || 'cableSchedule';
-        const dbKey = globalThis.TableUtils?.STORAGE_KEYS?.ductbankSchedule || 'ductbankSchedule';
-        const condKey = globalThis.TableUtils?.STORAGE_KEYS?.conduitSchedule || 'conduitSchedule';
 
         const trayJson = localStorage.getItem(trayKey);
         if (trayJson) {
@@ -385,36 +383,48 @@ document.addEventListener('DOMContentLoaded', async () => {
         if (cableJson) {
             try { cables = JSON.parse(cableJson); } catch (e) {}
         }
-        const dbJson = localStorage.getItem(dbKey);
-        if (dbJson) {
-            try { ductbanks = JSON.parse(dbJson); } catch (e) {}
+        let loaded;
+        if(typeof loadConduits==='function'){
+            loaded=loadConduits();
+        }else{
+            const dbKey=globalThis.TableUtils?.STORAGE_KEYS?.ductbankSchedule||'ductbankSchedule';
+            const condKey=globalThis.TableUtils?.STORAGE_KEYS?.conduitSchedule||'conduitSchedule';
+            let rawDb=[];let rawCond=[];
+            const dbJson=localStorage.getItem(dbKey);
+            if(dbJson){try{rawDb=JSON.parse(dbJson);}catch(e){}}
+            const condJson=localStorage.getItem(condKey);
+            if(condJson){try{rawCond=JSON.parse(condJson);}catch(e){}}
+            const flat=[];
+            rawDb=rawDb.map(db=>{
+                (db.conduits||[]).forEach(c=>{
+                    flat.push({
+                        ductbankTag:db.tag,
+                        conduit_id:c.conduit_id,
+                        tray_id:`${db.tag}-${c.conduit_id}`,
+                        type:c.type,
+                        trade_size:c.trade_size,
+                        start_x:c.start_x,start_y:c.start_y,start_z:c.start_z,
+                        end_x:c.end_x,end_y:c.end_y,end_z:c.end_z,
+                        allowed_cable_group:c.allowed_cable_group
+                    });
+                });
+                const {conduits:_,...rest}=db;
+                return rest;
+            });
+            loaded={ductbanks:rawDb,conduits:[...flat,...rawCond]};
         }
-        const condJson = localStorage.getItem(condKey);
-        if (condJson) {
-            try { conduits = JSON.parse(condJson); } catch (e) {}
-        }
+        ductbanks=loaded.ductbanks||[];
+        conduits=loaded.conduits||[];
         const normalize = s => String(s || '').trim().toUpperCase();
         const conduitsByDb = {};
         const standaloneConduits = [];
-        conduits = conduits.map(c => {
-            if (!c.ductbankTag && c.tag) {
-                const parts = String(c.tag).split('-');
-                if (parts.length > 1) {
-                    const condId = parts.pop();
-                    c.ductbankTag = parts.join('-');
-                    if (!c.conduit_id) c.conduit_id = condId;
-                }
-            }
-            if (c.ductbankTag && c.conduit_id && !c.tray_id) {
-                c.tray_id = `${c.ductbankTag}-${c.conduit_id}`;
-            }
+        conduits.forEach(c => {
             const key = normalize(c.ductbankTag);
             if (key) {
                 (conduitsByDb[key] ||= []).push(c);
             } else {
                 standaloneConduits.push(c);
             }
-            return c;
         });
         state.conduitsByDb = conduitsByDb;
         if (trays.length > 0) {

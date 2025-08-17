@@ -163,6 +163,45 @@ function initTableNav(){
   });
 }
 
+const CTR_CONDUITS = 'CTR_CONDUITS';
+
+function persistConduits(data){
+  try{localStorage.setItem(CTR_CONDUITS,JSON.stringify(data));}catch(e){console.error('Failed to persist conduits',e);}
+}
+
+function loadConduits(){
+  try{
+    const raw=localStorage.getItem(CTR_CONDUITS);
+    if(raw){
+      const parsed=JSON.parse(raw);
+      return {ductbanks:parsed.ductbanks||[],conduits:parsed.conduits||[]};
+    }
+  }catch(e){}
+  const dbKey=globalThis.TableUtils?.STORAGE_KEYS?.ductbankSchedule||'ductbankSchedule';
+  const condKey=globalThis.TableUtils?.STORAGE_KEYS?.conduitSchedule||'conduitSchedule';
+  let ductbanks=[];let conduits=[];
+  try{ductbanks=JSON.parse(localStorage.getItem(dbKey)||'[]');}catch(e){}
+  try{conduits=JSON.parse(localStorage.getItem(condKey)||'[]');}catch(e){}
+  const flattened=[];
+  ductbanks=ductbanks.map(db=>{
+    (db.conduits||[]).forEach(c=>{
+      flattened.push({
+        ductbankTag:db.tag,
+        conduit_id:c.conduit_id,
+        tray_id:`${db.tag}-${c.conduit_id}`,
+        type:c.type,
+        trade_size:c.trade_size,
+        start_x:c.start_x,start_y:c.start_y,start_z:c.start_z,
+        end_x:c.end_x,end_y:c.end_y,end_z:c.end_z,
+        allowed_cable_group:c.allowed_cable_group
+      });
+    });
+    const {conduits:_,...rest}=db;
+    return rest;
+  });
+  return {ductbanks,conduits:[...flattened,...conduits]};
+}
+
 document.addEventListener('DOMContentLoaded',initTableNav);
 
 window.initSettings=initSettings;
@@ -170,3 +209,5 @@ window.initDarkMode=initDarkMode;
 window.initHelpModal=initHelpModal;
 window.initNavToggle=initNavToggle;
 window.checkPrereqs=checkPrereqs;
+window.persistConduits=persistConduits;
+window.loadConduits=loadConduits;
