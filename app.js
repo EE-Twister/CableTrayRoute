@@ -108,6 +108,7 @@ document.addEventListener('DOMContentLoaded', async () => {
         ductbankData: null,
         ductbankTraceIndices: [],
         ductbankVisible: true,
+        is2D: false,
         conduitData: [],
         ductbanksWithoutConduits: [],
         includeDuctbankOutlines: false,
@@ -146,6 +147,8 @@ document.addEventListener('DOMContentLoaded', async () => {
         plot3d: document.getElementById('plot-3d'),
         popoutPlotBtn: document.getElementById('popout-plot-btn'),
         resetViewBtn: document.getElementById('reset-view-btn'),
+        viewToggleBtn: document.getElementById('view-toggle-btn'),
+        exportPngBtn: document.getElementById('export-png-btn'),
         ductbankToggle: document.getElementById('ductbank-toggle'),
         updatedUtilizationContainer: document.getElementById('updated-utilization-container'),
         exportCsvBtn: document.getElementById('export-csv-btn'),
@@ -2130,12 +2133,12 @@ const openDuctbankRoute = (dbId, conduitId) => {
         let totalLength = 0;
         let totalField = 0;
         let html = '';
-        results.forEach(res => {
+        results.forEach((res, idx) => {
             const tl = parseFloat(res.total_length);
             const fl = parseFloat(res.field_length);
             if (!isNaN(tl)) totalLength += tl;
             if (!isNaN(fl)) totalField += fl;
-            html += `<details><summary>${res.cable} | ${res.status} | ${res.mode} | Total ${res.total_length} | Field ${res.field_length} | Segments ${res.segments_count}</summary>`;
+            html += `<details><summary>${res.cable} | ${res.status} | ${res.mode} | Total ${res.total_length} | Field ${res.field_length} | Segments ${res.segments_count} <button class="view-map-btn" data-index="${idx}">View on Map</button></summary>`;
             if (res.exclusions && res.exclusions.length > 0) {
                 html += '<p class="exclusions-title"><strong>Excluded Conduits:</strong></p><ul class="exclusions-list">';
                 res.exclusions.forEach(ex => {
@@ -2226,6 +2229,13 @@ const openDuctbankRoute = (dbId, conduitId) => {
                 if (dbId) {
                     openDuctbankRoute(dbId, conduitId);
                 }
+            });
+        });
+        elements.routeBreakdownContainer.querySelectorAll('.view-map-btn').forEach(btn => {
+            btn.addEventListener('click', (e) => {
+                e.stopPropagation();
+                const idx = parseInt(btn.dataset.index, 10);
+                highlightCableRoute(idx);
             });
         });
     };
@@ -3398,6 +3408,7 @@ const openDuctbankRoute = (dbId, conduitId) => {
             }));
         }
         visualize(trays, routes, '3D View');
+        applyViewMode();
     };
 
     const highlightSharedRoute = (idx) => {
@@ -3470,6 +3481,69 @@ const openDuctbankRoute = (dbId, conduitId) => {
         Plotly.react(elements.plot3d, traces, layout);
         window.current3DPlot = { traces, layout };
         updateDuctbankVisibility(state.ductbankVisible);
+        applyViewMode();
+    };
+
+    const highlightCableRoute = (idx) => {
+        if (!state.latestRouteData[idx]) return;
+        reset3DView();
+        const route = state.latestRouteData[idx];
+        const traces = [];
+        (route.route_segments || []).forEach(seg => {
+            const color = seg.ductbankTag ? 'saddlebrown' : 'blue';
+            traces.push({
+                x: [seg.start[0], seg.end[0]],
+                y: [seg.start[1], seg.end[1]],
+                z: [seg.start[2], seg.end[2]],
+                mode: 'lines', type: 'scatter3d',
+                line: { color, width: 10 },
+                showlegend: false
+            });
+            if (seg.ductbankTag && seg.conduit_id) {
+                const mx = (seg.start[0] + seg.end[0]) / 2;
+                const my = (seg.start[1] + seg.end[1]) / 2;
+                const mz = (seg.start[2] + seg.end[2]) / 2;
+                traces.push({
+                    x: [mx], y: [my], z: [mz],
+                    mode: 'text', type: 'scatter3d',
+                    text: [`${seg.ductbankTag}-${seg.conduit_id}`],
+                    showlegend: false, hoverinfo: 'none'
+                });
+            }
+        });
+        Plotly.addTraces(elements.plot3d, traces);
+        window.current3DPlot.traces.push(...traces);
+    };
+
+    const applyViewMode = () => {
+        if (!window.current3DPlot) return;
+        const layout = window.current3DPlot.layout;
+        if (state.is2D) {
+            layout.scene.camera = { up: { x: 0, y: 0, z: 1 }, eye: { x: 0, y: 0, z: 2 } };
+            layout.scene.projection = { type: 'orthographic' };
+            if (elements.viewToggleBtn) elements.viewToggleBtn.textContent = '3D View';
+        } else {
+            layout.scene.camera = { up: { x: 0, y: 0, z: 1 }, eye: { x: 1.25, y: 1.25, z: 1.25 } };
+            layout.scene.projection = { type: 'perspective' };
+            if (elements.viewToggleBtn) elements.viewToggleBtn.textContent = '2D View';
+        }
+        Plotly.relayout(elements.plot3d, layout);
+        window.current3DPlot.layout = layout;
+        window.base3DPlot.layout = JSON.parse(JSON.stringify(layout));
+    };
+
+    const toggle2D3D = () => {
+        state.is2D = !state.is2D;
+        applyViewMode();
+    };
+
+    const exportCurrentPlotPNG = () => {
+        Plotly.toImage(elements.plot3d, { format: 'png' }).then(url => {
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = 'route.png';
+            a.click();
+        });
     };
 
     const popOutPlot = () => {
@@ -3529,6 +3603,12 @@ Plotly.newPlot(document.getElementById('plot'), data, layout, {responsive: true}
     }
     if (elements.ductbankToggle) {
         elements.ductbankToggle.addEventListener('change', e => updateDuctbankVisibility(e.target.checked));
+    }
+    if (elements.viewToggleBtn) {
+        elements.viewToggleBtn.addEventListener('click', toggle2D3D);
+    }
+    if (elements.exportPngBtn) {
+        elements.exportPngBtn.addEventListener('click', exportCurrentPlotPNG);
     }
     elements.cancelRoutingBtn.addEventListener('click', cancelCurrentRouting);
     if (elements.deleteDataBtn) {
