@@ -211,4 +211,58 @@ describe("_racewayRoute", () => {
     assert(result.success, "route should succeed with higher threshold");
     assert.strictEqual(result.exclusions.length, 0);
   });
+
+  it("warns when ductbank has no conduits", () => {
+    const appCode = fs.readFileSync(path.join(__dirname, "..", "app.js"), "utf8");
+    const startMarker = "const loadSchedulesIntoSession = async () => {";
+    const startIdx = appCode.indexOf(startMarker) + startMarker.length;
+    let idx = startIdx;
+    let depth = 1;
+    while (idx < appCode.length && depth > 0) {
+      const ch = appCode[idx++];
+      if (ch === "{") depth++;
+      else if (ch === "}") depth--;
+    }
+    const fnBody = appCode.slice(startIdx, idx - 1);
+    const state = {
+      manualTrays: [],
+      cableList: [],
+      trayData: [],
+      ductbankData: null,
+      conduitData: [],
+      ductbanksWithoutConduits: [],
+    };
+    const storage = {
+      _data: {},
+      getItem(k) {
+        return this._data[k] || null;
+      },
+      setItem(k, v) {
+        this._data[k] = String(v);
+      },
+      removeItem(k) {
+        delete this._data[k];
+      },
+    };
+    let warned = false;
+    const sandbox = {
+      state,
+      localStorage: storage,
+      rebuildTrayData: () => {},
+      globalThis: { TableUtils: { STORAGE_KEYS: { ductbankSchedule: "db", conduitSchedule: "cond" } } },
+      document: undefined,
+      console: { warn: () => { warned = true; } },
+      ensureConductorProps: async () => ({}),
+      setRacewayIds: () => {},
+    };
+    const loadSchedulesIntoSession = vm.runInNewContext(
+      'async function loadSchedulesIntoSession(){' + fnBody + '}; loadSchedulesIntoSession;',
+      sandbox,
+    );
+    storage.setItem("db", JSON.stringify([{ ductbank_id: "DB1", start_x: 0, start_y: 0, start_z: 0, end_x: 1, end_y: 0, end_z: 0 }]));
+    loadSchedulesIntoSession();
+    assert(warned, "missing conduit warning not emitted");
+    assert.strictEqual(state.ductbanksWithoutConduits.length, 1);
+    assert.strictEqual(state.ductbanksWithoutConduits[0], "DB1");
+  });
 });
