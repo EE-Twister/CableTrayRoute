@@ -5,10 +5,9 @@ checkPrereqs([{key:'traySchedule',page:'racewayschedule.html',label:'Raceway Sch
       initDarkMode();
       initHelpModal('help-btn','helpOverlay','helpClose');
       initNavToggle();
-      let saved = true;
-      const markSaved = () => { saved = true; };
-      const markUnsaved = () => { saved = false; };
-      window.addEventListener('beforeunload', e => { if (!saved) { e.preventDefault(); e.returnValue=''; } });
+      const dirty = createDirtyTracker();
+      const markSaved = () => { dirty.markClean(); };
+      const markUnsaved = () => { dirty.markDirty(); };
       // ─────────────────────────────────────────────────────────────
       // (A) Default Configurations (3 conductors + ground) :contentReference[oaicite:0]{index=0}
       // ─────────────────────────────────────────────────────────────

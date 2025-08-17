@@ -2306,10 +2306,9 @@ document.querySelector('#conduitTable').addEventListener('input',saveDuctbankSes
 document.querySelector('#cableTable').addEventListener('input',saveDuctbankSession);
 document.querySelector('#heatSourceTable').addEventListener('input',saveDuctbankSession);
 window.addEventListener('beforeunload',saveDuctbankSession);
-let saved=true;
-const markSaved=()=>{saved=true;};
-const markUnsaved=()=>{saved=false;};
-window.addEventListener('beforeunload',e=>{if(!saved){e.preventDefault();e.returnValue='';}});
+const dirty = createDirtyTracker();
+const markSaved = () => dirty.markClean();
+const markUnsaved = () => dirty.markDirty();
 ['ductbankTag','concreteEncasement','ductbankDepth','earthTemp','airTemp','soilResistivity','moistureContent','heatSources','hSpacing','vSpacing','topPad','bottomPad','leftPad','rightPad','perRow','conductorRating','gridRes','ductThermRes'].forEach(id=>{const el=document.getElementById(id);if(el){el.addEventListener('input',markUnsaved);el.addEventListener('change',markUnsaved);}});
 document.getElementById('conduitTable').addEventListener('input',markUnsaved);
 document.getElementById('cableTable').addEventListener('input',markUnsaved);
