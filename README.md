@@ -46,6 +46,10 @@ Supplying specific **Raceway IDs** on a cable forces the router to follow those 
 
 When routing, any raceway that cannot be used—because it is over capacity, belongs to a different cable group, or sits beyond the start/end proximity threshold—is recorded with a reason. The Route Breakdown now lists these exclusions so you can see why particular conduits were skipped.
 
+## New Feature: Conduit Import Count
+
+After raceway data is loaded, the app logs and displays how many ductbank conduits were successfully added. If a conduit schedule is supplied but no conduits load, a warning suggests possible geometry problems or mismatched identifiers.
+
 ## New Feature: Manual Batch Cable Entry
 
 When batch mode is selected, you can now use the **Add Cable to List** button to
