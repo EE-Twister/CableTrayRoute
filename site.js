@@ -1,4 +1,107 @@
 const FOCUSABLE="a[href],button:not([disabled]),textarea:not([disabled]),input:not([disabled]),select:not([disabled]),[tabindex]:not([tabindex='-1'])";
+const PROJECT_KEY='CTR_PROJECT_V1';
+
+function defaultProject(){
+  return {ductbanks:[],conduits:[],trays:[],cables:[],settings:{}};
+}
+
+function migrateProject(old={}){
+  return {
+    ductbanks: old.ductbanks || old.ductbankSchedule || [],
+    conduits: old.conduits || old.conduitSchedule || [],
+    trays: old.trays || old.traySchedule || [],
+    cables: old.cables || old.cableSchedule || [],
+    settings: old.settings || {
+      session: old.session || old.ctrSession || {},
+      collapsedGroups: old.collapsedGroups || {}
+    }
+  };
+}
+
+function initProjectStorage(){
+  if(typeof localStorage==='undefined')return;
+  const realGet=localStorage.getItem.bind(localStorage);
+  const realSet=localStorage.setItem.bind(localStorage);
+  const realRemove=localStorage.removeItem.bind(localStorage);
+
+  let project;
+  try{ project=JSON.parse(realGet(PROJECT_KEY)); }catch{ project=null; }
+  if(!project||typeof project!=='object'){
+    const old={
+      cables: JSON.parse(realGet('cableSchedule')||'[]'),
+      trays: JSON.parse(realGet('traySchedule')||'[]'),
+      conduits: JSON.parse(realGet('conduitSchedule')||'[]'),
+      ductbanks: JSON.parse(realGet('ductbankSchedule')||'[]'),
+      settings:{
+        session: JSON.parse(realGet('ctrSession')||'{}'),
+        collapsedGroups: JSON.parse(realGet('collapsedGroups')||'{}'),
+        conduitFillData: JSON.parse(realGet('conduitFillData')||'null'),
+        trayFillData: JSON.parse(realGet('trayFillData')||'null'),
+        ductbankSession: JSON.parse(realGet('ductbankSession')||'{}')
+      }
+    };
+    project=migrateProject(old);
+    realSet(PROJECT_KEY,JSON.stringify(project));
+  }
+
+  function save(){ realSet(PROJECT_KEY,JSON.stringify(project)); }
+
+  function setItem(key,value){
+    if(key===PROJECT_KEY){ realSet(key,value); return; }
+    switch(key){
+      case 'cableSchedule': project.cables=JSON.parse(value); break;
+      case 'traySchedule': project.trays=JSON.parse(value); break;
+      case 'conduitSchedule': project.conduits=JSON.parse(value); break;
+      case 'ductbankSchedule': project.ductbanks=JSON.parse(value); break;
+      case 'collapsedGroups': project.settings.collapsedGroups=JSON.parse(value); break;
+      case 'ctrSession': project.settings.session=JSON.parse(value); break;
+      default:
+        if(!project.settings) project.settings={};
+        try{ project.settings[key]=JSON.parse(value); }
+        catch{ project.settings[key]=value; }
+    }
+    save();
+  }
+
+  function getItem(key){
+    if(key===PROJECT_KEY) return realGet(key);
+    switch(key){
+      case 'cableSchedule': return JSON.stringify(project.cables||[]);
+      case 'traySchedule': return JSON.stringify(project.trays||[]);
+      case 'conduitSchedule': return JSON.stringify(project.conduits||[]);
+      case 'ductbankSchedule': return JSON.stringify(project.ductbanks||[]);
+      case 'collapsedGroups': return JSON.stringify(project.settings?.collapsedGroups||{});
+      case 'ctrSession': return JSON.stringify(project.settings?.session||{});
+      default:
+        return project.settings&&key in project.settings ? JSON.stringify(project.settings[key]) : null;
+    }
+  }
+
+  function removeItem(key){
+    if(key===PROJECT_KEY){ realRemove(key); return; }
+    switch(key){
+      case 'cableSchedule': project.cables=[]; break;
+      case 'traySchedule': project.trays=[]; break;
+      case 'conduitSchedule': project.conduits=[]; break;
+      case 'ductbankSchedule': project.ductbanks=[]; break;
+      case 'collapsedGroups': delete project.settings.collapsedGroups; break;
+      case 'ctrSession': delete project.settings.session; break;
+      default:
+        if(project.settings) delete project.settings[key];
+    }
+    save();
+  }
+
+  localStorage.getItem=getItem;
+  localStorage.setItem=setItem;
+  localStorage.removeItem=removeItem;
+
+  globalThis.getProject=()=>JSON.parse(JSON.stringify(project));
+  globalThis.setProject=p=>{ project=migrateProject(p); save(); };
+}
+
+globalThis.migrateProject=migrateProject;
+initProjectStorage();
 
 function trapFocus(e,container){
   if(e.key!=='Tab')return;
@@ -202,12 +305,50 @@ function loadConduits(){
   return {ductbanks,conduits:[...flattened,...conduits]};
 }
 
-document.addEventListener('DOMContentLoaded',initTableNav);
+ globalThis.document?.addEventListener('DOMContentLoaded',initTableNav);
 
-window.initSettings=initSettings;
-window.initDarkMode=initDarkMode;
-window.initHelpModal=initHelpModal;
-window.initNavToggle=initNavToggle;
-window.checkPrereqs=checkPrereqs;
-window.persistConduits=persistConduits;
-window.loadConduits=loadConduits;
+function initProjectIO(){
+  const exportBtn=document.getElementById('export-project-btn');
+  const importBtn=document.getElementById('import-project-btn');
+  const fileInput=document.getElementById('import-project-input');
+  if(exportBtn){
+    exportBtn.addEventListener('click',()=>{
+      try{
+        const data=globalThis.getProject?globalThis.getProject():defaultProject();
+        const blob=new Blob([JSON.stringify(data,null,2)],{type:'application/json'});
+        const a=document.createElement('a');
+        a.href=URL.createObjectURL(blob);
+        a.download='project.ctr.json';
+        a.click();
+        setTimeout(()=>URL.revokeObjectURL(a.href),0);
+      }catch(e){console.error('Export failed',e);}
+    });
+  }
+  if(importBtn&&fileInput){
+    importBtn.addEventListener('click',()=>fileInput.click());
+    fileInput.addEventListener('change',e=>{
+      const file=e.target.files[0];
+      if(!file)return;
+      const reader=new FileReader();
+      reader.onload=ev=>{
+        try{
+          const obj=JSON.parse(ev.target.result);
+          if(globalThis.setProject)globalThis.setProject(obj);
+          location.reload();
+        }catch(err){console.error('Import failed',err);}
+      };
+      reader.readAsText(file);
+      fileInput.value='';
+    });
+  }
+}
+
+globalThis.addEventListener?.('DOMContentLoaded',initProjectIO);
+
+globalThis.initSettings=initSettings;
+globalThis.initDarkMode=initDarkMode;
+globalThis.initHelpModal=initHelpModal;
+globalThis.initNavToggle=initNavToggle;
+globalThis.checkPrereqs=checkPrereqs;
+globalThis.persistConduits=persistConduits;
+globalThis.loadConduits=loadConduits;
