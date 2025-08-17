@@ -134,6 +134,7 @@
     ductbanks.forEach((db,i)=>{
       const row=ductbankTbody.insertRow();
       row.className='ductbank-row';
+      row.dataset.tag = db.tag;
       const tgl=row.insertCell();
       setWidth(tgl,0);
       const tglBtn=document.createElement('button');
@@ -266,6 +267,7 @@
       const cBody=cTable.createTBody();
       db.conduits.forEach((c,j)=>{
         const r=cBody.insertRow();
+        if (c.error) r.classList.add('missing-tag-row');
 
         // Conduit ID
         let cell=r.insertCell();
@@ -389,7 +391,20 @@
   }
 
   function saveDuctbanks(){
-    // ensure every conduit stores its parent tag before persisting
+    let hasError=false;
+    ductbanks.forEach(db=>db.conduits.forEach(c=>{
+      if(!c.ductbankTag||c.ductbankTag!==db.tag){
+        c.error=true;
+        hasError=true;
+      }else{
+        delete c.error;
+      }
+    }));
+    renderDuctbanks();
+    if(hasError){
+      alert('Every conduit must have a matching ductbank tag.');
+      return;
+    }
     ductbanks.forEach(db=>db.conduits.forEach(c=>{c.ductbankTag=db.tag;}));
     try{localStorage.setItem(DUCTBANK_KEY,JSON.stringify(ductbanks));}catch(e){}
     applyFilters();
@@ -519,6 +534,18 @@
     initHeader();
     document.getElementById('clear-ductbank-filters-btn').addEventListener('click',clearFilters);
     loadDuctbanks();
+    const params=new URLSearchParams(window.location.search);
+    const tag=params.get('db');
+    if(tag){
+      const db=ductbanks.find(d=>d.tag===tag);
+      if(db){
+        db.expanded=true;
+        renderDuctbanks();
+        const sel = CSS && typeof CSS.escape==='function'?CSS.escape(tag):tag;
+        const row=document.querySelector(`#ductbankTable tbody tr[data-tag="${sel}"]`);
+        if(row) row.scrollIntoView({block:'center'});
+      }
+    }
   }
 
   function getDuctbanks(){

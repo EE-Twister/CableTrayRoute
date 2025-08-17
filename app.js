@@ -622,11 +622,14 @@ document.addEventListener('DOMContentLoaded', async () => {
                 .filter(db => !db.conduits || db.conduits.length === 0)
                 .map(db => db.tag || db.id);
             if (state.ductbanksWithoutConduits.length > 0) {
-                console.warn('Ductbank(s) missing conduits will be ignored:', state.ductbanksWithoutConduits);
+                const fixUrl = `racewayschedule.html?db=${encodeURIComponent(state.ductbanksWithoutConduits[0])}`;
+                console.warn(`Ductbanks missing conduits: ${state.ductbanksWithoutConduits.join(', ')}. Go fix it: ${fixUrl}`);
                 const warnEl = typeof document !== 'undefined' && document.getElementById('ductbank-no-conduits-warning');
                 if (warnEl) {
                     const listEl = warnEl.querySelector('.db-list');
                     if (listEl) listEl.textContent = state.ductbanksWithoutConduits.join(', ');
+                    const fixLink = warnEl.querySelector('.fix-link');
+                    if (fixLink) fixLink.href = fixUrl;
                     warnEl.style.display = '';
                 }
             }
