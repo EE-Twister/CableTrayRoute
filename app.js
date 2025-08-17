@@ -487,17 +487,30 @@ document.addEventListener('DOMContentLoaded', async () => {
 
         if (state.ductbankData && state.ductbankData.ductbanks) {
             state.ductbankData.ductbanks.forEach(db => {
-                if (Array.isArray(db.outline) && db.outline.length >= 2) {
-                    const start = db.outline[0];
-                    const end = db.outline[db.outline.length - 1];
+                const dbStart = Array.isArray(db.outline) && db.outline.length >= 2
+                    ? db.outline[0]
+                    : [
+                        parseFloat(db.start_x),
+                        parseFloat(db.start_y),
+                        parseFloat(db.start_z)
+                    ];
+                const dbEnd = Array.isArray(db.outline) && db.outline.length >= 2
+                    ? db.outline[db.outline.length - 1]
+                    : [
+                        parseFloat(db.end_x),
+                        parseFloat(db.end_y),
+                        parseFloat(db.end_z)
+                    ];
+
+                if (dbStart.every(v => !isNaN(v)) && dbEnd.every(v => !isNaN(v))) {
                     state.trayData.push({
                         tray_id: db.id || db.tag,
-                        start_x: start[0],
-                        start_y: start[1],
-                        start_z: start[2],
-                        end_x: end[0],
-                        end_y: end[1],
-                        end_z: end[2],
+                        start_x: dbStart[0],
+                        start_y: dbStart[1],
+                        start_z: dbStart[2],
+                        end_x: dbEnd[0],
+                        end_y: dbEnd[1],
+                        end_z: dbEnd[2],
                         width: parseFloat(db.width) || 12,
                         height: parseFloat(db.height) || 12,
                         current_fill: 0,
@@ -506,35 +519,37 @@ document.addEventListener('DOMContentLoaded', async () => {
                         raceway_type: 'ductbank',
                     });
                 }
+
                 (db.conduits || []).forEach(cond => {
-                    if (Array.isArray(cond.path) && cond.path.length >= 2) {
-                        const start = cond.path[0];
-                        const end = cond.path[cond.path.length - 1];
-                        const area = (CONDUIT_SPECS[cond.type] || {})[cond.trade_size];
-                        const dia = area ? Math.sqrt((4 * area) / Math.PI)
-                                         : parseFloat(cond.diameter) || 0;
-                        const dbId = cond.ductbank_id || db.id || db.tag;
-                        const condId = cond.conduit_id || cond.id;
-                        const trayId = cond.tray_id || `${dbId}-${condId}`;
-                        cond.tray_id = trayId;
-                        state.trayData.push({
-                            tray_id: trayId,
-                            ductbank_id: dbId,
-                            conduit_id: condId,
-                            start_x: start[0],
-                            start_y: start[1],
-                            start_z: start[2],
-                            end_x: end[0],
-                            end_y: end[1],
-                            end_z: end[2],
-                            width: dia,
-                            height: dia,
-                            current_fill: 0,
-                            shape: 'STR',
-                            allowed_cable_group: cond.allowed_cable_group || '',
-                            raceway_type: 'conduit',
-                        });
+                    if (!Array.isArray(cond.path) || cond.path.length < 2) {
+                        cond.path = [dbStart, dbEnd];
                     }
+                    const start = cond.path[0];
+                    const end = cond.path[cond.path.length - 1];
+                    const area = (CONDUIT_SPECS[cond.type] || {})[cond.trade_size];
+                    const dia = area ? Math.sqrt((4 * area) / Math.PI)
+                                     : parseFloat(cond.diameter) || 0;
+                    const dbId = cond.ductbank_id || db.id || db.tag;
+                    const condId = cond.conduit_id || cond.id;
+                    const trayId = `${dbId}-${condId}`;
+                    cond.tray_id = trayId;
+                    state.trayData.push({
+                        tray_id: trayId,
+                        ductbank_id: dbId,
+                        conduit_id: condId,
+                        start_x: start[0],
+                        start_y: start[1],
+                        start_z: start[2],
+                        end_x: end[0],
+                        end_y: end[1],
+                        end_z: end[2],
+                        width: dia,
+                        height: dia,
+                        current_fill: 0,
+                        shape: 'STR',
+                        allowed_cable_group: cond.allowed_cable_group || '',
+                        raceway_type: 'conduit',
+                    });
                 });
             });
         }
