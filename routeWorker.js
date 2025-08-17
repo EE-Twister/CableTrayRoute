@@ -497,7 +497,7 @@ class CableRoutingSystem {
                 resolvedIds.push(trayId);
             } else {
                 unknownIds.push(id);
-                exclusions.push({ id, reason: 'not_found' });
+                exclusions.push({ id, reason: 'not_found', message: `Rejected ${id}: not found` });
             }
         }
 
@@ -515,13 +515,15 @@ class CableRoutingSystem {
             const segment = tray.ductbankTag ? `conduit ${tray.conduit_id} in ductbank ${tray.ductbankTag}` : `tray ${id}`;
             const filter = tray.ductbankTag ? `racewayschedule.html?db=${encodeURIComponent(tray.ductbankTag)}` : `racewayschedule.html?tray=${encodeURIComponent(id)}`;
             if (tray.allowed_cable_group && allowedGroup && tray.allowed_cable_group !== allowedGroup) {
-                const record = { tray_id: id, reason: 'group_mismatch', cable_id: cableId, conduit_id: tray.conduit_id, ductbank_tag: tray.ductbankTag, filter };
+                const record = { tray_id: id, reason: 'group_mismatch', cable_id: cableId, conduit_id: tray.conduit_id, ductbank_tag: tray.ductbankTag, filter, message: `Rejected ${id}: group mismatch` };
                 exclusions.push(record);
                 this.mismatchedRecords.push(record);
                 return { success: false, manual: true, manual_raceway: true, message: `${segment} not allowed`, exclusions, mismatched_records: this._formatMismatchedRecords() };
             }
             if (tray.current_fill + cableArea > tray.maxFill) {
-                const record = { tray_id: id, reason: 'over_capacity', cable_id: cableId, conduit_id: tray.conduit_id, ductbank_tag: tray.ductbankTag, filter };
+                const fillPct = ((tray.current_fill + cableArea) / (tray.width * tray.height)) * 100;
+                const maxPct = this.fillLimit * 100;
+                const record = { tray_id: id, reason: 'over_capacity', cable_id: cableId, conduit_id: tray.conduit_id, ductbank_tag: tray.ductbankTag, filter, message: `Rejected ${id}: ${fillPct.toFixed(1)}% fill > Max ${maxPct.toFixed(0)}%` };
                 exclusions.push(record);
                 this.mismatchedRecords.push(record);
                 return { success: false, manual: true, manual_raceway: true, message: `${segment} over capacity`, exclusions, mismatched_records: this._formatMismatchedRecords() };
@@ -586,11 +588,13 @@ class CableRoutingSystem {
             const segment = tray.ductbankTag ? `conduit ${tray.conduit_id} in ductbank ${tray.ductbankTag}` : `tray ${tray.tray_id}`;
             const filter = tray.ductbankTag ? `racewayschedule.html?db=${encodeURIComponent(tray.ductbankTag)}` : `racewayschedule.html?tray=${encodeURIComponent(tray.tray_id)}`;
             if (tray.current_fill + cableArea > tray.maxFill) {
-                const record = { tray_id: tray.tray_id, reason: 'over_capacity', cable_id: cableId, conduit_id: tray.conduit_id, ductbank_tag: tray.ductbankTag, filter };
+                const fillPct = ((tray.current_fill + cableArea) / (tray.width * tray.height)) * 100;
+                const maxPct = this.fillLimit * 100;
+                const record = { tray_id: tray.tray_id, reason: 'over_capacity', cable_id: cableId, conduit_id: tray.conduit_id, ductbank_tag: tray.ductbankTag, filter, message: `Rejected ${tray.tray_id}: ${fillPct.toFixed(1)}% fill > Max ${maxPct.toFixed(0)}%` };
                 exclusions.push(record);
                 this.mismatchedRecords.push(record);
             } else if (tray.allowed_cable_group && tray.allowed_cable_group !== allowedGroup) {
-                const record = { tray_id: tray.tray_id, reason: 'group_mismatch', cable_id: cableId, conduit_id: tray.conduit_id, ductbank_tag: tray.ductbankTag, filter };
+                const record = { tray_id: tray.tray_id, reason: 'group_mismatch', cable_id: cableId, conduit_id: tray.conduit_id, ductbank_tag: tray.ductbankTag, filter, message: `Rejected ${tray.tray_id}: group mismatch` };
                 exclusions.push(record);
                 this.mismatchedRecords.push(record);
             } else {
@@ -658,7 +662,7 @@ class CableRoutingSystem {
                 addEdge(projId, startId, this.distance(projStart, a), 'tray', tray.tray_id);
                 addEdge(projId, `${tray.tray_id}_end`, this.distance(projStart, b), 'tray', tray.tray_id);
             } else {
-                exclusions.push({ tray_id: tray.tray_id, reason: 'start_beyond_proximity' });
+                exclusions.push({ tray_id: tray.tray_id, reason: 'start_beyond_proximity', message: `Rejected ${tray.tray_id}: start ${distToProjStart.toFixed(1)} ft > Max ${this.proximityThreshold} ft` });
             }
 
             // Project cable's end point
@@ -672,7 +676,7 @@ class CableRoutingSystem {
                 addEdge(projId, startId, this.distance(projEnd, a), 'tray', tray.tray_id);
                 addEdge(projId, `${tray.tray_id}_end`, this.distance(projEnd, b), 'tray', tray.tray_id);
             } else {
-                exclusions.push({ tray_id: tray.tray_id, reason: 'end_beyond_proximity' });
+                exclusions.push({ tray_id: tray.tray_id, reason: 'end_beyond_proximity', message: `Rejected ${tray.tray_id}: end ${distToProjEnd.toFixed(1)} ft > Max ${this.proximityThreshold} ft` });
             }
         });
         

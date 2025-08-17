@@ -2133,6 +2133,7 @@ const openDuctbankRoute = (dbId, conduitId) => {
         let totalLength = 0;
         let totalField = 0;
         let html = '';
+        const reasonCounts = {};
         results.forEach((res, idx) => {
             const tl = parseFloat(res.total_length);
             const fl = parseFloat(res.field_length);
@@ -2140,12 +2141,16 @@ const openDuctbankRoute = (dbId, conduitId) => {
             if (!isNaN(fl)) totalField += fl;
             html += `<details><summary>${res.cable} | ${res.status} | ${res.mode} | Total ${res.total_length} | Field ${res.field_length} | Segments ${res.segments_count} <button class="view-map-btn" data-index="${idx}">View on Map</button></summary>`;
             if (res.exclusions && res.exclusions.length > 0) {
-                html += '<p class="exclusions-title"><strong>Excluded Conduits:</strong></p><ul class="exclusions-list">';
+                html += '<p class="exclusions-title"><strong>Rejected Segments:</strong></p><ul class="exclusions-list">';
                 res.exclusions.forEach(ex => {
                     const id = ex.tray_id || ex.id || 'unknown';
-                    const reason = ex.reason.replace(/_/g, ' ');
+                    const reason = ex.reason ? ex.reason.replace(/_/g, ' ') : 'unknown';
                     const link = ex.filter ? ` <a href="${ex.filter}">Filter</a>` : '';
-                    html += `<li>${id}: ${reason}${link}</li>`;
+                    const msg = ex.message ? ex.message : `${id}: ${reason}`;
+                    html += `<li>${msg}${link}</li>`;
+                    if (ex.reason) {
+                        reasonCounts[ex.reason] = (reasonCounts[ex.reason] || 0) + 1;
+                    }
                 });
                 html += '</ul>';
             }
@@ -2201,6 +2206,11 @@ const openDuctbankRoute = (dbId, conduitId) => {
         } else {
             elements.mismatchedRacewaysList.innerHTML = '';
             elements.mismatchedRacewaysDetails.style.display = 'none';
+        }
+        const summaryParts = Object.entries(reasonCounts).map(([r, c]) => `${c} ${r.replace(/_/g, ' ')}`);
+        if (summaryParts.length) {
+            const summaryHtml = `<div class="message info">Rejected segments: ${summaryParts.join('; ')}</div>`;
+            elements.messages.insertAdjacentHTML('afterbegin', summaryHtml);
         }
         if (results.some(r => (r.exclusions && r.exclusions.length > 0) || (r.mismatched_records && r.mismatched_records.length > 0))) {
             document.dispatchEvent(new CustomEvent('exclusions-found'));
