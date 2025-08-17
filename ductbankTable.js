@@ -146,7 +146,13 @@
       const tagInput=document.createElement('input');
       tagInput.value=db.tag||'';
       const tagRules=['required'];
-      tagInput.addEventListener('input',e=>{db.tag=e.target.value;TableUtils.applyValidation(tagInput,tagRules);saveDuctbanks();});
+      tagInput.addEventListener('input',e=>{
+        db.tag=e.target.value;
+        // keep conduit ductbank tags in sync with parent tag
+        db.conduits.forEach(c=>{c.ductbankTag=db.tag;});
+        TableUtils.applyValidation(tagInput,tagRules);
+        saveDuctbanks();
+      });
       TableUtils.applyValidation(tagInput,tagRules);
       tag.appendChild(tagInput);
 
@@ -324,7 +330,19 @@
 
   function addConduit(i){
     const db=ductbanks[i];
-    ductbanks[i].conduits.push({conduit_id:'',type:'',trade_size:'',allowed_cable_group:'',start_x:db.start_x,start_y:db.start_y,start_z:db.start_z,end_x:db.end_x,end_y:db.end_y,end_z:db.end_z});
+    ductbanks[i].conduits.push({
+      conduit_id:'',
+      type:'',
+      trade_size:'',
+      allowed_cable_group:'',
+      ductbankTag:db.tag,
+      start_x:db.start_x,
+      start_y:db.start_y,
+      start_z:db.start_z,
+      end_x:db.end_x,
+      end_y:db.end_y,
+      end_z:db.end_z
+    });
     renderDuctbanks();
     saveDuctbanks();
   }
@@ -355,6 +373,8 @@
   function duplicateDuctbank(i){
     const copy=JSON.parse(JSON.stringify(ductbanks[i]));
     copy.id=Date.now()+Math.random();
+    // ensure conduits reference the copied ductbank tag
+    copy.conduits.forEach(c=>{c.ductbankTag=copy.tag;});
     ductbanks.splice(i+1,0,copy);
     renderDuctbanks();
     saveDuctbanks();
@@ -362,12 +382,15 @@
 
   function duplicateConduit(i,j){
     const copy=JSON.parse(JSON.stringify(ductbanks[i].conduits[j]));
+    copy.ductbankTag=ductbanks[i].tag;
     ductbanks[i].conduits.splice(j+1,0,copy);
     renderDuctbanks();
     saveDuctbanks();
   }
 
   function saveDuctbanks(){
+    // ensure every conduit stores its parent tag before persisting
+    ductbanks.forEach(db=>db.conduits.forEach(c=>{c.ductbankTag=db.tag;}));
     try{localStorage.setItem(DUCTBANK_KEY,JSON.stringify(ductbanks));}catch(e){}
     applyFilters();
   }
@@ -382,6 +405,7 @@
       db.conduits.forEach(c=>{
         ['start_x','start_y','start_z','end_x','end_y','end_z'].forEach(k=>{if(c[k]===undefined) c[k]=db[k];});
         if(c.allowed_cable_group===undefined) c.allowed_cable_group='';
+        if(c.ductbankTag===undefined) c.ductbankTag=db.tag;
       });
     });
     renderDuctbanks();
@@ -461,6 +485,7 @@
             type:r['type']||'',
             trade_size:r['trade_size']||'',
             allowed_cable_group:r['allowed_cable_group']||'',
+            ductbankTag:p.tag,
             start_x:r['start_x']||p.start_x,
             start_y:r['start_y']||p.start_y,
             start_z:r['start_z']||p.start_z,
@@ -490,7 +515,10 @@
     loadDuctbanks();
   }
 
-  function getDuctbanks(){return ductbanks;}
+  function getDuctbanks(){
+    ductbanks.forEach(db=>db.conduits.forEach(c=>{if(c.ductbankTag===undefined) c.ductbankTag=db.tag;}));
+    return ductbanks;
+  }
 
   window.initDuctbankTable=initDuctbankTable;
   window.saveDuctbanks=saveDuctbanks;
