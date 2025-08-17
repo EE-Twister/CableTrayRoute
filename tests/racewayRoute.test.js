@@ -175,11 +175,45 @@ describe("_racewayRoute", () => {
     system.calculateRoute([0, 0, 0], [0, 10, 0], 1, null, '', [], 'cable-1');
     console.warn = origWarn;
     assert(warned, 'mismatch warning not emitted');
+    assert.strictEqual(warned[0], 'Mismatched raceway segments:');
     const records = warned[1];
     assert(Array.isArray(records) && records.length === 1);
     assert.strictEqual(records[0].tray_id, 'tray-over');
     assert.strictEqual(records[0].reason, 'over_capacity');
     assert.strictEqual(records[0].cable_id, 'cable-1');
+    assert.deepStrictEqual(Object.keys(records[0]).sort(), ['cable_id','reason','tray_id']);
+  });
+
+  it("warns for group mismatches with formatted record", () => {
+    const system = new CableRoutingSystem({ fillLimit: 0.4 });
+    system.addTraySegment({
+      tray_id: 'tray-group',
+      start_x: 0,
+      start_y: 0,
+      start_z: 0,
+      end_x: 0,
+      end_y: 10,
+      end_z: 0,
+      width: 10,
+      height: 10,
+      current_fill: 0,
+      allowed_cable_group: 'A',
+    });
+    let warned = null;
+    const origWarn = console.warn;
+    console.warn = (...args) => {
+      warned = args;
+    };
+    system.calculateRoute([0, 0, 0], [0, 10, 0], 1, 'B', '', [], 'cable-2');
+    console.warn = origWarn;
+    assert(warned, 'mismatch warning not emitted');
+    assert.strictEqual(warned[0], 'Mismatched raceway segments:');
+    const records = warned[1];
+    assert(Array.isArray(records) && records.length === 1);
+    assert.strictEqual(records[0].tray_id, 'tray-group');
+    assert.strictEqual(records[0].reason, 'group_mismatch');
+    assert.strictEqual(records[0].cable_id, 'cable-2');
+    assert.deepStrictEqual(Object.keys(records[0]).sort(), ['cable_id','reason','tray_id']);
   });
 
   it("routes when proximity threshold is increased", () => {
