@@ -104,5 +104,68 @@ describe('rebuildTrayData', () => {
     assert(res && res.success, 'routing failed');
     assert.deepStrictEqual(Array.from(res.tray_segments), ['DB1-C1']);
   });
+
+  it('omits ductbank outline segments when disabled', () => {
+    const state = {
+      manualTrays: [],
+      trayData: [],
+      includeDuctbankOutlines: false,
+      ductbankData: {
+        ductbanks: [
+          {
+            id: 'DB1',
+            start_x: 0,
+            start_y: 0,
+            start_z: 0,
+            end_x: 10,
+            end_y: 0,
+            end_z: 0,
+            width: 12,
+            height: 12,
+            conduits: [
+              { conduit_id: 'C1', type: 'RMC', trade_size: '1' },
+            ],
+          },
+        ],
+      },
+      conduitData: [],
+    };
+    const CONDUIT_SPECS = { RMC: { '1': 0.887 } };
+    rebuildTrayData(state, CONDUIT_SPECS);
+    assert.strictEqual(state.trayData.length, 1);
+    assert.strictEqual(state.trayData[0].raceway_type, 'conduit');
+  });
+
+  it('includes ductbank outline segments when enabled', () => {
+    const state = {
+      manualTrays: [],
+      trayData: [],
+      includeDuctbankOutlines: true,
+      ductbankData: {
+        ductbanks: [
+          {
+            id: 'DB1',
+            start_x: 0,
+            start_y: 0,
+            start_z: 0,
+            end_x: 10,
+            end_y: 0,
+            end_z: 0,
+            width: 12,
+            height: 12,
+            conduits: [
+              { conduit_id: 'C1', type: 'RMC', trade_size: '1' },
+            ],
+          },
+        ],
+      },
+      conduitData: [],
+    };
+    const CONDUIT_SPECS = { RMC: { '1': 0.887 } };
+    rebuildTrayData(state, CONDUIT_SPECS);
+    const types = state.trayData.map(t => t.raceway_type);
+    assert(types.includes('ductbank'), 'ductbank outline missing');
+    assert(types.includes('conduit'), 'conduit segment missing');
+  });
 });
 
