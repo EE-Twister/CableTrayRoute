@@ -331,11 +331,18 @@ document.addEventListener('DOMContentLoaded', async () => {
             elements.sidebar.classList.toggle('collapsed');
         });
     }
-    let cancelRouting = false;
-    let currentWorkers = [];
-    let workerResolvers = new Map();
-    const taskQueue = [];
-    const maxWorkers = navigator.hardwareConcurrency || 4;
+    let routingWorker = null;
+    let routingPaused = false;
+    let currentProjectHash = null;
+
+    const computeProjectHash = data => {
+        const str = JSON.stringify(data);
+        let hash = 5381;
+        for (let i = 0; i < str.length; i++) {
+            hash = ((hash << 5) + hash) ^ str.charCodeAt(i);
+        }
+        return (hash >>> 0).toString(16);
+    };
 
     const nextCableName = (sample) => {
         let prefix = 'Cable ';
@@ -2803,17 +2810,17 @@ const openDuctbankRoute = (dbId, conduitId) => {
     };
 
     const cancelCurrentRouting = () => {
-        cancelRouting = true;
-        elements.cancelRoutingBtn.disabled = true;
-        elements.progressLabel.textContent = 'Cancelling...';
-        currentWorkers.forEach(w => {
-            w.terminate();
-            const res = workerResolvers.get(w);
-            if (res) res({ cancelled: true });
-        });
-        currentWorkers = [];
-        workerResolvers.clear();
-        taskQueue.length = 0;
+        if (!routingWorker) return;
+        if (!routingPaused) {
+            routingWorker.postMessage({ type: 'cancel' });
+            routingPaused = true;
+            elements.cancelRoutingBtn.textContent = 'Resume Routing';
+            elements.progressLabel.textContent = 'Cancelling...';
+        } else {
+            routingWorker.postMessage({ type: 'resume' });
+            routingPaused = false;
+            elements.cancelRoutingBtn.textContent = 'Cancel Routing';
+        }
     };
 
     const mainCalculation = async () => {
@@ -2841,7 +2848,7 @@ const openDuctbankRoute = (dbId, conduitId) => {
             elements.manualTrayTableContainer.querySelectorAll('.tray-id-input').forEach(inp => inp.classList.remove('input-error'));
         }
 
-        const routingSystem = new CableRoutingSystem({
+        const options = {
             fillLimit: parseFloat(elements.fillLimitIn.value) / 100,
             proximityThreshold: parseFloat(document.getElementById('proximity-threshold').value),
             fieldPenalty: parseFloat(document.getElementById('field-route-penalty').value),
@@ -2849,12 +2856,10 @@ const openDuctbankRoute = (dbId, conduitId) => {
             maxFieldEdge: parseFloat(document.getElementById('max-field-edge').value),
             maxFieldNeighbors: 8,
             includeDuctbankOutlines: state.includeDuctbankOutlines,
-        });
-        
+        };
+
         // Deep copy tray data so original state isn't mutated during batch routing
         const trayDataForRun = JSON.parse(JSON.stringify(state.trayData));
-        trayDataForRun.forEach(tray => routingSystem.addTraySegment(tray));
-        routingSystem.prepareBaseGraph();
 
         const showManualPathError = (idx, message, trayId) => {
             const input = elements.cableListContainer.querySelector(`.cable-manual-input[data-idx='${idx}']`);
@@ -2874,119 +2879,81 @@ const openDuctbankRoute = (dbId, conduitId) => {
             }
         };
 
-        const validateManualPath = (manualPath, cableArea, allowedGroup) => {
-            const path = (manualPath || '').trim();
-            if (!path) return null;
-            const trayIds = path.split(/[>\s]+/).filter(Boolean);
-            for (const id of trayIds) {
-                const tray = routingSystem.trays.get(id);
-                if (!tray) return { message: `Tray ${id} not found`, trayId: id, reason: 'not_found' };
-                if (tray.allowed_cable_group && allowedGroup && tray.allowed_cable_group !== allowedGroup) {
-                    return { message: `Tray ${id} not allowed`, trayId: id, reason: 'not_allowed' };
-                }
-                if (tray.current_fill + cableArea > tray.maxFill) {
-                    return { message: `Tray ${id} over capacity`, trayId: id, reason: 'over_capacity' };
-                }
-            }
-            return null;
-        };
-
         if (state.cableList.length > 0) {
-            const batchResults = [];
-            const allRoutesForPlotting = [];
-
-            let completed = 0;
-            const runCable = (cable, index) => {
-                const cableArea = Math.PI * (cable.diameter / 2) ** 2;
-                const validationError = validateManualPath(cable.manual_path, cableArea, cable.allowed_cable_group);
-                let promise;
-                if (validationError) {
-                    showManualPathError(index, validationError.message, validationError.trayId);
-                    promise = Promise.resolve({
-                        success: false,
-                        manual: true,
-                        manual_raceway: false,
-                        message: validationError.message,
-                        error: { tray_id: validationError.trayId, reason: validationError.reason }
-                    });
-                } else {
-                    const startTask = (resolve, reject) => {
-                        if (cancelRouting) { resolve({ cancelled: true }); return; }
-                        const worker = new Worker('routeWorker.js');
-                        currentWorkers.push(worker);
-                        workerResolvers.set(worker, resolve);
-                        const cleanup = () => {
-                            worker.terminate();
-                            currentWorkers = currentWorkers.filter(w => w !== worker);
-                            workerResolvers.delete(worker);
-                            if (taskQueue.length > 0 && !cancelRouting) {
-                                const next = taskQueue.shift();
-                                next();
-                            }
-                        };
-                        worker.onmessage = e => { cleanup(); resolve(e.data); };
-                        worker.onerror = err => { cleanup(); reject(err); };
-                        worker.postMessage({
-                            trays: Array.from(routingSystem.trays.values()),
-                            options: {
-                                fillLimit: routingSystem.fillLimit,
-                                proximityThreshold: routingSystem.proximityThreshold,
-                                fieldPenalty: routingSystem.fieldPenalty,
-                                sharedPenalty: routingSystem.sharedPenalty,
-                                maxFieldEdge: routingSystem.maxFieldEdge,
-                                maxFieldNeighbors: routingSystem.maxFieldNeighbors
-                            },
-                            baseGraph: routingSystem.baseGraph,
-                            cable,
-                            cableArea
-                        });
+            const projectHash = computeProjectHash({ trays: trayDataForRun, cables: state.cableList, options });
+            currentProjectHash = projectHash;
+            const cacheKey = `route-${projectHash}`;
+            const cached = localStorage.getItem(cacheKey);
+            if (cached) {
+                const cache = JSON.parse(cached);
+                state.latestRouteData = cache.batchResults;
+                state.finalTrays = cache.finalTrays;
+                const fillLimit = parseFloat(elements.fillLimitIn.value) / 100;
+                const utilData = Object.entries(cache.utilization).map(([id, data]) => {
+                    const fullPct = (data.current_fill * fillLimit / data.max_fill) * 100;
+                    return {
+                        tray_id: id,
+                        full_pct: fullPct,
+                        utilization: data.utilization_percentage.toFixed(1),
+                        available: data.available_capacity.toFixed(2),
+                        fill: `<button class="fill-btn" data-tray="${id}">Open</button>`
                     };
-                    promise = new Promise((resolve, reject) => {
-                        const task = () => startTask(resolve, reject);
-                        if (currentWorkers.length < maxWorkers) {
-                            task();
-                        } else {
-                            taskQueue.push(task);
-                        }
-                    });
-                }
-                return promise.then(result => {
-                    completed++;
-                    const pct = (completed / state.cableList.length) * 100;
+                });
+                state.updatedUtilData = utilData;
+                renderUpdatedUtilizationTable();
+                buildFieldSegmentCableMap(cache.batchResults);
+                state.latestRouteData = cache.batchResults;
+                renderBatchResults(cache.batchResults);
+                state.trayCableMap = cache.trayCableMap || {};
+                state.sharedFieldRoutes = cache.sharedRoutes || [];
+                elements.metrics.innerHTML = cache.metricsHtml || '<p>No common field routes detected.</p>';
+                elements.progressBar.style.width = '100%';
+                elements.progressBar.setAttribute('aria-valuenow', '100');
+                elements.progressLabel.textContent = `Complete (${(cache.wallTime/1000).toFixed(2)}s, cached)`;
+                elements.progressContainer.style.display = 'none';
+                elements.cancelRoutingBtn.style.display = 'none';
+                visualize(trayDataForRun, cache.allRoutes, "Batch Route Visualization");
+                return;
+            }
+
+            let batchResults = [];
+            let allRoutesForPlotting = [];
+
+            routingWorker = new Worker('batchRouteWorker.js');
+            routingPaused = false;
+            elements.cancelRoutingBtn.textContent = 'Cancel Routing';
+            routingWorker.onmessage = e => {
+                const msg = e.data;
+                if (msg.type === 'progress') {
+                    const pct = (msg.completed / state.cableList.length) * 100;
                     elements.progressBar.style.width = `${pct}%`;
                     elements.progressBar.setAttribute('aria-valuenow', Math.round(pct).toString());
-                    elements.progressLabel.textContent = `Routing (${completed}/${state.cableList.length})`;
-                    if (!cancelRouting && !result.cancelled) {
-                        if (result.success) {
-                            routingSystem.updateTrayFill(result.tray_segments, cableArea);
-                            routingSystem.recordSharedFieldSegments(result.route_segments);
-                            allRoutesForPlotting.push({
-                                label: cable.name,
-                                segments: result.route_segments,
-                                startPoint: cable.start,
-                                endPoint: cable.end,
-                                startTag: cable.start_tag,
-                                endTag: cable.end_tag,
-                                allowed_cable_group: cable.allowed_cable_group
-                            });
-                        } else {
+                    elements.progressLabel.textContent = `Routing (${msg.completed}/${state.cableList.length})`;
+                } else if (msg.type === 'cancelled') {
+                    elements.progressLabel.textContent = `Paused (${msg.completed}/${state.cableList.length})`;
+                } else if (msg.type === 'done') {
+                    routingWorker.terminate();
+                    routingWorker = null;
+                    const rawResults = msg.results;
+                    allRoutesForPlotting = msg.allRoutes || [];
+                    batchResults = rawResults.map((result, index) => {
+                        const cable = state.cableList[index];
+                        if (!result.success) {
                             showManualPathError(index, result.message, result.error && result.error.tray_id);
                         }
-                        batchResults[index] = {
-                                cable: cable.name,
-                                status: result.success ? '✓ Routed' : '✗ Failed',
-                                mode: result.manual
-                                    ? (result.manual_raceway ? 'Manual Raceway' : 'Manual Path')
-                                    : 'Automatic',
-                                manual_raceway: !!result.manual_raceway,
-                                total_length: result.success ? result.total_length.toFixed(2) : 'N/A',
-                                field_length: result.success ? result.field_routed_length.toFixed(2) : 'N/A',
-                                tray_segments_count: result.success ? result.tray_segments.length : 0,
-                                segments_count: result.success ? result.route_segments.length : 0,
-                                tray_segments: result.success ? result.tray_segments : [],
-                                route_segments: result.success ? result.route_segments : [],
-                        exclusions: result.exclusions || [],
-                                breakdown: result.success ? result.route_segments.map((seg, i) => {
+                        return {
+                            cable: cable.name,
+                            status: result.success ? '✓ Routed' : '✗ Failed',
+                            mode: result.manual ? (result.manual_raceway ? 'Manual Raceway' : 'Manual Path') : 'Automatic',
+                            manual_raceway: !!result.manual_raceway,
+                            total_length: result.success ? result.total_length.toFixed(2) : 'N/A',
+                            field_length: result.success ? result.field_routed_length.toFixed(2) : 'N/A',
+                            tray_segments_count: result.success ? result.tray_segments.length : 0,
+                            segments_count: result.success ? result.route_segments.length : 0,
+                            tray_segments: result.success ? result.tray_segments : [],
+                            route_segments: result.success ? result.route_segments : [],
+                            exclusions: result.exclusions || [],
+                            breakdown: result.success ? result.route_segments.map((seg, i) => {
                                 let tray_id = seg.type === 'field' ? 'Field Route' : (seg.tray_id || 'N/A');
                                 let type = getSegmentType(seg);
                                 let raceway = '';
@@ -3004,141 +2971,141 @@ const openDuctbankRoute = (dbId, conduitId) => {
                                 };
                             }) : []
                         };
-                    }
-                });
-            };
-
-            const workerPromises = state.cableList.map((c, idx) => runCable(c, idx));
-            await Promise.all(workerPromises);
-
-            if (cancelRouting) {
-                elements.progressLabel.textContent = 'Cancelled';
-                elements.progressContainer.style.display = 'none';
-                elements.cancelRoutingBtn.style.display = 'none';
-                return;
-            }
-
-            buildFieldSegmentCableMap(batchResults);
-            state.latestRouteData = batchResults;
-            renderBatchResults(batchResults);
-            const nameMap = new Map(state.cableList.map(c => [c.name, c]));
-            state.trayCableMap = {};
-            batchResults.forEach(row => {
-                const cableObj = nameMap.get(row.cable);
-                if (!cableObj || !Array.isArray(row.breakdown)) return;
-                row.breakdown.forEach(b => {
-                    if (b.tray_id && b.tray_id !== 'Field Route' && b.tray_id !== 'N/A') {
-                        if (!state.trayCableMap[b.tray_id]) state.trayCableMap[b.tray_id] = [];
-                        const entry = b.conduit_id ? { ...cableObj, conduit_id: b.conduit_id } : cableObj;
-                        const exists = state.trayCableMap[b.tray_id].some(c =>
-                            c.name === entry.name && (!entry.conduit_id || c.conduit_id === entry.conduit_id)
-                        );
-                        if (!exists) {
-                            state.trayCableMap[b.tray_id].push(entry);
-                        }
-                    }
-                });
-            });
-            const cableMapForArea = new Map(state.cableList.map(c => [c.name, c.diameter]));
-            const cableMapForObj = new Map(state.cableList.map(c => [c.name, c]));
-            const commonRaw = routingSystem.findCommonFieldRoutes(allRoutesForPlotting, 6, cableMapForArea);
-            const common = commonRaw.map(r => {
-                const areas = r.cables.map(n => {
-                    const d = cableMapForArea.get(n);
-                    return d ? Math.PI * (d / 2) ** 2 : 0;
-                });
-                const totalArea = areas.reduce((a,b) => a + b, 0);
-                const count = r.cables.length;
-                let recommendation;
-                if (count <= CONTAINMENT_RULES.thresholds.conduit) recommendation = 'conduit';
-                else if (count <= CONTAINMENT_RULES.thresholds.channel) recommendation = 'channel';
-                else recommendation = 'tray';
-                let tradeSize = null;
-                let traySize = null;
-                if (recommendation === 'conduit') {
-                    const conduitType = elements.conduitType.value;
-                    const spec = CONDUIT_SPECS[conduitType] || {};
-                    /* NEC Chapter 9 Table 1 fill limits (see docs/standards.md) */
-                    const fillPct = count === 1 ? 0.53 : count === 2 ? 0.31 : 0.40;
-                    for (const size of Object.keys(spec)) {
-                        if (totalArea <= spec[size] * fillPct) { tradeSize = size; break; }
-                    }
-                    if (!tradeSize) tradeSize = 'N/A';
-                } else {
-                    const cableObjs = r.cables.map(n => cableMapForObj.get(n)).filter(Boolean);
-                    traySize = computeNeededTrayWidth(cableObjs) || null;
-                }
-                return { ...r, total_area: totalArea, cable_count: count, recommendation, trade_size: tradeSize, tray_size: traySize };
-            });
-            state.sharedFieldRoutes = common;
-            if (common.length > 0) {
-                let html = '<details><summary>Potential Shared Field Routes</summary><ul>';
-                common.forEach((c, idx) => {
-                    const group = c.allowed_cable_group ? ` (Group ${c.allowed_cable_group})` : '';
-                    let recText = c.recommendation;
-                    if (c.recommendation === 'conduit' && c.trade_size && c.trade_size !== 'N/A') {
-                        recText = `Recommended: ${c.trade_size}" Conduit`;
-                    } else if ((c.recommendation === 'tray' || c.recommendation === 'channel') && c.tray_size) {
-                        const label = c.recommendation === 'tray' ? 'Tray' : 'Channel';
-                        recText = `Recommended: ${c.tray_size}" ${label}`;
-                    } else {
-                        const label = c.recommendation.charAt(0).toUpperCase() + c.recommendation.slice(1);
-                        recText = `Recommended: ${label}`;
-                    }
-                    let fillLink = '';
-                    if (c.recommendation === 'conduit') {
-                        fillLink = ` <a href="#" class="conduit-fill-link" data-route-index="${idx}">Fill</a>`;
-                    }
-                    html += `<li class="shared-route-item" data-route-index="${idx}">${c.name}${group}: ${formatPoint(c.start)} to ${formatPoint(c.end)} - ${c.cables.join(', ')} | ${recText}${fillLink}</li>`;
-                });
-                html += '</ul></details>';
-                elements.metrics.innerHTML = html;
-                elements.metrics.querySelectorAll('.shared-route-item').forEach(li => {
-                    li.style.cursor = 'pointer';
-                    li.addEventListener('click', () => highlightSharedRoute(parseInt(li.dataset.routeIndex, 10)));
-                });
-                elements.metrics.querySelectorAll('.conduit-fill-link').forEach(link => {
-                    link.addEventListener('click', (e) => {
-                        e.preventDefault();
-                        e.stopPropagation();
-                        const idx = parseInt(link.dataset.routeIndex, 10);
-                        const route = state.sharedFieldRoutes[idx];
-                        if (route) {
-                            const cables = route.cables.map(n => state.cableList.find(c => c.name === n)).filter(Boolean);
-                            openConduitFill(cables);
-                        }
                     });
-                });
-            } else {
-                elements.metrics.innerHTML = '<p>No common field routes detected.</p>';
-            }
-            visualize(trayDataForRun, allRoutesForPlotting, "Batch Route Visualization");
+
+                    buildFieldSegmentCableMap(batchResults);
+                    state.latestRouteData = batchResults;
+                    renderBatchResults(batchResults);
+                    const nameMap = new Map(state.cableList.map(c => [c.name, c]));
+                    state.trayCableMap = {};
+                    batchResults.forEach(row => {
+                        const cableObj = nameMap.get(row.cable);
+                        if (!cableObj || !Array.isArray(row.breakdown)) return;
+                        row.breakdown.forEach(b => {
+                            if (b.tray_id && b.tray_id !== 'Field Route' && b.tray_id !== 'N/A') {
+                                if (!state.trayCableMap[b.tray_id]) state.trayCableMap[b.tray_id] = [];
+                                const entry = b.conduit_id ? { ...cableObj, conduit_id: b.conduit_id } : cableObj;
+                                const exists = state.trayCableMap[b.tray_id].some(c =>
+                                    c.name === entry.name && (!entry.conduit_id || c.conduit_id === entry.conduit_id)
+                                );
+                                if (!exists) state.trayCableMap[b.tray_id].push(entry);
+                            }
+                        });
+                    });
+                    const cableMapForArea = new Map(state.cableList.map(c => [c.name, c.diameter]));
+                    const cableMapForObj = new Map(state.cableList.map(c => [c.name, c]));
+                    const tempSystem = new CableRoutingSystem({});
+                    const commonRaw = tempSystem.findCommonFieldRoutes(allRoutesForPlotting, 6, cableMapForArea);
+                    const common = commonRaw.map(r => {
+                        const areas = r.cables.map(n => {
+                            const d = cableMapForArea.get(n);
+                            return d ? Math.PI * (d / 2) ** 2 : 0;
+                        });
+                        const totalArea = areas.reduce((a,b) => a + b, 0);
+                        const count = r.cables.length;
+                        let recommendation;
+                        if (count <= CONTAINMENT_RULES.thresholds.conduit) recommendation = 'conduit';
+                        else if (count <= CONTAINMENT_RULES.thresholds.channel) recommendation = 'channel';
+                        else recommendation = 'tray';
+                        let tradeSize = null;
+                        let traySize = null;
+                        if (recommendation === 'conduit') {
+                            const conduitType = elements.conduitType.value;
+                            const spec = CONDUIT_SPECS[conduitType] || {};
+                            const fillPct = count === 1 ? 0.53 : count === 2 ? 0.31 : 0.40;
+                            for (const size of Object.keys(spec)) {
+                                if (totalArea <= spec[size] * fillPct) { tradeSize = size; break; }
+                            }
+                            if (!tradeSize) tradeSize = 'N/A';
+                        } else {
+                            const cableObjs = r.cables.map(n => cableMapForObj.get(n)).filter(Boolean);
+                            traySize = computeNeededTrayWidth(cableObjs) || null;
+                        }
+                        return { ...r, total_area: totalArea, cable_count: count, recommendation, trade_size: tradeSize, tray_size: traySize };
+                    });
+                    state.sharedFieldRoutes = common;
+                    if (common.length > 0) {
+                        let html = '<details><summary>Potential Shared Field Routes</summary><ul>';
+                        common.forEach((c, idx) => {
+                            const group = c.allowed_cable_group ? ` (Group ${c.allowed_cable_group})` : '';
+                            let recText = c.recommendation;
+                            if (c.recommendation === 'conduit' && c.trade_size && c.trade_size !== 'N/A') {
+                                recText = `Recommended: ${c.trade_size}" Conduit`;
+                            } else if ((c.recommendation === 'tray' || c.recommendation === 'channel') && c.tray_size) {
+                                const label = c.recommendation === 'tray' ? 'Tray' : 'Channel';
+                                recText = `Recommended: ${c.tray_size}" ${label}`;
+                            } else {
+                                const label = c.recommendation.charAt(0).toUpperCase() + c.recommendation.slice(1);
+                                recText = `Recommended: ${label}`;
+                            }
+                            let fillLink = '';
+                            if (c.recommendation === 'conduit') {
+                                fillLink = ` <a href="#" class="conduit-fill-link" data-route-index="${idx}">Fill</a>`;
+                            }
+                            html += `<li class="shared-route-item" data-route-index="${idx}">${c.name}${group}: ${formatPoint(c.start)} to ${formatPoint(c.end)} - ${c.cables.join(', ')} | ${recText}${fillLink}</li>`;
+                        });
+                        html += '</ul></details>';
+                        elements.metrics.innerHTML = html;
+                        elements.metrics.querySelectorAll('.shared-route-item').forEach(li => {
+                            li.style.cursor = 'pointer';
+                            li.addEventListener('click', () => highlightSharedRoute(parseInt(li.dataset.routeIndex, 10)));
+                        });
+                        elements.metrics.querySelectorAll('.conduit-fill-link').forEach(link => {
+                            link.addEventListener('click', (e) => {
+                                e.preventDefault();
+                                e.stopPropagation();
+                                const idx = parseInt(link.dataset.routeIndex, 10);
+                                const route = state.sharedFieldRoutes[idx];
+                                if (route) {
+                                    const cables = route.cables.map(n => state.cableList.find(c => c.name === n)).filter(Boolean);
+                                    openConduitFill(cables);
+                                }
+                            });
+                        });
+                    } else {
+                        elements.metrics.innerHTML = '<p>No common field routes detected.</p>';
+                    }
+                    visualize(trayDataForRun, allRoutesForPlotting, "Batch Route Visualization");
+
+                    const finalUtilization = msg.utilization;
+                    const fillLimit = parseFloat(elements.fillLimitIn.value) / 100;
+                    const utilData = Object.entries(finalUtilization).map(([id, data]) => {
+                        const fullPct = (data.current_fill * fillLimit / data.max_fill) * 100;
+                        return {
+                            tray_id: id,
+                            full_pct: fullPct,
+                            utilization: data.utilization_percentage.toFixed(1),
+                            available: data.available_capacity.toFixed(2),
+                            fill: `<button class="fill-btn" data-tray="${id}">Open</button>`
+                        };
+                    });
+                    state.finalTrays = msg.finalTrays;
+                    state.updatedUtilData = utilData;
+                    renderUpdatedUtilizationTable();
+
+                    elements.progressLabel.textContent = `Complete (${(msg.wallTime/1000).toFixed(2)}s)`;
+                    elements.progressContainer.style.display = 'none';
+                    elements.cancelRoutingBtn.style.display = 'none';
+
+                    localStorage.setItem(cacheKey, JSON.stringify({
+                        batchResults,
+                        utilization: finalUtilization,
+                        finalTrays: msg.finalTrays,
+                        allRoutes: allRoutesForPlotting,
+                        trayCableMap: state.trayCableMap,
+                        sharedRoutes: state.sharedFieldRoutes,
+                        metricsHtml: elements.metrics.innerHTML,
+                        wallTime: msg.wallTime
+                    }));
+                }
+            };
+            routingWorker.postMessage({ type: 'start', trays: trayDataForRun, options, cables: state.cableList });
         } else {
             alert('Please add at least one cable to route.');
             elements.cancelRoutingBtn.style.display = 'none';
             elements.progressContainer.style.display = 'none';
             return;
         }
-        
-        const finalUtilization = routingSystem.getTrayUtilization();
-        const fillLimit = parseFloat(elements.fillLimitIn.value) / 100;
-        const utilData = Object.entries(finalUtilization).map(([id, data]) => {
-            const fullPct = (data.current_fill * fillLimit / data.max_fill) * 100;
-            return {
-                tray_id: id,
-                full_pct: fullPct,
-                utilization: data.utilization_percentage.toFixed(1),
-                available: data.available_capacity.toFixed(2),
-                fill: `<button class="fill-btn" data-tray="${id}">Open</button>`
-            };
-        });
-        state.finalTrays = Array.from(routingSystem.trays.values()).map(t => ({ ...t }));
-        state.updatedUtilData = utilData;
-        renderUpdatedUtilizationTable();
-
-        elements.progressLabel.textContent = 'Complete';
-        elements.progressContainer.style.display = 'none';
-        elements.cancelRoutingBtn.style.display = 'none';
     };
 
     const sleep = (ms = 0) => new Promise(res => setTimeout(res, ms));
