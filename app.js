@@ -111,6 +111,7 @@ document.addEventListener('DOMContentLoaded', async () => {
         ductbankVisible: true,
         conduitData: [],
         ductbanksWithoutConduits: [],
+        includeDuctbankOutlines: false,
     };
 
     // --- ELEMENT REFERENCES ---
@@ -273,7 +274,8 @@ document.addEventListener('DOMContentLoaded', async () => {
                 cableList: state.cableList,
                 darkMode: document.body.classList.contains('dark-mode'),
                 conduitType: elements.conduitType ? elements.conduitType.value : 'EMT',
-                proximityThreshold: parseFloat(document.getElementById('proximity-threshold')?.value) || 72
+                proximityThreshold: parseFloat(document.getElementById('proximity-threshold')?.value) || 72,
+                includeDuctbankOutlines: state.includeDuctbankOutlines,
             };
             localStorage.setItem('ctrSession', JSON.stringify(data));
         } catch (e) {
@@ -295,6 +297,9 @@ document.addEventListener('DOMContentLoaded', async () => {
                 const prox = document.getElementById('proximity-threshold');
                 if (prox && data.proximityThreshold !== undefined) {
                     prox.value = data.proximityThreshold;
+                }
+                if (data.includeDuctbankOutlines !== undefined) {
+                    state.includeDuctbankOutlines = !!data.includeDuctbankOutlines;
                 }
             }
         } catch (e) {
@@ -518,7 +523,7 @@ document.addEventListener('DOMContentLoaded', async () => {
                         parseFloat(db.end_z)
                     ];
 
-                if (dbStart.every(v => !isNaN(v)) && dbEnd.every(v => !isNaN(v))) {
+                if (state.includeDuctbankOutlines && dbStart.every(v => !isNaN(v)) && dbEnd.every(v => !isNaN(v))) {
                     state.trayData.push({
                         tray_id: db.id || db.tag,
                         start_x: dbStart[0],
@@ -1505,8 +1510,10 @@ document.addEventListener('DOMContentLoaded', async () => {
             elements.trayUtilizationContainer.innerHTML = '<p class="info-text">No tray data loaded.</p>';
             return;
         }
-        const filtered = state.trayData.filter(t => !(t.raceway_type === 'ductbank' && (t.conduit_id == null || t.conduit_id === '')));
-        const groups = filtered.reduce((acc, tray) => {
+        const trays = state.includeDuctbankOutlines
+            ? state.trayData
+            : state.trayData.filter(t => t.raceway_type !== 'ductbank');
+        const groups = trays.reduce((acc, tray) => {
             const key = tray.ductbank_id || '_none';
             acc[key] = acc[key] || [];
             acc[key].push(tray);
@@ -2692,7 +2699,8 @@ const openDuctbankRoute = (dbId, conduitId) => {
             fieldPenalty: parseFloat(document.getElementById('field-route-penalty').value),
             sharedPenalty: parseFloat(document.getElementById('shared-field-penalty').value),
             maxFieldEdge: parseFloat(document.getElementById('max-field-edge').value),
-            maxFieldNeighbors: 8
+            maxFieldNeighbors: 8,
+            includeDuctbankOutlines: state.includeDuctbankOutlines,
         });
         
         // Deep copy tray data so original state isn't mutated during batch routing
@@ -3000,7 +3008,8 @@ const openDuctbankRoute = (dbId, conduitId) => {
             fieldPenalty: parseFloat(document.getElementById('field-route-penalty').value),
             sharedPenalty: parseFloat(document.getElementById('shared-field-penalty').value),
             maxFieldEdge: parseFloat(document.getElementById('max-field-edge').value),
-            maxFieldNeighbors: 8
+            maxFieldNeighbors: 8,
+            includeDuctbankOutlines: state.includeDuctbankOutlines,
         });
 
         const trayData = state.finalTrays.map(t => ({ ...t }));
