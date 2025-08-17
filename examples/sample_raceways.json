@@ -9,17 +9,38 @@
         {
           "conduit_id": "DB-001-C1",
           "type": "PVC Sch 40",
-          "trade_size": "4"
+          "trade_size": "4",
+          "ductbank_id": "DB-001",
+          "start_x": 0,
+          "start_y": 0,
+          "start_z": 0,
+          "end_x": 100,
+          "end_y": 0,
+          "end_z": 0
         },
         {
           "conduit_id": "DB-001-C2",
           "type": "PVC Sch 40",
-          "trade_size": "4"
+          "trade_size": "4",
+          "ductbank_id": "DB-001",
+          "start_x": 0,
+          "start_y": 0,
+          "start_z": 0,
+          "end_x": 100,
+          "end_y": 0,
+          "end_z": 0
         },
         {
           "conduit_id": "DB-001-C3",
           "type": "PVC Sch 40",
-          "trade_size": "4"
+          "trade_size": "4",
+          "ductbank_id": "DB-001",
+          "start_x": 0,
+          "start_y": 0,
+          "start_z": 0,
+          "end_x": 100,
+          "end_y": 0,
+          "end_z": 0
         }
       ],
       "start_x": 0,
@@ -39,17 +60,38 @@
         {
           "conduit_id": "DB-002-C1",
           "type": "PVC Sch 40",
-          "trade_size": "4"
+          "trade_size": "4",
+          "ductbank_id": "DB-002",
+          "start_x": 0,
+          "start_y": 10,
+          "start_z": 0,
+          "end_x": 100,
+          "end_y": 10,
+          "end_z": 0
         },
         {
           "conduit_id": "DB-002-C2",
           "type": "PVC Sch 40",
-          "trade_size": "4"
+          "trade_size": "4",
+          "ductbank_id": "DB-002",
+          "start_x": 0,
+          "start_y": 10,
+          "start_z": 0,
+          "end_x": 100,
+          "end_y": 10,
+          "end_z": 0
         },
         {
           "conduit_id": "DB-002-C3",
           "type": "PVC Sch 40",
-          "trade_size": "4"
+          "trade_size": "4",
+          "ductbank_id": "DB-002",
+          "start_x": 0,
+          "start_y": 10,
+          "start_z": 0,
+          "end_x": 100,
+          "end_y": 10,
+          "end_z": 0
         }
       ],
       "start_x": 0,
@@ -69,17 +111,38 @@
         {
           "conduit_id": "DB-003-C1",
           "type": "PVC Sch 40",
-          "trade_size": "4"
+          "trade_size": "4",
+          "ductbank_id": "DB-003",
+          "start_x": 0,
+          "start_y": 20,
+          "start_z": 0,
+          "end_x": 100,
+          "end_y": 20,
+          "end_z": 0
         },
         {
           "conduit_id": "DB-003-C2",
           "type": "PVC Sch 40",
-          "trade_size": "4"
+          "trade_size": "4",
+          "ductbank_id": "DB-003",
+          "start_x": 0,
+          "start_y": 20,
+          "start_z": 0,
+          "end_x": 100,
+          "end_y": 20,
+          "end_z": 0
         },
         {
           "conduit_id": "DB-003-C3",
           "type": "PVC Sch 40",
-          "trade_size": "4"
+          "trade_size": "4",
+          "ductbank_id": "DB-003",
+          "start_x": 0,
+          "start_y": 20,
+          "start_z": 0,
+          "end_x": 100,
+          "end_y": 20,
+          "end_z": 0
         }
       ],
       "start_x": 0,
@@ -99,17 +162,38 @@
         {
           "conduit_id": "DB-004-C1",
           "type": "PVC Sch 40",
-          "trade_size": "4"
+          "trade_size": "4",
+          "ductbank_id": "DB-004",
+          "start_x": 0,
+          "start_y": 30,
+          "start_z": 0,
+          "end_x": 100,
+          "end_y": 30,
+          "end_z": 0
         },
         {
           "conduit_id": "DB-004-C2",
           "type": "PVC Sch 40",
-          "trade_size": "4"
+          "trade_size": "4",
+          "ductbank_id": "DB-004",
+          "start_x": 0,
+          "start_y": 30,
+          "start_z": 0,
+          "end_x": 100,
+          "end_y": 30,
+          "end_z": 0
         },
         {
           "conduit_id": "DB-004-C3",
           "type": "PVC Sch 40",
-          "trade_size": "4"
+          "trade_size": "4",
+          "ductbank_id": "DB-004",
+          "start_x": 0,
+          "start_y": 30,
+          "start_z": 0,
+          "end_x": 100,
+          "end_y": 30,
+          "end_z": 0
         }
       ],
       "start_x": 0,
@@ -129,17 +213,38 @@
         {
           "conduit_id": "DB-005-C1",
           "type": "PVC Sch 40",
-          "trade_size": "4"
+          "trade_size": "4",
+          "ductbank_id": "DB-005",
+          "start_x": 0,
+          "start_y": 40,
+          "start_z": 0,
+          "end_x": 100,
+          "end_y": 40,
+          "end_z": 0
         },
         {
           "conduit_id": "DB-005-C2",
           "type": "PVC Sch 40",
-          "trade_size": "4"
+          "trade_size": "4",
+          "ductbank_id": "DB-005",
+          "start_x": 0,
+          "start_y": 40,
+          "start_z": 0,
+          "end_x": 100,
+          "end_y": 40,
+          "end_z": 0
         },
         {
           "conduit_id": "DB-005-C3",
           "type": "PVC Sch 40",
-          "trade_size": "4"
+          "trade_size": "4",
+          "ductbank_id": "DB-005",
+          "start_x": 0,
+          "start_y": 40,
+          "start_z": 0,
+          "end_x": 100,
+          "end_y": 40,
+          "end_z": 0
         }
       ],
       "start_x": 0,
@@ -159,17 +264,38 @@
         {
           "conduit_id": "DB-006-C1",
           "type": "PVC Sch 40",
-          "trade_size": "4"
+          "trade_size": "4",
+          "ductbank_id": "DB-006",
+          "start_x": 0,
+          "start_y": 50,
+          "start_z": 0,
+          "end_x": 100,
+          "end_y": 50,
+          "end_z": 0
         },
         {
           "conduit_id": "DB-006-C2",
           "type": "PVC Sch 40",
-          "trade_size": "4"
+          "trade_size": "4",
+          "ductbank_id": "DB-006",
+          "start_x": 0,
+          "start_y": 50,
+          "start_z": 0,
+          "end_x": 100,
+          "end_y": 50,
+          "end_z": 0
         },
         {
           "conduit_id": "DB-006-C3",
           "type": "PVC Sch 40",
-          "trade_size": "4"
+          "trade_size": "4",
+          "ductbank_id": "DB-006",
+          "start_x": 0,
+          "start_y": 50,
+          "start_z": 0,
+          "end_x": 100,
+          "end_y": 50,
+          "end_z": 0
         }
       ],
       "start_x": 0,
@@ -189,17 +315,38 @@
         {
           "conduit_id": "DB-007-C1",
           "type": "PVC Sch 40",
-          "trade_size": "4"
+          "trade_size": "4",
+          "ductbank_id": "DB-007",
+          "start_x": 0,
+          "start_y": 60,
+          "start_z": 0,
+          "end_x": 100,
+          "end_y": 60,
+          "end_z": 0
         },
         {
           "conduit_id": "DB-007-C2",
           "type": "PVC Sch 40",
-          "trade_size": "4"
+          "trade_size": "4",
+          "ductbank_id": "DB-007",
+          "start_x": 0,
+          "start_y": 60,
+          "start_z": 0,
+          "end_x": 100,
+          "end_y": 60,
+          "end_z": 0
         },
         {
           "conduit_id": "DB-007-C3",
           "type": "PVC Sch 40",
-          "trade_size": "4"
+          "trade_size": "4",
+          "ductbank_id": "DB-007",
+          "start_x": 0,
+          "start_y": 60,
+          "start_z": 0,
+          "end_x": 100,
+          "end_y": 60,
+          "end_z": 0
         }
       ],
       "start_x": 0,
@@ -219,17 +366,38 @@
         {
           "conduit_id": "DB-008-C1",
           "type": "PVC Sch 40",
-          "trade_size": "4"
+          "trade_size": "4",
+          "ductbank_id": "DB-008",
+          "start_x": 0,
+          "start_y": 70,
+          "start_z": 0,
+          "end_x": 100,
+          "end_y": 70,
+          "end_z": 0
         },
         {
           "conduit_id": "DB-008-C2",
           "type": "PVC Sch 40",
-          "trade_size": "4"
+          "trade_size": "4",
+          "ductbank_id": "DB-008",
+          "start_x": 0,
+          "start_y": 70,
+          "start_z": 0,
+          "end_x": 100,
+          "end_y": 70,
+          "end_z": 0
         },
         {
           "conduit_id": "DB-008-C3",
           "type": "PVC Sch 40",
-          "trade_size": "4"
+          "trade_size": "4",
+          "ductbank_id": "DB-008",
+          "start_x": 0,
+          "start_y": 70,
+          "start_z": 0,
+          "end_x": 100,
+          "end_y": 70,
+          "end_z": 0
         }
       ],
       "start_x": 0,
@@ -249,17 +417,38 @@
         {
           "conduit_id": "DB-009-C1",
           "type": "PVC Sch 40",
-          "trade_size": "4"
+          "trade_size": "4",
+          "ductbank_id": "DB-009",
+          "start_x": 0,
+          "start_y": 80,
+          "start_z": 0,
+          "end_x": 100,
+          "end_y": 80,
+          "end_z": 0
         },
         {
           "conduit_id": "DB-009-C2",
           "type": "PVC Sch 40",
-          "trade_size": "4"
+          "trade_size": "4",
+          "ductbank_id": "DB-009",
+          "start_x": 0,
+          "start_y": 80,
+          "start_z": 0,
+          "end_x": 100,
+          "end_y": 80,
+          "end_z": 0
         },
         {
           "conduit_id": "DB-009-C3",
           "type": "PVC Sch 40",
-          "trade_size": "4"
+          "trade_size": "4",
+          "ductbank_id": "DB-009",
+          "start_x": 0,
+          "start_y": 80,
+          "start_z": 0,
+          "end_x": 100,
+          "end_y": 80,
+          "end_z": 0
         }
       ],
       "start_x": 0,
@@ -279,17 +468,38 @@
         {
           "conduit_id": "DB-010-C1",
           "type": "PVC Sch 40",
-          "trade_size": "4"
+          "trade_size": "4",
+          "ductbank_id": "DB-010",
+          "start_x": 0,
+          "start_y": 90,
+          "start_z": 0,
+          "end_x": 100,
+          "end_y": 90,
+          "end_z": 0
         },
         {
           "conduit_id": "DB-010-C2",
           "type": "PVC Sch 40",
-          "trade_size": "4"
+          "trade_size": "4",
+          "ductbank_id": "DB-010",
+          "start_x": 0,
+          "start_y": 90,
+          "start_z": 0,
+          "end_x": 100,
+          "end_y": 90,
+          "end_z": 0
         },
         {
           "conduit_id": "DB-010-C3",
           "type": "PVC Sch 40",
-          "trade_size": "4"
+          "trade_size": "4",
+          "ductbank_id": "DB-010",
+          "start_x": 0,
+          "start_y": 90,
+          "start_z": 0,
+          "end_x": 100,
+          "end_y": 90,
+          "end_z": 0
         }
       ],
       "start_x": 0,
@@ -309,17 +519,38 @@
         {
           "conduit_id": "DB-011-C1",
           "type": "PVC Sch 40",
-          "trade_size": "4"
+          "trade_size": "4",
+          "ductbank_id": "DB-011",
+          "start_x": 0,
+          "start_y": 100,
+          "start_z": 0,
+          "end_x": 100,
+          "end_y": 100,
+          "end_z": 0
         },
         {
           "conduit_id": "DB-011-C2",
           "type": "PVC Sch 40",
-          "trade_size": "4"
+          "trade_size": "4",
+          "ductbank_id": "DB-011",
+          "start_x": 0,
+          "start_y": 100,
+          "start_z": 0,
+          "end_x": 100,
+          "end_y": 100,
+          "end_z": 0
         },
         {
           "conduit_id": "DB-011-C3",
           "type": "PVC Sch 40",
-          "trade_size": "4"
+          "trade_size": "4",
+          "ductbank_id": "DB-011",
+          "start_x": 0,
+          "start_y": 100,
+          "start_z": 0,
+          "end_x": 100,
+          "end_y": 100,
+          "end_z": 0
         }
       ],
       "start_x": 0,
@@ -339,17 +570,38 @@
         {
           "conduit_id": "DB-012-C1",
           "type": "PVC Sch 40",
-          "trade_size": "4"
+          "trade_size": "4",
+          "ductbank_id": "DB-012",
+          "start_x": 0,
+          "start_y": 110,
+          "start_z": 0,
+          "end_x": 100,
+          "end_y": 110,
+          "end_z": 0
         },
         {
           "conduit_id": "DB-012-C2",
           "type": "PVC Sch 40",
-          "trade_size": "4"
+          "trade_size": "4",
+          "ductbank_id": "DB-012",
+          "start_x": 0,
+          "start_y": 110,
+          "start_z": 0,
+          "end_x": 100,
+          "end_y": 110,
+          "end_z": 0
         },
         {
           "conduit_id": "DB-012-C3",
           "type": "PVC Sch 40",
-          "trade_size": "4"
+          "trade_size": "4",
+          "ductbank_id": "DB-012",
+          "start_x": 0,
+          "start_y": 110,
+          "start_z": 0,
+          "end_x": 100,
+          "end_y": 110,
+          "end_z": 0
         }
       ],
       "start_x": 0,
@@ -369,17 +621,38 @@
         {
           "conduit_id": "DB-013-C1",
           "type": "PVC Sch 40",
-          "trade_size": "4"
+          "trade_size": "4",
+          "ductbank_id": "DB-013",
+          "start_x": 0,
+          "start_y": 120,
+          "start_z": 0,
+          "end_x": 100,
+          "end_y": 120,
+          "end_z": 0
         },
         {
           "conduit_id": "DB-013-C2",
           "type": "PVC Sch 40",
-          "trade_size": "4"
+          "trade_size": "4",
+          "ductbank_id": "DB-013",
+          "start_x": 0,
+          "start_y": 120,
+          "start_z": 0,
+          "end_x": 100,
+          "end_y": 120,
+          "end_z": 0
         },
         {
           "conduit_id": "DB-013-C3",
           "type": "PVC Sch 40",
-          "trade_size": "4"
+          "trade_size": "4",
+          "ductbank_id": "DB-013",
+          "start_x": 0,
+          "start_y": 120,
+          "start_z": 0,
+          "end_x": 100,
+          "end_y": 120,
+          "end_z": 0
         }
       ],
       "start_x": 0,
@@ -399,17 +672,38 @@
         {
           "conduit_id": "DB-014-C1",
           "type": "PVC Sch 40",
-          "trade_size": "4"
+          "trade_size": "4",
+          "ductbank_id": "DB-014",
+          "start_x": 0,
+          "start_y": 130,
+          "start_z": 0,
+          "end_x": 100,
+          "end_y": 130,
+          "end_z": 0
         },
         {
           "conduit_id": "DB-014-C2",
           "type": "PVC Sch 40",
-          "trade_size": "4"
+          "trade_size": "4",
+          "ductbank_id": "DB-014",
+          "start_x": 0,
+          "start_y": 130,
+          "start_z": 0,
+          "end_x": 100,
+          "end_y": 130,
+          "end_z": 0
         },
         {
           "conduit_id": "DB-014-C3",
           "type": "PVC Sch 40",
-          "trade_size": "4"
+          "trade_size": "4",
+          "ductbank_id": "DB-014",
+          "start_x": 0,
+          "start_y": 130,
+          "start_z": 0,
+          "end_x": 100,
+          "end_y": 130,
+          "end_z": 0
         }
       ],
       "start_x": 0,
@@ -429,17 +723,38 @@
         {
           "conduit_id": "DB-015-C1",
           "type": "PVC Sch 40",
-          "trade_size": "4"
+          "trade_size": "4",
+          "ductbank_id": "DB-015",
+          "start_x": 0,
+          "start_y": 140,
+          "start_z": 0,
+          "end_x": 100,
+          "end_y": 140,
+          "end_z": 0
         },
         {
           "conduit_id": "DB-015-C2",
           "type": "PVC Sch 40",
-          "trade_size": "4"
+          "trade_size": "4",
+          "ductbank_id": "DB-015",
+          "start_x": 0,
+          "start_y": 140,
+          "start_z": 0,
+          "end_x": 100,
+          "end_y": 140,
+          "end_z": 0
         },
         {
           "conduit_id": "DB-015-C3",
           "type": "PVC Sch 40",
-          "trade_size": "4"
+          "trade_size": "4",
+          "ductbank_id": "DB-015",
+          "start_x": 0,
+          "start_y": 140,
+          "start_z": 0,
+          "end_x": 100,
+          "end_y": 140,
+          "end_z": 0
         }
       ],
       "start_x": 0,
@@ -459,17 +774,38 @@
         {
           "conduit_id": "DB-016-C1",
           "type": "PVC Sch 40",
-          "trade_size": "4"
+          "trade_size": "4",
+          "ductbank_id": "DB-016",
+          "start_x": 0,
+          "start_y": 150,
+          "start_z": 0,
+          "end_x": 100,
+          "end_y": 150,
+          "end_z": 0
         },
         {
           "conduit_id": "DB-016-C2",
           "type": "PVC Sch 40",
-          "trade_size": "4"
+          "trade_size": "4",
+          "ductbank_id": "DB-016",
+          "start_x": 0,
+          "start_y": 150,
+          "start_z": 0,
+          "end_x": 100,
+          "end_y": 150,
+          "end_z": 0
         },
         {
           "conduit_id": "DB-016-C3",
           "type": "PVC Sch 40",
-          "trade_size": "4"
+          "trade_size": "4",
+          "ductbank_id": "DB-016",
+          "start_x": 0,
+          "start_y": 150,
+          "start_z": 0,
+          "end_x": 100,
+          "end_y": 150,
+          "end_z": 0
         }
       ],
       "start_x": 0,
@@ -489,17 +825,38 @@
         {
           "conduit_id": "DB-017-C1",
           "type": "PVC Sch 40",
-          "trade_size": "4"
+          "trade_size": "4",
+          "ductbank_id": "DB-017",
+          "start_x": 0,
+          "start_y": 160,
+          "start_z": 0,
+          "end_x": 100,
+          "end_y": 160,
+          "end_z": 0
         },
         {
           "conduit_id": "DB-017-C2",
           "type": "PVC Sch 40",
-          "trade_size": "4"
+          "trade_size": "4",
+          "ductbank_id": "DB-017",
+          "start_x": 0,
+          "start_y": 160,
+          "start_z": 0,
+          "end_x": 100,
+          "end_y": 160,
+          "end_z": 0
         },
         {
           "conduit_id": "DB-017-C3",
           "type": "PVC Sch 40",
-          "trade_size": "4"
+          "trade_size": "4",
+          "ductbank_id": "DB-017",
+          "start_x": 0,
+          "start_y": 160,
+          "start_z": 0,
+          "end_x": 100,
+          "end_y": 160,
+          "end_z": 0
         }
       ],
       "start_x": 0,
@@ -519,17 +876,38 @@
         {
           "conduit_id": "DB-018-C1",
           "type": "PVC Sch 40",
-          "trade_size": "4"
+          "trade_size": "4",
+          "ductbank_id": "DB-018",
+          "start_x": 0,
+          "start_y": 170,
+          "start_z": 0,
+          "end_x": 100,
+          "end_y": 170,
+          "end_z": 0
         },
         {
           "conduit_id": "DB-018-C2",
           "type": "PVC Sch 40",
-          "trade_size": "4"
+          "trade_size": "4",
+          "ductbank_id": "DB-018",
+          "start_x": 0,
+          "start_y": 170,
+          "start_z": 0,
+          "end_x": 100,
+          "end_y": 170,
+          "end_z": 0
         },
         {
           "conduit_id": "DB-018-C3",
           "type": "PVC Sch 40",
-          "trade_size": "4"
+          "trade_size": "4",
+          "ductbank_id": "DB-018",
+          "start_x": 0,
+          "start_y": 170,
+          "start_z": 0,
+          "end_x": 100,
+          "end_y": 170,
+          "end_z": 0
         }
       ],
       "start_x": 0,
@@ -549,17 +927,38 @@
         {
           "conduit_id": "DB-019-C1",
           "type": "PVC Sch 40",
-          "trade_size": "4"
+          "trade_size": "4",
+          "ductbank_id": "DB-019",
+          "start_x": 0,
+          "start_y": 180,
+          "start_z": 0,
+          "end_x": 100,
+          "end_y": 180,
+          "end_z": 0
         },
         {
           "conduit_id": "DB-019-C2",
           "type": "PVC Sch 40",
-          "trade_size": "4"
+          "trade_size": "4",
+          "ductbank_id": "DB-019",
+          "start_x": 0,
+          "start_y": 180,
+          "start_z": 0,
+          "end_x": 100,
+          "end_y": 180,
+          "end_z": 0
         },
         {
           "conduit_id": "DB-019-C3",
           "type": "PVC Sch 40",
-          "trade_size": "4"
+          "trade_size": "4",
+          "ductbank_id": "DB-019",
+          "start_x": 0,
+          "start_y": 180,
+          "start_z": 0,
+          "end_x": 100,
+          "end_y": 180,
+          "end_z": 0
         }
       ],
       "start_x": 0,
@@ -579,17 +978,38 @@
         {
           "conduit_id": "DB-020-C1",
           "type": "PVC Sch 40",
-          "trade_size": "4"
+          "trade_size": "4",
+          "ductbank_id": "DB-020",
+          "start_x": 0,
+          "start_y": 190,
+          "start_z": 0,
+          "end_x": 100,
+          "end_y": 190,
+          "end_z": 0
         },
         {
           "conduit_id": "DB-020-C2",
           "type": "PVC Sch 40",
-          "trade_size": "4"
+          "trade_size": "4",
+          "ductbank_id": "DB-020",
+          "start_x": 0,
+          "start_y": 190,
+          "start_z": 0,
+          "end_x": 100,
+          "end_y": 190,
+          "end_z": 0
         },
         {
           "conduit_id": "DB-020-C3",
           "type": "PVC Sch 40",
-          "trade_size": "4"
+          "trade_size": "4",
+          "ductbank_id": "DB-020",
+          "start_x": 0,
+          "start_y": 190,
+          "start_z": 0,
+          "end_x": 100,
+          "end_y": 190,
+          "end_z": 0
         }
       ],
       "start_x": 0,
