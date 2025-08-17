@@ -103,6 +103,109 @@ function initProjectStorage(){
 globalThis.migrateProject=migrateProject;
 initProjectStorage();
 
+const HISTORY_KEY='CTR_HISTORY';
+const HISTORY_LIMIT=20;
+let ctrHistory=[];
+let historyIndex=-1;
+
+function loadHistory(){
+  try{ctrHistory=JSON.parse(localStorage.getItem(HISTORY_KEY))||[];}catch{ctrHistory=[];}
+  historyIndex=ctrHistory.length-1;
+}
+
+function saveHistory(){
+  try{localStorage.setItem(HISTORY_KEY,JSON.stringify(ctrHistory));}catch(e){console.error('history save failed',e);}
+}
+
+function diffObj(a,b){
+  const diff={};
+  const keys=new Set([...Object.keys(a||{}),...Object.keys(b||{})]);
+  keys.forEach(k=>{
+    const av=a?a[k]:undefined;
+    const bv=b?b[k]:undefined;
+    if(typeof av==='object'&&av&&typeof bv==='object'&&bv){
+      const d=diffObj(av,bv);
+      if(Object.keys(d).length) diff[k]=d;
+    }else if(JSON.stringify(av)!==JSON.stringify(bv)){
+      diff[k]={old:av,new:bv};
+    }
+  });
+  return diff;
+}
+
+function takeSnapshot(){
+  if(typeof getProject!=='function') return;
+  const project=getProject();
+  const last=ctrHistory[ctrHistory.length-1];
+  if(last&&JSON.stringify(last.project)===JSON.stringify(project)) return;
+  if(historyIndex<ctrHistory.length-1) ctrHistory=ctrHistory.slice(0,historyIndex+1);
+  ctrHistory.push({ts:Date.now(),project});
+  if(ctrHistory.length>HISTORY_LIMIT){
+    ctrHistory.shift();
+    if(historyIndex>0) historyIndex--;
+  }
+  historyIndex=ctrHistory.length-1;
+  saveHistory();
+  updateUndoRedoButtons();
+}
+
+function restoreSnapshot(idx){
+  const snap=ctrHistory[idx];
+  if(!snap)return;
+  const diff=diffObj(getProject(),snap.project);
+  const ts=new Date(snap.ts).toLocaleString();
+  const diffStr=JSON.stringify(diff,null,2);
+  if(!confirm(`Restore snapshot from ${ts}?\n\nChanges:\n${diffStr}`)) return;
+  setProject(snap.project);
+  historyIndex=idx;
+  saveHistory();
+  location.reload();
+}
+
+function undoHistory(){ if(historyIndex>0) restoreSnapshot(historyIndex-1); }
+function redoHistory(){ if(historyIndex<ctrHistory.length-1) restoreSnapshot(historyIndex+1); }
+
+function updateUndoRedoButtons(){
+  const undoBtns=document.querySelectorAll('.ctr-undo-btn');
+  const redoBtns=document.querySelectorAll('.ctr-redo-btn');
+  undoBtns.forEach(b=>b.disabled=historyIndex<=0);
+  redoBtns.forEach(b=>b.disabled=historyIndex>=ctrHistory.length-1);
+}
+
+function attachHistoryButtons(){
+  const saveBtns=document.querySelectorAll('button[id^="save"]');
+  saveBtns.forEach(btn=>{
+    if(btn.dataset.historyAttached) return;
+    btn.dataset.historyAttached='1';
+    const undo=document.createElement('button');
+    undo.type='button';
+    undo.textContent='Undo';
+    undo.className='ctr-undo-btn';
+    const redo=document.createElement('button');
+    redo.type='button';
+    redo.textContent='Redo';
+    redo.className='ctr-redo-btn';
+    btn.insertAdjacentElement('afterend',redo);
+    btn.insertAdjacentElement('afterend',undo);
+    undo.addEventListener('click',undoHistory);
+    redo.addEventListener('click',redoHistory);
+  });
+  updateUndoRedoButtons();
+}
+
+function initHistory(){
+  if(typeof window==='undefined'||typeof localStorage==='undefined') return;
+  loadHistory();
+  if(!ctrHistory.length) takeSnapshot();
+  attachHistoryButtons();
+  setInterval(takeSnapshot,20000);
+  window.addEventListener('blur',takeSnapshot);
+  document.addEventListener('keydown',e=>{
+    if((e.ctrlKey||e.metaKey)&&e.key.toLowerCase()==='z'){e.preventDefault();undoHistory();}
+    if((e.ctrlKey||e.metaKey)&&e.key.toLowerCase()==='y'){e.preventDefault();redoHistory();}
+  });
+}
+
 function trapFocus(e,container){
   if(e.key!=='Tab')return;
   const focusables=container.querySelectorAll(FOCUSABLE);
@@ -161,6 +264,10 @@ function initSettings(){
         close();
       }
     });
+  }
+  if(!globalThis.__ctrHistoryInit){
+    initHistory();
+    globalThis.__ctrHistoryInit=true;
   }
 }
 
