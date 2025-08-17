@@ -2189,7 +2189,8 @@ const openDuctbankRoute = (dbId, conduitId) => {
             }
             html += '</details>';
         });
-        const overall = `<p class="overall-stats"><strong>Overall Total Length:</strong> ${totalLength.toFixed(2)} ft | <strong>Overall Field Length:</strong> ${totalField.toFixed(2)} ft</p>`;
+        const fmt = globalThis.units?.formatDistance || (v=>`${v.toFixed(2)} ft`);
+        const overall = `<p class="overall-stats"><strong>Overall Total Length:</strong> ${fmt(totalLength)} | <strong>Overall Field Length:</strong> ${fmt(totalField)}</p>`;
         elements.routeBreakdownContainer.innerHTML = overall + html;
         const mismatches = [];
         results.forEach(r => {

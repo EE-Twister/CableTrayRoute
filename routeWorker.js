@@ -1,3 +1,4 @@
+const formatDist = globalThis.units?.formatDistance || (v => `${v.toFixed(1)} ft`);
 class MinHeap {
     constructor() {
         this.heap = [];
@@ -662,7 +663,7 @@ class CableRoutingSystem {
                 addEdge(projId, startId, this.distance(projStart, a), 'tray', tray.tray_id);
                 addEdge(projId, `${tray.tray_id}_end`, this.distance(projStart, b), 'tray', tray.tray_id);
             } else {
-                exclusions.push({ tray_id: tray.tray_id, reason: 'start_beyond_proximity', message: `Rejected ${tray.tray_id}: start ${distToProjStart.toFixed(1)} ft > Max ${this.proximityThreshold} ft` });
+                exclusions.push({ tray_id: tray.tray_id, reason: 'start_beyond_proximity', message: `Rejected ${tray.tray_id}: start ${formatDist(distToProjStart)} > Max ${formatDist(this.proximityThreshold)}` });
             }
 
             // Project cable's end point
@@ -676,7 +677,7 @@ class CableRoutingSystem {
                 addEdge(projId, startId, this.distance(projEnd, a), 'tray', tray.tray_id);
                 addEdge(projId, `${tray.tray_id}_end`, this.distance(projEnd, b), 'tray', tray.tray_id);
             } else {
-                exclusions.push({ tray_id: tray.tray_id, reason: 'end_beyond_proximity', message: `Rejected ${tray.tray_id}: end ${distToProjEnd.toFixed(1)} ft > Max ${this.proximityThreshold} ft` });
+                exclusions.push({ tray_id: tray.tray_id, reason: 'end_beyond_proximity', message: `Rejected ${tray.tray_id}: end ${formatDist(distToProjEnd)} > Max ${formatDist(this.proximityThreshold)}` });
             }
         });
         
