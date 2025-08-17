@@ -12,6 +12,10 @@ function processFrom(index) {
             self.postMessage({ type: 'cancelled', completed: i, total: cables.length });
             return;
         }
+        if (results[i]) {
+            self.postMessage({ type: 'progress', completed: i + 1, total: cables.length });
+            continue;
+        }
 
         const cable = cables[i];
         const cableArea = Math.PI * (cable.diameter / 2) ** 2;
@@ -75,6 +79,36 @@ self.onmessage = function(e) {
             pausedDuration: 0
         };
         cancel = false;
+        cables.forEach((c, idx) => {
+            if (c.locked && Array.isArray(c.route_segments) && c.route_segments.length) {
+                const area = Math.PI * (c.diameter / 2) ** 2;
+                const traySegs = c.route_segments.filter(seg => seg.tray_id).map(seg => seg.tray_id);
+                system.updateTrayFill(traySegs, area);
+                system.recordSharedFieldSegments(c.route_segments);
+                const total = c.route_segments.reduce((s, seg) => s + (seg.length || 0), 0);
+                const fieldLen = c.route_segments.filter(seg => seg.type === 'field').reduce((s, seg) => s + (seg.length || 0), 0);
+                state.results[idx] = {
+                    success: true,
+                    total_length: total,
+                    field_routed_length: fieldLen,
+                    tray_segments: traySegs,
+                    route_segments: c.route_segments,
+                    manual: false,
+                    manual_raceway: false,
+                    exclusions: [],
+                    mismatched_records: []
+                };
+                state.allRoutes.push({
+                    label: c.name,
+                    segments: c.route_segments,
+                    startPoint: c.start,
+                    endPoint: c.end,
+                    startTag: c.start_tag,
+                    endTag: c.end_tag,
+                    allowed_cable_group: c.allowed_cable_group
+                });
+            }
+        });
         processFrom(0);
     } else if (type === 'cancel') {
         if (state && !cancel) {

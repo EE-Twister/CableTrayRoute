@@ -383,6 +383,8 @@ document.addEventListener('DOMContentLoaded', async () => {
         if (!cable) return;
         if (!('manual_path' in cable)) cable.manual_path = '';
         if (!('raceway_ids' in cable)) cable.raceway_ids = [];
+        if (!('locked' in cable)) cable.locked = false;
+        if (!Array.isArray(cable.route_segments)) cable.route_segments = [];
         if (!cable.manual_path && Array.isArray(cable.raceway_ids) && cable.raceway_ids.length) {
             cable.manual_path = cable.raceway_ids.join('>');
         }
@@ -2139,7 +2141,8 @@ const openDuctbankRoute = (dbId, conduitId) => {
             const fl = parseFloat(res.field_length);
             if (!isNaN(tl)) totalLength += tl;
             if (!isNaN(fl)) totalField += fl;
-            html += `<details><summary>${res.cable} | ${res.status} | ${res.mode} | Total ${res.total_length} | Field ${res.field_length} | Segments ${res.segments_count} <button class="view-map-btn" data-index="${idx}">View on Map</button></summary>`;
+            const lockBtn = state.cableList[idx]?.locked ? '' : ` <button class="lock-route-btn" data-idx="${idx}">Lock Route</button>`;
+            html += `<details><summary>${res.cable} | ${res.status} | ${res.mode} | Total ${res.total_length} | Field ${res.field_length} | Segments ${res.segments_count} <button class="view-map-btn" data-index="${idx}">View on Map</button>${lockBtn}</summary>`;
             if (res.exclusions && res.exclusions.length > 0) {
                 html += '<p class="exclusions-title"><strong>Rejected Segments:</strong></p><ul class="exclusions-list">';
                 res.exclusions.forEach(ex => {
@@ -2251,6 +2254,19 @@ const openDuctbankRoute = (dbId, conduitId) => {
                 highlightCableRoute(idx);
             });
         });
+        elements.routeBreakdownContainer.querySelectorAll('.lock-route-btn').forEach(btn => {
+            btn.addEventListener('click', (e) => {
+                e.stopPropagation();
+                const idx = parseInt(btn.dataset.idx, 10);
+                state.cableList[idx].locked = true;
+                saveSession();
+                if (state.latestRouteData && state.latestRouteData[idx]) {
+                    state.latestRouteData[idx].mode = 'Locked';
+                }
+                updateCableListDisplay();
+                renderBatchResults(state.latestRouteData);
+            });
+        });
     };
     
     const updateCableListDisplay = () => {
@@ -2259,6 +2275,7 @@ const openDuctbankRoute = (dbId, conduitId) => {
             updateTableCounts();
             return;
         }
+        state.cableList.forEach(syncManualPath);
         let html = '<h4>Cables to Route:</h4><table class="sticky-table"><thead><tr>' +
             '<th data-key="name">Tag</th>' +
             '<th data-key="start_tag">Start Tag</th>' +
@@ -2272,7 +2289,7 @@ const openDuctbankRoute = (dbId, conduitId) => {
             '<th data-key="start0">Start (X,Y,Z)</th>' +
             '<th data-key="end0">End (X,Y,Z)</th>' +
             '<th data-key="manual_path">Manual Path</th>' +
-            '<th></th><th></th></tr></thead><tbody>';
+            '<th data-key="locked">Locked</th><th></th><th></th></tr></thead><tbody>';
         state.cableList.forEach((c, idx) => {
             html += `<tr>
                         <td><input type="text" class="cable-tag-input" data-idx="${idx}" value="${c.name}"></td>
@@ -2325,6 +2342,7 @@ const openDuctbankRoute = (dbId, conduitId) => {
                             <input type="number" class="cable-end-input" data-idx="${idx}" data-coord="2" value="${c.end[2]}" step="0.1" style="width:60px;">
                         </td>
                         <td><input type="text" class="cable-manual-input" data-idx="${idx}" value="${c.manual_path || ''}" placeholder="Tray1>Tray2 or x,y,z;..." style="width:180px;"></td>
+                        <td><span class="lock-indicator">${c.locked ? '🔒' : ''}</span>${c.locked ? `<button class="unlock-cable" data-idx="${idx}">Unlock</button>` : (c.route_segments && c.route_segments.length ? `<button class="relock-cable" data-idx="${idx}">Relock</button>` : '')}</td>
                         <td><button class="icon-button dup-cable" data-idx="${idx}" title="Duplicate">📋</button></td>
                         <td><button class="icon-button del-cable icon-delete" data-idx="${idx}" title="Delete">\u274C</button></td>
                     </tr>`;
@@ -2437,6 +2455,26 @@ const openDuctbankRoute = (dbId, conduitId) => {
                 state.cableList.splice(i, 1);
                 updateCableListDisplay();
                 saveSession();
+            });
+        });
+        elements.cableListContainer.querySelectorAll('.unlock-cable').forEach(btn => {
+            btn.addEventListener('click', e => {
+                const i = parseInt(e.target.dataset.idx, 10);
+                state.cableList[i].locked = false;
+                if (state.latestRouteData && state.latestRouteData[i]) state.latestRouteData[i].mode = 'Unlocked';
+                saveSession();
+                updateCableListDisplay();
+                renderBatchResults(state.latestRouteData);
+            });
+        });
+        elements.cableListContainer.querySelectorAll('.relock-cable').forEach(btn => {
+            btn.addEventListener('click', e => {
+                const i = parseInt(e.target.dataset.idx, 10);
+                state.cableList[i].locked = true;
+                if (state.latestRouteData && state.latestRouteData[i]) state.latestRouteData[i].mode = 'Locked';
+                saveSession();
+                updateCableListDisplay();
+                renderBatchResults(state.latestRouteData);
             });
         });
         updateTableCounts();
@@ -2911,6 +2949,11 @@ const openDuctbankRoute = (dbId, conduitId) => {
                 const cache = JSON.parse(cached);
                 state.latestRouteData = cache.batchResults;
                 state.finalTrays = cache.finalTrays;
+                const resMap = new Map((cache.batchResults || []).map(r => [r.cable, r]));
+                state.cableList.forEach(c => {
+                    const r = resMap.get(c.name);
+                    c.route_segments = r ? r.route_segments || [] : [];
+                });
                 const fillLimit = parseFloat(elements.fillLimitIn.value) / 100;
                 const utilData = Object.entries(cache.utilization).map(([id, data]) => {
                     const fullPct = (data.current_fill * fillLimit / data.max_fill) * 100;
@@ -2964,10 +3007,11 @@ const openDuctbankRoute = (dbId, conduitId) => {
                         if (!result.success) {
                             showManualPathError(index, result.message, result.error && result.error.tray_id);
                         }
+                        cable.route_segments = result.success ? result.route_segments : [];
                         return {
                             cable: cable.name,
                             status: result.success ? '✓ Routed' : '✗ Failed',
-                            mode: result.manual ? (result.manual_raceway ? 'Manual Raceway' : 'Manual Path') : 'Automatic',
+                            mode: cable.locked ? 'Locked' : (result.manual ? (result.manual_raceway ? 'Manual Raceway' : 'Manual Path') : 'Automatic'),
                             manual_raceway: !!result.manual_raceway,
                             total_length: result.success ? result.total_length.toFixed(2) : 'N/A',
                             field_length: result.success ? result.field_routed_length.toFixed(2) : 'N/A',
