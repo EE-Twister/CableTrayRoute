@@ -393,20 +393,30 @@ document.addEventListener('DOMContentLoaded', async () => {
         if (condJson) {
             try { conduits = JSON.parse(condJson); } catch (e) {}
         }
+        const normalize = s => String(s || '').trim().toUpperCase();
+        const conduitsByDb = {};
+        const standaloneConduits = [];
         conduits = conduits.map(c => {
-            if ((!c.ductbank_id && !c.ductbank) && c.tag) {
+            if (!c.ductbankTag && c.tag) {
                 const parts = String(c.tag).split('-');
                 if (parts.length > 1) {
                     const condId = parts.pop();
-                    c.ductbank_id = parts.join('-');
+                    c.ductbankTag = parts.join('-');
                     if (!c.conduit_id) c.conduit_id = condId;
                 }
             }
-            if (c.ductbank_id && c.conduit_id && !c.tray_id) {
-                c.tray_id = `${c.ductbank_id}-${c.conduit_id}`;
+            if (c.ductbankTag && c.conduit_id && !c.tray_id) {
+                c.tray_id = `${c.ductbankTag}-${c.conduit_id}`;
+            }
+            const key = normalize(c.ductbankTag);
+            if (key) {
+                (conduitsByDb[key] ||= []).push(c);
+            } else {
+                standaloneConduits.push(c);
             }
             return c;
         });
+        state.conduitsByDb = conduitsByDb;
         if (trays.length > 0) {
             state.manualTrays = trays.map(t => ({
                 tray_id: t.tray_id,
@@ -502,32 +512,27 @@ document.addEventListener('DOMContentLoaded', async () => {
         }
 
         if (ductbanks.length > 0) {
-            const conduitMap = conduits.reduce((acc, c) => {
-                const id = c.ductbank_id || c.ductbank;
-                if (!acc[id]) acc[id] = [];
-                acc[id].push(c);
-                return acc;
-            }, {});
-
             state.ductbankData = {
                 ductbanks: ductbanks.map(db => {
-                    const dbId = db.ductbank_id || db.id || db.tag;
+                    const dbTag = db.tag;
+                    const key = normalize(dbTag);
+                    const dbId = db.id || db.tag || db.ductbank_id;
                     return {
                         id: dbId,
-                        tag: db.tag,
+                        tag: dbTag,
                         outline: [
                             [parseFloat(db.start_x), parseFloat(db.start_y), parseFloat(db.start_z)],
                             [parseFloat(db.end_x), parseFloat(db.end_y), parseFloat(db.end_z)]
                         ],
-                        conduits: (conduitMap[dbId] || []).map(c => {
+                        conduits: (state.conduitsByDb[key] || []).map(c => {
                             const condId = c.conduit_id || c.id;
-                            const trayId = c.tray_id || `${dbId}-${condId}`;
+                            const trayId = c.tray_id || `${dbTag}-${condId}`;
                             return {
                                 id: condId,
                                 tag: trayId,
                                 tray_id: trayId,
                                 conduit_id: condId,
-                                ductbank_id: dbId,
+                                ductbankTag: dbTag,
                                 type: c.type,
                                 conduit_type: c.type,
                                 trade_size: c.trade_size,
@@ -544,7 +549,7 @@ document.addEventListener('DOMContentLoaded', async () => {
 
             state.ductbanksWithoutConduits = state.ductbankData.ductbanks
                 .filter(db => !db.conduits || db.conduits.length === 0)
-                .map(db => db.id || db.tag);
+                .map(db => db.tag || db.id);
             if (state.ductbanksWithoutConduits.length > 0) {
                 console.warn('Ductbank(s) missing conduits will be ignored:', state.ductbanksWithoutConduits);
                 const warnEl = typeof document !== 'undefined' && document.getElementById('ductbank-no-conduits-warning');
@@ -556,7 +561,7 @@ document.addEventListener('DOMContentLoaded', async () => {
             }
         }
 
-        state.conduitData = conduits.filter(c => !(c.ductbank_id || c.ductbank));
+        state.conduitData = standaloneConduits;
         rebuildTrayData();
     };
 
@@ -617,13 +622,13 @@ document.addEventListener('DOMContentLoaded', async () => {
                     const area = (CONDUIT_SPECS[cond.type] || {})[cond.trade_size];
                     const dia = area ? Math.sqrt((4 * area) / Math.PI)
                                      : parseFloat(cond.diameter) || 0;
-                    const dbId = cond.ductbank_id || db.id || db.tag;
+                    const dbTag = cond.ductbankTag || db.tag;
                     const condId = cond.conduit_id || cond.id;
-                    const trayId = `${dbId}-${condId}`;
+                    const trayId = `${dbTag}-${condId}`;
                     cond.tray_id = trayId;
                     state.trayData.push({
                         tray_id: trayId,
-                        ductbank_id: dbId,
+                        ductbankTag: dbTag,
                         conduit_id: condId,
                         start_x: start[0],
                         start_y: start[1],
@@ -653,7 +658,7 @@ document.addEventListener('DOMContentLoaded', async () => {
                 const trayId = cond.tray_id || condId;
                 state.trayData.push({
                     tray_id: trayId,
-                    ductbank_id: cond.ductbank_id || cond.ductbank,
+                    ductbankTag: cond.ductbankTag,
                     conduit_id: condId,
                     start_x: start[0],
                     start_y: start[1],
@@ -941,7 +946,7 @@ document.addEventListener('DOMContentLoaded', async () => {
         addTraySegment(tray) {
             const maxFill = tray.width * tray.height * this.fillLimit;
             // Preserve ductbank association for later use
-            this.trays.set(tray.tray_id, { ...tray, ductbank_id: tray.ductbank_id, maxFill });
+            this.trays.set(tray.tray_id, { ...tray, ductbankTag: tray.ductbankTag, maxFill });
         }
 
         updateTrayFill(trayIds, cableArea) {
@@ -1409,27 +1414,27 @@ document.addEventListener('DOMContentLoaded', async () => {
                 }
                 if (type === 'tray') traySegments.add(tray_id);
                 const conduit_id = this.trays.get(tray_id)?.conduit_id;
-                const ductbank_id = this.trays.get(tray_id)?.ductbank_id;
+                const ductbankTag = this.trays.get(tray_id)?.ductbankTag;
 
                 if (edge.type === 'field') {
                     let curr = p1.slice();
                     if (p2[0] !== curr[0]) {
                         const next = [p2[0], curr[1], curr[2]];
-                        routeSegments.push({ type, start: curr, end: next, length: Math.abs(p2[0]-curr[0]), tray_id, conduit_id, ductbank_id });
+                        routeSegments.push({ type, start: curr, end: next, length: Math.abs(p2[0]-curr[0]), tray_id, conduit_id, ductbankTag });
                         curr = next;
                     }
                     if (p2[1] !== curr[1]) {
                         const next = [curr[0], p2[1], curr[2]];
-                        routeSegments.push({ type, start: curr, end: next, length: Math.abs(p2[1]-curr[1]), tray_id, conduit_id, ductbank_id });
+                        routeSegments.push({ type, start: curr, end: next, length: Math.abs(p2[1]-curr[1]), tray_id, conduit_id, ductbankTag });
                         curr = next;
                     }
                     if (p2[2] !== curr[2]) {
                         const next = [curr[0], curr[1], p2[2]];
-                        routeSegments.push({ type, start: curr, end: next, length: Math.abs(p2[2]-curr[2]), tray_id, conduit_id, ductbank_id });
+                        routeSegments.push({ type, start: curr, end: next, length: Math.abs(p2[2]-curr[2]), tray_id, conduit_id, ductbankTag });
                         curr = next;
                     }
                 } else {
-                    routeSegments.push({ type, start: p1, end: p2, length, tray_id, conduit_id, ductbank_id });
+                    routeSegments.push({ type, start: p1, end: p2, length, tray_id, conduit_id, ductbankTag });
                 }
             }
 
@@ -1593,7 +1598,7 @@ document.addEventListener('DOMContentLoaded', async () => {
             ? state.trayData
             : state.trayData.filter(t => t.raceway_type !== 'ductbank');
         const groups = trays.reduce((acc, tray) => {
-            const key = tray.ductbank_id || '_none';
+            const key = tray.ductbankTag || '_none';
             acc[key] = acc[key] || [];
             acc[key].push(tray);
             return acc;
@@ -2105,10 +2110,10 @@ const openDuctbankRoute = (dbId, conduitId) => {
                     let conduit = '';
                     if (b.type === 'field') {
                         link = `<button class="conduit-fill-btn" data-seg="${b.segment_key}">Open</button>`;
-                    } else if (b.ductbank_id) {
-                        racewayId = b.ductbank_id;
+                    } else if (b.ductbankTag) {
+                        racewayId = b.ductbankTag;
                         conduit = b.conduit_id || '';
-                        link = `<button class="ductbank-fill-btn" data-ductbank="${b.ductbank_id}" data-conduit="${b.conduit_id}">Fill</button>`;
+                        link = `<button class="ductbank-fill-btn" data-ductbank="${b.ductbankTag}" data-conduit="${b.conduit_id}">Fill</button>`;
                     } else if (b.tray_id && b.tray_id !== 'Field Route' && b.tray_id !== 'N/A') {
                         link = `<button class="tray-fill-btn" data-tray="${b.tray_id}">Fill</button>`;
                     }
@@ -2949,7 +2954,7 @@ const openDuctbankRoute = (dbId, conduitId) => {
                                     length: seg.length.toFixed(2),
                                     raceway,
                                     conduit_id,
-                                    ductbank_id: seg.ductbank_id
+                                    ductbankTag: seg.ductbankTag
                                 };
                             }) : []
                         };
@@ -3169,7 +3174,7 @@ const openDuctbankRoute = (dbId, conduitId) => {
                             length: seg.length.toFixed(2),
                             raceway,
                             conduit_id,
-                            ductbank_id: seg.ductbank_id
+                            ductbankTag: seg.ductbankTag
                         };
                     })
                 };
