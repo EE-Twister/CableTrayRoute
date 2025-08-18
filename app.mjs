@@ -3836,4 +3836,63 @@ Plotly.newPlot(document.getElementById('plot'), data, layout, {responsive: true}
         updateTrayDisplay();
         loadDuctbankData();
     }
+
+    async function runSelfCheck(){
+        const diag={};
+        try{
+            setProject({name:'',ductbanks:[],conduits:[],trays:[],cables:[],settings:{session:{},collapsedGroups:{},units:'imperial'}});
+            diag.cleared=true;
+            const [raceways,cables]=await Promise.all([
+                fetch('examples/sample_raceways.json').then(r=>r.json()),
+                fetch('examples/sample_cables.json').then(r=>r.json())
+            ]);
+            const proj=getProject();
+            proj.ductbanks=raceways.ductbanks||[];
+            proj.conduits=raceways.conduits||[];
+            proj.trays=raceways.trays||[];
+            proj.cables=cables;
+            setProject(proj);
+            diag.counts={ductbanks:proj.ductbanks.length,conduits:proj.conduits.length,trays:proj.trays.length,cables:proj.cables.length};
+            const dbTags=new Set(proj.ductbanks.map(db=>db.tag));
+            const invalid=proj.conduits.filter(c=>!c.ductbankTag||!dbTags.has(c.ductbankTag));
+            diag.invalidConduits=invalid.map(c=>c.conduit_id||c.id);
+            if(Object.values(diag.counts).some(c=>c===0)||invalid.length) throw new Error('Data validation failed');
+            await mainCalculation();
+            const banner=document.getElementById('ductbank-no-conduits-warning');
+            diag.noConduitsBanner=banner&&getComputedStyle(banner).display!=='none';
+            const hasConduitSeg=state.cableList.some(c=>(c.route_segments||[]).some(s=>s.conduit_id));
+            diag.hasConduitSegment=hasConduitSeg;
+            const utilRows=document.querySelectorAll('#updated-utilization-container table tbody tr').length;
+            diag.utilizationRows=utilRows;
+            const firstLen=state.cableList[0]?.route_segments?.[0]?.length||0;
+            const beforeLabel=units.distanceLabel();
+            const beforeSys=units.getUnitSystem();
+            units.setUnitSystem(beforeSys==='imperial'?'metric':'imperial');
+            applyUnitLabels();
+            const afterLabel=units.distanceLabel();
+            const afterLen=state.cableList[0]?.route_segments?.[0]?.length||0;
+            units.setUnitSystem(beforeSys);applyUnitLabels();
+            diag.unitLabelsChanged=beforeLabel!==afterLabel;
+            diag.unitValuesSame=firstLen===afterLen;
+            const original=state.cableList[0]?.name;
+            state.cableList[0].name='TEMP';
+            const edit=state.cableList[0].name==='TEMP';
+            state.cableList[0].name=original;
+            const undo=state.cableList[0].name===original;
+            state.cableList[0].name='TEMP';
+            const redo=state.cableList[0].name==='TEMP';
+            state.cableList[0].name=original;
+            diag.editUndoRedo=edit&&undo&&redo;
+            diag.pass=!diag.noConduitsBanner&&hasConduitSeg&&utilRows>0&&diag.unitLabelsChanged&&diag.unitValuesSame&&diag.editUndoRedo;
+            showSelfCheckModal(diag);
+        }catch(e){
+            diag.error=e.message||String(e);
+            diag.pass=false;
+            showSelfCheckModal(diag);
+        }
+    }
+
+    if(new URLSearchParams(location.search).get('selfcheck')==='1'){
+        runSelfCheck();
+    }
 });
