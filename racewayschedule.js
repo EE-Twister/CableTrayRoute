@@ -167,7 +167,21 @@ document.addEventListener('DOMContentLoaded',()=>{
         const data=await res.json();
         dataStore.setDuctbanks(data.ductbanks);
         dataStore.setTrays(data.trays);
-        dataStore.setConduits(data.conduits);
+        const flat=[];
+        (data.ductbanks||[]).forEach(db=>{
+          (db.conduits||[]).forEach(c=>{
+            flat.push({
+              ductbankTag:db.tag,
+              conduit_id:c.conduit_id,
+              type:c.type,
+              trade_size:c.trade_size,
+              start_x:c.start_x,start_y:c.start_y,start_z:c.start_z,
+              end_x:c.end_x,end_y:c.end_y,end_z:c.end_z,
+              allowed_cable_group:c.allowed_cable_group
+            });
+          });
+        });
+        dataStore.setConduits([...(data.conduits||[]),...flat]);
         document.getElementById('load-ductbank-btn').click();
         document.getElementById('load-tray-btn').click();
         document.getElementById('load-conduit-btn').click();
@@ -183,6 +197,7 @@ document.addEventListener('DOMContentLoaded',()=>{
     const conduits=[];
     nested.forEach(db=>{
       (db.conduits||[]).forEach(c=>{
+        c.ductbankTag=db.tag;
         conduits.push({
           ductbankTag:db.tag,
           conduit_id:c.conduit_id,
@@ -205,7 +220,9 @@ document.addEventListener('DOMContentLoaded',()=>{
   function persistAllConduits(){
     const {ductbanks,conduits:dbConduits}=serializeDuctbankSchedule();
     const standalone=conduitTable.getData();
-    persistConduits({ductbanks,conduits:[...dbConduits,...standalone]});
+    const all=[...dbConduits,...standalone];
+    persistConduits({ductbanks,conduits:all});
+    try{dataStore.setConduits(all);}catch(e){console.error('Failed to store conduits',e);}
   }
 
   function getRacewaySchedule(){

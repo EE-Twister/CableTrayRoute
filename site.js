@@ -582,7 +582,11 @@ function initTableNav(){
 const CTR_CONDUITS = 'CTR_CONDUITS';
 
 function persistConduits(data){
-  try{localStorage.setItem(CTR_CONDUITS,JSON.stringify(data));}catch(e){console.error('Failed to persist conduits',e);}
+  try{
+    localStorage.setItem(CTR_CONDUITS,JSON.stringify(data));
+    const condKey=globalThis.TableUtils?.STORAGE_KEYS?.conduitSchedule||'conduitSchedule';
+    localStorage.setItem(condKey,JSON.stringify(data.conduits||[]));
+  }catch(e){console.error('Failed to persist conduits',e);}
 }
 
 function loadConduits(){

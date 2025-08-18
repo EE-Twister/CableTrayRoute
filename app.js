@@ -687,7 +687,7 @@ document.addEventListener('DOMContentLoaded', async () => {
             };
 
             state.ductbanksWithoutConduits = state.ductbankData.ductbanks
-                .filter(db => !db.conduits || db.conduits.length === 0)
+                .filter(db => (state.conduitsByDb[normalize(db.tag || db.id)] || []).length === 0)
                 .map(db => db.tag || db.id);
             if (state.ductbanksWithoutConduits.length > 0) {
                 const fixUrl = `racewayschedule.html?db=${encodeURIComponent(state.ductbanksWithoutConduits[0])}`;

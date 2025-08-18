@@ -271,6 +271,7 @@ import { getDuctbanks, setDuctbanks, setItem, getItem } from './dataStore.js';
         h.appendChild(th);
       });
       const cBody=cTable.createTBody();
+      db.conduits.forEach(c=>{if(c.ductbankTag===undefined)c.ductbankTag=db.tag;});
       db.conduits.forEach((c,j)=>{
         const r=cBody.insertRow();
         if (c.error) r.classList.add('missing-tag-row');
