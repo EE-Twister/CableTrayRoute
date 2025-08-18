@@ -596,6 +596,33 @@ body.dark-mode .toast { background: #2c3034; color: #f8f9fa; }
 body.dark-mode .toast-success { background: #28a745; }
 body.dark-mode .toast-error { background: #dc3545; }
 
+/* Debug console */
+#debug-console {
+    position: fixed;
+    bottom: 0;
+    left: 0;
+    right: 0;
+    max-height: 200px;
+    overflow: auto;
+    background: #1e1e1e;
+    color: #0f0;
+    font-family: monospace;
+    padding: 4px 8px;
+    z-index: 1500;
+    display: none;
+}
+#debug-console summary {
+    cursor: pointer;
+    color: #fff;
+}
+#debug-console pre {
+    margin: 0;
+    white-space: pre-wrap;
+}
+body.dark-mode #debug-console {
+    background: #000;
+}
+
 #warning-area { margin-top: 8px; }
 #soilWarning { margin-top:4px; font-size:0.8rem; color: var(--warning-text); }
 #moistureWarning { margin-top:4px; font-size:0.8rem; color: var(--warning-text); }
