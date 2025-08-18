@@ -164,6 +164,9 @@ document.addEventListener('DOMContentLoaded', async () => {
         manualTraySummary: document.getElementById('manual-tray-summary'),
         cableListSummary: document.getElementById('cable-list-summary'),
         darkToggle: document.getElementById('dark-toggle'),
+        debugToggle: document.getElementById('debug-toggle'),
+        debugConsole: document.getElementById('debug-console'),
+        debugLog: document.getElementById('debug-log'),
         settingsBtn: document.getElementById('settings-btn'),
         settingsMenu: document.getElementById('settings-menu'),
         helpBtn: document.getElementById('help-btn'),
@@ -180,7 +183,7 @@ document.addEventListener('DOMContentLoaded', async () => {
         resumeNoBtn: document.getElementById('resume-no-btn'),
     };
 
-    document.querySelectorAll('input, select, textarea').forEach(el=>{if(!el.classList.contains('table-search')){el.addEventListener('input',markUnsaved);el.addEventListener('change',markUnsaved);}});
+    document.querySelectorAll('input, select, textarea').forEach(el=>{if(!el.classList.contains('table-search')&&!el.classList.contains('no-dirty')){el.addEventListener('input',markUnsaved);el.addEventListener('change',markUnsaved);}});
     ['addTrayBtn','clearTraysBtn','importTraysBtn','loadSampleTraysBtn','addCableBtn','clearCablesBtn','importCablesBtn','loadSampleCablesBtn'].forEach(k=>{const btn=elements[k];if(btn)btn.addEventListener('click',markUnsaved);});
     if(elements.importTraysFile) elements.importTraysFile.addEventListener('change',markUnsaved);
     if(elements.importCablesFile) elements.importCablesFile.addEventListener('change',markUnsaved);
@@ -191,15 +194,69 @@ document.addEventListener('DOMContentLoaded', async () => {
     const trayTemplateHeaders=['tray_id','start_x','start_y','start_z','end_x','end_y','end_z','width','height','current_fill','allowed_cable_group','shape'];
     const cableTemplateHeaders=['tag','start_tag','end_tag','cable_type','conductors','conductor_size','diameter','weight','allowed_cable_group','start_x','start_y','start_z','end_x','end_y','end_z'];
 
-    function showToast(msg,type='success'){
+    const debug = {
+        enabled: false,
+        log(...args){
+            if(!this.enabled) return;
+            const msg = args.map(a=>typeof a==='object'?JSON.stringify(a):a).join(' ');
+            if(elements.debugLog){
+                const time=new Date().toISOString();
+                elements.debugLog.textContent += `[${time}] ${msg}\n`;
+                elements.debugLog.scrollTop = elements.debugLog.scrollHeight;
+            }
+            console.debug(...args);
+        }
+    };
+    window.debug = debug;
+    const session=JSON.parse(localStorage.getItem('ctrSession')||'{}');
+    debug.enabled=!!session.debug;
+    if(elements.debugToggle) elements.debugToggle.checked=debug.enabled;
+    if(elements.debugConsole) elements.debugConsole.style.display=debug.enabled?'block':'none';
+    if(elements.debugToggle){
+        elements.debugToggle.addEventListener('change',()=>{
+            debug.enabled=elements.debugToggle.checked;
+            if(elements.debugConsole) elements.debugConsole.style.display=debug.enabled?'block':'none';
+            session.debug=debug.enabled;
+            localStorage.setItem('ctrSession',JSON.stringify(session));
+        });
+    }
+
+    function showToast(msg,type='success',diagnostics=''){
         const t=document.getElementById('toast');
         if(!t)return;
-        t.textContent=msg;
+        t.innerHTML='';
+        const span=document.createElement('span');
+        span.textContent=msg;
+        t.appendChild(span);
+        if(diagnostics){
+            const btn=document.createElement('button');
+            btn.textContent='Copy diagnostics';
+            btn.addEventListener('click',()=>{
+                navigator.clipboard.writeText(diagnostics).then(()=>{
+                    span.textContent='Diagnostics copied';
+                });
+            });
+            t.appendChild(btn);
+        }
         t.classList.remove('toast-error','toast-success','show');
         t.classList.add(type==='error'?'toast-error':'toast-success');
         requestAnimationFrame(()=>t.classList.add('show'));
-        setTimeout(()=>t.classList.remove('show'),3000);
+        setTimeout(()=>t.classList.remove('show'),4000);
     }
+
+    function setupErrorHandling(){
+        const scrub=str=>str?str.replace(new RegExp(location.origin,'g'),''):'';
+        const handler=e=>{
+            const msg=e.message||e.reason?.message||'Unknown error';
+            const stack=scrub(e.error?.stack||e.reason?.stack||'').split('\n').slice(0,5).join('\n');
+            const diag=`${msg}\n${stack}`.trim();
+            debug.log('Unhandled error:',diag);
+            showToast('Unexpected error','error',diag);
+        };
+        window.addEventListener('error',handler);
+        window.addEventListener('unhandledrejection',handler);
+    }
+    setupErrorHandling();
 
     const parseFile=(file,cb)=>{
         const reader=new FileReader();
@@ -1344,6 +1401,7 @@ document.addEventListener('DOMContentLoaded', async () => {
 
         calculateRoute(startPoint, endPoint, cableArea, allowedGroup) {
             if (!this.baseGraph) this.prepareBaseGraph();
+            const t0 = performance.now();
             // 1. Start from the precomputed graph
             const cloneGraph = (base) => {
                 const g = { nodes: {}, edges: {} };
@@ -1466,6 +1524,8 @@ document.addEventListener('DOMContentLoaded', async () => {
 
             // 3. Reconstruct path and results
             if (distances['end'] === Infinity) {
+                const elapsedFail = performance.now() - t0;
+                if (window.debug?.enabled) window.debug.log(`Route failed ${startPoint.join(',')} -> ${endPoint.join(',')} (${elapsedFail.toFixed(1)}ms)`);
                 return { success: false, error: "No valid path could be found." };
             }
 
@@ -1527,7 +1587,7 @@ document.addEventListener('DOMContentLoaded', async () => {
             }
 
             const cleaned = this._removeTrayBacktracking(routeSegments);
-            return {
+            const result = {
                 success: true,
                 total_length: totalLength,
                 field_routed_length: fieldRoutedLength,
@@ -1535,6 +1595,12 @@ document.addEventListener('DOMContentLoaded', async () => {
                 tray_segments: Array.from(traySegments),
                 warnings: [],
             };
+            const elapsed = performance.now() - t0;
+            if (window.debug?.enabled) {
+                const segSummary = result.route_segments.map(s => `${s.type}${s.tray_id?':' + s.tray_id:''}`).join(' -> ');
+                window.debug.log(`Route ${startPoint.join(',')} -> ${endPoint.join(',')} (${elapsed.toFixed(1)}ms)`, segSummary);
+            }
+            return result;
         }
     }
 
