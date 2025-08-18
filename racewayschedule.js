@@ -236,6 +236,97 @@ document.addEventListener('DOMContentLoaded',()=>{
   window.getRacewaySchedule=getRacewaySchedule;
   persistAllConduits();
 
+  const normalize=s=>(s||'').trim().toUpperCase();
+
+  function attachConduitsToDuctbanks(rows){
+    const banks=(typeof window.getDuctbanks==='function'?window.getDuctbanks():[]);
+    const tags=new Set(banks.map(db=>normalize(db.tag)));
+    const map={};
+    rows.forEach(r=>{
+      const tag=normalize(r.ductbankTag||r.ductbank_tag);
+      if(tags.has(tag)){(map[tag] ||= []).push(r);r._unmapped=false;}
+      else{r._unmapped=true;}
+    });
+    globalThis.conduitsByDb=map;
+    return map;
+  }
+
+  function parseCsv(txt){
+    const lines=txt.trim().split(/\r?\n/);
+    const headers=lines.shift().split(',').map(h=>h.trim());
+    return lines.filter(Boolean).map(line=>{
+      const cols=line.split(',');
+      const obj={};
+      headers.forEach((h,i)=>obj[h]=(cols[i]||'').trim());
+      return obj;
+    });
+  }
+
+  async function parseConduitFile(file){
+    const name=file.name.toLowerCase();
+    if(name.endsWith('.csv')) return parseCsv(await file.text());
+    const data=new Uint8Array(await file.arrayBuffer());
+    const wb=XLSX.read(data,{type:'array'});
+    const sheet=wb.Sheets[wb.SheetNames[0]];
+    return XLSX.utils.sheet_to_json(sheet);
+  }
+
+  function showConduitsWizard(){
+    const overlay=document.createElement('div');
+    overlay.id='conduits-wizard';
+    overlay.style.position='fixed';
+    overlay.style.top=0;overlay.style.left=0;overlay.style.right=0;overlay.style.bottom=0;
+    overlay.style.background='rgba(0,0,0,0.5)';
+    overlay.style.display='flex';
+    overlay.style.alignItems='center';
+    overlay.style.justifyContent='center';
+    overlay.innerHTML=`<div style="background:#fff;padding:20px;max-width:400px;width:90%;">
+        <h3>Add/Import Conduits</h3>
+        <input type="file" id="wizard-conduit-file" accept=".csv,.xlsx">
+        <div style="margin-top:8px;">
+          <button id="wizard-load-sample">Load Sample</button>
+          <button id="wizard-close">Close</button>
+        </div>
+        <table id="wizard-conduit-table" style="margin-top:10px;width:100%;border-collapse:collapse;">
+          <thead><tr><th>Ductbank Tag</th><th>Conduit ID</th></tr></thead>
+          <tbody></tbody>
+        </table>
+      </div>`;
+    const close=()=>overlay.remove();
+    overlay.addEventListener('click',e=>{if(e.target===overlay)close();});
+    document.body.appendChild(overlay);
+    overlay.querySelector('#wizard-close').addEventListener('click',close);
+    const processRows=rows=>{
+      attachConduitsToDuctbanks(rows);
+      persistConduits({ductbanks: typeof window.getDuctbanks==='function'?window.getDuctbanks():[], conduits: rows});
+      const tbody=overlay.querySelector('#wizard-conduit-table tbody');
+      tbody.innerHTML='';
+      rows.forEach(r=>{
+        const tr=document.createElement('tr');
+        if(r._unmapped) tr.classList.add('missing-tag-row');
+        tr.innerHTML=`<td>${r.ductbankTag||''}</td><td>${r.conduit_id||''}</td>`;
+        tbody.appendChild(tr);
+      });
+    };
+    overlay.querySelector('#wizard-conduit-file').addEventListener('change',async e=>{
+      const f=e.target.files[0];if(f){const rows=await parseConduitFile(f);processRows(rows);} });
+    overlay.querySelector('#wizard-load-sample').addEventListener('click',async()=>{
+      const res=await fetch('examples/ductbank_schedule_conduits.csv');
+      const txt=await res.text();
+      processRows(parseCsv(txt));
+    });
+  }
+
+  const params=new URLSearchParams(window.location.search);
+  if(params.get('expandAll')==='true'){
+    document.querySelectorAll('#ductbankTable tbody tr.ductbank-row td:first-child button').forEach(btn=>{if(btn.textContent==='\u25B6') btn.click();});
+  }
+  if(params.get('focus')==='ductbanks'){
+    const tbl=document.getElementById('ductbankTable');
+    if(tbl) tbl.scrollIntoView({behavior:'smooth',block:'start'});
+  }
+  if(params.get('showConduitsWizard')==='true') showConduitsWizard();
+
   // Validation button and lint panel
   const validateBtn=document.getElementById('validate-raceway-btn');
   const lintPanel=document.getElementById('lint-panel');
