@@ -113,6 +113,7 @@ document.addEventListener('DOMContentLoaded', async () => {
         ductbanksWithoutConduits: [],
         includeDuctbankOutlines: false,
         geometryWarnings: { ductbanks: [], conduits: [] },
+        heatmapEnabled: false,
     };
 
     // --- ELEMENT REFERENCES ---
@@ -150,6 +151,7 @@ document.addEventListener('DOMContentLoaded', async () => {
         viewToggleBtn: document.getElementById('view-toggle-btn'),
         exportPngBtn: document.getElementById('export-png-btn'),
         ductbankToggle: document.getElementById('ductbank-toggle'),
+        heatmapToggle: document.getElementById('heatmap-toggle'),
         updatedUtilizationContainer: document.getElementById('updated-utilization-container'),
         exportCsvBtn: document.getElementById('export-csv-btn'),
         rebalanceBtn: document.getElementById('rebalance-btn'),
@@ -3329,6 +3331,17 @@ const openDuctbankRoute = (dbId, conduitId) => {
     const visualize = (trays, routes, title) => {
         const traces = [];
 
+        const heatColor = (pct) => {
+            const p = Math.max(0, Math.min(100, pct));
+            if (p <= 50) {
+                const r = Math.round((p / 50) * 255);
+                return `rgb(${r},255,0)`;
+            } else {
+                const g = Math.round(255 - ((p - 50) / 50) * 255);
+                return `rgb(255,${g},0)`;
+            }
+        };
+
         const meshForSegment = (s, e, tray) => {
             const w = tray.width / 12;
             const h = tray.height / 12;
@@ -3354,14 +3367,20 @@ const openDuctbankRoute = (dbId, conduitId) => {
             const i = [0,0,4,4,3,3,0,0,0,0,1,1];
             const j = [1,2,5,6,2,6,1,5,3,7,2,6];
             const k = [2,3,6,7,6,7,5,4,7,4,6,5];
-            const color = tray.raceway_type === 'conduit'
-                ? 'black'
-                : tray.raceway_type === 'ductbank'
-                    ? 'saddlebrown'
-                    : SHAPE_COLORS[tray.shape] || 'lightgrey';
+            let color;
+            if (state.heatmapEnabled && tray.maxFill) {
+                const pct = (tray.current_fill / tray.maxFill) * 100;
+                color = heatColor(pct);
+            } else {
+                color = tray.raceway_type === 'conduit'
+                    ? 'black'
+                    : tray.raceway_type === 'ductbank'
+                        ? 'saddlebrown'
+                        : SHAPE_COLORS[tray.shape] || 'lightgrey';
+            }
             const typeText = tray.raceway_type || tray.shape || 'STR';
             const text = `${tray.tray_id} (${typeText})`;
-            return {type:'mesh3d', x, y, z, i, j, k, opacity:0.3, color, name: tray.tray_id, hoverinfo:'text', text:[text]};
+            return {type:'mesh3d', x, y, z, i, j, k, opacity: state.heatmapEnabled ? 0.8 : 0.3, color, name: tray.tray_id, hoverinfo:'text', text:[text]};
         };
 
         const trayMesh = (tray) => {
@@ -3436,6 +3455,21 @@ const openDuctbankRoute = (dbId, conduitId) => {
                         seenTags.add(`e-${route.endTag}`);
                     }
                 }
+            });
+        }
+
+        if (state.heatmapEnabled) {
+            traces.push({
+                x: [0], y: [0], z: [0],
+                mode: 'markers', type: 'scatter3d', showlegend: false, hoverinfo: 'none',
+                marker: {
+                    size: 0,
+                    color: [0],
+                    cmin: 0,
+                    cmax: 100,
+                    colorscale: [[0, 'green'], [0.5, 'yellow'], [1, 'red']],
+                    colorbar: { title: 'Fill %' },
+                },
             });
         }
 
@@ -3661,6 +3695,12 @@ Plotly.newPlot(document.getElementById('plot'), data, layout, {responsive: true}
     }
     if (elements.ductbankToggle) {
         elements.ductbankToggle.addEventListener('change', e => updateDuctbankVisibility(e.target.checked));
+    }
+    if (elements.heatmapToggle) {
+        elements.heatmapToggle.addEventListener('change', e => {
+            state.heatmapEnabled = e.target.checked;
+            update3DPlot();
+        });
     }
     if (elements.viewToggleBtn) {
         elements.viewToggleBtn.addEventListener('click', toggle2D3D);
