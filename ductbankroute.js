@@ -1,3 +1,5 @@
+import { getItem, setItem, removeItem, getCables, getConduits } from './dataStore.js';
+
 checkPrereqs([{key:'ductbankSchedule',page:'racewayschedule.html',label:'Raceway Schedule'}]);
 
 document.addEventListener('DOMContentLoaded',()=>{
@@ -467,14 +469,14 @@ function saveDuctbankSession(){
   conductorRating:document.getElementById('conductorRating').value,
   darkMode:document.body.classList.contains('dark-mode')
 };
- try{localStorage.setItem('ductbankSession',JSON.stringify(session));}catch(e){console.error('save session failed',e);}
+ try{setItem('ductbankSession',session);}catch(e){console.error('save session failed',e);}
 }
 
 function loadDuctbankSession(){
- const stored=localStorage.getItem('ductbankSession');
+ const stored=getItem('ductbankSession');
  if(!stored) return;
  try{
-  const s=JSON.parse(stored);
+  const s=stored;
   if(s.ductbankTag!==undefined)document.getElementById('ductbankTag').value=s.ductbankTag;
   if(s.concreteEncasement!==undefined)document.getElementById('concreteEncasement').checked=s.concreteEncasement;
   if(s.ductbankDepth!==undefined)document.getElementById('ductbankDepth').value=s.ductbankDepth;
@@ -519,11 +521,8 @@ function loadDuctbankSession(){
 function loadCablesFromSchedule(){
   const tbody=document.querySelector('#cableTable tbody');
   if(!tbody||tbody.children.length>0) return;
-  const key=globalThis.TableUtils?.STORAGE_KEYS?.cableSchedule||'cableSchedule';
-  const json=localStorage.getItem(key);
-  if(!json) return;
-  let cables;
-  try{cables=JSON.parse(json);}catch(e){console.error('Failed to parse cable schedule',e);return;}
+  const cables=getCables();
+  if(!cables||cables.length===0) return;
   const conduitSet=new Set(getAllConduits().map(c=>c.conduit_id));
   let added=false;
   cables.forEach(c=>{
@@ -2217,7 +2216,7 @@ function downloadCanvasData(){
 }
 
 function deleteSavedData(){
- localStorage.removeItem('ductbankSession');
+removeItem('ductbankSession');
  document.querySelector('#conduitTable tbody').innerHTML='';
  document.querySelector('#cableTable tbody').innerHTML='';
  ['ductbankTag','ductbankDepth','earthTemp','airTemp','soilResistivity','moistureContent','hSpacing','vSpacing','topPad','bottomPad','leftPad','rightPad','perRow','conductorRating','gridRes','ductThermRes'].forEach(id=>{
@@ -2411,7 +2410,7 @@ loadConductorProperties().then(()=>{
   updateInsulationOptions();
   checkInsulationThickness();
   loadDuctbankSession();
-  const storedRoute = localStorage.getItem('ductbankRouteData');
+  const storedRoute = getItem('ductbankRouteData');
   if (storedRoute) {
     try {
       const { ductbank, cables, conduitId } = JSON.parse(storedRoute);
@@ -2470,7 +2469,7 @@ loadConductorProperties().then(()=>{
     } catch (e) {
       console.error('Failed to load ductbankRouteData', e);
     }
-    localStorage.removeItem('ductbankRouteData');
+    removeItem('ductbankRouteData');
     drawGrid();
     updateAmpacityReport();
   }

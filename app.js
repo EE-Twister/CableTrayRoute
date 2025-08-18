@@ -1,3 +1,5 @@
+import { getItem, setItem, removeItem, getTrays, getCables, getDuctbanks, getConduits } from './dataStore.js';
+
 // Filename: app.js
 // (This is an improved version that adds route segment consolidation)
 
@@ -210,7 +212,7 @@ document.addEventListener('DOMContentLoaded', async () => {
         }
     };
     window.debug = debug;
-    const session=JSON.parse(localStorage.getItem('ctrSession')||'{}');
+    const session=getItem('ctrSession', {});
     debug.enabled=!!session.debug;
     if(elements.debugToggle) elements.debugToggle.checked=debug.enabled;
     if(elements.debugConsole) elements.debugConsole.style.display=debug.enabled?'block':'none';
@@ -219,7 +221,7 @@ document.addEventListener('DOMContentLoaded', async () => {
             debug.enabled=elements.debugToggle.checked;
             if(elements.debugConsole) elements.debugConsole.style.display=debug.enabled?'block':'none';
             session.debug=debug.enabled;
-            localStorage.setItem('ctrSession',JSON.stringify(session));
+            setItem('ctrSession',session);
         });
     }
 
@@ -468,7 +470,7 @@ document.addEventListener('DOMContentLoaded', async () => {
                 proximityThreshold: parseFloat(document.getElementById('proximity-threshold')?.value) || 72,
                 includeDuctbankOutlines: state.includeDuctbankOutlines,
             };
-            localStorage.setItem('ctrSession', JSON.stringify(data));
+            setItem('ctrSession', data);
         } catch (e) {
             console.error('Failed to save session', e);
         }
@@ -476,7 +478,7 @@ document.addEventListener('DOMContentLoaded', async () => {
 
     const loadSession = () => {
         try {
-            const data = JSON.parse(localStorage.getItem('ctrSession'));
+            const data = getItem('ctrSession');
             if (data) {
                 state.manualTrays = (data.manualTrays || []).map(t => ({ ...t, raceway_type: t.raceway_type || 'tray' }));
                 state.cableList = data.cableList || [];
@@ -499,35 +501,27 @@ document.addEventListener('DOMContentLoaded', async () => {
     };
 
     const loadSchedulesIntoSession = async () => {
-        let trays = [];
-        let cables = [];
+        const ks = globalThis.TableUtils?.STORAGE_KEYS || {};
+        const store = globalThis.dataStore || {
+            getTrays: () => { try { return JSON.parse(localStorage.getItem(ks.traySchedule || 'traySchedule')||'[]'); } catch { return []; } },
+            getCables: () => { try { return JSON.parse(localStorage.getItem(ks.cableSchedule || 'cableSchedule')||'[]'); } catch { return []; } },
+            getDuctbanks: () => { try { return JSON.parse(localStorage.getItem(ks.ductbankSchedule || 'ductbankSchedule')||'[]'); } catch { return []; } },
+            getConduits: () => { try { return JSON.parse(localStorage.getItem(ks.conduitSchedule || 'conduitSchedule')||'[]'); } catch { return []; } }
+        };
+
+        let trays = store.getTrays();
+        let cables = store.getCables();
         let ductbanks = [];
         let conduits = [];
 
         state.ductbanksWithoutConduits = [];
 
-        const trayKey = globalThis.TableUtils?.STORAGE_KEYS?.traySchedule || 'traySchedule';
-        const cableKey = globalThis.TableUtils?.STORAGE_KEYS?.cableSchedule || 'cableSchedule';
-
-        const trayJson = localStorage.getItem(trayKey);
-        if (trayJson) {
-            try { trays = JSON.parse(trayJson); } catch (e) {}
-        }
-        const cableJson = localStorage.getItem(cableKey);
-        if (cableJson) {
-            try { cables = JSON.parse(cableJson); } catch (e) {}
-        }
         let loaded;
         if(typeof loadConduits==='function'){
             loaded=loadConduits();
         }else{
-            const dbKey=globalThis.TableUtils?.STORAGE_KEYS?.ductbankSchedule||'ductbankSchedule';
-            const condKey=globalThis.TableUtils?.STORAGE_KEYS?.conduitSchedule||'conduitSchedule';
-            let rawDb=[];let rawCond=[];
-            const dbJson=localStorage.getItem(dbKey);
-            if(dbJson){try{rawDb=JSON.parse(dbJson);}catch(e){}}
-            const condJson=localStorage.getItem(condKey);
-            if(condJson){try{rawCond=JSON.parse(condJson);}catch(e){}}
+            let rawDb=store.getDuctbanks();
+            let rawCond=store.getConduits();
             const flat=[];
             rawDb=rawDb.map(db=>{
                 (db.conduits||[]).forEach(c=>{
@@ -1813,7 +1807,7 @@ const openTrayFill = (trayId) => {
     if (!tray) return;
     const cables = (state.trayCableMap && state.trayCableMap[trayId]) ? state.trayCableMap[trayId] : [];
     try {
-        localStorage.setItem('trayFillData', JSON.stringify({ tray, cables }));
+        setItem('trayFillData', { tray, cables });
     } catch (e) {
         console.error('Failed to store tray fill data', e);
     }
@@ -1838,7 +1832,7 @@ const openConduitFill = (cables) => {
         if (totalArea <= spec[size] * fillPct) { tradeSize = size; break; }
     }
     try {
-        localStorage.setItem('conduitFillData', JSON.stringify({ type: conduitType, tradeSize, cables: cableObjs }));
+        setItem('conduitFillData', { type: conduitType, tradeSize, cables: cableObjs });
     } catch (e) {
         console.error('Failed to store conduit fill data', e);
     }
@@ -1851,7 +1845,7 @@ const openDuctbankRoute = (dbId, conduitId) => {
     const cables = (state.trayCableMap && state.trayCableMap[key]) ? state.trayCableMap[key] : [];
     if (!ductbank) return;
     try {
-        localStorage.setItem('ductbankRouteData', JSON.stringify({ ductbank, cables, conduitId }));
+        setItem('ductbankRouteData', { ductbank, cables, conduitId });
     } catch (e) {
         console.error('Failed to store ductbank route data', e);
     }
@@ -2591,7 +2585,7 @@ const openDuctbankRoute = (dbId, conduitId) => {
 
     const deleteSavedData = () => {
         ['ctrSession','cableSchedule','ductbankSchedule','traySchedule','conduitSchedule']
-            .forEach(k => localStorage.removeItem(k));
+            .forEach(k => removeItem(k));
         state.manualTrays = [];
         state.cableList = [];
         if (elements.manualTrayTableContainer) {
@@ -2756,7 +2750,7 @@ const openDuctbankRoute = (dbId, conduitId) => {
                 grab();
             };
             try {
-                localStorage.setItem('trayFillData', JSON.stringify({ tray, cables }));
+                setItem('trayFillData', { tray, cables });
             } catch {}
             iframe.src = 'cabletrayfill.html';
         });
@@ -3015,9 +3009,8 @@ const openDuctbankRoute = (dbId, conduitId) => {
             const projectHash = computeProjectHash({ trays: trayDataForRun, cables: state.cableList, options });
             currentProjectHash = projectHash;
             const cacheKey = `route-${projectHash}`;
-            const cached = localStorage.getItem(cacheKey);
-            if (cached) {
-                const cache = JSON.parse(cached);
+            const cache = getItem(cacheKey);
+            if (cache) {
                 state.latestRouteData = cache.batchResults;
                 state.finalTrays = cache.finalTrays;
                 const resMap = new Map((cache.batchResults || []).map(r => [r.cable, r]));
@@ -3225,7 +3218,7 @@ const openDuctbankRoute = (dbId, conduitId) => {
                     elements.progressContainer.style.display = 'none';
                     elements.cancelRoutingBtn.style.display = 'none';
 
-                    localStorage.setItem(cacheKey, JSON.stringify({
+                    setItem(cacheKey, {
                         batchResults,
                         utilization: finalUtilization,
                         finalTrays: msg.finalTrays,
@@ -3809,7 +3802,7 @@ Plotly.newPlot(document.getElementById('plot'), data, layout, {responsive: true}
     const hadSession = state.manualTrays.length > 0 || state.cableList.length > 0;
     const trayKey = globalThis.TableUtils?.STORAGE_KEYS?.traySchedule || 'traySchedule';
     const cableKey = globalThis.TableUtils?.STORAGE_KEYS?.cableSchedule || 'cableSchedule';
-    const hasSaved = hadSession || localStorage.getItem(trayKey) || localStorage.getItem(cableKey);
+    const hasSaved = hadSession || getItem(trayKey) || getItem(cableKey);
 
     const finalizeLoad = () => {
         renderManualTrayTable();
@@ -3844,8 +3837,8 @@ Plotly.newPlot(document.getElementById('plot'), data, layout, {responsive: true}
                 state.manualTrays = [];
                 state.cableList = [];
                 saveSession();
-                localStorage.removeItem(trayKey);
-                localStorage.removeItem(cableKey);
+                removeItem(trayKey);
+                removeItem(cableKey);
                 renderManualTrayTable();
                 updateCableListDisplay();
                 rebuildTrayData();

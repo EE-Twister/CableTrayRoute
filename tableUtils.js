@@ -1,10 +1,4 @@
-const STORAGE_KEYS = {
-  cableSchedule: 'cableSchedule',
-  ductbankSchedule: 'ductbankSchedule',
-  traySchedule: 'traySchedule',
-  conduitSchedule: 'conduitSchedule',
-  collapsedGroups: 'collapsedGroups'
-};
+import { getItem, setItem, STORAGE_KEYS } from './dataStore.js';
 
 class TableManager {
   constructor(opts) {
@@ -193,14 +187,14 @@ class TableManager {
 
   saveGroupState() {
     let all = {};
-    try { all = JSON.parse(localStorage.getItem(STORAGE_KEYS.collapsedGroups) || '{}'); } catch(e) {}
+    try { all = getItem(STORAGE_KEYS.collapsedGroups, {}); } catch(e) {}
     all[this.storageKey] = Array.from(this.hiddenGroups);
-    try { localStorage.setItem(STORAGE_KEYS.collapsedGroups, JSON.stringify(all)); } catch(e) {}
+    try { setItem(STORAGE_KEYS.collapsedGroups, all); } catch(e) {}
   }
 
   loadGroupState() {
     let all = {};
-    try { all = JSON.parse(localStorage.getItem(STORAGE_KEYS.collapsedGroups) || '{}'); } catch(e) {}
+    try { all = getItem(STORAGE_KEYS.collapsedGroups, {}); } catch(e) {}
     const hidden = all[this.storageKey] || [];
     hidden.forEach(g => this.setGroupVisibility(g, true));
   }
@@ -669,13 +663,13 @@ class TableManager {
   save() {
     this.validateAll();
     try {
-      localStorage.setItem(this.storageKey, JSON.stringify(this.getData()));
+      setItem(this.storageKey, this.getData());
     } catch(e) { console.error('save failed', e); }
   }
 
   load() {
     let data = [];
-    try { data = JSON.parse(localStorage.getItem(this.storageKey) || '[]'); } catch(e) {}
+    try { data = getItem(this.storageKey, []); } catch(e) {}
     data.forEach(row => this.addRow(row));
     this.updateRowCount();
   }
@@ -748,10 +742,10 @@ class TableManager {
 }
 
 function saveToStorage(key, data){
-  try { localStorage.setItem(key, JSON.stringify(data)); } catch(e){}
+  try { setItem(key, data); } catch(e){}
 }
 function loadFromStorage(key){
-  try { return JSON.parse(localStorage.getItem(key) || '[]'); } catch(e){ return []; }
+  try { return getItem(key, []); } catch(e){ return []; }
 }
 
 function createTable(opts){ return new TableManager(opts); }
