@@ -10,6 +10,12 @@
     --warning-text: #856404;
     --error-bg: #f8d7da;
     --error-text: #721c24;
+    --focus-ring-color: #000;
+    --button-bg: #005a9c;
+    --button-hover-bg: #00457a;
+    --button-text: #fff;
+    --button-padding: 0.5rem 0.75rem;
+    --button-margin: 0.25rem;
 }
 
 body.dark-mode {
@@ -19,7 +25,16 @@ body.dark-mode {
     --text-color: #f8f9fa;
     --success-text: #28a745;
     --warning-text: #ffc107;
+    --focus-ring-color: #fff;
+    --button-bg: #1a73e8;
+    --button-hover-bg: #1558b0;
+    --button-text: #fff;
     background-color: #212529;
+}
+
+body.compact-mode {
+    --button-padding: 0.25rem 0.5rem;
+    --button-margin: 0.125rem;
 }
 
 .page-header {
@@ -69,6 +84,15 @@ table input[type="number"]::-webkit-inner-spin-button,
 table input[type="number"]::-webkit-outer-spin-button {
     -webkit-appearance: none;
     margin: 0;
+}
+
+/* Compact table mode */
+body.compact-mode table {
+    font-size: 0.85rem;
+}
+body.compact-mode th,
+body.compact-mode td {
+    padding: 2px 4px;
 }
 
 .skip-link {
@@ -240,18 +264,22 @@ input[type="number"], input[type="text"], select {
 }
 
 button, .primary-btn {
-    background-color: #6c757d;
-    color: white;
-    padding: 10px 15px;
-    border: none;
+    background-color: var(--button-bg);
+    color: var(--button-text);
+    padding: var(--button-padding);
+    margin: var(--button-margin);
+    border: 1px solid var(--button-bg);
     border-radius: 4px;
     cursor: pointer;
     font-size: 0.9rem;
-    margin-top: 10px;
     transition: background-color 0.2s;
 }
-button:hover {
-    background-color: #5a6268;
+button:hover, .primary-btn:hover {
+    background-color: var(--button-hover-bg);
+}
+button:focus-visible, .primary-btn:focus-visible {
+    outline: 2px solid var(--focus-ring-color);
+    outline-offset: 2px;
 }
 
 /* Icon style buttons */
@@ -989,8 +1017,8 @@ body.ductbank-page select {
     border: 1px solid var(--border-color);
 }
 body.ductbank-page button {
-    padding: 4px 8px;
-    margin: 4px 2px;
+    padding: var(--button-padding);
+    margin: var(--button-margin);
     cursor: pointer;
 }
 
@@ -1020,9 +1048,9 @@ body.conduitfill-page select {
     border: 1px solid var(--border-color);
 }
 body.conduitfill-page button {
-    padding: 6px 12px;
+    padding: var(--button-padding);
     font-size: 0.9rem;
-    margin: 8px 4px 16px 0;
+    margin: var(--button-margin);
     cursor: pointer;
 }
 body.conduitfill-page table {
@@ -1213,9 +1241,9 @@ body.cabletrayfill-page select {
     border: 1px solid var(--border-color);
 }
 body.cabletrayfill-page button {
-    padding: 6px 12px;
+    padding: var(--button-padding);
     font-size: 0.9rem;
-    margin: 8px 4px 16px 0;
+    margin: var(--button-margin);
     cursor: pointer;
 }
 body.cabletrayfill-page table {

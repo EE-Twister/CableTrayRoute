@@ -93,6 +93,7 @@ class TableManager {
           const toggle = document.createElement('button');
           toggle.className = 'group-toggle';
           toggle.textContent = '-';
+          toggle.setAttribute('aria-label','Toggle group');
           toggle.addEventListener('click', e => { e.stopPropagation(); this.toggleGroup(g.name); });
           th.appendChild(toggle);
           this.groupThs[g.name] = th;
@@ -113,6 +114,7 @@ class TableManager {
       const btn=document.createElement('button');
       btn.className='filter-btn';
       btn.innerHTML='\u25BC';
+      btn.setAttribute('aria-label','Filter column');
       btn.addEventListener('click',e=>{e.stopPropagation();this.showFilterPopup(btn,idx);});
       th.appendChild(btn);
       const resizer=document.createElement('span');
@@ -236,6 +238,7 @@ class TableManager {
     });
     const apply=document.createElement('button');
     apply.textContent='Apply';
+    apply.setAttribute('aria-label','Apply filter');
     apply.addEventListener('click',()=>{
       clearTimeout(debounceTimer);
       applyFilter();
@@ -244,6 +247,7 @@ class TableManager {
     popup.appendChild(apply);
     const clear=document.createElement('button');
     clear.textContent='Clear';
+    clear.setAttribute('aria-label','Clear filter');
     clear.addEventListener('click',()=>{
       inp.value='';
       this.filters[index]='';
@@ -306,17 +310,18 @@ class TableManager {
 
     const btnCol=document.createElement('div');
     btnCol.className='button-column';
-    const mkBtn=txt=>{
+    const mkBtn=(txt,label)=>{
       const b=document.createElement('button');
       b.type='button';
       b.textContent=txt;
+      if(label) b.setAttribute('aria-label',label);
       b.addEventListener('keydown',e=>{if(e.key==='Enter'||e.key===' '){e.preventDefault();b.click();}});
       return b;
     };
-    const allR=mkBtn('>>');
-    const someR=mkBtn('>');
-    const someL=mkBtn('<');
-    const allL=mkBtn('<<');
+    const allR=mkBtn('>>','Move all to selected');
+    const someR=mkBtn('>','Move selected to selected');
+    const someL=mkBtn('<','Move selected to available');
+    const allL=mkBtn('<<','Move all to available');
     [allR,someR,someL,allL].forEach(b=>btnCol.appendChild(b));
     dual.appendChild(btnCol);
     dual.appendChild(chosen.wrap);
@@ -341,9 +346,11 @@ class TableManager {
     const saveBtn=document.createElement('button');
     saveBtn.type='button';
     saveBtn.textContent='Save';
+    saveBtn.setAttribute('aria-label','Save selection');
     const cancelBtn=document.createElement('button');
     cancelBtn.type='button';
     cancelBtn.textContent='Cancel';
+    cancelBtn.setAttribute('aria-label','Cancel selection');
     actions.appendChild(saveBtn);
     actions.appendChild(cancelBtn);
     content.appendChild(actions);
@@ -455,6 +462,7 @@ class TableManager {
         summaryEl = document.createElement('button');
         summaryEl.type = 'button';
         summaryEl.className = 'raceway-summary';
+        summaryEl.setAttribute('aria-label','View selected raceways');
         summaryEl.addEventListener('click', e => {
           e.stopPropagation();
           this.showRacewayModal(el, summaryEl);

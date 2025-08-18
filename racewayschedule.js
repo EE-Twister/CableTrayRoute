@@ -25,6 +25,7 @@ const TRAY_TYPE_OPTIONS=['Ladder (50 % fill)','Solid Bottom (40 % fill)'];
 document.addEventListener('DOMContentLoaded',()=>{
   initSettings();
   initDarkMode();
+  initCompactMode();
   initHelpModal('help-btn','help-modal','close-help-btn');
   initHelpModal('ductbank-help-btn','ductbank-help-modal');
   initHelpModal('tray-help-btn','tray-help-modal');

@@ -3,6 +3,7 @@ checkPrereqs([{key:'ductbankSchedule',page:'racewayschedule.html',label:'Raceway
 document.addEventListener('DOMContentLoaded',()=>{
   initSettings();
   initDarkMode();
+  initCompactMode();
   initHelpModal('helpBtn','helpOverlay','helpClose');
   initNavToggle();
 });

@@ -18,6 +18,7 @@ checkPrereqs([{key:'conduitSchedule',page:'racewayschedule.html',label:'Raceway 
     document.addEventListener('DOMContentLoaded', () => {
       initSettings();
       initDarkMode();
+      initCompactMode();
       initHelpModal('help-btn','help-modal','close-help-btn');
       initNavToggle();
       const dirty = createDirtyTracker();

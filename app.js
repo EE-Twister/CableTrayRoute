@@ -86,6 +86,7 @@ const SHAPE_COLORS = {
 document.addEventListener('DOMContentLoaded', async () => {
     initSettings();
     initDarkMode();
+    initCompactMode();
     initHelpModal('help-btn','help-modal','close-help-btn');
     initNavToggle();
     // --- UNSAVED CHANGES TRACKING ---
@@ -164,6 +165,7 @@ document.addEventListener('DOMContentLoaded', async () => {
         manualTraySummary: document.getElementById('manual-tray-summary'),
         cableListSummary: document.getElementById('cable-list-summary'),
         darkToggle: document.getElementById('dark-toggle'),
+        compactToggle: document.getElementById('compact-toggle'),
         debugToggle: document.getElementById('debug-toggle'),
         debugConsole: document.getElementById('debug-console'),
         debugLog: document.getElementById('debug-log'),

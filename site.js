@@ -478,6 +478,35 @@ function initDarkMode(){
   });
 }
 
+function initCompactMode(){
+  const compactToggle=document.getElementById('compact-toggle');
+  const session=JSON.parse(localStorage.getItem('ctrSession')||'{}');
+  if(session.compactMode===undefined){
+    session.compactMode=false;
+    localStorage.setItem('ctrSession',JSON.stringify(session));
+  }
+  document.body.classList.toggle('compact-mode',session.compactMode);
+  if(compactToggle) compactToggle.checked=!!session.compactMode;
+  if(compactToggle){
+    compactToggle.addEventListener('change',()=>{
+      document.body.classList.toggle('compact-mode',compactToggle.checked);
+      session.compactMode=compactToggle.checked;
+      localStorage.setItem('ctrSession',JSON.stringify(session));
+      if(typeof window.saveSession==='function') window.saveSession();
+      if(typeof window.saveDuctbankSession==='function') window.saveDuctbankSession();
+    });
+  }
+  window.addEventListener('storage',e=>{
+    if(e.key==='ctrSession'){
+      try{
+        const data=JSON.parse(e.newValue);
+        document.body.classList.toggle('compact-mode',data&&data.compactMode);
+        if(compactToggle) compactToggle.checked=!!(data&&data.compactMode);
+      }catch{}
+    }
+  });
+}
+
 function initHelpModal(btnId='help-btn',modalId='help-modal',closeId){
   const btn=document.getElementById(btnId);
   const modal=document.getElementById(modalId);
@@ -640,6 +669,7 @@ function applyUnitLabels(){
 
 globalThis.initSettings=initSettings;
 globalThis.initDarkMode=initDarkMode;
+globalThis.initCompactMode=initCompactMode;
 globalThis.initHelpModal=initHelpModal;
 globalThis.initNavToggle=initNavToggle;
 globalThis.checkPrereqs=checkPrereqs;
