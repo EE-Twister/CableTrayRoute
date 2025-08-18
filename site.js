@@ -1,6 +1,8 @@
 import "./units.js";
 import { exportProject, importProject } from "./dataStore.js";
-import { applyPatch, compare } from "fast-json-patch";
+// Use a CDN-hosted ES module version of fast-json-patch so browsers can
+// resolve the dependency without a bundler.
+import { applyPatch, compare } from "https://cdn.jsdelivr.net/npm/fast-json-patch@3.1.0/index.mjs";
 const FOCUSABLE="a[href],button:not([disabled]),textarea:not([disabled]),input:not([disabled]),select:not([disabled]),[tabindex]:not([tabindex='-1'])";
 const PROJECT_KEY='CTR_PROJECT_V1';
 const CHECKPOINT_KEY='CTR_CHECKPOINT';
