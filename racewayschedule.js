@@ -216,5 +216,85 @@ document.addEventListener('DOMContentLoaded',()=>{
   }
   window.getRacewaySchedule=getRacewaySchedule;
   persistAllConduits();
+
+  // Validation button and lint panel
+  const validateBtn=document.getElementById('validate-raceway-btn');
+  const lintPanel=document.getElementById('lint-panel');
+  const lintList=document.getElementById('lint-list');
+
+  function focusIssue(issue){
+    if(!issue) return;
+    let row, el;
+    if(issue.table==='tray'){
+      row=document.querySelector(`#trayTable tbody tr:nth-child(${issue.row+1})`);
+      el=row?row.querySelector(`[name="${issue.col}"]`):null;
+    }else if(issue.table==='conduit'){
+      row=document.querySelector(`#conduitTable tbody tr:nth-child(${issue.row+1})`);
+      el=row?row.querySelector(`[name="${issue.col}"]`):null;
+    }else if(issue.table==='ductbank'){
+      const rows=document.querySelectorAll('#ductbankTable tbody tr.ductbank-row');
+      row=rows[issue.row];
+      el=row?row.cells[1].querySelector('input'):null;
+    }
+    if(el){
+      el.focus();
+      if(typeof el.scrollIntoView==='function') el.scrollIntoView({behavior:'smooth',block:'center'});
+    }
+  }
+
+  function lintRaceways(){
+    const issues=[];
+    // Duplicate ductbank tags
+    const ductbanks=getDuctbanks();
+    const dbTags=new Set();
+    ductbanks.forEach((db,i)=>{
+      if(dbTags.has(db.tag)) issues.push({message:`Duplicate ductbank tag "${db.tag}"`,table:'ductbank',row:i});
+      dbTags.add(db.tag);
+    });
+    // Tray checks
+    const trays=trayTable.getData();
+    const trayIds=new Set();
+    trays.forEach((t,i)=>{
+      if(trayIds.has(t.tray_id)) issues.push({message:`Duplicate tray ID "${t.tray_id}"`,table:'tray',row:i,col:'tray_id'});
+      trayIds.add(t.tray_id);
+      const sx=parseFloat(t.start_x), sy=parseFloat(t.start_y), sz=parseFloat(t.start_z);
+      const ex=parseFloat(t.end_x), ey=parseFloat(t.end_y), ez=parseFloat(t.end_z);
+      if(sx===ex && sy===ey && sz===ez) issues.push({message:`Tray ${t.tray_id} has zero length`,table:'tray',row:i,col:'end_x'});
+      if(ex<sx || ey<sy || ez<sz) issues.push({message:`Tray ${t.tray_id} has non-monotonic coordinates`,table:'tray',row:i,col:'end_x'});
+    });
+    // Conduit checks
+    const conduits=conduitTable.getData();
+    const cIds=new Set();
+    conduits.forEach((c,i)=>{
+      if(cIds.has(c.conduit_id)) issues.push({message:`Duplicate conduit ID "${c.conduit_id}"`,table:'conduit',row:i,col:'conduit_id'});
+      cIds.add(c.conduit_id);
+      const sx=parseFloat(c.start_x), sy=parseFloat(c.start_y), sz=parseFloat(c.start_z);
+      const ex=parseFloat(c.end_x), ey=parseFloat(c.end_y), ez=parseFloat(c.end_z);
+      if([sx,sy,sz,ex,ey,ez].some(v=>!Number.isFinite(v))) issues.push({message:`Dangling conduit ${c.conduit_id}`,table:'conduit',row:i,col:'start_x'});
+      if(ex<sx || ey<sy || ez<sz) issues.push({message:`Conduit ${c.conduit_id} has non-monotonic coordinates`,table:'conduit',row:i,col:'end_x'});
+      if(!CONDUIT_SPECS[c.type] || !CONDUIT_SPECS[c.type][c.trade_size]) issues.push({message:`Conduit ${c.conduit_id} has illegal size`,table:'conduit',row:i,col:'trade_size'});
+    });
+    return issues;
+  }
+
+  if(validateBtn){
+    validateBtn.addEventListener('click',()=>{
+      const issues=lintRaceways();
+      lintList.innerHTML='';
+      if(issues.length===0){
+        const li=document.createElement('li');
+        li.textContent='No issues found';
+        lintList.appendChild(li);
+      }else{
+        issues.forEach(issue=>{
+          const li=document.createElement('li');
+          li.textContent=issue.message;
+          li.addEventListener('click',()=>focusIssue(issue));
+          lintList.appendChild(li);
+        });
+      }
+      lintPanel.classList.remove('hidden');
+    });
+  }
 });
 

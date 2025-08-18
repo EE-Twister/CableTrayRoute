@@ -45,6 +45,7 @@
         <h1>Raceway Schedule</h1>
         <p>Centralized tables for managing raceway data.</p>
         <button id="load-sample-raceway-btn">Load Sample Data</button>
+        <button id="validate-raceway-btn">Validate</button>
       </header>
 
       <!-- Ductbank / Conduit Hierarchy -->
@@ -174,6 +175,11 @@
         <p>Record stand-alone conduits with start/end coordinates, type, trade size, and capacity. Template: <a href="examples/conduit_schedule.csv" download>conduit_schedule.csv</a>.</p>
       </div>
     </div>
+
+  <aside id="lint-panel" class="lint-panel hidden" aria-label="Validation issues">
+    <h2>Fix-it Hints</h2>
+    <ul id="lint-list"></ul>
+  </aside>
 
 </body>
 </html>
