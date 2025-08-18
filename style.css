@@ -1668,3 +1668,34 @@ body.dark-mode .workflow-card-title {
         justify-content: center;
     }
 }
+
+/* Lint panel for validation results */
+.lint-panel {
+    position: fixed;
+    top: 0;
+    right: 0;
+    width: 300px;
+    max-height: 100%;
+    overflow-y: auto;
+    background: var(--background-color);
+    color: var(--text-color);
+    border-left: 1px solid var(--border-color);
+    box-shadow: -2px 0 5px rgba(0,0,0,0.1);
+    padding: 1rem;
+    z-index: 1000;
+}
+
+.lint-panel.hidden {
+    display: none;
+}
+
+.lint-panel ul {
+    list-style: none;
+    padding-left: 0;
+    margin: 0;
+}
+
+.lint-panel li {
+    cursor: pointer;
+    margin-bottom: 0.5rem;
+}
