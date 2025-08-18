@@ -1,5 +1,6 @@
 import { getItem, setItem, removeItem, getTrays, getCables, getDuctbanks, getConduits } from './dataStore.js';
 import { buildSegmentRows, buildSummaryRows } from './resultsExport.mjs';
+import './site.js';
 
 // Filename: app.mjs
 // (This is an improved version that adds route segment consolidation)
