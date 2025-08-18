@@ -693,7 +693,7 @@ document.addEventListener('DOMContentLoaded', async () => {
                 .filter(db => (state.conduitsByDb[normalize(db.tag || db.id)] || []).length === 0)
                 .map(db => db.tag || db.id);
             if (state.ductbanksWithoutConduits.length > 0) {
-                const fixUrl = `racewayschedule.html?db=${encodeURIComponent(state.ductbanksWithoutConduits[0])}`;
+                const fixUrl = 'racewayschedule.html?focus=ductbanks&expandAll=true&showConduitsWizard=true';
                 console.warn(`Ductbanks missing conduits: ${state.ductbanksWithoutConduits.join(', ')}. Go fix it: ${fixUrl}`);
                 const warnEl = typeof document !== 'undefined' && document.getElementById('ductbank-no-conduits-warning');
                 if (warnEl) {
