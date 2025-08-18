@@ -1,3 +1,5 @@
+import * as dataStore from './dataStore.js';
+
 checkPrereqs([{key:'cableSchedule',page:'cableschedule.html',label:'Cable Schedule'}]);
 
 // Expose conduit specifications globally so other modules bundled into
@@ -33,9 +35,8 @@ document.addEventListener('DOMContentLoaded',()=>{
   initNavToggle();
   function cablesForRaceway(id){
     try{
-      const json=localStorage.getItem(TableUtils.STORAGE_KEYS.cableSchedule);
-      if(!json) return [];
-      const arr=JSON.parse(json);
+      const arr=dataStore.getCables();
+      if(!arr) return [];
       return arr
         .filter(c=>{
           let ids=c.raceway_ids;
@@ -110,7 +111,7 @@ document.addEventListener('DOMContentLoaded',()=>{
         trayTable.save();
         const tray={tray_id:row.tray_id,width:parseFloat(row.inside_width),height:parseFloat(row.tray_depth),allowed_cable_group:row.allowed_cable_group};
         const cables=cablesForRaceway(row.tray_id);
-        localStorage.setItem('trayFillData',JSON.stringify({tray,cables}));
+        dataStore.setItem('trayFillData',{tray,cables});
       }catch(e){console.error('Failed to store tray fill data',e);}
       window.location.href='cabletrayfill.html';
     }
@@ -147,7 +148,7 @@ document.addEventListener('DOMContentLoaded',()=>{
     onView:(row)=>{
       try{
         const cables=cablesForRaceway(row.conduit_id);
-        localStorage.setItem('conduitFillData',JSON.stringify({type:row.type,tradeSize:row.trade_size,cables}));
+        dataStore.setItem('conduitFillData',{type:row.type,tradeSize:row.trade_size,cables});
       }catch(e){console.error('Failed to store conduit fill data',e);}
       window.location.href='conduitfill.html';
     }
@@ -164,9 +165,9 @@ document.addEventListener('DOMContentLoaded',()=>{
       try{
         const res=await fetch('examples/sample_raceways.json');
         const data=await res.json();
-        localStorage.setItem(TableUtils.STORAGE_KEYS.ductbankSchedule,JSON.stringify(data.ductbanks));
-        localStorage.setItem(TableUtils.STORAGE_KEYS.traySchedule,JSON.stringify(data.trays));
-        localStorage.setItem(TableUtils.STORAGE_KEYS.conduitSchedule,JSON.stringify(data.conduits));
+        dataStore.setDuctbanks(data.ductbanks);
+        dataStore.setTrays(data.trays);
+        dataStore.setConduits(data.conduits);
         document.getElementById('load-ductbank-btn').click();
         document.getElementById('load-tray-btn').click();
         document.getElementById('load-conduit-btn').click();

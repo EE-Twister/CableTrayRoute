@@ -1,3 +1,5 @@
+import { getTrays, getCables, getDuctbanks, getConduits, getItem } from './dataStore.js';
+
 window.addEventListener('DOMContentLoaded', () => {
   const cards = document.querySelectorAll('.workflow-grid .workflow-card');
   cards.forEach(card => {
@@ -9,14 +11,12 @@ window.addEventListener('DOMContentLoaded', () => {
     if (key === 'racewaySchedule') {
       // Raceway data is spread across multiple storage keys; mark complete
       // when any of the related tables has saved data.
-      complete = ['ductbankSchedule', 'traySchedule', 'conduitSchedule']
-        .some(k => localStorage.getItem(k));
+      complete = getDuctbanks().length > 0 || getTrays().length > 0 || getConduits().length > 0;
     } else if (key === 'optimalRoute') {
       // Optimal routing relies on both cable and tray schedules.
-      complete = ['cableSchedule', 'traySchedule']
-        .every(k => localStorage.getItem(k));
+      complete = getCables().length > 0 && getTrays().length > 0;
     } else if (key) {
-      complete = !!localStorage.getItem(key);
+      complete = !!getItem(key);
     }
 
     if (complete) {

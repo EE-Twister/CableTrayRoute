@@ -1,3 +1,5 @@
+import { getItem, removeItem } from './dataStore.js';
+
 checkPrereqs([{key:'conduitSchedule',page:'racewayschedule.html',label:'Raceway Schedule'}]);
 
     const CONDUIT_SPECS = {
@@ -364,10 +366,10 @@ checkPrereqs([{key:'conduitSchedule',page:'racewayschedule.html',label:'Raceway 
       tableBody.addEventListener('click',e=>{if(e.target.tagName==='BUTTON') markUnsaved();});
       ['copyPngBtn','printBtn','copyBtn'].forEach(id=>{const el=document.getElementById(id);if(el)el.addEventListener('click',markSaved);});
 
-      const stored = localStorage.getItem('conduitFillData');
+      const stored = getItem('conduitFillData');
       if (stored) {
         try {
-          const { type, tradeSize, cables } = JSON.parse(stored);
+          const { type, tradeSize, cables } = stored;
           if (type) {
             typeSel.value = type;
             populateSizes();
@@ -392,7 +394,7 @@ checkPrereqs([{key:'conduitSchedule',page:'racewayschedule.html',label:'Raceway 
         } catch (e) {
           console.error('Failed to load conduitFillData', e);
         }
-        localStorage.removeItem('conduitFillData');
+        removeItem('conduitFillData');
       }
     });
   

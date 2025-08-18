@@ -1,3 +1,5 @@
+import { getItem, setItem, removeItem, keys as storeKeys } from './dataStore.js';
+
 checkPrereqs([{key:'traySchedule',page:'racewayschedule.html',label:'Raceway Schedule'}]);
 
     document.addEventListener("DOMContentLoaded", function() {
@@ -1610,7 +1612,7 @@ Wt: ${m.weight.toFixed(2)} lbs/ft
       const profileList = document.getElementById("profileList");
       function refreshProfileList() {
         profileList.innerHTML = "";
-        const keys = Object.keys(localStorage).filter(k => k.startsWith("trayProfile_"));
+        const keys = storeKeys().filter(k => k.startsWith("trayProfile_"));
         if (keys.length === 0) {
           const opt = document.createElement("option");
           opt.value = "";
@@ -1670,7 +1672,7 @@ Wt: ${m.weight.toFixed(2)} lbs/ft
           });
         }
         try {
-          localStorage.setItem("trayProfile_" + name, JSON.stringify(arr));
+          setItem("trayProfile_" + name, arr);
           alert(`Profile "${name}" saved.`);
           refreshProfileList();
         } catch (e) {
@@ -1685,19 +1687,13 @@ Wt: ${m.weight.toFixed(2)} lbs/ft
           alert("Select a profile to load.");
           return;
         }
-        const json = localStorage.getItem("trayProfile_" + profileName);
-        if (!json) {
+        const data = getItem("trayProfile_" + profileName);
+        if (!data) {
           alert(`Profile "${profileName}" not found.`);
           refreshProfileList();
           return;
         }
-        let arr;
-        try {
-          arr = JSON.parse(json);
-        } catch (e) {
-          alert("Error parsing profile data: " + e.message);
-          return;
-        }
+        const arr = data;
         cableTbody.innerHTML = "";
         arr.forEach(cable => {
           const newRow = createCableRow();
@@ -1735,7 +1731,7 @@ Wt: ${m.weight.toFixed(2)} lbs/ft
           return;
         }
         if (!confirm(`Delete profile "${profileName}"?`)) return;
-        localStorage.removeItem("trayProfile_" + profileName);
+        removeItem("trayProfile_" + profileName);
         alert(`Profile "${profileName}" deleted.`);
         refreshProfileList();
       });
@@ -1755,10 +1751,10 @@ Wt: ${m.weight.toFixed(2)} lbs/ft
       if(importExcelInput) importExcelInput.addEventListener('change',markUnsaved);
       ['saveProfileBtn','loadProfileBtn','exportExcelBtn'].forEach(id=>{const el=document.getElementById(id);if(el) el.addEventListener('click',markSaved);});
 
-      const stored = localStorage.getItem('trayFillData');
+      const stored = getItem('trayFillData');
       if (stored) {
         try {
-          const { tray, cables } = JSON.parse(stored);
+          const { tray, cables } = stored;
           document.getElementById('trayWidth').value = tray.width;
           document.getElementById('trayDepth').value = tray.height;
           document.getElementById('trayName').value = tray.tray_id || '';
@@ -1793,7 +1789,7 @@ Wt: ${m.weight.toFixed(2)} lbs/ft
         } catch (e) {
           console.error('Failed to load trayFillData', e);
         }
-        localStorage.removeItem('trayFillData');
+        removeItem('trayFillData');
       }
 
       // Attach help popups for table headers

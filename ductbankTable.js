@@ -1,3 +1,5 @@
+import { getDuctbanks, setDuctbanks, setItem, getItem } from './dataStore.js';
+
 (function(){
   let ductbanks=[];
   const DUCTBANK_KEY = TableUtils.STORAGE_KEYS.ductbankSchedule;
@@ -372,7 +374,7 @@
       concreteEncasement:db.concrete_encasement,
       conduits:db.conduits.map(c=>({conduit_id:c.conduit_id,conduit_type:c.type,trade_size:c.trade_size}))
     };
-    try{localStorage.setItem('ductbankSession',JSON.stringify(session));}catch(e){console.error('Failed to store ductbank session',e);}
+    try{setItem('ductbankSession',session);}catch(e){console.error('Failed to store ductbank session',e);}
     window.location.href='ductbankroute.html';
   }
 
@@ -410,12 +412,12 @@
       return;
     }
     ductbanks.forEach(db=>db.conduits.forEach(c=>{c.ductbankTag=db.tag;}));
-    try{localStorage.setItem(DUCTBANK_KEY,JSON.stringify(ductbanks));}catch(e){}
+    try{setDuctbanks(ductbanks);}catch(e){}
     applyFilters();
   }
 
   function loadDuctbanks(){
-    try{ductbanks=JSON.parse(localStorage.getItem(DUCTBANK_KEY))||[];}catch(e){ductbanks=[];}
+    try{ductbanks=getDuctbanks();}catch(e){ductbanks=[];}
     ductbanks.forEach(db=>{
       if(db.expanded===undefined) db.expanded=false;
       if(!db.conduits) db.conduits=[];

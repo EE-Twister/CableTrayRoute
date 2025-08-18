@@ -8,6 +8,7 @@
   <link rel="icon" href="icons/favicon.svg" type="image/svg+xml">
   <link rel="stylesheet" href="style.css">
   <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js" defer></script>
+  <script type="module" src="dataStore.js" defer></script>
   <script src="dist/cableschedule.js" defer></script>
 </head>
 <body>
@@ -99,12 +100,12 @@ const insulationRatings=['60','75','90'];
 
   function getRacewayOptions(){
     const ids=new Set();
-    try{(JSON.parse(localStorage.getItem(TableUtils.STORAGE_KEYS.traySchedule))||[]).forEach(t=>{if(t.tray_id) ids.add(t.tray_id);});}catch(e){}
-    try{(JSON.parse(localStorage.getItem(TableUtils.STORAGE_KEYS.conduitSchedule))||[]).forEach(c=>{
+    try{dataStore.getTrays().forEach(t=>{if(t.tray_id) ids.add(t.tray_id);});}catch(e){}
+    try{dataStore.getConduits().forEach(c=>{
       const id=c.tray_id||(c.ductbank_id&&c.conduit_id?`${c.ductbank_id}-${c.conduit_id}`:c.conduit_id);
       if(id) ids.add(id);
     });}catch(e){}
-    try{(JSON.parse(localStorage.getItem(TableUtils.STORAGE_KEYS.ductbankSchedule))||[]).forEach(db=>{
+    try{dataStore.getDuctbanks().forEach(db=>{
       const dbId=db.ductbank_id||db.id||db.tag;
       (db.conduits||[]).forEach(c=>{
         const id=c.tray_id||(dbId&&c.conduit_id?`${dbId}-${c.conduit_id}`:c.conduit_id);
