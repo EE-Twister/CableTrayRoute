@@ -272,14 +272,14 @@ describe("_racewayRoute", () => {
     const start = [0, -73, 0];
     const end = [0, 83, 0];
 
-    let system = new CableRoutingSystem({ proximityThreshold: 72 });
+    let system = new CableRoutingSystem({ proximityThreshold: 72 * 12 });
     system.addTraySegment(tray);
     let result = system.calculateRoute(start, end, 1, null);
     const reasons = result.exclusions.map(e => e.reason);
     assert(reasons.includes("start_beyond_proximity"));
     assert(reasons.includes("end_beyond_proximity"));
 
-    system = new CableRoutingSystem({ proximityThreshold: 80 });
+    system = new CableRoutingSystem({ proximityThreshold: 80 * 12 });
     system.addTraySegment(tray);
     result = system.calculateRoute(start, end, 1, null);
     assert(result.success, "route should succeed with higher threshold");

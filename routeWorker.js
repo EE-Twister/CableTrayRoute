@@ -44,7 +44,8 @@ class MinHeap {
 class CableRoutingSystem {
     constructor(options) {
         this.fillLimit = options.fillLimit || 0.4;
-        this.proximityThreshold = options.proximityThreshold || 72.0;
+        // Proximity threshold is specified in inches; convert to feet for calculations
+        this.proximityThreshold = (options.proximityThreshold ?? 72.0) / 12.0;
         this.fieldPenalty = options.fieldPenalty || 3.0;
         this.sharedPenalty = options.sharedPenalty || 0.5;
         // Limit distance between generic field nodes to keep the graph from
