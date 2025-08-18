@@ -90,7 +90,9 @@ const SHAPE_COLORS = {
 document.addEventListener('DOMContentLoaded', async () => {
     initSettings();
     initDarkMode();
-    initCompactMode();
+    if (typeof initCompactMode === 'function') {
+        initCompactMode();
+    }
     initHelpModal('help-btn','help-modal','close-help-btn');
     initNavToggle();
     // --- UNSAVED CHANGES TRACKING ---

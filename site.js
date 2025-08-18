@@ -45,16 +45,21 @@ function initProjectStorage(){
       }
     };
     project=migrateProject(old);
-    realSet(PROJECT_KEY,JSON.stringify(project));
+    try{realSet(PROJECT_KEY,JSON.stringify(project));}
+    catch(e){console.warn('project save failed',e);}
   }
 
   function save(){
-    realSet(PROJECT_KEY,JSON.stringify(project));
+    try{realSet(PROJECT_KEY,JSON.stringify(project));}
+    catch(e){console.warn('project save failed',e);}
     globalThis.updateProjectDisplay?.();
   }
 
   function setItem(key,value){
-    if(key===PROJECT_KEY){ realSet(key,value); return; }
+    if(key===PROJECT_KEY){
+      try{realSet(key,value);}catch(e){console.warn('project save failed',e);}
+      return;
+    }
     switch(key){
       case 'cableSchedule': project.cables=JSON.parse(value); break;
       case 'traySchedule': project.trays=JSON.parse(value); break;
