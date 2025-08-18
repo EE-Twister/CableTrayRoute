@@ -333,6 +333,12 @@ function initSettings(){
     if(exportBtn) exportBtn.insertAdjacentElement('beforebegin',shareBtn);
     else settingsMenu.appendChild(shareBtn);
     shareBtn.addEventListener('click',copyShareLink);
+
+    const selfCheckBtn=document.createElement('button');
+    selfCheckBtn.id='run-self-check-btn';
+    selfCheckBtn.textContent='Run Self-Check';
+    settingsMenu.appendChild(selfCheckBtn);
+    selfCheckBtn.addEventListener('click',()=>{ location.href='optimalRoute.html?selfcheck=1'; });
   }
   const unitSelect=document.getElementById('unit-select');
   if(unitSelect){
@@ -575,6 +581,36 @@ function applyUnitLabels(){
   document.querySelectorAll('[data-unit="conduit"]').forEach(el=>el.textContent=c);
 }
 
+function showSelfCheckModal(data){
+  const modal=document.createElement('div');
+  modal.className='modal';
+  modal.id='self-check-modal';
+  const content=document.createElement('div');
+  content.className='modal-content';
+  const close=document.createElement('button');
+  close.className='close-btn';
+  close.textContent='\u00D7';
+  close.addEventListener('click',()=>modal.remove());
+  const title=document.createElement('h2');
+  title.textContent=data.pass?'Self-Check PASSED':'Self-Check FAILED';
+  const pre=document.createElement('pre');
+  const json=JSON.stringify(data,null,2);
+  pre.textContent=json;
+  const actions=document.createElement('div');
+  actions.className='modal-actions';
+  const copyBtn=document.createElement('button');
+  copyBtn.textContent='Copy Diagnostics';
+  copyBtn.addEventListener('click',()=>navigator.clipboard.writeText(json));
+  actions.appendChild(copyBtn);
+  content.appendChild(close);
+  content.appendChild(title);
+  content.appendChild(pre);
+  content.appendChild(actions);
+  modal.appendChild(content);
+  document.body.appendChild(modal);
+  modal.style.display='flex';
+}
+
 globalThis.initSettings=initSettings;
 globalThis.initDarkMode=initDarkMode;
 globalThis.initCompactMode=initCompactMode;
@@ -584,3 +620,4 @@ globalThis.checkPrereqs=checkPrereqs;
 globalThis.persistConduits=persistConduits;
 globalThis.loadConduits=loadConduits;
 globalThis.applyUnitLabels=applyUnitLabels;
+globalThis.showSelfCheckModal=showSelfCheckModal;
