@@ -1,4 +1,5 @@
 import { getItem, setItem, removeItem, getTrays, getCables, getDuctbanks, getConduits } from './dataStore.js';
+import { buildSegmentRows, buildSummaryRows } from './resultsExport.mjs';
 
 // Filename: app.js
 // (This is an improved version that adds route segment consolidation)
@@ -2607,49 +2608,23 @@ const openDuctbankRoute = (dbId, conduitId) => {
             return;
         }
 
-        let data = state.latestRouteData;
+        const segmentRows = buildSegmentRows(state.latestRouteData);
+        const summaryRows = buildSummaryRows(state.latestRouteData);
 
-        if (data[0].breakdown !== undefined) {
-            const flat = [];
-            data.forEach(row => {
-                if (Array.isArray(row.breakdown) && row.breakdown.length > 0) {
-                    row.breakdown.forEach(b => {
-                        flat.push({
-                            cable: row.cable,
-                            total_length: row.total_length,
-                            field_length: row.field_length,
-                            tray_segments_count: row.tray_segments_count,
-                            segments_count: row.segments_count,
-                            segment: b.segment,
-                            tray_id: b.tray_id,
-                            conduit_id: b.conduit_id || '',
-                            type: b.type,
-                            from: b.from,
-                            to: b.to,
-                            length: b.length,
-                            recommended_raceway: b.raceway || ''
-                        });
-                    });
-                } else {
-                    flat.push({
-                        cable: row.cable,
-                        total_length: row.total_length,
-                        field_length: row.field_length,
-                        tray_segments_count: row.tray_segments_count,
-                        segments_count: row.segments_count,
-                        segment: '', tray_id: '', type: '', from: '', to: '', length: '',
-                        recommended_raceway: ''
-                    });
-                }
-            });
-            data = flat;
-        }
-
-        // remove status column if present
-        data = data.map(row => {
-            const { status, ...rest } = row;
-            return rest;
+        const headers = ['cable_tag','segment_order','element_type','element_id','length','cumulative_length','reason_codes'];
+        let csv = headers.join(',') + '\n';
+        segmentRows.forEach(r => {
+            csv += headers.map(h => r[h] !== undefined ? r[h] : '').join(',') + '\n';
         });
+        const csvBlob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
+        const csvUrl = URL.createObjectURL(csvBlob);
+        const csvLink = document.createElement('a');
+        csvLink.href = csvUrl;
+        csvLink.download = 'route_data.csv';
+        document.body.appendChild(csvLink);
+        csvLink.click();
+        document.body.removeChild(csvLink);
+        URL.revokeObjectURL(csvUrl);
 
         const trayMap = new Map();
         state.latestRouteData.forEach(row => {
@@ -2682,8 +2657,10 @@ const openDuctbankRoute = (dbId, conduitId) => {
         }));
 
         const wb = XLSX.utils.book_new();
-        const ws1 = XLSX.utils.json_to_sheet(data);
-        XLSX.utils.book_append_sheet(wb, ws1, 'Route Data');
+        const ws1 = XLSX.utils.json_to_sheet(segmentRows);
+        XLSX.utils.book_append_sheet(wb, ws1, 'Segments');
+        const wsSummary = XLSX.utils.json_to_sheet(summaryRows);
+        XLSX.utils.book_append_sheet(wb, wsSummary, 'Summary');
         const ws2 = XLSX.utils.json_to_sheet(trayList);
         XLSX.utils.book_append_sheet(wb, ws2, 'Tray Cable Map');
         if (sharedRoutes.length > 0) {
