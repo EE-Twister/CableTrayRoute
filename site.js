@@ -1,7 +1,10 @@
 import "./units.js";
 import { exportProject, importProject } from "./dataStore.js";
+import { applyPatch, compare } from "fast-json-patch";
 const FOCUSABLE="a[href],button:not([disabled]),textarea:not([disabled]),input:not([disabled]),select:not([disabled]),[tabindex]:not([tabindex='-1'])";
 const PROJECT_KEY='CTR_PROJECT_V1';
+const CHECKPOINT_KEY='CTR_CHECKPOINT';
+const MAX_CHECKPOINT_SIZE=2*1024*1024; // ~2MB
 
 function defaultProject(){
   return {name:'',ductbanks:[],conduits:[],trays:[],cables:[],settings:{session:{},collapsedGroups:{},units:'imperial'}};
@@ -28,6 +31,18 @@ function initProjectStorage(){
   const realGet=localStorage.getItem.bind(localStorage);
   const realSet=localStorage.setItem.bind(localStorage);
   const realRemove=localStorage.removeItem.bind(localStorage);
+  globalThis._ctrRealSetItem=realSet;
+
+  const undoStack=[];
+  const redoStack=[];
+
+  function pushUndo(oldProj,newProj){
+    const patch=compare(newProj,oldProj);
+    if(patch.length){
+      undoStack.push(patch);
+      redoStack.length=0;
+    }
+  }
 
   let project;
   try{ project=JSON.parse(realGet(PROJECT_KEY)); }catch{ project=null; }
@@ -57,6 +72,7 @@ function initProjectStorage(){
   }
 
   function setItem(key,value){
+    const oldProject=JSON.parse(JSON.stringify(project));
     if(key===PROJECT_KEY){
       try{realSet(key,value);}catch(e){console.warn('project save failed',e);}
       return;
@@ -73,6 +89,7 @@ function initProjectStorage(){
         try{ project.settings[key]=JSON.parse(value); }
         catch{ project.settings[key]=value; }
     }
+    pushUndo(oldProject,project);
     save();
   }
 
@@ -91,6 +108,7 @@ function initProjectStorage(){
   }
 
   function removeItem(key){
+    const oldProject=JSON.parse(JSON.stringify(project));
     if(key===PROJECT_KEY){ realRemove(key); return; }
     switch(key){
       case 'cableSchedule': project.cables=[]; break;
@@ -102,6 +120,7 @@ function initProjectStorage(){
       default:
         if(project.settings) delete project.settings[key];
     }
+    pushUndo(oldProject,project);
     save();
   }
 
@@ -110,7 +129,34 @@ function initProjectStorage(){
   localStorage.removeItem=removeItem;
 
   globalThis.getProject=()=>JSON.parse(JSON.stringify(project));
-  globalThis.setProject=p=>{ project=migrateProject(p); save(); };
+  globalThis.setProject=p=>{
+    const oldProject=JSON.parse(JSON.stringify(project));
+    project=migrateProject(p);
+    pushUndo(oldProject,project);
+    save();
+  };
+
+  globalThis.undoProject=()=>{
+    if(!undoStack.length) return;
+    const patch=undoStack.pop();
+    const current=JSON.parse(JSON.stringify(project));
+    const result=applyPatch(current,patch,true).newDocument;
+    redoStack.push(compare(result,project));
+    project=result;
+    save();
+  };
+
+  globalThis.redoProject=()=>{
+    if(!redoStack.length) return;
+    const patch=redoStack.pop();
+    const current=JSON.parse(JSON.stringify(project));
+    const result=applyPatch(current,patch,true).newDocument;
+    undoStack.push(compare(result,project));
+    project=result;
+    save();
+  };
+
+  globalThis.addEventListener('beforeunload',()=>{undoStack.length=0;redoStack.length=0;});
 }
 
 globalThis.migrateProject=migrateProject;
@@ -186,6 +232,21 @@ async function decodeProjectFromUrl(encoded){
   const bytes=base64ToBytes(decodeURIComponent(encoded));
   const json=await decompressBytes(bytes);
   return JSON.parse(json);
+}
+
+async function saveCheckpoint(){
+  try{
+    const proj=getProject();
+    const json=canonicalJSONString(proj);
+    const bytes=await compressString(json);
+    if(bytes.length>MAX_CHECKPOINT_SIZE){
+      alert('Checkpoint exceeds 2MB limit');
+      return;
+    }
+    globalThis._ctrRealSetItem?.(CHECKPOINT_KEY,bytesToBase64(bytes));
+  }catch(e){
+    console.error('Checkpoint save failed',e);
+  }
 }
 
 async function updateProjectDisplay(){
@@ -538,6 +599,13 @@ function loadConduits(){
 function initProjectIO(){
   loadProjectFromHash();
   const exportBtn=document.getElementById('export-project-btn');
+  if(exportBtn){
+    const checkpointBtn=document.createElement('button');
+    checkpointBtn.id='save-checkpoint-btn';
+    checkpointBtn.textContent='Save Checkpoint';
+    exportBtn.insertAdjacentElement('afterend',checkpointBtn);
+    checkpointBtn.addEventListener('click',saveCheckpoint);
+  }
   const importBtn=document.getElementById('import-project-btn');
   const fileInput=document.getElementById('import-project-input');
   if(exportBtn){
