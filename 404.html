@@ -24,6 +24,7 @@
   </nav>
   <div id="settings-menu" class="settings-menu">
     <label><input type="checkbox" id="dark-toggle"> Dark Mode</label>
+    <label><input type="checkbox" id="compact-toggle" aria-label="Enable compact table mode"> Compact Mode</label>
     <label for="unit-select">Units
       <select id="unit-select">
         <option value="imperial">Imperial</option>
@@ -56,6 +57,7 @@
     window.addEventListener('DOMContentLoaded', () => {
       initSettings();
       initDarkMode();
+      initCompactMode();
       initHelpModal('help-btn','help-modal','close-help-btn');
       initNavToggle();
     });

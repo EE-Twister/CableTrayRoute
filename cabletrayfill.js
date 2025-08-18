@@ -3,6 +3,7 @@ checkPrereqs([{key:'traySchedule',page:'racewayschedule.html',label:'Raceway Sch
     document.addEventListener("DOMContentLoaded", function() {
       initSettings();
       initDarkMode();
+      initCompactMode();
       initHelpModal('help-btn','helpOverlay','helpClose');
       initNavToggle();
       const dirty = createDirtyTracker();

@@ -38,6 +38,7 @@
     popup.appendChild(inp);
     const apply=document.createElement('button');
     apply.textContent='Apply';
+    apply.setAttribute('aria-label','Apply filter');
     apply.addEventListener('click',()=>{
       filters[index]=inp.value.trim();
       if(filters[index]) btn.classList.add('filtered'); else btn.classList.remove('filtered');
@@ -47,6 +48,7 @@
     popup.appendChild(apply);
     const clear=document.createElement('button');
     clear.textContent='Clear';
+    clear.setAttribute('aria-label','Clear filter');
     clear.addEventListener('click',()=>{
       inp.value='';
       filters[index]='';
@@ -107,6 +109,7 @@
         const btn=document.createElement('button');
         btn.className='filter-btn';
         btn.innerHTML='\u25BC';
+        btn.setAttribute('aria-label','Filter column');
         btn.addEventListener('click',e=>{e.stopPropagation();showFilterPopup(btn,idx);});
         th.appendChild(btn);
         filterButtons[idx]=btn;
@@ -139,6 +142,7 @@
       setWidth(tgl,0);
       const tglBtn=document.createElement('button');
       tglBtn.textContent=db.expanded?'\u25BC':'\u25B6';
+      tglBtn.setAttribute('aria-label','Toggle ductbank');
       tglBtn.addEventListener('click',()=>{db.expanded=!db.expanded;renderDuctbanks();});
       tgl.appendChild(tglBtn);
 
