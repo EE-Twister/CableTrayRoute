@@ -3204,7 +3204,7 @@ const openDuctbankRoute = (dbId, conduitId) => {
                         sharedRoutes: state.sharedFieldRoutes,
                         metricsHtml: elements.metrics.innerHTML,
                         wallTime: msg.wallTime
-                    }));
+                    });
                 }
             };
             routingWorker.postMessage({ type: 'start', trays: trayDataForRun, options, cables: state.cableList });
