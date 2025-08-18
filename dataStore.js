@@ -3,7 +3,8 @@
  * for core schedule data. Emits simple change events.
  */
 
-import Ajv from 'ajv';
+// Removed Ajv dependency to avoid bundling issues in the browser.
+// Implement a lightweight manual validator instead.
 
 /**
  * @typedef {{[key:string]:any}} GenericRecord
@@ -131,20 +132,34 @@ export const keys = () => {
   return [];
 };
 
-const ajv = new Ajv();
-const projectSchema = {
-  type: 'object',
-  properties: {
-    ductbanks: { type: 'array' },
-    conduits: { type: 'array' },
-    trays: { type: 'array' },
-    cables: { type: 'array' },
-    settings: { type: 'object' }
-  },
-  required: ['ductbanks', 'conduits', 'trays', 'cables', 'settings'],
-  additionalProperties: false
-};
-const validate = ajv.compile(projectSchema);
+// Simple schema validator replacing Ajv. Checks for required fields,
+// disallows extras, and verifies basic types.
+function validateProjectSchema(obj) {
+  const required = ['ductbanks', 'conduits', 'trays', 'cables', 'settings'];
+  const missing = [];
+  const extra = [];
+
+  if (!obj || typeof obj !== 'object') {
+    missing.push(...required);
+    return { valid: false, missing, extra };
+  }
+
+  for (const key of required) {
+    if (!(key in obj)) missing.push(key);
+  }
+  for (const key of Object.keys(obj)) {
+    if (!required.includes(key)) extra.push(key);
+  }
+
+  const typesValid = Array.isArray(obj.ductbanks) &&
+    Array.isArray(obj.conduits) &&
+    Array.isArray(obj.trays) &&
+    Array.isArray(obj.cables) &&
+    obj.settings && typeof obj.settings === 'object' && !Array.isArray(obj.settings);
+
+  const valid = missing.length === 0 && extra.length === 0 && typesValid;
+  return { valid, missing, extra };
+}
 
 /**
  * Export current project data.
@@ -173,13 +188,8 @@ export function exportProject() {
  */
 export function importProject(obj) {
   let data = obj;
-  if (!validate(data)) {
-    const missing = [];
-    const extra = [];
-    for (const err of validate.errors || []) {
-      if (err.keyword === 'required') missing.push(err.params.missingProperty);
-      if (err.keyword === 'additionalProperties') extra.push(err.params.additionalProperty);
-    }
+  const { valid, missing, extra } = validateProjectSchema(data);
+  if (!valid) {
     const parts = [];
     if (missing.length) parts.push(`Missing fields: ${missing.join(', ')}`);
     if (extra.length) parts.push(`Extra fields: ${extra.join(', ')}`);
