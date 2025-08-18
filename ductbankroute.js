@@ -7,6 +7,7 @@ document.addEventListener('DOMContentLoaded',()=>{
   initNavToggle();
 });
 let heatVisible=false;
+let utilHeatmap=false;
 window.lastHeatGrid=null;
 window.lastConduitTemps=null;
 window.lastAmbient=0;
@@ -900,9 +901,11 @@ function drawGrid(){
  const svg=document.getElementById('grid');
  const heat=document.getElementById('tempCanvas');
  const overlay=document.getElementById('tempOverlay');
- if(heat){const ctx=heat.getContext('2d');ctx.clearRect(0,0,heat.width,heat.height);} 
- if(overlay){const octx=overlay.getContext('2d');octx.clearRect(0,0,overlay.width,overlay.height);} 
+ if(heat){const ctx=heat.getContext('2d');ctx.clearRect(0,0,heat.width,heat.height);}
+ if(overlay){const octx=overlay.getContext('2d');octx.clearRect(0,0,overlay.width,overlay.height);}
  svg.innerHTML='';
+ const oldLegend=document.getElementById('fillLegend');
+ if(oldLegend) oldLegend.remove();
  autoPlaceConduits();
  const conduits=getAllConduits();
  if(conduits.length===0)return;
@@ -1034,13 +1037,13 @@ heightText.textContent=ductHeight.toFixed(2)+'"';
    const R=Rin*scale;
    const cx=c.x*scale+R+margin;
    const cy=c.y*scale+R+margin;
-   const data=fillMap[c.conduit_id];
-   let color='green';
-   if(data){
-     const count=data.cables.length;
-     const limit=count===1?53:count===2?31:40;
-     if(data.fillPct>limit)color='red';else if(data.fillPct>0.8*limit)color='yellow';
-   }
+  const data=fillMap[c.conduit_id];
+  let color=utilHeatmap?'green':'lightgray';
+  if(utilHeatmap && data){
+    const count=data.cables.length;
+    const limit=count===1?53:count===2?31:40;
+    if(data.fillPct>limit)color='red';else if(data.fillPct>0.8*limit)color='yellow';
+  }
    const clip=document.createElementNS('http://www.w3.org/2000/svg','clipPath');
    const clipId=`clip-${c.conduit_id}`;
    clip.setAttribute('id',clipId);
@@ -1084,8 +1087,8 @@ heightText.textContent=ductHeight.toFixed(2)+'"';
    }
    const circle=document.createElementNS('http://www.w3.org/2000/svg','circle');
    circle.setAttribute('cx',cx);circle.setAttribute('cy',cy);circle.setAttribute('r',R);
-   circle.setAttribute('fill',color);
-   circle.setAttribute('fill-opacity','0.4');
+  circle.setAttribute('fill',color);
+  circle.setAttribute('fill-opacity',utilHeatmap?'0.4':'0.0');
    circle.setAttribute('stroke','black');
   if(data){
     const names=data.cables.map(c=>c.tag).join(', ');
@@ -1256,8 +1259,11 @@ heightText.textContent=ductHeight.toFixed(2)+'"';
      svg.appendChild(textV);
    });
  }
+ if(utilHeatmap){
+   addFillLegend(svg, margin, overallMaxY*scale+margin+20);
+ }
 const width=Math.round(overallMaxX*scale+2*margin+80);
-const height=Math.round(overallMaxY*scale+2*margin+20);
+const height=Math.round(overallMaxY*scale+2*margin+(utilHeatmap?60:20));
 svg.setAttribute('width',width);
 svg.setAttribute('height',height);
 svg.style.background='white';
@@ -1273,9 +1279,33 @@ if(overlay){
   overlay.style.width=width+'px';
   overlay.style.height=height+'px';
 }
- if(heatVisible && window.lastHeatGrid){
-   drawHeatMap(window.lastHeatGrid, window.lastConduitTemps || {}, conduits, window.lastAmbient||0);
- }
+if(heatVisible && window.lastHeatGrid){
+  drawHeatMap(window.lastHeatGrid, window.lastConduitTemps || {}, conduits, window.lastAmbient||0);
+}
+}
+
+function addFillLegend(svg,x,y){
+  const legend=document.createElementNS('http://www.w3.org/2000/svg','g');
+  legend.setAttribute('id','fillLegend');
+  legend.setAttribute('transform',`translate(${x},${y})`);
+  const entries=[
+    {color:'green',text:'\u226480%'},
+    {color:'yellow',text:'80-100%'},
+    {color:'red',text:'>100%'}
+  ];
+  entries.forEach((e,i)=>{
+    const g=document.createElementNS('http://www.w3.org/2000/svg','g');
+    g.setAttribute('transform',`translate(${i*80},0)`);
+    const r=document.createElementNS('http://www.w3.org/2000/svg','rect');
+    r.setAttribute('width',20);r.setAttribute('height',20);r.setAttribute('fill',e.color);
+    g.appendChild(r);
+    const t=document.createElementNS('http://www.w3.org/2000/svg','text');
+    t.setAttribute('x',25);t.setAttribute('y',15);t.setAttribute('font-size','12');
+    t.textContent=e.text;
+    g.appendChild(t);
+    legend.appendChild(g);
+  });
+  svg.appendChild(legend);
 }
 
 function checkInsulationThickness(){
@@ -2254,6 +2284,11 @@ if(hideDrawing){
     }
     updateAmpacityReport();
   });
+}
+
+const utilHeatmapToggle=document.getElementById('utilHeatmapToggle');
+if(utilHeatmapToggle){
+  utilHeatmapToggle.addEventListener('change',e=>{utilHeatmap=e.target.checked;drawGrid();});
 }
 
 document.getElementById('deleteDataBtn').addEventListener('click',deleteSavedData);
