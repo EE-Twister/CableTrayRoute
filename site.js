@@ -1,4 +1,5 @@
 import "./units.js";
+import { exportProject, importProject } from "./dataStore.js";
 const FOCUSABLE="a[href],button:not([disabled]),textarea:not([disabled]),input:not([disabled]),select:not([disabled]),[tabindex]:not([tabindex='-1'])";
 const PROJECT_KEY='CTR_PROJECT_V1';
 
@@ -542,7 +543,7 @@ function initProjectIO(){
   if(exportBtn){
     exportBtn.addEventListener('click',()=>{
       try{
-        const data=globalThis.getProject?globalThis.getProject():defaultProject();
+        const data=exportProject();
         const blob=new Blob([JSON.stringify(data,null,2)],{type:'application/json'});
         const a=document.createElement('a');
         a.href=URL.createObjectURL(blob);
@@ -561,8 +562,7 @@ function initProjectIO(){
       reader.onload=ev=>{
         try{
           const obj=JSON.parse(ev.target.result);
-          if(globalThis.setProject)globalThis.setProject(obj);
-          location.reload();
+          if(importProject(obj)) location.reload();
         }catch(err){console.error('Import failed',err);}
       };
       reader.readAsText(file);
