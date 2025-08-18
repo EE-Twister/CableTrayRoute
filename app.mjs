@@ -1,7 +1,7 @@
 import { getItem, setItem, removeItem, getTrays, getCables, getDuctbanks, getConduits } from './dataStore.js';
 import { buildSegmentRows, buildSummaryRows } from './resultsExport.mjs';
 
-// Filename: app.js
+// Filename: app.mjs
 // (This is an improved version that adds route segment consolidation)
 
 // Ensure Canvas 2D contexts are optimized for repeated pixel reads.

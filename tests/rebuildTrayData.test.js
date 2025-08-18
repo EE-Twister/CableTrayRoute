@@ -18,8 +18,8 @@ function it(name, fn) {
   }
 }
 
-// Extract rebuildTrayData function body from app.js
-const appCode = fs.readFileSync(path.join(__dirname, '..', 'app.js'), 'utf8');
+// Extract rebuildTrayData function body from app.mjs
+const appCode = fs.readFileSync(path.join(__dirname, '..', 'app.mjs'), 'utf8');
 const startMarker = 'const rebuildTrayData = () => {';
 const startIdx = appCode.indexOf(startMarker) + startMarker.length;
 let idx = startIdx;
