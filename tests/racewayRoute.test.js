@@ -15,8 +15,8 @@ vm.runInContext(
 );
 const { CableRoutingSystem } = sandbox;
 
-// Extract rebuildTrayData from app.js for geometry warning tests
-const appCode = fs.readFileSync(path.join(__dirname, '..', 'app.js'), 'utf8');
+// Extract rebuildTrayData from app.mjs for geometry warning tests
+const appCode = fs.readFileSync(path.join(__dirname, '..', 'app.mjs'), 'utf8');
 const startMarker = 'const rebuildTrayData = () => {';
 const startIdx = appCode.indexOf(startMarker) + startMarker.length;
 let idx = startIdx;
@@ -287,7 +287,7 @@ describe("_racewayRoute", () => {
   });
 
   it("warns when ductbank has no conduits", () => {
-    const appCode = fs.readFileSync(path.join(__dirname, "..", "app.js"), "utf8");
+    const appCode = fs.readFileSync(path.join(__dirname, "..", "app.mjs"), "utf8");
     const startMarker = "const loadSchedulesIntoSession = async () => {";
     const startIdx = appCode.indexOf(startMarker) + startMarker.length;
     let idx = startIdx;

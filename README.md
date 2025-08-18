@@ -149,7 +149,7 @@ Underground ductbanks can be displayed alongside tray routes in the 3D viewer. E
 }
 ```
 
-`app.js` loads this data when rendering the 3D route and adds Plotly traces for the ductbank outline and each conduit. In `optimalRoute.html` a **Show Ductbanks** checkbox below the 3D plot toggles their visibility.
+`app.mjs` loads this data when rendering the 3D route and adds Plotly traces for the ductbank outline and each conduit. In `optimalRoute.html` a **Show Ductbanks** checkbox below the 3D plot toggles their visibility.
 
 ## Clearing Saved Sessions
 The application stores your trays, cables and theme preference in browser storage. Open the settings menu (⚙) and click **Delete Saved Data** to clear this information.

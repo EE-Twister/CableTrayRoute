@@ -18,8 +18,8 @@ function it(name, fn) {
   }
 }
 
-// Extract the conduit count expression and display function from app.js
-const appCode = fs.readFileSync(path.join(__dirname, '..', 'app.js'), 'utf8');
+// Extract the conduit count expression and display function from app.mjs
+const appCode = fs.readFileSync(path.join(__dirname, '..', 'app.mjs'), 'utf8');
 
 const conduitMatch = appCode.match(/const conduitCount =([^;]+);/);
 if (!conduitMatch) throw new Error('conduitCount expression not found');
