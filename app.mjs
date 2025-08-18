@@ -2939,7 +2939,6 @@ const openDuctbankRoute = (dbId, conduitId) => {
         elements.progressLabel.textContent = 'Starting...';
         elements.cancelRoutingBtn.style.display = 'block';
         elements.cancelRoutingBtn.disabled = false;
-        cancelRouting = false;
         rebuildTrayData();
 
         // clear previous manual path validation errors
