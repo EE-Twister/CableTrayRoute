@@ -3,7 +3,7 @@ const FOCUSABLE="a[href],button:not([disabled]),textarea:not([disabled]),input:n
 const PROJECT_KEY='CTR_PROJECT_V1';
 
 function defaultProject(){
-  return {ductbanks:[],conduits:[],trays:[],cables:[],settings:{session:{},collapsedGroups:{},units:'imperial'}};
+  return {name:'',ductbanks:[],conduits:[],trays:[],cables:[],settings:{session:{},collapsedGroups:{},units:'imperial'}};
 }
 
 function migrateProject(old={}){
@@ -13,6 +13,7 @@ function migrateProject(old={}){
   };
   if(!settings.units) settings.units='imperial';
   return {
+    name: old.name || '',
     ductbanks: old.ductbanks || old.ductbankSchedule || [],
     conduits: old.conduits || old.conduitSchedule || [],
     trays: old.trays || old.traySchedule || [],
@@ -47,7 +48,10 @@ function initProjectStorage(){
     realSet(PROJECT_KEY,JSON.stringify(project));
   }
 
-  function save(){ realSet(PROJECT_KEY,JSON.stringify(project)); }
+  function save(){
+    realSet(PROJECT_KEY,JSON.stringify(project));
+    globalThis.updateProjectDisplay?.();
+  }
 
   function setItem(key,value){
     if(key===PROJECT_KEY){ realSet(key,value); return; }
@@ -105,6 +109,135 @@ function initProjectStorage(){
 
 globalThis.migrateProject=migrateProject;
 initProjectStorage();
+
+function canonicalize(obj){
+  if(Array.isArray(obj)) return obj.map(canonicalize);
+  if(obj&&typeof obj==='object'){
+    const out={};
+    Object.keys(obj).sort().forEach(k=>{out[k]=canonicalize(obj[k]);});
+    return out;
+  }
+  return obj;
+}
+
+function canonicalJSONString(obj){
+  return JSON.stringify(canonicalize(obj));
+}
+
+async function sha256Hex(str){
+  const buf=new TextEncoder().encode(str);
+  const subtle=crypto.subtle||crypto.webcrypto?.subtle;
+  const hash=await subtle.digest('SHA-256',buf);
+  return Array.from(new Uint8Array(hash)).map(b=>b.toString(16).padStart(2,'0')).join('');
+}
+
+function bytesToBase64(bytes){
+  let binary='';
+  for(const b of bytes) binary+=String.fromCharCode(b);
+  return btoa(binary);
+}
+
+function base64ToBytes(b64){
+  const bin=atob(b64);
+  const arr=new Uint8Array(bin.length);
+  for(let i=0;i<bin.length;i++) arr[i]=bin.charCodeAt(i);
+  return arr;
+}
+
+async function compressString(str){
+  try{
+    const cs=new CompressionStream('gzip');
+    const writer=cs.writable.getWriter();
+    await writer.write(new TextEncoder().encode(str));
+    await writer.close();
+    const buffer=await new Response(cs.readable).arrayBuffer();
+    return new Uint8Array(buffer);
+  }catch{
+    return new TextEncoder().encode(str);
+  }
+}
+
+async function decompressBytes(bytes){
+  try{
+    const ds=new DecompressionStream('gzip');
+    const writer=ds.writable.getWriter();
+    await writer.write(bytes);
+    await writer.close();
+    const buffer=await new Response(ds.readable).arrayBuffer();
+    return new TextDecoder().decode(buffer);
+  }catch{
+    return new TextDecoder().decode(bytes);
+  }
+}
+
+async function encodeProjectForUrl(project){
+  const json=canonicalJSONString(project);
+  const bytes=await compressString(json);
+  return encodeURIComponent(bytesToBase64(bytes));
+}
+
+async function decodeProjectFromUrl(encoded){
+  const bytes=base64ToBytes(decodeURIComponent(encoded));
+  const json=await decompressBytes(bytes);
+  return JSON.parse(json);
+}
+
+async function updateProjectDisplay(){
+  if(typeof getProject!=='function') return;
+  const proj=getProject();
+  const name=proj.name||'Untitled';
+  try{
+    const hash=await sha256Hex(canonicalJSONString(proj));
+    let span=document.getElementById('project-display');
+    if(!span){
+      const nav=document.querySelector('.top-nav .nav-links');
+      const settingsBtn=document.getElementById('settings-btn');
+      if(nav){
+        span=document.createElement('span');
+        span.id='project-display';
+        span.style.marginLeft='auto';
+        span.style.marginRight='1rem';
+        nav.insertBefore(span,settingsBtn);
+        if(settingsBtn) settingsBtn.style.marginLeft='0';
+      }
+    }
+    if(span) span.textContent=`Project: ${name} (hash: ${hash.slice(0,8)})`;
+  }catch(e){console.error('hash failed',e);}
+}
+globalThis.updateProjectDisplay=updateProjectDisplay;
+
+async function copyShareLink(){
+  try{
+    const proj=getProject?getProject():defaultProject();
+    const canonical=canonicalJSONString(proj);
+    const encoded=await encodeProjectForUrl(proj);
+    const url=`${location.origin}${location.pathname}#project=${encoded}`;
+    if(url.length<2000){
+      await navigator.clipboard.writeText(url);
+      alert('Share link copied to clipboard');
+    }else{
+      const blob=new Blob([canonical],{type:'application/json'});
+      const a=document.createElement('a');
+      a.href=URL.createObjectURL(blob);
+      a.download='project.ctr.json';
+      a.click();
+      setTimeout(()=>URL.revokeObjectURL(a.href),0);
+      alert('Project too large for link; downloaded instead');
+    }
+  }catch(e){console.error('share link failed',e);}
+}
+
+async function loadProjectFromHash(){
+  if(location.hash.startsWith('#project=')){
+    try{
+      const data=location.hash.slice(9);
+      const proj=await decodeProjectFromUrl(data);
+      if(globalThis.setProject) globalThis.setProject(proj);
+      location.hash='';
+      location.reload();
+    }catch(e){console.error('load share failed',e);}
+  }
+}
 
 const HISTORY_KEY='CTR_HISTORY';
 const HISTORY_LIMIT=20;
@@ -267,6 +400,31 @@ function initSettings(){
         close();
       }
     });
+
+    const nameLabel=document.createElement('label');
+    nameLabel.textContent='Project Name';
+    const nameInput=document.createElement('input');
+    nameInput.type='text';
+    nameInput.id='project-name-input';
+    try{nameInput.value=getProject().name||'';}catch{}
+    nameLabel.appendChild(nameInput);
+    settingsMenu.insertBefore(nameLabel,settingsMenu.firstChild);
+    nameInput.addEventListener('input',e=>{
+      try{
+        const proj=getProject();
+        proj.name=e.target.value;
+        setProject(proj);
+        updateProjectDisplay();
+      }catch{}
+    });
+
+    const exportBtn=document.getElementById('export-project-btn');
+    const shareBtn=document.createElement('button');
+    shareBtn.id='copy-share-link-btn';
+    shareBtn.textContent='Copy Share Link';
+    if(exportBtn) exportBtn.insertAdjacentElement('beforebegin',shareBtn);
+    else settingsMenu.appendChild(shareBtn);
+    shareBtn.addEventListener('click',copyShareLink);
   }
   const unitSelect=document.getElementById('unit-select');
   if(unitSelect){
@@ -282,6 +440,8 @@ function initSettings(){
     });
   }
   applyUnitLabels();
+  updateProjectDisplay();
+  window.addEventListener('storage',e=>{if(e.key===PROJECT_KEY) updateProjectDisplay();});
   if(!globalThis.__ctrHistoryInit){
     initHistory();
     globalThis.__ctrHistoryInit=true;
@@ -432,6 +592,7 @@ function loadConduits(){
  globalThis.document?.addEventListener('DOMContentLoaded',initTableNav);
 
 function initProjectIO(){
+  loadProjectFromHash();
   const exportBtn=document.getElementById('export-project-btn');
   const importBtn=document.getElementById('import-project-btn');
   const fileInput=document.getElementById('import-project-input');
