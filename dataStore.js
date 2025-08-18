@@ -3,6 +3,8 @@
  * for core schedule data. Emits simple change events.
  */
 
+import Ajv from 'ajv';
+
 /**
  * @typedef {{[key:string]:any}} GenericRecord
  * @typedef {GenericRecord} Tray
@@ -129,6 +131,91 @@ export const keys = () => {
   return [];
 };
 
+const ajv = new Ajv();
+const projectSchema = {
+  type: 'object',
+  properties: {
+    ductbanks: { type: 'array' },
+    conduits: { type: 'array' },
+    trays: { type: 'array' },
+    cables: { type: 'array' },
+    settings: { type: 'object' }
+  },
+  required: ['ductbanks', 'conduits', 'trays', 'cables', 'settings'],
+  additionalProperties: false
+};
+const validate = ajv.compile(projectSchema);
+
+/**
+ * Export current project data.
+ */
+export function exportProject() {
+  const project = {
+    ductbanks: getDuctbanks(),
+    conduits: getConduits(),
+    trays: getTrays(),
+    cables: getCables(),
+    settings: {}
+  };
+  const reserved = new Set([...Object.values(KEYS), 'CTR_PROJECT_V1']);
+  for (const key of keys()) {
+    if (!reserved.has(key)) {
+      project.settings[key] = getItem(key);
+    }
+  }
+  return project;
+}
+
+/**
+ * Import project data with schema validation.
+ * @param {any} obj
+ * @returns {boolean} success
+ */
+export function importProject(obj) {
+  let data = obj;
+  if (!validate(data)) {
+    const missing = [];
+    const extra = [];
+    for (const err of validate.errors || []) {
+      if (err.keyword === 'required') missing.push(err.params.missingProperty);
+      if (err.keyword === 'additionalProperties') extra.push(err.params.additionalProperty);
+    }
+    const parts = [];
+    if (missing.length) parts.push(`Missing fields: ${missing.join(', ')}`);
+    if (extra.length) parts.push(`Extra fields: ${extra.join(', ')}`);
+    const msg = parts.join('\n') || 'Invalid project data.';
+    const proceed = (typeof window !== 'undefined' && typeof window.confirm === 'function')
+      ? window.confirm(`${msg}\nRepair & continue?`)
+      : false;
+    if (!proceed) return false;
+    data = {
+      ductbanks: Array.isArray(obj.ductbanks) ? obj.ductbanks : [],
+      conduits: Array.isArray(obj.conduits) ? obj.conduits : [],
+      trays: Array.isArray(obj.trays) ? obj.trays : [],
+      cables: Array.isArray(obj.cables) ? obj.cables : [],
+      settings: (obj.settings && typeof obj.settings === 'object') ? obj.settings : {}
+    };
+  }
+
+  setDuctbanks(data.ductbanks);
+  setConduits(data.conduits);
+  setTrays(data.trays);
+  setCables(data.cables);
+
+  const reserved = new Set([...Object.values(KEYS), 'CTR_PROJECT_V1']);
+  for (const key of keys()) {
+    if (!reserved.has(key) && !(data.settings && key in data.settings)) {
+      removeItem(key);
+    }
+  }
+  if (data.settings) {
+    for (const [k, v] of Object.entries(data.settings)) {
+      setItem(k, v);
+    }
+  }
+  return true;
+}
+
 // expose on window for non-module scripts
 if (typeof window !== 'undefined') {
   window.dataStore = {
@@ -146,6 +233,8 @@ if (typeof window !== 'undefined') {
     removeItem,
     on,
     off,
-    keys
+    keys,
+    exportProject,
+    importProject
   };
 }
