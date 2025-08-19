@@ -1,8 +1,13 @@
 import "./units.js";
 import { exportProject, importProject } from "./dataStore.js";
-// Use a CDN-hosted ES module version of fast-json-patch so browsers can
-// resolve the dependency without a bundler.
-import { applyPatch, compare } from "https://cdn.jsdelivr.net/npm/fast-json-patch@3.1.0/index.mjs";
+// fast-json-patch is loaded dynamically so the bundle does not expect a
+// build-time dependency. This avoids "index_mjs is not defined" errors in
+// the minified output when the raceway schedule loads sample data.
+let applyPatch, compare;
+async function loadJsonPatch() {
+  const mod = await import("https://cdn.jsdelivr.net/npm/fast-json-patch@3.1.0/index.mjs");
+  ({ applyPatch, compare } = mod);
+}
 const FOCUSABLE="a[href],button:not([disabled]),textarea:not([disabled]),input:not([disabled]),select:not([disabled]),[tabindex]:not([tabindex='-1'])";
 const PROJECT_KEY='CTR_PROJECT_V1';
 const CHECKPOINT_KEY='CTR_CHECKPOINT';
@@ -162,7 +167,7 @@ function initProjectStorage(){
 }
 
 globalThis.migrateProject=migrateProject;
-initProjectStorage();
+loadJsonPatch().then(initProjectStorage).catch(e=>console.error('fast-json-patch load failed',e));
 
 function canonicalize(obj){
   if(Array.isArray(obj)) return obj.map(canonicalize);
