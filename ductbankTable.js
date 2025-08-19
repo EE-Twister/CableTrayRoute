@@ -562,6 +562,7 @@ import { getDuctbanks, setDuctbanks, setItem, getItem } from './dataStore.js';
 
   window.initDuctbankTable=initDuctbankTable;
   window.saveDuctbanks=saveDuctbanks;
+  window.loadDuctbanks=loadDuctbanks;
   window.getDuctbanks=getDuctbanks;
 })();
 

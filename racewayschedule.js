@@ -182,9 +182,11 @@ document.addEventListener('DOMContentLoaded',()=>{
           });
         });
         dataStore.setConduits([...(data.conduits||[]),...flat]);
-        document.getElementById('load-ductbank-btn').click();
-        document.getElementById('load-tray-btn').click();
-        document.getElementById('load-conduit-btn').click();
+        if(typeof window.loadDuctbanks==='function') window.loadDuctbanks();
+        trayTable.tbody.innerHTML='';
+        trayTable.load();
+        conduitTable.tbody.innerHTML='';
+        conduitTable.load();
         persistAllConduits();
         markSaved();
       }catch(e){console.error('Failed to load sample raceway data',e);}
