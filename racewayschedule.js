@@ -89,9 +89,16 @@ document.addEventListener('DOMContentLoaded',()=>{
     if(importDb) importDb.addEventListener('change',markUnsaved);
     ['save-ductbank-btn','load-ductbank-btn','export-ductbank-xlsx-btn'].forEach(id=>{const el=document.getElementById(id);if(el) el.addEventListener('click',markSaved);});
     tables.ductbanks={
-      setData(rows){
+      async setData(rows){
         try{dataStore.setDuctbanks(rows);}catch(e){console.error('Failed to set ductbank data',e);}
+        // Ensure ductbank table is initialized before loading
+        if(!document.querySelector('#ductbankTable tbody')){
+          window.initDuctbankTable?.();
+        }
         if(typeof window.loadDuctbanks==='function') window.loadDuctbanks();
+        const rendered=document.querySelectorAll('#ductbankTable tbody tr.ductbank-row').length;
+        console.assert(rendered===rows.length && rendered>0,
+          `Ductbank table rendered ${rendered} rows for ${rows.length} samples`);
       },
       getData(){try{return window.getDuctbanks?window.getDuctbanks():[];}catch{return[];}},
       getDataCount(){return this.getData().length;}
@@ -229,7 +236,7 @@ document.addEventListener('DOMContentLoaded',()=>{
       console.table(conduits);
       console.table(trayRows);
       console.log(`Loaded samples: ductbanks=${dbRows.length}, trays=${trayRows.length}, conduits=${conduits.length}`);
-      const dbCount=tables.ductbanks.getDataCount?tables.ductbanks.getDataCount():0;
+      const dbCount=document.querySelectorAll('#ductbankTable tbody tr.ductbank-row').length;
       console.assert(dbCount>0,`Ductbank table is empty after sample load (count=${dbCount})`);
       showToast(`Loaded samples: ${dbRows.length} ductbanks, ${conduits.length} conduits, ${trayRows.length} trays.`,'success');
     }catch(err){
