@@ -1,5 +1,5 @@
 import * as dataStore from './dataStore.js';
-import { sampleDuctbanks, sampleConduits, sampleTrays, mapDuctbankRow, mapConduitRow, mapTrayRow } from './racewaySampleData.js';
+import { sampleDuctbanks, sampleConduits, sampleTrays, normalizeDuctbankRow, normalizeConduitRow, normalizeTrayRow } from './racewaySampleData.js';
 
 checkPrereqs([{key:'cableSchedule',page:'cableschedule.html',label:'Cable Schedule'}]);
 
@@ -35,6 +35,16 @@ document.addEventListener('DOMContentLoaded',()=>{
   initHelpModal('conduit-help-btn','conduit-help-modal');
   initNavToggle();
   const tables={};
+  function assertTablesReady(){
+    for(const [name,t] of Object.entries(tables)){
+      if(!t || typeof t.setData !== 'function'){
+        console.error(`Table '${name}' not initialized`);
+        alert("Raceway tables not initialized. See console.");
+        return false;
+      }
+    }
+    return true;
+  }
   function cablesForRaceway(id){
     try{
       const arr=dataStore.getCables();
@@ -83,7 +93,8 @@ document.addEventListener('DOMContentLoaded',()=>{
         try{dataStore.setDuctbanks(rows);}catch(e){console.error('Failed to set ductbank data',e);}
         if(typeof window.loadDuctbanks==='function') window.loadDuctbanks();
       },
-      getData:()=>{try{return window.getDuctbanks?window.getDuctbanks():[];}catch{return[];}}
+      getData(){try{return window.getDuctbanks?window.getDuctbanks():[];}catch{return[];}},
+      getDataCount(){return this.getData().length;}
     };
   }
 
@@ -131,6 +142,7 @@ document.addEventListener('DOMContentLoaded',()=>{
     this.updateRowCount?.();
     this.applyFilters?.();
   };
+  trayTable.getDataCount=function(){return this.getData().length;};
   tables.trays=trayTable;
 
   const conduitColumns=[
@@ -175,6 +187,7 @@ document.addEventListener('DOMContentLoaded',()=>{
     this.updateRowCount?.();
     this.applyFilters?.();
   };
+  conduitTable.getDataCount=function(){return this.getData().length;};
   tables.conduits=conduitTable;
 
   if(typeof window.saveDuctbanks==='function'){
@@ -190,47 +203,41 @@ document.addEventListener('DOMContentLoaded',()=>{
     setTimeout(()=>t.classList.remove('show'),4000);
   }
 
-  function onRacewayLoadSamples(){
-    console.time('loadSamples');
+  async function onRacewayLoadSamples(){
+    if(!assertTablesReady()) return;
+    console.time('raceway:loadSamples');
     try{
-      if(!tables.ductbanks||!tables.trays||!tables.conduits){
-        showToast('Raceway tables not initialized.','error');
-        return;
-      }
-      const dbRows=sampleDuctbanks.map(mapDuctbankRow);
-      const trayRows=sampleTrays.map(mapTrayRow);
-      const conduitRowsRaw=sampleConduits.map(mapConduitRow);
+      const dbRows=sampleDuctbanks.map(normalizeDuctbankRow);
+      const trayRows=sampleTrays.map(normalizeTrayRow);
+      const conduitRowsRaw=sampleConduits.map(normalizeConduitRow);
       const tags=new Set(dbRows.map(db=>String(db.tag||'').trim().toLowerCase()));
       const conduits=[]; const skipped=[];
       conduitRowsRaw.forEach(c=>{
         const tag=(c.ductbankTag||'').trim().toLowerCase();
         if(!tag||tags.has(tag)) conduits.push(c); else skipped.push(c);
       });
-      tables.ductbanks.setData(dbRows);
-      tables.trays.setData(trayRows);
-      tables.conduits.setData(conduits);
-      try{dataStore.setDuctbanks(dbRows);}catch(e){console.error('store ductbanks',e);}
-      try{dataStore.setTrays(trayRows);}catch(e){console.error('store trays',e);}
-      try{dataStore.setConduits(conduits);}catch(e){console.error('store conduits',e);}
+      await tables.ductbanks.setData(dbRows);
+      await tables.trays.setData(trayRows);
+      await tables.conduits.setData(conduits);
+      dataStore.setDuctbanks(dbRows);
+      dataStore.setTrays(trayRows);
+      dataStore.setConduits(conduits);
       persistAllConduits();
       markSaved();
       if(skipped.length) console.warn('Skipped conduits without matching ductbank',skipped);
       console.table(dbRows);
       console.table(conduits);
       console.table(trayRows);
+      console.log(`Loaded samples: ductbanks=${dbRows.length}, trays=${trayRows.length}, conduits=${conduits.length}`);
+      const dbCount=tables.ductbanks.getDataCount?tables.ductbanks.getDataCount():0;
+      console.assert(dbCount>0,`Ductbank table is empty after sample load (count=${dbCount})`);
       showToast(`Loaded samples: ${dbRows.length} ductbanks, ${conduits.length} conduits, ${trayRows.length} trays.`,'success');
     }catch(err){
       console.error(err);
       showToast('Sample load failed – see console.','error');
     }finally{
-      console.timeEnd('loadSamples');
+      console.timeEnd('raceway:loadSamples');
     }
-  }
-
-  const loadSampleBtn=document.getElementById('raceway-load-samples');
-  if(loadSampleBtn){
-    loadSampleBtn.removeEventListener('click',onRacewayLoadSamples);
-    loadSampleBtn.addEventListener('click',onRacewayLoadSamples);
   }
 
   function serializeDuctbankSchedule(){
@@ -277,6 +284,7 @@ document.addEventListener('DOMContentLoaded',()=>{
   }
   window.getRacewaySchedule=getRacewaySchedule;
   persistAllConduits();
+  document.getElementById('raceway-load-samples')?.addEventListener('click', onRacewayLoadSamples, { once:false });
 
   const normalize=s=>(s||'').trim().toUpperCase();
 
