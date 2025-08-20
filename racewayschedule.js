@@ -1,4 +1,5 @@
 import * as dataStore from './dataStore.js';
+import { sampleDuctbanks, sampleConduits, sampleTrays, mapDuctbankRow, mapConduitRow, mapTrayRow } from './racewaySampleData.js';
 
 checkPrereqs([{key:'cableSchedule',page:'cableschedule.html',label:'Cable Schedule'}]);
 
@@ -33,6 +34,7 @@ document.addEventListener('DOMContentLoaded',()=>{
   initHelpModal('tray-help-btn','tray-help-modal');
   initHelpModal('conduit-help-btn','conduit-help-modal');
   initNavToggle();
+  const tables={};
   function cablesForRaceway(id){
     try{
       const arr=dataStore.getCables();
@@ -76,6 +78,13 @@ document.addEventListener('DOMContentLoaded',()=>{
     const importDb=document.getElementById('import-ductbank-xlsx-input');
     if(importDb) importDb.addEventListener('change',markUnsaved);
     ['save-ductbank-btn','load-ductbank-btn','export-ductbank-xlsx-btn'].forEach(id=>{const el=document.getElementById(id);if(el) el.addEventListener('click',markSaved);});
+    tables.ductbanks={
+      setData(rows){
+        try{dataStore.setDuctbanks(rows);}catch(e){console.error('Failed to set ductbank data',e);}
+        if(typeof window.loadDuctbanks==='function') window.loadDuctbanks();
+      },
+      getData:()=>{try{return window.getDuctbanks?window.getDuctbanks():[];}catch{return[];}}
+    };
   }
 
   const trayColumns=[
@@ -116,6 +125,13 @@ document.addEventListener('DOMContentLoaded',()=>{
       window.location.href='cabletrayfill.html';
     }
   });
+  trayTable.setData=function(rows){
+    this.tbody.innerHTML='';
+    (rows||[]).forEach(r=>this.addRow(r));
+    this.updateRowCount?.();
+    this.applyFilters?.();
+  };
+  tables.trays=trayTable;
 
   const conduitColumns=[
     {key:'conduit_id',label:'Conduit ID',type:'text',validate:['required']},
@@ -153,44 +169,68 @@ document.addEventListener('DOMContentLoaded',()=>{
       window.location.href='conduitfill.html';
     }
   });
+  conduitTable.setData=function(rows){
+    this.tbody.innerHTML='';
+    (rows||[]).forEach(r=>this.addRow(r));
+    this.updateRowCount?.();
+    this.applyFilters?.();
+  };
+  tables.conduits=conduitTable;
 
   if(typeof window.saveDuctbanks==='function'){
     const origSave=window.saveDuctbanks;
     window.saveDuctbanks=()=>{origSave();persistAllConduits();};
   }
 
-  const loadSampleBtn=document.getElementById('load-sample-raceway-btn');
+  function showToast(msg,type='success'){
+    const t=document.getElementById('toast');
+    if(!t)return; t.textContent=msg;
+    t.className='toast '+(type==='error'?'toast-error':'toast-success');
+    requestAnimationFrame(()=>t.classList.add('show'));
+    setTimeout(()=>t.classList.remove('show'),4000);
+  }
+
+  function onRacewayLoadSamples(){
+    console.time('loadSamples');
+    try{
+      if(!tables.ductbanks||!tables.trays||!tables.conduits){
+        showToast('Raceway tables not initialized.','error');
+        return;
+      }
+      const dbRows=sampleDuctbanks.map(mapDuctbankRow);
+      const trayRows=sampleTrays.map(mapTrayRow);
+      const conduitRowsRaw=sampleConduits.map(mapConduitRow);
+      const tags=new Set(dbRows.map(db=>String(db.tag||'').trim().toLowerCase()));
+      const conduits=[]; const skipped=[];
+      conduitRowsRaw.forEach(c=>{
+        const tag=(c.ductbankTag||'').trim().toLowerCase();
+        if(!tag||tags.has(tag)) conduits.push(c); else skipped.push(c);
+      });
+      tables.ductbanks.setData(dbRows);
+      tables.trays.setData(trayRows);
+      tables.conduits.setData(conduits);
+      try{dataStore.setDuctbanks(dbRows);}catch(e){console.error('store ductbanks',e);}
+      try{dataStore.setTrays(trayRows);}catch(e){console.error('store trays',e);}
+      try{dataStore.setConduits(conduits);}catch(e){console.error('store conduits',e);}
+      persistAllConduits();
+      markSaved();
+      if(skipped.length) console.warn('Skipped conduits without matching ductbank',skipped);
+      console.table(dbRows);
+      console.table(conduits);
+      console.table(trayRows);
+      showToast(`Loaded samples: ${dbRows.length} ductbanks, ${conduits.length} conduits, ${trayRows.length} trays.`,'success');
+    }catch(err){
+      console.error(err);
+      showToast('Sample load failed – see console.','error');
+    }finally{
+      console.timeEnd('loadSamples');
+    }
+  }
+
+  const loadSampleBtn=document.getElementById('raceway-load-samples');
   if(loadSampleBtn){
-    loadSampleBtn.addEventListener('click',async()=>{
-      try{
-        const res=await fetch('examples/sample_raceways.json');
-        const data=await res.json();
-        dataStore.setDuctbanks(data.ductbanks);
-        dataStore.setTrays(data.trays);
-        const flat=[];
-        (data.ductbanks||[]).forEach(db=>{
-          (db.conduits||[]).forEach(c=>{
-            flat.push({
-              ductbankTag:db.tag,
-              conduit_id:c.conduit_id,
-              type:c.type,
-              trade_size:c.trade_size,
-              start_x:c.start_x,start_y:c.start_y,start_z:c.start_z,
-              end_x:c.end_x,end_y:c.end_y,end_z:c.end_z,
-              allowed_cable_group:c.allowed_cable_group
-            });
-          });
-        });
-        dataStore.setConduits([...(data.conduits||[]),...flat]);
-        if(typeof window.loadDuctbanks==='function') window.loadDuctbanks();
-        trayTable.tbody.innerHTML='';
-        trayTable.load();
-        conduitTable.tbody.innerHTML='';
-        conduitTable.load();
-        persistAllConduits();
-        markSaved();
-      }catch(e){console.error('Failed to load sample raceway data',e);}
-    });
+    loadSampleBtn.removeEventListener('click',onRacewayLoadSamples);
+    loadSampleBtn.addEventListener('click',onRacewayLoadSamples);
   }
 
   function serializeDuctbankSchedule(){
