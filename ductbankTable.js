@@ -1,4 +1,5 @@
-import { getDuctbanks, setDuctbanks, setItem, getItem } from './dataStore.js';
+// Alias storage helpers to avoid name conflicts with local functions
+import { getDuctbanks as readStoredDuctbanks, setDuctbanks, setItem, getItem } from './dataStore.js';
 
 (function(){
   let ductbanks=[];
@@ -134,6 +135,12 @@ import { getDuctbanks, setDuctbanks, setItem, getItem } from './dataStore.js';
   }
 
   function renderDuctbanks(){
+    // Lazily select the table body in case initialization was skipped
+    if(!ductbankTbody){
+      ductbankTbody=document.querySelector('#ductbankTable tbody');
+      console.assert(ductbankTbody, 'Ductbank table body not found during render');
+      if(!ductbankTbody) return;
+    }
     const specs = globalThis.CONDUIT_SPECS || {};
     ductbankTbody.innerHTML='';
     ductbanks.forEach((db,i)=>{
@@ -418,7 +425,13 @@ import { getDuctbanks, setDuctbanks, setItem, getItem } from './dataStore.js';
   }
 
   function loadDuctbanks(){
-    try{ductbanks=getDuctbanks();}catch(e){ductbanks=[];}
+    // Ensure the table body exists even if initDuctbankTable wasn't called
+    if(!ductbankTbody){
+      ductbankTbody=document.querySelector('#ductbankTable tbody');
+      console.assert(ductbankTbody, 'Ductbank table body not found');
+      if(!ductbankTbody) return;
+    }
+    try{ductbanks=readStoredDuctbanks();}catch(e){ductbanks=[];}
     ductbanks.forEach(db=>{
       if(db.expanded===undefined) db.expanded=false;
       if(!db.conduits) db.conduits=[];
@@ -431,6 +444,8 @@ import { getDuctbanks, setDuctbanks, setItem, getItem } from './dataStore.js';
       });
     });
     renderDuctbanks();
+    const rendered=ductbankTbody.querySelectorAll('tr.ductbank-row').length;
+    console.assert(rendered===ductbanks.length,`Rendered ${rendered} ductbanks, expected ${ductbanks.length}`);
   }
 
   function exportDuctbankXlsx(){
