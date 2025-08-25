@@ -1727,15 +1727,15 @@ body.dark-mode .workflow-card-title {
 /* Lint panel for validation results */
 .lint-panel {
     position: fixed;
-    top: 0;
-    right: 0;
+    top: 3.5rem;
+    right: 1rem;
     width: 300px;
-    max-height: 100%;
+    max-height: calc(100% - 4.5rem);
     overflow-y: auto;
-    background: var(--background-color);
+    background: var(--secondary-color);
     color: var(--text-color);
-    border-left: 1px solid var(--border-color);
-    box-shadow: -2px 0 5px rgba(0,0,0,0.1);
+    border: 1px solid var(--border-color);
+    box-shadow: 0 2px 6px rgba(0,0,0,0.15);
     padding: 1rem;
     z-index: 1000;
 }
@@ -1753,6 +1753,20 @@ body.dark-mode .workflow-card-title {
 .lint-panel li {
     cursor: pointer;
     margin-bottom: 0.5rem;
+}
+
+.lint-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+}
+
+.lint-close-btn {
+    background: none;
+    border: none;
+    font-size: 1.2rem;
+    cursor: pointer;
+    color: var(--text-color);
 }
 
 /* --- Documentation Pages --- */

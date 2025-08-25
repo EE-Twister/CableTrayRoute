@@ -396,6 +396,7 @@ document.addEventListener('DOMContentLoaded',()=>{
   const validateBtn=document.getElementById('validate-raceway-btn');
   const lintPanel=document.getElementById('lint-panel');
   const lintList=document.getElementById('lint-list');
+  const lintCloseBtn=document.getElementById('lint-close-btn');
 
   function focusIssue(issue){
     if(!issue) return;
@@ -469,6 +470,12 @@ document.addEventListener('DOMContentLoaded',()=>{
         });
       }
       lintPanel.classList.remove('hidden');
+    });
+  }
+
+  if(lintCloseBtn){
+    lintCloseBtn.addEventListener('click',()=>{
+      lintPanel.classList.add('hidden');
     });
   }
 });
