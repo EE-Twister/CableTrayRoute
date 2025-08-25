@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Math References</title>
+  <title>Engineering References</title>
   <link rel="stylesheet" href="../style.css">
 </head>
 <body>
@@ -22,17 +22,17 @@
     </div>
   </nav>
   <header class="hero">
-    <h1>Math References</h1>
-    <p>NEC and Neher-McGrath background used in calculations.</p>
+    <h1>Engineering References</h1>
+    <p>Standards and publications underpinning the calculations.</p>
   </header>
   <main id="main-content" class="doc-main">
-    <p>Ampacity calculations follow the Neher-McGrath method and guidance from the National Electrical Code (NEC). The app uses parameters for conductor resistance, thermal resistivity, and geometry to estimate allowable current.</p>
-    <p>See the following documents for detailed formulas and tables:</p>
-    <ul class="doc-list">
-      <li><a href="AMPACITY_METHOD.html">Ampacity Method</a></li>
-      <li><a href="soil_resistivity.html">Soil Resistivity</a></li>
-      <li><a href="standards.html">Standards</a></li>
+    <p>This project relies on several established standards and publications for its electrical calculations.</p>
+    <ul>
+      <li><strong>NEC 310‑15(C)</strong> – National Electrical Code, 2023 edition. This section outlines how conductor ampacity must be adjusted when more than three current‑carrying conductors are installed together. The same article points to Chapter 9 for conduit fill requirements used in this tool.</li>
+      <li><strong>IEEE Std 835</strong> – <em>IEEE Standard Power Cable Ampacity Tables</em>. The thermal modeling approach implemented here reflects the guidelines and example calculations provided in this standard.</li>
+      <li><strong>Neher‑McGrath Paper</strong> – <em>The Calculation of the Temperature Rise and Load Capability of Cable Systems</em> by J. H. Neher and M. H. McGrath (AIEE Transactions, 1957). The simplified ampacity and thermal resistance equations in this app stem from this seminal work.</li>
     </ul>
+    <p>See this file as the citation source for comments in the code referencing each of these standards.</p>
   </main>
   <footer class="site-footer">
     <div class="footer-left">
@@ -56,4 +56,3 @@
   </script>
 </body>
 </html>
-
