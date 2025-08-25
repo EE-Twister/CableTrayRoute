@@ -16,18 +16,18 @@ vm.runInContext(
 const { CableRoutingSystem } = sandbox;
 
 // Extract rebuildTrayData from app.mjs for geometry warning tests
-const appCode = fs.readFileSync(path.join(__dirname, '..', 'app.mjs'), 'utf8');
-const startMarker = 'const rebuildTrayData = () => {';
+const appCode = fs.readFileSync(path.join(__dirname, "..", "app.mjs"), "utf8");
+const startMarker = "const rebuildTrayData = () => {";
 const startIdx = appCode.indexOf(startMarker) + startMarker.length;
 let idx = startIdx;
 let depth = 1;
 while (idx < appCode.length && depth > 0) {
   const ch = appCode[idx++];
-  if (ch === '{') depth++;
-  else if (ch === '}') depth--;
+  if (ch === "{") depth++;
+  else if (ch === "}") depth--;
 }
 const rtBody = appCode.slice(startIdx, idx - 1);
-const rebuildTrayData = new Function('state', 'CONDUIT_SPECS', rtBody);
+const rebuildTrayData = new Function("state", "CONDUIT_SPECS", rtBody);
 
 function describe(name, fn) {
   console.log(name);
@@ -142,7 +142,9 @@ describe("_racewayRoute", () => {
     console.warn = origWarn;
     assert(warned, "missing ductbank warning not emitted");
     assert(
-      system.baseGraph.edges["ductbank_outline_0_start"]?.["ductbank_outline_0_end"],
+      system.baseGraph.edges["ductbank_outline_0_start"]?.[
+        "ductbank_outline_0_end"
+      ],
       "ductbank outline not included",
     );
   });
@@ -186,48 +188,27 @@ describe("_racewayRoute", () => {
     console.warn = (...args) => {
       warned = args;
     };
-    system.calculateRoute([0, 0, 0], [0, 10, 0], 1, null, '', [], 'cable-1');
+    system.calculateRoute([0, 0, 0], [0, 10, 0], 1, null, "", [], "cable-1");
     console.warn = origWarn;
-    assert(warned, 'mismatch warning not emitted');
-    assert.strictEqual(warned[0], 'Mismatched raceway segments:');
+    assert(warned, "mismatch warning not emitted");
+    assert.strictEqual(warned[0], "Mismatched raceway segments:");
     const records = warned[1];
     assert(Array.isArray(records) && records.length === 1);
-    assert.strictEqual(records[0].tray_id, 'tray-over');
-    assert.strictEqual(records[0].reason, 'over_capacity');
-    assert.strictEqual(records[0].cable_id, 'cable-1');
-      assert.deepStrictEqual(Object.keys(records[0]).sort(), ['cable_id','filter','reason','tray_id']);
-    });
+    assert.strictEqual(records[0].tray_id, "tray-over");
+    assert.strictEqual(records[0].reason, "over_capacity");
+    assert.strictEqual(records[0].cable_id, "cable-1");
+    assert.deepStrictEqual(Object.keys(records[0]).sort(), [
+      "cable_id",
+      "filter",
+      "reason",
+      "tray_id",
+    ]);
+  });
 
-    it("details ductbank group mismatch with filter", () => {
-      const system = new CableRoutingSystem({ fillLimit: 0.4 });
-      system.addTraySegment({
-        tray_id: 'DB1-1',
-        start_x: 0,
-        start_y: 0,
-        start_z: 0,
-        end_x: 0,
-        end_y: 10,
-        end_z: 0,
-        width: 10,
-        height: 10,
-        current_fill: 0,
-        allowed_cable_group: 'A',
-        conduit_id: '1',
-        ductbankTag: 'DB1',
-      });
-      const res = system.calculateRoute([0, 0, 0], [0, 10, 0], 1, 'B', '', ['DB1-1'], 'cable-3');
-      assert(!res.success);
-      assert(res.mismatched_records && res.mismatched_records.length === 1);
-      const rec = res.mismatched_records[0];
-      assert.strictEqual(rec.conduit_id, '1');
-      assert.strictEqual(rec.ductbank_tag, 'DB1');
-      assert(rec.filter.includes('DB1'));
-    });
-
-  it("warns for group mismatches with formatted record", () => {
+  it("details ductbank group mismatch with filter", () => {
     const system = new CableRoutingSystem({ fillLimit: 0.4 });
     system.addTraySegment({
-      tray_id: 'tray-group',
+      tray_id: "DB1-1",
       start_x: 0,
       start_y: 0,
       start_z: 0,
@@ -237,24 +218,63 @@ describe("_racewayRoute", () => {
       width: 10,
       height: 10,
       current_fill: 0,
-      allowed_cable_group: 'A',
+      allowed_cable_group: "A",
+      conduit_id: "1",
+      ductbankTag: "DB1",
+    });
+    const res = system.calculateRoute(
+      [0, 0, 0],
+      [0, 10, 0],
+      1,
+      "B",
+      "",
+      ["DB1-1"],
+      "cable-3",
+    );
+    assert(!res.success);
+    assert(res.mismatched_records && res.mismatched_records.length === 1);
+    const rec = res.mismatched_records[0];
+    assert.strictEqual(rec.conduit_id, "1");
+    assert.strictEqual(rec.ductbank_tag, "DB1");
+    assert(rec.filter.includes("DB1"));
+  });
+
+  it("warns for group mismatches with formatted record", () => {
+    const system = new CableRoutingSystem({ fillLimit: 0.4 });
+    system.addTraySegment({
+      tray_id: "tray-group",
+      start_x: 0,
+      start_y: 0,
+      start_z: 0,
+      end_x: 0,
+      end_y: 10,
+      end_z: 0,
+      width: 10,
+      height: 10,
+      current_fill: 0,
+      allowed_cable_group: "A",
     });
     let warned = null;
     const origWarn = console.warn;
     console.warn = (...args) => {
       warned = args;
     };
-    system.calculateRoute([0, 0, 0], [0, 10, 0], 1, 'B', '', [], 'cable-2');
+    system.calculateRoute([0, 0, 0], [0, 10, 0], 1, "B", "", [], "cable-2");
     console.warn = origWarn;
-    assert(warned, 'mismatch warning not emitted');
-    assert.strictEqual(warned[0], 'Mismatched raceway segments:');
+    assert(warned, "mismatch warning not emitted");
+    assert.strictEqual(warned[0], "Mismatched raceway segments:");
     const records = warned[1];
     assert(Array.isArray(records) && records.length === 1);
-    assert.strictEqual(records[0].tray_id, 'tray-group');
-    assert.strictEqual(records[0].reason, 'group_mismatch');
-    assert.strictEqual(records[0].cable_id, 'cable-2');
-      assert.deepStrictEqual(Object.keys(records[0]).sort(), ['cable_id','filter','reason','tray_id']);
-    });
+    assert.strictEqual(records[0].tray_id, "tray-group");
+    assert.strictEqual(records[0].reason, "group_mismatch");
+    assert.strictEqual(records[0].cable_id, "cable-2");
+    assert.deepStrictEqual(Object.keys(records[0]).sort(), [
+      "cable_id",
+      "filter",
+      "reason",
+      "tray_id",
+    ]);
+  });
 
   it("routes when proximity threshold is increased", () => {
     const tray = {
@@ -275,7 +295,7 @@ describe("_racewayRoute", () => {
     let system = new CableRoutingSystem({ proximityThreshold: 72 * 12 });
     system.addTraySegment(tray);
     let result = system.calculateRoute(start, end, 1, null);
-    const reasons = result.exclusions.map(e => e.reason);
+    const reasons = result.exclusions.map((e) => e.reason);
     assert(reasons.includes("start_beyond_proximity"));
     assert(reasons.includes("end_beyond_proximity"));
 
@@ -287,7 +307,10 @@ describe("_racewayRoute", () => {
   });
 
   it("warns when ductbank has no conduits", () => {
-    const appCode = fs.readFileSync(path.join(__dirname, "..", "app.mjs"), "utf8");
+    const appCode = fs.readFileSync(
+      path.join(__dirname, "..", "app.mjs"),
+      "utf8",
+    );
     const startMarker = "const loadSchedulesIntoSession = async () => {";
     const startIdx = appCode.indexOf(startMarker) + startMarker.length;
     let idx = startIdx;
@@ -323,47 +346,72 @@ describe("_racewayRoute", () => {
       state,
       localStorage: storage,
       rebuildTrayData: () => {},
-      globalThis: { TableUtils: { STORAGE_KEYS: { ductbankSchedule: "db", conduitSchedule: "cond" } } },
+      globalThis: {
+        TableUtils: {
+          STORAGE_KEYS: { ductbankSchedule: "db", conduitSchedule: "cond" },
+        },
+      },
       document: undefined,
-      console: { warn: () => { warned = true; } },
+      console: {
+        warn: () => {
+          warned = true;
+        },
+      },
       ensureConductorProps: async () => ({}),
       setRacewayIds: () => {},
     };
     const loadSchedulesIntoSession = vm.runInNewContext(
-      'async function loadSchedulesIntoSession(){' + fnBody + '}; loadSchedulesIntoSession;',
+      "async function loadSchedulesIntoSession(){" +
+        fnBody +
+        "}; loadSchedulesIntoSession;",
       sandbox,
     );
-    storage.setItem("db", JSON.stringify([{ tag: "DB1", start_x: 0, start_y: 0, start_z: 0, end_x: 1, end_y: 0, end_z: 0 }]));
+    storage.setItem(
+      "db",
+      JSON.stringify([
+        {
+          tag: "DB1",
+          start_x: 0,
+          start_y: 0,
+          start_z: 0,
+          end_x: 1,
+          end_y: 0,
+          end_z: 0,
+        },
+      ]),
+    );
     loadSchedulesIntoSession();
     assert(warned, "missing conduit warning not emitted");
     assert.strictEqual(state.ductbanksWithoutConduits.length, 1);
     assert.strictEqual(state.ductbanksWithoutConduits[0], "DB1");
   });
 
-  it('warns and skips ductbanks lacking geometry', () => {
+  it("warns and skips ductbanks lacking geometry", () => {
     const state = {
       manualTrays: [],
       trayData: [],
-      ductbankData: { ductbanks: [{ id: 'DB-missing' }] },
+      ductbankData: { ductbanks: [{ id: "DB-missing" }] },
       conduitData: [],
     };
     let warned = false;
     const origWarn = console.warn;
-    console.warn = () => { warned = true; };
+    console.warn = () => {
+      warned = true;
+    };
     rebuildTrayData(state, {});
     console.warn = origWarn;
-    assert(warned, 'warning not emitted');
+    assert(warned, "warning not emitted");
     assert.strictEqual(state.trayData.length, 0);
   });
 
-  it('warns and skips conduits without paths', () => {
+  it("warns and skips conduits without paths", () => {
     const state = {
       manualTrays: [],
       trayData: [],
       ductbankData: {
         ductbanks: [
           {
-            id: 'DB1',
+            id: "DB1",
             start_x: 0,
             start_y: 0,
             start_z: 0,
@@ -372,21 +420,21 @@ describe("_racewayRoute", () => {
             end_z: 0,
             width: 12,
             height: 12,
-            conduits: [
-              { conduit_id: 'C1', type: 'RMC', trade_size: '1' },
-            ],
+            conduits: [{ conduit_id: "C1", type: "RMC", trade_size: "1" }],
           },
         ],
       },
       conduitData: [],
     };
-    const specs = { RMC: { '1': 0.887 } };
+    const specs = { RMC: { 1: 0.887 } };
     let warned = false;
     const origWarn = console.warn;
-    console.warn = () => { warned = true; };
+    console.warn = () => {
+      warned = true;
+    };
     rebuildTrayData(state, specs);
     console.warn = origWarn;
-    assert(warned, 'warning not emitted');
+    assert(warned, "warning not emitted");
     assert.strictEqual(state.trayData.length, 0);
   });
 });
