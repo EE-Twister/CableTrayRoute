@@ -47,6 +47,17 @@
         <header class="page-header">
           <h1>Cable Tray Packing</h1>
         </header>
+        <details class="method-panel">
+          <summary>Method &amp; Assumptions</summary>
+          <p>Fill percentage is computed as F = 100 × Σ A_cable / A_tray.</p>
+          <p>Variables:</p>
+          <ul>
+            <li>A_cable – cross-sectional area of each cable</li>
+            <li>A_tray – usable inside area of the tray</li>
+          </ul>
+          <p>Citations: <a href="docs/standards.html">NEC 392</a></p>
+          <p>Applicability: valid for uniform cable loading with fill below 50%.</p>
+        </details>
 
         <!-- TRAY PARAMETERS -->
         <fieldset id="trayParameters">
@@ -91,7 +102,7 @@
 
   <!-- PROFILE CONTROLS -->
   <div id="profileControls">
-    <h2>Profile Management <button class="helpBtn" data-help="Profiles are saved locally to your browser.">?</button></h2>
+    <h2>Profile Management <button class="helpBtn" data-help="Profiles are saved locally to your browser." data-doc="docs/tutorial.html#trayfill">?</button></h2>
     <button id="saveProfileBtn" type="button">Save Profile</button>
     <label for="profileList">Load Profile:</label>
     <select id="profileList">
@@ -110,16 +121,16 @@
     <table id="cableTable">
       <thead>
         <tr>
-          <th>Tag <span class="required">*</span> <button class="helpBtn" data-help="Unique identifier or label for the cable.">?</button></th>
-          <th>Cable Type <span class="required">*</span> <button class="helpBtn" data-help="Classify as Power, Control, or Signal.">?</button></th>
-          <th>Conductors <span class="required">*</span> <button class="helpBtn" data-help="Number of conductors in the cable.">?</button></th>
-          <th>Conductor Size <span class="required">*</span> <button class="helpBtn" data-help="Gauge or size of each conductor.">?</button></th>
-          <th>Cable Rating (V) <button class="helpBtn" data-help="Voltage rating of the cable insulation.">?</button></th>
-          <th>Operating Voltage (V) <button class="helpBtn" data-help="Actual working voltage on the cable.">?</button></th>
-          <th>OD (in) <span class="required">*</span> <button class="helpBtn" data-help="Outer diameter of the cable in inches.">?</button></th>
-          <th>Weight (lbs/ft) <span class="required">*</span> <button class="helpBtn" data-help="Cable weight per foot.">?</button></th>
-          <th>Cable Zone <button class="helpBtn" data-help="Numeric zone for organizing cables. If Stackable and Non-Stackable Cables are placed in the same zone then a divider will automatically be added.">?</button></th>
-          <th>Circuit Group <button class="helpBtn" data-help="Numeric group for bundling single conductor cables in groups of 3 or 4 conductors.">?</button></th>
+          <th>Tag <span class="required">*</span> <button class="helpBtn" data-help="Unique identifier or label for the cable." data-doc="docs/tutorial.html#trayfill">?</button></th>
+          <th>Cable Type <span class="required">*</span> <button class="helpBtn" data-help="Classify as Power, Control, or Signal." data-doc="docs/tutorial.html#trayfill">?</button></th>
+          <th>Conductors <span class="required">*</span> <button class="helpBtn" data-help="Number of conductors in the cable." data-doc="docs/tutorial.html#trayfill">?</button></th>
+          <th>Conductor Size <span class="required">*</span> <button class="helpBtn" data-help="Gauge or size of each conductor." data-doc="docs/tutorial.html#trayfill">?</button></th>
+          <th>Cable Rating (V) <button class="helpBtn" data-help="Voltage rating of the cable insulation." data-doc="docs/tutorial.html#trayfill">?</button></th>
+          <th>Operating Voltage (V) <button class="helpBtn" data-help="Actual working voltage on the cable." data-doc="docs/tutorial.html#trayfill">?</button></th>
+          <th>OD (in) <span class="required">*</span> <button class="helpBtn" data-help="Outer diameter of the cable in inches." data-doc="docs/tutorial.html#trayfill">?</button></th>
+          <th>Weight (lbs/ft) <span class="required">*</span> <button class="helpBtn" data-help="Cable weight per foot." data-doc="docs/tutorial.html#trayfill">?</button></th>
+          <th>Cable Zone <button class="helpBtn" data-help="Numeric zone for organizing cables. If Stackable and Non-Stackable Cables are placed in the same zone then a divider will automatically be added." data-doc="docs/tutorial.html#trayfill">?</button></th>
+          <th>Circuit Group <button class="helpBtn" data-help="Numeric group for bundling single conductor cables in groups of 3 or 4 conductors." data-doc="docs/tutorial.html#trayfill">?</button></th>
           <th>Duplicate</th>
           <th>Remove</th>
         </tr>

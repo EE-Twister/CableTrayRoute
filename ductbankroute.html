@@ -44,10 +44,22 @@
  <input type="file" id="import-project-input" accept=".ctr.json" style="display:none;">
 </div>
 <div class="container">
- <main id="main-content" class="main-content">
+<main id="main-content" class="main-content">
 <header class="page-header">
  <h1>Ductbank Route</h1>
 </header>
+<details class="method-panel">
+  <summary>Method &amp; Assumptions</summary>
+  <p>Thermal resistance is evaluated as R = ln(D_e/D_i)/(2πk).</p>
+  <p>Variables:</p>
+  <ul>
+    <li>D_e – external diameter</li>
+    <li>D_i – internal diameter</li>
+    <li>k – thermal resistivity</li>
+  </ul>
+  <p>Citations: <a href="docs/AMPACITY_METHOD.html">IEEE 835</a></p>
+  <p>Applicability: homogeneous soil and steady-state current.</p>
+</details>
 <details id="infoSection" open>
  <summary><strong>Ductbank Info</strong></summary>
  <div>

@@ -334,6 +334,55 @@ function trapFocus(e,container){
   }
 }
 
+function loadScript(url){
+  return new Promise((resolve,reject)=>{
+    const s=document.createElement('script');
+    s.src=url;
+    s.onload=()=>resolve();
+    s.onerror=reject;
+    document.head.appendChild(s);
+  });
+}
+
+async function generateTechnicalReport(format='pdf'){
+  const getLabel=id=>document.querySelector(`label[for="${id}"]`)?.textContent.trim()||id;
+  const inputs=[...document.querySelectorAll('input, select, textarea')]
+    .map(el=>`${getLabel(el.id||el.name||'')}: ${el.value}`);
+  const outputEl=document.getElementById('results')||document.getElementById('output');
+  const outputs=outputEl?outputEl.innerText.trim():'';
+  const refs=[...document.querySelectorAll('.method-panel a')].map(a=>a.href);
+
+  if(format==='pdf'){
+    if(!window.jspdf){
+      await loadScript('https://cdn.jsdelivr.net/npm/jspdf@2.5.1/dist/jspdf.umd.min.js');
+    }
+    const { jsPDF } = window.jspdf;
+    const doc=new jsPDF();
+    let y=10;
+    doc.text('Technical Report',10,y); y+=10;
+    doc.text('Inputs:',10,y); y+=10;
+    inputs.forEach(line=>{doc.text(line,10,y); y+=10; if(y>280){doc.addPage(); y=10;}});
+    if(outputs){doc.addPage(); y=10; doc.text('Outputs:',10,y); y+=10; doc.text(outputs,10,y);}
+    if(refs.length){doc.addPage(); y=10; doc.text('References:',10,y); y+=10; refs.forEach(r=>{doc.text(r,10,y); y+=10; if(y>280){doc.addPage(); y=10;}});}
+    doc.save('technical_report.pdf');
+  }else{
+    if(!window.docx){
+      await loadScript('https://cdn.jsdelivr.net/npm/docx@8.4.0/build/index.min.js');
+    }
+    const { Document, Packer, Paragraph } = window.docx;
+    const paragraphs=[new Paragraph('Technical Report'),new Paragraph('Inputs:')];
+    inputs.forEach(line=>paragraphs.push(new Paragraph(line)));
+    if(outputs){paragraphs.push(new Paragraph('Outputs:')); paragraphs.push(new Paragraph(outputs));}
+    if(refs.length){paragraphs.push(new Paragraph('References:')); refs.forEach(r=>paragraphs.push(new Paragraph(r)));}
+    const doc=new Document({sections:[{properties:{},children:paragraphs}]});
+    const blob=await Packer.toBlob(doc);
+    const a=document.createElement('a');
+    a.href=URL.createObjectURL(blob);
+    a.download='technical_report.docx';
+    a.click();
+  }
+}
+
 function initSettings(){
   const settingsBtn=document.getElementById('settings-btn');
   const settingsMenu=document.getElementById('settings-menu');
@@ -408,6 +457,15 @@ function initSettings(){
     selfCheckBtn.textContent='Run Self-Check';
     settingsMenu.appendChild(selfCheckBtn);
     selfCheckBtn.addEventListener('click',()=>{ location.href='optimalRoute.html?selfcheck=1'; });
+
+    const reportBtn=document.createElement('button');
+    reportBtn.id='generate-report-btn';
+    reportBtn.textContent='Generate Technical Report';
+    settingsMenu.appendChild(reportBtn);
+    reportBtn.addEventListener('click',async()=>{
+      const useDocx=confirm('Generate DOCX? Cancel for PDF');
+      await generateTechnicalReport(useDocx?'docx':'pdf');
+    });
   }
   const unitSelect=document.getElementById('unit-select');
   if(unitSelect){
