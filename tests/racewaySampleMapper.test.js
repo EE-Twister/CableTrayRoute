@@ -1,7 +1,7 @@
 const assert = require("assert");
 
 async function run() {
-  const { mapConduitRow } = await import("../racewaySampleData.js");
+  const { mapConduitRow } = await import("../racewaySampleData.mjs");
   const legacy1 = {
     "Conduit ID": "C-001",
     Type: "RMC",
