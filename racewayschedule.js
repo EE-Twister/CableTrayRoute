@@ -218,27 +218,34 @@ document.addEventListener('DOMContentLoaded',()=>{
       const trayRows=sampleTrays.map(normalizeTrayRow);
       const conduitRowsRaw=sampleConduits.map(normalizeConduitRow);
       const tags=new Set(dbRows.map(db=>String(db.tag||'').trim().toLowerCase()));
-      const conduits=[]; const skipped=[];
+      const dbConduits=[]; const standalone=[]; const skipped=[];
       conduitRowsRaw.forEach(c=>{
         const tag=(c.ductbankTag||'').trim().toLowerCase();
-        if(!tag||tags.has(tag)) conduits.push(c); else skipped.push(c);
+        if(tag && tags.has(tag)) dbConduits.push(c);
+        else if(tag) skipped.push(c);
+        else standalone.push(c);
       });
-      await tables.ductbanks.setData(dbRows);
+      const nested=dbRows.map(db=>({
+        ...db,
+        conduits: dbConduits.filter(c=> (c.ductbankTag||'').trim().toLowerCase()===String(db.tag||'').trim().toLowerCase())
+      }));
+      await tables.ductbanks.setData(nested);
       await tables.trays.setData(trayRows);
-      await tables.conduits.setData(conduits);
-      dataStore.setDuctbanks(dbRows);
+      await tables.conduits.setData(standalone);
+      dataStore.setDuctbanks(nested);
       dataStore.setTrays(trayRows);
-      dataStore.setConduits(conduits);
-      persistAllConduits();
+      dataStore.setConduits([...dbConduits,...standalone]);
+      persistConduits({ductbanks:dbRows,conduits:[...dbConduits,...standalone]});
       markSaved();
       if(skipped.length) console.warn('Skipped conduits without matching ductbank',skipped);
-      console.table(dbRows);
-      console.table(conduits);
+      console.table(nested);
+      console.table([...dbConduits,...standalone]);
       console.table(trayRows);
-      console.log(`Loaded samples: ductbanks=${dbRows.length}, trays=${trayRows.length}, conduits=${conduits.length}`);
       const dbCount=document.querySelectorAll('#ductbankTable tbody tr.ductbank-row').length;
       console.assert(dbCount>0,`Ductbank table is empty after sample load (count=${dbCount})`);
-      showToast(`Loaded samples: ${dbRows.length} ductbanks, ${conduits.length} conduits, ${trayRows.length} trays.`,'success');
+      const conduitCount=dbConduits.length+standalone.length;
+      console.log(`Loaded samples: ductbanks=${dbRows.length}, trays=${trayRows.length}, conduits=${conduitCount}`);
+      showToast(`Loaded samples: ${dbRows.length} ductbanks, ${conduitCount} conduits, ${trayRows.length} trays.`,'success');
     }catch(err){
       console.error(err);
       showToast('Sample load failed – see console.','error');
@@ -337,6 +344,7 @@ document.addEventListener('DOMContentLoaded',()=>{
     overlay.style.display='flex';
     overlay.style.alignItems='center';
     overlay.style.justifyContent='center';
+    overlay.style.zIndex='1000';
     overlay.innerHTML=`<div style="background:#fff;padding:20px;max-width:400px;width:90%;">
         <h3>Add/Import Conduits</h3>
         <input type="file" id="wizard-conduit-file" accept=".csv,.xlsx">
