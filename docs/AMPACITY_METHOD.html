@@ -1,0 +1,108 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Ampacity Method</title>
+  <link rel="stylesheet" href="../style.css">
+</head>
+<body>
+  <a href="#main-content" class="skip-link">Skip to main content</a>
+  <nav class="top-nav">
+    <button class="nav-toggle" aria-label="Toggle navigation">☰</button>
+    <div class="nav-links">
+      <a href="../index.html">Home</a>
+      <a href="../cableschedule.html">Cable Schedule</a>
+      <a href="../racewayschedule.html">Raceway Schedule</a>
+      <a href="../ductbankroute.html">Ductbank</a>
+      <a href="../cabletrayfill.html">Tray Fill</a>
+      <a href="../conduitfill.html">Conduit Fill</a>
+      <a href="../optimalRoute.html">Optimal Route</a>
+      <a href="index.html" class="active" aria-current="page">Docs</a>
+    </div>
+  </nav>
+  <header class="hero">
+    <h1>Ampacity Method</h1>
+    <p>Neher‑McGrath equation and related guidance.</p>
+  </header>
+  <main id="main-content" class="doc-main">
+    <p>The application estimates conductor ampacity using the Neher‑McGrath method. This approach was introduced in the 1957 paper <em>The Calculation of the Temperature Rise and Load Carrying Capability of Cable Systems</em> by J. H. Neher and M. H. McGrath. It forms the basis of ampacity guidance in <strong>NEC 310‑15(C)</strong> and the calculation procedures detailed in <strong>IEEE Std 835</strong>.</p>
+
+    <h2 id="equation">Equation</h2>
+    <p>The allowable current <strong>I</strong> in amperes is obtained from:</p>
+    <pre><code>I = sqrt( (T_c - (T_a + ΔT_d)) / ( R_dc × (1 + Y_c) × R_ca ) )</code></pre>
+    <p>where <code>R_ca = R_cond + R_ins + R_duct + R_soil</code>.</p>
+
+    <h3 id="variable-definitions">Variable Definitions</h3>
+    <ul>
+      <li><strong>T_c</strong> – maximum conductor temperature rating in °C.</li>
+      <li><strong>T_a</strong> – ambient temperature of the surrounding medium (earth or air) in °C.</li>
+      <li><strong>ΔT_d</strong> – dielectric loss temperature rise in °C.</li>
+      <li><strong>R_dc</strong> – dc resistance of the conductor at temperature <code>T_c</code> (Ω/m).</li>
+      <li><strong>Y_c</strong> – ac resistance correction factor for skin and proximity effects.</li>
+      <li><strong>R_cond</strong> – thermal resistance internal to the conductor.</li>
+      <li><strong>R_ins</strong> – thermal resistance of insulation.</li>
+      <li><strong>R_duct</strong> – thermal resistance of any raceway or duct.</li>
+      <li><strong>R_soil</strong> – thermal resistance of the surrounding soil. It is calculated using a cylindrical model:</li>
+    </ul>
+    <p><code>R_soil = (ρ_m / (2π)) · ln(4·d / D)</code></p>
+    <p>where <code>ρ_m = ρ / 100</code> converts resistivity from °C·cm/W to °C·m/W, <em>d</em> is the burial depth of the conduit in meters and <em>D</em> is the conduit diameter in meters.</p>
+    <p>These terms follow the notation of NEC 310‑15(C) and Clause 4 of IEEE Std 835.</p>
+
+    <h2 id="ac-resistance-correction">AC Resistance Correction</h2>
+    <p>The factor <strong>Y_c</strong> is derived from IEEE Std 835 Table 4. The implementation converts the conductor size to kcmil and linearly interpolates the table so that <strong>Y_c</strong> varies smoothly with cross‑sectional area.</p>
+    <p>The dielectric loss temperature rise <strong>ΔT_d</strong> follows IEEE Std 835 Table 9 with simple interpolation. Typical values are around 5 °C at 5 kV and 10 °C at 15 kV.</p>
+
+    <h2 id="soil-resistivity-ranges">Soil Resistivity Ranges</h2>
+    <p>Typical soil resistivity values per IEEE Std 835 Table 1:</p>
+    <ul>
+      <li><strong>40 °C·cm/W</strong> – very wet clay</li>
+      <li><strong>60 °C·cm/W</strong> – moist clay or sand</li>
+      <li><strong>90 °C·cm/W</strong> – average native soil</li>
+      <li><strong>120 °C·cm/W</strong> – dry sand</li>
+      <li><strong>150 °C·cm/W</strong> – dry sand and gravel</li>
+    </ul>
+
+    <h2 id="calibration">Calibration</h2>
+    <p>The resistance constants were tuned so that calculated ampacities match IEEE 835 tables.</p>
+    <p>The library now exposes a <code>calibrateAmpacityModel</code> function which performs a grid search over reasonable model parameters. The routine compares the calculated ampacity of three common cables against their IEEE 835 free‑air ratings:</p>
+    <ul>
+      <li><strong>4/0 AWG Cu THHN (90 °C)</strong> – 260 A</li>
+      <li><strong>500 kcmil Cu THHN (90 °C)</strong> – 430 A</li>
+      <li><strong>250 kcmil Al THHN (75 °C)</strong> – 215 A</li>
+    </ul>
+    <p><code>calibrateAmpacityModel</code> adjusts the assumed insulation thermal conductivity, default duct resistance and the air thermal resistance until the maximum deviation from these reference values falls below ±10 %. Typical calibrated values are an air resistance near <strong>3.4 °C·m/W</strong> and an insulation thermal conductivity of about <strong>0.31 W/m·°C</strong>.</p>
+    <p>The original Neher‑McGrath paper provides additional discussion on how soil conditions influence ampacity.</p>
+
+    <h2 id="ieee-835-underground-benchmarks">IEEE 835 Underground Benchmarks</h2>
+    <p>The automated test suite validates underground calculations using published values from IEEE Std 835. A key benchmark is a <strong>500 kcmil Copper conductor</strong> with a 90 °C insulation rating installed 36 inches deep in average soil (90 °C·cm/W). IEEE 835 lists an ampacity of roughly <strong>392 A</strong> for this configuration. The Neher‑McGrath implementation and the finite‑element solver are calibrated so that the predicted ampacity and resulting conductor temperature are within ±5 % of these values.</p>
+
+    <h2 id="references">References</h2>
+    <ul>
+      <li><strong>NEC 310‑15(C)</strong> – National Electrical Code, 2023 edition.</li>
+      <li><strong>IEEE Std 835</strong> – <em>IEEE Standard Power Cable Ampacity Tables</em>.</li>
+      <li>J. H. Neher and M. H. McGrath, “The Calculation of the Temperature Rise and Load Carrying Capability of Cable Systems,” <em>AIEE Transactions</em>, 1957.</li>
+    </ul>
+  </main>
+  <footer class="site-footer">
+    <div class="footer-left">
+      <img src="../icons/route.svg" alt="CableTrayRoute logo" class="footer-logo">
+      <span>CableTrayRoute</span>
+    </div>
+    <nav class="footer-links">
+      <a href="../README.md">README</a>
+      <a href="quickstart.html">Quick Start</a>
+      <a href="index.html">Docs</a>
+      <a href="mailto:contact@example.com">Contact</a>
+    </nav>
+  </footer>
+  <script>
+    document.addEventListener('DOMContentLoaded', () => {
+      const toggle = document.querySelector('.nav-toggle');
+      toggle.addEventListener('click', () => {
+        document.querySelector('.top-nav').classList.toggle('open');
+      });
+    });
+  </script>
+</body>
+</html>

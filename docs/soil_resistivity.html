@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Math References</title>
+  <title>Soil Resistivity Reference</title>
   <link rel="stylesheet" href="../style.css">
 </head>
 <body>
@@ -22,17 +22,19 @@
     </div>
   </nav>
   <header class="hero">
-    <h1>Math References</h1>
-    <p>NEC and Neher-McGrath background used in calculations.</p>
+    <h1>Soil Resistivity Reference</h1>
+    <p>Typical thermal resistivity values for earth surrounding a ductbank.</p>
   </header>
   <main id="main-content" class="doc-main">
-    <p>Ampacity calculations follow the Neher-McGrath method and guidance from the National Electrical Code (NEC). The app uses parameters for conductor resistance, thermal resistivity, and geometry to estimate allowable current.</p>
-    <p>See the following documents for detailed formulas and tables:</p>
-    <ul class="doc-list">
-      <li><a href="AMPACITY_METHOD.html">Ampacity Method</a></li>
-      <li><a href="soil_resistivity.html">Soil Resistivity</a></li>
-      <li><a href="standards.html">Standards</a></li>
+    <p>The thermal resistance of the earth surrounding a ductbank depends heavily on soil resistivity (ρ). IEEE Std 835 provides typical values that are often used when detailed geotechnical data is unavailable.</p>
+    <p>Typical resistivity values:</p>
+    <ul>
+      <li><strong>60 °C·cm/W</strong> – damp soil or clay</li>
+      <li><strong>90 °C·cm/W</strong> – average native soil</li>
+      <li><strong>120 °C·cm/W</strong> – dry sand</li>
+      <li><strong>150 °C·cm/W</strong> – dry sand and gravel</li>
     </ul>
+    <p>Values outside this range may be encountered in unusual conditions. The ductbank route calculator accepts custom inputs but will warn when they fall outside the typical IEEE range.</p>
   </main>
   <footer class="site-footer">
     <div class="footer-left">
@@ -56,4 +58,3 @@
   </script>
 </body>
 </html>
-
