@@ -1795,7 +1795,9 @@ Wt: ${m.weight.toFixed(2)} lbs/ft
       // Attach help popups for table headers
       document.querySelectorAll('.helpBtn').forEach(btn => {
         btn.addEventListener('click', () => {
-          alert(btn.getAttribute('data-help'));
+          const doc = btn.getAttribute('data-doc');
+          if(doc) window.open(doc, '_blank');
+          else alert(btn.getAttribute('data-help'));
         });
       });
     });

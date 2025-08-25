@@ -46,6 +46,17 @@
         <h1>Cable Schedule</h1>
         <p>Centralized table for managing cable data.</p>
       </header>
+      <details class="method-panel">
+        <summary>Method &amp; Assumptions</summary>
+        <p>Total length is aggregated as L_total = Σ L_segment.</p>
+        <p>Variables:</p>
+        <ul>
+          <li>L_segment – length of individual route segment</li>
+          <li>L_total – sum of all segments</li>
+        </ul>
+        <p>Citations: <a href="docs/templates.html">Template documentation</a></p>
+        <p>Applicability: tabular organization only; no capacity limits.</p>
+      </details>
       <section class="card">
         <div style="margin-bottom:10px;">
           <button id="save-schedule-btn">Save Schedule</button>

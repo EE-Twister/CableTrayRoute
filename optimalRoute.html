@@ -122,6 +122,17 @@
                 <h1>Optimal 3D Cable Routing System</h1>
                 <p>Find the most efficient path for routing cables through tray networks with capacity constraints.</p>
             </header>
+            <details class="method-panel">
+                <summary>Method &amp; Assumptions</summary>
+                <p>Optimal paths are computed using Dijkstra where C = Σ w_i.</p>
+                <p>Variables:</p>
+                <ul>
+                    <li>w_i – weight of segment i</li>
+                    <li>C – total path cost</li>
+                </ul>
+                <p>Citations: <a href="docs/math.html">Shortest path algorithms</a></p>
+                <p>Applicability: non-negative weights and connected graphs.</p>
+            </details>
 
             <div id="conduit-count" class="message info"></div>
 
