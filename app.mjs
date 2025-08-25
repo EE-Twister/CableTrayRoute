@@ -2213,18 +2213,11 @@ const openDuctbankRoute = (dbId, conduitId) => {
             const lockBtn = state.cableList[idx]?.locked ? '' : ` <button class="lock-route-btn" data-idx="${idx}">Lock Route</button>`;
             html += `<details><summary>${res.cable} | ${res.status} | ${res.mode} | Total ${res.total_length} | Field ${res.field_length} | Segments ${res.segments_count} <button class="view-map-btn" data-index="${idx}">View on Map</button>${lockBtn}</summary>`;
             if (res.exclusions && res.exclusions.length > 0) {
-                html += '<p class="exclusions-title"><strong>Rejected Segments:</strong></p><ul class="exclusions-list">';
                 res.exclusions.forEach(ex => {
-                    const id = ex.tray_id || ex.id || 'unknown';
-                    const reason = ex.reason ? ex.reason.replace(/_/g, ' ') : 'unknown';
-                    const link = ex.filter ? ` <a href="${ex.filter}">Filter</a>` : '';
-                    const msg = ex.message ? ex.message : `${id}: ${reason}`;
-                    html += `<li>${msg}${link}</li>`;
                     if (ex.reason) {
                         reasonCounts[ex.reason] = (reasonCounts[ex.reason] || 0) + 1;
                     }
                 });
-                html += '</ul>';
             }
             if (res.mismatched_records && res.mismatched_records.length > 0) {
                 html += '<p class="exclusions-title"><strong>Mismatched Raceways:</strong></p><ul class="exclusions-list">';
