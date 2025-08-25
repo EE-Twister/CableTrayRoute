@@ -7,23 +7,55 @@
   <link rel="stylesheet" href="../style.css">
 </head>
 <body>
+  <a href="#main-content" class="skip-link">Skip to main content</a>
+  <nav class="top-nav">
+    <button class="nav-toggle" aria-label="Toggle navigation">☰</button>
+    <div class="nav-links">
+      <a href="../index.html">Home</a>
+      <a href="../cableschedule.html">Cable Schedule</a>
+      <a href="../racewayschedule.html">Raceway Schedule</a>
+      <a href="../ductbankroute.html">Ductbank</a>
+      <a href="../cabletrayfill.html">Tray Fill</a>
+      <a href="../conduitfill.html">Conduit Fill</a>
+      <a href="../optimalRoute.html">Optimal Route</a>
+      <a href="index.html" class="active" aria-current="page">Docs</a>
+    </div>
+  </nav>
   <header class="hero">
     <h1>Documentation</h1>
     <p>Guides and references for CableTrayRoute.</p>
   </header>
-  <main class="container">
-    <input type="search" id="doc-search" placeholder="Search docs..." aria-label="Search documentation" style="margin-bottom:1rem;">
-    <ul id="doc-list">
+  <main id="main-content" class="doc-main">
+    <input type="search" id="doc-search" placeholder="Search docs..." aria-label="Search documentation">
+    <ul id="doc-list" class="doc-list">
       <li><a href="quickstart.html">Quick Start</a></li>
       <li><a href="templates.html">CSV/XLSX Templates</a></li>
       <li><a href="tutorial.html">From empty to routed</a></li>
       <li><a href="math.html">Math References</a></li>
       <li><a href="troubleshooting.html">Troubleshooting</a></li>
     </ul>
+    <footer class="doc-footer">Docs last updated: <span id="last-updated"></span></footer>
   </main>
-  <footer class="doc-footer">
-    Docs last updated: <span id="last-updated"></span>
+  <footer class="site-footer">
+    <div class="footer-left">
+      <img src="../icons/route.svg" alt="CableTrayRoute logo" class="footer-logo">
+      <span>CableTrayRoute</span>
+    </div>
+    <nav class="footer-links">
+      <a href="../README.md">README</a>
+      <a href="quickstart.html">Quick Start</a>
+      <a href="index.html">Docs</a>
+      <a href="mailto:contact@example.com">Contact</a>
+    </nav>
   </footer>
   <script src="docs.js"></script>
+  <script>
+    document.addEventListener('DOMContentLoaded', () => {
+      const toggle = document.querySelector('.nav-toggle');
+      toggle.addEventListener('click', () => {
+        document.querySelector('.top-nav').classList.toggle('open');
+      });
+    });
+  </script>
 </body>
 </html>
