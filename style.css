@@ -1754,3 +1754,48 @@ body.dark-mode .workflow-card-title {
     cursor: pointer;
     margin-bottom: 0.5rem;
 }
+
+/* --- Documentation Pages --- */
+.doc-main {
+    max-width: 800px;
+    margin: 2rem auto;
+    padding: 0 1rem;
+}
+
+#doc-search {
+    width: 100%;
+    max-width: 400px;
+    padding: 0.5rem;
+    border: 1px solid var(--border-color);
+    border-radius: 4px;
+    margin: 0 auto 1.5rem;
+    display: block;
+}
+
+.doc-list {
+    list-style: none;
+    padding: 0;
+    display: flex;
+    flex-direction: column;
+    gap: 0.75rem;
+}
+
+.doc-list a {
+    display: block;
+    padding: 0.75rem 1rem;
+    background: var(--secondary-color);
+    border: 1px solid var(--border-color);
+    border-radius: 4px;
+    text-decoration: none;
+    color: var(--text-color);
+}
+
+.doc-list a:hover {
+    background: var(--primary-color);
+    color: #fff;
+}
+
+.doc-footer {
+    text-align: center;
+    margin-top: 2rem;
+}
