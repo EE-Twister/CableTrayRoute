@@ -1776,6 +1776,27 @@ body.dark-mode .workflow-card-title {
     padding: 0 1rem;
 }
 
+.doc-nav {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.5rem;
+    margin: 1rem 0;
+}
+
+.doc-nav a {
+    text-decoration: none;
+    padding: 0.25rem 0.5rem;
+    background: var(--secondary-color);
+    border-radius: 4px;
+    color: var(--text-color);
+}
+
+.doc-nav a.active {
+    font-weight: bold;
+    background: var(--primary-color);
+    color: #fff;
+}
+
 #doc-search {
     width: 100%;
     max-width: 400px;
