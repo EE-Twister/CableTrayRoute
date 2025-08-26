@@ -1,15 +1,40 @@
-const DOC_PAGES = [
-  { href: "index.html", title: "Docs Home" },
-  { href: "quickstart.html", title: "Quick Start" },
-  { href: "templates.html", title: "CSV/XLSX Templates" },
-  { href: "tutorial.html", title: "From empty to routed" },
-  { href: "AMPACITY_METHOD.html", title: "Ampacity Method" },
-  { href: "geometry-fields.html", title: "Geometry Fields" },
-  { href: "soil_resistivity.html", title: "Soil Resistivity" },
-  { href: "math.html", title: "Math References" },
-  { href: "standards.html", title: "Engineering References" },
-  { href: "troubleshooting.html", title: "Troubleshooting" },
-  { href: "tray_id_convention.html", title: "Tray ID Convention" },
+// Navigation hierarchy for documentation sections
+const DOC_SECTIONS = [
+  {
+    // top level link back to the documentation landing page
+    pages: [{ href: "index.html", title: "Docs Home" }],
+  },
+  {
+    title: "Getting Started",
+    pages: [
+      { href: "quickstart.html", title: "Quick Start" },
+      { href: "tutorial.html", title: "From empty to routed" },
+    ],
+  },
+  {
+    title: "Data & Templates",
+    pages: [
+      { href: "templates.html", title: "CSV/XLSX Templates" },
+      { href: "geometry-fields.html", title: "Geometry Fields" },
+      { href: "tray_id_convention.html", title: "Tray ID Convention" },
+    ],
+  },
+  {
+    title: "Advanced Topics",
+    pages: [
+      { href: "AMPACITY_METHOD.html", title: "Ampacity Method" },
+      { href: "soil_resistivity.html", title: "Soil Resistivity" },
+      { href: "math.html", title: "Math References" },
+    ],
+  },
+  {
+    title: "Standards",
+    pages: [{ href: "standards.html", title: "Engineering References" }],
+  },
+  {
+    title: "Support",
+    pages: [{ href: "troubleshooting.html", title: "Troubleshooting" }],
+  },
 ];
 
 document.addEventListener("DOMContentLoaded", () => {
@@ -21,15 +46,27 @@ document.addEventListener("DOMContentLoaded", () => {
 
   const nav = document.getElementById("doc-nav");
   if (nav) {
-    DOC_PAGES.forEach((page) => {
-      const link = document.createElement("a");
-      link.href = page.href;
-      link.textContent = page.title;
-      if (location.pathname.endsWith(page.href)) {
-        link.classList.add("active");
-        link.setAttribute("aria-current", "page");
+    DOC_SECTIONS.forEach((section) => {
+      if (section.title) {
+        const heading = document.createElement("span");
+        heading.textContent = section.title;
+        heading.classList.add("nav-section");
+        nav.appendChild(heading);
       }
-      nav.appendChild(link);
+      const ul = document.createElement("ul");
+      section.pages.forEach((page) => {
+        const li = document.createElement("li");
+        const link = document.createElement("a");
+        link.href = page.href;
+        link.textContent = page.title;
+        if (location.pathname.endsWith(page.href)) {
+          link.classList.add("active");
+          link.setAttribute("aria-current", "page");
+        }
+        li.appendChild(link);
+        ul.appendChild(li);
+      });
+      nav.appendChild(ul);
     });
   }
 

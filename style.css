@@ -1777,10 +1777,23 @@ body.dark-mode .workflow-card-title {
 }
 
 .doc-nav {
-    display: flex;
-    flex-wrap: wrap;
-    gap: 0.5rem;
     margin: 1rem 0;
+}
+
+.doc-nav .nav-section {
+    font-weight: bold;
+    margin-top: 1rem;
+    display: block;
+}
+
+.doc-nav ul {
+    list-style: none;
+    padding-left: 1rem;
+    margin: 0;
+}
+
+.doc-nav li {
+    margin: 0.25rem 0;
 }
 
 .doc-nav a {
@@ -1789,6 +1802,7 @@ body.dark-mode .workflow-card-title {
     background: var(--secondary-color);
     border-radius: 4px;
     color: var(--text-color);
+    display: inline-block;
 }
 
 .doc-nav a.active {
