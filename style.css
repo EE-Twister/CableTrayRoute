@@ -1792,6 +1792,11 @@ body.dark-mode .workflow-card-title {
     margin: 0;
 }
 
+/* remove indentation for top-level list */
+.doc-nav > ul {
+    padding-left: 0;
+}
+
 .doc-nav li {
     margin: 0.25rem 0;
 }
