@@ -9,7 +9,7 @@ const DOC_PAGES = [
   { href: "math.html", title: "Math References" },
   { href: "standards.html", title: "Engineering References" },
   { href: "troubleshooting.html", title: "Troubleshooting" },
-  { href: "tray_id_convention.html", title: "Tray ID Convention" }
+  { href: "tray_id_convention.html", title: "Tray ID Convention" },
 ];
 
 document.addEventListener("DOMContentLoaded", () => {
