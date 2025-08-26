@@ -2,15 +2,54 @@
 <html lang="en">
 <head>
   <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Required Geometry Fields</title>
   <link rel="stylesheet" href="../style.css">
 </head>
 <body>
-  <main class="container">
+  <a href="#main-content" class="skip-link">Skip to main content</a>
+  <nav class="top-nav">
+    <button class="nav-toggle" aria-label="Toggle navigation">☰</button>
+    <div class="nav-links">
+      <a href="../index.html">Home</a>
+      <a href="../cableschedule.html">Cable Schedule</a>
+      <a href="../racewayschedule.html">Raceway Schedule</a>
+      <a href="../ductbankroute.html">Ductbank</a>
+      <a href="../cabletrayfill.html">Tray Fill</a>
+      <a href="../conduitfill.html">Conduit Fill</a>
+      <a href="../optimalRoute.html">Optimal Route</a>
+      <a href="index.html" class="active" aria-current="page">Docs</a>
+    </div>
+  </nav>
+  <header class="hero">
     <h1>Required Geometry Fields</h1>
+    <p>Structure geometry data correctly to avoid skipped entries.</p>
+  </header>
+  <main id="main-content" class="doc-main">
     <p>Ductbank records must provide either an <code>outline</code> array of 3D points or both start and end coordinates using the fields <code>start_x</code>, <code>start_y</code>, <code>start_z</code>, <code>end_x</code>, <code>end_y</code>, and <code>end_z</code>.</p>
     <p>Conduit records must include a <code>path</code> array with at least two <code>[x, y, z]</code> points describing the run of the conduit.</p>
     <p>Entries missing these fields cannot be placed in the model and will be skipped.</p>
   </main>
+  <footer class="site-footer">
+    <div class="footer-left">
+      <img src="../icons/route.svg" alt="CableTrayRoute logo" class="footer-logo">
+      <span>CableTrayRoute</span>
+    </div>
+    <nav class="footer-links">
+      <a href="../README.md">README</a>
+      <a href="quickstart.html">Quick Start</a>
+      <a href="index.html">Docs</a>
+      <a href="mailto:contact@example.com">Contact</a>
+    </nav>
+  </footer>
+  <script>
+    document.addEventListener('DOMContentLoaded', () => {
+      const toggle = document.querySelector('.nav-toggle');
+      toggle.addEventListener('click', () => {
+        document.querySelector('.top-nav').classList.toggle('open');
+      });
+    });
+  </script>
 </body>
 </html>
+
