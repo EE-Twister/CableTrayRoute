@@ -1770,14 +1770,24 @@ body.dark-mode .workflow-card-title {
 }
 
 /* --- Documentation Pages --- */
-.doc-main {
-    max-width: 800px;
-    margin: 2rem auto;
-    padding: 0 1rem;
+.doc-content {
+    display: flex;
+    align-items: flex-start;
+    max-width: 1200px;
+    margin: 0 auto;
 }
 
 .doc-nav {
-    margin: 1rem 0;
+    width: 200px;
+    margin: 2rem 2rem 0 0;
+    flex-shrink: 0;
+}
+
+.doc-main {
+    flex: 1;
+    max-width: 800px;
+    margin: 2rem 0;
+    padding: 0 1rem;
 }
 
 .doc-nav .nav-section {

@@ -25,12 +25,14 @@
     <h1>Required Geometry Fields</h1>
     <p>Structure geometry data correctly to avoid skipped entries.</p>
   </header>
+<div class="doc-content">
   <nav id="doc-nav" class="doc-nav"></nav>
   <main id="main-content" class="doc-main">
     <p>Ductbank records must provide either an <code>outline</code> array of 3D points or both start and end coordinates using the fields <code>start_x</code>, <code>start_y</code>, <code>start_z</code>, <code>end_x</code>, <code>end_y</code>, and <code>end_z</code>.</p>
     <p>Conduit records must include a <code>path</code> array with at least two <code>[x, y, z]</code> points describing the run of the conduit.</p>
     <p>Entries missing these fields cannot be placed in the model and will be skipped.</p>
   </main>
+</div>
   <footer class="site-footer">
     <div class="footer-left">
       <img src="../icons/route.svg" alt="CableTrayRoute logo" class="footer-logo">
@@ -43,6 +45,7 @@
       <a href="mailto:contact@example.com">Contact</a>
     </nav>
   </footer>
+  <script src="docs.js"></script>
   <script>
     document.addEventListener('DOMContentLoaded', () => {
       const toggle = document.querySelector('.nav-toggle');
