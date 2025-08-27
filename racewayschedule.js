@@ -120,7 +120,7 @@ document.addEventListener('DOMContentLoaded',()=>{
   ];
   const trayTable=TableUtils.createTable({
     tableId:'trayTable',
-    storageKey:TableUtils.STORAGE_KEYS.traySchedule,
+    storageKey:TableUtils.STORAGE_KEYS.trays,
     addRowBtnId:'add-tray-btn',
     saveBtnId:'save-tray-btn',
     loadBtnId:'load-tray-btn',
@@ -167,7 +167,7 @@ document.addEventListener('DOMContentLoaded',()=>{
   ];
   const conduitTable=TableUtils.createTable({
     tableId:'conduitTable',
-    storageKey:TableUtils.STORAGE_KEYS.conduitSchedule,
+    storageKey:TableUtils.STORAGE_KEYS.conduits,
     addRowBtnId:'add-conduit-btn',
     saveBtnId:'save-conduit-btn',
     loadBtnId:'load-conduit-btn',

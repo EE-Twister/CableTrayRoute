@@ -15,10 +15,16 @@
  */
 
 const KEYS = {
+  // Preferred property names
   trays: 'traySchedule',
   cables: 'cableSchedule',
   ductbanks: 'ductbankSchedule',
-  conduits: 'conduitSchedule'
+  conduits: 'conduitSchedule',
+  // Legacy aliases for backward compatibility
+  traySchedule: 'traySchedule',
+  cableSchedule: 'cableSchedule',
+  ductbankSchedule: 'ductbankSchedule',
+  conduitSchedule: 'conduitSchedule'
 };
 
 const listeners = {};
