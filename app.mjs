@@ -3847,8 +3847,10 @@ Plotly.newPlot(document.getElementById('plot'), data, layout, {responsive: true}
             setProject(proj);
             diag.counts={ductbanks:proj.ductbanks.length,conduits:proj.conduits.length,trays:proj.trays.length,cables:proj.cables.length};
             const dbTags=new Set(proj.ductbanks.map(db=>db.tag));
-            const invalid=proj.conduits.filter(c=>!c.ductbankTag||!dbTags.has(c.ductbankTag));
+            const standalone=proj.conduits.filter(c=>!c.ductbankTag);
+            const invalid=proj.conduits.filter(c=>c.ductbankTag&&!dbTags.has(c.ductbankTag));
             diag.invalidConduits=invalid.map(c=>c.conduit_id||c.id);
+            diag.standaloneConduits=standalone.map(c=>c.conduit_id||c.id);
             if(Object.values(diag.counts).some(c=>c===0)||invalid.length) throw new Error('Data validation failed');
             await mainCalculation();
             const banner=document.getElementById('ductbank-no-conduits-warning');
