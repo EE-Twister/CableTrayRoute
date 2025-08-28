@@ -1,4 +1,4 @@
-import { getItem, setItem, removeItem, getTrays, getCables, getDuctbanks, getConduits } from './dataStore.js';
+import { getItem, setItem, removeItem, getTrays, getCables, getDuctbanks, getConduits, exportProject, importProject } from './dataStore.js';
 import { buildSegmentRows, buildSummaryRows } from './resultsExport.mjs';
 import './site.js';
 
@@ -3832,6 +3832,7 @@ Plotly.newPlot(document.getElementById('plot'), data, layout, {responsive: true}
 
     async function runSelfCheck(){
         const diag={};
+        const snapshot=exportProject();
         try{
             setProject({name:'',ductbanks:[],conduits:[],trays:[],cables:[],settings:{session:{},collapsedGroups:{},units:'imperial'}});
             diag.cleared=true;
@@ -3884,6 +3885,8 @@ Plotly.newPlot(document.getElementById('plot'), data, layout, {responsive: true}
             diag.error=e.message||String(e);
             diag.pass=false;
             showSelfCheckModal(diag);
+        }finally{
+            importProject(snapshot);
         }
     }
 
