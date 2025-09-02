@@ -1,0 +1,11 @@
+{
+  "conductors": {
+    "copper": { "density_lb_per_in3": 0.321, "cost_per_lb": 3 },
+    "aluminum": { "density_lb_per_in3": 0.097, "cost_per_lb": 1 }
+  },
+  "raceways": {
+    "Ladder (50 % fill)": { "weight_per_ft": 1, "cost_per_ft": 5 },
+    "RMC": { "weight_per_ft": 1.5, "cost_per_ft": 6 },
+    "PVC Sch 40": { "weight_per_ft": 0.5, "cost_per_ft": 2 }
+  }
+}
