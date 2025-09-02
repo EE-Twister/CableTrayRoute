@@ -367,6 +367,8 @@ if (typeof window !== 'undefined') {
     updateSummary(loads);
   }
 
+  dataStore.on('loadList', render);
+
   function loadsToCSV(loads, delimiter = ',') {
     const header = [
       'source',
