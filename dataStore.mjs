@@ -200,6 +200,8 @@ function ensureLoadFields(load) {
     duty: '',
     kw: '',
     powerFactor: '',
+    loadFactor: '',
+    efficiency: '',
     demandFactor: '',
     phases: '',
     circuit: '',
