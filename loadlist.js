@@ -262,10 +262,11 @@ if (typeof window !== 'undefined') {
 
   const menu = new ContextMenu();
   menu.setItems([
-    { label: 'Insert Row Above', action: tr => insertLoad(Number(tr.dataset.index), blankLoad) },
-    { label: 'Insert Row Below', action: tr => insertLoad(Number(tr.dataset.index) + 1, blankLoad) },
-    { label: 'Copy Row', action: tr => { clipboard = JSON.parse(JSON.stringify(gatherRow(tr))); } },
+    { label: 'Insert Row Above', action: tr => { if (!tr) return; insertLoad(Number(tr.dataset.index), blankLoad); } },
+    { label: 'Insert Row Below', action: tr => { if (!tr) return; insertLoad(Number(tr.dataset.index) + 1, blankLoad); } },
+    { label: 'Copy Row', action: tr => { if (!tr) return; clipboard = JSON.parse(JSON.stringify(gatherRow(tr))); } },
     { label: 'Paste Row', action: tr => {
+        if (!tr) return;
         if (!clipboard) return;
         const load = JSON.parse(JSON.stringify(clipboard));
         const idx = Number(tr.dataset.index);
@@ -278,7 +279,7 @@ if (typeof window !== 'undefined') {
         render();
       }
     },
-    { label: 'Delete Row', action: tr => { dataStore.deleteLoad(Number(tr.dataset.index)); render(); } }
+    { label: 'Delete Row', action: tr => { if (!tr) return; dataStore.deleteLoad(Number(tr.dataset.index)); render(); } }
   ]);
 
   table.addEventListener('contextmenu', e => {
