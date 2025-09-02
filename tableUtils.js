@@ -1,4 +1,4 @@
-import { getItem, setItem, STORAGE_KEYS } from './dataStore.js';
+import { getItem, setItem, STORAGE_KEYS } from './dataStore.mjs';
 
 class TableManager {
   constructor(opts) {

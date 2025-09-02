@@ -1,4 +1,4 @@
-import * as dataStore from './dataStore.js';
+import * as dataStore from './dataStore.mjs';
 
 // Initialize Cable Schedule page logic
 // This file mirrors the inline script previously embedded in

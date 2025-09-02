@@ -1,7 +1,7 @@
 import "../workflowStatus.js";
 import "../site.js";
 import "../tableUtils.js";
-import * as dataStore from "../dataStore.js";
+import * as dataStore from "../dataStore.mjs";
 
 // Panel Schedule page logic
 window.addEventListener("DOMContentLoaded", () => {

@@ -1,4 +1,4 @@
-import { getItem, setItem, removeItem, getCables, getConduits } from './dataStore.js';
+import { getItem, setItem, removeItem, getCables, getConduits } from './dataStore.mjs';
 
 checkPrereqs([{key:'ductbankSchedule',page:'racewayschedule.html',label:'Raceway Schedule'}]);
 

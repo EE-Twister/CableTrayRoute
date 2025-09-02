@@ -13,7 +13,7 @@ global.localStorage = {
 };
 
 (async () => {
-  const { exportProject, importProject } = await import("../dataStore.js");
+  const { exportProject, importProject } = await import("../dataStore.mjs");
 
   // initialize project data
   const initial = {

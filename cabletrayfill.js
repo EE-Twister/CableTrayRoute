@@ -1,4 +1,4 @@
-import { getItem, setItem, removeItem, keys as storeKeys } from './dataStore.js';
+import { getItem, setItem, removeItem, keys as storeKeys } from './dataStore.mjs';
 
 checkPrereqs([{key:'traySchedule',page:'racewayschedule.html',label:'Raceway Schedule'}]);
 

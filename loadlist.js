@@ -1,4 +1,4 @@
-import * as dataStore from './dataStore.js';
+import * as dataStore from './dataStore.mjs';
 
 window.addEventListener('DOMContentLoaded', () => {
   initSettings();

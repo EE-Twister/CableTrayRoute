@@ -1,5 +1,5 @@
 // Alias storage helpers to avoid name conflicts with local functions
-import { getDuctbanks as readStoredDuctbanks, setDuctbanks, setItem, getItem } from './dataStore.js';
+import { getDuctbanks as readStoredDuctbanks, setDuctbanks, setItem, getItem } from './dataStore.mjs';
 
 (function(){
   let ductbanks=[];

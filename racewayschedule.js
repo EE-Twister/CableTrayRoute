@@ -1,4 +1,4 @@
-import * as dataStore from './dataStore.js';
+import * as dataStore from './dataStore.mjs';
 import { sampleDuctbanks, sampleConduits, sampleTrays, normalizeDuctbankRow, normalizeConduitRow, normalizeTrayRow } from './racewaySampleData.mjs';
 
 checkPrereqs([{key:'cableSchedule',page:'cableschedule.html',label:'Cable Schedule'}]);

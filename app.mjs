@@ -1,4 +1,4 @@
-import { getItem, setItem, removeItem, getTrays, getCables, getDuctbanks, getConduits, exportProject, importProject, setCables } from './dataStore.js';
+import { getItem, setItem, removeItem, getTrays, getCables, getDuctbanks, getConduits, exportProject, importProject, setCables } from './dataStore.mjs';
 import { buildSegmentRows, buildSummaryRows, buildBOM } from './resultsExport.mjs';
 import './site.js';
 import { calculateVoltageDrop } from './src/voltageDrop.js';
