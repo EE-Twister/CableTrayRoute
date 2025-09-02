@@ -22,10 +22,16 @@ function it(name, fn) {
     "../resultsExport.mjs"
   );
   const conductorProps = JSON.parse(
-    fs.readFileSync(path.join(__dirname, "..", "data", "conductor_properties.json"), "utf8")
+    fs.readFileSync(
+      path.join(__dirname, "..", "data", "conductor_properties.json"),
+      "utf8",
+    ),
   );
   const materialCosts = JSON.parse(
-    fs.readFileSync(path.join(__dirname, "..", "data", "material_costs.json"), "utf8")
+    fs.readFileSync(
+      path.join(__dirname, "..", "data", "material_costs.json"),
+      "utf8",
+    ),
   );
 
   describe("buildSegmentRows", () => {
@@ -107,7 +113,7 @@ function it(name, fn) {
         trayData,
         cableList,
         conductorProps,
-        materialCosts
+        materialCosts,
       );
       const ladder = raceways.find((r) => r.type === "Ladder (50 % fill)");
       const rmc = raceways.find((r) => r.type === "RMC");

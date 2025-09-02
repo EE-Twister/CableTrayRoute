@@ -11,7 +11,7 @@
  * @returns {{trays:Array, conduits:Array}}
  */
 export function parseRevit(input) {
-  if (typeof input === 'string') {
+  if (typeof input === "string") {
     // Try JSON first – many exporters can emit JSON directly.
     try {
       const obj = JSON.parse(input);
@@ -31,16 +31,22 @@ export function parseRevit(input) {
  * @param {any} obj
  */
 function parseRevitJSON(obj) {
-  if (!obj || typeof obj !== 'object') return { trays: [], conduits: [] };
+  if (!obj || typeof obj !== "object") return { trays: [], conduits: [] };
   const trays = [];
   const conduits = [];
 
-  const traySrc = obj.trays || obj.Trays || obj.cableTrays || obj.CableTrays || [];
+  const traySrc =
+    obj.trays || obj.Trays || obj.cableTrays || obj.CableTrays || [];
   for (const t of traySrc) {
     trays.push(normalizeTray(t));
   }
 
-  const conduitSrc = obj.conduits || obj.Conduits || obj.cableConduits || obj.ConduitSegments || [];
+  const conduitSrc =
+    obj.conduits ||
+    obj.Conduits ||
+    obj.cableConduits ||
+    obj.ConduitSegments ||
+    [];
   for (const c of conduitSrc) {
     conduits.push(normalizeConduit(c));
   }
@@ -55,7 +61,7 @@ function num(val) {
 
 function normalizeTray(t = {}) {
   return {
-    id: t.id || t.tag || t.tray_id || t.TrayID || t.name || t.Tag || '',
+    id: t.id || t.tag || t.tray_id || t.TrayID || t.name || t.Tag || "",
     start_x: num(t.start_x ?? t.sx ?? t.x1 ?? t.StartX ?? t.start?.x),
     start_y: num(t.start_y ?? t.sy ?? t.y1 ?? t.StartY ?? t.start?.y),
     start_z: num(t.start_z ?? t.sz ?? t.z1 ?? t.StartZ ?? t.start?.z),
@@ -63,22 +69,22 @@ function normalizeTray(t = {}) {
     end_y: num(t.end_y ?? t.ey ?? t.y2 ?? t.EndY ?? t.end?.y),
     end_z: num(t.end_z ?? t.ez ?? t.z2 ?? t.EndZ ?? t.end?.z),
     width: num(t.width ?? t.w ?? t.Width ?? t.size_x),
-    height: num(t.height ?? t.h ?? t.Height ?? t.size_y)
+    height: num(t.height ?? t.h ?? t.Height ?? t.size_y),
   };
 }
 
 function normalizeConduit(c = {}) {
   return {
-    conduit_id: c.conduit_id || c.id || c.tag || c.ConduitID || '',
-    type: c.type || c.conduit_type || c.Type || '',
-    trade_size: c.trade_size || c.tradeSize || c.size || c.TradeSize || '',
+    conduit_id: c.conduit_id || c.id || c.tag || c.ConduitID || "",
+    type: c.type || c.conduit_type || c.Type || "",
+    trade_size: c.trade_size || c.tradeSize || c.size || c.TradeSize || "",
     start_x: num(c.start_x ?? c.sx ?? c.x1 ?? c.start?.x),
     start_y: num(c.start_y ?? c.sy ?? c.y1 ?? c.start?.y),
     start_z: num(c.start_z ?? c.sz ?? c.z1 ?? c.start?.z),
     end_x: num(c.end_x ?? c.ex ?? c.x2 ?? c.end?.x),
     end_y: num(c.end_y ?? c.ey ?? c.y2 ?? c.end?.y),
     end_z: num(c.end_z ?? c.ez ?? c.z2 ?? c.end?.z),
-    capacity: num(c.capacity ?? c.fill)
+    capacity: num(c.capacity ?? c.fill),
   };
 }
 
@@ -96,13 +102,14 @@ function normalizeConduit(c = {}) {
 function parseIFC(text) {
   const trays = [];
   const conduits = [];
-  const segRegex = /#\d+=IFC([^;]*?)SEGMENT[^;]*?IFCPOLYLINE\(\(([^)]+)\),\(([^)]+)\)\)/gi;
+  const segRegex =
+    /#\d+=IFC([^;]*?)SEGMENT[^;]*?IFCPOLYLINE\(\(([^)]+)\),\(([^)]+)\)\)/gi;
   let match;
   let i = 0;
   while ((match = segRegex.exec(text))) {
-    const kind = match[1] || '';
-    const start = match[2].split(',').map(v => parseFloat(v));
-    const end = match[3].split(',').map(v => parseFloat(v));
+    const kind = match[1] || "";
+    const start = match[2].split(",").map((v) => parseFloat(v));
+    const end = match[3].split(",").map((v) => parseFloat(v));
     const seg = {
       id: `SEG-${i++}`,
       start_x: start[0],
@@ -110,9 +117,10 @@ function parseIFC(text) {
       start_z: start[2],
       end_x: end[0],
       end_y: end[1],
-      end_z: end[2]
+      end_z: end[2],
     };
-    if (/CABLECARRIER/i.test(kind)) trays.push(seg); else conduits.push(seg);
+    if (/CABLECARRIER/i.test(kind)) trays.push(seg);
+    else conduits.push(seg);
   }
   return { trays, conduits };
 }
