@@ -331,7 +331,7 @@ document.addEventListener('DOMContentLoaded', async () => {
         if (gw.ductbanks?.length) parts.push(`ductbanks ${gw.ductbanks.join(', ')}`);
         if (gw.conduits?.length) parts.push(`conduits ${gw.conduits.join(', ')}`);
         if (typeof elements !== 'undefined' && elements.messages) {
-            const link = '<a href="docs/geometry-fields.html" target="_blank">Required geometry fields</a>';
+            const link = '<a href="docs/geometry-fields.html" target="_blank" rel="noopener noreferrer">Required geometry fields</a>';
             elements.messages.innerHTML += `<div class="message warning">Skipped ${parts.join('; ')}. ${link}</div>`;
         }
     };
