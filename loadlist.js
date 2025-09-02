@@ -92,6 +92,34 @@ window.addEventListener('DOMContentLoaded', () => {
     selectAll.checked = false;
   }
 
+  function loadsToCSV(loads, delimiter = ',') {
+    const header = ['description', 'power', 'phases', 'circuit'].join(delimiter);
+    const lines = loads.map(l => {
+      const vals = [l.description, l.power, l.phases, l.circuit].map(v => {
+        v = String(v ?? '').replace(/"/g, '""');
+        return v.includes(delimiter) ? `"${v}"` : v;
+      });
+      return vals.join(delimiter);
+    });
+    return [header, ...lines].join('\n');
+  }
+
+  function csvToLoads(text, delimiter = ',') {
+    const lines = text.trim().split(/\r?\n/);
+    if (!lines.length) return [];
+    const first = lines[0].toLowerCase();
+    if (first.includes('description') && first.includes('power')) lines.shift();
+    return lines.map(line => {
+      const cols = line
+        .split(delimiter)
+        .map(c => c.replace(/^"|"$/g, '').replace(/""/g, '"').trim());
+      if (cols.length !== 4) throw new Error('Invalid CSV format');
+      const [description, power, phases, circuit] = cols;
+      if (power && isNaN(Number(power))) throw new Error('Invalid CSV data');
+      return { description, power, phases, circuit };
+    });
+  }
+
   // --- events -------------------------------------------------------------
   addBtn.addEventListener('click', () => {
     dataStore.addLoad({ description: '', power: '', phases: '', circuit: '' });
@@ -137,6 +165,23 @@ window.addEventListener('DOMContentLoaded', () => {
     URL.revokeObjectURL(a.href);
   });
 
+  document.getElementById('export-csv-btn').addEventListener('click', () => {
+    const csv = loadsToCSV(dataStore.getLoads());
+    const blob = new Blob([csv], { type: 'text/csv' });
+    const a = document.createElement('a');
+    a.href = URL.createObjectURL(blob);
+    a.download = 'loads.csv';
+    a.click();
+    URL.revokeObjectURL(a.href);
+  });
+
+  document.getElementById('copy-btn').addEventListener('click', () => {
+    const tsv = loadsToCSV(dataStore.getLoads(), '\t');
+    navigator.clipboard.writeText(tsv).catch(() => {
+      alert('Copy failed');
+    });
+  });
+
   const importInput = document.getElementById('import-input');
   document.getElementById('import-btn').addEventListener('click', () => importInput.click());
   importInput.addEventListener('change', e => {
@@ -153,6 +198,23 @@ window.addEventListener('DOMContentLoaded', () => {
         }
       } catch {
         alert('Invalid load data');
+      }
+    });
+    e.target.value = '';
+  });
+
+  const importCsvInput = document.getElementById('import-csv-input');
+  document.getElementById('import-csv-btn').addEventListener('click', () => importCsvInput.click());
+  importCsvInput.addEventListener('change', e => {
+    const file = e.target.files[0];
+    if (!file) return;
+    file.text().then(text => {
+      try {
+        const loads = csvToLoads(text);
+        dataStore.setLoads(loads);
+        render();
+      } catch {
+        alert('Invalid CSV load data');
       }
     });
     e.target.value = '';
