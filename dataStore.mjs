@@ -227,6 +227,14 @@ export const addLoad = load => {
   setLoads(loads);
 };
 
+export const insertLoad = (index, load) => {
+  const loads = getLoads();
+  const normalized = ensureLoadFields(load);
+  const idx = Math.max(0, Math.min(index, loads.length));
+  loads.splice(idx, 0, normalized);
+  setLoads(loads);
+};
+
 export const updateLoad = (index, load) => {
   const loads = getLoads();
   if (index >= 0 && index < loads.length) {
@@ -460,6 +468,7 @@ if (typeof window !== 'undefined') {
     getLoads,
     setLoads,
     addLoad,
+    insertLoad,
     updateLoad,
     removeLoad,
     getItem,
