@@ -1,0 +1,99 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="description" content="Table for managing electrical loads.">
+  <title>Load List</title>
+  <link rel="icon" href="icons/favicon.svg" type="image/svg+xml">
+  <link rel="stylesheet" href="style.css">
+  <script type="module" src="dataStore.js" defer></script>
+  <script type="module" src="dist/loadlist.js" defer></script>
+</head>
+<body>
+  <a href="#main-content" class="skip-link">Skip to main content</a>
+  <nav class="top-nav">
+    <button id="nav-toggle" class="nav-toggle" aria-label="Toggle navigation" aria-controls="nav-links" aria-expanded="false">☰</button>
+    <div id="nav-links" class="nav-links">
+      <a href="index.html">Home</a>
+      <a href="loadlist.html" class="active" aria-current="page">Load List</a>
+      <a href="cableschedule.html">Cable Schedule</a>
+      <a href="panelschedule.html">Panel Schedule</a>
+      <a href="racewayschedule.html">Raceway Schedule</a>
+      <a href="ductbankroute.html">Ductbank</a>
+      <a href="cabletrayfill.html">Tray Fill</a>
+      <a href="conduitfill.html">Conduit Fill</a>
+      <a href="optimalRoute.html">Optimal Route</a>
+      <button id="settings-btn" class="settings-btn" aria-label="Settings" aria-expanded="false">⚙</button>
+    </div>
+  </nav>
+  <div id="settings-menu" class="settings-menu">
+    <label><input type="checkbox" id="dark-toggle"> Dark Mode</label>
+    <label><input type="checkbox" id="compact-toggle" aria-label="Enable compact table mode"> Compact Mode</label>
+    <label for="unit-select">Units
+      <select id="unit-select">
+        <option value="imperial">Imperial</option>
+        <option value="metric">Metric</option>
+      </select>
+    </label>
+    <button id="help-btn" aria-expanded="false">Site Help</button>
+    <button id="export-project-btn">Export Project</button>
+    <button id="import-project-btn">Import Project</button>
+    <input type="file" id="import-project-input" accept=".ctr.json" style="display:none;">
+  </div>
+  <div class="container">
+    <main id="main-content" class="main-content">
+      <header class="page-header">
+        <h1>Load List</h1>
+        <p>Manage connected loads for panels or equipment.</p>
+      </header>
+      <section class="card">
+        <div style="margin-bottom:10px;">
+          <input type="text" id="search" placeholder="Search loads..." aria-label="Search loads">
+          <button id="add-btn" class="primary-btn">Add Load</button>
+          <button id="export-btn">Export JSON</button>
+          <button id="import-btn">Import JSON</button>
+          <input type="file" id="import-input" accept=".json" style="display:none;">
+        </div>
+        <div style="overflow-x:auto;">
+          <table id="load-table" class="sticky-table">
+            <thead>
+              <tr>
+                <th>Description</th>
+                <th>kW/kVA</th>
+                <th>Phases</th>
+                <th>Panel Circuit</th>
+                <th>Actions</th>
+              </tr>
+            </thead>
+            <tbody></tbody>
+          </table>
+        </div>
+      </section>
+    </main>
+  </div>
+  <div id="form-modal" class="modal" aria-hidden="true" role="dialog" aria-labelledby="form-title">
+    <div class="modal-content">
+      <form id="load-form">
+        <h2 id="form-title">Load</h2>
+        <label>Description
+          <input type="text" name="description" required>
+        </label>
+        <label>kW/kVA
+          <input type="number" name="power" step="any" required>
+        </label>
+        <label>Phases
+          <input type="text" name="phases" required>
+        </label>
+        <label>Panel Circuit
+          <input type="text" name="circuit">
+        </label>
+        <div style="margin-top:10px;">
+          <button type="submit" class="primary-btn">Save</button>
+          <button id="cancel-btn">Cancel</button>
+        </div>
+      </form>
+    </div>
+  </div>
+</body>
+</html>
