@@ -30,6 +30,7 @@ class ContextMenu {
       Object.assign(li.style, {
         padding: '4px 12px',
         cursor: 'pointer',
+        background: '#fff',
         color: '#000'
       });
       li.tabIndex = 0;
@@ -38,8 +39,14 @@ class ContextMenu {
         this.hide();
         action(target);
       });
-      li.addEventListener('mouseenter', () => { li.style.background = '#eee'; });
-      li.addEventListener('mouseleave', () => { li.style.background = ''; });
+      li.addEventListener('mouseenter', () => {
+        li.style.background = '#eee';
+        li.style.color = '#000';
+      });
+      li.addEventListener('mouseleave', () => {
+        li.style.background = '#fff';
+        li.style.color = '#000';
+      });
       this.menu.appendChild(li);
     });
   }
