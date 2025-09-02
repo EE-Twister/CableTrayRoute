@@ -580,12 +580,24 @@ function initHelpModal(btnId='help-btn',modalId='help-modal',closeId){
 }
 
 function initNavToggle(){
-  const nav=document.querySelector('.top-nav');
-  if(!nav) return;
-  const toggle=nav.querySelector('.nav-toggle');
+  const toggle=document.querySelector('.nav-toggle');
   if(!toggle) return;
+  const target=document.getElementById(toggle.getAttribute('aria-controls'));
+  if(!target) return;
+
+  function closeMenu(){
+    toggle.setAttribute('aria-expanded','false');
+    target.classList.remove('open');
+  }
+
   toggle.addEventListener('click',()=>{
-    nav.classList.toggle('open');
+    const expanded=toggle.getAttribute('aria-expanded')==='true';
+    toggle.setAttribute('aria-expanded',String(!expanded));
+    target.classList.toggle('open',!expanded);
+  });
+
+  document.addEventListener('keydown',e=>{
+    if(e.key==='Escape') closeMenu();
   });
 }
 
