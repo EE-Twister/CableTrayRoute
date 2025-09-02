@@ -206,11 +206,24 @@ function ensureLoadFields(load) {
   };
 }
 
-export const setLoads = loads => write(KEYS.loads, loads.map(ensureLoadFields));
+function isEmptyLoad(load) {
+  const l = ensureLoadFields(load);
+  return Object.values(l).every(v => v === '');
+}
+
+export const setLoads = loads => {
+  const list = (loads.length ? loads : [{}]).map(ensureLoadFields);
+  write(KEYS.loads, list);
+};
 
 export const addLoad = load => {
   const loads = getLoads();
-  loads.push(ensureLoadFields(load));
+  const normalized = ensureLoadFields(load);
+  if (loads.length === 1 && isEmptyLoad(loads[0]) && !isEmptyLoad(normalized)) {
+    loads[0] = normalized;
+  } else {
+    loads.push(normalized);
+  }
   setLoads(loads);
 };
 
