@@ -187,7 +187,13 @@ if (typeof window !== 'undefined') {
 
   function render() {
     tbody.innerHTML = '';
-    const loads = dataStore.getLoads().map(l => ({ ...l, ...calculateDerived(l) }));
+    let loads = dataStore.getLoads();
+    if (!loads.length) {
+      // Ensure at least one editable row renders even with no stored data
+      loads = [{}];
+    } else {
+      loads = loads.map(l => ({ ...l, ...calculateDerived(l) }));
+    }
     dataStore.setLoads(loads);
     loads.forEach((load, idx) => tbody.appendChild(createRow(load, idx)));
     selectAll.checked = false;
