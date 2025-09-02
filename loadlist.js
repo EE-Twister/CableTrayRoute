@@ -1,5 +1,6 @@
 import * as dataStore from './dataStore.mjs';
 
+// Inline load list editor
 window.addEventListener('DOMContentLoaded', () => {
   initSettings();
   initDarkMode();
@@ -7,92 +8,128 @@ window.addEventListener('DOMContentLoaded', () => {
   initNavToggle();
 
   const tbody = document.querySelector('#load-table tbody');
-  const modal = document.getElementById('form-modal');
-  const form = document.getElementById('load-form');
+  const addBtn = document.getElementById('add-row-btn');
+  const deleteBtn = document.getElementById('delete-selected-btn');
+  const selectAll = document.getElementById('select-all');
 
-  function closeModal() {
-    modal.style.display = 'none';
-    form.reset();
-    delete form.dataset.index;
+  // --- helpers ------------------------------------------------------------
+  function gatherRow(tr) {
+    return {
+      description: tr.querySelector('input[name="description"]').value.trim(),
+      power: tr.querySelector('input[name="power"]').value.trim(),
+      phases: tr.querySelector('input[name="phases"]').value.trim(),
+      circuit: tr.querySelector('input[name="circuit"]').value.trim()
+    };
+  }
+
+  function saveRow(tr) {
+    const idx = Number(tr.dataset.index);
+    dataStore.updateLoad(idx, gatherRow(tr));
+  }
+
+  function handleNav(e, td) {
+    if (e.key === 'ArrowLeft' || e.key === 'ArrowRight') {
+      let allSelected = true;
+      if (e.target.tagName === 'INPUT' || e.target.tagName === 'TEXTAREA') {
+        const start = e.target.selectionStart ?? 0;
+        const end = e.target.selectionEnd ?? 0;
+        const len = (e.target.value || '').length;
+        allSelected = start === 0 && end === len;
+      }
+      if (allSelected) {
+        e.preventDefault();
+        const sib = e.key === 'ArrowLeft' ? td.previousElementSibling : td.nextElementSibling;
+        if (sib) {
+          const next = sib.querySelector('input,select,textarea');
+          if (next) {
+            next.focus();
+            if (typeof next.select === 'function') next.select();
+          }
+        }
+      }
+    } else if (e.key === 'Enter') {
+      e.preventDefault();
+      const col = td.cellIndex;
+      const nextRow = td.parentElement.nextElementSibling;
+      if (nextRow && nextRow.cells[col]) {
+        const next = nextRow.cells[col].querySelector('input,select,textarea');
+        if (next) {
+          next.focus();
+          if (typeof next.select === 'function') next.select();
+        }
+      }
+    }
+  }
+
+  function createRow(load, idx) {
+    const tr = document.createElement('tr');
+    tr.dataset.index = idx;
+    tr.innerHTML = `
+      <td><input type="checkbox" class="row-select" aria-label="Select row"></td>
+      <td><input name="description" type="text" value="${load.description || ''}"></td>
+      <td><input name="power" type="number" step="any" value="${load.power || ''}"></td>
+      <td><input name="phases" type="text" value="${load.phases || ''}"></td>
+      <td><input name="circuit" type="text" value="${load.circuit || ''}"></td>`;
+
+    Array.from(tr.querySelectorAll('input[type="text"],input[type="number"]')).forEach(input => {
+      const td = input.parentElement;
+      input.addEventListener('blur', () => saveRow(tr));
+      input.addEventListener('keydown', e => handleNav(e, td));
+    });
+
+    const chk = tr.querySelector('.row-select');
+    chk.addEventListener('change', () => {
+      if (!chk.checked) selectAll.checked = false;
+    });
+
+    return tr;
   }
 
   function render() {
     tbody.innerHTML = '';
     const loads = dataStore.getLoads();
-    loads.forEach((load, idx) => {
-      const tr = document.createElement('tr');
-      tr.innerHTML = `
-        <td>${load.description || ''}</td>
-        <td>${load.power || ''}</td>
-        <td>${load.phases || ''}</td>
-        <td>${load.circuit || ''}</td>
-        <td>
-          <button class="edit-btn" data-index="${idx}">Edit</button>
-          <button class="delete-btn" data-index="${idx}">Delete</button>
-        </td>`;
-      tbody.appendChild(tr);
-    });
+    loads.forEach((load, idx) => tbody.appendChild(createRow(load, idx)));
+    selectAll.checked = false;
   }
 
-  document.getElementById('add-btn').addEventListener('click', () => {
-    form.dataset.index = '';
-    modal.style.display = 'block';
-  });
-
-  document.getElementById('cancel-btn').addEventListener('click', e => {
-    e.preventDefault();
-    closeModal();
-  });
-
-  form.addEventListener('submit', e => {
-    e.preventDefault();
-    const load = {
-      description: form.description.value.trim(),
-      power: form.power.value.trim(),
-      phases: form.phases.value.trim(),
-      circuit: form.circuit.value.trim()
-    };
-    const idx = form.dataset.index;
-    if (idx === '' || idx === undefined) {
-      dataStore.addLoad(load);
-    } else {
-      dataStore.updateLoad(Number(idx), load);
+  // --- events -------------------------------------------------------------
+  addBtn.addEventListener('click', () => {
+    dataStore.addLoad({ description: '', power: '', phases: '', circuit: '' });
+    render();
+    const last = tbody.lastElementChild;
+    if (last) {
+      const inp = last.querySelector('input[name="description"]');
+      inp && inp.focus();
     }
-    closeModal();
+  });
+
+  deleteBtn.addEventListener('click', () => {
+    const rows = Array.from(tbody.querySelectorAll('tr')).filter(r => r.querySelector('.row-select').checked);
+    if (!rows.length) return;
+    if (!confirm('Delete selected loads?')) return;
+    const indices = rows.map(r => Number(r.dataset.index));
+    const loads = dataStore.getLoads().filter((_, idx) => !indices.includes(idx));
+    dataStore.setLoads(loads);
     render();
   });
 
-  tbody.addEventListener('click', e => {
-    const target = e.target;
-    const idx = target.dataset.index;
-    if (target.classList.contains('edit-btn')) {
-      const loads = dataStore.getLoads();
-      const load = loads[idx];
-      form.description.value = load.description || '';
-      form.power.value = load.power || '';
-      form.phases.value = load.phases || '';
-      form.circuit.value = load.circuit || '';
-      form.dataset.index = idx;
-      modal.style.display = 'block';
-    } else if (target.classList.contains('delete-btn')) {
-      if (confirm('Delete load?')) {
-        dataStore.removeLoad(Number(idx));
-        render();
-      }
-    }
+  selectAll.addEventListener('change', e => {
+    const checked = e.target.checked;
+    tbody.querySelectorAll('.row-select').forEach(cb => { cb.checked = checked; });
   });
 
   document.getElementById('search').addEventListener('input', e => {
     const term = e.target.value.toLowerCase();
     Array.from(tbody.rows).forEach(row => {
-      const match = Array.from(row.cells).slice(0,4).some(td => td.textContent.toLowerCase().includes(term));
+      const match = Array.from(row.querySelectorAll('input[type="text"],input[type="number"]'))
+        .some(inp => inp.value.toLowerCase().includes(term));
       row.style.display = match ? '' : 'none';
     });
   });
 
   document.getElementById('export-btn').addEventListener('click', () => {
     const data = dataStore.getLoads();
-    const blob = new Blob([JSON.stringify(data, null, 2)], {type: 'application/json'});
+    const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' });
     const a = document.createElement('a');
     a.href = URL.createObjectURL(blob);
     a.download = 'loads.json';
@@ -123,3 +160,4 @@ window.addEventListener('DOMContentLoaded', () => {
 
   render();
 });
+
