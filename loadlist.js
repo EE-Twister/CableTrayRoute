@@ -15,8 +15,14 @@ window.addEventListener('DOMContentLoaded', () => {
   // --- helpers ------------------------------------------------------------
   function gatherRow(tr) {
     return {
+      tag: tr.querySelector('input[name="tag"]').value.trim(),
       description: tr.querySelector('input[name="description"]').value.trim(),
+      quantity: tr.querySelector('input[name="quantity"]').value.trim(),
+      voltage: tr.querySelector('input[name="voltage"]').value.trim(),
+      loadType: tr.querySelector('input[name="loadType"]').value.trim(),
       power: tr.querySelector('input[name="power"]').value.trim(),
+      powerFactor: tr.querySelector('input[name="powerFactor"]').value.trim(),
+      demandFactor: tr.querySelector('input[name="demandFactor"]').value.trim(),
       phases: tr.querySelector('input[name="phases"]').value.trim(),
       circuit: tr.querySelector('input[name="circuit"]').value.trim()
     };
@@ -66,8 +72,14 @@ window.addEventListener('DOMContentLoaded', () => {
     tr.dataset.index = idx;
     tr.innerHTML = `
       <td><input type="checkbox" class="row-select" aria-label="Select row"></td>
+      <td><input name="tag" type="text" value="${load.tag || ''}"></td>
       <td><input name="description" type="text" value="${load.description || ''}"></td>
+      <td><input name="quantity" type="number" step="any" value="${load.quantity || ''}"></td>
+      <td><input name="voltage" type="number" step="any" value="${load.voltage || ''}"></td>
+      <td><input name="loadType" type="text" value="${load.loadType || ''}"></td>
       <td><input name="power" type="number" step="any" value="${load.power || ''}"></td>
+      <td><input name="powerFactor" type="number" step="any" value="${load.powerFactor || ''}"></td>
+      <td><input name="demandFactor" type="number" step="any" value="${load.demandFactor || ''}"></td>
       <td><input name="phases" type="text" value="${load.phases || ''}"></td>
       <td><input name="circuit" type="text" value="${load.circuit || ''}"></td>`;
 
@@ -93,9 +105,9 @@ window.addEventListener('DOMContentLoaded', () => {
   }
 
   function loadsToCSV(loads, delimiter = ',') {
-    const header = ['description', 'power', 'phases', 'circuit'].join(delimiter);
+    const header = ['tag', 'description', 'quantity', 'voltage', 'loadType', 'power', 'powerFactor', 'demandFactor', 'phases', 'circuit'].join(delimiter);
     const lines = loads.map(l => {
-      const vals = [l.description, l.power, l.phases, l.circuit].map(v => {
+      const vals = [l.tag, l.description, l.quantity, l.voltage, l.loadType, l.power, l.powerFactor, l.demandFactor, l.phases, l.circuit].map(v => {
         v = String(v ?? '').replace(/"/g, '""');
         return v.includes(delimiter) ? `"${v}"` : v;
       });
@@ -113,16 +125,28 @@ window.addEventListener('DOMContentLoaded', () => {
       const cols = line
         .split(delimiter)
         .map(c => c.replace(/^"|"$/g, '').replace(/""/g, '"').trim());
-      if (cols.length !== 4) throw new Error('Invalid CSV format');
-      const [description, power, phases, circuit] = cols;
-      if (power && isNaN(Number(power))) throw new Error('Invalid CSV data');
-      return { description, power, phases, circuit };
+      if (cols.length !== 10) throw new Error('Invalid CSV format');
+      const [tag, description, quantity, voltage, loadType, power, powerFactor, demandFactor, phases, circuit] = cols;
+      const nums = [quantity, voltage, power, powerFactor, demandFactor];
+      if (nums.some(n => n && isNaN(Number(n)))) throw new Error('Invalid CSV data');
+      return { tag, description, quantity, voltage, loadType, power, powerFactor, demandFactor, phases, circuit };
     });
   }
 
   // --- events -------------------------------------------------------------
   addBtn.addEventListener('click', () => {
-    dataStore.addLoad({ description: '', power: '', phases: '', circuit: '' });
+    dataStore.addLoad({
+      tag: '',
+      description: '',
+      quantity: '',
+      voltage: '',
+      loadType: '',
+      power: '',
+      powerFactor: '',
+      demandFactor: '',
+      phases: '',
+      circuit: ''
+    });
     render();
     const last = tbody.lastElementChild;
     if (last) {

@@ -135,18 +135,34 @@ export const getLoads = () => read(KEYS.loads, []);
 /**
  * @param {GenericRecord[]} loads
  */
-export const setLoads = loads => write(KEYS.loads, loads);
+function ensureLoadFields(load) {
+  return {
+    tag: '',
+    description: '',
+    quantity: '',
+    voltage: '',
+    loadType: '',
+    power: '',
+    powerFactor: '',
+    demandFactor: '',
+    phases: '',
+    circuit: '',
+    ...load
+  };
+}
+
+export const setLoads = loads => write(KEYS.loads, loads.map(ensureLoadFields));
 
 export const addLoad = load => {
   const loads = getLoads();
-  loads.push(load);
+  loads.push(ensureLoadFields(load));
   setLoads(loads);
 };
 
 export const updateLoad = (index, load) => {
   const loads = getLoads();
   if (index >= 0 && index < loads.length) {
-    loads[index] = load;
+    loads[index] = ensureLoadFields({ ...loads[index], ...load });
     setLoads(loads);
   }
 };
