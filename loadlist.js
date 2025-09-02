@@ -362,9 +362,9 @@ if (typeof window !== 'undefined') {
         // Ensure at least one editable row renders even with no stored data
         loads = [{}];
       } else {
+        // Recalculate derived fields for display without rewriting storage
         loads = loads.map(l => ({ ...l, ...calculateDerived(l) }));
       }
-      dataStore.setLoads(loads);
       loads.forEach((load, idx) => tbody.appendChild(createRow(load, idx)));
       selectAll.checked = false;
       updateFooter(loads);
@@ -374,6 +374,7 @@ if (typeof window !== 'undefined') {
     }
   }
 
+  // Re-render when load data changes without causing recursive updates
   dataStore.on('loadList', render);
 
   function loadsToCSV(loads, delimiter = ',') {
