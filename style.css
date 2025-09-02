@@ -162,7 +162,7 @@ body.compact-mode td {
         flex-direction: column;
         width: 100%;
     }
-    .top-nav.open .nav-links {
+    .top-nav .nav-links.open {
         display: flex;
     }
     .top-nav .settings-btn {
