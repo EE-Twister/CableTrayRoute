@@ -29,17 +29,21 @@ export function assignLoadToBreaker(panelId, loadIndex, breaker) {
 /**
  * Calculate connected and demand load totals for a panel.
  * @param {string} panelId
- * @returns {{connected:number,demand:number}}
+ * @returns {{connectedKva:number,connectedKw:number,demandKva:number,demandKw:number}}
  */
 export function calculatePanelTotals(panelId) {
   const loads = dataStore.getLoads().filter(l => l.panelId === panelId);
   return loads.reduce((acc, l) => {
-    const connected = parseFloat(l.power) || 0;
-    const demand = parseFloat(l.demand) || connected;
-    acc.connected += connected;
-    acc.demand += demand;
+    const cKva = parseFloat(l.kva) || 0;
+    const cKw = parseFloat(l.power) || 0;
+    const dKva = parseFloat(l.demandKva) || cKva;
+    const dKw = parseFloat(l.demandKw) || cKw;
+    acc.connectedKva += cKva;
+    acc.connectedKw += cKw;
+    acc.demandKva += dKva;
+    acc.demandKw += dKw;
     return acc;
-  }, {connected: 0, demand: 0});
+  }, { connectedKva: 0, connectedKw: 0, demandKva: 0, demandKw: 0 });
 }
 
 function render(panelId = 'P1') {
@@ -88,7 +92,7 @@ function createBreakerCell(panelId, loads, breaker) {
 function updateTotals(panelId) {
   const totals = calculatePanelTotals(panelId);
   const div = document.getElementById('panel-totals');
-  div.textContent = `Connected: ${totals.connected.toFixed(2)} kVA, Demand: ${totals.demand.toFixed(2)} kVA`;
+  div.textContent = `Connected: ${totals.connectedKva.toFixed(2)} kVA (${totals.connectedKw.toFixed(2)} kW), Demand: ${totals.demandKva.toFixed(2)} kVA (${totals.demandKw.toFixed(2)} kW)`;
 }
 
 window.addEventListener('DOMContentLoaded', () => {
