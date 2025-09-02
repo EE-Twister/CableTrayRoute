@@ -1,5 +1,5 @@
 import { getItem, setItem, removeItem, getTrays, getCables, getDuctbanks, getConduits, exportProject, importProject, setCables } from './dataStore.js';
-import { buildSegmentRows, buildSummaryRows } from './resultsExport.mjs';
+import { buildSegmentRows, buildSummaryRows, buildBOM } from './resultsExport.mjs';
 import './site.js';
 import { calculateVoltageDrop } from './src/voltageDrop.js';
 
@@ -164,6 +164,7 @@ document.addEventListener('DOMContentLoaded', async () => {
         heatmapToggle: document.getElementById('heatmap-toggle'),
         updatedUtilizationContainer: document.getElementById('updated-utilization-container'),
         exportCsvBtn: document.getElementById('export-csv-btn'),
+        downloadBomBtn: document.getElementById('download-bom-btn'),
         rebalanceBtn: document.getElementById('rebalance-btn'),
         openFillBtn: document.getElementById('open-fill-btn'),
         exportTrayFillsBtn: document.getElementById('export-tray-fills-btn'),
@@ -200,7 +201,7 @@ document.addEventListener('DOMContentLoaded', async () => {
     if(elements.importCablesFile) elements.importCablesFile.addEventListener('change',markUnsaved);
     if(elements.exportTraysBtn) elements.exportTraysBtn.addEventListener('click',markSaved);
     if(elements.exportCablesBtn) elements.exportCablesBtn.addEventListener('click',markSaved);
-    ['export-csv-btn','export-tray-fills-btn'].forEach(id=>{const b=document.getElementById(id);if(b)b.addEventListener('click',markSaved);});
+    ['export-csv-btn','download-bom-btn','export-tray-fills-btn'].forEach(id=>{const b=document.getElementById(id);if(b)b.addEventListener('click',markSaved);});
 
     const trayTemplateHeaders=['tray_id','start_x','start_y','start_z','end_x','end_y','end_z','width','height','current_fill','allowed_cable_group','shape'];
     const cableTemplateHeaders=['tag','start_tag','end_tag','cable_type','conductors','conductor_size','diameter','weight','allowed_cable_group','start_x','start_y','start_z','end_x','end_y','end_z'];
@@ -2692,6 +2693,28 @@ const renderBatchResults = (results) => {
         XLSX.writeFile(wb, 'route_data.xlsx');
     };
 
+    const exportBOMXLSX = async () => {
+        if (!state.latestRouteData || state.latestRouteData.length === 0) {
+            alert('No route data to export.');
+            return;
+        }
+        const [conductorProps, materialCosts] = await Promise.all([
+            fetch('data/conductor_properties.json').then(r => r.json()),
+            fetch('data/material_costs.json').then(r => r.json())
+        ]);
+        const { raceways, cables } = buildBOM(state.latestRouteData, state.trayData, state.cableList, conductorProps, materialCosts);
+        const wb = XLSX.utils.book_new();
+        if (raceways.length) {
+            const wsR = XLSX.utils.json_to_sheet(raceways);
+            XLSX.utils.book_append_sheet(wb, wsR, 'Raceways');
+        }
+        if (cables.length) {
+            const wsC = XLSX.utils.json_to_sheet(cables);
+            XLSX.utils.book_append_sheet(wb, wsC, 'Cables');
+        }
+        XLSX.writeFile(wb, 'bom.xlsx');
+    };
+
     const formatPoint = (p) => `(${p[0].toFixed(1)}, ${p[1].toFixed(1)}, ${p[2].toFixed(1)})`;
 
     const getSegmentType = (seg) => {
@@ -3744,6 +3767,9 @@ Plotly.newPlot(document.getElementById('plot'), data, layout, {responsive: true}
     elements.importCablesBtn.addEventListener('click', () => elements.importCablesFile.click());
     elements.importCablesFile.addEventListener('change', importCableOptions);
     elements.exportCsvBtn.addEventListener('click', exportRouteXLSX);
+    if (elements.downloadBomBtn) {
+        elements.downloadBomBtn.addEventListener('click', exportBOMXLSX);
+    }
     if (elements.rebalanceBtn) {
         elements.rebalanceBtn.addEventListener('click', rebalanceTrayFill);
     }
