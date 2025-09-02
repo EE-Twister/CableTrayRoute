@@ -131,7 +131,14 @@ export const setPanels = panels => write(KEYS.panels, panels);
 /**
  * @returns {GenericRecord[]}
  */
-export const getLoads = () => read(KEYS.loads, []).map(ensureLoadFields);
+export const getLoads = () => {
+  const raw = read(KEYS.loads, []);
+  const loads = raw.map(ensureLoadFields);
+  if (raw.some(l => l && typeof l === 'object' && !('source' in l))) {
+    write(KEYS.loads, loads);
+  }
+  return loads;
+};
 /**
  * @param {GenericRecord[]} loads
  */
@@ -142,6 +149,7 @@ function ensureLoadFields(load) {
     delete l.power;
   }
   return {
+    source: '',
     tag: '',
     description: '',
     quantity: '',
