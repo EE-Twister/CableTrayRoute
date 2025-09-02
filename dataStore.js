@@ -23,12 +23,14 @@ const KEYS = {
   ductbanks: 'ductbankSchedule',
   conduits: 'conduitSchedule',
   panels: 'panelSchedule',
+  loads: 'loadList',
   // Legacy aliases for backward compatibility
   traySchedule: 'traySchedule',
   cableSchedule: 'cableSchedule',
   ductbankSchedule: 'ductbankSchedule',
   conduitSchedule: 'conduitSchedule',
-  panelSchedule: 'panelSchedule'
+  panelSchedule: 'panelSchedule',
+  loadList: 'loadList'
 };
 
 const listeners = {};
@@ -126,6 +128,37 @@ export const getPanels = () => read(KEYS.panels, []);
  */
 export const setPanels = panels => write(KEYS.panels, panels);
 
+/**
+ * @returns {GenericRecord[]}
+ */
+export const getLoads = () => read(KEYS.loads, []);
+/**
+ * @param {GenericRecord[]} loads
+ */
+export const setLoads = loads => write(KEYS.loads, loads);
+
+export const addLoad = load => {
+  const loads = getLoads();
+  loads.push(load);
+  setLoads(loads);
+};
+
+export const updateLoad = (index, load) => {
+  const loads = getLoads();
+  if (index >= 0 && index < loads.length) {
+    loads[index] = load;
+    setLoads(loads);
+  }
+};
+
+export const removeLoad = index => {
+  const loads = getLoads();
+  if (index >= 0 && index < loads.length) {
+    loads.splice(index, 1);
+    setLoads(loads);
+  }
+};
+
 // generic access for other values so pages never touch localStorage directly
 export const getItem = (key, fallback = null) => read(key, fallback);
 export const setItem = (key, value) => write(key, value);
@@ -154,7 +187,7 @@ export const keys = () => {
 // Simple schema validator replacing Ajv. Checks for required fields,
 // disallows extras, and verifies basic types.
 function validateProjectSchema(obj) {
-  const required = ['ductbanks', 'conduits', 'trays', 'cables', 'panels', 'settings'];
+  const required = ['ductbanks', 'conduits', 'trays', 'cables', 'panels', 'loads', 'settings'];
   const missing = [];
   const extra = [];
 
@@ -175,6 +208,7 @@ function validateProjectSchema(obj) {
     Array.isArray(obj.trays) &&
     Array.isArray(obj.cables) &&
     Array.isArray(obj.panels) &&
+    Array.isArray(obj.loads) &&
     obj.settings && typeof obj.settings === 'object' && !Array.isArray(obj.settings);
 
   const valid = missing.length === 0 && extra.length === 0 && typesValid;
@@ -191,6 +225,7 @@ export function exportProject() {
     trays: getTrays(),
     cables: getCables(),
     panels: getPanels(),
+    loads: getLoads(),
     settings: {}
   };
   const reserved = new Set([...Object.values(KEYS), 'CTR_PROJECT_V1']);
@@ -289,6 +324,7 @@ export function importProject(obj) {
       trays: Array.isArray(obj.trays) ? obj.trays : [],
       cables: Array.isArray(obj.cables) ? obj.cables : [],
       panels: Array.isArray(obj.panels) ? obj.panels : [],
+      loads: Array.isArray(obj.loads) ? obj.loads : [],
       settings: (obj.settings && typeof obj.settings === 'object') ? obj.settings : {}
     };
   }
@@ -298,6 +334,7 @@ export function importProject(obj) {
   setTrays(data.trays);
   setCables(data.cables);
   setPanels(Array.isArray(data.panels) ? data.panels : []);
+  setLoads(Array.isArray(data.loads) ? data.loads : []);
 
   const reserved = new Set([...Object.values(KEYS), 'CTR_PROJECT_V1']);
   for (const key of keys()) {
@@ -327,6 +364,11 @@ if (typeof window !== 'undefined') {
     setConduits,
     getPanels,
     setPanels,
+    getLoads,
+    setLoads,
+    addLoad,
+    updateLoad,
+    removeLoad,
     getItem,
     setItem,
     removeItem,

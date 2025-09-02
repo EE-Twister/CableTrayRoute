@@ -9,6 +9,7 @@ const entries = {
   cabletrayfill: 'src/cabletrayfill.js',
   conduitfill: 'src/conduitfill.js',
   optimalRoute: 'src/optimalRoute.js',
+  loadlist: 'src/loadlist.js',
   '404': 'src/404.js'
 };
 
