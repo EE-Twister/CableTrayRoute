@@ -293,6 +293,8 @@ if (typeof window !== 'undefined') {
   });
 
   document.addEventListener('keydown', e => {
+    const tag = document.activeElement.tagName;
+    if (['INPUT', 'TEXTAREA', 'SELECT'].includes(tag)) return; // allow normal copy/paste
     const row = document.activeElement.closest(`.${rowClass}`);
     if (!row) return;
     if (e.ctrlKey && e.key.toLowerCase() === 'c') {
