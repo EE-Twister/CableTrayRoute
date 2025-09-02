@@ -59,10 +59,10 @@
 
       <fieldset>
         <legend><strong>Conduit Parameters</strong></legend>
-        <label for="conduitType">Type:</label>
+        <label for="conduitType">Type:<button class="helpBtn" data-doc="docs/nec_reference.html#conduit-fill">?</button></label>
         <select id="conduitType"></select>
 
-        <label for="tradeSize">Trade Size:</label>
+        <label for="tradeSize">Trade Size:<button class="helpBtn" data-doc="docs/nec_reference.html#conduit-fill">?</button></label>
         <select id="tradeSize"></select>
       </fieldset>
 
@@ -75,8 +75,8 @@
           <th>Tag</th>
           <th>Cable Type</th>
           <th>Conductors</th>
-          <th>Conductor Size</th>
-          <th>OD (in)</th>
+          <th>Conductor Size <button class="helpBtn" data-doc="docs/nec_reference.html#ampacity-adjustments">?</button></th>
+          <th>OD (in) <button class="helpBtn" data-doc="docs/nec_reference.html#derating-factors">?</button></th>
           <th>Duplicate</th>
           <th>Remove</th>
         </tr>
@@ -140,6 +140,7 @@
       <button id="close-help-btn" class="close-btn" aria-label="Close Help">&times;</button>
       <h2 id="help-title">Conduit Fill Help</h2>
       <p>This tool visualizes conduit fill based on cable sizes.</p>
+      <p><button class="helpBtn" data-doc="docs/nec_reference.html">NEC Reference Tables</button></p>
     </div>
   </div>
 

@@ -396,5 +396,13 @@ checkPrereqs([{key:'conduitSchedule',page:'racewayschedule.html',label:'Raceway 
         }
         removeItem('conduitFillData');
       }
+      document.querySelectorAll('.helpBtn').forEach(btn=>{
+        btn.addEventListener('click',()=>{
+          const doc=btn.getAttribute('data-doc');
+          if(doc && globalThis.showHelpDoc) showHelpDoc(doc);
+          else if(doc) window.open(doc,'_blank');
+          else alert(btn.getAttribute('data-help'));
+        });
+      });
     });
   
