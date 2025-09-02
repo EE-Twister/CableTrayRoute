@@ -16,6 +16,20 @@ export function calculateDerived(load) {
   return { kva: kVA, current, demandKw: demandKW, demandKva: demandKVA };
 }
 
+export function aggregateLoadsBySource(loads) {
+  return loads.reduce((acc, load) => {
+    const src = load.source || '';
+    const { kva, demandKw, demandKva } = calculateDerived(load);
+    const kW = parseFloat(load.kw) || 0;
+    if (!acc[src]) acc[src] = { kW: 0, kVA: 0, demandKW: 0, demandKVA: 0 };
+    acc[src].kW += kW;
+    acc[src].kVA += parseFloat(load.kva) || kva;
+    acc[src].demandKW += parseFloat(load.demandKw) || demandKw;
+    acc[src].demandKVA += parseFloat(load.demandKva) || demandKva;
+    return acc;
+  }, {});
+}
+
 // Inline load list editor
 if (typeof window !== 'undefined') {
   window.addEventListener('DOMContentLoaded', () => {
@@ -29,6 +43,7 @@ if (typeof window !== 'undefined') {
     const addBtn = document.getElementById('add-row-btn');
     const deleteBtn = document.getElementById('delete-selected-btn');
     const selectAll = document.getElementById('select-all');
+    const summaryDiv = document.getElementById('source-summary');
 
     // --- helpers ------------------------------------------------------------
     function format(num) {
@@ -62,6 +77,7 @@ if (typeof window !== 'undefined') {
     tr.querySelector('.demand-kva').textContent = format(computed.demandKva);
     tr.querySelector('.demand-kw').textContent = format(computed.demandKw);
     updateFooter();
+    updateSummary();
   }
 
   function handleNav(e, td) {
@@ -153,6 +169,22 @@ if (typeof window !== 'undefined') {
     </tr>`;
   }
 
+  function updateSummary(loads = dataStore.getLoads()) {
+    if (!summaryDiv) return;
+    const grouped = aggregateLoadsBySource(loads);
+    const entries = Object.entries(grouped);
+    if (!entries.length) {
+      summaryDiv.innerHTML = '';
+      return;
+    }
+    let html = '<table><thead><tr><th>Source</th><th>kW</th><th>kVA</th><th>Demand kW</th><th>Demand kVA</th></tr></thead><tbody>';
+    for (const [src, totals] of entries) {
+      html += `<tr><td>${src}</td><td>${totals.kW.toFixed(2)}</td><td>${totals.kVA.toFixed(2)}</td><td>${totals.demandKW.toFixed(2)}</td><td>${totals.demandKVA.toFixed(2)}</td></tr>`;
+    }
+    html += '</tbody></table>';
+    summaryDiv.innerHTML = html;
+  }
+
   function render() {
     tbody.innerHTML = '';
     const loads = dataStore.getLoads().map(l => ({ ...l, ...calculateDerived(l) }));
@@ -160,6 +192,7 @@ if (typeof window !== 'undefined') {
     loads.forEach((load, idx) => tbody.appendChild(createRow(load, idx)));
     selectAll.checked = false;
     updateFooter(loads);
+    updateSummary(loads);
   }
 
   function loadsToCSV(loads, delimiter = ',') {
