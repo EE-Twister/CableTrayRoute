@@ -79,11 +79,27 @@ window.addEventListener('DOMContentLoaded', () => {
     {key:'est_load',label:'Est Load (A)',type:'number',group:'Electrical Characteristics',tooltip:'Estimated operating current'},
     {key:'duty_cycle',label:'Duty Cycle (%)',type:'number',group:'Electrical Characteristics',tooltip:'Duty cycle percentage'},
     {key:'length',label:'Length (ft)',type:'number',group:'Electrical Characteristics',tooltip:'Length of cable run'},
+    {key:'voltage_drop_pct',label:'Estimated Voltage Drop (%)',type:'number',group:'Electrical Characteristics',tooltip:'Estimated voltage drop percent'},
     {key:'notes',label:'Notes',type:'text',group:'Notes',tooltip:'Additional comments or notes'}
   ];
 
   // Retrieve existing cables from project storage.
   let tableData = dataStore.getCables();
+  const vdLimitIn = document.getElementById('vd-limit');
+
+  function applyVoltageDropHighlight(){
+    const limit = parseFloat(vdLimitIn.value);
+    Array.from(table.tbody.querySelectorAll('tr')).forEach(tr => {
+      const input = tr.querySelector('input[name="voltage_drop_pct"]');
+      if (!input) return;
+      const val = parseFloat(input.value);
+      if (!isNaN(limit) && !isNaN(val) && val > limit){
+        input.classList.add('voltage-exceed');
+      } else {
+        input.classList.remove('voltage-exceed');
+      }
+    });
+  }
 
   const table = TableUtils.createTable({
     tableId:'cableScheduleTable',
@@ -97,7 +113,7 @@ window.addEventListener('DOMContentLoaded', () => {
     importBtnId:'import-xlsx-btn',
     deleteAllBtnId:'delete-all-btn',
     columns,
-    onChange:markUnsaved,
+    onChange:() => { markUnsaved(); applyVoltageDropHighlight(); },
     onSave:() => {
       markSaved();
       tableData = table.getData();
@@ -115,6 +131,8 @@ window.addEventListener('DOMContentLoaded', () => {
 
   // Ensure the table is populated with any existing data on load.
   table.setData(tableData);
+  applyVoltageDropHighlight();
+  vdLimitIn.addEventListener('input', applyVoltageDropHighlight);
 
   document.getElementById('load-sample-cables-btn').addEventListener('click', async () => {
     try {
