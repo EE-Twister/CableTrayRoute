@@ -28,7 +28,10 @@ const DOC_NAV = [
   },
   {
     title: "Standards",
-    children: [{ href: "standards.html", title: "Engineering References" }],
+    children: [
+      { href: "standards.html", title: "Engineering References" },
+      { href: "nec_reference.html", title: "NEC Reference Tables" },
+    ],
   },
   {
     title: "Support",

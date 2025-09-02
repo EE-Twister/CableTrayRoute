@@ -1312,7 +1312,8 @@ body.cabletrayfill-page .duplicateBtn {
 body.cabletrayfill-page .duplicateBtn:hover {
     background-color: #7f8c8d;
 }
-body.cabletrayfill-page .helpBtn {
+body.cabletrayfill-page .helpBtn,
+body.conduitfill-page .helpBtn {
     background: none;
     border: none;
     color: var(--primary-color);
@@ -1321,7 +1322,8 @@ body.cabletrayfill-page .helpBtn {
     margin-left: 4px;
     padding: 0 2px;
 }
-body.cabletrayfill-page .helpBtn:hover {
+body.cabletrayfill-page .helpBtn:hover,
+body.conduitfill-page .helpBtn:hover {
     text-decoration: underline;
 }
 body.cabletrayfill-page .required {

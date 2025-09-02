@@ -552,6 +552,9 @@ function initHelpModal(btnId='help-btn',modalId='help-modal',closeId){
     modal.setAttribute('role','dialog');
     modal.setAttribute('aria-modal','true');
     modal.setAttribute('aria-hidden','true');
+    const content=modal.querySelector('.modal-content');
+    const defaults=Array.from(content.children);
+    let iframe=null;
 
     const handleKey=e=>{
       if(e.key==='Escape')close();
@@ -572,6 +575,21 @@ function initHelpModal(btnId='help-btn',modalId='help-modal',closeId){
       btn.setAttribute('aria-expanded','false');
       document.removeEventListener('keydown',handleKey);
       btn.focus();
+      if(iframe){iframe.style.display='none';iframe.src='';}
+      defaults.forEach(el=>{if(el!==closeBtn)el.style.display='';});
+    };
+    globalThis.showHelpDoc=url=>{
+      if(!iframe){
+        iframe=document.createElement('iframe');
+        iframe.id='help-iframe';
+        iframe.style.width='100%';
+        iframe.style.height='80vh';
+        content.appendChild(iframe);
+      }
+      defaults.forEach(el=>{if(el!==closeBtn)el.style.display='none';});
+      iframe.style.display='block';
+      iframe.src=url;
+      open();
     };
     btn.addEventListener('click',open);
     closeBtn.addEventListener('click',close);

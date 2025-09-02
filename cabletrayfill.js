@@ -1796,7 +1796,8 @@ Wt: ${m.weight.toFixed(2)} lbs/ft
       document.querySelectorAll('.helpBtn').forEach(btn => {
         btn.addEventListener('click', () => {
           const doc = btn.getAttribute('data-doc');
-          if(doc) window.open(doc, '_blank');
+          if(doc && globalThis.showHelpDoc) showHelpDoc(doc);
+          else if(doc) window.open(doc, '_blank');
           else alert(btn.getAttribute('data-help'));
         });
       });
