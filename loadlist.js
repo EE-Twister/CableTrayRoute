@@ -1,5 +1,51 @@
 import * as dataStore from './dataStore.mjs';
 
+class ContextMenu {
+  constructor(items = []) {
+    this.items = items;
+    this.menu = document.createElement('ul');
+    this.menu.className = 'context-menu';
+    Object.assign(this.menu.style, {
+      position: 'absolute',
+      display: 'none',
+      listStyle: 'none',
+      margin: '0',
+      padding: '4px 0',
+      background: '#fff',
+      border: '1px solid #ccc',
+      zIndex: 1000
+    });
+    document.body.appendChild(this.menu);
+    document.addEventListener('click', () => this.hide());
+    document.addEventListener('keydown', e => { if (e.key === 'Escape') this.hide(); });
+  }
+
+  setItems(items) {
+    this.items = items;
+    this.menu.innerHTML = '';
+    items.forEach(({ label, action }) => {
+      const li = document.createElement('li');
+      li.textContent = label;
+      Object.assign(li.style, { padding: '4px 12px', cursor: 'pointer' });
+      li.tabIndex = 0;
+      li.addEventListener('click', () => { this.hide(); action(this.target); });
+      this.menu.appendChild(li);
+    });
+  }
+
+  show(x, y, target) {
+    this.target = target;
+    this.menu.style.left = `${x}px`;
+    this.menu.style.top = `${y}px`;
+    this.menu.style.display = 'block';
+  }
+
+  hide() {
+    this.menu.style.display = 'none';
+    this.target = null;
+  }
+}
+
 export function calculateDerived(load) {
   const qty = parseFloat(load.quantity) || 1;
   const voltage = parseFloat(load.voltage);
@@ -42,11 +88,30 @@ if (typeof window !== 'undefined') {
     initCompactMode();
     initNavToggle();
 
-    const tbody = document.querySelector('#load-table tbody');
-    const tfoot = document.querySelector('#load-table tfoot');
+    const table = document.getElementById('load-table');
+    const tbody = table.querySelector('tbody');
+    const tfoot = table.querySelector('tfoot');
     const deleteBtn = document.getElementById('delete-selected-btn');
     const selectAll = document.getElementById('select-all');
     const summaryDiv = document.getElementById('source-summary');
+    let clipboard = null;
+    const rowClass = tbody.dataset.rowClass || 'load-row';
+    const blankLoad = {
+      source: '',
+      tag: '',
+      description: '',
+      quantity: '',
+      voltage: '',
+      loadType: '',
+      duty: '',
+      kw: '',
+      powerFactor: '',
+      loadFactor: '',
+      efficiency: '',
+      demandFactor: '',
+      phases: '',
+      circuit: ''
+    };
 
     // --- helpers ------------------------------------------------------------
     function format(num) {
@@ -133,8 +198,9 @@ if (typeof window !== 'undefined') {
   function createRow(load, idx) {
     const tr = document.createElement('tr');
     tr.dataset.index = idx;
+    tr.classList.add(rowClass);
     tr.innerHTML = `
-      <td><button type="button" class="insert-row" aria-label="Insert row">➕</button><input type="checkbox" class="row-select" aria-label="Select row"></td>
+      <td><input type="checkbox" class="row-select" aria-label="Select row"></td>
       <td><input name="source" type="text" value="${load.source || ''}"></td>
       <td><input name="tag" type="text" value="${load.tag || ''}"></td>
       <td><input name="description" type="text" value="${load.description || ''}"></td>
@@ -168,27 +234,6 @@ if (typeof window !== 'undefined') {
       input.addEventListener('keydown', e => handleNav(e, td));
     });
 
-    const insertBtn = tr.querySelector('.insert-row');
-    insertBtn.addEventListener('click', () => {
-      const index = Number(tr.dataset.index) + 1;
-      insertLoad(index, {
-        source: '',
-        tag: '',
-        description: '',
-        quantity: '',
-        voltage: '',
-        loadType: '',
-        duty: '',
-        kw: '',
-        powerFactor: '',
-        loadFactor: '',
-        efficiency: '',
-        demandFactor: '',
-        phases: '',
-        circuit: ''
-      });
-    });
-
     const chk = tr.querySelector('.row-select');
     chk.addEventListener('change', () => {
       if (!chk.checked) selectAll.checked = false;
@@ -196,6 +241,58 @@ if (typeof window !== 'undefined') {
 
     return tr;
   }
+
+  const menu = new ContextMenu();
+  menu.setItems([
+    { label: 'Insert Row Above', action: tr => insertLoad(Number(tr.dataset.index), blankLoad) },
+    { label: 'Insert Row Below', action: tr => insertLoad(Number(tr.dataset.index) + 1, blankLoad) },
+    { label: 'Copy Row', action: tr => { clipboard = JSON.parse(JSON.stringify(gatherRow(tr))); } },
+    { label: 'Paste Row', action: tr => {
+        if (!clipboard) return;
+        const load = JSON.parse(JSON.stringify(clipboard));
+        const idx = Number(tr.dataset.index);
+        const loads = dataStore.getLoads();
+        if (idx >= loads.length - 1) {
+          dataStore.addLoad(load);
+        } else {
+          dataStore.insertLoad(idx + 1, load);
+        }
+        render();
+      }
+    },
+    { label: 'Delete Row', action: tr => { dataStore.deleteLoad(Number(tr.dataset.index)); render(); } }
+  ]);
+
+  table.addEventListener('contextmenu', e => {
+    const row = e.target.closest(`.${rowClass}`);
+    if (row) {
+      e.preventDefault();
+      menu.show(e.pageX, e.pageY, row);
+    } else if (e.target.closest('#load-table')) {
+      e.preventDefault();
+    }
+  });
+
+  document.addEventListener('keydown', e => {
+    const row = document.activeElement.closest(`.${rowClass}`);
+    if (!row) return;
+    if (e.ctrlKey && e.key.toLowerCase() === 'c') {
+      clipboard = JSON.parse(JSON.stringify(gatherRow(row)));
+      e.preventDefault();
+    } else if (e.ctrlKey && e.key.toLowerCase() === 'v') {
+      if (!clipboard) return;
+      const load = JSON.parse(JSON.stringify(clipboard));
+      const idx = Number(row.dataset.index);
+      const loads = dataStore.getLoads();
+      if (idx >= loads.length - 1) {
+        dataStore.addLoad(load);
+      } else {
+        dataStore.insertLoad(idx + 1, load);
+      }
+      render();
+      e.preventDefault();
+    }
+  });
 
   function updateFooter(loads = dataStore.getLoads()) {
     if (!tfoot) return;

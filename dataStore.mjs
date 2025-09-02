@@ -246,13 +246,16 @@ export const updateLoad = (index, load) => {
   }
 };
 
-export const removeLoad = index => {
+export const deleteLoad = index => {
   const loads = getLoads();
   if (index >= 0 && index < loads.length) {
     loads.splice(index, 1);
     setLoads(loads);
   }
 };
+
+// Backward compatibility
+export const removeLoad = deleteLoad;
 
 // generic access for other values so pages never touch localStorage directly
 export const getItem = (key, fallback = null) => read(key, fallback);
