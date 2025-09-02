@@ -197,6 +197,7 @@ function ensureLoadFields(load) {
     quantity: '',
     voltage: '',
     loadType: '',
+    duty: '',
     kw: '',
     powerFactor: '',
     demandFactor: '',
