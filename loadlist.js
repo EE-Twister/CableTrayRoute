@@ -13,7 +13,8 @@ class ContextMenu {
       padding: '4px 0',
       background: '#fff',
       border: '1px solid #ccc',
-      zIndex: 1000
+      zIndex: 1000,
+      color: '#000'
     });
     document.body.appendChild(this.menu);
     document.addEventListener('click', () => this.hide());
@@ -26,9 +27,15 @@ class ContextMenu {
     items.forEach(({ label, action }) => {
       const li = document.createElement('li');
       li.textContent = label;
-      Object.assign(li.style, { padding: '4px 12px', cursor: 'pointer' });
+      Object.assign(li.style, {
+        padding: '4px 12px',
+        cursor: 'pointer',
+        color: '#000'
+      });
       li.tabIndex = 0;
       li.addEventListener('click', () => { this.hide(); action(this.target); });
+      li.addEventListener('mouseenter', () => { li.style.background = '#eee'; });
+      li.addEventListener('mouseleave', () => { li.style.background = ''; });
       this.menu.appendChild(li);
     });
   }
