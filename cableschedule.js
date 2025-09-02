@@ -49,6 +49,12 @@ window.addEventListener('DOMContentLoaded', () => {
     return Array.from(ids);
   }
 
+  function getPanelOptions(){
+    const ids=new Set();
+    try{ dataStore.getPanels().forEach(p=>{ if(p.panel_id) ids.add(p.panel_id); }); }catch(e){}
+    return Array.from(ids);
+  }
+
   const columns=[
     {key:'tag',label:'Tag',type:'text',group:'Identification',tooltip:'Unique identifier for the cable'},
     {key:'service_description',label:'Service Description',type:'text',group:'Identification',tooltip:"Description of the cable's purpose"},
@@ -63,6 +69,8 @@ window.addEventListener('DOMContentLoaded', () => {
     {key:'zone',label:'Cable Zone',type:'number',group:'Routing / Termination',tooltip:'Routing zone or area number'},
     {key:'raceway_ids',label:'Raceway(s)',type:'select',multiple:true,size:5,options:()=>getRacewayOptions(),group:'Routing / Termination',tooltip:'Select raceway IDs from Raceway Schedule'},
     {key:'manual_path',label:'Manual Path',type:'text',datalist:()=>getRacewayOptions(),group:'Routing / Termination',tooltip:'Tray IDs separated by > to override route'},
+    {key:'panel_id',label:'Panel ID',type:'text',datalist:()=>getPanelOptions(),group:'Routing / Termination',tooltip:'Panel identifier from Panel Schedule'},
+    {key:'circuit_number',label:'Circuit #',type:'number',group:'Routing / Termination',tooltip:'Circuit number from Panel Schedule'},
     {key:'circuit_group',label:'Circuit Group',type:'number',group:'Routing / Termination',tooltip:'Circuit grouping number'},
     {key:'allowed_cable_group',label:'Allowed Group',type:'text',group:'Routing / Termination',tooltip:'Permitted cable grouping identifier'},
     {key:'cable_type',label:'Cable Type',type:'select',options:cableTypes,group:'Cable Construction & Specs',tooltip:'Category such as Power, Control, or Signal'},
