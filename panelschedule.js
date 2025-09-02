@@ -1,4 +1,5 @@
 import * as dataStore from './dataStore.js';
+import { exportPanelSchedule } from './exportPanelSchedule.js';
 
 /**
  * Assign a load to a breaker within a panel.
@@ -93,6 +94,7 @@ function updateTotals(panelId) {
 window.addEventListener('DOMContentLoaded', () => {
   const panelId = 'P1';
   render(panelId);
+  document.getElementById('export-panel-btn').addEventListener('click', () => exportPanelSchedule(panelId));
   document.getElementById('panel-container').addEventListener('change', e => {
     if (e.target.matches('select[data-breaker]')) {
       const breaker = parseInt(e.target.dataset.breaker, 10);
