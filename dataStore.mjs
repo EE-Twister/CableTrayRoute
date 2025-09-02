@@ -24,13 +24,15 @@ const KEYS = {
   conduits: 'conduitSchedule',
   panels: 'panelSchedule',
   loads: 'loadList',
+  equipment: 'equipment',
   // Legacy aliases for backward compatibility
   traySchedule: 'traySchedule',
   cableSchedule: 'cableSchedule',
   ductbankSchedule: 'ductbankSchedule',
   conduitSchedule: 'conduitSchedule',
   panelSchedule: 'panelSchedule',
-  loadList: 'loadList'
+  loadList: 'loadList',
+  equipmentList: 'equipment'
 };
 
 const listeners = {};
@@ -127,6 +129,46 @@ export const getPanels = () => read(KEYS.panels, []);
  * @param {GenericRecord[]} panels
  */
 export const setPanels = panels => write(KEYS.panels, panels);
+
+/**
+ * @returns {GenericRecord[]}
+ */
+export const getEquipment = () => read(KEYS.equipment, []);
+/**
+ * @param {GenericRecord[]} equipment
+ */
+function ensureEquipmentFields(eq) {
+  return {
+    id: '',
+    description: '',
+    voltage: '',
+    ...eq
+  };
+}
+
+export const setEquipment = list => write(KEYS.equipment, list.map(ensureEquipmentFields));
+
+export const addEquipment = item => {
+  const list = getEquipment();
+  list.push(ensureEquipmentFields(item));
+  setEquipment(list);
+};
+
+export const updateEquipment = (index, item) => {
+  const list = getEquipment();
+  if (index >= 0 && index < list.length) {
+    list[index] = ensureEquipmentFields({ ...list[index], ...item });
+    setEquipment(list);
+  }
+};
+
+export const removeEquipment = index => {
+  const list = getEquipment();
+  if (index >= 0 && index < list.length) {
+    list.splice(index, 1);
+    setEquipment(list);
+  }
+};
 
 /**
  * @returns {GenericRecord[]}
@@ -393,6 +435,11 @@ if (typeof window !== 'undefined') {
     setConduits,
     getPanels,
     setPanels,
+    getEquipment,
+    setEquipment,
+    addEquipment,
+    updateEquipment,
+    removeEquipment,
     getLoads,
     setLoads,
     addLoad,

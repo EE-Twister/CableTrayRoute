@@ -10,6 +10,7 @@ const entries = {
   conduitfill: 'src/conduitfill.js',
   optimalRoute: 'src/optimalRoute.js',
   loadlist: 'src/loadlist.js',
+  equipmentlist: 'src/equipmentlist.js',
   '404': 'src/404.js'
 };
 
