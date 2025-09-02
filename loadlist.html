@@ -50,7 +50,8 @@
       <section class="card">
         <div style="margin-bottom:10px;">
           <input type="text" id="search" placeholder="Search loads..." aria-label="Search loads">
-          <button id="add-btn" class="primary-btn">Add Load</button>
+          <button id="add-row-btn" class="primary-btn">Add Row</button>
+          <button id="delete-selected-btn">Delete Selected</button>
           <button id="export-btn">Export JSON</button>
           <button id="import-btn">Import JSON</button>
           <input type="file" id="import-input" accept=".json" style="display:none;">
@@ -59,11 +60,11 @@
           <table id="load-table" class="sticky-table">
             <thead>
               <tr>
+                <th><input type="checkbox" id="select-all" aria-label="Select all loads"></th>
                 <th>Description</th>
                 <th>kW/kVA</th>
                 <th>Phases</th>
                 <th>Panel Circuit</th>
-                <th>Actions</th>
               </tr>
             </thead>
             <tbody></tbody>
@@ -75,28 +76,6 @@
       </nav>
     </main>
   </div>
-  <div id="form-modal" class="modal" aria-hidden="true" role="dialog" aria-labelledby="form-title">
-    <div class="modal-content">
-      <form id="load-form">
-        <h2 id="form-title">Load</h2>
-        <label>Description
-          <input type="text" name="description" required>
-        </label>
-        <label>kW/kVA
-          <input type="number" name="power" step="any" required>
-        </label>
-        <label>Phases
-          <input type="text" name="phases" required>
-        </label>
-        <label>Panel Circuit
-          <input type="text" name="circuit">
-        </label>
-        <div style="margin-top:10px;">
-          <button type="submit" class="primary-btn">Save</button>
-          <button id="cancel-btn">Cancel</button>
-        </div>
-      </form>
-    </div>
-  </div>
+  
 </body>
 </html>
