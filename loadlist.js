@@ -1,18 +1,40 @@
 import * as dataStore from './dataStore.mjs';
 
+export function calculateDerived(load) {
+  const qty = parseFloat(load.quantity) || 1;
+  const voltage = parseFloat(load.voltage);
+  const power = parseFloat(load.power);
+  const pf = parseFloat(load.powerFactor);
+  const df = parseFloat(load.demandFactor);
+  const phases = parseInt(load.phases, 10);
+  const kW = isNaN(power) ? 0 : power * qty;
+  const kVA = pf ? kW / pf : kW;
+  const phaseFactor = phases === 1 ? 1 : Math.sqrt(3);
+  const current = voltage ? (kVA * 1000) / (phaseFactor * voltage) : 0;
+  const demandKW = kW * (isNaN(df) ? 1 : df / 100);
+  const demandKVA = pf ? demandKW / pf : demandKW;
+  return { kva: kVA, current, demandKw: demandKW, demandKva: demandKVA };
+}
+
 // Inline load list editor
-window.addEventListener('DOMContentLoaded', () => {
-  initSettings();
-  initDarkMode();
-  initCompactMode();
-  initNavToggle();
+if (typeof window !== 'undefined') {
+  window.addEventListener('DOMContentLoaded', () => {
+    initSettings();
+    initDarkMode();
+    initCompactMode();
+    initNavToggle();
 
-  const tbody = document.querySelector('#load-table tbody');
-  const addBtn = document.getElementById('add-row-btn');
-  const deleteBtn = document.getElementById('delete-selected-btn');
-  const selectAll = document.getElementById('select-all');
+    const tbody = document.querySelector('#load-table tbody');
+    const tfoot = document.querySelector('#load-table tfoot');
+    const addBtn = document.getElementById('add-row-btn');
+    const deleteBtn = document.getElementById('delete-selected-btn');
+    const selectAll = document.getElementById('select-all');
 
-  // --- helpers ------------------------------------------------------------
+    // --- helpers ------------------------------------------------------------
+    function format(num) {
+      const n = Number(num);
+      return Number.isFinite(n) && n !== 0 ? n.toFixed(2) : '';
+    }
   function gatherRow(tr) {
     return {
       tag: tr.querySelector('input[name="tag"]').value.trim(),
@@ -30,7 +52,15 @@ window.addEventListener('DOMContentLoaded', () => {
 
   function saveRow(tr) {
     const idx = Number(tr.dataset.index);
-    dataStore.updateLoad(idx, gatherRow(tr));
+    const load = gatherRow(tr);
+    const computed = calculateDerived(load);
+    Object.assign(load, computed);
+    dataStore.updateLoad(idx, load);
+    tr.querySelector('.kva').textContent = format(computed.kva);
+    tr.querySelector('.current').textContent = format(computed.current);
+    tr.querySelector('.demand-kva').textContent = format(computed.demandKva);
+    tr.querySelector('.demand-kw').textContent = format(computed.demandKw);
+    updateFooter();
   }
 
   function handleNav(e, td) {
@@ -81,7 +111,11 @@ window.addEventListener('DOMContentLoaded', () => {
       <td><input name="powerFactor" type="number" step="any" value="${load.powerFactor || ''}"></td>
       <td><input name="demandFactor" type="number" step="any" value="${load.demandFactor || ''}"></td>
       <td><input name="phases" type="text" value="${load.phases || ''}"></td>
-      <td><input name="circuit" type="text" value="${load.circuit || ''}"></td>`;
+      <td><input name="circuit" type="text" value="${load.circuit || ''}"></td>
+      <td class="kva">${format(load.kva)}</td>
+      <td class="current">${format(load.current)}</td>
+      <td class="demand-kva">${format(load.demandKva)}</td>
+      <td class="demand-kw">${format(load.demandKw)}</td>`;
 
     Array.from(tr.querySelectorAll('input[type="text"],input[type="number"]')).forEach(input => {
       const td = input.parentElement;
@@ -97,11 +131,33 @@ window.addEventListener('DOMContentLoaded', () => {
     return tr;
   }
 
+  function updateFooter(loads = dataStore.getLoads()) {
+    if (!tfoot) return;
+    const totals = loads.reduce((acc, l) => {
+      acc.kW += parseFloat(l.power) || 0;
+      acc.kVA += parseFloat(l.kva) || 0;
+      acc.demandKVA += parseFloat(l.demandKva) || 0;
+      acc.demandKW += parseFloat(l.demandKw) || 0;
+      return acc;
+    }, { kW: 0, kVA: 0, demandKVA: 0, demandKW: 0 });
+    tfoot.innerHTML = `<tr>
+      <td colspan="6">Totals</td>
+      <td>${totals.kW.toFixed(2)}</td>
+      <td colspan="4"></td>
+      <td>${totals.kVA.toFixed(2)}</td>
+      <td></td>
+      <td>${totals.demandKVA.toFixed(2)}</td>
+      <td>${totals.demandKW.toFixed(2)}</td>
+    </tr>`;
+  }
+
   function render() {
     tbody.innerHTML = '';
-    const loads = dataStore.getLoads();
+    const loads = dataStore.getLoads().map(l => ({ ...l, ...calculateDerived(l) }));
+    dataStore.setLoads(loads);
     loads.forEach((load, idx) => tbody.appendChild(createRow(load, idx)));
     selectAll.checked = false;
+    updateFooter(loads);
   }
 
   function loadsToCSV(loads, delimiter = ',') {
@@ -245,5 +301,6 @@ window.addEventListener('DOMContentLoaded', () => {
   });
 
   render();
-});
+  });
+}
 
