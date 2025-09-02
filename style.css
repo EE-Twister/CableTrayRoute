@@ -1868,3 +1868,27 @@ body.dark-mode .workflow-card-title {
     text-align: center;
     margin-top: 2rem;
 }
+
+/* Context menu styling */
+.context-menu {
+    background: #fff;
+    color: #000;
+}
+
+.context-menu li:hover {
+    background: #eee;
+}
+
+body.dark-mode .context-menu {
+    background: #333 !important;
+    color: #fff !important;
+}
+
+body.dark-mode .context-menu li {
+    background: #333 !important;
+    color: #fff !important;
+}
+
+body.dark-mode .context-menu li:hover {
+    background: #555 !important;
+}
