@@ -3,15 +3,15 @@ import * as dataStore from './dataStore.mjs';
 export function calculateDerived(load) {
   const qty = parseFloat(load.quantity) || 1;
   const voltage = parseFloat(load.voltage);
-  const power = parseFloat(load.power);
+  const kw = parseFloat(load.kw);
   const pf = parseFloat(load.powerFactor);
   const df = parseFloat(load.demandFactor);
   const phases = parseInt(load.phases, 10);
-  const kW = isNaN(power) ? 0 : power * qty;
-  const kVA = pf ? kW / pf : kW;
+  const totalKw = isNaN(kw) ? 0 : kw * qty;
+  const kVA = pf ? totalKw / pf : totalKw;
   const phaseFactor = phases === 1 ? 1 : Math.sqrt(3);
   const current = voltage ? (kVA * 1000) / (phaseFactor * voltage) : 0;
-  const demandKW = kW * (isNaN(df) ? 1 : df / 100);
+  const demandKW = totalKw * (isNaN(df) ? 1 : df / 100);
   const demandKVA = pf ? demandKW / pf : demandKW;
   return { kva: kVA, current, demandKw: demandKW, demandKva: demandKVA };
 }
@@ -42,7 +42,7 @@ if (typeof window !== 'undefined') {
       quantity: tr.querySelector('input[name="quantity"]').value.trim(),
       voltage: tr.querySelector('input[name="voltage"]').value.trim(),
       loadType: tr.querySelector('input[name="loadType"]').value.trim(),
-      power: tr.querySelector('input[name="power"]').value.trim(),
+      kw: tr.querySelector('input[name="kw"]').value.trim(),
       powerFactor: tr.querySelector('input[name="powerFactor"]').value.trim(),
       demandFactor: tr.querySelector('input[name="demandFactor"]').value.trim(),
       phases: tr.querySelector('input[name="phases"]').value.trim(),
@@ -107,7 +107,7 @@ if (typeof window !== 'undefined') {
       <td><input name="quantity" type="number" step="any" value="${load.quantity || ''}"></td>
       <td><input name="voltage" type="number" step="any" value="${load.voltage || ''}"></td>
       <td><input name="loadType" type="text" value="${load.loadType || ''}"></td>
-      <td><input name="power" type="number" step="any" value="${load.power || ''}"></td>
+      <td><input name="kw" type="number" step="any" value="${load.kw || ''}"></td>
       <td><input name="powerFactor" type="number" step="any" value="${load.powerFactor || ''}"></td>
       <td><input name="demandFactor" type="number" step="any" value="${load.demandFactor || ''}"></td>
       <td><input name="phases" type="text" value="${load.phases || ''}"></td>
@@ -134,7 +134,7 @@ if (typeof window !== 'undefined') {
   function updateFooter(loads = dataStore.getLoads()) {
     if (!tfoot) return;
     const totals = loads.reduce((acc, l) => {
-      acc.kW += parseFloat(l.power) || 0;
+      acc.kW += parseFloat(l.kw) || 0;
       acc.kVA += parseFloat(l.kva) || 0;
       acc.demandKVA += parseFloat(l.demandKva) || 0;
       acc.demandKW += parseFloat(l.demandKw) || 0;
@@ -167,7 +167,7 @@ if (typeof window !== 'undefined') {
       'quantity',
       'voltage',
       'loadType',
-      'power',
+      'kw',
       'powerFactor',
       'demandFactor',
       'phases',
@@ -188,7 +188,7 @@ if (typeof window !== 'undefined') {
         full.quantity,
         full.voltage,
         full.loadType,
-        full.power,
+        full.kw,
         full.powerFactor,
         full.demandFactor,
         full.phases,
@@ -212,15 +212,15 @@ if (typeof window !== 'undefined') {
     const lines = text.trim().split(/\r?\n/);
     if (!lines.length) return [];
     const first = lines[0].toLowerCase();
-    if (first.includes('description') && first.includes('power')) lines.shift();
+    if (first.includes('description') && (first.includes('kw') || first.includes('power'))) lines.shift();
     return lines.map(line => {
       const cols = line
         .split(delimiter)
         .map(c => c.replace(/^"|"$/g, '').replace(/""/g, '"').trim());
       let load;
       if (cols.length === 10) {
-        const [tag, description, quantity, voltage, loadType, power, powerFactor, demandFactor, phases, circuit] = cols;
-        const nums = [quantity, voltage, power, powerFactor, demandFactor];
+        const [tag, description, quantity, voltage, loadType, kw, powerFactor, demandFactor, phases, circuit] = cols;
+        const nums = [quantity, voltage, kw, powerFactor, demandFactor];
         if (nums.some(n => n && isNaN(Number(n)))) throw new Error('Invalid CSV data');
         load = {
           tag,
@@ -228,7 +228,7 @@ if (typeof window !== 'undefined') {
           quantity,
           voltage,
           loadType,
-          power,
+          kw,
           powerFactor,
           demandFactor,
           phases,
@@ -243,7 +243,7 @@ if (typeof window !== 'undefined') {
           quantity,
           voltage,
           loadType,
-          power,
+          kw,
           powerFactor,
           demandFactor,
           phases,
@@ -255,7 +255,7 @@ if (typeof window !== 'undefined') {
           demandKva,
           demandKw
         ] = cols;
-        const nums = [quantity, voltage, power, powerFactor, demandFactor, kva, current, demandKva, demandKw];
+        const nums = [quantity, voltage, kw, powerFactor, demandFactor, kva, current, demandKva, demandKw];
         if (nums.some(n => n && isNaN(Number(n)))) throw new Error('Invalid CSV data');
         load = {
           tag,
@@ -263,7 +263,7 @@ if (typeof window !== 'undefined') {
           quantity,
           voltage,
           loadType,
-          power,
+          kw,
           powerFactor,
           demandFactor,
           phases,
@@ -291,7 +291,7 @@ if (typeof window !== 'undefined') {
       quantity: '',
       voltage: '',
       loadType: '',
-      power: '',
+      kw: '',
       powerFactor: '',
       demandFactor: '',
       phases: '',
@@ -375,7 +375,7 @@ if (typeof window !== 'undefined') {
               quantity: '',
               voltage: '',
               loadType: '',
-              power: '',
+              kw: '',
               powerFactor: '',
               demandFactor: '',
               phases: '',
@@ -384,6 +384,10 @@ if (typeof window !== 'undefined') {
               breaker: '',
               ...l
             };
+            if ('power' in base && !('kw' in base)) {
+              base.kw = base.power;
+              delete base.power;
+            }
             return { ...base, ...calculateDerived(base) };
           });
           dataStore.setLoads(loads);

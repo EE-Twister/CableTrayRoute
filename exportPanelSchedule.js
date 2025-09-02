@@ -25,7 +25,7 @@ export function exportPanelSchedule(panelId) {
     const load = loads.find(l => Number(l.breaker) === circuit);
     const poles = load ? (load.poles || load.phases || '') : '';
     const desc = load ? (load.description || '') : '';
-    const demandVal = load ? (parseFloat(load.demand) || parseFloat(load.power) || 0) : 0;
+    const demandVal = load ? (parseFloat(load.demand) || parseFloat(load.demandKw) || parseFloat(load.kw) || 0) : 0;
     data.push([circuit, poles, desc, demandVal]);
   }
 

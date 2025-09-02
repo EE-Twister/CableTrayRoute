@@ -35,7 +35,7 @@ export function calculatePanelTotals(panelId) {
   const loads = dataStore.getLoads().filter(l => l.panelId === panelId);
   return loads.reduce((acc, l) => {
     const cKva = parseFloat(l.kva) || 0;
-    const cKw = parseFloat(l.power) || 0;
+    const cKw = parseFloat(l.kw) || 0;
     const dKva = parseFloat(l.demandKva) || cKva;
     const dKw = parseFloat(l.demandKw) || cKw;
     acc.connectedKva += cKva;
