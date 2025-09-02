@@ -37,6 +37,7 @@ if (typeof window !== 'undefined') {
     }
   function gatherRow(tr) {
     return {
+      source: tr.querySelector('input[name="source"]').value.trim(),
       tag: tr.querySelector('input[name="tag"]').value.trim(),
       description: tr.querySelector('input[name="description"]').value.trim(),
       quantity: tr.querySelector('input[name="quantity"]').value.trim(),
@@ -102,6 +103,7 @@ if (typeof window !== 'undefined') {
     tr.dataset.index = idx;
     tr.innerHTML = `
       <td><input type="checkbox" class="row-select" aria-label="Select row"></td>
+      <td><input name="source" type="text" value="${load.source || ''}"></td>
       <td><input name="tag" type="text" value="${load.tag || ''}"></td>
       <td><input name="description" type="text" value="${load.description || ''}"></td>
       <td><input name="quantity" type="number" step="any" value="${load.quantity || ''}"></td>
@@ -141,7 +143,7 @@ if (typeof window !== 'undefined') {
       return acc;
     }, { kW: 0, kVA: 0, demandKVA: 0, demandKW: 0 });
     tfoot.innerHTML = `<tr>
-      <td colspan="6">Totals</td>
+      <td colspan="7">Totals</td>
       <td>${totals.kW.toFixed(2)}</td>
       <td colspan="4"></td>
       <td>${totals.kVA.toFixed(2)}</td>
@@ -162,6 +164,7 @@ if (typeof window !== 'undefined') {
 
   function loadsToCSV(loads, delimiter = ',') {
     const header = [
+      'source',
       'tag',
       'description',
       'quantity',
@@ -180,9 +183,10 @@ if (typeof window !== 'undefined') {
       'demandKw'
     ].join(delimiter);
     const lines = loads.map(l => {
-      const base = { panelId: '', breaker: '', ...l };
+      const base = { source: '', panelId: '', breaker: '', ...l };
       const full = { ...base, ...calculateDerived(base) };
       const vals = [
+        full.source,
         full.tag,
         full.description,
         full.quantity,
@@ -218,11 +222,18 @@ if (typeof window !== 'undefined') {
         .split(delimiter)
         .map(c => c.replace(/^"|"$/g, '').replace(/""/g, '"').trim());
       let load;
-      if (cols.length === 10) {
-        const [tag, description, quantity, voltage, loadType, kw, powerFactor, demandFactor, phases, circuit] = cols;
+      if (cols.length === 10 || cols.length === 11) {
+        let source = '';
+        let tag, description, quantity, voltage, loadType, kw, powerFactor, demandFactor, phases, circuit;
+        if (cols.length === 10) {
+          [tag, description, quantity, voltage, loadType, kw, powerFactor, demandFactor, phases, circuit] = cols;
+        } else {
+          [source, tag, description, quantity, voltage, loadType, kw, powerFactor, demandFactor, phases, circuit] = cols;
+        }
         const nums = [quantity, voltage, kw, powerFactor, demandFactor];
         if (nums.some(n => n && isNaN(Number(n)))) throw new Error('Invalid CSV data');
         load = {
+          source,
           tag,
           description,
           quantity,
@@ -236,28 +247,53 @@ if (typeof window !== 'undefined') {
           panelId: '',
           breaker: ''
         };
-      } else if (cols.length === 16) {
-        const [
-          tag,
-          description,
-          quantity,
-          voltage,
-          loadType,
-          kw,
-          powerFactor,
-          demandFactor,
-          phases,
-          circuit,
-          panelId,
-          breaker,
-          kva,
-          current,
-          demandKva,
-          demandKw
-        ] = cols;
+      } else if (cols.length === 16 || cols.length === 17) {
+        let source = '';
+        let tag, description, quantity, voltage, loadType, kw, powerFactor, demandFactor, phases, circuit, panelId, breaker, kva, current, demandKva, demandKw;
+        if (cols.length === 16) {
+          [
+            tag,
+            description,
+            quantity,
+            voltage,
+            loadType,
+            kw,
+            powerFactor,
+            demandFactor,
+            phases,
+            circuit,
+            panelId,
+            breaker,
+            kva,
+            current,
+            demandKva,
+            demandKw
+          ] = cols;
+        } else {
+          [
+            source,
+            tag,
+            description,
+            quantity,
+            voltage,
+            loadType,
+            kw,
+            powerFactor,
+            demandFactor,
+            phases,
+            circuit,
+            panelId,
+            breaker,
+            kva,
+            current,
+            demandKva,
+            demandKw
+          ] = cols;
+        }
         const nums = [quantity, voltage, kw, powerFactor, demandFactor, kva, current, demandKva, demandKw];
         if (nums.some(n => n && isNaN(Number(n)))) throw new Error('Invalid CSV data');
         load = {
+          source,
           tag,
           description,
           quantity,
@@ -286,6 +322,7 @@ if (typeof window !== 'undefined') {
   // --- events -------------------------------------------------------------
   addBtn.addEventListener('click', () => {
     dataStore.addLoad({
+      source: '',
       tag: '',
       description: '',
       quantity: '',
@@ -369,21 +406,22 @@ if (typeof window !== 'undefined') {
         const data = JSON.parse(text);
         if (Array.isArray(data)) {
           const loads = data.map(l => {
-            const base = {
-              tag: '',
-              description: '',
-              quantity: '',
-              voltage: '',
-              loadType: '',
-              kw: '',
-              powerFactor: '',
-              demandFactor: '',
-              phases: '',
-              circuit: '',
-              panelId: '',
-              breaker: '',
-              ...l
-            };
+          const base = {
+            source: '',
+            tag: '',
+            description: '',
+            quantity: '',
+            voltage: '',
+            loadType: '',
+            kw: '',
+            powerFactor: '',
+            demandFactor: '',
+            phases: '',
+            circuit: '',
+            panelId: '',
+            breaker: '',
+            ...l
+          };
             if ('power' in base && !('kw' in base)) {
               base.kw = base.power;
               delete base.power;
