@@ -1,4 +1,37 @@
 const formatDist = globalThis.units?.formatDistance || (v => `${v.toFixed(1)} ft`);
+
+// Pull calculation helpers (fallback if not loaded separately)
+const calcSidewallPressure = globalThis.calcSidewallPressure || function(bendRadius, tension) {
+    if (!bendRadius) return 0;
+    return tension / bendRadius;
+};
+
+const calcPullTension = globalThis.calcPullTension || function(routeSegments = [], cableProps = {}) {
+    const mu = cableProps.coeffFriction ?? cableProps.mu ?? 0.35;
+    const weight = cableProps.weight ?? 0;
+    let tension = 0;
+    let maxTension = 0;
+    let maxSidewall = 0;
+    for (const seg of routeSegments) {
+        if (!seg) continue;
+        if (seg.type === 'bend') {
+            tension += weight * mu * (seg.length || 0);
+            tension *= Math.exp(mu * (seg.angle || 0));
+            const swp = calcSidewallPressure(seg.radius || 1, tension);
+            if (swp > maxSidewall) maxSidewall = swp;
+        } else {
+            tension += weight * mu * (seg.length || 0);
+        }
+        if (tension > maxTension) maxTension = tension;
+    }
+    return {
+        totalTension: tension,
+        maxTension,
+        maxSidewallPressure: maxSidewall,
+        allowableTension: cableProps.maxTension ?? cableProps.allowableTension ?? cableProps.max_tension ?? Infinity,
+        allowableSidewallPressure: cableProps.maxSidewallPressure ?? cableProps.allowableSidewallPressure ?? cableProps.max_sidewall_pressure ?? Infinity,
+    };
+};
 class MinHeap {
     constructor() {
         this.heap = [];
@@ -789,6 +822,30 @@ class CableRoutingSystem {
     }
 }
 
+function gatherPullSegments(segs) {
+    if (!Array.isArray(segs) || segs.length === 0) return [];
+    const pullSegs = [];
+    const vec = s => [s.end[0]-s.start[0], s.end[1]-s.start[1], s.end[2]-s.start[2]];
+    let prev = vec(segs[0]);
+    pullSegs.push({ type: 'straight', length: segs[0].length });
+    for (let i = 1; i < segs.length; i++) {
+        const curr = vec(segs[i]);
+        const prevMag = Math.hypot(...prev);
+        const currMag = Math.hypot(...curr);
+        if (prevMag > 0 && currMag > 0) {
+            const dot = prev[0]*curr[0] + prev[1]*curr[1] + prev[2]*curr[2];
+            const cos = Math.max(-1, Math.min(1, dot/(prevMag*currMag)));
+            const angle = Math.acos(cos);
+            if (angle > 1e-6) {
+                const radius = 1; // default 1 ft if actual radius unknown
+                pullSegs.push({ type: 'bend', radius, angle, length: radius * angle });
+            }
+        }
+        pullSegs.push({ type: 'straight', length: segs[i].length });
+        prev = curr;
+    }
+    return pullSegs;
+}
 
 self.onmessage = function(e) {
     const { trays, options, baseGraph, cable, cableArea } = e.data;
@@ -804,5 +861,10 @@ self.onmessage = function(e) {
         cable.raceway_ids || [],
         cable.id || cable.name || null
     );
+    if (result && result.success) {
+        const pullSegs = gatherPullSegments(result.route_segments || []);
+        const pull = calcPullTension(pullSegs, cable);
+        result.pull_check = pull;
+    }
     self.postMessage(result);
 };
