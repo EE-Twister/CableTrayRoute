@@ -14,6 +14,8 @@
  * @typedef {GenericRecord} Conduit
  */
 
+import { parseRevit } from './src/importers/revit.js';
+
 const KEYS = {
   // Preferred property names
   trays: 'traySchedule',
@@ -201,6 +203,70 @@ export function exportProject() {
 }
 
 /**
+ * Import tray and conduit geometry from a CAD export file (Revit JSON or IFC).
+ * Updates the current data store schedules.
+ *
+ * @param {File|string} file Input file or raw text
+ * @returns {Promise<{trays:any[], conduits:any[]}>}
+ */
+export async function importFromCad(file) {
+  let text;
+  if (typeof file === 'string') {
+    text = file;
+  } else if (file && typeof file.text === 'function') {
+    text = await file.text();
+  } else {
+    throw new Error('Unsupported CAD file');
+  }
+
+  const { trays = [], conduits = [] } = parseRevit(text);
+  if (Array.isArray(trays) && trays.length) setTrays(trays);
+  if (Array.isArray(conduits) && conduits.length) setConduits(conduits);
+  return { trays, conduits };
+}
+
+/**
+ * Export tray and conduit geometry to a CAD-friendly format. Currently
+ * only JSON is supported. When executed in a browser environment the
+ * file is automatically downloaded.
+ *
+ * @param {string} [fileType='json']
+ * @returns {string} serialized content
+ */
+export function exportToCad(fileType = 'json') {
+  const data = { trays: getTrays(), conduits: getConduits() };
+  let mime = 'application/json';
+  let ext = 'json';
+  let content = JSON.stringify(data, null, 2);
+
+  if (fileType === 'csv') {
+    const trayHeader = 'id,start_x,start_y,start_z,end_x,end_y,end_z,width,height';
+    const trayRows = data.trays.map(t => [t.id, t.start_x, t.start_y, t.start_z, t.end_x, t.end_y, t.end_z, t.width, t.height].join(','));
+    const conduitHeader = 'conduit_id,type,trade_size,start_x,start_y,start_z,end_x,end_y,end_z,capacity';
+    const conduitRows = data.conduits.map(c => [c.conduit_id, c.type, c.trade_size, c.start_x, c.start_y, c.start_z, c.end_x, c.end_y, c.end_z, c.capacity].join(','));
+    content = `# trays\n${[trayHeader, ...trayRows].join('\n')}\n# conduits\n${[conduitHeader, ...conduitRows].join('\n')}`;
+    mime = 'text/csv';
+    ext = 'csv';
+  }
+
+  if (typeof document !== 'undefined') {
+    try {
+      const blob = new Blob([content], { type: mime });
+      const a = document.createElement('a');
+      a.href = URL.createObjectURL(blob);
+      a.download = `raceways.${ext}`;
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      URL.revokeObjectURL(a.href);
+    } catch (e) {
+      console.error('Failed to export CAD data', e);
+    }
+  }
+  return content;
+}
+
+/**
  * Import project data with schema validation.
  * @param {any} obj
  * @returns {boolean} success
@@ -268,6 +334,8 @@ if (typeof window !== 'undefined') {
     off,
     keys,
     exportProject,
-    importProject
+    importProject,
+    importFromCad,
+    exportToCad
   };
 }

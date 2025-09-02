@@ -13,6 +13,7 @@
     <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js" defer></script>
     <script src="dirtyTracker.js" defer></script>
     <script src="dist/optimalRoute.js" defer></script>
+    <script type="module" src="dataStore.js"></script>
 </head>
 <body>
     <a href="#main-content" class="skip-link">Skip to main content</a>
@@ -122,6 +123,9 @@
             <header class="page-header">
                 <h1>Optimal 3D Cable Routing System</h1>
                 <p>Find the most efficient path for routing cables through tray networks with capacity constraints.</p>
+                <button id="import-cad-btn" onclick="document.getElementById('import-cad-input').click()">Import CAD</button>
+                <input type="file" id="import-cad-input" accept=".json,.ifc" style="display:none;" onchange="dataStore.importFromCad(this.files[0])">
+                <button id="export-cad-btn" onclick="dataStore.exportToCad('json')">Export CAD</button>
             </header>
             <details class="method-panel">
                 <summary>Method &amp; Assumptions</summary>

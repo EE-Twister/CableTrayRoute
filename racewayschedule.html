@@ -11,6 +11,7 @@
   <script src="dirtyTracker.js" defer></script>
   <script type="module" src="tableUtils.js"></script>
   <script src="dist/racewayschedule.js" defer></script>
+  <script type="module" src="dataStore.js"></script>
 </head>
 <body>
   <a href="#main-content" class="skip-link">Skip to main content</a>
@@ -49,6 +50,9 @@
         <p>Centralized tables for managing raceway data.</p>
         <button id="raceway-load-samples">Load Sample Data</button>
         <button id="validate-raceway-btn">Validate</button>
+        <button id="import-cad-btn" onclick="document.getElementById('import-cad-input').click()">Import CAD</button>
+        <input type="file" id="import-cad-input" accept=".json,.ifc" style="display:none;" onchange="dataStore.importFromCad(this.files[0])">
+        <button id="export-cad-btn" onclick="dataStore.exportToCad('json')">Export CAD</button>
       </header>
       <details class="method-panel">
         <summary>Method &amp; Assumptions</summary>
