@@ -161,9 +161,45 @@ if (typeof window !== 'undefined') {
   }
 
   function loadsToCSV(loads, delimiter = ',') {
-    const header = ['tag', 'description', 'quantity', 'voltage', 'loadType', 'power', 'powerFactor', 'demandFactor', 'phases', 'circuit'].join(delimiter);
+    const header = [
+      'tag',
+      'description',
+      'quantity',
+      'voltage',
+      'loadType',
+      'power',
+      'powerFactor',
+      'demandFactor',
+      'phases',
+      'circuit',
+      'panelId',
+      'breaker',
+      'kva',
+      'current',
+      'demandKva',
+      'demandKw'
+    ].join(delimiter);
     const lines = loads.map(l => {
-      const vals = [l.tag, l.description, l.quantity, l.voltage, l.loadType, l.power, l.powerFactor, l.demandFactor, l.phases, l.circuit].map(v => {
+      const base = { panelId: '', breaker: '', ...l };
+      const full = { ...base, ...calculateDerived(base) };
+      const vals = [
+        full.tag,
+        full.description,
+        full.quantity,
+        full.voltage,
+        full.loadType,
+        full.power,
+        full.powerFactor,
+        full.demandFactor,
+        full.phases,
+        full.circuit,
+        full.panelId,
+        full.breaker,
+        full.kva,
+        full.current,
+        full.demandKva,
+        full.demandKw
+      ].map(v => {
         v = String(v ?? '').replace(/"/g, '""');
         return v.includes(delimiter) ? `"${v}"` : v;
       });
@@ -181,11 +217,69 @@ if (typeof window !== 'undefined') {
       const cols = line
         .split(delimiter)
         .map(c => c.replace(/^"|"$/g, '').replace(/""/g, '"').trim());
-      if (cols.length !== 10) throw new Error('Invalid CSV format');
-      const [tag, description, quantity, voltage, loadType, power, powerFactor, demandFactor, phases, circuit] = cols;
-      const nums = [quantity, voltage, power, powerFactor, demandFactor];
-      if (nums.some(n => n && isNaN(Number(n)))) throw new Error('Invalid CSV data');
-      return { tag, description, quantity, voltage, loadType, power, powerFactor, demandFactor, phases, circuit };
+      let load;
+      if (cols.length === 10) {
+        const [tag, description, quantity, voltage, loadType, power, powerFactor, demandFactor, phases, circuit] = cols;
+        const nums = [quantity, voltage, power, powerFactor, demandFactor];
+        if (nums.some(n => n && isNaN(Number(n)))) throw new Error('Invalid CSV data');
+        load = {
+          tag,
+          description,
+          quantity,
+          voltage,
+          loadType,
+          power,
+          powerFactor,
+          demandFactor,
+          phases,
+          circuit,
+          panelId: '',
+          breaker: ''
+        };
+      } else if (cols.length === 16) {
+        const [
+          tag,
+          description,
+          quantity,
+          voltage,
+          loadType,
+          power,
+          powerFactor,
+          demandFactor,
+          phases,
+          circuit,
+          panelId,
+          breaker,
+          kva,
+          current,
+          demandKva,
+          demandKw
+        ] = cols;
+        const nums = [quantity, voltage, power, powerFactor, demandFactor, kva, current, demandKva, demandKw];
+        if (nums.some(n => n && isNaN(Number(n)))) throw new Error('Invalid CSV data');
+        load = {
+          tag,
+          description,
+          quantity,
+          voltage,
+          loadType,
+          power,
+          powerFactor,
+          demandFactor,
+          phases,
+          circuit,
+          panelId,
+          breaker,
+          kva,
+          current,
+          demandKva,
+          demandKw
+        };
+      } else {
+        throw new Error('Invalid CSV format');
+      }
+      const computed = calculateDerived(load);
+      return { panelId: '', breaker: '', ...load, ...computed };
     });
   }
 
@@ -236,7 +330,10 @@ if (typeof window !== 'undefined') {
   });
 
   document.getElementById('export-btn').addEventListener('click', () => {
-    const data = dataStore.getLoads();
+    const data = dataStore.getLoads().map(l => {
+      const base = { panelId: '', breaker: '', ...l };
+      return { ...base, ...calculateDerived(base) };
+    });
     const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' });
     const a = document.createElement('a');
     a.href = URL.createObjectURL(blob);
@@ -271,7 +368,25 @@ if (typeof window !== 'undefined') {
       try {
         const data = JSON.parse(text);
         if (Array.isArray(data)) {
-          dataStore.setLoads(data);
+          const loads = data.map(l => {
+            const base = {
+              tag: '',
+              description: '',
+              quantity: '',
+              voltage: '',
+              loadType: '',
+              power: '',
+              powerFactor: '',
+              demandFactor: '',
+              phases: '',
+              circuit: '',
+              panelId: '',
+              breaker: '',
+              ...l
+            };
+            return { ...base, ...calculateDerived(base) };
+          });
+          dataStore.setLoads(loads);
           render();
         } else {
           alert('Invalid load data');
