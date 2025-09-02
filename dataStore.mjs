@@ -131,23 +131,28 @@ export const setPanels = panels => write(KEYS.panels, panels);
 /**
  * @returns {GenericRecord[]}
  */
-export const getLoads = () => read(KEYS.loads, []);
+export const getLoads = () => read(KEYS.loads, []).map(ensureLoadFields);
 /**
  * @param {GenericRecord[]} loads
  */
 function ensureLoadFields(load) {
+  const l = { ...load };
+  if ('power' in l && !('kw' in l)) {
+    l.kw = l.power;
+    delete l.power;
+  }
   return {
     tag: '',
     description: '',
     quantity: '',
     voltage: '',
     loadType: '',
-    power: '',
+    kw: '',
     powerFactor: '',
     demandFactor: '',
     phases: '',
     circuit: '',
-    ...load
+    ...l
   };
 }
 
