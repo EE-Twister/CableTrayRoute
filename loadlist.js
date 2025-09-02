@@ -113,6 +113,7 @@ if (typeof window !== 'undefined') {
     const selectAll = document.getElementById('select-all');
     const summaryDiv = document.getElementById('source-summary');
     let clipboard = null;
+    let rendering = false;
     const rowClass = tbody.dataset.rowClass || 'load-row';
     const blankLoad = {
       source: '',
@@ -352,19 +353,25 @@ if (typeof window !== 'undefined') {
   }
 
   function render() {
-    tbody.innerHTML = '';
-    let loads = dataStore.getLoads();
-    if (!loads.length) {
-      // Ensure at least one editable row renders even with no stored data
-      loads = [{}];
-    } else {
-      loads = loads.map(l => ({ ...l, ...calculateDerived(l) }));
+    if (rendering) return;
+    rendering = true;
+    try {
+      tbody.innerHTML = '';
+      let loads = dataStore.getLoads();
+      if (!loads.length) {
+        // Ensure at least one editable row renders even with no stored data
+        loads = [{}];
+      } else {
+        loads = loads.map(l => ({ ...l, ...calculateDerived(l) }));
+      }
+      dataStore.setLoads(loads);
+      loads.forEach((load, idx) => tbody.appendChild(createRow(load, idx)));
+      selectAll.checked = false;
+      updateFooter(loads);
+      updateSummary(loads);
+    } finally {
+      rendering = false;
     }
-    dataStore.setLoads(loads);
-    loads.forEach((load, idx) => tbody.appendChild(createRow(load, idx)));
-    selectAll.checked = false;
-    updateFooter(loads);
-    updateSummary(loads);
   }
 
   dataStore.on('loadList', render);
