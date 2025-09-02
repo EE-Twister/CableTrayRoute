@@ -40,7 +40,6 @@ if (typeof window !== 'undefined') {
 
     const tbody = document.querySelector('#load-table tbody');
     const tfoot = document.querySelector('#load-table tfoot');
-    const addBtn = document.getElementById('add-row-btn');
     const deleteBtn = document.getElementById('delete-selected-btn');
     const selectAll = document.getElementById('select-all');
     const summaryDiv = document.getElementById('source-summary');
@@ -78,6 +77,16 @@ if (typeof window !== 'undefined') {
     tr.querySelector('.demand-kw').textContent = format(computed.demandKw);
     updateFooter();
     updateSummary();
+  }
+
+  function insertLoad(index, load) {
+    dataStore.insertLoad(index, load);
+    render();
+    const row = tbody.querySelector(`tr[data-index="${index}"]`);
+    if (row) {
+      const inp = row.querySelector('input[name="description"]');
+      inp && inp.focus();
+    }
   }
 
   function handleNav(e, td) {
@@ -118,7 +127,7 @@ if (typeof window !== 'undefined') {
     const tr = document.createElement('tr');
     tr.dataset.index = idx;
     tr.innerHTML = `
-      <td><input type="checkbox" class="row-select" aria-label="Select row"></td>
+      <td><button type="button" class="insert-row" aria-label="Insert row">➕</button><input type="checkbox" class="row-select" aria-label="Select row"></td>
       <td><input name="source" type="text" value="${load.source || ''}"></td>
       <td><input name="tag" type="text" value="${load.tag || ''}"></td>
       <td><input name="description" type="text" value="${load.description || ''}"></td>
@@ -139,6 +148,24 @@ if (typeof window !== 'undefined') {
       const td = input.parentElement;
       input.addEventListener('blur', () => saveRow(tr));
       input.addEventListener('keydown', e => handleNav(e, td));
+    });
+
+    const insertBtn = tr.querySelector('.insert-row');
+    insertBtn.addEventListener('click', () => {
+      const index = Number(tr.dataset.index) + 1;
+      insertLoad(index, {
+        source: '',
+        tag: '',
+        description: '',
+        quantity: '',
+        voltage: '',
+        loadType: '',
+        kw: '',
+        powerFactor: '',
+        demandFactor: '',
+        phases: '',
+        circuit: ''
+      });
     });
 
     const chk = tr.querySelector('.row-select');
@@ -359,28 +386,6 @@ if (typeof window !== 'undefined') {
   }
 
   // --- events -------------------------------------------------------------
-  addBtn.addEventListener('click', () => {
-    dataStore.addLoad({
-      source: '',
-      tag: '',
-      description: '',
-      quantity: '',
-      voltage: '',
-      loadType: '',
-      kw: '',
-      powerFactor: '',
-      demandFactor: '',
-      phases: '',
-      circuit: ''
-    });
-    render();
-    const last = tbody.lastElementChild;
-    if (last) {
-      const inp = last.querySelector('input[name="description"]');
-      inp && inp.focus();
-    }
-  });
-
   deleteBtn.addEventListener('click', () => {
     const rows = Array.from(tbody.querySelectorAll('tr')).filter(r => r.querySelector('.row-select').checked);
     if (!rows.length) return;
