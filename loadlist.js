@@ -33,7 +33,11 @@ class ContextMenu {
         color: '#000'
       });
       li.tabIndex = 0;
-      li.addEventListener('click', () => { this.hide(); action(this.target); });
+      li.addEventListener('click', () => {
+        const target = this.target;
+        this.hide();
+        action(target);
+      });
       li.addEventListener('mouseenter', () => { li.style.background = '#eee'; });
       li.addEventListener('mouseleave', () => { li.style.background = ''; });
       this.menu.appendChild(li);
