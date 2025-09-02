@@ -787,21 +787,21 @@ class CableRoutingSystem {
                 let curr = p1.slice();
                 if (p2[0] !== curr[0]) {
                     const next = [p2[0], curr[1], curr[2]];
-                    routeSegments.push({ type, start: curr, end: next, length: Math.abs(p2[0]-curr[0]), tray_id, conduit_id, ductbankTag });
+                    routeSegments.push({ type, start: curr, end: next, length: Math.abs(p2[0]-curr[0]), tray_id, conduit_id, ductbankTag, radius: edge.radius });
                     curr = next;
                 }
                 if (p2[1] !== curr[1]) {
                     const next = [curr[0], p2[1], curr[2]];
-                    routeSegments.push({ type, start: curr, end: next, length: Math.abs(p2[1]-curr[1]), tray_id, conduit_id, ductbankTag });
+                    routeSegments.push({ type, start: curr, end: next, length: Math.abs(p2[1]-curr[1]), tray_id, conduit_id, ductbankTag, radius: edge.radius });
                     curr = next;
                 }
                 if (p2[2] !== curr[2]) {
                     const next = [curr[0], curr[1], p2[2]];
-                    routeSegments.push({ type, start: curr, end: next, length: Math.abs(p2[2]-curr[2]), tray_id, conduit_id, ductbankTag });
+                    routeSegments.push({ type, start: curr, end: next, length: Math.abs(p2[2]-curr[2]), tray_id, conduit_id, ductbankTag, radius: edge.radius });
                     curr = next;
                 }
             } else {
-                routeSegments.push({ type, start: p1, end: p2, length, tray_id, conduit_id, ductbankTag });
+                routeSegments.push({ type, start: p1, end: p2, length, tray_id, conduit_id, ductbankTag, radius: edge.radius });
             }
         }
 
@@ -829,7 +829,8 @@ function gatherPullSegments(segs) {
     let prev = vec(segs[0]);
     pullSegs.push({ type: 'straight', length: segs[0].length });
     for (let i = 1; i < segs.length; i++) {
-        const curr = vec(segs[i]);
+        const seg = segs[i];
+        const curr = vec(seg);
         const prevMag = Math.hypot(...prev);
         const currMag = Math.hypot(...curr);
         if (prevMag > 0 && currMag > 0) {
@@ -837,11 +838,12 @@ function gatherPullSegments(segs) {
             const cos = Math.max(-1, Math.min(1, dot/(prevMag*currMag)));
             const angle = Math.acos(cos);
             if (angle > 1e-6) {
-                const radius = 1; // default 1 ft if actual radius unknown
+                const computedRadius = Math.min(prevMag, currMag) / 2 || 1;
+                const radius = seg.radius || computedRadius;
                 pullSegs.push({ type: 'bend', radius, angle, length: radius * angle });
             }
         }
-        pullSegs.push({ type: 'straight', length: segs[i].length });
+        pullSegs.push({ type: 'straight', length: seg.length });
         prev = curr;
     }
     return pullSegs;
