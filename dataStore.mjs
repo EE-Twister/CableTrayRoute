@@ -258,7 +258,7 @@ export const keys = () => {
 // Simple schema validator replacing Ajv. Checks for required fields,
 // disallows extras, and verifies basic types.
 function validateProjectSchema(obj) {
-  const required = ['ductbanks', 'conduits', 'trays', 'cables', 'panels', 'loads', 'settings'];
+  const required = ['ductbanks', 'conduits', 'trays', 'cables', 'panels', 'equipment', 'loads', 'settings'];
   const missing = [];
   const extra = [];
 
@@ -279,6 +279,7 @@ function validateProjectSchema(obj) {
     Array.isArray(obj.trays) &&
     Array.isArray(obj.cables) &&
     Array.isArray(obj.panels) &&
+    Array.isArray(obj.equipment) &&
     Array.isArray(obj.loads) &&
     obj.settings && typeof obj.settings === 'object' && !Array.isArray(obj.settings);
 
@@ -296,6 +297,7 @@ export function exportProject() {
     trays: getTrays(),
     cables: getCables(),
     panels: getPanels(),
+    equipment: getEquipment(),
     loads: getLoads(),
     settings: {}
   };
@@ -395,6 +397,7 @@ export function importProject(obj) {
       trays: Array.isArray(obj.trays) ? obj.trays : [],
       cables: Array.isArray(obj.cables) ? obj.cables : [],
       panels: Array.isArray(obj.panels) ? obj.panels : [],
+      equipment: Array.isArray(obj.equipment) ? obj.equipment : [],
       loads: Array.isArray(obj.loads) ? obj.loads : [],
       settings: (obj.settings && typeof obj.settings === 'object') ? obj.settings : {}
     };
@@ -405,6 +408,7 @@ export function importProject(obj) {
   setTrays(data.trays);
   setCables(data.cables);
   setPanels(Array.isArray(data.panels) ? data.panels : []);
+  setEquipment(Array.isArray(data.equipment) ? data.equipment : []);
   setLoads(Array.isArray(data.loads) ? data.loads : []);
 
   const reserved = new Set([...Object.values(KEYS), 'CTR_PROJECT_V1']);
