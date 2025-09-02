@@ -1,4 +1,4 @@
-import { getTrays, getCables, getDuctbanks, getConduits, getItem } from './dataStore.js';
+import { getTrays, getCables, getDuctbanks, getConduits, getItem } from './dataStore.mjs';
 
 window.addEventListener('DOMContentLoaded', () => {
   const cards = document.querySelectorAll('.workflow-grid .workflow-card');

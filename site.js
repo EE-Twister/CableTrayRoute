@@ -1,5 +1,5 @@
 import "./units.js";
-import { exportProject, importProject } from "./dataStore.js";
+import { exportProject, importProject } from "./dataStore.mjs";
 // fast-json-patch is loaded dynamically so the bundle does not expect a
 // build-time dependency. This avoids "index_mjs is not defined" errors in
 // the minified output when the raceway schedule loads sample data.
