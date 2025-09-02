@@ -968,7 +968,10 @@ body.dark-mode .legalDisclaimer {
 .unit-label[title]{text-decoration:underline dotted;cursor:help;}
 
 /* Highlight missing values */
-.missing-value{background-color:var(--warning-bg);}
+.missing-value{background-color:var(--warning-bg);} 
+
+/* Highlight voltage drop exceeding limit */
+.voltage-exceed{background-color:var(--warning-bg);color:var(--warning-text);} 
 
 /* --- Raceway Schedule Page --- */
 .ductbank-row > td {

@@ -1,6 +1,7 @@
-import { getItem, setItem, removeItem, getTrays, getCables, getDuctbanks, getConduits, exportProject, importProject } from './dataStore.js';
+import { getItem, setItem, removeItem, getTrays, getCables, getDuctbanks, getConduits, exportProject, importProject, setCables } from './dataStore.js';
 import { buildSegmentRows, buildSummaryRows } from './resultsExport.mjs';
 import './site.js';
+import { calculateVoltageDrop } from './src/voltageDrop.js';
 
 // Filename: app.mjs
 // (This is an improved version that adds route segment consolidation)
@@ -3045,6 +3046,11 @@ const openDuctbankRoute = (dbId, conduitId) => {
                             showManualPathError(index, result.message, result.error && result.error.tray_id);
                         }
                         cable.route_segments = result.success ? result.route_segments : [];
+                        let vd = 0;
+                        if (result.success) {
+                            vd = calculateVoltageDrop(cable, result.total_length, cable.phase);
+                            cable.voltage_drop_pct = vd;
+                        }
                         return {
                             cable: cable.name,
                             status: result.success ? '✓ Routed' : '✗ Failed',
@@ -3056,6 +3062,7 @@ const openDuctbankRoute = (dbId, conduitId) => {
                             segments_count: result.success ? result.route_segments.length : 0,
                             tray_segments: result.success ? result.tray_segments : [],
                             route_segments: result.success ? result.route_segments : [],
+                            voltage_drop_pct: result.success ? vd.toFixed(2) : 'N/A',
                             exclusions: result.exclusions || [],
                             breakdown: result.success ? result.route_segments.map((seg, i) => {
                                 let tray_id = seg.type === 'field' ? 'Field Route' : (seg.tray_id || 'N/A');
@@ -3078,6 +3085,7 @@ const openDuctbankRoute = (dbId, conduitId) => {
                     });
 
                     buildFieldSegmentCableMap(batchResults);
+                    setCables(state.cableList);
                     state.latestRouteData = batchResults;
                     renderBatchResults(batchResults);
                     const nameMap = new Map(state.cableList.map(c => [c.name, c]));
