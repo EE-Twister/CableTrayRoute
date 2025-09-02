@@ -57,6 +57,7 @@ if (typeof window !== 'undefined') {
       quantity: tr.querySelector('input[name="quantity"]').value.trim(),
       voltage: tr.querySelector('input[name="voltage"]').value.trim(),
       loadType: tr.querySelector('input[name="loadType"]').value.trim(),
+      duty: tr.querySelector('select[name="duty"]').value.trim(),
       kw: tr.querySelector('input[name="kw"]').value.trim(),
       powerFactor: tr.querySelector('input[name="powerFactor"]').value.trim(),
       demandFactor: tr.querySelector('input[name="demandFactor"]').value.trim(),
@@ -134,6 +135,12 @@ if (typeof window !== 'undefined') {
       <td><input name="quantity" type="number" step="any" value="${load.quantity || ''}"></td>
       <td><input name="voltage" type="number" step="any" value="${load.voltage || ''}"></td>
       <td><input name="loadType" type="text" value="${load.loadType || ''}"></td>
+      <td><select name="duty">
+        <option value=""></option>
+        <option value="Continuous"${load.duty === 'Continuous' ? ' selected' : ''}>Continuous</option>
+        <option value="Intermittent"${load.duty === 'Intermittent' ? ' selected' : ''}>Intermittent</option>
+        <option value="Stand-by"${load.duty === 'Stand-by' ? ' selected' : ''}>Stand-by</option>
+      </select></td>
       <td><input name="kw" type="number" step="any" value="${load.kw || ''}"></td>
       <td><input name="powerFactor" type="number" step="any" value="${load.powerFactor || ''}"></td>
       <td><input name="demandFactor" type="number" step="any" value="${load.demandFactor || ''}"></td>
@@ -144,9 +151,12 @@ if (typeof window !== 'undefined') {
       <td class="demand-kva">${format(load.demandKva)}</td>
       <td class="demand-kw">${format(load.demandKw)}</td>`;
 
-    Array.from(tr.querySelectorAll('input[type="text"],input[type="number"]')).forEach(input => {
+    Array.from(tr.querySelectorAll('input[type="text"],input[type="number"],select')).forEach(input => {
       const td = input.parentElement;
       input.addEventListener('blur', () => saveRow(tr));
+      if (input.tagName === 'SELECT') {
+        input.addEventListener('change', () => saveRow(tr));
+      }
       input.addEventListener('keydown', e => handleNav(e, td));
     });
 
@@ -160,6 +170,7 @@ if (typeof window !== 'undefined') {
         quantity: '',
         voltage: '',
         loadType: '',
+        duty: '',
         kw: '',
         powerFactor: '',
         demandFactor: '',
@@ -186,7 +197,7 @@ if (typeof window !== 'undefined') {
       return acc;
     }, { kW: 0, kVA: 0, demandKVA: 0, demandKW: 0 });
     tfoot.innerHTML = `<tr>
-      <td colspan="7">Totals</td>
+      <td colspan="8">Totals</td>
       <td>${totals.kW.toFixed(2)}</td>
       <td colspan="4"></td>
       <td>${totals.kVA.toFixed(2)}</td>
@@ -236,6 +247,7 @@ if (typeof window !== 'undefined') {
       'quantity',
       'voltage',
       'loadType',
+      'duty',
       'kw',
       'powerFactor',
       'demandFactor',
@@ -249,7 +261,7 @@ if (typeof window !== 'undefined') {
       'demandKw'
     ].join(delimiter);
     const lines = loads.map(l => {
-      const base = { source: '', panelId: '', breaker: '', ...l };
+      const base = { source: '', panelId: '', breaker: '', duty: '', ...l };
       const full = { ...base, ...calculateDerived(base) };
       const vals = [
         full.source,
@@ -258,6 +270,7 @@ if (typeof window !== 'undefined') {
         full.quantity,
         full.voltage,
         full.loadType,
+        full.duty,
         full.kw,
         full.powerFactor,
         full.demandFactor,
@@ -288,13 +301,13 @@ if (typeof window !== 'undefined') {
         .split(delimiter)
         .map(c => c.replace(/^"|"$/g, '').replace(/""/g, '"').trim());
       let load;
-      if (cols.length === 10 || cols.length === 11) {
+      if (cols.length === 11 || cols.length === 12) {
         let source = '';
-        let tag, description, quantity, voltage, loadType, kw, powerFactor, demandFactor, phases, circuit;
-        if (cols.length === 10) {
-          [tag, description, quantity, voltage, loadType, kw, powerFactor, demandFactor, phases, circuit] = cols;
+        let tag, description, quantity, voltage, loadType, duty, kw, powerFactor, demandFactor, phases, circuit;
+        if (cols.length === 11) {
+          [tag, description, quantity, voltage, loadType, duty, kw, powerFactor, demandFactor, phases, circuit] = cols;
         } else {
-          [source, tag, description, quantity, voltage, loadType, kw, powerFactor, demandFactor, phases, circuit] = cols;
+          [source, tag, description, quantity, voltage, loadType, duty, kw, powerFactor, demandFactor, phases, circuit] = cols;
         }
         const nums = [quantity, voltage, kw, powerFactor, demandFactor];
         if (nums.some(n => n && isNaN(Number(n)))) throw new Error('Invalid CSV data');
@@ -305,6 +318,7 @@ if (typeof window !== 'undefined') {
           quantity,
           voltage,
           loadType,
+          duty,
           kw,
           powerFactor,
           demandFactor,
@@ -313,16 +327,17 @@ if (typeof window !== 'undefined') {
           panelId: '',
           breaker: ''
         };
-      } else if (cols.length === 16 || cols.length === 17) {
+      } else if (cols.length === 17 || cols.length === 18) {
         let source = '';
-        let tag, description, quantity, voltage, loadType, kw, powerFactor, demandFactor, phases, circuit, panelId, breaker, kva, current, demandKva, demandKw;
-        if (cols.length === 16) {
+        let tag, description, quantity, voltage, loadType, duty, kw, powerFactor, demandFactor, phases, circuit, panelId, breaker, kva, current, demandKva, demandKw;
+        if (cols.length === 17) {
           [
             tag,
             description,
             quantity,
             voltage,
             loadType,
+            duty,
             kw,
             powerFactor,
             demandFactor,
@@ -343,6 +358,7 @@ if (typeof window !== 'undefined') {
             quantity,
             voltage,
             loadType,
+            duty,
             kw,
             powerFactor,
             demandFactor,
@@ -365,6 +381,7 @@ if (typeof window !== 'undefined') {
           quantity,
           voltage,
           loadType,
+          duty,
           kw,
           powerFactor,
           demandFactor,
@@ -404,15 +421,15 @@ if (typeof window !== 'undefined') {
   document.getElementById('search').addEventListener('input', e => {
     const term = e.target.value.toLowerCase();
     Array.from(tbody.rows).forEach(row => {
-      const match = Array.from(row.querySelectorAll('input[type="text"],input[type="number"]'))
-        .some(inp => inp.value.toLowerCase().includes(term));
+      const match = Array.from(row.querySelectorAll('input[type="text"],input[type="number"],select'))
+        .some(inp => (inp.value || '').toLowerCase().includes(term));
       row.style.display = match ? '' : 'none';
     });
   });
 
   document.getElementById('export-btn').addEventListener('click', () => {
     const data = dataStore.getLoads().map(l => {
-      const base = { panelId: '', breaker: '', ...l };
+      const base = { panelId: '', breaker: '', duty: '', ...l };
       return { ...base, ...calculateDerived(base) };
     });
     const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' });
@@ -457,6 +474,7 @@ if (typeof window !== 'undefined') {
             quantity: '',
             voltage: '',
             loadType: '',
+            duty: '',
             kw: '',
             powerFactor: '',
             demandFactor: '',
