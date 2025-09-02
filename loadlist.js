@@ -548,15 +548,6 @@ if (typeof window !== 'undefined') {
     tbody.querySelectorAll('.row-select').forEach(cb => { cb.checked = checked; });
   });
 
-  document.getElementById('search').addEventListener('input', e => {
-    const term = e.target.value.toLowerCase();
-    Array.from(tbody.rows).forEach(row => {
-      const match = Array.from(row.querySelectorAll('input[type="text"],input[type="number"],select'))
-        .some(inp => (inp.value || '').toLowerCase().includes(term));
-      row.style.display = match ? '' : 'none';
-    });
-  });
-
   document.getElementById('export-btn').addEventListener('click', () => {
     const data = dataStore.getLoads().map(l => {
       const base = { panelId: '', breaker: '', duty: '', ...l };
