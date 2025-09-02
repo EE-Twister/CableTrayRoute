@@ -5,13 +5,17 @@ export function calculateDerived(load) {
   const voltage = parseFloat(load.voltage);
   const kw = parseFloat(load.kw);
   const pf = parseFloat(load.powerFactor);
+  const lf = parseFloat(load.loadFactor);
+  const eff = parseFloat(load.efficiency);
   const df = parseFloat(load.demandFactor);
   const phases = parseInt(load.phases, 10);
   const totalKw = isNaN(kw) ? 0 : kw * qty;
-  const kVA = pf ? totalKw / pf : totalKw;
+  const lfKw = isNaN(lf) ? totalKw : totalKw * (lf / 100);
+  const effKw = isNaN(eff) || eff === 0 ? lfKw : lfKw / (eff / 100);
+  const kVA = pf ? effKw / pf : effKw;
   const phaseFactor = phases === 1 ? 1 : Math.sqrt(3);
   const current = voltage ? (kVA * 1000) / (phaseFactor * voltage) : 0;
-  const demandKW = totalKw * (isNaN(df) ? 1 : df / 100);
+  const demandKW = effKw * (isNaN(df) ? 1 : df / 100);
   const demandKVA = pf ? demandKW / pf : demandKW;
   return { kva: kVA, current, demandKw: demandKW, demandKva: demandKVA };
 }
@@ -60,6 +64,8 @@ if (typeof window !== 'undefined') {
       duty: tr.querySelector('select[name="duty"]').value.trim(),
       kw: tr.querySelector('input[name="kw"]').value.trim(),
       powerFactor: tr.querySelector('input[name="powerFactor"]').value.trim(),
+      loadFactor: tr.querySelector('input[name="loadFactor"]').value.trim(),
+      efficiency: tr.querySelector('input[name="efficiency"]').value.trim(),
       demandFactor: tr.querySelector('input[name="demandFactor"]').value.trim(),
       phases: tr.querySelector('input[name="phases"]').value.trim(),
       circuit: tr.querySelector('input[name="circuit"]').value.trim()
@@ -143,6 +149,8 @@ if (typeof window !== 'undefined') {
       </select></td>
       <td><input name="kw" type="number" step="any" value="${load.kw || ''}"></td>
       <td><input name="powerFactor" type="number" step="any" value="${load.powerFactor || ''}"></td>
+      <td><input name="loadFactor" type="number" step="any" value="${load.loadFactor || ''}"></td>
+      <td><input name="efficiency" type="number" step="any" value="${load.efficiency || ''}"></td>
       <td><input name="demandFactor" type="number" step="any" value="${load.demandFactor || ''}"></td>
       <td><input name="phases" type="text" value="${load.phases || ''}"></td>
       <td><input name="circuit" type="text" value="${load.circuit || ''}"></td>
@@ -173,6 +181,8 @@ if (typeof window !== 'undefined') {
         duty: '',
         kw: '',
         powerFactor: '',
+        loadFactor: '',
+        efficiency: '',
         demandFactor: '',
         phases: '',
         circuit: ''
@@ -199,7 +209,7 @@ if (typeof window !== 'undefined') {
     tfoot.innerHTML = `<tr>
       <td colspan="8">Totals</td>
       <td>${totals.kW.toFixed(2)}</td>
-      <td colspan="4"></td>
+      <td colspan="6"></td>
       <td>${totals.kVA.toFixed(2)}</td>
       <td></td>
       <td>${totals.demandKVA.toFixed(2)}</td>
@@ -250,6 +260,8 @@ if (typeof window !== 'undefined') {
       'duty',
       'kw',
       'powerFactor',
+      'loadFactor',
+      'efficiency',
       'demandFactor',
       'phases',
       'circuit',
@@ -273,6 +285,8 @@ if (typeof window !== 'undefined') {
         full.duty,
         full.kw,
         full.powerFactor,
+        full.loadFactor,
+        full.efficiency,
         full.demandFactor,
         full.phases,
         full.circuit,
@@ -301,15 +315,15 @@ if (typeof window !== 'undefined') {
         .split(delimiter)
         .map(c => c.replace(/^"|"$/g, '').replace(/""/g, '"').trim());
       let load;
-      if (cols.length === 11 || cols.length === 12) {
+      if (cols.length === 13 || cols.length === 14) {
         let source = '';
-        let tag, description, quantity, voltage, loadType, duty, kw, powerFactor, demandFactor, phases, circuit;
-        if (cols.length === 11) {
-          [tag, description, quantity, voltage, loadType, duty, kw, powerFactor, demandFactor, phases, circuit] = cols;
+        let tag, description, quantity, voltage, loadType, duty, kw, powerFactor, loadFactor, efficiency, demandFactor, phases, circuit;
+        if (cols.length === 13) {
+          [tag, description, quantity, voltage, loadType, duty, kw, powerFactor, loadFactor, efficiency, demandFactor, phases, circuit] = cols;
         } else {
-          [source, tag, description, quantity, voltage, loadType, duty, kw, powerFactor, demandFactor, phases, circuit] = cols;
+          [source, tag, description, quantity, voltage, loadType, duty, kw, powerFactor, loadFactor, efficiency, demandFactor, phases, circuit] = cols;
         }
-        const nums = [quantity, voltage, kw, powerFactor, demandFactor];
+        const nums = [quantity, voltage, kw, powerFactor, loadFactor, efficiency, demandFactor];
         if (nums.some(n => n && isNaN(Number(n)))) throw new Error('Invalid CSV data');
         load = {
           source,
@@ -321,16 +335,18 @@ if (typeof window !== 'undefined') {
           duty,
           kw,
           powerFactor,
+          loadFactor,
+          efficiency,
           demandFactor,
           phases,
           circuit,
           panelId: '',
           breaker: ''
         };
-      } else if (cols.length === 17 || cols.length === 18) {
+      } else if (cols.length === 19 || cols.length === 20) {
         let source = '';
-        let tag, description, quantity, voltage, loadType, duty, kw, powerFactor, demandFactor, phases, circuit, panelId, breaker, kva, current, demandKva, demandKw;
-        if (cols.length === 17) {
+        let tag, description, quantity, voltage, loadType, duty, kw, powerFactor, loadFactor, efficiency, demandFactor, phases, circuit, panelId, breaker, kva, current, demandKva, demandKw;
+        if (cols.length === 19) {
           [
             tag,
             description,
@@ -340,6 +356,8 @@ if (typeof window !== 'undefined') {
             duty,
             kw,
             powerFactor,
+            loadFactor,
+            efficiency,
             demandFactor,
             phases,
             circuit,
@@ -361,6 +379,8 @@ if (typeof window !== 'undefined') {
             duty,
             kw,
             powerFactor,
+            loadFactor,
+            efficiency,
             demandFactor,
             phases,
             circuit,
@@ -372,7 +392,7 @@ if (typeof window !== 'undefined') {
             demandKw
           ] = cols;
         }
-        const nums = [quantity, voltage, kw, powerFactor, demandFactor, kva, current, demandKva, demandKw];
+        const nums = [quantity, voltage, kw, powerFactor, loadFactor, efficiency, demandFactor, kva, current, demandKva, demandKw];
         if (nums.some(n => n && isNaN(Number(n)))) throw new Error('Invalid CSV data');
         load = {
           source,
@@ -384,6 +404,8 @@ if (typeof window !== 'undefined') {
           duty,
           kw,
           powerFactor,
+          loadFactor,
+          efficiency,
           demandFactor,
           phases,
           circuit,
@@ -477,6 +499,8 @@ if (typeof window !== 'undefined') {
             duty: '',
             kw: '',
             powerFactor: '',
+            loadFactor: '',
+            efficiency: '',
             demandFactor: '',
             phases: '',
             circuit: '',
