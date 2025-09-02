@@ -18,6 +18,7 @@ global.localStorage = {
     conduits: [{ conduit_id: 'C1', ductbankTag: 'DB1' }],
     trays: [{ id: 'T1' }],
     cables: [{ name: 'C1' }],
+    panels: [],
     settings: { session: {}, collapsedGroups: {}, units: 'imperial' }
   };
   importProject(initial);
@@ -25,7 +26,7 @@ global.localStorage = {
 
   // simulate self-check snapshot and restore
   const snapshot = exportProject();
-  importProject({ name: '', ductbanks: [], conduits: [], trays: [], cables: [], settings: { session: {}, collapsedGroups: {}, units: 'imperial' } });
+  importProject({ name: '', ductbanks: [], conduits: [], trays: [], cables: [], panels: [], settings: { session: {}, collapsedGroups: {}, units: 'imperial' } });
   // diagnostics would run here, potentially mutating schedules
   importProject(snapshot);
   const after = exportProject();

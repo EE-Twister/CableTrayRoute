@@ -20,11 +20,13 @@ const KEYS = {
   cables: 'cableSchedule',
   ductbanks: 'ductbankSchedule',
   conduits: 'conduitSchedule',
+  panels: 'panelSchedule',
   // Legacy aliases for backward compatibility
   traySchedule: 'traySchedule',
   cableSchedule: 'cableSchedule',
   ductbankSchedule: 'ductbankSchedule',
-  conduitSchedule: 'conduitSchedule'
+  conduitSchedule: 'conduitSchedule',
+  panelSchedule: 'panelSchedule'
 };
 
 const listeners = {};
@@ -113,6 +115,15 @@ export const getConduits = () => read(KEYS.conduits, []);
  */
 export const setConduits = conduits => write(KEYS.conduits, conduits);
 
+/**
+ * @returns {GenericRecord[]}
+ */
+export const getPanels = () => read(KEYS.panels, []);
+/**
+ * @param {GenericRecord[]} panels
+ */
+export const setPanels = panels => write(KEYS.panels, panels);
+
 // generic access for other values so pages never touch localStorage directly
 export const getItem = (key, fallback = null) => read(key, fallback);
 export const setItem = (key, value) => write(key, value);
@@ -141,7 +152,7 @@ export const keys = () => {
 // Simple schema validator replacing Ajv. Checks for required fields,
 // disallows extras, and verifies basic types.
 function validateProjectSchema(obj) {
-  const required = ['ductbanks', 'conduits', 'trays', 'cables', 'settings'];
+  const required = ['ductbanks', 'conduits', 'trays', 'cables', 'panels', 'settings'];
   const missing = [];
   const extra = [];
 
@@ -161,6 +172,7 @@ function validateProjectSchema(obj) {
     Array.isArray(obj.conduits) &&
     Array.isArray(obj.trays) &&
     Array.isArray(obj.cables) &&
+    Array.isArray(obj.panels) &&
     obj.settings && typeof obj.settings === 'object' && !Array.isArray(obj.settings);
 
   const valid = missing.length === 0 && extra.length === 0 && typesValid;
@@ -176,6 +188,7 @@ export function exportProject() {
     conduits: getConduits(),
     trays: getTrays(),
     cables: getCables(),
+    panels: getPanels(),
     settings: {}
   };
   const reserved = new Set([...Object.values(KEYS), 'CTR_PROJECT_V1']);
@@ -209,6 +222,7 @@ export function importProject(obj) {
       conduits: Array.isArray(obj.conduits) ? obj.conduits : [],
       trays: Array.isArray(obj.trays) ? obj.trays : [],
       cables: Array.isArray(obj.cables) ? obj.cables : [],
+      panels: Array.isArray(obj.panels) ? obj.panels : [],
       settings: (obj.settings && typeof obj.settings === 'object') ? obj.settings : {}
     };
   }
@@ -217,6 +231,7 @@ export function importProject(obj) {
   setConduits(data.conduits);
   setTrays(data.trays);
   setCables(data.cables);
+  setPanels(Array.isArray(data.panels) ? data.panels : []);
 
   const reserved = new Set([...Object.values(KEYS), 'CTR_PROJECT_V1']);
   for (const key of keys()) {
@@ -244,6 +259,8 @@ if (typeof window !== 'undefined') {
     setDuctbanks,
     getConduits,
     setConduits,
+    getPanels,
+    setPanels,
     getItem,
     setItem,
     removeItem,

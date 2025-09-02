@@ -3,13 +3,13 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <meta name="description" content="Interactive table for organizing cable data and exporting schedules.">
-  <title>Cable Schedule</title>
+  <meta name="description" content="Interactive table for organizing panel schedules and computing demand loads.">
+  <title>Panel Schedule</title>
   <link rel="icon" href="icons/favicon.svg" type="image/svg+xml">
   <link rel="stylesheet" href="style.css">
   <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js" defer></script>
   <script type="module" src="dataStore.js" defer></script>
-  <script src="dist/cableschedule.js" defer></script>
+  <script src="dist/panelschedule.js" defer></script>
 </head>
 <body>
   <a href="#main-content" class="skip-link">Skip to main content</a>
@@ -17,8 +17,8 @@
     <button id="nav-toggle" class="nav-toggle" aria-label="Toggle navigation" aria-controls="nav-links" aria-expanded="false">☰</button>
     <div id="nav-links" class="nav-links">
       <a href="index.html">Home</a>
-      <a href="cableschedule.html" class="active" aria-current="page">Cable Schedule</a>
-      <a href="panelschedule.html">Panel Schedule</a>
+      <a href="cableschedule.html">Cable Schedule</a>
+      <a href="panelschedule.html" class="active" aria-current="page">Panel Schedule</a>
       <a href="racewayschedule.html">Raceway Schedule</a>
       <a href="ductbankroute.html">Ductbank</a>
       <a href="cabletrayfill.html">Tray Fill</a>
@@ -44,54 +44,41 @@
   <div class="container">
     <main id="main-content" class="main-content">
       <header class="page-header">
-        <h1>Cable Schedule</h1>
-        <p>Centralized table for managing cable data.</p>
+        <h1>Panel Schedule</h1>
+        <p>Editable panel schedule with demand load calculations.</p>
       </header>
-      <details class="method-panel">
-        <summary>Method &amp; Assumptions</summary>
-        <p>Total length is aggregated as L_total = Σ L_segment.</p>
-        <p>Variables:</p>
-        <ul>
-          <li>L_segment – length of individual route segment</li>
-          <li>L_total – sum of all segments</li>
-        </ul>
-        <p>Citations: <a href="docs/templates.html">Template documentation</a></p>
-        <p>Applicability: tabular organization only; no capacity limits.</p>
-      </details>
       <section class="card">
         <div style="margin-bottom:10px;">
           <button id="save-schedule-btn">Save Schedule</button>
           <button id="load-schedule-btn">Load Schedule</button>
-          <button id="load-sample-cables-btn">Load Sample Data</button>
           <button id="clear-filters-btn">Clear Filters</button>
           <button id="export-xlsx-btn">Export XLSX</button>
           <input type="file" id="import-xlsx-input" accept=".xlsx" style="display:none;">
           <button id="import-xlsx-btn">Import XLSX</button>
           <button id="delete-all-btn">Delete All Rows</button>
-          <label for="vd-limit" style="margin-left:10px;">VD Limit (%)</label>
-          <input type="number" id="vd-limit" value="3" step="0.1" style="width:60px;">
         </div>
         <div style="overflow-x:auto;">
-          <table id="cableScheduleTable" class="sticky-table">
+          <table id="panelScheduleTable" class="sticky-table">
             <thead></thead>
             <tbody></tbody>
           </table>
         </div>
         <div style="margin-top:10px;">
-          <button id="add-row-btn" class="primary-btn add-row-btn">Add Cable</button>
+          <button id="add-row-btn" class="primary-btn add-row-btn">Add Circuit</button>
         </div>
+        <div id="panel-totals" style="margin-top:10px;"></div>
       </section>
       <nav class="step-nav">
-        <a href="index.html">Previous</a>
-        <a href="panelschedule.html">Next</a>
+        <a href="cableschedule.html">Previous</a>
+        <a href="racewayschedule.html">Next</a>
       </nav>
     </main>
   </div>
   <div id="help-modal" class="modal" aria-hidden="true" role="dialog" aria-labelledby="help-title">
     <div class="modal-content">
       <button id="close-help-btn" class="close-btn" aria-label="Close Help">&times;</button>
-      <h2 id="help-title">Cable Schedule Help</h2>
-      <p>This table allows managing cable data. Use the import/export buttons to work with Excel files. Select one or more raceway IDs in the "Raceway(s)" column; options are pulled from the Raceway Schedule page.</p>
+      <h2 id="help-title">Panel Schedule Help</h2>
+      <p>This table allows editing panel circuits and automatically applies NEC demand factors based on load type.</p>
     </div>
   </div>
 </body>

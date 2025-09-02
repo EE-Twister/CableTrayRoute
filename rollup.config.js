@@ -3,6 +3,7 @@ const terser = require('@rollup/plugin-terser');
 const entries = {
   index: 'src/index.js',
   cableschedule: 'src/cableschedule.js',
+  panelschedule: 'src/panelSchedule.js',
   racewayschedule: 'src/racewayschedule.js',
   ductbankroute: 'src/ductbankroute.js',
   cabletrayfill: 'src/cabletrayfill.js',
