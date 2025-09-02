@@ -151,6 +151,8 @@ document.addEventListener('DOMContentLoaded', async () => {
         messages: document.getElementById('messages'),
         metrics: document.getElementById('metrics'),
         routeBreakdownContainer: document.getElementById('route-breakdown-container'),
+        pullChecksContainer: document.getElementById('pull-checks-container'),
+        pullChecksDetails: document.getElementById('pull-checks-details'),
         mismatchedRacewaysDetails: document.getElementById('mismatched-raceways-details'),
         mismatchedRacewaysList: document.getElementById('mismatched-raceways-list'),
         plot3d: document.getElementById('plot-3d'),
@@ -2199,9 +2201,30 @@ const openDuctbankRoute = (dbId, conduitId) => {
     };
 
     const downloadTraySample=()=>downloadSampleTemplate(trayTemplateHeaders,'tray_list_template.xlsx');
-    const downloadCableSample=()=>downloadSampleTemplate(cableTemplateHeaders,'cable_options_template.xlsx');
+const downloadCableSample=()=>downloadSampleTemplate(cableTemplateHeaders,'cable_options_template.xlsx');
 
-    const renderBatchResults = (results) => {
+const renderPullChecks = (results) => {
+    if (!elements.pullChecksContainer || !elements.pullChecksDetails) return;
+    if (!results || results.length === 0) {
+        elements.pullChecksContainer.innerHTML = '';
+        elements.pullChecksDetails.style.display = 'none';
+        return;
+    }
+    let html = '<div class="table-scroll"><table class="sticky-table"><thead><tr><th>Cable</th><th>Tension</th><th>Allowable</th><th>Pressure</th><th>Allowable</th></tr></thead><tbody>';
+    results.forEach(r => {
+        const pc = r.pull_check || {};
+        const t = pc.maxTension;
+        const tAllow = pc.allowableTension;
+        const p = pc.maxSidewallPressure;
+        const pAllow = pc.allowableSidewallPressure;
+        html += `<tr><td>${r.cable}</td><td>${t !== undefined ? Number(t).toFixed(2) : 'N/A'}</td><td>${tAllow !== undefined && isFinite(tAllow) ? Number(tAllow).toFixed(2) : 'N/A'}</td><td>${p !== undefined ? Number(p).toFixed(2) : 'N/A'}</td><td>${pAllow !== undefined && isFinite(pAllow) ? Number(pAllow).toFixed(2) : 'N/A'}</td></tr>`;
+    });
+    html += '</tbody></table></div>';
+    elements.pullChecksContainer.innerHTML = html;
+    elements.pullChecksDetails.style.display = '';
+};
+
+const renderBatchResults = (results) => {
         let totalLength = 0;
         let totalField = 0;
         let html = '';
@@ -2331,6 +2354,7 @@ const openDuctbankRoute = (dbId, conduitId) => {
                 renderBatchResults(state.latestRouteData);
             });
         });
+        renderPullChecks(results);
     };
     
     const updateCableListDisplay = () => {
