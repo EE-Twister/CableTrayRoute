@@ -654,6 +654,7 @@ if (typeof window !== 'undefined') {
     e.target.value = '';
   });
 
+  // Initial render for an empty table; rows populate on 'loadList' events
   render();
   });
 }
