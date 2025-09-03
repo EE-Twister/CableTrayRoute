@@ -89,6 +89,9 @@ class TableManager {
     this.selectable = opts.selectable || false;
     this.colOffset = this.selectable ? 1 : 0;
     this.enableContextMenu = opts.enableContextMenu || false;
+    this.handleHeaderDragStart = this.handleHeaderDragStart.bind(this);
+    this.handleHeaderDragOver = this.handleHeaderDragOver.bind(this);
+    this.handleHeaderDrop = this.handleHeaderDrop.bind(this);
     this.buildHeader();
     this.initButtons(opts);
     this.load();
@@ -201,6 +204,8 @@ class TableManager {
     this.columns.forEach((col,idx) => {
       const th = document.createElement('th');
       th.style.position = 'relative';
+      th.draggable = true;
+      th.dataset.index = idx;
       const labelSpan=document.createElement('span');
       labelSpan.textContent=col.label;
       th.appendChild(labelSpan);
@@ -259,6 +264,9 @@ class TableManager {
     };
     res.addEventListener('mousedown',e=>{startX=e.pageX;startWidth=actTh.offsetWidth;document.addEventListener('mousemove',move);document.addEventListener('mouseup',()=>{document.removeEventListener('mousemove',move);},{once:true});});
     headerRow.appendChild(actTh);
+    headerRow.addEventListener('dragstart', this.handleHeaderDragStart);
+    headerRow.addEventListener('dragover', this.handleHeaderDragOver);
+    headerRow.addEventListener('drop', this.handleHeaderDrop);
     this.syncGroupBlankWidth();
   }
 
@@ -318,6 +326,33 @@ class TableManager {
     if (this.columnsKey) {
       try { setItem(this.columnsKey, this.columns); } catch(e) {}
     }
+  }
+
+  handleHeaderDragStart(e) {
+    const th = e.target.closest('th');
+    if (!th || th.dataset.index === undefined) return;
+    e.dataTransfer.setData('text/plain', th.dataset.index);
+  }
+
+  handleHeaderDragOver(e) {
+    if (e.target.closest('th')) e.preventDefault();
+  }
+
+  handleHeaderDrop(e) {
+    const th = e.target.closest('th');
+    if (!th || th.dataset.index === undefined) return;
+    e.preventDefault();
+    const from = parseInt(e.dataTransfer.getData('text/plain'), 10);
+    const to = parseInt(th.dataset.index, 10);
+    if (isNaN(from) || isNaN(to) || from === to) return;
+    const col = this.columns.splice(from, 1)[0];
+    this.columns.splice(to, 0, col);
+    this.persistColumns();
+    const data = this.getData();
+    this.buildHeader();
+    this.tbody.innerHTML = '';
+    data.forEach(row => this.addRow(row));
+    this.save();
   }
 
   addColumn(col) {
