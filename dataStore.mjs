@@ -35,6 +35,13 @@ const KEYS = {
   equipmentList: 'equipment'
 };
 
+const EXTRA_KEYS = {
+  equipmentColumns: 'equipmentColumns',
+  collapsedGroups: 'collapsedGroups'
+};
+
+export const STORAGE_KEYS = { ...KEYS, ...EXTRA_KEYS };
+
 const listeners = {};
 
 function emit(event, detail) {
@@ -276,7 +283,6 @@ export const removeItem = key => {
   }
 };
 
-export { KEYS as STORAGE_KEYS };
 
 export const keys = () => {
   try {
@@ -460,7 +466,7 @@ export function importProject(obj) {
 // expose on window for non-module scripts
 if (typeof window !== 'undefined') {
   window.dataStore = {
-    STORAGE_KEYS: KEYS,
+    STORAGE_KEYS,
     getTrays,
     setTrays,
     getCables,
