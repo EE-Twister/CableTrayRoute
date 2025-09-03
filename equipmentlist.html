@@ -7,6 +7,8 @@
   <title>Equipment List</title>
   <link rel="icon" href="icons/favicon.svg" type="image/svg+xml">
   <link rel="stylesheet" href="style.css">
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js" defer></script>
+  <script type="module" src="tableUtils.js" defer></script>
   <script type="module" src="dataStore.mjs" defer></script>
   <script type="module" src="dist/equipmentlist.js" defer></script>
 </head>
@@ -50,19 +52,15 @@
       </header>
       <section class="card">
         <div style="margin-bottom:10px;">
-          <button id="add-row-btn" class="primary-btn">Add Row</button>
-          <button id="delete-selected-btn">Delete Selected</button>
+          <button id="add-row-btn" class="primary-btn add-row-btn">Add Row</button>
+          <button id="delete-selected-btn">Delete All</button>
+          <button id="export-xlsx-btn">Export XLSX</button>
+          <input type="file" id="import-xlsx-input" accept=".xlsx" style="display:none;">
+          <button id="import-xlsx-btn">Import XLSX</button>
         </div>
         <div style="overflow-x:auto;">
           <table id="equipment-table" class="sticky-table">
-            <thead>
-              <tr>
-                <th><input type="checkbox" id="select-all" aria-label="Select all equipment"></th>
-                <th>ID</th>
-                <th>Description</th>
-                <th>Voltage (V)</th>
-              </tr>
-            </thead>
+            <thead></thead>
             <tbody></tbody>
           </table>
         </div>
