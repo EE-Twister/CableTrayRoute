@@ -1,5 +1,69 @@
 import { getItem, setItem, STORAGE_KEYS } from './dataStore.mjs';
 
+class ContextMenu {
+  constructor(items = []) {
+    this.items = items;
+    this.menu = document.createElement('ul');
+    this.menu.className = 'context-menu';
+    Object.assign(this.menu.style, {
+      position: 'absolute',
+      display: 'none',
+      listStyle: 'none',
+      margin: '0',
+      padding: '4px 0',
+      background: '#fff',
+      border: '1px solid #ccc',
+      zIndex: 1000,
+      color: '#000'
+    });
+    document.body.appendChild(this.menu);
+    document.addEventListener('click', () => this.hide());
+    document.addEventListener('keydown', e => { if (e.key === 'Escape') this.hide(); });
+  }
+
+  setItems(items) {
+    this.items = items;
+    this.menu.innerHTML = '';
+    items.forEach(({ label, action }) => {
+      const li = document.createElement('li');
+      li.textContent = label;
+      Object.assign(li.style, {
+        padding: '4px 12px',
+        cursor: 'pointer',
+        background: '#fff',
+        color: '#000'
+      });
+      li.tabIndex = 0;
+      li.addEventListener('click', () => {
+        const target = this.target;
+        this.hide();
+        action(target);
+      });
+      li.addEventListener('mouseenter', () => {
+        li.style.background = '#eee';
+        li.style.color = '#000';
+      });
+      li.addEventListener('mouseleave', () => {
+        li.style.background = '#fff';
+        li.style.color = '#000';
+      });
+      this.menu.appendChild(li);
+    });
+  }
+
+  show(x, y, target) {
+    this.target = target;
+    this.menu.style.left = `${x}px`;
+    this.menu.style.top = `${y}px`;
+    this.menu.style.display = 'block';
+  }
+
+  hide() {
+    this.menu.style.display = 'none';
+    this.target = null;
+  }
+}
+
 class TableManager {
   constructor(opts) {
     this.table = document.getElementById(opts.tableId);
@@ -11,9 +75,13 @@ class TableManager {
     this.onSave = opts.onSave || null;
     this.onView = opts.onView || null;
     this.rowCountEl = opts.rowCountId ? document.getElementById(opts.rowCountId) : null;
+    this.selectable = opts.selectable || false;
+    this.colOffset = this.selectable ? 1 : 0;
+    this.enableContextMenu = opts.enableContextMenu || false;
     this.buildHeader();
     this.initButtons(opts);
     this.load();
+    if (this.enableContextMenu) this.initContextMenu();
     this.hiddenGroups = new Set();
     this.loadGroupState();
     this.updateRowCount();
@@ -30,6 +98,7 @@ class TableManager {
       document.getElementById(opts.importInputId).addEventListener('change', e => { this.importXlsx(e.target.files[0]); e.target.value=''; if (this.onChange) this.onChange(); });
     }
     if (opts.deleteAllBtnId) document.getElementById(opts.deleteAllBtnId).addEventListener('click', () => { this.deleteAll(); if (this.onChange) this.onChange(); });
+    if (opts.deleteSelectedBtnId) document.getElementById(opts.deleteSelectedBtnId).addEventListener('click', () => { this.deleteSelected(); if (this.onChange) this.onChange(); });
   }
 
   buildHeader() {
@@ -38,6 +107,9 @@ class TableManager {
     let groupRow;
     if (hasGroups) {
       groupRow = this.thead.insertRow();
+      if (this.selectable) {
+        groupRow.appendChild(document.createElement('th'));
+      }
       this.groupRow = groupRow;
     }
     const headerRow = this.thead.insertRow();
@@ -50,6 +122,22 @@ class TableManager {
     this.groupFirstIndex = {};
     this.groupLastIndex = {};
     this.groupOrder = [];
+    const offset = this.colOffset;
+
+    if (this.selectable) {
+      const selTh = document.createElement('th');
+      const selAll = document.createElement('input');
+      selAll.type = 'checkbox';
+      selAll.id = `${this.table.id}-select-all`;
+      selAll.className = 'select-all';
+      selAll.setAttribute('aria-label','Select all rows');
+      selAll.addEventListener('change', () => {
+        this.tbody.querySelectorAll('.row-select').forEach(cb => { cb.checked = selAll.checked; });
+      });
+      selTh.appendChild(selAll);
+      headerRow.appendChild(selTh);
+      this.selectAll = selAll;
+    }
     
     if (hasGroups){
       const groups = [];
@@ -118,7 +206,7 @@ class TableManager {
       const onMove=e=>{
         const newWidth=Math.max(30,startWidth+e.pageX-startX);
         th.style.width=newWidth+'px';
-        Array.from(this.tbody.rows).forEach(r=>{if(r.cells[idx]) r.cells[idx].style.width=newWidth+'px';});
+        Array.from(this.tbody.rows).forEach(r=>{if(r.cells[idx+offset]) r.cells[idx+offset].style.width=newWidth+'px';});
       };
       resizer.addEventListener('mousedown',e=>{
         startX=e.pageX;startWidth=th.offsetWidth;
@@ -154,7 +242,8 @@ class TableManager {
     const move=e=>{
       const newWidth=Math.max(30,startWidth+e.pageX-startX);
       actTh.style.width=newWidth+'px';
-      Array.from(this.tbody.rows).forEach(r=>{if(r.cells[this.columns.length]) r.cells[this.columns.length].style.width=newWidth+'px';});
+      const idx = this.columns.length + offset;
+      Array.from(this.tbody.rows).forEach(r=>{if(r.cells[idx]) r.cells[idx].style.width=newWidth+'px';});
       if(this.groupBlankTh) this.groupBlankTh.style.width=newWidth+'px';
     };
     res.addEventListener('mousedown',e=>{startX=e.pageX;startWidth=actTh.offsetWidth;document.addEventListener('mousemove',move);document.addEventListener('mouseup',()=>{document.removeEventListener('mousemove',move);},{once:true});});
@@ -163,11 +252,12 @@ class TableManager {
   }
 
   setGroupVisibility(name, hide) {
+    const offset = this.colOffset;
     const indices = this.groupCols[name] || [];
     indices.forEach(i => {
-      if (this.headerRow && this.headerRow.cells[i]) this.headerRow.cells[i].classList.toggle('group-hidden', hide);
+      if (this.headerRow && this.headerRow.cells[i + offset]) this.headerRow.cells[i + offset].classList.toggle('group-hidden', hide);
       Array.from(this.tbody.rows).forEach(row => {
-        if (row.cells[i]) row.cells[i].classList.toggle('group-hidden', hide);
+        if (row.cells[i + offset]) row.cells[i + offset].classList.toggle('group-hidden', hide);
       });
     });
     if (this.groupThs[name]) {
@@ -200,8 +290,9 @@ class TableManager {
   }
 
   syncGroupBlankWidth(){
-    if(this.groupBlankTh && this.headerRow && this.headerRow.cells[this.columns.length]){
-      const w=this.headerRow.cells[this.columns.length].offsetWidth;
+    const idx = this.columns.length + this.colOffset;
+    if(this.groupBlankTh && this.headerRow && this.headerRow.cells[idx]){
+      const w=this.headerRow.cells[idx].offsetWidth;
       this.groupBlankTh.style.width=w+'px';
     }
   }
@@ -374,6 +465,16 @@ class TableManager {
 
   addRow(data = {}) {
     const tr = this.tbody.insertRow();
+    if (this.selectable) {
+      const selTd = tr.insertCell();
+      const chk = document.createElement('input');
+      chk.type = 'checkbox';
+      chk.className = 'row-select';
+      chk.addEventListener('change', () => {
+        if (!chk.checked && this.selectAll) this.selectAll.checked = false;
+      });
+      selTd.appendChild(chk);
+    }
     this.columns.forEach((col, idx) => {
       const td = tr.insertCell();
       if (col.group && idx === this.groupFirstIndex[col.group] && this.groupOrder.indexOf(col.group) > 0) {
@@ -447,8 +548,8 @@ class TableManager {
       } else if (el.tagName === 'SELECT' && el.options.length && !col.multiple) {
         el.value = el.options[0].value;
       }
-      if (this.headerRow && this.headerRow.cells[idx] && this.headerRow.cells[idx].style.width) {
-        td.style.width = this.headerRow.cells[idx].style.width;
+      if (this.headerRow && this.headerRow.cells[idx + this.colOffset] && this.headerRow.cells[idx + this.colOffset].style.width) {
+        td.style.width = this.headerRow.cells[idx + this.colOffset].style.width;
       }
       td.appendChild(el);
       let summaryEl, updateSummary;
@@ -491,6 +592,7 @@ class TableManager {
       }
       el.addEventListener('focus',()=>{el.dataset.prevValue=el.value;});
       el.addEventListener('keydown', e => {
+        const cellIdx = idx + this.colOffset;
         if (e.key === 'ArrowLeft' || e.key === 'ArrowRight') {
           let allSelected = true;
           if (e.target.tagName === 'INPUT' || e.target.tagName === 'TEXTAREA') {
@@ -515,8 +617,8 @@ class TableManager {
           let targetRow = tr;
           const dir = e.key === 'ArrowUp' ? 'previousElementSibling' : 'nextElementSibling';
           do{targetRow = targetRow[dir];}while(targetRow && targetRow.style.display==='none');
-          if(targetRow && targetRow.cells[idx]){
-            const next = targetRow.cells[idx].querySelector('input,select,textarea');
+          if(targetRow && targetRow.cells[cellIdx]){
+            const next = targetRow.cells[cellIdx].querySelector('input,select,textarea');
             if(next){next.focus(); if(typeof next.select==='function') next.select();}
           }
         } else if (e.key === 'Enter') {
@@ -526,8 +628,8 @@ class TableManager {
             nextRow = this.addRow();
             if (this.onChange) this.onChange();
           }
-          if (nextRow && nextRow.cells[idx]) {
-            const next = nextRow.cells[idx].querySelector('input,select,textarea');
+          if (nextRow && nextRow.cells[cellIdx]) {
+            const next = nextRow.cells[cellIdx].querySelector('input,select,textarea');
             if (next) {
               next.focus();
               if (typeof next.select === 'function') next.select();
@@ -549,8 +651,9 @@ class TableManager {
       }
     });
     const actTd = tr.insertCell();
-    if (this.headerRow && this.headerRow.cells[this.columns.length] && this.headerRow.cells[this.columns.length].style.width) {
-      actTd.style.width = this.headerRow.cells[this.columns.length].style.width;
+    const actIdx = this.columns.length + this.colOffset;
+    if (this.headerRow && this.headerRow.cells[actIdx] && this.headerRow.cells[actIdx].style.width) {
+      actTd.style.width = this.headerRow.cells[actIdx].style.width;
     }
     if(this.onView){
       const viewBtn=document.createElement('button');
@@ -561,7 +664,7 @@ class TableManager {
       viewBtn.addEventListener('click',()=>{
         const row={};
         this.columns.forEach((col,i)=>{
-          const el=tr.cells[i].firstChild;
+          const el=tr.cells[i + this.colOffset].firstChild;
           if(!el) return;
           if(col.multiple){
             if(typeof el.getSelectedValues==='function') row[col.key]=el.getSelectedValues();
@@ -590,7 +693,7 @@ class TableManager {
     dupBtn.addEventListener('click', () => {
       const row = {};
       this.columns.forEach((col,i) => {
-        const el = tr.cells[i].firstChild;
+        const el = tr.cells[i + this.colOffset].firstChild;
         if (!el) return;
         if (col.multiple) {
           if (typeof el.getSelectedValues === 'function') {
@@ -619,7 +722,7 @@ class TableManager {
     Object.keys(this.groupCols || {}).forEach(g => {
       if (this.hiddenGroups && this.hiddenGroups.has(g)) {
         (this.groupCols[g] || []).forEach(i => {
-          if (tr.cells[i]) tr.cells[i].classList.add('group-hidden');
+          if (tr.cells[i + this.colOffset]) tr.cells[i + this.colOffset].classList.add('group-hidden');
         });
       }
     });
@@ -627,12 +730,32 @@ class TableManager {
     return tr;
   }
 
+  getRowData(tr) {
+    const row = {};
+    const offset = this.colOffset;
+    this.columns.forEach((col,i) => {
+      const el = tr.cells[i + offset] ? tr.cells[i + offset].firstChild : null;
+      if (!el) return;
+      if (col.multiple) {
+        if (typeof el.getSelectedValues === 'function') {
+          row[col.key] = el.getSelectedValues();
+        } else {
+          row[col.key] = Array.from(el.selectedOptions || []).map(o=>o.value);
+        }
+      } else {
+        row[col.key] = el.value;
+      }
+    });
+    return row;
+  }
+
   getData() {
     const rows = [];
+    const offset = this.colOffset;
     Array.from(this.tbody.rows).forEach(tr => {
       const row = {};
       this.columns.forEach((col,i) => {
-        const el = tr.cells[i].firstChild;
+        const el = tr.cells[i + offset].firstChild;
         if (el) {
           const val = el.value;
           if (col.multiple) {
@@ -681,11 +804,12 @@ class TableManager {
   }
 
   applyFilters() {
+    const offset = this.colOffset;
     Array.from(this.tbody.rows).forEach(row => {
       let visible = true;
       this.filters.forEach((val,i) => {
         const v = val.toLowerCase();
-        if (v && !String(row.cells[i].firstChild.value).toLowerCase().includes(v)) visible = false;
+        if (v && !String(row.cells[i + offset].firstChild.value).toLowerCase().includes(v)) visible = false;
       });
       row.style.display = visible ? '' : 'none';
     });
@@ -693,9 +817,56 @@ class TableManager {
 
   deleteAll() {
     this.tbody.innerHTML='';
+    if (this.selectAll) this.selectAll.checked = false;
     this.save();
     this.updateRowCount();
     if (this.onChange) this.onChange();
+  }
+
+  deleteSelected() {
+    Array.from(this.tbody.querySelectorAll('.row-select:checked')).forEach(cb => cb.closest('tr').remove());
+    if (this.selectAll) this.selectAll.checked = false;
+    this.save();
+    this.updateRowCount();
+  }
+
+  initContextMenu() {
+    const menu = new ContextMenu();
+    let clipboard = null;
+    menu.setItems([
+      { label: 'Insert Row Above', action: tr => { if (!tr) return; const newRow = this.addRow(); this.tbody.insertBefore(newRow, tr); if (this.onChange) this.onChange(); } },
+      { label: 'Insert Row Below', action: tr => { if (!tr) return; const newRow = this.addRow(); this.tbody.insertBefore(newRow, tr.nextSibling); if (this.onChange) this.onChange(); } },
+      { label: 'Copy Row', action: tr => { if (!tr) return; clipboard = this.getRowData(tr); } },
+      { label: 'Paste Row', action: tr => { if (!tr || !clipboard) return; const newRow = this.addRow(clipboard); this.tbody.insertBefore(newRow, tr.nextSibling); if (this.onChange) this.onChange(); } },
+      { label: 'Delete Row', action: tr => { if (!tr) return; tr.remove(); this.save(); this.updateRowCount(); if (this.onChange) this.onChange(); } }
+    ]);
+
+    this.table.addEventListener('contextmenu', e => {
+      const row = e.target.closest('tbody tr');
+      if (row) {
+        e.preventDefault();
+        menu.show(e.pageX, e.pageY, row);
+      } else if (e.target.closest(`#${this.table.id}`)) {
+        e.preventDefault();
+      }
+    });
+
+    document.addEventListener('keydown', e => {
+      const tag = document.activeElement.tagName;
+      if (['INPUT', 'TEXTAREA', 'SELECT'].includes(tag)) return;
+      const row = document.activeElement.closest(`#${this.table.id} tbody tr`);
+      if (!row) return;
+      if (e.ctrlKey && e.key.toLowerCase() === 'c') {
+        clipboard = this.getRowData(row);
+        e.preventDefault();
+      } else if (e.ctrlKey && e.key.toLowerCase() === 'v') {
+        if (!clipboard) return;
+        const newRow = this.addRow(clipboard);
+        this.tbody.insertBefore(newRow, row.nextSibling);
+        if (this.onChange) this.onChange();
+        e.preventDefault();
+      }
+    });
   }
 
   exportXlsx() {
@@ -731,9 +902,10 @@ class TableManager {
 
   validateAll() {
     let valid = true;
+    const offset = this.colOffset;
     Array.from(this.tbody.rows).forEach(row => {
       this.columns.forEach((col,i) => {
-        const el = row.cells[i].firstChild;
+        const el = row.cells[i + offset].firstChild;
         if (col.validate && !applyValidation(el, Array.isArray(col.validate) ? col.validate : [col.validate])) valid = false;
       });
     });

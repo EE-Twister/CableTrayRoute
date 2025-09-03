@@ -18,10 +18,12 @@ if (typeof window !== 'undefined') {
       tableId: 'equipment-table',
       storageKey: TableUtils.STORAGE_KEYS.equipment,
       addRowBtnId: 'add-row-btn',
-      deleteAllBtnId: 'delete-selected-btn',
+      deleteSelectedBtnId: 'delete-selected-btn',
       exportBtnId: 'export-xlsx-btn',
       importInputId: 'import-xlsx-input',
       importBtnId: 'import-xlsx-btn',
+      selectable: true,
+      enableContextMenu: true,
       columns,
       onChange: () => table.save()
     });
