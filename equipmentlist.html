@@ -53,6 +53,7 @@
       <section class="card">
         <div style="margin-bottom:10px;">
           <button id="add-row-btn" class="primary-btn add-row-btn">Add Row</button>
+          <button id="add-column-btn">Add Column</button>
           <button id="delete-selected-btn">Delete Selected</button>
           <button id="export-xlsx-btn">Export XLSX</button>
           <input type="file" id="import-xlsx-input" accept=".xlsx" style="display:none;">
@@ -63,6 +64,19 @@
             <thead></thead>
             <tbody></tbody>
           </table>
+        </div>
+        <div id="add-column-modal" class="modal" style="display:none;">
+          <div class="modal-content">
+            <label>Key <input type="text" id="new-col-key"></label>
+            <label>Label <input type="text" id="new-col-label"></label>
+            <label>Type
+              <select id="new-col-type">
+                <option value="text">Text</option>
+                <option value="number">Number</option>
+              </select>
+            </label>
+            <button id="confirm-add-column">Add</button>
+          </div>
         </div>
       </section>
     </main>

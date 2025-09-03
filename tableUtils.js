@@ -69,7 +69,18 @@ class TableManager {
     this.table = document.getElementById(opts.tableId);
     this.thead = this.table.createTHead();
     this.tbody = this.table.tBodies[0] || this.table.createTBody();
+    this.columnsKey = opts.columnsKey || null;
     this.columns = opts.columns || [];
+    if (this.columnsKey) {
+      try {
+        const savedCols = getItem(this.columnsKey, null);
+        if (Array.isArray(savedCols) && savedCols.length) {
+          this.columns = savedCols;
+        } else {
+          setItem(this.columnsKey, this.columns);
+        }
+      } catch(e) {}
+    }
     this.storageKey = opts.storageKey || opts.tableId;
     this.onChange = opts.onChange || null;
     this.onSave = opts.onSave || null;
@@ -301,6 +312,39 @@ class TableManager {
     if (this.rowCountEl) {
       this.rowCountEl.textContent = `Rows: ${this.tbody.querySelectorAll('tr').length}`;
     }
+  }
+
+  persistColumns() {
+    if (this.columnsKey) {
+      try { setItem(this.columnsKey, this.columns); } catch(e) {}
+    }
+  }
+
+  addColumn(col) {
+    const data = this.getData();
+    this.columns.push(col);
+    this.persistColumns();
+    this.buildHeader();
+    this.tbody.innerHTML = '';
+    data.forEach(row => this.addRow(row));
+    this.save();
+    this.updateRowCount();
+    if (this.onChange) this.onChange();
+  }
+
+  removeColumn(key) {
+    const idx = this.columns.findIndex(c => c.key === key);
+    if (idx === -1) return;
+    const data = this.getData();
+    data.forEach(r => { delete r[key]; });
+    this.columns.splice(idx, 1);
+    this.persistColumns();
+    this.buildHeader();
+    this.tbody.innerHTML = '';
+    data.forEach(row => this.addRow(row));
+    this.save();
+    this.updateRowCount();
+    if (this.onChange) this.onChange();
   }
 
   showFilterPopup(btn, index){
