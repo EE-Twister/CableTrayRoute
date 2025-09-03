@@ -10,7 +10,12 @@ if (typeof window !== 'undefined') {
     const columns = [
       { key: 'id', label: 'ID', type: 'text' },
       { key: 'description', label: 'Description', type: 'text' },
-      { key: 'voltage', label: 'Voltage (V)', type: 'text' }
+      { key: 'voltage', label: 'Voltage (V)', type: 'text' },
+      { key: 'category', label: 'Category', type: 'text' },
+      { key: 'subCategory', label: 'Sub-Category', type: 'text' },
+      { key: 'x', label: 'X', type: 'number' },
+      { key: 'y', label: 'Y', type: 'number' },
+      { key: 'z', label: 'Z', type: 'number' }
     ];
 
     let table;

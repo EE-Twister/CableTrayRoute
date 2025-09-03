@@ -142,6 +142,11 @@ function ensureEquipmentFields(eq) {
     id: '',
     description: '',
     voltage: '',
+    category: '',
+    subCategory: '',
+    x: '',
+    y: '',
+    z: '',
     ...eq
   };
 }
