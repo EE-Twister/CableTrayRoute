@@ -26,8 +26,10 @@ Object.entries(componentTypes).forEach(([type, subs]) => {
 
 const svgNS = 'http://www.w3.org/2000/svg';
 let components = [];
+let selection = [];
 let selected = null;
 let dragOffset = null;
+let clipboard = [];
 let connectMode = false;
 let connectSource = null;
 let selectedConnection = null;
@@ -49,6 +51,7 @@ function undo() {
     historyIndex--;
     components = JSON.parse(JSON.stringify(history[historyIndex]));
     selected = null;
+    selection = [];
     selectedConnection = null;
     render();
     save();
@@ -60,6 +63,7 @@ function redo() {
     historyIndex++;
     components = JSON.parse(JSON.stringify(history[historyIndex]));
     selected = null;
+    selection = [];
     selectedConnection = null;
     render();
     save();
@@ -234,6 +238,7 @@ function render() {
       poly.addEventListener('click', e => {
         e.stopPropagation();
         selected = null;
+        selection = [];
         selectedConnection = { component: c, index: idx };
       });
       svg.appendChild(poly);
@@ -268,6 +273,18 @@ function render() {
     text.setAttribute('text-anchor', 'middle');
     text.textContent = c.label || c.subtype || c.type;
     g.appendChild(img);
+    if (selection.includes(c)) {
+      const rect = document.createElementNS(svgNS, 'rect');
+      rect.setAttribute('x', c.x - 2);
+      rect.setAttribute('y', c.y - 2);
+      rect.setAttribute('width', compWidth + 4);
+      rect.setAttribute('height', compHeight + 4);
+      rect.setAttribute('fill', 'none');
+      rect.setAttribute('stroke', '#00f');
+      rect.setAttribute('stroke-dasharray', '4 2');
+      rect.style.pointerEvents = 'none';
+      g.appendChild(rect);
+    }
     g.appendChild(text);
     svg.appendChild(g);
   });
@@ -290,8 +307,48 @@ function addComponent({ type, subtype }) {
   save();
 }
 
+function alignSelection(direction) {
+  if (selection.length < 2) return;
+  if (direction === 'left') {
+    const minX = Math.min(...selection.map(c => c.x));
+    selection.forEach(c => { c.x = minX; });
+  } else if (direction === 'right') {
+    const maxX = Math.max(...selection.map(c => c.x + compWidth));
+    selection.forEach(c => { c.x = maxX - compWidth; });
+  } else if (direction === 'top') {
+    const minY = Math.min(...selection.map(c => c.y));
+    selection.forEach(c => { c.y = minY; });
+  } else if (direction === 'bottom') {
+    const maxY = Math.max(...selection.map(c => c.y + compHeight));
+    selection.forEach(c => { c.y = maxY - compHeight; });
+  }
+  pushHistory();
+  render();
+  save();
+}
+
+function distributeSelection(axis) {
+  if (selection.length < 3) return;
+  const sorted = [...selection].sort(axis === 'h' ? (a, b) => a.x - b.x : (a, b) => a.y - b.y);
+  if (axis === 'h') {
+    const min = sorted[0].x;
+    const max = sorted[sorted.length - 1].x;
+    const step = (max - min) / (sorted.length - 1);
+    sorted.forEach((c, i) => { c.x = min + step * i; });
+  } else {
+    const min = sorted[0].y;
+    const max = sorted[sorted.length - 1].y;
+    const step = (max - min) / (sorted.length - 1);
+    sorted.forEach((c, i) => { c.y = min + step * i; });
+  }
+  pushHistory();
+  render();
+  save();
+}
+
 function selectComponent(comp) {
   selected = comp;
+  selection = [comp];
   selectedConnection = null;
   const modal = document.getElementById('prop-modal');
   modal.innerHTML = '';
@@ -367,6 +424,7 @@ function selectComponent(comp) {
   cancelBtn.addEventListener('click', () => {
     modal.style.display = 'none';
     selected = null;
+    selection = [];
     selectedConnection = null;
   });
   form.appendChild(cancelBtn);
@@ -380,6 +438,7 @@ function selectComponent(comp) {
     });
     modal.style.display = 'none';
     selected = null;
+    selection = [];
     selectedConnection = null;
     pushHistory();
     render();
@@ -399,6 +458,7 @@ function selectComponent(comp) {
     save();
     modal.style.display = 'none';
     selected = null;
+    selection = [];
     selectedConnection = null;
   });
   modal.appendChild(form);
@@ -544,6 +604,12 @@ function init() {
   });
   document.getElementById('undo-btn').addEventListener('click', undo);
   document.getElementById('redo-btn').addEventListener('click', redo);
+  document.getElementById('align-left-btn').addEventListener('click', () => alignSelection('left'));
+  document.getElementById('align-right-btn').addEventListener('click', () => alignSelection('right'));
+  document.getElementById('align-top-btn').addEventListener('click', () => alignSelection('top'));
+  document.getElementById('align-bottom-btn').addEventListener('click', () => alignSelection('bottom'));
+  document.getElementById('distribute-h-btn').addEventListener('click', () => distributeSelection('h'));
+  document.getElementById('distribute-v-btn').addEventListener('click', () => distributeSelection('v'));
   document.getElementById('export-btn').addEventListener('click', exportDiagram);
   document.getElementById('import-btn').addEventListener('click', () => document.getElementById('import-input').click());
   document.getElementById('import-input').addEventListener('change', importDiagram);
@@ -560,26 +626,41 @@ function init() {
   const svg = document.getElementById('diagram');
   svg.addEventListener('mousedown', e => {
     const g = e.target.closest('.component');
-    if (!g) return;
+    if (!g) {
+      dragOffset = null;
+      return;
+    }
     const comp = components.find(c => c.id === g.dataset.id);
     if (!comp) return;
+    if (e.shiftKey || e.ctrlKey || e.metaKey) {
+      if (selection.includes(comp)) {
+        selection = selection.filter(c => c !== comp);
+      } else {
+        selection.push(comp);
+      }
+    } else if (!selection.includes(comp)) {
+      selection = [comp];
+    }
     selected = comp;
-    dragOffset = { x: e.offsetX - comp.x, y: e.offsetY - comp.y };
+    dragOffset = selection.map(c => ({ comp: c, dx: e.offsetX - c.x, dy: e.offsetY - c.y }));
+    render();
   });
   svg.addEventListener('mousemove', e => {
-    if (!dragOffset || !selected) return;
-    let x = e.offsetX - dragOffset.x;
-    let y = e.offsetY - dragOffset.y;
-    if (gridEnabled) {
-      x = Math.round(x / gridSize) * gridSize;
-      y = Math.round(y / gridSize) * gridSize;
-    }
-    selected.x = x;
-    selected.y = y;
+    if (!dragOffset || !dragOffset.length) return;
+    dragOffset.forEach(off => {
+      let x = e.offsetX - off.dx;
+      let y = e.offsetY - off.dy;
+      if (gridEnabled) {
+        x = Math.round(x / gridSize) * gridSize;
+        y = Math.round(y / gridSize) * gridSize;
+      }
+      off.comp.x = x;
+      off.comp.y = y;
+    });
     render();
   });
   svg.addEventListener('mouseup', () => {
-    if (dragOffset) {
+    if (dragOffset && dragOffset.length) {
       dragOffset = null;
       pushHistory();
       render();
@@ -591,14 +672,21 @@ function init() {
   svg.addEventListener('click', async e => {
     const g = e.target.closest('.component');
     if (!g) {
+      selection = [];
       selected = null;
       selectedConnection = null;
+      render();
       return;
     }
     const comp = components.find(c => c.id === g.dataset.id);
     if (!comp) return;
+    if (e.shiftKey || e.ctrlKey || e.metaKey) {
+      return;
+    }
+    selection = [comp];
     selected = comp;
     selectedConnection = null;
+    render();
     if (connectMode) {
       if (!connectSource) {
         connectSource = comp;
@@ -640,12 +728,13 @@ function init() {
       if (selected) selectComponent(selected);
       return;
     }
-    if (selected) {
-      const comp = selected;
-      components = components.filter(c => c !== comp);
+    if (selection.length) {
+      const ids = new Set(selection.map(c => c.id));
+      components = components.filter(c => !ids.has(c.id));
       components.forEach(c => {
-        c.connections = (c.connections || []).filter(conn => conn.target !== comp.id);
+        c.connections = (c.connections || []).filter(conn => !ids.has(conn.target));
       });
+      selection = [];
       selected = null;
       selectedConnection = null;
       pushHistory();
@@ -669,6 +758,37 @@ function init() {
     } else if (mod && (key === 'y' || (key === 'z' && e.shiftKey))) {
       e.preventDefault();
       redo();
+    } else if (mod && key === 'c') {
+      e.preventDefault();
+      clipboard = selection.map(c => JSON.parse(JSON.stringify(c)));
+    } else if (mod && key === 'v') {
+      e.preventDefault();
+      if (clipboard.length) {
+        const base = Date.now();
+        const idMap = {};
+        const newComps = clipboard.map((c, idx) => {
+          const newId = 'n' + (base + idx);
+          idMap[c.id] = newId;
+          return {
+            ...JSON.parse(JSON.stringify(c)),
+            id: newId,
+            x: c.x + gridSize,
+            y: c.y + gridSize,
+            connections: (c.connections || []).map(conn => ({ ...conn }))
+          };
+        });
+        newComps.forEach(c => {
+          c.connections = (c.connections || [])
+            .filter(conn => idMap[conn.target])
+            .map(conn => ({ ...conn, target: idMap[conn.target] }));
+        });
+        components.push(...newComps);
+        selection = newComps;
+        selected = newComps[0] || null;
+        pushHistory();
+        render();
+        save();
+      }
     }
   });
 
@@ -731,6 +851,9 @@ async function importDiagram(e) {
         connections: (c.connections || []).map(conn => typeof conn === 'string' ? { target: conn } : conn)
       }));
       pushHistory();
+      selection = [];
+      selected = null;
+      selectedConnection = null;
       render();
       save();
       const equipment = components
