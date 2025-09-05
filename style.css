@@ -282,6 +282,21 @@ button:focus-visible, .primary-btn:focus-visible {
     outline-offset: 2px;
 }
 
+/* Palette buttons with icons */
+#palette button {
+    display: inline-flex;
+    align-items: center;
+}
+#palette button img {
+    width: 1.2em;
+    height: 1.2em;
+    margin-right: 0.25rem;
+}
+body.compact-mode #palette button img {
+    width: 1em;
+    height: 1em;
+}
+
 /* Icon style buttons */
 .icon-button {
     background: none;
