@@ -8,6 +8,7 @@ document.addEventListener('DOMContentLoaded',()=>{
   initCompactMode();
   initHelpModal('helpBtn','helpOverlay','helpClose');
   initNavToggle();
+  initPanZoom();
 });
 let heatVisible=false;
 let utilHeatmap=false;
@@ -22,6 +23,64 @@ window.thermalLogs=[];
  console.warn=function(...args){window.thermalLogs.push('WARN: '+args.join(' '));warn.apply(console,args);};
  console.error=function(...args){window.thermalLogs.push('ERROR: '+args.join(' '));error.apply(console,args);};
 })();
+
+function initPanZoom(){
+  const wrapper=document.getElementById('gridWrapper');
+  const container=document.getElementById('gridContainer');
+  if(!wrapper||!container)return;
+  let panX=0,panY=0,scale=1;
+  try{
+    const stored=getItem('ductbankPanZoom');
+    if(stored){
+      const s=JSON.parse(stored);
+      panX=s.x||0;
+      panY=s.y||0;
+      scale=s.scale||1;
+    }
+  }catch(e){}
+  apply();
+  function apply(){
+    container.style.transform=`translate(${panX}px,${panY}px) scale(${scale})`;
+    try{setItem('ductbankPanZoom',JSON.stringify({x:panX,y:panY,scale}));}catch(e){}
+  }
+  function zoomAt(cx,cy,f){
+    const ns=Math.min(Math.max(scale*f,0.5),5);
+    panX-=(cx-panX)*(ns/scale-1);
+    panY-=(cy-panY)*(ns/scale-1);
+    scale=ns;
+    apply();
+  }
+  wrapper.addEventListener('wheel',e=>{
+    e.preventDefault();
+    const r=wrapper.getBoundingClientRect();
+    zoomAt(e.clientX-r.left,e.clientY-r.top,e.deltaY<0?1.1:0.9);
+  },{passive:false});
+  let panning=false,startX=0,startY=0;
+  wrapper.addEventListener('mousedown',e=>{
+    if(e.button!==0)return;
+    panning=true;
+    startX=e.clientX-panX;
+    startY=e.clientY-panY;
+  });
+  wrapper.addEventListener('mousemove',e=>{
+    if(!panning)return;
+    panX=e.clientX-startX;
+    panY=e.clientY-startY;
+    apply();
+  });
+  wrapper.addEventListener('mouseup',()=>{panning=false;});
+  wrapper.addEventListener('mouseleave',()=>{panning=false;});
+  const fitBtn=document.getElementById('fitViewBtn');
+  const inBtn=document.getElementById('zoomInBtn');
+  const outBtn=document.getElementById('zoomOutBtn');
+  const centerZoom=f=>{
+    const r=wrapper.getBoundingClientRect();
+    zoomAt(r.width/2,r.height/2,f);
+  };
+  if(inBtn)inBtn.addEventListener('click',()=>centerZoom(1.2));
+  if(outBtn)outBtn.addEventListener('click',()=>centerZoom(0.8));
+  if(fitBtn)fitBtn.addEventListener('click',()=>{panX=0;panY=0;scale=1;apply();});
+}
 let GRID_SIZE = 20; // number of grid nodes across the ductbank for thermal solver
 const SAMPLE_CONDUITS=[
  {conduit_id:"C1",conduit_type:"PVC Sch 40",trade_size:"4",x:0,y:0},
