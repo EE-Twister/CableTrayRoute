@@ -35,6 +35,8 @@ const gridSize = 20;
 let gridEnabled = true;
 let history = [];
 let historyIndex = -1;
+const compWidth = 80;
+const compHeight = 40;
 
 function pushHistory() {
   history = history.slice(0, historyIndex + 1);
@@ -72,34 +74,183 @@ const cableColors = {
 
 function render() {
   const svg = document.getElementById('diagram');
-  svg.querySelectorAll('g.component, line.connection').forEach(el => el.remove());
+  svg.querySelectorAll('g.component, .connection, .conn-label').forEach(el => el.remove());
   if (gridEnabled) {
     components.forEach(c => {
       c.x = Math.round(c.x / gridSize) * gridSize;
       c.y = Math.round(c.y / gridSize) * gridSize;
     });
   }
+
+  const startFor = c => ({ x: c.x + compWidth / 2, y: c.y + compHeight / 2 });
+
+  function routeConnection(src, tgt) {
+    const start = startFor(src);
+    const end = startFor(tgt);
+
+    function horizontalFirst() {
+      let midX = (start.x + end.x) / 2;
+      let adjusted = true;
+      while (adjusted) {
+        adjusted = false;
+        components.forEach(comp => {
+          if (comp === src || comp === tgt) return;
+          const rect = { x: comp.x, y: comp.y, w: compWidth, h: compHeight };
+          if (
+            rect.x <= midX && midX <= rect.x + rect.w &&
+            Math.min(start.y, end.y) <= rect.y + rect.h &&
+            Math.max(start.y, end.y) >= rect.y
+          ) {
+            midX = midX < rect.x + rect.w / 2 ? rect.x - 10 : rect.x + rect.w + 10;
+            adjusted = true;
+          }
+          if (
+            start.y >= rect.y && start.y <= rect.y + rect.h &&
+            Math.min(start.x, midX) <= rect.x + rect.w &&
+            Math.max(start.x, midX) >= rect.x
+          ) {
+            midX = midX < rect.x ? rect.x - 10 : rect.x + rect.w + 10;
+            adjusted = true;
+          }
+          if (
+            end.y >= rect.y && end.y <= rect.y + rect.h &&
+            Math.min(end.x, midX) <= rect.x + rect.w &&
+            Math.max(end.x, midX) >= rect.x
+          ) {
+            midX = midX < rect.x ? rect.x - 10 : rect.x + rect.w + 10;
+            adjusted = true;
+          }
+        });
+      }
+      return [start, { x: midX, y: start.y }, { x: midX, y: end.y }, end];
+    }
+
+    function verticalFirst() {
+      let midY = (start.y + end.y) / 2;
+      let adjusted = true;
+      while (adjusted) {
+        adjusted = false;
+        components.forEach(comp => {
+          if (comp === src || comp === tgt) return;
+          const rect = { x: comp.x, y: comp.y, w: compWidth, h: compHeight };
+          if (
+            rect.y <= midY && midY <= rect.y + rect.h &&
+            Math.min(start.x, end.x) <= rect.x + rect.w &&
+            Math.max(start.x, end.x) >= rect.x
+          ) {
+            midY = midY < rect.y + rect.h / 2 ? rect.y - 10 : rect.y + rect.h + 10;
+            adjusted = true;
+          }
+          if (
+            start.x >= rect.x && start.x <= rect.x + rect.w &&
+            Math.min(start.y, midY) <= rect.y + rect.h &&
+            Math.max(start.y, midY) >= rect.y
+          ) {
+            midY = midY < rect.y ? rect.y - 10 : rect.y + rect.h + 10;
+            adjusted = true;
+          }
+          if (
+            end.x >= rect.x && end.x <= rect.x + rect.w &&
+            Math.min(end.y, midY) <= rect.y + rect.h &&
+            Math.max(end.y, midY) >= rect.y
+          ) {
+            midY = midY < rect.y ? rect.y - 10 : rect.y + rect.h + 10;
+            adjusted = true;
+          }
+        });
+      }
+      return [start, { x: start.x, y: midY }, { x: end.x, y: midY }, end];
+    }
+
+    function intersects(path) {
+      for (let i = 0; i < path.length - 1; i++) {
+        const p1 = path[i];
+        const p2 = path[i + 1];
+        const horizontal = p1.y === p2.y;
+        const x1 = Math.min(p1.x, p2.x);
+        const x2 = Math.max(p1.x, p2.x);
+        const y1 = Math.min(p1.y, p2.y);
+        const y2 = Math.max(p1.y, p2.y);
+        for (const comp of components) {
+          if (comp === src || comp === tgt) continue;
+          const rect = { x: comp.x, y: comp.y, w: compWidth, h: compHeight };
+          if (horizontal) {
+            if (
+              p1.y >= rect.y && p1.y <= rect.y + rect.h &&
+              x2 >= rect.x && x1 <= rect.x + rect.w
+            ) return true;
+          } else {
+            if (
+              p1.x >= rect.x && p1.x <= rect.x + rect.w &&
+              y2 >= rect.y && y1 <= rect.y + rect.h
+            ) return true;
+          }
+        }
+      }
+      return false;
+    }
+
+    const h = horizontalFirst();
+    if (!intersects(h)) return h;
+    const v = verticalFirst();
+    if (!intersects(v)) return v;
+    return h.length <= v.length ? h : v;
+  }
+
+  function midpoint(points) {
+    const segs = [];
+    let len = 0;
+    for (let i = 0; i < points.length - 1; i++) {
+      const p1 = points[i];
+      const p2 = points[i + 1];
+      const l = Math.hypot(p2.x - p1.x, p2.y - p1.y);
+      segs.push({ p1, p2, l });
+      len += l;
+    }
+    let half = len / 2;
+    for (const s of segs) {
+      if (half <= s.l) {
+        const ratio = half / s.l;
+        return { x: s.p1.x + (s.p2.x - s.p1.x) * ratio, y: s.p1.y + (s.p2.y - s.p1.y) * ratio };
+      }
+      half -= s.l;
+    }
+    return points[0];
+  }
+
   // draw connections
   components.forEach(c => {
     (c.connections || []).forEach((conn, idx) => {
       const target = components.find(t => t.id === conn.target);
       if (!target) return;
-      const line = document.createElementNS(svgNS, 'line');
-      line.setAttribute('x1', c.x + 40);
-      line.setAttribute('y1', c.y + 20);
-      line.setAttribute('x2', target.x + 40);
-      line.setAttribute('y2', target.y + 20);
+      const pts = routeConnection(c, target);
+      const poly = document.createElementNS(svgNS, 'polyline');
+      poly.setAttribute('points', pts.map(p => `${p.x},${p.y}`).join(' '));
       const stroke = cableColors[conn.cable?.cable_type] || conn.cable?.color || '#000';
-      line.setAttribute('stroke', stroke);
-      line.classList.add('connection');
-      line.addEventListener('click', e => {
+      poly.setAttribute('stroke', stroke);
+      poly.setAttribute('fill', 'none');
+      poly.setAttribute('marker-end', 'url(#arrow)');
+      poly.classList.add('connection');
+      poly.addEventListener('click', e => {
         e.stopPropagation();
         selected = null;
         selectedConnection = { component: c, index: idx };
       });
-      svg.appendChild(line);
+      svg.appendChild(poly);
+
+      const label = document.createElementNS(svgNS, 'text');
+      const mid = midpoint(pts);
+      label.setAttribute('x', mid.x);
+      label.setAttribute('y', mid.y);
+      label.setAttribute('text-anchor', 'middle');
+      label.setAttribute('dominant-baseline', 'middle');
+      label.textContent = conn.cable?.tag || conn.cable?.cable_type || '';
+      label.classList.add('conn-label');
+      label.style.pointerEvents = 'none';
+      svg.appendChild(label);
     });
   });
+
   // draw nodes
   components.forEach(c => {
     const g = document.createElementNS(svgNS, 'g');
@@ -108,12 +259,12 @@ function render() {
     const img = document.createElementNS(svgNS, 'image');
     img.setAttribute('x', c.x);
     img.setAttribute('y', c.y);
-    img.setAttribute('width', 80);
-    img.setAttribute('height', 40);
+    img.setAttribute('width', compWidth);
+    img.setAttribute('height', compHeight);
     img.setAttribute('href', `icons/${c.subtype || c.type}.svg`);
     const text = document.createElementNS(svgNS, 'text');
-    text.setAttribute('x', c.x + 40);
-    text.setAttribute('y', c.y + 55);
+    text.setAttribute('x', c.x + compWidth / 2);
+    text.setAttribute('y', c.y + compHeight + 15);
     text.setAttribute('text-anchor', 'middle');
     text.textContent = c.label || c.subtype || c.type;
     g.appendChild(img);
