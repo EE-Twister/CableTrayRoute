@@ -192,7 +192,7 @@ export const removeEquipment = index => {
  * @property {number} y Y coordinate
  * @property {string} [label] Display label
  * @property {string} [ref] Linked schedule id
- * @property {string[]} [connections] Target component ids
+ * @property {{target:string, cable?:Cable}[]} [connections] Connections to other components with optional cable spec
  */
 
 /**
