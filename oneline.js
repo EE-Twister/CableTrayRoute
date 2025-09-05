@@ -6,6 +6,17 @@ const componentTypes = {
   load: ['Load']
 };
 
+const propSchemas = {
+  Transformer: [
+    { name: 'voltage', label: 'Voltage', type: 'number' },
+    { name: 'rating', label: 'Rating', type: 'number' }
+  ],
+  Switchgear: [{ name: 'voltage', label: 'Voltage', type: 'number' }],
+  Load: [{ name: 'voltage', label: 'Voltage', type: 'number' }],
+  MLO: [{ name: 'voltage', label: 'Voltage', type: 'number' }],
+  MCC: [{ name: 'voltage', label: 'Voltage', type: 'number' }]
+};
+
 const subtypeCategory = {};
 Object.entries(componentTypes).forEach(([type, subs]) => {
   subs.forEach(sub => {
@@ -86,10 +97,51 @@ function addComponent({ type, subtype }) {
 
 function selectComponent(comp) {
   selected = comp;
-  const form = document.getElementById('prop-form');
-  form.style.display = 'block';
-  document.getElementById('prop-label').value = comp.label || '';
-  document.getElementById('prop-ref').value = comp.ref || '';
+  const modal = document.getElementById('prop-modal');
+  modal.innerHTML = '';
+  const form = document.createElement('form');
+  form.id = 'prop-form';
+  const schema = propSchemas[comp.subtype] || [];
+  const baseFields = [
+    { name: 'label', label: 'Label', type: 'text' },
+    { name: 'ref', label: 'Ref ID', type: 'text' }
+  ];
+  [...baseFields, ...schema].forEach(f => {
+    const lbl = document.createElement('label');
+    lbl.textContent = f.label + ' ';
+    const input = document.createElement('input');
+    input.type = f.type || 'text';
+    input.name = f.name;
+    input.value = comp[f.name] || '';
+    lbl.appendChild(input);
+    form.appendChild(lbl);
+  });
+  const saveBtn = document.createElement('button');
+  saveBtn.type = 'submit';
+  saveBtn.textContent = 'Save';
+  form.appendChild(saveBtn);
+  const cancelBtn = document.createElement('button');
+  cancelBtn.type = 'button';
+  cancelBtn.textContent = 'Cancel';
+  cancelBtn.addEventListener('click', () => {
+    modal.style.display = 'none';
+  });
+  form.appendChild(cancelBtn);
+  form.addEventListener('submit', e => {
+    e.preventDefault();
+    const fd = new FormData(form);
+    comp.label = fd.get('label') || '';
+    comp.ref = fd.get('ref') || '';
+    schema.forEach(f => {
+      comp[f.name] = fd.get(f.name) || '';
+    });
+    render();
+    save();
+    modal.style.display = 'none';
+    selected = null;
+  });
+  modal.appendChild(form);
+  modal.style.display = 'block';
 }
 
 function init() {
@@ -165,19 +217,15 @@ function init() {
         save();
         render();
       }
-      return;
     }
-    selectComponent(comp);
   });
 
-  document.getElementById('prop-form').addEventListener('submit', e => {
-    e.preventDefault();
-    if (!selected) return;
-    selected.label = document.getElementById('prop-label').value;
-    selected.ref = document.getElementById('prop-ref').value;
-    render();
-    save();
-    document.getElementById('prop-form').style.display = 'none';
+  svg.addEventListener('dblclick', e => {
+    const g = e.target.closest('.component');
+    if (!g) return;
+    const comp = components.find(c => c.id === g.dataset.id);
+    if (!comp) return;
+    selectComponent(comp);
   });
 
   initSettings();
