@@ -290,8 +290,9 @@ function render() {
   });
 }
 
-function save() {
+function save(notify = true) {
   setOneLine(components);
+  syncSchedules(notify);
 }
 
 function addComponent({ type, subtype }) {
@@ -586,6 +587,7 @@ function init() {
   }));
   pushHistory();
   render();
+  syncSchedules(false);
 
   const palette = document.getElementById('component-buttons');
   Object.entries(componentTypes).forEach(([type, subs]) => {
@@ -802,8 +804,15 @@ function getCategory(c) {
   return c.type || subtypeCategory[c.subtype];
 }
 
-function exportDiagram() {
-  save();
+function showToast(msg) {
+  const t = document.getElementById('toast');
+  if (!t) return;
+  t.textContent = msg;
+  t.classList.add('show');
+  setTimeout(() => t.classList.remove('show'), 3000);
+}
+
+function syncSchedules(notify = true) {
   const equipment = components
     .filter(c => getCategory(c) === 'equipment')
     .map(c => ({ id: c.ref || c.id, description: c.label }));
@@ -831,6 +840,11 @@ function exportDiagram() {
     });
   });
   setCables(cables);
+  if (notify) showToast('Schedules synced');
+}
+
+function exportDiagram() {
+  save(false);
   const blob = new Blob([JSON.stringify(components, null, 2)], { type: 'application/json' });
   const a = document.createElement('a');
   a.href = URL.createObjectURL(blob);
@@ -856,18 +870,6 @@ async function importDiagram(e) {
       selectedConnection = null;
       render();
       save();
-      const equipment = components
-        .filter(c => getCategory(c) === 'equipment')
-        .map(c => ({ id: c.ref || c.id, description: c.label }));
-      const panels = components
-        .filter(c => getCategory(c) === 'panel')
-        .map(c => ({ id: c.ref || c.id, description: c.label }));
-      const loads = components
-        .filter(c => getCategory(c) === 'load')
-        .map(c => ({ id: c.ref || c.id, description: c.label }));
-      setEquipment(equipment);
-      setPanels(panels);
-      setLoads(loads);
     }
   } catch (err) {
     console.error('Failed to import diagram', err);
