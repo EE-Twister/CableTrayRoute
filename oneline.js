@@ -30,6 +30,7 @@ let selected = null;
 let dragOffset = null;
 let connectMode = false;
 let connectSource = null;
+let selectedConnection = null;
 const gridSize = 20;
 let gridEnabled = true;
 
@@ -50,7 +51,7 @@ function render() {
   }
   // draw connections
   components.forEach(c => {
-    (c.connections || []).forEach(conn => {
+    (c.connections || []).forEach((conn, idx) => {
       const target = components.find(t => t.id === conn.target);
       if (!target) return;
       const line = document.createElementNS(svgNS, 'line');
@@ -61,6 +62,11 @@ function render() {
       const stroke = cableColors[conn.cable?.cable_type] || conn.cable?.color || '#000';
       line.setAttribute('stroke', stroke);
       line.classList.add('connection');
+      line.addEventListener('click', e => {
+        e.stopPropagation();
+        selected = null;
+        selectedConnection = { component: c, index: idx };
+      });
       svg.appendChild(line);
     });
   });
@@ -104,6 +110,7 @@ function addComponent({ type, subtype }) {
 
 function selectComponent(comp) {
   selected = comp;
+  selectedConnection = null;
   const modal = document.getElementById('prop-modal');
   modal.innerHTML = '';
   const form = document.createElement('form');
@@ -123,6 +130,32 @@ function selectComponent(comp) {
     lbl.appendChild(input);
     form.appendChild(lbl);
   });
+  if ((comp.connections || []).length) {
+    const header = document.createElement('h3');
+    header.textContent = 'Connections';
+    form.appendChild(header);
+    const list = document.createElement('ul');
+    (comp.connections || []).forEach((conn, idx) => {
+      const li = document.createElement('li');
+      const target = components.find(t => t.id === conn.target);
+      li.textContent = `to ${target?.label || target?.subtype || conn.target}`;
+      const del = document.createElement('button');
+      del.type = 'button';
+      del.textContent = 'Delete';
+      del.addEventListener('click', () => {
+        comp.connections.splice(idx, 1);
+        save();
+        render();
+        selectComponent(comp);
+      });
+      li.appendChild(del);
+      li.addEventListener('click', () => {
+        selectedConnection = { component: comp, index: idx };
+      });
+      list.appendChild(li);
+    });
+    form.appendChild(list);
+  }
   const saveBtn = document.createElement('button');
   saveBtn.type = 'submit';
   saveBtn.textContent = 'Save';
@@ -132,8 +165,25 @@ function selectComponent(comp) {
   cancelBtn.textContent = 'Cancel';
   cancelBtn.addEventListener('click', () => {
     modal.style.display = 'none';
+    selected = null;
+    selectedConnection = null;
   });
   form.appendChild(cancelBtn);
+  const deleteBtn = document.createElement('button');
+  deleteBtn.type = 'button';
+  deleteBtn.textContent = 'Delete Component';
+  deleteBtn.addEventListener('click', () => {
+    components = components.filter(c => c !== comp);
+    components.forEach(c => {
+      c.connections = (c.connections || []).filter(conn => conn.target !== comp.id);
+    });
+    modal.style.display = 'none';
+    selected = null;
+    selectedConnection = null;
+    save();
+    render();
+  });
+  form.appendChild(deleteBtn);
   form.addEventListener('submit', e => {
     e.preventDefault();
     const fd = new FormData(form);
@@ -146,6 +196,7 @@ function selectComponent(comp) {
     save();
     modal.style.display = 'none';
     selected = null;
+    selectedConnection = null;
   });
   modal.appendChild(form);
   modal.style.display = 'block';
@@ -222,14 +273,19 @@ function init() {
   });
   svg.addEventListener('mouseup', () => {
     dragOffset = null;
-    selected = null;
     save();
   });
   svg.addEventListener('click', e => {
     const g = e.target.closest('.component');
-    if (!g) return;
+    if (!g) {
+      selected = null;
+      selectedConnection = null;
+      return;
+    }
     const comp = components.find(c => c.id === g.dataset.id);
     if (!comp) return;
+    selected = comp;
+    selectedConnection = null;
     if (connectMode) {
       if (!connectSource) {
         connectSource = comp;
@@ -252,6 +308,32 @@ function init() {
     const comp = components.find(c => c.id === g.dataset.id);
     if (!comp) return;
     selectComponent(comp);
+  });
+
+  document.addEventListener('keydown', e => {
+    if (e.key !== 'Delete') return;
+    if (selectedConnection) {
+      const { component, index } = selectedConnection;
+      component.connections.splice(index, 1);
+      selectedConnection = null;
+      save();
+      render();
+      if (selected) selectComponent(selected);
+      return;
+    }
+    if (selected) {
+      const comp = selected;
+      components = components.filter(c => c !== comp);
+      components.forEach(c => {
+        c.connections = (c.connections || []).filter(conn => conn.target !== comp.id);
+      });
+      selected = null;
+      selectedConnection = null;
+      save();
+      render();
+      const modal = document.getElementById('prop-modal');
+      if (modal) modal.style.display = 'none';
+    }
   });
 
   initSettings();
