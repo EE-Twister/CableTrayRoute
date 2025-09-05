@@ -3,14 +3,12 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <meta name="description" content="Table for managing equipment items.">
-  <title>Equipment List</title>
+  <meta name="description" content="Simple one-line diagram editor.">
+  <title>One-Line Diagram</title>
   <link rel="icon" href="icons/favicon.svg" type="image/svg+xml">
   <link rel="stylesheet" href="style.css">
-  <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js" defer></script>
-  <script type="module" src="tableUtils.js" defer></script>
   <script type="module" src="dataStore.mjs" defer></script>
-  <script type="module" src="dist/equipmentlist.js" defer></script>
+  <script type="module" src="oneline.js" defer></script>
 </head>
 <body>
   <a href="#main-content" class="skip-link">Skip to main content</a>
@@ -18,7 +16,7 @@
     <button id="nav-toggle" class="nav-toggle" aria-label="Toggle navigation" aria-controls="nav-links" aria-expanded="false">☰</button>
     <div id="nav-links" class="nav-links">
       <a href="index.html">Home</a>
-      <a href="equipmentlist.html" class="active" aria-current="page">Equipment List</a>
+      <a href="equipmentlist.html">Equipment List</a>
       <a href="loadlist.html">Load List</a>
       <a href="cableschedule.html">Cable Schedule</a>
       <a href="panelschedule.html">Panel Schedule</a>
@@ -27,8 +25,8 @@
       <a href="cabletrayfill.html">Tray Fill</a>
       <a href="conduitfill.html">Conduit Fill</a>
       <a href="optimalRoute.html">Optimal Route</a>
-            <a href="oneline.html">One-Line</a>
-<button id="settings-btn" class="settings-btn" aria-label="Settings" aria-expanded="false">⚙</button>
+      <a href="oneline.html" class="active" aria-current="page">One-Line</a>
+      <button id="settings-btn" class="settings-btn" aria-label="Settings" aria-expanded="false">⚙</button>
     </div>
   </nav>
   <div id="settings-menu" class="settings-menu">
@@ -48,36 +46,26 @@
   <div class="container">
     <main id="main-content" class="main-content">
       <header class="page-header">
-        <h1>Equipment List</h1>
-        <p>Manage equipment items with basic details.</p>
+        <h1>One-Line Diagram</h1>
+        <p>Create and link components to schedules.</p>
       </header>
       <section class="card">
-        <div style="margin-bottom:10px;">
-          <button id="add-row-btn" class="primary-btn add-row-btn">Add Row</button>
-          <button id="add-column-btn">Add Column</button>
-          <button id="delete-selected-btn">Delete Selected</button>
-          <button id="export-xlsx-btn">Export XLSX</button>
-          <input type="file" id="import-xlsx-input" accept=".xlsx" style="display:none;">
-          <button id="import-xlsx-btn">Import XLSX</button>
+        <div id="palette" class="palette" style="margin-bottom:10px;">
+          <button data-type="equipment">Equipment</button>
+          <button data-type="panel">Panel</button>
+          <button data-type="load">Load</button>
+          <button id="connect-btn">Connect</button>
+          <button id="export-btn">Export</button>
+          <input type="file" id="import-input" accept=".json" style="display:none;">
+          <button id="import-btn">Import</button>
         </div>
-        <div style="overflow-x:auto;">
-          <table id="equipment-table" class="sticky-table">
-            <thead></thead>
-            <tbody></tbody>
-          </table>
-        </div>
-        <div id="add-column-modal" class="modal" style="display:none;">
-          <div class="modal-content">
-            <label>Key <input type="text" id="new-col-key"></label>
-            <label>Label <input type="text" id="new-col-label"></label>
-            <label>Type
-              <select id="new-col-type">
-                <option value="text">Text</option>
-                <option value="number">Number</option>
-              </select>
-            </label>
-            <button id="confirm-add-column">Add</button>
-          </div>
+        <div class="oneline-editor" style="position:relative;">
+          <svg id="diagram" width="800" height="600" style="border:1px solid #ccc;"></svg>
+          <form id="prop-form" class="prop-form" style="position:absolute;top:10px;right:10px;background:#fff;padding:5px;border:1px solid #ccc;display:none;">
+            <label>Label <input id="prop-label" type="text"></label>
+            <label>Ref ID <input id="prop-ref" type="text"></label>
+            <button type="submit">Save</button>
+          </form>
         </div>
       </section>
     </main>

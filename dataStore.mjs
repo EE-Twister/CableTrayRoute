@@ -25,6 +25,7 @@ const KEYS = {
   panels: 'panelSchedule',
   loads: 'loadList',
   equipment: 'equipment',
+  oneLine: 'oneLineDiagram',
   // Legacy aliases for backward compatibility
   traySchedule: 'traySchedule',
   cableSchedule: 'cableSchedule',
@@ -32,7 +33,8 @@ const KEYS = {
   conduitSchedule: 'conduitSchedule',
   panelSchedule: 'panelSchedule',
   loadList: 'loadList',
-  equipmentList: 'equipment'
+  equipmentList: 'equipment',
+  oneLineDiagram: 'oneLineDiagram'
 };
 
 const EXTRA_KEYS = {
@@ -183,6 +185,26 @@ export const removeEquipment = index => {
 };
 
 /**
+ * @typedef {Object} OneLineComponent
+ * @property {string} id Unique identifier
+ * @property {string} type Component type (equipment, panel, load)
+ * @property {number} x X coordinate
+ * @property {number} y Y coordinate
+ * @property {string} [label] Display label
+ * @property {string} [ref] Linked schedule id
+ * @property {string[]} [connections] Target component ids
+ */
+
+/**
+ * @returns {OneLineComponent[]}
+ */
+export const getOneLine = () => read(KEYS.oneLine, []);
+/**
+ * @param {OneLineComponent[]} comps
+ */
+export const setOneLine = comps => write(KEYS.oneLine, comps);
+
+/**
  * @returns {GenericRecord[]}
  */
 export const getLoads = () => {
@@ -297,6 +319,7 @@ export const keys = () => {
 // disallows extras, and verifies basic types.
 function validateProjectSchema(obj) {
   const required = ['ductbanks', 'conduits', 'trays', 'cables', 'panels', 'equipment', 'loads', 'settings'];
+  const optional = ['oneLine'];
   const missing = [];
   const extra = [];
 
@@ -309,7 +332,7 @@ function validateProjectSchema(obj) {
     if (!(key in obj)) missing.push(key);
   }
   for (const key of Object.keys(obj)) {
-    if (!required.includes(key)) extra.push(key);
+    if (!required.includes(key) && !optional.includes(key)) extra.push(key);
   }
 
   const typesValid = Array.isArray(obj.ductbanks) &&
@@ -319,7 +342,8 @@ function validateProjectSchema(obj) {
     Array.isArray(obj.panels) &&
     Array.isArray(obj.equipment) &&
     Array.isArray(obj.loads) &&
-    obj.settings && typeof obj.settings === 'object' && !Array.isArray(obj.settings);
+    obj.settings && typeof obj.settings === 'object' && !Array.isArray(obj.settings) &&
+    (obj.oneLine === undefined || Array.isArray(obj.oneLine));
 
   const valid = missing.length === 0 && extra.length === 0 && typesValid;
   return { valid, missing, extra };
@@ -337,6 +361,7 @@ export function exportProject() {
     panels: getPanels(),
     equipment: getEquipment(),
     loads: getLoads(),
+    oneLine: getOneLine(),
     settings: {}
   };
   const reserved = new Set([...Object.values(KEYS), 'CTR_PROJECT_V1']);
@@ -437,6 +462,7 @@ export function importProject(obj) {
       panels: Array.isArray(obj.panels) ? obj.panels : [],
       equipment: Array.isArray(obj.equipment) ? obj.equipment : [],
       loads: Array.isArray(obj.loads) ? obj.loads : [],
+      oneLine: Array.isArray(obj.oneLine) ? obj.oneLine : [],
       settings: (obj.settings && typeof obj.settings === 'object') ? obj.settings : {}
     };
   }
@@ -448,6 +474,7 @@ export function importProject(obj) {
   setPanels(Array.isArray(data.panels) ? data.panels : []);
   setEquipment(Array.isArray(data.equipment) ? data.equipment : []);
   setLoads(Array.isArray(data.loads) ? data.loads : []);
+  setOneLine(Array.isArray(data.oneLine) ? data.oneLine : []);
 
   const reserved = new Set([...Object.values(KEYS), 'CTR_PROJECT_V1']);
   for (const key of keys()) {
@@ -488,6 +515,8 @@ if (typeof window !== 'undefined') {
     insertLoad,
     updateLoad,
     removeLoad,
+    getOneLine,
+    setOneLine,
     getItem,
     setItem,
     removeItem,
