@@ -33,6 +33,36 @@ let connectSource = null;
 let selectedConnection = null;
 const gridSize = 20;
 let gridEnabled = true;
+let history = [];
+let historyIndex = -1;
+
+function pushHistory() {
+  history = history.slice(0, historyIndex + 1);
+  history.push(JSON.parse(JSON.stringify(components)));
+  historyIndex = history.length - 1;
+}
+
+function undo() {
+  if (historyIndex > 0) {
+    historyIndex--;
+    components = JSON.parse(JSON.stringify(history[historyIndex]));
+    selected = null;
+    selectedConnection = null;
+    render();
+    save();
+  }
+}
+
+function redo() {
+  if (historyIndex < history.length - 1) {
+    historyIndex++;
+    components = JSON.parse(JSON.stringify(history[historyIndex]));
+    selected = null;
+    selectedConnection = null;
+    render();
+    save();
+  }
+}
 
 const cableColors = {
   Power: '#f00',
@@ -104,8 +134,9 @@ function addComponent({ type, subtype }) {
     y = Math.round(y / gridSize) * gridSize;
   }
   components.push({ id, type, subtype, x, y, label: subtype, ref: '', connections: [] });
-  save();
+  pushHistory();
   render();
+  save();
 }
 
 function selectComponent(comp) {
@@ -144,8 +175,9 @@ function selectComponent(comp) {
       del.textContent = 'Delete';
       del.addEventListener('click', () => {
         comp.connections.splice(idx, 1);
-        save();
+        pushHistory();
         render();
+        save();
         selectComponent(comp);
       });
       li.appendChild(del);
@@ -180,8 +212,9 @@ function selectComponent(comp) {
     modal.style.display = 'none';
     selected = null;
     selectedConnection = null;
-    save();
+    pushHistory();
     render();
+    save();
   });
   form.appendChild(deleteBtn);
   form.addEventListener('submit', e => {
@@ -192,6 +225,7 @@ function selectComponent(comp) {
     schema.forEach(f => {
       comp[f.name] = fd.get(f.name) || '';
     });
+    pushHistory();
     render();
     save();
     modal.style.display = 'none';
@@ -220,6 +254,7 @@ function init() {
     ...c,
     connections: (c.connections || []).map(conn => typeof conn === 'string' ? { target: conn } : conn)
   }));
+  pushHistory();
   render();
 
   const palette = document.getElementById('component-buttons');
@@ -237,6 +272,8 @@ function init() {
     connectMode = true;
     connectSource = null;
   });
+  document.getElementById('undo-btn').addEventListener('click', undo);
+  document.getElementById('redo-btn').addEventListener('click', redo);
   document.getElementById('export-btn').addEventListener('click', exportDiagram);
   document.getElementById('import-btn').addEventListener('click', () => document.getElementById('import-input').click());
   document.getElementById('import-input').addEventListener('change', importDiagram);
@@ -272,8 +309,14 @@ function init() {
     render();
   });
   svg.addEventListener('mouseup', () => {
-    dragOffset = null;
-    save();
+    if (dragOffset) {
+      dragOffset = null;
+      pushHistory();
+      render();
+      save();
+    } else {
+      dragOffset = null;
+    }
   });
   svg.addEventListener('click', e => {
     const g = e.target.closest('.component');
@@ -293,11 +336,12 @@ function init() {
         const cable = chooseCable(connectSource, comp);
         if (cable) {
           connectSource.connections.push({ target: comp.id, cable });
+          pushHistory();
+          render();
+          save();
         }
         connectMode = false;
         connectSource = null;
-        save();
-        render();
       }
     }
   });
@@ -320,8 +364,9 @@ function init() {
       const { component, index } = selectedConnection;
       component.connections.splice(index, 1);
       selectedConnection = null;
-      save();
+      pushHistory();
       render();
+      save();
       if (selected) selectComponent(selected);
       return;
     }
@@ -333,10 +378,27 @@ function init() {
       });
       selected = null;
       selectedConnection = null;
-      save();
+      pushHistory();
       render();
+      save();
       const modal = document.getElementById('prop-modal');
       if (modal) modal.style.display = 'none';
+    }
+  });
+
+  document.addEventListener('keydown', e => {
+    const mod = e.ctrlKey || e.metaKey;
+    const target = e.target;
+    if (target instanceof HTMLElement && (target.isContentEditable || ['INPUT', 'TEXTAREA'].includes(target.tagName))) {
+      return;
+    }
+    const key = e.key.toLowerCase();
+    if (mod && key === 'z' && !e.shiftKey) {
+      e.preventDefault();
+      undo();
+    } else if (mod && (key === 'y' || (key === 'z' && e.shiftKey))) {
+      e.preventDefault();
+      redo();
     }
   });
 
@@ -398,6 +460,7 @@ async function importDiagram(e) {
         ...c,
         connections: (c.connections || []).map(conn => typeof conn === 'string' ? { target: conn } : conn)
       }));
+      pushHistory();
       render();
       save();
       const equipment = components
