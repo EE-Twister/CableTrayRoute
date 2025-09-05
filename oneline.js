@@ -1,4 +1,4 @@
-import { getOneLine, setOneLine, setEquipment, setPanels, setLoads } from './dataStore.mjs';
+import { getOneLine, setOneLine, setEquipment, setPanels, setLoads, getCables, setCables } from './dataStore.mjs';
 
 const componentTypes = {
   panel: ['MLO', 'MCC'],
@@ -33,6 +33,12 @@ let connectSource = null;
 const gridSize = 20;
 let gridEnabled = true;
 
+const cableColors = {
+  Power: '#f00',
+  Control: '#00f',
+  Signal: '#0a0'
+};
+
 function render() {
   const svg = document.getElementById('diagram');
   svg.querySelectorAll('g.component, line.connection').forEach(el => el.remove());
@@ -44,15 +50,16 @@ function render() {
   }
   // draw connections
   components.forEach(c => {
-    (c.connections || []).forEach(tid => {
-      const target = components.find(t => t.id === tid);
+    (c.connections || []).forEach(conn => {
+      const target = components.find(t => t.id === conn.target);
       if (!target) return;
       const line = document.createElementNS(svgNS, 'line');
       line.setAttribute('x1', c.x + 40);
       line.setAttribute('y1', c.y + 20);
       line.setAttribute('x2', target.x + 40);
       line.setAttribute('y2', target.y + 20);
-      line.setAttribute('stroke', '#000');
+      const stroke = cableColors[conn.cable?.cable_type] || conn.cable?.color || '#000';
+      line.setAttribute('stroke', stroke);
       line.classList.add('connection');
       svg.appendChild(line);
     });
@@ -144,8 +151,24 @@ function selectComponent(comp) {
   modal.style.display = 'block';
 }
 
+function chooseCable(source, target) {
+  const templates = getCables();
+  const list = templates.map(c => c.tag).join(', ');
+  const tag = prompt(`Select cable tag or enter new:\n${list}`);
+  if (!tag) return null;
+  let cable = templates.find(c => c.tag === tag);
+  if (!cable) {
+    const cable_type = prompt('Cable type?', 'Power') || '';
+    cable = { tag, cable_type };
+  }
+  return { ...cable, from_tag: source.ref || source.id, to_tag: target.ref || target.id };
+}
+
 function init() {
-  components = getOneLine();
+  components = getOneLine().map(c => ({
+    ...c,
+    connections: (c.connections || []).map(conn => typeof conn === 'string' ? { target: conn } : conn)
+  }));
   render();
 
   const palette = document.getElementById('component-buttons');
@@ -211,7 +234,10 @@ function init() {
       if (!connectSource) {
         connectSource = comp;
       } else if (connectSource !== comp) {
-        connectSource.connections.push(comp.id);
+        const cable = chooseCable(connectSource, comp);
+        if (cable) {
+          connectSource.connections.push({ target: comp.id, cable });
+        }
         connectMode = false;
         connectSource = null;
         save();
@@ -252,6 +278,21 @@ function exportDiagram() {
   setEquipment(equipment);
   setPanels(panels);
   setLoads(loads);
+  const cables = getCables();
+  components.forEach(c => {
+    (c.connections || []).forEach(conn => {
+      if (!conn.cable) return;
+      const target = components.find(t => t.id === conn.target);
+      const spec = { ...conn.cable, from_tag: c.ref || c.id, to_tag: target?.ref || conn.target };
+      const idx = cables.findIndex(cb => cb.tag === spec.tag);
+      if (idx >= 0) {
+        cables[idx] = { ...cables[idx], ...spec };
+      } else {
+        cables.push(spec);
+      }
+    });
+  });
+  setCables(cables);
   const blob = new Blob([JSON.stringify(components, null, 2)], { type: 'application/json' });
   const a = document.createElement('a');
   a.href = URL.createObjectURL(blob);
@@ -267,7 +308,10 @@ async function importDiagram(e) {
   try {
     const data = JSON.parse(text);
     if (Array.isArray(data)) {
-      components = data;
+      components = data.map(c => ({
+        ...c,
+        connections: (c.connections || []).map(conn => typeof conn === 'string' ? { target: conn } : conn)
+      }));
       render();
       save();
       const equipment = components
