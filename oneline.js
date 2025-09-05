@@ -6,10 +6,18 @@ let selected = null;
 let dragOffset = null;
 let connectMode = false;
 let connectSource = null;
+const gridSize = 20;
+let gridEnabled = true;
 
 function render() {
   const svg = document.getElementById('diagram');
-  svg.innerHTML = '';
+  svg.querySelectorAll('g.component, line.connection').forEach(el => el.remove());
+  if (gridEnabled) {
+    components.forEach(c => {
+      c.x = Math.round(c.x / gridSize) * gridSize;
+      c.y = Math.round(c.y / gridSize) * gridSize;
+    });
+  }
   // draw connections
   components.forEach(c => {
     (c.connections || []).forEach(tid => {
@@ -21,6 +29,7 @@ function render() {
       line.setAttribute('x2', target.x + 40);
       line.setAttribute('y2', target.y + 20);
       line.setAttribute('stroke', '#000');
+      line.classList.add('connection');
       svg.appendChild(line);
     });
   });
@@ -54,7 +63,12 @@ function save() {
 
 function addComponent(type) {
   const id = 'n' + Date.now();
-  components.push({ id, type, x: 20, y: 20, label: type, ref: '', connections: [] });
+  let x = 20, y = 20;
+  if (gridEnabled) {
+    x = Math.round(x / gridSize) * gridSize;
+    y = Math.round(y / gridSize) * gridSize;
+  }
+  components.push({ id, type, x, y, label: type, ref: '', connections: [] });
   save();
   render();
 }
@@ -82,6 +96,15 @@ function init() {
   document.getElementById('import-btn').addEventListener('click', () => document.getElementById('import-input').click());
   document.getElementById('import-input').addEventListener('change', importDiagram);
 
+  const gridToggle = document.getElementById('grid-toggle');
+  gridEnabled = gridToggle.checked;
+  document.getElementById('grid-bg').style.display = gridEnabled ? 'block' : 'none';
+  gridToggle.addEventListener('change', e => {
+    gridEnabled = e.target.checked;
+    document.getElementById('grid-bg').style.display = gridEnabled ? 'block' : 'none';
+    render();
+  });
+
   const svg = document.getElementById('diagram');
   svg.addEventListener('mousedown', e => {
     const g = e.target.closest('.component');
@@ -93,8 +116,14 @@ function init() {
   });
   svg.addEventListener('mousemove', e => {
     if (!dragOffset || !selected) return;
-    selected.x = e.offsetX - dragOffset.x;
-    selected.y = e.offsetY - dragOffset.y;
+    let x = e.offsetX - dragOffset.x;
+    let y = e.offsetY - dragOffset.y;
+    if (gridEnabled) {
+      x = Math.round(x / gridSize) * gridSize;
+      y = Math.round(y / gridSize) * gridSize;
+    }
+    selected.x = x;
+    selected.y = y;
     render();
   });
   svg.addEventListener('mouseup', () => {
