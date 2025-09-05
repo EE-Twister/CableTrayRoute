@@ -169,11 +169,29 @@ function selectComponent(comp) {
     (comp.connections || []).forEach((conn, idx) => {
       const li = document.createElement('li');
       const target = components.find(t => t.id === conn.target);
-      li.textContent = `to ${target?.label || target?.subtype || conn.target}`;
+      const span = document.createElement('span');
+      span.textContent = `to ${target?.label || target?.subtype || conn.target}${conn.cable?.tag ? ` (${conn.cable.tag})` : ''}`;
+      li.appendChild(span);
+      const edit = document.createElement('button');
+      edit.type = 'button';
+      edit.textContent = 'Edit';
+      edit.addEventListener('click', async e => {
+        e.stopPropagation();
+        const cable = await chooseCable(comp, target, conn.cable);
+        if (cable) {
+          conn.cable = cable;
+          pushHistory();
+          render();
+          save();
+          selectComponent(comp);
+        }
+      });
+      li.appendChild(edit);
       const del = document.createElement('button');
       del.type = 'button';
       del.textContent = 'Delete';
-      del.addEventListener('click', () => {
+      del.addEventListener('click', e => {
+        e.stopPropagation();
         comp.connections.splice(idx, 1);
         pushHistory();
         render();
@@ -236,17 +254,118 @@ function selectComponent(comp) {
   modal.style.display = 'block';
 }
 
-function chooseCable(source, target) {
-  const templates = getCables();
-  const list = templates.map(c => c.tag).join(', ');
-  const tag = prompt(`Select cable tag or enter new:\n${list}`);
-  if (!tag) return null;
-  let cable = templates.find(c => c.tag === tag);
-  if (!cable) {
-    const cable_type = prompt('Cable type?', 'Power') || '';
-    cable = { tag, cable_type };
-  }
-  return { ...cable, from_tag: source.ref || source.id, to_tag: target.ref || target.id };
+function chooseCable(source, target, existing = null) {
+  return new Promise(resolve => {
+    const modal = document.getElementById('cable-modal');
+    modal.innerHTML = '';
+    const form = document.createElement('form');
+
+    const templates = [];
+    const seen = new Set();
+    getCables().forEach(c => {
+      if (!seen.has(c.tag)) {
+        templates.push({ ...c });
+        seen.add(c.tag);
+      }
+    });
+    components.forEach(c => {
+      (c.connections || []).forEach(conn => {
+        if (conn.cable && !seen.has(conn.cable.tag)) {
+          templates.push({ ...conn.cable });
+          seen.add(conn.cable.tag);
+        }
+      });
+    });
+
+    const selLabel = document.createElement('label');
+    selLabel.textContent = 'Existing ';
+    const select = document.createElement('select');
+    const optNew = document.createElement('option');
+    optNew.value = '';
+    optNew.textContent = '--New Cable--';
+    select.appendChild(optNew);
+    templates.forEach(t => {
+      const opt = document.createElement('option');
+      opt.value = t.tag;
+      opt.textContent = t.tag;
+      select.appendChild(opt);
+    });
+    selLabel.appendChild(select);
+    form.appendChild(selLabel);
+
+    const tagLabel = document.createElement('label');
+    tagLabel.textContent = 'Tag ';
+    const tagInput = document.createElement('input');
+    tagInput.name = 'tag';
+    tagLabel.appendChild(tagInput);
+    form.appendChild(tagLabel);
+
+    const typeLabel = document.createElement('label');
+    typeLabel.textContent = 'Type ';
+    const typeInput = document.createElement('input');
+    typeInput.name = 'cable_type';
+    typeLabel.appendChild(typeInput);
+    form.appendChild(typeLabel);
+
+    const colorLabel = document.createElement('label');
+    colorLabel.textContent = 'Color ';
+    const colorInput = document.createElement('input');
+    colorInput.type = 'color';
+    colorInput.name = 'color';
+    colorLabel.appendChild(colorInput);
+    form.appendChild(colorLabel);
+
+    select.addEventListener('change', () => {
+      const c = templates.find(t => t.tag === select.value);
+      if (c) {
+        tagInput.value = c.tag || '';
+        typeInput.value = c.cable_type || '';
+        colorInput.value = c.color || '#000000';
+      } else {
+        tagInput.value = '';
+        typeInput.value = '';
+        colorInput.value = '#000000';
+      }
+    });
+
+    if (existing) {
+      tagInput.value = existing.tag || '';
+      typeInput.value = existing.cable_type || '';
+      colorInput.value = existing.color || '#000000';
+      if (templates.some(t => t.tag === existing.tag)) {
+        select.value = existing.tag;
+      }
+    } else {
+      colorInput.value = '#000000';
+    }
+
+    const saveBtn = document.createElement('button');
+    saveBtn.type = 'submit';
+    saveBtn.textContent = 'Save';
+    const cancelBtn = document.createElement('button');
+    cancelBtn.type = 'button';
+    cancelBtn.textContent = 'Cancel';
+    cancelBtn.addEventListener('click', () => {
+      modal.style.display = 'none';
+      resolve(null);
+    });
+    form.appendChild(saveBtn);
+    form.appendChild(cancelBtn);
+
+    form.addEventListener('submit', e => {
+      e.preventDefault();
+      const cable = {
+        tag: tagInput.value,
+        cable_type: typeInput.value,
+        color: colorInput.value
+      };
+      modal.style.display = 'none';
+      resolve({ ...cable, from_tag: source.ref || source.id, to_tag: target.ref || target.id });
+    });
+
+    modal.appendChild(form);
+    modal.style.display = 'block';
+  });
 }
 
 function init() {
@@ -318,7 +437,7 @@ function init() {
       dragOffset = null;
     }
   });
-  svg.addEventListener('click', e => {
+  svg.addEventListener('click', async e => {
     const g = e.target.closest('.component');
     if (!g) {
       selected = null;
@@ -333,7 +452,7 @@ function init() {
       if (!connectSource) {
         connectSource = comp;
       } else if (connectSource !== comp) {
-        const cable = chooseCable(connectSource, comp);
+        const cable = await chooseCable(connectSource, comp);
         if (cable) {
           connectSource.connections.push({ target: comp.id, cable });
           pushHistory();
