@@ -1,5 +1,18 @@
 import { getOneLine, setOneLine, setEquipment, setPanels, setLoads } from './dataStore.mjs';
 
+const componentTypes = {
+  panel: ['MLO', 'MCC'],
+  equipment: ['Transformer', 'Switchgear'],
+  load: ['Load']
+};
+
+const subtypeCategory = {};
+Object.entries(componentTypes).forEach(([type, subs]) => {
+  subs.forEach(sub => {
+    subtypeCategory[sub] = type;
+  });
+});
+
 const svgNS = 'http://www.w3.org/2000/svg';
 let components = [];
 let selected = null;
@@ -43,12 +56,12 @@ function render() {
     img.setAttribute('y', c.y);
     img.setAttribute('width', 80);
     img.setAttribute('height', 40);
-    img.setAttribute('href', `icons/${c.type}.svg`);
+    img.setAttribute('href', `icons/${c.subtype || c.type}.svg`);
     const text = document.createElementNS(svgNS, 'text');
     text.setAttribute('x', c.x + 40);
     text.setAttribute('y', c.y + 55);
     text.setAttribute('text-anchor', 'middle');
-    text.textContent = c.label || c.type;
+    text.textContent = c.label || c.subtype || c.type;
     g.appendChild(img);
     g.appendChild(text);
     svg.appendChild(g);
@@ -59,14 +72,14 @@ function save() {
   setOneLine(components);
 }
 
-function addComponent(type) {
+function addComponent({ type, subtype }) {
   const id = 'n' + Date.now();
   let x = 20, y = 20;
   if (gridEnabled) {
     x = Math.round(x / gridSize) * gridSize;
     y = Math.round(y / gridSize) * gridSize;
   }
-  components.push({ id, type, x, y, label: type, ref: '', connections: [] });
+  components.push({ id, type, subtype, x, y, label: subtype, ref: '', connections: [] });
   save();
   render();
 }
@@ -83,8 +96,16 @@ function init() {
   components = getOneLine();
   render();
 
-  document.querySelectorAll('#palette button[data-type]').forEach(btn => {
-    btn.addEventListener('click', () => addComponent(btn.dataset.type));
+  const palette = document.getElementById('component-buttons');
+  Object.entries(componentTypes).forEach(([type, subs]) => {
+    subs.forEach(sub => {
+      const btn = document.createElement('button');
+      btn.dataset.type = type;
+      btn.dataset.subtype = sub;
+      btn.innerHTML = `<img src="icons/${sub}.svg" alt="" aria-hidden="true"> ${sub}`;
+      btn.addEventListener('click', () => addComponent({ type, subtype: sub }));
+      palette.appendChild(btn);
+    });
   });
   document.getElementById('connect-btn').addEventListener('click', () => {
     connectMode = true;
@@ -165,11 +186,21 @@ function init() {
   initNavToggle();
 }
 
+function getCategory(c) {
+  return c.type || subtypeCategory[c.subtype];
+}
+
 function exportDiagram() {
   save();
-  const equipment = components.filter(c => c.type === 'equipment').map(c => ({ id: c.ref || c.id, description: c.label }));
-  const panels = components.filter(c => c.type === 'panel').map(c => ({ id: c.ref || c.id, description: c.label }));
-  const loads = components.filter(c => c.type === 'load').map(c => ({ id: c.ref || c.id, description: c.label }));
+  const equipment = components
+    .filter(c => getCategory(c) === 'equipment')
+    .map(c => ({ id: c.ref || c.id, description: c.label }));
+  const panels = components
+    .filter(c => getCategory(c) === 'panel')
+    .map(c => ({ id: c.ref || c.id, description: c.label }));
+  const loads = components
+    .filter(c => getCategory(c) === 'load')
+    .map(c => ({ id: c.ref || c.id, description: c.label }));
   setEquipment(equipment);
   setPanels(panels);
   setLoads(loads);
@@ -191,9 +222,15 @@ async function importDiagram(e) {
       components = data;
       render();
       save();
-      const equipment = components.filter(c => c.type === 'equipment').map(c => ({ id: c.ref || c.id, description: c.label }));
-      const panels = components.filter(c => c.type === 'panel').map(c => ({ id: c.ref || c.id, description: c.label }));
-      const loads = components.filter(c => c.type === 'load').map(c => ({ id: c.ref || c.id, description: c.label }));
+      const equipment = components
+        .filter(c => getCategory(c) === 'equipment')
+        .map(c => ({ id: c.ref || c.id, description: c.label }));
+      const panels = components
+        .filter(c => getCategory(c) === 'panel')
+        .map(c => ({ id: c.ref || c.id, description: c.label }));
+      const loads = components
+        .filter(c => getCategory(c) === 'load')
+        .map(c => ({ id: c.ref || c.id, description: c.label }));
       setEquipment(equipment);
       setPanels(panels);
       setLoads(loads);
