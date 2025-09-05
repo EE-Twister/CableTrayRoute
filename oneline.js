@@ -312,6 +312,10 @@ function init() {
 
   document.addEventListener('keydown', e => {
     if (e.key !== 'Delete') return;
+    const target = e.target;
+    if (target instanceof HTMLElement && (target.isContentEditable || ['INPUT', 'TEXTAREA'].includes(target.tagName))) {
+      return;
+    }
     if (selectedConnection) {
       const { component, index } = selectedConnection;
       component.connections.splice(index, 1);
