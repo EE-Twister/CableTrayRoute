@@ -1,5 +1,6 @@
 import * as d3 from 'https://cdn.jsdelivr.net/npm/d3@7/+esm';
 import { getItem, setItem, getOneLine, setOneLine, getStudies, setStudies } from '../dataStore.mjs';
+import { runShortCircuit } from './shortCircuit.js';
 import { scaleCurve, checkDuty } from './tccUtils.js';
 
 const deviceSelect = document.getElementById('device-select');
@@ -34,8 +35,23 @@ async function init() {
     const opt = new Option(d.name, d.id);
     deviceSelect.add(opt);
   });
+  const sc = runShortCircuit();
+  const studies = getStudies();
+  studies.shortCircuit = sc;
+  setStudies(studies);
+  let linked = null;
+  if (compId) {
+    const sheets = getOneLine();
+    for (const sheet of sheets) {
+      const comp = (sheet.components || []).find(c => c.id === compId);
+      if (comp) { linked = comp; break; }
+    }
+  }
   if (deviceParam) {
     const opt = [...deviceSelect.options].find(o => o.value === deviceParam);
+    if (opt) opt.selected = true;
+  } else if (linked?.tccId) {
+    const opt = [...deviceSelect.options].find(o => o.value === linked.tccId);
     if (opt) opt.selected = true;
   } else {
     saved.devices.forEach(id => {
@@ -44,6 +60,9 @@ async function init() {
     });
   }
   renderSettings();
+  if (compId && ([...deviceSelect.selectedOptions].length)) {
+    plot();
+  }
 }
 
 deviceSelect.addEventListener('change', renderSettings);

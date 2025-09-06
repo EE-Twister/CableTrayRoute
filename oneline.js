@@ -23,6 +23,7 @@ let propSchemas = {};
 let subtypeCategory = {};
 let componentTypes = {};
 let manufacturerDefaults = {};
+let protectiveDevices = [];
 
 const kvClasses = ['0.48 kV', '5 kV', '15 kV', '25 kV'];
 const thermalRatings = ['75C', '90C', '105C'];
@@ -77,6 +78,16 @@ async function loadManufacturerLibrary() {
   }
   const stored = getItem('manufacturerDefaults', {});
   manufacturerDefaults = { ...manufacturerDefaults, ...stored };
+}
+
+async function loadProtectiveDevices() {
+  try {
+    const res = await fetch('data/protectiveDevices.json');
+    protectiveDevices = await res.json();
+  } catch (err) {
+    console.error('Failed to load protective devices', err);
+    protectiveDevices = [];
+  }
 }
 
 function rebuildComponentMaps() {
@@ -1276,10 +1287,19 @@ function selectComponent(comp) {
   }
   const tccLbl = document.createElement('label');
   tccLbl.textContent = 'TCC Device ';
-  const tccInput = document.createElement('input');
-  tccInput.type = 'text';
+  const tccInput = document.createElement('select');
   tccInput.name = 'tccId';
-  tccInput.value = comp.tccId || '';
+  const optEmpty = document.createElement('option');
+  optEmpty.value = '';
+  optEmpty.textContent = '--Select Device--';
+  tccInput.appendChild(optEmpty);
+  protectiveDevices.forEach(dev => {
+    const opt = document.createElement('option');
+    opt.value = dev.id;
+    opt.textContent = dev.name;
+    if (comp.tccId === dev.id) opt.selected = true;
+    tccInput.appendChild(opt);
+  });
   tccLbl.appendChild(tccInput);
   form.appendChild(tccLbl);
   const tccBtn = document.createElement('button');
@@ -1728,6 +1748,7 @@ async function chooseCable(source, target, existingConn = null) {
 async function init() {
   await loadManufacturerLibrary();
   await loadComponentLibrary();
+  await loadProtectiveDevices();
   sheets = getOneLine().map((s, i) => ({
     name: s.name || `Sheet ${i + 1}`,
     components: (s.components || []).map(normalizeComponent)

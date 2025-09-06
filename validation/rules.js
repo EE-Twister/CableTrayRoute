@@ -39,6 +39,11 @@ export function runValidation(components = [], studies = {}) {
     }
   });
 
+  // TCC duty/coordination violations from studies
+  Object.entries(studies.duty || {}).forEach(([id, msgs = []]) => {
+    msgs.forEach(msg => issues.push({ component: id, message: msg }));
+  });
+
   // Single point of failure warnings from reliability study
   if (Array.isArray(studies.reliability?.n1Failures)) {
     studies.reliability.n1Failures.forEach(id => {
