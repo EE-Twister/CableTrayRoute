@@ -28,6 +28,39 @@
   margin-bottom: var(--ol-spacing);
 }
 
+#component-buttons {
+  display: flex;
+  flex-direction: column;
+}
+
+#component-buttons details {
+  border: 1px solid var(--ol-border-color);
+  border-radius: var(--ol-radius);
+  margin-bottom: var(--ol-spacing);
+  background: var(--ol-card-bg);
+}
+
+#component-buttons details summary {
+  padding: 0.25rem 0.5rem;
+  cursor: pointer;
+  list-style: none;
+}
+
+#component-buttons details[open] > summary {
+  border-bottom: 1px solid var(--ol-border-color);
+}
+
+#component-buttons details summary::-webkit-details-marker {
+  display: none;
+}
+
+#component-buttons .section-buttons {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--ol-spacing);
+  padding: var(--ol-spacing);
+}
+
 .grid-label {
   margin-left: var(--ol-spacing);
 }
