@@ -88,8 +88,8 @@ global.navigator = { clipboard: { writeText: () => Promise.resolve() } };
   global.document = dom.document;
 
   const dataStore = await import('../dataStore.mjs');
-  dataStore.addLoad({ source: 'S1', description: 'L1', kw: '10', voltage: '120' });
-  dataStore.addLoad({ source: 'S2', description: 'L2', kw: '20', voltage: '240' });
+  dataStore.addLoad({ source: 'S1', description: 'L1', kw: '10', voltage: '120', manufacturer: 'ACME', model: 'X1', notes: 'n1' });
+  dataStore.addLoad({ source: 'S2', description: 'L2', kw: '20', voltage: '240', manufacturer: 'Other', model: 'Y2', notes: 'n2' });
   const before = dataStore.getLoads();
 
   await import('../loadlist.js');

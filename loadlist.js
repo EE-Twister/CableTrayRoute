@@ -119,6 +119,8 @@ if (typeof window !== 'undefined') {
       source: '',
       tag: '',
       description: '',
+      manufacturer: '',
+      model: '',
       quantity: '',
       voltage: '',
       loadType: '',
@@ -129,7 +131,8 @@ if (typeof window !== 'undefined') {
       efficiency: '',
       demandFactor: '',
       phases: '',
-      circuit: ''
+      circuit: '',
+      notes: ''
     };
 
     // --- helpers ------------------------------------------------------------
@@ -142,6 +145,8 @@ if (typeof window !== 'undefined') {
       source: tr.querySelector('input[name="source"]').value.trim(),
       tag: tr.querySelector('input[name="tag"]').value.trim(),
       description: tr.querySelector('input[name="description"]').value.trim(),
+      manufacturer: tr.querySelector('input[name="manufacturer"]').value.trim(),
+      model: tr.querySelector('input[name="model"]').value.trim(),
       quantity: tr.querySelector('input[name="quantity"]').value.trim(),
       voltage: tr.querySelector('input[name="voltage"]').value.trim(),
       loadType: tr.querySelector('input[name="loadType"]').value.trim(),
@@ -152,7 +157,8 @@ if (typeof window !== 'undefined') {
       efficiency: tr.querySelector('input[name="efficiency"]').value.trim(),
       demandFactor: tr.querySelector('input[name="demandFactor"]').value.trim(),
       phases: tr.querySelector('input[name="phases"]').value.trim(),
-      circuit: tr.querySelector('input[name="circuit"]').value.trim()
+      circuit: tr.querySelector('input[name="circuit"]').value.trim(),
+      notes: tr.querySelector('textarea[name="notes"]').value.trim()
     };
   }
 
@@ -223,6 +229,8 @@ if (typeof window !== 'undefined') {
       <td><input name="source" type="text" value="${load.source || ''}"></td>
       <td><input name="tag" type="text" value="${load.tag || ''}"></td>
       <td><input name="description" type="text" value="${load.description || ''}"></td>
+      <td><input name="manufacturer" type="text" value="${load.manufacturer || ''}"></td>
+      <td><input name="model" type="text" value="${load.model || ''}"></td>
       <td><input name="quantity" type="number" step="any" value="${load.quantity || ''}"></td>
       <td><input name="voltage" type="number" step="any" value="${load.voltage || ''}"></td>
       <td><input name="loadType" type="text" value="${load.loadType || ''}"></td>
@@ -239,12 +247,13 @@ if (typeof window !== 'undefined') {
       <td><input name="demandFactor" type="number" step="any" value="${load.demandFactor || ''}"></td>
       <td><input name="phases" type="text" value="${load.phases || ''}"></td>
       <td><input name="circuit" type="text" value="${load.circuit || ''}"></td>
+      <td><textarea name="notes">${load.notes || ''}</textarea></td>
       <td class="kva">${format(load.kva)}</td>
       <td class="current">${format(load.current)}</td>
       <td class="demand-kva">${format(load.demandKva)}</td>
       <td class="demand-kw">${format(load.demandKw)}</td>`;
 
-    Array.from(tr.querySelectorAll('input[type="text"],input[type="number"],select')).forEach(input => {
+    Array.from(tr.querySelectorAll('input[type="text"],input[type="number"],select,textarea')).forEach(input => {
       const td = input.parentElement;
       input.addEventListener('blur', () => saveRow(tr));
       if (input.tagName === 'SELECT') {
@@ -326,9 +335,9 @@ if (typeof window !== 'undefined') {
       return acc;
     }, { kW: 0, kVA: 0, demandKVA: 0, demandKW: 0 });
     tfoot.innerHTML = `<tr>
-      <td colspan="8">Totals</td>
+      <td colspan="10">Totals</td>
       <td>${totals.kW.toFixed(2)}</td>
-      <td colspan="6"></td>
+      <td colspan="7"></td>
       <td>${totals.kVA.toFixed(2)}</td>
       <td></td>
       <td>${totals.demandKVA.toFixed(2)}</td>
@@ -382,6 +391,8 @@ if (typeof window !== 'undefined') {
       'source',
       'tag',
       'description',
+      'manufacturer',
+      'model',
       'quantity',
       'voltage',
       'loadType',
@@ -393,6 +404,7 @@ if (typeof window !== 'undefined') {
       'demandFactor',
       'phases',
       'circuit',
+      'notes',
       'panelId',
       'breaker',
       'kva',
@@ -401,12 +413,14 @@ if (typeof window !== 'undefined') {
       'demandKw'
     ].join(delimiter);
     const lines = loads.map(l => {
-      const base = { source: '', panelId: '', breaker: '', duty: '', ...l };
+      const base = { source: '', manufacturer: '', model: '', notes: '', panelId: '', breaker: '', duty: '', ...l };
       const full = { ...base, ...calculateDerived(base) };
       const vals = [
         full.source,
         full.tag,
         full.description,
+        full.manufacturer,
+        full.model,
         full.quantity,
         full.voltage,
         full.loadType,
@@ -418,6 +432,7 @@ if (typeof window !== 'undefined') {
         full.demandFactor,
         full.phases,
         full.circuit,
+        full.notes,
         full.panelId,
         full.breaker,
         full.kva,
@@ -443,13 +458,17 @@ if (typeof window !== 'undefined') {
         .split(delimiter)
         .map(c => c.replace(/^"|"$/g, '').replace(/""/g, '"').trim());
       let load;
-      if (cols.length === 13 || cols.length === 14) {
+      if (cols.length === 13 || cols.length === 14 || cols.length === 16 || cols.length === 17) {
         let source = '';
-        let tag, description, quantity, voltage, loadType, duty, kw, powerFactor, loadFactor, efficiency, demandFactor, phases, circuit;
+        let tag, description, manufacturer = '', model = '', quantity, voltage, loadType, duty, kw, powerFactor, loadFactor, efficiency, demandFactor, phases, circuit, notes = '';
         if (cols.length === 13) {
           [tag, description, quantity, voltage, loadType, duty, kw, powerFactor, loadFactor, efficiency, demandFactor, phases, circuit] = cols;
-        } else {
+        } else if (cols.length === 14) {
           [source, tag, description, quantity, voltage, loadType, duty, kw, powerFactor, loadFactor, efficiency, demandFactor, phases, circuit] = cols;
+        } else if (cols.length === 16) {
+          [tag, description, manufacturer, model, quantity, voltage, loadType, duty, kw, powerFactor, loadFactor, efficiency, demandFactor, phases, circuit, notes] = cols;
+        } else {
+          [source, tag, description, manufacturer, model, quantity, voltage, loadType, duty, kw, powerFactor, loadFactor, efficiency, demandFactor, phases, circuit, notes] = cols;
         }
         const nums = [quantity, voltage, kw, powerFactor, loadFactor, efficiency, demandFactor];
         if (nums.some(n => n && isNaN(Number(n)))) throw new Error('Invalid CSV data');
@@ -457,6 +476,8 @@ if (typeof window !== 'undefined') {
           source,
           tag,
           description,
+          manufacturer,
+          model,
           quantity,
           voltage,
           loadType,
@@ -468,12 +489,13 @@ if (typeof window !== 'undefined') {
           demandFactor,
           phases,
           circuit,
+          notes,
           panelId: '',
           breaker: ''
         };
-      } else if (cols.length === 19 || cols.length === 20) {
+      } else if (cols.length === 19 || cols.length === 20 || cols.length === 22 || cols.length === 23) {
         let source = '';
-        let tag, description, quantity, voltage, loadType, duty, kw, powerFactor, loadFactor, efficiency, demandFactor, phases, circuit, panelId, breaker, kva, current, demandKva, demandKw;
+        let tag, description, manufacturer = '', model = '', quantity, voltage, loadType, duty, kw, powerFactor, loadFactor, efficiency, demandFactor, phases, circuit, notes = '', panelId, breaker, kva, current, demandKva, demandKw;
         if (cols.length === 19) {
           [
             tag,
@@ -496,7 +518,7 @@ if (typeof window !== 'undefined') {
             demandKva,
             demandKw
           ] = cols;
-        } else {
+        } else if (cols.length === 20) {
           [
             source,
             tag,
@@ -519,6 +541,57 @@ if (typeof window !== 'undefined') {
             demandKva,
             demandKw
           ] = cols;
+        } else if (cols.length === 22) {
+          [
+            tag,
+            description,
+            manufacturer,
+            model,
+            quantity,
+            voltage,
+            loadType,
+            duty,
+            kw,
+            powerFactor,
+            loadFactor,
+            efficiency,
+            demandFactor,
+            phases,
+            circuit,
+            notes,
+            panelId,
+            breaker,
+            kva,
+            current,
+            demandKva,
+            demandKw
+          ] = cols;
+        } else {
+          [
+            source,
+            tag,
+            description,
+            manufacturer,
+            model,
+            quantity,
+            voltage,
+            loadType,
+            duty,
+            kw,
+            powerFactor,
+            loadFactor,
+            efficiency,
+            demandFactor,
+            phases,
+            circuit,
+            notes,
+            panelId,
+            breaker,
+            kva,
+            current,
+            demandKva,
+            demandKw
+          ] = cols;
         }
         const nums = [quantity, voltage, kw, powerFactor, loadFactor, efficiency, demandFactor, kva, current, demandKva, demandKw];
         if (nums.some(n => n && isNaN(Number(n)))) throw new Error('Invalid CSV data');
@@ -526,6 +599,8 @@ if (typeof window !== 'undefined') {
           source,
           tag,
           description,
+          manufacturer,
+          model,
           quantity,
           voltage,
           loadType,
@@ -537,6 +612,7 @@ if (typeof window !== 'undefined') {
           demandFactor,
           phases,
           circuit,
+          notes,
           panelId,
           breaker,
           kva,
@@ -570,7 +646,7 @@ if (typeof window !== 'undefined') {
 
   document.getElementById('export-btn').addEventListener('click', () => {
     const data = dataStore.getLoads().map(l => {
-      const base = { panelId: '', breaker: '', duty: '', ...l };
+      const base = { panelId: '', breaker: '', duty: '', manufacturer: '', model: '', notes: '', ...l };
       return { ...base, ...calculateDerived(base) };
     });
     const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' });
@@ -612,6 +688,8 @@ if (typeof window !== 'undefined') {
             source: '',
             tag: '',
             description: '',
+            manufacturer: '',
+            model: '',
             quantity: '',
             voltage: '',
             loadType: '',
@@ -623,6 +701,7 @@ if (typeof window !== 'undefined') {
             demandFactor: '',
             phases: '',
             circuit: '',
+            notes: '',
             panelId: '',
             breaker: '',
             ...l
