@@ -85,6 +85,10 @@ const compWidth = 80;
 const compHeight = 40;
 let templates = [];
 let cursorPos = { x: 20, y: 20 };
+const lintPanel = document.getElementById('lint-panel');
+const lintList = document.getElementById('lint-list');
+const lintCloseBtn = document.getElementById('lint-close-btn');
+if (lintCloseBtn) lintCloseBtn.addEventListener('click', () => lintPanel.classList.add('hidden'));
 
 // Prefix settings and counters for component labels
 let labelPrefixes = getItem('labelPrefixes', {});
@@ -728,8 +732,12 @@ function save(notify = true) {
   sheets = sheetData;
   components = sheets[activeSheet].components;
   setOneLine(sheetData);
-  syncSchedules(notify);
-  validateDiagram();
+  const issues = validateDiagram();
+  if (issues.length === 0) {
+    syncSchedules(notify);
+  } else if (notify) {
+    showToast('Fix validation issues before syncing schedules');
+  }
 }
 
 function addComponent(subtype) {
@@ -1131,8 +1139,8 @@ async function init() {
   historyIndex = 0;
   renderSheetTabs();
   render();
-  syncSchedules(false);
-  validateDiagram();
+  const initIssues = validateDiagram();
+  if (!initIssues.length) syncSchedules(false);
 
   const prefixBtn = document.getElementById('prefix-settings-btn');
   if (prefixBtn) prefixBtn.addEventListener('click', editPrefixes);
@@ -1210,34 +1218,7 @@ async function init() {
   document.getElementById('add-sheet-btn').addEventListener('click', addSheet);
   document.getElementById('rename-sheet-btn').addEventListener('click', renameSheet);
   document.getElementById('delete-sheet-btn').addEventListener('click', deleteSheet);
-  document.getElementById('validate-btn').addEventListener('click', () => {
-    const issues = validateDiagram();
-    const modal = document.getElementById('validation-modal');
-    modal.innerHTML = '';
-    const header = document.createElement('h3');
-    header.textContent = issues.length ? 'Validation Issues' : 'No issues found';
-    modal.appendChild(header);
-    if (issues.length) {
-      const list = document.createElement('ul');
-      issues.forEach(issue => {
-        const li = document.createElement('li');
-        li.textContent = issue.message;
-        li.style.cursor = 'pointer';
-        li.addEventListener('click', () => {
-          modal.classList.remove('show');
-          focusComponent(issue.component);
-        });
-        list.appendChild(li);
-      });
-      modal.appendChild(list);
-    }
-    const closeBtn = document.createElement('button');
-    closeBtn.type = 'button';
-    closeBtn.textContent = 'Close';
-    closeBtn.addEventListener('click', () => modal.classList.remove('show'));
-    modal.appendChild(closeBtn);
-    modal.classList.add('show');
-  });
+  document.getElementById('validate-btn').addEventListener('click', validateDiagram);
 
   const gridToggle = document.getElementById('grid-toggle');
   const gridSizeInput = document.getElementById('grid-size');
@@ -1566,6 +1547,7 @@ function validateDiagram() {
   // reset any previous markers
   svg.querySelectorAll('g.component').forEach(g => {
     g.classList.remove('invalid');
+    g.querySelectorAll('.issue-badge').forEach(b => b.remove());
     const comp = components.find(c => c.id === g.dataset.id);
     if (!comp) return;
     const tip = [];
@@ -1575,13 +1557,10 @@ function validateDiagram() {
     g.setAttribute('data-tooltip', tip.join('\n'));
   });
 
-  const labelMap = new Map();
-  const refMap = new Map();
+  const idMap = new Map();
   const inbound = new Map();
   components.forEach(c => {
-    const labelKey = (c.label || '').trim().toUpperCase();
-    if (labelKey) labelMap.set(labelKey, (labelMap.get(labelKey) || 0) + 1);
-    if (c.ref) refMap.set(c.ref, (refMap.get(c.ref) || 0) + 1);
+    idMap.set(c.id, (idMap.get(c.id) || 0) + 1);
     inbound.set(c.id, 0);
   });
 
@@ -1608,18 +1587,10 @@ function validateDiagram() {
     }
   });
 
-  labelMap.forEach((count, label) => {
+  idMap.forEach((count, id) => {
     if (count > 1) {
-      components.filter(c => (c.label || '').trim().toUpperCase() === label).forEach(c => {
-        validationIssues.push({ component: c.id, message: `Duplicate label "${c.label}"` });
-      });
-    }
-  });
-
-  refMap.forEach((count, ref) => {
-    if (count > 1) {
-      components.filter(c => c.ref === ref).forEach(c => {
-        validationIssues.push({ component: c.id, message: `Duplicate ref "${ref}"` });
+      components.filter(c => c.id === id).forEach(c => {
+        validationIssues.push({ component: c.id, message: `Duplicate ID "${id}"` });
       });
     }
   });
@@ -1637,7 +1608,37 @@ function validateDiagram() {
     const existing = g.getAttribute('data-tooltip');
     const tip = existing ? existing + '\n' + msgs.join('\n') : msgs.join('\n');
     g.setAttribute('data-tooltip', tip);
+    const badge = document.createElementNS(svgNS, 'g');
+    badge.setAttribute('class', 'issue-badge');
+    const circ = document.createElementNS(svgNS, 'circle');
+    circ.setAttribute('cx', compWidth - 8);
+    circ.setAttribute('cy', 8);
+    circ.setAttribute('r', 8);
+    circ.setAttribute('fill', '#c00');
+    const txt = document.createElementNS(svgNS, 'text');
+    txt.setAttribute('x', compWidth - 8);
+    txt.setAttribute('y', 11);
+    txt.setAttribute('text-anchor', 'middle');
+    txt.setAttribute('font-size', '12');
+    txt.setAttribute('fill', '#fff');
+    txt.textContent = '!';
+    badge.appendChild(circ);
+    badge.appendChild(txt);
+    g.appendChild(badge);
   });
+
+  lintList.innerHTML = '';
+  if (validationIssues.length) {
+    validationIssues.forEach(issue => {
+      const li = document.createElement('li');
+      li.textContent = issue.message;
+      li.addEventListener('click', () => focusComponent(issue.component));
+      lintList.appendChild(li);
+    });
+    lintPanel.classList.remove('hidden');
+  } else {
+    lintPanel.classList.add('hidden');
+  }
 
   showToast(validationIssues.length ? `Validation found ${validationIssues.length} issue${validationIssues.length === 1 ? '' : 's'}` : 'Diagram valid');
   return validationIssues;

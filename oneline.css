@@ -157,6 +157,10 @@
   fill: #c00;
 }
 
+.issue-badge {
+  pointer-events: none;
+}
+
 .voltage-legend {
   position: absolute;
   top: 10px;
