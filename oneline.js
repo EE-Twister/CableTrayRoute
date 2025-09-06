@@ -63,6 +63,32 @@ const compHeight = 40;
 let templates = [];
 let cursorPos = { x: 20, y: 20 };
 
+// Prefix settings and counters for component labels
+let labelPrefixes = getItem('labelPrefixes', {});
+let labelCounters = getItem('labelCounters', {});
+
+function getPrefix(subtype) {
+  return labelPrefixes[subtype] || (subtype.slice(0, 3).toUpperCase() + '-');
+}
+
+function nextLabel(subtype) {
+  const count = (labelCounters[subtype] || 0) + 1;
+  labelCounters[subtype] = count;
+  setItem('labelCounters', labelCounters);
+  return getPrefix(subtype) + count;
+}
+
+function editPrefixes() {
+  const prefixes = { ...labelPrefixes };
+  Object.keys(componentMeta).forEach(sub => {
+    const current = prefixes[sub] || getPrefix(sub);
+    const val = prompt(`Prefix for ${sub}`, current);
+    if (val !== null) prefixes[sub] = val;
+  });
+  labelPrefixes = prefixes;
+  setItem('labelPrefixes', labelPrefixes);
+}
+
 // --- Tooltip module ---
 const tooltip = document.createElement('div');
 tooltip.id = 'component-tooltip';
@@ -581,7 +607,7 @@ function addComponent(subtype) {
     subtype,
     x,
     y,
-    label: meta.label,
+    label: nextLabel(subtype),
     ref: '',
     rotation: 0,
     flipped: false,
@@ -939,6 +965,21 @@ async function init() {
     });
   });
 
+  // initialize counters from existing labels
+  labelCounters = getItem('labelCounters', labelCounters);
+  sheets.forEach(s => {
+    s.components.forEach(c => {
+      const m = (c.label || '').match(/(\d+)$/);
+      if (m) {
+        const num = Number(m[1]);
+        if (!labelCounters[c.subtype] || labelCounters[c.subtype] < num) {
+          labelCounters[c.subtype] = num;
+        }
+      }
+    });
+  });
+  setItem('labelCounters', labelCounters);
+
   activeSheet = 0;
   components = sheets[0].components;
   history = [JSON.parse(JSON.stringify(components))];
@@ -947,6 +988,9 @@ async function init() {
   render();
   syncSchedules(false);
   validateDiagram();
+
+  const prefixBtn = document.getElementById('prefix-settings-btn');
+  if (prefixBtn) prefixBtn.addEventListener('click', editPrefixes);
 
   const palette = document.getElementById('component-buttons');
   const sectionContainers = {
@@ -1387,7 +1431,8 @@ function validateDiagram() {
   const refMap = new Map();
   const inbound = new Map();
   components.forEach(c => {
-    if (c.label) labelMap.set(c.label, (labelMap.get(c.label) || 0) + 1);
+    const labelKey = (c.label || '').trim().toUpperCase();
+    if (labelKey) labelMap.set(labelKey, (labelMap.get(labelKey) || 0) + 1);
     if (c.ref) refMap.set(c.ref, (refMap.get(c.ref) || 0) + 1);
     inbound.set(c.id, 0);
   });
@@ -1417,8 +1462,8 @@ function validateDiagram() {
 
   labelMap.forEach((count, label) => {
     if (count > 1) {
-      components.filter(c => c.label === label).forEach(c => {
-        validationIssues.push({ component: c.id, message: `Duplicate label "${label}"` });
+      components.filter(c => (c.label || '').trim().toUpperCase() === label).forEach(c => {
+        validationIssues.push({ component: c.id, message: `Duplicate label "${c.label}"` });
       });
     }
   });
