@@ -1,9 +1,11 @@
 import { getOneLine, setOneLine, setEquipment, setPanels, setLoads, getCables, setCables } from './dataStore.mjs';
 
-const componentTypes = {
-  panel: ['MLO', 'MCC'],
-  equipment: ['Transformer', 'Switchgear'],
-  load: ['Load']
+const componentMeta = {
+  MLO: { icon: 'icons/MLO.svg', label: 'MLO', category: 'panel' },
+  MCC: { icon: 'icons/MCC.svg', label: 'MCC', category: 'panel' },
+  Transformer: { icon: 'icons/Transformer.svg', label: 'Transformer', category: 'equipment' },
+  Switchgear: { icon: 'icons/Switchgear.svg', label: 'Switchgear', category: 'equipment' },
+  Load: { icon: 'icons/Load.svg', label: 'Load', category: 'load' }
 };
 
 const propSchemas = {
@@ -18,10 +20,11 @@ const propSchemas = {
 };
 
 const subtypeCategory = {};
-Object.entries(componentTypes).forEach(([type, subs]) => {
-  subs.forEach(sub => {
-    subtypeCategory[sub] = type;
-  });
+const componentTypes = {};
+Object.entries(componentMeta).forEach(([sub, meta]) => {
+  subtypeCategory[sub] = meta.category;
+  if (!componentTypes[meta.category]) componentTypes[meta.category] = [];
+  componentTypes[meta.category].push(sub);
 });
 
 const svgNS = 'http://www.w3.org/2000/svg';
@@ -267,7 +270,8 @@ function render() {
     img.setAttribute('y', c.y);
     img.setAttribute('width', compWidth);
     img.setAttribute('height', compHeight);
-    img.setAttribute('href', `icons/${c.subtype || c.type}.svg`);
+    const meta = componentMeta[c.subtype] || componentMeta[c.type] || {};
+    if (meta.icon) img.setAttribute('href', meta.icon);
     if (c.rot) {
       const cx = c.x + compWidth / 2;
       const cy = c.y + compHeight / 2;
@@ -277,7 +281,7 @@ function render() {
     text.setAttribute('x', c.x + compWidth / 2);
     text.setAttribute('y', c.y + compHeight + 15);
     text.setAttribute('text-anchor', 'middle');
-    text.textContent = c.label || c.subtype || c.type;
+    text.textContent = c.label || meta.label || c.subtype || c.type;
     g.appendChild(img);
     if (selection.includes(c)) {
       const rect = document.createElementNS(svgNS, 'rect');
@@ -301,14 +305,16 @@ function save(notify = true) {
   syncSchedules(notify);
 }
 
-function addComponent({ type, subtype }) {
+function addComponent(subtype) {
+  const meta = componentMeta[subtype];
+  if (!meta) return;
   const id = 'n' + Date.now();
   let x = 20, y = 20;
   if (gridEnabled) {
     x = Math.round(x / gridSize) * gridSize;
     y = Math.round(y / gridSize) * gridSize;
   }
-  components.push({ id, type, subtype, x, y, label: subtype, ref: '', connections: [] });
+  components.push({ id, type: meta.category, subtype, x, y, label: meta.label, ref: '', connections: [] });
   pushHistory();
   render();
   save();
@@ -598,11 +604,13 @@ function init() {
   const palette = document.getElementById('component-buttons');
   Object.entries(componentTypes).forEach(([type, subs]) => {
     subs.forEach(sub => {
+      const meta = componentMeta[sub];
       const btn = document.createElement('button');
       btn.dataset.type = type;
       btn.dataset.subtype = sub;
-      btn.innerHTML = `<img src="icons/${sub}.svg" alt="" aria-hidden="true"> ${sub}`;
-      btn.addEventListener('click', () => addComponent({ type, subtype: sub }));
+      btn.title = meta.label;
+      btn.innerHTML = `<img src="${meta.icon}" alt="" aria-hidden="true">`;
+      btn.addEventListener('click', () => addComponent(sub));
       palette.appendChild(btn);
     });
   });
