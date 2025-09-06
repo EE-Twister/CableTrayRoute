@@ -1012,6 +1012,7 @@ function init() {
   document.getElementById('distribute-h-btn').addEventListener('click', () => distributeSelection('h'));
   document.getElementById('distribute-v-btn').addEventListener('click', () => distributeSelection('v'));
   document.getElementById('export-btn').addEventListener('click', exportDiagram);
+  document.getElementById('export-pdf-btn').addEventListener('click', exportPDF);
   document.getElementById('import-btn').addEventListener('click', () => document.getElementById('import-input').click());
   document.getElementById('import-input').addEventListener('change', importDiagram);
   document.getElementById('add-sheet-btn').addEventListener('click', addSheet);
@@ -1535,6 +1536,34 @@ function exportDiagram() {
   a.download = 'oneline.json';
   a.click();
   URL.revokeObjectURL(a.href);
+}
+
+function serializeDiagram() {
+  const svg = document.getElementById('diagram');
+  const serializer = new XMLSerializer();
+  let source = serializer.serializeToString(svg);
+  if (!source.match(/^<svg[^>]+xmlns="http:\/\/www.w3.org\/2000\/svg"/)) {
+    source = source.replace(/^<svg/, '<svg xmlns="http://www.w3.org/2000/svg"');
+  }
+  return source;
+}
+
+async function exportPDF() {
+  const original = activeSheet;
+  const svgEl = document.getElementById('diagram');
+  const width = svgEl.viewBox.baseVal?.width || svgEl.width.baseVal.value;
+  const height = svgEl.viewBox.baseVal?.height || svgEl.height.baseVal.value;
+  const { jsPDF } = window.jspdf;
+  const pdf = new jsPDF({ orientation: width > height ? 'landscape' : 'portrait', unit: 'pt', format: [width, height] });
+  for (let i = 0; i < sheets.length; i++) {
+    loadSheet(i);
+    const svgString = serializeDiagram();
+    const svg = new DOMParser().parseFromString(svgString, 'image/svg+xml').documentElement;
+    await window.svg2pdf(svg, pdf, { x: 0, y: 0, width, height });
+    if (i < sheets.length - 1) pdf.addPage([width, height]);
+  }
+  loadSheet(original);
+  pdf.save('oneline.pdf');
 }
 
 async function importDiagram(e) {
