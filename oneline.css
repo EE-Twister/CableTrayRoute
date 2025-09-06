@@ -23,6 +23,11 @@
   font-family: var(--ol-font);
 }
 
+#palette-search {
+  display: block;
+  margin-bottom: var(--ol-spacing);
+}
+
 .grid-label {
   margin-left: var(--ol-spacing);
 }
