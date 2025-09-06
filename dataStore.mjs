@@ -26,6 +26,7 @@ const KEYS = {
   loads: 'loadList',
   equipment: 'equipment',
   oneLine: 'oneLineDiagram',
+  studies: 'studyResults',
   // Legacy aliases for backward compatibility
   traySchedule: 'traySchedule',
   cableSchedule: 'cableSchedule',
@@ -235,6 +236,17 @@ export const getOneLine = () => {
  * @param {OneLineSheet[]} sheets
  */
 export const setOneLine = sheets => write(KEYS.oneLine, { sheets });
+
+/**
+ * Retrieve persisted study results.
+ * @returns {Object}
+ */
+export const getStudies = () => read(KEYS.studies, {});
+/**
+ * Store study results.
+ * @param {Object} results
+ */
+export const setStudies = results => write(KEYS.studies, results);
 
 /**
  * @returns {GenericRecord[]}
@@ -554,6 +566,8 @@ if (typeof window !== 'undefined') {
     removeLoad,
     getOneLine,
     setOneLine,
+    getStudies,
+    setStudies,
     getItem,
     setItem,
     removeItem,

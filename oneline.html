@@ -29,6 +29,7 @@
       <a href="conduitfill.html">Conduit Fill</a>
       <a href="optimalRoute.html">Optimal Route</a>
       <a href="oneline.html" class="active" aria-current="page">One-Line</a>
+      <button id="studies-panel-btn" type="button">Studies</button>
       <button id="settings-btn" class="settings-btn" aria-label="Settings" aria-expanded="false">⚙</button>
     </div>
   </nav>
@@ -162,6 +163,18 @@
       </section>
     </main>
   </div>
+  <aside id="studies-panel" class="studies-panel hidden" aria-label="Studies">
+    <div class="studies-header">
+      <h2>Studies</h2>
+      <button id="studies-close-btn" class="studies-close-btn" aria-label="Close">&times;</button>
+    </div>
+    <div class="studies-controls">
+      <button id="run-loadflow-btn" type="button">Load Flow</button>
+      <button id="run-shortcircuit-btn" type="button">Short Circuit</button>
+      <button id="run-arcflash-btn" type="button">Arc Flash</button>
+    </div>
+    <pre id="study-results" class="study-results"></pre>
+  </aside>
   <aside id="lint-panel" class="lint-panel hidden" aria-label="Validation issues">
     <div class="lint-header">
       <h2>Fix-it Hints</h2>
