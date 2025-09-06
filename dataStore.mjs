@@ -290,8 +290,8 @@ export const removeEquipment = index => {
  * Retrieve saved one-line sheets. Supports legacy single-sheet format.
  * @returns {OneLineSheet[]}
  */
-export const getOneLine = () => {
-  const data = read(KEYS.oneLine, []);
+export const getOneLine = (scenario = currentScenario) => {
+  const data = read(KEYS.oneLine, [], scenario);
   if (Array.isArray(data)) {
     // legacy array of components
     return [{ name: 'Sheet 1', components: data }];
@@ -303,7 +303,30 @@ export const getOneLine = () => {
  * Persist one-line sheets
  * @param {OneLineSheet[]} sheets
  */
-export const setOneLine = sheets => write(KEYS.oneLine, { sheets });
+const REVISION_KEY = 'oneLineRevisions';
+
+export const getRevisions = (scenario = currentScenario) => read(REVISION_KEY, [], scenario);
+
+function addRevision(sheets, scenario = currentScenario) {
+  const revs = getRevisions(scenario);
+  revs.push({ time: Date.now(), sheets: JSON.parse(JSON.stringify(sheets)) });
+  write(REVISION_KEY, revs, scenario);
+}
+
+export const restoreRevision = (index, scenario = currentScenario) => {
+  const revs = getRevisions(scenario);
+  const rev = revs[index];
+  if (rev) {
+    write(KEYS.oneLine, { sheets: rev.sheets }, scenario);
+  }
+  return rev ? rev.sheets : null;
+};
+
+export const setOneLine = (sheets, scenario = currentScenario) => {
+  const prev = getOneLine(scenario);
+  if (Array.isArray(prev) && prev.length) addRevision(prev, scenario);
+  write(KEYS.oneLine, { sheets }, scenario);
+};
 
 /**
  * Retrieve persisted study results.
@@ -488,7 +511,7 @@ export function exportProject() {
       project.settings[key] = getItem(key);
     }
   }
-  const meta = { version: 1, scenario: currentScenario };
+  const meta = { version: 1, scenario: currentScenario, scenarios: listScenarios() };
   return { meta, ...project };
 }
 
@@ -563,6 +586,10 @@ export function exportToCad(fileType = 'json') {
  */
 export function importProject(obj) {
   const { meta, ...rest } = obj || {};
+  if (meta && Array.isArray(meta.scenarios)) {
+    scenarioList = meta.scenarios;
+    writeGlobal(SCENARIOS_KEY, scenarioList);
+  }
   if (meta && meta.scenario) switchScenario(meta.scenario);
   let data = rest;
   const { valid, missing, extra } = validateProjectSchema(data);
@@ -638,6 +665,8 @@ if (typeof window !== 'undefined') {
     removeLoad,
     getOneLine,
     setOneLine,
+    getRevisions,
+    restoreRevision,
     getStudies,
     setStudies,
     getItem,

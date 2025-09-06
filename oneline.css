@@ -161,6 +161,11 @@
   fill: #c00;
 }
 
+g.component.scenario-diff > * {
+  stroke: #d00 !important;
+  stroke-width: 2;
+}
+
 .issue-badge {
   pointer-events: none;
 }

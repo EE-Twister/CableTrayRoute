@@ -1,4 +1,4 @@
-import { getOneLine, setOneLine, setEquipment, setPanels, setLoads, getCables, setCables, getItem, setItem, getStudies, setStudies, on } from './dataStore.mjs';
+import { getOneLine, setOneLine, setEquipment, setPanels, setLoads, getCables, setCables, getItem, setItem, getStudies, setStudies, on, getCurrentScenario, switchScenario } from './dataStore.mjs';
 import { runLoadFlow } from './analysis/loadFlow.js';
 import { runShortCircuit } from './analysis/shortCircuit.js';
 import { runArcFlash } from './analysis/arcFlash.js';
@@ -2681,6 +2681,7 @@ function serializeState() {
     return { equipment: [...equipment, ...buses], panels: [...panels, ...buses], loads, cables };
   }
   return {
+    meta: { scenario: getCurrentScenario() },
     version: DIAGRAM_VERSION,
     templates: templates.map(t => ({ ...t })),
     scale: diagramScale,
@@ -2840,6 +2841,9 @@ async function importDiagram(e) {
   const text = await file.text();
   try {
     let data = JSON.parse(text);
+    if (data.meta && data.meta.scenario) {
+      switchScenario(data.meta.scenario);
+    }
     data = migrateDiagram(data);
     diagramScale = data.scale || { unitPerPx: 1, unit: 'in' };
     setItem('diagramScale', diagramScale);
