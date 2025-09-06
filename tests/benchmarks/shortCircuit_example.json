@@ -25,23 +25,24 @@
             "z1": {"r": 0, "x": 0.02},
             "z2": {"r": 0, "x": 0.02},
             "z0": {"r": 0, "x": 0.02}
-          }]
+          }],
+          "xr_ratio": 6
         }
       ]
     }
   ],
   "expected": {
     "bus13kV": {
-      "threePhaseKA": 23.9,
-      "lineToGroundKA": 20.49,
-      "lineToLineKA": 20.7,
-      "doubleLineGroundKA": 44.82
+      "threePhaseKA": 26.29,
+      "lineToGroundKA": 22.54,
+      "lineToLineKA": 22.77,
+      "doubleLineGroundKA": 49.3
     },
     "bus480V": {
-      "threePhaseKA": 19.4,
-      "lineToGroundKA": 19.4,
-      "lineToLineKA": 16.8,
-      "doubleLineGroundKA": 38.8
+      "threePhaseKA": 20.37,
+      "lineToGroundKA": 20.37,
+      "lineToLineKA": 17.64,
+      "doubleLineGroundKA": 40.74
     }
   }
 }

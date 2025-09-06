@@ -27,6 +27,7 @@
           "enclosure": "Box",
           "gap": 32,
           "working_distance": 455,
+          "electrode_config": "VCB",
           "tccId": "abb_tmax_160",
           "enclosure_height": 508,
           "enclosure_width": 508,
@@ -37,8 +38,8 @@
   ],
   "expected": {
     "BUS1": {
-      "incidentEnergy": 1.21,
-      "boundary": 457.1,
+      "incidentEnergy": 1.25,
+      "boundary": 463.6,
       "ppeCategory": 1,
       "clearingTime": 0.01
     }
