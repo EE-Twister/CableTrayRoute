@@ -8,6 +8,8 @@
   <link rel="icon" href="icons/favicon.svg" type="image/svg+xml">
   <link rel="stylesheet" href="style.css">
   <link rel="stylesheet" href="oneline.css">
+  <script src="https://cdn.jsdelivr.net/npm/jspdf@2.5.1/dist/jspdf.umd.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/svg2pdf.js@2.0.1/dist/svg2pdf.umd.min.js"></script>
   <script type="module" src="dataStore.mjs" defer></script>
   <script type="module" src="oneline.js" defer></script>
 </head>
@@ -78,6 +80,7 @@
           <button id="distribute-h-btn" class="icon-button" title="Distribute Horizontal" aria-label="Distribute Horizontal"><img src="icons/toolbar/distribute-h.svg" alt=""></button>
           <button id="distribute-v-btn" class="icon-button" title="Distribute Vertical" aria-label="Distribute Vertical"><img src="icons/toolbar/distribute-v.svg" alt=""></button>
           <button id="export-btn" class="icon-button" title="Export" aria-label="Export"><img src="icons/toolbar/export.svg" alt=""></button>
+          <button id="export-pdf-btn" title="Export PDF" aria-label="Export PDF">Export PDF</button>
           <input type="file" id="import-input" accept=".json" class="hidden-input">
           <button id="import-btn" class="icon-button" title="Import" aria-label="Import"><img src="icons/toolbar/import.svg" alt=""></button>
           <button id="validate-btn" class="icon-button" title="Validate" aria-label="Validate"><img src="icons/toolbar/validate.svg" alt=""></button>
