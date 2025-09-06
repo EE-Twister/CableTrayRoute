@@ -74,6 +74,98 @@ if (typeof window !== 'undefined') {
     modal.addEventListener('click', e => {
       if (e.target === modal) modal.style.display = 'none';
     });
+
+    const fieldMap = {
+      'EquipmentID': 'id',
+      'ID': 'id',
+      'Description': 'description',
+      'Voltage': 'voltage',
+      'Category': 'category',
+      'Sub-Category': 'subCategory',
+      'Manufacturer': 'manufacturer',
+      'Model': 'model',
+      'Phases': 'phases',
+      'Notes': 'notes',
+      'X': 'x',
+      'Y': 'y',
+      'Z': 'z'
+    };
+
+    const csvBtn = document.getElementById('import-csv-btn');
+    const csvInput = document.getElementById('import-csv-input');
+    if (csvBtn && csvInput) {
+      csvBtn.addEventListener('click', () => csvInput.click());
+      csvInput.addEventListener('change', e => {
+        importCsv(e.target.files[0]);
+        e.target.value = '';
+      });
+    }
+
+    const xmlBtn = document.getElementById('import-xml-btn');
+    const xmlInput = document.getElementById('import-xml-input');
+    if (xmlBtn && xmlInput) {
+      xmlBtn.addEventListener('click', () => xmlInput.click());
+      xmlInput.addEventListener('change', e => {
+        importXml(e.target.files[0]);
+        e.target.value = '';
+      });
+    }
+
+    function mapExternal(obj = {}) {
+      const row = {};
+      Object.keys(fieldMap).forEach(key => {
+        const internal = fieldMap[key];
+        row[internal] = obj[key] || obj[key.toLowerCase()] || '';
+      });
+      return row;
+    }
+
+    function importCsv(file) {
+      if (!file) return;
+      const reader = new FileReader();
+      reader.onload = e => {
+        const text = e.target.result;
+        const lines = text.split(/\r?\n/).filter(l => l.trim());
+        if (!lines.length) return;
+        const headers = lines.shift().split(',').map(h => h.trim());
+        const rows = lines.map(line => {
+          const cells = line.split(',');
+          const obj = {};
+          headers.forEach((h, i) => obj[h] = cells[i] ? cells[i].trim() : '');
+          return obj;
+        });
+        table.tbody.innerHTML = '';
+        rows.forEach(r => table.addRow(mapExternal(r)));
+        table.applyFilters();
+        table.save();
+        if (table.onChange) table.onChange();
+      };
+      reader.readAsText(file);
+    }
+
+    function importXml(file) {
+      if (!file) return;
+      const reader = new FileReader();
+      reader.onload = e => {
+        const text = e.target.result;
+        const doc = new DOMParser().parseFromString(text, 'application/xml');
+        const items = Array.from(doc.getElementsByTagName('equipment'))
+          .concat(Array.from(doc.getElementsByTagName('item')));
+        table.tbody.innerHTML = '';
+        items.forEach(el => {
+          const obj = {};
+          Object.keys(fieldMap).forEach(key => {
+            const n = el.getElementsByTagName(key)[0];
+            if (n) obj[key] = n.textContent;
+          });
+          table.addRow(mapExternal(obj));
+        });
+        table.applyFilters();
+        table.save();
+        if (table.onChange) table.onChange();
+      };
+      reader.readAsText(file);
+    }
   });
 }
 
