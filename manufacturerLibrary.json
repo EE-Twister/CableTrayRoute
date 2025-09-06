@@ -1,0 +1,62 @@
+{
+  "MLO": {
+    "manufacturer": "Generic",
+    "model": "MLO-1000",
+    "voltage": 480,
+    "ratings": "1000A"
+  },
+  "MCC": {
+    "manufacturer": "Generic",
+    "model": "MCC-200",
+    "voltage": 480,
+    "ratings": "200A"
+  },
+  "Generator": {
+    "manufacturer": "Generic",
+    "model": "GEN-500",
+    "voltage": 480,
+    "ratings": "500kW"
+  },
+  "UPS": {
+    "manufacturer": "Generic",
+    "model": "UPS-100",
+    "voltage": 480,
+    "ratings": "100kVA"
+  },
+  "Transformer": {
+    "manufacturer": "Generic",
+    "model": "XFMR-75",
+    "voltage": 480,
+    "ratings": "75kVA"
+  },
+  "Switchgear": {
+    "manufacturer": "Generic",
+    "model": "SWG-1200",
+    "voltage": 480,
+    "ratings": "1200A"
+  },
+  "Motor": {
+    "manufacturer": "Generic",
+    "model": "MTR-10",
+    "voltage": 480,
+    "ratings": "10HP"
+  },
+  "CapacitorBank": {
+    "manufacturer": "Generic",
+    "model": "CAP-50",
+    "voltage": 480,
+    "ratings": "50kVAR"
+  },
+  "PVArray": {
+    "manufacturer": "Generic",
+    "model": "PV-100",
+    "voltage": 600,
+    "ratings": "100kW"
+  },
+  "Load": {
+    "manufacturer": "Generic",
+    "model": "LOAD-1",
+    "voltage": 480,
+    "ratings": "10kW"
+  }
+}
