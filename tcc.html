@@ -1,0 +1,70 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="description" content="Time-current curve plotting tool.">
+  <title>Time-Current Curves</title>
+  <link rel="icon" href="icons/favicon.svg" type="image/svg+xml">
+  <link rel="stylesheet" href="style.css">
+  <script type="module" src="dataStore.mjs" defer></script>
+  <script type="module" src="analysis/tcc.js" defer></script>
+</head>
+<body>
+  <a href="#main-content" class="skip-link">Skip to main content</a>
+  <nav class="top-nav">
+    <button id="nav-toggle" class="nav-toggle" aria-label="Toggle navigation" aria-controls="nav-links" aria-expanded="false">☰</button>
+    <div id="nav-links" class="nav-links">
+      <a href="index.html">Home</a>
+      <a href="equipmentlist.html">Equipment List</a>
+      <a href="loadlist.html">Load List</a>
+      <a href="cableschedule.html">Cable Schedule</a>
+      <a href="panelschedule.html">Panel Schedule</a>
+      <a href="racewayschedule.html">Raceway Schedule</a>
+      <a href="ductbankroute.html">Ductbank</a>
+      <a href="cabletrayfill.html">Tray Fill</a>
+      <a href="conduitfill.html">Conduit Fill</a>
+      <a href="optimalRoute.html">Optimal Route</a>
+      <a href="oneline.html">One-Line</a>
+      <a href="tcc.html" class="active" aria-current="page">TCC</a>
+      <button id="settings-btn" class="settings-btn" aria-label="Settings" aria-expanded="false">⚙</button>
+    </div>
+  </nav>
+  <div id="settings-menu" class="settings-menu">
+    <label><input type="checkbox" id="dark-toggle"> Dark Mode</label>
+    <label><input type="checkbox" id="compact-toggle" aria-label="Enable compact table mode"> Compact Mode</label>
+    <label for="unit-select">Units
+      <select id="unit-select">
+        <option value="imperial">Imperial</option>
+        <option value="metric">Metric</option>
+      </select>
+    </label>
+    <button id="help-btn" aria-expanded="false">Site Help</button>
+    <button id="export-project-btn">Export Project</button>
+    <button id="import-project-btn">Import Project</button>
+    <input type="file" id="import-project-input" accept=".ctr.json" class="hidden-input">
+  </div>
+  <div class="container">
+    <main id="main-content" class="main-content">
+      <header class="page-header">
+        <h1>Time-Current Curves</h1>
+        <p>Plot and compare protective device curves.</p>
+      </header>
+      <section class="card">
+        <div id="tcc-controls" class="tcc-controls">
+          <label>Downstream
+            <select id="downstream-select"></select>
+          </label>
+          <label>Upstream
+            <select id="upstream-select"></select>
+          </label>
+          <button id="plot-btn" type="button">Plot</button>
+          <button id="link-btn" type="button" style="display:none;">Link to Component</button>
+        </div>
+        <svg id="tcc-chart" width="800" height="600"></svg>
+        <div id="violation" class="violation"></div>
+      </section>
+    </main>
+  </div>
+</body>
+</html>
