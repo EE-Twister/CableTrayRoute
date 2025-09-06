@@ -1,4 +1,7 @@
-import { getOneLine, setOneLine, setEquipment, setPanels, setLoads, getCables, setCables, getItem, setItem } from './dataStore.mjs';
+import { getOneLine, setOneLine, setEquipment, setPanels, setLoads, getCables, setCables, getItem, setItem, getStudies, setStudies } from './dataStore.mjs';
+import { runLoadFlow } from './analysis/loadFlow.js';
+import { runShortCircuit } from './analysis/shortCircuit.js';
+import { runArcFlash } from './analysis/arcFlash.js';
 
 let componentMeta = {};
 
@@ -98,6 +101,52 @@ const lintPanel = document.getElementById('lint-panel');
 const lintList = document.getElementById('lint-list');
 const lintCloseBtn = document.getElementById('lint-close-btn');
 if (lintCloseBtn) lintCloseBtn.addEventListener('click', () => lintPanel.classList.add('hidden'));
+
+// Studies panel setup
+const studiesPanel = document.getElementById('studies-panel');
+const studiesToggle = document.getElementById('studies-panel-btn');
+const studiesCloseBtn = document.getElementById('studies-close-btn');
+const runLFBtn = document.getElementById('run-loadflow-btn');
+const runSCBtn = document.getElementById('run-shortcircuit-btn');
+const runAFBtn = document.getElementById('run-arcflash-btn');
+const studyResultsEl = document.getElementById('study-results');
+
+function renderStudyResults() {
+  if (!studyResultsEl) return;
+  const res = getStudies();
+  studyResultsEl.textContent = Object.keys(res).length ? JSON.stringify(res, null, 2) : 'No results';
+}
+
+if (studiesToggle) {
+  studiesToggle.addEventListener('click', () => {
+    studiesPanel.classList.toggle('hidden');
+    renderStudyResults();
+  });
+}
+if (studiesCloseBtn) studiesCloseBtn.addEventListener('click', () => studiesPanel.classList.add('hidden'));
+if (runLFBtn) runLFBtn.addEventListener('click', () => {
+  const res = runLoadFlow();
+  const studies = getStudies();
+  studies.loadFlow = res;
+  setStudies(studies);
+  renderStudyResults();
+});
+if (runSCBtn) runSCBtn.addEventListener('click', () => {
+  const res = runShortCircuit();
+  const studies = getStudies();
+  studies.shortCircuit = res;
+  setStudies(studies);
+  renderStudyResults();
+});
+if (runAFBtn) runAFBtn.addEventListener('click', () => {
+  const sc = runShortCircuit();
+  const af = runArcFlash();
+  const studies = getStudies();
+  studies.shortCircuit = sc;
+  studies.arcFlash = af;
+  setStudies(studies);
+  renderStudyResults();
+});
 
 // Guided tour steps
 const tourSteps = [

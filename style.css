@@ -1808,6 +1808,34 @@ body.dark-mode .workflow-card-title {
     margin-bottom: 0.5rem;
 }
 
+.studies-panel {
+    position: fixed;
+    bottom: 1rem;
+    right: 1rem;
+    width: 320px;
+    max-height: calc(100% - 4.5rem);
+    overflow-y: auto;
+    background: var(--secondary-color);
+    color: var(--text-color);
+    border: 1px solid var(--border-color);
+    box-shadow: 0 2px 6px rgba(0,0,0,0.15);
+    padding: 1rem;
+    z-index: 1000;
+}
+
+.studies-panel.hidden {
+    display: none;
+}
+
+.study-results {
+    white-space: pre-wrap;
+    background: var(--bg-color);
+    border: 1px solid var(--border-color);
+    padding: 0.5rem;
+    margin-top: 0.5rem;
+    font-size: 0.85rem;
+}
+
 .lint-header {
     display: flex;
     justify-content: space-between;
