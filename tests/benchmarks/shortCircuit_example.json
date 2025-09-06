@@ -1,0 +1,47 @@
+{
+  "oneLine": [
+    {
+      "name": "S1",
+      "components": [
+        {
+          "id": "bus13kV",
+          "kV": 13.8,
+          "z1": {"r": 0, "x": 1},
+          "z2": {"r": 0, "x": 1},
+          "z0": {"r": 0, "x": 1},
+          "sources": [{
+            "z1": {"r": 0, "x": 0.5},
+            "z2": {"r": 0, "x": 0.5},
+            "z0": {"r": 0, "x": 1}
+          }]
+        },
+        {
+          "id": "bus480V",
+          "kV": 0.48,
+          "z1": {"r": 0, "x": 0.05},
+          "z2": {"r": 0, "x": 0.05},
+          "z0": {"r": 0, "x": 0.05},
+          "sources": [{
+            "z1": {"r": 0, "x": 0.02},
+            "z2": {"r": 0, "x": 0.02},
+            "z0": {"r": 0, "x": 0.02}
+          }]
+        }
+      ]
+    }
+  ],
+  "expected": {
+    "bus13kV": {
+      "threePhaseKA": 23.9,
+      "lineToGroundKA": 20.49,
+      "lineToLineKA": 20.7,
+      "doubleLineGroundKA": 44.82
+    },
+    "bus480V": {
+      "threePhaseKA": 19.4,
+      "lineToGroundKA": 19.4,
+      "lineToLineKA": 16.8,
+      "doubleLineGroundKA": 38.8
+    }
+  }
+}

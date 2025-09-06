@@ -1,0 +1,46 @@
+{
+  "tccSettings": {
+    "devices": ["abb_tmax_160"],
+    "settings": {
+      "abb_tmax_160": {
+        "pickup": 160,
+        "delay": 0.2,
+        "instantaneous": 80
+      }
+    }
+  },
+  "oneLine": [
+    {
+      "name": "S1",
+      "components": [
+        {
+          "id": "BUS1",
+          "kV": 0.48,
+          "z1": {"r": 0, "x": 0.05},
+          "z2": {"r": 0, "x": 0.05},
+          "z0": {"r": 0, "x": 0.05},
+          "sources": [{
+            "z1": {"r": 0, "x": 0.02},
+            "z2": {"r": 0, "x": 0.02},
+            "z0": {"r": 0, "x": 0.02}
+          }],
+          "enclosure": "Box",
+          "gap": 32,
+          "working_distance": 455,
+          "tccId": "abb_tmax_160",
+          "enclosure_height": 508,
+          "enclosure_width": 508,
+          "enclosure_depth": 508
+        }
+      ]
+    }
+  ],
+  "expected": {
+    "BUS1": {
+      "incidentEnergy": 1.21,
+      "boundary": 457.1,
+      "ppeCategory": 1,
+      "clearingTime": 0.01
+    }
+  }
+}
