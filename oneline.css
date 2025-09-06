@@ -65,6 +65,10 @@
   margin-left: var(--ol-spacing);
 }
 
+.scale-label {
+  margin-left: var(--ol-spacing);
+}
+
 .hidden-input {
   display: none;
 }
@@ -190,6 +194,16 @@
   height: 12px;
   border: 1px solid var(--ol-border-color);
   display: inline-block;
+}
+
+.dimension {
+  stroke: #000;
+}
+
+.dim-label {
+  font-size: 10px;
+  fill: #000;
+  pointer-events: none;
 }
 
 @keyframes fadeIn {
