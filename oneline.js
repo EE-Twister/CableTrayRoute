@@ -669,6 +669,21 @@ function init() {
       palette.appendChild(btn);
     });
   });
+  const paletteSearch = document.getElementById('palette-search');
+  paletteSearch.addEventListener('input', () => {
+    const term = paletteSearch.value.trim().toLowerCase();
+    palette.querySelectorAll('button').forEach(btn => {
+      const sub = btn.dataset.subtype.toLowerCase();
+      const label = (componentMeta[btn.dataset.subtype]?.label || '').toLowerCase();
+      btn.style.display = !term || sub.includes(term) || label.includes(term) ? '' : 'none';
+    });
+  });
+  paletteSearch.addEventListener('keydown', e => {
+    if (e.key === 'Escape') {
+      paletteSearch.value = '';
+      paletteSearch.dispatchEvent(new Event('input'));
+    }
+  });
   document.getElementById('connect-btn').addEventListener('click', () => {
     connectMode = true;
     connectSource = null;
