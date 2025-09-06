@@ -11,6 +11,7 @@ const typeIcons = {
 let propSchemas = {};
 let subtypeCategory = {};
 let componentTypes = {};
+let manufacturerDefaults = {};
 
 async function loadComponentLibrary() {
   try {
@@ -31,6 +32,18 @@ async function loadComponentLibrary() {
   }
 }
 
+async function loadManufacturerLibrary() {
+  try {
+    const res = await fetch('manufacturerLibrary.json');
+    manufacturerDefaults = await res.json();
+  } catch (err) {
+    console.error('Failed to load manufacturer defaults', err);
+    manufacturerDefaults = {};
+  }
+  const stored = getItem('manufacturerDefaults', {});
+  manufacturerDefaults = { ...manufacturerDefaults, ...stored };
+}
+
 function rebuildComponentMaps() {
   subtypeCategory = {};
   componentTypes = {};
@@ -38,6 +51,16 @@ function rebuildComponentMaps() {
     subtypeCategory[sub] = meta.category;
     if (!componentTypes[meta.category]) componentTypes[meta.category] = [];
     componentTypes[meta.category].push(sub);
+  });
+}
+
+function applyDefaults(comp) {
+  const defs = manufacturerDefaults[comp.subtype];
+  if (!defs) return;
+  Object.entries(defs).forEach(([k, v]) => {
+    if (comp[k] === undefined || comp[k] === '') {
+      comp[k] = v;
+    }
   });
 }
 
@@ -87,6 +110,70 @@ function editPrefixes() {
   });
   labelPrefixes = prefixes;
   setItem('labelPrefixes', labelPrefixes);
+}
+
+function editManufacturerDefaults() {
+  const modal = document.getElementById('defaults-modal');
+  modal.innerHTML = '';
+  const form = document.createElement('form');
+
+  const subtypeLabel = document.createElement('label');
+  subtypeLabel.textContent = 'Subtype ';
+  const subtypeSelect = document.createElement('select');
+  Object.keys(componentMeta).forEach(sub => {
+    const opt = document.createElement('option');
+    opt.value = sub;
+    opt.textContent = sub;
+    subtypeSelect.appendChild(opt);
+  });
+  subtypeLabel.appendChild(subtypeSelect);
+  form.appendChild(subtypeLabel);
+
+  const fields = ['manufacturer', 'model', 'voltage', 'ratings'];
+  const inputs = {};
+  fields.forEach(f => {
+    const lbl = document.createElement('label');
+    lbl.textContent = f.charAt(0).toUpperCase() + f.slice(1) + ' ';
+    const input = document.createElement('input');
+    input.type = f === 'voltage' ? 'number' : 'text';
+    lbl.appendChild(input);
+    form.appendChild(lbl);
+    inputs[f] = input;
+  });
+
+  function loadValues() {
+    const defs = manufacturerDefaults[subtypeSelect.value] || {};
+    fields.forEach(f => {
+      inputs[f].value = defs[f] || '';
+    });
+  }
+  subtypeSelect.addEventListener('change', loadValues);
+  loadValues();
+
+  const saveBtn = document.createElement('button');
+  saveBtn.type = 'submit';
+  saveBtn.textContent = 'Save';
+  form.appendChild(saveBtn);
+  const cancelBtn = document.createElement('button');
+  cancelBtn.type = 'button';
+  cancelBtn.textContent = 'Cancel';
+  cancelBtn.addEventListener('click', () => modal.classList.remove('show'));
+  form.appendChild(cancelBtn);
+
+  form.addEventListener('submit', e => {
+    e.preventDefault();
+    const sub = subtypeSelect.value;
+    manufacturerDefaults[sub] = {};
+    fields.forEach(f => {
+      manufacturerDefaults[sub][f] = inputs[f].value;
+    });
+    setItem('manufacturerDefaults', manufacturerDefaults);
+    modal.classList.remove('show');
+    showToast('Defaults updated');
+  });
+
+  modal.appendChild(form);
+  modal.classList.add('show');
 }
 
 // --- Tooltip module ---
@@ -303,7 +390,7 @@ function nearestPorts(src, tgt) {
 }
 
 function normalizeComponent(c) {
-  return {
+  const nc = {
     ...c,
     rotation: c.rotation ?? c.rot ?? 0,
     flipped: c.flipped || false,
@@ -311,6 +398,8 @@ function normalizeComponent(c) {
       typeof conn === 'string' ? { target: conn } : conn
     )
   };
+  applyDefaults(nc);
+  return nc;
 }
 
 function render() {
@@ -652,7 +741,7 @@ function addComponent(subtype) {
     x = Math.round(x / gridSize) * gridSize;
     y = Math.round(y / gridSize) * gridSize;
   }
-  components.push({
+  const comp = {
     id,
     type: meta.category,
     subtype,
@@ -663,7 +752,9 @@ function addComponent(subtype) {
     rotation: 0,
     flipped: false,
     connections: []
-  });
+  };
+  applyDefaults(comp);
+  components.push(comp);
   pushHistory();
   render();
   save();
@@ -725,22 +816,24 @@ function selectComponent(comp) {
     const lbl = document.createElement('label');
     lbl.textContent = f.label + ' ';
     let input;
+    const defVal = manufacturerDefaults[comp.subtype]?.[f.name] || '';
+    const curVal = comp[f.name] !== undefined && comp[f.name] !== '' ? comp[f.name] : defVal;
     if (f.type === 'select') {
       input = document.createElement('select');
       (f.options || []).forEach(opt => {
         const o = document.createElement('option');
         o.value = opt;
         o.textContent = opt;
-        if ((comp[f.name] || '') == opt) o.selected = true;
+        if (curVal == opt) o.selected = true;
         input.appendChild(o);
       });
     } else if (f.type === 'textarea') {
       input = document.createElement('textarea');
-      input.value = comp[f.name] || '';
+      input.value = curVal;
     } else {
       input = document.createElement('input');
       input.type = f.type || 'text';
-      input.value = comp[f.name] || '';
+      input.value = curVal;
     }
     input.name = f.name;
     lbl.appendChild(input);
@@ -979,6 +1072,7 @@ function chooseCable(source, target, existing = null) {
 }
 
 async function init() {
+  await loadManufacturerLibrary();
   await loadComponentLibrary();
   sheets = getOneLine().map((s, i) => ({
     name: s.name || `Sheet ${i + 1}`,
@@ -1042,6 +1136,9 @@ async function init() {
 
   const prefixBtn = document.getElementById('prefix-settings-btn');
   if (prefixBtn) prefixBtn.addEventListener('click', editPrefixes);
+
+  const defaultsBtn = document.getElementById('update-defaults-btn');
+  if (defaultsBtn) defaultsBtn.addEventListener('click', editManufacturerDefaults);
 
   const palette = document.getElementById('component-buttons');
   const sectionContainers = {
