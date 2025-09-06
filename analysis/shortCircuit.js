@@ -18,13 +18,15 @@ function parallel(a, b) {
 }
 
 /**
- * Compute symmetrical component short-circuit currents.
- * Each component may define sequence impedances z1, z2, z0
- * (objects with r and x in ohms). If not supplied, the
- * generic `impedance` is used for all sequences. Results
- * include 3‑phase, line‑to‑ground, line‑to‑line and
- * double‑line‑to‑ground faults in kA for a 1 kV source.
- * Returns a map id -> { threePhaseKA, lineToGroundKA, lineToLineKA, doubleLineGroundKA }.
+ * Symmetrical-component short-circuit engine.
+ * Each component represents a bus with total sequence impedances to the
+ * upstream source. Optional `sources` array allows parallel generator or
+ * motor contributions. Fault currents are returned in kA for 3‑phase,
+ * line‑to‑ground, line‑to‑line and double‑line‑to‑ground faults per
+ * ANSI/IEC methods.
+ *
+ * Components may specify `kV` (line‑to‑line), sequence impedances `z1`,
+ * `z2`, `z0` (objects with r & x in ohms) and `sources` [{z1,z2,z0}].
  */
 export function runShortCircuit() {
   const sheets = getOneLine();
@@ -32,26 +34,25 @@ export function runShortCircuit() {
     ? sheets.flatMap(s => s.components)
     : sheets;
   const results = {};
-  let z1 = { r: 0, x: 0 };
-  let z2 = { r: 0, x: 0 };
-  let z0 = { r: 0, x: 0 };
   comps.forEach(comp => {
     const base = comp.impedance || { r: 0, x: 0 };
-    const a1 = comp.z1 || base;
-    const a2 = comp.z2 || a1;
-    const a0 = comp.z0 || a1;
-    z1 = add(z1, a1);
-    z2 = add(z2, a2);
-    z0 = add(z0, a0);
-    const Z1 = z1;
-    const Z2 = z2;
-    const Z0 = z0;
-    const V = 1; // kV base
-    const I3 = V / mag(Z1);
-    const ILG = (3 * V) / mag(add(add(Z1, Z2), Z0));
-    const ILL = (Math.sqrt(3) * V) / mag(add(Z1, Z2));
-    const Z2Z0 = parallel(Z2, Z0);
-    const IDLG = (3 * V) / mag(add(Z1, Z2Z0));
+    let z1 = comp.z1 || base;
+    let z2 = comp.z2 || z1;
+    let z0 = comp.z0 || z1;
+    (comp.sources || []).forEach(src => {
+      const s1 = src.z1 || src.impedance || { r: 0, x: 0 };
+      const s2 = src.z2 || s1;
+      const s0 = src.z0 || s1;
+      z1 = parallel(z1, s1);
+      z2 = parallel(z2, s2);
+      z0 = parallel(z0, s0);
+    });
+    const V = (comp.kV || 1) / Math.sqrt(3); // phase voltage in kV
+    const I3 = V / mag(z1);
+    const ILG = (3 * V) / mag(add(add(z1, z2), z0));
+    const ILL = (Math.sqrt(3) * V) / mag(add(z1, z2));
+    const Z2Z0 = parallel(z2, z0);
+    const IDLG = (3 * V) / mag(add(z1, Z2Z0));
     results[comp.id] = {
       threePhaseKA: Number(I3.toFixed(2)),
       lineToGroundKA: Number(ILG.toFixed(2)),
@@ -61,3 +62,4 @@ export function runShortCircuit() {
   });
   return results;
 }
+
