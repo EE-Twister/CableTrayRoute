@@ -23,6 +23,18 @@ let subtypeCategory = {};
 let componentTypes = {};
 let manufacturerDefaults = {};
 
+const kvClasses = ['0.48 kV', '5 kV', '15 kV', '25 kV'];
+const thermalRatings = ['75C', '90C', '105C'];
+const manufacturerModels = {
+  ABB: ['MNS', 'SafeGear'],
+  Siemens: ['SB1', 'S6'],
+  GE: ['EntelliGuard', 'Spectra'],
+  Schneider: ['QED-2', 'Blokset'],
+  Caterpillar: ['XQ125', 'C175'],
+  Cummins: ['C900', 'QSK60'],
+  Generac: ['G2000', 'Industrial']
+};
+
 async function loadComponentLibrary() {
   let data = [];
   try {
@@ -1054,15 +1066,33 @@ function selectComponent(comp) {
   modal.innerHTML = '';
   const form = document.createElement('form');
   form.id = 'prop-form';
-  const schema = propSchemas[comp.subtype] || [];
+  const rawSchema = propSchemas[comp.subtype] || [];
+  const schema = rawSchema.map(f => {
+    if (f.name === 'voltage_class') {
+      return { ...f, type: 'select', options: kvClasses };
+    }
+    if (f.name === 'thermal_rating') {
+      return { ...f, type: 'select', options: thermalRatings };
+    }
+    if (f.name === 'manufacturer') {
+      return { ...f, type: 'select', options: Object.keys(manufacturerModels) };
+    }
+    if (f.name === 'model') {
+      const manu = comp.manufacturer || Object.keys(manufacturerModels)[0];
+      return { ...f, type: 'select', options: manufacturerModels[manu] || [] };
+    }
+    return f;
+  });
   const baseFields = [
     { name: 'label', label: 'Label', type: 'text' },
     { name: 'ref', label: 'Ref ID', type: 'text' },
-    { name: 'enclosure', label: 'Enclosure Type', type: 'select', options: ['Box', 'Open'] },
+    { name: 'enclosure', label: 'Enclosure', type: 'select', options: ['NEMA 1', 'NEMA 3R', 'NEMA 4', 'NEMA 4X'] },
     { name: 'gap', label: 'Gap (mm)', type: 'number' },
     { name: 'working_distance', label: 'Working Distance (mm)', type: 'number' },
     { name: 'clearing_time', label: 'Clearing Time (s)', type: 'number' }
   ];
+  let manufacturerInput = null;
+  let modelInput = null;
   [...baseFields, ...schema].forEach(f => {
     const lbl = document.createElement('label');
     lbl.textContent = f.label + ' ';
@@ -1091,9 +1121,27 @@ function selectComponent(comp) {
       input.value = curVal;
     }
     input.name = f.name;
+    if (f.name === 'manufacturer') manufacturerInput = input;
+    if (f.name === 'model') modelInput = input;
     lbl.appendChild(input);
     form.appendChild(lbl);
   });
+  if (manufacturerInput && modelInput) {
+    const updateModels = () => {
+      const models = manufacturerModels[manufacturerInput.value] || [];
+      modelInput.innerHTML = '';
+      models.forEach(m => {
+        const o = document.createElement('option');
+        o.value = m;
+        o.textContent = m;
+        if (comp.model === m) o.selected = true;
+        modelInput.appendChild(o);
+      });
+    };
+    manufacturerInput.addEventListener('change', updateModels);
+    if (!manufacturerInput.value) manufacturerInput.value = Object.keys(manufacturerModels)[0];
+    updateModels();
+  }
   const tccLbl = document.createElement('label');
   tccLbl.textContent = 'TCC Device ';
   const tccInput = document.createElement('input');
@@ -2140,6 +2188,9 @@ function syncSchedules(notify = true) {
       description: c.label,
       manufacturer: c.manufacturer ?? '',
       model: c.model ?? '',
+      voltage_class: c.voltage_class ?? '',
+      enclosure: c.enclosure ?? '',
+      thermal_rating: c.thermal_rating ?? '',
       phases: c.phases ?? '',
       notes: c.notes ?? '',
       voltage: c.voltage ?? '',

@@ -18,9 +18,12 @@
     "cable_assembly": "Tray Cable"
   },
   "Generator": {
-    "manufacturer": "Generic",
-    "model": "GEN-500",
+    "manufacturer": "Caterpillar",
+    "model": "XQ125",
     "voltage": 480,
+    "voltage_class": "0.48 kV",
+    "thermal_rating": "90C",
+    "enclosure": "NEMA 3R",
     "rating": "500kW",
     "breaker_frame": "400A",
     "conductor_type": "XHHW",
@@ -45,11 +48,38 @@
     "cable_assembly": "MC Cable"
   },
   "Switchgear": {
-    "manufacturer": "Generic",
-    "model": "SWG-1200",
+    "manufacturer": "GE",
+    "model": "EntelliGuard",
     "voltage": 480,
+    "voltage_class": "0.48 kV",
+    "thermal_rating": "90C",
+    "enclosure": "NEMA 1",
     "rating": "1200A",
     "breaker_frame": "1200A",
+    "conductor_type": "THHN",
+    "cable_assembly": "Tray Cable"
+  },
+  "Switchboard": {
+    "manufacturer": "ABB",
+    "model": "MNS",
+    "voltage": 480,
+    "voltage_class": "0.48 kV",
+    "thermal_rating": "90C",
+    "enclosure": "NEMA 1",
+    "rating": "1200A",
+    "breaker_frame": "1200A",
+    "conductor_type": "THHN",
+    "cable_assembly": "Tray Cable"
+  },
+  "Feeder": {
+    "manufacturer": "Siemens",
+    "model": "SB1",
+    "voltage": 480,
+    "voltage_class": "0.48 kV",
+    "thermal_rating": "90C",
+    "enclosure": "NEMA 1",
+    "rating": "400A",
+    "breaker_frame": "400A",
     "conductor_type": "THHN",
     "cable_assembly": "Tray Cable"
   },
