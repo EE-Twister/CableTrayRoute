@@ -7,6 +7,40 @@ function parseNum(val) {
   return m ? Number(m[1]) : 0;
 }
 
+// Parse load torque curve formatted as "speedPct:torquePct" pairs
+function parseTorqueCurve(spec) {
+  if (!spec) return () => 0;
+  const pts = [];
+  if (Array.isArray(spec)) {
+    spec.forEach(p => {
+      const [s, t] = p.split(':');
+      pts.push({ s: Number(s), t: Number(t) });
+    });
+  } else if (typeof spec === 'string') {
+    spec.split(/[\,\s]+/).forEach(p => {
+      if (!p) return;
+      const [s, t] = p.split(':');
+      pts.push({ s: Number(s), t: Number(t) });
+    });
+  }
+  pts.sort((a, b) => a.s - b.s);
+  return (speedFrac) => {
+    const sp = speedFrac * 100;
+    let p1 = pts[0] || { s: 0, t: 0 };
+    let p2 = pts[pts.length - 1] || { s: 100, t: 100 };
+    for (let i = 0; i < pts.length - 1; i++) {
+      if (sp >= pts[i].s && sp <= pts[i + 1].s) {
+        p1 = pts[i];
+        p2 = pts[i + 1];
+        break;
+      }
+    }
+    const ratio = (sp - p1.s) / ((p2.s - p1.s) || 1);
+    const torquePct = p1.t + (p2.t - p1.t) * ratio;
+    return torquePct / 100;
+  };
+}
+
 /**
  * Estimate voltage sag during motor starting using a simple Thevenin model.
  * Motors may define inrushMultiple, thevenin_r, thevenin_x, inertia and load_torque.
@@ -28,19 +62,37 @@ export function runMotorStart() {
     const Ifl = hp * 746 / (Math.sqrt(3) * V * pf * eff || 1);
     const Ilr = Ifl * multiple;
     const Zth = Math.hypot(Number(c.thevenin_r) || 0, Number(c.thevenin_x) || 0);
-    const drop = Ilr * Zth;
-    const sagPct = (drop / V) * 100;
     const inertia = Number(c.inertia) || 0;
-    const loadT = Number(c.load_torque) || 0;
     const speed = Number(c.speed) || 1800;
-    const torque = hp ? (hp * 746) / (2 * Math.PI * speed / 60) : 0;
-    const accelT = Math.max(torque - loadT, 1);
+    const baseTorque = hp ? (hp * 746) / (2 * Math.PI * speed / 60) : 0;
+    const loadCurve = parseTorqueCurve(c.load_torque_curve || c.load_torque);
+
+    let w = 0; // mechanical speed rad/s
     const wSync = 2 * Math.PI * speed / 60;
-    const t = inertia ? (inertia * wSync) / accelT : 0;
+    const dt = 0.01;
+    let time = 0;
+    let maxDrop = 0;
+    while (w < wSync && time < 60) {
+      const slip = Math.max(1 - w / wSync, 0.001);
+      let I = Ilr * slip;
+      let Vdrop = I * Zth;
+      let Vterm = V - Vdrop;
+      I = Ilr * slip * (Vterm / V);
+      Vdrop = I * Zth;
+      Vterm = V - Vdrop;
+      const Tm = baseTorque * (Vterm / V) * (Vterm / V) * slip;
+      const Tl = baseTorque * loadCurve(w / wSync);
+      const accel = inertia ? (Tm - Tl) / inertia : 0;
+      w += accel * dt;
+      time += dt;
+      if (Vdrop > maxDrop) maxDrop = Vdrop;
+      if (slip < 0.01) break;
+    }
+    const sagPct = (maxDrop / V) * 100;
     results[c.id] = {
       inrushKA: Number((Ilr / 1000).toFixed(2)),
       voltageSagPct: Number(sagPct.toFixed(2)),
-      accelTime: Number(t.toFixed(2))
+      accelTime: Number(time.toFixed(2))
     };
   });
   return results;
