@@ -92,6 +92,8 @@ let historyIndex = -1;
 let validationIssues = [];
 const compWidth = 80;
 const compHeight = 40;
+let templates = [];
+let cursorPos = { x: 20, y: 20 };
 
 // --- Tooltip module ---
 const tooltip = document.createElement('div');
@@ -148,6 +150,79 @@ function redo() {
     render();
     save();
   }
+}
+
+function loadTemplates() {
+  try {
+    templates = JSON.parse(localStorage.getItem('onelineTemplates')) || [];
+  } catch {
+    templates = [];
+  }
+}
+
+function saveTemplates() {
+  localStorage.setItem('onelineTemplates', JSON.stringify(templates));
+}
+
+function renderTemplates() {
+  const container = document.getElementById('template-buttons');
+  if (!container) return;
+  container.innerHTML = '';
+  templates.forEach(t => {
+    const btn = document.createElement('button');
+    btn.textContent = t.name;
+    btn.dataset.subtype = t.component.subtype;
+    btn.dataset.label = t.name;
+    btn.addEventListener('click', () => addTemplateComponent(t.component));
+    container.appendChild(btn);
+  });
+}
+
+function addTemplateComponent(data) {
+  const id = 'n' + Date.now();
+  let x = cursorPos.x;
+  let y = cursorPos.y;
+  if (gridEnabled) {
+    x = Math.round(x / gridSize) * gridSize;
+    y = Math.round(y / gridSize) * gridSize;
+  }
+  components.push({
+    id,
+    ...JSON.parse(JSON.stringify(data)),
+    x,
+    y,
+    connections: []
+  });
+  pushHistory();
+  render();
+  save();
+}
+
+function exportTemplates() {
+  const blob = new Blob([JSON.stringify(templates, null, 2)], { type: 'application/json' });
+  const a = document.createElement('a');
+  a.href = URL.createObjectURL(blob);
+  a.download = 'onelineTemplates.json';
+  a.click();
+  URL.revokeObjectURL(a.href);
+}
+
+async function importTemplates(e) {
+  const file = e.target.files[0];
+  if (!file) return;
+  const text = await file.text();
+  try {
+    const data = JSON.parse(text);
+    if (Array.isArray(data)) {
+      templates = templates.concat(data);
+      saveTemplates();
+      renderTemplates();
+      showToast('Templates imported');
+    }
+  } catch (err) {
+    console.error('Failed to import templates', err);
+  }
+  e.target.value = '';
 }
 
 const cableColors = {
@@ -660,6 +735,28 @@ function selectComponent(comp) {
   saveBtn.type = 'submit';
   saveBtn.textContent = 'Save';
   form.appendChild(saveBtn);
+  const templateBtn = document.createElement('button');
+  templateBtn.type = 'button';
+  templateBtn.textContent = 'Save as Template';
+  templateBtn.addEventListener('click', () => {
+    const name = prompt('Template name', comp.label || comp.subtype);
+    if (!name) return;
+    const fd = new FormData(form);
+    const data = {
+      subtype: comp.subtype,
+      type: getCategory(comp),
+      rotation: comp.rotation || 0,
+      flipped: !!comp.flipped
+    };
+    [...baseFields, ...schema].forEach(f => {
+      data[f.name] = fd.get(f.name) || '';
+    });
+    templates.push({ name, component: data });
+    saveTemplates();
+    renderTemplates();
+    showToast('Template saved');
+  });
+  form.appendChild(templateBtn);
   const cancelBtn = document.createElement('button');
   cancelBtn.type = 'button';
   cancelBtn.textContent = 'Cancel';
@@ -886,8 +983,8 @@ function init() {
   paletteSearch.addEventListener('input', () => {
     const term = paletteSearch.value.trim().toLowerCase();
     palette.querySelectorAll('button').forEach(btn => {
-      const sub = btn.dataset.subtype.toLowerCase();
-      const label = (componentMeta[btn.dataset.subtype]?.label || '').toLowerCase();
+      const sub = (btn.dataset.subtype || '').toLowerCase();
+      const label = (btn.dataset.label || componentMeta[btn.dataset.subtype]?.label || '').toLowerCase();
       btn.style.display = !term || sub.includes(term) || label.includes(term) ? '' : 'none';
     });
   });
@@ -897,6 +994,11 @@ function init() {
       paletteSearch.dispatchEvent(new Event('input'));
     }
   });
+  loadTemplates();
+  renderTemplates();
+  document.getElementById('template-export-btn').addEventListener('click', exportTemplates);
+  document.getElementById('template-import-btn').addEventListener('click', () => document.getElementById('template-import-input').click());
+  document.getElementById('template-import-input').addEventListener('change', importTemplates);
   document.getElementById('connect-btn').addEventListener('click', () => {
     connectMode = true;
     connectSource = null;
@@ -990,6 +1092,9 @@ function init() {
     selected = comp;
     dragOffset = selection.map(c => ({ comp: c, dx: e.offsetX - c.x, dy: e.offsetY - c.y }));
     render();
+  });
+  svg.addEventListener('mousemove', e => {
+    cursorPos = { x: e.offsetX, y: e.offsetY };
   });
   svg.addEventListener('mousemove', e => {
     if (!dragOffset || !dragOffset.length) return;
