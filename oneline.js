@@ -2,6 +2,7 @@ import { getOneLine, setOneLine, setEquipment, setPanels, setLoads, getCables, s
 import { runLoadFlow } from './analysis/loadFlow.js';
 import { runShortCircuit } from './analysis/shortCircuit.js';
 import { runArcFlash } from './analysis/arcFlash.js';
+import { generateArcFlashReport } from './reports/arcFlashReport.mjs';
 import { sizeConductor } from './sizing.js';
 import { runValidation } from './validation/rules.js';
 
@@ -167,6 +168,7 @@ if (runAFBtn) runAFBtn.addEventListener('click', () => {
   studies.shortCircuit = sc;
   studies.arcFlash = af;
   setStudies(studies);
+  generateArcFlashReport(af);
   renderStudyResults();
 });
 
@@ -975,7 +977,11 @@ function selectComponent(comp) {
   const schema = propSchemas[comp.subtype] || [];
   const baseFields = [
     { name: 'label', label: 'Label', type: 'text' },
-    { name: 'ref', label: 'Ref ID', type: 'text' }
+    { name: 'ref', label: 'Ref ID', type: 'text' },
+    { name: 'enclosure', label: 'Enclosure Type', type: 'select', options: ['Box', 'Open'] },
+    { name: 'gap', label: 'Gap (mm)', type: 'number' },
+    { name: 'working_distance', label: 'Working Distance (mm)', type: 'number' },
+    { name: 'clearing_time', label: 'Clearing Time (s)', type: 'number' }
   ];
   [...baseFields, ...schema].forEach(f => {
     const lbl = document.createElement('label');
@@ -1122,9 +1128,7 @@ function selectComponent(comp) {
   form.addEventListener('submit', e => {
     e.preventDefault();
     const fd = new FormData(form);
-    comp.label = fd.get('label') || '';
-    comp.ref = fd.get('ref') || '';
-    schema.forEach(f => {
+    [...baseFields, ...schema].forEach(f => {
       comp[f.name] = fd.get(f.name) || '';
     });
     comp.tccId = fd.get('tccId') || '';
