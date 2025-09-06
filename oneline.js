@@ -132,9 +132,25 @@ if (studiesToggle) {
 if (studiesCloseBtn) studiesCloseBtn.addEventListener('click', () => studiesPanel.classList.add('hidden'));
 if (runLFBtn) runLFBtn.addEventListener('click', () => {
   const res = runLoadFlow();
+  const diagram = getOneLine();
+  res.forEach(r => {
+    const comp = diagram.find(c => c.id === r.id);
+    if (!comp) return;
+    if (r.phase) {
+      if (typeof comp.voltage_mag !== 'object') comp.voltage_mag = {};
+      if (typeof comp.voltage_angle !== 'object') comp.voltage_angle = {};
+      comp.voltage_mag[r.phase] = Number(r.Vm.toFixed(4));
+      comp.voltage_angle[r.phase] = Number(r.Va.toFixed(4));
+    } else {
+      comp.voltage_mag = Number(r.Vm.toFixed(4));
+      comp.voltage_angle = Number(r.Va.toFixed(4));
+    }
+  });
+  setOneLine(diagram);
   const studies = getStudies();
   studies.loadFlow = res;
   setStudies(studies);
+  syncSchedules(false);
   renderStudyResults();
 });
 if (runSCBtn) runSCBtn.addEventListener('click', () => {
@@ -2011,6 +2027,14 @@ function syncSchedules(notify = true) {
       phases: c.phases ?? '',
       notes: c.notes ?? '',
       voltage: c.voltage ?? '',
+      voltage_mag: typeof c.voltage_mag === 'number' ? c.voltage_mag : '',
+      voltage_angle: typeof c.voltage_angle === 'number' ? c.voltage_angle : '',
+      voltage_mag_a: c.voltage_mag?.A ?? c.voltage_mag?.a ?? '',
+      voltage_mag_b: c.voltage_mag?.B ?? c.voltage_mag?.b ?? '',
+      voltage_mag_c: c.voltage_mag?.C ?? c.voltage_mag?.c ?? '',
+      voltage_angle_a: c.voltage_angle?.A ?? c.voltage_angle?.a ?? '',
+      voltage_angle_b: c.voltage_angle?.B ?? c.voltage_angle?.b ?? '',
+      voltage_angle_c: c.voltage_angle?.C ?? c.voltage_angle?.c ?? '',
       category: getCategory(c),
       subCategory: c.subtype ?? '',
       x: c.x ?? '',
@@ -2062,14 +2086,22 @@ function serializeState() {
         description: c.label,
         manufacturer: c.manufacturer ?? '',
         model: c.model ?? '',
-        phases: c.phases ?? '',
-        notes: c.notes ?? '',
-        voltage: c.voltage ?? '',
-        category: getCategory(c),
-        subCategory: c.subtype ?? '',
-        x: c.x ?? '',
-        y: c.y ?? '',
-        z: c.z ?? ''
+      phases: c.phases ?? '',
+      notes: c.notes ?? '',
+      voltage: c.voltage ?? '',
+      voltage_mag: typeof c.voltage_mag === 'number' ? c.voltage_mag : '',
+      voltage_angle: typeof c.voltage_angle === 'number' ? c.voltage_angle : '',
+      voltage_mag_a: c.voltage_mag?.A ?? c.voltage_mag?.a ?? '',
+      voltage_mag_b: c.voltage_mag?.B ?? c.voltage_mag?.b ?? '',
+      voltage_mag_c: c.voltage_mag?.C ?? c.voltage_mag?.c ?? '',
+      voltage_angle_a: c.voltage_angle?.A ?? c.voltage_angle?.a ?? '',
+      voltage_angle_b: c.voltage_angle?.B ?? c.voltage_angle?.b ?? '',
+      voltage_angle_c: c.voltage_angle?.C ?? c.voltage_angle?.c ?? '',
+      category: getCategory(c),
+      subCategory: c.subtype ?? '',
+      x: c.x ?? '',
+      y: c.y ?? '',
+      z: c.z ?? ''
       };
       (propSchemas[c.subtype] || []).forEach(f => {
         fields[f.name] = c[f.name] ?? fields[f.name] ?? '';
