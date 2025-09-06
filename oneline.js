@@ -30,6 +30,7 @@ let selection = [];
 let selected = null;
 let dragOffset = null;
 let clipboard = [];
+let contextTarget = null;
 let connectMode = false;
 let connectSource = null;
 let selectedConnection = null;
@@ -267,6 +268,11 @@ function render() {
     img.setAttribute('width', compWidth);
     img.setAttribute('height', compHeight);
     img.setAttribute('href', `icons/${c.subtype || c.type}.svg`);
+    if (c.rot) {
+      const cx = c.x + compWidth / 2;
+      const cy = c.y + compHeight / 2;
+      img.setAttribute('transform', `rotate(${c.rot}, ${cx}, ${cy})`);
+    }
     const text = document.createElementNS(svgNS, 'text');
     text.setAttribute('x', c.x + compWidth / 2);
     text.setAttribute('y', c.y + compHeight + 15);
@@ -626,6 +632,7 @@ function init() {
   });
 
   const svg = document.getElementById('diagram');
+  const menu = document.getElementById('context-menu');
   svg.addEventListener('mousedown', e => {
     const g = e.target.closest('.component');
     if (!g) {
@@ -712,6 +719,97 @@ function init() {
     const comp = components.find(c => c.id === g.dataset.id);
     if (!comp) return;
     selectComponent(comp);
+  });
+
+  svg.addEventListener('contextmenu', e => {
+    e.preventDefault();
+    const g = e.target.closest('.component');
+    contextTarget = g ? components.find(c => c.id === g.dataset.id) : null;
+    const compItems = menu.querySelectorAll('[data-context="component"]');
+    const canvasItems = menu.querySelectorAll('[data-context="canvas"]');
+    compItems.forEach(li => li.style.display = contextTarget ? 'block' : 'none');
+    canvasItems.forEach(li => li.style.display = contextTarget ? 'none' : 'block');
+    menu.style.left = `${e.pageX}px`;
+    menu.style.top = `${e.pageY}px`;
+    menu.style.display = 'block';
+  });
+
+  menu.addEventListener('click', e => {
+    const action = e.target.dataset.action;
+    if (!action) return;
+    e.stopPropagation();
+    if (action === 'edit' && contextTarget) {
+      selectComponent(contextTarget);
+    } else if (action === 'delete' && contextTarget) {
+      components = components.filter(c => c !== contextTarget);
+      components.forEach(c => {
+        c.connections = (c.connections || []).filter(conn => conn.target !== contextTarget.id);
+      });
+      selection = [];
+      selected = null;
+      selectedConnection = null;
+      pushHistory();
+      render();
+      save();
+      const modal = document.getElementById('prop-modal');
+      if (modal) modal.style.display = 'none';
+    } else if (action === 'duplicate' && contextTarget) {
+      const copy = {
+        ...JSON.parse(JSON.stringify(contextTarget)),
+        id: 'n' + Date.now(),
+        x: contextTarget.x + gridSize,
+        y: contextTarget.y + gridSize,
+        connections: []
+      };
+      components.push(copy);
+      selection = [copy];
+      selected = copy;
+      pushHistory();
+      render();
+      save();
+    } else if (action === 'rotate' && contextTarget) {
+      contextTarget.rot = ((contextTarget.rot || 0) + 90) % 360;
+      pushHistory();
+      render();
+      save();
+    } else if (action === 'paste') {
+      if (clipboard.length) {
+        const base = Date.now();
+        const idMap = {};
+        const newComps = clipboard.map((c, idx) => {
+          const newId = 'n' + (base + idx);
+          idMap[c.id] = newId;
+          return {
+            ...JSON.parse(JSON.stringify(c)),
+            id: newId,
+            x: c.x + gridSize,
+            y: c.y + gridSize,
+            connections: (c.connections || []).map(conn => ({ ...conn }))
+          };
+        });
+        newComps.forEach(c => {
+          c.connections = (c.connections || [])
+            .filter(conn => idMap[conn.target])
+            .map(conn => ({ ...conn, target: idMap[conn.target] }));
+        });
+        components.push(...newComps);
+        selection = newComps;
+        selected = newComps[0] || null;
+        pushHistory();
+        render();
+        save();
+      }
+    }
+    menu.style.display = 'none';
+  });
+
+  document.addEventListener('click', e => {
+    if (!menu.contains(e.target)) {
+      menu.style.display = 'none';
+    }
+  });
+  document.addEventListener('keydown', e => {
+    if (e.key === 'Escape') menu.style.display = 'none';
   });
 
   document.addEventListener('keydown', e => {
