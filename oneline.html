@@ -12,6 +12,7 @@
   <script src="https://cdn.jsdelivr.net/npm/svg2pdf.js@2.0.1/dist/svg2pdf.umd.min.js"></script>
   <script type="module" src="dataStore.mjs" defer></script>
   <script type="module" src="oneline.js" defer></script>
+  <script type="module" src="scenarios.js" defer></script>
 </head>
 <body>
   <a href="#main-content" class="skip-link">Skip to main content</a>
@@ -58,6 +59,12 @@
       </header>
       <section class="card">
         <div class="sheet-controls">
+          <div class="scenario-controls">
+            <select id="scenario-select"></select>
+            <button id="scenario-duplicate-btn" type="button">Duplicate</button>
+            <button id="scenario-diff-btn" type="button">Diff</button>
+            <button id="revision-btn" type="button">Revisions</button>
+          </div>
           <div id="sheet-tabs" class="sheet-tabs"></div>
           <button id="add-sheet-btn">Add Sheet</button>
           <button id="rename-sheet-btn">Rename Sheet</button>
