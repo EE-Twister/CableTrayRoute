@@ -1905,24 +1905,25 @@ body.dark-mode .workflow-card-title {
 
 /* Context menu styling */
 .context-menu {
-    background: #fff;
-    color: #000;
+    position: absolute;
+    list-style: none;
+    padding: 4px 0;
+    margin: 0;
+    background: var(--secondary-color);
+    color: var(--text-color);
+    border: 1px solid var(--border-color);
+    box-shadow: 0 2px 6px rgba(0,0,0,0.2);
+    display: none;
+    z-index: 1000;
+}
+
+.context-menu li {
+    padding: 4px 12px;
+    cursor: pointer;
+    white-space: nowrap;
 }
 
 .context-menu li:hover {
-    background: #eee;
-}
-
-body.dark-mode .context-menu {
-    background: #333 !important;
-    color: #fff !important;
-}
-
-body.dark-mode .context-menu li {
-    background: #333 !important;
-    color: #fff !important;
-}
-
-body.dark-mode .context-menu li:hover {
-    background: #555 !important;
+    background: var(--primary-color);
+    color: #fff;
 }
