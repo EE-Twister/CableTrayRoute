@@ -1804,6 +1804,14 @@ body.dark-mode .workflow-card-title {
     margin: 0;
 }
 
+/* Highlight components that are single points of failure */
+.component.reliability-spf rect,
+.component.reliability-spf path,
+.component.reliability-spf polygon {
+  stroke: #c00;
+  stroke-width: 3px;
+}
+
 .lint-panel li {
     cursor: pointer;
     margin-bottom: 0.5rem;

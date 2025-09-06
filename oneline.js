@@ -4,6 +4,7 @@ import { runShortCircuit } from './analysis/shortCircuit.js';
 import { runArcFlash } from './analysis/arcFlash.js';
 import { runHarmonics } from './analysis/harmonics.js';
 import { runMotorStart } from './analysis/motorStart.js';
+import { runReliability } from './analysis/reliability.js';
 import { generateArcFlashReport } from './reports/arcFlashReport.mjs';
 import { sizeConductor } from './sizing.js';
 import { runValidation } from './validation/rules.js';
@@ -31,7 +32,16 @@ async function loadComponentLibrary() {
   }
   const stored = getItem('componentLibrary', null);
   if (stored) data = stored;
+  const reliabilityFields = [
+    { name: 'mtbf', label: 'MTBF (hrs)', type: 'number' },
+    { name: 'mttr', label: 'MTTR (hrs)', type: 'number' },
+    { name: 'failure_modes', label: 'Failure Modes', type: 'textarea' }
+  ];
   data.forEach(c => {
+    c.schema = c.schema || [];
+    reliabilityFields.forEach(f => {
+      if (!c.schema.some(s => s.name === f.name)) c.schema.push(f);
+    });
     componentMeta[c.subtype] = {
       icon: c.icon,
       label: c.label,
@@ -120,12 +130,23 @@ const runSCBtn = document.getElementById('run-shortcircuit-btn');
 const runAFBtn = document.getElementById('run-arcflash-btn');
 const runHBtn = document.getElementById('run-harmonics-btn');
 const runMSBtn = document.getElementById('run-motorstart-btn');
+const runRelBtn = document.getElementById('run-reliability-btn');
 const studyResultsEl = document.getElementById('study-results');
 
 function renderStudyResults() {
   if (!studyResultsEl) return;
   const res = getStudies();
   studyResultsEl.textContent = Object.keys(res).length ? JSON.stringify(res, null, 2) : 'No results';
+}
+
+function highlightSPF(ids = []) {
+  const svg = document.getElementById('diagram');
+  if (!svg) return;
+  svg.querySelectorAll('g.component').forEach(g => g.classList.remove('reliability-spf'));
+  ids.forEach(id => {
+    const g = svg.querySelector(`g.component[data-id="${id}"]`);
+    if (g) g.classList.add('reliability-spf');
+  });
 }
 
 if (studiesToggle) {
@@ -190,6 +211,15 @@ if (runMSBtn) runMSBtn.addEventListener('click', () => {
   setStudies(studies);
   renderStudyResults();
   window.open('motorStart.html', '_blank');
+});
+if (runRelBtn) runRelBtn.addEventListener('click', () => {
+  const diagram = getOneLine();
+  const res = runReliability(diagram);
+  const studies = getStudies();
+  studies.reliability = res;
+  setStudies(studies);
+  highlightSPF(res.n1Failures);
+  renderStudyResults();
 });
 
 // Guided tour steps
