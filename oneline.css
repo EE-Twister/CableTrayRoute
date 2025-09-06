@@ -157,6 +157,37 @@
   fill: #c00;
 }
 
+.voltage-legend {
+  position: absolute;
+  top: 10px;
+  left: 10px;
+  background: var(--ol-card-bg);
+  border: 1px solid var(--ol-border-color);
+  border-radius: var(--ol-radius);
+  padding: var(--ol-spacing);
+  box-shadow: var(--ol-shadow);
+  font-family: var(--ol-font);
+  display: none;
+}
+
+.voltage-legend .legend-item {
+  display: flex;
+  align-items: center;
+  gap: 0.25rem;
+  margin-bottom: 0.25rem;
+}
+
+.voltage-legend .legend-item:last-child {
+  margin-bottom: 0;
+}
+
+.voltage-legend .legend-color {
+  width: 12px;
+  height: 12px;
+  border: 1px solid var(--ol-border-color);
+  display: inline-block;
+}
+
 @keyframes fadeIn {
   from { opacity: 0; }
   to { opacity: 1; }
