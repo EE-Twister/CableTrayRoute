@@ -1,4 +1,7 @@
 import * as dataStore from './dataStore.mjs';
+import { sizeConductor } from './sizing.js';
+import ampacity from './ampacity.js';
+const { sizeToArea } = ampacity;
 
 // Initialize Cable Schedule page logic
 // This file mirrors the inline script previously embedded in
@@ -87,7 +90,10 @@ window.addEventListener('DOMContentLoaded', () => {
     {key:'est_load',label:'Est Load (A)',type:'number',group:'Electrical Characteristics',tooltip:'Estimated operating current'},
     {key:'duty_cycle',label:'Duty Cycle (%)',type:'number',group:'Electrical Characteristics',tooltip:'Duty cycle percentage'},
     {key:'length',label:'Length (ft)',type:'number',group:'Electrical Characteristics',tooltip:'Length of cable run'},
+    {key:'calc_ampacity',label:'Calc Ampacity (A)',type:'number',group:'Electrical Characteristics',tooltip:'Ampacity after code factors'},
+    {key:'code_reference',label:'Code Ref',type:'text',group:'Electrical Characteristics',tooltip:'Code table used'},
     {key:'voltage_drop_pct',label:'Estimated Voltage Drop (%)',type:'number',group:'Electrical Characteristics',tooltip:'Estimated voltage drop percent'},
+    {key:'sizing_warning',label:'Sizing Warning',type:'text',group:'Electrical Characteristics',tooltip:'Non-compliance details'},
     {key:'notes',label:'Notes',type:'text',group:'Notes',tooltip:'Additional comments or notes'}
   ];
 
@@ -95,17 +101,48 @@ window.addEventListener('DOMContentLoaded', () => {
   let tableData = dataStore.getCables();
   const vdLimitIn = document.getElementById('vd-limit');
 
-  function applyVoltageDropHighlight(){
+  function applySizingHighlight(){
     const limit = parseFloat(vdLimitIn.value);
     Array.from(table.tbody.querySelectorAll('tr')).forEach(tr => {
-      const input = tr.querySelector('input[name="voltage_drop_pct"]');
-      if (!input) return;
-      const val = parseFloat(input.value);
-      if (!isNaN(limit) && !isNaN(val) && val > limit){
-        input.classList.add('voltage-exceed');
-      } else {
-        input.classList.remove('voltage-exceed');
+      const sizeSel = tr.querySelector('[name="conductor_size"]');
+      const matSel = tr.querySelector('[name="conductor_material"]');
+      const insSel = tr.querySelector('[name="insulation_rating"]');
+      const loadIn = tr.querySelector('[name="est_load"]');
+      const voltIn = tr.querySelector('[name="operating_voltage"]');
+      const lenIn = tr.querySelector('[name="length"]');
+      const condIn = tr.querySelector('[name="conductors"]');
+      const ampIn = tr.querySelector('[name="calc_ampacity"]');
+      const vdIn = tr.querySelector('[name="voltage_drop_pct"]');
+      const warnIn = tr.querySelector('[name="sizing_warning"]');
+      const codeRefIn = tr.querySelector('[name="code_reference"]');
+      if (!sizeSel || !loadIn) return;
+      const load = {
+        current: parseFloat(loadIn.value) || 0,
+        voltage: parseFloat(voltIn?.value) || 0,
+        phases: 3,
+        conductors: parseInt(condIn?.value) || 1
+      };
+      const params = {
+        material: matSel?.value || 'cu',
+        insulation_rating: parseFloat(insSel?.value) || 90,
+        length: parseFloat(lenIn?.value) || 0,
+        conductors: parseInt(condIn?.value) || 1,
+        maxVoltageDrop: limit
+      };
+      const res = sizeConductor(load, params);
+      if (ampIn) ampIn.value = res.ampacity ? res.ampacity.toFixed(2) : '';
+      if (vdIn) {
+        vdIn.value = res.voltageDrop ? res.voltageDrop.toFixed(2) : '';
+        if (!isNaN(limit) && res.voltageDrop > limit) {
+          vdIn.classList.add('voltage-exceed');
+        } else {
+          vdIn.classList.remove('voltage-exceed');
+        }
       }
+      if (codeRefIn) codeRefIn.value = res.codeRef || '';
+      const sizeViolation = res.violation || (res.size && sizeSel.value && sizeToArea(sizeSel.value) < sizeToArea(res.size));
+      if (warnIn) warnIn.value = sizeViolation ? (res.violation || `Requires ${res.size}`) : '';
+      sizeSel.classList.toggle('sizing-violation', !!sizeViolation);
     });
   }
 
@@ -121,7 +158,7 @@ window.addEventListener('DOMContentLoaded', () => {
     importBtnId:'import-xlsx-btn',
     deleteAllBtnId:'delete-all-btn',
     columns,
-    onChange:() => { markUnsaved(); applyVoltageDropHighlight(); },
+    onChange:() => { markUnsaved(); applySizingHighlight(); },
     onSave:() => {
       markSaved();
       tableData = table.getData();
@@ -139,8 +176,8 @@ window.addEventListener('DOMContentLoaded', () => {
 
   // Ensure the table is populated with any existing data on load.
   table.setData(tableData);
-  applyVoltageDropHighlight();
-  vdLimitIn.addEventListener('input', applyVoltageDropHighlight);
+  applySizingHighlight();
+  vdLimitIn.addEventListener('input', applySizingHighlight);
 
   document.getElementById('load-sample-cables-btn').addEventListener('click', async () => {
     try {
