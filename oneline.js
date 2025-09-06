@@ -15,7 +15,8 @@ let componentMeta = {};
 const typeIcons = {
   panel: 'icons/panel.svg',
   equipment: 'icons/equipment.svg',
-  load: 'icons/load.svg'
+  load: 'icons/load.svg',
+  bus: 'icons/Bus.svg'
 };
 
 let propSchemas = {};
@@ -569,18 +570,21 @@ function updateLegend(ranges) {
 
 function portPosition(c, portIndex) {
   const meta = componentMeta[c.subtype] || {};
-  const port = meta.ports?.[portIndex];
+  const w = c.width || compWidth;
+  const h = c.height || compHeight;
+  const ports = c.ports || meta.ports;
+  const port = ports?.[portIndex];
   if (!port) {
-    return { x: c.x + compWidth / 2, y: c.y + compHeight / 2 };
+    return { x: c.x + w / 2, y: c.y + h / 2 };
   }
   let { x, y } = port;
-  if (c.flipped) x = compWidth - x;
+  if (c.flipped) x = w - x;
   let px = c.x + x;
   let py = c.y + y;
   const angle = (c.rotation || 0) * Math.PI / 180;
   if (angle) {
-    const cx = c.x + compWidth / 2;
-    const cy = c.y + compHeight / 2;
+    const cx = c.x + w / 2;
+    const cy = c.y + h / 2;
     const dx = px - cx;
     const dy = py - cy;
     px = cx + dx * Math.cos(angle) - dy * Math.sin(angle);
@@ -590,8 +594,8 @@ function portPosition(c, portIndex) {
 }
 
 function nearestPorts(src, tgt) {
-  const srcPorts = componentMeta[src.subtype]?.ports || [{ x: compWidth / 2, y: compHeight / 2 }];
-  const tgtPorts = componentMeta[tgt.subtype]?.ports || [{ x: compWidth / 2, y: compHeight / 2 }];
+  const srcPorts = src.ports || componentMeta[src.subtype]?.ports || [{ x: (src.width || compWidth) / 2, y: (src.height || compHeight) / 2 }];
+  const tgtPorts = tgt.ports || componentMeta[tgt.subtype]?.ports || [{ x: (tgt.width || compWidth) / 2, y: (tgt.height || compHeight) / 2 }];
   let min = Infinity;
   let best = [0, 0];
   srcPorts.forEach((_, i) => {
@@ -653,7 +657,7 @@ function render() {
         adjusted = false;
         components.forEach(comp => {
           if (comp === src || comp === tgt) return;
-          const rect = { x: comp.x, y: comp.y, w: compWidth, h: compHeight };
+          const rect = { x: comp.x, y: comp.y, w: comp.width || compWidth, h: comp.height || compHeight };
           if (
             rect.x <= midX && midX <= rect.x + rect.w &&
             Math.min(start.y, end.y) <= rect.y + rect.h &&
@@ -690,7 +694,7 @@ function render() {
         adjusted = false;
         components.forEach(comp => {
           if (comp === src || comp === tgt) return;
-          const rect = { x: comp.x, y: comp.y, w: compWidth, h: compHeight };
+          const rect = { x: comp.x, y: comp.y, w: comp.width || compWidth, h: comp.height || compHeight };
           if (
             rect.y <= midY && midY <= rect.y + rect.h &&
             Math.min(start.x, end.x) <= rect.x + rect.w &&
@@ -731,7 +735,7 @@ function render() {
         const y2 = Math.max(p1.y, p2.y);
         for (const comp of components) {
           if (comp === src || comp === tgt) continue;
-          const rect = { x: comp.x, y: comp.y, w: compWidth, h: compHeight };
+          const rect = { x: comp.x, y: comp.y, w: comp.width || compWidth, h: comp.height || compHeight };
           if (horizontal) {
             if (
               p1.y >= rect.y && p1.y <= rect.y + rect.h &&
@@ -855,8 +859,10 @@ function render() {
     g.addEventListener('mouseenter', showTooltip);
     g.addEventListener('mousemove', moveTooltip);
     g.addEventListener('mouseleave', hideTooltip);
-    const cx = c.x + compWidth / 2;
-    const cy = c.y + compHeight / 2;
+    const w = c.width || compWidth;
+    const h = c.height || compHeight;
+    const cx = c.x + w / 2;
+    const cy = c.y + h / 2;
     const transforms = [];
     if (c.flipped) transforms.push(`translate(${cx}, ${cy}) scale(-1,1) translate(${-cx}, ${-cy})`);
     if (c.rotation) transforms.push(`rotate(${c.rotation}, ${cx}, ${cy})`);
@@ -867,36 +873,47 @@ function render() {
       const bg = document.createElementNS(svgNS, 'rect');
       bg.setAttribute('x', c.x);
       bg.setAttribute('y', c.y);
-      bg.setAttribute('width', compWidth);
-      bg.setAttribute('height', compHeight);
+      bg.setAttribute('width', w);
+      bg.setAttribute('height', h);
       bg.setAttribute('fill', vRange.color);
       bg.setAttribute('opacity', 0.3);
       g.appendChild(bg);
     }
-    const use = document.createElementNS(svgNS, 'use');
-    use.setAttribute('x', c.x);
-    use.setAttribute('y', c.y);
-    use.setAttribute('width', compWidth);
-    use.setAttribute('height', compHeight);
     const meta = componentMeta[c.subtype] || {};
-    let href = `#icon-${c.subtype}`;
-    if (!document.getElementById(`icon-${c.subtype}`)) {
-      console.warn(`Missing symbol for subtype '${c.subtype}'`);
-      href = '#icon-equipment';
+    if (c.subtype === 'Bus') {
+      const rect = document.createElementNS(svgNS, 'rect');
+      rect.setAttribute('x', c.x);
+      rect.setAttribute('y', c.y);
+      rect.setAttribute('width', w);
+      rect.setAttribute('height', h);
+      rect.setAttribute('fill', '#ccc');
+      rect.setAttribute('stroke', '#000');
+      g.appendChild(rect);
+    } else {
+      const use = document.createElementNS(svgNS, 'use');
+      use.setAttribute('x', c.x);
+      use.setAttribute('y', c.y);
+      use.setAttribute('width', w);
+      use.setAttribute('height', h);
+      let href = `#icon-${c.subtype}`;
+      if (!document.getElementById(`icon-${c.subtype}`)) {
+        console.warn(`Missing symbol for subtype '${c.subtype}'`);
+        href = '#icon-equipment';
+      }
+      use.setAttributeNS('http://www.w3.org/1999/xlink', 'href', href);
+      g.appendChild(use);
     }
-    use.setAttributeNS('http://www.w3.org/1999/xlink', 'href', href);
     const text = document.createElementNS(svgNS, 'text');
-    text.setAttribute('x', c.x + compWidth / 2);
-    text.setAttribute('y', c.y + compHeight + 15);
+    text.setAttribute('x', c.x + w / 2);
+    text.setAttribute('y', c.y + h + 15);
     text.setAttribute('text-anchor', 'middle');
     text.textContent = c.label || meta.label || c.subtype || c.type;
-    g.appendChild(use);
     if (selection.includes(c)) {
       const rect = document.createElementNS(svgNS, 'rect');
       rect.setAttribute('x', c.x - 2);
       rect.setAttribute('y', c.y - 2);
-      rect.setAttribute('width', compWidth + 4);
-      rect.setAttribute('height', compHeight + 4);
+      rect.setAttribute('width', w + 4);
+      rect.setAttribute('height', h + 4);
       rect.setAttribute('fill', 'none');
       rect.setAttribute('stroke', '#00f');
       rect.setAttribute('stroke-dasharray', '4 2');
@@ -906,7 +923,7 @@ function render() {
     g.appendChild(text);
     svg.appendChild(g);
     if (connectMode) {
-      (meta.ports || []).forEach((p, idx) => {
+      (c.ports || meta.ports || []).forEach((p, idx) => {
         const pos = portPosition(c, idx);
         const circ = document.createElementNS(svgNS, 'circle');
         circ.setAttribute('cx', pos.x);
@@ -1017,6 +1034,17 @@ function addComponent(subtype) {
     flipped: false,
     connections: []
   };
+  if (subtype === 'Bus') {
+    comp.width = 200;
+    comp.height = 20;
+    const ports = [];
+    const spacing = 20;
+    for (let px = 0; px <= comp.width; px += spacing) {
+      ports.push({ x: px, y: 0 });
+      ports.push({ x: px, y: comp.height });
+    }
+    comp.ports = ports;
+  }
   applyDefaults(comp);
   components.push(comp);
   pushHistory();
@@ -1030,14 +1058,14 @@ function alignSelection(direction) {
     const minX = Math.min(...selection.map(c => c.x));
     selection.forEach(c => { c.x = minX; });
   } else if (direction === 'right') {
-    const maxX = Math.max(...selection.map(c => c.x + compWidth));
-    selection.forEach(c => { c.x = maxX - compWidth; });
+    const maxX = Math.max(...selection.map(c => c.x + (c.width || compWidth)));
+    selection.forEach(c => { c.x = maxX - (c.width || compWidth); });
   } else if (direction === 'top') {
     const minY = Math.min(...selection.map(c => c.y));
     selection.forEach(c => { c.y = minY; });
   } else if (direction === 'bottom') {
-    const maxY = Math.max(...selection.map(c => c.y + compHeight));
-    selection.forEach(c => { c.y = maxY - compHeight; });
+    const maxY = Math.max(...selection.map(c => c.y + (c.height || compHeight)));
+    selection.forEach(c => { c.y = maxY - (c.height || compHeight); });
   }
   pushHistory();
   render();
@@ -2183,13 +2211,15 @@ function validateDiagram() {
     g.setAttribute('data-tooltip', tip);
     const badge = document.createElementNS(svgNS, 'g');
     badge.setAttribute('class', 'issue-badge');
+    const comp = components.find(c => c.id === id) || {};
+    const w = comp.width || compWidth;
     const circ = document.createElementNS(svgNS, 'circle');
-    circ.setAttribute('cx', compWidth - 8);
+    circ.setAttribute('cx', w - 8);
     circ.setAttribute('cy', 8);
     circ.setAttribute('r', 8);
     circ.setAttribute('fill', '#c00');
     const txt = document.createElementNS(svgNS, 'text');
-    txt.setAttribute('x', compWidth - 8);
+    txt.setAttribute('x', w - 8);
     txt.setAttribute('y', 11);
     txt.setAttribute('text-anchor', 'middle');
     txt.setAttribute('font-size', '12');
@@ -2286,8 +2316,11 @@ function syncSchedules(notify = true) {
   const loads = all
     .filter(c => getCategory(c) === 'load')
     .map(mapFields);
-  setEquipment(equipment);
-  setPanels(panels);
+  const buses = all
+    .filter(c => c.subtype === 'Bus')
+    .map(mapFields);
+  setEquipment([...equipment, ...buses]);
+  setPanels([...panels, ...buses]);
   setLoads(loads);
   const cables = getCables();
   all.forEach(c => {
@@ -2377,6 +2410,9 @@ function serializeState() {
     const loads = comps
       .filter(c => getCategory(c) === 'load')
       .map(mapFields);
+    const buses = comps
+      .filter(c => c.subtype === 'Bus')
+      .map(mapFields);
     const cables = [];
     comps.forEach(c => {
       (c.connections || []).forEach(conn => {
@@ -2389,7 +2425,7 @@ function serializeState() {
         });
       });
     });
-    return { equipment, panels, loads, cables };
+    return { equipment: [...equipment, ...buses], panels: [...panels, ...buses], loads, cables };
   }
   return {
     version: DIAGRAM_VERSION,

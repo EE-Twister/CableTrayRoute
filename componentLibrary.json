@@ -1,5 +1,15 @@
 [
   {
+    "subtype": "Bus",
+    "label": "Bus",
+    "icon": "icons/Bus.svg",
+    "category": "bus",
+    "ports": [],
+    "schema": [
+      { "name": "baseKV", "label": "Base kV", "type": "number" }
+    ]
+  },
+  {
     "subtype": "MLO",
     "label": "MLO",
     "icon": "icons/MLO.svg",
