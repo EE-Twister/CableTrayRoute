@@ -14,26 +14,6 @@ const typeIcons = {
   load: 'icons/load.svg'
 };
 
-const iconCache = {};
-function preloadIcons() {
-  const iconPaths = new Set([
-    ...Object.values(typeIcons),
-    ...Object.values(componentMeta).map(m => m.icon)
-  ]);
-  iconPaths.forEach(path => {
-    fetch(path, { method: 'HEAD' })
-      .then(res => {
-        iconCache[path] = res.ok;
-        if (!res.ok) console.warn(`Missing icon file: ${path}`);
-      })
-      .catch(() => {
-        iconCache[path] = false;
-        console.warn(`Missing icon file: ${path}`);
-      });
-  });
-}
-if (typeof fetch === 'function') preloadIcons();
-
 const propSchemas = {
   Transformer: [
     { name: 'voltage', label: 'Voltage', type: 'number' },
@@ -326,29 +306,29 @@ function render() {
     g.addEventListener('mouseenter', showTooltip);
     g.addEventListener('mousemove', moveTooltip);
     g.addEventListener('mouseleave', hideTooltip);
-    const img = document.createElementNS(svgNS, 'image');
-    img.setAttribute('x', c.x);
-    img.setAttribute('y', c.y);
-    img.setAttribute('width', compWidth);
-    img.setAttribute('height', compHeight);
+    const use = document.createElementNS(svgNS, 'use');
+    use.setAttribute('x', c.x);
+    use.setAttribute('y', c.y);
+    use.setAttribute('width', compWidth);
+    use.setAttribute('height', compHeight);
     const meta = componentMeta[c.subtype] || {};
-    let icon = meta.icon;
-    if (!icon || iconCache[icon] === false) {
-      console.warn(`Missing icon for subtype '${c.subtype}'`);
-      icon = 'icons/equipment.svg';
+    let href = `#icon-${c.subtype}`;
+    if (!document.getElementById(`icon-${c.subtype}`)) {
+      console.warn(`Missing symbol for subtype '${c.subtype}'`);
+      href = '#icon-equipment';
     }
-    img.setAttributeNS('http://www.w3.org/1999/xlink', 'href', icon);
+    use.setAttributeNS('http://www.w3.org/1999/xlink', 'href', href);
     if (c.rot) {
       const cx = c.x + compWidth / 2;
       const cy = c.y + compHeight / 2;
-      img.setAttribute('transform', `rotate(${c.rot}, ${cx}, ${cy})`);
+      use.setAttribute('transform', `rotate(${c.rot}, ${cx}, ${cy})`);
     }
     const text = document.createElementNS(svgNS, 'text');
     text.setAttribute('x', c.x + compWidth / 2);
     text.setAttribute('y', c.y + compHeight + 15);
     text.setAttribute('text-anchor', 'middle');
     text.textContent = c.label || meta.label || c.subtype || c.type;
-    g.appendChild(img);
+    g.appendChild(use);
     if (selection.includes(c)) {
       const rect = document.createElementNS(svgNS, 'rect');
       rect.setAttribute('x', c.x - 2);
