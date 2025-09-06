@@ -816,6 +816,9 @@ function render() {
       poly.setAttribute('fill', 'none');
       poly.setAttribute('marker-end', 'url(#arrow)');
       poly.classList.add('connection');
+      const vdLimit = parseFloat(target.maxVoltageDrop) || 3;
+      if (conn.cable?.sizing_warning) poly.classList.add('sizing-violation');
+      if (parseFloat(conn.cable?.voltage_drop_pct) > vdLimit) poly.classList.add('voltage-exceed');
       poly.addEventListener('click', e => {
         e.stopPropagation();
         selected = null;
@@ -832,6 +835,8 @@ function render() {
       label.setAttribute('dominant-baseline', 'middle');
       label.textContent = conn.cable?.tag || conn.cable?.cable_type || '';
       label.classList.add('conn-label');
+      if (conn.cable?.sizing_warning) label.classList.add('sizing-violation');
+      if (parseFloat(conn.cable?.voltage_drop_pct) > vdLimit) label.classList.add('voltage-exceed');
       label.style.pointerEvents = 'none';
       svg.appendChild(label);
     });
@@ -1278,28 +1283,51 @@ function selectComponent(comp) {
   modal.classList.add('show');
 }
 
-function chooseCable(source, target, existing = null) {
+async function chooseCable(source, target, existing = null) {
+  const templateData = [];
+  try {
+    const res = await fetch('cableTemplates.json');
+    const arr = await res.json();
+    arr.forEach(t => templateData.push(t));
+  } catch (e) {}
+
+  const existingTemplates = [];
+  const seen = new Set();
+  getCables().forEach(c => {
+    if (!seen.has(c.tag)) {
+      existingTemplates.push({ ...c });
+      seen.add(c.tag);
+    }
+  });
+  components.forEach(c => {
+    (c.connections || []).forEach(conn => {
+      if (conn.cable && !seen.has(conn.cable.tag)) {
+        existingTemplates.push({ ...conn.cable });
+        seen.add(conn.cable.tag);
+      }
+    });
+  });
+
   return new Promise(resolve => {
     const modal = document.getElementById('cable-modal');
     modal.innerHTML = '';
     const form = document.createElement('form');
 
-    const templates = [];
-    const seen = new Set();
-    getCables().forEach(c => {
-      if (!seen.has(c.tag)) {
-        templates.push({ ...c });
-        seen.add(c.tag);
-      }
+    const tplLabel = document.createElement('label');
+    tplLabel.textContent = 'Template ';
+    const tplSelect = document.createElement('select');
+    const optTpl = document.createElement('option');
+    optTpl.value = '';
+    optTpl.textContent = '--Template--';
+    tplSelect.appendChild(optTpl);
+    templateData.forEach(t => {
+      const opt = document.createElement('option');
+      opt.value = t.name;
+      opt.textContent = t.name;
+      tplSelect.appendChild(opt);
     });
-    components.forEach(c => {
-      (c.connections || []).forEach(conn => {
-        if (conn.cable && !seen.has(conn.cable.tag)) {
-          templates.push({ ...conn.cable });
-          seen.add(conn.cable.tag);
-        }
-      });
-    });
+    tplLabel.appendChild(tplSelect);
+    form.appendChild(tplLabel);
 
     const selLabel = document.createElement('label');
     selLabel.textContent = 'Existing ';
@@ -1308,7 +1336,7 @@ function chooseCable(source, target, existing = null) {
     optNew.value = '';
     optNew.textContent = '--New Cable--';
     select.appendChild(optNew);
-    templates.forEach(t => {
+    existingTemplates.forEach(t => {
       const opt = document.createElement('option');
       opt.value = t.tag;
       opt.textContent = t.tag;
@@ -1360,6 +1388,21 @@ function chooseCable(source, target, existing = null) {
     insulationLabel.appendChild(insulationInput);
     form.appendChild(insulationLabel);
 
+    const ambientLabel = document.createElement('label');
+    ambientLabel.textContent = 'Ambient Temp (°C) ';
+    const ambientInput = document.createElement('input');
+    ambientInput.type = 'number';
+    ambientInput.name = 'ambient_temp';
+    ambientLabel.appendChild(ambientInput);
+    form.appendChild(ambientLabel);
+
+    const installLabel = document.createElement('label');
+    installLabel.textContent = 'Install Method ';
+    const installInput = document.createElement('input');
+    installInput.name = 'install_method';
+    installLabel.appendChild(installInput);
+    form.appendChild(installLabel);
+
     const lengthLabel = document.createElement('label');
     lengthLabel.textContent = 'Length (ft) ';
     const lengthInput = document.createElement('input');
@@ -1389,7 +1432,7 @@ function chooseCable(source, target, existing = null) {
         length: parseFloat(lengthInput.value) || 0,
         material: materialInput.value || 'cu',
         insulation_rating: parseFloat(target.insulation_rating) || 90,
-        ambient: parseFloat(source.ambient) || 30,
+        ambient: parseFloat(ambientInput.value) || parseFloat(source.ambient) || 30,
         maxVoltageDrop: parseFloat(target.maxVoltageDrop) || 3,
         conductors: parseInt(conductorsInput.value) || 1,
         code: target.code || 'NEC'
@@ -1416,8 +1459,19 @@ function chooseCable(source, target, existing = null) {
     });
     form.appendChild(sizeBtn);
 
+    tplSelect.addEventListener('change', () => {
+      const t = templateData.find(tp => tp.name === tplSelect.value);
+      if (t) {
+        sizeInput.value = t.conductor_size || '';
+        materialInput.value = t.conductor_material || '';
+        insulationInput.value = t.insulation_type || '';
+        ambientInput.value = t.ambient_temp || '';
+        installInput.value = t.install_method || '';
+      }
+    });
+
     select.addEventListener('change', () => {
-      const c = templates.find(t => t.tag === select.value);
+      const c = existingTemplates.find(t => t.tag === select.value);
       if (c) {
         tagInput.value = c.tag || '';
         typeInput.value = c.cable_type || '';
@@ -1427,6 +1481,8 @@ function chooseCable(source, target, existing = null) {
         insulationInput.value = c.insulation_type || '';
         lengthInput.value = c.length || '';
         colorInput.value = c.color || '#000000';
+        ambientInput.value = c.ambient_temp || '';
+        installInput.value = c.install_method || '';
       } else {
         tagInput.value = '';
         typeInput.value = '';
@@ -1436,6 +1492,8 @@ function chooseCable(source, target, existing = null) {
         insulationInput.value = '';
         lengthInput.value = '';
         colorInput.value = '#000000';
+        ambientInput.value = '';
+        installInput.value = '';
         sizeInput.dataset.calcAmpacity = '';
         sizeInput.dataset.voltageDrop = '';
         sizeInput.dataset.sizingWarning = '';
@@ -1454,13 +1512,15 @@ function chooseCable(source, target, existing = null) {
       insulationInput.value = existing.insulation_type || '';
       lengthInput.value = existing.length || '';
       colorInput.value = existing.color || '#000000';
+      ambientInput.value = existing.ambient_temp || '';
+      installInput.value = existing.install_method || '';
       sizeInput.dataset.calcAmpacity = existing.calc_ampacity || '';
       sizeInput.dataset.voltageDrop = existing.voltage_drop_pct || existing.voltage_drop || '';
       sizeInput.dataset.sizingWarning = existing.sizing_warning || '';
       sizeInput.dataset.codeRef = existing.code_reference || '';
       sizeInput.dataset.sizingReport = existing.sizing_report || '';
       if (existing.sizing_warning) sizeInput.classList.add('sizing-violation');
-      if (templates.some(t => t.tag === existing.tag)) {
+      if (existingTemplates.some(t => t.tag === existing.tag)) {
         select.value = existing.tag;
       }
     } else {
@@ -1489,6 +1549,8 @@ function chooseCable(source, target, existing = null) {
         conductor_size: sizeInput.value,
         conductor_material: materialInput.value,
         insulation_type: insulationInput.value,
+        ambient_temp: ambientInput.value,
+        install_method: installInput.value,
         length: lengthInput.value,
         color: colorInput.value,
         calc_ampacity: sizeInput.dataset.calcAmpacity || '',
@@ -2231,6 +2293,35 @@ function syncSchedules(notify = true) {
       if (!conn.cable) return;
       const target = all.find(t => t.id === conn.target);
       const spec = { ...conn.cable, from_tag: c.ref || c.id, to_tag: target?.ref || conn.target };
+      const load = {
+        current: parseFloat(target?.current) || 0,
+        voltage: parseFloat(target?.voltage) || parseFloat(c.voltage) || 0,
+        phases: parseInt(target?.phases || c.phases || 3, 10)
+      };
+      const params = {
+        length: parseFloat(spec.length) || 0,
+        material: spec.conductor_material || 'cu',
+        insulation_rating: parseFloat(target?.insulation_rating) || 90,
+        ambient: parseFloat(spec.ambient_temp) || parseFloat(c.ambient) || 30,
+        conductors: parseInt(spec.conductors) || 1,
+        maxVoltageDrop: parseFloat(target?.maxVoltageDrop) || 3,
+        code: target?.code || 'NEC'
+      };
+      const res = sizeConductor(load, params);
+      spec.calc_ampacity = res.ampacity ? res.ampacity.toFixed(2) : '';
+      spec.voltage_drop_pct = res.voltageDrop ? res.voltageDrop.toFixed(2) : '';
+      spec.sizing_warning = res.violation || '';
+      spec.code_reference = res.codeRef || '';
+      spec.sizing_report = JSON.stringify(res.report || {});
+      Object.assign(conn.cable, {
+        calc_ampacity: spec.calc_ampacity,
+        voltage_drop_pct: spec.voltage_drop_pct,
+        sizing_warning: spec.sizing_warning,
+        code_reference: spec.code_reference,
+        sizing_report: spec.sizing_report,
+        ambient_temp: spec.ambient_temp,
+        install_method: spec.install_method
+      });
       const idx = cables.findIndex(cb => cb.tag === spec.tag);
       if (idx >= 0) {
         cables[idx] = { ...cables[idx], ...spec };

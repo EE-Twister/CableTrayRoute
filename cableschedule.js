@@ -34,6 +34,7 @@ window.addEventListener('DOMContentLoaded', () => {
   const conductorMaterials = ['Copper','Aluminum'];
   const insulationRatings = ['60','75','90'];
   const shieldingOptions = ['', 'Lead', 'Copper Tape'];
+  const installMethods = ['Conduit','Tray','Direct Buried'];
 
   function getRacewayOptions(){
     const ids = new Set();
@@ -80,6 +81,8 @@ window.addEventListener('DOMContentLoaded', () => {
     {key:'conductors',label:'Conductors',type:'number',group:'Cable Construction & Specs',tooltip:'Number of conductors within the cable'},
     {key:'conductor_size',label:'Conductor Size',type:'select',options:conductorSizes,group:'Cable Construction & Specs',tooltip:'Size of each conductor'},
     {key:'conductor_material',label:'Conductor Material',type:'select',options:conductorMaterials,group:'Cable Construction & Specs',tooltip:'Material of the conductors'},
+    {key:'ambient_temp',label:'Ambient Temp (°C)',type:'number',group:'Cable Construction & Specs',tooltip:'Ambient temperature for sizing'},
+    {key:'install_method',label:'Install Method',type:'select',options:installMethods,group:'Cable Construction & Specs',tooltip:'Installation method'},
     {key:'insulation_type',label:'Insulation Type',type:'select',options:Object.keys(INSULATION_TEMP_LIMIT),group:'Cable Construction & Specs',tooltip:'Insulation material type'},
     {key:'insulation_rating',label:'Insul Rating (°C)',type:'select',options:insulationRatings,group:'Cable Construction & Specs',tooltip:'Maximum temperature rating of insulation'},
     {key:'insulation_thickness',label:'Insul Thick (in)',type:'number',group:'Cable Construction & Specs',tooltip:'Insulation thickness in inches'},
@@ -111,6 +114,7 @@ window.addEventListener('DOMContentLoaded', () => {
       const voltIn = tr.querySelector('[name="operating_voltage"]');
       const lenIn = tr.querySelector('[name="length"]');
       const condIn = tr.querySelector('[name="conductors"]');
+      const ambIn = tr.querySelector('[name="ambient_temp"]');
       const ampIn = tr.querySelector('[name="calc_ampacity"]');
       const vdIn = tr.querySelector('[name="voltage_drop_pct"]');
       const warnIn = tr.querySelector('[name="sizing_warning"]');
@@ -127,6 +131,7 @@ window.addEventListener('DOMContentLoaded', () => {
         insulation_rating: parseFloat(insSel?.value) || 90,
         length: parseFloat(lenIn?.value) || 0,
         conductors: parseInt(condIn?.value) || 1,
+        ambient: parseFloat(ambIn?.value) || 30,
         maxVoltageDrop: limit
       };
       const res = sizeConductor(load, params);

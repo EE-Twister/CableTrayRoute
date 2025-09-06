@@ -1,0 +1,20 @@
+[
+  {
+    "name": "THHN",
+    "conductor_size": "#12 AWG",
+    "conductor_material": "Copper",
+    "insulation_type": "THHN",
+    "insulation_rating": 90,
+    "install_method": "conduit",
+    "ambient_temp": 30
+  },
+  {
+    "name": "XHHW",
+    "conductor_size": "#12 AWG",
+    "conductor_material": "Aluminum",
+    "insulation_type": "XHHW",
+    "insulation_rating": 90,
+    "install_method": "conduit",
+    "ambient_temp": 30
+  }
+]
