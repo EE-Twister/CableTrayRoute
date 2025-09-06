@@ -16,6 +16,74 @@
 
 import { parseRevit } from './src/importers/revit.js';
 
+// scenario management keys
+const SCENARIOS_KEY = 'ctr_scenarios_v1';
+const CURRENT_SCENARIO_KEY = 'ctr_current_scenario_v1';
+
+function readGlobal(key, fallback) {
+  try {
+    const raw = (typeof localStorage !== 'undefined') ? localStorage.getItem(key) : null;
+    return raw ? JSON.parse(raw) : fallback;
+  } catch {
+    return fallback;
+  }
+}
+
+function writeGlobal(key, value) {
+  try {
+    if (typeof localStorage !== 'undefined') {
+      localStorage.setItem(key, JSON.stringify(value));
+    }
+  } catch {}
+}
+
+let currentScenario = readGlobal(CURRENT_SCENARIO_KEY, 'base');
+let scenarioList = readGlobal(SCENARIOS_KEY, ['base']);
+if (!scenarioList.includes(currentScenario)) scenarioList.push(currentScenario);
+writeGlobal(SCENARIOS_KEY, scenarioList);
+writeGlobal(CURRENT_SCENARIO_KEY, currentScenario);
+
+function scenarioKey(key, scenario = currentScenario) {
+  return `${scenario}:${key}`;
+}
+
+export function listScenarios() {
+  return [...scenarioList];
+}
+
+export function getCurrentScenario() {
+  return currentScenario;
+}
+
+export function switchScenario(name) {
+  if (!scenarioList.includes(name)) scenarioList.push(name);
+  currentScenario = name;
+  writeGlobal(CURRENT_SCENARIO_KEY, currentScenario);
+  writeGlobal(SCENARIOS_KEY, scenarioList);
+  emit('scenario', name);
+}
+
+export function cloneScenario(newName, from = currentScenario) {
+  const prefixFrom = `${from}:`;
+  const prefixTo = `${newName}:`;
+  const allKeys = Object.keys(localStorage || {});
+  for (const key of allKeys) {
+    if (key.startsWith(prefixFrom)) {
+      const value = localStorage.getItem(key);
+      const dest = prefixTo + key.slice(prefixFrom.length);
+      localStorage.setItem(dest, value);
+    }
+  }
+  if (!scenarioList.includes(newName)) scenarioList.push(newName);
+  writeGlobal(SCENARIOS_KEY, scenarioList);
+}
+
+export function compareStudies(a, b) {
+  const first = read(KEYS.studies, {}, a);
+  const second = read(KEYS.studies, {}, b);
+  return { [a]: first, [b]: second };
+}
+
 const KEYS = {
   // Preferred property names
   trays: 'traySchedule',
@@ -75,19 +143,19 @@ export function off(event, handler) {
   if (idx >= 0) arr.splice(idx, 1);
 }
 
-function read(key, fallback) {
+function read(key, fallback, scenario = currentScenario) {
   try {
-    const raw = (typeof localStorage !== 'undefined') ? localStorage.getItem(key) : null;
+    const raw = (typeof localStorage !== 'undefined') ? localStorage.getItem(scenarioKey(key, scenario)) : null;
     return raw ? JSON.parse(raw) : fallback;
   } catch {
     return fallback;
   }
 }
 
-function write(key, value) {
+function write(key, value, scenario = currentScenario) {
   try {
     if (typeof localStorage !== 'undefined') {
-      localStorage.setItem(key, JSON.stringify(value));
+      localStorage.setItem(scenarioKey(key, scenario), JSON.stringify(value));
     }
     emit(key, value);
   } catch (e) {
@@ -341,12 +409,12 @@ export const deleteLoad = index => {
 export const removeLoad = deleteLoad;
 
 // generic access for other values so pages never touch localStorage directly
-export const getItem = (key, fallback = null) => read(key, fallback);
-export const setItem = (key, value) => write(key, value);
-export const removeItem = key => {
+export const getItem = (key, fallback = null, scenario) => read(key, fallback, scenario);
+export const setItem = (key, value, scenario) => write(key, value, scenario);
+export const removeItem = (key, scenario = currentScenario) => {
   try {
     if (typeof localStorage !== 'undefined') {
-      localStorage.removeItem(key);
+      localStorage.removeItem(scenarioKey(key, scenario));
     }
     emit(key, null);
   } catch (e) {
@@ -355,10 +423,11 @@ export const removeItem = key => {
 };
 
 
-export const keys = () => {
+export const keys = (scenario = currentScenario) => {
   try {
     if (typeof localStorage !== 'undefined') {
-      return Object.keys(localStorage);
+      const prefix = `${scenario}:`;
+      return Object.keys(localStorage).filter(k => k.startsWith(prefix)).map(k => k.slice(prefix.length));
     }
   } catch {}
   return [];
@@ -419,7 +488,8 @@ export function exportProject() {
       project.settings[key] = getItem(key);
     }
   }
-  return project;
+  const meta = { version: 1, scenario: currentScenario };
+  return { meta, ...project };
 }
 
 /**
@@ -492,7 +562,9 @@ export function exportToCad(fileType = 'json') {
  * @returns {boolean} success
  */
 export function importProject(obj) {
-  let data = obj;
+  const { meta, ...rest } = obj || {};
+  if (meta && meta.scenario) switchScenario(meta.scenario);
+  let data = rest;
   const { valid, missing, extra } = validateProjectSchema(data);
   if (!valid) {
     const parts = [];
@@ -571,6 +643,11 @@ if (typeof window !== 'undefined') {
     getItem,
     setItem,
     removeItem,
+    listScenarios,
+    getCurrentScenario,
+    switchScenario,
+    cloneScenario,
+    compareStudies,
     on,
     off,
     keys,
