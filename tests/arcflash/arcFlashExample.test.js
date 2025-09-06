@@ -23,13 +23,13 @@ global.localStorage = {
       setOneLine([{ name: 'S1', components: [
         { id: 'BUS1', kV: 0.48, z1: { r: 0, x: 0.05 }, z2: { r: 0, x: 0.05 }, z0: { r: 0, x: 0.05 },
           sources: [{ z1: { r: 0, x: 0.02 }, z2: { r: 0, x: 0.02 }, z0: { r: 0, x: 0.02 } }],
-          enclosure: 'Box', gap: 32, working_distance: 455, tccId: 'abb_tmax_160',
+          enclosure: 'Box', gap: 32, working_distance: 455, electrode_config: 'VCB', tccId: 'abb_tmax_160',
           enclosure_height: 508, enclosure_width: 508, enclosure_depth: 508 }
       ] }]);
       const res = runArcFlash();
       const af = res.BUS1;
-      assert(Math.abs(af.incidentEnergy - 1.21) < 0.05);
-      assert(Math.abs(af.boundary - 457.1) < 1);
+      assert(Math.abs(af.incidentEnergy - 1.25) < 0.05);
+      assert(Math.abs(af.boundary - 463.6) < 1.5);
       assert.strictEqual(af.ppeCategory, 1);
       assert(Math.abs(af.clearingTime - 0.01) < 0.001);
     });

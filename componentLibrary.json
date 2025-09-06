@@ -6,7 +6,12 @@
     "category": "bus",
     "ports": [],
     "schema": [
-      { "name": "baseKV", "label": "Base kV", "type": "number" }
+      { "name": "baseKV", "label": "Base kV", "type": "number" },
+      { "name": "prefault_voltage", "label": "Prefault Voltage (kV)", "type": "number" },
+      { "name": "xr_ratio", "label": "Fault X/R", "type": "number" },
+      { "name": "electrode_config", "label": "Electrode Config", "type": "select", "options": ["VCB", "VCBB", "HCB", "VOA", "HOA"] },
+      { "name": "tccId", "label": "Protective Device", "type": "text" },
+      { "name": "clearing_time", "label": "Clearing Time (s)", "type": "number" }
     ]
   },
   {
