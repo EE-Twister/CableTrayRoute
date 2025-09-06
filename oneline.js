@@ -647,10 +647,25 @@ function selectComponent(comp) {
   [...baseFields, ...schema].forEach(f => {
     const lbl = document.createElement('label');
     lbl.textContent = f.label + ' ';
-    const input = document.createElement('input');
-    input.type = f.type || 'text';
+    let input;
+    if (f.type === 'select') {
+      input = document.createElement('select');
+      (f.options || []).forEach(opt => {
+        const o = document.createElement('option');
+        o.value = opt;
+        o.textContent = opt;
+        if ((comp[f.name] || '') == opt) o.selected = true;
+        input.appendChild(o);
+      });
+    } else if (f.type === 'textarea') {
+      input = document.createElement('textarea');
+      input.value = comp[f.name] || '';
+    } else {
+      input = document.createElement('input');
+      input.type = f.type || 'text';
+      input.value = comp[f.name] || '';
+    }
     input.name = f.name;
-    input.value = comp[f.name] || '';
     lbl.appendChild(input);
     form.appendChild(lbl);
   });
@@ -1449,15 +1464,23 @@ function focusComponent(id) {
 
 function syncSchedules(notify = true) {
   const all = sheets.flatMap(s => s.components);
+  const mapFields = c => ({
+    id: c.ref || c.id,
+    description: c.label,
+    manufacturer: c.manufacturer || '',
+    model: c.model || '',
+    phases: c.phases || '',
+    notes: c.notes || ''
+  });
   const equipment = all
     .filter(c => getCategory(c) === 'equipment')
-    .map(c => ({ id: c.ref || c.id, description: c.label }));
+    .map(mapFields);
   const panels = all
     .filter(c => getCategory(c) === 'panel')
-    .map(c => ({ id: c.ref || c.id, description: c.label }));
+    .map(mapFields);
   const loads = all
     .filter(c => getCategory(c) === 'load')
-    .map(c => ({ id: c.ref || c.id, description: c.label }));
+    .map(mapFields);
   setEquipment(equipment);
   setPanels(panels);
   setLoads(loads);
@@ -1482,15 +1505,23 @@ function syncSchedules(notify = true) {
 function exportDiagram() {
   save(false);
   function extractSchedules(comps) {
+    const mapFields = c => ({
+      id: c.ref || c.id,
+      description: c.label,
+      manufacturer: c.manufacturer || '',
+      model: c.model || '',
+      phases: c.phases || '',
+      notes: c.notes || ''
+    });
     const equipment = comps
       .filter(c => getCategory(c) === 'equipment')
-      .map(c => ({ id: c.ref || c.id, description: c.label }));
+      .map(mapFields);
     const panels = comps
       .filter(c => getCategory(c) === 'panel')
-      .map(c => ({ id: c.ref || c.id, description: c.label }));
+      .map(mapFields);
     const loads = comps
       .filter(c => getCategory(c) === 'load')
-      .map(c => ({ id: c.ref || c.id, description: c.label }));
+      .map(mapFields);
     const cables = [];
     comps.forEach(c => {
       (c.connections || []).forEach(conn => {

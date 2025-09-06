@@ -6,7 +6,11 @@
     "category": "panel",
     "ports": [{ "x": 0, "y": 20 }, { "x": 80, "y": 20 }],
     "schema": [
-      { "name": "voltage", "label": "Voltage", "type": "number" }
+      { "name": "voltage", "label": "Voltage", "type": "number" },
+      { "name": "manufacturer", "label": "Manufacturer", "type": "text" },
+      { "name": "model", "label": "Model", "type": "text" },
+      { "name": "phases", "label": "Phases", "type": "select", "options": ["1", "3"] },
+      { "name": "notes", "label": "Notes", "type": "textarea" }
     ]
   },
   {
@@ -16,7 +20,11 @@
     "category": "panel",
     "ports": [{ "x": 0, "y": 20 }, { "x": 80, "y": 20 }],
     "schema": [
-      { "name": "voltage", "label": "Voltage", "type": "number" }
+      { "name": "voltage", "label": "Voltage", "type": "number" },
+      { "name": "manufacturer", "label": "Manufacturer", "type": "text" },
+      { "name": "model", "label": "Model", "type": "text" },
+      { "name": "phases", "label": "Phases", "type": "select", "options": ["1", "3"] },
+      { "name": "notes", "label": "Notes", "type": "textarea" }
     ]
   },
   {
@@ -27,7 +35,11 @@
     "ports": [{ "x": 0, "y": 20 }, { "x": 80, "y": 20 }],
     "schema": [
       { "name": "voltage", "label": "Voltage", "type": "number" },
-      { "name": "kW", "label": "Power (kW)", "type": "number" }
+      { "name": "kW", "label": "Power (kW)", "type": "number" },
+      { "name": "manufacturer", "label": "Manufacturer", "type": "text" },
+      { "name": "model", "label": "Model", "type": "text" },
+      { "name": "phases", "label": "Phases", "type": "select", "options": ["1", "3"] },
+      { "name": "notes", "label": "Notes", "type": "textarea" }
     ]
   },
   {
@@ -38,7 +50,11 @@
     "ports": [{ "x": 0, "y": 20 }, { "x": 80, "y": 20 }],
     "schema": [
       { "name": "voltage", "label": "Voltage", "type": "number" },
-      { "name": "kVA", "label": "Capacity (kVA)", "type": "number" }
+      { "name": "kVA", "label": "Capacity (kVA)", "type": "number" },
+      { "name": "manufacturer", "label": "Manufacturer", "type": "text" },
+      { "name": "model", "label": "Model", "type": "text" },
+      { "name": "phases", "label": "Phases", "type": "select", "options": ["1", "3"] },
+      { "name": "notes", "label": "Notes", "type": "textarea" }
     ]
   },
   {
@@ -49,7 +65,11 @@
     "ports": [{ "x": 0, "y": 20 }, { "x": 80, "y": 20 }],
     "schema": [
       { "name": "voltage", "label": "Voltage", "type": "number" },
-      { "name": "rating", "label": "Rating", "type": "number" }
+      { "name": "rating", "label": "Rating", "type": "number" },
+      { "name": "manufacturer", "label": "Manufacturer", "type": "text" },
+      { "name": "model", "label": "Model", "type": "text" },
+      { "name": "phases", "label": "Phases", "type": "select", "options": ["1", "3"] },
+      { "name": "notes", "label": "Notes", "type": "textarea" }
     ]
   },
   {
@@ -59,7 +79,11 @@
     "category": "equipment",
     "ports": [{ "x": 0, "y": 20 }, { "x": 80, "y": 20 }],
     "schema": [
-      { "name": "voltage", "label": "Voltage", "type": "number" }
+      { "name": "voltage", "label": "Voltage", "type": "number" },
+      { "name": "manufacturer", "label": "Manufacturer", "type": "text" },
+      { "name": "model", "label": "Model", "type": "text" },
+      { "name": "phases", "label": "Phases", "type": "select", "options": ["1", "3"] },
+      { "name": "notes", "label": "Notes", "type": "textarea" }
     ]
   },
   {
@@ -70,7 +94,10 @@
     "ports": [{ "x": 0, "y": 20 }, { "x": 80, "y": 20 }],
     "schema": [
       { "name": "voltage", "label": "Voltage", "type": "number" },
-      { "name": "phases", "label": "Phases", "type": "number" }
+      { "name": "manufacturer", "label": "Manufacturer", "type": "text" },
+      { "name": "model", "label": "Model", "type": "text" },
+      { "name": "phases", "label": "Phases", "type": "select", "options": ["1", "3"] },
+      { "name": "notes", "label": "Notes", "type": "textarea" }
     ]
   },
   {
@@ -81,7 +108,11 @@
     "ports": [{ "x": 0, "y": 20 }, { "x": 80, "y": 20 }],
     "schema": [
       { "name": "voltage", "label": "Voltage", "type": "number" },
-      { "name": "kVAR", "label": "Reactive Power (kVAR)", "type": "number" }
+      { "name": "kVAR", "label": "Reactive Power (kVAR)", "type": "number" },
+      { "name": "manufacturer", "label": "Manufacturer", "type": "text" },
+      { "name": "model", "label": "Model", "type": "text" },
+      { "name": "phases", "label": "Phases", "type": "select", "options": ["1", "3"] },
+      { "name": "notes", "label": "Notes", "type": "textarea" }
     ]
   },
   {
@@ -92,7 +123,11 @@
     "ports": [{ "x": 0, "y": 20 }, { "x": 80, "y": 20 }],
     "schema": [
       { "name": "voltage", "label": "Voltage", "type": "number" },
-      { "name": "kW", "label": "Power (kW)", "type": "number" }
+      { "name": "kW", "label": "Power (kW)", "type": "number" },
+      { "name": "manufacturer", "label": "Manufacturer", "type": "text" },
+      { "name": "model", "label": "Model", "type": "text" },
+      { "name": "phases", "label": "Phases", "type": "select", "options": ["1", "3"] },
+      { "name": "notes", "label": "Notes", "type": "textarea" }
     ]
   },
   {
@@ -102,7 +137,11 @@
     "category": "load",
     "ports": [{ "x": 0, "y": 20 }, { "x": 80, "y": 20 }],
     "schema": [
-      { "name": "voltage", "label": "Voltage", "type": "number" }
+      { "name": "voltage", "label": "Voltage", "type": "number" },
+      { "name": "manufacturer", "label": "Manufacturer", "type": "text" },
+      { "name": "model", "label": "Model", "type": "text" },
+      { "name": "phases", "label": "Phases", "type": "select", "options": ["1", "3"] },
+      { "name": "notes", "label": "Notes", "type": "textarea" }
     ]
   }
 ]
