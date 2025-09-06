@@ -470,7 +470,7 @@ function selectComponent(comp) {
   cancelBtn.type = 'button';
   cancelBtn.textContent = 'Cancel';
   cancelBtn.addEventListener('click', () => {
-    modal.style.display = 'none';
+    modal.classList.remove('show');
     selected = null;
     selection = [];
     selectedConnection = null;
@@ -484,7 +484,7 @@ function selectComponent(comp) {
     components.forEach(c => {
       c.connections = (c.connections || []).filter(conn => conn.target !== comp.id);
     });
-    modal.style.display = 'none';
+    modal.classList.remove('show');
     selected = null;
     selection = [];
     selectedConnection = null;
@@ -504,13 +504,13 @@ function selectComponent(comp) {
     pushHistory();
     render();
     save();
-    modal.style.display = 'none';
+    modal.classList.remove('show');
     selected = null;
     selection = [];
     selectedConnection = null;
   });
   modal.appendChild(form);
-  modal.style.display = 'block';
+  modal.classList.add('show');
 }
 
 function chooseCable(source, target, existing = null) {
@@ -605,7 +605,7 @@ function chooseCable(source, target, existing = null) {
     cancelBtn.type = 'button';
     cancelBtn.textContent = 'Cancel';
     cancelBtn.addEventListener('click', () => {
-      modal.style.display = 'none';
+      modal.classList.remove('show');
       resolve(null);
     });
     form.appendChild(saveBtn);
@@ -618,12 +618,12 @@ function chooseCable(source, target, existing = null) {
         cable_type: typeInput.value,
         color: colorInput.value
       };
-      modal.style.display = 'none';
+      modal.classList.remove('show');
       resolve({ ...cable, from_tag: source.ref || source.id, to_tag: target.ref || target.id });
     });
 
     modal.appendChild(form);
-    modal.style.display = 'block';
+    modal.classList.add('show');
   });
 }
 
@@ -795,7 +795,7 @@ function init() {
       render();
       save();
       const modal = document.getElementById('prop-modal');
-      if (modal) modal.style.display = 'none';
+      if (modal) modal.classList.remove('show');
     } else if (action === 'duplicate' && contextTarget) {
       const copy = {
         ...JSON.parse(JSON.stringify(contextTarget)),
@@ -884,7 +884,7 @@ function init() {
       render();
       save();
       const modal = document.getElementById('prop-modal');
-      if (modal) modal.style.display = 'none';
+      if (modal) modal.classList.remove('show');
     }
   });
 
