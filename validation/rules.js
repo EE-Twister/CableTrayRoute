@@ -39,5 +39,12 @@ export function runValidation(components = [], studies = {}) {
     }
   });
 
+  // Single point of failure warnings from reliability study
+  if (Array.isArray(studies.reliability?.n1Failures)) {
+    studies.reliability.n1Failures.forEach(id => {
+      issues.push({ component: id, message: 'Single point of failure' });
+    });
+  }
+
   return issues;
 }

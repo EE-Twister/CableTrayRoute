@@ -70,3 +70,17 @@ export function downloadPDF(title, headers, rows, filename = 'report.pdf') {
   a.click();
   setTimeout(() => URL.revokeObjectURL(a.href), 0);
 }
+
+/**
+ * Build rows for reliability study results.
+ * @param {Object} result
+ * @returns {Array<Object>}
+ */
+export function buildReliabilityRows(result = {}) {
+  const rows = [];
+  const stats = result.componentStats || {};
+  Object.entries(stats).forEach(([id, s]) => {
+    rows.push({ id, availability: s.availability, downtime_hours: s.downtime });
+  });
+  return rows;
+}
