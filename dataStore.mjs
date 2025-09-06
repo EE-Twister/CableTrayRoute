@@ -196,13 +196,29 @@ export const removeEquipment = index => {
  */
 
 /**
- * @returns {OneLineComponent[]}
+ * @typedef {Object} OneLineSheet
+ * @property {string} name
+ * @property {OneLineComponent[]} components
  */
-export const getOneLine = () => read(KEYS.oneLine, []);
+
 /**
- * @param {OneLineComponent[]} comps
+ * Retrieve saved one-line sheets. Supports legacy single-sheet format.
+ * @returns {OneLineSheet[]}
  */
-export const setOneLine = comps => write(KEYS.oneLine, comps);
+export const getOneLine = () => {
+  const data = read(KEYS.oneLine, []);
+  if (Array.isArray(data)) {
+    // legacy array of components
+    return [{ name: 'Sheet 1', components: data }];
+  }
+  if (data && Array.isArray(data.sheets)) return data.sheets;
+  return [];
+};
+/**
+ * Persist one-line sheets
+ * @param {OneLineSheet[]} sheets
+ */
+export const setOneLine = sheets => write(KEYS.oneLine, { sheets });
 
 /**
  * @returns {GenericRecord[]}
@@ -474,7 +490,7 @@ export function importProject(obj) {
   setPanels(Array.isArray(data.panels) ? data.panels : []);
   setEquipment(Array.isArray(data.equipment) ? data.equipment : []);
   setLoads(Array.isArray(data.loads) ? data.loads : []);
-  setOneLine(Array.isArray(data.oneLine) ? data.oneLine : []);
+  setOneLine(Array.isArray(data.oneLine) ? data.oneLine : Array.isArray(data.oneLine?.sheets) ? data.oneLine.sheets : []);
 
   const reserved = new Set([...Object.values(KEYS), 'CTR_PROJECT_V1']);
   for (const key of keys()) {
