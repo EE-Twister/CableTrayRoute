@@ -52,14 +52,13 @@
       </header>
       <section class="card">
         <div id="tcc-controls" class="tcc-controls">
-          <label>Downstream
-            <select id="downstream-select"></select>
+          <label>Devices
+            <select id="device-select" multiple></select>
           </label>
-          <label>Upstream
-            <select id="upstream-select"></select>
-          </label>
+          <div id="device-settings"></div>
           <button id="plot-btn" type="button">Plot</button>
           <button id="link-btn" type="button" style="display:none;">Link to Component</button>
+          <button id="open-btn" type="button" style="display:none;">View Component</button>
         </div>
         <svg id="tcc-chart" width="800" height="600"></svg>
         <div id="violation" class="violation"></div>
