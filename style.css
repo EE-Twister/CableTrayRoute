@@ -1021,6 +1021,8 @@ body.dark-mode .legalDisclaimer {
 /* Highlight voltage drop exceeding limit */
 .voltage-exceed{background-color:var(--warning-bg);color:var(--warning-text);}
 .sizing-violation{background-color:var(--error-bg);color:var(--error-text);}
+.connection.sizing-violation{stroke:var(--error-text)!important;}
+.connection.voltage-exceed{stroke:var(--warning-text)!important;}
 
 /* --- Raceway Schedule Page --- */
 .ductbank-row > td {
