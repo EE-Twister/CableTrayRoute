@@ -1,0 +1,108 @@
+[
+  {
+    "subtype": "MLO",
+    "label": "MLO",
+    "icon": "icons/MLO.svg",
+    "category": "panel",
+    "ports": [{ "x": 0, "y": 20 }, { "x": 80, "y": 20 }],
+    "schema": [
+      { "name": "voltage", "label": "Voltage", "type": "number" }
+    ]
+  },
+  {
+    "subtype": "MCC",
+    "label": "MCC",
+    "icon": "icons/MCC.svg",
+    "category": "panel",
+    "ports": [{ "x": 0, "y": 20 }, { "x": 80, "y": 20 }],
+    "schema": [
+      { "name": "voltage", "label": "Voltage", "type": "number" }
+    ]
+  },
+  {
+    "subtype": "Generator",
+    "label": "Generator",
+    "icon": "icons/Generator.svg",
+    "category": "equipment",
+    "ports": [{ "x": 0, "y": 20 }, { "x": 80, "y": 20 }],
+    "schema": [
+      { "name": "voltage", "label": "Voltage", "type": "number" },
+      { "name": "kW", "label": "Power (kW)", "type": "number" }
+    ]
+  },
+  {
+    "subtype": "UPS",
+    "label": "UPS",
+    "icon": "icons/UPS.svg",
+    "category": "equipment",
+    "ports": [{ "x": 0, "y": 20 }, { "x": 80, "y": 20 }],
+    "schema": [
+      { "name": "voltage", "label": "Voltage", "type": "number" },
+      { "name": "kVA", "label": "Capacity (kVA)", "type": "number" }
+    ]
+  },
+  {
+    "subtype": "Transformer",
+    "label": "Transformer",
+    "icon": "icons/Transformer.svg",
+    "category": "equipment",
+    "ports": [{ "x": 0, "y": 20 }, { "x": 80, "y": 20 }],
+    "schema": [
+      { "name": "voltage", "label": "Voltage", "type": "number" },
+      { "name": "rating", "label": "Rating", "type": "number" }
+    ]
+  },
+  {
+    "subtype": "Switchgear",
+    "label": "Switchgear",
+    "icon": "icons/Switchgear.svg",
+    "category": "equipment",
+    "ports": [{ "x": 0, "y": 20 }, { "x": 80, "y": 20 }],
+    "schema": [
+      { "name": "voltage", "label": "Voltage", "type": "number" }
+    ]
+  },
+  {
+    "subtype": "Motor",
+    "label": "Motor",
+    "icon": "icons/Motor.svg",
+    "category": "load",
+    "ports": [{ "x": 0, "y": 20 }, { "x": 80, "y": 20 }],
+    "schema": [
+      { "name": "voltage", "label": "Voltage", "type": "number" },
+      { "name": "phases", "label": "Phases", "type": "number" }
+    ]
+  },
+  {
+    "subtype": "CapacitorBank",
+    "label": "Capacitor Bank",
+    "icon": "icons/CapacitorBank.svg",
+    "category": "equipment",
+    "ports": [{ "x": 0, "y": 20 }, { "x": 80, "y": 20 }],
+    "schema": [
+      { "name": "voltage", "label": "Voltage", "type": "number" },
+      { "name": "kVAR", "label": "Reactive Power (kVAR)", "type": "number" }
+    ]
+  },
+  {
+    "subtype": "PVArray",
+    "label": "PV Array",
+    "icon": "icons/PVArray.svg",
+    "category": "equipment",
+    "ports": [{ "x": 0, "y": 20 }, { "x": 80, "y": 20 }],
+    "schema": [
+      { "name": "voltage", "label": "Voltage", "type": "number" },
+      { "name": "kW", "label": "Power (kW)", "type": "number" }
+    ]
+  },
+  {
+    "subtype": "Load",
+    "label": "Load",
+    "icon": "icons/Load.svg",
+    "category": "load",
+    "ports": [{ "x": 0, "y": 20 }, { "x": 80, "y": 20 }],
+    "schema": [
+      { "name": "voltage", "label": "Voltage", "type": "number" }
+    ]
+  }
+]
