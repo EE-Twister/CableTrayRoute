@@ -8,6 +8,12 @@ const componentMeta = {
   Load: { icon: 'icons/Load.svg', label: 'Load', category: 'load' }
 };
 
+const typeIcons = {
+  panel: 'icons/panel.svg',
+  equipment: 'icons/equipment.svg',
+  load: 'icons/load.svg'
+};
+
 const propSchemas = {
   Transformer: [
     { name: 'voltage', label: 'Voltage', type: 'number' },
@@ -305,8 +311,9 @@ function render() {
     img.setAttribute('y', c.y);
     img.setAttribute('width', compWidth);
     img.setAttribute('height', compHeight);
-    const meta = componentMeta[c.subtype] || componentMeta[c.type] || {};
-    if (meta.icon) img.setAttribute('href', meta.icon);
+    const meta = componentMeta[c.subtype] || {};
+    const icon = meta.icon || typeIcons[c.type] || 'icons/equipment.svg';
+    img.setAttributeNS('http://www.w3.org/1999/xlink', 'href', icon);
     if (c.rot) {
       const cx = c.x + compWidth / 2;
       const cy = c.y + compHeight / 2;
@@ -632,6 +639,15 @@ function init() {
     ...c,
     connections: (c.connections || []).map(conn => typeof conn === 'string' ? { target: conn } : conn)
   }));
+  components.forEach(c => {
+    if (!componentMeta[c.subtype]) {
+      const icon = typeIcons[c.type] || 'icons/equipment.svg';
+      componentMeta[c.subtype] = { icon, label: c.subtype, category: c.type };
+      subtypeCategory[c.subtype] = c.type;
+      if (!componentTypes[c.type]) componentTypes[c.type] = [];
+      componentTypes[c.type].push(c.subtype);
+    }
+  });
   pushHistory();
   render();
   syncSchedules(false);
