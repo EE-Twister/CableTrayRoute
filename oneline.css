@@ -8,6 +8,21 @@
   --ol-hover-bg: rgba(0,0,0,0.05);
 }
 
+.btn {
+  background: #f0f0f0;
+  color: #333;
+  border: 1px solid var(--ol-border-color);
+  border-radius: var(--ol-radius);
+  padding: 0.25rem 0.5rem;
+  cursor: pointer;
+  transition: background-color 0.2s;
+}
+
+.btn:hover,
+.btn:focus {
+  background-color: var(--ol-hover-bg);
+}
+
 .card {
   background: var(--ol-card-bg);
   border: 1px solid var(--ol-border-color);
@@ -16,11 +31,12 @@
 }
 
 .palette {
+  width: 200px;
   display: flex;
-  align-items: center;
+  flex-direction: column;
   gap: var(--ol-spacing);
-  margin-bottom: var(--ol-spacing);
   font-family: var(--ol-font);
+  margin-right: var(--ol-spacing);
 }
 
 #palette-search {
@@ -84,6 +100,12 @@
   margin-bottom: var(--ol-spacing);
 }
 
+.sheet-action-group {
+  display: flex;
+  align-items: center;
+  gap: var(--ol-spacing);
+}
+
 .sheet-tabs {
   display: flex;
   gap: var(--ol-spacing);
@@ -103,6 +125,19 @@
 
 .oneline-editor {
   position: relative;
+  flex: 1;
+}
+
+.toolbar {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--ol-spacing);
+  margin-bottom: var(--ol-spacing);
+}
+
+.workspace {
+  display: flex;
 }
 
 .oneline-editor #diagram {
@@ -110,12 +145,12 @@
   border-radius: var(--ol-radius);
 }
 
-.palette .icon-button {
+.btn.icon-button {
   transition: transform 0.2s, background-color 0.2s;
 }
 
-.palette .icon-button:hover,
-.palette .icon-button:focus {
+.btn.icon-button:hover,
+.btn.icon-button:focus {
   background-color: var(--ol-hover-bg);
   transform: scale(1.05);
 }
