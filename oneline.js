@@ -14,6 +14,26 @@ const typeIcons = {
   load: 'icons/load.svg'
 };
 
+const iconCache = {};
+function preloadIcons() {
+  const iconPaths = new Set([
+    ...Object.values(typeIcons),
+    ...Object.values(componentMeta).map(m => m.icon)
+  ]);
+  iconPaths.forEach(path => {
+    fetch(path, { method: 'HEAD' })
+      .then(res => {
+        iconCache[path] = res.ok;
+        if (!res.ok) console.warn(`Missing icon file: ${path}`);
+      })
+      .catch(() => {
+        iconCache[path] = false;
+        console.warn(`Missing icon file: ${path}`);
+      });
+  });
+}
+if (typeof fetch === 'function') preloadIcons();
+
 const propSchemas = {
   Transformer: [
     { name: 'voltage', label: 'Voltage', type: 'number' },
@@ -312,7 +332,11 @@ function render() {
     img.setAttribute('width', compWidth);
     img.setAttribute('height', compHeight);
     const meta = componentMeta[c.subtype] || {};
-    const icon = meta.icon || typeIcons[c.type] || 'icons/equipment.svg';
+    let icon = meta.icon;
+    if (!icon || iconCache[icon] === false) {
+      console.warn(`Missing icon for subtype '${c.subtype}'`);
+      icon = 'icons/equipment.svg';
+    }
     img.setAttributeNS('http://www.w3.org/1999/xlink', 'href', icon);
     if (c.rot) {
       const cx = c.x + compWidth / 2;
