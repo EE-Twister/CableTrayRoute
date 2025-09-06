@@ -1,1 +1,1417 @@
-!function(){"use strict";function e(e){if("string"==typeof e)try{return t(JSON.parse(e))}catch{return function(e){const t=[],n=[],a=/#\d+=IFC([^;]*?)SEGMENT[^;]*?IFCPOLYLINE\(\(([^)]+)\),\(([^)]+)\)\)/gi;let o,r=0;for(;o=a.exec(e);){const e=o[1]||"",a=o[2].split(",").map(e=>parseFloat(e)),c=o[3].split(",").map(e=>parseFloat(e)),s={id:"SEG-"+r++,start_x:a[0],start_y:a[1],start_z:a[2],end_x:c[0],end_y:c[1],end_z:c[2]};/CABLECARRIER/i.test(e)?t.push(s):n.push(s)}return{trays:t,conduits:n}}(e)}return t(e)}function t(e){if(!e||"object"!=typeof e)return{trays:[],conduits:[]};const t=[],n=[],r=e.trays||e.Trays||e.cableTrays||e.CableTrays||[];for(const e of r)t.push(a(e));const c=e.conduits||e.Conduits||e.cableConduits||e.ConduitSegments||[];for(const e of c)n.push(o(e));return{trays:t,conduits:n}}function n(e){const t=parseFloat(e);return Number.isFinite(t)?t:void 0}function a(e={}){return{id:e.id||e.tag||e.tray_id||e.TrayID||e.name||e.Tag||"",start_x:n(e.start_x??e.sx??e.x1??e.StartX??e.start?.x),start_y:n(e.start_y??e.sy??e.y1??e.StartY??e.start?.y),start_z:n(e.start_z??e.sz??e.z1??e.StartZ??e.start?.z),end_x:n(e.end_x??e.ex??e.x2??e.EndX??e.end?.x),end_y:n(e.end_y??e.ey??e.y2??e.EndY??e.end?.y),end_z:n(e.end_z??e.ez??e.z2??e.EndZ??e.end?.z),width:n(e.width??e.w??e.Width??e.size_x),height:n(e.height??e.h??e.Height??e.size_y)}}function o(e={}){return{conduit_id:e.conduit_id||e.id||e.tag||e.ConduitID||"",type:e.type||e.conduit_type||e.Type||"",trade_size:e.trade_size||e.tradeSize||e.size||e.TradeSize||"",start_x:n(e.start_x??e.sx??e.x1??e.start?.x),start_y:n(e.start_y??e.sy??e.y1??e.start?.y),start_z:n(e.start_z??e.sz??e.z1??e.start?.z),end_x:n(e.end_x??e.ex??e.x2??e.end?.x),end_y:n(e.end_y??e.ey??e.y2??e.end?.y),end_z:n(e.end_z??e.ez??e.z2??e.end?.z),capacity:n(e.capacity??e.fill)}}const r={trays:"traySchedule",cables:"cableSchedule",ductbanks:"ductbankSchedule",conduits:"conduitSchedule",panels:"panelSchedule",loads:"loadList",equipment:"equipment",traySchedule:"traySchedule",cableSchedule:"cableSchedule",ductbankSchedule:"ductbankSchedule",conduitSchedule:"conduitSchedule",panelSchedule:"panelSchedule",loadList:"loadList",equipmentList:"equipment"},c={};function s(e,t){(c[e]||[]).forEach(e=>{try{e(t)}catch(e){console.error(e)}})}function i(e,t){c[e]||(c[e]=[]),c[e].push(t)}function d(e,t){try{const n="undefined"!=typeof localStorage?localStorage.getItem(e):null;return n?JSON.parse(n):t}catch{return t}}function l(e,t){try{"undefined"!=typeof localStorage&&localStorage.setItem(e,JSON.stringify(t)),s(e,t)}catch(t){console.error("Failed to store",e,t)}}const u=()=>d(r.trays,[]),p=e=>l(r.trays,e),m=()=>d(r.cables,[]),y=e=>l(r.cables,e),f=()=>d(r.ductbanks,[]),g=e=>l(r.ductbanks,e),h=()=>d(r.conduits,[]),b=e=>l(r.conduits,e),S=()=>d(r.panels,[]),w=e=>l(r.panels,e),k=()=>d(r.equipment,[]);function v(e){return{id:"",description:"",voltage:"",...e}}const E=e=>l(r.equipment,e.map(v)),x=e=>{const t=k();t.push(v(e)),E(t)},L=(e,t)=>{const n=k();e>=0&&e<n.length&&(n[e]=v({...n[e],...t}),E(n))},A=e=>{const t=k();e>=0&&e<t.length&&(t.splice(e,1),E(t))},N=()=>{const e=d(r.loads,[]),t=e.map(T);return e.some(e=>e&&"object"==typeof e&&!("source"in e))&&l(r.loads,t),t};function T(e){const t={...e};return"power"in t&&!("kw"in t)&&(t.kw=t.power,delete t.power),{source:"",tag:"",description:"",quantity:"",voltage:"",loadType:"",duty:"",kw:"",powerFactor:"",loadFactor:"",efficiency:"",demandFactor:"",phases:"",circuit:"",...t}}function j(e){const t=T(e);return Object.values(t).every(e=>""===e)}const C=e=>{const t=(e.length?e:[{}]).map(T);l(r.loads,t)},O=e=>{const t=N(),n=T(e);1===t.length&&j(t[0])&&!j(n)?t[0]=n:t.push(n),C(t)},_=(e,t)=>{const n=N(),a=T(t),o=Math.max(0,Math.min(e,n.length));n.splice(o,0,a),C(n)},I=(e,t)=>{const n=N();e>=0&&e<n.length&&(n[e]=T({...n[e],...t}),C(n))},F=e=>{const t=N();e>=0&&e<t.length&&(t.splice(e,1),C(t))},q=F,J=(e,t=null)=>d(e,t),R=(e,t)=>l(e,t),$=e=>{try{"undefined"!=typeof localStorage&&localStorage.removeItem(e),s(e,null)}catch(t){console.error("Failed to remove",e,t)}},P=()=>{try{if("undefined"!=typeof localStorage)return Object.keys(localStorage)}catch{}return[]};function D(){const e={ductbanks:f(),conduits:h(),trays:u(),cables:m(),panels:S(),equipment:k(),loads:N(),settings:{}},t=new Set([...Object.values(r),"CTR_PROJECT_V1"]);for(const n of P())t.has(n)||(e.settings[n]=J(n));return e}function z(e){let t=e;const{valid:n,missing:a,extra:o}=function(e){const t=["ductbanks","conduits","trays","cables","panels","equipment","loads","settings"],n=[],a=[];if(!e||"object"!=typeof e)return n.push(...t),{valid:!1,missing:n,extra:a};for(const a of t)a in e||n.push(a);for(const n of Object.keys(e))t.includes(n)||a.push(n);const o=Array.isArray(e.ductbanks)&&Array.isArray(e.conduits)&&Array.isArray(e.trays)&&Array.isArray(e.cables)&&Array.isArray(e.panels)&&Array.isArray(e.equipment)&&Array.isArray(e.loads)&&e.settings&&"object"==typeof e.settings&&!Array.isArray(e.settings);return{valid:0===n.length&&0===a.length&&o,missing:n,extra:a}}(t);if(!n){const n=[];a.length&&n.push(`Missing fields: ${a.join(", ")}`),o.length&&n.push(`Extra fields: ${o.join(", ")}`);const r=n.join("\n")||"Invalid project data.";if(!("undefined"!=typeof window&&"function"==typeof window.confirm&&window.confirm(`${r}\nRepair & continue?`)))return!1;t={ductbanks:Array.isArray(e.ductbanks)?e.ductbanks:[],conduits:Array.isArray(e.conduits)?e.conduits:[],trays:Array.isArray(e.trays)?e.trays:[],cables:Array.isArray(e.cables)?e.cables:[],panels:Array.isArray(e.panels)?e.panels:[],equipment:Array.isArray(e.equipment)?e.equipment:[],loads:Array.isArray(e.loads)?e.loads:[],settings:e.settings&&"object"==typeof e.settings?e.settings:{}}}g(t.ductbanks),b(t.conduits),p(t.trays),y(t.cables),w(Array.isArray(t.panels)?t.panels:[]),E(Array.isArray(t.equipment)?t.equipment:[]),C(Array.isArray(t.loads)?t.loads:[]);const c=new Set([...Object.values(r),"CTR_PROJECT_V1"]);for(const e of P())c.has(e)||t.settings&&e in t.settings||$(e);if(t.settings)for(const[e,n]of Object.entries(t.settings))R(e,n);return!0}let U,B;"undefined"!=typeof window&&(window.dataStore={STORAGE_KEYS:r,getTrays:u,setTrays:p,getCables:m,setCables:y,getDuctbanks:f,setDuctbanks:g,getConduits:h,setConduits:b,getPanels:S,setPanels:w,getEquipment:k,setEquipment:E,addEquipment:x,updateEquipment:L,removeEquipment:A,getLoads:N,setLoads:C,addLoad:O,insertLoad:_,updateLoad:I,removeLoad:q,getItem:J,setItem:R,removeItem:$,on:i,off:function(e,t){const n=c[e];if(!n)return;const a=n.indexOf(t);a>=0&&n.splice(a,1)},keys:P,exportProject:D,importProject:z,importFromCad:async function(t){let n;if("string"==typeof t)n=t;else{if(!t||"function"!=typeof t.text)throw new Error("Unsupported CAD file");n=await t.text()}const{trays:a=[],conduits:o=[]}=e(n);return Array.isArray(a)&&a.length&&p(a),Array.isArray(o)&&o.length&&b(o),{trays:a,conduits:o}},exportToCad:function(e="json"){const t={trays:u(),conduits:h()};let n="application/json",a="json",o=JSON.stringify(t,null,2);if("csv"===e){const e="id,start_x,start_y,start_z,end_x,end_y,end_z,width,height",r=t.trays.map(e=>[e.id,e.start_x,e.start_y,e.start_z,e.end_x,e.end_y,e.end_z,e.width,e.height].join(",")),c="conduit_id,type,trade_size,start_x,start_y,start_z,end_x,end_y,end_z,capacity",s=t.conduits.map(e=>[e.conduit_id,e.type,e.trade_size,e.start_x,e.start_y,e.start_z,e.end_x,e.end_y,e.end_z,e.capacity].join(","));o=`# trays\n${[e,...r].join("\n")}\n# conduits\n${[c,...s].join("\n")}`,n="text/csv",a="csv"}if("undefined"!=typeof document)try{const e=new Blob([o],{type:n}),t=document.createElement("a");t.href=URL.createObjectURL(e),t.download=`raceways.${a}`,document.body.appendChild(t),t.click(),document.body.removeChild(t),URL.revokeObjectURL(t.href)}catch(e){console.error("Failed to export CAD data",e)}return o}}),window.addEventListener("DOMContentLoaded",()=>{document.querySelectorAll(".workflow-grid .workflow-card").forEach(e=>{const t=e.dataset.storageKey,n=e.querySelector(".status");if(!n)return;let a=!1;"racewaySchedule"===t?a=f().length>0||u().length>0||h().length>0:"optimalRoute"===t?a=m().length>0&&u().length>0:t&&(a=!!J(t)),a?(e.classList.add("complete"),n.textContent="✓",n.setAttribute("aria-label","Completed")):n.textContent="Incomplete"})}),function(e){const t=.3048;let n="imperial";function a(){if(e.getProject)try{return e.getProject().settings?.units||"imperial"}catch{return"imperial"}return n}function o(e){return"imperial"===a()?e:e*t}function r(e){return"imperial"===a()?e:25.4*e}function c(){return"imperial"===a()?"ft":"m"}function s(){return"imperial"===a()?"in":"mm"}const i={getUnitSystem:a,setUnitSystem:function(t){const a="metric"===t?"metric":"imperial";if(e.getProject&&e.setProject)try{const t=e.getProject();t.settings=t.settings||{},t.settings.units=a,e.setProject(t)}catch{}n=a},distanceToDisplay:o,distanceFromInput:function(e){return"imperial"===a()?e:e/t},conduitToDisplay:r,conduitFromInput:function(e){return"imperial"===a()?e:e/25.4},distanceLabel:c,conduitLabel:s,formatDistance:function(e,t=2){return`${o(e).toFixed(t)} ${c()}`},formatConduitSize:function(e,t=2){return`${r(e).toFixed(t)} ${s()}`}};"undefined"!=typeof module&&module.exports&&(module.exports=i),e.units=i}("undefined"!=typeof globalThis?globalThis:window);const K="a[href],button:not([disabled]),textarea:not([disabled]),input:not([disabled]),select:not([disabled]),[tabindex]:not([tabindex='-1'])",M="CTR_PROJECT_V1";function V(e={}){const t=e.settings||{session:e.session||e.ctrSession||{},collapsedGroups:e.collapsedGroups||{}};return t.units||(t.units="imperial"),{name:e.name||"",ductbanks:e.ductbanks||e.ductbankSchedule||[],conduits:e.conduits||e.conduitSchedule||[],trays:e.trays||e.traySchedule||[],cables:e.cables||e.cableSchedule||[],settings:t}}function G(e){if(Array.isArray(e))return e.map(G);if(e&&"object"==typeof e){const t={};return Object.keys(e).sort().forEach(n=>{t[n]=G(e[n])}),t}return e}function W(e){return JSON.stringify(G(e))}function H(e){let t="";for(const n of e)t+=String.fromCharCode(n);return btoa(t)}async function Y(e){try{const t=new CompressionStream("gzip"),n=t.writable.getWriter();await n.write((new TextEncoder).encode(e)),await n.close();const a=await new Response(t.readable).arrayBuffer();return new Uint8Array(a)}catch{return(new TextEncoder).encode(e)}}async function X(e){const t=function(e){const t=atob(e),n=new Uint8Array(t.length);for(let e=0;e<t.length;e++)n[e]=t.charCodeAt(e);return n}(decodeURIComponent(e)),n=await async function(e){try{const t=new DecompressionStream("gzip"),n=t.writable.getWriter();await n.write(e),await n.close();const a=await new Response(t.readable).arrayBuffer();return(new TextDecoder).decode(a)}catch{return(new TextDecoder).decode(e)}}(t);return JSON.parse(n)}async function Z(){try{const e=W(getProject()),t=await Y(e);if(t.length>2097152)return void alert("Checkpoint exceeds 2MB limit");globalThis._ctrRealSetItem?.("CTR_CHECKPOINT",H(t))}catch(e){console.error("Checkpoint save failed",e)}}async function Q(){if("function"!=typeof getProject)return;const e=getProject(),t=e.name||"Untitled";try{const n=await async function(e){const t=(new TextEncoder).encode(e),n=crypto.subtle||crypto.webcrypto?.subtle,a=await n.digest("SHA-256",t);return Array.from(new Uint8Array(a)).map(e=>e.toString(16).padStart(2,"0")).join("")}(W(e));let a=document.getElementById("project-display");if(!a){const e=document.querySelector(".top-nav .nav-links"),t=document.getElementById("settings-btn");e&&(a=document.createElement("span"),a.id="project-display",a.style.marginLeft="auto",a.style.marginRight="1rem",e.insertBefore(a,t),t&&(t.style.marginLeft="0"))}a&&(a.textContent=`Project: ${t} (hash: ${n.slice(0,8)})`)}catch(e){console.error("hash failed",e)}}async function ee(){try{const e=getProject?getProject():{name:"",ductbanks:[],conduits:[],trays:[],cables:[],settings:{session:{},collapsedGroups:{},units:"imperial"}},t=W(e),n=await async function(e){const t=W(e),n=await Y(t);return encodeURIComponent(H(n))}(e),a=`${location.origin}${location.pathname}#project=${n}`;if(a.length<2e3)await navigator.clipboard.writeText(a),alert("Share link copied to clipboard");else{const e=new Blob([t],{type:"application/json"}),n=document.createElement("a");n.href=URL.createObjectURL(e),n.download="project.ctr.json",n.click(),setTimeout(()=>URL.revokeObjectURL(n.href),0),alert("Project too large for link; downloaded instead")}}catch(e){console.error("share link failed",e)}}function te(e,t){if("Tab"!==e.key)return;const n=t.querySelectorAll(K);if(!n.length)return;const a=n[0],o=n[n.length-1];e.shiftKey&&document.activeElement===a?(e.preventDefault(),o.focus()):e.shiftKey||document.activeElement!==o||(e.preventDefault(),a.focus())}function ne(e){return new Promise((t,n)=>{const a=document.createElement("script");a.src=e,a.onload=()=>t(),a.onerror=n,document.head.appendChild(a)})}async function ae(e="pdf"){const t=[...document.querySelectorAll("input, select, textarea")].map(e=>{return`${t=e.id||e.name||"",document.querySelector(`label[for="${t}"]`)?.textContent.trim()||t}: ${e.value}`;var t}),n=document.getElementById("results")||document.getElementById("output"),a=n?n.innerText.trim():"",o=[...document.querySelectorAll(".method-panel a")].map(e=>e.href);if("pdf"===e){window.jspdf||await ne("https://cdn.jsdelivr.net/npm/jspdf@2.5.1/dist/jspdf.umd.min.js");const{jsPDF:e}=window.jspdf,n=new e;let r=10;n.text("Technical Report",10,r),r+=10,n.text("Inputs:",10,r),r+=10,t.forEach(e=>{n.text(e,10,r),r+=10,r>280&&(n.addPage(),r=10)}),a&&(n.addPage(),r=10,n.text("Outputs:",10,r),r+=10,n.text(a,10,r)),o.length&&(n.addPage(),r=10,n.text("References:",10,r),r+=10,o.forEach(e=>{n.text(e,10,r),r+=10,r>280&&(n.addPage(),r=10)})),n.save("technical_report.pdf")}else{window.docx||await ne("https://cdn.jsdelivr.net/npm/docx@8.4.0/build/index.min.js");const{Document:e,Packer:n,Paragraph:r}=window.docx,c=[new r("Technical Report"),new r("Inputs:")];t.forEach(e=>c.push(new r(e))),a&&(c.push(new r("Outputs:")),c.push(new r(a))),o.length&&(c.push(new r("References:")),o.forEach(e=>c.push(new r(e))));const s=new e({sections:[{properties:{},children:c}]}),i=await n.toBlob(s),d=document.createElement("a");d.href=URL.createObjectURL(i),d.download="technical_report.docx",d.click()}}globalThis.migrateProject=V,async function(){const e=await import("https://cdn.jsdelivr.net/npm/fast-json-patch@3.1.0/index.mjs");({applyPatch:U,compare:B}=e)}().then(function(){if("undefined"==typeof localStorage)return;const e=localStorage.getItem.bind(localStorage),t=localStorage.setItem.bind(localStorage),n=localStorage.removeItem.bind(localStorage);globalThis._ctrRealSetItem=t;const a=[],o=[];function r(e,t){const n=B(t,e);n.length&&(a.push(n),o.length=0)}let c;try{c=JSON.parse(e(M))}catch{c=null}if(!c||"object"!=typeof c){const n={cables:JSON.parse(e("cableSchedule")||"[]"),trays:JSON.parse(e("traySchedule")||"[]"),conduits:JSON.parse(e("conduitSchedule")||"[]"),ductbanks:JSON.parse(e("ductbankSchedule")||"[]"),settings:{session:JSON.parse(e("ctrSession")||"{}"),collapsedGroups:JSON.parse(e("collapsedGroups")||"{}"),conduitFillData:JSON.parse(e("conduitFillData")||"null"),trayFillData:JSON.parse(e("trayFillData")||"null"),ductbankSession:JSON.parse(e("ductbankSession")||"{}")}};c=V(n);try{t(M,JSON.stringify(c))}catch(e){console.warn("project save failed",e)}}function s(){try{t(M,JSON.stringify(c))}catch(e){console.warn("project save failed",e)}globalThis.updateProjectDisplay?.()}localStorage.getItem=function(t){if(t===M)return e(t);switch(t){case"cableSchedule":return JSON.stringify(c.cables||[]);case"traySchedule":return JSON.stringify(c.trays||[]);case"conduitSchedule":return JSON.stringify(c.conduits||[]);case"ductbankSchedule":return JSON.stringify(c.ductbanks||[]);case"collapsedGroups":return JSON.stringify(c.settings?.collapsedGroups||{});case"ctrSession":return JSON.stringify(c.settings?.session||{});default:return c.settings&&t in c.settings?JSON.stringify(c.settings[t]):null}},localStorage.setItem=function(e,n){const a=JSON.parse(JSON.stringify(c));if(e!==M){switch(e){case"cableSchedule":c.cables=JSON.parse(n);break;case"traySchedule":c.trays=JSON.parse(n);break;case"conduitSchedule":c.conduits=JSON.parse(n);break;case"ductbankSchedule":c.ductbanks=JSON.parse(n);break;case"collapsedGroups":c.settings.collapsedGroups=JSON.parse(n);break;case"ctrSession":c.settings.session=JSON.parse(n);break;default:c.settings||(c.settings={});try{c.settings[e]=JSON.parse(n)}catch{c.settings[e]=n}}r(a,c),s()}else try{t(e,n)}catch(e){console.warn("project save failed",e)}},localStorage.removeItem=function(e){const t=JSON.parse(JSON.stringify(c));if(e!==M){switch(e){case"cableSchedule":c.cables=[];break;case"traySchedule":c.trays=[];break;case"conduitSchedule":c.conduits=[];break;case"ductbankSchedule":c.ductbanks=[];break;case"collapsedGroups":delete c.settings.collapsedGroups;break;case"ctrSession":delete c.settings.session;break;default:c.settings&&delete c.settings[e]}r(t,c),s()}else n(e)},globalThis.getProject=()=>JSON.parse(JSON.stringify(c)),globalThis.setProject=e=>{const t=JSON.parse(JSON.stringify(c));c=V(e),r(t,c),s()},globalThis.undoProject=()=>{if(!a.length)return;const e=a.pop(),t=JSON.parse(JSON.stringify(c)),n=U(t,e,!0).newDocument;o.push(B(n,c)),c=n,s()},globalThis.redoProject=()=>{if(!o.length)return;const e=o.pop(),t=JSON.parse(JSON.stringify(c)),n=U(t,e,!0).newDocument;a.push(B(n,c)),c=n,s()},globalThis.addEventListener("beforeunload",()=>{a.length=0,o.length=0})}).catch(e=>console.error("fast-json-patch load failed",e)),globalThis.updateProjectDisplay=Q;const oe="CTR_CONDUITS";function re(){const e=globalThis.units?.getUnitSystem()?globalThis.units.getUnitSystem():"imperial",t="imperial"===e?"ft":"m",n="imperial"===e?"in":"mm";document.querySelectorAll('[data-unit="distance"]').forEach(e=>e.textContent=t),document.querySelectorAll('[data-unit="conduit"]').forEach(e=>e.textContent=n)}globalThis.document?.addEventListener("DOMContentLoaded",function(){document.addEventListener("keydown",e=>{if("ArrowUp"!==e.key&&"ArrowDown"!==e.key)return;const t=e.target;if(!["INPUT","SELECT","TEXTAREA"].includes(t.tagName))return;const n=t.closest("td");if(!n||!n.closest("table"))return;const a=n.parentElement,o=n.cellIndex,r="ArrowUp"===e.key?a.previousElementSibling:a.nextElementSibling;if(!r)return;const c=r.cells[o];if(!c)return;const s=c.querySelector("input, select, textarea");s&&(e.preventDefault(),s.focus(),"function"==typeof s.select&&s.select())})}),globalThis.addEventListener?.("DOMContentLoaded",function(){!async function(){if(location.hash.startsWith("#project="))try{const e=location.hash.slice(9),t=await X(e);globalThis.setProject&&globalThis.setProject(t),location.hash="",location.reload()}catch(e){console.error("load share failed",e)}}();const e=document.getElementById("export-project-btn");if(e){const t=document.createElement("button");t.id="save-checkpoint-btn",t.textContent="Save Checkpoint",e.insertAdjacentElement("afterend",t),t.addEventListener("click",Z)}const t=document.getElementById("import-project-btn"),n=document.getElementById("import-project-input");e&&e.addEventListener("click",()=>{try{const e=D(),t=new Blob([JSON.stringify(e,null,2)],{type:"application/json"}),n=document.createElement("a");n.href=URL.createObjectURL(t),n.download="project.ctr.json",n.click(),setTimeout(()=>URL.revokeObjectURL(n.href),0)}catch(e){console.error("Export failed",e)}}),t&&n&&(t.addEventListener("click",()=>n.click()),n.addEventListener("change",e=>{const t=e.target.files[0];if(!t)return;const a=new FileReader;a.onload=e=>{try{z(JSON.parse(e.target.result))&&location.reload()}catch(e){console.error("Import failed",e)}},a.readAsText(t),n.value=""}))}),globalThis.initSettings=function(){const e=document.getElementById("settings-btn"),t=document.getElementById("settings-menu");if(e&&t){t.setAttribute("role","dialog"),t.setAttribute("aria-modal","true"),t.setAttribute("aria-hidden","true");let n=!1;const a=e=>{"Escape"===e.key?r():te(e,t)},o=()=>{n=!0,t.style.display="flex",t.setAttribute("aria-hidden","false"),e.setAttribute("aria-expanded","true"),document.addEventListener("keydown",a);const o=t.querySelectorAll(K);o.length&&o[0].focus()},r=()=>{n&&(n=!1,t.style.display="none",t.setAttribute("aria-hidden","true"),e.setAttribute("aria-expanded","false"),document.removeEventListener("keydown",a),e.focus())};e.addEventListener("click",()=>{n?r():o()}),document.addEventListener("click",a=>{n&&!t.contains(a.target)&&a.target!==e&&r()});const c=document.createElement("label");c.textContent="Project Name";const s=document.createElement("input");s.type="text",s.id="project-name-input";try{s.value=getProject().name||""}catch{}c.appendChild(s),t.insertBefore(c,t.firstChild),s.addEventListener("input",e=>{try{const t=getProject();t.name=e.target.value,setProject(t),Q()}catch{}});const i=document.getElementById("export-project-btn"),d=document.createElement("button");d.id="copy-share-link-btn",d.textContent="Copy Share Link",i?i.insertAdjacentElement("beforebegin",d):t.appendChild(d),d.addEventListener("click",ee);const l=document.createElement("button");l.id="run-self-check-btn",l.textContent="Run Self-Check",t.appendChild(l),l.addEventListener("click",()=>{location.href="optimalRoute.html?selfcheck=1"});const u=document.createElement("button");u.id="generate-report-btn",u.textContent="Generate Technical Report",t.appendChild(u),u.addEventListener("click",async()=>{const e=confirm("Generate DOCX? Cancel for PDF");await ae(e?"docx":"pdf")})}const n=document.getElementById("unit-select");if(n){try{n.value=getProject().settings?.units||"imperial"}catch{}n.addEventListener("change",e=>{try{const t=getProject();t.settings=t.settings||{},t.settings.units=e.target.value,setProject(t)}catch{}re()})}re(),Q(),window.addEventListener("storage",e=>{e.key===M&&Q()})},globalThis.initDarkMode=function(){const e=document.getElementById("dark-toggle"),t=JSON.parse(localStorage.getItem("ctrSession")||"{}");if(void 0===t.darkMode){const e=window.matchMedia&&window.matchMedia("(prefers-color-scheme: dark)").matches;t.darkMode=e,localStorage.setItem("ctrSession",JSON.stringify(t))}document.body.classList.toggle("dark-mode",t.darkMode),e&&(e.checked=!!t.darkMode),e&&e.addEventListener("change",()=>{document.body.classList.toggle("dark-mode",e.checked),t.darkMode=e.checked,localStorage.setItem("ctrSession",JSON.stringify(t)),"function"==typeof window.saveSession&&window.saveSession(),"function"==typeof window.saveDuctbankSession&&window.saveDuctbankSession()}),window.addEventListener("storage",t=>{if("ctrSession"===t.key)try{const n=JSON.parse(t.newValue);document.body.classList.toggle("dark-mode",n&&n.darkMode),e&&(e.checked=!(!n||!n.darkMode))}catch{}})},globalThis.initCompactMode=function(){const e=document.getElementById("compact-toggle"),t=JSON.parse(localStorage.getItem("ctrSession")||"{}");void 0===t.compactMode&&(t.compactMode=!1,localStorage.setItem("ctrSession",JSON.stringify(t))),document.body.classList.toggle("compact-mode",t.compactMode),e&&(e.checked=!!t.compactMode),e&&e.addEventListener("change",()=>{document.body.classList.toggle("compact-mode",e.checked),t.compactMode=e.checked,localStorage.setItem("ctrSession",JSON.stringify(t)),"function"==typeof window.saveSession&&window.saveSession(),"function"==typeof window.saveDuctbankSession&&window.saveDuctbankSession()}),window.addEventListener("storage",t=>{if("ctrSession"===t.key)try{const n=JSON.parse(t.newValue);document.body.classList.toggle("compact-mode",n&&n.compactMode),e&&(e.checked=!(!n||!n.compactMode))}catch{}})},globalThis.initHelpModal=function(e="help-btn",t="help-modal",n){const a=document.getElementById(e),o=document.getElementById(t),r=n?document.getElementById(n):o?o.querySelector(".close-btn"):null;if(a&&o&&r){o.setAttribute("role","dialog"),o.setAttribute("aria-modal","true"),o.setAttribute("aria-hidden","true");const e=o.querySelector(".modal-content"),t=Array.from(e.children);let n=null;const c=e=>{"Escape"===e.key?i():te(e,o)},s=()=>{o.style.display="flex",o.setAttribute("aria-hidden","false"),a.setAttribute("aria-expanded","true"),document.addEventListener("keydown",c);const e=o.querySelectorAll(K);e.length&&e[0].focus()},i=()=>{o.style.display="none",o.setAttribute("aria-hidden","true"),a.setAttribute("aria-expanded","false"),document.removeEventListener("keydown",c),a.focus(),n&&(n.style.display="none",n.src=""),t.forEach(e=>{e!==r&&(e.style.display="")})};globalThis.showHelpDoc=a=>{n||(n=document.createElement("iframe"),n.id="help-iframe",n.style.width="100%",n.style.height="80vh",e.appendChild(n)),t.forEach(e=>{e!==r&&(e.style.display="none")}),n.style.display="block",n.src=a,s()},a.addEventListener("click",s),r.addEventListener("click",i),o.addEventListener("click",e=>{e.target===o&&i()})}},globalThis.initNavToggle=function(){const e=document.querySelector(".nav-toggle");if(!e)return;const t=document.getElementById(e.getAttribute("aria-controls"));t&&(e.addEventListener("click",()=>{const n="true"===e.getAttribute("aria-expanded");e.setAttribute("aria-expanded",String(!n)),t.classList.toggle("open",!n)}),document.addEventListener("keydown",n=>{"Escape"===n.key&&(e.setAttribute("aria-expanded","false"),t.classList.remove("open"))}))},globalThis.checkPrereqs=function(e=[]){},globalThis.persistConduits=function(e){try{localStorage.setItem(oe,JSON.stringify(e));const t=globalThis.TableUtils?.STORAGE_KEYS?.conduitSchedule||"conduitSchedule";localStorage.setItem(t,JSON.stringify(e.conduits||[]))}catch(e){console.error("Failed to persist conduits",e)}},globalThis.loadConduits=function(){try{const e=localStorage.getItem(oe);if(e){const t=JSON.parse(e);return{ductbanks:t.ductbanks||[],conduits:t.conduits||[]}}}catch(e){}const e=globalThis.TableUtils?.STORAGE_KEYS?.ductbankSchedule||"ductbankSchedule",t=globalThis.TableUtils?.STORAGE_KEYS?.conduitSchedule||"conduitSchedule";let n=[],a=[];try{n=JSON.parse(localStorage.getItem(e)||"[]")}catch(e){}try{a=JSON.parse(localStorage.getItem(t)||"[]")}catch(e){}const o=[];return n=n.map(e=>{(e.conduits||[]).forEach(t=>{o.push({ductbankTag:e.tag,conduit_id:t.conduit_id,tray_id:`${e.tag}-${t.conduit_id}`,type:t.type,trade_size:t.trade_size,start_x:t.start_x,start_y:t.start_y,start_z:t.start_z,end_x:t.end_x,end_y:t.end_y,end_z:t.end_z,allowed_cable_group:t.allowed_cable_group})});const{conduits:t,...n}=e;return n}),{ductbanks:n,conduits:[...o,...a]}},globalThis.applyUnitLabels=re,globalThis.showSelfCheckModal=function(e){const t=document.createElement("div");t.className="modal",t.id="self-check-modal";const n=document.createElement("div");n.className="modal-content";const a=document.createElement("button");a.className="close-btn",a.textContent="×",a.addEventListener("click",()=>t.remove());const o=document.createElement("h2");o.textContent=e.pass?"Self-Check PASSED":"Self-Check FAILED";const r=document.createElement("pre"),c=JSON.stringify(e,null,2);r.textContent=c;const s=document.createElement("div");s.className="modal-actions";const i=document.createElement("button");i.textContent="Copy Diagnostics",i.addEventListener("click",()=>navigator.clipboard.writeText(c)),s.appendChild(i),n.appendChild(a),n.appendChild(o),n.appendChild(r),n.appendChild(s),t.appendChild(n),document.body.appendChild(t),t.style.display="flex"};class ce{constructor(e=[]){this.items=e,this.menu=document.createElement("ul"),this.menu.className="context-menu",Object.assign(this.menu.style,{position:"absolute",display:"none",listStyle:"none",margin:"0",padding:"4px 0",background:"#fff",border:"1px solid #ccc",zIndex:1e3,color:"#000"}),document.body.appendChild(this.menu),document.addEventListener("click",()=>this.hide()),document.addEventListener("keydown",e=>{"Escape"===e.key&&this.hide()})}setItems(e){this.items=e,this.menu.innerHTML="",e.forEach(({label:e,action:t})=>{const n=document.createElement("li");n.textContent=e,Object.assign(n.style,{padding:"4px 12px",cursor:"pointer",background:"#fff",color:"#000"}),n.tabIndex=0,n.addEventListener("click",()=>{const e=this.target;this.hide(),t(e)}),n.addEventListener("mouseenter",()=>{n.style.background="#eee",n.style.color="#000"}),n.addEventListener("mouseleave",()=>{n.style.background="#fff",n.style.color="#000"}),this.menu.appendChild(n)})}show(e,t,n){this.target=n,this.menu.style.left=`${e}px`,this.menu.style.top=`${t}px`,this.menu.style.display="block"}hide(){this.menu.style.display="none",this.target=null}}function se(e){const t=parseFloat(e.quantity)||1,n=parseFloat(e.voltage),a=parseFloat(e.kw),o=parseFloat(e.powerFactor),r=parseFloat(e.loadFactor),c=parseFloat(e.efficiency),s=parseFloat(e.demandFactor),i=parseInt(e.phases,10),d=isNaN(a)?0:a*t,l=isNaN(r)?d:d*(r/100),u=isNaN(c)||0===c?l:l/(c/100),p=o?u/o:u,m=1===i?1:Math.sqrt(3),y=n?1e3*p/(m*n):0,f=u*(isNaN(s)?1:s/100);return{kva:p,current:y,demandKw:f,demandKva:o?f/o:f}}"undefined"!=typeof window&&window.addEventListener("DOMContentLoaded",()=>{initSettings(),initDarkMode(),initCompactMode(),initNavToggle();const e=document.getElementById("load-table"),t=e.querySelector("tbody"),n=e.querySelector("tfoot"),a=document.getElementById("delete-selected-btn"),o=document.getElementById("select-all"),r=document.getElementById("source-summary");let c=null,s=!1;const d=t.dataset.rowClass||"load-row",l={source:"",tag:"",description:"",quantity:"",voltage:"",loadType:"",duty:"",kw:"",powerFactor:"",loadFactor:"",efficiency:"",demandFactor:"",phases:"",circuit:""};function u(e){const t=Number(e);return Number.isFinite(t)&&0!==t?t.toFixed(2):""}function p(e){return{source:e.querySelector('input[name="source"]').value.trim(),tag:e.querySelector('input[name="tag"]').value.trim(),description:e.querySelector('input[name="description"]').value.trim(),quantity:e.querySelector('input[name="quantity"]').value.trim(),voltage:e.querySelector('input[name="voltage"]').value.trim(),loadType:e.querySelector('input[name="loadType"]').value.trim(),duty:e.querySelector('select[name="duty"]').value.trim(),kw:e.querySelector('input[name="kw"]').value.trim(),powerFactor:e.querySelector('input[name="powerFactor"]').value.trim(),loadFactor:e.querySelector('input[name="loadFactor"]').value.trim(),efficiency:e.querySelector('input[name="efficiency"]').value.trim(),demandFactor:e.querySelector('input[name="demandFactor"]').value.trim(),phases:e.querySelector('input[name="phases"]').value.trim(),circuit:e.querySelector('input[name="circuit"]').value.trim()}}function m(e){const t=Number(e.dataset.index),n=p(e),a=se(n);Object.assign(n,a),I(t,n),e.querySelector(".kva").textContent=u(a.kva),e.querySelector(".current").textContent=u(a.current),e.querySelector(".demand-kva").textContent=u(a.demandKva),e.querySelector(".demand-kw").textContent=u(a.demandKw),g(),h()}function y(e,n){_(e,n),b();const a=t.querySelector(`tr[data-index="${e}"]`);if(a){const e=a.querySelector('input[name="description"]');e&&e.focus()}}const f=new ce;function g(e=N()){if(!n)return;const t=e.reduce((e,t)=>(e.kW+=parseFloat(t.kw)||0,e.kVA+=parseFloat(t.kva)||0,e.demandKVA+=parseFloat(t.demandKva)||0,e.demandKW+=parseFloat(t.demandKw)||0,e),{kW:0,kVA:0,demandKVA:0,demandKW:0});n.innerHTML=`<tr>\n      <td colspan="8">Totals</td>\n      <td>${t.kW.toFixed(2)}</td>\n      <td colspan="6"></td>\n      <td>${t.kVA.toFixed(2)}</td>\n      <td></td>\n      <td>${t.demandKVA.toFixed(2)}</td>\n      <td>${t.demandKW.toFixed(2)}</td>\n    </tr>`}function h(e=N()){if(!r)return;const t=function(e){return e.reduce((e,t)=>{const n=t.source||"",{kva:a,demandKw:o,demandKva:r}=se(t),c=parseFloat(t.kw)||0;return e[n]||(e[n]={kW:0,kVA:0,demandKW:0,demandKVA:0}),e[n].kW+=c,e[n].kVA+=parseFloat(t.kva)||a,e[n].demandKW+=parseFloat(t.demandKw)||o,e[n].demandKVA+=parseFloat(t.demandKva)||r,e},{})}(e),n=Object.entries(t);if(!n.length)return void(r.innerHTML="");let a="<table><thead><tr><th>Source</th><th>kW</th><th>kVA</th><th>Demand kW</th><th>Demand kVA</th></tr></thead><tbody>";for(const[e,t]of n)a+=`<tr><td>${e}</td><td>${t.kW.toFixed(2)}</td><td>${t.kVA.toFixed(2)}</td><td>${t.demandKW.toFixed(2)}</td><td>${t.demandKVA.toFixed(2)}</td></tr>`;a+="</tbody></table>",r.innerHTML=a}function b(){if(!s){s=!0;try{t.innerHTML="";let e=N();e=e.length?e.map(e=>({...e,...se(e)})):[{}],e.forEach((e,n)=>t.appendChild(function(e,t){const n=document.createElement("tr");n.dataset.index=t,n.classList.add(d),n.innerHTML=`\n      <td><input type="checkbox" class="row-select" aria-label="Select row"></td>\n      <td><input name="source" type="text" value="${e.source||""}"></td>\n      <td><input name="tag" type="text" value="${e.tag||""}"></td>\n      <td><input name="description" type="text" value="${e.description||""}"></td>\n      <td><input name="quantity" type="number" step="any" value="${e.quantity||""}"></td>\n      <td><input name="voltage" type="number" step="any" value="${e.voltage||""}"></td>\n      <td><input name="loadType" type="text" value="${e.loadType||""}"></td>\n      <td><select name="duty">\n        <option value=""></option>\n        <option value="Continuous"${"Continuous"===e.duty?" selected":""}>Continuous</option>\n        <option value="Intermittent"${"Intermittent"===e.duty?" selected":""}>Intermittent</option>\n        <option value="Stand-by"${"Stand-by"===e.duty?" selected":""}>Stand-by</option>\n      </select></td>\n      <td><input name="kw" type="number" step="any" value="${e.kw||""}"></td>\n      <td><input name="powerFactor" type="number" step="any" value="${e.powerFactor||""}"></td>\n      <td><input name="loadFactor" type="number" step="any" value="${e.loadFactor||""}"></td>\n      <td><input name="efficiency" type="number" step="any" value="${e.efficiency||""}"></td>\n      <td><input name="demandFactor" type="number" step="any" value="${e.demandFactor||""}"></td>\n      <td><input name="phases" type="text" value="${e.phases||""}"></td>\n      <td><input name="circuit" type="text" value="${e.circuit||""}"></td>\n      <td class="kva">${u(e.kva)}</td>\n      <td class="current">${u(e.current)}</td>\n      <td class="demand-kva">${u(e.demandKva)}</td>\n      <td class="demand-kw">${u(e.demandKw)}</td>`,Array.from(n.querySelectorAll('input[type="text"],input[type="number"],select')).forEach(e=>{const t=e.parentElement;e.addEventListener("blur",()=>m(n)),"SELECT"===e.tagName&&e.addEventListener("change",()=>m(n)),e.addEventListener("keydown",e=>function(e,t){if("ArrowLeft"===e.key||"ArrowRight"===e.key){let n=!0;if("INPUT"===e.target.tagName||"TEXTAREA"===e.target.tagName){const t=e.target.selectionStart??0,a=e.target.selectionEnd??0,o=(e.target.value||"").length;n=0===t&&a===o}if(n){e.preventDefault();const n="ArrowLeft"===e.key?t.previousElementSibling:t.nextElementSibling;if(n){const e=n.querySelector("input,select,textarea");e&&(e.focus(),"function"==typeof e.select&&e.select())}}}else if("Enter"===e.key){e.preventDefault();const n=t.cellIndex,a=t.parentElement.nextElementSibling;if(a&&a.cells[n]){const e=a.cells[n].querySelector("input,select,textarea");e&&(e.focus(),"function"==typeof e.select&&e.select())}}}(e,t))});const a=n.querySelector(".row-select");return a.addEventListener("change",()=>{a.checked||(o.checked=!1)}),n}(e,n))),o.checked=!1,g(e),h(e)}finally{s=!1}}}function S(e,t=","){return[["source","tag","description","quantity","voltage","loadType","duty","kw","powerFactor","loadFactor","efficiency","demandFactor","phases","circuit","panelId","breaker","kva","current","demandKva","demandKw"].join(t),...e.map(e=>{const n={source:"",panelId:"",breaker:"",duty:"",...e},a={...n,...se(n)};return[a.source,a.tag,a.description,a.quantity,a.voltage,a.loadType,a.duty,a.kw,a.powerFactor,a.loadFactor,a.efficiency,a.demandFactor,a.phases,a.circuit,a.panelId,a.breaker,a.kva,a.current,a.demandKva,a.demandKw].map(e=>(e=String(e??"").replace(/"/g,'""')).includes(t)?`"${e}"`:e).join(t)})].join("\n")}f.setItems([{label:"Insert Row Above",action:e=>{e&&y(Number(e.dataset.index),l)}},{label:"Insert Row Below",action:e=>{e&&y(Number(e.dataset.index)+1,l)}},{label:"Copy Row",action:e=>{e&&(c=JSON.parse(JSON.stringify(p(e))))}},{label:"Paste Row",action:e=>{if(!e)return;if(!c)return;const t=JSON.parse(JSON.stringify(c)),n=Number(e.dataset.index);n>=N().length-1?O(t):_(n+1,t),b()}},{label:"Delete Row",action:e=>{e&&(F(Number(e.dataset.index)),b())}}]),e.addEventListener("contextmenu",e=>{const t=e.target.closest(`.${d}`);t?(e.preventDefault(),f.show(e.pageX,e.pageY,t)):e.target.closest("#load-table")&&e.preventDefault()}),document.addEventListener("keydown",e=>{const t=document.activeElement.tagName;if(["INPUT","TEXTAREA","SELECT"].includes(t))return;const n=document.activeElement.closest(`.${d}`);if(n)if(e.ctrlKey&&"c"===e.key.toLowerCase())c=JSON.parse(JSON.stringify(p(n))),e.preventDefault();else if(e.ctrlKey&&"v"===e.key.toLowerCase()){if(!c)return;const t=JSON.parse(JSON.stringify(c)),a=Number(n.dataset.index);a>=N().length-1?O(t):_(a+1,t),b(),e.preventDefault()}}),i("loadList",b),a.addEventListener("click",()=>{const e=Array.from(t.querySelectorAll("tr")).filter(e=>e.querySelector(".row-select").checked);if(!e.length)return;if(!confirm("Delete selected loads?"))return;const n=e.map(e=>Number(e.dataset.index)),a=N().filter((e,t)=>!n.includes(t));C(a),b()}),o.addEventListener("change",e=>{const n=e.target.checked;t.querySelectorAll(".row-select").forEach(e=>{e.checked=n})}),document.getElementById("export-btn").addEventListener("click",()=>{const e=N().map(e=>{const t={panelId:"",breaker:"",duty:"",...e};return{...t,...se(t)}}),t=new Blob([JSON.stringify(e,null,2)],{type:"application/json"}),n=document.createElement("a");n.href=URL.createObjectURL(t),n.download="loads.json",n.click(),URL.revokeObjectURL(n.href)}),document.getElementById("export-csv-btn").addEventListener("click",()=>{const e=S(N()),t=new Blob([e],{type:"text/csv"}),n=document.createElement("a");n.href=URL.createObjectURL(t),n.download="loads.csv",n.click(),URL.revokeObjectURL(n.href)}),document.getElementById("copy-btn").addEventListener("click",()=>{const e=S(N(),"\t");navigator.clipboard.writeText(e).catch(()=>{alert("Copy failed")})});const w=document.getElementById("import-input");document.getElementById("import-btn").addEventListener("click",()=>w.click()),w.addEventListener("change",e=>{const t=e.target.files[0];t&&(t.text().then(e=>{try{const t=JSON.parse(e);if(Array.isArray(t)){const e=t.map(e=>{const t={source:"",tag:"",description:"",quantity:"",voltage:"",loadType:"",duty:"",kw:"",powerFactor:"",loadFactor:"",efficiency:"",demandFactor:"",phases:"",circuit:"",panelId:"",breaker:"",...e};return"power"in t&&!("kw"in t)&&(t.kw=t.power,delete t.power),{...t,...se(t)}});C(e),b()}else alert("Invalid load data")}catch{alert("Invalid load data")}}),e.target.value="")});const k=document.getElementById("import-csv-input");document.getElementById("import-csv-btn").addEventListener("click",()=>k.click()),k.addEventListener("change",e=>{const t=e.target.files[0];t&&(t.text().then(e=>{try{const t=function(e,t=","){const n=e.trim().split(/\r?\n/);if(!n.length)return[];const a=n[0].toLowerCase();return a.includes("description")&&(a.includes("kw")||a.includes("power"))&&n.shift(),n.map(e=>{const n=e.split(t).map(e=>e.replace(/^"|"$/g,"").replace(/""/g,'"').trim());let a;if(13===n.length||14===n.length){let e,t,o,r,c,s,i,d,l,u,p,m,y,f="";if(13===n.length?[e,t,o,r,c,s,i,d,l,u,p,m,y]=n:[f,e,t,o,r,c,s,i,d,l,u,p,m,y]=n,[o,r,i,d,l,u,p].some(e=>e&&isNaN(Number(e))))throw new Error("Invalid CSV data");a={source:f,tag:e,description:t,quantity:o,voltage:r,loadType:c,duty:s,kw:i,powerFactor:d,loadFactor:l,efficiency:u,demandFactor:p,phases:m,circuit:y,panelId:"",breaker:""}}else{if(19!==n.length&&20!==n.length)throw new Error("Invalid CSV format");{let e,t,o,r,c,s,i,d,l,u,p,m,y,f,g,h,b,S,w,k="";if(19===n.length?[e,t,o,r,c,s,i,d,l,u,p,m,y,f,g,h,b,S,w]=n:[k,e,t,o,r,c,s,i,d,l,u,p,m,y,f,g,h,b,S,w]=n,[o,r,i,d,l,u,p,h,b,S,w].some(e=>e&&isNaN(Number(e))))throw new Error("Invalid CSV data");a={source:k,tag:e,description:t,quantity:o,voltage:r,loadType:c,duty:s,kw:i,powerFactor:d,loadFactor:l,efficiency:u,demandFactor:p,phases:m,circuit:y,panelId:f,breaker:g,kva:h,current:b,demandKva:S,demandKw:w}}}const o=se(a);return{panelId:"",breaker:"",...a,...o}})}(e);C(t),b()}catch{alert("Invalid CSV load data")}}),e.target.value="")}),b()})}();
+/**
+ * Simple parser for Revit/IFC exports that extracts tray and conduit
+ * geometry. The goal is not to support the full schemas but to pull out
+ * basic start/end coordinates used by the app. The function accepts
+ * either a JSON object/string or raw IFC STEP text.
+ *
+ * Returned geometry objects use the field names already consumed by the
+ * data store (start_x, start_y, ...).
+ *
+ * @param {string|object} input - IFC STEP text or Revit JSON.
+ * @returns {{trays:Array, conduits:Array}}
+ */
+function parseRevit(input) {
+  if (typeof input === "string") {
+    // Try JSON first – many exporters can emit JSON directly.
+    try {
+      const obj = JSON.parse(input);
+      return parseRevitJSON(obj);
+    } catch {
+      // Treat as IFC STEP text
+      return parseIFC(input);
+    }
+  }
+  // Already an object – assume JSON structure
+  return parseRevitJSON(input);
+}
+
+/**
+ * Parse a Revit style JSON export. The exporter format is not
+ * standardized so we try a few common field names.
+ * @param {any} obj
+ */
+function parseRevitJSON(obj) {
+  if (!obj || typeof obj !== "object") return { trays: [], conduits: [] };
+  const trays = [];
+  const conduits = [];
+
+  const traySrc =
+    obj.trays || obj.Trays || obj.cableTrays || obj.CableTrays || [];
+  for (const t of traySrc) {
+    trays.push(normalizeTray(t));
+  }
+
+  const conduitSrc =
+    obj.conduits ||
+    obj.Conduits ||
+    obj.cableConduits ||
+    obj.ConduitSegments ||
+    [];
+  for (const c of conduitSrc) {
+    conduits.push(normalizeConduit(c));
+  }
+
+  return { trays, conduits };
+}
+
+function num(val) {
+  const n = parseFloat(val);
+  return Number.isFinite(n) ? n : undefined;
+}
+
+function normalizeTray(t = {}) {
+  return {
+    id: t.id || t.tag || t.tray_id || t.TrayID || t.name || t.Tag || "",
+    start_x: num(t.start_x ?? t.sx ?? t.x1 ?? t.StartX ?? t.start?.x),
+    start_y: num(t.start_y ?? t.sy ?? t.y1 ?? t.StartY ?? t.start?.y),
+    start_z: num(t.start_z ?? t.sz ?? t.z1 ?? t.StartZ ?? t.start?.z),
+    end_x: num(t.end_x ?? t.ex ?? t.x2 ?? t.EndX ?? t.end?.x),
+    end_y: num(t.end_y ?? t.ey ?? t.y2 ?? t.EndY ?? t.end?.y),
+    end_z: num(t.end_z ?? t.ez ?? t.z2 ?? t.EndZ ?? t.end?.z),
+    width: num(t.width ?? t.w ?? t.Width ?? t.size_x),
+    height: num(t.height ?? t.h ?? t.Height ?? t.size_y),
+  };
+}
+
+function normalizeConduit(c = {}) {
+  return {
+    conduit_id: c.conduit_id || c.id || c.tag || c.ConduitID || "",
+    type: c.type || c.conduit_type || c.Type || "",
+    trade_size: c.trade_size || c.tradeSize || c.size || c.TradeSize || "",
+    start_x: num(c.start_x ?? c.sx ?? c.x1 ?? c.start?.x),
+    start_y: num(c.start_y ?? c.sy ?? c.y1 ?? c.start?.y),
+    start_z: num(c.start_z ?? c.sz ?? c.z1 ?? c.start?.z),
+    end_x: num(c.end_x ?? c.ex ?? c.x2 ?? c.end?.x),
+    end_y: num(c.end_y ?? c.ey ?? c.y2 ?? c.end?.y),
+    end_z: num(c.end_z ?? c.ez ?? c.z2 ?? c.end?.z),
+    capacity: num(c.capacity ?? c.fill),
+  };
+}
+
+/**
+ * Extremely small IFC STEP parser. It looks for entities that contain an
+ * `IFCPOLYLINE` with two points – the start and end of a segment. If the
+ * entity name includes `CABLECARRIER` it is treated as a tray; otherwise
+ * it is treated as a conduit segment.
+ *
+ * This is a best‑effort helper and is not meant to cover the entire IFC
+ * specification, but it is sufficient for small test files and demos.
+ *
+ * @param {string} text
+ */
+function parseIFC(text) {
+  const trays = [];
+  const conduits = [];
+  const segRegex =
+    /#\d+=IFC([^;]*?)SEGMENT[^;]*?IFCPOLYLINE\(\(([^)]+)\),\(([^)]+)\)\)/gi;
+  let match;
+  let i = 0;
+  while ((match = segRegex.exec(text))) {
+    const kind = match[1] || "";
+    const start = match[2].split(",").map((v) => parseFloat(v));
+    const end = match[3].split(",").map((v) => parseFloat(v));
+    const seg = {
+      id: `SEG-${i++}`,
+      start_x: start[0],
+      start_y: start[1],
+      start_z: start[2],
+      end_x: end[0],
+      end_y: end[1],
+      end_z: end[2],
+    };
+    if (/CABLECARRIER/i.test(kind)) trays.push(seg);
+    else conduits.push(seg);
+  }
+  return { trays, conduits };
+}
+
+/**
+ * Centralized data store wrapper around localStorage with typed getters and setters
+ * for core schedule data. Emits simple change events.
+ */
+
+
+const KEYS = {
+  // Preferred property names
+  trays: 'traySchedule',
+  cables: 'cableSchedule',
+  ductbanks: 'ductbankSchedule',
+  conduits: 'conduitSchedule',
+  panels: 'panelSchedule',
+  loads: 'loadList',
+  equipment: 'equipment',
+  oneLine: 'oneLineDiagram',
+  // Legacy aliases for backward compatibility
+  traySchedule: 'traySchedule',
+  cableSchedule: 'cableSchedule',
+  ductbankSchedule: 'ductbankSchedule',
+  conduitSchedule: 'conduitSchedule',
+  panelSchedule: 'panelSchedule',
+  loadList: 'loadList',
+  equipmentList: 'equipment',
+  oneLineDiagram: 'oneLineDiagram'
+};
+
+const EXTRA_KEYS = {
+  equipmentColumns: 'equipmentColumns',
+  collapsedGroups: 'collapsedGroups'
+};
+
+const STORAGE_KEYS = { ...KEYS, ...EXTRA_KEYS };
+
+const listeners = {};
+
+function emit(event, detail) {
+  (listeners[event] || []).forEach(fn => {
+    try { fn(detail); } catch (e) { console.error(e); }
+  });
+}
+
+/**
+ * Subscribe to change events.
+ * @param {string} event
+ * @param {(data:any)=>void} handler
+ */
+function on(event, handler) {
+  if (!listeners[event]) listeners[event] = [];
+  listeners[event].push(handler);
+}
+
+/**
+ * Remove an event listener.
+ * @param {string} event
+ * @param {(data:any)=>void} handler
+ */
+function off(event, handler) {
+  const arr = listeners[event];
+  if (!arr) return;
+  const idx = arr.indexOf(handler);
+  if (idx >= 0) arr.splice(idx, 1);
+}
+
+function read(key, fallback) {
+  try {
+    const raw = (typeof localStorage !== 'undefined') ? localStorage.getItem(key) : null;
+    return raw ? JSON.parse(raw) : fallback;
+  } catch {
+    return fallback;
+  }
+}
+
+function write(key, value) {
+  try {
+    if (typeof localStorage !== 'undefined') {
+      localStorage.setItem(key, JSON.stringify(value));
+    }
+    emit(key, value);
+  } catch (e) {
+    console.error('Failed to store', key, e);
+  }
+}
+
+/**
+ * @returns {Tray[]}
+ */
+const getTrays = () => read(KEYS.trays, []);
+/**
+ * @param {Tray[]} trays
+ */
+const setTrays = trays => write(KEYS.trays, trays);
+
+/**
+ * @returns {Cable[]}
+ */
+const getCables = () => read(KEYS.cables, []);
+/**
+ * @param {Cable[]} cables
+ */
+const setCables = cables => write(KEYS.cables, cables);
+
+/**
+ * @returns {Ductbank[]}
+ */
+const getDuctbanks = () => read(KEYS.ductbanks, []);
+/**
+ * @param {Ductbank[]} banks
+ */
+const setDuctbanks = banks => write(KEYS.ductbanks, banks);
+
+/**
+ * @returns {Conduit[]}
+ */
+const getConduits = () => read(KEYS.conduits, []);
+/**
+ * @param {Conduit[]} conduits
+ */
+const setConduits = conduits => write(KEYS.conduits, conduits);
+
+/**
+ * @returns {GenericRecord[]}
+ */
+const getPanels = () => read(KEYS.panels, []);
+/**
+ * @param {GenericRecord[]} panels
+ */
+const setPanels = panels => write(KEYS.panels, panels);
+
+/**
+ * @returns {GenericRecord[]}
+ */
+const getEquipment = () => read(KEYS.equipment, []);
+/**
+ * @param {GenericRecord[]} equipment
+ */
+function ensureEquipmentFields(eq) {
+  return {
+    id: '',
+    description: '',
+    voltage: '',
+    category: '',
+    subCategory: '',
+    x: '',
+    y: '',
+    z: '',
+    manufacturer: '',
+    model: '',
+    phases: '',
+    notes: '',
+    ...eq
+  };
+}
+
+const setEquipment = list => write(KEYS.equipment, list.map(ensureEquipmentFields));
+
+const addEquipment = item => {
+  const list = getEquipment();
+  list.push(ensureEquipmentFields(item));
+  setEquipment(list);
+};
+
+const updateEquipment = (index, item) => {
+  const list = getEquipment();
+  if (index >= 0 && index < list.length) {
+    list[index] = ensureEquipmentFields({ ...list[index], ...item });
+    setEquipment(list);
+  }
+};
+
+const removeEquipment = index => {
+  const list = getEquipment();
+  if (index >= 0 && index < list.length) {
+    list.splice(index, 1);
+    setEquipment(list);
+  }
+};
+
+/**
+ * @typedef {Object} OneLineComponent
+ * @property {string} id Unique identifier
+ * @property {string} type Component type (equipment, panel, load)
+ * @property {number} x X coordinate
+ * @property {number} y Y coordinate
+ * @property {string} [label] Display label
+ * @property {string} [ref] Linked schedule id
+ * @property {{target:string, cable?:Cable}[]} [connections] Connections to other components with optional cable spec
+ */
+
+/**
+ * @typedef {Object} OneLineSheet
+ * @property {string} name
+ * @property {OneLineComponent[]} components
+ */
+
+/**
+ * Retrieve saved one-line sheets. Supports legacy single-sheet format.
+ * @returns {OneLineSheet[]}
+ */
+const getOneLine = () => {
+  const data = read(KEYS.oneLine, []);
+  if (Array.isArray(data)) {
+    // legacy array of components
+    return [{ name: 'Sheet 1', components: data }];
+  }
+  if (data && Array.isArray(data.sheets)) return data.sheets;
+  return [];
+};
+/**
+ * Persist one-line sheets
+ * @param {OneLineSheet[]} sheets
+ */
+const setOneLine = sheets => write(KEYS.oneLine, { sheets });
+
+/**
+ * @returns {GenericRecord[]}
+ */
+const getLoads = () => {
+  const raw = read(KEYS.loads, []);
+  const loads = raw.map(ensureLoadFields);
+  if (raw.some(l => l && typeof l === 'object' && !('source' in l))) {
+    write(KEYS.loads, loads);
+  }
+  return loads;
+};
+/**
+ * @param {GenericRecord[]} loads
+ */
+function ensureLoadFields(load) {
+  const l = { ...load };
+  if ('power' in l && !('kw' in l)) {
+    l.kw = l.power;
+    delete l.power;
+  }
+  return {
+    source: '',
+    tag: '',
+    description: '',
+    quantity: '',
+    voltage: '',
+    loadType: '',
+    duty: '',
+    kw: '',
+    powerFactor: '',
+    loadFactor: '',
+    efficiency: '',
+    demandFactor: '',
+    phases: '',
+    circuit: '',
+    manufacturer: '',
+    model: '',
+    notes: '',
+    ...l
+  };
+}
+
+function isEmptyLoad(load) {
+  const l = ensureLoadFields(load);
+  return Object.values(l).every(v => v === '');
+}
+
+const setLoads = loads => {
+  const list = (loads.length ? loads : [{}]).map(ensureLoadFields);
+  write(KEYS.loads, list);
+};
+
+const addLoad = load => {
+  const loads = getLoads();
+  const normalized = ensureLoadFields(load);
+  if (loads.length === 1 && isEmptyLoad(loads[0]) && !isEmptyLoad(normalized)) {
+    loads[0] = normalized;
+  } else {
+    loads.push(normalized);
+  }
+  setLoads(loads);
+};
+
+const insertLoad = (index, load) => {
+  const loads = getLoads();
+  const normalized = ensureLoadFields(load);
+  const idx = Math.max(0, Math.min(index, loads.length));
+  loads.splice(idx, 0, normalized);
+  setLoads(loads);
+};
+
+const updateLoad = (index, load) => {
+  const loads = getLoads();
+  if (index >= 0 && index < loads.length) {
+    loads[index] = ensureLoadFields({ ...loads[index], ...load });
+    setLoads(loads);
+  }
+};
+
+const deleteLoad = index => {
+  const loads = getLoads();
+  if (index >= 0 && index < loads.length) {
+    loads.splice(index, 1);
+    setLoads(loads);
+  }
+};
+
+// Backward compatibility
+const removeLoad = deleteLoad;
+
+// generic access for other values so pages never touch localStorage directly
+const getItem = (key, fallback = null) => read(key, fallback);
+const setItem = (key, value) => write(key, value);
+const removeItem = key => {
+  try {
+    if (typeof localStorage !== 'undefined') {
+      localStorage.removeItem(key);
+    }
+    emit(key, null);
+  } catch (e) {
+    console.error('Failed to remove', key, e);
+  }
+};
+
+
+const keys = () => {
+  try {
+    if (typeof localStorage !== 'undefined') {
+      return Object.keys(localStorage);
+    }
+  } catch {}
+  return [];
+};
+
+// Simple schema validator replacing Ajv. Checks for required fields,
+// disallows extras, and verifies basic types.
+function validateProjectSchema(obj) {
+  const required = ['ductbanks', 'conduits', 'trays', 'cables', 'panels', 'equipment', 'loads', 'settings'];
+  const optional = ['oneLine'];
+  const missing = [];
+  const extra = [];
+
+  if (!obj || typeof obj !== 'object') {
+    missing.push(...required);
+    return { valid: false, missing, extra };
+  }
+
+  for (const key of required) {
+    if (!(key in obj)) missing.push(key);
+  }
+  for (const key of Object.keys(obj)) {
+    if (!required.includes(key) && !optional.includes(key)) extra.push(key);
+  }
+
+  const typesValid = Array.isArray(obj.ductbanks) &&
+    Array.isArray(obj.conduits) &&
+    Array.isArray(obj.trays) &&
+    Array.isArray(obj.cables) &&
+    Array.isArray(obj.panels) &&
+    Array.isArray(obj.equipment) &&
+    Array.isArray(obj.loads) &&
+    obj.settings && typeof obj.settings === 'object' && !Array.isArray(obj.settings) &&
+    (obj.oneLine === undefined || Array.isArray(obj.oneLine));
+
+  const valid = missing.length === 0 && extra.length === 0 && typesValid;
+  return { valid, missing, extra };
+}
+
+/**
+ * Export current project data.
+ */
+function exportProject() {
+  const project = {
+    ductbanks: getDuctbanks(),
+    conduits: getConduits(),
+    trays: getTrays(),
+    cables: getCables(),
+    panels: getPanels(),
+    equipment: getEquipment(),
+    loads: getLoads(),
+    oneLine: getOneLine(),
+    settings: {}
+  };
+  const reserved = new Set([...Object.values(KEYS), 'CTR_PROJECT_V1']);
+  for (const key of keys()) {
+    if (!reserved.has(key)) {
+      project.settings[key] = getItem(key);
+    }
+  }
+  return project;
+}
+
+/**
+ * Import tray and conduit geometry from a CAD export file (Revit JSON or IFC).
+ * Updates the current data store schedules.
+ *
+ * @param {File|string} file Input file or raw text
+ * @returns {Promise<{trays:any[], conduits:any[]}>}
+ */
+async function importFromCad(file) {
+  let text;
+  if (typeof file === 'string') {
+    text = file;
+  } else if (file && typeof file.text === 'function') {
+    text = await file.text();
+  } else {
+    throw new Error('Unsupported CAD file');
+  }
+
+  const { trays = [], conduits = [] } = parseRevit(text);
+  if (Array.isArray(trays) && trays.length) setTrays(trays);
+  if (Array.isArray(conduits) && conduits.length) setConduits(conduits);
+  return { trays, conduits };
+}
+
+/**
+ * Export tray and conduit geometry to a CAD-friendly format. Currently
+ * only JSON is supported. When executed in a browser environment the
+ * file is automatically downloaded.
+ *
+ * @param {string} [fileType='json']
+ * @returns {string} serialized content
+ */
+function exportToCad(fileType = 'json') {
+  const data = { trays: getTrays(), conduits: getConduits() };
+  let mime = 'application/json';
+  let ext = 'json';
+  let content = JSON.stringify(data, null, 2);
+
+  if (fileType === 'csv') {
+    const trayHeader = 'id,start_x,start_y,start_z,end_x,end_y,end_z,width,height';
+    const trayRows = data.trays.map(t => [t.id, t.start_x, t.start_y, t.start_z, t.end_x, t.end_y, t.end_z, t.width, t.height].join(','));
+    const conduitHeader = 'conduit_id,type,trade_size,start_x,start_y,start_z,end_x,end_y,end_z,capacity';
+    const conduitRows = data.conduits.map(c => [c.conduit_id, c.type, c.trade_size, c.start_x, c.start_y, c.start_z, c.end_x, c.end_y, c.end_z, c.capacity].join(','));
+    content = `# trays\n${[trayHeader, ...trayRows].join('\n')}\n# conduits\n${[conduitHeader, ...conduitRows].join('\n')}`;
+    mime = 'text/csv';
+    ext = 'csv';
+  }
+
+  if (typeof document !== 'undefined') {
+    try {
+      const blob = new Blob([content], { type: mime });
+      const a = document.createElement('a');
+      a.href = URL.createObjectURL(blob);
+      a.download = `raceways.${ext}`;
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      URL.revokeObjectURL(a.href);
+    } catch (e) {
+      console.error('Failed to export CAD data', e);
+    }
+  }
+  return content;
+}
+
+/**
+ * Import project data with schema validation.
+ * @param {any} obj
+ * @returns {boolean} success
+ */
+function importProject(obj) {
+  let data = obj;
+  const { valid, missing, extra } = validateProjectSchema(data);
+  if (!valid) {
+    const parts = [];
+    if (missing.length) parts.push(`Missing fields: ${missing.join(', ')}`);
+    if (extra.length) parts.push(`Extra fields: ${extra.join(', ')}`);
+    const msg = parts.join('\n') || 'Invalid project data.';
+    const proceed = (typeof window !== 'undefined' && typeof window.confirm === 'function')
+      ? window.confirm(`${msg}\nRepair & continue?`)
+      : false;
+    if (!proceed) return false;
+    data = {
+      ductbanks: Array.isArray(obj.ductbanks) ? obj.ductbanks : [],
+      conduits: Array.isArray(obj.conduits) ? obj.conduits : [],
+      trays: Array.isArray(obj.trays) ? obj.trays : [],
+      cables: Array.isArray(obj.cables) ? obj.cables : [],
+      panels: Array.isArray(obj.panels) ? obj.panels : [],
+      equipment: Array.isArray(obj.equipment) ? obj.equipment : [],
+      loads: Array.isArray(obj.loads) ? obj.loads : [],
+      oneLine: Array.isArray(obj.oneLine) ? obj.oneLine : [],
+      settings: (obj.settings && typeof obj.settings === 'object') ? obj.settings : {}
+    };
+  }
+
+  setDuctbanks(data.ductbanks);
+  setConduits(data.conduits);
+  setTrays(data.trays);
+  setCables(data.cables);
+  setPanels(Array.isArray(data.panels) ? data.panels : []);
+  setEquipment(Array.isArray(data.equipment) ? data.equipment : []);
+  setLoads(Array.isArray(data.loads) ? data.loads : []);
+  setOneLine(Array.isArray(data.oneLine) ? data.oneLine : Array.isArray(data.oneLine?.sheets) ? data.oneLine.sheets : []);
+
+  const reserved = new Set([...Object.values(KEYS), 'CTR_PROJECT_V1']);
+  for (const key of keys()) {
+    if (!reserved.has(key) && !(data.settings && key in data.settings)) {
+      removeItem(key);
+    }
+  }
+  if (data.settings) {
+    for (const [k, v] of Object.entries(data.settings)) {
+      setItem(k, v);
+    }
+  }
+  return true;
+}
+
+// expose on window for non-module scripts
+if (typeof window !== 'undefined') {
+  window.dataStore = {
+    STORAGE_KEYS,
+    getTrays,
+    setTrays,
+    getCables,
+    setCables,
+    getDuctbanks,
+    setDuctbanks,
+    getConduits,
+    setConduits,
+    getPanels,
+    setPanels,
+    getEquipment,
+    setEquipment,
+    addEquipment,
+    updateEquipment,
+    removeEquipment,
+    getLoads,
+    setLoads,
+    addLoad,
+    insertLoad,
+    updateLoad,
+    removeLoad,
+    getOneLine,
+    setOneLine,
+    getItem,
+    setItem,
+    removeItem,
+    on,
+    off,
+    keys,
+    exportProject,
+    importProject,
+    importFromCad,
+    exportToCad
+  };
+}
+
+class ContextMenu {
+  constructor(items = []) {
+    this.items = items;
+    this.menu = document.createElement('ul');
+    this.menu.className = 'context-menu';
+    Object.assign(this.menu.style, {
+      position: 'absolute',
+      display: 'none',
+      listStyle: 'none',
+      margin: '0',
+      padding: '4px 0',
+      background: '#fff',
+      border: '1px solid #ccc',
+      zIndex: 1000,
+      color: '#000'
+    });
+    document.body.appendChild(this.menu);
+    document.addEventListener('click', () => this.hide());
+    document.addEventListener('keydown', e => { if (e.key === 'Escape') this.hide(); });
+  }
+
+  setItems(items) {
+    this.items = items;
+    this.menu.innerHTML = '';
+    items.forEach(({ label, action }) => {
+      const li = document.createElement('li');
+      li.textContent = label;
+      Object.assign(li.style, {
+        padding: '4px 12px',
+        cursor: 'pointer',
+        background: '#fff',
+        color: '#000'
+      });
+      li.tabIndex = 0;
+      li.addEventListener('click', () => {
+        const target = this.target;
+        this.hide();
+        action(target);
+      });
+      li.addEventListener('mouseenter', () => {
+        li.style.background = '#eee';
+        li.style.color = '#000';
+      });
+      li.addEventListener('mouseleave', () => {
+        li.style.background = '#fff';
+        li.style.color = '#000';
+      });
+      this.menu.appendChild(li);
+    });
+  }
+
+  show(x, y, target) {
+    this.target = target;
+    this.menu.style.left = `${x}px`;
+    this.menu.style.top = `${y}px`;
+    this.menu.style.display = 'block';
+  }
+
+  hide() {
+    this.menu.style.display = 'none';
+    this.target = null;
+  }
+}
+
+function calculateDerived(load) {
+  const qty = parseFloat(load.quantity) || 1;
+  const voltage = parseFloat(load.voltage);
+  const kw = parseFloat(load.kw);
+  const pf = parseFloat(load.powerFactor);
+  const lf = parseFloat(load.loadFactor);
+  const eff = parseFloat(load.efficiency);
+  const df = parseFloat(load.demandFactor);
+  const phases = parseInt(load.phases, 10);
+  const totalKw = isNaN(kw) ? 0 : kw * qty;
+  const lfKw = isNaN(lf) ? totalKw : totalKw * (lf / 100);
+  const effKw = isNaN(eff) || eff === 0 ? lfKw : lfKw / (eff / 100);
+  const kVA = pf ? effKw / pf : effKw;
+  const phaseFactor = phases === 1 ? 1 : Math.sqrt(3);
+  const current = voltage ? (kVA * 1000) / (phaseFactor * voltage) : 0;
+  const demandKW = effKw * (isNaN(df) ? 1 : df / 100);
+  const demandKVA = pf ? demandKW / pf : demandKW;
+  return { kva: kVA, current, demandKw: demandKW, demandKva: demandKVA };
+}
+
+function aggregateLoadsBySource(loads) {
+  return loads.reduce((acc, load) => {
+    const src = load.source || '';
+    const { kva, demandKw, demandKva } = calculateDerived(load);
+    const kW = parseFloat(load.kw) || 0;
+    if (!acc[src]) acc[src] = { kW: 0, kVA: 0, demandKW: 0, demandKVA: 0 };
+    acc[src].kW += kW;
+    acc[src].kVA += parseFloat(load.kva) || kva;
+    acc[src].demandKW += parseFloat(load.demandKw) || demandKw;
+    acc[src].demandKVA += parseFloat(load.demandKva) || demandKva;
+    return acc;
+  }, {});
+}
+
+// Inline load list editor
+if (typeof window !== 'undefined') {
+  window.addEventListener('DOMContentLoaded', () => {
+    initSettings();
+    initDarkMode();
+    initCompactMode();
+    initNavToggle();
+
+    const table = document.getElementById('load-table');
+    const tbody = table.querySelector('tbody');
+    const tfoot = table.querySelector('tfoot');
+    const deleteBtn = document.getElementById('delete-selected-btn');
+    const selectAll = document.getElementById('select-all');
+    const summaryDiv = document.getElementById('source-summary');
+    let clipboard = null;
+    let rendering = false;
+    const rowClass = tbody.dataset.rowClass || 'load-row';
+    const blankLoad = {
+      source: '',
+      tag: '',
+      description: '',
+      manufacturer: '',
+      model: '',
+      quantity: '',
+      voltage: '',
+      loadType: '',
+      duty: '',
+      kw: '',
+      powerFactor: '',
+      loadFactor: '',
+      efficiency: '',
+      demandFactor: '',
+      phases: '',
+      circuit: '',
+      notes: ''
+    };
+
+    // --- helpers ------------------------------------------------------------
+    function format(num) {
+      const n = Number(num);
+      return Number.isFinite(n) && n !== 0 ? n.toFixed(2) : '';
+    }
+  function gatherRow(tr) {
+    return {
+      source: tr.querySelector('input[name="source"]').value.trim(),
+      tag: tr.querySelector('input[name="tag"]').value.trim(),
+      description: tr.querySelector('input[name="description"]').value.trim(),
+      manufacturer: tr.querySelector('input[name="manufacturer"]').value.trim(),
+      model: tr.querySelector('input[name="model"]').value.trim(),
+      quantity: tr.querySelector('input[name="quantity"]').value.trim(),
+      voltage: tr.querySelector('input[name="voltage"]').value.trim(),
+      loadType: tr.querySelector('input[name="loadType"]').value.trim(),
+      duty: tr.querySelector('select[name="duty"]').value.trim(),
+      kw: tr.querySelector('input[name="kw"]').value.trim(),
+      powerFactor: tr.querySelector('input[name="powerFactor"]').value.trim(),
+      loadFactor: tr.querySelector('input[name="loadFactor"]').value.trim(),
+      efficiency: tr.querySelector('input[name="efficiency"]').value.trim(),
+      demandFactor: tr.querySelector('input[name="demandFactor"]').value.trim(),
+      phases: tr.querySelector('input[name="phases"]').value.trim(),
+      circuit: tr.querySelector('input[name="circuit"]').value.trim(),
+      notes: tr.querySelector('textarea[name="notes"]').value.trim()
+    };
+  }
+
+  function saveRow(tr) {
+    const idx = Number(tr.dataset.index);
+    const load = gatherRow(tr);
+    const computed = calculateDerived(load);
+    Object.assign(load, computed);
+    updateLoad(idx, load);
+    tr.querySelector('.kva').textContent = format(computed.kva);
+    tr.querySelector('.current').textContent = format(computed.current);
+    tr.querySelector('.demand-kva').textContent = format(computed.demandKva);
+    tr.querySelector('.demand-kw').textContent = format(computed.demandKw);
+    updateFooter();
+    updateSummary();
+  }
+
+  function insertLoad$1(index, load) {
+    insertLoad(index, load);
+    render();
+    const row = tbody.querySelector(`tr[data-index="${index}"]`);
+    if (row) {
+      const inp = row.querySelector('input[name="description"]');
+      inp && inp.focus();
+    }
+  }
+
+  function handleNav(e, td) {
+    if (e.key === 'ArrowLeft' || e.key === 'ArrowRight') {
+      let allSelected = true;
+      if (e.target.tagName === 'INPUT' || e.target.tagName === 'TEXTAREA') {
+        const start = e.target.selectionStart ?? 0;
+        const end = e.target.selectionEnd ?? 0;
+        const len = (e.target.value || '').length;
+        allSelected = start === 0 && end === len;
+      }
+      if (allSelected) {
+        e.preventDefault();
+        const sib = e.key === 'ArrowLeft' ? td.previousElementSibling : td.nextElementSibling;
+        if (sib) {
+          const next = sib.querySelector('input,select,textarea');
+          if (next) {
+            next.focus();
+            if (typeof next.select === 'function') next.select();
+          }
+        }
+      }
+    } else if (e.key === 'Enter') {
+      e.preventDefault();
+      const col = td.cellIndex;
+      const nextRow = td.parentElement.nextElementSibling;
+      if (nextRow && nextRow.cells[col]) {
+        const next = nextRow.cells[col].querySelector('input,select,textarea');
+        if (next) {
+          next.focus();
+          if (typeof next.select === 'function') next.select();
+        }
+      }
+    }
+  }
+
+  function createRow(load, idx) {
+    const tr = document.createElement('tr');
+    tr.dataset.index = idx;
+    tr.classList.add(rowClass);
+    tr.innerHTML = `
+      <td><input type="checkbox" class="row-select" aria-label="Select row"></td>
+      <td><input name="source" type="text" value="${load.source || ''}"></td>
+      <td><input name="tag" type="text" value="${load.tag || ''}"></td>
+      <td><input name="description" type="text" value="${load.description || ''}"></td>
+      <td><input name="manufacturer" type="text" value="${load.manufacturer || ''}"></td>
+      <td><input name="model" type="text" value="${load.model || ''}"></td>
+      <td><input name="quantity" type="number" step="any" value="${load.quantity || ''}"></td>
+      <td><input name="voltage" type="number" step="any" value="${load.voltage || ''}"></td>
+      <td><input name="loadType" type="text" value="${load.loadType || ''}"></td>
+      <td><select name="duty">
+        <option value=""></option>
+        <option value="Continuous"${load.duty === 'Continuous' ? ' selected' : ''}>Continuous</option>
+        <option value="Intermittent"${load.duty === 'Intermittent' ? ' selected' : ''}>Intermittent</option>
+        <option value="Stand-by"${load.duty === 'Stand-by' ? ' selected' : ''}>Stand-by</option>
+      </select></td>
+      <td><input name="kw" type="number" step="any" value="${load.kw || ''}"></td>
+      <td><input name="powerFactor" type="number" step="any" value="${load.powerFactor || ''}"></td>
+      <td><input name="loadFactor" type="number" step="any" value="${load.loadFactor || ''}"></td>
+      <td><input name="efficiency" type="number" step="any" value="${load.efficiency || ''}"></td>
+      <td><input name="demandFactor" type="number" step="any" value="${load.demandFactor || ''}"></td>
+      <td><input name="phases" type="text" value="${load.phases || ''}"></td>
+      <td><input name="circuit" type="text" value="${load.circuit || ''}"></td>
+      <td><textarea name="notes">${load.notes || ''}</textarea></td>
+      <td class="kva">${format(load.kva)}</td>
+      <td class="current">${format(load.current)}</td>
+      <td class="demand-kva">${format(load.demandKva)}</td>
+      <td class="demand-kw">${format(load.demandKw)}</td>`;
+
+    Array.from(tr.querySelectorAll('input[type="text"],input[type="number"],select,textarea')).forEach(input => {
+      const td = input.parentElement;
+      input.addEventListener('blur', () => saveRow(tr));
+      if (input.tagName === 'SELECT') {
+        input.addEventListener('change', () => saveRow(tr));
+      }
+      input.addEventListener('keydown', e => handleNav(e, td));
+    });
+
+    const chk = tr.querySelector('.row-select');
+    chk.addEventListener('change', () => {
+      if (!chk.checked) selectAll.checked = false;
+    });
+
+    return tr;
+  }
+
+  const menu = new ContextMenu();
+  menu.setItems([
+    { label: 'Insert Row Above', action: tr => { if (!tr) return; insertLoad$1(Number(tr.dataset.index), blankLoad); } },
+    { label: 'Insert Row Below', action: tr => { if (!tr) return; insertLoad$1(Number(tr.dataset.index) + 1, blankLoad); } },
+    { label: 'Copy Row', action: tr => { if (!tr) return; clipboard = JSON.parse(JSON.stringify(gatherRow(tr))); } },
+    { label: 'Paste Row', action: tr => {
+        if (!tr) return;
+        if (!clipboard) return;
+        const load = JSON.parse(JSON.stringify(clipboard));
+        const idx = Number(tr.dataset.index);
+        const loads = getLoads();
+        if (idx >= loads.length - 1) {
+          addLoad(load);
+        } else {
+          insertLoad(idx + 1, load);
+        }
+        render();
+      }
+    },
+    { label: 'Delete Row', action: tr => { if (!tr) return; deleteLoad(Number(tr.dataset.index)); render(); } }
+  ]);
+
+  table.addEventListener('contextmenu', e => {
+    const row = e.target.closest(`.${rowClass}`);
+    if (row) {
+      e.preventDefault();
+      menu.show(e.pageX, e.pageY, row);
+    } else if (e.target.closest('#load-table')) {
+      e.preventDefault();
+    }
+  });
+
+  document.addEventListener('keydown', e => {
+    const tag = document.activeElement.tagName;
+    if (['INPUT', 'TEXTAREA', 'SELECT'].includes(tag)) return; // allow normal copy/paste
+    const row = document.activeElement.closest(`.${rowClass}`);
+    if (!row) return;
+    if (e.ctrlKey && e.key.toLowerCase() === 'c') {
+      clipboard = JSON.parse(JSON.stringify(gatherRow(row)));
+      e.preventDefault();
+    } else if (e.ctrlKey && e.key.toLowerCase() === 'v') {
+      if (!clipboard) return;
+      const load = JSON.parse(JSON.stringify(clipboard));
+      const idx = Number(row.dataset.index);
+      const loads = getLoads();
+      if (idx >= loads.length - 1) {
+        addLoad(load);
+      } else {
+        insertLoad(idx + 1, load);
+      }
+      render();
+      e.preventDefault();
+    }
+  });
+
+  function updateFooter(loads = getLoads()) {
+    if (!tfoot) return;
+    const totals = loads.reduce((acc, l) => {
+      acc.kW += parseFloat(l.kw) || 0;
+      acc.kVA += parseFloat(l.kva) || 0;
+      acc.demandKVA += parseFloat(l.demandKva) || 0;
+      acc.demandKW += parseFloat(l.demandKw) || 0;
+      return acc;
+    }, { kW: 0, kVA: 0, demandKVA: 0, demandKW: 0 });
+    tfoot.innerHTML = `<tr>
+      <td colspan="10">Totals</td>
+      <td>${totals.kW.toFixed(2)}</td>
+      <td colspan="7"></td>
+      <td>${totals.kVA.toFixed(2)}</td>
+      <td></td>
+      <td>${totals.demandKVA.toFixed(2)}</td>
+      <td>${totals.demandKW.toFixed(2)}</td>
+    </tr>`;
+  }
+
+  function updateSummary(loads = getLoads()) {
+    if (!summaryDiv) return;
+    const grouped = aggregateLoadsBySource(loads);
+    const entries = Object.entries(grouped);
+    if (!entries.length) {
+      summaryDiv.innerHTML = '';
+      return;
+    }
+    let html = '<table><thead><tr><th>Source</th><th>kW</th><th>kVA</th><th>Demand kW</th><th>Demand kVA</th></tr></thead><tbody>';
+    for (const [src, totals] of entries) {
+      html += `<tr><td>${src}</td><td>${totals.kW.toFixed(2)}</td><td>${totals.kVA.toFixed(2)}</td><td>${totals.demandKW.toFixed(2)}</td><td>${totals.demandKVA.toFixed(2)}</td></tr>`;
+    }
+    html += '</tbody></table>';
+    summaryDiv.innerHTML = html;
+  }
+
+  function render() {
+    if (rendering) return;
+    rendering = true;
+    try {
+      tbody.innerHTML = '';
+      let loads = getLoads();
+      if (!loads.length) {
+        // Ensure at least one editable row renders even with no stored data
+        loads = [{}];
+      } else {
+        // Recalculate derived fields for display without rewriting storage
+        loads = loads.map(l => ({ ...l, ...calculateDerived(l) }));
+      }
+      loads.forEach((load, idx) => tbody.appendChild(createRow(load, idx)));
+      selectAll.checked = false;
+      updateFooter(loads);
+      updateSummary(loads);
+    } finally {
+      rendering = false;
+    }
+  }
+
+  // Re-render when load data changes without causing recursive updates
+  on('loadList', render);
+
+  function loadsToCSV(loads, delimiter = ',') {
+    const header = [
+      'source',
+      'tag',
+      'description',
+      'manufacturer',
+      'model',
+      'quantity',
+      'voltage',
+      'loadType',
+      'duty',
+      'kw',
+      'powerFactor',
+      'loadFactor',
+      'efficiency',
+      'demandFactor',
+      'phases',
+      'circuit',
+      'notes',
+      'panelId',
+      'breaker',
+      'kva',
+      'current',
+      'demandKva',
+      'demandKw'
+    ].join(delimiter);
+    const lines = loads.map(l => {
+      const base = { source: '', manufacturer: '', model: '', notes: '', panelId: '', breaker: '', duty: '', ...l };
+      const full = { ...base, ...calculateDerived(base) };
+      const vals = [
+        full.source,
+        full.tag,
+        full.description,
+        full.manufacturer,
+        full.model,
+        full.quantity,
+        full.voltage,
+        full.loadType,
+        full.duty,
+        full.kw,
+        full.powerFactor,
+        full.loadFactor,
+        full.efficiency,
+        full.demandFactor,
+        full.phases,
+        full.circuit,
+        full.notes,
+        full.panelId,
+        full.breaker,
+        full.kva,
+        full.current,
+        full.demandKva,
+        full.demandKw
+      ].map(v => {
+        v = String(v ?? '').replace(/"/g, '""');
+        return v.includes(delimiter) ? `"${v}"` : v;
+      });
+      return vals.join(delimiter);
+    });
+    return [header, ...lines].join('\n');
+  }
+
+  function csvToLoads(text, delimiter = ',') {
+    const lines = text.trim().split(/\r?\n/);
+    if (!lines.length) return [];
+    const first = lines[0].toLowerCase();
+    if (first.includes('description') && (first.includes('kw') || first.includes('power'))) lines.shift();
+    return lines.map(line => {
+      const cols = line
+        .split(delimiter)
+        .map(c => c.replace(/^"|"$/g, '').replace(/""/g, '"').trim());
+      let load;
+      if (cols.length === 13 || cols.length === 14 || cols.length === 16 || cols.length === 17) {
+        let source = '';
+        let tag, description, manufacturer = '', model = '', quantity, voltage, loadType, duty, kw, powerFactor, loadFactor, efficiency, demandFactor, phases, circuit, notes = '';
+        if (cols.length === 13) {
+          [tag, description, quantity, voltage, loadType, duty, kw, powerFactor, loadFactor, efficiency, demandFactor, phases, circuit] = cols;
+        } else if (cols.length === 14) {
+          [source, tag, description, quantity, voltage, loadType, duty, kw, powerFactor, loadFactor, efficiency, demandFactor, phases, circuit] = cols;
+        } else if (cols.length === 16) {
+          [tag, description, manufacturer, model, quantity, voltage, loadType, duty, kw, powerFactor, loadFactor, efficiency, demandFactor, phases, circuit, notes] = cols;
+        } else {
+          [source, tag, description, manufacturer, model, quantity, voltage, loadType, duty, kw, powerFactor, loadFactor, efficiency, demandFactor, phases, circuit, notes] = cols;
+        }
+        const nums = [quantity, voltage, kw, powerFactor, loadFactor, efficiency, demandFactor];
+        if (nums.some(n => n && isNaN(Number(n)))) throw new Error('Invalid CSV data');
+        load = {
+          source,
+          tag,
+          description,
+          manufacturer,
+          model,
+          quantity,
+          voltage,
+          loadType,
+          duty,
+          kw,
+          powerFactor,
+          loadFactor,
+          efficiency,
+          demandFactor,
+          phases,
+          circuit,
+          notes,
+          panelId: '',
+          breaker: ''
+        };
+      } else if (cols.length === 19 || cols.length === 20 || cols.length === 22 || cols.length === 23) {
+        let source = '';
+        let tag, description, manufacturer = '', model = '', quantity, voltage, loadType, duty, kw, powerFactor, loadFactor, efficiency, demandFactor, phases, circuit, notes = '', panelId, breaker, kva, current, demandKva, demandKw;
+        if (cols.length === 19) {
+          [
+            tag,
+            description,
+            quantity,
+            voltage,
+            loadType,
+            duty,
+            kw,
+            powerFactor,
+            loadFactor,
+            efficiency,
+            demandFactor,
+            phases,
+            circuit,
+            panelId,
+            breaker,
+            kva,
+            current,
+            demandKva,
+            demandKw
+          ] = cols;
+        } else if (cols.length === 20) {
+          [
+            source,
+            tag,
+            description,
+            quantity,
+            voltage,
+            loadType,
+            duty,
+            kw,
+            powerFactor,
+            loadFactor,
+            efficiency,
+            demandFactor,
+            phases,
+            circuit,
+            panelId,
+            breaker,
+            kva,
+            current,
+            demandKva,
+            demandKw
+          ] = cols;
+        } else if (cols.length === 22) {
+          [
+            tag,
+            description,
+            manufacturer,
+            model,
+            quantity,
+            voltage,
+            loadType,
+            duty,
+            kw,
+            powerFactor,
+            loadFactor,
+            efficiency,
+            demandFactor,
+            phases,
+            circuit,
+            notes,
+            panelId,
+            breaker,
+            kva,
+            current,
+            demandKva,
+            demandKw
+          ] = cols;
+        } else {
+          [
+            source,
+            tag,
+            description,
+            manufacturer,
+            model,
+            quantity,
+            voltage,
+            loadType,
+            duty,
+            kw,
+            powerFactor,
+            loadFactor,
+            efficiency,
+            demandFactor,
+            phases,
+            circuit,
+            notes,
+            panelId,
+            breaker,
+            kva,
+            current,
+            demandKva,
+            demandKw
+          ] = cols;
+        }
+        const nums = [quantity, voltage, kw, powerFactor, loadFactor, efficiency, demandFactor, kva, current, demandKva, demandKw];
+        if (nums.some(n => n && isNaN(Number(n)))) throw new Error('Invalid CSV data');
+        load = {
+          source,
+          tag,
+          description,
+          manufacturer,
+          model,
+          quantity,
+          voltage,
+          loadType,
+          duty,
+          kw,
+          powerFactor,
+          loadFactor,
+          efficiency,
+          demandFactor,
+          phases,
+          circuit,
+          notes,
+          panelId,
+          breaker,
+          kva,
+          current,
+          demandKva,
+          demandKw
+        };
+      } else {
+        throw new Error('Invalid CSV format');
+      }
+      const computed = calculateDerived(load);
+      return { panelId: '', breaker: '', ...load, ...computed };
+    });
+  }
+
+  // --- events -------------------------------------------------------------
+  deleteBtn.addEventListener('click', () => {
+    const rows = Array.from(tbody.querySelectorAll('tr')).filter(r => r.querySelector('.row-select').checked);
+    if (!rows.length) return;
+    if (!confirm('Delete selected loads?')) return;
+    const indices = rows.map(r => Number(r.dataset.index));
+    const loads = getLoads().filter((_, idx) => !indices.includes(idx));
+    setLoads(loads);
+    render();
+  });
+
+  selectAll.addEventListener('change', e => {
+    const checked = e.target.checked;
+    tbody.querySelectorAll('.row-select').forEach(cb => { cb.checked = checked; });
+  });
+
+  document.getElementById('export-btn').addEventListener('click', () => {
+    const data = getLoads().map(l => {
+      const base = { panelId: '', breaker: '', duty: '', manufacturer: '', model: '', notes: '', ...l };
+      return { ...base, ...calculateDerived(base) };
+    });
+    const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' });
+    const a = document.createElement('a');
+    a.href = URL.createObjectURL(blob);
+    a.download = 'loads.json';
+    a.click();
+    URL.revokeObjectURL(a.href);
+  });
+
+  document.getElementById('export-csv-btn').addEventListener('click', () => {
+    const csv = loadsToCSV(getLoads());
+    const blob = new Blob([csv], { type: 'text/csv' });
+    const a = document.createElement('a');
+    a.href = URL.createObjectURL(blob);
+    a.download = 'loads.csv';
+    a.click();
+    URL.revokeObjectURL(a.href);
+  });
+
+  document.getElementById('copy-btn').addEventListener('click', () => {
+    const tsv = loadsToCSV(getLoads(), '\t');
+    navigator.clipboard.writeText(tsv).catch(() => {
+      alert('Copy failed');
+    });
+  });
+
+  const importInput = document.getElementById('import-input');
+  document.getElementById('import-btn').addEventListener('click', () => importInput.click());
+  importInput.addEventListener('change', e => {
+    const file = e.target.files[0];
+    if (!file) return;
+    file.text().then(text => {
+      try {
+        const data = JSON.parse(text);
+        if (Array.isArray(data)) {
+          const loads = data.map(l => {
+          const base = {
+            source: '',
+            tag: '',
+            description: '',
+            manufacturer: '',
+            model: '',
+            quantity: '',
+            voltage: '',
+            loadType: '',
+            duty: '',
+            kw: '',
+            powerFactor: '',
+            loadFactor: '',
+            efficiency: '',
+            demandFactor: '',
+            phases: '',
+            circuit: '',
+            notes: '',
+            panelId: '',
+            breaker: '',
+            ...l
+          };
+            if ('power' in base && !('kw' in base)) {
+              base.kw = base.power;
+              delete base.power;
+            }
+            return { ...base, ...calculateDerived(base) };
+          });
+          setLoads(loads);
+          render();
+        } else {
+          alert('Invalid load data');
+        }
+      } catch {
+        alert('Invalid load data');
+      }
+    });
+    e.target.value = '';
+  });
+
+  const importCsvInput = document.getElementById('import-csv-input');
+  document.getElementById('import-csv-btn').addEventListener('click', () => importCsvInput.click());
+  importCsvInput.addEventListener('change', e => {
+    const file = e.target.files[0];
+    if (!file) return;
+    file.text().then(text => {
+      try {
+        const loads = csvToLoads(text);
+        setLoads(loads);
+        render();
+      } catch {
+        alert('Invalid CSV load data');
+      }
+    });
+    e.target.value = '';
+  });
+
+  // Initial render for an empty table; rows populate on 'loadList' events
+  render();
+  });
+}
+
+export { aggregateLoadsBySource, calculateDerived };
