@@ -43,9 +43,17 @@ async function loadComponentLibrary() {
   let data = [];
   try {
     const res = await fetch('componentLibrary.json');
+    if (!res.ok) throw new Error(res.statusText);
     data = await res.json();
   } catch (err) {
     console.error('Failed to load component library', err);
+    showToast('Failed to load component library. Using defaults.');
+    try {
+      const mod = await import('./componentLibrary.json', { assert: { type: 'json' } });
+      data = mod.default || mod;
+    } catch {
+      data = [];
+    }
   }
 
   const version = getItem('componentLibraryVersion', null);
@@ -136,6 +144,55 @@ function applyDefaults(comp) {
   Object.entries(defs).forEach(([k, v]) => {
     if (comp[k] === undefined || comp[k] === '') {
       comp[k] = v;
+    }
+  });
+}
+
+function buildPalette() {
+  const palette = document.getElementById('component-buttons');
+  const sectionContainers = {
+    panel: document.getElementById('panel-buttons'),
+    equipment: document.getElementById('equipment-buttons'),
+    load: document.getElementById('load-buttons')
+  };
+  Object.entries(sectionContainers).forEach(([cat, container]) => {
+    const summary = container?.parentElement?.querySelector('summary');
+    if (summary) summary.textContent = cat.charAt(0).toUpperCase() + cat.slice(1);
+  });
+  Object.entries(componentTypes).forEach(([type, subs]) => {
+    const container = sectionContainers[type] || palette;
+    subs.forEach(sub => {
+      const meta = componentMeta[sub];
+      const btn = document.createElement('button');
+      btn.dataset.type = type;
+      btn.dataset.subtype = sub;
+      btn.title = meta.label;
+      btn.innerHTML = `<img src="${meta.icon}" alt="" aria-hidden="true">`;
+      btn.addEventListener('click', () => addComponent(sub));
+      container.appendChild(btn);
+    });
+  });
+  document.querySelectorAll('#component-buttons details').forEach(det => {
+    const key = `palette-${det.id}-open`;
+    const stored = localStorage.getItem(key);
+    if (stored !== null) det.open = stored === 'true';
+    det.addEventListener('toggle', () => {
+      localStorage.setItem(key, det.open);
+    });
+  });
+  const paletteSearch = document.getElementById('palette-search');
+  paletteSearch.addEventListener('input', () => {
+    const term = paletteSearch.value.trim().toLowerCase();
+    palette.querySelectorAll('button').forEach(btn => {
+      const sub = (btn.dataset.subtype || '').toLowerCase();
+      const label = (btn.dataset.label || componentMeta[btn.dataset.subtype]?.label || '').toLowerCase();
+      btn.style.display = !term || sub.includes(term) || label.includes(term) ? '' : 'none';
+    });
+  });
+  paletteSearch.addEventListener('keydown', e => {
+    if (e.key === 'Escape') {
+      paletteSearch.value = '';
+      paletteSearch.dispatchEvent(new Event('input'));
     }
   });
 }
@@ -1885,52 +1942,7 @@ async function init() {
   const exportReportsBtn = document.getElementById('export-reports-btn');
   if (exportReportsBtn) exportReportsBtn.addEventListener('click', () => exportAllReports());
 
-  const palette = document.getElementById('component-buttons');
-  const sectionContainers = {
-    panel: document.getElementById('panel-buttons'),
-    equipment: document.getElementById('equipment-buttons'),
-    load: document.getElementById('load-buttons')
-  };
-  Object.entries(sectionContainers).forEach(([cat, container]) => {
-    const summary = container?.parentElement?.querySelector('summary');
-    if (summary) summary.textContent = cat.charAt(0).toUpperCase() + cat.slice(1);
-  });
-  Object.entries(componentTypes).forEach(([type, subs]) => {
-    const container = sectionContainers[type] || palette;
-    subs.forEach(sub => {
-      const meta = componentMeta[sub];
-      const btn = document.createElement('button');
-      btn.dataset.type = type;
-      btn.dataset.subtype = sub;
-      btn.title = meta.label;
-      btn.innerHTML = `<img src="${meta.icon}" alt="" aria-hidden="true">`;
-      btn.addEventListener('click', () => addComponent(sub));
-      container.appendChild(btn);
-    });
-  });
-  document.querySelectorAll('#component-buttons details').forEach(det => {
-    const key = `palette-${det.id}-open`;
-    const stored = localStorage.getItem(key);
-    if (stored !== null) det.open = stored === 'true';
-    det.addEventListener('toggle', () => {
-      localStorage.setItem(key, det.open);
-    });
-  });
-  const paletteSearch = document.getElementById('palette-search');
-  paletteSearch.addEventListener('input', () => {
-    const term = paletteSearch.value.trim().toLowerCase();
-    palette.querySelectorAll('button').forEach(btn => {
-      const sub = (btn.dataset.subtype || '').toLowerCase();
-      const label = (btn.dataset.label || componentMeta[btn.dataset.subtype]?.label || '').toLowerCase();
-      btn.style.display = !term || sub.includes(term) || label.includes(term) ? '' : 'none';
-    });
-  });
-  paletteSearch.addEventListener('keydown', e => {
-    if (e.key === 'Escape') {
-      paletteSearch.value = '';
-      paletteSearch.dispatchEvent(new Event('input'));
-    }
-  });
+  buildPalette();
   loadTemplates();
   renderTemplates();
   document.getElementById('template-export-btn').addEventListener('click', exportTemplates);
