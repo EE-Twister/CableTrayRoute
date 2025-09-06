@@ -84,3 +84,21 @@ export function buildReliabilityRows(result = {}) {
   });
   return rows;
 }
+
+/** Build rows for harmonic analysis */
+export function buildHarmonicsRows(result = {}) {
+  const rows = [];
+  Object.entries(result).forEach(([id, r]) => {
+    rows.push({ id, ithd: r.ithd, vthd: r.vthd, limit: r.limit, warning: r.warning });
+  });
+  return rows;
+}
+
+/** Build rows for motor starting study */
+export function buildMotorStartRows(result = {}) {
+  const rows = [];
+  Object.entries(result).forEach(([id, r]) => {
+    rows.push({ id, inrushKA: r.inrushKA, voltageSagPct: r.voltageSagPct, accelTime: r.accelTime });
+  });
+  return rows;
+}

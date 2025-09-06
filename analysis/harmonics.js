@@ -1,17 +1,27 @@
 import * as d3 from 'https://cdn.jsdelivr.net/npm/d3@7/+esm';
 import { getOneLine, getStudies, setStudies } from '../dataStore.mjs';
 
+// Convert spectrum description to a map of harmonic order to percent
 function parseSpectrum(spec) {
-  if (!spec) return [];
-  if (Array.isArray(spec)) return spec.map(n => Number(n));
-  if (typeof spec === 'string') {
-    return spec.split(/[,\s]+/).map(p => {
-      const parts = p.split(':');
-      const val = Number(parts[1] || parts[0]);
-      return isNaN(val) ? 0 : val;
-    }).filter(n => n);
+  const map = {};
+  if (!spec) return map;
+  if (Array.isArray(spec)) {
+    spec.forEach((v, i) => {
+      const val = Number(v);
+      if (!isNaN(val) && val) map[i + 1] = val;
+    });
+    return map;
   }
-  return [];
+  if (typeof spec === 'string') {
+    spec.split(/[\,\s]+/).forEach(p => {
+      if (!p) return;
+      const parts = p.split(':');
+      const order = Number(parts[0]);
+      const val = Number(parts[1] || parts[0]);
+      if (!isNaN(order) && !isNaN(val) && order > 1) map[order] = val;
+    });
+  }
+  return map;
 }
 
 function limitForVoltage(kv) {
@@ -21,11 +31,12 @@ function limitForVoltage(kv) {
 }
 
 /**
- * Run a simple harmonic study on the one-line diagram.
- * Loads flagged as harmonic sources may provide a harmonic spectrum as
- * comma separated order:percent pairs (e.g. "5:10,7:7"). Percentages are
- * of the fundamental current. THD is computed as sqrt(sum(p^2)).
- * @returns {Object<string,{thd:number,limit:number,warning:boolean}>}
+ * Frequency‑domain harmonic study. For each component flagged as a harmonic
+ * source, a rudimentary admittance aggregation is performed to estimate bus
+ * voltage distortion per IEEE 519. Capacitor banks and tuned filters may be
+ * provided as shunt admittances.
+ *
+ * @returns {Object<string,{ithd:number,vthd:number,limit:number,warning:boolean}>}
  */
 export function runHarmonics() {
   const sheets = getOneLine();
@@ -33,18 +44,60 @@ export function runHarmonics() {
     ? sheets.flatMap(s => s.components)
     : sheets;
   const results = {};
+
   comps.forEach(c => {
     if (!c.harmonicSource) return;
     const spectrum = parseSpectrum(c.harmonics);
-    const thd = Math.sqrt(spectrum.reduce((sum, p) => sum + p * p, 0));
-    const kv = Number(c.voltage) || 0;
-    const limit = limitForVoltage(kv);
+    const V = Number(c.voltage) || (Number(c.baseKV) || 0) * 1000;
+    const P = Number(c.load?.kw || c.load?.P || c.kw || 0);
+    const I1 = V ? P * 1000 / (Math.sqrt(3) * V) : 0;
+
+    // Base short‑circuit admittance if provided (scMVA) else assume 1 pu
+    const scMVA = Number(c.scMVA) || 0;
+    const yBase = V ? (scMVA ? scMVA / ((V / 1000) ** 2) : 1) : 1;
+
+    // Shunt capacitor banks
+    const capB = (c.capacitors || []).reduce((sum, cap) => {
+      const kvar = Number(cap.kvar) || 0;
+      const kv = Number(cap.kv) || (V / 1000) || 1;
+      return sum + (kvar / (kv * kv));
+    }, 0);
+
+    // Tuned filters provide large admittance at a specific harmonic order
+    const filterMap = {};
+    (c.filters || []).forEach(f => {
+      const ord = Number(f.order);
+      if (!ord) return;
+      const kvar = Number(f.kvar) || 0;
+      const kv = Number(f.kv) || (V / 1000) || 1;
+      const q = Number(f.q) || 1; // quality factor approximation
+      const adm = (kvar / (kv * kv)) * q;
+      filterMap[ord] = (filterMap[ord] || 0) + adm;
+    });
+
+    let i2 = 0;
+    let v2 = 0;
+    Object.entries(spectrum).forEach(([ordStr, pct]) => {
+      const h = Number(ordStr);
+      if (h <= 1) return;
+      const Ih = I1 * (pct / 100);
+      i2 += Ih * Ih;
+      const y = yBase + capB * h + (filterMap[h] || 0);
+      const Vh = y ? Ih / y : 0;
+      v2 += (Vh / V) * (Vh / V);
+    });
+
+    const ithd = I1 ? Math.sqrt(i2) / I1 * 100 : 0;
+    const vthd = Math.sqrt(v2) * 100;
+    const limit = limitForVoltage(V / 1000);
     results[c.id] = {
-      thd: Number(thd.toFixed(2)),
+      ithd: Number(ithd.toFixed(2)),
+      vthd: Number(vthd.toFixed(2)),
       limit,
-      warning: thd > limit
+      warning: vthd > limit
     };
   });
+
   return results;
 }
 
@@ -55,7 +108,7 @@ if (typeof document !== 'undefined') {
     const studies = getStudies();
     studies.harmonics = res;
     setStudies(studies);
-    const data = Object.entries(res).map(([id, r]) => ({ id, thd: r.thd, limit: r.limit }));
+    const data = Object.entries(res).map(([id, r]) => ({ id, thd: r.vthd, limit: r.limit }));
     const width = Number(chartEl.getAttribute('width')) || 800;
     const height = Number(chartEl.getAttribute('height')) || 400;
     const margin = { top: 20, right: 20, bottom: 40, left: 50 };
