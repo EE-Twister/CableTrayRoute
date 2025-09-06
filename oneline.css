@@ -69,6 +69,10 @@
   margin-left: var(--ol-spacing);
 }
 
+.slack-label {
+  margin-left: var(--ol-spacing);
+}
+
 .hidden-input {
   display: none;
 }

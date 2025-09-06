@@ -157,6 +157,8 @@ let dimensionStart = null;
 let diagramScale = getItem('diagramScale', { unitPerPx: 1, unit: 'in' });
 let scaleValueInput = null;
 let scaleUnitInput = null;
+let cableSlackPct = Number(getItem('cableSlackPct', 0));
+let slackPctInput = null;
 let gridSize = Number(getItem('gridSize', 20));
 let gridEnabled = true;
 let history = [];
@@ -168,6 +170,7 @@ let templates = [];
 const DIAGRAM_VERSION = 2;
 let cursorPos = { x: 20, y: 20 };
 let showOverlays = true;
+let syncing = false;
 const lintPanel = document.getElementById('lint-panel');
 const lintList = document.getElementById('lint-list');
 const lintCloseBtn = document.getElementById('lint-close-btn');
@@ -752,6 +755,7 @@ function render() {
   const svg = document.getElementById('diagram');
   svg.querySelectorAll('g.component, .connection, .conn-label, .port, .dimension, .dim-label').forEach(el => el.remove());
   const usedVoltageRanges = new Set();
+  let lengthsChanged = false;
   if (gridEnabled) {
     components.forEach(c => {
       c.x = Math.round(c.x / gridSize) * gridSize;
@@ -924,6 +928,9 @@ function render() {
       const target = components.find(t => t.id === conn.target);
       if (!target) return;
       const pts = routeConnection(c, target, conn);
+      const lenPx = pts.reduce((sum, p, i) => (i ? sum + Math.hypot(p.x - pts[i - 1].x, p.y - pts[i - 1].y) : 0), 0);
+      if (Math.abs((conn.length || 0) - lenPx) > 0.5) lengthsChanged = true;
+      conn.length = lenPx;
       const poly = document.createElementNS(svgNS, 'polyline');
       poly.setAttribute('points', pts.map(p => `${p.x},${p.y}`).join(' '));
       const vRange = getVoltageRange(conn.voltage || conn.cable?.voltage || c.voltage || target.voltage);
@@ -1076,6 +1083,12 @@ function render() {
   });
 
   updateLegend(usedVoltageRanges);
+  if (lengthsChanged && !syncing) {
+    syncing = true;
+    syncSchedules(false);
+    syncing = false;
+    render();
+  }
 }
 
 function renderSheetTabs() {
@@ -1594,6 +1607,14 @@ async function chooseCable(source, target, existingConn = null) {
     installLabel.appendChild(installInput);
     form.appendChild(installLabel);
 
+    const slackLabel = document.createElement('label');
+    slackLabel.textContent = 'Slack % ';
+    const slackInput = document.createElement('input');
+    slackInput.type = 'number';
+    slackInput.name = 'slack_pct';
+    slackLabel.appendChild(slackInput);
+    form.appendChild(slackLabel);
+
     const lengthLabel = document.createElement('label');
     lengthLabel.textContent = 'Length (ft) ';
     const lengthInput = document.createElement('input');
@@ -1672,6 +1693,7 @@ async function chooseCable(source, target, existingConn = null) {
         materialInput.value = c.conductor_material || '';
         insulationInput.value = c.insulation_type || '';
         lengthInput.value = c.length || '';
+        slackInput.value = c.slack_pct || cableSlackPct;
         colorInput.value = c.color || '#000000';
         ambientInput.value = c.ambient_temp || '';
         installInput.value = c.install_method || '';
@@ -1684,6 +1706,7 @@ async function chooseCable(source, target, existingConn = null) {
         materialInput.value = '';
         insulationInput.value = '';
         lengthInput.value = '';
+        slackInput.value = cableSlackPct;
         colorInput.value = '#000000';
         ambientInput.value = '';
         installInput.value = '';
@@ -1707,10 +1730,17 @@ async function chooseCable(source, target, existingConn = null) {
       sizeInput.value = existing.conductor_size || '';
       materialInput.value = existing.conductor_material || '';
       insulationInput.value = existing.insulation_type || '';
-      lengthInput.value = existing.length || '';
+      const autoLen = (existingConn.length || 0) * (diagramScale.unitPerPx || 1);
+      const slack = parseFloat(existing.slack_pct ?? cableSlackPct) || 0;
+      if (existing.length) {
+        lengthInput.value = existing.length;
+      } else if (autoLen) {
+        lengthInput.value = (autoLen * (1 + slack / 100)).toFixed(2);
+      }
       colorInput.value = existing.color || '#000000';
       ambientInput.value = existing.ambient_temp || '';
       installInput.value = existing.install_method || '';
+      slackInput.value = existing.slack_pct || cableSlackPct;
       sizeInput.dataset.calcAmpacity = existing.calc_ampacity || '';
       sizeInput.dataset.voltageDrop = existing.voltage_drop_pct || existing.voltage_drop || '';
       sizeInput.dataset.sizingWarning = existing.sizing_warning || '';
@@ -1722,6 +1752,7 @@ async function chooseCable(source, target, existingConn = null) {
       }
     } else {
       colorInput.value = '#000000';
+      slackInput.value = cableSlackPct;
     }
 
     const saveBtn = document.createElement('button');
@@ -1744,6 +1775,7 @@ async function chooseCable(source, target, existingConn = null) {
         .map(p => p.trim().toUpperCase())
         .filter(Boolean);
       const conductors = conductorsInput.value;
+      const manualLen = lengthInput.value.trim() !== '';
       const cable = {
         tag: tagInput.value,
         cable_type: typeInput.value,
@@ -1753,8 +1785,8 @@ async function chooseCable(source, target, existingConn = null) {
         insulation_type: insulationInput.value,
         ambient_temp: ambientInput.value,
         install_method: installInput.value,
-        length: lengthInput.value,
         color: colorInput.value,
+        slack_pct: slackInput.value || cableSlackPct,
         phases: phases.length,
         calc_ampacity: sizeInput.dataset.calcAmpacity || '',
         voltage_drop_pct: sizeInput.dataset.voltageDrop || '',
@@ -1762,6 +1794,10 @@ async function chooseCable(source, target, existingConn = null) {
         code_reference: sizeInput.dataset.codeRef || '',
         sizing_report: sizeInput.dataset.sizingReport || ''
       };
+      if (manualLen) {
+        cable.length = lengthInput.value;
+        cable.manual_length = true;
+      }
       modal.classList.remove('show');
       resolve({
         cable: { ...cable, from_tag: source.ref || source.id, to_tag: target.ref || target.id },
@@ -1974,6 +2010,15 @@ async function init() {
   if (scaleUnitInput) scaleUnitInput.value = diagramScale.unit;
   scaleValueInput?.addEventListener('change', updateScale);
   scaleUnitInput?.addEventListener('change', updateScale);
+
+  slackPctInput = document.getElementById('slack-pct');
+  if (slackPctInput) slackPctInput.value = cableSlackPct;
+  slackPctInput?.addEventListener('change', () => {
+    cableSlackPct = Number(slackPctInput.value) || 0;
+    setItem('cableSlackPct', cableSlackPct);
+    syncSchedules(false);
+    render();
+  });
 
   const svg = document.getElementById('diagram');
   const menu = document.getElementById('context-menu');
@@ -2572,13 +2617,25 @@ function syncSchedules(notify = true) {
         from_tag: c.ref || c.id,
         to_tag: target?.ref || conn.target
       };
+      const unitPerPx = diagramScale.unitPerPx || 1;
+      const slack = parseFloat(conn.cable?.slack_pct ?? cableSlackPct) || 0;
+      const autoLen = (conn.length || 0) * unitPerPx * (1 + slack / 100);
+      let finalLen = autoLen;
+      if (conn.cable?.manual_length) {
+        const manual = parseFloat(conn.cable.length);
+        if (!isNaN(manual)) finalLen = manual;
+      }
+      spec.length = finalLen.toFixed(2);
+      spec.slack_pct = conn.cable?.slack_pct ?? cableSlackPct;
+      if (conn.cable?.manual_length) spec.manual_length = true;
+      conn.cable.length = spec.length;
       const load = {
         current: parseFloat(target?.current) || 0,
         voltage: parseFloat(target?.voltage) || parseFloat(c.voltage) || 0,
         phases: conn.phases ? conn.phases.length : parseInt(target?.phases || c.phases || 3, 10)
       };
       const params = {
-        length: parseFloat(spec.length) || 0,
+        length: finalLen,
         material: spec.conductor_material || 'cu',
         insulation_rating: parseFloat(target?.insulation_rating) || 90,
         ambient: parseFloat(spec.ambient_temp) || parseFloat(c.ambient) || 30,
@@ -2601,7 +2658,10 @@ function syncSchedules(notify = true) {
         ambient_temp: spec.ambient_temp,
         install_method: spec.install_method,
         phases: spec.phases,
-        conductors: spec.conductors
+        conductors: spec.conductors,
+        length: spec.length,
+        slack_pct: spec.slack_pct,
+        manual_length: conn.cable?.manual_length
       });
       const idx = cables.findIndex(cb => cb.tag === spec.tag);
       if (idx >= 0) {
