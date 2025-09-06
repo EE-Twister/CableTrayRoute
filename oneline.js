@@ -1854,11 +1854,26 @@ function focusComponent(id) {
   if (g && g.scrollIntoView) g.scrollIntoView({ behavior: 'smooth', block: 'center', inline: 'center' });
 }
 
+function updateComponent(id, fields = {}) {
+  const comp = components.find(c => c.id === id || c.ref === id);
+  if (!comp) return;
+  const mapping = { description: 'label', id: 'ref', subCategory: 'subtype' };
+  Object.entries(fields).forEach(([k, v]) => {
+    if (k === 'ref') return;
+    const prop = mapping[k] || k;
+    if (prop === 'id') return;
+    comp[prop] = v;
+  });
+  render();
+  save(false);
+}
+
 function syncSchedules(notify = true) {
   const all = sheets.flatMap(s => s.components);
   const mapFields = c => {
     const fields = {
       id: c.ref || c.id,
+      ref: c.id,
       description: c.label,
       manufacturer: c.manufacturer ?? '',
       model: c.model ?? '',
@@ -1912,6 +1927,7 @@ function serializeState() {
     const mapFields = c => {
       const fields = {
         id: c.ref || c.id,
+        ref: c.id,
         description: c.label,
         manufacturer: c.manufacturer ?? '',
         model: c.model ?? '',
@@ -2086,6 +2102,10 @@ async function importDiagram(e) {
     console.error('Failed to import diagram', err);
   }
   e.target.value = '';
+}
+
+if (typeof window !== 'undefined') {
+  window.updateComponent = updateComponent;
 }
 
 window.addEventListener('DOMContentLoaded', init);
