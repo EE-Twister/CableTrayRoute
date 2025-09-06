@@ -38,6 +38,8 @@ const manufacturerModels = {
 };
 
 async function loadComponentLibrary() {
+  componentMeta = {};
+  propSchemas = {};
   let data = [];
   try {
     const res = await fetch('componentLibrary.json');
@@ -45,8 +47,32 @@ async function loadComponentLibrary() {
   } catch (err) {
     console.error('Failed to load component library', err);
   }
-  const stored = getItem('componentLibrary', null);
-  if (stored) data = stored;
+
+  const version = getItem('componentLibraryVersion', null);
+  let userComponents = [];
+  let userIcons = {};
+  if (version) {
+    const stored = getItem('componentLibrary_' + version, null);
+    if (stored) {
+      userComponents = Array.isArray(stored.components) ? stored.components : [];
+      userIcons = stored.icons || {};
+    }
+  }
+
+  const bySubtype = new Map();
+  data.forEach(c => bySubtype.set(c.subtype, c));
+
+  userComponents.forEach(c => {
+    if (!isValidComponent(c)) return;
+    if (userIcons[c.icon]) c.icon = userIcons[c.icon];
+    bySubtype.set(c.subtype, c);
+  });
+
+  data = Array.from(bySubtype.values()).map(c => {
+    if (userIcons[c.icon]) c.icon = userIcons[c.icon];
+    return c;
+  });
+
   const reliabilityFields = [
     { name: 'mtbf', label: 'MTBF (hrs)', type: 'number' },
     { name: 'mttr', label: 'MTTR (hrs)', type: 'number' },
@@ -66,6 +92,10 @@ async function loadComponentLibrary() {
     propSchemas[c.subtype] = c.schema || [];
   });
   rebuildComponentMaps();
+}
+
+function isValidComponent(c) {
+  return c && typeof c === 'object' && Array.isArray(c.ports) && c.category && c.icon;
 }
 
 async function loadManufacturerLibrary() {
@@ -2835,6 +2865,8 @@ async function importDiagram(e) {
 
 if (typeof window !== 'undefined') {
   window.updateComponent = updateComponent;
+  window.loadComponentLibrary = loadComponentLibrary;
+  window.loadManufacturerLibrary = loadManufacturerLibrary;
 }
 
 window.addEventListener('DOMContentLoaded', init);

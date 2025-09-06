@@ -459,6 +459,16 @@ function initSettings(){
     settingsMenu.appendChild(selfCheckBtn);
     selfCheckBtn.addEventListener('click',()=>{ location.href='optimalRoute.html?selfcheck=1'; });
 
+    const refreshLibBtn=document.createElement('button');
+    refreshLibBtn.id='refresh-library-btn';
+    refreshLibBtn.textContent='Refresh Library';
+    settingsMenu.appendChild(refreshLibBtn);
+    refreshLibBtn.addEventListener('click',async()=>{
+      if(typeof globalThis.loadComponentLibrary==='function') await globalThis.loadComponentLibrary();
+      if(typeof globalThis.loadManufacturerLibrary==='function') await globalThis.loadManufacturerLibrary();
+      alert('Library refreshed');
+    });
+
     const reportBtn=document.createElement('button');
     reportBtn.id='generate-report-btn';
     reportBtn.textContent='Generate Technical Report';

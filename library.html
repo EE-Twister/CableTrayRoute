@@ -10,7 +10,10 @@
   <h1>Library Manager</h1>
   <section>
     <h2>Component Library</h2>
-    <textarea id="component-text" rows="20" cols="80"></textarea><br>
+    <label>Version <input id="library-version" type="text" size="10"></label><br>
+    <textarea id="component-text" rows="10" cols="80"></textarea><br>
+    <textarea id="icon-text" rows="10" cols="80"></textarea><br>
+    <input type="file" id="library-upload" accept="application/json"><br>
     <button id="component-save">Save</button>
     <button id="component-download">Download</button>
   </section>
@@ -25,15 +28,27 @@
 
     async function load() {
       const compArea = document.getElementById('component-text');
+      const iconArea = document.getElementById('icon-text');
+      const versionInput = document.getElementById('library-version');
       const manufArea = document.getElementById('manufacturer-text');
-      try {
-        const res = await fetch('componentLibrary.json');
-        const data = await res.json();
-        const stored = getItem('componentLibrary', null);
-        compArea.value = JSON.stringify(stored || data, null, 2);
-      } catch {
-        compArea.value = '[]';
+
+      const currentVersion = getItem('componentLibraryVersion', '');
+      versionInput.value = currentVersion || '';
+      let stored = currentVersion ? getItem('componentLibrary_' + currentVersion, null) : null;
+      if (stored) {
+        compArea.value = JSON.stringify(stored.components || [], null, 2);
+        iconArea.value = JSON.stringify(stored.icons || {}, null, 2);
+      } else {
+        try {
+          const res = await fetch('componentLibrary.json');
+          const data = await res.json();
+          compArea.value = JSON.stringify(data, null, 2);
+        } catch {
+          compArea.value = '[]';
+        }
+        iconArea.value = '{}';
       }
+
       try {
         const res2 = await fetch('manufacturerLibrary.json');
         const data2 = await res2.json();
@@ -42,6 +57,60 @@
       } catch {
         manufArea.value = '{}';
       }
+    }
+
+    function saveComponents() {
+      const compArea = document.getElementById('component-text');
+      const iconArea = document.getElementById('icon-text');
+      const versionInput = document.getElementById('library-version');
+      try {
+        const comps = JSON.parse(compArea.value);
+        const icons = JSON.parse(iconArea.value);
+        const version = versionInput.value.trim() || 'user';
+        setItem('componentLibraryVersion', version);
+        setItem('componentLibrary_' + version, { components: comps, icons });
+        alert('Saved');
+      } catch {
+        alert('Invalid JSON');
+      }
+    }
+
+    function downloadComponents() {
+      const compArea = document.getElementById('component-text');
+      const iconArea = document.getElementById('icon-text');
+      const versionInput = document.getElementById('library-version');
+      try {
+        const comps = JSON.parse(compArea.value);
+        const icons = JSON.parse(iconArea.value);
+        const version = versionInput.value.trim() || 'user';
+        const blob = new Blob([JSON.stringify({ version, components: comps, icons }, null, 2)], { type: 'application/json' });
+        const a = document.createElement('a');
+        a.href = URL.createObjectURL(blob);
+        a.download = `componentLibrary_${version}.json`;
+        document.body.appendChild(a);
+        a.click();
+        document.body.removeChild(a);
+        URL.revokeObjectURL(a.href);
+      } catch {
+        alert('Invalid JSON');
+      }
+    }
+
+    function handleUpload(e) {
+      const file = e.target.files[0];
+      if (!file) return;
+      const reader = new FileReader();
+      reader.onload = () => {
+        try {
+          const obj = JSON.parse(reader.result);
+          document.getElementById('library-version').value = obj.version || '';
+          document.getElementById('component-text').value = JSON.stringify(obj.components || [], null, 2);
+          document.getElementById('icon-text').value = JSON.stringify(obj.icons || {}, null, 2);
+        } catch {
+          alert('Invalid file');
+        }
+      };
+      reader.readAsText(file);
     }
 
     function save(id, key) {
@@ -67,9 +136,10 @@
       URL.revokeObjectURL(a.href);
     }
 
-    document.getElementById('component-save').addEventListener('click', () => save('component-text', 'componentLibrary'));
+    document.getElementById('component-save').addEventListener('click', saveComponents);
+    document.getElementById('component-download').addEventListener('click', downloadComponents);
+    document.getElementById('library-upload').addEventListener('change', handleUpload);
     document.getElementById('manufacturer-save').addEventListener('click', () => save('manufacturer-text', 'manufacturerDefaults'));
-    document.getElementById('component-download').addEventListener('click', () => download('component-text', 'componentLibrary.json'));
     document.getElementById('manufacturer-download').addEventListener('click', () => download('manufacturer-text', 'manufacturerLibrary.json'));
 
     load();
