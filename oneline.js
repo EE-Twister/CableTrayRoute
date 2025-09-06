@@ -225,6 +225,40 @@ const cableColors = {
   Signal: '#0a0'
 };
 
+// Voltage range configuration used for coloring components and connections
+const voltageColors = [
+  { max: 600, color: '#4caf50', label: '\u2264600V' },
+  { max: 5000, color: '#ff9800', label: '600V-5kV' },
+  { max: Infinity, color: '#f44336', label: '>5kV' }
+];
+
+function getVoltageRange(voltage) {
+  const v = parseFloat(voltage);
+  if (isNaN(v)) return null;
+  return voltageColors.find(r => v <= r.max) || null;
+}
+
+function updateLegend(ranges) {
+  const legend = document.getElementById('voltage-legend');
+  if (!legend) return;
+  legend.innerHTML = '';
+  voltageColors.forEach(r => {
+    if (ranges.has(r)) {
+      const item = document.createElement('div');
+      item.className = 'legend-item';
+      const swatch = document.createElement('span');
+      swatch.className = 'legend-color';
+      swatch.style.background = r.color;
+      item.appendChild(swatch);
+      const lbl = document.createElement('span');
+      lbl.textContent = r.label;
+      item.appendChild(lbl);
+      legend.appendChild(item);
+    }
+  });
+  legend.style.display = ranges.size ? 'block' : 'none';
+}
+
 function portPosition(c, portIndex) {
   const meta = componentMeta[c.subtype] || {};
   const port = meta.ports?.[portIndex];
@@ -282,6 +316,7 @@ function normalizeComponent(c) {
 function render() {
   const svg = document.getElementById('diagram');
   svg.querySelectorAll('g.component, .connection, .conn-label, .port').forEach(el => el.remove());
+  const usedVoltageRanges = new Set();
   if (gridEnabled) {
     components.forEach(c => {
       c.x = Math.round(c.x / gridSize) * gridSize;
@@ -431,7 +466,9 @@ function render() {
       const pts = routeConnection(c, target, conn);
       const poly = document.createElementNS(svgNS, 'polyline');
       poly.setAttribute('points', pts.map(p => `${p.x},${p.y}`).join(' '));
-      const stroke = cableColors[conn.cable?.cable_type] || conn.cable?.color || '#000';
+      const vRange = getVoltageRange(conn.voltage || conn.cable?.voltage || c.voltage || target.voltage);
+      if (vRange) usedVoltageRanges.add(vRange);
+      const stroke = vRange?.color || cableColors[conn.cable?.cable_type] || conn.cable?.color || '#000';
       poly.setAttribute('stroke', stroke);
       poly.setAttribute('fill', 'none');
       poly.setAttribute('marker-end', 'url(#arrow)');
@@ -476,6 +513,18 @@ function render() {
     if (c.flipped) transforms.push(`translate(${cx}, ${cy}) scale(-1,1) translate(${-cx}, ${-cy})`);
     if (c.rotation) transforms.push(`rotate(${c.rotation}, ${cx}, ${cy})`);
     if (transforms.length) g.setAttribute('transform', transforms.join(' '));
+    const vRange = getVoltageRange(c.voltage);
+    if (vRange) {
+      usedVoltageRanges.add(vRange);
+      const bg = document.createElementNS(svgNS, 'rect');
+      bg.setAttribute('x', c.x);
+      bg.setAttribute('y', c.y);
+      bg.setAttribute('width', compWidth);
+      bg.setAttribute('height', compHeight);
+      bg.setAttribute('fill', vRange.color);
+      bg.setAttribute('opacity', 0.3);
+      g.appendChild(bg);
+    }
     const use = document.createElementNS(svgNS, 'use');
     use.setAttribute('x', c.x);
     use.setAttribute('y', c.y);
@@ -520,6 +569,8 @@ function render() {
       });
     }
   });
+
+  updateLegend(usedVoltageRanges);
 }
 
 function renderSheetTabs() {
