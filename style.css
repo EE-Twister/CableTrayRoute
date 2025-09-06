@@ -454,6 +454,20 @@ details > summary {
     outline: 2px solid var(--primary-color);
 }
 
+/* Tooltip for diagram components */
+#component-tooltip {
+    position: absolute;
+    background-color: rgba(0, 0, 0, 0.75);
+    color: #fff;
+    padding: 4px 8px;
+    border-radius: 4px;
+    font-size: 12px;
+    pointer-events: none;
+    white-space: pre;
+    z-index: 1000;
+    display: none;
+}
+
 /* --- Help Modal --- */
 .modal {
     position: fixed;
