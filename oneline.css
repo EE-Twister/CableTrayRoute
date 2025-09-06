@@ -90,6 +90,16 @@
   right: 10px;
 }
 
+#validation-modal {
+  top: 90px;
+  right: 10px;
+  max-width: 300px;
+}
+
+.component.invalid text {
+  fill: #c00;
+}
+
 @keyframes fadeIn {
   from { opacity: 0; }
   to { opacity: 1; }

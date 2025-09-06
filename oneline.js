@@ -87,6 +87,7 @@ let gridSize = Number(getItem('gridSize', 20));
 let gridEnabled = true;
 let history = [];
 let historyIndex = -1;
+let validationIssues = [];
 const compWidth = 80;
 const compHeight = 40;
 
@@ -447,6 +448,7 @@ function save(notify = true) {
   }));
   setOneLine(comps);
   syncSchedules(notify);
+  validateDiagram();
 }
 
 function addComponent(subtype) {
@@ -784,6 +786,7 @@ function init() {
   pushHistory();
   render();
   syncSchedules(false);
+  validateDiagram();
 
   const palette = document.getElementById('component-buttons');
   Object.entries(componentTypes).forEach(([type, subs]) => {
@@ -828,6 +831,34 @@ function init() {
   document.getElementById('export-btn').addEventListener('click', exportDiagram);
   document.getElementById('import-btn').addEventListener('click', () => document.getElementById('import-input').click());
   document.getElementById('import-input').addEventListener('change', importDiagram);
+  document.getElementById('validate-btn').addEventListener('click', () => {
+    const issues = validateDiagram();
+    const modal = document.getElementById('validation-modal');
+    modal.innerHTML = '';
+    const header = document.createElement('h3');
+    header.textContent = issues.length ? 'Validation Issues' : 'No issues found';
+    modal.appendChild(header);
+    if (issues.length) {
+      const list = document.createElement('ul');
+      issues.forEach(issue => {
+        const li = document.createElement('li');
+        li.textContent = issue.message;
+        li.style.cursor = 'pointer';
+        li.addEventListener('click', () => {
+          modal.classList.remove('show');
+          focusComponent(issue.component);
+        });
+        list.appendChild(li);
+      });
+      modal.appendChild(list);
+    }
+    const closeBtn = document.createElement('button');
+    closeBtn.type = 'button';
+    closeBtn.textContent = 'Close';
+    closeBtn.addEventListener('click', () => modal.classList.remove('show'));
+    modal.appendChild(closeBtn);
+    modal.classList.add('show');
+  });
 
   const gridToggle = document.getElementById('grid-toggle');
   const gridSizeInput = document.getElementById('grid-size');
@@ -1144,6 +1175,101 @@ function showToast(msg) {
   t.textContent = msg;
   t.classList.add('show');
   setTimeout(() => t.classList.remove('show'), 3000);
+}
+
+function validateDiagram() {
+  validationIssues = [];
+  const svg = document.getElementById('diagram');
+  if (!svg) return validationIssues;
+  // reset any previous markers
+  svg.querySelectorAll('g.component').forEach(g => {
+    g.classList.remove('invalid');
+    const comp = components.find(c => c.id === g.dataset.id);
+    if (!comp) return;
+    const tip = [];
+    if (comp.label) tip.push(`Label: ${comp.label}`);
+    if (comp.voltage) tip.push(`Voltage: ${comp.voltage}`);
+    if (comp.rating) tip.push(`Rating: ${comp.rating}`);
+    g.setAttribute('data-tooltip', tip.join('\n'));
+  });
+
+  const labelMap = new Map();
+  const refMap = new Map();
+  const inbound = new Map();
+  components.forEach(c => {
+    if (c.label) labelMap.set(c.label, (labelMap.get(c.label) || 0) + 1);
+    if (c.ref) refMap.set(c.ref, (refMap.get(c.ref) || 0) + 1);
+    inbound.set(c.id, 0);
+  });
+
+  components.forEach(c => {
+    (c.connections || []).forEach(conn => {
+      inbound.set(conn.target, (inbound.get(conn.target) || 0) + 1);
+      const target = components.find(t => t.id === conn.target);
+      if (target && c.voltage && target.voltage && c.voltage !== target.voltage) {
+        validationIssues.push({
+          component: c.id,
+          message: `Voltage mismatch with ${target.label || target.subtype || target.id}`
+        });
+        validationIssues.push({
+          component: target.id,
+          message: `Voltage mismatch with ${c.label || c.subtype || c.id}`
+        });
+      }
+    });
+  });
+
+  components.forEach(c => {
+    if ((c.connections || []).length + (inbound.get(c.id) || 0) === 0) {
+      validationIssues.push({ component: c.id, message: 'Unconnected component' });
+    }
+  });
+
+  labelMap.forEach((count, label) => {
+    if (count > 1) {
+      components.filter(c => c.label === label).forEach(c => {
+        validationIssues.push({ component: c.id, message: `Duplicate label "${label}"` });
+      });
+    }
+  });
+
+  refMap.forEach((count, ref) => {
+    if (count > 1) {
+      components.filter(c => c.ref === ref).forEach(c => {
+        validationIssues.push({ component: c.id, message: `Duplicate ref "${ref}"` });
+      });
+    }
+  });
+
+  const byComp = {};
+  validationIssues.forEach(issue => {
+    if (!byComp[issue.component]) byComp[issue.component] = [];
+    byComp[issue.component].push(issue.message);
+  });
+
+  Object.entries(byComp).forEach(([id, msgs]) => {
+    const g = svg.querySelector(`g.component[data-id="${id}"]`);
+    if (!g) return;
+    g.classList.add('invalid');
+    const existing = g.getAttribute('data-tooltip');
+    const tip = existing ? existing + '\n' + msgs.join('\n') : msgs.join('\n');
+    g.setAttribute('data-tooltip', tip);
+  });
+
+  showToast(validationIssues.length ? `Validation found ${validationIssues.length} issue${validationIssues.length === 1 ? '' : 's'}` : 'Diagram valid');
+  return validationIssues;
+}
+
+function focusComponent(id) {
+  const comp = components.find(c => c.id === id);
+  if (!comp) return;
+  selection = [comp];
+  selected = comp;
+  selectedConnection = null;
+  render();
+  const svg = document.getElementById('diagram');
+  const g = svg.querySelector(`g.component[data-id="${id}"]`);
+  if (g && g.scrollIntoView) g.scrollIntoView({ behavior: 'smooth', block: 'center', inline: 'center' });
 }
 
 function syncSchedules(notify = true) {
