@@ -76,6 +76,11 @@ let contextTarget = null;
 let connectMode = false;
 let connectSource = null;
 let selectedConnection = null;
+let dimensionMode = false;
+let dimensionStart = null;
+let diagramScale = getItem('diagramScale', { unitPerPx: 1, unit: 'in' });
+let scaleValueInput = null;
+let scaleUnitInput = null;
 let gridSize = Number(getItem('gridSize', 20));
 let gridEnabled = true;
 let history = [];
@@ -84,7 +89,7 @@ let validationIssues = [];
 const compWidth = 80;
 const compHeight = 40;
 let templates = [];
-const DIAGRAM_VERSION = 1;
+const DIAGRAM_VERSION = 2;
 let cursorPos = { x: 20, y: 20 };
 const lintPanel = document.getElementById('lint-panel');
 const lintList = document.getElementById('lint-list');
@@ -394,6 +399,14 @@ function nearestPorts(src, tgt) {
   return best;
 }
 
+function updateScale() {
+  if (!scaleValueInput) return;
+  diagramScale.unitPerPx = Number(scaleValueInput.value) || 0;
+  diagramScale.unit = scaleUnitInput?.value || '';
+  setItem('diagramScale', diagramScale);
+  render();
+}
+
 function normalizeComponent(c) {
   const nc = {
     ...c,
@@ -409,7 +422,7 @@ function normalizeComponent(c) {
 
 function render() {
   const svg = document.getElementById('diagram');
-  svg.querySelectorAll('g.component, .connection, .conn-label, .port').forEach(el => el.remove());
+  svg.querySelectorAll('g.component, .connection, .conn-label, .port, .dimension, .dim-label').forEach(el => el.remove());
   const usedVoltageRanges = new Set();
   if (gridEnabled) {
     components.forEach(c => {
@@ -552,6 +565,31 @@ function render() {
     return points[0];
   }
 
+  // draw dimension lines
+  components.filter(c => c.type === 'dimension').forEach(d => {
+    const line = document.createElementNS(svgNS, 'line');
+    line.setAttribute('x1', d.x1);
+    line.setAttribute('y1', d.y1);
+    line.setAttribute('x2', d.x2);
+    line.setAttribute('y2', d.y2);
+    line.classList.add('dimension');
+    line.setAttribute('marker-start', 'url(#arrow)');
+    line.setAttribute('marker-end', 'url(#arrow)');
+    svg.appendChild(line);
+
+    const midx = (d.x1 + d.x2) / 2;
+    const midy = (d.y1 + d.y2) / 2;
+    const dist = Math.hypot(d.x2 - d.x1, d.y2 - d.y1);
+    const len = dist * (diagramScale.unitPerPx || 1);
+    const text = document.createElementNS(svgNS, 'text');
+    text.setAttribute('x', midx);
+    text.setAttribute('y', midy - 5);
+    text.setAttribute('text-anchor', 'middle');
+    text.classList.add('dim-label');
+    text.textContent = `${len.toFixed(2)} ${diagramScale.unit}`;
+    svg.appendChild(text);
+  });
+
   // draw connections
   components.forEach(c => {
     (c.connections || []).forEach((conn, idx) => {
@@ -589,7 +627,7 @@ function render() {
   });
 
   // draw nodes
-  components.forEach(c => {
+  components.filter(c => c.type !== 'dimension').forEach(c => {
     const g = document.createElementNS(svgNS, 'g');
     g.dataset.id = c.id;
     g.classList.add('component');
@@ -733,6 +771,7 @@ function save(notify = true) {
   sheets = sheetData;
   components = sheets[activeSheet].components;
   setOneLine(sheetData);
+  setItem('diagramScale', diagramScale);
   const issues = validateDiagram();
   if (issues.length === 0) {
     syncSchedules(notify);
@@ -1091,6 +1130,7 @@ async function init() {
 
   sheets.forEach(s => {
     s.components.forEach(c => {
+      if (c.type === 'dimension') return;
       if (!componentMeta[c.subtype]) {
         const icon = typeIcons[c.type] || 'icons/equipment.svg';
         componentMeta[c.subtype] = {
@@ -1204,6 +1244,13 @@ async function init() {
     connectMode = true;
     connectSource = null;
   });
+  const dimensionBtn = document.getElementById('dimension-btn');
+  dimensionBtn.addEventListener('click', () => {
+    dimensionMode = !dimensionMode;
+    dimensionStart = null;
+    connectMode = false;
+    dimensionBtn.classList.toggle('active', dimensionMode);
+  });
   document.getElementById('undo-btn').addEventListener('click', undo);
   document.getElementById('redo-btn').addEventListener('click', redo);
   document.getElementById('align-left-btn').addEventListener('click', () => alignSelection('left'));
@@ -1257,6 +1304,13 @@ async function init() {
     render();
   });
 
+  scaleValueInput = document.getElementById('scale-value');
+  scaleUnitInput = document.getElementById('scale-unit');
+  if (scaleValueInput) scaleValueInput.value = diagramScale.unitPerPx;
+  if (scaleUnitInput) scaleUnitInput.value = diagramScale.unit;
+  scaleValueInput?.addEventListener('change', updateScale);
+  scaleUnitInput?.addEventListener('change', updateScale);
+
   const svg = document.getElementById('diagram');
   const menu = document.getElementById('context-menu');
   svg.addEventListener('mousedown', e => {
@@ -1308,6 +1362,24 @@ async function init() {
     }
   });
   svg.addEventListener('click', async e => {
+    if (dimensionMode) {
+      let x = e.offsetX;
+      let y = e.offsetY;
+      if (gridEnabled) {
+        x = Math.round(x / gridSize) * gridSize;
+        y = Math.round(y / gridSize) * gridSize;
+      }
+      if (!dimensionStart) {
+        dimensionStart = { x, y };
+      } else {
+        components.push({ id: 'd' + Date.now(), type: 'dimension', x1: dimensionStart.x, y1: dimensionStart.y, x2: x, y2: y });
+        dimensionStart = null;
+        pushHistory();
+        render();
+        save();
+      }
+      return;
+    }
     const g = e.target.closest('.component');
     if (!g) {
       selection = [];
@@ -1573,11 +1645,13 @@ function validateDiagram() {
   const idMap = new Map();
   const inbound = new Map();
   components.forEach(c => {
+    if (c.type === 'dimension') return;
     idMap.set(c.id, (idMap.get(c.id) || 0) + 1);
     inbound.set(c.id, 0);
   });
 
   components.forEach(c => {
+    if (c.type === 'dimension') return;
     (c.connections || []).forEach(conn => {
       inbound.set(conn.target, (inbound.get(conn.target) || 0) + 1);
       const target = components.find(t => t.id === conn.target);
@@ -1595,6 +1669,7 @@ function validateDiagram() {
   });
 
   components.forEach(c => {
+    if (c.type === 'dimension') return;
     if ((c.connections || []).length + (inbound.get(c.id) || 0) === 0) {
       validationIssues.push({ component: c.id, message: 'Unconnected component' });
     }
@@ -1746,6 +1821,7 @@ function serializeState() {
   return {
     version: DIAGRAM_VERSION,
     templates: templates.map(t => ({ ...t })),
+    scale: diagramScale,
     sheets: sheets.map(s => {
       const comps = s.components.map(c => ({
         ...c,
@@ -1842,6 +1918,9 @@ function migrateDiagram(data) {
       sheets: data.sheets || []
     };
   }
+  if (version < 2) {
+    migrated.scale = data.scale || { unitPerPx: 1, unit: 'in' };
+  }
   migrated.version = DIAGRAM_VERSION;
   return migrated;
 }
@@ -1853,6 +1932,10 @@ async function importDiagram(e) {
   try {
     let data = JSON.parse(text);
     data = migrateDiagram(data);
+    diagramScale = data.scale || { unitPerPx: 1, unit: 'in' };
+    setItem('diagramScale', diagramScale);
+    if (scaleValueInput) scaleValueInput.value = diagramScale.unitPerPx;
+    if (scaleUnitInput) scaleUnitInput.value = diagramScale.unit;
     templates = data.templates || [];
     saveTemplates();
     renderTemplates();
