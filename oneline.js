@@ -1,4 +1,4 @@
-import { getOneLine, setOneLine, setEquipment, setPanels, setLoads, getCables, setCables } from './dataStore.mjs';
+import { getOneLine, setOneLine, setEquipment, setPanels, setLoads, getCables, setCables, getItem, setItem } from './dataStore.mjs';
 
 const componentMeta = {
   MLO: { icon: 'icons/MLO.svg', label: 'MLO', category: 'panel' },
@@ -43,7 +43,7 @@ let contextTarget = null;
 let connectMode = false;
 let connectSource = null;
 let selectedConnection = null;
-const gridSize = 20;
+let gridSize = Number(getItem('gridSize', 20));
 let gridEnabled = true;
 let history = [];
 let historyIndex = -1;
@@ -686,11 +686,26 @@ function init() {
   document.getElementById('import-input').addEventListener('change', importDiagram);
 
   const gridToggle = document.getElementById('grid-toggle');
+  const gridSizeInput = document.getElementById('grid-size');
+  const gridPattern = document.getElementById('grid');
+  const gridPath = gridPattern.querySelector('path');
   gridEnabled = gridToggle.checked;
+  gridSizeInput.value = gridSize;
+  gridPattern.setAttribute('width', gridSize);
+  gridPattern.setAttribute('height', gridSize);
+  gridPath.setAttribute('d', `M${gridSize} 0 L0 0 0 ${gridSize}`);
   document.getElementById('grid-bg').style.display = gridEnabled ? 'block' : 'none';
   gridToggle.addEventListener('change', e => {
     gridEnabled = e.target.checked;
     document.getElementById('grid-bg').style.display = gridEnabled ? 'block' : 'none';
+    render();
+  });
+  gridSizeInput.addEventListener('change', e => {
+    gridSize = Number(e.target.value) || 20;
+    gridPattern.setAttribute('width', gridSize);
+    gridPattern.setAttribute('height', gridSize);
+    gridPath.setAttribute('d', `M${gridSize} 0 L0 0 0 ${gridSize}`);
+    setItem('gridSize', gridSize);
     render();
   });
 
