@@ -74,6 +74,8 @@ Object.entries(componentMeta).forEach(([sub, meta]) => {
 });
 
 const svgNS = 'http://www.w3.org/2000/svg';
+let sheets = [];
+let activeSheet = 0;
 let components = [];
 let selection = [];
 let selected = null;
@@ -195,6 +197,17 @@ function nearestPorts(src, tgt) {
     });
   });
   return best;
+}
+
+function normalizeComponent(c) {
+  return {
+    ...c,
+    rotation: c.rotation ?? c.rot ?? 0,
+    flipped: c.flipped || false,
+    connections: (c.connections || []).map(conn =>
+      typeof conn === 'string' ? { target: conn } : conn
+    )
+  };
 }
 
 function render() {
@@ -440,13 +453,72 @@ function render() {
   });
 }
 
+function renderSheetTabs() {
+  const tabs = document.getElementById('sheet-tabs');
+  if (!tabs) return;
+  tabs.innerHTML = '';
+  sheets.forEach((s, i) => {
+    const tab = document.createElement('button');
+    tab.textContent = s.name || `Sheet ${i + 1}`;
+    tab.className = 'sheet-tab' + (i === activeSheet ? ' active' : '');
+    tab.addEventListener('click', () => loadSheet(i));
+    tabs.appendChild(tab);
+  });
+}
+
+function loadSheet(idx) {
+  if (idx < 0 || idx >= sheets.length) return;
+  save(false);
+  activeSheet = idx;
+  components = sheets[activeSheet].components;
+  history = [JSON.parse(JSON.stringify(components))];
+  historyIndex = 0;
+  selection = [];
+  selected = null;
+  selectedConnection = null;
+  renderSheetTabs();
+  render();
+}
+
+function addSheet() {
+  const name = prompt('Sheet name', `Sheet ${sheets.length + 1}`);
+  if (!name) return;
+  sheets.push({ name, components: [] });
+  loadSheet(sheets.length - 1);
+  save();
+}
+
+function renameSheet() {
+  const name = prompt('Sheet name', sheets[activeSheet].name);
+  if (!name) return;
+  sheets[activeSheet].name = name;
+  renderSheetTabs();
+  save();
+}
+
+function deleteSheet() {
+  if (sheets.length <= 1) return;
+  if (!confirm('Delete current sheet?')) return;
+  sheets.splice(activeSheet, 1);
+  activeSheet = Math.max(0, activeSheet - 1);
+  components = sheets[activeSheet].components;
+  renderSheetTabs();
+  render();
+  save();
+}
+
 function save(notify = true) {
-  const comps = components.map(c => ({
-    ...c,
-    rotation: c.rotation || 0,
-    flipped: !!c.flipped
+  const sheetData = sheets.map((s, i) => ({
+    name: s.name,
+    components: (i === activeSheet ? components : s.components).map(c => ({
+      ...c,
+      rotation: c.rotation || 0,
+      flipped: !!c.flipped
+    }))
   }));
-  setOneLine(comps);
+  sheets = sheetData;
+  components = sheets[activeSheet].components;
+  setOneLine(sheetData);
   syncSchedules(notify);
   validateDiagram();
 }
@@ -750,40 +822,49 @@ function chooseCable(source, target, existing = null) {
 }
 
 function init() {
-  components = getOneLine().map(c => ({
-    ...c,
-    rotation: c.rotation ?? c.rot ?? 0,
-    flipped: c.flipped || false,
-    connections: (c.connections || []).map(conn => typeof conn === 'string' ? { target: conn } : conn)
+  sheets = getOneLine().map((s, i) => ({
+    name: s.name || `Sheet ${i + 1}`,
+    components: (s.components || []).map(normalizeComponent)
   }));
-  components.forEach(c => {
-    if (!componentMeta[c.subtype]) {
-      const icon = typeIcons[c.type] || 'icons/equipment.svg';
-      componentMeta[c.subtype] = {
-        icon,
-        label: c.subtype,
-        category: c.type,
-        ports: [
-          { x: 0, y: 20 },
-          { x: 80, y: 20 }
-        ]
-      };
-      subtypeCategory[c.subtype] = c.type;
-      if (!componentTypes[c.type]) componentTypes[c.type] = [];
-      componentTypes[c.type].push(c.subtype);
-    }
-  });
-  components.forEach(c => {
-    (c.connections || []).forEach(conn => {
-      const target = components.find(t => t.id === conn.target);
-      if (target && (conn.sourcePort === undefined || conn.targetPort === undefined)) {
-        const [sp, tp] = nearestPorts(c, target);
-        conn.sourcePort = sp;
-        conn.targetPort = tp;
+  if (!sheets.length) sheets = [{ name: 'Sheet 1', components: [] }];
+
+  sheets.forEach(s => {
+    s.components.forEach(c => {
+      if (!componentMeta[c.subtype]) {
+        const icon = typeIcons[c.type] || 'icons/equipment.svg';
+        componentMeta[c.subtype] = {
+          icon,
+          label: c.subtype,
+          category: c.type,
+          ports: [
+            { x: 0, y: 20 },
+            { x: 80, y: 20 }
+          ]
+        };
+        subtypeCategory[c.subtype] = c.type;
+        if (!componentTypes[c.type]) componentTypes[c.type] = [];
+        componentTypes[c.type].push(c.subtype);
       }
     });
   });
-  pushHistory();
+  sheets.forEach(s => {
+    s.components.forEach(c => {
+      (c.connections || []).forEach(conn => {
+        const target = s.components.find(t => t.id === conn.target);
+        if (target && (conn.sourcePort === undefined || conn.targetPort === undefined)) {
+          const [sp, tp] = nearestPorts(c, target);
+          conn.sourcePort = sp;
+          conn.targetPort = tp;
+        }
+      });
+    });
+  });
+
+  activeSheet = 0;
+  components = sheets[0].components;
+  history = [JSON.parse(JSON.stringify(components))];
+  historyIndex = 0;
+  renderSheetTabs();
   render();
   syncSchedules(false);
   validateDiagram();
@@ -831,6 +912,9 @@ function init() {
   document.getElementById('export-btn').addEventListener('click', exportDiagram);
   document.getElementById('import-btn').addEventListener('click', () => document.getElementById('import-input').click());
   document.getElementById('import-input').addEventListener('change', importDiagram);
+  document.getElementById('add-sheet-btn').addEventListener('click', addSheet);
+  document.getElementById('rename-sheet-btn').addEventListener('click', renameSheet);
+  document.getElementById('delete-sheet-btn').addEventListener('click', deleteSheet);
   document.getElementById('validate-btn').addEventListener('click', () => {
     const issues = validateDiagram();
     const modal = document.getElementById('validation-modal');
@@ -1273,23 +1357,24 @@ function focusComponent(id) {
 }
 
 function syncSchedules(notify = true) {
-  const equipment = components
+  const all = sheets.flatMap(s => s.components);
+  const equipment = all
     .filter(c => getCategory(c) === 'equipment')
     .map(c => ({ id: c.ref || c.id, description: c.label }));
-  const panels = components
+  const panels = all
     .filter(c => getCategory(c) === 'panel')
     .map(c => ({ id: c.ref || c.id, description: c.label }));
-  const loads = components
+  const loads = all
     .filter(c => getCategory(c) === 'load')
     .map(c => ({ id: c.ref || c.id, description: c.label }));
   setEquipment(equipment);
   setPanels(panels);
   setLoads(loads);
   const cables = getCables();
-  components.forEach(c => {
+  all.forEach(c => {
     (c.connections || []).forEach(conn => {
       if (!conn.cable) return;
-      const target = components.find(t => t.id === conn.target);
+      const target = all.find(t => t.id === conn.target);
       const spec = { ...conn.cable, from_tag: c.ref || c.id, to_tag: target?.ref || conn.target };
       const idx = cables.findIndex(cb => cb.tag === spec.tag);
       if (idx >= 0) {
@@ -1305,11 +1390,40 @@ function syncSchedules(notify = true) {
 
 function exportDiagram() {
   save(false);
-  const data = components.map(c => ({
-    ...c,
-    rotation: c.rotation || 0,
-    flipped: !!c.flipped
-  }));
+  function extractSchedules(comps) {
+    const equipment = comps
+      .filter(c => getCategory(c) === 'equipment')
+      .map(c => ({ id: c.ref || c.id, description: c.label }));
+    const panels = comps
+      .filter(c => getCategory(c) === 'panel')
+      .map(c => ({ id: c.ref || c.id, description: c.label }));
+    const loads = comps
+      .filter(c => getCategory(c) === 'load')
+      .map(c => ({ id: c.ref || c.id, description: c.label }));
+    const cables = [];
+    comps.forEach(c => {
+      (c.connections || []).forEach(conn => {
+        if (!conn.cable) return;
+        const target = comps.find(t => t.id === conn.target);
+        cables.push({
+          ...conn.cable,
+          from_tag: c.ref || c.id,
+          to_tag: target?.ref || conn.target
+        });
+      });
+    });
+    return { equipment, panels, loads, cables };
+  }
+  const data = {
+    sheets: sheets.map(s => {
+      const comps = s.components.map(c => ({
+        ...c,
+        rotation: c.rotation || 0,
+        flipped: !!c.flipped
+      }));
+      return { name: s.name, components: comps, schedules: extractSchedules(comps) };
+    })
+  };
   const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' });
   const a = document.createElement('a');
   a.href = URL.createObjectURL(blob);
@@ -1324,18 +1438,19 @@ async function importDiagram(e) {
   const text = await file.text();
   try {
     const data = JSON.parse(text);
+    let imported = [];
     if (Array.isArray(data)) {
-      components = data.map(c => ({
-        ...c,
-        rotation: c.rotation ?? c.rot ?? 0,
-        flipped: c.flipped || false,
-        connections: (c.connections || []).map(conn => typeof conn === 'string' ? { target: conn } : conn)
+      imported = [{ name: 'Sheet 1', components: data }];
+    } else if (Array.isArray(data.sheets)) {
+      imported = data.sheets;
+    }
+    if (imported.length) {
+      sheets = imported.map((s, i) => ({
+        name: s.name || `Sheet ${i + 1}`,
+        components: (s.components || []).map(normalizeComponent)
       }));
-      pushHistory();
-      selection = [];
-      selected = null;
-      selectedConnection = null;
-      render();
+      loadSheet(0);
+      renderSheetTabs();
       save();
     }
   } catch (err) {
