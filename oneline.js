@@ -1799,14 +1799,26 @@ function focusComponent(id) {
 
 function syncSchedules(notify = true) {
   const all = sheets.flatMap(s => s.components);
-  const mapFields = c => ({
-    id: c.ref || c.id,
-    description: c.label,
-    manufacturer: c.manufacturer || '',
-    model: c.model || '',
-    phases: c.phases || '',
-    notes: c.notes || ''
-  });
+  const mapFields = c => {
+    const fields = {
+      id: c.ref || c.id,
+      description: c.label,
+      manufacturer: c.manufacturer ?? '',
+      model: c.model ?? '',
+      phases: c.phases ?? '',
+      notes: c.notes ?? '',
+      voltage: c.voltage ?? '',
+      category: getCategory(c),
+      subCategory: c.subtype ?? '',
+      x: c.x ?? '',
+      y: c.y ?? '',
+      z: c.z ?? ''
+    };
+    (propSchemas[c.subtype] || []).forEach(f => {
+      fields[f.name] = c[f.name] ?? fields[f.name] ?? '';
+    });
+    return fields;
+  };
   const equipment = all
     .filter(c => getCategory(c) === 'equipment')
     .map(mapFields);
@@ -1840,14 +1852,26 @@ function syncSchedules(notify = true) {
 function serializeState() {
   save(false);
   function extractSchedules(comps) {
-    const mapFields = c => ({
-      id: c.ref || c.id,
-      description: c.label,
-      manufacturer: c.manufacturer || '',
-      model: c.model || '',
-      phases: c.phases || '',
-      notes: c.notes || ''
-    });
+    const mapFields = c => {
+      const fields = {
+        id: c.ref || c.id,
+        description: c.label,
+        manufacturer: c.manufacturer ?? '',
+        model: c.model ?? '',
+        phases: c.phases ?? '',
+        notes: c.notes ?? '',
+        voltage: c.voltage ?? '',
+        category: getCategory(c),
+        subCategory: c.subtype ?? '',
+        x: c.x ?? '',
+        y: c.y ?? '',
+        z: c.z ?? ''
+      };
+      (propSchemas[c.subtype] || []).forEach(f => {
+        fields[f.name] = c[f.name] ?? fields[f.name] ?? '';
+      });
+      return fields;
+    };
     const equipment = comps
       .filter(c => getCategory(c) === 'equipment')
       .map(mapFields);
