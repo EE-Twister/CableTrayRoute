@@ -14,22 +14,25 @@ let componentTypes = {};
 let manufacturerDefaults = {};
 
 async function loadComponentLibrary() {
+  let data = [];
   try {
     const res = await fetch('componentLibrary.json');
-    const data = await res.json();
-    data.forEach(c => {
-      componentMeta[c.subtype] = {
-        icon: c.icon,
-        label: c.label,
-        category: c.category,
-        ports: c.ports
-      };
-      propSchemas[c.subtype] = c.schema || [];
-    });
-    rebuildComponentMaps();
+    data = await res.json();
   } catch (err) {
     console.error('Failed to load component library', err);
   }
+  const stored = getItem('componentLibrary', null);
+  if (stored) data = stored;
+  data.forEach(c => {
+    componentMeta[c.subtype] = {
+      icon: c.icon,
+      label: c.label,
+      category: c.category,
+      ports: c.ports
+    };
+    propSchemas[c.subtype] = c.schema || [];
+  });
+  rebuildComponentMaps();
 }
 
 async function loadManufacturerLibrary() {

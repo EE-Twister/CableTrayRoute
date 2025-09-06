@@ -1,0 +1,79 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Library Manager</title>
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+  <h1>Library Manager</h1>
+  <section>
+    <h2>Component Library</h2>
+    <textarea id="component-text" rows="20" cols="80"></textarea><br>
+    <button id="component-save">Save</button>
+    <button id="component-download">Download</button>
+  </section>
+  <section>
+    <h2>Manufacturer Library</h2>
+    <textarea id="manufacturer-text" rows="20" cols="80"></textarea><br>
+    <button id="manufacturer-save">Save</button>
+    <button id="manufacturer-download">Download</button>
+  </section>
+  <script type="module">
+    import { getItem, setItem } from './dataStore.mjs';
+
+    async function load() {
+      const compArea = document.getElementById('component-text');
+      const manufArea = document.getElementById('manufacturer-text');
+      try {
+        const res = await fetch('componentLibrary.json');
+        const data = await res.json();
+        const stored = getItem('componentLibrary', null);
+        compArea.value = JSON.stringify(stored || data, null, 2);
+      } catch {
+        compArea.value = '[]';
+      }
+      try {
+        const res2 = await fetch('manufacturerLibrary.json');
+        const data2 = await res2.json();
+        const stored2 = getItem('manufacturerDefaults', null);
+        manufArea.value = JSON.stringify(stored2 || data2, null, 2);
+      } catch {
+        manufArea.value = '{}';
+      }
+    }
+
+    function save(id, key) {
+      const area = document.getElementById(id);
+      try {
+        const json = JSON.parse(area.value);
+        setItem(key, json);
+        alert('Saved');
+      } catch {
+        alert('Invalid JSON');
+      }
+    }
+
+    function download(id, filename) {
+      const area = document.getElementById(id);
+      const blob = new Blob([area.value], { type: 'application/json' });
+      const a = document.createElement('a');
+      a.href = URL.createObjectURL(blob);
+      a.download = filename;
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      URL.revokeObjectURL(a.href);
+    }
+
+    document.getElementById('component-save').addEventListener('click', () => save('component-text', 'componentLibrary'));
+    document.getElementById('manufacturer-save').addEventListener('click', () => save('manufacturer-text', 'manufacturerDefaults'));
+    document.getElementById('component-download').addEventListener('click', () => download('component-text', 'componentLibrary.json'));
+    document.getElementById('manufacturer-download').addEventListener('click', () => download('manufacturer-text', 'manufacturerLibrary.json'));
+
+    load();
+  </script>
+</body>
+</html>
+
