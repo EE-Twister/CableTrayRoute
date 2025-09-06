@@ -1856,6 +1856,13 @@ async function init() {
     localStorage.setItem('onelineTourDone', 'true');
   }
 
+  const params = new URLSearchParams(window.location.search);
+  const focus = params.get('component');
+  if (focus) {
+    const comp = components.find(c => c.id === focus);
+    if (comp) selectComponent(comp);
+  }
+
   initSettings();
   initDarkMode();
   initCompactMode();
