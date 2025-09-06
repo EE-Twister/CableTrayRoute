@@ -84,6 +84,7 @@ let validationIssues = [];
 const compWidth = 80;
 const compHeight = 40;
 let templates = [];
+const DIAGRAM_VERSION = 1;
 let cursorPos = { x: 20, y: 20 };
 const lintPanel = document.getElementById('lint-panel');
 const lintList = document.getElementById('lint-list');
@@ -1211,10 +1212,22 @@ async function init() {
   document.getElementById('align-bottom-btn').addEventListener('click', () => alignSelection('bottom'));
   document.getElementById('distribute-h-btn').addEventListener('click', () => distributeSelection('h'));
   document.getElementById('distribute-v-btn').addEventListener('click', () => distributeSelection('v'));
-  document.getElementById('export-btn').addEventListener('click', exportDiagram);
-  document.getElementById('export-pdf-btn').addEventListener('click', exportPDF);
-  document.getElementById('import-btn').addEventListener('click', () => document.getElementById('import-input').click());
-  document.getElementById('import-input').addEventListener('change', importDiagram);
+  const exportBtn = document.getElementById('export-btn');
+  if (exportBtn) exportBtn.addEventListener('click', exportDiagram);
+  const exportPdfBtn = document.getElementById('export-pdf-btn');
+  if (exportPdfBtn) exportPdfBtn.addEventListener('click', exportPDF);
+  const importBtn = document.getElementById('import-btn');
+  if (importBtn) importBtn.addEventListener('click', () => document.getElementById('import-input').click());
+  const importInput = document.getElementById('import-input');
+  if (importInput) importInput.addEventListener('change', importDiagram);
+  const diagramExportBtn = document.getElementById('diagram-export-btn');
+  if (diagramExportBtn) diagramExportBtn.addEventListener('click', exportDiagram);
+  const diagramImportBtn = document.getElementById('diagram-import-btn');
+  if (diagramImportBtn) diagramImportBtn.addEventListener('click', () => document.getElementById('diagram-import-input').click());
+  const diagramImportInput = document.getElementById('diagram-import-input');
+  if (diagramImportInput) diagramImportInput.addEventListener('change', importDiagram);
+  const shareBtn = document.getElementById('diagram-share-btn');
+  if (shareBtn) shareBtn.addEventListener('click', shareDiagram);
   document.getElementById('add-sheet-btn').addEventListener('click', addSheet);
   document.getElementById('rename-sheet-btn').addEventListener('click', renameSheet);
   document.getElementById('delete-sheet-btn').addEventListener('click', deleteSheet);
@@ -1696,7 +1709,7 @@ function syncSchedules(notify = true) {
   if (notify) showToast('Schedules synced');
 }
 
-function exportDiagram() {
+function serializeState() {
   save(false);
   function extractSchedules(comps) {
     const mapFields = c => ({
@@ -1730,7 +1743,9 @@ function exportDiagram() {
     });
     return { equipment, panels, loads, cables };
   }
-  const data = {
+  return {
+    version: DIAGRAM_VERSION,
+    templates: templates.map(t => ({ ...t })),
     sheets: sheets.map(s => {
       const comps = s.components.map(c => ({
         ...c,
@@ -1740,12 +1755,50 @@ function exportDiagram() {
       return { name: s.name, components: comps, schedules: extractSchedules(comps) };
     })
   };
+}
+
+function exportDiagram() {
+  const data = serializeState();
   const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' });
   const a = document.createElement('a');
   a.href = URL.createObjectURL(blob);
   a.download = 'oneline.json';
   a.click();
   URL.revokeObjectURL(a.href);
+}
+
+async function shareDiagram() {
+  const token = prompt('GitHub token (only needed once)', getItem('gistToken', ''));
+  if (!token) return;
+  setItem('gistToken', token);
+  const body = {
+    public: true,
+    files: {
+      'oneline.json': {
+        content: JSON.stringify(serializeState(), null, 2)
+      }
+    }
+  };
+  try {
+    const res = await fetch('https://api.github.com/gists', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        Authorization: `token ${token}`
+      },
+      body: JSON.stringify(body)
+    });
+    if (res.ok) {
+      const data = await res.json();
+      await navigator.clipboard.writeText(data.html_url);
+      showToast('Share link copied to clipboard');
+    } else {
+      showToast('Failed to share diagram');
+    }
+  } catch (err) {
+    console.error('Share failed', err);
+    showToast('Share failed');
+  }
 }
 
 function serializeDiagram() {
@@ -1776,23 +1829,38 @@ async function exportPDF() {
   pdf.save('oneline.pdf');
 }
 
+function migrateDiagram(data) {
+  if (Array.isArray(data)) {
+    data = { version: 0, templates: [], sheets: [{ name: 'Sheet 1', components: data }] };
+  }
+  const version = data.version || 0;
+  let migrated = data;
+  if (version < 1) {
+    migrated = {
+      version: 1,
+      templates: data.templates || [],
+      sheets: data.sheets || []
+    };
+  }
+  migrated.version = DIAGRAM_VERSION;
+  return migrated;
+}
+
 async function importDiagram(e) {
   const file = e.target.files[0];
   if (!file) return;
   const text = await file.text();
   try {
-    const data = JSON.parse(text);
-    let imported = [];
-    if (Array.isArray(data)) {
-      imported = [{ name: 'Sheet 1', components: data }];
-    } else if (Array.isArray(data.sheets)) {
-      imported = data.sheets;
-    }
-    if (imported.length) {
-      sheets = imported.map((s, i) => ({
-        name: s.name || `Sheet ${i + 1}`,
-        components: (s.components || []).map(normalizeComponent)
-      }));
+    let data = JSON.parse(text);
+    data = migrateDiagram(data);
+    templates = data.templates || [];
+    saveTemplates();
+    renderTemplates();
+    sheets = (data.sheets || []).map((s, i) => ({
+      name: s.name || `Sheet ${i + 1}`,
+      components: (s.components || []).map(normalizeComponent)
+    }));
+    if (sheets.length) {
       loadSheet(0);
       renderSheetTabs();
       save();
