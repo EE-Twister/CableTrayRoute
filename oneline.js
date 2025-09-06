@@ -2,6 +2,7 @@ import { getOneLine, setOneLine, setEquipment, setPanels, setLoads, getCables, s
 import { runLoadFlow } from './analysis/loadFlow.js';
 import { runShortCircuit } from './analysis/shortCircuit.js';
 import { runArcFlash } from './analysis/arcFlash.js';
+import { sizeConductor } from './sizing.js';
 
 let componentMeta = {};
 
@@ -1216,6 +1217,38 @@ function chooseCable(source, target, existing = null) {
     colorLabel.appendChild(colorInput);
     form.appendChild(colorLabel);
 
+    const sizeBtn = document.createElement('button');
+    sizeBtn.type = 'button';
+    sizeBtn.textContent = 'Size Conductor';
+    sizeBtn.addEventListener('click', () => {
+      const load = {
+        current: parseFloat(target.current) || 0,
+        voltage: parseFloat(target.voltage) || parseFloat(source.voltage) || 0,
+        phases: parseInt(target.phases || source.phases || 3, 10)
+      };
+      const params = {
+        length: parseFloat(lengthInput.value) || 0,
+        material: materialInput.value || 'cu',
+        insulation_rating: parseFloat(target.insulation_rating) || 90,
+        ambient: parseFloat(source.ambient) || 30,
+        maxVoltageDrop: parseFloat(target.maxVoltageDrop) || 3
+      };
+      const res = sizeConductor(load, params);
+      if (res.size) {
+        sizeInput.value = res.size;
+        sizeInput.dataset.calcAmpacity = res.ampacity.toFixed(2);
+        sizeInput.dataset.voltageDrop = res.voltageDrop.toFixed(2);
+        sizeInput.dataset.sizingWarning = '';
+        alert(`Sized to ${res.size} AWG`);
+      } else {
+        sizeInput.dataset.calcAmpacity = '';
+        sizeInput.dataset.voltageDrop = '';
+        sizeInput.dataset.sizingWarning = res.violation;
+        alert(res.violation);
+      }
+    });
+    form.appendChild(sizeBtn);
+
     select.addEventListener('change', () => {
       const c = templates.find(t => t.tag === select.value);
       if (c) {
@@ -1236,6 +1269,9 @@ function chooseCable(source, target, existing = null) {
         insulationInput.value = '';
         lengthInput.value = '';
         colorInput.value = '#000000';
+        sizeInput.dataset.calcAmpacity = '';
+        sizeInput.dataset.voltageDrop = '';
+        sizeInput.dataset.sizingWarning = '';
       }
     });
 
@@ -1248,6 +1284,9 @@ function chooseCable(source, target, existing = null) {
       insulationInput.value = existing.insulation_type || '';
       lengthInput.value = existing.length || '';
       colorInput.value = existing.color || '#000000';
+      sizeInput.dataset.calcAmpacity = existing.calc_ampacity || '';
+      sizeInput.dataset.voltageDrop = existing.voltage_drop || '';
+      sizeInput.dataset.sizingWarning = existing.sizing_warning || '';
       if (templates.some(t => t.tag === existing.tag)) {
         select.value = existing.tag;
       }
@@ -1278,7 +1317,10 @@ function chooseCable(source, target, existing = null) {
         conductor_material: materialInput.value,
         insulation_type: insulationInput.value,
         length: lengthInput.value,
-        color: colorInput.value
+        color: colorInput.value,
+        calc_ampacity: sizeInput.dataset.calcAmpacity || '',
+        voltage_drop: sizeInput.dataset.voltageDrop || '',
+        sizing_warning: sizeInput.dataset.sizingWarning || ''
       };
       modal.classList.remove('show');
       resolve({ ...cable, from_tag: source.ref || source.id, to_tag: target.ref || target.id });
@@ -1853,6 +1895,15 @@ function validateDiagram() {
     if ((c.connections || []).length + (inbound.get(c.id) || 0) === 0) {
       validationIssues.push({ component: c.id, message: 'Unconnected component' });
     }
+  });
+
+  components.forEach(c => {
+    if (c.type === 'dimension') return;
+    (c.connections || []).forEach(conn => {
+      if (conn.cable && conn.cable.sizing_warning) {
+        validationIssues.push({ component: c.id, message: conn.cable.sizing_warning });
+      }
+    });
   });
 
   idMap.forEach((count, id) => {
