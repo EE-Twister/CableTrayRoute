@@ -1,5 +1,6 @@
 import "./units.js";
-import { exportProject, importProject } from "./dataStore.mjs";
+import { exportProject, importProject, getOneLine, getStudies } from "./dataStore.mjs";
+import { runValidation } from "./validation/rules.js";
 // fast-json-patch is loaded dynamically so the bundle does not expect a
 // build-time dependency. This avoids "index_mjs is not defined" errors in
 // the minified output when the raceway schedule loads sample data.
@@ -476,6 +477,10 @@ function initSettings(){
       const headers=['sample'];
       const rows=[{sample:'demo'}];
       downloadCSV(headers,rows,'reports.csv');
+      const issues=runValidation(getOneLine(),getStudies());
+      const vHeaders=['component','message'];
+      const vRows=issues.length?issues:[{component:'-',message:'No issues'}];
+      downloadCSV(vHeaders,vRows,'validation-report.csv');
     });
 
     const printLabelsBtn=document.createElement('button');

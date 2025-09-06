@@ -1,8 +1,9 @@
-import { getOneLine, setOneLine, setEquipment, setPanels, setLoads, getCables, setCables, getItem, setItem, getStudies, setStudies } from './dataStore.mjs';
+import { getOneLine, setOneLine, setEquipment, setPanels, setLoads, getCables, setCables, getItem, setItem, getStudies, setStudies, on } from './dataStore.mjs';
 import { runLoadFlow } from './analysis/loadFlow.js';
 import { runShortCircuit } from './analysis/shortCircuit.js';
 import { runArcFlash } from './analysis/arcFlash.js';
 import { sizeConductor } from './sizing.js';
+import { runValidation } from './validation/rules.js';
 
 let componentMeta = {};
 
@@ -102,6 +103,10 @@ const lintPanel = document.getElementById('lint-panel');
 const lintList = document.getElementById('lint-list');
 const lintCloseBtn = document.getElementById('lint-close-btn');
 if (lintCloseBtn) lintCloseBtn.addEventListener('click', () => lintPanel.classList.add('hidden'));
+
+// Re-run validation whenever diagram or study results change
+on('oneLineDiagram', validateDiagram);
+on('studyResults', validateDiagram);
 
 // Studies panel setup
 const studiesPanel = document.getElementById('studies-panel');
@@ -1915,6 +1920,9 @@ function validateDiagram() {
       });
     }
   });
+
+  // Run additional validation rules
+  validationIssues.push(...runValidation(components, getStudies()));
 
   const byComp = {};
   validationIssues.forEach(issue => {
