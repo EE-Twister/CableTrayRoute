@@ -3,7 +3,7 @@
   "version": "1.0.0",
   "scripts": {
     "build": "rollup -c",
-    "test": "node tests/ampacity.test.js && node tests/ductbankSolver.test.js && node tests/ieee835.test.js && node tests/tableUtilsNavigation.test.js && node tests/racewayRoute.test.js && node tests/rebuildTrayData.test.js && node tests/conduitCount.test.js && node tests/dirtyTracker.test.js && node tests/units.test.js && node tests/resultsExporter.test.js && node tests/sampleLinks.test.js && node tests/racewaySampleMapper.test.js && node tests/selfCheckRestore.test.js && node tests/equipmentColumns.test.js && node tests/equipmentPersistence.test.js && node tests/loadlistPersistence.test.js && node tests/reporting.test.js && node tests/arcFlash.test.js",
+    "test": "node tests/ampacity.test.js && node tests/ductbankSolver.test.js && node tests/ieee835.test.js && node tests/tableUtilsNavigation.test.js && node tests/racewayRoute.test.js && node tests/rebuildTrayData.test.js && node tests/conduitCount.test.js && node tests/dirtyTracker.test.js && node tests/units.test.js && node tests/resultsExporter.test.js && node tests/sampleLinks.test.js && node tests/racewaySampleMapper.test.js && node tests/selfCheckRestore.test.js && node tests/equipmentColumns.test.js && node tests/equipmentPersistence.test.js && node tests/loadlistPersistence.test.js && node tests/reporting.test.js && node tests/arcFlash.test.js && node tests/exportAllReports.test.js",
     "e2e": "playwright test"
   },
   "devDependencies": {
