@@ -7,6 +7,10 @@
     "ports": [{ "x": 0, "y": 20 }, { "x": 80, "y": 20 }],
     "schema": [
       { "name": "voltage", "label": "Voltage", "type": "number" },
+      { "name": "rating", "label": "Rating", "type": "select", "options": ["100A", "225A", "400A", "600A", "800A", "1200A"] },
+      { "name": "breaker_frame", "label": "Breaker Frame", "type": "select", "options": ["150A", "250A", "400A", "600A", "800A", "1200A"] },
+      { "name": "conductor_type", "label": "Conductor Type", "type": "select", "options": ["THHN", "XHHW", "RHW"] },
+      { "name": "cable_assembly", "label": "Cable Assembly", "type": "select", "options": ["Tray Cable", "MC Cable", "SER Cable"] },
       { "name": "manufacturer", "label": "Manufacturer", "type": "text" },
       { "name": "model", "label": "Model", "type": "text" },
       { "name": "phases", "label": "Phases", "type": "select", "options": ["1", "3"] },
@@ -21,6 +25,10 @@
     "ports": [{ "x": 0, "y": 20 }, { "x": 80, "y": 20 }],
     "schema": [
       { "name": "voltage", "label": "Voltage", "type": "number" },
+      { "name": "rating", "label": "Rating", "type": "select", "options": ["200A", "400A", "600A", "800A", "1200A"] },
+      { "name": "breaker_frame", "label": "Breaker Frame", "type": "select", "options": ["250A", "400A", "600A", "800A", "1200A"] },
+      { "name": "conductor_type", "label": "Conductor Type", "type": "select", "options": ["THHN", "XHHW", "RHW"] },
+      { "name": "cable_assembly", "label": "Cable Assembly", "type": "select", "options": ["Tray Cable", "MC Cable", "SER Cable"] },
       { "name": "manufacturer", "label": "Manufacturer", "type": "text" },
       { "name": "model", "label": "Model", "type": "text" },
       { "name": "phases", "label": "Phases", "type": "select", "options": ["1", "3"] },
@@ -36,6 +44,10 @@
     "schema": [
       { "name": "voltage", "label": "Voltage", "type": "number" },
       { "name": "kW", "label": "Power (kW)", "type": "number" },
+      { "name": "rating", "label": "Rating", "type": "select", "options": ["100kW", "250kW", "500kW", "750kW", "1000kW"] },
+      { "name": "breaker_frame", "label": "Breaker Frame", "type": "select", "options": ["250A", "400A", "600A", "800A", "1200A"] },
+      { "name": "conductor_type", "label": "Conductor Type", "type": "select", "options": ["THHN", "XHHW", "RHW"] },
+      { "name": "cable_assembly", "label": "Cable Assembly", "type": "select", "options": ["Tray Cable", "MC Cable", "SER Cable"] },
       { "name": "manufacturer", "label": "Manufacturer", "type": "text" },
       { "name": "model", "label": "Model", "type": "text" },
       { "name": "phases", "label": "Phases", "type": "select", "options": ["1", "3"] },
@@ -51,6 +63,10 @@
     "schema": [
       { "name": "voltage", "label": "Voltage", "type": "number" },
       { "name": "kVA", "label": "Capacity (kVA)", "type": "number" },
+      { "name": "rating", "label": "Rating", "type": "select", "options": ["50kVA", "100kVA", "200kVA", "500kVA", "1000kVA"] },
+      { "name": "breaker_frame", "label": "Breaker Frame", "type": "select", "options": ["250A", "400A", "600A", "800A", "1200A"] },
+      { "name": "conductor_type", "label": "Conductor Type", "type": "select", "options": ["THHN", "XHHW", "RHW"] },
+      { "name": "cable_assembly", "label": "Cable Assembly", "type": "select", "options": ["Tray Cable", "MC Cable", "SER Cable"] },
       { "name": "manufacturer", "label": "Manufacturer", "type": "text" },
       { "name": "model", "label": "Model", "type": "text" },
       { "name": "phases", "label": "Phases", "type": "select", "options": ["1", "3"] },
@@ -65,7 +81,10 @@
     "ports": [{ "x": 0, "y": 20 }, { "x": 80, "y": 20 }],
     "schema": [
       { "name": "voltage", "label": "Voltage", "type": "number" },
-      { "name": "rating", "label": "Rating", "type": "number" },
+      { "name": "rating", "label": "Rating", "type": "select", "options": ["45kVA", "75kVA", "112.5kVA", "150kVA", "225kVA", "300kVA"] },
+      { "name": "breaker_frame", "label": "Breaker Frame", "type": "select", "options": ["250A", "400A", "600A", "800A", "1200A"] },
+      { "name": "conductor_type", "label": "Conductor Type", "type": "select", "options": ["THHN", "XHHW", "RHW"] },
+      { "name": "cable_assembly", "label": "Cable Assembly", "type": "select", "options": ["Tray Cable", "MC Cable", "SER Cable"] },
       { "name": "manufacturer", "label": "Manufacturer", "type": "text" },
       { "name": "model", "label": "Model", "type": "text" },
       { "name": "phases", "label": "Phases", "type": "select", "options": ["1", "3"] },
@@ -80,6 +99,10 @@
     "ports": [{ "x": 0, "y": 20 }, { "x": 80, "y": 20 }],
     "schema": [
       { "name": "voltage", "label": "Voltage", "type": "number" },
+      { "name": "rating", "label": "Rating", "type": "select", "options": ["400A", "600A", "800A", "1200A", "2000A"] },
+      { "name": "breaker_frame", "label": "Breaker Frame", "type": "select", "options": ["400A", "600A", "800A", "1200A", "2000A"] },
+      { "name": "conductor_type", "label": "Conductor Type", "type": "select", "options": ["THHN", "XHHW", "RHW"] },
+      { "name": "cable_assembly", "label": "Cable Assembly", "type": "select", "options": ["Tray Cable", "MC Cable", "SER Cable"] },
       { "name": "manufacturer", "label": "Manufacturer", "type": "text" },
       { "name": "model", "label": "Model", "type": "text" },
       { "name": "phases", "label": "Phases", "type": "select", "options": ["1", "3"] },
@@ -94,6 +117,10 @@
     "ports": [{ "x": 0, "y": 20 }, { "x": 80, "y": 20 }],
     "schema": [
       { "name": "voltage", "label": "Voltage", "type": "number" },
+      { "name": "rating", "label": "Rating", "type": "select", "options": ["5HP", "10HP", "20HP", "50HP", "100HP"] },
+      { "name": "breaker_frame", "label": "Breaker Frame", "type": "select", "options": ["100A", "225A", "400A"] },
+      { "name": "conductor_type", "label": "Conductor Type", "type": "select", "options": ["THHN", "XHHW", "RHW"] },
+      { "name": "cable_assembly", "label": "Cable Assembly", "type": "select", "options": ["Tray Cable", "MC Cable", "SER Cable"] },
       { "name": "manufacturer", "label": "Manufacturer", "type": "text" },
       { "name": "model", "label": "Model", "type": "text" },
       { "name": "phases", "label": "Phases", "type": "select", "options": ["1", "3"] },
@@ -109,6 +136,10 @@
     "schema": [
       { "name": "voltage", "label": "Voltage", "type": "number" },
       { "name": "kVAR", "label": "Reactive Power (kVAR)", "type": "number" },
+      { "name": "rating", "label": "Rating", "type": "select", "options": ["25kVAR", "50kVAR", "75kVAR", "100kVAR"] },
+      { "name": "breaker_frame", "label": "Breaker Frame", "type": "select", "options": ["100A", "225A", "400A", "600A"] },
+      { "name": "conductor_type", "label": "Conductor Type", "type": "select", "options": ["THHN", "XHHW", "RHW"] },
+      { "name": "cable_assembly", "label": "Cable Assembly", "type": "select", "options": ["Tray Cable", "MC Cable", "SER Cable"] },
       { "name": "manufacturer", "label": "Manufacturer", "type": "text" },
       { "name": "model", "label": "Model", "type": "text" },
       { "name": "phases", "label": "Phases", "type": "select", "options": ["1", "3"] },
@@ -124,6 +155,10 @@
     "schema": [
       { "name": "voltage", "label": "Voltage", "type": "number" },
       { "name": "kW", "label": "Power (kW)", "type": "number" },
+      { "name": "rating", "label": "Rating", "type": "select", "options": ["25kW", "50kW", "75kW", "100kW"] },
+      { "name": "breaker_frame", "label": "Breaker Frame", "type": "select", "options": ["100A", "225A", "400A", "600A"] },
+      { "name": "conductor_type", "label": "Conductor Type", "type": "select", "options": ["THHN", "XHHW", "RHW"] },
+      { "name": "cable_assembly", "label": "Cable Assembly", "type": "select", "options": ["Tray Cable", "MC Cable", "SER Cable"] },
       { "name": "manufacturer", "label": "Manufacturer", "type": "text" },
       { "name": "model", "label": "Model", "type": "text" },
       { "name": "phases", "label": "Phases", "type": "select", "options": ["1", "3"] },
@@ -138,6 +173,10 @@
     "ports": [{ "x": 0, "y": 20 }, { "x": 80, "y": 20 }],
     "schema": [
       { "name": "voltage", "label": "Voltage", "type": "number" },
+      { "name": "rating", "label": "Rating", "type": "select", "options": ["5kW", "10kW", "20kW", "50kW"] },
+      { "name": "breaker_frame", "label": "Breaker Frame", "type": "select", "options": ["100A", "225A", "400A"] },
+      { "name": "conductor_type", "label": "Conductor Type", "type": "select", "options": ["THHN", "XHHW", "RHW"] },
+      { "name": "cable_assembly", "label": "Cable Assembly", "type": "select", "options": ["Tray Cable", "MC Cable", "SER Cable"] },
       { "name": "manufacturer", "label": "Manufacturer", "type": "text" },
       { "name": "model", "label": "Model", "type": "text" },
       { "name": "phases", "label": "Phases", "type": "select", "options": ["1", "3"] },
@@ -145,3 +184,4 @@
     ]
   }
 ]
+
