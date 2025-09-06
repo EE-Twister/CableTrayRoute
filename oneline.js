@@ -934,7 +934,17 @@ async function init() {
   validateDiagram();
 
   const palette = document.getElementById('component-buttons');
+  const sectionContainers = {
+    panel: document.getElementById('panel-buttons'),
+    equipment: document.getElementById('equipment-buttons'),
+    load: document.getElementById('load-buttons')
+  };
+  Object.entries(sectionContainers).forEach(([cat, container]) => {
+    const summary = container?.parentElement?.querySelector('summary');
+    if (summary) summary.textContent = cat.charAt(0).toUpperCase() + cat.slice(1);
+  });
   Object.entries(componentTypes).forEach(([type, subs]) => {
+    const container = sectionContainers[type] || palette;
     subs.forEach(sub => {
       const meta = componentMeta[sub];
       const btn = document.createElement('button');
@@ -943,7 +953,15 @@ async function init() {
       btn.title = meta.label;
       btn.innerHTML = `<img src="${meta.icon}" alt="" aria-hidden="true">`;
       btn.addEventListener('click', () => addComponent(sub));
-      palette.appendChild(btn);
+      container.appendChild(btn);
+    });
+  });
+  document.querySelectorAll('#component-buttons details').forEach(det => {
+    const key = `palette-${det.id}-open`;
+    const stored = localStorage.getItem(key);
+    if (stored !== null) det.open = stored === 'true';
+    det.addEventListener('toggle', () => {
+      localStorage.setItem(key, det.open);
     });
   });
   const paletteSearch = document.getElementById('palette-search');
