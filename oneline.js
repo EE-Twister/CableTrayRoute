@@ -1717,6 +1717,8 @@ async function init() {
   if (exportPdfBtn) exportPdfBtn.addEventListener('click', exportPDF);
   const exportDxfBtn = document.getElementById('export-dxf-btn');
   if (exportDxfBtn) exportDxfBtn.addEventListener('click', exportDXF);
+  const exportDwgBtn = document.getElementById('export-dwg-btn');
+  if (exportDwgBtn) exportDwgBtn.addEventListener('click', exportDWG);
   const importBtn = document.getElementById('import-btn');
   if (importBtn) importBtn.addEventListener('click', () => document.getElementById('import-input').click());
   const importInput = document.getElementById('import-input');
@@ -2483,6 +2485,19 @@ function exportDXF() {
   const a = document.createElement('a');
   a.href = URL.createObjectURL(blob);
   a.download = 'oneline.dxf';
+  a.click();
+  URL.revokeObjectURL(a.href);
+}
+
+function exportDWG() {
+  // Placeholder implementation reusing the DXF builder. For many CAD tools a
+  // simple DXF renamed with a .dwg extension is sufficient for quick sharing.
+  const comps = sheets[activeSheet]?.components || [];
+  const content = buildDXF(comps);
+  const blob = new Blob([content], { type: 'application/acad' });
+  const a = document.createElement('a');
+  a.href = URL.createObjectURL(blob);
+  a.download = 'oneline.dwg';
   a.click();
   URL.revokeObjectURL(a.href);
 }

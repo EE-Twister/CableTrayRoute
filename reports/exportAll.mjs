@@ -28,12 +28,21 @@ export function setBranding(opts = {}) {
  * Set a custom template. Accepts either a function `(ctx)=>string` or a simple
  * template string with `{{title}}` and `{{company}}` tokens.
  */
-export function setReportTemplate(tpl) {
-  if (typeof tpl === 'function') pdfTemplate = tpl;
-  else if (typeof tpl === 'string') {
-    pdfTemplate = ctx => tpl
-      .replace(/{{\s*title\s*}}/g, ctx.title || '')
-      .replace(/{{\s*company\s*}}/g, ctx.company || '');
+export async function setReportTemplate(tpl) {
+  if (typeof tpl === 'function') {
+    pdfTemplate = tpl;
+    return;
+  }
+  if (typeof tpl === 'string') {
+    try {
+      const Handlebars = (await import('handlebars')).default;
+      const compiled = Handlebars.compile(tpl);
+      pdfTemplate = ctx => compiled(ctx);
+    } catch {
+      pdfTemplate = ctx => tpl
+        .replace(/{{\s*title\s*}}/g, ctx.title || '')
+        .replace(/{{\s*company\s*}}/g, ctx.company || '');
+    }
   }
 }
 

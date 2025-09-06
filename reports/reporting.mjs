@@ -102,3 +102,36 @@ export function buildMotorStartRows(result = {}) {
   });
   return rows;
 }
+
+/**
+ * Render a Handlebars template into a PDF document using PDFKit. This is a
+ * lightweight helper intended for server-side or Node based generation of
+ * richer reports where jsPDF is not available. The function lazily imports the
+ * `handlebars` and `pdfkit` packages so they remain optional dependencies for
+ * environments that do not need template rendering.
+ *
+ * @param {string|Function} template - Handlebars template string or precompiled
+ *   function. When a string is provided it will be compiled with Handlebars.
+ * @param {Object} context - Data passed to the template.
+ * @returns {Promise<ArrayBuffer>} - Resolves with the generated PDF bytes.
+ */
+export async function renderTemplatePDF(template = '', context = {}) {
+  const [HandlebarsMod, PDFKitMod] = await Promise.all([
+    import('handlebars').catch(() => null),
+    import('pdfkit').catch(() => null)
+  ]);
+  if (!HandlebarsMod || !PDFKitMod) {
+    throw new Error('handlebars and pdfkit are required for template based PDF generation');
+  }
+  const Handlebars = HandlebarsMod.default || HandlebarsMod;
+  const PDFDocument = PDFKitMod.default || PDFKitMod;
+  const compile = typeof template === 'function' ? template : Handlebars.compile(template);
+  const doc = new PDFDocument();
+  const chunks = [];
+  doc.on('data', c => chunks.push(c));
+  doc.on('end', () => {});
+  doc.text(compile(context));
+  doc.end();
+  await new Promise(res => doc.on('end', res));
+  return Buffer.concat(chunks).buffer;
+}
