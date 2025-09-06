@@ -1,11 +1,51 @@
 import { getOneLine, setOneLine, setEquipment, setPanels, setLoads, getCables, setCables, getItem, setItem } from './dataStore.mjs';
 
 const componentMeta = {
-  MLO: { icon: 'icons/MLO.svg', label: 'MLO', category: 'panel' },
-  MCC: { icon: 'icons/MCC.svg', label: 'MCC', category: 'panel' },
-  Transformer: { icon: 'icons/Transformer.svg', label: 'Transformer', category: 'equipment' },
-  Switchgear: { icon: 'icons/Switchgear.svg', label: 'Switchgear', category: 'equipment' },
-  Load: { icon: 'icons/Load.svg', label: 'Load', category: 'load' }
+  MLO: {
+    icon: 'icons/MLO.svg',
+    label: 'MLO',
+    category: 'panel',
+    ports: [
+      { x: 0, y: 20 },
+      { x: 80, y: 20 }
+    ]
+  },
+  MCC: {
+    icon: 'icons/MCC.svg',
+    label: 'MCC',
+    category: 'panel',
+    ports: [
+      { x: 0, y: 20 },
+      { x: 80, y: 20 }
+    ]
+  },
+  Transformer: {
+    icon: 'icons/Transformer.svg',
+    label: 'Transformer',
+    category: 'equipment',
+    ports: [
+      { x: 0, y: 20 },
+      { x: 80, y: 20 }
+    ]
+  },
+  Switchgear: {
+    icon: 'icons/Switchgear.svg',
+    label: 'Switchgear',
+    category: 'equipment',
+    ports: [
+      { x: 0, y: 20 },
+      { x: 80, y: 20 }
+    ]
+  },
+  Load: {
+    icon: 'icons/Load.svg',
+    label: 'Load',
+    category: 'load',
+    ports: [
+      { x: 0, y: 20 },
+      { x: 80, y: 20 }
+    ]
+  }
 };
 
 const typeIcons = {
@@ -113,9 +153,52 @@ const cableColors = {
   Signal: '#0a0'
 };
 
+function portPosition(c, portIndex) {
+  const meta = componentMeta[c.subtype] || {};
+  const port = meta.ports?.[portIndex];
+  if (!port) {
+    return { x: c.x + compWidth / 2, y: c.y + compHeight / 2 };
+  }
+  let { x, y } = port;
+  if (c.flipped) x = compWidth - x;
+  let px = c.x + x;
+  let py = c.y + y;
+  const angle = (c.rotation || 0) * Math.PI / 180;
+  if (angle) {
+    const cx = c.x + compWidth / 2;
+    const cy = c.y + compHeight / 2;
+    const dx = px - cx;
+    const dy = py - cy;
+    px = cx + dx * Math.cos(angle) - dy * Math.sin(angle);
+    py = cy + dx * Math.sin(angle) + dy * Math.cos(angle);
+  }
+  return { x: px, y: py };
+}
+
+function nearestPorts(src, tgt) {
+  const srcPorts = componentMeta[src.subtype]?.ports || [{ x: compWidth / 2, y: compHeight / 2 }];
+  const tgtPorts = componentMeta[tgt.subtype]?.ports || [{ x: compWidth / 2, y: compHeight / 2 }];
+  let min = Infinity;
+  let best = [0, 0];
+  srcPorts.forEach((_, i) => {
+    tgtPorts.forEach((_, j) => {
+      const sp = portPosition(src, i);
+      const tp = portPosition(tgt, j);
+      const dx = sp.x - tp.x;
+      const dy = sp.y - tp.y;
+      const d = dx * dx + dy * dy;
+      if (d < min) {
+        min = d;
+        best = [i, j];
+      }
+    });
+  });
+  return best;
+}
+
 function render() {
   const svg = document.getElementById('diagram');
-  svg.querySelectorAll('g.component, .connection, .conn-label').forEach(el => el.remove());
+  svg.querySelectorAll('g.component, .connection, .conn-label, .port').forEach(el => el.remove());
   if (gridEnabled) {
     components.forEach(c => {
       c.x = Math.round(c.x / gridSize) * gridSize;
@@ -123,11 +206,9 @@ function render() {
     });
   }
 
-  const startFor = c => ({ x: c.x + compWidth / 2, y: c.y + compHeight / 2 });
-
-  function routeConnection(src, tgt) {
-    const start = startFor(src);
-    const end = startFor(tgt);
+  function routeConnection(src, tgt, conn) {
+    const start = portPosition(src, conn?.sourcePort);
+    const end = portPosition(tgt, conn?.targetPort);
 
     function horizontalFirst() {
       let midX = (start.x + end.x) / 2;
@@ -264,7 +345,7 @@ function render() {
     (c.connections || []).forEach((conn, idx) => {
       const target = components.find(t => t.id === conn.target);
       if (!target) return;
-      const pts = routeConnection(c, target);
+      const pts = routeConnection(c, target, conn);
       const poly = document.createElementNS(svgNS, 'polyline');
       poly.setAttribute('points', pts.map(p => `${p.x},${p.y}`).join(' '));
       const stroke = cableColors[conn.cable?.cable_type] || conn.cable?.color || '#000';
@@ -344,6 +425,17 @@ function render() {
     }
     g.appendChild(text);
     svg.appendChild(g);
+    if (connectMode) {
+      (meta.ports || []).forEach((p, idx) => {
+        const pos = portPosition(c, idx);
+        const circ = document.createElementNS(svgNS, 'circle');
+        circ.setAttribute('cx', pos.x);
+        circ.setAttribute('cy', pos.y);
+        circ.setAttribute('r', 3);
+        circ.classList.add('port');
+        svg.appendChild(circ);
+      });
+    }
   });
 }
 
@@ -665,11 +757,29 @@ function init() {
   components.forEach(c => {
     if (!componentMeta[c.subtype]) {
       const icon = typeIcons[c.type] || 'icons/equipment.svg';
-      componentMeta[c.subtype] = { icon, label: c.subtype, category: c.type };
+      componentMeta[c.subtype] = {
+        icon,
+        label: c.subtype,
+        category: c.type,
+        ports: [
+          { x: 0, y: 20 },
+          { x: 80, y: 20 }
+        ]
+      };
       subtypeCategory[c.subtype] = c.type;
       if (!componentTypes[c.type]) componentTypes[c.type] = [];
       componentTypes[c.type].push(c.subtype);
     }
+  });
+  components.forEach(c => {
+    (c.connections || []).forEach(conn => {
+      const target = components.find(t => t.id === conn.target);
+      if (target && (conn.sourcePort === undefined || conn.targetPort === undefined)) {
+        const [sp, tp] = nearestPorts(c, target);
+        conn.sourcePort = sp;
+        conn.targetPort = tp;
+      }
+    });
   });
   pushHistory();
   render();
@@ -814,7 +924,8 @@ function init() {
       } else if (connectSource !== comp) {
         const cable = await chooseCable(connectSource, comp);
         if (cable) {
-          connectSource.connections.push({ target: comp.id, cable });
+          const [sPort, tPort] = nearestPorts(connectSource, comp);
+          connectSource.connections.push({ target: comp.id, cable, sourcePort: sPort, targetPort: tPort });
           pushHistory();
           render();
           save();

@@ -73,6 +73,13 @@
   opacity: 1;
 }
 
+.port {
+  fill: #666;
+  stroke: #fff;
+  stroke-width: 1;
+  pointer-events: none;
+}
+
 #prop-modal {
   top: 10px;
   right: 10px;
