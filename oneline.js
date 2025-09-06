@@ -306,6 +306,12 @@ function render() {
     g.addEventListener('mouseenter', showTooltip);
     g.addEventListener('mousemove', moveTooltip);
     g.addEventListener('mouseleave', hideTooltip);
+    const cx = c.x + compWidth / 2;
+    const cy = c.y + compHeight / 2;
+    const transforms = [];
+    if (c.flipped) transforms.push(`translate(${cx}, ${cy}) scale(-1,1) translate(${-cx}, ${-cy})`);
+    if (c.rotation) transforms.push(`rotate(${c.rotation}, ${cx}, ${cy})`);
+    if (transforms.length) g.setAttribute('transform', transforms.join(' '));
     const use = document.createElementNS(svgNS, 'use');
     use.setAttribute('x', c.x);
     use.setAttribute('y', c.y);
@@ -318,11 +324,6 @@ function render() {
       href = '#icon-equipment';
     }
     use.setAttributeNS('http://www.w3.org/1999/xlink', 'href', href);
-    if (c.rot) {
-      const cx = c.x + compWidth / 2;
-      const cy = c.y + compHeight / 2;
-      use.setAttribute('transform', `rotate(${c.rot}, ${cx}, ${cy})`);
-    }
     const text = document.createElementNS(svgNS, 'text');
     text.setAttribute('x', c.x + compWidth / 2);
     text.setAttribute('y', c.y + compHeight + 15);
@@ -347,7 +348,12 @@ function render() {
 }
 
 function save(notify = true) {
-  setOneLine(components);
+  const comps = components.map(c => ({
+    ...c,
+    rotation: c.rotation || 0,
+    flipped: !!c.flipped
+  }));
+  setOneLine(comps);
   syncSchedules(notify);
 }
 
@@ -360,7 +366,18 @@ function addComponent(subtype) {
     x = Math.round(x / gridSize) * gridSize;
     y = Math.round(y / gridSize) * gridSize;
   }
-  components.push({ id, type: meta.category, subtype, x, y, label: meta.label, ref: '', connections: [] });
+  components.push({
+    id,
+    type: meta.category,
+    subtype,
+    x,
+    y,
+    label: meta.label,
+    ref: '',
+    rotation: 0,
+    flipped: false,
+    connections: []
+  });
   pushHistory();
   render();
   save();
@@ -641,6 +658,8 @@ function chooseCable(source, target, existing = null) {
 function init() {
   components = getOneLine().map(c => ({
     ...c,
+    rotation: c.rotation ?? c.rot ?? 0,
+    flipped: c.flipped || false,
     connections: (c.connections || []).map(conn => typeof conn === 'string' ? { target: conn } : conn)
   }));
   components.forEach(c => {
@@ -861,7 +880,7 @@ function init() {
       render();
       save();
     } else if (action === 'rotate' && contextTarget) {
-      contextTarget.rot = ((contextTarget.rot || 0) + 90) % 360;
+      contextTarget.rotation = ((contextTarget.rotation || 0) + 90) % 360;
       pushHistory();
       render();
       save();
@@ -982,6 +1001,19 @@ function init() {
         render();
         save();
       }
+    } else if (!mod && key === 'r') {
+      e.preventDefault();
+      const targets = selection.length ? selection : selected ? [selected] : [];
+      if (targets.length) {
+        if (e.shiftKey) {
+          targets.forEach(c => { c.flipped = !c.flipped; });
+        } else {
+          targets.forEach(c => { c.rotation = ((c.rotation || 0) + 90) % 360; });
+        }
+        pushHistory();
+        render();
+        save();
+      }
     }
   });
 
@@ -1036,7 +1068,12 @@ function syncSchedules(notify = true) {
 
 function exportDiagram() {
   save(false);
-  const blob = new Blob([JSON.stringify(components, null, 2)], { type: 'application/json' });
+  const data = components.map(c => ({
+    ...c,
+    rotation: c.rotation || 0,
+    flipped: !!c.flipped
+  }));
+  const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' });
   const a = document.createElement('a');
   a.href = URL.createObjectURL(blob);
   a.download = 'oneline.json';
@@ -1053,6 +1090,8 @@ async function importDiagram(e) {
     if (Array.isArray(data)) {
       components = data.map(c => ({
         ...c,
+        rotation: c.rotation ?? c.rot ?? 0,
+        flipped: c.flipped || false,
         connections: (c.connections || []).map(conn => typeof conn === 'string' ? { target: conn } : conn)
       }));
       pushHistory();
