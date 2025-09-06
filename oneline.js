@@ -126,6 +126,7 @@ const compHeight = 40;
 let templates = [];
 const DIAGRAM_VERSION = 2;
 let cursorPos = { x: 20, y: 20 };
+let showOverlays = true;
 const lintPanel = document.getElementById('lint-panel');
 const lintList = document.getElementById('lint-list');
 const lintCloseBtn = document.getElementById('lint-close-btn');
@@ -147,6 +148,15 @@ const runMSBtn = document.getElementById('run-motorstart-btn');
 const runRelBtn = document.getElementById('run-reliability-btn');
 const studyResultsEl = document.getElementById('study-results');
 const loadFlowResultsEl = document.getElementById('loadflow-results');
+const overlayToggle = document.getElementById('toggle-overlays');
+
+if (overlayToggle) {
+  showOverlays = overlayToggle.checked;
+  overlayToggle.addEventListener('change', () => {
+    showOverlays = overlayToggle.checked;
+    render();
+  });
+}
 
 function renderStudyResults() {
   if (!studyResultsEl) return;
@@ -188,6 +198,18 @@ if (runLFBtn) runLFBtn.addEventListener('click', () => {
       comp.voltage_angle = Number(r.Va.toFixed(4));
     }
   });
+  // store line loading results on connections
+  (res.lines || []).forEach(l => {
+    const src = diagram.find(c => c.id === l.from);
+    const conn = src?.connections?.find(c => c.target === l.to);
+    if (!conn) return;
+    if (l.phase) {
+      if (typeof conn.loading_kW !== 'object') conn.loading_kW = {};
+      conn.loading_kW[l.phase] = Number(l.P.toFixed(2));
+    } else {
+      conn.loading_kW = Number(l.P.toFixed(2));
+    }
+  });
   setOneLine(diagram);
   const studies = getStudies();
   studies.loadFlow = res;
@@ -195,6 +217,7 @@ if (runLFBtn) runLFBtn.addEventListener('click', () => {
   syncSchedules(false);
   renderStudyResults();
   renderLoadFlowResults(res);
+  render();
 });
 
 function renderLoadFlowResults(res) {
@@ -224,20 +247,39 @@ function renderLoadFlowResults(res) {
 }
 if (runSCBtn) runSCBtn.addEventListener('click', () => {
   const res = runShortCircuit();
+  const diagram = getOneLine();
+  diagram.forEach(c => {
+    c.shortCircuit = res[c.id];
+    (c.connections || []).forEach(conn => {
+      conn.faultKA = res[conn.target]?.threePhaseKA;
+    });
+  });
+  setOneLine(diagram);
   const studies = getStudies();
   studies.shortCircuit = res;
   setStudies(studies);
   renderStudyResults();
+  render();
 });
 if (runAFBtn) runAFBtn.addEventListener('click', () => {
   const sc = runShortCircuit();
   const af = runArcFlash();
+  const diagram = getOneLine();
+  diagram.forEach(c => {
+    c.shortCircuit = sc[c.id];
+    c.arcFlash = af[c.id];
+    (c.connections || []).forEach(conn => {
+      conn.faultKA = sc[conn.target]?.threePhaseKA;
+    });
+  });
+  setOneLine(diagram);
   const studies = getStudies();
   studies.shortCircuit = sc;
   studies.arcFlash = af;
   setStudies(studies);
   generateArcFlashReport(af);
   renderStudyResults();
+  render();
 });
 if (runHBtn) runHBtn.addEventListener('click', () => {
   const res = runHarmonics();
@@ -576,7 +618,26 @@ function updateLegend(ranges) {
       legend.appendChild(item);
     }
   });
-  legend.style.display = ranges.size ? 'block' : 'none';
+  if (showOverlays) {
+    const items = [
+      { color: '#4caf50', label: 'Voltage \u2264 5% dev' },
+      { color: '#ffeb3b', label: '5-10% dev' },
+      { color: '#f44336', label: '>10% dev' }
+    ];
+    items.forEach(i => {
+      const item = document.createElement('div');
+      item.className = 'legend-item';
+      const swatch = document.createElement('span');
+      swatch.className = 'legend-color';
+      swatch.style.background = i.color;
+      item.appendChild(swatch);
+      const lbl = document.createElement('span');
+      lbl.textContent = i.label;
+      item.appendChild(lbl);
+      legend.appendChild(item);
+    });
+  }
+  legend.style.display = ranges.size || showOverlays ? 'block' : 'none';
 }
 
 function portPosition(c, portIndex) {
@@ -851,7 +912,15 @@ function render() {
       label.setAttribute('text-anchor', 'middle');
       label.setAttribute('dominant-baseline', 'middle');
       label.setAttribute('fill', stroke);
-      label.textContent = conn.cable?.tag || conn.cable?.cable_type || '';
+      let lblText = conn.cable?.tag || conn.cable?.cable_type || '';
+      if (showOverlays) {
+        const val = conn.faultKA ?? conn.loading_kW;
+        if (val !== undefined) {
+          const unit = conn.faultKA != null ? 'kA' : 'kW';
+          lblText += ` ${Number(val).toFixed(2)} ${unit}`;
+        }
+      }
+      label.textContent = lblText;
       label.classList.add('conn-label');
       if (conn.cable?.sizing_warning) label.classList.add('sizing-violation');
       if (parseFloat(conn.cable?.voltage_drop_pct) > vdLimit) label.classList.add('voltage-exceed');
@@ -877,6 +946,22 @@ function render() {
     const h = c.height || compHeight;
     const cx = c.x + w / 2;
     const cy = c.y + h / 2;
+    if (showOverlays && c.voltage_mag !== undefined) {
+      const mags = typeof c.voltage_mag === 'object' ? Object.values(c.voltage_mag) : [c.voltage_mag];
+      const dev = Math.max(...mags.map(v => Math.abs(v - 1) * 100));
+      let color = '#4caf50';
+      if (dev > 10) color = '#f44336';
+      else if (dev > 5) color = '#ffeb3b';
+      const halo = document.createElementNS(svgNS, 'circle');
+      halo.setAttribute('cx', cx);
+      halo.setAttribute('cy', cy);
+      halo.setAttribute('r', Math.max(w, h) / 2 + 6);
+      halo.setAttribute('fill', 'none');
+      halo.setAttribute('stroke', color);
+      halo.setAttribute('stroke-width', 6);
+      halo.setAttribute('opacity', 0.5);
+      g.appendChild(halo);
+    }
     const transforms = [];
     if (c.flipped) transforms.push(`translate(${cx}, ${cy}) scale(-1,1) translate(${-cx}, ${-cy})`);
     if (c.rotation) transforms.push(`rotate(${c.rotation}, ${cx}, ${cy})`);
