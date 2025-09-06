@@ -7,6 +7,7 @@
   <title>One-Line Diagram</title>
   <link rel="icon" href="icons/favicon.svg" type="image/svg+xml">
   <link rel="stylesheet" href="style.css">
+  <link rel="stylesheet" href="oneline.css">
   <script type="module" src="dataStore.mjs" defer></script>
   <script type="module" src="oneline.js" defer></script>
 </head>
@@ -41,7 +42,7 @@
     <button id="help-btn" aria-expanded="false">Site Help</button>
     <button id="export-project-btn">Export Project</button>
     <button id="import-project-btn">Import Project</button>
-    <input type="file" id="import-project-input" accept=".ctr.json" style="display:none;">
+    <input type="file" id="import-project-input" accept=".ctr.json" class="hidden-input">
   </div>
   <div class="container">
     <main id="main-content" class="main-content">
@@ -50,7 +51,7 @@
         <p>Create and link components to schedules.</p>
       </header>
       <section class="card">
-        <div id="palette" class="palette" style="margin-bottom:10px;">
+        <div id="palette" class="palette">
           <div id="component-buttons"></div>
           <button id="connect-btn" class="icon-button" title="Connect" aria-label="Connect"><img src="icons/toolbar/connect.svg" alt=""></button>
           <button id="undo-btn" class="icon-button" title="Undo" aria-label="Undo"><img src="icons/toolbar/undo.svg" alt=""></button>
@@ -62,12 +63,12 @@
           <button id="distribute-h-btn" class="icon-button" title="Distribute Horizontal" aria-label="Distribute Horizontal"><img src="icons/toolbar/distribute-h.svg" alt=""></button>
           <button id="distribute-v-btn" class="icon-button" title="Distribute Vertical" aria-label="Distribute Vertical"><img src="icons/toolbar/distribute-v.svg" alt=""></button>
           <button id="export-btn" class="icon-button" title="Export" aria-label="Export"><img src="icons/toolbar/export.svg" alt=""></button>
-          <input type="file" id="import-input" accept=".json" style="display:none;">
+          <input type="file" id="import-input" accept=".json" class="hidden-input">
           <button id="import-btn" class="icon-button" title="Import" aria-label="Import"><img src="icons/toolbar/import.svg" alt=""></button>
-          <label style="margin-left:10px;"><input type="checkbox" id="grid-toggle" checked> Grid</label>
+          <label class="grid-label"><input type="checkbox" id="grid-toggle" checked> Grid</label>
         </div>
-        <div class="oneline-editor" style="position:relative;">
-          <svg id="diagram" width="800" height="600" style="border:1px solid #ccc;">
+        <div class="oneline-editor">
+          <svg id="diagram" width="800" height="600">
             <defs>
               <pattern id="grid" width="20" height="20" patternUnits="userSpaceOnUse">
                 <path d="M20 0 L0 0 0 20" fill="none" stroke="#ccc" stroke-width="0.5" />
@@ -78,8 +79,8 @@
             </defs>
             <rect id="grid-bg" width="100%" height="100%" fill="url(#grid)" />
           </svg>
-          <div id="prop-modal" class="prop-modal" style="position:absolute;top:10px;right:10px;background:#fff;padding:5px;border:1px solid #ccc;display:none;"></div>
-          <div id="cable-modal" class="prop-modal" style="position:absolute;top:50px;right:10px;background:#fff;padding:5px;border:1px solid #ccc;display:none;"></div>
+          <div id="prop-modal" class="prop-modal"></div>
+          <div id="cable-modal" class="prop-modal"></div>
           <ul id="context-menu" class="context-menu">
             <li data-action="edit" data-context="component">Edit Properties</li>
             <li data-action="delete" data-context="component">Delete</li>

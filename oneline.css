@@ -1,0 +1,90 @@
+:root {
+  --ol-font: 'Segoe UI', Arial, sans-serif;
+  --ol-spacing: 0.5rem;
+  --ol-card-bg: #fdfdfd;
+  --ol-border-color: #dcdcdc;
+  --ol-shadow: 0 2px 6px rgba(0,0,0,0.1);
+  --ol-radius: 8px;
+  --ol-hover-bg: rgba(0,0,0,0.05);
+}
+
+.card {
+  background: var(--ol-card-bg);
+  border: 1px solid var(--ol-border-color);
+  border-radius: var(--ol-radius);
+  box-shadow: var(--ol-shadow);
+}
+
+.palette {
+  display: flex;
+  align-items: center;
+  gap: var(--ol-spacing);
+  margin-bottom: var(--ol-spacing);
+  font-family: var(--ol-font);
+}
+
+.grid-label {
+  margin-left: var(--ol-spacing);
+}
+
+.hidden-input {
+  display: none;
+}
+
+.oneline-editor {
+  position: relative;
+}
+
+.oneline-editor #diagram {
+  border: 1px solid var(--ol-border-color);
+  border-radius: var(--ol-radius);
+}
+
+.palette .icon-button {
+  transition: transform 0.2s, background-color 0.2s;
+}
+
+.palette .icon-button:hover,
+.palette .icon-button:focus {
+  background-color: var(--ol-hover-bg);
+  transform: scale(1.05);
+}
+
+.prop-modal {
+  position: absolute;
+  background: var(--ol-card-bg);
+  padding: var(--ol-spacing);
+  border: 1px solid var(--ol-border-color);
+  border-radius: var(--ol-radius);
+  box-shadow: var(--ol-shadow);
+  opacity: 0;
+  display: none;
+  font-family: var(--ol-font);
+  transition: opacity 0.3s ease;
+}
+
+.prop-modal.show {
+  display: block;
+  opacity: 1;
+}
+
+#prop-modal {
+  top: 10px;
+  right: 10px;
+}
+
+#cable-modal {
+  top: 50px;
+  right: 10px;
+}
+
+@keyframes fadeIn {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+
+@media (prefers-reduced-motion: no-preference) {
+  .prop-modal.show {
+    animation: fadeIn 0.3s ease-out;
+  }
+}
