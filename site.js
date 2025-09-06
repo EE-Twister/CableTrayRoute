@@ -466,6 +466,32 @@ function initSettings(){
       const useDocx=confirm('Generate DOCX? Cancel for PDF');
       await generateTechnicalReport(useDocx?'docx':'pdf');
     });
+
+    const exportReportsBtn=document.createElement('button');
+    exportReportsBtn.id='export-reports-btn';
+    exportReportsBtn.textContent='Export Reports';
+    settingsMenu.appendChild(exportReportsBtn);
+    exportReportsBtn.addEventListener('click',async()=>{
+      const { downloadCSV } = await import('./reports/reporting.mjs');
+      const headers=['sample'];
+      const rows=[{sample:'demo'}];
+      downloadCSV(headers,rows,'reports.csv');
+    });
+
+    const printLabelsBtn=document.createElement('button');
+    printLabelsBtn.id='print-labels-btn';
+    printLabelsBtn.textContent='Print Labels';
+    settingsMenu.appendChild(printLabelsBtn);
+    printLabelsBtn.addEventListener('click',async()=>{
+      const { generateArcFlashLabel } = await import('./reports/labels.mjs');
+      const svg=generateArcFlashLabel({equipment:'Demo',incidentEnergy:'--',boundary:'--'});
+      const win=window.open('');
+      if(win){
+        win.document.write(svg);
+        win.document.close();
+        win.print();
+      }
+    });
   }
   const unitSelect=document.getElementById('unit-select');
   if(unitSelect){
