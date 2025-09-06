@@ -124,6 +124,13 @@
       { "name": "manufacturer", "label": "Manufacturer", "type": "text" },
       { "name": "model", "label": "Model", "type": "text" },
       { "name": "phases", "label": "Phases", "type": "select", "options": ["1", "3"] },
+      { "name": "inrushMultiple", "label": "Inrush Multiple", "type": "number" },
+      { "name": "thevenin_r", "label": "Thevenin R (Ω)", "type": "number" },
+      { "name": "thevenin_x", "label": "Thevenin X (Ω)", "type": "number" },
+      { "name": "inertia", "label": "Inertia (kg·m²)", "type": "number" },
+      { "name": "load_torque", "label": "Load Torque (N·m)", "type": "number" },
+      { "name": "harmonicSource", "label": "Harmonic Source", "type": "checkbox" },
+      { "name": "harmonics", "label": "Harmonics (n:%)", "type": "text" },
       { "name": "notes", "label": "Notes", "type": "textarea" }
     ]
   },
@@ -180,6 +187,14 @@
       { "name": "manufacturer", "label": "Manufacturer", "type": "text" },
       { "name": "model", "label": "Model", "type": "text" },
       { "name": "phases", "label": "Phases", "type": "select", "options": ["1", "3"] },
+      { "name": "motor", "label": "Motor", "type": "checkbox" },
+      { "name": "inrushMultiple", "label": "Inrush Multiple", "type": "number" },
+      { "name": "thevenin_r", "label": "Thevenin R (Ω)", "type": "number" },
+      { "name": "thevenin_x", "label": "Thevenin X (Ω)", "type": "number" },
+      { "name": "inertia", "label": "Inertia (kg·m²)", "type": "number" },
+      { "name": "load_torque", "label": "Load Torque (N·m)", "type": "number" },
+      { "name": "harmonicSource", "label": "Harmonic Source", "type": "checkbox" },
+      { "name": "harmonics", "label": "Harmonics (n:%)", "type": "text" },
       { "name": "notes", "label": "Notes", "type": "textarea" }
     ]
   }
