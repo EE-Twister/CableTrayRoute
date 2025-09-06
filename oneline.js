@@ -534,6 +534,17 @@ const cableColors = {
   Signal: '#0a0'
 };
 
+// Phase sequence colors used for connection rendering
+const phaseColors = {
+  A: '#f00',
+  B: '#00f',
+  C: '#0a0',
+  AB: '#800080',
+  BC: '#008080',
+  AC: '#ffa500',
+  ABC: '#555'
+};
+
 // Voltage range configuration used for coloring components and connections
 const voltageColors = [
   { max: 600, color: '#4caf50', label: '\u2264600V' },
@@ -815,7 +826,9 @@ function render() {
       poly.setAttribute('points', pts.map(p => `${p.x},${p.y}`).join(' '));
       const vRange = getVoltageRange(conn.voltage || conn.cable?.voltage || c.voltage || target.voltage);
       if (vRange) usedVoltageRanges.add(vRange);
-      const stroke = vRange?.color || cableColors[conn.cable?.cable_type] || conn.cable?.color || '#000';
+      const phaseKey = (conn.phases || []).join('');
+      const phaseColor = phaseColors[phaseKey];
+      const stroke = phaseColor || vRange?.color || cableColors[conn.cable?.cable_type] || conn.cable?.color || '#000';
       poly.setAttribute('stroke', stroke);
       poly.setAttribute('fill', 'none');
       poly.setAttribute('marker-end', 'url(#arrow)');
@@ -837,6 +850,7 @@ function render() {
       label.setAttribute('y', mid.y);
       label.setAttribute('text-anchor', 'middle');
       label.setAttribute('dominant-baseline', 'middle');
+      label.setAttribute('fill', stroke);
       label.textContent = conn.cable?.tag || conn.cable?.cable_type || '';
       label.classList.add('conn-label');
       if (conn.cable?.sizing_warning) label.classList.add('sizing-violation');
@@ -1207,9 +1221,11 @@ function selectComponent(comp) {
       edit.textContent = 'Edit';
       edit.addEventListener('click', async e => {
         e.stopPropagation();
-        const cable = await chooseCable(comp, target, conn.cable);
-        if (cable) {
-          conn.cable = cable;
+        const res = await chooseCable(comp, target, conn);
+        if (res) {
+          conn.cable = res.cable;
+          conn.phases = res.phases;
+          conn.conductors = res.conductors;
           pushHistory();
           render();
           save();
@@ -1311,7 +1327,7 @@ function selectComponent(comp) {
   modal.classList.add('show');
 }
 
-async function chooseCable(source, target, existing = null) {
+async function chooseCable(source, target, existingConn = null) {
   const templateData = [];
   try {
     const res = await fetch('cableTemplates.json');
@@ -1330,7 +1346,11 @@ async function chooseCable(source, target, existing = null) {
   components.forEach(c => {
     (c.connections || []).forEach(conn => {
       if (conn.cable && !seen.has(conn.cable.tag)) {
-        existingTemplates.push({ ...conn.cable });
+        existingTemplates.push({
+          ...conn.cable,
+          phases: (conn.phases || []).join(','),
+          conductors: conn.conductors || conn.cable?.conductors
+        });
         seen.add(conn.cable.tag);
       }
     });
@@ -1394,6 +1414,14 @@ async function chooseCable(source, target, existing = null) {
     conductorsInput.name = 'conductors';
     conductorsLabel.appendChild(conductorsInput);
     form.appendChild(conductorsLabel);
+
+    const phasesLabel = document.createElement('label');
+    phasesLabel.textContent = 'Phases ';
+    const phasesInput = document.createElement('input');
+    phasesInput.name = 'phases';
+    phasesInput.placeholder = 'A,B,C';
+    phasesLabel.appendChild(phasesInput);
+    form.appendChild(phasesLabel);
 
     const sizeLabel = document.createElement('label');
     sizeLabel.textContent = 'Conductor Size ';
@@ -1504,6 +1532,7 @@ async function chooseCable(source, target, existing = null) {
         tagInput.value = c.tag || '';
         typeInput.value = c.cable_type || '';
         conductorsInput.value = c.conductors || '';
+        phasesInput.value = c.phases || '';
         sizeInput.value = c.conductor_size || '';
         materialInput.value = c.conductor_material || '';
         insulationInput.value = c.insulation_type || '';
@@ -1515,6 +1544,7 @@ async function chooseCable(source, target, existing = null) {
         tagInput.value = '';
         typeInput.value = '';
         conductorsInput.value = '';
+        phasesInput.value = '';
         sizeInput.value = '';
         materialInput.value = '';
         insulationInput.value = '';
@@ -1531,10 +1561,14 @@ async function chooseCable(source, target, existing = null) {
       }
     });
 
-    if (existing) {
+    if (existingConn) {
+      const existing = existingConn.cable || existingConn;
       tagInput.value = existing.tag || '';
       typeInput.value = existing.cable_type || '';
-      conductorsInput.value = existing.conductors || '';
+      conductorsInput.value = existingConn.conductors || existing.conductors || '';
+      phasesInput.value = Array.isArray(existingConn.phases)
+        ? existingConn.phases.join(',')
+        : existing.phases || '';
       sizeInput.value = existing.conductor_size || '';
       materialInput.value = existing.conductor_material || '';
       insulationInput.value = existing.insulation_type || '';
@@ -1570,10 +1604,15 @@ async function chooseCable(source, target, existing = null) {
 
     form.addEventListener('submit', e => {
       e.preventDefault();
+      const phases = phasesInput.value
+        .split(',')
+        .map(p => p.trim().toUpperCase())
+        .filter(Boolean);
+      const conductors = conductorsInput.value;
       const cable = {
         tag: tagInput.value,
         cable_type: typeInput.value,
-        conductors: conductorsInput.value,
+        conductors,
         conductor_size: sizeInput.value,
         conductor_material: materialInput.value,
         insulation_type: insulationInput.value,
@@ -1581,6 +1620,7 @@ async function chooseCable(source, target, existing = null) {
         install_method: installInput.value,
         length: lengthInput.value,
         color: colorInput.value,
+        phases: phases.length,
         calc_ampacity: sizeInput.dataset.calcAmpacity || '',
         voltage_drop_pct: sizeInput.dataset.voltageDrop || '',
         sizing_warning: sizeInput.dataset.sizingWarning || '',
@@ -1588,7 +1628,11 @@ async function chooseCable(source, target, existing = null) {
         sizing_report: sizeInput.dataset.sizingReport || ''
       };
       modal.classList.remove('show');
-      resolve({ ...cable, from_tag: source.ref || source.id, to_tag: target.ref || target.id });
+      resolve({
+        cable: { ...cable, from_tag: source.ref || source.id, to_tag: target.ref || target.id },
+        phases,
+        conductors
+      });
     });
 
     modal.appendChild(form);
@@ -1885,10 +1929,17 @@ async function init() {
       if (!connectSource) {
         connectSource = comp;
       } else if (connectSource !== comp) {
-        const cable = await chooseCable(connectSource, comp);
-        if (cable) {
+        const res = await chooseCable(connectSource, comp);
+        if (res) {
           const [sPort, tPort] = nearestPorts(connectSource, comp);
-          connectSource.connections.push({ target: comp.id, cable, sourcePort: sPort, targetPort: tPort });
+          connectSource.connections.push({
+            target: comp.id,
+            cable: res.cable,
+            phases: res.phases,
+            conductors: res.conductors,
+            sourcePort: sPort,
+            targetPort: tPort
+          });
           pushHistory();
           render();
           save();
@@ -2151,6 +2202,24 @@ function validateDiagram() {
     inbound.set(c.id, 0);
   });
 
+  function phaseSet(val) {
+    if (Array.isArray(val)) return val.map(p => String(p).toUpperCase());
+    if (typeof val === 'number') {
+      if (val === 3) return ['A', 'B', 'C'];
+      if (val === 2) return ['A', 'B'];
+      if (val === 1) return ['A'];
+      return [];
+    }
+    if (typeof val === 'string') {
+      if (/^\d+$/.test(val.trim())) return phaseSet(parseInt(val, 10));
+      return val
+        .split(/[\s,]+/)
+        .map(p => p.trim().toUpperCase())
+        .filter(Boolean);
+    }
+    return [];
+  }
+
   components.forEach(c => {
     if (c.type === 'dimension') return;
     (c.connections || []).forEach(conn => {
@@ -2165,6 +2234,34 @@ function validateDiagram() {
           component: target.id,
           message: `Voltage mismatch with ${c.label || c.subtype || c.id}`
         });
+      }
+      if (target) {
+        const srcPh = phaseSet(c.phases);
+        const tgtPh = phaseSet(target.phases);
+        const connPh = conn.phases ? phaseSet(conn.phases) : null;
+        if (connPh && connPh.length) {
+          if (srcPh.length && !connPh.every(p => srcPh.includes(p))) {
+            validationIssues.push({
+              component: c.id,
+              message: `Phase mismatch with ${target.label || target.subtype || target.id}`
+            });
+          }
+          if (tgtPh.length && !connPh.every(p => tgtPh.includes(p))) {
+            validationIssues.push({
+              component: target.id,
+              message: `Phase mismatch with ${c.label || c.subtype || c.id}`
+            });
+          }
+        } else if (srcPh.length && tgtPh.length && !tgtPh.every(p => srcPh.includes(p))) {
+          validationIssues.push({
+            component: c.id,
+            message: `Phase mismatch with ${target.label || target.subtype || target.id}`
+          });
+          validationIssues.push({
+            component: target.id,
+            message: `Phase mismatch with ${c.label || c.subtype || c.id}`
+          });
+        }
       }
     });
   });
@@ -2276,6 +2373,10 @@ function updateComponent(id, fields = {}) {
 function syncSchedules(notify = true) {
   const all = sheets.flatMap(s => s.components);
   const mapFields = c => {
+    const src = all.find(s => (s.connections || []).some(conn => conn.target === c.id));
+    const conn = src ? (src.connections || []).find(cc => cc.target === c.id) : null;
+    const connPhases = conn?.phases ? conn.phases.join(',') : c.phases ?? '';
+    const connConductors = conn?.conductors || conn?.cable?.conductors || '';
     const fields = {
       id: c.ref || c.id,
       ref: c.id,
@@ -2285,7 +2386,8 @@ function syncSchedules(notify = true) {
       voltage_class: c.voltage_class ?? '',
       enclosure: c.enclosure ?? '',
       thermal_rating: c.thermal_rating ?? '',
-      phases: c.phases ?? '',
+      phases: connPhases,
+      conductors: connConductors,
       notes: c.notes ?? '',
       voltage: c.voltage ?? '',
       voltage_mag: typeof c.voltage_mag === 'number' ? c.voltage_mag : '',
@@ -2327,11 +2429,17 @@ function syncSchedules(notify = true) {
     (c.connections || []).forEach(conn => {
       if (!conn.cable) return;
       const target = all.find(t => t.id === conn.target);
-      const spec = { ...conn.cable, from_tag: c.ref || c.id, to_tag: target?.ref || conn.target };
+      const spec = {
+        ...conn.cable,
+        phases: conn.phases ? conn.phases.join(',') : conn.cable.phases,
+        conductors: conn.conductors || conn.cable.conductors,
+        from_tag: c.ref || c.id,
+        to_tag: target?.ref || conn.target
+      };
       const load = {
         current: parseFloat(target?.current) || 0,
         voltage: parseFloat(target?.voltage) || parseFloat(c.voltage) || 0,
-        phases: parseInt(target?.phases || c.phases || 3, 10)
+        phases: conn.phases ? conn.phases.length : parseInt(target?.phases || c.phases || 3, 10)
       };
       const params = {
         length: parseFloat(spec.length) || 0,
@@ -2355,7 +2463,9 @@ function syncSchedules(notify = true) {
         code_reference: spec.code_reference,
         sizing_report: spec.sizing_report,
         ambient_temp: spec.ambient_temp,
-        install_method: spec.install_method
+        install_method: spec.install_method,
+        phases: spec.phases,
+        conductors: spec.conductors
       });
       const idx = cables.findIndex(cb => cb.tag === spec.tag);
       if (idx >= 0) {
@@ -2373,28 +2483,33 @@ function serializeState() {
   save(false);
   function extractSchedules(comps) {
     const mapFields = c => {
+      const src = comps.find(s => (s.connections || []).some(conn => conn.target === c.id));
+      const conn = src ? (src.connections || []).find(cc => cc.target === c.id) : null;
+      const connPhases = conn?.phases ? conn.phases.join(',') : c.phases ?? '';
+      const connConductors = conn?.conductors || conn?.cable?.conductors || '';
       const fields = {
         id: c.ref || c.id,
         ref: c.id,
         description: c.label,
         manufacturer: c.manufacturer ?? '',
         model: c.model ?? '',
-      phases: c.phases ?? '',
-      notes: c.notes ?? '',
-      voltage: c.voltage ?? '',
-      voltage_mag: typeof c.voltage_mag === 'number' ? c.voltage_mag : '',
-      voltage_angle: typeof c.voltage_angle === 'number' ? c.voltage_angle : '',
-      voltage_mag_a: c.voltage_mag?.A ?? c.voltage_mag?.a ?? '',
-      voltage_mag_b: c.voltage_mag?.B ?? c.voltage_mag?.b ?? '',
-      voltage_mag_c: c.voltage_mag?.C ?? c.voltage_mag?.c ?? '',
-      voltage_angle_a: c.voltage_angle?.A ?? c.voltage_angle?.a ?? '',
-      voltage_angle_b: c.voltage_angle?.B ?? c.voltage_angle?.b ?? '',
-      voltage_angle_c: c.voltage_angle?.C ?? c.voltage_angle?.c ?? '',
-      category: getCategory(c),
-      subCategory: c.subtype ?? '',
-      x: c.x ?? '',
-      y: c.y ?? '',
-      z: c.z ?? ''
+        phases: connPhases,
+        conductors: connConductors,
+        notes: c.notes ?? '',
+        voltage: c.voltage ?? '',
+        voltage_mag: typeof c.voltage_mag === 'number' ? c.voltage_mag : '',
+        voltage_angle: typeof c.voltage_angle === 'number' ? c.voltage_angle : '',
+        voltage_mag_a: c.voltage_mag?.A ?? c.voltage_mag?.a ?? '',
+        voltage_mag_b: c.voltage_mag?.B ?? c.voltage_mag?.b ?? '',
+        voltage_mag_c: c.voltage_mag?.C ?? c.voltage_mag?.c ?? '',
+        voltage_angle_a: c.voltage_angle?.A ?? c.voltage_angle?.a ?? '',
+        voltage_angle_b: c.voltage_angle?.B ?? c.voltage_angle?.b ?? '',
+        voltage_angle_c: c.voltage_angle?.C ?? c.voltage_angle?.c ?? '',
+        category: getCategory(c),
+        subCategory: c.subtype ?? '',
+        x: c.x ?? '',
+        y: c.y ?? '',
+        z: c.z ?? ''
       };
       (propSchemas[c.subtype] || []).forEach(f => {
         fields[f.name] = c[f.name] ?? fields[f.name] ?? '';
@@ -2420,6 +2535,8 @@ function serializeState() {
         const target = comps.find(t => t.id === conn.target);
         cables.push({
           ...conn.cable,
+          phases: conn.phases ? conn.phases.join(',') : conn.cable.phases,
+          conductors: conn.conductors || conn.cable.conductors,
           from_tag: c.ref || c.id,
           to_tag: target?.ref || conn.target
         });
