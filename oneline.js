@@ -2,6 +2,8 @@ import { getOneLine, setOneLine, setEquipment, setPanels, setLoads, getCables, s
 import { runLoadFlow } from './analysis/loadFlow.js';
 import { runShortCircuit } from './analysis/shortCircuit.js';
 import { runArcFlash } from './analysis/arcFlash.js';
+import { runHarmonics } from './analysis/harmonics.js';
+import { runMotorStart } from './analysis/motorStart.js';
 import { generateArcFlashReport } from './reports/arcFlashReport.mjs';
 import { sizeConductor } from './sizing.js';
 import { runValidation } from './validation/rules.js';
@@ -116,6 +118,8 @@ const studiesCloseBtn = document.getElementById('studies-close-btn');
 const runLFBtn = document.getElementById('run-loadflow-btn');
 const runSCBtn = document.getElementById('run-shortcircuit-btn');
 const runAFBtn = document.getElementById('run-arcflash-btn');
+const runHBtn = document.getElementById('run-harmonics-btn');
+const runMSBtn = document.getElementById('run-motorstart-btn');
 const studyResultsEl = document.getElementById('study-results');
 
 function renderStudyResults() {
@@ -170,6 +174,22 @@ if (runAFBtn) runAFBtn.addEventListener('click', () => {
   setStudies(studies);
   generateArcFlashReport(af);
   renderStudyResults();
+});
+if (runHBtn) runHBtn.addEventListener('click', () => {
+  const res = runHarmonics();
+  const studies = getStudies();
+  studies.harmonics = res;
+  setStudies(studies);
+  renderStudyResults();
+  window.open('harmonics.html', '_blank');
+});
+if (runMSBtn) runMSBtn.addEventListener('click', () => {
+  const res = runMotorStart();
+  const studies = getStudies();
+  studies.motorStart = res;
+  setStudies(studies);
+  renderStudyResults();
+  window.open('motorStart.html', '_blank');
 });
 
 // Guided tour steps
@@ -1001,6 +1021,10 @@ function selectComponent(comp) {
     } else if (f.type === 'textarea') {
       input = document.createElement('textarea');
       input.value = curVal;
+    } else if (f.type === 'checkbox') {
+      input = document.createElement('input');
+      input.type = 'checkbox';
+      input.checked = !!curVal;
     } else {
       input = document.createElement('input');
       input.type = f.type || 'text';
@@ -1089,7 +1113,8 @@ function selectComponent(comp) {
       flipped: !!comp.flipped
     };
     [...baseFields, ...schema].forEach(f => {
-      data[f.name] = fd.get(f.name) || '';
+      const v = fd.get(f.name);
+      data[f.name] = f.type === 'checkbox' ? v === 'on' : (v || '');
     });
     data.tccId = fd.get('tccId') || '';
     templates.push({ name, component: data });
@@ -1129,7 +1154,8 @@ function selectComponent(comp) {
     e.preventDefault();
     const fd = new FormData(form);
     [...baseFields, ...schema].forEach(f => {
-      comp[f.name] = fd.get(f.name) || '';
+      const v = fd.get(f.name);
+      comp[f.name] = f.type === 'checkbox' ? v === 'on' : (v || '');
     });
     comp.tccId = fd.get('tccId') || '';
     pushHistory();
