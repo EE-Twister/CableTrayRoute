@@ -96,6 +96,49 @@ const lintList = document.getElementById('lint-list');
 const lintCloseBtn = document.getElementById('lint-close-btn');
 if (lintCloseBtn) lintCloseBtn.addEventListener('click', () => lintPanel.classList.add('hidden'));
 
+// Guided tour steps
+const tourSteps = [
+  { element: '#component-buttons', text: 'Add components from the palette.' },
+  { element: '#connect-btn', text: 'Connect components using this button then selecting two components.' },
+  { element: '#diagram', text: 'Select a component to edit its properties.' },
+  { element: '#export-btn', text: 'Use Export to download your diagram.' }
+];
+let tourIndex = 0;
+let tourOverlay = null;
+
+function showTourStep() {
+  const step = tourSteps[tourIndex];
+  tourOverlay.querySelector('#tour-text').textContent = step.text;
+  document.querySelectorAll('.tour-highlight').forEach(el => el.classList.remove('tour-highlight'));
+  const el = document.querySelector(step.element);
+  if (el) el.classList.add('tour-highlight');
+  const next = tourOverlay.querySelector('#tour-next');
+  next.textContent = tourIndex === tourSteps.length - 1 ? 'Finish' : 'Next';
+}
+
+function endTour() {
+  document.querySelectorAll('.tour-highlight').forEach(el => el.classList.remove('tour-highlight'));
+  tourOverlay?.remove();
+  tourOverlay = null;
+}
+
+function startTour() {
+  tourIndex = 0;
+  tourOverlay = document.createElement('div');
+  tourOverlay.className = 'tour-overlay';
+  tourOverlay.innerHTML = `<div class="tour-modal"><p id="tour-text"></p><button id="tour-next">Next</button></div>`;
+  document.body.appendChild(tourOverlay);
+  tourOverlay.querySelector('#tour-next').addEventListener('click', () => {
+    tourIndex++;
+    if (tourIndex >= tourSteps.length) {
+      endTour();
+    } else {
+      showTourStep();
+    }
+  });
+  showTourStep();
+}
+
 // Prefix settings and counters for component labels
 let labelPrefixes = getItem('labelPrefixes', {});
 let labelCounters = getItem('labelCounters', {});
@@ -1606,6 +1649,16 @@ async function init() {
       }
     }
   });
+
+  const tourBtn = document.getElementById('tour-btn');
+  if (tourBtn) tourBtn.addEventListener('click', () => {
+    startTour();
+    localStorage.setItem('onelineTourDone', 'true');
+  });
+  if (!localStorage.getItem('onelineTourDone')) {
+    startTour();
+    localStorage.setItem('onelineTourDone', 'true');
+  }
 
   initSettings();
   initDarkMode();
