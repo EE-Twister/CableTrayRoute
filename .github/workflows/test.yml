@@ -21,4 +21,4 @@ jobs:
       - name: Run tests
         run: |
           node test.js
-          for test in tests/*.js; do node "$test"; done
+          npm test
