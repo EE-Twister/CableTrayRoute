@@ -1101,6 +1101,43 @@ function chooseCable(source, target, existing = null) {
     typeLabel.appendChild(typeInput);
     form.appendChild(typeLabel);
 
+    const conductorsLabel = document.createElement('label');
+    conductorsLabel.textContent = 'Conductors ';
+    const conductorsInput = document.createElement('input');
+    conductorsInput.type = 'number';
+    conductorsInput.name = 'conductors';
+    conductorsLabel.appendChild(conductorsInput);
+    form.appendChild(conductorsLabel);
+
+    const sizeLabel = document.createElement('label');
+    sizeLabel.textContent = 'Conductor Size ';
+    const sizeInput = document.createElement('input');
+    sizeInput.name = 'conductor_size';
+    sizeLabel.appendChild(sizeInput);
+    form.appendChild(sizeLabel);
+
+    const materialLabel = document.createElement('label');
+    materialLabel.textContent = 'Conductor Material ';
+    const materialInput = document.createElement('input');
+    materialInput.name = 'conductor_material';
+    materialLabel.appendChild(materialInput);
+    form.appendChild(materialLabel);
+
+    const insulationLabel = document.createElement('label');
+    insulationLabel.textContent = 'Insulation Type ';
+    const insulationInput = document.createElement('input');
+    insulationInput.name = 'insulation_type';
+    insulationLabel.appendChild(insulationInput);
+    form.appendChild(insulationLabel);
+
+    const lengthLabel = document.createElement('label');
+    lengthLabel.textContent = 'Length (ft) ';
+    const lengthInput = document.createElement('input');
+    lengthInput.type = 'number';
+    lengthInput.name = 'length';
+    lengthLabel.appendChild(lengthInput);
+    form.appendChild(lengthLabel);
+
     const colorLabel = document.createElement('label');
     colorLabel.textContent = 'Color ';
     const colorInput = document.createElement('input');
@@ -1114,10 +1151,20 @@ function chooseCable(source, target, existing = null) {
       if (c) {
         tagInput.value = c.tag || '';
         typeInput.value = c.cable_type || '';
+        conductorsInput.value = c.conductors || '';
+        sizeInput.value = c.conductor_size || '';
+        materialInput.value = c.conductor_material || '';
+        insulationInput.value = c.insulation_type || '';
+        lengthInput.value = c.length || '';
         colorInput.value = c.color || '#000000';
       } else {
         tagInput.value = '';
         typeInput.value = '';
+        conductorsInput.value = '';
+        sizeInput.value = '';
+        materialInput.value = '';
+        insulationInput.value = '';
+        lengthInput.value = '';
         colorInput.value = '#000000';
       }
     });
@@ -1125,6 +1172,11 @@ function chooseCable(source, target, existing = null) {
     if (existing) {
       tagInput.value = existing.tag || '';
       typeInput.value = existing.cable_type || '';
+      conductorsInput.value = existing.conductors || '';
+      sizeInput.value = existing.conductor_size || '';
+      materialInput.value = existing.conductor_material || '';
+      insulationInput.value = existing.insulation_type || '';
+      lengthInput.value = existing.length || '';
       colorInput.value = existing.color || '#000000';
       if (templates.some(t => t.tag === existing.tag)) {
         select.value = existing.tag;
@@ -1151,6 +1203,11 @@ function chooseCable(source, target, existing = null) {
       const cable = {
         tag: tagInput.value,
         cable_type: typeInput.value,
+        conductors: conductorsInput.value,
+        conductor_size: sizeInput.value,
+        conductor_material: materialInput.value,
+        insulation_type: insulationInput.value,
+        length: lengthInput.value,
         color: colorInput.value
       };
       modal.classList.remove('show');
