@@ -1,0 +1,86 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Component Library</title>
+  <link rel="stylesheet" href="../style.css">
+</head>
+<body>
+  <a href="#main-content" class="skip-link">Skip to main content</a>
+  <nav class="top-nav">
+    <button id="nav-toggle" class="nav-toggle" aria-label="Toggle navigation" aria-controls="nav-links" aria-expanded="false">☰</button>
+    <div id="nav-links" class="nav-links">
+      <a href="../index.html">Home</a>
+      <a href="../cableschedule.html">Cable Schedule</a>
+      <a href="../racewayschedule.html">Raceway Schedule</a>
+      <a href="../ductbankroute.html">Ductbank</a>
+      <a href="../cabletrayfill.html">Tray Fill</a>
+      <a href="../conduitfill.html">Conduit Fill</a>
+      <a href="../optimalRoute.html">Optimal Route</a>
+      <a href="index.html" class="active" aria-current="page">Docs</a>
+    </div>
+  </nav>
+  <header class="hero">
+    <h1>Component Library</h1>
+    <p>Define components for the one-line palette.</p>
+  </header>
+<div class="doc-content">
+  <nav id="doc-nav" class="doc-nav"></nav>
+  <main id="main-content" class="doc-main">
+    <p>The one-line editor loads component definitions from <code>componentLibrary.json</code>. Each object in this array describes a subtype available in the palette.</p>
+<pre><code>[{
+  "subtype": "MLO",
+  "label": "MLO",
+  "icon": "icons/MLO.svg",
+  "category": "panel",
+  "ports": [{ "x": 0, "y": 20 }, { "x": 80, "y": 20 }],
+  "schema": [
+    { "name": "voltage", "label": "Voltage", "type": "number" }
+  ]
+}]</code></pre>
+    <p>Fields:</p>
+    <ul>
+      <li><code>subtype</code> – unique identifier for the component.</li>
+      <li><code>label</code> – text shown in the palette.</li>
+      <li><code>icon</code> – path to an SVG icon.</li>
+      <li><code>category</code> – group for palette organization (e.g. <code>panel</code>, <code>equipment</code>, <code>load</code>).</li>
+      <li><code>ports</code> – connection points relative to the component width and height.</li>
+      <li><code>schema</code> – array of property descriptors with <code>name</code>, <code>label</code>, and <code>type</code>.</li>
+    </ul>
+    <p>Add new components by appending objects to the JSON array and providing corresponding icons. The application reloads the file at startup, so no JavaScript changes are required.</p>
+  </main>
+</div>
+  <footer class="site-footer">
+    <div class="footer-left">
+      <img src="../icons/route.svg" alt="CableTrayRoute logo" class="footer-logo">
+      <span>CableTrayRoute</span>
+    </div>
+    <nav class="footer-links">
+      <a href="../README.md">README</a>
+      <a href="quickstart.html">Quick Start</a>
+      <a href="index.html">Docs</a>
+      <a href="mailto:contact@example.com">Contact</a>
+    </nav>
+  </footer>
+  <script src="docs.js"></script>
+  <script>
+    document.addEventListener('DOMContentLoaded', () => {
+      const toggle = document.getElementById('nav-toggle');
+      const navLinks = document.getElementById(toggle.getAttribute('aria-controls'));
+      function closeMenu() {
+        toggle.setAttribute('aria-expanded', 'false');
+        navLinks.classList.remove('open');
+      }
+      toggle.addEventListener('click', () => {
+        const expanded = toggle.getAttribute('aria-expanded') === 'true';
+        toggle.setAttribute('aria-expanded', String(!expanded));
+        navLinks.classList.toggle('open', !expanded);
+      });
+      document.addEventListener('keydown', e => {
+        if (e.key === 'Escape') closeMenu();
+      });
+    });
+  </script>
+</body>
+</html>

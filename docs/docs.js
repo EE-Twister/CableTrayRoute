@@ -16,6 +16,7 @@ const DOC_NAV = [
       { href: "templates.html", title: "CSV/XLSX Templates" },
       { href: "geometry-fields.html", title: "Geometry Fields" },
       { href: "tray_id_convention.html", title: "Tray ID Convention" },
+      { href: "componentLibrary.html", title: "Component Library" },
     ],
   },
   {

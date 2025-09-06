@@ -1,97 +1,6 @@
 import { getOneLine, setOneLine, setEquipment, setPanels, setLoads, getCables, setCables, getItem, setItem } from './dataStore.mjs';
 
-const componentMeta = {
-  MLO: {
-    icon: 'icons/MLO.svg',
-    label: 'MLO',
-    category: 'panel',
-    ports: [
-      { x: 0, y: 20 },
-      { x: 80, y: 20 }
-    ]
-  },
-  MCC: {
-    icon: 'icons/MCC.svg',
-    label: 'MCC',
-    category: 'panel',
-    ports: [
-      { x: 0, y: 20 },
-      { x: 80, y: 20 }
-    ]
-  },
-  Generator: {
-    icon: 'icons/Generator.svg',
-    label: 'Generator',
-    category: 'equipment',
-    ports: [
-      { x: 0, y: 20 },
-      { x: 80, y: 20 }
-    ]
-  },
-  UPS: {
-    icon: 'icons/UPS.svg',
-    label: 'UPS',
-    category: 'equipment',
-    ports: [
-      { x: 0, y: 20 },
-      { x: 80, y: 20 }
-    ]
-  },
-  Transformer: {
-    icon: 'icons/Transformer.svg',
-    label: 'Transformer',
-    category: 'equipment',
-    ports: [
-      { x: 0, y: 20 },
-      { x: 80, y: 20 }
-    ]
-  },
-  Switchgear: {
-    icon: 'icons/Switchgear.svg',
-    label: 'Switchgear',
-    category: 'equipment',
-    ports: [
-      { x: 0, y: 20 },
-      { x: 80, y: 20 }
-    ]
-  },
-  Motor: {
-    icon: 'icons/Motor.svg',
-    label: 'Motor',
-    category: 'load',
-    ports: [
-      { x: 0, y: 20 },
-      { x: 80, y: 20 }
-    ]
-  },
-  CapacitorBank: {
-    icon: 'icons/CapacitorBank.svg',
-    label: 'Capacitor Bank',
-    category: 'equipment',
-    ports: [
-      { x: 0, y: 20 },
-      { x: 80, y: 20 }
-    ]
-  },
-  PVArray: {
-    icon: 'icons/PVArray.svg',
-    label: 'PV Array',
-    category: 'equipment',
-    ports: [
-      { x: 0, y: 20 },
-      { x: 80, y: 20 }
-    ]
-  },
-  Load: {
-    icon: 'icons/Load.svg',
-    label: 'Load',
-    category: 'load',
-    ports: [
-      { x: 0, y: 20 },
-      { x: 80, y: 20 }
-    ]
-  }
-};
+let componentMeta = {};
 
 const typeIcons = {
   panel: 'icons/panel.svg',
@@ -99,44 +8,38 @@ const typeIcons = {
   load: 'icons/load.svg'
 };
 
-const propSchemas = {
-  Transformer: [
-    { name: 'voltage', label: 'Voltage', type: 'number' },
-    { name: 'rating', label: 'Rating', type: 'number' }
-  ],
-  Switchgear: [{ name: 'voltage', label: 'Voltage', type: 'number' }],
-  Load: [{ name: 'voltage', label: 'Voltage', type: 'number' }],
-  MLO: [{ name: 'voltage', label: 'Voltage', type: 'number' }],
-  MCC: [{ name: 'voltage', label: 'Voltage', type: 'number' }],
-  Generator: [
-    { name: 'voltage', label: 'Voltage', type: 'number' },
-    { name: 'kW', label: 'Power (kW)', type: 'number' }
-  ],
-  UPS: [
-    { name: 'voltage', label: 'Voltage', type: 'number' },
-    { name: 'kVA', label: 'Capacity (kVA)', type: 'number' }
-  ],
-  Motor: [
-    { name: 'voltage', label: 'Voltage', type: 'number' },
-    { name: 'phases', label: 'Phases', type: 'number' }
-  ],
-  CapacitorBank: [
-    { name: 'voltage', label: 'Voltage', type: 'number' },
-    { name: 'kVAR', label: 'Reactive Power (kVAR)', type: 'number' }
-  ],
-  PVArray: [
-    { name: 'voltage', label: 'Voltage', type: 'number' },
-    { name: 'kW', label: 'Power (kW)', type: 'number' }
-  ]
-};
+let propSchemas = {};
+let subtypeCategory = {};
+let componentTypes = {};
 
-const subtypeCategory = {};
-const componentTypes = {};
-Object.entries(componentMeta).forEach(([sub, meta]) => {
-  subtypeCategory[sub] = meta.category;
-  if (!componentTypes[meta.category]) componentTypes[meta.category] = [];
-  componentTypes[meta.category].push(sub);
-});
+async function loadComponentLibrary() {
+  try {
+    const res = await fetch('componentLibrary.json');
+    const data = await res.json();
+    data.forEach(c => {
+      componentMeta[c.subtype] = {
+        icon: c.icon,
+        label: c.label,
+        category: c.category,
+        ports: c.ports
+      };
+      propSchemas[c.subtype] = c.schema || [];
+    });
+    rebuildComponentMaps();
+  } catch (err) {
+    console.error('Failed to load component library', err);
+  }
+}
+
+function rebuildComponentMaps() {
+  subtypeCategory = {};
+  componentTypes = {};
+  Object.entries(componentMeta).forEach(([sub, meta]) => {
+    subtypeCategory[sub] = meta.category;
+    if (!componentTypes[meta.category]) componentTypes[meta.category] = [];
+    componentTypes[meta.category].push(sub);
+  });
+}
 
 const svgNS = 'http://www.w3.org/2000/svg';
 let sheets = [];
@@ -983,7 +886,8 @@ function chooseCable(source, target, existing = null) {
   });
 }
 
-function init() {
+async function init() {
+  await loadComponentLibrary();
   sheets = getOneLine().map((s, i) => ({
     name: s.name || `Sheet ${i + 1}`,
     components: (s.components || []).map(normalizeComponent)
@@ -1003,12 +907,10 @@ function init() {
             { x: 80, y: 20 }
           ]
         };
-        subtypeCategory[c.subtype] = c.type;
-        if (!componentTypes[c.type]) componentTypes[c.type] = [];
-        componentTypes[c.type].push(c.subtype);
       }
     });
   });
+  rebuildComponentMaps();
   sheets.forEach(s => {
     s.components.forEach(c => {
       (c.connections || []).forEach(conn => {
