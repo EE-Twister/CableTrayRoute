@@ -33,8 +33,10 @@ export function runShortCircuit() {
   const comps = Array.isArray(sheets[0]?.components)
     ? sheets.flatMap(s => s.components)
     : sheets;
+  let buses = comps.filter(c => c.subtype === 'Bus');
+  if (buses.length === 0) buses = comps;
   const results = {};
-  comps.forEach(comp => {
+  buses.forEach(comp => {
     const base = comp.impedance || { r: 0, x: 0 };
     let z1 = comp.z1 || base;
     let z2 = comp.z2 || z1;
@@ -47,7 +49,7 @@ export function runShortCircuit() {
       z2 = parallel(z2, s2);
       z0 = parallel(z0, s0);
     });
-    const V = (comp.kV || 1) / Math.sqrt(3); // phase voltage in kV
+    const V = (comp.baseKV || comp.kV || 1) / Math.sqrt(3); // phase voltage in kV
     const I3 = V / mag(z1);
     const ILG = (3 * V) / mag(add(add(z1, z2), z0));
     const ILL = (Math.sqrt(3) * V) / mag(add(z1, z2));

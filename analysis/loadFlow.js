@@ -239,10 +239,13 @@ export function runLoadFlow(opts = {}) {
   const comps = Array.isArray(sheets[0]?.components)
     ? sheets.flatMap(s => s.components || [])
     : sheets;
+  let busComps = comps.filter(c => c.subtype === 'Bus');
+  if (busComps.length === 0) busComps = comps;
+  const busIds = busComps.map(b => b.id);
   const phases = balanced ? ['balanced'] : ['A', 'B', 'C'];
   const phaseResults = {};
   phases.forEach(phase => {
-    const buses = comps.map((c, idx) => {
+    const buses = busComps.map((c, idx) => {
       const load = c.load || {};
       const phaseLoad = balanced ? load : load[phase.toLowerCase()] || {};
       const shunt = balanced ? c.shunt : c.shunt?.[phase];
@@ -258,6 +261,7 @@ export function runLoadFlow(opts = {}) {
         Qg: c.generation?.kvar || 0,
         shunt,
         connections: (c.connections || []).filter(conn => {
+          if (!busIds.includes(conn.target)) return false;
           if (balanced) return true;
           return !conn.phases || conn.phases.includes(phase);
         }).map(conn => ({
