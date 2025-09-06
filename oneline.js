@@ -1256,7 +1256,9 @@ function chooseCable(source, target, existing = null) {
         material: materialInput.value || 'cu',
         insulation_rating: parseFloat(target.insulation_rating) || 90,
         ambient: parseFloat(source.ambient) || 30,
-        maxVoltageDrop: parseFloat(target.maxVoltageDrop) || 3
+        maxVoltageDrop: parseFloat(target.maxVoltageDrop) || 3,
+        conductors: parseInt(conductorsInput.value) || 1,
+        code: target.code || 'NEC'
       };
       const res = sizeConductor(load, params);
       if (res.size) {
@@ -1264,11 +1266,17 @@ function chooseCable(source, target, existing = null) {
         sizeInput.dataset.calcAmpacity = res.ampacity.toFixed(2);
         sizeInput.dataset.voltageDrop = res.voltageDrop.toFixed(2);
         sizeInput.dataset.sizingWarning = '';
-        alert(`Sized to ${res.size} AWG`);
+        sizeInput.dataset.codeRef = res.codeRef;
+        sizeInput.dataset.sizingReport = JSON.stringify(res.report || {});
+        sizeInput.classList.remove('sizing-violation');
+        alert(`Sized to ${res.size}`);
       } else {
         sizeInput.dataset.calcAmpacity = '';
         sizeInput.dataset.voltageDrop = '';
         sizeInput.dataset.sizingWarning = res.violation;
+        sizeInput.dataset.codeRef = res.codeRef || '';
+        sizeInput.dataset.sizingReport = JSON.stringify(res.report || {});
+        sizeInput.classList.add('sizing-violation');
         alert(res.violation);
       }
     });
@@ -1297,6 +1305,9 @@ function chooseCable(source, target, existing = null) {
         sizeInput.dataset.calcAmpacity = '';
         sizeInput.dataset.voltageDrop = '';
         sizeInput.dataset.sizingWarning = '';
+        sizeInput.dataset.codeRef = '';
+        sizeInput.dataset.sizingReport = '';
+        sizeInput.classList.remove('sizing-violation');
       }
     });
 
@@ -1310,8 +1321,11 @@ function chooseCable(source, target, existing = null) {
       lengthInput.value = existing.length || '';
       colorInput.value = existing.color || '#000000';
       sizeInput.dataset.calcAmpacity = existing.calc_ampacity || '';
-      sizeInput.dataset.voltageDrop = existing.voltage_drop || '';
+      sizeInput.dataset.voltageDrop = existing.voltage_drop_pct || existing.voltage_drop || '';
       sizeInput.dataset.sizingWarning = existing.sizing_warning || '';
+      sizeInput.dataset.codeRef = existing.code_reference || '';
+      sizeInput.dataset.sizingReport = existing.sizing_report || '';
+      if (existing.sizing_warning) sizeInput.classList.add('sizing-violation');
       if (templates.some(t => t.tag === existing.tag)) {
         select.value = existing.tag;
       }
@@ -1344,8 +1358,10 @@ function chooseCable(source, target, existing = null) {
         length: lengthInput.value,
         color: colorInput.value,
         calc_ampacity: sizeInput.dataset.calcAmpacity || '',
-        voltage_drop: sizeInput.dataset.voltageDrop || '',
-        sizing_warning: sizeInput.dataset.sizingWarning || ''
+        voltage_drop_pct: sizeInput.dataset.voltageDrop || '',
+        sizing_warning: sizeInput.dataset.sizingWarning || '',
+        code_reference: sizeInput.dataset.codeRef || '',
+        sizing_report: sizeInput.dataset.sizingReport || ''
       };
       modal.classList.remove('show');
       resolve({ ...cable, from_tag: source.ref || source.id, to_tag: target.ref || target.id });
