@@ -19,6 +19,24 @@ const componentMeta = {
       { x: 80, y: 20 }
     ]
   },
+  Generator: {
+    icon: 'icons/Generator.svg',
+    label: 'Generator',
+    category: 'equipment',
+    ports: [
+      { x: 0, y: 20 },
+      { x: 80, y: 20 }
+    ]
+  },
+  UPS: {
+    icon: 'icons/UPS.svg',
+    label: 'UPS',
+    category: 'equipment',
+    ports: [
+      { x: 0, y: 20 },
+      { x: 80, y: 20 }
+    ]
+  },
   Transformer: {
     icon: 'icons/Transformer.svg',
     label: 'Transformer',
@@ -31,6 +49,33 @@ const componentMeta = {
   Switchgear: {
     icon: 'icons/Switchgear.svg',
     label: 'Switchgear',
+    category: 'equipment',
+    ports: [
+      { x: 0, y: 20 },
+      { x: 80, y: 20 }
+    ]
+  },
+  Motor: {
+    icon: 'icons/Motor.svg',
+    label: 'Motor',
+    category: 'load',
+    ports: [
+      { x: 0, y: 20 },
+      { x: 80, y: 20 }
+    ]
+  },
+  CapacitorBank: {
+    icon: 'icons/CapacitorBank.svg',
+    label: 'Capacitor Bank',
+    category: 'equipment',
+    ports: [
+      { x: 0, y: 20 },
+      { x: 80, y: 20 }
+    ]
+  },
+  PVArray: {
+    icon: 'icons/PVArray.svg',
+    label: 'PV Array',
     category: 'equipment',
     ports: [
       { x: 0, y: 20 },
@@ -62,7 +107,27 @@ const propSchemas = {
   Switchgear: [{ name: 'voltage', label: 'Voltage', type: 'number' }],
   Load: [{ name: 'voltage', label: 'Voltage', type: 'number' }],
   MLO: [{ name: 'voltage', label: 'Voltage', type: 'number' }],
-  MCC: [{ name: 'voltage', label: 'Voltage', type: 'number' }]
+  MCC: [{ name: 'voltage', label: 'Voltage', type: 'number' }],
+  Generator: [
+    { name: 'voltage', label: 'Voltage', type: 'number' },
+    { name: 'kW', label: 'Power (kW)', type: 'number' }
+  ],
+  UPS: [
+    { name: 'voltage', label: 'Voltage', type: 'number' },
+    { name: 'kVA', label: 'Capacity (kVA)', type: 'number' }
+  ],
+  Motor: [
+    { name: 'voltage', label: 'Voltage', type: 'number' },
+    { name: 'phases', label: 'Phases', type: 'number' }
+  ],
+  CapacitorBank: [
+    { name: 'voltage', label: 'Voltage', type: 'number' },
+    { name: 'kVAR', label: 'Reactive Power (kVAR)', type: 'number' }
+  ],
+  PVArray: [
+    { name: 'voltage', label: 'Voltage', type: 'number' },
+    { name: 'kW', label: 'Power (kW)', type: 'number' }
+  ]
 };
 
 const subtypeCategory = {};
