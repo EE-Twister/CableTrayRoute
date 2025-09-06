@@ -544,6 +544,8 @@ class TableManager {
 
   addRow(data = {}) {
     const tr = this.tbody.insertRow();
+    if (data.ref !== undefined) tr.dataset.ref = data.ref;
+    if (data.id !== undefined) tr.dataset.id = data.id;
     if (this.selectable) {
       const selTd = tr.insertCell();
       const chk = document.createElement('input');
@@ -858,6 +860,8 @@ class TableManager {
         }
       });
       rows.push(row);
+      if (tr.dataset.ref !== undefined) row.ref = tr.dataset.ref;
+      if (tr.dataset.id !== undefined && row.id === undefined) row.id = tr.dataset.id;
     });
     return rows;
   }

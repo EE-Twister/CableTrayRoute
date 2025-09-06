@@ -35,7 +35,16 @@ if (typeof window !== 'undefined') {
       selectable: true,
       enableContextMenu: true,
       columns,
-      onChange: () => table.save()
+      onChange: () => {
+        table.save();
+        const fn = window.opener?.updateComponent || window.updateComponent;
+        if (fn) {
+          table.getData().forEach(row => {
+            const id = row.ref || row.id;
+            if (id) fn(id, row);
+          });
+        }
+      }
     });
 
     const addColBtn = document.getElementById('add-column-btn');

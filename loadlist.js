@@ -142,6 +142,8 @@ if (typeof window !== 'undefined') {
     }
   function gatherRow(tr) {
     return {
+      id: tr.dataset.id || tr.querySelector('input[name="tag"]').value.trim(),
+      ref: tr.dataset.ref || '',
       source: tr.querySelector('input[name="source"]').value.trim(),
       tag: tr.querySelector('input[name="tag"]').value.trim(),
       description: tr.querySelector('input[name="description"]').value.trim(),
@@ -168,12 +170,18 @@ if (typeof window !== 'undefined') {
     const computed = calculateDerived(load);
     Object.assign(load, computed);
     dataStore.updateLoad(idx, load);
+    tr.dataset.id = load.id;
     tr.querySelector('.kva').textContent = format(computed.kva);
     tr.querySelector('.current').textContent = format(computed.current);
     tr.querySelector('.demand-kva').textContent = format(computed.demandKva);
     tr.querySelector('.demand-kw').textContent = format(computed.demandKw);
     updateFooter();
     updateSummary();
+    const fn = window.opener?.updateComponent || window.updateComponent;
+    if (fn) {
+      const id = load.ref || load.id || load.tag;
+      if (id) fn(id, load);
+    }
   }
 
   function insertLoad(index, load) {
@@ -223,6 +231,8 @@ if (typeof window !== 'undefined') {
   function createRow(load, idx) {
     const tr = document.createElement('tr');
     tr.dataset.index = idx;
+    if (load.ref) tr.dataset.ref = load.ref;
+    if (load.id) tr.dataset.id = load.id;
     tr.classList.add(rowClass);
     tr.innerHTML = `
       <td><input type="checkbox" class="row-select" aria-label="Select row"></td>

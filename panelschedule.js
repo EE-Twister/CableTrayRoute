@@ -24,6 +24,11 @@ export function assignLoadToBreaker(panelId, loadIndex, breaker) {
   load.panelId = panelId;
   load.breaker = breaker;
   dataStore.setLoads(loads);
+  const fn = window.opener?.updateComponent || window.updateComponent;
+  if (fn) {
+    const id = load.ref || load.id || load.tag;
+    if (id) fn(id, load);
+  }
 }
 
 /**
@@ -108,13 +113,22 @@ window.addEventListener('DOMContentLoaded', () => {
       } else {
         // remove assignment if blank selected
         const loads = dataStore.getLoads();
+        const changed = [];
         loads.forEach(l => {
           if (l.panelId === panelId && Number(l.breaker) === breaker) {
             delete l.panelId;
             delete l.breaker;
+            changed.push(l);
           }
         });
         dataStore.setLoads(loads);
+        const fn = window.opener?.updateComponent || window.updateComponent;
+        if (fn) {
+          changed.forEach(l => {
+            const id = l.ref || l.id || l.tag;
+            if (id) fn(id, l);
+          });
+        }
       }
       render(panelId);
     }

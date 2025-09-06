@@ -135,9 +135,20 @@ export const setConduits = conduits => write(KEYS.conduits, conduits);
  */
 export const getPanels = () => read(KEYS.panels, []);
 /**
+ * @param {GenericRecord} panel
+ */
+function ensurePanelFields(panel) {
+  return {
+    id: '',
+    description: '',
+    ref: '',
+    ...panel
+  };
+}
+/**
  * @param {GenericRecord[]} panels
  */
-export const setPanels = panels => write(KEYS.panels, panels);
+export const setPanels = panels => write(KEYS.panels, panels.map(ensurePanelFields));
 
 /**
  * @returns {GenericRecord[]}
@@ -149,6 +160,7 @@ export const getEquipment = () => read(KEYS.equipment, []);
 function ensureEquipmentFields(eq) {
   return {
     id: '',
+    ref: '',
     description: '',
     voltage: '',
     category: '',
@@ -245,6 +257,8 @@ function ensureLoadFields(load) {
     delete l.power;
   }
   return {
+    id: '',
+    ref: '',
     source: '',
     tag: '',
     description: '',
