@@ -982,6 +982,22 @@ function selectComponent(comp) {
     lbl.appendChild(input);
     form.appendChild(lbl);
   });
+  const tccLbl = document.createElement('label');
+  tccLbl.textContent = 'TCC Device ';
+  const tccInput = document.createElement('input');
+  tccInput.type = 'text';
+  tccInput.name = 'tccId';
+  tccInput.value = comp.tccId || '';
+  tccLbl.appendChild(tccInput);
+  form.appendChild(tccLbl);
+  const tccBtn = document.createElement('button');
+  tccBtn.type = 'button';
+  tccBtn.textContent = 'Edit TCC';
+  tccBtn.addEventListener('click', () => {
+    const dev = tccInput.value ? `&device=${encodeURIComponent(tccInput.value)}` : '';
+    window.open(`tcc.html?component=${encodeURIComponent(comp.id)}${dev}`, '_blank');
+  });
+  form.appendChild(tccBtn);
   if ((comp.connections || []).length) {
     const header = document.createElement('h3');
     header.textContent = 'Connections';
@@ -1047,6 +1063,7 @@ function selectComponent(comp) {
     [...baseFields, ...schema].forEach(f => {
       data[f.name] = fd.get(f.name) || '';
     });
+    data.tccId = fd.get('tccId') || '';
     templates.push({ name, component: data });
     saveTemplates();
     renderTemplates();
@@ -1088,6 +1105,7 @@ function selectComponent(comp) {
     schema.forEach(f => {
       comp[f.name] = fd.get(f.name) || '';
     });
+    comp.tccId = fd.get('tccId') || '';
     pushHistory();
     render();
     save();

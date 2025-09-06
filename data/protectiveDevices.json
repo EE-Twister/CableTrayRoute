@@ -1,0 +1,22 @@
+[
+  {
+    "id": "breaker100",
+    "name": "Molded Case Breaker 100A",
+    "curve": [
+      {"current": 100, "time": 10},
+      {"current": 200, "time": 5},
+      {"current": 500, "time": 0.5},
+      {"current": 1000, "time": 0.1}
+    ]
+  },
+  {
+    "id": "breaker200",
+    "name": "Molded Case Breaker 200A",
+    "curve": [
+      {"current": 200, "time": 10},
+      {"current": 400, "time": 5},
+      {"current": 1000, "time": 0.5},
+      {"current": 2000, "time": 0.1}
+    ]
+  }
+]
