@@ -44,6 +44,33 @@ let historyIndex = -1;
 const compWidth = 80;
 const compHeight = 40;
 
+// --- Tooltip module ---
+const tooltip = document.createElement('div');
+tooltip.id = 'component-tooltip';
+tooltip.style.display = 'none';
+document.body.appendChild(tooltip);
+
+function positionTooltip(e) {
+  tooltip.style.left = e.pageX + 10 + 'px';
+  tooltip.style.top = e.pageY + 10 + 'px';
+}
+
+function showTooltip(e) {
+  const text = e.currentTarget.dataset.tooltip;
+  if (!text) return;
+  tooltip.textContent = text;
+  positionTooltip(e);
+  tooltip.style.display = 'block';
+}
+
+function moveTooltip(e) {
+  if (tooltip.style.display === 'block') positionTooltip(e);
+}
+
+function hideTooltip() {
+  tooltip.style.display = 'none';
+}
+
 function pushHistory() {
   history = history.slice(0, historyIndex + 1);
   history.push(JSON.parse(JSON.stringify(components)));
@@ -265,6 +292,14 @@ function render() {
     const g = document.createElementNS(svgNS, 'g');
     g.dataset.id = c.id;
     g.classList.add('component');
+    const tooltipParts = [];
+    if (c.label) tooltipParts.push(`Label: ${c.label}`);
+    if (c.voltage) tooltipParts.push(`Voltage: ${c.voltage}`);
+    if (c.rating) tooltipParts.push(`Rating: ${c.rating}`);
+    if (tooltipParts.length) g.setAttribute('data-tooltip', tooltipParts.join('\n'));
+    g.addEventListener('mouseenter', showTooltip);
+    g.addEventListener('mousemove', moveTooltip);
+    g.addEventListener('mouseleave', hideTooltip);
     const img = document.createElementNS(svgNS, 'image');
     img.setAttribute('x', c.x);
     img.setAttribute('y', c.y);
