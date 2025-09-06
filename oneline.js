@@ -1475,6 +1475,8 @@ async function init() {
   if (exportBtn) exportBtn.addEventListener('click', exportDiagram);
   const exportPdfBtn = document.getElementById('export-pdf-btn');
   if (exportPdfBtn) exportPdfBtn.addEventListener('click', exportPDF);
+  const exportDxfBtn = document.getElementById('export-dxf-btn');
+  if (exportDxfBtn) exportDxfBtn.addEventListener('click', exportDXF);
   const importBtn = document.getElementById('import-btn');
   if (importBtn) importBtn.addEventListener('click', () => document.getElementById('import-input').click());
   const importInput = document.getElementById('import-input');
@@ -2174,6 +2176,40 @@ async function exportPDF() {
   }
   loadSheet(original);
   pdf.save('oneline.pdf');
+}
+
+function exportDXF() {
+  const comps = sheets[activeSheet]?.components || [];
+  const content = buildDXF(comps);
+  const blob = new Blob([content], { type: 'application/dxf' });
+  const a = document.createElement('a');
+  a.href = URL.createObjectURL(blob);
+  a.download = 'oneline.dxf';
+  a.click();
+  URL.revokeObjectURL(a.href);
+}
+
+function buildDXF(components = []) {
+  const blockNames = new Set();
+  let blocks = '0\nSECTION\n2\nBLOCKS\n';
+  components.forEach(c => {
+    const name = c.subtype || 'Component';
+    if (!blockNames.has(name)) {
+      blockNames.add(name);
+      blocks += `0\nBLOCK\n2\n${name}\n0\nTEXT\n8\n0\n10\n0\n20\n0\n40\n5\n1\n${name}\n0\nENDBLK\n`;
+    }
+  });
+  blocks += '0\nENDSEC\n';
+
+  let entities = '0\nSECTION\n2\nENTITIES\n';
+  components.forEach(c => {
+    const name = c.subtype || 'Component';
+    const x = c.x || 0;
+    const y = c.y || 0;
+    entities += `0\nINSERT\n2\n${name}\n10\n${x}\n20\n${y}\n`;
+  });
+  entities += '0\nENDSEC\n0\nEOF';
+  return blocks + entities;
 }
 
 function migrateDiagram(data) {
