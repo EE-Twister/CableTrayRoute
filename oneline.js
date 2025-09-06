@@ -6,6 +6,7 @@ import { runHarmonics } from './analysis/harmonics.js';
 import { runMotorStart } from './analysis/motorStart.js';
 import { runReliability } from './analysis/reliability.js';
 import { generateArcFlashReport } from './reports/arcFlashReport.mjs';
+import { exportAllReports } from './reports/exportAll.mjs';
 import { sizeConductor } from './sizing.js';
 import { runValidation } from './validation/rules.js';
 
@@ -1497,6 +1498,9 @@ async function init() {
 
   const defaultsBtn = document.getElementById('update-defaults-btn');
   if (defaultsBtn) defaultsBtn.addEventListener('click', editManufacturerDefaults);
+
+  const exportReportsBtn = document.getElementById('export-reports-btn');
+  if (exportReportsBtn) exportReportsBtn.addEventListener('click', () => exportAllReports());
 
   const palette = document.getElementById('component-buttons');
   const sectionContainers = {
