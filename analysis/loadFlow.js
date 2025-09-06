@@ -4,46 +4,53 @@ import { getOneLine } from '../dataStore.mjs';
 function toComplex(re = 0, im = 0) {
   return { re, im };
 }
-function add(a, b) {
-  return { re: a.re + b.re, im: a.im + b.im };
+function add(a, b) { return { re: a.re + b.re, im: a.im + b.im }; }
+function sub(a, b) { return { re: a.re - b.re, im: a.im - b.im }; }
+function mul(a, b) { return { re: a.re * b.re - a.im * b.im, im: a.re * b.im + a.im * b.re }; }
+function div(a, b) {
+  const den = b.re * b.re + b.im * b.im || 1e-12;
+  return { re: (a.re * b.re + a.im * b.im) / den, im: (a.im * b.re - a.re * b.im) / den };
 }
-function sub(a, b) {
-  return { re: a.re - b.re, im: a.im - b.im };
-}
-function mul(a, b) {
-  return { re: a.re * b.re - a.im * b.im, im: a.re * b.im + a.im * b.re };
-}
-function inv(a) {
-  const den = a.re * a.re + a.im * a.im || 1e-12;
-  return { re: a.re / den, im: -a.im / den };
-}
+function inv(a) { return div({ re: 1, im: 0 }, a); }
+function conj(a) { return { re: a.re, im: -a.im }; }
 
-/**
- * Convert an impedance in ohms to per-unit based on baseKV/baseMVA
- */
+/** Convert an impedance in ohms to per‑unit based on bus base kV and system MVA. */
 function toPerUnitZ(z, baseKV, baseMVA) {
   const baseZ = (baseKV * baseKV) / baseMVA;
-  return { re: z.r / baseZ, im: z.x / baseZ };
+  return { re: (z.r || 0) / baseZ, im: (z.x || 0) / baseZ };
 }
 
-/**
- * Build the bus admittance matrix for the given network description.
- */
-function buildYBus(buses, baseKV, baseMVA) {
+/** Convert an admittance in siemens to per‑unit */
+function toPerUnitY(y, baseKV, baseMVA) {
+  const baseY = baseMVA / (baseKV * baseKV);
+  return { re: (y.g || 0) / baseY, im: (y.b || 0) / baseY };
+}
+
+/** Build the bus admittance matrix with taps and shunts. */
+function buildYBus(buses, baseMVA) {
   const n = buses.length;
   const Y = Array.from({ length: n }, () => Array.from({ length: n }, () => toComplex(0, 0)));
   buses.forEach((bus, i) => {
     (bus.connections || []).forEach(conn => {
       const j = buses.findIndex(b => b.id === conn.target);
       if (j < 0) return;
-      const Z = toPerUnitZ(conn.impedance || { r: 0, x: 0 }, baseKV, baseMVA);
+      const Z = toPerUnitZ(conn.impedance || { r: 0, x: 0 }, bus.baseKV || 1, baseMVA);
       const y = inv(toComplex(Z.re, Z.im));
-      Y[i][i] = add(Y[i][i], y);
-      Y[j][j] = add(Y[j][j], y);
-      const off = toComplex(-y.re, -y.im);
-      Y[i][j] = add(Y[i][j], off);
-      Y[j][i] = add(Y[j][i], off);
+      const tapMag = conn.tap?.ratio || conn.tap || 1;
+      const tapAng = (conn.tap?.angle || 0) * Math.PI / 180;
+      const t = toComplex(tapMag * Math.cos(tapAng), tapMag * Math.sin(tapAng));
+      const tconj = conj(t);
+      const tmag2 = t.re * t.re + t.im * t.im || 1e-12;
+      const yFromSh = conn.shunt?.from ? toPerUnitY(conn.shunt.from, bus.baseKV || 1, baseMVA) : toComplex(0, 0);
+      const yToSh = conn.shunt?.to ? toPerUnitY(conn.shunt.to, buses[j].baseKV || 1, baseMVA) : toComplex(0, 0);
+      Y[i][i] = add(Y[i][i], add(div(y, toComplex(tmag2, 0)), yFromSh));
+      Y[j][j] = add(Y[j][j], add(y, yToSh));
+      Y[i][j] = sub(Y[i][j], div(y, tconj));
+      Y[j][i] = sub(Y[j][i], div(y, t));
     });
+    if (bus.shunt) {
+      Y[i][i] = add(Y[i][i], toPerUnitY(bus.shunt, bus.baseKV || 1, baseMVA));
+    }
   });
   return Y;
 }
@@ -74,7 +81,7 @@ function calcPQ(buses, Y, Vm, Va) {
  * @param {number} baseMVA
  * @returns {Array<{id:string, Vm:number, Va:number}>}
  */
-function solvePhase(buses, baseKV, baseMVA) {
+function solvePhase(buses, baseMVA) {
   const n = buses.length;
   const Vm = buses.map(b => b.Vm ?? 1);
   const Va = buses.map(b => (b.Va ?? 0) * Math.PI / 180);
@@ -83,7 +90,7 @@ function solvePhase(buses, baseKV, baseMVA) {
   const PV = buses.map((b, i) => b.type === 'PV' ? i : -1).filter(i => i >= 0);
   const PQ = buses.map((b, i) => b.type === 'PQ' ? i : -1).filter(i => i >= 0);
   const nonSlack = buses.map((b, i) => b.type !== 'slack' ? i : -1).filter(i => i >= 0);
-  const Y = buildYBus(buses, baseKV, baseMVA);
+  const Y = buildYBus(buses, baseMVA);
   const maxIter = 20;
   const tol = 1e-6;
 
@@ -162,7 +169,38 @@ function solvePhase(buses, baseKV, baseMVA) {
     }
   }
 
-  return buses.map((b, i) => ({ id: b.id, Vm: Vm[i], Va: Va[i] * 180 / Math.PI }));
+  const busRes = buses.map((b, i) => ({ id: b.id, Vm: Vm[i], Va: Va[i] * 180 / Math.PI }));
+
+  // line flows and losses
+  const flows = [];
+  const lossMap = {};
+  buses.forEach((bus, i) => {
+    const Vi = toComplex(Vm[i] * Math.cos(Va[i]), Vm[i] * Math.sin(Va[i]));
+    (bus.connections || []).forEach(conn => {
+      const j = buses.findIndex(b => b.id === conn.target);
+      if (j < 0) return;
+      const Vj = toComplex(Vm[j] * Math.cos(Va[j]), Vm[j] * Math.sin(Va[j]));
+      const Z = toPerUnitZ(conn.impedance || { r: 0, x: 0 }, bus.baseKV || 1, baseMVA);
+      const y = inv(toComplex(Z.re, Z.im));
+      const tapMag = conn.tap?.ratio || conn.tap || 1;
+      const tapAng = (conn.tap?.angle || 0) * Math.PI / 180;
+      const t = toComplex(tapMag * Math.cos(tapAng), tapMag * Math.sin(tapAng));
+      const ViPrime = div(Vi, t);
+      const ySh = conn.shunt?.from ? toPerUnitY(conn.shunt.from, bus.baseKV || 1, baseMVA) : toComplex(0, 0);
+      const Iij = add(mul(sub(ViPrime, Vj), y), mul(ViPrime, ySh));
+      const Sij = mul(Vi, conj(Iij));
+      const P = Sij.re * baseMVA;
+      const Q = Sij.im * baseMVA;
+      flows.push({ from: bus.id, to: buses[j].id, P, Q });
+      const key = [bus.id, buses[j].id].sort().join('-');
+      lossMap[key] = lossMap[key] || { P: 0, Q: 0 };
+      lossMap[key].P += P;
+      lossMap[key].Q += Q;
+    });
+  });
+  const losses = Object.values(lossMap).reduce((acc, v) => ({ P: acc.P + v.P, Q: acc.Q + v.Q }), { P: 0, Q: 0 });
+
+  return { buses: busRes, lines: flows, losses };
 }
 
 /**
@@ -196,39 +234,52 @@ function solveLinear(A, b) {
  * Options may specify baseKV/baseMVA and whether the system is balanced.
  */
 export function runLoadFlow(opts = {}) {
-  const { baseKV = 1, baseMVA = 1, balanced = true } = opts;
-  const diagram = getOneLine();
-  const comps = diagram.filter(c => c && c.id);
+  const { baseMVA = 100, balanced = true } = opts;
+  const sheets = getOneLine();
+  const comps = Array.isArray(sheets[0]?.components)
+    ? sheets.flatMap(s => s.components || [])
+    : sheets;
   const phases = balanced ? ['balanced'] : ['A', 'B', 'C'];
   const phaseResults = {};
   phases.forEach(phase => {
     const buses = comps.map((c, idx) => {
       const load = c.load || {};
       const phaseLoad = balanced ? load : load[phase.toLowerCase()] || {};
+      const shunt = balanced ? c.shunt : c.shunt?.[phase];
       return {
         id: c.id,
         type: c.busType || (idx === 0 ? 'slack' : 'PQ'),
         Vm: c.Vm,
         Va: c.Va,
+        baseKV: c.baseKV || 1,
         Pd: phaseLoad.kw || phaseLoad.P || 0,
         Qd: phaseLoad.kvar || phaseLoad.Q || 0,
         Pg: c.generation?.kw || 0,
         Qg: c.generation?.kvar || 0,
+        shunt,
         connections: (c.connections || []).filter(conn => {
           if (balanced) return true;
           return !conn.phases || conn.phases.includes(phase);
-        }).map(conn => ({ target: conn.target, impedance: conn.impedance || conn.cable || {} }))
+        }).map(conn => ({
+          target: conn.target,
+          impedance: conn.impedance || conn.cable || {},
+          tap: conn.tap,
+          shunt: conn.shunt
+        }))
       };
     });
-    phaseResults[phase] = solvePhase(buses, baseKV, baseMVA);
+    phaseResults[phase] = solvePhase(buses, baseMVA);
   });
 
-  // Flatten results for consumers
   if (balanced) return phaseResults['balanced'];
-  const flat = [];
-  Object.entries(phaseResults).forEach(([ph, arr]) => {
-    arr.forEach(r => flat.push({ id: r.id, phase: ph, Vm: r.Vm, Va: r.Va }));
+  const buses = [];
+  const lines = [];
+  const losses = {};
+  Object.entries(phaseResults).forEach(([ph, res]) => {
+    res.buses.forEach(b => buses.push({ ...b, phase: ph }));
+    res.lines.forEach(l => lines.push({ ...l, phase: ph }));
+    losses[ph] = res.losses;
   });
-  return flat;
+  return { buses, lines, losses };
 }
 

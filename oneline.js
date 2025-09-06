@@ -133,6 +133,7 @@ const runHBtn = document.getElementById('run-harmonics-btn');
 const runMSBtn = document.getElementById('run-motorstart-btn');
 const runRelBtn = document.getElementById('run-reliability-btn');
 const studyResultsEl = document.getElementById('study-results');
+const loadFlowResultsEl = document.getElementById('loadflow-results');
 
 function renderStudyResults() {
   if (!studyResultsEl) return;
@@ -160,7 +161,8 @@ if (studiesCloseBtn) studiesCloseBtn.addEventListener('click', () => studiesPane
 if (runLFBtn) runLFBtn.addEventListener('click', () => {
   const res = runLoadFlow();
   const diagram = getOneLine();
-  res.forEach(r => {
+  const buses = res.buses || res;
+  buses.forEach(r => {
     const comp = diagram.find(c => c.id === r.id);
     if (!comp) return;
     if (r.phase) {
@@ -179,7 +181,34 @@ if (runLFBtn) runLFBtn.addEventListener('click', () => {
   setStudies(studies);
   syncSchedules(false);
   renderStudyResults();
+  renderLoadFlowResults(res);
 });
+
+function renderLoadFlowResults(res) {
+  if (!loadFlowResultsEl) return;
+  const buses = res.buses || res;
+  let html = '<h3>Bus Voltages</h3><table><tr><th>Bus</th><th>Phase</th><th>Vm</th><th>Va</th></tr>';
+  buses.forEach(b => {
+    html += `<tr><td>${b.id}</td><td>${b.phase || ''}</td><td>${b.Vm.toFixed(4)}</td><td>${b.Va.toFixed(2)}</td></tr>`;
+  });
+  html += '</table>';
+  if (res.lines) {
+    html += '<h3>Line Flows (kW/kvar)</h3><table><tr><th>From</th><th>To</th><th>Phase</th><th>P</th><th>Q</th></tr>';
+    res.lines.forEach(l => {
+      html += `<tr><td>${l.from}</td><td>${l.to}</td><td>${l.phase || ''}</td><td>${l.P.toFixed(2)}</td><td>${l.Q.toFixed(2)}</td></tr>`;
+    });
+    html += '</table>';
+    if (res.losses) {
+      if (res.losses.P !== undefined) {
+        html += `<p>Total Losses: ${res.losses.P.toFixed(2)} kW / ${res.losses.Q.toFixed(2)} kvar</p>`;
+      } else {
+        const entries = Object.entries(res.losses).map(([ph, v]) => `${ph}: ${v.P.toFixed(2)} kW / ${v.Q.toFixed(2)} kvar`).join(', ');
+        html += `<p>Total Losses: ${entries}</p>`;
+      }
+    }
+  }
+  loadFlowResultsEl.innerHTML = html;
+}
 if (runSCBtn) runSCBtn.addEventListener('click', () => {
   const res = runShortCircuit();
   const studies = getStudies();
