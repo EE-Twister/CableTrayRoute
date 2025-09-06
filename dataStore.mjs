@@ -156,6 +156,10 @@ function ensureEquipmentFields(eq) {
     x: '',
     y: '',
     z: '',
+    manufacturer: '',
+    model: '',
+    phases: '',
+    notes: '',
     ...eq
   };
 }
@@ -255,6 +259,9 @@ function ensureLoadFields(load) {
     demandFactor: '',
     phases: '',
     circuit: '',
+    manufacturer: '',
+    model: '',
+    notes: '',
     ...l
   };
 }
