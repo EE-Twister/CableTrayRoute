@@ -16,7 +16,7 @@ function it(name, fn){
 
   describe('tcc utilities', () => {
     it('scales curve points from overrides', () => {
-      const scaled = scaleCurve(abb, { pickup: 200, delay: 0.4, instantaneous: 1000 });
+      const scaled = scaleCurve(abb, { pickup: 200, time: 0.4, instantaneous: 1000 });
       assert.strictEqual(scaled.curve[0].current, 200);
       assert.strictEqual(scaled.curve[0].time, 200);
       const inst = scaled.curve.find(p => p.current === 1000 && p.time === 0.01);
