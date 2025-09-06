@@ -53,9 +53,16 @@ function buildSections(data = {}) {
   }
   if (data.analyses) {
     Object.entries(data.analyses).forEach(([name, rows]) => {
-      if (Array.isArray(rows) && rows.length) {
-        const headers = Object.keys(rows[0]);
-        sections.push({ title: `${name} Analysis`, headers, rows });
+      let arr = rows;
+      if (!Array.isArray(rows) && rows && typeof rows === 'object') {
+        arr = Object.entries(rows).map(([id, val]) => {
+          if (typeof val === 'object' && !Array.isArray(val)) return { id, ...val };
+          return { id, value: Array.isArray(val) ? val.join('; ') : val };
+        });
+      }
+      if (Array.isArray(arr) && arr.length) {
+        const headers = Object.keys(arr[0]);
+        sections.push({ title: `${name} Analysis`, headers, rows: arr });
       }
     });
   }

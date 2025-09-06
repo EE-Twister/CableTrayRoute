@@ -50,5 +50,31 @@
       { "current": 600, "time": 0.5 },
       { "current": 1200, "time": 0.05 }
     ]
+  },
+  {
+    "id": "eaton_seriesC_100",
+    "type": "breaker",
+    "vendor": "Eaton",
+    "name": "Eaton Series C 100A",
+    "interruptRating": 25,
+    "settings": { "pickup": 100, "delay": 0.2, "instantaneous": 500 },
+    "curve": [
+      { "current": 100, "time": 80 },
+      { "current": 400, "time": 0.4 },
+      { "current": 800, "time": 0.05 }
+    ]
+  },
+  {
+    "id": "mitsubishi_ws_225",
+    "type": "breaker",
+    "vendor": "Mitsubishi",
+    "name": "Mitsubishi WS 225A",
+    "interruptRating": 42,
+    "settings": { "pickup": 225, "delay": 0.3, "instantaneous": 1125 },
+    "curve": [
+      { "current": 225, "time": 100 },
+      { "current": 900, "time": 0.4 },
+      { "current": 1800, "time": 0.05 }
+    ]
   }
 ]
