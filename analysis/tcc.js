@@ -1,5 +1,6 @@
 import * as d3 from 'https://cdn.jsdelivr.net/npm/d3@7/+esm';
 import { getItem, setItem, getOneLine, setOneLine, getStudies, setStudies } from '../dataStore.mjs';
+import { scaleCurve, checkDuty } from './tccUtils.js';
 
 const deviceSelect = document.getElementById('device-select');
 const settingsDiv = document.getElementById('device-settings');
@@ -18,7 +19,7 @@ if (compId) {
 }
 
 let devices = [];
-const saved = getItem('tccSettings') || { devices: [], settings: {} };
+let saved = getItem('tccSettings') || { devices: [], settings: {} };
 
 init();
 
@@ -64,7 +65,12 @@ function renderSettings() {
     const div = document.createElement('div');
     div.className = 'device-settings';
     div.dataset.id = dev.id;
-    div.innerHTML = `\n      <h3>${dev.name}</h3>\n      <label>Pickup <input type="number" data-field="pickup" value="${set.pickup ?? ''}"></label>\n      <label>Delay <input type="number" step="0.01" data-field="delay" value="${set.delay ?? ''}"></label>\n      <label>Inst <input type="number" data-field="instantaneous" value="${set.instantaneous ?? ''}"></label>\n    `;
+    let html = `\n      <h3>${dev.name}</h3>`;
+    Object.keys(dev.settings || {}).forEach(k => {
+      const val = set[k] ?? '';
+      html += `\n      <label>${k.charAt(0).toUpperCase() + k.slice(1)} <input type="number" data-field="${k}" value="${val}"></label>`;
+    });
+    div.innerHTML = html;
     settingsDiv.appendChild(div);
   });
 }
@@ -74,13 +80,15 @@ function persistSettings() {
   const sets = {};
   settingsDiv.querySelectorAll('.device-settings').forEach(div => {
     const id = div.dataset.id;
-    sets[id] = {
-      pickup: Number(div.querySelector('[data-field="pickup"]').value) || undefined,
-      delay: Number(div.querySelector('[data-field="delay"]').value) || undefined,
-      instantaneous: Number(div.querySelector('[data-field="instantaneous"]').value) || undefined
-    };
+    const obj = {};
+    div.querySelectorAll('[data-field]').forEach(inp => {
+      const val = Number(inp.value);
+      if (!Number.isNaN(val)) obj[inp.dataset.field] = val;
+    });
+    sets[id] = obj;
   });
-  setItem('tccSettings', { devices: sel, settings: sets });
+  saved = { devices: sel, settings: sets };
+  setItem('tccSettings', saved);
 }
 
 function linkComponent() {
@@ -107,17 +115,12 @@ function plot() {
     const base = devices.find(d => d.id === id);
     if (!base) return null;
     const div = settingsDiv.querySelector(`.device-settings[data-id="${id}"]`);
-    const pickup = Number(div?.querySelector('[data-field="pickup"]').value) || base.settings.pickup || 1;
-    const delay = Number(div?.querySelector('[data-field="delay"]').value) || base.settings.delay || 1;
-    const inst = Number(div?.querySelector('[data-field="instantaneous"]').value) || base.settings.instantaneous || 0;
-    const scaleI = pickup / (base.settings.pickup || 1);
-    const scaleT = delay / (base.settings.delay || 1);
-    const curve = (base.curve || []).map(p => ({
-      current: p.current * scaleI,
-      time: p.time * scaleT
-    }));
-    if (inst) curve.push({ current: inst, time: 0.01 });
-    return { ...base, curve, settings: { pickup, delay, instantaneous: inst } };
+    const overrides = {};
+    div?.querySelectorAll('[data-field]').forEach(inp => {
+      const v = Number(inp.value);
+      if (!Number.isNaN(v)) overrides[inp.dataset.field] = v;
+    });
+    return scaleCurve(base, overrides);
   }).filter(Boolean);
   if (!selected.length) return;
   const allCurrents = selected.flatMap(s => s.curve.map(p => p.current));
@@ -131,22 +134,31 @@ function plot() {
   g.append('g').attr('transform', `translate(0,${height})`).call(d3.axisBottom(x));
   g.append('g').call(d3.axisLeft(y));
   const color = d3.scaleOrdinal(d3.schemeCategory10);
-  selected.forEach((s, i) => {
-    const line = d3.line().x(p => x(p.current)).y(p => y(p.time)).curve(d3.curveMonotoneX);
-    g.append('path').datum(s.curve).attr('fill', 'none').attr('stroke', color(i)).attr('stroke-width', 2).attr('d', line);
-  });
   const studies = getStudies();
   const fault = studies.shortCircuit?.[compId]?.threePhaseKA;
   const violations = [];
+  selected.forEach((s, i) => {
+    const violation = checkDuty(s, fault);
+    const line = d3.line().x(p => x(p.current)).y(p => y(p.time)).curve(d3.curveMonotoneX);
+    g.append('path')
+      .datum(s.curve)
+      .attr('fill', 'none')
+      .attr('stroke', violation ? 'red' : color(i))
+      .attr('stroke-width', 2)
+      .attr('d', line);
+    if (violation) violations.push(violation);
+  });
   if (fault) {
-    selected.forEach(s => {
-      if (s.interruptRating && s.interruptRating < fault) {
-        violations.push(`${s.name} interrupt rating ${s.interruptRating}kA < fault ${fault}kA`);
-      }
-    });
-    if (violations.length) {
-      violationDiv.innerHTML = violations.map(v => `<p>${v}</p>`).join('');
-    }
+    g.append('line')
+      .attr('x1', x(fault * 1000))
+      .attr('x2', x(fault * 1000))
+      .attr('y1', 0)
+      .attr('y2', height)
+      .attr('stroke', '#000')
+      .attr('stroke-dasharray', '4,2');
+  }
+  if (violations.length) {
+    violationDiv.innerHTML = violations.map(v => `<p>${v}</p>`).join('');
   }
   const res = getStudies();
   res.duty = res.duty || {};
