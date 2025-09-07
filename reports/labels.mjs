@@ -1,5 +1,4 @@
-import fs from 'fs';
-import path from 'path';
+// Load the arc flash label template without using Node's fs module.
 
 let template = `<svg xmlns="http://www.w3.org/2000/svg" width="200" height="100">
   <rect width="200" height="100" fill="#ffffff" stroke="#000"/>
@@ -10,7 +9,10 @@ let template = `<svg xmlns="http://www.w3.org/2000/svg" width="200" height="100"
 
 try {
   const p = new URL('./templates/arcflashLabel.svg', import.meta.url);
-  template = fs.readFileSync(p, 'utf8');
+  const res = await fetch(p);
+  if (res.ok) {
+    template = await res.text();
+  }
 } catch {}
 
 export function generateArcFlashLabel(data = {}) {
