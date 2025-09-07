@@ -25,6 +25,9 @@ const DOC_NAV = [
       { href: "AMPACITY_METHOD.html", title: "Ampacity Method" },
       { href: "soil_resistivity.html", title: "Soil Resistivity" },
       { href: "math.html", title: "Math References" },
+      { href: "load_calculation_formulas.html", title: "Load Calculation" },
+      { href: "cable_fill_rules.html", title: "Cable Fill Rules" },
+      { href: "routing_assumptions.html", title: "Routing Assumptions" },
     ],
   },
   {
