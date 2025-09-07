@@ -203,7 +203,7 @@ window.addEventListener('DOMContentLoaded', () => {
 
   document.getElementById('load-sample-cables-btn').addEventListener('click', async () => {
     try {
-      const res = await fetch('examples/sample_cables.json');
+      const res = await fetch('examples/sampleCables.json');
       const sampleCables = await res.json();
       table.setData(sampleCables); // immediately display the sample rows
       tableData = sampleCables;

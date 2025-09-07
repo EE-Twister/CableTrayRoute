@@ -1,0 +1,55 @@
+{
+  "ductbanks": [
+    {
+      "tag": "DB-01",
+      "from": "SUB-1",
+      "to": "BLDG-1",
+      "concrete_encasement": false,
+      "start_x": 0,
+      "start_y": 10,
+      "start_z": 0,
+      "end_x": 100,
+      "end_y": 10,
+      "end_z": 0
+    }
+  ],
+  "trays": [
+    {
+      "tray_id": "TRAY-01",
+      "start_x": 0,
+      "start_y": 0,
+      "start_z": 0,
+      "end_x": 100,
+      "end_y": 0,
+      "end_z": 0,
+      "inside_width": 24,
+      "tray_depth": 4,
+      "tray_type": "Ladder (50 % fill)"
+    }
+  ],
+  "conduits": [
+    {
+      "ductbankTag": "DB-01",
+      "conduit_id": "DB-01-C1",
+      "type": "PVC Sch 40",
+      "trade_size": "4",
+      "start_x": 0,
+      "start_y": 10,
+      "start_z": 0,
+      "end_x": 100,
+      "end_y": 10,
+      "end_z": 0
+    },
+    {
+      "conduit_id": "C-001",
+      "type": "EMT",
+      "trade_size": "2",
+      "start_x": 50,
+      "start_y": 50,
+      "start_z": 0,
+      "end_x": 50,
+      "end_y": 55,
+      "end_z": 0
+    }
+  ]
+}
