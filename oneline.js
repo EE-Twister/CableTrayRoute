@@ -9,6 +9,8 @@ import { generateArcFlashReport } from './reports/arcFlashReport.mjs';
 import { exportAllReports } from './reports/exportAll.mjs';
 import { sizeConductor } from './sizing.js';
 import { runValidation } from './validation/rules.js';
+import { exportPDF } from './exporters/pdf.js';
+import { exportDXF, exportDWG } from './exporters/dxf.js';
 
 let componentMeta = {};
 
@@ -2255,21 +2257,36 @@ async function init() {
   const exportBtn = document.getElementById('export-btn');
   if (exportBtn) exportBtn.addEventListener('click', exportDiagram);
   const exportPdfBtn = document.getElementById('export-pdf-btn');
-  if (exportPdfBtn) exportPdfBtn.addEventListener('click', exportPDF);
+  if (exportPdfBtn)
+    exportPdfBtn.addEventListener('click', () =>
+      exportPDF({
+        svgEl: document.getElementById('diagram'),
+        sheets,
+        loadSheet,
+        serializeDiagram,
+        activeSheet
+      })
+    );
   const exportDxfBtn = document.getElementById('export-dxf-btn');
-  if (exportDxfBtn) exportDxfBtn.addEventListener('click', exportDXF);
+  if (exportDxfBtn)
+    exportDxfBtn.addEventListener('click', () =>
+      exportDXF(sheets[activeSheet]?.components || [])
+    );
   const exportDwgBtn = document.getElementById('export-dwg-btn');
-  if (exportDwgBtn) exportDwgBtn.addEventListener('click', exportDWG);
+  if (exportDwgBtn)
+    exportDwgBtn.addEventListener('click', () =>
+      exportDWG(sheets[activeSheet]?.components || [])
+    );
   const importBtn = document.getElementById('import-btn');
   if (importBtn) importBtn.addEventListener('click', () => document.getElementById('import-input').click());
   const importInput = document.getElementById('import-input');
-  if (importInput) importInput.addEventListener('change', importDiagram);
+  if (importInput) importInput.addEventListener('change', handleImport);
   const diagramExportBtn = document.getElementById('diagram-export-btn');
   if (diagramExportBtn) diagramExportBtn.addEventListener('click', exportDiagram);
   const diagramImportBtn = document.getElementById('diagram-import-btn');
   if (diagramImportBtn) diagramImportBtn.addEventListener('click', () => document.getElementById('diagram-import-input').click());
   const diagramImportInput = document.getElementById('diagram-import-input');
-  if (diagramImportInput) diagramImportInput.addEventListener('change', importDiagram);
+  if (diagramImportInput) diagramImportInput.addEventListener('change', handleImport);
   const shareBtn = document.getElementById('diagram-share-btn');
   if (shareBtn) shareBtn.addEventListener('click', shareDiagram);
   document.getElementById('add-sheet-btn').addEventListener('click', addSheet);
@@ -3121,7 +3138,13 @@ function serializeState() {
 }
 
 function exportDiagram() {
-  const data = serializeState();
+  const data = {
+    sheets: sheets.map(s => ({
+      name: s.name,
+      components: s.components.map(c => ({ ...c })),
+      connections: (s.connections || []).map(conn => ({ ...conn }))
+    }))
+  };
   const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' });
   const a = document.createElement('a');
   a.href = URL.createObjectURL(blob);
@@ -3174,70 +3197,6 @@ function serializeDiagram() {
   return source;
 }
 
-async function exportPDF() {
-  const original = activeSheet;
-  const svgEl = document.getElementById('diagram');
-  const width = svgEl.viewBox.baseVal?.width || svgEl.width.baseVal.value;
-  const height = svgEl.viewBox.baseVal?.height || svgEl.height.baseVal.value;
-  const { jsPDF } = window.jspdf;
-  const pdf = new jsPDF({ orientation: width > height ? 'landscape' : 'portrait', unit: 'pt', format: [width, height] });
-  for (let i = 0; i < sheets.length; i++) {
-    loadSheet(i);
-    const svgString = serializeDiagram();
-    const svg = new DOMParser().parseFromString(svgString, 'image/svg+xml').documentElement;
-    await window.svg2pdf(svg, pdf, { x: 0, y: 0, width, height });
-    if (i < sheets.length - 1) pdf.addPage([width, height]);
-  }
-  loadSheet(original);
-  pdf.save('oneline.pdf');
-}
-
-function exportDXF() {
-  const comps = sheets[activeSheet]?.components || [];
-  const content = buildDXF(comps);
-  const blob = new Blob([content], { type: 'application/dxf' });
-  const a = document.createElement('a');
-  a.href = URL.createObjectURL(blob);
-  a.download = 'oneline.dxf';
-  a.click();
-  URL.revokeObjectURL(a.href);
-}
-
-function exportDWG() {
-  // Placeholder implementation reusing the DXF builder. For many CAD tools a
-  // simple DXF renamed with a .dwg extension is sufficient for quick sharing.
-  const comps = sheets[activeSheet]?.components || [];
-  const content = buildDXF(comps);
-  const blob = new Blob([content], { type: 'application/acad' });
-  const a = document.createElement('a');
-  a.href = URL.createObjectURL(blob);
-  a.download = 'oneline.dwg';
-  a.click();
-  URL.revokeObjectURL(a.href);
-}
-
-function buildDXF(components = []) {
-  const blockNames = new Set();
-  let blocks = '0\nSECTION\n2\nBLOCKS\n';
-  components.forEach(c => {
-    const name = c.subtype || 'Component';
-    if (!blockNames.has(name)) {
-      blockNames.add(name);
-      blocks += `0\nBLOCK\n2\n${name}\n0\nTEXT\n8\n0\n10\n0\n20\n0\n40\n5\n1\n${name}\n0\nENDBLK\n`;
-    }
-  });
-  blocks += '0\nENDSEC\n';
-
-  let entities = '0\nSECTION\n2\nENTITIES\n';
-  components.forEach(c => {
-    const name = c.subtype || 'Component';
-    const x = c.x || 0;
-    const y = c.y || 0;
-    entities += `0\nINSERT\n2\n${name}\n10\n${x}\n20\n${y}\n`;
-  });
-  entities += '0\nENDSEC\n0\nEOF';
-  return blocks + entities;
-}
 
 function migrateDiagram(data) {
   if (Array.isArray(data)) {
@@ -3259,36 +3218,41 @@ function migrateDiagram(data) {
   return migrated;
 }
 
-async function importDiagram(e) {
+async function handleImport(e) {
   const file = e.target.files[0];
   if (!file) return;
-  const text = await file.text();
   try {
-    let data = JSON.parse(text);
-    if (data.meta && data.meta.scenario) {
-      switchScenario(data.meta.scenario);
-    }
-    data = migrateDiagram(data);
-    diagramScale = data.scale || { unitPerPx: 1, unit: 'in' };
-    setItem('diagramScale', diagramScale);
-    if (scaleValueInput) scaleValueInput.value = diagramScale.unitPerPx;
-    if (scaleUnitInput) scaleUnitInput.value = diagramScale.unit;
-    templates = data.templates || [];
-    saveTemplates();
-    renderTemplates();
-    sheets = (data.sheets || []).map((s, i) => ({
-      name: s.name || `Sheet ${i + 1}`,
-      components: (s.components || []).map(normalizeComponent)
-    }));
-    if (sheets.length) {
-      loadSheet(0);
-      renderSheetTabs();
-      save();
-    }
+    const text = await file.text();
+    const data = JSON.parse(text);
+    await importDiagram(data);
   } catch (err) {
     console.error('Failed to import diagram', err);
   }
   e.target.value = '';
+}
+
+async function importDiagram(data) {
+  if (data.meta && data.meta.scenario) {
+    switchScenario(data.meta.scenario);
+  }
+  data = migrateDiagram(data);
+  diagramScale = data.scale || { unitPerPx: 1, unit: 'in' };
+  setItem('diagramScale', diagramScale);
+  if (scaleValueInput) scaleValueInput.value = diagramScale.unitPerPx;
+  if (scaleUnitInput) scaleUnitInput.value = diagramScale.unit;
+  templates = data.templates || [];
+  saveTemplates();
+  renderTemplates();
+  sheets = (data.sheets || []).map((s, i) => ({
+    name: s.name || `Sheet ${i + 1}`,
+    components: (s.components || []).map(normalizeComponent),
+    connections: Array.isArray(s.connections) ? s.connections : []
+  }));
+  if (sheets.length) {
+    loadSheet(0);
+    renderSheetTabs();
+    save();
+  }
 }
 
 if (typeof window !== 'undefined') {
