@@ -555,6 +555,12 @@ import { getDuctbanks as readStoredDuctbanks, setDuctbanks, setItem, getItem } f
     document.getElementById('import-ductbank-xlsx-input').addEventListener('change',e=>{importDuctbankXlsx(e.target.files[0]);e.target.value='';});
     initHeader();
     document.getElementById('clear-ductbank-filters-btn').addEventListener('click',clearFilters);
+    const addCableBtn=document.getElementById('addCableBtn');
+    if(addCableBtn){
+      cableTbody=document.querySelector('#cableTable tbody');
+      addCableBtn.addEventListener('click',addCable);
+      renderCableTable();
+    }
     loadDuctbanks();
     const params=new URLSearchParams(window.location.search);
     const tag=params.get('db');
@@ -573,6 +579,33 @@ import { getDuctbanks as readStoredDuctbanks, setDuctbanks, setItem, getItem } f
   function getDuctbanks(){
     ductbanks.forEach(db=>db.conduits.forEach(c=>{if(c.ductbankTag===undefined) c.ductbankTag=db.tag;}));
     return ductbanks;
+  }
+
+  // Optional cable table management
+  let cableRows=[];
+  let cableTbody;
+
+  function renderCableTable(){
+    if(!cableTbody){
+      cableTbody=document.querySelector('#cableTable tbody');
+      if(!cableTbody) return;
+    }
+    cableTbody.innerHTML='';
+    cableRows.forEach((cb,i)=>{
+      const tr=cableTbody.insertRow();
+      let cell=tr.insertCell();
+      const tagInput=document.createElement('input');
+      tagInput.value=cb.tag||'';
+      tagInput.addEventListener('input',e=>{cb.tag=e.target.value;});
+      cell.appendChild(tagInput);
+      cell=tr.insertCell();
+      cell.appendChild(iconBtn('\u2716','removeBtn','Delete Cable',()=>{cableRows.splice(i,1);renderCableTable();}));
+    });
+  }
+
+  function addCable(){
+    cableRows.push({tag:''});
+    renderCableTable();
   }
 
   window.initDuctbankTable=initDuctbankTable;
