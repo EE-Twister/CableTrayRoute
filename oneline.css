@@ -126,6 +126,7 @@
 
 #panel-section > summary::before { background-image: url('icons/panel.svg'); }
 #equipment-section > summary::before { background-image: url('icons/equipment.svg'); }
+#bus-section > summary::before { background-image: url('icons/Bus.svg'); }
 #load-section > summary::before { background-image: url('icons/load.svg'); }
 #template-section > summary::before { background-image: url('icons/oneline.svg'); }
 

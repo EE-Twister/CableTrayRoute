@@ -214,7 +214,8 @@ function buildPalette() {
   const sectionContainers = {
     panel: document.getElementById('panel-buttons'),
     equipment: document.getElementById('equipment-buttons'),
-    load: document.getElementById('load-buttons')
+    load: document.getElementById('load-buttons'),
+    bus: document.getElementById('bus-buttons')
   };
   Object.values(sectionContainers).forEach(c => {
     if (c) c.innerHTML = '';
