@@ -53,8 +53,13 @@ const manufacturerModels = {
 };
 
 async function loadComponentLibrary() {
+  // Reset library caches so a reload starts from a clean slate
   componentMeta = {};
   propSchemas = {};
+  // Track subtype->category and the category lists that build the palette
+  subtypeCategory = {};
+  componentTypes = {};
+
   let data = [];
   const skipped = [];
   const missingIcons = [];
@@ -136,6 +141,8 @@ async function loadComponentLibrary() {
     reliabilityFields.forEach(f => {
       if (!c.schema.some(s => s.name === f.name)) c.schema.push(f);
     });
+
+    // Store metadata for quick lookup when rendering components
     componentMeta[c.subtype] = {
       icon: c.icon,
       label: c.label,
@@ -143,8 +150,12 @@ async function loadComponentLibrary() {
       ports: c.ports
     };
     propSchemas[c.subtype] = c.schema || [];
+
+    // Build category -> subtype mapping used by the palette
+    subtypeCategory[c.subtype] = c.category;
+    if (!componentTypes[c.category]) componentTypes[c.category] = [];
+    componentTypes[c.category].push(c.subtype);
   });
-  rebuildComponentMaps();
   const banner = document.getElementById('component-library-banner');
   const reloadBtn = document.getElementById('reload-library-btn');
   if (Object.keys(componentTypes).length <= 1) {
@@ -234,9 +245,12 @@ function buildPalette() {
     subs.forEach(sub => {
       const meta = componentMeta[sub];
       const btn = btnTemplate ? btnTemplate.content.firstElementChild.cloneNode(true) : document.createElement('button');
+      // expose subtype/type information for drag & search and mark as draggable
       btn.draggable = true;
+      btn.setAttribute('draggable', 'true');
       btn.dataset.type = type;
       btn.dataset.subtype = sub;
+      btn.setAttribute('data-subtype', sub);
       btn.dataset.label = meta.label;
       btn.title = `${meta.label} - Drag to canvas or click to add`;
       btn.innerHTML = `<img src="${meta.icon}" alt="" aria-hidden="true">`;
