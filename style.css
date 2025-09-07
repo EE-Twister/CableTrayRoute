@@ -658,6 +658,7 @@ body.dark-mode .sticky-table tbody tr:hover {
 
 .over-limit-row { background-color: var(--error-bg); }
 .missing-tag-row { background-color: var(--error-bg); }
+.missing-row { background-color: var(--warning-bg); }
 
 .toast {
     position: fixed;
