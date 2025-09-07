@@ -636,7 +636,7 @@ function editManufacturerDefaults() {
   });
 
   modal.appendChild(form);
-  modal.classList.add('show');
+  return modal;
 }
 
 // --- Tooltip module ---
@@ -1778,11 +1778,7 @@ function selectComponent(comp) {
 
 function openPropertyDialog(componentId) {
   const comp = components.find(c => c.id === componentId);
-  if (!comp) return;
-  if (!propSchemas[comp.subtype]) {
-    showToast(`No properties defined for ${comp.subtype}`);
-    return;
-  }
+  if (!comp) return null;
 
   const modal = document.getElementById('prop-modal');
   modal.innerHTML = '';
@@ -1879,7 +1875,7 @@ function openPropertyDialog(componentId) {
   });
 
   modal.appendChild(form);
-  modal.classList.add('show');
+  return modal;
 }
 
 async function chooseCable(source, target, existingConn = null) {
@@ -2245,9 +2241,15 @@ async function init() {
           ]
         };
       }
+      if (!propSchemas[c.subtype]) {
+        propSchemas[c.subtype] = [];
+      }
     });
   });
   rebuildComponentMaps();
+  Object.keys(componentMeta).forEach(sub => {
+    if (!propSchemas[sub]) propSchemas[sub] = [];
+  });
   sheets.forEach(s => {
     s.components.forEach(c => {
       (c.connections || []).forEach(conn => {
@@ -2603,7 +2605,14 @@ async function init() {
   svg.addEventListener('dblclick', e => {
     const g = e.target.closest('.component');
     if (!g) return;
-    openPropertyDialog(g.dataset.id);
+    const comp = components.find(c => c.id === g.dataset.id);
+    const schema = comp && propSchemas[comp.subtype];
+    if (!comp || !schema || schema.length === 0) {
+      if (comp) showToast(`No properties defined for ${comp.subtype}`);
+      return;
+    }
+    const modal = openPropertyDialog(comp.id);
+    if (modal) modal.classList.add('show');
   });
 
   svg.addEventListener('contextmenu', e => {
@@ -2624,7 +2633,13 @@ async function init() {
     if (!action) return;
     e.stopPropagation();
     if (action === 'edit' && contextTarget) {
-      openPropertyDialog(contextTarget.id);
+      const schema = propSchemas[contextTarget.subtype];
+      if (!schema || schema.length === 0) {
+        showToast(`No properties defined for ${contextTarget.subtype}`);
+        return;
+      }
+      const modal = openPropertyDialog(contextTarget.id);
+      if (modal) modal.classList.add('show');
     } else if (action === 'delete' && contextTarget) {
       components = components.filter(c => c !== contextTarget);
       components.forEach(c => {
