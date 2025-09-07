@@ -12,25 +12,44 @@ const projectId = typeof window !== 'undefined' ? (window.currentProjectId || 'd
  */
 export function assignLoadToBreaker(panelId, loadIndex, breaker) {
   const loads = dataStore.getLoads();
+  const panels = dataStore.getPanels();
   if (!Array.isArray(loads) || loadIndex == null || loadIndex < 0 || loadIndex >= loads.length) {
     return;
   }
+  const panel = panels.find(p => p.id === panelId || p.ref === panelId || p.panel_id === panelId);
+  const load = loads[loadIndex];
+  const loadTag = load.ref || load.id || load.tag;
+  // remove existing assignment of this load
+  if (load.panelId) {
+    const prev = panels.find(p => p.id === load.panelId || p.ref === load.panelId || p.panel_id === load.panelId);
+    if (prev && Array.isArray(prev.breakers)) {
+      prev.breakers = prev.breakers.map(b => (b === loadTag ? null : b));
+    }
+  }
   // clear any existing assignment on this breaker for the panel
+  if (panel) {
+    if (!Array.isArray(panel.breakers)) panel.breakers = [];
+    panel.breakers[breaker - 1] = null;
+    // also remove any other breaker referencing this load
+    panel.breakers = panel.breakers.map(b => (b === loadTag ? null : b));
+  }
   loads.forEach(l => {
     if (l.panelId === panelId && l.breaker === breaker) {
       delete l.panelId;
       delete l.breaker;
     }
   });
-  const load = loads[loadIndex];
   load.panelId = panelId;
   load.breaker = breaker;
+  if (panel) {
+    panel.breakers[breaker - 1] = loadTag;
+    dataStore.setPanels(panels);
+  }
   dataStore.setLoads(loads);
   dataStore.saveProject(projectId);
   const fn = window.opener?.updateComponent || window.updateComponent;
   if (fn) {
-    const id = load.ref || load.id || load.tag;
-    if (id) fn(id, load);
+    if (loadTag) fn(loadTag, load);
   }
 }
 
@@ -86,7 +105,7 @@ function createBreakerCell(panelId, loads, breaker) {
   loads.forEach((load, idx) => {
     const opt = document.createElement('option');
     opt.value = String(idx);
-    opt.textContent = load.description || `Load ${idx + 1}`;
+    opt.textContent = load.ref || load.id || load.description || `Load ${idx + 1}`;
     if (load.panelId === panelId && Number(load.breaker) === breaker) {
       opt.selected = true;
     }
@@ -117,6 +136,8 @@ window.addEventListener('DOMContentLoaded', () => {
       } else {
         // remove assignment if blank selected
         const loads = dataStore.getLoads();
+        const panels = dataStore.getPanels();
+        const panel = panels.find(p => p.id === panelId || p.ref === panelId || p.panel_id === panelId);
         const changed = [];
         loads.forEach(l => {
           if (l.panelId === panelId && Number(l.breaker) === breaker) {
@@ -126,6 +147,11 @@ window.addEventListener('DOMContentLoaded', () => {
           }
         });
         dataStore.setLoads(loads);
+        if (panel) {
+          if (!Array.isArray(panel.breakers)) panel.breakers = [];
+          panel.breakers[breaker - 1] = null;
+          dataStore.setPanels(panels);
+        }
         dataStore.saveProject(projectId);
         const fn = window.opener?.updateComponent || window.updateComponent;
         if (fn) {

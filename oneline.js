@@ -2934,6 +2934,12 @@ function updateComponent(id, fields = {}) {
 
 function syncSchedules(notify = true) {
   const all = sheets.flatMap(s => s.components);
+  const findPanelId = id => {
+    const src = all.find(s => (s.connections || []).some(conn => conn.target === id));
+    if (!src) return null;
+    if (getCategory(src) === 'panel') return src.ref || src.id;
+    return findPanelId(src.id);
+  };
   const mapFields = c => {
     const src = all.find(s => (s.connections || []).some(conn => conn.target === c.id));
     const conn = src ? (src.connections || []).find(cc => cc.target === c.id) : null;
@@ -2979,7 +2985,12 @@ function syncSchedules(notify = true) {
     .map(mapFields);
   const loads = all
     .filter(c => getCategory(c) === 'load')
-    .map(mapFields);
+    .map(c => {
+      const fields = mapFields(c);
+      const panelId = findPanelId(c.id);
+      if (panelId) fields.panelId = panelId;
+      return fields;
+    });
   const buses = all
     .filter(c => c.subtype === 'Bus')
     .map(mapFields);
