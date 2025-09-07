@@ -268,6 +268,8 @@ let clipboard = [];
 let contextTarget = null;
 let connectMode = false;
 let connectSource = null;
+let tempConnection = null;
+let hoverPort = null;
 let selectedConnection = null;
 let dimensionMode = false;
 let dimensionStart = null;
@@ -870,6 +872,26 @@ function nearestPorts(src, tgt) {
   return best;
 }
 
+function nearestPortToPoint(x, y, exclude) {
+  let min = Infinity;
+  let best = null;
+  components.forEach(c => {
+    if (exclude && c === exclude.component) return;
+    const ports = c.ports || componentMeta[c.subtype]?.ports || [];
+    ports.forEach((p, idx) => {
+      const pos = portPosition(c, idx);
+      const dx = pos.x - x;
+      const dy = pos.y - y;
+      const d = Math.hypot(dx, dy);
+      if (d < min) {
+        min = d;
+        best = { component: c, port: idx, pos };
+      }
+    });
+  });
+  return best;
+}
+
 function updateScale() {
   if (!scaleValueInput) return;
   diagramScale.unitPerPx = Number(scaleValueInput.value) || 0;
@@ -1194,17 +1216,19 @@ function render() {
     }
     g.appendChild(text);
     svg.appendChild(g);
-    if (connectMode) {
-      (c.ports || meta.ports || []).forEach((p, idx) => {
-        const pos = portPosition(c, idx);
-        const circ = document.createElementNS(svgNS, 'circle');
-        circ.setAttribute('cx', pos.x);
-        circ.setAttribute('cy', pos.y);
-        circ.setAttribute('r', 3);
-        circ.classList.add('port');
-        svg.appendChild(circ);
-      });
-    }
+      if (connectMode) {
+        (c.ports || meta.ports || []).forEach((p, idx) => {
+          const pos = portPosition(c, idx);
+          const circ = document.createElementNS(svgNS, 'circle');
+          circ.setAttribute('cx', pos.x);
+          circ.setAttribute('cy', pos.y);
+          circ.setAttribute('r', 3);
+          circ.classList.add('port');
+          circ.dataset.id = c.id;
+          circ.dataset.port = idx;
+          svg.appendChild(circ);
+        });
+      }
   });
 
   updateLegend(usedVoltageRanges);
@@ -2222,30 +2246,58 @@ async function init() {
 
   const svg = document.getElementById('diagram');
   const menu = document.getElementById('context-menu');
-  svg.addEventListener('mousedown', e => {
-    const g = e.target.closest('.component');
-    if (!g) {
-      dragOffset = null;
-      return;
-    }
-    const comp = components.find(c => c.id === g.dataset.id);
-    if (!comp) return;
-    if (e.shiftKey || e.ctrlKey || e.metaKey) {
-      if (selection.includes(comp)) {
-        selection = selection.filter(c => c !== comp);
-      } else {
-        selection.push(comp);
+    svg.addEventListener('mousedown', e => {
+      if (connectMode && e.target.classList.contains('port')) {
+        const comp = components.find(c => c.id === e.target.dataset.id);
+        const port = Number(e.target.dataset.port);
+        if (comp) {
+          connectSource = { component: comp, port };
+          const start = portPosition(comp, port);
+          tempConnection = document.createElementNS(svgNS, 'line');
+          tempConnection.setAttribute('x1', start.x);
+          tempConnection.setAttribute('y1', start.y);
+          tempConnection.setAttribute('x2', start.x);
+          tempConnection.setAttribute('y2', start.y);
+          tempConnection.classList.add('connection');
+          tempConnection.classList.add('temp');
+          svg.appendChild(tempConnection);
+        }
+        return;
       }
-    } else if (!selection.includes(comp)) {
-      selection = [comp];
-    }
-    selected = comp;
-    dragOffset = selection.map(c => ({ comp: c, dx: e.offsetX - c.x, dy: e.offsetY - c.y }));
-    render();
-  });
-  svg.addEventListener('mousemove', e => {
-    cursorPos = { x: e.offsetX, y: e.offsetY };
-  });
+      const g = e.target.closest('.component');
+      if (!g) {
+        dragOffset = null;
+        return;
+      }
+      const comp = components.find(c => c.id === g.dataset.id);
+      if (!comp) return;
+      if (e.shiftKey || e.ctrlKey || e.metaKey) {
+        if (selection.includes(comp)) {
+          selection = selection.filter(c => c !== comp);
+        } else {
+          selection.push(comp);
+        }
+      } else if (!selection.includes(comp)) {
+        selection = [comp];
+      }
+      selected = comp;
+      dragOffset = selection.map(c => ({ comp: c, dx: e.offsetX - c.x, dy: e.offsetY - c.y }));
+      render();
+    });
+    svg.addEventListener('mousemove', e => {
+      cursorPos = { x: e.offsetX, y: e.offsetY };
+      if (connectSource && tempConnection) {
+        const nearest = nearestPortToPoint(e.offsetX, e.offsetY, connectSource);
+        let end = { x: e.offsetX, y: e.offsetY };
+        hoverPort = null;
+        if (nearest) {
+          hoverPort = { component: nearest.component, port: nearest.port };
+          end = nearest.pos;
+        }
+        tempConnection.setAttribute('x2', end.x);
+        tempConnection.setAttribute('y2', end.y);
+      }
+    });
   svg.addEventListener('mousemove', e => {
     if (!dragOffset || !dragOffset.length) return;
     let snapPos = null;
@@ -2267,16 +2319,44 @@ async function init() {
     render();
     if (snapPos) flashSnapIndicator(snapPos.x, snapPos.y);
   });
-  svg.addEventListener('mouseup', () => {
-    if (dragOffset && dragOffset.length) {
-      dragOffset = null;
-      pushHistory();
-      render();
-      save();
-    } else {
-      dragOffset = null;
-    }
-  });
+    svg.addEventListener('mouseup', e => {
+      if (connectSource && tempConnection) {
+        tempConnection.remove();
+        tempConnection = null;
+        if (hoverPort && hoverPort.component !== connectSource.component) {
+          const fromComp = connectSource.component;
+          const toComp = hoverPort.component;
+          const fromPort = connectSource.port;
+          const toPort = hoverPort.port;
+          fromComp.connections = fromComp.connections || [];
+          fromComp.connections.push({
+            target: toComp.id,
+            sourcePort: fromPort,
+            targetPort: toPort,
+            fromId: fromComp.id,
+            fromPort,
+            toId: toComp.id,
+            toPort,
+            cableId: null
+          });
+          pushHistory();
+          render();
+          save();
+        }
+        connectSource = null;
+        hoverPort = null;
+        connectMode = false;
+        return;
+      }
+      if (dragOffset && dragOffset.length) {
+        dragOffset = null;
+        pushHistory();
+        render();
+        save();
+      } else {
+        dragOffset = null;
+      }
+    });
   svg.addEventListener('click', async e => {
     if (dimensionMode) {
       let x = e.offsetX;
@@ -2313,29 +2393,6 @@ async function init() {
     selected = comp;
     selectedConnection = null;
     render();
-    if (connectMode) {
-      if (!connectSource) {
-        connectSource = comp;
-      } else if (connectSource !== comp) {
-        const res = await chooseCable(connectSource, comp);
-        if (res) {
-          const [sPort, tPort] = nearestPorts(connectSource, comp);
-          connectSource.connections.push({
-            target: comp.id,
-            cable: res.cable,
-            phases: res.phases,
-            conductors: res.conductors,
-            sourcePort: sPort,
-            targetPort: tPort
-          });
-          pushHistory();
-          render();
-          save();
-        }
-        connectMode = false;
-        connectSource = null;
-      }
-    }
   });
 
   svg.addEventListener('dblclick', e => {

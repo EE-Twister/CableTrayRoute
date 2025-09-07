@@ -4,7 +4,7 @@
     "label": "Bus",
     "icon": "icons/Bus.svg",
     "category": "bus",
-    "ports": [],
+    "ports": [{ "x": 0, "y": 20 }, { "x": 80, "y": 20 }],
     "schema": [
       { "name": "baseKV", "label": "Base kV", "type": "number" },
       { "name": "prefault_voltage", "label": "Prefault Voltage (kV)", "type": "number" },
