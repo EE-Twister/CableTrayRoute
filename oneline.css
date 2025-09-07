@@ -91,7 +91,7 @@
 }
 
 .palette-card h3 {
-  margin: 0 0 0.25rem;
+  display: none;
 }
 
 .palette-section {
@@ -101,21 +101,34 @@
 }
 
 .palette-section summary {
-  padding: 0.25rem 0.5rem;
+  padding: 0;
   cursor: pointer;
   list-style: none;
-  display: flex;
+  display: inline-flex;
   align-items: center;
-  gap: 0.25rem;
+  justify-content: center;
+  width: 32px;
+  height: 32px;
+  font-size: 0;
+  color: transparent;
 }
 
 .palette-section[open] > summary {
   border-bottom: 1px solid var(--ol-border-color);
 }
 
-.palette-section summary {
-  list-style: none;
+.palette-section summary::before {
+  content: '';
+  width: 24px;
+  height: 24px;
+  background-size: contain;
+  background-repeat: no-repeat;
 }
+
+#panel-section > summary::before { background-image: url('icons/panel.svg'); }
+#equipment-section > summary::before { background-image: url('icons/equipment.svg'); }
+#load-section > summary::before { background-image: url('icons/load.svg'); }
+#template-section > summary::before { background-image: url('icons/oneline.svg'); }
 
 .palette-section .section-buttons {
   display: flex;
@@ -125,8 +138,15 @@
 }
 
 .summary-icon {
-  width: 16px;
-  height: 16px;
+  display: none;
+}
+
+.library-tools {
+  margin-bottom: var(--ol-spacing);
+}
+
+.library-tools summary {
+  cursor: pointer;
 }
 
 
