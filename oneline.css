@@ -48,33 +48,47 @@
   display: flex;
   flex-direction: column;
 }
+.palette-card {
+  margin-bottom: var(--ol-spacing);
+}
 
-#component-buttons details {
+.palette-card h3 {
+  margin: 0 0 0.25rem;
+}
+
+.palette-section {
   border: 1px solid var(--ol-border-color);
   border-radius: var(--ol-radius);
-  margin-bottom: var(--ol-spacing);
   background: var(--ol-card-bg);
 }
 
-#component-buttons details summary {
+.palette-section summary {
   padding: 0.25rem 0.5rem;
   cursor: pointer;
   list-style: none;
+  display: flex;
+  align-items: center;
+  gap: 0.25rem;
 }
 
-#component-buttons details[open] > summary {
+.palette-section[open] > summary {
   border-bottom: 1px solid var(--ol-border-color);
 }
 
-#component-buttons details summary::-webkit-details-marker {
+.palette-section summary::-webkit-details-marker {
   display: none;
 }
 
-#component-buttons .section-buttons {
+.palette-section .section-buttons {
   display: flex;
   flex-wrap: wrap;
   gap: var(--ol-spacing);
   padding: var(--ol-spacing);
+}
+
+.summary-icon {
+  width: 16px;
+  height: 16px;
 }
 
 .grid-label {
