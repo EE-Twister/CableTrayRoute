@@ -1732,6 +1732,7 @@ function selectComponent(compOrId) {
           conn.cable = res.cable;
           conn.phases = res.phases;
           conn.conductors = res.conductors;
+          addCable(res.cable);
           pushHistory();
           render();
           save();
@@ -2476,7 +2477,7 @@ async function init() {
     render();
     if (snapPos) flashSnapIndicator(snapPos.x, snapPos.y);
   });
-    svg.addEventListener('mouseup', e => {
+    svg.addEventListener('mouseup', async e => {
       if (connectSource && tempConnection) {
         tempConnection.remove();
         tempConnection = null;
@@ -2486,29 +2487,36 @@ async function init() {
           const fromPort = connectSource.port;
           const toPort = hoverPort.port;
           fromComp.connections = fromComp.connections || [];
-          fromComp.connections.push({
+          const newConn = {
             target: toComp.id,
             sourcePort: fromPort,
             targetPort: toPort,
-            fromId: fromComp.id,
-            fromPort,
-            toId: toComp.id,
-            toPort,
-            cableId: null,
+            cable: null,
+            phases: [],
+            conductors: 0,
             impedance: { r: 0, x: 0 },
             rating: null
-          });
-          pushHistory();
-          render();
-          save();
+          };
+          fromComp.connections.push(newConn);
+
           try {
+            const res = await chooseCable(fromComp, toComp, newConn);
+            if (res) {
+              newConn.cable = res.cable;
+              newConn.phases = res.phases;
+              newConn.conductors = res.conductors;
+              addCable(res.cable);
+            }
             const fromTag = fromComp.ref || fromComp.id;
             const toTag = toComp.ref || toComp.id;
-            addCable({ from_tag: fromTag, to_tag: toTag });
             addRaceway({ conduit_id: `${fromTag}-${toTag}`, from_tag: fromTag, to_tag: toTag });
           } catch (err) {
             console.error('Failed to record connection', err);
           }
+
+          pushHistory();
+          render();
+          save();
         }
         connectSource = null;
         hoverPort = null;
