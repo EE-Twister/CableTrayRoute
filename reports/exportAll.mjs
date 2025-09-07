@@ -35,7 +35,7 @@ export async function setReportTemplate(tpl) {
   }
   if (typeof tpl === 'string') {
     try {
-      const Handlebars = (await import('handlebars')).default;
+      const Handlebars = (await import('https://cdn.jsdelivr.net/npm/handlebars@latest/dist/handlebars.esm.js')).default;
       const compiled = Handlebars.compile(tpl);
       pdfTemplate = ctx => compiled(ctx);
     } catch {
