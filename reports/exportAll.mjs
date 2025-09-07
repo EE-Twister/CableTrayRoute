@@ -1,4 +1,4 @@
-import { jsPDF } from 'jspdf';
+const { jsPDF } = window.jspdf || await import('https://cdn.jsdelivr.net/npm/jspdf@2.5.1/dist/jspdf.es.min.js');
 import { toCSV } from './reporting.mjs';
 import { generateArcFlashLabel } from './labels.mjs';
 import * as dataStore from '../dataStore.mjs';
