@@ -36,6 +36,7 @@ checkPrereqs([{key:'traySchedule',page:'racewayschedule.html',label:'Raceway Sch
       let lastType    = "";    // “ladder” or “solid”
       let lastScale   = 20;    // px/in for small view
       let lastZones   = [];    // array of zone labels in order
+      let lastColor   = '#66ccff'; // default cable color
 
       // Reference to <tbody> in the cable table
       const cableTbody = document.querySelector("#cableTable tbody");
@@ -113,6 +114,26 @@ checkPrereqs([{key:'traySchedule',page:'racewayschedule.html',label:'Raceway Sch
 
       const clearFiltersBtn=document.getElementById('clearCableFiltersBtn');
       if(clearFiltersBtn) clearFiltersBtn.addEventListener('click',clearFilters);
+        let fillSummaryEl;
+        function updateTotals(){
+          const trayW=parseFloat(document.getElementById('trayWidth').value)||0;
+          const trayD=parseFloat(document.getElementById('trayDepth').value)||0;
+          const trayArea=trayW*trayD;
+          const totalArea=cables.reduce((sum,c)=>{
+            const od=parseFloat(c.od||c.OD);
+            return isNaN(od)?sum:sum+Math.PI*Math.pow(od/2,2);
+          },0);
+          const fillP=trayArea?totalArea/trayArea*100:0;
+          const allow=document.getElementById('trayType').value==='ladder'?50:40;
+          if(!fillSummaryEl){
+            fillSummaryEl=document.createElement('p');
+            fillSummaryEl.id='trayFillInfo';
+            cableTable.parentElement.appendChild(fillSummaryEl);
+          }
+          fillSummaryEl.textContent=`Total Cable Area: ${totalArea.toFixed(2)} in², Fill: ${fillP.toFixed(1)}%`;
+          fillSummaryEl.style.color=fillP>allow?'red':'';
+          return {totalArea,fillP,allow};
+        }
 
       // ─────────────────────────────────────────────────────────────
       // (B) Helper: create one cable‐entry <tr> (Tag / Cable Type / Configuration / OD / Weight / Remove)
@@ -255,8 +276,9 @@ checkPrereqs([{key:'traySchedule',page:'racewayschedule.html',label:'Raceway Sch
             cables[idx].od = "";
             cables[idx].weight = "";
           }
+          updateTotals();
         });
-        inpWt.addEventListener("input", e => { cables[idx].weight = e.target.value; });
+        inpWt.addEventListener("input", e => { cables[idx].weight = e.target.value; updateTotals(); });
         if (data.cable_size) selOD.dispatchEvent(new Event('change'));
         // (9) Cable Zone cell
         const tdZone = document.createElement("td");
@@ -332,6 +354,7 @@ checkPrereqs([{key:'traySchedule',page:'racewayschedule.html',label:'Raceway Sch
         cableTbody.innerHTML = "";
         cables.forEach((c,i)=>cableTbody.appendChild(createCableRow(c,i)));
         applyFilters();
+        updateTotals();
       }
 
       // “Add Cable” button → append a blank row
@@ -342,6 +365,10 @@ checkPrereqs([{key:'traySchedule',page:'racewayschedule.html',label:'Raceway Sch
       // Start with one empty row
       cables.push({ tag:"", cableType:"", count:"", size:"", rating:"", voltage:"", od:"", weight:"", zone:1, circuitGroup:"" });
       renderCableRows();
+
+      document.getElementById('trayWidth').addEventListener('change',updateTotals);
+      document.getElementById('trayDepth').addEventListener('input',updateTotals);
+      document.getElementById('trayType').addEventListener('change',updateTotals);
 
       // ─────────────────────────────────────────────────────────────
       // (C) NEC-2011 Sizing Helpers (Table 5 allowable area for small) :contentReference[oaicite:1]{index=1}
@@ -724,6 +751,12 @@ checkPrereqs([{key:'traySchedule',page:'racewayschedule.html',label:'Raceway Sch
           alert("ERROR: Add at least one cable before drawing the tray.");
           return;
         }
+        const totalArea = sumAreas(cables);
+        const allowFill = trayType === "ladder" ? 50 : 40;
+        const overallFill = (totalArea / (trayW * trayD)) * 100;
+        const overLimit = overallFill > allowFill + 1e-6;
+        const cableColor = overLimit ? '#ff6666' : '#66ccff';
+        lastColor = cableColor;
 
         // 3) Convert circuit groups into placement groups
         let groupWarning = "";
@@ -1110,7 +1143,7 @@ checkPrereqs([{key:'traySchedule',page:'racewayschedule.html',label:'Raceway Sch
                   cx="${mx.toFixed(2)}"
                   cy="${my.toFixed(2)}"
                   r="${mr.toFixed(2)}"
-                  fill="#66ccff"
+                  fill="${cableColor}"
                   stroke="#0066aa"
                   stroke-width="1"
                 >
@@ -1134,7 +1167,7 @@ Wt: ${m.weight.toFixed(2)} lbs/ft
                 cx="${cx.toFixed(2)}"
                 cy="${cy.toFixed(2)}"
                 r="${r.toFixed(2)}"
-                fill="#66ccff"
+                fill="${cableColor}"
                 stroke="#0066aa"
                 stroke-width="1"
               >
@@ -1301,7 +1334,7 @@ Wt: ${p.weight.toFixed(2)} lbs/ft
                   cx="${mx.toFixed(2)}"
                   cy="${my.toFixed(2)}"
                   r="${mr.toFixed(2)}"
-                  fill="#66ccff"
+                  fill="${lastColor}"
                   stroke="#0066aa"
                   stroke-width="2"
                 >
@@ -1354,7 +1387,7 @@ Wt: ${m.weight.toFixed(2)} lbs/ft
                 cx="${cx.toFixed(2)}"
                 cy="${cy.toFixed(2)}"
                 r="${r.toFixed(2)}"
-                fill="#66ccff"
+                fill="${lastColor}"
                 stroke="#0066aa"
                 stroke-width="2"
               />
