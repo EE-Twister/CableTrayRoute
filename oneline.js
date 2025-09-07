@@ -221,7 +221,7 @@ function buildPalette() {
       btn.dataset.type = type;
       btn.dataset.subtype = sub;
       btn.dataset.label = meta.label;
-      btn.title = meta.label;
+      btn.title = `${meta.label} - Drag to canvas or click to add`;
       btn.innerHTML = `<img src="${meta.icon}" alt="" aria-hidden="true">`;
       btn.addEventListener('click', () => {
         addComponent({ type, subtype: sub });
