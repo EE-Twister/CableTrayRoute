@@ -2,7 +2,7 @@ import { getItem, setItem, removeItem, keys as storeKeys } from './dataStore.mjs
 
 checkPrereqs([{key:'traySchedule',page:'racewayschedule.html',label:'Raceway Schedule'}]);
 
-    document.addEventListener("DOMContentLoaded", function() {
+    document.addEventListener("DOMContentLoaded", async function() {
       initSettings();
       initDarkMode();
       initCompactMode();
@@ -11,25 +11,8 @@ checkPrereqs([{key:'traySchedule',page:'racewayschedule.html',label:'Raceway Sch
       const dirty = createDirtyTracker();
       const markSaved = () => { dirty.markClean(); };
       const markUnsaved = () => { dirty.markDirty(); };
-      // ─────────────────────────────────────────────────────────────
-      // (A) Default Configurations (3 conductors + ground) :contentReference[oaicite:0]{index=0}
-      // ─────────────────────────────────────────────────────────────
-      const cableOptions = [
-        { label: "3/C – #8 AWG",     conductors: 3, size: "#8 AWG",     OD: 0.66, weight: 0.33 },
-        { label: "3/C – #6 AWG",     conductors: 3, size: "#6 AWG",     OD: 0.74, weight: 0.45 },
-        { label: "3/C – #4 AWG",     conductors: 3, size: "#4 AWG",     OD: 0.88, weight: 0.66 },
-        { label: "3/C – #2 AWG",     conductors: 3, size: "#2 AWG",     OD: 1.00, weight: 0.96 },
-        { label: "3/C – #1 AWG",     conductors: 3, size: "#1 AWG",     OD: 1.13, weight: 1.17 },
-        { label: "3/C – 1/0 AWG",    conductors: 3, size: "1/0 AWG",    OD: 1.22, weight: 1.43 },
-        { label: "3/C – 2/0 AWG",    conductors: 3, size: "2/0 AWG",    OD: 1.31, weight: 1.72 },
-        { label: "3/C – 3/0 AWG",    conductors: 3, size: "3/0 AWG",    OD: 1.42, weight: 2.14 },
-        { label: "3/C – 4/0 AWG",    conductors: 3, size: "4/0 AWG",    OD: 1.55, weight: 2.64 },
-        { label: "3/C – 250 kcmil",  conductors: 3, size: "250 kcmil",  OD: 1.76, weight: 3.18 },
-        { label: "3/C – 350 kcmil",  conductors: 3, size: "350 kcmil",  OD: 1.98, weight: 4.29 },
-        { label: "3/C – 500 kcmil",  conductors: 3, size: "500 kcmil",  OD: 2.26, weight: 5.94 },
-        { label: "3/C – 750 kcmil",  conductors: 3, size: "750 kcmil",  OD: 2.71, weight: 9.01 },
-        { label: "3/C – 1000 kcmil", conductors: 3, size: "1000 kcmil", OD: 3.10, weight: 11.70 }
-      ];
+      // Load common cable sizes
+      const cableOptions = await fetch('data/cableSizes.json').then(r=>r.json());
 
       // Populate the <datalist> (#sizeList) with conductor sizes in order
       const typeDatalist = document.getElementById("sizeList");
@@ -213,17 +196,30 @@ checkPrereqs([{key:'traySchedule',page:'racewayschedule.html',label:'Raceway Sch
         inpVolt.addEventListener("input", e => { cables[idx].voltage = e.target.value; });
         tdVolt.appendChild(inpVolt);
         tr.appendChild(tdVolt);
-        // (7) OD cell (number; auto‐filled or custom)
+        // (7) Cable size select and OD display
         const tdOD = document.createElement("td");
+        const selOD = document.createElement("select");
+        const optBlank = document.createElement("option");
+        optBlank.value = "";
+        optBlank.textContent = "-- select --";
+        selOD.appendChild(optBlank);
+        cableOptions.forEach(o => {
+          const opt = document.createElement("option");
+          opt.value = o.label;
+          opt.textContent = o.label;
+          opt.dataset.od = o.OD;
+          opt.dataset.weight = o.weight;
+          selOD.appendChild(opt);
+        });
         const inpOD = document.createElement("input");
         inpOD.type = "number";
         inpOD.placeholder = "0.00";
         inpOD.step = "0.01";
         inpOD.style.width = "60px";
         inpOD.readOnly = true;
-        inpOD.value = data.od || data.cable_od || "";
-        if (inpOD.value) inpOD.readOnly = false;
-        inpOD.addEventListener("input", e => { cables[idx].od = e.target.value; });
+        inpOD.value = data.od || "";
+        selOD.value = data.cable_size || "";
+        tdOD.appendChild(selOD);
         tdOD.appendChild(inpOD);
         tr.appendChild(tdOD);
         // (8) Weight cell (number; auto‐filled or custom)
@@ -235,10 +231,33 @@ checkPrereqs([{key:'traySchedule',page:'racewayschedule.html',label:'Raceway Sch
         inpWt.style.width = "60px";
         inpWt.readOnly = true;
         inpWt.value = data.weight || "";
-        if (inpWt.value) inpWt.readOnly = false;
-        inpWt.addEventListener("input", e => { cables[idx].weight = e.target.value; });
         tdWt.appendChild(inpWt);
         tr.appendChild(tdWt);
+        if (!data.cable_size) {
+          inpWt.readOnly = false;
+          cables[idx].od = inpOD.value;
+          cables[idx].weight = inpWt.value;
+        }
+        selOD.addEventListener("change", e => {
+          const opt = e.target.selectedOptions[0];
+          if (opt && opt.dataset.od) {
+            inpOD.value = parseFloat(opt.dataset.od).toFixed(2);
+            inpWt.value = parseFloat(opt.dataset.weight).toFixed(2);
+            inpWt.readOnly = true;
+            cables[idx].cable_size = e.target.value;
+            cables[idx].od = inpOD.value;
+            cables[idx].weight = inpWt.value;
+          } else {
+            inpOD.value = "";
+            inpWt.value = "";
+            inpWt.readOnly = false;
+            cables[idx].cable_size = "";
+            cables[idx].od = "";
+            cables[idx].weight = "";
+          }
+        });
+        inpWt.addEventListener("input", e => { cables[idx].weight = e.target.value; });
+        if (data.cable_size) selOD.dispatchEvent(new Event('change'));
         // (9) Cable Zone cell
         const tdZone = document.createElement("td");
         const inpZone = document.createElement("input");
@@ -290,24 +309,18 @@ checkPrereqs([{key:'traySchedule',page:'racewayschedule.html',label:'Raceway Sch
         tdRm.appendChild(btnRm);
         tr.appendChild(tdRm);
 
-        // Auto-fill OD/Weight if count & size match a default
+        // Auto-select cable if count & size match a default
         function tryAutofill() {
           const cnt = parseInt(inpCount.value);
           const sz  = inpSize.value.trim();
-          const matchIdx = cableOptions.findIndex(o => o.conductors === cnt && o.size === sz);
-          if (matchIdx >= 0) {
-            inpOD.value    = cableOptions[matchIdx].OD.toFixed(2);
-            inpWt.value    = cableOptions[matchIdx].weight.toFixed(2);
-            inpOD.readOnly = true;
-            inpWt.readOnly = true;
+          const match = cableOptions.find(o => o.conductors === cnt && o.size === sz);
+          if (match) {
+            selOD.value = match.label;
+            selOD.dispatchEvent(new Event('change'));
           } else {
-            inpOD.value    = "";
-            inpWt.value    = "";
-            inpOD.readOnly = false;
-            inpWt.readOnly = false;
+            selOD.value = "";
+            selOD.dispatchEvent(new Event('change'));
           }
-          cables[idx].od = inpOD.value;
-          cables[idx].weight = inpWt.value;
         }
         inpCount.addEventListener("input", tryAutofill);
         inpSize.addEventListener("input", tryAutofill);
@@ -664,14 +677,15 @@ checkPrereqs([{key:'traySchedule',page:'racewayschedule.html',label:'Raceway Sch
           const tagVal     = row.children[0].querySelector("input").value.trim();
           const cableType  = row.children[1].querySelector("select").value;
           const countVal   = parseInt(row.children[2].querySelector("input").value);
-          const sizeVal     = row.children[3].querySelector("input").value.trim();
-          const ratingVal   = parseFloat(row.children[4].querySelector("input").value);
-          const voltVal     = parseFloat(row.children[5].querySelector("input").value);
-          const odVal       = parseFloat(row.children[6].querySelector("input").value);
-          const wtVal       = parseFloat(row.children[7].querySelector("input").value);
-          const zoneVal     = parseInt(row.children[8].querySelector("input").value) || 1;
-          const groupRaw    = row.children[9].querySelector("input").value;
-          const groupVal    = groupRaw ? parseInt(groupRaw) : null;
+          const sizeVal    = row.children[3].querySelector("input").value.trim();
+          const ratingVal  = parseFloat(row.children[4].querySelector("input").value);
+          const voltVal    = parseFloat(row.children[5].querySelector("input").value);
+          const selSize    = row.children[6].querySelector("select");
+          const odVal      = parseFloat(row.children[6].querySelector("input").value);
+          const wtVal      = parseFloat(row.children[7].querySelector("input").value);
+          const zoneVal    = parseInt(row.children[8].querySelector("input").value) || 1;
+          const groupRaw   = row.children[9].querySelector("input").value;
+          const groupVal   = groupRaw ? parseInt(groupRaw) : null;
           const multiVal   = countVal > 1;
 
           if (!tagVal) {
@@ -698,6 +712,7 @@ checkPrereqs([{key:'traySchedule',page:'racewayschedule.html',label:'Raceway Sch
             size: sizeVal,
             rating: ratingVal,
             voltage: voltVal,
+            cable_size: selSize ? selSize.value : "",
             OD: odVal,
             weight: wtVal,
             multi: multiVal,
@@ -1545,6 +1560,7 @@ Wt: ${m.weight.toFixed(2)} lbs/ft
           }
           // Expect columns: Tag, Cable Type, Conductors, Conductor Size, Cable Rating (V), Operating Voltage (V), OD, Weight, Zone, Circuit Group
           cableTbody.innerHTML = "";
+          cables = [];
           jsonArr.forEach((obj, idx) => {
             const {
               Tag,
@@ -1571,7 +1587,9 @@ Wt: ${m.weight.toFixed(2)} lbs/ft
               alert(`Row ${idx + 2} missing one of: Tag, Cable Type, Conductors, Conductor Size, Cable Rating (V), Operating Voltage (V), OD, Weight.`);
               return;
             }
-            const newRow = createCableRow();
+            const idx2 = cables.length;
+            cables.push({});
+            const newRow = createCableRow({}, idx2);
             newRow.children[0].querySelector("input").value = Tag;
             // Set the "Cable Type" dropdown
             newRow.children[1].querySelector("select").value = CableType;
@@ -1583,12 +1601,16 @@ Wt: ${m.weight.toFixed(2)} lbs/ft
             // Trigger autofill
             const sizeInput = newRow.children[3].querySelector("input");
             sizeInput.dispatchEvent(new Event("input"));
-            // If not matched a default, fill custom OD/Weight
+            const selSize = newRow.children[6].querySelector("select");
             const odInput = newRow.children[6].querySelector("input");
             const wtInput = newRow.children[7].querySelector("input");
             const zoneInput = newRow.children[8].querySelector("input");
             const groupInput = newRow.children[9].querySelector("input");
-            if (cableOptions.findIndex(o => o.conductors === parseInt(Conductors) && o.size === Size) < 0) {
+            const matchIdx = cableOptions.findIndex(o => o.conductors === parseInt(Conductors) && o.size === Size);
+            if (matchIdx >= 0) {
+              selSize.value = cableOptions[matchIdx].label;
+              selSize.dispatchEvent(new Event("change"));
+            } else {
               odInput.value = parseFloat(OD).toFixed(2);
               wtInput.value = parseFloat(Weight).toFixed(2);
               odInput.readOnly = false;
@@ -1705,8 +1727,11 @@ Wt: ${m.weight.toFixed(2)} lbs/ft
         }
         const arr = data;
         cableTbody.innerHTML = "";
+        cables = [];
         arr.forEach(cable => {
-          const newRow = createCableRow();
+          const idx2 = cables.length;
+          cables.push(cable);
+          const newRow = createCableRow(cable, idx2);
           newRow.children[0].querySelector("input").value = cable.tag;
           newRow.children[1].querySelector("select").value = cable.cableType;
           newRow.children[2].querySelector("input").value = cable.count;
@@ -1715,11 +1740,13 @@ Wt: ${m.weight.toFixed(2)} lbs/ft
           newRow.children[5].querySelector("input").value = cable.voltage || "";
           const sizeInput = newRow.children[3].querySelector("input");
           sizeInput.dispatchEvent(new Event("input"));
+          const selSize = newRow.children[6].querySelector("select");
           const odInput = newRow.children[6].querySelector("input");
           const wtInput = newRow.children[7].querySelector("input");
           const zoneInput = newRow.children[8].querySelector("input");
           const groupInput = newRow.children[9].querySelector("input");
           if (cableOptions.findIndex(o => o.conductors === cable.count && o.size === cable.size) < 0) {
+            selSize.value = "";
             odInput.value = cable.OD.toFixed(2);
             wtInput.value = cable.weight.toFixed(2);
             odInput.readOnly = false;

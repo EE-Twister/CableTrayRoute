@@ -8,6 +8,8 @@ import { getDuctbanks as readStoredDuctbanks, setDuctbanks, setItem, getItem } f
   let filters=[];
   let filterButtons=[];
   let headerCells;
+  let cableSizes=[];
+  fetch('data/cableSizes.json').then(r=>r.json()).then(d=>{cableSizes=d;});
 
   function iconBtn(sym,cls,label,handler){
     const b=document.createElement('button');
@@ -598,13 +600,59 @@ import { getDuctbanks as readStoredDuctbanks, setDuctbanks, setItem, getItem } f
       tagInput.value=cb.tag||'';
       tagInput.addEventListener('input',e=>{cb.tag=e.target.value;});
       cell.appendChild(tagInput);
+
+      cell=tr.insertCell();
+      const sel=document.createElement('select');
+      const empty=document.createElement('option');
+      empty.value='';
+      empty.textContent='-- select --';
+      sel.appendChild(empty);
+      cableSizes.forEach(cs=>{
+        const o=document.createElement('option');
+        const label=cs.label||cs.type;
+        o.value=label;
+        o.textContent=label;
+        o.dataset.od=cs.OD||cs.od;
+        o.dataset.weight=cs.weight;
+        sel.appendChild(o);
+      });
+      sel.value=cb.size||'';
+      cell.appendChild(sel);
+
+      cell=tr.insertCell();
+      const odInput=document.createElement('input');
+      odInput.type='number';
+      odInput.step='0.01';
+      odInput.readOnly=true;
+      odInput.style.width='80px';
+      odInput.value=cb.od||'';
+      cell.appendChild(odInput);
+
+      cell=tr.insertCell();
+      const wtInput=document.createElement('input');
+      wtInput.type='number';
+      wtInput.step='0.01';
+      wtInput.readOnly=true;
+      wtInput.style.width='80px';
+      wtInput.value=cb.weight||'';
+      cell.appendChild(wtInput);
+
       cell=tr.insertCell();
       cell.appendChild(iconBtn('\u2716','removeBtn','Delete Cable',()=>{cableRows.splice(i,1);renderCableTable();}));
+
+      sel.addEventListener('change',e=>{
+        const opt=e.target.selectedOptions[0];
+        cb.size=e.target.value;
+        cb.od=opt.dataset.od||'';
+        cb.weight=opt.dataset.weight||'';
+        odInput.value=cb.od;
+        wtInput.value=cb.weight;
+      });
     });
   }
 
   function addCable(){
-    cableRows.push({tag:''});
+    cableRows.push({tag:'',size:'',od:'',weight:''});
     renderCableTable();
   }
 
