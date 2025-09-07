@@ -291,13 +291,22 @@ export const removeEquipment = index => {
  * @returns {OneLineSheet[]}
  */
 export const getOneLine = (scenario = currentScenario) => {
-  const data = read(KEYS.oneLine, [], scenario);
+  const data = read(KEYS.oneLine, {}, scenario);
   if (Array.isArray(data)) {
     // legacy array of components
-    return [{ name: 'Sheet 1', components: data }];
+    return { activeSheet: 0, sheets: [{ name: 'Sheet 1', components: data, connections: [] }] };
   }
-  if (data && Array.isArray(data.sheets)) return data.sheets;
-  return [];
+  if (data && Array.isArray(data.sheets)) {
+    return {
+      activeSheet: data.activeSheet || 0,
+      sheets: data.sheets.map(s => ({
+        name: s.name,
+        components: Array.isArray(s.components) ? s.components : [],
+        connections: Array.isArray(s.connections) ? s.connections : []
+      }))
+    };
+  }
+  return { activeSheet: 0, sheets: [] };
 };
 /**
  * Persist one-line sheets
@@ -317,15 +326,19 @@ export const restoreRevision = (index, scenario = currentScenario) => {
   const revs = getRevisions(scenario);
   const rev = revs[index];
   if (rev) {
-    write(KEYS.oneLine, { sheets: rev.sheets }, scenario);
+    write(KEYS.oneLine, { activeSheet: 0, sheets: rev.sheets }, scenario);
   }
   return rev ? rev.sheets : null;
 };
 
-export const setOneLine = (sheets, scenario = currentScenario) => {
+export const setOneLine = (data, scenario = currentScenario) => {
   const prev = getOneLine(scenario);
-  if (Array.isArray(prev) && prev.length) addRevision(prev, scenario);
-  write(KEYS.oneLine, { sheets }, scenario);
+  if (Array.isArray(prev.sheets) && prev.sheets.length) addRevision(prev.sheets, scenario);
+  const payload = {
+    activeSheet: data.activeSheet || 0,
+    sheets: Array.isArray(data.sheets) ? data.sheets : []
+  };
+  write(KEYS.oneLine, payload, scenario);
 };
 
 /**
@@ -488,20 +501,24 @@ export function loadProject(projectId, scenario = currentScenario) {
       const raw = localStorage.getItem(prefix + k);
       try { return raw ? JSON.parse(raw) : null; } catch { return null; }
     };
-    const equipment = readKey('equipment') || [];
-    const panels = readKey('panels') || [];
-    const loads = readKey('loads') || [];
-    const cables = readKey('cables') || [];
+    const equipment = readKey('equipment');
+    const panels = readKey('panels');
+    const loads = readKey('loads');
+    const cables = readKey('cables');
     const raceways = readKey('raceways') || {};
-    const oneLine = readKey('oneLine') || [];
-    setEquipment(Array.isArray(equipment) ? equipment : []);
-    setPanels(Array.isArray(panels) ? panels : []);
-    setLoads(Array.isArray(loads) ? loads : []);
-    setCables(Array.isArray(cables) ? cables : []);
+    const oneLine = readKey('oneLine') || {};
+    if (Array.isArray(equipment)) setEquipment(equipment); else setEquipment([]);
+    if (Array.isArray(panels)) setPanels(panels); else setPanels([]);
+    if (Array.isArray(loads)) setLoads(loads);
+    if (Array.isArray(cables)) setCables(cables); else setCables([]);
     setTrays(Array.isArray(raceways.trays) ? raceways.trays : []);
     setConduits(Array.isArray(raceways.conduits) ? raceways.conduits : []);
     setDuctbanks(Array.isArray(raceways.ductbanks) ? raceways.ductbanks : []);
-    setOneLine(Array.isArray(oneLine) ? oneLine : [], scenario);
+    if (Array.isArray(oneLine)) {
+      setOneLine({ activeSheet: 0, sheets: oneLine }, scenario);
+    } else {
+      setOneLine(oneLine || { activeSheet: 0, sheets: [] }, scenario);
+    }
   } catch (e) {
     console.error('Failed to load project', e);
   }
@@ -535,7 +552,7 @@ function validateProjectSchema(obj) {
     Array.isArray(obj.equipment) &&
     Array.isArray(obj.loads) &&
     obj.settings && typeof obj.settings === 'object' && !Array.isArray(obj.settings) &&
-    (obj.oneLine === undefined || Array.isArray(obj.oneLine));
+    (obj.oneLine === undefined || Array.isArray(obj.oneLine) || Array.isArray(obj.oneLine?.sheets));
 
   const valid = missing.length === 0 && extra.length === 0 && typesValid;
   return { valid, missing, extra };
@@ -673,7 +690,13 @@ export function importProject(obj) {
   setPanels(Array.isArray(data.panels) ? data.panels : []);
   setEquipment(Array.isArray(data.equipment) ? data.equipment : []);
   setLoads(Array.isArray(data.loads) ? data.loads : []);
-  setOneLine(Array.isArray(data.oneLine) ? data.oneLine : Array.isArray(data.oneLine?.sheets) ? data.oneLine.sheets : []);
+  if (Array.isArray(data.oneLine)) {
+    setOneLine({ activeSheet: 0, sheets: data.oneLine });
+  } else if (data.oneLine && Array.isArray(data.oneLine.sheets)) {
+    setOneLine({ activeSheet: data.oneLine.activeSheet || 0, sheets: data.oneLine.sheets });
+  } else {
+    setOneLine({ activeSheet: 0, sheets: [] });
+  }
 
   const reserved = new Set([...Object.values(KEYS), 'CTR_PROJECT_V1']);
   for (const key of keys()) {

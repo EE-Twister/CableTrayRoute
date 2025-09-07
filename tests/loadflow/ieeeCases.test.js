@@ -47,13 +47,13 @@ function caseToDiagram(data){
 
   describe('IEEE load flow benchmarks', () => {
     it('solves IEEE 14-bus case', () => {
-      setOneLine(caseToDiagram(case14));
+      setOneLine({ activeSheet: 0, sheets: caseToDiagram(case14) });
       const res = runLoadFlow({ baseMVA: case14.baseMVA });
       assert(res.buses.length === case14.buses.length);
     });
 
     it('loads IEEE 57-bus placeholder', () => {
-      setOneLine(caseToDiagram(case57));
+      setOneLine({ activeSheet: 0, sheets: caseToDiagram(case57) });
       const res = runLoadFlow({ baseMVA: case57.baseMVA });
       assert(Array.isArray(res.buses || res));
     });

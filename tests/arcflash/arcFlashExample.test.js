@@ -20,12 +20,12 @@ global.localStorage = {
   describe('arc flash analysis', () => {
     it('uses protective device clearing time', () => {
       setItem('tccSettings', { devices: ['abb_tmax_160'], settings: { abb_tmax_160: { pickup: 160, delay: 0.2, instantaneous: 800 } } });
-      setOneLine([{ name: 'S1', components: [
+      setOneLine({ activeSheet: 0, sheets: [{ name: 'S1', components: [
         { id: 'BUS1', kV: 0.48, z1: { r: 0, x: 0.05 }, z2: { r: 0, x: 0.05 }, z0: { r: 0, x: 0.05 },
           sources: [{ z1: { r: 0, x: 0.02 }, z2: { r: 0, x: 0.02 }, z0: { r: 0, x: 0.02 } }],
           enclosure: 'Box', gap: 32, working_distance: 455, electrode_config: 'VCB', tccId: 'abb_tmax_160',
           enclosure_height: 508, enclosure_width: 508, enclosure_depth: 508 }
-      ] }]);
+      ] }] });
       const res = runArcFlash();
       const af = res.BUS1;
       assert(Math.abs(af.incidentEnergy - 1.25) < 0.05);

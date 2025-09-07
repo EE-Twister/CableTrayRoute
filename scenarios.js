@@ -25,8 +25,8 @@ function diffScenarios(a, b) {
   const diagram = document.getElementById('diagram');
   if (!diagram) return;
   diagram.querySelectorAll('.scenario-diff').forEach(el => el.classList.remove('scenario-diff'));
-  const sheetsA = getOneLine(a);
-  const sheetsB = getOneLine(b);
+  const { sheets: sheetsA } = getOneLine(a);
+  const { sheets: sheetsB } = getOneLine(b);
   const map = arr => {
     const m = new Map();
     for (const s of arr) {

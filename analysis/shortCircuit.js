@@ -29,7 +29,7 @@ function parallel(a, b) {
  *   - `method` ('ANSI' or 'IEC')
  */
 export function runShortCircuit(opts = {}) {
-  const sheets = getOneLine();
+  const { sheets } = getOneLine();
   const comps = Array.isArray(sheets[0]?.components)
     ? sheets.flatMap(s => s.components)
     : sheets;
