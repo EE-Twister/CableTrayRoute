@@ -215,6 +215,32 @@ if (typeof window !== 'undefined') {
     }
   }
 
+  function generateId(existing, base) {
+    let id = base || 'item';
+    let i = 1;
+    while (existing.includes(id)) {
+      id = `${base || 'item'}_${i++}`;
+    }
+    return id;
+  }
+
+  tbody.addEventListener('click', e => {
+    const btn = e.target;
+    const tr = btn.closest('tr');
+    if (!tr) return;
+    const idx = Number(tr.dataset.index);
+    if (btn.classList.contains('duplicateBtn')) {
+      const load = gatherRow(tr);
+      const ids = dataStore.getLoads().map(l => l.id).filter(Boolean);
+      load.id = generateId(ids, load.id || load.tag);
+      dataStore.insertLoad(idx + 1, load);
+      render();
+    } else if (btn.classList.contains('removeBtn')) {
+      dataStore.deleteLoad(idx);
+      render();
+    }
+  });
+
   function handleNav(e, td) {
     if (e.key === 'ArrowLeft' || e.key === 'ArrowRight') {
       let allSelected = true;

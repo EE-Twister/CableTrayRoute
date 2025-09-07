@@ -222,6 +222,41 @@ window.addEventListener('DOMContentLoaded', () => {
     }
   });
 
+  function generateId(existing, base) {
+    let id = base || 'item';
+    let i = 1;
+    while (existing.includes(id)) {
+      id = `${base || 'item'}_${i++}`;
+    }
+    return id;
+  }
+
+  table.tbody.addEventListener('click', e => {
+    const btn = e.target;
+    const tr = btn.closest('tr');
+    if (!tr) return;
+    if (btn.classList.contains('duplicateBtn')) {
+      e.stopImmediatePropagation();
+      const data = table.getData();
+      const idx = Array.from(table.tbody.rows).indexOf(tr);
+      const clone = { ...data[idx] };
+      const ids = data.map(r => r.tag).filter(Boolean);
+      clone.tag = generateId(ids, clone.tag);
+      data.splice(idx + 1, 0, clone);
+      table.setData(data);
+      table.save();
+      if (table.onChange) table.onChange();
+    } else if (btn.classList.contains('removeBtn')) {
+      e.stopImmediatePropagation();
+      const data = table.getData();
+      const idx = Array.from(table.tbody.rows).indexOf(tr);
+      data.splice(idx, 1);
+      table.setData(data);
+      table.save();
+      if (table.onChange) table.onChange();
+    }
+  });
+
   // Provide a setData method similar to Tabulator for convenience.
   table.setData = function(rows){
     this.tbody.innerHTML='';
