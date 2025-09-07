@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Documentation</title>
+  <title>Routing Assumptions</title>
   <link rel="stylesheet" href="../style.css">
 </head>
 <body>
@@ -18,60 +18,26 @@
       <a href="../cabletrayfill.html">Tray Fill</a>
       <a href="../conduitfill.html">Conduit Fill</a>
       <a href="../optimalRoute.html">Optimal Route</a>
-      <a href="index.html" class="active" aria-current="page">Docs</a>
+      <a href="index.html" aria-current="page">Docs</a>
     </div>
   </nav>
   <header class="hero">
-    <h1>Documentation</h1>
-    <p>Guides and references for CableTrayRoute.</p>
+    <h1>Routing Assumptions</h1>
+    <p>Simplifications used for path calculations.</p>
   </header>
-  <div class="doc-content">
+<div class="doc-content">
   <nav id="doc-nav" class="doc-nav"></nav>
   <main id="main-content" class="doc-main">
-    <input type="search" id="doc-search" placeholder="Search docs..." aria-label="Search documentation">
-    <div id="doc-list">
-      <section>
-        <h2>Getting Started</h2>
-        <ul class="doc-list">
-          <li><a href="quickstart.html">Quick Start</a></li>
-          <li><a href="tutorial.html">From empty to routed</a></li>
-        </ul>
-      </section>
-      <section>
-        <h2>Data &amp; Templates</h2>
-        <ul class="doc-list">
-          <li><a href="templates.html">CSV/XLSX Templates</a></li>
-          <li><a href="geometry-fields.html">Geometry Fields</a></li>
-          <li><a href="tray_id_convention.html">Tray ID Convention</a></li>
-        </ul>
-      </section>
-      <section>
-        <h2>Advanced Topics</h2>
-        <ul class="doc-list">
-          <li><a href="AMPACITY_METHOD.html">Ampacity Method</a></li>
-          <li><a href="soil_resistivity.html">Soil Resistivity</a></li>
-          <li><a href="math.html">Math References</a></li>
-          <li><a href="load_calculation_formulas.html">Load Calculation</a></li>
-          <li><a href="cable_fill_rules.html">Cable Fill Rules</a></li>
-          <li><a href="routing_assumptions.html">Routing Assumptions</a></li>
-        </ul>
-      </section>
-      <section>
-        <h2>Standards</h2>
-        <ul class="doc-list">
-          <li><a href="standards.html">Engineering References</a></li>
-        </ul>
-      </section>
-      <section>
-        <h2>Support</h2>
-        <ul class="doc-list">
-          <li><a href="troubleshooting.html">Troubleshooting</a></li>
-        </ul>
-      </section>
-    </div>
-    <footer class="doc-footer">Docs last updated: <span id="last-updated"></span></footer>
+    <p>Routing calculations simplify the physical environment to speed analysis.</p>
+    <ul>
+      <li>Paths are modeled as straight segments between defined nodes.</li>
+      <li>The solver ignores elevation changes, obstacles, and congestion.</li>
+      <li>Dijkstra's algorithm is applied with non‑negative edge weights.</li>
+      <li>Coordinates are treated as planar and use consistent units.</li>
+    </ul>
+    <p>These assumptions suit early design estimates; field conditions may require adjustment.</p>
   </main>
-  </div>
+</div>
   <footer class="site-footer">
     <div class="footer-left">
       <img src="../icons/route.svg" alt="CableTrayRoute logo" class="footer-logo">
