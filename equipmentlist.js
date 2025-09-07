@@ -1,7 +1,10 @@
+import * as dataStore from './dataStore.mjs';
 import './tableUtils.js';
 
 if (typeof window !== 'undefined') {
   window.addEventListener('DOMContentLoaded', () => {
+    const projectId = window.currentProjectId || 'default';
+    dataStore.loadProject(projectId);
     initSettings();
     initDarkMode();
     initCompactMode();
@@ -44,6 +47,7 @@ if (typeof window !== 'undefined') {
             if (id) fn(id, row);
           });
         }
+        dataStore.saveProject(projectId);
       }
     });
 

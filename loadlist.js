@@ -101,6 +101,9 @@ export function aggregateLoadsBySource(loads) {
 // Inline load list editor
 if (typeof window !== 'undefined') {
   window.addEventListener('DOMContentLoaded', () => {
+    const projectId = window.currentProjectId || 'default';
+    dataStore.loadProject(projectId);
+    dataStore.on(dataStore.STORAGE_KEYS.loads, () => dataStore.saveProject(projectId));
     initSettings();
     initDarkMode();
     initCompactMode();

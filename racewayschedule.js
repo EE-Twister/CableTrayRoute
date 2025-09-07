@@ -26,6 +26,10 @@ const TRAY_DEPTH_OPTIONS=['2','3','4','5','6','7','8','9','10','11','12'];
 const TRAY_TYPE_OPTIONS=['Ladder (50 % fill)','Solid Bottom (40 % fill)'];
 
 document.addEventListener('DOMContentLoaded',()=>{
+  const projectId = window.currentProjectId || 'default';
+  dataStore.loadProject(projectId);
+  const save = () => dataStore.saveProject(projectId);
+  [dataStore.STORAGE_KEYS.ductbanks, dataStore.STORAGE_KEYS.trays, dataStore.STORAGE_KEYS.conduits].forEach(k => dataStore.on(k, save));
   initSettings();
   initDarkMode();
   initCompactMode();

@@ -1,6 +1,8 @@
 import * as dataStore from './dataStore.mjs';
 import { exportPanelSchedule } from './exportPanelSchedule.js';
 
+const projectId = typeof window !== 'undefined' ? (window.currentProjectId || 'default') : undefined;
+
 /**
  * Assign a load to a breaker within a panel.
  * Updates the stored load with panel and breaker information.
@@ -24,6 +26,7 @@ export function assignLoadToBreaker(panelId, loadIndex, breaker) {
   load.panelId = panelId;
   load.breaker = breaker;
   dataStore.setLoads(loads);
+  dataStore.saveProject(projectId);
   const fn = window.opener?.updateComponent || window.updateComponent;
   if (fn) {
     const id = load.ref || load.id || load.tag;
@@ -101,6 +104,7 @@ function updateTotals(panelId) {
 }
 
 window.addEventListener('DOMContentLoaded', () => {
+  dataStore.loadProject(projectId);
   const panelId = 'P1';
   render(panelId);
   document.getElementById('export-panel-btn').addEventListener('click', () => exportPanelSchedule(panelId));
@@ -122,6 +126,7 @@ window.addEventListener('DOMContentLoaded', () => {
           }
         });
         dataStore.setLoads(loads);
+        dataStore.saveProject(projectId);
         const fn = window.opener?.updateComponent || window.updateComponent;
         if (fn) {
           changed.forEach(l => {
