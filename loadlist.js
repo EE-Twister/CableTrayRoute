@@ -196,7 +196,7 @@ if (typeof window !== 'undefined') {
     tr.querySelector('.current').textContent = format(computed.current);
     tr.querySelector('.demand-kva').textContent = format(computed.demandKva);
     tr.querySelector('.demand-kw').textContent = format(computed.demandKw);
-    updateFooter();
+    recalculateTotals();
     updateSummary();
     const fn = window.opener?.updateComponent || window.updateComponent;
     if (fn) {
@@ -356,15 +356,19 @@ if (typeof window !== 'undefined') {
     }
   });
 
-  function updateFooter(loads = dataStore.getLoads()) {
+  function recalculateTotals(loads = dataStore.getLoads()) {
     if (!tfoot) return;
-    const totals = loads.reduce((acc, l) => {
-      acc.kW += parseFloat(l.kw) || 0;
-      acc.kVA += parseFloat(l.kva) || 0;
-      acc.demandKVA += parseFloat(l.demandKva) || 0;
-      acc.demandKW += parseFloat(l.demandKw) || 0;
+    const totals = loads.reduce((acc, row) => {
+      const kw = parseFloat(row.kw) || 0;
+      const kva = parseFloat(row.kva) || 0;
+      const df = parseFloat(row.df ?? row.demandFactor);
+      const factor = isNaN(df) ? 1 : df / 100;
+      acc.kW += kw;
+      acc.kVA += kva;
+      acc.demandKW += kw * factor;
+      acc.demandKVA += kva * factor;
       return acc;
-    }, { kW: 0, kVA: 0, demandKVA: 0, demandKW: 0 });
+    }, { kW: 0, kVA: 0, demandKW: 0, demandKVA: 0 });
     tfoot.innerHTML = `<tr>
       <td colspan="10">Totals</td>
       <td>${totals.kW.toFixed(2)}</td>
@@ -407,7 +411,7 @@ if (typeof window !== 'undefined') {
       }
       loads.forEach((load, idx) => tbody.appendChild(createRow(load, idx)));
       selectAll.checked = false;
-      updateFooter(loads);
+      recalculateTotals(loads);
       updateSummary(loads);
     } finally {
       rendering = false;
