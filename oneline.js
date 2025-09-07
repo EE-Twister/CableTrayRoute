@@ -19,6 +19,8 @@ const typeIcons = {
   bus: 'icons/Bus.svg'
 };
 
+const placeholderIcon = 'icons/placeholder.svg';
+
 let propSchemas = {};
 let subtypeCategory = {};
 let componentTypes = {};
@@ -41,6 +43,8 @@ async function loadComponentLibrary() {
   componentMeta = {};
   propSchemas = {};
   let data = [];
+  const skipped = [];
+  const missingIcons = [];
   try {
     const res = await fetch('componentLibrary.json');
     if (!res.ok) throw new Error(res.statusText);
@@ -71,15 +75,40 @@ async function loadComponentLibrary() {
   data.forEach(c => bySubtype.set(c.subtype, c));
 
   userComponents.forEach(c => {
-    if (!isValidComponent(c)) return;
+    if (!isValidComponent(c)) {
+      skipped.push(c.subtype || 'unknown');
+      return;
+    }
     if (userIcons[c.icon]) c.icon = userIcons[c.icon];
     bySubtype.set(c.subtype, c);
   });
 
-  data = Array.from(bySubtype.values()).map(c => {
+  data = Array.from(bySubtype.values()).filter(c => {
+    if (!isValidComponent(c)) {
+      skipped.push(c.subtype || 'unknown');
+      return false;
+    }
     if (userIcons[c.icon]) c.icon = userIcons[c.icon];
-    return c;
+    return true;
   });
+
+  await Promise.all(
+    data.map(async c => {
+      if (!c.icon) {
+        missingIcons.push(c.subtype);
+        c.icon = placeholderIcon;
+        return;
+      }
+      try {
+        const head = await fetch(c.icon, { method: 'HEAD' });
+        if (!head.ok) throw new Error(head.statusText);
+      } catch {
+        console.warn(`Icon missing for subtype ${c.subtype}`);
+        missingIcons.push(c.subtype);
+        c.icon = placeholderIcon;
+      }
+    })
+  );
 
   const reliabilityFields = [
     { name: 'mtbf', label: 'MTBF (hrs)', type: 'number' },
@@ -100,10 +129,17 @@ async function loadComponentLibrary() {
     propSchemas[c.subtype] = c.schema || [];
   });
   rebuildComponentMaps();
+
+  if (skipped.length) {
+    showToast(`Skipped components: ${skipped.join(', ')}`);
+  }
+  if (missingIcons.length) {
+    console.warn('Using placeholder icons for: ' + missingIcons.join(', '));
+  }
 }
 
 function isValidComponent(c) {
-  return c && typeof c === 'object' && Array.isArray(c.ports) && c.category && c.icon;
+  return c && typeof c === 'object' && Array.isArray(c.ports) && c.category;
 }
 
 async function loadManufacturerLibrary() {
@@ -155,6 +191,9 @@ function buildPalette() {
     equipment: document.getElementById('equipment-buttons'),
     load: document.getElementById('load-buttons')
   };
+  Object.values(sectionContainers).forEach(c => {
+    if (c) c.innerHTML = '';
+  });
   Object.entries(sectionContainers).forEach(([cat, container]) => {
     const summary = container?.parentElement?.querySelector('summary');
     if (summary) summary.textContent = cat.charAt(0).toUpperCase() + cat.slice(1);
@@ -1993,6 +2032,11 @@ async function init() {
   if (exportReportsBtn) exportReportsBtn.addEventListener('click', () => exportAllReports());
 
   buildPalette();
+  const reloadBtn = document.getElementById('reload-library-btn');
+  if (reloadBtn) reloadBtn.addEventListener('click', async () => {
+    await loadComponentLibrary();
+    buildPalette();
+  });
   loadTemplates();
   renderTemplates();
   document.getElementById('template-export-btn').addEventListener('click', exportTemplates);
