@@ -18,10 +18,12 @@ export function exportPanelSchedule(panelId) {
   data.push(['Panel', panelId]);
   data.push(['Voltage', panel.voltage || panel.voltage_rating || '']);
   data.push(['Main Rating (A)', panel.mainRating || panel.main_rating || '']);
+  const circuitCount = panel.circuitCount || panel.breakers?.length || 42;
+  data.push(['Circuit Count', circuitCount]);
   data.push([]);
   data.push(['Circuit', 'Poles', 'Description', 'Demand (kVA)']);
 
-  for (let circuit = 1; circuit <= 42; circuit++) {
+  for (let circuit = 1; circuit <= circuitCount; circuit++) {
     const load = loads.find(l => Number(l.breaker) === circuit);
     const poles = load ? (load.poles || load.phases || '') : '';
     const desc = load ? (load.description || '') : '';

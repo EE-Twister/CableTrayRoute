@@ -3,6 +3,17 @@ import { exportPanelSchedule } from './exportPanelSchedule.js';
 
 const projectId = typeof window !== 'undefined' ? (window.currentProjectId || 'default') : undefined;
 
+function getOrCreatePanel(panelId) {
+  const panels = dataStore.getPanels();
+  let panel = panels.find(p => p.id === panelId || p.ref === panelId || p.panel_id === panelId);
+  if (!panel) {
+    panel = { id: panelId, breakers: [], voltage: '', mainRating: '', circuitCount: 42 };
+    panels.push(panel);
+    dataStore.setPanels(panels);
+  }
+  return { panel, panels };
+}
+
 /**
  * Assign a load to a breaker within a panel.
  * Updates the stored load with panel and breaker information.
@@ -74,18 +85,28 @@ export function calculatePanelTotals(panelId) {
 }
 
 function render(panelId = 'P1') {
+  const { panel } = getOrCreatePanel(panelId);
   const container = document.getElementById('panel-container');
   container.innerHTML = '';
   const table = document.createElement('table');
   table.id = 'panel-table';
-  const tbody = document.createElement('tbody');
-  const loads = dataStore.getLoads();
-  for (let i = 1; i <= 42; i += 2) {
-    const tr = document.createElement('tr');
-    tr.appendChild(createBreakerCell(panelId, loads, i));
-    tr.appendChild(createBreakerCell(panelId, loads, i + 1));
-    tbody.appendChild(tr);
+  const thead = document.createElement('thead');
+  const headRow = document.createElement('tr');
+  const circuitCount = panel.circuitCount || 42;
+  for (let i = 1; i <= circuitCount; i++) {
+    const th = document.createElement('th');
+    th.textContent = i;
+    headRow.appendChild(th);
   }
+  thead.appendChild(headRow);
+  table.appendChild(thead);
+  const tbody = document.createElement('tbody');
+  const row = document.createElement('tr');
+  const loads = dataStore.getLoads();
+  for (let i = 1; i <= circuitCount; i++) {
+    row.appendChild(createBreakerCell(panelId, loads, i));
+  }
+  tbody.appendChild(row);
   table.appendChild(tbody);
   container.appendChild(table);
   updateTotals(panelId);
@@ -93,9 +114,6 @@ function render(panelId = 'P1') {
 
 function createBreakerCell(panelId, loads, breaker) {
   const td = document.createElement('td');
-  const label = document.createElement('span');
-  label.textContent = breaker;
-  label.className = 'breaker-label';
   const select = document.createElement('select');
   select.dataset.breaker = breaker;
   const blank = document.createElement('option');
@@ -111,7 +129,6 @@ function createBreakerCell(panelId, loads, breaker) {
     }
     select.appendChild(opt);
   });
-  td.appendChild(label);
   td.appendChild(select);
   return td;
 }
@@ -125,6 +142,57 @@ function updateTotals(panelId) {
 window.addEventListener('DOMContentLoaded', () => {
   dataStore.loadProject(projectId);
   const panelId = 'P1';
+  const { panel, panels } = getOrCreatePanel(panelId);
+
+  const voltageInput = document.getElementById('panel-voltage');
+  const mainInput = document.getElementById('panel-main-rating');
+  const circuitInput = document.getElementById('panel-circuit-count');
+
+  voltageInput.value = panel.voltage || '';
+  mainInput.value = panel.mainRating || '';
+  circuitInput.value = panel.circuitCount || panel.breakers.length || 42;
+
+  const savePanels = () => {
+    dataStore.setPanels(panels);
+    dataStore.saveProject(projectId);
+  };
+
+  voltageInput.addEventListener('input', () => {
+    panel.voltage = voltageInput.value;
+    savePanels();
+  });
+
+  mainInput.addEventListener('input', () => {
+    panel.mainRating = mainInput.value;
+    savePanels();
+  });
+
+  circuitInput.addEventListener('input', () => {
+    const count = parseInt(circuitInput.value, 10) || 0;
+    panel.circuitCount = count;
+    if (!Array.isArray(panel.breakers)) panel.breakers = [];
+    const loads = dataStore.getLoads();
+    if (panel.breakers.length < count) {
+      for (let i = panel.breakers.length; i < count; i++) panel.breakers[i] = null;
+    }
+    if (panel.breakers.length > count) {
+      for (let i = count; i < panel.breakers.length; i++) {
+        const tag = panel.breakers[i];
+        if (tag) {
+          const load = loads.find(l => (l.ref || l.id || l.tag) === tag);
+          if (load) {
+            delete load.panelId;
+            delete load.breaker;
+          }
+        }
+      }
+      panel.breakers = panel.breakers.slice(0, count);
+      dataStore.setLoads(loads);
+    }
+    savePanels();
+    render(panelId);
+  });
+
   render(panelId);
   document.getElementById('export-panel-btn').addEventListener('click', () => exportPanelSchedule(panelId));
   document.getElementById('panel-container').addEventListener('change', e => {
@@ -134,7 +202,6 @@ window.addEventListener('DOMContentLoaded', () => {
       if (loadIdx !== null) {
         assignLoadToBreaker(panelId, loadIdx, breaker);
       } else {
-        // remove assignment if blank selected
         const loads = dataStore.getLoads();
         const panels = dataStore.getPanels();
         const panel = panels.find(p => p.id === panelId || p.ref === panelId || p.panel_id === panelId);

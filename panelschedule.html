@@ -54,6 +54,11 @@
         <p>Assign loads from the load list to panel breakers.</p>
       </header>
       <section class="card">
+        <div id="panel-info" style="margin-bottom:10px;">
+          <label>Voltage <input id="panel-voltage" type="text"></label>
+          <label>Main Breaker Rating (A) <input id="panel-main-rating" type="number" min="0"></label>
+          <label>Number of Circuits <input id="panel-circuit-count" type="number" min="1"></label>
+        </div>
         <div id="panel-container"></div>
         <div id="panel-totals" style="margin-top:10px;"></div>
         <button id="export-panel-btn">Export to Excel</button>
