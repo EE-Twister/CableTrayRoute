@@ -27,6 +27,9 @@ let componentTypes = {};
 let manufacturerDefaults = {};
 let protectiveDevices = [];
 
+let paletteWidth = 250;
+let resizingPalette = false;
+
 const kvClasses = ['0.48 kV', '5 kV', '15 kV', '25 kV'];
 const thermalRatings = ['75C', '90C', '105C'];
 const manufacturerModels = {
@@ -2124,6 +2127,39 @@ async function init() {
     setItem('cableSlackPct', cableSlackPct);
     syncSchedules(false);
     render();
+  });
+
+  const workspaceEl = document.querySelector('.workspace');
+  const splitter = document.querySelector('.splitter');
+  const paletteToggle = document.getElementById('palette-toggle');
+
+  splitter?.addEventListener('mousedown', e => {
+    resizingPalette = true;
+    e.preventDefault();
+  });
+
+  document.addEventListener('mousemove', e => {
+    if (!resizingPalette) return;
+    const rect = workspaceEl.getBoundingClientRect();
+    paletteWidth = Math.min(Math.max(e.clientX - rect.left, 100), 500);
+    workspaceEl.style.gridTemplateColumns = `${paletteWidth}px 1fr`;
+    splitter.style.left = `${paletteWidth}px`;
+  });
+
+  document.addEventListener('mouseup', () => {
+    resizingPalette = false;
+  });
+
+  paletteToggle?.addEventListener('click', () => {
+    const show = !workspaceEl.classList.contains('show-palette');
+    workspaceEl.classList.toggle('show-palette', show);
+    paletteToggle.setAttribute('aria-expanded', show);
+    if (show) {
+      workspaceEl.style.gridTemplateColumns = `${paletteWidth}px 1fr`;
+      splitter.style.left = `${paletteWidth}px`;
+    } else {
+      workspaceEl.style.gridTemplateColumns = '1fr';
+    }
   });
 
   const svg = document.getElementById('diagram');
