@@ -206,6 +206,13 @@
   gap: var(--ol-spacing);
 }
 
+.toolbar-group-right {
+  margin-left: auto;
+  display: flex;
+  align-items: center;
+  gap: var(--ol-spacing);
+}
+
 .sheet-controls {
   display: flex;
   align-items: center;
