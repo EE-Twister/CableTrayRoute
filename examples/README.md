@@ -2,6 +2,15 @@
 
 Sample CSV files illustrating the expected formats for CableTrayRoute. Each file can be opened with Excel and saved as `.xlsx` if needed.
 
+## Sample Projects
+
+Download ready-to-use data sets to explore the workflow:
+
+- [`tray_project.b64`](tray_project.b64) – base64-encoded tray routing sample with cables, trays, and raceways.
+- [`ductbank_project.b64`](ductbank_project.b64) – base64-encoded ductbank routing sample with schedules and cables.
+
+Decode the files using `base64 -d` (for example `base64 -d tray_project.b64 > tray_project.zip`) and then unzip the resulting archives before importing them through the appropriate tools.
+
 ## Cable Schedule (`cable_schedule.csv`)
 
 Columns (in order):

@@ -1,0 +1,110 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Help &amp; Tutorials</title>
+  <link rel="icon" href="icons/favicon.svg" type="image/svg+xml">
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+  <a href="#main-content" class="skip-link">Skip to main content</a>
+  <nav class="top-nav">
+    <button id="nav-toggle" class="nav-toggle" aria-label="Toggle navigation" aria-controls="nav-links" aria-expanded="false">☰</button>
+    <div id="nav-links" class="nav-links">
+      <a href="index.html">Home</a>
+      <a href="equipmentlist.html">Equipment List</a>
+      <a href="loadlist.html">Load List</a>
+      <a href="cableschedule.html">Cable Schedule</a>
+      <a href="panelschedule.html">Panel Schedule</a>
+      <a href="racewayschedule.html">Raceway Schedule</a>
+      <a href="ductbankroute.html">Ductbank</a>
+      <a href="cabletrayfill.html">Tray Fill</a>
+      <a href="conduitfill.html">Conduit Fill</a>
+      <a href="optimalRoute.html">Optimal Route</a>
+      <a href="oneline.html">One-Line</a>
+      <a href="help.html" class="active" aria-current="page">Help</a>
+      <button id="settings-btn" class="settings-btn" aria-label="Settings" aria-expanded="false">⚙</button>
+    </div>
+  </nav>
+  <div id="settings-menu" class="settings-menu">
+    <label><input type="checkbox" id="dark-toggle"> Dark Mode</label>
+    <label><input type="checkbox" id="compact-toggle" aria-label="Enable compact table mode"> Compact Mode</label>
+    <label for="unit-select">Units
+      <select id="unit-select">
+        <option value="imperial">Imperial</option>
+        <option value="metric">Metric</option>
+      </select>
+    </label>
+  </div>
+  <main id="main-content" class="help-content">
+    <h1>Help &amp; Tutorials</h1>
+    <section>
+      <h2>Workflow Overview</h2>
+      <p>The typical CableTrayRoute workflow follows these steps:</p>
+      <ol>
+        <li>Prepare equipment and load lists.</li>
+        <li>Create cable schedules and panel schedules.</li>
+        <li>Define raceway, ductbank, and tray layouts.</li>
+        <li>Analyze fill, sizing, and optimal routes.</li>
+        <li>Export reports and drawings.</li>
+      </ol>
+      <div class="help-screenshots">
+        <img src="icons/placeholder.svg" alt="Screenshot of workflow dashboard">
+        <img src="icons/placeholder.svg" alt="Screenshot of tray fill tool">
+      </div>
+    </section>
+    <section>
+      <h2>Sample Projects</h2>
+      <p>Download sample data sets to explore the application.</p>
+      <ul>
+        <li><a id="tray-sample-link" href="#">Tray routing sample project</a></li>
+        <li><a id="ductbank-sample-link" href="#">Ductbank sample project</a></li>
+      </ul>
+    </section>
+    <section>
+      <h2>Video Walkthroughs</h2>
+      <ul>
+        <li><a href="https://example.com/videos/tray-workflow" target="_blank" rel="noopener">Tray workflow overview</a></li>
+        <li><a href="https://example.com/videos/ductbank-workflow" target="_blank" rel="noopener">Ductbank workflow overview</a></li>
+      </ul>
+    </section>
+  </main>
+  <footer class="site-footer">
+    <div class="footer-left">
+      <img src="icons/route.svg" alt="CableTrayRoute logo" class="footer-logo">
+      <span>CableTrayRoute</span>
+    </div>
+    <nav class="footer-links">
+      <a href="README.md">README</a>
+      <a href="docs/quickstart.html">Quick Start</a>
+      <a href="docs/index.html">Docs</a>
+      <a href="mailto:contact@example.com">Contact</a>
+    </nav>
+  </footer>
+  <script src="dist/index.js" defer></script>
+  <script>
+    window.addEventListener('DOMContentLoaded', () => {
+      initSettings();
+      initDarkMode();
+      initCompactMode();
+      initNavToggle();
+
+      const setLink = async (id, file, name) => {
+        try {
+          const base64 = await fetch(file).then(r => r.text());
+          const link = document.getElementById(id);
+          link.href = `data:application/zip;base64,${base64.trim()}`;
+          link.setAttribute('download', name);
+        } catch (err) {
+          console.error('Failed to load sample project', file, err);
+        }
+      };
+
+      setLink('tray-sample-link', 'examples/tray_project.b64', 'tray_project.zip');
+      setLink('ductbank-sample-link', 'examples/ductbank_project.b64', 'ductbank_project.zip');
+    });
+  </script>
+</body>
+</html>
+
