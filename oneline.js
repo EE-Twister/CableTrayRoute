@@ -342,10 +342,15 @@ const lintList = document.getElementById('lint-list');
 const lintCloseBtn = document.getElementById('lint-close-btn');
 if (lintCloseBtn) lintCloseBtn.addEventListener('click', () => lintPanel.classList.add('hidden'));
 
-const diagram = document.getElementById('diagram');
-if (diagram) {
-  diagram.addEventListener('dragover', e => e.preventDefault());
-  diagram.addEventListener('drop', e => {
+const svg = document.getElementById('diagram');
+if (svg) {
+  svg.addEventListener('dblclick', e => {
+    const g = e.target.closest('.component');
+    if (!g) return;
+    selectComponent(g.dataset.id);
+  });
+  svg.addEventListener('dragover', e => e.preventDefault());
+  svg.addEventListener('drop', e => {
     e.preventDefault();
     const dataText = e.dataTransfer.getData('text/plain');
     if (!dataText) return;
@@ -356,13 +361,13 @@ if (diagram) {
       showToast('Cannot drop component');
       return;
     }
-    const { left, top } = diagram.getBoundingClientRect();
+    const { left, top } = svg.getBoundingClientRect();
     const x = e.clientX - left;
     const y = e.clientY - top;
     const comp = addComponent({ type: info.type, subtype: info.subtype, x, y });
     render();
     save();
-    const elem = diagram.querySelector(`g.component[data-id="${comp.id}"]`);
+    const elem = svg.querySelector(`g.component[data-id="${comp.id}"]`);
     if (elem) {
       elem.classList.add('flash');
       setTimeout(() => elem.classList.remove('flash'), 500);
@@ -1545,7 +1550,14 @@ function distributeSelection(axis) {
   save();
 }
 
-function selectComponent(comp) {
+function selectComponent(compOrId) {
+  const comp = typeof compOrId === 'string' ? components.find(c => c.id === compOrId) : compOrId;
+  if (!comp) return;
+  const rawSchema = propSchemas[comp.subtype] || [];
+  if (!rawSchema.length) {
+    showToast(`No properties defined for ${comp.subtype}`);
+    return;
+  }
   selected = comp;
   selection = [comp];
   selectedConnection = null;
@@ -1570,7 +1582,6 @@ function selectComponent(comp) {
     delete modal._keyHandler;
   }
 
-  const rawSchema = propSchemas[comp.subtype] || [];
   const schema = rawSchema.map(f => {
     if (f.name === 'voltage_class') {
       return { ...f, type: 'select', options: kvClasses };
@@ -1815,6 +1826,7 @@ function selectComponent(comp) {
     pushHistory();
     render();
     save();
+    syncSchedules();
     closeModal();
   });
 
@@ -1824,108 +1836,6 @@ function selectComponent(comp) {
   document.addEventListener('keydown', keyHandler);
   modal._outsideHandler = outsideHandler;
   modal._keyHandler = keyHandler;
-}
-
-function openPropertyDialog(componentId) {
-  const comp = components.find(c => c.id === componentId);
-  if (!comp) return null;
-
-  const modal = document.getElementById('prop-modal');
-  modal.innerHTML = '';
-
-  const form = document.createElement('form');
-
-  // Header with title and close button
-  const header = document.createElement('div');
-  header.classList.add('modal-header');
-  const title = document.createElement('h3');
-  title.textContent = comp.label || comp.subtype;
-  const closeBtn = document.createElement('button');
-  closeBtn.type = 'button';
-  closeBtn.textContent = '×';
-  closeBtn.addEventListener('click', () => modal.classList.remove('show'));
-  header.appendChild(title);
-  header.appendChild(closeBtn);
-  form.appendChild(header);
-
-  const rawSchema = propSchemas[comp.subtype] || [];
-  const groups = Array.isArray(rawSchema)
-    ? rawSchema.reduce((acc, f) => {
-        const g = f.group || 'General';
-        (acc[g] ||= []).push(f);
-        return acc;
-      }, {})
-    : rawSchema;
-
-  const buildField = (f, container) => {
-    const label = document.createElement('label');
-    label.textContent = f.label + ' ';
-    let input;
-    const current = comp[f.name] ?? '';
-    if (f.type === 'select') {
-      input = document.createElement('select');
-      (f.options || []).forEach(opt => {
-        const o = document.createElement('option');
-        o.value = opt;
-        o.textContent = opt;
-        if (current === opt) o.selected = true;
-        input.appendChild(o);
-      });
-    } else if (f.type === 'textarea') {
-      input = document.createElement('textarea');
-      input.value = current;
-    } else if (f.type === 'checkbox') {
-      input = document.createElement('input');
-      input.type = 'checkbox';
-      input.checked = !!current;
-    } else {
-      input = document.createElement('input');
-      input.type = f.type || 'text';
-      input.value = current;
-    }
-    input.name = f.name;
-    label.appendChild(input);
-    container.appendChild(label);
-  };
-
-  Object.entries(groups).forEach(([groupName, fields]) => {
-    const fs = document.createElement('fieldset');
-    const legend = document.createElement('legend');
-    legend.textContent = groupName;
-    fs.appendChild(legend);
-    (fields || []).forEach(f => buildField(f, fs));
-    form.appendChild(fs);
-  });
-
-  const saveBtn = document.createElement('button');
-  saveBtn.type = 'submit';
-  saveBtn.textContent = 'Save';
-  form.appendChild(saveBtn);
-
-  const cancelBtn = document.createElement('button');
-  cancelBtn.type = 'button';
-  cancelBtn.textContent = 'Cancel';
-  cancelBtn.addEventListener('click', () => modal.classList.remove('show'));
-  form.appendChild(cancelBtn);
-
-  form.addEventListener('submit', e => {
-    e.preventDefault();
-    const fd = new FormData(form);
-    Object.values(groups).forEach(fields => {
-      (fields || []).forEach(f => {
-        const val = fd.get(f.name);
-        comp[f.name] = f.type === 'checkbox' ? val === 'on' : (val || '');
-      });
-    });
-    pushHistory();
-    render();
-    save();
-    syncSchedules();
-    modal.classList.remove('show');
-  });
-
-  modal.appendChild(form);
-  return modal;
 }
 
 async function chooseCable(source, target, existingConn = null) {
@@ -2652,19 +2562,6 @@ async function init() {
     render();
   });
 
-  svg.addEventListener('dblclick', e => {
-    const g = e.target.closest('.component');
-    if (!g) return;
-    const comp = components.find(c => c.id === g.dataset.id);
-    const schema = comp && propSchemas[comp.subtype];
-    if (!comp || !schema || schema.length === 0) {
-      if (comp) showToast(`No properties defined for ${comp.subtype}`);
-      return;
-    }
-    const modal = openPropertyDialog(comp.id);
-    if (modal) modal.classList.add('show');
-  });
-
   svg.addEventListener('contextmenu', e => {
     e.preventDefault();
     const g = e.target.closest('.component');
@@ -2683,13 +2580,7 @@ async function init() {
     if (!action) return;
     e.stopPropagation();
     if (action === 'edit' && contextTarget) {
-      const schema = propSchemas[contextTarget.subtype];
-      if (!schema || schema.length === 0) {
-        showToast(`No properties defined for ${contextTarget.subtype}`);
-        return;
-      }
-      const modal = openPropertyDialog(contextTarget.id);
-      if (modal) modal.classList.add('show');
+      selectComponent(contextTarget.id);
     } else if (action === 'delete' && contextTarget) {
       components = components.filter(c => c !== contextTarget);
       components.forEach(c => {
