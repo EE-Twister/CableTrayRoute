@@ -167,6 +167,40 @@ window.addEventListener('DOMContentLoaded', () => {
     });
   }
 
+  function validateRow(tr){
+    const tagIn = tr.querySelector('[name="tag"]');
+    const sizeIn = tr.querySelector('[name="conductor_size"]');
+    const lengthIn = tr.querySelector('[name="length"]');
+    const racewaySel = tr.querySelector('[name="raceway_ids"]');
+    let valid = true;
+    const getRacewayVals = el => {
+      if (!el) return [];
+      if (typeof el.getSelectedValues === 'function') return el.getSelectedValues();
+      return Array.from(el.selectedOptions || []).map(o => o.value).filter(v => v);
+    };
+    const checks = [
+      [tagIn, tagIn && tagIn.value.trim() !== ''],
+      [sizeIn, sizeIn && sizeIn.value.trim() !== ''],
+      [lengthIn, lengthIn && lengthIn.value.trim() !== '' && !isNaN(lengthIn.value)],
+      [racewaySel, getRacewayVals(racewaySel).length > 0]
+    ];
+    checks.forEach(([el, ok]) => {
+      if (!el) return;
+      el.classList.toggle('missing-value', !ok);
+      if (!ok) valid = false;
+    });
+    tr.classList.toggle('missing-row', !valid);
+    return valid;
+  }
+
+  function validateAllRows(){
+    let allValid = true;
+    Array.from(table.tbody.querySelectorAll('tr')).forEach(tr => {
+      if(!validateRow(tr)) allValid = false;
+    });
+    return allValid;
+  }
+
   const table = TableUtils.createTable({
     tableId:'cableScheduleTable',
     storageKey:TableUtils.STORAGE_KEYS.cableSchedule,
@@ -179,7 +213,7 @@ window.addEventListener('DOMContentLoaded', () => {
     importBtnId:'import-xlsx-btn',
     deleteAllBtnId:'delete-all-btn',
     columns,
-    onChange:() => { markUnsaved(); applySizingHighlight(); },
+    onChange:() => { markUnsaved(); applySizingHighlight(); validateAllRows(); },
     onSave:() => {
       markSaved();
       tableData = table.getData();
@@ -199,6 +233,7 @@ window.addEventListener('DOMContentLoaded', () => {
   // Ensure the table is populated with any existing data on load.
   table.setData(tableData);
   applySizingHighlight();
+  validateAllRows();
   vdLimitIn.addEventListener('input', applySizingHighlight);
 
   document.getElementById('load-sample-cables-btn').addEventListener('click', async () => {
@@ -208,11 +243,21 @@ window.addEventListener('DOMContentLoaded', () => {
       table.setData(sampleCables); // immediately display the sample rows
       tableData = sampleCables;
       table.save();
+      validateAllRows();
       markSaved();
     } catch (e) {
       console.error('Failed to load sample cables', e);
     }
   });
+
+  const origExport = table.exportXlsx.bind(table);
+  table.exportXlsx = function(){
+    if(!validateAllRows()){
+      alert('Please complete required fields before exporting.');
+      return;
+    }
+    origExport();
+  };
 
   function getCableSchedule(){
     table.save();
