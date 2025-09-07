@@ -2,6 +2,10 @@
 
 /* --- Basic Setup --- */
 :root {
+    --primary-color: #0d6efd;
+    --secondary-color: #f8f9fa;
+    --font-family-base: Arial, sans-serif;
+    --spacing-base: 8px;
     --border-color: #dee2e6;
     --text-color: #212529;
     --success-bg: #d4edda;
@@ -16,6 +20,47 @@
     --button-text: #fff;
     --button-padding: var(--spacing-base) calc(var(--spacing-base) * 1.5);
     --button-margin: calc(var(--spacing-base) / 2);
+}
+
+/* Utility classes */
+.btn {
+    background: var(--button-bg);
+    color: var(--button-text);
+    padding: var(--button-padding);
+    margin: var(--button-margin);
+    border: none;
+    border-radius: 4px;
+    cursor: pointer;
+}
+.btn:hover {
+    background: var(--button-hover-bg);
+}
+.hidden {
+    display: none;
+}
+.d-block {
+    display: block;
+}
+.mt-1 {
+    margin-top: var(--spacing-base);
+}
+.mt-2 {
+    margin-top: calc(var(--spacing-base) * 2);
+}
+.mb-1 {
+    margin-bottom: var(--spacing-base);
+}
+.mb-2 {
+    margin-bottom: calc(var(--spacing-base) * 2);
+}
+.ml-1 {
+    margin-left: var(--spacing-base);
+}
+.overflow-x-auto {
+    overflow-x: auto;
+}
+.w-60 {
+    width: 60px;
 }
 
 body.dark-mode {

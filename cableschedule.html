@@ -14,7 +14,7 @@
 <body>
   <a href="#main-content" class="skip-link">Skip to main content</a>
   <nav class="top-nav">
-    <button id="nav-toggle" class="nav-toggle" aria-label="Toggle navigation" aria-controls="nav-links" aria-expanded="false">☰</button>
+    <button id="nav-toggle" class="nav-toggle" aria-label="Toggle navigation" aria-controls="nav-links" aria-expanded="false" title="Toggle navigation">☰</button>
     <div id="nav-links" class="nav-links">
       <a href="index.html">Home</a>
       <a href="equipmentlist.html">Equipment List</a>
@@ -27,7 +27,7 @@
       <a href="conduitfill.html">Conduit Fill</a>
       <a href="optimalRoute.html">Optimal Route</a>
             <a href="oneline.html">One-Line</a>
-<button id="settings-btn" class="settings-btn" aria-label="Settings" aria-expanded="false">⚙</button>
+<button id="settings-btn" class="settings-btn" aria-label="Settings" aria-expanded="false" title="Settings">⚙</button>
     </div>
   </nav>
   <div id="settings-menu" class="settings-menu">
@@ -39,13 +39,13 @@
         <option value="metric">Metric</option>
       </select>
     </label>
-    <button id="help-btn" aria-expanded="false">Site Help</button>
-    <button id="new-project-btn">New Project</button>
-    <button id="save-project-btn">Save Project</button>
-    <button id="load-project-btn">Load Project</button>
-    <button id="export-project-btn">Export Project</button>
-    <button id="import-project-btn">Import Project</button>
-    <input type="file" id="import-project-input" accept=".ctr.json" style="display:none;">
+    <button id="help-btn" class="btn" aria-expanded="false" title="Show help">Site Help</button>
+    <button id="new-project-btn" class="btn" title="Start a new project">New Project</button>
+    <button id="save-project-btn" class="btn" title="Save current project">Save Project</button>
+    <button id="load-project-btn" class="btn" title="Load an existing project">Load Project</button>
+    <button id="export-project-btn" class="btn" title="Export project data">Export Project</button>
+    <button id="import-project-btn" class="btn" title="Import project data">Import Project</button>
+    <input type="file" id="import-project-input" accept=".ctr.json" class="hidden" title="Select project file">
   </div>
   <div class="container">
     <main id="main-content" class="main-content">
@@ -65,26 +65,26 @@
         <p>Applicability: tabular organization only; no capacity limits.</p>
       </details>
       <section class="card">
-        <div style="margin-bottom:10px;">
-          <button id="save-schedule-btn">Save Schedule</button>
-          <button id="load-schedule-btn">Load Schedule</button>
-          <button id="load-sample-cables-btn">Load Sample Data</button>
-          <button id="clear-filters-btn">Clear Filters</button>
-          <button id="export-xlsx-btn">Export XLSX</button>
-          <input type="file" id="import-xlsx-input" accept=".xlsx" style="display:none;">
-          <button id="import-xlsx-btn">Import XLSX</button>
-          <button id="delete-all-btn">Delete All Rows</button>
-          <label for="vd-limit" style="margin-left:10px;">VD Limit (%)</label>
-          <input type="number" id="vd-limit" value="3" step="0.1" style="width:60px;">
+        <div class="mb-1">
+          <button id="save-schedule-btn" class="btn" title="Save schedule">Save Schedule</button>
+          <button id="load-schedule-btn" class="btn" title="Load schedule">Load Schedule</button>
+          <button id="load-sample-cables-btn" class="btn" title="Load sample cables">Load Sample Data</button>
+          <button id="clear-filters-btn" class="btn" title="Clear filters">Clear Filters</button>
+          <button id="export-xlsx-btn" class="btn" title="Export as Excel">Export XLSX</button>
+          <input type="file" id="import-xlsx-input" accept=".xlsx" class="hidden" title="Import from Excel">
+          <button id="import-xlsx-btn" class="btn" title="Import from Excel">Import XLSX</button>
+          <button id="delete-all-btn" class="btn" title="Delete all rows">Delete All Rows</button>
+          <label for="vd-limit" class="ml-1">VD Limit (%)</label>
+          <input type="number" id="vd-limit" value="3" step="0.1" class="w-60">
         </div>
-        <div style="overflow-x:auto;">
+        <div class="overflow-x-auto">
           <table id="cableScheduleTable" class="sticky-table">
             <thead></thead>
             <tbody></tbody>
           </table>
         </div>
-        <div style="margin-top:10px;">
-          <button id="add-row-btn" class="primary-btn add-row-btn">Add Cable</button>
+        <div class="mt-1">
+          <button id="add-row-btn" class="btn primary-btn add-row-btn" title="Add cable">Add Cable</button>
         </div>
       </section>
       <nav class="step-nav">
@@ -96,7 +96,7 @@
   </div>
   <div id="help-modal" class="modal" aria-hidden="true" role="dialog" aria-labelledby="help-title">
     <div class="modal-content">
-      <button id="close-help-btn" class="close-btn" aria-label="Close Help">&times;</button>
+      <button id="close-help-btn" class="close-btn" aria-label="Close Help" title="Close help">&times;</button>
       <h2 id="help-title">Cable Schedule Help</h2>
       <p>This table allows managing cable data. Use the import/export buttons to work with Excel files. Select one or more raceway IDs in the "Raceway(s)" column; options are pulled from the Raceway Schedule page.</p>
     </div>

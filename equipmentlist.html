@@ -15,7 +15,7 @@
 <body>
   <a href="#main-content" class="skip-link">Skip to main content</a>
   <nav class="top-nav">
-    <button id="nav-toggle" class="nav-toggle" aria-label="Toggle navigation" aria-controls="nav-links" aria-expanded="false">☰</button>
+    <button id="nav-toggle" class="nav-toggle" aria-label="Toggle navigation" aria-controls="nav-links" aria-expanded="false" title="Toggle navigation">☰</button>
     <div id="nav-links" class="nav-links">
       <a href="index.html">Home</a>
       <a href="equipmentlist.html" class="active" aria-current="page">Equipment List</a>
@@ -28,7 +28,7 @@
       <a href="conduitfill.html">Conduit Fill</a>
       <a href="optimalRoute.html">Optimal Route</a>
             <a href="oneline.html">One-Line</a>
-<button id="settings-btn" class="settings-btn" aria-label="Settings" aria-expanded="false">⚙</button>
+<button id="settings-btn" class="settings-btn" aria-label="Settings" aria-expanded="false" title="Settings">⚙</button>
     </div>
   </nav>
   <div id="settings-menu" class="settings-menu">
@@ -40,13 +40,13 @@
         <option value="metric">Metric</option>
       </select>
     </label>
-    <button id="help-btn" aria-expanded="false">Site Help</button>
-    <button id="new-project-btn">New Project</button>
-    <button id="save-project-btn">Save Project</button>
-    <button id="load-project-btn">Load Project</button>
-    <button id="export-project-btn">Export Project</button>
-    <button id="import-project-btn">Import Project</button>
-    <input type="file" id="import-project-input" accept=".ctr.json" style="display:none;">
+    <button id="help-btn" class="btn" aria-expanded="false" title="Show help">Site Help</button>
+    <button id="new-project-btn" class="btn" title="Start a new project">New Project</button>
+    <button id="save-project-btn" class="btn" title="Save current project">Save Project</button>
+    <button id="load-project-btn" class="btn" title="Load an existing project">Load Project</button>
+    <button id="export-project-btn" class="btn" title="Export project data">Export Project</button>
+    <button id="import-project-btn" class="btn" title="Import project data">Import Project</button>
+    <input type="file" id="import-project-input" accept=".ctr.json" class="hidden" title="Select project file">
   </div>
   <div class="container">
     <main id="main-content" class="main-content">
@@ -55,25 +55,25 @@
         <p>Manage equipment items with basic details.</p>
       </header>
       <section class="card">
-        <div style="margin-bottom:10px;">
-          <button id="add-row-btn" class="primary-btn add-row-btn">Add Row</button>
-          <button id="add-column-btn">Add Column</button>
-          <button id="delete-selected-btn">Delete Selected</button>
-          <button id="export-xlsx-btn">Export XLSX</button>
-          <input type="file" id="import-xlsx-input" accept=".xlsx" style="display:none;">
-          <button id="import-xlsx-btn">Import XLSX</button>
-          <input type="file" id="import-csv-input" accept=".csv" style="display:none;">
-          <button id="import-csv-btn">Import CSV</button>
-          <input type="file" id="import-xml-input" accept=".xml" style="display:none;">
-          <button id="import-xml-btn">Import XML</button>
+        <div class="mb-1">
+          <button id="add-row-btn" class="btn primary-btn add-row-btn" title="Add a new row">Add Row</button>
+          <button id="add-column-btn" class="btn" title="Add a new column">Add Column</button>
+          <button id="delete-selected-btn" class="btn" title="Delete selected rows">Delete Selected</button>
+          <button id="export-xlsx-btn" class="btn" title="Export as Excel">Export XLSX</button>
+          <input type="file" id="import-xlsx-input" accept=".xlsx" class="hidden" title="Import from Excel">
+          <button id="import-xlsx-btn" class="btn" title="Import from Excel">Import XLSX</button>
+          <input type="file" id="import-csv-input" accept=".csv" class="hidden" title="Import from CSV">
+          <button id="import-csv-btn" class="btn" title="Import from CSV">Import CSV</button>
+          <input type="file" id="import-xml-input" accept=".xml" class="hidden" title="Import from XML">
+          <button id="import-xml-btn" class="btn" title="Import from XML">Import XML</button>
         </div>
-        <div style="overflow-x:auto;">
+        <div class="overflow-x-auto">
           <table id="equipment-table" class="sticky-table">
             <thead></thead>
             <tbody></tbody>
           </table>
         </div>
-        <div id="add-column-modal" class="modal" style="display:none;">
+        <div id="add-column-modal" class="modal hidden">
           <div class="modal-content">
             <label>Key <input type="text" id="new-col-key"></label>
             <label>Label <input type="text" id="new-col-label"></label>
@@ -83,7 +83,7 @@
                 <option value="number">Number</option>
               </select>
             </label>
-            <button id="confirm-add-column">Add</button>
+            <button id="confirm-add-column" class="btn" title="Add column">Add</button>
           </div>
         </div>
       </section>

@@ -17,7 +17,7 @@
 <body>
   <a href="#main-content" class="skip-link">Skip to main content</a>
   <nav class="top-nav">
-    <button id="nav-toggle" class="nav-toggle" aria-label="Toggle navigation" aria-controls="nav-links" aria-expanded="false">☰</button>
+    <button id="nav-toggle" class="nav-toggle" aria-label="Toggle navigation" aria-controls="nav-links" aria-expanded="false" title="Toggle navigation">☰</button>
     <div id="nav-links" class="nav-links">
       <a href="index.html">Home</a>
       <a href="equipmentlist.html">Equipment List</a>
@@ -30,8 +30,8 @@
       <a href="conduitfill.html">Conduit Fill</a>
       <a href="optimalRoute.html">Optimal Route</a>
       <a href="oneline.html" class="active" aria-current="page">One-Line</a>
-      <button id="studies-panel-btn" type="button">Studies</button>
-      <button id="settings-btn" class="settings-btn" aria-label="Settings" aria-expanded="false">⚙</button>
+      <button id="studies-panel-btn" type="button" class="btn" title="Open studies panel">Studies</button>
+      <button id="settings-btn" class="settings-btn" aria-label="Settings" aria-expanded="false" title="Settings">⚙</button>
     </div>
   </nav>
   <div id="settings-menu" class="settings-menu">
@@ -43,16 +43,16 @@
         <option value="metric">Metric</option>
       </select>
     </label>
-    <button id="help-btn" aria-expanded="false">Site Help</button>
-    <button id="new-project-btn">New Project</button>
-    <button id="save-project-btn">Save Project</button>
-    <button id="load-project-btn">Load Project</button>
-    <button id="export-project-btn">Export Project</button>
-    <button id="import-project-btn">Import Project</button>
-    <button id="export-reports-btn">Export All Reports</button>
-    <input type="file" id="import-project-input" accept=".ctr.json" class="hidden-input">
-    <button id="prefix-settings-btn">Label Prefixes</button>
-    <button id="update-defaults-btn">Update Defaults</button>
+    <button id="help-btn" class="btn" aria-expanded="false" title="Show help">Site Help</button>
+    <button id="new-project-btn" class="btn" title="Start a new project">New Project</button>
+    <button id="save-project-btn" class="btn" title="Save current project">Save Project</button>
+    <button id="load-project-btn" class="btn" title="Load an existing project">Load Project</button>
+    <button id="export-project-btn" class="btn" title="Export project data">Export Project</button>
+    <button id="import-project-btn" class="btn" title="Import project data">Import Project</button>
+    <button id="export-reports-btn" class="btn" title="Export all reports">Export All Reports</button>
+    <input type="file" id="import-project-input" accept=".ctr.json" class="hidden-input" title="Select project file">
+    <button id="prefix-settings-btn" class="btn" title="Edit label prefixes">Label Prefixes</button>
+    <button id="update-defaults-btn" class="btn" title="Update default settings">Update Defaults</button>
   </div>
   <div class="container">
     <main id="main-content" class="main-content">
@@ -76,8 +76,8 @@
             <button id="diagram-export-btn" type="button" class="btn icon-button" title="Export Diagram" aria-label="Export Diagram"><img src="icons/toolbar/export.svg" alt=""></button>
             <input type="file" id="diagram-import-input" accept=".json" class="hidden-input">
             <button id="diagram-import-btn" type="button" class="btn icon-button" title="Import Diagram" aria-label="Import Diagram"><img src="icons/toolbar/import.svg" alt=""></button>
-            <button id="diagram-share-btn" type="button" class="btn">Share</button>
-            <button id="tour-btn" type="button" class="btn">Tour</button>
+            <button id="diagram-share-btn" type="button" class="btn" title="Share diagram">Share</button>
+            <button id="tour-btn" type="button" class="btn" title="Start tour">Tour</button>
           </div>
         </div>
         <div class="toolbar">
@@ -212,7 +212,7 @@
   <aside id="studies-panel" class="studies-panel hidden" aria-label="Studies">
     <div class="studies-header">
       <h2>Studies</h2>
-      <button id="studies-close-btn" class="studies-close-btn" aria-label="Close">&times;</button>
+      <button id="studies-close-btn" class="studies-close-btn" aria-label="Close" title="Close">&times;</button>
     </div>
     <div class="studies-controls">
       <button id="run-loadflow-btn" type="button">Load Flow</button>
@@ -221,7 +221,7 @@
         <button id="run-harmonics-btn" type="button">Harmonics</button>
         <button id="run-motorstart-btn" type="button">Motor Start</button>
         <button id="run-reliability-btn" type="button">Reliability</button>
-        <label style="display:block;margin-top:0.5em"><input type="checkbox" id="toggle-overlays" checked> Show Result Overlays</label>
+        <label class="d-block mt-1"><input type="checkbox" id="toggle-overlays" checked> Show Result Overlays</label>
       </div>
       <pre id="study-results" class="study-results"></pre>
       <div id="loadflow-results" class="study-results"></div>
@@ -229,7 +229,7 @@
   <aside id="lint-panel" class="lint-panel hidden" aria-label="Validation issues">
     <div class="lint-header">
       <h2>Fix-it Hints</h2>
-      <button id="lint-close-btn" class="lint-close-btn" aria-label="Close">&times;</button>
+      <button id="lint-close-btn" class="lint-close-btn" aria-label="Close" title="Close">&times;</button>
     </div>
     <ul id="lint-list"></ul>
   </aside>
