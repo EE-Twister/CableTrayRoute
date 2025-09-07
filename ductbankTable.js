@@ -451,6 +451,10 @@ import { getDuctbanks as readStoredDuctbanks, setDuctbanks, setItem, getItem } f
   }
 
   function exportDuctbankXlsx(){
+    if(typeof XLSX==='undefined'){
+      alert('XLSX library not loaded');
+      return;
+    }
     const dbData=[['ductbank_id','tag','from','to','concrete_encasement','start_x','start_y','start_z','end_x','end_y','end_z']];
     ductbanks.forEach(db=>dbData.push([db.id,db.tag,db.from,db.to,db.concrete_encasement?1:0,db.start_x,db.start_y,db.start_z,db.end_x,db.end_y,db.end_z]));
     const cData=[['ductbank_id','ductbankTag','conduit_id','type','trade_size','start_x','start_y','start_z','end_x','end_y','end_z','allowed_cable_group']];
@@ -463,6 +467,10 @@ import { getDuctbanks as readStoredDuctbanks, setDuctbanks, setItem, getItem } f
 
   function importDuctbankXlsx(file){
     if(!file) return;
+    if(typeof XLSX==='undefined'){
+      alert('XLSX library not loaded');
+      return;
+    }
     const reader=new FileReader();
     reader.onload=e=>{
       const wb=XLSX.read(e.target.result,{type:'binary'});
