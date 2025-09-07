@@ -86,7 +86,7 @@ export function runReliability(components = []) {
 if (typeof document !== 'undefined') {
   const chartEl = document.getElementById('reliability-chart');
   if (chartEl) {
-    const sheets = getOneLine();
+    const { sheets } = getOneLine();
     const comps = Array.isArray(sheets[0]?.components)
       ? sheets.flatMap(s => s.components)
       : sheets;

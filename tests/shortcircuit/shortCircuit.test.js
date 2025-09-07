@@ -21,12 +21,12 @@ global.localStorage = {
 
   describe('short circuit engine', () => {
     it('handles multiple voltages with X/R and source contributions', () => {
-      setOneLine([{ name: 'S1', components: [
+      setOneLine({ activeSheet: 0, sheets: [{ name: 'S1', components: [
         { id: 'bus13kV', kV: 13.8, z1: { r: 0, x: 1 }, z2: { r: 0, x: 1 }, z0: { r: 0, x: 1 },
           sources: [{ z1: { r: 0, x: 0.5 }, z2: { r: 0, x: 0.5 }, z0: { r: 0, x: 1 } }] },
         { id: 'bus480V', kV: 0.48, z1: { r: 0, x: 0.05 }, z2: { r: 0, x: 0.05 }, z0: { r: 0, x: 0.05 },
           sources: [{ z1: { r: 0, x: 0.02 }, z2: { r: 0, x: 0.02 }, z0: { r: 0, x: 0.02 } }], xr_ratio: 6 }
-      ] }]);
+      ] }] });
       const res = runShortCircuit();
       const a = res.bus13kV;
       assert(Math.abs(a.threePhaseKA - 26.29) < 0.1);

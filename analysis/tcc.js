@@ -41,7 +41,7 @@ async function init() {
   setStudies(studies);
   let linked = null;
   if (compId) {
-    const sheets = getOneLine();
+    const { sheets } = getOneLine();
     for (const sheet of sheets) {
       const comp = (sheet.components || []).find(c => c.id === compId);
       if (comp) { linked = comp; break; }
@@ -115,12 +115,12 @@ function linkComponent() {
   const sel = [...deviceSelect.selectedOptions].map(o => o.value);
   const first = sel[0];
   if (!first) return;
-  const sheets = getOneLine();
-  for (const sheet of sheets) {
+  const data = getOneLine();
+  for (const sheet of data.sheets) {
     const comp = (sheet.components || []).find(c => c.id === compId);
     if (comp) {
       comp.tccId = first;
-      setOneLine(sheets);
+      setOneLine(data);
       break;
     }
   }

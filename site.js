@@ -502,7 +502,7 @@ function initSettings(){
       const headers=['sample'];
       const rows=[{sample:'demo'}];
       downloadCSV(headers,rows,'reports.csv');
-      const issues=runValidation(getOneLine(),getStudies());
+      const issues=runValidation(getOneLine().sheets,getStudies());
       const vHeaders=['component','message'];
       const vRows=issues.length?issues:[{component:'-',message:'No issues'}];
       downloadCSV(vHeaders,vRows,'validation-report.csv');

@@ -63,7 +63,7 @@ function caseToDiagram(data) {
 
   describe('analysis benchmarks', () => {
     it('matches IEEE 14-bus load flow', () => {
-      setOneLine(caseToDiagram(lfBench));
+      setOneLine({ activeSheet: 0, sheets: caseToDiagram(lfBench) });
       const res = runLoadFlow({ baseMVA: lfBench.baseMVA });
       Object.entries(lfBench.expected).forEach(([id, exp]) => {
         const bus = res.buses.find(b => b.id === id);
@@ -74,7 +74,7 @@ function caseToDiagram(data) {
     });
 
     it('matches short-circuit example', () => {
-      setOneLine(scBench.oneLine);
+      setOneLine({ activeSheet: 0, sheets: scBench.oneLine });
       const res = runShortCircuit();
       Object.entries(scBench.expected).forEach(([id, exp]) => {
         const bus = res[id];
@@ -88,7 +88,7 @@ function caseToDiagram(data) {
 
     it('matches arc-flash example', () => {
       setItem('tccSettings', afBench.tccSettings);
-      setOneLine(afBench.oneLine);
+      setOneLine({ activeSheet: 0, sheets: afBench.oneLine });
       const res = runArcFlash();
       Object.entries(afBench.expected).forEach(([id, exp]) => {
         const bus = res[id];

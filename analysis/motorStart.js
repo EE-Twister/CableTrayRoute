@@ -47,7 +47,7 @@ function parseTorqueCurve(spec) {
  * @returns {Object<string,{inrushKA:number,voltageSagPct:number,accelTime:number}>}
  */
 export function runMotorStart() {
-  const sheets = getOneLine();
+  const { sheets } = getOneLine();
   const comps = Array.isArray(sheets[0]?.components)
     ? sheets.flatMap(s => s.components)
     : sheets;

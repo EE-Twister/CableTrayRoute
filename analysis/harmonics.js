@@ -39,7 +39,7 @@ function limitForVoltage(kv) {
  * @returns {Object<string,{ithd:number,vthd:number,limit:number,warning:boolean}>}
  */
 export function runHarmonics() {
-  const sheets = getOneLine();
+  const { sheets } = getOneLine();
   const comps = Array.isArray(sheets[0]?.components)
     ? sheets.flatMap(s => s.components)
     : sheets;

@@ -63,7 +63,7 @@ function arcingCurrent(Ibf, V, gap, cfg, enclosure) {
  */
 export function runArcFlash() {
   const sc = runShortCircuit();
-  const sheets = getOneLine();
+  const { sheets } = getOneLine();
   const comps = Array.isArray(sheets[0]?.components)
     ? sheets.flatMap(s => s.components)
     : sheets;

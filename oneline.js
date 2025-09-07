@@ -261,6 +261,7 @@ const svgNS = 'http://www.w3.org/2000/svg';
 let sheets = [];
 let activeSheet = 0;
 let components = [];
+let connections = [];
 let selection = [];
 let selected = null;
 let dragOffset = null;
@@ -366,7 +367,8 @@ if (studiesToggle) {
 if (studiesCloseBtn) studiesCloseBtn.addEventListener('click', () => studiesPanel.classList.add('hidden'));
 if (runLFBtn) runLFBtn.addEventListener('click', () => {
   const res = runLoadFlow();
-  const diagram = getOneLine();
+  const { sheets } = getOneLine();
+  const diagram = sheets.flatMap(s => s.components);
   const buses = res.buses || res;
   buses.forEach(r => {
     const comp = diagram.find(c => c.id === r.id);
@@ -393,7 +395,7 @@ if (runLFBtn) runLFBtn.addEventListener('click', () => {
       conn.loading_kW = Number(l.P.toFixed(2));
     }
   });
-  setOneLine(diagram);
+  setOneLine({ activeSheet, sheets });
   const studies = getStudies();
   studies.loadFlow = res;
   setStudies(studies);
@@ -430,14 +432,15 @@ function renderLoadFlowResults(res) {
 }
 if (runSCBtn) runSCBtn.addEventListener('click', () => {
   const res = runShortCircuit();
-  const diagram = getOneLine();
+  const { sheets } = getOneLine();
+  const diagram = sheets.flatMap(s => s.components);
   diagram.forEach(c => {
     c.shortCircuit = res[c.id];
     (c.connections || []).forEach(conn => {
       conn.faultKA = res[conn.target]?.threePhaseKA;
     });
   });
-  setOneLine(diagram);
+  setOneLine({ activeSheet, sheets });
   const studies = getStudies();
   studies.shortCircuit = res;
   setStudies(studies);
@@ -447,7 +450,8 @@ if (runSCBtn) runSCBtn.addEventListener('click', () => {
 if (runAFBtn) runAFBtn.addEventListener('click', () => {
   const sc = runShortCircuit();
   const af = runArcFlash();
-  const diagram = getOneLine();
+  const { sheets } = getOneLine();
+  const diagram = sheets.flatMap(s => s.components);
   diagram.forEach(c => {
     c.shortCircuit = sc[c.id];
     c.arcFlash = af[c.id];
@@ -455,7 +459,7 @@ if (runAFBtn) runAFBtn.addEventListener('click', () => {
       conn.faultKA = sc[conn.target]?.threePhaseKA;
     });
   });
-  setOneLine(diagram);
+  setOneLine({ activeSheet, sheets });
   const studies = getStudies();
   studies.shortCircuit = sc;
   studies.arcFlash = af;
@@ -481,7 +485,8 @@ if (runMSBtn) runMSBtn.addEventListener('click', () => {
   window.open('motorStart.html', '_blank');
 });
 if (runRelBtn) runRelBtn.addEventListener('click', () => {
-  const diagram = getOneLine();
+  const { sheets } = getOneLine();
+  const diagram = sheets.flatMap(s => s.components);
   const res = runReliability(diagram);
   const studies = getStudies();
   studies.reliability = res;
@@ -1284,6 +1289,7 @@ function loadSheet(idx) {
   save(false);
   activeSheet = idx;
   components = sheets[activeSheet].components;
+  connections = sheets[activeSheet].connections;
   history = [JSON.parse(JSON.stringify(components))];
   historyIndex = 0;
   selection = [];
@@ -1291,47 +1297,66 @@ function loadSheet(idx) {
   selectedConnection = null;
   renderSheetTabs();
   render();
+  setOneLine({ activeSheet, sheets });
 }
 
-function addSheet() {
-  const name = prompt('Sheet name', `Sheet ${sheets.length + 1}`);
-  if (!name) return;
-  sheets.push({ name, components: [] });
+function addSheet(name) {
+  const sheetName = name || prompt('Sheet name', `Sheet ${sheets.length + 1}`);
+  if (!sheetName) return;
+  sheets.push({ name: sheetName, components: [], connections: [] });
   loadSheet(sheets.length - 1);
   save();
 }
 
-function renameSheet() {
-  const name = prompt('Sheet name', sheets[activeSheet].name);
-  if (!name) return;
-  sheets[activeSheet].name = name;
+function renameSheet(id, newName) {
+  const idx = id ?? activeSheet;
+  if (idx < 0 || idx >= sheets.length) return;
+  const sheetName = newName || prompt('Sheet name', sheets[idx].name);
+  if (!sheetName) return;
+  sheets[idx].name = sheetName;
   renderSheetTabs();
   save();
 }
 
-function deleteSheet() {
+function deleteSheet(id) {
   if (sheets.length <= 1) return;
+  const idx = id ?? activeSheet;
+  if (idx < 0 || idx >= sheets.length) return;
   if (!confirm('Delete current sheet?')) return;
-  sheets.splice(activeSheet, 1);
-  activeSheet = Math.max(0, activeSheet - 1);
+  sheets.splice(idx, 1);
+  activeSheet = Math.max(0, idx - 1);
   components = sheets[activeSheet].components;
+  connections = sheets[activeSheet].connections;
   renderSheetTabs();
   render();
   save();
 }
 
 function save(notify = true) {
-  const sheetData = sheets.map((s, i) => ({
-    name: s.name,
-    components: (i === activeSheet ? components : s.components).map(c => ({
+  const buildConnections = comps =>
+    comps.flatMap(c =>
+      (c.connections || []).map(conn => ({
+        ...conn,
+        from: c.id,
+        to: conn.target
+      }))
+    );
+  const sheetData = sheets.map((s, i) => {
+    const comps = (i === activeSheet ? components : s.components).map(c => ({
       ...c,
       rotation: c.rotation || 0,
       flipped: !!c.flipped
-    }))
-  }));
+    }));
+    return {
+      name: s.name,
+      components: comps,
+      connections: buildConnections(comps)
+    };
+  });
   sheets = sheetData;
   components = sheets[activeSheet].components;
-  setOneLine(sheetData);
+  connections = sheets[activeSheet].connections;
+  setOneLine({ activeSheet, sheets: sheetData });
   setItem('diagramScale', diagramScale);
   const issues = validateDiagram();
   if (issues.length === 0) {
@@ -2124,11 +2149,13 @@ async function init() {
   await loadManufacturerLibrary();
   await loadComponentLibrary();
   await loadProtectiveDevices();
-  sheets = getOneLine().map((s, i) => ({
+  const { sheets: storedSheets, activeSheet: storedActive = 0 } = getOneLine();
+  sheets = storedSheets.map((s, i) => ({
     name: s.name || `Sheet ${i + 1}`,
-    components: (s.components || []).map(normalizeComponent)
+    components: (s.components || []).map(normalizeComponent),
+    connections: Array.isArray(s.connections) ? s.connections : []
   }));
-  if (!sheets.length) sheets = [{ name: 'Sheet 1', components: [] }];
+  if (!sheets.length) sheets = [{ name: 'Sheet 1', components: [], connections: [] }];
 
   sheets.forEach(s => {
     s.components.forEach(c => {
@@ -2176,8 +2203,9 @@ async function init() {
   });
   setItem('labelCounters', labelCounters);
 
-  activeSheet = 0;
-  components = sheets[0].components;
+  activeSheet = Math.min(storedActive, sheets.length - 1);
+  components = sheets[activeSheet].components;
+  connections = sheets[activeSheet].connections;
   history = [JSON.parse(JSON.stringify(components))];
   historyIndex = 0;
   renderSheetTabs();

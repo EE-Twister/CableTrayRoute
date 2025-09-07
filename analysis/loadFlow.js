@@ -235,7 +235,7 @@ function solveLinear(A, b) {
  */
 export function runLoadFlow(opts = {}) {
   const { baseMVA = 100, balanced = true } = opts;
-  const sheets = getOneLine();
+  const { sheets } = getOneLine();
   const comps = Array.isArray(sheets[0]?.components)
     ? sheets.flatMap(s => s.components || [])
     : sheets;
