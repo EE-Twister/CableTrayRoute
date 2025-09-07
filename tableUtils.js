@@ -130,6 +130,8 @@ class TableManager {
     this.headerRow = headerRow;
     this.filters = Array(this.columns.length).fill('');
     this.filterButtons = [];
+    this.globalFilter = '';
+    this.globalFilterCols = [];
     this.groupCols = {};
     this.groupThs = {};
     this.groupToggles = {};
@@ -386,20 +388,46 @@ class TableManager {
     document.querySelectorAll('.filter-popup').forEach(p=>p.remove());
     const popup=document.createElement('div');
     popup.className='filter-popup';
-    const inp=document.createElement('input');
-    inp.type='text';
-    inp.value=this.filters[index];
-    popup.appendChild(inp);
+    const col=this.columns[index];
+    const offset=this.colOffset;
+    let control;
+    if(col.filter==='dropdown'){
+      control=document.createElement('select');
+      const allOpt=document.createElement('option');
+      allOpt.value='';
+      allOpt.textContent='All';
+      control.appendChild(allOpt);
+      const values=[...new Set(Array.from(this.tbody.rows).map(r=>{
+        const cell=r.cells[index+offset];
+        return cell?cell.firstChild.value:'';
+      }).filter(v=>v))].sort();
+      values.forEach(v=>{
+        const opt=document.createElement('option');
+        opt.value=v;
+        opt.textContent=v;
+        control.appendChild(opt);
+      });
+      control.value=this.filters[index];
+    }else{
+      control=document.createElement('input');
+      control.type='text';
+      control.value=this.filters[index];
+    }
+    popup.appendChild(control);
     let debounceTimer;
     const applyFilter=()=>{
-      this.filters[index]=inp.value.trim();
+      this.filters[index]=control.value.trim();
       if(this.filters[index]) btn.classList.add('filtered'); else btn.classList.remove('filtered');
       this.applyFilters();
     };
-    inp.addEventListener('input',()=>{
-      clearTimeout(debounceTimer);
-      debounceTimer=setTimeout(applyFilter,300);
-    });
+    if(col.filter==='dropdown'){
+      control.addEventListener('change',applyFilter);
+    }else{
+      control.addEventListener('input',()=>{
+        clearTimeout(debounceTimer);
+        debounceTimer=setTimeout(applyFilter,300);
+      });
+    }
     const apply=document.createElement('button');
     apply.textContent='Apply';
     apply.setAttribute('aria-label','Apply filter');
@@ -413,7 +441,7 @@ class TableManager {
     clear.textContent='Clear';
     clear.setAttribute('aria-label','Clear filter');
     clear.addEventListener('click',()=>{
-      inp.value='';
+      control.value='';
       this.filters[index]='';
       btn.classList.remove('filtered');
       this.applyFilters();
@@ -898,6 +926,18 @@ class TableManager {
         const v = val.toLowerCase();
         if (v && !String(row.cells[i + offset].firstChild.value).toLowerCase().includes(v)) visible = false;
       });
+      if (visible && this.globalFilter) {
+        const term = this.globalFilter.toLowerCase();
+        const cols = this.globalFilterCols.length ? this.globalFilterCols : this.columns.map(c=>c.key);
+        const match = cols.some(key => {
+          const idx = this.columns.findIndex(c=>c.key === key);
+          if (idx === -1) return false;
+          const cell = row.cells[idx + offset];
+          if (!cell) return false;
+          return String(cell.firstChild.value || '').toLowerCase().includes(term);
+        });
+        if (!match) visible = false;
+      }
       row.style.display = visible ? '' : 'none';
     });
   }

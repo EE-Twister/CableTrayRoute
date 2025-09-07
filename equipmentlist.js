@@ -16,7 +16,7 @@ if (typeof window !== 'undefined') {
       { key: 'voltage', label: 'Voltage (V)', type: 'text' },
       { key: 'category', label: 'Category', type: 'text' },
       { key: 'subCategory', label: 'Sub-Category', type: 'text' },
-      { key: 'manufacturer', label: 'Manufacturer', type: 'text', className: 'manufacturer-input' },
+      { key: 'manufacturer', label: 'Manufacturer', type: 'text', className: 'manufacturer-input', filter: 'dropdown' },
       { key: 'model', label: 'Model', type: 'text', className: 'model-input' },
       { key: 'phases', label: 'Phases', type: 'text' },
       { key: 'notes', label: 'Notes', type: 'text' },
@@ -50,6 +50,15 @@ if (typeof window !== 'undefined') {
         dataStore.saveProject(projectId);
       }
     });
+
+    const searchInput = document.getElementById('equipment-search');
+    if (searchInput) {
+      table.globalFilterCols = ['id', 'description', 'manufacturer'];
+      searchInput.addEventListener('input', e => {
+        table.globalFilter = e.target.value;
+        table.applyFilters();
+      });
+    }
 
     function generateId(existing, base) {
       let id = base || 'item';
