@@ -1,4 +1,16 @@
+const fs = require('fs');
+const path = require('path');
 const terser = require('@rollup/plugin-terser');
+
+// Auto-generate an ES module wrapper for JSON data so it can be imported in browsers
+const jsonPath = path.resolve(__dirname, 'data/protectiveDevices.json');
+const mjsPath = path.resolve(__dirname, 'data/protectiveDevices.mjs');
+try {
+  const json = fs.readFileSync(jsonPath, 'utf8');
+  fs.writeFileSync(mjsPath, `export default ${json};\n`);
+} catch (err) {
+  console.error('Failed to generate protectiveDevices.mjs', err);
+}
 
 const entries = {
   index: 'src/index.js',
