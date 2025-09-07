@@ -126,13 +126,7 @@ body {
 
 /* Remove spin buttons from number inputs in tables */
 table input[type="number"] {
-    -moz-appearance: textfield;
-}
-
-table input[type="number"]::-webkit-inner-spin-button,
-table input[type="number"]::-webkit-outer-spin-button {
-    -webkit-appearance: none;
-    margin: 0;
+    appearance: textfield;
 }
 
 /* Compact table mode */
@@ -904,15 +898,8 @@ body.dark-mode .db-table td {
 
 #gridContainer {
     overflow-x: auto;
-}
-
-#gridContainer::-webkit-scrollbar {
-    height: 12px;
-}
-
-#gridContainer::-webkit-scrollbar-thumb {
-    background: #ccc;
-    border-radius: 6px;
+    scrollbar-width: thin;
+    scrollbar-color: #ccc transparent;
 }
 
 #scrollTopBtn {

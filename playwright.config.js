@@ -7,4 +7,8 @@ module.exports = defineConfig({
     headless: true,
   },
   timeout: 30000,
+  projects: [
+    { name: 'firefox', use: { browserName: 'firefox' } },
+    { name: 'msedge', use: { browserName: 'chromium', channel: 'msedge' } },
+  ],
 });

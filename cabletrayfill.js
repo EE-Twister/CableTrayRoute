@@ -1053,7 +1053,7 @@ checkPrereqs([{key:'traySchedule',page:'racewayschedule.html',label:'Raceway Sch
         const trayTopY     = nameRowPx + dimRowPx;  // Y‐coordinate of tray top edge
 
         let svg = `
-          <svg
+          <svg xmlns="http://www.w3.org/2000/svg"
             width="${totalSvgW}"
             height="${totalSvgH}"
             style="background:#f9f9f9; border:1px solid #999;"
@@ -1244,7 +1244,7 @@ Wt: ${p.weight.toFixed(2)} lbs/ft
         const trayTopY     = nameRowPx + dimRowPx;
 
         let svg = `
-          <svg
+          <svg xmlns="http://www.w3.org/2000/svg"
             width="${totalSvgW}"
             height="${totalSvgH}"
             style="background:#f9f9f9; border:1px solid #333;"
