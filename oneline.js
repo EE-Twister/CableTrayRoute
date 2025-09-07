@@ -247,8 +247,20 @@ function buildPalette() {
   });
   document.querySelectorAll('#component-buttons details').forEach(det => {
     const key = `palette-${det.id}-open`;
+    const container = det.querySelector('.section-buttons');
+    const hasButtons = container && container.children.length > 0;
+    if (!hasButtons && container) {
+      const placeholder = document.createElement('div');
+      placeholder.className = 'no-components';
+      placeholder.textContent = 'No components available';
+      container.appendChild(placeholder);
+    }
     const stored = localStorage.getItem(key);
-    if (stored !== null) det.open = stored === 'true';
+    if (stored !== null) {
+      det.open = stored === 'true';
+    } else if (!hasButtons) {
+      det.open = true;
+    }
     det.addEventListener('toggle', () => {
       localStorage.setItem(key, det.open);
     });
@@ -723,6 +735,13 @@ function renderTemplates() {
   const container = document.getElementById('template-buttons');
   if (!container) return;
   container.innerHTML = '';
+  if (!templates.length) {
+    const placeholder = document.createElement('div');
+    placeholder.className = 'no-components';
+    placeholder.textContent = 'No components available';
+    container.appendChild(placeholder);
+    return;
+  }
   templates.forEach(t => {
     const btn = document.createElement('button');
     btn.textContent = t.name;
