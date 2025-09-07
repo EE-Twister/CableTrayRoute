@@ -39,6 +39,30 @@
   color: var(--primary-color);
 }
 
+.icon-button {
+  background: none;
+  border: none;
+  padding: 0.25rem;
+  width: 32px;
+  height: 32px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  transition: background-color 0.2s, transform 0.2s;
+}
+
+.icon-button img {
+  width: 100%;
+  height: 100%;
+}
+
+.icon-button:hover,
+.icon-button:focus {
+  background: var(--ol-hover-bg);
+  border-radius: 4px;
+}
+
 .card {
   background: var(--ol-card-bg);
   border: 1px solid var(--ol-border-color);
@@ -219,16 +243,6 @@
   border-radius: var(--ol-radius);
   width: 100%;
   height: 100%;
-}
-
-.btn.icon-button {
-  transition: transform 0.2s, background-color 0.2s;
-}
-
-.btn.icon-button:hover,
-.btn.icon-button:focus {
-  background-color: var(--ol-hover-bg);
-  transform: scale(1.05);
 }
 
 #snap-indicator {
