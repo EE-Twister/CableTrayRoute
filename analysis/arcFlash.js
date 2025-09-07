@@ -1,6 +1,6 @@
 import { runShortCircuit } from './shortCircuit.js';
 import { getOneLine, getItem } from '../dataStore.mjs';
-import devices from '../data/protectiveDevices.json' assert { type: 'json' };
+import devices from '../data/protectiveDevices.mjs';
 
 function interpolateTime(curve = [], currentA) {
   if (!curve.length) return 0.2;

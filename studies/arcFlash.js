@@ -2,6 +2,8 @@ import { runArcFlash } from '../analysis/arcFlash.js';
 import { getStudies, setStudies } from '../dataStore.mjs';
 import { generateArcFlashReport } from '../reports/arcFlashReport.mjs';
 
+// JSON imports require a .mjs wrapper for broad browser compatibility.
+
 /**
  * Perform an IEEE 1584 arc‑flash study based on the current project data.
  * Results are persisted and a PDF/CSV report with labels is generated.
