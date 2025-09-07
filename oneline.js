@@ -1710,6 +1710,80 @@ function selectComponent(comp) {
   modal._keyHandler = keyHandler;
 }
 
+function openPropertyDialog(componentId) {
+  const comp = components.find(c => c.id === componentId);
+  if (!comp) return;
+  if (!propSchemas[comp.subtype]) {
+    showToast(`No properties defined for ${comp.subtype}`);
+    return;
+  }
+
+  const modal = document.getElementById('prop-modal');
+  modal.innerHTML = '';
+
+  const form = document.createElement('form');
+  const schema = propSchemas[comp.subtype] || [];
+
+  schema.forEach(f => {
+    const label = document.createElement('label');
+    label.textContent = f.label + ' ';
+    let input;
+    const current = comp[f.name] ?? '';
+    if (f.type === 'select') {
+      input = document.createElement('select');
+      (f.options || []).forEach(opt => {
+        const o = document.createElement('option');
+        o.value = opt;
+        o.textContent = opt;
+        if (current === opt) o.selected = true;
+        input.appendChild(o);
+      });
+    } else if (f.type === 'textarea') {
+      input = document.createElement('textarea');
+      input.value = current;
+    } else if (f.type === 'checkbox') {
+      input = document.createElement('input');
+      input.type = 'checkbox';
+      input.checked = !!current;
+    } else {
+      input = document.createElement('input');
+      input.type = f.type || 'text';
+      input.value = current;
+    }
+    input.name = f.name;
+    label.appendChild(input);
+    form.appendChild(label);
+  });
+
+  const saveBtn = document.createElement('button');
+  saveBtn.type = 'submit';
+  saveBtn.textContent = 'Save';
+  form.appendChild(saveBtn);
+
+  const cancelBtn = document.createElement('button');
+  cancelBtn.type = 'button';
+  cancelBtn.textContent = 'Cancel';
+  cancelBtn.addEventListener('click', () => modal.classList.remove('show'));
+  form.appendChild(cancelBtn);
+
+  form.addEventListener('submit', e => {
+    e.preventDefault();
+    const fd = new FormData(form);
+    schema.forEach(f => {
+      const val = fd.get(f.name);
+      comp[f.name] = f.type === 'checkbox' ? val === 'on' : (val || '');
+    });
+    pushHistory();
+    render();
+    save();
+    syncSchedules();
+    modal.classList.remove('show');
+  });
+
+  modal.appendChild(form);
+  modal.classList.add('show');
+}
+
 async function chooseCable(source, target, existingConn = null) {
   const templateData = [];
   try {
@@ -2398,13 +2472,7 @@ async function init() {
   svg.addEventListener('dblclick', e => {
     const g = e.target.closest('.component');
     if (!g) return;
-    const comp = components.find(c => c.id === g.dataset.id);
-    if (!comp) return;
-    if (!propSchemas[comp.subtype]) {
-      showToast(`No properties defined for ${comp.subtype}`);
-      return;
-    }
-    selectComponent(comp);
+    openPropertyDialog(g.dataset.id);
   });
 
   svg.addEventListener('contextmenu', e => {
@@ -2425,7 +2493,7 @@ async function init() {
     if (!action) return;
     e.stopPropagation();
     if (action === 'edit' && contextTarget) {
-      selectComponent(contextTarget);
+      openPropertyDialog(contextTarget.id);
     } else if (action === 'delete' && contextTarget) {
       components = components.filter(c => c !== contextTarget);
       components.forEach(c => {
