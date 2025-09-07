@@ -586,6 +586,7 @@ import { getDuctbanks as readStoredDuctbanks, setDuctbanks, setItem, getItem } f
   // Optional cable table management
   let cableRows=[];
   let cableTbody;
+  let cableSummary;
 
   function renderCableTable(){
     if(!cableTbody){
@@ -647,8 +648,33 @@ import { getDuctbanks as readStoredDuctbanks, setDuctbanks, setItem, getItem } f
         cb.weight=opt.dataset.weight||'';
         odInput.value=cb.od;
         wtInput.value=cb.weight;
+        updateCableTotals();
       });
     });
+    updateCableTotals();
+  }
+
+  function updateCableTotals(){
+    const specs=globalThis.CONDUIT_SPECS||{};
+    const cableArea=cableRows.reduce((sum,cb)=>{
+      const od=parseFloat(cb.od);
+      return isNaN(od)?sum:sum+Math.PI*Math.pow(od/2,2);
+    },0);
+    const conduitArea=ductbanks.reduce((tot,db)=>tot+db.conduits.reduce((s,c)=>{
+      const a=specs[c.type]&&specs[c.type][c.trade_size];
+      return s+(a||0);
+    },0),0);
+    const fill=conduitArea?cableArea/conduitArea*100:0;
+    if(!cableSummary){
+      cableSummary=document.createElement('p');
+      cableSummary.id='cableFillInfo';
+      const table=document.getElementById('cableTable');
+      if(table&&table.parentElement) table.parentElement.appendChild(cableSummary);
+    }
+    if(cableSummary){
+      cableSummary.textContent=`Total Cable Area: ${cableArea.toFixed(2)} in², Fill: ${fill.toFixed(1)}%`;
+      cableSummary.style.color=fill>40?'red':'';
+    }
   }
 
   function addCable(){
