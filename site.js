@@ -1,5 +1,5 @@
 import "./units.js";
-import { exportProject, importProject, getOneLine, getStudies } from "./dataStore.mjs";
+import { exportProject, importProject, getOneLine, getStudies, loadProject } from "./dataStore.mjs";
 import { runValidation } from "./validation/rules.js";
 // fast-json-patch is loaded dynamically so the bundle does not expect a
 // build-time dependency. This avoids "index_mjs is not defined" errors in
@@ -311,7 +311,22 @@ async function loadProjectFromHash(){
       location.hash='';
       location.reload();
     }catch(e){console.error('load share failed',e);}
+  } else if(location.hash){
+    try{
+      const name=decodeURIComponent(location.hash.slice(1));
+      if(name) loadProject(name);
+    }catch(e){console.error('hash load failed',e);}
   }
+}
+
+function applyProjectHash(){
+  const hash=location.hash;
+  if(!hash) return;
+  document.querySelectorAll('a[href$=".html"]').forEach(a=>{
+    const href=a.getAttribute('href');
+    if(!href||href.includes('#')) return;
+    a.setAttribute('href',href+hash);
+  });
 }
 
 // History and autosave features have been removed to avoid exceeding
@@ -734,6 +749,7 @@ function loadConduits(){
 
 function initProjectIO(){
   loadProjectFromHash();
+  applyProjectHash();
   const exportBtn=document.getElementById('export-project-btn');
   if(exportBtn){
     const checkpointBtn=document.createElement('button');
@@ -824,4 +840,5 @@ globalThis.checkPrereqs=checkPrereqs;
 globalThis.persistConduits=persistConduits;
 globalThis.loadConduits=loadConduits;
 globalThis.applyUnitLabels=applyUnitLabels;
+globalThis.applyProjectHash=applyProjectHash;
 globalThis.showSelfCheckModal=showSelfCheckModal;
