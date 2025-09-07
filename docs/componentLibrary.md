@@ -25,3 +25,7 @@ The one-line editor loads component definitions from `componentLibrary.json`. Ea
 - `schema` – optional property descriptors with `name`, `label`, and `type`.
 
 Add new objects to the JSON array and provide matching icons to extend the palette without modifying JavaScript code.
+
+## Icons
+
+Place custom SVG files under `icons/components/` and reference them in `componentLibrary.json`. Missing icons fall back to `icons/placeholder.svg`.

@@ -159,6 +159,11 @@ async function loadComponentLibrary() {
   }
   if (missingIcons.length) {
     console.warn('Using placeholder icons for: ' + missingIcons.join(', '));
+    showToast(
+      `Placeholder icons for: ${missingIcons.join(', ')}`,
+      'Fix icons',
+      'docs/componentLibrary.html#icons'
+    );
   }
 }
 
@@ -2863,10 +2868,17 @@ function getCategory(c) {
   return c.type || subtypeCategory[c.subtype];
 }
 
-function showToast(msg) {
+function showToast(msg, linkText, linkHref) {
   const t = document.getElementById('toast');
   if (!t) return;
   t.textContent = msg;
+  if (linkText && linkHref) {
+    const a = document.createElement('a');
+    a.href = linkHref;
+    a.textContent = linkText;
+    a.target = '_blank';
+    t.append(' ', a);
+  }
   t.classList.add('show');
   setTimeout(() => t.classList.remove('show'), 3000);
 }
