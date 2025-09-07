@@ -101,16 +101,14 @@
 }
 
 .palette-section summary {
-  padding: 0;
   cursor: pointer;
   list-style: none;
-  display: inline-flex;
+  display: flex;
   align-items: center;
-  justify-content: center;
-  width: 32px;
-  height: 32px;
-  font-size: 0;
-  color: transparent;
+  gap: var(--ol-spacing);
+  padding: var(--ol-spacing);
+  color: inherit;
+  font-size: 1rem;
 }
 
 .palette-section[open] > summary {
@@ -123,6 +121,7 @@
   height: 24px;
   background-size: contain;
   background-repeat: no-repeat;
+  flex-shrink: 0;
 }
 
 #panel-section > summary::before { background-image: url('icons/panel.svg'); }
@@ -135,6 +134,11 @@
   flex-wrap: wrap;
   gap: var(--ol-spacing);
   padding: var(--ol-spacing);
+}
+
+.palette-section .no-components {
+  font-style: italic;
+  color: #666;
 }
 
 .summary-icon {
