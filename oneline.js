@@ -310,11 +310,20 @@ if (diagram) {
     try {
       info = JSON.parse(dataText);
     } catch {
+      showToast('Cannot drop component');
       return;
     }
-    addComponent({ type: info.type, subtype: info.subtype, x: e.offsetX, y: e.offsetY });
+    const { left, top } = diagram.getBoundingClientRect();
+    const x = e.clientX - left;
+    const y = e.clientY - top;
+    const comp = addComponent({ type: info.type, subtype: info.subtype, x, y });
     render();
     save();
+    const elem = diagram.querySelector(`g.component[data-id="${comp.id}"]`);
+    if (elem) {
+      elem.classList.add('flash');
+      setTimeout(() => elem.classList.remove('flash'), 500);
+    }
   });
 }
 
