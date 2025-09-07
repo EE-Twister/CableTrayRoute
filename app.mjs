@@ -2,6 +2,7 @@ import { getItem, setItem, removeItem, getTrays, getCables, getDuctbanks, getCon
 import { buildSegmentRows, buildSummaryRows, buildBOM } from './resultsExport.mjs';
 import './site.js';
 import { calculateVoltageDrop } from './src/voltageDrop.js';
+import { exportRoutesDXF } from './bimExport.mjs';
 
 // Filename: app.mjs
 // (This is an improved version that adds route segment consolidation)
@@ -164,6 +165,7 @@ document.addEventListener('DOMContentLoaded', async () => {
         heatmapToggle: document.getElementById('heatmap-toggle'),
         updatedUtilizationContainer: document.getElementById('updated-utilization-container'),
         exportCsvBtn: document.getElementById('export-csv-btn'),
+        exportRoutesBtn: document.getElementById('export-routes-btn'),
         downloadBomBtn: document.getElementById('download-bom-btn'),
         rebalanceBtn: document.getElementById('rebalance-btn'),
         openFillBtn: document.getElementById('open-fill-btn'),
@@ -201,7 +203,7 @@ document.addEventListener('DOMContentLoaded', async () => {
     if(elements.importCablesFile) elements.importCablesFile.addEventListener('change',markUnsaved);
     if(elements.exportTraysBtn) elements.exportTraysBtn.addEventListener('click',markSaved);
     if(elements.exportCablesBtn) elements.exportCablesBtn.addEventListener('click',markSaved);
-    ['export-csv-btn','download-bom-btn','export-tray-fills-btn'].forEach(id=>{const b=document.getElementById(id);if(b)b.addEventListener('click',markSaved);});
+    ['export-csv-btn','export-routes-btn','download-bom-btn','export-tray-fills-btn'].forEach(id=>{const b=document.getElementById(id);if(b)b.addEventListener('click',markSaved);});
 
     const trayTemplateHeaders=['tray_id','start_x','start_y','start_z','end_x','end_y','end_z','width','height','current_fill','allowed_cable_group','shape'];
     const cableTemplateHeaders=['tag','start_tag','end_tag','cable_type','conductors','conductor_size','diameter','weight','allowed_cable_group','start_x','start_y','start_z','end_x','end_y','end_z'];
@@ -2625,6 +2627,35 @@ const renderBatchResults = (results) => {
         elements.messages.innerHTML += `<div class="message ${type}">${text}</div>`;
     };
 
+    const exportRoutesJSON = () => {
+        if (!state.latestRouteData || state.latestRouteData.length === 0) {
+            alert('No route data to export.');
+            return;
+        }
+        const routes = state.latestRouteData.map(r => ({
+            cable: r.cable,
+            segments: (r.route_segments || []).map(s => ({
+                tray_id: s.tray_id || '',
+                start: s.start,
+                end: s.end
+            }))
+        }));
+        const blob = new Blob([JSON.stringify(routes, null, 2)], { type: 'application/json' });
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = 'routes.json';
+        document.body.appendChild(a);
+        a.click();
+        document.body.removeChild(a);
+        URL.revokeObjectURL(url);
+        try {
+            exportRoutesDXF(routes);
+        } catch (err) {
+            console.warn('DXF export failed', err);
+        }
+    };
+
     const exportRouteXLSX = () => {
         if (!state.latestRouteData || state.latestRouteData.length === 0) {
             alert('No route data to export.');
@@ -3767,6 +3798,9 @@ Plotly.newPlot(document.getElementById('plot'), data, layout, {responsive: true}
     elements.importCablesBtn.addEventListener('click', () => elements.importCablesFile.click());
     elements.importCablesFile.addEventListener('change', importCableOptions);
     elements.exportCsvBtn.addEventListener('click', exportRouteXLSX);
+    if (elements.exportRoutesBtn) {
+        elements.exportRoutesBtn.addEventListener('click', exportRoutesJSON);
+    }
     if (elements.downloadBomBtn) {
         elements.downloadBomBtn.addEventListener('click', exportBOMXLSX);
     }
