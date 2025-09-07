@@ -211,6 +211,9 @@ function ensurePanelFields(panel) {
     id: '',
     description: '',
     ref: '',
+    voltage: '',
+    mainRating: '',
+    circuitCount: 42,
     ...panel
   };
 }
