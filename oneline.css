@@ -31,12 +31,10 @@
 }
 
 .palette {
-  width: 200px;
   display: flex;
   flex-direction: column;
   gap: var(--ol-spacing);
   font-family: var(--ol-font);
-  margin-right: var(--ol-spacing);
 }
 
 #palette-search {
@@ -139,7 +137,7 @@
 
 .oneline-editor {
   position: relative;
-  flex: 1;
+  min-height: 600px;
 }
 
 .toolbar {
@@ -151,12 +149,32 @@
 }
 
 .workspace {
-  display: flex;
+  --palette-width: 250px;
+  display: grid;
+  grid-template-columns: var(--palette-width) 1fr;
+  position: relative;
+}
+
+.splitter {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  left: var(--palette-width);
+  width: 5px;
+  cursor: col-resize;
+  background: var(--ol-border-color);
+}
+
+.palette-toggle {
+  display: none;
+  margin-bottom: var(--ol-spacing);
 }
 
 .oneline-editor #diagram {
   border: 1px solid var(--ol-border-color);
   border-radius: var(--ol-radius);
+  width: 100%;
+  height: 100%;
 }
 
 .btn.icon-button {
@@ -301,4 +319,24 @@ g.component.scenario-diff > * {
   position: relative;
   z-index: 1001;
   box-shadow: 0 0 0 4px orange;
+}
+
+@media (max-width: 600px) {
+  .palette-toggle {
+    display: inline-block;
+  }
+  .workspace {
+    grid-template-columns: 1fr;
+  }
+  .workspace #palette,
+  .workspace .splitter {
+    display: none;
+  }
+  .workspace.show-palette {
+    grid-template-columns: var(--palette-width) 1fr;
+  }
+  .workspace.show-palette #palette,
+  .workspace.show-palette .splitter {
+    display: block;
+  }
 }

@@ -100,6 +100,7 @@
           <label class="scale-label">1 px = <input type="number" id="scale-value" value="1" step="0.01" min="0"> <input type="text" id="scale-unit" value="in" size="3" aria-label="Scale unit"></label>
           <label class="slack-label">Slack % <input type="number" id="slack-pct" value="0" step="0.1" min="0"></label>
         </div>
+        <button id="palette-toggle" class="palette-toggle" aria-label="Toggle palette" aria-controls="palette" aria-expanded="false">☰</button>
         <div class="workspace">
           <aside id="palette" class="palette">
             <div id="component-buttons">
@@ -138,8 +139,9 @@
                 </div>
             </div>
           </aside>
+          <div class="splitter"></div>
           <div class="oneline-editor">
-            <svg id="diagram" width="800" height="600">
+            <svg id="diagram" width="100%" height="100%">
             <defs>
               <pattern id="grid" width="20" height="20" patternUnits="userSpaceOnUse">
                 <path d="M20 0 L0 0 0 20" fill="none" stroke="#ccc" stroke-width="0.5" />
