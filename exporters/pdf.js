@@ -1,5 +1,5 @@
-import { jsPDF } from 'jspdf';
-import svg2pdf from 'svg2pdf.js';
+const { jsPDF } = window.jspdf || await import('https://cdn.jsdelivr.net/npm/jspdf@2.5.1/dist/jspdf.es.min.js');
+const svg2pdf = (await import('https://cdn.jsdelivr.net/npm/svg2pdf.js@2.0.1/dist/svg2pdf.es.min.js')).default;
 
 /**
  * Export the current set of sheets to a PDF document.
