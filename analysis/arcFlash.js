@@ -1,6 +1,39 @@
 import { runShortCircuit } from './shortCircuit.js';
 import { getOneLine, getItem } from '../dataStore.mjs';
-import devices from '../data/protectiveDevices.mjs';
+
+let deviceCache = null;
+
+async function loadDevices() {
+  if (deviceCache) return deviceCache;
+  try {
+    const mod = await import('../data/protectiveDevices.mjs');
+    deviceCache = mod.default || mod;
+  } catch (err) {
+    console.error('Protective device library failed to load', err);
+    if (typeof window !== 'undefined') {
+      const diag = {
+        userAgent: navigator.userAgent,
+        dynamicImport: (() => {
+          try { new Function('import("")'); return true; } catch { return false; }
+        })()
+      };
+      console.info('Diagnostics:', diag);
+      console.info('Consider updating your browser or adding polyfills for missing features.');
+      if (typeof window.showToast === 'function') {
+        window.showToast('Protective device library failed to load', 'error', JSON.stringify(diag));
+      } else if (typeof alert === 'function') {
+        alert('Protective device library failed to load');
+      } else if (typeof document !== 'undefined') {
+        const banner = document.createElement('div');
+        banner.className = 'message error';
+        banner.textContent = 'Protective device library failed to load';
+        document.body.prepend(banner);
+      }
+    }
+    deviceCache = [];
+  }
+  return deviceCache;
+}
 
 function interpolateTime(curve = [], currentA) {
   if (!curve.length) return 0.2;
@@ -17,7 +50,7 @@ function interpolateTime(curve = [], currentA) {
   return curve[curve.length - 1].time;
 }
 
-function clearingTime(comp, Ibf) {
+function clearingTime(comp, Ibf, devices) {
   if (comp.clearing_time) return Number(comp.clearing_time);
   if (!comp.tccId) return 0.2;
   const dev = devices.find(d => d.id === comp.tccId);
@@ -61,7 +94,8 @@ function arcingCurrent(Ibf, V, gap, cfg, enclosure) {
  * { incidentEnergy, boundary, ppeCategory, clearingTime } where energy is
  * in cal/cm^2 and boundary in millimeters.
  */
-export function runArcFlash() {
+export async function runArcFlash() {
+  const devices = await loadDevices();
   const sc = runShortCircuit();
   const { sheets } = getOneLine();
   const comps = Array.isArray(sheets[0]?.components)
@@ -78,7 +112,7 @@ export function runArcFlash() {
     const w = Number(comp.enclosure_width || comp.box_width) || 508;
     const de = Number(comp.enclosure_depth || comp.box_depth) || 508;
     const sizeFactor = Math.cbrt((h * w * de) / (508 * 508 * 508)) || 1;
-    const time = clearingTime(comp, Ibf);
+    const time = clearingTime(comp, Ibf, devices);
     const cfg = (comp.electrode_config || 'VCB').toUpperCase();
     const V = Number(comp.kV || comp.baseKV || comp.prefault_voltage || 0.48);
     const Ia = arcingCurrent(Ibf, V, gap, cfg, enclosure);

@@ -7,8 +7,13 @@ function describe(name, fn) {
 
 function it(name, fn) {
   try {
-    fn();
-    console.log('  \u2713', name);
+    const res = fn();
+    if (res && typeof res.then === 'function') {
+      res.then(() => console.log('  \u2713', name))
+        .catch(err => { console.log('  \u2717', name); console.error(err); process.exitCode = 1; });
+    } else {
+      console.log('  \u2713', name);
+    }
   } catch (err) {
     console.log('  \u2717', name);
     console.error(err);
@@ -86,10 +91,10 @@ function caseToDiagram(data) {
       });
     });
 
-    it('matches arc-flash example', () => {
+    it('matches arc-flash example', async () => {
       setItem('tccSettings', afBench.tccSettings);
       setOneLine({ activeSheet: 0, sheets: afBench.oneLine });
-      const res = runArcFlash();
+      const res = await runArcFlash();
       Object.entries(afBench.expected).forEach(([id, exp]) => {
         const bus = res[id];
         assert(bus, `Missing bus ${id}`);

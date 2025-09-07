@@ -9,8 +9,8 @@ import { generateArcFlashReport } from '../reports/arcFlashReport.mjs';
  * Results are persisted and a PDF/CSV report with labels is generated.
  * @returns {Object}
  */
-export function runArcFlashStudy() {
-  const res = runArcFlash();
+export async function runArcFlashStudy() {
+  const res = await runArcFlash();
   const studies = getStudies();
   studies.arcFlash = res;
   setStudies(studies);
@@ -22,9 +22,9 @@ if (typeof document !== 'undefined') {
   const form = document.getElementById('arcflash-form');
   const out = document.getElementById('arcflash-output');
   if (form && out) {
-    form.addEventListener('submit', ev => {
+    form.addEventListener('submit', async ev => {
       ev.preventDefault();
-      const res = runArcFlashStudy();
+      const res = await runArcFlashStudy();
       out.textContent = JSON.stringify(res, null, 2);
     });
   }
