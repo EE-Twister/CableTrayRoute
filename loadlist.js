@@ -170,6 +170,24 @@ if (typeof window !== 'undefined') {
   function saveRow(tr) {
     const idx = Number(tr.dataset.index);
     const load = gatherRow(tr);
+    const numericFields = ['quantity','voltage','kw','powerFactor','loadFactor','efficiency','demandFactor','phases'];
+    let valid = true;
+    numericFields.forEach(name => {
+      const input = tr.querySelector(`input[name="${name}"]`);
+      if (input) {
+        const val = input.value.trim();
+        if (val !== '' && isNaN(Number(val))) {
+          input.classList.add('input-error');
+          valid = false;
+        } else {
+          input.classList.remove('input-error');
+        }
+      }
+    });
+    if (!valid) {
+      alert('Please correct highlighted numeric fields.');
+      return;
+    }
     const computed = calculateDerived(load);
     Object.assign(load, computed);
     dataStore.updateLoad(idx, load);
@@ -242,10 +260,10 @@ if (typeof window !== 'undefined') {
       <td><input name="source" type="text" value="${load.source || ''}"></td>
       <td><input name="tag" type="text" value="${load.tag || ''}"></td>
       <td><input name="description" type="text" value="${load.description || ''}"></td>
-      <td><input name="manufacturer" type="text" value="${load.manufacturer || ''}"></td>
-      <td><input name="model" type="text" value="${load.model || ''}"></td>
-      <td><input name="quantity" type="number" step="any" value="${load.quantity || ''}"></td>
-      <td><input name="voltage" type="number" step="any" value="${load.voltage || ''}"></td>
+      <td><input name="manufacturer" type="text" class="manufacturer-input" value="${load.manufacturer || ''}"></td>
+      <td><input name="model" type="text" class="model-input" value="${load.model || ''}"></td>
+      <td><input name="quantity" type="number" step="any" maxlength="15" value="${load.quantity || ''}"></td>
+      <td><input name="voltage" type="number" step="any" maxlength="15" value="${load.voltage || ''}"></td>
       <td><input name="loadType" type="text" value="${load.loadType || ''}"></td>
       <td><select name="duty">
         <option value=""></option>
@@ -253,12 +271,12 @@ if (typeof window !== 'undefined') {
         <option value="Intermittent"${load.duty === 'Intermittent' ? ' selected' : ''}>Intermittent</option>
         <option value="Stand-by"${load.duty === 'Stand-by' ? ' selected' : ''}>Stand-by</option>
       </select></td>
-      <td><input name="kw" type="number" step="any" value="${load.kw || ''}"></td>
-      <td><input name="powerFactor" type="number" step="any" value="${load.powerFactor || ''}"></td>
-      <td><input name="loadFactor" type="number" step="any" value="${load.loadFactor || ''}"></td>
-      <td><input name="efficiency" type="number" step="any" value="${load.efficiency || ''}"></td>
-      <td><input name="demandFactor" type="number" step="any" value="${load.demandFactor || ''}"></td>
-      <td><input name="phases" type="text" value="${load.phases || ''}"></td>
+      <td><input name="kw" type="number" step="any" maxlength="15" value="${load.kw || ''}"></td>
+      <td><input name="powerFactor" type="number" step="any" maxlength="15" value="${load.powerFactor || ''}"></td>
+      <td><input name="loadFactor" type="number" step="any" maxlength="15" value="${load.loadFactor || ''}"></td>
+      <td><input name="efficiency" type="number" step="any" maxlength="15" value="${load.efficiency || ''}"></td>
+      <td><input name="demandFactor" type="number" step="any" maxlength="15" value="${load.demandFactor || ''}"></td>
+      <td><input name="phases" type="number" step="any" maxlength="15" value="${load.phases || ''}"></td>
       <td><input name="circuit" type="text" value="${load.circuit || ''}"></td>
       <td><textarea name="notes">${load.notes || ''}</textarea></td>
       <td class="kva">${format(load.kva)}</td>

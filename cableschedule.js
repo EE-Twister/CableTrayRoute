@@ -102,6 +102,14 @@ window.addEventListener('DOMContentLoaded', () => {
     {key:'notes',label:'Notes',type:'text',group:'Notes',tooltip:'Additional comments or notes'}
   ];
 
+  columns.forEach(col => {
+    if (col.type === 'number') {
+      col.step = 'any';
+      col.maxlength = 15;
+      col.validate = col.validate || 'numeric';
+    }
+  });
+
   // Retrieve existing cables from project storage.
   let tableData = dataStore.getCables();
   const vdLimitIn = document.getElementById('vd-limit');
