@@ -1305,10 +1305,27 @@ function selectComponent(comp) {
   selected = comp;
   selection = [comp];
   selectedConnection = null;
-  const modal = document.getElementById('prop-modal');
+  let modal = document.getElementById('prop-modal');
+  if (modal._outsideHandler) modal.removeEventListener('click', modal._outsideHandler);
+  if (modal._keyHandler) document.removeEventListener('keydown', modal._keyHandler);
   modal.innerHTML = '';
   const form = document.createElement('form');
   form.id = 'prop-form';
+
+  const outsideHandler = e => { if (e.target === modal) closeModal(); };
+  const keyHandler = e => { if (e.key === 'Escape') { e.preventDefault(); closeModal(); } };
+
+  function closeModal() {
+    modal.classList.remove('show');
+    selected = null;
+    selection = [];
+    selectedConnection = null;
+    modal.removeEventListener('click', outsideHandler);
+    document.removeEventListener('keydown', keyHandler);
+    delete modal._outsideHandler;
+    delete modal._keyHandler;
+  }
+
   const rawSchema = propSchemas[comp.subtype] || [];
   const schema = rawSchema.map(f => {
     if (f.name === 'voltage_class') {
@@ -1336,7 +1353,7 @@ function selectComponent(comp) {
   ];
   let manufacturerInput = null;
   let modelInput = null;
-  [...baseFields, ...schema].forEach(f => {
+  const buildField = (f, container) => {
     const lbl = document.createElement('label');
     lbl.textContent = f.label + ' ';
     let input;
@@ -1367,8 +1384,33 @@ function selectComponent(comp) {
     if (f.name === 'manufacturer') manufacturerInput = input;
     if (f.name === 'model') modelInput = input;
     lbl.appendChild(input);
-    form.appendChild(lbl);
+    container.appendChild(lbl);
+  };
+
+  const fields = [...baseFields, ...schema];
+  const manufacturerFields = [];
+  const noteFields = [];
+  const electricalFields = [];
+  fields.forEach(f => {
+    if (['manufacturer', 'model'].includes(f.name)) manufacturerFields.push(f);
+    else if (['notes', 'failure_modes'].includes(f.name)) noteFields.push(f);
+    else electricalFields.push(f);
   });
+
+  const addFieldset = (legendText, fieldArr) => {
+    if (!fieldArr.length) return;
+    const fs = document.createElement('fieldset');
+    const legend = document.createElement('legend');
+    legend.textContent = legendText;
+    fs.appendChild(legend);
+    fieldArr.forEach(f => buildField(f, fs));
+    form.appendChild(fs);
+  };
+
+  addFieldset('Manufacturer', manufacturerFields);
+  addFieldset('Electrical', electricalFields);
+  addFieldset('Notes', noteFields);
+
   if (manufacturerInput && modelInput) {
     const updateModels = () => {
       const models = manufacturerModels[manufacturerInput.value] || [];
@@ -1385,6 +1427,7 @@ function selectComponent(comp) {
     if (!manufacturerInput.value) manufacturerInput.value = Object.keys(manufacturerModels)[0];
     updateModels();
   }
+
   const tccLbl = document.createElement('label');
   tccLbl.textContent = 'TCC Device ';
   const tccInput = document.createElement('select');
@@ -1405,11 +1448,13 @@ function selectComponent(comp) {
   const tccBtn = document.createElement('button');
   tccBtn.type = 'button';
   tccBtn.textContent = 'Edit TCC';
+  tccBtn.classList.add('btn');
   tccBtn.addEventListener('click', () => {
     const dev = tccInput.value ? `&device=${encodeURIComponent(tccInput.value)}` : '';
     window.open(`tcc.html?component=${encodeURIComponent(comp.id)}${dev}`, '_blank');
   });
   form.appendChild(tccBtn);
+
   if ((comp.connections || []).length) {
     const header = document.createElement('h3');
     header.textContent = 'Connections';
@@ -1424,6 +1469,7 @@ function selectComponent(comp) {
       const edit = document.createElement('button');
       edit.type = 'button';
       edit.textContent = 'Edit';
+      edit.classList.add('btn');
       edit.addEventListener('click', async e => {
         e.stopPropagation();
         const res = await chooseCable(comp, target, conn);
@@ -1441,6 +1487,7 @@ function selectComponent(comp) {
       const del = document.createElement('button');
       del.type = 'button';
       del.textContent = 'Delete';
+      del.classList.add('btn');
       del.addEventListener('click', e => {
         e.stopPropagation();
         comp.connections.splice(idx, 1);
@@ -1457,13 +1504,17 @@ function selectComponent(comp) {
     });
     form.appendChild(list);
   }
-  const saveBtn = document.createElement('button');
-  saveBtn.type = 'submit';
-  saveBtn.textContent = 'Save';
-  form.appendChild(saveBtn);
+
+  const applyBtn = document.createElement('button');
+  applyBtn.type = 'submit';
+  applyBtn.textContent = 'Apply';
+  applyBtn.classList.add('btn');
+  form.appendChild(applyBtn);
+
   const templateBtn = document.createElement('button');
   templateBtn.type = 'button';
   templateBtn.textContent = 'Save as Template';
+  templateBtn.classList.add('btn');
   templateBtn.addEventListener('click', () => {
     const name = prompt('Template name', comp.label || comp.subtype);
     if (!name) return;
@@ -1474,7 +1525,7 @@ function selectComponent(comp) {
       rotation: comp.rotation || 0,
       flipped: !!comp.flipped
     };
-    [...baseFields, ...schema].forEach(f => {
+    fields.forEach(f => {
       const v = fd.get(f.name);
       data[f.name] = f.type === 'checkbox' ? v === 'on' : (v || '');
     });
@@ -1485,37 +1536,34 @@ function selectComponent(comp) {
     showToast('Template saved');
   });
   form.appendChild(templateBtn);
+
   const cancelBtn = document.createElement('button');
   cancelBtn.type = 'button';
   cancelBtn.textContent = 'Cancel';
-  cancelBtn.addEventListener('click', () => {
-    modal.classList.remove('show');
-    selected = null;
-    selection = [];
-    selectedConnection = null;
-  });
+  cancelBtn.classList.add('btn');
+  cancelBtn.addEventListener('click', closeModal);
   form.appendChild(cancelBtn);
+
   const deleteBtn = document.createElement('button');
   deleteBtn.type = 'button';
   deleteBtn.textContent = 'Delete Component';
+  deleteBtn.classList.add('btn');
   deleteBtn.addEventListener('click', () => {
     components = components.filter(c => c !== comp);
     components.forEach(c => {
       c.connections = (c.connections || []).filter(conn => conn.target !== comp.id);
     });
-    modal.classList.remove('show');
-    selected = null;
-    selection = [];
-    selectedConnection = null;
+    closeModal();
     pushHistory();
     render();
     save();
   });
   form.appendChild(deleteBtn);
+
   form.addEventListener('submit', e => {
     e.preventDefault();
     const fd = new FormData(form);
-    [...baseFields, ...schema].forEach(f => {
+    fields.forEach(f => {
       const v = fd.get(f.name);
       comp[f.name] = f.type === 'checkbox' ? v === 'on' : (v || '');
     });
@@ -1523,13 +1571,15 @@ function selectComponent(comp) {
     pushHistory();
     render();
     save();
-    modal.classList.remove('show');
-    selected = null;
-    selection = [];
-    selectedConnection = null;
+    closeModal();
   });
+
   modal.appendChild(form);
   modal.classList.add('show');
+  modal.addEventListener('click', outsideHandler);
+  document.addEventListener('keydown', keyHandler);
+  modal._outsideHandler = outsideHandler;
+  modal._keyHandler = keyHandler;
 }
 
 async function chooseCable(source, target, existingConn = null) {
@@ -2148,6 +2198,10 @@ async function init() {
     if (!g) return;
     const comp = components.find(c => c.id === g.dataset.id);
     if (!comp) return;
+    if (!propSchemas[comp.subtype]) {
+      showToast(`No properties defined for ${comp.subtype}`);
+      return;
+    }
     selectComponent(comp);
   });
 
