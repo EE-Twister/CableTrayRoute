@@ -16,13 +16,13 @@ if (typeof window !== 'undefined') {
       { key: 'voltage', label: 'Voltage (V)', type: 'text' },
       { key: 'category', label: 'Category', type: 'text' },
       { key: 'subCategory', label: 'Sub-Category', type: 'text' },
-      { key: 'manufacturer', label: 'Manufacturer', type: 'text' },
-      { key: 'model', label: 'Model', type: 'text' },
+      { key: 'manufacturer', label: 'Manufacturer', type: 'text', className: 'manufacturer-input' },
+      { key: 'model', label: 'Model', type: 'text', className: 'model-input' },
       { key: 'phases', label: 'Phases', type: 'text' },
       { key: 'notes', label: 'Notes', type: 'text' },
-      { key: 'x', label: 'X', type: 'number' },
-      { key: 'y', label: 'Y', type: 'number' },
-      { key: 'z', label: 'Z', type: 'number' }
+      { key: 'x', label: 'X', type: 'number', step: 'any', maxlength: 15, validate: 'numeric' },
+      { key: 'y', label: 'Y', type: 'number', step: 'any', maxlength: 15, validate: 'numeric' },
+      { key: 'z', label: 'Z', type: 'number', step: 'any', maxlength: 15, validate: 'numeric' }
     ];
 
     let table;

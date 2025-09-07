@@ -594,7 +594,11 @@ class TableManager {
       } else {
         el = document.createElement('input');
         el.type = col.type || 'text';
-        if(el.type==='number') el.step = col.step || '1';
+        if (el.type === 'number') {
+          el.step = col.step || 'any';
+        }
+        if (col.maxlength) el.maxLength = col.maxlength;
+        if (col.className) el.className = col.className;
         if (col.datalist) {
           const listId = `${col.key}-datalist`;
           el.setAttribute('list', listId);

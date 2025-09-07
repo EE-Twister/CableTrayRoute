@@ -259,6 +259,11 @@ input[type="number"], input[type="text"], select {
     border-color: red;
 }
 
+.manufacturer-input,
+.model-input {
+    text-align: left;
+}
+
 .error-message {
     color: red;
     font-size: 0.85em;
