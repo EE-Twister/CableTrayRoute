@@ -230,17 +230,31 @@ function solveLinear(A, b) {
 }
 
 /**
- * Public API: run load flow on the one-line model.
+ * Public API: run load flow on a model. When `model` is omitted the
+ * current one-line diagram from dataStore is converted automatically.
  * Options may specify baseKV/baseMVA and whether the system is balanced.
  */
-export function runLoadFlow(opts = {}) {
+export function runLoadFlow(modelOrOpts = {}, maybeOpts = {}) {
+  let model, opts;
+  if (Array.isArray(modelOrOpts) || modelOrOpts?.buses) {
+    model = modelOrOpts.buses ? modelOrOpts : { buses: modelOrOpts };
+    opts = maybeOpts || {};
+  } else {
+    opts = modelOrOpts || {};
+    model = null;
+  }
   const { baseMVA = 100, balanced = true } = opts;
-  const { sheets } = getOneLine();
-  const comps = Array.isArray(sheets[0]?.components)
-    ? sheets.flatMap(s => s.components || [])
-    : sheets;
-  let busComps = comps.filter(c => c.subtype === 'Bus');
-  if (busComps.length === 0) busComps = comps;
+  let busComps;
+  if (model && model.buses) {
+    busComps = model.buses;
+  } else {
+    const { sheets } = getOneLine();
+    const comps = Array.isArray(sheets[0]?.components)
+      ? sheets.flatMap(s => s.components || [])
+      : sheets;
+    busComps = comps.filter(c => c.subtype === 'Bus');
+    if (busComps.length === 0) busComps = comps;
+  }
   const busIds = busComps.map(b => b.id);
   const phases = balanced ? ['balanced'] : ['A', 'B', 'C'];
   const phaseResults = {};

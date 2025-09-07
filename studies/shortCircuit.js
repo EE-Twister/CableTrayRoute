@@ -1,5 +1,5 @@
 import { runShortCircuit } from '../analysis/shortCircuit.js';
-import { getStudies, setStudies } from '../dataStore.mjs';
+import { getOneLine, getStudies, setStudies } from '../dataStore.mjs';
 import { downloadPDF } from '../reports/reporting.mjs';
 
 /**
@@ -8,8 +8,19 @@ import { downloadPDF } from '../reports/reporting.mjs';
  * @param {{method?:string}} opts
  * @returns {Object}
  */
+function buildModel() {
+  const { sheets } = getOneLine();
+  const comps = Array.isArray(sheets[0]?.components)
+    ? sheets.flatMap(s => s.components)
+    : sheets;
+  let buses = comps.filter(c => c.subtype === 'Bus');
+  if (buses.length === 0) buses = comps;
+  return { buses };
+}
+
 export function runShortCircuitStudy(opts = {}) {
-  const res = runShortCircuit(opts);
+  const model = buildModel();
+  const res = runShortCircuit(model, opts);
   const studies = getStudies();
   studies.shortCircuit = res;
   setStudies(studies);
