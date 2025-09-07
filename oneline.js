@@ -2279,28 +2279,33 @@ async function init() {
   document.getElementById('distribute-h-btn').addEventListener('click', () => distributeSelection('h'));
   document.getElementById('distribute-v-btn').addEventListener('click', () => distributeSelection('v'));
   const exportBtn = document.getElementById('export-btn');
-  if (exportBtn) exportBtn.addEventListener('click', exportDiagram);
-  const exportPdfBtn = document.getElementById('export-pdf-btn');
-  if (exportPdfBtn)
-    exportPdfBtn.addEventListener('click', () =>
-      exportPDF({
-        svgEl: document.getElementById('diagram'),
-        sheets,
-        loadSheet,
-        serializeDiagram,
-        activeSheet
-      })
-    );
-  const exportDxfBtn = document.getElementById('export-dxf-btn');
-  if (exportDxfBtn)
-    exportDxfBtn.addEventListener('click', () =>
-      exportDXF(sheets[activeSheet]?.components || [])
-    );
-  const exportDwgBtn = document.getElementById('export-dwg-btn');
-  if (exportDwgBtn)
-    exportDwgBtn.addEventListener('click', () =>
-      exportDWG(sheets[activeSheet]?.components || [])
-    );
+  const exportMenu = document.getElementById('export-menu');
+  if (exportBtn && exportMenu) {
+    exportBtn.addEventListener('click', () => {
+      const expanded = exportBtn.getAttribute('aria-expanded') === 'true';
+      exportBtn.setAttribute('aria-expanded', String(!expanded));
+      exportMenu.classList.toggle('show');
+    });
+    exportMenu.addEventListener('click', e => {
+      const format = e.target?.dataset?.format;
+      if (!format) return;
+      exportMenu.classList.remove('show');
+      exportBtn.setAttribute('aria-expanded', 'false');
+      if (format === 'pdf') {
+        exportPDF({
+          svgEl: document.getElementById('diagram'),
+          sheets,
+          loadSheet,
+          serializeDiagram,
+          activeSheet
+        });
+      } else if (format === 'dxf') {
+        exportDXF(sheets[activeSheet]?.components || []);
+      } else if (format === 'dwg') {
+        exportDWG(sheets[activeSheet]?.components || []);
+      }
+    });
+  }
   const importBtn = document.getElementById('import-btn');
   if (importBtn) importBtn.addEventListener('click', () => document.getElementById('import-input').click());
   const importInput = document.getElementById('import-input');
