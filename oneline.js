@@ -1773,9 +1773,30 @@ function openPropertyDialog(componentId) {
   modal.innerHTML = '';
 
   const form = document.createElement('form');
-  const schema = propSchemas[comp.subtype] || [];
 
-  schema.forEach(f => {
+  // Header with title and close button
+  const header = document.createElement('div');
+  header.classList.add('modal-header');
+  const title = document.createElement('h3');
+  title.textContent = comp.label || comp.subtype;
+  const closeBtn = document.createElement('button');
+  closeBtn.type = 'button';
+  closeBtn.textContent = '×';
+  closeBtn.addEventListener('click', () => modal.classList.remove('show'));
+  header.appendChild(title);
+  header.appendChild(closeBtn);
+  form.appendChild(header);
+
+  const rawSchema = propSchemas[comp.subtype] || [];
+  const groups = Array.isArray(rawSchema)
+    ? rawSchema.reduce((acc, f) => {
+        const g = f.group || 'General';
+        (acc[g] ||= []).push(f);
+        return acc;
+      }, {})
+    : rawSchema;
+
+  const buildField = (f, container) => {
     const label = document.createElement('label');
     label.textContent = f.label + ' ';
     let input;
@@ -1803,7 +1824,16 @@ function openPropertyDialog(componentId) {
     }
     input.name = f.name;
     label.appendChild(input);
-    form.appendChild(label);
+    container.appendChild(label);
+  };
+
+  Object.entries(groups).forEach(([groupName, fields]) => {
+    const fs = document.createElement('fieldset');
+    const legend = document.createElement('legend');
+    legend.textContent = groupName;
+    fs.appendChild(legend);
+    (fields || []).forEach(f => buildField(f, fs));
+    form.appendChild(fs);
   });
 
   const saveBtn = document.createElement('button');
@@ -1820,9 +1850,11 @@ function openPropertyDialog(componentId) {
   form.addEventListener('submit', e => {
     e.preventDefault();
     const fd = new FormData(form);
-    schema.forEach(f => {
-      const val = fd.get(f.name);
-      comp[f.name] = f.type === 'checkbox' ? val === 'on' : (val || '');
+    Object.values(groups).forEach(fields => {
+      (fields || []).forEach(f => {
+        const val = fd.get(f.name);
+        comp[f.name] = f.type === 'checkbox' ? val === 'on' : (val || '');
+      });
     });
     pushHistory();
     render();
