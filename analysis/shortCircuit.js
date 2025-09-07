@@ -28,11 +28,21 @@ function parallel(a, b) {
  *   - `xr_ratio` for momentary asymmetrical current
  *   - `method` ('ANSI' or 'IEC')
  */
-export function runShortCircuit(opts = {}) {
-  const { sheets } = getOneLine();
-  const comps = Array.isArray(sheets[0]?.components)
-    ? sheets.flatMap(s => s.components)
-    : sheets;
+export function runShortCircuit(modelOrOpts = {}, maybeOpts = {}) {
+  let comps, opts;
+  if (Array.isArray(modelOrOpts)) {
+    comps = modelOrOpts;
+    opts = maybeOpts || {};
+  } else if (modelOrOpts?.buses) {
+    comps = modelOrOpts.buses;
+    opts = maybeOpts || {};
+  } else {
+    opts = modelOrOpts || {};
+    const { sheets } = getOneLine();
+    comps = Array.isArray(sheets[0]?.components)
+      ? sheets.flatMap(s => s.components)
+      : sheets;
+  }
   let buses = comps.filter(c => c.subtype === 'Bus');
   if (buses.length === 0) buses = comps;
   const results = {};

@@ -1,5 +1,5 @@
 import { runLoadFlow } from '../analysis/loadFlow.js';
-import { getStudies, setStudies } from '../dataStore.mjs';
+import { getOneLine, getStudies, setStudies } from '../dataStore.mjs';
 import { downloadPDF } from '../reports/reporting.mjs';
 
 /**
@@ -8,8 +8,32 @@ import { downloadPDF } from '../reports/reporting.mjs';
  * @param {{baseMVA?:number, balanced?:boolean}} opts
  * @returns {Object}
  */
+function buildModel() {
+  const { sheets } = getOneLine();
+  const comps = Array.isArray(sheets[0]?.components)
+    ? sheets.flatMap(s => s.components || [])
+    : sheets;
+  let buses = comps.filter(c => c.subtype === 'Bus');
+  if (buses.length === 0) buses = comps;
+  const busIds = buses.map(b => b.id);
+  const branches = [];
+  buses.forEach(b => {
+    (b.connections || []).forEach(conn => {
+      if (!busIds.includes(conn.target)) return;
+      branches.push({
+        from: b.id,
+        to: conn.target,
+        impedance: conn.impedance || conn.cable || {},
+        rating: conn.rating
+      });
+    });
+  });
+  return { buses, branches };
+}
+
 export function runLoadFlowStudy(opts = {}) {
-  const res = runLoadFlow(opts);
+  const model = buildModel();
+  const res = runLoadFlow(model, opts);
   const studies = getStudies();
   studies.loadFlow = res;
   setStudies(studies);

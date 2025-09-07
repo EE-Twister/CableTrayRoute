@@ -1179,6 +1179,28 @@ function render() {
       halo.setAttribute('opacity', 0.5);
       g.appendChild(halo);
     }
+    if (showOverlays && (c.voltage_mag !== undefined || c.shortCircuit?.threePhaseKA !== undefined)) {
+      const txt = document.createElementNS(svgNS, 'text');
+      txt.setAttribute('x', cx);
+      txt.setAttribute('y', cy - (h / 2) - 4);
+      txt.setAttribute('text-anchor', 'middle');
+      txt.setAttribute('class', 'overlay-label');
+      const parts = [];
+      if (c.voltage_mag !== undefined) {
+        if (typeof c.voltage_mag === 'object') {
+          parts.push(Object.entries(c.voltage_mag)
+            .map(([ph, v]) => `${ph}:${Number(v).toFixed(3)} pu`)
+            .join(' '));
+        } else {
+          parts.push(`${Number(c.voltage_mag).toFixed(3)} pu`);
+        }
+      }
+      if (c.shortCircuit?.threePhaseKA !== undefined) {
+        parts.push(`${Number(c.shortCircuit.threePhaseKA).toFixed(2)} kA`);
+      }
+      txt.textContent = parts.join(' / ');
+      g.appendChild(txt);
+    }
     const transforms = [];
     if (c.flipped) transforms.push(`translate(${cx}, ${cy}) scale(-1,1) translate(${-cx}, ${-cy})`);
     if (c.rotation) transforms.push(`rotate(${c.rotation}, ${cx}, ${cy})`);
@@ -1397,6 +1419,8 @@ function addComponent(cfg) {
     ref: '',
     rotation: 0,
     flipped: false,
+    impedance: { r: 0, x: 0 },
+    rating: null,
     connections: []
   };
   if (subtype === 'Bus') {
@@ -2456,7 +2480,9 @@ async function init() {
             fromPort,
             toId: toComp.id,
             toPort,
-            cableId: null
+            cableId: null,
+            impedance: { r: 0, x: 0 },
+            rating: null
           });
           pushHistory();
           render();
@@ -2966,6 +2992,9 @@ function syncSchedules(notify = true) {
       conductors: connConductors,
       notes: c.notes ?? '',
       voltage: c.voltage ?? '',
+      rating: c.rating ?? '',
+      impedance_r: c.impedance?.r ?? '',
+      impedance_x: c.impedance?.x ?? '',
       voltage_mag: typeof c.voltage_mag === 'number' ? c.voltage_mag : '',
       voltage_angle: typeof c.voltage_angle === 'number' ? c.voltage_angle : '',
       voltage_mag_a: c.voltage_mag?.A ?? c.voltage_mag?.a ?? '',

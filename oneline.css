@@ -374,6 +374,12 @@ g.component.scenario-diff > * {
   box-shadow: 0 0 0 4px orange;
 }
 
+.overlay-label {
+  font-size: 10px;
+  fill: #000;
+  pointer-events: none;
+}
+
 @media (max-width: 600px) {
   .palette-toggle {
     display: inline-block;
