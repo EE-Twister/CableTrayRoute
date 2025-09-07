@@ -13,7 +13,7 @@
 <body>
   <a href="#main-content" class="skip-link">Skip to main content</a>
   <nav class="top-nav">
-    <button id="nav-toggle" class="nav-toggle" aria-label="Toggle navigation" aria-controls="nav-links" aria-expanded="false">☰</button>
+    <button id="nav-toggle" class="nav-toggle" aria-label="Toggle navigation" aria-controls="nav-links" aria-expanded="false" title="Toggle navigation">☰</button>
     <div id="nav-links" class="nav-links">
       <a href="index.html">Home</a>
       <a href="equipmentlist.html">Equipment List</a>
@@ -26,7 +26,7 @@
       <a href="conduitfill.html">Conduit Fill</a>
       <a href="optimalRoute.html">Optimal Route</a>
             <a href="oneline.html">One-Line</a>
-<button id="settings-btn" class="settings-btn" aria-label="Settings" aria-expanded="false">⚙</button>
+<button id="settings-btn" class="settings-btn" aria-label="Settings" aria-expanded="false" title="Settings">⚙</button>
     </div>
   </nav>
   <div id="settings-menu" class="settings-menu">
@@ -38,13 +38,13 @@
         <option value="metric">Metric</option>
       </select>
     </label>
-    <button id="help-btn" aria-expanded="false">Site Help</button>
-    <button id="new-project-btn">New Project</button>
-    <button id="save-project-btn">Save Project</button>
-    <button id="load-project-btn">Load Project</button>
-    <button id="export-project-btn">Export Project</button>
-    <button id="import-project-btn">Import Project</button>
-    <input type="file" id="import-project-input" accept=".ctr.json" style="display:none;">
+    <button id="help-btn" class="btn" aria-expanded="false" title="Show help">Site Help</button>
+    <button id="new-project-btn" class="btn" title="Start a new project">New Project</button>
+    <button id="save-project-btn" class="btn" title="Save current project">Save Project</button>
+    <button id="load-project-btn" class="btn" title="Load an existing project">Load Project</button>
+    <button id="export-project-btn" class="btn" title="Export project data">Export Project</button>
+    <button id="import-project-btn" class="btn" title="Import project data">Import Project</button>
+    <input type="file" id="import-project-input" accept=".ctr.json" class="hidden" title="Select project file">
   </div>
   <div class="container">
     <main id="main-content" class="main-content">
@@ -53,17 +53,17 @@
         <p>Manage connected loads for panels or equipment.</p>
       </header>
       <section class="card">
-        <div style="margin-bottom:10px;">
-          <button id="delete-selected-btn">Delete Selected</button>
-          <button id="export-btn">Export JSON</button>
-          <button id="import-btn">Import JSON</button>
-          <button id="export-csv-btn">Export CSV</button>
-          <button id="import-csv-btn">Import CSV</button>
-          <button id="copy-btn">Copy to Clipboard</button>
-          <input type="file" id="import-input" accept=".json" style="display:none;">
-          <input type="file" id="import-csv-input" accept=".csv" style="display:none;">
+        <div class="mb-1">
+          <button id="delete-selected-btn" class="btn" title="Delete selected rows">Delete Selected</button>
+          <button id="export-btn" class="btn" title="Export as JSON">Export JSON</button>
+          <button id="import-btn" class="btn" title="Import from JSON">Import JSON</button>
+          <button id="export-csv-btn" class="btn" title="Export as CSV">Export CSV</button>
+          <button id="import-csv-btn" class="btn" title="Import from CSV">Import CSV</button>
+          <button id="copy-btn" class="btn" title="Copy to clipboard">Copy to Clipboard</button>
+          <input type="file" id="import-input" accept=".json" class="hidden" title="Import JSON file">
+          <input type="file" id="import-csv-input" accept=".csv" class="hidden" title="Import CSV file">
         </div>
-        <div style="overflow-x:auto;">
+        <div class="overflow-x-auto">
           <table id="load-table" class="sticky-table">
             <thead>
               <tr>
@@ -95,7 +95,7 @@
             <tfoot></tfoot>
           </table>
         </div>
-        <div id="source-summary" style="margin-top:10px;"></div>
+        <div id="source-summary" class="mt-1"></div>
       </section>
       <nav class="step-nav">
         <a href="panelschedule.html">Panel Schedule</a>
