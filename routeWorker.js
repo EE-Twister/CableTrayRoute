@@ -648,6 +648,19 @@ class CableRoutingSystem {
             console.warn('Mismatched raceway segments:', formatted);
         }
 
+        // Adjust tray edge weights based on current utilization so that
+        // highly filled trays become less desirable during routing. The
+        // weight multiplier is 1 + (current_fill / maxFill).
+        for (const edges of Object.values(graph.edges)) {
+            for (const edge of Object.values(edges)) {
+                if (edge.type === 'tray' && edge.trayId && this.trays.has(edge.trayId)) {
+                    const t = this.trays.get(edge.trayId);
+                    const util = t.maxFill ? t.current_fill / t.maxFill : 0;
+                    edge.weight *= (1 + util);
+                }
+            }
+        }
+
         const addNode = (id, point, type = 'generic') => {
             graph.nodes[id] = { point, type };
             graph.edges[id] = {};
@@ -715,14 +728,16 @@ class CableRoutingSystem {
             }
         });
         
-        // 2. Dijkstra's Algorithm
+        // 2. A* Search Algorithm
+        const heuristic = (node) =>
+            this.manhattanDistance(graph.nodes[node].point, graph.nodes['end'].point);
         const distances = {};
         const prev = {};
-        Object.keys(graph.nodes).forEach(node => distances[node] = Infinity);
+        Object.keys(graph.nodes).forEach(node => (distances[node] = Infinity));
         distances['start'] = 0;
 
         const pq = new MinHeap();
-        pq.push('start', 0);
+        pq.push('start', heuristic('start'));
         const visited = new Set();
 
         while (!pq.isEmpty()) {
@@ -737,7 +752,7 @@ class CableRoutingSystem {
                 if (alt < distances[v]) {
                     distances[v] = alt;
                     prev[v] = { node: u, edge };
-                    pq.push(v, alt);
+                    pq.push(v, alt + heuristic(v));
                 }
             }
         }

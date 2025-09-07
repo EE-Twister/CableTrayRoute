@@ -137,3 +137,83 @@ function populateCableTable(cables){
   html += '</tbody></table>';
   container.innerHTML = html;
 }
+
+// --- Routing worker integration and visualization ---
+let routingWorker = null;
+
+// Create a canvas for drawing the tray network and cable paths
+const canvas = document.createElement('canvas');
+canvas.id = 'route-canvas';
+canvas.width = 800;
+canvas.height = 600;
+document.getElementById('main-content')?.appendChild(canvas);
+
+function getRoutingOptions(){
+  return {
+    fillLimit: (parseFloat(document.getElementById('fill-limit')?.value) || 40) / 100,
+    proximityThreshold: parseFloat(document.getElementById('proximity-threshold')?.value) || 72,
+    maxFieldEdge: parseFloat(document.getElementById('max-field-edge')?.value) || 1000,
+    fieldPenalty: parseFloat(document.getElementById('field-route-penalty')?.value) || 3.0,
+    sharedPenalty: parseFloat(document.getElementById('shared-field-penalty')?.value) || 0.5,
+  };
+}
+
+function calculateRoutes(){
+  if (trayData.length === 0 || cableData.length === 0) {
+    console.warn('No tray or cable data loaded');
+    return;
+  }
+  if (routingWorker) routingWorker.terminate();
+  routingWorker = new Worker('batchRouteWorker.js');
+  routingWorker.onmessage = (e) => {
+    if (e.data.type === 'done') {
+      drawNetwork(e.data.finalTrays || [], e.data.allRoutes || [], e.data.utilization || {});
+    }
+  };
+  routingWorker.postMessage({ type:'start', trays: trayData, options: getRoutingOptions(), cables: cableData });
+}
+
+document.getElementById('calculate-route-btn')?.addEventListener('click', calculateRoutes);
+
+function drawNetwork(trays, routes, utilization){
+  const ctx = canvas.getContext('2d');
+  ctx.clearRect(0,0,canvas.width,canvas.height);
+  const pts=[];
+  trays.forEach(t=>{pts.push([t.start_x,t.start_y]);pts.push([t.end_x,t.end_y]);});
+  routes.forEach(r=>r.segments.forEach(s=>{pts.push([s.start[0],s.start[1]]);pts.push([s.end[0],s.end[1]]);}));
+  if(pts.length===0)return;
+  const xs=pts.map(p=>p[0]);
+  const ys=pts.map(p=>p[1]);
+  const minX=Math.min(...xs),maxX=Math.max(...xs),minY=Math.min(...ys),maxY=Math.max(...ys);
+  const pad=20;
+  const scale=Math.min((canvas.width-2*pad)/((maxX-minX)||1),(canvas.height-2*pad)/((maxY-minY)||1));
+  const tx=p=>pad+(p[0]-minX)*scale;
+  const ty=p=>canvas.height-(pad+(p[1]-minY)*scale);
+
+  // Draw trays color-coded by utilization
+  trays.forEach(t=>{
+    const util=utilization[t.tray_id]?utilization[t.tray_id].current_fill/utilization[t.tray_id].max_fill:0;
+    const color=`hsl(${(1-util)*120},100%,50%)`;
+    ctx.strokeStyle=color;
+    ctx.lineWidth=2;
+    ctx.beginPath();
+    ctx.moveTo(tx([t.start_x,t.start_y]),ty([t.start_x,t.start_y]));
+    ctx.lineTo(tx([t.end_x,t.end_y]),ty([t.end_x,t.end_y]));
+    ctx.stroke();
+  });
+
+  // Draw cable routes
+  const colors=['#0000ff','#ff00ff','#00ffff','#000000','#ffa500'];
+  routes.forEach((r,idx)=>{
+    ctx.strokeStyle=colors[idx%colors.length];
+    ctx.lineWidth=1;
+    ctx.beginPath();
+    r.segments.forEach((s,i)=>{
+      const sx=tx(s.start), sy=ty(s.start);
+      const ex=tx(s.end), ey=ty(s.end);
+      if(i===0) ctx.moveTo(sx,sy);
+      ctx.lineTo(ex,ey);
+    });
+    ctx.stroke();
+  });
+}
