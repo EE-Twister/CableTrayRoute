@@ -234,6 +234,15 @@
     <ul id="lint-list"></ul>
   </aside>
   <div id="toast" class="toast" role="status" aria-live="polite"></div>
+  <script type="module">
+    import * as tour from './tour.js';
+    const btn = document.getElementById('tour-btn');
+    btn.addEventListener('click', () => tour.start());
+    if (!localStorage.getItem('onelineTourSeen')) {
+      tour.start();
+      localStorage.setItem('onelineTourSeen', 'true');
+    }
+  </script>
   <script type="module" src="projectManager.js"></script>
 </body>
 </html>
