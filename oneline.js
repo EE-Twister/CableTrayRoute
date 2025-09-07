@@ -216,6 +216,7 @@ function buildPalette() {
       const btn = document.createElement('button');
       btn.dataset.type = type;
       btn.dataset.subtype = sub;
+      btn.dataset.label = meta.label;
       btn.title = meta.label;
       btn.innerHTML = `<img src="${meta.icon}" alt="" aria-hidden="true">`;
       btn.addEventListener('click', () => addComponent(sub));
@@ -1138,29 +1139,14 @@ function render() {
       g.appendChild(bg);
     }
     const meta = componentMeta[c.subtype] || {};
-    if (c.subtype === 'Bus') {
-      const rect = document.createElementNS(svgNS, 'rect');
-      rect.setAttribute('x', c.x);
-      rect.setAttribute('y', c.y);
-      rect.setAttribute('width', w);
-      rect.setAttribute('height', h);
-      rect.setAttribute('fill', '#ccc');
-      rect.setAttribute('stroke', '#000');
-      g.appendChild(rect);
-    } else {
-      const use = document.createElementNS(svgNS, 'use');
-      use.setAttribute('x', c.x);
-      use.setAttribute('y', c.y);
-      use.setAttribute('width', w);
-      use.setAttribute('height', h);
-      let href = `#icon-${c.subtype}`;
-      if (!document.getElementById(`icon-${c.subtype}`)) {
-        console.warn(`Missing symbol for subtype '${c.subtype}'`);
-        href = '#icon-equipment';
-      }
-      use.setAttributeNS('http://www.w3.org/1999/xlink', 'href', href);
-      g.appendChild(use);
-    }
+    const iconHref = meta.icon || placeholderIcon;
+    const img = document.createElementNS(svgNS, 'image');
+    img.setAttribute('x', c.x);
+    img.setAttribute('y', c.y);
+    img.setAttribute('width', w);
+    img.setAttribute('height', h);
+    img.setAttributeNS('http://www.w3.org/1999/xlink', 'href', iconHref);
+    g.appendChild(img);
     const text = document.createElementNS(svgNS, 'text');
     text.setAttribute('x', c.x + w / 2);
     text.setAttribute('y', c.y + h + 15);
