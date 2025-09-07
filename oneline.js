@@ -58,17 +58,20 @@ async function loadComponentLibrary() {
   let data = [];
   const skipped = [];
   const missingIcons = [];
+  let status;
   try {
     const res = await fetch('componentLibrary.json');
+    status = res.status;
     if (!res.ok) throw new Error(res.statusText);
     data = await res.json();
   } catch (err) {
     console.error('Failed to load component library', err);
-    showToast('Failed to load component library. Using defaults.');
+    showToast(`Failed to load component library (status: ${status ?? 'unknown'}). ${err.message}`);
     try {
       const mod = await import('./componentLibrary.json', { assert: { type: 'json' } });
       data = mod.default || mod;
-    } catch {
+    } catch (importErr) {
+      showToast(`Failed to import component library. ${importErr.message}`);
       data = [];
     }
   }
@@ -142,6 +145,14 @@ async function loadComponentLibrary() {
     propSchemas[c.subtype] = c.schema || [];
   });
   rebuildComponentMaps();
+  const banner = document.getElementById('component-library-banner');
+  const reloadBtn = document.getElementById('reload-library-btn');
+  if (Object.keys(componentTypes).length <= 1) {
+    if (banner) banner.classList.remove('hidden');
+  } else if (banner) {
+    banner.classList.add('hidden');
+  }
+  if (reloadBtn) reloadBtn.onclick = () => loadComponentLibrary();
 
   if (skipped.length) {
     showToast(`Skipped components: ${skipped.join(', ')}`);
