@@ -487,9 +487,9 @@ if (runSCBtn) runSCBtn.addEventListener('click', () => {
   renderStudyResults();
   render();
 });
-if (runAFBtn) runAFBtn.addEventListener('click', () => {
+if (runAFBtn) runAFBtn.addEventListener('click', async () => {
   const sc = runShortCircuit();
-  const af = runArcFlash();
+  const af = await runArcFlash();
   const { sheets } = getOneLine();
   const diagram = sheets.flatMap(s => s.components);
   diagram.forEach(c => {
