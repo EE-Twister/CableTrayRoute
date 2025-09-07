@@ -197,6 +197,7 @@ function applyDefaults(comp) {
 
 function buildPalette() {
   const palette = document.getElementById('component-buttons');
+  const btnTemplate = document.getElementById('palette-button-template');
   const sectionContainers = {
     panel: document.getElementById('panel-buttons'),
     equipment: document.getElementById('equipment-buttons'),
@@ -213,13 +214,21 @@ function buildPalette() {
     const container = sectionContainers[type] || palette;
     subs.forEach(sub => {
       const meta = componentMeta[sub];
-      const btn = document.createElement('button');
+      const btn = btnTemplate ? btnTemplate.content.firstElementChild.cloneNode(true) : document.createElement('button');
+      btn.draggable = true;
       btn.dataset.type = type;
       btn.dataset.subtype = sub;
       btn.dataset.label = meta.label;
       btn.title = meta.label;
       btn.innerHTML = `<img src="${meta.icon}" alt="" aria-hidden="true">`;
-      btn.addEventListener('click', () => addComponent(sub));
+      btn.addEventListener('click', () => {
+        addComponent({ type, subtype: sub });
+        render();
+        save();
+      });
+      btn.addEventListener('dragstart', e => {
+        e.dataTransfer.setData('text/plain', JSON.stringify({ type, subtype: sub }));
+      });
       container.appendChild(btn);
     });
   });
@@ -284,6 +293,25 @@ const lintPanel = document.getElementById('lint-panel');
 const lintList = document.getElementById('lint-list');
 const lintCloseBtn = document.getElementById('lint-close-btn');
 if (lintCloseBtn) lintCloseBtn.addEventListener('click', () => lintPanel.classList.add('hidden'));
+
+const diagram = document.getElementById('diagram');
+if (diagram) {
+  diagram.addEventListener('dragover', e => e.preventDefault());
+  diagram.addEventListener('drop', e => {
+    e.preventDefault();
+    const dataText = e.dataTransfer.getData('text/plain');
+    if (!dataText) return;
+    let info;
+    try {
+      info = JSON.parse(dataText);
+    } catch {
+      return;
+    }
+    addComponent({ type: info.type, subtype: info.subtype, x: e.offsetX, y: e.offsetY });
+    render();
+    save();
+  });
+}
 
 // Re-run validation whenever diagram or study results change
 on('oneLineDiagram', validateDiagram);
@@ -1289,20 +1317,28 @@ function save(notify = true) {
   }
 }
 
-function addComponent(subtype) {
+function addComponent(cfg) {
+  let subtype, type, x = 20, y = 20;
+  if (typeof cfg === 'string') {
+    subtype = cfg;
+    type = componentMeta[subtype]?.category;
+  } else if (cfg && typeof cfg === 'object') {
+    subtype = cfg.subtype;
+    type = cfg.type || componentMeta[cfg.subtype]?.category;
+    if (cfg.x !== undefined) x = cfg.x;
+    if (cfg.y !== undefined) y = cfg.y;
+  } else {
+    return;
+  }
   const meta = componentMeta[subtype];
   if (!meta) return;
-  const id = 'n' + Date.now();
-  let x = 20, y = 20;
   if (gridEnabled) {
-    const snappedX = Math.round(x / gridSize) * gridSize;
-    const snappedY = Math.round(y / gridSize) * gridSize;
-    x = snappedX;
-    y = snappedY;
+    x = Math.round(x / gridSize) * gridSize;
+    y = Math.round(y / gridSize) * gridSize;
   }
   const comp = {
-    id,
-    type: meta.category,
+    id: 'n' + Date.now(),
+    type: type || meta.category,
     subtype,
     x,
     y,
@@ -1326,9 +1362,8 @@ function addComponent(subtype) {
   applyDefaults(comp);
   components.push(comp);
   pushHistory();
-  render();
-  save();
   if (gridEnabled) flashSnapIndicator(x, y);
+  return comp;
 }
 
 function alignSelection(direction) {
