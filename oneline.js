@@ -259,7 +259,8 @@ let scaleUnitInput = null;
 let cableSlackPct = Number(getItem('cableSlackPct', 0));
 let slackPctInput = null;
 let gridSize = Number(getItem('gridSize', 20));
-let gridEnabled = true;
+let gridEnabled = getItem('gridEnabled', true);
+let snapIndicatorTimeout = null;
 let history = [];
 let historyIndex = -1;
 let validationIssues = [];
@@ -671,8 +672,10 @@ function addTemplateComponent(data) {
   let x = cursorPos.x;
   let y = cursorPos.y;
   if (gridEnabled) {
-    x = Math.round(x / gridSize) * gridSize;
-    y = Math.round(y / gridSize) * gridSize;
+    const snappedX = Math.round(x / gridSize) * gridSize;
+    const snappedY = Math.round(y / gridSize) * gridSize;
+    x = snappedX;
+    y = snappedY;
   }
   components.push({
     id,
@@ -684,6 +687,7 @@ function addTemplateComponent(data) {
   pushHistory();
   render();
   save();
+  if (gridEnabled) flashSnapIndicator(x, y);
 }
 
 function exportTemplates() {
@@ -1190,6 +1194,32 @@ function render() {
   }
 }
 
+export function toggleGrid() {
+  const toggle = document.getElementById('grid-toggle');
+  gridEnabled = toggle?.checked;
+  setItem('gridEnabled', gridEnabled);
+  document.getElementById('grid-bg').style.display = gridEnabled ? 'block' : 'none';
+  render();
+}
+
+function flashSnapIndicator(x, y) {
+  const svg = document.getElementById('diagram');
+  let indicator = document.getElementById('snap-indicator');
+  if (!indicator) {
+    indicator = document.createElementNS(svgNS, 'circle');
+    indicator.id = 'snap-indicator';
+    svg.appendChild(indicator);
+  }
+  indicator.setAttribute('r', Math.max(2, gridSize / 4));
+  indicator.setAttribute('cx', x);
+  indicator.setAttribute('cy', y);
+  indicator.style.opacity = '1';
+  clearTimeout(snapIndicatorTimeout);
+  snapIndicatorTimeout = setTimeout(() => {
+    indicator.style.opacity = '0';
+  }, 200);
+}
+
 function renderSheetTabs() {
   const tabs = document.getElementById('sheet-tabs');
   if (!tabs) return;
@@ -1271,8 +1301,10 @@ function addComponent(subtype) {
   const id = 'n' + Date.now();
   let x = 20, y = 20;
   if (gridEnabled) {
-    x = Math.round(x / gridSize) * gridSize;
-    y = Math.round(y / gridSize) * gridSize;
+    const snappedX = Math.round(x / gridSize) * gridSize;
+    const snappedY = Math.round(y / gridSize) * gridSize;
+    x = snappedX;
+    y = snappedY;
   }
   const comp = {
     id,
@@ -1302,6 +1334,7 @@ function addComponent(subtype) {
   pushHistory();
   render();
   save();
+  if (gridEnabled) flashSnapIndicator(x, y);
 }
 
 function alignSelection(direction) {
@@ -2093,18 +2126,14 @@ async function init() {
   const gridSizeInput = document.getElementById('grid-size');
   const gridPattern = document.getElementById('grid');
   const gridPath = gridPattern.querySelector('path');
-  gridEnabled = gridToggle.checked;
-  gridSizeInput.value = gridSize;
+  if (gridToggle) gridToggle.checked = gridEnabled;
+  if (gridSizeInput) gridSizeInput.value = gridSize;
   gridPattern.setAttribute('width', gridSize);
   gridPattern.setAttribute('height', gridSize);
   gridPath.setAttribute('d', `M${gridSize} 0 L0 0 0 ${gridSize}`);
   document.getElementById('grid-bg').style.display = gridEnabled ? 'block' : 'none';
-  gridToggle.addEventListener('change', e => {
-    gridEnabled = e.target.checked;
-    document.getElementById('grid-bg').style.display = gridEnabled ? 'block' : 'none';
-    render();
-  });
-  gridSizeInput.addEventListener('change', e => {
+  gridToggle?.addEventListener('change', toggleGrid);
+  gridSizeInput?.addEventListener('change', e => {
     gridSize = Number(e.target.value) || 20;
     gridPattern.setAttribute('width', gridSize);
     gridPattern.setAttribute('height', gridSize);
@@ -2190,17 +2219,24 @@ async function init() {
   });
   svg.addEventListener('mousemove', e => {
     if (!dragOffset || !dragOffset.length) return;
+    let snapPos = null;
     dragOffset.forEach(off => {
       let x = e.offsetX - off.dx;
       let y = e.offsetY - off.dy;
       if (gridEnabled) {
-        x = Math.round(x / gridSize) * gridSize;
-        y = Math.round(y / gridSize) * gridSize;
+        const snappedX = Math.round(x / gridSize) * gridSize;
+        const snappedY = Math.round(y / gridSize) * gridSize;
+        if (snappedX !== x || snappedY !== y) {
+          snapPos = { x: snappedX, y: snappedY };
+        }
+        x = snappedX;
+        y = snappedY;
       }
       off.comp.x = x;
       off.comp.y = y;
     });
     render();
+    if (snapPos) flashSnapIndicator(snapPos.x, snapPos.y);
   });
   svg.addEventListener('mouseup', () => {
     if (dragOffset && dragOffset.length) {

@@ -89,8 +89,30 @@
   height: 16px;
 }
 
-.grid-label {
+
+.grid-controls {
+  display: flex;
+  align-items: center;
+  gap: 0.25rem;
   margin-left: var(--ol-spacing);
+}
+
+.grid-controls label {
+  display: flex;
+  align-items: center;
+}
+
+.grid-controls input[type="number"] {
+  width: 3rem;
+  margin-left: 0.25rem;
+}
+
+.grid-controls input[type="checkbox"] + img {
+  opacity: 0.5;
+}
+
+.grid-controls input[type="checkbox"]:checked + img {
+  opacity: 1;
 }
 
 .scale-label {
@@ -103,6 +125,12 @@
 
 .hidden-input {
   display: none;
+}
+
+.toolbar-group {
+  display: flex;
+  align-items: center;
+  gap: var(--ol-spacing);
 }
 
 .sheet-controls {
@@ -185,6 +213,15 @@
 .btn.icon-button:focus {
   background-color: var(--ol-hover-bg);
   transform: scale(1.05);
+}
+
+#snap-indicator {
+  pointer-events: none;
+  opacity: 0;
+  transition: opacity 0.2s ease;
+  stroke: orange;
+  stroke-width: 1;
+  fill: none;
 }
 
 .prop-modal {
