@@ -1,4 +1,4 @@
-import { getOneLine, setOneLine, setEquipment, setPanels, setLoads, getCables, setCables, getItem, setItem, getStudies, setStudies, on, getCurrentScenario, switchScenario } from './dataStore.mjs';
+import { getOneLine, setOneLine, setEquipment, setPanels, setLoads, getCables, setCables, getItem, setItem, getStudies, setStudies, on, getCurrentScenario, switchScenario, STORAGE_KEYS, loadProject, saveProject } from './dataStore.mjs';
 import { runLoadFlow } from './analysis/loadFlow.js';
 import { runShortCircuit } from './analysis/shortCircuit.js';
 import { runArcFlash } from './analysis/arcFlash.js';
@@ -11,6 +11,14 @@ import { sizeConductor } from './sizing.js';
 import { runValidation } from './validation/rules.js';
 
 let componentMeta = {};
+
+const projectId = typeof window !== 'undefined' ? (window.currentProjectId || 'default') : undefined;
+if (projectId) {
+  loadProject(projectId);
+  [STORAGE_KEYS.oneLine, STORAGE_KEYS.equipment, STORAGE_KEYS.panels, STORAGE_KEYS.loads, STORAGE_KEYS.cables, STORAGE_KEYS.trays, STORAGE_KEYS.conduits, STORAGE_KEYS.ductbanks].forEach(k => {
+    on(k, () => saveProject(projectId));
+  });
+}
 
 const typeIcons = {
   panel: 'icons/panel.svg',

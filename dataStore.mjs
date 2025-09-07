@@ -456,6 +456,57 @@ export const keys = (scenario = currentScenario) => {
   return [];
 };
 
+export function saveProject(projectId, scenario = currentScenario) {
+  if (!projectId || typeof localStorage === 'undefined') return;
+  try {
+    const prefix = `${projectId}:`;
+    const payload = {
+      equipment: getEquipment(),
+      panels: getPanels(),
+      loads: getLoads(),
+      cables: getCables(),
+      raceways: {
+        trays: getTrays(),
+        conduits: getConduits(),
+        ductbanks: getDuctbanks()
+      },
+      oneLine: getOneLine(scenario)
+    };
+    for (const [key, value] of Object.entries(payload)) {
+      localStorage.setItem(prefix + key, JSON.stringify(value));
+    }
+  } catch (e) {
+    console.error('Failed to save project', e);
+  }
+}
+
+export function loadProject(projectId, scenario = currentScenario) {
+  if (!projectId || typeof localStorage === 'undefined') return;
+  try {
+    const prefix = `${projectId}:`;
+    const readKey = k => {
+      const raw = localStorage.getItem(prefix + k);
+      try { return raw ? JSON.parse(raw) : null; } catch { return null; }
+    };
+    const equipment = readKey('equipment') || [];
+    const panels = readKey('panels') || [];
+    const loads = readKey('loads') || [];
+    const cables = readKey('cables') || [];
+    const raceways = readKey('raceways') || {};
+    const oneLine = readKey('oneLine') || [];
+    setEquipment(Array.isArray(equipment) ? equipment : []);
+    setPanels(Array.isArray(panels) ? panels : []);
+    setLoads(Array.isArray(loads) ? loads : []);
+    setCables(Array.isArray(cables) ? cables : []);
+    setTrays(Array.isArray(raceways.trays) ? raceways.trays : []);
+    setConduits(Array.isArray(raceways.conduits) ? raceways.conduits : []);
+    setDuctbanks(Array.isArray(raceways.ductbanks) ? raceways.ductbanks : []);
+    setOneLine(Array.isArray(oneLine) ? oneLine : [], scenario);
+  } catch (e) {
+    console.error('Failed to load project', e);
+  }
+}
+
 // Simple schema validator replacing Ajv. Checks for required fields,
 // disallows extras, and verifies basic types.
 function validateProjectSchema(obj) {
@@ -682,6 +733,8 @@ if (typeof window !== 'undefined') {
     keys,
     exportProject,
     importProject,
+    saveProject,
+    loadProject,
     importFromCad,
     exportToCad
   };

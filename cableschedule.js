@@ -10,6 +10,8 @@ const { sizeToArea } = ampacity;
 // behaviour needed to populate the schedule table.
 
 window.addEventListener('DOMContentLoaded', () => {
+  const projectId = window.currentProjectId || 'default';
+  dataStore.loadProject(projectId);
   initSettings();
   initDarkMode();
   initCompactMode();
@@ -168,6 +170,7 @@ window.addEventListener('DOMContentLoaded', () => {
       markSaved();
       tableData = table.getData();
       dataStore.setCables(tableData); // persist only when user saves
+      dataStore.saveProject(projectId);
     }
   });
 
