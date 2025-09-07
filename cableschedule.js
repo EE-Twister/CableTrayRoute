@@ -61,11 +61,17 @@ window.addEventListener('DOMContentLoaded', () => {
     return Array.from(ids);
   }
 
+  function getEquipmentOptions(){
+    const ids=new Set();
+    try{ dataStore.getEquipment().forEach(eq=>{ if(eq.id) ids.add(eq.id); }); }catch(e){}
+    return Array.from(ids);
+  }
+
   const columns=[
     {key:'tag',label:'Tag',type:'text',group:'Identification',tooltip:'Unique identifier for the cable'},
     {key:'service_description',label:'Service Description',type:'text',group:'Identification',tooltip:"Description of the cable's purpose"},
-    {key:'from_tag',label:'From Tag',type:'text',group:'Routing / Termination',tooltip:'Starting equipment or location tag'},
-    {key:'to_tag',label:'To Tag',type:'text',group:'Routing / Termination',tooltip:'Ending equipment or location tag'},
+    {key:'from_tag',label:'From Tag',type:'text',datalist:()=>getEquipmentOptions(),group:'Routing / Termination',tooltip:'Starting equipment or location tag'},
+    {key:'to_tag',label:'To Tag',type:'text',datalist:()=>getEquipmentOptions(),group:'Routing / Termination',tooltip:'Ending equipment or location tag'},
     {key:'start_x',label:'Start X',type:'number',group:'Routing / Termination',tooltip:'X-coordinate of cable start'},
     {key:'start_y',label:'Start Y',type:'number',group:'Routing / Termination',tooltip:'Y-coordinate of cable start'},
     {key:'start_z',label:'Start Z',type:'number',group:'Routing / Termination',tooltip:'Z-coordinate of cable start'},
