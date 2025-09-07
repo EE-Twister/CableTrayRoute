@@ -1674,11 +1674,29 @@ Wt: ${m.weight.toFixed(2)} lbs/ft
       // ─────────────────────────────────────────────────────────────
       // (M) Profile Management (localStorage)
       // ─────────────────────────────────────────────────────────────
+      const trayProfiles = {
+        prefix: "trayProfile_",
+        save(name, data) {
+          setItem(this.prefix + name, data);
+        },
+        load(name) {
+          return getItem(this.prefix + name);
+        },
+        remove(name) {
+          removeItem(this.prefix + name);
+        },
+        list() {
+          return storeKeys()
+            .filter(k => k.startsWith(this.prefix))
+            .map(k => k.replace(this.prefix, ""));
+        }
+      };
+
       const profileList = document.getElementById("profileList");
       function refreshProfileList() {
         profileList.innerHTML = "";
-        const keys = storeKeys().filter(k => k.startsWith("trayProfile_"));
-        if (keys.length === 0) {
+        const names = trayProfiles.list();
+        if (names.length === 0) {
           const opt = document.createElement("option");
           opt.value = "";
           opt.textContent = "-- no profiles saved --";
@@ -1689,9 +1707,8 @@ Wt: ${m.weight.toFixed(2)} lbs/ft
         defaultOpt.value = "";
         defaultOpt.textContent = "-- select profile --";
         profileList.appendChild(defaultOpt);
-        keys.sort();
-        keys.forEach(key => {
-          const profileName = key.replace("trayProfile_", "");
+        names.sort();
+        names.forEach(profileName => {
           const opt = document.createElement("option");
           opt.value = profileName;
           opt.textContent = profileName;
@@ -1736,8 +1753,14 @@ Wt: ${m.weight.toFixed(2)} lbs/ft
             circuitGroup: groupVal
           });
         }
+        const trayData = {
+          width: parseFloat(document.getElementById("trayWidth").value) || 0,
+          depth: parseFloat(document.getElementById("trayDepth").value) || 0,
+          type: document.getElementById("trayType").value,
+          tray_id: document.getElementById("trayName").value.trim()
+        };
         try {
-          setItem("trayProfile_" + name, arr);
+          trayProfiles.save(name, { tray: trayData, cables: arr });
           alert(`Profile "${name}" saved.`);
           refreshProfileList();
         } catch (e) {
@@ -1752,13 +1775,17 @@ Wt: ${m.weight.toFixed(2)} lbs/ft
           alert("Select a profile to load.");
           return;
         }
-        const data = getItem("trayProfile_" + profileName);
+        const data = trayProfiles.load(profileName);
         if (!data) {
           alert(`Profile "${profileName}" not found.`);
           refreshProfileList();
           return;
         }
-        const arr = data;
+        const { tray = {}, cables: arr = [] } = data;
+        document.getElementById("trayWidth").value = tray.width ?? tray.w ?? "";
+        document.getElementById("trayDepth").value = tray.depth ?? tray.height ?? "";
+        if (tray.type) document.getElementById("trayType").value = tray.type;
+        document.getElementById("trayName").value = tray.tray_id || tray.name || "";
         cableTbody.innerHTML = "";
         cables = [];
         arr.forEach(cable => {
@@ -1801,7 +1828,7 @@ Wt: ${m.weight.toFixed(2)} lbs/ft
           return;
         }
         if (!confirm(`Delete profile "${profileName}"?`)) return;
-        removeItem("trayProfile_" + profileName);
+        trayProfiles.remove(profileName);
         alert(`Profile "${profileName}" deleted.`);
         refreshProfileList();
       });
