@@ -1,5 +1,5 @@
 import * as dataStore from './dataStore.mjs';
-import { sampleDuctbanks, sampleConduits, sampleTrays, normalizeDuctbankRow, normalizeConduitRow, normalizeTrayRow } from './racewaySampleData.mjs';
+import { normalizeDuctbankRow, normalizeConduitRow, normalizeTrayRow } from './racewaySampleData.mjs';
 
 checkPrereqs([{key:'cableSchedule',page:'cableschedule.html',label:'Cable Schedule'}]);
 
@@ -240,9 +240,11 @@ document.addEventListener('DOMContentLoaded',()=>{
     if(!assertTablesReady()) return;
     console.time('raceway:loadSamples');
     try{
-      const dbRows=sampleDuctbanks.map(normalizeDuctbankRow);
-      const trayRows=sampleTrays.map(normalizeTrayRow);
-      const conduitRowsRaw=sampleConduits.map(normalizeConduitRow);
+      const res = await fetch('examples/sampleRaceways.json');
+      const { ductbanks = [], trays = [], conduits = [] } = await res.json();
+      const dbRows = ductbanks.map(normalizeDuctbankRow);
+      const trayRows = trays.map(normalizeTrayRow);
+      const conduitRowsRaw = conduits.map(normalizeConduitRow);
       const tags=new Set(dbRows.map(db=>String(db.tag||'').trim().toLowerCase()));
       const dbConduits=[]; const standalone=[]; const skipped=[];
       conduitRowsRaw.forEach(c=>{
