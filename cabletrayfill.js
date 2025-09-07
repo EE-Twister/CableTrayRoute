@@ -1532,133 +1532,121 @@ Wt: ${m.weight.toFixed(2)} lbs/ft
       });
 
       // ─────────────────────────────────────────────────────────────
-      // (K) Excel Export: gather table → create workbook → download
+      // (K) Excel Export / Import helpers
       // ─────────────────────────────────────────────────────────────
-      document.getElementById("exportExcelBtn").addEventListener("click", () => {
-        const rows = Array.from(cableTbody.querySelectorAll("tr"));
-        if (rows.length === 0) {
-          alert("No cables to export.");
+      function exportCableXlsx(){
+        if(typeof XLSX==='undefined'){
+          alert('XLSX library not loaded');
           return;
         }
-        // Build 2D array: header + each row’s data
-        const data = [[
-          "Tag",
-          "Cable Type",
-          "Conductors",
-          "Conductor Size",
-          "Cable Rating (V)",
-          "Operating Voltage (V)",
-          "OD",
-          "Weight",
-          "Zone",
-          "Circuit Group"
-        ]];
-        rows.forEach(row => {
-          const tag       = row.children[0].querySelector("input").value.trim();
-          const cableType = row.children[1].querySelector("select").value;
-          const count     = row.children[2].querySelector("input").value.trim();
-          const size      = row.children[3].querySelector("input").value.trim();
-          const rating    = row.children[4].querySelector("input").value.trim();
-          const voltage   = row.children[5].querySelector("input").value.trim();
-          const od        = row.children[6].querySelector("input").value.trim();
-          const weight    = row.children[7].querySelector("input").value.trim();
-          const zone      = row.children[8].querySelector("input").value.trim();
-          const group     = row.children[9].querySelector("input").value.trim();
-          data.push([tag, cableType, count, size, rating, voltage, od, weight, zone, group]);
+        const rows=Array.from(cableTbody.querySelectorAll('tr'));
+        if(rows.length===0){
+          alert('No cables to export.');
+          return;
+        }
+        const data=[['Tag','Cable Type','Conductors','Conductor Size','Cable Rating (V)','Operating Voltage (V)','OD','Weight','Zone','Circuit Group']];
+        rows.forEach(row=>{
+          const tag=row.children[0].querySelector('input').value.trim();
+          const cableType=row.children[1].querySelector('select').value;
+          const count=row.children[2].querySelector('input').value.trim();
+          const size=row.children[3].querySelector('input').value.trim();
+          const rating=row.children[4].querySelector('input').value.trim();
+          const voltage=row.children[5].querySelector('input').value.trim();
+          const od=row.children[6].querySelector('input').value.trim();
+          const weight=row.children[7].querySelector('input').value.trim();
+          const zone=row.children[8].querySelector('input').value.trim();
+          const group=row.children[9].querySelector('input').value.trim();
+          data.push([tag,cableType,count,size,rating,voltage,od,weight,zone,group]);
         });
-        const wb = XLSX.utils.book_new();
-        const ws = XLSX.utils.aoa_to_sheet(data);
-        XLSX.utils.book_append_sheet(wb, ws, "Cables");
-        XLSX.writeFile(wb, "CableList.xlsx");
-      });
+        const wb=XLSX.utils.book_new();
+        const ws=XLSX.utils.aoa_to_sheet(data);
+        XLSX.utils.book_append_sheet(wb,ws,'Cables');
+        XLSX.writeFile(wb,'CableList.xlsx');
+      }
 
-      // ─────────────────────────────────────────────────────────────
-      // (L) Excel Import: file‐picker → parse → populate table
-      // ─────────────────────────────────────────────────────────────
-      document.getElementById("importExcelBtn").addEventListener("click", () => {
-        document.getElementById("importExcelInput").click();
-      });
-      document.getElementById("importExcelInput").addEventListener("change", (evt) => {
-        const file = evt.target.files[0];
-        if (!file) return;
-        const reader = new FileReader();
-        reader.onload = (e) => {
-          const data = e.target.result;
-          const wb = XLSX.read(data, { type: "binary" });
-          const firstSheet = wb.Sheets[wb.SheetNames[0]];
-          const jsonArr = XLSX.utils.sheet_to_json(firstSheet, { defval: "" });
-          if (jsonArr.length === 0) {
-            alert("Excel sheet is empty.");
+      function importCableXlsx(file){
+        if(!file) return;
+        if(typeof XLSX==='undefined'){
+          alert('XLSX library not loaded');
+          return;
+        }
+        const reader=new FileReader();
+        reader.onload=e=>{
+          const wb=XLSX.read(e.target.result,{type:'binary'});
+          const firstSheet=wb.Sheets[wb.SheetNames[0]];
+          const jsonArr=XLSX.utils.sheet_to_json(firstSheet,{defval:""});
+          if(jsonArr.length===0){
+            alert('Excel sheet is empty.');
             return;
           }
-          // Expect columns: Tag, Cable Type, Conductors, Conductor Size, Cable Rating (V), Operating Voltage (V), OD, Weight, Zone, Circuit Group
-          cableTbody.innerHTML = "";
-          cables = [];
-          jsonArr.forEach((obj, idx) => {
+          cableTbody.innerHTML='';
+          cables=[];
+          jsonArr.forEach((obj,idx)=>{
             const {
               Tag,
-              "Cable Type": CableType,
+              'Cable Type':CableType,
               Conductors,
-              "Conductor Size": Size,
-              "Cable Rating (V)": Rating,
-              "Operating Voltage (V)": Voltage,
+              'Conductor Size':Size,
+              'Cable Rating (V)':Rating,
+              'Operating Voltage (V)':Voltage,
               OD,
               Weight,
               Zone,
-              "Circuit Group": CircuitGroup
-            } = obj;
-            if (
-              typeof Tag === "undefined" ||
-              typeof CableType === "undefined" ||
-              typeof Conductors === "undefined" ||
-              typeof Size === "undefined" ||
-              typeof Rating === "undefined" ||
-              typeof Voltage === "undefined" ||
-              typeof OD === "undefined" ||
-              typeof Weight === "undefined"
-            ) {
-              alert(`Row ${idx + 2} missing one of: Tag, Cable Type, Conductors, Conductor Size, Cable Rating (V), Operating Voltage (V), OD, Weight.`);
+              'Circuit Group':CircuitGroup
+            }=obj;
+            if(
+              typeof Tag==='undefined'||
+              typeof CableType==='undefined'||
+              typeof Conductors==='undefined'||
+              typeof Size==='undefined'||
+              typeof Rating==='undefined'||
+              typeof Voltage==='undefined'||
+              typeof OD==='undefined'||
+              typeof Weight==='undefined'
+            ){
+              alert(`Row ${idx+2} missing one of: Tag, Cable Type, Conductors, Conductor Size, Cable Rating (V), Operating Voltage (V), OD, Weight.`);
               return;
             }
-            const idx2 = cables.length;
+            const idx2=cables.length;
             cables.push({});
-            const newRow = createCableRow({}, idx2);
-            newRow.children[0].querySelector("input").value = Tag;
-            // Set the "Cable Type" dropdown
-            newRow.children[1].querySelector("select").value = CableType;
-            // Set count and size
-            newRow.children[2].querySelector("input").value = Conductors;
-            newRow.children[3].querySelector("input").value = Size;
-            newRow.children[4].querySelector("input").value = Rating;
-            newRow.children[5].querySelector("input").value = Voltage;
-            // Trigger autofill
-            const sizeInput = newRow.children[3].querySelector("input");
-            sizeInput.dispatchEvent(new Event("input"));
-            const selSize = newRow.children[6].querySelector("select");
-            const odInput = newRow.children[6].querySelector("input");
-            const wtInput = newRow.children[7].querySelector("input");
-            const zoneInput = newRow.children[8].querySelector("input");
-            const groupInput = newRow.children[9].querySelector("input");
-            const matchIdx = cableOptions.findIndex(o => o.conductors === parseInt(Conductors) && o.size === Size);
-            if (matchIdx >= 0) {
-              selSize.value = cableOptions[matchIdx].label;
-              selSize.dispatchEvent(new Event("change"));
-            } else {
-              odInput.value = parseFloat(OD).toFixed(2);
-              wtInput.value = parseFloat(Weight).toFixed(2);
-              odInput.readOnly = false;
-              wtInput.readOnly = false;
+            const newRow=createCableRow({},idx2);
+            newRow.children[0].querySelector('input').value=Tag;
+            newRow.children[1].querySelector('select').value=CableType;
+            newRow.children[2].querySelector('input').value=Conductors;
+            newRow.children[3].querySelector('input').value=Size;
+            newRow.children[4].querySelector('input').value=Rating;
+            newRow.children[5].querySelector('input').value=Voltage;
+            const sizeInput=newRow.children[3].querySelector('input');
+            sizeInput.dispatchEvent(new Event('input'));
+            const selSize=newRow.children[6].querySelector('select');
+            const odInput=newRow.children[6].querySelector('input');
+            const wtInput=newRow.children[7].querySelector('input');
+            const zoneInput=newRow.children[8].querySelector('input');
+            const groupInput=newRow.children[9].querySelector('input');
+            const matchIdx=cableOptions.findIndex(o=>o.conductors===parseInt(Conductors)&&o.size===Size);
+            if(matchIdx>=0){
+              selSize.value=cableOptions[matchIdx].label;
+              selSize.dispatchEvent(new Event('change'));
+            }else{
+              odInput.value=parseFloat(OD).toFixed(2);
+              wtInput.value=parseFloat(Weight).toFixed(2);
+              odInput.readOnly=false;
+              wtInput.readOnly=false;
             }
-            zoneInput.value = Zone || 1;
-            groupInput.value = obj["Circuit Group"] || "";
+            zoneInput.value=Zone||1;
+            groupInput.value=obj['Circuit Group']||'';
             cableTbody.appendChild(newRow);
           });
           applyFilters();
-          alert("Excel imported. Correct any unrecognized conductor details if needed.");
-          document.getElementById("importExcelInput").value = "";
+          alert('Excel imported. Correct any unrecognized conductor details if needed.');
+          document.getElementById('importExcelInput').value='';
         };
         reader.readAsBinaryString(file);
-      });
+      }
+
+      document.getElementById('exportExcelBtn').addEventListener('click',exportCableXlsx);
+      document.getElementById('importExcelBtn').addEventListener('click',()=>document.getElementById('importExcelInput').click());
+      document.getElementById('importExcelInput').addEventListener('change',e=>{importCableXlsx(e.target.files[0]);e.target.value='';});
 
       // (L2) Import Help button
       document.getElementById("importHelpBtn").addEventListener("click", () => {
