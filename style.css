@@ -1,7 +1,7 @@
+@import "./oneline.css";
+
 /* --- Basic Setup --- */
 :root {
-    --primary-color: #007bff;
-    --secondary-color: #f8f9fa;
     --border-color: #dee2e6;
     --text-color: #212529;
     --success-bg: #d4edda;
@@ -11,11 +11,11 @@
     --error-bg: #f8d7da;
     --error-text: #721c24;
     --focus-ring-color: #000;
-    --button-bg: #005a9c;
-    --button-hover-bg: #00457a;
+    --button-bg: var(--primary-color);
+    --button-hover-bg: #0056b3;
     --button-text: #fff;
-    --button-padding: 0.5rem 0.75rem;
-    --button-margin: 0.25rem;
+    --button-padding: var(--spacing-base) calc(var(--spacing-base) * 1.5);
+    --button-margin: calc(var(--spacing-base) / 2);
 }
 
 body.dark-mode {
@@ -26,9 +26,7 @@ body.dark-mode {
     --success-text: #28a745;
     --warning-text: #ffc107;
     --focus-ring-color: #fff;
-    --button-bg: #1a73e8;
     --button-hover-bg: #1558b0;
-    --button-text: #fff;
     background-color: #212529;
 }
 
@@ -68,10 +66,16 @@ body.dark-mode .settings-menu {
     background: var(--secondary-color);
 }
 
+h1, h2, h3 {
+    font-family: var(--font-family-base);
+    color: var(--primary-color);
+    margin-bottom: var(--spacing-base);
+}
+
 body {
-    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+    font-family: var(--font-family-base);
     margin: 0;
-    background-color: #f0f2f5;
+    background-color: var(--secondary-color);
     color: var(--text-color);
 }
 
@@ -485,7 +489,7 @@ details > summary {
 .modal-content {
     background: var(--secondary-color);
     color: var(--text-color);
-    padding: 1rem;
+    padding: calc(var(--spacing-base) * 2);
     border-radius: 4px;
     max-width: 600px;
     width: 90%;
@@ -495,9 +499,9 @@ details > summary {
 }
 
 .modal-actions {
-    margin-top: 1rem;
+    margin-top: calc(var(--spacing-base) * 2);
     display: flex;
-    gap: 0.5rem;
+    gap: var(--spacing-base);
     justify-content: flex-end;
 }
 
