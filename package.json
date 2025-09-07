@@ -16,6 +16,7 @@
     "jspdf": "^2.5.1",
     "svg2pdf.js": "^2.0.1",
     "handlebars": "^4.7.8",
-    "pdfkit": "^0.13.0"
+    "pdfkit": "^0.13.0",
+    "dxf-writer": "^1.0.0"
   }
 }
