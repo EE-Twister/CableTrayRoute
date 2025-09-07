@@ -1,12 +1,13 @@
 function createDirtyTracker(win = (typeof window !== 'undefined' ? window : undefined)) {
   if (!win) throw new Error('Window object required');
   let dirty = false;
+  const message = 'Project is auto-saved; you can safely leave.';
   const handler = e => {
     e.preventDefault();
-    e.returnValue = '';
+    e.returnValue = message;
   };
   const update = () => {
-    if (dirty) {
+    if (dirty && !win.autoSaveEnabled) {
       win.addEventListener('beforeunload', handler);
     } else {
       win.removeEventListener('beforeunload', handler);

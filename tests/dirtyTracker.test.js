@@ -46,12 +46,22 @@ describe("dirty state tracker", () => {
     assert.strictEqual(e.defaultPrevented, false);
   });
 
+  it("auto-save enabled -> no prompt", () => {
+    const win = makeWindow();
+    win.autoSaveEnabled = true;
+    const tracker = createDirtyTracker(win);
+    tracker.markDirty();
+    const e = win.fire();
+    assert.strictEqual(e.defaultPrevented, false);
+  });
+
   it("edit a cell -> prompt", () => {
     const win = makeWindow();
     const tracker = createDirtyTracker(win);
     tracker.markDirty();
     const e = win.fire();
     assert.strictEqual(e.defaultPrevented, true);
+    assert.strictEqual(e.returnValue, "Project is auto-saved; you can safely leave.");
   });
 
   it("Save -> no prompt", () => {
