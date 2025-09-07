@@ -167,6 +167,39 @@
   display: none;
 }
 
+.export-group {
+  position: relative;
+}
+
+.export-menu {
+  position: absolute;
+  top: 100%;
+  right: 0;
+  background: var(--ol-card-bg);
+  border: 1px solid var(--ol-border-color);
+  border-radius: var(--ol-radius);
+  list-style: none;
+  margin: 0;
+  padding: 0.25rem 0;
+  box-shadow: var(--ol-shadow);
+  display: none;
+}
+
+.export-menu li {
+  padding: 0.25rem 0.75rem;
+  white-space: nowrap;
+  cursor: pointer;
+}
+
+.export-menu li:hover,
+.export-menu li:focus {
+  background: var(--ol-hover-bg);
+}
+
+.export-menu.show {
+  display: block;
+}
+
 .toolbar-group {
   display: flex;
   align-items: center;
