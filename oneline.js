@@ -1219,13 +1219,25 @@ function render() {
     }
     const meta = componentMeta[c.subtype] || {};
     const iconHref = meta.icon || placeholderIcon;
-    const img = document.createElementNS(svgNS, 'image');
-    img.setAttribute('x', c.x);
-    img.setAttribute('y', c.y);
-    img.setAttribute('width', w);
-    img.setAttribute('height', h);
-    img.setAttributeNS('http://www.w3.org/1999/xlink', 'href', iconHref);
-    g.appendChild(img);
+    if (iconHref === placeholderIcon) {
+      const img = document.createElementNS(svgNS, 'image');
+      img.setAttribute('x', c.x);
+      img.setAttribute('y', c.y);
+      img.setAttribute('width', w);
+      img.setAttribute('height', h);
+      img.setAttributeNS('http://www.w3.org/1999/xlink', 'href', iconHref);
+      g.appendChild(img);
+    } else {
+      const svgEl = document.createElementNS(svgNS, 'svg');
+      svgEl.setAttribute('x', c.x);
+      svgEl.setAttribute('y', c.y);
+      svgEl.setAttribute('width', w);
+      svgEl.setAttribute('height', h);
+      const use = document.createElementNS(svgNS, 'use');
+      use.setAttributeNS('http://www.w3.org/1999/xlink', 'href', iconHref + '#icon');
+      svgEl.appendChild(use);
+      g.appendChild(svgEl);
+    }
     const text = document.createElementNS(svgNS, 'text');
     text.setAttribute('x', c.x + w / 2);
     text.setAttribute('y', c.y + h + 15);

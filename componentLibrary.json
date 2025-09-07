@@ -2,7 +2,7 @@
   {
     "subtype": "Bus",
     "label": "Bus",
-    "icon": "icons/Bus.svg",
+    "icon": "icons/components/Bus.svg",
     "category": "bus",
     "ports": [{ "x": 0, "y": 20 }, { "x": 80, "y": 20 }],
     "schema": [
@@ -17,7 +17,7 @@
   {
     "subtype": "MLO",
     "label": "MLO",
-    "icon": "icons/MLO.svg",
+    "icon": "icons/components/MLO.svg",
     "category": "panel",
     "ports": [{ "x": 0, "y": 20 }, { "x": 80, "y": 20 }],
     "schema": [
@@ -37,7 +37,7 @@
   {
     "subtype": "MCC",
     "label": "MCC",
-    "icon": "icons/MCC.svg",
+    "icon": "icons/components/MCC.svg",
     "category": "panel",
     "ports": [{ "x": 0, "y": 20 }, { "x": 80, "y": 20 }],
     "schema": [
@@ -57,7 +57,7 @@
   {
     "subtype": "Generator",
     "label": "Generator",
-    "icon": "icons/Generator.svg",
+    "icon": "icons/components/Generator.svg",
     "category": "equipment",
     "ports": [{ "x": 0, "y": 20 }, { "x": 80, "y": 20 }],
     "schema": [
@@ -78,7 +78,7 @@
   {
     "subtype": "UPS",
     "label": "UPS",
-    "icon": "icons/UPS.svg",
+    "icon": "icons/components/UPS.svg",
     "category": "equipment",
     "ports": [{ "x": 0, "y": 20 }, { "x": 80, "y": 20 }],
     "schema": [
@@ -97,7 +97,7 @@
   {
     "subtype": "Transformer",
     "label": "Transformer",
-    "icon": "icons/Transformer.svg",
+    "icon": "icons/components/Transformer.svg",
     "category": "equipment",
     "ports": [{ "x": 0, "y": 20 }, { "x": 80, "y": 20 }],
     "schema": [
@@ -115,7 +115,7 @@
   {
     "subtype": "Switchgear",
     "label": "Switchgear",
-    "icon": "icons/Switchgear.svg",
+    "icon": "icons/components/Switchgear.svg",
     "category": "equipment",
     "ports": [{ "x": 0, "y": 20 }, { "x": 80, "y": 20 }],
     "schema": [
@@ -135,7 +135,7 @@
   {
     "subtype": "Switchboard",
     "label": "Switchboard",
-    "icon": "icons/Switchboard.svg",
+    "icon": "icons/components/Switchboard.svg",
     "category": "equipment",
     "ports": [{ "x": 0, "y": 20 }, { "x": 80, "y": 20 }],
     "schema": [
@@ -151,7 +151,7 @@
   {
     "subtype": "Feeder",
     "label": "Feeder",
-    "icon": "icons/Feeder.svg",
+    "icon": "icons/components/Feeder.svg",
     "category": "equipment",
     "ports": [{ "x": 0, "y": 20 }, { "x": 80, "y": 20 }],
     "schema": [
@@ -169,7 +169,7 @@
   {
     "subtype": "Motor",
     "label": "Motor",
-    "icon": "icons/Motor.svg",
+    "icon": "icons/components/Motor.svg",
     "category": "load",
     "ports": [{ "x": 0, "y": 20 }, { "x": 80, "y": 20 }],
     "schema": [
@@ -194,7 +194,7 @@
   {
     "subtype": "CapacitorBank",
     "label": "Capacitor Bank",
-    "icon": "icons/CapacitorBank.svg",
+    "icon": "icons/components/CapacitorBank.svg",
     "category": "equipment",
     "ports": [{ "x": 0, "y": 20 }, { "x": 80, "y": 20 }],
     "schema": [
@@ -213,7 +213,7 @@
   {
     "subtype": "PVArray",
     "label": "PV Array",
-    "icon": "icons/PVArray.svg",
+    "icon": "icons/components/PVArray.svg",
     "category": "equipment",
     "ports": [{ "x": 0, "y": 20 }, { "x": 80, "y": 20 }],
     "schema": [
@@ -232,7 +232,7 @@
   {
     "subtype": "Load",
     "label": "Load",
-    "icon": "icons/Load.svg",
+    "icon": "icons/components/Load.svg",
     "category": "load",
     "ports": [{ "x": 0, "y": 20 }, { "x": 80, "y": 20 }],
     "schema": [
