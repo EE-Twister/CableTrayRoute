@@ -1,4 +1,4 @@
-import { getOneLine, setOneLine, setEquipment, setPanels, setLoads, getCables, setCables, getItem, setItem, getStudies, setStudies, on, getCurrentScenario, switchScenario, STORAGE_KEYS, loadProject, saveProject } from './dataStore.mjs';
+import { getOneLine, setOneLine, setEquipment, setPanels, setLoads, getCables, setCables, addCable, addRaceway, getItem, setItem, getStudies, setStudies, on, getCurrentScenario, switchScenario, STORAGE_KEYS, loadProject, saveProject } from './dataStore.mjs';
 import { runLoadFlow } from './analysis/loadFlow.js';
 import { runShortCircuit } from './analysis/shortCircuit.js';
 import { runArcFlash } from './analysis/arcFlash.js';
@@ -2461,6 +2461,14 @@ async function init() {
           pushHistory();
           render();
           save();
+          try {
+            const fromTag = fromComp.ref || fromComp.id;
+            const toTag = toComp.ref || toComp.id;
+            addCable({ from_tag: fromTag, to_tag: toTag });
+            addRaceway({ conduit_id: `${fromTag}-${toTag}`, from_tag: fromTag, to_tag: toTag });
+          } catch (err) {
+            console.error('Failed to record connection', err);
+          }
         }
         connectSource = null;
         hoverPort = null;

@@ -182,6 +182,16 @@ export const getCables = () => read(KEYS.cables, []);
 export const setCables = cables => write(KEYS.cables, cables);
 
 /**
+ * Append a cable record to the existing cable schedule.
+ * @param {Cable} cable
+ */
+export const addCable = cable => {
+  const list = getCables();
+  list.push(cable);
+  setCables(list);
+};
+
+/**
  * @returns {Ductbank[]}
  */
 export const getDuctbanks = () => read(KEYS.ductbanks, []);
@@ -198,6 +208,24 @@ export const getConduits = () => read(KEYS.conduits, []);
  * @param {Conduit[]} conduits
  */
 export const setConduits = conduits => write(KEYS.conduits, conduits);
+
+/**
+ * Append a raceway record. If the object contains `tray_id` it is stored
+ * with trays; otherwise it is assumed to be a conduit.
+ * @param {Tray|Conduit} raceway
+ */
+export const addRaceway = raceway => {
+  if (!raceway) return;
+  if (raceway.tray_id) {
+    const trays = getTrays();
+    trays.push(raceway);
+    setTrays(trays);
+  } else {
+    const conduits = getConduits();
+    conduits.push(raceway);
+    setConduits(conduits);
+  }
+};
 
 /**
  * @returns {GenericRecord[]}
@@ -723,10 +751,12 @@ if (typeof window !== 'undefined') {
     setTrays,
     getCables,
     setCables,
+    addCable,
     getDuctbanks,
     setDuctbanks,
     getConduits,
     setConduits,
+    addRaceway,
     getPanels,
     setPanels,
     getEquipment,

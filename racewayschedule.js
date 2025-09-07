@@ -38,6 +38,28 @@ document.addEventListener('DOMContentLoaded',()=>{
   initHelpModal('tray-help-btn','tray-help-modal');
   initHelpModal('conduit-help-btn','conduit-help-modal');
   initNavToggle();
+
+  const selectBtn=document.createElement('button');
+  selectBtn.id='select-raceway-btn';
+  selectBtn.textContent='Select Raceway';
+  document.querySelector('.page-header')?.appendChild(selectBtn);
+  const racewaySelect=document.createElement('select');
+  racewaySelect.multiple=true;
+  racewaySelect.style.display='none';
+  document.body.appendChild(racewaySelect);
+
+  function loadRacewayOptions(){
+    const ids=new Set();
+    try{ dataStore.getTrays().forEach(t=>{ if(t.tray_id) ids.add(t.tray_id); }); }catch(e){}
+    try{ dataStore.getConduits().forEach(c=>{ const id=c.tray_id||c.conduit_id; if(id) ids.add(id); }); }catch(e){}
+    racewaySelect.innerHTML='';
+    Array.from(ids).forEach(id=>{const o=document.createElement('option');o.value=id;o.textContent=id;racewaySelect.appendChild(o);});
+  }
+
+  selectBtn.addEventListener('click',()=>{
+    loadRacewayOptions();
+    TableUtils.showRacewayModal(racewaySelect,selectBtn);
+  });
   const tables={};
   function assertTablesReady(){
     for(const [name,t] of Object.entries(tables)){
