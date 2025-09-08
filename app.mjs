@@ -3888,12 +3888,12 @@ Plotly.newPlot(document.getElementById('plot'), data, layout, {responsive: true}
     const cableKey = globalThis.TableUtils?.STORAGE_KEYS?.cableSchedule || 'cableSchedule';
     const hasSaved = hadSession || getItem(trayKey) || getItem(cableKey);
 
-    const finalizeLoad = () => {
+    const finalizeLoad = async () => {
         renderManualTrayTable();
         updateCableListDisplay();
+        await loadDuctbankData();
         rebuildTrayData();
         updateTrayDisplay();
-        loadDuctbankData();
     };
 
     if (hasSaved) {
@@ -3914,7 +3914,7 @@ Plotly.newPlot(document.getElementById('plot'), data, layout, {responsive: true}
             yesBtn.addEventListener('click', async () => {
                 close();
                 await loadSchedulesIntoSession();
-                finalizeLoad();
+                await finalizeLoad();
             }, { once: true });
             noBtn.addEventListener('click', async () => {
                 close();
@@ -3923,22 +3923,14 @@ Plotly.newPlot(document.getElementById('plot'), data, layout, {responsive: true}
                 saveSession();
                 removeItem(trayKey);
                 removeItem(cableKey);
-                renderManualTrayTable();
-                updateCableListDisplay();
-                rebuildTrayData();
-                updateTrayDisplay();
-                await loadDuctbankData();
+                await finalizeLoad();
             }, { once: true });
         } else {
             await loadSchedulesIntoSession();
-            finalizeLoad();
+            await finalizeLoad();
         }
     } else {
-        renderManualTrayTable();
-        updateCableListDisplay();
-        rebuildTrayData();
-        updateTrayDisplay();
-        loadDuctbankData();
+        await finalizeLoad();
     }
 
     async function runSelfCheck(){
