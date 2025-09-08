@@ -1,9 +1,15 @@
 import { test, expect } from '@playwright/test';
 import path from 'path';
+import fs from 'fs';
 const root = path.join(__dirname, '..');
 const pageUrl = (file: string) => 'file://' + path.join(root, file);
 
 test('raceway load samples populates all tables', async ({ page }) => {
+  const samplePath = path.join(root, 'examples', 'sampleRaceways.json');
+  const sampleJson = fs.readFileSync(samplePath, 'utf-8');
+  await page.route('**/examples/sampleRaceways.json', route => {
+    route.fulfill({ body: sampleJson, contentType: 'application/json' });
+  });
   await page.goto(pageUrl('racewayschedule.html'));
   await page.click('#raceway-load-samples');
   await page.waitForSelector('#ductbank-table tbody tr.ductbank-row');
