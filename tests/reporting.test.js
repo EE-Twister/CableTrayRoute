@@ -11,6 +11,11 @@ function it(name, fn){
 }
 
 (async () => {
+  global.window = { jspdf: { jsPDF: class {
+    setFontSize() {}
+    text() {}
+    output() { return new ArrayBuffer(1); }
+  } } };
   const { toCSV, toPDF } = await import('../reports/reporting.mjs');
   const { generateArcFlashLabel } = await import('../reports/labels.mjs');
 

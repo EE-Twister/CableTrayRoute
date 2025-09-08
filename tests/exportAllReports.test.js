@@ -9,6 +9,11 @@ function it(name, fn){
 }
 
 (async () => {
+  global.window = { jspdf: { jsPDF: class {
+    setFontSize() {}
+    text() {}
+    output() { return new ArrayBuffer(1); }
+  } } };
   const { buildReportZip, setBranding } = await import('../reports/exportAll.mjs');
   describe('exportAll reports', () => {
     it('builds zip with pdf, csv and labels', async () => {
