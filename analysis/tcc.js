@@ -1,6 +1,6 @@
 import * as d3 from 'https://cdn.jsdelivr.net/npm/d3@7/+esm';
 import { getItem, setItem, getOneLine, setOneLine, getStudies, setStudies } from '../dataStore.mjs';
-import { runShortCircuit } from './shortCircuit.js';
+import { runShortCircuit } from './shortCircuit.mjs';
 import { scaleCurve, checkDuty } from './tccUtils.js';
 
 const deviceSelect = document.getElementById('device-select');

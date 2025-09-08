@@ -17,7 +17,7 @@ global.localStorage = {
 
 (async () => {
   const { setOneLine } = await import('../../dataStore.mjs');
-  const { runShortCircuit } = await import('../../analysis/shortCircuit.js');
+  const { runShortCircuit } = await import('../../analysis/shortCircuit.mjs');
 
   describe('short circuit engine', () => {
     it('handles multiple voltages with X/R and source contributions', () => {

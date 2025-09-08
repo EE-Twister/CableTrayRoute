@@ -1,4 +1,4 @@
-import { runShortCircuit } from '../analysis/shortCircuit.js';
+import { runShortCircuit } from '../analysis/shortCircuit.mjs';
 import { getOneLine, getStudies, setStudies } from '../dataStore.mjs';
 import { downloadPDF } from '../reports/reporting.mjs';
 
