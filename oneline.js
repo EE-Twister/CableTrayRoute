@@ -211,12 +211,6 @@ async function loadComponentLibrary() {
     if (libraryFailed) banner.classList.remove('hidden');
     else banner.classList.add('hidden');
   }
-  document.querySelectorAll('#reload-library-btn, #library-reload-btn').forEach(btn => {
-    btn.onclick = () => {
-      // allow reloading the library and rebuilding the palette
-      loadComponentLibrary();
-    };
-  });
 
   // build the palette with the newly loaded library
   buildPalette();
@@ -863,8 +857,11 @@ function exportTemplates() {
   const a = document.createElement('a');
   a.href = URL.createObjectURL(blob);
   a.download = 'onelineTemplates.json';
+  document.body.appendChild(a);
   a.click();
+  document.body.removeChild(a);
   URL.revokeObjectURL(a.href);
+  showToast('Templates exported');
 }
 
 async function importTemplates(e) {
@@ -883,6 +880,23 @@ async function importTemplates(e) {
     console.error('Failed to import templates', err);
   }
   e.target.value = '';
+}
+
+function setupLibraryTools() {
+  document.querySelectorAll('#reload-library-btn, #library-reload-btn').forEach(btn => {
+    btn.addEventListener('click', async () => {
+      await loadComponentLibrary();
+      showToast('Component library reloaded');
+    });
+  });
+  const templateExportBtn = document.getElementById('template-export-btn');
+  if (templateExportBtn) templateExportBtn.addEventListener('click', exportTemplates);
+  const templateImportBtn = document.getElementById('template-import-btn');
+  const templateImportInput = document.getElementById('template-import-input');
+  if (templateImportBtn && templateImportInput) {
+    templateImportBtn.addEventListener('click', () => templateImportInput.click());
+    templateImportInput.addEventListener('change', importTemplates);
+  }
 }
 
 const cableColors = {
@@ -2319,14 +2333,6 @@ async function init() {
   buildPalette();
   loadTemplates();
   renderTemplates();
-  const templateExportBtn = document.getElementById('template-export-btn');
-  if (templateExportBtn) templateExportBtn.addEventListener('click', exportTemplates);
-  const templateImportBtn = document.getElementById('template-import-btn');
-  const templateImportInput = document.getElementById('template-import-input');
-  if (templateImportBtn && templateImportInput) {
-    templateImportBtn.addEventListener('click', () => templateImportInput.click());
-    templateImportInput.addEventListener('change', importTemplates);
-  }
   const connectBtn = document.getElementById('connect-btn');
   if (connectBtn) {
     connectBtn.addEventListener('click', () => {
@@ -3395,4 +3401,7 @@ if (typeof window !== 'undefined') {
   window.loadManufacturerLibrary = loadManufacturerLibrary;
 }
 
-window.addEventListener('DOMContentLoaded', init);
+window.addEventListener('DOMContentLoaded', () => {
+  setupLibraryTools();
+  init();
+});
