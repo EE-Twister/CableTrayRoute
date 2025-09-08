@@ -29,9 +29,9 @@ test('raceway samples roundtrip and route', async ({ page }) => {
   await page.goto(pageUrl('racewayschedule.html'));
   await page.waitForSelector('#raceway-load-samples');
   await page.click('#raceway-load-samples');
-  await page.waitForSelector('#ductbankTable tbody tr.ductbank-row');
-  await page.waitForSelector('#trayTable tbody tr');
-  await page.waitForSelector('#conduitTable tbody tr');
+  await page.waitForSelector('#ductbankTable tbody tr.ductbank-row', { state: 'attached' });
+  await page.waitForSelector('#trayTable tbody tr', { state: 'attached' });
+  await page.waitForSelector('#conduitTable tbody tr', { state: 'attached' });
   const dbCount = await page.locator('#ductbankTable tbody tr.ductbank-row').count();
   const trayCount = await page.locator('#trayTable tbody tr').count();
   const conduitCount = await page.locator('#conduitTable tbody tr').count();
@@ -52,6 +52,9 @@ test('raceway samples roundtrip and route', async ({ page }) => {
   await page.click('#settings-btn');
   await page.click('#import-project-btn');
   await page.setInputFiles('#import-project-input', filePath);
+  await page.waitForSelector('#ductbankTable tbody tr.ductbank-row', { state: 'attached' });
+  await page.waitForSelector('#trayTable tbody tr', { state: 'attached' });
+  await page.waitForSelector('#conduitTable tbody tr', { state: 'attached' });
 
   expect(await page.locator('#ductbankTable tbody tr.ductbank-row').count()).toBe(dbCount);
   expect(await page.locator('#trayTable tbody tr').count()).toBe(trayCount);

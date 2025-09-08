@@ -26,18 +26,23 @@ test.describe("CableTrayRoute workflow", () => {
     await expect(page.locator("#conduitTable tbody tr")).toHaveCount(3);
     const dbData = await page.evaluate(() => {
       const tag = document.getElementById('ductbankTag').value;
+      const db = {
+        tag,
+        start_x: 0, start_y: 0, start_z: 0,
+        end_x: 0, end_y: 0, end_z: 0,
+      };
       const conduits = Array.from(document.querySelectorAll('#conduitTable tbody tr')).map((tr, i) => ({
         ductbankTag: tag,
         conduit_id: i + 1,
         type: '',
         trade_size: '',
         start_x: 0, start_y: 0, start_z: 0,
-        end_x: 0, end_y: 0, end_z: 0
+        end_x: 0, end_y: 0, end_z: 0,
       }));
-      return { tag, conduits };
+      return { db, conduits };
     });
-    await page.addInitScript(({ tag, conduits }) => {
-      localStorage.setItem('base:ductbankSchedule', JSON.stringify([{ tag }]));
+    await page.addInitScript(({ db, conduits }) => {
+      localStorage.setItem('base:ductbankSchedule', JSON.stringify([db]));
       localStorage.setItem('base:conduitSchedule', JSON.stringify(conduits));
       localStorage.setItem('base:traySchedule', '[]');
       localStorage.setItem('base:cableSchedule', '[]');
@@ -53,9 +58,9 @@ test.describe("CableTrayRoute workflow", () => {
     const trayFile = path.join(root, "examples", "tray_schedule.csv");
     const cableFile = path.join(root, "examples", "cable_schedule.csv");
     await page.setInputFiles("#import-trays-file", trayFile);
-    await page.waitForSelector("#manual-tray-table-container tbody tr");
+    await page.waitForSelector("#manual-tray-table-container tbody tr", { state: 'attached' });
     await page.setInputFiles("#import-cables-file", cableFile);
-    await page.waitForSelector("#cable-list-container tbody tr");
+    await page.waitForSelector("#cable-list-container tbody tr", { state: 'attached' });
     await page.click("#calculate-route-btn");
     await expect(page.locator("#results-section")).toBeVisible();
   });
@@ -92,9 +97,9 @@ test.describe("CableTrayRoute workflow", () => {
     await page.goto(pageUrl("optimalRoute.html"));
     await handleResume(page, false);
     await page.click("#load-sample-trays-btn");
-    await page.waitForSelector("#manual-tray-table-container tbody tr");
+    await page.waitForSelector("#manual-tray-table-container tbody tr", { state: 'attached' });
     await page.click("#load-sample-cables-btn");
-    await page.waitForSelector("#cable-list-container tbody tr");
+    await page.waitForSelector("#cable-list-container tbody tr", { state: 'attached' });
     await page.click("#calculate-route-btn");
     await expect(page.locator("#results-section")).toBeVisible();
     const firstRow = page.locator("#cable-list-container tbody tr").first();
