@@ -1,4 +1,4 @@
-import ampacity from "../ampacity.js";
+import ampacity from "../ampacity.js?v=2";
 
 export function calculateVoltageDrop(cable = {}, length = 0, phase = 3) {
   const { dcResistance } = ampacity;
