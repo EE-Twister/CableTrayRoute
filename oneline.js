@@ -31,6 +31,49 @@ const typeIcons = {
 
 const placeholderIcon = 'icons/placeholder.svg';
 
+const builtinComponents = [
+  {
+    subtype: 'Bus',
+    label: 'Bus',
+    icon: typeIcons.bus || placeholderIcon,
+    category: 'bus',
+    ports: [
+      { x: 0, y: 20 },
+      { x: 80, y: 20 }
+    ]
+  },
+  {
+    subtype: 'Panel',
+    label: 'Panel',
+    icon: typeIcons.panel || placeholderIcon,
+    category: 'panel',
+    ports: [
+      { x: 0, y: 20 },
+      { x: 80, y: 20 }
+    ]
+  },
+  {
+    subtype: 'Equipment',
+    label: 'Equipment',
+    icon: typeIcons.equipment || placeholderIcon,
+    category: 'equipment',
+    ports: [
+      { x: 0, y: 20 },
+      { x: 80, y: 20 }
+    ]
+  },
+  {
+    subtype: 'Load',
+    label: 'Load',
+    icon: typeIcons.load || placeholderIcon,
+    category: 'load',
+    ports: [
+      { x: 0, y: 20 },
+      { x: 80, y: 20 }
+    ]
+  }
+];
+
 let propSchemas = {};
 let subtypeCategory = {};
 let componentTypes = {};
@@ -64,6 +107,7 @@ async function loadComponentLibrary() {
   const skipped = [];
   const missingIcons = [];
   let status;
+  let libraryFailed = false;
   try {
     const res = await fetch('componentLibrary.json');
     status = res.status;
@@ -77,7 +121,9 @@ async function loadComponentLibrary() {
       data = mod.default || mod;
     } catch (importErr) {
       showToast(`Failed to import component library. ${importErr.message}`);
-      data = [];
+      showToast('Falling back to built-in components.');
+      libraryFailed = true;
+      data = builtinComponents;
     }
   }
 
@@ -158,12 +204,15 @@ async function loadComponentLibrary() {
   });
   const banner = document.getElementById('component-library-banner');
   const reloadBtn = document.getElementById('reload-library-btn');
-  if (Object.keys(componentTypes).length <= 1) {
-    if (banner) banner.classList.remove('hidden');
-  } else if (banner) {
-    banner.classList.add('hidden');
+  if (banner) {
+    if (libraryFailed) banner.classList.remove('hidden');
+    else banner.classList.add('hidden');
   }
-  if (reloadBtn) reloadBtn.onclick = () => loadComponentLibrary();
+  if (reloadBtn)
+    reloadBtn.onclick = async () => {
+      await loadComponentLibrary();
+      buildPalette();
+    };
 
   if (skipped.length) {
     showToast(`Skipped components: ${skipped.join(', ')}`);
@@ -2258,13 +2307,8 @@ async function init() {
   const exportReportsBtn = document.getElementById('export-reports-btn');
   if (exportReportsBtn) exportReportsBtn.addEventListener('click', () => exportAllReports());
 
-  buildPalette();
-  const reloadBtn = document.getElementById('reload-library-btn');
-  if (reloadBtn) reloadBtn.addEventListener('click', async () => {
-    await loadComponentLibrary();
     buildPalette();
-  });
-  loadTemplates();
+    loadTemplates();
   renderTemplates();
   document.getElementById('template-export-btn').addEventListener('click', exportTemplates);
   document.getElementById('template-import-btn').addEventListener('click', () => document.getElementById('template-import-input').click());
