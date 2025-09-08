@@ -1,4 +1,4 @@
-const conductorProps = require('./data/conductor_properties.json');
+import conductorProps from './data/conductor_properties.json' assert { type: 'json' };
 
 const AWG_AREA = {"22":642,"20":1020,"18":1624,"16":2583,"14":4107,"12":6530,"10":10380,"8":16510,"6":26240,"4":41740,"3":52620,"2":66360,"1":83690,"1/0":105600,"2/0":133100,"3/0":167800,"4/0":211600,"250":250000,"350":350000,"500":500000,"750":750000,"1000":1000000};
 const BASE_RESISTIVITY = { cu: 0.017241, al: 0.028264 };
@@ -214,7 +214,7 @@ function calibrateAmpacityModel() {
   return { maxError: bestErr, params: getModelParams() };
 }
 
-module.exports = {
+export default {
   sizeToArea,
   dcResistance,
   skinEffect,
@@ -224,5 +224,5 @@ module.exports = {
   ampacity,
   getModelParams,
   setModelParams,
-  calibrateAmpacityModel
+  calibrateAmpacityModel,
 };

@@ -1,6 +1,9 @@
-const assert = require("assert");
-const { ampacity } = require("../ampacity");
-const { computeDuctbankTemperatures, calcFiniteAmpacity } = require("../test");
+import assert from "assert";
+import ampacityLib from "../ampacity.js";
+import testLib from "../test.js";
+
+const { ampacity } = ampacityLib;
+const { computeDuctbankTemperatures, calcFiniteAmpacity } = testLib;
 
 function describe(name, fn) {
   console.log(name);

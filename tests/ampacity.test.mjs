@@ -1,4 +1,6 @@
-const assert = require("assert");
+import assert from "assert";
+import ampacityLib from "../ampacity.js";
+
 const {
   dcResistance,
   conductorThermalResistance,
@@ -7,7 +9,7 @@ const {
   dielectricRise,
   ampacity,
   calibrateAmpacityModel,
-} = require("../ampacity");
+} = ampacityLib;
 
 function describe(name, fn) {
   console.log(name);
