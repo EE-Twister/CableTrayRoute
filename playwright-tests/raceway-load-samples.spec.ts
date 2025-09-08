@@ -19,9 +19,9 @@ test('raceway load samples populates all tables', async ({ page }) => {
   await page.goto(pageUrl('racewayschedule.html'));
   await page.waitForSelector('#raceway-load-samples');
   await page.click('#raceway-load-samples');
-  await page.waitForSelector('#ductbankTable tbody tr.ductbank-row');
-  await page.waitForSelector('#trayTable tbody tr');
-  await page.waitForSelector('#conduitTable tbody tr');
+  await page.waitForSelector('#ductbankTable tbody tr.ductbank-row', { state: 'attached' });
+  await page.waitForSelector('#trayTable tbody tr', { state: 'attached' });
+  await page.waitForSelector('#conduitTable tbody tr', { state: 'attached' });
   const dbCount = await page.locator('#ductbankTable tbody tr.ductbank-row').count();
   const trayCount = await page.locator('#trayTable tbody tr').count();
   const conduitCount = await page.locator('#conduitTable tbody tr').count();
