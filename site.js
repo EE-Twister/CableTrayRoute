@@ -608,7 +608,7 @@ function initHelpModal(btnId='help-btn',modalId='help-modal',closeId){
     modal.setAttribute('role','dialog');
     modal.setAttribute('aria-modal','true');
     modal.setAttribute('aria-hidden','true');
-    const content=modal.querySelector('.modal-content');
+    const content=modal.querySelector('.modal-content') || closeBtn.parentElement || modal;
     const defaults=Array.from(content.children);
     let iframe=null;
 
