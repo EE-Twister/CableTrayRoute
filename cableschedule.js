@@ -1,6 +1,6 @@
 import * as dataStore from './dataStore.mjs';
 import { sizeConductor } from './sizing.js';
-import ampacity from './ampacity.js?v=2';
+import ampacity from './ampacity.mjs?v=2';
 const { sizeToArea } = ampacity;
 
 // Initialize Cable Schedule page logic

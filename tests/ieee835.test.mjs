@@ -1,5 +1,5 @@
 import assert from "assert";
-import ampacityLib from "../ampacity.js";
+import ampacityLib from "../ampacity.mjs";
 import testLib from "../test.js";
 
 const { ampacity } = ampacityLib;
