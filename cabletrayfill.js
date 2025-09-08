@@ -978,19 +978,19 @@ checkPrereqs([{key:'traySchedule',page:'racewayschedule.html',label:'Raceway Sch
 
         // 9) NFPA 70 392.22(A)(2) & (4) warning for Control/Signal‐only
         let csWarning = "";
-        const overallFill = (sumSmallArea / (trayW * trayD)) * 100;
+        const csFill = (sumSmallArea / (trayW * trayD)) * 100;
         if (allCS) {
-          if (trayType === "ladder" && overallFill > 50) {
+          if (trayType === "ladder" && csFill > 50) {
             csWarning = `
               <p class="nfpaWarn">
                 NFPA 70 392.22(A)(2) WARNING:<br>
-                All cables are Control/Signal and Fill % (${overallFill.toFixed(0)} %) exceeds 50 % for Ladder tray.
+                All cables are Control/Signal and Fill % (${csFill.toFixed(0)} %) exceeds 50 % for Ladder tray.
               </p>`;
-          } else if (trayType === "solid" && overallFill > 40) {
+          } else if (trayType === "solid" && csFill > 40) {
             csWarning = `
               <p class="nfpaWarn">
                 NFPA 70 392.22(A)(4) WARNING:<br>
-                All cables are Control/Signal and Fill % (${overallFill.toFixed(0)} %) exceeds 40 % for Solid Bottom tray.
+                All cables are Control/Signal and Fill % (${csFill.toFixed(0)} %) exceeds 40 % for Solid Bottom tray.
               </p>`;
           }
         }

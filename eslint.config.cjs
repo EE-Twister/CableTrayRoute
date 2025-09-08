@@ -1,10 +1,12 @@
 module.exports = [
   {
-    files: ['**/*.js'],
     ignores: ['dist/**', 'node_modules/**'],
+  },
+  {
+    files: ['**/*.{js,mjs}'],
     languageOptions: {
       sourceType: 'module',
-      ecmaVersion: 2021,
+      ecmaVersion: 2022,
     },
     rules: {},
   },
