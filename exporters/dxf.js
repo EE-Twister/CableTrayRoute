@@ -1,4 +1,4 @@
-import { Drawing } from 'dxf-writer';
+import { Drawing } from './simpleDxf.js';
 
 function buildDXF(components = []) {
   const d = new Drawing();
