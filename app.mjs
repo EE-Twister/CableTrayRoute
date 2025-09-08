@@ -285,38 +285,24 @@ document.addEventListener('DOMContentLoaded', async () => {
     setupErrorHandling();
 
     const parseFile=(file,cb)=>{
+        const isExcel=file.name.toLowerCase().endsWith('.xlsx')||file.name.toLowerCase().endsWith('.xls');
+        if(isExcel&&!globalThis.XLSX){
+            showToast('Failed to load XLSX parser','error');
+            return;
+        }
+        if(!isExcel&&!globalThis.Papa){
+            showToast('Failed to load CSV parser','error');
+            return;
+        }
         const reader=new FileReader();
-        reader.onload=async e=>{
+        reader.onload=e=>{
             try{
                 let rows=[];
-                const isExcel=file.name.toLowerCase().endsWith('.xlsx')||file.name.toLowerCase().endsWith('.xls');
                 if(isExcel){
-                    if(!globalThis.XLSX){
-                        try{
-                            await import('./node_modules/xlsx/dist/xlsx.full.min.js');
-                        }catch(err){
-                            console.error('Failed to load XLSX library',err);
-                        }
-                        if(!globalThis.XLSX){
-                            showToast('Failed to load XLSX parser','error');
-                            return;
-                        }
-                    }
                     const wb=XLSX.read(e.target.result,{type:'binary'});
                     const ws=wb.Sheets[wb.SheetNames[0]];
                     rows=XLSX.utils.sheet_to_json(ws,{defval:''});
                 }else{
-                    if(!globalThis.Papa){
-                        try{
-                            await import('./node_modules/papaparse/papaparse.min.js');
-                        }catch(err){
-                            console.error('Failed to load PapaParse library',err);
-                        }
-                        if(!globalThis.Papa){
-                            showToast('Failed to load CSV parser','error');
-                            return;
-                        }
-                    }
                     rows=Papa.parse(e.target.result,{header:true,skipEmptyLines:true}).data;
                 }
                 rows=rows.map(r=>{const o={};Object.keys(r).forEach(k=>{o[k.trim().toLowerCase()]=r[k];});return o;});
@@ -326,7 +312,7 @@ document.addEventListener('DOMContentLoaded', async () => {
                 showToast('Failed to parse file','error');
             }
         };
-        if(file.name.toLowerCase().endsWith('.xlsx')||file.name.toLowerCase().endsWith('.xls')) reader.readAsBinaryString(file); else reader.readAsText(file);
+        if(isExcel) reader.readAsBinaryString(file); else reader.readAsText(file);
     };
 
     const validateHeaders=(data,required)=>{
