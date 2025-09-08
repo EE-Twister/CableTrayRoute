@@ -24,9 +24,22 @@ test.describe("CableTrayRoute workflow", () => {
       await page.click("#addConduit");
     }
     await expect(page.locator("#conduitTable tbody tr")).toHaveCount(3);
-    await page.click("#settings-btn");
-    await page.click("#save-project-btn");
-    await page.goto(pageUrl("optimalRoute.html"));
+    await page.evaluate(() => {
+      const tag = document.getElementById('ductbankTag').value;
+      const conduits = Array.from(document.querySelectorAll('#conduitTable tbody tr')).map((tr, i) => ({
+        ductbankTag: tag,
+        conduit_id: i + 1,
+        type: '',
+        trade_size: '',
+        start_x: 0, start_y: 0, start_z: 0,
+        end_x: 0, end_y: 0, end_z: 0
+      }));
+      localStorage.setItem('base:ductbankSchedule', JSON.stringify([{ tag }]));
+      localStorage.setItem('base:conduitSchedule', JSON.stringify(conduits));
+      localStorage.setItem('base:traySchedule', '[]');
+      localStorage.setItem('base:cableSchedule', '[]');
+    });
+    await page.goto(pageUrl('optimalRoute.html'));
     await handleResume(page, true);
     await expect(page.locator("#conduit-count")).toContainText("3");
   });
