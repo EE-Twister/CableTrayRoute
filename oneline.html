@@ -84,28 +84,38 @@
           </div>
         </div>
         <div class="toolbar">
-          <button id="connect-btn" class="icon-button" title="Connect" aria-label="Connect"><img src="icons/toolbar/connect.svg" alt=""></button>
-          <button id="dimension-btn" class="icon-button" title="Dimension" aria-label="Dimension"><img src="icons/toolbar/dimension.svg" alt=""></button>
-          <button id="undo-btn" class="icon-button" title="Undo" aria-label="Undo"><img src="icons/toolbar/undo.svg" alt=""></button>
-          <button id="redo-btn" class="icon-button" title="Redo" aria-label="Redo"><img src="icons/toolbar/redo.svg" alt=""></button>
-          <button id="align-left-btn" class="icon-button" title="Align Left" aria-label="Align Left"><img src="icons/toolbar/align-left.svg" alt=""></button>
-          <button id="align-right-btn" class="icon-button" title="Align Right" aria-label="Align Right"><img src="icons/toolbar/align-right.svg" alt=""></button>
-          <button id="align-top-btn" class="icon-button" title="Align Top" aria-label="Align Top"><img src="icons/toolbar/align-top.svg" alt=""></button>
-          <button id="align-bottom-btn" class="icon-button" title="Align Bottom" aria-label="Align Bottom"><img src="icons/toolbar/align-bottom.svg" alt=""></button>
-          <button id="distribute-h-btn" class="icon-button" title="Distribute Horizontal" aria-label="Distribute Horizontal"><img src="icons/toolbar/distribute-h.svg" alt=""></button>
-          <button id="distribute-v-btn" class="icon-button" title="Distribute Vertical" aria-label="Distribute Vertical"><img src="icons/toolbar/distribute-v.svg" alt=""></button>
-          <div class="export-group">
-            <button id="export-btn" class="icon-button" title="Export" aria-label="Export" aria-haspopup="true" aria-expanded="false"><img src="icons/toolbar/export.svg" alt=""></button>
-            <ul id="export-menu" class="export-menu" role="menu">
-              <li data-format="pdf" role="menuitem">Export PDF</li>
-              <li data-format="dxf" role="menuitem">Export DXF</li>
-              <li data-format="dwg" role="menuitem">Export DWG</li>
-            </ul>
+          <div class="toolbar-group" aria-label="Edit">
+            <span class="toolbar-group-label">Edit</span>
+            <button id="connect-btn" class="icon-button" title="Connect" aria-label="Connect"><img src="icons/toolbar/connect.svg" alt=""></button>
+            <button id="dimension-btn" class="icon-button" title="Dimension" aria-label="Dimension"><img src="icons/toolbar/dimension.svg" alt=""></button>
+            <button id="undo-btn" class="icon-button" title="Undo" aria-label="Undo"><img src="icons/toolbar/undo.svg" alt=""></button>
+            <button id="redo-btn" class="icon-button" title="Redo" aria-label="Redo"><img src="icons/toolbar/redo.svg" alt=""></button>
           </div>
-          <input type="file" id="import-input" accept=".json" class="hidden-input">
-          <button id="import-btn" class="icon-button" title="Import" aria-label="Import"><img src="icons/toolbar/import.svg" alt=""></button>
-          <button id="validate-btn" class="icon-button" title="Validate" aria-label="Validate"><img src="icons/toolbar/validate.svg" alt=""></button>
-          <div class="grid-controls toolbar-group">
+          <div class="toolbar-group" aria-label="Align">
+            <span class="toolbar-group-label">Align</span>
+            <button id="align-left-btn" class="icon-button" title="Align Left" aria-label="Align Left"><img src="icons/toolbar/align-left.svg" alt=""></button>
+            <button id="align-right-btn" class="icon-button" title="Align Right" aria-label="Align Right"><img src="icons/toolbar/align-right.svg" alt=""></button>
+            <button id="align-top-btn" class="icon-button" title="Align Top" aria-label="Align Top"><img src="icons/toolbar/align-top.svg" alt=""></button>
+            <button id="align-bottom-btn" class="icon-button" title="Align Bottom" aria-label="Align Bottom"><img src="icons/toolbar/align-bottom.svg" alt=""></button>
+            <button id="distribute-h-btn" class="icon-button" title="Distribute Horizontal" aria-label="Distribute Horizontal"><img src="icons/toolbar/distribute-h.svg" alt=""></button>
+            <button id="distribute-v-btn" class="icon-button" title="Distribute Vertical" aria-label="Distribute Vertical"><img src="icons/toolbar/distribute-v.svg" alt=""></button>
+          </div>
+          <div class="toolbar-group" aria-label="Files">
+            <span class="toolbar-group-label">Files</span>
+            <div class="export-group">
+              <button id="export-btn" class="icon-button" title="Export" aria-label="Export" aria-haspopup="true" aria-expanded="false"><img src="icons/toolbar/export.svg" alt=""></button>
+              <ul id="export-menu" class="export-menu" role="menu">
+                <li data-format="pdf" role="menuitem">Export PDF</li>
+                <li data-format="dxf" role="menuitem">Export DXF</li>
+                <li data-format="dwg" role="menuitem">Export DWG</li>
+              </ul>
+            </div>
+            <input type="file" id="import-input" accept=".json" class="hidden-input">
+            <button id="import-btn" class="icon-button" title="Import" aria-label="Import"><img src="icons/toolbar/import.svg" alt=""></button>
+            <button id="validate-btn" class="icon-button" title="Validate" aria-label="Validate"><img src="icons/toolbar/validate.svg" alt=""></button>
+          </div>
+          <div class="grid-controls toolbar-group" aria-label="Grid">
+            <span class="toolbar-group-label">Grid</span>
             <label class="icon-button" title="Toggle Grid" aria-label="Toggle Grid">
               <input type="checkbox" id="grid-toggle" class="hidden-input" checked>
               <img src="icons/toolbar/grid.svg" alt="">
@@ -115,7 +125,8 @@
               <input type="number" id="grid-size" value="20" min="1">
             </label>
           </div>
-          <div class="toolbar-group toolbar-group-right">
+          <div class="toolbar-group toolbar-group-right" aria-label="Scale">
+            <span class="toolbar-group-label">Scale</span>
             <label class="scale-label">1 px = <input type="number" id="scale-value" value="1" step="0.01" min="0" placeholder="Scale"> <input type="text" id="scale-unit" value="in" size="3" aria-label="Scale unit"></label>
             <label class="slack-label">Slack % <input type="number" id="slack-pct" value="0" step="0.1" min="0" placeholder="Slack %"></label>
           </div>

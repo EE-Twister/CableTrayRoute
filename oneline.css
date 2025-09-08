@@ -231,6 +231,16 @@
   gap: var(--ol-spacing);
 }
 
+.toolbar-group + .toolbar-group {
+  border-left: 1px solid var(--ol-border-color);
+  padding-left: var(--ol-spacing);
+}
+
+.toolbar-group-label {
+  font-weight: 600;
+  margin-right: var(--ol-spacing);
+}
+
 .toolbar-group-right {
   margin-left: auto;
   display: flex;
