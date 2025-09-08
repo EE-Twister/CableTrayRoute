@@ -240,6 +240,10 @@ function ensurePanelFields(panel) {
     description: '',
     ref: '',
     voltage: '',
+    manufacturer: '',
+    model: '',
+    phases: '',
+    notes: '',
     mainRating: '',
     circuitCount: 42,
     ...panel

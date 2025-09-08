@@ -3006,6 +3006,7 @@ function syncSchedules(notify = true) {
       id: c.ref || c.id,
       ref: c.id,
       description: c.label,
+      voltage: c.voltage ?? '',
       manufacturer: c.manufacturer ?? '',
       model: c.model ?? '',
       voltage_class: c.voltage_class ?? '',
@@ -3014,7 +3015,6 @@ function syncSchedules(notify = true) {
       phases: connPhases,
       conductors: connConductors,
       notes: c.notes ?? '',
-      voltage: c.voltage ?? '',
       rating: c.rating ?? '',
       impedance_r: c.impedance?.r ?? '',
       impedance_x: c.impedance?.x ?? '',
@@ -3033,7 +3033,7 @@ function syncSchedules(notify = true) {
       z: c.z ?? ''
     };
     (propSchemas[c.subtype] || []).forEach(f => {
-      fields[f.name] = c[f.name] ?? fields[f.name] ?? '';
+      fields[f.name] = c[f.name] ?? f.default ?? fields[f.name] ?? '';
     });
     return fields;
   };

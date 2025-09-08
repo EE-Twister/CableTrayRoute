@@ -143,29 +143,14 @@ if (typeof window !== 'undefined') {
       const n = Number(num);
       return Number.isFinite(n) && n !== 0 ? n.toFixed(2) : '';
     }
-  function gatherRow(tr) {
-    return {
-      id: tr.dataset.id || tr.querySelector('input[name="tag"]').value.trim(),
-      ref: tr.dataset.ref || '',
-      source: tr.querySelector('input[name="source"]').value.trim(),
-      tag: tr.querySelector('input[name="tag"]').value.trim(),
-      description: tr.querySelector('input[name="description"]').value.trim(),
-      manufacturer: tr.querySelector('input[name="manufacturer"]').value.trim(),
-      model: tr.querySelector('input[name="model"]').value.trim(),
-      quantity: tr.querySelector('input[name="quantity"]').value.trim(),
-      voltage: tr.querySelector('input[name="voltage"]').value.trim(),
-      loadType: tr.querySelector('input[name="loadType"]').value.trim(),
-      duty: tr.querySelector('select[name="duty"]').value.trim(),
-      kw: tr.querySelector('input[name="kw"]').value.trim(),
-      powerFactor: tr.querySelector('input[name="powerFactor"]').value.trim(),
-      loadFactor: tr.querySelector('input[name="loadFactor"]').value.trim(),
-      efficiency: tr.querySelector('input[name="efficiency"]').value.trim(),
-      demandFactor: tr.querySelector('input[name="demandFactor"]').value.trim(),
-      phases: tr.querySelector('input[name="phases"]').value.trim(),
-      circuit: tr.querySelector('input[name="circuit"]').value.trim(),
-      notes: tr.querySelector('textarea[name="notes"]').value.trim()
-    };
-  }
+    function gatherRow(tr) {
+      const load = { ref: tr.dataset.ref || '' };
+      tr.querySelectorAll('input[name],select[name],textarea[name]').forEach(el => {
+        load[el.name] = el.value.trim();
+      });
+      load.id = tr.dataset.id || load.tag || '';
+      return load;
+    }
 
   function saveRow(tr) {
     const idx = Number(tr.dataset.index);

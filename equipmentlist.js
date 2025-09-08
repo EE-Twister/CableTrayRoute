@@ -10,20 +10,30 @@ if (typeof window !== 'undefined') {
     initCompactMode();
     initNavToggle();
 
-    const columns = [
-      { key: 'id', label: 'ID', type: 'text' },
-      { key: 'description', label: 'Description', type: 'text' },
-      { key: 'voltage', label: 'Voltage (V)', type: 'text' },
-      { key: 'category', label: 'Category', type: 'text' },
-      { key: 'subCategory', label: 'Sub-Category', type: 'text' },
-      { key: 'manufacturer', label: 'Manufacturer', type: 'text', className: 'manufacturer-input', filter: 'dropdown' },
-      { key: 'model', label: 'Model', type: 'text', className: 'model-input' },
-      { key: 'phases', label: 'Phases', type: 'text' },
-      { key: 'notes', label: 'Notes', type: 'text' },
-      { key: 'x', label: 'X', type: 'number', step: 'any', maxlength: 15, validate: 'numeric' },
-      { key: 'y', label: 'Y', type: 'number', step: 'any', maxlength: 15, validate: 'numeric' },
-      { key: 'z', label: 'Z', type: 'number', step: 'any', maxlength: 15, validate: 'numeric' }
-    ];
+      const columns = [
+        { key: 'id', label: 'ID', type: 'text' },
+        { key: 'description', label: 'Description', type: 'text' },
+        { key: 'voltage', label: 'Voltage (V)', type: 'text' },
+        { key: 'category', label: 'Category', type: 'text' },
+        { key: 'subCategory', label: 'Sub-Category', type: 'text' },
+        { key: 'manufacturer', label: 'Manufacturer', type: 'text', className: 'manufacturer-input', filter: 'dropdown' },
+        { key: 'model', label: 'Model', type: 'text', className: 'model-input' },
+        { key: 'phases', label: 'Phases', type: 'text' },
+        { key: 'notes', label: 'Notes', type: 'text' },
+        { key: 'x', label: 'X', type: 'number', step: 'any', maxlength: 15, validate: 'numeric' },
+        { key: 'y', label: 'Y', type: 'number', step: 'any', maxlength: 15, validate: 'numeric' },
+        { key: 'z', label: 'Z', type: 'number', step: 'any', maxlength: 15, validate: 'numeric' }
+      ];
+
+      const existing = new Set(columns.map(c => c.key));
+      dataStore.getEquipment().forEach(eq => {
+        Object.keys(eq).forEach(k => {
+          if (!existing.has(k)) {
+            existing.add(k);
+            columns.push({ key: k, label: k.charAt(0).toUpperCase() + k.slice(1), type: 'text' });
+          }
+        });
+      });
 
     let table;
     table = TableUtils.createTable({

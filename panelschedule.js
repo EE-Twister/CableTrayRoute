@@ -144,54 +144,76 @@ window.addEventListener('DOMContentLoaded', () => {
   const panelId = 'P1';
   const { panel, panels } = getOrCreatePanel(panelId);
 
-  const voltageInput = document.getElementById('panel-voltage');
-  const mainInput = document.getElementById('panel-main-rating');
-  const circuitInput = document.getElementById('panel-circuit-count');
+    const voltageInput = document.getElementById('panel-voltage');
+    const manufacturerInput = document.getElementById('panel-manufacturer');
+    const modelInput = document.getElementById('panel-model');
+    const phasesInput = document.getElementById('panel-phases');
+    const mainInput = document.getElementById('panel-main-rating');
+    const circuitInput = document.getElementById('panel-circuit-count');
 
-  voltageInput.value = panel.voltage || '';
-  mainInput.value = panel.mainRating || '';
-  circuitInput.value = panel.circuitCount || panel.breakers.length || 42;
+    voltageInput.value = panel.voltage || '';
+    manufacturerInput.value = panel.manufacturer || '';
+    modelInput.value = panel.model || '';
+    phasesInput.value = panel.phases || '';
+    mainInput.value = panel.mainRating || '';
+    circuitInput.value = panel.circuitCount || panel.breakers.length || 42;
 
-  const savePanels = () => {
-    dataStore.setPanels(panels);
-    dataStore.saveProject(projectId);
-  };
+    const savePanels = () => {
+      dataStore.setPanels(panels);
+      dataStore.saveProject(projectId);
+    };
 
-  voltageInput.addEventListener('input', () => {
-    panel.voltage = voltageInput.value;
-    savePanels();
-  });
+    const updateOneline = () => {
+      const fn = window.opener?.updateComponent || window.updateComponent;
+      if (fn) {
+        const id = panel.ref || panel.id;
+        if (id) fn(id, panel);
+      }
+    };
 
-  mainInput.addEventListener('input', () => {
-    panel.mainRating = mainInput.value;
-    savePanels();
-  });
+    const handleChange = (prop, input) => {
+      panel[prop] = input.value;
+      savePanels();
+      updateOneline();
+    };
 
-  circuitInput.addEventListener('input', () => {
-    const count = parseInt(circuitInput.value, 10) || 0;
-    panel.circuitCount = count;
-    if (!Array.isArray(panel.breakers)) panel.breakers = [];
-    const loads = dataStore.getLoads();
-    if (panel.breakers.length < count) {
-      for (let i = panel.breakers.length; i < count; i++) panel.breakers[i] = null;
-    }
-    if (panel.breakers.length > count) {
-      for (let i = count; i < panel.breakers.length; i++) {
-        const tag = panel.breakers[i];
-        if (tag) {
-          const load = loads.find(l => (l.ref || l.id || l.tag) === tag);
-          if (load) {
-            delete load.panelId;
-            delete load.breaker;
+    voltageInput.addEventListener('input', () => handleChange('voltage', voltageInput));
+    manufacturerInput.addEventListener('input', () => handleChange('manufacturer', manufacturerInput));
+    modelInput.addEventListener('input', () => handleChange('model', modelInput));
+    phasesInput.addEventListener('input', () => handleChange('phases', phasesInput));
+
+    mainInput.addEventListener('input', () => {
+      panel.mainRating = mainInput.value;
+      savePanels();
+      updateOneline();
+    });
+
+    circuitInput.addEventListener('input', () => {
+      const count = parseInt(circuitInput.value, 10) || 0;
+      panel.circuitCount = count;
+      if (!Array.isArray(panel.breakers)) panel.breakers = [];
+      const loads = dataStore.getLoads();
+      if (panel.breakers.length < count) {
+        for (let i = panel.breakers.length; i < count; i++) panel.breakers[i] = null;
+      }
+      if (panel.breakers.length > count) {
+        for (let i = count; i < panel.breakers.length; i++) {
+          const tag = panel.breakers[i];
+          if (tag) {
+            const load = loads.find(l => (l.ref || l.id || l.tag) === tag);
+            if (load) {
+              delete load.panelId;
+              delete load.breaker;
+            }
           }
         }
+        panel.breakers = panel.breakers.slice(0, count);
+        dataStore.setLoads(loads);
       }
-      panel.breakers = panel.breakers.slice(0, count);
-      dataStore.setLoads(loads);
-    }
-    savePanels();
-    render(panelId);
-  });
+      savePanels();
+      updateOneline();
+      render(panelId);
+    });
 
   render(panelId);
   document.getElementById('export-panel-btn').addEventListener('click', () => exportPanelSchedule(panelId));
