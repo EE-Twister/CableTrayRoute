@@ -209,11 +209,14 @@ async function loadComponentLibrary() {
     else banner.classList.add('hidden');
   }
   document.querySelectorAll('#reload-library-btn, #library-reload-btn').forEach(btn => {
-    btn.onclick = async () => {
-      await loadComponentLibrary();
-      buildPalette();
+    btn.onclick = () => {
+      // allow reloading the library and rebuilding the palette
+      loadComponentLibrary();
     };
   });
+
+  // build the palette with the newly loaded library
+  buildPalette();
 
   if (skipped.length) {
     showToast(`Skipped components: ${skipped.join(', ')}`);
@@ -336,20 +339,22 @@ function buildPalette() {
     });
   });
   const paletteSearch = document.getElementById('palette-search');
-  paletteSearch.addEventListener('input', () => {
-    const term = paletteSearch.value.trim().toLowerCase();
-    palette.querySelectorAll('button').forEach(btn => {
-      const sub = (btn.dataset.subtype || '').toLowerCase();
-      const label = (btn.dataset.label || componentMeta[btn.dataset.subtype]?.label || '').toLowerCase();
-      btn.style.display = !term || sub.includes(term) || label.includes(term) ? '' : 'none';
+  if (paletteSearch) {
+    paletteSearch.addEventListener('input', () => {
+      const term = paletteSearch.value.trim().toLowerCase();
+      palette.querySelectorAll('button').forEach(btn => {
+        const sub = (btn.dataset.subtype || '').toLowerCase();
+        const label = (btn.dataset.label || componentMeta[btn.dataset.subtype]?.label || '').toLowerCase();
+        btn.style.display = !term || sub.includes(term) || label.includes(term) ? '' : 'none';
+      });
     });
-  });
-  paletteSearch.addEventListener('keydown', e => {
-    if (e.key === 'Escape') {
-      paletteSearch.value = '';
-      paletteSearch.dispatchEvent(new Event('input'));
-    }
-  });
+    paletteSearch.addEventListener('keydown', e => {
+      if (e.key === 'Escape') {
+        paletteSearch.value = '';
+        paletteSearch.dispatchEvent(new Event('input'));
+      }
+    });
+  }
 }
 
 const svgNS = 'http://www.w3.org/2000/svg';
@@ -2308,23 +2313,33 @@ async function init() {
   const exportReportsBtn = document.getElementById('export-reports-btn');
   if (exportReportsBtn) exportReportsBtn.addEventListener('click', () => exportAllReports());
 
-    buildPalette();
-    loadTemplates();
+  buildPalette();
+  loadTemplates();
   renderTemplates();
-  document.getElementById('template-export-btn').addEventListener('click', exportTemplates);
-  document.getElementById('template-import-btn').addEventListener('click', () => document.getElementById('template-import-input').click());
-  document.getElementById('template-import-input').addEventListener('change', importTemplates);
-  document.getElementById('connect-btn').addEventListener('click', () => {
-    connectMode = true;
-    connectSource = null;
-  });
+  const templateExportBtn = document.getElementById('template-export-btn');
+  if (templateExportBtn) templateExportBtn.addEventListener('click', exportTemplates);
+  const templateImportBtn = document.getElementById('template-import-btn');
+  const templateImportInput = document.getElementById('template-import-input');
+  if (templateImportBtn && templateImportInput) {
+    templateImportBtn.addEventListener('click', () => templateImportInput.click());
+    templateImportInput.addEventListener('change', importTemplates);
+  }
+  const connectBtn = document.getElementById('connect-btn');
+  if (connectBtn) {
+    connectBtn.addEventListener('click', () => {
+      connectMode = true;
+      connectSource = null;
+    });
+  }
   const dimensionBtn = document.getElementById('dimension-btn');
-  dimensionBtn.addEventListener('click', () => {
-    dimensionMode = !dimensionMode;
-    dimensionStart = null;
-    connectMode = false;
-    dimensionBtn.classList.toggle('active', dimensionMode);
-  });
+  if (dimensionBtn) {
+    dimensionBtn.addEventListener('click', () => {
+      dimensionMode = !dimensionMode;
+      dimensionStart = null;
+      connectMode = false;
+      dimensionBtn.classList.toggle('active', dimensionMode);
+    });
+  }
   document.getElementById('undo-btn').addEventListener('click', undo);
   document.getElementById('redo-btn').addEventListener('click', redo);
   document.getElementById('align-left-btn').addEventListener('click', () => alignSelection('left'));
