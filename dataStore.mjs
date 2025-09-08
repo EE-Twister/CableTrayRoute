@@ -14,7 +14,13 @@
  * @typedef {GenericRecord} Conduit
  */
 
-import { parseRevit } from './src/importers/revit.js';
+// Revit parser is authored as a CommonJS module. When importing from an ES module
+// environment we need to access the default export to retrieve the named
+// function. Using a default import keeps compatibility with both CJS and ESM
+// implementations so tests running under Node (which treats `.js` files as
+// CommonJS by default) can still access `parseRevit`.
+import revitModule from './src/importers/revit.js';
+const { parseRevit } = revitModule;
 
 // scenario management keys
 const SCENARIOS_KEY = 'ctr_scenarios_v1';
