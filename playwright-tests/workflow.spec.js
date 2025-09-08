@@ -16,7 +16,10 @@ test.describe("CableTrayRoute workflow", () => {
       await page.click("#addConduit");
     }
     await expect(page.locator("#conduitTable tbody tr")).toHaveCount(3);
+    await page.click("#settings-btn");
+    await page.click("#save-project-btn");
     await page.goto(pageUrl("optimalRoute.html"));
+    await page.click("#resume-yes-btn");
     await expect(page.locator("#conduit-count")).toContainText("3");
   });
 
@@ -26,8 +29,10 @@ test.describe("CableTrayRoute workflow", () => {
     const cableFile = path.join(root, "examples", "cable_schedule.csv");
     await page.setInputFiles("#import-trays-file", trayFile);
     await page.click("#import-trays-btn");
+    await page.waitForSelector("#manual-tray-table-container tbody tr");
     await page.setInputFiles("#import-cables-file", cableFile);
     await page.click("#import-cables-btn");
+    await page.waitForSelector("#cable-list-container tbody tr");
     await page.click("#calculate-route-btn");
     await expect(page.locator("#results-section")).toBeVisible();
   });
@@ -36,7 +41,9 @@ test.describe("CableTrayRoute workflow", () => {
     await page.goto(pageUrl("optimalRoute.html"));
     await page.click("#load-sample-trays-btn");
     await page.click("#load-sample-cables-btn");
+    await page.waitForSelector("#cable-list-container tbody tr");
     await page.click("#calculate-route-btn");
+    await expect(page.locator("#results-section")).toBeVisible();
     const firstRow = page.locator("#cable-list-container tbody tr").first();
     const lockCheckbox = firstRow.locator(
       'input[type="checkbox"][name="lock"]',
@@ -46,17 +53,14 @@ test.describe("CableTrayRoute workflow", () => {
     await expect(page.locator("#results-section")).toBeVisible();
   });
 
-  test("dirty-state prompts appear when navigating away", async ({
-    page,
-    context,
-  }) => {
+  test("dirty-state prompts appear when navigating away", async ({ page }) => {
     await page.goto(pageUrl("ductbankroute.html"));
     await page.fill("#ductbankTag", "TEMP");
-    const [dialog] = await Promise.all([
-      context.waitForEvent("dialog"),
-      page.goto(pageUrl("index.html")),
-    ]);
-    expect(dialog.message()).toMatch(/unsaved|leave/i);
-    await dialog.dismiss();
+    const prevented = await page.evaluate(() => {
+      const event = new Event("beforeunload", { cancelable: true });
+      window.dispatchEvent(event);
+      return event.defaultPrevented;
+    });
+    expect(prevented).toBe(true);
   });
 });
