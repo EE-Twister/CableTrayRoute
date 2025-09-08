@@ -1,4 +1,4 @@
-import { loadConductorProperties } from './conductorProperties.js';
+import { loadConductorProperties } from './conductorProperties.mjs';
 
 const conductorProps = await loadConductorProperties();
 

@@ -1,15 +1,26 @@
-let data;
-
-if (typeof process !== 'undefined' && process.versions?.node) {
-  const { readFileSync } = await import('fs');
-  const { fileURLToPath } = await import('url');
-  const { dirname, join } = await import('path');
-
-  const __dirname = dirname(fileURLToPath(import.meta.url));
-  const dataPath = join(__dirname, 'data', 'conductor_properties.json');
-  data = JSON.parse(readFileSync(dataPath, 'utf8'));
-} else {
-  data = (await import('./data/conductor_properties.js')).default;
+export async function loadConductorProperties() {
+  try {
+    const url = new URL('./data/conductor_properties.json', import.meta.url);
+    const res = await fetch(url);
+    const data = await res.json();
+    if (typeof window !== 'undefined') {
+      window.CONDUCTOR_PROPS = data;
+    }
+    return data;
+  } catch (err) {
+    console.warn('Failed to load conductor properties', err);
+    if (typeof window !== 'undefined') {
+      window.CONDUCTOR_PROPS = {};
+    }
+    try {
+      return (await import('./conductorPropertiesData.mjs')).default;
+    } catch {
+      return {};
+    }
+  }
 }
 
-export default data;
+// Ensure the loader is available globally when modules are bundled.
+if (typeof window !== 'undefined') {
+  window.loadConductorProperties = loadConductorProperties;
+}
