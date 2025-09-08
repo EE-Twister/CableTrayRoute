@@ -10,7 +10,7 @@ global.localStorage = {
 (async () => {
   global.window = {};
   const dataStore = await import('../dataStore.mjs');
-  await import('../tableUtils.js');
+  await import('../tableUtils.mjs');
   const TableUtils = global.window.TableUtils;
   const { STORAGE_KEYS } = TableUtils;
 

@@ -1,5 +1,5 @@
 import * as dataStore from './dataStore.mjs';
-import './tableUtils.js';
+import './tableUtils.mjs';
 
 if (typeof window !== 'undefined') {
   window.addEventListener('DOMContentLoaded', () => {

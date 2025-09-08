@@ -1,6 +1,6 @@
 import "../workflowStatus.js";
 import "../site.js";
-import "../tableUtils.js";
+import "../tableUtils.mjs";
 import * as dataStore from "../dataStore.mjs";
 
 // Panel Schedule page logic

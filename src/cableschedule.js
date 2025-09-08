@@ -1,4 +1,4 @@
 import "../workflowStatus.js";
 import "../site.js";
-import "../tableUtils.js";
+import "../tableUtils.mjs";
 import "../cableschedule.js";
