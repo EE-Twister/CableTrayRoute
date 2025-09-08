@@ -3937,6 +3937,8 @@ Plotly.newPlot(document.getElementById('plot'), data, layout, {responsive: true}
             yesBtn.addEventListener('click', async () => {
                 close();
                 await loadSchedulesIntoSession();
+                rebuildTrayData();
+                displayConduitCount(state.trayData.filter(t => t.raceway_type === 'conduit').length, true);
                 await finalizeLoad();
             }, { once: true });
             noBtn.addEventListener('click', async () => {
@@ -3950,6 +3952,8 @@ Plotly.newPlot(document.getElementById('plot'), data, layout, {responsive: true}
             }, { once: true });
         } else {
             await loadSchedulesIntoSession();
+            rebuildTrayData();
+            displayConduitCount(state.trayData.filter(t => t.raceway_type === 'conduit').length, true);
             await finalizeLoad();
         }
     } else {
