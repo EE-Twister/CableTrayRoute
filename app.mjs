@@ -205,8 +205,20 @@ document.addEventListener('DOMContentLoaded', async () => {
     if(elements.exportCablesBtn) elements.exportCablesBtn.addEventListener('click',markSaved);
     ['export-csv-btn','export-routes-btn','download-bom-btn','export-tray-fills-btn'].forEach(id=>{const b=document.getElementById(id);if(b)b.addEventListener('click',markSaved);});
 
-    const trayTemplateHeaders=['tray_id','start_x','start_y','start_z','end_x','end_y','end_z','width','height','current_fill','allowed_cable_group','shape'];
-    const cableTemplateHeaders=['tag','start_tag','end_tag','cable_type','conductors','conductor_size','diameter','weight','allowed_cable_group','start_x','start_y','start_z','end_x','end_y','end_z'];
+    const trayTemplateHeaders=[
+        'tray_id','start_x','start_y','start_z','end_x','end_y','end_z',
+        ['inside_width','width'],
+        ['tray_depth','height'],
+        'tray_type','current_fill','allowed_cable_group','shape'
+    ];
+    const cableTemplateHeaders=[
+        'tag',
+        ['from_tag','start_tag'],
+        ['to_tag','end_tag'],
+        'cable_type','conductors','conductor_size',
+        ['cable_od','diameter'],
+        'allowed_cable_group','start_x','start_y','start_z','end_x','end_y','end_z'
+    ];
 
     const debug = {
         enabled: false,
@@ -295,9 +307,11 @@ document.addEventListener('DOMContentLoaded', async () => {
     };
 
     const validateHeaders=(data,required)=>{
-        if(!data.length)return required.slice();
+        if(!data.length) return required.map(r=>Array.isArray(r)?r[0]:r);
         const headers=Object.keys(data[0]);
-        return required.filter(r=>!headers.includes(r));
+        return required
+            .filter(r=>Array.isArray(r)?!r.some(h=>headers.includes(h)):!headers.includes(r))
+            .map(r=>Array.isArray(r)?r[0]:r);
     };
 
     const handleImport=(file,required,onValid)=>{
@@ -313,8 +327,9 @@ document.addEventListener('DOMContentLoaded', async () => {
     };
 
     const downloadSampleTemplate=(headers,filename)=>{
+        const headerRow=headers.map(h=>Array.isArray(h)?h[0]:h);
         const wb=XLSX.utils.book_new();
-        const ws=XLSX.utils.aoa_to_sheet([headers]);
+        const ws=XLSX.utils.aoa_to_sheet([headerRow]);
         XLSX.utils.book_append_sheet(wb,ws,'Template');
         XLSX.writeFile(wb,filename);
     };
@@ -2097,12 +2112,16 @@ const openDuctbankRoute = (dbId, conduitId) => {
     };
 
     const exportManualTraysCSV = () => {
-        const headers = ['tray_id','start_x','start_y','start_z','end_x','end_y','end_z','width','height','current_fill','allowed_cable_group','shape'];
+        const headers = trayTemplateHeaders.map(h=>Array.isArray(h)?h[0]:h);
         const rows = state.manualTrays;
         let csv = headers.join(',') + '\n';
         if (rows.length > 0) {
             rows.forEach(r => {
-                csv += headers.map(h => r[h] !== undefined ? r[h] : '').join(',') + '\n';
+                const row = [
+                    r.tray_id,r.start_x,r.start_y,r.start_z,r.end_x,r.end_y,r.end_z,
+                    r.width,r.height,r.tray_type||'',r.current_fill,r.allowed_cable_group,r.shape
+                ];
+                csv += row.join(',') + '\n';
             });
         }
         const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
@@ -2128,8 +2147,9 @@ const openDuctbankRoute = (dbId, conduitId) => {
                 end_x:parseFloat(t.end_x)||0,
                 end_y:parseFloat(t.end_y)||0,
                 end_z:parseFloat(t.end_z)||0,
-                width:parseFloat(t.width)||0,
-                height:parseFloat(t.height)||0,
+                width:parseFloat((t.inside_width??t.width))||0,
+                height:parseFloat((t.tray_depth??t.height))||0,
+                tray_type:t.tray_type||'',
                 current_fill:parseFloat(t.current_fill)||0,
                 allowed_cable_group:t.allowed_cable_group||'',
                 shape:t.shape||'STR',
@@ -2146,7 +2166,7 @@ const openDuctbankRoute = (dbId, conduitId) => {
     };
 
     const exportCableOptionsCSV = () => {
-        const headers = ['tag','start_tag','end_tag','cable_type','conductors','conductor_size','diameter','weight','allowed_cable_group','start_x','start_y','start_z','end_x','end_y','end_z'];
+        const headers = cableTemplateHeaders.map(h=>Array.isArray(h)?h[0]:h);
         const rows = state.cableList;
         let csv = headers.join(',') + '\n';
         if (rows.length > 0) {
@@ -2159,7 +2179,6 @@ const openDuctbankRoute = (dbId, conduitId) => {
                     c.conductors !== undefined ? c.conductors : '',
                     c.conductor_size || '',
                     c.diameter !== undefined ? c.diameter : '',
-                    c.weight !== undefined ? c.weight : '',
                     c.allowed_cable_group || '',
                     c.start[0], c.start[1], c.start[2],
                     c.end[0], c.end[1], c.end[2]
@@ -2182,12 +2201,12 @@ const openDuctbankRoute = (dbId, conduitId) => {
         handleImport(file,cableTemplateHeaders,rows=>{
             const newCables=rows.map(t=>({
                 name:t.tag||'',
-                start_tag:t.start_tag||'',
-                end_tag:t.end_tag||'',
+                start_tag:t.from_tag||t.start_tag||'',
+                end_tag:t.to_tag||t.end_tag||'',
                 cable_type:t.cable_type||'Power',
                 conductors:parseInt(t.conductors)||0,
                 conductor_size:t.conductor_size||'#12 AWG',
-                diameter:parseFloat(t.diameter)||0,
+                diameter:parseFloat(t.cable_od||t.diameter)||0,
                 weight:parseFloat(t.weight)||0,
                 allowed_cable_group:t.allowed_cable_group||'',
                 start:[parseFloat(t.start_x)||0,parseFloat(t.start_y)||0,parseFloat(t.start_z)||0],
