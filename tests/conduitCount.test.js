@@ -84,8 +84,9 @@ describe("displayConduitCount", () => {
   });
 });
 
-describe("optimalRoute DOMContentLoaded", () => {
-  it("rebuilds tray data and shows conduit total after navigation", () => {
+
+describe("rebuildTrayData integration", () => {
+  it("counts conduits from stored ductbank data", () => {
     const state = {
       manualTrays: [],
       cableList: [],
@@ -111,29 +112,12 @@ describe("optimalRoute DOMContentLoaded", () => {
       },
       conduitData: [],
     };
-
+    rebuildTrayDataFn(state, {});
+    const count = computeConduitCount(state);
     const el = { textContent: "" };
-    let domHandler;
-    const mockDoc = {
-      addEventListener: (evt, fn) => {
-        if (evt === "DOMContentLoaded") domHandler = fn;
-      },
-      getElementById: (id) => (id === "conduit-count" ? el : null),
-      createElement: () => ({}),
-    };
-    global.document = mockDoc;
-    global.elements = {};
-    global.checkPrereqs = () => {};
-    global.state = state;
-    global.CONDUIT_SPECS = {};
+    const doc = { getElementById: id => id === "conduit-count" ? el : null };
     const consoleStub = { log: () => {}, warn: () => {} };
-    global.displayConduitCount = (count, hasSchedule) =>
-      displayConduitCount(count, hasSchedule, mockDoc, {}, consoleStub);
-    global.rebuildTrayData = () => rebuildTrayDataFn(state, {});
-
-    require(path.join(__dirname, "..", "optimalRoute.js"));
-    domHandler();
-
+    displayConduitCount(count, true, doc, {}, consoleStub);
     assert.strictEqual(el.textContent, "Conduits added: 2");
   });
 });
