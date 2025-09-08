@@ -1,7 +1,7 @@
 import { getOneLine, setOneLine, setEquipment, setPanels, setLoads, getCables, setCables, addCable, addRaceway, getItem, setItem, getStudies, setStudies, on, getCurrentScenario, switchScenario, STORAGE_KEYS, loadProject, saveProject } from './dataStore.mjs';
 import { runLoadFlow } from './analysis/loadFlow.js';
 import { runShortCircuit } from './analysis/shortCircuit.mjs';
-import { runArcFlash } from './analysis/arcFlash.js';
+import { runArcFlash } from './analysis/arcFlash.mjs';
 import { runHarmonics } from './analysis/harmonics.js';
 import { runMotorStart } from './analysis/motorStart.js';
 import { runReliability } from './analysis/reliability.js';

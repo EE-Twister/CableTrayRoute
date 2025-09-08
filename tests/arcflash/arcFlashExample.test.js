@@ -26,7 +26,7 @@ global.localStorage = {
 
 (async () => {
   const { setOneLine, setItem } = await import('../../dataStore.mjs');
-  const { runArcFlash } = await import('../../analysis/arcFlash.js');
+  const { runArcFlash } = await import('../../analysis/arcFlash.mjs');
 
   describe('arc flash analysis', () => {
     it('uses protective device clearing time', async () => {

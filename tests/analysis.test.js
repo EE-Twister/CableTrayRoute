@@ -60,7 +60,7 @@ function caseToDiagram(data) {
   const { setOneLine, setItem } = await import('../dataStore.mjs');
   const { runLoadFlow } = await import('../analysis/loadFlow.js');
   const { runShortCircuit } = await import('../analysis/shortCircuit.mjs');
-  const { runArcFlash } = await import('../analysis/arcFlash.js');
+  const { runArcFlash } = await import('../analysis/arcFlash.mjs');
 
   const lfBench = require('./benchmarks/loadflow_ieee14.json');
   const scBench = require('./benchmarks/shortCircuit_example.json');
