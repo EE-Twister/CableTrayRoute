@@ -2,7 +2,15 @@ import ampacity from './ampacity.js';
 import { calculateVoltageDrop } from './src/voltageDrop.js';
 import nec from './codes/necTables.js';
 import iec from './codes/iecTables.js';
-const conductorProps = await fetch('./data/conductor_properties.json').then(r => r.json());
+
+let conductorProps = {};
+try {
+  const url = new URL('./data/conductor_properties.json', import.meta.url);
+  conductorProps = await fetch(url).then(r => r.json());
+} catch (err) {
+  console.warn('Failed to load conductor properties', err);
+  conductorProps = {};
+}
 
 const { sizeToArea } = ampacity;
 const codeLibs = { NEC: nec, IEC: iec };
