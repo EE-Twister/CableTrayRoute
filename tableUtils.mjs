@@ -1081,4 +1081,11 @@ function applyValidation(el, rules = []) {
   }
 }
 
-window.TableUtils = { createTable, saveToStorage, loadFromStorage, applyValidation, STORAGE_KEYS };
+window.TableUtils = {
+  createTable,
+  saveToStorage,
+  loadFromStorage,
+  applyValidation,
+  showRacewayModal: TableManager.prototype.showRacewayModal,
+  STORAGE_KEYS
+};
