@@ -5,11 +5,24 @@ const root = path.join(__dirname, '..');
 const pageUrl = (file: string) => 'file://' + path.join(root, file);
 
 test('raceway samples roundtrip and route', async ({ page }) => {
-  const samplePath = path.join(root, 'examples', 'sampleRaceways.json');
-  const sampleJson = fs.readFileSync(samplePath, 'utf-8');
-  await page.route('**/examples/sampleRaceways.json', route => {
-    route.fulfill({ body: sampleJson, contentType: 'application/json' });
-  });
+  const racewayPath = path.join(root, 'examples', 'sampleRaceways.json');
+  const racewayJson = fs.readFileSync(racewayPath, 'utf-8');
+  const cablePath = path.join(root, 'examples', 'sampleCables.json');
+  const cableJson = fs.readFileSync(cablePath, 'utf-8');
+  await page.addInitScript(({ racewayJson, cableJson }) => {
+    const originalFetch = window.fetch;
+    window.fetch = (input, init) => {
+      if (typeof input === 'string') {
+        if (input.endsWith('examples/sampleRaceways.json')) {
+          return Promise.resolve(new Response(racewayJson, { status: 200, headers: { 'Content-Type': 'application/json' } }));
+        }
+        if (input.endsWith('examples/sampleCables.json')) {
+          return Promise.resolve(new Response(cableJson, { status: 200, headers: { 'Content-Type': 'application/json' } }));
+        }
+      }
+      return originalFetch(input, init);
+    };
+  }, { racewayJson, cableJson });
   await page.goto(pageUrl('cableschedule.html'));
   await page.click('#load-sample-cables-btn');
 

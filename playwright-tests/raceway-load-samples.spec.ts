@@ -7,9 +7,15 @@ const pageUrl = (file: string) => 'file://' + path.join(root, file);
 test('raceway load samples populates all tables', async ({ page }) => {
   const samplePath = path.join(root, 'examples', 'sampleRaceways.json');
   const sampleJson = fs.readFileSync(samplePath, 'utf-8');
-  await page.route('**/examples/sampleRaceways.json', route => {
-    route.fulfill({ body: sampleJson, contentType: 'application/json' });
-  });
+  await page.addInitScript((sample) => {
+    const originalFetch = window.fetch;
+    window.fetch = (input, init) => {
+      if (typeof input === 'string' && input.endsWith('examples/sampleRaceways.json')) {
+        return Promise.resolve(new Response(sample, { status: 200, headers: { 'Content-Type': 'application/json' } }));
+      }
+      return originalFetch(input, init);
+    };
+  }, sampleJson);
   await page.goto(pageUrl('racewayschedule.html'));
   await page.click('#raceway-load-samples');
   await page.waitForSelector('#ductbank-table tbody tr.ductbank-row');
