@@ -1,5 +1,12 @@
 import * as dataStore from './dataStore.mjs';
-import { normalizeDuctbankRow, normalizeConduitRow, normalizeTrayRow } from './racewaySampleData.mjs';
+import {
+  normalizeDuctbankRow,
+  normalizeConduitRow,
+  normalizeTrayRow,
+  sampleDuctbanks,
+  sampleTrays,
+  sampleConduits
+} from './racewaySampleData.mjs';
 
 checkPrereqs([{key:'cableSchedule',page:'cableschedule.html',label:'Cable Schedule'}]);
 
@@ -240,8 +247,16 @@ document.addEventListener('DOMContentLoaded',()=>{
     if(!assertTablesReady()) return;
     console.time('raceway:loadSamples');
     try{
-      const res = await fetch('examples/sampleRaceways.json');
-      const { ductbanks = [], trays = [], conduits = [] } = await res.json();
+      let ductbanks=[],trays=[],conduits=[];
+      try{
+        const res=await fetch('examples/sampleRaceways.json');
+        ({ductbanks=[],trays=[],conduits=[]}=await res.json());
+      }catch(fetchErr){
+        console.warn('Sample raceways fetch failed, using built-in samples',fetchErr);
+        ductbanks=sampleDuctbanks;
+        trays=sampleTrays;
+        conduits=sampleConduits;
+      }
       const dbRows = ductbanks.map(normalizeDuctbankRow);
       const trayRows = trays.map(normalizeTrayRow);
       const conduitRowsRaw = conduits.map(normalizeConduitRow);
