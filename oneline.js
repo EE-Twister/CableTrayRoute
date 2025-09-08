@@ -117,8 +117,9 @@ async function loadComponentLibrary() {
     console.error('Failed to load component library', err);
     showToast(`Failed to load component library (status: ${status ?? 'unknown'}). ${err.message}`);
     try {
-      const mod = await import('./componentLibrary.json', { assert: { type: 'json' } });
-      data = mod.default || mod;
+      const url = new URL('./componentLibrary.json', import.meta.url);
+      const res = await fetch(url);
+      data = await res.json();
     } catch (importErr) {
       showToast(`Failed to import component library. ${importErr.message}`);
       showToast('Falling back to built-in components.');
