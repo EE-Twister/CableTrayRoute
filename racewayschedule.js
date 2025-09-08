@@ -32,7 +32,11 @@ const TRAY_WIDTH_OPTIONS=['2','3','4','6','8','9','12','16','18','20','24','30',
 const TRAY_DEPTH_OPTIONS=['2','3','4','5','6','7','8','9','10','11','12'];
 const TRAY_TYPE_OPTIONS=['Ladder (50 % fill)','Solid Bottom (40 % fill)'];
 
-document.addEventListener('DOMContentLoaded',()=>{
+document.addEventListener('DOMContentLoaded', async () => {
+  async function ensureTableUtils() {
+    if (!globalThis.TableUtils) await import('./tableUtils.mjs');
+  }
+  await ensureTableUtils();
   const projectId = window.currentProjectId || 'default';
   dataStore.loadProject(projectId);
   const save = () => dataStore.saveProject(projectId);
