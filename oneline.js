@@ -2397,6 +2397,8 @@ async function init() {
   if (diagramImportInput) diagramImportInput.addEventListener('change', handleImport);
   const shareBtn = document.getElementById('diagram-share-btn');
   if (shareBtn) shareBtn.addEventListener('click', shareDiagram);
+  const sampleBtn = document.getElementById('sample-diagram-btn');
+  if (sampleBtn) sampleBtn.addEventListener('click', loadSampleDiagram);
   document.getElementById('add-sheet-btn').addEventListener('click', addSheet);
   document.getElementById('rename-sheet-btn').addEventListener('click', renameSheet);
   document.getElementById('delete-sheet-btn').addEventListener('click', deleteSheet);
@@ -3392,6 +3394,18 @@ async function importDiagram(data) {
     loadSheet(0);
     renderSheetTabs();
     save();
+  }
+}
+
+async function loadSampleDiagram() {
+  try {
+    const res = await fetch('examples/sample_oneline.json');
+    if (!res.ok) throw new Error(res.statusText);
+    const data = await res.json();
+    await importDiagram(data);
+  } catch (err) {
+    console.error('Failed to load sample diagram', err);
+    showToast('Failed to load sample diagram');
   }
 }
 
