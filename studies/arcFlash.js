@@ -1,4 +1,4 @@
-import { runArcFlash } from '../analysis/arcFlash.js';
+import { runArcFlash } from '../analysis/arcFlash.mjs';
 import { getStudies, setStudies } from '../dataStore.mjs';
 import { generateArcFlashReport } from '../reports/arcFlashReport.mjs';
 
