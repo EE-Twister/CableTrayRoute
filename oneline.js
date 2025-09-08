@@ -22,14 +22,15 @@ if (projectId) {
   });
 }
 
+const baseUrl = typeof document !== 'undefined' ? document.baseURI : '';
 const typeIcons = {
-  panel: 'icons/panel.svg',
-  equipment: 'icons/equipment.svg',
-  load: 'icons/load.svg',
-  bus: 'icons/Bus.svg'
+  panel: new URL('icons/panel.svg', baseUrl).href,
+  equipment: new URL('icons/equipment.svg', baseUrl).href,
+  load: new URL('icons/load.svg', baseUrl).href,
+  bus: new URL('icons/Bus.svg', baseUrl).href
 };
 
-const placeholderIcon = 'icons/placeholder.svg';
+const placeholderIcon = new URL('icons/placeholder.svg', baseUrl).href;
 
 const builtinComponents = [
   {
@@ -167,9 +168,11 @@ async function loadComponentLibrary() {
         c.icon = placeholderIcon;
         return;
       }
+      const iconUrl = new URL(c.icon, document.baseURI).href;
       try {
-        const head = await fetch(c.icon, { method: 'HEAD' });
+        const head = await fetch(iconUrl, { method: 'HEAD' });
         if (!head.ok) throw new Error(head.statusText);
+        c.icon = iconUrl;
       } catch {
         console.warn(`Icon missing for subtype ${c.subtype}`);
         missingIcons.push(c.subtype);
