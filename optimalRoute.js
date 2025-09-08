@@ -51,6 +51,9 @@ document.addEventListener('DOMContentLoaded', () => {
       }
     });
   }
+
+  // After any resume logic completes, ensure tray/conduit data is rebuilt
+  if (typeof rebuildTrayData === 'function') rebuildTrayData();
 });
 
 function addTrayRow(){
