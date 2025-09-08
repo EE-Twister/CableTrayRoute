@@ -1,4 +1,4 @@
-import { runShortCircuit } from './shortCircuit.js';
+import { runShortCircuit } from './shortCircuit.mjs';
 import { getOneLine, getItem } from '../dataStore.mjs';
 
 let deviceCache = null;
