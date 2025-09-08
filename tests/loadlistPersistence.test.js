@@ -92,14 +92,14 @@ global.navigator = { clipboard: { writeText: () => Promise.resolve() } };
   dataStore.addLoad({ source: 'S2', description: 'L2', kw: '20', voltage: '240', manufacturer: 'Other', model: 'Y2', notes: 'n2' });
   const before = dataStore.getLoads();
 
-  await import('../loadlist.js');
+  await import('../loadlist.mjs');
   window.dispatchEvent(new window.Event('DOMContentLoaded'));
 
   dom = makeDOM();
   global.window = dom.window;
   global.document = dom.document;
 
-  await import('../loadlist.js?cache=' + Date.now());
+  await import('../loadlist.mjs?cache=' + Date.now());
   window.dispatchEvent(new window.Event('DOMContentLoaded'));
 
   const reloaded = await import('../dataStore.mjs?cache=' + Date.now());

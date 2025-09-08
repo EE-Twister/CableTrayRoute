@@ -1,3 +1,3 @@
 import "../workflowStatus.js";
 import "../site.js";
-import "../loadlist.js";
+import "../loadlist.mjs";
