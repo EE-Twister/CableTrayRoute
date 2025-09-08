@@ -3491,6 +3491,10 @@ const renderBatchResults = (results) => {
     
     // --- VISUALIZATION ---
     const visualize = (trays, routes, title) => {
+        if (!globalThis.Plotly) {
+            console.warn('Plotly is not loaded');
+            return;
+        }
         const traces = [];
 
         const heatColor = (pct) => {
@@ -3666,6 +3670,10 @@ const renderBatchResults = (results) => {
     };
 
     const highlightSharedRoute = (idx) => {
+        if (!globalThis.Plotly) {
+            console.warn('Plotly is not loaded');
+            return;
+        }
         if (!window.current3DPlot || !state.sharedFieldRoutes[idx]) return;
         const route = state.sharedFieldRoutes[idx];
         let traces = window.current3DPlot.traces.filter(t => t.name !== '__shared_highlight__');
@@ -3717,7 +3725,15 @@ const renderBatchResults = (results) => {
     };
 
     const updateDuctbankVisibility = (visible) => {
-        if (!window.current3DPlot || state.ductbankTraceIndices.length === 0) return;
+        if (!globalThis.Plotly) {
+            console.warn('Plotly is not loaded');
+            state.ductbankVisible = visible;
+            return;
+        }
+        if (!window.current3DPlot || state.ductbankTraceIndices.length === 0) {
+            state.ductbankVisible = visible;
+            return;
+        }
         const vis = visible ? true : false;
         Plotly.restyle(elements.plot3d, { visible: vis }, state.ductbankTraceIndices);
         state.ductbankVisible = visible;
@@ -3729,6 +3745,10 @@ const renderBatchResults = (results) => {
     };
 
     const reset3DView = () => {
+        if (!globalThis.Plotly) {
+            console.warn('Plotly is not loaded');
+            return;
+        }
         if (!window.base3DPlot) return;
         const traces = JSON.parse(JSON.stringify(window.base3DPlot.traces));
         const layout = JSON.parse(JSON.stringify(window.base3DPlot.layout));
@@ -3739,6 +3759,10 @@ const renderBatchResults = (results) => {
     };
 
     const highlightCableRoute = (idx) => {
+        if (!globalThis.Plotly) {
+            console.warn('Plotly is not loaded');
+            return;
+        }
         if (!state.latestRouteData[idx]) return;
         reset3DView();
         const route = state.latestRouteData[idx];
@@ -3770,6 +3794,10 @@ const renderBatchResults = (results) => {
     };
 
     const applyViewMode = () => {
+        if (!globalThis.Plotly) {
+            console.warn('Plotly is not loaded');
+            return;
+        }
         if (!window.current3DPlot) return;
         const layout = window.current3DPlot.layout;
         if (state.is2D) {
@@ -3792,6 +3820,10 @@ const renderBatchResults = (results) => {
     };
 
     const exportCurrentPlotPNG = () => {
+        if (!globalThis.Plotly) {
+            console.warn('Plotly is not loaded');
+            return;
+        }
         Plotly.toImage(elements.plot3d, { format: 'png' }).then(url => {
             const a = document.createElement('a');
             a.href = url;
