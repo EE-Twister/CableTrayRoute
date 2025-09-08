@@ -1,3 +1,3 @@
-tray_id,start_x,start_y,start_z,end_x,end_y,end_z,width,height,current_fill,allowed_cable_group
-T1,0,0,10,40,0,10,16,4,0,HV
-T2,40,0,10,80,0,10,16,4,0,LV
+tray_id,start_x,start_y,start_z,end_x,end_y,end_z,inside_width,tray_depth,tray_type,current_fill,allowed_cable_group,shape
+T1,0,0,10,40,0,10,16,4,Ladder (50 % fill),0,HV,STR
+T2,40,0,10,80,0,10,16,4,Solid Bottom (40 % fill),0,LV,STR

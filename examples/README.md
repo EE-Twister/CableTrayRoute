@@ -56,7 +56,7 @@ Two files represent the different sheets:
 
 ## Cable Trays (`tray_schedule.csv`)
 
-Columns (in order): `tray_id`, `start_x`, `start_y`, `start_z`, `end_x`, `end_y`, `end_z`, `width`, `height`, `capacity`
+Columns (in order): `tray_id`, `start_x`, `start_y`, `start_z`, `end_x`, `end_y`, `end_z`, `inside_width`, `tray_depth`, `tray_type`
 
 ## Stand-alone Conduits (`conduit_schedule.csv`)
 
@@ -64,8 +64,8 @@ Columns (in order): `conduit_id`, `type`, `trade_size`, `start_x`, `start_y`, `s
 
 ## Tray Import Template (`trays_template.csv`)
 
-Columns (in order): `tray_id`, `start_x`, `start_y`, `start_z`, `end_x`, `end_y`, `end_z`, `width`, `height`, `current_fill`, `allowed_cable_group`
+Columns (in order): `tray_id`, `start_x`, `start_y`, `start_z`, `end_x`, `end_y`, `end_z`, `inside_width`, `tray_depth`, `tray_type`, `current_fill`, `allowed_cable_group`, `shape`
 
 ## Cable Import Template (`cables_template.csv`)
 
-Columns (in order): `tag`, `start_tag`, `end_tag`, `cable_type`, `conductors`, `conductor_size`, `diameter`, `weight`, `allowed_cable_group`, `start_x`, `start_y`, `start_z`, `end_x`, `end_y`, `end_z`
+Columns (in order): `tag`, `from_tag`, `to_tag`, `cable_type`, `conductors`, `conductor_size`, `cable_od`, `allowed_cable_group`, `start_x`, `start_y`, `start_z`, `end_x`, `end_y`, `end_z`
