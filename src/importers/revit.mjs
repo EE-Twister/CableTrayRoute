@@ -10,7 +10,7 @@
  * @param {string|object} input - IFC STEP text or Revit JSON.
  * @returns {{trays:Array, conduits:Array}}
  */
-function parseRevit(input) {
+export function parseRevit(input) {
   if (typeof input === "string") {
     // Try JSON first – many exporters can emit JSON directly.
     try {
@@ -125,4 +125,3 @@ function parseIFC(text) {
   return { trays, conduits };
 }
 
-module.exports = { parseRevit };
