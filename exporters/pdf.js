@@ -1,5 +1,9 @@
 const { jsPDF } = window.jspdf || await import('https://cdn.jsdelivr.net/npm/jspdf@2.5.1/+esm');
-const svg2pdf = (await import('https://cdn.jsdelivr.net/npm/svg2pdf.js@2.0.1/dist/svg2pdf.es.min.js')).default;
+// Use ESM build of svg2pdf from jsDelivr. Previous URL pointed to a
+// non-existent file and caused a 404 in the browser. The `+esm` suffix
+// ensures the module entry in the package is used, which serves
+// `dist/svg2pdf.es.min.js` for version 2.5.0.
+const svg2pdf = (await import('https://cdn.jsdelivr.net/npm/svg2pdf.js@2.5.0/+esm')).default;
 
 /**
  * Export the current set of sheets to a PDF document.
