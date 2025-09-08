@@ -45,6 +45,18 @@ const displayConduitCount = new Function(
   dcBody,
 );
 
+const rtMarker = "const rebuildTrayData = () => {";
+const rtStart = appCode.indexOf(rtMarker) + rtMarker.length;
+let idx2 = rtStart;
+let depth2 = 1;
+while (idx2 < appCode.length && depth2 > 0) {
+  const ch = appCode[idx2++];
+  if (ch === "{") depth2++;
+  else if (ch === "}") depth2--;
+}
+const rtBody = appCode.slice(rtStart, idx2 - 1);
+const rebuildTrayDataFn = new Function("state", "CONDUIT_SPECS", rtBody);
+
 describe("displayConduitCount", () => {
   it("reflects the actual number of conduits", () => {
     const state = {
@@ -69,5 +81,59 @@ describe("displayConduitCount", () => {
 
     assert.strictEqual(el.textContent, "Conduits added: 2");
     assert.strictEqual(logged, "Conduits added: 2");
+  });
+});
+
+describe("optimalRoute DOMContentLoaded", () => {
+  it("rebuilds tray data and shows conduit total after navigation", () => {
+    const state = {
+      manualTrays: [],
+      cableList: [],
+      trayData: [],
+      geometryWarnings: { ductbanks: [], conduits: [] },
+      includeDuctbankOutlines: false,
+      ductbankData: {
+        ductbanks: [
+          {
+            tag: "DB1",
+            start_x: 0,
+            start_y: 0,
+            start_z: 0,
+            end_x: 1,
+            end_y: 1,
+            end_z: 1,
+            conduits: [
+              { conduit_id: "C1", path: [[0,0,0],[1,0,0]], diameter: 1 },
+              { conduit_id: "C2", path: [[0,0,0],[0,1,0]], diameter: 1 },
+            ],
+          },
+        ],
+      },
+      conduitData: [],
+    };
+
+    const el = { textContent: "" };
+    let domHandler;
+    const mockDoc = {
+      addEventListener: (evt, fn) => {
+        if (evt === "DOMContentLoaded") domHandler = fn;
+      },
+      getElementById: (id) => (id === "conduit-count" ? el : null),
+      createElement: () => ({}),
+    };
+    global.document = mockDoc;
+    global.elements = {};
+    global.checkPrereqs = () => {};
+    global.state = state;
+    global.CONDUIT_SPECS = {};
+    const consoleStub = { log: () => {}, warn: () => {} };
+    global.displayConduitCount = (count, hasSchedule) =>
+      displayConduitCount(count, hasSchedule, mockDoc, {}, consoleStub);
+    global.rebuildTrayData = () => rebuildTrayDataFn(state, {});
+
+    require(path.join(__dirname, "..", "optimalRoute.js"));
+    domHandler();
+
+    assert.strictEqual(el.textContent, "Conduits added: 2");
   });
 });
