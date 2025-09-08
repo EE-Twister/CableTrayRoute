@@ -5,7 +5,7 @@
  * shared with other BIM environments.
  */
 
-import { Drawing } from 'dxf-writer';
+import { Drawing } from './exporters/simpleDxf.js';
 
 export function exportRevitJSON(panels = [], cables = []) {
   const blob = new Blob([JSON.stringify({ panels, cables }, null, 2)], {
