@@ -1,5 +1,5 @@
 import "./units.js";
-import { exportProject, importProject, getOneLine, getStudies, loadProject } from "./dataStore.mjs";
+import { exportProject, importProject, getOneLine, getStudies, loadProject, getDuctbanks, getConduits } from "./dataStore.mjs";
 import { runValidation } from "./validation/rules.js";
 // fast-json-patch is loaded dynamically so the bundle does not expect a
 // build-time dependency. This avoids "index_mjs is not defined" errors in
@@ -720,11 +720,9 @@ function loadConduits(){
       return {ductbanks:parsed.ductbanks||[],conduits:parsed.conduits||[]};
     }
   }catch(e){}
-  const dbKey=globalThis.TableUtils?.STORAGE_KEYS?.ductbankSchedule||'ductbankSchedule';
-  const condKey=globalThis.TableUtils?.STORAGE_KEYS?.conduitSchedule||'conduitSchedule';
   let ductbanks=[];let conduits=[];
-  try{ductbanks=JSON.parse(localStorage.getItem(dbKey)||'[]');}catch(e){}
-  try{conduits=JSON.parse(localStorage.getItem(condKey)||'[]');}catch(e){}
+  try{ductbanks=getDuctbanks();}catch(e){}
+  try{conduits=getConduits();}catch(e){}
   const flattened=[];
   ductbanks=ductbanks.map(db=>{
     (db.conduits||[]).forEach(c=>{
