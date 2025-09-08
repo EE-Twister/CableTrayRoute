@@ -204,16 +204,16 @@ async function loadComponentLibrary() {
     componentTypes[c.category].push(c.subtype);
   });
   const banner = document.getElementById('component-library-banner');
-  const reloadBtn = document.getElementById('reload-library-btn');
   if (banner) {
     if (libraryFailed) banner.classList.remove('hidden');
     else banner.classList.add('hidden');
   }
-  if (reloadBtn)
-    reloadBtn.onclick = async () => {
+  document.querySelectorAll('#reload-library-btn, #library-reload-btn').forEach(btn => {
+    btn.onclick = async () => {
       await loadComponentLibrary();
       buildPalette();
     };
+  });
 
   if (skipped.length) {
     showToast(`Skipped components: ${skipped.join(', ')}`);
