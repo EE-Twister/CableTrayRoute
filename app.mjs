@@ -422,7 +422,7 @@ document.addEventListener('DOMContentLoaded', async () => {
         if (typeof document !== 'undefined') {
             const rs = document.getElementById('results-section');
             if (rs) rs.classList.remove('hidden', 'invisible', 'is-hidden');
-            emitAsync('route-updated');
+            if (typeof emitAsync === 'function') emitAsync('route-updated');
         }
     };
 
@@ -2217,7 +2217,7 @@ const openDuctbankRoute = (dbId, conduitId) => {
             updateTableCounts();
             saveSession();
             if (elements.manualTrayTableContainer?.querySelector('tbody tr')) {
-                emitAsync('imports-ready-trays');
+                requestAnimationFrame(() => emitAsync('imports-ready-trays'));
             }
         });
         elements.importTraysFile.value='';
@@ -2277,7 +2277,7 @@ const openDuctbankRoute = (dbId, conduitId) => {
             updateTableCounts();
             saveSession();
             if (elements.cableListContainer?.querySelector('tbody tr')) {
-                emitAsync('imports-ready-cables');
+                requestAnimationFrame(() => emitAsync('imports-ready-cables'));
             }
         });
         elements.importCablesFile.value='';
