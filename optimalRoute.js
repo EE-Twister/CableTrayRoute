@@ -1,27 +1,15 @@
 // ---- Inline E2E helpers (no external import) ----
 const E2E = new URLSearchParams(location.search).has('e2e');
 
-function markReady(flagName) {
-  try {
-    document.documentElement.setAttribute(flagName, '1');
-    // also expose to window for debugging
-    window[flagName.replace(/-([a-z])/g, (_, c) => c.toUpperCase())] = true;
-  } catch {}
-}
-
 function ensureReadyBeacon(attrName, id) {
   let el = document.getElementById(id);
   if (!el) {
     el = document.createElement('div');
     el.id = id;
-    // carry the SAME data attribute the tests look for
-    el.setAttribute(attrName, '1');
-    // make it "visible" to Playwright but unobtrusive
     el.style.cssText = 'position:fixed;left:0;bottom:0;width:1px;height:1px;opacity:0.01;z-index:2147483647;';
     document.body.appendChild(el);
-  } else {
-    el.setAttribute(attrName, '1');
   }
+  el.setAttribute(attrName, '1'); // carry the SAME data-* attr the tests wait for
 }
 
 
@@ -98,7 +86,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
   // After any resume logic completes, ensure tray/conduit data is rebuilt
   if (typeof rebuildTrayData === 'function') rebuildTrayData();
-  markReady('data-optimal-ready');
+  document.documentElement.setAttribute('data-optimal-ready', '1');
   ensureReadyBeacon('data-optimal-ready', 'optimal-ready-beacon');
 });
 

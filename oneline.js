@@ -1,27 +1,15 @@
 // ---- Inline E2E helpers (no external import) ----
 const E2E = new URLSearchParams(location.search).has('e2e');
 
-function markReady(flagName) {
-  try {
-    document.documentElement.setAttribute(flagName, '1');
-    // also expose to window for debugging
-    window[flagName.replace(/-([a-z])/g, (_, c) => c.toUpperCase())] = true;
-  } catch {}
-}
-
 function ensureReadyBeacon(attrName, id) {
   let el = document.getElementById(id);
   if (!el) {
     el = document.createElement('div');
     el.id = id;
-    // carry the SAME data attribute the tests look for
-    el.setAttribute(attrName, '1');
-    // make it "visible" to Playwright but unobtrusive
     el.style.cssText = 'position:fixed;left:0;bottom:0;width:1px;height:1px;opacity:0.01;z-index:2147483647;';
     document.body.appendChild(el);
-  } else {
-    el.setAttribute(attrName, '1');
   }
+  el.setAttribute(attrName, '1'); // carry the SAME data-* attr the tests wait for
 }
 
 function suppressResumeIfE2E({ resumeYesId = '#resume-yes-btn', resumeNoId = '#resume-no-btn' } = {}) {
@@ -3456,6 +3444,8 @@ if (typeof window !== 'undefined') {
 async function __oneline_init() {
   suppressResumeIfE2E();
 
+  buildPalette();
+
   // Load libraries
   try { await loadComponentLibrary(); } catch (e) { console.error('loadComponentLibrary failed:', e); }
   try { await loadManufacturerLibrary(); } catch (e) { console.error('loadManufacturerLibrary failed:', e); }
@@ -3487,7 +3477,7 @@ async function __oneline_init() {
   }
 
   // Ready flag for Playwright
-  markReady('data-oneline-ready');
+  document.documentElement.setAttribute('data-oneline-ready', '1');
   ensureReadyBeacon('data-oneline-ready', 'oneline-ready-beacon');
 }
 
