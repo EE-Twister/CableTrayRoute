@@ -89,6 +89,13 @@ const TRAY_WIDTH_OPTIONS=['2','3','4','6','8','9','12','16','18','20','24','30',
 const TRAY_DEPTH_OPTIONS=['2','3','4','5','6','7','8','9','10','11','12'];
 const TRAY_TYPE_OPTIONS=['Ladder (50 % fill)','Solid Bottom (40 % fill)'];
 
+function ensureDuctbankRows(){
+  const tbody=document.querySelector('#ductbankTable tbody');
+  if(!tbody) return;
+  document.querySelectorAll('#ductbankTable > tr').forEach(tr=>tbody.appendChild(tr));
+  tbody.querySelectorAll('tr').forEach(tr=>tr.classList.add('ductbank-row'));
+}
+
 document.addEventListener('DOMContentLoaded', async () => {
   async function ensureTableUtils() {
     if (!globalThis.TableUtils) await import('./tableUtils.mjs');
@@ -212,7 +219,7 @@ document.addEventListener('DOMContentLoaded', async () => {
   if(importProjInput){
     importProjInput.addEventListener('change',()=>{
       requestAnimationFrame(()=>{
-        document.querySelectorAll('#ductbankTable tbody tr').forEach(tr=>tr.classList.add('ductbank-row'));
+        ensureDuctbankRows();
         emitSticky('samples-loaded','samplesLoaded');
       });
       whenPresent('#ductbankTable tbody tr.ductbank-row', () => emitSticky('samples-loaded','samplesLoaded'));
@@ -238,6 +245,7 @@ document.addEventListener('DOMContentLoaded', async () => {
           window.initDuctbankTable?.();
         }
         if(typeof window.loadDuctbanks==='function') window.loadDuctbanks();
+        ensureDuctbankRows();
         const rendered=document.querySelectorAll('#ductbankTable tbody tr.ductbank-row').length;
         console.assert(rendered===rows.length && rendered>0,
           `Ductbank table rendered ${rendered} rows for ${rows.length} samples`);
@@ -409,7 +417,7 @@ document.addEventListener('DOMContentLoaded', async () => {
       );
       const conduitCount=dbConduits.length+standalone.length;
       console.log(`Loaded samples: ductbanks=${dbRows.length}, trays=${trayRows.length}, conduits=${conduitCount}`);
-      document.querySelectorAll('#ductbankTable tbody tr').forEach(tr=>tr.classList.add('ductbank-row'));
+      ensureDuctbankRows();
       emitSticky('samples-loaded','samplesLoaded');
       showToast(`Loaded samples: ${dbRows.length} ductbanks, ${conduitCount} conduits, ${trayRows.length} trays.`,'success');
     }catch(err){

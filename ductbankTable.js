@@ -136,6 +136,15 @@ import { getDuctbanks as readStoredDuctbanks, setDuctbanks, setItem, getItem } f
     });
   }
 
+  function appendDuctbankRow(tr){
+    if(!ductbankTbody){
+      ductbankTbody=document.querySelector('#ductbankTable tbody');
+      if(!ductbankTbody) return;
+    }
+    tr.classList.add('ductbank-row');
+    ductbankTbody.appendChild(tr);
+  }
+
   function renderDuctbanks(){
     // Lazily select the table body in case initialization was skipped
     if(!ductbankTbody){
@@ -147,9 +156,8 @@ import { getDuctbanks as readStoredDuctbanks, setDuctbanks, setItem, getItem } f
     ductbankTbody.innerHTML='';
     ductbanks.forEach((db,i)=>{
       const row=document.createElement('tr');
-      row.classList.add('ductbank-row');
       row.dataset.tag = db.tag;
-      ductbankTbody.appendChild(row);
+      appendDuctbankRow(row);
       const tgl=row.insertCell();
       setWidth(tgl,0);
       const tglBtn=document.createElement('button');
