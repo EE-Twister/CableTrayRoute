@@ -9,15 +9,18 @@ function markReady(flagName) {
   } catch {}
 }
 
-function ensureBeacon(id) {
+function ensureReadyBeacon(attrName, id) {
   let el = document.getElementById(id);
   if (!el) {
     el = document.createElement('div');
     el.id = id;
-    el.setAttribute('data-e2e-beacon', '1');
-    // Keep it visible to Playwright but unobtrusive
-    el.style.cssText = 'position:fixed;left:0;bottom:0;width:1px;height:1px;opacity:0.01;z-index:99999;';
+    // carry the SAME data attribute the tests look for
+    el.setAttribute(attrName, '1');
+    // make it "visible" to Playwright but unobtrusive
+    el.style.cssText = 'position:fixed;left:0;bottom:0;width:1px;height:1px;opacity:0.01;z-index:2147483647;';
     document.body.appendChild(el);
+  } else {
+    el.setAttribute(attrName, '1');
   }
 }
 
@@ -100,7 +103,7 @@ document.addEventListener('DOMContentLoaded', () => {
   // After any resume logic completes, ensure tray/conduit data is rebuilt
   if (typeof rebuildTrayData === 'function') rebuildTrayData();
   markReady('data-optimal-ready');
-  ensureBeacon('optimal-ready-beacon');
+  ensureReadyBeacon('data-optimal-ready', 'optimal-ready-beacon');
 });
 
 function addTrayRow(){
