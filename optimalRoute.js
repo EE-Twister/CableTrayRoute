@@ -148,7 +148,7 @@ function populateTrayTable(trays){
   });
   html += '</tbody></table>';
   container.innerHTML = html;
-  emitAsync('imports-ready-trays');
+  requestAnimationFrame(() => emitAsync('imports-ready-trays'));
 }
 
 function populateCableTable(cables){
@@ -174,7 +174,7 @@ function populateCableTable(cables){
   });
   html += '</tbody></table>';
   container.innerHTML = html;
-  emitAsync('imports-ready-cables');
+  requestAnimationFrame(() => emitAsync('imports-ready-cables'));
 }
 
 // --- Routing worker integration and visualization ---
@@ -215,7 +215,7 @@ function calculateRoutes(){
       if (typeof document !== 'undefined') {
         const rs = document.getElementById('results-section');
         if (rs) rs.classList.remove('hidden', 'invisible', 'is-hidden');
-        emitAsync('route-updated');
+        requestAnimationFrame(() => emitAsync('route-updated'));
       }
     }
   };

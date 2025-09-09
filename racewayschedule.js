@@ -69,6 +69,18 @@ document.addEventListener('DOMContentLoaded', async () => {
     if (!globalThis.TableUtils) await import('./tableUtils.mjs');
   }
   await ensureTableUtils();
+  const tableLoadState = { ductbanks: false, trays: false, conduits: false };
+  const resetTableLoadState = () => {
+    tableLoadState.ductbanks = false;
+    tableLoadState.trays = false;
+    tableLoadState.conduits = false;
+  };
+  const checkSamplesLoaded = () => {
+    if (tableLoadState.ductbanks && tableLoadState.trays && tableLoadState.conduits) {
+      requestAnimationFrame(() => requestAnimationFrame(() => emitAsync('samples-loaded')));
+    }
+  };
+  resetTableLoadState();
   const projectId = window.currentProjectId || 'default';
   dataStore.loadProject(projectId);
   const save = () => dataStore.saveProject(projectId);
@@ -197,6 +209,8 @@ document.addEventListener('DOMContentLoaded', async () => {
         const rendered=document.querySelectorAll('#ductbankTable tbody tr.ductbank-row').length;
         console.assert(rendered===rows.length && rendered>0,
           `Ductbank table rendered ${rendered} rows for ${rows.length} samples`);
+        tableLoadState.ductbanks = true;
+        checkSamplesLoaded();
       },
       getData(){try{return window.getDuctbanks?window.getDuctbanks():[];}catch{return[];}},
       getDataCount(){return this.getData().length;}
@@ -246,6 +260,8 @@ document.addEventListener('DOMContentLoaded', async () => {
     (rows||[]).forEach(r=>this.addRow(r));
     this.updateRowCount?.();
     this.applyFilters?.();
+    tableLoadState.trays = true;
+    checkSamplesLoaded();
   };
   trayTable.getDataCount=function(){return this.getData().length;};
   tables.trays=trayTable;
@@ -291,6 +307,8 @@ document.addEventListener('DOMContentLoaded', async () => {
     (rows||[]).forEach(r=>this.addRow(r));
     this.updateRowCount?.();
     this.applyFilters?.();
+    tableLoadState.conduits = true;
+    checkSamplesLoaded();
   };
   conduitTable.getDataCount=function(){return this.getData().length;};
   tables.conduits=conduitTable;
@@ -312,6 +330,7 @@ document.addEventListener('DOMContentLoaded', async () => {
     if(!assertTablesReady()) return;
     console.time('raceway:loadSamples');
     try{
+      resetTableLoadState();
       let ductbanks=[],trays=[],conduits=[];
       try{
         const res=await fetch('examples/sampleRaceways.json');
@@ -359,9 +378,6 @@ document.addEventListener('DOMContentLoaded', async () => {
       const conduitCount=dbConduits.length+standalone.length;
       console.log(`Loaded samples: ductbanks=${dbRows.length}, trays=${trayRows.length}, conduits=${conduitCount}`);
       showToast(`Loaded samples: ${dbRows.length} ductbanks, ${conduitCount} conduits, ${trayRows.length} trays.`,'success');
-      if (typeof document !== 'undefined') {
-        emitAsync('samples-loaded');
-      }
     }catch(err){
       console.error(err);
       showToast('Sample load failed – see console.','error');
@@ -596,11 +612,16 @@ document.addEventListener('DOMContentLoaded', async () => {
   }
 
   requestAnimationFrame(() => {
-    const hasInitialRows =
+    const anyRows =
       document.querySelector('#ductbankTable tbody tr.ductbank-row') ||
       document.querySelector('#trayTable tbody tr') ||
       document.querySelector('#conduitTable tbody tr');
-    if (hasInitialRows) emitAsync('samples-loaded');
+    if (anyRows) {
+      tableLoadState.ductbanks = true;
+      tableLoadState.trays = true;
+      tableLoadState.conduits = true;
+      checkSamplesLoaded();
+    }
   });
 
   document.documentElement.setAttribute('data-raceway-ready', '1');
