@@ -99,6 +99,8 @@ const manufacturerModels = {
   Generac: ['G2000', 'Industrial']
 };
 
+const isE2E = new URLSearchParams(window.location.search).get('e2e') === '1';
+
 // === REPLACE THE ENTIRE FUNCTION ===
 async function loadComponentLibrary() {
   // Reset caches for a clean reload
@@ -306,6 +308,7 @@ function buildPalette() {
       btn.dataset.type = type;
       btn.dataset.subtype = sub;
       btn.setAttribute('data-subtype', sub);
+      btn.setAttribute('data-testid', 'palette-button');
       btn.dataset.label = meta.label;
       btn.title = `${meta.label} - Drag to canvas or click to add`;
       btn.innerHTML = `<img src="${meta.icon}" alt="" aria-hidden="true">`;
@@ -330,16 +333,21 @@ function buildPalette() {
       placeholder.textContent = 'No components available';
       container.appendChild(placeholder);
     }
-    const stored = localStorage.getItem(key);
-    if (stored !== null) {
-      det.open = stored === 'true';
-    } else if (!hasButtons) {
+    if (isE2E) {
       det.open = true;
+    } else {
+      const stored = localStorage.getItem(key);
+      if (stored !== null) {
+        det.open = stored === 'true';
+      } else if (!hasButtons) {
+        det.open = true;
+      }
     }
     det.addEventListener('toggle', () => {
       localStorage.setItem(key, det.open);
     });
   });
+  document.documentElement.setAttribute('data-oneline-ready', '1');
   const paletteSearch = document.getElementById('palette-search');
   if (paletteSearch) {
     paletteSearch.addEventListener('input', () => {
@@ -2213,7 +2221,11 @@ async function init() {
   const lintCloseBtn = document.getElementById('lint-close-btn');
   if (lintCloseBtn) lintCloseBtn.addEventListener('click', () => lintPanel.classList.add('hidden'));
 
-  const svg = document.getElementById('diagram');
+  let svg = document.getElementById('diagram');
+  if (!svg) {
+    svg = document.querySelector('svg');
+    if (svg) svg.id = 'diagram';
+  }
   if (svg) {
     svg.addEventListener('dblclick', e => {
       const g = e.target.closest('.component');
