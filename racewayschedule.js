@@ -33,9 +33,9 @@ import {
   sampleConduits
 } from './racewaySampleData.mjs';
 
-checkPrereqs([{key:'cableSchedule',page:'cableschedule.html',label:'Cable Schedule'}]);
-
 suppressResumeIfE2E();
+
+checkPrereqs([{key:'cableSchedule',page:'cableschedule.html',label:'Cable Schedule'}]);
 
 // Expose conduit specifications globally so other modules bundled into
 // this file can access them after Rollup wraps everything in an IIFE. If
@@ -345,7 +345,12 @@ document.addEventListener('DOMContentLoaded', async () => {
       console.table([...dbConduits,...standalone]);
       console.table(trayRows);
       const dbCount=document.querySelectorAll('#ductbankTable tbody tr.ductbank-row').length;
-      console.assert(dbCount>0,`Ductbank table is empty after sample load (count=${dbCount})`);
+      const trayCount=document.querySelectorAll('#trayTable tbody tr').length;
+      const conduitRendered=document.querySelectorAll('#conduitTable tbody tr').length;
+      console.assert(
+        dbCount===nested.length && trayCount===trayRows.length && conduitRendered===standalone.length,
+        `Sample rows mismatch: ductbanks=${dbCount}/${nested.length}, trays=${trayCount}/${trayRows.length}, conduits=${conduitRendered}/${standalone.length}`
+      );
       const conduitCount=dbConduits.length+standalone.length;
       console.log(`Loaded samples: ductbanks=${dbRows.length}, trays=${trayRows.length}, conduits=${conduitCount}`);
       showToast(`Loaded samples: ${dbRows.length} ductbanks, ${conduitCount} conduits, ${trayRows.length} trays.`,'success');
