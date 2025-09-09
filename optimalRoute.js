@@ -25,7 +25,7 @@ function ensureReadyBeacon(attrName, id) {
 }
 
 function emitAsync(name) {
-  // two RAFs pushes dispatch after layout/paint; avoids listener races
+  // Two RAFs to ensure DOM attached + layout done before the event
   requestAnimationFrame(() => requestAnimationFrame(() => {
     document.dispatchEvent(new Event(name));
   }));
@@ -164,6 +164,7 @@ function populateTrayTable(trays){
   });
   html += '</tbody></table>';
   container.innerHTML = html;
+  emitAsync('imports-ready-trays');
 }
 
 function populateCableTable(cables){
@@ -189,6 +190,7 @@ function populateCableTable(cables){
   });
   html += '</tbody></table>';
   container.innerHTML = html;
+  emitAsync('imports-ready-cables');
 }
 
 // --- Routing worker integration and visualization ---
