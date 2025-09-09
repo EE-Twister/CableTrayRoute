@@ -1,0 +1,259 @@
+[
+  {
+    "subtype": "Bus",
+    "label": "Bus",
+    "icon": "icons/components/Bus.svg",
+    "category": "bus",
+    "ports": [{ "x": 0, "y": 20 }, { "x": 80, "y": 20 }],
+    "schema": [
+      { "name": "baseKV", "label": "Base kV", "type": "number" },
+      { "name": "prefault_voltage", "label": "Prefault Voltage (kV)", "type": "number" },
+      { "name": "xr_ratio", "label": "Fault X/R", "type": "number" },
+      { "name": "electrode_config", "label": "Electrode Config", "type": "select", "options": ["VCB", "VCBB", "HCB", "VOA", "HOA"] },
+      { "name": "tccId", "label": "Protective Device", "type": "text" },
+      { "name": "clearing_time", "label": "Clearing Time (s)", "type": "number" }
+    ]
+  },
+  {
+    "subtype": "MLO",
+    "label": "MLO",
+    "icon": "icons/components/MLO.svg",
+    "category": "panel",
+    "ports": [{ "x": 0, "y": 20 }, { "x": 80, "y": 20 }],
+    "schema": [
+      { "name": "voltage", "label": "Voltage", "type": "number" },
+      { "name": "rating", "label": "Rating", "type": "select", "options": ["100A", "225A", "400A", "600A", "800A", "1200A"] },
+      { "name": "breaker_frame", "label": "Breaker Frame", "type": "select", "options": ["150A", "250A", "400A", "600A", "800A", "1200A"] },
+      { "name": "conductor_type", "label": "Conductor Type", "type": "select", "options": ["THHN", "XHHW", "RHW"] },
+      { "name": "cable_assembly", "label": "Cable Assembly", "type": "select", "options": ["Tray Cable", "MC Cable", "SER Cable"] },
+        { "name": "voltage_class", "label": "Voltage Class", "type": "select" },
+        { "name": "thermal_rating", "label": "Thermal Rating", "type": "select" },
+        { "name": "manufacturer", "label": "Manufacturer", "type": "select" },
+        { "name": "model", "label": "Model", "type": "select" },
+        { "name": "phases", "label": "Phases", "type": "select", "options": ["1", "3"] },
+        { "name": "notes", "label": "Notes", "type": "textarea" }
+      ]
+    },
+  {
+    "subtype": "MCC",
+    "label": "MCC",
+    "icon": "icons/components/MCC.svg",
+    "category": "panel",
+    "ports": [{ "x": 0, "y": 20 }, { "x": 80, "y": 20 }],
+    "schema": [
+      { "name": "voltage", "label": "Voltage", "type": "number" },
+      { "name": "rating", "label": "Rating", "type": "select", "options": ["200A", "400A", "600A", "800A", "1200A"] },
+      { "name": "breaker_frame", "label": "Breaker Frame", "type": "select", "options": ["250A", "400A", "600A", "800A", "1200A"] },
+      { "name": "conductor_type", "label": "Conductor Type", "type": "select", "options": ["THHN", "XHHW", "RHW"] },
+      { "name": "cable_assembly", "label": "Cable Assembly", "type": "select", "options": ["Tray Cable", "MC Cable", "SER Cable"] },
+        { "name": "voltage_class", "label": "Voltage Class", "type": "select" },
+        { "name": "thermal_rating", "label": "Thermal Rating", "type": "select" },
+        { "name": "manufacturer", "label": "Manufacturer", "type": "select" },
+        { "name": "model", "label": "Model", "type": "select" },
+        { "name": "phases", "label": "Phases", "type": "select", "options": ["1", "3"] },
+      { "name": "notes", "label": "Notes", "type": "textarea" }
+      ]
+  },
+  {
+    "subtype": "Generator",
+    "label": "Generator",
+    "icon": "icons/components/Generator.svg",
+    "category": "equipment",
+    "ports": [{ "x": 0, "y": 20 }, { "x": 80, "y": 20 }],
+    "schema": [
+      { "name": "voltage", "label": "Voltage", "type": "number" },
+      { "name": "kW", "label": "Power (kW)", "type": "number" },
+      { "name": "rating", "label": "Rating", "type": "select", "options": ["100kW", "250kW", "500kW", "750kW", "1000kW"] },
+      { "name": "breaker_frame", "label": "Breaker Frame", "type": "select", "options": ["250A", "400A", "600A", "800A", "1200A"] },
+      { "name": "conductor_type", "label": "Conductor Type", "type": "select", "options": ["THHN", "XHHW", "RHW"] },
+      { "name": "cable_assembly", "label": "Cable Assembly", "type": "select", "options": ["Tray Cable", "MC Cable", "SER Cable"] },
+        { "name": "voltage_class", "label": "Voltage Class", "type": "select" },
+        { "name": "thermal_rating", "label": "Thermal Rating", "type": "select" },
+        { "name": "manufacturer", "label": "Manufacturer", "type": "select" },
+        { "name": "model", "label": "Model", "type": "select" },
+        { "name": "phases", "label": "Phases", "type": "select", "options": ["1", "3"] },
+        { "name": "notes", "label": "Notes", "type": "textarea" }
+      ]
+    },
+  {
+    "subtype": "UPS",
+    "label": "UPS",
+    "icon": "icons/components/UPS.svg",
+    "category": "equipment",
+    "ports": [{ "x": 0, "y": 20 }, { "x": 80, "y": 20 }],
+    "schema": [
+      { "name": "voltage", "label": "Voltage", "type": "number" },
+      { "name": "kVA", "label": "Capacity (kVA)", "type": "number" },
+      { "name": "rating", "label": "Rating", "type": "select", "options": ["50kVA", "100kVA", "200kVA", "500kVA", "1000kVA"] },
+      { "name": "breaker_frame", "label": "Breaker Frame", "type": "select", "options": ["250A", "400A", "600A", "800A", "1200A"] },
+      { "name": "conductor_type", "label": "Conductor Type", "type": "select", "options": ["THHN", "XHHW", "RHW"] },
+      { "name": "cable_assembly", "label": "Cable Assembly", "type": "select", "options": ["Tray Cable", "MC Cable", "SER Cable"] },
+      { "name": "manufacturer", "label": "Manufacturer", "type": "text" },
+      { "name": "model", "label": "Model", "type": "text" },
+      { "name": "phases", "label": "Phases", "type": "select", "options": ["1", "3"] },
+      { "name": "notes", "label": "Notes", "type": "textarea" }
+    ]
+  },
+  {
+    "subtype": "Transformer",
+    "label": "Transformer",
+    "icon": "icons/components/Transformer.svg",
+    "category": "equipment",
+    "ports": [{ "x": 0, "y": 20 }, { "x": 80, "y": 20 }],
+    "schema": [
+      { "name": "voltage", "label": "Voltage", "type": "number" },
+      { "name": "rating", "label": "Rating", "type": "select", "options": ["45kVA", "75kVA", "112.5kVA", "150kVA", "225kVA", "300kVA"] },
+      { "name": "breaker_frame", "label": "Breaker Frame", "type": "select", "options": ["250A", "400A", "600A", "800A", "1200A"] },
+      { "name": "conductor_type", "label": "Conductor Type", "type": "select", "options": ["THHN", "XHHW", "RHW"] },
+      { "name": "cable_assembly", "label": "Cable Assembly", "type": "select", "options": ["Tray Cable", "MC Cable", "SER Cable"] },
+      { "name": "manufacturer", "label": "Manufacturer", "type": "text" },
+      { "name": "model", "label": "Model", "type": "text" },
+      { "name": "phases", "label": "Phases", "type": "select", "options": ["1", "3"] },
+      { "name": "notes", "label": "Notes", "type": "textarea" }
+    ]
+  },
+  {
+    "subtype": "Switchgear",
+    "label": "Switchgear",
+    "icon": "icons/components/Switchgear.svg",
+    "category": "equipment",
+    "ports": [{ "x": 0, "y": 20 }, { "x": 80, "y": 20 }],
+    "schema": [
+      { "name": "voltage", "label": "Voltage", "type": "number" },
+      { "name": "rating", "label": "Rating", "type": "select", "options": ["400A", "600A", "800A", "1200A", "2000A"] },
+      { "name": "breaker_frame", "label": "Breaker Frame", "type": "select", "options": ["400A", "600A", "800A", "1200A", "2000A"] },
+      { "name": "conductor_type", "label": "Conductor Type", "type": "select", "options": ["THHN", "XHHW", "RHW"] },
+      { "name": "cable_assembly", "label": "Cable Assembly", "type": "select", "options": ["Tray Cable", "MC Cable", "SER Cable"] },
+      { "name": "voltage_class", "label": "Voltage Class", "type": "select" },
+      { "name": "thermal_rating", "label": "Thermal Rating", "type": "select" },
+      { "name": "manufacturer", "label": "Manufacturer", "type": "select" },
+      { "name": "model", "label": "Model", "type": "select" },
+      { "name": "phases", "label": "Phases", "type": "select", "options": ["1", "3"] },
+      { "name": "notes", "label": "Notes", "type": "textarea" }
+    ]
+  },
+  {
+    "subtype": "Switchboard",
+    "label": "Switchboard",
+    "icon": "icons/components/Switchboard.svg",
+    "category": "equipment",
+    "ports": [{ "x": 0, "y": 20 }, { "x": 80, "y": 20 }],
+    "schema": [
+      { "name": "voltage", "label": "Voltage", "type": "number" },
+      { "name": "rating", "label": "Rating", "type": "select", "options": ["400A", "800A", "1200A", "2000A"] },
+      { "name": "voltage_class", "label": "Voltage Class", "type": "select" },
+      { "name": "thermal_rating", "label": "Thermal Rating", "type": "select" },
+      { "name": "manufacturer", "label": "Manufacturer", "type": "select" },
+      { "name": "model", "label": "Model", "type": "select" },
+      { "name": "notes", "label": "Notes", "type": "textarea" }
+    ]
+  },
+  {
+    "subtype": "Feeder",
+    "label": "Feeder",
+    "icon": "icons/components/Feeder.svg",
+    "category": "equipment",
+    "ports": [{ "x": 0, "y": 20 }, { "x": 80, "y": 20 }],
+    "schema": [
+      { "name": "voltage", "label": "Voltage", "type": "number" },
+      { "name": "rating", "label": "Rating", "type": "select", "options": ["100A", "225A", "400A", "600A"] },
+      { "name": "voltage_class", "label": "Voltage Class", "type": "select" },
+      { "name": "thermal_rating", "label": "Thermal Rating", "type": "select" },
+      { "name": "conductor_type", "label": "Conductor Type", "type": "select", "options": ["THHN", "XHHW", "RHW"] },
+      { "name": "cable_assembly", "label": "Cable Assembly", "type": "select", "options": ["Tray Cable", "MC Cable", "SER Cable"] },
+      { "name": "manufacturer", "label": "Manufacturer", "type": "select" },
+      { "name": "model", "label": "Model", "type": "select" },
+      { "name": "notes", "label": "Notes", "type": "textarea" }
+    ]
+  },
+  {
+    "subtype": "Motor",
+    "label": "Motor",
+    "icon": "icons/components/Motor.svg",
+    "category": "load",
+    "ports": [{ "x": 0, "y": 20 }, { "x": 80, "y": 20 }],
+    "schema": [
+      { "name": "voltage", "label": "Voltage", "type": "number" },
+      { "name": "rating", "label": "Rating", "type": "select", "options": ["5HP", "10HP", "20HP", "50HP", "100HP"] },
+      { "name": "breaker_frame", "label": "Breaker Frame", "type": "select", "options": ["100A", "225A", "400A"] },
+      { "name": "conductor_type", "label": "Conductor Type", "type": "select", "options": ["THHN", "XHHW", "RHW"] },
+      { "name": "cable_assembly", "label": "Cable Assembly", "type": "select", "options": ["Tray Cable", "MC Cable", "SER Cable"] },
+      { "name": "manufacturer", "label": "Manufacturer", "type": "text" },
+      { "name": "model", "label": "Model", "type": "text" },
+      { "name": "phases", "label": "Phases", "type": "select", "options": ["1", "3"] },
+      { "name": "inrushMultiple", "label": "Inrush Multiple", "type": "number" },
+      { "name": "thevenin_r", "label": "Thevenin R (Ω)", "type": "number" },
+      { "name": "thevenin_x", "label": "Thevenin X (Ω)", "type": "number" },
+      { "name": "inertia", "label": "Inertia (kg·m²)", "type": "number" },
+      { "name": "load_torque", "label": "Load Torque (N·m)", "type": "number" },
+      { "name": "harmonicSource", "label": "Harmonic Source", "type": "checkbox" },
+      { "name": "harmonics", "label": "Harmonics (n:%)", "type": "text" },
+      { "name": "notes", "label": "Notes", "type": "textarea" }
+    ]
+  },
+  {
+    "subtype": "CapacitorBank",
+    "label": "Capacitor Bank",
+    "icon": "icons/components/CapacitorBank.svg",
+    "category": "equipment",
+    "ports": [{ "x": 0, "y": 20 }, { "x": 80, "y": 20 }],
+    "schema": [
+      { "name": "voltage", "label": "Voltage", "type": "number" },
+      { "name": "kVAR", "label": "Reactive Power (kVAR)", "type": "number" },
+      { "name": "rating", "label": "Rating", "type": "select", "options": ["25kVAR", "50kVAR", "75kVAR", "100kVAR"] },
+      { "name": "breaker_frame", "label": "Breaker Frame", "type": "select", "options": ["100A", "225A", "400A", "600A"] },
+      { "name": "conductor_type", "label": "Conductor Type", "type": "select", "options": ["THHN", "XHHW", "RHW"] },
+      { "name": "cable_assembly", "label": "Cable Assembly", "type": "select", "options": ["Tray Cable", "MC Cable", "SER Cable"] },
+      { "name": "manufacturer", "label": "Manufacturer", "type": "text" },
+      { "name": "model", "label": "Model", "type": "text" },
+      { "name": "phases", "label": "Phases", "type": "select", "options": ["1", "3"] },
+      { "name": "notes", "label": "Notes", "type": "textarea" }
+    ]
+  },
+  {
+    "subtype": "PVArray",
+    "label": "PV Array",
+    "icon": "icons/components/PVArray.svg",
+    "category": "equipment",
+    "ports": [{ "x": 0, "y": 20 }, { "x": 80, "y": 20 }],
+    "schema": [
+      { "name": "voltage", "label": "Voltage", "type": "number" },
+      { "name": "kW", "label": "Power (kW)", "type": "number" },
+      { "name": "rating", "label": "Rating", "type": "select", "options": ["25kW", "50kW", "75kW", "100kW"] },
+      { "name": "breaker_frame", "label": "Breaker Frame", "type": "select", "options": ["100A", "225A", "400A", "600A"] },
+      { "name": "conductor_type", "label": "Conductor Type", "type": "select", "options": ["THHN", "XHHW", "RHW"] },
+      { "name": "cable_assembly", "label": "Cable Assembly", "type": "select", "options": ["Tray Cable", "MC Cable", "SER Cable"] },
+      { "name": "manufacturer", "label": "Manufacturer", "type": "text" },
+      { "name": "model", "label": "Model", "type": "text" },
+      { "name": "phases", "label": "Phases", "type": "select", "options": ["1", "3"] },
+      { "name": "notes", "label": "Notes", "type": "textarea" }
+    ]
+  },
+  {
+    "subtype": "Load",
+    "label": "Load",
+    "icon": "icons/components/Load.svg",
+    "category": "load",
+    "ports": [{ "x": 0, "y": 20 }, { "x": 80, "y": 20 }],
+    "schema": [
+      { "name": "voltage", "label": "Voltage", "type": "number" },
+      { "name": "rating", "label": "Rating", "type": "select", "options": ["5kW", "10kW", "20kW", "50kW"] },
+      { "name": "breaker_frame", "label": "Breaker Frame", "type": "select", "options": ["100A", "225A", "400A"] },
+      { "name": "conductor_type", "label": "Conductor Type", "type": "select", "options": ["THHN", "XHHW", "RHW"] },
+      { "name": "cable_assembly", "label": "Cable Assembly", "type": "select", "options": ["Tray Cable", "MC Cable", "SER Cable"] },
+      { "name": "manufacturer", "label": "Manufacturer", "type": "text" },
+      { "name": "model", "label": "Model", "type": "text" },
+      { "name": "phases", "label": "Phases", "type": "select", "options": ["1", "3"] },
+      { "name": "motor", "label": "Motor", "type": "checkbox" },
+      { "name": "inrushMultiple", "label": "Inrush Multiple", "type": "number" },
+      { "name": "thevenin_r", "label": "Thevenin R (Ω)", "type": "number" },
+      { "name": "thevenin_x", "label": "Thevenin X (Ω)", "type": "number" },
+      { "name": "inertia", "label": "Inertia (kg·m²)", "type": "number" },
+      { "name": "load_torque", "label": "Load Torque (N·m)", "type": "number" },
+      { "name": "harmonicSource", "label": "Harmonic Source", "type": "checkbox" },
+      { "name": "harmonics", "label": "Harmonics (n:%)", "type": "text" },
+      { "name": "notes", "label": "Notes", "type": "textarea" }
+    ]
+  }
+]
+

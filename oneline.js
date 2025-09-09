@@ -14,6 +14,8 @@ import { exportDXF, exportDWG } from './exporters/dxf.js';
 
 let componentMeta = {};
 
+const asset = path => new URL(path, document.baseURI).href;
+
 const projectId = typeof window !== 'undefined' ? (window.currentProjectId || 'default') : undefined;
 if (projectId) {
   loadProject(projectId);
@@ -22,15 +24,14 @@ if (projectId) {
   });
 }
 
-const baseUrl = typeof document !== 'undefined' ? document.baseURI : '';
 const typeIcons = {
-  panel: new URL('icons/panel.svg', baseUrl).href,
-  equipment: new URL('icons/equipment.svg', baseUrl).href,
-  load: new URL('icons/load.svg', baseUrl).href,
-  bus: new URL('icons/Bus.svg', baseUrl).href
+  panel: asset('icons/panel.svg'),
+  equipment: asset('icons/equipment.svg'),
+  load: asset('icons/load.svg'),
+  bus: asset('icons/Bus.svg')
 };
 
-const placeholderIcon = new URL('icons/placeholder.svg', baseUrl).href;
+const placeholderIcon = asset('icons/placeholder.svg');
 
 const builtinComponents = [
   {
@@ -110,7 +111,7 @@ async function loadComponentLibrary() {
   let status;
   let libraryFailed = false;
   try {
-    const res = await fetch('componentLibrary.json');
+    const res = await fetch(asset('componentLibrary.json'));
     status = res.status;
     if (!res.ok) throw new Error(res.statusText);
     data = await res.json();
@@ -168,7 +169,7 @@ async function loadComponentLibrary() {
         c.icon = placeholderIcon;
         return;
       }
-      const iconUrl = new URL(c.icon, document.baseURI).href;
+      const iconUrl = asset(c.icon);
       try {
         const head = await fetch(iconUrl, { method: 'HEAD' });
         if (!head.ok) throw new Error(head.statusText);
@@ -234,7 +235,7 @@ function isValidComponent(c) {
 
 async function loadManufacturerLibrary() {
   try {
-    const res = await fetch('manufacturerLibrary.json');
+    const res = await fetch(asset('manufacturerLibrary.json'));
     manufacturerDefaults = await res.json();
   } catch (err) {
     console.error('Failed to load manufacturer defaults', err);
@@ -246,7 +247,7 @@ async function loadManufacturerLibrary() {
 
 async function loadProtectiveDevices() {
   try {
-    const res = await fetch('data/protectiveDevices.json');
+    const res = await fetch(asset('data/protectiveDevices.json'));
     protectiveDevices = await res.json();
   } catch (err) {
     console.error('Failed to load protective devices', err);
@@ -2256,7 +2257,7 @@ async function init() {
     s.components.forEach(c => {
       if (c.type === 'dimension') return;
       if (!componentMeta[c.subtype]) {
-        const icon = typeIcons[c.type] || 'icons/equipment.svg';
+        const icon = typeIcons[c.type] || asset('icons/equipment.svg');
         componentMeta[c.subtype] = {
           icon,
           label: c.subtype,

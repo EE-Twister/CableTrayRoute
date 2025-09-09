@@ -1,0 +1,16 @@
+[
+  { "label": "3/C – #8 AWG",     "conductors": 3, "size": "#8 AWG",     "OD": 0.66, "weight": 0.33 },
+  { "label": "3/C – #6 AWG",     "conductors": 3, "size": "#6 AWG",     "OD": 0.74, "weight": 0.45 },
+  { "label": "3/C – #4 AWG",     "conductors": 3, "size": "#4 AWG",     "OD": 0.88, "weight": 0.66 },
+  { "label": "3/C – #2 AWG",     "conductors": 3, "size": "#2 AWG",     "OD": 1.00, "weight": 0.96 },
+  { "label": "3/C – #1 AWG",     "conductors": 3, "size": "#1 AWG",     "OD": 1.13, "weight": 1.17 },
+  { "label": "3/C – 1/0 AWG",    "conductors": 3, "size": "1/0 AWG",    "OD": 1.22, "weight": 1.43 },
+  { "label": "3/C – 2/0 AWG",    "conductors": 3, "size": "2/0 AWG",    "OD": 1.31, "weight": 1.72 },
+  { "label": "3/C – 3/0 AWG",    "conductors": 3, "size": "3/0 AWG",    "OD": 1.42, "weight": 2.14 },
+  { "label": "3/C – 4/0 AWG",    "conductors": 3, "size": "4/0 AWG",    "OD": 1.55, "weight": 2.64 },
+  { "label": "3/C – 250 kcmil",  "conductors": 3, "size": "250 kcmil",  "OD": 1.76, "weight": 3.18 },
+  { "label": "3/C – 350 kcmil",  "conductors": 3, "size": "350 kcmil",  "OD": 1.98, "weight": 4.29 },
+  { "label": "3/C – 500 kcmil",  "conductors": 3, "size": "500 kcmil",  "OD": 2.26, "weight": 5.94 },
+  { "label": "3/C – 750 kcmil",  "conductors": 3, "size": "750 kcmil",  "OD": 2.71, "weight": 9.01 },
+  { "label": "3/C – 1000 kcmil", "conductors": 3, "size": "1000 kcmil", "OD": 3.10, "weight": 11.70 }
+]
