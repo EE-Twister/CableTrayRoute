@@ -427,7 +427,7 @@ document.addEventListener('DOMContentLoaded', async () => {
                 rs.style.visibility = 'visible';
                 rs.style.display = '';
             }
-            if (typeof emitAsync === 'function') emitAsync('route-updated');
+            emitAsync('route-updated');
         }
     };
 

@@ -2,6 +2,9 @@ const assert = require("assert");
 const fs = require("fs");
 const path = require("path");
 
+// Ensure emitAsync is globally defined for functions extracted from app.mjs
+require("../utils/safeEvents.js");
+
 // Utility functions for simple test output, mirroring existing tests
 function describe(name, fn) {
   console.log(name);
