@@ -17,3 +17,14 @@ export function markReady(flagName) {
     document.documentElement.setAttribute(flagName, '1');
   }
 }
+
+export function ensureBeacon(id) {
+  if (typeof document === 'undefined') return;
+  let el = document.getElementById(id);
+  if (!el) {
+    el = document.createElement('div');
+    el.id = id;
+    el.style.cssText = 'position:fixed;inset:auto auto 0 0;width:1px;height:1px;opacity:0;pointer-events:none;';
+    document.body.appendChild(el);
+  }
+}
