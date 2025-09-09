@@ -119,14 +119,30 @@ async function loadComponentLibrary() {
     console.info('Component library status:', status);
     if (!res.ok) throw new Error(res.statusText);
     data = await res.json();
+    console.info('Component library typeof:', typeof data, 'isArray:', Array.isArray(data), 'length:', Array.isArray(data) ? data.length : 'n/a');
+    if (!Array.isArray(data)) {
+      // Accept common shapes: {components:[...]} or {key:{...}, ...}
+      if (Array.isArray(data.components)) data = data.components;
+      else data = Object.values(data).filter(v => v && typeof v === 'object');
+      console.info('Normalized library length:', Array.isArray(data) ? data.length : 'n/a');
+    }
   } catch (err) {
     console.error(`Failed to load component library ${url} status ${status ?? 'unknown'}`, err);
     showToast(`Failed to load component library ${url} (status: ${status ?? 'unknown'}). ${err.message}`);
     try {
       const fallbackUrl = new URL('./componentLibrary.json', import.meta.url);
+      console.info('Component library fallback URL:', fallbackUrl.href);
       const res = await fetch(fallbackUrl);
+      status = res.status;
+      console.info('Component library fallback status:', status);
       if (!res.ok) throw new Error(res.statusText);
       data = await res.json();
+      console.info('Component library fallback typeof:', typeof data, 'isArray:', Array.isArray(data), 'length:', Array.isArray(data) ? data.length : 'n/a');
+      if (!Array.isArray(data)) {
+        if (Array.isArray(data.components)) data = data.components;
+        else data = Object.values(data).filter(v => v && typeof v === 'object');
+        console.info('Normalized fallback library length:', Array.isArray(data) ? data.length : 'n/a');
+      }
     } catch (importErr) {
       showToast(`Failed to import component library. ${importErr.message}`);
       showToast('Falling back to built-in components.');
@@ -169,23 +185,29 @@ async function loadComponentLibrary() {
   console.info('Library size:', Array.isArray(data) ? data.length : 'n/a');
 
   await Promise.all(
-    data.map(async c => {
-      if (!c.icon) {
-        missingIcons.push(c.subtype);
-        c.icon = placeholderIcon;
-        return;
-      }
-      const iconUrl = asset(c.icon);
-      try {
-        const ping = await fetch(iconUrl, { method: 'GET', cache: 'no-store' });
-        if (!ping.ok) throw new Error(ping.statusText);
-        c.icon = iconUrl;
-      } catch {
-        console.warn(`Icon missing for subtype ${c.subtype} -> using placeholder`);
-        missingIcons.push(c.subtype);
-        c.icon = placeholderIcon;
-      }
-    })
+    data.map(
+      c =>
+        new Promise(resolve => {
+          if (!c.icon) {
+            missingIcons.push(c.subtype);
+            c.icon = placeholderIcon;
+            return resolve();
+          }
+          const iconUrl = asset(c.icon);
+          const img = new Image();
+          img.onload = () => {
+            c.icon = iconUrl;
+            resolve();
+          };
+          img.onerror = () => {
+            console.warn(`Icon missing for subtype ${c.subtype} -> using placeholder`);
+            missingIcons.push(c.subtype);
+            c.icon = placeholderIcon;
+            resolve();
+          };
+          img.src = iconUrl;
+        })
+    )
   );
 
   const reliabilityFields = [
