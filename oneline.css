@@ -180,10 +180,6 @@
   opacity: 1;
 }
 
-.scale-label {
-  margin-left: var(--ol-spacing);
-}
-
 .slack-label {
   margin-left: var(--ol-spacing);
 }

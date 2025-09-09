@@ -371,9 +371,7 @@ let hoverPort = null;
 let selectedConnection = null;
 let dimensionMode = false;
 let dimensionStart = null;
-let diagramScale = getItem('diagramScale', { unitPerPx: 1, unit: 'in' });
-let scaleValueInput = null;
-let scaleUnitInput = null;
+let diagramScale = { unitPerPx: 1, unit: 'in' };
 let cableSlackPct = Number(getItem('cableSlackPct', 0));
 let slackPctInput = null;
 let gridSize = Number(getItem('gridSize', 20));
@@ -389,43 +387,8 @@ const DIAGRAM_VERSION = 2;
 let cursorPos = { x: 20, y: 20 };
 let showOverlays = true;
 let syncing = false;
-const lintPanel = document.getElementById('lint-panel');
-const lintList = document.getElementById('lint-list');
-const lintCloseBtn = document.getElementById('lint-close-btn');
-if (lintCloseBtn) lintCloseBtn.addEventListener('click', () => lintPanel.classList.add('hidden'));
-
-const svg = document.getElementById('diagram');
-if (svg) {
-  svg.addEventListener('dblclick', e => {
-    const g = e.target.closest('.component');
-    if (!g) return;
-    selectComponent(g.dataset.id);
-  });
-  svg.addEventListener('dragover', e => e.preventDefault());
-  svg.addEventListener('drop', e => {
-    e.preventDefault();
-    const dataText = e.dataTransfer.getData('text/plain');
-    if (!dataText) return;
-    let info;
-    try {
-      info = JSON.parse(dataText);
-    } catch {
-      showToast('Cannot drop component');
-      return;
-    }
-    const { left, top } = svg.getBoundingClientRect();
-    const x = e.clientX - left;
-    const y = e.clientY - top;
-    const comp = addComponent({ type: info.type, subtype: info.subtype, x, y });
-    render();
-    save();
-    const elem = svg.querySelector(`g.component[data-id="${comp.id}"]`);
-    if (elem) {
-      elem.classList.add('flash');
-      setTimeout(() => elem.classList.remove('flash'), 500);
-    }
-  });
-}
+let lintPanel = null;
+let lintList = null;
 
 // Re-run validation whenever diagram or study results change
 on('oneLineDiagram', validateDiagram);
@@ -1035,14 +998,6 @@ function nearestPortToPoint(x, y, exclude) {
   return best;
 }
 
-function updateScale() {
-  if (!scaleValueInput) return;
-  diagramScale.unitPerPx = Number(scaleValueInput.value) || 0;
-  diagramScale.unit = scaleUnitInput?.value || '';
-  setItem('diagramScale', diagramScale);
-  render();
-}
-
 function normalizeComponent(c) {
   const nc = {
     ...c,
@@ -1523,7 +1478,6 @@ function save(notify = true) {
   components = sheets[activeSheet].components;
   connections = sheets[activeSheet].connections;
   setOneLine({ activeSheet, sheets: sheetData });
-  setItem('diagramScale', diagramScale);
   const issues = validateDiagram();
   if (issues.length === 0) {
     syncSchedules(notify);
@@ -2248,6 +2202,44 @@ async function chooseCable(source, target, existingConn = null) {
 }
 
 async function init() {
+  lintPanel = document.getElementById('lint-panel');
+  lintList = document.getElementById('lint-list');
+  const lintCloseBtn = document.getElementById('lint-close-btn');
+  if (lintCloseBtn) lintCloseBtn.addEventListener('click', () => lintPanel.classList.add('hidden'));
+
+  const svg = document.getElementById('diagram');
+  if (svg) {
+    svg.addEventListener('dblclick', e => {
+      const g = e.target.closest('.component');
+      if (!g) return;
+      selectComponent(g.dataset.id);
+    });
+    svg.addEventListener('dragover', e => e.preventDefault());
+    svg.addEventListener('drop', e => {
+      e.preventDefault();
+      const dataText = e.dataTransfer.getData('text/plain');
+      if (!dataText) return;
+      let info;
+      try {
+        info = JSON.parse(dataText);
+      } catch {
+        showToast('Cannot drop component');
+        return;
+      }
+      const { left, top } = svg.getBoundingClientRect();
+      const x = e.clientX - left;
+      const y = e.clientY - top;
+      const comp = addComponent({ type: info.type, subtype: info.subtype, x, y });
+      render();
+      save();
+      const elem = svg.querySelector(`g.component[data-id="${comp.id}"]`);
+      if (elem) {
+        elem.classList.add('flash');
+        setTimeout(() => elem.classList.remove('flash'), 500);
+      }
+    });
+  }
+
   await loadManufacturerLibrary();
   await loadComponentLibrary();
   await loadProtectiveDevices();
@@ -2423,13 +2415,6 @@ async function init() {
     setItem('gridSize', gridSize);
     render();
   });
-
-  scaleValueInput = document.getElementById('scale-value');
-  scaleUnitInput = document.getElementById('scale-unit');
-  if (scaleValueInput) scaleValueInput.value = diagramScale.unitPerPx;
-  if (scaleUnitInput) scaleUnitInput.value = diagramScale.unit;
-  scaleValueInput?.addEventListener('change', updateScale);
-  scaleUnitInput?.addEventListener('change', updateScale);
 
   slackPctInput = document.getElementById('slack-pct');
   if (slackPctInput) slackPctInput.value = cableSlackPct;
@@ -3379,9 +3364,6 @@ async function importDiagram(data) {
   }
   data = migrateDiagram(data);
   diagramScale = data.scale || { unitPerPx: 1, unit: 'in' };
-  setItem('diagramScale', diagramScale);
-  if (scaleValueInput) scaleValueInput.value = diagramScale.unitPerPx;
-  if (scaleUnitInput) scaleUnitInput.value = diagramScale.unit;
   templates = data.templates || [];
   saveTemplates();
   renderTemplates();
