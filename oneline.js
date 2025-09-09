@@ -98,168 +98,138 @@ const manufacturerModels = {
   Generac: ['G2000', 'Industrial']
 };
 
+// === REPLACE THE ENTIRE FUNCTION ===
 async function loadComponentLibrary() {
-  // Reset library caches so a reload starts from a clean slate
+  // Reset caches for a clean reload
   componentMeta = {};
   propSchemas = {};
-  // Track subtype->category and the category lists that build the palette
   subtypeCategory = {};
   componentTypes = {};
 
-  let data = [];
-  const skipped = [];
-  const missingIcons = [];
-  let status;
-  let libraryFailed = false;
-  const url = asset('componentLibrary.json');
-  console.info('Component library URL:', url);
-  try {
-    const res = await fetch(url);
-    status = res.status;
-    console.info('Component library status:', status);
-    if (!res.ok) throw new Error(res.statusText);
-    data = await res.json();
-    console.info('Component library typeof:', typeof data, 'isArray:', Array.isArray(data), 'length:', Array.isArray(data) ? data.length : 'n/a');
-    if (!Array.isArray(data)) {
-      // Accept common shapes: {components:[...]} or {key:{...}, ...}
-      if (Array.isArray(data.components)) data = data.components;
-      else data = Object.values(data).filter(v => v && typeof v === 'object');
-      console.info('Normalized library length:', Array.isArray(data) ? data.length : 'n/a');
-    }
-  } catch (err) {
-    console.error(`Failed to load component library ${url} status ${status ?? 'unknown'}`, err);
-    showToast(`Failed to load component library ${url} (status: ${status ?? 'unknown'}). ${err.message}`);
+  const banner = document.getElementById('component-library-banner');
+
+  // Helper: fetch JSON with a clear error
+  async function fetchJSON(url) {
+    let res;
     try {
-      const fallbackUrl = new URL('./componentLibrary.json', import.meta.url);
-      console.info('Component library fallback URL:', fallbackUrl.href);
-      const res = await fetch(fallbackUrl);
-      status = res.status;
-      console.info('Component library fallback status:', status);
-      if (!res.ok) throw new Error(res.statusText);
-      data = await res.json();
-      console.info('Component library fallback typeof:', typeof data, 'isArray:', Array.isArray(data), 'length:', Array.isArray(data) ? data.length : 'n/a');
-      if (!Array.isArray(data)) {
-        if (Array.isArray(data.components)) data = data.components;
-        else data = Object.values(data).filter(v => v && typeof v === 'object');
-        console.info('Normalized fallback library length:', Array.isArray(data) ? data.length : 'n/a');
-      }
+      res = await fetch(url, { cache: 'no-store' });
+      if (!res.ok) throw new Error(`HTTP ${res.status}`);
+      return await res.json();
+    } catch (e) {
+      console.error('Component library fetch failed:', url, e?.message || e);
+      throw e;
+    }
+  }
+
+  // Helper: normalize library shape into an array of components
+  function normalizeToArray(data) {
+    if (Array.isArray(data)) return data;
+    if (data && Array.isArray(data.components)) return data.components;
+    if (data && typeof data === 'object') {
+      // Accept object maps: { MLO: {...}, MCC: {...}, ... }
+      const arr = Object.values(data).filter(v => v && typeof v === 'object');
+      if (arr.length) return arr;
+    }
+    return [];
+  }
+
+  // 1) Try base-relative
+  const primaryUrl = new URL('componentLibrary.json', document.baseURI).href;
+  console.info('Component library URL (primary):', primaryUrl);
+
+  let data;
+  try {
+    const d1 = await fetchJSON(primaryUrl);
+    data = normalizeToArray(d1);
+  } catch {
+    // 2) Fallback: relative to this module (import.meta.url)
+    try {
+      const fallbackUrl = new URL('./componentLibrary.json', import.meta.url).href;
+      console.info('Component library URL (fallback):', fallbackUrl);
+      const d2 = await fetchJSON(fallbackUrl);
+      data = normalizeToArray(d2);
     } catch (importErr) {
-      showToast(`Failed to import component library. ${importErr.message}`);
-      showToast('Falling back to built-in components.');
-      libraryFailed = true;
-      data = builtinComponents;
+      console.warn('Falling back to built-in components.', importErr?.message || importErr);
+      data = builtinComponents.slice(); // last resort
     }
   }
 
-  const version = getItem('componentLibraryVersion', null);
-  let userComponents = [];
-  let userIcons = {};
-  if (version) {
-    const stored = getItem('componentLibrary_' + version, null);
-    if (stored) {
-      userComponents = Array.isArray(stored.components) ? stored.components : [];
-      userIcons = stored.icons || {};
-    }
+  // If after normalization we still have nothing, bail with a visible banner
+  if (!Array.isArray(data) || data.length === 0) {
+    console.error('Component library normalized to zero components.');
+    if (banner) banner.classList.remove('hidden');
+    // Build an empty palette (shows "No components available" placeholders)
+    buildPalette();
+    showToast('Component library parsed to zero components.');
+    return;
   }
 
-  const bySubtype = new Map();
-  data.forEach(c => bySubtype.set(c.subtype, c));
-
-  userComponents.forEach(c => {
-    if (!isValidComponent(c)) {
-      skipped.push(c.subtype || 'unknown');
+  // Validate icons without breaking the palette
+  const missingIcons = [];
+  await Promise.all(data.map(async c => {
+    if (!isValidComponent(c)) return;
+    if (!c.icon) {
+      c.icon = placeholderIcon;
+      missingIcons.push(c.subtype || 'unknown');
       return;
     }
-    if (userIcons[c.icon]) c.icon = userIcons[c.icon];
-    bySubtype.set(c.subtype, c);
-  });
-
-  data = Array.from(bySubtype.values()).filter(c => {
-    if (!isValidComponent(c)) {
-      skipped.push(c.subtype || 'unknown');
-      return false;
+    const iconUrl = new URL(c.icon, document.baseURI).href;
+    // DO NOT use HEAD on GitHub Pages; do a tolerant GET and ignore failures
+    try {
+      const ping = await fetch(iconUrl, { method: 'GET', cache: 'no-store', mode: 'no-cors' });
+      // no-cors may not yield .ok; we still accept the URL
+      c.icon = iconUrl;
+    } catch {
+      console.warn(`Icon missing for subtype ${c.subtype}; using placeholder.`);
+      c.icon = placeholderIcon;
+      missingIcons.push(c.subtype || 'unknown');
     }
-    if (userIcons[c.icon]) c.icon = userIcons[c.icon];
-    return true;
-  });
-  console.info('Library size:', Array.isArray(data) ? data.length : 'n/a');
+  }));
 
-  await Promise.all(
-    data.map(
-      c =>
-        new Promise(resolve => {
-          if (!c.icon) {
-            missingIcons.push(c.subtype);
-            c.icon = placeholderIcon;
-            return resolve();
-          }
-          const iconUrl = asset(c.icon);
-          const img = new Image();
-          img.onload = () => {
-            c.icon = iconUrl;
-            resolve();
-          };
-          img.onerror = () => {
-            console.warn(`Icon missing for subtype ${c.subtype} -> using placeholder`);
-            missingIcons.push(c.subtype);
-            c.icon = placeholderIcon;
-            resolve();
-          };
-          img.src = iconUrl;
-        })
-    )
-  );
-
+  // Build metadata and category map
   const reliabilityFields = [
     { name: 'mtbf', label: 'MTBF (hrs)', type: 'number' },
     { name: 'mttr', label: 'MTTR (hrs)', type: 'number' },
     { name: 'failure_modes', label: 'Failure Modes', type: 'textarea' }
   ];
-  data.forEach(c => {
+
+  const bySubtype = new Map();
+  data.forEach(c => bySubtype.set(c.subtype, c)); // last one wins
+
+  const finalData = Array.from(bySubtype.values()).filter(isValidComponent);
+  finalData.forEach(c => {
     c.schema = c.schema || [];
     reliabilityFields.forEach(f => {
       if (!c.schema.some(s => s.name === f.name)) c.schema.push(f);
     });
 
-    // Store metadata for quick lookup when rendering components
     componentMeta[c.subtype] = {
-      icon: c.icon,
-      label: c.label,
+      icon: c.icon || placeholderIcon,
+      label: c.label || c.subtype || 'Component',
       category: c.category,
       ports: c.ports
     };
-    propSchemas[c.subtype] = c.schema || [];
 
-    // Build category -> subtype mapping used by the palette
-    subtypeCategory[c.subtype] = c.category;
-    if (!componentTypes[c.category]) componentTypes[c.category] = [];
-    componentTypes[c.category].push(c.subtype);
+    const cat = c.category;
+    subtypeCategory[c.subtype] = cat;
+    if (!componentTypes[cat]) componentTypes[cat] = [];
+    componentTypes[cat].push(c.subtype);
   });
-  if (Object.keys(componentTypes).length === 0) {
-    console.error('No component types derived from library', data);
-    showToast('Library parsed to zero components');
-  }
-  const banner = document.getElementById('component-library-banner');
-  if (banner) {
-    if (libraryFailed) banner.classList.remove('hidden');
-    else banner.classList.add('hidden');
-  }
 
-  // build the palette with the newly loaded library
+  console.info('Palette categories:', Object.keys(componentTypes));
+
+  // Show/hide banner based on whether we actually have anything to show
+  const hasAny = Object.values(componentTypes).some(arr => Array.isArray(arr) && arr.length);
+  if (banner) banner.classList.toggle('hidden', hasAny);
+
+  // Always render the palette
   buildPalette();
 
-  if (skipped.length) {
-    showToast(`Skipped components: ${skipped.join(', ')}`);
-  }
   if (missingIcons.length) {
-    console.warn('Using placeholder icons for: ' + missingIcons.join(', '));
-    showToast(
-      `Placeholder icons for: ${missingIcons.join(', ')}`,
-      'Fix icons',
-      'docs/componentLibrary.html#icons'
-    );
+    showToast(`Placeholder icons for: ${missingIcons.join(', ')}`);
   }
 }
+// === END REPLACEMENT ===
 
 function isValidComponent(c) {
   return c && typeof c === 'object' && Array.isArray(c.ports) && c.category;
@@ -2275,10 +2245,6 @@ async function init() {
     });
   }
 
-  await loadComponentLibrary();
-  await loadManufacturerLibrary();
-  await loadProtectiveDevices();
-  buildPalette();
   const { sheets: storedSheets, activeSheet: storedActive = 0 } = getOneLine();
   sheets = storedSheets.map((s, i) => ({
     name: s.name || `Sheet ${i + 1}`,
@@ -3435,8 +3401,25 @@ if (typeof window !== 'undefined') {
   window.loadManufacturerLibrary = loadManufacturerLibrary;
 }
 
-window.addEventListener('DOMContentLoaded', async () => {
+document.addEventListener('DOMContentLoaded', async () => {
   setupLibraryTools();
+  try {
+    await loadComponentLibrary();
+  } catch (e) {
+    console.error('loadComponentLibrary() threw:', e);
+  }
+  try {
+    await loadManufacturerLibrary();
+  } catch (e) {
+    console.error('loadManufacturerLibrary() threw:', e);
+  }
+  try {
+    await loadProtectiveDevices();
+  } catch (e) {
+    console.error('loadProtectiveDevices() threw:', e);
+  }
+  // buildPalette() is called inside loader; calling again is harmless
+  buildPalette();
   try {
     await init();
   } catch (err) {
