@@ -34,6 +34,30 @@ function suppressResumeIfE2E() {
 window.E2E = E2E;
 
 import { emitAsync } from './utils/safeEvents.mjs';
+
+function emitSticky(name, flagKey) {
+  if (!window.__e2eFlags) window.__e2eFlags = {};
+  window.__e2eFlags[flagKey] = true;
+  emitAsync(name);
+  if (E2E) {
+    let n = 0;
+    const id = setInterval(() => {
+      emitAsync(name);
+      if (++n >= 20) clearInterval(id);
+    }, 50);
+    setTimeout(() => clearInterval(id), 1500);
+  }
+}
+
+function whenPresent(selector, cb, timeoutMs = 5000) {
+  const start = performance.now();
+  const poll = () => {
+    if (document.querySelector(selector)) return cb();
+    if (performance.now() - start > timeoutMs) return;
+    setTimeout(poll, 50);
+  };
+  poll();
+}
 import { getItem, setItem, removeItem, getTrays, getCables, getDuctbanks, getConduits, exportProject, importProject, setCables } from './dataStore.mjs';
 import { buildSegmentRows, buildSummaryRows, buildBOM } from './resultsExport.mjs';
 import './site.js';
@@ -426,7 +450,11 @@ document.addEventListener('DOMContentLoaded', async () => {
                 rs.style.visibility = 'visible';
                 rs.style.display = '';
             }
-            emitAsync('route-updated');
+            if (typeof emitSticky === 'function') {
+                emitSticky('route-updated','routeUpdated');
+            } else {
+                emitAsync('route-updated');
+            }
         }
     };
 
@@ -2017,7 +2045,7 @@ const openDuctbankRoute = (dbId, conduitId) => {
         updateTrayDisplay();
         updateTableCounts();
         saveSession();
-        emitAsync('samples-loaded');
+        emitSticky('samples-loaded','samplesLoaded');
     };
 
     const renderManualTrayTable = () => {
@@ -2219,7 +2247,7 @@ const openDuctbankRoute = (dbId, conduitId) => {
             updateTableCounts();
             saveSession();
             if (elements.manualTrayTableContainer?.querySelector('tbody tr')) {
-                emitAsync('imports-ready-trays');
+                emitSticky('imports-ready-trays','importsReadyTrays');
             }
         });
         elements.importTraysFile.value='';
@@ -2279,7 +2307,7 @@ const openDuctbankRoute = (dbId, conduitId) => {
             updateTableCounts();
             saveSession();
             if (elements.cableListContainer?.querySelector('tbody tr')) {
-                emitAsync('imports-ready-cables');
+                emitSticky('imports-ready-cables','importsReadyCables');
             }
         });
         elements.importCablesFile.value='';
@@ -2388,7 +2416,7 @@ const renderBatchResults = (results) => {
             elements.messages.insertAdjacentHTML('afterbegin', summaryHtml);
         }
         if (results.some(r => (r.exclusions && r.exclusions.length > 0) || (r.mismatched_records && r.mismatched_records.length > 0))) {
-            document.dispatchEvent(new CustomEvent('exclusions-found'));
+            emitAsync('exclusions-found');
         }
         elements.routeBreakdownContainer.querySelectorAll('.conduit-fill-btn').forEach(btn => {
             btn.addEventListener('click', (e) => {
@@ -2660,7 +2688,7 @@ const renderBatchResults = (results) => {
         updateCableListDisplay();
         updateTableCounts();
         saveSession();
-        emitAsync('samples-loaded');
+        emitSticky('samples-loaded','samplesLoaded');
     };
 
     const addCableToBatch = () => {
@@ -3990,8 +4018,11 @@ Plotly.newPlot(document.getElementById('plot'), data, layout, {responsive: true}
         await loadDuctbankData();
         rebuildTrayData();
         updateTrayDisplay();
-        if (typeof document !== 'undefined' && document.dispatchEvent) {
-            document.dispatchEvent(new Event('imports-ready'));
+        if (elements.manualTrayTableContainer?.querySelector('tbody tr')) {
+            emitSticky('imports-ready-trays','importsReadyTrays');
+        }
+        if (elements.cableListContainer?.querySelector('tbody tr')) {
+            emitSticky('imports-ready-cables','importsReadyCables');
         }
     };
 

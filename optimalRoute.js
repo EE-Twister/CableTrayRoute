@@ -29,6 +29,30 @@ function suppressResumeIfE2E() {
 window.E2E = E2E;
 
 import { emitAsync } from './utils/safeEvents.mjs';
+
+function emitSticky(name, flagKey) {
+  if (!window.__e2eFlags) window.__e2eFlags = {};
+  window.__e2eFlags[flagKey] = true;
+  emitAsync(name);
+  if (E2E) {
+    let n = 0;
+    const id = setInterval(() => {
+      emitAsync(name);
+      if (++n >= 20) clearInterval(id);
+    }, 50);
+    setTimeout(() => clearInterval(id), 1500);
+  }
+}
+
+function whenPresent(selector, cb, timeoutMs = 5000) {
+  const start = performance.now();
+  const poll = () => {
+    if (document.querySelector(selector)) return cb();
+    if (performance.now() - start > timeoutMs) return;
+    setTimeout(poll, 50);
+  };
+  poll();
+}
 suppressResumeIfE2E();
 
 checkPrereqs([
@@ -148,7 +172,7 @@ function populateTrayTable(trays){
   });
   html += '</tbody></table>';
   container.innerHTML = html;
-  emitAsync('imports-ready-trays');
+  emitSticky('imports-ready-trays','importsReadyTrays');
 }
 
 function populateCableTable(cables){
@@ -174,7 +198,7 @@ function populateCableTable(cables){
   });
   html += '</tbody></table>';
   container.innerHTML = html;
-  emitAsync('imports-ready-cables');
+  emitSticky('imports-ready-cables','importsReadyCables');
 }
 
 // --- Routing worker integration and visualization ---
@@ -220,7 +244,7 @@ function calculateRoutes(){
           rs.style.visibility = 'visible';
           rs.style.display = '';
         }
-        emitAsync('route-updated');
+        emitSticky('route-updated','routeUpdated');
       }
     }
   };
