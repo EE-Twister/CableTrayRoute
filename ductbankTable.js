@@ -146,9 +146,10 @@ import { getDuctbanks as readStoredDuctbanks, setDuctbanks, setItem, getItem } f
     const specs = globalThis.CONDUIT_SPECS || {};
     ductbankTbody.innerHTML='';
     ductbanks.forEach((db,i)=>{
-      const row=ductbankTbody.insertRow();
-      row.className='ductbank-row';
+      const row=document.createElement('tr');
+      row.classList.add('ductbank-row');
       row.dataset.tag = db.tag;
+      ductbankTbody.appendChild(row);
       const tgl=row.insertCell();
       setWidth(tgl,0);
       const tglBtn=document.createElement('button');
@@ -265,8 +266,9 @@ import { getDuctbanks as readStoredDuctbanks, setDuctbanks, setItem, getItem } f
       act.appendChild(iconBtn('\u29C9','duplicateBtn','Duplicate Ductbank',()=>{duplicateDuctbank(i);}));
       act.appendChild(iconBtn('\u2716','removeBtn','Delete Ductbank',()=>{deleteDuctbank(i);}));
 
-      const cRow=ductbankTbody.insertRow();
-      cRow.className='conduit-container';
+      const cRow=document.createElement('tr');
+      cRow.classList.add('conduit-container');
+      ductbankTbody.appendChild(cRow);
       cRow.style.display=db.expanded?'':'none';
       const cCell=cRow.insertCell();
       cCell.colSpan=12;
