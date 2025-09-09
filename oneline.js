@@ -371,7 +371,7 @@ let hoverPort = null;
 let selectedConnection = null;
 let dimensionMode = false;
 let dimensionStart = null;
-let diagramScale = { unitPerPx: 1, unit: 'in' };
+let diagramScale = getItem('diagramScale', { unitPerPx: 1, unit: 'in' });
 let cableSlackPct = Number(getItem('cableSlackPct', 0));
 let slackPctInput = null;
 let gridSize = Number(getItem('gridSize', 20));
@@ -1478,6 +1478,7 @@ function save(notify = true) {
   components = sheets[activeSheet].components;
   connections = sheets[activeSheet].connections;
   setOneLine({ activeSheet, sheets: sheetData });
+  setItem('diagramScale', diagramScale);
   const issues = validateDiagram();
   if (issues.length === 0) {
     syncSchedules(notify);
@@ -3364,6 +3365,7 @@ async function importDiagram(data) {
   }
   data = migrateDiagram(data);
   diagramScale = data.scale || { unitPerPx: 1, unit: 'in' };
+  setItem('diagramScale', diagramScale);
   templates = data.templates || [];
   saveTemplates();
   renderTemplates();
