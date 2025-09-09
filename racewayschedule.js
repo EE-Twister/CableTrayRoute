@@ -430,7 +430,9 @@ document.addEventListener('DOMContentLoaded', async () => {
   }
   window.getRacewaySchedule=getRacewaySchedule;
   persistAllConduits();
-  document.getElementById('raceway-load-samples')?.addEventListener('click', onRacewayLoadSamples, { once:false });
+  const loadSamplesBtn=document.getElementById('raceway-load-samples');
+  console.assert(loadSamplesBtn,'#raceway-load-samples button missing');
+  loadSamplesBtn?.addEventListener('click', onRacewayLoadSamples, { once:false });
 
   const normalize=s=>(s||'').trim().toUpperCase();
 

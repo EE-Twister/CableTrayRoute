@@ -758,6 +758,7 @@ function initProjectIO(){
   }
   const importBtn=document.getElementById('import-project-btn');
   const fileInput=document.getElementById('import-project-input');
+  console.assert(importBtn&&fileInput,'Project import controls missing');
   if(exportBtn){
     exportBtn.addEventListener('click',()=>{
       try{
