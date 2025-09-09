@@ -255,7 +255,7 @@ document.addEventListener('DOMContentLoaded', async () => {
   if(importProjInput){
     importProjInput.addEventListener('change',()=>{
       requestAnimationFrame(()=>{
-        ensureDuctbankRows();
+        document.querySelectorAll('#ductbankTable tbody tr').forEach(tr=>tr.classList.add('ductbank-row'));
         emitSticky('samples-loaded','samplesLoaded');
       });
       whenPresent('#ductbankTable tbody tr.ductbank-row', () => emitSticky('samples-loaded','samplesLoaded'));
@@ -453,7 +453,7 @@ document.addEventListener('DOMContentLoaded', async () => {
       );
       const conduitCount=dbConduits.length+standalone.length;
       console.log(`Loaded samples: ductbanks=${dbRows.length}, trays=${trayRows.length}, conduits=${conduitCount}`);
-      ensureDuctbankRows();
+      document.querySelectorAll('#ductbankTable tbody tr').forEach(tr=>tr.classList.add('ductbank-row'));
       emitSticky('samples-loaded','samplesLoaded');
       showToast(`Loaded samples: ${dbRows.length} ductbanks, ${conduitCount} conduits, ${trayRows.length} trays.`,'success');
     }catch(err){

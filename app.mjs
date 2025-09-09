@@ -2194,6 +2194,9 @@ const openDuctbankRoute = (dbId, conduitId) => {
         updateTableCounts();
         addSortHandlers(elements.manualTrayTableContainer, state.manualTrays, renderManualTrayTable, traySort);
         filterTable(elements.manualTrayTableContainer, elements.traySearch.value);
+        if (elements.manualTrayTableContainer?.querySelector('tbody tr')) {
+            emitSticky('imports-ready-trays','importsReadyTrays');
+        }
     };
 
     const exportManualTraysCSV = () => {
@@ -2681,6 +2684,9 @@ const renderBatchResults = (results) => {
         updateTableCounts();
         addSortHandlers(elements.cableListContainer, state.cableList, updateCableListDisplay, cableSort);
         filterTable(elements.cableListContainer, elements.cableSearch.value);
+        if (elements.cableListContainer?.querySelector('tbody tr')) {
+            emitSticky('imports-ready-cables','importsReadyCables');
+        }
     };
 
     const loadSampleCables = () => {
