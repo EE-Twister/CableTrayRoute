@@ -165,6 +165,15 @@
 .grid-controls label {
   display: flex;
   align-items: center;
+  width: auto;
+  height: auto;
+}
+
+.grid-controls label img {
+  width: 32px;
+  height: 32px;
+  margin-right: 0.25rem;
+  flex-shrink: 0;
 }
 
 .grid-controls input[type="number"] {
