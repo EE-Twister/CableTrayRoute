@@ -9,6 +9,16 @@ function markReady(flagName) {
   } catch {}
 }
 
+function ensureBeacon(id) {
+  let el = document.getElementById(id);
+  if (!el) {
+    el = document.createElement('div');
+    el.id = id;
+    el.style.cssText = 'position:fixed;inset:auto auto 0 0;width:1px;height:1px;opacity:0;pointer-events:none;';
+    document.body.appendChild(el);
+  }
+}
+
 function suppressResumeIfE2E({ resumeYesId = '#resume-yes-btn', resumeNoId = '#resume-no-btn' } = {}) {
   if (!E2E) return;
   try { localStorage.clear(); sessionStorage.clear(); } catch {}
@@ -3474,6 +3484,7 @@ async function __oneline_init() {
 
   // Ready flag for Playwright
   markReady('data-oneline-ready');
+  ensureBeacon('oneline-ready-beacon');
 }
 
 if (document.readyState === 'loading') {

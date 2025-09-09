@@ -9,6 +9,16 @@ function markReady(flagName) {
   } catch {}
 }
 
+function ensureBeacon(id) {
+  let el = document.getElementById(id);
+  if (!el) {
+    el = document.createElement('div');
+    el.id = id;
+    el.style.cssText = 'position:fixed;inset:auto auto 0 0;width:1px;height:1px;opacity:0;pointer-events:none;';
+    document.body.appendChild(el);
+  }
+}
+
 function suppressResumeIfE2E({ resumeYesId = '#resume-yes-btn', resumeNoId = '#resume-no-btn' } = {}) {
   if (!E2E) return;
   try { localStorage.clear(); sessionStorage.clear(); } catch {}
@@ -81,6 +91,7 @@ document.addEventListener('DOMContentLoaded', () => {
   // After any resume logic completes, ensure tray/conduit data is rebuilt
   if (typeof rebuildTrayData === 'function') rebuildTrayData();
   markReady('data-optimal-ready');
+  ensureBeacon('optimal-ready-beacon');
 });
 
 function addTrayRow(){
