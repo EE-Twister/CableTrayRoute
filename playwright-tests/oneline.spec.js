@@ -7,8 +7,9 @@ function pageUrl(file) {
 }
 
 test('drag first library item onto canvas', async ({ page }) => {
-  await page.goto(pageUrl('oneline.html'));
-  const firstBtn = page.locator('#component-buttons button').first();
+  await page.goto(pageUrl('oneline.html?e2e=1'));
+  await page.waitForSelector('[data-oneline-ready="1"]');
+  const firstBtn = page.locator('[data-testid="palette-button"]').first();
   await firstBtn.waitFor({ state: 'visible' });
   const before = await page.locator('g.component').count();
   await firstBtn.dragTo(page.locator('#diagram'));

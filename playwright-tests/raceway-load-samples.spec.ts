@@ -16,9 +16,13 @@ test('raceway load samples populates all tables', async ({ page }) => {
       return originalFetch(input, init);
     };
   }, sampleJson);
-  await page.goto(pageUrl('racewayschedule.html'));
+  await page.goto(pageUrl('racewayschedule.html?e2e=1'));
+  await page.waitForSelector('[data-raceway-ready="1"]');
   await page.waitForSelector('#raceway-load-samples');
   await page.click('#raceway-load-samples');
+  await page.evaluate(
+    () => new Promise(r => document.addEventListener('samples-loaded', r, { once: true })),
+  );
   await page.waitForSelector('#ductbankTable tbody tr.ductbank-row', { state: 'attached' });
   await page.waitForSelector('#trayTable tbody tr', { state: 'attached' });
   await page.waitForSelector('#conduitTable tbody tr', { state: 'attached' });
