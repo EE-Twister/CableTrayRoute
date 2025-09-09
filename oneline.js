@@ -6,11 +6,12 @@ function ensureReadyBeacon(attrName, id) {
   if (!el) {
     el = document.createElement('div');
     el.id = id;
-    // Visible enough for Playwright, invisible to users
+    // Visible to Playwright, invisible to users
     el.style.cssText = 'position:fixed;left:0;bottom:0;width:1px;height:1px;opacity:0.01;z-index:2147483647;';
     document.body.appendChild(el);
   }
-  el.setAttribute(attrName, '1'); // exact same data-* attribute as tests wait for
+  // carry the SAME data-* attribute tests wait for
+  el.setAttribute(attrName, '1');
 }
 
 function suppressResumeIfE2E({ resumeYesId = '#resume-yes-btn', resumeNoId = '#resume-no-btn' } = {}) {
@@ -3488,7 +3489,6 @@ async function __oneline_init() {
   }
 
   // Ready flag for Playwright
-  document.documentElement.setAttribute('data-oneline-ready', '1');
   ensureReadyBeacon('data-oneline-ready', 'oneline-ready-beacon');
 }
 
