@@ -18,7 +18,7 @@ test.describe("CableTrayRoute workflow", () => {
   test("create DB-01 with three conduits appears in Optimal Route", async ({
     page,
   }) => {
-    await page.goto(pageUrl("ductbankroute.html"));
+    await page.goto(pageUrl("ductbankroute.html?e2e=1"));
     await page.fill("#ductbankTag", "DB-01");
     for (let i = 0; i < 3; i++) {
       await page.click("#addConduit");
@@ -47,13 +47,17 @@ test.describe("CableTrayRoute workflow", () => {
       localStorage.setItem('base:traySchedule', '[]');
       localStorage.setItem('base:cableSchedule', '[]');
     }, dbData);
-    await page.goto(pageUrl('optimalRoute.html'));
+    await page.goto(pageUrl('optimalRoute.html?e2e=1'));
+    const routeUpdated = page.evaluate(
+      () => new Promise(r => document.addEventListener('route-updated', r, { once: true })),
+    );
     await handleResume(page, true);
+    await routeUpdated;
     await expect(page.locator("#conduit-count")).toContainText("3");
   });
 
   test("import sample CSV/XLSX and route cables", async ({ page }) => {
-    await page.goto(pageUrl("optimalRoute.html"));
+    await page.goto(pageUrl("optimalRoute.html?e2e=1"));
     await handleResume(page, false);
     const trayFile = path.join(root, "examples", "tray_schedule.csv");
     const cableFile = path.join(root, "examples", "cable_schedule.csv");
@@ -94,7 +98,7 @@ test.describe("CableTrayRoute workflow", () => {
         return originalFetch(input, init);
       };
     }, { trayJson, cableJson });
-    await page.goto(pageUrl("optimalRoute.html"));
+    await page.goto(pageUrl("optimalRoute.html?e2e=1"));
     await handleResume(page, false);
     await page.click("#load-sample-trays-btn");
     await page.waitForSelector("#manual-tray-table-container tbody tr", { state: 'attached' });
@@ -112,7 +116,7 @@ test.describe("CableTrayRoute workflow", () => {
   });
 
   test("dirty-state prompts appear when navigating away", async ({ page }) => {
-    await page.goto(pageUrl("ductbankroute.html"));
+    await page.goto(pageUrl("ductbankroute.html?e2e=1"));
     await page.fill("#ductbankTag", "TEMP");
     const prevented = await page.evaluate(() => {
       const event = new Event("beforeunload", { cancelable: true });

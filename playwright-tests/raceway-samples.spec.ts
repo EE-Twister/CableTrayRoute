@@ -23,12 +23,16 @@ test('raceway samples roundtrip and route', async ({ page }) => {
       return originalFetch(input, init);
     };
   }, { racewayJson, cableJson });
-  await page.goto(pageUrl('cableschedule.html'));
+  await page.goto(pageUrl('cableschedule.html?e2e=1'));
   await page.click('#load-sample-cables-btn');
 
-  await page.goto(pageUrl('racewayschedule.html'));
+  await page.goto(pageUrl('racewayschedule.html?e2e=1'));
+  await page.waitForSelector('[data-raceway-ready="1"]');
   await page.waitForSelector('#raceway-load-samples');
   await page.click('#raceway-load-samples');
+  await page.evaluate(
+    () => new Promise(r => document.addEventListener('samples-loaded', r, { once: true })),
+  );
   await page.waitForSelector('#ductbankTable tbody tr.ductbank-row', { state: 'attached' });
   await page.waitForSelector('#trayTable tbody tr', { state: 'attached' });
   await page.waitForSelector('#conduitTable tbody tr', { state: 'attached' });
@@ -60,7 +64,7 @@ test('raceway samples roundtrip and route', async ({ page }) => {
   expect(await page.locator('#trayTable tbody tr').count()).toBe(trayCount);
   expect(await page.locator('#conduitTable tbody tr').count()).toBeGreaterThanOrEqual(conduitCount);
 
-  await page.goto(pageUrl('optimalRoute.html'));
+  await page.goto(pageUrl('optimalRoute.html?e2e=1'));
   await page.click('#resume-no-btn');
   await page.click('#settings-btn');
   await page.click('#import-project-btn');
