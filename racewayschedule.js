@@ -38,7 +38,7 @@ function suppressResumeIfE2E({ resumeYesId = '#resume-yes-btn', resumeNoId = '#r
 
 window.E2E = E2E;
 
-import { emitAsync } from './utils/safeEvents.js';
+import { emitAsync } from './utils/safeEvents.mjs';
 import * as dataStore from './dataStore.mjs';
 import {
   normalizeDuctbankRow,
