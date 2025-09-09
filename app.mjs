@@ -44,7 +44,7 @@ function suppressResumeIfE2E({ resumeYesId = '#resume-yes-btn', resumeNoId = '#r
 
 window.E2E = E2E;
 
-import { emitAsync } from './utils/safeEvents.js';
+import { emitAsync } from './utils/safeEvents.mjs';
 import { getItem, setItem, removeItem, getTrays, getCables, getDuctbanks, getConduits, exportProject, importProject, setCables } from './dataStore.mjs';
 import { buildSegmentRows, buildSummaryRows, buildBOM } from './resultsExport.mjs';
 import './site.js';
