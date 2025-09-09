@@ -1,0 +1,123 @@
+{
+  "MLO": {
+    "manufacturer": "Generic",
+    "model": "MLO-1000",
+    "voltage": 480,
+    "rating": "1000A",
+    "breaker_frame": "400A",
+    "conductor_type": "THHN",
+    "cable_assembly": "Tray Cable"
+  },
+  "MCC": {
+    "manufacturer": "Generic",
+    "model": "MCC-200",
+    "voltage": 480,
+    "rating": "200A",
+    "breaker_frame": "250A",
+    "conductor_type": "THHN",
+    "cable_assembly": "Tray Cable"
+  },
+  "Generator": {
+    "manufacturer": "Caterpillar",
+    "model": "XQ125",
+    "voltage": 480,
+    "voltage_class": "0.48 kV",
+    "thermal_rating": "90C",
+    "enclosure": "NEMA 3R",
+    "rating": "500kW",
+    "breaker_frame": "400A",
+    "conductor_type": "XHHW",
+    "cable_assembly": "MC Cable"
+  },
+  "UPS": {
+    "manufacturer": "Generic",
+    "model": "UPS-100",
+    "voltage": 480,
+    "rating": "100kVA",
+    "breaker_frame": "250A",
+    "conductor_type": "THHN",
+    "cable_assembly": "Tray Cable"
+  },
+  "Transformer": {
+    "manufacturer": "Generic",
+    "model": "XFMR-75",
+    "voltage": 480,
+    "rating": "75kVA",
+    "breaker_frame": "250A",
+    "conductor_type": "XHHW",
+    "cable_assembly": "MC Cable"
+  },
+  "Switchgear": {
+    "manufacturer": "GE",
+    "model": "EntelliGuard",
+    "voltage": 480,
+    "voltage_class": "0.48 kV",
+    "thermal_rating": "90C",
+    "enclosure": "NEMA 1",
+    "rating": "1200A",
+    "breaker_frame": "1200A",
+    "conductor_type": "THHN",
+    "cable_assembly": "Tray Cable"
+  },
+  "Switchboard": {
+    "manufacturer": "ABB",
+    "model": "MNS",
+    "voltage": 480,
+    "voltage_class": "0.48 kV",
+    "thermal_rating": "90C",
+    "enclosure": "NEMA 1",
+    "rating": "1200A",
+    "breaker_frame": "1200A",
+    "conductor_type": "THHN",
+    "cable_assembly": "Tray Cable"
+  },
+  "Feeder": {
+    "manufacturer": "Siemens",
+    "model": "SB1",
+    "voltage": 480,
+    "voltage_class": "0.48 kV",
+    "thermal_rating": "90C",
+    "enclosure": "NEMA 1",
+    "rating": "400A",
+    "breaker_frame": "400A",
+    "conductor_type": "THHN",
+    "cable_assembly": "Tray Cable"
+  },
+  "Motor": {
+    "manufacturer": "Generic",
+    "model": "MTR-10",
+    "voltage": 480,
+    "rating": "10HP",
+    "breaker_frame": "100A",
+    "conductor_type": "THHN",
+    "cable_assembly": "MC Cable"
+  },
+  "CapacitorBank": {
+    "manufacturer": "Generic",
+    "model": "CAP-50",
+    "voltage": 480,
+    "rating": "50kVAR",
+    "breaker_frame": "225A",
+    "conductor_type": "THHN",
+    "cable_assembly": "Tray Cable"
+  },
+  "PVArray": {
+    "manufacturer": "Generic",
+    "model": "PV-100",
+    "voltage": 600,
+    "rating": "100kW",
+    "breaker_frame": "225A",
+    "conductor_type": "XHHW",
+    "cable_assembly": "SER Cable"
+  },
+  "Load": {
+    "manufacturer": "Generic",
+    "model": "LOAD-1",
+    "voltage": 480,
+    "rating": "10kW",
+    "breaker_frame": "100A",
+    "conductor_type": "THHN",
+    "cable_assembly": "Tray Cable"
+  }
+}
+

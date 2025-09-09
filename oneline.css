@@ -325,6 +325,10 @@
   height: 100%;
 }
 
+#grid-bg {
+  pointer-events: none;
+}
+
 #snap-indicator {
   pointer-events: none;
   opacity: 0;
