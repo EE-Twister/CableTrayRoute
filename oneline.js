@@ -387,7 +387,6 @@ function buildPalette() {
       localStorage.setItem(key, det.open);
     });
   });
-  document.documentElement.setAttribute('data-oneline-ready', '1');
   const paletteSearch = document.getElementById('palette-search');
   if (paletteSearch) {
     paletteSearch.addEventListener('input', () => {
