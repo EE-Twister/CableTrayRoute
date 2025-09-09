@@ -2459,7 +2459,8 @@ async function init() {
     }
   });
 
-  const svg = document.getElementById('diagram');
+  // Reuse the diagram element fetched earlier in this function.
+  // Avoid redeclaring the `svg` constant to prevent "Identifier has already been declared" errors.
   const menu = document.getElementById('context-menu');
     svg.addEventListener('mousedown', e => {
       if (connectMode && e.target.classList.contains('port')) {
