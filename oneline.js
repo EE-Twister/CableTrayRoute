@@ -14,13 +14,23 @@ function ensureReadyBeacon(attrName, id) {
 
 function suppressResumeIfE2E({ resumeYesId = '#resume-yes-btn', resumeNoId = '#resume-no-btn' } = {}) {
   if (!E2E) return;
-  try { localStorage.clear(); sessionStorage.clear(); } catch {}
-  // If a resume modal happens to exist, auto-dismiss it on microtask
+
+  // Do NOT clear storage by default; it breaks cross-page flows.
+  // Only clear when explicitly requested via ?e2e_reset=1
+  const qs = new URLSearchParams(location.search);
+  const shouldClear = qs.has('e2e_reset');
+
+  if (shouldClear) {
+    try { localStorage.clear(); sessionStorage.clear(); } catch {}
+  }
+
+  // Still auto-dismiss the resume modal if it appears
   queueMicrotask(() => {
     const noBtn = document.querySelector(resumeNoId);
     const yesBtn = document.querySelector(resumeYesId);
-    if (noBtn && getComputedStyle(noBtn).display !== 'none') noBtn.click();
-    else if (yesBtn && getComputedStyle(yesBtn).display !== 'none') yesBtn.click();
+    const isVisible = el => !!el && el.offsetParent !== null;
+    if (isVisible(noBtn)) noBtn.click();
+    else if (isVisible(yesBtn)) yesBtn.click();
   });
 }
 
