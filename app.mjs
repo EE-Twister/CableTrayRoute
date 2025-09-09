@@ -2028,9 +2028,7 @@ const openDuctbankRoute = (dbId, conduitId) => {
         updateTrayDisplay();
         updateTableCounts();
         saveSession();
-        if (typeof document !== 'undefined' && document.dispatchEvent) {
-            document.dispatchEvent(new Event('samples-loaded'));
-        }
+        emitAsync('samples-loaded');
     };
 
     const renderManualTrayTable = () => {
@@ -2232,7 +2230,7 @@ const openDuctbankRoute = (dbId, conduitId) => {
             updateTableCounts();
             saveSession();
             if (elements.manualTrayTableContainer?.querySelector('tbody tr')) {
-                requestAnimationFrame(() => emitAsync('imports-ready-trays'));
+                emitAsync('imports-ready-trays');
             }
         });
         elements.importTraysFile.value='';
@@ -2292,7 +2290,7 @@ const openDuctbankRoute = (dbId, conduitId) => {
             updateTableCounts();
             saveSession();
             if (elements.cableListContainer?.querySelector('tbody tr')) {
-                requestAnimationFrame(() => emitAsync('imports-ready-cables'));
+                emitAsync('imports-ready-cables');
             }
         });
         elements.importCablesFile.value='';
@@ -2673,9 +2671,7 @@ const renderBatchResults = (results) => {
         updateCableListDisplay();
         updateTableCounts();
         saveSession();
-        if (typeof document !== 'undefined' && document.dispatchEvent) {
-            document.dispatchEvent(new Event('samples-loaded'));
-        }
+        emitAsync('samples-loaded');
     };
 
     const addCableToBatch = () => {

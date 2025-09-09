@@ -198,6 +198,16 @@ document.addEventListener('DOMContentLoaded', async () => {
     });
   }
 
+  const importProjInput=document.getElementById('import-project-input');
+  if(importProjInput){
+    importProjInput.addEventListener('change',()=>{
+      requestAnimationFrame(()=>{
+        document.querySelectorAll('#ductbankTable tbody tr').forEach(tr=>tr.classList.add('ductbank-row'));
+        emitAsync('samples-loaded');
+      });
+    });
+  }
+
   if(typeof initDuctbankTable==='function'){
     initDuctbankTable();
     const dbTable=document.getElementById('ductbankTable');
@@ -388,6 +398,8 @@ document.addEventListener('DOMContentLoaded', async () => {
       );
       const conduitCount=dbConduits.length+standalone.length;
       console.log(`Loaded samples: ductbanks=${dbRows.length}, trays=${trayRows.length}, conduits=${conduitCount}`);
+      document.querySelectorAll('#ductbankTable tbody tr').forEach(tr=>tr.classList.add('ductbank-row'));
+      emitAsync('samples-loaded');
       showToast(`Loaded samples: ${dbRows.length} ductbanks, ${conduitCount} conduits, ${trayRows.length} trays.`,'success');
     }catch(err){
       console.error(err);
@@ -625,15 +637,12 @@ document.addEventListener('DOMContentLoaded', async () => {
   }
 
   requestAnimationFrame(() => {
-    const anyRows =
-      document.querySelector('#ductbankTable tbody tr.ductbank-row') ||
-      document.querySelector('#trayTable tbody tr') ||
-      document.querySelector('#conduitTable tbody tr');
-    if (anyRows) {
-      tableLoadState.ductbanks = true;
-      tableLoadState.trays = true;
-      tableLoadState.conduits = true;
-      checkSamplesLoaded();
+    const dbRows = document.querySelectorAll('#ductbankTable tbody tr');
+    const trayRows = document.querySelectorAll('#trayTable tbody tr');
+    const conduitRows = document.querySelectorAll('#conduitTable tbody tr');
+    if (dbRows.length || trayRows.length || conduitRows.length) {
+      dbRows.forEach(tr => tr.classList.add('ductbank-row'));
+      emitAsync('samples-loaded');
     }
   });
 
