@@ -24,12 +24,6 @@ function ensureReadyBeacon(attrName, id) {
   }
 }
 
-function emitAsync(name) {
-  // Two RAFs to ensure DOM attached + layout done before the event
-  requestAnimationFrame(() => requestAnimationFrame(() => {
-    document.dispatchEvent(new Event(name));
-  }));
-}
 
 function suppressResumeIfE2E({ resumeYesId = '#resume-yes-btn', resumeNoId = '#resume-no-btn' } = {}) {
   if (!E2E) return;
@@ -45,6 +39,7 @@ function suppressResumeIfE2E({ resumeYesId = '#resume-yes-btn', resumeNoId = '#r
 
 window.E2E = E2E;
 
+import { emitAsync } from './utils/safeEvents.js';
 import * as dataStore from './dataStore.mjs';
 import {
   normalizeDuctbankRow,
