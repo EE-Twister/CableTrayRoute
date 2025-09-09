@@ -1,3 +1,4 @@
+import { E2E, suppressResumeIfE2E, markReady } from './e2e-helpers.js';
 import * as dataStore from './dataStore.mjs';
 import {
   normalizeDuctbankRow,
@@ -9,6 +10,8 @@ import {
 } from './racewaySampleData.mjs';
 
 checkPrereqs([{key:'cableSchedule',page:'cableschedule.html',label:'Cable Schedule'}]);
+
+suppressResumeIfE2E();
 
 // Expose conduit specifications globally so other modules bundled into
 // this file can access them after Rollup wraps everything in an IIFE. If
@@ -114,6 +117,35 @@ document.addEventListener('DOMContentLoaded', async () => {
   const markSaved = () => dirty.markClean();
   const markUnsaved = () => dirty.markDirty();
 
+  let importInProgress = false;
+  const handleChange = () => {
+    markUnsaved();
+    if (importInProgress) {
+      importInProgress = false;
+      if (typeof document !== 'undefined' && document.dispatchEvent) {
+        document.dispatchEvent(new Event('imports-ready'));
+      }
+    }
+  };
+
+  ['import-tray-xlsx-input','import-conduit-xlsx-input'].forEach(id => {
+    document.getElementById(id)?.addEventListener('change', () => { importInProgress = true; });
+  });
+
+  const importCadInput = document.getElementById('import-cad-input');
+  if (importCadInput) {
+    importCadInput.addEventListener('change', async e => {
+      const file = e.target.files[0];
+      if (file) {
+        await dataStore.importFromCad(file);
+        if (typeof document !== 'undefined' && document.dispatchEvent) {
+          document.dispatchEvent(new Event('imports-ready'));
+        }
+      }
+      e.target.value='';
+    });
+  }
+
   if(typeof initDuctbankTable==='function'){
     initDuctbankTable();
     const dbTable=document.getElementById('ductbankTable');
@@ -167,7 +199,7 @@ document.addEventListener('DOMContentLoaded', async () => {
     importBtnId:'import-tray-xlsx-btn',
     deleteAllBtnId:'delete-tray-btn',
     columns:trayColumns,
-    onChange:markUnsaved,
+    onChange:handleChange,
     onSave:markSaved,
     rowCountId:'tray-row-count',
     onView:(row)=>{
@@ -214,7 +246,7 @@ document.addEventListener('DOMContentLoaded', async () => {
     importBtnId:'import-conduit-xlsx-btn',
     deleteAllBtnId:'delete-conduit-btn',
     columns:conduitColumns,
-    onChange:markUnsaved,
+    onChange:handleChange,
     onSave:()=>{markSaved();persistAllConduits();},
     rowCountId:'conduit-row-count',
     onView:(row)=>{
@@ -293,6 +325,9 @@ document.addEventListener('DOMContentLoaded', async () => {
       const conduitCount=dbConduits.length+standalone.length;
       console.log(`Loaded samples: ductbanks=${dbRows.length}, trays=${trayRows.length}, conduits=${conduitCount}`);
       showToast(`Loaded samples: ${dbRows.length} ductbanks, ${conduitCount} conduits, ${trayRows.length} trays.`,'success');
+      if (typeof document !== 'undefined' && document.dispatchEvent) {
+        document.dispatchEvent(new Event('samples-loaded'));
+      }
     }catch(err){
       console.error(err);
       showToast('Sample load failed – see console.','error');
@@ -525,5 +560,7 @@ document.addEventListener('DOMContentLoaded', async () => {
       lintPanel.classList.add('hidden');
     });
   }
+
+  markReady('data-raceway-ready');
 });
 

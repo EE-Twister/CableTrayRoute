@@ -550,6 +550,9 @@ import { getDuctbanks as readStoredDuctbanks, setDuctbanks, setItem, getItem } f
       });
       renderDuctbanks();
       saveDuctbanks();
+      if (typeof document !== 'undefined' && document.dispatchEvent) {
+        document.dispatchEvent(new Event('imports-ready'));
+      }
     };
     reader.readAsBinaryString(file);
   }

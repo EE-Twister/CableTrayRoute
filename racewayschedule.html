@@ -11,8 +11,9 @@
   <script src="dirtyTracker.js" defer></script>
   <script type="module" src="site.js"></script>
   <script type="module" src="tableUtils.mjs" defer></script>
-  <script type="module" src="ductbankTable.js"></script>
-  <script type="module" src="racewayschedule.js"></script>
+  <script type="module" src="e2e-helpers.js?v={{COMMIT_SHA}}"></script>
+  <script type="module" src="ductbankTable.js?v={{COMMIT_SHA}}"></script>
+  <script type="module" src="racewayschedule.js?v={{COMMIT_SHA}}"></script>
 </head>
 <body>
   <a href="#main-content" class="skip-link">Skip to main content</a>
@@ -58,7 +59,7 @@
         <button id="raceway-load-samples">Load Sample Data</button>
         <button id="validate-raceway-btn">Validate</button>
         <button id="import-cad-btn" onclick="document.getElementById('import-cad-input').click()">Import CAD</button>
-        <input type="file" id="import-cad-input" accept=".json,.ifc" style="display:none;" onchange="dataStore.importFromCad(this.files[0])">
+        <input type="file" id="import-cad-input" accept=".json,.ifc" style="display:none;">
         <button id="export-cad-btn" onclick="dataStore.exportToCad('json')">Export CAD</button>
       </header>
       <details class="method-panel">
