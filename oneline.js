@@ -11,6 +11,7 @@ import { sizeConductor } from './sizing.js';
 import { runValidation } from './validation/rules.js';
 import { exportPDF } from './exporters/pdf.js';
 import { exportDXF, exportDWG } from './exporters/dxf.js';
+import './site.js';
 
 let componentMeta = {};
 
