@@ -25,7 +25,7 @@ function ensureReadyBeacon(attrName, id) {
 }
 
 function emitAsync(name) {
-  // two RAFs pushes dispatch after layout/paint; avoids listener races
+  // Two RAFs to ensure DOM attached + layout done before the event
   requestAnimationFrame(() => requestAnimationFrame(() => {
     document.dispatchEvent(new Event(name));
   }));
@@ -611,6 +611,14 @@ document.addEventListener('DOMContentLoaded', async () => {
       lintPanel.classList.add('hidden');
     });
   }
+
+  requestAnimationFrame(() => {
+    const hasInitialRows =
+      document.querySelector('#ductbankTable tbody tr.ductbank-row') ||
+      document.querySelector('#trayTable tbody tr') ||
+      document.querySelector('#conduitTable tbody tr');
+    if (hasInitialRows) emitAsync('samples-loaded');
+  });
 
   markReady('data-raceway-ready');
   ensureReadyBeacon('data-raceway-ready', 'raceway-ready-beacon');
