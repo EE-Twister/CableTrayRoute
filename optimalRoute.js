@@ -214,7 +214,12 @@ function calculateRoutes(){
       }
       if (typeof document !== 'undefined') {
         const rs = document.getElementById('results-section');
-        if (rs) rs.classList.remove('hidden', 'invisible', 'is-hidden');
+        if (rs) {
+          rs.classList.remove('hidden', 'invisible', 'is-hidden');
+          rs.removeAttribute('hidden');
+          rs.style.visibility = 'visible';
+          rs.style.display = '';
+        }
         requestAnimationFrame(() => emitAsync('route-updated'));
       }
     }
