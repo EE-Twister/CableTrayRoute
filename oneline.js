@@ -111,17 +111,21 @@ async function loadComponentLibrary() {
   const missingIcons = [];
   let status;
   let libraryFailed = false;
+  const url = asset('componentLibrary.json');
+  console.info('Component library URL:', url);
   try {
-    const res = await fetch(asset('componentLibrary.json'));
+    const res = await fetch(url);
     status = res.status;
+    console.info('Component library status:', status);
     if (!res.ok) throw new Error(res.statusText);
     data = await res.json();
   } catch (err) {
-    console.error('Failed to load component library', err);
-    showToast(`Failed to load component library (status: ${status ?? 'unknown'}). ${err.message}`);
+    console.error(`Failed to load component library ${url} status ${status ?? 'unknown'}`, err);
+    showToast(`Failed to load component library ${url} (status: ${status ?? 'unknown'}). ${err.message}`);
     try {
-      const url = new URL('./componentLibrary.json', import.meta.url);
-      const res = await fetch(url);
+      const fallbackUrl = new URL('./componentLibrary.json', import.meta.url);
+      const res = await fetch(fallbackUrl);
+      if (!res.ok) throw new Error(res.statusText);
       data = await res.json();
     } catch (importErr) {
       showToast(`Failed to import component library. ${importErr.message}`);
@@ -162,6 +166,7 @@ async function loadComponentLibrary() {
     if (userIcons[c.icon]) c.icon = userIcons[c.icon];
     return true;
   });
+  console.info('Library size:', Array.isArray(data) ? data.length : 'n/a');
 
   await Promise.all(
     data.map(async c => {
@@ -172,15 +177,11 @@ async function loadComponentLibrary() {
       }
       const iconUrl = asset(c.icon);
       try {
-        await new Promise((resolve, reject) => {
-          const img = new Image();
-          img.onload = () => resolve();
-          img.onerror = () => reject();
-          img.src = iconUrl;
-        });
+        const ping = await fetch(iconUrl, { method: 'GET', cache: 'no-store' });
+        if (!ping.ok) throw new Error(ping.statusText);
         c.icon = iconUrl;
       } catch {
-        console.warn(`Icon missing for subtype ${c.subtype}`);
+        console.warn(`Icon missing for subtype ${c.subtype} -> using placeholder`);
         missingIcons.push(c.subtype);
         c.icon = placeholderIcon;
       }
@@ -212,6 +213,10 @@ async function loadComponentLibrary() {
     if (!componentTypes[c.category]) componentTypes[c.category] = [];
     componentTypes[c.category].push(c.subtype);
   });
+  if (Object.keys(componentTypes).length === 0) {
+    console.error('No component types derived from library', data);
+    showToast('Library parsed to zero components');
+  }
   const banner = document.getElementById('component-library-banner');
   if (banner) {
     if (libraryFailed) banner.classList.remove('hidden');
@@ -281,6 +286,7 @@ function applyDefaults(comp) {
 }
 
 function buildPalette() {
+  console.info('Categories:', Object.keys(componentTypes));
   const palette = document.getElementById('component-buttons');
   const btnTemplate = document.getElementById('palette-button-template');
   const sectionContainers = {
@@ -2247,9 +2253,10 @@ async function init() {
     });
   }
 
-  await loadManufacturerLibrary();
   await loadComponentLibrary();
+  await loadManufacturerLibrary();
   await loadProtectiveDevices();
+  buildPalette();
   const { sheets: storedSheets, activeSheet: storedActive = 0 } = getOneLine();
   sheets = storedSheets.map((s, i) => ({
     name: s.name || `Sheet ${i + 1}`,
@@ -3406,7 +3413,11 @@ if (typeof window !== 'undefined') {
   window.loadManufacturerLibrary = loadManufacturerLibrary;
 }
 
-window.addEventListener('DOMContentLoaded', () => {
+window.addEventListener('DOMContentLoaded', async () => {
   setupLibraryTools();
-  init();
+  try {
+    await init();
+  } catch (err) {
+    console.error('Initialization failed', err);
+  }
 });
