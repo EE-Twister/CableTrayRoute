@@ -128,7 +128,12 @@ const TRAY_TYPE_OPTIONS=['Ladder (50 % fill)','Solid Bottom (40 % fill)'];
 function ensureDuctbankRows(){
   const tbody=document.querySelector('#ductbankTable tbody');
   if(!tbody) return;
-  document.querySelectorAll('#ductbankTable > tr').forEach(tr=>tbody.appendChild(tr));
+  // Move any rows directly under the table into the tbody and tag them
+  document.querySelectorAll('#ductbankTable > tr').forEach(tr=>{
+    tr.classList.add('ductbank-row');
+    tbody.appendChild(tr);
+  });
+  // Ensure all tbody rows carry the ductbank-row class
   tbody.querySelectorAll('tr').forEach(tr=>tr.classList.add('ductbank-row'));
 }
 
@@ -255,7 +260,7 @@ document.addEventListener('DOMContentLoaded', async () => {
   if(importProjInput){
     importProjInput.addEventListener('change',()=>{
       requestAnimationFrame(()=>{
-        document.querySelectorAll('#ductbankTable tbody tr').forEach(tr=>tr.classList.add('ductbank-row'));
+        ensureDuctbankRows();
         emitSticky('samples-loaded','samplesLoaded');
       });
       whenPresent('#ductbankTable tbody tr.ductbank-row', () => emitSticky('samples-loaded','samplesLoaded'));
@@ -453,7 +458,7 @@ document.addEventListener('DOMContentLoaded', async () => {
       );
       const conduitCount=dbConduits.length+standalone.length;
       console.log(`Loaded samples: ductbanks=${dbRows.length}, trays=${trayRows.length}, conduits=${conduitCount}`);
-      document.querySelectorAll('#ductbankTable tbody tr').forEach(tr=>tr.classList.add('ductbank-row'));
+      ensureDuctbankRows();
       emitSticky('samples-loaded','samplesLoaded');
       showToast(`Loaded samples: ${dbRows.length} ductbanks, ${conduitCount} conduits, ${trayRows.length} trays.`,'success');
     }catch(err){
@@ -695,11 +700,11 @@ document.addEventListener('DOMContentLoaded', async () => {
   }
 
   requestAnimationFrame(() => {
-    const dbRows = document.querySelectorAll('#ductbankTable tbody tr');
     const trayRows = document.querySelectorAll('#trayTable tbody tr');
     const conduitRows = document.querySelectorAll('#conduitTable tbody tr');
+    const dbRows = document.querySelectorAll('#ductbankTable tbody tr');
     if (dbRows.length || trayRows.length || conduitRows.length) {
-      dbRows.forEach(tr => tr.classList.add('ductbank-row'));
+      ensureDuctbankRows();
       emitSticky('samples-loaded','samplesLoaded');
     }
   });
