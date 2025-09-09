@@ -22,6 +22,7 @@ function suppressResumeIfE2E({ resumeYesId = '#resume-yes-btn', resumeNoId = '#r
 }
 
 window.E2E = E2E;
+suppressResumeIfE2E();
 
 checkPrereqs([
   {key:'cableSchedule',page:'cableschedule.html',label:'Cable Schedule'},
@@ -79,6 +80,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
   // After any resume logic completes, ensure tray/conduit data is rebuilt
   if (typeof rebuildTrayData === 'function') rebuildTrayData();
+  markReady('data-optimal-ready');
 });
 
 function addTrayRow(){
@@ -196,6 +198,12 @@ function calculateRoutes(){
   routingWorker.onmessage = (e) => {
     if (e.data.type === 'done') {
       drawNetwork(e.data.finalTrays || [], e.data.allRoutes || [], e.data.utilization || {});
+      const countEl = document.getElementById('conduit-count');
+      if (countEl && Array.isArray(e.data.finalTrays)) {
+        const conduitCount = e.data.finalTrays.filter(t => t.raceway_type === 'conduit').length;
+        countEl.textContent = `Conduits added: ${conduitCount}`;
+      }
+      document.dispatchEvent(new Event('route-updated'));
     }
   };
   routingWorker.postMessage({ type:'start', trays: trayData, options: getRoutingOptions(), cables: cableData });
