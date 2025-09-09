@@ -3419,15 +3419,17 @@ async function __oneline_init() {
   } catch (e) {
     console.error('loadProtectiveDevices() threw:', e);
   }
-  // buildPalette() is called inside loader; calling again is harmless
-  buildPalette();
   try {
+    // buildPalette() is called inside loader; calling again is harmless
+    buildPalette();
     await init();
   } catch (err) {
     console.error('Initialization failed', err);
+  } finally {
+    document.documentElement.setAttribute('data-oneline-ready', '1');
   }
 }
-// (insert the __oneline_init block above, exactly)
+
 if (document.readyState === 'loading') {
   document.addEventListener('DOMContentLoaded', __oneline_init);
 } else {
