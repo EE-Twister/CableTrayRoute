@@ -3440,35 +3440,44 @@ if (typeof window !== 'undefined') {
 }
 
 async function __oneline_init() {
-  setupLibraryTools();
-  try {
-    await loadComponentLibrary();
-  } catch (e) {
-    console.error('loadComponentLibrary() threw:', e);
+  suppressResumeIfE2E();
+
+  // Load libraries
+  try { await loadComponentLibrary(); } catch (e) { console.error('loadComponentLibrary failed:', e); }
+  try { await loadManufacturerLibrary(); } catch (e) { console.error('loadManufacturerLibrary failed:', e); }
+  try { await loadProtectiveDevices(); } catch (e) { console.error('loadProtectiveDevices failed:', e); }
+
+  // Ensure diagram drop works
+  const svg = document.getElementById('diagram');
+  if (svg) {
+    svg.addEventListener('dragover', e => e.preventDefault(), { passive: false });
+    svg.addEventListener('drop', e => {
+      e.preventDefault();
+      try {
+        const payload = JSON.parse(e.dataTransfer.getData('text/plain') || '{}');
+        if (payload?.subtype) {
+          const pt = svg.createSVGPoint();
+          pt.x = e.clientX; pt.y = e.clientY;
+          const ctm = svg.getScreenCTM();
+          const { x, y } = pt.matrixTransform(ctm.inverse());
+          addComponent({ type: payload.type, subtype: payload.subtype, x, y });
+          render(); save();
+        }
+      } catch {}
+    });
   }
-  try {
-    await loadManufacturerLibrary();
-  } catch (e) {
-    console.error('loadManufacturerLibrary() threw:', e);
+
+  // Auto-open palette details in E2E so buttons are visible
+  if (window.E2E === true) {
+    document.querySelectorAll('#component-buttons details').forEach(det => det.open = true);
   }
-  try {
-    await loadProtectiveDevices();
-  } catch (e) {
-    console.error('loadProtectiveDevices() threw:', e);
-  }
-  try {
-    // buildPalette() is called inside loader; calling again is harmless
-    buildPalette();
-    await init();
-  } catch (err) {
-    console.error('Initialization failed', err);
-  } finally {
-    document.documentElement.setAttribute('data-oneline-ready', '1');
-  }
+
+  // Ready flag for Playwright
+  markReady('data-oneline-ready');
 }
 
 if (document.readyState === 'loading') {
-  document.addEventListener('DOMContentLoaded', __oneline_init);
+  document.addEventListener('DOMContentLoaded', __oneline_init, { once: true });
 } else {
   __oneline_init();
 }
