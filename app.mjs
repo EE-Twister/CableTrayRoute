@@ -1,3 +1,4 @@
+import { E2E, suppressResumeIfE2E, markReady } from './e2e-helpers.js';
 import { getItem, setItem, removeItem, getTrays, getCables, getDuctbanks, getConduits, exportProject, importProject, setCables } from './dataStore.mjs';
 import { buildSegmentRows, buildSummaryRows, buildBOM } from './resultsExport.mjs';
 import './site.js';
@@ -6,6 +7,7 @@ import { exportRoutesDXF } from './bimExport.mjs';
 
 // Filename: app.mjs
 // (This is an improved version that adds route segment consolidation)
+suppressResumeIfE2E();
 
 // Ensure Canvas 2D contexts are optimized for repeated pixel reads.
 // This avoids Chrome warnings about frequent getImageData usage.
@@ -380,6 +382,9 @@ document.addEventListener('DOMContentLoaded', async () => {
             if (typeof elements !== 'undefined' && elements.messages) {
                 elements.messages.innerHTML += '<div class="message warning">No valid conduits were loaded. Verify geometry fields or conduit identifiers.</div>';
             }
+        }
+        if (typeof document !== 'undefined' && document.dispatchEvent) {
+            document.dispatchEvent(new Event('route-updated'));
         }
     };
 
@@ -1970,6 +1975,9 @@ const openDuctbankRoute = (dbId, conduitId) => {
         updateTrayDisplay();
         updateTableCounts();
         saveSession();
+        if (typeof document !== 'undefined' && document.dispatchEvent) {
+            document.dispatchEvent(new Event('samples-loaded'));
+        }
     };
 
     const renderManualTrayTable = () => {
@@ -2170,6 +2178,9 @@ const openDuctbankRoute = (dbId, conduitId) => {
             updateTrayDisplay();
             updateTableCounts();
             saveSession();
+            if (typeof document !== 'undefined' && document.dispatchEvent) {
+                document.dispatchEvent(new Event('imports-ready'));
+            }
         });
         elements.importTraysFile.value='';
     };
@@ -2227,6 +2238,9 @@ const openDuctbankRoute = (dbId, conduitId) => {
             updateCableListDisplay();
             updateTableCounts();
             saveSession();
+            if (typeof document !== 'undefined' && document.dispatchEvent) {
+                document.dispatchEvent(new Event('imports-ready'));
+            }
         });
         elements.importCablesFile.value='';
     };
@@ -2606,6 +2620,9 @@ const renderBatchResults = (results) => {
         updateCableListDisplay();
         updateTableCounts();
         saveSession();
+        if (typeof document !== 'undefined' && document.dispatchEvent) {
+            document.dispatchEvent(new Event('samples-loaded'));
+        }
     };
 
     const addCableToBatch = () => {
@@ -3935,6 +3952,9 @@ Plotly.newPlot(document.getElementById('plot'), data, layout, {responsive: true}
         await loadDuctbankData();
         rebuildTrayData();
         updateTrayDisplay();
+        if (typeof document !== 'undefined' && document.dispatchEvent) {
+            document.dispatchEvent(new Event('imports-ready'));
+        }
     };
 
     if (hasSaved) {
@@ -3977,6 +3997,8 @@ Plotly.newPlot(document.getElementById('plot'), data, layout, {responsive: true}
     } else {
         await finalizeLoad();
     }
+
+    markReady('data-optimal-ready');
 
     async function runSelfCheck(){
         const diag={};
