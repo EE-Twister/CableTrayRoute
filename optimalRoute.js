@@ -14,7 +14,9 @@ function ensureBeacon(id) {
   if (!el) {
     el = document.createElement('div');
     el.id = id;
-    el.style.cssText = 'position:fixed;inset:auto auto 0 0;width:1px;height:1px;opacity:0;pointer-events:none;';
+    el.setAttribute('data-e2e-beacon', '1');
+    // Keep it visible to Playwright but unobtrusive
+    el.style.cssText = 'position:fixed;left:0;bottom:0;width:1px;height:1px;opacity:0.01;z-index:99999;';
     document.body.appendChild(el);
   }
 }
