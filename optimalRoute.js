@@ -1,3 +1,28 @@
+// ---- Inline E2E helpers (no external import) ----
+const E2E = new URLSearchParams(location.search).has('e2e');
+
+function markReady(flagName) {
+  try {
+    document.documentElement.setAttribute(flagName, '1');
+    // also expose to window for debugging
+    window[flagName.replace(/-([a-z])/g, (_, c) => c.toUpperCase())] = true;
+  } catch {}
+}
+
+function suppressResumeIfE2E({ resumeYesId = '#resume-yes-btn', resumeNoId = '#resume-no-btn' } = {}) {
+  if (!E2E) return;
+  try { localStorage.clear(); sessionStorage.clear(); } catch {}
+  // If a resume modal happens to exist, auto-dismiss it on microtask
+  queueMicrotask(() => {
+    const noBtn = document.querySelector(resumeNoId);
+    const yesBtn = document.querySelector(resumeYesId);
+    if (noBtn && getComputedStyle(noBtn).display !== 'none') noBtn.click();
+    else if (yesBtn && getComputedStyle(yesBtn).display !== 'none') yesBtn.click();
+  });
+}
+
+window.E2E = E2E;
+
 checkPrereqs([
   {key:'cableSchedule',page:'cableschedule.html',label:'Cable Schedule'},
   {key:'traySchedule',page:'racewayschedule.html',label:'Raceway Schedule'}
