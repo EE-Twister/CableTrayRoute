@@ -61,10 +61,16 @@ test.describe("CableTrayRoute workflow", () => {
     await handleResume(page, false);
     const trayFile = path.join(root, "examples", "tray_schedule.csv");
     const cableFile = path.join(root, "examples", "cable_schedule.csv");
+    const traysReady = page.evaluate(
+      () => new Promise(r => document.addEventListener('imports-ready-trays', r, { once: true })),
+    );
     await page.setInputFiles("#import-trays-file", trayFile);
-    await page.waitForSelector("#manual-tray-table-container tbody tr", { state: 'attached' });
+    await traysReady;
+    const cablesReady = page.evaluate(
+      () => new Promise(r => document.addEventListener('imports-ready-cables', r, { once: true })),
+    );
     await page.setInputFiles("#import-cables-file", cableFile);
-    await page.waitForSelector("#cable-list-container tbody tr", { state: 'attached' });
+    await cablesReady;
     await page.click("#calculate-route-btn");
     await expect(page.locator("#results-section")).toBeVisible();
   });

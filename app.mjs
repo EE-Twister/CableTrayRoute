@@ -19,6 +19,14 @@ function ensureBeacon(id) {
   }
 }
 
+function emitAsync(name) {
+  requestAnimationFrame(() =>
+    requestAnimationFrame(() => {
+      document.dispatchEvent(new Event(name));
+    }),
+  );
+}
+
 function suppressResumeIfE2E({ resumeYesId = '#resume-yes-btn', resumeNoId = '#resume-no-btn' } = {}) {
   if (!E2E) return;
   try { localStorage.clear(); sessionStorage.clear(); } catch {}
@@ -2212,8 +2220,8 @@ const openDuctbankRoute = (dbId, conduitId) => {
             updateTrayDisplay();
             updateTableCounts();
             saveSession();
-            if (typeof document !== 'undefined' && document.dispatchEvent) {
-                document.dispatchEvent(new Event('imports-ready'));
+            if (elements.manualTrayTableContainer?.querySelector('tbody tr')) {
+                emitAsync('imports-ready-trays');
             }
         });
         elements.importTraysFile.value='';
@@ -2272,8 +2280,8 @@ const openDuctbankRoute = (dbId, conduitId) => {
             updateCableListDisplay();
             updateTableCounts();
             saveSession();
-            if (typeof document !== 'undefined' && document.dispatchEvent) {
-                document.dispatchEvent(new Event('imports-ready'));
+            if (elements.cableListContainer?.querySelector('tbody tr')) {
+                emitAsync('imports-ready-cables');
             }
         });
         elements.importCablesFile.value='';
