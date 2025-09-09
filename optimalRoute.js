@@ -224,6 +224,8 @@ function calculateRoutes(){
         countEl.textContent = `Conduits added: ${conduitCount}`;
       }
       if (typeof document !== 'undefined') {
+        const rs = document.getElementById('results-section');
+        if (rs) rs.classList.remove('hidden', 'invisible', 'is-hidden');
         emitAsync('route-updated');
       }
     }
