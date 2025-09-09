@@ -21,6 +21,13 @@ function ensureBeacon(id) {
   }
 }
 
+function emitAsync(name) {
+  // two RAFs pushes dispatch after layout/paint; avoids listener races
+  requestAnimationFrame(() => requestAnimationFrame(() => {
+    document.dispatchEvent(new Event(name));
+  }));
+}
+
 function suppressResumeIfE2E({ resumeYesId = '#resume-yes-btn', resumeNoId = '#resume-no-btn' } = {}) {
   if (!E2E) return;
   try { localStorage.clear(); sessionStorage.clear(); } catch {}
@@ -366,8 +373,8 @@ document.addEventListener('DOMContentLoaded', async () => {
       const conduitCount=dbConduits.length+standalone.length;
       console.log(`Loaded samples: ductbanks=${dbRows.length}, trays=${trayRows.length}, conduits=${conduitCount}`);
       showToast(`Loaded samples: ${dbRows.length} ductbanks, ${conduitCount} conduits, ${trayRows.length} trays.`,'success');
-      if (typeof document !== 'undefined' && document.dispatchEvent) {
-        document.dispatchEvent(new Event('samples-loaded'));
+      if (typeof document !== 'undefined') {
+        emitAsync('samples-loaded');
       }
     }catch(err){
       console.error(err);

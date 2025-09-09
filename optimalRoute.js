@@ -21,6 +21,13 @@ function ensureBeacon(id) {
   }
 }
 
+function emitAsync(name) {
+  // two RAFs pushes dispatch after layout/paint; avoids listener races
+  requestAnimationFrame(() => requestAnimationFrame(() => {
+    document.dispatchEvent(new Event(name));
+  }));
+}
+
 function suppressResumeIfE2E({ resumeYesId = '#resume-yes-btn', resumeNoId = '#resume-no-btn' } = {}) {
   if (!E2E) return;
   try { localStorage.clear(); sessionStorage.clear(); } catch {}
@@ -216,7 +223,9 @@ function calculateRoutes(){
         const conduitCount = e.data.finalTrays.filter(t => t.raceway_type === 'conduit').length;
         countEl.textContent = `Conduits added: ${conduitCount}`;
       }
-      document.dispatchEvent(new Event('route-updated'));
+      if (typeof document !== 'undefined') {
+        emitAsync('route-updated');
+      }
     }
   };
   routingWorker.postMessage({ type:'start', trays: trayData, options: getRoutingOptions(), cables: cableData });
