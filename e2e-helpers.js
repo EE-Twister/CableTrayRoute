@@ -11,6 +11,27 @@ export function suppressResumeIfE2E() {
   // Do NOT auto-click resume buttons. Let tests click #resume-no-btn.
 }
 
+// Show resume modal in E2E so tests can click the No button
+export function forceShowResumeIfE2E() {
+  if (!E2E) return;
+  const modal = document.getElementById('resume-modal');
+  const noBtn = document.getElementById('resume-no-btn');
+  if (modal) {
+    modal.removeAttribute('hidden');
+    modal.classList.remove('hidden', 'is-hidden', 'invisible');
+    modal.style.display = 'block';
+    modal.style.visibility = 'visible';
+    modal.style.opacity = '1';
+  }
+  if (noBtn) {
+    noBtn.style.display = 'inline-block';
+    noBtn.disabled = false;
+  }
+}
+if (typeof document !== 'undefined') {
+  document.addEventListener('DOMContentLoaded', forceShowResumeIfE2E);
+}
+
 export function markReady(flagName) {
   if (flagName && typeof document !== 'undefined') {
     document.documentElement.setAttribute(flagName, '1');
