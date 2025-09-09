@@ -3401,7 +3401,7 @@ if (typeof window !== 'undefined') {
   window.loadManufacturerLibrary = loadManufacturerLibrary;
 }
 
-document.addEventListener('DOMContentLoaded', async () => {
+async function __oneline_init() {
   setupLibraryTools();
   try {
     await loadComponentLibrary();
@@ -3425,4 +3425,10 @@ document.addEventListener('DOMContentLoaded', async () => {
   } catch (err) {
     console.error('Initialization failed', err);
   }
-});
+}
+// (insert the __oneline_init block above, exactly)
+if (document.readyState === 'loading') {
+  document.addEventListener('DOMContentLoaded', __oneline_init);
+} else {
+  __oneline_init();
+}
