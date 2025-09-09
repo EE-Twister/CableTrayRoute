@@ -14,26 +14,15 @@ function ensureReadyBeacon(attrName, id) {
   el.setAttribute(attrName, '1');
 }
 
-function suppressResumeIfE2E({ resumeYesId = '#resume-yes-btn', resumeNoId = '#resume-no-btn' } = {}) {
+function suppressResumeIfE2E() {
   if (!E2E) return;
-
-  // Do NOT clear storage by default; it breaks cross-page flows.
-  // Only clear when explicitly requested via ?e2e_reset=1
+  // Do NOT clear storage by default; only when ?e2e_reset=1 is present.
   const qs = new URLSearchParams(location.search);
   const shouldClear = qs.has('e2e_reset');
-
   if (shouldClear) {
     try { localStorage.clear(); sessionStorage.clear(); } catch {}
   }
-
-  // Still auto-dismiss the resume modal if it appears
-  queueMicrotask(() => {
-    const noBtn = document.querySelector(resumeNoId);
-    const yesBtn = document.querySelector(resumeYesId);
-    const isVisible = el => !!el && el.offsetParent !== null;
-    if (isVisible(noBtn)) noBtn.click();
-    else if (isVisible(yesBtn)) yesBtn.click();
-  });
+  // Do NOT auto-click resume buttons. Let tests click #resume-no-btn.
 }
 
 window.E2E = E2E;
