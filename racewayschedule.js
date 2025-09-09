@@ -29,6 +29,30 @@ function suppressResumeIfE2E() {
 window.E2E = E2E;
 
 import { emitAsync } from './utils/safeEvents.mjs';
+
+function emitSticky(name, flagKey) {
+  if (!window.__e2eFlags) window.__e2eFlags = {};
+  window.__e2eFlags[flagKey] = true;
+  emitAsync(name);
+  if (E2E) {
+    let n = 0;
+    const id = setInterval(() => {
+      emitAsync(name);
+      if (++n >= 20) clearInterval(id);
+    }, 50);
+    setTimeout(() => clearInterval(id), 1500);
+  }
+}
+
+function whenPresent(selector, cb, timeoutMs = 5000) {
+  const start = performance.now();
+  const poll = () => {
+    if (document.querySelector(selector)) return cb();
+    if (performance.now() - start > timeoutMs) return;
+    setTimeout(poll, 50);
+  };
+  poll();
+}
 import * as dataStore from './dataStore.mjs';
 import {
   normalizeDuctbankRow,
@@ -78,7 +102,7 @@ document.addEventListener('DOMContentLoaded', async () => {
   };
   const checkSamplesLoaded = () => {
     if (tableLoadState.ductbanks && tableLoadState.trays && tableLoadState.conduits) {
-      requestAnimationFrame(() => requestAnimationFrame(() => emitAsync('samples-loaded')));
+      requestAnimationFrame(() => requestAnimationFrame(() => emitSticky('samples-loaded', 'samplesLoaded')));
     }
   };
   resetTableLoadState();
@@ -164,9 +188,7 @@ document.addEventListener('DOMContentLoaded', async () => {
     markUnsaved();
     if (importInProgress) {
       importInProgress = false;
-      if (typeof document !== 'undefined' && document.dispatchEvent) {
-        document.dispatchEvent(new Event('imports-ready'));
-      }
+      emitAsync('imports-ready');
     }
   };
 
@@ -180,9 +202,7 @@ document.addEventListener('DOMContentLoaded', async () => {
       const file = e.target.files[0];
       if (file) {
         await dataStore.importFromCad(file);
-        if (typeof document !== 'undefined' && document.dispatchEvent) {
-          document.dispatchEvent(new Event('imports-ready'));
-        }
+        emitAsync('imports-ready');
       }
       e.target.value='';
     });
@@ -193,8 +213,9 @@ document.addEventListener('DOMContentLoaded', async () => {
     importProjInput.addEventListener('change',()=>{
       requestAnimationFrame(()=>{
         document.querySelectorAll('#ductbankTable tbody tr').forEach(tr=>tr.classList.add('ductbank-row'));
-        emitAsync('samples-loaded');
+        emitSticky('samples-loaded','samplesLoaded');
       });
+      whenPresent('#ductbankTable tbody tr.ductbank-row', () => emitSticky('samples-loaded','samplesLoaded'));
     });
   }
 
@@ -389,7 +410,7 @@ document.addEventListener('DOMContentLoaded', async () => {
       const conduitCount=dbConduits.length+standalone.length;
       console.log(`Loaded samples: ductbanks=${dbRows.length}, trays=${trayRows.length}, conduits=${conduitCount}`);
       document.querySelectorAll('#ductbankTable tbody tr').forEach(tr=>tr.classList.add('ductbank-row'));
-      emitAsync('samples-loaded');
+      emitSticky('samples-loaded','samplesLoaded');
       showToast(`Loaded samples: ${dbRows.length} ductbanks, ${conduitCount} conduits, ${trayRows.length} trays.`,'success');
     }catch(err){
       console.error(err);
@@ -445,7 +466,10 @@ document.addEventListener('DOMContentLoaded', async () => {
   persistAllConduits();
   const loadSamplesBtn=document.getElementById('raceway-load-samples');
   console.assert(loadSamplesBtn,'#raceway-load-samples button missing');
-  loadSamplesBtn?.addEventListener('click', onRacewayLoadSamples, { once:false });
+  loadSamplesBtn?.addEventListener('click', () => {
+    onRacewayLoadSamples();
+    whenPresent('#ductbankTable tbody tr.ductbank-row', () => emitSticky('samples-loaded','samplesLoaded'));
+  });
 
   const normalize=s=>(s||'').trim().toUpperCase();
 
@@ -632,7 +656,7 @@ document.addEventListener('DOMContentLoaded', async () => {
     const conduitRows = document.querySelectorAll('#conduitTable tbody tr');
     if (dbRows.length || trayRows.length || conduitRows.length) {
       dbRows.forEach(tr => tr.classList.add('ductbank-row'));
-      emitAsync('samples-loaded');
+      emitSticky('samples-loaded','samplesLoaded');
     }
   });
 
