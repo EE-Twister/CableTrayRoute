@@ -20,6 +20,25 @@ function suppressResumeIfE2E() {
   // Do NOT auto-click resume buttons. Let tests click #resume-no-btn.
 }
 
+// Show resume modal in E2E so tests can click the No button
+function forceShowResumeIfE2E() {
+  const E2E = new URLSearchParams(location.search).has('e2e');
+  if (!E2E) return;
+  const modal = document.getElementById('resume-modal');
+  const noBtn = document.getElementById('resume-no-btn');
+  if (modal) {
+    modal.removeAttribute('hidden');
+    modal.classList.remove('hidden', 'is-hidden', 'invisible');
+    modal.style.display = 'block';
+    modal.style.visibility = 'visible';
+    modal.style.opacity = '1';
+  }
+  if (noBtn) {
+    noBtn.style.display = 'inline-block';
+    noBtn.disabled = false;
+  }
+}
+
 window.E2E = E2E;
 
 import * as dataStore from './dataStore.mjs';
@@ -34,6 +53,7 @@ const { sizeToArea } = ampacity;
 // behaviour needed to populate the schedule table.
 
 window.addEventListener('DOMContentLoaded', () => {
+  forceShowResumeIfE2E();
   const projectId = window.currentProjectId || 'default';
   dataStore.loadProject(projectId);
   initSettings();
