@@ -42,22 +42,26 @@ function suppressResumeIfE2E() {
   // Do NOT auto-click resume buttons. Let tests click #resume-no-btn.
 }
 
-// Show resume modal in E2E so tests can click the No button
-function forceShowResumeIfE2E() {
-  const E2E = new URLSearchParams(location.search).has('e2e');
-  if (!E2E) return;
+function e2eFixResumeModalVisibility() {
+  const isE2E = new URLSearchParams(location.search).has('e2e');
+  if (!isE2E) return;
   const modal = document.getElementById('resume-modal');
+  if (!modal) return;
+  // Make modal visible & interactive; remove aria-hidden conflict
+  modal.setAttribute('aria-hidden', 'false');
+  modal.classList.remove('hidden', 'is-hidden', 'invisible');
+  modal.removeAttribute('hidden');
+  Object.assign(modal.style, {
+    display: 'block',
+    visibility: 'visible',
+    opacity: '1',
+    pointerEvents: 'auto',
+  });
   const noBtn = document.getElementById('resume-no-btn');
-  if (modal) {
-    modal.removeAttribute('hidden');
-    modal.classList.remove('hidden', 'is-hidden', 'invisible');
-    modal.style.display = 'block';
-    modal.style.visibility = 'visible';
-    modal.style.opacity = '1';
-  }
   if (noBtn) {
-    noBtn.style.display = 'inline-block';
     noBtn.disabled = false;
+    noBtn.style.display = 'inline-block';
+    noBtn.style.pointerEvents = 'auto';
   }
 }
 
@@ -89,7 +93,11 @@ function whenPresent(selector, cb, timeoutMs = 5000) {
   poll();
 }
 suppressResumeIfE2E();
-document.addEventListener('DOMContentLoaded', forceShowResumeIfE2E);
+if (document.readyState === 'loading') {
+  document.addEventListener('DOMContentLoaded', e2eFixResumeModalVisibility, { once: true });
+} else {
+  e2eFixResumeModalVisibility();
+}
 
 checkPrereqs([
   {key:'cableSchedule',page:'cableschedule.html',label:'Cable Schedule'},
