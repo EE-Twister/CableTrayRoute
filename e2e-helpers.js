@@ -1,14 +1,24 @@
 export const E2E = new URLSearchParams(location.search).get('e2e') === '1';
 
-export function suppressResumeIfE2E() {
+export function suppressResumeIfE2E({ resumeYesId = '#resume-yes-btn', resumeNoId = '#resume-no-btn' } = {}) {
   if (!E2E) return;
-  try {
-    sessionStorage.clear();
-    localStorage.clear();
-  } catch {}
-  document.addEventListener('DOMContentLoaded', () => {
-    document.getElementById('resume-yes-btn')?.click();
-    document.getElementById('resume-no-btn')?.click();
+
+  // Do NOT clear storage by default; it breaks cross-page flows.
+  // Only clear when explicitly requested via ?e2e_reset=1
+  const qs = new URLSearchParams(location.search);
+  const shouldClear = qs.has('e2e_reset');
+
+  if (shouldClear) {
+    try { localStorage.clear(); sessionStorage.clear(); } catch {}
+  }
+
+  // Still auto-dismiss the resume modal if it appears
+  queueMicrotask(() => {
+    const noBtn = document.querySelector(resumeNoId);
+    const yesBtn = document.querySelector(resumeYesId);
+    const isVisible = el => !!el && el.offsetParent !== null;
+    if (isVisible(noBtn)) noBtn.click();
+    else if (isVisible(yesBtn)) yesBtn.click();
   });
 }
 
