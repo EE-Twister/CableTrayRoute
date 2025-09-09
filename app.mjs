@@ -425,8 +425,10 @@ document.addEventListener('DOMContentLoaded', async () => {
                 elements.messages.innerHTML += '<div class="message warning">No valid conduits were loaded. Verify geometry fields or conduit identifiers.</div>';
             }
         }
-        if (typeof document !== 'undefined' && document.dispatchEvent) {
-            document.dispatchEvent(new Event('route-updated'));
+        if (typeof document !== 'undefined') {
+            const rs = document.getElementById('results-section');
+            if (rs) rs.classList.remove('hidden', 'invisible', 'is-hidden');
+            emitAsync('route-updated');
         }
     };
 
