@@ -14,7 +14,8 @@ import { exportDXF, exportDWG } from './exporters/dxf.js';
 
 let componentMeta = {};
 
-const asset = path => new URL(path, document.baseURI).href;
+const baseHref = document.querySelector('base')?.href || new URL('.', window.location.href).href;
+const asset = path => new URL(path, baseHref).href;
 
 const projectId = typeof window !== 'undefined' ? (window.currentProjectId || 'default') : undefined;
 if (projectId) {
@@ -171,8 +172,12 @@ async function loadComponentLibrary() {
       }
       const iconUrl = asset(c.icon);
       try {
-        const head = await fetch(iconUrl, { method: 'HEAD' });
-        if (!head.ok) throw new Error(head.statusText);
+        await new Promise((resolve, reject) => {
+          const img = new Image();
+          img.onload = () => resolve();
+          img.onerror = () => reject();
+          img.src = iconUrl;
+        });
         c.icon = iconUrl;
       } catch {
         console.warn(`Icon missing for subtype ${c.subtype}`);
