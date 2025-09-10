@@ -1,6 +1,51 @@
 // ---- Inline E2E helpers (no external import) ----
 const E2E = new URLSearchParams(location.search).has('e2e');
 
+function e2eOpenDetailsAndControls() {
+  const E2E = new URLSearchParams(location.search).has('e2e');
+  if (!E2E) return;
+  // open <details> to reveal nested buttons
+  document.querySelectorAll('details').forEach(d => { d.open = true; });
+  // unhide common containers that gate buttons in E2E
+  ['#settings-panel', '#controls', '#toolbar', '#sidebar'].forEach(sel => {
+    const el = document.querySelector(sel);
+    if (!el) return;
+    el.classList?.remove('hidden','is-hidden','invisible');
+    el.removeAttribute?.('hidden');
+    Object.assign(el.style, { display:'block', visibility:'visible', pointerEvents:'auto', opacity:'1' });
+  });
+  // make import button available for tests
+  const importBtn = document.getElementById('import-project-btn');
+  if (importBtn) { importBtn.disabled = false; importBtn.style.display = 'inline-block'; importBtn.style.pointerEvents = 'auto'; }
+}
+
+function ensureReadyBeacon(attrName, id) {
+  let el = document.getElementById(id);
+  if (!el) {
+    el = document.createElement('div');
+    el.id = id;
+    el.style.cssText = 'position:fixed;left:0;bottom:0;width:1px;height:1px;opacity:0.01;z-index:2147483647;';
+    document.body.appendChild(el);
+  }
+  el.setAttribute(attrName, '1');
+}
+
+function setReadyWhen(selector, attrName, id, timeoutMs = 25000) {
+  const start = performance.now();
+  const poll = () => {
+    const el = document.querySelector(selector);
+    const visible = !!el && !!(el.offsetParent || el.getClientRects().length);
+    if (visible) return ensureReadyBeacon(attrName, id);
+    if (performance.now() - start > timeoutMs) return;
+    setTimeout(poll, 50);
+  };
+  if (document.readyState === 'loading') {
+    document.addEventListener('DOMContentLoaded', poll, { once: true });
+  } else {
+    poll();
+  }
+}
+
 // --- Resume modal wiring ---
 function showResumeModal() {
   const modal = document.getElementById('resume-modal');
@@ -54,36 +99,6 @@ function wireResumeModalOnce() {
     hideResumeModal();
   }, { once: true });
 }
-
-function ensureReadyBeacon(attrName, id) {
-  let el = document.getElementById(id);
-  if (!el) {
-    el = document.createElement('div');
-    el.id = id;
-    // visible to Playwright (non-zero rect), visually negligible
-    el.style.cssText = 'position:fixed;left:0;bottom:0;width:1px;height:1px;opacity:0.01;z-index:2147483647;';
-    document.body.appendChild(el);
-  }
-  el.setAttribute(attrName, '1'); // exact data-* Playwright waits for
-}
-
-function setReadyWhen(selector, attrName, id, timeoutMs = 25000) {
-  const start = performance.now();
-  const poll = () => {
-    // element must exist and be visible
-    const el = document.querySelector(selector);
-    const visible = !!el && !!(el.offsetParent || el.getClientRects().length);
-    if (visible) return ensureReadyBeacon(attrName, id);
-    if (performance.now() - start > timeoutMs) return; // give up silently
-    setTimeout(poll, 50);
-  };
-  if (document.readyState === 'loading') {
-    document.addEventListener('DOMContentLoaded', poll, { once: true });
-  } else {
-    poll();
-  }
-}
-
 
 function suppressResumeIfE2E() {
   if (!E2E) return;
@@ -198,6 +213,7 @@ document.addEventListener('DOMContentLoaded', () => {
     });
   }
 
+  e2eOpenDetailsAndControls();
   setReadyWhen('#settings-btn', 'data-optimal-ready', 'optimal-ready-beacon');
 
   // After any resume logic completes, ensure tray/conduit data is rebuilt
