@@ -447,8 +447,6 @@ let tempConnection = null;
 let hoverPort = null;
 let selectedConnection = null;
 let diagramScale = getItem('diagramScale', { unitPerPx: 1, unit: 'in' });
-let cableSlackPct = Number(getItem('cableSlackPct', 0));
-let slackPctInput = null;
 let resizingBus = null;
 let legendDrag = null;
 let gridSize = Number(getItem('gridSize', 20));
@@ -1040,6 +1038,22 @@ function portPosition(c, portIndex) {
   return { x: px, y: py };
 }
 
+function portDirection(c, portIndex) {
+  const meta = componentMeta[c.subtype] || {};
+  const w = c.width || compWidth;
+  const h = c.height || compHeight;
+  const ports = c.ports || meta.ports;
+  const port = ports?.[portIndex];
+  if (!port) return null;
+  let { x, y } = port;
+  if (c.flipped) x = w - x;
+  if (y === 0) return 'top';
+  if (y === h) return 'bottom';
+  if (x === 0) return 'left';
+  if (x === w) return 'right';
+  return null;
+}
+
 function nearestPorts(src, tgt) {
   const srcPorts = src.ports || componentMeta[src.subtype]?.ports || [{ x: (src.width || compWidth) / 2, y: (src.height || compHeight) / 2 }];
   const tgtPorts = tgt.ports || componentMeta[tgt.subtype]?.ports || [{ x: (tgt.width || compWidth) / 2, y: (tgt.height || compHeight) / 2 }];
@@ -1109,6 +1123,7 @@ function render() {
   function routeConnection(src, tgt, conn) {
     const start = portPosition(src, conn?.sourcePort);
     const end = portPosition(tgt, conn?.targetPort);
+    const tDir = portDirection(tgt, conn?.targetPort);
     if (conn && conn.dir) {
       const mid = conn.mid ?? (conn.dir === 'h' ? (start.x + end.x) / 2 : (start.y + end.y) / 2);
       if (conn.dir === 'h') return [start, { x: mid, y: start.y }, { x: mid, y: end.y }, end];
@@ -1220,9 +1235,16 @@ function render() {
     const h = horizontalFirst();
     const v = verticalFirst();
     let path;
-    if (!intersects(h)) path = h;
-    else if (!intersects(v)) path = v;
-    else path = h.length <= v.length ? h : v;
+    const preferH = tDir === 'top' || tDir === 'bottom';
+    if (preferH) {
+      if (!intersects(h)) path = h;
+      else if (!intersects(v)) path = v;
+      else path = h.length <= v.length ? h : v;
+    } else {
+      if (!intersects(v)) path = v;
+      else if (!intersects(h)) path = h;
+      else path = h.length <= v.length ? h : v;
+    }
     if (conn) {
       conn.dir = path === h ? 'h' : 'v';
       conn.mid = conn.dir === 'h' ? path[1].x : path[1].y;
@@ -1276,6 +1298,8 @@ function render() {
       poly.style.pointerEvents = 'stroke';
       poly.style.cursor = 'move';
       poly.classList.add('connection');
+      poly.dataset.comp = c.id;
+      poly.dataset.index = idx;
       const vdLimit = parseFloat(target.maxVoltageDrop) || 3;
       if (conn.cable?.sizing_warning) poly.classList.add('sizing-violation');
       if (parseFloat(conn.cable?.voltage_drop_pct) > vdLimit) poly.classList.add('voltage-exceed');
@@ -1293,19 +1317,6 @@ function render() {
           start: { x: e.offsetX, y: e.offsetY },
           mid: conn.mid ?? (conn.dir === 'h' ? pts[1].x : pts[1].y)
         };
-      });
-      poly.addEventListener('dblclick', async e => {
-        e.stopPropagation();
-        const res = await chooseCable(c, target, conn);
-        if (res) {
-          conn.cable = res.cable;
-          conn.phases = res.phases;
-          conn.conductors = res.conductors;
-          addCable(res.cable);
-          pushHistory();
-          render();
-          save();
-        }
       });
       svg.appendChild(poly);
 
@@ -1438,10 +1449,6 @@ function render() {
       g.appendChild(rect);
     }
     g.appendChild(text);
-    g.addEventListener('dblclick', e => {
-      e.stopPropagation();
-      selectComponent(c.id);
-    });
     svg.appendChild(g);
     if (c.subtype === 'Bus' && selection.includes(c)) {
       const handleRight = document.createElementNS(svgNS, 'rect');
@@ -2123,14 +2130,6 @@ async function chooseCable(source, target, existingConn = null) {
     installLabel.appendChild(installInput);
     form.appendChild(installLabel);
 
-    const slackLabel = document.createElement('label');
-    slackLabel.textContent = 'Slack % ';
-    const slackInput = document.createElement('input');
-    slackInput.type = 'number';
-    slackInput.name = 'slack_pct';
-    slackLabel.appendChild(slackInput);
-    form.appendChild(slackLabel);
-
     const lengthLabel = document.createElement('label');
     lengthLabel.textContent = 'Length (ft) ';
     const lengthInput = document.createElement('input');
@@ -2209,7 +2208,6 @@ async function chooseCable(source, target, existingConn = null) {
         materialInput.value = c.conductor_material || '';
         insulationInput.value = c.insulation_type || '';
         lengthInput.value = c.length || '';
-        slackInput.value = c.slack_pct || cableSlackPct;
         colorInput.value = c.color || '#000000';
         ambientInput.value = c.ambient_temp || '';
         installInput.value = c.install_method || '';
@@ -2222,7 +2220,6 @@ async function chooseCable(source, target, existingConn = null) {
         materialInput.value = '';
         insulationInput.value = '';
         lengthInput.value = '';
-        slackInput.value = cableSlackPct;
         colorInput.value = '#000000';
         ambientInput.value = '';
         installInput.value = '';
@@ -2247,16 +2244,14 @@ async function chooseCable(source, target, existingConn = null) {
       materialInput.value = existing.conductor_material || '';
       insulationInput.value = existing.insulation_type || '';
       const autoLen = (existingConn.length || 0) * (diagramScale.unitPerPx || 1);
-      const slack = parseFloat(existing.slack_pct ?? cableSlackPct) || 0;
       if (existing.length) {
         lengthInput.value = existing.length;
       } else if (autoLen) {
-        lengthInput.value = (autoLen * (1 + slack / 100)).toFixed(2);
+        lengthInput.value = autoLen.toFixed(2);
       }
       colorInput.value = existing.color || '#000000';
       ambientInput.value = existing.ambient_temp || '';
       installInput.value = existing.install_method || '';
-      slackInput.value = existing.slack_pct || cableSlackPct;
       sizeInput.dataset.calcAmpacity = existing.calc_ampacity || '';
       sizeInput.dataset.voltageDrop = existing.voltage_drop_pct || existing.voltage_drop || '';
       sizeInput.dataset.sizingWarning = existing.sizing_warning || '';
@@ -2268,7 +2263,6 @@ async function chooseCable(source, target, existingConn = null) {
       }
     } else {
       colorInput.value = '#000000';
-      slackInput.value = cableSlackPct;
     }
 
     const saveBtn = document.createElement('button');
@@ -2302,7 +2296,6 @@ async function chooseCable(source, target, existingConn = null) {
         ambient_temp: ambientInput.value,
         install_method: installInput.value,
         color: colorInput.value,
-        slack_pct: slackInput.value || cableSlackPct,
         phases: phases.length,
         calc_ampacity: sizeInput.dataset.calcAmpacity || '',
         voltage_drop_pct: sizeInput.dataset.voltageDrop || '',
@@ -2339,7 +2332,27 @@ async function init() {
     if (svg) svg.id = 'diagram';
   }
   if (svg) {
-    svg.addEventListener('dblclick', e => {
+    svg.addEventListener('dblclick', async e => {
+      const connEl = e.target.closest('.connection');
+      if (connEl) {
+        e.stopPropagation();
+        const comp = components.find(c => c.id === connEl.dataset.comp);
+        if (!comp) return;
+        const index = parseInt(connEl.dataset.index, 10);
+        const conn = comp.connections[index];
+        const target = components.find(t => t.id === conn.target);
+        const res = await chooseCable(comp, target, conn);
+        if (res) {
+          conn.cable = res.cable;
+          conn.phases = res.phases;
+          conn.conductors = res.conductors;
+          addCable(res.cable);
+          pushHistory();
+          render();
+          save();
+        }
+        return;
+      }
       const g = e.target.closest('.component');
       if (!g) return;
       selectComponent(g.dataset.id);
@@ -2534,15 +2547,6 @@ async function init() {
     gridPattern.setAttribute('height', gridSize);
     gridPath.setAttribute('d', `M${gridSize} 0 L0 0 0 ${gridSize}`);
     setItem('gridSize', gridSize);
-    render();
-  });
-
-  slackPctInput = document.getElementById('slack-pct');
-  if (slackPctInput) slackPctInput.value = cableSlackPct;
-  slackPctInput?.addEventListener('change', () => {
-    cableSlackPct = Number(slackPctInput.value) || 0;
-    setItem('cableSlackPct', cableSlackPct);
-    syncSchedules(false);
     render();
   });
 
@@ -2819,21 +2823,54 @@ async function init() {
 
   svg.addEventListener('contextmenu', e => {
     e.preventDefault();
-    const g = e.target.closest('.component');
-    contextTarget = g ? components.find(c => c.id === g.dataset.id) : null;
+    const connEl = e.target.closest('.connection');
+    if (connEl) {
+      const comp = components.find(c => c.id === connEl.dataset.comp);
+      contextTarget = { component: comp, index: parseInt(connEl.dataset.index, 10), connection: true };
+    } else {
+      const g = e.target.closest('.component');
+      contextTarget = g ? components.find(c => c.id === g.dataset.id) : null;
+    }
     const compItems = menu.querySelectorAll('[data-context="component"]');
+    const connItems = menu.querySelectorAll('[data-context="connection"]');
     const canvasItems = menu.querySelectorAll('[data-context="canvas"]');
-    compItems.forEach(li => li.style.display = contextTarget ? 'block' : 'none');
+    compItems.forEach(li => li.style.display = contextTarget && !contextTarget.connection ? 'block' : 'none');
+    connItems.forEach(li => li.style.display = contextTarget && contextTarget.connection ? 'block' : 'none');
     canvasItems.forEach(li => li.style.display = contextTarget ? 'none' : 'block');
     menu.style.left = `${e.pageX}px`;
     menu.style.top = `${e.pageY}px`;
     menu.style.display = 'block';
   });
 
-  menu.addEventListener('click', e => {
+  menu.addEventListener('click', async e => {
     const action = e.target.dataset.action;
     if (!action) return;
     e.stopPropagation();
+    if (contextTarget && contextTarget.connection) {
+      const { component, index } = contextTarget;
+      const conn = component.connections[index];
+      if (action === 'edit') {
+        const target = components.find(t => t.id === conn.target);
+        const res = await chooseCable(component, target, conn);
+        if (res) {
+          conn.cable = res.cable;
+          conn.phases = res.phases;
+          conn.conductors = res.conductors;
+          addCable(res.cable);
+          pushHistory();
+          render();
+          save();
+        }
+      } else if (action === 'delete') {
+        component.connections.splice(index, 1);
+        selectedConnection = null;
+        pushHistory();
+        render();
+        save();
+      }
+      menu.style.display = 'none';
+      return;
+    }
     if (action === 'edit' && contextTarget) {
       selectComponent(contextTarget.id);
     } else if (action === 'delete' && contextTarget) {
@@ -3318,16 +3355,15 @@ function syncSchedules(notify = true) {
         from_tag: c.ref || c.id,
         to_tag: target?.ref || conn.target
       };
+      delete spec.slack_pct;
       const unitPerPx = diagramScale.unitPerPx || 1;
-      const slack = parseFloat(conn.cable?.slack_pct ?? cableSlackPct) || 0;
-      const autoLen = (conn.length || 0) * unitPerPx * (1 + slack / 100);
+      const autoLen = (conn.length || 0) * unitPerPx;
       let finalLen = autoLen;
       if (conn.cable?.manual_length) {
         const manual = parseFloat(conn.cable.length);
         if (!isNaN(manual)) finalLen = manual;
       }
       spec.length = finalLen.toFixed(2);
-      spec.slack_pct = conn.cable?.slack_pct ?? cableSlackPct;
       if (conn.cable?.manual_length) spec.manual_length = true;
       conn.cable.length = spec.length;
       const load = {
@@ -3361,7 +3397,6 @@ function syncSchedules(notify = true) {
         phases: spec.phases,
         conductors: spec.conductors,
         length: spec.length,
-        slack_pct: spec.slack_pct,
         manual_length: conn.cable?.manual_length
       });
       const idx = cables.findIndex(cb => cb.tag === spec.tag);
@@ -3575,7 +3610,7 @@ async function importDiagram(data) {
 
 async function loadSampleDiagram() {
   try {
-    const res = await fetch(new URL('examples/sample_oneline.json', baseUrl).href);
+    const res = await fetch('examples/sample_oneline.json');
     if (!res.ok) throw new Error(res.statusText);
     const data = await res.json();
     await importDiagram(data);

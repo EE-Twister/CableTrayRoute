@@ -190,10 +190,6 @@
   opacity: 1;
 }
 
-.slack-label {
-  margin-left: var(--ol-spacing);
-}
-
 .hidden-input {
   display: none;
 }
