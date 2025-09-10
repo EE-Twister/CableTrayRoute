@@ -448,6 +448,8 @@ let dimensionStart = null;
 let diagramScale = getItem('diagramScale', { unitPerPx: 1, unit: 'in' });
 let cableSlackPct = Number(getItem('cableSlackPct', 0));
 let slackPctInput = null;
+let resizingBus = null;
+let legendDrag = null;
 let gridSize = Number(getItem('gridSize', 20));
 let gridEnabled = getItem('gridEnabled', true);
 let snapIndicatorTimeout = null;
@@ -652,30 +654,36 @@ const tourSteps = [
 ];
 let tourIndex = 0;
 let tourOverlay = null;
+let tourModal = null;
 
 function showTourStep() {
   const step = tourSteps[tourIndex];
-  tourOverlay.querySelector('#tour-text').textContent = step.text;
+  tourModal.querySelector('#tour-text').textContent = step.text;
   document.querySelectorAll('.tour-highlight').forEach(el => el.classList.remove('tour-highlight'));
   const el = document.querySelector(step.element);
   if (el) el.classList.add('tour-highlight');
-  const next = tourOverlay.querySelector('#tour-next');
+  const next = tourModal.querySelector('#tour-next');
   next.textContent = tourIndex === tourSteps.length - 1 ? 'Finish' : 'Next';
 }
 
 function endTour() {
   document.querySelectorAll('.tour-highlight').forEach(el => el.classList.remove('tour-highlight'));
   tourOverlay?.remove();
+  tourModal?.remove();
   tourOverlay = null;
+  tourModal = null;
 }
 
 function startTour() {
   tourIndex = 0;
   tourOverlay = document.createElement('div');
   tourOverlay.className = 'tour-overlay';
-  tourOverlay.innerHTML = `<div class="tour-modal"><p id="tour-text"></p><button id="tour-next">Next</button></div>`;
+  tourModal = document.createElement('div');
+  tourModal.className = 'tour-modal';
+  tourModal.innerHTML = `<p id="tour-text"></p><button id="tour-next">Next</button>`;
   document.body.appendChild(tourOverlay);
-  tourOverlay.querySelector('#tour-next').addEventListener('click', () => {
+  document.body.appendChild(tourModal);
+  tourModal.querySelector('#tour-next').addEventListener('click', () => {
     tourIndex++;
     if (tourIndex >= tourSteps.length) {
       endTour();
@@ -1416,6 +1424,16 @@ function render() {
     }
     g.appendChild(text);
     svg.appendChild(g);
+    if (c.subtype === 'Bus' && selection.includes(c)) {
+      const handle = document.createElementNS(svgNS, 'rect');
+      handle.setAttribute('x', c.x + c.width - 5);
+      handle.setAttribute('y', c.y + (c.height / 2) - 5);
+      handle.setAttribute('width', 10);
+      handle.setAttribute('height', 10);
+      handle.classList.add('bus-handle');
+      handle.dataset.id = c.id;
+      svg.appendChild(handle);
+    }
       if (connectMode) {
         (c.ports || meta.ports || []).forEach((p, idx) => {
           const pos = portPosition(c, idx);
@@ -1561,6 +1579,16 @@ function save(notify = true) {
   }
 }
 
+function updateBusPorts(bus) {
+  const spacing = 20;
+  const ports = [];
+  for (let px = 0; px <= bus.width; px += spacing) {
+    ports.push({ x: px, y: 0 });
+    ports.push({ x: px, y: bus.height });
+  }
+  bus.ports = ports;
+}
+
 function addComponent(cfg) {
   let subtype, type, x = 20, y = 20;
   if (typeof cfg === 'string') {
@@ -1597,13 +1625,7 @@ function addComponent(cfg) {
   if (subtype === 'Bus') {
     comp.width = 200;
     comp.height = 20;
-    const ports = [];
-    const spacing = 20;
-    for (let px = 0; px <= comp.width; px += spacing) {
-      ports.push({ x: px, y: 0 });
-      ports.push({ x: px, y: comp.height });
-    }
-    comp.ports = ports;
+    updateBusPorts(comp);
   }
   applyDefaults(comp);
   components.push(comp);
@@ -2404,8 +2426,10 @@ async function init() {
   const connectBtn = document.getElementById('connect-btn');
   if (connectBtn) {
     connectBtn.addEventListener('click', () => {
-      connectMode = true;
+      connectMode = !connectMode;
       connectSource = null;
+      connectBtn.classList.toggle('active', connectMode);
+      render();
     });
   }
   const dimensionBtn = document.getElementById('dimension-btn');
@@ -2534,6 +2558,22 @@ async function init() {
     }
   });
 
+  const editorEl = document.querySelector('.oneline-editor');
+  const legendEl = document.getElementById('voltage-legend');
+  legendEl?.addEventListener('mousedown', e => {
+    legendDrag = { dx: e.offsetX, dy: e.offsetY };
+    e.preventDefault();
+  });
+  document.addEventListener('mousemove', e => {
+    if (!legendDrag || !legendEl || !editorEl) return;
+    const rect = editorEl.getBoundingClientRect();
+    legendEl.style.left = `${e.clientX - rect.left - legendDrag.dx}px`;
+    legendEl.style.top = `${e.clientY - rect.top - legendDrag.dy}px`;
+  });
+  document.addEventListener('mouseup', () => {
+    legendDrag = null;
+  });
+
   // Reuse the diagram element fetched earlier in this function.
   // Avoid redeclaring the `svg` constant to prevent "Identifier has already been declared" errors.
   const menu = document.getElementById('context-menu');
@@ -2552,6 +2592,13 @@ async function init() {
           tempConnection.classList.add('connection');
           tempConnection.classList.add('temp');
           svg.appendChild(tempConnection);
+        }
+        return;
+      }
+      if (e.target.classList.contains('bus-handle')) {
+        const comp = components.find(c => c.id === e.target.dataset.id);
+        if (comp) {
+          resizingBus = { comp, startX: e.offsetX, startWidth: comp.width };
         }
         return;
       }
@@ -2577,6 +2624,14 @@ async function init() {
     });
     svg.addEventListener('mousemove', e => {
       cursorPos = { x: e.offsetX, y: e.offsetY };
+      if (resizingBus) {
+        let newW = Math.max(40, resizingBus.startWidth + e.offsetX - resizingBus.startX);
+        if (gridEnabled) newW = Math.round(newW / gridSize) * gridSize;
+        resizingBus.comp.width = newW;
+        updateBusPorts(resizingBus.comp);
+        render();
+        return;
+      }
       if (connectSource && tempConnection) {
         const nearest = nearestPortToPoint(e.offsetX, e.offsetY, connectSource);
         let end = { x: e.offsetX, y: e.offsetY };
@@ -2590,6 +2645,7 @@ async function init() {
       }
     });
   svg.addEventListener('mousemove', e => {
+    if (resizingBus) return;
     if (!dragOffset || !dragOffset.length) return;
     let snapPos = null;
     dragOffset.forEach(off => {
@@ -2611,6 +2667,13 @@ async function init() {
     if (snapPos) flashSnapIndicator(snapPos.x, snapPos.y);
   });
     svg.addEventListener('mouseup', async e => {
+      if (resizingBus) {
+        resizingBus = null;
+        pushHistory();
+        render();
+        save();
+        return;
+      }
       if (connectSource && tempConnection) {
         tempConnection.remove();
         tempConnection = null;
@@ -2654,6 +2717,8 @@ async function init() {
         connectSource = null;
         hoverPort = null;
         connectMode = false;
+        connectBtn?.classList.remove('active');
+        render();
         return;
       }
       if (dragOffset && dragOffset.length) {
