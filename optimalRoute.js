@@ -1,6 +1,60 @@
 // ---- Inline E2E helpers (no external import) ----
 const E2E = new URLSearchParams(location.search).has('e2e');
 
+// --- Resume modal wiring ---
+function showResumeModal() {
+  const modal = document.getElementById('resume-modal');
+  if (!modal) return;
+  modal.setAttribute('aria-hidden', 'false');
+  modal.classList.remove('hidden', 'is-hidden', 'invisible');
+  modal.removeAttribute('hidden');
+  Object.assign(modal.style, {
+    display: 'block',
+    visibility: 'visible',
+    opacity: '1',
+    pointerEvents: 'auto'
+  });
+}
+
+function hideResumeModal() {
+  const modal = document.getElementById('resume-modal');
+  if (!modal) return;
+  modal.setAttribute('aria-hidden', 'true');
+  modal.classList.add('hidden');
+  modal.setAttribute('hidden', '');
+  Object.assign(modal.style, {
+    display: 'none',
+    visibility: 'hidden',
+    opacity: '0',
+    pointerEvents: 'none'
+  });
+  // move focus off hidden content to avoid AT warnings
+  try { if (document.activeElement) document.activeElement.blur(); } catch {}
+}
+
+let __wiredResumeModal = false;
+function wireResumeModalOnce() {
+  if (__wiredResumeModal) return;
+  __wiredResumeModal = true;
+  const yesBtn = document.getElementById('resume-yes-btn');
+  const noBtn  = document.getElementById('resume-no-btn');
+  // Ensure buttons don’t submit a form
+  if (yesBtn && yesBtn.getAttribute('type') !== 'button') yesBtn.setAttribute('type','button');
+  if (noBtn  && noBtn.getAttribute('type')  !== 'button') noBtn.setAttribute('type','button');
+
+  if (yesBtn) yesBtn.addEventListener('click', (e) => {
+    e.preventDefault(); e.stopPropagation();
+    try { sessionStorage.setItem('resume:choice','yes'); } catch {}
+    hideResumeModal();
+  }, { once: true });
+
+  if (noBtn) noBtn.addEventListener('click', (e) => {
+    e.preventDefault(); e.stopPropagation();
+    try { sessionStorage.setItem('resume:choice','no'); } catch {}
+    hideResumeModal();
+  }, { once: true });
+}
+
 function ensureReadyBeacon(attrName, id) {
   let el = document.getElementById(id);
   if (!el) {
@@ -45,24 +99,9 @@ function suppressResumeIfE2E() {
 function e2eFixResumeModalVisibility() {
   const isE2E = new URLSearchParams(location.search).has('e2e');
   if (!isE2E) return;
-  const modal = document.getElementById('resume-modal');
-  if (!modal) return;
-  // Make modal visible & interactive; remove aria-hidden conflict
-  modal.setAttribute('aria-hidden', 'false');
-  modal.classList.remove('hidden', 'is-hidden', 'invisible');
-  modal.removeAttribute('hidden');
-  Object.assign(modal.style, {
-    display: 'block',
-    visibility: 'visible',
-    opacity: '1',
-    pointerEvents: 'auto',
-  });
-  const noBtn = document.getElementById('resume-no-btn');
-  if (noBtn) {
-    noBtn.disabled = false;
-    noBtn.style.display = 'inline-block';
-    noBtn.style.pointerEvents = 'auto';
-  }
+  // If a choice was made this session, don’t force-show again
+  try { if (sessionStorage.getItem('resume:choice')) return; } catch {}
+  showResumeModal();
 }
 
 window.E2E = E2E;
@@ -93,6 +132,12 @@ function whenPresent(selector, cb, timeoutMs = 5000) {
   poll();
 }
 suppressResumeIfE2E();
+if (document.readyState === 'loading') {
+  document.addEventListener('DOMContentLoaded', () => { wireResumeModalOnce(); }, { once: true });
+} else {
+  wireResumeModalOnce();
+}
+
 if (document.readyState === 'loading') {
   document.addEventListener('DOMContentLoaded', e2eFixResumeModalVisibility, { once: true });
 } else {
