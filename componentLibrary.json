@@ -286,6 +286,16 @@
       }
     },
     {
+      "type": "annotation",
+      "subtype": "text_box",
+      "label": "Text Box",
+      "icon": "icons/components/TextBox.svg",
+      "props": {
+        "text": "Text"
+      },
+      "ports": []
+    },
+    {
       "type": "mcc",
       "label": "MCC",
       "icon": "icons/components/MCC.svg",
