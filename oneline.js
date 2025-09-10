@@ -1272,6 +1272,9 @@ function render() {
       poly.setAttribute('stroke', stroke);
       poly.setAttribute('fill', 'none');
       poly.setAttribute('marker-end', 'url(#arrow)');
+      poly.setAttribute('stroke-width', '2');
+      poly.style.pointerEvents = 'stroke';
+      poly.style.cursor = 'move';
       poly.classList.add('connection');
       const vdLimit = parseFloat(target.maxVoltageDrop) || 3;
       if (conn.cable?.sizing_warning) poly.classList.add('sizing-violation');
@@ -1290,6 +1293,19 @@ function render() {
           start: { x: e.offsetX, y: e.offsetY },
           mid: conn.mid ?? (conn.dir === 'h' ? pts[1].x : pts[1].y)
         };
+      });
+      poly.addEventListener('dblclick', async e => {
+        e.stopPropagation();
+        const res = await chooseCable(c, target, conn);
+        if (res) {
+          conn.cable = res.cable;
+          conn.phases = res.phases;
+          conn.conductors = res.conductors;
+          addCable(res.cable);
+          pushHistory();
+          render();
+          save();
+        }
       });
       svg.appendChild(poly);
 
@@ -1422,16 +1438,30 @@ function render() {
       g.appendChild(rect);
     }
     g.appendChild(text);
+    g.addEventListener('dblclick', e => {
+      e.stopPropagation();
+      selectComponent(c.id);
+    });
     svg.appendChild(g);
     if (c.subtype === 'Bus' && selection.includes(c)) {
-      const handle = document.createElementNS(svgNS, 'rect');
-      handle.setAttribute('x', c.x + c.width - 5);
-      handle.setAttribute('y', c.y + (c.height / 2) - 5);
-      handle.setAttribute('width', 10);
-      handle.setAttribute('height', 10);
-      handle.classList.add('bus-handle');
-      handle.dataset.id = c.id;
-      svg.appendChild(handle);
+      const handleRight = document.createElementNS(svgNS, 'rect');
+      handleRight.setAttribute('x', c.x + c.width - 5);
+      handleRight.setAttribute('y', c.y + (c.height / 2) - 5);
+      handleRight.setAttribute('width', 10);
+      handleRight.setAttribute('height', 10);
+      handleRight.classList.add('bus-handle');
+      handleRight.dataset.id = c.id;
+      handleRight.dataset.side = 'right';
+      svg.appendChild(handleRight);
+      const handleLeft = document.createElementNS(svgNS, 'rect');
+      handleLeft.setAttribute('x', c.x - 5);
+      handleLeft.setAttribute('y', c.y + (c.height / 2) - 5);
+      handleLeft.setAttribute('width', 10);
+      handleLeft.setAttribute('height', 10);
+      handleLeft.classList.add('bus-handle');
+      handleLeft.dataset.id = c.id;
+      handleLeft.dataset.side = 'left';
+      svg.appendChild(handleLeft);
     }
       if (connectMode) {
         (c.ports || meta.ports || []).forEach((p, idx) => {
@@ -2589,7 +2619,13 @@ async function init() {
       if (e.target.classList.contains('bus-handle')) {
         const comp = components.find(c => c.id === e.target.dataset.id);
         if (comp) {
-          resizingBus = { comp, startX: e.offsetX, startWidth: comp.width };
+          resizingBus = {
+            comp,
+            startX: e.offsetX,
+            startWidth: comp.width,
+            startCompX: comp.x,
+            side: e.target.dataset.side || 'right'
+          };
         }
         return;
       }
@@ -2630,9 +2666,24 @@ async function init() {
         return;
       }
       if (resizingBus) {
-        let newW = Math.max(40, resizingBus.startWidth + e.offsetX - resizingBus.startX);
-        if (gridEnabled) newW = Math.round(newW / gridSize) * gridSize;
-        resizingBus.comp.width = newW;
+        let delta = e.offsetX - resizingBus.startX;
+        if (resizingBus.side === 'right') {
+          let newW = Math.max(40, resizingBus.startWidth + delta);
+          if (gridEnabled) newW = Math.round(newW / gridSize) * gridSize;
+          resizingBus.comp.width = newW;
+        } else {
+          let newW = Math.max(40, resizingBus.startWidth - delta);
+          let newX = resizingBus.startCompX + delta;
+          if (gridEnabled) {
+            newW = Math.round(newW / gridSize) * gridSize;
+            newX = Math.round(newX / gridSize) * gridSize;
+          }
+          if (newW === 40 && delta > resizingBus.startWidth - 40) {
+            newX = resizingBus.startCompX + (resizingBus.startWidth - 40);
+          }
+          resizingBus.comp.width = newW;
+          resizingBus.comp.x = newX;
+        }
         updateBusPorts(resizingBus.comp);
         render();
         return;
