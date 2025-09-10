@@ -749,6 +749,7 @@ document.addEventListener('DOMContentLoaded', async () => {
     if (dbRows.length || trayRows.length || conduitRows.length) {
       ensureDuctbankRows();
       emitSticky('samples-loaded','samplesLoaded');
+      document.body.dataset.racewayReady = '1';
     }
   });
   e2eOpenDetailsAndControls();

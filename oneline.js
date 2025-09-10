@@ -102,12 +102,42 @@ const typeIcons = {
 
 const placeholderIcon = asset('icons/placeholder.svg');
 
+function compKey(type, subtype) {
+  return subtype ? `${type}_${subtype}` : type;
+}
+
+function categoryForType(t) {
+  if (t === 'bus') return 'bus';
+  if (t === 'mcc') return 'panel';
+  if (t === 'motor_load' || t === 'static_load') return 'load';
+  return 'equipment';
+}
+
+function inferSchemaFromProps(props) {
+  const schema = [];
+  Object.entries(props || {}).forEach(([k, v]) => {
+    if (v && typeof v === 'object') return; // skip nested objects for now
+    schema.push({
+      name: k,
+      label: k.replace(/_/g, ' '),
+      type: typeof v === 'number' ? 'number' : typeof v === 'boolean' ? 'checkbox' : 'text',
+      default: v
+    });
+  });
+  return schema;
+}
+
+function isBusComponent(c) {
+  return componentMeta[c.subtype]?.type === 'bus' || c.type === 'bus' || c.subtype === 'Bus';
+}
+
 const builtinComponents = [
   {
     subtype: 'Bus',
     label: 'Bus',
     icon: typeIcons.bus || placeholderIcon,
     category: 'bus',
+    type: 'bus',
     ports: [
       { x: 0, y: 20 },
       { x: 80, y: 20 }
@@ -118,6 +148,7 @@ const builtinComponents = [
     label: 'Panel',
     icon: typeIcons.panel || placeholderIcon,
     category: 'panel',
+    type: 'panel',
     ports: [
       { x: 0, y: 20 },
       { x: 80, y: 20 }
@@ -128,6 +159,7 @@ const builtinComponents = [
     label: 'Equipment',
     icon: typeIcons.equipment || placeholderIcon,
     category: 'equipment',
+    type: 'equipment',
     ports: [
       { x: 0, y: 20 },
       { x: 80, y: 20 }
@@ -138,6 +170,7 @@ const builtinComponents = [
     label: 'Load',
     icon: typeIcons.load || placeholderIcon,
     category: 'load',
+    type: 'load',
     ports: [
       { x: 0, y: 20 },
       { x: 80, y: 20 }
@@ -169,135 +202,38 @@ const manufacturerModels = {
 
 // === REPLACE THE ENTIRE FUNCTION ===
 async function loadComponentLibrary() {
-  // Reset caches for a clean reload
   componentMeta = {};
   propSchemas = {};
   subtypeCategory = {};
   componentTypes = {};
 
-  const banner = document.getElementById('component-library-banner');
-
-  // Helper: fetch JSON with a clear error
-  async function fetchJSON(url) {
-    let res;
-    try {
-      res = await fetch(url, { cache: 'no-store' });
-      if (!res.ok) throw new Error(`HTTP ${res.status}`);
-      return await res.json();
-    } catch (e) {
-      console.error('Component library fetch failed:', url, e?.message || e);
-      throw e;
-    }
-  }
-
-  // Helper: normalize library shape into an array of components
-  function normalizeToArray(data) {
-    if (Array.isArray(data)) return data;
-    if (data && Array.isArray(data.components)) return data.components;
-    if (data && typeof data === 'object') {
-      // Accept object maps: { MLO: {...}, MCC: {...}, ... }
-      const arr = Object.values(data).filter(v => v && typeof v === 'object');
-      if (arr.length) return arr;
-    }
-    return [];
-  }
-
-  // 1) Try base-relative
-  const primaryUrl = new URL('componentLibrary.json', document.baseURI).href;
-  console.info('Component library URL (primary):', primaryUrl);
-
-  let data;
   try {
-    const d1 = await fetchJSON(primaryUrl);
-    data = normalizeToArray(d1);
-  } catch {
-    // 2) Fallback: relative to this module (import.meta.url)
-    try {
-      const fallbackUrl = new URL('./componentLibrary.json', import.meta.url).href;
-      console.info('Component library URL (fallback):', fallbackUrl);
-      const d2 = await fetchJSON(fallbackUrl);
-      data = normalizeToArray(d2);
-    } catch (importErr) {
-      console.warn('Falling back to built-in components.', importErr?.message || importErr);
-      data = builtinComponents.slice(); // last resort
-    }
-  }
-
-  // If after normalization we still have nothing, bail with a visible banner
-  if (!Array.isArray(data) || data.length === 0) {
-    console.error('Component library normalized to zero components.');
-    if (banner) banner.classList.remove('hidden');
-    // Build an empty palette (shows "No components available" placeholders)
-    buildPalette();
-    showToast('Component library parsed to zero components.');
-    return;
-  }
-
-  // Validate icons without breaking the palette
-  const missingIcons = [];
-  await Promise.all(data.map(async c => {
-    if (!isValidComponent(c)) return;
-    if (!c.icon) {
-      c.icon = placeholderIcon;
-      missingIcons.push(c.subtype || 'unknown');
-      return;
-    }
-    const iconUrl = new URL(c.icon, document.baseURI).href;
-    // DO NOT use HEAD on GitHub Pages; do a tolerant GET and ignore failures
-    try {
-      const ping = await fetch(iconUrl, { method: 'GET', cache: 'no-store', mode: 'no-cors' });
-      // no-cors may not yield .ok; we still accept the URL
-      c.icon = iconUrl;
-    } catch {
-      console.warn(`Icon missing for subtype ${c.subtype}; using placeholder.`);
-      c.icon = placeholderIcon;
-      missingIcons.push(c.subtype || 'unknown');
-    }
-  }));
-
-  // Build metadata and category map
-  const reliabilityFields = [
-    { name: 'mtbf', label: 'MTBF (hrs)', type: 'number' },
-    { name: 'mttr', label: 'MTTR (hrs)', type: 'number' },
-    { name: 'failure_modes', label: 'Failure Modes', type: 'textarea' }
-  ];
-
-  const bySubtype = new Map();
-  data.forEach(c => bySubtype.set(c.subtype, c)); // last one wins
-
-  const finalData = Array.from(bySubtype.values()).filter(isValidComponent);
-  finalData.forEach(c => {
-    c.schema = c.schema || [];
-    reliabilityFields.forEach(f => {
-      if (!c.schema.some(s => s.name === f.name)) c.schema.push(f);
+    const res = await fetch(asset('componentLibrary.json'));
+    const data = await res.json();
+    const comps = Array.isArray(data.components) ? data.components : [];
+    comps.forEach(c => {
+      const key = compKey(c.type, c.subtype);
+      const cat = categoryForType(c.type);
+      const icon = c.symbol ? asset(`icons/components/${c.symbol}.svg`) : placeholderIcon;
+      componentMeta[key] = {
+        icon,
+        label: c.label || key,
+        category: cat,
+        ports: c.ports,
+        type: c.type,
+        subtype: c.subtype,
+        props: c.props
+      };
+      subtypeCategory[key] = cat;
+      if (!componentTypes[cat]) componentTypes[cat] = [];
+      componentTypes[cat].push(key);
+      propSchemas[key] = inferSchemaFromProps(c.props);
     });
-    propSchemas[c.subtype] = c.schema;
-
-    componentMeta[c.subtype] = {
-      icon: c.icon || placeholderIcon,
-      label: c.label || c.subtype || 'Component',
-      category: c.category,
-      ports: c.ports
-    };
-
-    const cat = c.category;
-    subtypeCategory[c.subtype] = cat;
-    if (!componentTypes[cat]) componentTypes[cat] = [];
-    componentTypes[cat].push(c.subtype);
-  });
-
-  console.info('Palette categories:', Object.keys(componentTypes));
-
-  // Show/hide banner based on whether we actually have anything to show
-  const hasAny = Object.values(componentTypes).some(arr => Array.isArray(arr) && arr.length);
-  if (banner) banner.classList.toggle('hidden', hasAny);
-
-  // Always render the palette
-  buildPalette();
-
-  if (missingIcons.length) {
-    showToast(`Placeholder icons for: ${missingIcons.join(', ')}`);
+  } catch (e) {
+    console.error('Component library load failed', e);
   }
+
+  buildPalette();
 }
 // === END REPLACEMENT ===
 
@@ -364,28 +300,32 @@ function buildPalette() {
     const summary = container?.parentElement?.querySelector('summary');
     if (summary) summary.textContent = cat.charAt(0).toUpperCase() + cat.slice(1);
   });
-  Object.entries(componentTypes).forEach(([type, subs]) => {
-    const container = sectionContainers[type] || palette;
-    subs.forEach(sub => {
-      const meta = componentMeta[sub];
+  Object.entries(componentTypes).forEach(([cat, subs]) => {
+    const container = sectionContainers[cat] || palette;
+    subs.forEach(subKey => {
+      const meta = componentMeta[subKey];
       const btn = btnTemplate ? btnTemplate.content.firstElementChild.cloneNode(true) : document.createElement('button');
-      // expose subtype/type information for drag & search and mark as draggable
       btn.draggable = true;
       btn.setAttribute('draggable', 'true');
-      btn.dataset.type = type;
-      btn.dataset.subtype = sub;
-      btn.setAttribute('data-subtype', sub);
+      btn.dataset.type = meta.type;
+      if (meta.subtype) {
+        btn.dataset.subtype = meta.subtype;
+        btn.setAttribute('data-subtype', meta.subtype);
+      } else {
+        btn.dataset.subtype = '';
+        btn.setAttribute('data-subtype', '');
+      }
       btn.setAttribute('data-testid', 'palette-button');
       btn.dataset.label = meta.label;
       btn.title = `${meta.label} - Drag to canvas or click to add`;
       btn.innerHTML = `<img src="${meta.icon}" alt="" aria-hidden="true">`;
       btn.addEventListener('click', () => {
-        addComponent({ type, subtype: sub });
+        addComponent({ type: meta.type, subtype: subKey });
         render();
         save();
       });
       btn.addEventListener('dragstart', e => {
-        e.dataTransfer.setData('text/plain', JSON.stringify({ type, subtype: sub }));
+        e.dataTransfer.setData('text/plain', JSON.stringify({ type: meta.type, subtype: subKey }));
       });
       container.appendChild(btn);
     });
@@ -1468,7 +1408,7 @@ function render() {
     img.setAttribute('width', w);
     img.setAttribute('height', h);
     img.setAttributeNS('http://www.w3.org/1999/xlink', 'href', iconHref);
-    if (c.subtype === 'Bus') img.setAttribute('preserveAspectRatio', 'none');
+    if (isBusComponent(c)) img.setAttribute('preserveAspectRatio', 'none');
     if (iconHref !== placeholderIcon) {
       img.addEventListener('error', () => {
         console.warn(`Missing icon for subtype ${c.subtype}`);
@@ -1503,7 +1443,7 @@ function render() {
     }
     g.appendChild(text);
     svg.appendChild(g);
-    if (c.subtype === 'Bus' && selection.includes(c)) {
+    if (isBusComponent(c) && selection.includes(c)) {
       const handleRight = document.createElementNS(svgNS, 'rect');
       handleRight.setAttribute('x', c.x + c.width - 5);
       handleRight.setAttribute('y', c.y + (c.height / 2) - 5);
@@ -1685,7 +1625,7 @@ function addComponent(cfg) {
     type = componentMeta[subtype]?.category;
   } else if (cfg && typeof cfg === 'object') {
     subtype = cfg.subtype;
-    type = cfg.type || componentMeta[cfg.subtype]?.category;
+    type = cfg.type || componentMeta[cfg.subtype]?.type || componentMeta[cfg.subtype]?.category;
     if (cfg.x !== undefined) x = cfg.x;
     if (cfg.y !== undefined) y = cfg.y;
   } else {
@@ -1699,7 +1639,7 @@ function addComponent(cfg) {
   }
   const comp = {
     id: 'n' + Date.now(),
-    type: type || meta.category,
+    type: type || meta.type || meta.category,
     subtype,
     x,
     y,
@@ -1709,9 +1649,13 @@ function addComponent(cfg) {
     flipped: false,
     impedance: { r: 0, x: 0 },
     rating: null,
-    connections: []
+    connections: [],
+    props: JSON.parse(JSON.stringify(meta.props || {}))
   };
-  if (subtype === 'Bus') {
+  Object.entries(meta.props || {}).forEach(([k, v]) => {
+    comp[k] = typeof v === 'object' ? JSON.parse(JSON.stringify(v)) : v;
+  });
+  if (meta.type === 'bus') {
     comp.width = 200;
     comp.height = 20;
     updateBusPorts(comp);
@@ -2428,6 +2372,7 @@ async function init() {
           icon,
           label: c.subtype,
           category: c.type,
+          type: c.type,
           ports: [
             { x: 0, y: 20 },
             { x: 80, y: 20 }
@@ -2435,13 +2380,20 @@ async function init() {
         };
       }
       if (!propSchemas[c.subtype]) {
-        propSchemas[c.subtype] = [];
+        const skip = new Set(['id', 'type', 'subtype', 'x', 'y', 'rotation', 'flipped', 'connections', 'label', 'ref', 'props']);
+        const raw = {};
+        Object.entries(c).forEach(([k, v]) => {
+          if (skip.has(k)) return;
+          if (v && typeof v === 'object') return;
+          raw[k] = v;
+        });
+        propSchemas[c.subtype] = inferSchemaFromProps(raw);
       }
     });
   });
   rebuildComponentMaps();
   Object.keys(componentMeta).forEach(sub => {
-    if (!propSchemas[sub]) propSchemas[sub] = [];
+    if (!propSchemas[sub]) propSchemas[sub] = inferSchemaFromProps(componentMeta[sub].props || {});
   });
   sheets.forEach(s => {
     s.components.forEach(c => {
@@ -3372,7 +3324,7 @@ function syncSchedules(notify = true) {
       return fields;
     });
   const buses = all
-    .filter(c => c.subtype === 'Bus')
+    .filter(c => isBusComponent(c))
     .map(mapFields);
   setEquipment([...equipment, ...buses]);
   setPanels([...panels, ...buses]);
@@ -3492,7 +3444,7 @@ function serializeState() {
       .filter(c => getCategory(c) === 'load')
       .map(mapFields);
     const buses = comps
-      .filter(c => c.subtype === 'Bus')
+      .filter(c => isBusComponent(c))
       .map(mapFields);
     const cables = [];
     comps.forEach(c => {
@@ -3671,6 +3623,8 @@ async function __oneline_init() {
   try { await loadProtectiveDevices(); } catch (e) { console.error('loadProtectiveDevices failed:', e); }
 
   await init();
+
+  document.body.dataset.onelineReady = '1';
 
   e2eOpenDetails();
   setReadyWhen('[data-testid="palette-button"]', 'data-oneline-ready', 'oneline-ready-beacon');
