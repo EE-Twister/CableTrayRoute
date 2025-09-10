@@ -315,6 +315,15 @@ window.addEventListener('DOMContentLoaded', () => {
   validateAllRows();
   vdLimitIn.addEventListener('input', applySizingHighlight);
 
+  // Update the table whenever cables are modified elsewhere (e.g. One-Line).
+  dataStore.on(dataStore.STORAGE_KEYS.cables, cables => {
+    table.setData(cables || []);
+    tableData = cables || [];
+    applySizingHighlight();
+    validateAllRows();
+    markSaved();
+  });
+
   document.getElementById('load-sample-cables-btn').addEventListener('click', async () => {
     try {
       const res = await fetch('examples/sampleCables.json');
