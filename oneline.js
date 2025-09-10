@@ -113,6 +113,24 @@ function categoryForType(t) {
   return 'equipment';
 }
 
+function inferSchemaFromProps(props) {
+  const schema = [];
+  Object.entries(props || {}).forEach(([k, v]) => {
+    if (v && typeof v === 'object') return; // skip nested objects for now
+    schema.push({
+      name: k,
+      label: k.replace(/_/g, ' '),
+      type: typeof v === 'number' ? 'number' : typeof v === 'boolean' ? 'checkbox' : 'text',
+      default: v
+    });
+  });
+  return schema;
+}
+
+function isBusComponent(c) {
+  return componentMeta[c.subtype]?.type === 'bus' || c.type === 'bus' || c.subtype === 'Bus';
+}
+
 const builtinComponents = [
   {
     subtype: 'Bus',
@@ -209,7 +227,7 @@ async function loadComponentLibrary() {
       subtypeCategory[key] = cat;
       if (!componentTypes[cat]) componentTypes[cat] = [];
       componentTypes[cat].push(key);
-      propSchemas[key] = [];
+      propSchemas[key] = inferSchemaFromProps(c.props);
     });
   } catch (e) {
     console.error('Component library load failed', e);
@@ -1390,7 +1408,7 @@ function render() {
     img.setAttribute('width', w);
     img.setAttribute('height', h);
     img.setAttributeNS('http://www.w3.org/1999/xlink', 'href', iconHref);
-    if (componentMeta[c.subtype]?.type === 'bus') img.setAttribute('preserveAspectRatio', 'none');
+    if (isBusComponent(c)) img.setAttribute('preserveAspectRatio', 'none');
     if (iconHref !== placeholderIcon) {
       img.addEventListener('error', () => {
         console.warn(`Missing icon for subtype ${c.subtype}`);
@@ -1425,7 +1443,7 @@ function render() {
     }
     g.appendChild(text);
     svg.appendChild(g);
-    if (componentMeta[c.subtype]?.type === 'bus' && selection.includes(c)) {
+    if (isBusComponent(c) && selection.includes(c)) {
       const handleRight = document.createElementNS(svgNS, 'rect');
       handleRight.setAttribute('x', c.x + c.width - 5);
       handleRight.setAttribute('y', c.y + (c.height / 2) - 5);
@@ -1634,6 +1652,9 @@ function addComponent(cfg) {
     connections: [],
     props: JSON.parse(JSON.stringify(meta.props || {}))
   };
+  Object.entries(meta.props || {}).forEach(([k, v]) => {
+    comp[k] = typeof v === 'object' ? JSON.parse(JSON.stringify(v)) : v;
+  });
   if (meta.type === 'bus') {
     comp.width = 200;
     comp.height = 20;
@@ -2351,6 +2372,7 @@ async function init() {
           icon,
           label: c.subtype,
           category: c.type,
+          type: c.type,
           ports: [
             { x: 0, y: 20 },
             { x: 80, y: 20 }
@@ -2358,13 +2380,20 @@ async function init() {
         };
       }
       if (!propSchemas[c.subtype]) {
-        propSchemas[c.subtype] = [];
+        const skip = new Set(['id', 'type', 'subtype', 'x', 'y', 'rotation', 'flipped', 'connections', 'label', 'ref', 'props']);
+        const raw = {};
+        Object.entries(c).forEach(([k, v]) => {
+          if (skip.has(k)) return;
+          if (v && typeof v === 'object') return;
+          raw[k] = v;
+        });
+        propSchemas[c.subtype] = inferSchemaFromProps(raw);
       }
     });
   });
   rebuildComponentMaps();
   Object.keys(componentMeta).forEach(sub => {
-    if (!propSchemas[sub]) propSchemas[sub] = [];
+    if (!propSchemas[sub]) propSchemas[sub] = inferSchemaFromProps(componentMeta[sub].props || {});
   });
   sheets.forEach(s => {
     s.components.forEach(c => {
@@ -3295,7 +3324,7 @@ function syncSchedules(notify = true) {
       return fields;
     });
   const buses = all
-    .filter(c => componentMeta[c.subtype]?.type === 'bus')
+    .filter(c => isBusComponent(c))
     .map(mapFields);
   setEquipment([...equipment, ...buses]);
   setPanels([...panels, ...buses]);
@@ -3415,7 +3444,7 @@ function serializeState() {
       .filter(c => getCategory(c) === 'load')
       .map(mapFields);
     const buses = comps
-      .filter(c => componentMeta[c.subtype]?.type === 'bus')
+      .filter(c => isBusComponent(c))
       .map(mapFields);
     const cables = [];
     comps.forEach(c => {
