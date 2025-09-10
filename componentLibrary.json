@@ -167,6 +167,30 @@
     ]
   },
   {
+    "subtype": "Breaker",
+    "label": "Breaker",
+    "icon": "icons/components/Breaker.svg",
+    "category": "equipment",
+    "ports": [{ "x": 0, "y": 20 }, { "x": 80, "y": 20 }],
+    "schema": [
+      { "name": "voltage", "label": "Voltage", "type": "number" },
+      { "name": "rating", "label": "Rating", "type": "select", "options": ["100A", "225A", "400A", "600A"] },
+      { "name": "notes", "label": "Notes", "type": "textarea" }
+    ]
+  },
+  {
+    "subtype": "Utility",
+    "label": "Utility Source",
+    "icon": "icons/components/Utility.svg",
+    "category": "equipment",
+    "ports": [{ "x": 0, "y": 20 }, { "x": 80, "y": 20 }],
+    "schema": [
+      { "name": "voltage", "label": "Voltage", "type": "number" },
+      { "name": "sc_rating", "label": "Short-Circuit Rating (kA)", "type": "number" },
+      { "name": "notes", "label": "Notes", "type": "textarea" }
+    ]
+  },
+  {
     "subtype": "Motor",
     "label": "Motor",
     "icon": "icons/components/Motor.svg",

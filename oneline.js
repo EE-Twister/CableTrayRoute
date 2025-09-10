@@ -1249,6 +1249,12 @@ function render() {
       conn.dir = path === h ? 'h' : 'v';
       conn.mid = conn.dir === 'h' ? path[1].x : path[1].y;
     }
+    const pen = path[path.length - 2];
+    if (tDir === 'top' || tDir === 'bottom') {
+      if (pen.x !== end.x) path.splice(path.length - 1, 0, { x: end.x, y: pen.y });
+    } else if (tDir === 'left' || tDir === 'right') {
+      if (pen.y !== end.y) path.splice(path.length - 1, 0, { x: pen.x, y: end.y });
+    }
     return path;
   }
 
@@ -1309,6 +1315,19 @@ function render() {
         selection = [];
         selectedConnection = { component: c, index: idx };
       });
+      poly.addEventListener('dblclick', async e => {
+        e.stopPropagation();
+        const res = await chooseCable(c, target, conn);
+        if (res) {
+          conn.cable = res.cable;
+          conn.phases = res.phases;
+          conn.conductors = res.conductors;
+          addCable(res.cable);
+          pushHistory();
+          render();
+          save();
+        }
+      });
       poly.addEventListener('mousedown', e => {
         e.stopPropagation();
         draggingConnection = {
@@ -1349,6 +1368,10 @@ function render() {
     const g = document.createElementNS(svgNS, 'g');
     g.dataset.id = c.id;
     g.classList.add('component');
+    g.addEventListener('dblclick', e => {
+      e.stopPropagation();
+      selectComponent(c);
+    });
     const tooltipParts = [];
     if (c.label) tooltipParts.push(`Label: ${c.label}`);
     if (c.voltage) tooltipParts.push(`Voltage: ${c.voltage}`);
@@ -2332,31 +2355,6 @@ async function init() {
     if (svg) svg.id = 'diagram';
   }
   if (svg) {
-    svg.addEventListener('dblclick', async e => {
-      const connEl = e.target.closest('.connection');
-      if (connEl) {
-        e.stopPropagation();
-        const comp = components.find(c => c.id === connEl.dataset.comp);
-        if (!comp) return;
-        const index = parseInt(connEl.dataset.index, 10);
-        const conn = comp.connections[index];
-        const target = components.find(t => t.id === conn.target);
-        const res = await chooseCable(comp, target, conn);
-        if (res) {
-          conn.cable = res.cable;
-          conn.phases = res.phases;
-          conn.conductors = res.conductors;
-          addCable(res.cable);
-          pushHistory();
-          render();
-          save();
-        }
-        return;
-      }
-      const g = e.target.closest('.component');
-      if (!g) return;
-      selectComponent(g.dataset.id);
-    });
     svg.addEventListener('dragover', e => e.preventDefault());
     svg.addEventListener('drop', e => {
       e.preventDefault();
