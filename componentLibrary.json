@@ -6,7 +6,7 @@
       "label": "Bus",
       "icon": "icons/components/Bus.svg",
       "props": {
-        "kv": 13.8,
+        "volts": 13800,
         "thevenin_mva": 500,
         "xr_ratio": 10,
         "grounding": "solid"
@@ -17,7 +17,7 @@
       "label": "Utility",
       "icon": "icons/components/Utility.svg",
       "props": {
-        "kv": 13.8,
+        "volts": 13800,
         "thevenin_mva": 500,
         "xr_ratio": 10,
         "grounding": "solid"
@@ -30,16 +30,16 @@
       "icon": "icons/components/Transformer.svg",
       "props": {
         "kva": 2500,
-        "kv_primary": 13.8,
-        "kv_secondary": 0.48,
+        "volts_primary": 13800,
+        "volts_secondary": 480,
         "percent_z": 6.0,
         "xr_ratio": 10,
         "vector_group": "Dyn11",
         "cooling": "ONAN",
         "ltc": {
           "enabled": true,
-          "min_tap_kv": 0.46,
-          "max_tap_kv": 0.50,
+          "min_tap_volts": 460,
+          "max_tap_volts": 500,
           "step_percent": 0.625,
           "control": "voltage",
           "setpoint_pu": 1.0
@@ -63,9 +63,9 @@
         "kva_hv": 25000,
         "kva_lv": 10000,
         "kva_tv": 5000,
-        "kv_hv": 115,
-        "kv_lv": 13.8,
-        "kv_tv": 4.16,
+        "volts_hv": 115000,
+        "volts_lv": 13800,
+        "volts_tv": 4160,
         "z_hv_lv_percent": 8.0,
         "z_hv_tv_percent": 10.0,
         "z_lv_tv_percent": 12.0,
@@ -84,8 +84,8 @@
       "icon": "icons/components/Transformer.svg",
       "props": {
         "kva": 5000,
-        "kv_primary": 115,
-        "kv_secondary": 13.8,
+        "volts_primary": 115000,
+        "volts_secondary": 13800,
         "percent_z": 8.0,
         "xr_ratio": 10,
         "vector_group": "YNa0d1"
@@ -102,8 +102,8 @@
       "icon": "icons/components/Transformer.svg",
       "props": {
         "kva": 500,
-        "kv_primary": 13.8,
-        "kv_secondary": 0.48,
+        "volts_primary": 13800,
+        "volts_secondary": 480,
         "percent_z": 6.0,
         "xr_ratio": 10,
         "vector_group": "Zn0"
@@ -182,7 +182,7 @@
       "label": "Recloser",
       "icon": "icons/components/Breaker.svg",
       "props": {
-        "kv": 15,
+        "volts": 15000,
         "ka": 12.5,
         "curve": "ANSI_E"
       }
@@ -233,7 +233,7 @@
       "label": "Shunt Cap",
       "icon": "icons/components/CapacitorBank.svg",
       "props": {
-        "kv": 13.8,
+        "volts": 13800,
         "kvar": 1800,
         "steps": 3,
         "detuned_hz": 189
@@ -244,7 +244,7 @@
       "label": "Shunt Reactor",
       "icon": "icons/placeholder.svg",
       "props": {
-        "kv": 13.8,
+        "volts": 13800,
         "kvar_absorb": 600
       }
     },
@@ -255,7 +255,7 @@
       "props": {
         "kw": 2000,
         "kva": 2500,
-        "kv": 13.8,
+        "volts": 13800,
         "pf": 0.8,
         "xd_pu": 1.8,
         "xd_prime_pu": 0.3,
@@ -269,7 +269,7 @@
       "icon": "icons/components/PVArray.svg",
       "props": {
         "kva": 1000,
-        "kv": 0.48,
+        "volts": 480,
         "pf_mode": "volt_var",
         "pf_setpoint": 1.0
       }
@@ -280,7 +280,7 @@
       "icon": "icons/components/UPS.svg",
       "props": {
         "kva": 500,
-        "kv": 0.48,
+        "volts": 480,
         "topology": "double_conversion",
         "battery_kwh": 250
       }
@@ -300,7 +300,7 @@
       "label": "MCC",
       "icon": "icons/components/MCC.svg",
       "props": {
-        "kv": 0.48,
+        "volts": 480,
         "sections": 6
       }
     },
@@ -309,7 +309,7 @@
       "label": "Busway",
       "icon": "icons/components/Bus.svg",
       "props": {
-        "kv": 0.48,
+        "volts": 480,
         "rating_a": 1200,
         "length_m": 30
       }
@@ -319,7 +319,7 @@
       "label": "Feeder",
       "icon": "icons/components/Feeder.svg",
       "props": {
-        "kv": 13.8,
+        "volts": 13800,
         "length_m": 120,
         "conductor": "500kcmil Cu",
         "insulation": "XHHW-2",
@@ -337,7 +337,7 @@
       ],
       "props": {
         "hp": 150,
-        "kv": 0.48,
+        "volts": 480,
         "pf": 0.88,
         "service_factor": 1.15,
         "efficiency": 95,
@@ -348,12 +348,11 @@
     },
     {
       "type": "static_load",
-      "label": "Load",
+      "label": "Non-Motor Load",
       "icon": "icons/components/Load.svg",
       "props": {
-        "kw": 300,
-        "kvar": 150,
-        "kv": 0.48
+        "watts": 300000,
+        "volts": 480
       }
     },
     {
@@ -371,7 +370,7 @@
       "label": "PT",
       "icon": "icons/placeholder.svg",
       "props": {
-        "ratio": "69kV:120V",
+        "ratio": "69000V:120V",
         "class": "0.3WZ"
       }
     },

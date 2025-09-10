@@ -181,7 +181,7 @@ const builtinComponents = [
   },
   {
     subtype: 'Load',
-    label: 'Load',
+    label: 'Non-Motor Load',
     icon: typeIcons.load || placeholderIcon,
     category: 'load',
     type: 'load',
@@ -201,7 +201,7 @@ let protectiveDevices = [];
 let paletteWidth = 250;
 let resizingPalette = false;
 
-const kvClasses = ['0.48 kV', '5 kV', '15 kV', '25 kV'];
+const voltageClasses = ['480 V', '5000 V', '15000 V', '25000 V'];
 const thermalRatings = ['75C', '90C', '105C'];
 const manufacturerModels = {
   ABB: ['MNS', 'SafeGear'],
@@ -234,6 +234,19 @@ async function loadComponentLibrary() {
         ? asset(`icons/components/${c.symbol}.svg`)
         : placeholderIcon;
       const ports = Array.isArray(c.ports) ? c.ports : defaultPorts(c.type, c.subtype);
+      const rawProps = c.props || {};
+      const props = {};
+      Object.entries(rawProps).forEach(([k, v]) => {
+        if (k === 'kv' || k.startsWith('kv_') || k.endsWith('_kv')) {
+          const newKey = k
+            .replace(/^kv_/, 'volts_')
+            .replace(/_kv$/, '_volts')
+            .replace('kv', 'volts');
+          props[newKey] = typeof v === 'number' ? v * 1000 : v;
+        } else {
+          props[k] = v;
+        }
+      });
       componentMeta[key] = {
         icon,
         label: c.label || key,
@@ -241,12 +254,12 @@ async function loadComponentLibrary() {
         ports,
         type: c.type,
         subtype: c.subtype,
-        props: c.props
+        props
       };
       subtypeCategory[key] = cat;
       if (!componentTypes[cat]) componentTypes[cat] = [];
       componentTypes[cat].push(key);
-      propSchemas[key] = inferSchemaFromProps(c.props);
+      propSchemas[key] = inferSchemaFromProps(props);
     });
   } catch (e) {
     console.error('Component library load failed', e);
@@ -922,8 +935,8 @@ const phaseColors = {
 // Voltage range configuration used for coloring components and connections
 const voltageColors = [
   { max: 600, color: '#4caf50', label: '\u2264600V' },
-  { max: 5000, color: '#ff9800', label: '600V-5kV' },
-  { max: Infinity, color: '#f44336', label: '>5kV' }
+  { max: 5000, color: '#ff9800', label: '600V-5000V' },
+  { max: Infinity, color: '#f44336', label: '>5000V' }
 ];
 
 function getVoltageRange(voltage) {
@@ -1459,6 +1472,18 @@ function render() {
         selectComponent(c);
       });
       g.appendChild(img);
+      if (c.subtype === 'motor_load') {
+        const letter = document.createElementNS(svgNS, 'text');
+        letter.setAttribute('x', cx);
+        letter.setAttribute('y', cy + 4);
+        letter.setAttribute('text-anchor', 'middle');
+        letter.setAttribute('dominant-baseline', 'middle');
+        letter.textContent = 'M';
+        if (c.rotation) {
+          letter.setAttribute('transform', `rotate(${-c.rotation}, ${cx}, ${cy})`);
+        }
+        g.appendChild(letter);
+      }
       const text = document.createElementNS(svgNS, 'text');
       text.setAttribute('x', c.x + w / 2);
       text.setAttribute('y', c.y + h + 15);
@@ -1786,7 +1811,7 @@ function selectComponent(compOrId) {
   let schema = rawSchema
     .map(f => {
       if (f.name === 'voltage_class') {
-        return { ...f, type: 'select', options: kvClasses };
+        return { ...f, type: 'select', options: voltageClasses };
       }
       if (f.name === 'thermal_rating') {
         return { ...f, type: 'select', options: thermalRatings };
