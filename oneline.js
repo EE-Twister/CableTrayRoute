@@ -131,6 +131,20 @@ function isBusComponent(c) {
   return componentMeta[c.subtype]?.type === 'bus' || c.type === 'bus' || c.subtype === 'Bus';
 }
 
+function defaultPorts(type, subtype) {
+  if (type === 'transformer' && subtype === 'three_winding') {
+    return [
+      { x: 0, y: 20 },
+      { x: 80, y: 10 },
+      { x: 80, y: 30 }
+    ];
+  }
+  return [
+    { x: 0, y: 20 },
+    { x: 80, y: 20 }
+  ];
+}
+
 const builtinComponents = [
   {
     subtype: 'Bus',
@@ -219,11 +233,12 @@ async function loadComponentLibrary() {
         : c.symbol
         ? asset(`icons/components/${c.symbol}.svg`)
         : placeholderIcon;
+      const ports = Array.isArray(c.ports) ? c.ports : defaultPorts(c.type, c.subtype);
       componentMeta[key] = {
         icon,
         label: c.label || key,
         category: cat,
-        ports: c.ports,
+        ports,
         type: c.type,
         subtype: c.subtype,
         props: c.props
@@ -1356,15 +1371,14 @@ function render() {
       let color = '#4caf50';
       if (dev > 10) color = '#f44336';
       else if (dev > 5) color = '#ffeb3b';
-      const halo = document.createElementNS(svgNS, 'circle');
-      halo.setAttribute('cx', cx);
-      halo.setAttribute('cy', cy);
-      halo.setAttribute('r', Math.max(w, h) / 2 + 6);
-      halo.setAttribute('fill', 'none');
-      halo.setAttribute('stroke', color);
-      halo.setAttribute('stroke-width', 6);
-      halo.setAttribute('opacity', 0.5);
-      g.appendChild(halo);
+      const overlay = document.createElementNS(svgNS, 'rect');
+      overlay.setAttribute('x', c.x);
+      overlay.setAttribute('y', c.y);
+      overlay.setAttribute('width', w);
+      overlay.setAttribute('height', h);
+      overlay.setAttribute('fill', color);
+      overlay.setAttribute('opacity', 0.3);
+      g.appendChild(overlay);
     }
     if (showOverlays && (c.voltage_mag !== undefined || c.shortCircuit?.threePhaseKA !== undefined)) {
       const txt = document.createElementNS(svgNS, 'text');
@@ -1392,7 +1406,7 @@ function render() {
     if (c.flipped) transforms.push(`translate(${cx}, ${cy}) scale(-1,1) translate(${-cx}, ${-cy})`);
     if (c.rotation) transforms.push(`rotate(${c.rotation}, ${cx}, ${cy})`);
     if (transforms.length) g.setAttribute('transform', transforms.join(' '));
-    const vRange = getVoltageRange(c.voltage);
+    const vRange = (!showOverlays || c.voltage_mag === undefined) ? getVoltageRange(c.voltage) : null;
     if (vRange) {
       usedVoltageRanges.add(vRange);
       const bg = document.createElementNS(svgNS, 'rect');
