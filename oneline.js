@@ -1235,7 +1235,9 @@ function render() {
     const h = horizontalFirst();
     const v = verticalFirst();
     let path;
-    const preferH = tDir === 'top' || tDir === 'bottom';
+    // Prefer horizontal routing only when targeting left/right ports so
+    // that connections into top/bottom ports end with a vertical segment.
+    const preferH = tDir === 'left' || tDir === 'right';
     if (preferH) {
       if (!intersects(h)) path = h;
       else if (!intersects(v)) path = v;
@@ -1358,7 +1360,27 @@ function render() {
       label.classList.add('conn-label');
       if (conn.cable?.sizing_warning) label.classList.add('sizing-violation');
       if (parseFloat(conn.cable?.voltage_drop_pct) > vdLimit) label.classList.add('voltage-exceed');
-      label.style.pointerEvents = 'none';
+      label.style.pointerEvents = 'auto';
+      label.style.cursor = 'pointer';
+      label.addEventListener('click', e => {
+        e.stopPropagation();
+        selected = null;
+        selection = [];
+        selectedConnection = { component: c, index: idx };
+      });
+      label.addEventListener('dblclick', async e => {
+        e.stopPropagation();
+        const res = await chooseCable(c, target, conn);
+        if (res) {
+          conn.cable = res.cable;
+          conn.phases = res.phases;
+          conn.conductors = res.conductors;
+          addCable(res.cable);
+          pushHistory();
+          render();
+          save();
+        }
+      });
       svg.appendChild(label);
     });
   });
@@ -1453,12 +1475,20 @@ function render() {
         img.setAttributeNS('http://www.w3.org/1999/xlink', 'href', placeholderIcon);
       }, { once: true });
     }
+    img.addEventListener('dblclick', e => {
+      e.stopPropagation();
+      selectComponent(c);
+    });
     g.appendChild(img);
     const text = document.createElementNS(svgNS, 'text');
     text.setAttribute('x', c.x + w / 2);
     text.setAttribute('y', c.y + h + 15);
     text.setAttribute('text-anchor', 'middle');
     text.textContent = c.label || meta.label || c.subtype || c.type;
+    text.addEventListener('dblclick', e => {
+      e.stopPropagation();
+      selectComponent(c);
+    });
     if (selection.includes(c)) {
       const rect = document.createElementNS(svgNS, 'rect');
       rect.setAttribute('x', c.x - 2);
@@ -2835,8 +2865,14 @@ async function init() {
     compItems.forEach(li => li.style.display = contextTarget && !contextTarget.connection ? 'block' : 'none');
     connItems.forEach(li => li.style.display = contextTarget && contextTarget.connection ? 'block' : 'none');
     canvasItems.forEach(li => li.style.display = contextTarget ? 'none' : 'block');
-    menu.style.left = `${e.pageX}px`;
-    menu.style.top = `${e.pageY}px`;
+    const rect = editorEl?.getBoundingClientRect();
+    if (rect) {
+      menu.style.left = `${e.clientX - rect.left}px`;
+      menu.style.top = `${e.clientY - rect.top}px`;
+    } else {
+      menu.style.left = `${e.pageX}px`;
+      menu.style.top = `${e.pageY}px`;
+    }
     menu.style.display = 'block';
   });
 

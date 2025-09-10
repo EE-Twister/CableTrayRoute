@@ -102,6 +102,9 @@
     "ports": [{ "x": 0, "y": 20 }, { "x": 80, "y": 20 }],
     "schema": [
       { "name": "voltage", "label": "Voltage", "type": "number" },
+      { "name": "primary_voltage", "label": "Primary Voltage", "type": "number" },
+      { "name": "secondary_voltage", "label": "Secondary Voltage", "type": "number" },
+      { "name": "xr_ratio", "label": "X/R Ratio", "type": "number" },
       { "name": "rating", "label": "Rating", "type": "select", "options": ["45kVA", "75kVA", "112.5kVA", "150kVA", "225kVA", "300kVA"] },
       { "name": "breaker_frame", "label": "Breaker Frame", "type": "select", "options": ["250A", "400A", "600A", "800A", "1200A"] },
       { "name": "conductor_type", "label": "Conductor Type", "type": "select", "options": ["THHN", "XHHW", "RHW"] },
