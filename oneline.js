@@ -3485,25 +3485,7 @@ async function __oneline_init() {
   try { await loadManufacturerLibrary(); } catch (e) { console.error('loadManufacturerLibrary failed:', e); }
   try { await loadProtectiveDevices(); } catch (e) { console.error('loadProtectiveDevices failed:', e); }
 
-  // Ensure diagram drop works
-  const svg = document.getElementById('diagram');
-  if (svg) {
-    svg.addEventListener('dragover', e => e.preventDefault(), { passive: false });
-    svg.addEventListener('drop', e => {
-      e.preventDefault();
-      try {
-        const payload = JSON.parse(e.dataTransfer.getData('text/plain') || '{}');
-        if (payload?.subtype) {
-          const pt = svg.createSVGPoint();
-          pt.x = e.clientX; pt.y = e.clientY;
-          const ctm = svg.getScreenCTM();
-          const { x, y } = pt.matrixTransform(ctm.inverse());
-          addComponent({ type: payload.type, subtype: payload.subtype, x, y });
-          render(); save();
-        }
-      } catch {}
-    });
-  }
+  await init();
 
   e2eOpenDetails();
   setReadyWhen('[data-testid="palette-button"]', 'data-oneline-ready', 'oneline-ready-beacon');
