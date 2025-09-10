@@ -58,7 +58,8 @@
 }
 
 .icon-button:hover,
-.icon-button:focus {
+.icon-button:focus,
+.icon-button.active {
   background: var(--ol-hover-bg);
   border-radius: 4px;
 }
@@ -411,6 +412,7 @@ g.component.scenario-diff > * {
   box-shadow: var(--ol-shadow);
   font-family: var(--ol-font);
   display: none;
+  cursor: move;
 }
 
 .voltage-legend .legend-item {
@@ -459,13 +461,14 @@ g.component.scenario-diff > * {
   width: 100%;
   height: 100%;
   background: rgba(0, 0, 0, 0.6);
-  display: flex;
-  align-items: center;
-  justify-content: center;
   z-index: 1000;
 }
 
 .tour-modal {
+  position: fixed;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
   background: var(--ol-card-bg);
   padding: 1rem;
   border-radius: var(--ol-radius);
@@ -478,6 +481,12 @@ g.component.scenario-diff > * {
   position: relative;
   z-index: 1001;
   box-shadow: 0 0 0 4px orange;
+}
+
+.bus-handle {
+  fill: #fff;
+  stroke: #000;
+  cursor: ew-resize;
 }
 
 .overlay-label {
