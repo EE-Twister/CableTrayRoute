@@ -262,6 +262,16 @@
   align-items: center;
   gap: var(--ol-spacing);
 }
+.sheet-action-group .icon-button {
+  border: 1px solid var(--border-color);
+  background: var(--ol-card-bg);
+  color: var(--text-color);
+}
+
+.sheet-action-group .icon-button:hover,
+.sheet-action-group .icon-button:focus {
+  background: var(--ol-hover-bg);
+}
 
 .sheet-tabs {
   display: flex;
@@ -270,13 +280,15 @@
 
 .sheet-tab {
   padding: 0.25rem 0.5rem;
-  border: 1px solid var(--ol-border-color);
+  border: 1px solid var(--border-color);
   background: var(--ol-card-bg);
   cursor: pointer;
+  color: var(--text-color);
 }
 
 .sheet-tab.active {
-  background: var(--ol-hover-bg);
+  background: var(--primary-color);
+  color: var(--secondary-color);
   font-weight: bold;
 }
 
