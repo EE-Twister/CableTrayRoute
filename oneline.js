@@ -1778,23 +1778,35 @@ function selectComponent(compOrId) {
     delete modal._keyHandler;
   }
 
-  const schema = rawSchema.map(f => {
-    if (f.name === 'voltage_class') {
-      return { ...f, type: 'select', options: kvClasses };
-    }
-    if (f.name === 'thermal_rating') {
-      return { ...f, type: 'select', options: thermalRatings };
-    }
-    if (f.name === 'manufacturer') {
-      return { ...f, type: 'select', options: Object.keys(manufacturerModels) };
-    }
-    if (f.name === 'model') {
-      const manu = comp.manufacturer || Object.keys(manufacturerModels)[0];
-      return { ...f, type: 'select', options: manufacturerModels[manu] || [] };
-    }
-    return f;
-  });
-  const baseFields = [
+  const labelOverrides = {
+    hp: 'Horsepower',
+    pf: 'Power Factor',
+    service_factor: 'Service Factor'
+  };
+  let schema = rawSchema
+    .map(f => {
+      if (f.name === 'voltage_class') {
+        return { ...f, type: 'select', options: kvClasses };
+      }
+      if (f.name === 'thermal_rating') {
+        return { ...f, type: 'select', options: thermalRatings };
+      }
+      if (f.name === 'manufacturer') {
+        return { ...f, type: 'select', options: Object.keys(manufacturerModels) };
+      }
+      if (f.name === 'model') {
+        const manu = comp.manufacturer || Object.keys(manufacturerModels)[0];
+        return { ...f, type: 'select', options: manufacturerModels[manu] || [] };
+      }
+      return f;
+    })
+    .map(f => ({ ...f, label: labelOverrides[f.name] || f.label }));
+  if (comp.subtype === 'motor_load') {
+    schema = schema.filter(
+      f => !['conductor_type', 'cable_assembly', 'breaker_frame', 'conductor_assembly', 'gap'].includes(f.name)
+    );
+  }
+  let baseFields = [
     { name: 'label', label: 'Label', type: 'text' },
     { name: 'ref', label: 'Ref ID', type: 'text' },
     { name: 'enclosure', label: 'Enclosure', type: 'select', options: ['NEMA 1', 'NEMA 3R', 'NEMA 4', 'NEMA 4X'] },
@@ -1802,6 +1814,11 @@ function selectComponent(compOrId) {
     { name: 'working_distance', label: 'Working Distance (mm)', type: 'number' },
     { name: 'clearing_time', label: 'Clearing Time (s)', type: 'number' }
   ];
+  if (comp.subtype === 'motor_load') {
+    baseFields = baseFields.filter(
+      f => !['gap', 'conductor_type', 'cable_assembly', 'breaker_frame', 'conductor_assembly'].includes(f.name)
+    );
+  }
   let manufacturerInput = null;
   let modelInput = null;
   const buildField = (f, container) => {
@@ -1839,7 +1856,12 @@ function selectComponent(compOrId) {
     container.appendChild(lbl);
   };
 
-  const fields = [...baseFields, ...schema];
+  let fields = [...baseFields, ...schema];
+  if (comp.subtype === 'motor_load') {
+    fields = fields.filter(
+      f => !['conductor_type', 'cable_assembly', 'breaker_frame', 'conductor_assembly'].includes(f.name)
+    );
+  }
   const manufacturerFields = [];
   const noteFields = [];
   const electricalFields = [];
@@ -2550,9 +2572,9 @@ async function init() {
   if (shareBtn) shareBtn.addEventListener('click', shareDiagram);
   const sampleBtn = document.getElementById('sample-diagram-btn');
   if (sampleBtn) sampleBtn.addEventListener('click', loadSampleDiagram);
-  document.getElementById('add-sheet-btn').addEventListener('click', addSheet);
-  document.getElementById('rename-sheet-btn').addEventListener('click', renameSheet);
-  document.getElementById('delete-sheet-btn').addEventListener('click', deleteSheet);
+  document.getElementById('add-sheet-btn').addEventListener('click', () => addSheet());
+  document.getElementById('rename-sheet-btn').addEventListener('click', () => renameSheet());
+  document.getElementById('delete-sheet-btn').addEventListener('click', () => deleteSheet());
   document.getElementById('validate-btn').addEventListener('click', validateDiagram);
 
   const gridToggle = document.getElementById('grid-toggle');
