@@ -436,6 +436,8 @@ let connections = [];
 let selection = [];
 let selected = null;
 let dragOffset = null;
+let dragging = false;
+let draggingConnection = null;
 let clipboard = [];
 let contextTarget = null;
 let connectMode = false;
@@ -1095,7 +1097,7 @@ function normalizeComponent(c) {
 
 function render() {
   const svg = document.getElementById('diagram');
-  svg.querySelectorAll('g.component, .connection, .conn-label, .port, .dimension, .dim-label').forEach(el => el.remove());
+  svg.querySelectorAll('g.component, .connection, .conn-label, .port, .dimension, .dim-label, .bus-handle, .issue-badge').forEach(el => el.remove());
   const usedVoltageRanges = new Set();
   let lengthsChanged = false;
   if (gridEnabled) {
@@ -1108,6 +1110,11 @@ function render() {
   function routeConnection(src, tgt, conn) {
     const start = portPosition(src, conn?.sourcePort);
     const end = portPosition(tgt, conn?.targetPort);
+    if (conn && conn.dir) {
+      const mid = conn.mid ?? (conn.dir === 'h' ? (start.x + end.x) / 2 : (start.y + end.y) / 2);
+      if (conn.dir === 'h') return [start, { x: mid, y: start.y }, { x: mid, y: end.y }, end];
+      return [start, { x: start.x, y: mid }, { x: end.x, y: mid }, end];
+    }
 
     function horizontalFirst() {
       let midX = (start.x + end.x) / 2;
@@ -1212,10 +1219,16 @@ function render() {
     }
 
     const h = horizontalFirst();
-    if (!intersects(h)) return h;
     const v = verticalFirst();
-    if (!intersects(v)) return v;
-    return h.length <= v.length ? h : v;
+    let path;
+    if (!intersects(h)) path = h;
+    else if (!intersects(v)) path = v;
+    else path = h.length <= v.length ? h : v;
+    if (conn) {
+      conn.dir = path === h ? 'h' : 'v';
+      conn.mid = conn.dir === 'h' ? path[1].x : path[1].y;
+    }
+    return path;
   }
 
   function midpoint(points) {
@@ -1292,6 +1305,15 @@ function render() {
         selected = null;
         selection = [];
         selectedConnection = { component: c, index: idx };
+      });
+      poly.addEventListener('mousedown', e => {
+        e.stopPropagation();
+        draggingConnection = {
+          component: c,
+          index: idx,
+          start: { x: e.offsetX, y: e.offsetY },
+          mid: conn.mid ?? (conn.dir === 'h' ? pts[1].x : pts[1].y)
+        };
       });
       svg.appendChild(poly);
 
@@ -2620,10 +2642,24 @@ async function init() {
       }
       selected = comp;
       dragOffset = selection.map(c => ({ comp: c, dx: e.offsetX - c.x, dy: e.offsetY - c.y }));
+      dragging = false;
       render();
     });
     svg.addEventListener('mousemove', e => {
       cursorPos = { x: e.offsetX, y: e.offsetY };
+      if (draggingConnection) {
+        const { component, index, start, mid } = draggingConnection;
+        const conn = component.connections[index];
+        if (conn) {
+          if (conn.dir === 'h') {
+            conn.mid = mid + (e.offsetX - start.x);
+          } else {
+            conn.mid = mid + (e.offsetY - start.y);
+          }
+          render();
+        }
+        return;
+      }
       if (resizingBus) {
         let newW = Math.max(40, resizingBus.startWidth + e.offsetX - resizingBus.startX);
         if (gridEnabled) newW = Math.round(newW / gridSize) * gridSize;
@@ -2645,7 +2681,7 @@ async function init() {
       }
     });
   svg.addEventListener('mousemove', e => {
-    if (resizingBus) return;
+    if (resizingBus || draggingConnection) return;
     if (!dragOffset || !dragOffset.length) return;
     let snapPos = null;
     dragOffset.forEach(off => {
@@ -2662,6 +2698,7 @@ async function init() {
       }
       off.comp.x = x;
       off.comp.y = y;
+      dragging = true;
     });
     render();
     if (snapPos) flashSnapIndicator(snapPos.x, snapPos.y);
@@ -2669,6 +2706,13 @@ async function init() {
     svg.addEventListener('mouseup', async e => {
       if (resizingBus) {
         resizingBus = null;
+        pushHistory();
+        render();
+        save();
+        return;
+      }
+      if (draggingConnection) {
+        draggingConnection = null;
         pushHistory();
         render();
         save();
@@ -2722,10 +2766,13 @@ async function init() {
         return;
       }
       if (dragOffset && dragOffset.length) {
+        if (dragging) {
+          pushHistory();
+          render();
+          save();
+        }
         dragOffset = null;
-        pushHistory();
-        render();
-        save();
+        dragging = false;
       } else {
         dragOffset = null;
       }
@@ -3127,14 +3174,16 @@ function validateDiagram() {
     badge.setAttribute('class', 'issue-badge');
     const comp = components.find(c => c.id === id) || {};
     const w = comp.width || compWidth;
+    const x0 = comp.x || 0;
+    const y0 = comp.y || 0;
     const circ = document.createElementNS(svgNS, 'circle');
-    circ.setAttribute('cx', w - 8);
-    circ.setAttribute('cy', 8);
+    circ.setAttribute('cx', x0 + w - 8);
+    circ.setAttribute('cy', y0 + 8);
     circ.setAttribute('r', 8);
     circ.setAttribute('fill', '#c00');
     const txt = document.createElementNS(svgNS, 'text');
-    txt.setAttribute('x', w - 8);
-    txt.setAttribute('y', 11);
+    txt.setAttribute('x', x0 + w - 8);
+    txt.setAttribute('y', y0 + 11);
     txt.setAttribute('text-anchor', 'middle');
     txt.setAttribute('font-size', '12');
     txt.setAttribute('fill', '#fff');
