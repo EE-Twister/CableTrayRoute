@@ -332,10 +332,14 @@
       "type": "motor_load",
       "label": "Motor",
       "icon": "icons/components/Motor.svg",
+      "ports": [
+        { "x": 80, "y": 20 }
+      ],
       "props": {
         "hp": 150,
         "kv": 0.48,
         "pf": 0.88,
+        "service_factor": 1.15,
         "efficiency": 95,
         "lr_current_pu": 6.0,
         "starting": "DOL",
