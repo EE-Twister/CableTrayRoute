@@ -4073,8 +4073,6 @@ Plotly.newPlot(document.getElementById('plot'), data, layout, {responsive: true}
         await finalizeLoad();
     }
 
-    markReady('data-optimal-ready');
-    ensureBeacon('optimal-ready-beacon');
 
     async function runSelfCheck(){
         const diag={};
