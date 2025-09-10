@@ -214,7 +214,11 @@ async function loadComponentLibrary() {
     comps.forEach(c => {
       const key = compKey(c.type, c.subtype);
       const cat = categoryForType(c.type);
-      const icon = c.symbol ? asset(`icons/components/${c.symbol}.svg`) : placeholderIcon;
+      const icon = c.icon
+        ? asset(c.icon)
+        : c.symbol
+        ? asset(`icons/components/${c.symbol}.svg`)
+        : placeholderIcon;
       componentMeta[key] = {
         icon,
         label: c.label || key,
