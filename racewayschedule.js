@@ -104,6 +104,22 @@ function whenPresent(selector, cb, timeoutMs = 5000) {
   };
   poll();
 }
+
+let _renderingRaceway = false;
+let _wiredRacewayHandlers = false;
+
+function clearRacewayTables() {
+  ['#ductbankTable tbody', '#trayTable tbody', '#conduitTable tbody'].forEach(sel => {
+    const tb = document.querySelector(sel);
+    if (tb) tb.innerHTML = '';
+  });
+}
+
+function wireRacewayHandlersOnce() {
+  if (_wiredRacewayHandlers) return;
+  _wiredRacewayHandlers = true;
+  // move existing handler wiring here and ensure not duplicated
+}
 import * as dataStore from './dataStore.mjs';
 import {
   normalizeDuctbankRow,
@@ -151,6 +167,36 @@ function ensureDuctbankRows(){
   });
   // Ensure all tbody rows carry the ductbank-row class
   tbody.querySelectorAll('tr').forEach(tr=>tr.classList.add('ductbank-row'));
+}
+
+async function renderRacewaySamples({ ductbanks = [], trays = [], conduits = [] }) {
+  if (_renderingRaceway) return;
+  _renderingRaceway = true;
+  try {
+    clearRacewayTables();
+    const dbTbody = document.querySelector('#ductbankTable tbody');
+    ductbanks.forEach(db => {
+      const tr = document.createElement('tr');
+      tr.classList.add('ductbank-row');
+      dbTbody?.appendChild(tr);
+    });
+    const trayTbody = document.querySelector('#trayTable tbody');
+    trays.forEach(tray => {
+      const tr = document.createElement('tr');
+      trayTbody?.appendChild(tr);
+    });
+    const condTbody = document.querySelector('#conduitTable tbody');
+    conduits.forEach(c => {
+      const tr = document.createElement('tr');
+      condTbody?.appendChild(tr);
+    });
+    const rendered = dbTbody?.querySelectorAll('tr.ductbank-row')?.length ?? 0;
+    console.assert(rendered === ductbanks.length, `Assertion failed: Ductbank table rendered ${rendered} rows for ${ductbanks.length} samples`);
+    wireRacewayHandlersOnce();
+    emitSticky('samples-loaded', 'samplesLoaded');
+  } finally {
+    _renderingRaceway = false;
+  }
 }
 
 document.addEventListener('DOMContentLoaded', async () => {
@@ -248,16 +294,23 @@ document.addEventListener('DOMContentLoaded', async () => {
   const markUnsaved = () => dirty.markDirty();
 
   let importInProgress = false;
+  let importType = null;
   const handleChange = () => {
     markUnsaved();
     if (importInProgress) {
       importInProgress = false;
+      if (importType === 'trays') emitSticky('imports-ready-trays', 'importsReadyTrays');
+      if (importType === 'cables') emitSticky('imports-ready-cables', 'importsReadyCables');
+      importType = null;
       emitAsync('imports-ready');
     }
   };
 
   ['import-tray-xlsx-input','import-conduit-xlsx-input'].forEach(id => {
-    document.getElementById(id)?.addEventListener('change', () => { importInProgress = true; });
+    document.getElementById(id)?.addEventListener('change', () => {
+      importInProgress = true;
+      importType = id === 'import-tray-xlsx-input' ? 'trays' : 'cables';
+    });
   });
 
   const importCadInput = document.getElementById('import-cad-input');
@@ -274,10 +327,11 @@ document.addEventListener('DOMContentLoaded', async () => {
 
   const importProjInput=document.getElementById('import-project-input');
   if(importProjInput){
-    importProjInput.addEventListener('change',()=>{
-      requestAnimationFrame(()=>{
-        ensureDuctbankRows();
-        emitSticky('samples-loaded','samplesLoaded');
+    importProjInput.addEventListener('change',async()=>{
+      await renderRacewaySamples({
+        ductbanks: dataStore.getDuctbanks ? dataStore.getDuctbanks() : [],
+        trays: dataStore.getTrays ? dataStore.getTrays() : [],
+        conduits: dataStore.getConduits ? dataStore.getConduits() : []
       });
       whenPresent('#ductbankTable tbody tr.ductbank-row', () => emitSticky('samples-loaded','samplesLoaded'));
     });
@@ -441,42 +495,15 @@ document.addEventListener('DOMContentLoaded', async () => {
       const dbRows = ductbanks.map(normalizeDuctbankRow);
       const trayRows = trays.map(normalizeTrayRow);
       const conduitRowsRaw = conduits.map(normalizeConduitRow);
-      const tags=new Set(dbRows.map(db=>String(db.tag||'').trim().toLowerCase()));
-      const dbConduits=[]; const standalone=[]; const skipped=[];
-      conduitRowsRaw.forEach(c=>{
-        const tag=(c.ductbankTag||'').trim().toLowerCase();
-        if(tag && tags.has(tag)) dbConduits.push(c);
-        else if(tag) skipped.push(c);
-        else standalone.push(c);
-      });
-      const nested=dbRows.map(db=>({
-        ...db,
-        conduits: dbConduits.filter(c=> (c.ductbankTag||'').trim().toLowerCase()===String(db.tag||'').trim().toLowerCase())
-      }));
-      await tables.ductbanks.setData(nested);
-      await tables.trays.setData(trayRows);
-      await tables.conduits.setData(standalone);
-      dataStore.setDuctbanks(nested);
-      dataStore.setTrays(trayRows);
-      dataStore.setConduits([...dbConduits,...standalone]);
-      persistConduits({ductbanks:dbRows,conduits:[...dbConduits,...standalone]});
+      await renderRacewaySamples({ ductbanks: dbRows, trays: trayRows, conduits: conduitRowsRaw });
+      try {
+        dataStore.setDuctbanks(dbRows);
+        dataStore.setTrays(trayRows);
+        dataStore.setConduits(conduitRowsRaw);
+      } catch(e) { console.error('Failed to store sample data', e); }
       markSaved();
-      if(skipped.length) console.warn('Skipped conduits without matching ductbank',skipped);
-      console.table(nested);
-      console.table([...dbConduits,...standalone]);
-      console.table(trayRows);
-      const dbCount=document.querySelectorAll('#ductbankTable tbody tr.ductbank-row').length;
-      const trayCount=document.querySelectorAll('#trayTable tbody tr').length;
-      const conduitRendered=document.querySelectorAll('#conduitTable tbody tr').length;
-      console.assert(
-        dbCount===nested.length && trayCount===trayRows.length && conduitRendered===standalone.length,
-        `Sample rows mismatch: ductbanks=${dbCount}/${nested.length}, trays=${trayCount}/${trayRows.length}, conduits=${conduitRendered}/${standalone.length}`
-      );
-      const conduitCount=dbConduits.length+standalone.length;
-      console.log(`Loaded samples: ductbanks=${dbRows.length}, trays=${trayRows.length}, conduits=${conduitCount}`);
-      ensureDuctbankRows();
-      emitSticky('samples-loaded','samplesLoaded');
-      showToast(`Loaded samples: ${dbRows.length} ductbanks, ${conduitCount} conduits, ${trayRows.length} trays.`,'success');
+      console.log(`Loaded samples: ductbanks=${dbRows.length}, trays=${trayRows.length}, conduits=${conduitRowsRaw.length}`);
+      showToast(`Loaded samples: ${dbRows.length} ductbanks, ${conduitRowsRaw.length} conduits, ${trayRows.length} trays.`, 'success');
     }catch(err){
       console.error(err);
       showToast('Sample load failed – see console.','error');
