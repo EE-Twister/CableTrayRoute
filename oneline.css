@@ -375,6 +375,23 @@
   box-shadow: var(--ol-shadow);
   max-height: 90%;
   overflow: auto;
+  width: 80vw;
+  max-width: 800px;
+}
+
+.prop-modal form fieldset {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+  gap: var(--ol-spacing);
+}
+
+.prop-modal form fieldset label {
+  display: flex;
+  flex-direction: column;
+}
+
+.prop-modal form fieldset legend {
+  grid-column: 1 / -1;
 }
 
 .prop-modal .modal-header {
