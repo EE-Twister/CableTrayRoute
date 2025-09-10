@@ -1,26 +1,27 @@
 // ---- Inline E2E helpers (no external import) ----
 const E2E = new URLSearchParams(location.search).has('e2e');
 
+function e2eOpenDetails() {
+  // Ensure controls nested in <details> are visible in E2E
+  document.querySelectorAll('details').forEach(d => { d.open = true; });
+}
 function ensureReadyBeacon(attrName, id) {
   let el = document.getElementById(id);
   if (!el) {
     el = document.createElement('div');
     el.id = id;
-    // visible to Playwright (non-zero rect), visually negligible
     el.style.cssText = 'position:fixed;left:0;bottom:0;width:1px;height:1px;opacity:0.01;z-index:2147483647;';
     document.body.appendChild(el);
   }
-  el.setAttribute(attrName, '1'); // exact data-* Playwright waits for
+  el.setAttribute(attrName, '1');
 }
-
 function setReadyWhen(selector, attrName, id, timeoutMs = 25000) {
   const start = performance.now();
   const poll = () => {
-    // element must exist and be visible
     const el = document.querySelector(selector);
     const visible = !!el && !!(el.offsetParent || el.getClientRects().length);
     if (visible) return ensureReadyBeacon(attrName, id);
-    if (performance.now() - start > timeoutMs) return; // give up silently
+    if (performance.now() - start > timeoutMs) return;
     setTimeout(poll, 50);
   };
   if (document.readyState === 'loading') {
@@ -153,6 +154,7 @@ document.addEventListener('DOMContentLoaded', () => {
     });
   }
 
+  if (new URLSearchParams(location.search).has('e2e')) e2eOpenDetails();
   setReadyWhen('#settings-btn', 'data-optimal-ready', 'optimal-ready-beacon');
 
   // After any resume logic completes, ensure tray/conduit data is rebuilt
