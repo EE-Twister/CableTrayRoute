@@ -383,7 +383,6 @@
   fill: #666;
   stroke: #fff;
   stroke-width: 1;
-  pointer-events: none;
 }
 
 
@@ -433,15 +432,7 @@ g.component.scenario-diff > * {
   display: inline-block;
 }
 
-.dimension {
-  stroke: #000;
-}
-
-.dim-label {
-  font-size: 10px;
-  fill: #000;
-  pointer-events: none;
-}
+/* dimension tool removed */
 
 @keyframes fadeIn {
   from { opacity: 0; }

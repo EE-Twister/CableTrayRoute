@@ -271,6 +271,7 @@ async function loadComponentLibrary() {
     reliabilityFields.forEach(f => {
       if (!c.schema.some(s => s.name === f.name)) c.schema.push(f);
     });
+    propSchemas[c.subtype] = c.schema;
 
     componentMeta[c.subtype] = {
       icon: c.icon || placeholderIcon,
@@ -445,8 +446,6 @@ let connectSource = null;
 let tempConnection = null;
 let hoverPort = null;
 let selectedConnection = null;
-let dimensionMode = false;
-let dimensionStart = null;
 let diagramScale = getItem('diagramScale', { unitPerPx: 1, unit: 'in' });
 let cableSlackPct = Number(getItem('cableSlackPct', 0));
 let slackPctInput = null;
@@ -1097,7 +1096,7 @@ function normalizeComponent(c) {
 
 function render() {
   const svg = document.getElementById('diagram');
-  svg.querySelectorAll('g.component, .connection, .conn-label, .port, .dimension, .dim-label, .bus-handle, .issue-badge').forEach(el => el.remove());
+  svg.querySelectorAll('g.component, .connection, .conn-label, .port, .bus-handle, .issue-badge').forEach(el => el.remove());
   const usedVoltageRanges = new Set();
   let lengthsChanged = false;
   if (gridEnabled) {
@@ -1252,30 +1251,7 @@ function render() {
     return points[0];
   }
 
-  // draw dimension lines
-  components.filter(c => c.type === 'dimension').forEach(d => {
-    const line = document.createElementNS(svgNS, 'line');
-    line.setAttribute('x1', d.x1);
-    line.setAttribute('y1', d.y1);
-    line.setAttribute('x2', d.x2);
-    line.setAttribute('y2', d.y2);
-    line.classList.add('dimension');
-    line.setAttribute('marker-start', 'url(#arrow)');
-    line.setAttribute('marker-end', 'url(#arrow)');
-    svg.appendChild(line);
-
-    const midx = (d.x1 + d.x2) / 2;
-    const midy = (d.y1 + d.y2) / 2;
-    const dist = Math.hypot(d.x2 - d.x1, d.y2 - d.y1);
-    const len = dist * (diagramScale.unitPerPx || 1);
-    const text = document.createElementNS(svgNS, 'text');
-    text.setAttribute('x', midx);
-    text.setAttribute('y', midy - 5);
-    text.setAttribute('text-anchor', 'middle');
-    text.classList.add('dim-label');
-    text.textContent = `${len.toFixed(2)} ${diagramScale.unit}`;
-    svg.appendChild(text);
-  });
+  // dimension tool removed
 
   // draw connections
   components.forEach(c => {
@@ -1420,6 +1396,7 @@ function render() {
     img.setAttribute('width', w);
     img.setAttribute('height', h);
     img.setAttributeNS('http://www.w3.org/1999/xlink', 'href', iconHref);
+    if (c.subtype === 'Bus') img.setAttribute('preserveAspectRatio', 'none');
     if (iconHref !== placeholderIcon) {
       img.addEventListener('error', () => {
         console.warn(`Missing icon for subtype ${c.subtype}`);
@@ -2454,15 +2431,7 @@ async function init() {
       render();
     });
   }
-  const dimensionBtn = document.getElementById('dimension-btn');
-  if (dimensionBtn) {
-    dimensionBtn.addEventListener('click', () => {
-      dimensionMode = !dimensionMode;
-      dimensionStart = null;
-      connectMode = false;
-      dimensionBtn.classList.toggle('active', dimensionMode);
-    });
-  }
+  // dimension tool removed
   document.getElementById('undo-btn').addEventListener('click', undo);
   document.getElementById('redo-btn').addEventListener('click', redo);
   document.getElementById('align-left-btn').addEventListener('click', () => alignSelection('left'));
@@ -2778,24 +2747,6 @@ async function init() {
       }
     });
   svg.addEventListener('click', async e => {
-    if (dimensionMode) {
-      let x = e.offsetX;
-      let y = e.offsetY;
-      if (gridEnabled) {
-        x = Math.round(x / gridSize) * gridSize;
-        y = Math.round(y / gridSize) * gridSize;
-      }
-      if (!dimensionStart) {
-        dimensionStart = { x, y };
-      } else {
-        components.push({ id: 'd' + Date.now(), type: 'dimension', x1: dimensionStart.x, y1: dimensionStart.y, x2: x, y2: y });
-        dimensionStart = null;
-        pushHistory();
-        render();
-        save();
-      }
-      return;
-    }
     const g = e.target.closest('.component');
     if (!g) {
       selection = [];
