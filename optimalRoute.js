@@ -127,12 +127,9 @@ function emitSticky(name, flagKey) {
   if (!window.__e2eFlags) window.__e2eFlags = {};
   window.__e2eFlags[flagKey] = true;
   emitAsync(name);
-  if (E2E) {
+  if (new URLSearchParams(location.search).has('e2e')) {
     let n = 0;
-    const id = setInterval(() => {
-      emitAsync(name);
-      if (++n >= 20) clearInterval(id);
-    }, 50);
+    const id = setInterval(() => { emitAsync(name); if (++n >= 20) clearInterval(id); }, 50);
     setTimeout(() => clearInterval(id), 1500);
   }
 }
@@ -342,16 +339,13 @@ function calculateRoutes(){
         const conduitCount = e.data.finalTrays.filter(t => t.raceway_type === 'conduit').length;
         countEl.textContent = `Conduits added: ${conduitCount}`;
       }
-      if (typeof document !== 'undefined') {
-        const rs = document.getElementById('results-section');
-        if (rs) {
-          rs.classList.remove('hidden', 'invisible', 'is-hidden');
-          rs.removeAttribute('hidden');
-          rs.style.visibility = 'visible';
-          rs.style.display = '';
-        }
-        emitSticky('route-updated','routeUpdated');
+      const rs = document.getElementById('results-section');
+      if (rs) {
+        rs.classList?.remove('hidden','is-hidden','invisible');
+        rs.removeAttribute?.('hidden');
+        Object.assign(rs.style, { display:'', visibility:'visible', opacity:'1' });
       }
+      emitSticky('route-updated','routeUpdated');
     }
   };
   routingWorker.postMessage({ type:'start', trays: trayData, options: getRoutingOptions(), cables: cableData });
