@@ -1,26 +1,29 @@
 // ---- Inline E2E helpers (no external import) ----
 const E2E = new URLSearchParams(location.search).has('e2e');
 
+function e2eOpenDetails() {
+  if (!new URLSearchParams(location.search).has('e2e')) return;
+  document.querySelectorAll('details').forEach(d => { d.open = true; });
+}
+
 function ensureReadyBeacon(attrName, id) {
   let el = document.getElementById(id);
   if (!el) {
     el = document.createElement('div');
     el.id = id;
-    // visible to Playwright (non-zero rect), visually negligible
     el.style.cssText = 'position:fixed;left:0;bottom:0;width:1px;height:1px;opacity:0.01;z-index:2147483647;';
     document.body.appendChild(el);
   }
-  el.setAttribute(attrName, '1'); // exact data-* Playwright waits for
+  el.setAttribute(attrName, '1');
 }
 
 function setReadyWhen(selector, attrName, id, timeoutMs = 25000) {
   const start = performance.now();
   const poll = () => {
-    // element must exist and be visible
     const el = document.querySelector(selector);
     const visible = !!el && !!(el.offsetParent || el.getClientRects().length);
     if (visible) return ensureReadyBeacon(attrName, id);
-    if (performance.now() - start > timeoutMs) return; // give up silently
+    if (performance.now() - start > timeoutMs) return;
     setTimeout(poll, 50);
   };
   if (document.readyState === 'loading') {
@@ -163,7 +166,6 @@ const manufacturerModels = {
   Generac: ['G2000', 'Industrial']
 };
 
-const isE2E = new URLSearchParams(window.location.search).get('e2e') === '1';
 
 // === REPLACE THE ENTIRE FUNCTION ===
 async function loadComponentLibrary() {
@@ -397,15 +399,11 @@ function buildPalette() {
       placeholder.textContent = 'No components available';
       container.appendChild(placeholder);
     }
-    if (isE2E) {
+    const stored = localStorage.getItem(key);
+    if (stored !== null) {
+      det.open = stored === 'true';
+    } else if (!hasButtons) {
       det.open = true;
-    } else {
-      const stored = localStorage.getItem(key);
-      if (stored !== null) {
-        det.open = stored === 'true';
-      } else if (!hasButtons) {
-        det.open = true;
-      }
     }
     det.addEventListener('toggle', () => {
       localStorage.setItem(key, det.open);
@@ -3507,12 +3505,7 @@ async function __oneline_init() {
     });
   }
 
-  // Auto-open palette details in E2E so buttons are visible
-  if (window.E2E === true) {
-    document.querySelectorAll('#component-buttons details').forEach(det => det.open = true);
-  }
-
-  // Ready flag for Playwright
+  e2eOpenDetails();
   setReadyWhen('[data-testid="palette-button"]', 'data-oneline-ready', 'oneline-ready-beacon');
 }
 
