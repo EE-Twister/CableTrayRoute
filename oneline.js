@@ -1260,7 +1260,7 @@ function render() {
       const stroke = phaseColor || vRange?.color || cableColors[conn.cable?.cable_type] || conn.cable?.color || '#000';
       poly.setAttribute('stroke', stroke);
       poly.setAttribute('fill', 'none');
-      poly.setAttribute('marker-end', 'url(#arrow)');
+      poly.setAttribute('marker-end', 'url(#connection-x)');
       poly.setAttribute('stroke-width', '2');
       poly.style.pointerEvents = 'stroke';
       poly.style.cursor = 'move';
@@ -1807,6 +1807,7 @@ function selectComponent(compOrId) {
     } else {
       input = document.createElement('input');
       input.type = f.type || 'text';
+      if (f.type === 'number') input.step = 'any';
       input.value = curVal;
     }
     input.name = f.name;
@@ -1957,7 +1958,9 @@ function selectComponent(compOrId) {
     };
     fields.forEach(f => {
       const v = fd.get(f.name);
-      data[f.name] = f.type === 'checkbox' ? v === 'on' : (v || '');
+      if (f.type === 'checkbox') data[f.name] = v === 'on';
+      else if (f.type === 'number') data[f.name] = v ? parseFloat(v) : '';
+      else data[f.name] = v || '';
     });
     data.tccId = fd.get('tccId') || '';
     templates.push({ name, component: data });
@@ -1995,7 +1998,9 @@ function selectComponent(compOrId) {
     const fd = new FormData(form);
     fields.forEach(f => {
       const v = fd.get(f.name);
-      comp[f.name] = f.type === 'checkbox' ? v === 'on' : (v || '');
+      if (f.type === 'checkbox') comp[f.name] = v === 'on';
+      else if (f.type === 'number') comp[f.name] = v ? parseFloat(v) : '';
+      else comp[f.name] = v || '';
     });
     comp.tccId = fd.get('tccId') || '';
     pushHistory();
