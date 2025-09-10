@@ -1260,6 +1260,7 @@ function render() {
       const stroke = phaseColor || vRange?.color || cableColors[conn.cable?.cable_type] || conn.cable?.color || '#000';
       poly.setAttribute('stroke', stroke);
       poly.setAttribute('fill', 'none');
+      poly.setAttribute('marker-start', 'url(#connection-x)');
       poly.setAttribute('marker-end', 'url(#connection-x)');
       poly.setAttribute('stroke-width', '2');
       poly.style.pointerEvents = 'stroke';
@@ -1419,34 +1420,56 @@ function render() {
       g.appendChild(bg);
     }
     const meta = componentMeta[c.subtype] || {};
-    const iconHref = meta.icon || placeholderIcon;
-    const img = document.createElementNS(svgNS, 'image');
-    img.setAttribute('x', c.x);
-    img.setAttribute('y', c.y);
-    img.setAttribute('width', w);
-    img.setAttribute('height', h);
-    img.setAttributeNS('http://www.w3.org/1999/xlink', 'href', iconHref);
-    if (isBusComponent(c)) img.setAttribute('preserveAspectRatio', 'none');
-    if (iconHref !== placeholderIcon) {
-      img.addEventListener('error', () => {
-        console.warn(`Missing icon for subtype ${c.subtype}`);
-        img.setAttributeNS('http://www.w3.org/1999/xlink', 'href', placeholderIcon);
-      }, { once: true });
+    if (c.type === 'annotation') {
+      const rect = document.createElementNS(svgNS, 'rect');
+      rect.setAttribute('x', c.x);
+      rect.setAttribute('y', c.y);
+      rect.setAttribute('width', w);
+      rect.setAttribute('height', h);
+      rect.setAttribute('fill', '#fff');
+      rect.setAttribute('stroke', '#333');
+      g.appendChild(rect);
+      const txt = document.createElementNS(svgNS, 'text');
+      txt.setAttribute('x', c.x + w / 2);
+      txt.setAttribute('y', c.y + h / 2 + 5);
+      txt.setAttribute('text-anchor', 'middle');
+      txt.textContent = c.text || c.label || '';
+      txt.addEventListener('dblclick', e => {
+        e.stopPropagation();
+        selectComponent(c);
+      });
+      g.appendChild(txt);
+    } else {
+      const iconHref = meta.icon || placeholderIcon;
+      const img = document.createElementNS(svgNS, 'image');
+      img.setAttribute('x', c.x);
+      img.setAttribute('y', c.y);
+      img.setAttribute('width', w);
+      img.setAttribute('height', h);
+      img.setAttributeNS('http://www.w3.org/1999/xlink', 'href', iconHref);
+      if (isBusComponent(c)) img.setAttribute('preserveAspectRatio', 'none');
+      if (iconHref !== placeholderIcon) {
+        img.addEventListener('error', () => {
+          console.warn(`Missing icon for subtype ${c.subtype}`);
+          img.setAttributeNS('http://www.w3.org/1999/xlink', 'href', placeholderIcon);
+        }, { once: true });
+      }
+      img.addEventListener('dblclick', e => {
+        e.stopPropagation();
+        selectComponent(c);
+      });
+      g.appendChild(img);
+      const text = document.createElementNS(svgNS, 'text');
+      text.setAttribute('x', c.x + w / 2);
+      text.setAttribute('y', c.y + h + 15);
+      text.setAttribute('text-anchor', 'middle');
+      text.textContent = c.label || meta.label || c.subtype || c.type;
+      text.addEventListener('dblclick', e => {
+        e.stopPropagation();
+        selectComponent(c);
+      });
+      g.appendChild(text);
     }
-    img.addEventListener('dblclick', e => {
-      e.stopPropagation();
-      selectComponent(c);
-    });
-    g.appendChild(img);
-    const text = document.createElementNS(svgNS, 'text');
-    text.setAttribute('x', c.x + w / 2);
-    text.setAttribute('y', c.y + h + 15);
-    text.setAttribute('text-anchor', 'middle');
-    text.textContent = c.label || meta.label || c.subtype || c.type;
-    text.addEventListener('dblclick', e => {
-      e.stopPropagation();
-      selectComponent(c);
-    });
     if (selection.includes(c)) {
       const rect = document.createElementNS(svgNS, 'rect');
       rect.setAttribute('x', c.x - 2);
@@ -1459,7 +1482,6 @@ function render() {
       rect.style.pointerEvents = 'none';
       g.appendChild(rect);
     }
-    g.appendChild(text);
     svg.appendChild(g);
     if (isBusComponent(c) && selection.includes(c)) {
       const handleRight = document.createElementNS(svgNS, 'rect');
