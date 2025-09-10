@@ -54,6 +54,7 @@ const { sizeToArea } = ampacity;
 
 window.addEventListener('DOMContentLoaded', () => {
   forceShowResumeIfE2E();
+  const TableUtils = window.TableUtils;
   const projectId = window.currentProjectId || 'default';
   dataStore.loadProject(projectId);
   initSettings();
