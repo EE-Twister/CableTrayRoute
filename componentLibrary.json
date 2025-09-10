@@ -4,7 +4,7 @@
     {
       "type": "bus",
       "label": "Bus",
-      "symbol": "busbar",
+      "icon": "icons/components/Bus.svg",
       "props": {
         "kv": 13.8,
         "thevenin_mva": 500,
@@ -15,7 +15,7 @@
     {
       "type": "utility_source",
       "label": "Utility",
-      "symbol": "utility",
+      "icon": "icons/components/Utility.svg",
       "props": {
         "kv": 13.8,
         "thevenin_mva": 500,
@@ -27,7 +27,7 @@
       "type": "transformer",
       "subtype": "two_winding",
       "label": "XFMR 2W",
-      "symbol": "transformer_2w",
+      "icon": "icons/components/Transformer.svg",
       "props": {
         "kva": 2500,
         "kv_primary": 13.8,
@@ -54,7 +54,7 @@
       "type": "transformer",
       "subtype": "three_winding",
       "label": "XFMR 3W",
-      "symbol": "transformer_3w",
+      "icon": "icons/components/Transformer.svg",
       "props": {
         "kva_hv": 25000,
         "kva_lv": 10000,
@@ -72,7 +72,7 @@
       "type": "transformer",
       "subtype": "auto_transformer",
       "label": "Autotrans",
-      "symbol": "transformer_auto",
+      "icon": "icons/components/Transformer.svg",
       "props": {
         "kva": 5000,
         "kv_primary": 115,
@@ -86,7 +86,7 @@
       "type": "transformer",
       "subtype": "grounding_transformer",
       "label": "Ground XFMR",
-      "symbol": "transformer_grounding",
+      "icon": "icons/components/Transformer.svg",
       "props": {
         "kva": 500,
         "kv_primary": 13.8,
@@ -100,7 +100,7 @@
       "type": "breaker",
       "subtype": "lv_cb",
       "label": "LV CB",
-      "symbol": "breaker_lv",
+      "icon": "icons/components/Breaker.svg",
       "props": {
         "interrupt_rating_ka": 65,
         "frame_a": 1600,
@@ -118,7 +118,7 @@
       "type": "breaker",
       "subtype": "mv_cb",
       "label": "MV CB",
-      "symbol": "breaker_mv",
+      "icon": "icons/components/Breaker.svg",
       "props": {
         "interrupt_rating_ka": 25,
         "frame_a": 1200,
@@ -136,7 +136,7 @@
       "type": "breaker",
       "subtype": "hv_cb",
       "label": "HV CB",
-      "symbol": "breaker_hv",
+      "icon": "icons/components/Breaker.svg",
       "props": {
         "interrupt_rating_ka": 63,
         "frame_a": 2000,
@@ -153,7 +153,7 @@
     {
       "type": "fuse",
       "label": "Fuse",
-      "symbol": "fuse",
+      "icon": "icons/placeholder.svg",
       "props": {
         "class": "RK1",
         "rating_a": 400,
@@ -163,7 +163,7 @@
     {
       "type": "recloser",
       "label": "Recloser",
-      "symbol": "recloser",
+      "icon": "icons/components/Breaker.svg",
       "props": {
         "kv": 15,
         "ka": 12.5,
@@ -174,7 +174,7 @@
       "type": "switch",
       "subtype": "ats",
       "label": "ATS",
-      "symbol": "switch_ats",
+      "icon": "icons/components/Switchgear.svg",
       "props": {
         "rating_a": 800,
         "transition": "open",
@@ -185,7 +185,7 @@
       "type": "switch",
       "subtype": "single_throw",
       "label": "ST Switch",
-      "symbol": "switch_st",
+      "icon": "icons/components/Switchgear.svg",
       "props": {
         "rating_a": 800,
         "transition": "open"
@@ -195,7 +195,7 @@
       "type": "switch",
       "subtype": "double_throw",
       "label": "DT Switch",
-      "symbol": "switch_dt",
+      "icon": "icons/components/Switchgear.svg",
       "props": {
         "rating_a": 800,
         "transition": "open",
@@ -205,7 +205,7 @@
     {
       "type": "contactor",
       "label": "Contactor",
-      "symbol": "contactor",
+      "icon": "icons/components/Switchgear.svg",
       "props": {
         "rating_a": 100,
         "coil_v": 120
@@ -214,7 +214,7 @@
     {
       "type": "shunt_capacitor_bank",
       "label": "Shunt Cap",
-      "symbol": "capacitor",
+      "icon": "icons/components/CapacitorBank.svg",
       "props": {
         "kv": 13.8,
         "kvar": 1800,
@@ -225,7 +225,7 @@
     {
       "type": "reactor",
       "label": "Shunt Reactor",
-      "symbol": "reactor",
+      "icon": "icons/placeholder.svg",
       "props": {
         "kv": 13.8,
         "kvar_absorb": 600
@@ -234,7 +234,7 @@
     {
       "type": "generator",
       "label": "Gen",
-      "symbol": "generator",
+      "icon": "icons/components/Generator.svg",
       "props": {
         "kw": 2000,
         "kva": 2500,
@@ -249,7 +249,7 @@
     {
       "type": "pv_inverter",
       "label": "PV Inverter",
-      "symbol": "inverter",
+      "icon": "icons/components/PVArray.svg",
       "props": {
         "kva": 1000,
         "kv": 0.48,
@@ -260,7 +260,7 @@
     {
       "type": "ups",
       "label": "UPS",
-      "symbol": "ups",
+      "icon": "icons/components/UPS.svg",
       "props": {
         "kva": 500,
         "kv": 0.48,
@@ -271,7 +271,7 @@
     {
       "type": "mcc",
       "label": "MCC",
-      "symbol": "mcc",
+      "icon": "icons/components/MCC.svg",
       "props": {
         "kv": 0.48,
         "sections": 6
@@ -280,7 +280,7 @@
     {
       "type": "busway",
       "label": "Busway",
-      "symbol": "busway",
+      "icon": "icons/components/Bus.svg",
       "props": {
         "kv": 0.48,
         "rating_a": 1200,
@@ -290,7 +290,7 @@
     {
       "type": "feeder",
       "label": "Feeder",
-      "symbol": "cable",
+      "icon": "icons/components/Feeder.svg",
       "props": {
         "kv": 13.8,
         "length_m": 120,
@@ -304,7 +304,7 @@
     {
       "type": "motor_load",
       "label": "Motor",
-      "symbol": "motor",
+      "icon": "icons/components/Motor.svg",
       "props": {
         "hp": 150,
         "kv": 0.48,
@@ -318,7 +318,7 @@
     {
       "type": "static_load",
       "label": "Load",
-      "symbol": "load",
+      "icon": "icons/components/Load.svg",
       "props": {
         "kw": 300,
         "kvar": 150,
@@ -328,7 +328,7 @@
     {
       "type": "ct",
       "label": "CT",
-      "symbol": "ct",
+      "icon": "icons/placeholder.svg",
       "props": {
         "ratio": "600:5",
         "burden_va": 10,
@@ -338,7 +338,7 @@
     {
       "type": "vt",
       "label": "PT",
-      "symbol": "vt",
+      "icon": "icons/placeholder.svg",
       "props": {
         "ratio": "69kV:120V",
         "class": "0.3WZ"
@@ -347,7 +347,7 @@
     {
       "type": "relay",
       "label": "Relay",
-      "symbol": "relay",
+      "icon": "icons/placeholder.svg",
       "props": {
         "function": "50/51",
         "curve": "IEC_VeryInverse",
