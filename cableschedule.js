@@ -54,9 +54,11 @@ const { sizeToArea } = ampacity;
 // behaviour needed to populate the schedule table.
 
 window.addEventListener('DOMContentLoaded', () => {
+  console.log('Cable Schedule DOMContentLoaded event fired');
   forceShowResumeIfE2E();
   const projectId = window.currentProjectId || 'default';
   dataStore.loadProject(projectId);
+  console.log('Loaded project', projectId);
   initSettings();
   initDarkMode();
   initCompactMode();
@@ -163,6 +165,7 @@ window.addEventListener('DOMContentLoaded', () => {
 
   // Retrieve existing cables from project storage.
   let tableData = dataStore.getCables();
+  console.log('Initial cable data from store:', tableData);
   const vdLimitIn = document.getElementById('vd-limit');
 
   function applySizingHighlight(){
@@ -258,12 +261,39 @@ window.addEventListener('DOMContentLoaded', () => {
     importBtnId:'import-xlsx-btn',
     deleteAllBtnId:'delete-all-btn',
     columns,
-    onChange:() => { markUnsaved(); applySizingHighlight(); validateAllRows(); },
+    onChange:() => {
+      console.log('Table changed');
+      markUnsaved();
+      applySizingHighlight();
+      validateAllRows();
+    },
     onSave:() => {
+      console.log('Save triggered');
       markSaved();
       tableData = table.getData();
       dataStore.setCables(tableData); // persist only when user saves
       dataStore.saveProject(projectId);
+    }
+  });
+  console.log('Cable schedule table created', table);
+  window.cableScheduleTable = table;
+
+  const debugButtons = [
+    'add-row-btn',
+    'save-schedule-btn',
+    'load-schedule-btn',
+    'clear-filters-btn',
+    'export-xlsx-btn',
+    'import-xlsx-btn',
+    'delete-all-btn',
+    'load-sample-cables-btn'
+  ];
+  debugButtons.forEach(id => {
+    const btn = document.getElementById(id);
+    if (btn) {
+      btn.addEventListener('click', () => console.log(`Button ${id} clicked`));
+    } else {
+      console.warn(`Debug: Button with id '${id}' not found`);
     }
   });
 
@@ -318,6 +348,7 @@ window.addEventListener('DOMContentLoaded', () => {
 
   // Update the table whenever cables are modified elsewhere (e.g. One-Line).
   dataStore.on(dataStore.STORAGE_KEYS.cables, cables => {
+    console.log('dataStore cables updated', cables);
     table.setData(cables || []);
     tableData = cables || [];
     applySizingHighlight();
@@ -326,6 +357,7 @@ window.addEventListener('DOMContentLoaded', () => {
   });
 
   document.getElementById('load-sample-cables-btn').addEventListener('click', async () => {
+    console.log('load-sample-cables-btn clicked');
     try {
       const mod = await import('./examples/sampleCables.json', { assert: { type: 'json' } });
       const sampleCables = mod.default;
