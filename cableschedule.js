@@ -41,6 +41,7 @@ function forceShowResumeIfE2E() {
 
 window.E2E = E2E;
 
+import './site.js';
 import * as dataStore from './dataStore.mjs';
 import { sizeConductor } from './sizing.js';
 import ampacity from './ampacity.mjs?v=2';
