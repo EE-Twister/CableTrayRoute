@@ -57,7 +57,7 @@ document.addEventListener('DOMContentLoaded', forceShowResumeIfE2E);
 // build (src/cableschedule.js -> dist/cableschedule.js) actually includes the
 // behaviour needed to populate the schedule table.
 
-window.addEventListener('DOMContentLoaded', () => {
+window.addEventListener('DOMContentLoaded', async () => {
   const logContainer = document.getElementById('console-log');
   if (logContainer) {
     ['log', 'warn', 'error'].forEach(level => {
@@ -365,6 +365,21 @@ window.addEventListener('DOMContentLoaded', () => {
 
   // Ensure the table is populated with any existing data on load.
   table.setData(tableData);
+
+  // If no saved data exists, load sample cables so the table isn't empty
+  if (!tableData || tableData.length === 0) {
+    try {
+      const mod = await import('./examples/sampleCables.json', { assert: { type: 'json' } });
+      const sampleCables = mod.default;
+      table.setData(sampleCables);
+      tableData = sampleCables;
+      table.save();
+      markSaved();
+    } catch (e) {
+      console.warn('Failed to auto load sample cables', e);
+    }
+  }
+
   applySizingHighlight();
   validateAllRows();
   vdLimitIn.addEventListener('input', applySizingHighlight);
