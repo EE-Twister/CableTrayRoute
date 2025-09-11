@@ -366,18 +366,9 @@ window.addEventListener('DOMContentLoaded', async () => {
   // Ensure the table is populated with any existing data on load.
   table.setData(tableData);
 
-  // If no saved data exists, load sample cables so the table isn't empty
+  // If no saved data exists, display a single empty row so the table isn't blank
   if (!tableData || tableData.length === 0) {
-    try {
-      const mod = await import('./examples/sampleCables.json', { assert: { type: 'json' } });
-      const sampleCables = mod.default;
-      table.setData(sampleCables);
-      tableData = sampleCables;
-      table.save();
-      markSaved();
-    } catch (e) {
-      console.warn('Failed to auto load sample cables', e);
-    }
+    table.addRow();
   }
 
   applySizingHighlight();
