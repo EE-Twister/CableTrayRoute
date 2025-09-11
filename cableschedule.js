@@ -54,6 +54,26 @@ const { sizeToArea } = ampacity;
 // behaviour needed to populate the schedule table.
 
 window.addEventListener('DOMContentLoaded', () => {
+  const logContainer = document.getElementById('console-log');
+  if (logContainer) {
+    ['log', 'warn', 'error'].forEach(level => {
+      const orig = console[level];
+      console[level] = (...args) => {
+        orig.apply(console, args);
+        const msg = args.map(a => {
+          try {
+            return typeof a === 'object' ? JSON.stringify(a) : String(a);
+          } catch {
+            return String(a);
+          }
+        }).join(' ');
+        const line = document.createElement('div');
+        line.textContent = `[${level}] ${msg}`;
+        logContainer.appendChild(line);
+        logContainer.scrollTop = logContainer.scrollHeight;
+      };
+    });
+  }
   console.log('Cable Schedule DOMContentLoaded event fired');
   forceShowResumeIfE2E();
   const projectId = window.currentProjectId || 'default';
