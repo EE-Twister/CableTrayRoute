@@ -47,6 +47,9 @@ import ampacity from './ampacity.mjs?v=2';
 import { createTable, STORAGE_KEYS } from './tableUtils.mjs';
 const { sizeToArea } = ampacity;
 
+suppressResumeIfE2E();
+document.addEventListener('DOMContentLoaded', forceShowResumeIfE2E);
+
 // Initialize Cable Schedule page logic
 // This file mirrors the inline script previously embedded in
 // cableschedule.html.  It now lives in its own module so that the Rollup
@@ -75,7 +78,6 @@ window.addEventListener('DOMContentLoaded', () => {
     });
   }
   console.log('Cable Schedule DOMContentLoaded event fired');
-  forceShowResumeIfE2E();
   const projectId = window.currentProjectId || 'default';
   dataStore.loadProject(projectId);
   console.log('Loaded project', projectId);
