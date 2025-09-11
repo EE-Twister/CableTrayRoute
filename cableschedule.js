@@ -44,6 +44,7 @@ window.E2E = E2E;
 import * as dataStore from './dataStore.mjs';
 import { sizeConductor } from './sizing.js';
 import ampacity from './ampacity.mjs?v=2';
+import { createTable, STORAGE_KEYS } from './tableUtils.mjs';
 const { sizeToArea } = ampacity;
 
 // Initialize Cable Schedule page logic
@@ -54,7 +55,6 @@ const { sizeToArea } = ampacity;
 
 window.addEventListener('DOMContentLoaded', () => {
   forceShowResumeIfE2E();
-  const TableUtils = window.TableUtils;
   const projectId = window.currentProjectId || 'default';
   dataStore.loadProject(projectId);
   initSettings();
@@ -246,9 +246,9 @@ window.addEventListener('DOMContentLoaded', () => {
     return allValid;
   }
 
-  const table = TableUtils.createTable({
+  const table = createTable({
     tableId:'cableScheduleTable',
-    storageKey:TableUtils.STORAGE_KEYS.cableSchedule,
+    storageKey:STORAGE_KEYS.cableSchedule,
     addRowBtnId:'add-row-btn',
     saveBtnId:'save-schedule-btn',
     loadBtnId:'load-schedule-btn',

@@ -1089,3 +1089,11 @@ window.TableUtils = {
   showRacewayModal: TableManager.prototype.showRacewayModal,
   STORAGE_KEYS
 };
+
+export {
+  createTable,
+  saveToStorage,
+  loadFromStorage,
+  applyValidation,
+  STORAGE_KEYS
+};
