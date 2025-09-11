@@ -2022,3 +2022,15 @@ body.dark-mode .workflow-card-title {
     background: var(--primary-color);
     color: #fff;
 }
+
+/* Debug console output */
+.console-log {
+    background: #000;
+    color: #0f0;
+    padding: 0.5rem;
+    max-height: 200px;
+    overflow-y: auto;
+    font-family: monospace;
+    font-size: 0.8rem;
+    white-space: pre-wrap;
+}
