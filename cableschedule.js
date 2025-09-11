@@ -397,8 +397,8 @@ window.addEventListener('DOMContentLoaded', async () => {
   document.getElementById('load-sample-cables-btn').addEventListener('click', async () => {
     console.log('load-sample-cables-btn clicked');
     try {
-      const mod = await import('./examples/sampleCables.json', { assert: { type: 'json' } });
-      const sampleCables = mod.default;
+      const res = await fetch('./examples/sampleCables.json', { cache: 'no-store' });
+      const sampleCables = await res.json();
       table.setData(sampleCables); // immediately display the sample rows
       tableData = sampleCables;
       table.save();
@@ -423,5 +423,6 @@ window.addEventListener('DOMContentLoaded', async () => {
     return table.getData();
   }
   window.getCableSchedule = getCableSchedule;
+  window.dispatchEvent(new Event('cableschedule-ready'));
   window.__CableScheduleInitOK = true;
 });
