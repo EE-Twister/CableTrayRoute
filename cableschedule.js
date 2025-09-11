@@ -407,4 +407,5 @@ window.addEventListener('DOMContentLoaded', () => {
     return table.getData();
   }
   window.getCableSchedule = getCableSchedule;
+  window.__CableScheduleInitOK = true;
 });
