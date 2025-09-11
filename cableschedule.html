@@ -444,16 +444,24 @@
     // Feed explorer (shows ALL data without touching table)
     explorer.load(sample, props);
 
-    // Try to populate any existing schedule table NON-destructively
-    const table = findExistingTable();
-    if (table && Array.isArray(sample)) {
-      const appended = populateExistingTable(table, sample);
-      console.info(`[CableDataViewer] appended ${appended} row(s) to existing table.`);
-    } else if (table && sample && Array.isArray(sample.rows)) {
-      const appended = populateExistingTable(table, sample.rows);
-      console.info(`[CableDataViewer] appended ${appended} row(s) from sample.rows.`);
-    } else {
-      console.info("[CableDataViewer] No compatible table found or sample format not array. Table untouched.");
+    function populateTable() {
+      const table = findExistingTable();
+      if (table && Array.isArray(sample)) {
+        const appended = populateExistingTable(table, sample);
+        console.info(`[CableDataViewer] appended ${appended} row(s) to existing table.`);
+        return appended;
+      } else if (table && sample && Array.isArray(sample.rows)) {
+        const appended = populateExistingTable(table, sample.rows);
+        console.info(`[CableDataViewer] appended ${appended} row(s) from sample.rows.`);
+        return appended;
+      } else {
+        console.info("[CableDataViewer] No compatible table found or sample format not array. Table untouched.");
+        return 0;
+      }
+    }
+
+    if (!populateTable()) {
+      window.addEventListener('cableschedule-ready', populateTable, { once: true });
     }
 
     // Open the explorer automatically on first load so you can see everything
