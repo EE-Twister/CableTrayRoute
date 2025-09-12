@@ -77,4 +77,5 @@ export default [
       { "current": 1800, "time": 0.05 }
     ]
   }
-];
+]
+;
