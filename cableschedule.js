@@ -92,6 +92,7 @@ window.addEventListener('DOMContentLoaded', async () => {
   // undo/redo history managed in site.js – the project hash is updated only
   // when dataStore.setCables is invoked on save.
   let saved = true;
+  let suppressCablesUpdate = false;
   const markSaved = () => { saved = true; };
   const markUnsaved = () => { saved = false; };
   window.addEventListener('beforeunload', e => {
@@ -286,6 +287,11 @@ window.addEventListener('DOMContentLoaded', async () => {
     columns,
     onChange:() => {
       console.log('Table changed');
+      const data = table.getData();
+      suppressCablesUpdate = true;
+      dataStore.setCables(data); // auto-persist edits
+      suppressCablesUpdate = false;
+      tableData = data;
       markUnsaved();
       applySizingHighlight();
       validateAllRows();
@@ -378,6 +384,7 @@ window.addEventListener('DOMContentLoaded', async () => {
   // Update the table whenever cables are modified elsewhere (e.g. One-Line).
   dataStore.on(dataStore.STORAGE_KEYS.cables, cables => {
     console.log('dataStore cables updated', cables);
+    if (suppressCablesUpdate) return;
     table.setData(cables || []);
     tableData = cables || [];
     applySizingHighlight();
