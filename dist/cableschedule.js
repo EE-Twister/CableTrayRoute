@@ -4,17 +4,17 @@
   document.addEventListener('DOMContentLoaded', init);
 
   function init() {
-    bind('#btnSave', onSave);
-    bind('#btnLoad', onLoad);
-    bind('#btnLoadSample', onLoadSample);
-    bind('#btnClearFilters', onClearFilters);
-    bind('#btnExportXlsx', onExportXlsx);
-    bind('#btnImportXlsx', onImportXlsx);
-    bind('#btnDeleteAll', onDeleteAll);
-    bind('#btnAddCable', onAddCable);
+    bind('#save-schedule-btn', onSave);
+    bind('#load-schedule-btn', onLoad);
+    bind('#load-sample-cables-btn', onLoadSample);
+    bind('#clear-filters-btn', onClearFilters);
+    bind('#export-xlsx-btn', onExportXlsx);
+    bind('#import-xlsx-btn', onImportXlsx);
+    bind('#delete-all-btn', onDeleteAll);
+    bind('#add-row-btn', onAddCable);
     if (!window.XLSX) {
-      disable('#btnExportXlsx');
-      disable('#btnImportXlsx');
+      disable('#export-xlsx-btn');
+      disable('#import-xlsx-btn');
     }
     render();
     window.__CableScheduleInitOK = true;
