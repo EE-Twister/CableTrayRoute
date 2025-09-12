@@ -31,7 +31,8 @@ module.exports = Object.entries(entries).map(([name, input]) => ({
   output: {
     file: `dist/${name}.js`,
     format: 'iife',
-    sourcemap: false
+    sourcemap: false,
+    inlineDynamicImports: true
   },
   plugins: [terser()]
 }));
