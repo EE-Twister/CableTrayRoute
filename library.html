@@ -36,7 +36,10 @@
       versionInput.value = currentVersion || '';
       let stored = currentVersion ? getItem('componentLibrary_' + currentVersion, null) : null;
       if (stored) {
-        compArea.value = JSON.stringify(stored.components || [], null, 2);
+        compArea.value = JSON.stringify({
+          categories: stored.categories || [],
+          components: stored.components || []
+        }, null, 2);
         iconArea.value = JSON.stringify(stored.icons || {}, null, 2);
       } else {
         try {
@@ -64,11 +67,13 @@
       const iconArea = document.getElementById('icon-text');
       const versionInput = document.getElementById('library-version');
       try {
-        const comps = JSON.parse(compArea.value);
+        const data = JSON.parse(compArea.value);
         const icons = JSON.parse(iconArea.value);
         const version = versionInput.value.trim() || 'user';
+        const components = Array.isArray(data) ? data : data.components || [];
+        const categories = Array.isArray(data.categories) ? data.categories : [];
         setItem('componentLibraryVersion', version);
-        setItem('componentLibrary_' + version, { components: comps, icons });
+        setItem('componentLibrary_' + version, { components, categories, icons });
         alert('Saved');
       } catch {
         alert('Invalid JSON');
@@ -80,10 +85,14 @@
       const iconArea = document.getElementById('icon-text');
       const versionInput = document.getElementById('library-version');
       try {
-        const comps = JSON.parse(compArea.value);
+        const data = JSON.parse(compArea.value);
         const icons = JSON.parse(iconArea.value);
         const version = versionInput.value.trim() || 'user';
-        const blob = new Blob([JSON.stringify({ version, components: comps, icons }, null, 2)], { type: 'application/json' });
+        const components = Array.isArray(data) ? data : data.components || [];
+        const categories = Array.isArray(data.categories) ? data.categories : [];
+        const blob = new Blob([
+          JSON.stringify({ version, categories, components, icons }, null, 2)
+        ], { type: 'application/json' });
         const a = document.createElement('a');
         a.href = URL.createObjectURL(blob);
         a.download = `componentLibrary_${version}.json`;
@@ -103,8 +112,18 @@
       reader.onload = () => {
         try {
           const obj = JSON.parse(reader.result);
-          document.getElementById('library-version').value = obj.version || '';
-          document.getElementById('component-text').value = JSON.stringify(obj.components || [], null, 2);
+          const version = obj.version || '';
+          const components = Array.isArray(obj.components)
+            ? obj.components
+            : Array.isArray(obj)
+            ? obj
+            : [];
+          const categories = Array.isArray(obj.categories) ? obj.categories : [];
+          document.getElementById('library-version').value = version;
+          document.getElementById('component-text').value = JSON.stringify({
+            categories,
+            components
+          }, null, 2);
           document.getElementById('icon-text').value = JSON.stringify(obj.icons || {}, null, 2);
         } catch {
           alert('Invalid file');
