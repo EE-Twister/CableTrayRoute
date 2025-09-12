@@ -146,6 +146,29 @@ export function off(event, handler) {
   if (idx >= 0) arr.splice(idx, 1);
 }
 
+// Propagate localStorage changes across browser tabs/windows. When one page
+// updates a schedule (e.g. cables from the One-Line view), other open pages
+// need to receive the same event so their UIs stay in sync. The `storage`
+// event only fires in other tabs, so we translate the changed key back into
+// our internal event name and emit it.
+const crossWindowKeys = new Set([
+  ...Object.values(KEYS),
+  ...Object.values(EXTRA_KEYS)
+]);
+
+if (typeof window !== 'undefined' && typeof window.addEventListener === 'function') {
+  window.addEventListener('storage', e => {
+    if (!e.key) return;
+    const [scenario, key] = e.key.split(':');
+    if (!key || scenario !== currentScenario) return;
+    if (!crossWindowKeys.has(key)) return;
+    try {
+      const val = e.newValue ? JSON.parse(e.newValue) : undefined;
+      emit(key, val);
+    } catch {}
+  });
+}
+
 function read(key, fallback, scenario = currentScenario) {
   try {
     const raw = (typeof localStorage !== 'undefined') ? localStorage.getItem(scenarioKey(key, scenario)) : null;
