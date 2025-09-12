@@ -1,0 +1,33 @@
+name: cableschedule bundle check
+
+on:
+  push:
+    paths:
+      - 'cableschedule.js'
+      - 'sizing.js'
+      - 'src/voltageDrop.js'
+      - 'rollup.config.js'
+      - 'dist/cableschedule.js'
+  pull_request:
+    paths:
+      - 'cableschedule.js'
+      - 'sizing.js'
+      - 'src/voltageDrop.js'
+      - 'rollup.config.js'
+      - 'dist/cableschedule.js'
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v3
+      - uses: actions/setup-node@v3
+        with:
+          node-version: '20'
+      - run: npm install
+      - name: Rebuild cableschedule bundle
+        run: npx rollup src/cableschedule.js --file dist/cableschedule.js --format es --inlineDynamicImports -p @rollup/plugin-terser
+      - name: Ensure bundle up to date
+        run: |
+          git status --short
+          test -z "$(git status --short)"
