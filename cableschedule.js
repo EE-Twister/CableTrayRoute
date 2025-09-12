@@ -44,7 +44,7 @@ window.E2E = E2E;
 import './site.js';
 import * as dataStore from './dataStore.mjs';
 import { sizeConductor } from './sizing.js';
-import ampacity from './ampacity.mjs?v=2';
+import ampacity from './ampacity.mjs';
 import { createTable, STORAGE_KEYS } from './tableUtils.mjs';
 const { sizeToArea } = ampacity;
 

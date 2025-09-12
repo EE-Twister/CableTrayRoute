@@ -1,4 +1,4 @@
-import ampacity from './ampacity.mjs?v=2';
+import ampacity from './ampacity.mjs';
 import { calculateVoltageDrop } from './src/voltageDrop.js';
 import nec from './codes/necTables.js';
 import iec from './codes/iecTables.js';
