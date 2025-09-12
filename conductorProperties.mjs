@@ -1,3 +1,5 @@
+import fallbackData from './data/conductor_properties.js';
+
 export async function loadConductorProperties() {
   // Node does not currently support fetching local files with the Fetch API.
   // When running under Node (no `window` object), fall back to the bundled
@@ -7,7 +9,7 @@ export async function loadConductorProperties() {
       return (await import('./conductorPropertiesData.mjs')).default;
     } catch (err) {
       console.warn('Failed to load conductor properties', err);
-      return {};
+      return fallbackData;
     }
   }
 
@@ -19,12 +21,8 @@ export async function loadConductorProperties() {
     return data;
   } catch (err) {
     console.warn('Failed to load conductor properties', err);
-    window.CONDUCTOR_PROPS = {};
-    try {
-      return (await import('./conductorPropertiesData.mjs')).default;
-    } catch {
-      return {};
-    }
+    window.CONDUCTOR_PROPS = fallbackData;
+    return fallbackData;
   }
 }
 
