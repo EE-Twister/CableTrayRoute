@@ -72,4 +72,20 @@ describe("dirty state tracker", () => {
     const e = win.fire();
     assert.strictEqual(e.defaultPrevented, false);
   });
+
+  it("toggle auto-save while dirty adjusts prompt", () => {
+    const win = makeWindow();
+    const tracker = createDirtyTracker(win);
+    tracker.markDirty();
+    let e = win.fire();
+    assert.strictEqual(e.defaultPrevented, true);
+
+    win.autoSaveEnabled = true;
+    e = win.fire();
+    assert.strictEqual(e.defaultPrevented, false);
+
+    win.autoSaveEnabled = false;
+    e = win.fire();
+    assert.strictEqual(e.defaultPrevented, true);
+  });
 });
