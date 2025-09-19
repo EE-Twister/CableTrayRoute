@@ -5,8 +5,17 @@ import { runValidation } from "./validation/rules.js";
 // build-time dependency. This avoids "index_mjs is not defined" errors in
 // the minified output when the raceway schedule loads sample data.
 let applyPatch, compare;
+const FAST_JSON_PATCH_URL=(() => {
+  if(typeof document!=='undefined' && document.baseURI){
+    return new URL('dist/vendor/fast-json-patch.mjs',document.baseURI).href;
+  }
+  if(typeof location!=='undefined' && location.href){
+    return new URL('dist/vendor/fast-json-patch.mjs',location.href).href;
+  }
+  return './dist/vendor/fast-json-patch.mjs';
+})();
 async function loadJsonPatch() {
-  const mod = await import("https://cdn.jsdelivr.net/npm/fast-json-patch@3.1.0/index.mjs");
+  const mod = await import(FAST_JSON_PATCH_URL);
   ({ applyPatch, compare } = mod);
 }
 const FOCUSABLE="a[href],button:not([disabled]),textarea:not([disabled]),input:not([disabled]),select:not([disabled]),[tabindex]:not([tabindex='-1'])";
