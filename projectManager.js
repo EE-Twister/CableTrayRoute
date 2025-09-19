@@ -15,6 +15,30 @@ function listProjects() {
   return [...names].sort((a, b) => a.localeCompare(b, undefined, { sensitivity: 'base' }));
 }
 
+function clearAuthContext() {
+  if (typeof localStorage === 'undefined') return;
+  localStorage.removeItem('authToken');
+  localStorage.removeItem('authCsrfToken');
+  localStorage.removeItem('authExpiresAt');
+  localStorage.removeItem('authUser');
+}
+
+function getAuthContext() {
+  if (typeof localStorage === 'undefined') return null;
+  const token = localStorage.getItem('authToken');
+  const csrfToken = localStorage.getItem('authCsrfToken');
+  const expiresAtRaw = localStorage.getItem('authExpiresAt');
+  if (!token || !csrfToken || !expiresAtRaw) {
+    return null;
+  }
+  const expiresAt = Number.parseInt(expiresAtRaw, 10);
+  if (!Number.isFinite(expiresAt) || Date.now() >= expiresAt) {
+    clearAuthContext();
+    return null;
+  }
+  return { token, csrfToken, expiresAt };
+}
+
 function validateProjectName(name, existingNames, { allowExisting = true, currentName = '' } = {}) {
   const trimmed = name.trim();
   if (!trimmed) return 'Project name is required.';
@@ -183,25 +207,34 @@ async function newProject() {
 }
 
 async function serverSaveProject(name) {
-  const token = localStorage.getItem('authToken');
-  if (!token) return false;
+  const auth = getAuthContext();
+  if (!auth) return false;
   const res = await fetch(`/projects/${encodeURIComponent(name)}`, {
     method: 'POST',
     headers: {
       'Content-Type': 'application/json',
-      'Authorization': `Bearer ${token}`
+      'Authorization': `Bearer ${auth.token}`,
+      'X-CSRF-Token': auth.csrfToken
     },
     body: JSON.stringify(exportProject())
   });
+  if (res.status === 401 || res.status === 403) clearAuthContext();
   return res.ok;
 }
 
 async function serverLoadProject(name) {
-  const token = localStorage.getItem('authToken');
-  if (!token) return false;
+  const auth = getAuthContext();
+  if (!auth) return false;
   const res = await fetch(`/projects/${encodeURIComponent(name)}`, {
-    headers: { 'Authorization': `Bearer ${token}` }
+    headers: {
+      'Authorization': `Bearer ${auth.token}`,
+      'X-CSRF-Token': auth.csrfToken
+    }
   });
+  if (res.status === 401 || res.status === 403) {
+    clearAuthContext();
+    return false;
+  }
   if (!res.ok) return false;
   const { data } = await res.json();
   importProject(data);
@@ -251,13 +284,12 @@ if (typeof window !== 'undefined') {
     if (menu) {
       const btn = document.createElement('button');
       function updateLabel() {
-        btn.textContent = localStorage.getItem('authToken') ? 'Logout' : 'Login';
+        btn.textContent = getAuthContext() ? 'Logout' : 'Login';
       }
       updateLabel();
       btn.addEventListener('click', () => {
-        if (localStorage.getItem('authToken')) {
-          localStorage.removeItem('authToken');
-          localStorage.removeItem('authUser');
+        if (getAuthContext()) {
+          clearAuthContext();
           updateLabel();
         } else {
           location.href = 'login.html';
