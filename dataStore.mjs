@@ -18,6 +18,7 @@
 // directly. Import it with a named import so it works consistently in
 // both the browser and Node test environments.
 import { parseRevit } from './src/importers/revit.mjs';
+import { setProjectKey, removeProjectKey } from './projectStorage.js';
 
 // scenario management keys
 const SCENARIOS_KEY = 'ctr_scenarios_v1';
@@ -180,8 +181,12 @@ function read(key, fallback, scenario = currentScenario) {
 
 function write(key, value, scenario = currentScenario) {
   try {
+    const serialized = JSON.stringify(value);
     if (typeof localStorage !== 'undefined') {
-      localStorage.setItem(scenarioKey(key, scenario), JSON.stringify(value));
+      localStorage.setItem(scenarioKey(key, scenario), serialized);
+    }
+    if (scenario === currentScenario) {
+      try { setProjectKey(key, serialized); } catch {}
     }
     emit(key, value);
   } catch (e) {
@@ -512,6 +517,9 @@ export const removeItem = (key, scenario = currentScenario) => {
   try {
     if (typeof localStorage !== 'undefined') {
       localStorage.removeItem(scenarioKey(key, scenario));
+      if (scenario === currentScenario) {
+        try { removeProjectKey(key); } catch {}
+      }
     }
     emit(key, null);
   } catch (e) {

@@ -4,8 +4,9 @@
   let cached = 'imperial';
 
   function getUnitSystem(){
-    if (global.getProject) {
-      try { return global.getProject().settings?.units || 'imperial'; }
+    const storage = global.projectStorage;
+    if (storage && typeof storage.getProjectState === 'function') {
+      try { return storage.getProjectState().settings?.units || 'imperial'; }
       catch { return 'imperial'; }
     }
     return cached;
@@ -13,12 +14,13 @@
 
   function setUnitSystem(sys){
     const val = sys === 'metric' ? 'metric' : 'imperial';
-    if (global.getProject && global.setProject){
+    const storage = global.projectStorage;
+    if (storage && typeof storage.getProjectState === 'function' && typeof storage.setProjectState === 'function'){
       try {
-        const proj = global.getProject();
+        const proj = storage.getProjectState();
         proj.settings = proj.settings || {};
         proj.settings.units = val;
-        global.setProject(proj);
+        storage.setProjectState(proj);
       } catch {}
     }
     cached = val;
