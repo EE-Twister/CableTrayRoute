@@ -48,7 +48,14 @@ function getPanelPhaseSequence(panel) {
 function getPhaseLabel(panel, breaker) {
   const sequence = getPanelPhaseSequence(panel);
   if (!sequence.length) return "";
-  return sequence[(breaker - 1) % sequence.length];
+  const index = Number(breaker);
+  if (!Number.isFinite(index) || index < 1) return "";
+  const system = getPanelSystem(panel);
+  if (sequence.length === 3 && system === "ac") {
+    const rowIndex = Math.floor((index - 1) / 2);
+    return sequence[rowIndex % sequence.length];
+  }
+  return sequence[(index - 1) % sequence.length];
 }
 
 function formatLoadLabel(load, index) {
@@ -62,6 +69,99 @@ function createMetaChip(text) {
   const span = document.createElement("span");
   span.textContent = text;
   return span;
+}
+
+function getPhasePowerValue(load, system) {
+  if (!load) return null;
+  const candidates = system === "dc"
+    ? [
+        { value: load.demandKw, scale: 1000 },
+        { value: load.kw, scale: 1000 },
+        { value: load.demandKva, scale: 1000 },
+        { value: load.kva, scale: 1000 },
+        { value: load.watts, scale: 1 }
+      ]
+    : [
+        { value: load.demandKva, scale: 1000 },
+        { value: load.kva, scale: 1000 },
+        { value: load.demandKw, scale: 1000 },
+        { value: load.kw, scale: 1000 },
+        { value: load.va, scale: 1 }
+      ];
+  let zeroFound = false;
+  for (const candidate of candidates) {
+    const parsed = parseFloat(candidate.value);
+    if (!Number.isFinite(parsed)) continue;
+    if (parsed === 0) {
+      zeroFound = true;
+      continue;
+    }
+    return parsed * candidate.scale;
+  }
+  if (zeroFound) return 0;
+  return null;
+}
+
+function createPhaseSummary(panel, panelId, loads, circuitCount) {
+  const sequence = getPanelPhaseSequence(panel);
+  if (!sequence.length) return null;
+  const phases = Array.from(new Set(sequence)).filter(Boolean);
+  if (!phases.length) return null;
+  const system = getPanelSystem(panel);
+  const totals = {};
+  phases.forEach(phase => {
+    totals[phase] = 0;
+  });
+
+  const loadByBreaker = new Map();
+  loads.forEach(load => {
+    if (load.panelId !== panelId) return;
+    const breakerNumber = Number(load.breaker);
+    if (!Number.isFinite(breakerNumber) || breakerNumber < 1) return;
+    if (circuitCount && breakerNumber > circuitCount) return;
+    loadByBreaker.set(breakerNumber, load);
+  });
+
+  if (Array.isArray(panel.breakers)) {
+    for (let i = 0; i < panel.breakers.length && i < circuitCount; i++) {
+      if (loadByBreaker.has(i + 1)) continue;
+      const tag = panel.breakers[i];
+      if (!tag) continue;
+      const load = loads.find(l => (l.ref || l.id || l.tag) === tag);
+      if (load) {
+        loadByBreaker.set(i + 1, load);
+      }
+    }
+  }
+
+  loadByBreaker.forEach((load, breakerNumber) => {
+    const phase = getPhaseLabel(panel, breakerNumber);
+    if (!phase) return;
+    const value = getPhasePowerValue(load, system);
+    if (value == null) return;
+    totals[phase] += value;
+  });
+
+  const summary = document.createElement("div");
+  summary.className = "panel-phase-summary";
+  const title = document.createElement("div");
+  title.className = "panel-phase-summary-title";
+  title.textContent = system === "dc" ? "Polarity Load (W)" : "Phase Load (VA)";
+  summary.appendChild(title);
+
+  const values = document.createElement("div");
+  values.className = "panel-phase-summary-values";
+  const formatter = new Intl.NumberFormat(undefined, { maximumFractionDigits: 0 });
+  const unit = system === "dc" ? "W" : "VA";
+  phases.forEach(phase => {
+    const chip = document.createElement("span");
+    chip.className = "panel-phase-summary-chip";
+    const total = totals[phase] || 0;
+    chip.textContent = `${phase}: ${formatter.format(total)} ${unit}`;
+    values.appendChild(chip);
+  });
+  summary.appendChild(values);
+  return summary;
 }
 
 /**
@@ -140,7 +240,7 @@ function render(panelId = "P1") {
   if (!container) return;
   container.innerHTML = "";
 
-  const circuitCount = panel.circuitCount || panel.breakers?.length || 42;
+  const circuitCount = Number(panel.circuitCount) || panel.breakers?.length || 42;
   const loads = dataStore.getLoads();
   const system = getPanelSystem(panel);
   const sequence = getPanelPhaseSequence(panel);
@@ -154,6 +254,11 @@ function render(panelId = "P1") {
     legend.textContent = `${descriptor} Bus: ${sequence.join(" / ")}`;
   }
   container.appendChild(legend);
+
+  const phaseSummary = createPhaseSummary(panel, panelId, loads, circuitCount);
+  if (phaseSummary) {
+    container.appendChild(phaseSummary);
+  }
 
   const table = document.createElement("table");
   table.id = "panel-table";
