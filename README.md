@@ -5,6 +5,27 @@ Designed to find the optimal cable route for your cable.
 
 For a step-by-step overview of the workflow, see the [Quick Start](docs/quickstart.html) guide. Each tool can run on its own, but following the six steps in sequence provides a smoother experience.
 
+## Secure Authentication & API Hardening
+
+The bundled Express server now persists credentials and sessions securely:
+
+- Passwords supplied during `/signup` are salted and hashed with Node's `crypto.scrypt` algorithm before being written to `server_data/users.json`.
+- `/login` verifies hashes, rotates any existing sessions for the account, and stores bearer tokens with CSRF secrets and expiry timestamps in `server_data/sessions.json`.
+- Client code stores the issued bearer token, CSRF token, and expiry. Authenticated project requests must supply both the `Authorization: Bearer <token>` header and the matching `X-CSRF-Token` header for state-changing calls.
+- `/projects` endpoints are guarded by a lightweight rate limiter and will return HTTP `429` if the per-IP ceiling defined by `PROJECT_RATE_LIMIT_MAX` within `PROJECT_RATE_LIMIT_WINDOW_MS` is exceeded.
+- When `NODE_ENV=production`, the server assumes it is behind a TLS terminator and redirects HTTP requests to HTTPS. For self-hosted deployments, terminate TLS at a reverse proxy or run the app behind an HTTPS-capable load balancer.
+
+Environment variables let you tune behaviour without code changes:
+
+| Variable | Purpose | Default |
+| --- | --- | --- |
+| `SERVER_DATA_DIR` | Location for `users.json`/`sessions.json` | `<repo>/server_data` |
+| `AUTH_TOKEN_TTL_MS` | Lifetime of issued bearer tokens | `3600000` (1 hour) |
+| `PROJECT_RATE_LIMIT_WINDOW_MS` | Rate limit window size | `900000` (15 minutes) |
+| `PROJECT_RATE_LIMIT_MAX` | Maximum requests per window | `100` |
+
+Existing installs that contain plaintext passwords will be migrated automatically: the first successful login rehashes the credential using the secure format.
+
 ## Landing Page and Workflow
 
 The new landing page (`index.html`) links to every tool in the suite and outlines

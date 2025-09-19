@@ -24,8 +24,16 @@ async function login(e) {
     body: JSON.stringify({ username, password })
   });
   if (res.ok) {
-    const { token } = await res.json();
-    localStorage.setItem('authToken', token);
+    const { token, csrfToken, expiresAt } = await res.json();
+    if (token) {
+      localStorage.setItem('authToken', token);
+    }
+    if (csrfToken) {
+      localStorage.setItem('authCsrfToken', csrfToken);
+    }
+    if (expiresAt) {
+      localStorage.setItem('authExpiresAt', String(expiresAt));
+    }
     localStorage.setItem('authUser', username);
     window.location.href = 'index.html';
   } else {
