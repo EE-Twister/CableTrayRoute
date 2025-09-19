@@ -17,6 +17,9 @@ export function exportPanelSchedule(panelId) {
   const data = [];
   data.push(['Panel', panelId]);
   data.push(['Voltage', panel.voltage || panel.voltage_rating || '']);
+  const systemType = (panel.powerType || panel.systemType || panel.type || '').toString().toLowerCase() === 'dc' ? 'DC' : 'AC';
+  data.push(['System Type', systemType]);
+  data.push(['Phases', panel.phases || panel.phaseCount || '']);
   data.push(['Main Rating (A)', panel.mainRating || panel.main_rating || '']);
   const circuitCount = panel.circuitCount || panel.breakers?.length || 42;
   data.push(['Circuit Count', circuitCount]);

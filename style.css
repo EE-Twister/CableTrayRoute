@@ -562,6 +562,11 @@ g.component.scenario-diff > * {
     --button-text: #fff;
     --button-padding: var(--spacing-base) calc(var(--spacing-base) * 1.5);
     --button-margin: calc(var(--spacing-base) / 2);
+    --panel-phase-a: #f25c54;
+    --panel-phase-b: #3a86ff;
+    --panel-phase-c: #43aa8b;
+    --panel-phase-pos: #f6aa1c;
+    --panel-phase-neg: #495057;
 }
 
 /* Utility classes */
@@ -614,6 +619,11 @@ body.dark-mode {
     --warning-text: #ffc107;
     --focus-ring-color: #fff;
     --button-hover-bg: #1558b0;
+    --panel-phase-a: #ff8a80;
+    --panel-phase-b: #74c0fc;
+    --panel-phase-c: #8ce99a;
+    --panel-phase-pos: #ffd43b;
+    --panel-phase-neg: #ced4da;
     background-color: #212529;
 }
 
@@ -2662,4 +2672,191 @@ body.dark-mode .workflow-card-title {
     font-family: monospace;
     font-size: 0.8rem;
     white-space: pre-wrap;
+}
+
+/* Panel schedule layout */
+#panel-info {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+    gap: 0.75rem;
+    align-items: end;
+}
+
+#panel-info label {
+    display: flex;
+    flex-direction: column;
+    font-size: 0.9rem;
+    font-weight: 600;
+    gap: 0.25rem;
+}
+
+#panel-info input,
+#panel-info select {
+    width: 100%;
+    padding: 0.5rem;
+    border: 1px solid var(--border-color);
+    border-radius: 4px;
+    background: var(--secondary-color);
+    color: var(--text-color);
+}
+
+#panel-container {
+    margin-top: 1rem;
+}
+
+.panel-bus-legend {
+    font-size: 0.9rem;
+    font-weight: 600;
+    margin-bottom: 0.5rem;
+    color: var(--text-color);
+    opacity: 0.85;
+}
+
+.panel-schedule-table {
+    width: 100%;
+    table-layout: fixed;
+    border-collapse: separate;
+    border-spacing: 0.75rem;
+}
+
+.panel-schedule-table thead th {
+    text-align: center;
+    font-weight: 600;
+    padding: 0.5rem 0;
+    border-bottom: 1px solid var(--border-color);
+    color: var(--text-color);
+}
+
+.panel-schedule-table td {
+    padding: 0;
+    vertical-align: top;
+}
+
+.panel-cell {
+    width: 50%;
+}
+
+.panel-slot {
+    display: flex;
+    flex-direction: column;
+    gap: 0.5rem;
+    padding: 0.75rem;
+    border: 1px solid var(--border-color);
+    border-radius: 6px;
+    background: var(--secondary-color);
+    color: var(--text-color);
+    min-height: 8rem;
+    box-shadow: 0 2px 4px rgba(0, 0, 0, 0.04);
+}
+
+body.dark-mode .panel-slot {
+    background: rgba(255, 255, 255, 0.05);
+    box-shadow: none;
+}
+
+.panel-slot[data-phase="A"] {
+    box-shadow: inset 4px 0 0 var(--panel-phase-a);
+}
+
+.panel-slot[data-phase="B"] {
+    box-shadow: inset 4px 0 0 var(--panel-phase-b);
+}
+
+.panel-slot[data-phase="C"] {
+    box-shadow: inset 4px 0 0 var(--panel-phase-c);
+}
+
+.panel-slot[data-phase="+"] {
+    box-shadow: inset 4px 0 0 var(--panel-phase-pos);
+}
+
+.panel-slot[data-phase="−"],
+.panel-slot[data-phase="-"] {
+    box-shadow: inset 4px 0 0 var(--panel-phase-neg);
+}
+
+.panel-slot-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: baseline;
+    gap: 0.5rem;
+    font-weight: 600;
+}
+
+.panel-slot-phase {
+    font-size: 0.75rem;
+    letter-spacing: 0.05em;
+    text-transform: uppercase;
+    opacity: 0.75;
+}
+
+.panel-slot-control {
+    display: flex;
+}
+
+.panel-slot-select {
+    width: 100%;
+    padding: 0.4rem 0.5rem;
+    border: 1px solid var(--border-color);
+    border-radius: 4px;
+    background: var(--secondary-color);
+    color: var(--text-color);
+}
+
+body.dark-mode .panel-slot-select {
+    background: #2c3034;
+}
+
+.panel-slot-details {
+    display: flex;
+    flex-direction: column;
+    gap: 0.35rem;
+    min-height: 3.25rem;
+}
+
+.panel-slot-desc {
+    font-weight: 500;
+    word-break: break-word;
+}
+
+.panel-slot-meta {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.5rem;
+    font-size: 0.75rem;
+    opacity: 0.85;
+}
+
+.panel-slot-meta span {
+    padding: 0.15rem 0.5rem;
+    border-radius: 999px;
+    background: rgba(0, 0, 0, 0.05);
+}
+
+body.dark-mode .panel-slot-meta span {
+    background: rgba(255, 255, 255, 0.1);
+}
+
+.panel-slot-details-empty {
+    font-style: italic;
+    opacity: 0.6;
+}
+
+.panel-slot--inactive {
+    border-style: dashed;
+    background: transparent;
+    min-height: 4.5rem;
+    align-items: center;
+    justify-content: center;
+    color: var(--text-color);
+    opacity: 0.6;
+}
+
+.panel-slot-empty {
+    text-align: center;
+}
+
+#panel-totals {
+    margin-top: 1rem;
+    font-weight: 600;
 }
