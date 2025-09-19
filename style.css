@@ -2712,6 +2712,36 @@ body.dark-mode .workflow-card-title {
     opacity: 0.85;
 }
 
+.panel-phase-summary {
+    display: flex;
+    flex-direction: column;
+    gap: 0.35rem;
+    margin-bottom: 0.75rem;
+    color: var(--text-color);
+    font-size: 0.85rem;
+}
+
+.panel-phase-summary-title {
+    font-weight: 600;
+    opacity: 0.85;
+}
+
+.panel-phase-summary-values {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.5rem;
+}
+
+.panel-phase-summary-chip {
+    padding: 0.15rem 0.5rem;
+    border-radius: 999px;
+    background: rgba(0, 0, 0, 0.05);
+}
+
+body.dark-mode .panel-phase-summary-chip {
+    background: rgba(255, 255, 255, 0.1);
+}
+
 .panel-schedule-table {
     width: 100%;
     table-layout: fixed;
