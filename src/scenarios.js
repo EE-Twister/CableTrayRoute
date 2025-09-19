@@ -1,4 +1,4 @@
-import { listScenarios, getCurrentScenario, switchScenario, cloneScenario, getOneLine, getRevisions, restoreRevision } from './dataStore.mjs';
+import { listScenarios, getCurrentScenario, switchScenario, cloneScenario, getOneLine, getRevisions, restoreRevision } from '../dataStore.mjs';
 
 function ensureDefaults() {
   const defaults = ['base', 'future', 'emergency'];
