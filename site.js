@@ -91,6 +91,7 @@ async function saveCheckpoint(){
       return;
     }
     localStorage?.setItem(CHECKPOINT_KEY,bytesToBase64(bytes));
+    await save(proj,{flush:true,reason:'checkpoint'});
   }catch(e){
     console.error('Checkpoint save failed',e);
   }
@@ -117,9 +118,160 @@ async function updateProjectDisplay(snapshot){
     if(span) span.textContent=`Project: ${name} (hash: ${hash.slice(0,8)})`;
   }catch(e){console.error('hash failed',e);}
 }
+
+const projectDisplayMetrics={
+  scheduledCalls:0,
+  flushCalls:0,
+  runCount:0,
+  coalesced:0,
+  lastRunDuration:0,
+  lastQueueDelay:0,
+  maxQueueDelay:0,
+  lastReason:'',
+  lastScheduledAt:0
+};
+
+const now=()=>globalThis.performance?.now?.()??Date.now();
+
+function createProjectDisplayScheduler(){
+  let pendingSnapshot=null;
+  let pendingReason='change';
+  let scheduledHandle=null;
+  let scheduledType=null;
+  let runningPromise=null;
+
+  function cancelScheduled(){
+    if(scheduledHandle===null)return;
+    if(scheduledType==='idle'&&typeof cancelIdleCallback==='function'){
+      cancelIdleCallback(scheduledHandle);
+    }else{
+      clearTimeout(scheduledHandle);
+    }
+    scheduledHandle=null;
+    scheduledType=null;
+  }
+
+  function run(snapshot,reason){
+    const started=now();
+    return updateProjectDisplay(snapshot).catch(err=>{
+      console.error('project display update failed',err);
+    }).finally(()=>{
+      const duration=now()-started;
+      projectDisplayMetrics.lastRunDuration=duration;
+      projectDisplayMetrics.runCount+=1;
+      projectDisplayMetrics.lastReason=reason;
+    });
+  }
+
+  function processNext(){
+    scheduledHandle=null;
+    scheduledType=null;
+    if(!pendingSnapshot){
+      return;
+    }
+    if(runningPromise){
+      runningPromise.finally(()=>{
+        if(pendingSnapshot) ensureProcessing();
+      });
+      return;
+    }
+    const snapshot=pendingSnapshot;
+    const reason=pendingReason;
+    pendingSnapshot=null;
+    pendingReason='change';
+    runningPromise=run(snapshot,reason).finally(()=>{
+      runningPromise=null;
+      if(pendingSnapshot) ensureProcessing();
+    });
+  }
+
+  function ensureProcessing(){
+    if(scheduledHandle!==null||runningPromise){
+      return;
+    }
+    if(!pendingSnapshot){
+      return;
+    }
+    projectDisplayMetrics.lastScheduledAt=now();
+    const runner=()=>{
+      const delay=now()-projectDisplayMetrics.lastScheduledAt;
+      projectDisplayMetrics.lastQueueDelay=delay;
+      if(delay>projectDisplayMetrics.maxQueueDelay) projectDisplayMetrics.maxQueueDelay=delay;
+      processNext();
+    };
+    if(typeof requestIdleCallback==='function'){
+      scheduledType='idle';
+      scheduledHandle=requestIdleCallback(runner,{timeout:200});
+    }else{
+      scheduledType='timeout';
+      scheduledHandle=setTimeout(runner,32);
+    }
+  }
+
+  function schedule(snapshot,{reason='change'}={}){
+    const alreadyPending=!!pendingSnapshot||scheduledHandle!==null||!!runningPromise;
+    pendingSnapshot=snapshot??getProjectState();
+    pendingReason=reason;
+    projectDisplayMetrics.scheduledCalls+=1;
+    if(alreadyPending) projectDisplayMetrics.coalesced+=1;
+    ensureProcessing();
+  }
+
+  async function flush(snapshot,{reason='flush'}={}){
+    projectDisplayMetrics.flushCalls+=1;
+    pendingSnapshot=snapshot??pendingSnapshot??getProjectState();
+    pendingReason=reason;
+    cancelScheduled();
+    if(runningPromise){
+      try{await runningPromise;}catch{}
+    }
+    const next=pendingSnapshot;
+    pendingSnapshot=null;
+    pendingReason='change';
+    if(!next) return;
+    await run(next,reason);
+  }
+
+  function resetMetrics(){
+    projectDisplayMetrics.scheduledCalls=0;
+    projectDisplayMetrics.flushCalls=0;
+    projectDisplayMetrics.runCount=0;
+    projectDisplayMetrics.coalesced=0;
+    projectDisplayMetrics.lastRunDuration=0;
+    projectDisplayMetrics.lastQueueDelay=0;
+    projectDisplayMetrics.maxQueueDelay=0;
+    projectDisplayMetrics.lastReason='';
+    projectDisplayMetrics.lastScheduledAt=0;
+  }
+
+  function getMetrics(){
+    return {
+      ...projectDisplayMetrics,
+      hasPending:!!pendingSnapshot||scheduledHandle!==null||!!runningPromise
+    };
+  }
+
+  return {schedule,flush,resetMetrics,getMetrics};
+}
+
+const projectDisplayScheduler=createProjectDisplayScheduler();
+
+function save(snapshot,options={}){
+  if(options.flush){
+    return projectDisplayScheduler.flush(snapshot,options);
+  }
+  projectDisplayScheduler.schedule(snapshot,options);
+  return Promise.resolve();
+}
+
 globalThis.updateProjectDisplay=updateProjectDisplay;
-onProjectChange(updateProjectDisplay);
-updateProjectDisplay();
+if(typeof globalThis!=='undefined'){
+  globalThis.__CTR_projectDisplayScheduler=projectDisplayScheduler;
+}
+export const __projectDisplayScheduler=projectDisplayScheduler;
+export const __projectDisplaySave=save;
+onProjectChange(save);
+save(null,{flush:true,reason:'initial-render'});
 
 async function copyShareLink(){
   try{
@@ -296,7 +448,7 @@ function initSettings(){
         const proj=getProjectState();
         proj.name=e.target.value;
         setProjectState(proj);
-        updateProjectDisplay(proj);
+        save(proj,{flush:true,reason:'name-input'});
       }catch{}
     });
 
@@ -377,7 +529,7 @@ function initSettings(){
     });
   }
   applyUnitLabels();
-  updateProjectDisplay();
+  save(null,{flush:true,reason:'settings-init'});
 }
 
 function initDarkMode(){
