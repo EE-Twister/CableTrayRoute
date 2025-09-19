@@ -1,3 +1,5 @@
+import { setAuthContextState, clearAuthContextState } from './projectStorage.js';
+
 async function signup(e) {
   e.preventDefault();
   const username = document.getElementById('signup-user').value.trim();
@@ -18,27 +20,23 @@ async function login(e) {
   e.preventDefault();
   const username = document.getElementById('login-user').value.trim();
   const password = document.getElementById('login-pass').value;
-  const res = await fetch('/login', {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ username, password })
-  });
-  if (res.ok) {
-    const { token, csrfToken, expiresAt } = await res.json();
-    if (token) {
-      localStorage.setItem('authToken', token);
+  try {
+    const res = await fetch('/login', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ username, password })
+    });
+    if (res.ok) {
+      const { token, csrfToken, expiresAt } = await res.json();
+      setAuthContextState({ token, csrfToken, expiresAt, user: username });
+      window.location.href = 'index.html';
+      return;
     }
-    if (csrfToken) {
-      localStorage.setItem('authCsrfToken', csrfToken);
-    }
-    if (expiresAt) {
-      localStorage.setItem('authExpiresAt', String(expiresAt));
-    }
-    localStorage.setItem('authUser', username);
-    window.location.href = 'index.html';
-  } else {
-    alert('Login failed');
+  } catch (err) {
+    console.error('Login request failed', err);
   }
+  clearAuthContextState();
+  alert('Login failed');
 }
 
 document.getElementById('signup-form').addEventListener('submit', signup);
