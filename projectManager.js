@@ -1,42 +1,22 @@
 import { saveProject as dsSaveProject, loadProject as dsLoadProject, exportProject, importProject } from './dataStore.mjs';
-import { getProjectState } from './projectStorage.js';
+import {
+  getProjectState,
+  listSavedProjects as listSavedProjectsStorage,
+  getAuthContextState,
+  clearAuthContextState
+} from './projectStorage.js';
 import { openModal, showAlertModal } from './src/components/modal.js';
 
 function listProjects() {
-  if (typeof localStorage === 'undefined') return [];
-  const names = new Set();
-  const suffixes = ['equipment', 'panels', 'loads', 'cables', 'raceways', 'oneLine'];
-  for (let i = 0; i < localStorage.length; i++) {
-    const key = localStorage.key(i);
-    if (!key) continue;
-    const [name, suffix] = key.split(':');
-    if (suffixes.includes(suffix)) names.add(name);
-  }
-  return [...names].sort((a, b) => a.localeCompare(b, undefined, { sensitivity: 'base' }));
+  return listSavedProjectsStorage();
 }
 
 function clearAuthContext() {
-  if (typeof localStorage === 'undefined') return;
-  localStorage.removeItem('authToken');
-  localStorage.removeItem('authCsrfToken');
-  localStorage.removeItem('authExpiresAt');
-  localStorage.removeItem('authUser');
+  clearAuthContextState();
 }
 
 function getAuthContext() {
-  if (typeof localStorage === 'undefined') return null;
-  const token = localStorage.getItem('authToken');
-  const csrfToken = localStorage.getItem('authCsrfToken');
-  const expiresAtRaw = localStorage.getItem('authExpiresAt');
-  if (!token || !csrfToken || !expiresAtRaw) {
-    return null;
-  }
-  const expiresAt = Number.parseInt(expiresAtRaw, 10);
-  if (!Number.isFinite(expiresAt) || Date.now() >= expiresAt) {
-    clearAuthContext();
-    return null;
-  }
-  return { token, csrfToken, expiresAt };
+  return getAuthContextState();
 }
 
 function validateProjectName(name, existingNames, { allowExisting = true, currentName = '' } = {}) {
