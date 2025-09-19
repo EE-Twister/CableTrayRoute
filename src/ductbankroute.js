@@ -1,4 +1,4 @@
-import "../workflowStatus.js";
+import "./workflowStatus.js";
 import "../site.js";
 import "../soilResistivityConfig.js";
 import "../conductorProperties.mjs";

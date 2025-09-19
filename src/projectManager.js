@@ -1,11 +1,11 @@
-import { saveProject as dsSaveProject, loadProject as dsLoadProject, exportProject, importProject } from './dataStore.mjs';
+import { saveProject as dsSaveProject, loadProject as dsLoadProject, exportProject, importProject } from '../dataStore.mjs';
 import {
   getProjectState,
   listSavedProjects as listSavedProjectsStorage,
   getAuthContextState,
   clearAuthContextState
-} from './projectStorage.js';
-import { openModal, showAlertModal } from './src/components/modal.js';
+} from '../projectStorage.js';
+import { openModal, showAlertModal } from './components/modal.js';
 
 function listProjects() {
   return listSavedProjectsStorage();

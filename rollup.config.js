@@ -23,6 +23,8 @@ const entries = {
   optimalRoute: 'src/optimalRoute.js',
   loadlist: 'src/loadlist.js',
   equipmentlist: 'src/equipmentlist.js',
+  projectManager: 'src/projectManager.js',
+  scenarios: 'src/scenarios.js',
   '404': 'src/404.js'
 };
 
@@ -30,7 +32,7 @@ module.exports = Object.entries(entries).map(([name, input]) => ({
   input,
   output: {
     file: `dist/${name}.js`,
-    format: 'iife',
+    format: 'es',
     sourcemap: false,
     inlineDynamicImports: true
   },
