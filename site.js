@@ -1,7 +1,18 @@
 import "./units.js";
 import { exportProject, importProject, getOneLine, getStudies, loadProject, getDuctbanks, getConduits } from "./dataStore.mjs";
 import { runValidation } from "./validation/rules.js";
-import { PROJECT_KEY, defaultProject, initializeProjectStorage, getProjectState, setProjectState, setProjectKey, onProjectChange } from "./projectStorage.js";
+import {
+  PROJECT_KEY,
+  defaultProject,
+  initializeProjectStorage,
+  getProjectState,
+  setProjectState,
+  onProjectChange,
+  getSessionPreferences,
+  updateSessionPreferences,
+  setConduitCache,
+  getConduitCache
+} from "./projectStorage.js";
 import { openModal, showAlertModal } from "./src/components/modal.js";
 
 const FOCUSABLE="a[href],button:not([disabled]),textarea:not([disabled]),input:not([disabled]),select:not([disabled]),[tabindex]:not([tabindex='-1'])";
@@ -592,19 +603,21 @@ function initSettings(){
 
 function initDarkMode(){
   const darkToggle=document.getElementById('dark-toggle');
-  const session=JSON.parse(localStorage.getItem('ctrSession')||'{}');
+  let session=getSessionPreferences();
   if(session.darkMode===undefined){
     const prefersDark=window.matchMedia&&window.matchMedia('(prefers-color-scheme: dark)').matches;
-    session.darkMode=prefersDark;
-    setProjectKey('ctrSession',JSON.stringify(session));
+    session=updateSessionPreferences(prev=>({...(prev&&typeof prev==='object'?prev:{}),darkMode:prefersDark}));
   }
-  document.body.classList.toggle('dark-mode',session.darkMode);
-  if(darkToggle) darkToggle.checked=!!session.darkMode;
+  const applyState=value=>{
+    document.body.classList.toggle('dark-mode',!!value);
+    if(darkToggle) darkToggle.checked=!!value;
+  };
+  applyState(session.darkMode);
   if(darkToggle){
     darkToggle.addEventListener('change',()=>{
-      document.body.classList.toggle('dark-mode',darkToggle.checked);
-      session.darkMode=darkToggle.checked;
-      setProjectKey('ctrSession',JSON.stringify(session));
+      const value=!!darkToggle.checked;
+      applyState(value);
+      session=updateSessionPreferences(prev=>({...(prev&&typeof prev==='object'?prev:{}),darkMode:value}));
       if(typeof window.saveSession==='function') window.saveSession();
       if(typeof window.saveDuctbankSession==='function') window.saveDuctbankSession();
     });
@@ -612,9 +625,9 @@ function initDarkMode(){
   window.addEventListener('storage',e=>{
     if(e.key==='ctrSession'){
       try{
-        const data=JSON.parse(e.newValue);
-        document.body.classList.toggle('dark-mode',data&&data.darkMode);
-        if(darkToggle) darkToggle.checked=!!(data&&data.darkMode);
+        const data=e.newValue?JSON.parse(e.newValue):{};
+        applyState(data&&data.darkMode);
+        session=data||{};
       }catch{}
     }
   });
@@ -622,18 +635,20 @@ function initDarkMode(){
 
 function initCompactMode(){
   const compactToggle=document.getElementById('compact-toggle');
-  const session=JSON.parse(localStorage.getItem('ctrSession')||'{}');
+  let session=getSessionPreferences();
   if(session.compactMode===undefined){
-    session.compactMode=false;
-    setProjectKey('ctrSession',JSON.stringify(session));
+    session=updateSessionPreferences(prev=>({...(prev&&typeof prev==='object'?prev:{}),compactMode:false}));
   }
-  document.body.classList.toggle('compact-mode',session.compactMode);
-  if(compactToggle) compactToggle.checked=!!session.compactMode;
+  const applyState=value=>{
+    document.body.classList.toggle('compact-mode',!!value);
+    if(compactToggle) compactToggle.checked=!!value;
+  };
+  applyState(session.compactMode);
   if(compactToggle){
     compactToggle.addEventListener('change',()=>{
-      document.body.classList.toggle('compact-mode',compactToggle.checked);
-      session.compactMode=compactToggle.checked;
-      setProjectKey('ctrSession',JSON.stringify(session));
+      const value=!!compactToggle.checked;
+      applyState(value);
+      session=updateSessionPreferences(prev=>({...(prev&&typeof prev==='object'?prev:{}),compactMode:value}));
       if(typeof window.saveSession==='function') window.saveSession();
       if(typeof window.saveDuctbankSession==='function') window.saveDuctbankSession();
     });
@@ -641,9 +656,9 @@ function initCompactMode(){
   window.addEventListener('storage',e=>{
     if(e.key==='ctrSession'){
       try{
-        const data=JSON.parse(e.newValue);
-        document.body.classList.toggle('compact-mode',data&&data.compactMode);
-        if(compactToggle) compactToggle.checked=!!(data&&data.compactMode);
+        const data=e.newValue?JSON.parse(e.newValue):{};
+        applyState(data&&data.compactMode);
+        session=data||{};
       }catch{}
     }
   });
@@ -751,22 +766,20 @@ function initTableNav(){
   });
 }
 
-const CTR_CONDUITS = 'CTR_CONDUITS';
-
 function persistConduits(data){
   try{
-    localStorage.setItem(CTR_CONDUITS,JSON.stringify(data));
-    const condKey=globalThis.TableUtils?.STORAGE_KEYS?.conduitSchedule||'conduitSchedule';
-    localStorage.setItem(condKey,JSON.stringify(data.conduits||[]));
+    setConduitCache(data);
   }catch(e){console.error('Failed to persist conduits',e);}
 }
 
 function loadConduits(){
   try{
-    const raw=localStorage.getItem(CTR_CONDUITS);
-    if(raw){
-      const parsed=JSON.parse(raw);
-      return {ductbanks:parsed.ductbanks||[],conduits:parsed.conduits||[]};
+    const cached=getConduitCache();
+    if(cached){
+      return {
+        ductbanks:Array.isArray(cached.ductbanks)?cached.ductbanks:[],
+        conduits:Array.isArray(cached.conduits)?cached.conduits:[]
+      };
     }
   }catch(e){}
   let ductbanks=[];let conduits=[];

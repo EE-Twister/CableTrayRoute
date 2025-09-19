@@ -18,68 +18,42 @@
 // directly. Import it with a named import so it works consistently in
 // both the browser and Node test environments.
 import { parseRevit } from './src/importers/revit.mjs';
-import { setProjectKey, removeProjectKey } from './projectStorage.js';
+import {
+  getScenarioListState,
+  setScenarioListState,
+  registerScenario,
+  getCurrentScenarioNameState,
+  setCurrentScenarioNameState,
+  readScenarioValue,
+  writeScenarioValue,
+  removeScenarioValue,
+  listScenarioKeysState,
+  cloneScenarioStorage,
+  writeSavedProject,
+  readSavedProject
+} from './projectStorage.js';
 
-// scenario management keys
-const SCENARIOS_KEY = 'ctr_scenarios_v1';
-const CURRENT_SCENARIO_KEY = 'ctr_current_scenario_v1';
-
-function readGlobal(key, fallback) {
-  try {
-    const raw = (typeof localStorage !== 'undefined') ? localStorage.getItem(key) : null;
-    return raw ? JSON.parse(raw) : fallback;
-  } catch {
-    return fallback;
-  }
-}
-
-function writeGlobal(key, value) {
-  try {
-    if (typeof localStorage !== 'undefined') {
-      localStorage.setItem(key, JSON.stringify(value));
-    }
-  } catch {}
-}
-
-let currentScenario = readGlobal(CURRENT_SCENARIO_KEY, 'base');
-let scenarioList = readGlobal(SCENARIOS_KEY, ['base']);
-if (!scenarioList.includes(currentScenario)) scenarioList.push(currentScenario);
-writeGlobal(SCENARIOS_KEY, scenarioList);
-writeGlobal(CURRENT_SCENARIO_KEY, currentScenario);
-
-function scenarioKey(key, scenario = currentScenario) {
-  return `${scenario}:${key}`;
-}
+registerScenario(getCurrentScenarioNameState());
 
 export function listScenarios() {
-  return [...scenarioList];
+  return [...getScenarioListState()];
 }
 
 export function getCurrentScenario() {
-  return currentScenario;
+  return getCurrentScenarioNameState();
 }
 
 export function switchScenario(name) {
-  if (!scenarioList.includes(name)) scenarioList.push(name);
-  currentScenario = name;
-  writeGlobal(CURRENT_SCENARIO_KEY, currentScenario);
-  writeGlobal(SCENARIOS_KEY, scenarioList);
-  emit('scenario', name);
+  if (!name) return;
+  registerScenario(name);
+  setCurrentScenarioNameState(name);
+  emit('scenario', getCurrentScenarioNameState());
 }
 
-export function cloneScenario(newName, from = currentScenario) {
-  const prefixFrom = `${from}:`;
-  const prefixTo = `${newName}:`;
-  const allKeys = Object.keys(localStorage || {});
-  for (const key of allKeys) {
-    if (key.startsWith(prefixFrom)) {
-      const value = localStorage.getItem(key);
-      const dest = prefixTo + key.slice(prefixFrom.length);
-      localStorage.setItem(dest, value);
-    }
-  }
-  if (!scenarioList.includes(newName)) scenarioList.push(newName);
-  writeGlobal(SCENARIOS_KEY, scenarioList);
+export function cloneScenario(newName, from = getCurrentScenarioNameState()) {
+  if (!newName) return;
+  cloneScenarioStorage(from, newName);
+  registerScenario(newName);
 }
 
 export function compareStudies(a, b) {
@@ -161,7 +135,7 @@ if (typeof window !== 'undefined' && typeof window.addEventListener === 'functio
   window.addEventListener('storage', e => {
     if (!e.key) return;
     const [scenario, key] = e.key.split(':');
-    if (!key || scenario !== currentScenario) return;
+    if (!key || scenario !== getCurrentScenarioNameState()) return;
     if (!crossWindowKeys.has(key)) return;
     try {
       const val = e.newValue ? JSON.parse(e.newValue) : undefined;
@@ -170,24 +144,13 @@ if (typeof window !== 'undefined' && typeof window.addEventListener === 'functio
   });
 }
 
-function read(key, fallback, scenario = currentScenario) {
-  try {
-    const raw = (typeof localStorage !== 'undefined') ? localStorage.getItem(scenarioKey(key, scenario)) : null;
-    return raw ? JSON.parse(raw) : fallback;
-  } catch {
-    return fallback;
-  }
+function read(key, fallback, scenario = getCurrentScenarioNameState()) {
+  return readScenarioValue(key, fallback, scenario);
 }
 
-function write(key, value, scenario = currentScenario) {
+function write(key, value, scenario = getCurrentScenarioNameState()) {
   try {
-    const serialized = JSON.stringify(value);
-    if (typeof localStorage !== 'undefined') {
-      localStorage.setItem(scenarioKey(key, scenario), serialized);
-    }
-    if (scenario === currentScenario) {
-      try { setProjectKey(key, serialized); } catch {}
-    }
+    writeScenarioValue(key, value, scenario);
     emit(key, value);
   } catch (e) {
     console.error('Failed to store', key, e);
@@ -356,7 +319,7 @@ export const removeEquipment = index => {
  * Retrieve saved one-line sheets. Supports legacy single-sheet format.
  * @returns {OneLineSheet[]}
  */
-export const getOneLine = (scenario = currentScenario) => {
+export const getOneLine = (scenario = getCurrentScenarioNameState()) => {
   const data = read(KEYS.oneLine, {}, scenario);
   if (Array.isArray(data)) {
     // legacy array of components
@@ -380,15 +343,15 @@ export const getOneLine = (scenario = currentScenario) => {
  */
 const REVISION_KEY = 'oneLineRevisions';
 
-export const getRevisions = (scenario = currentScenario) => read(REVISION_KEY, [], scenario);
+export const getRevisions = (scenario = getCurrentScenarioNameState()) => read(REVISION_KEY, [], scenario);
 
-function addRevision(sheets, scenario = currentScenario) {
+function addRevision(sheets, scenario = getCurrentScenarioNameState()) {
   const revs = getRevisions(scenario);
   revs.push({ time: Date.now(), sheets: JSON.parse(JSON.stringify(sheets)) });
   write(REVISION_KEY, revs, scenario);
 }
 
-export const restoreRevision = (index, scenario = currentScenario) => {
+export const restoreRevision = (index, scenario = getCurrentScenarioNameState()) => {
   const revs = getRevisions(scenario);
   const rev = revs[index];
   if (rev) {
@@ -397,7 +360,7 @@ export const restoreRevision = (index, scenario = currentScenario) => {
   return rev ? rev.sheets : null;
 };
 
-export const setOneLine = (data, scenario = currentScenario) => {
+export const setOneLine = (data, scenario = getCurrentScenarioNameState()) => {
   const prev = getOneLine(scenario);
   if (Array.isArray(prev.sheets) && prev.sheets.length) addRevision(prev.sheets, scenario);
   const payload = {
@@ -513,14 +476,9 @@ export const removeLoad = deleteLoad;
 // generic access for other values so pages never touch localStorage directly
 export const getItem = (key, fallback = null, scenario) => read(key, fallback, scenario);
 export const setItem = (key, value, scenario) => write(key, value, scenario);
-export const removeItem = (key, scenario = currentScenario) => {
+export const removeItem = (key, scenario = getCurrentScenarioNameState()) => {
   try {
-    if (typeof localStorage !== 'undefined') {
-      localStorage.removeItem(scenarioKey(key, scenario));
-      if (scenario === currentScenario) {
-        try { removeProjectKey(key); } catch {}
-      }
-    }
+    removeScenarioValue(key, scenario);
     emit(key, null);
   } catch (e) {
     console.error('Failed to remove', key, e);
@@ -528,20 +486,17 @@ export const removeItem = (key, scenario = currentScenario) => {
 };
 
 
-export const keys = (scenario = currentScenario) => {
+export const keys = (scenario = getCurrentScenarioNameState()) => {
   try {
-    if (typeof localStorage !== 'undefined') {
-      const prefix = `${scenario}:`;
-      return Object.keys(localStorage).filter(k => k.startsWith(prefix)).map(k => k.slice(prefix.length));
-    }
-  } catch {}
-  return [];
+    return listScenarioKeysState(scenario);
+  } catch {
+    return [];
+  }
 };
 
-export function saveProject(projectId, scenario = currentScenario) {
-  if (!projectId || typeof localStorage === 'undefined') return;
+export function saveProject(projectId, scenario = getCurrentScenarioNameState()) {
+  if (!projectId) return;
   try {
-    const prefix = `${projectId}:`;
     const payload = {
       equipment: getEquipment(),
       panels: getPanels(),
@@ -554,28 +509,22 @@ export function saveProject(projectId, scenario = currentScenario) {
       },
       oneLine: getOneLine(scenario)
     };
-    for (const [key, value] of Object.entries(payload)) {
-      localStorage.setItem(prefix + key, JSON.stringify(value));
-    }
+    writeSavedProject(projectId, payload);
   } catch (e) {
     console.error('Failed to save project', e);
   }
 }
 
-export function loadProject(projectId, scenario = currentScenario) {
-  if (!projectId || typeof localStorage === 'undefined') return;
+export function loadProject(projectId, scenario = getCurrentScenarioNameState()) {
+  if (!projectId) return;
   try {
-    const prefix = `${projectId}:`;
-    const readKey = k => {
-      const raw = localStorage.getItem(prefix + k);
-      try { return raw ? JSON.parse(raw) : null; } catch { return null; }
-    };
-    const equipment = readKey('equipment');
-    const panels = readKey('panels');
-    const loads = readKey('loads');
-    const cables = readKey('cables');
-    const raceways = readKey('raceways') || {};
-    const oneLine = readKey('oneLine') || {};
+    const payload = readSavedProject(projectId) || {};
+    const equipment = payload.equipment;
+    const panels = payload.panels;
+    const loads = payload.loads;
+    const cables = payload.cables;
+    const raceways = payload.raceways || {};
+    const oneLine = payload.oneLine || {};
     if (Array.isArray(equipment)) setEquipment(equipment); else setEquipment([]);
     if (Array.isArray(panels)) setPanels(panels); else setPanels([]);
     if (Array.isArray(loads)) setLoads(loads);
@@ -648,7 +597,7 @@ export function exportProject() {
       project.settings[key] = getItem(key);
     }
   }
-  const meta = { version: 1, scenario: currentScenario, scenarios: listScenarios() };
+  const meta = { version: 1, scenario: getCurrentScenarioNameState(), scenarios: listScenarios() };
   return { meta, ...project };
 }
 
@@ -724,8 +673,7 @@ export function exportToCad(fileType = 'json') {
 export function importProject(obj) {
   const { meta, ...rest } = obj || {};
   if (meta && Array.isArray(meta.scenarios)) {
-    scenarioList = meta.scenarios;
-    writeGlobal(SCENARIOS_KEY, scenarioList);
+    setScenarioListState(meta.scenarios);
   }
   if (meta && meta.scenario) switchScenario(meta.scenario);
   let data = rest;

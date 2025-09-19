@@ -1,4 +1,11 @@
 const PROJECT_KEY = 'CTR_PROJECT_V1';
+const SCENARIOS_KEY = 'ctr_scenarios_v1';
+const CURRENT_SCENARIO_KEY = 'ctr_current_scenario_v1';
+const CONDUIT_CACHE_KEY = 'CTR_CONDUITS';
+const AUTH_TOKEN_KEY = 'authToken';
+const AUTH_CSRF_KEY = 'authCsrfToken';
+const AUTH_EXPIRES_KEY = 'authExpiresAt';
+const AUTH_USER_KEY = 'authUser';
 const FAST_JSON_PATCH_URL = (() => {
   if (typeof document !== 'undefined' && document.baseURI) {
     return new URL('dist/vendor/fast-json-patch.mjs', document.baseURI).href;
@@ -44,6 +51,350 @@ const undoStack = [];
 const redoStack = [];
 let trackedSettingsKeys = new Set();
 const listeners = new Set();
+const memoryStorage = new Map();
+let scenarioListCache = ['base'];
+let currentScenarioName = 'base';
+let conduitCacheState = null;
+
+function readRawStorage(key) {
+  const storage = getStorage();
+  if (storage) {
+    const value = safeGet(storage, key);
+    if (value !== null && value !== undefined) return value;
+  }
+  return memoryStorage.has(key) ? memoryStorage.get(key) : null;
+}
+
+function writeRawStorage(key, value) {
+  if (value === null || value === undefined) {
+    memoryStorage.delete(key);
+  } else {
+    memoryStorage.set(key, value);
+  }
+  const storage = getStorage();
+  if (!storage) return;
+  try {
+    if (value === null || value === undefined) {
+      storage.removeItem(key);
+    } else {
+      storage.setItem(key, value);
+    }
+  } catch (e) {
+    console.warn('project storage write failed', key, e);
+  }
+}
+
+function listPrefixedKeys(prefix) {
+  const keys = new Set();
+  const storage = getStorage();
+  if (storage) {
+    try {
+      for (let i = 0; i < storage.length; i++) {
+        const key = storage.key(i);
+        if (!key || !key.startsWith(prefix)) continue;
+        keys.add(key.slice(prefix.length));
+      }
+    } catch (e) {
+      console.warn('project storage enumerate failed', e);
+    }
+  }
+  for (const key of memoryStorage.keys()) {
+    if (key.startsWith(prefix)) keys.add(key.slice(prefix.length));
+  }
+  return [...keys];
+}
+
+function sanitizeScenarioName(name) {
+  if (typeof name !== 'string') return '';
+  return name.trim();
+}
+
+function ensureScenarioList(list) {
+  const normalized = Array.isArray(list) ? list.map(sanitizeScenarioName).filter(Boolean) : [];
+  if (!normalized.length) normalized.push('base');
+  return [...new Set(normalized)];
+}
+
+function persistScenarioState() {
+  scenarioListCache = ensureScenarioList(scenarioListCache);
+  if (!scenarioListCache.includes(currentScenarioName)) {
+    scenarioListCache.push(currentScenarioName);
+  }
+  writeRawStorage(SCENARIOS_KEY, JSON.stringify(scenarioListCache));
+  writeRawStorage(CURRENT_SCENARIO_KEY, currentScenarioName);
+}
+
+function loadScenarioState() {
+  const storedList = safeParse(readRawStorage(SCENARIOS_KEY), ['base']);
+  scenarioListCache = ensureScenarioList(storedList);
+  const storedCurrent = readRawStorage(CURRENT_SCENARIO_KEY);
+  const nextCurrent = sanitizeScenarioName(typeof storedCurrent === 'string' ? storedCurrent : '');
+  currentScenarioName = nextCurrent || scenarioListCache[0] || 'base';
+  if (!scenarioListCache.includes(currentScenarioName)) scenarioListCache.push(currentScenarioName);
+  persistScenarioState();
+}
+
+function scenarioStorageKey(scenario, key) {
+  return `${scenario}:${key}`;
+}
+
+function readScenarioRaw(scenario, key) {
+  return readRawStorage(scenarioStorageKey(scenario, key));
+}
+
+function writeScenarioRaw(scenario, key, value) {
+  writeRawStorage(scenarioStorageKey(scenario, key), value);
+}
+
+function getAllStorageKeys() {
+  const keys = new Set();
+  const storage = getStorage();
+  if (storage) {
+    try {
+      for (let i = 0; i < storage.length; i++) {
+        const key = storage.key(i);
+        if (key) keys.add(key);
+      }
+    } catch (e) {
+      console.warn('project storage enumerate failed', e);
+    }
+  }
+  for (const key of memoryStorage.keys()) keys.add(key);
+  return [...keys];
+}
+
+export function getScenarioListState() {
+  return [...scenarioListCache];
+}
+
+export function setScenarioListState(list) {
+  scenarioListCache = ensureScenarioList(list);
+  if (!scenarioListCache.includes(currentScenarioName)) scenarioListCache.push(currentScenarioName);
+  persistScenarioState();
+}
+
+export function registerScenario(name) {
+  const normalized = sanitizeScenarioName(name);
+  if (!normalized) return;
+  if (!scenarioListCache.includes(normalized)) {
+    scenarioListCache.push(normalized);
+    persistScenarioState();
+  }
+}
+
+export function getCurrentScenarioNameState() {
+  return currentScenarioName;
+}
+
+export function setCurrentScenarioNameState(name) {
+  const normalized = sanitizeScenarioName(name) || 'base';
+  currentScenarioName = normalized;
+  if (!scenarioListCache.includes(normalized)) scenarioListCache.push(normalized);
+  persistScenarioState();
+}
+
+export function readScenarioValue(key, fallback, scenario = currentScenarioName) {
+  const target = sanitizeScenarioName(scenario) || currentScenarioName;
+  const raw = readScenarioRaw(target, key);
+  if (raw === null || raw === undefined) return fallback;
+  return safeParse(raw, fallback);
+}
+
+export function writeScenarioValue(key, value, scenario = currentScenarioName) {
+  const target = sanitizeScenarioName(scenario) || currentScenarioName;
+  try {
+    const serialized = JSON.stringify(value);
+    writeScenarioRaw(target, key, serialized);
+    if (target === currentScenarioName) {
+      setProjectKey(key, serialized);
+    }
+  } catch (e) {
+    console.error('scenario write failed', key, e);
+  }
+}
+
+export function removeScenarioValue(key, scenario = currentScenarioName) {
+  const target = sanitizeScenarioName(scenario) || currentScenarioName;
+  writeScenarioRaw(target, key, null);
+  if (target === currentScenarioName) {
+    removeProjectKey(key);
+  }
+}
+
+export function listScenarioKeysState(scenario = currentScenarioName) {
+  const target = sanitizeScenarioName(scenario) || currentScenarioName;
+  return listPrefixedKeys(`${target}:`);
+}
+
+export function cloneScenarioStorage(from, to) {
+  const source = sanitizeScenarioName(from) || currentScenarioName;
+  const target = sanitizeScenarioName(to);
+  if (!target) return;
+  const keys = listScenarioKeysState(source);
+  for (const key of keys) {
+    const raw = readScenarioRaw(source, key);
+    if (raw === null || raw === undefined) continue;
+    writeScenarioRaw(target, key, raw);
+    if (target === currentScenarioName) {
+      setProjectKey(key, raw);
+    }
+  }
+}
+
+const SAVED_PROJECT_SUFFIXES = ['equipment', 'panels', 'loads', 'cables', 'raceways', 'oneLine'];
+
+export function listSavedProjects() {
+  const names = new Set();
+  const suffixes = new Set(SAVED_PROJECT_SUFFIXES);
+  for (const key of getAllStorageKeys()) {
+    const idx = key.indexOf(':');
+    if (idx <= 0) continue;
+    const suffix = key.slice(idx + 1);
+    if (suffixes.has(suffix)) names.add(key.slice(0, idx));
+  }
+  return [...names].sort((a, b) => a.localeCompare(b, undefined, { sensitivity: 'base' }));
+}
+
+export function writeSavedProject(projectId, sections = {}) {
+  const name = typeof projectId === 'string' ? projectId.trim() : '';
+  if (!name) return;
+  for (const [key, value] of Object.entries(sections)) {
+    try {
+      writeRawStorage(`${name}:${key}`, JSON.stringify(value));
+    } catch (e) {
+      console.error('project save failed', key, e);
+    }
+  }
+}
+
+export function readSavedProject(projectId) {
+  const name = typeof projectId === 'string' ? projectId.trim() : '';
+  if (!name) return null;
+  const prefix = `${name}:`;
+  const result = {};
+  for (const key of listPrefixedKeys(prefix)) {
+    const raw = readRawStorage(prefix + key);
+    if (raw === null || raw === undefined) continue;
+    result[key] = safeParse(raw, null);
+  }
+  return result;
+}
+
+export function removeSavedProject(projectId) {
+  const name = typeof projectId === 'string' ? projectId.trim() : '';
+  if (!name) return;
+  const prefix = `${name}:`;
+  for (const key of listPrefixedKeys(prefix)) {
+    writeRawStorage(prefix + key, null);
+  }
+}
+
+export function getSessionPreferences() {
+  const session = project.settings?.session;
+  if (session && typeof session === 'object') {
+    return JSON.parse(JSON.stringify(session));
+  }
+  return {};
+}
+
+export function setSessionPreferences(next = {}) {
+  const value = next && typeof next === 'object' ? next : {};
+  try {
+    setProjectKey('ctrSession', JSON.stringify(value));
+  } catch (e) {
+    console.warn('session save failed', e);
+  }
+  return getSessionPreferences();
+}
+
+export function updateSessionPreferences(patch) {
+  const current = getSessionPreferences();
+  const next = typeof patch === 'function'
+    ? patch(current)
+    : { ...current, ...(patch && typeof patch === 'object' ? patch : {}) };
+  return setSessionPreferences(next && typeof next === 'object' ? next : {});
+}
+
+export function getConduitCache() {
+  if (conduitCacheState) {
+    return JSON.parse(JSON.stringify(conduitCacheState));
+  }
+  const raw = readRawStorage(CONDUIT_CACHE_KEY);
+  const parsed = safeParse(raw, null);
+  if (parsed && typeof parsed === 'object') {
+    conduitCacheState = {
+      ductbanks: Array.isArray(parsed.ductbanks) ? parsed.ductbanks : [],
+      conduits: Array.isArray(parsed.conduits) ? parsed.conduits : []
+    };
+    return JSON.parse(JSON.stringify(conduitCacheState));
+  }
+  conduitCacheState = null;
+  return null;
+}
+
+export function setConduitCache(data) {
+  if (!data || typeof data !== 'object') {
+    conduitCacheState = null;
+    writeRawStorage(CONDUIT_CACHE_KEY, null);
+    return null;
+  }
+  const normalized = {
+    ductbanks: Array.isArray(data.ductbanks) ? data.ductbanks : [],
+    conduits: Array.isArray(data.conduits) ? data.conduits : []
+  };
+  conduitCacheState = {
+    ductbanks: JSON.parse(JSON.stringify(normalized.ductbanks)),
+    conduits: JSON.parse(JSON.stringify(normalized.conduits))
+  };
+  writeRawStorage(CONDUIT_CACHE_KEY, JSON.stringify(conduitCacheState));
+  try { setProjectKey('ductbankSchedule', JSON.stringify(normalized.ductbanks)); } catch {}
+  try { setProjectKey('conduitSchedule', JSON.stringify(normalized.conduits)); } catch {}
+  return JSON.parse(JSON.stringify(conduitCacheState));
+}
+
+export function clearConduitCache() {
+  conduitCacheState = null;
+  writeRawStorage(CONDUIT_CACHE_KEY, null);
+}
+
+export function getAuthContextState() {
+  const token = readRawStorage(AUTH_TOKEN_KEY);
+  const csrfToken = readRawStorage(AUTH_CSRF_KEY);
+  const expiresRaw = readRawStorage(AUTH_EXPIRES_KEY);
+  if (!token || !csrfToken || !expiresRaw) return null;
+  const expiresAt = Number.parseInt(expiresRaw, 10);
+  if (!Number.isFinite(expiresAt)) {
+    clearAuthContextState();
+    return null;
+  }
+  if (Date.now() >= expiresAt) {
+    clearAuthContextState();
+    return null;
+  }
+  const user = readRawStorage(AUTH_USER_KEY);
+  return { token, csrfToken, expiresAt, user: user || null };
+}
+
+export function setAuthContextState({ token, csrfToken, expiresAt, user }) {
+  if (!token || !csrfToken) return;
+  const expiresValue = Number(expiresAt);
+  if (!Number.isFinite(expiresValue)) return;
+  writeRawStorage(AUTH_TOKEN_KEY, token);
+  writeRawStorage(AUTH_CSRF_KEY, csrfToken);
+  writeRawStorage(AUTH_EXPIRES_KEY, String(expiresValue));
+  if (user === undefined || user === null) {
+    writeRawStorage(AUTH_USER_KEY, null);
+  } else {
+    writeRawStorage(AUTH_USER_KEY, String(user));
+  }
+}
+
+export function clearAuthContextState() {
+  writeRawStorage(AUTH_TOKEN_KEY, null);
+  writeRawStorage(AUTH_CSRF_KEY, null);
+  writeRawStorage(AUTH_EXPIRES_KEY, null);
+  writeRawStorage(AUTH_USER_KEY, null);
+}
 
 function getStorage() {
   try {
@@ -218,15 +569,42 @@ export async function initializeProjectStorage() {
       redoStack.length = 0;
     });
     window.addEventListener('storage', event => {
-      if (!event.key || event.key !== PROJECT_KEY) return;
-      if (!event.newValue) return;
-      try {
-        project = migrateProject(JSON.parse(event.newValue));
-        setTrackedSettings(Object.keys(project.settings || {}));
-        if (storage) syncDerivedStorage(storage);
-        notifyChange();
-      } catch (e) {
-        console.warn('project sync failed', e);
+      if (!event.key) return;
+      if (event.key === PROJECT_KEY) {
+        if (!event.newValue) return;
+        try {
+          project = migrateProject(JSON.parse(event.newValue));
+          setTrackedSettings(Object.keys(project.settings || {}));
+          if (storage) syncDerivedStorage(storage);
+          notifyChange();
+        } catch (e) {
+          console.warn('project sync failed', e);
+        }
+        return;
+      }
+      if (event.key === SCENARIOS_KEY) {
+        const parsed = safeParse(event.newValue, ['base']);
+        scenarioListCache = ensureScenarioList(parsed);
+        if (!scenarioListCache.includes(currentScenarioName)) scenarioListCache.push(currentScenarioName);
+        return;
+      }
+      if (event.key === CURRENT_SCENARIO_KEY) {
+        const next = sanitizeScenarioName(event.newValue || '');
+        currentScenarioName = next || scenarioListCache[0] || 'base';
+        if (!scenarioListCache.includes(currentScenarioName)) scenarioListCache.push(currentScenarioName);
+        return;
+      }
+      if (event.key === CONDUIT_CACHE_KEY) {
+        conduitCacheState = null;
+        if (event.newValue) {
+          const parsed = safeParse(event.newValue, null);
+          if (parsed && typeof parsed === 'object') {
+            conduitCacheState = {
+              ductbanks: Array.isArray(parsed.ductbanks) ? parsed.ductbanks : [],
+              conduits: Array.isArray(parsed.conduits) ? parsed.conduits : []
+            };
+          }
+        }
       }
     });
   }
@@ -382,6 +760,7 @@ export function onProjectChange(handler) {
 }
 
 loadExistingProject();
+loadScenarioState();
 
 const api = {
   PROJECT_KEY,
@@ -396,7 +775,30 @@ const api = {
   redoProjectChange,
   canUndo,
   canRedo,
-  onProjectChange
+  onProjectChange,
+  getScenarioListState,
+  setScenarioListState,
+  registerScenario,
+  getCurrentScenarioNameState,
+  setCurrentScenarioNameState,
+  readScenarioValue,
+  writeScenarioValue,
+  removeScenarioValue,
+  listScenarioKeysState,
+  cloneScenarioStorage,
+  listSavedProjects,
+  writeSavedProject,
+  readSavedProject,
+  removeSavedProject,
+  getSessionPreferences,
+  setSessionPreferences,
+  updateSessionPreferences,
+  getConduitCache,
+  setConduitCache,
+  clearConduitCache,
+  getAuthContextState,
+  setAuthContextState,
+  clearAuthContextState
 };
 
 if (typeof globalThis !== 'undefined') {
