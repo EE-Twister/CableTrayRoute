@@ -530,6 +530,17 @@ details > summary {
     z-index: 200;
 }
 
+.component-modal {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: var(--spacing-base);
+}
+
+body.modal-open {
+    overflow: hidden;
+}
+
 .modal-content {
     background: var(--secondary-color);
     color: var(--text-color);
@@ -542,11 +553,87 @@ details > summary {
     position: relative;
 }
 
+.modal-body {
+    margin-top: var(--spacing-base);
+    display: flex;
+    flex-direction: column;
+    gap: var(--spacing-base);
+}
+
+.modal-description {
+    margin: 0;
+    font-size: 0.95rem;
+    line-height: 1.5;
+}
+
+.modal-body form,
+.modal-form {
+    display: flex;
+    flex-direction: column;
+    gap: var(--spacing-base);
+}
+
+.modal-body label {
+    font-weight: 600;
+    display: flex;
+    flex-direction: column;
+    gap: calc(var(--spacing-base) / 2);
+}
+
+.modal-body input,
+.modal-body select,
+.modal-body textarea {
+    padding: calc(var(--spacing-base) * 0.75);
+    border: 1px solid var(--border-color);
+    border-radius: 4px;
+    font-size: 1rem;
+    color: var(--text-color);
+    background: var(--secondary-color);
+}
+
+.modal-select {
+    width: 100%;
+    min-height: 6rem;
+}
+
+.modal-body input:focus,
+.modal-body select:focus,
+.modal-body textarea:focus {
+    outline: 2px solid var(--focus-ring-color);
+    outline-offset: 2px;
+}
+
+.modal-message {
+    margin: 0;
+    font-size: 0.95rem;
+    line-height: 1.5;
+}
+
+.modal-error {
+    margin: 0;
+    color: var(--error-text);
+    font-size: 0.9rem;
+}
+
 .modal-actions {
     margin-top: calc(var(--spacing-base) * 2);
     display: flex;
     gap: var(--spacing-base);
     justify-content: flex-end;
+}
+
+.btn.secondary-btn {
+    background: transparent;
+    color: var(--text-color);
+    border: 1px solid var(--border-color);
+}
+
+.btn.secondary-btn:hover {
+    background: rgba(0, 0, 0, 0.05);
+}
+
+body.dark-mode .btn.secondary-btn:hover {
+    background: rgba(255, 255, 255, 0.1);
 }
 
 .modal-actions .primary-btn {
