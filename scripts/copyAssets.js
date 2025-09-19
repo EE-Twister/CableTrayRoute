@@ -23,3 +23,10 @@ copy(path.join(dist, 'vendor'), path.join(docs, 'dist', 'vendor'));
   fs.copyFileSync(src, path.join(dist, file));
   fs.copyFileSync(src, path.join(docs, file));
 });
+
+['style.css'].forEach(file => {
+  const src = path.join(root, file);
+  if (!fs.existsSync(src)) return;
+  fs.copyFileSync(src, path.join(dist, file));
+  fs.copyFileSync(src, path.join(docs, file));
+});
