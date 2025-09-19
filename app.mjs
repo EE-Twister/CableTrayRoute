@@ -61,6 +61,7 @@ function whenPresent(selector, cb, timeoutMs = 5000) {
 import { getItem, setItem, removeItem, getTrays, getCables, getDuctbanks, getConduits, exportProject, importProject, setCables } from './dataStore.mjs';
 import { buildSegmentRows, buildSummaryRows, buildBOM } from './resultsExport.mjs';
 import './site.js';
+import { getProjectState, setProjectState } from './projectStorage.js';
 import { calculateVoltageDrop } from './src/voltageDrop.js';
 import { exportRoutesDXF } from './bimExport.mjs';
 
@@ -4078,18 +4079,18 @@ Plotly.newPlot(document.getElementById('plot'), data, layout, {responsive: true}
         const diag={};
         const snapshot=exportProject();
         try{
-            setProject({name:'',ductbanks:[],conduits:[],trays:[],cables:[],settings:{session:{},collapsedGroups:{},units:'imperial'}});
+            setProjectState({name:'',ductbanks:[],conduits:[],trays:[],cables:[],settings:{session:{},collapsedGroups:{},units:'imperial'}});
             diag.cleared=true;
             const [raceways,cables]=await Promise.all([
                 fetch('examples/sample_raceways.json').then(r=>r.json()),
                 fetch('examples/sample_cables.json').then(r=>r.json())
             ]);
-            const proj=getProject();
+            const proj=getProjectState();
             proj.ductbanks=raceways.ductbanks||[];
             proj.conduits=raceways.conduits||[];
             proj.trays=raceways.trays||[];
             proj.cables=cables;
-            setProject(proj);
+            setProjectState(proj);
             diag.counts={ductbanks:proj.ductbanks.length,conduits:proj.conduits.length,trays:proj.trays.length,cables:proj.cables.length};
             const dbTags=new Set(proj.ductbanks.map(db=>db.tag));
             const standalone=proj.conduits.filter(c=>!c.ductbankTag);

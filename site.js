@@ -1,183 +1,13 @@
 import "./units.js";
 import { exportProject, importProject, getOneLine, getStudies, loadProject, getDuctbanks, getConduits } from "./dataStore.mjs";
 import { runValidation } from "./validation/rules.js";
-// fast-json-patch is loaded dynamically so the bundle does not expect a
-// build-time dependency. This avoids "index_mjs is not defined" errors in
-// the minified output when the raceway schedule loads sample data.
-let applyPatch, compare;
-const FAST_JSON_PATCH_URL=(() => {
-  if(typeof document!=='undefined' && document.baseURI){
-    return new URL('dist/vendor/fast-json-patch.mjs',document.baseURI).href;
-  }
-  if(typeof location!=='undefined' && location.href){
-    return new URL('dist/vendor/fast-json-patch.mjs',location.href).href;
-  }
-  return './dist/vendor/fast-json-patch.mjs';
-})();
-async function loadJsonPatch() {
-  const mod = await import(FAST_JSON_PATCH_URL);
-  ({ applyPatch, compare } = mod);
-}
+import { PROJECT_KEY, defaultProject, initializeProjectStorage, getProjectState, setProjectState, setProjectKey, onProjectChange } from "./projectStorage.js";
+
 const FOCUSABLE="a[href],button:not([disabled]),textarea:not([disabled]),input:not([disabled]),select:not([disabled]),[tabindex]:not([tabindex='-1'])";
-const PROJECT_KEY='CTR_PROJECT_V1';
 const CHECKPOINT_KEY='CTR_CHECKPOINT';
 const MAX_CHECKPOINT_SIZE=2*1024*1024; // ~2MB
 
-function defaultProject(){
-  return {name:'',ductbanks:[],conduits:[],trays:[],cables:[],settings:{session:{},collapsedGroups:{},units:'imperial'}};
-}
-
-function migrateProject(old={}){
-  const settings = old.settings || {
-    session: old.session || old.ctrSession || {},
-    collapsedGroups: old.collapsedGroups || {}
-  };
-  if(!settings.units) settings.units='imperial';
-  return {
-    name: old.name || '',
-    ductbanks: old.ductbanks || old.ductbankSchedule || [],
-    conduits: old.conduits || old.conduitSchedule || [],
-    trays: old.trays || old.traySchedule || [],
-    cables: old.cables || old.cableSchedule || [],
-    settings
-  };
-}
-
-function initProjectStorage(){
-  if(typeof localStorage==='undefined')return;
-  const realGet=localStorage.getItem.bind(localStorage);
-  const realSet=localStorage.setItem.bind(localStorage);
-  const realRemove=localStorage.removeItem.bind(localStorage);
-  globalThis._ctrRealSetItem=realSet;
-
-  const undoStack=[];
-  const redoStack=[];
-
-  function pushUndo(oldProj,newProj){
-    const patch=compare(newProj,oldProj);
-    if(patch.length){
-      undoStack.push(patch);
-      redoStack.length=0;
-    }
-  }
-
-  let project;
-  try{ project=JSON.parse(realGet(PROJECT_KEY)); }catch{ project=null; }
-  if(!project||typeof project!=='object'){
-    const old={
-      cables: JSON.parse(realGet('cableSchedule')||'[]'),
-      trays: JSON.parse(realGet('traySchedule')||'[]'),
-      conduits: JSON.parse(realGet('conduitSchedule')||'[]'),
-      ductbanks: JSON.parse(realGet('ductbankSchedule')||'[]'),
-      settings:{
-        session: JSON.parse(realGet('ctrSession')||'{}'),
-        collapsedGroups: JSON.parse(realGet('collapsedGroups')||'{}'),
-        conduitFillData: JSON.parse(realGet('conduitFillData')||'null'),
-        trayFillData: JSON.parse(realGet('trayFillData')||'null'),
-        ductbankSession: JSON.parse(realGet('ductbankSession')||'{}')
-      }
-    };
-    project=migrateProject(old);
-    try{realSet(PROJECT_KEY,JSON.stringify(project));}
-    catch(e){console.warn('project save failed',e);}
-  }
-
-  function save(){
-    try{realSet(PROJECT_KEY,JSON.stringify(project));}
-    catch(e){console.warn('project save failed',e);}
-    globalThis.updateProjectDisplay?.();
-  }
-
-  function setItem(key,value){
-    const oldProject=JSON.parse(JSON.stringify(project));
-    if(key===PROJECT_KEY){
-      try{realSet(key,value);}catch(e){console.warn('project save failed',e);}
-      return;
-    }
-    switch(key){
-      case 'cableSchedule': project.cables=JSON.parse(value); break;
-      case 'traySchedule': project.trays=JSON.parse(value); break;
-      case 'conduitSchedule': project.conduits=JSON.parse(value); break;
-      case 'ductbankSchedule': project.ductbanks=JSON.parse(value); break;
-      case 'collapsedGroups': project.settings.collapsedGroups=JSON.parse(value); break;
-      case 'ctrSession': project.settings.session=JSON.parse(value); break;
-      default:
-        if(!project.settings) project.settings={};
-        try{ project.settings[key]=JSON.parse(value); }
-        catch{ project.settings[key]=value; }
-    }
-    pushUndo(oldProject,project);
-    save();
-  }
-
-  function getItem(key){
-    if(key===PROJECT_KEY) return realGet(key);
-    switch(key){
-      case 'cableSchedule': return JSON.stringify(project.cables||[]);
-      case 'traySchedule': return JSON.stringify(project.trays||[]);
-      case 'conduitSchedule': return JSON.stringify(project.conduits||[]);
-      case 'ductbankSchedule': return JSON.stringify(project.ductbanks||[]);
-      case 'collapsedGroups': return JSON.stringify(project.settings?.collapsedGroups||{});
-      case 'ctrSession': return JSON.stringify(project.settings?.session||{});
-      default:
-        return project.settings&&key in project.settings ? JSON.stringify(project.settings[key]) : null;
-    }
-  }
-
-  function removeItem(key){
-    const oldProject=JSON.parse(JSON.stringify(project));
-    if(key===PROJECT_KEY){ realRemove(key); return; }
-    switch(key){
-      case 'cableSchedule': project.cables=[]; break;
-      case 'traySchedule': project.trays=[]; break;
-      case 'conduitSchedule': project.conduits=[]; break;
-      case 'ductbankSchedule': project.ductbanks=[]; break;
-      case 'collapsedGroups': delete project.settings.collapsedGroups; break;
-      case 'ctrSession': delete project.settings.session; break;
-      default:
-        if(project.settings) delete project.settings[key];
-    }
-    pushUndo(oldProject,project);
-    save();
-  }
-
-  localStorage.getItem=getItem;
-  localStorage.setItem=setItem;
-  localStorage.removeItem=removeItem;
-
-  globalThis.getProject=()=>JSON.parse(JSON.stringify(project));
-  globalThis.setProject=p=>{
-    const oldProject=JSON.parse(JSON.stringify(project));
-    project=migrateProject(p);
-    pushUndo(oldProject,project);
-    save();
-  };
-
-  globalThis.undoProject=()=>{
-    if(!undoStack.length) return;
-    const patch=undoStack.pop();
-    const current=JSON.parse(JSON.stringify(project));
-    const result=applyPatch(current,patch,true).newDocument;
-    redoStack.push(compare(result,project));
-    project=result;
-    save();
-  };
-
-  globalThis.redoProject=()=>{
-    if(!redoStack.length) return;
-    const patch=redoStack.pop();
-    const current=JSON.parse(JSON.stringify(project));
-    const result=applyPatch(current,patch,true).newDocument;
-    undoStack.push(compare(result,project));
-    project=result;
-    save();
-  };
-
-  globalThis.addEventListener('beforeunload',()=>{undoStack.length=0;redoStack.length=0;});
-}
-
-globalThis.migrateProject=migrateProject;
-loadJsonPatch().then(initProjectStorage).catch(e=>console.error('fast-json-patch load failed',e));
+initializeProjectStorage().catch(e=>console.error('fast-json-patch load failed',e));
 
 function canonicalize(obj){
   if(Array.isArray(obj)) return obj.map(canonicalize);
@@ -253,22 +83,21 @@ async function decodeProjectFromUrl(encoded){
 
 async function saveCheckpoint(){
   try{
-    const proj=getProject();
+    const proj=getProjectState();
     const json=canonicalJSONString(proj);
     const bytes=await compressString(json);
     if(bytes.length>MAX_CHECKPOINT_SIZE){
       alert('Checkpoint exceeds 2MB limit');
       return;
     }
-    globalThis._ctrRealSetItem?.(CHECKPOINT_KEY,bytesToBase64(bytes));
+    localStorage?.setItem(CHECKPOINT_KEY,bytesToBase64(bytes));
   }catch(e){
     console.error('Checkpoint save failed',e);
   }
 }
 
-async function updateProjectDisplay(){
-  if(typeof getProject!=='function') return;
-  const proj=getProject();
+async function updateProjectDisplay(snapshot){
+  const proj=snapshot||getProjectState();
   const name=proj.name||'Untitled';
   try{
     const hash=await sha256Hex(canonicalJSONString(proj));
@@ -289,10 +118,12 @@ async function updateProjectDisplay(){
   }catch(e){console.error('hash failed',e);}
 }
 globalThis.updateProjectDisplay=updateProjectDisplay;
+onProjectChange(updateProjectDisplay);
+updateProjectDisplay();
 
 async function copyShareLink(){
   try{
-    const proj=getProject?getProject():defaultProject();
+    const proj=getProjectState()||defaultProject();
     const canonical=canonicalJSONString(proj);
     const encoded=await encodeProjectForUrl(proj);
     const url=`${location.origin}${location.pathname}#project=${encoded}`;
@@ -316,7 +147,7 @@ async function loadProjectFromHash(){
     try{
       const data=location.hash.slice(9);
       const proj=await decodeProjectFromUrl(data);
-      if(globalThis.setProject) globalThis.setProject(proj);
+      setProjectState(proj);
       location.hash='';
       location.reload();
     }catch(e){console.error('load share failed',e);}
@@ -457,15 +288,15 @@ function initSettings(){
     const nameInput=document.createElement('input');
     nameInput.type='text';
     nameInput.id='project-name-input';
-    try{nameInput.value=getProject().name||'';}catch{}
+    try{nameInput.value=getProjectState().name||'';}catch{}
     nameLabel.appendChild(nameInput);
     settingsMenu.insertBefore(nameLabel,settingsMenu.firstChild);
     nameInput.addEventListener('input',e=>{
       try{
-        const proj=getProject();
+        const proj=getProjectState();
         proj.name=e.target.value;
-        setProject(proj);
-        updateProjectDisplay();
+        setProjectState(proj);
+        updateProjectDisplay(proj);
       }catch{}
     });
 
@@ -534,20 +365,19 @@ function initSettings(){
   }
   const unitSelect=document.getElementById('unit-select');
   if(unitSelect){
-    try{ unitSelect.value=getProject().settings?.units||'imperial'; }catch{}
+    try{ unitSelect.value=getProjectState().settings?.units||'imperial'; }catch{}
     unitSelect.addEventListener('change',e=>{
       try{
-        const proj=getProject();
+        const proj=getProjectState();
         proj.settings=proj.settings||{};
         proj.settings.units=e.target.value;
-        setProject(proj);
+        setProjectState(proj);
       }catch{}
       applyUnitLabels();
     });
   }
   applyUnitLabels();
   updateProjectDisplay();
-    window.addEventListener('storage',e=>{if(e.key===PROJECT_KEY) updateProjectDisplay();});
 }
 
 function initDarkMode(){
@@ -556,7 +386,7 @@ function initDarkMode(){
   if(session.darkMode===undefined){
     const prefersDark=window.matchMedia&&window.matchMedia('(prefers-color-scheme: dark)').matches;
     session.darkMode=prefersDark;
-    localStorage.setItem('ctrSession',JSON.stringify(session));
+    setProjectKey('ctrSession',JSON.stringify(session));
   }
   document.body.classList.toggle('dark-mode',session.darkMode);
   if(darkToggle) darkToggle.checked=!!session.darkMode;
@@ -564,7 +394,7 @@ function initDarkMode(){
     darkToggle.addEventListener('change',()=>{
       document.body.classList.toggle('dark-mode',darkToggle.checked);
       session.darkMode=darkToggle.checked;
-      localStorage.setItem('ctrSession',JSON.stringify(session));
+      setProjectKey('ctrSession',JSON.stringify(session));
       if(typeof window.saveSession==='function') window.saveSession();
       if(typeof window.saveDuctbankSession==='function') window.saveDuctbankSession();
     });
@@ -585,7 +415,7 @@ function initCompactMode(){
   const session=JSON.parse(localStorage.getItem('ctrSession')||'{}');
   if(session.compactMode===undefined){
     session.compactMode=false;
-    localStorage.setItem('ctrSession',JSON.stringify(session));
+    setProjectKey('ctrSession',JSON.stringify(session));
   }
   document.body.classList.toggle('compact-mode',session.compactMode);
   if(compactToggle) compactToggle.checked=!!session.compactMode;
@@ -593,7 +423,7 @@ function initCompactMode(){
     compactToggle.addEventListener('change',()=>{
       document.body.classList.toggle('compact-mode',compactToggle.checked);
       session.compactMode=compactToggle.checked;
-      localStorage.setItem('ctrSession',JSON.stringify(session));
+      setProjectKey('ctrSession',JSON.stringify(session));
       if(typeof window.saveSession==='function') window.saveSession();
       if(typeof window.saveDuctbankSession==='function') window.saveDuctbankSession();
     });
