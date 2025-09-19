@@ -2,6 +2,7 @@ import "./units.js";
 import { exportProject, importProject, getOneLine, getStudies, loadProject, getDuctbanks, getConduits } from "./dataStore.mjs";
 import { runValidation } from "./validation/rules.js";
 import { PROJECT_KEY, defaultProject, initializeProjectStorage, getProjectState, setProjectState, setProjectKey, onProjectChange } from "./projectStorage.js";
+import { openModal, showAlertModal } from "./src/components/modal.js";
 
 const FOCUSABLE="a[href],button:not([disabled]),textarea:not([disabled]),input:not([disabled]),select:not([disabled]),[tabindex]:not([tabindex='-1'])";
 const CHECKPOINT_KEY='CTR_CHECKPOINT';
@@ -87,7 +88,7 @@ async function saveCheckpoint(){
     const json=canonicalJSONString(proj);
     const bytes=await compressString(json);
     if(bytes.length>MAX_CHECKPOINT_SIZE){
-      alert('Checkpoint exceeds 2MB limit');
+      await showAlertModal('Checkpoint Too Large', 'The checkpoint exceeds the 2MB limit. Reduce project data before saving again.');
       return;
     }
     localStorage?.setItem(CHECKPOINT_KEY,bytesToBase64(bytes));
@@ -273,15 +274,65 @@ export const __projectDisplaySave=save;
 onProjectChange(save);
 save(null,{flush:true,reason:'initial-render'});
 
+async function showShareLinkModal(url,{copied=true}={}){
+  if(typeof document==='undefined') return;
+  const inputId=`share-link-${Math.random().toString(36).slice(2)}`;
+  const description=copied?
+    'Share link copied to clipboard. You can also copy it manually below.':
+    'Clipboard access is unavailable. Copy the link below to share the project.';
+  await openModal({
+    title:'Share Project',
+    description,
+    primaryText:'Close',
+    secondaryText:null,
+    onSubmit(){return true;},
+    render(container,controls){
+      const doc=container.ownerDocument;
+      const wrapper=doc.createElement('div');
+      wrapper.className='modal-form';
+      const label=doc.createElement('label');
+      label.setAttribute('for',inputId);
+      label.textContent='Share URL';
+      const input=doc.createElement('input');
+      input.type='text';
+      input.id=inputId;
+      input.value=url;
+      input.readOnly=true;
+      input.addEventListener('focus',()=>input.select());
+      label.appendChild(input);
+      wrapper.appendChild(label);
+      const note=doc.createElement('p');
+      note.className='modal-message';
+      note.id=`${inputId}-note`;
+      note.textContent=copied?'Use this link to collaborate with your team.':'Select the link and use Ctrl+C (or ⌘C) to copy it.';
+      const described=[controls.descriptionId,note.id].filter(Boolean).join(' ').trim();
+      if(described) input.setAttribute('aria-describedby',described);
+      wrapper.appendChild(note);
+      container.appendChild(wrapper);
+      controls.setInitialFocus(input);
+      return input;
+    }
+  });
+}
+
 async function copyShareLink(){
+  let shareUrl='';
   try{
     const proj=getProjectState()||defaultProject();
     const canonical=canonicalJSONString(proj);
     const encoded=await encodeProjectForUrl(proj);
-    const url=`${location.origin}${location.pathname}#project=${encoded}`;
-    if(url.length<2000){
-      await navigator.clipboard.writeText(url);
-      alert('Share link copied to clipboard');
+    shareUrl=`${location.origin}${location.pathname}#project=${encoded}`;
+    if(shareUrl.length<2000){
+      let copied=false;
+      if(typeof navigator!=='undefined'&&navigator.clipboard?.writeText){
+        try{
+          await navigator.clipboard.writeText(shareUrl);
+          copied=true;
+        }catch(err){
+          console.warn('Clipboard copy failed',err);
+        }
+      }
+      await showShareLinkModal(shareUrl,{copied});
     }else{
       const blob=new Blob([canonical],{type:'application/json'});
       const a=document.createElement('a');
@@ -289,9 +340,16 @@ async function copyShareLink(){
       a.download='project.ctr.json';
       a.click();
       setTimeout(()=>URL.revokeObjectURL(a.href),0);
-      alert('Project too large for link; downloaded instead');
+      await showAlertModal('Download Ready','The project is too large to share as a link. A download has started instead.');
     }
-  }catch(e){console.error('share link failed',e);}
+  }catch(e){
+    console.error('share link failed',e);
+    if(shareUrl){
+      await showShareLinkModal(shareUrl,{copied:false});
+    }else{
+      await showAlertModal('Share Failed','We could not generate a share link. Please try again.');
+    }
+  }
 }
 
 async function loadProjectFromHash(){
@@ -473,7 +531,7 @@ function initSettings(){
     refreshLibBtn.addEventListener('click',async()=>{
       if(typeof globalThis.loadComponentLibrary==='function') await globalThis.loadComponentLibrary();
       if(typeof globalThis.loadManufacturerLibrary==='function') await globalThis.loadManufacturerLibrary();
-      alert('Library refreshed');
+      await showAlertModal('Library Refreshed','Component and manufacturer libraries were reloaded.');
     });
 
     const reportBtn=document.createElement('button');
