@@ -84,6 +84,7 @@ export function exportPanelSchedule(panelId) {
   data.push(['System Type', systemType]);
   data.push(['Phases', panel.phases || panel.phaseCount || '']);
   data.push(['Main Rating (A)', panel.mainRating || panel.main_rating || '']);
+  data.push(['Short-Circuit Rating (A)', panel.shortCircuitRating || panel.shortCircuitCurrentRating || '']);
   const circuitCount = getPanelCircuitCount(panel);
   data.push(['Circuit Count', circuitCount]);
   data.push([]);
