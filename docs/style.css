@@ -2811,7 +2811,128 @@ body.dark-mode .panel-breaker-toolbox-item {
 }
 
 .panel-cell {
-    width: 50%;
+    width: 45%;
+}
+
+.panel-device-header {
+    width: 10%;
+    text-align: center;
+    font-weight: 600;
+}
+
+.panel-device-cell {
+    width: 10%;
+    padding: 0.75rem 0.5rem;
+    vertical-align: top;
+}
+
+.panel-device-wrapper {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 0.5rem;
+    justify-items: center;
+    align-items: stretch;
+}
+
+.panel-device-slot {
+    display: flex;
+    justify-content: center;
+    align-items: stretch;
+    min-height: 8rem;
+    padding: 0 0.25rem;
+}
+
+.panel-device-slot--odd {
+    justify-content: flex-end;
+}
+
+.panel-device-slot--even {
+    justify-content: flex-start;
+}
+
+.panel-device {
+    position: relative;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 0.35rem;
+    padding: 0.5rem 0.4rem;
+    border: 1px solid var(--border-color);
+    border-radius: 6px;
+    background: var(--secondary-color);
+    color: var(--text-color);
+    min-width: 3.25rem;
+    max-width: 6.5rem;
+    box-shadow: 0 1px 2px rgba(0, 0, 0, 0.05);
+}
+
+body.dark-mode .panel-device {
+    background: rgba(255, 255, 255, 0.08);
+    box-shadow: none;
+}
+
+.panel-device-graphic {
+    position: relative;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    min-height: 2.25rem;
+}
+
+.panel-device-handles {
+    display: flex;
+    flex-direction: column;
+    gap: 0.25rem;
+    align-items: center;
+}
+
+.panel-device-handle {
+    width: 0.6rem;
+    height: 0.95rem;
+    border-radius: 2px;
+    background: var(--primary-color);
+    box-shadow: inset 0 -2px 0 rgba(0, 0, 0, 0.15);
+}
+
+.panel-device--fuse .panel-device-handle {
+    width: 0.75rem;
+    height: 0.75rem;
+    border-radius: 999px;
+    background: #f5b041;
+    box-shadow: inset 0 -2px 0 rgba(0, 0, 0, 0.15);
+}
+
+body.dark-mode .panel-device--fuse .panel-device-handle {
+    background: #f3c678;
+}
+
+.panel-device-tie {
+    position: absolute;
+    top: 0.25rem;
+    bottom: 0.25rem;
+    width: 0.2rem;
+    border-radius: 999px;
+    background: rgba(0, 0, 0, 0.35);
+}
+
+body.dark-mode .panel-device-tie {
+    background: rgba(255, 255, 255, 0.35);
+}
+
+.panel-device-label {
+    font-size: 0.75rem;
+    font-weight: 600;
+    text-align: center;
+    line-height: 1.1;
+    word-break: break-word;
+}
+
+.panel-device-subtext {
+    font-size: 0.65rem;
+    opacity: 0.7;
+    text-align: center;
+    line-height: 1.1;
+    word-break: break-word;
 }
 
 .panel-slot {
@@ -2969,6 +3090,32 @@ body.dark-mode .panel-slot-add-btn {
     display: flex;
     flex-direction: column;
     gap: 0.5rem;
+}
+
+.panel-slot-device-config {
+    display: grid;
+    gap: 0.5rem;
+    grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
+}
+
+.panel-slot-field {
+    display: flex;
+    flex-direction: column;
+    gap: 0.25rem;
+    font-size: 0.75rem;
+}
+
+.panel-slot-input {
+    width: 100%;
+    padding: 0.35rem 0.5rem;
+    border: 1px solid var(--border-color);
+    border-radius: 4px;
+    background: var(--secondary-color);
+    color: var(--text-color);
+}
+
+body.dark-mode .panel-slot-input {
+    background: #2c3034;
 }
 
 .panel-slot-select {

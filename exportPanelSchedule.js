@@ -183,6 +183,7 @@ export function exportPanelSchedule(panelId) {
 
   const data = [];
   data.push(['Panel', panelLabel || panelId]);
+  data.push(['Fed From', panel.fedFrom || panel.fed_from || '']);
   data.push(['Voltage', panel.voltage || panel.voltage_rating || '']);
   data.push(['System Type', systemType === 'dc' ? 'DC' : 'AC']);
   data.push(['Phases', panel.phases || panel.phaseCount || '']);
