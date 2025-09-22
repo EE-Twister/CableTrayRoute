@@ -49,7 +49,11 @@ import { createTable, STORAGE_KEYS } from './tableUtils.mjs';
 const { sizeToArea } = ampacity;
 
 suppressResumeIfE2E();
-document.addEventListener('DOMContentLoaded', forceShowResumeIfE2E);
+if (document.readyState === 'loading') {
+  document.addEventListener('DOMContentLoaded', forceShowResumeIfE2E, { once: true });
+} else {
+  forceShowResumeIfE2E();
+}
 
 // Initialize Cable Schedule page logic
 // This file mirrors the inline script previously embedded in
@@ -57,7 +61,7 @@ document.addEventListener('DOMContentLoaded', forceShowResumeIfE2E);
 // build (src/cableschedule.js -> dist/cableschedule.js) actually includes the
 // behaviour needed to populate the schedule table.
 
-window.addEventListener('DOMContentLoaded', async () => {
+async function initCableSchedule() {
   const logContainer = document.getElementById('console-log');
   if (logContainer) {
     ['log', 'warn', 'error'].forEach(level => {
@@ -423,4 +427,10 @@ window.addEventListener('DOMContentLoaded', async () => {
   window.getCableSchedule = getCableSchedule;
   window.dispatchEvent(new Event('cableschedule-ready'));
   window.__CableScheduleInitOK = true;
-});
+}
+
+if (document.readyState === 'loading') {
+  window.addEventListener('DOMContentLoaded', initCableSchedule, { once: true });
+} else {
+  initCableSchedule();
+}
