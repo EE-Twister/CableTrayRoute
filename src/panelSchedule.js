@@ -255,13 +255,19 @@ export function assignLoadToBreaker(panelId, loadIndex, breaker) {
   const load = loads[loadIndex];
   const loadTag = load.ref || load.id || load.tag;
   const circuitCount = panel ? getPanelCircuitCount(panel) : 0;
-  const span = getLoadBreakerSpan({ ...load, breaker }, panel, circuitCount);
+  const loadWithBreaker = { ...load, breaker };
+  const span = getLoadBreakerSpan(loadWithBreaker, panel, circuitCount);
   if (!span.length) {
     alert("Unable to assign load: invalid breaker selection.");
     return;
   }
+  const requiredPoles = Math.max(1, getLoadPoleCount(loadWithBreaker, panel));
   if (circuitCount && span[span.length - 1] > circuitCount) {
-    alert(`Breaker selection requires ${span.length} adjacent circuits but exceeds the panel's circuit count.`);
+    alert(`Breaker selection requires ${requiredPoles} adjacent circuits but exceeds the panel's circuit count.`);
+    return;
+  }
+  if (span.length !== requiredPoles) {
+    alert(`Breaker selection requires ${requiredPoles} adjacent circuits but only ${span.length} are available before the panel ends.`);
     return;
   }
   const conflict = loads.find((candidate, idx) => {
@@ -297,8 +303,8 @@ export function assignLoadToBreaker(panelId, loadIndex, breaker) {
   });
   load.panelId = panelId;
   load.breaker = breaker;
-  if (span.length > 1) {
-    load.breakerPoles = span.length;
+  if (requiredPoles > 1) {
+    load.breakerPoles = requiredPoles;
   } else {
     delete load.breakerPoles;
   }
