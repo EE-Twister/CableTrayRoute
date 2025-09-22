@@ -52,9 +52,39 @@ function getOrCreatePanel(panelId) {
 const DC_PHASE_LABELS = ["+", "−"];
 const SINGLE_PHASE_LABELS = ["A", "B"];
 const THREE_PHASE_LABELS = ["A", "B", "C"];
+const FALLBACK_DC_SEQUENCE = ["+", "−"];
+
+function resolveDcSequence(sequence) {
+  if (Array.isArray(sequence) && sequence.length >= 2) {
+    return sequence;
+  }
+  return FALLBACK_DC_SEQUENCE;
+}
+
+function getDcPolarityForCircuit(circuit, sequence = DC_PHASE_LABELS) {
+  const slot = Number.parseInt(circuit, 10);
+  if (!Number.isFinite(slot) || slot < 1) return "";
+  const normalized = resolveDcSequence(sequence);
+  const positive = normalized[0] ?? FALLBACK_DC_SEQUENCE[0];
+  const negative = normalized[1] ?? FALLBACK_DC_SEQUENCE[1];
+  const rowIndex = Math.floor((slot - 1) / 2);
+  const label = rowIndex % 2 === 0 ? positive : negative;
+  return label == null ? "" : String(label);
+}
+
+function getMaxBranchPoleCount(system) {
+  return system === "dc" ? 2 : 3;
+}
 
 function getAllowedBranchPoleCounts(system) {
-  return system === "dc" ? [1, 2] : [1, 2, 3];
+  const max = getMaxBranchPoleCount(system);
+  return Array.from({ length: Math.max(1, max) }, (_, idx) => idx + 1);
+}
+
+function clampBreakerPolesForSystem(system, poles) {
+  if (!Number.isFinite(poles) || poles < 1) return 1;
+  const max = getMaxBranchPoleCount(system);
+  return Math.min(poles, Math.max(1, max));
 }
 
 function parsePositiveInt(value) {
@@ -77,7 +107,7 @@ function getPanelSystem(panel) {
 
 function getPanelPhaseSequence(panel) {
   const system = getPanelSystem(panel);
-  if (system === "dc") return DC_PHASE_LABELS;
+  if (system === "dc") return resolveDcSequence(DC_PHASE_LABELS);
   const phases = parseInt(panel?.phases, 10);
   if (Number.isFinite(phases)) {
     if (phases <= 1) return SINGLE_PHASE_LABELS;
@@ -192,6 +222,10 @@ function ensurePanelBreakerLayout(panel, circuitCount) {
   const normalized = new Array(count).fill(null);
   let changed = false;
   const details = panel ? ensureBreakerDetails(panel) : {};
+  const system = getPanelSystem(panel);
+  const isDcPanel = system === "dc";
+  const maxPoles = getMaxBranchPoleCount(system);
+  const trimmedSlots = new Set();
 
   const blocks = new Map();
   for (let i = 0; i < prevLayout.length; i++) {
@@ -213,8 +247,21 @@ function ensurePanelBreakerLayout(panel, circuitCount) {
       continue;
     }
     const existing = blocks.get(start);
-    if (!existing || existing.size < size) {
-      blocks.set(start, { start, size });
+    let normalizedSize = size;
+    if (isDcPanel && Number.isFinite(maxPoles) && normalizedSize > maxPoles) {
+      if (position === 0) {
+        const spanToTrim = computeBreakerSpan(start, normalizedSize, count);
+        if (spanToTrim.length > maxPoles) {
+          for (let idx = maxPoles; idx < spanToTrim.length; idx++) {
+            trimmedSlots.add(spanToTrim[idx]);
+          }
+        }
+      }
+      normalizedSize = maxPoles;
+      changed = true;
+    }
+    if (!existing || existing.size < normalizedSize) {
+      blocks.set(start, { start, size: normalizedSize });
     }
   }
 
@@ -263,6 +310,14 @@ function ensurePanelBreakerLayout(panel, circuitCount) {
   }
 
   panel.breakerLayout = normalized;
+  if (trimmedSlots.size && Array.isArray(panel.breakers)) {
+    trimmedSlots.forEach(slot => {
+      const index = slot - 1;
+      if (index >= 0 && index < panel.breakers.length) {
+        panel.breakers[index] = null;
+      }
+    });
+  }
   if (panel) {
     const validStarts = new Set();
     normalized.forEach(entry => {
@@ -342,9 +397,7 @@ function getPhaseLabel(panel, breaker) {
   if (!Number.isFinite(index) || index < 1) return "";
   const system = getPanelSystem(panel);
   if (system === "dc") {
-    const rowIndex = Math.floor((index - 1) / 2);
-    const phase = sequence[rowIndex % sequence.length];
-    return phase || "";
+    return getDcPolarityForCircuit(index, sequence);
   }
   if (sequence.length === 3 && system === "ac") {
     const rowIndex = Math.floor((index - 1) / 2);
@@ -404,6 +457,21 @@ function getLoadBreakerSpan(load, panel, circuitCount) {
 
   const poles = Math.max(1, getLoadPoleCount(load, panel));
   return computeBreakerSpan(start, poles, limit);
+}
+
+function sanitizeDcLoadBreakerPoles(loads, panel, panelId) {
+  if (!Array.isArray(loads)) return false;
+  if (!panel || getPanelSystem(panel) !== "dc") return false;
+  let mutated = false;
+  loads.forEach(load => {
+    if (!load || load.panelId !== panelId) return;
+    const parsed = parsePositiveInt(load.breakerPoles);
+    if (parsed && parsed > 2) {
+      load.breakerPoles = 2;
+      mutated = true;
+    }
+  });
+  return mutated;
 }
 
 function ensurePanelBreakerCapacity(panel, circuitCount) {
@@ -685,9 +753,15 @@ function render(panelId = "P1") {
   ensurePanelBreakerCapacity(panel, circuitCount);
   const { changed: layoutAdjusted } = ensurePanelBreakerLayout(panel, circuitCount);
   const loads = dataStore.getLoads();
+  const sanitizedLoads = sanitizeDcLoadBreakerPoles(loads, panel, panelId);
   const seeded = initializeLayoutFromLoads(panel, panelId, loads, circuitCount);
   if (layoutAdjusted || seeded) {
     dataStore.setPanels(panels);
+  }
+  if (sanitizedLoads) {
+    dataStore.setLoads(loads);
+  }
+  if (layoutAdjusted || seeded || sanitizedLoads) {
     dataStore.saveProject(projectId);
   }
   const system = getPanelSystem(panel);
@@ -1299,8 +1373,7 @@ window.addEventListener("DOMContentLoaded", () => {
     let size = Number.parseInt(poles, 10);
     if (!Number.isFinite(size) || size < 1) size = 1;
     const systemType = getPanelSystem(panel);
-    const maxPoles = systemType === "dc" ? 2 : 3;
-    if (size > maxPoles) size = maxPoles;
+    size = clampBreakerPolesForSystem(systemType, size);
     const count = getPanelCircuitCount(panel);
     ensurePanelBreakerCapacity(panel, count);
     const { layout } = ensurePanelBreakerLayout(panel, count);

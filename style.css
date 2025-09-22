@@ -2894,6 +2894,24 @@ body.dark-mode .panel-device {
     box-shadow: inset 0 -2px 0 rgba(0, 0, 0, 0.15);
 }
 
+.panel-device--dc-positive {
+    border-color: #c62828;
+}
+
+body.dark-mode .panel-device--dc-positive {
+    border-color: #ef5350;
+}
+
+.panel-device--dc-positive .panel-device-label,
+.panel-device--dc-positive .panel-device-subtext {
+    color: #c62828;
+}
+
+body.dark-mode .panel-device--dc-positive .panel-device-label,
+body.dark-mode .panel-device--dc-positive .panel-device-subtext {
+    color: #ef9a9a;
+}
+
 .panel-device--dc-positive .panel-device-handle {
     background: #c62828;
 }
