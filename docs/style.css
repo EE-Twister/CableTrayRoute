@@ -2742,6 +2742,54 @@ body.dark-mode .panel-phase-summary-chip {
     background: rgba(255, 255, 255, 0.1);
 }
 
+.panel-breaker-toolbox {
+    display: flex;
+    flex-direction: column;
+    gap: 0.35rem;
+    margin-bottom: 1rem;
+    padding: 0.75rem;
+    border: 1px solid var(--border-color);
+    border-radius: 6px;
+    background: var(--secondary-color);
+}
+
+body.dark-mode .panel-breaker-toolbox {
+    background: rgba(255, 255, 255, 0.05);
+}
+
+.panel-breaker-toolbox-title {
+    font-weight: 600;
+}
+
+.panel-breaker-toolbox-help {
+    font-size: 0.85rem;
+    opacity: 0.8;
+}
+
+.panel-breaker-toolbox-items {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.75rem;
+    margin-top: 0.5rem;
+}
+
+.panel-breaker-toolbox-item {
+    padding: 0.5rem 0.75rem;
+    border: 1px dashed var(--border-color);
+    border-radius: 4px;
+    background: rgba(0, 0, 0, 0.04);
+    cursor: grab;
+    user-select: none;
+}
+
+body.dark-mode .panel-breaker-toolbox-item {
+    background: rgba(255, 255, 255, 0.1);
+}
+
+.panel-breaker-toolbox-item:active {
+    cursor: grabbing;
+}
+
 .panel-schedule-table {
     width: 100%;
     table-layout: fixed;
@@ -2779,6 +2827,15 @@ body.dark-mode .panel-phase-summary-chip {
     box-shadow: 0 2px 4px rgba(0, 0, 0, 0.04);
 }
 
+.panel-slot--blank {
+    border-style: dashed;
+    background: rgba(0, 0, 0, 0.02);
+}
+
+body.dark-mode .panel-slot--blank {
+    background: rgba(255, 255, 255, 0.05);
+}
+
 body.dark-mode .panel-slot {
     background: rgba(255, 255, 255, 0.05);
     box-shadow: none;
@@ -2805,6 +2862,11 @@ body.dark-mode .panel-slot {
     box-shadow: inset 4px 0 0 var(--panel-phase-neg);
 }
 
+.panel-slot--drop-hover {
+    outline: 2px solid var(--primary-color);
+    outline-offset: 2px;
+}
+
 .panel-slot--locked .panel-slot-control {
     justify-content: space-between;
 }
@@ -2824,6 +2886,70 @@ body.dark-mode .panel-slot-locked {
     background: rgba(255, 255, 255, 0.08);
 }
 
+.panel-slot-control--blank {
+    align-items: stretch;
+}
+
+.panel-slot-dropzone {
+    padding: 0.75rem;
+    border: 1px dashed var(--border-color);
+    border-radius: 4px;
+    text-align: center;
+    font-size: 0.9rem;
+    background: rgba(0, 0, 0, 0.03);
+}
+
+body.dark-mode .panel-slot-dropzone {
+    background: rgba(255, 255, 255, 0.08);
+}
+
+.panel-slot-quick-add {
+    display: flex;
+    gap: 0.5rem;
+    flex-wrap: wrap;
+}
+
+.panel-slot-add-btn {
+    padding: 0.35rem 0.75rem;
+    border-radius: 4px;
+    border: 1px solid var(--border-color);
+    background: var(--secondary-color);
+    color: var(--text-color);
+    font-size: 0.8rem;
+    cursor: pointer;
+}
+
+.panel-slot-add-btn:hover,
+.panel-slot-add-btn:focus {
+    background: var(--primary-color);
+    color: #fff;
+}
+
+body.dark-mode .panel-slot-add-btn {
+    background: rgba(255, 255, 255, 0.05);
+}
+
+.panel-slot-breaker-info {
+    font-size: 0.85rem;
+    font-weight: 600;
+}
+
+.panel-slot-remove {
+    align-self: flex-start;
+    padding: 0.35rem 0.75rem;
+    border-radius: 4px;
+    border: 1px solid var(--border-color);
+    background: transparent;
+    color: var(--text-color);
+    font-size: 0.75rem;
+    cursor: pointer;
+}
+
+.panel-slot-remove[disabled] {
+    opacity: 0.6;
+    cursor: not-allowed;
+}
+
 .panel-slot-header {
     display: flex;
     justify-content: space-between;
@@ -2841,6 +2967,8 @@ body.dark-mode .panel-slot-locked {
 
 .panel-slot-control {
     display: flex;
+    flex-direction: column;
+    gap: 0.5rem;
 }
 
 .panel-slot-select {
@@ -2861,6 +2989,23 @@ body.dark-mode .panel-slot-select {
     flex-direction: column;
     gap: 0.35rem;
     min-height: 3.25rem;
+}
+
+.panel-slot-phase-load {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.5rem;
+    font-size: 0.75rem;
+}
+
+.panel-slot-phase-chip {
+    padding: 0.15rem 0.5rem;
+    border-radius: 999px;
+    background: rgba(0, 0, 0, 0.05);
+}
+
+body.dark-mode .panel-slot-phase-chip {
+    background: rgba(255, 255, 255, 0.1);
 }
 
 .panel-slot-desc {
