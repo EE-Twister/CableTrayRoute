@@ -2805,6 +2805,25 @@ body.dark-mode .panel-slot {
     box-shadow: inset 4px 0 0 var(--panel-phase-neg);
 }
 
+.panel-slot--locked .panel-slot-control {
+    justify-content: space-between;
+}
+
+.panel-slot-locked {
+    width: 100%;
+    padding: 0.35rem 0.5rem;
+    border: 1px dashed var(--border-color);
+    border-radius: 4px;
+    font-size: 0.8rem;
+    background: rgba(0, 0, 0, 0.03);
+    color: inherit;
+}
+
+body.dark-mode .panel-slot-locked {
+    border-color: rgba(255, 255, 255, 0.3);
+    background: rgba(255, 255, 255, 0.08);
+}
+
 .panel-slot-header {
     display: flex;
     justify-content: space-between;

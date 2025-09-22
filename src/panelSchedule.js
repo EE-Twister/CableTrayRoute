@@ -28,6 +28,19 @@ const DC_PHASE_LABELS = ["+", "−"];
 const SINGLE_PHASE_LABELS = ["A", "B"];
 const THREE_PHASE_LABELS = ["A", "B", "C"];
 
+function parsePositiveInt(value) {
+  if (value == null) return null;
+  const parsed = Number.parseInt(value, 10);
+  return Number.isFinite(parsed) && parsed > 0 ? parsed : null;
+}
+
+function getPanelCircuitCount(panel) {
+  const explicit = parsePositiveInt(panel?.circuitCount);
+  if (explicit) return explicit;
+  if (Array.isArray(panel?.breakers)) return panel.breakers.length;
+  return 42;
+}
+
 function getPanelSystem(panel) {
   const raw = (panel?.powerType || panel?.systemType || panel?.type || "").toString().toLowerCase();
   return raw === "dc" ? "dc" : "ac";
@@ -56,6 +69,77 @@ function getPhaseLabel(panel, breaker) {
     return sequence[rowIndex % sequence.length];
   }
   return sequence[(index - 1) % sequence.length];
+}
+
+function getLoadPoleCount(load, panel) {
+  if (!load) return 1;
+  const system = getPanelSystem(panel);
+  const candidates = [
+    load.breakerPoles,
+    load.poles,
+    load.poleCount,
+    load.phaseCount,
+    load.phases
+  ];
+  for (const candidate of candidates) {
+    const parsed = parsePositiveInt(candidate);
+    if (!parsed) continue;
+    if (system === "dc") return Math.min(parsed, 2);
+    if (system === "ac") {
+      if (parsed >= 3) return 3;
+      if (parsed === 2) return 2;
+      return 1;
+    }
+    return parsed;
+  }
+  return 1;
+}
+
+function getLoadBreakerSpan(load, panel, circuitCount) {
+  const start = parsePositiveInt(load?.breaker);
+  if (!start) return [];
+  const poles = Math.max(1, getLoadPoleCount(load, panel));
+  const limit = Number.isFinite(circuitCount) && circuitCount > 0 ? circuitCount : null;
+  const span = [];
+  for (let offset = 0; offset < poles; offset++) {
+    const slot = start + offset;
+    if (limit && slot > limit) break;
+    span.push(slot);
+  }
+  return span;
+}
+
+function ensurePanelBreakerCapacity(panel, circuitCount) {
+  if (!panel) return;
+  if (!Array.isArray(panel.breakers)) panel.breakers = [];
+  if (!Number.isFinite(circuitCount) || circuitCount <= 0) return;
+  if (panel.breakers.length >= circuitCount) return;
+  for (let i = panel.breakers.length; i < circuitCount; i++) {
+    panel.breakers[i] = null;
+  }
+}
+
+function clearPanelBreakerAssignments(panel, loadTag) {
+  if (!panel || !Array.isArray(panel.breakers) || !loadTag) return;
+  for (let i = 0; i < panel.breakers.length; i++) {
+    if (panel.breakers[i] === loadTag) {
+      panel.breakers[i] = null;
+    }
+  }
+}
+
+function applyPanelBreakerAssignments(panel, loadTag, span) {
+  if (!panel || !Array.isArray(panel.breakers) || !loadTag) return;
+  span.forEach(slot => {
+    const index = slot - 1;
+    if (index >= 0 && index < panel.breakers.length) {
+      panel.breakers[index] = loadTag;
+    }
+  });
+}
+
+function getLoadDisplayId(load) {
+  return load?.ref || load?.id || load?.tag || null;
 }
 
 function formatLoadLabel(load, index) {
@@ -113,33 +197,23 @@ function createPhaseSummary(panel, panelId, loads, circuitCount) {
     totals[phase] = 0;
   });
 
-  const loadByBreaker = new Map();
+  const seenLoads = new Set();
+  const totalBreakers = Number.isFinite(circuitCount) && circuitCount > 0 ? circuitCount : panel.breakers?.length || 0;
   loads.forEach(load => {
     if (load.panelId !== panelId) return;
-    const breakerNumber = Number(load.breaker);
-    if (!Number.isFinite(breakerNumber) || breakerNumber < 1) return;
-    if (circuitCount && breakerNumber > circuitCount) return;
-    loadByBreaker.set(breakerNumber, load);
-  });
-
-  if (Array.isArray(panel.breakers)) {
-    for (let i = 0; i < panel.breakers.length && i < circuitCount; i++) {
-      if (loadByBreaker.has(i + 1)) continue;
-      const tag = panel.breakers[i];
-      if (!tag) continue;
-      const load = loads.find(l => (l.ref || l.id || l.tag) === tag);
-      if (load) {
-        loadByBreaker.set(i + 1, load);
-      }
-    }
-  }
-
-  loadByBreaker.forEach((load, breakerNumber) => {
-    const phase = getPhaseLabel(panel, breakerNumber);
-    if (!phase) return;
+    const id = getLoadDisplayId(load) || `idx-${loads.indexOf(load)}`;
+    if (seenLoads.has(id)) return;
+    seenLoads.add(id);
+    const span = getLoadBreakerSpan(load, panel, totalBreakers);
+    if (!span.length) return;
     const value = getPhasePowerValue(load, system);
     if (value == null) return;
-    totals[phase] += value;
+    const share = span.length > 0 ? value / span.length : value;
+    span.forEach(slot => {
+      const phase = getPhaseLabel(panel, slot);
+      if (!phase) return;
+      totals[phase] += share;
+    });
   });
 
   const summary = document.createElement("div");
@@ -180,30 +254,56 @@ export function assignLoadToBreaker(panelId, loadIndex, breaker) {
   const panel = panels.find(p => p.id === panelId || p.ref === panelId || p.panel_id === panelId);
   const load = loads[loadIndex];
   const loadTag = load.ref || load.id || load.tag;
+  const circuitCount = panel ? getPanelCircuitCount(panel) : 0;
+  const span = getLoadBreakerSpan({ ...load, breaker }, panel, circuitCount);
+  if (!span.length) {
+    alert("Unable to assign load: invalid breaker selection.");
+    return;
+  }
+  if (circuitCount && span[span.length - 1] > circuitCount) {
+    alert(`Breaker selection requires ${span.length} adjacent circuits but exceeds the panel's circuit count.`);
+    return;
+  }
+  const conflict = loads.find((candidate, idx) => {
+    if (idx === loadIndex) return false;
+    if (candidate.panelId !== panelId) return false;
+    const otherSpan = getLoadBreakerSpan(candidate, panel, circuitCount);
+    if (!otherSpan.length) return false;
+    return otherSpan.some(slot => span.includes(slot));
+  });
+  if (conflict) {
+    alert(`Cannot assign load: circuits conflict with ${formatLoadLabel(conflict, loads.indexOf(conflict))}.`);
+    return;
+  }
   // remove existing assignment of this load
   if (load.panelId) {
     const prev = panels.find(p => p.id === load.panelId || p.ref === load.panelId || p.panel_id === load.panelId);
     if (prev && Array.isArray(prev.breakers)) {
-      prev.breakers = prev.breakers.map(b => (b === loadTag ? null : b));
+      clearPanelBreakerAssignments(prev, loadTag);
     }
   }
   // clear any existing assignment on this breaker for the panel
   if (panel) {
-    if (!Array.isArray(panel.breakers)) panel.breakers = [];
-    panel.breakers[breaker - 1] = null;
-    // also remove any other breaker referencing this load
-    panel.breakers = panel.breakers.map(b => (b === loadTag ? null : b));
+    const count = getPanelCircuitCount(panel);
+    ensurePanelBreakerCapacity(panel, count);
+    clearPanelBreakerAssignments(panel, loadTag);
   }
   loads.forEach(l => {
     if (l.panelId === panelId && l.breaker === breaker) {
       delete l.panelId;
       delete l.breaker;
+      delete l.breakerPoles;
     }
   });
   load.panelId = panelId;
   load.breaker = breaker;
+  if (span.length > 1) {
+    load.breakerPoles = span.length;
+  } else {
+    delete load.breakerPoles;
+  }
   if (panel) {
-    panel.breakers[breaker - 1] = loadTag;
+    applyPanelBreakerAssignments(panel, loadTag, span);
     dataStore.setPanels(panels);
   }
   dataStore.setLoads(loads);
@@ -240,7 +340,8 @@ function render(panelId = "P1") {
   if (!container) return;
   container.innerHTML = "";
 
-  const circuitCount = Number(panel.circuitCount) || panel.breakers?.length || 42;
+  const circuitCount = getPanelCircuitCount(panel);
+  ensurePanelBreakerCapacity(panel, circuitCount);
   const loads = dataStore.getLoads();
   const system = getPanelSystem(panel);
   const sequence = getPanelPhaseSequence(panel);
@@ -331,29 +432,82 @@ function createCircuitCell(panel, panelId, loads, breaker, circuitCount, positio
 
   const control = document.createElement("div");
   control.className = "panel-slot-control";
-  const select = document.createElement("select");
-  select.dataset.breaker = breaker;
-  select.id = `panel-breaker-${breaker}`;
-  select.className = "panel-slot-select";
-  select.setAttribute("aria-label", `Assign load to circuit ${breaker}`);
-  const placeholder = document.createElement("option");
-  placeholder.value = "";
-  placeholder.textContent = "— Assign Load —";
-  select.appendChild(placeholder);
-
+  const totalBreakers = Number.isFinite(circuitCount) && circuitCount > 0 ? circuitCount : panel.breakers?.length || 0;
   let assignedLoad = null;
-  loads.forEach((load, idx) => {
-    const opt = document.createElement("option");
-    opt.value = String(idx);
-    opt.textContent = formatLoadLabel(load, idx);
-    if (load.panelId === panelId && Number(load.breaker) === breaker) {
-      opt.selected = true;
-      assignedLoad = load;
+  let assignedIndex = -1;
+  let assignedSpan = [];
+  let assignedStart = null;
+  for (let i = 0; i < loads.length; i++) {
+    const candidate = loads[i];
+    if (candidate.panelId !== panelId) continue;
+    const span = getLoadBreakerSpan(candidate, panel, totalBreakers);
+    if (!span.length) continue;
+    if (span.includes(breaker)) {
+      assignedLoad = candidate;
+      assignedIndex = i;
+      assignedSpan = span;
+      assignedStart = parsePositiveInt(candidate.breaker);
+      break;
     }
-    select.appendChild(opt);
-  });
+  }
+  if (!assignedLoad && Array.isArray(panel.breakers)) {
+    const tag = panel.breakers[breaker - 1];
+    if (tag) {
+      const fallbackIndex = loads.findIndex(load => (load.ref || load.id || load.tag) === tag);
+      if (fallbackIndex >= 0) {
+        assignedLoad = loads[fallbackIndex];
+        assignedIndex = fallbackIndex;
+        assignedStart = parsePositiveInt(assignedLoad.breaker);
+        if (!assignedStart) {
+          const first = panel.breakers.findIndex(val => val === tag);
+          assignedStart = first >= 0 ? first + 1 : breaker;
+        }
+        assignedSpan = getLoadBreakerSpan(assignedLoad, panel, totalBreakers);
+        if (!assignedSpan.length && assignedStart) {
+          const poles = Math.max(1, getLoadPoleCount(assignedLoad, panel));
+          for (let offset = 0; offset < poles; offset++) {
+            const slotNumber = assignedStart + offset;
+            if (totalBreakers && slotNumber > totalBreakers) break;
+            assignedSpan.push(slotNumber);
+          }
+        }
+      }
+    }
+  }
 
-  control.appendChild(select);
+  const isStart = assignedLoad && assignedStart === breaker;
+
+  if (!assignedLoad || isStart) {
+    const select = document.createElement("select");
+    select.dataset.breaker = breaker;
+    select.id = `panel-breaker-${breaker}`;
+    select.className = "panel-slot-select";
+    select.setAttribute("aria-label", `Assign load to circuit ${breaker}`);
+    const placeholder = document.createElement("option");
+    placeholder.value = "";
+    placeholder.textContent = "— Assign Load —";
+    select.appendChild(placeholder);
+
+    loads.forEach((load, idx) => {
+      const opt = document.createElement("option");
+      opt.value = String(idx);
+      opt.textContent = formatLoadLabel(load, idx);
+      if (assignedLoad && idx === assignedIndex && isStart) {
+        opt.selected = true;
+      }
+      select.appendChild(opt);
+    });
+
+    control.appendChild(select);
+  } else {
+    slot.classList.add("panel-slot--locked");
+    const locked = document.createElement("div");
+    locked.className = "panel-slot-locked";
+    const label = formatLoadLabel(assignedLoad, assignedIndex >= 0 ? assignedIndex : loads.indexOf(assignedLoad));
+    const startCircuit = assignedStart || assignedSpan[0] || breaker;
+    locked.textContent = label ? `Tied to Circuit ${startCircuit} — ${label}` : `Tied to Circuit ${startCircuit}`;
+    control.appendChild(locked);
+  }
   slot.appendChild(control);
 
   const details = document.createElement("div");
@@ -378,8 +532,15 @@ function createCircuitCell(panel, panelId, loads, breaker, circuitCount, positio
     if (Number.isFinite(demandKva) && demandKva !== 0) meta.appendChild(createMetaChip(`Demand ${demandKva.toFixed(2)} kVA`));
     const demandKw = parseFloat(assignedLoad.demandKw);
     if (Number.isFinite(demandKw) && demandKw !== 0) meta.appendChild(createMetaChip(`Demand ${demandKw.toFixed(2)} kW`));
+    const poleCount = assignedSpan.length || Math.max(1, getLoadPoleCount(assignedLoad, panel));
+    if (poleCount > 1) meta.appendChild(createMetaChip(`${poleCount}-pole`));
     const phases = assignedLoad.phases || assignedLoad.poles;
-    if (phases) meta.appendChild(createMetaChip(`${phases}ϕ`));
+    const parsedPhases = parsePositiveInt(phases);
+    if (phases && (!parsedPhases || parsedPhases !== poleCount)) meta.appendChild(createMetaChip(`${phases}ϕ`));
+    if (poleCount > 1) {
+      const spanIndex = assignedSpan.indexOf(breaker);
+      if (spanIndex >= 0) meta.appendChild(createMetaChip(`Pole ${spanIndex + 1} of ${poleCount}`));
+    }
     const voltage = assignedLoad.voltage;
     if (voltage) meta.appendChild(createMetaChip(`${voltage} V`));
     if (meta.childElementCount > 0) {
@@ -494,6 +655,7 @@ window.addEventListener("DOMContentLoaded", () => {
             if (load) {
               delete load.panelId;
               delete load.breaker;
+              delete load.breakerPoles;
             }
           }
         }
@@ -523,26 +685,51 @@ window.addEventListener("DOMContentLoaded", () => {
           const loads = dataStore.getLoads();
           const panelList = dataStore.getPanels();
           const targetPanel = panelList.find(p => p.id === panelId || p.ref === panelId || p.panel_id === panelId);
-          const changed = [];
-          loads.forEach(l => {
-            if (l.panelId === panelId && Number(l.breaker) === breaker) {
-              delete l.panelId;
-              delete l.breaker;
-              changed.push(l);
+          const circuitCount = targetPanel ? getPanelCircuitCount(targetPanel) : 0;
+          const removed = [];
+          loads.forEach(load => {
+            if (load.panelId !== panelId) return;
+            const span = getLoadBreakerSpan(load, targetPanel, circuitCount);
+            if (!span.length) return;
+            if (span.includes(breaker)) {
+              removed.push({ load, span });
             }
+          });
+          const changed = [];
+          removed.forEach(({ load }) => {
+            delete load.panelId;
+            delete load.breaker;
+            delete load.breakerPoles;
+            changed.push(load);
           });
           dataStore.setLoads(loads);
           if (targetPanel) {
-            if (!Array.isArray(targetPanel.breakers)) targetPanel.breakers = [];
-            targetPanel.breakers[breaker - 1] = null;
+            ensurePanelBreakerCapacity(targetPanel, circuitCount);
+            if (removed.length) {
+              removed.forEach(({ load, span }) => {
+                const tag = getLoadDisplayId(load);
+                if (tag) {
+                  clearPanelBreakerAssignments(targetPanel, tag);
+                } else if (Array.isArray(targetPanel.breakers)) {
+                  span.forEach(slot => {
+                    const index = slot - 1;
+                    if (index >= 0 && index < targetPanel.breakers.length) {
+                      targetPanel.breakers[index] = null;
+                    }
+                  });
+                }
+              });
+            } else if (Array.isArray(targetPanel.breakers)) {
+              targetPanel.breakers[breaker - 1] = null;
+            }
             dataStore.setPanels(panelList);
           }
           dataStore.saveProject(projectId);
           const fn = window.opener?.updateComponent || window.updateComponent;
           if (fn) {
-            changed.forEach(l => {
-              const id = l.ref || l.id || l.tag;
-              if (id) fn(id, l);
+            changed.forEach(load => {
+              const id = load.ref || load.id || load.tag;
+              if (id) fn(id, load);
             });
           }
         }
