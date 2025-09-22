@@ -1,13 +1,17 @@
 const assert = require('assert');
 
+const pending = [];
+
 function describe(name, fn){
   console.log(name);
   fn();
 }
 
 function it(name, fn){
-  try { fn(); console.log('  \u2713', name); }
-  catch(err){ console.log('  \u2717', name); console.error(err); }
+  const task = (async () => fn())()
+    .then(() => console.log('  \u2713', name))
+    .catch(err => { console.log('  \u2717', name); console.error(err); });
+  pending.push(task);
 }
 
 (async () => {
@@ -28,10 +32,10 @@ function it(name, fn){
       assert(csv.includes('C1,10'));
     });
 
-    it('exports PDF', () => {
+    it('exports PDF', async () => {
       const headers = ['cable', 'length'];
       const rows = [{ cable: 'C1', length: 10 }];
-      const pdf = toPDF('Test', headers, rows);
+      const pdf = await toPDF('Test', headers, rows);
       assert(pdf.byteLength > 0);
     });
   });
@@ -48,4 +52,5 @@ function it(name, fn){
       assert(svg.includes('3 ft'));
     });
   });
+  await Promise.all(pending);
 })();

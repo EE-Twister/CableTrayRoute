@@ -1,4 +1,35 @@
-const { jsPDF } = window.jspdf || await import('https://cdn.jsdelivr.net/npm/jspdf@2.5.1/+esm');
+let jsPdfPromise = null;
+
+function getJsPdfNamespace() {
+  const globalScope = typeof window !== 'undefined' ? window : globalThis;
+  const namespace = globalScope.jspdf || {};
+  globalScope.jspdf = namespace;
+  return namespace;
+}
+
+async function ensureJsPDF() {
+  const namespace = getJsPdfNamespace();
+  if (namespace.jsPDF) {
+    return namespace.jsPDF;
+  }
+  if (!jsPdfPromise) {
+    jsPdfPromise = import('https://cdn.jsdelivr.net/npm/jspdf@2.5.1/+esm')
+      .then(mod => {
+        const ctor = mod?.jsPDF || mod?.default || mod;
+        if (!ctor) {
+          throw new Error('jsPDF module did not provide a constructor');
+        }
+        namespace.jsPDF = ctor;
+        return ctor;
+      })
+      .catch(err => {
+        console.error('Failed to load jsPDF module', err);
+        jsPdfPromise = null;
+        throw err;
+      });
+  }
+  return jsPdfPromise;
+}
 
 /**
  * Convert array of objects to CSV string.
@@ -27,9 +58,10 @@ export function toCSV(headers = [], rows = []) {
  * @param {string} title
  * @param {string[]} headers
  * @param {Array<Object>} rows
- * @returns {ArrayBuffer}
+ * @returns {Promise<ArrayBuffer>}
  */
-export function toPDF(title = 'Report', headers = [], rows = []) {
+export async function toPDF(title = 'Report', headers = [], rows = []) {
+  const jsPDF = await ensureJsPDF();
   const doc = new jsPDF();
   doc.setFontSize(16);
   doc.text(title, 10, 10);
@@ -61,14 +93,18 @@ export function downloadCSV(headers, rows, filename = 'report.csv') {
 /**
  * Convenience helper to export data as PDF file in browser.
  */
-export function downloadPDF(title, headers, rows, filename = 'report.pdf') {
-  const pdf = toPDF(title, headers, rows);
-  const blob = new Blob([pdf], { type: 'application/pdf' });
-  const a = document.createElement('a');
-  a.href = URL.createObjectURL(blob);
-  a.download = filename;
-  a.click();
-  setTimeout(() => URL.revokeObjectURL(a.href), 0);
+export async function downloadPDF(title, headers, rows, filename = 'report.pdf') {
+  try {
+    const pdf = await toPDF(title, headers, rows);
+    const blob = new Blob([pdf], { type: 'application/pdf' });
+    const a = document.createElement('a');
+    a.href = URL.createObjectURL(blob);
+    a.download = filename;
+    a.click();
+    setTimeout(() => URL.revokeObjectURL(a.href), 0);
+  } catch (err) {
+    console.error('Failed to download PDF', err);
+  }
 }
 
 /**
