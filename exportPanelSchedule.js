@@ -21,6 +21,25 @@ function getPanelSystem(panel) {
 const DC_PHASE_LABELS = ['+', '−'];
 const SINGLE_PHASE_LABELS = ['A', 'B'];
 const THREE_PHASE_LABELS = ['A', 'B', 'C'];
+const FALLBACK_DC_SEQUENCE = ['+', '−'];
+
+function resolveDcSequence(sequence) {
+  if (Array.isArray(sequence) && sequence.length >= 2) {
+    return sequence;
+  }
+  return FALLBACK_DC_SEQUENCE;
+}
+
+function getDcPolarityForCircuit(circuit, sequence = DC_PHASE_LABELS) {
+  const slot = Number.parseInt(circuit, 10);
+  if (!Number.isFinite(slot) || slot < 1) return '';
+  const normalized = resolveDcSequence(sequence);
+  const positive = normalized[0] ?? FALLBACK_DC_SEQUENCE[0];
+  const negative = normalized[1] ?? FALLBACK_DC_SEQUENCE[1];
+  const rowIndex = Math.floor((slot - 1) / 2);
+  const label = rowIndex % 2 === 0 ? positive : negative;
+  return label == null ? '' : String(label);
+}
 
 function computeBreakerSpan(startCircuit, poleCount, circuitCount) {
   const start = Number.parseInt(startCircuit, 10);
@@ -64,7 +83,7 @@ function getBlockCircuits(panel, block, circuitCount) {
 
 function getPanelPhaseSequence(panel) {
   const system = getPanelSystem(panel);
-  if (system === 'dc') return DC_PHASE_LABELS;
+  if (system === 'dc') return resolveDcSequence(DC_PHASE_LABELS);
   const phases = parseInt(panel?.phases, 10);
   if (Number.isFinite(phases)) {
     if (phases <= 1) return SINGLE_PHASE_LABELS;
@@ -80,6 +99,9 @@ function getPhaseLabel(panel, circuit) {
   const index = Number(circuit);
   if (!Number.isFinite(index) || index < 1) return '';
   const system = getPanelSystem(panel);
+  if (system === 'dc') {
+    return getDcPolarityForCircuit(index, sequence);
+  }
   if (sequence.length === 3 && system === 'ac') {
     const rowIndex = Math.floor((index - 1) / 2);
     return sequence[rowIndex % sequence.length];
@@ -228,8 +250,9 @@ export function exportPanelSchedule(panelId) {
     if (info) {
       const { load, position, spanLength, startCircuit } = info;
       if (position === 0) {
-        const poleValue = parsePositiveInt(load.breakerPoles || load.poles || load.phases) || spanLength;
-        poles = poleValue ? String(poleValue) : '';
+        const derivedPoles = getLoadPoleCount(load, panel);
+        const effectivePoles = Math.max(spanLength, derivedPoles);
+        poles = effectivePoles ? String(effectivePoles) : '';
         description = getLoadLabel(load);
         const demandCandidate = getDemandValue(load);
         demandVal = demandCandidate != null ? demandCandidate.toFixed(2) : '';
