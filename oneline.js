@@ -65,7 +65,7 @@ function forceShowResumeIfE2E() {
 
 window.E2E = E2E;
 
-import { getOneLine, setOneLine, setEquipment, setPanels, setLoads, getCables, setCables, addCable, addRaceway, getItem, setItem, getStudies, setStudies, on, getCurrentScenario, switchScenario, STORAGE_KEYS, loadProject, saveProject } from './dataStore.mjs';
+import { getOneLine, setOneLine, setEquipment, setPanels, setLoads, getCables, setCables, addRaceway, getItem, setItem, getStudies, setStudies, on, getCurrentScenario, switchScenario, STORAGE_KEYS, loadProject, saveProject } from './dataStore.mjs';
 import { runLoadFlow } from './analysis/loadFlow.js';
 import { runShortCircuit } from './analysis/shortCircuit.mjs';
 import { runArcFlash } from './analysis/arcFlash.mjs';
@@ -97,7 +97,8 @@ const typeIcons = {
   panel: asset('icons/panel.svg'),
   equipment: asset('icons/equipment.svg'),
   load: asset('icons/load.svg'),
-  bus: asset('icons/Bus.svg')
+  bus: asset('icons/Bus.svg'),
+  cable: asset('icons/oneline.svg')
 };
 
 const placeholderIcon = asset('icons/placeholder.svg');
@@ -110,6 +111,7 @@ function categoryForType(t) {
   if (t === 'bus') return 'bus';
   if (t === 'mcc') return 'panel';
   if (t === 'motor_load' || t === 'static_load') return 'load';
+  if (t === 'cable') return 'cable';
   return 'equipment';
 }
 
@@ -189,6 +191,33 @@ const builtinComponents = [
       { x: 0, y: 20 },
       { x: 80, y: 20 }
     ]
+  },
+  {
+    subtype: 'Cable',
+    label: 'Cable',
+    icon: typeIcons.cable || placeholderIcon,
+    category: 'cable',
+    type: 'cable',
+    ports: [
+      { x: 0, y: 20 },
+      { x: 80, y: 20 }
+    ],
+    props: {
+      cable: {
+        tag: '',
+        cable_type: '',
+        conductors: '',
+        phases: '',
+        conductor_size: '',
+        conductor_material: '',
+        insulation_type: '',
+        ambient_temp: '',
+        install_method: '',
+        color: '#000000',
+        length: '',
+        manual_length: false
+      }
+    }
   }
 ];
 
@@ -265,6 +294,32 @@ async function loadComponentLibrary() {
     console.error('Component library load failed', e);
   }
 
+  builtinComponents.forEach(c => {
+    const key = compKey(c.type, c.subtype);
+    if (componentMeta[key]) return;
+    const cat = c.category || categoryForType(c.type);
+    const icon = c.icon || placeholderIcon;
+    const ports = Array.isArray(c.ports) ? c.ports : defaultPorts(c.type, c.subtype);
+    const rawProps = c.props || {};
+    const props = {};
+    Object.entries(rawProps).forEach(([k, v]) => {
+      props[k] = typeof v === 'object' ? JSON.parse(JSON.stringify(v)) : v;
+    });
+    componentMeta[key] = {
+      icon,
+      label: c.label || key,
+      category: cat,
+      ports,
+      type: c.type,
+      subtype: c.subtype,
+      props
+    };
+    subtypeCategory[key] = cat;
+    if (!componentTypes[cat]) componentTypes[cat] = [];
+    componentTypes[cat].push(key);
+    propSchemas[key] = inferSchemaFromProps(props);
+  });
+
   buildPalette();
 }
 // === END REPLACEMENT ===
@@ -323,7 +378,8 @@ function buildPalette() {
     panel: document.getElementById('panel-buttons'),
     equipment: document.getElementById('equipment-buttons'),
     load: document.getElementById('load-buttons'),
-    bus: document.getElementById('bus-buttons')
+    bus: document.getElementById('bus-buttons'),
+    cable: document.getElementById('cable-buttons')
   };
   Object.values(sectionContainers).forEach(c => {
     if (c) c.innerHTML = '';
@@ -921,6 +977,30 @@ const cableColors = {
   Signal: '#0a0'
 };
 
+function getCableForConnection(source, target, conn) {
+  if (source?.type === 'cable') return source.cable || null;
+  if (target?.type === 'cable') return target.cable || null;
+  return conn?.cable || null;
+}
+
+function parseCablePhases(cable) {
+  if (!cable) return [];
+  if (Array.isArray(cable.phases)) return cable.phases.map(p => String(p).trim().toUpperCase()).filter(Boolean);
+  if (typeof cable.phases === 'number') {
+    if (cable.phases === 3) return ['A', 'B', 'C'];
+    if (cable.phases === 2) return ['A', 'B'];
+    if (cable.phases === 1) return ['A'];
+    return [];
+  }
+  if (typeof cable.phases === 'string') {
+    return cable.phases
+      .split(/[\s,]+/)
+      .map(p => p.trim().toUpperCase())
+      .filter(Boolean);
+  }
+  return [];
+}
+
 // Phase sequence colors used for connection rendering
 const phaseColors = {
   A: '#f00',
@@ -1065,6 +1145,10 @@ function nearestPortToPoint(x, y, exclude) {
     });
   });
   return best;
+}
+
+function findSourceComponent(targetId, comps = components) {
+  return comps.find(c => (c.connections || []).some(conn => conn.target === targetId)) || null;
 }
 
 function normalizeComponent(c) {
@@ -1266,11 +1350,15 @@ function render() {
       conn.length = lenPx;
       const poly = document.createElementNS(svgNS, 'polyline');
       poly.setAttribute('points', pts.map(p => `${p.x},${p.y}`).join(' '));
-      const vRange = getVoltageRange(conn.voltage || conn.cable?.voltage || c.voltage || target.voltage);
+      const cableInfo = getCableForConnection(c, target, conn);
+      const vRange = getVoltageRange(conn.voltage || cableInfo?.voltage || c.voltage || target.voltage);
       if (vRange) usedVoltageRanges.add(vRange);
-      const phaseKey = (conn.phases || []).join('');
+      const rawPhases = conn.phases && conn.phases.length
+        ? (Array.isArray(conn.phases) ? conn.phases : parseCablePhases({ phases: conn.phases }))
+        : parseCablePhases(cableInfo);
+      const phaseKey = rawPhases.join('');
       const phaseColor = phaseColors[phaseKey];
-      const stroke = phaseColor || vRange?.color || cableColors[conn.cable?.cable_type] || conn.cable?.color || '#000';
+      const stroke = phaseColor || vRange?.color || cableColors[cableInfo?.cable_type] || cableInfo?.color || '#000';
       poly.setAttribute('stroke', stroke);
       poly.setAttribute('fill', 'none');
       poly.setAttribute('marker-start', 'url(#connection-x)');
@@ -1282,8 +1370,8 @@ function render() {
       poly.dataset.comp = c.id;
       poly.dataset.index = idx;
       const vdLimit = parseFloat(target.maxVoltageDrop) || 3;
-      if (conn.cable?.sizing_warning) poly.classList.add('sizing-violation');
-      if (parseFloat(conn.cable?.voltage_drop_pct) > vdLimit) poly.classList.add('voltage-exceed');
+      if (cableInfo?.sizing_warning) poly.classList.add('sizing-violation');
+      if (parseFloat(cableInfo?.voltage_drop_pct) > vdLimit) poly.classList.add('voltage-exceed');
       poly.addEventListener('click', e => {
         e.stopPropagation();
         selected = null;
@@ -1292,15 +1380,9 @@ function render() {
       });
       poly.addEventListener('dblclick', async e => {
         e.stopPropagation();
-        const res = await chooseCable(c, target, conn);
-        if (res) {
-          conn.cable = res.cable;
-          conn.phases = res.phases;
-          conn.conductors = res.conductors;
-          addCable(res.cable);
-          pushHistory();
-          render();
-          save();
+        const cableComp = c.type === 'cable' ? c : target.type === 'cable' ? target : null;
+        if (cableComp) {
+          await editCableComponent(cableComp);
         }
       });
       poly.addEventListener('mousedown', e => {
@@ -1321,7 +1403,7 @@ function render() {
       label.setAttribute('text-anchor', 'middle');
       label.setAttribute('dominant-baseline', 'middle');
       label.setAttribute('fill', stroke);
-      let lblText = conn.cable?.tag || conn.cable?.cable_type || '';
+      let lblText = cableInfo?.tag || cableInfo?.cable_type || '';
       if (showOverlays) {
         const val = conn.faultKA ?? conn.loading_kW;
         if (val !== undefined) {
@@ -1331,8 +1413,8 @@ function render() {
       }
       label.textContent = lblText;
       label.classList.add('conn-label');
-      if (conn.cable?.sizing_warning) label.classList.add('sizing-violation');
-      if (parseFloat(conn.cable?.voltage_drop_pct) > vdLimit) label.classList.add('voltage-exceed');
+      if (cableInfo?.sizing_warning) label.classList.add('sizing-violation');
+      if (parseFloat(cableInfo?.voltage_drop_pct) > vdLimit) label.classList.add('voltage-exceed');
       label.style.pointerEvents = 'auto';
       label.style.cursor = 'pointer';
       label.addEventListener('click', e => {
@@ -1343,15 +1425,9 @@ function render() {
       });
       label.addEventListener('dblclick', async e => {
         e.stopPropagation();
-        const res = await chooseCable(c, target, conn);
-        if (res) {
-          conn.cable = res.cable;
-          conn.phases = res.phases;
-          conn.conductors = res.conductors;
-          addCable(res.cable);
-          pushHistory();
-          render();
-          save();
+        const cableComp = c.type === 'cable' ? c : target.type === 'cable' ? target : null;
+        if (cableComp) {
+          await editCableComponent(cableComp);
         }
       });
       svg.appendChild(label);
@@ -1774,6 +1850,10 @@ function distributeSelection(axis) {
 function selectComponent(compOrId) {
   const comp = typeof compOrId === 'string' ? components.find(c => c.id === compOrId) : compOrId;
   if (!comp) return;
+  if (comp.type === 'cable') {
+    openCableProperties(comp);
+    return;
+  }
   const rawSchema = propSchemas[comp.subtype] || [];
   if (!rawSchema.length) {
     showToast(`No properties defined for ${comp.subtype}`);
@@ -1963,7 +2043,9 @@ function selectComponent(compOrId) {
       const li = document.createElement('li');
       const target = components.find(t => t.id === conn.target);
       const span = document.createElement('span');
-      span.textContent = `to ${target?.label || target?.subtype || conn.target}${conn.cable?.tag ? ` (${conn.cable.tag})` : ''}`;
+      const cableInfo = getCableForConnection(comp, target, conn);
+      const cableLabel = cableInfo?.tag || cableInfo?.cable_type;
+      span.textContent = `to ${target?.label || target?.subtype || conn.target}${cableLabel ? ` (${cableLabel})` : ''}`;
       li.appendChild(span);
       const edit = document.createElement('button');
       edit.type = 'button';
@@ -1971,16 +2053,12 @@ function selectComponent(compOrId) {
       edit.classList.add('btn');
       edit.addEventListener('click', async e => {
         e.stopPropagation();
-        const res = await chooseCable(comp, target, conn);
-        if (res) {
-          conn.cable = res.cable;
-          conn.phases = res.phases;
-          conn.conductors = res.conductors;
-          addCable(res.cable);
-          pushHistory();
-          render();
-          save();
+        const cableComp = comp.type === 'cable' ? comp : target?.type === 'cable' ? target : null;
+        if (cableComp) {
+          await editCableComponent(cableComp);
           selectComponent(comp);
+        } else {
+          showToast('No cable component on this connection');
         }
       });
       li.appendChild(edit);
@@ -2104,6 +2182,14 @@ async function chooseCable(source, target, existingConn = null) {
     }
   });
   components.forEach(c => {
+    if (c.type === 'cable' && c.cable && !seen.has(c.cable.tag)) {
+      existingTemplates.push({
+        ...c.cable,
+        phases: Array.isArray(c.cable.phases) ? c.cable.phases.join(',') : c.cable.phases,
+        conductors: c.cable.conductors
+      });
+      if (c.cable.tag) seen.add(c.cable.tag);
+    }
     (c.connections || []).forEach(conn => {
       if (conn.cable && !seen.has(conn.cable.tag)) {
         existingTemplates.push({
@@ -2240,18 +2326,18 @@ async function chooseCable(source, target, existingConn = null) {
     sizeBtn.textContent = 'Size Conductor';
     sizeBtn.addEventListener('click', () => {
       const load = {
-        current: parseFloat(target.current) || 0,
-        voltage: parseFloat(target.voltage) || parseFloat(source.voltage) || 0,
-        phases: parseInt(target.phases || source.phases || 3, 10)
+        current: parseFloat(target?.current) || 0,
+        voltage: parseFloat(target?.voltage) || parseFloat(source?.voltage) || 0,
+        phases: parseInt(target?.phases || source?.phases || 3, 10)
       };
       const params = {
         length: parseFloat(lengthInput.value) || 0,
         material: materialInput.value || 'cu',
-        insulation_rating: parseFloat(target.insulation_rating) || 90,
-        ambient: parseFloat(ambientInput.value) || parseFloat(source.ambient) || 30,
-        maxVoltageDrop: parseFloat(target.maxVoltageDrop) || 3,
+        insulation_rating: parseFloat(target?.insulation_rating) || 90,
+        ambient: parseFloat(ambientInput.value) || parseFloat(source?.ambient) || 30,
+        maxVoltageDrop: parseFloat(target?.maxVoltageDrop) || 3,
         conductors: parseInt(conductorsInput.value) || 1,
-        code: target.code || 'NEC'
+        code: target?.code || 'NEC'
       };
       const res = sizeConductor(load, params);
       if (res.size) {
@@ -2398,7 +2484,7 @@ async function chooseCable(source, target, existingConn = null) {
       }
       modal.classList.remove('show');
       resolve({
-        cable: { ...cable, from_tag: source.ref || source.id, to_tag: target.ref || target.id },
+        cable: { ...cable, from_tag: source?.ref || source?.id || '', to_tag: target?.ref || target?.id || '' },
         phases,
         conductors
       });
@@ -2407,6 +2493,152 @@ async function chooseCable(source, target, existingConn = null) {
     modal.appendChild(form);
     modal.classList.add('show');
   });
+}
+
+async function editCableComponent(comp) {
+  if (!comp) return;
+  if (!comp.cable || typeof comp.cable !== 'object') comp.cable = {};
+  const outbound = (comp.connections || []).find(conn => conn.target);
+  const target = outbound ? components.find(t => t.id === outbound.target) || {} : {};
+  const workingConn = outbound || {
+    target: target.id || '',
+    cable: comp.cable,
+    phases: Array.isArray(comp.cable?.phases) ? comp.cable.phases : parseCablePhases(comp.cable),
+    conductors: comp.cable?.conductors || comp.cable?.conductors_count || ''
+  };
+  const originalCable = outbound ? outbound.cable : undefined;
+  if (outbound) outbound.cable = comp.cable;
+  try {
+    const res = await chooseCable(comp, target, workingConn);
+    if (!res) return;
+    comp.cable = { ...res.cable };
+    if (outbound) {
+      outbound.phases = res.phases;
+      outbound.conductors = res.conductors;
+    }
+    pushHistory();
+    render();
+    save();
+    syncSchedules();
+  } finally {
+    if (outbound) {
+      if (originalCable === undefined) delete outbound.cable;
+      else outbound.cable = originalCable;
+    }
+  }
+}
+
+function openCableProperties(comp) {
+  if (!comp) return;
+  selected = comp;
+  selection = [comp];
+  selectedConnection = null;
+  const modal = document.getElementById('prop-modal');
+  if (modal._outsideHandler) modal.removeEventListener('click', modal._outsideHandler);
+  if (modal._keyHandler) document.removeEventListener('keydown', modal._keyHandler);
+  modal.innerHTML = '';
+  const form = document.createElement('form');
+  form.id = 'cable-prop-form';
+
+  const outsideHandler = e => { if (e.target === modal) closeModal(); };
+  const keyHandler = e => { if (e.key === 'Escape') { e.preventDefault(); closeModal(); } };
+
+  function closeModal() {
+    modal.classList.remove('show');
+    selected = null;
+    selection = [];
+    selectedConnection = null;
+    modal.removeEventListener('click', outsideHandler);
+    document.removeEventListener('keydown', keyHandler);
+    delete modal._outsideHandler;
+    delete modal._keyHandler;
+  }
+
+  const labelLabel = document.createElement('label');
+  labelLabel.textContent = 'Label ';
+  const labelInput = document.createElement('input');
+  labelInput.type = 'text';
+  labelInput.value = comp.label || '';
+  labelLabel.appendChild(labelInput);
+  form.appendChild(labelLabel);
+
+  const refLabel = document.createElement('label');
+  refLabel.textContent = 'Ref ID ';
+  const refInput = document.createElement('input');
+  refInput.type = 'text';
+  refInput.value = comp.ref || '';
+  refLabel.appendChild(refInput);
+  form.appendChild(refLabel);
+
+  const cableInfo = document.createElement('div');
+  cableInfo.classList.add('cable-info');
+  const cable = comp.cable || {};
+  cableInfo.innerHTML = `
+    <p><strong>Tag:</strong> ${cable.tag || ''}</p>
+    <p><strong>Type:</strong> ${cable.cable_type || ''}</p>
+    <p><strong>Conductors:</strong> ${cable.conductors || ''}</p>
+    <p><strong>Phases:</strong> ${Array.isArray(cable.phases) ? cable.phases.join(',') : cable.phases || ''}</p>
+    <p><strong>Length:</strong> ${cable.length || ''}</p>
+  `;
+  form.appendChild(cableInfo);
+
+  const editCableBtn = document.createElement('button');
+  editCableBtn.type = 'button';
+  editCableBtn.textContent = 'Edit Cable Details';
+  editCableBtn.classList.add('btn');
+  editCableBtn.addEventListener('click', async e => {
+    e.preventDefault();
+    await editCableComponent(comp);
+    openCableProperties(comp);
+  });
+  form.appendChild(editCableBtn);
+
+  const applyBtn = document.createElement('button');
+  applyBtn.type = 'submit';
+  applyBtn.textContent = 'Apply';
+  applyBtn.classList.add('btn');
+  form.appendChild(applyBtn);
+
+  const cancelBtn = document.createElement('button');
+  cancelBtn.type = 'button';
+  cancelBtn.textContent = 'Cancel';
+  cancelBtn.classList.add('btn');
+  cancelBtn.addEventListener('click', closeModal);
+  form.appendChild(cancelBtn);
+
+  const deleteBtn = document.createElement('button');
+  deleteBtn.type = 'button';
+  deleteBtn.textContent = 'Delete Cable Component';
+  deleteBtn.classList.add('btn');
+  deleteBtn.addEventListener('click', () => {
+    components = components.filter(c => c !== comp);
+    components.forEach(c => {
+      c.connections = (c.connections || []).filter(conn => conn.target !== comp.id);
+    });
+    closeModal();
+    pushHistory();
+    render();
+    save();
+  });
+  form.appendChild(deleteBtn);
+
+  form.addEventListener('submit', e => {
+    e.preventDefault();
+    comp.label = labelInput.value || '';
+    comp.ref = refInput.value || '';
+    pushHistory();
+    render();
+    save();
+    syncSchedules();
+    closeModal();
+  });
+
+  modal.appendChild(form);
+  modal.classList.add('show');
+  modal._outsideHandler = outsideHandler;
+  modal._keyHandler = keyHandler;
+  modal.addEventListener('click', outsideHandler);
+  document.addEventListener('keydown', keyHandler);
 }
 
 async function init() {
@@ -2836,13 +3068,6 @@ async function init() {
           fromComp.connections.push(newConn);
 
           try {
-            const res = await chooseCable(fromComp, toComp, newConn);
-            if (res) {
-              newConn.cable = res.cable;
-              newConn.phases = res.phases;
-              newConn.conductors = res.conductors;
-              addCable(res.cable);
-            }
             const fromTag = fromComp.ref || fromComp.id;
             const toTag = toComp.ref || toComp.id;
             addRaceway({ conduit_id: `${fromTag}-${toTag}`, from_tag: fromTag, to_tag: toTag });
@@ -2929,15 +3154,11 @@ async function init() {
       const conn = component.connections[index];
       if (action === 'edit') {
         const target = components.find(t => t.id === conn.target);
-        const res = await chooseCable(component, target, conn);
-        if (res) {
-          conn.cable = res.cable;
-          conn.phases = res.phases;
-          conn.conductors = res.conductors;
-          addCable(res.cable);
-          pushHistory();
-          render();
-          save();
+        const cableComp = component.type === 'cable' ? component : target?.type === 'cable' ? target : null;
+        if (cableComp) {
+          await editCableComponent(cableComp);
+        } else {
+          showToast('No cable component on this connection');
         }
       } else if (action === 'delete') {
         component.connections.splice(index, 1);
@@ -3143,6 +3364,65 @@ function getCategory(c) {
   return c.type || subtypeCategory[c.subtype];
 }
 
+function buildCableSpecFromComponent(comp, allComps) {
+  if (!comp || comp.type !== 'cable') return null;
+  const cable = comp.cable || {};
+  const upstream = findSourceComponent(comp.id, allComps);
+  const outbound = (comp.connections || []).find(conn => conn.target);
+  const target = outbound ? allComps.find(c => c.id === outbound.target) : null;
+  const spec = { ...cable };
+  if (!spec.tag) spec.tag = comp.label || comp.id;
+  spec.from_tag = upstream?.ref || upstream?.id || '';
+  spec.to_tag = target?.ref || outbound?.target || '';
+  const phases = outbound?.phases && outbound.phases.length
+    ? (Array.isArray(outbound.phases) ? outbound.phases : parseCablePhases({ phases: outbound.phases }))
+    : parseCablePhases(cable);
+  spec.phases = phases.join(',') || cable.phases || '';
+  spec.conductors = outbound?.conductors || cable.conductors || '';
+  const unitPerPx = diagramScale.unitPerPx || 1;
+  const autoLen = (outbound?.length || 0) * unitPerPx;
+  let finalLen = autoLen;
+  if (cable.manual_length) {
+    const manual = parseFloat(cable.length);
+    if (!Number.isNaN(manual)) finalLen = manual;
+  }
+  if (finalLen) {
+    spec.length = finalLen.toFixed(2);
+  }
+  if (cable.manual_length) spec.manual_length = true;
+  const load = {
+    current: parseFloat(target?.current) || 0,
+    voltage: parseFloat(target?.voltage) || parseFloat(upstream?.voltage) || 0,
+    phases: phases.length || parseInt(target?.phases || upstream?.phases || 3, 10)
+  };
+  const params = {
+    length: finalLen,
+    material: spec.conductor_material || 'cu',
+    insulation_rating: parseFloat(target?.insulation_rating) || 90,
+    ambient: parseFloat(spec.ambient_temp) || parseFloat(upstream?.ambient) || 30,
+    conductors: parseInt(spec.conductors) || 1,
+    maxVoltageDrop: parseFloat(target?.maxVoltageDrop) || 3,
+    code: target?.code || 'NEC'
+  };
+  const result = sizeConductor(load, params);
+  spec.calc_ampacity = result.ampacity ? result.ampacity.toFixed(2) : spec.calc_ampacity || '';
+  spec.voltage_drop_pct = result.voltageDrop ? result.voltageDrop.toFixed(2) : spec.voltage_drop_pct || '';
+  spec.sizing_warning = result.violation || spec.sizing_warning || '';
+  spec.code_reference = result.codeRef || spec.code_reference || '';
+  spec.sizing_report = JSON.stringify(result.report || {});
+  comp.cable = {
+    ...comp.cable,
+    calc_ampacity: spec.calc_ampacity,
+    voltage_drop_pct: spec.voltage_drop_pct,
+    sizing_warning: spec.sizing_warning,
+    code_reference: spec.code_reference,
+    sizing_report: spec.sizing_report,
+    length: spec.length,
+    manual_length: spec.manual_length
+  };
+  return spec;
+}
+
 function showToast(msg, linkText, linkHref) {
   const t = document.getElementById('toast');
   if (!t) return;
@@ -3257,8 +3537,10 @@ function validateDiagram() {
   components.forEach(c => {
     if (c.type === 'dimension') return;
     (c.connections || []).forEach(conn => {
-      if (conn.cable && conn.cable.sizing_warning) {
-        validationIssues.push({ component: c.id, message: conn.cable.sizing_warning });
+      const target = components.find(t => t.id === conn.target);
+      const cableInfo = getCableForConnection(c, target, conn);
+      if (cableInfo && cableInfo.sizing_warning) {
+        validationIssues.push({ component: c.id, message: cableInfo.sizing_warning });
       }
     });
   });
@@ -3364,8 +3646,16 @@ function syncSchedules(notify = true) {
   const mapFields = c => {
     const src = all.find(s => (s.connections || []).some(conn => conn.target === c.id));
     const conn = src ? (src.connections || []).find(cc => cc.target === c.id) : null;
-    const connPhases = conn?.phases ? conn.phases.join(',') : c.phases ?? '';
-    const connConductors = conn?.conductors || conn?.cable?.conductors || '';
+    const inboundCable = src && src.type === 'cable'
+      ? src
+      : all.find(item => item.type === 'cable' && (item.connections || []).some(cc => cc.target === c.id));
+    const cableInfo = inboundCable?.cable || null;
+    const connPhases = conn?.phases
+      ? conn.phases.join(',')
+      : cableInfo
+      ? (Array.isArray(cableInfo.phases) ? cableInfo.phases.join(',') : cableInfo.phases || '')
+      : c.phases ?? '';
+    const connConductors = conn?.conductors || cableInfo?.conductors || conn?.cable?.conductors || '';
     const fields = {
       id: c.ref || c.id,
       ref: c.id,
@@ -3421,10 +3711,20 @@ function syncSchedules(notify = true) {
   setEquipment([...equipment, ...buses]);
   setPanels([...panels, ...buses]);
   setLoads(loads);
-  const cables = getCables();
+  const cableSpecs = [];
+  const seenTags = new Set();
+  all
+    .filter(c => c.type === 'cable')
+    .forEach(cableComp => {
+      const spec = buildCableSpecFromComponent(cableComp, all);
+      if (!spec) return;
+      if (spec.tag) seenTags.add(spec.tag);
+      cableSpecs.push(spec);
+    });
   all.forEach(c => {
     (c.connections || []).forEach(conn => {
       if (!conn.cable) return;
+      if (conn.cable.tag && seenTags.has(conn.cable.tag)) return;
       const target = all.find(t => t.id === conn.target);
       const spec = {
         ...conn.cable,
@@ -3433,59 +3733,10 @@ function syncSchedules(notify = true) {
         from_tag: c.ref || c.id,
         to_tag: target?.ref || conn.target
       };
-      delete spec.slack_pct;
-      const unitPerPx = diagramScale.unitPerPx || 1;
-      const autoLen = (conn.length || 0) * unitPerPx;
-      let finalLen = autoLen;
-      if (conn.cable?.manual_length) {
-        const manual = parseFloat(conn.cable.length);
-        if (!isNaN(manual)) finalLen = manual;
-      }
-      spec.length = finalLen.toFixed(2);
-      if (conn.cable?.manual_length) spec.manual_length = true;
-      conn.cable.length = spec.length;
-      const load = {
-        current: parseFloat(target?.current) || 0,
-        voltage: parseFloat(target?.voltage) || parseFloat(c.voltage) || 0,
-        phases: conn.phases ? conn.phases.length : parseInt(target?.phases || c.phases || 3, 10)
-      };
-      const params = {
-        length: finalLen,
-        material: spec.conductor_material || 'cu',
-        insulation_rating: parseFloat(target?.insulation_rating) || 90,
-        ambient: parseFloat(spec.ambient_temp) || parseFloat(c.ambient) || 30,
-        conductors: parseInt(spec.conductors) || 1,
-        maxVoltageDrop: parseFloat(target?.maxVoltageDrop) || 3,
-        code: target?.code || 'NEC'
-      };
-      const res = sizeConductor(load, params);
-      spec.calc_ampacity = res.ampacity ? res.ampacity.toFixed(2) : '';
-      spec.voltage_drop_pct = res.voltageDrop ? res.voltageDrop.toFixed(2) : '';
-      spec.sizing_warning = res.violation || '';
-      spec.code_reference = res.codeRef || '';
-      spec.sizing_report = JSON.stringify(res.report || {});
-      Object.assign(conn.cable, {
-        calc_ampacity: spec.calc_ampacity,
-        voltage_drop_pct: spec.voltage_drop_pct,
-        sizing_warning: spec.sizing_warning,
-        code_reference: spec.code_reference,
-        sizing_report: spec.sizing_report,
-        ambient_temp: spec.ambient_temp,
-        install_method: spec.install_method,
-        phases: spec.phases,
-        conductors: spec.conductors,
-        length: spec.length,
-        manual_length: conn.cable?.manual_length
-      });
-      const idx = cables.findIndex(cb => cb.tag === spec.tag);
-      if (idx >= 0) {
-        cables[idx] = { ...cables[idx], ...spec };
-      } else {
-        cables.push(spec);
-      }
+      cableSpecs.push(spec);
     });
   });
-  setCables(cables);
+  setCables(cableSpecs);
   if (notify) showToast('Schedules synced');
 }
 
@@ -3495,8 +3746,16 @@ function serializeState() {
     const mapFields = c => {
       const src = comps.find(s => (s.connections || []).some(conn => conn.target === c.id));
       const conn = src ? (src.connections || []).find(cc => cc.target === c.id) : null;
-      const connPhases = conn?.phases ? conn.phases.join(',') : c.phases ?? '';
-      const connConductors = conn?.conductors || conn?.cable?.conductors || '';
+      const inboundCable = src && src.type === 'cable'
+        ? src
+        : comps.find(item => item.type === 'cable' && (item.connections || []).some(cc => cc.target === c.id));
+      const cableInfo = inboundCable?.cable || null;
+      const connPhases = conn?.phases
+        ? conn.phases.join(',')
+        : cableInfo
+        ? (Array.isArray(cableInfo.phases) ? cableInfo.phases.join(',') : cableInfo.phases || '')
+        : c.phases ?? '';
+      const connConductors = conn?.conductors || cableInfo?.conductors || conn?.cable?.conductors || '';
       const fields = {
         id: c.ref || c.id,
         ref: c.id,
@@ -3539,9 +3798,19 @@ function serializeState() {
       .filter(c => isBusComponent(c))
       .map(mapFields);
     const cables = [];
+    const seenTags = new Set();
+    comps
+      .filter(c => c.type === 'cable')
+      .forEach(cableComp => {
+        const spec = buildCableSpecFromComponent(cableComp, comps);
+        if (!spec) return;
+        if (spec.tag) seenTags.add(spec.tag);
+        cables.push(spec);
+      });
     comps.forEach(c => {
       (c.connections || []).forEach(conn => {
         if (!conn.cable) return;
+        if (conn.cable.tag && seenTags.has(conn.cable.tag)) return;
         const target = comps.find(t => t.id === conn.target);
         cables.push({
           ...conn.cable,
