@@ -2894,6 +2894,14 @@ body.dark-mode .panel-device {
     box-shadow: inset 0 -2px 0 rgba(0, 0, 0, 0.15);
 }
 
+.panel-device--dc-positive .panel-device-handle {
+    background: #c62828;
+}
+
+.panel-device--dc-negative .panel-device-handle {
+    background: #000;
+}
+
 .panel-device--fuse .panel-device-handle {
     width: 0.75rem;
     height: 0.75rem;
@@ -3084,6 +3092,14 @@ body.dark-mode .panel-slot-add-btn {
     letter-spacing: 0.05em;
     text-transform: uppercase;
     opacity: 0.75;
+}
+
+.panel-slot-phase--positive {
+    color: #c62828;
+}
+
+.panel-slot-phase--negative {
+    color: #000;
 }
 
 .panel-slot-control {

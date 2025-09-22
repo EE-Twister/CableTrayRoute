@@ -53,6 +53,10 @@ const DC_PHASE_LABELS = ["+", "−"];
 const SINGLE_PHASE_LABELS = ["A", "B"];
 const THREE_PHASE_LABELS = ["A", "B", "C"];
 
+function getAllowedBranchPoleCounts(system) {
+  return system === "dc" ? [1, 2] : [1, 2, 3];
+}
+
 function parsePositiveInt(value) {
   if (value == null) return null;
   const parsed = Number.parseInt(value, 10);
@@ -337,11 +341,16 @@ function getPhaseLabel(panel, breaker) {
   const index = Number(breaker);
   if (!Number.isFinite(index) || index < 1) return "";
   const system = getPanelSystem(panel);
+  if (system === "dc") {
+    const rowIndex = Math.floor((index - 1) / 2);
+    const phase = sequence[rowIndex % sequence.length];
+    return phase || "";
+  }
   if (sequence.length === 3 && system === "ac") {
     const rowIndex = Math.floor((index - 1) / 2);
     return sequence[rowIndex % sequence.length];
   }
-  return sequence[(index - 1) % sequence.length];
+  return sequence[(index - 1) % sequence.length] || "";
 }
 
 function getLoadPoleCount(load, panel) {
@@ -682,6 +691,7 @@ function render(panelId = "P1") {
     dataStore.saveProject(projectId);
   }
   const system = getPanelSystem(panel);
+  const branchPoleOptions = getAllowedBranchPoleCounts(system);
   const sequence = getPanelPhaseSequence(panel);
 
   const legend = document.createElement("div");
@@ -706,7 +716,7 @@ function render(panelId = "P1") {
   toolbox.appendChild(toolboxHelp);
   const toolboxItems = document.createElement("div");
   toolboxItems.className = "panel-breaker-toolbox-items";
-  [1, 2, 3].forEach(poles => {
+  branchPoleOptions.forEach(poles => {
     const item = document.createElement("div");
     item.className = "panel-breaker-toolbox-item";
     item.draggable = true;
@@ -749,7 +759,7 @@ function render(panelId = "P1") {
     const oddCircuit = i * 2 + 1;
     const evenCircuit = oddCircuit + 1;
     row.appendChild(createCircuitCell(panel, panelId, loads, oddCircuit, circuitCount, "left", system, breakerDetails));
-    row.appendChild(createDeviceCell(panel, oddCircuit, evenCircuit, circuitCount, breakerDetails));
+    row.appendChild(createDeviceCell(panel, oddCircuit, evenCircuit, circuitCount, breakerDetails, system));
     row.appendChild(createCircuitCell(panel, panelId, loads, evenCircuit, circuitCount, "right", system, breakerDetails));
     tbody.appendChild(row);
   }
@@ -820,6 +830,12 @@ function createCircuitCell(panel, panelId, loads, breaker, circuitCount, positio
   const phaseEl = document.createElement("span");
   phaseEl.className = "panel-slot-phase";
   phaseEl.textContent = phaseLabel;
+  if (system === "dc" && phaseLabel) {
+    const polarity = phaseLabel === "+" ? "positive" : "negative";
+    slot.classList.add(`panel-slot--dc-${polarity}`);
+    phaseEl.classList.add(`panel-slot-phase--${polarity}`);
+    slot.dataset.polarity = polarity;
+  }
   if (system === "dc") {
     const label = phaseLabel === "+" ? "positive" : "negative";
     phaseEl.setAttribute("aria-label", `Polarity ${label}`);
@@ -890,7 +906,7 @@ function createCircuitCell(panel, panelId, loads, breaker, circuitCount, positio
 
     const quickAdd = document.createElement("div");
     quickAdd.className = "panel-slot-quick-add";
-    [1, 2, 3].forEach(poles => {
+    getAllowedBranchPoleCounts(system).forEach(poles => {
       const button = document.createElement("button");
       button.type = "button";
       button.className = "panel-slot-add-btn";
@@ -1121,7 +1137,7 @@ function createCircuitCell(panel, panelId, loads, breaker, circuitCount, positio
   return td;
 }
 
-function createDeviceCell(panel, oddCircuit, evenCircuit, circuitCount, breakerDetails) {
+function createDeviceCell(panel, oddCircuit, evenCircuit, circuitCount, breakerDetails, system) {
   const td = document.createElement("td");
   td.className = "panel-device-cell";
 
@@ -1135,6 +1151,9 @@ function createDeviceCell(panel, oddCircuit, evenCircuit, circuitCount, breakerD
   td.appendChild(wrapper);
 
   const layout = Array.isArray(panel.breakerLayout) ? panel.breakerLayout : [];
+  if (!system) {
+    system = getPanelSystem(panel);
+  }
 
   const appendDevice = (circuit, slotEl) => {
     if (!Number.isFinite(circuit) || circuit < 1 || circuit > circuitCount) return;
@@ -1144,7 +1163,14 @@ function createDeviceCell(panel, oddCircuit, evenCircuit, circuitCount, breakerD
     if (!Number.isFinite(start)) return;
     const size = Number(block.size);
     const detail = breakerDetails ? breakerDetails[String(start)] || getBreakerDetail(panel, start) : getBreakerDetail(panel, start);
-    const icon = createBranchDeviceIcon(detail, Number.isFinite(size) && size > 0 ? Number(size) : 1, start);
+    const phase = getPhaseLabel(panel, start);
+    const icon = createBranchDeviceIcon(
+      detail,
+      Number.isFinite(size) && size > 0 ? Number(size) : 1,
+      start,
+      system,
+      phase
+    );
     if (icon) {
       slotEl.appendChild(icon);
     }
@@ -1155,7 +1181,7 @@ function createDeviceCell(panel, oddCircuit, evenCircuit, circuitCount, breakerD
   return td;
 }
 
-function createBranchDeviceIcon(detail, poleCount, startCircuit) {
+function createBranchDeviceIcon(detail, poleCount, startCircuit, system, phaseLabel) {
   const type = getDeviceType(detail);
   const poles = Number.isFinite(poleCount) && poleCount > 0 ? poleCount : 1;
   const icon = document.createElement("div");
@@ -1163,6 +1189,16 @@ function createBranchDeviceIcon(detail, poleCount, startCircuit) {
   icon.dataset.breaker = String(startCircuit);
   icon.dataset.poles = String(poles);
   icon.dataset.deviceType = type;
+  if (phaseLabel) {
+    icon.dataset.phase = phaseLabel;
+  }
+
+  if (system === "dc" && phaseLabel) {
+    const polarity = phaseLabel === "+" ? "positive" : "negative";
+    icon.classList.add("panel-device--dc");
+    icon.classList.add(`panel-device--dc-${polarity}`);
+    icon.dataset.polarity = polarity;
+  }
 
   const graphic = document.createElement("div");
   graphic.className = "panel-device-graphic";
@@ -1262,7 +1298,9 @@ window.addEventListener("DOMContentLoaded", () => {
     if (!Number.isFinite(start) || start < 1) return;
     let size = Number.parseInt(poles, 10);
     if (!Number.isFinite(size) || size < 1) size = 1;
-    if (size > 3) size = 3;
+    const systemType = getPanelSystem(panel);
+    const maxPoles = systemType === "dc" ? 2 : 3;
+    if (size > maxPoles) size = maxPoles;
     const count = getPanelCircuitCount(panel);
     ensurePanelBreakerCapacity(panel, count);
     const { layout } = ensurePanelBreakerLayout(panel, count);
