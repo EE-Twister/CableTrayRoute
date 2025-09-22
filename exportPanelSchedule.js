@@ -18,6 +18,75 @@ function getPanelSystem(panel) {
   return raw === 'dc' ? 'dc' : 'ac';
 }
 
+const DC_PHASE_LABELS = ['+', '−'];
+const SINGLE_PHASE_LABELS = ['A', 'B'];
+const THREE_PHASE_LABELS = ['A', 'B', 'C'];
+
+function computeBreakerSpan(startCircuit, poleCount, circuitCount) {
+  const start = Number.parseInt(startCircuit, 10);
+  const poles = Number.parseInt(poleCount, 10);
+  if (!Number.isFinite(start) || start < 1) return [];
+  if (!Number.isFinite(poles) || poles <= 0) return [];
+  const limit = Number.isFinite(circuitCount) && circuitCount > 0 ? circuitCount : null;
+  const step = poles > 1 ? 2 : 1;
+  const span = [];
+  for (let position = 0; position < poles; position++) {
+    const circuit = start + position * step;
+    if (limit && circuit > limit) {
+      return [];
+    }
+    span.push(circuit);
+  }
+  return span;
+}
+
+function getBreakerBlock(panel, circuit) {
+  if (!panel || !Array.isArray(panel.breakerLayout)) return null;
+  if (!Number.isFinite(circuit) || circuit < 1) return null;
+  return panel.breakerLayout[circuit - 1] || null;
+}
+
+function getLayoutPoleCount(panel, startCircuit) {
+  const block = getBreakerBlock(panel, startCircuit);
+  if (!block || block.position !== 0) return null;
+  const size = Number(block.size);
+  return Number.isFinite(size) && size > 0 ? size : null;
+}
+
+function getBlockCircuits(panel, block, circuitCount) {
+  if (!block) return [];
+  const size = Number(block.size);
+  const start = Number(block.start);
+  if (!Number.isFinite(size) || !Number.isFinite(start) || size <= 0 || start < 1) return [];
+  const limit = Number.isFinite(circuitCount) && circuitCount > 0 ? circuitCount : getPanelCircuitCount(panel);
+  return computeBreakerSpan(start, size, limit);
+}
+
+function getPanelPhaseSequence(panel) {
+  const system = getPanelSystem(panel);
+  if (system === 'dc') return DC_PHASE_LABELS;
+  const phases = parseInt(panel?.phases, 10);
+  if (Number.isFinite(phases)) {
+    if (phases <= 1) return SINGLE_PHASE_LABELS;
+    if (phases === 2) return SINGLE_PHASE_LABELS;
+    if (phases >= 3) return THREE_PHASE_LABELS;
+  }
+  return THREE_PHASE_LABELS;
+}
+
+function getPhaseLabel(panel, circuit) {
+  const sequence = getPanelPhaseSequence(panel);
+  if (!sequence.length) return '';
+  const index = Number(circuit);
+  if (!Number.isFinite(index) || index < 1) return '';
+  const system = getPanelSystem(panel);
+  if (sequence.length === 3 && system === 'ac') {
+    const rowIndex = Math.floor((index - 1) / 2);
+    return sequence[rowIndex % sequence.length];
+  }
+  return sequence[(index - 1) % sequence.length];
+}
+
 function getLoadPoleCount(load, panel) {
   if (!load) return 1;
   const system = getPanelSystem(panel);
@@ -43,17 +112,32 @@ function getLoadPoleCount(load, panel) {
 }
 
 function getLoadBreakerSpan(load, panel, circuitCount) {
-  const start = parsePositiveInt(load?.breaker);
+  let start = parsePositiveInt(load?.breaker);
   if (!start) return [];
-  const poles = Math.max(1, getLoadPoleCount(load, panel));
-  const limit = Number.isFinite(circuitCount) && circuitCount > 0 ? circuitCount : null;
-  const span = [];
-  for (let offset = 0; offset < poles; offset++) {
-    const slot = start + offset;
-    if (limit && slot > limit) break;
-    span.push(slot);
+  const limit = Number.isFinite(circuitCount) && circuitCount > 0
+    ? circuitCount
+    : getPanelCircuitCount(panel);
+
+  if (panel) {
+    const blockAtSlot = getBreakerBlock(panel, start);
+    if (blockAtSlot && Number.isFinite(Number(blockAtSlot.start)) && Number(blockAtSlot.start) !== start) {
+      start = Number(blockAtSlot.start);
+    }
+    const startBlock = getBreakerBlock(panel, start);
+    if (startBlock && startBlock.position === 0) {
+      const blockSpan = getBlockCircuits(panel, startBlock, limit);
+      if (blockSpan.length) {
+        return blockSpan;
+      }
+    }
+    const layoutPoles = getLayoutPoleCount(panel, start);
+    if (Number.isFinite(layoutPoles) && layoutPoles > 0) {
+      return computeBreakerSpan(start, layoutPoles, limit);
+    }
   }
-  return span;
+
+  const poles = Math.max(1, getLoadPoleCount(load, panel));
+  return computeBreakerSpan(start, poles, limit);
 }
 
 function getLoadLabel(load) {
@@ -61,6 +145,22 @@ function getLoadLabel(load) {
   const desc = load?.description;
   if (tag && desc) return `${tag} — ${desc}`;
   return tag || desc || '';
+}
+
+function getDemandValue(load) {
+  if (!load) return null;
+  const candidates = [
+    load.demandKva,
+    load.kva,
+    load.demandKw,
+    load.kw,
+    load.demand
+  ];
+  for (const candidate of candidates) {
+    const parsed = Number.parseFloat(candidate);
+    if (Number.isFinite(parsed)) return parsed;
+  }
+  return null;
 }
 
 /**
@@ -77,24 +177,27 @@ export function exportPanelSchedule(panelId) {
   const panel = panels.find(p => p.id === panelId || p.panel_id === panelId) || {};
   const loads = dataStore.getLoads().filter(l => l.panelId === panelId);
 
+  const circuitCount = getPanelCircuitCount(panel);
+  const panelLabel = panel.ref || panel.panel_id || panel.id || panelId;
+  const systemType = getPanelSystem(panel);
+
   const data = [];
-  data.push(['Panel', panelId]);
+  data.push(['Panel', panelLabel || panelId]);
   data.push(['Voltage', panel.voltage || panel.voltage_rating || '']);
-  const systemType = (panel.powerType || panel.systemType || panel.type || '').toString().toLowerCase() === 'dc' ? 'DC' : 'AC';
-  data.push(['System Type', systemType]);
+  data.push(['System Type', systemType === 'dc' ? 'DC' : 'AC']);
   data.push(['Phases', panel.phases || panel.phaseCount || '']);
   data.push(['Main Rating (A)', panel.mainRating || panel.main_rating || '']);
   data.push(['Short-Circuit Rating (A)', panel.shortCircuitRating || panel.shortCircuitCurrentRating || '']);
-  const circuitCount = getPanelCircuitCount(panel);
   data.push(['Circuit Count', circuitCount]);
   data.push([]);
-  data.push(['Circuit', 'Poles', 'Description', 'Demand (kVA)']);
+  data.push(['Circuit', 'Phase', 'Description', 'Poles', 'Demand (kVA)', '', 'Circuit', 'Phase', 'Description', 'Poles', 'Demand (kVA)']);
+
   const assignments = new Map();
   loads.forEach(load => {
     const span = getLoadBreakerSpan(load, panel, circuitCount);
     if (!span.length) return;
     span.forEach((slot, position) => {
-      assignments.set(slot, { load, position, spanLength: span.length });
+      assignments.set(slot, { load, position, spanLength: span.length, startCircuit: span[0] });
     });
   });
   if (Array.isArray(panel.breakers)) {
@@ -106,36 +209,77 @@ export function exportPanelSchedule(panelId) {
       const span = getLoadBreakerSpan(load, panel, circuitCount);
       if (span.length) {
         span.forEach((slot, position) => {
-          assignments.set(slot, { load, position, spanLength: span.length });
+          assignments.set(slot, { load, position, spanLength: span.length, startCircuit: span[0] });
         });
       } else {
-        assignments.set(circuit, { load, position: 0, spanLength: 1 });
+        assignments.set(circuit, { load, position: 0, spanLength: 1, startCircuit: circuit });
       }
     });
   }
 
+  const rows = [];
   for (let circuit = 1; circuit <= circuitCount; circuit++) {
     const info = assignments.get(circuit);
+    const phase = getPhaseLabel(panel, circuit) || '';
+    let description = '';
     let poles = '';
-    let desc = '';
     let demandVal = '';
     if (info) {
-      const { load, position, spanLength } = info;
-      const isStart = position === 0;
-      if (isStart) {
+      const { load, position, spanLength, startCircuit } = info;
+      if (position === 0) {
         const poleValue = parsePositiveInt(load.breakerPoles || load.poles || load.phases) || spanLength;
         poles = poleValue ? String(poleValue) : '';
-        desc = getLoadLabel(load);
-        const demandCandidate = parseFloat(load.demand) || parseFloat(load.demandKw) || parseFloat(load.kw);
-        demandVal = Number.isFinite(demandCandidate) ? demandCandidate : '';
+        description = getLoadLabel(load);
+        const demandCandidate = getDemandValue(load);
+        demandVal = demandCandidate != null ? demandCandidate.toFixed(2) : '';
       } else {
-        const startCircuit = parsePositiveInt(load.breaker) || (circuit - position);
+        const startRef = parsePositiveInt(load.breaker) || startCircuit || (circuit - position);
         const label = getLoadLabel(load);
-        desc = `Tied to Circuit ${startCircuit}${label ? ` — ${label}` : ''}`;
+        description = `Tied to Circuit ${startRef}${label ? ` — ${label}` : ''}`;
       }
     }
-    data.push([circuit, poles, desc, demandVal]);
+    rows.push({
+      circuit,
+      phase,
+      description,
+      poles,
+      demand: demandVal
+    });
   }
+
+  for (let i = 0; i < rows.length; i += 2) {
+    const left = rows[i] || { circuit: '', phase: '', description: '', poles: '', demand: '' };
+    const right = rows[i + 1] || { circuit: '', phase: '', description: '', poles: '', demand: '' };
+    data.push([
+      left.circuit ?? '',
+      left.phase ?? '',
+      left.description ?? '',
+      left.poles ?? '',
+      left.demand ?? '',
+      '',
+      right.circuit ?? '',
+      right.phase ?? '',
+      right.description ?? '',
+      right.poles ?? '',
+      right.demand ?? ''
+    ]);
+  }
+
+  const totals = loads.reduce((acc, load) => {
+    const connectedKva = Number.parseFloat(load.kva) || 0;
+    const connectedKw = Number.parseFloat(load.kw) || 0;
+    const demandKva = Number.parseFloat(load.demandKva) || connectedKva;
+    const demandKw = Number.parseFloat(load.demandKw) || connectedKw;
+    acc.connectedKva += connectedKva;
+    acc.connectedKw += connectedKw;
+    acc.demandKva += demandKva;
+    acc.demandKw += demandKw;
+    return acc;
+  }, { connectedKva: 0, connectedKw: 0, demandKva: 0, demandKw: 0 });
+
+  data.push([]);
+  data.push(['Connected Load (kVA)', totals.connectedKva.toFixed(2), '', '', '', '', 'Demand Load (kVA)', totals.demandKva.toFixed(2)]);
+  data.push(['Connected Load (kW)', totals.connectedKw.toFixed(2), '', '', '', '', 'Demand Load (kW)', totals.demandKw.toFixed(2)]);
 
   const ws = XLSX.utils.aoa_to_sheet(data);
   const wb = XLSX.utils.book_new();
