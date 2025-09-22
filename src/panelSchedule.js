@@ -13,18 +13,29 @@ function getOrCreatePanel(panelId) {
       id: panelId,
       breakers: [],
       breakerLayout: [],
+      breakerDetails: {},
       voltage: "",
       mainRating: "",
       circuitCount: 42,
       powerType: "ac",
       phases: "3",
-      shortCircuitRating: ""
+      shortCircuitRating: "",
+      fedFrom: ""
     };
     panels.push(panel);
     dataStore.setPanels(panels);
   }
   if (!Array.isArray(panel.breakerLayout)) {
     panel.breakerLayout = [];
+  }
+  if (!panel.breakerDetails || typeof panel.breakerDetails !== "object") {
+    panel.breakerDetails = {};
+  }
+  if (panel.fedFrom == null && panel.fed_from != null) {
+    panel.fedFrom = panel.fed_from;
+  }
+  if (panel.fedFrom == null) {
+    panel.fedFrom = "";
   }
   if (panel.tag && !panel.ref) {
     panel.ref = panel.tag;
@@ -90,6 +101,71 @@ function computeBreakerSpan(startCircuit, poleCount, circuitCount) {
   return span;
 }
 
+const BREAKER_RATING_VALUES = [15, 20, 25, 30, 35, 40, 45, 50, 60, 70, 80, 90, 100, 110, 125, 150, 175, 200, 225, 250];
+
+function ensureBreakerDetails(panel) {
+  if (!panel) return {};
+  if (!panel.breakerDetails || typeof panel.breakerDetails !== "object") {
+    panel.breakerDetails = {};
+  }
+  return panel.breakerDetails;
+}
+
+function ensureBreakerDetail(panel, startCircuit) {
+  if (!panel || !Number.isFinite(startCircuit)) return null;
+  const details = ensureBreakerDetails(panel);
+  const key = String(startCircuit);
+  const existing = details[key];
+  if (existing && typeof existing === "object") {
+    if (!existing.deviceType) existing.deviceType = "breaker";
+    return existing;
+  }
+  const created = { deviceType: "breaker" };
+  details[key] = created;
+  return created;
+}
+
+function getBreakerDetail(panel, startCircuit) {
+  if (!panel || !Number.isFinite(startCircuit)) return null;
+  const details = ensureBreakerDetails(panel);
+  const detail = details[String(startCircuit)];
+  if (detail && !detail.deviceType) {
+    detail.deviceType = "breaker";
+  }
+  return detail || null;
+}
+
+function deleteBreakerDetail(panel, startCircuit) {
+  if (!panel || !panel.breakerDetails || !Number.isFinite(startCircuit)) return;
+  delete panel.breakerDetails[String(startCircuit)];
+}
+
+function getDeviceType(detail) {
+  return detail && detail.deviceType === "fuse" ? "fuse" : "breaker";
+}
+
+function formatDeviceLabel(detail, poleCount) {
+  const type = getDeviceType(detail);
+  const base = type === "fuse" ? "Fuse" : "Breaker";
+  if (Number.isFinite(poleCount) && poleCount > 1) {
+    return `${poleCount}-Pole ${base}`;
+  }
+  return base;
+}
+
+function getCableDisplayId(cable) {
+  return cable?.tag || cable?.id || cable?.ref || cable?.cable_id || null;
+}
+
+function getCableLabel(cable) {
+  const id = getCableDisplayId(cable);
+  const desc = cable?.service_description || cable?.description || cable?.notes || cable?.circuit_number;
+  if (id && desc && desc !== id) {
+    return `${id} — ${desc}`;
+  }
+  return id || desc || null;
+}
+
 function clearBreakerBlock(layout, startCircuit) {
   if (!Array.isArray(layout)) return;
   for (let i = 0; i < layout.length; i++) {
@@ -111,6 +187,7 @@ function ensurePanelBreakerLayout(panel, circuitCount) {
   const count = Number.isFinite(circuitCount) && circuitCount > 0 ? circuitCount : 0;
   const normalized = new Array(count).fill(null);
   let changed = false;
+  const details = panel ? ensureBreakerDetails(panel) : {};
 
   const blocks = new Map();
   for (let i = 0; i < prevLayout.length; i++) {
@@ -158,6 +235,13 @@ function ensurePanelBreakerLayout(panel, circuitCount) {
       const idx = slot - 1;
       normalized[idx] = { start, size, position };
     });
+    if (details) {
+      const detail = details[String(start)];
+      if (detail) {
+        detail.poles = Number.isFinite(size) && size > 0 ? Number(size) : detail.poles;
+        if (!detail.deviceType) detail.deviceType = "breaker";
+      }
+    }
   });
 
   if (prevLayout.length !== normalized.length) {
@@ -175,6 +259,28 @@ function ensurePanelBreakerLayout(panel, circuitCount) {
   }
 
   panel.breakerLayout = normalized;
+  if (panel) {
+    const validStarts = new Set();
+    normalized.forEach(entry => {
+      if (!entry) return;
+      const start = Number(entry.start);
+      if (!Number.isFinite(start)) return;
+      if (entry.position === 0) {
+        const key = String(start);
+        validStarts.add(key);
+        const detail = details[key];
+        if (detail) {
+          detail.poles = Number(entry.size) && Number(entry.size) > 0 ? Number(entry.size) : detail.poles;
+          if (!detail.deviceType) detail.deviceType = "breaker";
+        }
+      }
+    });
+    Object.keys(details).forEach(key => {
+      if (!validStarts.has(key)) {
+        delete details[key];
+      }
+    });
+  }
   return { layout: panel.breakerLayout, changed };
 }
 
@@ -538,6 +644,34 @@ function render(panelId = "P1") {
   if (!container) return;
   container.innerHTML = "";
 
+  const breakerDetails = ensureBreakerDetails(panel);
+  const ratingList = document.createElement("datalist");
+  ratingList.id = "panel-breaker-rating-options";
+  BREAKER_RATING_VALUES.forEach(value => {
+    const option = document.createElement("option");
+    option.value = String(value);
+    ratingList.appendChild(option);
+  });
+  container.appendChild(ratingList);
+
+  const cableList = document.createElement("datalist");
+  cableList.id = "panel-breaker-cable-options";
+  const cables = dataStore.getCables();
+  const seenCableIds = new Set();
+  cables.forEach(cable => {
+    const id = getCableDisplayId(cable);
+    if (!id || seenCableIds.has(id)) return;
+    seenCableIds.add(id);
+    const option = document.createElement("option");
+    option.value = id;
+    const label = getCableLabel(cable);
+    if (label && label !== id) {
+      option.label = label;
+    }
+    cableList.appendChild(option);
+  });
+  container.appendChild(cableList);
+
   const circuitCount = getPanelCircuitCount(panel);
   ensurePanelBreakerCapacity(panel, circuitCount);
   const { changed: layoutAdjusted } = ensurePanelBreakerLayout(panel, circuitCount);
@@ -597,10 +731,14 @@ function render(panelId = "P1") {
   const leftHeader = document.createElement("th");
   leftHeader.scope = "col";
   leftHeader.textContent = "Odd Circuits";
+  const deviceHeader = document.createElement("th");
+  deviceHeader.scope = "col";
+  deviceHeader.className = "panel-device-header";
+  deviceHeader.textContent = "Device";
   const rightHeader = document.createElement("th");
   rightHeader.scope = "col";
   rightHeader.textContent = "Even Circuits";
-  headRow.append(leftHeader, rightHeader);
+  headRow.append(leftHeader, deviceHeader, rightHeader);
   thead.appendChild(headRow);
   table.appendChild(thead);
 
@@ -609,9 +747,10 @@ function render(panelId = "P1") {
   for (let i = 0; i < rows; i++) {
     const row = document.createElement("tr");
     const oddCircuit = i * 2 + 1;
-    row.appendChild(createCircuitCell(panel, panelId, loads, oddCircuit, circuitCount, "left", system));
     const evenCircuit = oddCircuit + 1;
-    row.appendChild(createCircuitCell(panel, panelId, loads, evenCircuit, circuitCount, "right", system));
+    row.appendChild(createCircuitCell(panel, panelId, loads, oddCircuit, circuitCount, "left", system, breakerDetails));
+    row.appendChild(createDeviceCell(panel, oddCircuit, evenCircuit, circuitCount, breakerDetails));
+    row.appendChild(createCircuitCell(panel, panelId, loads, evenCircuit, circuitCount, "right", system, breakerDetails));
     tbody.appendChild(row);
   }
   table.appendChild(tbody);
@@ -619,7 +758,7 @@ function render(panelId = "P1") {
   updateTotals(panelId);
 }
 
-function createCircuitCell(panel, panelId, loads, breaker, circuitCount, position, system) {
+function createCircuitCell(panel, panelId, loads, breaker, circuitCount, position, system, breakerDetails) {
   const td = document.createElement("td");
   td.className = "panel-cell";
   if (position) td.classList.add(`panel-cell--${position}`);
@@ -646,6 +785,8 @@ function createCircuitCell(panel, panelId, loads, breaker, circuitCount, positio
   const blockSize = block && Number.isFinite(Number(block.size)) ? Number(block.size) : null;
   const isBlockStart = Boolean(block && block.position === 0);
   const isBlockContinuation = Boolean(block && block.position > 0);
+  const detailMap = breakerDetails || ensureBreakerDetails(panel);
+  const breakerDetail = Number.isFinite(blockStart) ? (detailMap[String(blockStart)] || null) : null;
   slot.dataset.circuit = String(breaker);
   if (!block) {
     slot.dataset.breakerDrop = "available";
@@ -658,6 +799,14 @@ function createCircuitCell(panel, panelId, loads, breaker, circuitCount, positio
       if (Number.isFinite(blockSize)) {
         slot.dataset.breakerSize = String(blockSize);
       }
+    }
+  }
+  if (breakerDetail) {
+    slot.dataset.deviceType = getDeviceType(breakerDetail);
+    if (breakerDetail.rating != null && breakerDetail.rating !== "") {
+      slot.dataset.deviceRating = String(breakerDetail.rating);
+    } else {
+      delete slot.dataset.deviceRating;
     }
   }
   const phaseLabel = getPhaseLabel(panel, breaker);
@@ -728,6 +877,8 @@ function createCircuitCell(panel, panelId, loads, breaker, circuitCount, positio
   const isStart = assignedLoad && assignedStart === breaker;
   const blockCircuits = block ? getBlockCircuits(panel, block, circuitCount) : [];
   const primaryStart = blockStart || (blockCircuits.length ? blockCircuits[0] : breaker);
+  const blockPoleCount = Number.isFinite(blockSize) && blockSize > 0 ? Number(blockSize) : null;
+  const blockLabel = formatDeviceLabel(breakerDetail, blockPoleCount || (assignedSpan.length || 1));
 
   if (!block) {
     slot.classList.add("panel-slot--blank");
@@ -773,9 +924,65 @@ function createCircuitCell(panel, panelId, loads, breaker, circuitCount, positio
 
     control.appendChild(select);
 
+    const config = document.createElement("div");
+    config.className = "panel-slot-device-config";
+    const deviceType = getDeviceType(breakerDetail);
+    const ratingValue = breakerDetail && breakerDetail.rating != null ? String(breakerDetail.rating) : "";
+    const cableValue = breakerDetail?.cableTag || breakerDetail?.cable || breakerDetail?.cableId || "";
+
+    const typeLabel = document.createElement("label");
+    typeLabel.className = "panel-slot-field";
+    typeLabel.textContent = "Device Type";
+    const typeSelect = document.createElement("select");
+    typeSelect.className = "panel-slot-input";
+    typeSelect.dataset.breakerDevice = String(primaryStart);
+    const breakerOption = document.createElement("option");
+    breakerOption.value = "breaker";
+    breakerOption.textContent = "Breaker";
+    const fuseOption = document.createElement("option");
+    fuseOption.value = "fuse";
+    fuseOption.textContent = "Fuse";
+    typeSelect.append(breakerOption, fuseOption);
+    typeSelect.value = deviceType === "fuse" ? "fuse" : "breaker";
+    typeLabel.appendChild(typeSelect);
+    config.appendChild(typeLabel);
+
+    const ratingLabel = document.createElement("label");
+    ratingLabel.className = "panel-slot-field";
+    ratingLabel.textContent = "Rating (A)";
+    const ratingInput = document.createElement("input");
+    ratingInput.type = "number";
+    ratingInput.min = "0";
+    ratingInput.step = "1";
+    ratingInput.placeholder = "e.g. 20";
+    ratingInput.className = "panel-slot-input";
+    ratingInput.dataset.breakerRating = String(primaryStart);
+    ratingInput.setAttribute("list", "panel-breaker-rating-options");
+    ratingInput.value = ratingValue;
+    ratingLabel.appendChild(ratingInput);
+    config.appendChild(ratingLabel);
+
+    const cableLabel = document.createElement("label");
+    cableLabel.className = "panel-slot-field";
+    cableLabel.textContent = "Cable";
+    const cableInput = document.createElement("input");
+    cableInput.type = "text";
+    cableInput.className = "panel-slot-input";
+    cableInput.placeholder = "Cable Tag";
+    cableInput.dataset.breakerCable = String(primaryStart);
+    cableInput.setAttribute("list", "panel-breaker-cable-options");
+    cableInput.value = cableValue;
+    cableLabel.appendChild(cableInput);
+    config.appendChild(cableLabel);
+
+    control.appendChild(config);
+
     const breakerInfo = document.createElement("div");
     breakerInfo.className = "panel-slot-breaker-info";
-    breakerInfo.textContent = blockSize ? `${blockSize}-Pole Breaker` : "Breaker";
+    const infoSegments = [];
+    if (blockLabel) infoSegments.push(blockLabel);
+    if (ratingValue) infoSegments.push(`${ratingValue}A`);
+    breakerInfo.textContent = infoSegments.length ? infoSegments.join(" — ") : "Breaker";
     control.appendChild(breakerInfo);
 
     const removeBtn = document.createElement("button");
@@ -783,12 +990,13 @@ function createCircuitCell(panel, panelId, loads, breaker, circuitCount, positio
     removeBtn.className = "panel-slot-remove";
     removeBtn.dataset.action = "remove-breaker";
     removeBtn.dataset.circuit = String(primaryStart);
-    removeBtn.textContent = "Remove Breaker";
+    const removeLabel = deviceType === "fuse" ? "Fuse" : "Breaker";
+    removeBtn.textContent = `Remove ${removeLabel}`;
     if (assignedLoad) {
       removeBtn.disabled = true;
-      removeBtn.title = "Remove the load before deleting this breaker.";
+      removeBtn.title = `Remove the load before deleting this ${removeLabel.toLowerCase()}.`;
     } else {
-      removeBtn.title = "Remove breaker";
+      removeBtn.title = `Remove ${removeLabel.toLowerCase()}`;
     }
     control.appendChild(removeBtn);
   } else {
@@ -839,6 +1047,17 @@ function createCircuitCell(panel, panelId, loads, breaker, circuitCount, positio
     }
     const voltage = assignedLoad.voltage;
     if (voltage) meta.appendChild(createMetaChip(`${voltage} V`));
+    if (blockLabel) {
+      const ratingChip = breakerDetail && breakerDetail.rating != null && breakerDetail.rating !== ""
+        ? `${breakerDetail.rating}A ${blockLabel}`
+        : blockLabel;
+      const normalized = ratingChip.trim();
+      if (normalized) meta.appendChild(createMetaChip(normalized));
+    }
+    const cableTag = breakerDetail?.cableTag || breakerDetail?.cable || breakerDetail?.cableId;
+    if (cableTag) {
+      meta.appendChild(createMetaChip(`Cable ${cableTag}`));
+    }
     if (meta.childElementCount > 0) {
       details.appendChild(meta);
     }
@@ -872,9 +1091,25 @@ function createCircuitCell(panel, panelId, loads, breaker, circuitCount, positio
   } else if (block) {
     details.classList.add("panel-slot-details-empty");
     if (isBlockStart) {
-      details.textContent = blockSize ? `${blockSize}-pole breaker available` : "Breaker available";
+      const infoSegments = [];
+      if (blockLabel) infoSegments.push(blockLabel);
+      const ratingValue = breakerDetail && breakerDetail.rating != null && breakerDetail.rating !== ""
+        ? String(breakerDetail.rating)
+        : "";
+      if (ratingValue) infoSegments.push(`${ratingValue}A`);
+      const summary = infoSegments.length ? infoSegments.join(" — ") : "Breaker";
+      details.textContent = `${summary} available`;
+      const cableTag = breakerDetail?.cableTag || breakerDetail?.cable || breakerDetail?.cableId;
+      if (cableTag) {
+        const meta = document.createElement("div");
+        meta.className = "panel-slot-meta";
+        meta.appendChild(createMetaChip(`Cable ${cableTag}`));
+        details.appendChild(meta);
+      }
     } else {
-      details.textContent = `Part of breaker starting at Circuit ${primaryStart}`;
+      details.textContent = blockLabel
+        ? `Part of ${blockLabel} starting at Circuit ${primaryStart}`
+        : `Part of breaker starting at Circuit ${primaryStart}`;
     }
   } else {
     details.classList.add("panel-slot-details-empty");
@@ -884,6 +1119,104 @@ function createCircuitCell(panel, panelId, loads, breaker, circuitCount, positio
   slot.appendChild(details);
   td.appendChild(slot);
   return td;
+}
+
+function createDeviceCell(panel, oddCircuit, evenCircuit, circuitCount, breakerDetails) {
+  const td = document.createElement("td");
+  td.className = "panel-device-cell";
+
+  const wrapper = document.createElement("div");
+  wrapper.className = "panel-device-wrapper";
+  const oddSlot = document.createElement("div");
+  oddSlot.className = "panel-device-slot panel-device-slot--odd";
+  const evenSlot = document.createElement("div");
+  evenSlot.className = "panel-device-slot panel-device-slot--even";
+  wrapper.append(oddSlot, evenSlot);
+  td.appendChild(wrapper);
+
+  const layout = Array.isArray(panel.breakerLayout) ? panel.breakerLayout : [];
+
+  const appendDevice = (circuit, slotEl) => {
+    if (!Number.isFinite(circuit) || circuit < 1 || circuit > circuitCount) return;
+    const block = layout[circuit - 1] || null;
+    if (!block || block.position !== 0) return;
+    const start = Number(block.start);
+    if (!Number.isFinite(start)) return;
+    const size = Number(block.size);
+    const detail = breakerDetails ? breakerDetails[String(start)] || getBreakerDetail(panel, start) : getBreakerDetail(panel, start);
+    const icon = createBranchDeviceIcon(detail, Number.isFinite(size) && size > 0 ? Number(size) : 1, start);
+    if (icon) {
+      slotEl.appendChild(icon);
+    }
+  };
+
+  appendDevice(oddCircuit, oddSlot);
+  appendDevice(evenCircuit, evenSlot);
+  return td;
+}
+
+function createBranchDeviceIcon(detail, poleCount, startCircuit) {
+  const type = getDeviceType(detail);
+  const poles = Number.isFinite(poleCount) && poleCount > 0 ? poleCount : 1;
+  const icon = document.createElement("div");
+  icon.className = `panel-device panel-device--${type}`;
+  icon.dataset.breaker = String(startCircuit);
+  icon.dataset.poles = String(poles);
+  icon.dataset.deviceType = type;
+
+  const graphic = document.createElement("div");
+  graphic.className = "panel-device-graphic";
+  const handles = document.createElement("div");
+  handles.className = "panel-device-handles";
+  for (let i = 0; i < poles; i++) {
+    const handle = document.createElement("span");
+    handle.className = "panel-device-handle";
+    handles.appendChild(handle);
+  }
+  graphic.appendChild(handles);
+  if (poles > 1) {
+    const tie = document.createElement("span");
+    tie.className = "panel-device-tie";
+    graphic.appendChild(tie);
+  }
+  icon.appendChild(graphic);
+
+  const ratingValue = detail && detail.rating != null && detail.rating !== "" ? String(detail.rating) : "";
+  const labelText = ratingValue ? `${ratingValue}A` : formatDeviceLabel(detail, poles);
+  if (labelText) {
+    const label = document.createElement("span");
+    label.className = "panel-device-label";
+    label.textContent = labelText;
+    icon.appendChild(label);
+    if (ratingValue) {
+      icon.dataset.rating = ratingValue;
+    }
+  }
+
+  const cableTag = detail?.cableTag || detail?.cable || detail?.cableId;
+  if (cableTag) {
+    const subtext = document.createElement("span");
+    subtext.className = "panel-device-subtext";
+    subtext.textContent = cableTag;
+    icon.dataset.cable = cableTag;
+    icon.appendChild(subtext);
+  }
+
+  const tooltipParts = [];
+  tooltipParts.push(formatDeviceLabel(detail, poles));
+  if (ratingValue) tooltipParts.push(`${ratingValue}A`);
+  if (cableTag) tooltipParts.push(`Cable ${cableTag}`);
+  const tooltip = tooltipParts.filter(Boolean).join(" • ");
+  if (tooltip) {
+    icon.title = tooltip;
+    icon.setAttribute("aria-label", tooltip);
+  } else {
+    const fallback = formatDeviceLabel(detail, poles);
+    icon.title = fallback;
+    icon.setAttribute("aria-label", fallback);
+  }
+
+  return icon;
 }
 
 function updateTotals(panelId) {
@@ -901,6 +1234,7 @@ window.addEventListener("DOMContentLoaded", () => {
   let currentDragPoles = null;
 
   const tagInput = document.getElementById("panel-tag");
+  const fedFromInput = document.getElementById("panel-fed-from");
   const voltageInput = document.getElementById("panel-voltage");
   const manufacturerInput = document.getElementById("panel-manufacturer");
   const modelInput = document.getElementById("panel-model");
@@ -965,6 +1299,8 @@ window.addEventListener("DOMContentLoaded", () => {
       alert(label ? `Remove load ${label} before changing this breaker.` : "Remove the load before changing this breaker.");
       return;
     }
+    const detail = ensureBreakerDetail(panel, start);
+    detail.poles = size;
     clearBreakerBlock(layout, start);
     targetSlots.forEach((slot, position) => {
       if (slot >= 1 && slot <= layout.length) {
@@ -1005,6 +1341,7 @@ window.addEventListener("DOMContentLoaded", () => {
       return;
     }
     clearBreakerBlock(panel.breakerLayout, start);
+    deleteBreakerDetail(panel, start);
     if (Array.isArray(panel.breakers)) {
       blockSlots.forEach(slot => {
         const idx = slot - 1;
@@ -1038,6 +1375,7 @@ window.addEventListener("DOMContentLoaded", () => {
   }
 
   if (tagInput) tagInput.value = panel.ref || panel.panel_id || panel.tag || panel.id || "";
+  if (fedFromInput) fedFromInput.value = panel.fedFrom || panel.fed_from || "";
   if (voltageInput) voltageInput.value = panel.voltage || "";
   if (manufacturerInput) manufacturerInput.value = panel.manufacturer || "";
   if (modelInput) modelInput.value = panel.model || "";
@@ -1063,6 +1401,18 @@ window.addEventListener("DOMContentLoaded", () => {
       } else {
         delete panel.panel_id;
         delete panel.tag;
+      }
+      savePanels();
+      updateOneline();
+    });
+  }
+  if (fedFromInput) {
+    fedFromInput.addEventListener("input", () => {
+      panel.fedFrom = fedFromInput.value;
+      if (fedFromInput.value) {
+        panel.fed_from = fedFromInput.value;
+      } else {
+        delete panel.fed_from;
       }
       savePanels();
       updateOneline();
@@ -1117,16 +1467,27 @@ window.addEventListener("DOMContentLoaded", () => {
           const size = Number(entry.size);
           if (!Number.isFinite(start) || !Number.isFinite(size)) {
             layout[i] = null;
+            if (Number.isFinite(start)) {
+              deleteBreakerDetail(panel, start);
+            }
             continue;
           }
           if (start < 1 || start > count || start + size - 1 > count) {
             clearBreakerBlock(layout, start);
+            deleteBreakerDetail(panel, start);
           }
         }
         if (layout.length > count) {
+          for (let i = count; i < layout.length; i++) {
+            const entry = layout[i];
+            if (entry && Number.isFinite(Number(entry.start))) {
+              deleteBreakerDetail(panel, Number(entry.start));
+            }
+          }
           layout.splice(count);
         }
       }
+      ensurePanelBreakerLayout(panel, count);
       savePanels();
       updateOneline();
       render(panelId);
@@ -1290,6 +1651,51 @@ window.addEventListener("DOMContentLoaded", () => {
 
   if (panelContainer) {
     panelContainer.addEventListener("change", e => {
+      if (e.target.matches("select[data-breaker-device]")) {
+        const start = Number.parseInt(e.target.dataset.breakerDevice, 10);
+        if (Number.isFinite(start)) {
+          const detail = ensureBreakerDetail(panel, start);
+          detail.deviceType = e.target.value === "fuse" ? "fuse" : "breaker";
+          savePanels();
+          updateOneline();
+          render(panelId);
+        }
+        return;
+      }
+      if (e.target.matches("input[data-breaker-rating]")) {
+        const start = Number.parseInt(e.target.dataset.breakerRating, 10);
+        if (Number.isFinite(start)) {
+          const detail = ensureBreakerDetail(panel, start);
+          const value = e.target.value.trim();
+          if (value) {
+            detail.rating = value;
+          } else {
+            delete detail.rating;
+          }
+          savePanels();
+          updateOneline();
+          render(panelId);
+        }
+        return;
+      }
+      if (e.target.matches("input[data-breaker-cable]")) {
+        const start = Number.parseInt(e.target.dataset.breakerCable, 10);
+        if (Number.isFinite(start)) {
+          const detail = ensureBreakerDetail(panel, start);
+          const value = e.target.value.trim();
+          if (value) {
+            detail.cableTag = value;
+          } else {
+            delete detail.cableTag;
+            delete detail.cable;
+            delete detail.cableId;
+          }
+          savePanels();
+          updateOneline();
+          render(panelId);
+        }
+        return;
+      }
       if (e.target.matches("select[data-breaker]")) {
         const breaker = parseInt(e.target.dataset.breaker, 10);
         const loadIdx = e.target.value ? Number(e.target.value) : null;
