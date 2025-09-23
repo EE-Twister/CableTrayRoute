@@ -64,9 +64,9 @@
     </section>
     <section>
       <h2>Saving Projects</h2>
-      <p>Click <strong>Save Project</strong> to capture the entire workspace. CableTrayRoute now stores every schedule, diagram, and preference for a project inside a single browser entry, so loading a project restores the full state in one step.</p>
-      <p>Use <strong>Load Project</strong> to switch between saved projects. To clear the saved entries, open the ⚙ settings menu and choose <strong>Delete Saved Data</strong>.</p>
-      <p>For an external copy, use <strong>Export Project</strong>. The first export prompts for a destination file; later exports update that file automatically when the browser supports direct writes. Otherwise, the app continues to download a JSON file you can store manually.</p>
+      <p>The first time you click <strong>Save Project</strong> the browser prompts for a destination file. CableTrayRoute writes to that file immediately and schedules a background autosave every five minutes so in-progress work is preserved without additional clicks.</p>
+      <p>After a location is chosen the same file is reused for manual saves and the autosave loop. If direct file access is unavailable, the button falls back to downloading a JSON snapshot so you can keep a copy locally.</p>
+      <p>Use <strong>Load Project</strong> to switch between saved projects. To clear the saved entries, open the ⚙ settings menu and choose <strong>Delete Saved Data</strong>. <strong>Export Project</strong> remains available whenever you need a separate checkpoint or shareable archive.</p>
     </section>
     <section>
       <h2>Video Walkthroughs</h2>
