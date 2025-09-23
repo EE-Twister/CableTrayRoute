@@ -23,6 +23,22 @@ let cachedProjectFileHandle=null;
 let autoSaveSchedulerInstance=null;
 let dirtyTrackerInstance=null;
 
+function currentProjectFromHash(){
+  if(typeof location==='undefined') return '';
+  const hash=location.hash;
+  if(!hash||hash==='#'||hash.startsWith('#project=')) return '';
+  try{
+    return decodeURIComponent(hash.slice(1)).trim();
+  }catch{
+    return '';
+  }
+}
+
+if(typeof window!=='undefined'){
+  const initialProject=currentProjectFromHash()||(window.currentProjectId||'');
+  window.currentProjectId=initialProject||'default';
+}
+
 function getDirtyTracker(){
   if(dirtyTrackerInstance) return dirtyTrackerInstance;
   const win=typeof window!=='undefined'?window:globalThis;
@@ -412,6 +428,11 @@ async function loadProjectFromHash(){
 }
 
 function applyProjectHash(){
+  if(typeof window!=='undefined'){
+    const current=currentProjectFromHash();
+    window.currentProjectId=current||'default';
+  }
+  if(typeof document==='undefined'||typeof location==='undefined') return;
   const hash=location.hash;
   if(!hash) return;
   document.querySelectorAll('a[href$=".html"]').forEach(a=>{

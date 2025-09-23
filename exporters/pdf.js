@@ -3,7 +3,11 @@ const { jsPDF } = window.jspdf || await import('https://cdn.jsdelivr.net/npm/jsp
 // non-existent file and caused a 404 in the browser. The `+esm` suffix
 // ensures the module entry in the package is used, which serves
 // `dist/svg2pdf.es.min.js` for version 2.5.0.
-const svg2pdf = (await import('https://cdn.jsdelivr.net/npm/svg2pdf.js@2.5.0/+esm')).default;
+const svg2pdfModule = await import('https://cdn.jsdelivr.net/npm/svg2pdf.js@2.5.0/+esm');
+const svg2pdf = svg2pdfModule?.default || svg2pdfModule?.svg2pdf;
+if (typeof svg2pdf !== 'function') {
+  throw new Error('svg2pdf module failed to load');
+}
 
 /**
  * Export the current set of sheets to a PDF document.

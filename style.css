@@ -235,6 +235,7 @@
   padding: 0.25rem 0;
   box-shadow: var(--ol-shadow);
   display: none;
+  z-index: 10;
 }
 
 .export-menu li {
@@ -402,6 +403,24 @@
   overflow: auto;
   width: 80vw;
   max-width: 800px;
+}
+
+.prefix-table {
+  width: 100%;
+  border-collapse: collapse;
+  margin-top: var(--ol-spacing);
+}
+
+.prefix-table th,
+.prefix-table td {
+  padding: 0.5rem;
+  text-align: left;
+  border-bottom: 1px solid var(--ol-border-color);
+}
+
+.prefix-table input[type="text"] {
+  width: 100%;
+  box-sizing: border-box;
 }
 
 .prop-modal form fieldset {
