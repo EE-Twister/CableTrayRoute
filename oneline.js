@@ -418,7 +418,21 @@ function buildPalette() {
   });
   Object.entries(sectionContainers).forEach(([cat, container]) => {
     const summary = container?.parentElement?.querySelector('summary');
-    if (summary) summary.textContent = cat.charAt(0).toUpperCase() + cat.slice(1);
+    if (!summary) return;
+    const details = summary.closest('details');
+    if (details) details.dataset.category = cat;
+    Array.from(summary.childNodes).forEach(node => {
+      if (node.nodeType === Node.TEXT_NODE) {
+        summary.removeChild(node);
+      }
+    });
+    let label = summary.querySelector('.summary-label');
+    if (!label) {
+      label = document.createElement('span');
+      label.className = 'summary-label';
+      summary.appendChild(label);
+    }
+    label.textContent = cat.charAt(0).toUpperCase() + cat.slice(1);
   });
   Object.entries(componentTypes).forEach(([cat, subs]) => {
     const container = sectionContainers[cat] || palette;
@@ -529,6 +543,7 @@ let showOverlays = true;
 let syncing = false;
 let lintPanel = null;
 let lintList = null;
+let clickSelectTimer = null;
 
 // Re-run validation whenever diagram or study results change
 on('oneLineDiagram', validateDiagram);
@@ -570,6 +585,13 @@ function highlightSPF(ids = []) {
     const g = svg.querySelector(`g.component[data-id="${id}"]`);
     if (g) g.classList.add('reliability-spf');
   });
+}
+
+function cancelPendingClickSelection() {
+  if (clickSelectTimer) {
+    clearTimeout(clickSelectTimer);
+    clickSelectTimer = null;
+  }
 }
 
 if (studiesToggle) {
@@ -1101,11 +1123,10 @@ function updateLegend(ranges) {
 }
 
 function defaultLabelAnchor(comp) {
-  const w = comp.width || compWidth;
-  const h = comp.height || compHeight;
+  const bounds = componentBounds(comp);
   return {
-    x: comp.x + w / 2,
-    y: comp.y + h + 15
+    x: (bounds.left + bounds.right) / 2,
+    y: bounds.bottom + 15
   };
 }
 
@@ -1144,19 +1165,18 @@ function portPosition(c, portIndex) {
 }
 
 function portDirection(c, portIndex) {
-  const meta = componentMeta[c.subtype] || {};
+  const pos = portPosition(c, portIndex);
+  if (!pos) return null;
   const w = c.width || compWidth;
   const h = c.height || compHeight;
-  const ports = c.ports || meta.ports;
-  const port = ports?.[portIndex];
-  if (!port) return null;
-  let { x, y } = port;
-  if (c.flipped) x = w - x;
-  if (y === 0) return 'top';
-  if (y === h) return 'bottom';
-  if (x === 0) return 'left';
-  if (x === w) return 'right';
-  return null;
+  const cx = c.x + w / 2;
+  const cy = c.y + h / 2;
+  const dx = pos.x - cx;
+  const dy = pos.y - cy;
+  if (Math.abs(dx) > Math.abs(dy)) {
+    return dx < 0 ? 'left' : 'right';
+  }
+  return dy < 0 ? 'top' : 'bottom';
 }
 
 function normalizePortIndex(port) {
@@ -1382,11 +1402,38 @@ function normalizeComponent(c) {
 function componentBounds(comp) {
   const w = comp.width || compWidth;
   const h = comp.height || compHeight;
+  const angle = (comp.rotation || 0) * Math.PI / 180;
+  if (!angle) {
+    return {
+      left: comp.x,
+      top: comp.y,
+      right: comp.x + w,
+      bottom: comp.y + h
+    };
+  }
+  const cx = comp.x + w / 2;
+  const cy = comp.y + h / 2;
+  const rotatePoint = (px, py) => {
+    const dx = px - cx;
+    const dy = py - cy;
+    return {
+      x: cx + dx * Math.cos(angle) - dy * Math.sin(angle),
+      y: cy + dx * Math.sin(angle) + dy * Math.cos(angle)
+    };
+  };
+  const points = [
+    rotatePoint(comp.x, comp.y),
+    rotatePoint(comp.x + w, comp.y),
+    rotatePoint(comp.x, comp.y + h),
+    rotatePoint(comp.x + w, comp.y + h)
+  ];
+  const xs = points.map(p => p.x);
+  const ys = points.map(p => p.y);
   return {
-    left: comp.x,
-    top: comp.y,
-    right: comp.x + w,
-    bottom: comp.y + h
+    left: Math.min(...xs),
+    top: Math.min(...ys),
+    right: Math.max(...xs),
+    bottom: Math.max(...ys)
   };
 }
 
@@ -1664,6 +1711,7 @@ function render() {
       });
       poly.addEventListener('dblclick', async e => {
         e.stopPropagation();
+        cancelPendingClickSelection();
         const cableComp = c.type === 'cable' ? c : target.type === 'cable' ? target : null;
         if (cableComp) {
           await editCableComponent(cableComp);
@@ -1709,6 +1757,7 @@ function render() {
       });
       label.addEventListener('dblclick', async e => {
         e.stopPropagation();
+        cancelPendingClickSelection();
         const cableComp = c.type === 'cable' ? c : target.type === 'cable' ? target : null;
         if (cableComp) {
           await editCableComponent(cableComp);
@@ -1725,6 +1774,7 @@ function render() {
     g.classList.add('component');
     g.addEventListener('dblclick', e => {
       e.stopPropagation();
+      cancelPendingClickSelection();
       selectComponent(c);
     });
     const tooltipParts = [];
@@ -1809,10 +1859,38 @@ function render() {
       txt.textContent = c.text || c.label || '';
       txt.addEventListener('dblclick', e => {
         e.stopPropagation();
+        cancelPendingClickSelection();
         selectComponent(c);
       });
       g.appendChild(txt);
     } else {
+      if (c.type === 'cable') {
+        const wLocal = c.width || compWidth;
+        const hLocal = c.height || compHeight;
+        const centerLocal = { x: wLocal / 2, y: hLocal / 2 };
+        const ports = c.ports || meta.ports || [];
+        ports.forEach(port => {
+          if (!port) return;
+          let px = port.x;
+          let py = port.y;
+          if (c.flipped) px = wLocal - px;
+          const dx = centerLocal.x - px;
+          const dy = centerLocal.y - py;
+          const dist = Math.hypot(dx, dy);
+          if (!dist) return;
+          const leadLength = Math.min(20, dist - 2);
+          if (leadLength <= 0) return;
+          const innerX = px + (dx * (leadLength / dist));
+          const innerY = py + (dy * (leadLength / dist));
+          const lead = document.createElementNS(svgNS, 'line');
+          lead.setAttribute('x1', c.x + px);
+          lead.setAttribute('y1', c.y + py);
+          lead.setAttribute('x2', c.x + innerX);
+          lead.setAttribute('y2', c.y + innerY);
+          lead.classList.add('cable-lead');
+          g.appendChild(lead);
+        });
+      }
       const iconHref = meta.icon || placeholderIcon;
       const img = document.createElementNS(svgNS, 'image');
       img.setAttribute('x', c.x);
@@ -1829,6 +1907,7 @@ function render() {
       }
       img.addEventListener('dblclick', e => {
         e.stopPropagation();
+        cancelPendingClickSelection();
         selectComponent(c);
       });
       g.appendChild(img);
@@ -1847,10 +1926,11 @@ function render() {
     }
     if (selection.includes(c)) {
       const rect = document.createElementNS(svgNS, 'rect');
-      rect.setAttribute('x', c.x - 2);
-      rect.setAttribute('y', c.y - 2);
-      rect.setAttribute('width', w + 4);
-      rect.setAttribute('height', h + 4);
+      const bounds = componentBounds(c);
+      rect.setAttribute('x', bounds.left - 2);
+      rect.setAttribute('y', bounds.top - 2);
+      rect.setAttribute('width', (bounds.right - bounds.left) + 4);
+      rect.setAttribute('height', (bounds.bottom - bounds.top) + 4);
       rect.setAttribute('fill', 'none');
       rect.setAttribute('stroke', '#00f');
       rect.setAttribute('stroke-dasharray', '4 2');
@@ -1904,6 +1984,7 @@ function render() {
       });
       labelEl.addEventListener('dblclick', e => {
         e.stopPropagation();
+        cancelPendingClickSelection();
         selectComponent(c);
       });
       svg.appendChild(labelEl);
@@ -2123,22 +2204,33 @@ function addComponent(cfg) {
     x = Math.round(x / gridSize) * gridSize;
     y = Math.round(y / gridSize) * gridSize;
   }
+  const resolvedType = type || meta.type || meta.category;
+  const defaultRotation = resolvedType === 'bus' || resolvedType === 'annotation' ? 0 : 90;
   const comp = {
     id: 'n' + Date.now(),
-    type: type || meta.type || meta.category,
+    type: resolvedType,
     subtype,
     x,
     y,
     label: nextLabel(subtype),
     ref: '',
     labelOffset: { x: 0, y: 0 },
-    rotation: 0,
+    rotation: defaultRotation,
     flipped: false,
     impedance: { r: 0, x: 0 },
     rating: null,
     connections: [],
     props: JSON.parse(JSON.stringify(meta.props || {}))
   };
+  if (defaultRotation) {
+    const bounds = componentBounds(comp);
+    const dx = bounds.left - x;
+    const dy = bounds.top - y;
+    if (Math.abs(dx) > 0.01 || Math.abs(dy) > 0.01) {
+      comp.x -= dx;
+      comp.y -= dy;
+    }
+  }
   Object.entries(meta.props || {}).forEach(([k, v]) => {
     comp[k] = typeof v === 'object' ? JSON.parse(JSON.stringify(v)) : v;
   });
@@ -3295,6 +3387,7 @@ async function init() {
   // Avoid redeclaring the `svg` constant to prevent "Identifier has already been declared" errors.
   const menu = document.getElementById('context-menu');
     svg.addEventListener('mousedown', e => {
+      cancelPendingClickSelection();
       marqueeSelectionMade = false;
       if (connectMode && e.target.classList.contains('port')) {
         const comp = components.find(c => c.id === e.target.dataset.id);
@@ -3565,28 +3658,35 @@ async function init() {
         dragOffset = null;
       }
     });
-  svg.addEventListener('click', async e => {
+  svg.addEventListener('click', e => {
     if (marqueeSelectionMade) {
       marqueeSelectionMade = false;
       return;
     }
-    const g = e.target.closest('.component');
-    if (!g) {
-      selection = [];
-      selected = null;
+    if (e.shiftKey || e.ctrlKey || e.metaKey) {
+      cancelPendingClickSelection();
+      return;
+    }
+    const compEl = e.target.closest('.component');
+    const compId = compEl?.dataset.id || null;
+    const clickedOutside = !compEl;
+    cancelPendingClickSelection();
+    clickSelectTimer = window.setTimeout(() => {
+      clickSelectTimer = null;
+      if (clickedOutside) {
+        selection = [];
+        selected = null;
+        selectedConnection = null;
+        render();
+        return;
+      }
+      const comp = components.find(c => c.id === compId);
+      if (!comp) return;
+      selection = [comp];
+      selected = comp;
       selectedConnection = null;
       render();
-      return;
-    }
-    const comp = components.find(c => c.id === g.dataset.id);
-    if (!comp) return;
-    if (e.shiftKey || e.ctrlKey || e.metaKey) {
-      return;
-    }
-    selection = [comp];
-    selected = comp;
-    selectedConnection = null;
-    render();
+    }, 175);
   });
 
   svg.addEventListener('contextmenu', e => {

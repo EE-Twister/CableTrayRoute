@@ -238,7 +238,17 @@ async function saveProject() {
   setProjectHash(name);
   // Save locally and attempt server sync if logged in
   dsSaveProject(name);
-  try { await serverSaveProject(name); } catch (e) { console.error(e); }
+  let serverError = null;
+  try {
+    await serverSaveProject(name);
+  } catch (e) {
+    console.error(e);
+    serverError = e;
+  }
+  const message = serverError
+    ? `Project "${name}" saved locally. Server sync failed.`
+    : `Project "${name}" successfully saved.`;
+  alert(message);
 }
 
 async function loadProject() {

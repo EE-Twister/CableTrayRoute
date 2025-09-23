@@ -111,6 +111,11 @@
   padding: var(--ol-spacing);
   color: inherit;
   font-size: 1rem;
+  position: relative;
+}
+
+.palette-section summary .summary-label {
+  flex: 1;
 }
 
 .palette-section[open] > summary {
@@ -126,10 +131,29 @@
   flex-shrink: 0;
 }
 
-#panel-section > summary::before { background-image: url('icons/panel.svg'); }
+.palette-section summary::after {
+  content: '';
+  border: solid currentColor;
+  border-width: 0 2px 2px 0;
+  display: inline-block;
+  padding: 4px;
+  transform: rotate(45deg);
+  margin-left: auto;
+  transition: transform 0.2s ease;
+}
+
+.palette-section[open] > summary::after {
+  transform: rotate(225deg);
+}
+
+#sources-section > summary::before { background-image: url('icons/sources.svg'); }
 #equipment-section > summary::before { background-image: url('icons/equipment.svg'); }
+#protection-section > summary::before { background-image: url('icons/components/Breaker.svg'); }
 #bus-section > summary::before { background-image: url('icons/Bus.svg'); }
 #load-section > summary::before { background-image: url('icons/load.svg'); }
+#cable-section > summary::before { background-image: url('icons/oneline.svg'); }
+#links-section > summary::before { background-image: url('icons/links.svg'); }
+#annotations-section > summary::before { background-image: url('icons/annotation.svg'); }
 #template-section > summary::before { background-image: url('icons/oneline.svg'); }
 
 .palette-section .section-buttons {
@@ -1702,6 +1726,15 @@ body.dark-mode .legalDisclaimer {
 /* Highlight voltage drop exceeding limit */
 .voltage-exceed{background-color:var(--warning-bg);color:var(--warning-text);}
 .sizing-violation{background-color:var(--error-bg);color:var(--error-text);}
+.cable-lead{
+    stroke:#555;
+    stroke-width:2;
+    stroke-linecap:round;
+    pointer-events:none;
+}
+body.dark-mode .cable-lead{
+    stroke:#bbb;
+}
 .connection.sizing-violation{stroke:var(--error-text)!important;}
 .connection.voltage-exceed{stroke:var(--warning-text)!important;}
 .component-label{
