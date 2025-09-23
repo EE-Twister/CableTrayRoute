@@ -52,6 +52,8 @@ const redoStack = [];
 let trackedSettingsKeys = new Set();
 const listeners = new Set();
 const memoryStorage = new Map();
+let storageWriteBlocked = false;
+let quotaWarningShown = false;
 let scenarioListCache = ['base'];
 let currentScenarioName = 'base';
 let conduitCacheState = null;
@@ -72,7 +74,7 @@ function writeRawStorage(key, value) {
     memoryStorage.set(key, value);
   }
   const storage = getStorage();
-  if (!storage) return;
+  if (!storage || storageWriteBlocked) return;
   try {
     if (value === null || value === undefined) {
       storage.removeItem(key);
@@ -80,7 +82,7 @@ function writeRawStorage(key, value) {
       storage.setItem(key, value);
     }
   } catch (e) {
-    console.warn('project storage write failed', key, e);
+    handleStorageWriteError('project storage write failed', key, e);
   }
 }
 
@@ -404,6 +406,42 @@ function getStorage() {
   }
 }
 
+function isQuotaExceeded(error) {
+  if (!error || typeof error !== 'object') return false;
+  const name = error.name;
+  if (name === 'QuotaExceededError' || name === 'NS_ERROR_DOM_QUOTA_REACHED') return true;
+  if (error.code === 22 || error.code === 1014) return true;
+  if (typeof DOMException !== 'undefined' && error instanceof DOMException) {
+    if (error.name === 'QuotaExceededError' || error.name === 'NS_ERROR_DOM_QUOTA_REACHED') return true;
+  }
+  const message = typeof error.message === 'string' ? error.message : '';
+  return message.toLowerCase().includes('quota') || message.toLowerCase().includes('exceeded');
+}
+
+function handleStorageWriteError(prefix, keyOrError, maybeError) {
+  const error = maybeError ?? keyOrError;
+  const args = maybeError === undefined ? [prefix, error] : [prefix, keyOrError, error];
+  console.warn(...args);
+  if (isQuotaExceeded(error)) {
+    storageWriteBlocked = true;
+    if (!quotaWarningShown) {
+      quotaWarningShown = true;
+      console.warn('Local storage quota exceeded. Further saves will be kept in memory only for this session.');
+    }
+  }
+}
+
+function trySetStorage(storage, key, value, label = 'project save failed') {
+  if (!storage || storageWriteBlocked) return false;
+  try {
+    storage.setItem(key, value);
+    return true;
+  } catch (e) {
+    handleStorageWriteError(label, key, e);
+    return false;
+  }
+}
+
 function cloneProject(obj = project) {
   return JSON.parse(JSON.stringify(obj));
 }
@@ -443,30 +481,33 @@ function notifyChange() {
 }
 
 function syncDerivedStorage(storage) {
-  if (!storage) return;
-  try { storage.setItem('cableSchedule', JSON.stringify(project.cables || [])); }
-  catch (e) { console.warn('project save failed', e); }
-  try { storage.setItem('traySchedule', JSON.stringify(project.trays || [])); }
-  catch (e) { console.warn('project save failed', e); }
-  try { storage.setItem('conduitSchedule', JSON.stringify(project.conduits || [])); }
-  catch (e) { console.warn('project save failed', e); }
-  try { storage.setItem('ductbankSchedule', JSON.stringify(project.ductbanks || [])); }
-  catch (e) { console.warn('project save failed', e); }
+  if (!storage || storageWriteBlocked) return;
+  const derivedKeys = [
+    ['cableSchedule', JSON.stringify(project.cables || [])],
+    ['traySchedule', JSON.stringify(project.trays || [])],
+    ['conduitSchedule', JSON.stringify(project.conduits || [])],
+    ['ductbankSchedule', JSON.stringify(project.ductbanks || [])]
+  ];
+  for (const [key, value] of derivedKeys) {
+    if (!trySetStorage(storage, key, value)) return;
+  }
 
   const session = project.settings?.session;
   if (session === undefined) {
-    try { storage.removeItem('ctrSession'); } catch {}
+    if (!storageWriteBlocked) {
+      try { storage.removeItem('ctrSession'); } catch {}
+    }
   } else {
-    try { storage.setItem('ctrSession', JSON.stringify(session)); }
-    catch (e) { console.warn('project save failed', e); }
+    if (!trySetStorage(storage, 'ctrSession', JSON.stringify(session))) return;
   }
 
   const collapsed = project.settings?.collapsedGroups;
   if (collapsed === undefined) {
-    try { storage.removeItem('collapsedGroups'); } catch {}
+    if (!storageWriteBlocked) {
+      try { storage.removeItem('collapsedGroups'); } catch {}
+    }
   } else {
-    try { storage.setItem('collapsedGroups', JSON.stringify(collapsed)); }
-    catch (e) { console.warn('project save failed', e); }
+    if (!trySetStorage(storage, 'collapsedGroups', JSON.stringify(collapsed))) return;
   }
 
   const settings = project.settings && typeof project.settings === 'object' ? project.settings : {};
@@ -474,23 +515,26 @@ function syncDerivedStorage(storage) {
 
   for (const key of trackedSettingsKeys) {
     if (!filteredKeys.includes(key)) {
-      try { storage.removeItem(key); } catch {}
+      if (!storageWriteBlocked) {
+        try { storage.removeItem(key); } catch {}
+      }
     }
   }
   for (const key of filteredKeys) {
     const value = settings[key];
-    try { storage.setItem(key, JSON.stringify(value)); }
-    catch (e) { console.warn('project save failed', key, e); }
+    if (!trySetStorage(storage, key, JSON.stringify(value))) return;
   }
   trackedSettingsKeys = new Set(filteredKeys);
 }
 
 function persistProject({ notify = true } = {}) {
   const storage = getStorage();
-  if (storage) {
+  if (storage && !storageWriteBlocked) {
     syncDerivedStorage(storage);
-    try { storage.setItem(PROJECT_KEY, JSON.stringify(project)); }
-    catch (e) { console.warn('project save failed', e); }
+    if (!storageWriteBlocked) {
+      try { storage.setItem(PROJECT_KEY, JSON.stringify(project)); }
+      catch (e) { handleStorageWriteError('project save failed', e); }
+    }
   }
   if (notify) notifyChange();
 }
@@ -627,9 +671,9 @@ export function setProjectKey(key, value, options = {}) {
   if (key === PROJECT_KEY) {
     if (!options.skipLocalStorage) {
       const storage = getStorage();
-      if (storage) {
+      if (storage && !storageWriteBlocked) {
         try { storage.setItem(key, value); }
-        catch (e) { console.warn('project save failed', e); }
+        catch (e) { handleStorageWriteError('project save failed', e); }
       }
     }
     return;
@@ -660,10 +704,7 @@ export function setProjectKey(key, value, options = {}) {
   pushUndo(oldProject);
   if (!options.skipLocalStorage) {
     const storage = getStorage();
-    if (storage) {
-      try { storage.setItem(key, value); }
-      catch (e) { console.warn('project save failed', e); }
-    }
+    trySetStorage(storage, key, value);
   }
   persistProject();
 }
@@ -673,7 +714,7 @@ export function removeProjectKey(key, options = {}) {
   if (key === PROJECT_KEY) {
     if (!options.skipLocalStorage) {
       const storage = getStorage();
-      if (storage) {
+      if (storage && !storageWriteBlocked) {
         try { storage.removeItem(key); } catch {}
       }
     }
@@ -698,7 +739,7 @@ export function removeProjectKey(key, options = {}) {
   pushUndo(oldProject);
   if (!options.skipLocalStorage) {
     const storage = getStorage();
-    if (storage) {
+    if (storage && !storageWriteBlocked) {
       try { storage.removeItem(key); } catch {}
     }
   }
