@@ -85,11 +85,30 @@ let componentMeta = {};
 const baseHref = document.querySelector('base')?.href || new URL('.', window.location.href).href;
 const asset = path => new URL(path, baseHref).href;
 
-const projectId = typeof window !== 'undefined' ? (window.currentProjectId || 'default') : undefined;
+let projectId = 'default';
+if (typeof window !== 'undefined') {
+  if (typeof location !== 'undefined') {
+    const hash = location.hash;
+    if (hash && hash.startsWith('#') && !hash.startsWith('#project=')) {
+      try {
+        const decoded = decodeURIComponent(hash.slice(1)).trim();
+        if (decoded) projectId = decoded;
+      } catch {}
+    } else if (window.currentProjectId && window.currentProjectId.trim()) {
+      projectId = window.currentProjectId;
+    }
+  } else if (window.currentProjectId && window.currentProjectId.trim()) {
+    projectId = window.currentProjectId;
+  }
+  window.currentProjectId = projectId || 'default';
+}
 if (projectId) {
   loadProject(projectId);
   [STORAGE_KEYS.oneLine, STORAGE_KEYS.equipment, STORAGE_KEYS.panels, STORAGE_KEYS.loads, STORAGE_KEYS.cables, STORAGE_KEYS.trays, STORAGE_KEYS.conduits, STORAGE_KEYS.ductbanks].forEach(k => {
-    on(k, () => saveProject(projectId));
+    on(k, () => {
+      const targetId = (typeof window !== 'undefined' && window.currentProjectId) ? window.currentProjectId : projectId;
+      if (targetId) saveProject(targetId);
+    });
   });
 }
 
@@ -801,14 +820,128 @@ function applyNextLabel(comp) {
 }
 
 function editPrefixes() {
-  const prefixes = { ...labelPrefixes };
-  Object.keys(componentMeta).forEach(sub => {
-    const current = prefixes[sub] || getPrefix(sub);
-    const val = prompt(`Prefix for ${sub}`, current);
-    if (val !== null) prefixes[sub] = val;
+  const subtypeSet = new Set([...Object.keys(componentMeta), ...Object.keys(labelPrefixes)]);
+  const subtypes = [...subtypeSet].filter(Boolean).sort((a, b) => a.localeCompare(b, undefined, { sensitivity: 'base' }));
+  if (!subtypes.length) {
+    showToast('No component prefixes available to edit');
+    return;
+  }
+
+  let modal = document.getElementById('prefix-modal');
+  if (!modal) {
+    modal = document.createElement('div');
+    modal.id = 'prefix-modal';
+    modal.className = 'prop-modal';
+    document.body.appendChild(modal);
+  }
+  if (modal._outsideHandler) modal.removeEventListener('click', modal._outsideHandler);
+  if (modal._keyHandler) document.removeEventListener('keydown', modal._keyHandler);
+  modal.innerHTML = '';
+
+  const form = document.createElement('form');
+  form.id = 'prefix-form';
+
+  const closeModal = () => {
+    modal.classList.remove('show');
+    modal.removeEventListener('click', outsideHandler);
+    document.removeEventListener('keydown', keyHandler);
+    delete modal._outsideHandler;
+    delete modal._keyHandler;
+  };
+
+  const outsideHandler = e => { if (e.target === modal) closeModal(); };
+  const keyHandler = e => {
+    if (e.key === 'Escape') {
+      e.preventDefault();
+      closeModal();
+    }
+  };
+
+  const header = document.createElement('div');
+  header.className = 'modal-header';
+  const title = document.createElement('h3');
+  title.textContent = 'Label Prefixes';
+  header.appendChild(title);
+  form.appendChild(header);
+
+  const helpText = document.createElement('p');
+  helpText.textContent = 'Update the prefix used for auto-generated labels by subtype.';
+  form.appendChild(helpText);
+
+  const table = document.createElement('table');
+  table.className = 'prefix-table';
+  const thead = document.createElement('thead');
+  const headRow = document.createElement('tr');
+  const subtypeHeader = document.createElement('th');
+  subtypeHeader.scope = 'col';
+  subtypeHeader.textContent = 'Subtype';
+  headRow.appendChild(subtypeHeader);
+  const prefixHeader = document.createElement('th');
+  prefixHeader.scope = 'col';
+  prefixHeader.textContent = 'Prefix';
+  headRow.appendChild(prefixHeader);
+  thead.appendChild(headRow);
+  table.appendChild(thead);
+
+  const tbody = document.createElement('tbody');
+  subtypes.forEach(sub => {
+    const row = document.createElement('tr');
+    const labelCell = document.createElement('th');
+    labelCell.scope = 'row';
+    labelCell.textContent = sub;
+    row.appendChild(labelCell);
+    const inputCell = document.createElement('td');
+    const input = document.createElement('input');
+    input.type = 'text';
+    input.value = labelPrefixes[sub] ?? getPrefix(sub);
+    input.dataset.subtype = sub;
+    input.setAttribute('aria-label', `Label prefix for ${sub}`);
+    inputCell.appendChild(input);
+    row.appendChild(inputCell);
+    tbody.appendChild(row);
   });
-  labelPrefixes = prefixes;
-  setItem('labelPrefixes', labelPrefixes);
+  table.appendChild(tbody);
+  form.appendChild(table);
+
+  const actions = document.createElement('div');
+  actions.className = 'modal-actions';
+  const cancelBtn = document.createElement('button');
+  cancelBtn.type = 'button';
+  cancelBtn.className = 'btn secondary-btn';
+  cancelBtn.textContent = 'Cancel';
+  cancelBtn.addEventListener('click', () => closeModal());
+  const saveBtn = document.createElement('button');
+  saveBtn.type = 'submit';
+  saveBtn.className = 'btn primary-btn';
+  saveBtn.textContent = 'Save';
+  actions.appendChild(cancelBtn);
+  actions.appendChild(saveBtn);
+  form.appendChild(actions);
+
+  form.addEventListener('submit', e => {
+    e.preventDefault();
+    const updated = {};
+    form.querySelectorAll('input[data-subtype]').forEach(input => {
+      const subtype = input.dataset.subtype;
+      if (!subtype) return;
+      const value = input.value;
+      if (value !== null && value !== undefined && value !== '') {
+        updated[subtype] = value;
+      }
+    });
+    labelPrefixes = updated;
+    setItem('labelPrefixes', labelPrefixes);
+    closeModal();
+  });
+
+  modal.appendChild(form);
+  modal.classList.add('show');
+  modal._outsideHandler = outsideHandler;
+  modal._keyHandler = keyHandler;
+  modal.addEventListener('click', outsideHandler);
+  document.addEventListener('keydown', keyHandler);
+  const firstInput = form.querySelector('input');
+  if (firstInput) firstInput.focus();
 }
 
 function editManufacturerDefaults() {
@@ -4432,7 +4565,12 @@ function exportDiagram() {
 }
 
 async function shareDiagram() {
-  const token = prompt('GitHub token (only needed once)', getItem('gistToken', ''));
+  const tokenPrompt = [
+    'Enter a GitHub personal access token with the "gist" scope.',
+    'Create one at https://github.com/settings/tokens (classic).',
+    'The token is stored locally and used only to publish the shared diagram as a Gist.'
+  ].join('\n\n');
+  const token = prompt(tokenPrompt, getItem('gistToken', ''));
   if (!token) return;
   setItem('gistToken', token);
   const body = {
