@@ -3,30 +3,77 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Login</title>
+  <meta name="description" content="Secure access to CableTrayRoute for managing cable routing workflows.">
+  <title>CableTrayRoute Login</title>
+  <link rel="icon" href="icons/favicon.svg" type="image/svg+xml">
   <link rel="stylesheet" href="style.css">
 </head>
-<body>
-  <main class="container">
-    <h1>Login or Sign Up</h1>
-    <section class="card">
-      <form id="signup-form">
-        <h2>Sign Up</h2>
-        <input id="signup-user" placeholder="Username" required>
-        <input id="signup-pass" type="password" placeholder="Password" required>
-        <button type="submit">Sign Up</button>
-      </form>
-    </section>
-    <section class="card">
-      <form id="login-form">
-        <h2>Log In</h2>
-        <input id="login-user" placeholder="Username" required>
-        <input id="login-pass" type="password" placeholder="Password" required>
-        <button type="submit">Log In</button>
-      </form>
+<body class="auth-page">
+  <a href="#main-content" class="skip-link">Skip to main content</a>
+  <header class="auth-top-bar">
+    <a href="index.html" class="auth-brand">
+      <img src="icons/route.svg" alt="" class="auth-brand-icon" aria-hidden="true">
+      <span>CableTrayRoute</span>
+    </a>
+    <nav class="auth-top-links" aria-label="Primary">
+      <a href="help.html">Help</a>
+      <a href="docs/index.html">Docs</a>
+      <a href="README.md">Overview</a>
+    </nav>
+  </header>
+  <main id="main-content" class="auth-main">
+    <section class="auth-card" aria-labelledby="auth-title">
+      <header class="auth-header">
+        <h1 id="auth-title">Access CableTrayRoute</h1>
+        <p class="auth-subtitle">Sign in to continue your electrical design workflow or create an account to launch a new project.</p>
+      </header>
+      <div class="auth-panels">
+        <section class="auth-pane" aria-labelledby="signup-title">
+          <h2 id="signup-title">Create an account</h2>
+          <p class="auth-description">Set up credentials to keep cable schedules, tray fill analyses, and routing studies in sync across the suite.</p>
+          <form id="signup-form" class="auth-form">
+            <div class="auth-field">
+              <label for="signup-user">Username</label>
+              <input id="signup-user" name="signup-user" type="text" autocomplete="username" placeholder="Username" required>
+            </div>
+            <div class="auth-field">
+              <label for="signup-pass">Password</label>
+              <input id="signup-pass" name="signup-pass" type="password" autocomplete="new-password" placeholder="Password" required>
+            </div>
+            <button type="submit" class="primary-btn">Sign Up</button>
+          </form>
+        </section>
+        <section class="auth-pane" aria-labelledby="login-title">
+          <h2 id="login-title">Sign in</h2>
+          <p class="auth-description">Return to your saved workspaces and continue coordinating load lists, one-line diagrams, and routes.</p>
+          <form id="login-form" class="auth-form">
+            <div class="auth-field">
+              <label for="login-user">Username</label>
+              <input id="login-user" name="login-user" type="text" autocomplete="username" placeholder="Username" required>
+            </div>
+            <div class="auth-field">
+              <label for="login-pass">Password</label>
+              <input id="login-pass" name="login-pass" type="password" autocomplete="current-password" placeholder="Password" required>
+            </div>
+            <button type="submit" class="primary-btn">Log In</button>
+          </form>
+        </section>
+      </div>
+      <p class="auth-note">Need a refresher first? Review the <a href="docs/quickstart.html">Quick Start</a> guide or explore the <a href="help.html">help center</a>.</p>
     </section>
   </main>
+  <footer class="site-footer">
+    <div class="footer-left">
+      <img src="icons/route.svg" alt="CableTrayRoute logo" class="footer-logo">
+      <span>CableTrayRoute</span>
+    </div>
+    <nav class="footer-links" aria-label="Footer">
+      <a href="README.md">README</a>
+      <a href="docs/quickstart.html">Quick Start</a>
+      <a href="docs/index.html">Docs</a>
+      <a href="mailto:contact@example.com">Contact</a>
+    </nav>
+  </footer>
   <script type="module" src="auth.js"></script>
 </body>
 </html>
-
