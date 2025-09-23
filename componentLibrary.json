@@ -1,5 +1,5 @@
 {
-  "categories": ["bus", "equipment", "load", "sources", "links", "annotations", "cable"],
+  "categories": ["bus", "equipment", "protection", "load", "sources", "links", "annotations", "cable"],
   "components": [
     {
       "type": "bus",

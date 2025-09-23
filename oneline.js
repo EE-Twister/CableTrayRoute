@@ -119,6 +119,13 @@ function categoryForType(t) {
       return 'load';
     case 'cable':
       return 'cable';
+    case 'breaker':
+    case 'fuse':
+    case 'recloser':
+    case 'relay':
+    case 'contactor':
+    case 'switch':
+      return 'protection';
     case 'utility_source':
     case 'generator':
     case 'pv_inverter':
@@ -399,6 +406,7 @@ function buildPalette() {
   const sectionContainers = {
     sources: document.getElementById('sources-buttons'),
     equipment: document.getElementById('equipment-buttons'),
+    protection: document.getElementById('protection-buttons'),
     load: document.getElementById('load-buttons'),
     bus: document.getElementById('bus-buttons'),
     cable: document.getElementById('cable-buttons'),
@@ -1151,6 +1159,72 @@ function portDirection(c, portIndex) {
   return null;
 }
 
+function normalizePortIndex(port) {
+  const idx = Number(port);
+  return Number.isFinite(idx) ? idx : 0;
+}
+
+function portInUse(component, portIndex, skipConn = null) {
+  const idx = normalizePortIndex(portIndex);
+  if ((component.connections || []).some(conn => conn !== skipConn && normalizePortIndex(conn.sourcePort) === idx)) {
+    return true;
+  }
+  return components.some(comp => (comp.connections || []).some(conn => {
+    if (conn === skipConn) return false;
+    return conn.target === component.id && normalizePortIndex(conn.targetPort) === idx;
+  }));
+}
+
+function captureBusAnchors(bus) {
+  const anchors = [];
+  (bus.connections || []).forEach(conn => {
+    const index = normalizePortIndex(conn.sourcePort);
+    anchors.push({ type: 'source', conn, point: portPosition(bus, index) });
+  });
+  components.forEach(comp => {
+    (comp.connections || []).forEach(conn => {
+      if (conn.target !== bus.id) return;
+      const index = normalizePortIndex(conn.targetPort);
+      anchors.push({ type: 'target', conn, point: portPosition(bus, index) });
+    });
+  });
+  return anchors;
+}
+
+function reassignBusAnchors(bus, anchors = []) {
+  if (!anchors.length) return;
+  const ports = bus.ports || [];
+  if (!ports.length) return;
+  const worldPorts = ports.map((_, idx) => ({ idx, point: portPosition(bus, idx) }));
+  anchors.forEach(anchor => {
+    let best = null;
+    let bestDist = Infinity;
+    worldPorts.forEach(port => {
+      const dx = port.point.x - anchor.point.x;
+      const dy = port.point.y - anchor.point.y;
+      const dist = dx * dx + dy * dy;
+      if (dist < bestDist) {
+        bestDist = dist;
+        best = port;
+      }
+    });
+    if (!best) return;
+    if (anchor.type === 'source') {
+      if (normalizePortIndex(anchor.conn.sourcePort) !== best.idx) {
+        anchor.conn.sourcePort = best.idx;
+        delete anchor.conn.mid;
+        delete anchor.conn.dir;
+      }
+    } else if (anchor.type === 'target') {
+      if (normalizePortIndex(anchor.conn.targetPort) !== best.idx) {
+        anchor.conn.targetPort = best.idx;
+        delete anchor.conn.mid;
+        delete anchor.conn.dir;
+      }
+    }
+  });
+}
+
 function nearestPorts(src, tgt) {
   const srcPorts = src.ports || componentMeta[src.subtype]?.ports || [{ x: (src.width || compWidth) / 2, y: (src.height || compHeight) / 2 }];
   const tgtPorts = tgt.ports || componentMeta[tgt.subtype]?.ports || [{ x: (tgt.width || compWidth) / 2, y: (tgt.height || compHeight) / 2 }];
@@ -1195,14 +1269,25 @@ function nearestPortToPoint(x, y, exclude) {
 function ensureConnection(fromComp, toComp, fromPort, toPort) {
   if (!fromComp || !toComp) return false;
   fromComp.connections = fromComp.connections || [];
-  const exists = fromComp.connections.some(conn =>
-    conn.target === toComp.id && conn.sourcePort === fromPort && conn.targetPort === toPort
-  );
-  if (exists) return false;
+  const fromIdx = normalizePortIndex(fromPort);
+  const toIdx = normalizePortIndex(toPort);
+  const existingConn = fromComp.connections.find(conn => conn.target === toComp.id) || null;
+  if (existingConn && normalizePortIndex(existingConn.sourcePort) === fromIdx && normalizePortIndex(existingConn.targetPort) === toIdx) {
+    return false;
+  }
+  if (portInUse(fromComp, fromIdx, existingConn)) return false;
+  if (portInUse(toComp, toIdx, existingConn)) return false;
+  if (existingConn) {
+    existingConn.sourcePort = fromIdx;
+    existingConn.targetPort = toIdx;
+    delete existingConn.mid;
+    delete existingConn.dir;
+    return true;
+  }
   const newConn = {
     target: toComp.id,
-    sourcePort: fromPort,
-    targetPort: toPort,
+    sourcePort: fromIdx,
+    targetPort: toIdx,
     cable: null,
     phases: [],
     conductors: 0,
@@ -1348,11 +1433,17 @@ function render() {
   function routeConnection(src, tgt, conn) {
     const start = portPosition(src, conn?.sourcePort);
     const end = portPosition(tgt, conn?.targetPort);
+    const sDir = portDirection(src, conn?.sourcePort);
     const tDir = portDirection(tgt, conn?.targetPort);
+    let path;
     if (conn && conn.dir) {
       const mid = conn.mid ?? (conn.dir === 'h' ? (start.x + end.x) / 2 : (start.y + end.y) / 2);
-      if (conn.dir === 'h') return [start, { x: mid, y: start.y }, { x: mid, y: end.y }, end];
-      return [start, { x: start.x, y: mid }, { x: end.x, y: mid }, end];
+      if (conn.dir === 'h') {
+        path = [start, { x: mid, y: start.y }, { x: mid, y: end.y }, end];
+      } else {
+        path = [start, { x: start.x, y: mid }, { x: end.x, y: mid }, end];
+      }
+      conn.mid = mid;
     }
 
     function horizontalFirst() {
@@ -1457,30 +1548,54 @@ function render() {
       return false;
     }
 
-    const h = horizontalFirst();
-    const v = verticalFirst();
-    let path;
-    // Prefer horizontal routing only when targeting left/right ports so
-    // that connections into top/bottom ports end with a vertical segment.
-    const preferH = tDir === 'left' || tDir === 'right';
-    if (preferH) {
-      if (!intersects(h)) path = h;
-      else if (!intersects(v)) path = v;
-      else path = h.length <= v.length ? h : v;
-    } else {
-      if (!intersects(v)) path = v;
-      else if (!intersects(h)) path = h;
-      else path = h.length <= v.length ? h : v;
-    }
-    if (conn) {
-      conn.dir = path === h ? 'h' : 'v';
-      conn.mid = conn.dir === 'h' ? path[1].x : path[1].y;
+    if (!path) {
+      const h = horizontalFirst();
+      const v = verticalFirst();
+      // Prefer horizontal routing only when targeting left/right ports so
+      // that connections into top/bottom ports end with a vertical segment.
+      const preferH = tDir === 'left' || tDir === 'right';
+      if (preferH) {
+        if (!intersects(h)) path = h;
+        else if (!intersects(v)) path = v;
+        else path = h.length <= v.length ? h : v;
+      } else {
+        if (!intersects(v)) path = v;
+        else if (!intersects(h)) path = h;
+        else path = h.length <= v.length ? h : v;
+      }
+      if (conn) {
+        conn.dir = path === h ? 'h' : 'v';
+        conn.mid = conn.dir === 'h' ? path[1].x : path[1].y;
+      }
     }
     const pen = path[path.length - 2];
     if (tDir === 'top' || tDir === 'bottom') {
       if (pen.x !== end.x) path.splice(path.length - 1, 0, { x: end.x, y: pen.y });
     } else if (tDir === 'left' || tDir === 'right') {
       if (pen.y !== end.y) path.splice(path.length - 1, 0, { x: pen.x, y: end.y });
+    }
+    const approx = (a, b) => Math.abs(a - b) < 0.01;
+    const samePoint = (a, b) => approx(a.x, b.x) && approx(a.y, b.y);
+    const offsetPoint = (pt, dir) => {
+      const len = 18;
+      if (dir === 'left') return { x: pt.x - len, y: pt.y };
+      if (dir === 'right') return { x: pt.x + len, y: pt.y };
+      if (dir === 'top') return { x: pt.x, y: pt.y - len };
+      if (dir === 'bottom') return { x: pt.x, y: pt.y + len };
+      return pt;
+    };
+    if (src.type === 'cable' && sDir && path.length > 1) {
+      const stub = offsetPoint(path[0], sDir);
+      if (!samePoint(path[0], stub) && (!path[1] || !samePoint(path[1], stub))) {
+        path.splice(1, 0, stub);
+      }
+    }
+    if (tgt.type === 'cable' && tDir && path.length > 1) {
+      const stub = offsetPoint(path[path.length - 1], tDir);
+      const insertAt = path.length - 1;
+      if (!samePoint(path[insertAt], stub) && (!path[insertAt - 1] || !samePoint(path[insertAt - 1], stub))) {
+        path.splice(insertAt, 0, stub);
+      }
     }
     return path;
   }
@@ -2088,10 +2203,10 @@ function selectComponent(compOrId) {
     openCableProperties(comp);
     return;
   }
-  const rawSchema = propSchemas[comp.subtype] || [];
+  let rawSchema = propSchemas[comp.subtype] || [];
   if (!rawSchema.length) {
-    showToast(`No properties defined for ${comp.subtype}`);
-    return;
+    const metaProps = componentMeta[comp.subtype]?.props || {};
+    rawSchema = inferSchemaFromProps({ ...metaProps, ...(comp.props || {}) });
   }
   selected = comp;
   selection = [comp];
@@ -3220,7 +3335,8 @@ async function init() {
             startX: e.offsetX,
             startWidth: comp.width,
             startCompX: comp.x,
-            side: e.target.dataset.side || 'right'
+            side: e.target.dataset.side || 'right',
+            anchors: captureBusAnchors(comp)
           };
         }
         return;
@@ -3314,6 +3430,7 @@ async function init() {
           resizingBus.comp.x = newX;
         }
         updateBusPorts(resizingBus.comp);
+        reassignBusAnchors(resizingBus.comp, resizingBus.anchors);
         render();
         return;
       }
@@ -3887,7 +4004,7 @@ function validateDiagram() {
   });
 
   components.forEach(c => {
-    if (c.type === 'dimension') return;
+    if (c.type === 'dimension' || c.type === 'annotation') return;
     if ((c.connections || []).length + (inbound.get(c.id) || 0) === 0) {
       validationIssues.push({ component: c.id, message: 'Unconnected component' });
     }
