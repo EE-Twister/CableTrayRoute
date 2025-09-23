@@ -195,7 +195,7 @@
       "type": "switch",
       "subtype": "ats",
       "label": "ATS",
-      "icon": "icons/components/Switchgear.svg",
+      "icon": "icons/components/Switch.svg",
       "props": {
         "rating_a": 800,
         "transition": "open",
@@ -206,7 +206,7 @@
       "type": "switch",
       "subtype": "single_throw",
       "label": "ST Switch",
-      "icon": "icons/components/Switchgear.svg",
+      "icon": "icons/components/Switch.svg",
       "props": {
         "rating_a": 800,
         "transition": "open"
@@ -216,7 +216,7 @@
       "type": "switch",
       "subtype": "double_throw",
       "label": "DT Switch",
-      "icon": "icons/components/Switchgear.svg",
+      "icon": "icons/components/Switch.svg",
       "props": {
         "rating_a": 800,
         "transition": "open",
@@ -226,7 +226,7 @@
     {
       "type": "contactor",
       "label": "Contactor",
-      "icon": "icons/components/Switchgear.svg",
+      "icon": "icons/components/Switch.svg",
       "props": {
         "rating_a": 100,
         "coil_v": 120
