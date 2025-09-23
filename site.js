@@ -18,7 +18,37 @@ import { openModal, showAlertModal } from "./src/components/modal.js";
 const FOCUSABLE="a[href],button:not([disabled]),textarea:not([disabled]),input:not([disabled]),select:not([disabled]),[tabindex]:not([tabindex='-1'])";
 const CHECKPOINT_KEY='CTR_CHECKPOINT';
 const MAX_CHECKPOINT_SIZE=2*1024*1024; // ~2MB
+const AUTO_SAVE_INTERVAL_MS=5*60*1000;
 let cachedProjectFileHandle=null;
+let autoSaveSchedulerInstance=null;
+let dirtyTrackerInstance=null;
+
+function getDirtyTracker(){
+  if(dirtyTrackerInstance) return dirtyTrackerInstance;
+  const win=typeof window!=='undefined'?window:globalThis;
+  if(!win) return null;
+  if(win.dirtyTracker){
+    dirtyTrackerInstance=win.dirtyTracker;
+    return dirtyTrackerInstance;
+  }
+  if(typeof win.createDirtyTracker==='function'){
+    try{
+      dirtyTrackerInstance=win.createDirtyTracker(win);
+      win.dirtyTracker=dirtyTrackerInstance;
+      return dirtyTrackerInstance;
+    }catch(err){console.error('Failed to initialize dirty tracker',err);}
+  }
+  return null;
+}
+
+function setAutoSaveFlag(active){
+  if(typeof window!=='undefined'){
+    window.autoSaveEnabled=Boolean(active);
+  }
+}
+if(typeof window!=='undefined'&&!('autoSaveEnabled'in window)){
+  window.autoSaveEnabled=false;
+}
 
 initializeProjectStorage().catch(e=>console.error('fast-json-patch load failed',e));
 
@@ -842,44 +872,195 @@ async function writeProjectToHandle(handle){
       try{
         if(typeof writable.abort==='function') await writable.abort();
         else await writable.close();
-      }catch(closeErr){console.error('Writable cleanup failed',closeErr);}    
+      }catch(closeErr){console.error('Writable cleanup failed',closeErr);}
     }
     downloadProjectAsBlob(json);
     return false;
   }
 }
 
+function updateSaveButtonState(){
+  if(typeof document==='undefined') return;
+  const btn=document.getElementById('save-project-btn');
+  if(!btn) return;
+  btn.disabled=false;
+  if(cachedProjectFileHandle){
+    btn.removeAttribute('title');
+  }else if(typeof globalThis.showSaveFilePicker==='function'){
+    btn.title='Choose a save location to enable autosave and quick saves.';
+  }else{
+    btn.title='Saving downloads a JSON backup because direct file access is unavailable.';
+  }
+}
+
+function defaultManualSaveWarn(){
+  console.warn('Select a save location with Save Project to enable autosave.');
+}
+
+async function defaultRequestProjectFileHandle(){
+  if(typeof globalThis.showSaveFilePicker!=='function'){
+    downloadProjectAsBlob();
+    return {handle:null,cancelled:false};
+  }
+  try{
+    const handle=await globalThis.showSaveFilePicker({
+      suggestedName:'project.ctr.json',
+      types:[{
+        description:'CableTrayRoute Project',
+        accept:{'application/json':['.ctr.json','.json']}
+      }]
+    });
+    if(!handle) return {handle:null,cancelled:true};
+    return {handle,cancelled:false};
+  }catch(err){
+    if(err?.name==='AbortError') return {handle:null,cancelled:true};
+    console.error('showSaveFilePicker failed',err);
+    downloadProjectAsBlob();
+    return {handle:null,cancelled:false};
+  }
+}
+
+async function ensureHandlePermission(handle){
+  if(!handle||typeof handle.queryPermission!=='function') return true;
+  try{
+    let permission=await handle.queryPermission({mode:'readwrite'});
+    if(permission==='granted') return true;
+    if(typeof handle.requestPermission==='function'){
+      permission=await handle.requestPermission({mode:'readwrite'});
+      return permission==='granted';
+    }
+  }catch(err){console.warn('File permission request failed',err);}
+  return false;
+}
+
+export function createAutoSaveScheduler({
+  getHandle,
+  writer=writeProjectToHandle,
+  markClean=()=>getDirtyTracker()?.markClean?.(),
+  setFlag=setAutoSaveFlag,
+  warn=()=>{},
+  intervalMs=AUTO_SAVE_INTERVAL_MS,
+  schedule=(fn,delay)=>setInterval(fn,delay),
+  cancel=id=>clearInterval(id)
+}={}){
+  let timerId=null;
+  async function run(){
+    const handle=typeof getHandle==='function'?getHandle():undefined;
+    if(!handle){
+      setFlag?.(false);
+      warn?.();
+      return false;
+    }
+    setFlag?.(true);
+    let saved=false;
+    try{
+      saved=await writer(handle);
+      if(saved) markClean?.();
+    }catch(err){
+      console.error('Autosave execution failed',err);
+    }finally{
+      setFlag?.(false);
+    }
+    return saved;
+  }
+  function start(){
+    if(timerId!==null) return;
+    timerId=schedule(run,intervalMs);
+  }
+  function stop(){
+    if(timerId===null) return;
+    cancel(timerId);
+    timerId=null;
+  }
+  return {start,stop,run};
+}
+
+function ensureAutoSaveScheduler(){
+  if(autoSaveSchedulerInstance) return autoSaveSchedulerInstance;
+  autoSaveSchedulerInstance=createAutoSaveScheduler({
+    getHandle:()=>cachedProjectFileHandle,
+    writer:handle=>writeProjectToHandle(handle),
+    markClean:()=>getDirtyTracker()?.markClean?.(),
+    setFlag:setAutoSaveFlag,
+    warn:()=>{updateSaveButtonState(); console.warn('Autosave skipped: choose Save Project to select a file for updates.');}
+  });
+  if(typeof window!=='undefined'){
+    window.__CTR_autoSaveScheduler=autoSaveSchedulerInstance;
+  }
+  return autoSaveSchedulerInstance;
+}
+
+export async function manualSaveProject({
+  requestHandle=defaultRequestProjectFileHandle,
+  writer=writeProjectToHandle,
+  ensurePermission=ensureHandlePermission,
+  markClean=()=>getDirtyTracker()?.markClean?.(),
+  notifyNoHandle=defaultManualSaveWarn
+}={}){
+  updateSaveButtonState();
+  let handle=cachedProjectFileHandle;
+  if(!handle){
+    let requestResult=null;
+    try{requestResult=await requestHandle();}catch(err){console.error('Manual save handle request failed',err);}
+    if(requestResult&&typeof requestResult==='object'&&('handle'in requestResult||'cancelled'in requestResult)){
+      const cancelled=Boolean(requestResult.cancelled);
+      handle=requestResult.handle??null;
+      if(!handle){
+        if(cancelled) return false;
+        notifyNoHandle?.();
+        return null;
+      }
+    }else{
+      handle=requestResult??null;
+      if(!handle){
+        notifyNoHandle?.();
+        return null;
+      }
+    }
+    cachedProjectFileHandle=handle;
+    updateSaveButtonState();
+  }
+  let permitted=false;
+  try{permitted=await ensurePermission(handle);}catch(err){console.error('Manual save permission check failed',err);}
+  if(!permitted){
+    cachedProjectFileHandle=null;
+    updateSaveButtonState();
+    notifyNoHandle?.();
+    return false;
+  }
+  let saved=false;
+  try{saved=await writer(handle);}catch(err){console.error('Manual save write failed',err);}
+  if(saved){
+    markClean?.();
+    return true;
+  }
+  return null;
+}
+
+export function __setCachedProjectFileHandle(handle){
+  cachedProjectFileHandle=handle||null;
+  updateSaveButtonState();
+}
+
+export function __getCachedProjectFileHandle(){
+  return cachedProjectFileHandle;
+}
+
+if(typeof window!=='undefined'){
+  window.manualSaveProject=manualSaveProject;
+}
+
 function initProjectIO(){
   loadProjectFromHash();
   applyProjectHash();
+  updateSaveButtonState();
   const exportBtn=document.getElementById('export-project-btn');
-  const supportsFilePicker=typeof globalThis.showSaveFilePicker==='function';
-  let quickSaveBtn=null;
-  if(exportBtn&&supportsFilePicker){
-    quickSaveBtn=document.createElement('button');
-    quickSaveBtn.id='save-project-btn';
-    quickSaveBtn.textContent='Save';
-    if(cachedProjectFileHandle){
-      quickSaveBtn.disabled=false;
-    }else{
-      quickSaveBtn.disabled=true;
-      quickSaveBtn.title='Export the project once to choose a save location.';
-    }
-    exportBtn.insertAdjacentElement('afterend',quickSaveBtn);
-  }
-  if(exportBtn){
-    const checkpointBtn=document.createElement('button');
-    checkpointBtn.id='save-checkpoint-btn';
-    checkpointBtn.textContent='Save Checkpoint';
-    (quickSaveBtn||exportBtn).insertAdjacentElement('afterend',checkpointBtn);
-    checkpointBtn.addEventListener('click',saveCheckpoint);
-  }
   const importBtn=document.getElementById('import-project-btn');
   const fileInput=document.getElementById('import-project-input');
   console.assert(importBtn&&fileInput,'Project import controls missing');
   if(exportBtn){
     exportBtn.addEventListener('click',async()=>{
-      if(supportsFilePicker){
+      if(typeof globalThis.showSaveFilePicker==='function'){
         try{
           const handle=await globalThis.showSaveFilePicker({
             suggestedName:'project.ctr.json',
@@ -890,10 +1071,7 @@ function initProjectIO(){
           });
           if(!handle)return;
           cachedProjectFileHandle=handle;
-          if(quickSaveBtn){
-            quickSaveBtn.disabled=false;
-            quickSaveBtn.removeAttribute('title');
-          }
+          updateSaveButtonState();
           await writeProjectToHandle(handle);
         }catch(err){
           if(err?.name==='AbortError')return;
@@ -902,32 +1080,6 @@ function initProjectIO(){
         }
       }else{
         downloadProjectAsBlob();
-      }
-    });
-  }
-  if(quickSaveBtn){
-    quickSaveBtn.addEventListener('click',async()=>{
-      if(!cachedProjectFileHandle){
-        downloadProjectAsBlob();
-        return;
-      }
-      try{
-        if(typeof cachedProjectFileHandle.queryPermission==='function'){
-          let permission=await cachedProjectFileHandle.queryPermission({mode:'readwrite'});
-          if(permission!=='granted'&&typeof cachedProjectFileHandle.requestPermission==='function'){
-            permission=await cachedProjectFileHandle.requestPermission({mode:'readwrite'});
-          }
-          if(permission!=='granted'){
-            quickSaveBtn.disabled=true;
-            quickSaveBtn.title='Permission required to update the saved project file.';
-            return;
-          }
-        }
-        quickSaveBtn.disabled=false;
-        quickSaveBtn.removeAttribute('title');
-        await writeProjectToHandle(cachedProjectFileHandle);
-      }catch(err){
-        console.error('Save to existing project file failed',err);
       }
     });
   }
@@ -947,6 +1099,7 @@ function initProjectIO(){
       fileInput.value='';
     });
   }
+  ensureAutoSaveScheduler().start();
 }
 
 globalThis.addEventListener?.('DOMContentLoaded',initProjectIO);

@@ -222,7 +222,23 @@ async function serverLoadProject(name) {
   return true;
 }
 
-async function saveProject() {
+async function saveProject(options = {}) {
+  const { skipManual = false } = options || {};
+  if (!skipManual) {
+    const manualSaver = globalThis.manualSaveProject;
+    if (typeof manualSaver === 'function') {
+      let manualResult;
+      try {
+        manualResult = await manualSaver();
+      } catch (err) {
+        console.error(err);
+        manualResult = null;
+      }
+      if (manualResult === false) {
+        return;
+      }
+    }
+  }
   let name = currentProject();
   if (!name) {
     let suggested = '';
