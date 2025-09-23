@@ -151,7 +151,7 @@ const SHAPE_COLORS = {
     'SPIRAL': '#17becf'
 };
 
-document.addEventListener('DOMContentLoaded', async () => {
+async function initializeApp() {
     initSettings();
     initDarkMode();
     if (typeof initCompactMode === 'function') {
@@ -4138,4 +4138,12 @@ Plotly.newPlot(document.getElementById('plot'), data, layout, {responsive: true}
     if(new URLSearchParams(location.search).get('selfcheck')==='1'){
         runSelfCheck();
     }
-});
+}
+
+const startApp = () => initializeApp().catch(err => console.error('App initialization failed', err));
+
+if (document.readyState === 'loading') {
+    document.addEventListener('DOMContentLoaded', startApp, { once: true });
+} else {
+    startApp();
+}
