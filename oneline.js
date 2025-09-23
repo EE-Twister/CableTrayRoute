@@ -202,15 +202,17 @@ const builtinComponents = [
     ]
   },
   {
-    subtype: 'Load',
     label: 'Non-Motor Load',
-    icon: typeIcons.load || placeholderIcon,
+    icon: asset('icons/components/Load.svg'),
     category: 'load',
-    type: 'load',
+    type: 'static_load',
     ports: [
-      { x: 0, y: 20 },
       { x: 80, y: 20 }
-    ]
+    ],
+    props: {
+      watts: 300000,
+      volts: 480
+    }
   },
   {
     subtype: 'Cable',
@@ -499,6 +501,9 @@ let hoverPort = null;
 let selectedConnection = null;
 let diagramScale = getItem('diagramScale', { unitPerPx: 1, unit: 'in' });
 let resizingBus = null;
+let resizingAnnotation = null;
+let marquee = null;
+let marqueeSelectionMade = false;
 let legendDrag = null;
 let gridSize = Number(getItem('gridSize', 20));
 let gridEnabled = getItem('gridEnabled', true);
@@ -508,6 +513,7 @@ let historyIndex = -1;
 let validationIssues = [];
 const compWidth = 80;
 const compHeight = 40;
+const marqueeThreshold = 4;
 let templates = [];
 const DIAGRAM_VERSION = 2;
 let cursorPos = { x: 20, y: 20 };
@@ -757,6 +763,11 @@ function nextLabel(subtype) {
   labelCounters[subtype] = count;
   setItem('labelCounters', labelCounters);
   return getPrefix(subtype) + count;
+}
+
+function applyNextLabel(comp) {
+  if (!comp || !comp.subtype) return;
+  comp.label = nextLabel(comp.subtype);
 }
 
 function editPrefixes() {
@@ -1275,13 +1286,56 @@ function normalizeComponent(c) {
       y: Number(nc.labelOffset.y) || 0
     };
   }
+  if (nc.type === 'annotation') {
+    nc.width = Number(nc.width) || compWidth;
+    nc.height = Number(nc.height) || compHeight;
+  }
   applyDefaults(nc);
   return nc;
 }
 
+function componentBounds(comp) {
+  const w = comp.width || compWidth;
+  const h = comp.height || compHeight;
+  return {
+    left: comp.x,
+    top: comp.y,
+    right: comp.x + w,
+    bottom: comp.y + h
+  };
+}
+
+function finalizeMarqueeSelection() {
+  if (!marquee || !marquee.active) return false;
+  const dx = Math.abs(marquee.x2 - marquee.x1);
+  const dy = Math.abs(marquee.y2 - marquee.y1);
+  const area = marquee;
+  marquee = null;
+  if (dx < marqueeThreshold && dy < marqueeThreshold) {
+    return false;
+  }
+  const left = Math.min(area.x1, area.x2);
+  const right = Math.max(area.x1, area.x2);
+  const top = Math.min(area.y1, area.y2);
+  const bottom = Math.max(area.y1, area.y2);
+  const strict = area.x2 >= area.x1;
+  const picked = components.filter(c => {
+    if (c.type === 'dimension') return false;
+    const bounds = componentBounds(c);
+    if (strict) {
+      return bounds.left >= left && bounds.right <= right && bounds.top >= top && bounds.bottom <= bottom;
+    }
+    return !(bounds.right < left || bounds.left > right || bounds.bottom < top || bounds.top > bottom);
+  });
+  selection = picked;
+  selected = picked[0] || null;
+  selectedConnection = null;
+  return true;
+}
+
 function render() {
   const svg = document.getElementById('diagram');
-  svg.querySelectorAll('g.component, .connection, .conn-label, .port, .bus-handle, .issue-badge, .component-label').forEach(el => el.remove());
+  svg.querySelectorAll('g.component, .connection, .conn-label, .port, .bus-handle, .annotation-handle, .issue-badge, .component-label, .selection-marquee').forEach(el => el.remove());
   const usedVoltageRanges = new Set();
   let lengthsChanged = false;
   if (gridEnabled) {
@@ -1689,6 +1743,19 @@ function render() {
       g.appendChild(rect);
     }
     svg.appendChild(g);
+    if (c.type === 'annotation' && selection.includes(c)) {
+      const handle = document.createElementNS(svgNS, 'rect');
+      handle.setAttribute('x', c.x + w - 5);
+      handle.setAttribute('y', c.y + h - 5);
+      handle.setAttribute('width', 10);
+      handle.setAttribute('height', 10);
+      handle.setAttribute('fill', '#fff');
+      handle.setAttribute('stroke', '#00f');
+      handle.setAttribute('stroke-width', '1');
+      handle.classList.add('annotation-handle');
+      handle.dataset.id = c.id;
+      svg.appendChild(handle);
+    }
     if (c.type !== 'annotation') {
       const labelPos = getLabelPosition(c);
       const labelEl = document.createElementNS(svgNS, 'text');
@@ -1760,6 +1827,25 @@ function render() {
         });
       }
   });
+
+  if (marquee && marquee.active) {
+    const rect = document.createElementNS(svgNS, 'rect');
+    const x = Math.min(marquee.x1, marquee.x2);
+    const y = Math.min(marquee.y1, marquee.y2);
+    const width = Math.abs(marquee.x2 - marquee.x1);
+    const height = Math.abs(marquee.y2 - marquee.y1);
+    rect.setAttribute('x', x);
+    rect.setAttribute('y', y);
+    rect.setAttribute('width', width);
+    rect.setAttribute('height', height);
+    rect.setAttribute('fill', marquee.x2 < marquee.x1 ? 'rgba(76, 175, 80, 0.15)' : 'rgba(33, 150, 243, 0.15)');
+    rect.setAttribute('stroke', marquee.x2 < marquee.x1 ? '#4caf50' : '#2196f3');
+    rect.setAttribute('stroke-width', '1');
+    if (marquee.x2 < marquee.x1) rect.setAttribute('stroke-dasharray', '6 4');
+    rect.classList.add('selection-marquee');
+    rect.style.pointerEvents = 'none';
+    svg.appendChild(rect);
+  }
 
   updateLegend(usedVoltageRanges);
   if (lengthsChanged && !syncing) {
@@ -1945,6 +2031,9 @@ function addComponent(cfg) {
     comp.width = 200;
     comp.height = 20;
     updateBusPorts(comp);
+  } else if (comp.type === 'annotation') {
+    comp.width = comp.width || 120;
+    comp.height = comp.height || 60;
   }
   applyDefaults(comp);
   components.push(comp);
@@ -3021,14 +3110,41 @@ async function init() {
 
   document.addEventListener('mouseup', () => {
     resizingPalette = false;
+    let needsRender = false;
+    let needsSave = false;
     if (draggingLabel) {
       const moved = draggingLabel.moved;
       draggingLabel = null;
       if (moved) {
         pushHistory();
-        render();
-        save();
+        needsRender = true;
+        needsSave = true;
       }
+    }
+    if (resizingAnnotation) {
+      const data = resizingAnnotation;
+      resizingAnnotation = null;
+      const comp = data.comp;
+      if (comp) {
+        const widthChanged = Math.abs((comp.width || 0) - data.startWidth) > 0.01;
+        const heightChanged = Math.abs((comp.height || 0) - data.startHeight) > 0.01;
+        if (widthChanged || heightChanged) {
+          pushHistory();
+          needsSave = true;
+        }
+        needsRender = true;
+      }
+    }
+    if (marquee && marquee.active) {
+      const changed = finalizeMarqueeSelection();
+      marqueeSelectionMade = changed;
+      needsRender = true;
+    }
+    if (needsRender) {
+      render();
+    }
+    if (needsSave) {
+      save();
     }
   });
 
@@ -3064,6 +3180,7 @@ async function init() {
   // Avoid redeclaring the `svg` constant to prevent "Identifier has already been declared" errors.
   const menu = document.getElementById('context-menu');
     svg.addEventListener('mousedown', e => {
+      marqueeSelectionMade = false;
       if (connectMode && e.target.classList.contains('port')) {
         const comp = components.find(c => c.id === e.target.dataset.id);
         const port = Number(e.target.dataset.port);
@@ -3078,6 +3195,20 @@ async function init() {
           tempConnection.classList.add('connection');
           tempConnection.classList.add('temp');
           svg.appendChild(tempConnection);
+        }
+        return;
+      }
+      if (e.target.classList.contains('annotation-handle')) {
+        const comp = components.find(c => c.id === e.target.dataset.id);
+        if (comp) {
+          resizingAnnotation = {
+            comp,
+            startX: e.offsetX,
+            startY: e.offsetY,
+            startWidth: comp.width || compWidth,
+            startHeight: comp.height || compHeight,
+            changed: false
+          };
         }
         return;
       }
@@ -3097,6 +3228,13 @@ async function init() {
       const g = e.target.closest('.component');
       if (!g) {
         dragOffset = null;
+        marquee = {
+          active: true,
+          x1: e.offsetX,
+          y1: e.offsetY,
+          x2: e.offsetX,
+          y2: e.offsetY
+        };
         return;
       }
       const comp = components.find(c => c.id === g.dataset.id);
@@ -3118,6 +3256,31 @@ async function init() {
     svg.addEventListener('mousemove', e => {
       if (draggingLabel) return;
       cursorPos = { x: e.offsetX, y: e.offsetY };
+      if (resizingAnnotation) {
+        const data = resizingAnnotation;
+        const comp = data.comp;
+        if (comp) {
+          let newW = Math.max(40, data.startWidth + (e.offsetX - data.startX));
+          let newH = Math.max(20, data.startHeight + (e.offsetY - data.startY));
+          if (gridEnabled) {
+            newW = Math.max(40, Math.round(newW / gridSize) * gridSize);
+            newH = Math.max(20, Math.round(newH / gridSize) * gridSize);
+          }
+          if (comp.width !== newW || comp.height !== newH) {
+            comp.width = newW;
+            comp.height = newH;
+            data.changed = true;
+            render();
+          }
+        }
+        return;
+      }
+      if (marquee && marquee.active) {
+        marquee.x2 = e.offsetX;
+        marquee.y2 = e.offsetY;
+        render();
+        return;
+      }
       if (draggingConnection) {
         const { component, index, start, mid } = draggingConnection;
         const conn = component.connections[index];
@@ -3188,6 +3351,8 @@ async function init() {
       }
       return;
     }
+    if (resizingAnnotation) return;
+    if (marquee && marquee.active) return;
     if (resizingBus || draggingConnection) return;
     if (!dragOffset || !dragOffset.length) return;
     let snapPos = null;
@@ -3221,6 +3386,9 @@ async function init() {
         }
         return;
       }
+      if (resizingAnnotation) {
+        return;
+      }
       if (resizingBus) {
         resizingBus = null;
         pushHistory();
@@ -3233,6 +3401,12 @@ async function init() {
         pushHistory();
         render();
         save();
+        return;
+      }
+      if (marquee && marquee.active) {
+        const changed = finalizeMarqueeSelection();
+        marqueeSelectionMade = changed;
+        render();
         return;
       }
       if (connectSource && tempConnection) {
@@ -3275,6 +3449,10 @@ async function init() {
       }
     });
   svg.addEventListener('click', async e => {
+    if (marqueeSelectionMade) {
+      marqueeSelectionMade = false;
+      return;
+    }
     const g = e.target.closest('.component');
     if (!g) {
       selection = [];
@@ -3369,6 +3547,7 @@ async function init() {
         y: contextTarget.y + gridSize,
         connections: []
       };
+      applyNextLabel(copy);
       components.push(copy);
       selection = [copy];
       selected = copy;
@@ -3387,13 +3566,15 @@ async function init() {
         const newComps = clipboard.map((c, idx) => {
           const newId = 'n' + (base + idx);
           idMap[c.id] = newId;
-          return {
+          const clone = {
             ...JSON.parse(JSON.stringify(c)),
             id: newId,
             x: c.x + gridSize,
             y: c.y + gridSize,
             connections: (c.connections || []).map(conn => ({ ...conn }))
           };
+          applyNextLabel(clone);
+          return clone;
         });
         newComps.forEach(c => {
           c.connections = (c.connections || [])
@@ -3477,13 +3658,15 @@ async function init() {
         const newComps = clipboard.map((c, idx) => {
           const newId = 'n' + (base + idx);
           idMap[c.id] = newId;
-          return {
+          const clone = {
             ...JSON.parse(JSON.stringify(c)),
             id: newId,
             x: c.x + gridSize,
             y: c.y + gridSize,
             connections: (c.connections || []).map(conn => ({ ...conn }))
           };
+          applyNextLabel(clone);
+          return clone;
         });
         newComps.forEach(c => {
           c.connections = (c.connections || [])
