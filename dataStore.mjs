@@ -30,7 +30,8 @@ import {
   listScenarioKeysState,
   cloneScenarioStorage,
   writeSavedProject,
-  readSavedProject
+  readSavedProject,
+  wasSavedProjectMigrated
 } from './projectStorage.js';
 
 registerScenario(getCurrentScenarioNameState());
@@ -516,9 +517,11 @@ export function saveProject(projectId, scenario = getCurrentScenarioNameState())
 }
 
 export function loadProject(projectId, scenario = getCurrentScenarioNameState()) {
-  if (!projectId) return;
+  if (!projectId) return false;
   try {
-    const payload = readSavedProject(projectId) || {};
+    const rawPayload = readSavedProject(projectId);
+    const payload = rawPayload || {};
+    const migrated = rawPayload ? wasSavedProjectMigrated(projectId) : false;
     const equipment = payload.equipment;
     const panels = payload.panels;
     const loads = payload.loads;
@@ -537,8 +540,11 @@ export function loadProject(projectId, scenario = getCurrentScenarioNameState())
     } else {
       setOneLine(oneLine || { activeSheet: 0, sheets: [] }, scenario);
     }
+    if (migrated) saveProject(projectId, scenario);
+    return !!rawPayload;
   } catch (e) {
     console.error('Failed to load project', e);
+    return false;
   }
 }
 
