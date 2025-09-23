@@ -127,13 +127,6 @@
           </div>
         </div>
         <button id="palette-toggle" class="palette-toggle" aria-label="Toggle palette" aria-controls="palette" aria-expanded="false">☰</button>
-        <details id="library-tools" class="library-tools">
-          <summary>Library Tools</summary>
-          <button id="library-reload-btn" type="button" class="btn">Reload library</button>
-          <button id="template-export-btn" type="button" class="btn">Export Templates</button>
-          <input type="file" id="template-import-input" accept=".json" class="hidden-input">
-          <button id="template-import-btn" type="button" class="btn">Import Templates</button>
-        </details>
         <div class="workspace">
           <aside id="palette" class="palette">
             <div id="component-buttons">
@@ -142,10 +135,10 @@
               </template>
                 <input type="text" id="palette-search" placeholder="Search" aria-label="Filter components">
                 <div class="palette-card card">
-                  <h3>Panel</h3>
-                  <details id="panel-section" class="palette-section">
-                    <summary><img src="./icons/panel.svg" alt="" class="summary-icon"> Panel</summary>
-                    <div id="panel-buttons" class="section-buttons"></div>
+                  <h3>Sources</h3>
+                  <details id="sources-section" class="palette-section">
+                    <summary><img src="./icons/sources.svg" alt="" class="summary-icon"> Sources</summary>
+                    <div id="sources-buttons" class="section-buttons"></div>
                   </details>
                 </div>
                 <div class="palette-card card">
@@ -174,6 +167,20 @@
                   <details id="cable-section" class="palette-section">
                     <summary><img src="./icons/oneline.svg" alt="" class="summary-icon"> Cable</summary>
                     <div id="cable-buttons" class="section-buttons"></div>
+                  </details>
+                </div>
+                <div class="palette-card card">
+                  <h3>Links</h3>
+                  <details id="links-section" class="palette-section">
+                    <summary><img src="./icons/links.svg" alt="" class="summary-icon"> Links</summary>
+                    <div id="links-buttons" class="section-buttons"></div>
+                  </details>
+                </div>
+                <div class="palette-card card">
+                  <h3>Annotations</h3>
+                  <details id="annotations-section" class="palette-section">
+                    <summary><img src="./icons/annotation.svg" alt="" class="summary-icon"> Annotations</summary>
+                    <div id="annotations-buttons" class="section-buttons"></div>
                   </details>
                 </div>
                 <div class="palette-card card">

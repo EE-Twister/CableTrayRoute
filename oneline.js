@@ -94,11 +94,14 @@ if (projectId) {
 }
 
 const typeIcons = {
-  panel: asset('icons/panel.svg'),
+  panel: asset('icons/equipment.svg'),
   equipment: asset('icons/equipment.svg'),
   load: asset('icons/load.svg'),
   bus: asset('icons/Bus.svg'),
-  cable: asset('icons/oneline.svg')
+  cable: asset('icons/oneline.svg'),
+  sources: asset('icons/sources.svg'),
+  links: asset('icons/links.svg'),
+  annotations: asset('icons/annotation.svg')
 };
 
 const placeholderIcon = asset('icons/placeholder.svg');
@@ -108,11 +111,28 @@ function compKey(type, subtype) {
 }
 
 function categoryForType(t) {
-  if (t === 'bus') return 'bus';
-  if (t === 'mcc') return 'panel';
-  if (t === 'motor_load' || t === 'static_load') return 'load';
-  if (t === 'cable') return 'cable';
-  return 'equipment';
+  switch (t) {
+    case 'bus':
+      return 'bus';
+    case 'motor_load':
+    case 'static_load':
+      return 'load';
+    case 'cable':
+      return 'cable';
+    case 'utility_source':
+    case 'generator':
+    case 'pv_inverter':
+      return 'sources';
+    case 'sheet_link':
+      return 'links';
+    case 'annotation':
+      return 'annotations';
+    case 'panel':
+    case 'mcc':
+      return 'equipment';
+    default:
+      return 'equipment';
+  }
 }
 
 function inferSchemaFromProps(props) {
@@ -163,7 +183,7 @@ const builtinComponents = [
     subtype: 'Panel',
     label: 'Panel',
     icon: typeIcons.panel || placeholderIcon,
-    category: 'panel',
+    category: 'equipment',
     type: 'panel',
     ports: [
       { x: 0, y: 20 },
@@ -287,7 +307,7 @@ async function loadComponentLibrary() {
       };
       subtypeCategory[key] = cat;
       if (!componentTypes[cat]) componentTypes[cat] = [];
-      componentTypes[cat].push(key);
+      if (!componentTypes[cat].includes(key)) componentTypes[cat].push(key);
       propSchemas[key] = inferSchemaFromProps(props);
     });
   } catch (e) {
@@ -316,7 +336,7 @@ async function loadComponentLibrary() {
     };
     subtypeCategory[key] = cat;
     if (!componentTypes[cat]) componentTypes[cat] = [];
-    componentTypes[cat].push(key);
+    if (!componentTypes[cat].includes(key)) componentTypes[cat].push(key);
     propSchemas[key] = inferSchemaFromProps(props);
   });
 
@@ -375,11 +395,13 @@ function buildPalette() {
   const palette = document.getElementById('component-buttons');
   const btnTemplate = document.getElementById('palette-button-template');
   const sectionContainers = {
-    panel: document.getElementById('panel-buttons'),
+    sources: document.getElementById('sources-buttons'),
     equipment: document.getElementById('equipment-buttons'),
     load: document.getElementById('load-buttons'),
     bus: document.getElementById('bus-buttons'),
-    cable: document.getElementById('cable-buttons')
+    cable: document.getElementById('cable-buttons'),
+    links: document.getElementById('links-buttons'),
+    annotations: document.getElementById('annotations-buttons')
   };
   Object.values(sectionContainers).forEach(c => {
     if (c) c.innerHTML = '';
@@ -467,6 +489,7 @@ let selected = null;
 let dragOffset = null;
 let dragging = false;
 let draggingConnection = null;
+let draggingLabel = null;
 let clipboard = [];
 let contextTarget = null;
 let connectMode = false;
@@ -955,19 +978,12 @@ async function importTemplates(e) {
 }
 
 function setupLibraryTools() {
-  document.querySelectorAll('#reload-library-btn, #library-reload-btn').forEach(btn => {
-    btn.addEventListener('click', async () => {
+  const reloadBtn = document.getElementById('reload-library-btn');
+  if (reloadBtn) {
+    reloadBtn.addEventListener('click', async () => {
       await loadComponentLibrary();
       showToast('Component library reloaded');
     });
-  });
-  const templateExportBtn = document.getElementById('template-export-btn');
-  if (templateExportBtn) templateExportBtn.addEventListener('click', exportTemplates);
-  const templateImportBtn = document.getElementById('template-import-btn');
-  const templateImportInput = document.getElementById('template-import-input');
-  if (templateImportBtn && templateImportInput) {
-    templateImportBtn.addEventListener('click', () => templateImportInput.click());
-    templateImportInput.addEventListener('change', importTemplates);
   }
 }
 
@@ -1065,6 +1081,24 @@ function updateLegend(ranges) {
   legend.style.display = ranges.size || showOverlays ? 'block' : 'none';
 }
 
+function defaultLabelAnchor(comp) {
+  const w = comp.width || compWidth;
+  const h = comp.height || compHeight;
+  return {
+    x: comp.x + w / 2,
+    y: comp.y + h + 15
+  };
+}
+
+function getLabelPosition(comp) {
+  const offset = comp.labelOffset || { x: 0, y: 0 };
+  const base = defaultLabelAnchor(comp);
+  return {
+    x: base.x + (Number(offset.x) || 0),
+    y: base.y + (Number(offset.y) || 0)
+  };
+}
+
 function portPosition(c, portIndex) {
   const meta = componentMeta[c.subtype] || {};
   const w = c.width || compWidth;
@@ -1147,6 +1181,79 @@ function nearestPortToPoint(x, y, exclude) {
   return best;
 }
 
+function ensureConnection(fromComp, toComp, fromPort, toPort) {
+  if (!fromComp || !toComp) return false;
+  fromComp.connections = fromComp.connections || [];
+  const exists = fromComp.connections.some(conn =>
+    conn.target === toComp.id && conn.sourcePort === fromPort && conn.targetPort === toPort
+  );
+  if (exists) return false;
+  const newConn = {
+    target: toComp.id,
+    sourcePort: fromPort,
+    targetPort: toPort,
+    cable: null,
+    phases: [],
+    conductors: 0,
+    impedance: { r: 0, x: 0 },
+    rating: null
+  };
+  fromComp.connections.push(newConn);
+  try {
+    const fromTag = fromComp.ref || fromComp.id;
+    const toTag = toComp.ref || toComp.id;
+    addRaceway({ conduit_id: `${fromTag}-${toTag}`, from_tag: fromTag, to_tag: toTag });
+  } catch (err) {
+    console.error('Failed to record connection', err);
+  }
+  return true;
+}
+
+function autoAttachComponent(comp, exclude = new Set()) {
+  if (!comp) return false;
+  const meta = componentMeta[comp.subtype] || {};
+  const ports = comp.ports || meta.ports;
+  if (!ports || !ports.length) return false;
+  let best = null;
+  components.forEach(other => {
+    if (other === comp || exclude.has(other)) return;
+    const otherMeta = componentMeta[other.subtype] || {};
+    const otherPorts = other.ports || otherMeta.ports;
+    if (!otherPorts || !otherPorts.length) return;
+    ports.forEach((_, portIdx) => {
+      const compPos = portPosition(comp, portIdx);
+      otherPorts.forEach((__, otherIdx) => {
+        const otherPos = portPosition(other, otherIdx);
+        const dist = Math.hypot(otherPos.x - compPos.x, otherPos.y - compPos.y);
+        if (!best || dist < best.distance) {
+          best = {
+            distance: dist,
+            portIdx,
+            other,
+            otherIdx,
+            compPos,
+            otherPos
+          };
+        }
+      });
+    });
+  });
+  if (!best) return false;
+  const threshold = Math.max(12, gridSize / 2);
+  if (best.distance > threshold) return false;
+  const updatedCompPos = portPosition(comp, best.portIdx);
+  const dx = best.otherPos.x - updatedCompPos.x;
+  const dy = best.otherPos.y - updatedCompPos.y;
+  let changed = false;
+  if (Math.abs(dx) > 0.01 || Math.abs(dy) > 0.01) {
+    comp.x = Number((comp.x + dx).toFixed(2));
+    comp.y = Number((comp.y + dy).toFixed(2));
+    changed = true;
+  }
+  const connected = ensureConnection(comp, best.other, best.portIdx, best.otherIdx);
+  return changed || connected;
+}
+
 function findSourceComponent(targetId, comps = components) {
   return comps.find(c => (c.connections || []).some(conn => conn.target === targetId)) || null;
 }
@@ -1160,13 +1267,21 @@ function normalizeComponent(c) {
       typeof conn === 'string' ? { target: conn } : conn
     )
   };
+  if (typeof nc.labelOffset !== 'object' || nc.labelOffset === null) {
+    nc.labelOffset = { x: 0, y: 0 };
+  } else {
+    nc.labelOffset = {
+      x: Number(nc.labelOffset.x) || 0,
+      y: Number(nc.labelOffset.y) || 0
+    };
+  }
   applyDefaults(nc);
   return nc;
 }
 
 function render() {
   const svg = document.getElementById('diagram');
-  svg.querySelectorAll('g.component, .connection, .conn-label, .port, .bus-handle, .issue-badge').forEach(el => el.remove());
+  svg.querySelectorAll('g.component, .connection, .conn-label, .port, .bus-handle, .issue-badge, .component-label').forEach(el => el.remove());
   const usedVoltageRanges = new Set();
   let lengthsChanged = false;
   if (gridEnabled) {
@@ -1560,16 +1675,6 @@ function render() {
         }
         g.appendChild(letter);
       }
-      const text = document.createElementNS(svgNS, 'text');
-      text.setAttribute('x', c.x + w / 2);
-      text.setAttribute('y', c.y + h + 15);
-      text.setAttribute('text-anchor', 'middle');
-      text.textContent = c.label || meta.label || c.subtype || c.type;
-      text.addEventListener('dblclick', e => {
-        e.stopPropagation();
-        selectComponent(c);
-      });
-      g.appendChild(text);
     }
     if (selection.includes(c)) {
       const rect = document.createElementNS(svgNS, 'rect');
@@ -1584,6 +1689,43 @@ function render() {
       g.appendChild(rect);
     }
     svg.appendChild(g);
+    if (c.type !== 'annotation') {
+      const labelPos = getLabelPosition(c);
+      const labelEl = document.createElementNS(svgNS, 'text');
+      labelEl.classList.add('component-label');
+      labelEl.dataset.id = c.id;
+      labelEl.setAttribute('x', labelPos.x);
+      labelEl.setAttribute('y', labelPos.y);
+      labelEl.setAttribute('text-anchor', 'middle');
+      labelEl.textContent = c.label || meta.label || c.subtype || c.type;
+      labelEl.addEventListener('mousedown', e => {
+        e.stopPropagation();
+        selected = c;
+        selection = [c];
+        selectedConnection = null;
+        const pos = getLabelPosition(c);
+        draggingLabel = {
+          component: c,
+          dx: e.offsetX - pos.x,
+          dy: e.offsetY - pos.y,
+          moved: false
+        };
+      });
+      labelEl.addEventListener('click', e => {
+        e.stopPropagation();
+        if (!selection.includes(c)) {
+          selection = [c];
+          selected = c;
+          selectedConnection = null;
+          render();
+        }
+      });
+      labelEl.addEventListener('dblclick', e => {
+        e.stopPropagation();
+        selectComponent(c);
+      });
+      svg.appendChild(labelEl);
+    }
     if (isBusComponent(c) && selection.includes(c)) {
       const handleRight = document.createElementNS(svgNS, 'rect');
       handleRight.setAttribute('x', c.x + c.width - 5);
@@ -1761,6 +1903,7 @@ function updateBusPorts(bus) {
 
 function addComponent(cfg) {
   let subtype, type, x = 20, y = 20;
+  let skipHistory = false;
   if (typeof cfg === 'string') {
     subtype = cfg;
     type = componentMeta[subtype]?.category;
@@ -1769,6 +1912,7 @@ function addComponent(cfg) {
     type = cfg.type || componentMeta[cfg.subtype]?.type || componentMeta[cfg.subtype]?.category;
     if (cfg.x !== undefined) x = cfg.x;
     if (cfg.y !== undefined) y = cfg.y;
+    skipHistory = !!cfg.skipHistory;
   } else {
     return;
   }
@@ -1786,6 +1930,7 @@ function addComponent(cfg) {
     y,
     label: nextLabel(subtype),
     ref: '',
+    labelOffset: { x: 0, y: 0 },
     rotation: 0,
     flipped: false,
     impedance: { r: 0, x: 0 },
@@ -1803,7 +1948,7 @@ function addComponent(cfg) {
   }
   applyDefaults(comp);
   components.push(comp);
-  pushHistory();
+  if (!skipHistory) pushHistory();
   if (gridEnabled) flashSnapIndicator(x, y);
   return comp;
 }
@@ -2668,7 +2813,9 @@ async function init() {
       const { left, top } = svg.getBoundingClientRect();
       const x = e.clientX - left;
       const y = e.clientY - top;
-      const comp = addComponent({ type: info.type, subtype: info.subtype, x, y });
+      const comp = addComponent({ type: info.type, subtype: info.subtype, x, y, skipHistory: true });
+      autoAttachComponent(comp);
+      pushHistory();
       render();
       save();
       const elem = svg.querySelector(`g.component[data-id="${comp.id}"]`);
@@ -2769,6 +2916,7 @@ async function init() {
   buildPalette();
   loadTemplates();
   renderTemplates();
+  setupLibraryTools();
   const connectBtn = document.getElementById('connect-btn');
   if (connectBtn) {
     connectBtn.addEventListener('click', () => {
@@ -2873,6 +3021,15 @@ async function init() {
 
   document.addEventListener('mouseup', () => {
     resizingPalette = false;
+    if (draggingLabel) {
+      const moved = draggingLabel.moved;
+      draggingLabel = null;
+      if (moved) {
+        pushHistory();
+        render();
+        save();
+      }
+    }
   });
 
   paletteToggle?.addEventListener('click', () => {
@@ -2959,6 +3116,7 @@ async function init() {
       render();
     });
     svg.addEventListener('mousemove', e => {
+      if (draggingLabel) return;
       cursorPos = { x: e.offsetX, y: e.offsetY };
       if (draggingConnection) {
         const { component, index, start, mid } = draggingConnection;
@@ -3009,6 +3167,27 @@ async function init() {
       }
     });
   svg.addEventListener('mousemove', e => {
+    if (draggingLabel) {
+      let x = e.offsetX - draggingLabel.dx;
+      let y = e.offsetY - draggingLabel.dy;
+      if (gridEnabled) {
+        x = Math.round(x / gridSize) * gridSize;
+        y = Math.round(y / gridSize) * gridSize;
+      }
+      const comp = draggingLabel.component;
+      const base = defaultLabelAnchor(comp);
+      const newOffset = {
+        x: Number((x - base.x).toFixed(2)),
+        y: Number((y - base.y).toFixed(2))
+      };
+      const current = comp.labelOffset || { x: 0, y: 0 };
+      if (newOffset.x !== current.x || newOffset.y !== current.y) {
+        comp.labelOffset = newOffset;
+        draggingLabel.moved = true;
+        render();
+      }
+      return;
+    }
     if (resizingBus || draggingConnection) return;
     if (!dragOffset || !dragOffset.length) return;
     let snapPos = null;
@@ -3032,6 +3211,16 @@ async function init() {
     if (snapPos) flashSnapIndicator(snapPos.x, snapPos.y);
   });
     svg.addEventListener('mouseup', async e => {
+      if (draggingLabel) {
+        const moved = draggingLabel.moved;
+        draggingLabel = null;
+        if (moved) {
+          pushHistory();
+          render();
+          save();
+        }
+        return;
+      }
       if (resizingBus) {
         resizingBus = null;
         pushHistory();
@@ -3054,30 +3243,12 @@ async function init() {
           const toComp = hoverPort.component;
           const fromPort = connectSource.port;
           const toPort = hoverPort.port;
-          fromComp.connections = fromComp.connections || [];
-          const newConn = {
-            target: toComp.id,
-            sourcePort: fromPort,
-            targetPort: toPort,
-            cable: null,
-            phases: [],
-            conductors: 0,
-            impedance: { r: 0, x: 0 },
-            rating: null
-          };
-          fromComp.connections.push(newConn);
-
-          try {
-            const fromTag = fromComp.ref || fromComp.id;
-            const toTag = toComp.ref || toComp.id;
-            addRaceway({ conduit_id: `${fromTag}-${toTag}`, from_tag: fromTag, to_tag: toTag });
-          } catch (err) {
-            console.error('Failed to record connection', err);
+          const created = ensureConnection(fromComp, toComp, fromPort, toPort);
+          if (created) {
+            pushHistory();
+            render();
+            save();
           }
-
-          pushHistory();
-          render();
-          save();
         }
         connectSource = null;
         hoverPort = null;
@@ -3088,6 +3259,11 @@ async function init() {
       }
       if (dragOffset && dragOffset.length) {
         if (dragging) {
+          const moved = dragOffset.map(off => off.comp);
+          const exclude = new Set(moved);
+          moved.forEach(comp => {
+            autoAttachComponent(comp, exclude);
+          });
           pushHistory();
           render();
           save();
