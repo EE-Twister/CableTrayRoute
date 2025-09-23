@@ -18,6 +18,7 @@ import { openModal, showAlertModal } from "./src/components/modal.js";
 const FOCUSABLE="a[href],button:not([disabled]),textarea:not([disabled]),input:not([disabled]),select:not([disabled]),[tabindex]:not([tabindex='-1'])";
 const CHECKPOINT_KEY='CTR_CHECKPOINT';
 const MAX_CHECKPOINT_SIZE=2*1024*1024; // ~2MB
+let cachedProjectFileHandle=null;
 
 initializeProjectStorage().catch(e=>console.error('fast-json-patch load failed',e));
 
@@ -802,36 +803,132 @@ function loadConduits(){
     const {conduits:_,...rest}=db;
     return rest;
   });
-  return {ductbanks,conduits:[...flattened,...conduits]};
+ return {ductbanks,conduits:[...flattened,...conduits]};
 }
 
  globalThis.document?.addEventListener('DOMContentLoaded',initTableNav);
+
+function downloadProjectAsBlob(precomputedJson){
+  try{
+    const json=typeof precomputedJson==='string'?precomputedJson:JSON.stringify(exportProject(),null,2);
+    const blob=new Blob([json],{type:'application/json'});
+    const a=document.createElement('a');
+    a.href=URL.createObjectURL(blob);
+    a.download='project.ctr.json';
+    a.click();
+    setTimeout(()=>URL.revokeObjectURL(a.href),0);
+  }catch(err){console.error('Export fallback failed',err);}
+}
+
+async function writeProjectToHandle(handle){
+  if(!handle){
+    downloadProjectAsBlob();
+    return false;
+  }
+  let writable;
+  let json;
+  try{
+    const data=exportProject();
+    json=JSON.stringify(data,null,2);
+    writable=await handle.createWritable();
+    const shouldCompress=typeof handle.name==='string'&&handle.name.endsWith('.gz');
+    const payload=shouldCompress?await compressString(json):json;
+    await writable.write(payload);
+    await writable.close();
+    return true;
+  }catch(err){
+    console.error('File System Access export failed',err);
+    if(writable){
+      try{
+        if(typeof writable.abort==='function') await writable.abort();
+        else await writable.close();
+      }catch(closeErr){console.error('Writable cleanup failed',closeErr);}    
+    }
+    downloadProjectAsBlob(json);
+    return false;
+  }
+}
 
 function initProjectIO(){
   loadProjectFromHash();
   applyProjectHash();
   const exportBtn=document.getElementById('export-project-btn');
+  const supportsFilePicker=typeof globalThis.showSaveFilePicker==='function';
+  let quickSaveBtn=null;
+  if(exportBtn&&supportsFilePicker){
+    quickSaveBtn=document.createElement('button');
+    quickSaveBtn.id='save-project-btn';
+    quickSaveBtn.textContent='Save';
+    if(cachedProjectFileHandle){
+      quickSaveBtn.disabled=false;
+    }else{
+      quickSaveBtn.disabled=true;
+      quickSaveBtn.title='Export the project once to choose a save location.';
+    }
+    exportBtn.insertAdjacentElement('afterend',quickSaveBtn);
+  }
   if(exportBtn){
     const checkpointBtn=document.createElement('button');
     checkpointBtn.id='save-checkpoint-btn';
     checkpointBtn.textContent='Save Checkpoint';
-    exportBtn.insertAdjacentElement('afterend',checkpointBtn);
+    (quickSaveBtn||exportBtn).insertAdjacentElement('afterend',checkpointBtn);
     checkpointBtn.addEventListener('click',saveCheckpoint);
   }
   const importBtn=document.getElementById('import-project-btn');
   const fileInput=document.getElementById('import-project-input');
   console.assert(importBtn&&fileInput,'Project import controls missing');
   if(exportBtn){
-    exportBtn.addEventListener('click',()=>{
+    exportBtn.addEventListener('click',async()=>{
+      if(supportsFilePicker){
+        try{
+          const handle=await globalThis.showSaveFilePicker({
+            suggestedName:'project.ctr.json',
+            types:[{
+              description:'CableTrayRoute Project',
+              accept:{'application/json':['.ctr.json','.json']}
+            }]
+          });
+          if(!handle)return;
+          cachedProjectFileHandle=handle;
+          if(quickSaveBtn){
+            quickSaveBtn.disabled=false;
+            quickSaveBtn.removeAttribute('title');
+          }
+          await writeProjectToHandle(handle);
+        }catch(err){
+          if(err?.name==='AbortError')return;
+          console.error('showSaveFilePicker failed',err);
+          downloadProjectAsBlob();
+        }
+      }else{
+        downloadProjectAsBlob();
+      }
+    });
+  }
+  if(quickSaveBtn){
+    quickSaveBtn.addEventListener('click',async()=>{
+      if(!cachedProjectFileHandle){
+        downloadProjectAsBlob();
+        return;
+      }
       try{
-        const data=exportProject();
-        const blob=new Blob([JSON.stringify(data,null,2)],{type:'application/json'});
-        const a=document.createElement('a');
-        a.href=URL.createObjectURL(blob);
-        a.download='project.ctr.json';
-        a.click();
-        setTimeout(()=>URL.revokeObjectURL(a.href),0);
-      }catch(e){console.error('Export failed',e);}
+        if(typeof cachedProjectFileHandle.queryPermission==='function'){
+          let permission=await cachedProjectFileHandle.queryPermission({mode:'readwrite'});
+          if(permission!=='granted'&&typeof cachedProjectFileHandle.requestPermission==='function'){
+            permission=await cachedProjectFileHandle.requestPermission({mode:'readwrite'});
+          }
+          if(permission!=='granted'){
+            quickSaveBtn.disabled=true;
+            quickSaveBtn.title='Permission required to update the saved project file.';
+            return;
+          }
+        }
+        quickSaveBtn.disabled=false;
+        quickSaveBtn.removeAttribute('title');
+        await writeProjectToHandle(cachedProjectFileHandle);
+      }catch(err){
+        console.error('Save to existing project file failed',err);
+      }
     });
   }
   if(importBtn&&fileInput){
