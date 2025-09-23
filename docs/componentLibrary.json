@@ -1,5 +1,5 @@
 {
-  "categories": ["bus", "panel", "equipment", "load"],
+  "categories": ["bus", "equipment", "load", "sources", "links", "annotations", "cable"],
   "components": [
     {
       "type": "bus",
@@ -14,8 +14,12 @@
     },
     {
       "type": "utility_source",
+      "subtype": "utility",
       "label": "Utility",
       "icon": "icons/components/Utility.svg",
+      "ports": [
+        { "x": 80, "y": 20 }
+      ],
       "props": {
         "volts": 13800,
         "thevenin_mva": 500,
@@ -250,8 +254,12 @@
     },
     {
       "type": "generator",
-      "label": "Gen",
-      "icon": "icons/components/Generator.svg",
+      "subtype": "synchronous",
+      "label": "Synchronous Gen",
+      "icon": "icons/components/SynchronousGenerator.svg",
+      "ports": [
+        { "x": 80, "y": 20 }
+      ],
       "props": {
         "kw": 2000,
         "kva": 2500,
@@ -261,6 +269,24 @@
         "xd_prime_pu": 0.3,
         "xd_double_prime_pu": 0.2,
         "grounding": "high_resistance"
+      }
+    },
+    {
+      "type": "generator",
+      "subtype": "asynchronous",
+      "label": "Asynchronous Gen",
+      "icon": "icons/components/AsynchronousGenerator.svg",
+      "ports": [
+        { "x": 80, "y": 20 }
+      ],
+      "props": {
+        "kw": 1500,
+        "kva": 1875,
+        "volts": 4160,
+        "pf": 0.85,
+        "slip_percent": 2.5,
+        "reactance_pu": 0.25,
+        "grounding": "ungrounded"
       }
     },
     {
@@ -283,6 +309,34 @@
         "volts": 480,
         "topology": "double_conversion",
         "battery_kwh": 250
+      }
+    },
+    {
+      "type": "sheet_link",
+      "subtype": "link_source",
+      "label": "Sheet Link Out",
+      "icon": "icons/components/SheetLinkOut.svg",
+      "ports": [
+        { "x": 80, "y": 20 }
+      ],
+      "props": {
+        "link_id": "",
+        "target_sheet": "",
+        "notes": ""
+      }
+    },
+    {
+      "type": "sheet_link",
+      "subtype": "link_target",
+      "label": "Sheet Link In",
+      "icon": "icons/components/SheetLinkIn.svg",
+      "ports": [
+        { "x": 0, "y": 20 }
+      ],
+      "props": {
+        "link_id": "",
+        "from_sheet": "",
+        "notes": ""
       }
     },
     {

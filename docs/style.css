@@ -1704,6 +1704,11 @@ body.dark-mode .legalDisclaimer {
 .sizing-violation{background-color:var(--error-bg);color:var(--error-text);}
 .connection.sizing-violation{stroke:var(--error-text)!important;}
 .connection.voltage-exceed{stroke:var(--warning-text)!important;}
+.component-label{
+    fill:var(--text-color);
+    cursor:move;
+    user-select:none;
+}
 
 /* --- Raceway Schedule Page --- */
 .ductbank-row > td {
