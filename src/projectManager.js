@@ -3,7 +3,8 @@ import {
   getProjectState,
   listSavedProjects as listSavedProjectsStorage,
   getAuthContextState,
-  clearAuthContextState
+  clearAuthContextState,
+  getSavedProjectsError
 } from '../projectStorage.js';
 import { openModal, showAlertModal } from './components/modal.js';
 
@@ -238,14 +239,24 @@ async function saveProject() {
   setProjectHash(name);
   // Save locally and attempt server sync if logged in
   dsSaveProject(name);
+  const storageError = getSavedProjectsError();
+  let serverSynced = false;
   let serverError = null;
   try {
-    await serverSaveProject(name);
+    serverSynced = await serverSaveProject(name);
   } catch (e) {
     console.error(e);
     serverError = e;
   }
-  const message = serverError
+  if (storageError) {
+    const baseMessage = storageError.message || 'Saved projects could not be updated. Clear saved data in Settings and try again.';
+    const detail = serverSynced
+      ? 'The project was uploaded to the server, but the local copy could not be updated.'
+      : 'The project was not uploaded to the server.';
+    await showAlertModal('Save Failed', `${baseMessage} ${detail}`.trim());
+    return;
+  }
+  const message = (serverError || !serverSynced)
     ? `Project "${name}" saved locally. Server sync failed.`
     : `Project "${name}" successfully saved.`;
   alert(message);
@@ -253,12 +264,31 @@ async function saveProject() {
 
 async function loadProject() {
   const projects = listProjects();
+  const storageError = getSavedProjectsError();
+  if (storageError) {
+    const message = storageError.message || 'Saved projects could not be read. Clear saved data in Settings and try again.';
+    await showAlertModal('Saved Projects Unavailable', message);
+    return;
+  }
   const name = await promptLoadProject(projects);
   if (!name) return;
   setProjectHash(name);
   let loaded = false;
   try { loaded = await serverLoadProject(name); } catch (e) { console.error(e); }
-  if (!loaded) dsLoadProject(name);
+  if (!loaded) {
+    const stored = dsLoadProject(name);
+    const postLoadError = getSavedProjectsError();
+    if (postLoadError) {
+      const message = postLoadError.message || 'Saved projects could not be read. Clear saved data in Settings and try again.';
+      await showAlertModal('Saved Project Migration Failed', message);
+      return;
+    }
+    loaded = stored;
+  }
+  if (!loaded) {
+    await showAlertModal('Project Not Found', `Project "${name}" could not be loaded from local storage.`);
+    return;
+  }
   location.reload();
 }
 

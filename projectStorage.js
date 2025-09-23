@@ -1,6 +1,7 @@
 const PROJECT_KEY = 'CTR_PROJECT_V1';
 const SCENARIOS_KEY = 'ctr_scenarios_v1';
 const CURRENT_SCENARIO_KEY = 'ctr_current_scenario_v1';
+const SAVED_PROJECTS_KEY = 'CTR_SAVED_PROJECTS_V1';
 const CONDUIT_CACHE_KEY = 'CTR_CONDUITS';
 const AUTH_TOKEN_KEY = 'authToken';
 const AUTH_CSRF_KEY = 'authCsrfToken';
@@ -57,6 +58,10 @@ let quotaWarningShown = false;
 let scenarioListCache = ['base'];
 let currentScenarioName = 'base';
 let conduitCacheState = null;
+let savedProjectsCache = {};
+let savedProjectsLoaded = false;
+let savedProjectsError = null;
+const migratedSavedProjects = new Set();
 
 function readRawStorage(key) {
   const storage = getStorage();
@@ -244,51 +249,200 @@ export function cloneScenarioStorage(from, to) {
 }
 
 const SAVED_PROJECT_SUFFIXES = ['equipment', 'panels', 'loads', 'cables', 'raceways', 'oneLine'];
+const SAVED_PROJECT_PRIMARY_SUFFIXES = new Set(SAVED_PROJECT_SUFFIXES.filter(suffix => suffix !== 'equipment'));
 
-export function listSavedProjects() {
-  const names = new Set();
+class SavedProjectMigrationError extends Error {
+  constructor(message, cause) {
+    super(message);
+    this.name = 'SavedProjectMigrationError';
+    if (cause) this.cause = cause;
+  }
+}
+
+function isPlainObject(value) {
+  return value !== null && typeof value === 'object' && !Array.isArray(value);
+}
+
+function cloneSavedProjectValue(value) {
+  if (value === undefined) return undefined;
+  return JSON.parse(JSON.stringify(value));
+}
+
+function cloneSavedProjectRecord(record) {
+  return JSON.parse(JSON.stringify(record || {}));
+}
+
+function loadSavedProjectsBlob() {
+  const raw = readRawStorage(SAVED_PROJECTS_KEY);
+  if (raw === null || raw === undefined) return {};
+  let parsed;
+  try {
+    parsed = JSON.parse(raw);
+  } catch (e) {
+    throw new SavedProjectMigrationError('Saved projects could not be read because the stored data is corrupted. Clear the saved projects entry in browser storage and try again.', e);
+  }
+  if (!isPlainObject(parsed)) {
+    throw new SavedProjectMigrationError('Saved projects could not be read because the stored data is in an unexpected format.');
+  }
+  return parsed;
+}
+
+function migrateLegacySavedProjects() {
+  const legacyRecords = new Map();
   const suffixes = new Set(SAVED_PROJECT_SUFFIXES);
   for (const key of getAllStorageKeys()) {
     const idx = key.indexOf(':');
     if (idx <= 0) continue;
     const suffix = key.slice(idx + 1);
-    if (suffixes.has(suffix)) names.add(key.slice(0, idx));
+    if (!suffixes.has(suffix)) continue;
+    const name = key.slice(0, idx);
+    let entry = legacyRecords.get(name);
+    if (!entry) {
+      entry = { data: {}, suffixes: new Set(), keys: [] };
+      legacyRecords.set(name, entry);
+    }
+    entry.keys.push(key);
+    entry.suffixes.add(suffix);
+    const raw = readRawStorage(key);
+    if (raw === null || raw === undefined) continue;
+    let parsed;
+    try {
+      parsed = JSON.parse(raw);
+    } catch (e) {
+      throw new SavedProjectMigrationError(`Saved project "${name}" could not be migrated because the "${suffix}" section is corrupted. Clear the saved project from browser storage and save again.`, e);
+    }
+    entry.data[suffix] = parsed;
   }
-  return [...names].sort((a, b) => a.localeCompare(b, undefined, { sensitivity: 'base' }));
+
+  if (!legacyRecords.size) return null;
+
+  const migrated = {};
+  const keysToRemove = [];
+  for (const [name, entry] of legacyRecords) {
+    const hasPrimary = [...entry.suffixes].some(suffix => SAVED_PROJECT_PRIMARY_SUFFIXES.has(suffix));
+    if (!hasPrimary) continue;
+    if (!Object.keys(entry.data).length) continue;
+    migrated[name] = cloneSavedProjectRecord(entry.data);
+    keysToRemove.push(...entry.keys);
+  }
+
+  if (!Object.keys(migrated).length) return null;
+  return { records: migrated, keysToRemove };
+}
+
+function persistSavedProjects() {
+  if (savedProjectsError) throw savedProjectsError;
+  const names = Object.keys(savedProjectsCache);
+  if (!names.length) {
+    writeRawStorage(SAVED_PROJECTS_KEY, null);
+    return;
+  }
+  try {
+    writeRawStorage(SAVED_PROJECTS_KEY, JSON.stringify(savedProjectsCache));
+  } catch (e) {
+    const error = e instanceof Error ? e : new Error(String(e));
+    const wrapped = error instanceof SavedProjectMigrationError
+      ? error
+      : new SavedProjectMigrationError('Saved projects could not be written to storage.', error);
+    savedProjectsError = wrapped;
+    throw wrapped;
+  }
+}
+
+function ensureSavedProjectsCache() {
+  if (savedProjectsLoaded) return;
+  savedProjectsLoaded = true;
+  savedProjectsError = null;
+  migratedSavedProjects.clear();
+  try {
+    const existing = loadSavedProjectsBlob();
+    const migration = migrateLegacySavedProjects();
+    if (migration) {
+      const existingNames = new Set(Object.keys(existing));
+      for (const name of Object.keys(migration.records)) {
+        if (!existingNames.has(name)) {
+          migratedSavedProjects.add(name);
+        }
+      }
+      savedProjectsCache = { ...migration.records, ...existing };
+      persistSavedProjects();
+      for (const key of migration.keysToRemove) {
+        writeRawStorage(key, null);
+      }
+    } else {
+      savedProjectsCache = existing;
+    }
+  } catch (e) {
+    const error = e instanceof Error ? e : new Error(String(e));
+    savedProjectsError = error;
+    savedProjectsCache = {};
+    console.error('Saved project initialization failed', error);
+  }
+}
+
+export function getSavedProjectsError() {
+  ensureSavedProjectsCache();
+  return savedProjectsError;
+}
+
+export function listSavedProjects() {
+  ensureSavedProjectsCache();
+  if (savedProjectsError) return [];
+  return Object.keys(savedProjectsCache).sort((a, b) => a.localeCompare(b, undefined, { sensitivity: 'base' }));
 }
 
 export function writeSavedProject(projectId, sections = {}) {
   const name = typeof projectId === 'string' ? projectId.trim() : '';
   if (!name) return;
-  for (const [key, value] of Object.entries(sections)) {
-    try {
-      writeRawStorage(`${name}:${key}`, JSON.stringify(value));
-    } catch (e) {
-      console.error('project save failed', key, e);
+  ensureSavedProjectsCache();
+  if (savedProjectsError) throw savedProjectsError;
+  const entries = sections && typeof sections === 'object' ? Object.entries(sections) : [];
+  if (!entries.length) return;
+  const current = isPlainObject(savedProjectsCache[name]) ? { ...savedProjectsCache[name] } : {};
+  for (const [key, value] of entries) {
+    const cloned = cloneSavedProjectValue(value);
+    if (cloned === undefined) {
+      delete current[key];
+    } else {
+      current[key] = cloned;
     }
   }
+  if (Object.keys(current).length === 0) {
+    delete savedProjectsCache[name];
+  } else {
+    savedProjectsCache[name] = current;
+  }
+  migratedSavedProjects.delete(name);
+  persistSavedProjects();
 }
 
 export function readSavedProject(projectId) {
   const name = typeof projectId === 'string' ? projectId.trim() : '';
   if (!name) return null;
-  const prefix = `${name}:`;
-  const result = {};
-  for (const key of listPrefixedKeys(prefix)) {
-    const raw = readRawStorage(prefix + key);
-    if (raw === null || raw === undefined) continue;
-    result[key] = safeParse(raw, null);
-  }
-  return result;
+  ensureSavedProjectsCache();
+  if (savedProjectsError) throw savedProjectsError;
+  const record = savedProjectsCache[name];
+  if (!isPlainObject(record)) return null;
+  return cloneSavedProjectRecord(record);
 }
 
 export function removeSavedProject(projectId) {
   const name = typeof projectId === 'string' ? projectId.trim() : '';
   if (!name) return;
-  const prefix = `${name}:`;
-  for (const key of listPrefixedKeys(prefix)) {
-    writeRawStorage(prefix + key, null);
-  }
+  ensureSavedProjectsCache();
+  if (savedProjectsError) throw savedProjectsError;
+  if (!(name in savedProjectsCache)) return;
+  delete savedProjectsCache[name];
+  migratedSavedProjects.delete(name);
+  persistSavedProjects();
+}
+
+export function wasSavedProjectMigrated(projectId) {
+  const name = typeof projectId === 'string' ? projectId.trim() : '';
+  if (!name) return false;
+  ensureSavedProjectsCache();
+  if (savedProjectsError) return false;
+  return migratedSavedProjects.has(name);
 }
 
 export function getSessionPreferences() {
@@ -827,10 +981,12 @@ const api = {
   removeScenarioValue,
   listScenarioKeysState,
   cloneScenarioStorage,
+  getSavedProjectsError,
   listSavedProjects,
   writeSavedProject,
   readSavedProject,
   removeSavedProject,
+  wasSavedProjectMigrated,
   getSessionPreferences,
   setSessionPreferences,
   updateSessionPreferences,
