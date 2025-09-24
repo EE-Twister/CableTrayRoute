@@ -141,10 +141,27 @@ function normalizeCategoryValue(value) {
   }
 }
 
+function clampPaletteWidth(value, fallback = defaultPaletteWidth) {
+  if (value === null || value === undefined || value === '') {
+    return clampPaletteWidth(fallback, defaultPaletteWidth);
+  }
+  const numeric = Number(value);
+  if (!Number.isFinite(numeric)) {
+    return clampPaletteWidth(fallback, defaultPaletteWidth);
+  }
+  if (numeric < minPaletteWidth) return minPaletteWidth;
+  if (numeric > maxPaletteWidth) return maxPaletteWidth;
+  return numeric;
+}
+
 const compWidth = 80;
 const compHeight = 40;
 const attributeLineHeight = 12;
 const viewAttributeStorageKey = 'diagramViewAttributes';
+const defaultPaletteWidth = 250;
+const minPaletteWidth = 100;
+const maxPaletteWidth = 600;
+const paletteWidthStorageKey = 'onelinePaletteWidth';
 
 const attributeDisplayOverrides = {
   rating: { label: 'Rating', unit: '' },
@@ -418,7 +435,7 @@ let componentTypes = {};
 let manufacturerDefaults = {};
 let protectiveDevices = [];
 
-let paletteWidth = 250;
+let paletteWidth = clampPaletteWidth(getItem(paletteWidthStorageKey, defaultPaletteWidth));
 let resizingPalette = false;
 
 const voltageClasses = ['480 V', '5000 V', '15000 V', '25000 V'];
@@ -2037,7 +2054,7 @@ function finalizeMarqueeSelection() {
 
 function render() {
   const svg = document.getElementById('diagram');
-  svg.querySelectorAll('g.component, .connection, .conn-label, .port, .bus-handle, .annotation-handle, .issue-badge, .component-label, .selection-marquee').forEach(el => el.remove());
+  svg.querySelectorAll('g.component, .connection, .conn-label, .port, .bus-handle, .annotation-handle, .issue-badge, .component-label, .component-attribute, .selection-marquee').forEach(el => el.remove());
   const usedVoltageRanges = new Set();
   let lengthsChanged = false;
   if (gridEnabled) {
@@ -3902,21 +3919,38 @@ async function init() {
   const splitter = document.querySelector('.splitter');
   const paletteToggle = document.getElementById('palette-toggle');
 
+  if (workspaceEl) {
+    workspaceEl.style.setProperty('--palette-width', `${paletteWidth}px`);
+  }
+  if (splitter) {
+    splitter.style.left = `${paletteWidth}px`;
+  }
+
   splitter?.addEventListener('mousedown', e => {
     resizingPalette = true;
     e.preventDefault();
   });
 
   document.addEventListener('mousemove', e => {
-    if (!resizingPalette) return;
+    if (!resizingPalette || !workspaceEl) return;
     const rect = workspaceEl.getBoundingClientRect();
-    paletteWidth = Math.min(Math.max(e.clientX - rect.left, 100), 500);
+    const nextWidth = clampPaletteWidth(e.clientX - rect.left, paletteWidth);
+    if (nextWidth === paletteWidth) return;
+    paletteWidth = nextWidth;
+    workspaceEl.style.setProperty('--palette-width', `${paletteWidth}px`);
     workspaceEl.style.gridTemplateColumns = `${paletteWidth}px 1fr`;
-    splitter.style.left = `${paletteWidth}px`;
+    if (splitter) splitter.style.left = `${paletteWidth}px`;
   });
 
   document.addEventListener('mouseup', () => {
+    const wasResizingPalette = resizingPalette;
     resizingPalette = false;
+    if (wasResizingPalette) {
+      if (workspaceEl) {
+        workspaceEl.style.setProperty('--palette-width', `${paletteWidth}px`);
+      }
+      setItem(paletteWidthStorageKey, Math.round(paletteWidth));
+    }
     let needsRender = false;
     let needsSave = false;
     if (draggingLabel) {
@@ -3956,12 +3990,14 @@ async function init() {
   });
 
   paletteToggle?.addEventListener('click', () => {
+    if (!workspaceEl) return;
     const show = !workspaceEl.classList.contains('show-palette');
     workspaceEl.classList.toggle('show-palette', show);
     paletteToggle.setAttribute('aria-expanded', show);
     if (show) {
+      workspaceEl.style.setProperty('--palette-width', `${paletteWidth}px`);
       workspaceEl.style.gridTemplateColumns = `${paletteWidth}px 1fr`;
-      splitter.style.left = `${paletteWidth}px`;
+      if (splitter) splitter.style.left = `${paletteWidth}px`;
     } else {
       workspaceEl.style.gridTemplateColumns = '1fr';
     }
