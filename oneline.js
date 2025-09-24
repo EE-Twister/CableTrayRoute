@@ -143,6 +143,81 @@ function normalizeCategoryValue(value) {
 
 const compWidth = 80;
 const compHeight = 40;
+const attributeLineHeight = 12;
+const viewAttributeStorageKey = 'diagramViewAttributes';
+
+const attributeDisplayOverrides = {
+  rating: { label: 'Rating', unit: '' },
+  rating_a: { label: 'Rating', unit: 'A' },
+  interrupt_rating_ka: { label: 'Interrupt Rating', unit: 'kA' },
+  frame_a: { label: 'Frame', unit: 'A' },
+  voltage: { label: 'Voltage', unit: 'V' },
+  volts: { label: 'Voltage', unit: 'V' },
+  volts_primary: { label: 'Primary Voltage', unit: 'V' },
+  volts_secondary: { label: 'Secondary Voltage', unit: 'V' },
+  volts_hv: { label: 'HV Voltage', unit: 'V' },
+  volts_lv: { label: 'LV Voltage', unit: 'V' },
+  volts_tv: { label: 'Tertiary Voltage', unit: 'V' },
+  kva: { label: 'kVA', unit: '' },
+  kva_hv: { label: 'HV kVA', unit: '' },
+  kva_lv: { label: 'LV kVA', unit: '' },
+  kva_tv: { label: 'TV kVA', unit: '' },
+  percent_z: { label: 'Impedance', unit: '%' },
+  z_hv_lv_percent: { label: 'Z HV-LV', unit: '%' },
+  z_hv_tv_percent: { label: 'Z HV-TV', unit: '%' },
+  z_lv_tv_percent: { label: 'Z LV-TV', unit: '%' },
+  thevenin_mva: { label: 'Thevenin MVA', unit: 'MVA' },
+  xr_ratio: { label: 'X/R Ratio', unit: '' },
+  hp: { label: 'Horsepower', unit: 'HP' },
+  pf: { label: 'Power Factor', unit: '' },
+  service_factor: { label: 'Service Factor', unit: '' },
+  efficiency: { label: 'Efficiency', unit: '%' },
+  lr_current_pu: { label: 'Locked Rotor Current (p.u.)', unit: '' },
+  starting: { label: 'Starting', unit: '' },
+  vfd: { label: 'VFD', unit: '' },
+  length_m: { label: 'Length', unit: 'm' },
+  length_ft: { label: 'Length', unit: 'ft' },
+  length: { label: 'Length', unit: '' },
+  voltage_class: { label: 'Voltage Class', unit: '' },
+  thermal_rating: { label: 'Thermal Rating', unit: '' },
+  manufacturer: { label: 'Manufacturer', unit: '' },
+  model: { label: 'Model', unit: '' },
+  enclosure: { label: 'Enclosure', unit: '' },
+  gap: { label: 'Gap', unit: 'mm' },
+  working_distance: { label: 'Working Distance', unit: 'mm' },
+  clearing_time: { label: 'Clearing Time', unit: 's' },
+  tccId: { label: 'TCC Device', unit: '' },
+  voltage_mag: { label: 'Voltage (p.u.)', unit: '' },
+  voltage_mag_a: { label: 'Voltage A (p.u.)', unit: '' },
+  voltage_mag_b: { label: 'Voltage B (p.u.)', unit: '' },
+  voltage_mag_c: { label: 'Voltage C (p.u.)', unit: '' }
+};
+
+const attributeIgnoreKeys = new Set([
+  'id',
+  'type',
+  'subtype',
+  'x',
+  'y',
+  'rotation',
+  'flipped',
+  'connections',
+  'label',
+  'labelOffset',
+  'width',
+  'height',
+  'ports',
+  'impedance',
+  'props'
+]);
+
+const storedViewAttributes = getItem(viewAttributeStorageKey, []);
+const initialViewAttributes = Array.isArray(storedViewAttributes)
+  ? storedViewAttributes.filter(key => typeof key === 'string' && key.trim())
+  : [];
+let viewAttributes = new Set(initialViewAttributes);
+let attributeOptions = [];
+const attributeOptionsMap = new Map();
 
 function compKey(type, subtype) {
   return subtype ? `${type}_${subtype}` : type;
@@ -441,6 +516,7 @@ async function loadComponentLibrary() {
   });
 
   buildPalette();
+  refreshAttributeOptions();
 }
 // === END REPLACEMENT ===
 
@@ -542,6 +618,7 @@ function buildPalette() {
       btn.setAttribute('data-testid', 'palette-button');
       btn.dataset.label = meta.label;
       btn.title = `${meta.label} - Drag to canvas or click to add`;
+      btn.setAttribute('aria-label', meta.label || meta.subtype || meta.type || subKey);
       const rotation = normalizeRotation(meta?.defaultRotation ?? defaultRotationForType(meta?.type, meta?.category));
       const iconWrapper = document.createElement('span');
       iconWrapper.className = 'palette-icon';
@@ -553,6 +630,10 @@ function buildPalette() {
       iconWrapper.appendChild(iconImg);
       btn.innerHTML = '';
       btn.appendChild(iconWrapper);
+      const labelSpan = document.createElement('span');
+      labelSpan.className = 'palette-label';
+      labelSpan.textContent = meta.label || meta.subtype || meta.type || subKey;
+      btn.appendChild(labelSpan);
       btn.addEventListener('click', () => {
         addComponent({ type: meta.type, subtype: subKey });
         render();
@@ -1412,6 +1493,213 @@ function getLabelAlignment(comp) {
   return resolveComponentCategory(comp) === 'load' ? 'middle' : 'start';
 }
 
+function attachLabelInteractions(el, comp) {
+  if (!el) return;
+  el.addEventListener('mousedown', e => {
+    e.stopPropagation();
+    selected = comp;
+    selection = [comp];
+    selectedConnection = null;
+    const pos = getLabelPosition(comp);
+    draggingLabel = {
+      component: comp,
+      dx: e.offsetX - pos.x,
+      dy: e.offsetY - pos.y,
+      moved: false
+    };
+  });
+  el.addEventListener('click', e => {
+    e.stopPropagation();
+    if (!selection.includes(comp)) {
+      selection = [comp];
+      selected = comp;
+      selectedConnection = null;
+      render();
+    }
+  });
+  el.addEventListener('dblclick', e => {
+    e.stopPropagation();
+    cancelPendingClickSelection();
+    selectComponent(comp);
+  });
+}
+
+function formatAttributeLabel(key) {
+  return key
+    .split('_')
+    .filter(Boolean)
+    .map(part => (part.length <= 3 ? part.toUpperCase() : part.charAt(0).toUpperCase() + part.slice(1)))
+    .join(' ');
+}
+
+function inferAttributeUnit(key) {
+  const lower = key.toLowerCase();
+  if (lower.includes('voltage') || lower.endsWith('volts')) return 'V';
+  if (lower.endsWith('_ka')) return 'kA';
+  if (lower.endsWith('_kv')) return 'kV';
+  if (lower.endsWith('_kw') || lower.endsWith('kw')) return 'kW';
+  if (lower.endsWith('kva') || lower.endsWith('_kva')) return 'kVA';
+  if (lower.endsWith('_a') || lower.endsWith('amps') || lower.endsWith('current_a')) return 'A';
+  if (lower.includes('percent') || lower.endsWith('_pct') || lower.includes('impedance') || lower.endsWith('%')) return '%';
+  if (lower.includes('efficiency')) return '%';
+  if (lower.endsWith('_hz') || lower.endsWith('hz')) return 'Hz';
+  if (lower.endsWith('_ft')) return 'ft';
+  if (lower.endsWith('_m')) return 'm';
+  return '';
+}
+
+function getAttributeOption(key) {
+  if (!key) return null;
+  if (attributeOptionsMap.has(key)) return attributeOptionsMap.get(key);
+  const override = attributeDisplayOverrides[key];
+  const label = override?.label || formatAttributeLabel(key);
+  const unit = override && Object.prototype.hasOwnProperty.call(override, 'unit')
+    ? override.unit
+    : inferAttributeUnit(key);
+  const option = { key, label, unit };
+  attributeOptionsMap.set(key, option);
+  return option;
+}
+
+function formatAttributeValue(key, value) {
+  if (value === undefined || value === null) return null;
+  if (typeof value === 'number') {
+    if (!Number.isFinite(value)) return null;
+    const abs = Math.abs(value);
+    const decimals = abs >= 100 ? 0 : abs >= 10 ? 1 : 2;
+    let formatted = value.toFixed(decimals);
+    if (decimals > 0) formatted = formatted.replace(/\.0+$/, '').replace(/(\.\d*[1-9])0+$/, '$1');
+    return formatted;
+  }
+  if (typeof value === 'boolean') {
+    return value ? 'Yes' : 'No';
+  }
+  if (typeof value === 'string') {
+    const trimmed = value.trim();
+    return trimmed ? trimmed : null;
+  }
+  return null;
+}
+
+function getComponentAttributeLines(comp) {
+  if (!viewAttributes.size) return [];
+  const keys = Array.from(viewAttributes);
+  keys.sort((a, b) => {
+    const optA = getAttributeOption(a);
+    const optB = getAttributeOption(b);
+    return (optA?.label || a).localeCompare(optB?.label || b);
+  });
+  const lines = [];
+  keys.forEach(key => {
+    const option = getAttributeOption(key);
+    if (!option) return;
+    let value = comp[key];
+    if (value === undefined && comp.props && typeof comp.props === 'object') {
+      value = comp.props[key];
+    }
+    const formatted = formatAttributeValue(key, value);
+    if (formatted === null) return;
+    const unit = option.unit || '';
+    const valueText = unit ? `${formatted} ${unit}`.trim() : formatted;
+    const labelText = option.label || formatAttributeLabel(key);
+    lines.push(`${labelText}: ${valueText}`.trim());
+  });
+  return lines;
+}
+
+function renderViewMenu() {
+  const menu = document.getElementById('view-menu');
+  if (!menu) return;
+  menu.innerHTML = '';
+  if (!attributeOptions.length) {
+    const empty = document.createElement('li');
+    empty.className = 'view-menu-empty';
+    empty.textContent = 'No attributes available';
+    menu.appendChild(empty);
+    updateViewButtonLabel();
+    return;
+  }
+  attributeOptions.forEach(opt => {
+    const li = document.createElement('li');
+    li.setAttribute('role', 'none');
+    const label = document.createElement('label');
+    label.dataset.key = opt.key;
+    label.setAttribute('role', 'menuitemcheckbox');
+    label.setAttribute('aria-checked', String(viewAttributes.has(opt.key)));
+    const input = document.createElement('input');
+    input.type = 'checkbox';
+    input.value = opt.key;
+    input.checked = viewAttributes.has(opt.key);
+    input.addEventListener('change', () => {
+      if (input.checked) {
+        viewAttributes.add(opt.key);
+      } else {
+        viewAttributes.delete(opt.key);
+      }
+      const persisted = Array.from(viewAttributes);
+      persisted.sort();
+      setItem(viewAttributeStorageKey, persisted);
+      label.setAttribute('aria-checked', String(input.checked));
+      updateViewButtonLabel();
+      render();
+    });
+    const text = document.createElement('span');
+    text.textContent = opt.label;
+    label.appendChild(input);
+    label.appendChild(text);
+    li.appendChild(label);
+    menu.appendChild(li);
+  });
+  updateViewButtonLabel();
+}
+
+function updateViewButtonLabel() {
+  const btn = document.getElementById('view-menu-btn');
+  if (!btn) return;
+  const count = viewAttributes.size;
+  btn.textContent = count ? `Views (${count})` : 'Views';
+}
+
+function refreshAttributeOptions() {
+  const optionMap = new Map();
+  const addKey = key => {
+    if (!key) return;
+    if (attributeIgnoreKeys.has(key)) return;
+    const normalized = String(key);
+    if (optionMap.has(normalized)) return;
+    const override = attributeDisplayOverrides[normalized];
+    const label = override?.label || formatAttributeLabel(normalized);
+    const unit = override && Object.prototype.hasOwnProperty.call(override, 'unit')
+      ? override.unit
+      : inferAttributeUnit(normalized);
+    optionMap.set(normalized, { key: normalized, label, unit });
+  };
+  Object.values(componentMeta).forEach(meta => {
+    Object.entries(meta.props || {}).forEach(([key, value]) => {
+      if (attributeIgnoreKeys.has(key)) return;
+      if (value === undefined || value === null) return;
+      if (typeof value === 'object') return;
+      addKey(key);
+    });
+  });
+  const allSheets = Array.isArray(sheets) ? sheets : [];
+  allSheets.forEach(sheet => {
+    (sheet.components || []).forEach(comp => {
+      Object.entries(comp).forEach(([key, value]) => {
+        if (attributeIgnoreKeys.has(key)) return;
+        if (value === undefined || value === null) return;
+        if (typeof value === 'object') return;
+        addKey(key);
+      });
+    });
+  });
+  viewAttributes.forEach(addKey);
+  attributeOptions = Array.from(optionMap.values()).sort((a, b) => a.label.localeCompare(b.label));
+  attributeOptionsMap.clear();
+  attributeOptions.forEach(opt => attributeOptionsMap.set(opt.key, opt));
+  renderViewMenu();
+}
+
 function portPosition(c, portIndex) {
   const meta = componentMeta[c.subtype] || {};
   const w = c.width || compWidth;
@@ -2252,34 +2540,22 @@ function render() {
       labelEl.setAttribute('y', labelPos.y);
       labelEl.setAttribute('text-anchor', getLabelAlignment(c));
       labelEl.textContent = c.label || meta.label || c.subtype || c.type;
-      labelEl.addEventListener('mousedown', e => {
-        e.stopPropagation();
-        selected = c;
-        selection = [c];
-        selectedConnection = null;
-        const pos = getLabelPosition(c);
-        draggingLabel = {
-          component: c,
-          dx: e.offsetX - pos.x,
-          dy: e.offsetY - pos.y,
-          moved: false
-        };
-      });
-      labelEl.addEventListener('click', e => {
-        e.stopPropagation();
-        if (!selection.includes(c)) {
-          selection = [c];
-          selected = c;
-          selectedConnection = null;
-          render();
-        }
-      });
-      labelEl.addEventListener('dblclick', e => {
-        e.stopPropagation();
-        cancelPendingClickSelection();
-        selectComponent(c);
-      });
+      attachLabelInteractions(labelEl, c);
       svg.appendChild(labelEl);
+      const attrLines = getComponentAttributeLines(c);
+      if (attrLines.length) {
+        attrLines.forEach((line, idx) => {
+          const attrEl = document.createElementNS(svgNS, 'text');
+          attrEl.classList.add('component-attribute');
+          attrEl.dataset.id = c.id;
+          attrEl.setAttribute('x', labelPos.x);
+          attrEl.setAttribute('y', labelPos.y + attributeLineHeight * (idx + 1));
+          attrEl.setAttribute('text-anchor', getLabelAlignment(c));
+          attrEl.textContent = line;
+          attachLabelInteractions(attrEl, c);
+          svg.appendChild(attrEl);
+        });
+      }
     }
     if (isBusComponent(c) && selection.includes(c)) {
       const handleRight = document.createElementNS(svgNS, 'rect');
@@ -2394,6 +2670,7 @@ function loadSheet(idx) {
   selection = [];
   selected = null;
   selectedConnection = null;
+  refreshAttributeOptions();
   renderSheetTabs();
   render();
   setOneLine({ activeSheet, sheets });
@@ -2426,6 +2703,7 @@ function deleteSheet(id) {
   activeSheet = Math.max(0, idx - 1);
   components = sheets[activeSheet].components;
   connections = sheets[activeSheet].connections;
+  refreshAttributeOptions();
   renderSheetTabs();
   render();
   save();
@@ -3493,6 +3771,7 @@ async function init() {
   connections = sheets[activeSheet].connections;
   history = [JSON.parse(JSON.stringify(components))];
   historyIndex = 0;
+  refreshAttributeOptions();
   renderSheetTabs();
   render();
   const initIssues = validateDiagram();
@@ -3556,6 +3835,29 @@ async function init() {
         exportDWG(sheets[activeSheet]?.components || []);
       }
     });
+  }
+  const viewMenuBtn = document.getElementById('view-menu-btn');
+  const viewMenu = document.getElementById('view-menu');
+  const viewGroup = document.querySelector('.view-group');
+  if (viewMenuBtn && viewMenu && viewGroup) {
+    const closeViewMenu = () => {
+      viewMenu.classList.remove('show');
+      viewMenuBtn.setAttribute('aria-expanded', 'false');
+    };
+    viewMenuBtn.addEventListener('click', e => {
+      e.stopPropagation();
+      const expanded = viewMenuBtn.getAttribute('aria-expanded') === 'true';
+      viewMenuBtn.setAttribute('aria-expanded', String(!expanded));
+      viewMenu.classList.toggle('show', !expanded);
+    });
+    viewMenu.addEventListener('click', e => e.stopPropagation());
+    document.addEventListener('click', e => {
+      if (!viewGroup.contains(e.target)) closeViewMenu();
+    });
+    document.addEventListener('keydown', e => {
+      if (e.key === 'Escape') closeViewMenu();
+    });
+    updateViewButtonLabel();
   }
   const importBtn = document.getElementById('import-btn');
   if (importBtn) importBtn.addEventListener('click', () => document.getElementById('import-input').click());
