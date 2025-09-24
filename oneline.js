@@ -156,7 +156,15 @@ function normalizeRotation(angle) {
 
 function defaultRotationForType(type, category) {
   const resolved = type || category;
-  return resolved === 'bus' || resolved === 'annotation' ? 0 : 90;
+  if (resolved === 'bus' || resolved === 'annotation') return 0;
+  if (
+    category === 'load' ||
+    resolved === 'load' ||
+    (typeof resolved === 'string' && resolved.endsWith('_load'))
+  ) {
+    return 270;
+  }
+  return 90;
 }
 
 function categoryForType(t) {
@@ -2211,11 +2219,10 @@ function render() {
     }
     if (selection.includes(c)) {
       const rect = document.createElementNS(svgNS, 'rect');
-      const bounds = componentBounds(c);
-      rect.setAttribute('x', bounds.left - 2);
-      rect.setAttribute('y', bounds.top - 2);
-      rect.setAttribute('width', (bounds.right - bounds.left) + 4);
-      rect.setAttribute('height', (bounds.bottom - bounds.top) + 4);
+      rect.setAttribute('x', c.x - 2);
+      rect.setAttribute('y', c.y - 2);
+      rect.setAttribute('width', w + 4);
+      rect.setAttribute('height', h + 4);
       rect.setAttribute('fill', 'none');
       rect.setAttribute('stroke', '#00f');
       rect.setAttribute('stroke-dasharray', '4 2');
