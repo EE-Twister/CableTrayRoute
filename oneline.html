@@ -66,10 +66,15 @@
       <section class="card">
         <div class="sheet-controls">
           <div class="scenario-controls">
-            <select id="scenario-select"></select>
-            <button id="scenario-duplicate-btn" type="button" class="btn">Duplicate</button>
-            <button id="scenario-diff-btn" type="button" class="btn">Diff</button>
-            <button id="revision-btn" type="button" class="btn">Revisions</button>
+            <div class="scenario-select-group">
+              <label for="scenario-select" class="scenario-label">Scenario</label>
+              <select id="scenario-select"></select>
+            </div>
+            <div class="scenario-action-group">
+              <button id="scenario-duplicate-btn" type="button" class="btn">Duplicate</button>
+              <button id="scenario-diff-btn" type="button" class="btn">Diff</button>
+              <button id="revision-btn" type="button" class="btn">Revisions</button>
+            </div>
           </div>
           <div id="sheet-tabs" class="sheet-tabs" role="tablist"></div>
           <div class="sheet-action-group">

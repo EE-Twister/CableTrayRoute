@@ -148,6 +148,17 @@ function compKey(type, subtype) {
   return subtype ? `${type}_${subtype}` : type;
 }
 
+function normalizeRotation(angle) {
+  if (!Number.isFinite(angle)) return 0;
+  const normalized = angle % 360;
+  return normalized < 0 ? normalized + 360 : normalized;
+}
+
+function defaultRotationForType(type, category) {
+  const resolved = type || category;
+  return resolved === 'bus' || resolved === 'annotation' ? 0 : 90;
+}
+
 function categoryForType(t) {
   switch (t) {
     case 'bus':
@@ -220,13 +231,20 @@ function coerceNumber(value, fallback) {
 function normalizePortsForCategory(category, ports, type, subtype) {
   const base = Array.isArray(ports) && ports.length ? ports : defaultPorts(type, subtype);
   if (category === 'load') {
-    const center = compWidth / 2;
-    if (base.length <= 1) {
-      return [{ x: center, y: 0 }];
+    const defaultX = compWidth;
+    const defaultY = compHeight / 2;
+    if (!base.length) {
+      return [{ x: defaultX, y: defaultY }];
+    }
+    if (base.length === 1) {
+      return [{
+        x: coerceNumber(base[0]?.x, defaultX),
+        y: coerceNumber(base[0]?.y, defaultY)
+      }];
     }
     return base.map(port => ({
-      x: coerceNumber(port?.x, center),
-      y: 0
+      x: coerceNumber(port?.x, defaultX),
+      y: coerceNumber(port?.y, defaultY)
     }));
   }
   return base.map(port => ({
@@ -353,6 +371,7 @@ async function loadComponentLibrary() {
         ? asset(`icons/components/${c.symbol}.svg`)
         : placeholderIcon;
       const ports = normalizePortsForCategory(cat, c.ports, c.type, c.subtype);
+      const defaultRotation = normalizeRotation(defaultRotationForType(c.type, cat));
       const rawProps = c.props || {};
       const props = {};
       Object.entries(rawProps).forEach(([k, v]) => {
@@ -373,7 +392,8 @@ async function loadComponentLibrary() {
         ports,
         type: c.type,
         subtype: c.subtype,
-        props
+        props,
+        defaultRotation
       };
       subtypeCategory[key] = cat;
       if (!componentTypes[cat]) componentTypes[cat] = [];
@@ -390,6 +410,7 @@ async function loadComponentLibrary() {
     const cat = c.category || categoryForType(c.type);
     const icon = c.icon || placeholderIcon;
     const ports = normalizePortsForCategory(cat, c.ports, c.type, c.subtype);
+    const defaultRotation = normalizeRotation(defaultRotationForType(c.type, cat));
     const rawProps = c.props || {};
     const props = {};
     Object.entries(rawProps).forEach(([k, v]) => {
@@ -402,7 +423,8 @@ async function loadComponentLibrary() {
       ports,
       type: c.type,
       subtype: c.subtype,
-      props
+      props,
+      defaultRotation
     };
     subtypeCategory[key] = cat;
     if (!componentTypes[cat]) componentTypes[cat] = [];
@@ -512,7 +534,17 @@ function buildPalette() {
       btn.setAttribute('data-testid', 'palette-button');
       btn.dataset.label = meta.label;
       btn.title = `${meta.label} - Drag to canvas or click to add`;
-      btn.innerHTML = `<img src="${meta.icon}" alt="" aria-hidden="true">`;
+      const rotation = normalizeRotation(meta?.defaultRotation ?? defaultRotationForType(meta?.type, meta?.category));
+      const iconWrapper = document.createElement('span');
+      iconWrapper.className = 'palette-icon';
+      iconWrapper.dataset.rotation = String(rotation);
+      const iconImg = document.createElement('img');
+      iconImg.src = meta.icon;
+      iconImg.alt = '';
+      iconImg.setAttribute('aria-hidden', 'true');
+      iconWrapper.appendChild(iconImg);
+      btn.innerHTML = '';
+      btn.appendChild(iconWrapper);
       btn.addEventListener('click', () => {
         addComponent({ type: meta.type, subtype: subKey });
         render();
@@ -520,6 +552,7 @@ function buildPalette() {
       });
       btn.addEventListener('dragstart', e => {
         e.dataTransfer.setData('text/plain', JSON.stringify({ type: meta.type, subtype: subKey }));
+        setDragPreview(e, meta, rotation);
       });
       container.appendChild(btn);
     });
@@ -560,6 +593,38 @@ function buildPalette() {
         paletteSearch.dispatchEvent(new Event('input'));
       }
     });
+  }
+}
+
+function setDragPreview(e, meta, rotation) {
+  if (!e?.dataTransfer || !meta?.icon) return;
+  try {
+    const preview = document.createElement('div');
+    preview.className = 'drag-preview';
+    preview.dataset.rotation = String(rotation);
+    const baseWidth = compWidth;
+    const baseHeight = compHeight;
+    const normalized = normalizeRotation(rotation);
+    const width = normalized === 90 || normalized === 270 ? baseHeight : baseWidth;
+    const height = normalized === 90 || normalized === 270 ? baseWidth : baseHeight;
+    preview.style.width = `${width}px`;
+    preview.style.height = `${height}px`;
+    const img = document.createElement('img');
+    img.src = meta.icon;
+    img.alt = '';
+    img.setAttribute('aria-hidden', 'true');
+    img.draggable = false;
+    preview.appendChild(img);
+    document.body.appendChild(preview);
+    const rect = preview.getBoundingClientRect();
+    const offsetX = rect.width / 2;
+    const offsetY = rect.height / 2;
+    e.dataTransfer.setDragImage(preview, offsetX, offsetY);
+    requestAnimationFrame(() => {
+      preview.remove();
+    });
+  } catch (err) {
+    // ignore drag preview failures
   }
 }
 
@@ -1596,22 +1661,13 @@ function normalizeComponent(c) {
     nc.height = Number(nc.height) || compHeight;
   }
   if (resolveComponentCategory(nc) === 'load') {
-    const metaPorts = componentMeta[nc.subtype]?.ports;
-    if (Array.isArray(metaPorts) && metaPorts.length) {
-      nc.ports = metaPorts.map(port => ({
-        x: coerceNumber(port?.x, compWidth / 2),
-        y: coerceNumber(port?.y, 0)
-      }));
-    } else if (Array.isArray(nc.ports) && nc.ports.length) {
-      const center = compWidth / 2;
-      if (nc.ports.length <= 1) {
-        nc.ports = [{ x: center, y: 0 }];
-      } else {
-        nc.ports = nc.ports.map(port => ({ x: coerceNumber(port?.x, center), y: 0 }));
-      }
-    } else {
-      nc.ports = [{ x: compWidth / 2, y: 0 }];
-    }
+    const basePorts = componentMeta[nc.subtype]?.ports?.length
+      ? componentMeta[nc.subtype].ports
+      : nc.ports;
+    nc.ports = normalizePortsForCategory('load', basePorts, nc.type, nc.subtype).map(port => ({
+      x: coerceNumber(port?.x, compWidth),
+      y: coerceNumber(port?.y, compHeight / 2)
+    }));
   }
   applyDefaults(nc);
   return nc;
@@ -2390,8 +2446,16 @@ function save(notify = true) {
     };
   });
   sheets = sheetData;
-  components = sheets[activeSheet].components;
-  connections = sheets[activeSheet].connections;
+  if (sheets.length) {
+    const clampedIndex = Math.min(Math.max(activeSheet, 0), sheets.length - 1);
+    activeSheet = clampedIndex;
+    components = sheets[clampedIndex].components;
+    connections = sheets[clampedIndex].connections;
+  } else {
+    activeSheet = 0;
+    components = [];
+    connections = [];
+  }
   setOneLine({ activeSheet, sheets: sheetData });
   setItem('diagramScale', diagramScale);
   const issues = validateDiagram();
@@ -2434,7 +2498,7 @@ function addComponent(cfg) {
     y = Math.round(y / gridSize) * gridSize;
   }
   const resolvedType = type || meta.type || meta.category;
-  const defaultRotation = resolvedType === 'bus' || resolvedType === 'annotation' ? 0 : 90;
+  const defaultRotation = normalizeRotation(meta.defaultRotation ?? defaultRotationForType(resolvedType, meta.category));
   const comp = {
     id: 'n' + Date.now(),
     type: resolvedType,
@@ -3914,6 +3978,16 @@ async function init() {
       selectedConnection = null;
       render();
     }, 175);
+  });
+
+  svg.addEventListener('dblclick', e => {
+    const targetComponent = e.target instanceof Element ? e.target.closest('g.component') : null;
+    if (!targetComponent) return;
+    const comp = components.find(c => c.id === targetComponent.dataset.id);
+    if (!comp) return;
+    e.stopPropagation();
+    cancelPendingClickSelection();
+    selectComponent(comp);
   });
 
   svg.addEventListener('contextmenu', e => {
