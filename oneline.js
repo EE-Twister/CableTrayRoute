@@ -148,6 +148,21 @@ function compKey(type, subtype) {
   return subtype ? `${type}_${subtype}` : type;
 }
 
+function normalizeRotation(angle) {
+  if (!Number.isFinite(angle)) return 0;
+  const normalized = angle % 360;
+  return normalized < 0 ? normalized + 360 : normalized;
+}
+
+function defaultRotationForType(type, category) {
+  const resolvedType = type || category;
+  const resolvedCategory = normalizeCategoryValue(category) || categoryForType(resolvedType);
+  if (resolvedType === 'bus' || resolvedCategory === 'bus') return 0;
+  if (resolvedType === 'annotation' || resolvedCategory === 'annotations') return 0;
+  if (resolvedType === 'motor_load' || resolvedType === 'static_load' || resolvedCategory === 'load') return 270;
+  return 90;
+}
+
 function categoryForType(t) {
   switch (t) {
     case 'bus':
@@ -220,13 +235,20 @@ function coerceNumber(value, fallback) {
 function normalizePortsForCategory(category, ports, type, subtype) {
   const base = Array.isArray(ports) && ports.length ? ports : defaultPorts(type, subtype);
   if (category === 'load') {
-    const center = compWidth / 2;
-    if (base.length <= 1) {
-      return [{ x: center, y: 0 }];
+    const defaultX = compWidth;
+    const defaultY = compHeight / 2;
+    if (!base.length) {
+      return [{ x: defaultX, y: defaultY }];
+    }
+    if (base.length === 1) {
+      return [{
+        x: coerceNumber(base[0]?.x, defaultX),
+        y: coerceNumber(base[0]?.y, defaultY)
+      }];
     }
     return base.map(port => ({
-      x: coerceNumber(port?.x, center),
-      y: 0
+      x: coerceNumber(port?.x, defaultX),
+      y: coerceNumber(port?.y, defaultY)
     }));
   }
   return base.map(port => ({
@@ -353,6 +375,7 @@ async function loadComponentLibrary() {
         ? asset(`icons/components/${c.symbol}.svg`)
         : placeholderIcon;
       const ports = normalizePortsForCategory(cat, c.ports, c.type, c.subtype);
+      const defaultRotation = normalizeRotation(defaultRotationForType(c.type, cat));
       const rawProps = c.props || {};
       const props = {};
       Object.entries(rawProps).forEach(([k, v]) => {
@@ -373,7 +396,8 @@ async function loadComponentLibrary() {
         ports,
         type: c.type,
         subtype: c.subtype,
-        props
+        props,
+        defaultRotation
       };
       subtypeCategory[key] = cat;
       if (!componentTypes[cat]) componentTypes[cat] = [];
@@ -390,6 +414,7 @@ async function loadComponentLibrary() {
     const cat = c.category || categoryForType(c.type);
     const icon = c.icon || placeholderIcon;
     const ports = normalizePortsForCategory(cat, c.ports, c.type, c.subtype);
+    const defaultRotation = normalizeRotation(defaultRotationForType(c.type, cat));
     const rawProps = c.props || {};
     const props = {};
     Object.entries(rawProps).forEach(([k, v]) => {
@@ -402,7 +427,8 @@ async function loadComponentLibrary() {
       ports,
       type: c.type,
       subtype: c.subtype,
-      props
+      props,
+      defaultRotation
     };
     subtypeCategory[key] = cat;
     if (!componentTypes[cat]) componentTypes[cat] = [];
@@ -512,7 +538,15 @@ function buildPalette() {
       btn.setAttribute('data-testid', 'palette-button');
       btn.dataset.label = meta.label;
       btn.title = `${meta.label} - Drag to canvas or click to add`;
-      btn.innerHTML = `<img src="${meta.icon}" alt="" aria-hidden="true">`;
+      const rotation = normalizeRotation(meta?.defaultRotation ?? defaultRotationForType(meta?.type, meta?.category));
+      const iconImg = document.createElement('img');
+      iconImg.src = meta.icon;
+      iconImg.alt = '';
+      iconImg.setAttribute('aria-hidden', 'true');
+      iconImg.draggable = false;
+      iconImg.dataset.rotation = String(rotation);
+      btn.innerHTML = '';
+      btn.appendChild(iconImg);
       btn.addEventListener('click', () => {
         addComponent({ type: meta.type, subtype: subKey });
         render();
@@ -520,6 +554,7 @@ function buildPalette() {
       });
       btn.addEventListener('dragstart', e => {
         e.dataTransfer.setData('text/plain', JSON.stringify({ type: meta.type, subtype: subKey }));
+        setDragPreview(e, meta, rotation);
       });
       container.appendChild(btn);
     });
@@ -560,6 +595,38 @@ function buildPalette() {
         paletteSearch.dispatchEvent(new Event('input'));
       }
     });
+  }
+}
+
+function setDragPreview(e, meta, rotation) {
+  if (!e?.dataTransfer || !meta?.icon) return;
+  try {
+    const preview = document.createElement('div');
+    preview.className = 'drag-preview';
+    preview.dataset.rotation = String(rotation);
+    const baseWidth = compWidth;
+    const baseHeight = compHeight;
+    const normalized = normalizeRotation(rotation);
+    const width = normalized === 90 || normalized === 270 ? baseHeight : baseWidth;
+    const height = normalized === 90 || normalized === 270 ? baseWidth : baseHeight;
+    preview.style.width = `${width}px`;
+    preview.style.height = `${height}px`;
+    const img = document.createElement('img');
+    img.src = meta.icon;
+    img.alt = '';
+    img.setAttribute('aria-hidden', 'true');
+    img.draggable = false;
+    preview.appendChild(img);
+    document.body.appendChild(preview);
+    const rect = preview.getBoundingClientRect();
+    const offsetX = rect.width / 2;
+    const offsetY = rect.height / 2;
+    e.dataTransfer.setDragImage(preview, offsetX, offsetY);
+    requestAnimationFrame(() => {
+      preview.remove();
+    });
+  } catch (err) {
+    // ignore drag preview failures
   }
 }
 
@@ -1575,9 +1642,22 @@ function findSourceComponent(targetId, comps = components) {
 }
 
 function normalizeComponent(c) {
+  const meta = componentMeta[c.subtype] || {};
+  const resolvedType = c.type || meta.type || meta.category || '';
+  const resolvedCategory = normalizeCategoryValue(c.category || meta.category || resolvedType);
+  const metaDefault = meta.defaultRotation;
+  const parsedMetaDefault = metaDefault === undefined || metaDefault === null ? null : Number(metaDefault);
+  const defaultRotation = parsedMetaDefault === null || Number.isNaN(parsedMetaDefault)
+    ? normalizeRotation(defaultRotationForType(resolvedType, resolvedCategory))
+    : normalizeRotation(parsedMetaDefault);
+  const rotationSource = c.rotation ?? c.rot;
+  const parsedRotation = rotationSource === undefined || rotationSource === null ? null : Number(rotationSource);
+  const rotation = parsedRotation === null || Number.isNaN(parsedRotation)
+    ? defaultRotation
+    : normalizeRotation(parsedRotation);
   const nc = {
     ...c,
-    rotation: c.rotation ?? c.rot ?? 0,
+    rotation,
     flipped: c.flipped || false,
     connections: (c.connections || []).map(conn =>
       typeof conn === 'string' ? { target: conn } : conn
@@ -1596,22 +1676,13 @@ function normalizeComponent(c) {
     nc.height = Number(nc.height) || compHeight;
   }
   if (resolveComponentCategory(nc) === 'load') {
-    const metaPorts = componentMeta[nc.subtype]?.ports;
-    if (Array.isArray(metaPorts) && metaPorts.length) {
-      nc.ports = metaPorts.map(port => ({
-        x: coerceNumber(port?.x, compWidth / 2),
-        y: coerceNumber(port?.y, 0)
-      }));
-    } else if (Array.isArray(nc.ports) && nc.ports.length) {
-      const center = compWidth / 2;
-      if (nc.ports.length <= 1) {
-        nc.ports = [{ x: center, y: 0 }];
-      } else {
-        nc.ports = nc.ports.map(port => ({ x: coerceNumber(port?.x, center), y: 0 }));
-      }
-    } else {
-      nc.ports = [{ x: compWidth / 2, y: 0 }];
-    }
+    const basePorts = componentMeta[nc.subtype]?.ports?.length
+      ? componentMeta[nc.subtype].ports
+      : nc.ports;
+    nc.ports = normalizePortsForCategory('load', basePorts, nc.type, nc.subtype).map(port => ({
+      x: coerceNumber(port?.x, compWidth),
+      y: coerceNumber(port?.y, compHeight / 2)
+    }));
   }
   applyDefaults(nc);
   return nc;
@@ -2014,10 +2085,12 @@ function render() {
     g.addEventListener('mouseenter', showTooltip);
     g.addEventListener('mousemove', moveTooltip);
     g.addEventListener('mouseleave', hideTooltip);
-    const w = c.width || compWidth;
-    const h = c.height || compHeight;
-    const cx = c.x + w / 2;
-    const cy = c.y + h / 2;
+    const w = Number.isFinite(Number(c.width)) ? Number(c.width) : compWidth;
+    const h = Number.isFinite(Number(c.height)) ? Number(c.height) : compHeight;
+    const compX = Number.isFinite(Number(c.x)) ? Number(c.x) : 0;
+    const compY = Number.isFinite(Number(c.y)) ? Number(c.y) : 0;
+    const cx = compX + w / 2;
+    const cy = compY + h / 2;
     if (showOverlays && c.voltage_mag !== undefined) {
       const mags = typeof c.voltage_mag === 'object' ? Object.values(c.voltage_mag) : [c.voltage_mag];
       const dev = Math.max(...mags.map(v => Math.abs(v - 1) * 100));
@@ -2025,8 +2098,8 @@ function render() {
       if (dev > 10) color = '#f44336';
       else if (dev > 5) color = '#ffeb3b';
       const overlay = document.createElementNS(svgNS, 'rect');
-      overlay.setAttribute('x', c.x);
-      overlay.setAttribute('y', c.y);
+      overlay.setAttribute('x', compX);
+      overlay.setAttribute('y', compY);
       overlay.setAttribute('width', w);
       overlay.setAttribute('height', h);
       overlay.setAttribute('fill', color);
@@ -2063,8 +2136,8 @@ function render() {
     if (vRange) {
       usedVoltageRanges.add(vRange);
       const bg = document.createElementNS(svgNS, 'rect');
-      bg.setAttribute('x', c.x);
-      bg.setAttribute('y', c.y);
+      bg.setAttribute('x', compX);
+      bg.setAttribute('y', compY);
       bg.setAttribute('width', w);
       bg.setAttribute('height', h);
       bg.setAttribute('fill', vRange.color);
@@ -2074,16 +2147,16 @@ function render() {
     const meta = componentMeta[c.subtype] || {};
     if (c.type === 'annotation') {
       const rect = document.createElementNS(svgNS, 'rect');
-      rect.setAttribute('x', c.x);
-      rect.setAttribute('y', c.y);
+      rect.setAttribute('x', compX);
+      rect.setAttribute('y', compY);
       rect.setAttribute('width', w);
       rect.setAttribute('height', h);
       rect.setAttribute('fill', '#fff');
       rect.setAttribute('stroke', '#333');
       g.appendChild(rect);
       const txt = document.createElementNS(svgNS, 'text');
-      txt.setAttribute('x', c.x + w / 2);
-      txt.setAttribute('y', c.y + h / 2 + 5);
+      txt.setAttribute('x', compX + w / 2);
+      txt.setAttribute('y', compY + h / 2 + 5);
       txt.setAttribute('text-anchor', 'middle');
       txt.textContent = c.text || c.label || '';
       txt.addEventListener('dblclick', e => {
@@ -2112,18 +2185,18 @@ function render() {
           const innerX = px + (dx * (leadLength / dist));
           const innerY = py + (dy * (leadLength / dist));
           const lead = document.createElementNS(svgNS, 'line');
-          lead.setAttribute('x1', c.x + px);
-          lead.setAttribute('y1', c.y + py);
-          lead.setAttribute('x2', c.x + innerX);
-          lead.setAttribute('y2', c.y + innerY);
+          lead.setAttribute('x1', compX + px);
+          lead.setAttribute('y1', compY + py);
+          lead.setAttribute('x2', compX + innerX);
+          lead.setAttribute('y2', compY + innerY);
           lead.classList.add('cable-lead');
           g.appendChild(lead);
         });
       }
       const iconHref = meta.icon || placeholderIcon;
       const img = document.createElementNS(svgNS, 'image');
-      img.setAttribute('x', c.x);
-      img.setAttribute('y', c.y);
+      img.setAttribute('x', compX);
+      img.setAttribute('y', compY);
       img.setAttribute('width', w);
       img.setAttribute('height', h);
       img.setAttributeNS('http://www.w3.org/1999/xlink', 'href', iconHref);
@@ -2155,11 +2228,10 @@ function render() {
     }
     if (selection.includes(c)) {
       const rect = document.createElementNS(svgNS, 'rect');
-      const bounds = componentBounds(c);
-      rect.setAttribute('x', bounds.left - 2);
-      rect.setAttribute('y', bounds.top - 2);
-      rect.setAttribute('width', (bounds.right - bounds.left) + 4);
-      rect.setAttribute('height', (bounds.bottom - bounds.top) + 4);
+      rect.setAttribute('x', compX - 2);
+      rect.setAttribute('y', compY - 2);
+      rect.setAttribute('width', w + 4);
+      rect.setAttribute('height', h + 4);
       rect.setAttribute('fill', 'none');
       rect.setAttribute('stroke', '#00f');
       rect.setAttribute('stroke-dasharray', '4 2');
@@ -2169,8 +2241,8 @@ function render() {
     svg.appendChild(g);
     if (c.type === 'annotation' && selection.includes(c)) {
       const handle = document.createElementNS(svgNS, 'rect');
-      handle.setAttribute('x', c.x + w - 5);
-      handle.setAttribute('y', c.y + h - 5);
+      handle.setAttribute('x', compX + w - 5);
+      handle.setAttribute('y', compY + h - 5);
       handle.setAttribute('width', 10);
       handle.setAttribute('height', 10);
       handle.setAttribute('fill', '#fff');
@@ -2220,8 +2292,8 @@ function render() {
     }
     if (isBusComponent(c) && selection.includes(c)) {
       const handleRight = document.createElementNS(svgNS, 'rect');
-      handleRight.setAttribute('x', c.x + c.width - 5);
-      handleRight.setAttribute('y', c.y + (c.height / 2) - 5);
+      handleRight.setAttribute('x', compX + w - 5);
+      handleRight.setAttribute('y', compY + (h / 2) - 5);
       handleRight.setAttribute('width', 10);
       handleRight.setAttribute('height', 10);
       handleRight.classList.add('bus-handle');
@@ -2229,8 +2301,8 @@ function render() {
       handleRight.dataset.side = 'right';
       svg.appendChild(handleRight);
       const handleLeft = document.createElementNS(svgNS, 'rect');
-      handleLeft.setAttribute('x', c.x - 5);
-      handleLeft.setAttribute('y', c.y + (c.height / 2) - 5);
+      handleLeft.setAttribute('x', compX - 5);
+      handleLeft.setAttribute('y', compY + (h / 2) - 5);
       handleLeft.setAttribute('width', 10);
       handleLeft.setAttribute('height', 10);
       handleLeft.classList.add('bus-handle');
@@ -2390,8 +2462,16 @@ function save(notify = true) {
     };
   });
   sheets = sheetData;
-  components = sheets[activeSheet].components;
-  connections = sheets[activeSheet].connections;
+  if (sheets.length) {
+    const clampedIndex = Math.min(Math.max(activeSheet, 0), sheets.length - 1);
+    activeSheet = clampedIndex;
+    components = sheets[clampedIndex].components;
+    connections = sheets[clampedIndex].connections;
+  } else {
+    activeSheet = 0;
+    components = [];
+    connections = [];
+  }
   setOneLine({ activeSheet, sheets: sheetData });
   setItem('diagramScale', diagramScale);
   const issues = validateDiagram();
@@ -2434,7 +2514,7 @@ function addComponent(cfg) {
     y = Math.round(y / gridSize) * gridSize;
   }
   const resolvedType = type || meta.type || meta.category;
-  const defaultRotation = resolvedType === 'bus' || resolvedType === 'annotation' ? 0 : 90;
+  const defaultRotation = normalizeRotation(meta.defaultRotation ?? defaultRotationForType(resolvedType, meta.category));
   const comp = {
     id: 'n' + Date.now(),
     type: resolvedType,
@@ -3914,6 +3994,16 @@ async function init() {
       selectedConnection = null;
       render();
     }, 175);
+  });
+
+  svg.addEventListener('dblclick', e => {
+    const targetComponent = e.target instanceof Element ? e.target.closest('g.component') : null;
+    if (!targetComponent) return;
+    const comp = components.find(c => c.id === targetComponent.dataset.id);
+    if (!comp) return;
+    e.stopPropagation();
+    cancelPendingClickSelection();
+    selectComponent(comp);
   });
 
   svg.addEventListener('contextmenu', e => {
