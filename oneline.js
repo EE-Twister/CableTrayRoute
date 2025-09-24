@@ -804,6 +804,9 @@ let syncing = false;
 let lintPanel = null;
 let lintList = null;
 let clickSelectTimer = null;
+const SINGLE_CLICK_DELAY_MS = 175;
+const DOUBLE_CLICK_THRESHOLD_MS = 400;
+let lastComponentClick = { id: null, time: 0 };
 let findHighlightId = null;
 let findHighlightTimer = null;
 
@@ -4519,12 +4522,26 @@ async function init() {
     }
     if (e.shiftKey || e.ctrlKey || e.metaKey) {
       cancelPendingClickSelection();
+      lastComponentClick = { id: null, time: 0 };
       return;
     }
     const compEl = e.target.closest('.component');
     const compId = compEl?.dataset.id || null;
     const clickedOutside = !compEl;
+    const now = (typeof performance !== 'undefined' && performance.now)
+      ? performance.now()
+      : Date.now();
     cancelPendingClickSelection();
+    if (compId && lastComponentClick.id === compId && (now - lastComponentClick.time) <= DOUBLE_CLICK_THRESHOLD_MS) {
+      lastComponentClick = { id: null, time: 0 };
+      const comp = components.find(c => c.id === compId);
+      if (comp) {
+        selectComponent(comp);
+      }
+      return;
+    }
+    lastComponentClick = { id: compId, time: now };
+    if (e.detail > 1) return;
     clickSelectTimer = window.setTimeout(() => {
       clickSelectTimer = null;
       if (clickedOutside) {
@@ -4540,7 +4557,7 @@ async function init() {
       selected = comp;
       selectedConnection = null;
       render();
-    }, 175);
+    }, SINGLE_CLICK_DELAY_MS);
   });
 
   svg.addEventListener('dblclick', e => {
