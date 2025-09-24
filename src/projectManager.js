@@ -266,7 +266,9 @@ function renameProject(name) {
 
 async function serverSaveProject(name) {
   const auth = getAuthContext();
-  if (!auth) return false;
+  if (!auth) {
+    return { attempted: false, ok: false };
+  }
   const res = await fetch(`/projects/${encodeURIComponent(name)}`, {
     method: 'POST',
     headers: {
@@ -277,7 +279,7 @@ async function serverSaveProject(name) {
     body: JSON.stringify(exportProject())
   });
   if (res.status === 401 || res.status === 403) clearAuthContext();
-  return res.ok;
+  return { attempted: true, ok: res.ok };
 }
 
 async function serverLoadProject(name) {
@@ -333,25 +335,36 @@ async function saveProject(options = {}) {
   // Save locally and attempt server sync if logged in
   dsSaveProject(name);
   const storageError = getSavedProjectsError();
-  let serverSynced = false;
+  let serverResult = { attempted: false, ok: false };
   let serverError = null;
   try {
-    serverSynced = await serverSaveProject(name);
+    serverResult = await serverSaveProject(name);
   } catch (e) {
     console.error(e);
     serverError = e;
   }
+  const { attempted, ok } = serverResult;
   if (storageError) {
     const baseMessage = storageError.message || 'Saved projects could not be updated. Clear saved data in Settings and try again.';
-    const detail = serverSynced
-      ? 'The project was uploaded to the server, but the local copy could not be updated.'
-      : 'The project was not uploaded to the server.';
+    let detail;
+    if (!attempted) {
+      detail = 'The project was saved locally, but not uploaded to the server.';
+    } else if (ok) {
+      detail = 'The project was uploaded to the server, but the local copy could not be updated.';
+    } else {
+      detail = 'The project was not uploaded to the server.';
+    }
     await showAlertModal('Save Failed', `${baseMessage} ${detail}`.trim());
     return;
   }
-  const message = (serverError || !serverSynced)
-    ? `Project "${name}" saved locally. Server sync failed.`
-    : `Project "${name}" successfully saved.`;
+  let message;
+  if (serverError || (attempted && !ok)) {
+    message = `Project "${name}" saved locally. Server sync failed.`;
+  } else if (!attempted) {
+    message = `Project "${name}" saved locally.`;
+  } else {
+    message = `Project "${name}" successfully saved.`;
+  }
   alert(message);
 }
 
