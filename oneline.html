@@ -29,7 +29,7 @@
       <a href="./conduitfill.html">Conduit Fill</a>
       <a href="./optimalRoute.html">Optimal Route</a>
       <a href="./oneline.html" class="active" aria-current="page">One-Line</a>
-      <button id="studies-panel-btn" type="button" class="btn" title="Open studies panel">Studies</button>
+      <a href="./custom-components.html" title="Create custom palette components">Custom Components</a>
       <button id="settings-btn" class="settings-btn" aria-label="Settings" aria-expanded="false" title="Settings">⚙</button>
     </div>
   </nav>
@@ -86,6 +86,7 @@
             <button id="diagram-import-btn" type="button" class="icon-button" title="Import Diagram" aria-label="Import Diagram"><img src="./icons/toolbar/import.svg" alt=""></button>
             <button id="sample-diagram-btn" type="button" class="btn" title="Load sample diagram">Load Sample</button>
             <button id="diagram-share-btn" type="button" class="btn" title="Share diagram">Share</button>
+            <button id="studies-panel-btn" type="button" class="btn" title="Open studies panel">Studies</button>
             <button id="tour-btn" type="button" class="btn" title="Start tour">Tour</button>
           </div>
         </div>
@@ -136,6 +137,13 @@
               <button id="view-menu-btn" type="button" class="btn" aria-haspopup="true" aria-expanded="false">Views</button>
               <ul id="view-menu" class="export-menu view-menu" role="menu" aria-label="Device attribute visibility"></ul>
             </div>
+          </div>
+          <div class="toolbar-group" aria-label="Find devices">
+            <span class="toolbar-group-label">Find</span>
+            <form id="find-device-form" class="find-device" role="search">
+              <input type="search" id="find-device-input" name="device" placeholder="Device tag" aria-label="Device tag" autocomplete="off">
+              <button type="submit" class="btn">Go</button>
+            </form>
           </div>
         </div>
         <button id="palette-toggle" class="palette-toggle" aria-label="Toggle palette" aria-controls="palette" aria-expanded="false">☰</button>
@@ -268,15 +276,6 @@
     <ul id="lint-list"></ul>
   </aside>
   <div id="toast" class="toast" role="status" aria-live="polite"></div>
-  <script type="module">
-    import * as tour from './tour.js';
-    const btn = document.getElementById('tour-btn');
-    btn.addEventListener('click', () => tour.start());
-    if (!localStorage.getItem('onelineTourSeen')) {
-      tour.start();
-      localStorage.setItem('onelineTourSeen', 'true');
-    }
-  </script>
   <script type="module" src="./dist/projectManager.js"></script>
 </body>
 </html>
