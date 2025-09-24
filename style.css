@@ -455,6 +455,12 @@ body.compact-mode .palette-section .section-buttons {
   height: 100%;
 }
 
+.oneline-editor.panning,
+.oneline-editor.panning #diagram {
+  cursor: grabbing;
+  cursor: -webkit-grabbing;
+}
+
 #grid-bg {
   pointer-events: none;
 }

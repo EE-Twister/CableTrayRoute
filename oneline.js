@@ -809,6 +809,8 @@ const DOUBLE_CLICK_THRESHOLD_MS = 400;
 let lastComponentClick = { id: null, time: 0 };
 let findHighlightId = null;
 let findHighlightTimer = null;
+let pointerDownComponentId = null;
+let middlePanState = null;
 
 // Re-run validation whenever diagram or study results change
 on('oneLineDiagram', validateDiagram);
@@ -857,6 +859,33 @@ function cancelPendingClickSelection() {
     clearTimeout(clickSelectTimer);
     clickSelectTimer = null;
   }
+}
+
+function startMiddlePan(e, container) {
+  if (!container) return;
+  middlePanState = {
+    container,
+    startX: e.clientX,
+    startY: e.clientY,
+    scrollLeft: container.scrollLeft,
+    scrollTop: container.scrollTop
+  };
+  container.classList.add('panning');
+}
+
+function updateMiddlePan(e) {
+  if (!middlePanState) return;
+  const { container, startX, startY, scrollLeft, scrollTop } = middlePanState;
+  const dx = e.clientX - startX;
+  const dy = e.clientY - startY;
+  container.scrollLeft = scrollLeft - dx;
+  container.scrollTop = scrollTop - dy;
+}
+
+function stopMiddlePan() {
+  if (!middlePanState) return;
+  middlePanState.container.classList.remove('panning');
+  middlePanState = null;
 }
 
 function normalizeSearchValue(value) {
@@ -4231,6 +4260,11 @@ async function init() {
     e.preventDefault();
   });
   document.addEventListener('mousemove', e => {
+    if (!middlePanState) return;
+    updateMiddlePan(e);
+    e.preventDefault();
+  });
+  document.addEventListener('mousemove', e => {
     if (!legendDrag || !legendEl || !editorEl) return;
     const rect = editorEl.getBoundingClientRect();
     legendEl.style.left = `${e.clientX - rect.left - legendDrag.dx}px`;
@@ -4238,6 +4272,7 @@ async function init() {
   });
   document.addEventListener('mouseup', () => {
     legendDrag = null;
+    stopMiddlePan();
   });
 
   // Reuse the diagram element fetched earlier in this function.
@@ -4246,10 +4281,19 @@ async function init() {
     svg.addEventListener('mousedown', e => {
       cancelPendingClickSelection();
       marqueeSelectionMade = false;
+      pointerDownComponentId = null;
+      if (e.button === 1) {
+        if (editorEl) {
+          e.preventDefault();
+          startMiddlePan(e, editorEl);
+        }
+        return;
+      }
       if (connectMode && e.target.classList.contains('port')) {
         const comp = components.find(c => c.id === e.target.dataset.id);
         const port = Number(e.target.dataset.port);
         if (comp) {
+          pointerDownComponentId = comp.id;
           connectSource = { component: comp, port };
           const start = portPosition(comp, port);
           tempConnection = document.createElementNS(svgNS, 'line');
@@ -4266,6 +4310,7 @@ async function init() {
       if (e.target.classList.contains('annotation-handle')) {
         const comp = components.find(c => c.id === e.target.dataset.id);
         if (comp) {
+          pointerDownComponentId = comp.id;
           resizingAnnotation = {
             comp,
             startX: e.offsetX,
@@ -4280,6 +4325,7 @@ async function init() {
       if (e.target.classList.contains('bus-handle')) {
         const comp = components.find(c => c.id === e.target.dataset.id);
         if (comp) {
+          pointerDownComponentId = comp.id;
           resizingBus = {
             comp,
             startX: e.offsetX,
@@ -4303,6 +4349,7 @@ async function init() {
         };
         return;
       }
+      pointerDownComponentId = g.dataset.id || null;
       const comp = components.find(c => c.id === g.dataset.id);
       if (!comp) return;
       if (e.shiftKey || e.ctrlKey || e.metaKey) {
@@ -4320,6 +4367,7 @@ async function init() {
       render();
     });
     svg.addEventListener('mousemove', e => {
+      if (middlePanState) return;
       if (draggingLabel) return;
       cursorPos = { x: e.offsetX, y: e.offsetY };
       if (resizingAnnotation) {
@@ -4397,6 +4445,7 @@ async function init() {
       }
     });
   svg.addEventListener('mousemove', e => {
+    if (middlePanState) return;
     if (draggingLabel) {
       let x = e.offsetX - draggingLabel.dx;
       let y = e.offsetY - draggingLabel.dy;
@@ -4443,6 +4492,11 @@ async function init() {
     if (snapPos) flashSnapIndicator(snapPos.x, snapPos.y);
   });
     svg.addEventListener('mouseup', async e => {
+      if (e.button === 1 && middlePanState) {
+        stopMiddlePan();
+        pointerDownComponentId = null;
+        return;
+      }
       if (draggingLabel) {
         const moved = draggingLabel.moved;
         draggingLabel = null;
@@ -4518,20 +4572,23 @@ async function init() {
   svg.addEventListener('click', e => {
     if (marqueeSelectionMade) {
       marqueeSelectionMade = false;
+      pointerDownComponentId = null;
       return;
     }
     if (e.shiftKey || e.ctrlKey || e.metaKey) {
       cancelPendingClickSelection();
       lastComponentClick = { id: null, time: 0 };
+      pointerDownComponentId = null;
       return;
     }
     const compEl = e.target.closest('.component');
-    const compId = compEl?.dataset.id || null;
-    const clickedOutside = !compEl;
+    let compId = compEl?.dataset.id || pointerDownComponentId || null;
+    const clickedOutside = !compId;
     const now = (typeof performance !== 'undefined' && performance.now)
       ? performance.now()
       : Date.now();
     cancelPendingClickSelection();
+    pointerDownComponentId = null;
     if (compId && lastComponentClick.id === compId && (now - lastComponentClick.time) <= DOUBLE_CLICK_THRESHOLD_MS) {
       lastComponentClick = { id: null, time: 0 };
       const comp = components.find(c => c.id === compId);
@@ -4562,11 +4619,14 @@ async function init() {
 
   svg.addEventListener('dblclick', e => {
     const targetComponent = e.target instanceof Element ? e.target.closest('g.component') : null;
-    if (!targetComponent) return;
-    const comp = components.find(c => c.id === targetComponent.dataset.id);
+    const compId = targetComponent?.dataset.id || pointerDownComponentId || null;
+    pointerDownComponentId = null;
+    if (!compId) return;
+    const comp = components.find(c => c.id === compId);
     if (!comp) return;
     e.stopPropagation();
     cancelPendingClickSelection();
+    lastComponentClick = { id: null, time: 0 };
     selectComponent(comp);
   });
 
