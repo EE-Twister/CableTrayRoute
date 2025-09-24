@@ -92,11 +92,23 @@
             <button type="button" id="add-property-btn" class="btn">Add Property</button>
           </fieldset>
           <div class="icon-fieldset">
-            <div class="icon-upload">
-              <label for="component-icon">Icon (SVG or PNG)
-                <input id="component-icon" type="file" accept="image/svg+xml,image/png">
-              </label>
-              <button type="button" id="clear-icon-btn" class="btn secondary-btn">Clear Icon</button>
+            <div class="icon-builder">
+              <div id="icon-tool-buttons" class="icon-toolbar" role="toolbar" aria-label="Icon drawing tools">
+                <button type="button" class="icon-tool-btn active" data-tool="select" aria-pressed="true">Select</button>
+                <button type="button" class="icon-tool-btn" data-tool="line" aria-pressed="false">Line</button>
+                <button type="button" class="icon-tool-btn" data-tool="rectangle" aria-pressed="false">Rectangle</button>
+                <button type="button" class="icon-tool-btn" data-tool="circle" aria-pressed="false">Circle</button>
+                <button type="button" class="icon-tool-btn" data-tool="arc" aria-pressed="false">Arc</button>
+                <button type="button" class="icon-tool-btn" data-tool="text" aria-pressed="false">Text</button>
+              </div>
+              <div class="icon-canvas-wrapper">
+                <svg id="icon-canvas" viewBox="0 0 120 120" tabindex="0" aria-label="Custom component icon canvas"></svg>
+              </div>
+              <div class="icon-actions">
+                <button type="button" id="undo-icon-btn" class="btn secondary-btn">Undo</button>
+                <button type="button" id="clear-icon-btn" class="btn secondary-btn">Clear</button>
+              </div>
+              <p class="icon-hint muted">Draw directly on the canvas. Use Select to move shapes or press Delete to remove the selection.</p>
             </div>
             <div id="icon-preview" class="icon-preview" aria-live="polite"></div>
           </div>

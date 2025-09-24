@@ -861,14 +861,34 @@ function cancelPendingClickSelection() {
   }
 }
 
+function getScrollableContainer(element) {
+  let current = element;
+  while (current && current !== document.body && current !== document.documentElement) {
+    try {
+      const style = window.getComputedStyle(current);
+      const overflowX = style.overflowX || '';
+      const overflowY = style.overflowY || '';
+      const canScrollX = /auto|scroll|overlay/i.test(overflowX) && current.scrollWidth > current.clientWidth;
+      const canScrollY = /auto|scroll|overlay/i.test(overflowY) && current.scrollHeight > current.clientHeight;
+      if (canScrollX || canScrollY) return current;
+    } catch {
+      // ignore computed style failures
+    }
+    current = current.parentElement;
+  }
+  return document.scrollingElement || document.documentElement || document.body;
+}
+
 function startMiddlePan(e, container) {
   if (!container) return;
+  const scrollHost = getScrollableContainer(container);
   middlePanState = {
-    container,
+    container: scrollHost,
+    host: container,
     startX: e.clientX,
     startY: e.clientY,
-    scrollLeft: container.scrollLeft,
-    scrollTop: container.scrollTop
+    scrollLeft: scrollHost ? scrollHost.scrollLeft : 0,
+    scrollTop: scrollHost ? scrollHost.scrollTop : 0
   };
   container.classList.add('panning');
 }
@@ -876,6 +896,7 @@ function startMiddlePan(e, container) {
 function updateMiddlePan(e) {
   if (!middlePanState) return;
   const { container, startX, startY, scrollLeft, scrollTop } = middlePanState;
+  if (!container) return;
   const dx = e.clientX - startX;
   const dy = e.clientY - startY;
   container.scrollLeft = scrollLeft - dx;
@@ -884,7 +905,9 @@ function updateMiddlePan(e) {
 
 function stopMiddlePan() {
   if (!middlePanState) return;
-  middlePanState.container.classList.remove('panning');
+  if (middlePanState.host && middlePanState.host.classList) {
+    middlePanState.host.classList.remove('panning');
+  }
   middlePanState = null;
 }
 
@@ -4684,6 +4707,20 @@ async function init() {
     }
     if (action === 'edit' && contextTarget) {
       selectComponent(contextTarget.id);
+    } else if (action === 'rename' && contextTarget) {
+      const current = contextTarget.label || '';
+      const next = prompt('Component label', current);
+      if (next !== null) {
+        const trimmed = next.trim();
+        if (!trimmed) {
+          showToast('Label cannot be empty');
+        } else if (trimmed !== current) {
+          contextTarget.label = trimmed;
+          pushHistory();
+          render();
+          save();
+        }
+      }
     } else if (action === 'delete' && contextTarget) {
       components = components.filter(c => c !== contextTarget);
       components.forEach(c => {

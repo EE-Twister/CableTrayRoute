@@ -415,6 +415,7 @@ body.compact-mode .palette-section .section-buttons {
 .oneline-editor {
   position: relative;
   min-height: 600px;
+  overflow: auto;
 }
 
 .toolbar {
@@ -3153,34 +3154,113 @@ body.dark-mode .workflow-card-title {
     line-height: 1;
 }
 
-.icon-upload {
+.icon-fieldset {
+    gap: 1.25rem;
+}
+
+.icon-builder {
+    display: grid;
+    gap: 0.75rem;
+}
+
+.icon-toolbar {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.5rem;
+}
+
+.icon-tool-btn {
+    padding: 0.35rem 0.75rem;
+    border: 1px solid var(--ol-border-color);
+    border-radius: var(--ol-radius);
+    background: var(--secondary-color);
+    color: var(--text-color);
+    cursor: pointer;
+    transition: background 0.2s ease, color 0.2s ease, border-color 0.2s ease;
+}
+
+.icon-tool-btn.active,
+.icon-tool-btn:focus-visible {
+    outline: none;
+    border-color: var(--primary-color);
+    background: var(--primary-color);
+    color: var(--secondary-color);
+}
+
+.icon-canvas-wrapper {
+    width: 200px;
+    height: 200px;
+    border: 1px solid var(--ol-border-color);
+    border-radius: var(--ol-radius);
+    background: var(--secondary-color);
     display: flex;
     align-items: center;
-    gap: 1rem;
+    justify-content: center;
+    position: relative;
+}
+
+#icon-canvas {
+    width: 180px;
+    height: 180px;
+    border-radius: var(--ol-radius);
+    box-shadow: inset 0 0 0 1px rgba(0, 0, 0, 0.04);
+    cursor: crosshair;
+}
+
+#icon-canvas:focus-visible {
+    outline: 2px solid var(--primary-color);
+    outline-offset: 2px;
+}
+
+.icon-actions {
+    display: flex;
+    gap: 0.5rem;
     flex-wrap: wrap;
+}
+
+.icon-hint {
+    margin: 0;
+    font-size: 0.85rem;
 }
 
 .icon-preview {
     min-height: 64px;
-    min-width: 120px;
-    max-width: 180px;
+    min-width: 140px;
+    max-width: 220px;
     border: 1px dashed var(--ol-border-color);
     border-radius: var(--ol-radius);
-    padding: 0.5rem;
+    padding: 0.75rem;
     display: flex;
+    flex-direction: column;
     align-items: center;
     justify-content: center;
+    gap: 0.5rem;
     background: var(--secondary-color);
+    text-align: center;
 }
 
 .icon-preview img {
     max-width: 100%;
-    max-height: 80px;
+    max-height: 96px;
 }
 
 .icon-placeholder {
     color: var(--text-muted, #6c757d);
     font-size: 0.9rem;
+}
+
+.icon-note {
+    font-size: 0.8rem;
+    color: var(--text-muted, #6c757d);
+    margin: 0;
+}
+
+.icon-canvas-bg {
+    fill: url(#icon-grid-pattern);
+}
+
+.icon-shape-selected {
+    filter: drop-shadow(0 0 4px rgba(0, 123, 255, 0.6));
 }
 
 .component-form .form-actions {
