@@ -945,33 +945,49 @@ function downloadProjectAsBlob(precomputedJson){
   }catch(err){console.error('Export fallback failed',err);}
 }
 
-async function writeProjectToHandle(handle){
-  if(!handle){
-    downloadProjectAsBlob();
-    return false;
-  }
-  let writable;
-  let json;
+let fileWriteLock=Promise.resolve();
+async function withFileWriteLock(fn){
+  let release;
+  const next=new Promise(resolve=>{release=resolve;});
+  const previous=fileWriteLock;
+  fileWriteLock=next;
+  await previous.catch(()=>{});
   try{
-    const data=exportProject();
-    json=JSON.stringify(data,null,2);
-    writable=await handle.createWritable();
-    const shouldCompress=typeof handle.name==='string'&&handle.name.endsWith('.gz');
-    const payload=shouldCompress?await compressString(json):json;
-    await writable.write(payload);
-    await writable.close();
-    return true;
-  }catch(err){
-    console.error('File System Access export failed',err);
-    if(writable){
-      try{
-        if(typeof writable.abort==='function') await writable.abort();
-        else await writable.close();
-      }catch(closeErr){console.error('Writable cleanup failed',closeErr);}
-    }
-    downloadProjectAsBlob(json);
-    return false;
+    return await fn();
+  }finally{
+    release();
   }
+}
+
+async function writeProjectToHandle(handle){
+  return withFileWriteLock(async()=>{
+    if(!handle){
+      downloadProjectAsBlob();
+      return false;
+    }
+    let writable;
+    let json;
+    try{
+      const data=exportProject();
+      json=JSON.stringify(data,null,2);
+      writable=await handle.createWritable();
+      const shouldCompress=typeof handle.name==='string'&&handle.name.endsWith('.gz');
+      const payload=shouldCompress?await compressString(json):json;
+      await writable.write(payload);
+      await writable.close();
+      return true;
+    }catch(err){
+      console.error('File System Access export failed',err);
+      if(writable){
+        try{
+          if(typeof writable.abort==='function') await writable.abort();
+          else await writable.close();
+        }catch(closeErr){console.error('Writable cleanup failed',closeErr);}
+      }
+      downloadProjectAsBlob(json);
+      return false;
+    }
+  });
 }
 
 function updateSaveButtonState(){
