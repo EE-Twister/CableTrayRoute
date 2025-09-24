@@ -343,12 +343,35 @@ export const getOneLine = (scenario = getCurrentScenarioNameState()) => {
  * @param {OneLineSheet[]} sheets
  */
 const REVISION_KEY = 'oneLineRevisions';
+const MAX_REVISION_COUNT = 10;
+const MAX_REVISION_BYTES = 1.5 * 1024 * 1024;
+
+function pruneRevisions(revisions) {
+  if (!Array.isArray(revisions)) return [];
+  if (revisions.length > MAX_REVISION_COUNT) {
+    revisions.splice(0, revisions.length - MAX_REVISION_COUNT);
+  }
+  if (MAX_REVISION_BYTES > 0) {
+    let serialized = JSON.stringify(revisions);
+    if (serialized.length > MAX_REVISION_BYTES) {
+      while (revisions.length > 1 && serialized.length > MAX_REVISION_BYTES) {
+        revisions.shift();
+        serialized = JSON.stringify(revisions);
+      }
+      if (serialized.length > MAX_REVISION_BYTES) {
+        revisions.length = 0;
+      }
+    }
+  }
+  return revisions;
+}
 
 export const getRevisions = (scenario = getCurrentScenarioNameState()) => read(REVISION_KEY, [], scenario);
 
 function addRevision(sheets, scenario = getCurrentScenarioNameState()) {
   const revs = getRevisions(scenario);
   revs.push({ time: Date.now(), sheets: JSON.parse(JSON.stringify(sheets)) });
+  pruneRevisions(revs);
   write(REVISION_KEY, revs, scenario);
 }
 
