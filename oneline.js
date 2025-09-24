@@ -82,6 +82,18 @@ import './site.js';
 
 let componentMeta = {};
 
+function ensurePropModal() {
+  let modal = document.getElementById('prop-modal');
+  if (!modal) {
+    modal = document.createElement('div');
+    modal.id = 'prop-modal';
+    modal.className = 'prop-modal';
+    const host = document.querySelector('.oneline-editor') || document.body;
+    host.appendChild(modal);
+  }
+  return modal;
+}
+
 const baseHref = document.querySelector('base')?.href || new URL('.', window.location.href).href;
 const asset = path => new URL(path, baseHref).href;
 
@@ -3070,7 +3082,7 @@ function selectComponent(compOrId) {
   selected = comp;
   selection = [comp];
   selectedConnection = null;
-  let modal = document.getElementById('prop-modal');
+  let modal = ensurePropModal();
   if (modal._outsideHandler) modal.removeEventListener('click', modal._outsideHandler);
   if (modal._keyHandler) document.removeEventListener('keydown', modal._keyHandler);
   modal.innerHTML = '';
@@ -3741,7 +3753,7 @@ function openCableProperties(comp) {
   selected = comp;
   selection = [comp];
   selectedConnection = null;
-  const modal = document.getElementById('prop-modal');
+  const modal = ensurePropModal();
   if (modal._outsideHandler) modal.removeEventListener('click', modal._outsideHandler);
   if (modal._keyHandler) document.removeEventListener('keydown', modal._keyHandler);
   modal.innerHTML = '';
@@ -4606,7 +4618,7 @@ async function init() {
       pushHistory();
       render();
       save();
-      const modal = document.getElementById('prop-modal');
+      const modal = ensurePropModal();
       if (modal) modal.classList.remove('show');
     } else if (action === 'duplicate' && contextTarget) {
       const copy = {
@@ -4698,7 +4710,7 @@ async function init() {
       pushHistory();
       render();
       save();
-      const modal = document.getElementById('prop-modal');
+      const modal = ensurePropModal();
       if (modal) modal.classList.remove('show');
     }
   });
