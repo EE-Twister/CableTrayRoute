@@ -359,16 +359,6 @@
       }
     },
     {
-      "type": "busway",
-      "label": "Busway",
-      "icon": "icons/components/Bus.svg",
-      "props": {
-        "volts": 480,
-        "rating_a": 1200,
-        "length_m": 30
-      }
-    },
-    {
       "type": "feeder",
       "label": "Feeder",
       "icon": "icons/components/Feeder.svg",
