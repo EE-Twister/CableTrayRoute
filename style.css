@@ -157,10 +157,15 @@
 #template-section > summary::before { background-image: url('icons/oneline.svg'); }
 
 .palette-section .section-buttons {
-  display: flex;
-  flex-wrap: wrap;
+  --palette-column-min: 6rem;
+  display: grid;
   gap: var(--ol-spacing);
   padding: var(--ol-spacing);
+  grid-template-columns: repeat(auto-fit, minmax(var(--palette-column-min), 1fr));
+}
+
+body.compact-mode .palette-section .section-buttons {
+  --palette-column-min: 5rem;
 }
 
 .palette-section .no-components {
@@ -1256,12 +1261,13 @@ button:focus-visible, .primary-btn:focus-visible {
     background: none;
     border: none;
     color: var(--text-color);
-    margin: var(--button-margin);
+    margin: 0;
     padding: 0.25rem;
-    min-width: 5rem;
-    max-width: 6rem;
+    width: 100%;
+    min-width: 0;
     gap: 0.35rem;
     text-align: center;
+    box-sizing: border-box;
 }
 #palette button:hover {
     background-color: rgba(0, 0, 0, 0.08);
@@ -1306,7 +1312,7 @@ button:focus-visible, .primary-btn:focus-visible {
     word-break: break-word;
 }
 body.compact-mode #palette button {
-    min-width: 4.25rem;
+    min-width: 0;
 }
 body.compact-mode #palette button .palette-icon {
     width: 1.25rem;
