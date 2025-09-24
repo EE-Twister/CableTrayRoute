@@ -1,15 +1,63 @@
 import { saveProject as dsSaveProject, loadProject as dsLoadProject, exportProject, importProject } from '../dataStore.mjs';
 import {
   getProjectState,
+  setProjectState,
   listSavedProjects as listSavedProjectsStorage,
   getAuthContextState,
   clearAuthContextState,
-  getSavedProjectsError
+  getSavedProjectsError,
+  writeSavedProject,
+  readSavedProject,
+  removeSavedProject
 } from '../projectStorage.js';
 import { openModal, showAlertModal } from './components/modal.js';
 
 function listProjects() {
   return listSavedProjectsStorage();
+}
+
+function normalizeProjectName(name) {
+  return typeof name === 'string' ? name.trim() : '';
+}
+
+function currentProjectName() {
+  const hashName = normalizeProjectName(currentProject());
+  if (hashName) return hashName;
+  if (typeof window !== 'undefined') {
+    const globalName = normalizeProjectName(window.currentProjectId || '');
+    if (globalName) return globalName;
+  }
+  try {
+    const stateName = normalizeProjectName(getProjectState().name || '');
+    if (stateName) return stateName;
+  } catch {}
+  return '';
+}
+
+function applyProjectStateName(name) {
+  const trimmed = normalizeProjectName(name);
+  if (!trimmed) return '';
+  try {
+    const state = getProjectState();
+    if ((state.name || '') !== trimmed) {
+      state.name = trimmed;
+      setProjectState(state);
+    }
+  } catch (e) {
+    console.warn('Project state update failed', e);
+  }
+  return trimmed;
+}
+
+function createEmptyProjectSections() {
+  return {
+    equipment: [],
+    panels: [],
+    loads: [],
+    cables: [],
+    raceways: { trays: [], conduits: [], ductbanks: [] },
+    oneLine: { activeSheet: 0, sheets: [] }
+  };
 }
 
 function clearAuthContext() {
@@ -181,10 +229,39 @@ async function newProject() {
     allowExisting: false,
     message: 'Choose a unique name for the new project.'
   });
-  if (!name) return;
-  setProjectHash(name);
-  dsLoadProject(name);
+  const trimmed = normalizeProjectName(name);
+  if (!trimmed) return;
+  setProjectHash(trimmed);
+  applyProjectStateName(trimmed);
+  try {
+    writeSavedProject(trimmed, createEmptyProjectSections());
+  } catch (e) {
+    console.error('Failed to initialize new project storage', e);
+  }
   location.reload();
+}
+
+function renameProject(name) {
+  const trimmed = normalizeProjectName(name);
+  if (!trimmed) throw new Error('Project name is required.');
+  const current = currentProjectName();
+  const existing = listProjects();
+  const validation = validateProjectName(trimmed, existing, { allowExisting: false, currentName: current });
+  if (validation) throw new Error(validation);
+  if (current && trimmed !== current) {
+    try {
+      const record = readSavedProject(current);
+      if (record) {
+        writeSavedProject(trimmed, record);
+        removeSavedProject(current);
+      }
+    } catch (e) {
+      console.error('Project rename persistence failed', e);
+    }
+  }
+  setProjectHash(trimmed);
+  applyProjectStateName(trimmed);
+  return trimmed;
 }
 
 async function serverSaveProject(name) {
@@ -239,7 +316,7 @@ async function saveProject(options = {}) {
       }
     }
   }
-  let name = currentProject();
+  let name = currentProjectName();
   if (!name) {
     let suggested = '';
     try { suggested = getProjectState().name || ''; } catch {}
@@ -309,7 +386,7 @@ async function loadProject() {
 }
 
 if (typeof window !== 'undefined') {
-  window.projectManager = { listProjects, newProject, saveProject, loadProject };
+  window.projectManager = { listProjects, newProject, renameProject, saveProject, loadProject };
   window.addEventListener('DOMContentLoaded', () => {
     document.getElementById('new-project-btn')?.addEventListener('click', () => { newProject().catch(console.error); });
     document.getElementById('save-project-btn')?.addEventListener('click', () => { saveProject().catch(console.error); });

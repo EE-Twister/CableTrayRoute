@@ -55,6 +55,8 @@ const listeners = new Set();
 const memoryStorage = new Map();
 let storageWriteBlocked = false;
 let quotaWarningShown = false;
+const MAX_SCENARIO_ENTRY_SIZE = 2.5 * 1024 * 1024;
+const scenarioSizeWarnings = new Set();
 let scenarioListCache = ['base'];
 let currentScenarioName = 'base';
 let conduitCacheState = null;
@@ -72,7 +74,8 @@ function readRawStorage(key) {
   return memoryStorage.has(key) ? memoryStorage.get(key) : null;
 }
 
-function writeRawStorage(key, value) {
+function writeRawStorage(key, value, options = {}) {
+  const skipLocalStorage = Boolean(options && options.skipLocalStorage);
   if (value === null || value === undefined) {
     memoryStorage.delete(key);
   } else {
@@ -80,6 +83,7 @@ function writeRawStorage(key, value) {
   }
   const storage = getStorage();
   if (!storage || storageWriteBlocked) return;
+  if (skipLocalStorage && value !== null && value !== undefined) return;
   try {
     if (value === null || value === undefined) {
       storage.removeItem(key);
@@ -149,8 +153,8 @@ function readScenarioRaw(scenario, key) {
   return readRawStorage(scenarioStorageKey(scenario, key));
 }
 
-function writeScenarioRaw(scenario, key, value) {
-  writeRawStorage(scenarioStorageKey(scenario, key), value);
+function writeScenarioRaw(scenario, key, value, options) {
+  writeRawStorage(scenarioStorageKey(scenario, key), value, options);
 }
 
 function getAllStorageKeys() {
@@ -211,6 +215,19 @@ export function writeScenarioValue(key, value, scenario = currentScenarioName) {
   const target = sanitizeScenarioName(scenario) || currentScenarioName;
   try {
     const serialized = JSON.stringify(value);
+    const storageKey = scenarioStorageKey(target, key);
+    if (serialized.length > MAX_SCENARIO_ENTRY_SIZE) {
+      writeScenarioRaw(target, key, serialized, { skipLocalStorage: true });
+      if (target === currentScenarioName) {
+        setProjectKey(key, serialized);
+      }
+      if (!scenarioSizeWarnings.has(storageKey)) {
+        scenarioSizeWarnings.add(storageKey);
+        const limitMb = (MAX_SCENARIO_ENTRY_SIZE / (1024 * 1024)).toFixed(1);
+        console.warn(`Scenario entry "${storageKey}" exceeds ${limitMb}MB. Data will persist for this tab only; use Save Project to keep a copy.`);
+      }
+      return;
+    }
     writeScenarioRaw(target, key, serialized);
     if (target === currentScenarioName) {
       setProjectKey(key, serialized);
