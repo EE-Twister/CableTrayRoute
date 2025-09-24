@@ -428,17 +428,39 @@ async function loadProjectFromHash(){
 }
 
 function applyProjectHash(){
+  let activeName='';
   if(typeof window!=='undefined'){
-    const current=currentProjectFromHash();
-    window.currentProjectId=current||'default';
+    const fromHash=currentProjectFromHash();
+    if(fromHash){
+      activeName=fromHash;
+    }else{
+      try{
+        const stateName=(getProjectState().name||'').trim();
+        if(stateName) activeName=stateName;
+      }catch{}
+      if(!activeName){
+        const globalName=typeof window.currentProjectId==='string'?window.currentProjectId.trim():'';
+        if(globalName&&globalName!=='default') activeName=globalName;
+      }
+    }
+    window.currentProjectId=activeName||'default';
+    if(activeName){
+      try{
+        const proj=getProjectState();
+        if((proj.name||'')!==activeName){
+          proj.name=activeName;
+          setProjectState(proj);
+        }
+      }catch(err){console.warn('Project name sync failed',err);}
+    }
   }
   if(typeof document==='undefined'||typeof location==='undefined') return;
-  const hash=location.hash;
-  if(!hash) return;
+  const navHash=location.hash||(activeName?`#${encodeURIComponent(activeName)}`:'');
+  if(!navHash) return;
   document.querySelectorAll('a[href$=".html"]').forEach(a=>{
     const href=a.getAttribute('href');
     if(!href||href.includes('#')) return;
-    a.setAttribute('href',href+hash);
+    a.setAttribute('href',href+navHash);
   });
 }
 
@@ -561,9 +583,54 @@ function initSettings(){
     const nameInput=document.createElement('input');
     nameInput.type='text';
     nameInput.id='project-name-input';
-    try{nameInput.value=getProjectState().name||'';}catch{}
+    let initialProjectName='';
+    try{initialProjectName=getProjectState().name||'';}catch{}
+    nameInput.value=initialProjectName;
+    nameInput.dataset.originalName=(initialProjectName||'').trim();
     nameLabel.appendChild(nameInput);
     settingsMenu.insertBefore(nameLabel,settingsMenu.firstChild);
+    nameInput.addEventListener('focus',()=>{
+      try{nameInput.dataset.originalName=(getProjectState().name||'').trim();}
+      catch{nameInput.dataset.originalName=nameInput.value.trim();}
+    });
+    const commitProjectNameChange=async()=>{
+      const manager=globalThis.projectManager;
+      const previous=(nameInput.dataset.originalName||'').trim();
+      const next=nameInput.value.trim();
+      if(!next){
+        nameInput.value=previous;
+        return;
+      }
+      if(next===previous) return;
+      if(!manager?.renameProject){
+        try{
+          const proj=getProjectState();
+          proj.name=next;
+          setProjectState(proj);
+          save(proj,{flush:true,reason:'name-rename-fallback'});
+        }catch{}
+        nameInput.dataset.originalName=next;
+        return;
+      }
+      try{
+        const updated=manager.renameProject(next);
+        const resolved=(updated||next).trim();
+        if(resolved!==nameInput.value) nameInput.value=resolved;
+        nameInput.dataset.originalName=resolved;
+      }catch(err){
+        console.error('Project rename failed',err);
+        try{
+          const proj=getProjectState();
+          proj.name=previous;
+          setProjectState(proj);
+          save(proj,{flush:true,reason:'name-revert'});
+        }catch{}
+        nameInput.value=previous;
+        nameInput.dataset.originalName=previous;
+        const message=err instanceof Error?err.message:'Project name could not be updated.';
+        await showAlertModal('Rename Failed',message);
+      }
+    };
     nameInput.addEventListener('input',e=>{
       try{
         const proj=getProjectState();
@@ -571,6 +638,13 @@ function initSettings(){
         setProjectState(proj);
         save(proj,{flush:true,reason:'name-input'});
       }catch{}
+    });
+    nameInput.addEventListener('change',()=>{commitProjectNameChange().catch(console.error);});
+    nameInput.addEventListener('keydown',e=>{
+      if(e.key==='Enter'){
+        e.preventDefault();
+        nameInput.blur();
+      }
     });
 
     const exportBtn=document.getElementById('export-project-btn');
