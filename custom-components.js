@@ -18,7 +18,9 @@ const portBottomInput = document.getElementById('port-bottom');
 const portLeftInput = document.getElementById('port-left');
 const propertyList = document.getElementById('property-list');
 const addPropertyBtn = document.getElementById('add-property-btn');
-const iconInput = document.getElementById('component-icon');
+const iconCanvas = document.getElementById('icon-canvas');
+const iconToolButtons = document.getElementById('icon-tool-buttons');
+const undoIconBtn = document.getElementById('undo-icon-btn');
 const clearIconBtn = document.getElementById('clear-icon-btn');
 const iconPreview = document.getElementById('icon-preview');
 const resetFormBtn = document.getElementById('reset-form-btn');
@@ -36,6 +38,15 @@ let components = loadComponents();
 let editingIndex = null;
 let currentIconData = null;
 let toastTimer = null;
+let iconTool = 'select';
+let drawingShape = null;
+let drawingStart = null;
+let shapeDragState = null;
+let selectedIconShape = null;
+
+const SVG_NS = 'http://www.w3.org/2000/svg';
+const ICON_CANVAS_SIZE = 120;
+const BUILDER_FLAG_ATTR = 'data-ctr-icon';
 
 if (navToggle && navLinks) {
   navToggle.addEventListener('click', () => {
@@ -61,6 +72,538 @@ function showToast(message, kind = 'info') {
     toast.classList.remove('show', 'toast-error', 'toast-success');
     toastTimer = null;
   }, 3000);
+}
+
+function ensureIconCanvas() {
+  if (!iconCanvas) return;
+  if (!iconCanvas.dataset.initialized) {
+    iconCanvas.setAttribute('viewBox', `0 0 ${ICON_CANVAS_SIZE} ${ICON_CANVAS_SIZE}`);
+    iconCanvas.setAttribute('role', 'img');
+    iconCanvas.setAttribute('aria-label', 'Custom component icon canvas');
+    iconCanvas.dataset.initialized = '1';
+  }
+  if (!iconCanvas.querySelector('[data-icon-layer="defs"]')) {
+    const defs = document.createElementNS(SVG_NS, 'defs');
+    defs.setAttribute('data-icon-layer', 'defs');
+    const pattern = document.createElementNS(SVG_NS, 'pattern');
+    pattern.id = 'icon-grid-pattern';
+    pattern.setAttribute('width', '10');
+    pattern.setAttribute('height', '10');
+    pattern.setAttribute('patternUnits', 'userSpaceOnUse');
+    const path = document.createElementNS(SVG_NS, 'path');
+    path.setAttribute('d', 'M 10 0 L 0 0 0 10');
+    path.setAttribute('stroke', '#d0d0d0');
+    path.setAttribute('stroke-width', '0.5');
+    pattern.appendChild(path);
+    defs.appendChild(pattern);
+    iconCanvas.appendChild(defs);
+  }
+  if (!iconCanvas.querySelector('[data-icon-grid]')) {
+    const bg = document.createElementNS(SVG_NS, 'rect');
+    bg.setAttribute('x', '0');
+    bg.setAttribute('y', '0');
+    bg.setAttribute('width', ICON_CANVAS_SIZE);
+    bg.setAttribute('height', ICON_CANVAS_SIZE);
+    bg.setAttribute('data-icon-grid', '1');
+    bg.classList.add('icon-canvas-bg');
+    iconCanvas.appendChild(bg);
+  }
+}
+
+function setActiveIconTool(tool) {
+  iconTool = tool;
+  if (!iconToolButtons) return;
+  const buttons = iconToolButtons.querySelectorAll('button[data-tool]');
+  buttons.forEach(btn => {
+    const active = btn.dataset.tool === tool;
+    btn.classList.toggle('active', active);
+    btn.setAttribute('aria-pressed', String(active));
+  });
+  if (iconCanvas) {
+    iconCanvas.style.cursor = tool === 'select' ? 'default' : tool === 'text' ? 'text' : 'crosshair';
+  }
+}
+
+function selectIconShape(shape) {
+  if (selectedIconShape === shape) return;
+  if (selectedIconShape) selectedIconShape.classList.remove('icon-shape-selected');
+  selectedIconShape = shape || null;
+  if (selectedIconShape) selectedIconShape.classList.add('icon-shape-selected');
+}
+
+function roundCoord(value) {
+  return Math.round(Number(value || 0) * 100) / 100;
+}
+
+function getCanvasPoint(event) {
+  if (!iconCanvas) return null;
+  const rect = iconCanvas.getBoundingClientRect();
+  if (!rect.width || !rect.height) return null;
+  const x = ((event.clientX - rect.left) / rect.width) * ICON_CANVAS_SIZE;
+  const y = ((event.clientY - rect.top) / rect.height) * ICON_CANVAS_SIZE;
+  return {
+    x: roundCoord(Math.min(Math.max(x, 0), ICON_CANVAS_SIZE)),
+    y: roundCoord(Math.min(Math.max(y, 0), ICON_CANVAS_SIZE))
+  };
+}
+
+function applyLineAttributes(shape, start, end) {
+  shape.dataset.x1 = String(start.x);
+  shape.dataset.y1 = String(start.y);
+  shape.dataset.x2 = String(end.x);
+  shape.dataset.y2 = String(end.y);
+  shape.setAttribute('x1', start.x);
+  shape.setAttribute('y1', start.y);
+  shape.setAttribute('x2', end.x);
+  shape.setAttribute('y2', end.y);
+}
+
+function applyRectAttributes(shape, start, current) {
+  const x = Math.min(start.x, current.x);
+  const y = Math.min(start.y, current.y);
+  const w = Math.abs(current.x - start.x);
+  const h = Math.abs(current.y - start.y);
+  shape.dataset.x = String(roundCoord(x));
+  shape.dataset.y = String(roundCoord(y));
+  shape.dataset.width = String(roundCoord(w));
+  shape.dataset.height = String(roundCoord(h));
+  shape.setAttribute('x', roundCoord(x));
+  shape.setAttribute('y', roundCoord(y));
+  shape.setAttribute('width', roundCoord(w));
+  shape.setAttribute('height', roundCoord(h));
+}
+
+function applyCircleAttributes(shape, center, point) {
+  const r = Math.hypot(point.x - center.x, point.y - center.y);
+  shape.dataset.cx = String(center.x);
+  shape.dataset.cy = String(center.y);
+  shape.dataset.r = String(roundCoord(r));
+  shape.setAttribute('cx', center.x);
+  shape.setAttribute('cy', center.y);
+  shape.setAttribute('r', roundCoord(r));
+}
+
+function buildArcGeometry(start, point, invert = false) {
+  const midX = (start.x + point.x) / 2;
+  const midY = (start.y + point.y) / 2;
+  const dx = point.x - start.x;
+  const dy = point.y - start.y;
+  const distance = Math.hypot(dx, dy) || 1;
+  const normX = -dy / distance;
+  const normY = dx / distance;
+  const offset = distance / 2;
+  const factor = invert ? -1 : 1;
+  return {
+    control: {
+      x: roundCoord(midX + normX * offset * factor),
+      y: roundCoord(midY + normY * offset * factor)
+    },
+    end: { x: roundCoord(point.x), y: roundCoord(point.y) }
+  };
+}
+
+function applyArcAttributes(shape, start, geometry) {
+  const { control, end } = geometry;
+  shape.dataset.startX = String(start.x);
+  shape.dataset.startY = String(start.y);
+  shape.dataset.controlX = String(control.x);
+  shape.dataset.controlY = String(control.y);
+  shape.dataset.endX = String(end.x);
+  shape.dataset.endY = String(end.y);
+  shape.setAttribute('d', `M ${start.x} ${start.y} Q ${control.x} ${control.y} ${end.x} ${end.y}`);
+}
+
+function applyTextAttributes(shape, point) {
+  shape.dataset.x = String(point.x);
+  shape.dataset.y = String(point.y);
+  shape.setAttribute('x', point.x);
+  shape.setAttribute('y', point.y);
+}
+
+function createShapeElement(tool) {
+  let el;
+  if (tool === 'line') {
+    el = document.createElementNS(SVG_NS, 'line');
+    el.setAttribute('stroke-linecap', 'round');
+  } else if (tool === 'rectangle') {
+    el = document.createElementNS(SVG_NS, 'rect');
+    el.setAttribute('fill', 'none');
+  } else if (tool === 'circle') {
+    el = document.createElementNS(SVG_NS, 'circle');
+    el.setAttribute('fill', 'none');
+  } else if (tool === 'arc') {
+    el = document.createElementNS(SVG_NS, 'path');
+    el.setAttribute('fill', 'none');
+  }
+  if (el) {
+    el.dataset.iconShape = '1';
+    el.dataset.shapeType = tool;
+    el.classList.add('icon-shape');
+    el.setAttribute('stroke', '#1f2933');
+    el.setAttribute('stroke-width', tool === 'line' ? '4' : '3');
+    el.setAttribute('stroke-linejoin', 'round');
+  }
+  return el;
+}
+
+function finishDrawingShape(valid = true) {
+  if (!drawingShape) return;
+  if (!valid) {
+    drawingShape.remove();
+  } else {
+    selectIconShape(drawingShape);
+    commitIconChanges();
+  }
+  drawingShape = null;
+  drawingStart = null;
+}
+
+function clearIconCanvas({ resetData = true } = {}) {
+  if (!iconCanvas) return;
+  iconCanvas.querySelectorAll('[data-icon-shape]').forEach(el => el.remove());
+  drawingShape = null;
+  drawingStart = null;
+  shapeDragState = null;
+  selectIconShape(null);
+  iconCanvas.setAttribute('viewBox', `0 0 ${ICON_CANVAS_SIZE} ${ICON_CANVAS_SIZE}`);
+  if (resetData) {
+    currentIconData = null;
+    updateIconPreview(null);
+  }
+}
+
+function serializeIconCanvas() {
+  if (!iconCanvas) return null;
+  const shapes = iconCanvas.querySelectorAll('[data-icon-shape]');
+  if (!shapes.length) return null;
+  const clone = iconCanvas.cloneNode(true);
+  clone.removeAttribute('id');
+  clone.querySelectorAll('[data-icon-grid]').forEach(el => el.remove());
+  clone.querySelectorAll('[data-icon-layer="defs"]').forEach(el => el.remove());
+  clone.querySelectorAll('.icon-shape-selected').forEach(el => el.classList.remove('icon-shape-selected'));
+  clone.setAttribute('xmlns', SVG_NS);
+  clone.setAttribute('xmlns:xlink', 'http://www.w3.org/1999/xlink');
+  clone.setAttribute('width', String(ICON_CANVAS_SIZE));
+  clone.setAttribute('height', String(ICON_CANVAS_SIZE));
+  clone.setAttribute(BUILDER_FLAG_ATTR, '1');
+  const serialized = new XMLSerializer().serializeToString(clone);
+  const encoded = window.btoa(unescape(encodeURIComponent(serialized)));
+  return `data:image/svg+xml;base64,${encoded}`;
+}
+
+function commitIconChanges() {
+  const data = serializeIconCanvas();
+  currentIconData = data;
+  updateIconPreview(data);
+}
+
+function decodeSvgDataUrl(dataUrl) {
+  const match = /^data:image\/svg\+xml(;base64)?,(.*)$/i.exec(dataUrl || '');
+  if (!match) return null;
+  try {
+    if (match[1]) {
+      const decoded = window.atob(match[2]);
+      const escaped = Array.from(decoded).map(ch => `%${ch.charCodeAt(0).toString(16).padStart(2, '0')}`).join('');
+      return decodeURIComponent(escaped);
+    }
+    return decodeURIComponent(match[2]);
+  } catch {
+    return null;
+  }
+}
+
+function importIconData(dataUrl) {
+  ensureIconCanvas();
+  clearIconCanvas({ resetData: false });
+  if (!dataUrl) {
+    currentIconData = null;
+    updateIconPreview(null);
+    return;
+  }
+  const svgText = decodeSvgDataUrl(dataUrl);
+  if (svgText) {
+    try {
+      const parser = new DOMParser();
+      const doc = parser.parseFromString(svgText, 'image/svg+xml');
+      const root = doc.documentElement;
+      if (root && root.getAttribute(BUILDER_FLAG_ATTR) === '1') {
+        const vb = root.getAttribute('viewBox');
+        if (vb) iconCanvas.setAttribute('viewBox', vb);
+        Array.from(root.children).forEach(node => {
+          if (node.nodeType !== 1) return;
+          if (node.getAttribute('data-icon-grid') || node.tagName.toLowerCase() === 'defs') return;
+          const imported = node.cloneNode(true);
+          imported.dataset.iconShape = '1';
+          if (!imported.dataset.shapeType) {
+            const tag = imported.tagName.toLowerCase();
+            if (tag === 'line') imported.dataset.shapeType = 'line';
+            else if (tag === 'rect') imported.dataset.shapeType = 'rectangle';
+            else if (tag === 'circle') imported.dataset.shapeType = 'circle';
+            else if (tag === 'path') imported.dataset.shapeType = 'arc';
+            else if (tag === 'text') imported.dataset.shapeType = 'text';
+          }
+          imported.classList.add('icon-shape');
+          iconCanvas.appendChild(imported);
+        });
+        commitIconChanges();
+        return;
+      }
+    } catch (err) {
+      console.warn('Unable to import saved icon', err);
+    }
+  }
+  currentIconData = dataUrl;
+  updateIconPreview(dataUrl, true);
+}
+
+function captureShapeData(shape) {
+  const type = shape?.dataset.shapeType;
+  if (!type) return null;
+  if (type === 'line') {
+    return {
+      x1: Number(shape.dataset.x1) || 0,
+      y1: Number(shape.dataset.y1) || 0,
+      x2: Number(shape.dataset.x2) || 0,
+      y2: Number(shape.dataset.y2) || 0
+    };
+  }
+  if (type === 'rectangle') {
+    return {
+      x: Number(shape.dataset.x) || 0,
+      y: Number(shape.dataset.y) || 0,
+      width: Number(shape.dataset.width) || 0,
+      height: Number(shape.dataset.height) || 0
+    };
+  }
+  if (type === 'circle') {
+    return {
+      cx: Number(shape.dataset.cx) || 0,
+      cy: Number(shape.dataset.cy) || 0,
+      r: Number(shape.dataset.r) || 0
+    };
+  }
+  if (type === 'arc') {
+    return {
+      startX: Number(shape.dataset.startX) || 0,
+      startY: Number(shape.dataset.startY) || 0,
+      controlX: Number(shape.dataset.controlX) || 0,
+      controlY: Number(shape.dataset.controlY) || 0,
+      endX: Number(shape.dataset.endX) || 0,
+      endY: Number(shape.dataset.endY) || 0
+    };
+  }
+  if (type === 'text') {
+    return {
+      x: Number(shape.dataset.x) || 0,
+      y: Number(shape.dataset.y) || 0
+    };
+  }
+  return null;
+}
+
+function startShapeDrag(shape, point) {
+  const type = shape?.dataset.shapeType;
+  if (!shape || !type) return;
+  const original = captureShapeData(shape);
+  if (!original) return;
+  shapeDragState = { shape, type, start: point, original };
+}
+
+function updateShapeDrag(point) {
+  if (!shapeDragState) return;
+  const { shape, type, start, original } = shapeDragState;
+  const dx = point.x - start.x;
+  const dy = point.y - start.y;
+  if (type === 'line') {
+    const startPos = { x: roundCoord(original.x1 + dx), y: roundCoord(original.y1 + dy) };
+    const endPos = { x: roundCoord(original.x2 + dx), y: roundCoord(original.y2 + dy) };
+    applyLineAttributes(shape, startPos, endPos);
+  } else if (type === 'rectangle') {
+    const x = roundCoord(original.x + dx);
+    const y = roundCoord(original.y + dy);
+    shape.dataset.x = String(x);
+    shape.dataset.y = String(y);
+    shape.setAttribute('x', x);
+    shape.setAttribute('y', y);
+    shape.setAttribute('width', roundCoord(original.width));
+    shape.setAttribute('height', roundCoord(original.height));
+  } else if (type === 'circle') {
+    const cx = roundCoord(original.cx + dx);
+    const cy = roundCoord(original.cy + dy);
+    shape.dataset.cx = String(cx);
+    shape.dataset.cy = String(cy);
+    shape.setAttribute('cx', cx);
+    shape.setAttribute('cy', cy);
+    shape.setAttribute('r', roundCoord(original.r));
+  } else if (type === 'arc') {
+    const startPos = { x: roundCoord(original.startX + dx), y: roundCoord(original.startY + dy) };
+    const control = { x: roundCoord(original.controlX + dx), y: roundCoord(original.controlY + dy) };
+    const endPos = { x: roundCoord(original.endX + dx), y: roundCoord(original.endY + dy) };
+    applyArcAttributes(shape, startPos, { control, end: endPos });
+  } else if (type === 'text') {
+    const x = roundCoord(original.x + dx);
+    const y = roundCoord(original.y + dy);
+    applyTextAttributes(shape, { x, y });
+  }
+}
+
+function finishShapeDrag(commit = true) {
+  if (!shapeDragState) return;
+  if (commit) commitIconChanges();
+  shapeDragState = null;
+}
+
+function handleTextPlacement(point) {
+  const value = window.prompt('Icon text', '');
+  if (value === null) return;
+  const trimmed = value.trim();
+  if (!trimmed) return;
+  const txt = document.createElementNS(SVG_NS, 'text');
+  txt.textContent = trimmed;
+  txt.dataset.iconShape = '1';
+  txt.dataset.shapeType = 'text';
+  txt.classList.add('icon-shape');
+  txt.setAttribute('fill', '#1f2933');
+  txt.setAttribute('font-size', '18');
+  txt.setAttribute('text-anchor', 'middle');
+  txt.setAttribute('dominant-baseline', 'middle');
+  applyTextAttributes(txt, point);
+  iconCanvas.appendChild(txt);
+  selectIconShape(txt);
+  commitIconChanges();
+}
+
+function handleCanvasMouseDown(event) {
+  if (!iconCanvas || event.button !== 0) return;
+  const point = getCanvasPoint(event);
+  if (!point) return;
+  ensureIconCanvas();
+  const target = event.target;
+  if (iconTool === 'text') {
+    event.preventDefault();
+    handleTextPlacement(point);
+    return;
+  }
+  if (iconTool === 'select') {
+    if (target instanceof SVGElement && target.dataset.iconShape === '1') {
+      startShapeDrag(target, point);
+      selectIconShape(target);
+      event.preventDefault();
+    } else {
+      selectIconShape(null);
+    }
+    return;
+  }
+  const shape = createShapeElement(iconTool);
+  if (!shape) return;
+  drawingShape = shape;
+  drawingStart = point;
+  if (iconTool === 'line') {
+    applyLineAttributes(shape, point, point);
+  } else if (iconTool === 'rectangle') {
+    applyRectAttributes(shape, point, point);
+  } else if (iconTool === 'circle') {
+    applyCircleAttributes(shape, point, point);
+  } else if (iconTool === 'arc') {
+    applyArcAttributes(shape, point, buildArcGeometry(point, point));
+  }
+  iconCanvas.appendChild(shape);
+  selectIconShape(null);
+  event.preventDefault();
+}
+
+function handleCanvasMouseMove(event) {
+  const point = getCanvasPoint(event);
+  if (!point) return;
+  if (drawingShape && drawingStart) {
+    const tool = drawingShape.dataset.shapeType;
+    if (tool === 'line') {
+      applyLineAttributes(drawingShape, drawingStart, point);
+    } else if (tool === 'rectangle') {
+      applyRectAttributes(drawingShape, drawingStart, point);
+    } else if (tool === 'circle') {
+      applyCircleAttributes(drawingShape, drawingStart, point);
+    } else if (tool === 'arc') {
+      const invert = event.shiftKey;
+      applyArcAttributes(drawingShape, drawingStart, buildArcGeometry(drawingStart, point, invert));
+    }
+  } else if (shapeDragState) {
+    updateShapeDrag(point);
+  }
+}
+
+function handleCanvasMouseUp() {
+  if (drawingShape) {
+    const type = drawingShape.dataset.shapeType;
+    let valid = true;
+    if (type === 'line') {
+      const x1 = Number(drawingShape.dataset.x1) || 0;
+      const y1 = Number(drawingShape.dataset.y1) || 0;
+      const x2 = Number(drawingShape.dataset.x2) || 0;
+      const y2 = Number(drawingShape.dataset.y2) || 0;
+      valid = Math.hypot(x2 - x1, y2 - y1) >= 1;
+    } else if (type === 'rectangle') {
+      const w = Number(drawingShape.dataset.width) || 0;
+      const h = Number(drawingShape.dataset.height) || 0;
+      valid = w >= 1 && h >= 1;
+    } else if (type === 'circle') {
+      const r = Number(drawingShape.dataset.r) || 0;
+      valid = r >= 0.5;
+    } else if (type === 'arc') {
+      const sx = Number(drawingShape.dataset.startX) || 0;
+      const sy = Number(drawingShape.dataset.startY) || 0;
+      const ex = Number(drawingShape.dataset.endX) || 0;
+      const ey = Number(drawingShape.dataset.endY) || 0;
+      valid = Math.hypot(ex - sx, ey - sy) >= 1;
+    }
+    finishDrawingShape(valid);
+  }
+  if (shapeDragState) {
+    finishShapeDrag(true);
+  }
+}
+
+function handleCanvasDoubleClick(event) {
+  if (!iconCanvas || iconTool !== 'select') return;
+  const target = event.target;
+  if (!(target instanceof SVGElement) || target.dataset.iconShape !== '1') return;
+  if (target.dataset.shapeType === 'text') {
+    event.preventDefault();
+    const current = target.textContent || '';
+    const next = window.prompt('Edit text', current);
+    if (next === null) return;
+    const trimmed = next.trim();
+    if (!trimmed) {
+      target.remove();
+      selectIconShape(null);
+    } else {
+      target.textContent = trimmed;
+    }
+    commitIconChanges();
+  }
+}
+
+function undoLastIconShape() {
+  if (!iconCanvas) return;
+  const shapes = iconCanvas.querySelectorAll('[data-icon-shape]');
+  if (!shapes.length) return;
+  const last = shapes[shapes.length - 1];
+  if (selectedIconShape === last) selectIconShape(null);
+  last.remove();
+  commitIconChanges();
+}
+
+function handleBuilderKeydown(event) {
+  if (!selectedIconShape) return;
+  if (event.key !== 'Delete' && event.key !== 'Backspace') return;
+  const target = event.target;
+  if (target instanceof HTMLElement && (target.isContentEditable || ['INPUT', 'TEXTAREA'].includes(target.tagName))) {
+    return;
+  }
+  event.preventDefault();
+  selectedIconShape.remove();
+  selectIconShape(null);
+  commitIconChanges();
 }
 
 function loadComponents() {
@@ -239,13 +782,7 @@ function propertiesToObject(properties) {
 }
 
 function resetIcon() {
-  currentIconData = null;
-  if (iconPreview) {
-    iconPreview.innerHTML = '<span class="icon-placeholder">No icon selected</span>';
-  }
-  if (iconInput) {
-    iconInput.value = '';
-  }
+  clearIconCanvas();
 }
 
 function resetForm() {
@@ -258,17 +795,23 @@ function resetForm() {
   resetIcon();
 }
 
-function updateIconPreview(src) {
+function updateIconPreview(src, nonEditable = false) {
   if (!iconPreview) return;
   iconPreview.innerHTML = '';
   if (!src) {
-    iconPreview.innerHTML = '<span class="icon-placeholder">No icon selected</span>';
+    iconPreview.innerHTML = '<span class="icon-placeholder">No icon defined</span>';
     return;
   }
   const img = document.createElement('img');
   img.src = src;
   img.alt = '';
   iconPreview.appendChild(img);
+  if (nonEditable) {
+    const note = document.createElement('p');
+    note.className = 'icon-note';
+    note.textContent = 'Imported image icons cannot be edited. Clear to draw a new icon.';
+    iconPreview.appendChild(note);
+  }
 }
 
 function updateTable() {
@@ -345,8 +888,7 @@ function loadComponentForEdit(index) {
   clearPropertyRows();
   (comp.properties || []).forEach(entry => addPropertyRow(entry));
   if (!comp.properties || comp.properties.length === 0) addPropertyRow();
-  currentIconData = comp.icon || null;
-  updateIconPreview(currentIconData);
+  importIconData(comp.icon || null);
   if (submitBtn) submitBtn.textContent = 'Update Component';
   form.scrollIntoView({ behavior: 'smooth', block: 'start' });
 }
@@ -438,29 +980,6 @@ function handleFormSubmit(event) {
     console.error(err);
     showToast(err.message || 'Unable to save component.', 'error');
   }
-}
-
-function handleIconChange(event) {
-  const file = event.target.files?.[0];
-  if (!file) {
-    resetIcon();
-    return;
-  }
-  if (!/image\/(svg\+xml|png)/.test(file.type)) {
-    showToast('Icon must be an SVG or PNG file.', 'error');
-    iconInput.value = '';
-    return;
-  }
-  const reader = new FileReader();
-  reader.onload = () => {
-    currentIconData = reader.result;
-    updateIconPreview(currentIconData);
-  };
-  reader.onerror = () => {
-    showToast('Failed to read icon file.', 'error');
-    resetIcon();
-  };
-  reader.readAsDataURL(file);
 }
 
 function handleExport() {
@@ -576,8 +1095,22 @@ function setupListeners() {
   form.addEventListener('submit', handleFormSubmit);
   addPropertyBtn.addEventListener('click', () => addPropertyRow());
   resetFormBtn.addEventListener('click', resetForm);
-  iconInput.addEventListener('change', handleIconChange);
-  clearIconBtn.addEventListener('click', resetIcon);
+  clearIconBtn?.addEventListener('click', resetIcon);
+  undoIconBtn?.addEventListener('click', undoLastIconShape);
+  if (iconToolButtons) {
+    iconToolButtons.addEventListener('click', e => {
+      const btn = e.target.closest('button[data-tool]');
+      if (!btn) return;
+      setActiveIconTool(btn.dataset.tool || 'select');
+    });
+  }
+  if (iconCanvas) {
+    iconCanvas.addEventListener('mousedown', handleCanvasMouseDown);
+    iconCanvas.addEventListener('dblclick', handleCanvasDoubleClick);
+  }
+  document.addEventListener('mousemove', handleCanvasMouseMove);
+  document.addEventListener('mouseup', handleCanvasMouseUp);
+  document.addEventListener('keydown', handleBuilderKeydown);
   exportBtn.addEventListener('click', handleExport);
   importBtn.addEventListener('click', () => importInput.click());
   importInput.addEventListener('change', handleImportChange);
@@ -591,6 +1124,8 @@ function setupListeners() {
   });
 }
 
+ensureIconCanvas();
+setActiveIconTool('select');
 resetForm();
 updateTable();
 setupListeners();
