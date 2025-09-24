@@ -1227,9 +1227,9 @@ button:focus-visible, .primary-btn:focus-visible {
     display: inline-flex;
     align-items: center;
     justify-content: center;
-    width: 2.5rem;
-    height: 2.5rem;
-    border: 1px solid var(--primary-color);
+    width: 2rem;
+    height: 2rem;
+    border: none;
     border-radius: 4px;
     background: var(--ol-card-bg);
     padding: 0.25rem;
@@ -1255,8 +1255,8 @@ button:focus-visible, .primary-btn:focus-visible {
     transform: rotate(270deg);
 }
 body.compact-mode #palette button .palette-icon {
-    width: 2rem;
-    height: 2rem;
+    width: 1.5rem;
+    height: 1.5rem;
 }
 
 /* Icon style buttons */
