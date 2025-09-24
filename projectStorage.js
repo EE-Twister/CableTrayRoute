@@ -219,7 +219,7 @@ export function writeScenarioValue(key, value, scenario = currentScenarioName) {
     if (serialized.length > MAX_SCENARIO_ENTRY_SIZE) {
       writeScenarioRaw(target, key, serialized, { skipLocalStorage: true });
       if (target === currentScenarioName) {
-        setProjectKey(key, serialized);
+        setProjectKey(key, serialized, { skipLocalStorage: true });
       }
       if (!scenarioSizeWarnings.has(storageKey)) {
         scenarioSizeWarnings.add(storageKey);
