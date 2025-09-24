@@ -282,6 +282,35 @@
   gap: var(--ol-spacing);
   margin-bottom: var(--ol-spacing);
 }
+.sheet-controls > * {
+  display: flex;
+  align-items: center;
+  gap: var(--ol-spacing);
+}
+.sheet-controls > * + * {
+  border-left: 1px solid var(--ol-border-color);
+  padding-left: var(--ol-spacing);
+}
+.scenario-controls {
+  display: flex;
+  align-items: center;
+  gap: var(--ol-spacing);
+}
+.scenario-select-group {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+.scenario-label {
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+}
+.scenario-action-group {
+  display: flex;
+  align-items: center;
+  gap: var(--ol-spacing);
+}
 
 .sheet-action-group {
   display: flex;
@@ -1185,6 +1214,7 @@ button:focus-visible, .primary-btn:focus-visible {
 #palette button {
     display: inline-flex;
     align-items: center;
+    justify-content: center;
     background: none;
     border: none;
     color: var(--text-color);
@@ -1193,14 +1223,40 @@ button:focus-visible, .primary-btn:focus-visible {
 #palette button:hover {
     background-color: rgba(0, 0, 0, 0.1);
 }
-#palette button:not(.icon-button) img {
-    width: 1.2em;
-    height: 1.2em;
-    margin-right: 0.25rem;
+#palette button .palette-icon {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 2.5rem;
+    height: 2.5rem;
+    border: 1px solid var(--primary-color);
+    border-radius: 4px;
+    background: var(--ol-card-bg);
+    padding: 0.25rem;
+    box-sizing: border-box;
 }
-body.compact-mode #palette button:not(.icon-button) img {
-    width: 1em;
-    height: 1em;
+#palette button .palette-icon img {
+    width: 100%;
+    height: auto;
+    display: block;
+    transform-origin: center;
+}
+#palette button .palette-icon[data-rotation="90"] img {
+    width: auto;
+    height: 100%;
+    transform: rotate(90deg);
+}
+#palette button .palette-icon[data-rotation="180"] img {
+    transform: rotate(180deg);
+}
+#palette button .palette-icon[data-rotation="270"] img {
+    width: auto;
+    height: 100%;
+    transform: rotate(270deg);
+}
+body.compact-mode #palette button .palette-icon {
+    width: 2rem;
+    height: 2rem;
 }
 
 /* Icon style buttons */
@@ -2006,6 +2062,35 @@ body.dark-mode .legalDisclaimer {
     stroke-width:2;
     stroke-linecap:round;
     pointer-events:none;
+}
+.drag-preview{
+    position:fixed;
+    top:-1000px;
+    left:-1000px;
+    pointer-events:none;
+    border:1px solid var(--primary-color);
+    border-radius:4px;
+    background:var(--ol-card-bg);
+    display:inline-flex;
+    align-items:center;
+    justify-content:center;
+    padding:4px;
+    box-sizing:border-box;
+}
+.drag-preview img{
+    width:100%;
+    height:100%;
+    object-fit:contain;
+    transform-origin:center;
+}
+.drag-preview[data-rotation="90"] img{
+    transform:rotate(90deg);
+}
+.drag-preview[data-rotation="180"] img{
+    transform:rotate(180deg);
+}
+.drag-preview[data-rotation="270"] img{
+    transform:rotate(270deg);
 }
 body.dark-mode .cable-lead{
     stroke:#bbb;
