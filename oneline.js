@@ -125,6 +125,25 @@ const typeIcons = {
 
 const placeholderIcon = asset('icons/placeholder.svg');
 
+function normalizeCategoryValue(value) {
+  switch (value) {
+    case 'bus':
+    case 'equipment':
+    case 'protection':
+    case 'load':
+    case 'sources':
+    case 'links':
+    case 'annotations':
+    case 'cable':
+      return value;
+    default:
+      return value ? categoryForType(value) : '';
+  }
+}
+
+const compWidth = 80;
+const compHeight = 40;
+
 function compKey(type, subtype) {
   return subtype ? `${type}_${subtype}` : type;
 }
@@ -191,6 +210,29 @@ function defaultPorts(type, subtype) {
     { x: 0, y: 20 },
     { x: 80, y: 20 }
   ];
+}
+
+function coerceNumber(value, fallback) {
+  const num = Number(value);
+  return Number.isFinite(num) ? num : fallback;
+}
+
+function normalizePortsForCategory(category, ports, type, subtype) {
+  const base = Array.isArray(ports) && ports.length ? ports : defaultPorts(type, subtype);
+  if (category === 'load') {
+    const center = compWidth / 2;
+    if (base.length <= 1) {
+      return [{ x: center, y: 0 }];
+    }
+    return base.map(port => ({
+      x: coerceNumber(port?.x, center),
+      y: 0
+    }));
+  }
+  return base.map(port => ({
+    x: coerceNumber(port?.x, compWidth / 2),
+    y: coerceNumber(port?.y, compHeight / 2)
+  }));
 }
 
 const builtinComponents = [
@@ -310,7 +352,7 @@ async function loadComponentLibrary() {
         : c.symbol
         ? asset(`icons/components/${c.symbol}.svg`)
         : placeholderIcon;
-      const ports = Array.isArray(c.ports) ? c.ports : defaultPorts(c.type, c.subtype);
+      const ports = normalizePortsForCategory(cat, c.ports, c.type, c.subtype);
       const rawProps = c.props || {};
       const props = {};
       Object.entries(rawProps).forEach(([k, v]) => {
@@ -347,7 +389,7 @@ async function loadComponentLibrary() {
     if (componentMeta[key]) return;
     const cat = c.category || categoryForType(c.type);
     const icon = c.icon || placeholderIcon;
-    const ports = Array.isArray(c.ports) ? c.ports : defaultPorts(c.type, c.subtype);
+    const ports = normalizePortsForCategory(cat, c.ports, c.type, c.subtype);
     const rawProps = c.props || {};
     const props = {};
     Object.entries(rawProps).forEach(([k, v]) => {
@@ -419,7 +461,6 @@ function applyDefaults(comp) {
 }
 
 function buildPalette() {
-  console.info('Categories:', Object.keys(componentTypes));
   const palette = document.getElementById('component-buttons');
   const btnTemplate = document.getElementById('palette-button-template');
   const sectionContainers = {
@@ -552,8 +593,6 @@ let snapIndicatorTimeout = null;
 let history = [];
 let historyIndex = -1;
 let validationIssues = [];
-const compWidth = 80;
-const compHeight = 40;
 const marqueeThreshold = 4;
 let templates = [];
 const DIAGRAM_VERSION = 2;
@@ -1255,11 +1294,35 @@ function updateLegend(ranges) {
   legend.style.display = ranges.size || showOverlays ? 'block' : 'none';
 }
 
+function resolveComponentCategory(comp) {
+  if (!comp) return '';
+  const meta = componentMeta[comp.subtype];
+  const metaCategory = normalizeCategoryValue(meta?.category);
+  if (metaCategory) return metaCategory;
+  if (meta?.type) {
+    const typeCategory = categoryForType(meta.type);
+    if (typeCategory) return typeCategory;
+  }
+  const storedCategory = normalizeCategoryValue(subtypeCategory[comp.subtype]);
+  if (storedCategory) return storedCategory;
+  const compCategory = normalizeCategoryValue(comp.category);
+  if (compCategory) return compCategory;
+  if (comp.type) return categoryForType(comp.type);
+  return '';
+}
+
 function defaultLabelAnchor(comp) {
+  const category = resolveComponentCategory(comp);
   const bounds = componentBounds(comp);
+  if (category === 'load') {
+    return {
+      x: (bounds.left + bounds.right) / 2,
+      y: bounds.bottom + 15
+    };
+  }
   return {
-    x: (bounds.left + bounds.right) / 2,
-    y: bounds.bottom + 15
+    x: bounds.right + 15,
+    y: (bounds.top + bounds.bottom) / 2
   };
 }
 
@@ -1270,6 +1333,10 @@ function getLabelPosition(comp) {
     x: base.x + (Number(offset.x) || 0),
     y: base.y + (Number(offset.y) || 0)
   };
+}
+
+function getLabelAlignment(comp) {
+  return resolveComponentCategory(comp) === 'load' ? 'middle' : 'start';
 }
 
 function portPosition(c, portIndex) {
@@ -1528,6 +1595,24 @@ function normalizeComponent(c) {
     nc.width = Number(nc.width) || compWidth;
     nc.height = Number(nc.height) || compHeight;
   }
+  if (resolveComponentCategory(nc) === 'load') {
+    const metaPorts = componentMeta[nc.subtype]?.ports;
+    if (Array.isArray(metaPorts) && metaPorts.length) {
+      nc.ports = metaPorts.map(port => ({
+        x: coerceNumber(port?.x, compWidth / 2),
+        y: coerceNumber(port?.y, 0)
+      }));
+    } else if (Array.isArray(nc.ports) && nc.ports.length) {
+      const center = compWidth / 2;
+      if (nc.ports.length <= 1) {
+        nc.ports = [{ x: center, y: 0 }];
+      } else {
+        nc.ports = nc.ports.map(port => ({ x: coerceNumber(port?.x, center), y: 0 }));
+      }
+    } else {
+      nc.ports = [{ x: compWidth / 2, y: 0 }];
+    }
+  }
   applyDefaults(nc);
   return nc;
 }
@@ -1781,24 +1866,35 @@ function render() {
   }
 
   function midpoint(points) {
+    if (!Array.isArray(points) || points.length === 0) {
+      return { x: 0, y: 0 };
+    }
     const segs = [];
     let len = 0;
     for (let i = 0; i < points.length - 1; i++) {
       const p1 = points[i];
       const p2 = points[i + 1];
       const l = Math.hypot(p2.x - p1.x, p2.y - p1.y);
+      if (!Number.isFinite(l) || l <= 0) continue;
       segs.push({ p1, p2, l });
       len += l;
+    }
+    if (!segs.length) {
+      return points[0] || { x: 0, y: 0 };
     }
     let half = len / 2;
     for (const s of segs) {
       if (half <= s.l) {
         const ratio = half / s.l;
-        return { x: s.p1.x + (s.p2.x - s.p1.x) * ratio, y: s.p1.y + (s.p2.y - s.p1.y) * ratio };
+        return {
+          x: s.p1.x + (s.p2.x - s.p1.x) * ratio,
+          y: s.p1.y + (s.p2.y - s.p1.y) * ratio
+        };
       }
       half -= s.l;
     }
-    return points[0];
+    const last = segs[segs.length - 1];
+    return last ? last.p2 : points[0];
   }
 
   // dimension tool removed
@@ -2091,7 +2187,7 @@ function render() {
       labelEl.dataset.id = c.id;
       labelEl.setAttribute('x', labelPos.x);
       labelEl.setAttribute('y', labelPos.y);
-      labelEl.setAttribute('text-anchor', 'middle');
+      labelEl.setAttribute('text-anchor', getLabelAlignment(c));
       labelEl.textContent = c.label || meta.label || c.subtype || c.type;
       labelEl.addEventListener('mousedown', e => {
         e.stopPropagation();
@@ -3268,15 +3364,13 @@ async function init() {
       if (c.type === 'dimension') return;
       if (!componentMeta[c.subtype]) {
         const icon = typeIcons[c.type] || asset('icons/equipment.svg');
+        const category = categoryForType(c.type);
         componentMeta[c.subtype] = {
           icon,
           label: c.subtype,
-          category: c.type,
+          category,
           type: c.type,
-          ports: [
-            { x: 0, y: 20 },
-            { x: 80, y: 20 }
-          ]
+          ports: normalizePortsForCategory(category, c.ports, c.type, c.subtype)
         };
       }
       if (!propSchemas[c.subtype]) {
