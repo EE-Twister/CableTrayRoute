@@ -1,0 +1,141 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="description" content="Build custom one-line diagram components.">
+  <title>Custom Components</title>
+  <link rel="icon" href="./icons/favicon.svg" type="image/svg+xml">
+  <link rel="stylesheet" href="./style.css">
+</head>
+<body>
+  <a class="skip-link" href="#main-content">Skip to main content</a>
+  <nav class="top-nav">
+    <button id="nav-toggle" class="nav-toggle" aria-label="Toggle navigation" aria-controls="nav-links" aria-expanded="false" title="Toggle navigation">☰</button>
+    <div id="nav-links" class="nav-links">
+      <a href="./index.html">Home</a>
+      <a href="./equipmentlist.html">Equipment List</a>
+      <a href="./loadlist.html">Load List</a>
+      <a href="./cableschedule.html">Cable Schedule</a>
+      <a href="./panelschedule.html">Panel Schedule</a>
+      <a href="./racewayschedule.html">Raceway Schedule</a>
+      <a href="./ductbankroute.html">Ductbank</a>
+      <a href="./cabletrayfill.html">Tray Fill</a>
+      <a href="./conduitfill.html">Conduit Fill</a>
+      <a href="./optimalRoute.html">Optimal Route</a>
+      <a href="./oneline.html">One-Line</a>
+      <a href="./custom-components.html" class="active" aria-current="page">Custom Components</a>
+    </div>
+  </nav>
+  <div class="container">
+    <main id="main-content" class="main-content">
+      <header class="page-header">
+        <h1>Custom Components</h1>
+        <p>Create reusable palette entries that load directly into the One-Line diagram.</p>
+      </header>
+      <section class="card component-builder-card">
+        <h2>Create or Edit Component</h2>
+        <p class="muted">Saved components are stored in this browser and appear under the appropriate palette category.</p>
+        <form id="component-form" class="component-form" novalidate>
+          <input type="hidden" id="component-index" value="">
+          <div class="form-grid">
+            <label for="component-label">Display label
+              <input id="component-label" name="label" type="text" maxlength="80" required placeholder="e.g., Custom Switchgear">
+            </label>
+            <label for="component-subtype">Subtype (unique id)
+              <input id="component-subtype" name="subtype" type="text" maxlength="80" required placeholder="e.g., custom_switchgear">
+            </label>
+            <label for="component-type">Type
+              <input id="component-type" name="type" type="text" maxlength="80" required placeholder="e.g., panel">
+            </label>
+            <label for="component-category">Palette category
+              <select id="component-category" name="category" required>
+                <option value="equipment">Equipment</option>
+                <option value="sources">Sources</option>
+                <option value="protection">Protection</option>
+                <option value="load">Load</option>
+                <option value="bus">Bus</option>
+                <option value="cable">Cable</option>
+                <option value="links">Links</option>
+                <option value="annotations">Annotations</option>
+              </select>
+            </label>
+            <label for="component-width">Width (px)
+              <input id="component-width" name="width" type="number" min="20" max="600" value="80" required>
+            </label>
+            <label for="component-height">Height (px)
+              <input id="component-height" name="height" type="number" min="20" max="400" value="40" required>
+            </label>
+          </div>
+          <fieldset class="ports-fieldset">
+            <legend>Connection Ports</legend>
+            <p class="muted">Set how many connection points should appear on each edge. Ports are spaced evenly.</p>
+            <div class="port-grid">
+              <label for="port-top">Top
+                <input id="port-top" name="portTop" type="number" min="0" max="12" value="0">
+              </label>
+              <label for="port-right">Right
+                <input id="port-right" name="portRight" type="number" min="0" max="12" value="1">
+              </label>
+              <label for="port-bottom">Bottom
+                <input id="port-bottom" name="portBottom" type="number" min="0" max="12" value="0">
+              </label>
+              <label for="port-left">Left
+                <input id="port-left" name="portLeft" type="number" min="0" max="12" value="1">
+              </label>
+            </div>
+          </fieldset>
+          <fieldset class="properties-fieldset">
+            <legend>Default Properties</legend>
+            <p class="muted">Add optional default properties that appear in the edit dialog.</p>
+            <div id="property-list" class="property-list"></div>
+            <button type="button" id="add-property-btn" class="btn">Add Property</button>
+          </fieldset>
+          <div class="icon-fieldset">
+            <div class="icon-upload">
+              <label for="component-icon">Icon (SVG or PNG)
+                <input id="component-icon" type="file" accept="image/svg+xml,image/png">
+              </label>
+              <button type="button" id="clear-icon-btn" class="btn secondary-btn">Clear Icon</button>
+            </div>
+            <div id="icon-preview" class="icon-preview" aria-live="polite"></div>
+          </div>
+          <div class="form-actions">
+            <button type="submit" class="btn primary-btn">Save Component</button>
+            <button type="button" id="reset-form-btn" class="btn">Reset</button>
+          </div>
+        </form>
+      </section>
+      <section class="card component-list-card">
+        <div class="component-list-header">
+          <h2>Saved Components</h2>
+          <div class="component-list-actions">
+            <button type="button" id="export-components-btn" class="btn">Export</button>
+            <input type="file" id="import-components-input" accept="application/json" class="hidden-input">
+            <button type="button" id="import-components-btn" class="btn">Import</button>
+          </div>
+        </div>
+        <p class="muted">Custom components apply to this browser. Export and share the JSON file to reuse elsewhere.</p>
+        <p id="no-components-message" class="empty-state">No custom components yet. Save one above to get started.</p>
+        <div class="table-wrapper">
+          <table id="custom-components-table" class="component-table">
+            <thead>
+              <tr>
+                <th scope="col">Label</th>
+                <th scope="col">Subtype</th>
+                <th scope="col">Category</th>
+                <th scope="col">Type</th>
+                <th scope="col">Ports</th>
+                <th scope="col" class="actions">Actions</th>
+              </tr>
+            </thead>
+            <tbody></tbody>
+          </table>
+        </div>
+      </section>
+    </main>
+  </div>
+  <div id="custom-toast" class="toast" role="status" aria-live="polite"></div>
+  <script type="module" src="./custom-components.js"></script>
+</body>
+</html>

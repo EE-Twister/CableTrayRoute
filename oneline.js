@@ -162,6 +162,8 @@ const defaultPaletteWidth = 250;
 const minPaletteWidth = 100;
 const maxPaletteWidth = 600;
 const paletteWidthStorageKey = 'onelinePaletteWidth';
+const customComponentStorageKey = 'customComponents';
+const customComponentScenarioKey = '__ctr_custom_components__';
 
 const attributeDisplayOverrides = {
   rating: { label: 'Rating', unit: '' },
@@ -451,6 +453,27 @@ const manufacturerModels = {
 };
 
 
+function loadStoredCustomComponents() {
+  const stored = getItem(customComponentStorageKey, [], customComponentScenarioKey);
+  if (!Array.isArray(stored)) return [];
+  return stored.filter(item => item && typeof item === 'object');
+}
+
+function resolveIconSource(iconPath, fallbackSymbol) {
+  if (typeof iconPath === 'string' && iconPath.trim()) {
+    const trimmed = iconPath.trim();
+    if (trimmed.startsWith('data:') || /^https?:/i.test(trimmed)) {
+      return trimmed;
+    }
+    return asset(trimmed);
+  }
+  if (fallbackSymbol) {
+    return asset(`icons/components/${fallbackSymbol}.svg`);
+  }
+  return placeholderIcon;
+}
+
+
 // === REPLACE THE ENTIRE FUNCTION ===
 async function loadComponentLibrary() {
   componentMeta = {};
@@ -458,79 +481,75 @@ async function loadComponentLibrary() {
   subtypeCategory = {};
   componentTypes = {};
 
+  const registerDefinition = (definition, { allowOverride = true } = {}) => {
+    if (!definition || typeof definition !== 'object') return;
+    const subtype = (definition.subtype || '').trim();
+    if (!subtype) return;
+    const baseType = (definition.type || definition.category || subtype).trim();
+    const key = compKey(baseType, subtype);
+    if (!allowOverride && componentMeta[key]) return;
+    if (componentMeta[key]) {
+      const prevCat = subtypeCategory[key];
+      if (prevCat && componentTypes[prevCat]) {
+        componentTypes[prevCat] = componentTypes[prevCat].filter(entry => entry !== key);
+      }
+    }
+    const resolvedType = definition.type || baseType;
+    const category = definition.category || categoryForType(resolvedType);
+    const icon = resolveIconSource(definition.icon, definition.symbol);
+    const ports = normalizePortsForCategory(category, definition.ports, resolvedType, subtype);
+    const defaultRotation = normalizeRotation(
+      definition.defaultRotation ?? defaultRotationForType(resolvedType, category)
+    );
+    const rawProps = definition.props || {};
+    const props = {};
+    Object.entries(rawProps).forEach(([propKey, propValue]) => {
+      if (propKey === 'kv' || propKey.startsWith('kv_') || propKey.endsWith('_kv')) {
+        const newKey = propKey
+          .replace(/^kv_/, 'volts_')
+          .replace(/_kv$/, '_volts')
+          .replace('kv', 'volts');
+        props[newKey] = typeof propValue === 'number' ? propValue * 1000 : propValue;
+      } else {
+        props[propKey] = typeof propValue === 'object' && propValue !== null
+          ? JSON.parse(JSON.stringify(propValue))
+          : propValue;
+      }
+    });
+    const meta = {
+      icon,
+      label: definition.label || key,
+      category,
+      ports,
+      type: resolvedType,
+      subtype,
+      props,
+      defaultRotation
+    };
+    const widthVal = Number(definition.width);
+    const heightVal = Number(definition.height);
+    if (Number.isFinite(widthVal)) meta.width = widthVal;
+    if (Number.isFinite(heightVal)) meta.height = heightVal;
+    componentMeta[key] = meta;
+    subtypeCategory[key] = category;
+    if (!componentTypes[category]) componentTypes[category] = [];
+    if (!componentTypes[category].includes(key)) componentTypes[category].push(key);
+    propSchemas[key] = inferSchemaFromProps(props);
+  };
+
   try {
     const res = await fetch(asset('componentLibrary.json'));
     const data = await res.json();
     const comps = Array.isArray(data.components) ? data.components : [];
-    comps.forEach(c => {
-      const key = compKey(c.type, c.subtype);
-      const cat = categoryForType(c.type);
-      const icon = c.icon
-        ? asset(c.icon)
-        : c.symbol
-        ? asset(`icons/components/${c.symbol}.svg`)
-        : placeholderIcon;
-      const ports = normalizePortsForCategory(cat, c.ports, c.type, c.subtype);
-      const defaultRotation = normalizeRotation(defaultRotationForType(c.type, cat));
-      const rawProps = c.props || {};
-      const props = {};
-      Object.entries(rawProps).forEach(([k, v]) => {
-        if (k === 'kv' || k.startsWith('kv_') || k.endsWith('_kv')) {
-          const newKey = k
-            .replace(/^kv_/, 'volts_')
-            .replace(/_kv$/, '_volts')
-            .replace('kv', 'volts');
-          props[newKey] = typeof v === 'number' ? v * 1000 : v;
-        } else {
-          props[k] = v;
-        }
-      });
-      componentMeta[key] = {
-        icon,
-        label: c.label || key,
-        category: cat,
-        ports,
-        type: c.type,
-        subtype: c.subtype,
-        props,
-        defaultRotation
-      };
-      subtypeCategory[key] = cat;
-      if (!componentTypes[cat]) componentTypes[cat] = [];
-      if (!componentTypes[cat].includes(key)) componentTypes[cat].push(key);
-      propSchemas[key] = inferSchemaFromProps(props);
-    });
+    comps.forEach(c => registerDefinition(c));
   } catch (e) {
     console.error('Component library load failed', e);
   }
 
-  builtinComponents.forEach(c => {
-    const key = compKey(c.type, c.subtype);
-    if (componentMeta[key]) return;
-    const cat = c.category || categoryForType(c.type);
-    const icon = c.icon || placeholderIcon;
-    const ports = normalizePortsForCategory(cat, c.ports, c.type, c.subtype);
-    const defaultRotation = normalizeRotation(defaultRotationForType(c.type, cat));
-    const rawProps = c.props || {};
-    const props = {};
-    Object.entries(rawProps).forEach(([k, v]) => {
-      props[k] = typeof v === 'object' ? JSON.parse(JSON.stringify(v)) : v;
-    });
-    componentMeta[key] = {
-      icon,
-      label: c.label || key,
-      category: cat,
-      ports,
-      type: c.type,
-      subtype: c.subtype,
-      props,
-      defaultRotation
-    };
-    subtypeCategory[key] = cat;
-    if (!componentTypes[cat]) componentTypes[cat] = [];
-    if (!componentTypes[cat].includes(key)) componentTypes[cat].push(key);
-    propSchemas[key] = inferSchemaFromProps(props);
-  });
+  const customDefinitions = loadStoredCustomComponents();
+  customDefinitions.forEach(def => registerDefinition(def));
+
+  builtinComponents.forEach(def => registerDefinition(def, { allowOverride: false }));
 
   buildPalette();
   refreshAttributeOptions();
@@ -773,6 +792,8 @@ let syncing = false;
 let lintPanel = null;
 let lintList = null;
 let clickSelectTimer = null;
+let findHighlightId = null;
+let findHighlightTimer = null;
 
 // Re-run validation whenever diagram or study results change
 on('oneLineDiagram', validateDiagram);
@@ -820,6 +841,79 @@ function cancelPendingClickSelection() {
   if (clickSelectTimer) {
     clearTimeout(clickSelectTimer);
     clickSelectTimer = null;
+  }
+}
+
+function normalizeSearchValue(value) {
+  if (value === null || value === undefined) return '';
+  return String(value).trim().toLowerCase();
+}
+
+function componentSearchValues(comp) {
+  const values = new Set();
+  if (!comp || typeof comp !== 'object') return values;
+  const add = val => {
+    const normalized = normalizeSearchValue(val);
+    if (normalized) values.add(normalized);
+  };
+  add(comp.label);
+  add(comp.ref);
+  add(comp.name);
+  add(comp.id);
+  add(comp.tag);
+  if (comp.cable && typeof comp.cable === 'object') add(comp.cable.tag);
+  if (Array.isArray(comp.tags)) comp.tags.forEach(add);
+  if (comp.props && typeof comp.props === 'object') {
+    ['tag', 'label', 'name', 'id'].forEach(key => add(comp.props[key]));
+  }
+  return values;
+}
+
+function findComponentByTag(query) {
+  const target = normalizeSearchValue(query);
+  if (!target) return null;
+  let exact = null;
+  let partial = null;
+  components.forEach(comp => {
+    if (!comp || partial && exact) return;
+    const values = componentSearchValues(comp);
+    if (values.has(target)) {
+      if (!exact) exact = comp;
+      return;
+    }
+    if (!partial) {
+      const hasPartial = Array.from(values).some(val => val.includes(target));
+      if (hasPartial) partial = comp;
+    }
+  });
+  return exact || partial;
+}
+
+function highlightFoundComponent(componentId) {
+  if (!componentId) return;
+  findHighlightId = componentId;
+  if (findHighlightTimer) {
+    clearTimeout(findHighlightTimer);
+    findHighlightTimer = null;
+  }
+  render();
+  findHighlightTimer = window.setTimeout(() => {
+    findHighlightId = null;
+    findHighlightTimer = null;
+    render();
+  }, 3000);
+}
+
+function focusComponentElement(comp) {
+  if (!comp) return;
+  const svg = document.getElementById('diagram');
+  if (!svg) return;
+  const target = svg.querySelector(`g.component[data-id="${comp.id}"]`);
+  if (!target || typeof target.scrollIntoView !== 'function') return;
+  try {
+    target.scrollIntoView({ behavior: 'smooth', block: 'center', inline: 'center' });
+  } catch {
+    target.scrollIntoView();
   }
 }
 
@@ -970,19 +1064,56 @@ const tourSteps = [
 let tourIndex = 0;
 let tourOverlay = null;
 let tourModal = null;
+let tourResizeHandler = null;
+let tourKeyHandler = null;
+
+function positionTourModal(target) {
+  if (!tourModal) return;
+  if (target) {
+    const rect = target.getBoundingClientRect();
+    const modalWidth = tourModal.offsetWidth;
+    const modalHeight = tourModal.offsetHeight;
+    let top = rect.bottom + 12;
+    if (top + modalHeight > window.innerHeight - 16) {
+      top = Math.max(16, rect.top - modalHeight - 12);
+    }
+    const maxLeft = Math.max(16, window.innerWidth - modalWidth - 16);
+    const left = Math.min(Math.max(16, rect.left), maxLeft);
+    tourModal.style.top = `${top}px`;
+    tourModal.style.left = `${left}px`;
+    tourModal.style.transform = 'none';
+    tourModal.classList.add('anchored');
+  } else {
+    tourModal.style.top = '50%';
+    tourModal.style.left = '50%';
+    tourModal.style.transform = 'translate(-50%, -50%)';
+    tourModal.classList.remove('anchored');
+  }
+}
 
 function showTourStep() {
+  if (!tourModal) return;
   const step = tourSteps[tourIndex];
-  tourModal.querySelector('#tour-text').textContent = step.text;
+  const textEl = tourModal.querySelector('#tour-text');
+  if (textEl) textEl.textContent = step.text;
   document.querySelectorAll('.tour-highlight').forEach(el => el.classList.remove('tour-highlight'));
-  const el = document.querySelector(step.element);
-  if (el) el.classList.add('tour-highlight');
+  const target = step.element ? document.querySelector(step.element) : null;
+  if (target) target.classList.add('tour-highlight');
   const next = tourModal.querySelector('#tour-next');
-  next.textContent = tourIndex === tourSteps.length - 1 ? 'Finish' : 'Next';
+  if (next) next.textContent = tourIndex === tourSteps.length - 1 ? 'Finish' : 'Next';
+  positionTourModal(target);
 }
 
 function endTour() {
   document.querySelectorAll('.tour-highlight').forEach(el => el.classList.remove('tour-highlight'));
+  if (tourResizeHandler) {
+    window.removeEventListener('resize', tourResizeHandler);
+    tourResizeHandler = null;
+  }
+  if (tourKeyHandler) {
+    document.removeEventListener('keydown', tourKeyHandler, true);
+    tourKeyHandler = null;
+  }
   tourOverlay?.remove();
   tourModal?.remove();
   tourOverlay = null;
@@ -995,18 +1126,47 @@ function startTour() {
   tourOverlay.className = 'tour-overlay';
   tourModal = document.createElement('div');
   tourModal.className = 'tour-modal';
-  tourModal.innerHTML = `<p id="tour-text"></p><button id="tour-next">Next</button>`;
+  tourModal.setAttribute('tabindex', '-1');
+  tourModal.innerHTML = `
+    <div class="tour-content">
+      <p id="tour-text"></p>
+      <div class="tour-actions">
+        <button type="button" id="tour-skip">Skip</button>
+        <button type="button" id="tour-next">Next</button>
+      </div>
+    </div>`;
   document.body.appendChild(tourOverlay);
   document.body.appendChild(tourModal);
-  tourModal.querySelector('#tour-next').addEventListener('click', () => {
+  const advance = () => {
     tourIndex++;
     if (tourIndex >= tourSteps.length) {
       endTour();
     } else {
       showTourStep();
     }
-  });
+  };
+  tourModal.querySelector('#tour-next').addEventListener('click', advance);
+  tourModal.querySelector('#tour-skip').addEventListener('click', () => endTour());
+  tourOverlay.addEventListener('click', advance);
+  tourKeyHandler = e => {
+    if (e.key === 'Escape') {
+      e.preventDefault();
+      endTour();
+    } else if (e.key === 'Enter' || e.key === ' ') {
+      if (!tourModal) return;
+      if (tourModal.contains(document.activeElement)) {
+        e.preventDefault();
+        advance();
+      }
+    }
+  };
+  document.addEventListener('keydown', tourKeyHandler, true);
+  tourResizeHandler = () => showTourStep();
+  window.addEventListener('resize', tourResizeHandler);
   showTourStep();
+  try {
+    tourModal.focus();
+  } catch {}
 }
 
 // Prefix settings and counters for component labels
@@ -2370,6 +2530,7 @@ function render() {
     const g = document.createElementNS(svgNS, 'g');
     g.dataset.id = c.id;
     g.classList.add('component');
+    g.setAttribute('pointer-events', 'bounding-box');
     g.addEventListener('dblclick', e => {
       e.stopPropagation();
       cancelPendingClickSelection();
@@ -2385,6 +2546,15 @@ function render() {
     g.addEventListener('mouseleave', hideTooltip);
     const w = c.width || compWidth;
     const h = c.height || compHeight;
+    if (findHighlightId === c.id) {
+      const highlight = document.createElementNS(svgNS, 'rect');
+      highlight.setAttribute('x', c.x - 6);
+      highlight.setAttribute('y', c.y - 6);
+      highlight.setAttribute('width', w + 12);
+      highlight.setAttribute('height', h + 12);
+      highlight.setAttribute('class', 'find-highlight');
+      g.appendChild(highlight);
+    }
     const cx = c.x + w / 2;
     const cy = c.y + h / 2;
     if (showOverlays && c.voltage_mag !== undefined) {
@@ -2817,6 +2987,8 @@ function addComponent(cfg) {
     connections: [],
     props: JSON.parse(JSON.stringify(meta.props || {}))
   };
+  if (Number.isFinite(meta.width)) comp.width = meta.width;
+  if (Number.isFinite(meta.height)) comp.height = meta.height;
   if (defaultRotation) {
     const bounds = componentBounds(comp);
     const dx = bounds.left - x;
@@ -2830,8 +3002,8 @@ function addComponent(cfg) {
     comp[k] = typeof v === 'object' ? JSON.parse(JSON.stringify(v)) : v;
   });
   if (meta.type === 'bus') {
-    comp.width = 200;
-    comp.height = 20;
+    comp.width = Number.isFinite(meta.width) ? meta.width : 200;
+    comp.height = Number.isFinite(meta.height) ? meta.height : 20;
     updateBusPorts(comp);
   } else if (comp.type === 'annotation') {
     comp.width = comp.width || 120;
@@ -3807,6 +3979,15 @@ async function init() {
   loadTemplates();
   renderTemplates();
   setupLibraryTools();
+  const customComponentStorageSuffix = `:${customComponentStorageKey}`;
+  window.addEventListener('storage', e => {
+    if (!e.key) return;
+    if (e.key === customComponentStorageKey || e.key.endsWith(customComponentStorageSuffix)) {
+      loadComponentLibrary()
+        .then(() => render())
+        .catch(err => console.error('Custom component reload failed', err));
+    }
+  });
   const connectBtn = document.getElementById('connect-btn');
   if (connectBtn) {
     connectBtn.addEventListener('click', () => {
@@ -3914,6 +4095,31 @@ async function init() {
     setItem('gridSize', gridSize);
     render();
   });
+
+  const findForm = document.getElementById('find-device-form');
+  const findInput = document.getElementById('find-device-input');
+  if (findForm && findInput) {
+    findForm.addEventListener('submit', e => {
+      e.preventDefault();
+      const query = findInput.value.trim();
+      if (!query) {
+        showToast('Enter a device tag to find');
+        findInput.focus();
+        return;
+      }
+      const match = findComponentByTag(query);
+      if (!match) {
+        showToast(`No device found matching "${query}"`);
+        return;
+      }
+      selection = [match];
+      selected = match;
+      selectedConnection = null;
+      highlightFoundComponent(match.id);
+      focusComponentElement(match);
+      showToast(`Selected ${match.label || match.subtype || match.id}`);
+    });
+  }
 
   const workspaceEl = document.querySelector('.workspace');
   const splitter = document.querySelector('.splitter');
