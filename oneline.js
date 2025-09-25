@@ -789,6 +789,7 @@ let resizingAnnotation = null;
 let marquee = null;
 let marqueeSelectionMade = false;
 let legendDrag = null;
+let legendUserMoved = false;
 let gridSize = Number(getItem('gridSize', 20));
 let gridEnabled = getItem('gridEnabled', true);
 let snapIndicatorTimeout = null;
@@ -1691,6 +1692,19 @@ function updateLegend(ranges) {
     });
   }
   legend.style.display = ranges.size || showOverlays ? 'block' : 'none';
+  if (!legendUserMoved && legend.style.display === 'block') {
+    const host = legend.offsetParent instanceof HTMLElement ? legend.offsetParent : legend.parentElement;
+    const parentWidth = host instanceof HTMLElement ? host.clientWidth : (legend.parentElement?.clientWidth || window.innerWidth);
+    const parentHeight = host instanceof HTMLElement ? host.clientHeight : (legend.parentElement?.clientHeight || window.innerHeight);
+    const legendWidth = legend.offsetWidth || 0;
+    const legendHeight = legend.offsetHeight || 0;
+    const maxLeft = parentWidth - legendWidth;
+    const preferredLeft = maxLeft - 10;
+    const clampedLeft = Math.max(0, preferredLeft >= 0 ? preferredLeft : maxLeft >= 0 ? maxLeft : 0);
+    const clampedTop = Math.max(0, Math.min(10, parentHeight - legendHeight));
+    legend.style.left = `${clampedLeft}px`;
+    legend.style.top = `${clampedTop}px`;
+  }
 }
 
 function resolveComponentCategory(comp) {
@@ -4280,7 +4294,14 @@ async function init() {
   const editorEl = document.querySelector('.oneline-editor');
   const legendEl = document.getElementById('voltage-legend');
   legendEl?.addEventListener('mousedown', e => {
-    legendDrag = { dx: e.offsetX, dy: e.offsetY };
+    if (e.button !== 0) return;
+    legendDrag = {
+      dx: e.offsetX,
+      dy: e.offsetY,
+      startX: e.clientX,
+      startY: e.clientY,
+      moved: false
+    };
     e.preventDefault();
   });
   document.addEventListener('mousemove', e => {
@@ -4291,10 +4312,23 @@ async function init() {
   document.addEventListener('mousemove', e => {
     if (!legendDrag || !legendEl || !editorEl) return;
     const rect = editorEl.getBoundingClientRect();
-    legendEl.style.left = `${e.clientX - rect.left - legendDrag.dx}px`;
-    legendEl.style.top = `${e.clientY - rect.top - legendDrag.dy}px`;
+    const parent = legendEl.offsetParent instanceof HTMLElement ? legendEl.offsetParent : editorEl;
+    const boundsWidth = parent instanceof HTMLElement ? parent.clientWidth : rect.width;
+    const boundsHeight = parent instanceof HTMLElement ? parent.clientHeight : rect.height;
+    const rawLeft = e.clientX - rect.left - legendDrag.dx;
+    const rawTop = e.clientY - rect.top - legendDrag.dy;
+    const clampedLeft = Math.max(0, Math.min(boundsWidth - legendEl.offsetWidth, rawLeft));
+    const clampedTop = Math.max(0, Math.min(boundsHeight - legendEl.offsetHeight, rawTop));
+    legendEl.style.left = `${clampedLeft}px`;
+    legendEl.style.top = `${clampedTop}px`;
+    if (!legendDrag.moved) {
+      const deltaX = Math.abs(e.clientX - legendDrag.startX);
+      const deltaY = Math.abs(e.clientY - legendDrag.startY);
+      if (deltaX > 2 || deltaY > 2) legendDrag.moved = true;
+    }
   });
   document.addEventListener('mouseup', () => {
+    if (legendDrag?.moved) legendUserMoved = true;
     legendDrag = null;
     stopMiddlePan();
   });
