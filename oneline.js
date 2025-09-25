@@ -78,6 +78,7 @@ import { sizeConductor } from './sizing.js';
 import { runValidation } from './validation/rules.js';
 import { exportPDF } from './exporters/pdf.js';
 import { exportDXF, exportDWG } from './exporters/dxf.js';
+import { openModal } from './src/components/modal.js';
 import './site.js';
 
 let componentMeta = {};
@@ -249,6 +250,11 @@ const initialViewAttributes = Array.isArray(storedViewAttributes)
 let viewAttributes = new Set(initialViewAttributes);
 let attributeOptions = [];
 const attributeOptionsMap = new Map();
+let componentAttributeOptions = new Map();
+let componentAttributeList = [];
+let componentAttributeLabelMap = new Map();
+const viewComponentStorageKey = 'diagramViewComponentSelection';
+let selectedViewComponent = getItem(viewComponentStorageKey, null);
 
 function compKey(type, subtype) {
   return subtype ? `${type}_${subtype}` : type;
@@ -1867,50 +1873,195 @@ function getComponentAttributeLines(comp) {
   return lines;
 }
 
-function renderViewMenu() {
-  const menu = document.getElementById('view-menu');
-  if (!menu) return;
-  menu.innerHTML = '';
-  if (!attributeOptions.length) {
-    const empty = document.createElement('li');
-    empty.className = 'view-menu-empty';
-    empty.textContent = 'No attributes available';
-    menu.appendChild(empty);
-    updateViewButtonLabel();
-    return;
+function getComponentDisplayLabel(key) {
+  if (!key) return 'Component';
+  if (key === '__other__') return 'Other Attributes';
+  if (componentAttributeLabelMap.has(key)) return componentAttributeLabelMap.get(key);
+  const meta = componentMeta[key];
+  if (meta?.label) return meta.label;
+  if (meta?.subtype) return formatAttributeLabel(meta.subtype);
+  if (typeof key === 'string') {
+    const parts = key.split('_');
+    if (parts.length > 1) {
+      return formatAttributeLabel(parts.slice(1).join('_'));
+    }
+    return formatAttributeLabel(key);
   }
-  attributeOptions.forEach(opt => {
-    const li = document.createElement('li');
-    li.setAttribute('role', 'none');
-    const label = document.createElement('label');
-    label.dataset.key = opt.key;
-    label.setAttribute('role', 'menuitemcheckbox');
-    label.setAttribute('aria-checked', String(viewAttributes.has(opt.key)));
-    const input = document.createElement('input');
-    input.type = 'checkbox';
-    input.value = opt.key;
-    input.checked = viewAttributes.has(opt.key);
-    input.addEventListener('change', () => {
-      if (input.checked) {
-        viewAttributes.add(opt.key);
-      } else {
-        viewAttributes.delete(opt.key);
+  return 'Component';
+}
+
+function openViewModal() {
+  const btn = document.getElementById('view-menu-btn');
+  if (btn) btn.setAttribute('aria-expanded', 'true');
+  const hasComponents = componentAttributeList.length > 0;
+  const closePromise = openModal({
+    title: 'Component Views',
+    primaryText: 'Done',
+    secondaryText: null,
+    closeOnBackdrop: true,
+    variant: 'wide',
+    render(body, controller) {
+      body.classList.add('view-modal-body');
+      if (!hasComponents) {
+        const empty = document.createElement('p');
+        empty.className = 'view-modal-empty';
+        empty.textContent = 'No attributes are available to display.';
+        controller.setPrimaryDisabled(true);
+        body.appendChild(empty);
+        return empty;
       }
-      const persisted = Array.from(viewAttributes);
-      persisted.sort();
-      setItem(viewAttributeStorageKey, persisted);
-      label.setAttribute('aria-checked', String(input.checked));
-      updateViewButtonLabel();
-      render();
-    });
-    const text = document.createElement('span');
-    text.textContent = opt.label;
-    label.appendChild(input);
-    label.appendChild(text);
-    li.appendChild(label);
-    menu.appendChild(li);
+
+      const layout = document.createElement('div');
+      layout.className = 'view-modal-layout';
+
+      const componentColumn = document.createElement('div');
+      componentColumn.className = 'view-modal-column view-modal-components';
+      const componentHeading = document.createElement('h3');
+      componentHeading.className = 'view-modal-heading';
+      componentHeading.textContent = 'Components';
+      const componentListEl = document.createElement('div');
+      componentListEl.className = 'view-component-list';
+      componentColumn.append(componentHeading, componentListEl);
+
+      const propertyColumn = document.createElement('div');
+      propertyColumn.className = 'view-modal-column view-modal-properties';
+      const propertyHeading = document.createElement('h3');
+      propertyHeading.className = 'view-modal-heading';
+      const propertyList = document.createElement('div');
+      propertyList.className = 'view-property-list';
+      propertyColumn.append(propertyHeading, propertyList);
+
+      layout.append(componentColumn, propertyColumn);
+      body.appendChild(layout);
+
+      const buttonMap = new Map();
+      let activeKey = selectedViewComponent;
+      if (!activeKey || !componentAttributeOptions.has(activeKey)) {
+        activeKey = componentAttributeList[0]?.key || null;
+      }
+      if (activeKey !== selectedViewComponent) {
+        selectedViewComponent = activeKey;
+        if (selectedViewComponent) setItem(viewComponentStorageKey, selectedViewComponent);
+      }
+
+      function updateButtonStates() {
+        buttonMap.forEach((button, key) => {
+          const selected = key === activeKey;
+          button.classList.toggle('is-active', selected);
+          button.setAttribute('aria-pressed', String(selected));
+          button.tabIndex = selected ? 0 : -1;
+        });
+      }
+
+      function toggleAttribute(option, checked) {
+        if (!option) return;
+        if (checked) {
+          viewAttributes.add(option.key);
+        } else {
+          viewAttributes.delete(option.key);
+        }
+        const persisted = Array.from(viewAttributes);
+        persisted.sort();
+        setItem(viewAttributeStorageKey, persisted);
+        updateViewButtonLabel();
+        render();
+      }
+
+      function renderProperties() {
+        propertyList.innerHTML = '';
+        if (!activeKey || !componentAttributeOptions.has(activeKey)) {
+          propertyHeading.textContent = 'Properties';
+          const empty = document.createElement('p');
+          empty.className = 'view-modal-empty';
+          empty.textContent = 'Select a component to see its properties.';
+          propertyList.appendChild(empty);
+          return;
+        }
+        const options = componentAttributeOptions.get(activeKey) || [];
+        const componentLabel = getComponentDisplayLabel(activeKey);
+        propertyHeading.textContent = `${componentLabel} Properties`;
+        if (!options.length) {
+          const empty = document.createElement('p');
+          empty.className = 'view-modal-empty';
+          empty.textContent = 'No properties available for this component.';
+          propertyList.appendChild(empty);
+          return;
+        }
+        options.forEach(opt => {
+          const label = document.createElement('label');
+          label.className = 'view-property-option';
+          label.dataset.key = opt.key;
+          const input = document.createElement('input');
+          input.type = 'checkbox';
+          input.checked = viewAttributes.has(opt.key);
+          input.addEventListener('change', () => {
+            label.classList.toggle('is-selected', input.checked);
+            toggleAttribute(opt, input.checked);
+          });
+          const text = document.createElement('span');
+          text.className = 'view-property-label';
+          text.textContent = opt.unit ? `${opt.label} (${opt.unit})` : opt.label;
+          label.classList.toggle('is-selected', input.checked);
+          label.append(input, text);
+          propertyList.appendChild(label);
+        });
+      }
+
+      function setActiveComponent(key) {
+        if (!key || !componentAttributeOptions.has(key)) return;
+        activeKey = key;
+        selectedViewComponent = key;
+        setItem(viewComponentStorageKey, key);
+        updateButtonStates();
+        renderProperties();
+      }
+
+      componentAttributeList.forEach(entry => {
+        if (!componentAttributeOptions.has(entry.key)) return;
+        const button = document.createElement('button');
+        button.type = 'button';
+        button.className = 'view-component-option';
+        button.textContent = entry.label || getComponentDisplayLabel(entry.key);
+        button.dataset.key = entry.key;
+        button.setAttribute('aria-pressed', 'false');
+        button.addEventListener('click', () => setActiveComponent(entry.key));
+        button.addEventListener('keydown', event => {
+          if (event.key !== 'ArrowUp' && event.key !== 'ArrowDown') return;
+          event.preventDefault();
+          const currentIndex = componentAttributeList.findIndex(item => item.key === activeKey);
+          if (currentIndex === -1) return;
+          const offset = event.key === 'ArrowUp' ? -1 : 1;
+          let nextIndex = currentIndex + offset;
+          if (nextIndex < 0) nextIndex = 0;
+          if (nextIndex >= componentAttributeList.length) nextIndex = componentAttributeList.length - 1;
+          const nextKey = componentAttributeList[nextIndex]?.key;
+          if (!nextKey) return;
+          setActiveComponent(nextKey);
+          const nextButton = buttonMap.get(nextKey);
+          nextButton?.focus();
+        });
+        buttonMap.set(entry.key, button);
+        componentListEl.appendChild(button);
+      });
+
+      updateButtonStates();
+      renderProperties();
+
+      const initialButton = buttonMap.get(activeKey);
+      if (initialButton) {
+        controller.setInitialFocus(initialButton);
+      }
+
+      return initialButton;
+    }
   });
-  updateViewButtonLabel();
+  if (closePromise && typeof closePromise.finally === 'function') {
+    closePromise.finally(() => {
+      if (btn) btn.setAttribute('aria-expanded', 'false');
+    });
+  } else if (btn) {
+    btn.setAttribute('aria-expanded', 'false');
+  }
 }
 
 function updateViewButtonLabel() {
@@ -1918,46 +2069,151 @@ function updateViewButtonLabel() {
   if (!btn) return;
   const count = viewAttributes.size;
   btn.textContent = count ? `Views (${count})` : 'Views';
+  const hasOptions = attributeOptions.length > 0 && componentAttributeList.length > 0;
+  btn.disabled = !hasOptions;
+  if (!hasOptions) {
+    btn.title = 'No component properties are available to view';
+  } else {
+    btn.title = 'Select component properties to display';
+  }
 }
 
 function refreshAttributeOptions() {
   const optionMap = new Map();
-  const addKey = key => {
-    if (!key) return;
-    if (attributeIgnoreKeys.has(key)) return;
+  const componentOptionMap = new Map();
+  const componentLabelMap = new Map();
+
+  const registerOption = key => {
+    if (!key) return null;
+    if (attributeIgnoreKeys.has(key)) return null;
     const normalized = String(key);
-    if (optionMap.has(normalized)) return;
+    if (optionMap.has(normalized)) return optionMap.get(normalized);
     const override = attributeDisplayOverrides[normalized];
     const label = override?.label || formatAttributeLabel(normalized);
     const unit = override && Object.prototype.hasOwnProperty.call(override, 'unit')
       ? override.unit
       : inferAttributeUnit(normalized);
-    optionMap.set(normalized, { key: normalized, label, unit });
+    const option = { key: normalized, label, unit };
+    optionMap.set(normalized, option);
+    return option;
   };
-  Object.values(componentMeta).forEach(meta => {
+
+  const registerComponentLabel = (compKey, fallbackLabel) => {
+    if (!compKey) return;
+    if (componentLabelMap.has(compKey)) return;
+    const meta = componentMeta[compKey];
+    if (meta?.label) {
+      componentLabelMap.set(compKey, meta.label);
+      return;
+    }
+    if (typeof fallbackLabel === 'string' && fallbackLabel.trim()) {
+      componentLabelMap.set(compKey, fallbackLabel.trim());
+      return;
+    }
+    if (meta?.subtype) {
+      componentLabelMap.set(compKey, formatAttributeLabel(meta.subtype));
+      return;
+    }
+    if (typeof compKey === 'string') {
+      const parts = compKey.split('_');
+      const formatted = formatAttributeLabel(parts.length > 1 ? parts.slice(1).join('_') : compKey);
+      componentLabelMap.set(compKey, formatted);
+      return;
+    }
+    componentLabelMap.set(compKey, 'Component');
+  };
+
+  const addComponentKey = (compKey, key) => {
+    if (!compKey) return;
+    const option = registerOption(key);
+    if (!option) return;
+    if (!componentOptionMap.has(compKey)) {
+      componentOptionMap.set(compKey, new Map());
+    }
+    componentOptionMap.get(compKey).set(option.key, option);
+  };
+
+  Object.entries(componentMeta).forEach(([compKey, meta]) => {
+    registerComponentLabel(compKey, meta?.label);
     Object.entries(meta.props || {}).forEach(([key, value]) => {
-      if (attributeIgnoreKeys.has(key)) return;
       if (value === undefined || value === null) return;
       if (typeof value === 'object') return;
-      addKey(key);
+      addComponentKey(compKey, key);
     });
   });
+
   const allSheets = Array.isArray(sheets) ? sheets : [];
   allSheets.forEach(sheet => {
     (sheet.components || []).forEach(comp => {
+      if (!comp) return;
+      const compKey = comp.subtype || comp.type;
+      if (!compKey) return;
+      const fallbackLabel = componentMeta[compKey]?.label || comp.type || comp.label;
+      registerComponentLabel(compKey, fallbackLabel);
       Object.entries(comp).forEach(([key, value]) => {
-        if (attributeIgnoreKeys.has(key)) return;
         if (value === undefined || value === null) return;
         if (typeof value === 'object') return;
-        addKey(key);
+        addComponentKey(compKey, key);
       });
+      if (comp.props && typeof comp.props === 'object') {
+        Object.entries(comp.props).forEach(([key, value]) => {
+          if (value === undefined || value === null) return;
+          if (typeof value === 'object') return;
+          addComponentKey(compKey, key);
+        });
+      }
     });
   });
-  viewAttributes.forEach(addKey);
+
+  viewAttributes.forEach(key => registerOption(key));
+
   attributeOptions = Array.from(optionMap.values()).sort((a, b) => a.label.localeCompare(b.label));
   attributeOptionsMap.clear();
   attributeOptions.forEach(opt => attributeOptionsMap.set(opt.key, opt));
-  renderViewMenu();
+
+  componentAttributeOptions = new Map();
+  componentAttributeList = [];
+  componentAttributeLabelMap = new Map();
+
+  componentOptionMap.forEach((options, compKey) => {
+    const list = Array.from(options.values()).sort((a, b) => a.label.localeCompare(b.label));
+    componentAttributeOptions.set(compKey, list);
+    const label = componentLabelMap.get(compKey) || getComponentDisplayLabel(compKey);
+    componentAttributeLabelMap.set(compKey, label);
+    componentAttributeList.push({ key: compKey, label });
+  });
+
+  const orphanKeys = new Set(viewAttributes);
+  componentAttributeOptions.forEach(options => {
+    options.forEach(opt => orphanKeys.delete(opt.key));
+  });
+  if (orphanKeys.size) {
+    const orphanOptions = Array.from(orphanKeys)
+      .map(key => attributeOptionsMap.get(key))
+      .filter(Boolean)
+      .sort((a, b) => a.label.localeCompare(b.label));
+    if (orphanOptions.length) {
+      const orphanLabel = 'Other Attributes';
+      componentAttributeOptions.set('__other__', orphanOptions);
+      componentAttributeLabelMap.set('__other__', orphanLabel);
+      componentAttributeList.push({ key: '__other__', label: orphanLabel });
+    }
+  }
+
+  componentAttributeList.sort((a, b) => {
+    if (a.key === '__other__') return 1;
+    if (b.key === '__other__') return -1;
+    return a.label.localeCompare(b.label);
+  });
+
+  if (selectedViewComponent && !componentAttributeOptions.has(selectedViewComponent)) {
+    selectedViewComponent = componentAttributeList[0]?.key || null;
+    if (selectedViewComponent) {
+      setItem(viewComponentStorageKey, selectedViewComponent);
+    }
+  }
+
+  updateViewButtonLabel();
 }
 
 function portPosition(c, portIndex) {
@@ -4118,25 +4374,12 @@ async function init() {
     });
   }
   const viewMenuBtn = document.getElementById('view-menu-btn');
-  const viewMenu = document.getElementById('view-menu');
-  const viewGroup = document.querySelector('.view-group');
-  if (viewMenuBtn && viewMenu && viewGroup) {
-    const closeViewMenu = () => {
-      viewMenu.classList.remove('show');
-      viewMenuBtn.setAttribute('aria-expanded', 'false');
-    };
-    viewMenuBtn.addEventListener('click', e => {
-      e.stopPropagation();
-      const expanded = viewMenuBtn.getAttribute('aria-expanded') === 'true';
-      viewMenuBtn.setAttribute('aria-expanded', String(!expanded));
-      viewMenu.classList.toggle('show', !expanded);
-    });
-    viewMenu.addEventListener('click', e => e.stopPropagation());
-    document.addEventListener('click', e => {
-      if (!viewGroup.contains(e.target)) closeViewMenu();
-    });
-    document.addEventListener('keydown', e => {
-      if (e.key === 'Escape') closeViewMenu();
+  if (viewMenuBtn) {
+    viewMenuBtn.setAttribute('aria-expanded', 'false');
+    viewMenuBtn.addEventListener('click', event => {
+      event.preventDefault();
+      if (viewMenuBtn.disabled) return;
+      openViewModal();
     });
     updateViewButtonLabel();
   }
