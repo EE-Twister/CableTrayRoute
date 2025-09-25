@@ -92,8 +92,8 @@ function ensureIconCanvas() {
     pattern.setAttribute('patternUnits', 'userSpaceOnUse');
     const path = document.createElementNS(SVG_NS, 'path');
     path.setAttribute('d', 'M 10 0 L 0 0 0 10');
-    path.setAttribute('stroke', '#d0d0d0');
-    path.setAttribute('stroke-width', '0.5');
+    path.setAttribute('stroke', '#e0e5ea');
+    path.setAttribute('stroke-width', '0.4');
     pattern.appendChild(path);
     defs.appendChild(pattern);
     iconCanvas.appendChild(defs);
@@ -106,6 +106,7 @@ function ensureIconCanvas() {
     bg.setAttribute('height', ICON_CANVAS_SIZE);
     bg.setAttribute('data-icon-grid', '1');
     bg.classList.add('icon-canvas-bg');
+    bg.setAttribute('fill', '#f8f9fb');
     iconCanvas.appendChild(bg);
   }
 }
@@ -479,19 +480,20 @@ function handleCanvasMouseDown(event) {
   if (!point) return;
   ensureIconCanvas();
   const target = event.target;
+  const shapeTarget = target instanceof SVGElement && target.dataset.iconShape === '1';
   if (iconTool === 'text') {
     event.preventDefault();
     handleTextPlacement(point);
     return;
   }
+  if (shapeTarget && iconTool !== 'text') {
+    startShapeDrag(target, point);
+    selectIconShape(target);
+    event.preventDefault();
+    return;
+  }
   if (iconTool === 'select') {
-    if (target instanceof SVGElement && target.dataset.iconShape === '1') {
-      startShapeDrag(target, point);
-      selectIconShape(target);
-      event.preventDefault();
-    } else {
-      selectIconShape(null);
-    }
+    selectIconShape(null);
     return;
   }
   const shape = createShapeElement(iconTool);
@@ -518,7 +520,18 @@ function handleCanvasMouseMove(event) {
   if (drawingShape && drawingStart) {
     const tool = drawingShape.dataset.shapeType;
     if (tool === 'line') {
-      applyLineAttributes(drawingShape, drawingStart, point);
+      const start = drawingStart;
+      let current = point;
+      if (event.shiftKey && start) {
+        const dx = Math.abs(point.x - start.x);
+        const dy = Math.abs(point.y - start.y);
+        if (dx >= dy) {
+          current = { x: point.x, y: start.y };
+        } else {
+          current = { x: start.x, y: point.y };
+        }
+      }
+      applyLineAttributes(drawingShape, start, current);
     } else if (tool === 'rectangle') {
       applyRectAttributes(drawingShape, drawingStart, point);
     } else if (tool === 'circle') {

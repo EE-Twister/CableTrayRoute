@@ -3257,6 +3257,7 @@ body.dark-mode .workflow-card-title {
 
 .icon-canvas-bg {
     fill: url(#icon-grid-pattern);
+    opacity: 0.35;
 }
 
 .icon-shape-selected {
