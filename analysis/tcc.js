@@ -24,6 +24,11 @@ let saved = getItem('tccSettings') || { devices: [], settings: {} };
 
 init();
 
+const MIN_PICKUP = 0.01;
+const MAX_PICKUP = 1e6;
+const MIN_DELAY = 0.001;
+const MAX_DELAY = 1e5;
+
 async function init() {
   try {
     devices = await fetch('data/protectiveDevices.json').then(r => r.json());
@@ -130,7 +135,7 @@ function plot() {
   chart.selectAll('*').remove();
   violationDiv.textContent = '';
   const sel = [...deviceSelect.selectedOptions].map(o => o.value);
-  const selected = sel.map(id => {
+  const entries = sel.map(id => {
     const base = devices.find(d => d.id === id);
     if (!base) return null;
     const div = settingsDiv.querySelector(`.device-settings[data-id="${id}"]`);
@@ -139,11 +144,12 @@ function plot() {
       const v = Number(inp.value);
       if (!Number.isNaN(v)) overrides[inp.dataset.field] = v;
     });
-    return scaleCurve(base, overrides);
+    const scaled = scaleCurve(base, overrides);
+    return { id, base, overrides, scaled };
   }).filter(Boolean);
-  if (!selected.length) return;
-  const allCurrents = selected.flatMap(s => s.curve.map(p => p.current));
-  const allTimes = selected.flatMap(s => s.curve.map(p => p.time));
+  if (!entries.length) return;
+  const allCurrents = entries.flatMap(s => s.scaled.curve.map(p => p.current));
+  const allTimes = entries.flatMap(s => s.scaled.curve.map(p => p.time));
   const margin = { top: 20, right: 20, bottom: 40, left: 60 };
   const width = +chart.attr('width') - margin.left - margin.right;
   const height = +chart.attr('height') - margin.top - margin.bottom;
@@ -155,18 +161,6 @@ function plot() {
   const color = d3.scaleOrdinal(d3.schemeCategory10);
   const studies = getStudies();
   const fault = studies.shortCircuit?.[compId]?.threePhaseKA;
-  const violations = [];
-  selected.forEach((s, i) => {
-    const violation = checkDuty(s, fault);
-    const line = d3.line().x(p => x(p.current)).y(p => y(p.time)).curve(d3.curveMonotoneX);
-    g.append('path')
-      .datum(s.curve)
-      .attr('fill', 'none')
-      .attr('stroke', violation ? 'red' : color(i))
-      .attr('stroke-width', 2)
-      .attr('d', line);
-    if (violation) violations.push(violation);
-  });
   if (fault) {
     g.append('line')
       .attr('x1', x(fault * 1000))
@@ -176,11 +170,110 @@ function plot() {
       .attr('stroke', '#000')
       .attr('stroke-dasharray', '4,2');
   }
-  if (violations.length) {
-    violationDiv.innerHTML = violations.map(v => `<p>${v}</p>`).join('');
-  }
-  const res = getStudies();
-  res.duty = res.duty || {};
-  if (compId) res.duty[compId] = violations;
-  setStudies(res);
+  const line = d3.line().x(p => x(p.current)).y(p => y(p.time)).curve(d3.curveMonotoneX);
+  const [xMin, xMax] = x.range();
+  const [yMin, yMax] = y.range();
+
+  const plotted = entries.map((entry, index) => {
+    entry.color = color(index);
+    entry.path = g.append('path')
+      .datum(entry.scaled.curve)
+      .attr('fill', 'none')
+      .attr('stroke-width', 2)
+      .style('cursor', 'move');
+    return entry;
+  });
+
+  const updateDutyResults = violations => {
+    if (violations.length) {
+      violationDiv.innerHTML = violations.map(v => `<p>${v}</p>`).join('');
+    } else {
+      violationDiv.textContent = '';
+    }
+    if (!compId) return;
+    const res = getStudies();
+    res.duty = res.duty || {};
+    res.duty[compId] = violations;
+    setStudies(res);
+  };
+
+  const updateCurves = () => {
+    const faultKA = getStudies().shortCircuit?.[compId]?.threePhaseKA;
+    const violations = [];
+    plotted.forEach(entry => {
+      entry.scaled = scaleCurve(entry.base, entry.overrides);
+      entry.path
+        .datum(entry.scaled.curve)
+        .attr('d', line(entry.scaled.curve))
+        .attr('stroke', () => {
+          const violation = checkDuty(entry.scaled, faultKA);
+          if (violation) {
+            violations.push(violation);
+            return 'red';
+          }
+          return entry.color;
+        });
+    });
+    updateDutyResults(violations);
+  };
+
+  const clampValue = (value, min, max) => {
+    if (!Number.isFinite(value)) return min;
+    if (value < min) return min;
+    if (value > max) return max;
+    return value;
+  };
+
+  const updateDeviceInputs = entry => {
+    const div = settingsDiv.querySelector(`.device-settings[data-id="${entry.base.id}"]`);
+    if (!div) return;
+    Object.entries(entry.overrides).forEach(([field, value]) => {
+      const input = div.querySelector(`[data-field="${field}"]`);
+      if (!input || !Number.isFinite(value)) return;
+      const decimals = value >= 100 ? 0 : value >= 10 ? 1 : 2;
+      input.value = Number(value.toFixed(decimals));
+    });
+  };
+
+  const createDragBehavior = entry => d3.drag()
+    .on('start', event => {
+      event.sourceEvent?.stopPropagation?.();
+      const curve = entry.scaled.curve || [];
+      const reference = curve[Math.floor(curve.length / 2)] || curve[0];
+      if (!reference) return;
+      entry.dragState = {
+        reference,
+        offsetX: event.x - x(reference.current),
+        offsetY: event.y - y(reference.time),
+        startPickup: entry.overrides.pickup ?? entry.scaled.settings?.pickup ?? entry.base.settings?.pickup ?? 1,
+        startDelay: entry.overrides.time ?? entry.scaled.settings?.time ?? entry.base.settings?.time ?? entry.base.settings?.delay ?? 0.1
+      };
+      entry.path.attr('stroke-width', 3);
+    })
+    .on('drag', event => {
+      const state = entry.dragState;
+      if (!state) return;
+      const targetX = clampValue(event.x - state.offsetX, xMin + 1, xMax - 1);
+      const targetY = clampValue(event.y - state.offsetY, Math.min(yMin, yMax) + 1, Math.max(yMin, yMax) - 1);
+      const newCurrent = clampValue(x.invert(targetX), MIN_PICKUP, MAX_PICKUP * 10);
+      const newTime = clampValue(y.invert(targetY), MIN_DELAY, MAX_DELAY);
+      const ratioI = newCurrent / Math.max(state.reference.current, MIN_PICKUP);
+      const ratioT = newTime / Math.max(state.reference.time, MIN_DELAY);
+      entry.overrides.pickup = clampValue(state.startPickup * ratioI, MIN_PICKUP, MAX_PICKUP);
+      entry.overrides.time = clampValue(state.startDelay * ratioT, MIN_DELAY, MAX_DELAY);
+      updateDeviceInputs(entry);
+      updateCurves();
+    })
+    .on('end', () => {
+      entry.path.attr('stroke-width', 2);
+      entry.dragState = null;
+      persistSettings();
+      plot();
+    });
+
+  plotted.forEach(entry => {
+    entry.path.call(createDragBehavior(entry));
+  });
+
+  updateCurves();
 }
