@@ -474,7 +474,12 @@ const manufacturerModels = {
 function loadStoredCustomComponents() {
   const stored = getItem(customComponentStorageKey, [], customComponentScenarioKey);
   if (!Array.isArray(stored)) return [];
-  return stored.filter(item => item && typeof item === 'object');
+  return stored
+    .filter(item => item && typeof item === 'object')
+    .map(item => ({
+      ...item,
+      defaultRotation: normalizeRotation(item?.defaultRotation ?? 0)
+    }));
 }
 
 function resolveIconSource(iconPath, fallbackSymbol) {

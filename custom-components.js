@@ -23,6 +23,9 @@ const iconToolButtons = document.getElementById('icon-tool-buttons');
 const undoIconBtn = document.getElementById('undo-icon-btn');
 const clearIconBtn = document.getElementById('clear-icon-btn');
 const iconPreview = document.getElementById('icon-preview');
+const textFontSelect = document.getElementById('icon-text-font');
+const textSizeInput = document.getElementById('icon-text-size');
+const textColorInput = document.getElementById('icon-text-color');
 const resetFormBtn = document.getElementById('reset-form-btn');
 const exportBtn = document.getElementById('export-components-btn');
 const importBtn = document.getElementById('import-components-btn');
@@ -47,6 +50,18 @@ let selectedIconShape = null;
 const SVG_NS = 'http://www.w3.org/2000/svg';
 const ICON_CANVAS_SIZE = 120;
 const BUILDER_FLAG_ATTR = 'data-ctr-icon';
+const MIN_TEXT_SIZE = 6;
+const MAX_TEXT_SIZE = 120;
+const DEFAULT_TEXT_SIZE = Number(textSizeInput?.value) || 18;
+const DEFAULT_TEXT_COLOR = textColorInput?.value || '#1f2933';
+const DEFAULT_TEXT_FONT = textFontSelect?.value || 'Arial, sans-serif';
+
+let textStyleState = {
+  fontFamily: DEFAULT_TEXT_FONT,
+  fontSize: DEFAULT_TEXT_SIZE,
+  color: DEFAULT_TEXT_COLOR
+};
+let suppressTextControlEvents = false;
 
 if (navToggle && navLinks) {
   navToggle.addEventListener('click', () => {
@@ -126,14 +141,117 @@ function setActiveIconTool(tool) {
 }
 
 function selectIconShape(shape) {
-  if (selectedIconShape === shape) return;
+  if (selectedIconShape === shape) {
+    syncTextControls(shape || null);
+    return;
+  }
   if (selectedIconShape) selectedIconShape.classList.remove('icon-shape-selected');
   selectedIconShape = shape || null;
   if (selectedIconShape) selectedIconShape.classList.add('icon-shape-selected');
+  syncTextControls(selectedIconShape);
 }
 
 function roundCoord(value) {
   return Math.round(Number(value || 0) * 100) / 100;
+}
+
+function normalizeRotationValue(value) {
+  const num = Number(value);
+  if (!Number.isFinite(num)) return 0;
+  const normalized = num % 360;
+  return normalized < 0 ? normalized + 360 : normalized;
+}
+
+function sanitizeTextSize(value) {
+  if (value === undefined || value === null || value === '') return DEFAULT_TEXT_SIZE;
+  const num = Number(value);
+  if (!Number.isFinite(num)) return DEFAULT_TEXT_SIZE;
+  const clamped = Math.min(Math.max(Math.round(num), MIN_TEXT_SIZE), MAX_TEXT_SIZE);
+  return clamped;
+}
+
+function normalizeColorValue(value) {
+  const color = String(value || '').trim();
+  if (/^#[0-9a-fA-F]{6}$/.test(color)) {
+    return color.toLowerCase();
+  }
+  if (/^#[0-9a-fA-F]{3}$/.test(color)) {
+    const hex = color.slice(1);
+    return `#${hex[0]}${hex[0]}${hex[1]}${hex[1]}${hex[2]}${hex[2]}`.toLowerCase();
+  }
+  return DEFAULT_TEXT_COLOR;
+}
+
+function ensureTextFontOption(font) {
+  if (!textFontSelect || !font) return;
+  const existing = Array.from(textFontSelect.options).some(opt => opt.value === font);
+  if (!existing) {
+    const option = document.createElement('option');
+    option.value = font;
+    option.textContent = font.replace(/['"]/g, '') || font;
+    textFontSelect.appendChild(option);
+  }
+}
+
+function updateTextControlValues(style) {
+  if (!textFontSelect || !textSizeInput || !textColorInput) return;
+  suppressTextControlEvents = true;
+  ensureTextFontOption(style.fontFamily);
+  textFontSelect.value = style.fontFamily;
+  textSizeInput.value = String(style.fontSize);
+  textColorInput.value = normalizeColorValue(style.color);
+  suppressTextControlEvents = false;
+}
+
+function getTextStyleFromInputs() {
+  const fontFamily = (textFontSelect?.value || '').trim() || DEFAULT_TEXT_FONT;
+  const fontSize = sanitizeTextSize(textSizeInput?.value);
+  const color = normalizeColorValue(textColorInput?.value);
+  return { fontFamily, fontSize, color };
+}
+
+function syncTextControls(shape) {
+  if (!textFontSelect || !textSizeInput || !textColorInput) return;
+  if (shape && shape.dataset.shapeType === 'text') {
+    const font = shape.getAttribute('font-family') || textStyleState.fontFamily;
+    const size = sanitizeTextSize(shape.getAttribute('font-size'));
+    const color = normalizeColorValue(shape.getAttribute('fill'));
+    const next = { fontFamily: font, fontSize: size, color };
+    textStyleState = next;
+    updateTextControlValues(next);
+  } else {
+    updateTextControlValues(textStyleState);
+  }
+}
+
+function applyTextStyle(shape, style) {
+  if (!shape) return;
+  const font = style.fontFamily || DEFAULT_TEXT_FONT;
+  const size = sanitizeTextSize(style.fontSize);
+  const color = normalizeColorValue(style.color);
+  ensureTextFontOption(font);
+  if (font) {
+    shape.setAttribute('font-family', font);
+    shape.dataset.fontFamily = font;
+  } else {
+    shape.removeAttribute('font-family');
+    delete shape.dataset.fontFamily;
+  }
+  shape.setAttribute('font-size', size);
+  shape.dataset.fontSize = String(size);
+  shape.setAttribute('fill', color);
+  shape.dataset.fill = color;
+}
+
+function handleTextStyleChange() {
+  if (suppressTextControlEvents) return;
+  const style = getTextStyleFromInputs();
+  textStyleState = style;
+  updateTextControlValues(style);
+  if (selectedIconShape?.dataset.shapeType === 'text') {
+    applyTextStyle(selectedIconShape, style);
+    commitIconChanges();
+  }
 }
 
 function getCanvasPoint(event) {
@@ -464,10 +582,11 @@ function handleTextPlacement(point) {
   txt.dataset.iconShape = '1';
   txt.dataset.shapeType = 'text';
   txt.classList.add('icon-shape');
-  txt.setAttribute('fill', '#1f2933');
-  txt.setAttribute('font-size', '18');
   txt.setAttribute('text-anchor', 'middle');
   txt.setAttribute('dominant-baseline', 'middle');
+  const style = getTextStyleFromInputs();
+  textStyleState = style;
+  applyTextStyle(txt, style);
   applyTextAttributes(txt, point);
   iconCanvas.appendChild(txt);
   selectIconShape(txt);
@@ -533,7 +652,19 @@ function handleCanvasMouseMove(event) {
       }
       applyLineAttributes(drawingShape, start, current);
     } else if (tool === 'rectangle') {
-      applyRectAttributes(drawingShape, drawingStart, point);
+      let currentPoint = point;
+      if (event.shiftKey && drawingStart) {
+        const dx = point.x - drawingStart.x;
+        const dy = point.y - drawingStart.y;
+        const size = Math.max(Math.abs(dx), Math.abs(dy));
+        const dirX = dx === 0 ? (dy >= 0 ? 1 : -1) : (dx > 0 ? 1 : -1);
+        const dirY = dy === 0 ? (dx >= 0 ? 1 : -1) : (dy > 0 ? 1 : -1);
+        currentPoint = {
+          x: roundCoord(drawingStart.x + size * dirX),
+          y: roundCoord(drawingStart.y + size * dirY)
+        };
+      }
+      applyRectAttributes(drawingShape, drawingStart, currentPoint);
     } else if (tool === 'circle') {
       applyCircleAttributes(drawingShape, drawingStart, point);
     } else if (tool === 'arc') {
@@ -607,12 +738,19 @@ function undoLastIconShape() {
 }
 
 function handleBuilderKeydown(event) {
-  if (!selectedIconShape) return;
-  if (event.key !== 'Delete' && event.key !== 'Backspace') return;
   const target = event.target;
-  if (target instanceof HTMLElement && (target.isContentEditable || ['INPUT', 'TEXTAREA'].includes(target.tagName))) {
+  const inEditable = target instanceof HTMLElement && (
+    target.isContentEditable || ['INPUT', 'TEXTAREA'].includes(target.tagName)
+  );
+  if ((event.ctrlKey || event.metaKey) && event.key.toLowerCase() === 'z') {
+    if (inEditable) return;
+    event.preventDefault();
+    undoLastIconShape();
     return;
   }
+  if (!selectedIconShape) return;
+  if (event.key !== 'Delete' && event.key !== 'Backspace') return;
+  if (inEditable) return;
   event.preventDefault();
   selectedIconShape.remove();
   selectIconShape(null);
@@ -622,7 +760,12 @@ function handleBuilderKeydown(event) {
 function loadComponents() {
   const data = getStoredItem(STORAGE_KEY, [], STORAGE_SCENARIO);
   if (!Array.isArray(data)) return [];
-  return data;
+  return data
+    .filter(item => item && typeof item === 'object')
+    .map(item => ({
+      ...item,
+      defaultRotation: normalizeRotationValue(item?.defaultRotation)
+    }));
 }
 
 function persist() {
@@ -803,6 +946,8 @@ function resetForm() {
   formIndexInput.value = '';
   editingIndex = null;
   if (submitBtn) submitBtn.textContent = 'Save Component';
+  textStyleState = getTextStyleFromInputs();
+  syncTextControls(null);
   clearPropertyRows();
   addPropertyRow();
   resetIcon();
@@ -962,6 +1107,10 @@ function handleFormSubmit(event) {
     const properties = collectProperties();
     const props = propertiesToObject(properties);
     const ports = buildPorts(counts, width, height);
+    const existingRotation = (editingIndex !== null && editingIndex >= 0)
+      ? components[editingIndex]?.defaultRotation
+      : undefined;
+    const defaultRotation = normalizeRotationValue(existingRotation);
     const data = {
       label,
       subtype,
@@ -973,7 +1122,8 @@ function handleFormSubmit(event) {
       portCounts: counts,
       props,
       properties,
-      icon: currentIconData || null
+      icon: currentIconData || null,
+      defaultRotation
     };
     const duplicateIndex = components.findIndex((c, idx) => c.subtype === subtype && idx !== editingIndex);
     if (duplicateIndex !== -1) {
@@ -1022,6 +1172,7 @@ function normalizeImportedComponent(raw) {
   const width = sanitizeNumber(raw.width, 80);
   const height = sanitizeNumber(raw.height, 40);
   const counts = raw.portCounts || inferPortCounts(raw.ports || [], width, height);
+  const defaultRotation = normalizeRotationValue(raw.defaultRotation);
   const props = raw.props && typeof raw.props === 'object' ? raw.props : {};
   const properties = Array.isArray(raw.properties)
     ? raw.properties
@@ -1058,7 +1209,8 @@ function normalizeImportedComponent(raw) {
     portCounts: counts,
     props: propertiesToObject(normalizedProperties),
     properties: normalizedProperties,
-    icon: raw.icon || null
+    icon: raw.icon || null,
+    defaultRotation
   };
 }
 
@@ -1105,6 +1257,10 @@ function handleImportChange(event) {
 }
 
 function setupListeners() {
+  textFontSelect?.addEventListener('change', handleTextStyleChange);
+  textSizeInput?.addEventListener('change', handleTextStyleChange);
+  textColorInput?.addEventListener('input', handleTextStyleChange);
+  textColorInput?.addEventListener('change', handleTextStyleChange);
   form.addEventListener('submit', handleFormSubmit);
   addPropertyBtn.addEventListener('click', () => addPropertyRow());
   resetFormBtn.addEventListener('click', resetForm);
