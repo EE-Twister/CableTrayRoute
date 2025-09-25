@@ -24,7 +24,6 @@
       <a href="./conduitfill.html">Conduit Fill</a>
       <a href="./optimalRoute.html">Optimal Route</a>
       <a href="./oneline.html">One-Line</a>
-      <a href="./custom-components.html" class="active" aria-current="page">Custom Components</a>
     </div>
   </nav>
   <div class="container">
@@ -100,6 +99,23 @@
                 <button type="button" class="icon-tool-btn" data-tool="circle" aria-pressed="false">Circle</button>
                 <button type="button" class="icon-tool-btn" data-tool="arc" aria-pressed="false">Arc</button>
                 <button type="button" class="icon-tool-btn" data-tool="text" aria-pressed="false">Text</button>
+              </div>
+              <div class="text-style-controls" aria-label="Text options">
+                <label for="icon-text-font">Font
+                  <select id="icon-text-font">
+                    <option value="Arial, sans-serif">Arial</option>
+                    <option value="'Times New Roman', serif">Times New Roman</option>
+                    <option value="'Courier New', monospace">Courier New</option>
+                    <option value="'Segoe UI', sans-serif">Segoe UI</option>
+                    <option value="'Inter', sans-serif">Inter</option>
+                  </select>
+                </label>
+                <label for="icon-text-size">Size
+                  <input id="icon-text-size" type="number" min="6" max="120" value="18">
+                </label>
+                <label for="icon-text-color">Color
+                  <input id="icon-text-color" type="color" value="#1f2933">
+                </label>
               </div>
               <div class="icon-canvas-wrapper">
                 <svg id="icon-canvas" viewBox="0 0 120 120" tabindex="0" aria-label="Custom component icon canvas"></svg>
