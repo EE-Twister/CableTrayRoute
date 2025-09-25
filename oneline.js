@@ -806,6 +806,7 @@ let lintList = null;
 let clickSelectTimer = null;
 const SINGLE_CLICK_DELAY_MS = 175;
 const DOUBLE_CLICK_THRESHOLD_MS = 400;
+const DRAG_MOVE_THRESHOLD = 3;
 let lastComponentClick = { id: null, time: 0 };
 let findHighlightId = null;
 let findHighlightTimer = null;
@@ -4385,7 +4386,13 @@ async function init() {
         selection = [comp];
       }
       selected = comp;
-      dragOffset = selection.map(c => ({ comp: c, dx: e.offsetX - c.x, dy: e.offsetY - c.y }));
+      dragOffset = selection.map(c => ({
+        comp: c,
+        dx: e.offsetX - c.x,
+        dy: e.offsetY - c.y,
+        startX: c.x,
+        startY: c.y
+      }));
       dragging = false;
       render();
     });
@@ -4495,9 +4502,12 @@ async function init() {
     if (resizingBus || draggingConnection) return;
     if (!dragOffset || !dragOffset.length) return;
     let snapPos = null;
+    let moved = false;
     dragOffset.forEach(off => {
-      let x = e.offsetX - off.dx;
-      let y = e.offsetY - off.dy;
+      const rawX = e.offsetX - off.dx;
+      const rawY = e.offsetY - off.dy;
+      let x = rawX;
+      let y = rawY;
       if (gridEnabled) {
         const snappedX = Math.round(x / gridSize) * gridSize;
         const snappedY = Math.round(y / gridSize) * gridSize;
@@ -4507,12 +4517,21 @@ async function init() {
         x = snappedX;
         y = snappedY;
       }
-      off.comp.x = x;
-      off.comp.y = y;
-      dragging = true;
+      const deltaX = Math.abs(rawX - off.startX);
+      const deltaY = Math.abs(rawY - off.startY);
+      const shouldMove = dragging || deltaX >= DRAG_MOVE_THRESHOLD || deltaY >= DRAG_MOVE_THRESHOLD;
+      if (!shouldMove) return;
+      if (!dragging) dragging = true;
+      if (off.comp.x !== x || off.comp.y !== y) {
+        off.comp.x = x;
+        off.comp.y = y;
+        moved = true;
+      }
     });
-    render();
-    if (snapPos) flashSnapIndicator(snapPos.x, snapPos.y);
+    if (moved) {
+      render();
+      if (snapPos) flashSnapIndicator(snapPos.x, snapPos.y);
+    }
   });
     svg.addEventListener('mouseup', async e => {
       if (e.button === 1 && middlePanState) {
