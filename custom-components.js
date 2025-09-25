@@ -3,6 +3,7 @@ import { getItem as getStoredItem, setItem as setStoredItem } from './dataStore.
 const STORAGE_KEY = 'customComponents';
 const STORAGE_SCENARIO = '__ctr_custom_components__';
 const MAX_PROPERTIES = 20;
+const PREFILL_STORAGE_KEY = 'ctrCustomComponentPrefill';
 
 const form = document.getElementById('component-form');
 const formIndexInput = document.getElementById('component-index');
@@ -1577,6 +1578,50 @@ function clearEditQueryParam() {
   window.history.replaceState({}, '', next);
 }
 
+function clearPrefillQueryParam() {
+  const params = new URLSearchParams(window.location.search);
+  if (!params.has('prefill')) return;
+  params.delete('prefill');
+  const query = params.toString();
+  const next = `${window.location.pathname}${query ? `?${query}` : ''}${window.location.hash}`;
+  window.history.replaceState({}, '', next);
+}
+
+function loadPrefillComponent(raw) {
+  const normalized = normalizeImportedComponent(raw);
+  if (!normalized) return false;
+  resetForm();
+  editingIndex = null;
+  formIndexInput.value = '';
+  const width = sanitizeNumber(normalized.width, DEFAULT_COMPONENT_WIDTH);
+  const height = sanitizeNumber(normalized.height, DEFAULT_COMPONENT_HEIGHT);
+  labelInput.value = normalized.label || '';
+  subtypeInput.value = normalized.subtype || '';
+  typeInput.value = normalized.type || '';
+  categorySelect.value = normalized.category || 'equipment';
+  widthInput.value = width;
+  heightInput.value = height;
+  syncCanvasToInputs({ rescale: false, updateInputValue: true });
+  const counts = normalized.portCounts || inferPortCounts(normalized.ports || [], width, height);
+  portTopInput.value = counts.top || 0;
+  portRightInput.value = counts.right || 0;
+  portBottomInput.value = counts.bottom || 0;
+  portLeftInput.value = counts.left || 0;
+  clearPropertyRows();
+  const propsList = Array.isArray(normalized.properties) ? normalized.properties : [];
+  if (propsList.length) {
+    propsList.forEach(entry => addPropertyRow(entry));
+  } else {
+    addPropertyRow();
+  }
+  importIconData(normalized.icon || null);
+  currentIconData = normalized.icon || null;
+  syncCanvasToInputs({ rescale: true, updateInputValue: false });
+  if (submitBtn) submitBtn.textContent = 'Save Component';
+  form.scrollIntoView({ behavior: 'smooth', block: 'start' });
+  return true;
+}
+
 function handleInitialEditQuery() {
   if (editQueryHandled || !initialEditSubtype) return;
   const normalized = initialEditSubtype.trim().toLowerCase();
@@ -1598,10 +1643,45 @@ function handleInitialEditQuery() {
   clearEditQueryParam();
 }
 
+function handlePalettePrefill() {
+  const wantsPrefill = urlParams.get('prefill') === '1';
+  let raw = null;
+  try {
+    raw = sessionStorage.getItem(PREFILL_STORAGE_KEY);
+    if (wantsPrefill) sessionStorage.removeItem(PREFILL_STORAGE_KEY);
+  } catch (err) {
+    console.error('Failed to access component prefill', err);
+  }
+  if (!wantsPrefill) return;
+  if (editingIndex !== null) {
+    clearPrefillQueryParam();
+    return;
+  }
+  if (!raw) {
+    showToast('Component details unavailable. Create a new component manually.', 'error');
+    clearPrefillQueryParam();
+    return;
+  }
+  try {
+    const data = JSON.parse(raw);
+    const loaded = loadPrefillComponent(data);
+    if (loaded) {
+      showToast('Loaded component from palette. Update and save to customize.', 'info');
+    } else {
+      showToast('Unable to load component details for editing.', 'error');
+    }
+  } catch (err) {
+    console.error('Failed to parse component prefill', err);
+    showToast('Unable to load component details for editing.', 'error');
+  }
+  clearPrefillQueryParam();
+}
+
 ensureIconCanvas();
 setActiveIconTool('select');
 resetForm();
 updateTable();
 setupListeners();
 handleInitialEditQuery();
+handlePalettePrefill();
 

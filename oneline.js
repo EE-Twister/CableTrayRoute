@@ -177,6 +177,7 @@ const maxPaletteWidth = 600;
 const paletteWidthStorageKey = 'onelinePaletteWidth';
 const customComponentStorageKey = 'customComponents';
 const customComponentScenarioKey = '__ctr_custom_components__';
+const customComponentPrefillStorageKey = 'ctrCustomComponentPrefill';
 const paletteContextMenu = document.getElementById('palette-context-menu');
 
 let paletteContextTarget = null;
@@ -669,6 +670,84 @@ function applyDefaults(comp) {
   });
 }
 
+function inferPortCountsForMeta(ports = [], width = compWidth, height = compHeight) {
+  const counts = { top: 0, right: 0, bottom: 0, left: 0 };
+  const w = Number.isFinite(width) ? width : compWidth;
+  const h = Number.isFinite(height) ? height : compHeight;
+  const epsilon = 0.5;
+  ports.forEach(port => {
+    if (!port || typeof port.x !== 'number' || typeof port.y !== 'number') return;
+    if (Math.abs(port.y) <= epsilon) counts.top += 1;
+    else if (Math.abs(port.x - w) <= epsilon) counts.right += 1;
+    else if (Math.abs(port.y - h) <= epsilon) counts.bottom += 1;
+    else if (Math.abs(port.x) <= epsilon) counts.left += 1;
+  });
+  return counts;
+}
+
+function createComponentPrefill(meta) {
+  if (!meta || typeof meta !== 'object') return null;
+  const ports = Array.isArray(meta.ports)
+    ? meta.ports
+        .filter(port => port && typeof port === 'object')
+        .map(port => ({
+          x: Number.isFinite(Number(port.x)) ? Number(port.x) : 0,
+          y: Number.isFinite(Number(port.y)) ? Number(port.y) : 0
+        }))
+    : [];
+  const baseProps = meta.props && typeof meta.props === 'object' ? meta.props : {};
+  const props = {};
+  const properties = [];
+  Object.entries(baseProps).forEach(([name, value]) => {
+    if (value !== null && typeof value === 'object') return;
+    props[name] = value;
+    properties.push({
+      name,
+      type: typeof value === 'number' ? 'number' : typeof value === 'boolean' ? 'checkbox' : 'text',
+      value
+    });
+  });
+  const widthVal = Number(meta.width);
+  const heightVal = Number(meta.height);
+  const defaultRotation = Number(meta.defaultRotation);
+  return {
+    label: meta.label || meta.subtype || '',
+    subtype: meta.subtype || '',
+    type: meta.type || meta.category || '',
+    category: meta.category || meta.type || 'equipment',
+    width: Number.isFinite(widthVal) ? widthVal : undefined,
+    height: Number.isFinite(heightVal) ? heightVal : undefined,
+    ports,
+    portCounts: inferPortCountsForMeta(ports, widthVal, heightVal),
+    props,
+    properties,
+    icon: meta.icon || null,
+    defaultRotation: Number.isFinite(defaultRotation) ? defaultRotation : undefined
+  };
+}
+
+function navigateToCustomComponentEditor(meta) {
+  if (!meta) return;
+  const url = new URL('./custom-components.html', window.location.href);
+  if (meta.isCustom && meta.subtype) {
+    url.searchParams.set('edit', meta.subtype);
+    window.location.href = url.toString();
+    return;
+  }
+  const prefill = createComponentPrefill(meta);
+  if (!prefill) {
+    window.location.href = url.toString();
+    return;
+  }
+  try {
+    sessionStorage.setItem(customComponentPrefillStorageKey, JSON.stringify(prefill));
+  } catch (err) {
+    console.error('Failed to store component prefill', err);
+  }
+  url.searchParams.set('prefill', '1');
+  window.location.href = url.toString();
+}
+
 function buildPalette() {
   closePaletteContextMenu();
   const palette = document.getElementById('component-buttons');
@@ -747,27 +826,23 @@ function buildPalette() {
         e.dataTransfer.setData('text/plain', JSON.stringify({ type: meta.type, subtype: subKey }));
         setDragPreview(e, meta, rotation);
       });
-      if (meta.isCustom) {
-        btn.dataset.custom = '1';
-        btn.addEventListener('contextmenu', e => {
+      btn.dataset.custom = meta.isCustom ? '1' : '0';
+      btn.addEventListener('contextmenu', e => {
+        e.preventDefault();
+        openPaletteContextMenu(meta, btn, e.clientX, e.clientY);
+      });
+      btn.addEventListener('keydown', e => {
+        if (e.key === 'ContextMenu' || (e.shiftKey && e.key === 'F10')) {
           e.preventDefault();
-          openPaletteContextMenu(meta, btn, e.clientX, e.clientY);
-        });
-        btn.addEventListener('keydown', e => {
-          if (e.key === 'ContextMenu' || (e.shiftKey && e.key === 'F10')) {
-            e.preventDefault();
-            const rect = btn.getBoundingClientRect();
-            openPaletteContextMenu(
-              meta,
-              btn,
-              rect.left + rect.width / 2,
-              rect.top + rect.height / 2
-            );
-          }
-        });
-      } else {
-        btn.dataset.custom = '0';
-      }
+          const rect = btn.getBoundingClientRect();
+          openPaletteContextMenu(
+            meta,
+            btn,
+            rect.left + rect.width / 2,
+            rect.top + rect.height / 2
+          );
+        }
+      });
       container.appendChild(btn);
     });
   });
@@ -3572,316 +3647,459 @@ function distributeSelection(axis) {
 }
 
 function selectComponent(compOrId) {
-  const comp = typeof compOrId === 'string' ? components.find(c => c.id === compOrId) : compOrId;
-  if (!comp) return;
-  if (comp.type === 'cable') {
-    openCableProperties(comp);
+  const initialComponent = typeof compOrId === 'string' ? components.find(c => c.id === compOrId) : compOrId;
+  if (!initialComponent) return;
+  if (initialComponent.type === 'cable') {
+    openCableProperties(initialComponent);
     return;
   }
-  let rawSchema = propSchemas[comp.subtype] || [];
-  if (!rawSchema.length) {
-    const metaProps = componentMeta[comp.subtype]?.props || {};
-    rawSchema = inferSchemaFromProps({ ...metaProps, ...(comp.props || {}) });
+  const deviceComponents = components.filter(c => c.type !== 'cable');
+  if (!deviceComponents.length) return;
+
+  let activeComponent = initialComponent;
+  if (!deviceComponents.includes(activeComponent)) {
+    activeComponent = deviceComponents[0];
   }
-  selected = comp;
-  selection = [comp];
+
+  selected = activeComponent;
+  selection = [activeComponent];
   selectedConnection = null;
-  let modal = ensurePropModal();
+
+  const sortedComponents = [...deviceComponents].sort((a, b) =>
+    getComponentListLabel(a).localeCompare(getComponentListLabel(b), undefined, { sensitivity: 'base' })
+  );
+
+  const modal = ensurePropModal();
   if (modal._outsideHandler) modal.removeEventListener('click', modal._outsideHandler);
   if (modal._keyHandler) document.removeEventListener('keydown', modal._keyHandler);
   modal.innerHTML = '';
-  const form = document.createElement('form');
-  form.id = 'prop-form';
 
-  const outsideHandler = e => { if (e.target === modal) closeModal(); };
-  const keyHandler = e => { if (e.key === 'Escape') { e.preventDefault(); closeModal(); } };
+  const panel = document.createElement('div');
+  panel.className = 'prop-modal-panel';
+  modal.appendChild(panel);
+
+  const layout = document.createElement('div');
+  layout.className = 'prop-modal-layout';
+  panel.appendChild(layout);
+
+  const componentColumn = document.createElement('div');
+  componentColumn.className = 'prop-modal-column prop-modal-components';
+  const componentHeading = document.createElement('h3');
+  componentHeading.className = 'prop-modal-heading';
+  componentHeading.textContent = 'Device Tags';
+  const componentListEl = document.createElement('div');
+  componentListEl.className = 'prop-component-list';
+  componentColumn.append(componentHeading, componentListEl);
+  layout.appendChild(componentColumn);
+
+  const propertyColumn = document.createElement('div');
+  propertyColumn.className = 'prop-modal-column prop-modal-properties';
+  const propertyHeading = document.createElement('h3');
+  propertyHeading.className = 'prop-modal-heading';
+  propertyColumn.appendChild(propertyHeading);
+  const propertyContainer = document.createElement('div');
+  propertyContainer.className = 'prop-property-container';
+  propertyColumn.appendChild(propertyContainer);
+  layout.appendChild(propertyColumn);
+
+  const buttonMap = new Map();
+  let activeId = activeComponent?.id || null;
+
+  function getComponentListLabel(comp) {
+    if (!comp) return 'Device';
+    const tag = typeof comp.label === 'string' ? comp.label.trim() : '';
+    if (tag) return tag;
+    if (comp.subtype) return comp.subtype;
+    if (comp.type) return comp.type;
+    return comp.id || 'Device';
+  }
+
+  function updateButtonStates() {
+    buttonMap.forEach((button, id) => {
+      const selectedState = id === activeId;
+      button.classList.toggle('is-active', selectedState);
+      button.setAttribute('aria-pressed', String(selectedState));
+      button.tabIndex = selectedState ? 0 : -1;
+    });
+  }
 
   function closeModal() {
     modal.classList.remove('show');
-    selected = null;
-    selection = [];
-    selectedConnection = null;
     modal.removeEventListener('click', outsideHandler);
     document.removeEventListener('keydown', keyHandler);
     delete modal._outsideHandler;
     delete modal._keyHandler;
+    selected = null;
+    selection = [];
+    selectedConnection = null;
   }
 
-  const labelOverrides = {
-    hp: 'Horsepower',
-    pf: 'Power Factor',
-    service_factor: 'Service Factor'
-  };
-  let schema = rawSchema
-    .map(f => {
-      if (f.name === 'voltage_class') {
-        return { ...f, type: 'select', options: voltageClasses };
-      }
-      if (f.name === 'thermal_rating') {
-        return { ...f, type: 'select', options: thermalRatings };
-      }
-      if (f.name === 'manufacturer') {
-        return { ...f, type: 'select', options: Object.keys(manufacturerModels) };
-      }
-      if (f.name === 'model') {
-        const manu = comp.manufacturer || Object.keys(manufacturerModels)[0];
-        return { ...f, type: 'select', options: manufacturerModels[manu] || [] };
-      }
-      return f;
-    })
-    .map(f => ({ ...f, label: labelOverrides[f.name] || f.label }));
-  if (comp.subtype === 'motor_load') {
-    schema = schema.filter(
-      f => !['conductor_type', 'cable_assembly', 'breaker_frame', 'conductor_assembly', 'gap'].includes(f.name)
-    );
-  }
-  let baseFields = [
-    { name: 'label', label: 'Label', type: 'text' },
-    { name: 'ref', label: 'Ref ID', type: 'text' },
-    { name: 'enclosure', label: 'Enclosure', type: 'select', options: ['NEMA 1', 'NEMA 3R', 'NEMA 4', 'NEMA 4X'] },
-    { name: 'gap', label: 'Gap (mm)', type: 'number' },
-    { name: 'working_distance', label: 'Working Distance (mm)', type: 'number' },
-    { name: 'clearing_time', label: 'Clearing Time (s)', type: 'number' }
-  ];
-  if (comp.subtype === 'motor_load') {
-    baseFields = baseFields.filter(
-      f => !['gap', 'conductor_type', 'cable_assembly', 'breaker_frame', 'conductor_assembly'].includes(f.name)
-    );
-  }
-  let manufacturerInput = null;
-  let modelInput = null;
-  const buildField = (f, container) => {
-    const lbl = document.createElement('label');
-    lbl.textContent = f.label + ' ';
-    let input;
-    const defVal = manufacturerDefaults[comp.subtype]?.[f.name] || '';
-    const curVal = comp[f.name] !== undefined && comp[f.name] !== '' ? comp[f.name] : defVal;
-    if (f.type === 'select') {
-      input = document.createElement('select');
-      (f.options || []).forEach(opt => {
-        const o = document.createElement('option');
-        o.value = opt;
-        o.textContent = opt;
-        if (curVal == opt) o.selected = true;
-        input.appendChild(o);
-      });
-    } else if (f.type === 'textarea') {
-      input = document.createElement('textarea');
-      input.value = curVal;
-    } else if (f.type === 'checkbox') {
-      input = document.createElement('input');
-      input.type = 'checkbox';
-      input.checked = !!curVal;
-    } else {
-      input = document.createElement('input');
-      input.type = f.type || 'text';
-      if (f.type === 'number') input.step = 'any';
-      input.value = curVal;
+  const outsideHandler = e => { if (e.target === modal) closeModal(); };
+  const keyHandler = e => {
+    if (e.key === 'Escape') {
+      e.preventDefault();
+      closeModal();
     }
-    input.name = f.name;
-    if (f.name === 'manufacturer') manufacturerInput = input;
-    if (f.name === 'model') modelInput = input;
-    lbl.appendChild(input);
-    container.appendChild(lbl);
   };
 
-  let fields = [...baseFields, ...schema];
-  if (comp.subtype === 'motor_load') {
-    fields = fields.filter(
-      f => !['conductor_type', 'cable_assembly', 'breaker_frame', 'conductor_assembly'].includes(f.name)
-    );
-  }
-  const manufacturerFields = [];
-  const noteFields = [];
-  const electricalFields = [];
-  fields.forEach(f => {
-    if (['manufacturer', 'model'].includes(f.name)) manufacturerFields.push(f);
-    else if (['notes', 'failure_modes'].includes(f.name)) noteFields.push(f);
-    else electricalFields.push(f);
-  });
+  function renderPropertiesFor(targetComp) {
+    propertyContainer.innerHTML = '';
+    if (!targetComp) {
+      propertyHeading.textContent = 'Properties';
+      const empty = document.createElement('p');
+      empty.className = 'prop-property-empty view-modal-empty';
+      empty.textContent = 'Select a device to view its properties.';
+      propertyContainer.appendChild(empty);
+      return;
+    }
 
-  const addFieldset = (legendText, fieldArr) => {
-    if (!fieldArr.length) return;
-    const fs = document.createElement('fieldset');
-    const legend = document.createElement('legend');
-    legend.textContent = legendText;
-    fs.appendChild(legend);
-    fieldArr.forEach(f => buildField(f, fs));
-    form.appendChild(fs);
-  };
+    propertyHeading.textContent = `${getComponentListLabel(targetComp)} Properties`;
 
-  addFieldset('Manufacturer', manufacturerFields);
-  addFieldset('Electrical', electricalFields);
-  addFieldset('Notes', noteFields);
+    let rawSchema = propSchemas[targetComp.subtype] || [];
+    if (!rawSchema.length) {
+      const metaProps = componentMeta[targetComp.subtype]?.props || {};
+      rawSchema = inferSchemaFromProps({ ...metaProps, ...(targetComp.props || {}) });
+    }
 
-  if (manufacturerInput && modelInput) {
-    const updateModels = () => {
-      const models = manufacturerModels[manufacturerInput.value] || [];
-      modelInput.innerHTML = '';
-      models.forEach(m => {
-        const o = document.createElement('option');
-        o.value = m;
-        o.textContent = m;
-        if (comp.model === m) o.selected = true;
-        modelInput.appendChild(o);
-      });
+    const labelOverrides = {
+      hp: 'Horsepower',
+      pf: 'Power Factor',
+      service_factor: 'Service Factor'
     };
-    manufacturerInput.addEventListener('change', updateModels);
-    if (!manufacturerInput.value) manufacturerInput.value = Object.keys(manufacturerModels)[0];
-    updateModels();
-  }
 
-  const tccLbl = document.createElement('label');
-  tccLbl.textContent = 'TCC Device ';
-  const tccInput = document.createElement('select');
-  tccInput.name = 'tccId';
-  const optEmpty = document.createElement('option');
-  optEmpty.value = '';
-  optEmpty.textContent = '--Select Device--';
-  tccInput.appendChild(optEmpty);
-  protectiveDevices.forEach(dev => {
-    const opt = document.createElement('option');
-    opt.value = dev.id;
-    opt.textContent = dev.name;
-    if (comp.tccId === dev.id) opt.selected = true;
-    tccInput.appendChild(opt);
-  });
-  tccLbl.appendChild(tccInput);
-  form.appendChild(tccLbl);
-  const tccBtn = document.createElement('button');
-  tccBtn.type = 'button';
-  tccBtn.textContent = 'Edit TCC';
-  tccBtn.classList.add('btn');
-  tccBtn.addEventListener('click', () => {
-    const dev = tccInput.value ? `&device=${encodeURIComponent(tccInput.value)}` : '';
-    window.open(`tcc.html?component=${encodeURIComponent(comp.id)}${dev}`, '_blank');
-  });
-  form.appendChild(tccBtn);
-
-  if ((comp.connections || []).length) {
-    const header = document.createElement('h3');
-    header.textContent = 'Connections';
-    form.appendChild(header);
-    const list = document.createElement('ul');
-    (comp.connections || []).forEach((conn, idx) => {
-      const li = document.createElement('li');
-      const target = components.find(t => t.id === conn.target);
-      const span = document.createElement('span');
-      const cableInfo = getCableForConnection(comp, target, conn);
-      const cableLabel = cableInfo?.tag || cableInfo?.cable_type;
-      span.textContent = `to ${target?.label || target?.subtype || conn.target}${cableLabel ? ` (${cableLabel})` : ''}`;
-      li.appendChild(span);
-      const edit = document.createElement('button');
-      edit.type = 'button';
-      edit.textContent = 'Edit';
-      edit.classList.add('btn');
-      edit.addEventListener('click', async e => {
-        e.stopPropagation();
-        const cableComp = comp.type === 'cable' ? comp : target?.type === 'cable' ? target : null;
-        if (cableComp) {
-          await editCableComponent(cableComp);
-          selectComponent(comp);
-        } else {
-          showToast('No cable component on this connection');
+    let schema = rawSchema
+      .map(f => {
+        if (f.name === 'voltage_class') {
+          return { ...f, type: 'select', options: voltageClasses };
         }
-      });
-      li.appendChild(edit);
-      const del = document.createElement('button');
-      del.type = 'button';
-      del.textContent = 'Delete';
-      del.classList.add('btn');
-      del.addEventListener('click', e => {
-        e.stopPropagation();
-        comp.connections.splice(idx, 1);
-        pushHistory();
-        render();
-        save();
-        selectComponent(comp);
-      });
-      li.appendChild(del);
-      li.addEventListener('click', () => {
-        selectedConnection = { component: comp, index: idx };
-      });
-      list.appendChild(li);
+        if (f.name === 'thermal_rating') {
+          return { ...f, type: 'select', options: thermalRatings };
+        }
+        if (f.name === 'manufacturer') {
+          return { ...f, type: 'select', options: Object.keys(manufacturerModels) };
+        }
+        if (f.name === 'model') {
+          const manu = targetComp.manufacturer || Object.keys(manufacturerModels)[0];
+          return { ...f, type: 'select', options: manufacturerModels[manu] || [] };
+        }
+        return f;
+      })
+      .map(f => ({ ...f, label: labelOverrides[f.name] || f.label }));
+
+    if (targetComp.subtype === 'motor_load') {
+      schema = schema.filter(
+        f => !['conductor_type', 'cable_assembly', 'breaker_frame', 'conductor_assembly', 'gap'].includes(f.name)
+      );
+    }
+
+    let baseFields = [
+      { name: 'label', label: 'Label', type: 'text' },
+      { name: 'ref', label: 'Ref ID', type: 'text' },
+      { name: 'enclosure', label: 'Enclosure', type: 'select', options: ['NEMA 1', 'NEMA 3R', 'NEMA 4', 'NEMA 4X'] },
+      { name: 'gap', label: 'Gap (mm)', type: 'number' },
+      { name: 'working_distance', label: 'Working Distance (mm)', type: 'number' },
+      { name: 'clearing_time', label: 'Clearing Time (s)', type: 'number' }
+    ];
+
+    if (targetComp.subtype === 'motor_load') {
+      baseFields = baseFields.filter(
+        f => !['gap', 'conductor_type', 'cable_assembly', 'breaker_frame', 'conductor_assembly'].includes(f.name)
+      );
+    }
+
+    let manufacturerInput = null;
+    let modelInput = null;
+
+    const form = document.createElement('form');
+    form.id = 'prop-form';
+    form.className = 'prop-detail-form';
+
+    const buildField = (f, container) => {
+      const lbl = document.createElement('label');
+      lbl.textContent = f.label + ' ';
+      let input;
+      const defVal = manufacturerDefaults[targetComp.subtype]?.[f.name] || '';
+      const curVal = targetComp[f.name] !== undefined && targetComp[f.name] !== '' ? targetComp[f.name] : defVal;
+      if (f.type === 'select') {
+        input = document.createElement('select');
+        (f.options || []).forEach(opt => {
+          const o = document.createElement('option');
+          o.value = opt;
+          o.textContent = opt;
+          if (curVal == opt) o.selected = true;
+          input.appendChild(o);
+        });
+      } else if (f.type === 'textarea') {
+        input = document.createElement('textarea');
+        input.value = curVal;
+      } else if (f.type === 'checkbox') {
+        input = document.createElement('input');
+        input.type = 'checkbox';
+        input.checked = !!curVal;
+      } else {
+        input = document.createElement('input');
+        input.type = f.type || 'text';
+        if (f.type === 'number') input.step = 'any';
+        input.value = curVal;
+      }
+      input.name = f.name;
+      if (f.name === 'manufacturer') manufacturerInput = input;
+      if (f.name === 'model') modelInput = input;
+      lbl.appendChild(input);
+      container.appendChild(lbl);
+    };
+
+    let fields = [...baseFields, ...schema];
+    if (targetComp.subtype === 'motor_load') {
+      fields = fields.filter(
+        f => !['conductor_type', 'cable_assembly', 'breaker_frame', 'conductor_assembly'].includes(f.name)
+      );
+    }
+
+    const manufacturerFields = [];
+    const noteFields = [];
+    const electricalFields = [];
+    fields.forEach(f => {
+      if (['manufacturer', 'model'].includes(f.name)) manufacturerFields.push(f);
+      else if (['notes', 'failure_modes'].includes(f.name)) noteFields.push(f);
+      else electricalFields.push(f);
     });
-    form.appendChild(list);
+
+    const addFieldset = (legendText, fieldArr) => {
+      if (!fieldArr.length) return;
+      const fs = document.createElement('fieldset');
+      const legend = document.createElement('legend');
+      legend.textContent = legendText;
+      fs.appendChild(legend);
+      fieldArr.forEach(f => buildField(f, fs));
+      form.appendChild(fs);
+    };
+
+    addFieldset('Manufacturer', manufacturerFields);
+    addFieldset('Electrical', electricalFields);
+    addFieldset('Notes', noteFields);
+
+    if (manufacturerInput && modelInput) {
+      const updateModels = () => {
+        const models = manufacturerModels[manufacturerInput.value] || [];
+        modelInput.innerHTML = '';
+        models.forEach(m => {
+          const o = document.createElement('option');
+          o.value = m;
+          o.textContent = m;
+          if (targetComp.model === m) o.selected = true;
+          modelInput.appendChild(o);
+        });
+      };
+      manufacturerInput.addEventListener('change', updateModels);
+      if (!manufacturerInput.value) manufacturerInput.value = Object.keys(manufacturerModels)[0];
+      updateModels();
+    }
+
+    const tccLbl = document.createElement('label');
+    tccLbl.textContent = 'TCC Device ';
+    const tccInput = document.createElement('select');
+    tccInput.name = 'tccId';
+    const optEmpty = document.createElement('option');
+    optEmpty.value = '';
+    optEmpty.textContent = '--Select Device--';
+    tccInput.appendChild(optEmpty);
+    protectiveDevices.forEach(dev => {
+      const opt = document.createElement('option');
+      opt.value = dev.id;
+      opt.textContent = dev.name;
+      if (targetComp.tccId === dev.id) opt.selected = true;
+      tccInput.appendChild(opt);
+    });
+    tccLbl.appendChild(tccInput);
+    form.appendChild(tccLbl);
+
+    const tccBtn = document.createElement('button');
+    tccBtn.type = 'button';
+    tccBtn.textContent = 'Edit TCC';
+    tccBtn.classList.add('btn');
+    tccBtn.addEventListener('click', () => {
+      const dev = tccInput.value ? `&device=${encodeURIComponent(tccInput.value)}` : '';
+      window.open(`tcc.html?component=${encodeURIComponent(targetComp.id)}${dev}`, '_blank');
+    });
+    form.appendChild(tccBtn);
+
+    if ((targetComp.connections || []).length) {
+      const header = document.createElement('h3');
+      header.textContent = 'Connections';
+      form.appendChild(header);
+      const list = document.createElement('ul');
+      (targetComp.connections || []).forEach((conn, idx) => {
+        const li = document.createElement('li');
+        const target = components.find(t => t.id === conn.target);
+        const span = document.createElement('span');
+        const cableInfo = getCableForConnection(targetComp, target, conn);
+        const cableLabel = cableInfo?.tag || cableInfo?.cable_type;
+        span.textContent = `to ${target?.label || target?.subtype || conn.target}${cableLabel ? ` (${cableLabel})` : ''}`;
+        li.appendChild(span);
+        const edit = document.createElement('button');
+        edit.type = 'button';
+        edit.textContent = 'Edit';
+        edit.classList.add('btn');
+        edit.addEventListener('click', async e => {
+          e.stopPropagation();
+          const cableComp = targetComp.type === 'cable' ? targetComp : target?.type === 'cable' ? target : null;
+          if (cableComp) {
+            await editCableComponent(cableComp);
+            renderPropertiesFor(targetComp);
+          } else {
+            showToast('No cable component on this connection');
+          }
+        });
+        li.appendChild(edit);
+        const del = document.createElement('button');
+        del.type = 'button';
+        del.textContent = 'Delete';
+        del.classList.add('btn');
+        del.addEventListener('click', e => {
+          e.stopPropagation();
+          targetComp.connections.splice(idx, 1);
+          pushHistory();
+          render();
+          save();
+          renderPropertiesFor(targetComp);
+        });
+        li.appendChild(del);
+        li.addEventListener('click', () => {
+          selectedConnection = { component: targetComp, index: idx };
+        });
+        list.appendChild(li);
+      });
+      form.appendChild(list);
+    }
+
+    const actions = document.createElement('div');
+    actions.className = 'prop-form-actions';
+
+    const applyBtn = document.createElement('button');
+    applyBtn.type = 'submit';
+    applyBtn.textContent = 'Apply';
+    applyBtn.classList.add('btn');
+    actions.appendChild(applyBtn);
+
+    const templateBtn = document.createElement('button');
+    templateBtn.type = 'button';
+    templateBtn.textContent = 'Save as Template';
+    templateBtn.classList.add('btn');
+    templateBtn.addEventListener('click', () => {
+      const name = prompt('Template name', targetComp.label || targetComp.subtype);
+      if (!name) return;
+      const fd = new FormData(form);
+      const data = {
+        subtype: targetComp.subtype,
+        type: getCategory(targetComp),
+        rotation: targetComp.rotation || 0,
+        flipped: !!targetComp.flipped
+      };
+      fields.forEach(f => {
+        const v = fd.get(f.name);
+        if (f.type === 'checkbox') data[f.name] = v === 'on';
+        else if (f.type === 'number') data[f.name] = v ? parseFloat(v) : '';
+        else data[f.name] = v || '';
+      });
+      data.tccId = fd.get('tccId') || '';
+      templates.push({ name, component: data });
+      saveTemplates();
+      renderTemplates();
+      showToast('Template saved');
+    });
+    actions.appendChild(templateBtn);
+
+    const cancelBtn = document.createElement('button');
+    cancelBtn.type = 'button';
+    cancelBtn.textContent = 'Cancel';
+    cancelBtn.classList.add('btn');
+    cancelBtn.addEventListener('click', closeModal);
+    actions.appendChild(cancelBtn);
+
+    const deleteBtn = document.createElement('button');
+    deleteBtn.type = 'button';
+    deleteBtn.textContent = 'Delete Component';
+    deleteBtn.classList.add('btn');
+    deleteBtn.addEventListener('click', () => {
+      components = components.filter(c => c !== targetComp);
+      components.forEach(c => {
+        c.connections = (c.connections || []).filter(conn => conn.target !== targetComp.id);
+      });
+      closeModal();
+      pushHistory();
+      render();
+      save();
+    });
+    actions.appendChild(deleteBtn);
+
+    form.appendChild(actions);
+
+    form.addEventListener('submit', e => {
+      e.preventDefault();
+      const fd = new FormData(form);
+      fields.forEach(f => {
+        const v = fd.get(f.name);
+        if (f.type === 'checkbox') targetComp[f.name] = v === 'on';
+        else if (f.type === 'number') targetComp[f.name] = v ? parseFloat(v) : '';
+        else targetComp[f.name] = v || '';
+      });
+      targetComp.tccId = fd.get('tccId') || '';
+      pushHistory();
+      render();
+      save();
+      syncSchedules();
+      closeModal();
+    });
+
+    propertyContainer.appendChild(form);
+    propertyContainer.scrollTop = 0;
   }
 
-  const applyBtn = document.createElement('button');
-  applyBtn.type = 'submit';
-  applyBtn.textContent = 'Apply';
-  applyBtn.classList.add('btn');
-  form.appendChild(applyBtn);
+  function setActiveComponent(target) {
+    if (!target) return;
+    activeComponent = target;
+    activeId = target.id;
+    selected = target;
+    selection = [target];
+    selectedConnection = null;
+    updateButtonStates();
+    renderPropertiesFor(target);
+  }
 
-  const templateBtn = document.createElement('button');
-  templateBtn.type = 'button';
-  templateBtn.textContent = 'Save as Template';
-  templateBtn.classList.add('btn');
-  templateBtn.addEventListener('click', () => {
-    const name = prompt('Template name', comp.label || comp.subtype);
-    if (!name) return;
-    const fd = new FormData(form);
-    const data = {
-      subtype: comp.subtype,
-      type: getCategory(comp),
-      rotation: comp.rotation || 0,
-      flipped: !!comp.flipped
-    };
-    fields.forEach(f => {
-      const v = fd.get(f.name);
-      if (f.type === 'checkbox') data[f.name] = v === 'on';
-      else if (f.type === 'number') data[f.name] = v ? parseFloat(v) : '';
-      else data[f.name] = v || '';
+  sortedComponents.forEach(device => {
+    const button = document.createElement('button');
+    button.type = 'button';
+    button.className = 'prop-component-option';
+    button.dataset.componentId = device.id;
+    button.textContent = getComponentListLabel(device);
+    button.setAttribute('aria-pressed', 'false');
+    button.addEventListener('click', () => setActiveComponent(device));
+    button.addEventListener('keydown', event => {
+      if (event.key !== 'ArrowUp' && event.key !== 'ArrowDown') return;
+      event.preventDefault();
+      const currentIndex = sortedComponents.findIndex(item => item.id === device.id);
+      if (currentIndex === -1) return;
+      const offset = event.key === 'ArrowUp' ? -1 : 1;
+      let nextIndex = currentIndex + offset;
+      if (nextIndex < 0) nextIndex = 0;
+      if (nextIndex >= sortedComponents.length) nextIndex = sortedComponents.length - 1;
+      const nextDevice = sortedComponents[nextIndex];
+      if (!nextDevice) return;
+      setActiveComponent(nextDevice);
+      const nextButton = buttonMap.get(nextDevice.id);
+      nextButton?.focus();
     });
-    data.tccId = fd.get('tccId') || '';
-    templates.push({ name, component: data });
-    saveTemplates();
-    renderTemplates();
-    showToast('Template saved');
-  });
-  form.appendChild(templateBtn);
-
-  const cancelBtn = document.createElement('button');
-  cancelBtn.type = 'button';
-  cancelBtn.textContent = 'Cancel';
-  cancelBtn.classList.add('btn');
-  cancelBtn.addEventListener('click', closeModal);
-  form.appendChild(cancelBtn);
-
-  const deleteBtn = document.createElement('button');
-  deleteBtn.type = 'button';
-  deleteBtn.textContent = 'Delete Component';
-  deleteBtn.classList.add('btn');
-  deleteBtn.addEventListener('click', () => {
-    components = components.filter(c => c !== comp);
-    components.forEach(c => {
-      c.connections = (c.connections || []).filter(conn => conn.target !== comp.id);
-    });
-    closeModal();
-    pushHistory();
-    render();
-    save();
-  });
-  form.appendChild(deleteBtn);
-
-  form.addEventListener('submit', e => {
-    e.preventDefault();
-    const fd = new FormData(form);
-    fields.forEach(f => {
-      const v = fd.get(f.name);
-      if (f.type === 'checkbox') comp[f.name] = v === 'on';
-      else if (f.type === 'number') comp[f.name] = v ? parseFloat(v) : '';
-      else comp[f.name] = v || '';
-    });
-    comp.tccId = fd.get('tccId') || '';
-    pushHistory();
-    render();
-    save();
-    syncSchedules();
-    closeModal();
+    buttonMap.set(device.id, button);
+    componentListEl.appendChild(button);
   });
 
-  modal.appendChild(form);
+  updateButtonStates();
+  renderPropertiesFor(activeComponent);
+
+  const initialButton = buttonMap.get(activeId);
+  if (initialButton) initialButton.focus();
+
   modal.classList.add('show');
   modal.addEventListener('click', outsideHandler);
   document.addEventListener('keydown', keyHandler);
@@ -5415,10 +5633,8 @@ async function init() {
       if (!item) return;
       e.preventDefault();
       e.stopPropagation();
-      if (item.dataset.action === 'edit' && paletteContextTarget?.meta?.subtype) {
-        const url = new URL('./custom-components.html', window.location.href);
-        url.searchParams.set('edit', paletteContextTarget.meta.subtype);
-        window.location.href = url.toString();
+      if (item.dataset.action === 'edit' && paletteContextTarget?.meta) {
+        navigateToCustomComponentEditor(paletteContextTarget.meta);
       }
       closePaletteContextMenu();
     });
