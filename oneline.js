@@ -177,6 +177,9 @@ const maxPaletteWidth = 600;
 const paletteWidthStorageKey = 'onelinePaletteWidth';
 const customComponentStorageKey = 'customComponents';
 const customComponentScenarioKey = '__ctr_custom_components__';
+const paletteContextMenu = document.getElementById('palette-context-menu');
+
+let paletteContextTarget = null;
 
 const attributeDisplayOverrides = {
   rating: { label: 'Rating', unit: '' },
@@ -478,6 +481,7 @@ function loadStoredCustomComponents() {
     .filter(item => item && typeof item === 'object')
     .map(item => ({
       ...item,
+      source: item.source || 'custom',
       defaultRotation: normalizeRotation(item?.defaultRotation ?? 0)
     }));
 }
@@ -524,6 +528,9 @@ async function loadComponentLibrary() {
     const defaultRotation = normalizeRotation(
       definition.defaultRotation ?? defaultRotationForType(resolvedType, category)
     );
+    const rawSource = typeof definition.source === 'string' ? definition.source.trim() : '';
+    const derivedSource = rawSource || (definition.isCustom ? 'custom' : '');
+    const isCustom = derivedSource.toLowerCase() === 'custom';
     const rawProps = definition.props || {};
     const props = {};
     Object.entries(rawProps).forEach(([propKey, propValue]) => {
@@ -547,7 +554,9 @@ async function loadComponentLibrary() {
       type: resolvedType,
       subtype,
       props,
-      defaultRotation
+      defaultRotation,
+      source: derivedSource || null,
+      isCustom
     };
     const widthVal = Number(definition.width);
     const heightVal = Number(definition.height);
@@ -626,6 +635,7 @@ function applyDefaults(comp) {
 }
 
 function buildPalette() {
+  closePaletteContextMenu();
   const palette = document.getElementById('component-buttons');
   const btnTemplate = document.getElementById('palette-button-template');
   const sectionContainers = {
@@ -702,6 +712,27 @@ function buildPalette() {
         e.dataTransfer.setData('text/plain', JSON.stringify({ type: meta.type, subtype: subKey }));
         setDragPreview(e, meta, rotation);
       });
+      if (meta.isCustom) {
+        btn.dataset.custom = '1';
+        btn.addEventListener('contextmenu', e => {
+          e.preventDefault();
+          openPaletteContextMenu(meta, btn, e.clientX, e.clientY);
+        });
+        btn.addEventListener('keydown', e => {
+          if (e.key === 'ContextMenu' || (e.shiftKey && e.key === 'F10')) {
+            e.preventDefault();
+            const rect = btn.getBoundingClientRect();
+            openPaletteContextMenu(
+              meta,
+              btn,
+              rect.left + rect.width / 2,
+              rect.top + rect.height / 2
+            );
+          }
+        });
+      } else {
+        btn.dataset.custom = '0';
+      }
       container.appendChild(btn);
     });
   });
@@ -742,6 +773,28 @@ function buildPalette() {
       }
     });
   }
+}
+
+function closePaletteContextMenu() {
+  if (!paletteContextMenu) return;
+  paletteContextMenu.style.display = 'none';
+  paletteContextTarget = null;
+}
+
+function openPaletteContextMenu(meta, triggerEl, clientX, clientY) {
+  if (!paletteContextMenu || !meta) return;
+  closePaletteContextMenu();
+  paletteContextTarget = { meta, trigger: triggerEl };
+  paletteContextMenu.style.display = 'block';
+  paletteContextMenu.style.left = '0px';
+  paletteContextMenu.style.top = '0px';
+  const rect = paletteContextMenu.getBoundingClientRect();
+  const viewportWidth = window.innerWidth || document.documentElement.clientWidth || rect.width;
+  const viewportHeight = window.innerHeight || document.documentElement.clientHeight || rect.height;
+  const left = Math.min(Math.max(0, clientX), viewportWidth - rect.width);
+  const top = Math.min(Math.max(0, clientY), viewportHeight - rect.height);
+  paletteContextMenu.style.left = `${Math.round(left)}px`;
+  paletteContextMenu.style.top = `${Math.round(top)}px`;
 }
 
 function setDragPreview(e, meta, rotation) {
@@ -4994,6 +5047,7 @@ async function init() {
 
   svg.addEventListener('contextmenu', e => {
     e.preventDefault();
+    closePaletteContextMenu();
     const connEl = e.target.closest('.connection');
     if (connEl) {
       const comp = components.find(c => c.id === connEl.dataset.comp);
@@ -5130,9 +5184,15 @@ async function init() {
     if (!menu.contains(e.target)) {
       menu.style.display = 'none';
     }
+    if (paletteContextMenu && paletteContextMenu.style.display === 'block' && !paletteContextMenu.contains(e.target)) {
+      closePaletteContextMenu();
+    }
   });
   document.addEventListener('keydown', e => {
-    if (e.key === 'Escape') menu.style.display = 'none';
+    if (e.key === 'Escape') {
+      menu.style.display = 'none';
+      closePaletteContextMenu();
+    }
   });
 
   document.addEventListener('keydown', e => {
@@ -5229,6 +5289,26 @@ async function init() {
       }
     }
   });
+
+  if (paletteContextMenu) {
+    paletteContextMenu.addEventListener('click', e => {
+      const item = e.target.closest('li[data-action]');
+      if (!item) return;
+      e.preventDefault();
+      e.stopPropagation();
+      if (item.dataset.action === 'edit' && paletteContextTarget?.meta?.subtype) {
+        const url = new URL('./custom-components.html', window.location.href);
+        url.searchParams.set('edit', paletteContextTarget.meta.subtype);
+        window.location.href = url.toString();
+      }
+      closePaletteContextMenu();
+    });
+    paletteContextMenu.addEventListener('contextmenu', e => {
+      e.preventDefault();
+    });
+  }
+  window.addEventListener('resize', closePaletteContextMenu);
+  document.addEventListener('scroll', closePaletteContextMenu, true);
 
   const tourBtn = document.getElementById('tour-btn');
   if (tourBtn) tourBtn.addEventListener('click', () => {

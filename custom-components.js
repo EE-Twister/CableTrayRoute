@@ -20,6 +20,7 @@ const propertyList = document.getElementById('property-list');
 const addPropertyBtn = document.getElementById('add-property-btn');
 const iconCanvas = document.getElementById('icon-canvas');
 const iconToolButtons = document.getElementById('icon-tool-buttons');
+const iconAlignButtons = document.getElementById('icon-align-buttons');
 const undoIconBtn = document.getElementById('undo-icon-btn');
 const clearIconBtn = document.getElementById('clear-icon-btn');
 const iconPreview = document.getElementById('icon-preview');
@@ -33,6 +34,7 @@ const importInput = document.getElementById('import-components-input');
 const tableBody = document.querySelector('#custom-components-table tbody');
 const emptyMessage = document.getElementById('no-components-message');
 const submitBtn = form?.querySelector('button[type="submit"]');
+const alignButtonList = iconAlignButtons ? Array.from(iconAlignButtons.querySelectorAll('button[data-align]')) : [];
 
 const navToggle = document.getElementById('nav-toggle');
 const navLinks = document.getElementById('nav-links');
@@ -55,6 +57,13 @@ const MAX_TEXT_SIZE = 120;
 const DEFAULT_TEXT_SIZE = Number(textSizeInput?.value) || 18;
 const DEFAULT_TEXT_COLOR = textColorInput?.value || '#1f2933';
 const DEFAULT_TEXT_FONT = textFontSelect?.value || 'Arial, sans-serif';
+const DEFAULT_COMPONENT_WIDTH = Number(widthInput?.defaultValue) || Number(widthInput?.value) || 80;
+const DEFAULT_COMPONENT_HEIGHT = Number(heightInput?.defaultValue) || Number(heightInput?.value) || 40;
+const MIN_COMPONENT_WIDTH = Number(widthInput?.min) || 20;
+const MAX_COMPONENT_WIDTH = Number(widthInput?.max) || 600;
+const MIN_COMPONENT_HEIGHT = Number(heightInput?.min) || 20;
+const MAX_COMPONENT_HEIGHT = Number(heightInput?.max) || 400;
+let iconCanvasSize = { width: ICON_CANVAS_SIZE, height: ICON_CANVAS_SIZE };
 
 let textStyleState = {
   fontFamily: DEFAULT_TEXT_FONT,
@@ -62,6 +71,9 @@ let textStyleState = {
   color: DEFAULT_TEXT_COLOR
 };
 let suppressTextControlEvents = false;
+const urlParams = new URLSearchParams(window.location.search);
+const initialEditSubtype = urlParams.get('edit');
+let editQueryHandled = false;
 
 if (navToggle && navLinks) {
   navToggle.addEventListener('click', () => {
@@ -92,7 +104,6 @@ function showToast(message, kind = 'info') {
 function ensureIconCanvas() {
   if (!iconCanvas) return;
   if (!iconCanvas.dataset.initialized) {
-    iconCanvas.setAttribute('viewBox', `0 0 ${ICON_CANVAS_SIZE} ${ICON_CANVAS_SIZE}`);
     iconCanvas.setAttribute('role', 'img');
     iconCanvas.setAttribute('aria-label', 'Custom component icon canvas');
     iconCanvas.dataset.initialized = '1';
@@ -117,13 +128,25 @@ function ensureIconCanvas() {
     const bg = document.createElementNS(SVG_NS, 'rect');
     bg.setAttribute('x', '0');
     bg.setAttribute('y', '0');
-    bg.setAttribute('width', ICON_CANVAS_SIZE);
-    bg.setAttribute('height', ICON_CANVAS_SIZE);
+    bg.setAttribute('width', iconCanvasSize.width);
+    bg.setAttribute('height', iconCanvasSize.height);
     bg.setAttribute('data-icon-grid', '1');
     bg.classList.add('icon-canvas-bg');
     bg.setAttribute('fill', '#f8f9fb');
     iconCanvas.appendChild(bg);
   }
+  if (!iconCanvas.querySelector('[data-component-outline]')) {
+    const outline = document.createElementNS(SVG_NS, 'rect');
+    outline.setAttribute('x', '0');
+    outline.setAttribute('y', '0');
+    outline.setAttribute('width', iconCanvasSize.width);
+    outline.setAttribute('height', iconCanvasSize.height);
+    outline.setAttribute('data-component-outline', '1');
+    outline.setAttribute('fill', 'none');
+    outline.classList.add('icon-component-outline');
+    iconCanvas.appendChild(outline);
+  }
+  setIconCanvasSize(iconCanvasSize.width, iconCanvasSize.height);
 }
 
 function setActiveIconTool(tool) {
@@ -143,12 +166,14 @@ function setActiveIconTool(tool) {
 function selectIconShape(shape) {
   if (selectedIconShape === shape) {
     syncTextControls(shape || null);
+    updateAlignButtonsState();
     return;
   }
   if (selectedIconShape) selectedIconShape.classList.remove('icon-shape-selected');
   selectedIconShape = shape || null;
   if (selectedIconShape) selectedIconShape.classList.add('icon-shape-selected');
   syncTextControls(selectedIconShape);
+  updateAlignButtonsState();
 }
 
 function roundCoord(value) {
@@ -180,6 +205,230 @@ function normalizeColorValue(value) {
     return `#${hex[0]}${hex[0]}${hex[1]}${hex[1]}${hex[2]}${hex[2]}`.toLowerCase();
   }
   return DEFAULT_TEXT_COLOR;
+}
+
+function clampDimension(value, min, max, fallback) {
+  const num = Number(value);
+  if (!Number.isFinite(num)) return fallback;
+  if (num < min) return min;
+  if (num > max) return max;
+  return num;
+}
+
+function scaleStrokeWidth(shape, factor) {
+  if (!shape) return;
+  const current = Number(shape.getAttribute('stroke-width'));
+  if (!Number.isFinite(current)) return;
+  const next = Math.max(0.5, roundCoord(current * factor));
+  shape.setAttribute('stroke-width', next);
+}
+
+function scaleIconShapes(scaleX, scaleY) {
+  if (!iconCanvas) return;
+  if (!Number.isFinite(scaleX) || !Number.isFinite(scaleY)) return;
+  const shapes = iconCanvas.querySelectorAll('[data-icon-shape]');
+  if (!shapes.length) return;
+  const strokeScale = Math.min(Math.abs(scaleX), Math.abs(scaleY));
+  shapes.forEach(shape => {
+    const type = shape.dataset.shapeType;
+    if (type === 'line') {
+      const start = {
+        x: roundCoord((Number(shape.dataset.x1) || 0) * scaleX),
+        y: roundCoord((Number(shape.dataset.y1) || 0) * scaleY)
+      };
+      const end = {
+        x: roundCoord((Number(shape.dataset.x2) || 0) * scaleX),
+        y: roundCoord((Number(shape.dataset.y2) || 0) * scaleY)
+      };
+      applyLineAttributes(shape, start, end);
+      scaleStrokeWidth(shape, strokeScale);
+    } else if (type === 'rectangle') {
+      const x = (Number(shape.dataset.x) || 0) * scaleX;
+      const y = (Number(shape.dataset.y) || 0) * scaleY;
+      const width = (Number(shape.dataset.width) || 0) * scaleX;
+      const height = (Number(shape.dataset.height) || 0) * scaleY;
+      const start = { x: roundCoord(x), y: roundCoord(y) };
+      const end = { x: roundCoord(x + width), y: roundCoord(y + height) };
+      applyRectAttributes(shape, start, end);
+      scaleStrokeWidth(shape, strokeScale);
+    } else if (type === 'circle') {
+      const cx = roundCoord((Number(shape.dataset.cx) || 0) * scaleX);
+      const cy = roundCoord((Number(shape.dataset.cy) || 0) * scaleY);
+      const radiusScale = Math.min(Math.abs(scaleX), Math.abs(scaleY));
+      const r = roundCoord((Number(shape.dataset.r) || 0) * radiusScale);
+      shape.dataset.cx = String(cx);
+      shape.dataset.cy = String(cy);
+      shape.dataset.r = String(r);
+      shape.setAttribute('cx', cx);
+      shape.setAttribute('cy', cy);
+      shape.setAttribute('r', r);
+      scaleStrokeWidth(shape, strokeScale);
+    } else if (type === 'arc') {
+      const start = {
+        x: roundCoord((Number(shape.dataset.startX) || 0) * scaleX),
+        y: roundCoord((Number(shape.dataset.startY) || 0) * scaleY)
+      };
+      const control = {
+        x: roundCoord((Number(shape.dataset.controlX) || 0) * scaleX),
+        y: roundCoord((Number(shape.dataset.controlY) || 0) * scaleY)
+      };
+      const end = {
+        x: roundCoord((Number(shape.dataset.endX) || 0) * scaleX),
+        y: roundCoord((Number(shape.dataset.endY) || 0) * scaleY)
+      };
+      applyArcAttributes(shape, start, { control, end });
+      scaleStrokeWidth(shape, strokeScale);
+    } else if (type === 'text') {
+      const x = roundCoord((Number(shape.dataset.x) || 0) * scaleX);
+      const y = roundCoord((Number(shape.dataset.y) || 0) * scaleY);
+      applyTextAttributes(shape, { x, y });
+      const baseSize = Number(shape.dataset.fontSize) || sanitizeTextSize(shape.getAttribute('font-size'));
+      const nextSize = sanitizeTextSize(baseSize * Math.min(Math.abs(scaleX), Math.abs(scaleY)));
+      shape.dataset.fontSize = String(nextSize);
+      shape.setAttribute('font-size', nextSize);
+    }
+  });
+}
+
+function setIconCanvasSize(width, height, { rescale = false } = {}) {
+  if (!iconCanvas) return;
+  const prevWidth = iconCanvasSize.width || ICON_CANVAS_SIZE;
+  const prevHeight = iconCanvasSize.height || ICON_CANVAS_SIZE;
+  const nextWidth = Math.max(1, Number(width) || ICON_CANVAS_SIZE);
+  const nextHeight = Math.max(1, Number(height) || ICON_CANVAS_SIZE);
+  const hasShapes = iconCanvas.querySelector('[data-icon-shape]');
+  if (
+    rescale &&
+    hasShapes &&
+    (Math.abs(nextWidth - prevWidth) > 0.01 || Math.abs(nextHeight - prevHeight) > 0.01)
+  ) {
+    scaleIconShapes(nextWidth / prevWidth, nextHeight / prevHeight);
+  }
+  iconCanvasSize = { width: nextWidth, height: nextHeight };
+  iconCanvas.setAttribute('viewBox', `0 0 ${nextWidth} ${nextHeight}`);
+  const bg = iconCanvas.querySelector('[data-icon-grid]');
+  if (bg) {
+    bg.setAttribute('width', nextWidth);
+    bg.setAttribute('height', nextHeight);
+  }
+  const outline = iconCanvas.querySelector('[data-component-outline]');
+  if (outline) {
+    outline.setAttribute('width', nextWidth);
+    outline.setAttribute('height', nextHeight);
+  }
+  if (hasShapes) {
+    commitIconChanges();
+  }
+}
+
+function syncCanvasToInputs({ rescale = false, updateInputValue = true } = {}) {
+  if (!widthInput || !heightInput) return;
+  const widthFallback = updateInputValue ? DEFAULT_COMPONENT_WIDTH : iconCanvasSize.width;
+  const heightFallback = updateInputValue ? DEFAULT_COMPONENT_HEIGHT : iconCanvasSize.height;
+  const width = clampDimension(widthInput.value, MIN_COMPONENT_WIDTH, MAX_COMPONENT_WIDTH, widthFallback);
+  const height = clampDimension(heightInput.value, MIN_COMPONENT_HEIGHT, MAX_COMPONENT_HEIGHT, heightFallback);
+  if (updateInputValue) {
+    widthInput.value = String(width);
+    heightInput.value = String(height);
+  }
+  setIconCanvasSize(width, height, { rescale });
+}
+
+function handleDimensionInputChange(event) {
+  const rescale = event.type === 'change';
+  const updateInputValue = event.type === 'change';
+  syncCanvasToInputs({ rescale, updateInputValue });
+}
+
+function updateAlignButtonsState() {
+  const enabled = !!selectedIconShape;
+  alignButtonList.forEach(btn => {
+    btn.disabled = !enabled;
+  });
+}
+
+function translateShape(shape, dx, dy) {
+  if (!shape) return false;
+  const type = shape.dataset.shapeType;
+  if (!type) return false;
+  if (Math.abs(dx) < 0.01 && Math.abs(dy) < 0.01) return false;
+  const data = captureShapeData(shape);
+  if (!data) return false;
+  if (type === 'line') {
+    const start = { x: roundCoord(data.x1 + dx), y: roundCoord(data.y1 + dy) };
+    const end = { x: roundCoord(data.x2 + dx), y: roundCoord(data.y2 + dy) };
+    applyLineAttributes(shape, start, end);
+    return true;
+  }
+  if (type === 'rectangle') {
+    const x = roundCoord(data.x + dx);
+    const y = roundCoord(data.y + dy);
+    shape.dataset.x = String(x);
+    shape.dataset.y = String(y);
+    shape.dataset.width = String(roundCoord(data.width));
+    shape.dataset.height = String(roundCoord(data.height));
+    shape.setAttribute('x', x);
+    shape.setAttribute('y', y);
+    shape.setAttribute('width', roundCoord(data.width));
+    shape.setAttribute('height', roundCoord(data.height));
+    return true;
+  }
+  if (type === 'circle') {
+    const cx = roundCoord(data.cx + dx);
+    const cy = roundCoord(data.cy + dy);
+    shape.dataset.cx = String(cx);
+    shape.dataset.cy = String(cy);
+    shape.dataset.r = String(roundCoord(data.r));
+    shape.setAttribute('cx', cx);
+    shape.setAttribute('cy', cy);
+    shape.setAttribute('r', roundCoord(data.r));
+    return true;
+  }
+  if (type === 'arc') {
+    const start = { x: roundCoord(data.startX + dx), y: roundCoord(data.startY + dy) };
+    const control = { x: roundCoord(data.controlX + dx), y: roundCoord(data.controlY + dy) };
+    const end = { x: roundCoord(data.endX + dx), y: roundCoord(data.endY + dy) };
+    applyArcAttributes(shape, start, { control, end });
+    return true;
+  }
+  if (type === 'text') {
+    const x = roundCoord(data.x + dx);
+    const y = roundCoord(data.y + dy);
+    applyTextAttributes(shape, { x, y });
+    return true;
+  }
+  return false;
+}
+
+function alignSelectedShape(direction) {
+  if (!iconCanvas || !selectedIconShape) return;
+  const bbox = selectedIconShape.getBBox();
+  const width = iconCanvasSize.width || ICON_CANVAS_SIZE;
+  const height = iconCanvasSize.height || ICON_CANVAS_SIZE;
+  let dx = 0;
+  let dy = 0;
+  if (direction === 'left') {
+    dx = -bbox.x;
+  } else if (direction === 'right') {
+    dx = width - (bbox.x + bbox.width);
+  } else if (direction === 'center') {
+    dx = width / 2 - (bbox.x + bbox.width / 2);
+  } else if (direction === 'top') {
+    dy = -bbox.y;
+  } else if (direction === 'bottom') {
+    dy = height - (bbox.y + bbox.height);
+  } else if (direction === 'middle') {
+    dy = height / 2 - (bbox.y + bbox.height / 2);
+  }
+  if (direction === 'left' || direction === 'right' || direction === 'center') {
+    dy = 0;
+  } else if (direction === 'top' || direction === 'bottom' || direction === 'middle') {
+    dx = 0;
+  }
+  dx = roundCoord(dx);
+  dy = roundCoord(dy);
+  if (!translateShape(selectedIconShape, dx, dy)) return;
+  commitIconChanges();
 }
 
 function ensureTextFontOption(font) {
@@ -258,11 +507,12 @@ function getCanvasPoint(event) {
   if (!iconCanvas) return null;
   const rect = iconCanvas.getBoundingClientRect();
   if (!rect.width || !rect.height) return null;
-  const x = ((event.clientX - rect.left) / rect.width) * ICON_CANVAS_SIZE;
-  const y = ((event.clientY - rect.top) / rect.height) * ICON_CANVAS_SIZE;
+  const { width, height } = iconCanvasSize;
+  const x = ((event.clientX - rect.left) / rect.width) * width;
+  const y = ((event.clientY - rect.top) / rect.height) * height;
   return {
-    x: roundCoord(Math.min(Math.max(x, 0), ICON_CANVAS_SIZE)),
-    y: roundCoord(Math.min(Math.max(y, 0), ICON_CANVAS_SIZE))
+    x: roundCoord(Math.min(Math.max(x, 0), width)),
+    y: roundCoord(Math.min(Math.max(y, 0), height))
   };
 }
 
@@ -384,7 +634,7 @@ function clearIconCanvas({ resetData = true } = {}) {
   drawingStart = null;
   shapeDragState = null;
   selectIconShape(null);
-  iconCanvas.setAttribute('viewBox', `0 0 ${ICON_CANVAS_SIZE} ${ICON_CANVAS_SIZE}`);
+  setIconCanvasSize(iconCanvasSize.width, iconCanvasSize.height);
   if (resetData) {
     currentIconData = null;
     updateIconPreview(null);
@@ -399,11 +649,12 @@ function serializeIconCanvas() {
   clone.removeAttribute('id');
   clone.querySelectorAll('[data-icon-grid]').forEach(el => el.remove());
   clone.querySelectorAll('[data-icon-layer="defs"]').forEach(el => el.remove());
+  clone.querySelectorAll('[data-component-outline]').forEach(el => el.remove());
   clone.querySelectorAll('.icon-shape-selected').forEach(el => el.classList.remove('icon-shape-selected'));
   clone.setAttribute('xmlns', SVG_NS);
   clone.setAttribute('xmlns:xlink', 'http://www.w3.org/1999/xlink');
-  clone.setAttribute('width', String(ICON_CANVAS_SIZE));
-  clone.setAttribute('height', String(ICON_CANVAS_SIZE));
+  clone.setAttribute('width', String(iconCanvasSize.width));
+  clone.setAttribute('height', String(iconCanvasSize.height));
   clone.setAttribute(BUILDER_FLAG_ATTR, '1');
   const serialized = new XMLSerializer().serializeToString(clone);
   const encoded = window.btoa(unescape(encodeURIComponent(serialized)));
@@ -447,7 +698,12 @@ function importIconData(dataUrl) {
       const root = doc.documentElement;
       if (root && root.getAttribute(BUILDER_FLAG_ATTR) === '1') {
         const vb = root.getAttribute('viewBox');
-        if (vb) iconCanvas.setAttribute('viewBox', vb);
+        if (vb) {
+          const parts = vb.split(/\s+/).map(Number);
+          if (parts.length === 4 && Number.isFinite(parts[2]) && Number.isFinite(parts[3])) {
+            setIconCanvasSize(parts[2], parts[3], { rescale: false });
+          }
+        }
         Array.from(root.children).forEach(node => {
           if (node.nodeType !== 1) return;
           if (node.getAttribute('data-icon-grid') || node.tagName.toLowerCase() === 'defs') return;
@@ -764,6 +1020,7 @@ function loadComponents() {
     .filter(item => item && typeof item === 'object')
     .map(item => ({
       ...item,
+      source: item.source || 'custom',
       defaultRotation: normalizeRotationValue(item?.defaultRotation)
     }));
 }
@@ -939,6 +1196,7 @@ function propertiesToObject(properties) {
 
 function resetIcon() {
   clearIconCanvas();
+  syncCanvasToInputs({ rescale: false, updateInputValue: false });
 }
 
 function resetForm() {
@@ -951,6 +1209,7 @@ function resetForm() {
   clearPropertyRows();
   addPropertyRow();
   resetIcon();
+  syncCanvasToInputs({ rescale: false, updateInputValue: true });
 }
 
 function updateIconPreview(src, nonEditable = false) {
@@ -1038,6 +1297,7 @@ function loadComponentForEdit(index) {
   categorySelect.value = comp.category || 'equipment';
   widthInput.value = comp.width || 80;
   heightInput.value = comp.height || 40;
+  syncCanvasToInputs({ rescale: false, updateInputValue: true });
   const counts = comp.portCounts || inferPortCounts(comp.ports || [], comp.width, comp.height);
   portTopInput.value = counts.top || 0;
   portRightInput.value = counts.right || 0;
@@ -1047,6 +1307,7 @@ function loadComponentForEdit(index) {
   (comp.properties || []).forEach(entry => addPropertyRow(entry));
   if (!comp.properties || comp.properties.length === 0) addPropertyRow();
   importIconData(comp.icon || null);
+  syncCanvasToInputs({ rescale: true, updateInputValue: false });
   if (submitBtn) submitBtn.textContent = 'Update Component';
   form.scrollIntoView({ behavior: 'smooth', block: 'start' });
 }
@@ -1083,6 +1344,7 @@ function deleteComponent(index) {
 function handleFormSubmit(event) {
   event.preventDefault();
   try {
+    syncCanvasToInputs({ rescale: true, updateInputValue: true });
     const label = labelInput.value.trim();
     const subtype = subtypeInput.value.trim();
     const type = typeInput.value.trim();
@@ -1123,7 +1385,8 @@ function handleFormSubmit(event) {
       props,
       properties,
       icon: currentIconData || null,
-      defaultRotation
+      defaultRotation,
+      source: 'custom'
     };
     const duplicateIndex = components.findIndex((c, idx) => c.subtype === subtype && idx !== editingIndex);
     if (duplicateIndex !== -1) {
@@ -1210,7 +1473,8 @@ function normalizeImportedComponent(raw) {
     props: propertiesToObject(normalizedProperties),
     properties: normalizedProperties,
     icon: raw.icon || null,
-    defaultRotation
+    defaultRotation,
+    source: 'custom'
   };
 }
 
@@ -1261,6 +1525,10 @@ function setupListeners() {
   textSizeInput?.addEventListener('change', handleTextStyleChange);
   textColorInput?.addEventListener('input', handleTextStyleChange);
   textColorInput?.addEventListener('change', handleTextStyleChange);
+  widthInput?.addEventListener('input', handleDimensionInputChange);
+  widthInput?.addEventListener('change', handleDimensionInputChange);
+  heightInput?.addEventListener('input', handleDimensionInputChange);
+  heightInput?.addEventListener('change', handleDimensionInputChange);
   form.addEventListener('submit', handleFormSubmit);
   addPropertyBtn.addEventListener('click', () => addPropertyRow());
   resetFormBtn.addEventListener('click', resetForm);
@@ -1276,6 +1544,13 @@ function setupListeners() {
   if (iconCanvas) {
     iconCanvas.addEventListener('mousedown', handleCanvasMouseDown);
     iconCanvas.addEventListener('dblclick', handleCanvasDoubleClick);
+  }
+  if (iconAlignButtons) {
+    iconAlignButtons.addEventListener('click', e => {
+      const btn = e.target.closest('button[data-align]');
+      if (!btn || btn.disabled) return;
+      alignSelectedShape(btn.dataset.align);
+    });
   }
   document.addEventListener('mousemove', handleCanvasMouseMove);
   document.addEventListener('mouseup', handleCanvasMouseUp);
@@ -1293,9 +1568,40 @@ function setupListeners() {
   });
 }
 
+function clearEditQueryParam() {
+  const params = new URLSearchParams(window.location.search);
+  if (!params.has('edit')) return;
+  params.delete('edit');
+  const query = params.toString();
+  const next = `${window.location.pathname}${query ? `?${query}` : ''}${window.location.hash}`;
+  window.history.replaceState({}, '', next);
+}
+
+function handleInitialEditQuery() {
+  if (editQueryHandled || !initialEditSubtype) return;
+  const normalized = initialEditSubtype.trim().toLowerCase();
+  if (!normalized) {
+    editQueryHandled = true;
+    clearEditQueryParam();
+    return;
+  }
+  const idx = components.findIndex(c => (c.subtype || '').trim().toLowerCase() === normalized);
+  if (idx >= 0) {
+    loadComponentForEdit(idx);
+    const comp = components[idx];
+    const label = comp.label || comp.subtype || initialEditSubtype;
+    showToast(`Loaded ${label} for editing.`, 'info');
+  } else {
+    showToast(`Component "${initialEditSubtype}" not found.`, 'error');
+  }
+  editQueryHandled = true;
+  clearEditQueryParam();
+}
+
 ensureIconCanvas();
 setActiveIconTool('select');
 resetForm();
 updateTable();
 setupListeners();
+handleInitialEditQuery();
 

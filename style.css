@@ -3305,7 +3305,8 @@ body.dark-mode .workflow-card-title {
     height: 2.5rem;
 }
 
-.icon-tool-btn {
+.icon-tool-btn,
+.icon-align-btn {
     padding: 0.35rem 0.75rem;
     border: 1px solid var(--ol-border-color);
     border-radius: var(--ol-radius);
@@ -3316,11 +3317,34 @@ body.dark-mode .workflow-card-title {
 }
 
 .icon-tool-btn.active,
-.icon-tool-btn:focus-visible {
+.icon-tool-btn:focus-visible,
+.icon-align-btn:focus-visible {
     outline: none;
     border-color: var(--primary-color);
     background: var(--primary-color);
     color: var(--secondary-color);
+}
+
+.icon-align-toolbar {
+    display: grid;
+    gap: 0.75rem;
+}
+
+.icon-align-group {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    flex-wrap: wrap;
+}
+
+.icon-align-group-label {
+    font-size: 0.85rem;
+    color: var(--text-muted, #6c757d);
+}
+
+.icon-align-btn:disabled {
+    opacity: 0.55;
+    cursor: not-allowed;
 }
 
 .icon-canvas-wrapper {
@@ -3394,6 +3418,16 @@ body.dark-mode .workflow-card-title {
 .icon-canvas-bg {
     fill: url(#icon-grid-pattern);
     opacity: 0.35;
+}
+
+.icon-component-outline {
+    fill: none;
+    stroke: var(--primary-color);
+    stroke-width: 1.5;
+    stroke-dasharray: 6 4;
+    opacity: 0.45;
+    pointer-events: none;
+    vector-effect: non-scaling-stroke;
 }
 
 .icon-shape-selected {

@@ -91,18 +91,32 @@
             <button type="button" id="add-property-btn" class="btn">Add Property</button>
           </fieldset>
           <div class="icon-fieldset">
-            <div class="icon-builder">
-              <div id="icon-tool-buttons" class="icon-toolbar" role="toolbar" aria-label="Icon drawing tools">
-                <button type="button" class="icon-tool-btn active" data-tool="select" aria-pressed="true">Select</button>
-                <button type="button" class="icon-tool-btn" data-tool="line" aria-pressed="false">Line</button>
-                <button type="button" class="icon-tool-btn" data-tool="rectangle" aria-pressed="false">Rectangle</button>
-                <button type="button" class="icon-tool-btn" data-tool="circle" aria-pressed="false">Circle</button>
-                <button type="button" class="icon-tool-btn" data-tool="arc" aria-pressed="false">Arc</button>
-                <button type="button" class="icon-tool-btn" data-tool="text" aria-pressed="false">Text</button>
-              </div>
-              <div class="text-style-controls" aria-label="Text options">
-                <label for="icon-text-font">Font
-                  <select id="icon-text-font">
+              <div class="icon-builder">
+                <div id="icon-tool-buttons" class="icon-toolbar" role="toolbar" aria-label="Icon drawing tools">
+                  <button type="button" class="icon-tool-btn active" data-tool="select" aria-pressed="true">Select</button>
+                  <button type="button" class="icon-tool-btn" data-tool="line" aria-pressed="false">Line</button>
+                  <button type="button" class="icon-tool-btn" data-tool="rectangle" aria-pressed="false">Rectangle</button>
+                  <button type="button" class="icon-tool-btn" data-tool="circle" aria-pressed="false">Circle</button>
+                  <button type="button" class="icon-tool-btn" data-tool="arc" aria-pressed="false">Arc</button>
+                  <button type="button" class="icon-tool-btn" data-tool="text" aria-pressed="false">Text</button>
+                </div>
+                <div id="icon-align-buttons" class="icon-align-toolbar" role="group" aria-label="Alignment tools">
+                  <div class="icon-align-group" role="group" aria-label="Horizontal alignment">
+                    <span class="icon-align-group-label">Horizontal</span>
+                    <button type="button" class="icon-align-btn" data-align="left" title="Align left" disabled>Left</button>
+                    <button type="button" class="icon-align-btn" data-align="center" title="Align center" disabled>Center</button>
+                    <button type="button" class="icon-align-btn" data-align="right" title="Align right" disabled>Right</button>
+                  </div>
+                  <div class="icon-align-group" role="group" aria-label="Vertical alignment">
+                    <span class="icon-align-group-label">Vertical</span>
+                    <button type="button" class="icon-align-btn" data-align="top" title="Align top" disabled>Top</button>
+                    <button type="button" class="icon-align-btn" data-align="middle" title="Align middle" disabled>Middle</button>
+                    <button type="button" class="icon-align-btn" data-align="bottom" title="Align bottom" disabled>Bottom</button>
+                  </div>
+                </div>
+                <div class="text-style-controls" aria-label="Text options">
+                  <label for="icon-text-font">Font
+                    <select id="icon-text-font">
                     <option value="Arial, sans-serif">Arial</option>
                     <option value="'Times New Roman', serif">Times New Roman</option>
                     <option value="'Courier New', monospace">Courier New</option>
