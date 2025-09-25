@@ -225,7 +225,20 @@ const attributeDisplayOverrides = {
   voltage_mag: { label: 'Voltage (p.u.)', unit: '' },
   voltage_mag_a: { label: 'Voltage A (p.u.)', unit: '' },
   voltage_mag_b: { label: 'Voltage B (p.u.)', unit: '' },
-  voltage_mag_c: { label: 'Voltage C (p.u.)', unit: '' }
+  voltage_mag_c: { label: 'Voltage C (p.u.)', unit: '' },
+  'arcFlash.incidentEnergy': { label: 'Arc Flash Incident Energy', unit: 'cal/cm²' },
+  'arcFlash.boundary': { label: 'Arc Flash Boundary', unit: 'mm' },
+  'arcFlash.ppeCategory': { label: 'Arc Flash PPE Category', unit: '' },
+  'arcFlash.clearingTime': { label: 'Arc Flash Clearing Time', unit: 's' },
+  'shortCircuit.method': { label: 'Short-Circuit Method', unit: '' },
+  'shortCircuit.prefaultKV': { label: 'Prefault Voltage', unit: 'kV' },
+  'shortCircuit.threePhaseKA': { label: 'Three-Phase Fault', unit: 'kA' },
+  'shortCircuit.asymKA': { label: 'Asymmetrical Fault', unit: 'kA' },
+  'shortCircuit.lineToGroundKA': { label: 'Line-to-Ground Fault', unit: 'kA' },
+  'shortCircuit.lineToLineKA': { label: 'Line-to-Line Fault', unit: 'kA' },
+  'shortCircuit.doubleLineGroundKA': { label: 'Double-Line-Ground Fault', unit: 'kA' },
+  'reliability.availability': { label: 'Reliability Availability', unit: '' },
+  'reliability.downtime': { label: 'Reliability Downtime', unit: 'h/year' }
 };
 
 const attributeIgnoreKeys = new Set([
@@ -243,8 +256,30 @@ const attributeIgnoreKeys = new Set([
   'height',
   'ports',
   'impedance',
-  'props'
+  'props',
+  'arcFlash',
+  'shortCircuit',
+  'reliability'
 ]);
+
+let cachedStudyResults = getStudies();
+
+const studyAttributeResolvers = {
+  arcFlash: comp => {
+    if (!comp) return null;
+    if (comp.arcFlash && typeof comp.arcFlash === 'object') return comp.arcFlash;
+    return cachedStudyResults?.arcFlash?.[comp.id] || null;
+  },
+  shortCircuit: comp => {
+    if (!comp) return null;
+    if (comp.shortCircuit && typeof comp.shortCircuit === 'object') return comp.shortCircuit;
+    return cachedStudyResults?.shortCircuit?.[comp.id] || null;
+  },
+  reliability: comp => {
+    if (!comp) return null;
+    return cachedStudyResults?.reliability?.componentStats?.[comp.id] || null;
+  }
+};
 
 const storedViewAttributes = getItem(viewAttributeStorageKey, []);
 const initialViewAttributes = Array.isArray(storedViewAttributes)
@@ -882,6 +917,11 @@ let middlePanState = null;
 // Re-run validation whenever diagram or study results change
 on('oneLineDiagram', validateDiagram);
 on('studyResults', validateDiagram);
+on('studyResults', () => {
+  cachedStudyResults = getStudies();
+  refreshAttributeOptions();
+  render();
+});
 
 // Studies panel setup
 const studiesPanel = document.getElementById('studies-panel');
@@ -1849,11 +1889,20 @@ function attachLabelInteractions(el, comp) {
 }
 
 function formatAttributeLabel(key) {
+  if (!key) return '';
   return key
+    .replace(/\./g, '_')
     .split('_')
     .filter(Boolean)
-    .map(part => (part.length <= 3 ? part.toUpperCase() : part.charAt(0).toUpperCase() + part.slice(1)))
-    .join(' ');
+    .map(part => {
+      const normalized = part.replace(/([a-z0-9])([A-Z])/g, '$1 $2');
+      if (normalized.length <= 3 && normalized === normalized.toUpperCase()) return normalized;
+      if (normalized.length <= 3) return normalized.toUpperCase();
+      return normalized.charAt(0).toUpperCase() + normalized.slice(1);
+    })
+    .join(' ')
+    .replace(/\s+/g, ' ')
+    .trim();
 }
 
 function inferAttributeUnit(key) {
@@ -1905,6 +1954,42 @@ function formatAttributeValue(key, value) {
   return null;
 }
 
+function getNestedValue(source, segments = []) {
+  let current = source;
+  for (const segment of segments) {
+    if (!current || typeof current !== 'object' || !(segment in current)) return undefined;
+    current = current[segment];
+  }
+  return current;
+}
+
+function resolveComponentAttribute(comp, key) {
+  if (!comp || !key) return undefined;
+  if (!key.includes('.')) {
+    let value = comp[key];
+    if (value === undefined && comp.props && typeof comp.props === 'object') {
+      value = comp.props[key];
+    }
+    return value;
+  }
+  const segments = key.split('.');
+  let value = getNestedValue(comp, segments);
+  if (value !== undefined) return value;
+  if (comp.props && typeof comp.props === 'object') {
+    value = getNestedValue(comp.props, segments);
+    if (value !== undefined) return value;
+  }
+  const resolver = studyAttributeResolvers[segments[0]];
+  if (resolver) {
+    const base = resolver(comp);
+    if (base && typeof base === 'object') {
+      value = getNestedValue(base, segments.slice(1));
+      if (value !== undefined) return value;
+    }
+  }
+  return undefined;
+}
+
 function getComponentAttributeLines(comp) {
   if (!viewAttributes.size) return [];
   const keys = Array.from(viewAttributes);
@@ -1917,15 +2002,12 @@ function getComponentAttributeLines(comp) {
   keys.forEach(key => {
     const option = getAttributeOption(key);
     if (!option) return;
-    let value = comp[key];
-    if (value === undefined && comp.props && typeof comp.props === 'object') {
-      value = comp.props[key];
-    }
-    const formatted = formatAttributeValue(key, value);
+    const value = resolveComponentAttribute(comp, option.key);
+    const formatted = formatAttributeValue(option.key, value);
     if (formatted === null) return;
     const unit = option.unit || '';
     const valueText = unit ? `${formatted} ${unit}`.trim() : formatted;
-    const labelText = option.label || formatAttributeLabel(key);
+    const labelText = option.label || formatAttributeLabel(option.key);
     lines.push(`${labelText}: ${valueText}`.trim());
   });
   return lines;
@@ -2137,9 +2219,11 @@ function updateViewButtonLabel() {
 }
 
 function refreshAttributeOptions() {
+  cachedStudyResults = getStudies();
   const optionMap = new Map();
   const componentOptionMap = new Map();
   const componentLabelMap = new Map();
+  const componentById = new Map();
 
   const registerOption = key => {
     if (!key) return null;
@@ -2206,6 +2290,7 @@ function refreshAttributeOptions() {
       if (!comp) return;
       const compKey = comp.subtype || comp.type;
       if (!compKey) return;
+      if (comp.id) componentById.set(comp.id, comp);
       const fallbackLabel = componentMeta[compKey]?.label || comp.type || comp.label;
       registerComponentLabel(compKey, fallbackLabel);
       Object.entries(comp).forEach(([key, value]) => {
@@ -2222,6 +2307,40 @@ function refreshAttributeOptions() {
       }
     });
   });
+
+  const registerStudyAttributes = (namespace, data) => {
+    if (!data || typeof data !== 'object') return;
+    Object.entries(data).forEach(([id, record]) => {
+      const comp = componentById.get(id);
+      if (!comp) return;
+      const compKey = comp.subtype || comp.type;
+      if (!compKey) return;
+      if (!record || typeof record !== 'object') return;
+      Object.entries(record).forEach(([prop, value]) => {
+        if (value === undefined || value === null) return;
+        if (typeof value === 'object') return;
+        const combinedKey = `${namespace}.${prop}`;
+        const option = registerOption(combinedKey);
+        if (!option) return;
+        addComponentKey(compKey, option.key);
+      });
+    });
+  };
+
+  registerStudyAttributes('arcFlash', cachedStudyResults?.arcFlash);
+  registerStudyAttributes('shortCircuit', cachedStudyResults?.shortCircuit);
+  const reliabilityStats = cachedStudyResults?.reliability?.componentStats;
+  if (reliabilityStats && typeof reliabilityStats === 'object') {
+    const mapped = {};
+    Object.entries(reliabilityStats).forEach(([id, stats]) => {
+      if (!stats || typeof stats !== 'object') return;
+      mapped[id] = {
+        availability: stats.availability,
+        downtime: stats.downtime
+      };
+    });
+    registerStudyAttributes('reliability', mapped);
+  }
 
   viewAttributes.forEach(key => registerOption(key));
 
