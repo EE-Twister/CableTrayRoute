@@ -809,6 +809,7 @@ const SINGLE_CLICK_DELAY_MS = 175;
 const DOUBLE_CLICK_THRESHOLD_MS = 400;
 const DRAG_MOVE_THRESHOLD = 3;
 let lastComponentClick = { id: null, time: 0 };
+let lastPointerUp = { id: null, time: 0 };
 let findHighlightId = null;
 let findHighlightTimer = null;
 let pointerDownComponentId = null;
@@ -4571,6 +4572,7 @@ async function init() {
       if (e.button === 1 && middlePanState) {
         stopMiddlePan();
         pointerDownComponentId = null;
+        lastPointerUp = { id: null, time: 0 };
         return;
       }
       if (draggingLabel) {
@@ -4581,9 +4583,11 @@ async function init() {
           render();
           save();
         }
+        lastPointerUp = { id: null, time: 0 };
         return;
       }
       if (resizingAnnotation) {
+        lastPointerUp = { id: null, time: 0 };
         return;
       }
       if (resizingBus) {
@@ -4591,6 +4595,7 @@ async function init() {
         pushHistory();
         render();
         save();
+        lastPointerUp = { id: null, time: 0 };
         return;
       }
       if (draggingConnection) {
@@ -4598,12 +4603,14 @@ async function init() {
         pushHistory();
         render();
         save();
+        lastPointerUp = { id: null, time: 0 };
         return;
       }
       if (marquee && marquee.active) {
         const changed = finalizeMarqueeSelection();
         marqueeSelectionMade = changed;
         render();
+        lastPointerUp = { id: null, time: 0 };
         return;
       }
       if (connectSource && tempConnection) {
@@ -4626,8 +4633,10 @@ async function init() {
         connectMode = false;
         connectBtn?.classList.remove('active');
         render();
+        lastPointerUp = { id: null, time: 0 };
         return;
       }
+      let movedDuringDrag = false;
       if (dragOffset && dragOffset.length) {
         if (dragging) {
           const moved = dragOffset.map(off => off.comp);
@@ -4638,12 +4647,41 @@ async function init() {
           pushHistory();
           render();
           save();
+          movedDuringDrag = true;
         }
         dragOffset = null;
         dragging = false;
       } else {
         dragOffset = null;
       }
+      if (movedDuringDrag) {
+        lastPointerUp = { id: null, time: 0 };
+        return;
+      }
+      if (e.button !== 0) {
+        lastPointerUp = { id: null, time: 0 };
+        return;
+      }
+      const targetComponent = e.target instanceof Element ? e.target.closest('.component') : null;
+      const compId = targetComponent?.dataset.id || pointerDownComponentId || null;
+      if (!compId) {
+        lastPointerUp = { id: null, time: 0 };
+        return;
+      }
+      const now = (typeof performance !== 'undefined' && performance.now)
+        ? performance.now()
+        : Date.now();
+      if (lastPointerUp.id === compId && (now - lastPointerUp.time) <= DOUBLE_CLICK_THRESHOLD_MS) {
+        lastPointerUp = { id: null, time: 0 };
+        const comp = components.find(c => c.id === compId);
+        if (comp) {
+          cancelPendingClickSelection();
+          lastComponentClick = { id: null, time: 0 };
+          selectComponent(comp);
+        }
+        return;
+      }
+      lastPointerUp = { id: compId, time: now };
     });
   svg.addEventListener('click', e => {
     if (marqueeSelectionMade) {
