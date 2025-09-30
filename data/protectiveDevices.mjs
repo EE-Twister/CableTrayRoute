@@ -111,28 +111,65 @@ export default [
     "name": "GE Multilin 750 Relay",
     "interruptRating": 30,
     "settings": {
-      "pickup": 150,
-      "time": 0.15,
-      "instantaneous": 600
+      "curveProfile": "IEC_VeryInverse",
+      "longTimePickup": 150,
+      "longTimeDelay": 0.15,
+      "shortTimePickup": 450,
+      "shortTimeDelay": 0.05,
+      "instantaneousPickup": 600
     },
     "settingOptions": {
-      "pickup": [75, 100, 125, 150, 175, 200],
-      "time": [0.1, 0.15, 0.2, 0.3],
-      "instantaneous": [300, 400, 500, 600, 700, 800, 900, 1000, 1200]
+      "curveProfile": [
+        { "value": "IEC_VeryInverse", "label": "IEC Very Inverse" },
+        { "value": "IEC_ExtremelyInverse", "label": "IEC Extremely Inverse" }
+      ],
+      "longTimePickup": [75, 100, 125, 150, 175, 200],
+      "longTimeDelay": [0.1, 0.15, 0.2, 0.3],
+      "shortTimePickup": [300, 400, 500, 600, 700, 800, 900, 1000, 1200],
+      "shortTimeDelay": [0.05, 0.1, 0.2, 0.3],
+      "instantaneousPickup": [300, 400, 500, 600, 700, 800, 900, 1000, 1200]
     },
-    "curve": [
+    "curveProfiles": [
       {
-        "current": 150,
-        "time": 50
+        "id": "IEC_VeryInverse",
+        "name": "IEC Very Inverse",
+        "curve": [
+          { "current": 150, "time": 40 },
+          { "current": 300, "time": 4 },
+          { "current": 600, "time": 0.6 },
+          { "current": 1200, "time": 0.12 }
+        ],
+        "settings": {
+          "longTimePickup": 150,
+          "longTimeDelay": 0.15,
+          "shortTimePickup": 450,
+          "shortTimeDelay": 0.05,
+          "instantaneousPickup": 600
+        }
       },
       {
-        "current": 600,
-        "time": 0.5
-      },
-      {
-        "current": 1200,
-        "time": 0.05
+        "id": "IEC_ExtremelyInverse",
+        "name": "IEC Extremely Inverse",
+        "curve": [
+          { "current": 150, "time": 30 },
+          { "current": 300, "time": 3 },
+          { "current": 600, "time": 0.4 },
+          { "current": 1200, "time": 0.08 }
+        ],
+        "settings": {
+          "longTimePickup": 150,
+          "longTimeDelay": 0.2,
+          "shortTimePickup": 450,
+          "shortTimeDelay": 0.08,
+          "instantaneousPickup": 600
+        }
       }
+    ],
+    "curve": [
+      { "current": 150, "time": 40 },
+      { "current": 300, "time": 4 },
+      { "current": 600, "time": 0.6 },
+      { "current": 1200, "time": 0.12 }
     ],
     "tolerance": {
       "timeLower": 0.75,
