@@ -4,6 +4,7 @@ import { runShortCircuit } from './shortCircuit.mjs';
 import { scaleCurve, checkDuty } from './tccUtils.js';
 
 const deviceSelect = document.getElementById('device-select');
+const deviceList = document.getElementById('device-multi-list');
 const settingsDiv = document.getElementById('device-settings');
 const plotBtn = document.getElementById('plot-btn');
 const linkBtn = document.getElementById('link-btn');
@@ -29,6 +30,30 @@ const MAX_PICKUP = 1e6;
 const MIN_DELAY = 0.001;
 const MAX_DELAY = 1e5;
 
+function selectedDeviceIds() {
+  return [...deviceSelect.selectedOptions].map(o => o.value);
+}
+
+function syncCheckboxesFromSelect() {
+  if (!deviceList) return;
+  const selected = new Set(selectedDeviceIds());
+  deviceList.querySelectorAll('input[type="checkbox"]').forEach(box => {
+    box.checked = selected.has(box.value);
+  });
+}
+
+function syncSelectFromCheckboxes({ persist = false } = {}) {
+  if (!deviceList) return;
+  const checked = new Set(
+    [...deviceList.querySelectorAll('input[type="checkbox"]:checked')].map(box => box.value)
+  );
+  [...deviceSelect.options].forEach(opt => {
+    opt.selected = checked.has(opt.value);
+  });
+  renderSettings();
+  if (persist) persistSettings();
+}
+
 function capitalize(word = '') {
   return word.charAt(0).toUpperCase() + word.slice(1);
 }
@@ -49,9 +74,28 @@ async function init() {
     console.error('Failed to load device data', e);
     devices = [];
   }
+  if (deviceList) deviceList.innerHTML = '';
   devices.forEach(d => {
     const opt = new Option(d.name, d.id);
     deviceSelect.add(opt);
+    if (deviceList) {
+      const label = document.createElement('label');
+      label.className = 'device-multi-item';
+      const checkbox = document.createElement('input');
+      checkbox.type = 'checkbox';
+      checkbox.value = d.id;
+      if (saved.devices?.includes?.(d.id)) {
+        checkbox.checked = true;
+      }
+      checkbox.addEventListener('change', () => {
+        syncSelectFromCheckboxes({ persist: true });
+      });
+      const name = document.createElement('span');
+      name.textContent = d.name;
+      label.appendChild(checkbox);
+      label.appendChild(name);
+      deviceList.appendChild(label);
+    }
   });
   const sc = runShortCircuit();
   const studies = getStudies();
@@ -77,13 +121,18 @@ async function init() {
       if (opt) opt.selected = true;
     });
   }
+  syncCheckboxesFromSelect();
   renderSettings();
   if (compId && ([...deviceSelect.selectedOptions].length)) {
     plot();
   }
 }
 
-deviceSelect.addEventListener('change', renderSettings);
+deviceSelect.addEventListener('change', () => {
+  renderSettings();
+  syncCheckboxesFromSelect();
+  persistSettings();
+});
 plotBtn.addEventListener('click', () => {
   plot();
   persistSettings();
@@ -94,6 +143,7 @@ openBtn.addEventListener('click', () => {
 });
 
 function renderSettings() {
+  syncCheckboxesFromSelect();
   settingsDiv.innerHTML = '';
   [...deviceSelect.selectedOptions].forEach(opt => {
     const dev = devices.find(d => d.id === opt.value);
@@ -146,6 +196,8 @@ function renderSettings() {
     settingsDiv.appendChild(div);
   });
 }
+
+
 
 function persistSettings() {
   const sel = [...deviceSelect.selectedOptions].map(o => o.value);

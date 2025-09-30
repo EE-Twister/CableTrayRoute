@@ -55,9 +55,12 @@
       </header>
       <section class="card">
         <div id="tcc-controls" class="tcc-controls">
-          <label>Devices
-            <select id="device-select" multiple></select>
-          </label>
+          <div class="device-select-group">
+            <span id="device-select-title" class="device-select-title">Devices</span>
+            <p id="device-select-hint" class="device-select-hint">Select one or more devices to plot. Use the checkboxes below to toggle curves.</p>
+            <select id="device-select" multiple class="visually-hidden" aria-hidden="true"></select>
+            <div id="device-multi-list" class="device-multi-list" role="group" aria-labelledby="device-select-title" aria-describedby="device-select-hint"></div>
+          </div>
           <div id="device-settings"></div>
           <button id="plot-btn" type="button">Plot</button>
           <button id="link-btn" type="button" style="display:none;">Link to Component</button>

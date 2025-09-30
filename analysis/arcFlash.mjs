@@ -98,9 +98,9 @@ export async function runArcFlash() {
   const devices = await loadDevices();
   const sc = runShortCircuit();
   const { sheets } = getOneLine();
-  const comps = Array.isArray(sheets[0]?.components)
+  const comps = (Array.isArray(sheets[0]?.components)
     ? sheets.flatMap(s => s.components)
-    : sheets;
+    : sheets).filter(c => c && c.type !== 'annotation' && c.type !== 'dimension');
   const results = {};
   comps.forEach(comp => {
     const Ibf = sc[comp.id]?.threePhaseKA || 0;

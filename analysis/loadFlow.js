@@ -1,5 +1,11 @@
 import { getOneLine } from '../dataStore.mjs';
 
+const IGNORED_TYPES = new Set(['annotation', 'dimension']);
+
+function isUsableComponent(comp) {
+  return comp && !IGNORED_TYPES.has(comp.type);
+}
+
 /** Basic complex number helpers used by the load-flow solver */
 function toComplex(re = 0, im = 0) {
   return { re, im };
@@ -247,12 +253,12 @@ export function runLoadFlow(modelOrOpts = {}, maybeOpts = {}) {
   const { baseMVA = 100, balanced = true } = opts;
   let busComps;
   if (model && model.buses) {
-    busComps = model.buses;
+    busComps = model.buses.filter(isUsableComponent);
   } else {
     const { sheets } = getOneLine();
-    const comps = Array.isArray(sheets[0]?.components)
+    const comps = (Array.isArray(sheets[0]?.components)
       ? sheets.flatMap(s => s.components || [])
-      : sheets;
+      : sheets).filter(isUsableComponent);
     busComps = comps.filter(c => c.subtype === 'Bus');
     if (busComps.length === 0) busComps = comps;
   }
