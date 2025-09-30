@@ -10,6 +10,10 @@ export function scaleCurve(device = {}, overrides = {}) {
   const time = overrides.time ?? base.time ?? base.delay ?? 1;
   const instantaneous = overrides.instantaneous ?? base.instantaneous ?? 0;
   const instDelay = overrides.instantaneousDelay ?? base.instantaneousDelay ?? 0.01;
+  const instMaxSetting = overrides.instantaneousMax
+    ?? base.instantaneousMax
+    ?? device.instantaneousMax
+    ?? null;
   const baseTime = base.time ?? base.delay ?? 1;
   const scaleI = base.pickup ? pickup / base.pickup : 1;
   const scaleT = baseTime ? time / baseTime : 1;
@@ -28,17 +32,29 @@ export function scaleCurve(device = {}, overrides = {}) {
     time: Math.max(p.time * scaleT, MIN_TIME)
   }));
 
+  let resolvedInstMax = instMaxSetting;
   if (instantaneous) {
     const instCurrent = instantaneous;
     const instTime = Math.max(instDelay, MIN_TIME);
     const last = curve[curve.length - 1];
+    const ratedCeiling = Number.isFinite(Number(device.interruptRating))
+      ? Number(device.interruptRating) * 1000
+      : null;
+    let instLimit = Number(instMaxSetting);
+    if (!Number.isFinite(instLimit) || instLimit <= instCurrent) {
+      instLimit = ratedCeiling && ratedCeiling > instCurrent ? ratedCeiling : instCurrent * 10;
+    }
+    resolvedInstMax = instLimit;
     if (last && last.current < instCurrent) {
       curve.push({ current: instCurrent, time: last.time });
     } else if (!last) {
       curve.push({ current: instCurrent, time: instTime });
     }
     curve.push({ current: instCurrent, time: instTime });
-    curve.push({ current: instCurrent, time: MIN_TIME });
+    if (instLimit > instCurrent) {
+      curve.push({ current: instLimit, time: instTime });
+    }
+    curve.push({ current: instLimit, time: MIN_TIME });
   }
 
   const minCurve = curve.map(p => ({
@@ -61,7 +77,13 @@ export function scaleCurve(device = {}, overrides = {}) {
     minCurve,
     maxCurve,
     envelope,
-    settings: { pickup, time, instantaneous, instantaneousDelay: instDelay },
+    settings: {
+      pickup,
+      time,
+      instantaneous,
+      instantaneousDelay: instDelay,
+      instantaneousMax: resolvedInstMax
+    },
     tolerance
   };
 }

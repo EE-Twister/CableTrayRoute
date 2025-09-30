@@ -4,14 +4,35 @@ if (typeof document !== 'undefined') {
   d3 = await import('https://cdn.jsdelivr.net/npm/d3@7/+esm');
 }
 
+const VISUAL_TYPES = new Set(['dimension', 'annotation']);
+
+function isVisualComponent(comp) {
+  return comp ? VISUAL_TYPES.has(comp.type) : false;
+}
+
+function isConnectorComponent(comp) {
+  if (!comp) return false;
+  const type = (comp.type || '').toLowerCase();
+  if (!type) return false;
+  if (type.includes('link')) return true;
+  if (type.includes('cable')) return true;
+  if (type.includes('feeder')) return true;
+  if (type.includes('conductor')) return true;
+  if (type.includes('tap')) return true;
+  if (type.includes('splice')) return true;
+  return false;
+}
+
 export function runReliability(components = []) {
-  // Filter out non-operational components like dimensions
-  const ops = components.filter(c => c.type !== 'dimension');
+  // Filter out non-operational components like dimensions or annotations
+  const ops = components.filter(c => !isVisualComponent(c));
+  const eligible = ops.filter(c => !isConnectorComponent(c));
+  const connectorIds = new Set(ops.filter(isConnectorComponent).map(c => c.id));
   const compMap = new Map(ops.map(c => [c.id, c]));
   // Compute component availability and expected downtime per year
   const componentStats = {};
   const availMap = {};
-  ops.forEach(c => {
+  eligible.forEach(c => {
     const mtbf = Number(c.mtbf);
     const mttr = Number(c.mttr);
     if (mtbf > 0 && mttr >= 0) {
@@ -71,13 +92,13 @@ export function runReliability(components = []) {
 
   const n1Failures = [];
   const n1FailureDetails = {};
-  ops.forEach(c => {
+  eligible.forEach(c => {
     const islands = computeIslands([c.id]);
     if (islands.length <= 1) return;
     n1Failures.push(c.id);
     const sorted = islands.slice().sort((a, b) => b.length - a.length);
     const impactedIslands = sorted.slice(1);
-    const impactedIds = impactedIslands.flat();
+    const impactedIds = impactedIslands.flat().filter(id => !connectorIds.has(id));
     n1FailureDetails[c.id] = {
       islands,
       impactedIds,
@@ -87,9 +108,11 @@ export function runReliability(components = []) {
   });
 
   const n2Failures = [];
-  for (let i = 0; i < ops.length; i++) {
-    for (let j = i + 1; j < ops.length; j++) {
-      if (!isConnected([ops[i].id, ops[j].id])) n2Failures.push([ops[i].id, ops[j].id]);
+  for (let i = 0; i < eligible.length; i++) {
+    for (let j = i + 1; j < eligible.length; j++) {
+      if (!isConnected([eligible[i].id, eligible[j].id])) {
+        n2Failures.push([eligible[i].id, eligible[j].id]);
+      }
     }
   }
 
