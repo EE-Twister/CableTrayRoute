@@ -2,6 +2,17 @@ import * as d3 from 'https://cdn.jsdelivr.net/npm/d3@7/+esm';
 import { getItem, setItem, getOneLine, setOneLine, getStudies, setStudies } from '../dataStore.mjs';
 import { runShortCircuit } from './shortCircuit.mjs';
 import { scaleCurve, checkDuty } from './tccUtils.js';
+import conductorProperties from '../conductorPropertiesData.mjs';
+
+const PROTECTIVE_TYPES = new Set(['breaker', 'fuse', 'relay', 'recloser', 'contactor', 'switch']);
+const CMIL_TO_MM2 = 0.000506707478; // 1 circular mil in mm^2
+const DEFAULT_INRUSH_MULTIPLE = 12;
+const DEFAULT_INRUSH_DURATION = 0.1;
+const CABLE_TIME_POINTS = [0.005, 0.01, 0.02, 0.05, 0.1, 0.2, 0.5, 1, 2, 5, 10, 20, 50];
+const K_CONSTANTS = {
+  copper: { 60: 103, 75: 118, 90: 143 },
+  aluminum: { 60: 75, 75: 87, 90: 99 }
+};
 
 const deviceSelect = document.getElementById('device-select');
 const deviceList = document.getElementById('device-multi-list');
@@ -20,8 +31,19 @@ if (compId) {
   openBtn.style.display = 'inline-block';
 }
 
-let devices = [];
-let saved = getItem('tccSettings') || { devices: [], settings: {} };
+let libraryDevices = [];
+let deviceEntries = [];
+let deviceMap = new Map();
+let deviceGroups = [];
+let componentRecords = [];
+let componentLookup = new Map();
+let neighborMap = new Map();
+
+let saved = getItem('tccSettings') || {};
+if (!Array.isArray(saved.devices)) saved.devices = [];
+if (!saved.settings || typeof saved.settings !== 'object') saved.settings = {};
+if (!saved.componentOverrides || typeof saved.componentOverrides !== 'object') saved.componentOverrides = {};
+if (!saved.overlaySelections || typeof saved.overlaySelections !== 'object') saved.overlaySelections = {};
 
 init();
 
@@ -69,62 +91,249 @@ function formatSettingValue(value) {
 
 async function init() {
   try {
-    devices = await fetch('data/protectiveDevices.json').then(r => r.json());
+    const list = await fetch('data/protectiveDevices.json').then(r => r.json());
+    libraryDevices = Array.isArray(list) ? list : [];
   } catch (e) {
     console.error('Failed to load device data', e);
-    devices = [];
+    libraryDevices = [];
   }
-  if (deviceList) deviceList.innerHTML = '';
-  devices.forEach(d => {
-    const opt = new Option(d.name, d.id);
-    deviceSelect.add(opt);
-    if (deviceList) {
-      const label = document.createElement('label');
-      label.className = 'device-multi-item';
-      const checkbox = document.createElement('input');
-      checkbox.type = 'checkbox';
-      checkbox.value = d.id;
-      if (saved.devices?.includes?.(d.id)) {
-        checkbox.checked = true;
-      }
-      checkbox.addEventListener('change', () => {
-        syncSelectFromCheckboxes({ persist: true });
-      });
-      const name = document.createElement('span');
-      name.textContent = d.name;
-      label.appendChild(checkbox);
-      label.appendChild(name);
-      deviceList.appendChild(label);
-    }
-  });
+
+  buildComponentData();
+  rebuildCatalog();
+
   const sc = runShortCircuit();
   const studies = getStudies();
   studies.shortCircuit = sc;
   setStudies(studies);
-  let linked = null;
+
+  const available = new Set(deviceEntries.map(entry => entry.uid));
+  const defaults = new Set((saved.devices || []).filter(id => available.has(id)));
   if (compId) {
-    const { sheets } = getOneLine();
-    for (const sheet of sheets) {
-      const comp = (sheet.components || []).find(c => c.id === compId);
-      if (comp) { linked = comp; break; }
-    }
+    const compEntry = deviceEntries.find(entry => entry.kind === 'component' && entry.componentId === compId);
+    if (compEntry) defaults.add(compEntry.uid);
   }
   if (deviceParam) {
-    const opt = [...deviceSelect.options].find(o => o.value === deviceParam);
-    if (opt) opt.selected = true;
-  } else if (linked?.tccId) {
-    const opt = [...deviceSelect.options].find(o => o.value === linked.tccId);
-    if (opt) opt.selected = true;
-  } else {
-    saved.devices.forEach(id => {
-      const opt = [...deviceSelect.options].find(o => o.value === id);
-      if (opt) opt.selected = true;
-    });
+    const libraryEntry = deviceEntries.find(entry => entry.kind === 'library' && entry.baseDeviceId === deviceParam);
+    if (libraryEntry) defaults.add(libraryEntry.uid);
   }
+  if (!defaults.size && deviceEntries.length) {
+    const first = deviceEntries.find(entry => entry.kind === 'component')
+      || deviceEntries.find(entry => entry.kind === 'library');
+    if (first) defaults.add(first.uid);
+  }
+  deviceEntries
+    .filter(entry => entry.autoSelect)
+    .forEach(entry => defaults.add(entry.uid));
+  if (defaults.size) {
+    selectDefaults(defaults);
+  }
+
   syncCheckboxesFromSelect();
   renderSettings();
-  if (compId && ([...deviceSelect.selectedOptions].length)) {
+  if (compId && deviceSelect && deviceSelect.selectedOptions.length) {
     plot();
+  }
+}
+
+function selectDefaults(ids) {
+  const valid = [...ids].filter(id => deviceMap.has(id));
+  [...deviceSelect.options].forEach(opt => {
+    opt.selected = valid.includes(opt.value);
+  });
+  if (deviceList) {
+    deviceList.querySelectorAll('input[type="checkbox"]').forEach(box => {
+      box.checked = valid.includes(box.value);
+    });
+  }
+  saved.devices = valid;
+  setItem('tccSettings', saved);
+}
+
+function buildComponentData() {
+  const { sheets } = getOneLine();
+  const records = [];
+  const lookup = new Map();
+  const neighbors = new Map();
+  (sheets || []).forEach((sheet, idx) => {
+    const sheetName = sheet?.name || `Sheet ${idx + 1}`;
+    (sheet?.components || []).forEach(comp => {
+      records.push({ component: comp, sheetName });
+      lookup.set(comp.id, { component: comp, sheetName });
+      neighbors.set(comp.id, new Set());
+    });
+  });
+  records.forEach(({ component }) => {
+    (component.connections || []).forEach(conn => {
+      if (!lookup.has(conn.target)) return;
+      neighbors.get(component.id)?.add(conn.target);
+      neighbors.get(conn.target)?.add(component.id);
+    });
+  });
+  componentRecords = records;
+  componentLookup = lookup;
+  neighborMap = neighbors;
+}
+
+function rebuildCatalog() {
+  deviceEntries = [];
+  deviceMap = new Map();
+  deviceGroups = [];
+
+  const componentEntries = buildComponentEntries();
+  const libraryEntries = buildLibraryEntries();
+  const overlayEntries = buildOverlayEntries();
+
+  if (componentEntries.length) {
+    deviceGroups.push({ id: 'oneline', label: 'One-Line Devices', items: componentEntries });
+  }
+  if (libraryEntries.length) {
+    deviceGroups.push({ id: 'library', label: 'Library Devices', items: libraryEntries });
+  }
+  if (overlayEntries.length) {
+    deviceGroups.push({ id: 'overlays', label: 'Connected Elements', items: overlayEntries });
+  }
+
+  deviceEntries = deviceGroups.flatMap(group => group.items);
+  deviceEntries.forEach(entry => deviceMap.set(entry.uid, entry));
+
+  renderDeviceList();
+}
+
+function buildComponentEntries() {
+  const entries = [];
+  componentRecords.forEach(({ component, sheetName }) => {
+    if (!PROTECTIVE_TYPES.has(component.type) || !component.tccId) return;
+    const base = libraryDevices.find(dev => dev.id === component.tccId);
+    if (!base) return;
+    const overrides = mergeOverrides(component.tccOverrides, saved.componentOverrides?.[component.id]);
+    const entry = {
+      uid: `component:${component.id}`,
+      kind: 'component',
+      name: `${component.label || component.name || base.name || component.type}${sheetName ? ` (${sheetName})` : ''}`,
+      baseDeviceId: base.id,
+      baseDevice: base,
+      componentId: component.id,
+      sheetName,
+      overrideSource: overrides
+    };
+    entries.push(entry);
+  });
+  return entries.sort((a, b) => a.name.localeCompare(b.name, undefined, { sensitivity: 'base' }));
+}
+
+function buildLibraryEntries() {
+  return libraryDevices.map(dev => ({
+    uid: dev.id,
+    kind: 'library',
+    name: dev.name || dev.id,
+    baseDeviceId: dev.id,
+    baseDevice: dev,
+    overrideSource: saved.settings?.[dev.id] || {}
+  })).sort((a, b) => a.name.localeCompare(b.name, undefined, { sensitivity: 'base' }));
+}
+
+function buildOverlayEntries() {
+  if (!compId || !componentLookup.has(compId)) return [];
+  const overlays = [];
+  overlays.push(...buildTransformerInrushEntries(compId));
+  overlays.push(...buildCableEntries(compId));
+  return overlays;
+}
+
+function buildTransformerInrushEntries(targetId) {
+  const overlays = [];
+  const reference = componentLookup.get(targetId)?.component;
+  if (!reference) return overlays;
+  const refVoltage = inferVoltage(reference);
+  const refPhases = parsePhases(reference.phases).length || 3;
+  (neighborMap.get(targetId) || new Set()).forEach(id => {
+    const neighbor = componentLookup.get(id)?.component;
+    if (!neighbor || neighbor.type !== 'transformer') return;
+    const inrush = computeTransformerInrush(neighbor, refVoltage, refPhases);
+    if (!inrush) return;
+    overlays.push({
+      uid: `inrush:${neighbor.id}:${targetId}`,
+      kind: 'inrush',
+      name: `${componentLabel(neighbor)} Inrush`,
+      current: inrush.current,
+      duration: inrush.duration,
+      sourceId: neighbor.id,
+      autoSelect: true
+    });
+  });
+  return overlays.sort((a, b) => a.name.localeCompare(b.name, undefined, { sensitivity: 'base' }));
+}
+
+function buildCableEntries(targetId) {
+  const overlays = [];
+  const seen = new Set();
+  componentRecords.forEach(({ component }) => {
+    (component.connections || []).forEach(conn => {
+      if (component.id !== targetId && conn.target !== targetId) return;
+      const source = component.id === targetId ? component : componentLookup.get(conn.target)?.component;
+      const other = component.id === targetId ? componentLookup.get(conn.target)?.component : component;
+      const cableInfo = resolveCableInfo(component, other, conn);
+      if (!cableInfo) return;
+      const tag = cableInfo.tag || `edge:${[component.id, conn.target].sort().join('~')}`;
+      if (seen.has(tag)) return;
+      const phases = parsePhases(conn.phases || cableInfo.phases || (other?.phases ?? source?.phases));
+      const curve = buildCableCurve(cableInfo, phases.length || 3);
+      if (!curve) return;
+      seen.add(tag);
+      overlays.push({
+        uid: `cable:${tag}`,
+        kind: 'cable',
+        name: `${cableInfo.tag || 'Cable'} Damage${other ? ` (${componentLabel(source)} → ${componentLabel(other)})` : ''}`,
+        curve: curve.curve,
+        ampacity: curve.ampacity,
+        autoSelect: true
+      });
+    });
+  });
+  return overlays.sort((a, b) => a.name.localeCompare(b.name, undefined, { sensitivity: 'base' }));
+}
+
+function renderDeviceList() {
+  if (!deviceSelect) return;
+  deviceSelect.innerHTML = '';
+  if (deviceList) deviceList.innerHTML = '';
+
+  let addedComponentGroup = false;
+  deviceGroups.forEach(group => {
+    if (!group.items.length) return;
+    if (deviceList) {
+      const heading = document.createElement('h4');
+      heading.className = 'device-multi-heading';
+      heading.textContent = group.label;
+      deviceList.appendChild(heading);
+      if (group.id === 'oneline') addedComponentGroup = true;
+    }
+    group.items.forEach(item => {
+      const opt = new Option(item.name, item.uid);
+      opt.dataset.kind = item.kind;
+      deviceSelect.add(opt);
+      if (deviceList) {
+        const label = document.createElement('label');
+        label.className = 'device-multi-item';
+        label.dataset.uid = item.uid;
+        const checkbox = document.createElement('input');
+        checkbox.type = 'checkbox';
+        checkbox.value = item.uid;
+        checkbox.addEventListener('change', () => syncSelectFromCheckboxes({ persist: true }));
+        label.appendChild(checkbox);
+        const name = document.createElement('span');
+        name.textContent = item.name;
+        label.appendChild(name);
+        deviceList.appendChild(label);
+      }
+    });
+  });
+
+  if (!addedComponentGroup && deviceList) {
+    const info = document.createElement('p');
+    info.className = 'device-multi-empty';
+    info.textContent = 'Link protective devices on the One-Line to view them here.';
+    deviceList.appendChild(info);
   }
 }
 
@@ -145,21 +354,26 @@ openBtn.addEventListener('click', () => {
 function renderSettings() {
   syncCheckboxesFromSelect();
   settingsDiv.innerHTML = '';
-  [...deviceSelect.selectedOptions].forEach(opt => {
-    const dev = devices.find(d => d.id === opt.value);
-    if (!dev) return;
-    const set = saved.settings[dev.id] || dev.settings || {};
+  selectedDeviceIds().forEach(uid => {
+    const entry = deviceMap.get(uid);
+    if (!entry) return;
+    if (entry.kind !== 'library' && entry.kind !== 'component') return;
+    const base = entry.baseDevice || {};
+    const overrides = entry.overrideSource || {};
     const div = document.createElement('div');
     div.className = 'device-settings';
-    div.dataset.id = dev.id;
+    div.dataset.uid = uid;
+    div.dataset.kind = entry.kind;
+    div.dataset.baseId = entry.baseDeviceId;
+    if (entry.kind === 'component') div.dataset.componentId = entry.componentId;
     const heading = document.createElement('h3');
-    heading.textContent = dev.name;
+    heading.textContent = entry.name;
     div.appendChild(heading);
-    Object.keys(dev.settings || {}).forEach(field => {
+    Object.keys(base.settings || {}).forEach(field => {
       const label = document.createElement('label');
       label.textContent = `${capitalize(field)} `;
-      const options = Array.isArray(dev.settingOptions?.[field]) ? dev.settingOptions[field] : null;
-      const savedValue = set[field];
+      const options = Array.isArray(base.settingOptions?.[field]) ? base.settingOptions[field] : null;
+      const savedValue = overrides[field];
       if (options && options.length) {
         const select = document.createElement('select');
         select.dataset.field = field;
@@ -197,69 +411,180 @@ function renderSettings() {
   });
 }
 
-
-
 function persistSettings() {
-  const sel = [...deviceSelect.selectedOptions].map(o => o.value);
-  const sets = {};
+  const selected = selectedDeviceIds();
+  const deviceSettings = {};
+  const componentSettings = {};
   settingsDiv.querySelectorAll('.device-settings').forEach(div => {
-    const id = div.dataset.id;
-    const obj = {};
+    const uid = div.dataset.uid;
+    const entry = deviceMap.get(uid);
+    if (!entry) return;
+    const overrides = {};
     div.querySelectorAll('[data-field]').forEach(inp => {
       const raw = inp.value;
       const val = raw === '' ? NaN : Number(raw);
-      if (!Number.isNaN(val)) obj[inp.dataset.field] = val;
+      if (!Number.isNaN(val)) overrides[inp.dataset.field] = val;
     });
-    sets[id] = obj;
+    if (entry.kind === 'component') {
+      if (Object.keys(overrides).length) {
+        componentSettings[entry.componentId] = overrides;
+      }
+      entry.overrideSource = overrides;
+    } else if (entry.kind === 'library') {
+      if (Object.keys(overrides).length) {
+        deviceSettings[entry.baseDeviceId] = overrides;
+      }
+      entry.overrideSource = overrides;
+    }
   });
-  saved = { devices: sel, settings: sets };
+  saved.devices = selected;
+  saved.settings = deviceSettings;
+  saved.componentOverrides = componentSettings;
   setItem('tccSettings', saved);
+  syncComponentOverrides(componentSettings);
+}
+
+function syncComponentOverrides(componentSettings) {
+  const data = getOneLine();
+  let changed = false;
+  (data.sheets || []).forEach(sheet => {
+    (sheet.components || []).forEach(comp => {
+      if (!PROTECTIVE_TYPES.has(comp.type)) return;
+      const overrides = componentSettings[comp.id];
+      if (overrides && Object.keys(overrides).length) {
+        if (!deepEqual(comp.tccOverrides, overrides)) {
+          comp.tccOverrides = overrides;
+          changed = true;
+        }
+      } else if (comp.tccOverrides) {
+        delete comp.tccOverrides;
+        changed = true;
+      }
+    });
+  });
+  if (changed) {
+    setOneLine(data);
+    buildComponentData();
+    rebuildCatalog();
+    const defaults = new Set(saved.devices || []);
+    deviceEntries
+      .filter(entry => entry.autoSelect)
+      .forEach(entry => defaults.add(entry.uid));
+    selectDefaults(defaults);
+    renderSettings();
+    plot();
+  }
+}
+
+function deepEqual(a, b) {
+  const objA = a && typeof a === 'object' ? a : {};
+  const objB = b && typeof b === 'object' ? b : {};
+  const keysA = Object.keys(objA);
+  const keysB = Object.keys(objB);
+  if (keysA.length !== keysB.length) return false;
+  return keysA.every(key => Object.is(objA[key], objB[key]));
 }
 
 function linkComponent() {
   if (!compId) return;
-  const sel = [...deviceSelect.selectedOptions].map(o => o.value);
-  const first = sel[0];
+  const first = selectedDeviceIds().find(id => {
+    const entry = deviceMap.get(id);
+    return entry && (entry.kind === 'library' || entry.kind === 'component');
+  });
   if (!first) return;
+  const entry = deviceMap.get(first);
+  if (!entry) return;
+  const deviceId = entry.baseDeviceId;
+  const overrides = entry.overrideSource || {};
   const data = getOneLine();
-  for (const sheet of data.sheets) {
-    const comp = (sheet.components || []).find(c => c.id === compId);
-    if (comp) {
-      comp.tccId = first;
-      setOneLine(data);
-      break;
-    }
+  let updated = false;
+  (data.sheets || []).forEach(sheet => {
+    (sheet.components || []).forEach(comp => {
+      if (comp.id !== compId) return;
+      comp.tccId = deviceId;
+      if (overrides && Object.keys(overrides).length) {
+        comp.tccOverrides = overrides;
+      } else {
+        delete comp.tccOverrides;
+      }
+      updated = true;
+    });
+  });
+  if (updated) {
+    setOneLine(data);
+    buildComponentData();
+    rebuildCatalog();
+    selectDefaults(new Set([`component:${compId}`]));
+    renderSettings();
+    plot();
   }
+}
+
+function gatherOverridesFromInputs(uid) {
+  const div = settingsDiv.querySelector(`.device-settings[data-uid="${uid}"]`);
+  if (!div) return {};
+  const overrides = {};
+  div.querySelectorAll('[data-field]').forEach(inp => {
+    const raw = inp.value;
+    const val = raw === '' ? NaN : Number(raw);
+    if (!Number.isNaN(val)) overrides[inp.dataset.field] = val;
+  });
+  return overrides;
 }
 
 function plot() {
   chart.selectAll('*').remove();
   violationDiv.textContent = '';
-  const sel = [...deviceSelect.selectedOptions].map(o => o.value);
-  const entries = sel.map(id => {
-    const base = devices.find(d => d.id === id);
-    if (!base) return null;
-    const div = settingsDiv.querySelector(`.device-settings[data-id="${id}"]`);
-    const overrides = {};
-    div?.querySelectorAll('[data-field]').forEach(inp => {
-      const v = Number(inp.value);
-      if (!Number.isNaN(v)) overrides[inp.dataset.field] = v;
-    });
-    const scaled = scaleCurve(base, overrides);
-    return { id, base, overrides, scaled };
-  }).filter(Boolean);
-  if (!entries.length) return;
-  let allCurrents = entries.flatMap(s => s.scaled.curve.map(p => p.current)).filter(v => v > 0);
-  const allTimes = entries.flatMap(s => {
-    const base = s.scaled.curve.map(p => p.time);
-    const band = s.scaled.envelope?.flatMap(p => [p.minTime, p.maxTime]) || [];
-    return [...base, ...band];
-  }).filter(v => v > 0);
+  const selections = selectedDeviceIds().map(id => deviceMap.get(id)).filter(Boolean);
+  if (!selections.length) return;
+
+  const devicePlots = [];
+  const overlays = [];
+
+  selections.forEach(selection => {
+    if (selection.kind === 'library' || selection.kind === 'component') {
+      const overrides = {
+        ...selection.overrideSource,
+        ...gatherOverridesFromInputs(selection.uid)
+      };
+      const scaled = scaleCurve(selection.baseDevice, overrides);
+      devicePlots.push({ selection, overrides, scaled });
+    } else if (selection.kind === 'cable') {
+      overlays.push({ ...selection });
+    } else if (selection.kind === 'inrush') {
+      overlays.push({ ...selection });
+    }
+  });
+
+  if (!devicePlots.length && !overlays.length) return;
+
+  let allCurrents = [];
+  let allTimes = [];
+  devicePlots.forEach(plotEntry => {
+    const scaled = plotEntry.scaled;
+    allCurrents = allCurrents.concat(scaled.curve.map(p => p.current).filter(v => v > 0));
+    const band = scaled.envelope?.flatMap(p => [p.minTime, p.maxTime]) || [];
+    const times = scaled.curve.map(p => p.time);
+    allTimes = allTimes.concat(times.filter(v => v > 0), band.filter(v => v > 0));
+  });
+  overlays.forEach(entry => {
+    if (entry.kind === 'cable') {
+      entry.curve.forEach(point => {
+        if (point.current > 0) allCurrents.push(point.current);
+        if (point.time > 0) allTimes.push(point.time);
+      });
+    } else if (entry.kind === 'inrush') {
+      if (entry.current > 0) allCurrents.push(entry.current);
+      if (entry.duration) allTimes.push(entry.duration);
+    }
+  });
+
   const studies = getStudies();
-  const fault = studies.shortCircuit?.[compId]?.threePhaseKA;
+  const fault = compId ? studies.shortCircuit?.[compId]?.threePhaseKA : null;
   if (fault) {
-    allCurrents = [...allCurrents, fault * 1000];
+    allCurrents.push(fault * 1000);
   }
+
   const margin = { top: 20, right: 30, bottom: 70, left: 70 };
   const width = +chart.attr('width') - margin.left - margin.right;
   const height = +chart.attr('height') - margin.top - margin.bottom;
@@ -304,10 +629,49 @@ function plot() {
     .attr('text-anchor', 'middle')
     .attr('fill', '#333')
     .text('Time (s)');
+
   const color = d3.scaleOrdinal(d3.schemeCategory10);
   const legend = chart.append('g')
     .attr('class', 'tcc-legend')
     .attr('transform', `translate(${margin.left},${margin.top - 12})`);
+
+  const plottables = [...devicePlots, ...overlays];
+  plottables.forEach((entry, index) => {
+    entry.color = color(index);
+    const legendItem = legend.append('g').attr('transform', `translate(${index * 180},0)`);
+    if (entry.kind === 'cable') {
+      legendItem.append('line')
+        .attr('x1', 0)
+        .attr('x2', 16)
+        .attr('y1', 8)
+        .attr('y2', 8)
+        .attr('stroke', entry.color)
+        .attr('stroke-width', 2)
+        .attr('stroke-dasharray', '6,3');
+    } else if (entry.kind === 'inrush') {
+      legendItem.append('line')
+        .attr('x1', 8)
+        .attr('x2', 8)
+        .attr('y1', 0)
+        .attr('y2', 16)
+        .attr('stroke', entry.color)
+        .attr('stroke-width', 2)
+        .attr('stroke-dasharray', '4,2');
+    } else {
+      legendItem.append('rect')
+        .attr('width', 16)
+        .attr('height', 16)
+        .attr('fill', entry.color)
+        .attr('opacity', 0.6);
+    }
+    legendItem.append('text')
+      .attr('x', 20)
+      .attr('y', 12)
+      .attr('fill', '#333')
+      .attr('font-size', 12)
+      .text(entry.selection?.name || entry.name || entry.selection?.baseDevice?.name || '');
+  });
+
   if (fault) {
     g.append('line')
       .attr('x1', x(fault * 1000))
@@ -317,6 +681,7 @@ function plot() {
       .attr('stroke', '#000')
       .attr('stroke-dasharray', '4,2');
   }
+
   const line = d3.line().x(p => x(p.current)).y(p => y(p.time)).curve(d3.curveLinear);
   const bandArea = d3.area()
     .x(p => x(p.current))
@@ -326,41 +691,60 @@ function plot() {
   const [xMin, xMax] = x.range();
   const [yMin, yMax] = y.range();
 
-  const plotted = entries.map((entry, index) => {
-    entry.color = color(index);
-    const legendItem = legend.append('g').attr('transform', `translate(${index * 160},0)`);
-    legendItem.append('rect')
-      .attr('width', 16)
-      .attr('height', 16)
-      .attr('fill', entry.color)
-      .attr('opacity', 0.6);
-    legendItem.append('text')
-      .attr('x', 20)
+  overlays.filter(entry => entry.kind === 'cable').forEach(entry => {
+    g.append('path')
+      .datum(entry.curve)
+      .attr('fill', 'none')
+      .attr('stroke', entry.color)
+      .attr('stroke-width', 2)
+      .attr('stroke-dasharray', '6,3')
+      .attr('d', entry.curve.length ? line(entry.curve) : null);
+  });
+
+  overlays.filter(entry => entry.kind === 'inrush').forEach(entry => {
+    const xPos = x(entry.current);
+    g.append('line')
+      .attr('x1', xPos)
+      .attr('x2', xPos)
+      .attr('y1', 0)
+      .attr('y2', height)
+      .attr('stroke', entry.color)
+      .attr('stroke-width', 2)
+      .attr('stroke-dasharray', '4,2');
+    g.append('text')
+      .attr('x', xPos + 6)
       .attr('y', 12)
-      .attr('fill', '#333')
+      .attr('fill', entry.color)
       .attr('font-size', 12)
-      .text(entry.base.name || entry.base.id);
+      .text(`${formatSettingValue(entry.current)} A Inrush`);
+  });
+
+  const plotted = devicePlots.map(plotEntry => {
+    const selection = plotEntry.selection;
+    const scaled = plotEntry.scaled;
+    const entry = { ...plotEntry, selection, scaled };
     entry.bandPath = g.append('path')
-      .datum(entry.scaled.envelope || [])
+      .datum(scaled.envelope || [])
       .attr('fill', entry.color)
       .attr('opacity', 0.15)
       .attr('stroke', 'none');
     entry.minPath = g.append('path')
-      .datum(entry.scaled.minCurve || [])
+      .datum(scaled.minCurve || [])
       .attr('fill', 'none')
       .attr('stroke-width', 1)
       .attr('stroke-opacity', 0.6)
       .attr('stroke-dasharray', '4,4');
     entry.maxPath = g.append('path')
-      .datum(entry.scaled.maxCurve || [])
+      .datum(scaled.maxCurve || [])
       .attr('fill', 'none')
       .attr('stroke-width', 1)
       .attr('stroke-opacity', 0.6)
       .attr('stroke-dasharray', '4,4');
     entry.path = g.append('path')
-      .datum(entry.scaled.curve)
+      .datum(scaled.curve)
       .attr('fill', 'none')
       .attr('stroke-width', 2)
+      .attr('stroke', entry.color)
       .style('cursor', 'move');
     return entry;
   });
@@ -379,10 +763,10 @@ function plot() {
   };
 
   const updateCurves = () => {
-    const faultKA = getStudies().shortCircuit?.[compId]?.threePhaseKA;
+    const faultKA = compId ? getStudies().shortCircuit?.[compId]?.threePhaseKA : null;
     const violations = [];
     plotted.forEach(entry => {
-      entry.scaled = scaleCurve(entry.base, entry.overrides);
+      entry.scaled = scaleCurve(entry.selection.baseDevice, entry.overrides);
       const envelope = entry.scaled.envelope || [];
       const minCurve = entry.scaled.minCurve || [];
       const maxCurve = entry.scaled.maxCurve || [];
@@ -422,7 +806,7 @@ function plot() {
   };
 
   const updateDeviceInputs = entry => {
-    const div = settingsDiv.querySelector(`.device-settings[data-id="${entry.base.id}"]`);
+    const div = settingsDiv.querySelector(`.device-settings[data-uid="${entry.selection.uid}"]`);
     if (!div) return;
     Object.entries(entry.overrides).forEach(([field, value]) => {
       const input = div.querySelector(`[data-field="${field}"]`);
@@ -454,8 +838,8 @@ function plot() {
         reference,
         offsetX: event.x - x(reference.current),
         offsetY: event.y - y(reference.time),
-        startPickup: entry.overrides.pickup ?? entry.scaled.settings?.pickup ?? entry.base.settings?.pickup ?? 1,
-        startDelay: entry.overrides.time ?? entry.scaled.settings?.time ?? entry.base.settings?.time ?? entry.base.settings?.delay ?? 0.1
+        startPickup: entry.overrides.pickup ?? entry.scaled.settings?.pickup ?? entry.selection.baseDevice.settings?.pickup ?? 1,
+        startDelay: entry.overrides.time ?? entry.scaled.settings?.time ?? entry.selection.baseDevice.settings?.time ?? entry.selection.baseDevice.settings?.delay ?? 0.1
       };
       entry.path.attr('stroke-width', 3);
     })
@@ -485,4 +869,185 @@ function plot() {
   });
 
   updateCurves();
+}
+
+function componentLabel(comp) {
+  return comp?.label || comp?.name || comp?.subtype || comp?.type || comp?.id || 'Component';
+}
+
+function mergeOverrides(base, extra) {
+  const a = base && typeof base === 'object' ? base : {};
+  const b = extra && typeof extra === 'object' ? extra : {};
+  return { ...a, ...b };
+}
+
+function parsePhases(value) {
+  if (Array.isArray(value)) return value.map(v => String(v).trim().toUpperCase()).filter(Boolean);
+  if (typeof value === 'number') {
+    if (value === 3) return ['A', 'B', 'C'];
+    if (value === 2) return ['A', 'B'];
+    if (value === 1) return ['A'];
+    return [];
+  }
+  if (typeof value === 'string') {
+    if (/^\d+$/.test(value.trim())) return parsePhases(parseInt(value, 10));
+    return value.split(/[\s,]+/).map(v => v.trim().toUpperCase()).filter(Boolean);
+  }
+  return [];
+}
+
+function inferVoltage(comp) {
+  const keys = ['voltage', 'volts', 'volts_secondary', 'volts_lv', 'volts_primary', 'volts_hv', 'prefault_voltage', 'baseKV', 'kV'];
+  for (const key of keys) {
+    if (comp[key] === undefined || comp[key] === null || comp[key] === '') continue;
+    const num = Number(comp[key]);
+    if (!Number.isFinite(num)) continue;
+    if (key.toLowerCase().includes('kv')) return num * 1000;
+    return num;
+  }
+  return null;
+}
+
+function computeTransformerInrush(transformer, referenceVoltage, refPhases = 3) {
+  const sides = [];
+  const sideDefs = [
+    { kvaKey: 'kva_hv', voltsKey: 'volts_hv', label: 'HV' },
+    { kvaKey: 'kva_lv', voltsKey: 'volts_lv', label: 'LV' },
+    { kvaKey: 'kva_tv', voltsKey: 'volts_tv', label: 'Tertiary' },
+    { kvaKey: 'kva_primary', voltsKey: 'volts_primary', label: 'Primary' },
+    { kvaKey: 'kva_secondary', voltsKey: 'volts_secondary', label: 'Secondary' }
+  ];
+  sideDefs.forEach(({ kvaKey, voltsKey, label }) => {
+    const kva = Number(transformer[kvaKey]);
+    const volts = Number(transformer[voltsKey]);
+    if (!Number.isFinite(kva) || !Number.isFinite(volts)) return;
+    sides.push({ kva, volts, label });
+  });
+  if (!sides.length) {
+    const kva = Number(transformer.kva || (transformer.mva ? transformer.mva * 1000 : NaN));
+    const volts = Number(transformer.volts_secondary || transformer.volts_primary || transformer.voltage);
+    if (Number.isFinite(kva) && Number.isFinite(volts)) {
+      sides.push({ kva, volts, label: 'Secondary' });
+    }
+  }
+  if (!sides.length) return null;
+  let selected = sides[0];
+  if (referenceVoltage) {
+    let best = { diff: Infinity, side: sides[0] };
+    sides.forEach(side => {
+      const diff = Math.abs(side.volts - referenceVoltage);
+      if (diff < best.diff) best = { diff, side };
+    });
+    selected = best.side;
+  }
+  const phases = parsePhases(transformer.phases).length || refPhases || 3;
+  const kva = Number(selected.kva);
+  const volts = Number(selected.volts);
+  if (!kva || !volts) return null;
+  const apparent = kva * 1000;
+  const fla = phases === 1 ? apparent / volts : apparent / (Math.sqrt(3) * volts);
+  if (!Number.isFinite(fla) || fla <= 0) return null;
+  const multiple = resolveInrushMultiple(transformer);
+  const duration = resolveInrushDuration(transformer);
+  return { current: fla * multiple, duration };
+}
+
+function resolveInrushMultiple(comp) {
+  const keys = ['inrush_multiple', 'inrushMultiple', 'inrush_multiplier', 'xfmr_inrush_multiple', 'xfmrInrushMultiple'];
+  for (const key of keys) {
+    const val = Number(comp[key]);
+    if (Number.isFinite(val) && val > 0) return val;
+  }
+  return DEFAULT_INRUSH_MULTIPLE;
+}
+
+function resolveInrushDuration(comp) {
+  const keys = ['inrush_duration', 'inrushDuration', 'xfmr_inrush_duration'];
+  for (const key of keys) {
+    const val = Number(comp[key]);
+    if (Number.isFinite(val) && val > 0) return val;
+  }
+  return DEFAULT_INRUSH_DURATION;
+}
+
+function resolveCableInfo(source, target, conn) {
+  if (source?.type === 'cable' && source.cable) return source.cable;
+  if (target?.type === 'cable' && target.cable) return target.cable;
+  if (conn?.cable) return conn.cable;
+  return null;
+}
+
+function normalizeConductorSize(size) {
+  if (!size) return null;
+  let s = String(size).trim().toUpperCase();
+  if (!s) return null;
+  s = s.replace(/MCM$/, 'KCMIL');
+  if (/^#?\d+\s*AWG$/.test(s)) {
+    s = s.startsWith('#') ? s : `#${s.replace(/\s*AWG$/, '')} AWG`;
+  } else if (/^\d+\s*KCMIL$/.test(s)) {
+    s = s.replace(/\s*KCMIL$/, ' kcmil');
+  } else if (/^\d+\/0$/.test(s)) {
+    s = `${s} AWG`;
+  } else if (/^#\d+$/.test(s)) {
+    s = `${s} AWG`;
+  } else if (/^\d+$/.test(s)) {
+    // treat bare number as kcmil above 4/0
+    const num = Number(s);
+    if (num >= 250) {
+      s = `${num} kcmil`;
+    } else {
+      s = `#${s} AWG`;
+    }
+  }
+  return s;
+}
+
+function areaFromSize(size) {
+  const normalized = normalizeConductorSize(size);
+  if (!normalized) return null;
+  const data = conductorProperties[normalized];
+  if (data?.area_cm) return data.area_cm;
+  return null;
+}
+
+function parseConductorsDescriptor(descriptor) {
+  if (!descriptor) return { count: null, size: null };
+  const text = String(descriptor).trim();
+  const match = text.match(/^(\d+)\s*[Xx\-]\s*(.+)$/);
+  if (match) {
+    return { count: Number(match[1]), size: match[2].trim() };
+  }
+  return { count: null, size: null };
+}
+
+function getKConstant(material, insulation) {
+  const mat = String(material || '').toLowerCase();
+  const table = mat.startsWith('al') ? K_CONSTANTS.aluminum : K_CONSTANTS.copper;
+  const rating = insulation >= 90 ? 90 : insulation >= 75 ? 75 : 60;
+  return table[rating];
+}
+
+function buildCableCurve(cable, phases = 3) {
+  const descriptor = parseConductorsDescriptor(cable.conductors);
+  const size = cable.conductor_size || descriptor.size || cable.size || cable.awg;
+  const baseArea = areaFromSize(size);
+  if (!baseArea) return null;
+  const parallel = Number(cable.parallel_count || cable.parallels || cable.parallel) || 1;
+  const perPhase = Number(cable.conductors_per_phase || cable.conductorsPerPhase) || null;
+  const phaseCount = phases || 3;
+  const inferredPerPhase = perPhase || (descriptor.count ? Math.max(1, Math.round(descriptor.count / phaseCount)) : 1);
+  const effectiveArea = baseArea * inferredPerPhase * parallel;
+  const material = cable.conductor_material || cable.material || 'copper';
+  const insulation = Number(cable.insulation_rating || cable.temperature_rating || 90);
+  const k = getKConstant(material, insulation);
+  if (!k) return null;
+  const areaMm2 = effectiveArea * CMIL_TO_MM2;
+  const curve = CABLE_TIME_POINTS.map(time => ({
+    time,
+    current: (k * areaMm2) / Math.sqrt(time)
+  })).filter(p => Number.isFinite(p.current) && p.current > 0);
+  return {
+    curve,
+    ampacity: Number(cable.ampacity || cable.calc_ampacity || cable.rating || '') || null
+  };
 }

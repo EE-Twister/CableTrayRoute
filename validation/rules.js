@@ -75,12 +75,12 @@ export function runValidation(components = [], studies = {}) {
         const suffix = remainder > 0 ? ', …' : '';
         issues.push({
           component: id,
-          message: `${label} single point of failure (missing ${hint}): isolates ${count} component${count === 1 ? '' : 's'} (${list}${suffix})`
+          message: `${label} single point of failure (missing ${hint}): isolates ${count} component${count === 1 ? '' : 's'} (${list}${suffix}). Add ${hint} to provide a redundant path or acknowledge this radial connection if it is intentional.`
         });
       } else {
         issues.push({
           component: id,
-          message: `${label} single point of failure (missing ${hint})`
+          message: `${label} single point of failure (missing ${hint}). Add ${hint} to provide a redundant path or acknowledge this radial connection if it is intentional.`
         });
       }
     });
