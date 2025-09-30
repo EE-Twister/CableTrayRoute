@@ -555,6 +555,7 @@ body.compact-mode .palette-section .section-buttons {
   font-weight: 600;
 }
 
+.prop-category-list,
 .prop-component-list {
   border: 1px solid var(--ol-border-color);
   border-radius: var(--ol-radius);
@@ -563,10 +564,20 @@ body.compact-mode .palette-section .section-buttons {
   display: flex;
   flex-direction: column;
   gap: 0.5rem;
+}
+
+.prop-category-list {
+  max-height: 10rem;
+  overflow-y: auto;
+}
+
+.prop-component-list {
+  flex: 1 1 0;
   max-height: 20rem;
   overflow-y: auto;
 }
 
+.prop-category-option,
 .prop-component-option {
   border: 1px solid transparent;
   border-radius: var(--ol-radius);
@@ -579,12 +590,15 @@ body.compact-mode .palette-section .section-buttons {
   transition: background-color 0.2s, border-color 0.2s, color 0.2s;
 }
 
+.prop-category-option:hover,
+.prop-category-option:focus,
 .prop-component-option:hover,
 .prop-component-option:focus {
   background: var(--ol-hover-bg);
   outline: none;
 }
 
+.prop-category-option.is-active,
 .prop-component-option.is-active {
   background: var(--primary-color);
   color: var(--secondary-color);
@@ -1751,6 +1765,10 @@ body.modal-open {
 }
 
 .view-component-option {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 0.5rem;
     border: 1px solid transparent;
     border-radius: var(--ol-radius);
     padding: 0.45rem 0.75rem;
@@ -1760,6 +1778,29 @@ body.modal-open {
     font: inherit;
     cursor: pointer;
     transition: background-color 0.2s, border-color 0.2s, color 0.2s;
+}
+
+.view-component-option.has-selection {
+    border-color: var(--primary-color);
+}
+
+.view-component-label {
+    flex: 1 1 auto;
+}
+
+.view-component-indicator {
+    font-size: 0.75rem;
+    font-weight: 600;
+    padding: 0.1rem 0.5rem;
+    border-radius: 999px;
+    border: 1px solid var(--primary-color);
+    color: var(--primary-color);
+    background: var(--secondary-color);
+}
+
+.view-component-option.is-active .view-component-indicator {
+    color: var(--primary-color);
+    background: var(--secondary-color);
 }
 
 .view-component-option:hover,

@@ -189,8 +189,9 @@ function solvePhase(buses, baseMVA) {
       const ySh = conn.shunt?.from ? toPerUnitY(conn.shunt.from, bus.baseKV || 1, baseMVA) : toComplex(0, 0);
       const Iij = add(mul(sub(ViPrime, Vj), y), mul(ViPrime, ySh));
       const Sij = mul(Vi, conj(Iij));
-      const P = Sij.re * baseMVA;
-      const Q = Sij.im * baseMVA;
+      const scale = baseMVA * 1000; // convert per-unit results to kW/kvar
+      const P = Sij.re * scale;
+      const Q = Sij.im * scale;
       flows.push({ from: bus.id, to: buses[j].id, P, Q });
       const key = [bus.id, buses[j].id].sort().join('-');
       lossMap[key] = lossMap[key] || { P: 0, Q: 0 };
