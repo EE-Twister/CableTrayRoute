@@ -98,27 +98,77 @@ export function runMotorStart() {
   return results;
 }
 
+function ensureMotorStartResults() {
+  const studies = getStudies();
+  if (studies?.motorStart && Object.keys(studies.motorStart).length) {
+    return studies.motorStart;
+  }
+  const res = runMotorStart();
+  studies.motorStart = res;
+  setStudies(studies);
+  return res;
+}
+
+function renderMotorStartChart(svgEl, data) {
+  const width = Number(svgEl.getAttribute('width')) || 800;
+  const height = Number(svgEl.getAttribute('height')) || 400;
+  const margin = { top: 20, right: 20, bottom: 60, left: 70 };
+  const svg = d3.select(svgEl);
+  svg.selectAll('*').remove();
+
+  if (!data.length) {
+    svg.append('text')
+      .attr('x', width / 2)
+      .attr('y', height / 2)
+      .attr('text-anchor', 'middle')
+      .attr('fill', '#666')
+      .text('No motors with starting data found in the active project.');
+    return;
+  }
+
+  const x = d3.scaleBand().domain(data.map(d => d.id)).range([margin.left, width - margin.right]).padding(0.15);
+  const yMax = d3.max(data, d => d.sag) || 1;
+  const y = d3.scaleLinear().domain([0, yMax]).nice().range([height - margin.bottom, margin.top]);
+
+  svg.append('g')
+    .attr('transform', `translate(0,${height - margin.bottom})`)
+    .call(d3.axisBottom(x))
+    .selectAll('text')
+    .attr('transform', 'rotate(-35)')
+    .style('text-anchor', 'end');
+
+  svg.append('g')
+    .attr('transform', `translate(${margin.left},0)`)
+    .call(d3.axisLeft(y).tickFormat(d => `${d}%`));
+
+  svg.append('text')
+    .attr('x', margin.left + (width - margin.left - margin.right) / 2)
+    .attr('y', height - 10)
+    .attr('text-anchor', 'middle')
+    .attr('fill', '#333')
+    .text('Motor ID');
+
+  svg.append('text')
+    .attr('transform', 'rotate(-90)')
+    .attr('x', -(margin.top + (height - margin.top - margin.bottom) / 2))
+    .attr('y', 20)
+    .attr('text-anchor', 'middle')
+    .attr('fill', '#333')
+    .text('Voltage Sag (%)');
+
+  svg.append('g').selectAll('rect').data(data).enter().append('rect')
+    .attr('x', d => x(d.id))
+    .attr('y', d => y(d.sag))
+    .attr('width', x.bandwidth())
+    .attr('height', d => y(0) - y(d.sag))
+    .attr('fill', 'steelblue');
+}
+
 if (typeof document !== 'undefined') {
   const chartEl = document.getElementById('motorstart-chart');
   if (chartEl) {
-    const res = runMotorStart();
-    const studies = getStudies();
-    studies.motorStart = res;
-    setStudies(studies);
-    const data = Object.entries(res).map(([id, r]) => ({ id, sag: r.voltageSagPct }));
-    const width = Number(chartEl.getAttribute('width')) || 800;
-    const height = Number(chartEl.getAttribute('height')) || 400;
-    const margin = { top: 20, right: 20, bottom: 40, left: 50 };
-    const svg = d3.select(chartEl);
-    const x = d3.scaleBand().domain(data.map(d => d.id)).range([margin.left, width - margin.right]).padding(0.1);
-    const y = d3.scaleLinear().domain([0, d3.max(data, d => d.sag) || 1]).nice().range([height - margin.bottom, margin.top]);
-    svg.append('g').attr('transform', `translate(0,${height - margin.bottom})`).call(d3.axisBottom(x));
-    svg.append('g').attr('transform', `translate(${margin.left},0)`).call(d3.axisLeft(y));
-    svg.selectAll('.bar').data(data).enter().append('rect')
-      .attr('x', d => x(d.id))
-      .attr('y', d => y(d.sag))
-      .attr('width', x.bandwidth())
-      .attr('height', d => y(0) - y(d.sag))
-      .attr('fill', 'steelblue');
+    const results = ensureMotorStartResults();
+    const data = Object.entries(results).map(([id, r]) => ({ id, sag: r.voltageSagPct }));
+    renderMotorStartChart(chartEl, data);
   }
 }

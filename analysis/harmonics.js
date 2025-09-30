@@ -101,34 +101,88 @@ export function runHarmonics() {
   return results;
 }
 
+function ensureHarmonicResults() {
+  const studies = getStudies();
+  if (studies?.harmonics && Object.keys(studies.harmonics).length) {
+    return studies.harmonics;
+  }
+  const res = runHarmonics();
+  studies.harmonics = res;
+  setStudies(studies);
+  return res;
+}
+
+function renderChart(svgEl, data) {
+  const width = Number(svgEl.getAttribute('width')) || 800;
+  const height = Number(svgEl.getAttribute('height')) || 400;
+  const margin = { top: 20, right: 20, bottom: 60, left: 70 };
+  const svg = d3.select(svgEl);
+  svg.selectAll('*').remove();
+
+  if (!data.length) {
+    svg.append('text')
+      .attr('x', width / 2)
+      .attr('y', height / 2)
+      .attr('text-anchor', 'middle')
+      .attr('fill', '#666')
+      .text('No harmonic sources found in the active project.');
+    return;
+  }
+
+  const ids = data.map(d => d.id);
+  const x = d3.scaleBand().domain(ids).range([margin.left, width - margin.right]).padding(0.15);
+  const yMax = d3.max(data, d => Math.max(d.thd, d.limit)) || 1;
+  const y = d3.scaleLinear().domain([0, yMax]).nice().range([height - margin.bottom, margin.top]);
+
+  svg.append('g')
+    .attr('transform', `translate(0,${height - margin.bottom})`)
+    .call(d3.axisBottom(x))
+    .selectAll('text')
+    .attr('transform', 'rotate(-35)')
+    .style('text-anchor', 'end');
+
+  svg.append('g')
+    .attr('transform', `translate(${margin.left},0)`)
+    .call(d3.axisLeft(y).tickFormat(d => `${d}%`));
+
+  svg.append('text')
+    .attr('x', margin.left + (width - margin.left - margin.right) / 2)
+    .attr('y', height - 10)
+    .attr('text-anchor', 'middle')
+    .attr('fill', '#333')
+    .text('Component ID');
+
+  svg.append('text')
+    .attr('transform', 'rotate(-90)')
+    .attr('x', -(margin.top + (height - margin.top - margin.bottom) / 2))
+    .attr('y', 20)
+    .attr('text-anchor', 'middle')
+    .attr('fill', '#333')
+    .text('Voltage THD (%)');
+
+  const groups = svg.append('g');
+  groups.selectAll('rect').data(data).enter().append('rect')
+    .attr('x', d => x(d.id))
+    .attr('y', d => y(d.thd))
+    .attr('width', x.bandwidth())
+    .attr('height', d => y(0) - y(d.thd))
+    .attr('fill', d => d.thd > d.limit ? 'crimson' : 'steelblue');
+
+  groups.selectAll('line').data(data).enter().append('line')
+    .attr('x1', d => x(d.id))
+    .attr('x2', d => x(d.id) + x.bandwidth())
+    .attr('y1', d => y(d.limit))
+    .attr('y2', d => y(d.limit))
+    .attr('stroke', 'orange')
+    .attr('stroke-width', 2)
+    .attr('stroke-dasharray', '4,2');
+}
+
 if (typeof document !== 'undefined') {
   const chartEl = document.getElementById('harmonics-chart');
   if (chartEl) {
-    const res = runHarmonics();
-    const studies = getStudies();
-    studies.harmonics = res;
-    setStudies(studies);
-    const data = Object.entries(res).map(([id, r]) => ({ id, thd: r.vthd, limit: r.limit }));
-    const width = Number(chartEl.getAttribute('width')) || 800;
-    const height = Number(chartEl.getAttribute('height')) || 400;
-    const margin = { top: 20, right: 20, bottom: 40, left: 50 };
-    const svg = d3.select(chartEl);
-    const x = d3.scaleBand().domain(data.map(d => d.id)).range([margin.left, width - margin.right]).padding(0.1);
-    const y = d3.scaleLinear().domain([0, d3.max(data, d => Math.max(d.thd, d.limit)) || 1]).nice().range([height - margin.bottom, margin.top]);
-    svg.append('g').attr('transform', `translate(0,${height - margin.bottom})`).call(d3.axisBottom(x));
-    svg.append('g').attr('transform', `translate(${margin.left},0)`).call(d3.axisLeft(y));
-    svg.selectAll('.bar').data(data).enter().append('rect')
-      .attr('x', d => x(d.id))
-      .attr('y', d => y(d.thd))
-      .attr('width', x.bandwidth())
-      .attr('height', d => y(0) - y(d.thd))
-      .attr('fill', d => d.thd > d.limit ? 'crimson' : 'steelblue');
-    svg.selectAll('.limit').data(data).enter().append('line')
-      .attr('x1', d => x(d.id))
-      .attr('x2', d => x(d.id) + x.bandwidth())
-      .attr('y1', d => y(d.limit))
-      .attr('y2', d => y(d.limit))
-      .attr('stroke', 'orange')
-      .attr('stroke-dasharray', '4,2');
+    const results = ensureHarmonicResults();
+    const data = Object.entries(results).map(([id, r]) => ({ id, thd: r.vthd, limit: r.limit }));
+    renderChart(chartEl, data);
   }
 }

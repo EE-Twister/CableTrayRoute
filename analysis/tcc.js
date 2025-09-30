@@ -148,23 +148,65 @@ function plot() {
     return { id, base, overrides, scaled };
   }).filter(Boolean);
   if (!entries.length) return;
-  const allCurrents = entries.flatMap(s => s.scaled.curve.map(p => p.current));
+  let allCurrents = entries.flatMap(s => s.scaled.curve.map(p => p.current)).filter(v => v > 0);
   const allTimes = entries.flatMap(s => {
     const base = s.scaled.curve.map(p => p.time);
     const band = s.scaled.envelope?.flatMap(p => [p.minTime, p.maxTime]) || [];
     return [...base, ...band];
-  });
-  const margin = { top: 20, right: 20, bottom: 40, left: 60 };
+  }).filter(v => v > 0);
+  const studies = getStudies();
+  const fault = studies.shortCircuit?.[compId]?.threePhaseKA;
+  if (fault) {
+    allCurrents = [...allCurrents, fault * 1000];
+  }
+  const margin = { top: 20, right: 30, bottom: 70, left: 70 };
   const width = +chart.attr('width') - margin.left - margin.right;
   const height = +chart.attr('height') - margin.top - margin.bottom;
   const g = chart.append('g').attr('transform', `translate(${margin.left},${margin.top})`);
-  const x = d3.scaleLog().domain([d3.min(allCurrents), d3.max(allCurrents)]).range([0, width]);
-  const y = d3.scaleLog().domain([d3.min(allTimes), d3.max(allTimes)]).range([height, 0]);
-  g.append('g').attr('transform', `translate(0,${height})`).call(d3.axisBottom(x));
-  g.append('g').call(d3.axisLeft(y));
+  const minCurrent = d3.min(allCurrents) || 1;
+  const maxCurrent = d3.max(allCurrents) || minCurrent * 10;
+  const minTime = d3.min(allTimes) || 0.01;
+  const maxTime = d3.max(allTimes) || minTime * 10;
+  const x = d3.scaleLog()
+    .domain([Math.max(minCurrent / 1.5, 0.01), Math.max(maxCurrent * 1.5, minCurrent * 1.2)])
+    .range([0, width]);
+  const y = d3.scaleLog()
+    .domain([Math.max(minTime / 1.5, 0.001), Math.max(maxTime * 1.3, minTime * 2)])
+    .range([height, 0]);
+  const xAxis = d3.axisBottom(x).ticks(10, '~g');
+  const yAxis = d3.axisLeft(y).ticks(10, '~g');
+
+  g.append('g').attr('transform', `translate(0,${height})`).call(xAxis);
+  g.append('g').call(yAxis);
+
+  g.append('g')
+    .attr('class', 'grid grid-x')
+    .attr('transform', `translate(0,${height})`)
+    .call(xAxis.tickSize(-height).tickFormat(''))
+    .call(axis => axis.select('.domain').remove());
+  g.append('g')
+    .attr('class', 'grid grid-y')
+    .call(yAxis.tickSize(-width).tickFormat(''))
+    .call(axis => axis.select('.domain').remove());
+
+  g.append('text')
+    .attr('x', width / 2)
+    .attr('y', height + margin.bottom - 5)
+    .attr('text-anchor', 'middle')
+    .attr('fill', '#333')
+    .text('Current (A)');
+
+  g.append('text')
+    .attr('transform', 'rotate(-90)')
+    .attr('x', -height / 2)
+    .attr('y', -margin.left + 15)
+    .attr('text-anchor', 'middle')
+    .attr('fill', '#333')
+    .text('Time (s)');
   const color = d3.scaleOrdinal(d3.schemeCategory10);
-  const studies = getStudies();
-  const fault = studies.shortCircuit?.[compId]?.threePhaseKA;
+  const legend = chart.append('g')
+    .attr('class', 'tcc-legend')
+    .attr('transform', `translate(${margin.left},${margin.top - 12})`);
   if (fault) {
     g.append('line')
       .attr('x1', x(fault * 1000))
@@ -174,30 +216,42 @@ function plot() {
       .attr('stroke', '#000')
       .attr('stroke-dasharray', '4,2');
   }
-  const line = d3.line().x(p => x(p.current)).y(p => y(p.time)).curve(d3.curveMonotoneX);
+  const line = d3.line().x(p => x(p.current)).y(p => y(p.time)).curve(d3.curveLinear);
   const bandArea = d3.area()
     .x(p => x(p.current))
     .y0(p => y(p.maxTime))
     .y1(p => y(p.minTime))
-    .curve(d3.curveMonotoneX);
+    .curve(d3.curveLinear);
   const [xMin, xMax] = x.range();
   const [yMin, yMax] = y.range();
 
   const plotted = entries.map((entry, index) => {
     entry.color = color(index);
+    const legendItem = legend.append('g').attr('transform', `translate(${index * 160},0)`);
+    legendItem.append('rect')
+      .attr('width', 16)
+      .attr('height', 16)
+      .attr('fill', entry.color)
+      .attr('opacity', 0.6);
+    legendItem.append('text')
+      .attr('x', 20)
+      .attr('y', 12)
+      .attr('fill', '#333')
+      .attr('font-size', 12)
+      .text(entry.base.name || entry.base.id);
     entry.bandPath = g.append('path')
-      .datum(entry.scaled.envelope)
+      .datum(entry.scaled.envelope || [])
       .attr('fill', entry.color)
       .attr('opacity', 0.15)
       .attr('stroke', 'none');
     entry.minPath = g.append('path')
-      .datum(entry.scaled.minCurve)
+      .datum(entry.scaled.minCurve || [])
       .attr('fill', 'none')
       .attr('stroke-width', 1)
       .attr('stroke-opacity', 0.6)
       .attr('stroke-dasharray', '4,4');
     entry.maxPath = g.append('path')
-      .datum(entry.scaled.maxCurve)
+      .datum(entry.scaled.maxCurve || [])
       .attr('fill', 'none')
       .attr('stroke-width', 1)
       .attr('stroke-opacity', 0.6)
@@ -228,21 +282,25 @@ function plot() {
     const violations = [];
     plotted.forEach(entry => {
       entry.scaled = scaleCurve(entry.base, entry.overrides);
+      const envelope = entry.scaled.envelope || [];
+      const minCurve = entry.scaled.minCurve || [];
+      const maxCurve = entry.scaled.maxCurve || [];
+      const mainCurve = entry.scaled.curve || [];
       entry.bandPath
-        .datum(entry.scaled.envelope)
-        .attr('d', bandArea(entry.scaled.envelope))
+        .datum(envelope)
+        .attr('d', envelope.length ? bandArea(envelope) : null)
         .attr('fill', entry.color);
       entry.minPath
-        .datum(entry.scaled.minCurve)
-        .attr('d', line(entry.scaled.minCurve))
+        .datum(minCurve)
+        .attr('d', minCurve.length ? line(minCurve) : null)
         .attr('stroke', entry.color);
       entry.maxPath
-        .datum(entry.scaled.maxCurve)
-        .attr('d', line(entry.scaled.maxCurve))
+        .datum(maxCurve)
+        .attr('d', maxCurve.length ? line(maxCurve) : null)
         .attr('stroke', entry.color);
       entry.path
-        .datum(entry.scaled.curve)
-        .attr('d', line(entry.scaled.curve))
+        .datum(mainCurve)
+        .attr('d', mainCurve.length ? line(mainCurve) : null)
         .attr('stroke', () => {
           const violation = checkDuty(entry.scaled, faultKA);
           if (violation) {
