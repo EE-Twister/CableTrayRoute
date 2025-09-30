@@ -29,6 +29,19 @@ const MAX_PICKUP = 1e6;
 const MIN_DELAY = 0.001;
 const MAX_DELAY = 1e5;
 
+function capitalize(word = '') {
+  return word.charAt(0).toUpperCase() + word.slice(1);
+}
+
+function formatSettingValue(value) {
+  if (!Number.isFinite(Number(value))) return '';
+  const num = Number(value);
+  if (Math.abs(num) >= 1000 || Number.isInteger(num)) return String(num);
+  if (Math.abs(num) >= 100) return num.toFixed(1);
+  if (Math.abs(num) >= 10) return num.toFixed(2);
+  return num.toFixed(3).replace(/0+$/, '').replace(/\.$/, '');
+}
+
 async function init() {
   try {
     devices = await fetch('data/protectiveDevices.json').then(r => r.json());
@@ -89,12 +102,47 @@ function renderSettings() {
     const div = document.createElement('div');
     div.className = 'device-settings';
     div.dataset.id = dev.id;
-    let html = `\n      <h3>${dev.name}</h3>`;
-    Object.keys(dev.settings || {}).forEach(k => {
-      const val = set[k] ?? '';
-      html += `\n      <label>${k.charAt(0).toUpperCase() + k.slice(1)} <input type="number" data-field="${k}" value="${val}"></label>`;
+    const heading = document.createElement('h3');
+    heading.textContent = dev.name;
+    div.appendChild(heading);
+    Object.keys(dev.settings || {}).forEach(field => {
+      const label = document.createElement('label');
+      label.textContent = `${capitalize(field)} `;
+      const options = Array.isArray(dev.settingOptions?.[field]) ? dev.settingOptions[field] : null;
+      const savedValue = set[field];
+      if (options && options.length) {
+        const select = document.createElement('select');
+        select.dataset.field = field;
+        const normalized = Number(savedValue);
+        const existingValues = options.map(Number);
+        options.forEach(val => {
+          const optEl = document.createElement('option');
+          optEl.value = String(val);
+          optEl.textContent = formatSettingValue(val);
+          select.appendChild(optEl);
+        });
+        if (Number.isFinite(normalized) && !existingValues.includes(normalized)) {
+          const customOpt = document.createElement('option');
+          customOpt.value = String(normalized);
+          customOpt.textContent = `${formatSettingValue(normalized)} (custom)`;
+          customOpt.dataset.custom = 'true';
+          select.appendChild(customOpt);
+        }
+        if (Number.isFinite(normalized)) {
+          select.value = String(normalized);
+        }
+        label.appendChild(select);
+      } else {
+        const input = document.createElement('input');
+        input.type = 'number';
+        input.dataset.field = field;
+        if (Number.isFinite(Number(savedValue))) {
+          input.value = formatSettingValue(savedValue);
+        }
+        label.appendChild(input);
+      }
+      div.appendChild(label);
     });
-    div.innerHTML = html;
     settingsDiv.appendChild(div);
   });
 }
@@ -106,7 +154,8 @@ function persistSettings() {
     const id = div.dataset.id;
     const obj = {};
     div.querySelectorAll('[data-field]').forEach(inp => {
-      const val = Number(inp.value);
+      const raw = inp.value;
+      const val = raw === '' ? NaN : Number(raw);
       if (!Number.isNaN(val)) obj[inp.dataset.field] = val;
     });
     sets[id] = obj;
@@ -326,8 +375,20 @@ function plot() {
     Object.entries(entry.overrides).forEach(([field, value]) => {
       const input = div.querySelector(`[data-field="${field}"]`);
       if (!input || !Number.isFinite(value)) return;
-      const decimals = value >= 100 ? 0 : value >= 10 ? 1 : 2;
-      input.value = Number(value.toFixed(decimals));
+      if (input.tagName === 'SELECT') {
+        const valueStr = String(value);
+        let option = [...input.options].find(o => o.value === valueStr);
+        if (!option) {
+          option = document.createElement('option');
+          option.value = valueStr;
+          option.textContent = `${formatSettingValue(value)} (custom)`;
+          option.dataset.custom = 'true';
+          input.appendChild(option);
+        }
+        input.value = valueStr;
+      } else {
+        input.value = formatSettingValue(value);
+      }
     });
   };
 

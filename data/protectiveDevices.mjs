@@ -10,6 +10,11 @@ export default [
       "time": 0.2,
       "instantaneous": 800
     },
+    "settingOptions": {
+      "pickup": [80, 100, 125, 160],
+      "time": [0.1, 0.2, 0.3, 0.4],
+      "instantaneous": [800, 960, 1120, 1280, 1440, 1600]
+    },
     "curve": [
       {
         "current": 160,
@@ -39,6 +44,11 @@ export default [
       "pickup": 125,
       "time": 0.25,
       "instantaneous": 600
+    },
+    "settingOptions": {
+      "pickup": [63, 80, 100, 125],
+      "time": [0.2, 0.25, 0.3, 0.4],
+      "instantaneous": [500, 600, 700, 800, 900, 1000]
     },
     "curve": [
       {
@@ -70,6 +80,11 @@ export default [
       "time": 0.3,
       "instantaneous": 500
     },
+    "settingOptions": {
+      "pickup": [50, 63, 80, 100],
+      "time": [0.2, 0.3, 0.4, 0.5],
+      "instantaneous": [400, 500, 600, 700, 800, 900]
+    },
     "curve": [
       {
         "current": 100,
@@ -99,6 +114,11 @@ export default [
       "pickup": 150,
       "time": 0.15,
       "instantaneous": 600
+    },
+    "settingOptions": {
+      "pickup": [75, 100, 125, 150, 175, 200],
+      "time": [0.1, 0.15, 0.2, 0.3],
+      "instantaneous": [300, 400, 500, 600, 700, 800, 900, 1000, 1200]
     },
     "curve": [
       {
@@ -130,6 +150,11 @@ export default [
       "time": 0.2,
       "instantaneous": 500
     },
+    "settingOptions": {
+      "pickup": [50, 63, 80, 100],
+      "time": [0.15, 0.2, 0.25, 0.3],
+      "instantaneous": [400, 500, 600, 700, 800, 900]
+    },
     "curve": [
       {
         "current": 100,
@@ -159,6 +184,11 @@ export default [
       "pickup": 225,
       "time": 0.3,
       "instantaneous": 1125
+    },
+    "settingOptions": {
+      "pickup": [125, 160, 200, 225],
+      "time": [0.2, 0.3, 0.4, 0.5],
+      "instantaneous": [1125, 1350, 1575, 1800, 2025, 2250]
     },
     "curve": [
       {
