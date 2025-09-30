@@ -76,17 +76,143 @@ function syncSelectFromCheckboxes({ persist = false } = {}) {
   if (persist) persistSettings();
 }
 
-function capitalize(word = '') {
-  return word.charAt(0).toUpperCase() + word.slice(1);
+function formatSettingLabel(field = '') {
+  const known = {
+    pickup: 'Pickup',
+    time: 'Delay',
+    delay: 'Delay',
+    instantaneous: 'Instantaneous Pickup',
+    instantaneousDelay: 'Instantaneous Delay',
+    instantaneousMax: 'Instantaneous Max',
+    instantaneousPickup: 'Instantaneous Pickup',
+    curveProfile: 'Curve Profile',
+    longTimePickup: 'Long Time Pickup',
+    longTimeDelay: 'Long Time Delay',
+    shortTimePickup: 'Short Time Pickup',
+    shortTimeDelay: 'Short Time Delay'
+  };
+  if (known[field]) return known[field];
+  return String(field)
+    .replace(/[_\s]+/g, ' ')
+    .replace(/([a-z])([A-Z])/g, '$1 $2')
+    .replace(/\b([a-z])/g, (_, char) => char.toUpperCase())
+    .trim();
 }
 
 function formatSettingValue(value) {
-  if (!Number.isFinite(Number(value))) return '';
-  const num = Number(value);
+  if (value === null || value === undefined) return '';
+  if (typeof value === 'string') {
+    const trimmed = value.trim();
+    if (!trimmed) return '';
+    const num = Number(trimmed);
+    if (!Number.isNaN(num)) return formatSettingValue(num);
+    return trimmed;
+  }
+  if (typeof value !== 'number' || !Number.isFinite(value)) return '';
+  const num = value;
   if (Math.abs(num) >= 1000 || Number.isInteger(num)) return String(num);
   if (Math.abs(num) >= 100) return num.toFixed(1);
   if (Math.abs(num) >= 10) return num.toFixed(2);
   return num.toFixed(3).replace(/0+$/, '').replace(/\.$/, '');
+}
+
+function formatOptionLabel(value) {
+  if (value === null || value === undefined) return '';
+  if (typeof value === 'number') return formatSettingValue(value);
+  const str = String(value).trim();
+  if (!str) return '';
+  return str
+    .replace(/[_\s-]+/g, ' ')
+    .replace(/([a-z])([A-Z])/g, '$1 $2')
+    .replace(/\b([a-z])/g, (_, char) => char.toUpperCase());
+}
+
+function normalizeSettingOptions(options) {
+  if (!Array.isArray(options)) return [];
+  return options.map(option => {
+    if (option && typeof option === 'object' && !Array.isArray(option)) {
+      const value = option.value;
+      return {
+        value,
+        valueStr: String(value ?? ''),
+        label: option.label ?? formatOptionLabel(value)
+      };
+    }
+    return {
+      value: option,
+      valueStr: String(option ?? ''),
+      label: formatOptionLabel(option)
+    };
+  });
+}
+
+function resolveSettingType(defaultValue, options) {
+  if (Array.isArray(options)) {
+    const hasNonNumericOption = options.some(option => {
+      const value = option && typeof option === 'object' && !Array.isArray(option)
+        ? option.value
+        : option;
+      if (value === null || value === undefined) return false;
+      if (typeof value === 'number') return false;
+      const asNumber = Number(value);
+      return Number.isNaN(asNumber);
+    });
+    if (hasNonNumericOption) return 'string';
+  }
+  if (defaultValue !== null && defaultValue !== undefined) {
+    if (typeof defaultValue === 'string') {
+      const asNumber = Number(defaultValue);
+      if (Number.isNaN(asNumber)) return 'string';
+    } else if (typeof defaultValue !== 'number') {
+      return 'string';
+    }
+  }
+  return 'number';
+}
+
+function valuesEqual(a, b) {
+  if (a === b) return true;
+  const numA = Number(a);
+  const numB = Number(b);
+  if (Number.isFinite(numA) && Number.isFinite(numB)) {
+    return Math.abs(numA - numB) < 1e-9;
+  }
+  return String(a) === String(b);
+}
+
+function readOverrideFromInput(input) {
+  const field = input.dataset.field;
+  if (!field) return null;
+  const raw = input.value;
+  const defaultRaw = input.dataset.defaultValue ?? '';
+  const valueType = input.dataset.valueType || (input.tagName === 'SELECT' ? 'string' : 'number');
+  if (valueType === 'number') {
+    if (raw === '') return null;
+    const num = Number(raw);
+    if (!Number.isFinite(num)) return null;
+    if (defaultRaw !== '') {
+      const defaultNum = Number(defaultRaw);
+      if (Number.isFinite(defaultNum) && Math.abs(num - defaultNum) < 1e-9) {
+        return null;
+      }
+    }
+    return { field, value: num };
+  }
+  if (valueType === 'string') {
+    if (!raw) return null;
+    if (raw === defaultRaw) return null;
+    return { field, value: raw };
+  }
+  return null;
+}
+
+function collectOverridesFromDiv(div) {
+  const overrides = {};
+  div.querySelectorAll('[data-field]').forEach(input => {
+    const result = readOverrideFromInput(input);
+    if (result) overrides[result.field] = result.value;
+  });
+  return overrides;
 }
 
 async function init() {
@@ -370,38 +496,56 @@ function renderSettings() {
     heading.textContent = entry.name;
     div.appendChild(heading);
     Object.keys(base.settings || {}).forEach(field => {
+      const defaultValue = base.settings?.[field];
+      const overrideValue = overrides[field];
       const label = document.createElement('label');
-      label.textContent = `${capitalize(field)} `;
+      label.textContent = `${formatSettingLabel(field)} `;
       const options = Array.isArray(base.settingOptions?.[field]) ? base.settingOptions[field] : null;
-      const savedValue = overrides[field];
-      if (options && options.length) {
+      const normalizedOptions = normalizeSettingOptions(options);
+      if (normalizedOptions.length) {
         const select = document.createElement('select');
         select.dataset.field = field;
-        const normalized = Number(savedValue);
-        const existingValues = options.map(Number);
-        options.forEach(val => {
+        const valueType = resolveSettingType(defaultValue, options);
+        select.dataset.valueType = valueType;
+        select.dataset.defaultValue = defaultValue !== undefined && defaultValue !== null
+          ? String(defaultValue)
+          : '';
+        normalizedOptions.forEach(opt => {
           const optEl = document.createElement('option');
-          optEl.value = String(val);
-          optEl.textContent = formatSettingValue(val);
+          optEl.value = opt.valueStr;
+          optEl.textContent = opt.label;
           select.appendChild(optEl);
         });
-        if (Number.isFinite(normalized) && !existingValues.includes(normalized)) {
-          const customOpt = document.createElement('option');
-          customOpt.value = String(normalized);
-          customOpt.textContent = `${formatSettingValue(normalized)} (custom)`;
-          customOpt.dataset.custom = 'true';
-          select.appendChild(customOpt);
-        }
-        if (Number.isFinite(normalized)) {
-          select.value = String(normalized);
+        const activeValue = overrideValue !== undefined ? overrideValue : defaultValue;
+        if (activeValue !== undefined && activeValue !== null) {
+          const activeStr = String(activeValue);
+          const hasValue = normalizedOptions.some(opt => valuesEqual(opt.value, activeValue));
+          if (!hasValue) {
+            const customOpt = document.createElement('option');
+            customOpt.value = activeStr;
+            customOpt.textContent = `${formatSettingValue(activeValue)} (custom)`;
+            customOpt.dataset.custom = 'true';
+            select.appendChild(customOpt);
+          }
+          select.value = activeStr;
         }
         label.appendChild(select);
       } else {
         const input = document.createElement('input');
         input.type = 'number';
         input.dataset.field = field;
-        if (Number.isFinite(Number(savedValue))) {
-          input.value = formatSettingValue(savedValue);
+        input.dataset.valueType = 'number';
+        input.dataset.defaultValue = defaultValue !== undefined && defaultValue !== null
+          ? String(defaultValue)
+          : '';
+        if (overrideValue !== undefined && overrideValue !== null && overrideValue !== '') {
+          const numeric = Number(overrideValue);
+          if (Number.isFinite(numeric)) {
+            input.value = formatSettingValue(numeric);
+          }
+        }
+        if (defaultValue !== undefined && defaultValue !== null) {
+          input.placeholder = formatSettingValue(defaultValue);
         }
         label.appendChild(input);
       }
@@ -419,12 +563,7 @@ function persistSettings() {
     const uid = div.dataset.uid;
     const entry = deviceMap.get(uid);
     if (!entry) return;
-    const overrides = {};
-    div.querySelectorAll('[data-field]').forEach(inp => {
-      const raw = inp.value;
-      const val = raw === '' ? NaN : Number(raw);
-      if (!Number.isNaN(val)) overrides[inp.dataset.field] = val;
-    });
+    const overrides = collectOverridesFromDiv(div);
     if (entry.kind === 'component') {
       if (Object.keys(overrides).length) {
         componentSettings[entry.componentId] = overrides;
@@ -523,13 +662,7 @@ function linkComponent() {
 function gatherOverridesFromInputs(uid) {
   const div = settingsDiv.querySelector(`.device-settings[data-uid="${uid}"]`);
   if (!div) return {};
-  const overrides = {};
-  div.querySelectorAll('[data-field]').forEach(inp => {
-    const raw = inp.value;
-    const val = raw === '' ? NaN : Number(raw);
-    if (!Number.isNaN(val)) overrides[inp.dataset.field] = val;
-  });
-  return overrides;
+  return collectOverridesFromDiv(div);
 }
 
 function plot() {
@@ -810,20 +943,21 @@ function plot() {
     if (!div) return;
     Object.entries(entry.overrides).forEach(([field, value]) => {
       const input = div.querySelector(`[data-field="${field}"]`);
-      if (!input || !Number.isFinite(value)) return;
+      if (!input) return;
+      const formatted = formatSettingValue(value);
       if (input.tagName === 'SELECT') {
-        const valueStr = String(value);
+        const valueStr = String(value ?? '');
         let option = [...input.options].find(o => o.value === valueStr);
         if (!option) {
           option = document.createElement('option');
           option.value = valueStr;
-          option.textContent = `${formatSettingValue(value)} (custom)`;
+          option.textContent = formatted ? `${formatted} (custom)` : 'Custom';
           option.dataset.custom = 'true';
           input.appendChild(option);
         }
         input.value = valueStr;
-      } else {
-        input.value = formatSettingValue(value);
+      } else if (formatted !== '') {
+        input.value = formatted;
       }
     });
   };
