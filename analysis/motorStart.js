@@ -117,12 +117,18 @@ function renderMotorStartChart(svgEl, data) {
   svg.selectAll('*').remove();
 
   if (!data.length) {
-    svg.append('text')
-      .attr('x', width / 2)
-      .attr('y', height / 2)
-      .attr('text-anchor', 'middle')
-      .attr('fill', '#666')
-      .text('No motors with starting data found in the active project.');
+    const messages = [
+      'No motors with starting data found in the active project.',
+      'Add a motor starting curve by editing a motor on the One-Line and entering the inrush multiple, Thevenin impedance, inertia, and load torque curve points on the Motor Start tab.'
+    ];
+    messages.forEach((msg, index) => {
+      svg.append('text')
+        .attr('x', width / 2)
+        .attr('y', height / 2 + index * 20)
+        .attr('text-anchor', 'middle')
+        .attr('fill', index === 0 ? '#666' : '#444')
+        .text(msg);
+    });
     return;
   }
 

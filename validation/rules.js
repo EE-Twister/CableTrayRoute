@@ -6,6 +6,14 @@ export function runValidation(components = [], studies = {}) {
     return comp?.label || comp?.name || comp?.id || id;
   };
 
+  const inferReliabilityHint = comp => {
+    if (!comp) return 'redundant connection';
+    if (comp.type === 'breaker' || comp.type === 'switch') return 'alternate source or tie connection';
+    if (comp.type === 'transformer') return 'secondary tie or backup source';
+    if (comp.type === 'bus') return 'feed connection';
+    return 'redundant connection';
+  };
+
   // Map inbound connections for bus connectivity check
   const inbound = new Map();
   components.forEach(c => {
@@ -53,6 +61,9 @@ export function runValidation(components = [], studies = {}) {
   if (Array.isArray(studies.reliability?.n1Failures)) {
     const detailMap = studies.reliability.n1FailureDetails || {};
     studies.reliability.n1Failures.forEach(id => {
+      const comp = componentLookup.get(id);
+      const label = describe(id);
+      const hint = inferReliabilityHint(comp);
       const detail = detailMap[id];
       if (detail?.impactedIds?.length) {
         const count = detail.impactedIds.length;
@@ -64,10 +75,13 @@ export function runValidation(components = [], studies = {}) {
         const suffix = remainder > 0 ? ', …' : '';
         issues.push({
           component: id,
-          message: `Single point of failure: isolates ${count} component${count === 1 ? '' : 's'} (${list}${suffix})`
+          message: `${label} single point of failure (missing ${hint}): isolates ${count} component${count === 1 ? '' : 's'} (${list}${suffix})`
         });
       } else {
-        issues.push({ component: id, message: 'Single point of failure' });
+        issues.push({
+          component: id,
+          message: `${label} single point of failure (missing ${hint})`
+        });
       }
     });
   }
