@@ -9,6 +9,7 @@ export function scaleCurve(device = {}, overrides = {}) {
   const pickup = overrides.pickup ?? base.pickup ?? 1;
   const time = overrides.time ?? base.time ?? base.delay ?? 1;
   const instantaneous = overrides.instantaneous ?? base.instantaneous ?? 0;
+  const instDelay = overrides.instantaneousDelay ?? base.instantaneousDelay ?? 0.01;
   const baseTime = base.time ?? base.delay ?? 1;
   const scaleI = base.pickup ? pickup / base.pickup : 1;
   const scaleT = baseTime ? time / baseTime : 1;
@@ -17,12 +18,27 @@ export function scaleCurve(device = {}, overrides = {}) {
     timeUpper: Math.max(device.tolerance?.timeUpper ?? DEFAULT_TOLERANCE.timeUpper, 1.0)
   };
 
-  const curve = (device.curve || []).map(p => ({
+  const sorted = (device.curve || [])
+    .map(p => ({ current: Number(p.current) || 0, time: Math.max(Number(p.time) || MIN_TIME, MIN_TIME) }))
+    .filter(p => p.current > 0)
+    .sort((a, b) => a.current - b.current);
+
+  const curve = sorted.map(p => ({
     current: p.current * scaleI,
     time: Math.max(p.time * scaleT, MIN_TIME)
   }));
+
   if (instantaneous) {
-    curve.push({ current: instantaneous, time: 0.01 });
+    const instCurrent = instantaneous;
+    const instTime = Math.max(instDelay, MIN_TIME);
+    const last = curve[curve.length - 1];
+    if (last && last.current < instCurrent) {
+      curve.push({ current: instCurrent, time: last.time });
+    } else if (!last) {
+      curve.push({ current: instCurrent, time: instTime });
+    }
+    curve.push({ current: instCurrent, time: instTime });
+    curve.push({ current: instCurrent, time: MIN_TIME });
   }
 
   const minCurve = curve.map(p => ({
@@ -45,7 +61,7 @@ export function scaleCurve(device = {}, overrides = {}) {
     minCurve,
     maxCurve,
     envelope,
-    settings: { pickup, time, instantaneous },
+    settings: { pickup, time, instantaneous, instantaneousDelay: instDelay },
     tolerance
   };
 }
