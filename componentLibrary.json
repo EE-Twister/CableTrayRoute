@@ -1,5 +1,14 @@
 {
-  "categories": ["bus", "equipment", "protection", "load", "sources", "links", "annotations", "cable"],
+  "categories": [
+    "bus",
+    "equipment",
+    "protection",
+    "load",
+    "sources",
+    "links",
+    "annotations",
+    "cable"
+  ],
   "components": [
     {
       "type": "bus",
@@ -9,7 +18,24 @@
         "volts": 13800,
         "thevenin_mva": 500,
         "xr_ratio": 10,
-        "grounding": "solid"
+        "grounding": "solid",
+        "baseKV": 13.8,
+        "kV": 13.8,
+        "Vm": 1.0,
+        "Va": 0,
+        "prefault_voltage": 13.8,
+        "load": {
+          "kw": 0,
+          "kvar": 0
+        },
+        "generation": {
+          "kw": 0,
+          "kvar": 0
+        },
+        "enclosure": "box",
+        "gap": 102,
+        "working_distance": 914,
+        "electrode_config": "VCB"
       }
     },
     {
@@ -18,13 +44,24 @@
       "label": "Utility",
       "icon": "icons/components/Utility.svg",
       "ports": [
-        { "x": 80, "y": 20 }
+        {
+          "x": 80,
+          "y": 20
+        }
       ],
       "props": {
         "volts": 13800,
         "thevenin_mva": 500,
         "xr_ratio": 10,
-        "grounding": "solid"
+        "grounding": "solid",
+        "baseKV": 13.8,
+        "kV": 13.8,
+        "prefault_voltage": 13.8,
+        "mva": 500,
+        "enclosure": "open",
+        "gap": 152,
+        "working_distance": 1219,
+        "electrode_config": "HOA"
       }
     },
     {
@@ -51,11 +88,20 @@
         "neutral_grounding": {
           "primary": "solid",
           "secondary": "solid"
-        }
+        },
+        "baseKV": 0.48,
+        "kV": 0.48,
+        "prefault_voltage": 0.48
       },
       "ports": [
-        { "x": 0, "y": 20 },
-        { "x": 80, "y": 20 }
+        {
+          "x": 0,
+          "y": 20
+        },
+        {
+          "x": 80,
+          "y": 20
+        }
       ]
     },
     {
@@ -73,12 +119,24 @@
         "z_hv_lv_percent": 8.0,
         "z_hv_tv_percent": 10.0,
         "z_lv_tv_percent": 12.0,
-        "vector_group": "YNd1d11"
+        "vector_group": "YNd1d11",
+        "baseKV": 13.8,
+        "kV": 13.8,
+        "prefault_voltage": 13.8
       },
       "ports": [
-        { "x": 0, "y": 20 },
-        { "x": 80, "y": 10 },
-        { "x": 80, "y": 30 }
+        {
+          "x": 0,
+          "y": 20
+        },
+        {
+          "x": 80,
+          "y": 10
+        },
+        {
+          "x": 80,
+          "y": 30
+        }
       ]
     },
     {
@@ -92,11 +150,20 @@
         "volts_secondary": 13800,
         "percent_z": 8.0,
         "xr_ratio": 10,
-        "vector_group": "YNa0d1"
+        "vector_group": "YNa0d1",
+        "baseKV": 13.8,
+        "kV": 13.8,
+        "prefault_voltage": 13.8
       },
       "ports": [
-        { "x": 0, "y": 20 },
-        { "x": 80, "y": 20 }
+        {
+          "x": 0,
+          "y": 20
+        },
+        {
+          "x": 80,
+          "y": 20
+        }
       ]
     },
     {
@@ -110,11 +177,20 @@
         "volts_secondary": 480,
         "percent_z": 6.0,
         "xr_ratio": 10,
-        "vector_group": "Zn0"
+        "vector_group": "Zn0",
+        "baseKV": 0.48,
+        "kV": 0.48,
+        "prefault_voltage": 0.48
       },
       "ports": [
-        { "x": 0, "y": 20 },
-        { "x": 80, "y": 20 }
+        {
+          "x": 0,
+          "y": 20
+        },
+        {
+          "x": 80,
+          "y": 20
+        }
       ]
     },
     {
@@ -132,7 +208,15 @@
         "short_delay_s": 0.3,
         "inst_pickup_ka": 20,
         "ground_pickup_a": 400,
-        "ground_delay_s": 0.3
+        "ground_delay_s": 0.3,
+        "voltage": 480,
+        "baseKV": 0.48,
+        "kV": 0.48,
+        "prefault_voltage": 0.48,
+        "enclosure": "box",
+        "gap": 32,
+        "working_distance": 455,
+        "electrode_config": "VCB"
       }
     },
     {
@@ -150,7 +234,15 @@
         "short_delay_s": 0.3,
         "inst_pickup_ka": 20,
         "ground_pickup_a": 400,
-        "ground_delay_s": 0.3
+        "ground_delay_s": 0.3,
+        "voltage": 4160,
+        "baseKV": 4.16,
+        "kV": 4.16,
+        "prefault_voltage": 4.16,
+        "enclosure": "box",
+        "gap": 102,
+        "working_distance": 914,
+        "electrode_config": "VCB"
       }
     },
     {
@@ -168,7 +260,15 @@
         "short_delay_s": 0.3,
         "inst_pickup_ka": 20,
         "ground_pickup_a": 400,
-        "ground_delay_s": 0.3
+        "ground_delay_s": 0.3,
+        "voltage": 13800,
+        "baseKV": 13.8,
+        "kV": 13.8,
+        "prefault_voltage": 13.8,
+        "enclosure": "box",
+        "gap": 152,
+        "working_distance": 1219,
+        "electrode_config": "VOA"
       }
     },
     {
@@ -178,7 +278,16 @@
       "props": {
         "class": "RK1",
         "rating_a": 400,
-        "speed": "time_delay"
+        "speed": "time_delay",
+        "voltage": 480,
+        "baseKV": 0.48,
+        "kV": 0.48,
+        "prefault_voltage": 0.48,
+        "enclosure": "box",
+        "gap": 32,
+        "working_distance": 455,
+        "electrode_config": "VCB",
+        "interrupt_rating_ka": 0.4
       }
     },
     {
@@ -188,7 +297,9 @@
       "props": {
         "volts": 15000,
         "ka": 12.5,
-        "curve": "ANSI_E"
+        "curve": "ANSI_E",
+        "baseKV": 15.0,
+        "kV": 15.0
       }
     },
     {
@@ -199,7 +310,15 @@
       "props": {
         "rating_a": 800,
         "transition": "open",
-        "source_priority": "normal"
+        "source_priority": "normal",
+        "voltage": 480,
+        "baseKV": 0.48,
+        "kV": 0.48,
+        "prefault_voltage": 0.48,
+        "enclosure": "box",
+        "gap": 32,
+        "working_distance": 455,
+        "electrode_config": "VCB"
       }
     },
     {
@@ -209,7 +328,15 @@
       "icon": "icons/components/Switch.svg",
       "props": {
         "rating_a": 800,
-        "transition": "open"
+        "transition": "open",
+        "voltage": 480,
+        "baseKV": 0.48,
+        "kV": 0.48,
+        "prefault_voltage": 0.48,
+        "enclosure": "box",
+        "gap": 32,
+        "working_distance": 455,
+        "electrode_config": "VCB"
       }
     },
     {
@@ -220,7 +347,15 @@
       "props": {
         "rating_a": 800,
         "transition": "open",
-        "source_priority": "normal"
+        "source_priority": "normal",
+        "voltage": 480,
+        "baseKV": 0.48,
+        "kV": 0.48,
+        "prefault_voltage": 0.48,
+        "enclosure": "box",
+        "gap": 32,
+        "working_distance": 455,
+        "electrode_config": "VCB"
       }
     },
     {
@@ -229,7 +364,15 @@
       "icon": "icons/components/Switch.svg",
       "props": {
         "rating_a": 100,
-        "coil_v": 120
+        "coil_v": 120,
+        "voltage": 480,
+        "baseKV": 0.48,
+        "kV": 0.48,
+        "prefault_voltage": 0.48,
+        "enclosure": "box",
+        "gap": 32,
+        "working_distance": 455,
+        "electrode_config": "VCB"
       }
     },
     {
@@ -240,7 +383,13 @@
         "volts": 13800,
         "kvar": 1800,
         "steps": 3,
-        "detuned_hz": 189
+        "detuned_hz": 189,
+        "baseKV": 13.8,
+        "kV": 13.8,
+        "prefault_voltage": 13.8,
+        "shunt": {
+          "kvar": 1800
+        }
       }
     },
     {
@@ -249,7 +398,13 @@
       "icon": "icons/placeholder.svg",
       "props": {
         "volts": 13800,
-        "kvar_absorb": 600
+        "kvar_absorb": 600,
+        "baseKV": 13.8,
+        "kV": 13.8,
+        "prefault_voltage": 13.8,
+        "shunt": {
+          "kvar": -600
+        }
       }
     },
     {
@@ -258,7 +413,10 @@
       "label": "Synchronous Gen",
       "icon": "icons/components/SynchronousGenerator.svg",
       "ports": [
-        { "x": 80, "y": 20 }
+        {
+          "x": 80,
+          "y": 20
+        }
       ],
       "props": {
         "kw": 2000,
@@ -268,7 +426,16 @@
         "xd_pu": 1.8,
         "xd_prime_pu": 0.3,
         "xd_double_prime_pu": 0.2,
-        "grounding": "high_resistance"
+        "grounding": "high_resistance",
+        "baseKV": 13.8,
+        "kV": 13.8,
+        "mva": 2.5,
+        "thevenin_mva": 2.5,
+        "prefault_voltage": 13.8,
+        "gap": 152,
+        "working_distance": 914,
+        "electrode_config": "VCB",
+        "enclosure": "open"
       }
     },
     {
@@ -277,7 +444,10 @@
       "label": "Asynchronous Gen",
       "icon": "icons/components/AsynchronousGenerator.svg",
       "ports": [
-        { "x": 80, "y": 20 }
+        {
+          "x": 80,
+          "y": 20
+        }
       ],
       "props": {
         "kw": 1500,
@@ -286,7 +456,16 @@
         "pf": 0.85,
         "slip_percent": 2.5,
         "reactance_pu": 0.25,
-        "grounding": "ungrounded"
+        "grounding": "ungrounded",
+        "baseKV": 4.16,
+        "kV": 4.16,
+        "mva": 1.875,
+        "thevenin_mva": 1.875,
+        "prefault_voltage": 4.16,
+        "gap": 152,
+        "working_distance": 914,
+        "electrode_config": "VCB",
+        "enclosure": "open"
       }
     },
     {
@@ -297,7 +476,18 @@
         "kva": 1000,
         "volts": 480,
         "pf_mode": "volt_var",
-        "pf_setpoint": 1.0
+        "pf_setpoint": 1.0,
+        "baseKV": 0.48,
+        "kV": 0.48,
+        "voltage": 480,
+        "prefault_voltage": 0.48,
+        "enclosure": "box",
+        "gap": 32,
+        "working_distance": 455,
+        "electrode_config": "VCB",
+        "mva": 1.0,
+        "thevenin_mva": 1.0,
+        "pf": 1.0
       }
     },
     {
@@ -308,7 +498,18 @@
         "kva": 500,
         "volts": 480,
         "topology": "double_conversion",
-        "battery_kwh": 250
+        "battery_kwh": 250,
+        "baseKV": 0.48,
+        "kV": 0.48,
+        "voltage": 480,
+        "prefault_voltage": 0.48,
+        "enclosure": "box",
+        "gap": 32,
+        "working_distance": 455,
+        "electrode_config": "VCB",
+        "mva": 0.5,
+        "thevenin_mva": 0.5,
+        "battery_runtime_min": 15
       }
     },
     {
@@ -317,7 +518,10 @@
       "label": "Sheet Link Out",
       "icon": "icons/components/SheetLinkOut.svg",
       "ports": [
-        { "x": 80, "y": 20 }
+        {
+          "x": 80,
+          "y": 20
+        }
       ],
       "props": {
         "link_id": "",
@@ -331,7 +535,10 @@
       "label": "Sheet Link In",
       "icon": "icons/components/SheetLinkIn.svg",
       "ports": [
-        { "x": 0, "y": 20 }
+        {
+          "x": 0,
+          "y": 20
+        }
       ],
       "props": {
         "link_id": "",
@@ -355,7 +562,19 @@
       "icon": "icons/components/MCC.svg",
       "props": {
         "volts": 480,
-        "sections": 6
+        "sections": 6,
+        "baseKV": 0.48,
+        "kV": 0.48,
+        "voltage": 480,
+        "prefault_voltage": 0.48,
+        "enclosure": "box",
+        "gap": 32,
+        "working_distance": 455,
+        "electrode_config": "VCB",
+        "load": {
+          "kw": 0,
+          "kvar": 0
+        }
       }
     },
     {
@@ -369,7 +588,15 @@
         "insulation": "XHHW-2",
         "temp_c": 75,
         "r_ohm_per_km": 0.045,
-        "x_ohm_per_km": 0.08
+        "x_ohm_per_km": 0.08,
+        "baseKV": 13.8,
+        "kV": 13.8,
+        "prefault_voltage": 13.8,
+        "impedance": {
+          "r": 0.0054,
+          "x": 0.0096
+        },
+        "enclosure": "box"
       }
     },
     {
@@ -377,7 +604,10 @@
       "label": "Motor",
       "icon": "icons/components/Motor.svg",
       "ports": [
-        { "x": 80, "y": 20 }
+        {
+          "x": 80,
+          "y": 20
+        }
       ],
       "props": {
         "hp": 150,
@@ -387,7 +617,19 @@
         "efficiency": 95,
         "lr_current_pu": 6.0,
         "starting": "DOL",
-        "vfd": false
+        "vfd": false,
+        "baseKV": 0.48,
+        "kV": 0.48,
+        "voltage": 480,
+        "prefault_voltage": 0.48,
+        "enclosure": "box",
+        "gap": 32,
+        "working_distance": 455,
+        "electrode_config": "VCB",
+        "load": {
+          "kw": 117.789,
+          "kvar": 63.576
+        }
       }
     },
     {
@@ -396,10 +638,25 @@
       "icon": "icons/components/Load.svg",
       "props": {
         "watts": 300000,
-        "volts": 480
+        "volts": 480,
+        "baseKV": 0.48,
+        "kV": 0.48,
+        "voltage": 480,
+        "prefault_voltage": 0.48,
+        "enclosure": "box",
+        "gap": 32,
+        "working_distance": 455,
+        "electrode_config": "VCB",
+        "load": {
+          "kw": 300.0,
+          "kvar": 0
+        }
       },
       "ports": [
-        { "x": 80, "y": 20 }
+        {
+          "x": 80,
+          "y": 20
+        }
       ]
     },
     {

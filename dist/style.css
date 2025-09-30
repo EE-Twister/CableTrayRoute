@@ -520,6 +520,130 @@ body.compact-mode .palette-section .section-buttons {
   max-width: 800px;
 }
 
+.prop-modal-panel {
+  background: var(--ol-card-bg);
+  padding: var(--ol-spacing);
+  border: 1px solid var(--ol-border-color);
+  border-radius: var(--ol-radius);
+  box-shadow: var(--ol-shadow);
+  max-height: 90%;
+  max-width: 960px;
+  width: min(90vw, 960px);
+  display: flex;
+  flex-direction: column;
+  gap: var(--ol-spacing);
+}
+
+.prop-modal-layout {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--ol-spacing);
+  overflow: auto;
+}
+
+.prop-modal-column {
+  flex: 1 1 260px;
+  min-width: 220px;
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+}
+
+.prop-modal-heading {
+  margin: 0;
+  font-size: 1rem;
+  font-weight: 600;
+}
+
+.prop-category-list,
+.prop-component-list {
+  border: 1px solid var(--ol-border-color);
+  border-radius: var(--ol-radius);
+  background: var(--ol-card-bg);
+  padding: 0.5rem;
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+}
+
+.prop-category-list {
+  max-height: 10rem;
+  overflow-y: auto;
+}
+
+.prop-component-list {
+  flex: 1 1 0;
+  max-height: 20rem;
+  overflow-y: auto;
+}
+
+.prop-category-option,
+.prop-component-option {
+  border: 1px solid transparent;
+  border-radius: var(--ol-radius);
+  padding: 0.45rem 0.75rem;
+  text-align: left;
+  background: transparent;
+  color: inherit;
+  font: inherit;
+  cursor: pointer;
+  transition: background-color 0.2s, border-color 0.2s, color 0.2s;
+}
+
+.prop-category-option:hover,
+.prop-category-option:focus,
+.prop-component-option:hover,
+.prop-component-option:focus {
+  background: var(--ol-hover-bg);
+  outline: none;
+}
+
+.prop-category-option.is-active,
+.prop-component-option.is-active {
+  background: var(--primary-color);
+  color: var(--secondary-color);
+  border-color: var(--primary-color);
+}
+
+.prop-property-container {
+  border: 1px solid var(--ol-border-color);
+  border-radius: var(--ol-radius);
+  background: var(--ol-card-bg);
+  padding: var(--ol-spacing);
+  flex: 1 1 320px;
+  min-height: 12rem;
+  max-height: 60vh;
+  overflow-y: auto;
+  display: flex;
+  flex-direction: column;
+  gap: var(--ol-spacing);
+}
+
+.prop-modal .prop-detail-form {
+  background: transparent;
+  border: 0;
+  padding: 0;
+  box-shadow: none;
+  max-height: none;
+  max-width: none;
+  width: 100%;
+  display: flex;
+  flex-direction: column;
+  gap: var(--ol-spacing);
+}
+
+.prop-form-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+  margin-top: 0.5rem;
+}
+
+.prop-property-empty {
+  margin: 0;
+  color: var(--text-muted, #666);
+}
+
 .prefix-table {
   width: 100%;
   border-collapse: collapse;
@@ -1641,6 +1765,10 @@ body.modal-open {
 }
 
 .view-component-option {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 0.5rem;
     border: 1px solid transparent;
     border-radius: var(--ol-radius);
     padding: 0.45rem 0.75rem;
@@ -1650,6 +1778,29 @@ body.modal-open {
     font: inherit;
     cursor: pointer;
     transition: background-color 0.2s, border-color 0.2s, color 0.2s;
+}
+
+.view-component-option.has-selection {
+    border-color: var(--primary-color);
+}
+
+.view-component-label {
+    flex: 1 1 auto;
+}
+
+.view-component-indicator {
+    font-size: 0.75rem;
+    font-weight: 600;
+    padding: 0.1rem 0.5rem;
+    border-radius: 999px;
+    border: 1px solid var(--primary-color);
+    color: var(--primary-color);
+    background: var(--secondary-color);
+}
+
+.view-component-option.is-active .view-component-indicator {
+    color: var(--primary-color);
+    background: var(--secondary-color);
 }
 
 .view-component-option:hover,

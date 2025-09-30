@@ -1,5 +1,10 @@
 export function runValidation(components = [], studies = {}) {
   const issues = [];
+  const componentLookup = new Map(components.map(c => [c.id, c]));
+  const describe = id => {
+    const comp = componentLookup.get(id);
+    return comp?.label || comp?.name || comp?.id || id;
+  };
 
   // Map inbound connections for bus connectivity check
   const inbound = new Map();
@@ -46,8 +51,24 @@ export function runValidation(components = [], studies = {}) {
 
   // Single point of failure warnings from reliability study
   if (Array.isArray(studies.reliability?.n1Failures)) {
+    const detailMap = studies.reliability.n1FailureDetails || {};
     studies.reliability.n1Failures.forEach(id => {
-      issues.push({ component: id, message: 'Single point of failure' });
+      const detail = detailMap[id];
+      if (detail?.impactedIds?.length) {
+        const count = detail.impactedIds.length;
+        const sample = detail.impactedLabels?.length
+          ? detail.impactedLabels.slice(0, 3)
+          : detail.impactedIds.slice(0, 3).map(describe);
+        const remainder = count - sample.length;
+        const list = sample.join(', ');
+        const suffix = remainder > 0 ? ', …' : '';
+        issues.push({
+          component: id,
+          message: `Single point of failure: isolates ${count} component${count === 1 ? '' : 's'} (${list}${suffix})`
+        });
+      } else {
+        issues.push({ component: id, message: 'Single point of failure' });
+      }
     });
   }
 
