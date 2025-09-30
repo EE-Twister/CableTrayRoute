@@ -37,25 +37,54 @@ export function runReliability(components = []) {
     });
   });
 
-  function isConnected(exclude = []) {
+  function computeIslands(exclude = []) {
     const excludeSet = new Set(exclude);
     const nodes = ops.map(c => c.id).filter(id => !excludeSet.has(id));
-    if (!nodes.length) return true;
     const visited = new Set();
-    const stack = [nodes[0]];
-    while (stack.length) {
-      const n = stack.pop();
-      if (visited.has(n) || excludeSet.has(n)) continue;
-      visited.add(n);
-      adj.get(n)?.forEach(m => {
-        if (!visited.has(m) && !excludeSet.has(m)) stack.push(m);
-      });
-    }
-    return visited.size === nodes.length;
+    const islands = [];
+    nodes.forEach(start => {
+      if (visited.has(start)) return;
+      const stack = [start];
+      const group = [];
+      while (stack.length) {
+        const node = stack.pop();
+        if (visited.has(node) || excludeSet.has(node)) continue;
+        visited.add(node);
+        group.push(node);
+        adj.get(node)?.forEach(next => {
+          if (!visited.has(next) && !excludeSet.has(next)) stack.push(next);
+        });
+      }
+      if (group.length) islands.push(group);
+    });
+    return islands;
   }
 
+  function isConnected(exclude = []) {
+    return computeIslands(exclude).length <= 1;
+  }
+
+  const labelFor = id => {
+    const comp = compMap.get(id);
+    return comp?.label || comp?.name || comp?.id || id;
+  };
+
   const n1Failures = [];
-  ops.forEach(c => { if (!isConnected([c.id])) n1Failures.push(c.id); });
+  const n1FailureDetails = {};
+  ops.forEach(c => {
+    const islands = computeIslands([c.id]);
+    if (islands.length <= 1) return;
+    n1Failures.push(c.id);
+    const sorted = islands.slice().sort((a, b) => b.length - a.length);
+    const impactedIslands = sorted.slice(1);
+    const impactedIds = impactedIslands.flat();
+    n1FailureDetails[c.id] = {
+      islands,
+      impactedIds,
+      impactedLabels: impactedIds.map(labelFor),
+      impactedCount: impactedIds.length
+    };
+  });
 
   const n2Failures = [];
   for (let i = 0; i < ops.length; i++) {
@@ -80,7 +109,16 @@ export function runReliability(components = []) {
     + n2Impacts.reduce((s, i) => s + i.probability, 0);
   const systemAvailability = 1 - unavailability;
 
-  return { systemAvailability, expectedOutage, componentStats, n1Failures, n2Failures, n1Impacts, n2Impacts };
+  return {
+    systemAvailability,
+    expectedOutage,
+    componentStats,
+    n1Failures,
+    n2Failures,
+    n1Impacts,
+    n2Impacts,
+    n1FailureDetails
+  };
 }
 
 if (typeof document !== 'undefined') {

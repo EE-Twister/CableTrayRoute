@@ -149,7 +149,11 @@ function plot() {
   }).filter(Boolean);
   if (!entries.length) return;
   const allCurrents = entries.flatMap(s => s.scaled.curve.map(p => p.current));
-  const allTimes = entries.flatMap(s => s.scaled.curve.map(p => p.time));
+  const allTimes = entries.flatMap(s => {
+    const base = s.scaled.curve.map(p => p.time);
+    const band = s.scaled.envelope?.flatMap(p => [p.minTime, p.maxTime]) || [];
+    return [...base, ...band];
+  });
   const margin = { top: 20, right: 20, bottom: 40, left: 60 };
   const width = +chart.attr('width') - margin.left - margin.right;
   const height = +chart.attr('height') - margin.top - margin.bottom;
@@ -171,11 +175,33 @@ function plot() {
       .attr('stroke-dasharray', '4,2');
   }
   const line = d3.line().x(p => x(p.current)).y(p => y(p.time)).curve(d3.curveMonotoneX);
+  const bandArea = d3.area()
+    .x(p => x(p.current))
+    .y0(p => y(p.maxTime))
+    .y1(p => y(p.minTime))
+    .curve(d3.curveMonotoneX);
   const [xMin, xMax] = x.range();
   const [yMin, yMax] = y.range();
 
   const plotted = entries.map((entry, index) => {
     entry.color = color(index);
+    entry.bandPath = g.append('path')
+      .datum(entry.scaled.envelope)
+      .attr('fill', entry.color)
+      .attr('opacity', 0.15)
+      .attr('stroke', 'none');
+    entry.minPath = g.append('path')
+      .datum(entry.scaled.minCurve)
+      .attr('fill', 'none')
+      .attr('stroke-width', 1)
+      .attr('stroke-opacity', 0.6)
+      .attr('stroke-dasharray', '4,4');
+    entry.maxPath = g.append('path')
+      .datum(entry.scaled.maxCurve)
+      .attr('fill', 'none')
+      .attr('stroke-width', 1)
+      .attr('stroke-opacity', 0.6)
+      .attr('stroke-dasharray', '4,4');
     entry.path = g.append('path')
       .datum(entry.scaled.curve)
       .attr('fill', 'none')
@@ -202,6 +228,18 @@ function plot() {
     const violations = [];
     plotted.forEach(entry => {
       entry.scaled = scaleCurve(entry.base, entry.overrides);
+      entry.bandPath
+        .datum(entry.scaled.envelope)
+        .attr('d', bandArea(entry.scaled.envelope))
+        .attr('fill', entry.color);
+      entry.minPath
+        .datum(entry.scaled.minCurve)
+        .attr('d', line(entry.scaled.minCurve))
+        .attr('stroke', entry.color);
+      entry.maxPath
+        .datum(entry.scaled.maxCurve)
+        .attr('d', line(entry.scaled.maxCurve))
+        .attr('stroke', entry.color);
       entry.path
         .datum(entry.scaled.curve)
         .attr('d', line(entry.scaled.curve))
