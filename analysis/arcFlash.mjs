@@ -1,4 +1,5 @@
 import { runShortCircuit } from './shortCircuit.mjs';
+import { scaleCurve } from './tccUtils.js';
 import { getOneLine, getItem } from '../dataStore.mjs';
 
 let deviceCache = null;
@@ -55,20 +56,17 @@ function clearingTime(comp, Ibf, devices) {
   if (!comp.tccId) return 0.2;
   const dev = devices.find(d => d.id === comp.tccId);
   if (!dev) return 0.2;
-  const saved = getItem('tccSettings', { devices: [], settings: {} });
-  const set = saved.settings?.[dev.id] || {};
-  const base = dev.settings || {};
-  const pickup = set.pickup ?? base.pickup ?? 1;
-  const delay = set.delay ?? base.delay ?? 0.1;
-  const inst = set.instantaneous ?? base.instantaneous;
-  if (inst && Ibf * 1000 >= inst) return 0.01;
-  const scaleI = pickup / (base.pickup || pickup);
-  const scaleT = delay / (base.delay || delay);
-  const curve = (dev.curve || []).map(p => ({
-    current: p.current * scaleI,
-    time: p.time * scaleT
-  }));
-  return interpolateTime(curve, Ibf * 1000);
+  const saved = getItem('tccSettings', { devices: [], settings: {}, componentOverrides: {} });
+  const deviceOverride = saved.settings?.[dev.id] || {};
+  const componentOverride = saved.componentOverrides?.[comp.id] || {};
+  const inlineOverride = comp.tccOverrides && typeof comp.tccOverrides === 'object' ? comp.tccOverrides : {};
+  const overrides = { ...deviceOverride, ...componentOverride, ...inlineOverride };
+  const scaled = scaleCurve(dev, overrides);
+  const settings = scaled.settings || {};
+  if (settings.instantaneous && Ibf * 1000 >= settings.instantaneous) {
+    return Math.max(settings.instantaneousDelay || 0.01, 0.005);
+  }
+  return interpolateTime(scaled.curve || [], Ibf * 1000);
 }
 
 // IEEE 1584‑2018 arcing current model

@@ -95,6 +95,23 @@
   grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
 }
 
+.device-multi-heading {
+  grid-column: 1 / -1;
+  margin: 0.75rem 0 0.25rem;
+  font-size: 0.75rem;
+  font-weight: 600;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--text-muted, #6c757d);
+}
+
+.device-multi-empty {
+  grid-column: 1 / -1;
+  margin: 0.25rem 0 0.5rem;
+  font-size: 0.85rem;
+  color: var(--text-muted, #6c757d);
+}
+
 .device-multi-item {
   display: flex;
   align-items: center;
