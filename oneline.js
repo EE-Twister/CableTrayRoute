@@ -3949,6 +3949,37 @@ function selectComponent(compOrId) {
   const buttonMap = new Map();
   let activeId = activeComponent?.id || null;
 
+  function renderCategoryButtons() {
+    categoryListEl.innerHTML = '';
+    categoryButtonMap.clear();
+    categoryOrder.forEach(categoryKey => {
+      const button = document.createElement('button');
+      button.type = 'button';
+      button.className = 'prop-category-option';
+      button.textContent = getCategoryLabel(categoryKey);
+      button.dataset.category = categoryKey;
+      button.setAttribute('aria-pressed', 'false');
+      button.addEventListener('click', () => {
+        if (activeCategory === categoryKey) return;
+        activeCategory = categoryKey;
+        const nextDevice = categoryEntries.get(activeCategory)?.[0] || null;
+        renderDeviceButtons();
+        updateCategoryStates();
+        if (nextDevice) {
+          setActiveComponent(nextDevice);
+        } else {
+          selected = null;
+          selection = [];
+          selectedConnection = null;
+          renderPropertiesFor(null);
+          updateButtonStates();
+        }
+      });
+      categoryButtonMap.set(categoryKey, button);
+      categoryListEl.appendChild(button);
+    });
+  }
+
   function getComponentListLabel(comp) {
     if (!comp) return 'Device';
     const tag = typeof comp.label === 'string' ? comp.label.trim() : '';
@@ -3961,6 +3992,40 @@ function selectComponent(compOrId) {
   function getCategoryLabel(key) {
     if (!key) return 'Other';
     return formatAttributeLabel(String(key));
+  }
+
+  function renderDeviceButtons() {
+    componentListEl.innerHTML = '';
+    buttonMap.clear();
+    const devices = activeCategory ? categoryEntries.get(activeCategory) || [] : [];
+    const headingLabel = activeCategory ? `Device Tags – ${getCategoryLabel(activeCategory)}` : 'Device Tags';
+    componentHeading.textContent = headingLabel;
+    devices.forEach(device => {
+      const button = document.createElement('button');
+      button.type = 'button';
+      button.className = 'prop-component-option';
+      button.dataset.componentId = device.id;
+      button.textContent = getComponentListLabel(device);
+      button.setAttribute('aria-pressed', 'false');
+      button.addEventListener('click', () => {
+        if (activeId === device.id) return;
+        activeComponent = device;
+        activeId = device.id;
+        selected = device;
+        selection = [device];
+        selectedConnection = null;
+        updateButtonStates();
+        renderPropertiesFor(device);
+      });
+      buttonMap.set(device.id, button);
+      componentListEl.appendChild(button);
+    });
+    if (!devices.length) {
+      const empty = document.createElement('p');
+      empty.className = 'prop-component-empty view-modal-empty';
+      empty.textContent = 'No devices in this category.';
+      componentListEl.appendChild(empty);
+    }
   }
 
   function updateButtonStates() {
