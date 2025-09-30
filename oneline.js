@@ -1476,6 +1476,72 @@ function editPrefixes() {
     }
   };
 
+  function renderCategoryButtons() {
+    categoryListEl.innerHTML = '';
+    categoryButtonMap.clear();
+    categoryOrder.forEach(categoryKey => {
+      const button = document.createElement('button');
+      button.type = 'button';
+      button.className = 'prop-category-option';
+      button.textContent = getCategoryLabel(categoryKey);
+      button.dataset.category = categoryKey;
+      button.setAttribute('aria-pressed', 'false');
+      button.addEventListener('click', () => {
+        if (activeCategory === categoryKey) return;
+        activeCategory = categoryKey;
+        const nextDevice = categoryEntries.get(activeCategory)?.[0] || null;
+        renderDeviceButtons();
+        updateCategoryStates();
+        if (nextDevice) {
+          setActiveComponent(nextDevice);
+        } else {
+          selected = null;
+          selection = [];
+          selectedConnection = null;
+          renderPropertiesFor(null);
+          updateButtonStates();
+        }
+      });
+      categoryButtonMap.set(categoryKey, button);
+      categoryListEl.appendChild(button);
+    });
+  }
+
+  function renderDeviceButtons() {
+    componentListEl.innerHTML = '';
+    buttonMap.clear();
+    const devices = categoryEntries.get(activeCategory) || [];
+    const headingLabel = activeCategory ? `Device Tags – ${getCategoryLabel(activeCategory)}` : 'Device Tags';
+    componentHeading.textContent = headingLabel;
+    devices.forEach(device => {
+      const button = document.createElement('button');
+      button.type = 'button';
+      button.className = 'prop-component-option';
+      button.dataset.componentId = device.id;
+      button.textContent = getComponentListLabel(device);
+      button.setAttribute('aria-pressed', 'false');
+      button.addEventListener('click', () => setActiveComponent(device));
+      button.addEventListener('keydown', event => {
+        if (event.key !== 'ArrowUp' && event.key !== 'ArrowDown') return;
+        event.preventDefault();
+        const list = categoryEntries.get(activeCategory) || [];
+        const currentIndex = list.findIndex(item => item.id === device.id);
+        if (currentIndex === -1) return;
+        const offset = event.key === 'ArrowUp' ? -1 : 1;
+        let nextIndex = currentIndex + offset;
+        if (nextIndex < 0) nextIndex = 0;
+        if (nextIndex >= list.length) nextIndex = list.length - 1;
+        const nextDevice = list[nextIndex];
+        if (!nextDevice) return;
+        setActiveComponent(nextDevice);
+        const nextButton = buttonMap.get(nextDevice.id);
+        nextButton?.focus();
+      });
+      buttonMap.set(device.id, button);
+      componentListEl.appendChild(button);
+    });
+  }
+
   const header = document.createElement('div');
   header.className = 'modal-header';
   const title = document.createElement('h3');
@@ -2162,9 +2228,14 @@ function openViewModal() {
       function updateButtonStates() {
         buttonMap.forEach((button, key) => {
           const selected = key === activeKey;
+          const options = componentAttributeOptions.get(key) || [];
+          const hasSelection = options.some(opt => viewAttributes.has(opt.key));
           button.classList.toggle('is-active', selected);
+           button.classList.toggle('has-selection', hasSelection);
           button.setAttribute('aria-pressed', String(selected));
           button.tabIndex = selected ? 0 : -1;
+          const indicator = button.querySelector('.view-component-indicator');
+          if (indicator) indicator.hidden = !hasSelection;
         });
       }
 
@@ -2180,6 +2251,7 @@ function openViewModal() {
         setItem(viewAttributeStorageKey, persisted);
         updateViewButtonLabel();
         render();
+        updateButtonStates();
       }
 
       function renderProperties() {
@@ -2236,9 +2308,20 @@ function openViewModal() {
         const button = document.createElement('button');
         button.type = 'button';
         button.className = 'view-component-option';
-        button.textContent = entry.label || getComponentDisplayLabel(entry.key);
         button.dataset.key = entry.key;
         button.setAttribute('aria-pressed', 'false');
+
+        const labelText = entry.label || getComponentDisplayLabel(entry.key);
+        const labelSpan = document.createElement('span');
+        labelSpan.className = 'view-component-label';
+        labelSpan.textContent = labelText;
+
+        const indicator = document.createElement('span');
+        indicator.className = 'view-component-indicator';
+        indicator.textContent = 'Filtered';
+        indicator.hidden = true;
+
+        button.append(labelSpan, indicator);
         button.addEventListener('click', () => setActiveComponent(entry.key));
         button.addEventListener('keydown', event => {
           if (event.key !== 'ArrowUp' && event.key !== 'ArrowDown') return;
@@ -2524,6 +2607,135 @@ function portInUse(component, portIndex, skipConn = null) {
   }));
 }
 
+const transformerVoltageKeyMap = {
+  two_winding: ['volts_primary', 'volts_secondary'],
+  auto_transformer: ['volts_primary', 'volts_secondary'],
+  grounding_transformer: ['volts_primary', 'volts_secondary'],
+  three_winding: ['volts_hv', 'volts_lv', 'volts_tv']
+};
+
+function parseVoltageNumber(value) {
+  if (value === undefined || value === null) return null;
+  if (typeof value === 'number') {
+    return Number.isFinite(value) ? value : null;
+  }
+  const str = String(value);
+  const match = str.replace(/[,\s]+/g, ' ').match(/[-+]?\d*\.?\d+(?:[eE][-+]?\d+)?/);
+  if (!match) return null;
+  const num = Number.parseFloat(match[0]);
+  return Number.isFinite(num) ? num : null;
+}
+
+function resolveTransformerVoltageValue(transformer, portIndex) {
+  if (!transformer) return null;
+  const metaProps = componentMeta[transformer.subtype]?.props || {};
+  const subtypeKeys = transformerVoltageKeyMap[transformer.subtype] || [];
+  const fallbacks = portIndex === 0
+    ? ['volts_primary', 'voltage_primary', 'primary_voltage', 'volts_hv', 'voltage']
+    : portIndex === 1
+      ? ['volts_secondary', 'voltage_secondary', 'secondary_voltage', 'volts_lv', 'voltage']
+      : ['volts_tv', 'volts_tertiary', 'tertiary_voltage', 'volts_lv', 'voltage'];
+  const keys = [subtypeKeys[portIndex], ...fallbacks];
+  const seen = new Set();
+  for (const key of keys) {
+    if (!key || seen.has(key)) continue;
+    seen.add(key);
+    const value = transformer[key] ?? transformer.props?.[key] ?? metaProps[key];
+    const num = parseVoltageNumber(value);
+    if (num !== null) return num;
+  }
+  return null;
+}
+
+function formatVoltageString(num) {
+  if (!Number.isFinite(num)) return null;
+  const rounded = Number(num.toFixed(4));
+  return Number.isInteger(rounded) ? String(rounded) : String(rounded);
+}
+
+function assignInheritedVoltage(target, voltageValue, connection = null) {
+  if (!target) return false;
+  const num = parseVoltageNumber(voltageValue);
+  if (num === null) return false;
+  const formatted = formatVoltageString(num);
+  if (!formatted) return false;
+  const current = target.voltage ?? '';
+  const changed = String(current) !== formatted;
+  target.voltage = formatted;
+  if (connection) connection.voltage = formatted;
+  return changed;
+}
+
+function propagateTransformerVoltages(comps) {
+  if (!Array.isArray(comps) || !comps.length) return;
+  const byId = new Map();
+  comps.forEach(comp => { if (comp?.id) byId.set(comp.id, comp); });
+  const inbound = new Map();
+  comps.forEach(comp => {
+    (comp.connections || []).forEach(conn => {
+      if (!byId.has(conn.target)) return;
+      if (!inbound.has(conn.target)) inbound.set(conn.target, []);
+      inbound.get(conn.target).push({ from: comp, connection: conn });
+    });
+  });
+
+  comps.forEach(transformer => {
+    if (!transformer || transformer.type !== 'transformer') return;
+    const ports = transformer.ports || componentMeta[transformer.subtype]?.ports || [];
+    const portCount = ports.length || 2;
+    const secondaryPorts = [];
+    for (let idx = 0; idx < portCount; idx += 1) {
+      if (idx === 0 && portCount > 1) continue;
+      secondaryPorts.push(idx);
+    }
+    secondaryPorts.forEach(portIdx => {
+      const voltageValue = resolveTransformerVoltageValue(transformer, portIdx);
+      if (voltageValue === null) return;
+      const queue = [];
+      const visited = new Set([transformer.id]);
+      (transformer.connections || []).forEach(conn => {
+        if (normalizePortIndex(conn.sourcePort) !== portIdx) return;
+        const target = byId.get(conn.target);
+        if (!target || target.type === 'transformer') return;
+        queue.push({ component: target, connection: conn });
+      });
+      (inbound.get(transformer.id) || []).forEach(entry => {
+        if (normalizePortIndex(entry.connection?.targetPort) !== portIdx) return;
+        const sourceComp = entry.from;
+        if (!sourceComp || sourceComp.type === 'transformer') return;
+        queue.push({ component: sourceComp, connection: entry.connection });
+      });
+      while (queue.length) {
+        const { component: current, connection } = queue.shift();
+        if (!current || visited.has(current.id)) continue;
+        visited.add(current.id);
+        assignInheritedVoltage(current, voltageValue, connection);
+        (current.connections || []).forEach(conn => {
+          const neighbor = byId.get(conn.target);
+          if (!neighbor || neighbor.type === 'transformer' || visited.has(neighbor.id)) return;
+          queue.push({ component: neighbor, connection: conn });
+        });
+        (inbound.get(current.id) || []).forEach(entry => {
+          const neighbor = entry.from;
+          if (!neighbor || neighbor.type === 'transformer' || visited.has(neighbor.id)) return;
+          queue.push({ component: neighbor, connection: entry.connection });
+        });
+      }
+    });
+  });
+}
+
+function applyTransformerVoltages(scope = sheets) {
+  if (!scope) return;
+  if (Array.isArray(scope) && scope.length && Array.isArray(scope[0]?.components)) {
+    scope.forEach(sheet => propagateTransformerVoltages(sheet.components || []));
+  } else if (Array.isArray(scope)) {
+    propagateTransformerVoltages(scope);
+  } else if (scope?.components) {
+    propagateTransformerVoltages(scope.components);
+  }
+}
+
 function captureBusAnchors(bus) {
   const anchors = [];
   (bus.connections || []).forEach(conn => {
@@ -2804,6 +3016,7 @@ function finalizeMarqueeSelection() {
 }
 
 function render() {
+  applyTransformerVoltages();
   const svg = document.getElementById('diagram');
   svg.querySelectorAll('g.component, .connection, .conn-label, .port, .bus-handle, .annotation-handle, .issue-badge, .component-label, .component-attribute, .selection-marquee').forEach(el => el.remove());
   const usedVoltageRanges = new Set();
@@ -3669,6 +3882,31 @@ function selectComponent(compOrId) {
     getComponentListLabel(a).localeCompare(getComponentListLabel(b), undefined, { sensitivity: 'base' })
   );
 
+  const categoryEntries = new Map();
+  sortedComponents.forEach(device => {
+    const category = getCategory(device) || 'equipment';
+    if (!categoryEntries.has(category)) categoryEntries.set(category, []);
+    categoryEntries.get(category).push(device);
+  });
+  const categoryOrder = Array.from(categoryEntries.keys()).sort((a, b) =>
+    formatAttributeLabel(String(a)).localeCompare(formatAttributeLabel(String(b)), undefined, { sensitivity: 'base' })
+  );
+  let activeCategory = null;
+  if (activeComponent) {
+    const componentCategory = getCategory(activeComponent) || null;
+    if (componentCategory && categoryEntries.has(componentCategory)) activeCategory = componentCategory;
+  }
+  if (!activeCategory) activeCategory = categoryOrder[0] || null;
+  if (activeCategory && (!activeComponent || !categoryEntries.get(activeCategory).some(item => item.id === activeComponent.id))) {
+    const fallbackDevice = categoryEntries.get(activeCategory)?.[0] || null;
+    if (fallbackDevice) {
+      activeComponent = fallbackDevice;
+    }
+  }
+  selected = activeComponent;
+  selection = [activeComponent];
+  selectedConnection = null;
+
   const modal = ensurePropModal();
   if (modal._outsideHandler) modal.removeEventListener('click', modal._outsideHandler);
   if (modal._keyHandler) document.removeEventListener('keydown', modal._keyHandler);
@@ -3684,12 +3922,17 @@ function selectComponent(compOrId) {
 
   const componentColumn = document.createElement('div');
   componentColumn.className = 'prop-modal-column prop-modal-components';
+  const categoryHeading = document.createElement('h3');
+  categoryHeading.className = 'prop-modal-heading';
+  categoryHeading.textContent = 'Categories';
+  const categoryListEl = document.createElement('div');
+  categoryListEl.className = 'prop-category-list';
   const componentHeading = document.createElement('h3');
   componentHeading.className = 'prop-modal-heading';
   componentHeading.textContent = 'Device Tags';
   const componentListEl = document.createElement('div');
   componentListEl.className = 'prop-component-list';
-  componentColumn.append(componentHeading, componentListEl);
+  componentColumn.append(categoryHeading, categoryListEl, componentHeading, componentListEl);
   layout.appendChild(componentColumn);
 
   const propertyColumn = document.createElement('div');
@@ -3702,6 +3945,7 @@ function selectComponent(compOrId) {
   propertyColumn.appendChild(propertyContainer);
   layout.appendChild(propertyColumn);
 
+  const categoryButtonMap = new Map();
   const buttonMap = new Map();
   let activeId = activeComponent?.id || null;
 
@@ -3714,9 +3958,23 @@ function selectComponent(compOrId) {
     return comp.id || 'Device';
   }
 
+  function getCategoryLabel(key) {
+    if (!key) return 'Other';
+    return formatAttributeLabel(String(key));
+  }
+
   function updateButtonStates() {
     buttonMap.forEach((button, id) => {
       const selectedState = id === activeId;
+      button.classList.toggle('is-active', selectedState);
+      button.setAttribute('aria-pressed', String(selectedState));
+      button.tabIndex = selectedState ? 0 : -1;
+    });
+  }
+
+  function updateCategoryStates() {
+    categoryButtonMap.forEach((button, key) => {
+      const selectedState = key === activeCategory;
       button.classList.toggle('is-active', selectedState);
       button.setAttribute('aria-pressed', String(selectedState));
       button.tabIndex = selectedState ? 0 : -1;
@@ -4058,6 +4316,14 @@ function selectComponent(compOrId) {
 
   function setActiveComponent(target) {
     if (!target) return;
+    const targetCategory = getCategory(target) || activeCategory;
+    if (targetCategory && targetCategory !== activeCategory) {
+      activeCategory = targetCategory;
+      renderDeviceButtons();
+      updateCategoryStates();
+    } else if (!buttonMap.has(target.id)) {
+      renderDeviceButtons();
+    }
     activeComponent = target;
     activeId = target.id;
     selected = target;
@@ -4067,33 +4333,9 @@ function selectComponent(compOrId) {
     renderPropertiesFor(target);
   }
 
-  sortedComponents.forEach(device => {
-    const button = document.createElement('button');
-    button.type = 'button';
-    button.className = 'prop-component-option';
-    button.dataset.componentId = device.id;
-    button.textContent = getComponentListLabel(device);
-    button.setAttribute('aria-pressed', 'false');
-    button.addEventListener('click', () => setActiveComponent(device));
-    button.addEventListener('keydown', event => {
-      if (event.key !== 'ArrowUp' && event.key !== 'ArrowDown') return;
-      event.preventDefault();
-      const currentIndex = sortedComponents.findIndex(item => item.id === device.id);
-      if (currentIndex === -1) return;
-      const offset = event.key === 'ArrowUp' ? -1 : 1;
-      let nextIndex = currentIndex + offset;
-      if (nextIndex < 0) nextIndex = 0;
-      if (nextIndex >= sortedComponents.length) nextIndex = sortedComponents.length - 1;
-      const nextDevice = sortedComponents[nextIndex];
-      if (!nextDevice) return;
-      setActiveComponent(nextDevice);
-      const nextButton = buttonMap.get(nextDevice.id);
-      nextButton?.focus();
-    });
-    buttonMap.set(device.id, button);
-    componentListEl.appendChild(button);
-  });
-
+  renderCategoryButtons();
+  renderDeviceButtons();
+  updateCategoryStates();
   updateButtonStates();
   renderPropertiesFor(activeComponent);
 
