@@ -5364,6 +5364,8 @@ async function init() {
   if (shareBtn) shareBtn.addEventListener('click', shareDiagram);
   const sampleBtn = document.getElementById('sample-diagram-btn');
   if (sampleBtn) sampleBtn.addEventListener('click', loadSampleDiagram);
+  const onelineExportBtn = document.getElementById('export-oneline-data-btn');
+  if (onelineExportBtn) onelineExportBtn.addEventListener('click', exportOneLineDiagnostics);
   document.getElementById('add-sheet-btn').addEventListener('click', () => addSheet());
   document.getElementById('rename-sheet-btn').addEventListener('click', () => renameSheet());
   document.getElementById('delete-sheet-btn').addEventListener('click', () => deleteSheet());
@@ -6733,6 +6735,30 @@ function exportDiagram() {
   a.download = 'oneline.json';
   a.click();
   URL.revokeObjectURL(a.href);
+}
+
+function exportOneLineDiagnostics() {
+  try {
+    const scenario = getCurrentScenario() || 'default';
+    const safeScenario = scenario.replace(/[^a-z0-9-_]+/gi, '_') || 'default';
+    const timestamp = new Date().toISOString().replace(/[:.]/g, '-');
+    const payload = {
+      exportedAt: new Date().toISOString(),
+      scenario,
+      oneLine: getOneLine(),
+      studies: getStudies()
+    };
+    const blob = new Blob([JSON.stringify(payload, null, 2)], { type: 'application/json' });
+    const a = document.createElement('a');
+    a.href = URL.createObjectURL(blob);
+    a.download = `oneline-diagnostics-${safeScenario}-${timestamp}.json`;
+    a.click();
+    URL.revokeObjectURL(a.href);
+    showToast('One-line diagnostics exported');
+  } catch (err) {
+    console.error('Failed to export one-line diagnostics', err);
+    showToast('Failed to export one-line diagnostics');
+  }
 }
 
 async function shareDiagram() {
