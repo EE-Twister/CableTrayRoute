@@ -601,12 +601,14 @@
     },
     {
       "type": "motor_load",
-      "label": "Motor",
+      "subtype": "motor_load",
+      "label": "Motor Load",
       "icon": "icons/components/Motor.svg",
+      "defaultRotation": 0,
       "ports": [
         {
-          "x": 80,
-          "y": 20
+          "x": 40,
+          "y": 0
         }
       ],
       "props": {
@@ -634,8 +636,10 @@
     },
     {
       "type": "static_load",
+      "subtype": "static_load",
       "label": "Non-Motor Load",
       "icon": "icons/components/Load.svg",
+      "defaultRotation": 0,
       "props": {
         "watts": 300000,
         "volts": 480,
@@ -654,8 +658,8 @@
       },
       "ports": [
         {
-          "x": 80,
-          "y": 20
+          "x": 40,
+          "y": 0
         }
       ]
     },

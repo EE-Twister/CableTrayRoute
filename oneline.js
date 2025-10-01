@@ -187,6 +187,7 @@ const attributeDisplayOverrides = {
   rating_a: { label: 'Rating', unit: 'A' },
   interrupt_rating_ka: { label: 'Interrupt Rating', unit: 'kA' },
   frame_a: { label: 'Frame', unit: 'A' },
+  ref: { label: 'Node Tag', unit: '' },
   voltage: { label: 'Voltage', unit: 'V' },
   volts: { label: 'Voltage', unit: 'V' },
   volts_primary: { label: 'Primary Voltage', unit: 'V' },
@@ -447,16 +448,47 @@ const builtinComponents = [
     ]
   },
   {
+    subtype: 'motor_load',
+    label: 'Motor Load',
+    icon: asset('icons/components/Motor.svg'),
+    category: 'load',
+    type: 'motor_load',
+    defaultRotation: 0,
+    ports: [
+      { x: 40, y: 0 }
+    ],
+    props: {
+      hp: 150,
+      volts: 480,
+      pf: 0.88,
+      service_factor: 1.15,
+      efficiency: 95,
+      lr_current_pu: 6.0,
+      starting: 'DOL',
+      vfd: false,
+      load: {
+        kw: 117.789,
+        kvar: 63.576
+      }
+    }
+  },
+  {
+    subtype: 'static_load',
     label: 'Non-Motor Load',
     icon: asset('icons/components/Load.svg'),
     category: 'load',
     type: 'static_load',
+    defaultRotation: 0,
     ports: [
-      { x: 80, y: 20 }
+      { x: 40, y: 0 }
     ],
     props: {
       watts: 300000,
-      volts: 480
+      volts: 480,
+      load: {
+        kw: 300.0,
+        kvar: 0
+      }
     }
   },
   {
