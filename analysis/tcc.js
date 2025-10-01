@@ -5,10 +5,23 @@ import { scaleCurve, checkDuty } from './tccUtils.js';
 import conductorProperties from '../conductorPropertiesData.mjs';
 
 const PROTECTIVE_TYPES = new Set(['breaker', 'fuse', 'relay', 'recloser', 'contactor', 'switch']);
+const MOTOR_TYPES = new Set(['motor_load', 'motor', 'motor_starter', 'motor_controller']);
 const CMIL_TO_MM2 = 0.000506707478; // 1 circular mil in mm^2
 const DEFAULT_INRUSH_MULTIPLE = 12;
 const DEFAULT_INRUSH_DURATION = 0.1;
 const CABLE_TIME_POINTS = [0.005, 0.01, 0.02, 0.05, 0.1, 0.2, 0.5, 1, 2, 5, 10, 20, 50];
+const TRANSFORMER_DAMAGE_TEMPLATE = [
+  { multiple: 1.5, time: 600 },
+  { multiple: 2, time: 300 },
+  { multiple: 4, time: 30 },
+  { multiple: 6, time: 10 },
+  { multiple: 12, time: 2 },
+  { multiple: 25, time: 0.5 },
+  { multiple: 40, time: 0.1 }
+];
+const MOTOR_START_PRETIME_RATIO = 0.2;
+const MOTOR_START_POSTTIME_RATIO = 1.1;
+const MOTOR_START_MIN_PRETIME = 0.01;
 const K_CONSTANTS = {
   copper: { 60: 103, 75: 118, 90: 143 },
   aluminum: { 60: 75, 75: 87, 90: 99 }
@@ -416,7 +429,9 @@ function buildOverlayEntries() {
   if (!compId || !componentLookup.has(compId)) return [];
   const overlays = [];
   overlays.push(...buildTransformerInrushEntries(compId));
+  overlays.push(...buildTransformerDamageEntries(compId));
   overlays.push(...buildCableEntries(compId));
+  overlays.push(...buildMotorStartingEntries(compId));
   return overlays;
 }
 
@@ -438,6 +453,29 @@ function buildTransformerInrushEntries(targetId) {
       current: inrush.current,
       duration: inrush.duration,
       sourceId: neighbor.id,
+      autoSelect: true
+    });
+  });
+  return overlays.sort((a, b) => a.name.localeCompare(b.name, undefined, { sensitivity: 'base' }));
+}
+
+function buildTransformerDamageEntries(targetId) {
+  const overlays = [];
+  const reference = componentLookup.get(targetId)?.component;
+  if (!reference) return overlays;
+  const refVoltage = inferVoltage(reference);
+  const refPhases = parsePhases(reference.phases).length || 3;
+  (neighborMap.get(targetId) || new Set()).forEach(id => {
+    const neighbor = componentLookup.get(id)?.component;
+    if (!neighbor || neighbor.type !== 'transformer') return;
+    const damage = buildTransformerDamageCurve(neighbor, refVoltage, refPhases);
+    if (!damage) return;
+    overlays.push({
+      uid: `transformer-damage:${neighbor.id}:${targetId}`,
+      kind: 'transformerDamage',
+      name: `${componentLabel(neighbor)} Damage`,
+      curve: damage.curve,
+      fla: damage.fla,
       autoSelect: true
     });
   });
@@ -468,6 +506,31 @@ function buildCableEntries(targetId) {
         ampacity: curve.ampacity,
         autoSelect: true
       });
+    });
+  });
+  return overlays.sort((a, b) => a.name.localeCompare(b.name, undefined, { sensitivity: 'base' }));
+}
+
+function buildMotorStartingEntries(targetId) {
+  const overlays = [];
+  const reference = componentLookup.get(targetId)?.component;
+  if (!reference) return overlays;
+  const refVoltage = inferVoltage(reference);
+  const refPhases = parsePhases(reference.phases).length || 3;
+  (neighborMap.get(targetId) || new Set()).forEach(id => {
+    const neighbor = componentLookup.get(id)?.component;
+    if (!neighbor || !MOTOR_TYPES.has(neighbor.type)) return;
+    const metrics = resolveMotorStartingMetrics(neighbor, refVoltage, refPhases);
+    if (!metrics) return;
+    overlays.push({
+      uid: `motor-start:${neighbor.id}:${targetId}`,
+      kind: 'motorStart',
+      name: `${componentLabel(neighbor)} Motor Starting`,
+      curve: metrics.curve,
+      fla: metrics.fla,
+      lockedRotor: metrics.lockedRotor,
+      startTime: metrics.startTime,
+      autoSelect: true
     });
   });
   return overlays.sort((a, b) => a.name.localeCompare(b.name, undefined, { sensitivity: 'base' }));
@@ -742,9 +805,7 @@ function plot() {
       );
       const scaled = scaleCurve(selection.baseDevice, overrides);
       devicePlots.push({ selection, overrides, scaled });
-    } else if (selection.kind === 'cable') {
-      overlays.push({ ...selection });
-    } else if (selection.kind === 'inrush') {
+    } else if (selection.kind === 'cable' || selection.kind === 'inrush' || selection.kind === 'transformerDamage' || selection.kind === 'motorStart') {
       overlays.push({ ...selection });
     }
   });
@@ -769,6 +830,11 @@ function plot() {
     } else if (entry.kind === 'inrush') {
       if (entry.current > 0) allCurrents.push(entry.current);
       if (entry.duration) allTimes.push(entry.duration);
+    } else if (entry.kind === 'transformerDamage' || entry.kind === 'motorStart') {
+      entry.curve.forEach(point => {
+        if (point.current > 0) allCurrents.push(point.current);
+        if (point.time > 0) allTimes.push(point.time);
+      });
     }
   });
 
@@ -850,6 +916,24 @@ function plot() {
         .attr('stroke', entry.color)
         .attr('stroke-width', 2)
         .attr('stroke-dasharray', '4,2');
+    } else if (entry.kind === 'transformerDamage') {
+      legendItem.append('line')
+        .attr('x1', 0)
+        .attr('x2', 16)
+        .attr('y1', 8)
+        .attr('y2', 8)
+        .attr('stroke', entry.color)
+        .attr('stroke-width', 2)
+        .attr('stroke-dasharray', '8,4');
+    } else if (entry.kind === 'motorStart') {
+      legendItem.append('line')
+        .attr('x1', 0)
+        .attr('x2', 16)
+        .attr('y1', 8)
+        .attr('y2', 8)
+        .attr('stroke', entry.color)
+        .attr('stroke-width', 2)
+        .attr('stroke-dasharray', '2,2');
     } else {
       legendItem.append('rect')
         .attr('width', 16)
@@ -894,6 +978,16 @@ function plot() {
       .attr('d', entry.curve.length ? line(entry.curve) : null);
   });
 
+  overlays.filter(entry => entry.kind === 'transformerDamage').forEach(entry => {
+    g.append('path')
+      .datum(entry.curve)
+      .attr('fill', 'none')
+      .attr('stroke', entry.color)
+      .attr('stroke-width', 2)
+      .attr('stroke-dasharray', '8,4')
+      .attr('d', entry.curve.length ? line(entry.curve) : null);
+  });
+
   overlays.filter(entry => entry.kind === 'inrush').forEach(entry => {
     const xPos = x(entry.current);
     g.append('line')
@@ -910,6 +1004,16 @@ function plot() {
       .attr('fill', entry.color)
       .attr('font-size', 12)
       .text(`${formatSettingValue(entry.current)} A Inrush`);
+  });
+
+  overlays.filter(entry => entry.kind === 'motorStart').forEach(entry => {
+    g.append('path')
+      .datum(entry.curve)
+      .attr('fill', 'none')
+      .attr('stroke', entry.color)
+      .attr('stroke-width', 2)
+      .attr('stroke-dasharray', '2,2')
+      .attr('d', entry.curve.length ? line(entry.curve) : null);
   });
 
   const plotted = devicePlots.map(plotEntry => {
@@ -1063,7 +1167,12 @@ function plot() {
 }
 
 function componentLabel(comp) {
-  return comp?.label || comp?.name || comp?.subtype || comp?.type || comp?.id || 'Component';
+  if (!comp) return 'Component';
+  const label = getComponentValue(comp, 'label');
+  const name = getComponentValue(comp, 'name');
+  const subtype = getComponentValue(comp, 'subtype');
+  const type = getComponentValue(comp, 'type');
+  return label || name || subtype || type || comp.id || 'Component';
 }
 
 function mergeOverrides(base, extra) {
@@ -1090,9 +1199,9 @@ function parsePhases(value) {
 function inferVoltage(comp) {
   const keys = ['voltage', 'volts', 'volts_secondary', 'volts_lv', 'volts_primary', 'volts_hv', 'prefault_voltage', 'baseKV', 'kV'];
   for (const key of keys) {
-    if (comp[key] === undefined || comp[key] === null || comp[key] === '') continue;
-    const num = Number(comp[key]);
-    if (!Number.isFinite(num)) continue;
+    const raw = getComponentValue(comp, key);
+    const num = parseNumeric(raw);
+    if (!Number.isFinite(num) || num <= 0) continue;
     if (key.toLowerCase().includes('kv')) return num * 1000;
     return num;
   }
@@ -1100,53 +1209,17 @@ function inferVoltage(comp) {
 }
 
 function computeTransformerInrush(transformer, referenceVoltage, refPhases = 3) {
-  const sides = [];
-  const sideDefs = [
-    { kvaKey: 'kva_hv', voltsKey: 'volts_hv', label: 'HV' },
-    { kvaKey: 'kva_lv', voltsKey: 'volts_lv', label: 'LV' },
-    { kvaKey: 'kva_tv', voltsKey: 'volts_tv', label: 'Tertiary' },
-    { kvaKey: 'kva_primary', voltsKey: 'volts_primary', label: 'Primary' },
-    { kvaKey: 'kva_secondary', voltsKey: 'volts_secondary', label: 'Secondary' }
-  ];
-  sideDefs.forEach(({ kvaKey, voltsKey, label }) => {
-    const kva = Number(transformer[kvaKey]);
-    const volts = Number(transformer[voltsKey]);
-    if (!Number.isFinite(kva) || !Number.isFinite(volts)) return;
-    sides.push({ kva, volts, label });
-  });
-  if (!sides.length) {
-    const kva = Number(transformer.kva || (transformer.mva ? transformer.mva * 1000 : NaN));
-    const volts = Number(transformer.volts_secondary || transformer.volts_primary || transformer.voltage);
-    if (Number.isFinite(kva) && Number.isFinite(volts)) {
-      sides.push({ kva, volts, label: 'Secondary' });
-    }
-  }
-  if (!sides.length) return null;
-  let selected = sides[0];
-  if (referenceVoltage) {
-    let best = { diff: Infinity, side: sides[0] };
-    sides.forEach(side => {
-      const diff = Math.abs(side.volts - referenceVoltage);
-      if (diff < best.diff) best = { diff, side };
-    });
-    selected = best.side;
-  }
-  const phases = parsePhases(transformer.phases).length || refPhases || 3;
-  const kva = Number(selected.kva);
-  const volts = Number(selected.volts);
-  if (!kva || !volts) return null;
-  const apparent = kva * 1000;
-  const fla = phases === 1 ? apparent / volts : apparent / (Math.sqrt(3) * volts);
-  if (!Number.isFinite(fla) || fla <= 0) return null;
+  const operating = resolveTransformerOperatingPoint(transformer, referenceVoltage, refPhases);
+  if (!operating) return null;
   const multiple = resolveInrushMultiple(transformer);
   const duration = resolveInrushDuration(transformer);
-  return { current: fla * multiple, duration };
+  return { current: operating.fla * multiple, duration };
 }
 
 function resolveInrushMultiple(comp) {
   const keys = ['inrush_multiple', 'inrushMultiple', 'inrush_multiplier', 'xfmr_inrush_multiple', 'xfmrInrushMultiple'];
   for (const key of keys) {
-    const val = Number(comp[key]);
+    const val = parseNumeric(getComponentValue(comp, key));
     if (Number.isFinite(val) && val > 0) return val;
   }
   return DEFAULT_INRUSH_MULTIPLE;
@@ -1155,15 +1228,21 @@ function resolveInrushMultiple(comp) {
 function resolveInrushDuration(comp) {
   const keys = ['inrush_duration', 'inrushDuration', 'xfmr_inrush_duration'];
   for (const key of keys) {
-    const val = Number(comp[key]);
+    const val = parseNumeric(getComponentValue(comp, key));
     if (Number.isFinite(val) && val > 0) return val;
   }
   return DEFAULT_INRUSH_DURATION;
 }
 
 function resolveCableInfo(source, target, conn) {
-  if (source?.type === 'cable' && source.cable) return source.cable;
-  if (target?.type === 'cable' && target.cable) return target.cable;
+  if (source?.type === 'cable') {
+    if (source.cable) return source.cable;
+    if (source.props && source.props.cable) return source.props.cable;
+  }
+  if (target?.type === 'cable') {
+    if (target.cable) return target.cable;
+    if (target.props && target.props.cable) return target.props.cable;
+  }
   if (conn?.cable) return conn.cable;
   return null;
 }
@@ -1241,4 +1320,197 @@ function buildCableCurve(cable, phases = 3) {
     curve,
     ampacity: Number(cable.ampacity || cable.calc_ampacity || cable.rating || '') || null
   };
+}
+
+function buildTransformerDamageCurve(transformer, referenceVoltage, refPhases = 3) {
+  const operating = resolveTransformerOperatingPoint(transformer, referenceVoltage, refPhases);
+  if (!operating) return null;
+  const points = TRANSFORMER_DAMAGE_TEMPLATE.map(({ multiple, time }) => ({
+    time,
+    current: operating.fla * multiple
+  })).filter(point => Number.isFinite(point.current) && point.current > 0 && Number.isFinite(point.time) && point.time > 0);
+  if (!points.length) return null;
+  return {
+    curve: points.sort((a, b) => a.time - b.time),
+    fla: operating.fla
+  };
+}
+
+function resolveTransformerOperatingPoint(transformer, referenceVoltage, refPhases = 3) {
+  const sides = [];
+  const sideDefs = [
+    { kvaKey: 'kva_hv', voltsKey: 'volts_hv', label: 'HV' },
+    { kvaKey: 'kva_lv', voltsKey: 'volts_lv', label: 'LV' },
+    { kvaKey: 'kva_tv', voltsKey: 'volts_tv', label: 'Tertiary' },
+    { kvaKey: 'kva_primary', voltsKey: 'volts_primary', label: 'Primary' },
+    { kvaKey: 'kva_secondary', voltsKey: 'volts_secondary', label: 'Secondary' }
+  ];
+  sideDefs.forEach(({ kvaKey, voltsKey, label }) => {
+    const kva = getNumericValue(transformer, kvaKey);
+    const volts = getNumericValue(transformer, voltsKey);
+    if (!Number.isFinite(kva) || !Number.isFinite(volts)) return;
+    sides.push({ kva, volts, label });
+  });
+  if (!sides.length) {
+    const kva = getNumericValue(transformer, ['kva', 'kva_base']);
+    let volts = getNumericValue(transformer, ['volts_secondary', 'volts_primary', 'voltage', 'volts']);
+    if (!Number.isFinite(volts)) {
+      const baseKv = getNumericValue(transformer, ['baseKV', 'kV']);
+      if (Number.isFinite(baseKv)) volts = baseKv * 1000;
+    }
+    if (Number.isFinite(kva) && Number.isFinite(volts)) {
+      sides.push({ kva, volts, label: 'Secondary' });
+    }
+  }
+  if (!sides.length) {
+    const mva = getNumericValue(transformer, 'mva');
+    const volts = getNumericValue(transformer, ['volts_secondary', 'volts_primary', 'voltage', 'volts']);
+    if (Number.isFinite(mva) && Number.isFinite(volts)) {
+      sides.push({ kva: mva * 1000, volts, label: 'Secondary' });
+    }
+  }
+  if (!sides.length) return null;
+  let selected = sides[0];
+  if (Number.isFinite(referenceVoltage)) {
+    let best = { diff: Math.abs(selected.volts - referenceVoltage), side: selected };
+    sides.slice(1).forEach(side => {
+      const diff = Math.abs(side.volts - referenceVoltage);
+      if (diff < best.diff) best = { diff, side };
+    });
+    selected = best.side;
+  }
+  const phases = parsePhases(getComponentValue(transformer, 'phases')).length || refPhases || 3;
+  const kva = Number(selected.kva);
+  const volts = Number(selected.volts);
+  if (!Number.isFinite(kva) || !Number.isFinite(volts) || kva <= 0 || volts <= 0) return null;
+  const apparent = kva * 1000;
+  const fla = phases === 1 ? apparent / volts : apparent / (Math.sqrt(3) * volts);
+  if (!Number.isFinite(fla) || fla <= 0) return null;
+  return { fla, volts, phases, side: selected.label };
+}
+
+function resolveMotorStartingMetrics(motor, referenceVoltage, refPhases = 3) {
+  const phases = parsePhases(getComponentValue(motor, 'phases')).length || refPhases || 3;
+  const voltage = (() => {
+    const val = getNumericValue(motor, ['voltage', 'volts', 'rated_voltage', 'line_voltage']);
+    if (Number.isFinite(val) && val > 0) return val;
+    if (Number.isFinite(referenceVoltage)) return referenceVoltage;
+    const inferred = inferVoltage(motor);
+    return Number.isFinite(inferred) ? inferred : null;
+  })();
+  if (!Number.isFinite(voltage) || voltage <= 0) return null;
+
+  let fla = getNumericValue(motor, ['fla', 'full_load_amps', 'full_load_current', 'full_load_amp', 'rated_current', 'running_current', 'amps']);
+  if (!Number.isFinite(fla) || fla <= 0) {
+    const hp = getNumericValue(motor, ['hp', 'horsepower']);
+    const kw = getNumericValue(motor, ['kw', 'power_kw', 'load_kw', 'output_kw']);
+    let pf = getNumericValue(motor, ['pf', 'power_factor']);
+    if (!Number.isFinite(pf) || pf <= 0) pf = 0.85;
+    let eff = getNumericValue(motor, ['efficiency', 'eff']);
+    if (Number.isFinite(eff)) {
+      if (eff > 1.2) eff /= 100;
+    } else {
+      eff = 0.9;
+    }
+    if (eff <= 0) eff = 0.9;
+    if (Number.isFinite(hp) && hp > 0) {
+      const watts = hp * 746;
+      const denom = (phases === 1 ? voltage : Math.sqrt(3) * voltage) * pf * eff;
+      if (denom > 0) fla = watts / denom;
+    } else if (Number.isFinite(kw) && kw > 0) {
+      const watts = (kw * 1000) / eff;
+      const denom = (phases === 1 ? voltage : Math.sqrt(3) * voltage) * pf;
+      if (denom > 0) fla = watts / denom;
+    }
+  }
+  if (!Number.isFinite(fla) || fla <= 0) return null;
+
+  let lockedRotor = getNumericValue(motor, ['locked_rotor_current', 'lockedRotorCurrent', 'locked_rotor_amps', 'lockedRotorAmps', 'lr_current_amps', 'lra']);
+  if (!Number.isFinite(lockedRotor) || lockedRotor <= 0) {
+    let ratio = getNumericValue(motor, ['lr_current_pu', 'locked_rotor_multiple', 'lockedRotorMultiple', 'locked_rotor_pu', 'locked_rotor_ratio']);
+    if (!Number.isFinite(ratio) || ratio <= 0) ratio = 6;
+    lockedRotor = fla * ratio;
+  }
+  if (!Number.isFinite(lockedRotor) || lockedRotor <= 0) return null;
+
+  const startTime = getNumericValue(motor, [
+    'starting_time_s',
+    'starting_time',
+    'start_time_s',
+    'start_time',
+    'starting_seconds',
+    'start_seconds',
+    'accel_time',
+    'acceleration_time',
+    'starting_duration',
+    'start_duration',
+    'start_time_sec'
+  ]);
+  if (!Number.isFinite(startTime) || startTime <= 0) return null;
+
+  const curve = buildMotorStartingCurve({ fla, lockedRotor, startTime });
+  if (!curve.length) return null;
+
+  return { fla, lockedRotor, startTime, curve };
+}
+
+function buildMotorStartingCurve({ fla, lockedRotor, startTime }) {
+  const start = Math.max(startTime, 0.01);
+  const pre = Math.max(MOTOR_START_MIN_PRETIME, Math.min(start * MOTOR_START_PRETIME_RATIO, start * 0.9));
+  const dropStart = Math.max(start * 1.001, start + 0.001);
+  const settle = Math.max(dropStart * MOTOR_START_POSTTIME_RATIO, dropStart + 0.01);
+  const points = [
+    { time: pre, current: lockedRotor },
+    { time: start, current: lockedRotor },
+    { time: dropStart, current: fla },
+    { time: settle, current: fla }
+  ];
+  return points.filter(point => Number.isFinite(point.time) && point.time > 0 && Number.isFinite(point.current) && point.current > 0)
+    .sort((a, b) => a.time - b.time);
+}
+
+function getComponentValue(comp, key) {
+  if (!comp) return undefined;
+  if (Object.prototype.hasOwnProperty.call(comp, key)) {
+    const value = comp[key];
+    if (value !== undefined && value !== null) return value;
+  }
+  if (comp.props && typeof comp.props === 'object' && Object.prototype.hasOwnProperty.call(comp.props, key)) {
+    const value = comp.props[key];
+    if (value !== undefined && value !== null) return value;
+  }
+  if (Object.prototype.hasOwnProperty.call(comp, key)) return comp[key];
+  if (comp.props && typeof comp.props === 'object' && Object.prototype.hasOwnProperty.call(comp.props, key)) return comp.props[key];
+  return undefined;
+}
+
+function parseNumeric(value) {
+  if (value === undefined || value === null || value === '') return null;
+  if (typeof value === 'number') return Number.isFinite(value) ? value : null;
+  if (typeof value !== 'string') return null;
+  const trimmed = value.trim();
+  if (!trimmed) return null;
+  const normalized = trimmed.replace(/,/g, '');
+  const direct = Number(normalized);
+  if (Number.isFinite(direct)) return direct;
+  const match = normalized.match(/^(-?\d+(?:\.\d+)?)(?:\s*([kKmM])(?:[a-zA-Z]*)?)?$/);
+  if (!match) return null;
+  let num = Number(match[1]);
+  const prefix = match[2];
+  if (prefix) {
+    if (prefix === 'k' || prefix === 'K') num *= 1000;
+    else if (prefix === 'M') num *= 1e6;
+    else if (prefix === 'm') num *= 0.001;
+  }
+  return num;
+}
+
+function getNumericValue(comp, keys) {
+  const list = Array.isArray(keys) ? keys : [keys];
+  for (const key of list) {
+    const raw = getComponentValue(comp, key);
+    const num = parseNumeric(raw);
+    if (Number.isFinite(num)) return num;
+  }
+  return null;
 }
