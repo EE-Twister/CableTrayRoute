@@ -3820,6 +3820,74 @@ function addComponent(cfg) {
   return comp;
 }
 
+function buildVirtualNodeEntries(allComponents, sheetConnections) {
+  const compById = new Map();
+  allComponents.forEach(comp => {
+    if (!comp || !comp.id) return;
+    if (!compById.has(comp.id)) compById.set(comp.id, comp);
+  });
+  const nodeMap = new Map();
+  const ensureNode = id => {
+    if (!id || compById.has(id)) return null;
+    if (!nodeMap.has(id)) {
+      nodeMap.set(id, {
+        id,
+        label: id,
+        type: 'nodes',
+        category: 'nodes',
+        isVirtualNode: true,
+        inbound: [],
+        outbound: []
+      });
+    }
+    return nodeMap.get(id);
+  };
+
+  allComponents.forEach(source => {
+    if (!source) return;
+    const list = Array.isArray(source.connections) ? source.connections : [];
+    list.forEach(conn => {
+      if (!conn || !conn.target) return;
+      const node = ensureNode(conn.target);
+      if (!node) return;
+      node.inbound.push({
+        sourceId: source.id || conn.source || '',
+        sourceComponent: source,
+        connection: conn
+      });
+    });
+  });
+
+  const sheetList = Array.isArray(sheetConnections) ? sheetConnections : [];
+  sheetList.forEach(conn => {
+    if (!conn) return;
+    const fromId = conn.from;
+    const toId = conn.to;
+    if (fromId && !compById.has(fromId)) {
+      const node = ensureNode(fromId);
+      if (node) {
+        node.outbound.push({
+          targetId: toId || '',
+          targetComponent: toId ? compById.get(toId) || null : null,
+          connection: conn
+        });
+      }
+    }
+    if (toId && !compById.has(toId)) {
+      const node = ensureNode(toId);
+      if (node) {
+        node.inbound.push({
+          sourceId: fromId || '',
+          sourceComponent: fromId ? compById.get(fromId) || null : null,
+          connection: conn
+        });
+      }
+    }
+  });
+
+  return Array.from(nodeMap.values());
+}
+
 function alignSelection(direction) {
   if (selection.length < 2) return;
   if (direction === 'left') {
@@ -3860,22 +3928,43 @@ function distributeSelection(axis) {
 }
 
 function selectComponent(compOrId) {
-  const initialComponent = typeof compOrId === 'string' ? components.find(c => c.id === compOrId) : compOrId;
-  if (!initialComponent) return;
-  if (initialComponent.type === 'cable') {
-    openCableProperties(initialComponent);
+  if (compOrId && typeof compOrId === 'object' && compOrId.type === 'cable') {
+    openCableProperties(compOrId);
     return;
   }
-  const deviceComponents = components.filter(c => c.type !== 'cable');
+
+  const nodeComponents = buildVirtualNodeEntries(components, connections);
+  const baseComponents = components.filter(c => c.type !== 'cable');
+  const deviceComponents = [...baseComponents, ...nodeComponents];
   if (!deviceComponents.length) return;
 
-  let activeComponent = initialComponent;
-  if (!deviceComponents.includes(activeComponent)) {
-    activeComponent = deviceComponents[0];
+  const findDeviceById = id => deviceComponents.find(item => item.id === id) || null;
+  let activeComponent = null;
+  if (typeof compOrId === 'string' && compOrId) {
+    activeComponent = findDeviceById(compOrId);
+    if (!activeComponent) {
+      const comp = components.find(c => c.id === compOrId);
+      if (comp && comp.type === 'cable') {
+        openCableProperties(comp);
+        return;
+      }
+    }
+  } else if (compOrId && typeof compOrId === 'object') {
+    if (compOrId.isVirtualNode) {
+      activeComponent = findDeviceById(compOrId.id);
+    } else if (compOrId.type !== 'cable') {
+      activeComponent = compOrId;
+    }
   }
+  if (!activeComponent) activeComponent = deviceComponents[0];
 
-  selected = activeComponent;
-  selection = [activeComponent];
+  if (activeComponent?.isVirtualNode) {
+    selected = null;
+    selection = [];
+  } else {
+    selected = activeComponent;
+    selection = [activeComponent];
+  }
   selectedConnection = null;
 
   const sortedComponents = [...deviceComponents].sort((a, b) =>
@@ -3903,8 +3992,13 @@ function selectComponent(compOrId) {
       activeComponent = fallbackDevice;
     }
   }
-  selected = activeComponent;
-  selection = [activeComponent];
+  if (activeComponent?.isVirtualNode) {
+    selected = null;
+    selection = [];
+  } else {
+    selected = activeComponent;
+    selection = [activeComponent];
+  }
   selectedConnection = null;
 
   const modal = ensurePropModal();
@@ -4011,8 +4105,13 @@ function selectComponent(compOrId) {
         if (activeId === device.id) return;
         activeComponent = device;
         activeId = device.id;
-        selected = device;
-        selection = [device];
+        if (device?.isVirtualNode) {
+          selected = null;
+          selection = [];
+        } else {
+          selected = device;
+          selection = [device];
+        }
         selectedConnection = null;
         updateButtonStates();
         renderPropertiesFor(device);
@@ -4073,6 +4172,11 @@ function selectComponent(compOrId) {
       empty.className = 'prop-property-empty view-modal-empty';
       empty.textContent = 'Select a device to view its properties.';
       propertyContainer.appendChild(empty);
+      return;
+    }
+
+    if (targetComp.isVirtualNode) {
+      renderNodeProperties(targetComp);
       return;
     }
 
@@ -4377,6 +4481,130 @@ function selectComponent(compOrId) {
 
     propertyContainer.appendChild(form);
     propertyContainer.scrollTop = 0;
+
+    function renderNodeProperties(node) {
+      const displayName = node.label || node.id || 'Node';
+      propertyHeading.textContent = `${displayName} Node`;
+      const inboundCount = Array.isArray(node.inbound) ? node.inbound.length : 0;
+      const outboundCount = Array.isArray(node.outbound) ? node.outbound.length : 0;
+      const summary = document.createElement('p');
+      summary.className = 'prop-node-summary';
+      const formatCount = (count, noun) => `${count} ${noun}${count === 1 ? '' : 's'}`;
+      summary.textContent = `This node has ${formatCount(inboundCount, 'inbound connection')} and ${formatCount(outboundCount, 'outbound connection')}.`;
+      propertyContainer.appendChild(summary);
+
+      const formatEndpoint = (component, fallback) => {
+        if (component) return getComponentListLabel(component);
+        if (fallback) return fallback;
+        return 'Unknown';
+      };
+
+      const describeCable = conn => {
+        if (!conn) return '';
+        if (conn.cable && conn.cable.tag) return ` (${conn.cable.tag})`;
+        if (conn.cable?.cable_type) return ` (${conn.cable.cable_type})`;
+        if (conn.cable_tag) return ` (${conn.cable_tag})`;
+        if (conn.cable_type) return ` (${conn.cable_type})`;
+        return '';
+      };
+
+      const addConnectionList = (title, entries, direction) => {
+        const header = document.createElement('h4');
+        header.textContent = title;
+        propertyContainer.appendChild(header);
+        if (!entries.length) {
+          const empty = document.createElement('p');
+          empty.className = 'view-modal-empty prop-node-empty';
+          empty.textContent = direction === 'inbound'
+            ? 'No inbound connections.'
+            : 'No outbound connections.';
+          propertyContainer.appendChild(empty);
+          return;
+        }
+        const list = document.createElement('ul');
+        list.className = 'prop-node-connection-list';
+        entries.forEach(entry => {
+          const li = document.createElement('li');
+          const text = document.createElement('span');
+          if (direction === 'inbound') {
+            const sourceLabel = formatEndpoint(entry.sourceComponent, entry.sourceId);
+            text.textContent = `From ${sourceLabel}${describeCable(entry.connection)}`;
+          } else {
+            const targetLabel = formatEndpoint(entry.targetComponent, entry.targetId);
+            text.textContent = `To ${targetLabel}${describeCable(entry.connection)}`;
+          }
+          li.appendChild(text);
+          const related = direction === 'inbound' ? entry.sourceComponent : entry.targetComponent;
+          if (related) {
+            const viewBtn = document.createElement('button');
+            viewBtn.type = 'button';
+            viewBtn.textContent = 'View';
+            viewBtn.classList.add('btn');
+            viewBtn.addEventListener('click', e => {
+              e.stopPropagation();
+              setActiveComponent(related);
+            });
+            li.appendChild(viewBtn);
+          }
+          list.appendChild(li);
+        });
+        propertyContainer.appendChild(list);
+      };
+
+      addConnectionList('Inbound Connections', Array.isArray(node.inbound) ? node.inbound : [], 'inbound');
+      addConnectionList('Outbound Connections', Array.isArray(node.outbound) ? node.outbound : [], 'outbound');
+
+      const actions = document.createElement('div');
+      actions.className = 'prop-form-actions';
+      const deleteBtn = document.createElement('button');
+      deleteBtn.type = 'button';
+      deleteBtn.textContent = 'Delete Node';
+      deleteBtn.classList.add('btn');
+      deleteBtn.addEventListener('click', e => {
+        e.stopPropagation();
+        const nodeId = node.id;
+        if (!nodeId) return;
+        let updated = false;
+        components.forEach(comp => {
+          if (!Array.isArray(comp.connections)) return;
+          const filtered = comp.connections.filter(conn => conn && conn.target !== nodeId);
+          if (filtered.length !== comp.connections.length) {
+            comp.connections = filtered;
+            updated = true;
+          }
+        });
+        const sheet = sheets[activeSheet];
+        if (sheet && Array.isArray(sheet.connections)) {
+          const filtered = sheet.connections.filter(conn => conn && conn.from !== nodeId && conn.to !== nodeId);
+          if (filtered.length !== sheet.connections.length) {
+            sheet.connections.splice(0, sheet.connections.length, ...filtered);
+            connections = sheet.connections;
+            updated = true;
+          }
+        }
+        if (updated) {
+          pushHistory();
+          render();
+          save();
+          showToast('Node deleted');
+          closeModal();
+          selectComponent();
+        } else {
+          showToast('No connections referenced this node');
+        }
+      });
+      actions.appendChild(deleteBtn);
+      const closeBtn = document.createElement('button');
+      closeBtn.type = 'button';
+      closeBtn.textContent = 'Close';
+      closeBtn.classList.add('btn');
+      closeBtn.addEventListener('click', () => {
+        closeModal();
+      });
+      actions.appendChild(closeBtn);
+      propertyContainer.appendChild(actions);
+      propertyContainer.scrollTop = 0;
+    }
   }
 
   function setActiveComponent(target) {
@@ -4391,8 +4619,13 @@ function selectComponent(compOrId) {
     }
     activeComponent = target;
     activeId = target.id;
-    selected = target;
-    selection = [target];
+    if (target?.isVirtualNode) {
+      selected = null;
+      selection = [];
+    } else {
+      selected = target;
+      selection = [target];
+    }
     selectedConnection = null;
     updateButtonStates();
     renderPropertiesFor(target);
