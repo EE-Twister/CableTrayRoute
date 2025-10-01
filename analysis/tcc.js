@@ -146,6 +146,57 @@ function normalizeSettingOptions(options) {
   });
 }
 
+function getSettingOptions(device, field) {
+  if (!device || !device.settingOptions) return [];
+  const raw = device.settingOptions[field];
+  if (!Array.isArray(raw)) return [];
+  return normalizeSettingOptions(raw);
+}
+
+function snapSettingValue(device, field, value) {
+  if (value === undefined || value === null) return value;
+  const options = getSettingOptions(device, field);
+  if (!options.length) return value;
+  const numericOptions = options
+    .map(opt => {
+      const num = Number(opt.value);
+      return Number.isFinite(num) ? { ...opt, numeric: num } : null;
+    })
+    .filter(Boolean);
+  const parsedValue = Number(value);
+  if (numericOptions.length === options.length && Number.isFinite(parsedValue)) {
+    let best = numericOptions[0];
+    let bestDiff = Math.abs(parsedValue - best.numeric);
+    numericOptions.slice(1).forEach(opt => {
+      const diff = Math.abs(parsedValue - opt.numeric);
+      if (diff < bestDiff) {
+        best = opt;
+        bestDiff = diff;
+      }
+    });
+    if (typeof best.value === 'number') return best.value;
+    const asNumber = Number(best.value);
+    return Number.isFinite(asNumber) ? asNumber : best.value;
+  }
+  const strValue = String(value);
+  const match = options.find(opt => opt.valueStr === strValue || valuesEqual(opt.value, value));
+  if (match) return match.value;
+  return options[0].value;
+}
+
+function snapOverridesToOptions(device, overrides = {}) {
+  if (!device) return { ...overrides };
+  const result = {};
+  Object.entries(overrides).forEach(([field, val]) => {
+    if (val === undefined || val === null) return;
+    const snapped = snapSettingValue(device, field, val);
+    if (snapped !== undefined && snapped !== null) {
+      result[field] = snapped;
+    }
+  });
+  return result;
+}
+
 function resolveSettingType(defaultValue, options) {
   if (Array.isArray(options)) {
     const hasNonNumericOption = options.some(option => {
@@ -331,7 +382,10 @@ function buildComponentEntries() {
     if (!PROTECTIVE_TYPES.has(component.type) || !component.tccId) return;
     const base = libraryDevices.find(dev => dev.id === component.tccId);
     if (!base) return;
-    const overrides = mergeOverrides(component.tccOverrides, saved.componentOverrides?.[component.id]);
+    const overrides = snapOverridesToOptions(
+      base,
+      mergeOverrides(component.tccOverrides, saved.componentOverrides?.[component.id])
+    );
     const entry = {
       uid: `component:${component.id}`,
       kind: 'component',
@@ -354,7 +408,7 @@ function buildLibraryEntries() {
     name: dev.name || dev.id,
     baseDeviceId: dev.id,
     baseDevice: dev,
-    overrideSource: saved.settings?.[dev.id] || {}
+    overrideSource: snapOverridesToOptions(dev, saved.settings?.[dev.id] || {})
   })).sort((a, b) => a.name.localeCompare(b.name, undefined, { sensitivity: 'base' }));
 }
 
@@ -518,16 +572,15 @@ function renderSettings() {
         });
         const activeValue = overrideValue !== undefined ? overrideValue : defaultValue;
         if (activeValue !== undefined && activeValue !== null) {
-          const activeStr = String(activeValue);
-          const hasValue = normalizedOptions.some(opt => valuesEqual(opt.value, activeValue));
-          if (!hasValue) {
-            const customOpt = document.createElement('option');
-            customOpt.value = activeStr;
-            customOpt.textContent = `${formatSettingValue(activeValue)} (custom)`;
-            customOpt.dataset.custom = 'true';
-            select.appendChild(customOpt);
+          const snapped = snapSettingValue(base, field, activeValue);
+          const match = normalizedOptions.find(opt => valuesEqual(opt.value, snapped));
+          if (match) {
+            select.value = match.valueStr;
+          } else if (normalizedOptions[0]) {
+            select.value = normalizedOptions[0].valueStr;
           }
-          select.value = activeStr;
+        } else if (normalizedOptions[0]) {
+          select.value = normalizedOptions[0].valueStr;
         }
         label.appendChild(select);
       } else {
@@ -563,7 +616,7 @@ function persistSettings() {
     const uid = div.dataset.uid;
     const entry = deviceMap.get(uid);
     if (!entry) return;
-    const overrides = collectOverridesFromDiv(div);
+    const overrides = snapOverridesToOptions(entry.baseDevice, collectOverridesFromDiv(div));
     if (entry.kind === 'component') {
       if (Object.keys(overrides).length) {
         componentSettings[entry.componentId] = overrides;
@@ -589,8 +642,10 @@ function syncComponentOverrides(componentSettings) {
   (data.sheets || []).forEach(sheet => {
     (sheet.components || []).forEach(comp => {
       if (!PROTECTIVE_TYPES.has(comp.type)) return;
-      const overrides = componentSettings[comp.id];
-      if (overrides && Object.keys(overrides).length) {
+      const baseDevice = libraryDevices.find(dev => dev.id === comp.tccId);
+      const rawOverrides = componentSettings[comp.id];
+      const overrides = snapOverridesToOptions(baseDevice, rawOverrides || {});
+      if (rawOverrides && Object.keys(overrides).length) {
         if (!deepEqual(comp.tccOverrides, overrides)) {
           comp.tccOverrides = overrides;
           changed = true;
@@ -634,7 +689,7 @@ function linkComponent() {
   const entry = deviceMap.get(first);
   if (!entry) return;
   const deviceId = entry.baseDeviceId;
-  const overrides = entry.overrideSource || {};
+  const overrides = snapOverridesToOptions(entry.baseDevice, entry.overrideSource || {});
   const data = getOneLine();
   let updated = false;
   (data.sheets || []).forEach(sheet => {
@@ -662,7 +717,9 @@ function linkComponent() {
 function gatherOverridesFromInputs(uid) {
   const div = settingsDiv.querySelector(`.device-settings[data-uid="${uid}"]`);
   if (!div) return {};
-  return collectOverridesFromDiv(div);
+  const entry = deviceMap.get(uid);
+  if (!entry) return {};
+  return snapOverridesToOptions(entry.baseDevice, collectOverridesFromDiv(div));
 }
 
 function plot() {
@@ -676,10 +733,13 @@ function plot() {
 
   selections.forEach(selection => {
     if (selection.kind === 'library' || selection.kind === 'component') {
-      const overrides = {
-        ...selection.overrideSource,
-        ...gatherOverridesFromInputs(selection.uid)
-      };
+      const overrides = snapOverridesToOptions(
+        selection.baseDevice,
+        {
+          ...selection.overrideSource,
+          ...gatherOverridesFromInputs(selection.uid)
+        }
+      );
       const scaled = scaleCurve(selection.baseDevice, overrides);
       devicePlots.push({ selection, overrides, scaled });
     } else if (selection.kind === 'cable') {
@@ -944,18 +1004,15 @@ function plot() {
     Object.entries(entry.overrides).forEach(([field, value]) => {
       const input = div.querySelector(`[data-field="${field}"]`);
       if (!input) return;
-      const formatted = formatSettingValue(value);
+      const sanitized = snapSettingValue(entry.selection.baseDevice, field, value);
+      entry.overrides[field] = sanitized;
+      const formatted = formatSettingValue(sanitized);
       if (input.tagName === 'SELECT') {
-        const valueStr = String(value ?? '');
-        let option = [...input.options].find(o => o.value === valueStr);
-        if (!option) {
-          option = document.createElement('option');
-          option.value = valueStr;
-          option.textContent = formatted ? `${formatted} (custom)` : 'Custom';
-          option.dataset.custom = 'true';
-          input.appendChild(option);
+        const valueStr = String(sanitized ?? '');
+        const option = [...input.options].find(o => o.value === valueStr);
+        if (option) {
+          input.value = valueStr;
         }
-        input.value = valueStr;
       } else if (formatted !== '') {
         input.value = formatted;
       }

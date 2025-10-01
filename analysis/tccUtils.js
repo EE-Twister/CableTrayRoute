@@ -106,8 +106,16 @@ export function scaleCurve(device = {}, overrides = {}) {
     combinedBase.longTimeDelay,
     1
   );
-  const shortTimePickup = firstDefined(overrides.shortTimePickup, combinedBase.shortTimePickup);
-  const shortTimeDelay = firstDefined(overrides.shortTimeDelay, combinedBase.shortTimeDelay);
+  const rawShortTimePickup = firstDefined(overrides.shortTimePickup, combinedBase.shortTimePickup);
+  const rawShortTimeDelay = firstDefined(overrides.shortTimeDelay, combinedBase.shortTimeDelay);
+  const parsedShortTimePickup = Number(rawShortTimePickup);
+  const parsedShortTimeDelay = Number(rawShortTimeDelay);
+  const shortTimePickup = Number.isFinite(parsedShortTimePickup) && parsedShortTimePickup > 0
+    ? parsedShortTimePickup
+    : null;
+  const shortTimeDelay = Number.isFinite(parsedShortTimeDelay) && parsedShortTimeDelay > 0
+    ? Math.max(parsedShortTimeDelay, MIN_TIME)
+    : null;
   const instantaneous = firstDefined(
     overrides.instantaneous,
     overrides.instantaneousPickup,
@@ -143,10 +151,42 @@ export function scaleCurve(device = {}, overrides = {}) {
     .filter(p => p.current > 0)
     .sort((a, b) => a.current - b.current);
 
-  const curve = sorted.map(p => ({
+  let curve = sorted.map(p => ({
     current: p.current * scaleI,
     time: Math.max(p.time * scaleT, MIN_TIME)
   }));
+
+  if (shortTimePickup && shortTimeDelay) {
+    const plateauCurrent = shortTimePickup;
+    const plateauTime = shortTimeDelay;
+    const adjusted = [];
+    let plateauStarted = false;
+    const EPSILON = 1e-9;
+    curve.forEach(point => {
+      if (point.current + EPSILON < plateauCurrent) {
+        adjusted.push(point);
+        return;
+      }
+      if (!plateauStarted) {
+        const prev = adjusted[adjusted.length - 1];
+        const startTime = prev ? Math.min(prev.time, plateauTime) : plateauTime;
+        adjusted.push({ current: plateauCurrent, time: Math.max(startTime, MIN_TIME) });
+        plateauStarted = true;
+      }
+      const current = Math.max(point.current, plateauCurrent);
+      const last = adjusted[adjusted.length - 1];
+      const time = Math.max(Math.min(plateauTime, last ? last.time : plateauTime), MIN_TIME);
+      if (!last || Math.abs(last.current - current) > EPSILON || Math.abs(last.time - time) > EPSILON) {
+        adjusted.push({ current, time });
+      }
+    });
+    if (!plateauStarted && adjusted.length) {
+      const last = adjusted[adjusted.length - 1];
+      const startTime = Math.max(Math.min(plateauTime, last.time), MIN_TIME);
+      adjusted.push({ current: plateauCurrent, time: startTime });
+    }
+    curve = adjusted;
+  }
 
   let resolvedInstMax = instMaxSetting;
   if (instantaneous) {

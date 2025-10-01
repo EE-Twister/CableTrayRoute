@@ -13,6 +13,7 @@ function it(name, fn){
   const { scaleCurve, checkDuty } = await import('../../analysis/tccUtils.js');
   const devices = JSON.parse(fs.readFileSync('data/protectiveDevices.json', 'utf8'));
   const abb = devices.find(d => d.id === 'abb_tmax_160');
+  const geRelay = devices.find(d => d.id === 'ge_multilin_750');
 
   describe('tcc utilities', () => {
     it('scales curve points from overrides', () => {
@@ -21,6 +22,18 @@ function it(name, fn){
       assert.strictEqual(scaled.curve[0].time, 200);
       const inst = scaled.curve.find(p => p.current === 1000 && p.time === 0.01);
       assert(inst);
+    });
+
+    it('applies short-time pickup and delay overrides to the curve plateau', () => {
+      const scaled = scaleCurve(geRelay, { shortTimePickup: 600, shortTimeDelay: 0.1 });
+      const start = scaled.curve.find(p => Math.abs(p.current - 600) < 1e-6);
+      assert(start, 'expected curve to include short-time pickup point');
+      assert(Math.abs(start.time - 0.1) < 1e-6, 'short-time delay should set plateau time');
+      const plateau = scaled.curve.filter(p => p.current >= 600 && p.time >= 0.099);
+      assert(plateau.some(p => p.current > 600), 'plateau should extend beyond pickup before instantaneous region');
+      plateau.forEach(point => {
+        assert(Math.abs(point.time - 0.1) < 1e-6, 'plateau points should use short-time delay');
+      });
     });
 
     it('detects interrupt rating violations', () => {
