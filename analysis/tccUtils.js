@@ -4,6 +4,33 @@ const DEFAULT_TOLERANCE = {
   timeUpper: 1.2
 };
 
+function sanitizeCurve(points = []) {
+  const filtered = points
+    .map(point => ({
+      current: Number(point?.current) || 0,
+      time: Math.max(Number(point?.time) || MIN_TIME, MIN_TIME)
+    }))
+    .filter(point => point.current > 0)
+    .sort((a, b) => {
+      if (a.current === b.current) {
+        return b.time - a.time;
+      }
+      return a.current - b.current;
+    });
+
+  let previousTime = null;
+  return filtered.map((point, index) => {
+    const safeTime = Math.max(point.time, MIN_TIME);
+    if (index === 0) {
+      previousTime = safeTime;
+      return { current: point.current, time: safeTime };
+    }
+    const monotonicTime = previousTime === null ? safeTime : Math.min(safeTime, previousTime);
+    previousTime = monotonicTime;
+    return { current: point.current, time: monotonicTime };
+  });
+}
+
 function firstDefined(...values) {
   for (const value of values) {
     if (value !== undefined && value !== null) return value;
@@ -146,14 +173,11 @@ export function scaleCurve(device = {}, overrides = {}) {
     timeUpper: Math.max(toleranceSource.timeUpper ?? DEFAULT_TOLERANCE.timeUpper, 1.0)
   };
 
-  const sorted = (profile.curve || device.curve || [])
-    .map(p => ({ current: Number(p.current) || 0, time: Math.max(Number(p.time) || MIN_TIME, MIN_TIME) }))
-    .filter(p => p.current > 0)
-    .sort((a, b) => a.current - b.current);
+  const baseCurve = sanitizeCurve(profile.curve || device.curve || []);
 
-  let curve = sorted.map(p => ({
-    current: p.current * scaleI,
-    time: Math.max(p.time * scaleT, MIN_TIME)
+  let curve = baseCurve.map(point => ({
+    current: point.current * scaleI,
+    time: Math.max(point.time * scaleT, MIN_TIME)
   }));
 
   if (shortTimePickup && shortTimeDelay) {
@@ -201,9 +225,20 @@ export function scaleCurve(device = {}, overrides = {}) {
       instLimit = ratedCeiling && ratedCeiling > instCurrent ? ratedCeiling : instCurrent * 10;
     }
     resolvedInstMax = instLimit;
-    if (last && last.current < instCurrent) {
-      curve.push({ current: instCurrent, time: last.time });
-    } else if (!last) {
+    let referenceTime = instTime;
+    for (let idx = curve.length - 1; idx >= 0; idx -= 1) {
+      const point = curve[idx];
+      if (point.current <= instCurrent + 1e-9) {
+        referenceTime = Math.max(point.time, MIN_TIME);
+        break;
+      }
+    }
+    if (curve.length === 0) {
+      referenceTime = instTime;
+    }
+    if (referenceTime > instTime + 1e-9) {
+      curve.push({ current: instCurrent, time: referenceTime });
+    } else if (!curve.length) {
       curve.push({ current: instCurrent, time: instTime });
     }
     curve.push({ current: instCurrent, time: instTime });
@@ -212,6 +247,8 @@ export function scaleCurve(device = {}, overrides = {}) {
     }
     curve.push({ current: instLimit, time: MIN_TIME });
   }
+
+  curve = sanitizeCurve(curve);
 
   const minCurve = curve.map(p => ({
     current: p.current,
