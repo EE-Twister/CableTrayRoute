@@ -1,9 +1,11 @@
+import { resolveComponentLabel } from '../utils/componentLabels.js';
+
 export function runValidation(components = [], studies = {}) {
   const issues = [];
   const componentLookup = new Map(components.map(c => [c.id, c]));
   const describe = id => {
     const comp = componentLookup.get(id);
-    return comp?.label || comp?.name || comp?.id || id;
+    return resolveComponentLabel(comp, id);
   };
 
   const inferReliabilityHint = comp => {
