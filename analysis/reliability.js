@@ -1,4 +1,5 @@
 import { getOneLine, getStudies, setStudies } from '../dataStore.mjs';
+import { resolveComponentLabel } from '../utils/componentLabels.js';
 let d3;
 if (typeof document !== 'undefined') {
   d3 = await import('https://cdn.jsdelivr.net/npm/d3@7/+esm');
@@ -87,7 +88,7 @@ export function runReliability(components = []) {
 
   const labelFor = id => {
     const comp = compMap.get(id);
-    return comp?.label || comp?.name || comp?.id || id;
+    return resolveComponentLabel(comp, id);
   };
 
   const n1Failures = [];
