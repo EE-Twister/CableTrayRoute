@@ -22,10 +22,24 @@ function it(name, fn){
       assert.strictEqual(scaled.curve[0].time, 200);
       const inst = scaled.curve.find(p => p.current === 1000 && p.time === 0.01);
       assert(inst);
+      for (let i = 1; i < scaled.curve.length; i += 1) {
+        assert(
+          scaled.curve[i].current >= scaled.curve[i - 1].current,
+          'curve currents should be non-decreasing'
+        );
+        assert(
+          scaled.curve[i].time <= scaled.curve[i - 1].time + 1e-9,
+          'curve times should be non-increasing as current rises'
+        );
+      }
     });
 
     it('applies short-time pickup and delay overrides to the curve plateau', () => {
-      const scaled = scaleCurve(geRelay, { shortTimePickup: 600, shortTimeDelay: 0.1 });
+      const scaled = scaleCurve(geRelay, {
+        shortTimePickup: 600,
+        shortTimeDelay: 0.1,
+        instantaneousPickup: 1000
+      });
       const start = scaled.curve.find(p => Math.abs(p.current - 600) < 1e-6);
       assert(start, 'expected curve to include short-time pickup point');
       assert(Math.abs(start.time - 0.1) < 1e-6, 'short-time delay should set plateau time');
