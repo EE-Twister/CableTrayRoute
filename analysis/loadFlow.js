@@ -1,9 +1,54 @@
+import componentLibrary from '../componentLibrary.json' with { type: 'json' };
 import { getOneLine } from '../dataStore.mjs';
 
 const IGNORED_TYPES = new Set(['annotation', 'dimension']);
 
+const DEFAULT_COMPONENT_DEFINITIONS = [
+  { type: 'bus', subtype: 'Bus' }
+];
+
+function compKey(type, subtype) {
+  return subtype ? `${type}_${subtype}` : type;
+}
+
+function buildComponentTypeMap() {
+  const map = new Map();
+  const register = definition => {
+    if (!definition || typeof definition !== 'object') return;
+    const subtype = typeof definition.subtype === 'string' ? definition.subtype.trim() : '';
+    if (!subtype) return;
+    const baseType = (typeof definition.type === 'string' && definition.type.trim())
+      || (typeof definition.category === 'string' && definition.category.trim())
+      || subtype;
+    const key = compKey(baseType, subtype);
+    map.set(key, baseType);
+    map.set(subtype, baseType);
+    map.set(baseType, baseType);
+  };
+
+  const libraryDefs = Array.isArray(componentLibrary?.components)
+    ? componentLibrary.components
+    : [];
+  libraryDefs.forEach(register);
+  DEFAULT_COMPONENT_DEFINITIONS.forEach(register);
+  return map;
+}
+
+const componentTypeBySubtype = buildComponentTypeMap();
+
 function isUsableComponent(comp) {
   return comp && !IGNORED_TYPES.has(comp.type);
+}
+
+function isBusComponent(comp) {
+  if (!comp) return false;
+  if (comp.type === 'bus' || comp.subtype === 'Bus') return true;
+  const subtype = typeof comp.subtype === 'string' ? comp.subtype : '';
+  const type = typeof comp.type === 'string' ? comp.type : '';
+  const metaType = componentTypeBySubtype.get(subtype)
+    || componentTypeBySubtype.get(compKey(type, subtype))
+    || componentTypeBySubtype.get(type);
+  return metaType === 'bus';
 }
 
 /** Basic complex number helpers used by the load-flow solver */
@@ -259,7 +304,7 @@ export function runLoadFlow(modelOrOpts = {}, maybeOpts = {}) {
     const comps = (Array.isArray(sheets[0]?.components)
       ? sheets.flatMap(s => s.components || [])
       : sheets).filter(isUsableComponent);
-    busComps = comps.filter(c => c.subtype === 'Bus');
+    busComps = comps.filter(isBusComponent);
     if (busComps.length === 0) busComps = comps;
   }
   const busIds = busComps.map(b => b.id);
