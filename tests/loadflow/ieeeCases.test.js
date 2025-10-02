@@ -42,6 +42,7 @@ function caseToDiagram(data){
 (async () => {
   const { setOneLine } = await import('../../dataStore.mjs');
   const { runLoadFlow } = await import('../../analysis/loadFlow.js');
+  const { buildModel } = await import('../../studies/loadFlow.js');
   const case14 = require('./IEEE14.json');
   const case57 = require('./IEEE57.json');
 
@@ -90,6 +91,57 @@ function caseToDiagram(data){
       assert(Array.isArray(buses));
       assert.strictEqual(buses.length, 1);
       assert.strictEqual(buses[0].id, 'bus-1');
+    });
+
+    it('creates impedance links when buses are joined by non-bus equipment', () => {
+      setOneLine({
+        activeSheet: 0,
+        sheets: [{
+          name: 'links',
+          components: [
+            {
+              id: 'bus-a',
+              type: 'bus',
+              subtype: 'Bus',
+              busType: 'slack',
+              baseKV: 13.8,
+              Vm: 1,
+              Va: 0
+            },
+            {
+              id: 'cable-1',
+              type: 'feeder',
+              subtype: 'feeder',
+              connections: [
+                { target: 'bus-a' },
+                { target: 'bus-b' }
+              ],
+              impedance: { r: 0.05, x: 0.15 }
+            },
+            {
+              id: 'bus-b',
+              type: 'bus',
+              subtype: 'Bus',
+              busType: 'PQ',
+              baseKV: 13.8,
+              Vm: 1,
+              Va: 0,
+              load: { kw: 500, kvar: 200 }
+            }
+          ]
+        }]
+      });
+      const model = buildModel();
+      const res = runLoadFlow(model, { baseMVA: 100 });
+      const buses = Array.isArray(res?.buses) ? res.buses : res;
+      const loadBus = buses.find(b => b.id === 'bus-b');
+      assert(loadBus);
+      assert(loadBus.Vm < 1);
+      assert(Math.abs(loadBus.Va) > 0);
+      const lines = res.lines || [];
+      const flow = lines.find(l => l.from === 'bus-a' && l.to === 'bus-b');
+      assert(flow);
+      assert(Math.abs(flow.P) > 0);
     });
   });
 })();

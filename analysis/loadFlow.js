@@ -51,6 +51,20 @@ function isBusComponent(comp) {
   return metaType === 'bus';
 }
 
+function cloneData(value) {
+  if (value === null || value === undefined) return value;
+  if (Array.isArray(value)) return value.map(cloneData);
+  if (typeof value === 'object') {
+    const out = {};
+    Object.keys(value).forEach(key => {
+      const val = value[key];
+      if (val !== undefined) out[key] = cloneData(val);
+    });
+    return out;
+  }
+  return value;
+}
+
 /** Basic complex number helpers used by the load-flow solver */
 function toComplex(re = 0, im = 0) {
   return { re, im };
@@ -298,7 +312,38 @@ export function runLoadFlow(modelOrOpts = {}, maybeOpts = {}) {
   const { baseMVA = 100, balanced = true } = opts;
   let busComps;
   if (model && model.buses) {
-    busComps = model.buses.filter(isUsableComponent);
+    const usable = model.buses.filter(isUsableComponent);
+    let selected = usable.filter(isBusComponent);
+    if (selected.length === 0) selected = usable;
+    const busMap = new Map();
+    busComps = selected.map(bus => {
+      const clone = { ...bus };
+      clone.connections = Array.isArray(bus.connections)
+        ? bus.connections.map(conn => ({ ...conn }))
+        : [];
+      busMap.set(clone.id, clone);
+      return clone;
+    });
+    if (Array.isArray(model.branches)) {
+      model.branches.forEach(branch => {
+        if (!branch) return;
+        const fromBus = busMap.get(branch.from);
+        if (!fromBus) return;
+        if (!Array.isArray(fromBus.connections)) fromBus.connections = [];
+        const componentId = branch.id || branch.componentId;
+        const already = fromBus.connections.some(conn => conn.target === branch.to && (conn.componentId || conn.id) === componentId);
+        if (already) return;
+        fromBus.connections.push({
+          target: branch.to,
+          impedance: cloneData(branch.impedance || branch.cable || {}),
+          tap: cloneData(branch.tap),
+          shunt: cloneData(branch.shunt),
+          rating: branch.rating,
+          phases: cloneData(branch.phases),
+          componentId
+        });
+      });
+    }
   } else {
     const { sheets } = getOneLine();
     const comps = (Array.isArray(sheets[0]?.components)
