@@ -109,6 +109,34 @@ function ensureMotorStartResults() {
   return res;
 }
 
+function appendWrappedText(selection, text, { x, y, maxWidth, fill = '#444', lineHeight = 18 }) {
+  const textEl = selection.append('text')
+    .attr('x', x)
+    .attr('y', y)
+    .attr('text-anchor', 'middle')
+    .attr('fill', fill);
+  const words = text.split(/\s+/).filter(Boolean);
+  if (!words.length) return { element: textEl, lineCount: 0 };
+  let line = [];
+  let lineNumber = 0;
+  let tspan = textEl.append('tspan').attr('x', x).attr('dy', 0);
+  words.forEach(word => {
+    line.push(word);
+    tspan.text(line.join(' '));
+    if (tspan.node().getComputedTextLength() > maxWidth && line.length > 1) {
+      line.pop();
+      tspan.text(line.join(' '));
+      line = [word];
+      lineNumber += 1;
+      tspan = textEl.append('tspan')
+        .attr('x', x)
+        .attr('dy', `${lineHeight}px`)
+        .text(word);
+    }
+  });
+  return { element: textEl, lineCount: lineNumber + 1 };
+}
+
 function renderMotorStartChart(svgEl, data) {
   const width = Number(svgEl.getAttribute('width')) || 800;
   const height = Number(svgEl.getAttribute('height')) || 400;
@@ -118,16 +146,19 @@ function renderMotorStartChart(svgEl, data) {
 
   if (!data.length) {
     const messages = [
-      'No motors with starting data found in the active project.',
-      'Add a motor starting curve by editing a motor on the One-Line and entering the inrush multiple, Thevenin impedance, inertia, and load torque curve points on the Motor Start tab.'
+      { text: 'No motors with starting data found in the active project.', fill: '#666' },
+      { text: 'Add a motor starting curve by editing a motor on the One-Line and entering the inrush multiple, Thevenin impedance, inertia, and load torque curve points on the Motor Start tab.' }
     ];
-    messages.forEach((msg, index) => {
-      svg.append('text')
-        .attr('x', width / 2)
-        .attr('y', height / 2 + index * 20)
-        .attr('text-anchor', 'middle')
-        .attr('fill', index === 0 ? '#666' : '#444')
-        .text(msg);
+    const maxWidth = Math.max(120, width - margin.left - margin.right);
+    let currentY = height / 2 - ((messages.length - 1) * 24);
+    messages.forEach(msg => {
+      const { lineCount } = appendWrappedText(svg, msg.text, {
+        x: width / 2,
+        y: currentY,
+        maxWidth,
+        fill: msg.fill || '#444'
+      });
+      currentY += lineCount * 18 + 8;
     });
     return;
   }
