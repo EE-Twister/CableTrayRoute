@@ -138,6 +138,47 @@ const typeIcons = {
 
 const placeholderIcon = asset('icons/placeholder.svg');
 
+function hasImpedance(holder) {
+  return !!(holder && holder.impedance && typeof holder.impedance === 'object');
+}
+
+function hasImpedanceValues(obj) {
+  if (!obj || typeof obj !== 'object') return false;
+  return Object.prototype.hasOwnProperty.call(obj, 'r') || Object.prototype.hasOwnProperty.call(obj, 'x');
+}
+
+function getImpedancePart(holder, key) {
+  if (!holder || !holder.impedance || typeof holder.impedance !== 'object') return '';
+  const val = holder.impedance[key];
+  return val === undefined || val === null ? '' : val;
+}
+
+function setImpedancePart(holder, key, value, { keepEmpty = false } = {}) {
+  if (!holder || typeof holder !== 'object') return;
+  const raw = typeof value === 'string' ? value.trim() : value;
+  if (raw === '' || raw === null || raw === undefined) {
+    if (holder.impedance && typeof holder.impedance === 'object') {
+      delete holder.impedance[key];
+      if (!keepEmpty && !hasImpedanceValues(holder.impedance)) {
+        delete holder.impedance;
+      }
+    }
+    return;
+  }
+  const num = typeof raw === 'number' ? raw : Number.parseFloat(raw);
+  if (!Number.isFinite(num)) {
+    if (holder.impedance && typeof holder.impedance === 'object') {
+      delete holder.impedance[key];
+      if (!keepEmpty && !hasImpedanceValues(holder.impedance)) {
+        delete holder.impedance;
+      }
+    }
+    return;
+  }
+  if (!holder.impedance || typeof holder.impedance !== 'object') holder.impedance = {};
+  holder.impedance[key] = num;
+}
+
 function normalizeCategoryValue(value) {
   switch (value) {
     case 'bus':
@@ -4280,6 +4321,25 @@ function selectComponent(compOrId) {
       );
     }
 
+    if (hasImpedance(targetComp)) {
+      baseFields = baseFields.concat([
+        {
+          name: 'impedance_r',
+          label: 'Impedance R (Ω)',
+          type: 'number',
+          getValue: comp => getImpedancePart(comp, 'r'),
+          setValue: (comp, value) => setImpedancePart(comp, 'r', value, { keepEmpty: true })
+        },
+        {
+          name: 'impedance_x',
+          label: 'Impedance X (Ω)',
+          type: 'number',
+          getValue: comp => getImpedancePart(comp, 'x'),
+          setValue: (comp, value) => setImpedancePart(comp, 'x', value, { keepEmpty: true })
+        }
+      ]);
+    }
+
     let manufacturerInput = null;
     let modelInput = null;
 
@@ -4292,7 +4352,10 @@ function selectComponent(compOrId) {
       lbl.textContent = f.label + ' ';
       let input;
       const defVal = manufacturerDefaults[targetComp.subtype]?.[f.name] || '';
-      const curVal = targetComp[f.name] !== undefined && targetComp[f.name] !== '' ? targetComp[f.name] : defVal;
+      let curVal;
+      if (typeof f.getValue === 'function') curVal = f.getValue(targetComp);
+      else if (targetComp[f.name] !== undefined && targetComp[f.name] !== '') curVal = targetComp[f.name];
+      else curVal = defVal;
       if (f.type === 'select') {
         input = document.createElement('select');
         (f.options || []).forEach(opt => {
@@ -4304,7 +4367,7 @@ function selectComponent(compOrId) {
         });
       } else if (f.type === 'textarea') {
         input = document.createElement('textarea');
-        input.value = curVal;
+        input.value = curVal ?? '';
         if (f.rows) input.rows = f.rows;
         input.spellcheck = false;
       } else if (f.type === 'checkbox') {
@@ -4315,7 +4378,7 @@ function selectComponent(compOrId) {
         input = document.createElement('input');
         input.type = f.type || 'text';
         if (f.type === 'number') input.step = 'any';
-        input.value = curVal;
+        input.value = curVal ?? '';
       }
       input.name = f.name;
       if (f.placeholder) input.placeholder = f.placeholder;
@@ -4330,6 +4393,20 @@ function selectComponent(compOrId) {
         lbl.appendChild(help);
       }
       container.appendChild(lbl);
+    };
+
+    const applyFieldFromForm = (target, field, formData) => {
+      if (field.type === 'checkbox') {
+        const checked = formData.get(field.name) === 'on';
+        if (typeof field.setValue === 'function') field.setValue(target, checked);
+        else target[field.name] = checked;
+        return;
+      }
+      const raw = formData.get(field.name);
+      const value = raw === null ? '' : raw;
+      if (typeof field.setValue === 'function') field.setValue(target, value);
+      else if (field.type === 'number') target[field.name] = value ? parseFloat(value) : '';
+      else target[field.name] = value || '';
     };
 
     let fields = [...baseFields, ...schema];
@@ -4485,10 +4562,7 @@ function selectComponent(compOrId) {
         flipped: !!targetComp.flipped
       };
       fields.forEach(f => {
-        const v = fd.get(f.name);
-        if (f.type === 'checkbox') data[f.name] = v === 'on';
-        else if (f.type === 'number') data[f.name] = v ? parseFloat(v) : '';
-        else data[f.name] = v || '';
+        applyFieldFromForm(data, f, fd);
       });
       data.tccId = fd.get('tccId') || '';
       templates.push({ name, component: data });
@@ -4527,10 +4601,7 @@ function selectComponent(compOrId) {
       e.preventDefault();
       const fd = new FormData(form);
       fields.forEach(f => {
-        const v = fd.get(f.name);
-        if (f.type === 'checkbox') targetComp[f.name] = v === 'on';
-        else if (f.type === 'number') targetComp[f.name] = v ? parseFloat(v) : '';
-        else targetComp[f.name] = v || '';
+        applyFieldFromForm(targetComp, f, fd);
       });
       targetComp.tccId = fd.get('tccId') || '';
       pushHistory();
@@ -4856,6 +4927,24 @@ async function chooseCable(source, target, existingConn = null) {
     lengthLabel.appendChild(lengthInput);
     form.appendChild(lengthLabel);
 
+    const impedanceRLabel = document.createElement('label');
+    impedanceRLabel.textContent = 'Impedance R (Ω) ';
+    const impedanceRInput = document.createElement('input');
+    impedanceRInput.type = 'number';
+    impedanceRInput.step = 'any';
+    impedanceRInput.name = 'impedance_r';
+    impedanceRLabel.appendChild(impedanceRInput);
+    form.appendChild(impedanceRLabel);
+
+    const impedanceXLabel = document.createElement('label');
+    impedanceXLabel.textContent = 'Impedance X (Ω) ';
+    const impedanceXInput = document.createElement('input');
+    impedanceXInput.type = 'number';
+    impedanceXInput.step = 'any';
+    impedanceXInput.name = 'impedance_x';
+    impedanceXLabel.appendChild(impedanceXInput);
+    form.appendChild(impedanceXLabel);
+
     const colorLabel = document.createElement('label');
     colorLabel.textContent = 'Color ';
     const colorInput = document.createElement('input');
@@ -4912,6 +5001,8 @@ async function chooseCable(source, target, existingConn = null) {
         insulationInput.value = t.insulation_type || '';
         ambientInput.value = t.ambient_temp || '';
         installInput.value = t.install_method || '';
+        impedanceRInput.value = getImpedancePart(t, 'r') || '';
+        impedanceXInput.value = getImpedancePart(t, 'x') || '';
       }
     });
 
@@ -4929,6 +5020,8 @@ async function chooseCable(source, target, existingConn = null) {
         colorInput.value = c.color || '#000000';
         ambientInput.value = c.ambient_temp || '';
         installInput.value = c.install_method || '';
+        impedanceRInput.value = getImpedancePart(c, 'r') || '';
+        impedanceXInput.value = getImpedancePart(c, 'x') || '';
       } else {
         tagInput.value = '';
         typeInput.value = '';
@@ -4941,6 +5034,8 @@ async function chooseCable(source, target, existingConn = null) {
         colorInput.value = '#000000';
         ambientInput.value = '';
         installInput.value = '';
+        impedanceRInput.value = '';
+        impedanceXInput.value = '';
         sizeInput.dataset.calcAmpacity = '';
         sizeInput.dataset.voltageDrop = '';
         sizeInput.dataset.sizingWarning = '';
@@ -4976,11 +5071,15 @@ async function chooseCable(source, target, existingConn = null) {
       sizeInput.dataset.codeRef = existing.code_reference || '';
       sizeInput.dataset.sizingReport = existing.sizing_report || '';
       if (existing.sizing_warning) sizeInput.classList.add('sizing-violation');
+      impedanceRInput.value = getImpedancePart(existing, 'r') || '';
+      impedanceXInput.value = getImpedancePart(existing, 'x') || '';
       if (existingTemplates.some(t => t.tag === existing.tag)) {
         select.value = existing.tag;
       }
     } else {
       colorInput.value = '#000000';
+      impedanceRInput.value = '';
+      impedanceXInput.value = '';
     }
 
     const saveBtn = document.createElement('button');
@@ -5021,6 +5120,8 @@ async function chooseCable(source, target, existingConn = null) {
         code_reference: sizeInput.dataset.codeRef || '',
         sizing_report: sizeInput.dataset.sizingReport || ''
       };
+      setImpedancePart(cable, 'r', impedanceRInput.value, { keepEmpty: false });
+      setImpedancePart(cable, 'x', impedanceXInput.value, { keepEmpty: false });
       if (manualLen) {
         cable.length = lengthInput.value;
         cable.manual_length = true;
@@ -5122,8 +5223,28 @@ function openCableProperties(comp) {
     <p><strong>Conductors:</strong> ${cable.conductors || ''}</p>
     <p><strong>Phases:</strong> ${Array.isArray(cable.phases) ? cable.phases.join(',') : cable.phases || ''}</p>
     <p><strong>Length:</strong> ${cable.length || ''}</p>
+    <p><strong>Impedance R (Ω):</strong> ${getImpedancePart(cable, 'r') || ''}</p>
+    <p><strong>Impedance X (Ω):</strong> ${getImpedancePart(cable, 'x') || ''}</p>
   `;
   form.appendChild(cableInfo);
+
+  const impedanceRLabel = document.createElement('label');
+  impedanceRLabel.textContent = 'Impedance R (Ω) ';
+  const impedanceRInput = document.createElement('input');
+  impedanceRInput.type = 'number';
+  impedanceRInput.step = 'any';
+  impedanceRInput.value = getImpedancePart(cable, 'r') || '';
+  impedanceRLabel.appendChild(impedanceRInput);
+  form.appendChild(impedanceRLabel);
+
+  const impedanceXLabel = document.createElement('label');
+  impedanceXLabel.textContent = 'Impedance X (Ω) ';
+  const impedanceXInput = document.createElement('input');
+  impedanceXInput.type = 'number';
+  impedanceXInput.step = 'any';
+  impedanceXInput.value = getImpedancePart(cable, 'x') || '';
+  impedanceXLabel.appendChild(impedanceXInput);
+  form.appendChild(impedanceXLabel);
 
   const editCableBtn = document.createElement('button');
   editCableBtn.type = 'button';
@@ -5169,6 +5290,9 @@ function openCableProperties(comp) {
     e.preventDefault();
     comp.label = labelInput.value || '';
     comp.ref = refInput.value || '';
+    if (!comp.cable || typeof comp.cable !== 'object') comp.cable = {};
+    setImpedancePart(comp.cable, 'r', impedanceRInput.value, { keepEmpty: false });
+    setImpedancePart(comp.cable, 'x', impedanceXInput.value, { keepEmpty: false });
     pushHistory();
     render();
     save();
