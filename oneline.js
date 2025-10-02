@@ -6737,6 +6737,51 @@ function exportDiagram() {
   URL.revokeObjectURL(a.href);
 }
 
+function sanitizeForExport(value, seen = new WeakSet()) {
+  if (value === undefined) return undefined;
+  const type = typeof value;
+  if (type === 'bigint') {
+    const num = Number(value);
+    return Number.isSafeInteger(num) ? num : value.toString();
+  }
+  if (type === 'number') {
+    if (Number.isFinite(value)) return value;
+    if (Number.isNaN(value)) return 'NaN';
+    return value > 0 ? 'Infinity' : '-Infinity';
+  }
+  if (type === 'boolean' || type === 'string') return value;
+  if (type === 'function') return undefined;
+  if (value === null) return null;
+  if (type !== 'object') return value;
+  if (typeof window !== 'undefined' && (value === window || value === window.document)) return undefined;
+  if (value && typeof value.nodeType === 'number' && typeof value.nodeName === 'string') return undefined;
+  if (seen.has(value)) return '[Circular]';
+  seen.add(value);
+  if (value instanceof Date) return value.toISOString();
+  if (value instanceof Set) return Array.from(value, item => sanitizeForExport(item, seen));
+  if (value instanceof Map) {
+    const out = {};
+    value.forEach((v, k) => {
+      const sanitized = sanitizeForExport(v, seen);
+      if (sanitized !== undefined) out[String(k)] = sanitized;
+    });
+    return out;
+  }
+  if (ArrayBuffer.isView(value)) {
+    return Array.from(new Uint8Array(value.buffer, value.byteOffset, value.byteLength));
+  }
+  if (value instanceof ArrayBuffer) {
+    return Array.from(new Uint8Array(value));
+  }
+  if (Array.isArray(value)) return value.map(item => sanitizeForExport(item, seen));
+  const plain = {};
+  Object.keys(value).forEach(key => {
+    const sanitized = sanitizeForExport(value[key], seen);
+    if (sanitized !== undefined) plain[key] = sanitized;
+  });
+  return plain;
+}
+
 function exportOneLineDiagnostics() {
   try {
     const scenario = getCurrentScenario() || 'default';
@@ -6748,12 +6793,17 @@ function exportOneLineDiagnostics() {
       oneLine: getOneLine(),
       studies: getStudies()
     };
-    const blob = new Blob([JSON.stringify(payload, null, 2)], { type: 'application/json' });
+    const sanitized = sanitizeForExport(payload);
+    const blob = new Blob([JSON.stringify(sanitized, null, 2)], { type: 'application/json' });
     const a = document.createElement('a');
-    a.href = URL.createObjectURL(blob);
+    const url = URL.createObjectURL(blob);
+    a.href = url;
     a.download = `oneline-diagnostics-${safeScenario}-${timestamp}.json`;
+    const parent = document.body || document.documentElement;
+    if (parent) parent.appendChild(a);
     a.click();
-    URL.revokeObjectURL(a.href);
+    if (a.parentNode) a.parentNode.removeChild(a);
+    setTimeout(() => URL.revokeObjectURL(url), 0);
     showToast('One-line diagnostics exported');
   } catch (err) {
     console.error('Failed to export one-line diagnostics', err);
