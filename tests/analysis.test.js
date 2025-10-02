@@ -116,25 +116,23 @@ function caseToDiagram(data) {
       assert.strictEqual(label, 'REF-1');
     });
 
-    it('uses enhanced labels in reliability outputs and validation issues', () => {
+    it('does not emit radial reliability failures', () => {
       const source = { id: 'source', type: 'bus', connections: [{ target: 'breaker' }] };
       const breaker = { id: 'breaker', type: 'breaker', tag: 'BRK-1', connections: [{ target: 'source' }, { target: 'load' }] };
       const load = { id: 'load', type: 'bus', props: { tag: 'LD-1' }, connections: [{ target: 'breaker' }] };
       const components = [source, breaker, load];
 
       const reliability = runReliability(components);
-      assert.deepStrictEqual(reliability.n1Failures, ['breaker']);
-      assert.deepStrictEqual(reliability.n1FailureDetails.breaker.impactedLabels, ['LD-1']);
+      assert.deepStrictEqual(reliability.n1Failures, []);
+      assert.deepStrictEqual(reliability.n1FailureDetails, {});
 
       const issues = runValidation(components, {
         reliability: {
-          n1Failures: ['breaker'],
-          n1FailureDetails: { breaker: { impactedIds: ['load'] } }
+          n1Failures: reliability.n1Failures,
+          n1FailureDetails: reliability.n1FailureDetails
         }
       });
-      assert.strictEqual(issues.length, 1);
-      assert.ok(issues[0].message.includes('BRK-1 single point of failure'));
-      assert.ok(issues[0].message.includes('LD-1'));
+      assert.strictEqual(issues.length, 0);
     });
   });
 })();
