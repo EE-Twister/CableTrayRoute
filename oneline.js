@@ -4791,26 +4791,32 @@ async function chooseCable(source, target, existingConn = null) {
   const seen = new Set();
   getCables().forEach(c => {
     if (!seen.has(c.tag)) {
-      existingTemplates.push({ ...c });
+      const template = { ...c };
+      if (hasImpedance(c)) template.impedance = { ...c.impedance };
+      existingTemplates.push(template);
       seen.add(c.tag);
     }
   });
   components.forEach(c => {
     if (c.type === 'cable' && c.cable && !seen.has(c.cable.tag)) {
-      existingTemplates.push({
+      const template = {
         ...c.cable,
         phases: Array.isArray(c.cable.phases) ? c.cable.phases.join(',') : c.cable.phases,
         conductors: c.cable.conductors
-      });
+      };
+      if (hasImpedance(c.cable)) template.impedance = { ...c.cable.impedance };
+      existingTemplates.push(template);
       if (c.cable.tag) seen.add(c.cable.tag);
     }
     (c.connections || []).forEach(conn => {
       if (conn.cable && !seen.has(conn.cable.tag)) {
-        existingTemplates.push({
+        const template = {
           ...conn.cable,
           phases: (conn.phases || []).join(','),
           conductors: conn.conductors || conn.cable?.conductors
-        });
+        };
+        if (hasImpedance(conn.cable)) template.impedance = { ...conn.cable.impedance };
+        existingTemplates.push(template);
         seen.add(conn.cable.tag);
       }
     });
@@ -4944,6 +4950,12 @@ async function chooseCable(source, target, existingConn = null) {
     impedanceXInput.name = 'impedance_x';
     impedanceXLabel.appendChild(impedanceXInput);
     form.appendChild(impedanceXLabel);
+
+    const existingImpedance = existingConn?.cable?.impedance || existingConn?.impedance;
+    if (existingImpedance && typeof existingImpedance === 'object') {
+      impedanceRInput.value = existingImpedance.r ?? existingImpedance.R ?? '';
+      impedanceXInput.value = existingImpedance.x ?? existingImpedance.X ?? '';
+    }
 
     const colorLabel = document.createElement('label');
     colorLabel.textContent = 'Color ';
@@ -5127,10 +5139,13 @@ async function chooseCable(source, target, existingConn = null) {
         cable.manual_length = true;
       }
       modal.classList.remove('show');
+      const resolvedCable = { ...cable, from_tag: source?.ref || source?.id || '', to_tag: target?.ref || target?.id || '' };
+      if (hasImpedance(cable)) resolvedCable.impedance = { ...cable.impedance };
       resolve({
-        cable: { ...cable, from_tag: source?.ref || source?.id || '', to_tag: target?.ref || target?.id || '' },
+        cable: resolvedCable,
         phases,
-        conductors
+        conductors,
+        impedance: hasImpedance(cable) ? { ...cable.impedance } : undefined
       });
     });
 
@@ -5150,26 +5165,39 @@ async function editCableComponent(comp) {
     phases: Array.isArray(comp.cable?.phases) ? comp.cable.phases : parseCablePhases(comp.cable),
     conductors: comp.cable?.conductors || comp.cable?.conductors_count || ''
   };
+  const hadOutboundCable = outbound ? Object.prototype.hasOwnProperty.call(outbound, 'cable') : false;
   const originalCable = outbound ? outbound.cable : undefined;
   if (outbound) outbound.cable = comp.cable;
+  let res = null;
   try {
-    const res = await chooseCable(comp, target, workingConn);
-    if (!res) return;
-    comp.cable = { ...res.cable };
-    if (outbound) {
-      outbound.phases = res.phases;
-      outbound.conductors = res.conductors;
-    }
-    pushHistory();
-    render();
-    save();
-    syncSchedules();
+    res = await chooseCable(comp, target, workingConn);
   } finally {
-    if (outbound) {
-      if (originalCable === undefined) delete outbound.cable;
-      else outbound.cable = originalCable;
+    if (!res && outbound) {
+      if (hadOutboundCable) outbound.cable = originalCable;
+      else delete outbound.cable;
     }
   }
+  if (!res) return;
+  const updatedCable = { ...res.cable };
+  if (hasImpedance(res.cable)) updatedCable.impedance = { ...res.cable.impedance };
+  comp.cable = updatedCable;
+  if (outbound) {
+    outbound.cable = { ...updatedCable };
+    if (hasImpedance(updatedCable)) outbound.cable.impedance = { ...updatedCable.impedance };
+    outbound.phases = res.phases;
+    outbound.conductors = res.conductors;
+    if (res.impedance && typeof res.impedance === 'object') {
+      outbound.impedance = { ...res.impedance };
+    } else if (hasImpedance(updatedCable)) {
+      outbound.impedance = { ...updatedCable.impedance };
+    } else {
+      delete outbound.impedance;
+    }
+  }
+  pushHistory();
+  render();
+  save();
+  syncSchedules();
 }
 
 function openCableProperties(comp) {
@@ -6406,6 +6434,7 @@ function buildCableSpecFromComponent(comp, allComps) {
   const outbound = (comp.connections || []).find(conn => conn.target);
   const target = outbound ? allComps.find(c => c.id === outbound.target) : null;
   const spec = { ...cable };
+  if (hasImpedance(cable)) spec.impedance = { ...cable.impedance };
   if (!spec.tag) spec.tag = comp.label || comp.id;
   spec.from_tag = upstream?.ref || upstream?.id || '';
   spec.to_tag = target?.ref || outbound?.target || '';
@@ -6768,6 +6797,10 @@ function syncSchedules(notify = true) {
         from_tag: c.ref || c.id,
         to_tag: target?.ref || conn.target
       };
+      const impedanceSource = conn.impedance || conn.cable?.impedance;
+      if (impedanceSource && typeof impedanceSource === 'object') {
+        spec.impedance = { ...impedanceSource };
+      }
       cableSpecs.push(spec);
     });
   });
@@ -6847,13 +6880,18 @@ function serializeState() {
         if (!conn.cable) return;
         if (conn.cable.tag && seenTags.has(conn.cable.tag)) return;
         const target = comps.find(t => t.id === conn.target);
-        cables.push({
+        const spec = {
           ...conn.cable,
           phases: conn.phases ? conn.phases.join(',') : conn.cable.phases,
           conductors: conn.conductors || conn.cable.conductors,
           from_tag: c.ref || c.id,
           to_tag: target?.ref || conn.target
-        });
+        };
+        const impedanceSource = conn.impedance || conn.cable?.impedance;
+        if (impedanceSource && typeof impedanceSource === 'object') {
+          spec.impedance = { ...impedanceSource };
+        }
+        cables.push(spec);
       });
     });
     return { equipment: [...equipment, ...buses], panels: [...panels, ...buses], loads, cables };
