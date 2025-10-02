@@ -143,5 +143,58 @@ function caseToDiagram(data){
       assert(flow);
       assert(Math.abs(flow.P) > 0);
     });
+
+    it('sums nested phase loads when solving a balanced study', () => {
+      setOneLine({
+        activeSheet: 0,
+        sheets: [{
+          name: 'phases',
+          components: [
+            {
+              id: 'bus-source',
+              type: 'bus',
+              subtype: 'Bus',
+              busType: 'slack',
+              baseKV: 13.8,
+              Vm: 1,
+              Va: 0
+            },
+            {
+              id: 'bus-load',
+              type: 'bus',
+              subtype: 'Bus',
+              busType: 'PQ',
+              baseKV: 13.8,
+              Vm: 1,
+              Va: 0,
+              load: {
+                a: { kw: 4000, kvar: 1200 },
+                b: { kw: 4000, kvar: 1200 },
+                c: { kw: 4000, kvar: 1200 }
+              }
+            },
+            {
+              id: 'cable-ph',
+              type: 'feeder',
+              subtype: 'feeder',
+              connections: [
+                { target: 'bus-source' },
+                { target: 'bus-load' }
+              ],
+              impedance: { r: 0.2, x: 0.4 }
+            }
+          ]
+        }]
+      });
+      const res = runLoadFlow({ baseMVA: 10 });
+      const buses = Array.isArray(res?.buses) ? res.buses : res;
+      const loadBus = buses.find(b => b.id === 'bus-load');
+      assert(loadBus);
+      assert(loadBus.Vm < 1);
+      const lines = res.lines || [];
+      const flow = lines.find(l => l.from === 'bus-source' && l.to === 'bus-load');
+      assert(flow);
+      assert(Math.abs(flow.P) > 0);
+    });
   });
 })();
