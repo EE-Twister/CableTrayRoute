@@ -53,19 +53,51 @@ export function runMotorStart() {
     : sheets).filter(c => c && c.type !== 'annotation' && c.type !== 'dimension');
   const results = {};
   comps.forEach(c => {
-    if (!(c.subtype === 'Motor' || c.motor)) return;
-    const hp = parseNum(c.rating || c.hp);
-    const V = Number(c.voltage) || 480;
-    const pf = Number(c.pf) || 0.9;
-    const eff = Number(c.efficiency) || 0.9;
-    const multiple = Number(c.inrushMultiple) || 6;
+    const subtype = typeof c.subtype === 'string' ? c.subtype.toLowerCase() : '';
+    const type = typeof c.type === 'string' ? c.type.toLowerCase() : '';
+    const isMotor = subtype === 'motor_load'
+      || type === 'motor_load'
+      || subtype === 'motor'
+      || type === 'motor'
+      || !!c.motor;
+    if (!isMotor) return;
+    const hp = parseNum(c.rating || c.hp || c.props?.hp);
+    const volts = c.voltage ?? c.volts ?? c.props?.voltage ?? c.props?.volts;
+    const V = Number(volts) || 480;
+    const pfRaw = Number(c.pf ?? c.power_factor ?? c.props?.pf ?? c.props?.power_factor);
+    const pf = pfRaw > 1 ? pfRaw / 100 : (pfRaw || 0.9);
+    const effRaw = Number(c.efficiency ?? c.eff ?? c.props?.efficiency ?? c.props?.eff);
+    const eff = effRaw > 1 ? effRaw / 100 : (effRaw || 0.9);
+    const multiple = Number(
+      c.inrushMultiple
+      ?? c.lr_current_pu
+      ?? c.props?.inrushMultiple
+      ?? c.props?.lr_current_pu
+    ) || 6;
     const Ifl = hp * 746 / (Math.sqrt(3) * V * pf * eff || 1);
     const Ilr = Ifl * multiple;
-    const Zth = Math.hypot(Number(c.thevenin_r) || 0, Number(c.thevenin_x) || 0);
-    const inertia = Number(c.inertia) || 0;
-    const speed = Number(c.speed) || 1800;
+    const theveninR = Number(
+      c.thevenin_r
+      ?? c.props?.thevenin_r
+      ?? c.theveninR
+      ?? c.props?.theveninR
+    ) || 0;
+    const theveninX = Number(
+      c.thevenin_x
+      ?? c.props?.thevenin_x
+      ?? c.theveninX
+      ?? c.props?.theveninX
+    ) || 0;
+    const Zth = Math.hypot(theveninR, theveninX);
+    const inertia = Number(c.inertia ?? c.props?.inertia) || 0;
+    const speed = Number(c.speed ?? c.props?.speed) || 1800;
     const baseTorque = hp ? (hp * 746) / (2 * Math.PI * speed / 60) : 0;
-    const loadCurve = parseTorqueCurve(c.load_torque_curve || c.load_torque);
+    const loadCurve = parseTorqueCurve(
+      c.load_torque_curve
+      ?? c.load_torque
+      ?? c.props?.load_torque_curve
+      ?? c.props?.load_torque
+    );
 
     let w = 0; // mechanical speed rad/s
     const wSync = 2 * Math.PI * speed / 60;
