@@ -4223,7 +4223,12 @@ function selectComponent(compOrId) {
     const labelOverrides = {
       hp: 'Horsepower',
       pf: 'Power Factor',
-      service_factor: 'Service Factor'
+      service_factor: 'Service Factor',
+      inrushMultiple: 'Inrush Multiple (× FLA)',
+      thevenin_r: 'Thevenin R (Ω)',
+      thevenin_x: 'Thevenin X (Ω)',
+      inertia: 'Inertia (kg·m²)',
+      load_torque_curve: 'Load Torque Curve (speed%:torque%)'
     };
 
     let schema = rawSchema
@@ -4240,6 +4245,15 @@ function selectComponent(compOrId) {
         if (f.name === 'model') {
           const manu = targetComp.manufacturer || Object.keys(manufacturerModels)[0];
           return { ...f, type: 'select', options: manufacturerModels[manu] || [] };
+        }
+        if (targetComp.subtype === 'motor_load' && f.name === 'load_torque_curve') {
+          return {
+            ...f,
+            type: 'textarea',
+            rows: 3,
+            placeholder: '0:0 50:40 100:100',
+            help: 'Enter speed%:torque% pairs separated by spaces or commas.'
+          };
         }
         return f;
       })
@@ -4291,6 +4305,8 @@ function selectComponent(compOrId) {
       } else if (f.type === 'textarea') {
         input = document.createElement('textarea');
         input.value = curVal;
+        if (f.rows) input.rows = f.rows;
+        input.spellcheck = false;
       } else if (f.type === 'checkbox') {
         input = document.createElement('input');
         input.type = 'checkbox';
@@ -4302,9 +4318,17 @@ function selectComponent(compOrId) {
         input.value = curVal;
       }
       input.name = f.name;
+      if (f.placeholder) input.placeholder = f.placeholder;
       if (f.name === 'manufacturer') manufacturerInput = input;
       if (f.name === 'model') modelInput = input;
       lbl.appendChild(input);
+      if (f.help) {
+        lbl.appendChild(document.createElement('br'));
+        const help = document.createElement('small');
+        help.className = 'prop-field-help';
+        help.textContent = f.help;
+        lbl.appendChild(help);
+      }
       container.appendChild(lbl);
     };
 
@@ -4318,8 +4342,12 @@ function selectComponent(compOrId) {
     const manufacturerFields = [];
     const noteFields = [];
     const electricalFields = [];
+    const motorStartFields = [];
+    const motorStartFieldNames = ['inrushMultiple', 'thevenin_r', 'thevenin_x', 'inertia', 'load_torque_curve'];
     fields.forEach(f => {
-      if (['manufacturer', 'model'].includes(f.name)) manufacturerFields.push(f);
+      if (targetComp.subtype === 'motor_load' && motorStartFieldNames.includes(f.name)) {
+        motorStartFields.push(f);
+      } else if (['manufacturer', 'model'].includes(f.name)) manufacturerFields.push(f);
       else if (['notes', 'failure_modes'].includes(f.name)) noteFields.push(f);
       else electricalFields.push(f);
     });
@@ -4336,6 +4364,7 @@ function selectComponent(compOrId) {
 
     addFieldset('Manufacturer', manufacturerFields);
     addFieldset('Electrical', electricalFields);
+    addFieldset('Motor Start', motorStartFields);
     addFieldset('Notes', noteFields);
 
     if (manufacturerInput && modelInput) {

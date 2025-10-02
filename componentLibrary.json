@@ -628,6 +628,11 @@
         "gap": 32,
         "working_distance": 455,
         "electrode_config": "VCB",
+        "inrushMultiple": 6,
+        "thevenin_r": 0.02,
+        "thevenin_x": 0.08,
+        "inertia": 0.5,
+        "load_torque_curve": "0:0 100:100",
         "load": {
           "kw": 117.789,
           "kvar": 63.576
