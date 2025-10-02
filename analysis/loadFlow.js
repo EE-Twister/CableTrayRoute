@@ -1,68 +1,10 @@
-import componentLibrary from '../componentLibrary.json' with { type: 'json' };
 import { getOneLine } from '../dataStore.mjs';
+import { buildLoadFlowModel, cloneData, isBusComponent } from './loadFlowModel.js';
 
 const IGNORED_TYPES = new Set(['annotation', 'dimension']);
 
-const DEFAULT_COMPONENT_DEFINITIONS = [
-  { type: 'bus', subtype: 'Bus' }
-];
-
-function compKey(type, subtype) {
-  return subtype ? `${type}_${subtype}` : type;
-}
-
-function buildComponentTypeMap() {
-  const map = new Map();
-  const register = definition => {
-    if (!definition || typeof definition !== 'object') return;
-    const subtype = typeof definition.subtype === 'string' ? definition.subtype.trim() : '';
-    if (!subtype) return;
-    const baseType = (typeof definition.type === 'string' && definition.type.trim())
-      || (typeof definition.category === 'string' && definition.category.trim())
-      || subtype;
-    const key = compKey(baseType, subtype);
-    map.set(key, baseType);
-    map.set(subtype, baseType);
-    map.set(baseType, baseType);
-  };
-
-  const libraryDefs = Array.isArray(componentLibrary?.components)
-    ? componentLibrary.components
-    : [];
-  libraryDefs.forEach(register);
-  DEFAULT_COMPONENT_DEFINITIONS.forEach(register);
-  return map;
-}
-
-const componentTypeBySubtype = buildComponentTypeMap();
-
 function isUsableComponent(comp) {
   return comp && !IGNORED_TYPES.has(comp.type);
-}
-
-function isBusComponent(comp) {
-  if (!comp) return false;
-  if (comp.type === 'bus' || comp.subtype === 'Bus') return true;
-  const subtype = typeof comp.subtype === 'string' ? comp.subtype : '';
-  const type = typeof comp.type === 'string' ? comp.type : '';
-  const metaType = componentTypeBySubtype.get(subtype)
-    || componentTypeBySubtype.get(compKey(type, subtype))
-    || componentTypeBySubtype.get(type);
-  return metaType === 'bus';
-}
-
-function cloneData(value) {
-  if (value === null || value === undefined) return value;
-  if (Array.isArray(value)) return value.map(cloneData);
-  if (typeof value === 'object') {
-    const out = {};
-    Object.keys(value).forEach(key => {
-      const val = value[key];
-      if (val !== undefined) out[key] = cloneData(val);
-    });
-    return out;
-  }
-  return value;
 }
 
 /** Basic complex number helpers used by the load-flow solver */
@@ -309,6 +251,9 @@ export function runLoadFlow(modelOrOpts = {}, maybeOpts = {}) {
     opts = modelOrOpts || {};
     model = null;
   }
+  if (!model) {
+    model = buildLoadFlowModel(getOneLine());
+  }
   const { baseMVA = 100, balanced = true } = opts;
   let busComps;
   if (model && model.buses) {
@@ -344,13 +289,10 @@ export function runLoadFlow(modelOrOpts = {}, maybeOpts = {}) {
         });
       });
     }
-  } else {
-    const { sheets } = getOneLine();
-    const comps = (Array.isArray(sheets[0]?.components)
-      ? sheets.flatMap(s => s.components || [])
-      : sheets).filter(isUsableComponent);
-    busComps = comps.filter(isBusComponent);
-    if (busComps.length === 0) busComps = comps;
+  } else if (Array.isArray(model)) {
+    const usable = model.filter(isUsableComponent);
+    busComps = usable.filter(isBusComponent);
+    if (busComps.length === 0) busComps = usable;
   }
   const busIds = busComps.map(b => b.id);
   const phases = balanced ? ['balanced'] : ['A', 'B', 'C'];
