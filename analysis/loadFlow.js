@@ -3,6 +3,11 @@ import { buildLoadFlowModel, cloneData, isBusComponent } from './loadFlowModel.j
 
 const IGNORED_TYPES = new Set(['annotation', 'dimension']);
 
+function toNumber(value, scale = 1) {
+  const num = Number(value);
+  return Number.isFinite(num) ? num * scale : 0;
+}
+
 function isUsableComponent(comp) {
   return comp && !IGNORED_TYPES.has(comp.type);
 }
@@ -237,6 +242,77 @@ function solveLinear(A, b) {
   return M.map(row => row[n]);
 }
 
+function sumPQ(value) {
+  if (value === null || value === undefined) {
+    return { kw: 0, kvar: 0 };
+  }
+  if (typeof value === 'number') {
+    return { kw: toNumber(value), kvar: 0 };
+  }
+  if (Array.isArray(value)) {
+    return value.reduce((acc, item) => {
+      const { kw, kvar } = sumPQ(item);
+      return { kw: acc.kw + kw, kvar: acc.kvar + kvar };
+    }, { kw: 0, kvar: 0 });
+  }
+  if (typeof value !== 'object') {
+    return { kw: 0, kvar: 0 };
+  }
+  let kw = 0;
+  let kvar = 0;
+  let hasDirect = false;
+  const directKw = value.kw ?? value.kW ?? value.P ?? value.p;
+  const directKvar = value.kvar ?? value.kVAr ?? value.Q ?? value.q;
+  if (directKw !== undefined) {
+    kw += toNumber(directKw);
+    hasDirect = true;
+  }
+  if (directKvar !== undefined) {
+    kvar += toNumber(directKvar);
+    hasDirect = true;
+  }
+  if (value.watts !== undefined) {
+    kw += toNumber(value.watts, 0.001);
+    hasDirect = true;
+  }
+  if (value.hp !== undefined) {
+    kw += toNumber(value.hp, 0.746);
+    hasDirect = true;
+  }
+  if (!hasDirect) {
+    Object.keys(value).forEach(key => {
+      const child = value[key];
+      if (!child || typeof child !== 'object') return;
+      const { kw: childKw, kvar: childKvar } = sumPQ(child);
+      kw += childKw;
+      kvar += childKvar;
+    });
+  }
+  return { kw, kvar };
+}
+
+function resolvePhaseRecord(record, phase) {
+  if (!record || typeof record !== 'object') return null;
+  const variants = [phase, phase?.toLowerCase?.(), phase?.toUpperCase?.()];
+  for (const key of variants) {
+    if (!key) continue;
+    if (record[key] !== undefined) return record[key];
+  }
+  if (record.phases) {
+    const nested = resolvePhaseRecord(record.phases, phase);
+    if (nested) return nested;
+  }
+  return null;
+}
+
+function extractPhasePQ(record, phase, balanced) {
+  if (!record) return { kw: 0, kvar: 0 };
+  if (balanced) return sumPQ(record);
+  const phaseRecord = resolvePhaseRecord(record, phase);
+  if (phaseRecord) return sumPQ(phaseRecord);
+  return sumPQ(record);
+}
+
 /**
  * Public API: run load flow on a model. When `model` is omitted the
  * current one-line diagram from dataStore is converted automatically.
@@ -299,19 +375,19 @@ export function runLoadFlow(modelOrOpts = {}, maybeOpts = {}) {
   const phaseResults = {};
   phases.forEach(phase => {
     const buses = busComps.map((c, idx) => {
-      const load = c.load || {};
-      const phaseLoad = balanced ? load : load[phase.toLowerCase()] || {};
-      const shunt = balanced ? c.shunt : c.shunt?.[phase];
+      const loadPQ = extractPhasePQ(c.load, phase, balanced);
+      const genPQ = extractPhasePQ(c.generation, phase, balanced);
+      const shunt = balanced ? c.shunt : resolvePhaseRecord(c.shunt, phase);
       return {
         id: c.id,
         type: c.busType || (idx === 0 ? 'slack' : 'PQ'),
         Vm: c.Vm,
         Va: c.Va,
         baseKV: c.baseKV || 1,
-        Pd: phaseLoad.kw || phaseLoad.P || 0,
-        Qd: phaseLoad.kvar || phaseLoad.Q || 0,
-        Pg: c.generation?.kw || 0,
-        Qg: c.generation?.kvar || 0,
+        Pd: loadPQ.kw,
+        Qd: loadPQ.kvar,
+        Pg: genPQ.kw,
+        Qg: genPQ.kvar,
         shunt,
         connections: (c.connections || []).filter(conn => {
           if (!busIds.includes(conn.target)) return false;

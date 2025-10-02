@@ -33,6 +33,134 @@ function buildComponentTypeMap() {
 
 const componentTypeBySubtype = buildComponentTypeMap();
 
+function toNumber(value, scale = 1) {
+  const num = Number(value);
+  return Number.isFinite(num) ? num * scale : 0;
+}
+
+function addPQ(target, addition) {
+  if (!addition) return target;
+  const out = target && typeof target === 'object' ? { ...target } : {};
+  if (addition.kw !== undefined) out.kw = toNumber(out.kw) + addition.kw;
+  if (addition.kvar !== undefined) out.kvar = toNumber(out.kvar) + addition.kvar;
+  return out;
+}
+
+function extractPQ(source) {
+  if (source === null || source === undefined) return null;
+  if (typeof source === 'number') {
+    const kw = toNumber(source);
+    return kw ? { kw, kvar: 0 } : null;
+  }
+  if (Array.isArray(source)) {
+    return source.reduce((acc, item) => addPQ(acc, extractPQ(item)), null);
+  }
+  if (typeof source !== 'object') return null;
+  let kw = toNumber(source.kw ?? source.kW ?? source.P ?? source.p);
+  let kvar = toNumber(source.kvar ?? source.kVAr ?? source.Q ?? source.q);
+  if (!kw && !kvar) {
+    let nested = null;
+    Object.keys(source).forEach(key => {
+      const child = source[key];
+      if (!child || typeof child !== 'object') return;
+      const pq = extractPQ(child);
+      if (pq) nested = addPQ(nested, pq);
+    });
+    if (nested) return nested;
+  }
+  if (!kw && !kvar) return null;
+  return { kw, kvar };
+}
+
+function isLoadDevice(comp) {
+  const type = String(comp?.type || '').toLowerCase();
+  const subtype = String(comp?.subtype || '').toLowerCase();
+  return type.includes('load') || subtype.includes('load');
+}
+
+function isGeneratorDevice(comp) {
+  const type = String(comp?.type || '').toLowerCase();
+  const subtype = String(comp?.subtype || '').toLowerCase();
+  return type.includes('generator') || subtype.includes('generator') || type.includes('source');
+}
+
+function extractLoadPQ(comp) {
+  const sources = [comp?.load, comp?.props?.load, comp?.parameters?.load];
+  let total = null;
+  sources.forEach(src => {
+    const pq = extractPQ(src);
+    if (pq) total = addPQ(total, pq);
+  });
+  if (!total && isLoadDevice(comp)) {
+    let kw = 0;
+    let kvar = 0;
+    kw += toNumber(comp?.kw ?? comp?.kW);
+    kw += toNumber(comp?.watts, 0.001);
+    kw += toNumber(comp?.hp, 0.746);
+    kvar += toNumber(comp?.kvar ?? comp?.kVAr);
+    if (kw || kvar) total = addPQ(total, { kw, kvar });
+  }
+  return total;
+}
+
+function extractGenerationPQ(comp) {
+  const sources = [comp?.generation, comp?.props?.generation, comp?.parameters?.generation];
+  let total = null;
+  sources.forEach(src => {
+    const pq = extractPQ(src);
+    if (pq) total = addPQ(total, pq);
+  });
+  if (!total && isGeneratorDevice(comp)) {
+    let kw = toNumber(comp?.kw ?? comp?.kW ?? comp?.power_kw ?? comp?.output_kw);
+    let kvar = toNumber(comp?.kvar ?? comp?.kVAr ?? comp?.reactive_kw);
+    if (!kw) {
+      const kva = toNumber(comp?.kva ?? comp?.kVA) + toNumber(comp?.mva ?? comp?.MVA, 1000);
+      const pf = Number(comp?.pf ?? comp?.power_factor ?? comp?.powerFactor);
+      if (kva && Number.isFinite(pf) && pf !== 0) {
+        kw = kva * pf;
+        if (!kvar) {
+          const kvarMag = Math.sqrt(Math.max(0, kva * kva - kw * kw));
+          kvar = kvarMag;
+        }
+      }
+    }
+    if (kw || kvar) total = addPQ(total, { kw, kvar });
+  }
+  return total;
+}
+
+function findDirectBusId(comp, busMap) {
+  const connections = Array.isArray(comp?.connections) ? comp.connections : [];
+  for (const conn of connections) {
+    const target = typeof conn === 'string' ? conn : conn?.target;
+    if (target && busMap.has(target)) return target;
+  }
+  return null;
+}
+
+function findNearestBusId(comp, busMap, adjacency) {
+  if (!comp || !comp.id) return null;
+  const direct = findDirectBusId(comp, busMap);
+  if (direct) return direct;
+  if (!adjacency) return null;
+  const visited = new Set([comp.id]);
+  const queue = [{ id: comp.id, depth: 0 }];
+  const maxDepth = 3;
+  while (queue.length) {
+    const { id, depth } = queue.shift();
+    if (depth >= maxDepth) continue;
+    const neighbors = adjacency.get(id);
+    if (!neighbors) continue;
+    for (const neighbor of neighbors) {
+      if (visited.has(neighbor)) continue;
+      if (busMap.has(neighbor)) return neighbor;
+      visited.add(neighbor);
+      queue.push({ id: neighbor, depth: depth + 1 });
+    }
+  }
+  return null;
+}
+
 export function isBusComponent(comp) {
   if (!comp) return false;
   if (comp.type === 'bus' || comp.subtype === 'Bus') return true;
@@ -168,6 +296,18 @@ export function buildLoadFlowModel(oneLine = {}) {
     buses = components.map(cloneBusComponent);
   }
   const busMap = new Map(buses.map(b => [b.id, b]));
+
+  components.forEach(comp => {
+    if (!comp || isBusComponent(comp) || typeof comp.busType === 'string' && comp.busType) return;
+    const busId = findDirectBusId(comp, busMap) || findNearestBusId(comp, busMap, adjacency);
+    if (!busId) return;
+    const bus = busMap.get(busId);
+    if (!bus) return;
+    const load = extractLoadPQ(comp);
+    if (load) bus.load = addPQ(bus.load, load);
+    const gen = extractGenerationPQ(comp);
+    if (gen) bus.generation = addPQ(bus.generation, gen);
+  });
 
   const branches = [];
   components.forEach(comp => {
