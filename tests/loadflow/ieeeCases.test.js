@@ -57,5 +57,39 @@ function caseToDiagram(data){
       const res = runLoadFlow({ baseMVA: case57.baseMVA });
       assert(Array.isArray(res.buses || res));
     });
+
+    it('keeps only bus components when subtype keys include metadata prefixes', () => {
+      setOneLine({
+        activeSheet: 0,
+        sheets: [{
+          name: 'meta',
+          components: [
+            {
+              id: 'bus-1',
+              type: 'bus',
+              subtype: 'bus_Bus',
+              busType: 'slack',
+              baseKV: 13.8,
+              Vm: 1,
+              Va: 0,
+              connections: [
+                { target: 'motor-1', impedance: { r: 0.01, x: 0.05 } }
+              ]
+            },
+            {
+              id: 'motor-1',
+              type: 'motor_load',
+              subtype: 'motor_load',
+              load: { kw: 75, kvar: 40 }
+            }
+          ]
+        }]
+      });
+      const res = runLoadFlow();
+      const buses = Array.isArray(res?.buses) ? res.buses : res;
+      assert(Array.isArray(buses));
+      assert.strictEqual(buses.length, 1);
+      assert.strictEqual(buses[0].id, 'bus-1');
+    });
   });
 })();
