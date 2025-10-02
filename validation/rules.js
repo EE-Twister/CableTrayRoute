@@ -8,14 +8,6 @@ export function runValidation(components = [], studies = {}) {
     return resolveComponentLabel(comp, id);
   };
 
-  const inferReliabilityHint = comp => {
-    if (!comp) return 'redundant connection';
-    if (comp.type === 'breaker' || comp.type === 'switch') return 'alternate source or tie connection';
-    if (comp.type === 'transformer') return 'secondary tie or backup source';
-    if (comp.type === 'bus') return 'feed connection';
-    return 'redundant connection';
-  };
-
   // Map inbound connections for bus connectivity check
   const inbound = new Map();
   components.forEach(c => {
@@ -58,35 +50,6 @@ export function runValidation(components = [], studies = {}) {
   Object.entries(studies.duty || {}).forEach(([id, msgs = []]) => {
     msgs.forEach(msg => issues.push({ component: id, message: msg }));
   });
-
-  // Single point of failure warnings from reliability study
-  if (Array.isArray(studies.reliability?.n1Failures)) {
-    const detailMap = studies.reliability.n1FailureDetails || {};
-    studies.reliability.n1Failures.forEach(id => {
-      const comp = componentLookup.get(id);
-      const label = describe(id);
-      const hint = inferReliabilityHint(comp);
-      const detail = detailMap[id];
-      if (detail?.impactedIds?.length) {
-        const count = detail.impactedIds.length;
-        const sample = detail.impactedLabels?.length
-          ? detail.impactedLabels.slice(0, 3)
-          : detail.impactedIds.slice(0, 3).map(describe);
-        const remainder = count - sample.length;
-        const list = sample.join(', ');
-        const suffix = remainder > 0 ? ', …' : '';
-        issues.push({
-          component: id,
-          message: `${label} single point of failure (missing ${hint}): isolates ${count} component${count === 1 ? '' : 's'} (${list}${suffix}). Add ${hint} to provide a redundant path or acknowledge this radial connection if it is intentional.`
-        });
-      } else {
-        issues.push({
-          component: id,
-          message: `${label} single point of failure (missing ${hint}). Add ${hint} to provide a redundant path or acknowledge this radial connection if it is intentional.`
-        });
-      }
-    });
-  }
 
   return issues;
 }
