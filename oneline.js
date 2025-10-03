@@ -1034,10 +1034,41 @@ let diagramScale = getItem('diagramScale', { unitPerPx: 1, unit: 'in' });
 const DEFAULT_DIAGRAM_ZOOM = 1;
 const MIN_DIAGRAM_ZOOM = 0.25;
 const MAX_DIAGRAM_ZOOM = 4;
+const DEFAULT_VIEWPORT_WIDTH = 1600;
+const DEFAULT_VIEWPORT_HEIGHT = 900;
+const VIEWPORT_PADDING = 200;
+const STUDY_SETTINGS_KEY = 'studySettings';
+const defaultStudySettings = {
+  loadFlow: { baseMVA: 100, balanced: true },
+  shortCircuit: { method: 'IEC' }
+};
+let diagramViewport = {
+  minX: 0,
+  minY: 0,
+  width: DEFAULT_VIEWPORT_WIDTH,
+  height: DEFAULT_VIEWPORT_HEIGHT
+};
 let diagramZoom = clampZoom(getItem('diagramZoom', DEFAULT_DIAGRAM_ZOOM));
 let resizingBus = null;
 let resizingAnnotation = null;
 let marquee = null;
+
+function normalizeStudySettings(raw = {}) {
+  const lf = raw && typeof raw === 'object' ? raw.loadFlow || {} : {};
+  const sc = raw && typeof raw === 'object' ? raw.shortCircuit || {} : {};
+  const base = Number(lf.baseMVA);
+  return {
+    loadFlow: {
+      baseMVA: Number.isFinite(base) && base > 0 ? base : defaultStudySettings.loadFlow.baseMVA,
+      balanced: lf.balanced !== false
+    },
+    shortCircuit: {
+      method: typeof sc.method === 'string' && sc.method.trim().toUpperCase() === 'ANSI' ? 'ANSI' : 'IEC'
+    }
+  };
+}
+
+let studySettings = normalizeStudySettings(getItem(STUDY_SETTINGS_KEY, defaultStudySettings));
 let marqueeSelectionMade = false;
 let legendDrag = null;
 let legendUserMoved = false;
@@ -1074,6 +1105,10 @@ on('studyResults', () => {
   refreshAttributeOptions();
   render();
 });
+on(STUDY_SETTINGS_KEY, value => {
+  studySettings = normalizeStudySettings(value || defaultStudySettings);
+  applyStudySettingsToForm();
+});
 
 // Studies panel setup
 const studiesPanel = document.getElementById('studies-panel');
@@ -1088,12 +1123,67 @@ const runRelBtn = document.getElementById('run-reliability-btn');
 const studyResultsEl = document.getElementById('study-results');
 const loadFlowResultsEl = document.getElementById('loadflow-results');
 const overlayToggle = document.getElementById('toggle-overlays');
+const studySettingsBtn = document.getElementById('study-settings-btn');
+const studySettingsForm = document.getElementById('study-settings-menu');
+const studyLoadFlowBase = document.getElementById('study-loadflow-basemva');
+const studyLoadFlowBalanced = document.getElementById('study-loadflow-balanced');
+const studyShortCircuitMethod = document.getElementById('study-shortcircuit-method');
+
+function persistStudySettings() {
+  setItem(STUDY_SETTINGS_KEY, studySettings);
+}
+
+function applyStudySettingsToForm() {
+  if (studyLoadFlowBase) studyLoadFlowBase.value = String(studySettings.loadFlow.baseMVA);
+  if (studyLoadFlowBalanced) studyLoadFlowBalanced.checked = !!studySettings.loadFlow.balanced;
+  if (studyShortCircuitMethod) studyShortCircuitMethod.value = studySettings.shortCircuit.method;
+}
 
 if (overlayToggle) {
   showOverlays = overlayToggle.checked;
   overlayToggle.addEventListener('change', () => {
     showOverlays = overlayToggle.checked;
     render();
+  });
+}
+
+applyStudySettingsToForm();
+
+if (studySettingsBtn && studySettingsForm) {
+  studySettingsBtn.addEventListener('click', () => {
+    const isHidden = studySettingsForm.classList.toggle('hidden');
+    studySettingsBtn.setAttribute('aria-expanded', String(!isHidden));
+    studySettingsForm.setAttribute('aria-hidden', String(isHidden));
+    if (!isHidden) applyStudySettingsToForm();
+  });
+}
+if (studySettingsForm) {
+  studySettingsForm.addEventListener('submit', e => e.preventDefault());
+  if (!studySettingsForm.hasAttribute('aria-hidden')) {
+    studySettingsForm.setAttribute('aria-hidden', 'true');
+  }
+}
+if (studyLoadFlowBase) {
+  studyLoadFlowBase.addEventListener('change', () => {
+    const value = Number(studyLoadFlowBase.value);
+    const normalized = Number.isFinite(value) && value > 0 ? value : defaultStudySettings.loadFlow.baseMVA;
+    studySettings.loadFlow.baseMVA = normalized;
+    studyLoadFlowBase.value = String(normalized);
+    persistStudySettings();
+  });
+}
+if (studyLoadFlowBalanced) {
+  studyLoadFlowBalanced.addEventListener('change', () => {
+    studySettings.loadFlow.balanced = studyLoadFlowBalanced.checked;
+    persistStudySettings();
+  });
+}
+if (studyShortCircuitMethod) {
+  studyShortCircuitMethod.addEventListener('change', () => {
+    const method = (studyShortCircuitMethod.value || '').toUpperCase() === 'ANSI' ? 'ANSI' : 'IEC';
+    studySettings.shortCircuit.method = method;
+    studyShortCircuitMethod.value = method;
+    persistStudySettings();
   });
 }
 
@@ -1188,8 +1278,8 @@ function getViewportCenter(previousZoom = diagramZoom) {
   if (!svg || !(editor instanceof HTMLElement)) return null;
   const zoom = previousZoom || diagramZoom || DEFAULT_DIAGRAM_ZOOM;
   return {
-    x: (editor.scrollLeft + editor.clientWidth / 2) / zoom,
-    y: (editor.scrollTop + editor.clientHeight / 2) / zoom
+    x: diagramViewport.minX + (editor.scrollLeft + editor.clientWidth / 2) / zoom,
+    y: diagramViewport.minY + (editor.scrollTop + editor.clientHeight / 2) / zoom
   };
 }
 
@@ -1197,10 +1287,18 @@ function applyDiagramZoom({ adjustScroll = false, previousZoom, focusPoint } = {
   const svg = document.getElementById('diagram');
   if (!svg) return;
   const zoom = diagramZoom || DEFAULT_DIAGRAM_ZOOM;
-  const width = svg.clientWidth || svg.viewBox?.baseVal?.width || 0;
-  const height = svg.clientHeight || svg.viewBox?.baseVal?.height || 0;
+  const { minX, minY, width, height } = diagramViewport;
   if (width && height) {
-    svg.setAttribute('viewBox', `0 0 ${width / zoom} ${height / zoom}`);
+    svg.setAttribute('viewBox', `${minX} ${minY} ${width} ${height}`);
+    svg.style.width = `${width * zoom}px`;
+    svg.style.height = `${height * zoom}px`;
+  }
+  const gridBg = document.getElementById('grid-bg');
+  if (gridBg) {
+    gridBg.setAttribute('x', String(minX));
+    gridBg.setAttribute('y', String(minY));
+    gridBg.setAttribute('width', String(width));
+    gridBg.setAttribute('height', String(height));
   }
   if (!adjustScroll) return;
   const editor = svg.parentElement;
@@ -1208,10 +1306,30 @@ function applyDiagramZoom({ adjustScroll = false, previousZoom, focusPoint } = {
   const prevZoom = previousZoom || zoom;
   const focus = focusPoint || getViewportCenter(prevZoom);
   if (!focus) return;
-  const nextLeft = focus.x * zoom - editor.clientWidth / 2;
-  const nextTop = focus.y * zoom - editor.clientHeight / 2;
+  const nextLeft = (focus.x - minX) * zoom - editor.clientWidth / 2;
+  const nextTop = (focus.y - minY) * zoom - editor.clientHeight / 2;
   editor.scrollLeft = Math.max(0, nextLeft);
   editor.scrollTop = Math.max(0, nextTop);
+}
+
+function updateDiagramViewport(bounds) {
+  if (!bounds || !Number.isFinite(bounds.minX) || !Number.isFinite(bounds.minY) ||
+      !Number.isFinite(bounds.maxX) || !Number.isFinite(bounds.maxY)) {
+    diagramViewport = {
+      minX: 0,
+      minY: 0,
+      width: DEFAULT_VIEWPORT_WIDTH,
+      height: DEFAULT_VIEWPORT_HEIGHT
+    };
+    return;
+  }
+  const minX = Math.min(0, Math.floor(bounds.minX - VIEWPORT_PADDING));
+  const minY = Math.min(0, Math.floor(bounds.minY - VIEWPORT_PADDING));
+  const maxX = Math.max(bounds.maxX + VIEWPORT_PADDING, minX + DEFAULT_VIEWPORT_WIDTH);
+  const maxY = Math.max(bounds.maxY + VIEWPORT_PADDING, minY + DEFAULT_VIEWPORT_HEIGHT);
+  const width = Math.max(DEFAULT_VIEWPORT_WIDTH, Math.ceil(maxX - minX));
+  const height = Math.max(DEFAULT_VIEWPORT_HEIGHT, Math.ceil(maxY - minY));
+  diagramViewport = { minX, minY, width, height };
 }
 
 function updateZoomDisplay() {
@@ -1241,8 +1359,8 @@ function toDiagramCoords(e) {
   if (!svg) return { x: 0, y: 0 };
   const rect = svg.getBoundingClientRect();
   const zoom = diagramZoom || DEFAULT_DIAGRAM_ZOOM;
-  const x = (e.clientX - rect.left) / zoom;
-  const y = (e.clientY - rect.top) / zoom;
+  const x = (e.clientX - rect.left) / zoom + diagramViewport.minX;
+  const y = (e.clientY - rect.top) / zoom + diagramViewport.minY;
   return { x, y };
 }
 
@@ -1327,7 +1445,10 @@ if (studiesToggle) {
 }
 if (studiesCloseBtn) studiesCloseBtn.addEventListener('click', () => studiesPanel.classList.add('hidden'));
 if (runLFBtn) runLFBtn.addEventListener('click', () => {
-  const res = runLoadFlow();
+  const res = runLoadFlow({
+    baseMVA: studySettings.loadFlow.baseMVA,
+    balanced: studySettings.loadFlow.balanced
+  });
   const { sheets } = getOneLine();
   const diagram = sheets.flatMap(s => s.components);
   diagram.forEach(comp => {
@@ -1418,7 +1539,7 @@ function renderLoadFlowResults(res) {
   loadFlowResultsEl.innerHTML = html;
 }
 if (runSCBtn) runSCBtn.addEventListener('click', () => {
-  const res = runShortCircuit();
+  const res = runShortCircuit({ method: studySettings.shortCircuit.method });
   const { sheets } = getOneLine();
   const diagram = sheets.flatMap(s => s.components);
   diagram.forEach(c => {
@@ -1435,8 +1556,9 @@ if (runSCBtn) runSCBtn.addEventListener('click', () => {
   render();
 });
 if (runAFBtn) runAFBtn.addEventListener('click', async () => {
-  const sc = runShortCircuit();
-  const af = await runArcFlash();
+  const shortCircuitOpts = { method: studySettings.shortCircuit.method };
+  const sc = runShortCircuit(shortCircuitOpts);
+  const af = await runArcFlash({ shortCircuit: { ...shortCircuitOpts } });
   const { sheets } = getOneLine();
   const diagram = sheets.flatMap(s => s.components);
   diagram.forEach(c => {
@@ -3029,11 +3151,124 @@ function nearestPortToPoint(x, y, exclude) {
   return best;
 }
 
+function componentsAreLinked(a, b) {
+  if (!a || !b) return false;
+  const forward = Array.isArray(a.connections) && a.connections.some(conn => conn?.target === b.id);
+  if (forward) return true;
+  return Array.isArray(b.connections) && b.connections.some(conn => conn?.target === a.id);
+}
+
+function hasForwardConnection(from, to) {
+  if (!from || !to) return false;
+  return Array.isArray(from.connections) && from.connections.some(conn => conn?.target === to.id);
+}
+
+function findSharedBusBetween(a, b) {
+  if (!a || !b) return null;
+  return components.find(comp => {
+    if (!isBusComponent(comp) || comp === a || comp === b) return false;
+    const linkedToA = componentsAreLinked(comp, a);
+    const linkedToB = componentsAreLinked(comp, b);
+    return linkedToA && linkedToB;
+  }) || null;
+}
+
+function isImpedanceDevice(comp) {
+  if (!comp) return false;
+  if (isBusComponent(comp)) return false;
+  const category = resolveComponentCategory(comp);
+  if (!category || category === 'annotations' || category === 'links' || category === 'cable') return false;
+  return hasImpedance(comp);
+}
+
+function getDefaultBusSubtype() {
+  const entry = Object.keys(componentMeta).find(key => componentMeta[key]?.type === 'bus');
+  return entry || 'Bus';
+}
+
+function nearestPortIndexForPoint(comp, point) {
+  if (!comp) return 0;
+  const meta = componentMeta[comp.subtype] || {};
+  const ports = comp.ports || meta.ports || [];
+  if (!ports.length) return 0;
+  const target = point && Number.isFinite(point.x) && Number.isFinite(point.y) ? point : null;
+  let bestIdx = 0;
+  let bestScore = Infinity;
+  ports.forEach((_, idx) => {
+    const pos = portPosition(comp, idx);
+    if (!Number.isFinite(pos.x) || !Number.isFinite(pos.y)) return;
+    const baseDist = Math.hypot(pos.x - (target ? target.x : pos.x), pos.y - (target ? target.y : pos.y));
+    const occupied = portInUse(comp, idx);
+    const score = occupied ? baseDist + 1000 : baseDist;
+    if (score < bestScore) {
+      bestScore = score;
+      bestIdx = idx;
+    }
+  });
+  return bestIdx;
+}
+
 function ensureConnection(fromComp, toComp, fromPort, toPort) {
   if (!fromComp || !toComp) return false;
   fromComp.connections = fromComp.connections || [];
   const fromIdx = normalizePortIndex(fromPort);
   const toIdx = normalizePortIndex(toPort);
+  const sharedBus = findSharedBusBetween(fromComp, toComp);
+  if (sharedBus) {
+    let changed = false;
+    const startPos = portPosition(fromComp, fromIdx);
+    const endPos = portPosition(toComp, toIdx);
+    if (!hasForwardConnection(fromComp, sharedBus)) {
+      const busPort = nearestPortIndexForPoint(sharedBus, startPos);
+      changed = ensureConnection(fromComp, sharedBus, fromIdx, busPort) || changed;
+    }
+    if (!hasForwardConnection(sharedBus, toComp)) {
+      const busPort = nearestPortIndexForPoint(sharedBus, endPos);
+      changed = ensureConnection(sharedBus, toComp, busPort, toIdx) || changed;
+    }
+    return changed;
+  }
+  const linkedBus = components.find(comp => {
+    if (!isBusComponent(comp) || comp === fromComp || comp === toComp) return false;
+    return componentsAreLinked(comp, fromComp) || componentsAreLinked(comp, toComp);
+  });
+  if (linkedBus) {
+    let changed = false;
+    const startPos = portPosition(fromComp, fromIdx);
+    const endPos = portPosition(toComp, toIdx);
+    if (!hasForwardConnection(fromComp, linkedBus)) {
+      const busPort = nearestPortIndexForPoint(linkedBus, startPos);
+      changed = ensureConnection(fromComp, linkedBus, fromIdx, busPort) || changed;
+    }
+    if (!hasForwardConnection(linkedBus, toComp)) {
+      const busPort = nearestPortIndexForPoint(linkedBus, endPos);
+      changed = ensureConnection(linkedBus, toComp, busPort, toIdx) || changed;
+    }
+    if (changed) return true;
+  }
+  if (isImpedanceDevice(fromComp) && isImpedanceDevice(toComp) && !componentsAreLinked(fromComp, toComp)) {
+    const startPos = portPosition(fromComp, fromIdx);
+    const endPos = portPosition(toComp, toIdx);
+    const busKey = getDefaultBusSubtype();
+    const busMeta = componentMeta[busKey] || {};
+    const defaultWidth = Number.isFinite(busMeta.width) ? busMeta.width : 200;
+    const defaultHeight = Number.isFinite(busMeta.height) ? busMeta.height : 20;
+    let busX = ((startPos?.x ?? 0) + (endPos?.x ?? 0)) / 2 - defaultWidth / 2;
+    let busY = ((startPos?.y ?? 0) + (endPos?.y ?? 0)) / 2 - defaultHeight / 2;
+    if (gridEnabled) {
+      busX = Math.round(busX / gridSize) * gridSize;
+      busY = Math.round(busY / gridSize) * gridSize;
+    }
+    const bus = addComponent({ subtype: busKey, type: 'bus', x: busX, y: busY, skipHistory: true });
+    if (!bus) return false;
+    bus.x = busX;
+    bus.y = busY;
+    const busFromPort = nearestPortIndexForPoint(bus, startPos);
+    const busToPort = nearestPortIndexForPoint(bus, endPos);
+    const createdA = ensureConnection(fromComp, bus, fromIdx, busFromPort);
+    const createdB = ensureConnection(bus, toComp, busToPort, toIdx);
+    return createdA || createdB;
+  }
   const existingConn = fromComp.connections.find(conn => conn.target === toComp.id) || null;
   if (existingConn && normalizePortIndex(existingConn.sourcePort) === fromIdx && normalizePortIndex(existingConn.targetPort) === toIdx) {
     return false;
@@ -3222,6 +3457,20 @@ function render() {
   const svg = document.getElementById('diagram');
   svg.querySelectorAll('g.component, .connection, .conn-label, .port, .bus-handle, .annotation-handle, .issue-badge, .component-label, .component-attribute, .selection-marquee').forEach(el => el.remove());
   const usedVoltageRanges = new Set();
+  const boundsState = { minX: Infinity, minY: Infinity, maxX: -Infinity, maxY: -Infinity };
+  const includePoint = (x, y) => {
+    if (!Number.isFinite(x) || !Number.isFinite(y)) return;
+    boundsState.minX = Math.min(boundsState.minX, x);
+    boundsState.minY = Math.min(boundsState.minY, y);
+    boundsState.maxX = Math.max(boundsState.maxX, x);
+    boundsState.maxY = Math.max(boundsState.maxY, y);
+  };
+  const includeComponentBounds = comp => {
+    if (!comp) return;
+    const bounds = componentBounds(comp);
+    includePoint(bounds.left, bounds.top);
+    includePoint(bounds.right, bounds.bottom);
+  };
   let lengthsChanged = false;
   if (gridEnabled) {
     components.forEach(c => {
@@ -3440,6 +3689,7 @@ function render() {
       const target = components.find(t => t.id === conn.target);
       if (!target) return;
       const pts = routeConnection(c, target, conn);
+      pts.forEach(pt => includePoint(pt.x, pt.y));
       const lenPx = pts.reduce((sum, p, i) => (i ? sum + Math.hypot(p.x - pts[i - 1].x, p.y - pts[i - 1].y) : 0), 0);
       if (Math.abs((conn.length || 0) - lenPx) > 0.5) lengthsChanged = true;
       conn.length = lenPx;
@@ -3542,6 +3792,7 @@ function render() {
 
   // draw nodes
   components.filter(c => c.type !== 'dimension').forEach(c => {
+    includeComponentBounds(c);
     const g = document.createElementNS(svgNS, 'g');
     g.dataset.id = c.id;
     g.classList.add('component');
@@ -3813,6 +4064,7 @@ function render() {
     svg.appendChild(rect);
   }
 
+  updateDiagramViewport(boundsState);
   applyDiagramZoom();
   updateLegend(usedVoltageRanges);
   if (lengthsChanged && !syncing) {
