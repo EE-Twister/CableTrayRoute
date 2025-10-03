@@ -14,6 +14,7 @@ function copy(src, dest) {
 
 copy(path.join(root, 'icons'), path.join(dist, 'icons'));
 copy(path.join(root, 'data'), path.join(dist, 'data'));
+copy(path.join(root, 'examples', 'sample_oneline.json'), path.join(dist, 'examples', 'sample_oneline.json'));
 copy(path.join(root, 'icons'), path.join(docs, 'icons'));
 copy(path.join(root, 'reports', 'templates'), path.join(dist, 'templates'));
 copy(path.join(root, 'reports', 'templates'), path.join(docs, 'templates'));
@@ -23,6 +24,8 @@ copy(path.join(dist, 'vendor'), path.join(docs, 'dist', 'vendor'));
   fs.copyFileSync(src, path.join(dist, file));
   fs.copyFileSync(src, path.join(docs, file));
 });
+
+copy(path.join(root, 'examples', 'sample_oneline.json'), path.join(docs, 'examples', 'sample_oneline.json'));
 
 ['style.css'].forEach(file => {
   const src = path.join(root, file);

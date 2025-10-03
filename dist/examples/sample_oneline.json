@@ -1,0 +1,49 @@
+{
+  "version": 2,
+  "scale": { "unitPerPx": 1, "unit": "in" },
+  "templates": [],
+  "sheets": [
+    {
+      "name": "Sample",
+      "components": [
+        {
+          "id": "n1",
+          "type": "bus",
+          "subtype": "Bus",
+          "x": 40,
+          "y": 60,
+          "label": "Bus 1",
+          "rotation": 0,
+          "flipped": false,
+          "connections": [ { "target": "n2" } ]
+        },
+        {
+          "id": "n2",
+          "type": "panel",
+          "subtype": "MLO",
+          "x": 220,
+          "y": 60,
+          "label": "Panel 1",
+          "rotation": 0,
+          "flipped": false,
+          "connections": [ { "target": "n3" } ]
+        },
+        {
+          "id": "n3",
+          "type": "load",
+          "subtype": "Load",
+          "x": 400,
+          "y": 60,
+          "label": "Load 1",
+          "rotation": 0,
+          "flipped": false,
+          "connections": []
+        }
+      ],
+      "connections": [
+        { "from": "n1", "to": "n2" },
+        { "from": "n2", "to": "n3" }
+      ]
+    }
+  ]
+}
