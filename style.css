@@ -541,6 +541,66 @@ body.compact-mode .palette-section .section-buttons {
   align-items: start;
 }
 
+body.oneline-page {
+  min-height: 100vh;
+  display: flex;
+  flex-direction: column;
+}
+
+body.oneline-page .top-nav {
+  flex-shrink: 0;
+}
+
+body.oneline-page .container {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+  height: auto;
+}
+
+body.oneline-page .main-content {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+
+body.oneline-page .oneline-card {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+  overflow: hidden;
+}
+
+body.oneline-page .oneline-card .sheet-controls,
+body.oneline-page .oneline-card .toolbar {
+  flex-shrink: 0;
+}
+
+body.oneline-page .workspace {
+  flex: 1;
+  min-height: 0;
+  height: 100%;
+  align-items: stretch;
+}
+
+body.oneline-page .palette {
+  height: 100%;
+  max-height: none;
+}
+
+body.oneline-page .oneline-editor {
+  flex: 1;
+  min-height: 0;
+  height: 100%;
+}
+
+body.oneline-page .oneline-editor #diagram {
+  height: 100%;
+}
+
 .splitter {
   position: absolute;
   top: 0;
