@@ -273,10 +273,32 @@
       <button id="run-shortcircuit-btn" type="button">Short Circuit</button>
         <button id="run-arcflash-btn" type="button">Arc Flash</button>
         <button id="run-harmonics-btn" type="button">Harmonics</button>
-        <button id="run-motorstart-btn" type="button">Motor Start</button>
-        <button id="run-reliability-btn" type="button">Reliability</button>
+      <button id="run-motorstart-btn" type="button">Motor Start</button>
+      <button id="run-reliability-btn" type="button">Reliability</button>
+      <button id="study-settings-btn" type="button" class="btn" aria-expanded="false">Settings</button>
         <label class="d-block mt-1"><input type="checkbox" id="toggle-overlays" checked> Show Result Overlays</label>
       </div>
+      <form id="study-settings-menu" class="study-settings hidden" aria-label="Study settings">
+        <fieldset>
+          <legend>Load Flow</legend>
+          <label for="study-loadflow-basemva">Base MVA
+            <input type="number" id="study-loadflow-basemva" min="1" step="1">
+          </label>
+          <label class="inline-control">
+            <input type="checkbox" id="study-loadflow-balanced">
+            <span>Balanced solution</span>
+          </label>
+        </fieldset>
+        <fieldset>
+          <legend>Short Circuit</legend>
+          <label for="study-shortcircuit-method">Method
+            <select id="study-shortcircuit-method">
+              <option value="IEC">IEC 60909</option>
+              <option value="ANSI">ANSI</option>
+            </select>
+          </label>
+        </fieldset>
+      </form>
       <pre id="study-results" class="study-results"></pre>
       <div id="loadflow-results" class="study-results"></div>
     </aside>

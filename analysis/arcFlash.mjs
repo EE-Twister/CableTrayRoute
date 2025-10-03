@@ -92,9 +92,17 @@ function arcingCurrent(Ibf, V, gap, cfg, enclosure) {
  * { incidentEnergy, boundary, ppeCategory, clearingTime } where energy is
  * in cal/cm^2 and boundary in millimeters.
  */
-export async function runArcFlash() {
+export async function runArcFlash(options = {}) {
   const devices = await loadDevices();
-  const sc = runShortCircuit();
+  let scOptions = {};
+  if (options && typeof options === 'object') {
+    if (options.shortCircuit && typeof options.shortCircuit === 'object') {
+      scOptions = options.shortCircuit;
+    } else if (Object.prototype.hasOwnProperty.call(options, 'method')) {
+      scOptions = options;
+    }
+  }
+  const sc = runShortCircuit(scOptions);
   const { sheets } = getOneLine();
   const comps = (Array.isArray(sheets[0]?.components)
     ? sheets.flatMap(s => s.components)
