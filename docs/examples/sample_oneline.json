@@ -9,34 +9,62 @@
         {
           "id": "n1",
           "type": "bus",
-          "subtype": "Bus",
+          "subtype": "bus_Bus",
           "x": 40,
           "y": 60,
+          "width": 200,
+          "height": 20,
           "label": "Bus 1",
+          "ref": "",
+          "labelOffset": { "x": 0, "y": 0 },
           "rotation": 0,
           "flipped": false,
-          "connections": [ { "target": "n2" } ]
+          "impedance": { "r": 0, "x": 0 },
+          "rating": null,
+          "props": {},
+          "connections": [
+            { "target": "n2" }
+          ]
         },
         {
           "id": "n2",
           "type": "panel",
-          "subtype": "MLO",
+          "subtype": "panel_Panel",
           "x": 220,
           "y": 60,
           "label": "Panel 1",
+          "ref": "",
+          "labelOffset": { "x": 0, "y": 0 },
           "rotation": 0,
           "flipped": false,
-          "connections": [ { "target": "n3" } ]
+          "impedance": { "r": 0, "x": 0 },
+          "rating": null,
+          "props": {},
+          "connections": [
+            { "target": "n3" }
+          ]
         },
         {
           "id": "n3",
-          "type": "load",
-          "subtype": "Load",
+          "type": "static_load",
+          "subtype": "static_load_static_load",
           "x": 400,
           "y": 60,
           "label": "Load 1",
+          "ref": "",
+          "labelOffset": { "x": 0, "y": 0 },
           "rotation": 0,
           "flipped": false,
+          "impedance": { "r": 0, "x": 0 },
+          "rating": null,
+          "props": {
+            "watts": 300000,
+            "volts": 480,
+            "load": { "kw": 300, "kvar": 0 }
+          },
+          "watts": 300000,
+          "volts": 480,
+          "load": { "kw": 300, "kvar": 0 },
           "connections": []
         }
       ],
