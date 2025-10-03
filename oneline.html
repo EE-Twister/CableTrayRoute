@@ -131,6 +131,15 @@
               <input type="number" id="grid-size" value="20" min="1">
             </label>
           </div>
+          <div class="toolbar-group" aria-label="Zoom">
+            <span class="toolbar-group-label">Zoom</span>
+            <div class="zoom-controls">
+              <button id="zoom-out-btn" type="button" class="icon-button" title="Zoom out" aria-label="Zoom out">&minus;</button>
+              <span id="zoom-display" aria-live="polite">100%</span>
+              <button id="zoom-in-btn" type="button" class="icon-button" title="Zoom in" aria-label="Zoom in">+</button>
+              <button id="zoom-reset-btn" type="button" class="btn" title="Reset zoom">Reset</button>
+            </div>
+          </div>
           <div class="toolbar-group" aria-label="View options">
             <span class="toolbar-group-label">View</span>
               <div class="view-group">
