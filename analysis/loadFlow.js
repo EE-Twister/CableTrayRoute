@@ -204,7 +204,12 @@ function solvePhase(buses, baseMVA) {
       const scale = baseMVA * 1000; // convert per-unit results to kW/kvar
       const P = Sij.re * scale;
       const Q = Sij.im * scale;
-      flows.push({ from: bus.id, to: buses[j].id, P, Q });
+      const Ipu = Math.hypot(Iij.re, Iij.im);
+      const baseKV = bus.baseKV || buses[j].baseKV || 1;
+      const baseCurrentKA = baseKV ? baseMVA / (Math.sqrt(3) * baseKV) : 0;
+      const currentKA = Ipu * baseCurrentKA;
+      const currentA = currentKA * 1000;
+      flows.push({ from: bus.id, to: buses[j].id, P, Q, Ipu, currentKA, amps: currentA });
       const key = [bus.id, buses[j].id].sort().join('-');
       lossMap[key] = lossMap[key] || { P: 0, Q: 0 };
       lossMap[key].P += P;

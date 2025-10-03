@@ -1031,6 +1031,10 @@ let tempConnection = null;
 let hoverPort = null;
 let selectedConnection = null;
 let diagramScale = getItem('diagramScale', { unitPerPx: 1, unit: 'in' });
+const DEFAULT_DIAGRAM_ZOOM = 1;
+const MIN_DIAGRAM_ZOOM = 0.25;
+const MAX_DIAGRAM_ZOOM = 4;
+let diagramZoom = clampZoom(getItem('diagramZoom', DEFAULT_DIAGRAM_ZOOM));
 let resizingBus = null;
 let resizingAnnotation = null;
 let marquee = null;
@@ -1166,6 +1170,82 @@ function stopMiddlePan() {
   middlePanState = null;
 }
 
+function clampZoom(value, fallback = DEFAULT_DIAGRAM_ZOOM) {
+  const num = Number(value);
+  if (!Number.isFinite(num)) {
+    const safe = Number(fallback);
+    if (Number.isFinite(safe)) {
+      return Math.min(MAX_DIAGRAM_ZOOM, Math.max(MIN_DIAGRAM_ZOOM, safe));
+    }
+    return DEFAULT_DIAGRAM_ZOOM;
+  }
+  return Math.min(MAX_DIAGRAM_ZOOM, Math.max(MIN_DIAGRAM_ZOOM, num));
+}
+
+function getViewportCenter(previousZoom = diagramZoom) {
+  const svg = document.getElementById('diagram');
+  const editor = svg?.parentElement;
+  if (!svg || !(editor instanceof HTMLElement)) return null;
+  const zoom = previousZoom || diagramZoom || DEFAULT_DIAGRAM_ZOOM;
+  return {
+    x: (editor.scrollLeft + editor.clientWidth / 2) / zoom,
+    y: (editor.scrollTop + editor.clientHeight / 2) / zoom
+  };
+}
+
+function applyDiagramZoom({ adjustScroll = false, previousZoom, focusPoint } = {}) {
+  const svg = document.getElementById('diagram');
+  if (!svg) return;
+  const zoom = diagramZoom || DEFAULT_DIAGRAM_ZOOM;
+  const width = svg.clientWidth || svg.viewBox?.baseVal?.width || 0;
+  const height = svg.clientHeight || svg.viewBox?.baseVal?.height || 0;
+  if (width && height) {
+    svg.setAttribute('viewBox', `0 0 ${width / zoom} ${height / zoom}`);
+  }
+  if (!adjustScroll) return;
+  const editor = svg.parentElement;
+  if (!(editor instanceof HTMLElement)) return;
+  const prevZoom = previousZoom || zoom;
+  const focus = focusPoint || getViewportCenter(prevZoom);
+  if (!focus) return;
+  const nextLeft = focus.x * zoom - editor.clientWidth / 2;
+  const nextTop = focus.y * zoom - editor.clientHeight / 2;
+  editor.scrollLeft = Math.max(0, nextLeft);
+  editor.scrollTop = Math.max(0, nextTop);
+}
+
+function updateZoomDisplay() {
+  const display = document.getElementById('zoom-display');
+  if (!display) return;
+  const percent = Math.round((diagramZoom || DEFAULT_DIAGRAM_ZOOM) * 100);
+  display.textContent = `${percent}%`;
+}
+
+function setDiagramZoom(nextZoom, { focusPoint } = {}) {
+  const prev = diagramZoom || DEFAULT_DIAGRAM_ZOOM;
+  const clamped = clampZoom(nextZoom, prev);
+  if (clamped === diagramZoom) return;
+  diagramZoom = clamped;
+  setItem('diagramZoom', Number(diagramZoom.toFixed(2)));
+  applyDiagramZoom({ adjustScroll: true, previousZoom: prev, focusPoint });
+  updateZoomDisplay();
+}
+
+function adjustZoom(factor, opts = {}) {
+  if (!Number.isFinite(factor) || factor === 0) return;
+  setDiagramZoom((diagramZoom || DEFAULT_DIAGRAM_ZOOM) * factor, opts);
+}
+
+function toDiagramCoords(e) {
+  const svg = document.getElementById('diagram');
+  if (!svg) return { x: 0, y: 0 };
+  const rect = svg.getBoundingClientRect();
+  const zoom = diagramZoom || DEFAULT_DIAGRAM_ZOOM;
+  const x = (e.clientX - rect.left) / zoom;
+  const y = (e.clientY - rect.top) / zoom;
+  return { x, y };
+}
+
 function normalizeSearchValue(value) {
   if (value === null || value === undefined) return '';
   return String(value).trim().toLowerCase();
@@ -1250,6 +1330,12 @@ if (runLFBtn) runLFBtn.addEventListener('click', () => {
   const res = runLoadFlow();
   const { sheets } = getOneLine();
   const diagram = sheets.flatMap(s => s.components);
+  diagram.forEach(comp => {
+    (comp.connections || []).forEach(conn => {
+      delete conn.loading_kW;
+      delete conn.loading_amps;
+    });
+  });
   const buses = res.buses || res;
   buses.forEach(r => {
     const comp = diagram.find(c => c.id === r.id);
@@ -1269,11 +1355,25 @@ if (runLFBtn) runLFBtn.addEventListener('click', () => {
     const src = diagram.find(c => c.id === l.from);
     const conn = src?.connections?.find(c => c.target === l.to);
     if (!conn) return;
+    const ampsRaw = typeof l.amps === 'number'
+      ? l.amps
+      : typeof l.currentKA === 'number'
+        ? l.currentKA * 1000
+        : null;
+    const formatKw = value => Number(value.toFixed(2));
+    const formatAmp = value => Number(value.toFixed(1));
     if (l.phase) {
       if (typeof conn.loading_kW !== 'object') conn.loading_kW = {};
-      conn.loading_kW[l.phase] = Number(l.P.toFixed(2));
+      conn.loading_kW[l.phase] = formatKw(l.P);
+      if (ampsRaw !== null) {
+        if (typeof conn.loading_amps !== 'object') conn.loading_amps = {};
+        conn.loading_amps[l.phase] = formatAmp(ampsRaw);
+      }
     } else {
-      conn.loading_kW = Number(l.P.toFixed(2));
+      conn.loading_kW = formatKw(l.P);
+      if (ampsRaw !== null) {
+        conn.loading_amps = formatAmp(ampsRaw);
+      }
     }
   });
   setOneLine({ activeSheet, sheets });
@@ -1295,9 +1395,15 @@ function renderLoadFlowResults(res) {
   });
   html += '</table>';
   if (res.lines) {
-    html += '<h3>Line Flows (kW/kvar)</h3><table><tr><th>From</th><th>To</th><th>Phase</th><th>P</th><th>Q</th></tr>';
+    html += '<h3>Line Flows (kW/kvar)</h3><table><tr><th>From</th><th>To</th><th>Phase</th><th>P</th><th>Q</th><th>I (A)</th></tr>';
     res.lines.forEach(l => {
-      html += `<tr><td>${l.from}</td><td>${l.to}</td><td>${l.phase || ''}</td><td>${l.P.toFixed(2)}</td><td>${l.Q.toFixed(2)}</td></tr>`;
+      const amps = typeof l.amps === 'number'
+        ? l.amps
+        : typeof l.currentKA === 'number'
+          ? l.currentKA * 1000
+          : null;
+      const ampsText = amps !== null ? amps.toFixed(1) : '';
+      html += `<tr><td>${l.from}</td><td>${l.to}</td><td>${l.phase || ''}</td><td>${l.P.toFixed(2)}</td><td>${l.Q.toFixed(2)}</td><td>${ampsText}</td></tr>`;
     });
     html += '</table>';
     if (res.losses) {
@@ -2079,10 +2185,11 @@ function attachLabelInteractions(el, comp) {
     selection = [comp];
     selectedConnection = null;
     const pos = getLabelPosition(comp);
+    const coords = toDiagramCoords(e);
     draggingLabel = {
       component: comp,
-      dx: e.offsetX - pos.x,
-      dy: e.offsetY - pos.y,
+      dx: coords.x - pos.x,
+      dy: coords.y - pos.y,
       moved: false
     };
   });
@@ -2117,6 +2224,28 @@ function formatAttributeLabel(key) {
     .join(' ')
     .replace(/\s+/g, ' ')
     .trim();
+}
+
+function formatOverlayMetric(value, unit, decimals = 2) {
+  if (value === null || value === undefined) return '';
+  const formatNumber = val => {
+    const num = Number(val);
+    if (!Number.isFinite(num)) return null;
+    return num.toFixed(decimals);
+  };
+  if (typeof value === 'object') {
+    const parts = Object.entries(value)
+      .map(([key, val]) => {
+        const formatted = formatNumber(val);
+        if (formatted === null) return null;
+        return `${key}:${formatted}`;
+      })
+      .filter(Boolean);
+    if (!parts.length) return '';
+    return `${parts.join(', ')} ${unit}`;
+  }
+  const formatted = formatNumber(value);
+  return formatted === null ? '' : `${formatted} ${unit}`;
 }
 
 function inferAttributeUnit(key) {
@@ -3354,10 +3483,11 @@ function render() {
       });
       poly.addEventListener('mousedown', e => {
         e.stopPropagation();
+        const coords = toDiagramCoords(e);
         draggingConnection = {
           component: c,
           index: idx,
-          start: { x: e.offsetX, y: e.offsetY },
+          start: { x: coords.x, y: coords.y },
           mid: conn.mid ?? (conn.dir === 'h' ? pts[1].x : pts[1].y)
         };
       });
@@ -3372,10 +3502,18 @@ function render() {
       label.setAttribute('fill', stroke);
       let lblText = cableInfo?.tag || cableInfo?.cable_type || '';
       if (showOverlays) {
-        const val = conn.faultKA ?? conn.loading_kW;
-        if (val !== undefined) {
-          const unit = conn.faultKA != null ? 'kA' : 'kW';
-          lblText += ` ${Number(val).toFixed(2)} ${unit}`;
+        const overlays = [];
+        if (conn.faultKA != null) {
+          const faultText = formatOverlayMetric(conn.faultKA, 'kA', 2);
+          if (faultText) overlays.push(faultText);
+        } else {
+          const loadKw = formatOverlayMetric(conn.loading_kW, 'kW', 2);
+          if (loadKw) overlays.push(loadKw);
+          const loadAmps = formatOverlayMetric(conn.loading_amps, 'A', 1);
+          if (loadAmps) overlays.push(loadAmps);
+        }
+        if (overlays.length) {
+          lblText += ` ${overlays.join(' / ')}`;
         }
       }
       label.textContent = lblText;
@@ -3675,6 +3813,7 @@ function render() {
     svg.appendChild(rect);
   }
 
+  applyDiagramZoom();
   updateLegend(usedVoltageRanges);
   if (lengthsChanged && !syncing) {
     syncing = true;
@@ -5552,6 +5691,25 @@ async function init() {
   document.getElementById('delete-sheet-btn').addEventListener('click', () => deleteSheet());
   document.getElementById('validate-btn').addEventListener('click', validateDiagram);
 
+  updateZoomDisplay();
+  applyDiagramZoom();
+  window.addEventListener('resize', () => applyDiagramZoom());
+  const zoomInBtn = document.getElementById('zoom-in-btn');
+  const zoomOutBtn = document.getElementById('zoom-out-btn');
+  const zoomResetBtn = document.getElementById('zoom-reset-btn');
+  zoomInBtn?.addEventListener('click', () => {
+    const focus = getViewportCenter();
+    adjustZoom(1.2, focus ? { focusPoint: focus } : {});
+  });
+  zoomOutBtn?.addEventListener('click', () => {
+    const focus = getViewportCenter();
+    adjustZoom(1 / 1.2, focus ? { focusPoint: focus } : {});
+  });
+  zoomResetBtn?.addEventListener('click', () => {
+    const focus = getViewportCenter();
+    setDiagramZoom(DEFAULT_DIAGRAM_ZOOM, focus ? { focusPoint: focus } : {});
+  });
+
   const gridToggle = document.getElementById('grid-toggle');
   const gridSizeInput = document.getElementById('grid-size');
   const gridPattern = document.getElementById('grid');
@@ -5687,6 +5845,15 @@ async function init() {
 
   const editorEl = document.querySelector('.oneline-editor');
   const legendEl = document.getElementById('voltage-legend');
+  if (editorEl) {
+    editorEl.addEventListener('wheel', e => {
+      if (!e.ctrlKey) return;
+      const factor = e.deltaY < 0 ? 1.1 : 1 / 1.1;
+      const focus = toDiagramCoords(e);
+      e.preventDefault();
+      adjustZoom(factor, { focusPoint: focus });
+    }, { passive: false });
+  }
   legendEl?.addEventListener('mousedown', e => {
     if (e.button !== 0) return;
     legendDrag = {
@@ -5741,6 +5908,9 @@ async function init() {
         }
         return;
       }
+      const coords = toDiagramCoords(e);
+      const pointerX = coords.x;
+      const pointerY = coords.y;
       if (connectMode && e.target.classList.contains('port')) {
         const comp = components.find(c => c.id === e.target.dataset.id);
         const port = Number(e.target.dataset.port);
@@ -5765,8 +5935,8 @@ async function init() {
           pointerDownComponentId = comp.id;
           resizingAnnotation = {
             comp,
-            startX: e.offsetX,
-            startY: e.offsetY,
+            startX: pointerX,
+            startY: pointerY,
             startWidth: comp.width || compWidth,
             startHeight: comp.height || compHeight,
             changed: false
@@ -5780,7 +5950,7 @@ async function init() {
           pointerDownComponentId = comp.id;
           resizingBus = {
             comp,
-            startX: e.offsetX,
+            startX: pointerX,
             startWidth: comp.width,
             startCompX: comp.x,
             side: e.target.dataset.side || 'right',
@@ -5794,10 +5964,10 @@ async function init() {
         dragOffset = null;
         marquee = {
           active: true,
-          x1: e.offsetX,
-          y1: e.offsetY,
-          x2: e.offsetX,
-          y2: e.offsetY
+          x1: pointerX,
+          y1: pointerY,
+          x2: pointerX,
+          y2: pointerY
         };
         return;
       }
@@ -5816,8 +5986,8 @@ async function init() {
       selected = comp;
       dragOffset = selection.map(c => ({
         comp: c,
-        dx: e.offsetX - c.x,
-        dy: e.offsetY - c.y,
+        dx: pointerX - c.x,
+        dy: pointerY - c.y,
         startX: c.x,
         startY: c.y
       }));
@@ -5827,13 +5997,16 @@ async function init() {
     svg.addEventListener('mousemove', e => {
       if (middlePanState) return;
       if (draggingLabel) return;
-      cursorPos = { x: e.offsetX, y: e.offsetY };
+      const coords = toDiagramCoords(e);
+      const pointerX = coords.x;
+      const pointerY = coords.y;
+      cursorPos = { x: pointerX, y: pointerY };
       if (resizingAnnotation) {
         const data = resizingAnnotation;
         const comp = data.comp;
         if (comp) {
-          let newW = Math.max(40, data.startWidth + (e.offsetX - data.startX));
-          let newH = Math.max(20, data.startHeight + (e.offsetY - data.startY));
+          let newW = Math.max(40, data.startWidth + (pointerX - data.startX));
+          let newH = Math.max(20, data.startHeight + (pointerY - data.startY));
           if (gridEnabled) {
             newW = Math.max(40, Math.round(newW / gridSize) * gridSize);
             newH = Math.max(20, Math.round(newH / gridSize) * gridSize);
@@ -5848,8 +6021,8 @@ async function init() {
         return;
       }
       if (marquee && marquee.active) {
-        marquee.x2 = e.offsetX;
-        marquee.y2 = e.offsetY;
+        marquee.x2 = pointerX;
+        marquee.y2 = pointerY;
         render();
         return;
       }
@@ -5858,16 +6031,16 @@ async function init() {
         const conn = component.connections[index];
         if (conn) {
           if (conn.dir === 'h') {
-            conn.mid = mid + (e.offsetX - start.x);
+            conn.mid = mid + (pointerX - start.x);
           } else {
-            conn.mid = mid + (e.offsetY - start.y);
+            conn.mid = mid + (pointerY - start.y);
           }
           render();
         }
         return;
       }
       if (resizingBus) {
-        let delta = e.offsetX - resizingBus.startX;
+        let delta = pointerX - resizingBus.startX;
         if (resizingBus.side === 'right') {
           let newW = Math.max(40, resizingBus.startWidth + delta);
           if (gridEnabled) newW = Math.round(newW / gridSize) * gridSize;
@@ -5891,8 +6064,8 @@ async function init() {
         return;
       }
       if (connectSource && tempConnection) {
-        const nearest = nearestPortToPoint(e.offsetX, e.offsetY, connectSource);
-        let end = { x: e.offsetX, y: e.offsetY };
+        const nearest = nearestPortToPoint(pointerX, pointerY, connectSource);
+        let end = { x: pointerX, y: pointerY };
         hoverPort = null;
         if (nearest) {
           hoverPort = { component: nearest.component, port: nearest.port };
@@ -5904,9 +6077,12 @@ async function init() {
     });
   svg.addEventListener('mousemove', e => {
     if (middlePanState) return;
+    const coords = toDiagramCoords(e);
+    const pointerX = coords.x;
+    const pointerY = coords.y;
     if (draggingLabel) {
-      let x = e.offsetX - draggingLabel.dx;
-      let y = e.offsetY - draggingLabel.dy;
+      let x = pointerX - draggingLabel.dx;
+      let y = pointerY - draggingLabel.dy;
       if (gridEnabled) {
         x = Math.round(x / gridSize) * gridSize;
         y = Math.round(y / gridSize) * gridSize;
@@ -5932,8 +6108,8 @@ async function init() {
     let snapPos = null;
     let moved = false;
     dragOffset.forEach(off => {
-      const rawX = e.offsetX - off.dx;
-      const rawY = e.offsetY - off.dy;
+      const rawX = pointerX - off.dx;
+      const rawY = pointerY - off.dy;
       let x = rawX;
       let y = rawY;
       if (gridEnabled) {
