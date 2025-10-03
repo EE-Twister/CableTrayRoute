@@ -7109,7 +7109,7 @@ async function importDiagram(data) {
 
 async function loadSampleDiagram() {
   try {
-    const res = await fetch('examples/sample_oneline.json');
+    const res = await fetch(asset('examples/sample_oneline.json'));
     if (!res.ok) throw new Error(res.statusText);
     const data = await res.json();
     await importDiagram(data);
