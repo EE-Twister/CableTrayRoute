@@ -12,6 +12,103 @@ function isUsableComponent(comp) {
   return comp && !IGNORED_TYPES.has(comp.type);
 }
 
+const BASE_KV_KEYS = ['baseKV', 'base_kv', 'base_kV', 'basekv', 'kv', 'kV'];
+const VOLTAGE_KEYS = [
+  'voltage',
+  'volts',
+  'nominal_voltage',
+  'nominalVolts',
+  'prefault_voltage',
+  'line_voltage',
+  'line_to_line_voltage',
+  'lineToLineVoltage',
+  'll_voltage',
+  'ln_voltage',
+  'voltage_ll',
+  'voltage_ln'
+];
+const EXTRA_VALUE_SOURCES = ['props', 'parameters', 'settings', 'config', 'metadata', 'rating'];
+const KNOWN_KV_INTEGERS = new Set([11, 12, 13, 14, 15, 16, 20, 22, 23, 24, 25, 27, 33, 34, 35]);
+
+function findField(source, key) {
+  if (!source || typeof source !== 'object') return undefined;
+  if (source[key] !== undefined) return source[key];
+  const camel = key.replace(/_([a-z])/g, (_, c) => c.toUpperCase());
+  if (source[camel] !== undefined) return source[camel];
+  const pascal = camel.charAt(0).toUpperCase() + camel.slice(1);
+  if (source[pascal] !== undefined) return source[pascal];
+  const lower = key.toLowerCase();
+  const matchKey = Object.keys(source).find(prop => prop.toLowerCase() === lower);
+  return matchKey ? source[matchKey] : undefined;
+}
+
+function extractNumeric(source, keys) {
+  if (!source) return null;
+  for (const key of keys) {
+    const raw = findField(source, key);
+    if (raw === undefined || raw === null) continue;
+    if (typeof raw === 'number' && Number.isFinite(raw)) return raw;
+    if (typeof raw === 'string') {
+      const match = raw.match(/-?\d+(?:\.\d+)?/);
+      if (!match) continue;
+      const parsed = Number.parseFloat(match[0]);
+      if (Number.isFinite(parsed)) return parsed;
+    }
+  }
+  return null;
+}
+
+function normalizeKvValue(value) {
+  if (!Number.isFinite(value) || value <= 0) return null;
+  if (value >= 100) return value / 1000;
+  return value;
+}
+
+function normalizeVoltageValue(value) {
+  if (!Number.isFinite(value) || value <= 0) return null;
+  if (value >= 100) return value / 1000;
+  if (value > 10 && Number.isInteger(value)) return KNOWN_KV_INTEGERS.has(value) ? value : value / 1000;
+  if (value > 10) return value;
+  return value;
+}
+
+function resolveBaseKV(comp) {
+  const sources = [comp];
+  EXTRA_VALUE_SOURCES.forEach(key => {
+    const src = comp && comp[key];
+    if (src) sources.push(src);
+  });
+  for (const src of sources) {
+    const raw = extractNumeric(src, BASE_KV_KEYS);
+    const normalized = normalizeKvValue(raw);
+    if (normalized) return normalized;
+  }
+  for (const src of sources) {
+    const raw = extractNumeric(src, VOLTAGE_KEYS);
+    const normalized = normalizeVoltageValue(raw);
+    if (normalized) return normalized;
+  }
+  if (Array.isArray(comp?.connections)) {
+    for (const conn of comp.connections) {
+      if (!conn) continue;
+      const connSources = [conn];
+      EXTRA_VALUE_SOURCES.forEach(key => {
+        const src = conn && conn[key];
+        if (src) connSources.push(src);
+      });
+      for (const src of connSources) {
+        const rawKv = extractNumeric(src, BASE_KV_KEYS);
+        const normalizedKv = normalizeKvValue(rawKv);
+        if (normalizedKv) return normalizedKv;
+        const rawVolt = extractNumeric(src, VOLTAGE_KEYS);
+        const normalizedVolt = normalizeVoltageValue(rawVolt);
+        if (normalizedVolt) return normalizedVolt;
+      }
+    }
+  }
+  return 1;
+}
+
 /** Basic complex number helpers used by the load-flow solver */
 function toComplex(re = 0, im = 0) {
   return { re, im };
@@ -383,12 +480,14 @@ export function runLoadFlow(modelOrOpts = {}, maybeOpts = {}) {
       const loadPQ = extractPhasePQ(c.load, phase, balanced);
       const genPQ = extractPhasePQ(c.generation, phase, balanced);
       const shunt = balanced ? c.shunt : resolvePhaseRecord(c.shunt, phase);
+      const baseKV = resolveBaseKV(c);
+      c.baseKV = baseKV;
       return {
         id: c.id,
         type: c.busType || (idx === 0 ? 'slack' : 'PQ'),
-        Vm: c.Vm,
-        Va: c.Va,
-        baseKV: c.baseKV || 1,
+        Vm: Number.isFinite(c.Vm) ? c.Vm : 1,
+        Va: Number.isFinite(c.Va) ? c.Va : 0,
+        baseKV,
         Pd: loadPQ.kw,
         Qd: loadPQ.kvar,
         Pg: genPQ.kw,
