@@ -1191,6 +1191,7 @@ function renderStudyResults() {
   if (!studyResultsEl) return;
   const res = getStudies();
   studyResultsEl.textContent = Object.keys(res).length ? JSON.stringify(res, null, 2) : 'No results';
+  renderLoadFlowResults(res.loadFlow);
 }
 
 function highlightSPF(ids = []) {
@@ -1289,16 +1290,22 @@ function applyDiagramZoom({ adjustScroll = false, previousZoom, focusPoint } = {
   const zoom = diagramZoom || DEFAULT_DIAGRAM_ZOOM;
   const { minX, minY, width, height } = diagramViewport;
   if (width && height) {
+    const pixelWidth = width * zoom;
+    const pixelHeight = height * zoom;
     svg.setAttribute('viewBox', `${minX} ${minY} ${width} ${height}`);
-    svg.style.width = `${width * zoom}px`;
-    svg.style.height = `${height * zoom}px`;
+    svg.setAttribute('width', String(pixelWidth));
+    svg.setAttribute('height', String(pixelHeight));
+    svg.style.width = `${pixelWidth}px`;
+    svg.style.height = `${pixelHeight}px`;
+    svg.style.minWidth = `${pixelWidth}px`;
+    svg.style.minHeight = `${pixelHeight}px`;
   }
   const gridBg = document.getElementById('grid-bg');
   if (gridBg) {
     gridBg.setAttribute('x', String(minX));
     gridBg.setAttribute('y', String(minY));
-    gridBg.setAttribute('width', String(width));
-    gridBg.setAttribute('height', String(height));
+    gridBg.setAttribute('width', String(width + gridSize));
+    gridBg.setAttribute('height', String(height + gridSize));
   }
   if (!adjustScroll) return;
   const editor = svg.parentElement;
@@ -1498,24 +1505,48 @@ if (runLFBtn) runLFBtn.addEventListener('click', () => {
     }
   });
   setOneLine({ activeSheet, sheets });
-  const studies = getStudies();
-  studies.loadFlow = res;
+  const currentStudies = getStudies();
+  let clonedResult;
+  if (typeof structuredClone === 'function') {
+    clonedResult = structuredClone(res);
+  } else {
+    try {
+      clonedResult = JSON.parse(JSON.stringify(res));
+    } catch {
+      const cloneRecursive = value => {
+        if (Array.isArray(value)) return value.map(cloneRecursive);
+        if (value && typeof value === 'object') {
+          const out = {};
+          Object.keys(value).forEach(key => {
+            out[key] = cloneRecursive(value[key]);
+          });
+          return out;
+        }
+        return value;
+      };
+      clonedResult = cloneRecursive(res);
+    }
+  }
+  const studies = { ...currentStudies, loadFlow: clonedResult };
   setStudies(studies);
   syncSchedules(false);
   renderStudyResults();
-  renderLoadFlowResults(res);
   render();
 });
 
 function renderLoadFlowResults(res) {
   if (!loadFlowResultsEl) return;
-  const buses = res.buses || res;
+  if (!res) {
+    loadFlowResultsEl.innerHTML = '<p>No load flow results.</p>';
+    return;
+  }
+  const buses = Array.isArray(res?.buses) ? res.buses : (Array.isArray(res) ? res : []);
   let html = '<h3>Bus Voltages</h3><table><tr><th>Bus</th><th>Phase</th><th>Vm</th><th>Va</th></tr>';
   buses.forEach(b => {
     html += `<tr><td>${b.id}</td><td>${b.phase || ''}</td><td>${b.Vm.toFixed(4)}</td><td>${b.Va.toFixed(2)}</td></tr>`;
   });
   html += '</table>';
-  if (res.lines) {
+  if (Array.isArray(res.lines) && res.lines.length) {
     html += '<h3>Line Flows (kW/kvar)</h3><table><tr><th>From</th><th>To</th><th>Phase</th><th>P</th><th>Q</th><th>I (A)</th></tr>';
     res.lines.forEach(l => {
       const amps = typeof l.amps === 'number'
