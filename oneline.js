@@ -1036,18 +1036,18 @@ const MIN_DIAGRAM_ZOOM = 0.25;
 const MAX_DIAGRAM_ZOOM = 4;
 const DEFAULT_VIEWPORT_WIDTH = 1600;
 const DEFAULT_VIEWPORT_HEIGHT = 900;
-const VIEWPORT_PADDING = 200;
+const STATIC_VIEWPORT_BOUNDS = {
+  minX: -DEFAULT_VIEWPORT_WIDTH * 3,
+  minY: -DEFAULT_VIEWPORT_HEIGHT * 3,
+  width: DEFAULT_VIEWPORT_WIDTH * 6,
+  height: DEFAULT_VIEWPORT_HEIGHT * 6
+};
 const STUDY_SETTINGS_KEY = 'studySettings';
 const defaultStudySettings = {
   loadFlow: { baseMVA: 100, balanced: true },
   shortCircuit: { method: 'IEC' }
 };
-let diagramViewport = {
-  minX: 0,
-  minY: 0,
-  width: DEFAULT_VIEWPORT_WIDTH,
-  height: DEFAULT_VIEWPORT_HEIGHT
-};
+let diagramViewport = { ...STATIC_VIEWPORT_BOUNDS };
 let diagramZoom = clampZoom(getItem('diagramZoom', DEFAULT_DIAGRAM_ZOOM));
 let resizingBus = null;
 let resizingAnnotation = null;
@@ -1082,6 +1082,9 @@ const marqueeThreshold = 4;
 let templates = [];
 const DIAGRAM_VERSION = 2;
 let cursorPos = { x: 20, y: 20 };
+let cursorPosValid = false;
+let needsInitialViewportCenter = true;
+let pendingInitialCenter = null;
 let showOverlays = true;
 let syncing = false;
 let lintPanel = null;
@@ -1300,8 +1303,17 @@ function applyDiagramZoom({ adjustScroll = false, previousZoom, focusPoint } = {
     gridBg.setAttribute('width', String(width));
     gridBg.setAttribute('height', String(height));
   }
-  if (!adjustScroll) return;
   const editor = svg.parentElement;
+  if (needsInitialViewportCenter && editor instanceof HTMLElement) {
+    const initialFocus = pendingInitialCenter || getStaticViewportCenter();
+    const nextLeft = (initialFocus.x - minX) * zoom - editor.clientWidth / 2;
+    const nextTop = (initialFocus.y - minY) * zoom - editor.clientHeight / 2;
+    editor.scrollLeft = Math.max(0, nextLeft);
+    editor.scrollTop = Math.max(0, nextTop);
+    needsInitialViewportCenter = false;
+    pendingInitialCenter = null;
+  }
+  if (!adjustScroll) return;
   if (!(editor instanceof HTMLElement)) return;
   const prevZoom = previousZoom || zoom;
   const focus = focusPoint || getViewportCenter(prevZoom);
@@ -1313,23 +1325,20 @@ function applyDiagramZoom({ adjustScroll = false, previousZoom, focusPoint } = {
 }
 
 function updateDiagramViewport(bounds) {
-  if (!bounds || !Number.isFinite(bounds.minX) || !Number.isFinite(bounds.minY) ||
-      !Number.isFinite(bounds.maxX) || !Number.isFinite(bounds.maxY)) {
-    diagramViewport = {
-      minX: 0,
-      minY: 0,
-      width: DEFAULT_VIEWPORT_WIDTH,
-      height: DEFAULT_VIEWPORT_HEIGHT
-    };
-    return;
+  if (needsInitialViewportCenter) {
+    if (bounds && Number.isFinite(bounds.minX) && Number.isFinite(bounds.minY) &&
+        Number.isFinite(bounds.maxX) && Number.isFinite(bounds.maxY)) {
+      const centerX = (bounds.minX + bounds.maxX) / 2;
+      const centerY = (bounds.minY + bounds.maxY) / 2;
+      if (Number.isFinite(centerX) && Number.isFinite(centerY)) {
+        pendingInitialCenter = { x: centerX, y: centerY };
+      }
+    }
+    if (!pendingInitialCenter) {
+      pendingInitialCenter = getStaticViewportCenter();
+    }
   }
-  const minX = Math.min(0, Math.floor(bounds.minX - VIEWPORT_PADDING));
-  const minY = Math.min(0, Math.floor(bounds.minY - VIEWPORT_PADDING));
-  const maxX = Math.max(bounds.maxX + VIEWPORT_PADDING, minX + DEFAULT_VIEWPORT_WIDTH);
-  const maxY = Math.max(bounds.maxY + VIEWPORT_PADDING, minY + DEFAULT_VIEWPORT_HEIGHT);
-  const width = Math.max(DEFAULT_VIEWPORT_WIDTH, Math.ceil(maxX - minX));
-  const height = Math.max(DEFAULT_VIEWPORT_HEIGHT, Math.ceil(maxY - minY));
-  diagramViewport = { minX, minY, width, height };
+  diagramViewport = { ...STATIC_VIEWPORT_BOUNDS };
 }
 
 function updateZoomDisplay() {
@@ -2086,8 +2095,9 @@ function renderTemplates() {
 
 function addTemplateComponent(data) {
   const id = 'n' + Date.now();
-  let x = cursorPos.x;
-  let y = cursorPos.y;
+  const insertionPoint = getDefaultInsertionPoint();
+  let x = insertionPoint.x;
+  let y = insertionPoint.y;
   if (gridEnabled) {
     const snappedX = Math.round(x / gridSize) * gridSize;
     const snappedY = Math.round(y / gridSize) * gridSize;
@@ -4127,6 +4137,8 @@ function loadSheet(idx) {
   selectedConnection = null;
   refreshAttributeOptions();
   renderSheetTabs();
+  needsInitialViewportCenter = true;
+  pendingInitialCenter = null;
   render();
   setOneLine({ activeSheet, sheets });
 }
@@ -4216,8 +4228,29 @@ function updateBusPorts(bus) {
   bus.ports = ports;
 }
 
+function getStaticViewportCenter() {
+  return {
+    x: STATIC_VIEWPORT_BOUNDS.minX + STATIC_VIEWPORT_BOUNDS.width / 2,
+    y: STATIC_VIEWPORT_BOUNDS.minY + STATIC_VIEWPORT_BOUNDS.height / 2
+  };
+}
+
+function getDefaultInsertionPoint() {
+  if (cursorPosValid && Number.isFinite(cursorPos.x) && Number.isFinite(cursorPos.y)) {
+    return { x: cursorPos.x, y: cursorPos.y };
+  }
+  const center = getViewportCenter();
+  if (center && Number.isFinite(center.x) && Number.isFinite(center.y)) {
+    return center;
+  }
+  return getStaticViewportCenter();
+}
+
 function addComponent(cfg) {
-  let subtype, type, x = 20, y = 20;
+  const insertionPoint = getDefaultInsertionPoint();
+  let subtype, type;
+  let x = insertionPoint.x;
+  let y = insertionPoint.y;
   let skipHistory = false;
   if (typeof cfg === 'string') {
     subtype = cfg;
@@ -6256,6 +6289,7 @@ async function init() {
       const pointerX = coords.x;
       const pointerY = coords.y;
       cursorPos = { x: pointerX, y: pointerY };
+      cursorPosValid = Number.isFinite(pointerX) && Number.isFinite(pointerY);
       if (resizingAnnotation) {
         const data = resizingAnnotation;
         const comp = data.comp;
@@ -6828,6 +6862,18 @@ async function init() {
       e.preventDefault();
     });
   }
+  svg.addEventListener('mouseenter', e => {
+    const coords = toDiagramCoords(e);
+    const pointerX = coords.x;
+    const pointerY = coords.y;
+    if (Number.isFinite(pointerX) && Number.isFinite(pointerY)) {
+      cursorPos = { x: pointerX, y: pointerY };
+      cursorPosValid = true;
+    }
+  });
+  svg.addEventListener('mouseleave', () => {
+    cursorPosValid = false;
+  });
   window.addEventListener('resize', closePaletteContextMenu);
   document.addEventListener('scroll', closePaletteContextMenu, true);
 
