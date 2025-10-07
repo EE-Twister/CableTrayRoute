@@ -5751,9 +5751,12 @@ async function init() {
         showToast('Cannot drop component');
         return;
       }
+      const coords = toDiagramCoords(e);
       const { left, top } = svg.getBoundingClientRect();
-      const x = e.clientX - left;
-      const y = e.clientY - top;
+      const fallbackX = e.clientX - left;
+      const fallbackY = e.clientY - top;
+      const x = Number.isFinite(coords?.x) ? coords.x : fallbackX;
+      const y = Number.isFinite(coords?.y) ? coords.y : fallbackY;
       const comp = addComponent({ type: info.type, subtype: info.subtype, x, y, skipHistory: true });
       autoAttachComponent(comp);
       pushHistory();
@@ -7130,10 +7133,16 @@ function updateComponent(id, fields = {}) {
 function syncSchedules(notify = true) {
   const all = sheets.flatMap(s => s.components);
   const findPanelId = id => {
-    const src = all.find(s => (s.connections || []).some(conn => conn.target === id));
-    if (!src) return null;
-    if (getCategory(src) === 'panel') return src.ref || src.id;
-    return findPanelId(src.id);
+    const visited = new Set();
+    let currentId = id;
+    while (currentId && !visited.has(currentId)) {
+      visited.add(currentId);
+      const upstream = all.find(item => (item.connections || []).some(conn => conn.target === currentId));
+      if (!upstream) return null;
+      if (getCategory(upstream) === 'panel') return upstream.ref || upstream.id;
+      currentId = upstream.id;
+    }
+    return null;
   };
   const mapFields = c => {
     const src = all.find(s => (s.connections || []).some(conn => conn.target === c.id));
