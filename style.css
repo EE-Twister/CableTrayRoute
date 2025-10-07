@@ -509,7 +509,7 @@ body.compact-mode .palette-section .section-buttons {
 
 .oneline-editor {
   position: relative;
-  min-height: 600px;
+  min-height: 480px;
   overflow: auto;
 }
 
@@ -525,6 +525,23 @@ body.compact-mode .palette-section .section-buttons {
   display: inline-flex;
   align-items: center;
   gap: 0.5rem;
+}
+
+.pan-controls {
+  display: inline-flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.25rem;
+}
+
+.pan-controls .pan-middle-row {
+  display: flex;
+  gap: 0.25rem;
+}
+
+.pan-controls .icon-button {
+  width: 32px;
+  height: 32px;
 }
 
 #zoom-display {
