@@ -590,7 +590,7 @@ body.oneline-page .palette {
   height: 100%;
   max-height: none;
   min-height: 0;
-  overflow-y: auto;
+  overflow: hidden;
 }
 
 body.oneline-page .oneline-editor {
@@ -601,6 +601,13 @@ body.oneline-page .oneline-editor {
 
 body.oneline-page .oneline-editor #diagram {
   height: 100%;
+}
+
+body.oneline-page #component-buttons {
+  flex: 1;
+  min-height: 0;
+  overflow-y: auto;
+  padding-right: 0.25rem;
 }
 
 .splitter {
