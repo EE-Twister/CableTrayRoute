@@ -590,7 +590,8 @@ body.oneline-page .palette {
   height: 100%;
   max-height: none;
   min-height: 0;
-  overflow: hidden;
+  overflow-x: hidden;
+  overflow-y: auto;
 }
 
 body.oneline-page .oneline-editor {

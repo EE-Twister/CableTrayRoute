@@ -891,7 +891,7 @@ function buildPalette() {
       labelSpan.textContent = meta.label || meta.subtype || meta.type || subKey;
       btn.appendChild(labelSpan);
       btn.addEventListener('click', () => {
-        addComponent({ type: meta.type, subtype: subKey });
+        addComponent({ type: meta.type, subtype: subKey, placeAtViewportCenter: true });
         render();
         save();
       });
@@ -1031,17 +1031,19 @@ let tempConnection = null;
 let hoverPort = null;
 let selectedConnection = null;
 let diagramScale = getItem('diagramScale', { unitPerPx: 1, unit: 'in' });
-const DEFAULT_DIAGRAM_ZOOM = 1;
+const DEFAULT_DIAGRAM_ZOOM = 1.35;
 const MIN_DIAGRAM_ZOOM = 0.25;
 const MAX_DIAGRAM_ZOOM = 4;
 const DEFAULT_VIEWPORT_WIDTH = 1600;
 const DEFAULT_VIEWPORT_HEIGHT = 900;
+const STATIC_VIEWPORT_SCALE = 10;
 const STATIC_VIEWPORT_BOUNDS = {
-  minX: -DEFAULT_VIEWPORT_WIDTH * 3,
-  minY: -DEFAULT_VIEWPORT_HEIGHT * 3,
-  width: DEFAULT_VIEWPORT_WIDTH * 6,
-  height: DEFAULT_VIEWPORT_HEIGHT * 6
+  minX: -DEFAULT_VIEWPORT_WIDTH * STATIC_VIEWPORT_SCALE / 2,
+  minY: -DEFAULT_VIEWPORT_HEIGHT * STATIC_VIEWPORT_SCALE / 2,
+  width: DEFAULT_VIEWPORT_WIDTH * STATIC_VIEWPORT_SCALE,
+  height: DEFAULT_VIEWPORT_HEIGHT * STATIC_VIEWPORT_SCALE
 };
+const MAX_ROUTE_ADJUST_STEPS = 250;
 const STUDY_SETTINGS_KEY = 'studySettings';
 const defaultStudySettings = {
   loadFlow: { baseMVA: 100, balanced: true },
@@ -3506,10 +3508,10 @@ function render() {
     }
 
     function horizontalFirst() {
-      let midX = (start.x + end.x) / 2;
-      let adjusted = true;
-      while (adjusted) {
-        adjusted = false;
+      const initialMid = (start.x + end.x) / 2;
+      let midX = initialMid;
+      for (let attempts = 0; attempts < MAX_ROUTE_ADJUST_STEPS; attempts++) {
+        let moved = false;
         components.forEach(comp => {
           if (comp === src || comp === tgt) return;
           const rect = { x: comp.x, y: comp.y, w: comp.width || compWidth, h: comp.height || compHeight };
@@ -3519,7 +3521,7 @@ function render() {
             Math.max(start.y, end.y) >= rect.y
           ) {
             midX = midX < rect.x + rect.w / 2 ? rect.x - 10 : rect.x + rect.w + 10;
-            adjusted = true;
+            moved = true;
           }
           if (
             start.y >= rect.y && start.y <= rect.y + rect.h &&
@@ -3527,7 +3529,7 @@ function render() {
             Math.max(start.x, midX) >= rect.x
           ) {
             midX = midX < rect.x ? rect.x - 10 : rect.x + rect.w + 10;
-            adjusted = true;
+            moved = true;
           }
           if (
             end.y >= rect.y && end.y <= rect.y + rect.h &&
@@ -3535,18 +3537,25 @@ function render() {
             Math.max(end.x, midX) >= rect.x
           ) {
             midX = midX < rect.x ? rect.x - 10 : rect.x + rect.w + 10;
-            adjusted = true;
+            moved = true;
           }
         });
+        if (moved === false) break;
+      }
+      if (Number.isFinite(midX) === false) midX = initialMid;
+      if (diagramViewport && Number.isFinite(diagramViewport.minX) && Number.isFinite(diagramViewport.width)) {
+        const min = diagramViewport.minX;
+        const max = diagramViewport.minX + diagramViewport.width;
+        midX = Math.min(Math.max(midX, min), max);
       }
       return [start, { x: midX, y: start.y }, { x: midX, y: end.y }, end];
     }
 
     function verticalFirst() {
-      let midY = (start.y + end.y) / 2;
-      let adjusted = true;
-      while (adjusted) {
-        adjusted = false;
+      const initialMid = (start.y + end.y) / 2;
+      let midY = initialMid;
+      for (let attempts = 0; attempts < MAX_ROUTE_ADJUST_STEPS; attempts++) {
+        let moved = false;
         components.forEach(comp => {
           if (comp === src || comp === tgt) return;
           const rect = { x: comp.x, y: comp.y, w: comp.width || compWidth, h: comp.height || compHeight };
@@ -3556,7 +3565,7 @@ function render() {
             Math.max(start.x, end.x) >= rect.x
           ) {
             midY = midY < rect.y + rect.h / 2 ? rect.y - 10 : rect.y + rect.h + 10;
-            adjusted = true;
+            moved = true;
           }
           if (
             start.x >= rect.x && start.x <= rect.x + rect.w &&
@@ -3564,7 +3573,7 @@ function render() {
             Math.max(start.y, midY) >= rect.y
           ) {
             midY = midY < rect.y ? rect.y - 10 : rect.y + rect.h + 10;
-            adjusted = true;
+            moved = true;
           }
           if (
             end.x >= rect.x && end.x <= rect.x + rect.w &&
@@ -3572,9 +3581,16 @@ function render() {
             Math.max(end.y, midY) >= rect.y
           ) {
             midY = midY < rect.y ? rect.y - 10 : rect.y + rect.h + 10;
-            adjusted = true;
+            moved = true;
           }
         });
+        if (moved === false) break;
+      }
+      if (Number.isFinite(midY) === false) midY = initialMid;
+      if (diagramViewport && Number.isFinite(diagramViewport.minY) && Number.isFinite(diagramViewport.height)) {
+        const min = diagramViewport.minY;
+        const max = diagramViewport.minY + diagramViewport.height;
+        midY = Math.min(Math.max(midY, min), max);
       }
       return [start, { x: start.x, y: midY }, { x: end.x, y: midY }, end];
     }
@@ -4247,22 +4263,32 @@ function getDefaultInsertionPoint() {
 }
 
 function addComponent(cfg) {
-  const insertionPoint = getDefaultInsertionPoint();
-  let subtype, type;
-  let x = insertionPoint.x;
-  let y = insertionPoint.y;
+  let subtype;
+  let type;
+  let explicitX;
+  let explicitY;
   let skipHistory = false;
+  let placeAtCenter = false;
   if (typeof cfg === 'string') {
     subtype = cfg;
     type = componentMeta[subtype]?.category;
   } else if (cfg && typeof cfg === 'object') {
     subtype = cfg.subtype;
     type = cfg.type || componentMeta[cfg.subtype]?.type || componentMeta[cfg.subtype]?.category;
-    if (cfg.x !== undefined) x = cfg.x;
-    if (cfg.y !== undefined) y = cfg.y;
+    if (cfg.x !== undefined) explicitX = cfg.x;
+    if (cfg.y !== undefined) explicitY = cfg.y;
     skipHistory = !!cfg.skipHistory;
+    placeAtCenter = cfg.placeAtViewportCenter === true;
   } else {
     return;
+  }
+  const insertionPoint = placeAtCenter ? (getViewportCenter() || getStaticViewportCenter()) : getDefaultInsertionPoint();
+  let x = explicitX !== undefined ? explicitX : insertionPoint.x;
+  let y = explicitY !== undefined ? explicitY : insertionPoint.y;
+  if (Number.isFinite(x) === false || Number.isFinite(y) === false) {
+    const fallback = getStaticViewportCenter();
+    if (Number.isFinite(x) === false) x = fallback.x;
+    if (Number.isFinite(y) === false) y = fallback.y;
   }
   const meta = componentMeta[subtype];
   if (!meta) return;
