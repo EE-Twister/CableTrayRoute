@@ -1031,12 +1031,12 @@ let tempConnection = null;
 let hoverPort = null;
 let selectedConnection = null;
 let diagramScale = getItem('diagramScale', { unitPerPx: 1, unit: 'in' });
-const DEFAULT_DIAGRAM_ZOOM = 1.35;
+const DEFAULT_DIAGRAM_ZOOM = 1;
 const MIN_DIAGRAM_ZOOM = 0.25;
 const MAX_DIAGRAM_ZOOM = 4;
-const DEFAULT_VIEWPORT_WIDTH = 1600;
-const DEFAULT_VIEWPORT_HEIGHT = 900;
-const STATIC_VIEWPORT_SCALE = 10;
+const DEFAULT_VIEWPORT_WIDTH = 1200;
+const DEFAULT_VIEWPORT_HEIGHT = 675;
+const STATIC_VIEWPORT_SCALE = 6;
 const STATIC_VIEWPORT_BOUNDS = {
   minX: -DEFAULT_VIEWPORT_WIDTH * STATIC_VIEWPORT_SCALE / 2,
   minY: -DEFAULT_VIEWPORT_HEIGHT * STATIC_VIEWPORT_SCALE / 2,
@@ -1363,6 +1363,24 @@ function setDiagramZoom(nextZoom, { focusPoint } = {}) {
 function adjustZoom(factor, opts = {}) {
   if (!Number.isFinite(factor) || factor === 0) return;
   setDiagramZoom((diagramZoom || DEFAULT_DIAGRAM_ZOOM) * factor, opts);
+}
+
+function panDiagram(direction, container) {
+  if (!(container instanceof HTMLElement)) return;
+  const stepX = Math.max(80, Math.round(container.clientWidth * 0.3));
+  const stepY = Math.max(80, Math.round(container.clientHeight * 0.3));
+  if (direction === 'left') {
+    container.scrollLeft -= stepX;
+  } else if (direction === 'right') {
+    container.scrollLeft += stepX;
+  } else if (direction === 'up') {
+    container.scrollTop -= stepY;
+  } else if (direction === 'down') {
+    container.scrollTop += stepY;
+  } else {
+    return;
+  }
+  needsInitialViewportCenter = false;
 }
 
 function toDiagramCoords(e) {
@@ -6022,6 +6040,48 @@ async function init() {
   zoomResetBtn?.addEventListener('click', () => {
     const focus = getViewportCenter();
     setDiagramZoom(DEFAULT_DIAGRAM_ZOOM, focus ? { focusPoint: focus } : {});
+  });
+
+  const panUpBtn = document.getElementById('pan-up-btn');
+  const panDownBtn = document.getElementById('pan-down-btn');
+  const panLeftBtn = document.getElementById('pan-left-btn');
+  const panRightBtn = document.getElementById('pan-right-btn');
+  const bindPan = (btn, direction) => {
+    if (!btn) return;
+    btn.addEventListener('click', () => {
+      if (!editorEl) return;
+      panDiagram(direction, editorEl);
+    });
+  };
+  bindPan(panUpBtn, 'up');
+  bindPan(panDownBtn, 'down');
+  bindPan(panLeftBtn, 'left');
+  bindPan(panRightBtn, 'right');
+
+  document.addEventListener('keydown', e => {
+    if (!editorEl) return;
+    if (e.defaultPrevented) return;
+    if (e.altKey || e.ctrlKey || e.metaKey) return;
+    const target = e.target instanceof HTMLElement ? e.target : null;
+    if (target) {
+      const tag = target.tagName;
+      if (target.isContentEditable) return;
+      if (tag === 'INPUT' || tag === 'TEXTAREA' || tag === 'SELECT') return;
+      if (tag === 'BUTTON' || tag === 'A' || tag === 'OPTION') return;
+    }
+    if (e.key === 'ArrowUp') {
+      e.preventDefault();
+      panDiagram('up', editorEl);
+    } else if (e.key === 'ArrowDown') {
+      e.preventDefault();
+      panDiagram('down', editorEl);
+    } else if (e.key === 'ArrowLeft') {
+      e.preventDefault();
+      panDiagram('left', editorEl);
+    } else if (e.key === 'ArrowRight') {
+      e.preventDefault();
+      panDiagram('right', editorEl);
+    }
   });
 
   const gridToggle = document.getElementById('grid-toggle');
