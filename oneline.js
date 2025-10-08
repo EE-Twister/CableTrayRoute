@@ -1034,9 +1034,9 @@ let diagramScale = getItem('diagramScale', { unitPerPx: 1, unit: 'in' });
 const DEFAULT_DIAGRAM_ZOOM = 1;
 const MIN_DIAGRAM_ZOOM = 0.25;
 const MAX_DIAGRAM_ZOOM = 4;
-const DEFAULT_VIEWPORT_WIDTH = 1200;
-const DEFAULT_VIEWPORT_HEIGHT = 675;
-const STATIC_VIEWPORT_SCALE = 6;
+const DEFAULT_VIEWPORT_WIDTH = 960;
+const DEFAULT_VIEWPORT_HEIGHT = 540;
+const STATIC_VIEWPORT_SCALE = 4;
 const STATIC_VIEWPORT_BOUNDS = {
   minX: -DEFAULT_VIEWPORT_WIDTH * STATIC_VIEWPORT_SCALE / 2,
   minY: -DEFAULT_VIEWPORT_HEIGHT * STATIC_VIEWPORT_SCALE / 2,
@@ -1367,16 +1367,18 @@ function adjustZoom(factor, opts = {}) {
 
 function panDiagram(direction, container) {
   if (!(container instanceof HTMLElement)) return;
-  const stepX = Math.max(80, Math.round(container.clientWidth * 0.3));
-  const stepY = Math.max(80, Math.round(container.clientHeight * 0.3));
+  const scrollHost = getScrollableContainer(container) || container;
+  if (!(scrollHost instanceof HTMLElement)) return;
+  const stepX = Math.max(80, Math.round(scrollHost.clientWidth * 0.3));
+  const stepY = Math.max(80, Math.round(scrollHost.clientHeight * 0.3));
   if (direction === 'left') {
-    container.scrollLeft -= stepX;
+    scrollHost.scrollLeft -= stepX;
   } else if (direction === 'right') {
-    container.scrollLeft += stepX;
+    scrollHost.scrollLeft += stepX;
   } else if (direction === 'up') {
-    container.scrollTop -= stepY;
+    scrollHost.scrollTop -= stepY;
   } else if (direction === 'down') {
-    container.scrollTop += stepY;
+    scrollHost.scrollTop += stepY;
   } else {
     return;
   }
