@@ -616,6 +616,8 @@ body.oneline-page .oneline-editor {
   flex: 1;
   min-height: 0;
   height: 100%;
+  overflow: auto;
+  scrollbar-gutter: stable both-edges;
 }
 
 body.oneline-page .oneline-editor #diagram {

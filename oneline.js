@@ -1215,22 +1215,64 @@ function cancelPendingClickSelection() {
   }
 }
 
+function isScrollableElement(element) {
+  if (!(element instanceof HTMLElement)) return false;
+  try {
+    const style = window.getComputedStyle(element);
+    const overflowX = style.overflowX || '';
+    const overflowY = style.overflowY || '';
+    const canScrollX = /auto|scroll|overlay/i.test(overflowX) && element.scrollWidth > element.clientWidth;
+    const canScrollY = /auto|scroll|overlay/i.test(overflowY) && element.scrollHeight > element.clientHeight;
+    return canScrollX || canScrollY;
+  } catch {
+    return false;
+  }
+}
+
 function getScrollableContainer(element) {
   let current = element;
   while (current && current !== document.body && current !== document.documentElement) {
-    try {
-      const style = window.getComputedStyle(current);
-      const overflowX = style.overflowX || '';
-      const overflowY = style.overflowY || '';
-      const canScrollX = /auto|scroll|overlay/i.test(overflowX) && current.scrollWidth > current.clientWidth;
-      const canScrollY = /auto|scroll|overlay/i.test(overflowY) && current.scrollHeight > current.clientHeight;
-      if (canScrollX || canScrollY) return current;
-    } catch {
-      // ignore computed style failures
-    }
+    if (isScrollableElement(current)) return current;
     current = current.parentElement;
   }
   return document.scrollingElement || document.documentElement || document.body;
+}
+
+function findScrollableAncestorWithin(element, boundary) {
+  const root = boundary instanceof Element ? boundary : null;
+  let current = element instanceof Element ? element : null;
+  while (current) {
+    if (root && !root.contains(current)) break;
+    if (isScrollableElement(current)) return current;
+    if (current === root) break;
+    current = current.parentElement;
+  }
+  if (root && isScrollableElement(root)) return root;
+  return null;
+}
+
+function attachLocalWheelScroll(container) {
+  if (!(container instanceof HTMLElement)) return;
+  container.addEventListener('wheel', event => {
+    if (event.ctrlKey) return;
+    const target = event.target instanceof Element ? event.target : container;
+    const scrollHost = findScrollableAncestorWithin(target, container);
+    if (!(scrollHost instanceof HTMLElement)) return;
+    let consumed = false;
+    if (event.deltaY !== 0 && scrollHost.scrollHeight > scrollHost.clientHeight) {
+      const prevTop = scrollHost.scrollTop;
+      scrollHost.scrollTop += event.deltaY;
+      if (scrollHost.scrollTop !== prevTop) consumed = true;
+    }
+    if (event.deltaX !== 0 && scrollHost.scrollWidth > scrollHost.clientWidth) {
+      const prevLeft = scrollHost.scrollLeft;
+      scrollHost.scrollLeft += event.deltaX;
+      if (scrollHost.scrollLeft !== prevLeft) consumed = true;
+    }
+    if (!consumed) return;
+    event.preventDefault();
+    event.stopPropagation();
+  }, { passive: false });
 }
 
 function startMiddlePan(e, container) {
@@ -6220,6 +6262,9 @@ async function init() {
   });
 
   const editorEl = document.querySelector('.oneline-editor');
+  const paletteRoot = document.getElementById('palette');
+  attachLocalWheelScroll(paletteRoot);
+  attachLocalWheelScroll(editorEl);
   const legendEl = document.getElementById('voltage-legend');
   if (editorEl) {
     editorEl.addEventListener('wheel', e => {
