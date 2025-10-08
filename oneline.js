@@ -6263,7 +6263,12 @@ async function init() {
 
   const editorEl = document.querySelector('.oneline-editor');
   const paletteRoot = document.getElementById('palette');
-  attachLocalWheelScroll(paletteRoot);
+  const paletteScroll = paletteRoot?.querySelector('.palette-scroll');
+  if (paletteScroll instanceof HTMLElement) {
+    attachLocalWheelScroll(paletteScroll);
+  } else {
+    attachLocalWheelScroll(paletteRoot);
+  }
   attachLocalWheelScroll(editorEl);
   const legendEl = document.getElementById('voltage-legend');
   if (editorEl) {
