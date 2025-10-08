@@ -169,7 +169,8 @@
               <template id="palette-button-template">
                 <button draggable="true" data-subtype="" title="Drag to canvas or click to add"></button>
               </template>
-                <input type="text" id="palette-search" placeholder="Search" aria-label="Filter components">
+              <input type="text" id="palette-search" placeholder="Search" aria-label="Filter components">
+              <div class="palette-scroll">
                 <div class="palette-card card">
                   <h3>Sources</h3>
                   <details id="sources-section" class="palette-section">
@@ -230,12 +231,13 @@
                   <h3>Templates</h3>
                   <details id="template-section" class="palette-section">
                     <summary><img src="./icons/oneline.svg" alt="" class="summary-icon"> Templates</summary>
-                      <div id="template-buttons" class="section-buttons"></div>
-                    </details>
+                    <div id="template-buttons" class="section-buttons"></div>
+                  </details>
                 </div>
                 <div class="create-component-footer">
                   <a href="./custom-components.html" class="btn create-component-btn" title="Design a new custom component">Create Component</a>
                 </div>
+              </div>
             </div>
           </aside>
           <div class="splitter"></div>

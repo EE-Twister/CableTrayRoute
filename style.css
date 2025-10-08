@@ -606,10 +606,11 @@ body.oneline-page .workspace {
 body.oneline-page .palette {
   height: 100%;
   max-height: none;
+  display: flex;
+  flex-direction: column;
   min-height: 0;
-  overflow-x: hidden;
-  overflow-y: auto;
-  scrollbar-gutter: stable both-edges;
+  overflow: hidden;
+  padding-right: 0;
 }
 
 body.oneline-page .oneline-editor {
@@ -625,6 +626,11 @@ body.oneline-page .oneline-editor #diagram {
 }
 
 body.oneline-page #component-buttons {
+  flex: 1;
+  min-height: 0;
+}
+
+body.oneline-page .palette-scroll {
   flex: 1;
   min-height: 0;
   overflow-y: auto;
