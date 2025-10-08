@@ -617,11 +617,20 @@ body.oneline-page .oneline-editor {
   flex: 1;
   min-height: 0;
   height: 100%;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+
+.oneline-canvas-scroll {
+  position: relative;
+  flex: 1;
+  min-height: 0;
   overflow: auto;
   scrollbar-gutter: stable both-edges;
 }
 
-body.oneline-page .oneline-editor #diagram {
+body.oneline-page .oneline-canvas-scroll #diagram {
   height: 100%;
 }
 
@@ -654,7 +663,7 @@ body.oneline-page .palette-scroll {
   margin-bottom: var(--ol-spacing);
 }
 
-.oneline-editor #diagram {
+.oneline-canvas-scroll #diagram {
   border: 1px solid var(--ol-border-color);
   border-radius: var(--ol-radius);
   width: 100%;
@@ -662,7 +671,10 @@ body.oneline-page .palette-scroll {
 }
 
 .oneline-editor.panning,
-.oneline-editor.panning #diagram {
+.oneline-editor.panning .oneline-canvas-scroll,
+.oneline-editor.panning .oneline-canvas-scroll #diagram,
+.oneline-canvas-scroll.panning,
+.oneline-canvas-scroll.panning #diagram {
   cursor: grabbing;
   cursor: -webkit-grabbing;
 }

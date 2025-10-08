@@ -6093,8 +6093,8 @@ async function init() {
   const bindPan = (btn, direction) => {
     if (!btn) return;
     btn.addEventListener('click', () => {
-      if (!editorEl) return;
-      panDiagram(direction, editorEl);
+      if (!canvasScroll) return;
+      panDiagram(direction, canvasScroll);
     });
   };
   bindPan(panUpBtn, 'up');
@@ -6103,7 +6103,7 @@ async function init() {
   bindPan(panRightBtn, 'right');
 
   document.addEventListener('keydown', e => {
-    if (!editorEl) return;
+    if (!canvasScroll) return;
     if (e.defaultPrevented) return;
     if (e.altKey || e.ctrlKey || e.metaKey) return;
     const target = e.target instanceof HTMLElement ? e.target : null;
@@ -6115,16 +6115,16 @@ async function init() {
     }
     if (e.key === 'ArrowUp') {
       e.preventDefault();
-      panDiagram('up', editorEl);
+      panDiagram('up', canvasScroll);
     } else if (e.key === 'ArrowDown') {
       e.preventDefault();
-      panDiagram('down', editorEl);
+      panDiagram('down', canvasScroll);
     } else if (e.key === 'ArrowLeft') {
       e.preventDefault();
-      panDiagram('left', editorEl);
+      panDiagram('left', canvasScroll);
     } else if (e.key === 'ArrowRight') {
       e.preventDefault();
-      panDiagram('right', editorEl);
+      panDiagram('right', canvasScroll);
     }
   });
 
@@ -6262,6 +6262,7 @@ async function init() {
   });
 
   const editorEl = document.querySelector('.oneline-editor');
+  const canvasScroll = document.querySelector('.oneline-canvas-scroll') || editorEl;
   const paletteRoot = document.getElementById('palette');
   const paletteScroll = paletteRoot?.querySelector('.palette-scroll');
   if (paletteScroll instanceof HTMLElement) {
@@ -6269,10 +6270,10 @@ async function init() {
   } else {
     attachLocalWheelScroll(paletteRoot);
   }
-  attachLocalWheelScroll(editorEl);
+  attachLocalWheelScroll(canvasScroll);
   const legendEl = document.getElementById('voltage-legend');
-  if (editorEl) {
-    editorEl.addEventListener('wheel', e => {
+  if (canvasScroll) {
+    canvasScroll.addEventListener('wheel', e => {
       if (!e.ctrlKey) return;
       const factor = e.deltaY < 0 ? 1.1 : 1 / 1.1;
       const focus = toDiagramCoords(e);
@@ -6297,9 +6298,9 @@ async function init() {
     e.preventDefault();
   });
   document.addEventListener('mousemove', e => {
-    if (!legendDrag || !legendEl || !editorEl) return;
-    const rect = editorEl.getBoundingClientRect();
-    const parent = legendEl.offsetParent instanceof HTMLElement ? legendEl.offsetParent : editorEl;
+    if (!legendDrag || !legendEl || !canvasScroll) return;
+    const rect = canvasScroll.getBoundingClientRect();
+    const parent = legendEl.offsetParent instanceof HTMLElement ? legendEl.offsetParent : canvasScroll;
     const boundsWidth = parent instanceof HTMLElement ? parent.clientWidth : rect.width;
     const boundsHeight = parent instanceof HTMLElement ? parent.clientHeight : rect.height;
     const rawLeft = e.clientX - rect.left - legendDrag.dx;
@@ -6328,9 +6329,9 @@ async function init() {
       marqueeSelectionMade = false;
       pointerDownComponentId = null;
       if (e.button === 1) {
-        if (editorEl) {
+        if (canvasScroll) {
           e.preventDefault();
-          startMiddlePan(e, editorEl);
+          startMiddlePan(e, canvasScroll);
         }
         return;
       }
@@ -6757,7 +6758,7 @@ async function init() {
     compItems.forEach(li => li.style.display = contextTarget && !contextTarget.connection ? 'block' : 'none');
     connItems.forEach(li => li.style.display = contextTarget && contextTarget.connection ? 'block' : 'none');
     canvasItems.forEach(li => li.style.display = contextTarget ? 'none' : 'block');
-    const rect = editorEl?.getBoundingClientRect();
+    const rect = canvasScroll?.getBoundingClientRect();
     if (rect) {
       menu.style.left = `${e.clientX - rect.left}px`;
       menu.style.top = `${e.clientY - rect.top}px`;
