@@ -558,10 +558,16 @@ body.compact-mode .palette-section .section-buttons {
   align-items: start;
 }
 
+html {
+  height: 100%;
+}
+
 body.oneline-page {
   min-height: 100vh;
+  height: 100vh;
   display: flex;
   flex-direction: column;
+  overflow: hidden;
 }
 
 body.oneline-page .top-nav {
@@ -581,6 +587,8 @@ body.oneline-page .main-content {
   display: flex;
   flex-direction: column;
   overflow: hidden;
+  padding: 1rem;
+  gap: 1rem;
 }
 
 body.oneline-page .oneline-card {
@@ -589,6 +597,7 @@ body.oneline-page .oneline-card {
   flex-direction: column;
   min-height: 0;
   overflow: hidden;
+  margin: 0;
 }
 
 body.oneline-page .oneline-card .sheet-controls,
