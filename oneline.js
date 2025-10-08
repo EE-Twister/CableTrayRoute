@@ -410,6 +410,13 @@ function isBusComponent(c) {
   return componentMeta[c.subtype]?.type === 'bus' || c.type === 'bus' || c.subtype === 'Bus';
 }
 
+function isDeviceComponent(c) {
+  if (!c) return false;
+  const category = resolveComponentCategory(c);
+  if (!category) return false;
+  return category !== 'bus' && category !== 'cable' && category !== 'links' && category !== 'annotations';
+}
+
 function defaultPorts(type, subtype) {
   if (type === 'transformer' && subtype === 'three_winding') {
     return [
@@ -1017,6 +1024,7 @@ let sheets = [];
 let activeSheet = 0;
 let components = [];
 let connections = [];
+let connectionErrorMessage = '';
 let selection = [];
 let selected = null;
 let dragOffset = null;
@@ -3282,6 +3290,15 @@ function nearestPortIndexForPoint(comp, point) {
   return bestIdx;
 }
 
+function setConnectionError(message) {
+  connectionErrorMessage = message || '';
+  return false;
+}
+
+function clearConnectionError() {
+  connectionErrorMessage = '';
+}
+
 function ensureConnection(fromComp, toComp, fromPort, toPort) {
   if (!fromComp || !toComp) return false;
   fromComp.connections = fromComp.connections || [];
@@ -3344,11 +3361,29 @@ function ensureConnection(fromComp, toComp, fromPort, toPort) {
     return createdA || createdB;
   }
   const existingConn = fromComp.connections.find(conn => conn.target === toComp.id) || null;
+  const reverseConn = Array.isArray(toComp.connections)
+    ? toComp.connections.find(conn => conn && conn.target === fromComp.id)
+    : null;
+  const fromIsDevice = isDeviceComponent(fromComp);
+  const toIsDevice = isDeviceComponent(toComp);
+  const duplicateMessage = 'Devices must connect to unique components. Remove the existing connection first.';
+  const portMessage = 'Each device connection point supports only one link.';
+  const hasForwardDuplicate = (fromComp.connections || []).some(conn => conn && conn !== existingConn && conn.target === toComp.id);
+  if ((fromIsDevice || toIsDevice) && (hasForwardDuplicate || (reverseConn && reverseConn !== existingConn))) {
+    return setConnectionError(duplicateMessage);
+  }
+  if (fromIsDevice && existingConn && normalizePortIndex(existingConn.sourcePort) !== fromIdx) {
+    return setConnectionError(duplicateMessage);
+  }
   if (existingConn && normalizePortIndex(existingConn.sourcePort) === fromIdx && normalizePortIndex(existingConn.targetPort) === toIdx) {
     return false;
   }
-  if (portInUse(fromComp, fromIdx, existingConn)) return false;
-  if (portInUse(toComp, toIdx, existingConn)) return false;
+  if (portInUse(fromComp, fromIdx, existingConn)) {
+    return fromIsDevice ? setConnectionError(portMessage) : false;
+  }
+  if (portInUse(toComp, toIdx, existingConn)) {
+    return toIsDevice ? setConnectionError(portMessage) : false;
+  }
   if (existingConn) {
     existingConn.sourcePort = fromIdx;
     existingConn.targetPort = toIdx;
@@ -6618,11 +6653,15 @@ async function init() {
           const toComp = hoverPort.component;
           const fromPort = connectSource.port;
           const toPort = hoverPort.port;
+          clearConnectionError();
           const created = ensureConnection(fromComp, toComp, fromPort, toPort);
           if (created) {
             pushHistory();
             render();
             save();
+          } else if (connectionErrorMessage) {
+            showToast(connectionErrorMessage);
+            clearConnectionError();
           }
         }
         connectSource = null;
