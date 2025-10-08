@@ -609,6 +609,7 @@ body.oneline-page .palette {
   min-height: 0;
   overflow-x: hidden;
   overflow-y: auto;
+  scrollbar-gutter: stable both-edges;
 }
 
 body.oneline-page .oneline-editor {
@@ -626,6 +627,7 @@ body.oneline-page #component-buttons {
   min-height: 0;
   overflow-y: auto;
   padding-right: 0.25rem;
+  scrollbar-gutter: stable both-edges;
 }
 
 .splitter {
