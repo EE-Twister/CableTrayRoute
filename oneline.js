@@ -1637,11 +1637,39 @@ function formatVoltage(volts) {
   return `${volts.toFixed(1)} V`;
 }
 
+function formatPhases(phases) {
+  if (!phases) return '';
+  if (Array.isArray(phases)) return phases.join(', ');
+  return String(phases);
+}
+
+function extractSummaryEntries(summary) {
+  if (!summary || typeof summary !== 'object') return [];
+  const hasSystemTotals = 'totalLoadKW' in summary
+    || 'totalGenKW' in summary
+    || 'totalLossKW' in summary
+    || 'totalLossKVAR' in summary
+    || Array.isArray(summary.branchConnections);
+  if (hasSystemTotals) {
+    return [{ label: 'System', data: summary }];
+  }
+  return Object.entries(summary).map(([label, data]) => ({
+    label: label.toUpperCase(),
+    data
+  }));
+}
+
 function buildSummaryList(summary) {
-  if (!summary || typeof summary !== 'object') return '';
+  const entries = extractSummaryEntries(summary);
+  if (!entries.length) return '';
   const items = [];
-  const emit = (label, data) => {
+  entries.forEach(({ label, data }) => {
     if (!data || typeof data !== 'object') return;
+    const hasTotals = 'totalLoadKW' in data
+      || 'totalGenKW' in data
+      || 'totalLossKW' in data
+      || 'totalLossKVAR' in data;
+    if (!hasTotals) return;
     const loadKw = formatNumber(data.totalLoadKW, 1, '0.0');
     const loadKvar = formatNumber(data.totalLoadKVAR, 1, '0.0');
     const genKw = formatNumber(data.totalGenKW, 1, '0.0');
@@ -1649,13 +1677,58 @@ function buildSummaryList(summary) {
     const lossKw = formatNumber(data.totalLossKW, 2, '0.00');
     const lossKvar = formatNumber(data.totalLossKVAR, 2, '0.00');
     items.push(`<li><strong>${escapeHtml(label)}</strong>: Load ${loadKw} kW / ${loadKvar} kvar, Generation ${genKw} kW / ${genKvar} kvar, Loss ${lossKw} kW / ${lossKvar} kvar</li>`);
-  };
-  if ('totalLoadKW' in summary || 'totalGenKW' in summary) {
-    emit('System', summary);
-  } else {
-    Object.entries(summary).forEach(([label, data]) => emit(label.toUpperCase(), data));
-  }
+  });
   return items.length ? `<h3>Power Summary</h3><ul class="lf-summary">${items.join('')}</ul>` : '';
+}
+
+function buildBranchConnectionsSection(summary) {
+  const entries = extractSummaryEntries(summary)
+    .map(({ label, data }) => ({
+      label,
+      connections: Array.isArray(data?.branchConnections) ? data.branchConnections : []
+    }))
+    .filter(entry => entry.connections.length);
+  if (!entries.length) return '';
+  let html = '<h3>Branch Connections</h3>';
+  const showSubheading = entries.length > 1;
+  entries.forEach(({ label, connections }) => {
+    if (showSubheading) {
+      html += `<h4>${escapeHtml(label)}</h4>`;
+    }
+    html += '<table><thead><tr><th>Device</th><th>ID</th><th>Type</th><th>From Bus</th><th>To Bus</th><th>Phases</th><th>Rating</th></tr></thead><tbody>';
+    connections.forEach(conn => {
+      const primaryName = conn.componentName || conn.componentLabel || '';
+      const secondaryLabel = conn.componentLabel && conn.componentLabel !== primaryName ? conn.componentLabel : '';
+      const refLabel = conn.componentRef && conn.componentRef !== conn.componentId ? conn.componentRef : '';
+      let deviceCell = primaryName ? escapeHtml(primaryName) : '';
+      if (secondaryLabel) {
+        deviceCell += (deviceCell ? '<br>' : '') + escapeHtml(secondaryLabel);
+      }
+      if (refLabel) {
+        deviceCell += (deviceCell ? '<br>' : '') + escapeHtml(refLabel);
+      }
+      const typeParts = [conn.componentType, conn.componentSubtype].filter(Boolean);
+      const typeText = typeParts.join(' / ');
+      let ratingText = '';
+      if (Number.isFinite(conn.rating)) {
+        const digits = Math.abs(conn.rating % 1) < 1e-6 ? 0 : 2;
+        ratingText = formatNumber(conn.rating, digits, '');
+      } else if (conn.rating !== undefined && conn.rating !== null) {
+        ratingText = String(conn.rating);
+      }
+      html += '<tr>'
+        + `<td>${deviceCell || ''}</td>`
+        + `<td>${escapeHtml(conn.componentId || '')}</td>`
+        + `<td>${escapeHtml(typeText)}</td>`
+        + `<td>${escapeHtml(conn.fromBus || '')}</td>`
+        + `<td>${escapeHtml(conn.toBus || '')}</td>`
+        + `<td>${escapeHtml(formatPhases(conn.phases))}</td>`
+        + `<td>${escapeHtml(ratingText)}</td>`
+        + '</tr>';
+    });
+    html += '</tbody></table>';
+  });
+  return html;
 }
 
 function renderLoadFlowResults(res) {
@@ -1683,6 +1756,7 @@ function renderLoadFlowResults(res) {
   }
 
   html += buildSummaryList(res?.summary);
+  html += buildBranchConnectionsSection(res?.summary);
 
   if (buses.length) {
     html += '<h3>Bus Voltages</h3>';
