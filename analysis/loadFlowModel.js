@@ -371,6 +371,9 @@ export function buildLoadFlowModel(oneLine = {}) {
       const shunt = cloneData(comp.shunt);
       const rating = comp.rating ?? comp.ampacity ?? comp.currentRating;
       const phases = comp.phases ? cloneData(comp.phases) : undefined;
+      const componentName = typeof comp.name === 'string' ? comp.name : undefined;
+      const componentLabel = typeof comp.label === 'string' ? comp.label : undefined;
+      const componentRef = typeof comp.ref === 'string' ? comp.ref : undefined;
       const branch = {
         id: comp.id,
         type: comp.type,
@@ -381,7 +384,10 @@ export function buildLoadFlowModel(oneLine = {}) {
         tap,
         shunt,
         rating,
-        phases
+        phases,
+        name: componentName,
+        label: componentLabel,
+        ref: componentRef
       };
       branches.push(branch);
       const fromBus = busMap.get(fromId);
@@ -398,7 +404,10 @@ export function buildLoadFlowModel(oneLine = {}) {
             phases,
             componentId: comp.id,
             componentType: comp.type,
-            componentSubtype: comp.subtype
+            componentSubtype: comp.subtype,
+            componentName,
+            componentLabel,
+            componentRef
           };
           fromBus.connections.push(conn);
         }

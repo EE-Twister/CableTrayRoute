@@ -333,10 +333,16 @@ function solvePhase(buses, baseMVA) {
       const key = componentId ? componentId : `${bus.id}->${conn.target}`;
       if (seenConnections.has(key)) return;
       seenConnections.add(key);
+      const phases = Array.isArray(conn.phases) ? [...conn.phases] : conn.phases;
       branchConnections.push({
         componentId,
+        componentName: conn.componentName,
+        componentLabel: conn.componentLabel,
+        componentRef: conn.componentRef,
         componentType: conn.componentType,
         componentSubtype: conn.componentSubtype,
+        rating: conn.rating,
+        phases,
         fromBus: bus.id,
         toBus: conn.target
       });
@@ -507,7 +513,10 @@ export function runLoadFlow(modelOrOpts = {}, maybeOpts = {}) {
           phases: cloneData(branch.phases),
           componentId,
           componentType: branch.type,
-          componentSubtype: branch.subtype
+          componentSubtype: branch.subtype,
+          componentName: branch.name,
+          componentLabel: branch.label,
+          componentRef: branch.ref
         });
       });
     }
@@ -545,8 +554,12 @@ export function runLoadFlow(modelOrOpts = {}, maybeOpts = {}) {
           tap: conn.tap,
           shunt: conn.shunt,
           componentId: conn.componentId || conn.id,
+          componentName: conn.componentName,
+          componentLabel: conn.componentLabel,
+          componentRef: conn.componentRef,
           componentType: conn.componentType,
           componentSubtype: conn.componentSubtype,
+          rating: conn.rating,
           phases: conn.phases
         }))
       };
