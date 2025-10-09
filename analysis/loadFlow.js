@@ -2,6 +2,8 @@ import { getOneLine } from '../dataStore.mjs';
 import { buildLoadFlowModel, cloneData, isBusComponent } from './loadFlowModel.js';
 
 const IGNORED_TYPES = new Set(['annotation', 'dimension']);
+const MIN_COMPLEX_MAG = 1e-12;
+const LARGE_ADMITTANCE = 1e12;
 
 function toNumber(value, scale = 1) {
   const num = Number(value);
@@ -12,6 +14,10 @@ function isUsableComponent(comp) {
   return comp && !IGNORED_TYPES.has(comp.type);
 }
 
+function hasConnectionMetadata(conn) {
+  return Boolean(conn && (conn.componentType || conn.componentSubtype || conn.componentName || conn.componentLabel || conn.componentRef));
+}
+
 /** Basic complex number helpers used by the load-flow solver */
 function toComplex(re = 0, im = 0) {
   return { re, im };
@@ -20,10 +26,16 @@ function add(a, b) { return { re: a.re + b.re, im: a.im + b.im }; }
 function sub(a, b) { return { re: a.re - b.re, im: a.im - b.im }; }
 function mul(a, b) { return { re: a.re * b.re - a.im * b.im, im: a.re * b.im + a.im * b.re }; }
 function div(a, b) {
-  const den = b.re * b.re + b.im * b.im || 1e-12;
+  const den = b.re * b.re + b.im * b.im || MIN_COMPLEX_MAG;
   return { re: (a.re * b.re + a.im * b.im) / den, im: (a.im * b.re - a.re * b.im) / den };
 }
-function inv(a) { return div({ re: 1, im: 0 }, a); }
+function inv(a) {
+  const mag2 = a.re * a.re + a.im * a.im;
+  if (mag2 < MIN_COMPLEX_MAG) {
+    return toComplex(LARGE_ADMITTANCE, 0);
+  }
+  return { re: a.re / mag2, im: -a.im / mag2 };
+}
 function conj(a) { return { re: a.re, im: -a.im }; }
 
 /** Convert an impedance in ohms to per‑unit based on bus base kV and system MVA. */
@@ -47,6 +59,10 @@ function buildYBus(buses, baseMVA) {
       const j = buses.findIndex(b => b.id === conn.target);
       if (j < 0) return;
       const Z = toPerUnitZ(conn.impedance || { r: 0, x: 0 }, bus.baseKV || 1, baseMVA);
+      const mag2 = Z.re * Z.re + Z.im * Z.im;
+      if (mag2 < MIN_COMPLEX_MAG && !hasConnectionMetadata(conn)) {
+        return;
+      }
       const y = inv(toComplex(Z.re, Z.im));
       const tapMag = conn.tap?.ratio || conn.tap || 1;
       const tapAng = (conn.tap?.angle || 0) * Math.PI / 180;
