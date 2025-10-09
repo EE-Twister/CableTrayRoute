@@ -3586,18 +3586,25 @@ function ensureConnection(fromComp, toComp, fromPort, toPort) {
     return componentsAreLinked(comp, fromComp) || componentsAreLinked(comp, toComp);
   });
   if (linkedBus && (isBusComponent(fromComp) || isBusComponent(toComp))) {
-    let changed = false;
-    const startPos = portPosition(fromComp, fromIdx);
-    const endPos = portPosition(toComp, toIdx);
-    if (!hasForwardConnection(fromComp, linkedBus)) {
-      const busPort = nearestPortIndexForPoint(linkedBus, startPos);
-      changed = ensureConnection(fromComp, linkedBus, fromIdx, busPort) || changed;
+    const busComp = isBusComponent(fromComp) ? fromComp : toComp;
+    const otherComp = busComp === fromComp ? toComp : fromComp;
+    const linkedToBus = componentsAreLinked(linkedBus, busComp);
+    const linkedToOther = componentsAreLinked(linkedBus, otherComp);
+    if (linkedToBus && linkedToOther) {
+      // Only reroute through an intermediate bus when it already links both components.
+      let changed = false;
+      const startPos = portPosition(fromComp, fromIdx);
+      const endPos = portPosition(toComp, toIdx);
+      if (!hasForwardConnection(fromComp, linkedBus)) {
+        const busPort = nearestPortIndexForPoint(linkedBus, startPos);
+        changed = ensureConnection(fromComp, linkedBus, fromIdx, busPort) || changed;
+      }
+      if (!hasForwardConnection(linkedBus, toComp)) {
+        const busPort = nearestPortIndexForPoint(linkedBus, endPos);
+        changed = ensureConnection(linkedBus, toComp, busPort, toIdx) || changed;
+      }
+      if (changed) return true;
     }
-    if (!hasForwardConnection(linkedBus, toComp)) {
-      const busPort = nearestPortIndexForPoint(linkedBus, endPos);
-      changed = ensureConnection(linkedBus, toComp, busPort, toIdx) || changed;
-    }
-    if (changed) return true;
   }
   if (isImpedanceDevice(fromComp) && isImpedanceDevice(toComp) && !componentsAreLinked(fromComp, toComp)) {
     const startPos = portPosition(fromComp, fromIdx);
