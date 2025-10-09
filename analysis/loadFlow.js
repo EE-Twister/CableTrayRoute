@@ -554,8 +554,12 @@ export function runLoadFlow(modelOrOpts = {}, maybeOpts = {}) {
           tap: conn.tap,
           shunt: conn.shunt,
           componentId: conn.componentId || conn.id,
+          componentName: conn.componentName,
+          componentLabel: conn.componentLabel,
+          componentRef: conn.componentRef,
           componentType: conn.componentType,
           componentSubtype: conn.componentSubtype,
+          rating: conn.rating,
           phases: conn.phases
         }))
       };
