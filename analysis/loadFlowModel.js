@@ -396,7 +396,9 @@ export function buildLoadFlowModel(oneLine = {}) {
             shunt: branch.shunt ? cloneData(branch.shunt) : undefined,
             rating: branch.rating,
             phases,
-            componentId: comp.id
+            componentId: comp.id,
+            componentType: comp.type,
+            componentSubtype: comp.subtype
           };
           fromBus.connections.push(conn);
         }
