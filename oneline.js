@@ -3491,14 +3491,31 @@ function updateCableOperatingVoltages(comps = components) {
     const upstream = findSourceComponent(comp.id, comps);
     const outbound = (comp.connections || []).find(conn => conn && conn.target);
     const downstream = outbound ? byId.get(outbound.target) || null : null;
-    const candidates = [
-      computeComponentOperatingVoltage(comp),
-      computeComponentOperatingVoltage(upstream),
-      computeComponentOperatingVoltage(downstream)
-    ].filter(value => value !== null);
-    if (!candidates.length) return;
-    const resolved = Number(candidates[0]);
-    if (!Number.isFinite(resolved)) return;
+    const prioritized = [upstream, downstream, comp];
+    let resolved = null;
+    for (const source of prioritized) {
+      if (!source) continue;
+      const nominal = resolveNominalVoltage(source);
+      if (nominal === null) continue;
+      const magnitude = resolveVoltageMagnitude(source);
+      if (magnitude === null) continue;
+      const candidate = Number(nominal * magnitude);
+      if (Number.isFinite(candidate)) {
+        resolved = candidate;
+        break;
+      }
+    }
+    if (resolved === null) {
+      for (const source of prioritized) {
+        const candidate = computeComponentOperatingVoltage(source);
+        if (candidate === null) continue;
+        const numeric = Number(candidate);
+        if (!Number.isFinite(numeric)) continue;
+        resolved = numeric;
+        break;
+      }
+    }
+    if (resolved === null) return;
     const rounded = Number(resolved.toFixed(2));
     comp.cable.operating_voltage = rounded;
     if (outbound) {
