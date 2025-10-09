@@ -222,6 +222,16 @@ function solvePhase(buses, baseMVA) {
     warnings.push(`Solution did not converge after ${maxIter} iterations. Last mismatch ${maxMis.toFixed(4)} pu (${mismatchKW.toFixed(1)} kW).`);
   }
 
+  const { P: PcalcFinal, Q: QcalcFinal } = calcPQ(working, Y, Vm, Va);
+  const baseKW = baseMVA * 1000;
+  const actualGeneration = working.map((bus, i) => {
+    const netP = Number.isFinite(PcalcFinal[i]) ? PcalcFinal[i] * baseKW : 0;
+    const netQ = Number.isFinite(QcalcFinal[i]) ? QcalcFinal[i] * baseKW : 0;
+    const Pg = netP + (bus.Pd || 0);
+    const Qg = netQ + (bus.Qd || 0);
+    return { Pg, Qg };
+  });
+
   const busRes = working.map((b, i) => {
     const angleDeg = Va[i] * 180 / Math.PI;
     const voltageKV = b.baseKV * Vm[i];
@@ -236,8 +246,8 @@ function solvePhase(buses, baseMVA) {
       type: b.type,
       Pd: b.Pd,
       Qd: b.Qd,
-      Pg: b.Pg,
-      Qg: b.Qg
+      Pg: actualGeneration[i].Pg,
+      Qg: actualGeneration[i].Qg
     };
   });
 
@@ -296,20 +306,20 @@ function solvePhase(buses, baseMVA) {
   const sources = working.map((bus, i) => ({
     id: bus.id,
     type: bus.type,
-    Pg: bus.Pg,
-    Qg: bus.Qg,
+    Pg: actualGeneration[i].Pg,
+    Qg: actualGeneration[i].Qg,
     baseKV: bus.baseKV,
     Vm: Vm[i],
     Va: Va[i] * 180 / Math.PI,
     voltageKV: bus.baseKV * Vm[i],
     voltageV: bus.baseKV * Vm[i] * 1000
-  })).filter(src => Math.abs(src.Pg) > 0 || Math.abs(src.Qg) > 0 || (src.type || '').toLowerCase() === 'slack');
+  })).filter(src => Math.abs(src.Pg) > 1e-6 || Math.abs(src.Qg) > 1e-6 || (src.type || '').toLowerCase() === 'slack');
 
   const summary = {
     totalLoadKW: working.reduce((sum, bus) => sum + (bus.Pd || 0), 0),
     totalLoadKVAR: working.reduce((sum, bus) => sum + (bus.Qd || 0), 0),
-    totalGenKW: working.reduce((sum, bus) => sum + (bus.Pg || 0), 0),
-    totalGenKVAR: working.reduce((sum, bus) => sum + (bus.Qg || 0), 0),
+    totalGenKW: actualGeneration.reduce((sum, gen) => sum + gen.Pg, 0),
+    totalGenKVAR: actualGeneration.reduce((sum, gen) => sum + gen.Qg, 0),
     totalLossKW: Number.isFinite(losses.P) ? losses.P : 0,
     totalLossKVAR: Number.isFinite(losses.Q) ? losses.Q : 0
   };
