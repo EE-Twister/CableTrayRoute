@@ -1022,6 +1022,7 @@ let selected = null;
 let dragOffset = null;
 let dragging = false;
 let draggingConnection = null;
+let dragConnections = null;
 let draggingLabel = null;
 let clipboard = [];
 let contextTarget = null;
@@ -3306,7 +3307,7 @@ function ensureConnection(fromComp, toComp, fromPort, toPort) {
     if (!isBusComponent(comp) || comp === fromComp || comp === toComp) return false;
     return componentsAreLinked(comp, fromComp) || componentsAreLinked(comp, toComp);
   });
-  if (linkedBus) {
+  if (linkedBus && (isBusComponent(fromComp) || isBusComponent(toComp))) {
     let changed = false;
     const startPos = portPosition(fromComp, fromIdx);
     const endPos = portPosition(toComp, toIdx);
@@ -3496,6 +3497,54 @@ function componentBounds(comp) {
     right: Math.max(...xs),
     bottom: Math.max(...ys)
   };
+}
+
+function computeDragConnections(selectedComponents) {
+  if (!Array.isArray(selectedComponents) || !selectedComponents.length) {
+    return [];
+  }
+  const incomingMap = new Map();
+  components.forEach(source => {
+    (source.connections || []).forEach(conn => {
+      if (!incomingMap.has(conn.target)) incomingMap.set(conn.target, []);
+      incomingMap.get(conn.target).push({ source, conn });
+    });
+  });
+  const seen = new Set();
+  const records = [];
+  const addRecord = (sourceComp, conn) => {
+    if (!conn || seen.has(conn)) return;
+    if (conn.dir !== 'h' && conn.dir !== 'v') return;
+    const targetComp = components.find(c => c.id === conn.target);
+    if (!targetComp) return;
+    const startPos = portPosition(sourceComp, conn.sourcePort);
+    const endPos = portPosition(targetComp, conn.targetPort);
+    if (!startPos || !endPos) return;
+    const baseMid = Number.isFinite(conn.mid)
+      ? conn.mid
+      : conn.dir === 'h'
+        ? (startPos.x + endPos.x) / 2
+        : (startPos.y + endPos.y) / 2;
+    const baseAvg = conn.dir === 'h'
+      ? (startPos.x + endPos.x) / 2
+      : (startPos.y + endPos.y) / 2;
+    const offset = Number.isFinite(baseMid) && Number.isFinite(baseAvg)
+      ? baseMid - baseAvg
+      : 0;
+    seen.add(conn);
+    records.push({
+      conn,
+      dir: conn.dir,
+      source: sourceComp,
+      target: targetComp,
+      offset
+    });
+  };
+  selectedComponents.forEach(comp => {
+    (comp.connections || []).forEach(conn => addRecord(comp, conn));
+    (incomingMap.get(comp.id) || []).forEach(entry => addRecord(entry.source, entry.conn));
+  });
+  return records;
 }
 
 function finalizeMarqueeSelection() {
@@ -6418,6 +6467,7 @@ async function init() {
         startX: c.x,
         startY: c.y
       }));
+      dragConnections = computeDragConnections(selection);
       dragging = false;
       render();
     });
@@ -6561,6 +6611,24 @@ async function init() {
       }
     });
     if (moved) {
+      if (dragConnections && dragConnections.length) {
+        dragConnections.forEach(entry => {
+          const { conn, dir, source, target, offset } = entry;
+          if (!conn || (dir !== 'h' && dir !== 'v')) return;
+          const startPos = portPosition(source, conn.sourcePort);
+          const endPos = target ? portPosition(target, conn.targetPort) : null;
+          if (!startPos || !endPos) return;
+          const base = dir === 'h'
+            ? (startPos.x + endPos.x) / 2
+            : (startPos.y + endPos.y) / 2;
+          const nextMid = Number.isFinite(base)
+            ? base + (Number.isFinite(offset) ? offset : 0)
+            : base;
+          if (Number.isFinite(nextMid)) {
+            conn.mid = Number(nextMid.toFixed(2));
+          }
+        });
+      }
       render();
       if (snapPos) flashSnapIndicator(snapPos.x, snapPos.y);
     }
@@ -6647,9 +6715,11 @@ async function init() {
           movedDuringDrag = true;
         }
         dragOffset = null;
+        dragConnections = null;
         dragging = false;
       } else {
         dragOffset = null;
+        dragConnections = null;
       }
       if (movedDuringDrag) {
         lastPointerUp = { id: null, time: 0 };
