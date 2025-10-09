@@ -79,6 +79,7 @@ import { runValidation } from './validation/rules.js';
 import { exportPDF } from './exporters/pdf.js';
 import { exportDXF, exportDWG } from './exporters/dxf.js';
 import { openModal } from './src/components/modal.js';
+import { normalizeVoltageToVolts, toBaseKV } from './utils/voltage.js';
 import './site.js';
 
 let componentMeta = {};
@@ -1529,12 +1530,27 @@ if (runLFBtn) runLFBtn.addEventListener('click', () => {
     (comp.connections || []).forEach(conn => {
       delete conn.loading_kW;
       delete conn.loading_amps;
+      delete conn.voltage_drop_pct;
+      delete conn.voltage_from_kv;
+      delete conn.voltage_to_kv;
+      delete conn.voltage_from_v;
+      delete conn.voltage_to_v;
     });
   });
-  const buses = res.buses || res;
+  const buses = Array.isArray(res?.buses)
+    ? res.buses
+    : Array.isArray(res)
+      ? res
+      : [];
   buses.forEach(r => {
     const comp = diagram.find(c => c.id === r.id);
     if (!comp) return;
+    if (!Number.isFinite(r.Vm)) return;
+    const kv = Number.isFinite(r.voltageKV)
+      ? r.voltageKV
+      : Number.isFinite(r.baseKV)
+        ? r.baseKV * r.Vm
+        : null;
     if (r.phase) {
       if (typeof comp.voltage_mag !== 'object') comp.voltage_mag = {};
       if (typeof comp.voltage_angle !== 'object') comp.voltage_angle = {};
@@ -1543,6 +1559,12 @@ if (runLFBtn) runLFBtn.addEventListener('click', () => {
     } else {
       comp.voltage_mag = Number(r.Vm.toFixed(4));
       comp.voltage_angle = Number(r.Va.toFixed(4));
+    }
+    if (kv !== null && Number.isFinite(kv)) {
+      const kvRounded = Number(kv.toFixed(4));
+      const voltsRounded = Number((kv * 1000).toFixed(1));
+      comp.voltage_kv = kvRounded;
+      comp.voltage_v = voltsRounded;
     }
   });
   // store line loading results on connections
@@ -1557,6 +1579,9 @@ if (runLFBtn) runLFBtn.addEventListener('click', () => {
         : null;
     const formatKw = value => Number(value.toFixed(2));
     const formatAmp = value => Number(value.toFixed(1));
+    const formatPct = value => Number(value.toFixed(2));
+    const formatKV = value => Number(value.toFixed(3));
+    const formatVolts = value => Number(value.toFixed(1));
     if (l.phase) {
       if (typeof conn.loading_kW !== 'object') conn.loading_kW = {};
       conn.loading_kW[l.phase] = formatKw(l.P);
@@ -1564,12 +1589,23 @@ if (runLFBtn) runLFBtn.addEventListener('click', () => {
         if (typeof conn.loading_amps !== 'object') conn.loading_amps = {};
         conn.loading_amps[l.phase] = formatAmp(ampsRaw);
       }
+      if (typeof l.dropPct === 'number') {
+        if (typeof conn.voltage_drop_pct !== 'object') conn.voltage_drop_pct = {};
+        conn.voltage_drop_pct[l.phase] = formatPct(l.dropPct);
+      }
     } else {
       conn.loading_kW = formatKw(l.P);
       if (ampsRaw !== null) {
         conn.loading_amps = formatAmp(ampsRaw);
       }
+      if (typeof l.dropPct === 'number') {
+        conn.voltage_drop_pct = formatPct(l.dropPct);
+      }
     }
+    if (typeof l.fromKV === 'number') conn.voltage_from_kv = formatKV(l.fromKV);
+    if (typeof l.toKV === 'number') conn.voltage_to_kv = formatKV(l.toKV);
+    if (typeof l.fromKV === 'number') conn.voltage_from_v = formatVolts(l.fromKV * 1000);
+    if (typeof l.toKV === 'number') conn.voltage_to_v = formatVolts(l.toKV * 1000);
   });
   updateCableOperatingVoltages(diagram);
   setOneLine({ activeSheet, sheets });
@@ -1582,36 +1618,152 @@ if (runLFBtn) runLFBtn.addEventListener('click', () => {
   render();
 });
 
+function escapeHtml(value) {
+  return String(value ?? '')
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&#39;');
+}
+
+function formatNumber(value, digits, fallback = '') {
+  return Number.isFinite(value) ? Number(value).toFixed(digits) : fallback;
+}
+
+function formatVoltage(volts) {
+  if (!Number.isFinite(volts)) return '';
+  if (Math.abs(volts) >= 1000) return `${(volts / 1000).toFixed(3)} kV`;
+  return `${volts.toFixed(1)} V`;
+}
+
+function buildSummaryList(summary) {
+  if (!summary || typeof summary !== 'object') return '';
+  const items = [];
+  const emit = (label, data) => {
+    if (!data || typeof data !== 'object') return;
+    const loadKw = formatNumber(data.totalLoadKW, 1, '0.0');
+    const loadKvar = formatNumber(data.totalLoadKVAR, 1, '0.0');
+    const genKw = formatNumber(data.totalGenKW, 1, '0.0');
+    const genKvar = formatNumber(data.totalGenKVAR, 1, '0.0');
+    const lossKw = formatNumber(data.totalLossKW, 2, '0.00');
+    const lossKvar = formatNumber(data.totalLossKVAR, 2, '0.00');
+    items.push(`<li><strong>${escapeHtml(label)}</strong>: Load ${loadKw} kW / ${loadKvar} kvar, Generation ${genKw} kW / ${genKvar} kvar, Loss ${lossKw} kW / ${lossKvar} kvar</li>`);
+  };
+  if ('totalLoadKW' in summary || 'totalGenKW' in summary) {
+    emit('System', summary);
+  } else {
+    Object.entries(summary).forEach(([label, data]) => emit(label.toUpperCase(), data));
+  }
+  return items.length ? `<h3>Power Summary</h3><ul class="lf-summary">${items.join('')}</ul>` : '';
+}
+
 function renderLoadFlowResults(res) {
   if (!loadFlowResultsEl) return;
-  const buses = res.buses || res;
-  let html = '<h3>Bus Voltages</h3><table><tr><th>Bus</th><th>Phase</th><th>Vm</th><th>Va</th></tr>';
-  buses.forEach(b => {
-    html += `<tr><td>${b.id}</td><td>${b.phase || ''}</td><td>${b.Vm.toFixed(4)}</td><td>${b.Va.toFixed(2)}</td></tr>`;
-  });
-  html += '</table>';
-  if (res.lines) {
-    html += '<h3>Line Flows (kW/kvar)</h3><table><tr><th>From</th><th>To</th><th>Phase</th><th>P</th><th>Q</th><th>I (A)</th></tr>';
-    res.lines.forEach(l => {
-      const amps = typeof l.amps === 'number'
-        ? l.amps
-        : typeof l.currentKA === 'number'
-          ? l.currentKA * 1000
-          : null;
-      const ampsText = amps !== null ? amps.toFixed(1) : '';
-      html += `<tr><td>${l.from}</td><td>${l.to}</td><td>${l.phase || ''}</td><td>${l.P.toFixed(2)}</td><td>${l.Q.toFixed(2)}</td><td>${ampsText}</td></tr>`;
+  const buses = Array.isArray(res?.buses)
+    ? res.buses
+    : Array.isArray(res)
+      ? res
+      : [];
+  const lines = Array.isArray(res?.lines) ? res.lines : [];
+  const sources = Array.isArray(res?.sources) ? res.sources : [];
+  const warnings = Array.isArray(res?.warnings) ? res.warnings.filter(Boolean) : [];
+  const converged = res?.converged !== false;
+  let html = '';
+
+  if (!converged) {
+    const mismatch = formatNumber(res?.maxMismatch, 4, '—');
+    const mismatchKw = formatNumber(res?.maxMismatchKW, 1, '—');
+    html += `<p class="study-warning">Load flow did not converge. Max mismatch ${mismatch} pu (${mismatchKw} kW).</p>`;
+  }
+  if (warnings.length) {
+    html += '<ul class="study-warning-list">';
+    warnings.forEach(msg => { html += `<li>${escapeHtml(msg)}</li>`; });
+    html += '</ul>';
+  }
+
+  html += buildSummaryList(res?.summary);
+
+  if (buses.length) {
+    html += '<h3>Bus Voltages</h3>';
+    html += '<table><thead><tr><th>Bus</th><th>Type</th><th>Phase</th><th>Vm (pu)</th><th>Voltage</th><th>Angle (deg)</th><th>Load (kW)</th><th>Generation (kW)</th></tr></thead><tbody>';
+    buses.forEach(bus => {
+      const volts = Number.isFinite(bus.voltageV)
+        ? formatVoltage(bus.voltageV)
+        : Number.isFinite(bus.voltageKV)
+          ? `${formatNumber(bus.voltageKV, 3)} kV`
+          : '';
+      html += '<tr>'
+        + `<td>${escapeHtml(bus.id || '')}</td>`
+        + `<td>${escapeHtml(bus.type || '')}</td>`
+        + `<td>${escapeHtml(bus.phase || '')}</td>`
+        + `<td>${formatNumber(bus.Vm, 4, '—')}</td>`
+        + `<td>${volts}</td>`
+        + `<td>${formatNumber(bus.Va, 2, '—')}</td>`
+        + `<td>${formatNumber(bus.Pd, 1, '0.0')}</td>`
+        + `<td>${formatNumber(bus.Pg, 1, '0.0')}</td>`
+        + '</tr>';
     });
-    html += '</table>';
-    if (res.losses) {
-      if (res.losses.P !== undefined) {
-        html += `<p>Total Losses: ${res.losses.P.toFixed(2)} kW / ${res.losses.Q.toFixed(2)} kvar</p>`;
+    html += '</tbody></table>';
+  }
+
+  if (lines.length) {
+    html += '<h3>Line Flows</h3>';
+    html += '<table><thead><tr><th>From</th><th>To</th><th>Phase</th><th>P (kW)</th><th>Q (kvar)</th><th>I (A)</th><th>From (kV)</th><th>To (kV)</th><th>ΔV (%)</th></tr></thead><tbody>';
+    lines.forEach(line => {
+      const amps = Number.isFinite(line.amps)
+        ? line.amps
+        : Number.isFinite(line.currentKA)
+          ? line.currentKA * 1000
+          : null;
+      html += '<tr>'
+        + `<td>${escapeHtml(line.from || '')}</td>`
+        + `<td>${escapeHtml(line.to || '')}</td>`
+        + `<td>${escapeHtml(line.phase || '')}</td>`
+        + `<td>${formatNumber(line.P, 2, '0.00')}</td>`
+        + `<td>${formatNumber(line.Q, 2, '0.00')}</td>`
+        + `<td>${amps !== null ? formatNumber(amps, 1, '0.0') : ''}</td>`
+        + `<td>${formatNumber(line.fromKV, 3, '')}</td>`
+        + `<td>${formatNumber(line.toKV, 3, '')}</td>`
+        + `<td>${formatNumber(line.dropPct, 2, '')}</td>`
+        + '</tr>';
+    });
+    html += '</tbody></table>';
+    if (res?.losses) {
+      if (Number.isFinite(res.losses?.P)) {
+        html += `<p>Total Losses: ${formatNumber(res.losses.P, 2, '0.00')} kW / ${formatNumber(res.losses.Q, 2, '0.00')} kvar</p>`;
       } else {
-        const entries = Object.entries(res.losses).map(([ph, v]) => `${ph}: ${v.P.toFixed(2)} kW / ${v.Q.toFixed(2)} kvar`).join(', ');
+        const entries = Object.entries(res.losses)
+          .map(([ph, loss]) => `${escapeHtml(ph)}: ${formatNumber(loss?.P, 2, '0.00')} kW / ${formatNumber(loss?.Q, 2, '0.00')} kvar`)
+          .join(', ');
         html += `<p>Total Losses: ${entries}</p>`;
       }
     }
   }
-  loadFlowResultsEl.innerHTML = html;
+
+  if (sources.length) {
+    html += '<h3>Sources</h3>';
+    html += '<table><thead><tr><th>Bus</th><th>Type</th><th>Phase</th><th>P (kW)</th><th>Q (kvar)</th><th>Voltage</th><th>Angle (deg)</th></tr></thead><tbody>';
+    sources.forEach(src => {
+      const volts = Number.isFinite(src.voltageV)
+        ? formatVoltage(src.voltageV)
+        : Number.isFinite(src.voltageKV)
+          ? `${formatNumber(src.voltageKV, 3)} kV`
+          : '';
+      html += '<tr>'
+        + `<td>${escapeHtml(src.id || '')}</td>`
+        + `<td>${escapeHtml(src.type || '')}</td>`
+        + `<td>${escapeHtml(src.phase || '')}</td>`
+        + `<td>${formatNumber(src.Pg, 1, '0.0')}</td>`
+        + `<td>${formatNumber(src.Qg, 1, '0.0')}</td>`
+        + `<td>${volts}</td>`
+        + `<td>${formatNumber(src.Va, 2, '—')}</td>`
+        + '</tr>';
+    });
+    html += '</tbody></table>';
+  }
+
+  loadFlowResultsEl.innerHTML = html || '<p>No load flow results.</p>';
 }
 if (runSCBtn) runSCBtn.addEventListener('click', () => {
   const res = runShortCircuit({ method: studySettings.shortCircuit.method });
@@ -7345,6 +7497,42 @@ function showToast(msg, linkText, linkHref) {
   setTimeout(() => t.classList.remove('show'), 3000);
 }
 
+function resolveComponentVoltageVolts(comp) {
+  if (!comp || typeof comp !== 'object') return null;
+  const directSources = [
+    comp.voltage,
+    comp.volts,
+    comp.voltage_v,
+    comp.voltage_kv,
+    comp.operating_voltage,
+    comp.props?.voltage,
+    comp.props?.operating_voltage,
+    comp.parameters?.voltage,
+    comp.cable?.operating_voltage,
+    comp.cable?.voltage,
+    comp.study_voltage
+  ];
+  for (const source of directSources) {
+    const resolved = normalizeVoltageToVolts(source);
+    if (resolved !== null) return resolved;
+  }
+  const baseSources = [
+    comp.baseKV,
+    comp.kV,
+    comp.kv,
+    comp.nominalVoltage,
+    comp.nominal_voltage,
+    comp.prefault_voltage,
+    comp.props?.baseKV,
+    comp.parameters?.baseKV
+  ];
+  for (const baseSource of baseSources) {
+    const base = toBaseKV(baseSource);
+    if (Number.isFinite(base) && base > 0) return base * 1000;
+  }
+  return null;
+}
+
 function validateDiagram() {
   validationIssues = [];
   const svg = document.getElementById('diagram');
@@ -7393,15 +7581,25 @@ function validateDiagram() {
     (c.connections || []).forEach(conn => {
       inbound.set(conn.target, (inbound.get(conn.target) || 0) + 1);
       const target = components.find(t => t.id === conn.target);
-      if (target && c.voltage && target.voltage && c.voltage !== target.voltage) {
-        validationIssues.push({
-          component: c.id,
-          message: `Voltage mismatch with ${target.label || target.subtype || target.id}`
-        });
-        validationIssues.push({
-          component: target.id,
-          message: `Voltage mismatch with ${c.label || c.subtype || c.id}`
-        });
+      if (target) {
+        const srcVolt = resolveComponentVoltageVolts(c);
+        const tgtVolt = resolveComponentVoltageVolts(target);
+        if (srcVolt !== null && tgtVolt !== null) {
+          const diff = Math.abs(srcVolt - tgtVolt);
+          const tolerance = Math.max(1, Math.min(srcVolt, tgtVolt) * 0.005);
+          if (diff > tolerance) {
+            const srcLabel = formatVoltage(srcVolt);
+            const tgtLabel = formatVoltage(tgtVolt);
+            validationIssues.push({
+              component: c.id,
+              message: `Voltage mismatch with ${target.label || target.subtype || target.id} (${srcLabel} vs ${tgtLabel})`
+            });
+            validationIssues.push({
+              component: target.id,
+              message: `Voltage mismatch with ${c.label || c.subtype || c.id} (${tgtLabel} vs ${srcLabel})`
+            });
+          }
+        }
       }
       if (target) {
         const srcPh = phaseSet(c.phases);

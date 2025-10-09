@@ -93,26 +93,61 @@ function calcPQ(buses, Y, Vm, Va) {
  * @param {number} baseMVA
  * @returns {Array<{id:string, Vm:number, Va:number}>}
  */
+function toMW(value) {
+  const num = Number(value);
+  return Number.isFinite(num) ? num / 1000 : 0;
+}
+
 function solvePhase(buses, baseMVA) {
-  const n = buses.length;
-  const Vm = buses.map(b => b.Vm ?? 1);
-  const Va = buses.map(b => (b.Va ?? 0) * Math.PI / 180);
-  const Pspec = buses.map(b => ((b.Pg || 0) - (b.Pd || 0)) / baseMVA);
-  const Qspec = buses.map(b => ((b.Qg || 0) - (b.Qd || 0)) / baseMVA);
-  const PV = buses.map((b, i) => b.type === 'PV' ? i : -1).filter(i => i >= 0);
-  const PQ = buses.map((b, i) => b.type === 'PQ' ? i : -1).filter(i => i >= 0);
-  const nonSlack = buses.map((b, i) => b.type !== 'slack' ? i : -1).filter(i => i >= 0);
-  const Y = buildYBus(buses, baseMVA);
+  const warnings = [];
+  const working = buses.map(b => {
+    const clone = {
+      ...b,
+      connections: Array.isArray(b.connections) ? b.connections.map(conn => ({ ...conn })) : []
+    };
+    const baseKV = Number(b.baseKV);
+    if (!Number.isFinite(baseKV) || baseKV <= 0) {
+      clone.baseKV = 0.48;
+      warnings.push(`Bus ${b.id} is missing a base voltage; assuming 0.48 kV.`);
+    } else {
+      clone.baseKV = baseKV;
+    }
+    clone.Pd = Number(b.Pd) || 0;
+    clone.Qd = Number(b.Qd) || 0;
+    clone.Pg = Number(b.Pg) || 0;
+    clone.Qg = Number(b.Qg) || 0;
+    return clone;
+  });
+  if (!working.some(b => (b.type || '').toLowerCase() === 'slack')) {
+    warnings.push('No slack/source bus detected. Select a source or set a bus type to "slack".');
+  }
+  const n = working.length;
+  const Vm = working.map(b => Number.isFinite(b.Vm) && b.Vm > 0 ? b.Vm : 1);
+  const Va = working.map(b => (Number.isFinite(b.Va) ? b.Va : 0) * Math.PI / 180);
+  const Pspec = working.map(b => (toMW(b.Pg) - toMW(b.Pd)) / baseMVA);
+  const Qspec = working.map(b => (toMW(b.Qg) - toMW(b.Qd)) / baseMVA);
+  const PV = working.map((b, i) => b.type === 'PV' ? i : -1).filter(i => i >= 0);
+  const PQ = working.map((b, i) => b.type === 'PQ' ? i : -1).filter(i => i >= 0);
+  const nonSlack = working.map((b, i) => b.type !== 'slack' ? i : -1).filter(i => i >= 0);
+  const Y = buildYBus(working, baseMVA);
   const maxIter = 20;
   const tol = 1e-6;
+  let iterations = 0;
+  let maxMis = 0;
+  let converged = false;
 
   for (let iter = 0; iter < maxIter; iter++) {
-    const { P: Pcalc, Q: Qcalc } = calcPQ(buses, Y, Vm, Va);
+    const { P: Pcalc, Q: Qcalc } = calcPQ(working, Y, Vm, Va);
     const dP = nonSlack.map(i => Pspec[i] - Pcalc[i]);
     const dQ = PQ.map(i => Qspec[i] - Qcalc[i]);
     const mismatch = [...dP, ...dQ];
-    const maxMis = Math.max(...mismatch.map(v => Math.abs(v)));
-    if (maxMis < tol) break;
+    const mismatchVals = mismatch.map(v => Math.abs(v));
+    maxMis = mismatchVals.length ? Math.max(...mismatchVals) : 0;
+    if (maxMis < tol) {
+      converged = true;
+      iterations = iter + 1;
+      break;
+    }
 
     const m = nonSlack.length;
     const k = PQ.length;
@@ -179,17 +214,40 @@ function solvePhase(buses, baseMVA) {
     for (let idx = 0; idx < PQ.length; idx++) {
       Vm[PQ[idx]] += dx[nonSlack.length + idx];
     }
+    iterations = iter + 1;
   }
 
-  const busRes = buses.map((b, i) => ({ id: b.id, Vm: Vm[i], Va: Va[i] * 180 / Math.PI }));
+  if (!converged) {
+    const mismatchKW = maxMis * baseMVA * 1000;
+    warnings.push(`Solution did not converge after ${maxIter} iterations. Last mismatch ${maxMis.toFixed(4)} pu (${mismatchKW.toFixed(1)} kW).`);
+  }
+
+  const busRes = working.map((b, i) => {
+    const angleDeg = Va[i] * 180 / Math.PI;
+    const voltageKV = b.baseKV * Vm[i];
+    const voltageV = voltageKV * 1000;
+    return {
+      id: b.id,
+      Vm: Vm[i],
+      Va: angleDeg,
+      baseKV: b.baseKV,
+      voltageKV,
+      voltageV,
+      type: b.type,
+      Pd: b.Pd,
+      Qd: b.Qd,
+      Pg: b.Pg,
+      Qg: b.Qg
+    };
+  });
 
   // line flows and losses
   const flows = [];
   const lossMap = {};
-  buses.forEach((bus, i) => {
+  working.forEach((bus, i) => {
     const Vi = toComplex(Vm[i] * Math.cos(Va[i]), Vm[i] * Math.sin(Va[i]));
     (bus.connections || []).forEach(conn => {
-      const j = buses.findIndex(b => b.id === conn.target);
+      const j = working.findIndex(b => b.id === conn.target);
       if (j < 0) return;
       const Vj = toComplex(Vm[j] * Math.cos(Va[j]), Vm[j] * Math.sin(Va[j]));
       const Z = toPerUnitZ(conn.impedance || { r: 0, x: 0 }, bus.baseKV || 1, baseMVA);
@@ -205,12 +263,29 @@ function solvePhase(buses, baseMVA) {
       const P = Sij.re * scale;
       const Q = Sij.im * scale;
       const Ipu = Math.hypot(Iij.re, Iij.im);
-      const baseKV = bus.baseKV || buses[j].baseKV || 1;
+      const baseKV = bus.baseKV || working[j].baseKV || 1;
       const baseCurrentKA = baseKV ? baseMVA / (Math.sqrt(3) * baseKV) : 0;
       const currentKA = Ipu * baseCurrentKA;
       const currentA = currentKA * 1000;
-      flows.push({ from: bus.id, to: buses[j].id, P, Q, Ipu, currentKA, amps: currentA });
-      const key = [bus.id, buses[j].id].sort().join('-');
+      const fromKV = Vm[i] * (bus.baseKV || 0);
+      const toKV = Vm[j] * (working[j].baseKV || 0);
+      const dropKV = fromKV - toKV;
+      const dropPct = fromKV ? (dropKV / fromKV) * 100 : 0;
+      flows.push({
+        from: bus.id,
+        to: working[j].id,
+        P,
+        Q,
+        Ipu,
+        currentKA,
+        amps: currentA,
+        fromKV,
+        toKV,
+        dropKV,
+        dropPct,
+        componentId: conn.componentId || conn.id
+      });
+      const key = [bus.id, working[j].id].sort().join('-');
       lossMap[key] = lossMap[key] || { P: 0, Q: 0 };
       lossMap[key].P += P;
       lossMap[key].Q += Q;
@@ -218,7 +293,41 @@ function solvePhase(buses, baseMVA) {
   });
   const losses = Object.values(lossMap).reduce((acc, v) => ({ P: acc.P + v.P, Q: acc.Q + v.Q }), { P: 0, Q: 0 });
 
-  return { buses: busRes, lines: flows, losses };
+  const sources = working.map((bus, i) => ({
+    id: bus.id,
+    type: bus.type,
+    Pg: bus.Pg,
+    Qg: bus.Qg,
+    baseKV: bus.baseKV,
+    Vm: Vm[i],
+    Va: Va[i] * 180 / Math.PI,
+    voltageKV: bus.baseKV * Vm[i],
+    voltageV: bus.baseKV * Vm[i] * 1000
+  })).filter(src => Math.abs(src.Pg) > 0 || Math.abs(src.Qg) > 0 || (src.type || '').toLowerCase() === 'slack');
+
+  const summary = {
+    totalLoadKW: working.reduce((sum, bus) => sum + (bus.Pd || 0), 0),
+    totalLoadKVAR: working.reduce((sum, bus) => sum + (bus.Qd || 0), 0),
+    totalGenKW: working.reduce((sum, bus) => sum + (bus.Pg || 0), 0),
+    totalGenKVAR: working.reduce((sum, bus) => sum + (bus.Qg || 0), 0),
+    totalLossKW: Number.isFinite(losses.P) ? losses.P : 0,
+    totalLossKVAR: Number.isFinite(losses.Q) ? losses.Q : 0
+  };
+
+  const mismatchPu = Number.isFinite(maxMis) ? maxMis : 0;
+
+  return {
+    converged,
+    iterations,
+    maxMismatch: mismatchPu,
+    maxMismatchKW: mismatchPu * baseMVA * 1000,
+    warnings,
+    buses: busRes,
+    lines: flows,
+    losses,
+    sources,
+    summary
+  };
 }
 
 /**
@@ -410,14 +519,36 @@ export function runLoadFlow(modelOrOpts = {}, maybeOpts = {}) {
   });
 
   if (balanced) return phaseResults['balanced'];
-  const buses = [];
-  const lines = [];
-  const losses = {};
+  const combined = {
+    buses: [],
+    lines: [],
+    losses: {},
+    sources: [],
+    warnings: [],
+    converged: true,
+    iterations: 0,
+    maxMismatch: 0,
+    maxMismatchKW: 0,
+    summary: {}
+  };
   Object.entries(phaseResults).forEach(([ph, res]) => {
-    res.buses.forEach(b => buses.push({ ...b, phase: ph }));
-    res.lines.forEach(l => lines.push({ ...l, phase: ph }));
-    losses[ph] = res.losses;
+    (res.buses || []).forEach(b => combined.buses.push({ ...b, phase: ph }));
+    (res.lines || []).forEach(l => combined.lines.push({ ...l, phase: ph }));
+    combined.losses[ph] = res.losses;
+    (res.sources || []).forEach(src => combined.sources.push({ ...src, phase: ph }));
+    if (Array.isArray(res.warnings)) {
+      res.warnings.forEach(w => combined.warnings.push(`${ph}: ${w}`));
+    }
+    if (!res.converged) combined.converged = false;
+    if (res.iterations) combined.iterations = Math.max(combined.iterations, res.iterations);
+    if (Number.isFinite(res.maxMismatch)) {
+      combined.maxMismatch = Math.max(combined.maxMismatch, res.maxMismatch);
+    }
+    if (Number.isFinite(res.maxMismatchKW)) {
+      combined.maxMismatchKW = Math.max(combined.maxMismatchKW, res.maxMismatchKW);
+    }
+    combined.summary[ph] = res.summary;
   });
-  return { buses, lines, losses };
+  return combined;
 }
 

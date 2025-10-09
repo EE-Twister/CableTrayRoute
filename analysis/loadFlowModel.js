@@ -1,4 +1,5 @@
 import componentLibrary from '../componentLibrary.json' with { type: 'json' };
+import { normalizeVoltageToVolts, toBaseKV } from '../utils/voltage.js';
 
 const DEFAULT_COMPONENT_DEFINITIONS = [
   { type: 'bus', subtype: 'Bus' }
@@ -262,7 +263,38 @@ function cloneBusComponent(comp) {
   clone.connections = Array.isArray(comp.connections)
     ? comp.connections.map(conn => ({ ...conn }))
     : [];
+  const base = resolveBusBaseKV(comp);
+  if (Number.isFinite(base) && base > 0) {
+    clone.baseKV = base;
+  } else if (!Number.isFinite(clone.baseKV) || clone.baseKV <= 0) {
+    clone.baseKV = 0.48;
+  }
   return clone;
+}
+
+function resolveBusBaseKV(comp) {
+  if (!comp || typeof comp !== 'object') return null;
+  const direct = [
+    comp.baseKV,
+    comp.kV,
+    comp.kv,
+    comp.nominalVoltage,
+    comp.nominal_voltage,
+    comp.prefault_voltage,
+    comp.voltage,
+    comp.volts,
+    comp.props?.baseKV,
+    comp.props?.voltage,
+    comp.parameters?.baseKV,
+    comp.parameters?.voltage
+  ];
+  for (const candidate of direct) {
+    const base = toBaseKV(candidate);
+    if (Number.isFinite(base) && base > 0) return base;
+  }
+  const volts = normalizeVoltageToVolts(comp?.props?.operating_voltage ?? comp?.cable?.operating_voltage);
+  if (Number.isFinite(volts) && volts > 0) return volts / 1000;
+  return null;
 }
 
 function registerConnection(map, from, to) {
