@@ -324,6 +324,26 @@ function solvePhase(buses, baseMVA) {
     totalLossKVAR: Number.isFinite(losses.Q) ? losses.Q : 0
   };
 
+  const branchConnections = [];
+  const seenConnections = new Set();
+  working.forEach(bus => {
+    (bus.connections || []).forEach(conn => {
+      if (!conn || !conn.target) return;
+      const componentId = conn.componentId || conn.id || null;
+      const key = componentId ? componentId : `${bus.id}->${conn.target}`;
+      if (seenConnections.has(key)) return;
+      seenConnections.add(key);
+      branchConnections.push({
+        componentId,
+        componentType: conn.componentType,
+        componentSubtype: conn.componentSubtype,
+        fromBus: bus.id,
+        toBus: conn.target
+      });
+    });
+  });
+  summary.branchConnections = branchConnections;
+
   const mismatchPu = Number.isFinite(maxMis) ? maxMis : 0;
 
   return {
@@ -485,7 +505,9 @@ export function runLoadFlow(modelOrOpts = {}, maybeOpts = {}) {
           shunt: cloneData(branch.shunt),
           rating: branch.rating,
           phases: cloneData(branch.phases),
-          componentId
+          componentId,
+          componentType: branch.type,
+          componentSubtype: branch.subtype
         });
       });
     }
@@ -521,7 +543,11 @@ export function runLoadFlow(modelOrOpts = {}, maybeOpts = {}) {
           target: conn.target,
           impedance: conn.impedance || conn.cable || {},
           tap: conn.tap,
-          shunt: conn.shunt
+          shunt: conn.shunt,
+          componentId: conn.componentId || conn.id,
+          componentType: conn.componentType,
+          componentSubtype: conn.componentSubtype,
+          phases: conn.phases
         }))
       };
     });
