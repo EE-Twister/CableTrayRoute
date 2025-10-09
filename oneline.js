@@ -7499,36 +7499,37 @@ function showToast(msg, linkText, linkHref) {
 
 function resolveComponentVoltageVolts(comp) {
   if (!comp || typeof comp !== 'object') return null;
-  const directSources = [
-    comp.voltage,
-    comp.volts,
-    comp.voltage_v,
-    comp.voltage_kv,
-    comp.operating_voltage,
-    comp.props?.voltage,
-    comp.props?.operating_voltage,
-    comp.parameters?.voltage,
-    comp.cable?.operating_voltage,
-    comp.cable?.voltage,
-    comp.study_voltage
+  const containers = [comp, comp.props, comp.parameters, comp.cable];
+  const directKeys = [
+    'rated_voltage',
+    'rated_volts',
+    'voltage_rating',
+    'voltage',
+    'volts',
+    'voltage_v',
+    'voltage_kv',
+    'operating_voltage'
   ];
-  for (const source of directSources) {
-    const resolved = normalizeVoltageToVolts(source);
-    if (resolved !== null) return resolved;
+  for (const container of containers) {
+    if (!container || typeof container !== 'object') continue;
+    for (const key of directKeys) {
+      if (!(key in container)) continue;
+      const resolved = normalizeVoltageToVolts(container[key]);
+      if (resolved !== null && Number.isFinite(resolved) && resolved > 0) {
+        return resolved;
+      }
+    }
   }
-  const baseSources = [
-    comp.baseKV,
-    comp.kV,
-    comp.kv,
-    comp.nominalVoltage,
-    comp.nominal_voltage,
-    comp.prefault_voltage,
-    comp.props?.baseKV,
-    comp.parameters?.baseKV
-  ];
-  for (const baseSource of baseSources) {
-    const base = toBaseKV(baseSource);
-    if (Number.isFinite(base) && base > 0) return base * 1000;
+  const baseKeys = ['baseKV', 'kV', 'kv', 'nominalVoltage', 'nominal_voltage', 'prefault_voltage'];
+  for (const container of containers) {
+    if (!container || typeof container !== 'object') continue;
+    for (const key of baseKeys) {
+      if (!(key in container)) continue;
+      const base = toBaseKV(container[key]);
+      if (Number.isFinite(base) && base > 0) {
+        return base * 1000;
+      }
+    }
   }
   return null;
 }
