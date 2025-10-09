@@ -25,8 +25,8 @@ function caseToDiagram(data){
       Va: b.Va,
       connections: []
     };
-    if (b.Pd || b.Qd) comp.load = { kw: b.Pd || 0, kvar: b.Qd || 0 };
-    if (b.Pg || b.Qg) comp.generation = { kw: b.Pg || 0, kvar: b.Qg || 0 };
+    if (b.Pd || b.Qd) comp.load = { kw: (b.Pd || 0) * 1000, kvar: (b.Qd || 0) * 1000 };
+    if (b.Pg || b.Qg) comp.generation = { kw: (b.Pg || 0) * 1000, kvar: (b.Qg || 0) * 1000 };
     return comp;
   });
   data.branches.forEach(br => {
