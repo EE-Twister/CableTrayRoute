@@ -1571,6 +1571,7 @@ if (runLFBtn) runLFBtn.addEventListener('click', () => {
       }
     }
   });
+  updateCableOperatingVoltages(diagram);
   setOneLine({ activeSheet, sheets });
   const studies = getStudies();
   studies.loadFlow = res;
@@ -3052,6 +3053,57 @@ function formatVoltageString(num) {
   return Number.isInteger(rounded) ? String(rounded) : String(rounded);
 }
 
+function resolveNominalVoltage(component) {
+  if (!component || typeof component !== 'object') return null;
+  const direct = parseVoltageNumber(component.voltage);
+  if (direct !== null) return direct;
+  if (component.cable && typeof component.cable === 'object') {
+    const cableVoltage = parseVoltageNumber(component.cable.voltage || component.cable.voltage_rating);
+    if (cableVoltage !== null) return cableVoltage;
+  }
+  if (component.props && typeof component.props === 'object') {
+    const propVoltage = parseVoltageNumber(component.props.voltage || component.props.volts);
+    if (propVoltage !== null) return propVoltage;
+  }
+  return null;
+}
+
+function resolveVoltageMagnitude(component) {
+  if (!component || typeof component !== 'object') return null;
+  const raw = component.voltage_mag;
+  if (typeof raw === 'number' && Number.isFinite(raw)) {
+    return raw;
+  }
+  if (raw && typeof raw === 'object') {
+    const values = Object.values(raw)
+      .map(val => Number(val))
+      .filter(val => Number.isFinite(val) && val > 0);
+    if (values.length) {
+      const total = values.reduce((sum, val) => sum + val, 0);
+      return total / values.length;
+    }
+  }
+  return null;
+}
+
+function computeComponentOperatingVoltage(component) {
+  if (!component) return null;
+  const nominal = resolveNominalVoltage(component);
+  if (nominal === null) return null;
+  const magnitude = resolveVoltageMagnitude(component);
+  if (magnitude !== null) {
+    return nominal * magnitude;
+  }
+  return nominal;
+}
+
+function formatOperatingVoltage(value) {
+  if (value === null || value === undefined || value === '') return '';
+  const num = Number(value);
+  if (Number.isFinite(num)) return Number(num.toFixed(2));
+  return value;
+}
+
 function assignInheritedVoltage(target, voltageValue, connection = null) {
   if (!target) return false;
   const num = parseVoltageNumber(voltageValue);
@@ -3425,6 +3477,35 @@ function autoAttachComponent(comp, exclude = new Set()) {
 
 function findSourceComponent(targetId, comps = components) {
   return comps.find(c => (c.connections || []).some(conn => conn.target === targetId)) || null;
+}
+
+function updateCableOperatingVoltages(comps = components) {
+  if (!Array.isArray(comps)) return;
+  const byId = new Map();
+  comps.forEach(comp => {
+    if (comp && comp.id) byId.set(comp.id, comp);
+  });
+  comps.forEach(comp => {
+    if (!comp || comp.type !== 'cable') return;
+    if (!comp.cable || typeof comp.cable !== 'object') comp.cable = {};
+    const upstream = findSourceComponent(comp.id, comps);
+    const outbound = (comp.connections || []).find(conn => conn && conn.target);
+    const downstream = outbound ? byId.get(outbound.target) || null : null;
+    const candidates = [
+      computeComponentOperatingVoltage(comp),
+      computeComponentOperatingVoltage(upstream),
+      computeComponentOperatingVoltage(downstream)
+    ].filter(value => value !== null);
+    if (!candidates.length) return;
+    const resolved = Number(candidates[0]);
+    if (!Number.isFinite(resolved)) return;
+    const rounded = Number(resolved.toFixed(2));
+    comp.cable.operating_voltage = rounded;
+    if (outbound) {
+      if (!outbound.cable || typeof outbound.cable !== 'object') outbound.cable = {};
+      outbound.cable.operating_voltage = rounded;
+    }
+  });
 }
 
 function normalizeComponent(c) {
@@ -4011,6 +4092,14 @@ function render() {
       bg.setAttribute('height', h);
       bg.setAttribute('fill', vRange.color);
       bg.setAttribute('opacity', 0.3);
+      if (c.subtype === 'motor_load' || c.subtype === 'static_load') {
+        const rotation = normalizeRotation(Number(c.rotation) || 0);
+        const desired = 90;
+        const offset = desired - rotation;
+        if (offset % 360 !== 0) {
+          bg.setAttribute('transform', `rotate(${offset}, ${cx}, ${cy})`);
+        }
+      }
       g.appendChild(bg);
     }
     const meta = componentMeta[c.subtype] || {};
@@ -5434,6 +5523,16 @@ async function chooseCable(source, target, existingConn = null) {
     typeLabel.appendChild(typeInput);
     form.appendChild(typeLabel);
 
+    const ratingLabel = document.createElement('label');
+    ratingLabel.textContent = 'Cable Rating (V) ';
+    const ratingInput = document.createElement('input');
+    ratingInput.type = 'number';
+    ratingInput.name = 'cable_rating';
+    ratingInput.min = '0';
+    ratingInput.step = 'any';
+    ratingLabel.appendChild(ratingInput);
+    form.appendChild(ratingLabel);
+
     const conductorsLabel = document.createElement('label');
     conductorsLabel.textContent = 'Conductors ';
     const conductorsInput = document.createElement('input');
@@ -5574,6 +5673,7 @@ async function chooseCable(source, target, existingConn = null) {
         insulationInput.value = t.insulation_type || '';
         ambientInput.value = t.ambient_temp || '';
         installInput.value = t.install_method || '';
+        ratingInput.value = t.cable_rating || '';
         impedanceRInput.value = getImpedancePart(t, 'r') || '';
         impedanceXInput.value = getImpedancePart(t, 'x') || '';
       }
@@ -5584,6 +5684,7 @@ async function chooseCable(source, target, existingConn = null) {
       if (c) {
         tagInput.value = c.tag || '';
         typeInput.value = c.cable_type || '';
+        ratingInput.value = c.cable_rating || '';
         conductorsInput.value = c.conductors || '';
         phasesInput.value = c.phases || '';
         sizeInput.value = c.conductor_size || '';
@@ -5598,6 +5699,7 @@ async function chooseCable(source, target, existingConn = null) {
       } else {
         tagInput.value = '';
         typeInput.value = '';
+        ratingInput.value = '';
         conductorsInput.value = '';
         phasesInput.value = '';
         sizeInput.value = '';
@@ -5622,6 +5724,7 @@ async function chooseCable(source, target, existingConn = null) {
       const existing = existingConn.cable || existingConn;
       tagInput.value = existing.tag || '';
       typeInput.value = existing.cable_type || '';
+      ratingInput.value = existing.cable_rating || '';
       conductorsInput.value = existingConn.conductors || existing.conductors || '';
       phasesInput.value = Array.isArray(existingConn.phases)
         ? existingConn.phases.join(',')
@@ -5679,6 +5782,12 @@ async function chooseCable(source, target, existingConn = null) {
       const cable = {
         tag: tagInput.value,
         cable_type: typeInput.value,
+        cable_rating: (() => {
+          const raw = ratingInput.value != null ? ratingInput.value.trim() : '';
+          if (!raw) return '';
+          const num = Number(raw);
+          return Number.isFinite(num) ? num : raw;
+        })(),
         conductors,
         conductor_size: sizeInput.value,
         conductor_material: materialInput.value,
@@ -5695,6 +5804,9 @@ async function chooseCable(source, target, existingConn = null) {
       };
       setImpedancePart(cable, 'r', impedanceRInput.value, { keepEmpty: false });
       setImpedancePart(cable, 'x', impedanceXInput.value, { keepEmpty: false });
+      if (existingConn?.cable?.operating_voltage !== undefined) {
+        cable.operating_voltage = existingConn.cable.operating_voltage;
+      }
       if (manualLen) {
         cable.length = lengthInput.value;
         cable.manual_length = true;
@@ -5803,12 +5915,24 @@ function openCableProperties(comp) {
   refLabel.appendChild(refInput);
   form.appendChild(refLabel);
 
+  const ratingLabel = document.createElement('label');
+  ratingLabel.textContent = 'Cable Rating (V) ';
+  const ratingInput = document.createElement('input');
+  ratingInput.type = 'number';
+  ratingInput.min = '0';
+  ratingInput.step = 'any';
+  ratingInput.value = comp.cable?.cable_rating ?? '';
+  ratingLabel.appendChild(ratingInput);
+  form.appendChild(ratingLabel);
+
   const cableInfo = document.createElement('div');
   cableInfo.classList.add('cable-info');
   const cable = comp.cable || {};
   cableInfo.innerHTML = `
     <p><strong>Tag:</strong> ${cable.tag || ''}</p>
     <p><strong>Type:</strong> ${cable.cable_type || ''}</p>
+    <p><strong>Cable Rating (V):</strong> ${cable.cable_rating ?? ''}</p>
+    <p><strong>Operating Voltage (V):</strong> ${formatOperatingVoltage(cable.operating_voltage) || ''}</p>
     <p><strong>Conductors:</strong> ${cable.conductors || ''}</p>
     <p><strong>Phases:</strong> ${Array.isArray(cable.phases) ? cable.phases.join(',') : cable.phases || ''}</p>
     <p><strong>Length:</strong> ${cable.length || ''}</p>
@@ -5880,6 +6004,13 @@ function openCableProperties(comp) {
     comp.label = labelInput.value || '';
     comp.ref = refInput.value || '';
     if (!comp.cable || typeof comp.cable !== 'object') comp.cable = {};
+    const ratingRaw = ratingInput.value != null ? ratingInput.value.trim() : '';
+    if (ratingRaw) {
+      const ratingNum = Number(ratingRaw);
+      comp.cable.cable_rating = Number.isFinite(ratingNum) ? ratingNum : ratingRaw;
+    } else {
+      delete comp.cable.cable_rating;
+    }
     setImpedancePart(comp.cable, 'r', impedanceRInput.value, { keepEmpty: false });
     setImpedancePart(comp.cable, 'x', impedanceXInput.value, { keepEmpty: false });
     pushHistory();
@@ -6879,6 +7010,32 @@ async function init() {
           render();
           save();
         }
+      }
+    } else if (action === 'disconnect' && contextTarget) {
+      const targetId = contextTarget.id;
+      let changed = false;
+      if (Array.isArray(contextTarget.connections) && contextTarget.connections.length) {
+        contextTarget.connections = [];
+        changed = true;
+      }
+      components.forEach(comp => {
+        if (!Array.isArray(comp.connections) || !comp.connections.length) return;
+        const filtered = comp.connections.filter(conn => conn.target !== targetId);
+        if (filtered.length !== comp.connections.length) {
+          comp.connections = filtered;
+          changed = true;
+          if (selectedConnection && selectedConnection.component === comp) {
+            selectedConnection = null;
+          }
+        }
+      });
+      if (selectedConnection && selectedConnection.component === contextTarget) {
+        selectedConnection = null;
+      }
+      if (changed) {
+        pushHistory();
+        render();
+        save();
       }
     } else if (action === 'delete' && contextTarget) {
       components = components.filter(c => c !== contextTarget);
