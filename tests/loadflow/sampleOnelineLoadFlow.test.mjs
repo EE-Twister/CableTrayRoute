@@ -74,3 +74,34 @@ describe('Published sample one-line load flow', () => {
     assert(Math.abs(result.losses.Q) < 1e-6, 'Reactive losses should be zero');
   });
 });
+
+describe('Simple feeder load flow', () => {
+  it('reports negligible losses for a near-ideal feeder', () => {
+    const model = {
+      buses: [
+        { id: 'source', type: 'slack', baseKV: 13.8 },
+        { id: 'load', type: 'PQ', baseKV: 13.8, load: { kw: 100, kvar: 0 } }
+      ],
+      branches: [
+        {
+          id: 'feeder',
+          from: 'source',
+          to: 'load',
+          impedance: { r: 0.01, x: 0 }
+        }
+      ]
+    };
+
+    const result = runLoadFlow(model, { baseMVA: 1, balanced: true });
+    assert(result.converged, 'Load flow should converge');
+    const branchFlow = result.lines.find(line => line.from === 'source' && line.to === 'load');
+    assert(branchFlow, 'Feeder flow should be reported');
+    assert(Math.abs(branchFlow.P - 100) < 1e-3, 'Active power transfer should remain near 100 kW');
+    assert(Math.abs(result.summary.totalLoadKW - 100) < 1e-6, 'Load total should reflect 100 kW demand');
+    assert(Math.abs(result.summary.totalGenKW - 100) < 1e-3, 'Generation should supply the load with negligible loss');
+    assert(Array.isArray(result.losses.branches), 'Per-branch losses should be reported');
+    assert(result.losses.branches.length === 1, 'Single feeder should produce one branch loss record');
+    assert(Math.abs(result.losses.P) < 1e-3, 'System losses should be effectively zero');
+    assert(Math.abs(result.summary.totalLossKW - result.losses.P) < 1e-9, 'Summary loss tally should match detailed losses');
+  });
+});
