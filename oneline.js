@@ -3189,7 +3189,7 @@ function formatVoltage(volts) {
 
 function resolveNominalVoltage(component) {
   if (!component || typeof component !== 'object') return null;
-  const resolved = resolveComponentVoltageVolts(component);
+  const resolved = resolveComponentVoltageVolts(component, { includeOperatingVoltage: false });
   if (Number.isFinite(resolved) && resolved > 0) return resolved;
   return null;
 }
@@ -7612,23 +7612,24 @@ function showToast(msg, linkText, linkHref) {
   setTimeout(() => t.classList.remove('show'), 3000);
 }
 
-function resolveComponentVoltageVolts(comp) {
+function resolveComponentVoltageVolts(comp, options = {}) {
   if (!comp || typeof comp !== 'object') return null;
+  const { includeOperatingVoltage = true } = options;
   const containers = [];
   if (comp.props && typeof comp.props === 'object') containers.push(comp.props);
   if (comp.parameters && typeof comp.parameters === 'object') containers.push(comp.parameters);
   if (comp.cable && typeof comp.cable === 'object') containers.push(comp.cable);
   containers.push(comp);
-  const directKeys = [
+  const primaryKeys = [
     'rated_voltage',
     'rated_volts',
     'voltage_rating',
     'voltage',
     'volts',
     'voltage_v',
-    'voltage_kv',
-    'operating_voltage'
+    'voltage_kv'
   ];
+  const directKeys = includeOperatingVoltage ? [...primaryKeys, 'operating_voltage'] : primaryKeys;
   for (const container of containers) {
     if (!container || typeof container !== 'object') continue;
     for (const key of directKeys) {
