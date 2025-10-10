@@ -3252,6 +3252,7 @@ function propagateSourceVoltagesToBuses(comps) {
       if (!neighbor || visited.has(neighbor.id)) continue;
       visited.add(neighbor.id);
       if (neighbor.type === 'transformer') continue;
+      if (isSourceComponent(neighbor)) continue;
       if (isBusComponent(neighbor)) {
         assignInheritedVoltage(neighbor, voltageValue, connection);
       }
