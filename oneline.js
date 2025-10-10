@@ -3189,16 +3189,8 @@ function formatVoltage(volts) {
 
 function resolveNominalVoltage(component) {
   if (!component || typeof component !== 'object') return null;
-  const direct = parseVoltageNumber(component.voltage);
-  if (direct !== null) return direct;
-  if (component.cable && typeof component.cable === 'object') {
-    const cableVoltage = parseVoltageNumber(component.cable.voltage || component.cable.voltage_rating);
-    if (cableVoltage !== null) return cableVoltage;
-  }
-  if (component.props && typeof component.props === 'object') {
-    const propVoltage = parseVoltageNumber(component.props.voltage || component.props.volts);
-    if (propVoltage !== null) return propVoltage;
-  }
+  const resolved = resolveComponentVoltageVolts(component);
+  if (Number.isFinite(resolved) && resolved > 0) return resolved;
   return null;
 }
 
@@ -7622,7 +7614,11 @@ function showToast(msg, linkText, linkHref) {
 
 function resolveComponentVoltageVolts(comp) {
   if (!comp || typeof comp !== 'object') return null;
-  const containers = [comp, comp.props, comp.parameters, comp.cable];
+  const containers = [];
+  if (comp.props && typeof comp.props === 'object') containers.push(comp.props);
+  if (comp.parameters && typeof comp.parameters === 'object') containers.push(comp.parameters);
+  if (comp.cable && typeof comp.cable === 'object') containers.push(comp.cable);
+  containers.push(comp);
   const directKeys = [
     'rated_voltage',
     'rated_volts',
@@ -7669,7 +7665,12 @@ function validateDiagram() {
     if (!comp) return;
     const tip = [];
     if (comp.label) tip.push(`Label: ${comp.label}`);
-    if (comp.voltage) tip.push(`Voltage: ${comp.voltage}`);
+    const tooltipVoltage = resolveComponentVoltageVolts(comp);
+    if (Number.isFinite(tooltipVoltage) && tooltipVoltage > 0) {
+      tip.push(`Voltage: ${formatVoltage(tooltipVoltage)}`);
+    } else if (comp.voltage) {
+      tip.push(`Voltage: ${comp.voltage}`);
+    }
     if (comp.rating) tip.push(`Rating: ${comp.rating}`);
     g.setAttribute('data-tooltip', tip.join('\n'));
   });
