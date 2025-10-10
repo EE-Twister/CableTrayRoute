@@ -412,6 +412,14 @@ function isBusComponent(c) {
   return componentMeta[c.subtype]?.type === 'bus' || c.type === 'bus' || c.subtype === 'Bus';
 }
 
+function isSourceComponent(comp) {
+  if (!comp || comp.type === 'transformer') return false;
+  const category = resolveComponentCategory(comp);
+  if (category === 'sources') return true;
+  const type = (comp.type || '').toLowerCase();
+  return type === 'utility_source' || type === 'generator' || type === 'pv_inverter';
+}
+
 function defaultPorts(type, subtype) {
   if (type === 'transformer' && subtype === 'three_winding') {
     return [
@@ -3199,6 +3207,62 @@ function propagateTransformerVoltages(comps) {
   });
 }
 
+function gatherNeighborEntries(component, byId, inbound) {
+  const neighbors = [];
+  if (!component || !byId) return neighbors;
+  (component.connections || []).forEach(conn => {
+    if (!conn || !byId.has(conn.target)) return;
+    neighbors.push({ component: byId.get(conn.target), connection: conn });
+  });
+  const inboundEntries = component?.id ? inbound.get(component.id) : null;
+  (inboundEntries || []).forEach(entry => {
+    if (!entry || !entry.from) return;
+    neighbors.push({ component: entry.from, connection: entry.connection });
+  });
+  return neighbors;
+}
+
+function propagateSourceVoltagesToBuses(comps) {
+  if (!Array.isArray(comps) || !comps.length) return;
+  const byId = new Map();
+  comps.forEach(comp => { if (comp?.id) byId.set(comp.id, comp); });
+  if (!byId.size) return;
+
+  const inbound = new Map();
+  comps.forEach(comp => {
+    (comp?.connections || []).forEach(conn => {
+      if (!conn || !conn.target || !byId.has(conn.target)) return;
+      if (!inbound.has(conn.target)) inbound.set(conn.target, []);
+      inbound.get(conn.target).push({ from: comp, connection: conn });
+    });
+  });
+
+  comps.forEach(source => {
+    if (!isSourceComponent(source)) return;
+    let voltageValue = computeComponentOperatingVoltage(source);
+    if (!Number.isFinite(voltageValue)) voltageValue = resolveNominalVoltage(source);
+    if (!Number.isFinite(voltageValue)) voltageValue = parseVoltageNumber(source?.voltage);
+    if (!Number.isFinite(voltageValue)) voltageValue = parseVoltageNumber(source?.props?.voltage || source?.props?.volts);
+    if (!Number.isFinite(voltageValue)) return;
+
+    const visited = new Set([source.id]);
+    const queue = gatherNeighborEntries(source, byId, inbound);
+    while (queue.length) {
+      const { component: neighbor, connection } = queue.shift();
+      if (!neighbor || visited.has(neighbor.id)) continue;
+      visited.add(neighbor.id);
+      if (neighbor.type === 'transformer') continue;
+      if (isBusComponent(neighbor)) {
+        assignInheritedVoltage(neighbor, voltageValue, connection);
+      }
+      gatherNeighborEntries(neighbor, byId, inbound).forEach(entry => {
+        if (!entry.component || visited.has(entry.component.id)) return;
+        queue.push(entry);
+      });
+    }
+  });
+}
+
 function applyTransformerVoltages(scope = sheets) {
   if (!scope) return;
   if (Array.isArray(scope) && scope.length && Array.isArray(scope[0]?.components)) {
@@ -3688,6 +3752,7 @@ function finalizeMarqueeSelection() {
 
 function render() {
   applyTransformerVoltages();
+  propagateSourceVoltagesToBuses(components);
   const svg = document.getElementById('diagram');
   svg.querySelectorAll('g.component, .connection, .conn-label, .port, .bus-handle, .annotation-handle, .issue-badge, .component-label, .component-attribute, .selection-marquee').forEach(el => el.remove());
   const usedVoltageRanges = new Set();
