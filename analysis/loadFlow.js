@@ -269,7 +269,7 @@ function solvePhase(buses, baseMVA) {
 
   // line flows and losses
   const flows = [];
-  const lossMap = {};
+  const branchLossMap = new Map();
   working.forEach((bus, i) => {
     const Vi = toComplex(Vm[i] * Math.cos(Va[i]), Vm[i] * Math.sin(Va[i]));
     (bus.connections || []).forEach(conn => {
@@ -289,6 +289,7 @@ function solvePhase(buses, baseMVA) {
       const P = Sij.re * scale;
       const Q = Sij.im * scale;
       const Ipu = Math.hypot(Iij.re, Iij.im);
+      const Ipu2 = Ipu * Ipu;
       const baseKV = bus.baseKV || working[j].baseKV || 1;
       const baseCurrentKA = baseKV ? baseMVA / (Math.sqrt(3) * baseKV) : 0;
       const currentKA = Ipu * baseCurrentKA;
@@ -297,6 +298,8 @@ function solvePhase(buses, baseMVA) {
       const toKV = Vm[j] * (working[j].baseKV || 0);
       const dropKV = fromKV - toKV;
       const dropPct = fromKV ? (dropKV / fromKV) * 100 : 0;
+      const lossKW = Ipu2 * (Z.re || 0) * scale;
+      const lossKVAR = Ipu2 * (Z.im || 0) * scale;
       flows.push({
         from: bus.id,
         to: working[j].id,
@@ -311,13 +314,45 @@ function solvePhase(buses, baseMVA) {
         dropPct,
         componentId: conn.componentId || conn.id
       });
-      const key = [bus.id, working[j].id].sort().join('-');
-      lossMap[key] = lossMap[key] || { P: 0, Q: 0 };
-      lossMap[key].P += P;
-      lossMap[key].Q += Q;
+      const branchKeyParts = [];
+      if (conn.componentId || conn.id) branchKeyParts.push(conn.componentId || conn.id);
+      branchKeyParts.push([bus.id, working[j].id].sort().join('->'));
+      const branchKey = branchKeyParts.join('|');
+      if (!branchLossMap.has(branchKey)) {
+        branchLossMap.set(branchKey, {
+          componentId: conn.componentId || conn.id || null,
+          componentName: conn.componentName,
+          componentLabel: conn.componentLabel,
+          componentRef: conn.componentRef,
+          from: bus.id,
+          to: working[j].id,
+          P: 0,
+          Q: 0,
+          _directions: new Set()
+        });
+      }
+      const branchLoss = branchLossMap.get(branchKey);
+      const directionKey = `${bus.id}->${working[j].id}`;
+      if (!branchLoss._directions.has(directionKey)) {
+        if (Number.isFinite(lossKW)) branchLoss.P += lossKW;
+        if (Number.isFinite(lossKVAR)) branchLoss.Q += lossKVAR;
+        branchLoss._directions.add(directionKey);
+      }
     });
   });
-  const losses = Object.values(lossMap).reduce((acc, v) => ({ P: acc.P + v.P, Q: acc.Q + v.Q }), { P: 0, Q: 0 });
+  const branchLosses = Array.from(branchLossMap.values()).map(entry => {
+    const { _directions, ...rest } = entry;
+    return {
+      ...rest,
+      P: Number.isFinite(rest.P) ? rest.P : 0,
+      Q: Number.isFinite(rest.Q) ? rest.Q : 0
+    };
+  });
+  const losses = branchLosses.reduce((acc, loss) => ({
+    P: acc.P + (Number.isFinite(loss.P) ? loss.P : 0),
+    Q: acc.Q + (Number.isFinite(loss.Q) ? loss.Q : 0)
+  }), { P: 0, Q: 0 });
+  losses.branches = branchLosses;
 
   const sources = working.map((bus, i) => ({
     id: bus.id,
