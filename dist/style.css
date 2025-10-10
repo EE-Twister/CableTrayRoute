@@ -154,6 +154,9 @@
   flex-direction: column;
   gap: var(--ol-spacing);
   font-family: var(--ol-font);
+  overflow-y: auto;
+  max-height: calc(100vh - 12rem);
+  padding-right: 0.25rem;
 }
 
 #palette-search {
@@ -256,6 +259,12 @@
 
 body.compact-mode .palette-section .section-buttons {
   --palette-column-min: 5rem;
+}
+
+@media (max-width: 900px) {
+  .palette {
+    max-height: none;
+  }
 }
 
 .palette-section .no-components {
@@ -500,7 +509,7 @@ body.compact-mode .palette-section .section-buttons {
 
 .oneline-editor {
   position: relative;
-  min-height: 600px;
+  min-height: 480px;
   overflow: auto;
 }
 
@@ -512,11 +521,160 @@ body.compact-mode .palette-section .section-buttons {
   margin-bottom: var(--ol-spacing);
 }
 
+.zoom-controls {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.pan-controls {
+  display: inline-flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.25rem;
+}
+
+.pan-controls .pan-middle-row {
+  display: flex;
+  gap: 0.25rem;
+}
+
+.pan-controls .icon-button {
+  width: 32px;
+  height: 32px;
+}
+
+.zoom-controls .icon-button,
+.pan-controls .icon-button {
+  background-color: var(--primary-color);
+  border: 1px solid var(--primary-color);
+  border-radius: 0.5rem;
+  color: var(--secondary-color);
+  font-weight: 600;
+  line-height: 1;
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.2);
+}
+
+.zoom-controls .icon-button:hover,
+.zoom-controls .icon-button:focus,
+.pan-controls .icon-button:hover,
+.pan-controls .icon-button:focus {
+  background-color: var(--secondary-color);
+  color: var(--primary-color);
+}
+
+#zoom-display {
+  min-width: 3rem;
+  text-align: center;
+  font-variant-numeric: tabular-nums;
+}
+
 .workspace {
   --palette-width: 250px;
   display: grid;
   grid-template-columns: var(--palette-width) 1fr;
   position: relative;
+  align-items: start;
+}
+
+html {
+  height: 100%;
+}
+
+body.oneline-page {
+  min-height: 100vh;
+  height: 100vh;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+
+body.oneline-page .top-nav {
+  flex-shrink: 0;
+}
+
+body.oneline-page .container {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+  height: auto;
+}
+
+body.oneline-page .main-content {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  padding: 1rem;
+  gap: 1rem;
+}
+
+body.oneline-page .oneline-card {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+  overflow: hidden;
+  margin: 0;
+}
+
+body.oneline-page .oneline-card .sheet-controls,
+body.oneline-page .oneline-card .toolbar {
+  flex-shrink: 0;
+}
+
+body.oneline-page .workspace {
+  flex: 1;
+  min-height: 0;
+  height: 100%;
+  align-items: stretch;
+}
+
+body.oneline-page .palette {
+  height: 100%;
+  max-height: 100%;
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+  overflow-x: hidden;
+  overflow-y: auto;
+  padding-right: 0;
+}
+
+body.oneline-page .oneline-editor {
+  flex: 1;
+  min-height: 0;
+  height: 100%;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+
+.oneline-canvas-scroll {
+  position: relative;
+  flex: 1;
+  min-height: 0;
+  overflow: auto;
+  scrollbar-gutter: stable both-edges;
+}
+
+body.oneline-page .oneline-canvas-scroll #diagram {
+  height: 100%;
+}
+
+body.oneline-page #component-buttons {
+  flex: 1;
+  min-height: 0;
+}
+
+body.oneline-page .palette-scroll {
+  flex: 1;
+  min-height: 0;
+  height: 100%;
+  overflow-y: auto;
+  padding-right: 0.25rem;
+  scrollbar-gutter: stable both-edges;
 }
 
 .splitter {
@@ -535,7 +693,7 @@ body.compact-mode .palette-section .section-buttons {
   margin-bottom: var(--ol-spacing);
 }
 
-.oneline-editor #diagram {
+.oneline-canvas-scroll #diagram {
   border: 1px solid var(--ol-border-color);
   border-radius: var(--ol-radius);
   width: 100%;
@@ -543,7 +701,10 @@ body.compact-mode .palette-section .section-buttons {
 }
 
 .oneline-editor.panning,
-.oneline-editor.panning #diagram {
+.oneline-editor.panning .oneline-canvas-scroll,
+.oneline-editor.panning .oneline-canvas-scroll #diagram,
+.oneline-canvas-scroll.panning,
+.oneline-canvas-scroll.panning #diagram {
   cursor: grabbing;
   cursor: -webkit-grabbing;
 }
@@ -3378,6 +3539,41 @@ body.dark-mode .workflow-card-title {
     display: none;
 }
 
+.study-settings {
+    margin-top: 1rem;
+    padding: 0.75rem;
+    background: var(--bg-color);
+    border: 1px solid var(--border-color);
+    border-radius: var(--ol-radius);
+    display: flex;
+    flex-direction: column;
+    gap: 0.75rem;
+}
+
+.study-settings.hidden {
+    display: none;
+}
+
+.study-settings fieldset {
+    border: 1px solid var(--border-color);
+    border-radius: var(--ol-radius);
+    padding: 0.75rem;
+    display: flex;
+    flex-direction: column;
+    gap: 0.5rem;
+}
+
+.study-settings label {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 0.5rem;
+}
+
+.study-settings .inline-control {
+    justify-content: flex-start;
+}
+
 .study-results {
     white-space: pre-wrap;
     background: var(--bg-color);
@@ -3385,6 +3581,31 @@ body.dark-mode .workflow-card-title {
     padding: 0.5rem;
     margin-top: 0.5rem;
     font-size: 0.85rem;
+}
+
+.study-branch-connections table {
+    width: 100%;
+    border-collapse: collapse;
+    margin-top: 0.5rem;
+}
+
+.study-branch-connections th,
+.study-branch-connections td {
+    border: 1px solid var(--border-color);
+    padding: 0.35rem 0.5rem;
+    text-align: left;
+    vertical-align: top;
+}
+
+.study-branch-connections th {
+    background: var(--secondary-color);
+}
+
+.transformer-port-label {
+    font-size: 0.7rem;
+    fill: var(--text-color);
+    pointer-events: none;
+    user-select: none;
 }
 
 .component-builder-card,

@@ -582,6 +582,14 @@ let resizingPalette = false;
 
 const voltageClasses = ['480 V', '5000 V', '15000 V', '25000 V'];
 const thermalRatings = ['75C', '90C', '105C'];
+const transformerConnectionOptions = [
+  'Delta',
+  'Wye (Grounded)',
+  'Wye (Ungrounded)',
+  'Zig-Zag',
+  'Open Delta',
+  'Open Wye'
+];
 const manufacturerModels = {
   ABB: ['MNS', 'SafeGear'],
   Siemens: ['SB1', 'S6'],
@@ -1057,7 +1065,7 @@ const STATIC_VIEWPORT_BOUNDS = {
 const MAX_ROUTE_ADJUST_STEPS = 250;
 const STUDY_SETTINGS_KEY = 'studySettings';
 const defaultStudySettings = {
-  loadFlow: { baseMVA: 100, balanced: true },
+  loadFlow: { baseMVA: 100, balanced: true, maxIterations: 20 },
   shortCircuit: { method: 'IEC' }
 };
 let diagramViewport = { ...STATIC_VIEWPORT_BOUNDS };
@@ -1070,10 +1078,14 @@ function normalizeStudySettings(raw = {}) {
   const lf = raw && typeof raw === 'object' ? raw.loadFlow || {} : {};
   const sc = raw && typeof raw === 'object' ? raw.shortCircuit || {} : {};
   const base = Number(lf.baseMVA);
+  const iter = Number(lf.maxIterations);
   return {
     loadFlow: {
       baseMVA: Number.isFinite(base) && base > 0 ? base : defaultStudySettings.loadFlow.baseMVA,
-      balanced: lf.balanced !== false
+      balanced: lf.balanced !== false,
+      maxIterations: Number.isFinite(iter) && iter > 0
+        ? Math.min(Math.floor(iter), 999)
+        : defaultStudySettings.loadFlow.maxIterations
     },
     shortCircuit: {
       method: typeof sc.method === 'string' && sc.method.trim().toUpperCase() === 'ANSI' ? 'ANSI' : 'IEC'
@@ -1142,6 +1154,7 @@ const overlayToggle = document.getElementById('toggle-overlays');
 const studySettingsBtn = document.getElementById('study-settings-btn');
 const studySettingsForm = document.getElementById('study-settings-menu');
 const studyLoadFlowBase = document.getElementById('study-loadflow-basemva');
+const studyLoadFlowIterations = document.getElementById('study-loadflow-iterations');
 const studyLoadFlowBalanced = document.getElementById('study-loadflow-balanced');
 const studyShortCircuitMethod = document.getElementById('study-shortcircuit-method');
 
@@ -1151,6 +1164,7 @@ function persistStudySettings() {
 
 function applyStudySettingsToForm() {
   if (studyLoadFlowBase) studyLoadFlowBase.value = String(studySettings.loadFlow.baseMVA);
+  if (studyLoadFlowIterations) studyLoadFlowIterations.value = String(studySettings.loadFlow.maxIterations);
   if (studyLoadFlowBalanced) studyLoadFlowBalanced.checked = !!studySettings.loadFlow.balanced;
   if (studyShortCircuitMethod) studyShortCircuitMethod.value = studySettings.shortCircuit.method;
 }
@@ -1185,6 +1199,17 @@ if (studyLoadFlowBase) {
     const normalized = Number.isFinite(value) && value > 0 ? value : defaultStudySettings.loadFlow.baseMVA;
     studySettings.loadFlow.baseMVA = normalized;
     studyLoadFlowBase.value = String(normalized);
+    persistStudySettings();
+  });
+}
+if (studyLoadFlowIterations) {
+  studyLoadFlowIterations.addEventListener('change', () => {
+    const value = Number(studyLoadFlowIterations.value);
+    const normalized = Number.isFinite(value) && value > 0
+      ? Math.min(Math.floor(value), 999)
+      : defaultStudySettings.loadFlow.maxIterations;
+    studySettings.loadFlow.maxIterations = normalized;
+    studyLoadFlowIterations.value = String(normalized);
     persistStudySettings();
   });
 }
@@ -1531,7 +1556,8 @@ if (studiesCloseBtn) studiesCloseBtn.addEventListener('click', () => studiesPane
 if (runLFBtn) runLFBtn.addEventListener('click', () => {
   const res = runLoadFlow({
     baseMVA: studySettings.loadFlow.baseMVA,
-    balanced: studySettings.loadFlow.balanced
+    balanced: studySettings.loadFlow.balanced,
+    maxIterations: studySettings.loadFlow.maxIterations
   });
   const { sheets } = getOneLine();
   const diagram = sheets.flatMap(s => s.components);
@@ -3034,6 +3060,58 @@ const transformerVoltageKeyMap = {
   three_winding: ['volts_hv', 'volts_lv', 'volts_tv']
 };
 
+function getTransformerConnectionSetting(transformer, role) {
+  if (!transformer || !role) return null;
+  const key = `${role}_connection`;
+  const direct = transformer[key];
+  if (typeof direct === 'string' && direct.trim()) return direct.trim();
+  if (transformer.props && typeof transformer.props[key] === 'string') {
+    const value = transformer.props[key].trim();
+    if (value) return value;
+  }
+  const metaProps = componentMeta[transformer.subtype]?.props || {};
+  const metaValue = metaProps[key];
+  if (typeof metaValue === 'string' && metaValue.trim()) return metaValue.trim();
+  return null;
+}
+
+function getTransformerPortRole(transformer, portIndex) {
+  if (!transformer || transformer.type !== 'transformer') return null;
+  const idx = Number(portIndex);
+  if (!Number.isFinite(idx)) return null;
+  if (transformer.subtype === 'three_winding') {
+    if (idx === 0) return 'primary';
+    if (idx === 1) return 'secondary';
+    if (idx === 2) return 'tertiary';
+  }
+  if (idx === 0) return 'primary';
+  if (idx === 1) return 'secondary';
+  if (idx === 2) return 'tertiary';
+  return null;
+}
+
+function buildTransformerPortLabel(transformer, portIndex) {
+  const role = getTransformerPortRole(transformer, portIndex);
+  if (!role) return null;
+  let roleLabel;
+  switch (role) {
+    case 'primary':
+      roleLabel = 'Primary';
+      break;
+    case 'secondary':
+      roleLabel = 'Secondary';
+      break;
+    case 'tertiary':
+      roleLabel = 'Tertiary';
+      break;
+    default:
+      roleLabel = role;
+      break;
+  }
+  const config = getTransformerConnectionSetting(transformer, role);
+  return config ? `${roleLabel} (${config})` : roleLabel;
+}
+
 function parseVoltageNumber(value) {
   if (value === undefined || value === null) return null;
   if (typeof value === 'number') {
@@ -3755,7 +3833,7 @@ function render() {
   applyTransformerVoltages();
   propagateSourceVoltagesToBuses(components);
   const svg = document.getElementById('diagram');
-  svg.querySelectorAll('g.component, .connection, .conn-label, .port, .bus-handle, .annotation-handle, .issue-badge, .component-label, .component-attribute, .selection-marquee').forEach(el => el.remove());
+  svg.querySelectorAll('g.component, .connection, .conn-label, .port, .bus-handle, .annotation-handle, .issue-badge, .component-label, .component-attribute, .selection-marquee, .transformer-port-label').forEach(el => el.remove());
   const usedVoltageRanges = new Set();
   const boundsState = { minX: Infinity, minY: Infinity, maxX: -Infinity, maxY: -Infinity };
   const includePoint = (x, y) => {
@@ -4329,6 +4407,42 @@ function render() {
           attrEl.textContent = line;
           attachLabelInteractions(attrEl, c);
           svg.appendChild(attrEl);
+        });
+      }
+      if (c.type === 'transformer') {
+        const ports = c.ports || componentMeta[c.subtype]?.ports || [];
+        ports.forEach((_, portIdx) => {
+          const labelText = buildTransformerPortLabel(c, portIdx);
+          if (!labelText) return;
+          const pos = portPosition(c, portIdx);
+          if (!pos) return;
+          const dir = portDirection(c, portIdx) || 'top';
+          let x = pos.x;
+          let y = pos.y;
+          let anchor = 'middle';
+          let baseline = 'middle';
+          if (dir === 'left') {
+            x -= 6;
+            anchor = 'end';
+          } else if (dir === 'right') {
+            x += 6;
+            anchor = 'start';
+          } else if (dir === 'bottom') {
+            y += 10;
+            baseline = 'hanging';
+          } else {
+            y -= 6;
+            baseline = 'baseline';
+          }
+          const textEl = document.createElementNS(svgNS, 'text');
+          textEl.classList.add('transformer-port-label');
+          textEl.dataset.componentId = c.id;
+          textEl.setAttribute('x', x);
+          textEl.setAttribute('y', y);
+          textEl.setAttribute('text-anchor', anchor);
+          textEl.setAttribute('dominant-baseline', baseline);
+          textEl.textContent = labelText;
+          svg.appendChild(textEl);
         });
       }
     }
@@ -5015,7 +5129,10 @@ function selectComponent(compOrId) {
       thevenin_r: 'Thevenin R (Ω)',
       thevenin_x: 'Thevenin X (Ω)',
       inertia: 'Inertia (kg·m²)',
-      load_torque_curve: 'Load Torque Curve (speed%:torque%)'
+      load_torque_curve: 'Load Torque Curve (speed%:torque%)',
+      primary_connection: 'Primary Connection',
+      secondary_connection: 'Secondary Connection',
+      tertiary_connection: 'Tertiary Connection'
     };
 
     let schema = rawSchema
@@ -5032,6 +5149,12 @@ function selectComponent(compOrId) {
         if (f.name === 'model') {
           const manu = targetComp.manufacturer || Object.keys(manufacturerModels)[0];
           return { ...f, type: 'select', options: manufacturerModels[manu] || [] };
+        }
+        if (
+          targetComp.type === 'transformer'
+          && ['primary_connection', 'secondary_connection', 'tertiary_connection'].includes(f.name)
+        ) {
+          return { ...f, type: 'select', options: transformerConnectionOptions };
         }
         if (targetComp.subtype === 'motor_load' && f.name === 'load_torque_curve') {
           return {

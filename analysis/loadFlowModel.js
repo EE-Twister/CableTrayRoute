@@ -34,6 +34,35 @@ function buildComponentTypeMap() {
 
 const componentTypeBySubtype = buildComponentTypeMap();
 
+function normalizePortIndex(port) {
+  const idx = Number(port);
+  return Number.isFinite(idx) ? idx : null;
+}
+
+function getTransformerPortRole(comp, portIndex) {
+  if (!comp || (comp.type !== 'transformer' && !String(comp.subtype || '').includes('transformer'))) {
+    return null;
+  }
+  const idx = normalizePortIndex(portIndex);
+  if (idx === null) return null;
+  if (comp.subtype === 'three_winding') {
+    if (idx === 0) return 'primary';
+    if (idx === 1) return 'secondary';
+    if (idx === 2) return 'tertiary';
+  }
+  if (idx === 0) return 'primary';
+  if (idx === 1) return 'secondary';
+  if (idx === 2) return 'tertiary';
+  return null;
+}
+
+function getTransformerConnectionSetting(comp, role) {
+  if (!comp || !role) return null;
+  const key = `${role}_connection`;
+  const value = comp[key] ?? comp.props?.[key];
+  return typeof value === 'string' ? value : null;
+}
+
 function toNumber(value, scale = 1) {
   const num = Number(value);
   return Number.isFinite(num) ? num * scale : 0;
@@ -395,7 +424,19 @@ export function buildLoadFlowModel(oneLine = {}) {
         if (!Array.isArray(fromBus.connections)) fromBus.connections = [];
         const exists = fromBus.connections.some(conn => conn.target === toId && (conn.componentId || conn.id) === comp.id);
         if (!exists) {
-          const conn = {
+          const connectionEntry = connList.find(item => {
+            if (!item) return false;
+            const targetId = typeof item === 'string' ? item : item?.target;
+            return targetId === toId;
+          });
+          const portIndex = normalizePortIndex(
+            connectionEntry && typeof connectionEntry === 'object'
+              ? connectionEntry.sourcePort
+              : undefined
+          );
+          const connectionSide = getTransformerPortRole(comp, portIndex);
+          const connectionConfig = connectionSide ? getTransformerConnectionSetting(comp, connectionSide) : null;
+          const busConn = {
             target: toId,
             impedance: cloneData(branch.impedance),
             tap: branch.tap ? cloneData(branch.tap) : undefined,
@@ -407,9 +448,12 @@ export function buildLoadFlowModel(oneLine = {}) {
             componentSubtype: comp.subtype,
             componentName,
             componentLabel,
-            componentRef
+            componentRef,
+            componentPort: portIndex,
+            connectionSide,
+            connectionConfig
           };
-          fromBus.connections.push(conn);
+          fromBus.connections.push(busConn);
         }
       }
     });
