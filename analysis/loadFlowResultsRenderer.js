@@ -56,7 +56,7 @@ function buildSummaryList(summary) {
   return html;
 }
 
-function buildBranchConnectionsSection(summary) {
+function buildBranchConnectionsSection(summary, busLabelMap) {
   const entries = Array.isArray(summary?.branchConnections) ? summary.branchConnections : [];
   if (!entries.length) return '';
   let html = '<h3>Branch Device Connections</h3>';
@@ -70,7 +70,7 @@ function buildBranchConnectionsSection(summary) {
   grouped.forEach((items, type) => {
     const label = type ? type.replace(/_/g, ' ').replace(/\b\w/g, c => c.toUpperCase()) : 'Branch Devices';
     html += `<h4>${escapeHtml(label)}</h4>`;
-    html += '<table><thead><tr><th>Device</th><th>ID</th><th>Type</th><th>From</th><th>To</th><th>Phase</th><th>Rating</th></tr></thead><tbody>';
+    html += '<table><thead><tr><th>Device</th><th>Tag</th><th>Type</th><th>Side</th><th>From</th><th>To</th><th>Phase</th><th>Rating</th></tr></thead><tbody>';
     items.forEach(conn => {
       const primaryName = conn.componentName || conn.componentLabel || '';
       const secondaryLabel = conn.componentLabel && conn.componentLabel !== primaryName ? conn.componentLabel : '';
@@ -84,12 +84,24 @@ function buildBranchConnectionsSection(summary) {
         const digits = Math.abs(conn.rating) >= 1000 ? 0 : 1;
         ratingText = formatNumber(conn.rating, digits, '');
       }
-      html += '<tr>'
+      const tagText = conn.componentName
+        || conn.componentLabel
+        || conn.componentRef
+        || conn.componentId
+        || '';
+      const nodeId = conn.componentId ? ` data-node-id="${escapeHtml(conn.componentId)}"` : '';
+      const sideLabel = conn.connectionSideLabel || '';
+      const configText = conn.connectionConfig ? ` (${conn.connectionConfig})` : '';
+      const sideText = sideLabel ? `${sideLabel}${configText}` : (conn.connectionConfig || '');
+      const fromLabel = resolveBusLabel(conn.fromBus, conn.fromLabel, busLabelMap);
+      const toLabel = resolveBusLabel(conn.toBus, conn.toLabel, busLabelMap);
+      html += `<tr${nodeId}>`
         + `<td>${deviceCell || ''}</td>`
-        + `<td>${escapeHtml(conn.componentId || '')}</td>`
+        + `<td>${escapeHtml(tagText)}</td>`
         + `<td>${escapeHtml(typeText)}</td>`
-        + `<td>${escapeHtml(conn.fromBus || '')}</td>`
-        + `<td>${escapeHtml(conn.toBus || '')}</td>`
+        + `<td>${escapeHtml(sideText)}</td>`
+        + `<td>${escapeHtml(fromLabel)}</td>`
+        + `<td>${escapeHtml(toLabel)}</td>`
         + `<td>${escapeHtml(formatPhases(conn.phases))}</td>`
         + `<td>${escapeHtml(ratingText)}</td>`
         + '</tr>';
@@ -155,7 +167,7 @@ export function renderLoadFlowResultsHtml(res) {
   }
 
   html += buildSummaryList(res?.summary);
-  html += buildBranchConnectionsSection(res?.summary);
+  html += buildBranchConnectionsSection(res?.summary, busLabelMap);
 
   if (buses.length) {
     html += '<h3>Bus Voltages</h3>';

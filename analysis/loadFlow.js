@@ -5,6 +5,40 @@ const IGNORED_TYPES = new Set(['annotation', 'dimension']);
 const MIN_COMPLEX_MAG = 1e-12;
 const LARGE_ADMITTANCE = 1e12;
 
+function normalizePortIndex(port) {
+  const idx = Number(port);
+  return Number.isFinite(idx) ? idx : null;
+}
+
+function resolveTransformerConnectionSide(subtype, portIndex) {
+  if (!subtype || !String(subtype).includes('transformer')) return null;
+  const idx = normalizePortIndex(portIndex);
+  if (idx === null) return null;
+  if (subtype === 'three_winding') {
+    if (idx === 0) return 'primary';
+    if (idx === 1) return 'secondary';
+    if (idx === 2) return 'tertiary';
+  }
+  if (idx === 0) return 'primary';
+  if (idx === 1) return 'secondary';
+  if (idx === 2) return 'tertiary';
+  return null;
+}
+
+function formatConnectionSideLabel(side) {
+  if (!side) return '';
+  switch (side) {
+    case 'primary':
+      return 'Primary';
+    case 'secondary':
+      return 'Secondary';
+    case 'tertiary':
+      return 'Tertiary';
+    default:
+      return side.charAt(0).toUpperCase() + side.slice(1);
+  }
+}
+
 function toNumber(value, scale = 1) {
   const num = Number(value);
   return Number.isFinite(num) ? num * scale : 0;
@@ -120,7 +154,10 @@ function toMW(value) {
   return Number.isFinite(num) ? num / 1000 : 0;
 }
 
-function solvePhase(buses, baseMVA) {
+function solvePhase(buses, baseMVA, options = {}) {
+  const requestedIter = Number.isFinite(options.maxIterations)
+    ? Math.floor(options.maxIterations)
+    : null;
   const warnings = [];
   const working = buses.map(b => {
     const clone = {
@@ -152,7 +189,7 @@ function solvePhase(buses, baseMVA) {
   const PQ = working.map((b, i) => b.type === 'PQ' ? i : -1).filter(i => i >= 0);
   const nonSlack = working.map((b, i) => b.type !== 'slack' ? i : -1).filter(i => i >= 0);
   const Y = buildYBus(working, baseMVA);
-  const maxIter = 20;
+  const maxIter = Math.max(1, requestedIter && requestedIter > 0 ? requestedIter : 20);
   const tol = 1e-6;
   let iterations = 0;
   let maxMis = 0;
@@ -440,6 +477,13 @@ function solvePhase(buses, baseMVA) {
       if (seenConnections.has(key)) return;
       seenConnections.add(key);
       const phases = Array.isArray(conn.phases) ? [...conn.phases] : conn.phases;
+      const componentPort = normalizePortIndex(conn.componentPort ?? conn.sourcePort);
+      const connectionSide = conn.connectionSide
+        || resolveTransformerConnectionSide(conn.componentSubtype, componentPort);
+      const connectionSideLabel = formatConnectionSideLabel(connectionSide);
+      const connectionConfig = typeof conn.connectionConfig === 'string'
+        ? conn.connectionConfig
+        : null;
       branchConnections.push({
         componentId,
         componentName: conn.componentName,
@@ -450,7 +494,11 @@ function solvePhase(buses, baseMVA) {
         rating: conn.rating,
         phases,
         fromBus: bus.id,
-        toBus: conn.target
+        toBus: conn.target,
+        componentPort,
+        connectionSide,
+        connectionSideLabel,
+        connectionConfig
       });
     });
   });
@@ -586,7 +634,7 @@ export function runLoadFlow(modelOrOpts = {}, maybeOpts = {}) {
   if (!model) {
     model = buildLoadFlowModel(getOneLine());
   }
-  const { baseMVA = 100, balanced = true } = opts;
+  const { baseMVA = 100, balanced = true, maxIterations = 20 } = opts;
   let busComps;
   if (model && model.buses) {
     const usable = model.buses.filter(isUsableComponent);
@@ -672,11 +720,14 @@ export function runLoadFlow(modelOrOpts = {}, maybeOpts = {}) {
           componentType: conn.componentType,
           componentSubtype: conn.componentSubtype,
           rating: conn.rating,
-          phases: conn.phases
+          phases: conn.phases,
+          componentPort: conn.componentPort,
+          connectionSide: conn.connectionSide,
+          connectionConfig: conn.connectionConfig
         }))
       };
     });
-    phaseResults[phase] = solvePhase(buses, baseMVA);
+    phaseResults[phase] = solvePhase(buses, baseMVA, { maxIterations });
   });
 
   if (balanced) return phaseResults['balanced'];
