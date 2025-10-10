@@ -18,6 +18,12 @@ function hasConnectionMetadata(conn) {
   return Boolean(conn && (conn.componentType || conn.componentSubtype || conn.componentName || conn.componentLabel || conn.componentRef));
 }
 
+function normalizeIdentifier(value) {
+  if (typeof value !== 'string') return undefined;
+  const trimmed = value.trim();
+  return trimmed ? trimmed : undefined;
+}
+
 /** Basic complex number helpers used by the load-flow solver */
 function toComplex(re = 0, im = 0) {
   return { re, im };
@@ -252,8 +258,16 @@ function solvePhase(buses, baseMVA) {
     const angleDeg = Va[i] * 180 / Math.PI;
     const voltageKV = b.baseKV * Vm[i];
     const voltageV = voltageKV * 1000;
+    const name = normalizeIdentifier(b.name);
+    const label = normalizeIdentifier(b.label);
+    const ref = normalizeIdentifier(b.ref);
+    const displayLabel = label || name || ref || b.id;
     return {
       id: b.id,
+      name,
+      label,
+      ref,
+      displayLabel,
       Vm: Vm[i],
       Va: angleDeg,
       baseKV: b.baseKV,
@@ -266,6 +280,18 @@ function solvePhase(buses, baseMVA) {
       Qg: actualGeneration[i].Qg
     };
   });
+
+  const busMetaById = new Map(busRes.map(bus => [bus.id, bus]));
+  const getBusDisplayLabel = id => {
+    if (!id) return '';
+    const meta = busMetaById.get(id);
+    if (!meta) return id;
+    const label = normalizeIdentifier(meta.displayLabel)
+      || normalizeIdentifier(meta.label)
+      || normalizeIdentifier(meta.name)
+      || normalizeIdentifier(meta.ref);
+    return label || meta.id || id;
+  };
 
   // line flows and losses
   const flows = [];
@@ -307,7 +333,9 @@ function solvePhase(buses, baseMVA) {
       const shuntToLossKW = VjMag2 * (yShTo.re || 0) * scale;
       flows.push({
         from: bus.id,
+        fromLabel: getBusDisplayLabel(bus.id),
         to: working[j].id,
+        toLabel: getBusDisplayLabel(working[j].id),
         P,
         Q,
         Ipu,
@@ -370,17 +398,28 @@ function solvePhase(buses, baseMVA) {
   }), { P: 0, Q: 0 });
   losses.branches = branchLosses;
 
-  const sources = working.map((bus, i) => ({
-    id: bus.id,
-    type: bus.type,
-    Pg: actualGeneration[i].Pg,
-    Qg: actualGeneration[i].Qg,
-    baseKV: bus.baseKV,
-    Vm: Vm[i],
-    Va: Va[i] * 180 / Math.PI,
-    voltageKV: bus.baseKV * Vm[i],
-    voltageV: bus.baseKV * Vm[i] * 1000
-  })).filter(src => Math.abs(src.Pg) > 1e-6 || Math.abs(src.Qg) > 1e-6 || (src.type || '').toLowerCase() === 'slack');
+  const sources = working.map((bus, i) => {
+    const meta = busMetaById.get(bus.id);
+    const name = normalizeIdentifier(meta?.name ?? bus.name);
+    const label = normalizeIdentifier(meta?.label ?? bus.label);
+    const ref = normalizeIdentifier(meta?.ref ?? bus.ref);
+    const displayLabel = normalizeIdentifier(meta?.displayLabel) || label || name || ref || bus.id;
+    return {
+      id: bus.id,
+      name,
+      label,
+      ref,
+      displayLabel,
+      type: bus.type,
+      Pg: actualGeneration[i].Pg,
+      Qg: actualGeneration[i].Qg,
+      baseKV: bus.baseKV,
+      Vm: Vm[i],
+      Va: Va[i] * 180 / Math.PI,
+      voltageKV: bus.baseKV * Vm[i],
+      voltageV: bus.baseKV * Vm[i] * 1000
+    };
+  }).filter(src => Math.abs(src.Pg) > 1e-6 || Math.abs(src.Qg) > 1e-6 || (src.type || '').toLowerCase() === 'slack');
 
   const summary = {
     totalLoadKW: working.reduce((sum, bus) => sum + (bus.Pd || 0), 0),
@@ -600,8 +639,14 @@ export function runLoadFlow(modelOrOpts = {}, maybeOpts = {}) {
       const loadPQ = extractPhasePQ(c.load, phase, balanced);
       const genPQ = extractPhasePQ(c.generation, phase, balanced);
       const shunt = balanced ? c.shunt : resolvePhaseRecord(c.shunt, phase);
+      const name = normalizeIdentifier(c.name);
+      const label = normalizeIdentifier(c.label);
+      const ref = normalizeIdentifier(c.ref);
       return {
         id: c.id,
+        name,
+        label,
+        ref,
         type: c.busType || (idx === 0 ? 'slack' : 'PQ'),
         Vm: c.Vm,
         Va: c.Va,
