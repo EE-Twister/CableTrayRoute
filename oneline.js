@@ -5247,9 +5247,20 @@ function selectComponent(compOrId) {
       let input;
       const defVal = manufacturerDefaults[targetComp.subtype]?.[f.name] || '';
       let curVal;
-      if (typeof f.getValue === 'function') curVal = f.getValue(targetComp);
-      else if (targetComp[f.name] !== undefined && targetComp[f.name] !== '') curVal = targetComp[f.name];
-      else curVal = defVal;
+      if (typeof f.getValue === 'function') {
+        curVal = f.getValue(targetComp);
+      } else if (targetComp[f.name] !== undefined && targetComp[f.name] !== '') {
+        curVal = targetComp[f.name];
+      } else if (
+        targetComp.props
+        && typeof targetComp.props === 'object'
+        && Object.prototype.hasOwnProperty.call(targetComp.props, f.name)
+        && targetComp.props[f.name] !== ''
+      ) {
+        curVal = targetComp.props[f.name];
+      } else {
+        curVal = defVal;
+      }
       if (f.type === 'select') {
         input = document.createElement('select');
         (f.options || []).forEach(opt => {
@@ -5290,17 +5301,37 @@ function selectComponent(compOrId) {
     };
 
     const applyFieldFromForm = (target, field, formData) => {
+      const hasPropKey = !!(
+        target
+        && target.props
+        && typeof target.props === 'object'
+        && Object.prototype.hasOwnProperty.call(target.props, field.name)
+      );
       if (field.type === 'checkbox') {
         const checked = formData.get(field.name) === 'on';
         if (typeof field.setValue === 'function') field.setValue(target, checked);
         else target[field.name] = checked;
+        if (hasPropKey) target.props[field.name] = checked;
         return;
       }
       const raw = formData.get(field.name);
       const value = raw === null ? '' : raw;
-      if (typeof field.setValue === 'function') field.setValue(target, value);
-      else if (field.type === 'number') target[field.name] = value ? parseFloat(value) : '';
-      else target[field.name] = value || '';
+      if (typeof field.setValue === 'function') {
+        field.setValue(target, value);
+        if (hasPropKey) {
+          target.props[field.name] = field.type === 'number' && value ? parseFloat(value) : value || '';
+        }
+        return;
+      }
+      if (field.type === 'number') {
+        const numVal = value ? parseFloat(value) : '';
+        target[field.name] = numVal;
+        if (hasPropKey) target.props[field.name] = numVal;
+      } else {
+        const textVal = value || '';
+        target[field.name] = textVal;
+        if (hasPropKey) target.props[field.name] = textVal;
+      }
     };
 
     let fields = [...baseFields, ...schema];
