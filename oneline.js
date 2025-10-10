@@ -3065,6 +3065,17 @@ function formatVoltageString(num) {
   return Number.isInteger(rounded) ? String(rounded) : String(rounded);
 }
 
+function formatVoltage(volts) {
+  if (!Number.isFinite(volts)) return '';
+  const abs = Math.abs(volts);
+  if (abs >= 1000) {
+    const kv = Number((volts / 1000).toFixed(3));
+    return `${kv} kV`;
+  }
+  const value = Number(volts.toFixed(1));
+  return `${value} V`;
+}
+
 function resolveNominalVoltage(component) {
   if (!component || typeof component !== 'object') return null;
   const direct = parseVoltageNumber(component.voltage);
