@@ -21,7 +21,11 @@ export function runValidation(components = [], studies = {}) {
     });
   });
   inbound.forEach((cnt, id) => {
-    if (cnt === 0) {
+    const comp = componentLookup.get(id);
+    const outbound = Array.isArray(comp?.connections)
+      ? comp.connections.filter(conn => conn && conn.target).length
+      : 0;
+    if (cnt === 0 && outbound === 0) {
       issues.push({ component: id, message: 'Unconnected bus' });
     }
   });

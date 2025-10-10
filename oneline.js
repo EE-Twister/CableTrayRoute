@@ -464,6 +464,30 @@ function normalizePortsForCategory(category, ports, type, subtype) {
   }));
 }
 
+const defaultBusProps = {
+  volts: 13800,
+  thevenin_mva: 500,
+  xr_ratio: 10,
+  grounding: 'solid',
+  baseKV: 13.8,
+  kV: 13.8,
+  Vm: 1.0,
+  Va: 0,
+  prefault_voltage: 13.8,
+  load: {
+    kw: 0,
+    kvar: 0
+  },
+  generation: {
+    kw: 0,
+    kvar: 0
+  },
+  enclosure: 'box',
+  gap: 102,
+  working_distance: 914,
+  electrode_config: 'VCB'
+};
+
 const builtinComponents = [
   {
     subtype: 'Bus',
@@ -474,7 +498,8 @@ const builtinComponents = [
     ports: [
       { x: 0, y: 20 },
       { x: 80, y: 20 }
-    ]
+    ],
+    props: { ...defaultBusProps }
   },
   {
     subtype: 'Panel',
