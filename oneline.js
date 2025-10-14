@@ -394,16 +394,85 @@ function categoryForType(t) {
   }
 }
 
-function inferSchemaFromProps(props) {
+function readNestedValue(holder, path = []) {
+  if (!holder || typeof holder !== 'object') return undefined;
+  let current = holder;
+  for (const key of path) {
+    if (!current || typeof current !== 'object' || !(key in current)) return undefined;
+    current = current[key];
+  }
+  return current;
+}
+
+function writeNestedValue(holder, path = [], value) {
+  if (!holder || typeof holder !== 'object' || !path.length) return;
+  let current = holder;
+  for (let i = 0; i < path.length - 1; i += 1) {
+    const key = path[i];
+    if (!current[key] || typeof current[key] !== 'object') current[key] = {};
+    current = current[key];
+  }
+  current[path[path.length - 1]] = value;
+}
+
+function getNestedComponentValue(comp, path = []) {
+  const direct = readNestedValue(comp, path);
+  if (direct !== undefined) return direct;
+  if (comp && comp.props && typeof comp.props === 'object') {
+    return readNestedValue(comp.props, path);
+  }
+  return undefined;
+}
+
+function setNestedComponentValue(comp, path = [], rawValue, type) {
+  if (!comp || !path.length) return;
+  let finalValue;
+  if (type === 'checkbox') {
+    finalValue = !!rawValue;
+  } else if (type === 'number') {
+    if (rawValue === '' || rawValue === null || rawValue === undefined) {
+      finalValue = '';
+    } else if (typeof rawValue === 'number' && Number.isFinite(rawValue)) {
+      finalValue = rawValue;
+    } else {
+      const parsed = parseFloat(rawValue);
+      finalValue = Number.isFinite(parsed) ? parsed : '';
+    }
+  } else {
+    finalValue = rawValue ?? '';
+  }
+  writeNestedValue(comp, path, finalValue);
+  if (comp.props && typeof comp.props === 'object') {
+    writeNestedValue(comp.props, path, finalValue);
+  }
+}
+
+function inferSchemaFromProps(props, path = []) {
   const schema = [];
-  Object.entries(props || {}).forEach(([k, v]) => {
-    if (v && typeof v === 'object') return; // skip nested objects for now
-    schema.push({
-      name: k,
-      label: k.replace(/_/g, ' '),
-      type: typeof v === 'number' ? 'number' : typeof v === 'boolean' ? 'checkbox' : 'text',
-      default: v
-    });
+  Object.entries(props || {}).forEach(([key, value]) => {
+    const currentPath = [...path, key];
+    if (value && typeof value === 'object' && !Array.isArray(value)) {
+      schema.push(...inferSchemaFromProps(value, currentPath));
+      return;
+    }
+    const fieldName = currentPath.join('_');
+    const labelParts = currentPath.map(part => part.replace(/_/g, ' '));
+    const type = typeof value === 'number'
+      ? 'number'
+      : typeof value === 'boolean'
+        ? 'checkbox'
+        : 'text';
+    const field = {
+      name: fieldName,
+      label: labelParts.join(' '),
+      type,
+      default: value
+    };
+    if (path.length) {
+      field.getValue = comp => getNestedComponentValue(comp, currentPath);
+      field.setValue = (comp, raw) => setNestedComponentValue(comp, currentPath, raw, type);
+    }
+    schema.push(field);
   });
   return schema;
 }
@@ -718,7 +787,11 @@ async function loadComponentLibrary() {
     subtypeCategory[key] = category;
     if (!componentTypes[category]) componentTypes[category] = [];
     if (!componentTypes[category].includes(key)) componentTypes[category].push(key);
-    propSchemas[key] = inferSchemaFromProps(props);
+    const schema = inferSchemaFromProps(props);
+    propSchemas[key] = schema;
+    if (!propSchemas[subtype] || allowOverride) {
+      propSchemas[subtype] = schema.map(field => ({ ...field }));
+    }
   };
 
   try {
