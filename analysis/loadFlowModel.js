@@ -63,6 +63,204 @@ function getTransformerConnectionSetting(comp, role) {
   return typeof value === 'string' ? value : null;
 }
 
+const ZERO_IMPEDANCE_TOLERANCE = 1e-9;
+
+function isTransformerComponent(comp) {
+  if (!comp) return false;
+  if (comp.type === 'transformer') return true;
+  const subtype = typeof comp.subtype === 'string' ? comp.subtype.toLowerCase() : '';
+  return subtype.includes('transformer');
+}
+
+function parseNumeric(value) {
+  if (value === undefined || value === null) return null;
+  if (typeof value === 'number') {
+    return Number.isFinite(value) ? value : null;
+  }
+  if (typeof value === 'string') {
+    const match = value.replace(/[,\s]+/g, ' ').match(/[-+]?\d*\.?\d+(?:[eE][-+]?\d+)?/);
+    if (!match) return null;
+    const num = Number.parseFloat(match[0]);
+    return Number.isFinite(num) ? num : null;
+  }
+  return null;
+}
+
+function toKVValue(value) {
+  const num = parseNumeric(value);
+  if (num === null) return null;
+  return num > 100 ? num / 1000 : num;
+}
+
+function pickNestedValue(comp, key) {
+  if (!comp || !key) return undefined;
+  if (Object.prototype.hasOwnProperty.call(comp, key)) return comp[key];
+  if (comp.props && Object.prototype.hasOwnProperty.call(comp.props, key)) return comp.props[key];
+  if (comp.parameters && Object.prototype.hasOwnProperty.call(comp.parameters, key)) return comp.parameters[key];
+  return undefined;
+}
+
+const transformerVoltageKeysByRole = {
+  primary: ['volts_primary', 'voltage_primary', 'primary_voltage', 'volts_hv', 'voltage'],
+  secondary: ['volts_secondary', 'voltage_secondary', 'secondary_voltage', 'volts_lv', 'voltage'],
+  tertiary: ['volts_tv', 'volts_tertiary', 'tertiary_voltage', 'volts_lv', 'voltage']
+};
+
+const transformerKvaKeysByRole = {
+  primary: ['kva_primary', 'kva_hv', 'kva'],
+  secondary: ['kva_secondary', 'kva_lv', 'kva'],
+  tertiary: ['kva_tertiary', 'kva_tv', 'kva']
+};
+
+const transformerMvaKeysByRole = {
+  primary: ['mva_primary', 'mva_hv', 'mva'],
+  secondary: ['mva_secondary', 'mva_lv', 'mva'],
+  tertiary: ['mva_tertiary', 'mva_tv', 'mva']
+};
+
+const transformerPercentKeysByRole = {
+  primary: ['percent_primary', 'percent_z', 'z_percent'],
+  secondary: ['percent_secondary', 'percent_z', 'z_percent'],
+  tertiary: ['percent_tertiary', 'percent_z', 'z_percent']
+};
+
+function getTransformerSideVoltage(comp, role) {
+  const roleKeys = transformerVoltageKeysByRole[role] || [];
+  const candidates = [...roleKeys, 'voltage', 'volts', 'baseKV'];
+  for (const key of candidates) {
+    const kv = toKVValue(pickNestedValue(comp, key));
+    if (kv) return kv;
+  }
+  return null;
+}
+
+function getTransformerPercent(comp, role) {
+  const roleKeys = transformerPercentKeysByRole[role] || [];
+  const candidates = [...roleKeys, 'percent_z'];
+  for (const key of candidates) {
+    const percent = parseNumeric(pickNestedValue(comp, key));
+    if (percent !== null) return percent;
+  }
+  return null;
+}
+
+function getTransformerKva(comp, role) {
+  const kvaKeys = transformerKvaKeysByRole[role] || [];
+  const kvaCandidates = [...kvaKeys, 'kva'];
+  for (const key of kvaCandidates) {
+    const kva = parseNumeric(pickNestedValue(comp, key));
+    if (kva !== null) return kva;
+  }
+  const mvaKeys = transformerMvaKeysByRole[role] || [];
+  const mvaCandidates = [...mvaKeys, 'mva'];
+  for (const key of mvaCandidates) {
+    const mva = parseNumeric(pickNestedValue(comp, key));
+    if (mva !== null) return mva * 1000;
+  }
+  return null;
+}
+
+function getTransformerXr(comp) {
+  const xr = parseNumeric(pickNestedValue(comp, 'xr_ratio'));
+  return xr !== null ? xr : null;
+}
+
+function isZeroImpedance(impedance) {
+  if (!impedance || typeof impedance !== 'object') return true;
+  const r = parseNumeric(impedance.r) ?? 0;
+  const x = parseNumeric(impedance.x) ?? 0;
+  return Math.abs(r) < ZERO_IMPEDANCE_TOLERANCE && Math.abs(x) < ZERO_IMPEDANCE_TOLERANCE;
+}
+
+function normalizeImpedance(impedance) {
+  if (!impedance || typeof impedance !== 'object') return { r: 0, x: 0 };
+  const r = parseNumeric(impedance.r) ?? 0;
+  const x = parseNumeric(impedance.x) ?? 0;
+  return { r, x };
+}
+
+function determineSideKV(comp, role, bus) {
+  const kv = role ? getTransformerSideVoltage(comp, role) : null;
+  if (kv) return kv;
+  if (bus && Number.isFinite(bus.baseKV) && bus.baseKV > 0) return bus.baseKV;
+  const fallback = toKVValue(pickNestedValue(comp, 'voltage') ?? pickNestedValue(comp, 'volts'));
+  return fallback ?? null;
+}
+
+function deriveTransformerImpedance(comp, fromRole, toRole, fromBus, toBus) {
+  if (!isTransformerComponent(comp)) return null;
+  const rolePriority = [];
+  if (fromRole) rolePriority.push(fromRole);
+  if (toRole && !rolePriority.includes(toRole)) rolePriority.push(toRole);
+  rolePriority.push('primary', 'secondary', 'tertiary');
+  let percent = null;
+  for (const role of rolePriority) {
+    percent = getTransformerPercent(comp, role);
+    if (percent !== null) break;
+  }
+  if (percent === null) return null;
+  let kva = null;
+  for (const role of rolePriority) {
+    kva = getTransformerKva(comp, role);
+    if (kva !== null) break;
+  }
+  if (kva === null || kva === 0) return null;
+  let kv = null;
+  for (const role of rolePriority) {
+    kv = getTransformerSideVoltage(comp, role);
+    if (kv) break;
+  }
+  if (!kv) {
+    const busCandidates = [fromBus, toBus];
+    for (const bus of busCandidates) {
+      if (bus && Number.isFinite(bus.baseKV) && bus.baseKV > 0) {
+        kv = bus.baseKV;
+        break;
+      }
+    }
+  }
+  if (!kv) return null;
+  const baseMVA = kva / 1000;
+  if (!baseMVA) return null;
+  const baseZ = (kv * kv) / baseMVA;
+  const zMag = baseZ * (percent / 100);
+  const xr = getTransformerXr(comp);
+  if (xr && Math.abs(xr) > 0.01) {
+    const r = zMag / Math.sqrt(1 + xr * xr);
+    return { r, x: r * xr };
+  }
+  const r = zMag * 0.1;
+  const x = Math.sqrt(Math.max(zMag * zMag - r * r, 0)) || zMag;
+  return { r, x };
+}
+
+function computeExistingTapRatio(tap) {
+  if (tap === null || tap === undefined) return null;
+  if (typeof tap === 'number') return Number.isFinite(tap) ? tap : null;
+  if (typeof tap === 'object' && tap !== null) {
+    const ratio = parseNumeric(tap.ratio);
+    return ratio !== null ? ratio : null;
+  }
+  return null;
+}
+
+function deriveTransformerTap(comp, tap, fromRole, toRole, fromBus, toBus) {
+  if (!isTransformerComponent(comp)) return tap;
+  const fromKV = determineSideKV(comp, fromRole, fromBus);
+  const toKV = determineSideKV(comp, toRole, toBus);
+  if (!fromKV || !toKV || Math.abs(toKV) < 1e-9) return tap;
+  const desiredRatio = fromKV / toKV;
+  if (!Number.isFinite(desiredRatio) || desiredRatio <= 0) return tap;
+  const existingRatio = computeExistingTapRatio(tap);
+  if (existingRatio !== null && Math.abs(existingRatio - desiredRatio) < 1e-6) {
+    return tap;
+  }
+  if (tap && typeof tap === 'object' && tap !== null) {
+    return { ...tap, ratio: desiredRatio };
+  }
+  return { ratio: desiredRatio };
+}
+
 function toNumber(value, scale = 1) {
   const num = Number(value);
   return Number.isFinite(num) ? num * scale : 0;
@@ -115,7 +313,31 @@ function isGeneratorDevice(comp) {
 }
 
 function extractLoadPQ(comp) {
-  const sources = [comp?.load, comp?.props?.load, comp?.parameters?.load];
+  const rawSources = [comp?.load, comp?.props?.load, comp?.parameters?.load];
+  const seenRefs = new Set();
+  const seenValues = new Set();
+  const sources = [];
+  rawSources.forEach(src => {
+    if (src === null || src === undefined) return;
+    if (typeof src === 'object') {
+      if (seenRefs.has(src)) return;
+      seenRefs.add(src);
+      let signature = null;
+      try {
+        signature = JSON.stringify(src);
+      } catch (err) {
+        signature = null;
+      }
+      if (signature && seenValues.has(signature)) return;
+      if (signature) seenValues.add(signature);
+      sources.push(src);
+      return;
+    }
+    const signature = `${typeof src}:${src}`;
+    if (seenValues.has(signature)) return;
+    seenValues.add(signature);
+    sources.push(src);
+  });
   let total = null;
   sources.forEach(src => {
     const pq = extractPQ(src);
@@ -263,10 +485,10 @@ function extractImpedance(comp) {
     comp?.parameters?.impedance
   ];
   for (const cand of candidates) {
-    if (cand && typeof cand === 'object') return cand;
+    if (cand && typeof cand === 'object') return normalizeImpedance(cand);
   }
   if (typeof comp?.r === 'number' || typeof comp?.x === 'number') {
-    return { r: comp.r || 0, x: comp.x || 0 };
+    return normalizeImpedance({ r: comp.r, x: comp.x });
   }
   return { r: 0, x: 0 };
 }
@@ -394,9 +616,41 @@ export function buildLoadFlowModel(oneLine = {}) {
     if (busTargets.length < 2) return;
     const [fromId, ...otherTargets] = busTargets;
     otherTargets.forEach(toId => {
-      if (!busMap.has(fromId) || !busMap.has(toId)) return;
-      const impedance = cloneData(extractImpedance(comp));
-      const tap = cloneData(comp.tap);
+      const fromBus = busMap.get(fromId);
+      const toBus = busMap.get(toId);
+      if (!fromBus || !toBus) return;
+      const fromConnectionEntry = connList.find(item => {
+        if (!item) return false;
+        const targetId = typeof item === 'string' ? item : item?.target;
+        return targetId === fromId;
+      });
+      const toConnectionEntry = connList.find(item => {
+        if (!item) return false;
+        const targetId = typeof item === 'string' ? item : item?.target;
+        return targetId === toId;
+      });
+      const fromPortIndex = normalizePortIndex(
+        fromConnectionEntry && typeof fromConnectionEntry === 'object'
+          ? fromConnectionEntry.sourcePort
+          : undefined
+      );
+      const toPortIndex = normalizePortIndex(
+        toConnectionEntry && typeof toConnectionEntry === 'object'
+          ? toConnectionEntry.sourcePort
+          : undefined
+      );
+      const fromSide = getTransformerPortRole(comp, fromPortIndex);
+      const toSide = getTransformerPortRole(comp, toPortIndex);
+      const baseImpedance = extractImpedance(comp);
+      let impedance = cloneData(baseImpedance);
+      if (isTransformerComponent(comp) && isZeroImpedance(impedance)) {
+        const derived = deriveTransformerImpedance(comp, fromSide, toSide, fromBus, toBus);
+        if (derived) {
+          impedance = cloneData(derived);
+        }
+      }
+      let tap = cloneData(comp.tap);
+      tap = deriveTransformerTap(comp, tap, fromSide, toSide, fromBus, toBus);
       const shunt = cloneData(comp.shunt);
       const rating = comp.rating ?? comp.ampacity ?? comp.currentRating;
       const phases = comp.phases ? cloneData(comp.phases) : undefined;
@@ -419,22 +673,13 @@ export function buildLoadFlowModel(oneLine = {}) {
         ref: componentRef
       };
       branches.push(branch);
-      const fromBus = busMap.get(fromId);
       if (fromBus) {
         if (!Array.isArray(fromBus.connections)) fromBus.connections = [];
         const exists = fromBus.connections.some(conn => conn.target === toId && (conn.componentId || conn.id) === comp.id);
         if (!exists) {
-          const connectionEntry = connList.find(item => {
-            if (!item) return false;
-            const targetId = typeof item === 'string' ? item : item?.target;
-            return targetId === toId;
-          });
-          const portIndex = normalizePortIndex(
-            connectionEntry && typeof connectionEntry === 'object'
-              ? connectionEntry.sourcePort
-              : undefined
-          );
-          const connectionSide = getTransformerPortRole(comp, portIndex);
+          const connectionEntry = toConnectionEntry;
+          const portIndex = toPortIndex;
+          const connectionSide = toSide;
           const connectionConfig = connectionSide ? getTransformerConnectionSetting(comp, connectionSide) : null;
           const busConn = {
             target: toId,

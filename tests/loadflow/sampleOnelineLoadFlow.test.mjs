@@ -59,7 +59,7 @@ describe('Published sample one-line load flow', () => {
     const bus = model.buses.find(b => b.id === 'n1');
     assert(bus, 'Sample diagram should contain bus n1');
     assert(bus.load, 'Bus n1 should aggregate downstream loads');
-    assert(Math.abs(bus.load.kw - 600) < 1e-9, 'Aggregated kW should equal 600');
+    assert(Math.abs(bus.load.kw - 300) < 1e-9, 'Aggregated kW should equal 300');
     assert(Math.abs(bus.load.kvar || 0) < 1e-9, 'Aggregated kvar should equal 0');
 
     const result = runLoadFlow(model, { baseMVA: 100, balanced: true });
