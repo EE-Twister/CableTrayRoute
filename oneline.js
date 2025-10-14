@@ -8014,7 +8014,10 @@ function syncSchedules(notify = true) {
       z: c.z ?? ''
     };
     (propSchemas[c.subtype] || []).forEach(f => {
-      fields[f.name] = c[f.name] ?? f.default ?? fields[f.name] ?? '';
+      const value = typeof f.getValue === 'function'
+        ? f.getValue(c)
+        : c[f.name];
+      fields[f.name] = value ?? f.default ?? fields[f.name] ?? '';
     });
     return fields;
   };
@@ -8112,7 +8115,10 @@ function serializeState() {
         z: c.z ?? ''
       };
       (propSchemas[c.subtype] || []).forEach(f => {
-        fields[f.name] = c[f.name] ?? fields[f.name] ?? '';
+        const value = typeof f.getValue === 'function'
+          ? f.getValue(c)
+          : c[f.name];
+        fields[f.name] = value ?? fields[f.name] ?? '';
       });
       return fields;
     };
