@@ -104,4 +104,35 @@ describe('Simple feeder load flow', () => {
     assert(Math.abs(result.losses.P) < 1e-3, 'System losses should be effectively zero');
     assert(Math.abs(result.summary.totalLossKW - result.losses.P) < 1e-9, 'Summary loss tally should match detailed losses');
   });
+
+  it('derives reactive demand from power factor when kvar is omitted', () => {
+    const kw = 150;
+    const pf = 0.8;
+    const expectedKvar = Math.sqrt(Math.max(0, (kw / pf) ** 2 - kw * kw));
+    const model = {
+      buses: [
+        { id: 'source', type: 'slack', baseKV: 13.8 },
+        { id: 'load', type: 'PQ', baseKV: 13.8, load: { kw, pf } }
+      ],
+      branches: [
+        {
+          id: 'feeder',
+          from: 'source',
+          to: 'load',
+          impedance: { r: 0.5, x: 0.9 }
+        }
+      ]
+    };
+
+    const result = runLoadFlow(model, { baseMVA: 1, balanced: true });
+    assert(result.converged, 'Load flow should converge');
+    const branchFlow = result.lines.find(line => line.from === 'source' && line.to === 'load');
+    assert(branchFlow, 'Feeder flow should be reported');
+    assert(Math.abs(result.summary.totalLoadKW - kw) < 1e-6, 'Aggregated active demand should match the load input');
+    assert(Math.abs(result.summary.totalLoadKVAR - expectedKvar) < 1e-3, 'Reactive demand should be derived from the power factor');
+    assert(Math.abs(branchFlow.Q - expectedKvar) < 0.5, 'Reactive flow should reflect the derived kvar within tolerance');
+    const loadBus = result.buses.find(bus => bus.id === 'load');
+    assert(loadBus, 'Load bus should be reported');
+    assert(loadBus.Vm < 1, 'Load bus voltage should sag under reactive draw');
+  });
 });

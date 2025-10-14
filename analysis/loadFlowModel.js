@@ -266,6 +266,177 @@ function toNumber(value, scale = 1) {
   return Number.isFinite(num) ? num * scale : 0;
 }
 
+function parseBooleanFlag(value) {
+  if (value === null || value === undefined) return null;
+  if (typeof value === 'boolean') return value;
+  if (typeof value === 'number') {
+    if (value === 1) return true;
+    if (value === 0) return false;
+  }
+  if (typeof value === 'string') {
+    const normalized = value.trim().toLowerCase();
+    if (!normalized) return null;
+    if (['true', 't', 'yes', 'y', '1', 'on'].includes(normalized)) return true;
+    if (['false', 'f', 'no', 'n', '0', 'off'].includes(normalized)) return false;
+  }
+  return null;
+}
+
+function parsePowerFactorValue(raw) {
+  if (raw === null || raw === undefined) return null;
+  let value = raw;
+  if (typeof value === 'string') {
+    const trimmed = value.trim();
+    if (!trimmed) return null;
+    if (trimmed.endsWith('%')) {
+      value = trimmed.slice(0, -1);
+    } else {
+      value = trimmed;
+    }
+  }
+  const numeric = Number(value);
+  if (!Number.isFinite(numeric) || numeric === 0) return null;
+  let normalized = numeric;
+  if (Math.abs(normalized) > 1) normalized /= 100;
+  if (!Number.isFinite(normalized) || normalized === 0) return null;
+  const magnitude = Math.abs(normalized);
+  if (magnitude <= 0 || magnitude > 1) return null;
+  const sign = normalized < 0 ? -1 : 1;
+  return { magnitude, sign };
+}
+
+function extractPowerFactor(record) {
+  if (!record || typeof record !== 'object') return null;
+  const fields = [record.pf, record.power_factor, record.powerFactor];
+  for (const raw of fields) {
+    const parsed = parsePowerFactorValue(raw);
+    if (parsed) return parsed;
+  }
+  return null;
+}
+
+function resolveReactiveSign(record, pfSign = 1) {
+  let sign = pfSign < 0 ? -1 : 1;
+  if (!record || typeof record !== 'object') return sign;
+  const leadLagCandidates = [
+    record.pf_lead_lag,
+    record.pfLeadLag,
+    record.power_factor_lead_lag,
+    record.powerFactorLeadLag,
+    record.leadLag,
+    record.lead_lag,
+    record.powerFactorMode,
+    record.power_factor_mode,
+    record.pf_mode,
+    record.pfMode
+  ];
+  for (const candidate of leadLagCandidates) {
+    if (typeof candidate !== 'string') continue;
+    const normalized = candidate.trim().toLowerCase();
+    if (!normalized) continue;
+    if (normalized.includes('lead')) {
+      sign = -1;
+    } else if (normalized.includes('lag')) {
+      sign = 1;
+    }
+  }
+  const leadingFlags = [
+    record.leading,
+    record.isLeading,
+    record.pf_leading,
+    record.pfLeading,
+    record.power_factor_leading,
+    record.powerFactorLeading
+  ];
+  for (const flag of leadingFlags) {
+    const parsed = parseBooleanFlag(flag);
+    if (parsed === true) {
+      sign = -1;
+    }
+  }
+  const laggingFlags = [
+    record.lagging,
+    record.isLagging,
+    record.pf_lagging,
+    record.pfLagging,
+    record.power_factor_lagging,
+    record.powerFactorLagging
+  ];
+  for (const flag of laggingFlags) {
+    const parsed = parseBooleanFlag(flag);
+    if (parsed === true) {
+      sign = 1;
+    }
+  }
+  const signFields = [
+    record.kvar_sign,
+    record.kvarSign,
+    record.q_sign,
+    record.qSign,
+    record.reactive_sign,
+    record.reactiveSign
+  ];
+  for (const raw of signFields) {
+    if (raw === null || raw === undefined) continue;
+    if (typeof raw === 'string') {
+      const normalized = raw.trim().toLowerCase();
+      if (!normalized) continue;
+      if (normalized === 'lead' || normalized === 'leading' || normalized === 'capacitive') {
+        sign = -1;
+        break;
+      }
+      if (normalized === 'lag' || normalized === 'lagging' || normalized === 'inductive') {
+        sign = 1;
+        break;
+      }
+    }
+    const numeric = Number(raw);
+    if (Number.isFinite(numeric) && numeric !== 0) {
+      sign = numeric > 0 ? 1 : -1;
+      break;
+    }
+  }
+  return sign;
+}
+
+function isReactiveAuthoritative(record, directProvided) {
+  if (!record || typeof record !== 'object') return directProvided;
+  const authoritativeFlags = [
+    record.kvar_authoritative,
+    record.kvarAuthoritative,
+    record.reactive_authoritative,
+    record.reactiveAuthoritative,
+    record.q_authoritative,
+    record.qAuthoritative,
+    record.kvar_locked,
+    record.kvarLocked,
+    record.reactive_locked,
+    record.reactiveLocked,
+    record.kvar_manual,
+    record.kvarManual,
+    record.q_manual,
+    record.qManual
+  ];
+  for (const flag of authoritativeFlags) {
+    const parsed = parseBooleanFlag(flag);
+    if (parsed === true) return true;
+    if (parsed === false) return false;
+  }
+  return directProvided;
+}
+
+function deriveReactiveFromPF(kw, record) {
+  const pf = extractPowerFactor(record);
+  if (!pf) return 0;
+  const kwAbs = Math.abs(Number(kw) || 0);
+  if (!kwAbs) return 0;
+  const kva = kwAbs / pf.magnitude;
+  const kvarMag = Math.sqrt(Math.max(0, kva * kva - kwAbs * kwAbs));
+  if (!kvarMag) return 0;
+  const sign = resolveReactiveSign(record, pf.sign);
+  return kvarMag * sign;
+}
+
 function addPQ(target, addition) {
   if (!addition) return target;
   const out = target && typeof target === 'object' ? { ...target } : {};
@@ -285,7 +456,19 @@ function extractPQ(source) {
   }
   if (typeof source !== 'object') return null;
   let kw = toNumber(source.kw ?? source.kW ?? source.P ?? source.p);
-  let kvar = toNumber(source.kvar ?? source.kVAr ?? source.Q ?? source.q);
+  kw += toNumber(source.watts, 0.001);
+  kw += toNumber(source.hp, 0.746);
+  const directKvar = source.kvar ?? source.kVAr ?? source.Q ?? source.q;
+  const kvarProvided = directKvar !== undefined;
+  const kvarAuthoritative = isReactiveAuthoritative(source, kvarProvided);
+  let kvar = 0;
+  if (kvarProvided && kvarAuthoritative) {
+    kvar += toNumber(directKvar);
+  }
+  if ((!kvarAuthoritative || !kvarProvided) && kw) {
+    const derived = deriveReactiveFromPF(kw, source);
+    if (derived) kvar += derived;
+  }
   if (!kw && !kvar) {
     let nested = null;
     Object.keys(source).forEach(key => {
@@ -349,7 +532,16 @@ function extractLoadPQ(comp) {
     kw += toNumber(comp?.kw ?? comp?.kW);
     kw += toNumber(comp?.watts, 0.001);
     kw += toNumber(comp?.hp, 0.746);
-    kvar += toNumber(comp?.kvar ?? comp?.kVAr);
+    const directKvar = comp?.kvar ?? comp?.kVAr;
+    const kvarProvided = directKvar !== undefined;
+    const kvarAuthoritative = isReactiveAuthoritative(comp, kvarProvided);
+    if (kvarProvided && kvarAuthoritative) {
+      kvar += toNumber(directKvar);
+    }
+    if ((!kvarAuthoritative || !kvarProvided) && kw) {
+      const derived = deriveReactiveFromPF(kw, comp);
+      if (derived) kvar += derived;
+    }
     if (kw || kvar) total = addPQ(total, { kw, kvar });
   }
   return total;
