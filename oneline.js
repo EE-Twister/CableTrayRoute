@@ -5168,18 +5168,28 @@ function selectComponent(compOrId) {
     });
   }
 
-  function closeModal() {
+  function closeModal(opts) {
+    let shouldApply = false;
+    if (opts && typeof opts === 'object' && Object.prototype.hasOwnProperty.call(opts, 'applyChanges')) {
+      shouldApply = !!opts.applyChanges;
+    }
+    if (shouldApply && typeof modal._applyChanges === 'function') {
+      modal._applyChanges();
+    }
     modal.classList.remove('show');
     modal.removeEventListener('click', outsideHandler);
     document.removeEventListener('keydown', keyHandler);
     delete modal._outsideHandler;
     delete modal._keyHandler;
+    delete modal._applyChanges;
     selected = null;
     selection = [];
     selectedConnection = null;
   }
 
-  const outsideHandler = e => { if (e.target === modal) closeModal(); };
+  const outsideHandler = e => {
+    if (e.target === modal) closeModal({ applyChanges: true });
+  };
   const keyHandler = e => {
     if (e.key === 'Escape') {
       e.preventDefault();
@@ -5189,6 +5199,7 @@ function selectComponent(compOrId) {
 
   function renderPropertiesFor(targetComp) {
     propertyContainer.innerHTML = '';
+    modal._applyChanges = null;
     if (!targetComp) {
       propertyHeading.textContent = 'Properties';
       const empty = document.createElement('p');
@@ -5305,6 +5316,7 @@ function selectComponent(compOrId) {
     const form = document.createElement('form');
     form.id = 'prop-form';
     form.className = 'prop-detail-form';
+    let hasApplied = false;
 
     const buildField = (f, container) => {
       const lbl = document.createElement('label');
@@ -5405,6 +5417,21 @@ function selectComponent(compOrId) {
         f => !['conductor_type', 'cable_assembly', 'breaker_frame', 'conductor_assembly'].includes(f.name)
       );
     }
+
+    const applyChanges = () => {
+      if (hasApplied) return;
+      hasApplied = true;
+      const fd = new FormData(form);
+      fields.forEach(f => {
+        applyFieldFromForm(targetComp, f, fd);
+      });
+      targetComp.tccId = fd.get('tccId') || '';
+      pushHistory();
+      render();
+      save();
+      syncSchedules();
+    };
+    modal._applyChanges = applyChanges;
 
     const manufacturerFields = [];
     const noteFields = [];
@@ -5589,15 +5616,7 @@ function selectComponent(compOrId) {
 
     form.addEventListener('submit', e => {
       e.preventDefault();
-      const fd = new FormData(form);
-      fields.forEach(f => {
-        applyFieldFromForm(targetComp, f, fd);
-      });
-      targetComp.tccId = fd.get('tccId') || '';
-      pushHistory();
-      render();
-      save();
-      syncSchedules();
+      applyChanges();
       closeModal();
     });
 
