@@ -761,11 +761,15 @@ body.oneline-page .palette-scroll {
   border-radius: var(--ol-radius);
   box-shadow: var(--ol-shadow);
   max-height: 90%;
-  max-width: 960px;
+  max-width: min(100vw - 2rem, 1200px);
   width: min(90vw, 960px);
   display: flex;
   flex-direction: column;
   gap: var(--ol-spacing);
+  min-width: 320px;
+  min-height: 320px;
+  resize: both;
+  overflow: auto;
 }
 
 .prop-modal-layout {
@@ -3524,15 +3528,18 @@ body.dark-mode .workflow-card-title {
     position: fixed;
     bottom: 1rem;
     right: 1rem;
-    width: 320px;
+    width: clamp(320px, 28vw, 480px);
     max-height: calc(100% - 4.5rem);
-    overflow-y: auto;
+    overflow: auto;
     background: var(--secondary-color);
     color: var(--text-color);
     border: 1px solid var(--border-color);
     box-shadow: 0 2px 6px rgba(0,0,0,0.15);
     padding: 1rem;
     z-index: 1000;
+    resize: horizontal;
+    min-width: 280px;
+    max-width: min(90vw, 900px);
 }
 
 .studies-panel.hidden {
