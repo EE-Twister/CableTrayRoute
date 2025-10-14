@@ -7654,6 +7654,23 @@ function resolveComponentVoltageVolts(comp, options = {}) {
   return null;
 }
 
+function resolveConnectionVoltageVolts(component, connection, role) {
+  if (!component) return null;
+  if (component.type === 'transformer' && connection) {
+    const portIndex = role === 'target'
+      ? normalizePortIndex(connection?.targetPort)
+      : normalizePortIndex(connection?.sourcePort);
+    if (Number.isFinite(portIndex)) {
+      const portVoltage = resolveTransformerVoltageValue(component, portIndex);
+      const normalized = normalizeVoltageToVolts(portVoltage);
+      if (normalized !== null && Number.isFinite(normalized) && normalized > 0) {
+        return normalized;
+      }
+    }
+  }
+  return resolveComponentVoltageVolts(component);
+}
+
 function validateDiagram() {
   validationIssues = [];
   const svg = document.getElementById('diagram');
@@ -7708,8 +7725,8 @@ function validateDiagram() {
       inbound.set(conn.target, (inbound.get(conn.target) || 0) + 1);
       const target = components.find(t => t.id === conn.target);
       if (target) {
-        const srcVolt = resolveComponentVoltageVolts(c);
-        const tgtVolt = resolveComponentVoltageVolts(target);
+        const srcVolt = resolveConnectionVoltageVolts(c, conn, 'source');
+        const tgtVolt = resolveConnectionVoltageVolts(target, conn, 'target');
         if (srcVolt !== null && tgtVolt !== null) {
           const diff = Math.abs(srcVolt - tgtVolt);
           const tolerance = Math.max(1, Math.min(srcVolt, tgtVolt) * 0.005);
