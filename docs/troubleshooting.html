@@ -33,7 +33,13 @@
       <li><strong>No routes found:</strong> Check that raceways connect between cable endpoints.</li>
       <li><strong>Incorrect ampacity:</strong> Verify soil resistivity and conductor properties.</li>
       <li><strong>Browser performance:</strong> Large projects run faster in a modern desktop browser.</li>
-      <li><strong>Load flow will not converge:</strong> Ensure transformer windings are mapped to buses with matching base kV. If the high-side bus is accidentally wired to the low-side winding (or vice versa), the solver drives the secondary voltage toward zero and stalls near the iteration limit.</li>
+      <li><strong>Load flow will not converge:</strong>
+        <ul>
+          <li>Read the new <em>Diagnostics</em> section in the study output. It highlights collapsed buses, ignored zero-impedance branches, and outsized generation so you know where to start.</li>
+          <li>When a low-voltage bus reports a magnitude below 0.10 pu, confirm that the transformer feeding it is wired to the correct buses (high-side at the medium-voltage bus, secondary at the low-voltage bus) and that the base kV on each winding matches the connected equipment.</li>
+          <li>If the downstream load exceeds the transformer kVA rating, reduce the modeled demand or select a larger transformer so the secondary voltage can recover. Replace placeholder zero-impedance cables with realistic impedance or merge the buses when they represent the same node.</li>
+        </ul>
+      </li>
       <li><strong>Can't locate a One-Line node from Fix-it Hints:</strong> Run <em>Validate</em> so the Fix-it panel stays open, then click the hint entry to jump the canvas to the flagged device. Use the <em>Find</em> search box to select devices by tag when you only have an identifier, and open the properties drawer. The <em>Nodes</em> category lists orphaned nodes so you can inspect their connections or remove the node directly from the menu.</li>
     </ul>
   </main>
