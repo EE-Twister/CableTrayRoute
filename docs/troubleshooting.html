@@ -33,6 +33,7 @@
       <li><strong>No routes found:</strong> Check that raceways connect between cable endpoints.</li>
       <li><strong>Incorrect ampacity:</strong> Verify soil resistivity and conductor properties.</li>
       <li><strong>Browser performance:</strong> Large projects run faster in a modern desktop browser.</li>
+      <li><strong>Load flow will not converge:</strong> Ensure transformer windings are mapped to buses with matching base kV. If the high-side bus is accidentally wired to the low-side winding (or vice versa), the solver drives the secondary voltage toward zero and stalls near the iteration limit.</li>
       <li><strong>Can't locate a One-Line node from Fix-it Hints:</strong> Run <em>Validate</em> so the Fix-it panel stays open, then click the hint entry to jump the canvas to the flagged device. Use the <em>Find</em> search box to select devices by tag when you only have an identifier, and open the properties drawer. The <em>Nodes</em> category lists orphaned nodes so you can inspect their connections or remove the node directly from the menu.</li>
     </ul>
   </main>
