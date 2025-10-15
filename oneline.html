@@ -278,18 +278,19 @@
   </div>
   <aside id="studies-panel" class="studies-panel hidden" aria-label="Studies">
     <div id="studies-resize-handle" class="studies-resize-handle" aria-hidden="true"></div>
-    <div class="studies-header">
-      <h2>Studies</h2>
-      <button id="studies-close-btn" class="studies-close-btn" aria-label="Close" title="Close">&times;</button>
-    </div>
-    <div class="studies-controls">
-      <button id="run-loadflow-btn" type="button">Load Flow</button>
-      <button id="run-shortcircuit-btn" type="button">Short Circuit</button>
+    <div class="studies-content">
+      <div class="studies-header">
+        <h2>Studies</h2>
+        <button id="studies-close-btn" class="studies-close-btn" aria-label="Close" title="Close">&times;</button>
+      </div>
+      <div class="studies-controls">
+        <button id="run-loadflow-btn" type="button">Load Flow</button>
+        <button id="run-shortcircuit-btn" type="button">Short Circuit</button>
         <button id="run-arcflash-btn" type="button">Arc Flash</button>
         <button id="run-harmonics-btn" type="button">Harmonics</button>
-      <button id="run-motorstart-btn" type="button">Motor Start</button>
-      <button id="run-reliability-btn" type="button">Reliability</button>
-      <button id="study-settings-btn" type="button" class="btn" aria-expanded="false">Settings</button>
+        <button id="run-motorstart-btn" type="button">Motor Start</button>
+        <button id="run-reliability-btn" type="button">Reliability</button>
+        <button id="study-settings-btn" type="button" class="btn" aria-expanded="false">Settings</button>
         <label class="d-block mt-1"><input type="checkbox" id="toggle-overlays" checked> Show Result Overlays</label>
       </div>
       <form id="study-settings-menu" class="study-settings hidden" aria-label="Study settings">
@@ -318,7 +319,8 @@
       </form>
       <pre id="study-results" class="study-results"></pre>
       <div id="loadflow-results" class="study-results"></div>
-    </aside>
+    </div>
+  </aside>
   <aside id="lint-panel" class="lint-panel hidden" aria-label="Validation issues">
     <div class="lint-header">
       <h2>Fix-it Hints</h2>
