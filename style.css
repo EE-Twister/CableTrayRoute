@@ -3528,7 +3528,7 @@ body.dark-mode .workflow-card-title {
     position: fixed;
     bottom: 1rem;
     right: 1rem;
-    width: clamp(320px, 28vw, 480px);
+    width: var(--studies-width, clamp(320px, 28vw, 480px));
     max-height: calc(100% - 4.5rem);
     overflow: auto;
     background: var(--secondary-color);
@@ -3536,10 +3536,44 @@ body.dark-mode .workflow-card-title {
     border: 1px solid var(--border-color);
     box-shadow: 0 2px 6px rgba(0,0,0,0.15);
     padding: 1rem;
+    padding-left: 1.5rem;
     z-index: 1000;
-    resize: horizontal;
     min-width: 280px;
     max-width: min(90vw, 900px);
+}
+
+.studies-panel.is-resizing {
+    cursor: col-resize;
+    user-select: none;
+}
+
+.studies-resize-handle {
+    position: absolute;
+    top: 0;
+    bottom: 0;
+    left: 0;
+    width: 0.75rem;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    cursor: col-resize;
+    user-select: none;
+}
+
+.studies-resize-handle::after {
+    content: '';
+    width: 2px;
+    height: 40%;
+    border-radius: 999px;
+    background: var(--border-color);
+    opacity: 0.5;
+    transition: opacity 0.2s ease, background-color 0.2s ease;
+}
+
+.studies-panel.is-resizing .studies-resize-handle::after,
+.studies-resize-handle:hover::after {
+    opacity: 1;
+    background: var(--primary-color);
 }
 
 .studies-panel.hidden {
