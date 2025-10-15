@@ -48,14 +48,27 @@ function isUsableComponent(comp) {
   return comp && !IGNORED_TYPES.has(comp.type);
 }
 
-function hasConnectionMetadata(conn) {
-  return Boolean(conn && (conn.componentType || conn.componentSubtype || conn.componentName || conn.componentLabel || conn.componentRef));
-}
-
 function normalizeIdentifier(value) {
   if (typeof value !== 'string') return undefined;
   const trimmed = value.trim();
   return trimmed ? trimmed : undefined;
+}
+
+function describeComponentMetadata(meta = {}) {
+  const label = normalizeIdentifier(meta.componentLabel);
+  if (label) return label;
+  const name = normalizeIdentifier(meta.componentName);
+  if (name) return name;
+  const ref = normalizeIdentifier(meta.componentRef);
+  if (ref) return ref;
+  const id = normalizeIdentifier(meta.componentId);
+  if (id) return `ID ${id}`;
+  const subtype = normalizeIdentifier(meta.componentSubtype);
+  const type = normalizeIdentifier(meta.componentType);
+  if (subtype && type) return `${subtype} ${type}`;
+  if (subtype) return subtype;
+  if (type) return type;
+  return null;
 }
 
 /** Basic complex number helpers used by the load-flow solver */
@@ -94,13 +107,29 @@ function toPerUnitY(y, baseKV, baseMVA) {
 function buildYBus(buses, baseMVA) {
   const n = buses.length;
   const Y = Array.from({ length: n }, () => Array.from({ length: n }, () => toComplex(0, 0)));
+  const warnings = [];
   buses.forEach((bus, i) => {
     (bus.connections || []).forEach(conn => {
       const j = buses.findIndex(b => b.id === conn.target);
       if (j < 0) return;
       const Z = toPerUnitZ(conn.impedance || { r: 0, x: 0 }, bus.baseKV || 1, baseMVA);
       const mag2 = Z.re * Z.re + Z.im * Z.im;
-      if (mag2 < MIN_COMPLEX_MAG && !hasConnectionMetadata(conn)) {
+      if (mag2 < MIN_COMPLEX_MAG) {
+        warnings.push({
+          type: 'zero_impedance_branch',
+          fromBus: bus.id,
+          toBus: buses[j].id,
+          componentId: conn.componentId || conn.id || null,
+          componentName: conn.componentName,
+          componentLabel: conn.componentLabel,
+          componentRef: conn.componentRef,
+          componentType: conn.componentType,
+          componentSubtype: conn.componentSubtype,
+          rating: conn.rating,
+          componentPort: conn.componentPort,
+          connectionSide: conn.connectionSide,
+          connectionConfig: conn.connectionConfig
+        });
         return;
       }
       const y = inv(toComplex(Z.re, Z.im));
@@ -120,7 +149,7 @@ function buildYBus(buses, baseMVA) {
       Y[i][i] = add(Y[i][i], toPerUnitY(bus.shunt, bus.baseKV || 1, baseMVA));
     }
   });
-  return Y;
+  return { matrix: Y, warnings };
 }
 
 /**
@@ -188,7 +217,7 @@ function solvePhase(buses, baseMVA, options = {}) {
   const PV = working.map((b, i) => b.type === 'PV' ? i : -1).filter(i => i >= 0);
   const PQ = working.map((b, i) => b.type === 'PQ' ? i : -1).filter(i => i >= 0);
   const nonSlack = working.map((b, i) => b.type !== 'slack' ? i : -1).filter(i => i >= 0);
-  const Y = buildYBus(working, baseMVA);
+  const { matrix: Y, warnings: branchWarnings = [] } = buildYBus(working, baseMVA);
   const maxIter = Math.max(1, requestedIter && requestedIter > 0 ? requestedIter : 20);
   const tol = 1e-6;
   let iterations = 0;
@@ -330,6 +359,16 @@ function solvePhase(buses, baseMVA, options = {}) {
     return label || meta.id || id;
   };
 
+  if (Array.isArray(branchWarnings) && branchWarnings.length) {
+    branchWarnings.forEach(payload => {
+      const fromLabel = getBusDisplayLabel(payload.fromBus);
+      const toLabel = getBusDisplayLabel(payload.toBus);
+      const descriptor = describeComponentMetadata(payload);
+      const componentText = descriptor ? descriptor : 'connection';
+      warnings.push(`Ignored zero-impedance data for ${componentText} between ${fromLabel} and ${toLabel}; treating it as an ideal tie.`);
+    });
+  }
+
   // line flows and losses
   const flows = [];
   const branchLossMap = new Map();
@@ -340,6 +379,10 @@ function solvePhase(buses, baseMVA, options = {}) {
       if (j < 0) return;
       const Vj = toComplex(Vm[j] * Math.cos(Va[j]), Vm[j] * Math.sin(Va[j]));
       const Z = toPerUnitZ(conn.impedance || { r: 0, x: 0 }, bus.baseKV || 1, baseMVA);
+      const mag2 = Z.re * Z.re + Z.im * Z.im;
+      if (mag2 < MIN_COMPLEX_MAG) {
+        return;
+      }
       const y = inv(toComplex(Z.re, Z.im));
       const tapMag = conn.tap?.ratio || conn.tap || 1;
       const tapAng = (conn.tap?.angle || 0) * Math.PI / 180;
