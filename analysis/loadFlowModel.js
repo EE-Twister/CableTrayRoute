@@ -787,50 +787,107 @@ export function buildLoadFlowModel(oneLine = {}) {
   const branches = [];
   components.forEach(comp => {
     if (!isBranchDevice(comp)) return;
-    const busTargets = [];
     const connList = Array.isArray(comp.connections) ? comp.connections : [];
+    const detailMap = new Map();
+    let nextDetailOrder = 0;
+    const registerTargetDetail = (targetId, entry) => {
+      if (!targetId || !busMap.has(targetId)) return null;
+      if (!detailMap.has(targetId)) {
+        detailMap.set(targetId, {
+          targetId,
+          entry: null,
+          portIndex: null,
+          role: null,
+          order: nextDetailOrder++
+        });
+      }
+      const detail = detailMap.get(targetId);
+      if (entry && typeof entry === 'object') {
+        if (!detail.entry) detail.entry = entry;
+        const portIndex = normalizePortIndex(entry.sourcePort);
+        if (portIndex !== null) {
+          if (detail.portIndex === null) detail.portIndex = portIndex;
+          const role = getTransformerPortRole(comp, portIndex);
+          if (!detail.role && role) detail.role = role;
+        }
+      }
+      return detail;
+    };
     connList.forEach(conn => {
       const target = typeof conn === 'string' ? conn : conn?.target;
-      if (target && busMap.has(target) && !busTargets.includes(target)) {
-        busTargets.push(target);
-      }
+      if (!target) return;
+      registerTargetDetail(target, typeof conn === 'object' ? conn : null);
     });
-    if (busTargets.length < 2) {
+    if (detailMap.size < 2) {
       const neighborSet = adjacency.get(comp.id);
       if (neighborSet) {
         neighborSet.forEach(n => {
-          if (busMap.has(n) && !busTargets.includes(n)) {
-            busTargets.push(n);
-          }
+          registerTargetDetail(n, null);
         });
       }
     }
-    if (busTargets.length < 2) return;
-    const [fromId, ...otherTargets] = busTargets;
-    otherTargets.forEach(toId => {
+    if (detailMap.size < 2) return;
+    const targetDetails = Array.from(detailMap.values());
+    const getDetailBaseKV = detail => {
+      if (!detail) return null;
+      const bus = busMap.get(detail.targetId);
+      if (bus && Number.isFinite(bus.baseKV) && bus.baseKV > 0) return bus.baseKV;
+      return null;
+    };
+    let baseDetail = null;
+    if (isTransformerComponent(comp)) {
+      baseDetail = targetDetails.find(detail => detail.role === 'primary') || null;
+    }
+    if (!baseDetail) {
+      baseDetail = targetDetails.reduce((best, detail) => {
+        if (!best) return detail;
+        const bestKV = getDetailBaseKV(best);
+        const detailKV = getDetailBaseKV(detail);
+        const bestScore = Number.isFinite(bestKV) ? bestKV : -Infinity;
+        const detailScore = Number.isFinite(detailKV) ? detailKV : -Infinity;
+        if (detailScore > bestScore) return detail;
+        if (detailScore === bestScore && best && detail.order < best.order) {
+          return detail;
+        }
+        return best;
+      }, null);
+    }
+    if (!baseDetail) baseDetail = targetDetails[0];
+    if (!baseDetail) return;
+    const baseOrder = baseDetail ? baseDetail.order : 0;
+    const otherDetails = targetDetails.filter(detail => detail !== baseDetail);
+    const orientPair = (detailA, detailB) => {
+      if (isTransformerComponent(comp)) {
+        if (detailA?.role === 'primary' && detailB?.role !== 'primary') {
+          return { fromDetail: detailA, toDetail: detailB };
+        }
+        if (detailB?.role === 'primary' && detailA?.role !== 'primary') {
+          return { fromDetail: detailB, toDetail: detailA };
+        }
+      }
+      const kvA = getDetailBaseKV(detailA);
+      const kvB = getDetailBaseKV(detailB);
+      const scoreA = Number.isFinite(kvA) ? kvA : -Infinity;
+      const scoreB = Number.isFinite(kvB) ? kvB : -Infinity;
+      if (scoreA > scoreB) return { fromDetail: detailA, toDetail: detailB };
+      if (scoreB > scoreA) return { fromDetail: detailB, toDetail: detailA };
+      const orderA = detailA ? detailA.order : baseOrder;
+      const orderB = detailB ? detailB.order : baseOrder;
+      if (orderA <= orderB) return { fromDetail: detailA, toDetail: detailB };
+      return { fromDetail: detailB, toDetail: detailA };
+    };
+    otherDetails.forEach(detail => {
+      const { fromDetail, toDetail } = orientPair(baseDetail, detail);
+      if (!fromDetail || !toDetail) return;
+      const fromId = fromDetail.targetId;
+      const toId = toDetail.targetId;
       const fromBus = busMap.get(fromId);
       const toBus = busMap.get(toId);
       if (!fromBus || !toBus) return;
-      const fromConnectionEntry = connList.find(item => {
-        if (!item) return false;
-        const targetId = typeof item === 'string' ? item : item?.target;
-        return targetId === fromId;
-      });
-      const toConnectionEntry = connList.find(item => {
-        if (!item) return false;
-        const targetId = typeof item === 'string' ? item : item?.target;
-        return targetId === toId;
-      });
-      const fromPortIndex = normalizePortIndex(
-        fromConnectionEntry && typeof fromConnectionEntry === 'object'
-          ? fromConnectionEntry.sourcePort
-          : undefined
-      );
-      const toPortIndex = normalizePortIndex(
-        toConnectionEntry && typeof toConnectionEntry === 'object'
-          ? toConnectionEntry.sourcePort
-          : undefined
-      );
+      const fromConnectionEntry = typeof fromDetail.entry === 'object' ? fromDetail.entry : null;
+      const toConnectionEntry = typeof toDetail.entry === 'object' ? toDetail.entry : null;
+      const fromPortIndex = fromDetail.portIndex;
+      const toPortIndex = toDetail.portIndex;
       const fromSide = getTransformerPortRole(comp, fromPortIndex);
       const toSide = getTransformerPortRole(comp, toPortIndex);
       const baseImpedance = extractImpedance(comp);
