@@ -1290,6 +1290,7 @@ const loadFlowResultsEl = document.getElementById('loadflow-results');
 const overlayToggle = document.getElementById('toggle-overlays');
 const studySettingsBtn = document.getElementById('study-settings-btn');
 const studySettingsForm = document.getElementById('study-settings-menu');
+const studyResultsCopyBtn = document.getElementById('study-results-copy-btn');
 const studyLoadFlowBase = document.getElementById('study-loadflow-basemva');
 const studyLoadFlowIterations = document.getElementById('study-loadflow-iterations');
 const studyLoadFlowBalanced = document.getElementById('study-loadflow-balanced');
@@ -1330,6 +1331,12 @@ if (studySettingsForm) {
     studySettingsForm.setAttribute('aria-hidden', 'true');
   }
 }
+if (studyResultsCopyBtn) {
+  studyResultsCopyBtn.addEventListener('click', () => {
+    copyStudyResultsToClipboard();
+  });
+  updateStudyResultsCopyState();
+}
 if (studyLoadFlowBase) {
   studyLoadFlowBase.addEventListener('change', () => {
     const value = Number(studyLoadFlowBase.value);
@@ -1365,10 +1372,78 @@ if (studyShortCircuitMethod) {
   });
 }
 
+function hasRenderedStudyResults() {
+  if (!studyResultsEl) return false;
+  const text = (studyResultsEl.textContent || '').trim();
+  if (!text || text === 'No results') return false;
+  return true;
+}
+
+function hasRenderedLoadFlowResults() {
+  if (!loadFlowResultsEl) return false;
+  const text = (loadFlowResultsEl.innerText || loadFlowResultsEl.textContent || '').trim();
+  return text.length > 0;
+}
+
+function updateStudyResultsCopyState() {
+  if (!studyResultsCopyBtn) return;
+  const hasCopyable = hasRenderedStudyResults() || hasRenderedLoadFlowResults();
+  studyResultsCopyBtn.disabled = !hasCopyable;
+}
+
 function renderStudyResults() {
   if (!studyResultsEl) return;
   const res = getStudies();
   studyResultsEl.textContent = Object.keys(res).length ? JSON.stringify(res, null, 2) : 'No results';
+  updateStudyResultsCopyState();
+}
+
+function gatherStudyResultsText() {
+  const sections = [];
+  if (hasRenderedStudyResults()) {
+    const jsonText = (studyResultsEl.textContent || '').trim();
+    if (jsonText) sections.push(jsonText);
+  }
+  if (hasRenderedLoadFlowResults()) {
+    const loadFlowText = (loadFlowResultsEl.innerText || loadFlowResultsEl.textContent || '').trim();
+    if (loadFlowText) sections.push(loadFlowText);
+  }
+  return sections.join('\n\n').trim();
+}
+
+async function copyStudyResultsToClipboard() {
+  const payload = gatherStudyResultsText();
+  if (!payload) {
+    showToast('No study results to copy');
+    return;
+  }
+  let copied = false;
+  if (typeof navigator !== 'undefined' && navigator.clipboard?.writeText) {
+    try {
+      await navigator.clipboard.writeText(payload);
+      copied = true;
+    } catch (err) {
+      console.error('Clipboard write failed', err);
+    }
+  }
+  if (!copied) {
+    try {
+      const textarea = document.createElement('textarea');
+      textarea.value = payload;
+      textarea.setAttribute('readonly', '');
+      textarea.style.position = 'fixed';
+      textarea.style.opacity = '0';
+      document.body.appendChild(textarea);
+      textarea.select();
+      textarea.setSelectionRange(0, textarea.value.length);
+      copied = document.execCommand('copy');
+      textarea.remove();
+    } catch (err) {
+      console.error('Fallback copy failed', err);
+      copied = false;
+    }
+  }
+  showToast(copied ? 'Study results copied to clipboard' : 'Unable to copy study results');
 }
 
 function highlightSPF(ids = []) {
@@ -1807,6 +1882,7 @@ if (runLFBtn) runLFBtn.addEventListener('click', () => {
 function renderLoadFlowResults(res) {
   if (!loadFlowResultsEl) return;
   loadFlowResultsEl.innerHTML = renderLoadFlowResultsHtml(res);
+  updateStudyResultsCopyState();
 }
 
 export { renderLoadFlowResults };
@@ -3613,7 +3689,10 @@ function isImpedanceDevice(comp) {
   if (!comp) return false;
   if (isBusComponent(comp)) return false;
   const category = resolveComponentCategory(comp);
-  if (!category || category === 'annotations' || category === 'links' || category === 'cable') return false;
+  if (!category || category === 'annotations' || category === 'links') return false;
+  if (category === 'cable') {
+    return hasImpedance(comp) || hasImpedanceValues(comp?.cable) || hasImpedanceValues(comp?.seriesImpedance);
+  }
   return hasImpedance(comp);
 }
 
@@ -3642,6 +3721,67 @@ function nearestPortIndexForPoint(comp, point) {
     }
   });
   return bestIdx;
+}
+
+function inferComponentPortBaseKV(comp, portIndex, role = 'source') {
+  if (!comp) return null;
+  const idx = normalizePortIndex(portIndex);
+  let volts = null;
+  if (comp.type === 'transformer' && Number.isFinite(idx)) {
+    const portVoltage = resolveTransformerVoltageValue(comp, idx);
+    const normalized = normalizeVoltageToVolts(portVoltage);
+    if (Number.isFinite(normalized) && normalized > 0) {
+      volts = normalized;
+    }
+  }
+  if (volts === null) {
+    const mockConnection = role === 'target'
+      ? { targetPort: idx }
+      : { sourcePort: idx };
+    const resolved = resolveConnectionVoltageVolts(comp, mockConnection, role);
+    if (Number.isFinite(resolved) && resolved > 0) {
+      volts = resolved;
+    }
+  }
+  if (volts === null) {
+    const componentVoltage = resolveComponentVoltageVolts(comp);
+    if (Number.isFinite(componentVoltage) && componentVoltage > 0) {
+      volts = componentVoltage;
+    }
+  }
+  if (volts === null) {
+    const base = toBaseKV(comp?.baseKV ?? comp?.kV ?? comp?.kv ?? comp?.prefault_voltage);
+    return Number.isFinite(base) && base > 0 ? base : null;
+  }
+  const baseKV = toBaseKV(volts);
+  return Number.isFinite(baseKV) && baseKV > 0 ? baseKV : null;
+}
+
+function inferBusBaseKV(fromComp, fromPort, toComp, toPort) {
+  const candidates = [];
+  const fromBase = inferComponentPortBaseKV(fromComp, fromPort, 'source');
+  if (Number.isFinite(fromBase) && fromBase > 0) candidates.push(fromBase);
+  const toBase = inferComponentPortBaseKV(toComp, toPort, 'target');
+  if (Number.isFinite(toBase) && toBase > 0) candidates.push(toBase);
+  if (!candidates.length) return null;
+  return candidates.find(kv => kv >= 0.001) ?? candidates[0];
+}
+
+function applyBusBaseKV(bus, baseKV) {
+  if (!bus || !Number.isFinite(baseKV) || baseKV <= 0) return;
+  const kv = Number(baseKV.toFixed(6));
+  const volts = Number((kv * 1000).toFixed(3));
+  bus.baseKV = kv;
+  bus.kV = kv;
+  bus.kv = kv;
+  bus.prefault_voltage = kv;
+  bus.voltage = kv;
+  bus.volts = volts;
+  if (!bus.props || typeof bus.props !== 'object') bus.props = {};
+  bus.props.baseKV = kv;
+  bus.props.kV = kv;
+  bus.props.volts = volts;
+  bus.props.prefault_voltage = kv;
 }
 
 function ensureConnection(fromComp, toComp, fromPort, toPort) {
@@ -3706,6 +3846,10 @@ function ensureConnection(fromComp, toComp, fromPort, toPort) {
     if (!bus) return false;
     bus.x = busX;
     bus.y = busY;
+    const inferredKV = inferBusBaseKV(fromComp, fromIdx, toComp, toIdx);
+    if (Number.isFinite(inferredKV) && inferredKV > 0) {
+      applyBusBaseKV(bus, inferredKV);
+    }
     const busFromPort = nearestPortIndexForPoint(bus, startPos);
     const busToPort = nearestPortIndexForPoint(bus, endPos);
     const createdA = ensureConnection(fromComp, bus, fromIdx, busFromPort);
