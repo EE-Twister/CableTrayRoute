@@ -777,6 +777,9 @@ body.oneline-page .palette-scroll {
   flex-wrap: wrap;
   gap: var(--ol-spacing);
   overflow: auto;
+  flex: 1 1 auto;
+  min-height: 0;
+  align-items: stretch;
 }
 
 .prop-modal-column {
@@ -785,6 +788,7 @@ body.oneline-page .palette-scroll {
   display: flex;
   flex-direction: column;
   gap: 0.75rem;
+  min-height: 0;
 }
 
 .prop-modal-heading {
@@ -805,14 +809,13 @@ body.oneline-page .palette-scroll {
 }
 
 .prop-category-list {
-  max-height: 10rem;
   overflow-y: auto;
 }
 
 .prop-component-list {
   flex: 1 1 0;
-  max-height: 20rem;
   overflow-y: auto;
+  min-height: 0;
 }
 
 .prop-category-option,
@@ -850,7 +853,6 @@ body.oneline-page .palette-scroll {
   padding: var(--ol-spacing);
   flex: 1 1 320px;
   min-height: 12rem;
-  max-height: 60vh;
   overflow-y: auto;
   display: flex;
   flex-direction: column;
@@ -3528,18 +3530,63 @@ body.dark-mode .workflow-card-title {
     position: fixed;
     bottom: 1rem;
     right: 1rem;
-    width: clamp(320px, 28vw, 480px);
+    width: var(--studies-width, clamp(320px, 28vw, 480px));
     max-height: calc(100% - 4.5rem);
-    overflow: auto;
     background: var(--secondary-color);
     color: var(--text-color);
     border: 1px solid var(--border-color);
     box-shadow: 0 2px 6px rgba(0,0,0,0.15);
-    padding: 1rem;
     z-index: 1000;
-    resize: horizontal;
     min-width: 280px;
     max-width: min(90vw, 900px);
+    display: grid;
+    grid-template-columns: auto minmax(0, 1fr);
+    grid-template-rows: minmax(0, 1fr);
+    overflow: hidden;
+}
+
+.studies-content {
+    grid-column: 2;
+    grid-row: 1;
+    overflow: auto;
+    padding: 1rem;
+    padding-left: 1.5rem;
+    display: flex;
+    flex-direction: column;
+    min-width: 0;
+    min-height: 0;
+}
+
+.studies-panel.is-resizing {
+    cursor: col-resize;
+    user-select: none;
+}
+
+.studies-resize-handle {
+    grid-column: 1;
+    grid-row: 1;
+    width: 0.75rem;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    cursor: col-resize;
+    user-select: none;
+}
+
+.studies-resize-handle::after {
+    content: '';
+    width: 2px;
+    height: 100%;
+    border-radius: 999px;
+    background: var(--border-color);
+    opacity: 0.5;
+    transition: opacity 0.2s ease, background-color 0.2s ease;
+}
+
+.studies-panel.is-resizing .studies-resize-handle::after,
+.studies-resize-handle:hover::after {
+    opacity: 1;
+    background: var(--primary-color);
 }
 
 .studies-panel.hidden {
