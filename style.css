@@ -3637,6 +3637,28 @@ body.dark-mode .workflow-card-title {
     font-size: 0.85rem;
 }
 
+.study-results-wrapper {
+    position: relative;
+    margin-top: 0.5rem;
+}
+
+.study-results-wrapper .study-results {
+    margin-top: 0;
+}
+
+.study-results-copy-btn {
+    position: absolute;
+    top: 0.25rem;
+    right: 0.25rem;
+    background: var(--bg-color);
+    border-radius: var(--ol-radius);
+}
+
+.study-results-copy-btn:disabled {
+    opacity: 0.5;
+    cursor: not-allowed;
+}
+
 .study-branch-connections table {
     width: 100%;
     border-collapse: collapse;
