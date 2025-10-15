@@ -924,17 +924,43 @@ export function buildLoadFlowModel(oneLine = {}) {
       branches.push(branch);
       if (fromBus) {
         if (!Array.isArray(fromBus.connections)) fromBus.connections = [];
-        const exists = fromBus.connections.some(conn => conn.target === toId && (conn.componentId || conn.id) === comp.id);
-        if (!exists) {
-          const connectionEntry = toConnectionEntry;
-          const portIndex = toPortIndex;
-          const connectionSide = toSide;
-          const connectionConfig = connectionSide ? getTransformerConnectionSetting(comp, connectionSide) : null;
+        const portIndex = toPortIndex;
+        const connectionSide = toSide;
+        const connectionConfig = connectionSide ? getTransformerConnectionSetting(comp, connectionSide) : null;
+        const connectionImpedance = cloneData(branch.impedance);
+        const connectionTap = branch.tap ? cloneData(branch.tap) : undefined;
+        const connectionShunt = branch.shunt ? cloneData(branch.shunt) : undefined;
+        const existingConnection = fromBus.connections.find(conn => conn.target === toId && (conn.componentId || conn.id) === comp.id);
+        if (existingConnection) {
+          existingConnection.target = toId;
+          existingConnection.impedance = connectionImpedance;
+          if (connectionTap !== undefined) {
+            existingConnection.tap = connectionTap;
+          } else {
+            delete existingConnection.tap;
+          }
+          if (connectionShunt !== undefined) {
+            existingConnection.shunt = connectionShunt;
+          } else {
+            delete existingConnection.shunt;
+          }
+          existingConnection.rating = branch.rating;
+          existingConnection.phases = phases;
+          existingConnection.componentId = comp.id;
+          existingConnection.componentType = comp.type;
+          existingConnection.componentSubtype = comp.subtype;
+          existingConnection.componentName = componentName;
+          existingConnection.componentLabel = componentLabel;
+          existingConnection.componentRef = componentRef;
+          existingConnection.componentPort = portIndex;
+          existingConnection.connectionSide = connectionSide;
+          existingConnection.connectionConfig = connectionConfig;
+        } else {
           const busConn = {
             target: toId,
-            impedance: cloneData(branch.impedance),
-            tap: branch.tap ? cloneData(branch.tap) : undefined,
-            shunt: branch.shunt ? cloneData(branch.shunt) : undefined,
+            impedance: connectionImpedance,
+            tap: connectionTap,
+            shunt: connectionShunt,
             rating: branch.rating,
             phases,
             componentId: comp.id,
