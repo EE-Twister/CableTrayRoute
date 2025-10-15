@@ -210,6 +210,30 @@ function clampPaletteWidth(value, fallback = defaultPaletteWidth) {
   return numeric;
 }
 
+const minStudiesWidth = 280;
+const maxStudiesWidth = 900;
+const defaultStudiesWidth = (() => {
+  if (typeof window === 'undefined') return 420;
+  const approx = Math.round(window.innerWidth * 0.28);
+  if (!Number.isFinite(approx)) return 420;
+  if (approx < minStudiesWidth) return minStudiesWidth;
+  if (approx > maxStudiesWidth) return maxStudiesWidth;
+  return approx;
+})();
+
+function clampStudiesWidth(value, fallback = defaultStudiesWidth) {
+  if (value === null || value === undefined || value === '') {
+    return clampStudiesWidth(fallback, defaultStudiesWidth);
+  }
+  const numeric = Number(value);
+  if (!Number.isFinite(numeric)) {
+    return clampStudiesWidth(fallback, defaultStudiesWidth);
+  }
+  if (numeric < minStudiesWidth) return minStudiesWidth;
+  if (numeric > maxStudiesWidth) return maxStudiesWidth;
+  return numeric;
+}
+
 const compWidth = 80;
 const compHeight = 40;
 const attributeLineHeight = 12;
@@ -218,6 +242,7 @@ const defaultPaletteWidth = 250;
 const minPaletteWidth = 100;
 const maxPaletteWidth = 600;
 const paletteWidthStorageKey = 'onelinePaletteWidth';
+const studiesWidthStorageKey = 'onelineStudiesWidth';
 const customComponentStorageKey = 'customComponents';
 const customComponentScenarioKey = '__ctr_custom_components__';
 const customComponentPrefillStorageKey = 'ctrCustomComponentPrefill';
@@ -672,7 +697,17 @@ let manufacturerDefaults = {};
 let protectiveDevices = [];
 
 let paletteWidth = clampPaletteWidth(getItem(paletteWidthStorageKey, defaultPaletteWidth));
+const storedStudiesWidth = getItem(studiesWidthStorageKey, null);
+let studiesWidth = defaultStudiesWidth;
+let hasStoredStudiesWidth = false;
+if (storedStudiesWidth !== null && storedStudiesWidth !== undefined && storedStudiesWidth !== '') {
+  studiesWidth = clampStudiesWidth(storedStudiesWidth, defaultStudiesWidth);
+  hasStoredStudiesWidth = true;
+}
 let resizingPalette = false;
+let resizingStudiesPanel = false;
+let studiesResizeStartX = 0;
+let studiesResizeStartWidth = studiesWidth;
 
 const voltageClasses = ['480 V', '5000 V', '15000 V', '25000 V'];
 const thermalRatings = ['75C', '90C', '105C'];
@@ -1240,6 +1275,10 @@ on(STUDY_SETTINGS_KEY, value => {
 const studiesPanel = document.getElementById('studies-panel');
 const studiesToggle = document.getElementById('studies-panel-btn');
 const studiesCloseBtn = document.getElementById('studies-close-btn');
+const studiesResizeHandle = document.getElementById('studies-resize-handle');
+if (studiesPanel && hasStoredStudiesWidth) {
+  studiesPanel.style.setProperty('--studies-width', `${studiesWidth}px`);
+}
 const runLFBtn = document.getElementById('run-loadflow-btn');
 const runSCBtn = document.getElementById('run-shortcircuit-btn');
 const runAFBtn = document.getElementById('run-arcflash-btn');
@@ -1651,6 +1690,20 @@ if (studiesToggle) {
   });
 }
 if (studiesCloseBtn) studiesCloseBtn.addEventListener('click', () => studiesPanel.classList.add('hidden'));
+if (studiesResizeHandle && studiesPanel) {
+  studiesResizeHandle.addEventListener('mousedown', e => {
+    if (e.button !== 0) return;
+    resizingStudiesPanel = true;
+    studiesPanel.classList.add('is-resizing');
+    studiesResizeStartX = e.clientX;
+    const rect = studiesPanel.getBoundingClientRect();
+    studiesResizeStartWidth = rect.width;
+    studiesWidth = clampStudiesWidth(rect.width, defaultStudiesWidth);
+    studiesPanel.style.setProperty('--studies-width', `${studiesWidth}px`);
+    hasStoredStudiesWidth = true;
+    e.preventDefault();
+  });
+}
 if (runLFBtn) runLFBtn.addEventListener('click', () => {
   const res = runLoadFlow({
     baseMVA: studySettings.loadFlow.baseMVA,
@@ -5178,23 +5231,34 @@ function selectComponent(compOrId) {
     }
     modal.classList.remove('show');
     modal.removeEventListener('click', outsideHandler);
+    if (modal._pointerDownHandler) {
+      modal.removeEventListener('pointerdown', modal._pointerDownHandler);
+    }
     document.removeEventListener('keydown', keyHandler);
     delete modal._outsideHandler;
     delete modal._keyHandler;
     delete modal._applyChanges;
+    delete modal._pointerDownHandler;
+    delete modal._pointerDownOnOverlay;
     selected = null;
     selection = [];
     selectedConnection = null;
   }
 
   const outsideHandler = e => {
-    if (e.target === modal) closeModal({ applyChanges: true });
+    if (e.target === modal && modal._pointerDownOnOverlay) {
+      closeModal({ applyChanges: true });
+    }
+    modal._pointerDownOnOverlay = false;
   };
   const keyHandler = e => {
     if (e.key === 'Escape') {
       e.preventDefault();
       closeModal();
     }
+  };
+  const pointerDownHandler = e => {
+    modal._pointerDownOnOverlay = e.target === modal;
   };
 
   function renderPropertiesFor(targetComp) {
@@ -5783,6 +5847,9 @@ function selectComponent(compOrId) {
 
   modal.classList.add('show');
   modal.addEventListener('click', outsideHandler);
+  modal.addEventListener('pointerdown', pointerDownHandler);
+  modal._pointerDownHandler = pointerDownHandler;
+  modal._pointerDownOnOverlay = false;
   document.addEventListener('keydown', keyHandler);
   modal._outsideHandler = outsideHandler;
   modal._keyHandler = keyHandler;
@@ -6729,24 +6796,51 @@ async function init() {
   });
 
   document.addEventListener('mousemove', e => {
-    if (!resizingPalette || !workspaceEl) return;
-    const rect = workspaceEl.getBoundingClientRect();
-    const nextWidth = clampPaletteWidth(e.clientX - rect.left, paletteWidth);
-    if (nextWidth === paletteWidth) return;
-    paletteWidth = nextWidth;
-    workspaceEl.style.setProperty('--palette-width', `${paletteWidth}px`);
-    workspaceEl.style.gridTemplateColumns = `${paletteWidth}px 1fr`;
-    if (splitter) splitter.style.left = `${paletteWidth}px`;
+    let handled = false;
+    if (resizingPalette && workspaceEl) {
+      const rect = workspaceEl.getBoundingClientRect();
+      const nextWidth = clampPaletteWidth(e.clientX - rect.left, paletteWidth);
+      if (nextWidth !== paletteWidth) {
+        paletteWidth = nextWidth;
+        workspaceEl.style.setProperty('--palette-width', `${paletteWidth}px`);
+        workspaceEl.style.gridTemplateColumns = `${paletteWidth}px 1fr`;
+        if (splitter) splitter.style.left = `${paletteWidth}px`;
+      }
+      handled = true;
+    }
+    if (resizingStudiesPanel && studiesPanel) {
+      const delta = studiesResizeStartX - e.clientX;
+      const nextWidth = clampStudiesWidth(studiesResizeStartWidth + delta, studiesWidth);
+      if (nextWidth !== studiesWidth) {
+        studiesWidth = nextWidth;
+        studiesPanel.style.setProperty('--studies-width', `${studiesWidth}px`);
+      }
+      handled = true;
+    }
+    if (handled) {
+      e.preventDefault();
+    }
   });
 
   document.addEventListener('mouseup', () => {
     const wasResizingPalette = resizingPalette;
+    const wasResizingStudies = resizingStudiesPanel;
     resizingPalette = false;
+    resizingStudiesPanel = false;
     if (wasResizingPalette) {
       if (workspaceEl) {
         workspaceEl.style.setProperty('--palette-width', `${paletteWidth}px`);
       }
       setItem(paletteWidthStorageKey, Math.round(paletteWidth));
+    }
+    if (wasResizingStudies && studiesPanel) {
+      studiesPanel.classList.remove('is-resizing');
+      studiesPanel.style.setProperty('--studies-width', `${studiesWidth}px`);
+      if (Number.isFinite(studiesWidth)) {
+        setItem(studiesWidthStorageKey, Math.round(studiesWidth));
+      }
+    } else if (studiesPanel) {
+      studiesPanel.classList.remove('is-resizing');
     }
     let needsRender = false;
     let needsSave = false;
