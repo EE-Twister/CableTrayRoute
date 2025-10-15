@@ -1290,6 +1290,7 @@ const loadFlowResultsEl = document.getElementById('loadflow-results');
 const overlayToggle = document.getElementById('toggle-overlays');
 const studySettingsBtn = document.getElementById('study-settings-btn');
 const studySettingsForm = document.getElementById('study-settings-menu');
+const studyResultsCopyBtn = document.getElementById('study-results-copy-btn');
 const studyLoadFlowBase = document.getElementById('study-loadflow-basemva');
 const studyLoadFlowIterations = document.getElementById('study-loadflow-iterations');
 const studyLoadFlowBalanced = document.getElementById('study-loadflow-balanced');
