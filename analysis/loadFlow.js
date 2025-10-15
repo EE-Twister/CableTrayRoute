@@ -3,7 +3,7 @@ import { buildLoadFlowModel, cloneData, isBusComponent } from './loadFlowModel.j
 
 const IGNORED_TYPES = new Set(['annotation', 'dimension']);
 const MIN_COMPLEX_MAG = 1e-12;
-const LARGE_ADMITTANCE = 1e12;
+const LARGE_ADMITTANCE = 1e9;
 
 function normalizePortIndex(port) {
   const idx = Number(port);
@@ -114,6 +114,7 @@ function buildYBus(buses, baseMVA) {
       if (j < 0) return;
       const Z = toPerUnitZ(conn.impedance || { r: 0, x: 0 }, bus.baseKV || 1, baseMVA);
       const mag2 = Z.re * Z.re + Z.im * Z.im;
+      let treatAsIdealTie = conn.idealTie === true;
       if (mag2 < MIN_COMPLEX_MAG) {
         warnings.push({
           type: 'zero_impedance_branch',
@@ -130,9 +131,14 @@ function buildYBus(buses, baseMVA) {
           connectionSide: conn.connectionSide,
           connectionConfig: conn.connectionConfig
         });
-        return;
+        if (!treatAsIdealTie) {
+          return;
+        }
       }
-      const y = inv(toComplex(Z.re, Z.im));
+      const y = treatAsIdealTie ? toComplex(LARGE_ADMITTANCE, 0) : inv(toComplex(Z.re, Z.im));
+      if (treatAsIdealTie) {
+        conn.idealTie = true;
+      }
       const tapMag = conn.tap?.ratio || conn.tap || 1;
       const tapAng = (conn.tap?.angle || 0) * Math.PI / 180;
       const t = toComplex(tapMag * Math.cos(tapAng), tapMag * Math.sin(tapAng));
@@ -380,10 +386,16 @@ function solvePhase(buses, baseMVA, options = {}) {
       const Vj = toComplex(Vm[j] * Math.cos(Va[j]), Vm[j] * Math.sin(Va[j]));
       const Z = toPerUnitZ(conn.impedance || { r: 0, x: 0 }, bus.baseKV || 1, baseMVA);
       const mag2 = Z.re * Z.re + Z.im * Z.im;
+      let treatAsIdealTie = conn.idealTie === true;
       if (mag2 < MIN_COMPLEX_MAG) {
-        return;
+        if (!treatAsIdealTie) {
+          return;
+        }
       }
-      const y = inv(toComplex(Z.re, Z.im));
+      if (treatAsIdealTie) {
+        conn.idealTie = true;
+      }
+      const y = treatAsIdealTie ? toComplex(LARGE_ADMITTANCE, 0) : inv(toComplex(Z.re, Z.im));
       const tapMag = conn.tap?.ratio || conn.tap || 1;
       const tapAng = (conn.tap?.angle || 0) * Math.PI / 180;
       const t = toComplex(tapMag * Math.cos(tapAng), tapMag * Math.sin(tapAng));
@@ -897,7 +909,8 @@ export function runLoadFlow(modelOrOpts = {}, maybeOpts = {}) {
           componentSubtype: branch.subtype,
           componentName: branch.name,
           componentLabel: branch.label,
-          componentRef: branch.ref
+          componentRef: branch.ref,
+          idealTie: branch.idealTie === true
         });
       });
     }
@@ -950,7 +963,8 @@ export function runLoadFlow(modelOrOpts = {}, maybeOpts = {}) {
           phases: conn.phases,
           componentPort: conn.componentPort,
           connectionSide: conn.connectionSide,
-          connectionConfig: conn.connectionConfig
+          connectionConfig: conn.connectionConfig,
+          idealTie: conn.idealTie === true
         }))
       };
     });

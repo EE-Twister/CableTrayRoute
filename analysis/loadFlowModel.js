@@ -72,6 +72,15 @@ function isTransformerComponent(comp) {
   return subtype.includes('transformer');
 }
 
+function isCableComponent(comp) {
+  if (!comp || typeof comp !== 'object') return false;
+  const type = typeof comp.type === 'string' ? comp.type.toLowerCase() : '';
+  const subtype = typeof comp.subtype === 'string' ? comp.subtype.toLowerCase() : '';
+  if (type.includes('cable') || subtype.includes('cable')) return true;
+  if (comp.cable && typeof comp.cable === 'object') return true;
+  return false;
+}
+
 function parseNumeric(value) {
   if (value === undefined || value === null) return null;
   if (typeof value === 'number') {
@@ -892,12 +901,15 @@ export function buildLoadFlowModel(oneLine = {}) {
       const toSide = getTransformerPortRole(comp, toPortIndex);
       const baseImpedance = extractImpedance(comp);
       let impedance = cloneData(baseImpedance);
-      if (isTransformerComponent(comp) && isZeroImpedance(impedance)) {
+      let zeroImpedance = isZeroImpedance(impedance);
+      if (isTransformerComponent(comp) && zeroImpedance) {
         const derived = deriveTransformerImpedance(comp, fromSide, toSide, fromBus, toBus);
         if (derived) {
           impedance = cloneData(derived);
+          zeroImpedance = isZeroImpedance(impedance);
         }
       }
+      const explicitTie = zeroImpedance && isCableComponent(comp);
       let tap = cloneData(comp.tap);
       tap = deriveTransformerTap(comp, tap, fromSide, toSide, fromBus, toBus);
       const shunt = cloneData(comp.shunt);
@@ -919,7 +931,8 @@ export function buildLoadFlowModel(oneLine = {}) {
         phases,
         name: componentName,
         label: componentLabel,
-        ref: componentRef
+        ref: componentRef,
+        idealTie: explicitTie
       };
       branches.push(branch);
       if (fromBus) {
@@ -945,7 +958,8 @@ export function buildLoadFlowModel(oneLine = {}) {
             componentRef,
             componentPort: portIndex,
             connectionSide,
-            connectionConfig
+            connectionConfig,
+            idealTie: explicitTie
           };
           fromBus.connections.push(busConn);
         }
