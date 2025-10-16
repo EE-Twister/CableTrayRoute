@@ -72,15 +72,6 @@ function isTransformerComponent(comp) {
   return subtype.includes('transformer');
 }
 
-function isCableComponent(comp) {
-  if (!comp || typeof comp !== 'object') return false;
-  const type = typeof comp.type === 'string' ? comp.type.toLowerCase() : '';
-  const subtype = typeof comp.subtype === 'string' ? comp.subtype.toLowerCase() : '';
-  if (type.includes('cable') || subtype.includes('cable')) return true;
-  if (comp.cable && typeof comp.cable === 'object') return true;
-  return false;
-}
-
 function parseNumeric(value) {
   if (value === undefined || value === null) return null;
   if (typeof value === 'number') {
@@ -647,6 +638,7 @@ const BRANCH_KEYWORDS = [
 function isBranchDevice(comp) {
   if (!comp || typeof comp !== 'object') return false;
   if (isBusComponent(comp)) return false;
+  if (typeof comp.busType === 'string' && comp.busType.trim()) return false;
   const type = String(comp.type || '').toLowerCase();
   const subtype = String(comp.subtype || '').toLowerCase();
   if (type.includes('load') || subtype.includes('load')) return false;
@@ -902,6 +894,24 @@ export function buildLoadFlowModel(oneLine = {}) {
       const baseImpedance = extractImpedance(comp);
       let impedance = cloneData(baseImpedance);
       let zeroImpedance = isZeroImpedance(impedance);
+      if (zeroImpedance) {
+        const connectionImpedanceCandidates = [
+          fromConnectionEntry?.impedance,
+          fromConnectionEntry?.seriesImpedance,
+          fromConnectionEntry?.cable?.impedance,
+          fromConnectionEntry?.cable,
+          toConnectionEntry?.impedance,
+          toConnectionEntry?.seriesImpedance,
+          toConnectionEntry?.cable?.impedance,
+          toConnectionEntry?.cable
+        ];
+        for (const candidate of connectionImpedanceCandidates) {
+          if (!candidate || typeof candidate !== 'object') continue;
+          impedance = normalizeImpedance(candidate);
+          zeroImpedance = isZeroImpedance(impedance);
+          if (!zeroImpedance) break;
+        }
+      }
       if (isTransformerComponent(comp) && zeroImpedance) {
         const derived = deriveTransformerImpedance(comp, fromSide, toSide, fromBus, toBus);
         if (derived) {
@@ -909,7 +919,7 @@ export function buildLoadFlowModel(oneLine = {}) {
           zeroImpedance = isZeroImpedance(impedance);
         }
       }
-      const explicitTie = zeroImpedance && isCableComponent(comp);
+      const explicitTie = zeroImpedance;
       let tap = cloneData(comp.tap);
       tap = deriveTransformerTap(comp, tap, fromSide, toSide, fromBus, toBus);
       const shunt = cloneData(comp.shunt);
