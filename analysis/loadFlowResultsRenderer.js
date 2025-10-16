@@ -56,6 +56,104 @@ function buildSummaryList(summary) {
   return html;
 }
 
+function collectTransformers(summary, busId) {
+  if (!summary || !Array.isArray(summary.branchConnections)) return [];
+  const matches = summary.branchConnections.filter(conn => {
+    const type = `${conn.componentType || ''}`.toLowerCase();
+    const subtype = `${conn.componentSubtype || ''}`.toLowerCase();
+    const isTransformer = type.includes('transformer') || subtype.includes('transformer');
+    if (!isTransformer) return false;
+    return conn.fromBus === busId || conn.toBus === busId;
+  });
+  return matches.map(conn => conn.componentName || conn.componentLabel || conn.componentRef || conn.componentId).filter(Boolean);
+}
+
+function collectCollapsedBuses(res, busLabelMap) {
+  const buses = Array.isArray(res?.buses) ? res.buses : [];
+  return buses.filter(bus => Number.isFinite(bus?.Vm) && bus.Vm > 0 && bus.Vm < 0.1).map(bus => {
+    const label = resolveBusLabel(bus.id, bus.displayLabel, busLabelMap);
+    const vm = formatNumber(bus.Vm, 4, '—');
+    const kv = Number.isFinite(bus.voltageKV) ? `${formatNumber(bus.voltageKV, 3, '—')} kV` : '';
+    const loadKw = Number.isFinite(bus.Pd) ? `${formatNumber(bus.Pd, 1, '0.0')} kW` : '';
+    const transformers = collectTransformers(res?.summary, bus.id);
+    return {
+      label,
+      vm,
+      kv,
+      loadKw,
+      transformers
+    };
+  });
+}
+
+function collectZeroImpedanceWarnings(warnings) {
+  if (!Array.isArray(warnings)) return [];
+  return warnings
+    .map(msg => {
+      const match = msg.match(/for ([^;]+?) between ([^ ]+) and ([^;]+?)(?:;|$)/i);
+      if (!match) return null;
+      const [, device, from, to] = match;
+      return {
+        device: device.trim(),
+        from: from.trim(),
+        to: to.trim()
+      };
+    })
+    .filter(Boolean);
+}
+
+function buildNonConvergenceInsights(res, busLabelMap) {
+  if (!res || res.converged !== false) return '';
+  const hints = [];
+  const collapsed = collectCollapsedBuses(res, busLabelMap);
+  if (collapsed.length) {
+    const fragments = collapsed.map(item => {
+      const parts = [item.label];
+      if (item.vm !== '—') parts.push(`${item.vm} pu`);
+      if (item.kv) parts.push(item.kv);
+      if (item.loadKw) parts.push(`load ${item.loadKw}`);
+      return parts.filter(Boolean).join(' / ');
+    });
+    let message = 'One or more downstream buses collapsed well below 0.10 pu: ' + fragments.join('; ') + '. ';
+    const transformerNames = new Set();
+    collapsed.forEach(item => item.transformers.forEach(name => transformerNames.add(name)));
+    if (transformerNames.size) {
+      message += 'Inspect the transformer connection';
+      message += transformerNames.size > 1 ? 's ' : ' ';
+      message += Array.from(transformerNames).join(', ');
+      message += ' feeding those buses. Ensure the high-side bus is tied to the correct base kV and the secondary base matches the low-voltage network.';
+    } else {
+      message += 'Verify that the connected transformers or sources are mapped to the correct high- and low-side buses and that their base kV values are accurate.';
+    }
+    message += ' If the load exceeds the transformer kVA rating, increase the rating or reduce the modeled load so the secondary voltage can recover.';
+    hints.push(message.trim());
+  }
+
+  const zeroImpedance = collectZeroImpedanceWarnings(res?.warnings);
+  if (zeroImpedance.length) {
+    const entries = zeroImpedance.map(entry => `${entry.device} (${entry.from}–${entry.to})`);
+    const text = 'Zero-impedance branches were replaced with ideal ties: ' + entries.join(', ') + '. Replace placeholder values with realistic cable impedance or merge the buses when they are meant to be the same node to avoid ill-conditioned equations.';
+    hints.push(text);
+  }
+
+  const totalLoad = Number(res?.summary?.totalLoadKW);
+  const totalGen = Number(res?.summary?.totalGenKW);
+  if (Number.isFinite(totalLoad) && Number.isFinite(totalGen) && totalLoad > 0) {
+    const ratio = Math.abs(totalGen) / totalLoad;
+    if (ratio > 50) {
+      hints.push('The generation total is orders of magnitude larger than the modeled load, which typically indicates a bus orientation or base kV mismatch that is forcing the solver to inject unreal power. Revisit transformer polarities and make sure only the upstream source is modeled as a slack or PV bus.');
+    }
+  }
+
+  if (!hints.length) return '';
+  let html = '<div class="study-diagnostics"><h3>Diagnostics</h3><ul>';
+  hints.forEach(hint => {
+    html += `<li>${escapeHtml(hint)}</li>`;
+  });
+  html += '</ul></div>';
+  return html;
+}
+
 function buildBranchConnectionsSection(summary, busLabelMap) {
   const entries = Array.isArray(summary?.branchConnections) ? summary.branchConnections : [];
   if (!entries.length) return '';
@@ -165,6 +263,8 @@ export function renderLoadFlowResultsHtml(res) {
     warnings.forEach(msg => { html += `<li>${escapeHtml(msg)}</li>`; });
     html += '</ul>';
   }
+
+  html += buildNonConvergenceInsights(res, busLabelMap);
 
   html += buildSummaryList(res?.summary);
   html += buildBranchConnectionsSection(res?.summary, busLabelMap);
