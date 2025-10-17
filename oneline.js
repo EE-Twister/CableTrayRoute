@@ -681,7 +681,21 @@ const builtinComponents = [
         conductor_material: '',
         insulation_type: '',
         ambient_temp: '',
+        operating_temp: '',
         install_method: '',
+        thermal_rating_ampacity: '',
+        shield_armor: '',
+        resistance_per_km: '',
+        reactance_per_km: '',
+        zero_sequence_impedance: '',
+        mutual_coupling: '',
+        impedance_per_length: '',
+        capacitance_per_km: '',
+        short_circuit_rating: '',
+        grouping_factor: '',
+        resistance_temp_correction_coeff: '',
+        core_configuration: '',
+        ground_return_path_resistance: '',
         color: '#000000',
         length: '',
         manual_length: false
@@ -689,6 +703,100 @@ const builtinComponents = [
     }
   }
 ];
+
+const cablePropertyMetadata = {
+  conductor_size: {
+    label: 'Conductor Size (AWG or mm²)',
+    help: 'Determines resistance and ampacity. Base electrical characteristic.'
+  },
+  conductor_material: {
+    label: 'Conductor Material (Cu/Al)',
+    help: 'Affects resistance and derating. Impacts loss and weight.'
+  },
+  resistance_per_km: {
+    label: 'Resistance (Ω/km)',
+    type: 'number',
+    help: 'Used in voltage drop and loss calculations. Derived or vendor data.'
+  },
+  reactance_per_km: {
+    label: 'Reactance (Ω/km)',
+    type: 'number',
+    help: 'Used in power flow and fault calculations. Important for impedance matching.'
+  },
+  zero_sequence_impedance: {
+    label: 'Zero Sequence Impedance',
+    help: 'Ground fault studies. Required for unbalanced analysis.'
+  },
+  mutual_coupling: {
+    label: 'Mutual Coupling',
+    help: 'Modeling magnetic coupling between circuits. Important for parallel runs.'
+  },
+  length: {
+    label: 'Length',
+    type: 'number',
+    help: 'Scales impedance and drop. Must be accurate for realistic models.'
+  },
+  operating_temp: {
+    label: 'Operating Temperature (°C)',
+    type: 'number',
+    help: 'Used for resistance correction. Impacts ampacity.'
+  },
+  ambient_temp: {
+    label: 'Ambient Temperature (°C)',
+    type: 'number',
+    help: 'Used for derating. Impacts heat dissipation.'
+  },
+  thermal_rating_ampacity: {
+    label: 'Thermal Rating/Ampacity (A)',
+    type: 'number',
+    help: 'Defines max current capacity. Used in protection sizing.'
+  },
+  shield_armor: {
+    label: 'Shield/Armor Data',
+    help: 'Defines ground path and shielding. Used for EMI and fault analysis.'
+  },
+  impedance_per_length: {
+    label: 'Impedance per Length',
+    help: 'Z = R + jX. Defines voltage drop and fault contribution.'
+  },
+  capacitance_per_km: {
+    label: 'Capacitance (µF/km)',
+    type: 'number',
+    help: 'Used for reactive compensation. Relevant for long lines.'
+  },
+  insulation_type: {
+    label: 'Insulation Type',
+    help: 'Determines max voltage and dielectric loss. Used for derating.'
+  },
+  install_method: {
+    label: 'Installation Type (in conduit, tray, buried)',
+    help: 'Determines derating factors. Used for thermal calculations.'
+  },
+  short_circuit_rating: {
+    label: 'Short Circuit Rating (kA)',
+    type: 'number',
+    help: 'Fault withstand capability. Compare against max fault.'
+  },
+  grouping_factor: {
+    label: 'Grouping Factor',
+    type: 'number',
+    help: 'Used for ampacity derating. Multiple cables reduce rating.'
+  },
+  resistance_temp_correction_coeff: {
+    label: 'Resistance Temp Correction Coeff',
+    type: 'number',
+    help: 'Adjust R vs temperature. Used in IEC modeling.'
+  },
+  core_configuration: {
+    label: 'Core Configuration (1C,3C)',
+    help: 'Determines magnetic coupling. Impacts reactance.'
+  },
+  ground_return_path_resistance: {
+    label: 'Ground Return Path Resistance',
+    type: 'number',
+    help: 'Used for unbalanced faults. Important for system grounding.'
+  }
+};
 
 let propSchemas = {};
 let subtypeCategory = {};
@@ -5430,7 +5538,7 @@ function selectComponent(compOrId) {
       rawSchema = inferSchemaFromProps({ ...metaProps, ...(targetComp.props || {}) });
     }
 
-    const labelOverrides = {
+    const generalLabelOverrides = {
       hp: 'Horsepower',
       pf: 'Power Factor',
       service_factor: 'Service Factor',
@@ -5475,8 +5583,23 @@ function selectComponent(compOrId) {
           };
         }
         return f;
-      })
-      .map(f => ({ ...f, label: labelOverrides[f.name] || f.label }));
+      });
+
+    schema = schema.map(f => {
+      const next = { ...f };
+      if (next.name.startsWith('cable_')) {
+        const key = next.name.replace(/^cable_/, '');
+        const meta = cablePropertyMetadata[key];
+        if (meta) {
+          if (meta.label) next.label = meta.label;
+          if (meta.type) next.type = meta.type;
+          if (meta.help) next.help = meta.help;
+        }
+      } else if (generalLabelOverrides[next.name]) {
+        next.label = generalLabelOverrides[next.name];
+      }
+      return next;
+    });
 
     if (targetComp.subtype === 'motor_load') {
       schema = schema.filter(
@@ -6047,6 +6170,22 @@ async function chooseCable(source, target, existingConn = null) {
     modal.innerHTML = '';
     const form = document.createElement('form');
 
+    const applyCableMeta = (label, key, fallback) => {
+      const meta = cablePropertyMetadata[key];
+      const text = meta?.label || fallback || key;
+      label.textContent = `${text} `;
+      if (meta?.help) label.title = meta.help;
+      return meta || {};
+    };
+
+    const parseNumericValue = input => {
+      if (!input) return '';
+      const raw = typeof input.value === 'string' ? input.value.trim() : '';
+      if (!raw) return '';
+      const num = Number(raw);
+      return Number.isFinite(num) ? num : raw;
+    };
+
     const tplLabel = document.createElement('label');
     tplLabel.textContent = 'Template ';
     const tplSelect = document.createElement('select');
@@ -6120,48 +6259,166 @@ async function chooseCable(source, target, existingConn = null) {
     form.appendChild(phasesLabel);
 
     const sizeLabel = document.createElement('label');
-    sizeLabel.textContent = 'Conductor Size ';
+    applyCableMeta(sizeLabel, 'conductor_size', 'Conductor Size');
     const sizeInput = document.createElement('input');
     sizeInput.name = 'conductor_size';
     sizeLabel.appendChild(sizeInput);
     form.appendChild(sizeLabel);
 
     const materialLabel = document.createElement('label');
-    materialLabel.textContent = 'Conductor Material ';
+    applyCableMeta(materialLabel, 'conductor_material', 'Conductor Material');
     const materialInput = document.createElement('input');
     materialInput.name = 'conductor_material';
     materialLabel.appendChild(materialInput);
     form.appendChild(materialLabel);
 
+    const resistancePerKmLabel = document.createElement('label');
+    applyCableMeta(resistancePerKmLabel, 'resistance_per_km', 'Resistance (Ω/km)');
+    const resistancePerKmInput = document.createElement('input');
+    resistancePerKmInput.type = 'number';
+    resistancePerKmInput.step = 'any';
+    resistancePerKmInput.name = 'resistance_per_km';
+    resistancePerKmLabel.appendChild(resistancePerKmInput);
+    form.appendChild(resistancePerKmLabel);
+
+    const reactancePerKmLabel = document.createElement('label');
+    applyCableMeta(reactancePerKmLabel, 'reactance_per_km', 'Reactance (Ω/km)');
+    const reactancePerKmInput = document.createElement('input');
+    reactancePerKmInput.type = 'number';
+    reactancePerKmInput.step = 'any';
+    reactancePerKmInput.name = 'reactance_per_km';
+    reactancePerKmLabel.appendChild(reactancePerKmInput);
+    form.appendChild(reactancePerKmLabel);
+
+    const zeroSeqLabel = document.createElement('label');
+    applyCableMeta(zeroSeqLabel, 'zero_sequence_impedance', 'Zero Sequence Impedance');
+    const zeroSequenceInput = document.createElement('input');
+    zeroSequenceInput.name = 'zero_sequence_impedance';
+    zeroSeqLabel.appendChild(zeroSequenceInput);
+    form.appendChild(zeroSeqLabel);
+
+    const mutualCouplingLabel = document.createElement('label');
+    applyCableMeta(mutualCouplingLabel, 'mutual_coupling', 'Mutual Coupling');
+    const mutualCouplingInput = document.createElement('input');
+    mutualCouplingInput.name = 'mutual_coupling';
+    mutualCouplingLabel.appendChild(mutualCouplingInput);
+    form.appendChild(mutualCouplingLabel);
+
+    const lengthLabel = document.createElement('label');
+    applyCableMeta(lengthLabel, 'length', 'Length');
+    const lengthInput = document.createElement('input');
+    lengthInput.type = 'number';
+    lengthInput.step = 'any';
+    lengthInput.name = 'length';
+    lengthLabel.appendChild(lengthInput);
+    form.appendChild(lengthLabel);
+
+    const operatingTempLabel = document.createElement('label');
+    applyCableMeta(operatingTempLabel, 'operating_temp', 'Operating Temperature (°C)');
+    const operatingTempInput = document.createElement('input');
+    operatingTempInput.type = 'number';
+    operatingTempInput.step = 'any';
+    operatingTempInput.name = 'operating_temp';
+    operatingTempLabel.appendChild(operatingTempInput);
+    form.appendChild(operatingTempLabel);
+
+    const ambientLabel = document.createElement('label');
+    applyCableMeta(ambientLabel, 'ambient_temp', 'Ambient Temperature (°C)');
+    const ambientInput = document.createElement('input');
+    ambientInput.type = 'number';
+    ambientInput.step = 'any';
+    ambientInput.name = 'ambient_temp';
+    ambientLabel.appendChild(ambientInput);
+    form.appendChild(ambientLabel);
+
+    const thermalRatingLabel = document.createElement('label');
+    applyCableMeta(thermalRatingLabel, 'thermal_rating_ampacity', 'Thermal Rating/Ampacity (A)');
+    const thermalRatingInput = document.createElement('input');
+    thermalRatingInput.type = 'number';
+    thermalRatingInput.step = 'any';
+    thermalRatingInput.name = 'thermal_rating_ampacity';
+    thermalRatingLabel.appendChild(thermalRatingInput);
+    form.appendChild(thermalRatingLabel);
+
+    const shieldArmorLabel = document.createElement('label');
+    applyCableMeta(shieldArmorLabel, 'shield_armor', 'Shield/Armor Data');
+    const shieldArmorInput = document.createElement('input');
+    shieldArmorInput.name = 'shield_armor';
+    shieldArmorLabel.appendChild(shieldArmorInput);
+    form.appendChild(shieldArmorLabel);
+
+    const impedancePerLengthLabel = document.createElement('label');
+    applyCableMeta(impedancePerLengthLabel, 'impedance_per_length', 'Impedance per Length');
+    const impedancePerLengthInput = document.createElement('input');
+    impedancePerLengthInput.name = 'impedance_per_length';
+    impedancePerLengthLabel.appendChild(impedancePerLengthInput);
+    form.appendChild(impedancePerLengthLabel);
+
+    const capacitanceLabel = document.createElement('label');
+    applyCableMeta(capacitanceLabel, 'capacitance_per_km', 'Capacitance (µF/km)');
+    const capacitanceInput = document.createElement('input');
+    capacitanceInput.type = 'number';
+    capacitanceInput.step = 'any';
+    capacitanceInput.name = 'capacitance_per_km';
+    capacitanceLabel.appendChild(capacitanceInput);
+    form.appendChild(capacitanceLabel);
+
     const insulationLabel = document.createElement('label');
-    insulationLabel.textContent = 'Insulation Type ';
+    applyCableMeta(insulationLabel, 'insulation_type', 'Insulation Type');
     const insulationInput = document.createElement('input');
     insulationInput.name = 'insulation_type';
     insulationLabel.appendChild(insulationInput);
     form.appendChild(insulationLabel);
 
-    const ambientLabel = document.createElement('label');
-    ambientLabel.textContent = 'Ambient Temp (°C) ';
-    const ambientInput = document.createElement('input');
-    ambientInput.type = 'number';
-    ambientInput.name = 'ambient_temp';
-    ambientLabel.appendChild(ambientInput);
-    form.appendChild(ambientLabel);
-
     const installLabel = document.createElement('label');
-    installLabel.textContent = 'Install Method ';
+    applyCableMeta(installLabel, 'install_method', 'Installation Type');
     const installInput = document.createElement('input');
     installInput.name = 'install_method';
     installLabel.appendChild(installInput);
     form.appendChild(installLabel);
 
-    const lengthLabel = document.createElement('label');
-    lengthLabel.textContent = 'Length (ft) ';
-    const lengthInput = document.createElement('input');
-    lengthInput.type = 'number';
-    lengthInput.name = 'length';
-    lengthLabel.appendChild(lengthInput);
-    form.appendChild(lengthLabel);
+    const shortCircuitLabel = document.createElement('label');
+    applyCableMeta(shortCircuitLabel, 'short_circuit_rating', 'Short Circuit Rating (kA)');
+    const shortCircuitInput = document.createElement('input');
+    shortCircuitInput.type = 'number';
+    shortCircuitInput.step = 'any';
+    shortCircuitInput.name = 'short_circuit_rating';
+    shortCircuitLabel.appendChild(shortCircuitInput);
+    form.appendChild(shortCircuitLabel);
+
+    const groupingLabel = document.createElement('label');
+    applyCableMeta(groupingLabel, 'grouping_factor', 'Grouping Factor');
+    const groupingInput = document.createElement('input');
+    groupingInput.type = 'number';
+    groupingInput.step = 'any';
+    groupingInput.name = 'grouping_factor';
+    groupingLabel.appendChild(groupingInput);
+    form.appendChild(groupingLabel);
+
+    const resistanceCoeffLabel = document.createElement('label');
+    applyCableMeta(resistanceCoeffLabel, 'resistance_temp_correction_coeff', 'Resistance Temp Correction Coeff');
+    const resistanceCoeffInput = document.createElement('input');
+    resistanceCoeffInput.type = 'number';
+    resistanceCoeffInput.step = 'any';
+    resistanceCoeffInput.name = 'resistance_temp_correction_coeff';
+    resistanceCoeffLabel.appendChild(resistanceCoeffInput);
+    form.appendChild(resistanceCoeffLabel);
+
+    const coreConfigLabel = document.createElement('label');
+    applyCableMeta(coreConfigLabel, 'core_configuration', 'Core Configuration (1C,3C)');
+    const coreConfigurationInput = document.createElement('input');
+    coreConfigurationInput.name = 'core_configuration';
+    coreConfigLabel.appendChild(coreConfigurationInput);
+    form.appendChild(coreConfigLabel);
+
+    const groundReturnLabel = document.createElement('label');
+    applyCableMeta(groundReturnLabel, 'ground_return_path_resistance', 'Ground Return Path Resistance');
+    const groundReturnInput = document.createElement('input');
+    groundReturnInput.type = 'number';
+    groundReturnInput.step = 'any';
+    groundReturnInput.name = 'ground_return_path_resistance';
+    groundReturnLabel.appendChild(groundReturnInput);
+    form.appendChild(groundReturnLabel);
 
     const impedanceRLabel = document.createElement('label');
     impedanceRLabel.textContent = 'Impedance R (Ω) ';
@@ -6240,12 +6497,42 @@ async function chooseCable(source, target, existingConn = null) {
       if (t) {
         sizeInput.value = t.conductor_size || '';
         materialInput.value = t.conductor_material || '';
+        resistancePerKmInput.value = t.resistance_per_km ?? '';
+        reactancePerKmInput.value = t.reactance_per_km ?? '';
+        zeroSequenceInput.value = t.zero_sequence_impedance || '';
+        mutualCouplingInput.value = t.mutual_coupling || '';
+        lengthInput.value = t.length ?? '';
+        operatingTempInput.value = t.operating_temp ?? '';
+        thermalRatingInput.value = t.thermal_rating_ampacity ?? '';
+        shieldArmorInput.value = t.shield_armor || '';
+        impedancePerLengthInput.value = t.impedance_per_length || '';
+        capacitanceInput.value = t.capacitance_per_km ?? '';
         insulationInput.value = t.insulation_type || '';
         ambientInput.value = t.ambient_temp || '';
         installInput.value = t.install_method || '';
+        shortCircuitInput.value = t.short_circuit_rating ?? '';
+        groupingInput.value = t.grouping_factor ?? '';
+        resistanceCoeffInput.value = t.resistance_temp_correction_coeff ?? '';
+        coreConfigurationInput.value = t.core_configuration || '';
+        groundReturnInput.value = t.ground_return_path_resistance ?? '';
         ratingInput.value = t.cable_rating || '';
         impedanceRInput.value = getImpedancePart(t, 'r') || '';
         impedanceXInput.value = getImpedancePart(t, 'x') || '';
+      } else {
+        resistancePerKmInput.value = '';
+        reactancePerKmInput.value = '';
+        zeroSequenceInput.value = '';
+        mutualCouplingInput.value = '';
+        operatingTempInput.value = '';
+        thermalRatingInput.value = '';
+        shieldArmorInput.value = '';
+        impedancePerLengthInput.value = '';
+        capacitanceInput.value = '';
+        shortCircuitInput.value = '';
+        groupingInput.value = '';
+        resistanceCoeffInput.value = '';
+        coreConfigurationInput.value = '';
+        groundReturnInput.value = '';
       }
     });
 
@@ -6259,11 +6546,25 @@ async function chooseCable(source, target, existingConn = null) {
         phasesInput.value = c.phases || '';
         sizeInput.value = c.conductor_size || '';
         materialInput.value = c.conductor_material || '';
+        resistancePerKmInput.value = c.resistance_per_km ?? '';
+        reactancePerKmInput.value = c.reactance_per_km ?? '';
+        zeroSequenceInput.value = c.zero_sequence_impedance || '';
+        mutualCouplingInput.value = c.mutual_coupling || '';
         insulationInput.value = c.insulation_type || '';
-        lengthInput.value = c.length || '';
+        lengthInput.value = c.length ?? '';
+        operatingTempInput.value = c.operating_temp ?? '';
         colorInput.value = c.color || '#000000';
         ambientInput.value = c.ambient_temp || '';
         installInput.value = c.install_method || '';
+        thermalRatingInput.value = c.thermal_rating_ampacity ?? '';
+        shieldArmorInput.value = c.shield_armor || '';
+        impedancePerLengthInput.value = c.impedance_per_length || '';
+        capacitanceInput.value = c.capacitance_per_km ?? '';
+        shortCircuitInput.value = c.short_circuit_rating ?? '';
+        groupingInput.value = c.grouping_factor ?? '';
+        resistanceCoeffInput.value = c.resistance_temp_correction_coeff ?? '';
+        coreConfigurationInput.value = c.core_configuration || '';
+        groundReturnInput.value = c.ground_return_path_resistance ?? '';
         impedanceRInput.value = getImpedancePart(c, 'r') || '';
         impedanceXInput.value = getImpedancePart(c, 'x') || '';
       } else {
@@ -6275,10 +6576,24 @@ async function chooseCable(source, target, existingConn = null) {
         sizeInput.value = '';
         materialInput.value = '';
         insulationInput.value = '';
+        resistancePerKmInput.value = '';
+        reactancePerKmInput.value = '';
+        zeroSequenceInput.value = '';
+        mutualCouplingInput.value = '';
         lengthInput.value = '';
+        operatingTempInput.value = '';
         colorInput.value = '#000000';
         ambientInput.value = '';
         installInput.value = '';
+        thermalRatingInput.value = '';
+        shieldArmorInput.value = '';
+        impedancePerLengthInput.value = '';
+        capacitanceInput.value = '';
+        shortCircuitInput.value = '';
+        groupingInput.value = '';
+        resistanceCoeffInput.value = '';
+        coreConfigurationInput.value = '';
+        groundReturnInput.value = '';
         impedanceRInput.value = '';
         impedanceXInput.value = '';
         sizeInput.dataset.calcAmpacity = '';
@@ -6301,6 +6616,10 @@ async function chooseCable(source, target, existingConn = null) {
         : existing.phases || '';
       sizeInput.value = existing.conductor_size || '';
       materialInput.value = existing.conductor_material || '';
+      resistancePerKmInput.value = existing.resistance_per_km ?? '';
+      reactancePerKmInput.value = existing.reactance_per_km ?? '';
+      zeroSequenceInput.value = existing.zero_sequence_impedance || '';
+      mutualCouplingInput.value = existing.mutual_coupling || '';
       insulationInput.value = existing.insulation_type || '';
       const autoLen = (existingConn.length || 0) * (diagramScale.unitPerPx || 1);
       if (existing.length) {
@@ -6308,9 +6627,19 @@ async function chooseCable(source, target, existingConn = null) {
       } else if (autoLen) {
         lengthInput.value = autoLen.toFixed(2);
       }
+      operatingTempInput.value = existing.operating_temp ?? '';
       colorInput.value = existing.color || '#000000';
       ambientInput.value = existing.ambient_temp || '';
       installInput.value = existing.install_method || '';
+      thermalRatingInput.value = existing.thermal_rating_ampacity ?? '';
+      shieldArmorInput.value = existing.shield_armor || '';
+      impedancePerLengthInput.value = existing.impedance_per_length || '';
+      capacitanceInput.value = existing.capacitance_per_km ?? '';
+      shortCircuitInput.value = existing.short_circuit_rating ?? '';
+      groupingInput.value = existing.grouping_factor ?? '';
+      resistanceCoeffInput.value = existing.resistance_temp_correction_coeff ?? '';
+      coreConfigurationInput.value = existing.core_configuration || '';
+      groundReturnInput.value = existing.ground_return_path_resistance ?? '';
       sizeInput.dataset.calcAmpacity = existing.calc_ampacity || '';
       sizeInput.dataset.voltageDrop = existing.voltage_drop_pct || existing.voltage_drop || '';
       sizeInput.dataset.sizingWarning = existing.sizing_warning || '';
@@ -6361,9 +6690,23 @@ async function chooseCable(source, target, existingConn = null) {
         conductors,
         conductor_size: sizeInput.value,
         conductor_material: materialInput.value,
+        resistance_per_km: parseNumericValue(resistancePerKmInput),
+        reactance_per_km: parseNumericValue(reactancePerKmInput),
+        zero_sequence_impedance: zeroSequenceInput.value,
+        mutual_coupling: mutualCouplingInput.value,
         insulation_type: insulationInput.value,
-        ambient_temp: ambientInput.value,
+        operating_temp: parseNumericValue(operatingTempInput),
+        ambient_temp: parseNumericValue(ambientInput),
         install_method: installInput.value,
+        thermal_rating_ampacity: parseNumericValue(thermalRatingInput),
+        shield_armor: shieldArmorInput.value,
+        impedance_per_length: impedancePerLengthInput.value,
+        capacitance_per_km: parseNumericValue(capacitanceInput),
+        short_circuit_rating: parseNumericValue(shortCircuitInput),
+        grouping_factor: parseNumericValue(groupingInput),
+        resistance_temp_correction_coeff: parseNumericValue(resistanceCoeffInput),
+        core_configuration: coreConfigurationInput.value,
+        ground_return_path_resistance: parseNumericValue(groundReturnInput),
         color: colorInput.value,
         phases: phases.length,
         calc_ampacity: sizeInput.dataset.calcAmpacity || '',
@@ -6378,7 +6721,7 @@ async function chooseCable(source, target, existingConn = null) {
         cable.operating_voltage = existingConn.cable.operating_voltage;
       }
       if (manualLen) {
-        cable.length = lengthInput.value;
+        cable.length = parseNumericValue(lengthInput);
         cable.manual_length = true;
       }
       modal.classList.remove('show');
@@ -6505,7 +6848,26 @@ function openCableProperties(comp) {
     <p><strong>Operating Voltage (V):</strong> ${formatOperatingVoltage(cable.operating_voltage) || ''}</p>
     <p><strong>Conductors:</strong> ${cable.conductors || ''}</p>
     <p><strong>Phases:</strong> ${Array.isArray(cable.phases) ? cable.phases.join(',') : cable.phases || ''}</p>
-    <p><strong>Length:</strong> ${cable.length || ''}</p>
+    <p><strong>Conductor Size (AWG or mm²):</strong> ${cable.conductor_size || ''}</p>
+    <p><strong>Conductor Material (Cu/Al):</strong> ${cable.conductor_material || ''}</p>
+    <p><strong>Resistance (Ω/km):</strong> ${cable.resistance_per_km ?? ''}</p>
+    <p><strong>Reactance (Ω/km):</strong> ${cable.reactance_per_km ?? ''}</p>
+    <p><strong>Zero Sequence Impedance:</strong> ${cable.zero_sequence_impedance || ''}</p>
+    <p><strong>Mutual Coupling:</strong> ${cable.mutual_coupling || ''}</p>
+    <p><strong>Length:</strong> ${cable.length ?? ''}</p>
+    <p><strong>Operating Temperature (°C):</strong> ${cable.operating_temp ?? ''}</p>
+    <p><strong>Ambient Temperature (°C):</strong> ${cable.ambient_temp ?? ''}</p>
+    <p><strong>Thermal Rating/Ampacity (A):</strong> ${cable.thermal_rating_ampacity ?? ''}</p>
+    <p><strong>Shield/Armor Data:</strong> ${cable.shield_armor || ''}</p>
+    <p><strong>Impedance per Length:</strong> ${cable.impedance_per_length || ''}</p>
+    <p><strong>Capacitance (µF/km):</strong> ${cable.capacitance_per_km ?? ''}</p>
+    <p><strong>Insulation Type:</strong> ${cable.insulation_type || ''}</p>
+    <p><strong>Installation Type (in conduit, tray, buried):</strong> ${cable.install_method || ''}</p>
+    <p><strong>Short Circuit Rating (kA):</strong> ${cable.short_circuit_rating ?? ''}</p>
+    <p><strong>Grouping Factor:</strong> ${cable.grouping_factor ?? ''}</p>
+    <p><strong>Resistance Temp Correction Coeff:</strong> ${cable.resistance_temp_correction_coeff ?? ''}</p>
+    <p><strong>Core Configuration (1C,3C):</strong> ${cable.core_configuration || ''}</p>
+    <p><strong>Ground Return Path Resistance:</strong> ${cable.ground_return_path_resistance ?? ''}</p>
     <p><strong>Impedance R (Ω):</strong> ${getImpedancePart(cable, 'r') || ''}</p>
     <p><strong>Impedance X (Ω):</strong> ${getImpedancePart(cable, 'x') || ''}</p>
   `;
