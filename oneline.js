@@ -7867,6 +7867,33 @@ function getCategory(c) {
   return c.type || subtypeCategory[c.subtype];
 }
 
+function formatLoadFlowCurrentValue(value) {
+  if (value === null || value === undefined) return '';
+  const normalize = val => {
+    const num = Number(val);
+    if (!Number.isFinite(num)) return null;
+    return num.toFixed(1);
+  };
+  if (typeof value === 'object') {
+    const entries = Array.isArray(value)
+      ? value.map((val, idx) => [idx, val])
+      : Object.entries(value);
+    const parts = entries
+      .map(([phase, val]) => {
+        const formatted = normalize(val);
+        if (formatted === null) return null;
+        const label = String(phase).trim();
+        return { phase: label, formatted };
+      })
+      .filter(Boolean)
+      .sort((a, b) => a.phase.localeCompare(b.phase, undefined, { sensitivity: 'base', numeric: true }))
+      .map(entry => `${entry.phase}:${entry.formatted}`);
+    return parts.join(', ');
+  }
+  const formatted = normalize(value);
+  return formatted === null ? '' : formatted;
+}
+
 function buildCableSpecFromComponent(comp, allComps) {
   if (!comp || comp.type !== 'cable') return null;
   const cable = comp.cable || {};
@@ -7914,6 +7941,7 @@ function buildCableSpecFromComponent(comp, allComps) {
   spec.sizing_warning = result.violation || spec.sizing_warning || '';
   spec.code_reference = result.codeRef || spec.code_reference || '';
   spec.sizing_report = JSON.stringify(result.report || {});
+  spec.load_flow_current = formatLoadFlowCurrentValue(outbound?.loading_amps);
   comp.cable = {
     ...comp.cable,
     calc_ampacity: spec.calc_ampacity,
@@ -7922,7 +7950,8 @@ function buildCableSpecFromComponent(comp, allComps) {
     code_reference: spec.code_reference,
     sizing_report: spec.sizing_report,
     length: spec.length,
-    manual_length: spec.manual_length
+    manual_length: spec.manual_length,
+    load_flow_current: spec.load_flow_current
   };
   return spec;
 }
@@ -8324,6 +8353,7 @@ function syncSchedules(notify = true) {
       if (impedanceSource && typeof impedanceSource === 'object') {
         spec.impedance = { ...impedanceSource };
       }
+      spec.load_flow_current = formatLoadFlowCurrentValue(conn.loading_amps);
       cableSpecs.push(spec);
     });
   });
@@ -8417,6 +8447,7 @@ function serializeState() {
         if (impedanceSource && typeof impedanceSource === 'object') {
           spec.impedance = { ...impedanceSource };
         }
+        spec.load_flow_current = formatLoadFlowCurrentValue(conn.loading_amps);
         cables.push(spec);
       });
     });
