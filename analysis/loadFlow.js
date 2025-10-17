@@ -131,14 +131,12 @@ function buildYBus(buses, baseMVA) {
           connectionSide: conn.connectionSide,
           connectionConfig: conn.connectionConfig
         });
-        if (!treatAsIdealTie) {
-          return;
-        }
+        treatAsIdealTie = true;
       }
-      const y = treatAsIdealTie ? toComplex(LARGE_ADMITTANCE, 0) : inv(toComplex(Z.re, Z.im));
       if (treatAsIdealTie) {
         conn.idealTie = true;
       }
+      const y = treatAsIdealTie ? toComplex(LARGE_ADMITTANCE, 0) : inv(toComplex(Z.re, Z.im));
       const tapMag = conn.tap?.ratio || conn.tap || 1;
       const tapAng = (conn.tap?.angle || 0) * Math.PI / 180;
       const t = toComplex(tapMag * Math.cos(tapAng), tapMag * Math.sin(tapAng));
@@ -388,9 +386,7 @@ function solvePhase(buses, baseMVA, options = {}) {
       const mag2 = Z.re * Z.re + Z.im * Z.im;
       let treatAsIdealTie = conn.idealTie === true;
       if (mag2 < MIN_COMPLEX_MAG) {
-        if (!treatAsIdealTie) {
-          return;
-        }
+        treatAsIdealTie = true;
       }
       if (treatAsIdealTie) {
         conn.idealTie = true;
