@@ -550,7 +550,123 @@
         "working_distance": 914,
         "electrode_config": "VCB",
         "enclosure": "open"
-      }
+      },
+      "deviceProperties": [
+        {
+          "DeviceType": "Generator",
+          "PropertyName": "Rated Voltage (kV)",
+          "PurposeUseCase": "Defines terminal voltage",
+          "NotesOrComments": "Used for per-unit conversion"
+        },
+        {
+          "DeviceType": "Generator",
+          "PropertyName": "Rated Power (MVA or kVA)",
+          "PurposeUseCase": "Defines capacity",
+          "NotesOrComments": "Base rating"
+        },
+        {
+          "DeviceType": "Generator",
+          "PropertyName": "Power Factor (Lag/Lead)",
+          "PurposeUseCase": "Defines operating point",
+          "NotesOrComments": "Used in steady-state modeling"
+        },
+        {
+          "DeviceType": "Generator",
+          "PropertyName": "Efficiency (%)",
+          "PurposeUseCase": "Defines loss and heat",
+          "NotesOrComments": "Used in system balance"
+        },
+        {
+          "DeviceType": "Generator",
+          "PropertyName": "Number of Poles",
+          "PurposeUseCase": "Determines speed",
+          "NotesOrComments": "Used in machine design"
+        },
+        {
+          "DeviceType": "Generator",
+          "PropertyName": "Excitation System (AVR)",
+          "PurposeUseCase": "Defines voltage control",
+          "NotesOrComments": "Dynamic behavior"
+        },
+        {
+          "DeviceType": "Generator",
+          "PropertyName": "Transient Reactance (Xd’)",
+          "PurposeUseCase": "Defines transient fault current",
+          "NotesOrComments": "Key in protection"
+        },
+        {
+          "DeviceType": "Generator",
+          "PropertyName": "Subtransient Reactance (Xd”)",
+          "PurposeUseCase": "Defines short circuit current",
+          "NotesOrComments": "Used in protection"
+        },
+        {
+          "DeviceType": "Generator",
+          "PropertyName": "Direct Axis Reactance (Xd)",
+          "PurposeUseCase": "Defines machine impedance",
+          "NotesOrComments": "Used in load flow"
+        },
+        {
+          "DeviceType": "Generator",
+          "PropertyName": "Quadrature Axis Reactance (Xq)",
+          "PurposeUseCase": "For torque/angle studies",
+          "NotesOrComments": "Used in dynamics"
+        },
+        {
+          "DeviceType": "Generator",
+          "PropertyName": "Zero Sequence Reactance (X0)",
+          "PurposeUseCase": "For ground faults",
+          "NotesOrComments": "Used in unbalanced fault analysis"
+        },
+        {
+          "DeviceType": "Generator",
+          "PropertyName": "Armature Resistance (Ra)",
+          "PurposeUseCase": "For losses",
+          "NotesOrComments": "Used in voltage calc"
+        },
+        {
+          "DeviceType": "Generator",
+          "PropertyName": "Inertia Constant (H)",
+          "PurposeUseCase": "Defines kinetic energy storage",
+          "NotesOrComments": "Used in stability"
+        },
+        {
+          "DeviceType": "Generator",
+          "PropertyName": "Saturation Curve Data",
+          "PurposeUseCase": "For nonlinear effects",
+          "NotesOrComments": "Advanced modeling"
+        },
+        {
+          "DeviceType": "Generator",
+          "PropertyName": "Regulation Settings (Droop, AVR gain)",
+          "PurposeUseCase": "Defines control behavior",
+          "NotesOrComments": "Used in dynamic response"
+        },
+        {
+          "DeviceType": "Generator",
+          "PropertyName": "Grounding Connection",
+          "PurposeUseCase": "Defines return path",
+          "NotesOrComments": "Used in fault model"
+        },
+        {
+          "DeviceType": "Generator",
+          "PropertyName": "Stator Leakage Reactance",
+          "PurposeUseCase": "Used in impedance derivation",
+          "NotesOrComments": "Minor but relevant"
+        },
+        {
+          "DeviceType": "Generator",
+          "PropertyName": "Field Resistance / Time Constant",
+          "PurposeUseCase": "Defines excitation dynamics",
+          "NotesOrComments": "Used in AVR modeling"
+        },
+        {
+          "DeviceType": "Generator",
+          "PropertyName": "Governor Parameters (speed droop, time const)",
+          "PurposeUseCase": "Used for frequency control",
+          "NotesOrComments": "Dynamic studies"
+        }
+      ]
     },
     {
       "type": "generator",
@@ -580,7 +696,123 @@
         "working_distance": 914,
         "electrode_config": "VCB",
         "enclosure": "open"
-      }
+      },
+      "deviceProperties": [
+        {
+          "DeviceType": "Generator",
+          "PropertyName": "Rated Voltage (kV)",
+          "PurposeUseCase": "Defines terminal voltage",
+          "NotesOrComments": "Used for per-unit conversion"
+        },
+        {
+          "DeviceType": "Generator",
+          "PropertyName": "Rated Power (MVA or kVA)",
+          "PurposeUseCase": "Defines capacity",
+          "NotesOrComments": "Base rating"
+        },
+        {
+          "DeviceType": "Generator",
+          "PropertyName": "Power Factor (Lag/Lead)",
+          "PurposeUseCase": "Defines operating point",
+          "NotesOrComments": "Used in steady-state modeling"
+        },
+        {
+          "DeviceType": "Generator",
+          "PropertyName": "Efficiency (%)",
+          "PurposeUseCase": "Defines loss and heat",
+          "NotesOrComments": "Used in system balance"
+        },
+        {
+          "DeviceType": "Generator",
+          "PropertyName": "Number of Poles",
+          "PurposeUseCase": "Determines speed",
+          "NotesOrComments": "Used in machine design"
+        },
+        {
+          "DeviceType": "Generator",
+          "PropertyName": "Excitation System (AVR)",
+          "PurposeUseCase": "Defines voltage control",
+          "NotesOrComments": "Dynamic behavior"
+        },
+        {
+          "DeviceType": "Generator",
+          "PropertyName": "Transient Reactance (Xd’)",
+          "PurposeUseCase": "Defines transient fault current",
+          "NotesOrComments": "Key in protection"
+        },
+        {
+          "DeviceType": "Generator",
+          "PropertyName": "Subtransient Reactance (Xd”)",
+          "PurposeUseCase": "Defines short circuit current",
+          "NotesOrComments": "Used in protection"
+        },
+        {
+          "DeviceType": "Generator",
+          "PropertyName": "Direct Axis Reactance (Xd)",
+          "PurposeUseCase": "Defines machine impedance",
+          "NotesOrComments": "Used in load flow"
+        },
+        {
+          "DeviceType": "Generator",
+          "PropertyName": "Quadrature Axis Reactance (Xq)",
+          "PurposeUseCase": "For torque/angle studies",
+          "NotesOrComments": "Used in dynamics"
+        },
+        {
+          "DeviceType": "Generator",
+          "PropertyName": "Zero Sequence Reactance (X0)",
+          "PurposeUseCase": "For ground faults",
+          "NotesOrComments": "Used in unbalanced fault analysis"
+        },
+        {
+          "DeviceType": "Generator",
+          "PropertyName": "Armature Resistance (Ra)",
+          "PurposeUseCase": "For losses",
+          "NotesOrComments": "Used in voltage calc"
+        },
+        {
+          "DeviceType": "Generator",
+          "PropertyName": "Inertia Constant (H)",
+          "PurposeUseCase": "Defines kinetic energy storage",
+          "NotesOrComments": "Used in stability"
+        },
+        {
+          "DeviceType": "Generator",
+          "PropertyName": "Saturation Curve Data",
+          "PurposeUseCase": "For nonlinear effects",
+          "NotesOrComments": "Advanced modeling"
+        },
+        {
+          "DeviceType": "Generator",
+          "PropertyName": "Regulation Settings (Droop, AVR gain)",
+          "PurposeUseCase": "Defines control behavior",
+          "NotesOrComments": "Used in dynamic response"
+        },
+        {
+          "DeviceType": "Generator",
+          "PropertyName": "Grounding Connection",
+          "PurposeUseCase": "Defines return path",
+          "NotesOrComments": "Used in fault model"
+        },
+        {
+          "DeviceType": "Generator",
+          "PropertyName": "Stator Leakage Reactance",
+          "PurposeUseCase": "Used in impedance derivation",
+          "NotesOrComments": "Minor but relevant"
+        },
+        {
+          "DeviceType": "Generator",
+          "PropertyName": "Field Resistance / Time Constant",
+          "PurposeUseCase": "Defines excitation dynamics",
+          "NotesOrComments": "Used in AVR modeling"
+        },
+        {
+          "DeviceType": "Generator",
+          "PropertyName": "Governor Parameters (speed droop, time const)",
+          "PurposeUseCase": "Used for frequency control",
+          "NotesOrComments": "Dynamic studies"
+        }
+      ]
     },
     {
       "type": "pv_inverter",
