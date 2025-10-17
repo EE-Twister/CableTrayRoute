@@ -646,7 +646,141 @@
           "kw": 117.789,
           "kvar": 63.576
         }
-      }
+      },
+      "deviceProperties": [
+        {
+          "DeviceType": "Motor",
+          "PropertyName": "Rated Power (HP or kW)",
+          "PurposeUseCase": "Power flow and demand calculations",
+          "NotesOrComments": "Can represent grouped motors"
+        },
+        {
+          "DeviceType": "Motor",
+          "PropertyName": "Rated Voltage (kV or V)",
+          "PurposeUseCase": "Voltage base alignment",
+          "NotesOrComments": "Should match bus base voltage"
+        },
+        {
+          "DeviceType": "Motor",
+          "PropertyName": "Full Load Current (FLA)",
+          "PurposeUseCase": "Defines kVA and current base",
+          "NotesOrComments": "Often derived automatically"
+        },
+        {
+          "DeviceType": "Motor",
+          "PropertyName": "Efficiency (%)",
+          "PurposeUseCase": "Relates real vs apparent power",
+          "NotesOrComments": "Used for loss modeling"
+        },
+        {
+          "DeviceType": "Motor",
+          "PropertyName": "Power Factor (%)",
+          "PurposeUseCase": "Splits kW and kVAR contributions",
+          "NotesOrComments": "Used in load flow and sizing"
+        },
+        {
+          "DeviceType": "Motor",
+          "PropertyName": "Speed (RPM)",
+          "PurposeUseCase": "Dynamic and slip modeling",
+          "NotesOrComments": "Used in torque/speed relationships"
+        },
+        {
+          "DeviceType": "Motor",
+          "PropertyName": "Poles",
+          "PurposeUseCase": "Determines synchronous speed",
+          "NotesOrComments": "Used in mechanical design linkage"
+        },
+        {
+          "DeviceType": "Motor",
+          "PropertyName": "Slip (%)",
+          "PurposeUseCase": "Affects torque and acceleration curves",
+          "NotesOrComments": "Used in dynamic motor modeling"
+        },
+        {
+          "DeviceType": "Motor",
+          "PropertyName": "Locked Rotor Current",
+          "PurposeUseCase": "Startup and inrush modeling",
+          "NotesOrComments": "Used for voltage drop/start studies"
+        },
+        {
+          "DeviceType": "Motor",
+          "PropertyName": "Locked Rotor Torque",
+          "PurposeUseCase": "Startup performance analysis",
+          "NotesOrComments": "Defines acceleration capability"
+        },
+        {
+          "DeviceType": "Motor",
+          "PropertyName": "Breakdown Torque",
+          "PurposeUseCase": "Stability under load",
+          "NotesOrComments": "Used in mechanical performance"
+        },
+        {
+          "DeviceType": "Motor",
+          "PropertyName": "Inertia (J or H)",
+          "PurposeUseCase": "Transient and stability simulations",
+          "NotesOrComments": "Represents stored kinetic energy"
+        },
+        {
+          "DeviceType": "Motor",
+          "PropertyName": "Transient Reactance (X’d)",
+          "PurposeUseCase": "Short circuit and stability studies",
+          "NotesOrComments": "For dynamic machine modeling"
+        },
+        {
+          "DeviceType": "Motor",
+          "PropertyName": "Subtransient Reactance (X”d)",
+          "PurposeUseCase": "Fault and transient current shaping",
+          "NotesOrComments": "Key for symmetrical components"
+        },
+        {
+          "DeviceType": "Motor",
+          "PropertyName": "Resistance (Ra)",
+          "PurposeUseCase": "Internal loss modeling",
+          "NotesOrComments": "Used in fault current derivations"
+        },
+        {
+          "DeviceType": "Motor",
+          "PropertyName": "X/R Ratio",
+          "PurposeUseCase": "Determines short-circuit asymmetry",
+          "NotesOrComments": "Used in peak current calc"
+        },
+        {
+          "DeviceType": "Motor",
+          "PropertyName": "Connection Type (Delta/Wye)",
+          "PurposeUseCase": "Defines grounding and impedance reference",
+          "NotesOrComments": "Essential for network model"
+        },
+        {
+          "DeviceType": "Motor",
+          "PropertyName": "Service Factor",
+          "PurposeUseCase": "Defines permissible overload",
+          "NotesOrComments": "Used for protection coordination"
+        },
+        {
+          "DeviceType": "Motor",
+          "PropertyName": "Grounding Type",
+          "PurposeUseCase": "Safety and fault current path",
+          "NotesOrComments": "Relevant to system grounding"
+        },
+        {
+          "DeviceType": "Motor",
+          "PropertyName": "Control Type (Across-line, Soft-start, VFD)",
+          "PurposeUseCase": "Defines starting behavior",
+          "NotesOrComments": "Used in starting analysis"
+        },
+        {
+          "DeviceType": "Motor",
+          "PropertyName": "Ambient Temp / Cooling",
+          "PurposeUseCase": "For derating and thermal limit",
+          "NotesOrComments": "Used in capacity analysis"
+        },
+        {
+          "DeviceType": "Motor",
+          "PropertyName": "Excitation/AVR Data (if synchronous)",
+          "PurposeUseCase": "Defines voltage regulation behavior",
+          "NotesOrComments": "Used in dynamic studies"
+        }
+      ]
     },
     {
       "type": "static_load",
