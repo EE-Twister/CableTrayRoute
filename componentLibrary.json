@@ -54,15 +54,120 @@
         "thevenin_mva": 500,
         "xr_ratio": 10,
         "grounding": "solid",
+        "source_voltage_base": 13.8,
+        "short_circuit_capacity": 500,
+        "source_impedance": "",
+        "sequence_impedances": "",
+        "frequency_hz": 60,
         "baseKV": 13.8,
         "kV": 13.8,
         "prefault_voltage": 13.8,
         "mva": 500,
+        "voltage_regulation_percent": 0,
+        "phase_angle": 0,
+        "max_mw_delivery": 0,
+        "losses_r_percent": 0,
+        "stability_response": "",
+        "transformer_impedance": "",
+        "operating_mode": "Infinite Bus",
+        "short_circuit_duration_cycles": 0,
         "enclosure": "open",
         "gap": 152,
         "working_distance": 1219,
         "electrode_config": "HOA"
-      }
+      },
+      "deviceProperties": [
+        {
+          "DeviceType": "Utility",
+          "PropertyName": "Source Voltage (kV)",
+          "PurposeUseCase": "Defines system base voltage",
+          "NotesOrComments": "Reference point of system"
+        },
+        {
+          "DeviceType": "Utility",
+          "PropertyName": "Short Circuit Capacity (MVA or kA)",
+          "PurposeUseCase": "Defines source strength",
+          "NotesOrComments": "Used for fault calc"
+        },
+        {
+          "DeviceType": "Utility",
+          "PropertyName": "Source Impedance (R + jX)",
+          "PurposeUseCase": "Sets Thevenin equivalent",
+          "NotesOrComments": "Core short circuit input"
+        },
+        {
+          "DeviceType": "Utility",
+          "PropertyName": "X/R Ratio",
+          "PurposeUseCase": "Defines DC offset and asymmetry",
+          "NotesOrComments": "Used for fault peak"
+        },
+        {
+          "DeviceType": "Utility",
+          "PropertyName": "Sequence Impedances (Z1,Z2,Z0)",
+          "PurposeUseCase": "For asymmetrical faults",
+          "NotesOrComments": "Required for detailed calc"
+        },
+        {
+          "DeviceType": "Utility",
+          "PropertyName": "Frequency (Hz)",
+          "PurposeUseCase": "System operating frequency",
+          "NotesOrComments": "Usually 50 or 60 Hz"
+        },
+        {
+          "DeviceType": "Utility",
+          "PropertyName": "Grounding Type (solid, resistive)",
+          "PurposeUseCase": "Defines earth fault characteristics",
+          "NotesOrComments": "Important for grounding model"
+        },
+        {
+          "DeviceType": "Utility",
+          "PropertyName": "Voltage Regulation (%)",
+          "PurposeUseCase": "Defines source voltage control range",
+          "NotesOrComments": "Used for load flow"
+        },
+        {
+          "DeviceType": "Utility",
+          "PropertyName": "Phase Angle",
+          "PurposeUseCase": "Reference for system phase",
+          "NotesOrComments": "Used for synchronization"
+        },
+        {
+          "DeviceType": "Utility",
+          "PropertyName": "Max MW Delivery",
+          "PurposeUseCase": "For power flow limit modeling",
+          "NotesOrComments": "Defines source constraint"
+        },
+        {
+          "DeviceType": "Utility",
+          "PropertyName": "Losses (R%)",
+          "PurposeUseCase": "For performance modeling",
+          "NotesOrComments": "Used for efficiency calc"
+        },
+        {
+          "DeviceType": "Utility",
+          "PropertyName": "Stability Response",
+          "PurposeUseCase": "Used in dynamic studies",
+          "NotesOrComments": "Defines voltage recovery"
+        },
+        {
+          "DeviceType": "Utility",
+          "PropertyName": "Transformer Impedance (if substation integrated)",
+          "PurposeUseCase": "Defines interface strength",
+          "NotesOrComments": "For network modeling"
+        },
+        {
+          "DeviceType": "Utility",
+          "PropertyName": "Operating Mode (infinite bus, finite grid)",
+          "PurposeUseCase": "Determines model behavior",
+          "NotesOrComments": "Impacts fault current"
+        },
+        {
+          "DeviceType": "Utility",
+          "PropertyName": "Short Circuit Duration (cycles)",
+          "PurposeUseCase": "For thermal withstand calc",
+          "NotesOrComments": "Time-dependent modeling"
+        }
+      ]
     },
     {
       "type": "transformer",
