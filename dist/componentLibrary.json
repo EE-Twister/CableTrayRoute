@@ -909,6 +909,92 @@
           "kvar": 0
         }
       },
+      "deviceProperties": [
+        {
+          "DeviceType": "Load",
+          "PropertyName": "Real Power (kW)",
+          "PurposeUseCase": "Power flow and demand modeling",
+          "NotesOrComments": "Defines active power"
+        },
+        {
+          "DeviceType": "Load",
+          "PropertyName": "Reactive Power (kVAR)",
+          "PurposeUseCase": "For power factor and voltage calc",
+          "NotesOrComments": "Used in VAR control"
+        },
+        {
+          "DeviceType": "Load",
+          "PropertyName": "Apparent Power (kVA)",
+          "PurposeUseCase": "Total load magnitude",
+          "NotesOrComments": "Used in S load calc"
+        },
+        {
+          "DeviceType": "Load",
+          "PropertyName": "Power Factor (PF)",
+          "PurposeUseCase": "Defines reactive component",
+          "NotesOrComments": "Used for sizing and correction"
+        },
+        {
+          "DeviceType": "Load",
+          "PropertyName": "Load Model Type (P, I, Z)",
+          "PurposeUseCase": "Defines behavior vs voltage",
+          "NotesOrComments": "Used for stability modeling"
+        },
+        {
+          "DeviceType": "Load",
+          "PropertyName": "Max Demand (kW)",
+          "PurposeUseCase": "For load flow limit",
+          "NotesOrComments": "Defines feeder sizing"
+        },
+        {
+          "DeviceType": "Load",
+          "PropertyName": "Demand Factor",
+          "PurposeUseCase": "Used for diversity and sizing",
+          "NotesOrComments": "Determines realistic load"
+        },
+        {
+          "DeviceType": "Load",
+          "PropertyName": "Load Growth Factor",
+          "PurposeUseCase": "Used for planning scenarios",
+          "NotesOrComments": "Applied in multi-year studies"
+        },
+        {
+          "DeviceType": "Load",
+          "PropertyName": "Harmonic Content (%THD)",
+          "PurposeUseCase": "For harmonic analysis",
+          "NotesOrComments": "Used for filter design"
+        },
+        {
+          "DeviceType": "Load",
+          "PropertyName": "Inrush/Starting Characteristics",
+          "PurposeUseCase": "For transient modeling",
+          "NotesOrComments": "Used for motor-type loads"
+        },
+        {
+          "DeviceType": "Load",
+          "PropertyName": "Min Load (kW)",
+          "PurposeUseCase": "Defines base load",
+          "NotesOrComments": "Used in stability margin"
+        },
+        {
+          "DeviceType": "Load",
+          "PropertyName": "Time-of-Day Profile",
+          "PurposeUseCase": "Used in dynamic simulation",
+          "NotesOrComments": "Defines daily profile"
+        },
+        {
+          "DeviceType": "Load",
+          "PropertyName": "Connection Type",
+          "PurposeUseCase": "Defines grounding path",
+          "NotesOrComments": "Relevant for fault studies"
+        },
+        {
+          "DeviceType": "Load",
+          "PropertyName": "Priority (Critical/Noncritical)",
+          "PurposeUseCase": "Used for shedding and reliability",
+          "NotesOrComments": "Used in contingency plans"
+        }
+      ],
       "ports": [
         {
           "x": 40,
