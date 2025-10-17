@@ -174,6 +174,7 @@ async function initCableSchedule() {
     {key:'cable_rating',label:'Cable Rating (V)',type:'number',group:'Electrical Characteristics',tooltip:'Maximum voltage rating'},
     {key:'operating_voltage',label:'Operating Voltage (V)',type:'number',group:'Electrical Characteristics',tooltip:'Nominal operating voltage'},
     {key:'est_load',label:'Est Load (A)',type:'number',group:'Electrical Characteristics',tooltip:'Estimated operating current'},
+    {key:'load_flow_current',label:'Load Flow Current (A)',type:'text',group:'Electrical Characteristics',tooltip:'Current captured from the latest load flow study'},
     {key:'duty_cycle',label:'Duty Cycle (%)',type:'number',group:'Electrical Characteristics',tooltip:'Duty cycle percentage'},
     {key:'length',label:'Length (ft)',type:'number',group:'Electrical Characteristics',tooltip:'Length of cable run'},
     {key:'calc_ampacity',label:'Calc Ampacity (A)',type:'number',group:'Electrical Characteristics',tooltip:'Ampacity after code factors'},
