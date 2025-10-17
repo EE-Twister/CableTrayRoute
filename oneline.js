@@ -273,6 +273,20 @@ const attributeDisplayOverrides = {
   z_lv_tv_percent: { label: 'Z LV-TV', unit: '%' },
   thevenin_mva: { label: 'Thevenin MVA', unit: 'MVA' },
   xr_ratio: { label: 'X/R Ratio', unit: '' },
+  source_voltage_base: { label: 'Source Voltage', unit: 'kV' },
+  short_circuit_capacity: { label: 'Short Circuit Capacity', unit: 'MVA' },
+  source_impedance: { label: 'Source Impedance (R + jX)', unit: '' },
+  sequence_impedances: { label: 'Sequence Impedances (Z1,Z2,Z0)', unit: '' },
+  frequency_hz: { label: 'Frequency', unit: 'Hz' },
+  grounding: { label: 'Grounding Type', unit: '' },
+  voltage_regulation_percent: { label: 'Voltage Regulation', unit: '%' },
+  phase_angle: { label: 'Phase Angle', unit: '°' },
+  max_mw_delivery: { label: 'Max MW Delivery', unit: 'MW' },
+  losses_r_percent: { label: 'Losses (R%)', unit: '%' },
+  stability_response: { label: 'Stability Response', unit: '' },
+  transformer_impedance: { label: 'Transformer Impedance', unit: '' },
+  operating_mode: { label: 'Operating Mode', unit: '' },
+  short_circuit_duration_cycles: { label: 'Short Circuit Duration', unit: 'cycles' },
   hp: { label: 'Horsepower', unit: 'HP' },
   pf: { label: 'Power Factor', unit: '' },
   service_factor: { label: 'Service Factor', unit: '' },
@@ -5549,7 +5563,65 @@ function selectComponent(compOrId) {
       load_torque_curve: 'Load Torque Curve (speed%:torque%)',
       primary_connection: 'Primary Connection',
       secondary_connection: 'Secondary Connection',
-      tertiary_connection: 'Tertiary Connection'
+      tertiary_connection: 'Tertiary Connection',
+      source_voltage_base: {
+        label: 'Source Voltage (kV)',
+        help: 'Defines system base voltage. Reference point of system.'
+      },
+      short_circuit_capacity: {
+        label: 'Short Circuit Capacity (MVA or kA)',
+        help: 'Defines source strength. Used for fault calc.'
+      },
+      source_impedance: {
+        label: 'Source Impedance (R + jX)',
+        help: 'Sets Thevenin equivalent. Core short circuit input.',
+        placeholder: '0.01 + j0.08'
+      },
+      sequence_impedances: {
+        label: 'Sequence Impedances (Z1,Z2,Z0)',
+        help: 'For asymmetrical faults. Required for detailed calc.',
+        placeholder: 'Z1=, Z2=, Z0='
+      },
+      frequency_hz: {
+        label: 'Frequency (Hz)',
+        help: 'System operating frequency. Usually 50 or 60 Hz.'
+      },
+      grounding: {
+        label: 'Grounding Type (solid, resistive)',
+        help: 'Defines earth fault characteristics. Important for grounding model.'
+      },
+      voltage_regulation_percent: {
+        label: 'Voltage Regulation (%)',
+        help: 'Defines source voltage control range. Used for load flow.'
+      },
+      phase_angle: {
+        label: 'Phase Angle',
+        help: 'Reference for system phase. Used for synchronization.'
+      },
+      max_mw_delivery: {
+        label: 'Max MW Delivery',
+        help: 'For power flow limit modeling. Defines source constraint.'
+      },
+      losses_r_percent: {
+        label: 'Losses (R%)',
+        help: 'For performance modeling. Used for efficiency calc.'
+      },
+      stability_response: {
+        label: 'Stability Response',
+        help: 'Used in dynamic studies. Defines voltage recovery.'
+      },
+      transformer_impedance: {
+        label: 'Transformer Impedance (if substation integrated)',
+        help: 'Defines interface strength. For network modeling.'
+      },
+      operating_mode: {
+        label: 'Operating Mode (infinite bus, finite grid)',
+        help: 'Determines model behavior. Impacts fault current.'
+      },
+      short_circuit_duration_cycles: {
+        label: 'Short Circuit Duration (cycles)',
+        help: 'For thermal withstand calc. Time-dependent modeling.'
+      }
     };
 
     let schema = rawSchema
@@ -5596,7 +5668,16 @@ function selectComponent(compOrId) {
           if (meta.help) next.help = meta.help;
         }
       } else if (generalLabelOverrides[next.name]) {
-        next.label = generalLabelOverrides[next.name];
+        const override = generalLabelOverrides[next.name];
+        if (typeof override === 'string') {
+          next.label = override;
+        } else if (override && typeof override === 'object') {
+          if (override.label) next.label = override.label;
+          if (override.type) next.type = override.type;
+          if (override.options) next.options = override.options;
+          if (override.placeholder) next.placeholder = override.placeholder;
+          if (override.help) next.help = override.help;
+        }
       }
       return next;
     });
