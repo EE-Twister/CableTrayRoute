@@ -819,7 +819,57 @@
         "gap": 32,
         "working_distance": 455,
         "electrode_config": "VCB"
-      }
+      },
+      "deviceProperties": [
+        {
+          "DeviceType": "Breaker",
+          "PropertyName": "Rated Current (A)",
+          "PurposeUseCase": "Defines continuous capacity",
+          "NotesOrComments": "Used for load calc"
+        },
+        {
+          "DeviceType": "Breaker",
+          "PropertyName": "Interrupting Rating (kA)",
+          "PurposeUseCase": "Defines max fault current",
+          "NotesOrComments": "Used for protection"
+        },
+        {
+          "DeviceType": "Breaker",
+          "PropertyName": "Trip Curve Type",
+          "PurposeUseCase": "Defines TCC behavior",
+          "NotesOrComments": "Used in coordination"
+        },
+        {
+          "DeviceType": "Breaker",
+          "PropertyName": "Pickup Setting (A)",
+          "PurposeUseCase": "Defines current threshold",
+          "NotesOrComments": "Used in relay settings"
+        },
+        {
+          "DeviceType": "Breaker",
+          "PropertyName": "Time Dial",
+          "PurposeUseCase": "Defines trip delay",
+          "NotesOrComments": "Used in TCC coordination"
+        },
+        {
+          "DeviceType": "Breaker",
+          "PropertyName": "Curve Family (Inverse/Definite)",
+          "PurposeUseCase": "Defines trip logic",
+          "NotesOrComments": "Used in protection coordination"
+        },
+        {
+          "DeviceType": "Breaker",
+          "PropertyName": "X/R Capability",
+          "PurposeUseCase": "Defines asymmetrical capacity",
+          "NotesOrComments": "Used in fault calc"
+        },
+        {
+          "DeviceType": "Breaker",
+          "PropertyName": "Arc Duration (ms)",
+          "PurposeUseCase": "Used for arc flash analysis",
+          "NotesOrComments": "Defines incident energy"
+        }
+      ]
     },
     {
       "type": "breaker",
@@ -845,7 +895,57 @@
         "gap": 102,
         "working_distance": 914,
         "electrode_config": "VCB"
-      }
+      },
+      "deviceProperties": [
+        {
+          "DeviceType": "Breaker",
+          "PropertyName": "Rated Current (A)",
+          "PurposeUseCase": "Defines continuous capacity",
+          "NotesOrComments": "Used for load calc"
+        },
+        {
+          "DeviceType": "Breaker",
+          "PropertyName": "Interrupting Rating (kA)",
+          "PurposeUseCase": "Defines max fault current",
+          "NotesOrComments": "Used for protection"
+        },
+        {
+          "DeviceType": "Breaker",
+          "PropertyName": "Trip Curve Type",
+          "PurposeUseCase": "Defines TCC behavior",
+          "NotesOrComments": "Used in coordination"
+        },
+        {
+          "DeviceType": "Breaker",
+          "PropertyName": "Pickup Setting (A)",
+          "PurposeUseCase": "Defines current threshold",
+          "NotesOrComments": "Used in relay settings"
+        },
+        {
+          "DeviceType": "Breaker",
+          "PropertyName": "Time Dial",
+          "PurposeUseCase": "Defines trip delay",
+          "NotesOrComments": "Used in TCC coordination"
+        },
+        {
+          "DeviceType": "Breaker",
+          "PropertyName": "Curve Family (Inverse/Definite)",
+          "PurposeUseCase": "Defines trip logic",
+          "NotesOrComments": "Used in protection coordination"
+        },
+        {
+          "DeviceType": "Breaker",
+          "PropertyName": "X/R Capability",
+          "PurposeUseCase": "Defines asymmetrical capacity",
+          "NotesOrComments": "Used in fault calc"
+        },
+        {
+          "DeviceType": "Breaker",
+          "PropertyName": "Arc Duration (ms)",
+          "PurposeUseCase": "Used for arc flash analysis",
+          "NotesOrComments": "Defines incident energy"
+        }
+      ]
     },
     {
       "type": "breaker",
@@ -871,7 +971,57 @@
         "gap": 152,
         "working_distance": 1219,
         "electrode_config": "VOA"
-      }
+      },
+      "deviceProperties": [
+        {
+          "DeviceType": "Breaker",
+          "PropertyName": "Rated Current (A)",
+          "PurposeUseCase": "Defines continuous capacity",
+          "NotesOrComments": "Used for load calc"
+        },
+        {
+          "DeviceType": "Breaker",
+          "PropertyName": "Interrupting Rating (kA)",
+          "PurposeUseCase": "Defines max fault current",
+          "NotesOrComments": "Used for protection"
+        },
+        {
+          "DeviceType": "Breaker",
+          "PropertyName": "Trip Curve Type",
+          "PurposeUseCase": "Defines TCC behavior",
+          "NotesOrComments": "Used in coordination"
+        },
+        {
+          "DeviceType": "Breaker",
+          "PropertyName": "Pickup Setting (A)",
+          "PurposeUseCase": "Defines current threshold",
+          "NotesOrComments": "Used in relay settings"
+        },
+        {
+          "DeviceType": "Breaker",
+          "PropertyName": "Time Dial",
+          "PurposeUseCase": "Defines trip delay",
+          "NotesOrComments": "Used in TCC coordination"
+        },
+        {
+          "DeviceType": "Breaker",
+          "PropertyName": "Curve Family (Inverse/Definite)",
+          "PurposeUseCase": "Defines trip logic",
+          "NotesOrComments": "Used in protection coordination"
+        },
+        {
+          "DeviceType": "Breaker",
+          "PropertyName": "X/R Capability",
+          "PurposeUseCase": "Defines asymmetrical capacity",
+          "NotesOrComments": "Used in fault calc"
+        },
+        {
+          "DeviceType": "Breaker",
+          "PropertyName": "Arc Duration (ms)",
+          "PurposeUseCase": "Used for arc flash analysis",
+          "NotesOrComments": "Defines incident energy"
+        }
+      ]
     },
     {
       "type": "fuse",
