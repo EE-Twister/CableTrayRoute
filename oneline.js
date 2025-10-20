@@ -851,6 +851,62 @@ const manufacturerModels = {
   Generac: ['G2000', 'Industrial']
 };
 
+function createCapacitorField(name, label, type, help) {
+  return {
+    name,
+    label,
+    type,
+    help,
+    getValue: comp => {
+      if (!comp) return '';
+      if (comp.props && Object.prototype.hasOwnProperty.call(comp.props, name)) {
+        return comp.props[name];
+      }
+      return comp[name] ?? '';
+    },
+    setValue: (comp, raw) => {
+      if (!comp) return;
+      let value;
+      if (type === 'number') {
+        if (raw === '' || raw === null || raw === undefined) {
+          value = '';
+        } else if (typeof raw === 'number' && Number.isFinite(raw)) {
+          value = raw;
+        } else {
+          const parsed = parseFloat(raw);
+          value = Number.isFinite(parsed) ? parsed : '';
+        }
+      } else {
+        value = raw ?? '';
+      }
+      if (!comp.props || typeof comp.props !== 'object') {
+        comp.props = { ...(comp.props || {}) };
+      }
+      comp.props[name] = value;
+      comp[name] = value;
+    }
+  };
+}
+
+const capacitorBankPropertyFields = [
+  createCapacitorField('rated_voltage_kv', 'Rated Voltage (kV)', 'number',
+    'Defines operating voltage. Used in power factor correction.'),
+  createCapacitorField('reactive_power_kvar', 'Reactive Power (kVAR)', 'number',
+    'Defines compensation capacity. Used in VAR support.'),
+  createCapacitorField('connection_type', 'Connection Type (Y or Δ)', 'text',
+    'Defines grounding scheme. Used in circuit calc.'),
+  createCapacitorField('steps', 'Steps (#)', 'number',
+    'Defines switching granularity. Used for control logic.'),
+  createCapacitorField('losses', 'Losses (W or %)', 'text',
+    'Defines dielectric loss. Used for heat calc.'),
+  createCapacitorField('discharge_resistor_mohm', 'Discharge Resistor (MΩ)', 'number',
+    'Defines safety discharge. Used in transient modeling.'),
+  createCapacitorField('harmonic_impedance', 'Harmonic Impedance', 'text',
+    'Defines frequency response. Used in harmonic study.'),
+  createCapacitorField('control_mode', 'Control Mode (manual/auto)', 'text',
+    'Defines operation behavior. Used in network control.')
+];
+
 
 function loadStoredCustomComponents() {
   const stored = getItem(customComponentStorageKey, [], customComponentScenarioKey);
@@ -876,6 +932,64 @@ function resolveIconSource(iconPath, fallbackSymbol) {
     return asset(`icons/components/${fallbackSymbol}.svg`);
   }
   return placeholderIcon;
+}
+
+
+function ensureCapacitorBankPropertyMetadata() {
+  const targets = new Set(['CapacitorBank', 'shunt_capacitor_bank']);
+  const ensureMetaDefaults = meta => {
+    if (!meta || typeof meta !== 'object') return;
+    if (!meta.props || typeof meta.props !== 'object') {
+      meta.props = { ...(meta.props || {}) };
+    }
+    capacitorBankPropertyFields.forEach(field => {
+      if (!Object.prototype.hasOwnProperty.call(meta.props, field.name)) {
+        meta.props[field.name] = '';
+      }
+    });
+  };
+  Object.entries(componentMeta).forEach(([key, meta]) => {
+    if (!meta || typeof meta !== 'object') return;
+    const subtype = (meta.subtype || '').trim();
+    const type = (meta.type || '').trim();
+    const category = (meta.category || '').trim();
+    if (subtype === 'CapacitorBank' || subtype === 'shunt_capacitor_bank') {
+      targets.add(subtype);
+      targets.add(key);
+      if (type) targets.add(compKey(type, subtype));
+      if (category) targets.add(compKey(category, subtype));
+      ensureMetaDefaults(meta);
+    }
+    if (type === 'shunt_capacitor_bank') {
+      targets.add(type);
+      if (subtype) targets.add(compKey(type, subtype));
+      targets.add(key);
+      ensureMetaDefaults(meta);
+    }
+  });
+  ['equipment', 'load', 'shunt_capacitor_bank'].forEach(type => {
+    targets.add(compKey(type, 'CapacitorBank'));
+  });
+  targets.forEach(key => {
+    if (!key) return;
+    const existing = Array.isArray(propSchemas[key]) ? [...propSchemas[key]] : [];
+    const nameMap = new Map(existing.map(field => [field.name, field]));
+    capacitorBankPropertyFields.forEach(field => {
+      const targetField = nameMap.get(field.name);
+      if (targetField) {
+        targetField.label = field.label;
+        targetField.type = field.type;
+        targetField.help = field.help;
+        if (!targetField.getValue) targetField.getValue = field.getValue;
+        if (!targetField.setValue) targetField.setValue = field.setValue;
+      } else {
+        const nextField = { ...field };
+        existing.push(nextField);
+        nameMap.set(field.name, nextField);
+      }
+    });
+    propSchemas[key] = existing;
+  });
 }
 
 
@@ -964,6 +1078,8 @@ async function loadComponentLibrary() {
   customDefinitions.forEach(def => registerDefinition(def));
 
   builtinComponents.forEach(def => registerDefinition(def, { allowOverride: false }));
+
+  ensureCapacitorBankPropertyMetadata();
 
   buildPalette();
   refreshAttributeOptions();
