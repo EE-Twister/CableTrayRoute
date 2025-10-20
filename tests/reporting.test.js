@@ -43,13 +43,25 @@ function it(name, fn){
   describe('label templates', () => {
     it('fills template with data', () => {
       const svg = generateArcFlashLabel({
-        equipment: 'MCC-1',
-        incidentEnergy: '5 cal/cm^2',
-        boundary: '3 ft'
+        signalWord: 'WARNING',
+        signalColor: '#f57c00',
+        equipmentTag: 'MCC-1',
+        voltage: '480 V',
+        incidentEnergy: '5 cal/cm² @ 1 ft 6 in',
+        workingDistance: '1 ft 6 in (457 mm)',
+        arcFlashBoundary: '3 ft (914 mm)',
+        limitedApproach: '3 ft 6 in (1067 mm)',
+        restrictedApproach: '1 ft (305 mm)',
+        upstreamDevice: 'Main Breaker',
+        ppeCategory: '2',
+        studyDate: '2024-01-15'
       });
+      assert(svg.includes('WARNING'));
       assert(svg.includes('MCC-1'));
-      assert(svg.includes('5 cal/cm^2'));
-      assert(svg.includes('3 ft'));
+      assert(svg.includes('5 cal/cm² @ 1 ft 6 in'));
+      assert(svg.includes('3 ft (914 mm)'));
+      assert(svg.includes('Main Breaker'));
+      assert(svg.includes('Study Date'));
     });
   });
   await Promise.all(pending);
