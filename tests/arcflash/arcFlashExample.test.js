@@ -43,6 +43,14 @@ global.localStorage = {
       assert(Math.abs(af.boundary - 463.6) < 1.5);
       assert.strictEqual(af.ppeCategory, 1);
       assert(Math.abs(af.clearingTime - 0.01) < 0.001);
+      assert.strictEqual(af.nominalVoltage, 480);
+      assert.strictEqual(af.workingDistance, 455);
+      assert.strictEqual(af.limitedApproach, 1067);
+      assert.strictEqual(af.restrictedApproach, 305);
+      assert.strictEqual(af.equipmentTag, 'BUS1');
+      assert.strictEqual(af.upstreamDevice, 'ABB Tmax T3 160A');
+      const today = new Date().toISOString().split('T')[0];
+      assert.strictEqual(af.studyDate, today);
     });
   });
 })();

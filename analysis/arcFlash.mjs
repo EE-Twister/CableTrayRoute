@@ -4,6 +4,101 @@ import { getOneLine, getItem } from '../dataStore.mjs';
 
 let deviceCache = null;
 
+function parseNumeric(value) {
+  if (value === undefined || value === null) return null;
+  if (typeof value === 'number') {
+    return Number.isFinite(value) ? value : null;
+  }
+  if (typeof value === 'string') {
+    const match = value.replace(/[\,\s]+/g, ' ').match(/[-+]?\d*\.?\d+(?:[eE][-+]?\d+)?/);
+    if (!match) return null;
+    const num = Number.parseFloat(match[0]);
+    return Number.isFinite(num) ? num : null;
+  }
+  return null;
+}
+
+function pickValue(comp, ...keys) {
+  if (!comp) return undefined;
+  for (const key of keys) {
+    if (!key) continue;
+    if (Object.prototype.hasOwnProperty.call(comp, key)) {
+      return comp[key];
+    }
+    if (comp.props && typeof comp.props === 'object' && Object.prototype.hasOwnProperty.call(comp.props, key)) {
+      return comp.props[key];
+    }
+  }
+  return undefined;
+}
+
+function toVolts(raw, key = '') {
+  const num = parseNumeric(raw);
+  if (num === null) return null;
+  const lowerKey = typeof key === 'string' ? key.toLowerCase() : '';
+  if (lowerKey.includes('kv')) return num * 1000;
+  if (num <= 1) return num * 1000;
+  if (num > 1000) return num;
+  if (lowerKey.includes('volts')) return num;
+  if (num > 300) return num;
+  if (num > 10 && lowerKey.includes('voltage')) return num;
+  return num * 1000;
+}
+
+function resolveVoltage(comp) {
+  const candidates = [
+    'voltage',
+    'volts',
+    'volts_primary',
+    'volts_secondary',
+    'volts_hv',
+    'volts_lv',
+    'volts_tv',
+    'source_voltage_base',
+    'kV',
+    'kv',
+    'baseKV',
+    'prefault_voltage',
+    'nominal_voltage'
+  ];
+  for (const key of candidates) {
+    const val = pickValue(comp, key);
+    if (val === undefined) continue;
+    const volts = toVolts(val, key);
+    if (Number.isFinite(volts) && volts > 0) return volts;
+  }
+  return null;
+}
+
+function computeApproachDistances(voltage) {
+  if (!Number.isFinite(voltage) || voltage <= 50) {
+    return { limited: null, restricted: null };
+  }
+  const table = [
+    { min: 50, max: 150, limited: 1067, restricted: null },
+    { min: 151, max: 750, limited: 1067, restricted: 305 },
+    { min: 751, max: 15000, limited: 1524, restricted: 432 },
+    { min: 15001, max: 36000, limited: 1829, restricted: 660 },
+    { min: 36001, max: 46000, limited: 2438, restricted: 787 },
+    { min: 46001, max: 72500, limited: 3048, restricted: 914 }
+  ];
+  const row = table.find(entry => voltage >= entry.min && voltage <= entry.max);
+  if (!row) return { limited: null, restricted: null };
+  return { limited: row.limited, restricted: row.restricted };
+}
+
+function resolveEquipmentTag(comp) {
+  return comp?.tag || comp?.ref || comp?.label || comp?.name || comp?.id || '';
+}
+
+function resolveUpstreamDevice(comp, devices) {
+  if (!comp?.tccId) return 'Not Specified';
+  const dev = devices.find(d => d.id === comp.tccId);
+  if (dev?.name) return dev.name;
+  if (dev?.vendor) return `${dev.vendor} ${dev.id}`;
+  return comp.tccId;
+}
+
 async function loadDevices() {
   if (deviceCache) return deviceCache;
   try {
@@ -94,6 +189,7 @@ function arcingCurrent(Ibf, V, gap, cfg, enclosure) {
  */
 export async function runArcFlash(options = {}) {
   const devices = await loadDevices();
+  const studyDate = new Date().toISOString().split('T')[0];
   let scOptions = {};
   if (options && typeof options === 'object') {
     if (options.shortCircuit && typeof options.shortCircuit === 'object') {
@@ -130,11 +226,20 @@ export async function runArcFlash(options = {}) {
     if (energy > 8) ppe = 3;
     if (energy > 25) ppe = 4;
     if (energy > 40) ppe = 5;
+    const voltage = resolveVoltage(comp);
+    const approaches = computeApproachDistances(voltage);
     results[comp.id] = {
       incidentEnergy: Number(energy.toFixed(2)),
       boundary: Number(boundary.toFixed(1)),
       ppeCategory: ppe,
-      clearingTime: Number(time.toFixed(3))
+      clearingTime: Number(time.toFixed(3)),
+      nominalVoltage: voltage,
+      workingDistance: Number(dist.toFixed(1)),
+      limitedApproach: approaches.limited,
+      restrictedApproach: approaches.restricted,
+      equipmentTag: resolveEquipmentTag(comp),
+      upstreamDevice: resolveUpstreamDevice(comp, devices),
+      studyDate
     };
   });
   return results;
