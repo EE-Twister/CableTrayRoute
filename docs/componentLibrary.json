@@ -1007,7 +1007,45 @@
         "shunt": {
           "kvar": -600
         }
-      }
+      },
+      "deviceProperties": [
+        {
+          "DeviceType": "Reactor",
+          "PropertyName": "Rated Voltage (kV)",
+          "PurposeUseCase": "Defines terminal voltage",
+          "NotesOrComments": "Used in impedance calc"
+        },
+        {
+          "DeviceType": "Reactor",
+          "PropertyName": "Rated MVAR",
+          "PurposeUseCase": "Defines reactive absorption",
+          "NotesOrComments": "Used in compensation"
+        },
+        {
+          "DeviceType": "Reactor",
+          "PropertyName": "Reactance (Ω or %)",
+          "PurposeUseCase": "Defines impedance",
+          "NotesOrComments": "Used for fault calc"
+        },
+        {
+          "DeviceType": "Reactor",
+          "PropertyName": "Losses (W or %)",
+          "PurposeUseCase": "Used for heat and efficiency calc",
+          "NotesOrComments": "Minor but relevant"
+        },
+        {
+          "DeviceType": "Reactor",
+          "PropertyName": "Connection Type (Y/Δ)",
+          "PurposeUseCase": "Defines phase configuration",
+          "NotesOrComments": "Grounding relevance"
+        },
+        {
+          "DeviceType": "Reactor",
+          "PropertyName": "Harmonic Impedance",
+          "PurposeUseCase": "Defines frequency characteristics",
+          "NotesOrComments": "Used for filter design"
+        }
+      ]
     },
     {
       "type": "generator",
