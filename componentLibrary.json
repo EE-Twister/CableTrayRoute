@@ -200,6 +200,128 @@
         "kV": 0.48,
         "prefault_voltage": 0.48
       },
+      "deviceProperties": [
+        {
+          "DeviceType": "Transformer",
+          "PropertyName": "Rated Power (kVA/MVA)",
+          "PurposeUseCase": "Defines load capacity",
+          "NotesOrComments": "Base sizing parameter"
+        },
+        {
+          "DeviceType": "Transformer",
+          "PropertyName": "Primary Voltage (kV)",
+          "PurposeUseCase": "Defines HV winding voltage",
+          "NotesOrComments": "Used for system connection"
+        },
+        {
+          "DeviceType": "Transformer",
+          "PropertyName": "Secondary Voltage (kV)",
+          "PurposeUseCase": "Defines LV winding voltage",
+          "NotesOrComments": "Used for load connection"
+        },
+        {
+          "DeviceType": "Transformer",
+          "PropertyName": "Connection Type (Δ/Y)",
+          "PurposeUseCase": "Defines vector group and grounding",
+          "NotesOrComments": "Determines phase shift"
+        },
+        {
+          "DeviceType": "Transformer",
+          "PropertyName": "Impedance (%Z)",
+          "PurposeUseCase": "Defines voltage drop and fault limit",
+          "NotesOrComments": "Usually nameplate data"
+        },
+        {
+          "DeviceType": "Transformer",
+          "PropertyName": "Resistance (%R)",
+          "PurposeUseCase": "For loss calc and R/X split",
+          "NotesOrComments": "Used in efficiency calc"
+        },
+        {
+          "DeviceType": "Transformer",
+          "PropertyName": "Reactance (%X)",
+          "PurposeUseCase": "For impedance modeling",
+          "NotesOrComments": "Used in fault calc"
+        },
+        {
+          "DeviceType": "Transformer",
+          "PropertyName": "No Load Loss (W)",
+          "PurposeUseCase": "For loss modeling",
+          "NotesOrComments": "Used in efficiency calc"
+        },
+        {
+          "DeviceType": "Transformer",
+          "PropertyName": "Load Loss (W)",
+          "PurposeUseCase": "Copper loss modeling",
+          "NotesOrComments": "Used in performance calc"
+        },
+        {
+          "DeviceType": "Transformer",
+          "PropertyName": "Magnetizing Current (%)",
+          "PurposeUseCase": "Defines magnetizing branch",
+          "NotesOrComments": "Used in inrush analysis"
+        },
+        {
+          "DeviceType": "Transformer",
+          "PropertyName": "Core Loss (W)",
+          "PurposeUseCase": "Used in thermal calc",
+          "NotesOrComments": "No-load component"
+        },
+        {
+          "DeviceType": "Transformer",
+          "PropertyName": "Taps (±%)",
+          "PurposeUseCase": "For regulation modeling",
+          "NotesOrComments": "Used in tap changer simulation"
+        },
+        {
+          "DeviceType": "Transformer",
+          "PropertyName": "Tap Step Size (%)",
+          "PurposeUseCase": "Defines voltage adjustment granularity",
+          "NotesOrComments": "Used in LTC control"
+        },
+        {
+          "DeviceType": "Transformer",
+          "PropertyName": "Tap Range (min-max)",
+          "PurposeUseCase": "Defines control band",
+          "NotesOrComments": "Used in voltage control"
+        },
+        {
+          "DeviceType": "Transformer",
+          "PropertyName": "Vector Group",
+          "PurposeUseCase": "Defines phase displacement",
+          "NotesOrComments": "Used in fault current direction"
+        },
+        {
+          "DeviceType": "Transformer",
+          "PropertyName": "Winding Resistance (Ohms)",
+          "PurposeUseCase": "For detailed modeling",
+          "NotesOrComments": "Loss calc"
+        },
+        {
+          "DeviceType": "Transformer",
+          "PropertyName": "Winding Leakage Reactance",
+          "PurposeUseCase": "Defines coupling strength",
+          "NotesOrComments": "Used in dynamic models"
+        },
+        {
+          "DeviceType": "Transformer",
+          "PropertyName": "Cooling Type (ONAN/ONAF)",
+          "PurposeUseCase": "Thermal limit modeling",
+          "NotesOrComments": "Used for overload studies"
+        },
+        {
+          "DeviceType": "Transformer",
+          "PropertyName": "Overexcitation Limit (%)",
+          "PurposeUseCase": "Used in protection modeling",
+          "NotesOrComments": "Prevents core damage"
+        },
+        {
+          "DeviceType": "Transformer",
+          "PropertyName": "Inrush Current Multiplier",
+          "PurposeUseCase": "Used for transient calc",
+          "NotesOrComments": "For energization analysis"
+        }
+      ],
       "ports": [
         {
           "x": 0,
@@ -234,6 +356,128 @@
         "kV": 13.8,
         "prefault_voltage": 13.8
       },
+      "deviceProperties": [
+        {
+          "DeviceType": "Transformer",
+          "PropertyName": "Rated Power (kVA/MVA)",
+          "PurposeUseCase": "Defines load capacity",
+          "NotesOrComments": "Base sizing parameter"
+        },
+        {
+          "DeviceType": "Transformer",
+          "PropertyName": "Primary Voltage (kV)",
+          "PurposeUseCase": "Defines HV winding voltage",
+          "NotesOrComments": "Used for system connection"
+        },
+        {
+          "DeviceType": "Transformer",
+          "PropertyName": "Secondary Voltage (kV)",
+          "PurposeUseCase": "Defines LV winding voltage",
+          "NotesOrComments": "Used for load connection"
+        },
+        {
+          "DeviceType": "Transformer",
+          "PropertyName": "Connection Type (Δ/Y)",
+          "PurposeUseCase": "Defines vector group and grounding",
+          "NotesOrComments": "Determines phase shift"
+        },
+        {
+          "DeviceType": "Transformer",
+          "PropertyName": "Impedance (%Z)",
+          "PurposeUseCase": "Defines voltage drop and fault limit",
+          "NotesOrComments": "Usually nameplate data"
+        },
+        {
+          "DeviceType": "Transformer",
+          "PropertyName": "Resistance (%R)",
+          "PurposeUseCase": "For loss calc and R/X split",
+          "NotesOrComments": "Used in efficiency calc"
+        },
+        {
+          "DeviceType": "Transformer",
+          "PropertyName": "Reactance (%X)",
+          "PurposeUseCase": "For impedance modeling",
+          "NotesOrComments": "Used in fault calc"
+        },
+        {
+          "DeviceType": "Transformer",
+          "PropertyName": "No Load Loss (W)",
+          "PurposeUseCase": "For loss modeling",
+          "NotesOrComments": "Used in efficiency calc"
+        },
+        {
+          "DeviceType": "Transformer",
+          "PropertyName": "Load Loss (W)",
+          "PurposeUseCase": "Copper loss modeling",
+          "NotesOrComments": "Used in performance calc"
+        },
+        {
+          "DeviceType": "Transformer",
+          "PropertyName": "Magnetizing Current (%)",
+          "PurposeUseCase": "Defines magnetizing branch",
+          "NotesOrComments": "Used in inrush analysis"
+        },
+        {
+          "DeviceType": "Transformer",
+          "PropertyName": "Core Loss (W)",
+          "PurposeUseCase": "Used in thermal calc",
+          "NotesOrComments": "No-load component"
+        },
+        {
+          "DeviceType": "Transformer",
+          "PropertyName": "Taps (±%)",
+          "PurposeUseCase": "For regulation modeling",
+          "NotesOrComments": "Used in tap changer simulation"
+        },
+        {
+          "DeviceType": "Transformer",
+          "PropertyName": "Tap Step Size (%)",
+          "PurposeUseCase": "Defines voltage adjustment granularity",
+          "NotesOrComments": "Used in LTC control"
+        },
+        {
+          "DeviceType": "Transformer",
+          "PropertyName": "Tap Range (min-max)",
+          "PurposeUseCase": "Defines control band",
+          "NotesOrComments": "Used in voltage control"
+        },
+        {
+          "DeviceType": "Transformer",
+          "PropertyName": "Vector Group",
+          "PurposeUseCase": "Defines phase displacement",
+          "NotesOrComments": "Used in fault current direction"
+        },
+        {
+          "DeviceType": "Transformer",
+          "PropertyName": "Winding Resistance (Ohms)",
+          "PurposeUseCase": "For detailed modeling",
+          "NotesOrComments": "Loss calc"
+        },
+        {
+          "DeviceType": "Transformer",
+          "PropertyName": "Winding Leakage Reactance",
+          "PurposeUseCase": "Defines coupling strength",
+          "NotesOrComments": "Used in dynamic models"
+        },
+        {
+          "DeviceType": "Transformer",
+          "PropertyName": "Cooling Type (ONAN/ONAF)",
+          "PurposeUseCase": "Thermal limit modeling",
+          "NotesOrComments": "Used for overload studies"
+        },
+        {
+          "DeviceType": "Transformer",
+          "PropertyName": "Overexcitation Limit (%)",
+          "PurposeUseCase": "Used in protection modeling",
+          "NotesOrComments": "Prevents core damage"
+        },
+        {
+          "DeviceType": "Transformer",
+          "PropertyName": "Inrush Current Multiplier",
+          "PurposeUseCase": "Used for transient calc",
+          "NotesOrComments": "For energization analysis"
+        }
+      ],
       "ports": [
         {
           "x": 0,
@@ -267,6 +511,128 @@
         "kV": 13.8,
         "prefault_voltage": 13.8
       },
+      "deviceProperties": [
+        {
+          "DeviceType": "Transformer",
+          "PropertyName": "Rated Power (kVA/MVA)",
+          "PurposeUseCase": "Defines load capacity",
+          "NotesOrComments": "Base sizing parameter"
+        },
+        {
+          "DeviceType": "Transformer",
+          "PropertyName": "Primary Voltage (kV)",
+          "PurposeUseCase": "Defines HV winding voltage",
+          "NotesOrComments": "Used for system connection"
+        },
+        {
+          "DeviceType": "Transformer",
+          "PropertyName": "Secondary Voltage (kV)",
+          "PurposeUseCase": "Defines LV winding voltage",
+          "NotesOrComments": "Used for load connection"
+        },
+        {
+          "DeviceType": "Transformer",
+          "PropertyName": "Connection Type (Δ/Y)",
+          "PurposeUseCase": "Defines vector group and grounding",
+          "NotesOrComments": "Determines phase shift"
+        },
+        {
+          "DeviceType": "Transformer",
+          "PropertyName": "Impedance (%Z)",
+          "PurposeUseCase": "Defines voltage drop and fault limit",
+          "NotesOrComments": "Usually nameplate data"
+        },
+        {
+          "DeviceType": "Transformer",
+          "PropertyName": "Resistance (%R)",
+          "PurposeUseCase": "For loss calc and R/X split",
+          "NotesOrComments": "Used in efficiency calc"
+        },
+        {
+          "DeviceType": "Transformer",
+          "PropertyName": "Reactance (%X)",
+          "PurposeUseCase": "For impedance modeling",
+          "NotesOrComments": "Used in fault calc"
+        },
+        {
+          "DeviceType": "Transformer",
+          "PropertyName": "No Load Loss (W)",
+          "PurposeUseCase": "For loss modeling",
+          "NotesOrComments": "Used in efficiency calc"
+        },
+        {
+          "DeviceType": "Transformer",
+          "PropertyName": "Load Loss (W)",
+          "PurposeUseCase": "Copper loss modeling",
+          "NotesOrComments": "Used in performance calc"
+        },
+        {
+          "DeviceType": "Transformer",
+          "PropertyName": "Magnetizing Current (%)",
+          "PurposeUseCase": "Defines magnetizing branch",
+          "NotesOrComments": "Used in inrush analysis"
+        },
+        {
+          "DeviceType": "Transformer",
+          "PropertyName": "Core Loss (W)",
+          "PurposeUseCase": "Used in thermal calc",
+          "NotesOrComments": "No-load component"
+        },
+        {
+          "DeviceType": "Transformer",
+          "PropertyName": "Taps (±%)",
+          "PurposeUseCase": "For regulation modeling",
+          "NotesOrComments": "Used in tap changer simulation"
+        },
+        {
+          "DeviceType": "Transformer",
+          "PropertyName": "Tap Step Size (%)",
+          "PurposeUseCase": "Defines voltage adjustment granularity",
+          "NotesOrComments": "Used in LTC control"
+        },
+        {
+          "DeviceType": "Transformer",
+          "PropertyName": "Tap Range (min-max)",
+          "PurposeUseCase": "Defines control band",
+          "NotesOrComments": "Used in voltage control"
+        },
+        {
+          "DeviceType": "Transformer",
+          "PropertyName": "Vector Group",
+          "PurposeUseCase": "Defines phase displacement",
+          "NotesOrComments": "Used in fault current direction"
+        },
+        {
+          "DeviceType": "Transformer",
+          "PropertyName": "Winding Resistance (Ohms)",
+          "PurposeUseCase": "For detailed modeling",
+          "NotesOrComments": "Loss calc"
+        },
+        {
+          "DeviceType": "Transformer",
+          "PropertyName": "Winding Leakage Reactance",
+          "PurposeUseCase": "Defines coupling strength",
+          "NotesOrComments": "Used in dynamic models"
+        },
+        {
+          "DeviceType": "Transformer",
+          "PropertyName": "Cooling Type (ONAN/ONAF)",
+          "PurposeUseCase": "Thermal limit modeling",
+          "NotesOrComments": "Used for overload studies"
+        },
+        {
+          "DeviceType": "Transformer",
+          "PropertyName": "Overexcitation Limit (%)",
+          "PurposeUseCase": "Used in protection modeling",
+          "NotesOrComments": "Prevents core damage"
+        },
+        {
+          "DeviceType": "Transformer",
+          "PropertyName": "Inrush Current Multiplier",
+          "PurposeUseCase": "Used for transient calc",
+          "NotesOrComments": "For energization analysis"
+        }
+      ],
       "ports": [
         {
           "x": 0,
@@ -296,6 +662,128 @@
         "kV": 0.48,
         "prefault_voltage": 0.48
       },
+      "deviceProperties": [
+        {
+          "DeviceType": "Transformer",
+          "PropertyName": "Rated Power (kVA/MVA)",
+          "PurposeUseCase": "Defines load capacity",
+          "NotesOrComments": "Base sizing parameter"
+        },
+        {
+          "DeviceType": "Transformer",
+          "PropertyName": "Primary Voltage (kV)",
+          "PurposeUseCase": "Defines HV winding voltage",
+          "NotesOrComments": "Used for system connection"
+        },
+        {
+          "DeviceType": "Transformer",
+          "PropertyName": "Secondary Voltage (kV)",
+          "PurposeUseCase": "Defines LV winding voltage",
+          "NotesOrComments": "Used for load connection"
+        },
+        {
+          "DeviceType": "Transformer",
+          "PropertyName": "Connection Type (Δ/Y)",
+          "PurposeUseCase": "Defines vector group and grounding",
+          "NotesOrComments": "Determines phase shift"
+        },
+        {
+          "DeviceType": "Transformer",
+          "PropertyName": "Impedance (%Z)",
+          "PurposeUseCase": "Defines voltage drop and fault limit",
+          "NotesOrComments": "Usually nameplate data"
+        },
+        {
+          "DeviceType": "Transformer",
+          "PropertyName": "Resistance (%R)",
+          "PurposeUseCase": "For loss calc and R/X split",
+          "NotesOrComments": "Used in efficiency calc"
+        },
+        {
+          "DeviceType": "Transformer",
+          "PropertyName": "Reactance (%X)",
+          "PurposeUseCase": "For impedance modeling",
+          "NotesOrComments": "Used in fault calc"
+        },
+        {
+          "DeviceType": "Transformer",
+          "PropertyName": "No Load Loss (W)",
+          "PurposeUseCase": "For loss modeling",
+          "NotesOrComments": "Used in efficiency calc"
+        },
+        {
+          "DeviceType": "Transformer",
+          "PropertyName": "Load Loss (W)",
+          "PurposeUseCase": "Copper loss modeling",
+          "NotesOrComments": "Used in performance calc"
+        },
+        {
+          "DeviceType": "Transformer",
+          "PropertyName": "Magnetizing Current (%)",
+          "PurposeUseCase": "Defines magnetizing branch",
+          "NotesOrComments": "Used in inrush analysis"
+        },
+        {
+          "DeviceType": "Transformer",
+          "PropertyName": "Core Loss (W)",
+          "PurposeUseCase": "Used in thermal calc",
+          "NotesOrComments": "No-load component"
+        },
+        {
+          "DeviceType": "Transformer",
+          "PropertyName": "Taps (±%)",
+          "PurposeUseCase": "For regulation modeling",
+          "NotesOrComments": "Used in tap changer simulation"
+        },
+        {
+          "DeviceType": "Transformer",
+          "PropertyName": "Tap Step Size (%)",
+          "PurposeUseCase": "Defines voltage adjustment granularity",
+          "NotesOrComments": "Used in LTC control"
+        },
+        {
+          "DeviceType": "Transformer",
+          "PropertyName": "Tap Range (min-max)",
+          "PurposeUseCase": "Defines control band",
+          "NotesOrComments": "Used in voltage control"
+        },
+        {
+          "DeviceType": "Transformer",
+          "PropertyName": "Vector Group",
+          "PurposeUseCase": "Defines phase displacement",
+          "NotesOrComments": "Used in fault current direction"
+        },
+        {
+          "DeviceType": "Transformer",
+          "PropertyName": "Winding Resistance (Ohms)",
+          "PurposeUseCase": "For detailed modeling",
+          "NotesOrComments": "Loss calc"
+        },
+        {
+          "DeviceType": "Transformer",
+          "PropertyName": "Winding Leakage Reactance",
+          "PurposeUseCase": "Defines coupling strength",
+          "NotesOrComments": "Used in dynamic models"
+        },
+        {
+          "DeviceType": "Transformer",
+          "PropertyName": "Cooling Type (ONAN/ONAF)",
+          "PurposeUseCase": "Thermal limit modeling",
+          "NotesOrComments": "Used for overload studies"
+        },
+        {
+          "DeviceType": "Transformer",
+          "PropertyName": "Overexcitation Limit (%)",
+          "PurposeUseCase": "Used in protection modeling",
+          "NotesOrComments": "Prevents core damage"
+        },
+        {
+          "DeviceType": "Transformer",
+          "PropertyName": "Inrush Current Multiplier",
+          "PurposeUseCase": "Used for transient calc",
+          "NotesOrComments": "For energization analysis"
+        }
+      ],
       "ports": [
         {
           "x": 0,
