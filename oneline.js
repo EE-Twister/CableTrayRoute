@@ -5840,6 +5840,7 @@ function selectComponent(compOrId) {
 
     let manufacturerInput = null;
     let modelInput = null;
+    let tccInput = null;
 
     const form = document.createElement('form');
     form.id = 'prop-form';
@@ -5848,7 +5849,9 @@ function selectComponent(compOrId) {
 
     const buildField = (f, container) => {
       const lbl = document.createElement('label');
-      lbl.textContent = f.label + ' ';
+      const labelHeader = document.createElement('span');
+      labelHeader.className = 'prop-field-label';
+      labelHeader.textContent = f.label;
       let input;
       const defVal = manufacturerDefaults[targetComp.subtype]?.[f.name] || '';
       let curVal;
@@ -5869,10 +5872,12 @@ function selectComponent(compOrId) {
       if (f.type === 'select') {
         input = document.createElement('select');
         (f.options || []).forEach(opt => {
+          const optionValue = typeof opt === 'object' ? opt.value ?? opt.label ?? '' : opt;
+          const optionLabel = typeof opt === 'object' ? opt.label ?? opt.value ?? '' : opt;
           const o = document.createElement('option');
-          o.value = opt;
-          o.textContent = opt;
-          if (curVal == opt) o.selected = true;
+          o.value = optionValue;
+          o.textContent = optionLabel;
+          if ((curVal ?? '') == optionValue) o.selected = true;
           input.appendChild(o);
         });
       } else if (f.type === 'textarea') {
@@ -5894,14 +5899,18 @@ function selectComponent(compOrId) {
       if (f.placeholder) input.placeholder = f.placeholder;
       if (f.name === 'manufacturer') manufacturerInput = input;
       if (f.name === 'model') modelInput = input;
-      lbl.appendChild(input);
+      if (f.name === 'tccId') tccInput = input;
       if (f.help) {
-        lbl.appendChild(document.createElement('br'));
-        const help = document.createElement('small');
-        help.className = 'prop-field-help';
-        help.textContent = f.help;
-        lbl.appendChild(help);
+        const helpBtn = document.createElement('button');
+        helpBtn.type = 'button';
+        helpBtn.className = 'prop-help-btn';
+        helpBtn.title = f.help;
+        helpBtn.setAttribute('aria-label', f.help);
+        helpBtn.textContent = '?';
+        labelHeader.appendChild(helpBtn);
       }
+      lbl.appendChild(labelHeader);
+      lbl.appendChild(input);
       container.appendChild(lbl);
     };
 
@@ -5946,6 +5955,21 @@ function selectComponent(compOrId) {
       );
     }
 
+    const tccOptions = [
+      { value: '', label: '--Select Device--' },
+      ...protectiveDevices.map(dev => ({ value: dev.id, label: dev.name }))
+    ];
+    fields.push({
+      name: 'tccId',
+      label: 'TCC Device',
+      type: 'select',
+      options: tccOptions,
+      getValue: comp => comp.tccId || '',
+      setValue: (comp, value) => {
+        comp.tccId = value || '';
+      }
+    });
+
     const applyChanges = () => {
       if (hasApplied) return;
       hasApplied = true;
@@ -5961,33 +5985,173 @@ function selectComponent(compOrId) {
     };
     modal._applyChanges = applyChanges;
 
+    const baseFieldNames = new Set(baseFields.map(f => f.name));
     const manufacturerFields = [];
     const noteFields = [];
     const electricalFields = [];
     const motorStartFields = [];
+    const generalFields = [];
     const motorStartFieldNames = ['inrushMultiple', 'thevenin_r', 'thevenin_x', 'inertia', 'load_torque_curve'];
     fields.forEach(f => {
       if (targetComp.subtype === 'motor_load' && motorStartFieldNames.includes(f.name)) {
         motorStartFields.push(f);
       } else if (['manufacturer', 'model'].includes(f.name)) manufacturerFields.push(f);
       else if (['notes', 'failure_modes'].includes(f.name)) noteFields.push(f);
+      else if (baseFieldNames.has(f.name) || f.name === 'tccId') generalFields.push(f);
       else electricalFields.push(f);
     });
 
-    const addFieldset = (legendText, fieldArr) => {
-      if (!fieldArr.length) return;
+    const createFieldset = (legendText, fieldArr) => {
       const fs = document.createElement('fieldset');
-      const legend = document.createElement('legend');
-      legend.textContent = legendText;
-      fs.appendChild(legend);
-      fieldArr.forEach(f => buildField(f, fs));
-      form.appendChild(fs);
+      if (legendText) {
+        const legend = document.createElement('legend');
+        legend.textContent = legendText;
+        fs.appendChild(legend);
+      }
+      fieldArr.forEach(field => buildField(field, fs));
+      return fs;
     };
 
-    addFieldset('Manufacturer', manufacturerFields);
-    addFieldset('Electrical', electricalFields);
-    addFieldset('Motor Start', motorStartFields);
-    addFieldset('Notes', noteFields);
+    const tabList = document.createElement('div');
+    tabList.className = 'prop-tabs';
+    tabList.setAttribute('role', 'tablist');
+    form.appendChild(tabList);
+
+    const tabPanels = document.createElement('div');
+    tabPanels.className = 'prop-tab-panels';
+    form.appendChild(tabPanels);
+
+    const tabs = [];
+    const tabMap = new Map();
+
+    const activateTab = id => {
+      tabs.forEach(tab => {
+        const isSelected = tab.id === id;
+        tab.button.setAttribute('aria-selected', isSelected ? 'true' : 'false');
+        tab.button.tabIndex = isSelected ? 0 : -1;
+        tab.panel.hidden = !isSelected;
+      });
+    };
+
+    const focusTabAt = index => {
+      if (!tabs.length) return;
+      const normalized = ((index % tabs.length) + tabs.length) % tabs.length;
+      const tab = tabs[normalized];
+      activateTab(tab.id);
+      tab.button.focus();
+    };
+
+    const createTabSection = (id, label, legendText, fieldArr, options = {}) => {
+      const hasFields = Array.isArray(fieldArr) && fieldArr.length > 0;
+      if (!options.force && !hasFields) return null;
+      const tabButton = document.createElement('button');
+      tabButton.type = 'button';
+      tabButton.className = 'prop-tab';
+      tabButton.id = `prop-tab-${id}`;
+      tabButton.textContent = label;
+      tabButton.setAttribute('role', 'tab');
+      tabButton.setAttribute('aria-selected', 'false');
+      tabButton.setAttribute('aria-controls', `prop-tab-panel-${id}`);
+      tabButton.tabIndex = -1;
+      tabList.appendChild(tabButton);
+
+      const panel = document.createElement('div');
+      panel.className = 'prop-tab-panel';
+      panel.id = `prop-tab-panel-${id}`;
+      panel.setAttribute('role', 'tabpanel');
+      panel.setAttribute('aria-labelledby', tabButton.id);
+      panel.hidden = true;
+      if (hasFields) panel.appendChild(createFieldset(legendText, fieldArr));
+      tabPanels.appendChild(panel);
+
+      const tabRecord = { id, button: tabButton, panel };
+      tabs.push(tabRecord);
+      tabMap.set(id, tabRecord);
+
+      tabButton.addEventListener('click', () => {
+        activateTab(id);
+      });
+      tabButton.addEventListener('keydown', e => {
+        if (e.key === 'ArrowRight') {
+          e.preventDefault();
+          focusTabAt(tabs.findIndex(t => t.id === id) + 1);
+        } else if (e.key === 'ArrowLeft') {
+          e.preventDefault();
+          focusTabAt(tabs.findIndex(t => t.id === id) - 1);
+        }
+      });
+
+      return tabRecord;
+    };
+
+    createTabSection('general', 'General', 'General', generalFields);
+    createTabSection('electrical', 'Electrical', 'Electrical', electricalFields);
+    createTabSection('motor', 'Motor Start', 'Motor Start', motorStartFields);
+    createTabSection('manufacturer', 'Manufacturer', 'Manufacturer', manufacturerFields);
+    createTabSection('notes', 'Notes', 'Notes', noteFields);
+
+    const getTabPanel = id => tabMap.get(id)?.panel || tabs[0]?.panel || null;
+
+    const connectionCount = Array.isArray(targetComp.connections) ? targetComp.connections.length : 0;
+    if (connectionCount > 0) {
+      const connectionsTab = createTabSection('connections', 'Connections', null, [], { force: true });
+      if (connectionsTab) {
+        const header = document.createElement('h3');
+        header.textContent = 'Connections';
+        connectionsTab.panel.appendChild(header);
+        const list = document.createElement('ul');
+        list.className = 'prop-connection-list';
+        (targetComp.connections || []).forEach((conn, idx) => {
+          const li = document.createElement('li');
+          const target = components.find(t => t.id === conn.target);
+          const span = document.createElement('span');
+          const cableInfo = getCableForConnection(targetComp, target, conn);
+          const cableLabel = cableInfo?.tag || cableInfo?.cable_type;
+          span.textContent = `to ${target?.label || target?.subtype || conn.target}${cableLabel ? ` (${cableLabel})` : ''}`;
+          li.appendChild(span);
+          const edit = document.createElement('button');
+          edit.type = 'button';
+          edit.textContent = 'Edit';
+          edit.classList.add('btn');
+          edit.addEventListener('click', async e => {
+            e.stopPropagation();
+            const cableComp = targetComp.type === 'cable' ? targetComp : target?.type === 'cable' ? target : null;
+            if (cableComp) {
+              await editCableComponent(cableComp);
+              renderPropertiesFor(targetComp);
+            } else {
+              showToast('No cable component on this connection');
+            }
+          });
+          li.appendChild(edit);
+          const del = document.createElement('button');
+          del.type = 'button';
+          del.textContent = 'Delete';
+          del.classList.add('btn');
+          del.addEventListener('click', e => {
+            e.stopPropagation();
+            targetComp.connections.splice(idx, 1);
+            pushHistory();
+            render();
+            save();
+            renderPropertiesFor(targetComp);
+          });
+          li.appendChild(del);
+          li.addEventListener('click', () => {
+            selectedConnection = { component: targetComp, index: idx };
+          });
+          list.appendChild(li);
+        });
+        connectionsTab.panel.appendChild(list);
+      }
+    }
+
+    if (tabs.length) {
+      activateTab(tabs[0].id);
+    } else {
+      tabList.remove();
+      tabPanels.remove();
+    }
 
     if (manufacturerInput && modelInput) {
       const updateModels = () => {
@@ -6006,81 +6170,22 @@ function selectComponent(compOrId) {
       updateModels();
     }
 
-    const tccLbl = document.createElement('label');
-    tccLbl.textContent = 'TCC Device ';
-    const tccInput = document.createElement('select');
-    tccInput.name = 'tccId';
-    const optEmpty = document.createElement('option');
-    optEmpty.value = '';
-    optEmpty.textContent = '--Select Device--';
-    tccInput.appendChild(optEmpty);
-    protectiveDevices.forEach(dev => {
-      const opt = document.createElement('option');
-      opt.value = dev.id;
-      opt.textContent = dev.name;
-      if (targetComp.tccId === dev.id) opt.selected = true;
-      tccInput.appendChild(opt);
-    });
-    tccLbl.appendChild(tccInput);
-    form.appendChild(tccLbl);
-
-    const tccBtn = document.createElement('button');
-    tccBtn.type = 'button';
-    tccBtn.textContent = 'Edit TCC';
-    tccBtn.classList.add('btn');
-    tccBtn.addEventListener('click', () => {
-      const dev = tccInput.value ? `&device=${encodeURIComponent(tccInput.value)}` : '';
-      window.open(`tcc.html?component=${encodeURIComponent(targetComp.id)}${dev}`, '_blank');
-    });
-    form.appendChild(tccBtn);
-
-    if ((targetComp.connections || []).length) {
-      const header = document.createElement('h3');
-      header.textContent = 'Connections';
-      form.appendChild(header);
-      const list = document.createElement('ul');
-      (targetComp.connections || []).forEach((conn, idx) => {
-        const li = document.createElement('li');
-        const target = components.find(t => t.id === conn.target);
-        const span = document.createElement('span');
-        const cableInfo = getCableForConnection(targetComp, target, conn);
-        const cableLabel = cableInfo?.tag || cableInfo?.cable_type;
-        span.textContent = `to ${target?.label || target?.subtype || conn.target}${cableLabel ? ` (${cableLabel})` : ''}`;
-        li.appendChild(span);
-        const edit = document.createElement('button');
-        edit.type = 'button';
-        edit.textContent = 'Edit';
-        edit.classList.add('btn');
-        edit.addEventListener('click', async e => {
-          e.stopPropagation();
-          const cableComp = targetComp.type === 'cable' ? targetComp : target?.type === 'cable' ? target : null;
-          if (cableComp) {
-            await editCableComponent(cableComp);
-            renderPropertiesFor(targetComp);
-          } else {
-            showToast('No cable component on this connection');
-          }
+    if (tccInput) {
+      const generalPanel = getTabPanel('general');
+      if (generalPanel) {
+        const tccActions = document.createElement('div');
+        tccActions.className = 'prop-tab-actions';
+        const tccBtn = document.createElement('button');
+        tccBtn.type = 'button';
+        tccBtn.textContent = 'Edit TCC';
+        tccBtn.classList.add('btn');
+        tccBtn.addEventListener('click', () => {
+          const dev = tccInput.value ? `&device=${encodeURIComponent(tccInput.value)}` : '';
+          window.open(`tcc.html?component=${encodeURIComponent(targetComp.id)}${dev}`, '_blank');
         });
-        li.appendChild(edit);
-        const del = document.createElement('button');
-        del.type = 'button';
-        del.textContent = 'Delete';
-        del.classList.add('btn');
-        del.addEventListener('click', e => {
-          e.stopPropagation();
-          targetComp.connections.splice(idx, 1);
-          pushHistory();
-          render();
-          save();
-          renderPropertiesFor(targetComp);
-        });
-        li.appendChild(del);
-        li.addEventListener('click', () => {
-          selectedConnection = { component: targetComp, index: idx };
-        });
-        list.appendChild(li);
-      });
-      form.appendChild(list);
+        tccActions.appendChild(tccBtn);
+        generalPanel.appendChild(tccActions);
+      }
     }
 
     const actions = document.createElement('div');
