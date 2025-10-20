@@ -1510,7 +1510,69 @@
         "mva": 1.0,
         "thevenin_mva": 1.0,
         "pf": 1.0
-      }
+      },
+      "deviceProperties": [
+        {
+          "DeviceType": "Inverter/DG",
+          "PropertyName": "Rated Power (kW/MW)",
+          "PurposeUseCase": "Defines generation capacity",
+          "NotesOrComments": "Used for load flow"
+        },
+        {
+          "DeviceType": "Inverter/DG",
+          "PropertyName": "Rated Voltage (kV)",
+          "PurposeUseCase": "Defines interconnection",
+          "NotesOrComments": "Used for grid tie"
+        },
+        {
+          "DeviceType": "Inverter/DG",
+          "PropertyName": "PF Control Capability",
+          "PurposeUseCase": "Defines VAR range",
+          "NotesOrComments": "Used in VAR optimization"
+        },
+        {
+          "DeviceType": "Inverter/DG",
+          "PropertyName": "Efficiency (%)",
+          "PurposeUseCase": "Used for loss modeling",
+          "NotesOrComments": "Power balance"
+        },
+        {
+          "DeviceType": "Inverter/DG",
+          "PropertyName": "Harmonic Emission (%THD)",
+          "PurposeUseCase": "Used for harmonic analysis",
+          "NotesOrComments": "Compliance check"
+        },
+        {
+          "DeviceType": "Inverter/DG",
+          "PropertyName": "Fault Contribution (% or kA)",
+          "PurposeUseCase": "Defines short circuit behavior",
+          "NotesOrComments": "Used in protection"
+        },
+        {
+          "DeviceType": "Inverter/DG",
+          "PropertyName": "Ride Through Settings",
+          "PurposeUseCase": "Defines grid stability compliance",
+          "NotesOrComments": "Used for dynamic modeling"
+        },
+        {
+          "DeviceType": "Inverter/DG",
+          "PropertyName": "Control Mode (PQ or PV)",
+          "PurposeUseCase": "Defines operational strategy",
+          "NotesOrComments": "Used for dispatch"
+        },
+        {
+          "DeviceType": "Inverter/DG",
+          "PropertyName": "Response Time (ms)",
+          "PurposeUseCase": "Defines dynamic behavior",
+          "NotesOrComments": "Used for frequency studies"
+        },
+        {
+          "DeviceType": "Inverter/DG",
+          "PropertyName": "Grounding Type",
+          "PurposeUseCase": "Defines reference and safety",
+          "NotesOrComments": "Used for fault modeling"
+        }
+      ]
     },
     {
       "type": "ups",
