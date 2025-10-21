@@ -56,7 +56,9 @@ export function openModal(options = {}) {
     render,
     initialFocusSelector,
     variant,
-    closeLabel = 'Close dialog'
+    closeLabel = 'Close dialog',
+    resizable = false,
+    defaultWidth
   } = options;
 
   return new Promise(resolve => {
@@ -80,6 +82,13 @@ export function openModal(options = {}) {
     content.className = 'modal-content';
     if (variant) {
       content.dataset.variant = variant;
+    }
+    if (resizable) {
+      content.classList.add('modal-resizable');
+    }
+    if (defaultWidth !== null && defaultWidth !== undefined) {
+      const widthValue = typeof defaultWidth === 'number' ? `${defaultWidth}px` : String(defaultWidth);
+      content.style.width = widthValue;
     }
 
     const closeBtn = doc.createElement('button');

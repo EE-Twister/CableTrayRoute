@@ -69,6 +69,30 @@ const LIBRARY_FALLBACK_GROUP = 'Library Devices';
 const OTHER_MANUFACTURER_GROUP = 'Other Manufacturers';
 const OVERLAY_GROUP_SET = new Set([...Object.values(OVERLAY_GROUP_LABELS), SYSTEM_OVERLAY_GROUP]);
 
+const TYPE_LABEL_OVERRIDES = {
+  'lv breaker': 'LV Breaker',
+  'mv breaker': 'MV Breaker',
+  'hv breaker': 'HV Breaker',
+  ats: 'ATS',
+  ups: 'UPS'
+};
+
+const TYPE_PRIORITY = new Map([
+  ['lv breaker', -6],
+  ['mv breaker', -5],
+  ['breaker', -4],
+  ['fuse', -3],
+  ['relay', -2],
+  ['recloser', -1],
+  ['contactor', 0],
+  ['switch', 1],
+  ['transformer', 2],
+  ['motor', 3],
+  ['cable', 4],
+  ['system', 5],
+  ['other', 6]
+]);
+
 let saved = getItem('tccSettings') || {};
 if (!Array.isArray(saved.devices)) saved.devices = [];
 if (!saved.settings || typeof saved.settings !== 'object') saved.settings = {};
@@ -480,6 +504,7 @@ function buildComponentEntries() {
       name: `${component.label || component.name || base.name || component.type}${sheetName ? ` (${sheetName})` : ''}`,
       baseDeviceId: base.id,
       baseDevice: base,
+      deviceCategory: base.type || '',
       componentId: component.id,
       sheetName,
       overrideSource: overrides
@@ -499,6 +524,7 @@ function buildLibraryEntries() {
       baseDeviceId: dev.id,
       baseDevice: dev,
       deviceType: dev.type || '',
+      deviceCategory: dev.type || '',
       overrideSource: snapOverridesToOptions(dev, saved.settings?.[dev.id] || {})
     }))
     .sort((a, b) => a.name.localeCompare(b.name, undefined, { sensitivity: 'base' }));
@@ -551,9 +577,12 @@ function buildTransformerInrushEntries(targetId) {
       uid: `inrush:${neighbor.id}:${targetId}`,
       kind: 'inrush',
       name: `${componentLabel(neighbor)} Inrush`,
+      deviceCategory: 'transformer',
+      deviceType: 'transformer inrush',
       current: inrush.current,
       duration: inrush.duration,
       sourceId: neighbor.id,
+      sourceLabel: componentLabel(neighbor),
       autoSelect: true
     });
   });
@@ -575,8 +604,11 @@ function buildTransformerDamageEntries(targetId) {
       uid: `transformer-damage:${neighbor.id}:${targetId}`,
       kind: 'transformerDamage',
       name: `${componentLabel(neighbor)} Damage`,
+      deviceCategory: 'transformer',
+      deviceType: 'transformer damage',
       curve: damage.curve,
       fla: damage.fla,
+      sourceLabel: componentLabel(neighbor),
       autoSelect: true
     });
   });
@@ -603,8 +635,12 @@ function buildCableEntries(targetId) {
         uid: `cable:${tag}`,
         kind: 'cable',
         name: `${cableInfo.tag || 'Cable'} Damage${other ? ` (${componentLabel(source)} → ${componentLabel(other)})` : ''}`,
+        deviceCategory: 'cable',
+        deviceType: 'cable damage',
         curve: curve.curve,
         ampacity: curve.ampacity,
+        sourceLabel: componentLabel(source),
+        targetLabel: other ? componentLabel(other) : '',
         autoSelect: true
       });
     });
@@ -627,10 +663,13 @@ function buildMotorStartingEntries(targetId) {
       uid: `motor-start:${neighbor.id}:${targetId}`,
       kind: 'motorStart',
       name: `${componentLabel(neighbor)} Motor Starting`,
+      deviceCategory: 'motor',
+      deviceType: 'motor starting',
       curve: metrics.curve,
       fla: metrics.fla,
       lockedRotor: metrics.lockedRotor,
       startTime: metrics.startTime,
+      sourceLabel: componentLabel(neighbor),
       autoSelect: true
     });
   });
@@ -675,26 +714,95 @@ function getManufacturerLabel(entry) {
   return OVERLAY_GROUP_LABELS[entry.kind] || SYSTEM_OVERLAY_GROUP;
 }
 
-function buildManufacturerGroups() {
+function normalizeTypeKey(value) {
+  if (value === null || value === undefined) return 'other';
+  const str = String(value).trim();
+  if (!str) return 'other';
+  return str.toLowerCase().replace(/[_\s-]+/g, ' ');
+}
+
+function resolveTypeLabel(rawValue) {
+  const normalized = normalizeTypeKey(rawValue);
+  if (TYPE_LABEL_OVERRIDES[normalized]) {
+    return TYPE_LABEL_OVERRIDES[normalized];
+  }
+  if (!rawValue || !String(rawValue).trim()) {
+    return 'Other Devices';
+  }
+  return formatOptionLabel(rawValue);
+}
+
+function resolveTypePriority(rawValue) {
+  const normalized = normalizeTypeKey(rawValue);
+  if (TYPE_PRIORITY.has(normalized)) {
+    return TYPE_PRIORITY.get(normalized);
+  }
+  if (normalized.includes('breaker')) return -3;
+  if (normalized.includes('relay')) return -2;
+  if (normalized.includes('transformer')) return 2;
+  if (normalized.includes('motor')) return 3;
+  if (normalized.includes('cable')) return 4;
+  return TYPE_PRIORITY.get('other');
+}
+
+function getTypeInfo(entry) {
+  if (!entry) {
+    return { id: 'other', label: 'Other Devices', priority: TYPE_PRIORITY.get('other') };
+  }
+  const base = entry.baseDevice || {};
+  const category = entry.deviceCategory || base.type || entry.deviceType || entry.kind || 'other';
+  const normalized = normalizeTypeKey(category);
+  return {
+    id: normalized,
+    label: resolveTypeLabel(category),
+    priority: resolveTypePriority(category)
+  };
+}
+
+function buildTypeGroups() {
   const groups = new Map();
   deviceEntries.forEach(entry => {
-    const label = getManufacturerLabel(entry);
-    if (!groups.has(label)) {
-      groups.set(label, []);
+    const typeInfo = getTypeInfo(entry);
+    if (!groups.has(typeInfo.id)) {
+      groups.set(typeInfo.id, {
+        id: typeInfo.id,
+        label: typeInfo.label,
+        priority: typeInfo.priority,
+        manufacturers: new Map(),
+        total: 0
+      });
     }
-    groups.get(label).push(entry);
+    const group = groups.get(typeInfo.id);
+    const manufacturerName = getManufacturerLabel(entry);
+    if (!group.manufacturers.has(manufacturerName)) {
+      group.manufacturers.set(manufacturerName, {
+        name: manufacturerName,
+        entries: [],
+        priority: manufacturerPriority(manufacturerName)
+      });
+    }
+    group.manufacturers.get(manufacturerName).entries.push(entry);
+    group.total += 1;
   });
-  return [...groups.entries()]
-    .map(([name, entries]) => ({
-      name,
-      entries: entries
-        .slice()
-        .sort((a, b) => a.name.localeCompare(b.name, undefined, { sensitivity: 'base' })),
-      priority: manufacturerPriority(name)
+
+  return [...groups.values()]
+    .map(group => ({
+      ...group,
+      manufacturers: [...group.manufacturers.values()]
+        .map(manufacturer => ({
+          ...manufacturer,
+          entries: manufacturer.entries
+            .slice()
+            .sort((a, b) => a.name.localeCompare(b.name, undefined, { sensitivity: 'base' }))
+        }))
+        .sort((a, b) => {
+          if (a.priority !== b.priority) return a.priority - b.priority;
+          return a.name.localeCompare(b.name, undefined, { sensitivity: 'base' });
+        })
     }))
     .sort((a, b) => {
       if (a.priority !== b.priority) return a.priority - b.priority;
-      return a.name.localeCompare(b.name, undefined, { sensitivity: 'base' });
+      return a.label.localeCompare(b.label, undefined, { sensitivity: 'base' });
     });
 }
 
@@ -775,10 +883,16 @@ function renderDeviceDetails(entry, container, doc) {
   }
 
   const base = entry.baseDevice || {};
-  const typeLabel = base.type || entry.deviceType;
+  const typeLabel = entry.deviceType || base.type;
   if (typeLabel) appendMeta('Type', formatOptionLabel(typeLabel));
   if (base.interruptRating !== undefined) {
     appendMeta('Interrupt Rating', `${formatSettingValue(base.interruptRating)} kA`);
+  }
+  if (entry.kind === 'inrush' || entry.kind === 'transformerDamage' || entry.kind === 'motorStart') {
+    appendMeta('Component', entry.sourceLabel || entry.sourceId || 'Associated Component');
+  } else if (entry.kind === 'cable') {
+    appendMeta('From', entry.sourceLabel || 'Source');
+    appendMeta('To', entry.targetLabel || 'Destination');
   }
   if (entry.autoSelect) {
     appendMeta('Auto Selection', 'Added automatically when analyzing the linked component.');
@@ -828,8 +942,8 @@ function renderDeviceDetails(entry, container, doc) {
 }
 
 async function openDeviceSelectionModal() {
-  const manufacturerGroups = buildManufacturerGroups();
-  if (!manufacturerGroups.length) {
+  const typeGroups = buildTypeGroups();
+  if (!typeGroups.length) {
     await openModal({
       title: 'Select Devices',
       primaryText: 'Close',
@@ -849,14 +963,31 @@ async function openDeviceSelectionModal() {
 
   const initialSelection = new Set(selectedDeviceIds());
   const selectionSet = new Set(initialSelection);
-  const preferredGroup = manufacturerGroups.find(group =>
-    group.entries.some(entry => selectionSet.has(entry.uid))
-  );
-  let activeManufacturer = preferredGroup?.name || manufacturerGroups[0].name;
-  let activeEntry = preferredGroup?.entries.find(entry => selectionSet.has(entry.uid))
-    || manufacturerGroups[0].entries[0]
+
+  const findSelectedContext = () => {
+    for (const group of typeGroups) {
+      for (const manufacturer of group.manufacturers) {
+        const entry = manufacturer.entries.find(item => selectionSet.has(item.uid));
+        if (entry) {
+          return { group, manufacturer, entry };
+        }
+      }
+    }
+    return null;
+  };
+
+  const selectedContext = findSelectedContext();
+  let activeTypeId = selectedContext?.group?.id || typeGroups[0]?.id || null;
+  let activeManufacturer = selectedContext?.manufacturer?.name
+    || (typeGroups.find(group => group.id === activeTypeId)?.manufacturers[0]?.name)
+    || null;
+  let activeEntry = selectedContext?.entry
+    || (typeGroups.find(group => group.id === activeTypeId)?.manufacturers.find(m => m.name === activeManufacturer)?.entries[0])
     || null;
 
+  const getActiveTypeGroup = () => typeGroups.find(group => group.id === activeTypeId) || typeGroups[0] || null;
+
+  let typeContainer;
   let manufacturerContainer;
   let modelContainer;
   let detailContainer;
@@ -873,19 +1004,61 @@ async function openDeviceSelectionModal() {
     renderDeviceDetails(entry, detailContainer, docRef.current);
   }
 
+  function renderDeviceTypes() {
+    if (!typeContainer || !docRef.current) return;
+    typeContainer.innerHTML = '';
+    firstButtonRef.current = firstButtonRef.current && docRef.current.contains(firstButtonRef.current)
+      ? firstButtonRef.current
+      : null;
+    typeGroups.forEach(group => {
+      const button = docRef.current.createElement('button');
+      button.type = 'button';
+      button.className = 'device-type-btn';
+      if (group.id === activeTypeId) button.classList.add('active');
+      button.textContent = `${group.label} (${group.total})`;
+      button.addEventListener('click', () => {
+        activeTypeId = group.id;
+        const selectedInGroup = group.manufacturers
+          .map(manufacturer => ({ manufacturer, entry: manufacturer.entries.find(item => selectionSet.has(item.uid)) }))
+          .find(result => result && result.entry);
+        const fallbackManufacturer = group.manufacturers[0]?.name || null;
+        activeManufacturer = selectedInGroup?.manufacturer?.name || fallbackManufacturer;
+        activeEntry = selectedInGroup?.entry
+          || (group.manufacturers.find(manufacturer => manufacturer.name === activeManufacturer)?.entries[0] || null);
+        renderDeviceTypes();
+        renderManufacturers();
+        renderModels();
+        updateActiveEntry(activeEntry);
+      });
+      if (!firstButtonRef.current) firstButtonRef.current = button;
+      typeContainer.appendChild(button);
+    });
+  }
+
   function renderManufacturers() {
     if (!manufacturerContainer || !docRef.current) return;
     manufacturerContainer.innerHTML = '';
-    manufacturerGroups.forEach(group => {
+    const group = getActiveTypeGroup();
+    if (!group || !group.manufacturers.length) {
+      const empty = docRef.current.createElement('p');
+      empty.className = 'device-detail-empty';
+      empty.textContent = 'No manufacturers available for this device type.';
+      manufacturerContainer.appendChild(empty);
+      return;
+    }
+    if (!group.manufacturers.some(manufacturer => manufacturer.name === activeManufacturer)) {
+      activeManufacturer = group.manufacturers[0].name;
+    }
+    group.manufacturers.forEach(manufacturer => {
       const button = docRef.current.createElement('button');
       button.type = 'button';
       button.className = 'device-manufacturer-btn';
-      if (group.name === activeManufacturer) button.classList.add('active');
-      button.textContent = `${group.name} (${group.entries.length})`;
+      if (manufacturer.name === activeManufacturer) button.classList.add('active');
+      button.textContent = `${manufacturer.name} (${manufacturer.entries.length})`;
       button.addEventListener('click', () => {
-        activeManufacturer = group.name;
-        const selectedInGroup = group.entries.find(entry => selectionSet.has(entry.uid));
-        activeEntry = selectedInGroup || group.entries[0] || null;
+        activeManufacturer = manufacturer.name;
+        const selectedInGroup = manufacturer.entries.find(entry => selectionSet.has(entry.uid));
+        activeEntry = selectedInGroup || manufacturer.entries[0] || null;
         renderManufacturers();
         renderModels();
         updateActiveEntry(activeEntry);
@@ -899,8 +1072,18 @@ async function openDeviceSelectionModal() {
     if (!modelContainer || !docRef.current) return;
     modelElements.clear();
     modelContainer.innerHTML = '';
-    const group = manufacturerGroups.find(g => g.name === activeManufacturer);
-    if (!group || !group.entries.length) {
+    const group = getActiveTypeGroup();
+    if (!group) {
+      const empty = docRef.current.createElement('p');
+      empty.className = 'device-detail-empty';
+      empty.textContent = 'No devices available for this type.';
+      modelContainer.appendChild(empty);
+      updateActiveEntry(null);
+      return;
+    }
+    const manufacturer = group.manufacturers.find(m => m.name === activeManufacturer)
+      || group.manufacturers[0];
+    if (!manufacturer || !manufacturer.entries.length) {
       const empty = docRef.current.createElement('p');
       empty.className = 'device-detail-empty';
       empty.textContent = 'No models available for this manufacturer.';
@@ -908,10 +1091,10 @@ async function openDeviceSelectionModal() {
       updateActiveEntry(null);
       return;
     }
-    if (!group.entries.some(entry => entry.uid === (activeEntry && activeEntry.uid))) {
-      activeEntry = group.entries.find(entry => selectionSet.has(entry.uid)) || group.entries[0] || null;
+    if (!manufacturer.entries.some(entry => entry.uid === (activeEntry && activeEntry.uid))) {
+      activeEntry = manufacturer.entries.find(entry => selectionSet.has(entry.uid)) || manufacturer.entries[0] || null;
     }
-    group.entries.forEach((entry, index) => {
+    manufacturer.entries.forEach((entry, index) => {
       const item = docRef.current.createElement('div');
       item.className = 'device-model-item';
       if (activeEntry && activeEntry.uid === entry.uid) {
@@ -963,6 +1146,8 @@ async function openDeviceSelectionModal() {
     description: 'Choose protective devices to include on the TCC chart.',
     primaryText: 'Done',
     secondaryText: 'Cancel',
+    resizable: true,
+    defaultWidth: 960,
     closeOnBackdrop: false,
     onSubmit() {
       applySelectionSet(selectionSet, { persist: true });
@@ -981,6 +1166,15 @@ async function openDeviceSelectionModal() {
       const leftPane = doc.createElement('div');
       leftPane.className = 'device-selection-left';
 
+      const typesHeading = doc.createElement('h3');
+      typesHeading.className = 'device-selection-subtitle';
+      typesHeading.textContent = 'Device Types';
+      leftPane.appendChild(typesHeading);
+
+      typeContainer = doc.createElement('div');
+      typeContainer.className = 'device-type-list';
+      leftPane.appendChild(typeContainer);
+
       const manufacturersHeading = doc.createElement('h3');
       manufacturersHeading.className = 'device-selection-subtitle';
       manufacturersHeading.textContent = 'Manufacturers';
@@ -992,7 +1186,7 @@ async function openDeviceSelectionModal() {
 
       const modelsHeading = doc.createElement('h3');
       modelsHeading.className = 'device-selection-subtitle';
-      modelsHeading.textContent = 'Models';
+      modelsHeading.textContent = 'Devices';
       leftPane.appendChild(modelsHeading);
 
       modelContainer = doc.createElement('div');
@@ -1005,6 +1199,7 @@ async function openDeviceSelectionModal() {
       layout.append(leftPane, detailContainer);
       container.appendChild(layout);
 
+      renderDeviceTypes();
       renderManufacturers();
       renderModels();
       updateActiveEntry(activeEntry);
