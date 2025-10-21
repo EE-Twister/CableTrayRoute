@@ -120,8 +120,11 @@ export function scaleCurve(device = {}, overrides = {}) {
   const pickup = firstDefined(
     overrides.pickup,
     overrides.longTimePickup,
+    overrides.ampRating,
     combinedBase.pickup,
     combinedBase.longTimePickup,
+    combinedBase.ampRating,
+    device.ampRating,
     1
   );
   const time = firstDefined(
@@ -162,7 +165,13 @@ export function scaleCurve(device = {}, overrides = {}) {
     device.instantaneousMax
   );
 
-  const basePickup = firstDefined(combinedBase.pickup, combinedBase.longTimePickup, 1);
+  const basePickup = firstDefined(
+    combinedBase.pickup,
+    combinedBase.longTimePickup,
+    combinedBase.ampRating,
+    device.ampRating,
+    1
+  );
   const baseTime = firstDefined(combinedBase.time, combinedBase.delay, combinedBase.longTimeDelay, 1);
   const scaleI = basePickup ? pickup / basePickup : 1;
   const scaleT = baseTime ? time / baseTime : 1;
