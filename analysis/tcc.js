@@ -51,6 +51,9 @@ let deviceGroups = [];
 let componentRecords = [];
 let componentLookup = new Map();
 let neighborMap = new Map();
+let componentDeviceMap = new Map();
+
+const MAX_NEIGHBOR_DEPTH = 4;
 
 let saved = getItem('tccSettings') || {};
 if (!Array.isArray(saved.devices)) saved.devices = [];
@@ -299,8 +302,9 @@ async function init() {
   const available = new Set(deviceEntries.map(entry => entry.uid));
   const defaults = new Set((saved.devices || []).filter(id => available.has(id)));
   if (compId) {
-    const compEntry = deviceEntries.find(entry => entry.kind === 'component' && entry.componentId === compId);
+    const compEntry = componentDeviceMap.get(compId);
     if (compEntry) defaults.add(compEntry.uid);
+    collectNeighborDeviceDefaults(compId).forEach(id => defaults.add(id));
   }
   if (deviceParam) {
     const libraryEntry = deviceEntries.find(entry => entry.kind === 'library' && entry.baseDeviceId === deviceParam);
@@ -351,6 +355,15 @@ function buildComponentData() {
       lookup.set(comp.id, { component: comp, sheetName });
       neighbors.set(comp.id, new Set());
     });
+    (sheet?.connections || []).forEach(conn => {
+      if (!conn) return;
+      const from = conn.from ?? conn.source ?? conn.a ?? conn.start ?? null;
+      const to = conn.to ?? conn.target ?? conn.b ?? conn.end ?? null;
+      if (!from || !to) return;
+      if (!lookup.has(from) || !lookup.has(to)) return;
+      neighbors.get(from)?.add(to);
+      neighbors.get(to)?.add(from);
+    });
   });
   records.forEach(({ component }) => {
     (component.connections || []).forEach(conn => {
@@ -384,7 +397,13 @@ function rebuildCatalog() {
   }
 
   deviceEntries = deviceGroups.flatMap(group => group.items);
-  deviceEntries.forEach(entry => deviceMap.set(entry.uid, entry));
+  componentDeviceMap = new Map();
+  deviceEntries.forEach(entry => {
+    deviceMap.set(entry.uid, entry);
+    if (entry.kind === 'component' && entry.componentId) {
+      componentDeviceMap.set(entry.componentId, entry);
+    }
+  });
 
   renderDeviceList();
 }
@@ -433,6 +452,28 @@ function buildOverlayEntries() {
   overlays.push(...buildCableEntries(compId));
   overlays.push(...buildMotorStartingEntries(compId));
   return overlays;
+}
+
+function collectNeighborDeviceDefaults(targetId, depthLimit = MAX_NEIGHBOR_DEPTH) {
+  const defaults = new Set();
+  if (!targetId || !neighborMap.has(targetId)) return defaults;
+  const visited = new Set([targetId]);
+  const queue = [{ id: targetId, depth: 0 }];
+  while (queue.length) {
+    const { id, depth } = queue.shift();
+    const neighbors = neighborMap.get(id);
+    if (!neighbors || !neighbors.size) continue;
+    neighbors.forEach(neighborId => {
+      if (visited.has(neighborId)) return;
+      visited.add(neighborId);
+      const entry = componentDeviceMap.get(neighborId);
+      if (entry) defaults.add(entry.uid);
+      if (depth + 1 < depthLimit) {
+        queue.push({ id: neighborId, depth: depth + 1 });
+      }
+    });
+  }
+  return defaults;
 }
 
 function buildTransformerInrushEntries(targetId) {
