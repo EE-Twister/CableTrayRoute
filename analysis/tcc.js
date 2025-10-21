@@ -64,6 +64,7 @@ let componentRecords = [];
 let componentLookup = new Map();
 let neighborMap = new Map();
 let componentDeviceMap = new Map();
+let pendingPlotRefresh = null;
 
 const MAX_NEIGHBOR_DEPTH = 4;
 
@@ -1555,14 +1556,44 @@ deviceSelect.addEventListener('change', () => {
   renderSettings();
   persistSettings();
 });
-plotBtn.addEventListener('click', () => {
-  plot();
-  persistSettings();
-});
+plotBtn.addEventListener('click', applyPlotAndPersistence);
+if (settingsDiv) {
+  const handleSettingMutation = event => {
+    const target = event.target;
+    if (!target) return;
+    const fieldSource = target.dataset?.field
+      ? target
+      : (typeof target.closest === 'function' ? target.closest('[data-field]') : null);
+    if (!fieldSource || !fieldSource.dataset?.field) return;
+    requestPlotRefresh();
+  };
+  settingsDiv.addEventListener('input', handleSettingMutation);
+  settingsDiv.addEventListener('change', handleSettingMutation);
+}
 linkBtn.addEventListener('click', linkComponent);
 openBtn.addEventListener('click', () => {
   if (compId) window.open(`oneline.html?component=${encodeURIComponent(compId)}`, '_blank');
 });
+
+function applyPlotAndPersistence() {
+  plot();
+  persistSettings();
+}
+
+function requestPlotRefresh() {
+  if (typeof requestAnimationFrame !== 'function') {
+    applyPlotAndPersistence();
+    return;
+  }
+  if (pendingPlotRefresh !== null && typeof cancelAnimationFrame === 'function') {
+    cancelAnimationFrame(pendingPlotRefresh);
+  }
+  pendingPlotRefresh = requestAnimationFrame(() => {
+    pendingPlotRefresh = null;
+    applyPlotAndPersistence();
+  });
+}
+
 if (componentModalBtn) {
   componentModalBtn.addEventListener('click', () => {
     openComponentBrowserModal();
