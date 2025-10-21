@@ -21,14 +21,14 @@ function it(name, fn){
       const data = {
         equipment: [{ id: 'E1', name: 'Motor' }],
         analyses: { loadFlow: [{ id: 'B1', Vm: 1 }] },
-        arcFlash: { BUS1: { incidentEnergy: 1, boundary: 2 } }
+        arcFlash: { BUS1: { incidentEnergy: 1, boundary: 2, equipmentTag: 'Main Switchboard' } }
       };
       const zip = buildReportZip(data);
       const files = Object.keys(zip.files);
       assert(files.includes('reports.pdf'));
       assert(files.includes('equipment_schedule.csv'));
       assert(files.includes('loadflow_analysis.csv'));
-      assert(files.includes('arcflash_BUS1.svg'));
+      assert(files.includes('Main_Switchboard.svg'));
     });
   });
 })();

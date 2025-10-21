@@ -4,6 +4,26 @@ import { getOneLine, getItem } from '../dataStore.mjs';
 
 let deviceCache = null;
 
+const PROTECTIVE_TYPES = new Set(['breaker', 'fuse', 'relay', 'recloser', 'contactor', 'switch']);
+const FALLBACK_TYPES = new Set(['motor_load', 'static_load', 'load', 'panel', 'equipment', 'bus', 'cable', 'mcc']);
+const UPSTREAM_CANDIDATE_TYPES = new Set([
+  'transformer',
+  'panel',
+  'equipment',
+  'bus',
+  'utility_source',
+  'generator',
+  'pv_inverter',
+  'mcc',
+  'feeder',
+  'breaker',
+  'fuse',
+  'relay',
+  'recloser',
+  'contactor',
+  'switch'
+]);
+
 function parseNumeric(value) {
   if (value === undefined || value === null) return null;
   if (typeof value === 'number') {
@@ -91,12 +111,83 @@ function resolveEquipmentTag(comp) {
   return comp?.tag || comp?.ref || comp?.label || comp?.name || comp?.id || '';
 }
 
-function resolveUpstreamDevice(comp, devices) {
-  if (!comp?.tccId) return 'Not Specified';
-  const dev = devices.find(d => d.id === comp.tccId);
-  if (dev?.name) return dev.name;
-  if (dev?.vendor) return `${dev.vendor} ${dev.id}`;
-  return comp.tccId;
+function buildParentIndex(comps = []) {
+  const compMap = new Map();
+  const directParents = new Map();
+  comps.forEach(comp => {
+    if (!comp?.id) return;
+    compMap.set(comp.id, comp);
+  });
+  comps.forEach(comp => {
+    (comp.connections || []).forEach(conn => {
+      const targetId = conn?.target;
+      if (!targetId || !compMap.has(targetId)) return;
+      if (!directParents.has(targetId)) directParents.set(targetId, []);
+      directParents.get(targetId).push({ component: comp, connection: conn, reversed: false });
+    });
+  });
+  return { compMap, directParents };
+}
+
+function createProtectiveResolver(comps = []) {
+  const { compMap, directParents } = buildParentIndex(comps);
+  const cache = new Map();
+
+  function getParents(component) {
+    const direct = directParents.get(component.id);
+    if (direct && direct.length) return direct;
+    if (!FALLBACK_TYPES.has(component.type)) return [];
+    const parents = [];
+    (component.connections || []).forEach(conn => {
+      const target = compMap.get(conn?.target);
+      if (!target) return;
+      if (!UPSTREAM_CANDIDATE_TYPES.has(target.type) && target.type !== 'transformer') return;
+      parents.push({ component: target, connection: conn, reversed: true });
+    });
+    return parents;
+  }
+
+  function visit(component, stack = new Set()) {
+    if (!component?.id) return null;
+    if (cache.has(component.id)) return cache.get(component.id);
+    if (stack.has(component.id)) {
+      cache.set(component.id, null);
+      return null;
+    }
+    stack.add(component.id);
+    let result = null;
+    if (component?.tccId) {
+      result = component;
+    } else {
+      const parents = getParents(component);
+      for (const parent of parents) {
+        result = visit(parent.component, stack);
+        if (result) break;
+      }
+    }
+    stack.delete(component.id);
+    cache.set(component.id, result || null);
+    return result;
+  }
+
+  return {
+    findNearest(component) {
+      if (!component) return null;
+      const target = typeof component === 'string' ? compMap.get(component) : component;
+      if (!target) return null;
+      return visit(target);
+    }
+  };
+}
+
+function formatProtectiveDeviceName(protectiveComp, device) {
+  if (!protectiveComp) return 'Not Specified';
+  if (device?.name) return device.name;
+  if (device?.vendor) return `${device.vendor} ${device.id}`;
+  const tag = resolveEquipmentTag(protectiveComp);
+  if (tag) return tag;
+  if (protectiveComp.tccId) return protectiveComp.tccId;
+  return 'Not Specified';
 }
 
 async function loadDevices() {
@@ -146,22 +237,45 @@ function interpolateTime(curve = [], currentA) {
   return curve[curve.length - 1].time;
 }
 
-function clearingTime(comp, Ibf, devices) {
-  if (comp.clearing_time) return Number(comp.clearing_time);
-  if (!comp.tccId) return 0.2;
-  const dev = devices.find(d => d.id === comp.tccId);
+function clearingTime(comp, Ibf, devices, protectiveComp, scResults, protectiveDevice) {
+  const compClearing = parseNumeric(comp?.clearing_time);
+  if (compClearing !== null) return compClearing;
+  if (protectiveComp && protectiveComp !== comp) {
+    const protectiveClearing = parseNumeric(protectiveComp.clearing_time);
+    if (protectiveClearing !== null) return protectiveClearing;
+  }
+  const deviceComp = protectiveComp || comp;
+  if (!deviceComp?.tccId) return 0.2;
+  const dev = protectiveDevice || devices.find(d => d.id === deviceComp.tccId);
   if (!dev) return 0.2;
   const saved = getItem('tccSettings', { devices: [], settings: {}, componentOverrides: {} });
   const deviceOverride = saved.settings?.[dev.id] || {};
-  const componentOverride = saved.componentOverrides?.[comp.id] || {};
-  const inlineOverride = comp.tccOverrides && typeof comp.tccOverrides === 'object' ? comp.tccOverrides : {};
+  const componentOverride = saved.componentOverrides?.[deviceComp.id] || {};
+  const inlineOverride = deviceComp.tccOverrides && typeof deviceComp.tccOverrides === 'object'
+    ? deviceComp.tccOverrides
+    : {};
   const overrides = { ...deviceOverride, ...componentOverride, ...inlineOverride };
   const scaled = scaleCurve(dev, overrides);
   const settings = scaled.settings || {};
-  if (settings.instantaneous && Ibf * 1000 >= settings.instantaneous) {
+  const downstreamKA = Number.isFinite(Ibf) && Ibf > 0
+    ? Ibf
+    : Number.isFinite(scResults?.[comp.id]?.threePhaseKA) && scResults[comp.id].threePhaseKA > 0
+      ? scResults[comp.id].threePhaseKA
+      : 0;
+  const deviceKA = Number.isFinite(scResults?.[deviceComp.id]?.threePhaseKA) && scResults[deviceComp.id].threePhaseKA > 0
+    ? scResults[deviceComp.id].threePhaseKA
+    : 0;
+  const effectiveKA = deviceComp !== comp && downstreamKA > 0
+    ? downstreamKA
+    : deviceKA > 0
+      ? deviceKA
+      : downstreamKA > 0
+        ? downstreamKA
+        : 0.001;
+  if (settings.instantaneous && effectiveKA * 1000 >= settings.instantaneous) {
     return Math.max(settings.instantaneousDelay || 0.01, 0.005);
   }
-  return interpolateTime(scaled.curve || [], Ibf * 1000);
+  return interpolateTime(scaled.curve || [], effectiveKA * 1000);
 }
 
 // IEEE 1584‑2018 arcing current model
@@ -203,9 +317,13 @@ export async function runArcFlash(options = {}) {
   const comps = (Array.isArray(sheets[0]?.components)
     ? sheets.flatMap(s => s.components)
     : sheets).filter(c => c && c.type !== 'annotation' && c.type !== 'dimension');
+  const protection = createProtectiveResolver(comps);
   const results = {};
   comps.forEach(comp => {
-    const Ibf = sc[comp.id]?.threePhaseKA || 0;
+    const fault = sc[comp.id];
+    const Ibf = Number.isFinite(fault?.threePhaseKA) ? fault.threePhaseKA : 0;
+    const protectiveComp = protection.findNearest(comp);
+    const protectiveDevice = protectiveComp ? devices.find(d => d.id === protectiveComp.tccId) : null;
     const enclosure = (comp.enclosure || 'box').toLowerCase();
     const Cf = enclosure === 'open' ? 1 : 1.5;
     const gap = Number(comp.gap) || 25;
@@ -214,7 +332,7 @@ export async function runArcFlash(options = {}) {
     const w = Number(comp.enclosure_width || comp.box_width) || 508;
     const de = Number(comp.enclosure_depth || comp.box_depth) || 508;
     const sizeFactor = Math.cbrt((h * w * de) / (508 * 508 * 508)) || 1;
-    const time = clearingTime(comp, Ibf, devices);
+    const time = clearingTime(comp, Ibf, devices, protectiveComp, sc, protectiveDevice);
     const cfg = (comp.electrode_config || 'VCB').toUpperCase();
     const V = Number(comp.kV || comp.baseKV || comp.prefault_voltage || 0.48);
     const Ia = arcingCurrent(Ibf, V, gap, cfg, enclosure);
@@ -238,7 +356,7 @@ export async function runArcFlash(options = {}) {
       limitedApproach: approaches.limited,
       restrictedApproach: approaches.restricted,
       equipmentTag: resolveEquipmentTag(comp),
-      upstreamDevice: resolveUpstreamDevice(comp, devices),
+      upstreamDevice: formatProtectiveDeviceName(protectiveComp, protectiveDevice),
       studyDate
     };
   });

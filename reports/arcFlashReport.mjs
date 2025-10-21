@@ -70,6 +70,24 @@ function safeEntries(results = {}) {
   });
 }
 
+function sanitizeFileName(value, fallback = 'equipment') {
+  if (typeof value !== 'string') {
+    if (value && typeof value.toString === 'function') {
+      value = value.toString();
+    } else {
+      value = fallback;
+    }
+  }
+  const normalized = value.normalize('NFKD').replace(/[\u0300-\u036f]/g, '');
+  const cleaned = normalized.replace(/[^A-Za-z0-9._-]+/g, '_').replace(/^_+|_+$/g, '');
+  return cleaned || fallback;
+}
+
+export function getArcFlashLabelBaseName(id, info = {}) {
+  const tag = info.equipmentTag || info.tag || info.name || info.label || id || 'equipment';
+  return sanitizeFileName(tag, id || 'equipment');
+}
+
 export function buildArcFlashLabelData(id, info = {}) {
   const incidentEnergy = Number.isFinite(info.incidentEnergy) ? info.incidentEnergy : NaN;
   const signalWord = incidentEnergy >= 40 ? 'DANGER' : 'WARNING';
@@ -138,10 +156,11 @@ export function generateArcFlashReport(results = {}) {
   // export individual labels
   entries.forEach(([id, info]) => {
     const svg = generateArcFlashLabel(buildArcFlashLabelData(id, info));
+    const baseName = getArcFlashLabelBaseName(id, info);
     const blob = new Blob([svg], { type: 'image/svg+xml' });
     const a = document.createElement('a');
     a.href = URL.createObjectURL(blob);
-    a.download = `${id}_label.svg`;
+    a.download = `${baseName}.svg`;
     a.click();
     setTimeout(() => URL.revokeObjectURL(a.href), 0);
   });
