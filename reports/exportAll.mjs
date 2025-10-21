@@ -1,7 +1,7 @@
 const { jsPDF } = window.jspdf || await import('https://cdn.jsdelivr.net/npm/jspdf@2.5.1/+esm');
 import { toCSV } from './reporting.mjs';
 import { generateArcFlashLabel } from './labels.mjs';
-import { buildArcFlashLabelData } from './arcFlashReport.mjs';
+import { buildArcFlashLabelData, getArcFlashLabelBaseName } from './arcFlashReport.mjs';
 import * as dataStore from '../dataStore.mjs';
 
 let branding = { title: 'Project Report', logo: null, company: '' };
@@ -204,12 +204,21 @@ export function buildReportZip(data = {}) {
   });
 
   // Arc flash labels
+  const usedLabelNames = new Set();
   if (data.arcFlash) {
     Object.entries(data.arcFlash)
       .filter(([key, value]) => key && typeof value === 'object' && value !== null && !key.startsWith('_'))
       .forEach(([id, info]) => {
         const svg = generateArcFlashLabel(buildArcFlashLabelData(id, info));
-        zip.file(`arcflash_${id}.svg`, svg);
+        const baseName = getArcFlashLabelBaseName(id, info);
+        let fileName = `${baseName}.svg`;
+        let counter = 2;
+        while (usedLabelNames.has(fileName)) {
+          fileName = `${baseName}_${counter}.svg`;
+          counter += 1;
+        }
+        usedLabelNames.add(fileName);
+        zip.file(fileName, svg);
       });
   }
   return zip;
