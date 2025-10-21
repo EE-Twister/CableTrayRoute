@@ -2,6 +2,7 @@ import * as d3 from 'https://cdn.jsdelivr.net/npm/d3@7/+esm';
 import { getItem, setItem, getOneLine, setOneLine, getStudies, setStudies } from '../dataStore.mjs';
 import { runShortCircuit } from './shortCircuit.mjs';
 import { scaleCurve, checkDuty } from './tccUtils.js';
+import { openModal } from '../src/components/modal.js';
 import conductorProperties from '../conductorPropertiesData.mjs';
 
 const PROTECTIVE_TYPES = new Set(['breaker', 'fuse', 'relay', 'recloser', 'contactor', 'switch']);
@@ -28,7 +29,8 @@ const K_CONSTANTS = {
 };
 
 const deviceSelect = document.getElementById('device-select');
-const deviceList = document.getElementById('device-multi-list');
+const deviceModalBtn = document.getElementById('device-modal-btn');
+const selectedSummary = document.getElementById('selected-device-summary');
 const settingsDiv = document.getElementById('device-settings');
 const plotBtn = document.getElementById('plot-btn');
 const linkBtn = document.getElementById('link-btn');
@@ -55,6 +57,18 @@ let componentDeviceMap = new Map();
 
 const MAX_NEIGHBOR_DEPTH = 4;
 
+const OVERLAY_GROUP_LABELS = {
+  inrush: 'Transformer Inrush',
+  transformerDamage: 'Transformer Damage',
+  cable: 'Cable Damage',
+  motorStart: 'Motor Starting'
+};
+const SYSTEM_OVERLAY_GROUP = 'System Curves';
+const COMPONENT_FALLBACK_GROUP = 'One-Line Devices';
+const LIBRARY_FALLBACK_GROUP = 'Library Devices';
+const OTHER_MANUFACTURER_GROUP = 'Other Manufacturers';
+const OVERLAY_GROUP_SET = new Set([...Object.values(OVERLAY_GROUP_LABELS), SYSTEM_OVERLAY_GROUP]);
+
 let saved = getItem('tccSettings') || {};
 if (!Array.isArray(saved.devices)) saved.devices = [];
 if (!saved.settings || typeof saved.settings !== 'object') saved.settings = {};
@@ -72,24 +86,43 @@ function selectedDeviceIds() {
   return [...deviceSelect.selectedOptions].map(o => o.value);
 }
 
-function syncCheckboxesFromSelect() {
-  if (!deviceList) return;
-  const selected = new Set(selectedDeviceIds());
-  deviceList.querySelectorAll('input[type="checkbox"]').forEach(box => {
-    box.checked = selected.has(box.value);
+function applySelectionSet(selection, { persist = false } = {}) {
+  const chosen = Array.isArray(selection) ? selection : [...selection];
+  const selectedSet = new Set(chosen);
+  [...deviceSelect.options].forEach(opt => {
+    opt.selected = selectedSet.has(opt.value);
   });
+  renderSelectedSummary();
+  renderSettings();
+  if (persist) {
+    persistSettings();
+  }
 }
 
-function syncSelectFromCheckboxes({ persist = false } = {}) {
-  if (!deviceList) return;
-  const checked = new Set(
-    [...deviceList.querySelectorAll('input[type="checkbox"]:checked')].map(box => box.value)
-  );
-  [...deviceSelect.options].forEach(opt => {
-    opt.selected = checked.has(opt.value);
+function renderSelectedSummary() {
+  if (!selectedSummary) return;
+  selectedSummary.innerHTML = '';
+  const ids = selectedDeviceIds();
+  if (deviceModalBtn) {
+    deviceModalBtn.textContent = ids.length ? `Choose Devices (${ids.length})` : 'Choose Devices';
+  }
+  if (!ids.length) {
+    const empty = document.createElement('p');
+    empty.className = 'selected-device-empty';
+    empty.textContent = 'No devices selected.';
+    selectedSummary.appendChild(empty);
+    return;
+  }
+  const list = document.createElement('div');
+  list.className = 'selected-device-list';
+  ids.forEach(uid => {
+    const entry = deviceMap.get(uid);
+    const chip = document.createElement('span');
+    chip.className = 'selected-device-chip';
+    chip.textContent = entry ? entry.name : uid;
+    list.appendChild(chip);
   });
-  renderSettings();
-  if (persist) persistSettings();
+  selectedSummary.appendChild(list);
 }
 
 function formatSettingLabel(field = '') {
@@ -169,6 +202,29 @@ function getSettingOptions(device, field) {
   const raw = device.settingOptions[field];
   if (!Array.isArray(raw)) return [];
   return normalizeSettingOptions(raw);
+}
+
+function describeSettingRange(device, field) {
+  const options = getSettingOptions(device, field);
+  if (!options.length) return '';
+  const numericOptions = options
+    .map(opt => {
+      const num = Number(opt.value);
+      return Number.isFinite(num) ? num : null;
+    })
+    .filter(num => num !== null);
+  if (numericOptions.length === options.length && numericOptions.length) {
+    const min = Math.min(...numericOptions);
+    const max = Math.max(...numericOptions);
+    if (Math.abs(min - max) < 1e-9) {
+      return formatSettingValue(min);
+    }
+    return `${formatSettingValue(min)} – ${formatSettingValue(max)}`;
+  }
+  return options
+    .map(opt => opt.label)
+    .filter(label => label && label.trim())
+    .join(', ');
 }
 
 function snapSettingValue(device, field, value) {
@@ -324,7 +380,7 @@ async function init() {
     selectDefaults(defaults);
   }
 
-  syncCheckboxesFromSelect();
+  renderSelectedSummary();
   renderSettings();
   if (compId && deviceSelect && deviceSelect.selectedOptions.length) {
     plot();
@@ -333,14 +389,7 @@ async function init() {
 
 function selectDefaults(ids) {
   const valid = [...ids].filter(id => deviceMap.has(id));
-  [...deviceSelect.options].forEach(opt => {
-    opt.selected = valid.includes(opt.value);
-  });
-  if (deviceList) {
-    deviceList.querySelectorAll('input[type="checkbox"]').forEach(box => {
-      box.checked = valid.includes(box.value);
-    });
-  }
+  applySelectionSet(valid);
   saved.devices = valid;
   setItem('tccSettings', saved);
 }
@@ -591,50 +640,387 @@ function buildMotorStartingEntries(targetId) {
 function renderDeviceList() {
   if (!deviceSelect) return;
   deviceSelect.innerHTML = '';
-  if (deviceList) deviceList.innerHTML = '';
-
-  let addedComponentGroup = false;
   deviceGroups.forEach(group => {
     if (!group.items.length) return;
-    if (deviceList) {
-      const heading = document.createElement('h4');
-      heading.className = 'device-multi-heading';
-      heading.textContent = group.label;
-      deviceList.appendChild(heading);
-      if (group.id === 'oneline') addedComponentGroup = true;
-    }
     group.items.forEach(item => {
       const opt = new Option(item.name, item.uid);
       opt.dataset.kind = item.kind;
       deviceSelect.add(opt);
-      if (deviceList) {
-        const label = document.createElement('label');
-        label.className = 'device-multi-item';
-        label.dataset.uid = item.uid;
-        const checkbox = document.createElement('input');
-        checkbox.type = 'checkbox';
-        checkbox.value = item.uid;
-        checkbox.addEventListener('change', () => syncSelectFromCheckboxes({ persist: true }));
-        label.appendChild(checkbox);
-        const name = document.createElement('span');
-        name.textContent = item.name;
-        label.appendChild(name);
-        deviceList.appendChild(label);
-      }
     });
   });
+}
 
-  if (!addedComponentGroup && deviceList) {
-    const info = document.createElement('p');
-    info.className = 'device-multi-empty';
-    info.textContent = 'Link protective devices on the One-Line to view them here.';
-    deviceList.appendChild(info);
+if (deviceModalBtn) {
+  deviceModalBtn.addEventListener('click', () => {
+    openDeviceSelectionModal();
+  });
+}
+
+function manufacturerPriority(name) {
+  if (name === COMPONENT_FALLBACK_GROUP) return -2;
+  if (name === LIBRARY_FALLBACK_GROUP) return -1;
+  if (name === OTHER_MANUFACTURER_GROUP) return 2;
+  if (OVERLAY_GROUP_SET.has(name)) return 5;
+  return 0;
+}
+
+function getManufacturerLabel(entry) {
+  if (!entry) return OTHER_MANUFACTURER_GROUP;
+  if (entry.kind === 'library' || entry.kind === 'component') {
+    const base = entry.baseDevice || {};
+    const vendor = (base.vendor || base.manufacturer || '').trim();
+    if (vendor) return vendor;
+    return entry.kind === 'component' ? COMPONENT_FALLBACK_GROUP : LIBRARY_FALLBACK_GROUP;
+  }
+  return OVERLAY_GROUP_LABELS[entry.kind] || SYSTEM_OVERLAY_GROUP;
+}
+
+function buildManufacturerGroups() {
+  const groups = new Map();
+  deviceEntries.forEach(entry => {
+    const label = getManufacturerLabel(entry);
+    if (!groups.has(label)) {
+      groups.set(label, []);
+    }
+    groups.get(label).push(entry);
+  });
+  return [...groups.entries()]
+    .map(([name, entries]) => ({
+      name,
+      entries: entries
+        .slice()
+        .sort((a, b) => a.name.localeCompare(b.name, undefined, { sensitivity: 'base' })),
+      priority: manufacturerPriority(name)
+    }))
+    .sort((a, b) => {
+      if (a.priority !== b.priority) return a.priority - b.priority;
+      return a.name.localeCompare(b.name, undefined, { sensitivity: 'base' });
+    });
+}
+
+function describeEntryAttributes(entry) {
+  if (!entry) return [];
+  if (entry.kind === 'library' || entry.kind === 'component') {
+    const base = entry.baseDevice || {};
+    return Object.keys(base.settings || {}).map(field => ({
+      label: formatSettingLabel(field),
+      value: formatSettingValue(base.settings?.[field]),
+      range: describeSettingRange(base, field)
+    }));
+  }
+  if (entry.kind === 'inrush') {
+    return [
+      { label: 'Inrush Current', value: entry.current !== undefined ? `${formatSettingValue(entry.current)} A` : '', range: '' },
+      { label: 'Duration', value: entry.duration !== undefined ? `${formatSettingValue(entry.duration)} s` : '', range: '' }
+    ];
+  }
+  if (entry.kind === 'transformerDamage') {
+    return [
+      { label: 'Full-Load Amps', value: entry.fla !== undefined ? `${formatSettingValue(entry.fla)} A` : '', range: '' },
+      { label: 'Data Points', value: Array.isArray(entry.curve) ? `${entry.curve.length} points` : '', range: '' }
+    ];
+  }
+  if (entry.kind === 'cable') {
+    return [
+      { label: 'Ampacity', value: entry.ampacity !== undefined ? `${formatSettingValue(entry.ampacity)} A` : '', range: '' },
+      { label: 'Data Points', value: Array.isArray(entry.curve) ? `${entry.curve.length} points` : '', range: '' }
+    ];
+  }
+  if (entry.kind === 'motorStart') {
+    return [
+      { label: 'Full-Load Amps', value: entry.fla !== undefined ? `${formatSettingValue(entry.fla)} A` : '', range: '' },
+      { label: 'Locked Rotor', value: entry.lockedRotor !== undefined ? `${formatSettingValue(entry.lockedRotor)} A` : '', range: '' },
+      { label: 'Start Time', value: entry.startTime !== undefined ? `${formatSettingValue(entry.startTime)} s` : '', range: '' }
+    ];
+  }
+  return [];
+}
+
+function renderDeviceDetails(entry, container, doc) {
+  if (!container) return;
+  const docRef = doc || container.ownerDocument || (typeof document !== 'undefined' ? document : null);
+  if (!docRef) return;
+  container.innerHTML = '';
+  if (!entry) {
+    const empty = docRef.createElement('p');
+    empty.className = 'device-detail-empty';
+    empty.textContent = 'Select a device to view its properties.';
+    container.appendChild(empty);
+    return;
+  }
+  const title = docRef.createElement('h3');
+  title.className = 'device-detail-title';
+  title.textContent = entry.name;
+  container.appendChild(title);
+
+  const meta = docRef.createElement('dl');
+  meta.className = 'device-detail-meta';
+  const appendMeta = (term, value) => {
+    if (!value) return;
+    const dt = docRef.createElement('dt');
+    dt.textContent = term;
+    const dd = docRef.createElement('dd');
+    dd.textContent = value;
+    meta.append(dt, dd);
+  };
+
+  appendMeta('Manufacturer', getManufacturerLabel(entry));
+  if (entry.kind === 'library') {
+    appendMeta('Source', 'Library Device');
+  } else if (entry.kind === 'component') {
+    appendMeta('Source', 'One-Line Device');
+    if (entry.sheetName) appendMeta('Sheet', entry.sheetName);
+  } else {
+    appendMeta('Source', 'System Curve');
+  }
+
+  const base = entry.baseDevice || {};
+  const typeLabel = base.type || entry.deviceType;
+  if (typeLabel) appendMeta('Type', formatOptionLabel(typeLabel));
+  if (base.interruptRating !== undefined) {
+    appendMeta('Interrupt Rating', `${formatSettingValue(base.interruptRating)} kA`);
+  }
+  if (entry.autoSelect) {
+    appendMeta('Auto Selection', 'Added automatically when analyzing the linked component.');
+  }
+
+  if (meta.childElementCount) {
+    container.appendChild(meta);
+  }
+
+  const properties = describeEntryAttributes(entry);
+  if (properties.length) {
+    const table = docRef.createElement('table');
+    table.className = 'device-property-table';
+    const thead = docRef.createElement('thead');
+    const headerRow = docRef.createElement('tr');
+    ['Property', 'Default', 'Range / Options'].forEach(text => {
+      const th = docRef.createElement('th');
+      th.scope = 'col';
+      th.textContent = text;
+      headerRow.appendChild(th);
+    });
+    thead.appendChild(headerRow);
+    table.appendChild(thead);
+    const tbody = docRef.createElement('tbody');
+    properties.forEach(prop => {
+      const row = docRef.createElement('tr');
+      const nameCell = docRef.createElement('th');
+      nameCell.scope = 'row';
+      nameCell.textContent = prop.label;
+      row.appendChild(nameCell);
+      const valueCell = docRef.createElement('td');
+      valueCell.textContent = prop.value || '—';
+      row.appendChild(valueCell);
+      const rangeCell = docRef.createElement('td');
+      rangeCell.textContent = prop.range || '—';
+      row.appendChild(rangeCell);
+      tbody.appendChild(row);
+    });
+    table.appendChild(tbody);
+    container.appendChild(table);
+  } else {
+    const emptyProps = docRef.createElement('p');
+    emptyProps.className = 'device-detail-empty';
+    emptyProps.textContent = 'No adjustable properties available.';
+    container.appendChild(emptyProps);
   }
 }
 
+async function openDeviceSelectionModal() {
+  const manufacturerGroups = buildManufacturerGroups();
+  if (!manufacturerGroups.length) {
+    await openModal({
+      title: 'Select Devices',
+      primaryText: 'Close',
+      secondaryText: null,
+      onSubmit: () => true,
+      render(container) {
+        const doc = container.ownerDocument;
+        const message = doc.createElement('p');
+        message.className = 'device-detail-empty';
+        message.textContent = 'No protective devices are available for selection.';
+        container.appendChild(message);
+        return message;
+      }
+    });
+    return;
+  }
+
+  const initialSelection = new Set(selectedDeviceIds());
+  const selectionSet = new Set(initialSelection);
+  const preferredGroup = manufacturerGroups.find(group =>
+    group.entries.some(entry => selectionSet.has(entry.uid))
+  );
+  let activeManufacturer = preferredGroup?.name || manufacturerGroups[0].name;
+  let activeEntry = preferredGroup?.entries.find(entry => selectionSet.has(entry.uid))
+    || manufacturerGroups[0].entries[0]
+    || null;
+
+  let manufacturerContainer;
+  let modelContainer;
+  let detailContainer;
+  const modelElements = new Map();
+  const firstButtonRef = { current: null };
+
+  const docRef = { current: null };
+
+  function updateActiveEntry(entry) {
+    activeEntry = entry;
+    modelElements.forEach(({ item }, uid) => {
+      item.classList.toggle('active', !!entry && uid === entry.uid);
+    });
+    renderDeviceDetails(entry, detailContainer, docRef.current);
+  }
+
+  function renderManufacturers() {
+    if (!manufacturerContainer || !docRef.current) return;
+    manufacturerContainer.innerHTML = '';
+    manufacturerGroups.forEach(group => {
+      const button = docRef.current.createElement('button');
+      button.type = 'button';
+      button.className = 'device-manufacturer-btn';
+      if (group.name === activeManufacturer) button.classList.add('active');
+      button.textContent = `${group.name} (${group.entries.length})`;
+      button.addEventListener('click', () => {
+        activeManufacturer = group.name;
+        const selectedInGroup = group.entries.find(entry => selectionSet.has(entry.uid));
+        activeEntry = selectedInGroup || group.entries[0] || null;
+        renderManufacturers();
+        renderModels();
+        updateActiveEntry(activeEntry);
+      });
+      if (!firstButtonRef.current) firstButtonRef.current = button;
+      manufacturerContainer.appendChild(button);
+    });
+  }
+
+  function renderModels() {
+    if (!modelContainer || !docRef.current) return;
+    modelElements.clear();
+    modelContainer.innerHTML = '';
+    const group = manufacturerGroups.find(g => g.name === activeManufacturer);
+    if (!group || !group.entries.length) {
+      const empty = docRef.current.createElement('p');
+      empty.className = 'device-detail-empty';
+      empty.textContent = 'No models available for this manufacturer.';
+      modelContainer.appendChild(empty);
+      updateActiveEntry(null);
+      return;
+    }
+    if (!group.entries.some(entry => entry.uid === (activeEntry && activeEntry.uid))) {
+      activeEntry = group.entries.find(entry => selectionSet.has(entry.uid)) || group.entries[0] || null;
+    }
+    group.entries.forEach((entry, index) => {
+      const item = docRef.current.createElement('div');
+      item.className = 'device-model-item';
+      if (activeEntry && activeEntry.uid === entry.uid) {
+        item.classList.add('active');
+      }
+      const checkbox = docRef.current.createElement('input');
+      checkbox.type = 'checkbox';
+      const safeId = `device-model-${index}-${entry.uid.replace(/[^a-zA-Z0-9_-]/g, '_')}`;
+      checkbox.id = safeId;
+      checkbox.checked = selectionSet.has(entry.uid);
+      checkbox.addEventListener('change', () => {
+        if (checkbox.checked) {
+          selectionSet.add(entry.uid);
+        } else {
+          selectionSet.delete(entry.uid);
+        }
+        applySelectionSet(selectionSet);
+      });
+      checkbox.addEventListener('focus', () => updateActiveEntry(entry));
+      item.appendChild(checkbox);
+
+      const label = docRef.current.createElement('label');
+      label.className = 'device-model-label';
+      label.setAttribute('for', safeId);
+      label.textContent = entry.name;
+      label.addEventListener('click', () => updateActiveEntry(entry));
+      label.addEventListener('focus', () => updateActiveEntry(entry));
+      label.addEventListener('mouseenter', () => updateActiveEntry(entry));
+      item.appendChild(label);
+
+      const badge = docRef.current.createElement('span');
+      badge.className = 'device-model-badge';
+      if (entry.kind === 'component') {
+        badge.textContent = 'One-Line';
+      } else if (entry.kind === 'library') {
+        badge.textContent = 'Library';
+      } else {
+        badge.textContent = 'Curve';
+      }
+      item.appendChild(badge);
+
+      modelContainer.appendChild(item);
+      modelElements.set(entry.uid, { item, checkbox });
+    });
+  }
+
+  await openModal({
+    title: 'Select Devices',
+    description: 'Choose protective devices to include on the TCC chart.',
+    primaryText: 'Done',
+    secondaryText: 'Cancel',
+    closeOnBackdrop: false,
+    onSubmit() {
+      applySelectionSet(selectionSet, { persist: true });
+      return true;
+    },
+    onCancel() {
+      applySelectionSet(initialSelection, { persist: true });
+    },
+    render(container, controls) {
+      const doc = container.ownerDocument;
+      docRef.current = doc;
+      container.classList.add('device-selection-modal');
+      const layout = doc.createElement('div');
+      layout.className = 'device-selection-layout';
+
+      const leftPane = doc.createElement('div');
+      leftPane.className = 'device-selection-left';
+
+      const manufacturersHeading = doc.createElement('h3');
+      manufacturersHeading.className = 'device-selection-subtitle';
+      manufacturersHeading.textContent = 'Manufacturers';
+      leftPane.appendChild(manufacturersHeading);
+
+      manufacturerContainer = doc.createElement('div');
+      manufacturerContainer.className = 'device-manufacturer-list';
+      leftPane.appendChild(manufacturerContainer);
+
+      const modelsHeading = doc.createElement('h3');
+      modelsHeading.className = 'device-selection-subtitle';
+      modelsHeading.textContent = 'Models';
+      leftPane.appendChild(modelsHeading);
+
+      modelContainer = doc.createElement('div');
+      modelContainer.className = 'device-model-list';
+      leftPane.appendChild(modelContainer);
+
+      detailContainer = doc.createElement('div');
+      detailContainer.className = 'device-selection-details';
+
+      layout.append(leftPane, detailContainer);
+      container.appendChild(layout);
+
+      renderManufacturers();
+      renderModels();
+      updateActiveEntry(activeEntry);
+
+      const initialFocus = firstButtonRef.current || leftPane;
+      if (initialFocus && controls && typeof controls.setInitialFocus === 'function') {
+        controls.setInitialFocus(initialFocus);
+      }
+      return initialFocus;
+    }
+  });
+}
+
 deviceSelect.addEventListener('change', () => {
+  renderSelectedSummary();
   renderSettings();
-  syncCheckboxesFromSelect();
   persistSettings();
 });
 plotBtn.addEventListener('click', () => {
@@ -647,7 +1033,6 @@ openBtn.addEventListener('click', () => {
 });
 
 function renderSettings() {
-  syncCheckboxesFromSelect();
   settingsDiv.innerHTML = '';
   selectedDeviceIds().forEach(uid => {
     const entry = deviceMap.get(uid);
