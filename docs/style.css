@@ -291,6 +291,13 @@
   color: var(--text-muted, #6c757d);
 }
 
+.device-detail-actions {
+  margin-top: 1.25rem;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.75rem;
+}
+
 .device-property-table {
   width: 100%;
   border-collapse: collapse;

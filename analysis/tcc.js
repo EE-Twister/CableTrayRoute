@@ -827,9 +827,9 @@ function getTypeInfo(entry) {
   };
 }
 
-function buildTypeGroups() {
+function buildTypeGroups(entries = deviceEntries) {
   const groups = new Map();
-  deviceEntries.forEach(entry => {
+  entries.forEach(entry => {
     const typeInfo = getTypeInfo(entry);
     if (!groups.has(typeInfo.id)) {
       groups.set(typeInfo.id, {
@@ -1296,12 +1296,256 @@ openBtn.addEventListener('click', () => {
 });
 if (componentModalBtn) {
   componentModalBtn.addEventListener('click', () => {
-    const params = new URLSearchParams();
-    params.set('componentModal', '1');
-    if (compId) params.set('component', compId);
-    const url = `oneline.html?${params.toString()}`;
-    window.open(url, '_blank');
+    openComponentBrowserModal();
   });
+}
+
+async function openComponentBrowserModal() {
+  if (componentModalBtn) {
+    componentModalBtn.setAttribute('aria-expanded', 'true');
+  }
+
+  const componentEntries = deviceEntries.filter(entry => entry.kind === 'component');
+  if (!componentEntries.length) {
+    await openModal({
+      title: 'One-Line Components',
+      primaryText: 'Close',
+      secondaryText: null,
+      onSubmit: () => true,
+      onCancel: () => {
+        if (componentModalBtn) componentModalBtn.setAttribute('aria-expanded', 'false');
+      },
+      render(container) {
+        const doc = container.ownerDocument;
+        const message = doc.createElement('p');
+        message.className = 'device-detail-empty';
+        message.textContent = 'No one-line components are available to display.';
+        container.appendChild(message);
+        return message;
+      }
+    });
+    if (componentModalBtn) {
+      componentModalBtn.setAttribute('aria-expanded', 'false');
+    }
+    return;
+  }
+
+  const typeGroups = buildTypeGroups(componentEntries);
+  const initialEntry = (compId && componentDeviceMap.get(compId)) || componentEntries[0] || null;
+  let activeEntry = initialEntry;
+  let activeTypeId = initialEntry ? getTypeInfo(initialEntry).id : typeGroups[0]?.id || null;
+  let activeManufacturer = initialEntry ? getManufacturerLabel(initialEntry) : null;
+
+  const getGroupById = id => typeGroups.find(group => group.id === id) || null;
+  const ensureManufacturerForGroup = group => {
+    if (!group || !group.manufacturers.length) return null;
+    if (activeManufacturer && group.manufacturers.some(m => m.name === activeManufacturer)) {
+      return group.manufacturers.find(m => m.name === activeManufacturer) || group.manufacturers[0];
+    }
+    activeManufacturer = group.manufacturers[0].name;
+    return group.manufacturers[0];
+  };
+
+  const initialGroup = getGroupById(activeTypeId);
+  const initialManufacturer = ensureManufacturerForGroup(initialGroup);
+  if (!activeEntry || !initialManufacturer?.entries.some(entry => entry.uid === activeEntry.uid)) {
+    activeEntry = initialManufacturer?.entries[0] || null;
+  }
+
+  const modelElements = new Map();
+  const docRef = { current: null };
+  let typeContainer;
+  let manufacturerContainer;
+  let modelContainer;
+  let detailContainer;
+  let modelsHeading;
+  const firstButtonRef = { current: null };
+
+  function updateActiveEntry(entry) {
+    activeEntry = entry || null;
+    modelElements.forEach(({ item }, uid) => {
+      const isActive = !!entry && uid === entry.uid;
+      item.classList.toggle('active', isActive);
+      item.setAttribute('aria-pressed', String(isActive));
+      item.tabIndex = isActive ? 0 : -1;
+    });
+    renderDeviceDetails(entry, detailContainer, docRef.current);
+    if (entry && entry.kind === 'component' && detailContainer && docRef.current) {
+      const actions = docRef.current.createElement('div');
+      actions.className = 'device-detail-actions';
+      const openLink = docRef.current.createElement('a');
+      openLink.className = 'btn secondary-btn';
+      openLink.href = `oneline.html?component=${encodeURIComponent(entry.componentId)}`;
+      openLink.target = '_blank';
+      openLink.rel = 'noopener';
+      openLink.textContent = 'Open in One-Line';
+      actions.appendChild(openLink);
+      detailContainer.appendChild(actions);
+    }
+  }
+
+  function getActiveTypeGroup() {
+    return getGroupById(activeTypeId) || typeGroups[0] || null;
+  }
+
+  function renderDeviceTypes() {
+    if (!typeContainer || !docRef.current) return;
+    typeContainer.innerHTML = '';
+    const doc = docRef.current;
+    typeGroups.forEach(group => {
+      const button = doc.createElement('button');
+      button.type = 'button';
+      button.className = 'device-type-btn';
+      if (group.id === activeTypeId) button.classList.add('active');
+      button.textContent = `${group.label} (${group.total})`;
+      button.addEventListener('click', () => {
+        if (activeTypeId === group.id) return;
+        activeTypeId = group.id;
+        const manufacturer = ensureManufacturerForGroup(group);
+        activeEntry = manufacturer?.entries[0] || null;
+        renderDeviceTypes();
+        renderManufacturers();
+        renderModels();
+        updateActiveEntry(activeEntry);
+      });
+      if (!firstButtonRef.current) firstButtonRef.current = button;
+      typeContainer.appendChild(button);
+    });
+  }
+
+  function renderManufacturers() {
+    if (!manufacturerContainer || !docRef.current) return;
+    manufacturerContainer.innerHTML = '';
+    const doc = docRef.current;
+    const group = getActiveTypeGroup();
+    if (!group || !group.manufacturers.length) {
+      const empty = doc.createElement('p');
+      empty.className = 'device-detail-empty';
+      empty.textContent = 'No manufacturers available for this device type.';
+      manufacturerContainer.appendChild(empty);
+      return;
+    }
+    if (!group.manufacturers.some(manufacturer => manufacturer.name === activeManufacturer)) {
+      activeManufacturer = group.manufacturers[0].name;
+    }
+    group.manufacturers.forEach(manufacturer => {
+      const button = doc.createElement('button');
+      button.type = 'button';
+      button.className = 'device-manufacturer-btn';
+      if (manufacturer.name === activeManufacturer) button.classList.add('active');
+      button.textContent = `${manufacturer.name} (${manufacturer.entries.length})`;
+      button.addEventListener('click', () => {
+        if (activeManufacturer === manufacturer.name) return;
+        activeManufacturer = manufacturer.name;
+        activeEntry = manufacturer.entries[0] || null;
+        renderManufacturers();
+        renderModels();
+        updateActiveEntry(activeEntry);
+      });
+      if (!firstButtonRef.current) firstButtonRef.current = button;
+      manufacturerContainer.appendChild(button);
+    });
+  }
+
+  function renderModels() {
+    if (!modelContainer || !docRef.current) return;
+    modelContainer.innerHTML = '';
+    modelElements.clear();
+    const doc = docRef.current;
+    const group = getActiveTypeGroup();
+    const manufacturer = group?.manufacturers.find(m => m.name === activeManufacturer) || null;
+    if (!manufacturer || !manufacturer.entries.length) {
+      modelsHeading.textContent = activeManufacturer
+        ? `One-Line Devices – ${activeManufacturer}`
+        : 'One-Line Devices';
+      const empty = doc.createElement('p');
+      empty.className = 'device-detail-empty';
+      empty.textContent = 'No components available for this manufacturer.';
+      modelContainer.appendChild(empty);
+      return;
+    }
+    modelsHeading.textContent = `One-Line Devices – ${manufacturer.name}`;
+    manufacturer.entries.forEach(entry => {
+      const button = doc.createElement('button');
+      button.type = 'button';
+      button.className = 'device-model-btn';
+      button.dataset.uid = entry.uid;
+      button.textContent = entry.name;
+      const isActive = !!activeEntry && entry.uid === activeEntry.uid;
+      button.classList.toggle('active', isActive);
+      button.setAttribute('aria-pressed', String(isActive));
+      button.tabIndex = isActive ? 0 : -1;
+      button.addEventListener('click', () => {
+        if (activeEntry && activeEntry.uid === entry.uid) return;
+        activeEntry = entry;
+        updateActiveEntry(entry);
+      });
+      if (!firstButtonRef.current) firstButtonRef.current = button;
+      modelElements.set(entry.uid, { item: button });
+      modelContainer.appendChild(button);
+    });
+  }
+
+  const modalPromise = openModal({
+    title: 'One-Line Components',
+    primaryText: 'Close',
+    secondaryText: null,
+    onSubmit: () => true,
+    onCancel: () => {
+      if (componentModalBtn) componentModalBtn.setAttribute('aria-expanded', 'false');
+    },
+    render(container) {
+      const doc = container.ownerDocument;
+      docRef.current = doc;
+      container.classList.add('device-selection-modal');
+
+      const layout = doc.createElement('div');
+      layout.className = 'device-selection-layout';
+
+      const leftPane = doc.createElement('div');
+      leftPane.className = 'device-selection-left';
+
+      const typesHeading = doc.createElement('h3');
+      typesHeading.className = 'device-selection-subtitle';
+      typesHeading.textContent = 'Device Types';
+      typeContainer = doc.createElement('div');
+      typeContainer.className = 'device-type-list';
+
+      const manufacturersHeading = doc.createElement('h3');
+      manufacturersHeading.className = 'device-selection-subtitle';
+      manufacturersHeading.textContent = 'Manufacturers';
+      manufacturerContainer = doc.createElement('div');
+      manufacturerContainer.className = 'device-manufacturer-list';
+
+      modelsHeading = doc.createElement('h3');
+      modelsHeading.className = 'device-selection-subtitle';
+      modelsHeading.textContent = 'One-Line Devices';
+      modelContainer = doc.createElement('div');
+      modelContainer.className = 'device-model-list';
+
+      leftPane.append(typesHeading, typeContainer, manufacturersHeading, manufacturerContainer, modelsHeading, modelContainer);
+
+      detailContainer = doc.createElement('div');
+      detailContainer.className = 'device-selection-details';
+
+      layout.append(leftPane, detailContainer);
+      container.appendChild(layout);
+
+      firstButtonRef.current = null;
+      renderDeviceTypes();
+      renderManufacturers();
+      renderModels();
+      updateActiveEntry(activeEntry);
+
+      return firstButtonRef.current || container.querySelector('button') || container;
+    }
+  });
+
+  modalPromise.finally(() => {
+    if (componentModalBtn) componentModalBtn.setAttribute('aria-expanded', 'false');
+  });
+
+  await modalPromise;
 }
 
 function renderSettings() {
