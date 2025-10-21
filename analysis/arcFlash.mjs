@@ -346,9 +346,14 @@ export async function runArcFlash(options = {}) {
     const cfg = (comp.electrode_config || 'VCB').toUpperCase();
     const voltageSettingRaw = parseNumeric(comp.kV ?? comp.baseKV ?? comp.prefault_voltage);
     const V = Number.isFinite(voltageSettingRaw) && voltageSettingRaw > 0 ? voltageSettingRaw : 0.48;
-    const Ia = arcingCurrent(Ibf, V, gap, cfg, enclosure);
-    let energy = 1.6 * Cf * sizeFactor * Math.pow(Ia, 1.2) * time * (gap / 25) * Math.pow(610 / dist, 2);
-    const boundary = dist * Math.sqrt(energy / 1.2);
+    const rawIa = Ibf > 0 && time > 0
+      ? arcingCurrent(Ibf, V, gap, cfg, enclosure)
+      : 0;
+    const Ia = Number.isFinite(rawIa) && rawIa > 0 ? Math.min(rawIa, Ibf) : 0;
+    const energy = Ia > 0 && time > 0 && dist > 0
+      ? 1.6 * Cf * sizeFactor * Math.pow(Ia, 1.2) * time * (gap / 25) * Math.pow(610 / dist, 2)
+      : 0;
+    const boundary = energy > 0 && dist > 0 ? dist * Math.sqrt(energy / 1.2) : 0;
     let ppe = 0;
     if (energy > 1.2) ppe = 1;
     if (energy > 4) ppe = 2;
@@ -359,49 +364,59 @@ export async function runArcFlash(options = {}) {
     const approaches = computeApproachDistances(voltage);
     const notes = [];
     const requiredInputs = [];
+    const addNote = message => {
+      if (message && !notes.includes(message)) notes.push(message);
+    };
+    const addRequired = message => {
+      if (message && !requiredInputs.includes(message)) requiredInputs.push(message);
+    };
     if (!shortCircuitAvailable) {
-      notes.push('No short-circuit study current was available; bolted fault current was assumed.');
-      requiredInputs.push('Provide a short-circuit result for this location to validate the incident energy.');
+      addNote('No short-circuit study current was available; bolted fault current was assumed.');
+      addRequired('Provide a short-circuit result for this location to validate the incident energy.');
+    }
+    if (Array.isArray(fault?.warnings) && fault.warnings.length) {
+      fault.warnings.forEach(addNote);
+      addRequired('Provide impedance data for the upstream path to compute realistic fault current.');
     }
     if (Ibf > 100) {
-      notes.push(`Bolted fault current ${Ibf.toFixed(2)} kA is very high; confirm conductor and source data.`);
+      addNote(`Bolted fault current ${Ibf.toFixed(2)} kA is very high; confirm conductor and source data.`);
     } else if (Ibf <= 0) {
-      notes.push('Bolted fault current resolved to 0 kA; check connectivity and source definitions.');
-      requiredInputs.push('Confirm the upstream source and conductors provide a non-zero fault current.');
+      addNote('Bolted fault current resolved to 0 kA; check connectivity and source definitions.');
+      addRequired('Confirm the upstream source and conductors provide a non-zero fault current.');
     }
     if (!protectiveComp || (!protectiveComp.tccId && compClearing === null && upstreamClearing === null)) {
-      notes.push('Clearing time defaulted to 0.2 s because no protective device data was linked.');
-      requiredInputs.push('Associate a protective device time-current curve or specify a clearing time.');
+      addNote('Clearing time defaulted to 0.2 s because no protective device data was linked.');
+      addRequired('Associate a protective device time-current curve or specify a clearing time.');
     } else if (protectiveComp?.tccId && !protectiveDevice && compClearing === null && upstreamClearing === null) {
-      notes.push('Protective device curve reference was not found; clearing time used default assumptions.');
-      requiredInputs.push('Ensure the protective device library includes the referenced curve.');
+      addNote('Protective device curve reference was not found; clearing time used default assumptions.');
+      addRequired('Ensure the protective device library includes the referenced curve.');
     }
     if (workingDistanceRaw === null) {
-      notes.push('Working distance not provided; defaulted to 455 mm (18 in).');
-      requiredInputs.push('Document the working distance used for arc flash analysis.');
+      addNote('Working distance not provided; defaulted to 455 mm (18 in).');
+      addRequired('Document the working distance used for arc flash analysis.');
     }
     if (gapRaw === null) {
-      notes.push('Electrode gap not provided; defaulted to 25 mm.');
-      requiredInputs.push('Provide the electrode gap to refine the arc flash calculation.');
+      addNote('Electrode gap not provided; defaulted to 25 mm.');
+      addRequired('Provide the electrode gap to refine the arc flash calculation.');
     }
     if (heightRaw === null || widthRaw === null || depthRaw === null) {
-      notes.push('Enclosure dimensions missing; assumed a 508 mm cube for the enclosure size correction.');
-      requiredInputs.push('Specify enclosure height, width, and depth for this equipment.');
+      addNote('Enclosure dimensions missing; assumed a 508 mm cube for the enclosure size correction.');
+      addRequired('Specify enclosure height, width, and depth for this equipment.');
     }
     if (!Number.isFinite(voltage)) {
-      notes.push('Nominal voltage unavailable; approach boundaries could not be derived.');
-      requiredInputs.push('Provide the equipment nominal voltage to compute approach boundaries.');
+      addNote('Nominal voltage unavailable; approach boundaries could not be derived.');
+      addRequired('Provide the equipment nominal voltage to compute approach boundaries.');
     }
     if (Number.isFinite(voltageSettingRaw) && voltageSettingRaw <= 0) {
-      notes.push('Nominal voltage value was non-positive; defaulted to 0.48 kV for calculations.');
+      addNote('Nominal voltage value was non-positive; defaulted to 0.48 kV for calculations.');
     } else if (!Number.isFinite(voltageSettingRaw)) {
-      notes.push('No nominal voltage provided; defaulted to 0.48 kV for the energy model.');
+      addNote('No nominal voltage provided; defaulted to 0.48 kV for the energy model.');
     }
     if (energy > 40) {
-      notes.push('Incident energy exceeds 40 cal/cm²; verify protective coordination and consider mitigation.');
+      addNote('Incident energy exceeds 40 cal/cm²; verify protective coordination and consider mitigation.');
     }
     if (boundary > 20000) {
-      notes.push('Arc flash boundary exceeds 20 m; confirm the clearing time and working distance inputs.');
+      addNote('Arc flash boundary exceeds 20 m; confirm the clearing time and working distance inputs.');
     }
     const upstreamDeviceName = formatProtectiveDeviceName(protectiveComp, protectiveDevice);
     const entry = {
@@ -417,7 +432,7 @@ export async function runArcFlash(options = {}) {
       upstreamDevice: upstreamDeviceName,
       studyDate,
       calculationInputs: {
-        boltedFaultCurrentKA: Number(Ibf.toFixed(2)),
+        boltedFaultCurrentKA: Number(Math.max(Ibf, 0).toFixed(2)),
         arcingCurrentKA: Number(Ia.toFixed(2)),
         clearingTimeSeconds: Number(time.toFixed(3)),
         electrodeConfiguration: cfg,
