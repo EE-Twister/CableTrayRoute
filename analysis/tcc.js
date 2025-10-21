@@ -105,7 +105,9 @@ function formatSettingLabel(field = '') {
     longTimePickup: 'Long Time Pickup',
     longTimeDelay: 'Long Time Delay',
     shortTimePickup: 'Short Time Pickup',
-    shortTimeDelay: 'Short Time Delay'
+    shortTimeDelay: 'Short Time Delay',
+    ampRating: 'Amp Rating',
+    speed: 'Speed'
   };
   if (known[field]) return known[field];
   return String(field)
@@ -384,13 +386,18 @@ function rebuildCatalog() {
 
   const componentEntries = buildComponentEntries();
   const libraryEntries = buildLibraryEntries();
+  const fuseEntries = libraryEntries.filter(entry => (entry.baseDevice?.type || entry.deviceType) === 'fuse');
+  const otherLibraryEntries = libraryEntries.filter(entry => (entry.baseDevice?.type || entry.deviceType) !== 'fuse');
   const overlayEntries = buildOverlayEntries();
 
   if (componentEntries.length) {
     deviceGroups.push({ id: 'oneline', label: 'One-Line Devices', items: componentEntries });
   }
-  if (libraryEntries.length) {
-    deviceGroups.push({ id: 'library', label: 'Library Devices', items: libraryEntries });
+  if (otherLibraryEntries.length) {
+    deviceGroups.push({ id: 'library', label: 'Library Devices', items: otherLibraryEntries });
+  }
+  if (fuseEntries.length) {
+    deviceGroups.push({ id: 'fuses', label: 'Fuse Library', items: fuseEntries });
   }
   if (overlayEntries.length) {
     deviceGroups.push({ id: 'overlays', label: 'Connected Elements', items: overlayEntries });
@@ -434,14 +441,18 @@ function buildComponentEntries() {
 }
 
 function buildLibraryEntries() {
-  return libraryDevices.map(dev => ({
-    uid: dev.id,
-    kind: 'library',
-    name: dev.name || dev.id,
-    baseDeviceId: dev.id,
-    baseDevice: dev,
-    overrideSource: snapOverridesToOptions(dev, saved.settings?.[dev.id] || {})
-  })).sort((a, b) => a.name.localeCompare(b.name, undefined, { sensitivity: 'base' }));
+  return libraryDevices
+    .filter(dev => PROTECTIVE_TYPES.has(dev.type))
+    .map(dev => ({
+      uid: dev.id,
+      kind: 'library',
+      name: dev.type ? `${formatOptionLabel(dev.type)} – ${dev.name || dev.id}` : dev.name || dev.id,
+      baseDeviceId: dev.id,
+      baseDevice: dev,
+      deviceType: dev.type || '',
+      overrideSource: snapOverridesToOptions(dev, saved.settings?.[dev.id] || {})
+    }))
+    .sort((a, b) => a.name.localeCompare(b.name, undefined, { sensitivity: 'base' }));
 }
 
 function buildOverlayEntries() {

@@ -719,6 +719,11 @@ const builtinComponents = [
 ];
 
 const cablePropertyMetadata = {
+  cable_rating: {
+    label: 'Cable Rating (V)',
+    type: 'number',
+    help: 'Maximum operating voltage. Used for duty and validation checks.'
+  },
   conductor_size: {
     label: 'Conductor Size (AWG or mm²)',
     help: 'Determines resistance and ampacity. Base electrical characteristic.'
@@ -809,6 +814,16 @@ const cablePropertyMetadata = {
     label: 'Ground Return Path Resistance',
     type: 'number',
     help: 'Used for unbalanced faults. Important for system grounding.'
+  },
+  impedance_r: {
+    label: 'Impedance R (Ω)',
+    type: 'number',
+    help: 'Positive-sequence resistance. Impacts voltage drop and fault currents.'
+  },
+  impedance_x: {
+    label: 'Impedance X (Ω)',
+    type: 'number',
+    help: 'Positive-sequence reactance. Impacts voltage drop and fault currents.'
   }
 };
 
@@ -5386,13 +5401,8 @@ function distributeSelection(axis) {
 }
 
 function selectComponent(compOrId) {
-  if (compOrId && typeof compOrId === 'object' && compOrId.type === 'cable') {
-    openCableProperties(compOrId);
-    return;
-  }
-
   const nodeComponents = buildVirtualNodeEntries(components, connections);
-  const baseComponents = components.filter(c => c.type !== 'cable');
+  const baseComponents = [...components];
   const deviceComponents = [...baseComponents, ...nodeComponents];
   if (!deviceComponents.length) return;
 
@@ -5400,17 +5410,10 @@ function selectComponent(compOrId) {
   let activeComponent = null;
   if (typeof compOrId === 'string' && compOrId) {
     activeComponent = findDeviceById(compOrId);
-    if (!activeComponent) {
-      const comp = components.find(c => c.id === compOrId);
-      if (comp && comp.type === 'cable') {
-        openCableProperties(comp);
-        return;
-      }
-    }
   } else if (compOrId && typeof compOrId === 'object') {
     if (compOrId.isVirtualNode) {
       activeComponent = findDeviceById(compOrId.id);
-    } else if (compOrId.type !== 'cable') {
+    } else {
       activeComponent = compOrId;
     }
   }
@@ -5660,6 +5663,10 @@ function selectComponent(compOrId) {
       return;
     }
 
+    if (targetComp.type === 'cable' && (!targetComp.cable || typeof targetComp.cable !== 'object')) {
+      targetComp.cable = {};
+    }
+
     propertyHeading.textContent = `${getComponentListLabel(targetComp)} Properties`;
 
     let rawSchema = propSchemas[targetComp.subtype] || [];
@@ -5798,44 +5805,92 @@ function selectComponent(compOrId) {
       return next;
     });
 
+    if (targetComp.type === 'cable') {
+      schema = schema.filter(f => !['cable_cable_rating', 'cable_impedance_r', 'cable_impedance_x'].includes(f.name));
+    }
+
     if (targetComp.subtype === 'motor_load') {
       schema = schema.filter(
         f => !['conductor_type', 'cable_assembly', 'breaker_frame', 'conductor_assembly', 'gap'].includes(f.name)
       );
     }
 
-    let baseFields = [
-      { name: 'label', label: 'Label', type: 'text' },
-      { name: 'ref', label: 'Ref ID', type: 'text' },
-      { name: 'enclosure', label: 'Enclosure', type: 'select', options: ['NEMA 1', 'NEMA 3R', 'NEMA 4', 'NEMA 4X'] },
-      { name: 'gap', label: 'Gap (mm)', type: 'number' },
-      { name: 'working_distance', label: 'Working Distance (mm)', type: 'number' },
-      { name: 'clearing_time', label: 'Clearing Time (s)', type: 'number' }
-    ];
-
-    if (targetComp.subtype === 'motor_load') {
-      baseFields = baseFields.filter(
-        f => !['gap', 'conductor_type', 'cable_assembly', 'breaker_frame', 'conductor_assembly'].includes(f.name)
-      );
-    }
-
-    if (hasImpedance(targetComp)) {
-      baseFields = baseFields.concat([
+    let baseFields;
+    if (targetComp.type === 'cable') {
+      baseFields = [
+        { name: 'label', label: 'Label', type: 'text' },
+        { name: 'ref', label: 'Ref ID', type: 'text' },
         {
-          name: 'impedance_r',
-          label: 'Impedance R (Ω)',
+          name: 'cable_rating',
+          label: 'Cable Rating (V)',
           type: 'number',
-          getValue: comp => getImpedancePart(comp, 'r'),
-          setValue: (comp, value) => setImpedancePart(comp, 'r', value, { keepEmpty: true })
+          getValue: comp => comp.cable?.cable_rating ?? '',
+          setValue: (comp, rawValue) => {
+            if (!comp.cable || typeof comp.cable !== 'object') comp.cable = {};
+            const trimmed = typeof rawValue === 'string' ? rawValue.trim() : rawValue;
+            if (trimmed === '' || trimmed === null || trimmed === undefined) {
+              delete comp.cable.cable_rating;
+              return;
+            }
+            const num = Number(trimmed);
+            comp.cable.cable_rating = Number.isFinite(num) ? num : trimmed;
+          }
         },
         {
-          name: 'impedance_x',
+          name: 'cable_impedance_r',
+          label: 'Impedance R (Ω)',
+          type: 'number',
+          getValue: comp => getImpedancePart(comp.cable, 'r'),
+          setValue: (comp, value) => {
+            if (!comp.cable || typeof comp.cable !== 'object') comp.cable = {};
+            setImpedancePart(comp.cable, 'r', value, { keepEmpty: false });
+          }
+        },
+        {
+          name: 'cable_impedance_x',
           label: 'Impedance X (Ω)',
           type: 'number',
-          getValue: comp => getImpedancePart(comp, 'x'),
-          setValue: (comp, value) => setImpedancePart(comp, 'x', value, { keepEmpty: true })
+          getValue: comp => getImpedancePart(comp.cable, 'x'),
+          setValue: (comp, value) => {
+            if (!comp.cable || typeof comp.cable !== 'object') comp.cable = {};
+            setImpedancePart(comp.cable, 'x', value, { keepEmpty: false });
+          }
         }
-      ]);
+      ];
+    } else {
+      baseFields = [
+        { name: 'label', label: 'Label', type: 'text' },
+        { name: 'ref', label: 'Ref ID', type: 'text' },
+        { name: 'enclosure', label: 'Enclosure', type: 'select', options: ['NEMA 1', 'NEMA 3R', 'NEMA 4', 'NEMA 4X'] },
+        { name: 'gap', label: 'Gap (mm)', type: 'number' },
+        { name: 'working_distance', label: 'Working Distance (mm)', type: 'number' },
+        { name: 'clearing_time', label: 'Clearing Time (s)', type: 'number' }
+      ];
+
+      if (targetComp.subtype === 'motor_load') {
+        baseFields = baseFields.filter(
+          f => !['gap', 'conductor_type', 'cable_assembly', 'breaker_frame', 'conductor_assembly'].includes(f.name)
+        );
+      }
+
+      if (hasImpedance(targetComp)) {
+        baseFields = baseFields.concat([
+          {
+            name: 'impedance_r',
+            label: 'Impedance R (Ω)',
+            type: 'number',
+            getValue: comp => getImpedancePart(comp, 'r'),
+            setValue: (comp, value) => setImpedancePart(comp, 'r', value, { keepEmpty: true })
+          },
+          {
+            name: 'impedance_x',
+            label: 'Impedance X (Ω)',
+            type: 'number',
+            getValue: comp => getImpedancePart(comp, 'x'),
+            setValue: (comp, value) => setImpedancePart(comp, 'x', value, { keepEmpty: true })
+          }
+        ]);
+      }
     }
 
     let manufacturerInput = null;
@@ -5955,20 +6010,22 @@ function selectComponent(compOrId) {
       );
     }
 
-    const tccOptions = [
-      { value: '', label: '--Select Device--' },
-      ...protectiveDevices.map(dev => ({ value: dev.id, label: dev.name }))
-    ];
-    fields.push({
-      name: 'tccId',
-      label: 'TCC Device',
-      type: 'select',
-      options: tccOptions,
-      getValue: comp => comp.tccId || '',
-      setValue: (comp, value) => {
-        comp.tccId = value || '';
-      }
-    });
+    if (targetComp.type !== 'cable') {
+      const tccOptions = [
+        { value: '', label: '--Select Device--' },
+        ...protectiveDevices.map(dev => ({ value: dev.id, label: dev.name }))
+      ];
+      fields.push({
+        name: 'tccId',
+        label: 'TCC Device',
+        type: 'select',
+        options: tccOptions,
+        getValue: comp => comp.tccId || '',
+        setValue: (comp, value) => {
+          comp.tccId = value || '';
+        }
+      });
+    }
 
     const applyChanges = () => {
       if (hasApplied) return;
@@ -5977,7 +6034,9 @@ function selectComponent(compOrId) {
       fields.forEach(f => {
         applyFieldFromForm(targetComp, f, fd);
       });
-      targetComp.tccId = fd.get('tccId') || '';
+      if (targetComp.type !== 'cable') {
+        targetComp.tccId = fd.get('tccId') || '';
+      }
       pushHistory();
       render();
       save();
@@ -6185,6 +6244,59 @@ function selectComponent(compOrId) {
         });
         tccActions.appendChild(tccBtn);
         generalPanel.appendChild(tccActions);
+      }
+    }
+
+    if (targetComp.type === 'cable') {
+      const generalPanel = getTabPanel('general');
+      if (generalPanel) {
+        const cable = targetComp.cable || {};
+        const cableInfo = document.createElement('div');
+        cableInfo.className = 'cable-info';
+        cableInfo.innerHTML = `
+          <p><strong>Tag:</strong> ${cable.tag || ''}</p>
+          <p><strong>Type:</strong> ${cable.cable_type || ''}</p>
+          <p><strong>Cable Rating (V):</strong> ${cable.cable_rating ?? ''}</p>
+          <p><strong>Operating Voltage (V):</strong> ${formatOperatingVoltage(cable.operating_voltage) || ''}</p>
+          <p><strong>Conductors:</strong> ${cable.conductors || ''}</p>
+          <p><strong>Phases:</strong> ${Array.isArray(cable.phases) ? cable.phases.join(',') : cable.phases || ''}</p>
+          <p><strong>Conductor Size (AWG or mm²):</strong> ${cable.conductor_size || ''}</p>
+          <p><strong>Conductor Material (Cu/Al):</strong> ${cable.conductor_material || ''}</p>
+          <p><strong>Resistance (Ω/km):</strong> ${cable.resistance_per_km ?? ''}</p>
+          <p><strong>Reactance (Ω/km):</strong> ${cable.reactance_per_km ?? ''}</p>
+          <p><strong>Zero Sequence Impedance:</strong> ${cable.zero_sequence_impedance || ''}</p>
+          <p><strong>Mutual Coupling:</strong> ${cable.mutual_coupling || ''}</p>
+          <p><strong>Length:</strong> ${cable.length ?? ''}</p>
+          <p><strong>Operating Temperature (°C):</strong> ${cable.operating_temp ?? ''}</p>
+          <p><strong>Ambient Temperature (°C):</strong> ${cable.ambient_temp ?? ''}</p>
+          <p><strong>Thermal Rating/Ampacity (A):</strong> ${cable.thermal_rating_ampacity ?? ''}</p>
+          <p><strong>Shield/Armor Data:</strong> ${cable.shield_armor || ''}</p>
+          <p><strong>Impedance per Length:</strong> ${cable.impedance_per_length || ''}</p>
+          <p><strong>Capacitance (µF/km):</strong> ${cable.capacitance_per_km ?? ''}</p>
+          <p><strong>Insulation Type:</strong> ${cable.insulation_type || ''}</p>
+          <p><strong>Installation Type (in conduit, tray, buried):</strong> ${cable.install_method || ''}</p>
+          <p><strong>Short Circuit Rating (kA):</strong> ${cable.short_circuit_rating ?? ''}</p>
+          <p><strong>Grouping Factor:</strong> ${cable.grouping_factor ?? ''}</p>
+          <p><strong>Resistance Temp Correction Coeff:</strong> ${cable.resistance_temp_correction_coeff ?? ''}</p>
+          <p><strong>Core Configuration (1C,3C):</strong> ${cable.core_configuration || ''}</p>
+          <p><strong>Ground Return Path Resistance:</strong> ${cable.ground_return_path_resistance ?? ''}</p>
+          <p><strong>Impedance R (Ω):</strong> ${getImpedancePart(cable, 'r') || ''}</p>
+          <p><strong>Impedance X (Ω):</strong> ${getImpedancePart(cable, 'x') || ''}</p>
+        `;
+        generalPanel.appendChild(cableInfo);
+
+        const cableActions = document.createElement('div');
+        cableActions.className = 'prop-tab-actions';
+        const editCableBtn = document.createElement('button');
+        editCableBtn.type = 'button';
+        editCableBtn.textContent = 'Edit Cable Details';
+        editCableBtn.classList.add('btn');
+        editCableBtn.addEventListener('click', async () => {
+          await editCableComponent(targetComp);
+          renderPropertiesFor(targetComp);
+        });
+        cableActions.appendChild(editCableBtn);
+        generalPanel.appendChild(cableActions);
       }
     }
 
@@ -7086,180 +7198,6 @@ async function editCableComponent(comp) {
   render();
   save();
   syncSchedules();
-}
-
-function openCableProperties(comp) {
-  if (!comp) return;
-  selected = comp;
-  selection = [comp];
-  selectedConnection = null;
-  const modal = ensurePropModal();
-  if (modal._outsideHandler) modal.removeEventListener('click', modal._outsideHandler);
-  if (modal._keyHandler) document.removeEventListener('keydown', modal._keyHandler);
-  modal.innerHTML = '';
-  const form = document.createElement('form');
-  form.id = 'cable-prop-form';
-
-  const outsideHandler = e => { if (e.target === modal) closeModal(); };
-  const keyHandler = e => { if (e.key === 'Escape') { e.preventDefault(); closeModal(); } };
-
-  function closeModal() {
-    modal.classList.remove('show');
-    selected = null;
-    selection = [];
-    selectedConnection = null;
-    modal.removeEventListener('click', outsideHandler);
-    document.removeEventListener('keydown', keyHandler);
-    delete modal._outsideHandler;
-    delete modal._keyHandler;
-  }
-
-  const labelLabel = document.createElement('label');
-  labelLabel.textContent = 'Label ';
-  const labelInput = document.createElement('input');
-  labelInput.type = 'text';
-  labelInput.value = comp.label || '';
-  labelLabel.appendChild(labelInput);
-  form.appendChild(labelLabel);
-
-  const refLabel = document.createElement('label');
-  refLabel.textContent = 'Ref ID ';
-  const refInput = document.createElement('input');
-  refInput.type = 'text';
-  refInput.value = comp.ref || '';
-  refLabel.appendChild(refInput);
-  form.appendChild(refLabel);
-
-  const ratingLabel = document.createElement('label');
-  ratingLabel.textContent = 'Cable Rating (V) ';
-  const ratingInput = document.createElement('input');
-  ratingInput.type = 'number';
-  ratingInput.min = '0';
-  ratingInput.step = 'any';
-  ratingInput.value = comp.cable?.cable_rating ?? '';
-  ratingLabel.appendChild(ratingInput);
-  form.appendChild(ratingLabel);
-
-  const cableInfo = document.createElement('div');
-  cableInfo.classList.add('cable-info');
-  const cable = comp.cable || {};
-  cableInfo.innerHTML = `
-    <p><strong>Tag:</strong> ${cable.tag || ''}</p>
-    <p><strong>Type:</strong> ${cable.cable_type || ''}</p>
-    <p><strong>Cable Rating (V):</strong> ${cable.cable_rating ?? ''}</p>
-    <p><strong>Operating Voltage (V):</strong> ${formatOperatingVoltage(cable.operating_voltage) || ''}</p>
-    <p><strong>Conductors:</strong> ${cable.conductors || ''}</p>
-    <p><strong>Phases:</strong> ${Array.isArray(cable.phases) ? cable.phases.join(',') : cable.phases || ''}</p>
-    <p><strong>Conductor Size (AWG or mm²):</strong> ${cable.conductor_size || ''}</p>
-    <p><strong>Conductor Material (Cu/Al):</strong> ${cable.conductor_material || ''}</p>
-    <p><strong>Resistance (Ω/km):</strong> ${cable.resistance_per_km ?? ''}</p>
-    <p><strong>Reactance (Ω/km):</strong> ${cable.reactance_per_km ?? ''}</p>
-    <p><strong>Zero Sequence Impedance:</strong> ${cable.zero_sequence_impedance || ''}</p>
-    <p><strong>Mutual Coupling:</strong> ${cable.mutual_coupling || ''}</p>
-    <p><strong>Length:</strong> ${cable.length ?? ''}</p>
-    <p><strong>Operating Temperature (°C):</strong> ${cable.operating_temp ?? ''}</p>
-    <p><strong>Ambient Temperature (°C):</strong> ${cable.ambient_temp ?? ''}</p>
-    <p><strong>Thermal Rating/Ampacity (A):</strong> ${cable.thermal_rating_ampacity ?? ''}</p>
-    <p><strong>Shield/Armor Data:</strong> ${cable.shield_armor || ''}</p>
-    <p><strong>Impedance per Length:</strong> ${cable.impedance_per_length || ''}</p>
-    <p><strong>Capacitance (µF/km):</strong> ${cable.capacitance_per_km ?? ''}</p>
-    <p><strong>Insulation Type:</strong> ${cable.insulation_type || ''}</p>
-    <p><strong>Installation Type (in conduit, tray, buried):</strong> ${cable.install_method || ''}</p>
-    <p><strong>Short Circuit Rating (kA):</strong> ${cable.short_circuit_rating ?? ''}</p>
-    <p><strong>Grouping Factor:</strong> ${cable.grouping_factor ?? ''}</p>
-    <p><strong>Resistance Temp Correction Coeff:</strong> ${cable.resistance_temp_correction_coeff ?? ''}</p>
-    <p><strong>Core Configuration (1C,3C):</strong> ${cable.core_configuration || ''}</p>
-    <p><strong>Ground Return Path Resistance:</strong> ${cable.ground_return_path_resistance ?? ''}</p>
-    <p><strong>Impedance R (Ω):</strong> ${getImpedancePart(cable, 'r') || ''}</p>
-    <p><strong>Impedance X (Ω):</strong> ${getImpedancePart(cable, 'x') || ''}</p>
-  `;
-  form.appendChild(cableInfo);
-
-  const impedanceRLabel = document.createElement('label');
-  impedanceRLabel.textContent = 'Impedance R (Ω) ';
-  const impedanceRInput = document.createElement('input');
-  impedanceRInput.type = 'number';
-  impedanceRInput.step = 'any';
-  impedanceRInput.value = getImpedancePart(cable, 'r') || '';
-  impedanceRLabel.appendChild(impedanceRInput);
-  form.appendChild(impedanceRLabel);
-
-  const impedanceXLabel = document.createElement('label');
-  impedanceXLabel.textContent = 'Impedance X (Ω) ';
-  const impedanceXInput = document.createElement('input');
-  impedanceXInput.type = 'number';
-  impedanceXInput.step = 'any';
-  impedanceXInput.value = getImpedancePart(cable, 'x') || '';
-  impedanceXLabel.appendChild(impedanceXInput);
-  form.appendChild(impedanceXLabel);
-
-  const editCableBtn = document.createElement('button');
-  editCableBtn.type = 'button';
-  editCableBtn.textContent = 'Edit Cable Details';
-  editCableBtn.classList.add('btn');
-  editCableBtn.addEventListener('click', async e => {
-    e.preventDefault();
-    await editCableComponent(comp);
-    openCableProperties(comp);
-  });
-  form.appendChild(editCableBtn);
-
-  const applyBtn = document.createElement('button');
-  applyBtn.type = 'submit';
-  applyBtn.textContent = 'Apply';
-  applyBtn.classList.add('btn');
-  form.appendChild(applyBtn);
-
-  const cancelBtn = document.createElement('button');
-  cancelBtn.type = 'button';
-  cancelBtn.textContent = 'Cancel';
-  cancelBtn.classList.add('btn');
-  cancelBtn.addEventListener('click', closeModal);
-  form.appendChild(cancelBtn);
-
-  const deleteBtn = document.createElement('button');
-  deleteBtn.type = 'button';
-  deleteBtn.textContent = 'Delete Cable Component';
-  deleteBtn.classList.add('btn');
-  deleteBtn.addEventListener('click', () => {
-    components = components.filter(c => c !== comp);
-    components.forEach(c => {
-      c.connections = (c.connections || []).filter(conn => conn.target !== comp.id);
-    });
-    closeModal();
-    pushHistory();
-    render();
-    save();
-  });
-  form.appendChild(deleteBtn);
-
-  form.addEventListener('submit', e => {
-    e.preventDefault();
-    comp.label = labelInput.value || '';
-    comp.ref = refInput.value || '';
-    if (!comp.cable || typeof comp.cable !== 'object') comp.cable = {};
-    const ratingRaw = ratingInput.value != null ? ratingInput.value.trim() : '';
-    if (ratingRaw) {
-      const ratingNum = Number(ratingRaw);
-      comp.cable.cable_rating = Number.isFinite(ratingNum) ? ratingNum : ratingRaw;
-    } else {
-      delete comp.cable.cable_rating;
-    }
-    setImpedancePart(comp.cable, 'r', impedanceRInput.value, { keepEmpty: false });
-    setImpedancePart(comp.cable, 'x', impedanceXInput.value, { keepEmpty: false });
-    pushHistory();
-    render();
-    save();
-    syncSchedules();
-    closeModal();
-  });
-
-  modal.appendChild(form);
-  modal.classList.add('show');
-  modal._outsideHandler = outsideHandler;
-  modal._keyHandler = keyHandler;
-  modal.addEventListener('click', outsideHandler);
-  document.addEventListener('keydown', keyHandler);
 }
 
 async function init() {
