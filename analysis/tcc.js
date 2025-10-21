@@ -621,21 +621,28 @@ function buildTransformerInrushEntries(targetId) {
   if (!reference) return overlays;
   const refVoltage = inferVoltage(reference);
   const refPhases = parsePhases(reference.phases).length || 3;
+  const transformers = new Map();
+  if (reference.type === 'transformer') {
+    transformers.set(reference.id, reference);
+  }
   (neighborMap.get(targetId) || new Set()).forEach(id => {
     const neighbor = componentLookup.get(id)?.component;
     if (!neighbor || neighbor.type !== 'transformer') return;
-    const inrush = computeTransformerInrush(neighbor, refVoltage, refPhases);
+    if (!transformers.has(neighbor.id)) transformers.set(neighbor.id, neighbor);
+  });
+  transformers.forEach(transformer => {
+    const inrush = computeTransformerInrush(transformer, refVoltage, refPhases);
     if (!inrush) return;
     overlays.push({
-      uid: `inrush:${neighbor.id}:${targetId}`,
+      uid: `inrush:${transformer.id}:${targetId}`,
       kind: 'inrush',
-      name: `${componentLabel(neighbor)} Inrush`,
+      name: `${componentLabel(transformer)} Inrush`,
       deviceCategory: 'transformer',
       deviceType: 'transformer inrush',
       current: inrush.current,
       duration: inrush.duration,
-      sourceId: neighbor.id,
-      sourceLabel: componentLabel(neighbor),
+      sourceId: transformer.id,
+      sourceLabel: componentLabel(transformer),
       autoSelect: true
     });
   });
@@ -648,20 +655,27 @@ function buildTransformerDamageEntries(targetId) {
   if (!reference) return overlays;
   const refVoltage = inferVoltage(reference);
   const refPhases = parsePhases(reference.phases).length || 3;
+  const transformers = new Map();
+  if (reference.type === 'transformer') {
+    transformers.set(reference.id, reference);
+  }
   (neighborMap.get(targetId) || new Set()).forEach(id => {
     const neighbor = componentLookup.get(id)?.component;
     if (!neighbor || neighbor.type !== 'transformer') return;
-    const damage = buildTransformerDamageCurve(neighbor, refVoltage, refPhases);
+    if (!transformers.has(neighbor.id)) transformers.set(neighbor.id, neighbor);
+  });
+  transformers.forEach(transformer => {
+    const damage = buildTransformerDamageCurve(transformer, refVoltage, refPhases);
     if (!damage) return;
     overlays.push({
-      uid: `transformer-damage:${neighbor.id}:${targetId}`,
+      uid: `transformer-damage:${transformer.id}:${targetId}`,
       kind: 'transformerDamage',
-      name: `${componentLabel(neighbor)} Damage`,
+      name: `${componentLabel(transformer)} Damage`,
       deviceCategory: 'transformer',
       deviceType: 'transformer damage',
       curve: damage.curve,
       fla: damage.fla,
-      sourceLabel: componentLabel(neighbor),
+      sourceLabel: componentLabel(transformer),
       autoSelect: true
     });
   });
