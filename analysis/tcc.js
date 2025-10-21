@@ -2085,7 +2085,8 @@ function deepEqual(a, b) {
 }
 
 function linkComponent() {
-  if (!compId) return;
+  const targetComponentId = getActiveComponentId() || compId;
+  if (!targetComponentId) return;
   const first = selectedDeviceIds().find(id => {
     const entry = deviceMap.get(id);
     return entry && (entry.kind === 'library' || entry.kind === 'component');
@@ -2099,7 +2100,7 @@ function linkComponent() {
   let updated = false;
   (data.sheets || []).forEach(sheet => {
     (sheet.components || []).forEach(comp => {
-      if (comp.id !== compId) return;
+      if (comp.id !== targetComponentId) return;
       comp.tccId = deviceId;
       if (overrides && Object.keys(overrides).length) {
         comp.tccOverrides = overrides;
@@ -2113,7 +2114,7 @@ function linkComponent() {
     setOneLine(data);
     buildComponentData();
     rebuildCatalog();
-    selectDefaults(new Set([`component:${compId}`]));
+    selectDefaults(new Set([`component:${targetComponentId}`]));
     renderSettings();
     plot();
   }
