@@ -5402,7 +5402,7 @@ function distributeSelection(axis) {
 
 function selectComponent(compOrId) {
   const nodeComponents = buildVirtualNodeEntries(components, connections);
-  const baseComponents = components.filter(c => c.type !== 'dimension');
+  const baseComponents = [...components];
   const deviceComponents = [...baseComponents, ...nodeComponents];
   if (!deviceComponents.length) return;
 
