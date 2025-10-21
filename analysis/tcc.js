@@ -1574,6 +1574,12 @@ async function openComponentBrowserModal() {
     componentModalBtn.setAttribute('aria-expanded', 'true');
   }
 
+  // Ensure we rebuild the catalog so one-line changes made since the last
+  // refresh are represented when the modal opens. This keeps the component
+  // list in sync with the latest diagram data instead of relying on the
+  // previously cached entries.
+  refreshCatalog({ preserveSelection: true });
+
   const componentEntries = buildComponentDisplayEntries();
   if (!componentEntries.length) {
     await openModal({
