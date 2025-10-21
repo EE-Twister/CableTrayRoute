@@ -1,5 +1,14 @@
 import * as d3 from 'https://cdn.jsdelivr.net/npm/d3@7/+esm';
-import { getItem, setItem, getOneLine, setOneLine, getStudies, setStudies } from '../dataStore.mjs';
+import {
+  getItem,
+  setItem,
+  getOneLine,
+  setOneLine,
+  getStudies,
+  setStudies,
+  on,
+  STORAGE_KEYS
+} from '../dataStore.mjs';
 import { runShortCircuit } from './shortCircuit.mjs';
 import { scaleCurve, checkDuty } from './tccUtils.js';
 import { openModal } from '../src/components/modal.js';
@@ -93,11 +102,16 @@ const TYPE_PRIORITY = new Map([
   ['other', 6]
 ]);
 
-let saved = getItem('tccSettings') || {};
-if (!Array.isArray(saved.devices)) saved.devices = [];
-if (!saved.settings || typeof saved.settings !== 'object') saved.settings = {};
-if (!saved.componentOverrides || typeof saved.componentOverrides !== 'object') saved.componentOverrides = {};
-if (!saved.overlaySelections || typeof saved.overlaySelections !== 'object') saved.overlaySelections = {};
+function loadSavedSettings() {
+  const stored = getItem('tccSettings') || {};
+  if (!Array.isArray(stored.devices)) stored.devices = [];
+  if (!stored.settings || typeof stored.settings !== 'object') stored.settings = {};
+  if (!stored.componentOverrides || typeof stored.componentOverrides !== 'object') stored.componentOverrides = {};
+  if (!stored.overlaySelections || typeof stored.overlaySelections !== 'object') stored.overlaySelections = {};
+  return stored;
+}
+
+let saved = loadSavedSettings();
 
 init();
 
@@ -364,6 +378,57 @@ function collectOverridesFromDiv(div) {
   return overrides;
 }
 
+function refreshCatalog({
+  preserveSelection = false,
+  includeComponentContext = !preserveSelection,
+  includeDeviceParam = !preserveSelection
+} = {}) {
+  const previousSelection = preserveSelection ? new Set(selectedDeviceIds()) : new Set();
+  buildComponentData();
+  rebuildCatalog();
+  const available = new Set(deviceEntries.map(entry => entry.uid));
+  const defaults = new Set((saved.devices || []).filter(id => available.has(id)));
+  if (preserveSelection) {
+    previousSelection.forEach(id => {
+      if (available.has(id)) defaults.add(id);
+    });
+  }
+  if (includeComponentContext && compId) {
+    const compEntry = componentDeviceMap.get(compId);
+    if (compEntry) defaults.add(compEntry.uid);
+    collectNeighborDeviceDefaults(compId).forEach(id => {
+      if (available.has(id)) defaults.add(id);
+    });
+  }
+  if (includeDeviceParam && deviceParam) {
+    const libraryEntry = deviceEntries.find(
+      entry => entry.kind === 'library' && entry.baseDeviceId === deviceParam
+    );
+    if (libraryEntry) defaults.add(libraryEntry.uid);
+  }
+  deviceEntries
+    .filter(entry => entry.autoSelect)
+    .forEach(entry => defaults.add(entry.uid));
+  if (!defaults.size && deviceEntries.length) {
+    const first = deviceEntries.find(entry => entry.kind === 'component')
+      || deviceEntries.find(entry => entry.kind === 'library');
+    if (first) defaults.add(first.uid);
+  }
+  const selection = [...defaults].filter(id => available.has(id));
+  applySelectionSet(selection);
+  saved.devices = selection;
+  setItem('tccSettings', saved);
+  return selection;
+}
+
+function updateShortCircuitStudy() {
+  const sc = runShortCircuit();
+  const studies = getStudies();
+  studies.shortCircuit = sc;
+  setStudies(studies);
+  return sc;
+}
+
 async function init() {
   try {
     const list = await fetch('data/protectiveDevices.json').then(r => r.json());
@@ -373,42 +438,30 @@ async function init() {
     libraryDevices = [];
   }
 
-  buildComponentData();
-  rebuildCatalog();
+  const initialSelection = refreshCatalog({ includeComponentContext: true, includeDeviceParam: true });
 
-  const sc = runShortCircuit();
-  const studies = getStudies();
-  studies.shortCircuit = sc;
-  setStudies(studies);
+  updateShortCircuitStudy();
 
-  const available = new Set(deviceEntries.map(entry => entry.uid));
-  const defaults = new Set((saved.devices || []).filter(id => available.has(id)));
-  if (compId) {
-    const compEntry = componentDeviceMap.get(compId);
-    if (compEntry) defaults.add(compEntry.uid);
-    collectNeighborDeviceDefaults(compId).forEach(id => defaults.add(id));
-  }
-  if (deviceParam) {
-    const libraryEntry = deviceEntries.find(entry => entry.kind === 'library' && entry.baseDeviceId === deviceParam);
-    if (libraryEntry) defaults.add(libraryEntry.uid);
-  }
-  if (!defaults.size && deviceEntries.length) {
-    const first = deviceEntries.find(entry => entry.kind === 'component')
-      || deviceEntries.find(entry => entry.kind === 'library');
-    if (first) defaults.add(first.uid);
-  }
-  deviceEntries
-    .filter(entry => entry.autoSelect)
-    .forEach(entry => defaults.add(entry.uid));
-  if (defaults.size) {
-    selectDefaults(defaults);
-  }
-
-  renderSelectedSummary();
-  renderSettings();
-  if (compId && deviceSelect && deviceSelect.selectedOptions.length) {
+  if (compId && deviceSelect && deviceSelect.selectedOptions.length && initialSelection.length) {
     plot();
   }
+
+  on(STORAGE_KEYS.oneLine, () => {
+    const selection = refreshCatalog({ preserveSelection: true });
+    updateShortCircuitStudy();
+    if (compId && deviceSelect && deviceSelect.selectedOptions.length && selection.length) {
+      plot();
+    }
+  });
+
+  on('scenario', () => {
+    saved = loadSavedSettings();
+    const selection = refreshCatalog({ includeComponentContext: true, includeDeviceParam: true });
+    updateShortCircuitStudy();
+    if (compId && deviceSelect && deviceSelect.selectedOptions.length && selection.length) {
+      plot();
+    }
+  });
 }
 
 function selectDefaults(ids) {
