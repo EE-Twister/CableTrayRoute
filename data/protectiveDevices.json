@@ -105,6 +105,65 @@
     }
   },
   {
+    "id": "bussmann_lpsrksp_400",
+    "type": "fuse",
+    "vendor": "Eaton Bussmann",
+    "name": "Bussmann LPS-RK-SP 400A",
+    "interruptRating": 200,
+    "settings": {
+      "ampRating": 400,
+      "speed": "time_delay"
+    },
+    "settingOptions": {
+      "ampRating": [100, 200, 400, 600],
+      "speed": [
+        { "value": "time_delay", "label": "Time-Delay" },
+        { "value": "fast", "label": "Fast-Acting" }
+      ]
+    },
+    "curve": [
+      { "current": 400, "time": 100 },
+      { "current": 800, "time": 10 },
+      { "current": 2000, "time": 1 },
+      { "current": 4000, "time": 0.1 }
+    ],
+    "tolerance": {
+      "timeLower": 0.9,
+      "timeUpper": 1.2
+    }
+  },
+  {
+    "id": "mersen_trs200r",
+    "type": "fuse",
+    "vendor": "Mersen",
+    "name": "Mersen TRS-R 200A",
+    "interruptRating": 200,
+    "settings": {
+      "ampRating": 200,
+      "speed": "time_delay"
+    },
+    "settingOptions": {
+      "ampRating": [100, 200, 225, 250],
+      "speed": [
+        { "value": "time_delay", "label": "Time-Delay" },
+        { "value": "fast", "label": "Fast-Acting" }
+      ]
+    },
+    "curve": [
+      { "current": 200, "time": 120 },
+      { "current": 600, "time": 8 },
+      { "current": 1800, "time": 0.6 },
+      { "current": 3600, "time": 0.08 }
+    ],
+    "letThrough": {
+      "i2t": 120000
+    },
+    "tolerance": {
+      "timeLower": 0.85,
+      "timeUpper": 1.15
+    }
+  },
+  {
     "id": "ge_multilin_750",
     "type": "relay",
     "vendor": "GE",
