@@ -421,6 +421,14 @@ function refreshCatalog({
   return selection;
 }
 
+function updateShortCircuitStudy() {
+  const sc = runShortCircuit();
+  const studies = getStudies();
+  studies.shortCircuit = sc;
+  setStudies(studies);
+  return sc;
+}
+
 async function init() {
   try {
     const list = await fetch('data/protectiveDevices.json').then(r => r.json());
@@ -432,10 +440,7 @@ async function init() {
 
   const initialSelection = refreshCatalog({ includeComponentContext: true, includeDeviceParam: true });
 
-  const sc = runShortCircuit();
-  const studies = getStudies();
-  studies.shortCircuit = sc;
-  setStudies(studies);
+  updateShortCircuitStudy();
 
   if (compId && deviceSelect && deviceSelect.selectedOptions.length && initialSelection.length) {
     plot();
@@ -443,6 +448,7 @@ async function init() {
 
   on(STORAGE_KEYS.oneLine, () => {
     const selection = refreshCatalog({ preserveSelection: true });
+    updateShortCircuitStudy();
     if (compId && deviceSelect && deviceSelect.selectedOptions.length && selection.length) {
       plot();
     }
@@ -451,6 +457,7 @@ async function init() {
   on('scenario', () => {
     saved = loadSavedSettings();
     const selection = refreshCatalog({ includeComponentContext: true, includeDeviceParam: true });
+    updateShortCircuitStudy();
     if (compId && deviceSelect && deviceSelect.selectedOptions.length && selection.length) {
       plot();
     }
