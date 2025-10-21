@@ -1025,8 +1025,11 @@
     },
     {
       "type": "fuse",
+      "subtype": "class_rk1",
       "label": "Fuse",
-      "icon": "icons/placeholder.svg",
+      "icon": "icons/components/Fuse.svg",
+      "width": 80,
+      "height": 40,
       "props": {
         "class": "RK1",
         "rating_a": 400,
@@ -1039,8 +1042,45 @@
         "gap": 32,
         "working_distance": 455,
         "electrode_config": "VCB",
-        "interrupt_rating_ka": 0.4
-      }
+        "interrupt_rating_ka": 200,
+        "let_through_i2t": 150000
+      },
+      "deviceProperties": [
+        {
+          "DeviceType": "Fuse",
+          "PropertyName": "Class",
+          "PurposeUseCase": "Defines time-current curve family",
+          "NotesOrComments": "Used to select coordination curve"
+        },
+        {
+          "DeviceType": "Fuse",
+          "PropertyName": "Rated Current (A)",
+          "PurposeUseCase": "Defines continuous ampacity",
+          "NotesOrComments": "Used in load and coordination studies"
+        },
+        {
+          "DeviceType": "Fuse",
+          "PropertyName": "Speed",
+          "PurposeUseCase": "Defines time-delay characteristic",
+          "NotesOrComments": "Impacts TCC and arc flash clearing time"
+        },
+        {
+          "DeviceType": "Fuse",
+          "PropertyName": "Interrupting Rating (kA)",
+          "PurposeUseCase": "Defines maximum fault duty",
+          "NotesOrComments": "Used for short-circuit and arc flash duty checks"
+        },
+        {
+          "DeviceType": "Fuse",
+          "PropertyName": "Let-Through I²t",
+          "PurposeUseCase": "Supports incident energy calculations",
+          "NotesOrComments": "Used in arc flash evaluations"
+        }
+      ],
+      "ports": [
+        { "x": 0, "y": 20 },
+        { "x": 80, "y": 20 }
+      ]
     },
     {
       "type": "recloser",

@@ -1025,8 +1025,11 @@
     },
     {
       "type": "fuse",
+      "subtype": "class_rk1",
       "label": "Fuse",
-      "icon": "icons/placeholder.svg",
+      "icon": "icons/components/Fuse.svg",
+      "width": 80,
+      "height": 40,
       "props": {
         "class": "RK1",
         "rating_a": 400,
@@ -1039,8 +1042,45 @@
         "gap": 32,
         "working_distance": 455,
         "electrode_config": "VCB",
-        "interrupt_rating_ka": 0.4
-      }
+        "interrupt_rating_ka": 200,
+        "let_through_i2t": 150000
+      },
+      "deviceProperties": [
+        {
+          "DeviceType": "Fuse",
+          "PropertyName": "Class",
+          "PurposeUseCase": "Defines time-current curve family",
+          "NotesOrComments": "Used to select coordination curve"
+        },
+        {
+          "DeviceType": "Fuse",
+          "PropertyName": "Rated Current (A)",
+          "PurposeUseCase": "Defines continuous ampacity",
+          "NotesOrComments": "Used in load and coordination studies"
+        },
+        {
+          "DeviceType": "Fuse",
+          "PropertyName": "Speed",
+          "PurposeUseCase": "Defines time-delay characteristic",
+          "NotesOrComments": "Impacts TCC and arc flash clearing time"
+        },
+        {
+          "DeviceType": "Fuse",
+          "PropertyName": "Interrupting Rating (kA)",
+          "PurposeUseCase": "Defines maximum fault duty",
+          "NotesOrComments": "Used for short-circuit and arc flash duty checks"
+        },
+        {
+          "DeviceType": "Fuse",
+          "PropertyName": "Let-Through I²t",
+          "PurposeUseCase": "Supports incident energy calculations",
+          "NotesOrComments": "Used in arc flash evaluations"
+        }
+      ],
+      "ports": [
+        { "x": 0, "y": 20 },
+        { "x": 80, "y": 20 }
+      ]
     },
     {
       "type": "recloser",
@@ -1510,7 +1550,69 @@
         "mva": 1.0,
         "thevenin_mva": 1.0,
         "pf": 1.0
-      }
+      },
+      "deviceProperties": [
+        {
+          "DeviceType": "Inverter/DG",
+          "PropertyName": "Rated Power (kW/MW)",
+          "PurposeUseCase": "Defines generation capacity",
+          "NotesOrComments": "Used for load flow"
+        },
+        {
+          "DeviceType": "Inverter/DG",
+          "PropertyName": "Rated Voltage (kV)",
+          "PurposeUseCase": "Defines interconnection",
+          "NotesOrComments": "Used for grid tie"
+        },
+        {
+          "DeviceType": "Inverter/DG",
+          "PropertyName": "PF Control Capability",
+          "PurposeUseCase": "Defines VAR range",
+          "NotesOrComments": "Used in VAR optimization"
+        },
+        {
+          "DeviceType": "Inverter/DG",
+          "PropertyName": "Efficiency (%)",
+          "PurposeUseCase": "Used for loss modeling",
+          "NotesOrComments": "Power balance"
+        },
+        {
+          "DeviceType": "Inverter/DG",
+          "PropertyName": "Harmonic Emission (%THD)",
+          "PurposeUseCase": "Used for harmonic analysis",
+          "NotesOrComments": "Compliance check"
+        },
+        {
+          "DeviceType": "Inverter/DG",
+          "PropertyName": "Fault Contribution (% or kA)",
+          "PurposeUseCase": "Defines short circuit behavior",
+          "NotesOrComments": "Used in protection"
+        },
+        {
+          "DeviceType": "Inverter/DG",
+          "PropertyName": "Ride Through Settings",
+          "PurposeUseCase": "Defines grid stability compliance",
+          "NotesOrComments": "Used for dynamic modeling"
+        },
+        {
+          "DeviceType": "Inverter/DG",
+          "PropertyName": "Control Mode (PQ or PV)",
+          "PurposeUseCase": "Defines operational strategy",
+          "NotesOrComments": "Used for dispatch"
+        },
+        {
+          "DeviceType": "Inverter/DG",
+          "PropertyName": "Response Time (ms)",
+          "PurposeUseCase": "Defines dynamic behavior",
+          "NotesOrComments": "Used for frequency studies"
+        },
+        {
+          "DeviceType": "Inverter/DG",
+          "PropertyName": "Grounding Type",
+          "PurposeUseCase": "Defines reference and safety",
+          "NotesOrComments": "Used for fault modeling"
+        }
+      ]
     },
     {
       "type": "ups",
