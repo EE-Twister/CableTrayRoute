@@ -308,12 +308,14 @@ export function runShortCircuit(modelOrOpts = {}, maybeOpts = {}) {
   const voltageCache = new Map();
   const results = {};
 
-  const ensureNonZero = z => {
-    if (!z) return { r: 0.0001, x: 0.0001 };
-    const r = Number(z.r) || 0;
-    const x = Number(z.x) || 0;
+  const missingImpedanceComponents = new Set();
+
+  const ensureNonZero = (z, compId) => {
+    const r = Number(z?.r) || 0;
+    const x = Number(z?.x) || 0;
     if (Math.abs(r) < 1e-9 && Math.abs(x) < 1e-9) {
-      return { r: 0.0001, x: 0.0001 };
+      if (compId) missingImpedanceComponents.add(compId);
+      return { r: 1e6, x: 1e6 };
     }
     return { r, x };
   };
@@ -321,18 +323,18 @@ export function runShortCircuit(modelOrOpts = {}, maybeOpts = {}) {
   buses.forEach(comp => {
     const baseZ = computeImpedance(comp, comps, compMap, impedanceCache);
     let z1 = comp.z1 ? toImpedance(comp.z1) : baseZ;
-    z1 = ensureNonZero(z1);
     let z2 = comp.z2 ? toImpedance(comp.z2) : z1;
     let z0 = comp.z0 ? toImpedance(comp.z0) : z1;
 
     const sourceList = Array.isArray(comp.sources) ? comp.sources : [];
     if (sourceList.length) {
-      z1 = ensureNonZero(sourceList.reduce((acc, src) => combineParallel(acc, toImpedance(src.z1 || src.impedance || src)), z1));
-      z2 = ensureNonZero(sourceList.reduce((acc, src) => combineParallel(acc, toImpedance(src.z2 || src.impedance || src)), z2));
-      z0 = ensureNonZero(sourceList.reduce((acc, src) => combineParallel(acc, toImpedance(src.z0 || src.impedance || src)), z0));
+      z1 = ensureNonZero(sourceList.reduce((acc, src) => combineParallel(acc, toImpedance(src.z1 || src.impedance || src)), z1), comp.id);
+      z2 = ensureNonZero(sourceList.reduce((acc, src) => combineParallel(acc, toImpedance(src.z2 || src.impedance || src)), z2), comp.id);
+      z0 = ensureNonZero(sourceList.reduce((acc, src) => combineParallel(acc, toImpedance(src.z0 || src.impedance || src)), z0), comp.id);
     } else {
-      z2 = ensureNonZero(z2);
-      z0 = ensureNonZero(z0);
+      z1 = ensureNonZero(z1, comp.id);
+      z2 = ensureNonZero(z2, comp.id);
+      z0 = ensureNonZero(z0, comp.id);
     }
 
     const prefaultKV = computePrefaultKV(comp, comps, compMap, voltageCache) || 1;
@@ -349,7 +351,7 @@ export function runShortCircuit(modelOrOpts = {}, maybeOpts = {}) {
     const xr = Math.abs(comp.xr_ratio || 0);
     const asym = I3 * (1 + Math.exp(-Math.PI / Math.max(xr, 0.01)));
 
-    results[comp.id] = {
+    const entry = {
       method,
       prefaultKV: Number(prefaultKV.toFixed(3)),
       threePhaseKA: Number(I3.toFixed(2)),
@@ -358,6 +360,12 @@ export function runShortCircuit(modelOrOpts = {}, maybeOpts = {}) {
       lineToLineKA: Number(ILL.toFixed(2)),
       doubleLineGroundKA: Number(IDLG.toFixed(2))
     };
+
+    if (missingImpedanceComponents.has(comp.id)) {
+      entry.warnings = ['Impedance data missing; results limited by default high resistance.'];
+    }
+
+    results[comp.id] = entry;
   });
 
   return results;
