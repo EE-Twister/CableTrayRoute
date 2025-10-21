@@ -51,10 +51,6 @@ const chart = d3.select('#tcc-chart');
 const params = new URLSearchParams(window.location.search);
 const compId = params.get('component');
 const deviceParam = params.get('device');
-if (compId) {
-  linkBtn.style.display = 'inline-block';
-  openBtn.style.display = 'inline-block';
-}
 
 let libraryDevices = [];
 let deviceEntries = [];
@@ -65,6 +61,28 @@ let componentLookup = new Map();
 let neighborMap = new Map();
 let componentDeviceMap = new Map();
 let pendingPlotRefresh = null;
+let activeComponentId = compId || null;
+
+function getActiveComponentId() {
+  if (!activeComponentId) return null;
+  if (!componentLookup.has(activeComponentId)) return null;
+  return activeComponentId;
+}
+
+function updateComponentContextUI() {
+  const hasContext = Boolean(
+    activeComponentId
+    && (componentLookup.size === 0 || componentLookup.has(activeComponentId))
+  );
+  if (openBtn) {
+    openBtn.style.display = hasContext ? 'inline-block' : 'none';
+  }
+}
+
+if (compId) {
+  linkBtn.style.display = 'inline-block';
+}
+updateComponentContextUI();
 
 const MAX_NEIGHBOR_DEPTH = 4;
 
@@ -410,15 +428,16 @@ function refreshCatalog({
   rebuildCatalog();
   const available = new Set(deviceEntries.map(entry => entry.uid));
   const defaults = new Set((saved.devices || []).filter(id => available.has(id)));
+  const contextId = getActiveComponentId();
   if (preserveSelection) {
     previousSelection.forEach(id => {
       if (available.has(id)) defaults.add(id);
     });
   }
-  if (includeComponentContext && compId) {
-    const compEntry = componentDeviceMap.get(compId);
+  if (includeComponentContext && contextId) {
+    const compEntry = componentDeviceMap.get(contextId);
     if (compEntry) defaults.add(compEntry.uid);
-    collectNeighborDeviceDefaults(compId).forEach(id => {
+    collectNeighborDeviceDefaults(contextId).forEach(id => {
       if (available.has(id)) defaults.add(id);
     });
   }
@@ -443,6 +462,27 @@ function refreshCatalog({
   return selection;
 }
 
+function setActiveComponent(componentId, { preserveSelection = false } = {}) {
+  const normalized = componentId && componentLookup.has(componentId)
+    ? componentId
+    : null;
+  activeComponentId = normalized;
+  updateComponentContextUI();
+  if (!preserveSelection) {
+    saved.devices = [];
+  }
+  const selection = refreshCatalog({
+    preserveSelection,
+    includeComponentContext: true,
+    includeDeviceParam: true
+  });
+  renderSettings();
+  if (deviceSelect && deviceSelect.selectedOptions.length && selection.length) {
+    plot();
+  }
+  return selection;
+}
+
 function updateShortCircuitStudy() {
   const sc = runShortCircuit();
   const studies = getStudies();
@@ -464,14 +504,14 @@ async function init() {
 
   updateShortCircuitStudy();
 
-  if (compId && deviceSelect && deviceSelect.selectedOptions.length && initialSelection.length) {
+  if (getActiveComponentId() && deviceSelect && deviceSelect.selectedOptions.length && initialSelection.length) {
     plot();
   }
 
   on(STORAGE_KEYS.oneLine, () => {
     const selection = refreshCatalog({ preserveSelection: true });
     updateShortCircuitStudy();
-    if (compId && deviceSelect && deviceSelect.selectedOptions.length && selection.length) {
+    if (getActiveComponentId() && deviceSelect && deviceSelect.selectedOptions.length && selection.length) {
       plot();
     }
   });
@@ -480,7 +520,7 @@ async function init() {
     saved = loadSavedSettings();
     const selection = refreshCatalog({ includeComponentContext: true, includeDeviceParam: true });
     updateShortCircuitStudy();
-    if (compId && deviceSelect && deviceSelect.selectedOptions.length && selection.length) {
+    if (getActiveComponentId() && deviceSelect && deviceSelect.selectedOptions.length && selection.length) {
       plot();
     }
   });
@@ -525,6 +565,10 @@ function buildComponentData() {
   componentRecords = records;
   componentLookup = lookup;
   neighborMap = neighbors;
+  if (activeComponentId && !componentLookup.has(activeComponentId)) {
+    activeComponentId = null;
+    updateComponentContextUI();
+  }
 }
 
 function rebuildCatalog() {
@@ -645,12 +689,13 @@ function buildLibraryEntries() {
 }
 
 function buildOverlayEntries() {
-  if (!compId || !componentLookup.has(compId)) return [];
+  const contextId = getActiveComponentId();
+  if (!contextId || !componentLookup.has(contextId)) return [];
   const overlays = [];
-  overlays.push(...buildTransformerInrushEntries(compId));
-  overlays.push(...buildTransformerDamageEntries(compId));
-  overlays.push(...buildCableEntries(compId));
-  overlays.push(...buildMotorStartingEntries(compId));
+  overlays.push(...buildTransformerInrushEntries(contextId));
+  overlays.push(...buildTransformerDamageEntries(contextId));
+  overlays.push(...buildCableEntries(contextId));
+  overlays.push(...buildMotorStartingEntries(contextId));
   return overlays;
 }
 
@@ -1572,7 +1617,10 @@ if (settingsDiv) {
 }
 linkBtn.addEventListener('click', linkComponent);
 openBtn.addEventListener('click', () => {
-  if (compId) window.open(`oneline.html?component=${encodeURIComponent(compId)}`, '_blank');
+  const targetId = getActiveComponentId() || activeComponentId || compId;
+  if (targetId) {
+    window.open(`oneline.html?component=${encodeURIComponent(targetId)}`, '_blank');
+  }
 });
 
 function applyPlotAndPersistence() {
@@ -1638,7 +1686,8 @@ async function openComponentBrowserModal() {
 
   const componentEntryMap = new Map(componentEntries.map(entry => [entry.componentId, entry]));
   const typeGroups = buildTypeGroups(componentEntries);
-  const initialEntry = (compId && componentEntryMap.get(compId)) || componentEntries[0] || null;
+  const currentContextId = getActiveComponentId() || activeComponentId || compId;
+  const initialEntry = (currentContextId && componentEntryMap.get(currentContextId)) || componentEntries[0] || null;
   let activeEntry = initialEntry;
   let activeTypeId = initialEntry ? getTypeInfo(initialEntry).id : typeGroups[0]?.id || null;
   let activeManufacturer = initialEntry ? getManufacturerLabel(initialEntry) : null;
@@ -1661,12 +1710,21 @@ async function openComponentBrowserModal() {
 
   const modelElements = new Map();
   const docRef = { current: null };
+  const controllerRef = { current: null };
   let typeContainer;
   let manufacturerContainer;
   let modelContainer;
   let detailContainer;
   let modelsHeading;
   const firstButtonRef = { current: null };
+
+  const commitSelection = entry => {
+    if (!entry || entry.kind !== 'component' || !entry.componentId) {
+      return false;
+    }
+    setActiveComponent(entry.componentId);
+    return true;
+  };
 
   function updateActiveEntry(entry) {
     activeEntry = entry || null;
@@ -1677,6 +1735,10 @@ async function openComponentBrowserModal() {
       item.tabIndex = isActive ? 0 : -1;
     });
     renderDeviceDetails(entry, detailContainer, docRef.current);
+    if (controllerRef.current && typeof controllerRef.current.setPrimaryDisabled === 'function') {
+      const disable = !(entry && entry.kind === 'component' && entry.componentId);
+      controllerRef.current.setPrimaryDisabled(disable);
+    }
     if (entry && entry.kind === 'component' && detailContainer && docRef.current) {
       const actions = docRef.current.createElement('div');
       actions.className = 'device-detail-actions';
@@ -1787,6 +1849,11 @@ async function openComponentBrowserModal() {
         activeEntry = entry;
         updateActiveEntry(entry);
       });
+      button.addEventListener('dblclick', () => {
+        if (commitSelection(entry) && controllerRef.current && typeof controllerRef.current.close === 'function') {
+          controllerRef.current.close(entry.componentId);
+        }
+      });
       if (!firstButtonRef.current) firstButtonRef.current = button;
       modelElements.set(entry.uid, { item: button });
       modelContainer.appendChild(button);
@@ -1795,15 +1862,29 @@ async function openComponentBrowserModal() {
 
   const modalPromise = openModal({
     title: 'One-Line Components',
-    primaryText: 'Close',
-    secondaryText: null,
-    onSubmit: () => true,
+    primaryText: 'Plot Component',
+    secondaryText: 'Close',
+    onSubmit: controller => {
+      if (!activeEntry || activeEntry.kind !== 'component' || !activeEntry.componentId) {
+        if (controller && typeof controller.setPrimaryDisabled === 'function') {
+          controller.setPrimaryDisabled(true);
+        }
+        return false;
+      }
+      commitSelection(activeEntry);
+      return activeEntry.componentId;
+    },
     onCancel: () => {
       if (componentModalBtn) componentModalBtn.setAttribute('aria-expanded', 'false');
     },
-    render(container) {
+    render(container, controller) {
       const doc = container.ownerDocument;
       docRef.current = doc;
+      controllerRef.current = controller;
+      if (controller && typeof controller.setPrimaryDisabled === 'function') {
+        const disable = !(activeEntry && activeEntry.kind === 'component' && activeEntry.componentId);
+        controller.setPrimaryDisabled(disable);
+      }
       container.classList.add('device-selection-modal');
 
       const layout = doc.createElement('div');
@@ -1849,6 +1930,7 @@ async function openComponentBrowserModal() {
   });
 
   modalPromise.finally(() => {
+    controllerRef.current = null;
     if (componentModalBtn) componentModalBtn.setAttribute('aria-expanded', 'false');
   });
 
@@ -2003,7 +2085,8 @@ function deepEqual(a, b) {
 }
 
 function linkComponent() {
-  if (!compId) return;
+  const targetComponentId = getActiveComponentId() || compId;
+  if (!targetComponentId) return;
   const first = selectedDeviceIds().find(id => {
     const entry = deviceMap.get(id);
     return entry && (entry.kind === 'library' || entry.kind === 'component');
@@ -2017,7 +2100,7 @@ function linkComponent() {
   let updated = false;
   (data.sheets || []).forEach(sheet => {
     (sheet.components || []).forEach(comp => {
-      if (comp.id !== compId) return;
+      if (comp.id !== targetComponentId) return;
       comp.tccId = deviceId;
       if (overrides && Object.keys(overrides).length) {
         comp.tccOverrides = overrides;
@@ -2031,7 +2114,7 @@ function linkComponent() {
     setOneLine(data);
     buildComponentData();
     rebuildCatalog();
-    selectDefaults(new Set([`component:${compId}`]));
+    selectDefaults(new Set([`component:${targetComponentId}`]));
     renderSettings();
     plot();
   }
@@ -2103,7 +2186,8 @@ function plot() {
   });
 
   const studies = getStudies();
-  const fault = compId ? studies.shortCircuit?.[compId]?.threePhaseKA : null;
+  const contextId = getActiveComponentId();
+  const fault = contextId ? studies.shortCircuit?.[contextId]?.threePhaseKA : null;
   if (fault) {
     allCurrents.push(fault * 1000);
   }
@@ -2332,15 +2416,17 @@ function plot() {
     } else {
       violationDiv.textContent = '';
     }
-    if (!compId) return;
+    const contextIdForDuty = getActiveComponentId();
+    if (!contextIdForDuty) return;
     const res = getStudies();
     res.duty = res.duty || {};
-    res.duty[compId] = violations;
+    res.duty[contextIdForDuty] = violations;
     setStudies(res);
   };
 
   const updateCurves = () => {
-    const faultKA = compId ? getStudies().shortCircuit?.[compId]?.threePhaseKA : null;
+    const contextIdForFault = getActiveComponentId();
+    const faultKA = contextIdForFault ? getStudies().shortCircuit?.[contextIdForFault]?.threePhaseKA : null;
     const violations = [];
     plotted.forEach(entry => {
       entry.scaled = scaleCurve(entry.selection.baseDevice, entry.overrides);
