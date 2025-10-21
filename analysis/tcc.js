@@ -217,6 +217,26 @@ function formatOptionLabel(value) {
     .replace(/\b([a-z])/g, (_, char) => char.toUpperCase());
 }
 
+function formatDetailValue(value) {
+  if (value === null || value === undefined) return '';
+  if (Array.isArray(value)) {
+    return value
+      .map(item => formatDetailValue(item))
+      .filter(str => str)
+      .join(', ');
+  }
+  if (typeof value === 'boolean') {
+    return value ? 'Yes' : 'No';
+  }
+  if (typeof value === 'number') {
+    return formatSettingValue(value);
+  }
+  if (typeof value === 'string') {
+    return value.trim();
+  }
+  return '';
+}
+
 function normalizeSettingOptions(options) {
   if (!Array.isArray(options)) return [];
   return options.map(option => {
@@ -552,19 +572,58 @@ function buildComponentEntries() {
       base,
       mergeOverrides(component.tccOverrides, saved.componentOverrides?.[component.id])
     );
+    const vendor = getComponentVendor(component);
     const entry = {
       uid: `component:${component.id}`,
       kind: 'component',
       name: `${component.label || component.name || base.name || component.type}${sheetName ? ` (${sheetName})` : ''}`,
       baseDeviceId: base.id,
       baseDevice: base,
-      deviceCategory: base.type || '',
+      deviceCategory: component.type || base.type || '',
+      deviceType: component.subtype || component.type || base.type || '',
       componentId: component.id,
+      component,
       sheetName,
-      overrideSource: overrides
+      overrideSource: overrides,
+      componentVendor: vendor
     };
     entries.push(entry);
   });
+  return entries.sort((a, b) => a.name.localeCompare(b.name, undefined, { sensitivity: 'base' }));
+}
+
+function buildComponentDisplayEntries() {
+  const existing = new Map();
+  deviceEntries
+    .filter(entry => entry.kind === 'component' && entry.componentId)
+    .forEach(entry => existing.set(entry.componentId, entry));
+
+  const entries = [...existing.values()];
+
+  componentRecords.forEach(({ component, sheetName }) => {
+    if (!component || existing.has(component.id)) return;
+    const base = component.tccId ? libraryDevices.find(dev => dev.id === component.tccId) : null;
+    const mergedOverrides = mergeOverrides(component.tccOverrides, saved.componentOverrides?.[component.id]);
+    const overrides = base ? snapOverridesToOptions(base, mergedOverrides) : { ...mergedOverrides };
+    const vendor = getComponentVendor(component);
+    const entry = {
+      uid: `component:${component.id}`,
+      kind: 'component',
+      name: `${componentLabel(component)}${sheetName ? ` (${sheetName})` : ''}`,
+      baseDeviceId: base?.id || component.tccId || '',
+      baseDevice: base || null,
+      deviceCategory: component.type || base?.type || '',
+      deviceType: component.subtype || component.type || base?.type || '',
+      componentId: component.id,
+      component,
+      sheetName,
+      overrideSource: overrides,
+      componentVendor: vendor,
+      missingBase: !base
+    };
+    entries.push(entry);
+  });
+
   return entries.sort((a, b) => a.name.localeCompare(b.name, undefined, { sensitivity: 'base' }));
 }
 
@@ -777,7 +836,12 @@ function getManufacturerLabel(entry) {
     const base = entry.baseDevice || {};
     const vendor = (base.vendor || base.manufacturer || '').trim();
     if (vendor) return vendor;
-    return entry.kind === 'component' ? COMPONENT_FALLBACK_GROUP : LIBRARY_FALLBACK_GROUP;
+    if (entry.kind === 'component') {
+      const componentVendor = (entry.componentVendor || getComponentVendor(entry.component)).trim();
+      if (componentVendor) return componentVendor;
+      return COMPONENT_FALLBACK_GROUP;
+    }
+    return LIBRARY_FALLBACK_GROUP;
   }
   return OVERLAY_GROUP_LABELS[entry.kind] || SYSTEM_OVERLAY_GROUP;
 }
@@ -878,11 +942,17 @@ function describeEntryAttributes(entry) {
   if (!entry) return [];
   if (entry.kind === 'library' || entry.kind === 'component') {
     const base = entry.baseDevice || {};
-    return Object.keys(base.settings || {}).map(field => ({
+    const baseRows = Object.keys(base.settings || {}).map(field => ({
       label: formatSettingLabel(field),
       value: formatSettingValue(base.settings?.[field]),
       range: describeSettingRange(base, field)
     }));
+    if (entry.kind === 'component') {
+      const used = new Set(baseRows.map(row => row.label.toLowerCase()));
+      const componentRows = describeComponentDetailRows(entry, used);
+      baseRows.push(...componentRows);
+    }
+    return baseRows;
   }
   if (entry.kind === 'inrush') {
     return [
@@ -910,6 +980,202 @@ function describeEntryAttributes(entry) {
     ];
   }
   return [];
+}
+
+const COMPONENT_DETAIL_FIELDS = [
+  { label: 'Manufacturer', keys: ['manufacturer', 'vendor'] },
+  { label: 'Model', keys: ['model', 'catalog_number', 'catalogNumber'] },
+  {
+    label: 'Amp Rating',
+    keys: ['amp_rating', 'ampRating', 'ampacity', 'rating'],
+    format: value => {
+      const num = parseNumeric(value);
+      if (Number.isFinite(num)) return `${formatSettingValue(num)} A`;
+      const str = formatDetailValue(value);
+      return str ? `${str} A` : '';
+    }
+  },
+  {
+    label: 'Frame Size',
+    keys: ['frame', 'frame_size', 'breaker_frame', 'breakerFrame']
+  },
+  {
+    label: 'Sensor Rating',
+    keys: ['sensor_rating', 'sensorRating'],
+    format: value => {
+      const num = parseNumeric(value);
+      if (Number.isFinite(num)) return `${formatSettingValue(num)} A`;
+      const str = formatDetailValue(value);
+      return str ? `${str} A` : '';
+    }
+  },
+  { label: 'Trip Unit', keys: ['trip_unit', 'tripUnit'] },
+  {
+    label: 'Interrupt Rating',
+    keys: ['interrupt_rating', 'interruptRating', 'ic_rating', 'icRating', 'short_circuit_rating', 'shortCircuitRating'],
+    format: value => {
+      const num = parseNumeric(value);
+      if (Number.isFinite(num)) return `${formatSettingValue(num)} kA`;
+      const str = formatDetailValue(value);
+      return str ? `${str}` : '';
+    }
+  },
+  {
+    label: 'Full-Load Amps',
+    keys: ['full_load_amps', 'fullLoadAmps', 'fla'],
+    format: value => {
+      const num = parseNumeric(value);
+      if (Number.isFinite(num)) return `${formatSettingValue(num)} A`;
+      const str = formatDetailValue(value);
+      return str ? `${str} A` : '';
+    }
+  },
+  {
+    label: 'Voltage',
+    keys: ['voltage', 'volts', 'kv', 'kV', 'prefault_voltage', 'baseKV'],
+    format: value => {
+      const num = parseNumeric(value);
+      if (Number.isFinite(num)) {
+        return `${formatSettingValue(num)} V`;
+      }
+      const str = formatDetailValue(value);
+      if (!str) return '';
+      if (/\bkv\b/i.test(str)) return str;
+      return `${str} V`;
+    }
+  },
+  {
+    label: 'Phases',
+    keys: ['phases'],
+    format: value => {
+      const phases = parsePhases(value);
+      if (phases.length) return phases.join(', ');
+      return formatDetailValue(value);
+    }
+  }
+];
+
+const COMPONENT_SKIP_KEYS = new Set([
+  'id',
+  'name',
+  'label',
+  'type',
+  'subtype',
+  'connections',
+  'tccid',
+  'tcc_id',
+  'tccoverrides',
+  'props',
+  'x',
+  'y',
+  'cx',
+  'cy',
+  'fx',
+  'fy',
+  'px',
+  'py',
+  'width',
+  'height',
+  'rotation',
+  'angle',
+  'sheet',
+  'sheetname',
+  'componentid',
+  'component_id',
+  'notes',
+  'description',
+  'manufacturer',
+  'vendor',
+  'maker',
+  'brand',
+  'model',
+  'amp_rating',
+  'amprating',
+  'ampacity',
+  'rating',
+  'frame',
+  'frame_size',
+  'breaker_frame',
+  'framesize',
+  'sensor_rating',
+  'sensorrating',
+  'trip_unit',
+  'tripunit',
+  'interrupt_rating',
+  'interruptrating',
+  'ic_rating',
+  'icrating',
+  'short_circuit_rating',
+  'shortcircuitrating',
+  'full_load_amps',
+  'fullloadamps',
+  'fla',
+  'voltage',
+  'volts',
+  'kv',
+  'prefault_voltage',
+  'basekv',
+  'phases'
+]);
+
+function describeComponentDetailRows(entry, usedLabels = new Set()) {
+  const component = entry?.component;
+  if (!component) return [];
+  const rows = [];
+  const used = usedLabels instanceof Set ? usedLabels : new Set();
+  const normalizedSkip = new Set([...COMPONENT_SKIP_KEYS]);
+  const maxRows = 20;
+
+  const pushRow = (label, value) => {
+    const formatted = typeof value === 'string' ? value : formatDetailValue(value);
+    if (!formatted) return;
+    const key = label.toLowerCase();
+    if (used.has(key)) return;
+    rows.push({ label, value: formatted, range: '' });
+    used.add(key);
+  };
+
+  const addField = ({ label, keys, format }) => {
+    if (rows.length >= maxRows) return;
+    for (const key of keys) {
+      const raw = getComponentValue(component, key);
+      if (raw === undefined || raw === null || raw === '') continue;
+      let value;
+      if (typeof format === 'function') {
+        value = format(raw, { key, component });
+      } else {
+        value = formatDetailValue(raw);
+      }
+      if (!value) continue;
+      pushRow(label, value);
+      keys.forEach(k => normalizedSkip.add(String(k).toLowerCase()));
+      return;
+    }
+  };
+
+  COMPONENT_DETAIL_FIELDS.forEach(addField);
+
+  const appendSimpleProps = source => {
+    if (!source || typeof source !== 'object') return;
+    Object.entries(source).forEach(([key, raw]) => {
+      if (rows.length >= maxRows) return;
+      if (raw === undefined || raw === null || raw === '') return;
+      const normalizedKey = String(key).toLowerCase();
+      if (normalizedSkip.has(normalizedKey)) return;
+      if (typeof raw === 'object' && !Array.isArray(raw)) return;
+      const value = formatDetailValue(raw);
+      if (!value) return;
+      pushRow(formatSettingLabel(key), value);
+      normalizedSkip.add(normalizedKey);
+    });
+  };
+
+  appendSimpleProps(component);
+  if (component.props && typeof component.props === 'object') {
+    appendSimpleProps(component.props);
+  }
+
+  return rows;
 }
 
 function renderDeviceDetails(entry, container, doc) {
@@ -946,6 +1212,9 @@ function renderDeviceDetails(entry, container, doc) {
   } else if (entry.kind === 'component') {
     appendMeta('Source', 'One-Line Device');
     if (entry.sheetName) appendMeta('Sheet', entry.sheetName);
+    if (entry.componentId) appendMeta('Component ID', entry.componentId);
+    const assigned = entry.baseDevice?.name || entry.baseDeviceId || entry.component?.tccId;
+    appendMeta('Assigned TCC Device', assigned || 'Not Assigned');
   } else {
     appendMeta('Source', 'System Curve');
   }
@@ -1305,7 +1574,7 @@ async function openComponentBrowserModal() {
     componentModalBtn.setAttribute('aria-expanded', 'true');
   }
 
-  const componentEntries = deviceEntries.filter(entry => entry.kind === 'component');
+  const componentEntries = buildComponentDisplayEntries();
   if (!componentEntries.length) {
     await openModal({
       title: 'One-Line Components',
@@ -1330,8 +1599,9 @@ async function openComponentBrowserModal() {
     return;
   }
 
+  const componentEntryMap = new Map(componentEntries.map(entry => [entry.componentId, entry]));
   const typeGroups = buildTypeGroups(componentEntries);
-  const initialEntry = (compId && componentDeviceMap.get(compId)) || componentEntries[0] || null;
+  const initialEntry = (compId && componentEntryMap.get(compId)) || componentEntries[0] || null;
   let activeEntry = initialEntry;
   let activeTypeId = initialEntry ? getTypeInfo(initialEntry).id : typeGroups[0]?.id || null;
   let activeManufacturer = initialEntry ? getManufacturerLabel(initialEntry) : null;
@@ -1782,7 +2052,11 @@ function plot() {
       });
     } else if (entry.kind === 'inrush') {
       if (entry.current > 0) allCurrents.push(entry.current);
-      if (entry.duration) allTimes.push(entry.duration);
+      const normalizedDuration = Number.isFinite(entry.duration) && entry.duration > 0
+        ? entry.duration
+        : DEFAULT_INRUSH_DURATION;
+      entry.normalizedDuration = normalizedDuration;
+      allTimes.push(normalizedDuration);
     } else if (entry.kind === 'transformerDamage' || entry.kind === 'motorStart') {
       entry.curve.forEach(point => {
         if (point.current > 0) allCurrents.push(point.current);
@@ -1862,13 +2136,19 @@ function plot() {
         .attr('stroke-dasharray', '6,3');
     } else if (entry.kind === 'inrush') {
       legendItem.append('line')
-        .attr('x1', 8)
-        .attr('x2', 8)
-        .attr('y1', 0)
-        .attr('y2', 16)
+        .attr('x1', 2)
+        .attr('x2', 14)
+        .attr('y1', 2)
+        .attr('y2', 14)
         .attr('stroke', entry.color)
-        .attr('stroke-width', 2)
-        .attr('stroke-dasharray', '4,2');
+        .attr('stroke-width', 2);
+      legendItem.append('line')
+        .attr('x1', 2)
+        .attr('x2', 14)
+        .attr('y1', 14)
+        .attr('y2', 2)
+        .attr('stroke', entry.color)
+        .attr('stroke-width', 2);
     } else if (entry.kind === 'transformerDamage') {
       legendItem.append('line')
         .attr('x1', 0)
@@ -1942,21 +2222,31 @@ function plot() {
   });
 
   overlays.filter(entry => entry.kind === 'inrush').forEach(entry => {
+    if (!(entry.current > 0)) return;
+    const duration = entry.normalizedDuration ?? DEFAULT_INRUSH_DURATION;
     const xPos = x(entry.current);
+    const yPos = y(duration);
+    const size = 6;
     g.append('line')
-      .attr('x1', xPos)
-      .attr('x2', xPos)
-      .attr('y1', 0)
-      .attr('y2', height)
+      .attr('x1', xPos - size)
+      .attr('x2', xPos + size)
+      .attr('y1', yPos - size)
+      .attr('y2', yPos + size)
       .attr('stroke', entry.color)
-      .attr('stroke-width', 2)
-      .attr('stroke-dasharray', '4,2');
+      .attr('stroke-width', 2);
+    g.append('line')
+      .attr('x1', xPos - size)
+      .attr('x2', xPos + size)
+      .attr('y1', yPos + size)
+      .attr('y2', yPos - size)
+      .attr('stroke', entry.color)
+      .attr('stroke-width', 2);
     g.append('text')
-      .attr('x', xPos + 6)
-      .attr('y', 12)
+      .attr('x', xPos + size + 4)
+      .attr('y', Math.max(12, yPos - size - 2))
       .attr('fill', entry.color)
       .attr('font-size', 12)
-      .text(`${formatSettingValue(entry.current)} A Inrush`);
+      .text(`Inrush – ${formatSettingValue(entry.current)} A @ ${formatSettingValue(duration)} s`);
   });
 
   overlays.filter(entry => entry.kind === 'motorStart').forEach(entry => {
@@ -2126,6 +2416,19 @@ function componentLabel(comp) {
   const subtype = getComponentValue(comp, 'subtype');
   const type = getComponentValue(comp, 'type');
   return label || name || subtype || type || comp.id || 'Component';
+}
+
+function getComponentVendor(comp) {
+  if (!comp) return '';
+  const keys = ['manufacturer', 'vendor', 'maker', 'brand'];
+  for (const key of keys) {
+    const value = getComponentValue(comp, key);
+    if (typeof value === 'string') {
+      const trimmed = value.trim();
+      if (trimmed) return trimmed;
+    }
+  }
+  return '';
 }
 
 function mergeOverrides(base, extra) {
