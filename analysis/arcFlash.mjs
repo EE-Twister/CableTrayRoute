@@ -257,12 +257,21 @@ function clearingTime(comp, Ibf, devices, protectiveComp, scResults, protectiveD
   const overrides = { ...deviceOverride, ...componentOverride, ...inlineOverride };
   const scaled = scaleCurve(dev, overrides);
   const settings = scaled.settings || {};
-  const upstreamKA = Number.isFinite(scResults?.[deviceComp.id]?.threePhaseKA)
+  const downstreamKA = Number.isFinite(Ibf) && Ibf > 0
+    ? Ibf
+    : Number.isFinite(scResults?.[comp.id]?.threePhaseKA) && scResults[comp.id].threePhaseKA > 0
+      ? scResults[comp.id].threePhaseKA
+      : 0;
+  const deviceKA = Number.isFinite(scResults?.[deviceComp.id]?.threePhaseKA) && scResults[deviceComp.id].threePhaseKA > 0
     ? scResults[deviceComp.id].threePhaseKA
-    : Number.isFinite(Ibf) && Ibf > 0
-      ? Ibf
-      : 0.001;
-  const effectiveKA = upstreamKA > 0 ? upstreamKA : 0.001;
+    : 0;
+  const effectiveKA = deviceComp !== comp && downstreamKA > 0
+    ? downstreamKA
+    : deviceKA > 0
+      ? deviceKA
+      : downstreamKA > 0
+        ? downstreamKA
+        : 0.001;
   if (settings.instantaneous && effectiveKA * 1000 >= settings.instantaneous) {
     return Math.max(settings.instantaneousDelay || 0.01, 0.005);
   }
