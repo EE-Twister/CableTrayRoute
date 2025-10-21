@@ -8454,9 +8454,16 @@ async function init() {
 
   const params = new URLSearchParams(window.location.search);
   const focus = params.get('component');
+  const shouldOpenComponentModal = params.has('componentModal');
   if (focus) {
     const comp = components.find(c => c.id === focus);
-    if (comp) selectComponent(comp);
+    if (comp) {
+      selectComponent(comp);
+    } else if (shouldOpenComponentModal) {
+      selectComponent();
+    }
+  } else if (shouldOpenComponentModal) {
+    selectComponent();
   }
 
   initSettings();

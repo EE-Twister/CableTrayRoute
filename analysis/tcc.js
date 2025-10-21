@@ -44,6 +44,7 @@ const settingsDiv = document.getElementById('device-settings');
 const plotBtn = document.getElementById('plot-btn');
 const linkBtn = document.getElementById('link-btn');
 const openBtn = document.getElementById('open-btn');
+const componentModalBtn = document.getElementById('component-modal-btn');
 const violationDiv = document.getElementById('violation');
 const chart = d3.select('#tcc-chart');
 
@@ -1293,6 +1294,15 @@ linkBtn.addEventListener('click', linkComponent);
 openBtn.addEventListener('click', () => {
   if (compId) window.open(`oneline.html?component=${encodeURIComponent(compId)}`, '_blank');
 });
+if (componentModalBtn) {
+  componentModalBtn.addEventListener('click', () => {
+    const params = new URLSearchParams();
+    params.set('componentModal', '1');
+    if (compId) params.set('component', compId);
+    const url = `oneline.html?${params.toString()}`;
+    window.open(url, '_blank');
+  });
+}
 
 function renderSettings() {
   settingsDiv.innerHTML = '';
