@@ -2345,7 +2345,7 @@ function plot() {
     allCurrents.push(fault * 1000);
   }
 
-  const margin = { top: 20, right: 30, bottom: 70, left: 70 };
+  const margin = { top: 50, right: 90, bottom: 70, left: 70 };
   const width = +chart.attr('width') - margin.left - margin.right;
   const height = +chart.attr('height') - margin.top - margin.bottom;
   const g = chart.append('g').attr('transform', `translate(${margin.left},${margin.top})`);
@@ -2369,11 +2369,13 @@ function plot() {
     .attr('class', 'grid grid-x')
     .attr('transform', `translate(0,${height})`)
     .call(xAxis.tickSize(-height).tickFormat(''))
-    .call(axis => axis.select('.domain').remove());
+    .call(axis => axis.select('.domain').remove())
+    .call(axis => axis.selectAll('line').attr('stroke', '#999').attr('stroke-opacity', 0.2));
   g.append('g')
     .attr('class', 'grid grid-y')
     .call(yAxis.tickSize(-width).tickFormat(''))
-    .call(axis => axis.select('.domain').remove());
+    .call(axis => axis.select('.domain').remove())
+    .call(axis => axis.selectAll('line').attr('stroke', '#999').attr('stroke-opacity', 0.2));
 
   g.append('text')
     .attr('x', width / 2)
@@ -2383,9 +2385,24 @@ function plot() {
     .text('Current (A)');
 
   g.append('text')
+    .attr('x', width / 2)
+    .attr('y', -margin.top + 20)
+    .attr('text-anchor', 'middle')
+    .attr('fill', '#333')
+    .text('Current (A)');
+
+  g.append('text')
     .attr('transform', 'rotate(-90)')
     .attr('x', -height / 2)
     .attr('y', -margin.left + 15)
+    .attr('text-anchor', 'middle')
+    .attr('fill', '#333')
+    .text('Time (s)');
+
+  g.append('text')
+    .attr('transform', 'rotate(-90)')
+    .attr('x', -height / 2)
+    .attr('y', width + margin.right - 20)
     .attr('text-anchor', 'middle')
     .attr('fill', '#333')
     .text('Time (s)');
