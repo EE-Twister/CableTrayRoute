@@ -68,6 +68,7 @@ let deviceGroups = [];
 let componentRecords = [];
 let componentLookup = new Map();
 let neighborMap = new Map();
+let connectionIndex = new Map();
 let componentDeviceMap = new Map();
 let pendingPlotRefresh = null;
 let activeComponentId = compId || null;
@@ -411,6 +412,7 @@ function handleAnnotationDragStart(event, datum) {
   const pointer = d3.pointer(pointerEvent, g.node());
   const offsets = ensureAnnotationOffsets(datum, anchorX, anchorY, width, height);
   datum[ANNOTATION_DRAG_STATE] = {
+    mode: 'label',
     startPointerX: pointer[0],
     startPointerY: pointer[1],
     baseOffsetX: offsets.offsetX,
@@ -429,7 +431,7 @@ function handleAnnotationDragStart(event, datum) {
 function handleAnnotationDrag(event, datum) {
   if (!annotationContext || !annotationContext.g) return;
   const state = datum[ANNOTATION_DRAG_STATE];
-  if (!state) return;
+  if (!state || state.mode !== 'label') return;
   const pointerEvent = event && event.sourceEvent ? event.sourceEvent : event;
   const pointer = d3.pointer(pointerEvent, annotationContext.g.node());
   const dx = pointer[0] - state.startPointerX;
@@ -442,7 +444,8 @@ function handleAnnotationDrag(event, datum) {
 }
 
 function handleAnnotationDragEnd(event, datum) {
-  if (!datum[ANNOTATION_DRAG_STATE]) return;
+  const state = datum[ANNOTATION_DRAG_STATE];
+  if (!state || state.mode !== 'label') return;
   delete datum[ANNOTATION_DRAG_STATE];
   persistAnnotations();
   renderAnnotations();
@@ -453,6 +456,68 @@ const annotationDragBehavior = d3.drag()
   .on('start', handleAnnotationDragStart)
   .on('drag', handleAnnotationDrag)
   .on('end', handleAnnotationDragEnd);
+
+function clampToDomain(value, domain) {
+  if (!Number.isFinite(value)) return value;
+  if (!Array.isArray(domain) || domain.length < 2) return value;
+  const [a, b] = domain;
+  const min = Math.min(a, b);
+  const max = Math.max(a, b);
+  if (value < min) return min;
+  if (value > max) return max;
+  return value;
+}
+
+function handleAnnotationAnchorDragStart(event, datum) {
+  if (!annotationContext || !annotationContext.g) return;
+  datum[ANNOTATION_DRAG_STATE] = { mode: 'anchor' };
+  if (event.sourceEvent) {
+    if (typeof event.sourceEvent.stopPropagation === 'function') {
+      event.sourceEvent.stopPropagation();
+    }
+    if (typeof event.sourceEvent.preventDefault === 'function') {
+      event.sourceEvent.preventDefault();
+    }
+  }
+}
+
+function handleAnnotationAnchorDrag(event, datum) {
+  if (!annotationContext || !annotationContext.g) return;
+  const state = datum[ANNOTATION_DRAG_STATE];
+  if (!state || state.mode !== 'anchor') return;
+  const { g, x, y, width, height } = annotationContext;
+  const pointerEvent = event && event.sourceEvent ? event.sourceEvent : event;
+  const pointer = d3.pointer(pointerEvent, g.node());
+  if (!pointer) return;
+  let [mx, my] = pointer;
+  mx = Math.max(0, Math.min(width, mx));
+  my = Math.max(0, Math.min(height, my));
+  const current = clampToDomain(x.invert(mx), x.domain());
+  const time = clampToDomain(y.invert(my), y.domain());
+  if (!Number.isFinite(current) || !Number.isFinite(time) || current <= 0 || time <= 0) {
+    return;
+  }
+  datum.current = current;
+  datum.time = time;
+  const group = d3.select(this.parentNode);
+  if (!group.empty()) {
+    positionAnnotation(group, datum);
+  }
+}
+
+function handleAnnotationAnchorDragEnd(event, datum) {
+  const state = datum[ANNOTATION_DRAG_STATE];
+  if (!state || state.mode !== 'anchor') return;
+  delete datum[ANNOTATION_DRAG_STATE];
+  persistAnnotations();
+  renderAnnotations();
+}
+
+const annotationAnchorDragBehavior = d3.drag()
+  .filter(annotationDragFilter)
+  .on('start', handleAnnotationAnchorDragStart)
+  .on('drag', handleAnnotationAnchorDrag)
+  .on('end', handleAnnotationAnchorDragEnd);
 
 function renderAnnotations() {
   if (!annotationContext || !annotationContext.layer) return;
@@ -474,6 +539,12 @@ function renderAnnotations() {
   merged.select('g.annotation-label')
     .style('cursor', 'move')
     .call(annotationDragBehavior);
+  merged.select('circle.annotation-anchor')
+    .style('cursor', 'move')
+    .call(annotationAnchorDragBehavior);
+  merged.select('line.annotation-connector')
+    .style('cursor', 'move')
+    .call(annotationAnchorDragBehavior);
   merged.on('dblclick', (event, datum) => {
     event.stopPropagation();
     event.preventDefault();
@@ -975,12 +1046,14 @@ function buildComponentData() {
   const records = [];
   const lookup = new Map();
   const neighbors = new Map();
+  const connections = new Map();
   (sheets || []).forEach((sheet, idx) => {
     const sheetName = sheet?.name || `Sheet ${idx + 1}`;
     (sheet?.components || []).forEach(comp => {
       records.push({ component: comp, sheetName });
       lookup.set(comp.id, { component: comp, sheetName });
       neighbors.set(comp.id, new Set());
+      connections.set(comp.id, []);
     });
     (sheet?.connections || []).forEach(conn => {
       if (!conn) return;
@@ -990,6 +1063,11 @@ function buildComponentData() {
       if (!lookup.has(from) || !lookup.has(to)) return;
       neighbors.get(from)?.add(to);
       neighbors.get(to)?.add(from);
+      const sourceRecord = lookup.get(from);
+      const targetRecord = lookup.get(to);
+      if (!sourceRecord || !targetRecord) return;
+      connections.get(from)?.push({ conn, source: sourceRecord.component, target: targetRecord.component });
+      connections.get(to)?.push({ conn, source: targetRecord.component, target: sourceRecord.component });
     });
   });
   records.forEach(({ component }) => {
@@ -997,11 +1075,16 @@ function buildComponentData() {
       if (!lookup.has(conn.target)) return;
       neighbors.get(component.id)?.add(conn.target);
       neighbors.get(conn.target)?.add(component.id);
+      const targetRecord = lookup.get(conn.target);
+      if (!targetRecord) return;
+      connections.get(component.id)?.push({ conn, source: component, target: targetRecord.component });
+      connections.get(conn.target)?.push({ conn, source: targetRecord.component, target: component });
     });
   });
   componentRecords = records;
   componentLookup = lookup;
   neighborMap = neighbors;
+  connectionIndex = connections;
   if (activeComponentId && !componentLookup.has(activeComponentId)) {
     activeComponentId = null;
     updateComponentContextUI();
@@ -1092,6 +1175,35 @@ function describeComponentPlotAvailability(component, baseDevice) {
     const thermalMetrics = resolveMotorThermalLimit(component, refVoltage, refPhases, base, startMetrics);
     if (!startMetrics && !thermalMetrics) {
       return 'Provide the motor starting or stall time before plotting this component.';
+    }
+    return null;
+  }
+  const isCable = normalizedType.includes('cable')
+    || normalizedSubtype.includes('cable')
+    || normalizedBase.includes('cable');
+  if (isCable) {
+    const basePhases = parsePhases(component.phases);
+    const phaseCount = basePhases.length || 3;
+    const attemptCurve = (descriptor, phases = basePhases) => {
+      if (!descriptor) return null;
+      const count = (Array.isArray(phases) && phases.length) ? phases.length : phaseCount;
+      return buildCableCurve(descriptor, count);
+    };
+    let curve = attemptCurve(component.cable || component.props?.cable || component);
+    if (!curve) {
+      const contexts = connectionIndex.get(component.id) || [];
+      for (const { conn, source, target } of contexts) {
+        const descriptor = resolveCableInfo(source, target, conn);
+        if (!descriptor) continue;
+        const phases = parsePhases(
+          conn?.phases || descriptor.phases || (target?.phases ?? source?.phases)
+        );
+        curve = attemptCurve(descriptor, phases);
+        if (curve) break;
+      }
+    }
+    if (!curve) {
+      return 'Provide the cable conductor size, material, and insulation rating before plotting this component.';
     }
     return null;
   }
