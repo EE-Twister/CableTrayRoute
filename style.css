@@ -5105,3 +5105,62 @@ body.dark-mode .panel-slot-meta span {
     margin-top: 1rem;
     font-weight: 600;
 }
+
+.tcc-print-controls {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.75rem;
+    align-items: flex-end;
+    margin-top: 0.75rem;
+}
+
+.tcc-print-controls label {
+    display: flex;
+    flex-direction: column;
+    font-size: 0.85rem;
+    color: #333;
+    gap: 0.25rem;
+}
+
+.tcc-print-controls input {
+    padding: 0.4rem 0.5rem;
+    border: 1px solid #bcbcbc;
+    border-radius: 4px;
+    min-width: 14rem;
+}
+
+.tcc-print-controls button {
+    align-self: flex-start;
+    padding: 0.5rem 1rem;
+}
+
+#add-annotation-btn {
+    margin-top: 0.75rem;
+}
+
+#tcc-chart.annotation-mode {
+    cursor: crosshair;
+}
+
+.annotation-layer .annotation-connector {
+    pointer-events: none;
+}
+
+.annotation-layer .annotation-anchor {
+    fill: #fff;
+    stroke: #444;
+    stroke-width: 1.5;
+}
+
+.annotation-layer .annotation-label-bg {
+    fill: #fff;
+    stroke: #444;
+    stroke-width: 1;
+    filter: drop-shadow(0 1px 1px rgba(0, 0, 0, 0.2));
+}
+
+.annotation-layer .annotation-text {
+    font-size: 12px;
+    fill: #111;
+    pointer-events: none;
+}
