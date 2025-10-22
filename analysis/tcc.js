@@ -827,25 +827,35 @@ function buildMotorStartingEntries(targetId) {
   if (!reference) return overlays;
   const refVoltage = inferVoltage(reference);
   const refPhases = parsePhases(reference.phases).length || 3;
-  (neighborMap.get(targetId) || new Set()).forEach(id => {
-    const neighbor = componentLookup.get(id)?.component;
-    if (!neighbor || !MOTOR_TYPES.has(neighbor.type)) return;
-    const metrics = resolveMotorStartingMetrics(neighbor, refVoltage, refPhases);
+  const seen = new Set();
+
+  const addMotor = motor => {
+    if (!motor || !MOTOR_TYPES.has(motor.type)) return;
+    if (seen.has(motor.id)) return;
+    const metrics = resolveMotorStartingMetrics(motor, refVoltage, refPhases);
     if (!metrics) return;
+    seen.add(motor.id);
     overlays.push({
-      uid: `motor-start:${neighbor.id}:${targetId}`,
+      uid: `motor-start:${motor.id}:${targetId}`,
       kind: 'motorStart',
-      name: `${componentLabel(neighbor)} Motor Starting`,
+      name: `${componentLabel(motor)} Motor Starting`,
       deviceCategory: 'motor',
       deviceType: 'motor starting',
       curve: metrics.curve,
       fla: metrics.fla,
       lockedRotor: metrics.lockedRotor,
       startTime: metrics.startTime,
-      sourceLabel: componentLabel(neighbor),
+      sourceLabel: componentLabel(motor),
       autoSelect: true
     });
+  };
+
+  addMotor(reference);
+  (neighborMap.get(targetId) || new Set()).forEach(id => {
+    const neighbor = componentLookup.get(id)?.component;
+    addMotor(neighbor);
   });
+
   return overlays.sort((a, b) => a.name.localeCompare(b.name, undefined, { sensitivity: 'base' }));
 }
 
