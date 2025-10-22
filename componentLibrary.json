@@ -1757,6 +1757,8 @@
         "thevenin_x": 0.08,
         "inertia": 0.5,
         "load_torque_curve": "0:0 100:100",
+        "start_time_s": 1.5,
+        "stall_time": 8,
         "load": {
           "kw": 117.789,
           "kvar": 63.576
