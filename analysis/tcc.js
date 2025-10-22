@@ -32,6 +32,8 @@ const TRANSFORMER_DAMAGE_TEMPLATE = [
 const MOTOR_START_PRETIME_RATIO = 0.2;
 const MOTOR_START_POSTTIME_RATIO = 1.1;
 const MOTOR_START_MIN_PRETIME = 0.01;
+const MOTOR_START_PLOT_FLOOR = 0.01;
+const MOTOR_START_PLOT_CEILING = 10000;
 const K_CONSTANTS = {
   copper: { 60: 103, 75: 118, 90: 143 },
   aluminum: { 60: 75, 75: 87, 90: 99 }
@@ -2332,6 +2334,10 @@ function plot() {
     }
   });
 
+  if (overlays.some(entry => entry.kind === 'motorStart')) {
+    allTimes.push(MOTOR_START_PLOT_FLOOR, MOTOR_START_PLOT_CEILING);
+  }
+
   const studies = getStudies();
   const contextId = getActiveComponentId();
   const fault = contextId ? studies.shortCircuit?.[contextId]?.threePhaseKA : null;
@@ -2477,6 +2483,36 @@ function plot() {
     .curve(d3.curveLinear);
   const [xMin, xMax] = x.range();
   const [yMin, yMax] = y.range();
+  const [domainMinTime, domainMaxTime] = y.domain();
+  const motorStartCurves = new Map();
+
+  const addOrReplacePoint = (list, time, current) => {
+    if (!Number.isFinite(time) || time <= 0) return;
+    if (!Number.isFinite(current) || current <= 0) return;
+    const existing = list.find(point => Math.abs(point.time - time) <= Math.max(time, point.time) * 1e-9);
+    if (existing) {
+      existing.time = time;
+      existing.current = current;
+    } else {
+      list.push({ time, current });
+    }
+  };
+
+  overlays.filter(entry => entry.kind === 'motorStart').forEach(entry => {
+    const basePoints = Array.isArray(entry.curve)
+      ? entry.curve.map(point => ({ time: point.time, current: point.current }))
+      : [];
+    const sanitized = basePoints.filter(point => (
+      Number.isFinite(point.time)
+      && point.time > 0
+      && Number.isFinite(point.current)
+      && point.current > 0
+    ));
+    addOrReplacePoint(sanitized, domainMinTime, entry.lockedRotor);
+    addOrReplacePoint(sanitized, domainMaxTime, entry.fla);
+    sanitized.sort((a, b) => a.time - b.time);
+    motorStartCurves.set(entry, sanitized);
+  });
 
   overlays.filter(entry => entry.kind === 'cable').forEach(entry => {
     g.append('path')
@@ -2537,13 +2573,14 @@ function plot() {
   });
 
   overlays.filter(entry => entry.kind === 'motorStart').forEach(entry => {
+    const curve = motorStartCurves.get(entry) || entry.curve;
     g.append('path')
-      .datum(entry.curve)
+      .datum(curve)
       .attr('fill', 'none')
       .attr('stroke', entry.color)
       .attr('stroke-width', 2)
       .attr('stroke-dasharray', '2,2')
-      .attr('d', entry.curve.length ? line(entry.curve) : null);
+      .attr('d', curve.length ? line(curve) : null);
   });
 
   const plotted = devicePlots.map(plotEntry => {
