@@ -140,6 +140,43 @@ const typeIcons = {
 
 const placeholderIcon = asset('icons/placeholder.svg');
 
+const physicalFieldNameSet = new Set([
+  'enclosure',
+  'enclosure_type',
+  'enclosure_rating',
+  'electrode_config',
+  'electrode_configuration',
+  'gap',
+  'air_gap',
+  'arc_gap',
+  'working_distance',
+  'clearance',
+  'physical_spacing'
+]);
+
+const physicalFieldKeywordList = [
+  'electrode',
+  'enclosure',
+  'working distance',
+  'working_distance',
+  'gap',
+  'clearance',
+  'spacing',
+  'cabinet',
+  'housing'
+];
+
+function isPhysicalPropertyField(field) {
+  if (!field || typeof field !== 'object') return false;
+  const rawName = typeof field.name === 'string' ? field.name.toLowerCase() : '';
+  const rawLabel = typeof field.label === 'string' ? field.label.toLowerCase() : '';
+  if (rawName && physicalFieldNameSet.has(rawName)) return true;
+  return physicalFieldKeywordList.some(keyword => {
+    const key = keyword.toLowerCase();
+    return (rawName && rawName.includes(key)) || (rawLabel && rawLabel.includes(key));
+  });
+}
+
 function hasImpedance(holder) {
   return !!(holder && holder.impedance && typeof holder.impedance === 'object');
 }
@@ -6049,11 +6086,14 @@ function selectComponent(compOrId) {
     const noteFields = [];
     const electricalFields = [];
     const motorStartFields = [];
+    const physicalFields = [];
     const generalFields = [];
     const motorStartFieldNames = ['inrushMultiple', 'thevenin_r', 'thevenin_x', 'inertia', 'load_torque_curve'];
     fields.forEach(f => {
       if (targetComp.subtype === 'motor_load' && motorStartFieldNames.includes(f.name)) {
         motorStartFields.push(f);
+      } else if (isPhysicalPropertyField(f)) {
+        physicalFields.push(f);
       } else if (['manufacturer', 'model'].includes(f.name)) manufacturerFields.push(f);
       else if (['notes', 'failure_modes'].includes(f.name)) noteFields.push(f);
       else if (baseFieldNames.has(f.name) || f.name === 'tccId') generalFields.push(f);
@@ -6144,6 +6184,7 @@ function selectComponent(compOrId) {
     };
 
     createTabSection('general', 'General', 'General', generalFields);
+    createTabSection('physical', 'Physical', 'Physical', physicalFields);
     createTabSection('electrical', 'Electrical', 'Electrical', electricalFields);
     createTabSection('motor', 'Motor Start', 'Motor Start', motorStartFields);
     createTabSection('manufacturer', 'Manufacturer', 'Manufacturer', manufacturerFields);
