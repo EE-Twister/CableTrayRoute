@@ -411,6 +411,7 @@ function handleAnnotationDragStart(event, datum) {
   const pointer = d3.pointer(pointerEvent, g.node());
   const offsets = ensureAnnotationOffsets(datum, anchorX, anchorY, width, height);
   datum[ANNOTATION_DRAG_STATE] = {
+    mode: 'label',
     startPointerX: pointer[0],
     startPointerY: pointer[1],
     baseOffsetX: offsets.offsetX,
@@ -429,7 +430,7 @@ function handleAnnotationDragStart(event, datum) {
 function handleAnnotationDrag(event, datum) {
   if (!annotationContext || !annotationContext.g) return;
   const state = datum[ANNOTATION_DRAG_STATE];
-  if (!state) return;
+  if (!state || state.mode !== 'label') return;
   const pointerEvent = event && event.sourceEvent ? event.sourceEvent : event;
   const pointer = d3.pointer(pointerEvent, annotationContext.g.node());
   const dx = pointer[0] - state.startPointerX;
@@ -442,7 +443,8 @@ function handleAnnotationDrag(event, datum) {
 }
 
 function handleAnnotationDragEnd(event, datum) {
-  if (!datum[ANNOTATION_DRAG_STATE]) return;
+  const state = datum[ANNOTATION_DRAG_STATE];
+  if (!state || state.mode !== 'label') return;
   delete datum[ANNOTATION_DRAG_STATE];
   persistAnnotations();
   renderAnnotations();
@@ -453,6 +455,68 @@ const annotationDragBehavior = d3.drag()
   .on('start', handleAnnotationDragStart)
   .on('drag', handleAnnotationDrag)
   .on('end', handleAnnotationDragEnd);
+
+function clampToDomain(value, domain) {
+  if (!Number.isFinite(value)) return value;
+  if (!Array.isArray(domain) || domain.length < 2) return value;
+  const [a, b] = domain;
+  const min = Math.min(a, b);
+  const max = Math.max(a, b);
+  if (value < min) return min;
+  if (value > max) return max;
+  return value;
+}
+
+function handleAnnotationAnchorDragStart(event, datum) {
+  if (!annotationContext || !annotationContext.g) return;
+  datum[ANNOTATION_DRAG_STATE] = { mode: 'anchor' };
+  if (event.sourceEvent) {
+    if (typeof event.sourceEvent.stopPropagation === 'function') {
+      event.sourceEvent.stopPropagation();
+    }
+    if (typeof event.sourceEvent.preventDefault === 'function') {
+      event.sourceEvent.preventDefault();
+    }
+  }
+}
+
+function handleAnnotationAnchorDrag(event, datum) {
+  if (!annotationContext || !annotationContext.g) return;
+  const state = datum[ANNOTATION_DRAG_STATE];
+  if (!state || state.mode !== 'anchor') return;
+  const { g, x, y, width, height } = annotationContext;
+  const pointerEvent = event && event.sourceEvent ? event.sourceEvent : event;
+  const pointer = d3.pointer(pointerEvent, g.node());
+  if (!pointer) return;
+  let [mx, my] = pointer;
+  mx = Math.max(0, Math.min(width, mx));
+  my = Math.max(0, Math.min(height, my));
+  const current = clampToDomain(x.invert(mx), x.domain());
+  const time = clampToDomain(y.invert(my), y.domain());
+  if (!Number.isFinite(current) || !Number.isFinite(time) || current <= 0 || time <= 0) {
+    return;
+  }
+  datum.current = current;
+  datum.time = time;
+  const group = d3.select(this.parentNode);
+  if (!group.empty()) {
+    positionAnnotation(group, datum);
+  }
+}
+
+function handleAnnotationAnchorDragEnd(event, datum) {
+  const state = datum[ANNOTATION_DRAG_STATE];
+  if (!state || state.mode !== 'anchor') return;
+  delete datum[ANNOTATION_DRAG_STATE];
+  persistAnnotations();
+  renderAnnotations();
+}
+
+const annotationAnchorDragBehavior = d3.drag()
+  .filter(annotationDragFilter)
+  .on('start', handleAnnotationAnchorDragStart)
+  .on('drag', handleAnnotationAnchorDrag)
+  .on('end', handleAnnotationAnchorDragEnd);
 
 function renderAnnotations() {
   if (!annotationContext || !annotationContext.layer) return;
@@ -474,6 +538,12 @@ function renderAnnotations() {
   merged.select('g.annotation-label')
     .style('cursor', 'move')
     .call(annotationDragBehavior);
+  merged.select('circle.annotation-anchor')
+    .style('cursor', 'move')
+    .call(annotationAnchorDragBehavior);
+  merged.select('line.annotation-connector')
+    .style('cursor', 'move')
+    .call(annotationAnchorDragBehavior);
   merged.on('dblclick', (event, datum) => {
     event.stopPropagation();
     event.preventDefault();
@@ -1092,6 +1162,18 @@ function describeComponentPlotAvailability(component, baseDevice) {
     const thermalMetrics = resolveMotorThermalLimit(component, refVoltage, refPhases, base, startMetrics);
     if (!startMetrics && !thermalMetrics) {
       return 'Provide the motor starting or stall time before plotting this component.';
+    }
+    return null;
+  }
+  const isCable = normalizedType.includes('cable')
+    || normalizedSubtype.includes('cable')
+    || normalizedBase.includes('cable');
+  if (isCable) {
+    const cableData = component.cable || component.props?.cable || component;
+    const phaseCount = parsePhases(component.phases).length || 3;
+    const curve = buildCableCurve(cableData, phaseCount);
+    if (!curve) {
+      return 'Provide the cable conductor size, material, and insulation rating before plotting this component.';
     }
     return null;
   }
