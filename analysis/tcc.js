@@ -407,7 +407,8 @@ function handleAnnotationDragStart(event, datum) {
   const anchorX = x(datum.current);
   const anchorY = y(datum.time);
   if (!Number.isFinite(anchorX) || !Number.isFinite(anchorY)) return;
-  const pointer = d3.pointer(event, g.node());
+  const pointerEvent = event && event.sourceEvent ? event.sourceEvent : event;
+  const pointer = d3.pointer(pointerEvent, g.node());
   const offsets = ensureAnnotationOffsets(datum, anchorX, anchorY, width, height);
   datum[ANNOTATION_DRAG_STATE] = {
     startPointerX: pointer[0],
@@ -429,7 +430,8 @@ function handleAnnotationDrag(event, datum) {
   if (!annotationContext || !annotationContext.g) return;
   const state = datum[ANNOTATION_DRAG_STATE];
   if (!state) return;
-  const pointer = d3.pointer(event, annotationContext.g.node());
+  const pointerEvent = event && event.sourceEvent ? event.sourceEvent : event;
+  const pointer = d3.pointer(pointerEvent, annotationContext.g.node());
   const dx = pointer[0] - state.startPointerX;
   const dy = pointer[1] - state.startPointerY;
   datum.offsetX = state.baseOffsetX + dx;
