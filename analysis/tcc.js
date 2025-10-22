@@ -90,7 +90,8 @@ const OVERLAY_GROUP_LABELS = {
   inrush: 'Transformer Inrush',
   transformerDamage: 'Transformer Damage',
   cable: 'Cable Damage',
-  motorStart: 'Motor Starting'
+  motorStart: 'Motor Starting',
+  motorThermal: 'Motor Thermal Limit'
 };
 const SYSTEM_OVERLAY_GROUP = 'System Curves';
 const COMPONENT_FALLBACK_GROUP = 'One-Line Devices';
@@ -631,6 +632,33 @@ function describeComponentPlotAvailability(component, baseDevice) {
   const normalizedType = typeof component.type === 'string' ? component.type.toLowerCase() : '';
   const normalizedSubtype = typeof component.subtype === 'string' ? component.subtype.toLowerCase() : '';
   const normalizedBase = typeof baseDevice?.type === 'string' ? baseDevice.type.toLowerCase() : '';
+  const isMotor = MOTOR_TYPES.has(normalizedType)
+    || MOTOR_TYPES.has(normalizedSubtype)
+    || MOTOR_TYPES.has(normalizedBase);
+  if (isMotor) {
+    const refPhases = parsePhases(component.phases).length || 3;
+    const refVoltage = inferVoltage(component);
+    const partial = collectMotorOperatingData(component, refVoltage, refPhases, { allowPartial: true });
+    if (!partial || !Number.isFinite(partial.voltage) || partial.voltage <= 0) {
+      return 'Provide the motor rated voltage before plotting this component.';
+    }
+    if (!Number.isFinite(partial.fla) || partial.fla <= 0) {
+      return 'Provide the motor full-load amps, horsepower, or kW before plotting this component.';
+    }
+    if (!Number.isFinite(partial.lockedRotor) || partial.lockedRotor <= 0) {
+      return 'Provide the motor locked-rotor current or multiple before plotting this component.';
+    }
+    const base = collectMotorOperatingData(component, refVoltage, refPhases);
+    if (!base) {
+      return 'Motor data is incomplete; verify the full-load and locked-rotor values before plotting.';
+    }
+    const startMetrics = resolveMotorStartingMetrics(component, refVoltage, refPhases, base);
+    const thermalMetrics = resolveMotorThermalLimit(component, refVoltage, refPhases, base, startMetrics);
+    if (!startMetrics && !thermalMetrics) {
+      return 'Provide the motor starting or stall time before plotting this component.';
+    }
+    return null;
+  }
   const isProtective = PROTECTIVE_TYPES.has(normalizedType)
     || PROTECTIVE_TYPES.has(normalizedSubtype)
     || PROTECTIVE_TYPES.has(normalizedBase);
@@ -740,7 +768,7 @@ function buildOverlayEntries() {
   overlays.push(...buildTransformerInrushEntries(contextId));
   overlays.push(...buildTransformerDamageEntries(contextId));
   overlays.push(...buildCableEntries(contextId));
-  overlays.push(...buildMotorStartingEntries(contextId));
+  overlays.push(...buildMotorOverlayEntries(contextId));
   return overlays;
 }
 
@@ -866,7 +894,7 @@ function buildCableEntries(targetId) {
   return overlays.sort((a, b) => a.name.localeCompare(b.name, undefined, { sensitivity: 'base' }));
 }
 
-function buildMotorStartingEntries(targetId) {
+function buildMotorOverlayEntries(targetId) {
   const overlays = [];
   const reference = componentLookup.get(targetId)?.component;
   if (!reference) return overlays;
@@ -877,22 +905,44 @@ function buildMotorStartingEntries(targetId) {
   const addMotor = motor => {
     if (!motor || !MOTOR_TYPES.has(motor.type)) return;
     if (seen.has(motor.id)) return;
-    const metrics = resolveMotorStartingMetrics(motor, refVoltage, refPhases);
-    if (!metrics) return;
+    const base = collectMotorOperatingData(motor, refVoltage, refPhases);
+    if (!base) return;
+    const startMetrics = resolveMotorStartingMetrics(motor, refVoltage, refPhases, base);
+    const thermalMetrics = resolveMotorThermalLimit(motor, refVoltage, refPhases, base, startMetrics);
+    if (!startMetrics && !thermalMetrics) return;
     seen.add(motor.id);
-    overlays.push({
-      uid: `motor-start:${motor.id}:${targetId}`,
-      kind: 'motorStart',
-      name: `${componentLabel(motor)} Motor Starting`,
-      deviceCategory: 'motor',
-      deviceType: 'motor starting',
-      curve: metrics.curve,
-      fla: metrics.fla,
-      lockedRotor: metrics.lockedRotor,
-      startTime: metrics.startTime,
-      sourceLabel: componentLabel(motor),
-      autoSelect: true
-    });
+    if (startMetrics) {
+      overlays.push({
+        uid: `motor-start:${motor.id}:${targetId}`,
+        kind: 'motorStart',
+        name: `${componentLabel(motor)} Motor Starting`,
+        deviceCategory: 'motor',
+        deviceType: 'motor starting',
+        curve: startMetrics.curve,
+        fla: startMetrics.fla,
+        lockedRotor: startMetrics.lockedRotor,
+        startTime: startMetrics.startTime,
+        sourceLabel: componentLabel(motor),
+        autoSelect: true
+      });
+    }
+    if (thermalMetrics) {
+      overlays.push({
+        uid: `motor-thermal:${motor.id}:${targetId}`,
+        kind: 'motorThermal',
+        name: `${componentLabel(motor)} Motor Thermal Limit`,
+        deviceCategory: 'motor',
+        deviceType: 'motor thermal limit',
+        curve: thermalMetrics.curve,
+        fla: thermalMetrics.fla,
+        lockedRotor: thermalMetrics.lockedRotor,
+        serviceFactor: thermalMetrics.serviceFactor,
+        stallTime: thermalMetrics.stallTime,
+        continuousCurrent: thermalMetrics.continuousCurrent,
+        sourceLabel: componentLabel(motor),
+        autoSelect: true
+      });
+    }
   };
 
   addMotor(reference);
@@ -1078,6 +1128,16 @@ function describeEntryAttributes(entry) {
       { label: 'Full-Load Amps', value: entry.fla !== undefined ? `${formatSettingValue(entry.fla)} A` : '', range: '' },
       { label: 'Locked Rotor', value: entry.lockedRotor !== undefined ? `${formatSettingValue(entry.lockedRotor)} A` : '', range: '' },
       { label: 'Start Time', value: entry.startTime !== undefined ? `${formatSettingValue(entry.startTime)} s` : '', range: '' }
+    ];
+  }
+  if (entry.kind === 'motorThermal') {
+    return [
+      { label: 'Full-Load Amps', value: entry.fla !== undefined ? `${formatSettingValue(entry.fla)} A` : '', range: '' },
+      { label: 'Locked Rotor', value: entry.lockedRotor !== undefined ? `${formatSettingValue(entry.lockedRotor)} A` : '', range: '' },
+      { label: 'Stall Time', value: entry.stallTime !== undefined ? `${formatSettingValue(entry.stallTime)} s` : '', range: '' },
+      { label: 'Service Factor', value: entry.serviceFactor !== undefined ? formatSettingValue(entry.serviceFactor) : '', range: '' },
+      { label: 'Continuous Current', value: entry.continuousCurrent !== undefined ? `${formatSettingValue(entry.continuousCurrent)} A` : '', range: '' },
+      { label: 'Data Points', value: Array.isArray(entry.curve) ? `${entry.curve.length} points` : '', range: '' }
     ];
   }
   return [];
@@ -1327,7 +1387,7 @@ function renderDeviceDetails(entry, container, doc) {
   if (base.interruptRating !== undefined) {
     appendMeta('Interrupt Rating', `${formatSettingValue(base.interruptRating)} kA`);
   }
-  if (entry.kind === 'inrush' || entry.kind === 'transformerDamage' || entry.kind === 'motorStart') {
+  if (entry.kind === 'inrush' || entry.kind === 'transformerDamage' || entry.kind === 'motorStart' || entry.kind === 'motorThermal') {
     appendMeta('Component', entry.sourceLabel || entry.sourceId || 'Associated Component');
   } else if (entry.kind === 'cable') {
     appendMeta('From', entry.sourceLabel || 'Source');
@@ -2235,7 +2295,7 @@ function plot() {
       );
       const scaled = scaleCurve(selection.baseDevice, overrides);
       devicePlots.push({ selection, overrides, scaled });
-    } else if (selection.kind === 'cable' || selection.kind === 'inrush' || selection.kind === 'transformerDamage' || selection.kind === 'motorStart') {
+    } else if (selection.kind === 'cable' || selection.kind === 'inrush' || selection.kind === 'transformerDamage' || selection.kind === 'motorStart' || selection.kind === 'motorThermal') {
       overlays.push({ ...selection });
     }
   });
@@ -2264,7 +2324,7 @@ function plot() {
         : DEFAULT_INRUSH_DURATION;
       entry.normalizedDuration = normalizedDuration;
       allTimes.push(normalizedDuration);
-    } else if (entry.kind === 'transformerDamage' || entry.kind === 'motorStart') {
+    } else if (entry.kind === 'transformerDamage' || entry.kind === 'motorStart' || entry.kind === 'motorThermal') {
       entry.curve.forEach(point => {
         if (point.current > 0) allCurrents.push(point.current);
         if (point.time > 0) allTimes.push(point.time);
@@ -2375,6 +2435,15 @@ function plot() {
         .attr('stroke', entry.color)
         .attr('stroke-width', 2)
         .attr('stroke-dasharray', '2,2');
+    } else if (entry.kind === 'motorThermal') {
+      legendItem.append('line')
+        .attr('x1', 0)
+        .attr('x2', 16)
+        .attr('y1', 8)
+        .attr('y2', 8)
+        .attr('stroke', entry.color)
+        .attr('stroke-width', 2)
+        .attr('stroke-dasharray', '4,1,1,1');
     } else {
       legendItem.append('rect')
         .attr('width', 16)
@@ -2426,6 +2495,16 @@ function plot() {
       .attr('stroke', entry.color)
       .attr('stroke-width', 2)
       .attr('stroke-dasharray', '8,4')
+      .attr('d', entry.curve.length ? line(entry.curve) : null);
+  });
+
+  overlays.filter(entry => entry.kind === 'motorThermal').forEach(entry => {
+    g.append('path')
+      .datum(entry.curve)
+      .attr('fill', 'none')
+      .attr('stroke', entry.color)
+      .attr('stroke-width', 2)
+      .attr('stroke-dasharray', '4,1,1,1')
       .attr('d', entry.curve.length ? line(entry.curve) : null);
   });
 
@@ -2855,7 +2934,13 @@ function resolveTransformerOperatingPoint(transformer, referenceVoltage, refPhas
   return { fla, volts, phases, side: selected.label };
 }
 
-function resolveMotorStartingMetrics(motor, referenceVoltage, refPhases = 3) {
+function collectMotorOperatingData(
+  motor,
+  referenceVoltage,
+  refPhases = 3,
+  { allowPartial = false } = {}
+) {
+  if (!motor) return null;
   const phases = parsePhases(getComponentValue(motor, 'phases')).length || refPhases || 3;
   const voltage = (() => {
     const val = getNumericValue(motor, ['voltage', 'volts', 'rated_voltage', 'line_voltage']);
@@ -2864,7 +2949,6 @@ function resolveMotorStartingMetrics(motor, referenceVoltage, refPhases = 3) {
     const inferred = inferVoltage(motor);
     return Number.isFinite(inferred) ? inferred : null;
   })();
-  if (!Number.isFinite(voltage) || voltage <= 0) return null;
 
   let fla = getNumericValue(motor, ['fla', 'full_load_amps', 'full_load_current', 'full_load_amp', 'rated_current', 'running_current', 'amps']);
   if (!Number.isFinite(fla) || fla <= 0) {
@@ -2889,15 +2973,13 @@ function resolveMotorStartingMetrics(motor, referenceVoltage, refPhases = 3) {
       if (denom > 0) fla = watts / denom;
     }
   }
-  if (!Number.isFinite(fla) || fla <= 0) return null;
 
   let lockedRotor = getNumericValue(motor, ['locked_rotor_current', 'lockedRotorCurrent', 'locked_rotor_amps', 'lockedRotorAmps', 'lr_current_amps', 'lra']);
   if (!Number.isFinite(lockedRotor) || lockedRotor <= 0) {
     let ratio = getNumericValue(motor, ['lr_current_pu', 'locked_rotor_multiple', 'lockedRotorMultiple', 'locked_rotor_pu', 'locked_rotor_ratio']);
     if (!Number.isFinite(ratio) || ratio <= 0) ratio = 6;
-    lockedRotor = fla * ratio;
+    lockedRotor = Number.isFinite(fla) && fla > 0 ? fla * ratio : null;
   }
-  if (!Number.isFinite(lockedRotor) || lockedRotor <= 0) return null;
 
   const startTime = getNumericValue(motor, [
     'starting_time_s',
@@ -2912,12 +2994,104 @@ function resolveMotorStartingMetrics(motor, referenceVoltage, refPhases = 3) {
     'start_duration',
     'start_time_sec'
   ]);
-  if (!Number.isFinite(startTime) || startTime <= 0) return null;
 
+  const data = { phases, voltage, fla, lockedRotor, startTime };
+  if (allowPartial) return data;
+  if (!Number.isFinite(voltage) || voltage <= 0) return null;
+  if (!Number.isFinite(fla) || fla <= 0) return null;
+  if (!Number.isFinite(lockedRotor) || lockedRotor <= 0) return null;
+  return data;
+}
+
+function resolveMotorStartingMetrics(motor, referenceVoltage, refPhases = 3, baseData) {
+  const base = baseData || collectMotorOperatingData(motor, referenceVoltage, refPhases);
+  if (!base) return null;
+  const { fla, lockedRotor, startTime } = base;
+  if (!Number.isFinite(fla) || fla <= 0) return null;
+  if (!Number.isFinite(lockedRotor) || lockedRotor <= 0) return null;
+  if (!Number.isFinite(startTime) || startTime <= 0) return null;
   const curve = buildMotorStartingCurve({ fla, lockedRotor, startTime });
   if (!curve.length) return null;
-
   return { fla, lockedRotor, startTime, curve };
+}
+
+function normalizeServiceFactor(value) {
+  let sf = Number(value);
+  if (!Number.isFinite(sf) || sf <= 0) return 1.15;
+  if (sf > 5) sf /= 100;
+  if (sf < 1) sf = 1;
+  return sf;
+}
+
+function resolveMotorThermalLimit(
+  motor,
+  referenceVoltage,
+  refPhases = 3,
+  baseData,
+  startMetrics
+) {
+  const base = baseData || collectMotorOperatingData(motor, referenceVoltage, refPhases);
+  if (!base) return null;
+  const { fla, lockedRotor } = base;
+  if (!Number.isFinite(fla) || fla <= 0) return null;
+  if (!Number.isFinite(lockedRotor) || lockedRotor <= 0) return null;
+  const stallTimeCandidates = [
+    getNumericValue(motor, [
+      'stall_time',
+      'stall_time_s',
+      'locked_rotor_time',
+      'max_start_time',
+      'thermal_limit_time',
+      'thermal_limit_duration'
+    ]),
+    startMetrics?.startTime,
+    base.startTime
+  ];
+  let stallTime = stallTimeCandidates.find(val => Number.isFinite(val) && val > 0) || null;
+  if (!Number.isFinite(stallTime) || stallTime <= 0) return null;
+  const serviceFactor = normalizeServiceFactor(getNumericValue(motor, ['service_factor', 'sf', 'serviceFactor']));
+  const continuousCurrent = Math.max(fla * serviceFactor, fla * 1.05);
+  const thermalConstant = lockedRotor * lockedRotor * stallTime;
+  let longTime = thermalConstant / (continuousCurrent * continuousCurrent);
+  if (!Number.isFinite(longTime) || longTime <= stallTime) {
+    longTime = stallTime * 3;
+  }
+  longTime = Math.max(longTime, stallTime * 1.2);
+  longTime = Math.min(longTime, 900);
+  const timeCandidates = [
+    stallTime,
+    stallTime * 1.5,
+    stallTime * 2.5,
+    longTime
+  ];
+  const tailTime = Math.min(longTime * 3, 1800);
+  if (Number.isFinite(tailTime) && tailTime > longTime * 1.1) {
+    timeCandidates.push(tailTime);
+  }
+  const points = [...new Set(timeCandidates
+    .filter(time => Number.isFinite(time) && time > 0)
+    .map(time => Number(time)))]
+    .sort((a, b) => a - b)
+    .map(time => {
+      const current = Math.max(Math.sqrt(thermalConstant / time), continuousCurrent);
+      return { time, current };
+    });
+  if (!points.length) return null;
+  const last = points[points.length - 1];
+  if (last) last.current = continuousCurrent;
+  for (let i = 1; i < points.length; i += 1) {
+    if (points[i].current > points[i - 1].current) {
+      points[i].current = points[i - 1].current;
+    }
+  }
+  return {
+    curve: points,
+    fla,
+    lockedRotor,
+    serviceFactor,
+    stallTime,
+    continuousCurrent
+  };
 }
 
 function buildMotorStartingCurve({ fla, lockedRotor, startTime }) {
