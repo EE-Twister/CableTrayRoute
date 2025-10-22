@@ -607,6 +607,49 @@ function rebuildCatalog() {
   renderDeviceList();
 }
 
+function deviceHasCurveData(device) {
+  if (!device || typeof device !== 'object') return false;
+  const curve = device.curve;
+  if (Array.isArray(curve) && curve.some(point => point && (point.current !== undefined || point.time !== undefined))) {
+    return curve.length > 0;
+  }
+  const profiles = device.curveProfiles;
+  if (Array.isArray(profiles)) {
+    return profiles.some(profile => Array.isArray(profile?.curve) && profile.curve.length);
+  }
+  if (profiles && typeof profiles === 'object') {
+    return Object.values(profiles).some(profile => Array.isArray(profile?.curve) && profile.curve.length);
+  }
+  return false;
+}
+
+function describeComponentPlotAvailability(component, baseDevice) {
+  if (!component) {
+    return 'This component could not be found in the one-line diagram.';
+  }
+  const typeKey = component.type || component.subtype || baseDevice?.type || '';
+  const normalizedType = typeof component.type === 'string' ? component.type.toLowerCase() : '';
+  const normalizedSubtype = typeof component.subtype === 'string' ? component.subtype.toLowerCase() : '';
+  const normalizedBase = typeof baseDevice?.type === 'string' ? baseDevice.type.toLowerCase() : '';
+  const isProtective = PROTECTIVE_TYPES.has(normalizedType)
+    || PROTECTIVE_TYPES.has(normalizedSubtype)
+    || PROTECTIVE_TYPES.has(normalizedBase);
+  if (!isProtective) {
+    const label = formatOptionLabel(typeKey || 'Device');
+    return `${label} components do not provide a protective TCC curve.`;
+  }
+  if (!component.tccId) {
+    return 'Assign a TCC device before plotting this component.';
+  }
+  if (!baseDevice) {
+    return `The assigned TCC device (${component.tccId}) is not available in the library.`;
+  }
+  if (!deviceHasCurveData(baseDevice)) {
+    return 'The assigned TCC device does not include curve data to plot.';
+  }
+  return null;
+}
+
 function buildComponentEntries() {
   const entries = [];
   componentRecords.forEach(({ component, sheetName }) => {
@@ -651,6 +694,7 @@ function buildComponentDisplayEntries() {
     const mergedOverrides = mergeOverrides(component.tccOverrides, saved.componentOverrides?.[component.id]);
     const overrides = base ? snapOverridesToOptions(base, mergedOverrides) : { ...mergedOverrides };
     const vendor = getComponentVendor(component);
+    const plotDisabledReason = describeComponentPlotAvailability(component, base);
     const entry = {
       uid: `component:${component.id}`,
       kind: 'component',
@@ -664,7 +708,8 @@ function buildComponentDisplayEntries() {
       sheetName,
       overrideSource: overrides,
       componentVendor: vendor,
-      missingBase: !base
+      missingBase: !base,
+      plotDisabledReason
     };
     entries.push(entry);
   });
@@ -1271,6 +1316,7 @@ function renderDeviceDetails(entry, container, doc) {
     if (entry.componentId) appendMeta('Component ID', entry.componentId);
     const assigned = entry.baseDevice?.name || entry.baseDeviceId || entry.component?.tccId;
     appendMeta('Assigned TCC Device', assigned || 'Not Assigned');
+    appendMeta('Plot Status', entry.plotDisabledReason ? 'Unavailable' : 'Ready to Plot');
   } else {
     appendMeta('Source', 'System Curve');
   }
@@ -1293,6 +1339,13 @@ function renderDeviceDetails(entry, container, doc) {
 
   if (meta.childElementCount) {
     container.appendChild(meta);
+  }
+
+  if (entry.kind === 'component' && entry.plotDisabledReason) {
+    const warning = docRef.createElement('p');
+    warning.className = 'device-detail-warning';
+    warning.textContent = entry.plotDisabledReason;
+    container.appendChild(warning);
   }
 
   const properties = describeEntryAttributes(entry);
@@ -1732,21 +1785,31 @@ async function openComponentBrowserModal() {
     if (!entry || entry.kind !== 'component' || !entry.componentId) {
       return false;
     }
+    if (entry.plotDisabledReason) {
+      return false;
+    }
     setActiveComponent(entry.componentId);
     return true;
   };
 
   function updateActiveEntry(entry) {
     activeEntry = entry || null;
-    modelElements.forEach(({ item }, uid) => {
+    modelElements.forEach(({ item, entry: itemEntry }, uid) => {
       const isActive = !!entry && uid === entry.uid;
       item.classList.toggle('active', isActive);
       item.setAttribute('aria-pressed', String(isActive));
       item.tabIndex = isActive ? 0 : -1;
+      if (itemEntry?.plotDisabledReason) {
+        item.classList.add('device-model-unavailable');
+        item.title = itemEntry.plotDisabledReason;
+      } else {
+        item.classList.remove('device-model-unavailable');
+        item.removeAttribute('title');
+      }
     });
     renderDeviceDetails(entry, detailContainer, docRef.current);
     if (controllerRef.current && typeof controllerRef.current.setPrimaryDisabled === 'function') {
-      const disable = !(entry && entry.kind === 'component' && entry.componentId);
+      const disable = !(entry && entry.kind === 'component' && entry.componentId && !entry.plotDisabledReason);
       controllerRef.current.setPrimaryDisabled(disable);
     }
     if (entry && entry.kind === 'component' && detailContainer && docRef.current) {
@@ -1850,6 +1913,10 @@ async function openComponentBrowserModal() {
       button.className = 'device-model-btn';
       button.dataset.uid = entry.uid;
       button.textContent = entry.name;
+      if (entry.plotDisabledReason) {
+        button.classList.add('device-model-unavailable');
+        button.title = entry.plotDisabledReason;
+      }
       const isActive = !!activeEntry && entry.uid === activeEntry.uid;
       button.classList.toggle('active', isActive);
       button.setAttribute('aria-pressed', String(isActive));
@@ -1865,7 +1932,7 @@ async function openComponentBrowserModal() {
         }
       });
       if (!firstButtonRef.current) firstButtonRef.current = button;
-      modelElements.set(entry.uid, { item: button });
+      modelElements.set(entry.uid, { item: button, entry });
       modelContainer.appendChild(button);
     });
   }
@@ -1875,7 +1942,12 @@ async function openComponentBrowserModal() {
     primaryText: 'Plot Component',
     secondaryText: 'Close',
     onSubmit: controller => {
-      if (!activeEntry || activeEntry.kind !== 'component' || !activeEntry.componentId) {
+      if (
+        !activeEntry
+        || activeEntry.kind !== 'component'
+        || !activeEntry.componentId
+        || activeEntry.plotDisabledReason
+      ) {
         if (controller && typeof controller.setPrimaryDisabled === 'function') {
           controller.setPrimaryDisabled(true);
         }
@@ -1892,7 +1964,12 @@ async function openComponentBrowserModal() {
       docRef.current = doc;
       controllerRef.current = controller;
       if (controller && typeof controller.setPrimaryDisabled === 'function') {
-        const disable = !(activeEntry && activeEntry.kind === 'component' && activeEntry.componentId);
+        const disable = !(
+          activeEntry
+          && activeEntry.kind === 'component'
+          && activeEntry.componentId
+          && !activeEntry.plotDisabledReason
+        );
         controller.setPrimaryDisabled(disable);
       }
       container.classList.add('device-selection-modal');
