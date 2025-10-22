@@ -48,11 +48,17 @@ const linkBtn = document.getElementById('link-btn');
 const openBtn = document.getElementById('open-btn');
 const componentModalBtn = document.getElementById('component-modal-btn');
 const violationDiv = document.getElementById('violation');
+const printPlotBtn = document.getElementById('print-plot-btn');
+const printHeaderInput = document.getElementById('print-header-input');
+const printFooterInput = document.getElementById('print-footer-input');
+const annotationBtn = document.getElementById('add-annotation-btn');
 const chart = d3.select('#tcc-chart');
 
 const params = new URLSearchParams(window.location.search);
 const compId = params.get('component');
 const deviceParam = params.get('device');
+const annotationBtnDefaultLabel = annotationBtn ? annotationBtn.textContent : 'Add Annotation';
+const ANNOTATION_ACTIVE_LABEL = 'Click chart to place annotation';
 
 let libraryDevices = [];
 let deviceEntries = [];
@@ -64,6 +70,9 @@ let neighborMap = new Map();
 let componentDeviceMap = new Map();
 let pendingPlotRefresh = null;
 let activeComponentId = compId || null;
+let annotationMode = false;
+let annotations = [];
+let annotationContext = null;
 
 function getActiveComponentId() {
   if (!activeComponentId) return null;
@@ -131,10 +140,16 @@ function loadSavedSettings() {
   if (!stored.settings || typeof stored.settings !== 'object') stored.settings = {};
   if (!stored.componentOverrides || typeof stored.componentOverrides !== 'object') stored.componentOverrides = {};
   if (!stored.overlaySelections || typeof stored.overlaySelections !== 'object') stored.overlaySelections = {};
+  if (!Array.isArray(stored.annotations)) stored.annotations = [];
   return stored;
 }
 
 let saved = loadSavedSettings();
+
+annotations = (saved.annotations || []).map(sanitizeAnnotation).filter(Boolean);
+saved.annotations = annotations.map(exportAnnotation);
+
+setPlotAvailability(false);
 
 init();
 
@@ -226,6 +241,276 @@ function formatSettingValue(value) {
   if (Math.abs(num) >= 100) return num.toFixed(1);
   if (Math.abs(num) >= 10) return num.toFixed(2);
   return num.toFixed(3).replace(/0+$/, '').replace(/\.$/, '');
+}
+
+function escapeHtml(value) {
+  if (value === null || value === undefined) return '';
+  return String(value)
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&#39;');
+}
+
+function createAnnotationId() {
+  return `note-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 8)}`;
+}
+
+function sanitizeAnnotation(raw) {
+  if (!raw || typeof raw !== 'object') return null;
+  const current = Number(raw.current);
+  const time = Number(raw.time);
+  const text = typeof raw.text === 'string' ? raw.text.trim() : '';
+  if (!Number.isFinite(current) || current <= 0) return null;
+  if (!Number.isFinite(time) || time <= 0) return null;
+  if (!text) return null;
+  const annotation = {
+    id: typeof raw.id === 'string' && raw.id ? raw.id : createAnnotationId(),
+    current,
+    time,
+    text
+  };
+  if (Number.isFinite(raw.offsetX)) annotation.offsetX = Number(raw.offsetX);
+  if (Number.isFinite(raw.offsetY)) annotation.offsetY = Number(raw.offsetY);
+  return annotation;
+}
+
+function exportAnnotation(annotation) {
+  const base = {
+    id: annotation.id,
+    current: annotation.current,
+    time: annotation.time,
+    text: annotation.text
+  };
+  if (Number.isFinite(annotation.offsetX)) base.offsetX = annotation.offsetX;
+  if (Number.isFinite(annotation.offsetY)) base.offsetY = annotation.offsetY;
+  return base;
+}
+
+function persistAnnotations({ skipSetItem = false } = {}) {
+  saved.annotations = annotations.map(exportAnnotation);
+  if (!skipSetItem) {
+    setItem('tccSettings', saved);
+  }
+}
+
+function setPlotAvailability(available) {
+  if (printPlotBtn) {
+    printPlotBtn.disabled = !available;
+  }
+  if (annotationBtn) {
+    annotationBtn.disabled = !available;
+    if (!available) {
+      disableAnnotationMode();
+    }
+  }
+}
+
+function enableAnnotationMode() {
+  if (!annotationBtn || annotationBtn.disabled) return;
+  if (!annotationContext) return;
+  annotationMode = true;
+  annotationBtn.textContent = ANNOTATION_ACTIVE_LABEL;
+  annotationBtn.setAttribute('aria-pressed', 'true');
+  chart.classed('annotation-mode', true);
+}
+
+function disableAnnotationMode() {
+  annotationMode = false;
+  if (annotationBtn) {
+    annotationBtn.textContent = annotationBtnDefaultLabel;
+    annotationBtn.setAttribute('aria-pressed', 'false');
+  }
+  chart.classed('annotation-mode', false);
+}
+
+function defaultAnnotationOffsets(xPos, yPos, width, height) {
+  const horizontal = xPos > width * 0.7 ? -60 : 60;
+  const vertical = yPos < height * 0.3 ? 40 : -40;
+  return { offsetX: horizontal, offsetY: vertical };
+}
+
+function renderAnnotations() {
+  if (!annotationContext || !annotationContext.layer) return;
+  const { layer, x, y, width, height } = annotationContext;
+  const selection = layer.selectAll('g.annotation').data(annotations, d => d.id);
+  selection.exit().remove();
+  const entered = selection.enter().append('g').attr('class', 'annotation');
+  entered.append('line').attr('class', 'annotation-connector');
+  entered.append('circle').attr('class', 'annotation-anchor').attr('r', 4);
+  const labelGroup = entered.append('g').attr('class', 'annotation-label');
+  labelGroup.append('rect').attr('class', 'annotation-label-bg').attr('rx', 4).attr('ry', 4);
+  labelGroup.append('text')
+    .attr('class', 'annotation-text')
+    .attr('x', 0)
+    .attr('y', 0)
+    .attr('dominant-baseline', 'hanging');
+  const merged = entered.merge(selection);
+  merged.style('cursor', 'pointer');
+  merged.on('dblclick', (event, datum) => {
+    event.stopPropagation();
+    event.preventDefault();
+    const updated = window.prompt('Edit annotation text (leave blank to remove):', datum.text);
+    if (updated === null) return;
+    const trimmed = updated.trim();
+    if (!trimmed) {
+      annotations = annotations.filter(item => item.id !== datum.id);
+    } else {
+      datum.text = trimmed;
+    }
+    persistAnnotations();
+    renderAnnotations();
+  });
+  merged.each(function renderAnnotation(datum) {
+    const anchorX = annotationContext.x(datum.current);
+    const anchorY = annotationContext.y(datum.time);
+    if (!Number.isFinite(anchorX) || !Number.isFinite(anchorY)) {
+      d3.select(this).attr('display', 'none');
+      return;
+    }
+    d3.select(this).attr('display', null);
+    const offsets = Number.isFinite(datum.offsetX) && Number.isFinite(datum.offsetY)
+      ? { offsetX: datum.offsetX, offsetY: datum.offsetY }
+      : defaultAnnotationOffsets(anchorX, anchorY, width, height);
+    const labelX = anchorX + offsets.offsetX;
+    const labelY = anchorY + offsets.offsetY;
+    const group = d3.select(this);
+    group.select('line.annotation-connector')
+      .attr('x1', anchorX)
+      .attr('y1', anchorY)
+      .attr('x2', labelX)
+      .attr('y2', labelY)
+      .attr('stroke', '#444')
+      .attr('stroke-width', 1.5);
+    group.select('circle.annotation-anchor')
+      .attr('cx', anchorX)
+      .attr('cy', anchorY)
+      .attr('r', 4)
+      .attr('fill', '#fff')
+      .attr('stroke', '#444')
+      .attr('stroke-width', 1.5);
+    const label = group.select('g.annotation-label')
+      .attr('transform', `translate(${labelX},${labelY})`);
+    const text = label.select('text.annotation-text')
+      .text(datum.text)
+      .attr('fill', '#111')
+      .attr('font-size', 12);
+    const textNode = text.node();
+    if (textNode) {
+      const bbox = textNode.getBBox();
+      const paddingX = 6;
+      const paddingY = 4;
+      label.select('rect.annotation-label-bg')
+        .attr('x', bbox.x - paddingX)
+        .attr('y', bbox.y - paddingY)
+        .attr('width', bbox.width + paddingX * 2)
+        .attr('height', bbox.height + paddingY * 2)
+        .attr('fill', '#fff')
+        .attr('stroke', '#444')
+        .attr('stroke-width', 1);
+    }
+  });
+}
+
+function handleAnnotationPlacement(event) {
+  if (!annotationMode || !annotationContext) return;
+  event.preventDefault();
+  event.stopPropagation();
+  const { g, x, y, width, height } = annotationContext;
+  const pointer = d3.pointer(event, g.node());
+  if (!pointer) {
+    disableAnnotationMode();
+    return;
+  }
+  const [mx, my] = pointer;
+  if (mx < 0 || mx > width || my < 0 || my > height) {
+    disableAnnotationMode();
+    return;
+  }
+  const current = x.invert(mx);
+  const time = y.invert(my);
+  if (!Number.isFinite(current) || current <= 0 || !Number.isFinite(time) || time <= 0) {
+    disableAnnotationMode();
+    return;
+  }
+  const response = window.prompt('Enter annotation text:', '');
+  if (response === null) {
+    disableAnnotationMode();
+    return;
+  }
+  const trimmed = response.trim();
+  if (!trimmed) {
+    disableAnnotationMode();
+    return;
+  }
+  const offsets = defaultAnnotationOffsets(mx, my, width, height);
+  const annotation = {
+    id: createAnnotationId(),
+    current,
+    time,
+    text: trimmed,
+    offsetX: offsets.offsetX,
+    offsetY: offsets.offsetY
+  };
+  annotations = [...annotations, annotation];
+  persistAnnotations();
+  renderAnnotations();
+  disableAnnotationMode();
+}
+
+function buildPrintMarkup(svgMarkup, headerText, footerText) {
+  const header = headerText || 'Time-Current Curves';
+  const footer = footerText || `Generated ${new Date().toLocaleString()}`;
+  return `<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <title>Time-Current Curve Plot</title>
+  <style>
+    *, *::before, *::after { box-sizing: border-box; }
+    body { font-family: 'Segoe UI', Arial, sans-serif; margin: 24px; color: #111; }
+    .print-header { text-align: center; font-size: 1.5rem; font-weight: 600; margin-bottom: 16px; }
+    .print-chart { display: flex; justify-content: center; align-items: center; margin: 16px 0; }
+    .print-chart svg { max-width: 100%; height: auto; }
+    .print-footer { text-align: center; font-size: 0.85rem; color: #555; margin-top: 24px; }
+    @page { size: landscape; margin: 15mm; }
+  </style>
+</head>
+<body>
+  <div class="print-header">${escapeHtml(header)}</div>
+  <div class="print-chart">${svgMarkup}</div>
+  <div class="print-footer">${escapeHtml(footer)}</div>
+  <script>
+    window.addEventListener('load', () => {
+      setTimeout(() => {
+        window.print();
+        window.addEventListener('afterprint', () => window.close());
+      }, 50);
+    });
+  </script>
+</body>
+</html>`;
+}
+
+function handlePrintPlot() {
+  if (!printPlotBtn || printPlotBtn.disabled) return;
+  if (!chart || !chart.node()) return;
+  const svgNode = chart.node().cloneNode(true);
+  if (!svgNode) return;
+  if (!svgNode.getAttribute('xmlns')) {
+    svgNode.setAttribute('xmlns', 'http://www.w3.org/2000/svg');
+  }
+  const serializer = new XMLSerializer();
+  const markup = serializer.serializeToString(svgNode);
+  const headerText = (printHeaderInput?.value || '').trim();
+  const footerText = (printFooterInput?.value || '').trim();
+  const html = buildPrintMarkup(markup, headerText, footerText);
+  const win = window.open('', '_blank');
+  if (!win) return;
+  win.document.open();
+  win.document.write(html);
+  win.document.close();
 }
 
 function formatOptionLabel(value) {
@@ -461,6 +746,7 @@ function refreshCatalog({
   const selection = [...defaults].filter(id => available.has(id));
   applySelectionSet(selection);
   saved.devices = selection;
+  persistAnnotations({ skipSetItem: true });
   setItem('tccSettings', saved);
   return selection;
 }
@@ -521,6 +807,9 @@ async function init() {
 
   on('scenario', () => {
     saved = loadSavedSettings();
+    annotations = (saved.annotations || []).map(sanitizeAnnotation).filter(Boolean);
+    saved.annotations = annotations.map(exportAnnotation);
+    renderAnnotations();
     const selection = refreshCatalog({ includeComponentContext: true, includeDeviceParam: true });
     updateShortCircuitStudy();
     if (getActiveComponentId() && deviceSelect && deviceSelect.selectedOptions.length && selection.length) {
@@ -533,6 +822,7 @@ function selectDefaults(ids) {
   const valid = [...ids].filter(id => deviceMap.has(id));
   applySelectionSet(valid);
   saved.devices = valid;
+  persistAnnotations({ skipSetItem: true });
   setItem('tccSettings', saved);
 }
 
@@ -1727,6 +2017,21 @@ deviceSelect.addEventListener('change', () => {
   persistSettings();
 });
 plotBtn.addEventListener('click', applyPlotAndPersistence);
+if (printPlotBtn) {
+  printPlotBtn.addEventListener('click', handlePrintPlot);
+}
+if (annotationBtn) {
+  annotationBtn.setAttribute('aria-pressed', 'false');
+  annotationBtn.addEventListener('click', () => {
+    if (annotationBtn.disabled) return;
+    if (annotationMode) {
+      disableAnnotationMode();
+    } else {
+      enableAnnotationMode();
+    }
+  });
+}
+chart.on('click.annotation', handleAnnotationPlacement);
 if (settingsDiv) {
   const handleSettingMutation = event => {
     const target = event.target;
@@ -2186,6 +2491,7 @@ function persistSettings() {
   saved.devices = selected;
   saved.settings = deviceSettings;
   saved.componentOverrides = componentSettings;
+  persistAnnotations({ skipSetItem: true });
   setItem('tccSettings', saved);
   syncComponentOverrides(componentSettings);
 }
@@ -2280,6 +2586,9 @@ function gatherOverridesFromInputs(uid) {
 function plot() {
   chart.selectAll('*').remove();
   violationDiv.textContent = '';
+  annotationContext = null;
+  setPlotAvailability(false);
+  chart.classed('annotation-mode', false);
   const selections = selectedDeviceIds().map(id => deviceMap.get(id)).filter(Boolean);
   if (!selections.length) return;
 
@@ -2748,6 +3057,11 @@ function plot() {
   plotted.forEach(entry => {
     entry.path.call(createDragBehavior(entry));
   });
+
+  const annotationLayer = g.append('g').attr('class', 'annotation-layer');
+  annotationContext = { g, x, y, width, height, layer: annotationLayer };
+  setPlotAvailability(true);
+  renderAnnotations();
 
   updateCurves();
 }
