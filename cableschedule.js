@@ -149,6 +149,8 @@ async function initCableSchedule() {
     {key:'circuit_number',label:'Circuit #',type:'number',group:'Routing / Termination',tooltip:'Circuit number from Panel Schedule'},
     {key:'circuit_group',label:'Circuit Group',type:'number',group:'Routing / Termination',tooltip:'Circuit grouping number'},
     {key:'allowed_cable_group',label:'Allowed Group',type:'text',group:'Routing / Termination',tooltip:'Permitted cable grouping identifier'},
+    {key:'manufacturer',label:'Manufacturer',type:'text',group:'Cable Construction & Specs',tooltip:'Manufacturer or vendor for this cable'},
+    {key:'model',label:'Model #',type:'text',group:'Cable Construction & Specs',tooltip:'Manufacturer model number or catalog reference'},
     {key:'cable_type',label:'Cable Type',type:'select',options:cableTypes,group:'Cable Construction & Specs',tooltip:'Category such as Power, Control, or Signal'},
     {key:'conductors',label:'Conductors',type:'number',group:'Cable Construction & Specs',tooltip:'Number of conductors within the cable'},
     {key:'conductor_size',label:'Conductor Size',type:'select',options:conductorSizes,group:'Cable Construction & Specs',tooltip:'Size of each conductor'},
@@ -179,6 +181,7 @@ async function initCableSchedule() {
     'operating_voltage',
     'est_load',
     'load_flow_current',
+    'ambient_temp',
     'duty_cycle',
     'length',
     'calc_ampacity',
@@ -984,6 +987,7 @@ async function initCableSchedule() {
       }
       if (this.labelInput) {
         this.labelInput.value = templateForFields.label || '';
+        this.labelInput.removeAttribute('aria-invalid');
       }
       this.formFields.innerHTML = '';
       this.fieldMap = new Map();
@@ -1044,6 +1048,28 @@ async function initCableSchedule() {
 
     saveTemplate() {
       const values = this.gatherValues();
+      const label = this.labelInput ? this.labelInput.value.trim() : '';
+      if (!label) {
+        if (this.labelInput) {
+          this.labelInput.setAttribute('aria-invalid', 'true');
+          this.labelInput.focus();
+          if (typeof this.labelInput.setCustomValidity === 'function') {
+            this.labelInput.setCustomValidity('Enter a unique name for this cable typical.');
+            if (typeof this.labelInput.reportValidity === 'function') {
+              this.labelInput.reportValidity();
+            } else if (window.alert) {
+              window.alert('Enter a unique name for this cable typical.');
+            }
+            this.labelInput.setCustomValidity('');
+          } else if (window.alert) {
+            window.alert('Enter a unique name for this cable typical.');
+          }
+        }
+        return;
+      }
+      if (this.labelInput) {
+        this.labelInput.removeAttribute('aria-invalid');
+      }
       const sanitized = filterTemplateFields(values, { keepLabel: true });
       const next = { ...sanitized };
       if (this.mode === 'edit' && this.editIndex >= 0) {
