@@ -989,6 +989,8 @@ async function initCableSchedule() {
       this.fieldMap = new Map();
       const { order, grouped } = this.buildGroupMap();
       order.forEach(groupName => {
+        const fields = grouped.get(groupName) || [];
+        if (!fields.length) return;
         const section = document.createElement('fieldset');
         section.className = 'modal-section';
         if (groupName) {
@@ -998,7 +1000,7 @@ async function initCableSchedule() {
         }
         const wrapper = document.createElement('div');
         wrapper.className = 'modal-body';
-        (grouped.get(groupName) || []).forEach(col => {
+        fields.forEach(col => {
           const fieldContainer = document.createElement('div');
           fieldContainer.className = 'modal-form-field';
           const label = document.createElement('label');
