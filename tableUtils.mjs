@@ -89,6 +89,7 @@ class TableManager {
     this.selectable = opts.selectable || false;
     this.colOffset = this.selectable ? 1 : 0;
     this.enableContextMenu = opts.enableContextMenu || false;
+    this.customFilters = new Map();
     this.handleHeaderDragStart = this.handleHeaderDragStart.bind(this);
     this.handleHeaderDragOver = this.handleHeaderDragOver.bind(this);
     this.handleHeaderDrop = this.handleHeaderDrop.bind(this);
@@ -148,7 +149,11 @@ class TableManager {
       selAll.className = 'select-all';
       selAll.setAttribute('aria-label','Select all rows');
       selAll.addEventListener('change', () => {
-        this.tbody.querySelectorAll('.row-select').forEach(cb => { cb.checked = selAll.checked; });
+        Array.from(this.tbody.rows).forEach(tr => {
+          if (tr.style.display === 'none') return;
+          const cb = tr.querySelector('.row-select');
+          if (cb) cb.checked = selAll.checked;
+        });
       });
       selTh.appendChild(selAll);
       headerRow.appendChild(selTh);
@@ -322,6 +327,7 @@ class TableManager {
     if (this.rowCountEl) {
       this.rowCountEl.textContent = `Rows: ${this.tbody.querySelectorAll('tr').length}`;
     }
+    this.updateSelectAllState();
   }
 
   persistColumns() {
@@ -581,6 +587,7 @@ class TableManager {
       chk.className = 'row-select';
       chk.addEventListener('change', () => {
         if (!chk.checked && this.selectAll) this.selectAll.checked = false;
+        this.updateSelectAllState();
       });
       selTd.appendChild(chk);
     }
@@ -839,7 +846,13 @@ class TableManager {
         });
       }
     });
+    if (data.typical_id !== undefined) {
+      tr.dataset.typicalId = data.typical_id || '';
+    } else {
+      delete tr.dataset.typicalId;
+    }
     this.updateRowCount();
+    this.updateSelectAllState();
     return tr;
   }
 
@@ -859,6 +872,7 @@ class TableManager {
         row[col.key] = el.value;
       }
     });
+    row.typical_id = tr.dataset.typicalId || '';
     return row;
   }
 
@@ -891,6 +905,7 @@ class TableManager {
           row[col.key] = '';
         }
       });
+      row.typical_id = tr.dataset.typicalId || '';
       rows.push(row);
       if (tr.dataset.ref !== undefined) row.ref = tr.dataset.ref;
       if (tr.dataset.id !== undefined && row.id === undefined) row.id = tr.dataset.id;
@@ -915,6 +930,7 @@ class TableManager {
   clearFilters() {
     this.filters=this.filters.map(()=> '');
     this.filterButtons.forEach(btn=>btn.classList.remove('filtered'));
+    this.customFilters.clear();
     this.applyFilters();
   }
 
@@ -938,8 +954,15 @@ class TableManager {
         });
         if (!match) visible = false;
       }
+      if (visible && this.customFilters.size) {
+        for (const filterFn of this.customFilters.values()) {
+          if (typeof filterFn !== 'function') continue;
+          if (!filterFn(row)) { visible = false; break; }
+        }
+      }
       row.style.display = visible ? '' : 'none';
     });
+    this.updateSelectAllState();
   }
 
   deleteAll() {
@@ -951,10 +974,12 @@ class TableManager {
   }
 
   deleteSelected() {
-    Array.from(this.tbody.querySelectorAll('.row-select:checked')).forEach(cb => cb.closest('tr').remove());
+    this.getSelectedRows(true).forEach(tr => tr.remove());
     if (this.selectAll) this.selectAll.checked = false;
     this.save();
     this.updateRowCount();
+    this.updateSelectAllState();
+    if (this.onChange) this.onChange();
   }
 
   initContextMenu() {
@@ -994,6 +1019,89 @@ class TableManager {
         e.preventDefault();
       }
     });
+  }
+
+  getSelectedRows(includeHidden = false) {
+    if (!this.selectable) return [];
+    return Array.from(this.tbody.rows).filter(tr => {
+      const cb = tr.querySelector('.row-select');
+      if (!cb || !cb.checked) return false;
+      if (!includeHidden && tr.style.display === 'none') return false;
+      return true;
+    });
+  }
+
+  getSelectedRowData(includeHidden = false) {
+    return this.getSelectedRows(includeHidden).map(tr => this.getRowData(tr));
+  }
+
+  clearSelection() {
+    if (!this.selectable) return;
+    Array.from(this.tbody.querySelectorAll('.row-select')).forEach(cb => { cb.checked = false; });
+    if (this.selectAll) this.selectAll.checked = false;
+  }
+
+  updateSelectAllState() {
+    if (!this.selectAll) return;
+    const rows = Array.from(this.tbody.rows).filter(tr => tr.style.display !== 'none');
+    if (!rows.length) {
+      this.selectAll.checked = false;
+      return;
+    }
+    const allChecked = rows.every(tr => {
+      const cb = tr.querySelector('.row-select');
+      return cb && cb.checked;
+    });
+    this.selectAll.checked = allChecked;
+  }
+
+  setCustomFilter(name, fn) {
+    if (!name) return;
+    if (typeof fn === 'function') {
+      this.customFilters.set(name, fn);
+    } else {
+      this.customFilters.delete(name);
+    }
+    this.applyFilters();
+  }
+
+  clearCustomFilters() {
+    this.customFilters.clear();
+    this.applyFilters();
+  }
+
+  applyValuesToRow(tr, values = {}, options = {}) {
+    if (!tr) return;
+    const skipUndefined = options.skipUndefined || false;
+    const offset = this.colOffset;
+    this.columns.forEach((col, idx) => {
+      if (!(col.key in values) && skipUndefined) return;
+      const rawValue = values[col.key];
+      const cell = tr.cells[idx + offset];
+      if (!cell) return;
+      const el = cell.firstChild;
+      if (!el) return;
+      if (col.multiple) {
+        if (!(col.key in values)) return;
+        const vals = Array.isArray(rawValue) ? rawValue : (rawValue ? [rawValue] : []);
+        if (typeof el.setSelectedValues === 'function') {
+          el.setSelectedValues(vals);
+        } else if (el.options) {
+          Array.from(el.options).forEach(opt => {
+            opt.selected = vals.includes(opt.value);
+          });
+        }
+        el.dispatchEvent(new Event('change', { bubbles: true }));
+      } else {
+        const value = rawValue ?? '';
+        el.value = value;
+        el.dispatchEvent(new Event('input', { bubbles: true }));
+        el.dispatchEvent(new Event('change', { bubbles: true }));
+      }
+    });
+    if ('typical_id' in values) {
+      tr.dataset.typicalId = values.typical_id || '';
+    }
   }
 
   exportXlsx() {

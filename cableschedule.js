@@ -204,11 +204,35 @@ async function initCableSchedule() {
   let editorTypicalControls = null;
   let editorTypicalSelect = null;
   let editorSaveTypicalBtn = null;
+  let batchTypicalSelect = null;
+  let applyTypicalBtn = null;
+  let typicalFilterSelect = null;
+  let tableInstance = null;
 
   const cloneTemplates = templates => (Array.isArray(templates) ? templates.map(t => JSON.parse(JSON.stringify(t))) : []);
+  const generateTemplateId = () => {
+    if (typeof crypto !== 'undefined' && typeof crypto.randomUUID === 'function') {
+      return crypto.randomUUID();
+    }
+    const rand = Math.random().toString(36).slice(2, 10);
+    const stamp = Date.now().toString(36);
+    return `tpl-${stamp}-${rand}`;
+  };
+  const ensureTemplateIds = templates => {
+    const copies = cloneTemplates(templates);
+    let changed = false;
+    copies.forEach(tpl => {
+      if (!tpl.template_id) {
+        tpl.template_id = generateTemplateId();
+        changed = true;
+      }
+    });
+    return { templates: copies, changed };
+  };
   const sanitizeTemplate = template => {
     const copy = JSON.parse(JSON.stringify(template || {}));
     delete copy.label;
+    delete copy.typical_id;
     return copy;
   };
   const getTemplateDisplayName = (template, idx) => (template?.label || template?.tag || `Typical ${idx + 1}`);
@@ -218,7 +242,7 @@ async function initCableSchedule() {
     const overwriteExisting = options.overwriteExisting || false;
     const merged = { ...existingValues };
     Object.entries(templateValues || {}).forEach(([key, value]) => {
-      if (key === 'label') return;
+      if (key === 'label' || key === 'template_id') return;
       if (preserveKeys.has(key)) return;
       if ((value === undefined || value === null) && skipUndefined) return;
       if (!overwriteExisting) {
@@ -232,7 +256,114 @@ async function initCableSchedule() {
     });
     return merged;
   };
-  let cachedCableTemplates = cloneTemplates(dataStore.getCableTemplates());
+  const { templates: initialTemplates, changed: initialTemplateChange } = ensureTemplateIds(dataStore.getCableTemplates());
+  if (initialTemplateChange) {
+    dataStore.setCableTemplates(initialTemplates);
+  }
+  let cachedCableTemplates = initialTemplates;
+
+  function collectRowTypicalIds() {
+    const ids = new Set();
+    if (!tableInstance || !tableInstance.tbody) return ids;
+    Array.from(tableInstance.tbody.rows).forEach(tr => {
+      const id = tr?.dataset?.typicalId || '';
+      if (id) ids.add(id);
+    });
+    return ids;
+  }
+
+  function updateBatchActionState() {
+    if (!applyTypicalBtn) return;
+    const hasTemplate = batchTypicalSelect && batchTypicalSelect.value;
+    const selectedCount = tableInstance && typeof tableInstance.getSelectedRows === 'function'
+      ? tableInstance.getSelectedRows().length
+      : 0;
+    applyTypicalBtn.disabled = !(hasTemplate && selectedCount > 0);
+  }
+
+  function updateBatchTypicalControls() {
+    if (!batchTypicalSelect && !typicalFilterSelect) return;
+    const labelEntries = [];
+    cachedCableTemplates.forEach((tpl, idx) => {
+      if (!tpl || !tpl.template_id) return;
+      labelEntries.push([tpl.template_id, getTemplateDisplayName(tpl, idx)]);
+    });
+
+    if (batchTypicalSelect) {
+      const previousValue = batchTypicalSelect.value;
+      batchTypicalSelect.innerHTML = '';
+      const placeholder = document.createElement('option');
+      placeholder.value = '';
+      placeholder.textContent = cachedCableTemplates.length ? 'Select a typical…' : 'No typicals available';
+      batchTypicalSelect.appendChild(placeholder);
+      labelEntries.forEach(([id, label]) => {
+        const option = document.createElement('option');
+        option.value = id;
+        option.textContent = label;
+        batchTypicalSelect.appendChild(option);
+      });
+      batchTypicalSelect.disabled = !cachedCableTemplates.length;
+      if (labelEntries.some(([id]) => id === previousValue)) {
+        batchTypicalSelect.value = previousValue;
+      } else {
+        batchTypicalSelect.value = '';
+      }
+    }
+
+    if (typicalFilterSelect) {
+      const previousFilter = typicalFilterSelect.value;
+      typicalFilterSelect.innerHTML = '';
+      const allOption = document.createElement('option');
+      allOption.value = '';
+      allOption.textContent = 'All Typicals';
+      typicalFilterSelect.appendChild(allOption);
+      const noneOption = document.createElement('option');
+      noneOption.value = '__none__';
+      noneOption.textContent = 'No Typical';
+      typicalFilterSelect.appendChild(noneOption);
+
+      const labelsForFilter = new Map(labelEntries);
+      collectRowTypicalIds().forEach(id => {
+        if (!labelsForFilter.has(id)) {
+          const suffix = id.slice(-6) || id;
+          labelsForFilter.set(id, `Deleted Typical (${suffix})`);
+        }
+      });
+      Array.from(labelsForFilter.entries())
+        .sort((a, b) => a[1].localeCompare(b[1]))
+        .forEach(([id, label]) => {
+          const option = document.createElement('option');
+          option.value = id;
+          option.textContent = label;
+          typicalFilterSelect.appendChild(option);
+        });
+
+      if (previousFilter && Array.from(typicalFilterSelect.options).some(opt => opt.value === previousFilter)) {
+        typicalFilterSelect.value = previousFilter;
+      } else {
+        typicalFilterSelect.value = '';
+      }
+    }
+
+    applyTypicalFilter();
+    updateBatchActionState();
+  }
+
+  function applyTypicalFilter() {
+    if (!tableInstance || !typicalFilterSelect || typeof tableInstance.setCustomFilter !== 'function') return;
+    const value = typicalFilterSelect.value;
+    if (!value) {
+      tableInstance.setCustomFilter('typical', null);
+    } else if (value === '__none__') {
+      tableInstance.setCustomFilter('typical', tr => {
+        const id = (tr?.dataset?.typicalId || '').trim();
+        return id === '';
+      });
+    } else {
+      tableInstance.setCustomFilter('typical', tr => (tr?.dataset?.typicalId || '') === value);
+    }
+    updateBatchActionState();
+  }
 
   const buildGroupMap = () => {
     const order = [];
@@ -375,6 +506,9 @@ async function initCableSchedule() {
         el.dispatchEvent(new Event('change', { bubbles: true }));
       }
     });
+    if ('typical_id' in values && activeRow) {
+      activeRow.dataset.typicalId = values.typical_id || '';
+    }
     activeRowData = { ...(activeRowData || {}), ...values };
     if (typeof activeTable.onChange === 'function') {
       activeTable.onChange();
@@ -414,14 +548,18 @@ async function initCableSchedule() {
     editorTypicalSelect.addEventListener('change', () => {
       const idx = Number(editorTypicalSelect.value);
       if (Number.isNaN(idx)) return;
-      const template = sanitizeTemplate(cachedCableTemplates[idx]);
+      const rawTemplate = cachedCableTemplates[idx];
+      const template = sanitizeTemplate(rawTemplate);
       if (!template) {
         editorTypicalSelect.value = '';
         return;
       }
       const currentValues = getEditorFieldValues();
       const merged = mergeTemplateValues(template, currentValues, { preserveKeys: ['tag'] });
-      setEditorFieldValues(merged);
+      const templateId = rawTemplate?.template_id || '';
+      delete merged.template_id;
+      merged.typical_id = templateId;
+      setEditorFieldValues(merged, { skipUndefined: false });
       applyValuesToActiveRow(merged, { skipUndefined: false });
       editorTypicalSelect.value = '';
     });
@@ -439,6 +577,8 @@ async function initCableSchedule() {
       const label = (labelInput || suggestion || '').trim();
       if (!label) return;
       const template = { ...values, label };
+      delete template.typical_id;
+      if (!template.template_id) template.template_id = generateTemplateId();
       const updated = cloneTemplates(cachedCableTemplates);
       updated.push(template);
       dataStore.setCableTemplates(updated);
@@ -480,8 +620,11 @@ async function initCableSchedule() {
   };
 
   dataStore.on(dataStore.STORAGE_KEYS.cableTemplates, templates => {
-    cachedCableTemplates = cloneTemplates(templates);
+    const { templates: normalized, changed } = ensureTemplateIds(templates);
+    cachedCableTemplates = normalized;
     updateEditorTypicalControls();
+    updateBatchTypicalControls();
+    if (changed) dataStore.setCableTemplates(normalized);
   });
 
   const openEditor = (rowData, tr, tableInstance) => {
@@ -635,7 +778,6 @@ async function initCableSchedule() {
         this.syncTemplates(templates);
       });
       this.syncTemplates(dataStore.getCableTemplates());
-      this.renderList();
     }
 
     setApplyHandler(fn) {
@@ -643,7 +785,9 @@ async function initCableSchedule() {
     }
 
     syncTemplates(templates) {
-      this.templates = Array.isArray(templates) ? templates.map(t => ({ ...t })) : [];
+      const { templates: normalized, changed } = ensureTemplateIds(templates);
+      this.templates = normalized;
+      if (changed) dataStore.setCableTemplates(normalized);
       this.renderList();
     }
 
@@ -854,10 +998,15 @@ async function initCableSchedule() {
 
     saveTemplate() {
       const values = this.gatherValues();
+      const next = { ...values };
+      delete next.typical_id;
       if (this.mode === 'edit' && this.editIndex >= 0) {
-        this.templates[this.editIndex] = { ...values };
+        const existingId = this.templates[this.editIndex]?.template_id;
+        next.template_id = existingId || next.template_id || generateTemplateId();
+        this.templates[this.editIndex] = next;
       } else {
-        this.templates.push({ ...values });
+        next.template_id = next.template_id || generateTemplateId();
+        this.templates.push(next);
       }
       dataStore.setCableTemplates(this.templates);
       this.showList();
@@ -881,6 +1030,7 @@ async function initCableSchedule() {
       if (!template) return;
       const copy = JSON.parse(JSON.stringify(template));
       delete copy.label;
+      delete copy.typical_id;
       this.onApply(copy);
     }
   }
@@ -983,7 +1133,13 @@ async function initCableSchedule() {
           cleanup(undefined);
           return;
         }
-        const template = sanitizeTemplate(cachedCableTemplates[idx]);
+        const sourceTemplate = cachedCableTemplates[idx];
+        if (!sourceTemplate) {
+          cleanup(undefined);
+          return;
+        }
+        const template = sanitizeTemplate(sourceTemplate);
+        template.template_id = sourceTemplate.template_id;
         cleanup(template || undefined);
       });
       setTimeout(() => {
@@ -1090,6 +1246,7 @@ async function initCableSchedule() {
     importInputId:'import-xlsx-input',
     importBtnId:'import-xlsx-btn',
     deleteAllBtnId:'delete-all-btn',
+    selectable:true,
     columns,
     onView:(row,tr)=>openEditor(row,tr,table),
     onChange:() => {
@@ -1102,6 +1259,7 @@ async function initCableSchedule() {
       markUnsaved();
       applySizingHighlight();
       validateAllRows();
+      updateBatchTypicalControls();
     },
     onSave:() => {
       console.log('Save triggered');
@@ -1112,18 +1270,22 @@ async function initCableSchedule() {
     }
   });
   console.log('Cable schedule table created', table);
+  tableInstance = table;
   window.cableScheduleTable = table;
 
   const addRowFromTemplate = templateValues => {
-    if (!table) return null;
+    if (!tableInstance) return null;
+    const templateId = templateValues?.template_id || templateValues?.typical_id || '';
     const templateCopy = sanitizeTemplate(templateValues || {});
     if (templateCopy.tag) {
-      const ids = table.getData().map(r => r.tag).filter(Boolean);
+      const ids = tableInstance.getData().map(r => r.tag).filter(Boolean);
       templateCopy.tag = generateId(ids, templateCopy.tag);
     }
-    const tr = table.addRow(templateCopy);
-    if (typeof table.onChange === 'function') {
-      table.onChange();
+    delete templateCopy.template_id;
+    templateCopy.typical_id = templateId;
+    const tr = tableInstance.addRow(templateCopy);
+    if (typeof tableInstance.onChange === 'function') {
+      tableInstance.onChange();
     }
     return tr;
   };
@@ -1146,9 +1308,73 @@ async function initCableSchedule() {
   }
 
   libraryController.setApplyHandler(template => {
-    if (!table) return;
+    if (!tableInstance) return;
     addRowFromTemplate(template);
   });
+
+  batchTypicalSelect = document.getElementById('batch-typical-select');
+  applyTypicalBtn = document.getElementById('apply-typical-selected-btn');
+  typicalFilterSelect = document.getElementById('typical-filter-select');
+
+  if (batchTypicalSelect) {
+    batchTypicalSelect.addEventListener('change', () => {
+      updateBatchActionState();
+    });
+  }
+
+  if (applyTypicalBtn) {
+    applyTypicalBtn.addEventListener('click', () => {
+      if (!tableInstance || !batchTypicalSelect) return;
+      const templateId = batchTypicalSelect.value;
+      if (!templateId) return;
+      const template = cachedCableTemplates.find(tpl => tpl.template_id === templateId);
+      if (!template) return;
+      const rows = tableInstance.getSelectedRows();
+      if (!rows.length) return;
+      const templateValues = sanitizeTemplate(template);
+      const templateAssociation = template.template_id || '';
+      rows.forEach(tr => {
+        const current = tableInstance.getRowData(tr);
+        const merged = mergeTemplateValues(templateValues, current, { preserveKeys: ['tag'], overwriteExisting: true });
+        merged.typical_id = templateAssociation;
+        delete merged.template_id;
+        tableInstance.applyValuesToRow(tr, merged, { skipUndefined: true });
+      });
+      tableInstance.applyFilters();
+      updateBatchTypicalControls();
+    });
+  }
+
+  if (typicalFilterSelect) {
+    typicalFilterSelect.addEventListener('change', () => {
+      applyTypicalFilter();
+    });
+  }
+
+  if (table.tbody) {
+    table.tbody.addEventListener('change', e => {
+      if (e.target && e.target.classList && e.target.classList.contains('row-select')) {
+        updateBatchActionState();
+      }
+    });
+  }
+  if (table.selectAll) {
+    table.selectAll.addEventListener('change', () => {
+      updateBatchActionState();
+    });
+  }
+
+  const clearFiltersBtn = document.getElementById('clear-filters-btn');
+  if (clearFiltersBtn) {
+    clearFiltersBtn.addEventListener('click', () => {
+      if (typicalFilterSelect) {
+        typicalFilterSelect.value = '';
+      }
+      applyTypicalFilter();
+    });
+  }
+
+  updateBatchTypicalControls();
 
   const presetSelect = document.getElementById('cable-preset-select');
   const presetStorageKey = dataStore.STORAGE_KEYS.cableSchedulePreset;
@@ -1254,6 +1480,7 @@ async function initCableSchedule() {
     (rows||[]).forEach(r=>this.addRow(r));
     this.updateRowCount?.();
     this.applyFilters?.();
+    updateBatchTypicalControls();
   };
 
   // Ensure the table is populated with any existing data on load.

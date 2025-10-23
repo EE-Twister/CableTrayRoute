@@ -86,6 +86,18 @@
             <option value="construction">Construction Specs</option>
           </select>
         </div>
+        <div class="mb-1" id="cable-typical-controls">
+          <label for="typical-filter-select">Typical Filter</label>
+          <select id="typical-filter-select" title="Filter cables by typical">
+            <option value="">All Typicals</option>
+            <option value="__none__">No Typical</option>
+          </select>
+          <label for="batch-typical-select">Apply Typical</label>
+          <select id="batch-typical-select" title="Choose a typical to apply">
+            <option value="">Select a typical…</option>
+          </select>
+          <button id="apply-typical-selected-btn" class="btn" type="button" disabled title="Apply selected typical to chosen rows">Apply to Selected</button>
+        </div>
         <div class="overflow-x-auto">
           <table id="cableScheduleTable" class="sticky-table">
             <thead></thead>
