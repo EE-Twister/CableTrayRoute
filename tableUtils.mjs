@@ -89,6 +89,7 @@ class TableManager {
     this.selectable = opts.selectable || false;
     this.colOffset = this.selectable ? 1 : 0;
     this.enableContextMenu = opts.enableContextMenu || false;
+    this.showActionColumn = opts.showActionColumn !== false;
     this.customFilters = new Map();
     this.handleHeaderDragStart = this.handleHeaderDragStart.bind(this);
     this.handleHeaderDragOver = this.handleHeaderDragOver.bind(this);
@@ -119,6 +120,7 @@ class TableManager {
   buildHeader() {
     this.thead.innerHTML='';
     const hasGroups = this.columns.some(c=>c.group);
+    const showActions = this.showActionColumn;
     let groupRow;
     if (hasGroups) {
       groupRow = this.thead.insertRow();
@@ -248,29 +250,32 @@ class TableManager {
       this.filterButtons.push(btn);
     });
 
-    if (hasGroups){
+    this.groupBlankTh = null;
+    if (hasGroups && showActions){
       const blank = document.createElement('th');
       blank.rowSpan = 1;
       blank.style.position='relative';
       groupRow.appendChild(blank);
       this.groupBlankTh = blank;
     }
-    const actTh = document.createElement('th');
-    actTh.textContent = 'Actions';
-    actTh.style.position='relative';
-    const res=document.createElement('span');
-    res.className='col-resizer';
-    actTh.appendChild(res);
-    let startX,startWidth;
-    const move=e=>{
-      const newWidth=Math.max(30,startWidth+e.pageX-startX);
-      actTh.style.width=newWidth+'px';
-      const idx = this.columns.length + offset;
-      Array.from(this.tbody.rows).forEach(r=>{if(r.cells[idx]) r.cells[idx].style.width=newWidth+'px';});
-      if(this.groupBlankTh) this.groupBlankTh.style.width=newWidth+'px';
-    };
-    res.addEventListener('mousedown',e=>{startX=e.pageX;startWidth=actTh.offsetWidth;document.addEventListener('mousemove',move);document.addEventListener('mouseup',()=>{document.removeEventListener('mousemove',move);},{once:true});});
-    headerRow.appendChild(actTh);
+    if (showActions) {
+      const actTh = document.createElement('th');
+      actTh.textContent = 'Actions';
+      actTh.style.position='relative';
+      const res=document.createElement('span');
+      res.className='col-resizer';
+      actTh.appendChild(res);
+      let startX,startWidth;
+      const move=e=>{
+        const newWidth=Math.max(30,startWidth+e.pageX-startX);
+        actTh.style.width=newWidth+'px';
+        const idx = this.columns.length + offset;
+        Array.from(this.tbody.rows).forEach(r=>{if(r.cells[idx]) r.cells[idx].style.width=newWidth+'px';});
+        if(this.groupBlankTh) this.groupBlankTh.style.width=newWidth+'px';
+      };
+      res.addEventListener('mousedown',e=>{startX=e.pageX;startWidth=actTh.offsetWidth;document.addEventListener('mousemove',move);document.addEventListener('mouseup',()=>{document.removeEventListener('mousemove',move);},{once:true});});
+      headerRow.appendChild(actTh);
+    }
     headerRow.addEventListener('dragstart', this.handleHeaderDragStart);
     headerRow.addEventListener('dragover', this.handleHeaderDragOver);
     headerRow.addEventListener('drop', this.handleHeaderDrop);
@@ -316,6 +321,7 @@ class TableManager {
   }
 
   syncGroupBlankWidth(){
+    if(!this.showActionColumn) return;
     const idx = this.columns.length + this.colOffset;
     if(this.groupBlankTh && this.headerRow && this.headerRow.cells[idx]){
       const w=this.headerRow.cells[idx].offsetWidth;
@@ -770,74 +776,53 @@ class TableManager {
         applyValidation(el, rules);
       }
     });
-    const actTd = tr.insertCell();
-    const actIdx = this.columns.length + this.colOffset;
-    if (this.headerRow && this.headerRow.cells[actIdx] && this.headerRow.cells[actIdx].style.width) {
-      actTd.style.width = this.headerRow.cells[actIdx].style.width;
-    }
-    if(this.onView){
-      const viewBtn=document.createElement('button');
-      viewBtn.textContent='👁';
-      viewBtn.className='viewBtn';
-      viewBtn.title='View row';
-      viewBtn.setAttribute('aria-label','View row');
-      viewBtn.addEventListener('click',()=>{
-        const row={};
-        this.columns.forEach((col,i)=>{
-          const el=tr.cells[i + this.colOffset].firstChild;
-          if(!el) return;
-          if(col.multiple){
-            if(typeof el.getSelectedValues==='function') row[col.key]=el.getSelectedValues();
-            else row[col.key]=Array.from(el.selectedOptions||[]).map(o=>o.value);
-          }else{
-            row[col.key]=el.value;
-          }
+    if (this.showActionColumn) {
+      const actTd = tr.insertCell();
+      const actIdx = this.columns.length + this.colOffset;
+      if (this.headerRow && this.headerRow.cells[actIdx] && this.headerRow.cells[actIdx].style.width) {
+        actTd.style.width = this.headerRow.cells[actIdx].style.width;
+      }
+      if(this.onView){
+        const viewBtn=document.createElement('button');
+        viewBtn.textContent='👁';
+        viewBtn.className='viewBtn';
+        viewBtn.title='View row';
+        viewBtn.setAttribute('aria-label','View row');
+        viewBtn.addEventListener('click',()=>{
+          const row=this.getRowData(tr);
+          this.onView(row,tr);
         });
-        this.onView(row,tr);
+        actTd.appendChild(viewBtn);
+      }
+      const addBtn=document.createElement('button');
+      addBtn.textContent='+';
+      addBtn.className='insertBelowBtn';
+      addBtn.title='Add row';
+      addBtn.setAttribute('aria-label','Add row');
+      addBtn.addEventListener('click',()=>{const newRow=this.addRow();if(newRow) this.tbody.insertBefore(newRow,tr.nextSibling);if(this.onChange) this.onChange();});
+      actTd.appendChild(addBtn);
+
+      const dupBtn = document.createElement('button');
+      dupBtn.textContent = '\u29C9';
+      dupBtn.className='duplicateBtn';
+      dupBtn.title='Duplicate row';
+      dupBtn.setAttribute('aria-label','Duplicate row');
+      dupBtn.addEventListener('click', () => {
+        const row = this.getRowData(tr);
+        const newRow = this.addRow(row);
+        if (newRow) this.tbody.insertBefore(newRow, tr.nextSibling);
+        if (this.onChange) this.onChange();
       });
-      actTd.appendChild(viewBtn);
+      actTd.appendChild(dupBtn);
+
+      const delBtn = document.createElement('button');
+      delBtn.textContent = '\u2716';
+      delBtn.className='removeBtn';
+      delBtn.title='Delete row';
+      delBtn.setAttribute('aria-label','Delete row');
+      delBtn.addEventListener('click', () => { tr.remove(); this.save(); this.updateRowCount(); if (this.onChange) this.onChange(); });
+      actTd.appendChild(delBtn);
     }
-    const addBtn=document.createElement('button');
-    addBtn.textContent='+';
-    addBtn.className='insertBelowBtn';
-    addBtn.title='Add row';
-    addBtn.setAttribute('aria-label','Add row');
-    addBtn.addEventListener('click',()=>{const newRow=this.addRow();if(newRow) this.tbody.insertBefore(newRow,tr.nextSibling);if(this.onChange) this.onChange();});
-    actTd.appendChild(addBtn);
-
-    const dupBtn = document.createElement('button');
-    dupBtn.textContent = '\u29C9';
-    dupBtn.className='duplicateBtn';
-    dupBtn.title='Duplicate row';
-    dupBtn.setAttribute('aria-label','Duplicate row');
-    dupBtn.addEventListener('click', () => {
-      const row = {};
-      this.columns.forEach((col,i) => {
-        const el = tr.cells[i + this.colOffset].firstChild;
-        if (!el) return;
-        if (col.multiple) {
-          if (typeof el.getSelectedValues === 'function') {
-            row[col.key] = el.getSelectedValues();
-          } else {
-            row[col.key] = Array.from(el.selectedOptions || []).map(o=>o.value);
-          }
-        } else {
-          row[col.key] = el.value;
-        }
-      });
-      const newRow = this.addRow(row);
-      if (newRow) this.tbody.insertBefore(newRow, tr.nextSibling);
-      if (this.onChange) this.onChange();
-    });
-    actTd.appendChild(dupBtn);
-
-    const delBtn = document.createElement('button');
-    delBtn.textContent = '\u2716';
-    delBtn.className='removeBtn';
-    delBtn.title='Delete row';
-    delBtn.setAttribute('aria-label','Delete row');
-    delBtn.addEventListener('click', () => { tr.remove(); this.save(); this.updateRowCount(); if (this.onChange) this.onChange(); });
-    actTd.appendChild(delBtn);
 
     Object.keys(this.groupCols || {}).forEach(g => {
       if (this.hiddenGroups && this.hiddenGroups.has(g)) {
@@ -985,13 +970,26 @@ class TableManager {
   initContextMenu() {
     const menu = new ContextMenu();
     let clipboard = null;
-    menu.setItems([
+    const items = [];
+    if (typeof this.onView === 'function') {
+      items.push({
+        label: 'View / Edit Row',
+        action: tr => {
+          if (!tr) return;
+          const row = this.getRowData(tr);
+          this.onView(row, tr);
+        }
+      });
+    }
+    items.push(
       { label: 'Insert Row Above', action: tr => { if (!tr) return; const newRow = this.addRow(); this.tbody.insertBefore(newRow, tr); if (this.onChange) this.onChange(); } },
       { label: 'Insert Row Below', action: tr => { if (!tr) return; const newRow = this.addRow(); this.tbody.insertBefore(newRow, tr.nextSibling); if (this.onChange) this.onChange(); } },
+      { label: 'Duplicate Row', action: tr => { if (!tr) return; const data = this.getRowData(tr); const newRow = this.addRow(data); this.tbody.insertBefore(newRow, tr.nextSibling); if (this.onChange) this.onChange(); } },
       { label: 'Copy Row', action: tr => { if (!tr) return; clipboard = this.getRowData(tr); } },
       { label: 'Paste Row', action: tr => { if (!tr || !clipboard) return; const newRow = this.addRow(clipboard); this.tbody.insertBefore(newRow, tr.nextSibling); if (this.onChange) this.onChange(); } },
       { label: 'Delete Row', action: tr => { if (!tr) return; tr.remove(); this.save(); this.updateRowCount(); if (this.onChange) this.onChange(); } }
-    ]);
+    );
+    menu.setItems(items);
 
     this.table.addEventListener('contextmenu', e => {
       const row = e.target.closest('tbody tr');

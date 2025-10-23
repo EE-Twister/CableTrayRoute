@@ -1609,6 +1609,8 @@ async function initCableSchedule() {
     importBtnId:'import-xlsx-btn',
     deleteAllBtnId:'delete-all-btn',
     selectable:true,
+    enableContextMenu:true,
+    showActionColumn:false,
     columns,
     onView:(row,tr)=>openEditor(row,tr,table),
     onChange:() => {
