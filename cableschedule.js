@@ -181,6 +181,220 @@ async function initCableSchedule() {
     }
   });
 
+  const editorModal = document.getElementById('cable-editor-modal');
+  const editorForm = editorModal ? editorModal.querySelector('#cable-editor-form') : null;
+  const editorBody = editorModal ? editorModal.querySelector('#cable-editor-body') : null;
+  const editorCancelBtn = editorModal ? editorModal.querySelector('#cable-editor-cancel') : null;
+  const editorCloseBtn = editorModal ? editorModal.querySelector('#close-cable-editor-btn') : null;
+  const editorTitle = editorModal ? editorModal.querySelector('#cable-editor-title') : null;
+  const defaultEditorTitle = editorTitle ? editorTitle.textContent : '';
+  let editorFieldMap = new Map();
+  let activeRow = null;
+  let activeTable = null;
+  let activeRowData = null;
+
+  const buildGroupMap = () => {
+    const order = [];
+    const grouped = new Map();
+    columns.forEach(col => {
+      const groupName = col.group || 'General';
+      if (!grouped.has(groupName)) {
+        grouped.set(groupName, []);
+        order.push(groupName);
+      }
+      grouped.get(groupName).push(col);
+    });
+    return { order, grouped };
+  };
+
+  const ensureDatalist = (col, tr, rowData) => {
+    if (!editorModal || !col.datalist) return null;
+    const listId = `cable-editor-${col.key}-list`;
+    let list = editorModal.querySelector(`#${listId}`);
+    if (!list) {
+      list = document.createElement('datalist');
+      list.id = listId;
+      editorModal.appendChild(list);
+    }
+    const items = typeof col.datalist === 'function' ? col.datalist(tr, rowData) : col.datalist;
+    list.innerHTML = '';
+    (items || []).forEach(opt => {
+      const option = document.createElement('option');
+      option.value = opt;
+      list.appendChild(option);
+    });
+    return listId;
+  };
+
+  const createEditorField = (col, tr) => {
+    const rowData = activeRowData || {};
+    let field;
+    if (col.type === 'select') {
+      const opts = typeof col.options === 'function' ? col.options(tr, rowData) : (col.options || []);
+      field = document.createElement('select');
+      if (col.multiple) {
+        field.multiple = true;
+        if (col.size) field.size = col.size;
+        field.classList.add('modal-select');
+      }
+      opts.forEach(opt => {
+        const option = document.createElement('option');
+        option.value = opt;
+        option.textContent = opt;
+        field.appendChild(option);
+      });
+    } else {
+      field = document.createElement('input');
+      field.type = col.type || 'text';
+      if (field.type === 'number') {
+        field.step = col.step || 'any';
+      }
+      if (col.maxlength) field.maxLength = col.maxlength;
+      if (col.className) field.className = col.className;
+      const listId = ensureDatalist(col, tr, rowData);
+      if (listId) field.setAttribute('list', listId);
+    }
+    field.name = col.key;
+    const val = rowData[col.key] !== undefined ? rowData[col.key] : col.default;
+    if (col.multiple) {
+      const values = Array.isArray(val) ? val : (val ? [val] : []);
+      const opts = Array.from(field.options || []);
+      if (typeof field.setSelectedValues === 'function') {
+        field.setSelectedValues(values);
+      } else if (field.multiple) {
+        opts.forEach(option => { option.selected = values.includes(option.value); });
+      }
+    } else if (val !== undefined && val !== null) {
+      field.value = val;
+    }
+    if (field.tagName === 'SELECT' && !col.multiple && field.options.length && (val === undefined || val === null)) {
+      field.value = field.options[0].value;
+    }
+    return field;
+  };
+
+  const closeEditor = () => {
+    if (!editorModal) return;
+    editorModal.style.display = 'none';
+    editorModal.setAttribute('aria-hidden', 'true');
+    document.body.classList.remove('modal-open');
+    document.removeEventListener('keydown', handleEditorKeydown);
+    editorFieldMap = new Map();
+    activeRow = null;
+    activeTable = null;
+    activeRowData = null;
+    if (editorTitle) editorTitle.textContent = defaultEditorTitle;
+  };
+
+  const handleEditorKeydown = e => {
+    if (e.key === 'Escape') {
+      e.preventDefault();
+      closeEditor();
+    }
+  };
+
+  const openEditor = (rowData, tr, tableInstance) => {
+    if (!editorModal || !editorForm || !editorBody) return;
+    activeRow = tr;
+    activeTable = tableInstance;
+    activeRowData = rowData || {};
+    editorFieldMap = new Map();
+    editorBody.innerHTML = '';
+    const { order, grouped } = buildGroupMap();
+    order.forEach(groupName => {
+      const section = document.createElement('fieldset');
+      section.className = 'modal-section';
+      const legendText = groupName || '';
+      if (legendText) {
+        const legend = document.createElement('legend');
+        legend.textContent = legendText;
+        section.appendChild(legend);
+      }
+      const fieldsWrapper = document.createElement('div');
+      fieldsWrapper.className = 'modal-body';
+      (grouped.get(groupName) || []).forEach(col => {
+        const fieldId = `cable-editor-${col.key}`;
+        const fieldContainer = document.createElement('div');
+        fieldContainer.className = 'modal-form-field';
+        const label = document.createElement('label');
+        label.setAttribute('for', fieldId);
+        label.textContent = col.label;
+        if (col.tooltip) label.title = col.tooltip;
+        const field = createEditorField(col, tr);
+        field.id = fieldId;
+        fieldContainer.appendChild(label);
+        fieldContainer.appendChild(field);
+        editorFieldMap.set(col.key, field);
+        fieldsWrapper.appendChild(fieldContainer);
+      });
+      section.appendChild(fieldsWrapper);
+      editorBody.appendChild(section);
+    });
+    if (editorTitle) {
+      const tag = activeRowData?.tag;
+      editorTitle.textContent = tag ? `Cable Details – ${tag}` : (defaultEditorTitle || 'Cable Details');
+    }
+    editorModal.style.display = 'flex';
+    editorModal.setAttribute('aria-hidden', 'false');
+    document.body.classList.add('modal-open');
+    document.addEventListener('keydown', handleEditorKeydown);
+    const focusTarget = editorBody.querySelector('input, select, textarea');
+    if (focusTarget) focusTarget.focus();
+  };
+
+  if (editorCancelBtn) editorCancelBtn.addEventListener('click', closeEditor);
+  if (editorCloseBtn) editorCloseBtn.addEventListener('click', closeEditor);
+  if (editorModal) {
+    editorModal.addEventListener('click', e => {
+      if (e.target === editorModal) closeEditor();
+    });
+  }
+
+  if (editorForm) {
+    editorForm.addEventListener('submit', e => {
+      e.preventDefault();
+      if (!activeRow || !activeTable) {
+        closeEditor();
+        return;
+      }
+      const updatedValues = {};
+      editorFieldMap.forEach((field, key) => {
+        if (field.multiple) {
+          updatedValues[key] = Array.from(field.selectedOptions || []).map(opt => opt.value);
+        } else {
+          updatedValues[key] = field.value;
+        }
+      });
+      const offset = activeTable.colOffset || 0;
+      activeTable.columns.forEach((col, idx) => {
+        const value = updatedValues[col.key];
+        const cell = activeRow.cells[idx + offset];
+        if (!cell) return;
+        const el = cell.firstChild;
+        if (!el) return;
+        if (col.multiple) {
+          const values = Array.isArray(value) ? value : (value ? [value] : []);
+          if (typeof el.setSelectedValues === 'function') {
+            el.setSelectedValues(values);
+          } else if (el.options) {
+            Array.from(el.options).forEach(opt => {
+              opt.selected = values.includes(opt.value);
+            });
+          }
+          el.dispatchEvent(new Event('change', { bubbles: true }));
+        } else {
+          el.value = value ?? '';
+          el.dispatchEvent(new Event('input', { bubbles: true }));
+          el.dispatchEvent(new Event('change', { bubbles: true }));
+        }
+      });
+      if (typeof activeTable.onChange === 'function') {
+        activeTable.onChange();
+      }
+      closeEditor();
+    });
+  }
+
   // Retrieve existing cables from project storage.
   let tableData = dataStore.getCables();
   console.log('Initial cable data from store:', tableData);
@@ -280,6 +494,7 @@ async function initCableSchedule() {
     importBtnId:'import-xlsx-btn',
     deleteAllBtnId:'delete-all-btn',
     columns,
+    onView:(row,tr)=>openEditor(row,tr,table),
     onChange:() => {
       console.log('Table changed');
       const data = table.getData();
