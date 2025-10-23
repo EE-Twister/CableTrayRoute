@@ -75,6 +75,7 @@
           <input type="file" id="import-xlsx-input" accept=".xlsx" class="hidden" title="Import from Excel">
           <button id="import-xlsx-btn" class="btn" title="Import from Excel">Import XLSX</button>
           <button id="delete-all-btn" class="btn" title="Delete all rows">Delete All Rows</button>
+          <button id="cable-library-btn" class="btn" title="Manage cable typicals" aria-haspopup="dialog" aria-expanded="false" aria-controls="cable-library-modal">Cable Library</button>
         </div>
         <div class="mb-1" id="cable-preset-controls">
           <label for="cable-preset-select">View Preset</label>
@@ -118,6 +119,34 @@
         <div class="modal-actions">
           <button type="button" id="cable-editor-cancel" class="btn" title="Cancel editing">Cancel</button>
           <button type="submit" id="cable-editor-save" class="btn primary-btn" title="Save changes">Save</button>
+        </div>
+      </form>
+    </div>
+  </div>
+  <div id="cable-library-modal" class="modal" aria-hidden="true" role="dialog" aria-modal="true" aria-labelledby="cable-library-title" aria-describedby="cable-library-description">
+    <div class="modal-content" data-variant="wide">
+      <button id="close-cable-library-btn" class="close-btn" aria-label="Close cable library" title="Close cable library">&times;</button>
+      <div class="modal-header">
+        <h2 id="cable-library-title">Cable Library</h2>
+        <p id="cable-library-description">Reuse saved cable typicals across your schedule.</p>
+      </div>
+      <div id="cable-library-list-view" class="modal-body">
+        <div class="modal-actions">
+          <button id="cable-library-add-btn" class="btn primary-btn" type="button" title="Add a new cable typical">Add Typical</button>
+        </div>
+        <p id="cable-library-empty" class="muted">No cable typicals saved yet.</p>
+        <ul id="cable-library-list" class="library-list" role="list"></ul>
+      </div>
+      <form id="cable-library-form" class="modal-form hidden" aria-hidden="true" novalidate>
+        <h3 id="cable-library-form-title">Add Cable Typical</h3>
+        <div class="modal-form-field">
+          <label for="cable-library-label">Label</label>
+          <input id="cable-library-label" name="label" type="text" maxlength="120" placeholder="Cable description or tag">
+        </div>
+        <div id="cable-library-form-fields" class="modal-body"></div>
+        <div class="modal-actions">
+          <button type="button" id="cable-library-cancel-btn" class="btn" title="Cancel library edit">Cancel</button>
+          <button type="submit" id="cable-library-save-btn" class="btn primary-btn" title="Save cable typical">Save Typical</button>
         </div>
       </form>
     </div>

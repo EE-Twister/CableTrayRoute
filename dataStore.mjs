@@ -88,7 +88,8 @@ const KEYS = {
 const EXTRA_KEYS = {
   equipmentColumns: 'equipmentColumns',
   collapsedGroups: 'collapsedGroups',
-  cableSchedulePreset: 'cableSchedulePreset'
+  cableSchedulePreset: 'cableSchedulePreset',
+  cableTemplates: 'cableTemplates'
 };
 
 export const STORAGE_KEYS = { ...KEYS, ...EXTRA_KEYS };
@@ -176,6 +177,9 @@ export const getCables = () => read(KEYS.cables, []);
  * @param {Cable[]} cables
  */
 export const setCables = cables => write(KEYS.cables, cables);
+
+export const getCableTemplates = () => read(EXTRA_KEYS.cableTemplates, []);
+export const setCableTemplates = templates => write(EXTRA_KEYS.cableTemplates, templates);
 
 /**
  * Append a cable record to the existing cable schedule.
