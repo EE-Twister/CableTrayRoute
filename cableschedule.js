@@ -201,6 +201,38 @@ async function initCableSchedule() {
   let activeRow = null;
   let activeTable = null;
   let activeRowData = null;
+  let editorTypicalControls = null;
+  let editorTypicalSelect = null;
+  let editorSaveTypicalBtn = null;
+
+  const cloneTemplates = templates => (Array.isArray(templates) ? templates.map(t => JSON.parse(JSON.stringify(t))) : []);
+  const sanitizeTemplate = template => {
+    const copy = JSON.parse(JSON.stringify(template || {}));
+    delete copy.label;
+    return copy;
+  };
+  const getTemplateDisplayName = (template, idx) => (template?.label || template?.tag || `Typical ${idx + 1}`);
+  const mergeTemplateValues = (templateValues, existingValues = {}, options = {}) => {
+    const preserveKeys = new Set(options.preserveKeys || []);
+    const skipUndefined = options.skipUndefined !== undefined ? options.skipUndefined : true;
+    const overwriteExisting = options.overwriteExisting || false;
+    const merged = { ...existingValues };
+    Object.entries(templateValues || {}).forEach(([key, value]) => {
+      if (key === 'label') return;
+      if (preserveKeys.has(key)) return;
+      if ((value === undefined || value === null) && skipUndefined) return;
+      if (!overwriteExisting) {
+        const existing = merged[key];
+        const isArrayEmpty = Array.isArray(existing) && existing.length === 0;
+        const isStringEmpty = typeof existing === 'string' && existing.trim() === '';
+        const hasExisting = !(existing === undefined || existing === null || isArrayEmpty || isStringEmpty);
+        if (hasExisting) return;
+      }
+      merged[key] = Array.isArray(value) ? value.map(v => (v != null ? `${v}` : v)) : value;
+    });
+    return merged;
+  };
+  let cachedCableTemplates = cloneTemplates(dataStore.getCableTemplates());
 
   const buildGroupMap = () => {
     const order = [];
@@ -283,6 +315,72 @@ async function initCableSchedule() {
     return field;
   };
 
+  const getEditorFieldValues = () => {
+    const values = {};
+    editorFieldMap.forEach((field, key) => {
+      if (field.multiple) {
+        values[key] = Array.from(field.selectedOptions || []).map(opt => opt.value).filter(v => v !== '');
+      } else {
+        values[key] = field.value;
+      }
+    });
+    return values;
+  };
+
+  const setEditorFieldValues = (values, options = {}) => {
+    const skipUndefined = options.skipUndefined || false;
+    editorFieldMap.forEach((field, key) => {
+      if (!field) return;
+      if (!(key in values) && skipUndefined) return;
+      const value = values[key];
+      if (field.multiple) {
+        const vals = Array.isArray(value) ? value : (value ? [value] : []);
+        Array.from(field.options || []).forEach(option => {
+          option.selected = vals.includes(option.value);
+        });
+      } else if (value !== undefined && value !== null) {
+        field.value = value;
+      } else if (!skipUndefined) {
+        field.value = '';
+      }
+    });
+  };
+
+  const applyValuesToActiveRow = (values, options = {}) => {
+    if (!activeRow || !activeTable) return;
+    const skipUndefined = options.skipUndefined || false;
+    const offset = activeTable.colOffset || 0;
+    activeTable.columns.forEach((col, idx) => {
+      if (!(col.key in values) && skipUndefined) return;
+      const rawValue = values[col.key];
+      const cell = activeRow.cells[idx + offset];
+      if (!cell) return;
+      const el = cell.firstChild;
+      if (!el) return;
+      if (col.multiple) {
+        if (!(col.key in values)) return;
+        const vals = Array.isArray(rawValue) ? rawValue : (rawValue ? [rawValue] : []);
+        if (typeof el.setSelectedValues === 'function') {
+          el.setSelectedValues(vals);
+        } else if (el.options) {
+          Array.from(el.options).forEach(opt => {
+            opt.selected = vals.includes(opt.value);
+          });
+        }
+        el.dispatchEvent(new Event('change', { bubbles: true }));
+      } else {
+        const value = rawValue ?? '';
+        el.value = value;
+        el.dispatchEvent(new Event('input', { bubbles: true }));
+        el.dispatchEvent(new Event('change', { bubbles: true }));
+      }
+    });
+    activeRowData = { ...(activeRowData || {}), ...values };
+    if (typeof activeTable.onChange === 'function') {
+      activeTable.onChange();
+    }
+  };
+
   const closeEditor = () => {
     if (!editorModal) return;
     editorModal.style.display = 'none';
@@ -303,6 +401,89 @@ async function initCableSchedule() {
     }
   };
 
+  const ensureEditorTypicalControls = () => {
+    if (!editorForm || editorTypicalControls) return;
+    editorTypicalControls = document.createElement('div');
+    editorTypicalControls.className = 'modal-toolbar typical-controls';
+    const typicalLabel = document.createElement('label');
+    typicalLabel.setAttribute('for', 'cable-editor-typical-select');
+    typicalLabel.textContent = 'Use Typical';
+    editorTypicalSelect = document.createElement('select');
+    editorTypicalSelect.id = 'cable-editor-typical-select';
+    editorTypicalSelect.className = 'modal-select';
+    editorTypicalSelect.addEventListener('change', () => {
+      const idx = Number(editorTypicalSelect.value);
+      if (Number.isNaN(idx)) return;
+      const template = sanitizeTemplate(cachedCableTemplates[idx]);
+      if (!template) {
+        editorTypicalSelect.value = '';
+        return;
+      }
+      const currentValues = getEditorFieldValues();
+      const merged = mergeTemplateValues(template, currentValues, { preserveKeys: ['tag'] });
+      setEditorFieldValues(merged);
+      applyValuesToActiveRow(merged, { skipUndefined: false });
+      editorTypicalSelect.value = '';
+    });
+    editorSaveTypicalBtn = document.createElement('button');
+    editorSaveTypicalBtn.type = 'button';
+    editorSaveTypicalBtn.id = 'cable-editor-save-typical';
+    editorSaveTypicalBtn.className = 'btn';
+    editorSaveTypicalBtn.textContent = 'Save as Typical';
+    editorSaveTypicalBtn.addEventListener('click', () => {
+      if (!activeTable) return;
+      const values = getEditorFieldValues();
+      const suggestion = values.tag || values.service_description || values.label || 'Cable Typical';
+      const labelInput = window.prompt ? window.prompt('Label for this cable typical', suggestion) : suggestion;
+      if (labelInput === null) return;
+      const label = (labelInput || suggestion || '').trim();
+      if (!label) return;
+      const template = { ...values, label };
+      const updated = cloneTemplates(cachedCableTemplates);
+      updated.push(template);
+      dataStore.setCableTemplates(updated);
+      if (editorTypicalSelect) editorTypicalSelect.value = '';
+    });
+    editorTypicalControls.appendChild(typicalLabel);
+    editorTypicalControls.appendChild(editorTypicalSelect);
+    editorTypicalControls.appendChild(editorSaveTypicalBtn);
+    const insertTarget = editorTitle || editorForm.firstChild;
+    if (insertTarget && insertTarget.parentNode) {
+      insertTarget.parentNode.insertBefore(editorTypicalControls, insertTarget.nextSibling);
+    } else if (editorForm.firstChild) {
+      editorForm.insertBefore(editorTypicalControls, editorForm.firstChild.nextSibling);
+    } else {
+      editorForm.appendChild(editorTypicalControls);
+    }
+  };
+
+  const updateEditorTypicalControls = () => {
+    if (!editorTypicalSelect) return;
+    const previous = editorTypicalSelect.value;
+    editorTypicalSelect.innerHTML = '';
+    const placeholder = document.createElement('option');
+    placeholder.value = '';
+    placeholder.textContent = cachedCableTemplates.length ? 'Select a typical…' : 'No typicals available';
+    editorTypicalSelect.appendChild(placeholder);
+    cachedCableTemplates.forEach((tpl, idx) => {
+      const option = document.createElement('option');
+      option.value = String(idx);
+      option.textContent = getTemplateDisplayName(tpl, idx);
+      editorTypicalSelect.appendChild(option);
+    });
+    editorTypicalSelect.disabled = !cachedCableTemplates.length;
+    if (!editorTypicalSelect.disabled && Array.from(editorTypicalSelect.options).some(opt => opt.value === previous)) {
+      editorTypicalSelect.value = previous;
+    } else {
+      editorTypicalSelect.value = '';
+    }
+  };
+
+  dataStore.on(dataStore.STORAGE_KEYS.cableTemplates, templates => {
+    cachedCableTemplates = cloneTemplates(templates);
+    updateEditorTypicalControls();
+  });
+
   const openEditor = (rowData, tr, tableInstance) => {
     if (!editorModal || !editorForm || !editorBody) return;
     activeRow = tr;
@@ -311,6 +492,9 @@ async function initCableSchedule() {
     editorFieldMap = new Map();
     editorBody.innerHTML = '';
     const { order, grouped } = buildGroupMap();
+    ensureEditorTypicalControls();
+    updateEditorTypicalControls();
+    if (editorTypicalSelect) editorTypicalSelect.value = '';
     order.forEach(groupName => {
       const section = document.createElement('fieldset');
       section.className = 'modal-section';
@@ -367,14 +551,7 @@ async function initCableSchedule() {
         closeEditor();
         return;
       }
-      const updatedValues = {};
-      editorFieldMap.forEach((field, key) => {
-        if (field.multiple) {
-          updatedValues[key] = Array.from(field.selectedOptions || []).map(opt => opt.value);
-        } else {
-          updatedValues[key] = field.value;
-        }
-      });
+      const updatedValues = getEditorFieldValues();
       const offset = activeTable.colOffset || 0;
       activeTable.columns.forEach((col, idx) => {
         const value = updatedValues[col.key];
@@ -714,6 +891,107 @@ async function initCableSchedule() {
     createField: (col, options) => createEditorField(col, null, options)
   });
 
+  const ensureTemplateName = (template, idx) => getTemplateDisplayName(template, idx);
+
+  const chooseTemplateForNewRow = () => {
+    if (!cachedCableTemplates.length) {
+      return Promise.resolve(undefined);
+    }
+    return new Promise(resolve => {
+      const overlay = document.createElement('div');
+      overlay.className = 'modal typical-picker-modal';
+      overlay.setAttribute('role', 'dialog');
+      overlay.setAttribute('aria-modal', 'true');
+      overlay.setAttribute('aria-label', 'Add Cable from Typical');
+      const content = document.createElement('div');
+      content.className = 'modal-content';
+      const header = document.createElement('div');
+      header.className = 'modal-header';
+      const title = document.createElement('h2');
+      title.textContent = 'Add Cable';
+      header.appendChild(title);
+      const description = document.createElement('p');
+      description.textContent = 'Select a typical to prefill the new cable or start from a blank row.';
+      const select = document.createElement('select');
+      select.className = 'modal-select';
+      select.id = 'add-cable-typical-select';
+      const blankOption = document.createElement('option');
+      blankOption.value = '';
+      blankOption.textContent = 'Start with blank cable';
+      select.appendChild(blankOption);
+      cachedCableTemplates.forEach((tpl, idx) => {
+        const opt = document.createElement('option');
+        opt.value = String(idx);
+        opt.textContent = ensureTemplateName(tpl, idx);
+        select.appendChild(opt);
+      });
+      const footer = document.createElement('div');
+      footer.className = 'modal-actions';
+      const cancelBtn = document.createElement('button');
+      cancelBtn.type = 'button';
+      cancelBtn.className = 'btn';
+      cancelBtn.textContent = 'Cancel';
+      const addBtn = document.createElement('button');
+      addBtn.type = 'button';
+      addBtn.className = 'btn primary-btn';
+      addBtn.textContent = 'Add Cable';
+      footer.appendChild(cancelBtn);
+      footer.appendChild(addBtn);
+      const body = document.createElement('div');
+      body.className = 'modal-body';
+      body.appendChild(description);
+      body.appendChild(select);
+      content.appendChild(header);
+      content.appendChild(body);
+      content.appendChild(footer);
+      overlay.appendChild(content);
+      document.body.appendChild(overlay);
+      document.body.classList.add('modal-open');
+      let resolved = false;
+      const cleanup = result => {
+        if (resolved) return;
+        resolved = true;
+        document.body.classList.remove('modal-open');
+        document.removeEventListener('keydown', handleKey);
+        overlay.remove();
+        resolve(result);
+      };
+      const handleKey = e => {
+        const trap = typeof window.trapFocus === 'function' ? window.trapFocus : (typeof trapFocus === 'function' ? trapFocus : null);
+        if (trap) trap(e, content);
+        if (e.key === 'Escape') {
+          e.preventDefault();
+          cleanup(null);
+        } else if (e.key === 'Enter' && document.activeElement === select) {
+          e.preventDefault();
+          addBtn.click();
+        }
+      };
+      document.addEventListener('keydown', handleKey);
+      overlay.addEventListener('click', e => {
+        if (e.target === overlay) cleanup(null);
+      });
+      cancelBtn.addEventListener('click', () => cleanup(null));
+      addBtn.addEventListener('click', () => {
+        const value = select.value;
+        if (!value) {
+          cleanup(undefined);
+          return;
+        }
+        const idx = Number(value);
+        if (Number.isNaN(idx)) {
+          cleanup(undefined);
+          return;
+        }
+        const template = sanitizeTemplate(cachedCableTemplates[idx]);
+        cleanup(template || undefined);
+      });
+      setTimeout(() => {
+        select.focus();
+      }, 0);
+    });
+  };
+
   // Retrieve existing cables from project storage.
   let tableData = dataStore.getCables();
   console.log('Initial cable data from store:', tableData);
@@ -836,17 +1114,40 @@ async function initCableSchedule() {
   console.log('Cable schedule table created', table);
   window.cableScheduleTable = table;
 
-  libraryController.setApplyHandler(template => {
-    if (!table) return;
-    const templateCopy = JSON.parse(JSON.stringify(template || {}));
+  const addRowFromTemplate = templateValues => {
+    if (!table) return null;
+    const templateCopy = sanitizeTemplate(templateValues || {});
     if (templateCopy.tag) {
       const ids = table.getData().map(r => r.tag).filter(Boolean);
       templateCopy.tag = generateId(ids, templateCopy.tag);
     }
-    table.addRow(templateCopy);
+    const tr = table.addRow(templateCopy);
     if (typeof table.onChange === 'function') {
       table.onChange();
     }
+    return tr;
+  };
+
+  const addRowBtn = document.getElementById('add-row-btn');
+  if (addRowBtn) {
+    addRowBtn.addEventListener('click', async e => {
+      e.preventDefault();
+      e.stopImmediatePropagation();
+      console.log('Button add-row-btn clicked');
+      const template = await chooseTemplateForNewRow();
+      if (template === null) return;
+      if (template) {
+        addRowFromTemplate(template);
+      } else {
+        table.addRow();
+        if (typeof table.onChange === 'function') table.onChange();
+      }
+    }, { capture: true });
+  }
+
+  libraryController.setApplyHandler(template => {
+    if (!table) return;
+    addRowFromTemplate(template);
   });
 
   const presetSelect = document.getElementById('cable-preset-select');
