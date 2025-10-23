@@ -71,6 +71,10 @@ test.describe('cableschedule buttons', () => {
     await page.route('**/examples/sampleCables.json', route =>
       route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify(sample) })
     );
+    const templates = [{ template_id: 'tpl-1', label: 'Test Template', cable_type: 'Power' }];
+    await page.route('**/examples/sampleCableTemplates.json', route =>
+      route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify(templates) })
+    );
 
     await page.click('#load-sample-cables-btn');
     await expect(page.locator('#cableScheduleTable tbody tr')).toHaveCount(sample.length);
