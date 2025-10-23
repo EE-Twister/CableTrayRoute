@@ -76,6 +76,15 @@
           <button id="import-xlsx-btn" class="btn" title="Import from Excel">Import XLSX</button>
           <button id="delete-all-btn" class="btn" title="Delete all rows">Delete All Rows</button>
         </div>
+        <div class="mb-1" id="cable-preset-controls">
+          <label for="cable-preset-select">View Preset</label>
+          <select id="cable-preset-select">
+            <option value="full">Full Detail</option>
+            <option value="routing">Routing Focus</option>
+            <option value="electrical">Electrical Focus</option>
+            <option value="construction">Construction Specs</option>
+          </select>
+        </div>
         <div class="overflow-x-auto">
           <table id="cableScheduleTable" class="sticky-table">
             <thead></thead>
