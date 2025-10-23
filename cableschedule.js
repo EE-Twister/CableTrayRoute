@@ -1509,12 +1509,28 @@ async function initCableSchedule() {
     console.log('load-sample-cables-btn clicked');
     try {
       const res = await fetch('./examples/sampleCables.json', { cache: 'no-store' });
+      if (!res.ok) throw new Error(`Sample cables request failed: ${res.status}`);
       const sampleCables = await res.json();
+      let sampleTemplates = [];
+      try {
+        const tplRes = await fetch('./examples/sampleCableTemplates.json', { cache: 'no-store' });
+        if (tplRes.ok) {
+          sampleTemplates = await tplRes.json();
+        } else {
+          console.warn('Sample cable templates request failed', tplRes.status);
+        }
+      } catch (templateError) {
+        console.warn('Failed to load sample cable templates', templateError);
+      }
       table.setData(sampleCables); // immediately display the sample rows
       tableData = sampleCables;
       table.save();
       validateAllRows();
       markSaved();
+      if (Array.isArray(sampleTemplates) && sampleTemplates.length) {
+        const { templates: normalized } = ensureTemplateIds(sampleTemplates);
+        dataStore.setCableTemplates(normalized);
+      }
     } catch (e) {
       console.error('Failed to load sample cables', e);
     }
