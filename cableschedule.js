@@ -216,14 +216,15 @@ async function initCableSchedule() {
     return { order, grouped };
   };
 
-  const ensureDatalist = (col, tr, rowData) => {
-    if (!editorModal || !col.datalist) return null;
-    const listId = `cable-editor-${col.key}-list`;
-    let list = editorModal.querySelector(`#${listId}`);
+  const ensureDatalist = (col, tr, rowData, hostModal = editorModal) => {
+    if (!hostModal || !col.datalist) return null;
+    const prefix = hostModal === editorModal ? 'cable-editor' : (hostModal.id || 'modal');
+    const listId = `${prefix}-${col.key}-list`;
+    let list = hostModal.querySelector(`#${listId}`);
     if (!list) {
       list = document.createElement('datalist');
       list.id = listId;
-      editorModal.appendChild(list);
+      hostModal.appendChild(list);
     }
     const items = typeof col.datalist === 'function' ? col.datalist(tr, rowData) : col.datalist;
     list.innerHTML = '';
@@ -235,8 +236,8 @@ async function initCableSchedule() {
     return listId;
   };
 
-  const createEditorField = (col, tr) => {
-    const rowData = activeRowData || {};
+  const createEditorField = (col, tr, options = {}) => {
+    const rowData = options.rowData || activeRowData || {};
     let field;
     if (col.type === 'select') {
       const opts = typeof col.options === 'function' ? col.options(tr, rowData) : (col.options || []);
@@ -260,7 +261,7 @@ async function initCableSchedule() {
       }
       if (col.maxlength) field.maxLength = col.maxlength;
       if (col.className) field.className = col.className;
-      const listId = ensureDatalist(col, tr, rowData);
+      const listId = ensureDatalist(col, tr, rowData, options.modal || editorModal);
       if (listId) field.setAttribute('list', listId);
     }
     field.name = col.key;
@@ -404,6 +405,315 @@ async function initCableSchedule() {
     });
   }
 
+  class CableLibraryController {
+    constructor({ columns: modalColumns, buildGroupMap: buildGroups, createField }) {
+      this.columns = modalColumns;
+      this.buildGroupMap = buildGroups;
+      this.createField = createField;
+      this.modal = document.getElementById('cable-library-modal');
+      this.button = document.getElementById('cable-library-btn');
+      this.closeBtn = this.modal ? this.modal.querySelector('#close-cable-library-btn') : null;
+      this.addBtn = this.modal ? this.modal.querySelector('#cable-library-add-btn') : null;
+      this.listView = this.modal ? this.modal.querySelector('#cable-library-list-view') : null;
+      this.list = this.modal ? this.modal.querySelector('#cable-library-list') : null;
+      this.emptyState = this.modal ? this.modal.querySelector('#cable-library-empty') : null;
+      this.form = this.modal ? this.modal.querySelector('#cable-library-form') : null;
+      this.formTitle = this.form ? this.form.querySelector('#cable-library-form-title') : null;
+      this.formFields = this.modal ? this.modal.querySelector('#cable-library-form-fields') : null;
+      this.labelInput = this.modal ? this.modal.querySelector('#cable-library-label') : null;
+      this.cancelBtn = this.modal ? this.modal.querySelector('#cable-library-cancel-btn') : null;
+      this.saveBtn = this.modal ? this.modal.querySelector('#cable-library-save-btn') : null;
+      this.content = this.modal ? this.modal.querySelector('.modal-content') : null;
+      this.templates = [];
+      this.fieldMap = new Map();
+      this.mode = 'list';
+      this.editIndex = -1;
+      this.onApply = null;
+      this.previouslyFocused = null;
+      this.handleKeydown = this.handleKeydown.bind(this);
+      this.handleListClick = this.handleListClick.bind(this);
+      this.init();
+    }
+
+    init() {
+      if (!this.modal || !this.button || !this.listView || !this.form) return;
+      this.form.hidden = true;
+      this.listView.hidden = false;
+      this.button.setAttribute('aria-expanded', 'false');
+      this.button.addEventListener('click', () => this.open());
+      if (this.closeBtn) this.closeBtn.addEventListener('click', () => this.close());
+      if (this.addBtn) this.addBtn.addEventListener('click', () => this.startAdd());
+      if (this.cancelBtn) this.cancelBtn.addEventListener('click', () => this.showList());
+      if (this.form) {
+        this.form.addEventListener('submit', e => {
+          e.preventDefault();
+          this.saveTemplate();
+        });
+      }
+      if (this.list) this.list.addEventListener('click', this.handleListClick);
+      this.modal.addEventListener('click', e => {
+        if (e.target === this.modal) this.close();
+      });
+      dataStore.on(dataStore.STORAGE_KEYS.cableTemplates, templates => {
+        this.syncTemplates(templates);
+      });
+      this.syncTemplates(dataStore.getCableTemplates());
+      this.renderList();
+    }
+
+    setApplyHandler(fn) {
+      this.onApply = typeof fn === 'function' ? fn : null;
+    }
+
+    syncTemplates(templates) {
+      this.templates = Array.isArray(templates) ? templates.map(t => ({ ...t })) : [];
+      this.renderList();
+    }
+
+    open() {
+      if (!this.modal) return;
+      this.syncTemplates(dataStore.getCableTemplates());
+      this.showList();
+      this.modal.style.display = 'flex';
+      this.modal.setAttribute('aria-hidden', 'false');
+      document.body.classList.add('modal-open');
+      this.button.setAttribute('aria-expanded', 'true');
+      this.previouslyFocused = document.activeElement;
+      document.addEventListener('keydown', this.handleKeydown);
+      const focusTarget = this.addBtn || this.modal.querySelector('button, input, select, textarea');
+      if (focusTarget) focusTarget.focus();
+    }
+
+    close() {
+      if (!this.modal) return;
+      this.modal.style.display = 'none';
+      this.modal.setAttribute('aria-hidden', 'true');
+      document.body.classList.remove('modal-open');
+      this.button.setAttribute('aria-expanded', 'false');
+      document.removeEventListener('keydown', this.handleKeydown);
+      const target = this.previouslyFocused && document.contains(this.previouslyFocused) ? this.previouslyFocused : this.button;
+      if (target && typeof target.focus === 'function') target.focus();
+    }
+
+    handleKeydown(e) {
+      if (e.key === 'Escape') {
+        e.preventDefault();
+        this.close();
+        return;
+      }
+      const trap = typeof window.trapFocus === 'function' ? window.trapFocus : (typeof trapFocus === 'function' ? trapFocus : null);
+      if (!trap) return;
+      trap(e, this.form && !this.form.hidden ? this.form : (this.content || this.modal));
+    }
+
+    handleListClick(e) {
+      const btn = e.target.closest('button[data-action]');
+      if (!btn) return;
+      const idx = Number(btn.getAttribute('data-index'));
+      if (Number.isNaN(idx)) return;
+      const action = btn.getAttribute('data-action');
+      if (action === 'edit') {
+        this.startEdit(idx);
+      } else if (action === 'delete') {
+        this.deleteTemplate(idx);
+      } else if (action === 'apply') {
+        this.applyTemplate(idx);
+      }
+    }
+
+    renderList() {
+      if (!this.list) return;
+      this.list.innerHTML = '';
+      if (!this.templates.length) {
+        if (this.emptyState) this.emptyState.hidden = false;
+        this.list.setAttribute('aria-hidden', 'true');
+        return;
+      }
+      this.list.removeAttribute('aria-hidden');
+      if (this.emptyState) this.emptyState.hidden = true;
+      this.templates.forEach((tpl, idx) => {
+        const li = document.createElement('li');
+        li.className = 'library-item';
+        li.setAttribute('role', 'listitem');
+        const info = document.createElement('div');
+        info.className = 'library-item-info';
+        const name = document.createElement('span');
+        name.className = 'library-item-name';
+        name.textContent = tpl.label || tpl.tag || `Cable ${idx + 1}`;
+        info.appendChild(name);
+        const detail = document.createElement('span');
+        detail.className = 'library-item-detail';
+        const from = tpl.from_tag ? `From ${tpl.from_tag}` : '';
+        const to = tpl.to_tag ? `to ${tpl.to_tag}` : '';
+        detail.textContent = [from, to].filter(Boolean).join(' ');
+        if (detail.textContent) info.appendChild(detail);
+        li.appendChild(info);
+        const actions = document.createElement('div');
+        actions.className = 'library-item-actions';
+        const applyBtn = document.createElement('button');
+        applyBtn.type = 'button';
+        applyBtn.className = 'btn';
+        applyBtn.textContent = 'Add to Schedule';
+        applyBtn.setAttribute('data-action', 'apply');
+        applyBtn.setAttribute('data-index', idx);
+        applyBtn.setAttribute('aria-label', `Add ${name.textContent} to schedule`);
+        const editBtn = document.createElement('button');
+        editBtn.type = 'button';
+        editBtn.className = 'btn';
+        editBtn.textContent = 'Edit';
+        editBtn.setAttribute('data-action', 'edit');
+        editBtn.setAttribute('data-index', idx);
+        editBtn.setAttribute('aria-label', `Edit ${name.textContent}`);
+        const deleteBtn = document.createElement('button');
+        deleteBtn.type = 'button';
+        deleteBtn.className = 'btn';
+        deleteBtn.textContent = 'Delete';
+        deleteBtn.setAttribute('data-action', 'delete');
+        deleteBtn.setAttribute('data-index', idx);
+        deleteBtn.setAttribute('aria-label', `Delete ${name.textContent}`);
+        actions.appendChild(applyBtn);
+        actions.appendChild(editBtn);
+        actions.appendChild(deleteBtn);
+        li.appendChild(actions);
+        this.list.appendChild(li);
+      });
+    }
+
+    showList() {
+      this.mode = 'list';
+      this.editIndex = -1;
+      this.fieldMap = new Map();
+      if (this.form) {
+        this.form.hidden = true;
+        this.form.classList.add('hidden');
+        this.form.setAttribute('aria-hidden', 'true');
+      }
+      if (this.listView) {
+        this.listView.hidden = false;
+        this.listView.classList.remove('hidden');
+        this.listView.removeAttribute('aria-hidden');
+      }
+      if (this.labelInput) this.labelInput.value = '';
+      if (this.addBtn && this.modal.getAttribute('aria-hidden') === 'false') this.addBtn.focus();
+    }
+
+    startAdd() {
+      this.mode = 'add';
+      this.editIndex = -1;
+      this.openForm({});
+    }
+
+    startEdit(index) {
+      const template = this.templates[index];
+      if (!template) return;
+      this.mode = 'edit';
+      this.editIndex = index;
+      this.openForm(template);
+    }
+
+    openForm(template) {
+      if (!this.form || !this.formFields) return;
+      if (this.formTitle) {
+        const label = template.label || template.tag || '';
+        this.formTitle.textContent = this.mode === 'edit' && label ? `Edit Cable Typical – ${label}` : (this.mode === 'edit' ? 'Edit Cable Typical' : 'Add Cable Typical');
+      }
+      if (this.labelInput) {
+        this.labelInput.value = template.label || '';
+      }
+      this.formFields.innerHTML = '';
+      this.fieldMap = new Map();
+      const { order, grouped } = this.buildGroupMap();
+      order.forEach(groupName => {
+        const section = document.createElement('fieldset');
+        section.className = 'modal-section';
+        if (groupName) {
+          const legend = document.createElement('legend');
+          legend.textContent = groupName;
+          section.appendChild(legend);
+        }
+        const wrapper = document.createElement('div');
+        wrapper.className = 'modal-body';
+        (grouped.get(groupName) || []).forEach(col => {
+          const fieldContainer = document.createElement('div');
+          fieldContainer.className = 'modal-form-field';
+          const label = document.createElement('label');
+          const fieldId = `cable-library-${col.key}`;
+          label.setAttribute('for', fieldId);
+          label.textContent = col.label;
+          if (col.tooltip) label.title = col.tooltip;
+          const field = this.createField(col, { rowData: template, modal: this.modal });
+          field.id = fieldId;
+          fieldContainer.appendChild(label);
+          fieldContainer.appendChild(field);
+          this.fieldMap.set(col.key, field);
+          wrapper.appendChild(fieldContainer);
+        });
+        section.appendChild(wrapper);
+        this.formFields.appendChild(section);
+      });
+      this.listView.hidden = true;
+      this.listView.classList.add('hidden');
+      this.listView.setAttribute('aria-hidden', 'true');
+      this.form.hidden = false;
+      this.form.classList.remove('hidden');
+      this.form.setAttribute('aria-hidden', 'false');
+      const focusTarget = this.labelInput || this.form.querySelector('input, select, textarea, button');
+      if (focusTarget) focusTarget.focus();
+    }
+
+    gatherValues() {
+      const output = {};
+      this.fieldMap.forEach((field, key) => {
+        if (field.multiple) {
+          output[key] = Array.from(field.selectedOptions || []).map(opt => opt.value).filter(v => v !== '');
+        } else {
+          output[key] = field.value;
+        }
+      });
+      const label = this.labelInput ? this.labelInput.value.trim() : '';
+      if (label) output.label = label;
+      return output;
+    }
+
+    saveTemplate() {
+      const values = this.gatherValues();
+      if (this.mode === 'edit' && this.editIndex >= 0) {
+        this.templates[this.editIndex] = { ...values };
+      } else {
+        this.templates.push({ ...values });
+      }
+      dataStore.setCableTemplates(this.templates);
+      this.showList();
+      this.renderList();
+    }
+
+    deleteTemplate(index) {
+      if (index < 0 || index >= this.templates.length) return;
+      const template = this.templates[index];
+      const label = template?.label || template?.tag || `Cable ${index + 1}`;
+      const confirmed = window.confirm ? window.confirm(`Delete "${label}" from the cable library?`) : true;
+      if (!confirmed) return;
+      this.templates.splice(index, 1);
+      dataStore.setCableTemplates(this.templates);
+      this.renderList();
+    }
+
+    applyTemplate(index) {
+      if (!this.onApply) return;
+      const template = this.templates[index];
+      if (!template) return;
+      const copy = JSON.parse(JSON.stringify(template));
+      delete copy.label;
+      this.onApply(copy);
+    }
+  }
+
+  const libraryController = new CableLibraryController({
+    columns,
+    buildGroupMap,
+    createField: (col, options) => createEditorField(col, null, options)
+  });
+
   // Retrieve existing cables from project storage.
   let tableData = dataStore.getCables();
   console.log('Initial cable data from store:', tableData);
@@ -526,6 +836,19 @@ async function initCableSchedule() {
   console.log('Cable schedule table created', table);
   window.cableScheduleTable = table;
 
+  libraryController.setApplyHandler(template => {
+    if (!table) return;
+    const templateCopy = JSON.parse(JSON.stringify(template || {}));
+    if (templateCopy.tag) {
+      const ids = table.getData().map(r => r.tag).filter(Boolean);
+      templateCopy.tag = generateId(ids, templateCopy.tag);
+    }
+    table.addRow(templateCopy);
+    if (typeof table.onChange === 'function') {
+      table.onChange();
+    }
+  });
+
   const presetSelect = document.getElementById('cable-preset-select');
   const presetStorageKey = dataStore.STORAGE_KEYS.cableSchedulePreset;
   const readStoredPreset = () => {
@@ -577,7 +900,8 @@ async function initCableSchedule() {
     'export-xlsx-btn',
     'import-xlsx-btn',
     'delete-all-btn',
-    'load-sample-cables-btn'
+    'load-sample-cables-btn',
+    'cable-library-btn'
   ];
   debugButtons.forEach(id => {
     const btn = document.getElementById(id);
