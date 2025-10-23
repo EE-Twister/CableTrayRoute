@@ -780,6 +780,9 @@ async function initCableSchedule() {
       this.button = document.getElementById('cable-library-btn');
       this.closeBtn = this.modal ? this.modal.querySelector('#close-cable-library-btn') : null;
       this.addBtn = this.modal ? this.modal.querySelector('#cable-library-add-btn') : null;
+      this.exportBtn = this.modal ? this.modal.querySelector('#cable-library-export-btn') : null;
+      this.importBtn = this.modal ? this.modal.querySelector('#cable-library-import-btn') : null;
+      this.importInput = this.modal ? this.modal.querySelector('#cable-library-import-input') : null;
       this.listView = this.modal ? this.modal.querySelector('#cable-library-list-view') : null;
       this.list = this.modal ? this.modal.querySelector('#cable-library-list') : null;
       this.emptyState = this.modal ? this.modal.querySelector('#cable-library-empty') : null;
@@ -809,6 +812,15 @@ async function initCableSchedule() {
       this.button.addEventListener('click', () => this.open());
       if (this.closeBtn) this.closeBtn.addEventListener('click', () => this.close());
       if (this.addBtn) this.addBtn.addEventListener('click', () => this.startAdd());
+      if (this.exportBtn) this.exportBtn.addEventListener('click', () => this.exportTemplates());
+      if (this.importBtn && this.importInput) {
+        this.importBtn.addEventListener('click', () => {
+          this.importInput.click();
+        });
+        this.importInput.addEventListener('change', () => {
+          this.importFromFiles(this.importInput.files);
+        });
+      }
       if (this.cancelBtn) this.cancelBtn.addEventListener('click', () => this.showList());
       if (this.form) {
         this.form.addEventListener('submit', e => {
@@ -835,6 +847,131 @@ async function initCableSchedule() {
       this.templates = normalized;
       if (changed) dataStore.setCableTemplates(normalized);
       this.renderList();
+    }
+
+    exportTemplates() {
+      if (!this.templates || this.templates.length === 0) {
+        if (typeof window !== 'undefined' && window.alert) {
+          window.alert('No cable typicals to export yet.');
+        }
+        return;
+      }
+      const payload = {
+        version: 1,
+        generatedAt: new Date().toISOString(),
+        templates: this.templates.map(tpl => filterTemplateFields(tpl, { keepLabel: true }))
+      };
+      let blob;
+      try {
+        blob = new Blob([JSON.stringify(payload, null, 2)], { type: 'application/json' });
+      } catch (err) {
+        console.error('Failed to create cable typical export blob', err);
+        if (typeof window !== 'undefined' && window.alert) {
+          window.alert('Unable to export cable typicals.');
+        }
+        return;
+      }
+      if (typeof URL === 'undefined' || typeof URL.createObjectURL !== 'function') {
+        console.error('Export is not supported: missing URL.createObjectURL');
+        if (typeof window !== 'undefined' && window.alert) {
+          window.alert('Export is not supported in this environment.');
+        }
+        return;
+      }
+      if (typeof document === 'undefined' || !document.body) {
+        console.error('Export is not supported: missing document body');
+        if (typeof window !== 'undefined' && window.alert) {
+          window.alert('Export is not supported in this environment.');
+        }
+        return;
+      }
+      const url = URL.createObjectURL(blob);
+      const link = document.createElement('a');
+      const stamp = new Date().toISOString().split('T')[0];
+      link.href = url;
+      link.download = `cable-typicals-${stamp}.json`;
+      document.body.appendChild(link);
+      link.click();
+      setTimeout(() => {
+        document.body.removeChild(link);
+        URL.revokeObjectURL(url);
+      }, 0);
+    }
+
+    async importFromFiles(fileList) {
+      const resetInput = () => {
+        if (this.importInput) {
+          this.importInput.value = '';
+        }
+      };
+      try {
+        if (!fileList || fileList.length === 0) {
+          resetInput();
+          return;
+        }
+        const file = fileList[0];
+        if (!file) {
+          resetInput();
+          return;
+        }
+        const text = await file.text();
+        let parsed;
+        try {
+          parsed = JSON.parse(text);
+        } catch (err) {
+          console.error('Failed to parse cable typical import', err);
+          if (typeof window !== 'undefined' && window.alert) {
+            window.alert('Unable to import cable typicals. The file is not valid JSON.');
+          }
+          resetInput();
+          return;
+        }
+        const candidates = Array.isArray(parsed)
+          ? parsed
+          : (parsed && Array.isArray(parsed.templates) ? parsed.templates : []);
+        if (!candidates.length) {
+          if (typeof window !== 'undefined' && window.alert) {
+            window.alert('No cable typicals found in the selected file.');
+          }
+          resetInput();
+          return;
+        }
+        const existingIds = new Set(
+          (this.templates || [])
+            .map(tpl => tpl && tpl.template_id)
+            .filter(Boolean)
+        );
+        const imported = candidates
+          .map(tpl => filterTemplateFields(tpl, { keepLabel: true }))
+          .map(tpl => {
+            const copy = { ...tpl };
+            copy.template_id = copy.template_id || generateTemplateId();
+            while (existingIds.has(copy.template_id)) {
+              copy.template_id = generateTemplateId();
+            }
+            existingIds.add(copy.template_id);
+            return copy;
+          })
+          .filter(tpl => Object.keys(tpl).length > 0);
+        if (!imported.length) {
+          if (typeof window !== 'undefined' && window.alert) {
+            window.alert('No valid cable typicals found in the selected file.');
+          }
+          resetInput();
+          return;
+        }
+        const merged = [...(this.templates || []), ...imported];
+        const { templates: normalized } = ensureTemplateIds(merged);
+        dataStore.setCableTemplates(normalized);
+        this.showList();
+      } catch (err) {
+        console.error('Unexpected error importing cable typicals', err);
+        if (typeof window !== 'undefined' && window.alert) {
+          window.alert('Unable to import cable typicals.');
+        }
+      } finally {
+        resetInput();
+      }
     }
 
     open() {
