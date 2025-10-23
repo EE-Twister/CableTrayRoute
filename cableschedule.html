@@ -100,6 +100,19 @@
       <p>This table allows managing cable data. Use the import/export buttons to work with Excel files. Select one or more raceway IDs in the "Raceway(s)" column; options are pulled from the Raceway Schedule page.</p>
     </div>
   </div>
+  <div id="cable-editor-modal" class="modal" aria-hidden="true" role="dialog" aria-labelledby="cable-editor-title">
+    <div class="modal-content" data-variant="wide">
+      <button id="close-cable-editor-btn" class="close-btn" aria-label="Close cable editor" title="Close cable editor">&times;</button>
+      <form id="cable-editor-form" class="modal-form" novalidate>
+        <h2 id="cable-editor-title">Cable Details</h2>
+        <div id="cable-editor-body" class="modal-body"></div>
+        <div class="modal-actions">
+          <button type="button" id="cable-editor-cancel" class="btn" title="Cancel editing">Cancel</button>
+          <button type="submit" id="cable-editor-save" class="btn primary-btn" title="Save changes">Save</button>
+        </div>
+      </form>
+    </div>
+  </div>
   <script type="module" src="dist/projectManager.js"></script>
   <script>
     window.addEventListener('load', () => {
