@@ -17,7 +17,10 @@ class ContextMenu {
       color: '#000'
     });
     document.body.appendChild(this.menu);
-    document.addEventListener('click', () => this.hide());
+    document.addEventListener('mousedown', e => {
+      if (e.button !== 0) return;
+      if (!this.menu.contains(e.target)) this.hide();
+    });
     document.addEventListener('keydown', e => { if (e.key === 'Escape') this.hide(); });
   }
 
