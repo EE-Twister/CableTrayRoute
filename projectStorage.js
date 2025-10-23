@@ -24,6 +24,7 @@ function defaultProject() {
     conduits: [],
     trays: [],
     cables: [],
+    cableTypicals: [],
     settings: { session: {}, collapsedGroups: {}, units: 'imperial' }
   };
 }
@@ -40,6 +41,7 @@ function migrateProject(old = {}) {
     conduits: old.conduits || old.conduitSchedule || [],
     trays: old.trays || old.traySchedule || [],
     cables: old.cables || old.cableSchedule || [],
+    cableTypicals: old.cableTypicals || [],
     settings
   };
 }
@@ -265,7 +267,7 @@ export function cloneScenarioStorage(from, to) {
   }
 }
 
-const SAVED_PROJECT_SUFFIXES = ['equipment', 'panels', 'loads', 'cables', 'raceways', 'oneLine'];
+const SAVED_PROJECT_SUFFIXES = ['equipment', 'panels', 'loads', 'cables', 'cableTypicals', 'raceways', 'oneLine'];
 const SAVED_PROJECT_PRIMARY_SUFFIXES = new Set(SAVED_PROJECT_SUFFIXES.filter(suffix => suffix !== 'equipment'));
 
 class SavedProjectMigrationError extends Error {
@@ -657,7 +659,8 @@ function syncDerivedStorage(storage) {
     ['cableSchedule', JSON.stringify(project.cables || [])],
     ['traySchedule', JSON.stringify(project.trays || [])],
     ['conduitSchedule', JSON.stringify(project.conduits || [])],
-    ['ductbankSchedule', JSON.stringify(project.ductbanks || [])]
+    ['ductbankSchedule', JSON.stringify(project.ductbanks || [])],
+    ['cableTypicals', JSON.stringify(project.cableTypicals || [])]
   ];
   for (const [key, value] of derivedKeys) {
     if (!trySetStorage(storage, key, value)) return;
@@ -716,6 +719,7 @@ function loadLegacyProject(storage) {
     trays: safeParse(safeGet(storage, 'traySchedule'), []),
     conduits: safeParse(safeGet(storage, 'conduitSchedule'), []),
     ductbanks: safeParse(safeGet(storage, 'ductbankSchedule'), []),
+    cableTypicals: safeParse(safeGet(storage, 'cableTypicals'), []),
     settings: {
       session: safeParse(safeGet(storage, 'ctrSession'), {}),
       collapsedGroups: safeParse(safeGet(storage, 'collapsedGroups'), {}),
@@ -858,6 +862,8 @@ export function setProjectKey(key, value, options = {}) {
     project.conduits = safeParse(value, []);
   } else if (key === 'ductbankSchedule') {
     project.ductbanks = safeParse(value, []);
+  } else if (key === 'cableTypicals') {
+    project.cableTypicals = safeParse(value, []);
   } else if (key === 'collapsedGroups') {
     if (!project.settings) project.settings = {};
     project.settings.collapsedGroups = safeParse(value, {});
@@ -900,6 +906,8 @@ export function removeProjectKey(key, options = {}) {
     project.conduits = [];
   } else if (key === 'ductbankSchedule') {
     project.ductbanks = [];
+  } else if (key === 'cableTypicals') {
+    project.cableTypicals = [];
   } else if (key === 'collapsedGroups') {
     if (project.settings) delete project.settings.collapsedGroups;
   } else if (key === 'ctrSession') {

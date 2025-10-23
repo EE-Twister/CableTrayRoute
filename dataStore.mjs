@@ -67,6 +67,7 @@ const KEYS = {
   // Preferred property names
   trays: 'traySchedule',
   cables: 'cableSchedule',
+  cableTypicals: 'cableTypicals',
   ductbanks: 'ductbankSchedule',
   conduits: 'conduitSchedule',
   panels: 'panelSchedule',
@@ -177,6 +178,9 @@ export const getCables = () => read(KEYS.cables, []);
  * @param {Cable[]} cables
  */
 export const setCables = cables => write(KEYS.cables, cables);
+
+export const getCableTypicals = () => read(KEYS.cableTypicals, []);
+export const setCableTypicals = typicals => write(KEYS.cableTypicals, typicals);
 
 export const getCableTemplates = () => read(EXTRA_KEYS.cableTemplates, []);
 export const setCableTemplates = templates => write(EXTRA_KEYS.cableTemplates, templates);
@@ -531,6 +535,7 @@ export function saveProject(projectId, scenario = getCurrentScenarioNameState())
       panels: getPanels(),
       loads: getLoads(),
       cables: getCables(),
+      cableTypicals: getCableTypicals(),
       cableTemplates: getCableTemplates(),
       raceways: {
         trays: getTrays(),
@@ -556,6 +561,7 @@ export function loadProject(projectId, scenario = getCurrentScenarioNameState())
     const panels = payload.panels;
     const loads = payload.loads;
     const cables = payload.cables;
+    const cableTypicals = payload.cableTypicals;
     const cableTemplates = payload.cableTemplates;
     const raceways = payload.raceways || {};
     const oneLine = payload.oneLine || {};
@@ -563,6 +569,7 @@ export function loadProject(projectId, scenario = getCurrentScenarioNameState())
     if (Array.isArray(panels)) setPanels(panels); else setPanels([]);
     if (Array.isArray(loads)) setLoads(loads);
     if (Array.isArray(cables)) setCables(cables); else setCables([]);
+    if (Array.isArray(cableTypicals)) setCableTypicals(cableTypicals); else setCableTypicals([]);
     if (Array.isArray(cableTemplates)) setCableTemplates(cableTemplates); else setCableTemplates([]);
     setTrays(Array.isArray(raceways.trays) ? raceways.trays : []);
     setConduits(Array.isArray(raceways.conduits) ? raceways.conduits : []);
@@ -583,7 +590,7 @@ export function loadProject(projectId, scenario = getCurrentScenarioNameState())
 // Simple schema validator replacing Ajv. Checks for required fields,
 // disallows extras, and verifies basic types.
 function validateProjectSchema(obj) {
-  const required = ['ductbanks', 'conduits', 'trays', 'cables', 'panels', 'equipment', 'loads', 'settings'];
+  const required = ['ductbanks', 'conduits', 'trays', 'cables', 'cableTypicals', 'panels', 'equipment', 'loads', 'settings'];
   const optional = ['oneLine'];
   const missing = [];
   const extra = [];
@@ -604,6 +611,7 @@ function validateProjectSchema(obj) {
     Array.isArray(obj.conduits) &&
     Array.isArray(obj.trays) &&
     Array.isArray(obj.cables) &&
+    Array.isArray(obj.cableTypicals) &&
     Array.isArray(obj.panels) &&
     Array.isArray(obj.equipment) &&
     Array.isArray(obj.loads) &&
@@ -623,6 +631,7 @@ export function exportProject() {
     conduits: getConduits(),
     trays: getTrays(),
     cables: getCables(),
+    cableTypicals: getCableTypicals(),
     panels: getPanels(),
     equipment: getEquipment(),
     loads: getLoads(),
@@ -730,6 +739,7 @@ export function importProject(obj) {
       conduits: Array.isArray(obj.conduits) ? obj.conduits : [],
       trays: Array.isArray(obj.trays) ? obj.trays : [],
       cables: Array.isArray(obj.cables) ? obj.cables : [],
+      cableTypicals: Array.isArray(obj.cableTypicals) ? obj.cableTypicals : [],
       panels: Array.isArray(obj.panels) ? obj.panels : [],
       equipment: Array.isArray(obj.equipment) ? obj.equipment : [],
       loads: Array.isArray(obj.loads) ? obj.loads : [],
@@ -742,6 +752,7 @@ export function importProject(obj) {
   setConduits(data.conduits);
   setTrays(data.trays);
   setCables(data.cables);
+  setCableTypicals(Array.isArray(data.cableTypicals) ? data.cableTypicals : []);
   setPanels(Array.isArray(data.panels) ? data.panels : []);
   setEquipment(Array.isArray(data.equipment) ? data.equipment : []);
   setLoads(Array.isArray(data.loads) ? data.loads : []);
@@ -775,6 +786,8 @@ if (typeof window !== 'undefined') {
     setTrays,
     getCables,
     setCables,
+    getCableTypicals,
+    setCableTypicals,
     addCable,
     getDuctbanks,
     setDuctbanks,
