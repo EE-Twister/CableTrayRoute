@@ -173,6 +173,15 @@ async function initCableSchedule() {
     {key:'notes',label:'Notes',type:'text',group:'Notes',tooltip:'Additional comments or notes'}
   ];
 
+  const groupNames = Array.from(new Set(columns.map(col => col.group || 'General')));
+  const PRESETS = {
+    full: { label: 'Full Detail', groups: groupNames },
+    routing: { label: 'Routing Focus', groups: ['Identification', 'Routing / Termination', 'Notes'] },
+    electrical: { label: 'Electrical Focus', groups: ['Identification', 'Electrical Characteristics', 'Notes'] },
+    construction: { label: 'Construction Specs', groups: ['Identification', 'Cable Construction & Specs', 'Notes'] }
+  };
+  const DEFAULT_PRESET = 'full';
+
   columns.forEach(col => {
     if (col.type === 'number') {
       col.step = 'any';
@@ -516,6 +525,49 @@ async function initCableSchedule() {
   });
   console.log('Cable schedule table created', table);
   window.cableScheduleTable = table;
+
+  const presetSelect = document.getElementById('cable-preset-select');
+  const presetStorageKey = dataStore.STORAGE_KEYS.cableSchedulePreset;
+  const readStoredPreset = () => {
+    let stored = DEFAULT_PRESET;
+    try {
+      stored = dataStore.getItem(presetStorageKey, DEFAULT_PRESET) || DEFAULT_PRESET;
+    } catch (e) {
+      console.error('Failed to load cable schedule preset', e);
+    }
+    return PRESETS[stored] ? stored : DEFAULT_PRESET;
+  };
+  const applyPreset = (name, persist = true) => {
+    const presetName = PRESETS[name] ? name : DEFAULT_PRESET;
+    const visibleGroups = new Set(PRESETS[presetName].groups);
+    groupNames.forEach(groupName => {
+      const hide = !visibleGroups.has(groupName);
+      table.setGroupVisibility(groupName, hide);
+    });
+    if (persist) {
+      try {
+        dataStore.setItem(presetStorageKey, presetName);
+      } catch (e) {
+        console.error('Failed to store cable schedule preset', e);
+      }
+    }
+    if (presetSelect && presetSelect.value !== presetName) {
+      presetSelect.value = presetName;
+    }
+    if (typeof table.saveGroupState === 'function') {
+      table.saveGroupState();
+    }
+  };
+  if (presetSelect) {
+    presetSelect.addEventListener('change', e => {
+      applyPreset(e.target.value);
+    });
+  }
+  const initialPreset = readStoredPreset();
+  applyPreset(initialPreset, false);
+  if (presetSelect) {
+    presetSelect.value = initialPreset;
+  }
 
   const debugButtons = [
     'add-row-btn',

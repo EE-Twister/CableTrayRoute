@@ -87,7 +87,8 @@ const KEYS = {
 
 const EXTRA_KEYS = {
   equipmentColumns: 'equipmentColumns',
-  collapsedGroups: 'collapsedGroups'
+  collapsedGroups: 'collapsedGroups',
+  cableSchedulePreset: 'cableSchedulePreset'
 };
 
 export const STORAGE_KEYS = { ...KEYS, ...EXTRA_KEYS };
