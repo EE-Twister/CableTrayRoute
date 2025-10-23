@@ -531,6 +531,7 @@ export function saveProject(projectId, scenario = getCurrentScenarioNameState())
       panels: getPanels(),
       loads: getLoads(),
       cables: getCables(),
+      cableTemplates: getCableTemplates(),
       raceways: {
         trays: getTrays(),
         conduits: getConduits(),
@@ -555,12 +556,14 @@ export function loadProject(projectId, scenario = getCurrentScenarioNameState())
     const panels = payload.panels;
     const loads = payload.loads;
     const cables = payload.cables;
+    const cableTemplates = payload.cableTemplates;
     const raceways = payload.raceways || {};
     const oneLine = payload.oneLine || {};
     if (Array.isArray(equipment)) setEquipment(equipment); else setEquipment([]);
     if (Array.isArray(panels)) setPanels(panels); else setPanels([]);
     if (Array.isArray(loads)) setLoads(loads);
     if (Array.isArray(cables)) setCables(cables); else setCables([]);
+    if (Array.isArray(cableTemplates)) setCableTemplates(cableTemplates); else setCableTemplates([]);
     setTrays(Array.isArray(raceways.trays) ? raceways.trays : []);
     setConduits(Array.isArray(raceways.conduits) ? raceways.conduits : []);
     setDuctbanks(Array.isArray(raceways.ductbanks) ? raceways.ductbanks : []);
