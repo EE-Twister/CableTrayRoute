@@ -1003,7 +1003,7 @@ async function initCableSchedule() {
           section.appendChild(legend);
         }
         const wrapper = document.createElement('div');
-        wrapper.className = 'modal-body cable-library-grid';
+        wrapper.className = 'cable-library-grid';
         fields.forEach(col => {
           const fieldContainer = document.createElement('div');
           fieldContainer.className = 'modal-form-field';
