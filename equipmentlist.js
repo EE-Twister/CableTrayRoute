@@ -47,6 +47,7 @@ if (typeof window !== 'undefined') {
       importBtnId: 'import-xlsx-btn',
       selectable: true,
       enableContextMenu: true,
+      showActionColumn: false,
       columns,
       onChange: () => {
         table.save();
