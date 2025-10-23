@@ -2963,11 +2963,38 @@ body.dark-mode .db-table td {
 }
 
 .group-toggle {
-    background: none;
-    border: 1px solid var(--border-color);
+    background: var(--primary-color);
+    border: 1px solid var(--primary-color);
+    color: #fff;
     cursor: pointer;
-    padding: 0 2px;
-    font-size: 0.7rem;
+    padding: 0 0.4rem;
+    font-size: 0.75rem;
+    border-radius: 4px;
+    font-weight: 600;
+    transition: background-color 0.2s, color 0.2s;
+}
+
+.group-toggle:hover,
+.group-toggle:focus {
+    background: var(--secondary-color);
+    color: var(--primary-color);
+}
+
+.group-toggle:focus-visible {
+    outline: 2px solid var(--primary-color);
+    outline-offset: 2px;
+}
+
+body.dark-mode .group-toggle {
+    background: var(--primary-color);
+    border-color: var(--primary-color);
+    color: #fff;
+}
+
+body.dark-mode .group-toggle:hover,
+body.dark-mode .group-toggle:focus {
+    background: #fff;
+    color: #000;
 }
 
 .filter-popup {
@@ -4532,18 +4559,6 @@ body.dark-mode .workflow-card-title {
     color: #fff;
 }
 
-/* Debug console output */
-.console-log {
-    background: #000;
-    color: #0f0;
-    padding: 0.5rem;
-    max-height: 200px;
-    overflow-y: auto;
-    font-family: monospace;
-    font-size: 0.8rem;
-    white-space: pre-wrap;
-}
-
 /* Panel schedule layout */
 #panel-info {
     display: grid;
@@ -5104,4 +5119,88 @@ body.dark-mode .panel-slot-meta span {
 #panel-totals {
     margin-top: 1rem;
     font-weight: 600;
+}
+
+.tcc-print-controls {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.75rem;
+    align-items: flex-end;
+    margin-top: 0.75rem;
+}
+
+.tcc-print-controls label {
+    display: flex;
+    flex-direction: column;
+    font-size: 0.85rem;
+    color: #333;
+    gap: 0.25rem;
+}
+
+.tcc-print-controls input {
+    padding: 0.4rem 0.5rem;
+    border: 1px solid #bcbcbc;
+    border-radius: 4px;
+    min-width: 14rem;
+}
+
+.tcc-print-controls button {
+    align-self: flex-start;
+    padding: 0.5rem 1rem;
+}
+
+.print-settings-form {
+    display: flex;
+    flex-direction: column;
+    gap: 0.75rem;
+    min-width: 20rem;
+}
+
+.print-settings-form label {
+    display: flex;
+    flex-direction: column;
+    gap: 0.35rem;
+    font-size: 0.95rem;
+    color: #333;
+}
+
+.print-settings-form input {
+    padding: 0.5rem 0.6rem;
+    border: 1px solid #bcbcbc;
+    border-radius: 4px;
+}
+
+#add-annotation-btn {
+    margin-top: 0.75rem;
+}
+
+#tcc-chart.annotation-mode {
+    cursor: crosshair;
+}
+
+.annotation-layer .annotation-connector {
+    pointer-events: none;
+}
+
+.annotation-layer .annotation-label {
+    cursor: move;
+}
+
+.annotation-layer .annotation-anchor {
+    fill: #fff;
+    stroke: #444;
+    stroke-width: 1.5;
+}
+
+.annotation-layer .annotation-label-bg {
+    fill: #fff;
+    stroke: #444;
+    stroke-width: 1;
+    filter: drop-shadow(0 1px 1px rgba(0, 0, 0, 0.2));
+}
+
+.annotation-layer .annotation-text {
+    font-size: 12px;
+    fill: #111;
+    pointer-events: none;
 }
