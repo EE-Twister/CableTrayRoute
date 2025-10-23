@@ -2344,6 +2344,52 @@ body.modal-open {
     gap: var(--spacing-base);
 }
 
+.cable-library-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(320px, 1fr));
+    gap: calc(var(--spacing-base) * 0.75) 1.25rem;
+    margin-top: var(--spacing-base);
+}
+
+.cable-library-grid .modal-form-field {
+    display: grid;
+    grid-template-columns: minmax(120px, 0.45fr) minmax(160px, 1fr);
+    align-items: center;
+    column-gap: 0.75rem;
+    row-gap: calc(var(--spacing-base) / 3);
+}
+
+.cable-library-grid .modal-form-field label {
+    display: inline-flex;
+    align-items: center;
+    justify-content: flex-start;
+    flex-direction: row;
+    gap: 0.25rem;
+    margin: 0;
+    font-weight: 600;
+    font-size: 0.95rem;
+}
+
+.cable-library-grid .modal-form-field label + * {
+    width: 100%;
+}
+
+@media (max-width: 720px) {
+    .cable-library-grid {
+        grid-template-columns: 1fr;
+        gap: var(--spacing-base);
+    }
+
+    .cable-library-grid .modal-form-field {
+        grid-template-columns: 1fr;
+        align-items: stretch;
+    }
+
+    .cable-library-grid .modal-form-field label {
+        align-items: flex-start;
+    }
+}
+
 .library-list {
     list-style: none;
     margin: var(--spacing-base) 0 0;
