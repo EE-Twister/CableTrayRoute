@@ -199,6 +199,38 @@ async function initCableSchedule() {
     col => !TYPICAL_EXCLUDED_GROUPS.has(col.group) && !TYPICAL_EXCLUDED_KEYS.has(col.key)
   );
 
+  const buildTemplateHeaderConfig = cols => {
+    const seen = new Set();
+    const config = [];
+    const add = (key, header) => {
+      if (!header) return;
+      let candidate = header;
+      while (seen.has(candidate)) {
+        candidate = `${header} (${key})`;
+      }
+      seen.add(candidate);
+      config.push({ key, header: candidate });
+    };
+    add('label', 'Typical Name');
+    add('template_id', 'Template ID');
+    cols.forEach(col => add(col.key, col.label || col.key));
+    return config;
+  };
+
+  const buildTemplateHeaderLookup = config => {
+    const lookup = new Map();
+    config.forEach(({ key, header }) => {
+      const normalizedHeader = typeof header === 'string' ? header.trim().toLowerCase() : '';
+      const normalizedKey = typeof key === 'string' ? key.trim().toLowerCase() : '';
+      if (normalizedHeader && !lookup.has(normalizedHeader)) lookup.set(normalizedHeader, key);
+      if (normalizedKey && !lookup.has(normalizedKey)) lookup.set(normalizedKey, key);
+    });
+    return lookup;
+  };
+
+  const templateHeaderConfig = buildTemplateHeaderConfig(libraryColumns);
+  const templateHeaderLookup = buildTemplateHeaderLookup(templateHeaderConfig);
+
   const groupNames = Array.from(new Set(columns.map(col => col.group || 'General')));
   const PRESETS = {
     full: { label: 'Full Detail', groups: groupNames },
@@ -772,10 +804,18 @@ async function initCableSchedule() {
   }
 
   class CableLibraryController {
-    constructor({ columns: modalColumns, buildGroupMap: buildGroups, createField }) {
+    constructor({
+      columns: modalColumns,
+      buildGroupMap: buildGroups,
+      createField,
+      headerConfig = templateHeaderConfig,
+      headerLookup = templateHeaderLookup
+    }) {
       this.columns = modalColumns;
       this.buildGroupMap = buildGroups;
       this.createField = createField;
+      this.headerConfig = Array.isArray(headerConfig) && headerConfig.length ? headerConfig : templateHeaderConfig;
+      this.headerLookup = headerLookup instanceof Map && headerLookup.size ? headerLookup : templateHeaderLookup;
       this.modal = document.getElementById('cable-library-modal');
       this.button = document.getElementById('cable-library-btn');
       this.closeBtn = this.modal ? this.modal.querySelector('#close-cable-library-btn') : null;
@@ -856,10 +896,45 @@ async function initCableSchedule() {
         }
         return;
       }
+      const safeValue = value => {
+        if (Array.isArray(value)) {
+          return value.map(item => (item == null ? '' : `${item}`)).join(', ');
+        }
+        return value == null ? '' : value;
+      };
+      const templatesForExport = this.templates.map(tpl =>
+        filterTemplateFields(tpl, { keepLabel: true, keepTypicalId: true })
+      );
+      if (typeof XLSX !== 'undefined' && XLSX && typeof XLSX.utils?.aoa_to_sheet === 'function') {
+        try {
+          const headerConfig = this.headerConfig;
+          const headerRow = headerConfig.map(cfg => cfg.header);
+          const rows = templatesForExport.map(tpl =>
+            headerConfig.map(({ key }) => {
+              if (key === 'label') return safeValue(tpl.label);
+              if (key === 'template_id') return safeValue(tpl.template_id);
+              return safeValue(tpl[key]);
+            })
+          );
+          const sheetData = [headerRow, ...rows];
+          const sheet = XLSX.utils.aoa_to_sheet(sheetData);
+          const workbook = XLSX.utils.book_new();
+          XLSX.utils.book_append_sheet(workbook, sheet, 'Cable Typicals');
+          const stamp = new Date().toISOString().split('T')[0];
+          XLSX.writeFile(workbook, `cable-typicals-${stamp}.xlsx`);
+          return;
+        } catch (err) {
+          console.error('Failed to export cable typicals to Excel', err);
+          if (typeof window !== 'undefined' && window.alert) {
+            window.alert('Unable to export cable typicals to Excel.');
+          }
+          return;
+        }
+      }
       const payload = {
         version: 1,
         generatedAt: new Date().toISOString(),
-        templates: this.templates.map(tpl => filterTemplateFields(tpl, { keepLabel: true }))
+        templates: templatesForExport
       };
       let blob;
       try {
@@ -914,21 +989,68 @@ async function initCableSchedule() {
           resetInput();
           return;
         }
-        const text = await file.text();
-        let parsed;
-        try {
-          parsed = JSON.parse(text);
-        } catch (err) {
-          console.error('Failed to parse cable typical import', err);
-          if (typeof window !== 'undefined' && window.alert) {
-            window.alert('Unable to import cable typicals. The file is not valid JSON.');
+        const name = (file.name || '').toLowerCase();
+        const type = (file.type || '').toLowerCase();
+        const isExcel = name.endsWith('.xlsx') || type.includes('spreadsheet');
+        let candidates;
+        if (isExcel) {
+          if (typeof XLSX === 'undefined' || !XLSX || typeof XLSX.read !== 'function' || !XLSX.utils || typeof XLSX.utils.sheet_to_json !== 'function') {
+            console.error('Excel import requested but XLSX library is unavailable');
+            if (typeof window !== 'undefined' && window.alert) {
+              window.alert('Excel import is not supported in this environment.');
+            }
+            resetInput();
+            return;
           }
-          resetInput();
-          return;
+          let workbook;
+          try {
+            const buffer = await file.arrayBuffer();
+            workbook = XLSX.read(buffer, { type: 'array' });
+          } catch (err) {
+            console.error('Failed to read cable typical Excel file', err);
+            if (typeof window !== 'undefined' && window.alert) {
+              window.alert('Unable to import cable typicals. The Excel file could not be read.');
+            }
+            resetInput();
+            return;
+          }
+          const sheetName = workbook.SheetNames && workbook.SheetNames[0];
+          if (!sheetName) {
+            if (typeof window !== 'undefined' && window.alert) {
+              window.alert('No sheets were found in the selected file.');
+            }
+            resetInput();
+            return;
+          }
+          const sheet = workbook.Sheets[sheetName];
+          const rows = XLSX.utils.sheet_to_json(sheet, { defval: '', raw: true });
+          if (!Array.isArray(rows) || rows.length === 0) {
+            if (typeof window !== 'undefined' && window.alert) {
+              window.alert('No cable typicals found in the selected file.');
+            }
+            resetInput();
+            return;
+          }
+          candidates = rows
+            .map(row => this.normalizeExcelRow(row))
+            .filter(Boolean);
+        } else {
+          const text = await file.text();
+          let parsed;
+          try {
+            parsed = JSON.parse(text);
+          } catch (err) {
+            console.error('Failed to parse cable typical import', err);
+            if (typeof window !== 'undefined' && window.alert) {
+              window.alert('Unable to import cable typicals. The file is not valid JSON.');
+            }
+            resetInput();
+            return;
+          }
+          candidates = Array.isArray(parsed)
+            ? parsed
+            : (parsed && Array.isArray(parsed.templates) ? parsed.templates : []);
         }
-        const candidates = Array.isArray(parsed)
-          ? parsed
-          : (parsed && Array.isArray(parsed.templates) ? parsed.templates : []);
         if (!candidates.length) {
           if (typeof window !== 'undefined' && window.alert) {
             window.alert('No cable typicals found in the selected file.');
@@ -942,7 +1064,7 @@ async function initCableSchedule() {
             .filter(Boolean)
         );
         const imported = candidates
-          .map(tpl => filterTemplateFields(tpl, { keepLabel: true }))
+          .map(tpl => filterTemplateFields(tpl, { keepLabel: true, keepTypicalId: true }))
           .map(tpl => {
             const copy = { ...tpl };
             copy.template_id = copy.template_id || generateTemplateId();
@@ -972,6 +1094,37 @@ async function initCableSchedule() {
       } finally {
         resetInput();
       }
+    }
+
+    normalizeExcelRow(row) {
+      if (!row || typeof row !== 'object') return null;
+      const normalized = {};
+      Object.entries(row).forEach(([header, rawValue]) => {
+        if (rawValue === undefined || rawValue === null) return;
+        const key = this.resolveHeaderKey(header);
+        if (!key) return;
+        let value = rawValue;
+        if (typeof value === 'string') {
+          value = value.trim();
+          if (value === '') return;
+        }
+        if (key === 'label') {
+          normalized.label = value;
+        } else if (key === 'template_id') {
+          normalized.template_id = value;
+        } else {
+          normalized[key] = value;
+        }
+      });
+      const sanitized = filterTemplateFields(normalized, { keepLabel: true, keepTypicalId: true });
+      return Object.keys(sanitized).length ? sanitized : null;
+    }
+
+    resolveHeaderKey(header) {
+      if (!header) return null;
+      const normalizedHeader = String(header).trim().toLowerCase();
+      if (!normalizedHeader) return null;
+      return this.headerLookup.get(normalizedHeader) || null;
     }
 
     open() {
@@ -1245,7 +1398,9 @@ async function initCableSchedule() {
   const libraryController = new CableLibraryController({
     columns: libraryColumns,
     buildGroupMap: buildLibraryGroupMap,
-    createField: (col, options) => createEditorField(col, null, options)
+    createField: (col, options) => createEditorField(col, null, options),
+    headerConfig: templateHeaderConfig,
+    headerLookup: templateHeaderLookup
   });
 
   const ensureTemplateName = (template, idx) => getTemplateDisplayName(template, idx);
