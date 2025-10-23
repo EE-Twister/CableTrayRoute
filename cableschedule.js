@@ -173,6 +173,29 @@ async function initCableSchedule() {
     {key:'notes',label:'Notes',type:'text',group:'Notes',tooltip:'Additional comments or notes'}
   ];
 
+  const TYPICAL_EXCLUDED_GROUPS = new Set(['Identification', 'Routing / Termination']);
+  const ADDITIONAL_TEMPLATE_FIELD_EXCLUSIONS = [
+    'install_method',
+    'operating_voltage',
+    'est_load',
+    'load_flow_current',
+    'duty_cycle',
+    'length',
+    'calc_ampacity',
+    'voltage_drop_pct',
+    'sizing_warning'
+  ];
+  const TYPICAL_EXCLUDED_KEYS = new Set(
+    columns
+      .filter(col => TYPICAL_EXCLUDED_GROUPS.has(col.group))
+      .map(col => col.key)
+  );
+  ADDITIONAL_TEMPLATE_FIELD_EXCLUSIONS.forEach(key => TYPICAL_EXCLUDED_KEYS.add(key));
+
+  const libraryColumns = columns.filter(
+    col => !TYPICAL_EXCLUDED_GROUPS.has(col.group) && !TYPICAL_EXCLUDED_KEYS.has(col.key)
+  );
+
   const groupNames = Array.from(new Set(columns.map(col => col.group || 'General')));
   const PRESETS = {
     full: { label: 'Full Detail', groups: groupNames },
@@ -210,6 +233,22 @@ async function initCableSchedule() {
   let tableInstance = null;
 
   const cloneTemplates = templates => (Array.isArray(templates) ? templates.map(t => JSON.parse(JSON.stringify(t))) : []);
+  const filterTemplateFields = (input = {}, options = {}) => {
+    const { keepLabel = true, keepTypicalId = false } = options;
+    const copy = { ...input };
+    Object.keys(copy).forEach(key => {
+      if (TYPICAL_EXCLUDED_KEYS.has(key)) {
+        delete copy[key];
+      }
+    });
+    if (!keepLabel && Object.prototype.hasOwnProperty.call(copy, 'label')) {
+      delete copy.label;
+    }
+    if (!keepTypicalId && Object.prototype.hasOwnProperty.call(copy, 'typical_id')) {
+      delete copy.typical_id;
+    }
+    return copy;
+  };
   const generateTemplateId = () => {
     if (typeof crypto !== 'undefined' && typeof crypto.randomUUID === 'function') {
       return crypto.randomUUID();
@@ -221,20 +260,22 @@ async function initCableSchedule() {
   const ensureTemplateIds = templates => {
     const copies = cloneTemplates(templates);
     let changed = false;
-    copies.forEach(tpl => {
-      if (!tpl.template_id) {
-        tpl.template_id = generateTemplateId();
+    copies.forEach((tpl, idx) => {
+      const sanitized = filterTemplateFields(tpl);
+      const tplKeys = Object.keys(tpl || {});
+      const sanitizedKeys = Object.keys(sanitized || {});
+      if (tplKeys.length !== sanitizedKeys.length || sanitizedKeys.some(key => sanitized[key] !== tpl[key])) {
         changed = true;
       }
+      if (!sanitized.template_id) {
+        sanitized.template_id = generateTemplateId();
+        changed = true;
+      }
+      copies[idx] = sanitized;
     });
     return { templates: copies, changed };
   };
-  const sanitizeTemplate = template => {
-    const copy = JSON.parse(JSON.stringify(template || {}));
-    delete copy.label;
-    delete copy.typical_id;
-    return copy;
-  };
+  const sanitizeTemplate = template => filterTemplateFields(template, { keepLabel: false, keepTypicalId: false });
   const getTemplateDisplayName = (template, idx) => (template?.label || template?.tag || `Typical ${idx + 1}`);
   const mergeTemplateValues = (templateValues, existingValues = {}, options = {}) => {
     const preserveKeys = new Set(options.preserveKeys || []);
@@ -365,10 +406,10 @@ async function initCableSchedule() {
     updateBatchActionState();
   }
 
-  const buildGroupMap = () => {
+  const buildGroupMapForColumns = cols => {
     const order = [];
     const grouped = new Map();
-    columns.forEach(col => {
+    cols.forEach(col => {
       const groupName = col.group || 'General';
       if (!grouped.has(groupName)) {
         grouped.set(groupName, []);
@@ -378,6 +419,8 @@ async function initCableSchedule() {
     });
     return { order, grouped };
   };
+  const buildGroupMap = () => buildGroupMapForColumns(columns);
+  const buildLibraryGroupMap = () => buildGroupMapForColumns(libraryColumns);
 
   const ensureDatalist = (col, tr, rowData, hostModal = editorModal) => {
     if (!hostModal || !col.datalist) return null;
@@ -576,8 +619,8 @@ async function initCableSchedule() {
       if (labelInput === null) return;
       const label = (labelInput || suggestion || '').trim();
       if (!label) return;
-      const template = { ...values, label };
-      delete template.typical_id;
+      const sanitizedValues = filterTemplateFields(values);
+      const template = { ...sanitizedValues, label };
       if (!template.template_id) template.template_id = generateTemplateId();
       const updated = cloneTemplates(cachedCableTemplates);
       updated.push(template);
@@ -934,12 +977,13 @@ async function initCableSchedule() {
 
     openForm(template) {
       if (!this.form || !this.formFields) return;
+      const templateForFields = filterTemplateFields(template, { keepLabel: true });
       if (this.formTitle) {
-        const label = template.label || template.tag || '';
+        const label = templateForFields.label || templateForFields.tag || '';
         this.formTitle.textContent = this.mode === 'edit' && label ? `Edit Cable Typical – ${label}` : (this.mode === 'edit' ? 'Edit Cable Typical' : 'Add Cable Typical');
       }
       if (this.labelInput) {
-        this.labelInput.value = template.label || '';
+        this.labelInput.value = templateForFields.label || '';
       }
       this.formFields.innerHTML = '';
       this.fieldMap = new Map();
@@ -962,7 +1006,7 @@ async function initCableSchedule() {
           label.setAttribute('for', fieldId);
           label.textContent = col.label;
           if (col.tooltip) label.title = col.tooltip;
-          const field = this.createField(col, { rowData: template, modal: this.modal });
+          const field = this.createField(col, { rowData: templateForFields, modal: this.modal });
           field.id = fieldId;
           fieldContainer.appendChild(label);
           fieldContainer.appendChild(field);
@@ -998,8 +1042,8 @@ async function initCableSchedule() {
 
     saveTemplate() {
       const values = this.gatherValues();
-      const next = { ...values };
-      delete next.typical_id;
+      const sanitized = filterTemplateFields(values, { keepLabel: true });
+      const next = { ...sanitized };
       if (this.mode === 'edit' && this.editIndex >= 0) {
         const existingId = this.templates[this.editIndex]?.template_id;
         next.template_id = existingId || next.template_id || generateTemplateId();
@@ -1028,16 +1072,14 @@ async function initCableSchedule() {
       if (!this.onApply) return;
       const template = this.templates[index];
       if (!template) return;
-      const copy = JSON.parse(JSON.stringify(template));
-      delete copy.label;
-      delete copy.typical_id;
-      this.onApply(copy);
+      const sanitized = filterTemplateFields(template, { keepLabel: false, keepTypicalId: false });
+      this.onApply(sanitized);
     }
   }
 
   const libraryController = new CableLibraryController({
-    columns,
-    buildGroupMap,
+    columns: libraryColumns,
+    buildGroupMap: buildLibraryGroupMap,
     createField: (col, options) => createEditorField(col, null, options)
   });
 
