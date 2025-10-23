@@ -62,26 +62,6 @@ if (document.readyState === 'loading') {
 // behaviour needed to populate the schedule table.
 
 async function initCableSchedule() {
-  const logContainer = document.getElementById('console-log');
-  if (logContainer) {
-    ['log', 'warn', 'error'].forEach(level => {
-      const orig = console[level];
-      console[level] = (...args) => {
-        orig.apply(console, args);
-        const msg = args.map(a => {
-          try {
-            return typeof a === 'object' ? JSON.stringify(a) : String(a);
-          } catch {
-            return String(a);
-          }
-        }).join(' ');
-        const line = document.createElement('div');
-        line.textContent = `[${level}] ${msg}`;
-        logContainer.appendChild(line);
-        logContainer.scrollTop = logContainer.scrollHeight;
-      };
-    });
-  }
   console.log('Cable Schedule DOMContentLoaded event fired');
   const projectId = window.currentProjectId || 'default';
   dataStore.loadProject(projectId);
@@ -137,9 +117,18 @@ async function initCableSchedule() {
   }
 
   function getEquipmentOptions(){
-    const ids=new Set();
-    try{ dataStore.getEquipment().forEach(eq=>{ if(eq.id) ids.add(eq.id); }); }catch(e){}
-    return Array.from(ids);
+    const toLabel=value=>{
+      if(value===null||value===undefined) return '';
+      try{return String(value).trim();}catch{return '';}
+    };
+    const names=new Set();
+    try{
+      dataStore.getEquipment().forEach(eq=>{
+        const friendly=toLabel(eq?.ref)||toLabel(eq?.description)||toLabel(eq?.id);
+        if(friendly) names.add(friendly);
+      });
+    }catch(e){}
+    return Array.from(names);
   }
 
   const columns=[
@@ -195,10 +184,11 @@ async function initCableSchedule() {
   // Retrieve existing cables from project storage.
   let tableData = dataStore.getCables();
   console.log('Initial cable data from store:', tableData);
-  const vdLimitIn = document.getElementById('vd-limit');
+  const DEFAULT_VD_LIMIT = 3;
+  const getVoltageDropLimit = () => DEFAULT_VD_LIMIT;
 
   function applySizingHighlight(){
-    const limit = parseFloat(vdLimitIn.value);
+    const limit = getVoltageDropLimit();
     Array.from(table.tbody.querySelectorAll('tr')).forEach(tr => {
       const sizeSel = tr.querySelector('[name="conductor_size"]');
       const matSel = tr.querySelector('[name="conductor_material"]');
@@ -231,7 +221,7 @@ async function initCableSchedule() {
       if (ampIn) ampIn.value = res.ampacity ? res.ampacity.toFixed(2) : '';
       if (vdIn) {
         vdIn.value = res.voltageDrop ? res.voltageDrop.toFixed(2) : '';
-        if (!isNaN(limit) && res.voltageDrop > limit) {
+        if (Number.isFinite(limit) && res.voltageDrop > limit) {
           vdIn.classList.add('voltage-exceed');
         } else {
           vdIn.classList.remove('voltage-exceed');
@@ -384,7 +374,6 @@ async function initCableSchedule() {
 
   applySizingHighlight();
   validateAllRows();
-  vdLimitIn.addEventListener('input', applySizingHighlight);
 
   // Update the table whenever cables are modified elsewhere (e.g. One-Line).
   dataStore.on(dataStore.STORAGE_KEYS.cables, cables => {

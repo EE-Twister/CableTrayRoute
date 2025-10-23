@@ -1060,7 +1060,7 @@ function applyValidation(el, rules = []) {
     } else if (rule === 'required') {
       if (!value) error = 'Required';
     } else if (rule === 'numeric') {
-      if (value === '' || isNaN(Number(value))) error = 'Must be numeric';
+      if (value !== '' && Number.isNaN(Number(value))) error = 'Must be numeric';
     }
   });
   const existing = el.nextElementSibling;
