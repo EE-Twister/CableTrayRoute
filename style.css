@@ -145,6 +145,158 @@
   line-height: 1.2;
 }
 
+.tcc-visual-area {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 1.5rem;
+  align-items: flex-start;
+  margin-top: 1.5rem;
+}
+
+.tcc-visual-area #tcc-chart {
+  flex: 1 1 640px;
+  min-width: min(100%, 480px);
+  max-width: 100%;
+}
+
+.tcc-preview {
+  flex: 0 0 260px;
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+  padding: 0.75rem;
+  border: 1px solid var(--border-color, #d1d5db);
+  border-radius: 10px;
+  background: var(--surface-muted, rgba(15, 23, 42, 0.03));
+  box-shadow: 0 1px 2px rgba(15, 23, 42, 0.04);
+}
+
+.tcc-preview-title {
+  margin: 0;
+  font-size: 1rem;
+  font-weight: 600;
+  color: var(--text-color, #111827);
+}
+
+.tcc-preview-frame {
+  position: relative;
+  width: 100%;
+  padding-top: 75%;
+  border: 1px solid var(--border-color, #d1d5db);
+  border-radius: 8px;
+  background: var(--surface, #ffffff);
+  overflow: hidden;
+}
+
+.tcc-preview-svg {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  opacity: 0;
+  transition: opacity 0.2s ease-in-out;
+}
+
+.tcc-preview-message {
+  position: absolute;
+  inset: 0.75rem;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  margin: 0;
+  text-align: center;
+  font-size: 0.9rem;
+  color: var(--text-muted, #6c757d);
+}
+
+.tcc-preview.has-content .tcc-preview-svg {
+  opacity: 1;
+}
+
+.tcc-preview.has-content .tcc-preview-message {
+  display: none;
+}
+
+.tcc-preview-svg .preview-connection {
+  stroke: var(--border-color, #9ca3af);
+  stroke-width: 1.6;
+  stroke-linecap: round;
+}
+
+.tcc-preview-svg .preview-node circle {
+  fill: #ffffff;
+  stroke: var(--border-color, #9ca3af);
+  stroke-width: 2;
+  transition: stroke 0.2s ease-in-out, stroke-width 0.2s ease-in-out, fill 0.2s ease-in-out;
+}
+
+.tcc-preview-svg .preview-node text {
+  font-size: 10px;
+  fill: var(--text-muted, #4b5563);
+  pointer-events: none;
+}
+
+.tcc-preview-svg .preview-node--active circle {
+  stroke: var(--accent-color, #3b82f6);
+  stroke-width: 3.2;
+  fill: rgba(59, 130, 246, 0.15);
+}
+
+.tcc-preview-svg .preview-node--selected circle {
+  stroke: var(--primary-color, #007bff);
+  stroke-width: 2.8;
+}
+
+.tcc-preview-svg .preview-node--type-transformer circle {
+  fill: #fef3c7;
+  stroke: #d97706;
+}
+
+.tcc-preview-svg .preview-node--type-breaker circle {
+  fill: #dbeafe;
+  stroke: #2563eb;
+}
+
+.tcc-preview-svg .preview-node--type-relay circle {
+  fill: #ede9fe;
+  stroke: #7c3aed;
+}
+
+.tcc-preview-svg .preview-node--type-motor circle {
+  fill: #dcfce7;
+  stroke: #16a34a;
+}
+
+.tcc-preview-svg .preview-node--type-panel circle {
+  fill: #f3f4f6;
+  stroke: #6b7280;
+}
+
+.tcc-preview-svg .preview-node--type-source circle {
+  fill: #fee2e2;
+  stroke: #dc2626;
+}
+
+.tcc-preview-svg .preview-node--type-bus circle {
+  fill: #e0f2fe;
+  stroke: #0ea5e9;
+}
+
+.tcc-preview-svg .preview-node--type-load circle {
+  fill: #fef9c3;
+  stroke: #ca8a04;
+}
+
+.tcc-preview-svg .preview-node--type-cable circle {
+  fill: #e2e8f0;
+  stroke: #64748b;
+}
+
+.tcc-preview-svg .preview-node--type-other circle {
+  fill: #ffffff;
+  stroke: var(--border-color, #9ca3af);
+}
+
 .device-selection-modal {
   padding: 0;
 }

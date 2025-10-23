@@ -51,6 +51,13 @@ const violationDiv = document.getElementById('violation');
 const printPlotBtn = document.getElementById('print-plot-btn');
 const annotationBtn = document.getElementById('add-annotation-btn');
 const chart = d3.select('#tcc-chart');
+const previewPanel = document.getElementById('tcc-preview');
+const previewSvg = previewPanel ? previewPanel.querySelector('svg') : null;
+const previewMessage = previewPanel ? previewPanel.querySelector('.tcc-preview-message') : null;
+const previewTitle = previewPanel ? previewPanel.querySelector('.tcc-preview-title') : null;
+const SVG_NS = 'http://www.w3.org/2000/svg';
+const PREVIEW_NODE_RADIUS = 12;
+const defaultPreviewTitle = previewTitle ? (previewTitle.textContent || 'One-Line Preview') : 'One-Line Preview';
 
 const params = new URLSearchParams(window.location.search);
 const compId = params.get('component');
@@ -98,6 +105,7 @@ if (compId) {
 updateComponentContextUI();
 
 const MAX_NEIGHBOR_DEPTH = 4;
+const PREVIEW_NEIGHBOR_DEPTH = 2;
 
 const OVERLAY_GROUP_LABELS = {
   inrush: 'Transformer Inrush',
@@ -177,6 +185,7 @@ function applySelectionSet(selection, { persist = false } = {}) {
   if (persist) {
     persistSettings();
   }
+  renderOneLinePreview();
 }
 
 function renderSelectedSummary() {
@@ -1051,7 +1060,7 @@ function buildComponentData() {
     const sheetName = sheet?.name || `Sheet ${idx + 1}`;
     (sheet?.components || []).forEach(comp => {
       records.push({ component: comp, sheetName });
-      lookup.set(comp.id, { component: comp, sheetName });
+      lookup.set(comp.id, { component: comp, sheetName, sheetIndex: idx, sheet });
       neighbors.set(comp.id, new Set());
       connections.set(comp.id, []);
     });
@@ -1089,6 +1098,255 @@ function buildComponentData() {
     activeComponentId = null;
     updateComponentContextUI();
   }
+  renderOneLinePreview();
+}
+
+function collectPreviewComponentIds(rootId, depth = PREVIEW_NEIGHBOR_DEPTH) {
+  const included = new Set();
+  if (!rootId || !componentLookup.has(rootId)) return included;
+  const record = componentLookup.get(rootId);
+  const sheet = record?.sheet || null;
+  if (!sheet) return included;
+  included.add(rootId);
+  const queue = [{ id: rootId, depth: 0 }];
+  while (queue.length) {
+    const { id, depth: currentDepth } = queue.shift();
+    if (currentDepth >= depth) continue;
+    const neighbors = neighborMap.get(id);
+    if (!neighbors || !neighbors.size) continue;
+    neighbors.forEach(neighborId => {
+      if (included.has(neighborId)) return;
+      const neighborRecord = componentLookup.get(neighborId);
+      if (!neighborRecord || neighborRecord.sheet !== sheet) return;
+      included.add(neighborId);
+      queue.push({ id: neighborId, depth: currentDepth + 1 });
+    });
+  }
+  return included;
+}
+
+function resolvePreviewType(component) {
+  if (!component) return 'other';
+  const candidates = [component.type, component.subtype, component.category, component.kind];
+  for (const value of candidates) {
+    const normalized = normalizeTypeKey(value);
+    if (!normalized || normalized === 'other') continue;
+    if (normalized.includes('transformer')) return 'transformer';
+    if (normalized.includes('breaker')) return 'breaker';
+    if (normalized.includes('relay')) return 'relay';
+    if (normalized.includes('motor')) return 'motor';
+    if (normalized.includes('panel') || normalized.includes('switchgear') || normalized.includes('switchboard') || normalized.includes('switch')) {
+      return 'panel';
+    }
+    if (normalized.includes('source') || normalized.includes('utility') || normalized.includes('generator')) {
+      return 'source';
+    }
+    if (normalized.includes('bus')) return 'bus';
+    if (normalized.includes('load')) return 'load';
+    if (normalized.includes('cable') || normalized.includes('feeder')) return 'cable';
+  }
+  return 'other';
+}
+
+function sanitizePreviewLabel(label) {
+  if (label === null || label === undefined) return '';
+  const text = String(label).trim();
+  if (!text) return '';
+  return text.length > 18 ? `${text.slice(0, 17)}…` : text;
+}
+
+function renderOneLinePreview() {
+  if (!previewPanel || !previewSvg) return;
+  const setEmptyState = (message, titleText = defaultPreviewTitle) => {
+    previewPanel.classList.remove('has-content');
+    if (previewSvg) {
+      previewSvg.innerHTML = '';
+      previewSvg.setAttribute('aria-hidden', 'true');
+    }
+    if (previewMessage) previewMessage.textContent = message;
+    if (previewTitle) previewTitle.textContent = titleText;
+  };
+
+  const contextId = getActiveComponentId();
+  if (!contextId || !componentLookup.has(contextId)) {
+    setEmptyState('Select a one-line component to view its context.');
+    return;
+  }
+
+  const contextRecord = componentLookup.get(contextId);
+  const sheet = contextRecord?.sheet || null;
+  const sheetName = contextRecord?.sheetName || '';
+  if (!sheet) {
+    setEmptyState('This component is not placed on a one-line sheet.');
+    return;
+  }
+
+  const includedIds = collectPreviewComponentIds(contextId, PREVIEW_NEIGHBOR_DEPTH);
+  const component = contextRecord.component || {};
+  (component.connections || []).forEach(conn => {
+    if (!conn || !conn.target) return;
+    if (!componentLookup.has(conn.target)) return;
+    const targetRecord = componentLookup.get(conn.target);
+    if (targetRecord?.sheet !== sheet) return;
+    includedIds.add(conn.target);
+  });
+  if (!includedIds.size) includedIds.add(contextId);
+
+  const nodes = [...includedIds]
+    .map(id => {
+      const record = componentLookup.get(id);
+      if (!record || record.sheet !== sheet) return null;
+      const comp = record.component || {};
+      const rawX = Number(comp.x);
+      const rawY = Number(comp.y);
+      const widthValue = Number(comp.width);
+      const heightValue = Number(comp.height);
+      const width = Number.isFinite(widthValue) ? widthValue : 60;
+      const height = Number.isFinite(heightValue) ? heightValue : 40;
+      if (!Number.isFinite(rawX) || !Number.isFinite(rawY)) return null;
+      const cx = rawX + width / 2;
+      const cy = rawY + height / 2;
+      if (!Number.isFinite(cx) || !Number.isFinite(cy)) return null;
+      const resolvedLabel = componentLabel(comp);
+      return {
+        id,
+        component: comp,
+        cx,
+        cy,
+        label: sanitizePreviewLabel(resolvedLabel),
+        fullLabel: resolvedLabel,
+        type: resolvePreviewType(comp)
+      };
+    })
+    .filter(Boolean);
+
+  if (!nodes.length) {
+    setEmptyState('Preview is unavailable for this component.');
+    return;
+  }
+
+  const idSet = new Set(nodes.map(node => node.id));
+  let minX = Infinity;
+  let minY = Infinity;
+  let maxX = -Infinity;
+  let maxY = -Infinity;
+  nodes.forEach(node => {
+    minX = Math.min(minX, node.cx - PREVIEW_NODE_RADIUS);
+    maxX = Math.max(maxX, node.cx + PREVIEW_NODE_RADIUS);
+    minY = Math.min(minY, node.cy - PREVIEW_NODE_RADIUS);
+    maxY = Math.max(maxY, node.cy + PREVIEW_NODE_RADIUS);
+  });
+
+  if (!Number.isFinite(minX) || !Number.isFinite(minY) || !Number.isFinite(maxX) || !Number.isFinite(maxY)) {
+    setEmptyState('Preview is unavailable for this component.');
+    return;
+  }
+
+  const baseWidth = maxX - minX;
+  const baseHeight = maxY - minY;
+  const width = baseWidth > 0 ? baseWidth : 60;
+  const height = baseHeight > 0 ? baseHeight : 60;
+  const padding = Math.max(width, height) * 0.35;
+  const viewMinX = minX - padding;
+  const viewMinY = minY - padding;
+  const viewWidth = width + padding * 2;
+  const viewHeight = height + padding * 2;
+
+  previewSvg.innerHTML = '';
+  previewSvg.setAttribute('aria-hidden', 'false');
+  previewSvg.setAttribute('viewBox', `${viewMinX} ${viewMinY} ${viewWidth} ${viewHeight}`);
+
+  if (previewTitle) {
+    previewTitle.textContent = sheetName ? `${defaultPreviewTitle} – ${sheetName}` : defaultPreviewTitle;
+  }
+  if (previewMessage) {
+    previewMessage.textContent = '';
+  }
+  previewPanel.classList.add('has-content');
+
+  const selectedComponents = new Set();
+  if (deviceSelect) {
+    selectedDeviceIds().forEach(uid => {
+      const entry = deviceMap.get(uid);
+      if (entry && entry.kind === 'component' && entry.componentId) {
+        selectedComponents.add(entry.componentId);
+      }
+    });
+  }
+
+  const centers = new Map(nodes.map(node => [node.id, { cx: node.cx, cy: node.cy }]));
+  const connections = [];
+  const connectionKeys = new Set();
+  const pushConnection = (from, to) => {
+    if (!from || !to || from === to) return;
+    const [a, b] = from < to ? [from, to] : [to, from];
+    const key = `${a}__${b}`;
+    if (connectionKeys.has(key)) return;
+    connectionKeys.add(key);
+    connections.push({ from: a, to: b });
+  };
+
+  (sheet.connections || []).forEach(conn => {
+    if (!conn) return;
+    const from = conn.from ?? conn.source ?? conn.a ?? conn.start ?? null;
+    const to = conn.to ?? conn.target ?? conn.b ?? conn.end ?? null;
+    if (!idSet.has(from) || !idSet.has(to)) return;
+    pushConnection(from, to);
+  });
+
+  nodes.forEach(node => {
+    const comp = componentLookup.get(node.id)?.component;
+    (comp?.connections || []).forEach(conn => {
+      if (!conn?.target || !idSet.has(conn.target)) return;
+      pushConnection(node.id, conn.target);
+    });
+  });
+
+  connections.forEach(({ from, to }) => {
+    const start = centers.get(from);
+    const end = centers.get(to);
+    if (!start || !end) return;
+    const line = document.createElementNS(SVG_NS, 'line');
+    line.setAttribute('x1', start.cx);
+    line.setAttribute('y1', start.cy);
+    line.setAttribute('x2', end.cx);
+    line.setAttribute('y2', end.cy);
+    line.classList.add('preview-connection');
+    previewSvg.appendChild(line);
+  });
+
+  nodes.forEach(node => {
+    const group = document.createElementNS(SVG_NS, 'g');
+    group.classList.add('preview-node');
+    group.classList.add(`preview-node--type-${node.type}`);
+    if (node.id === contextId) {
+      group.classList.add('preview-node--active');
+    } else if (selectedComponents.has(node.id)) {
+      group.classList.add('preview-node--selected');
+    }
+
+    const circle = document.createElementNS(SVG_NS, 'circle');
+    circle.setAttribute('cx', node.cx);
+    circle.setAttribute('cy', node.cy);
+    circle.setAttribute('r', PREVIEW_NODE_RADIUS);
+    group.appendChild(circle);
+
+    if (node.label) {
+      const text = document.createElementNS(SVG_NS, 'text');
+      text.setAttribute('x', node.cx);
+      text.setAttribute('y', node.cy + PREVIEW_NODE_RADIUS + 6);
+      text.setAttribute('text-anchor', 'middle');
+      text.setAttribute('dominant-baseline', 'hanging');
+      text.textContent = node.label;
+      group.appendChild(text);
+    }
+
+    const title = document.createElementNS(SVG_NS, 'title');
+    title.textContent = node.fullLabel || node.label || 'Component';
+    group.appendChild(title);
+
+    previewSvg.appendChild(group);
+  });
 }
 
 function rebuildCatalog() {
@@ -2270,6 +2528,7 @@ async function openDeviceSelectionModal() {
 deviceSelect.addEventListener('change', () => {
   renderSelectedSummary();
   renderSettings();
+  renderOneLinePreview();
   persistSettings();
 });
 plotBtn.addEventListener('click', applyPlotAndPersistence);
