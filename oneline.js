@@ -650,6 +650,82 @@ const defaultBusProps = {
   electrode_config: 'VCB'
 };
 
+const defaultShapeProps = {
+  shapeType: 'rectangle',
+  strokeColor: '#333333',
+  fillColor: '#ffffff',
+  strokeWidth: 2,
+  strokeStyle: 'solid',
+  cornerRadius: 12
+};
+
+const shapePropKeys = ['shapeType', 'strokeColor', 'fillColor', 'strokeWidth', 'strokeStyle', 'cornerRadius'];
+
+const shapeDashPatterns = {
+  solid: '',
+  dashed: '8 4',
+  dotted: '2 2'
+};
+
+function ensureShapeDefaults(comp) {
+  if (!comp || comp.subtype !== 'annotation_custom_shape') return;
+  if (!comp.props || typeof comp.props !== 'object') comp.props = {};
+  const meta = componentMeta[comp.subtype] || {};
+  const defaults = { ...defaultShapeProps, ...(meta.props || {}) };
+  shapePropKeys.forEach(key => {
+    const current = comp[key];
+    if (
+      current === undefined ||
+      current === null ||
+      (typeof current === 'string' && current.trim() === '')
+    ) {
+      const fallback = defaults[key];
+      if (fallback !== undefined) comp[key] = fallback;
+    }
+  });
+  comp.shapeType = (comp.shapeType || defaults.shapeType || 'rectangle').toLowerCase();
+  if (comp.shapeType === 'rounded_rectangle') comp.shapeType = 'rounded';
+  if (!['rectangle', 'rounded', 'circle'].includes(comp.shapeType)) comp.shapeType = 'rectangle';
+  comp.strokeStyle = (comp.strokeStyle || defaults.strokeStyle || 'solid').toLowerCase();
+  if (!['solid', 'dashed', 'dotted'].includes(comp.strokeStyle)) comp.strokeStyle = 'solid';
+  let strokeWidth = Number(comp.strokeWidth);
+  if (!Number.isFinite(strokeWidth) || strokeWidth <= 0) {
+    strokeWidth = Number(defaults.strokeWidth) || 1;
+  }
+  comp.strokeWidth = strokeWidth;
+  let radius = Number(comp.cornerRadius);
+  if (!Number.isFinite(radius) || radius < 0) {
+    radius = Number(defaults.cornerRadius) || 0;
+  }
+  const metaWidth = Number(meta.width);
+  const metaHeight = Number(meta.height);
+  let width = Number(comp.width);
+  let height = Number(comp.height);
+  if (!Number.isFinite(width) || width <= 0) width = Number.isFinite(metaWidth) ? metaWidth : 160;
+  if (!Number.isFinite(height) || height <= 0) height = Number.isFinite(metaHeight) ? metaHeight : 100;
+  if (comp.shapeType === 'circle') {
+    const diameter = Number.isFinite(width) ? width : height;
+    comp.width = Number.isFinite(diameter) && diameter > 0 ? diameter : (Number.isFinite(metaWidth) ? metaWidth : 160);
+    comp.height = comp.width;
+  } else {
+    comp.width = width;
+    comp.height = height;
+  }
+  const maxCorner = Math.min(comp.width, comp.height) / 2;
+  if (Number.isFinite(maxCorner) && maxCorner >= 0) {
+    comp.cornerRadius = Math.min(radius, maxCorner);
+  } else {
+    comp.cornerRadius = radius;
+  }
+  const strokeColor = typeof comp.strokeColor === 'string' ? comp.strokeColor.trim() : '';
+  comp.strokeColor = strokeColor || defaults.strokeColor || '#333333';
+  const fillColor = typeof comp.fillColor === 'string' ? comp.fillColor.trim() : '';
+  comp.fillColor = fillColor || defaults.fillColor || '#ffffff';
+  shapePropKeys.forEach(key => {
+    comp.props[key] = comp[key];
+  });
+}
+
 const builtinComponents = [
   {
     subtype: 'Bus',
@@ -769,6 +845,17 @@ const builtinComponents = [
         manual_length: false
       }
     }
+  },
+  {
+    subtype: 'custom_shape',
+    label: 'Shape',
+    icon: typeIcons.annotations || placeholderIcon,
+    category: 'annotations',
+    type: 'annotation',
+    width: 160,
+    height: 100,
+    props: { ...defaultShapeProps },
+    hidden: true
   }
 ];
 
@@ -1119,6 +1206,7 @@ async function loadComponentLibrary() {
       source: derivedSource || null,
       isCustom
     };
+    if (definition.hidden) meta.hidden = true;
     const widthVal = Number(definition.width);
     const heightVal = Number(definition.height);
     if (Number.isFinite(widthVal)) meta.width = widthVal;
@@ -1318,6 +1406,7 @@ function buildPalette() {
     const container = sectionContainers[cat] || palette;
     subs.forEach(subKey => {
       const meta = componentMeta[subKey];
+      if (!meta || meta.hidden) return;
       const btn = btnTemplate ? btnTemplate.content.firstElementChild.cloneNode(true) : document.createElement('button');
       btn.draggable = true;
       btn.setAttribute('draggable', 'true');
@@ -3494,6 +3583,206 @@ function openViewModal() {
   }
 }
 
+function openShapeModal() {
+  const meta = componentMeta['annotation_custom_shape'] || {};
+  const defaults = {
+    width: Number.isFinite(Number(meta.width)) ? Number(meta.width) : 160,
+    height: Number.isFinite(Number(meta.height)) ? Number(meta.height) : 100,
+    ...defaultShapeProps,
+    ...(meta.props || {})
+  };
+  let form;
+  let shapeSelect;
+  let widthInput;
+  let heightInput;
+  let strokeStyleSelect;
+  let strokeWidthInput;
+  let strokeColorInput;
+  let fillColorInput;
+  let cornerRadiusInput;
+
+  const createLabeledField = (labelText, input, helpText) => {
+    const label = document.createElement('label');
+    label.className = 'shape-field';
+    const span = document.createElement('span');
+    span.className = 'shape-field-label';
+    span.textContent = labelText;
+    label.appendChild(span);
+    label.appendChild(input);
+    if (helpText) {
+      const help = document.createElement('span');
+      help.className = 'shape-field-help';
+      help.textContent = helpText;
+      label.appendChild(help);
+    }
+    return label;
+  };
+
+  openModal({
+    title: 'Add Shape',
+    primaryText: 'Add Shape',
+    secondaryText: 'Cancel',
+    closeOnBackdrop: true,
+    render(body, controller) {
+      form = document.createElement('form');
+      form.className = 'shape-modal-form';
+      const fieldset = document.createElement('fieldset');
+      fieldset.className = 'shape-modal-fieldset';
+      const legend = document.createElement('legend');
+      legend.textContent = 'Shape settings';
+      fieldset.appendChild(legend);
+
+      shapeSelect = document.createElement('select');
+      shapeSelect.name = 'shapeType';
+      [
+        { value: 'rectangle', label: 'Rectangle' },
+        { value: 'rounded', label: 'Rounded Rectangle' },
+        { value: 'circle', label: 'Circle' }
+      ].forEach(opt => {
+        const option = document.createElement('option');
+        option.value = opt.value;
+        option.textContent = opt.label;
+        if ((defaults.shapeType || 'rectangle').toLowerCase() === opt.value) option.selected = true;
+        shapeSelect.appendChild(option);
+      });
+
+      widthInput = document.createElement('input');
+      widthInput.type = 'number';
+      widthInput.name = 'width';
+      widthInput.min = '1';
+      widthInput.step = '1';
+      widthInput.value = Number(defaults.width) || 160;
+
+      heightInput = document.createElement('input');
+      heightInput.type = 'number';
+      heightInput.name = 'height';
+      heightInput.min = '1';
+      heightInput.step = '1';
+      heightInput.value = Number(defaults.height) || 100;
+
+      strokeStyleSelect = document.createElement('select');
+      strokeStyleSelect.name = 'strokeStyle';
+      [
+        { value: 'solid', label: 'Solid' },
+        { value: 'dashed', label: 'Dashed' },
+        { value: 'dotted', label: 'Dotted' }
+      ].forEach(opt => {
+        const option = document.createElement('option');
+        option.value = opt.value;
+        option.textContent = opt.label;
+        if ((defaults.strokeStyle || 'solid').toLowerCase() === opt.value) option.selected = true;
+        strokeStyleSelect.appendChild(option);
+      });
+
+      strokeWidthInput = document.createElement('input');
+      strokeWidthInput.type = 'number';
+      strokeWidthInput.name = 'strokeWidth';
+      strokeWidthInput.min = '0.1';
+      strokeWidthInput.step = '0.5';
+      strokeWidthInput.value = Number(defaults.strokeWidth) || 2;
+
+      strokeColorInput = document.createElement('input');
+      strokeColorInput.type = 'color';
+      strokeColorInput.name = 'strokeColor';
+      strokeColorInput.value = defaults.strokeColor || '#333333';
+
+      fillColorInput = document.createElement('input');
+      fillColorInput.type = 'color';
+      fillColorInput.name = 'fillColor';
+      fillColorInput.value = defaults.fillColor && defaults.fillColor !== 'none'
+        ? defaults.fillColor
+        : '#ffffff';
+
+      cornerRadiusInput = document.createElement('input');
+      cornerRadiusInput.type = 'number';
+      cornerRadiusInput.name = 'cornerRadius';
+      cornerRadiusInput.min = '0';
+      cornerRadiusInput.step = '1';
+      cornerRadiusInput.value = Number(defaults.cornerRadius) || 12;
+
+      fieldset.appendChild(createLabeledField('Shape Type', shapeSelect));
+      fieldset.appendChild(createLabeledField('Width (px)', widthInput, 'For circles width is the diameter.'));
+      fieldset.appendChild(createLabeledField('Height (px)', heightInput, 'Circles keep height equal to width.'));
+      fieldset.appendChild(createLabeledField('Line Style', strokeStyleSelect));
+      fieldset.appendChild(createLabeledField('Line Weight', strokeWidthInput));
+      fieldset.appendChild(createLabeledField('Line Color', strokeColorInput));
+      fieldset.appendChild(createLabeledField('Fill Color', fillColorInput));
+      fieldset.appendChild(createLabeledField('Corner Radius', cornerRadiusInput, 'Applies to rounded rectangles.'));
+
+      form.appendChild(fieldset);
+      controller.registerForm(form);
+      controller.setInitialFocus(shapeSelect);
+      body.appendChild(form);
+
+      const syncControlState = () => {
+        const shape = shapeSelect.value;
+        const isCircle = shape === 'circle';
+        heightInput.disabled = isCircle;
+        if (isCircle) {
+          heightInput.value = widthInput.value;
+        }
+        cornerRadiusInput.disabled = shape !== 'rounded';
+      };
+
+      shapeSelect.addEventListener('change', () => {
+        syncControlState();
+      });
+      widthInput.addEventListener('input', () => {
+        if (shapeSelect.value === 'circle') {
+          heightInput.value = widthInput.value;
+        }
+      });
+      syncControlState();
+
+      return shapeSelect;
+    },
+    onSubmit() {
+      if (!form) return false;
+      const data = new FormData(form);
+      const shapeType = String(data.get('shapeType') || defaults.shapeType || 'rectangle').toLowerCase();
+      let width = Number.parseFloat(data.get('width'));
+      let height = Number.parseFloat(data.get('height'));
+      let strokeWidth = Number.parseFloat(data.get('strokeWidth'));
+      const strokeStyle = String(data.get('strokeStyle') || defaults.strokeStyle || 'solid').toLowerCase();
+      const strokeColor = data.get('strokeColor') || defaults.strokeColor || '#333333';
+      const fillColor = data.get('fillColor') || defaults.fillColor || '#ffffff';
+      let cornerRadius = Number.parseFloat(data.get('cornerRadius'));
+
+      if (!Number.isFinite(width) || width <= 0) width = Number(defaults.width) || 160;
+      if (!Number.isFinite(height) || height <= 0) height = Number(defaults.height) || 100;
+      if (!Number.isFinite(strokeWidth) || strokeWidth <= 0) strokeWidth = Number(defaults.strokeWidth) || 1;
+      if (!Number.isFinite(cornerRadius) || cornerRadius < 0) cornerRadius = Number(defaults.cornerRadius) || 0;
+      if (shapeType === 'circle') {
+        height = width;
+      }
+
+      const comp = addComponent({
+        type: 'annotation',
+        subtype: 'annotation_custom_shape',
+        skipHistory: true,
+        placeAtViewportCenter: true
+      });
+      if (!comp) return false;
+
+      comp.width = width;
+      comp.height = height;
+      comp.shapeType = shapeType;
+      comp.strokeStyle = strokeStyle;
+      comp.strokeWidth = strokeWidth;
+      comp.strokeColor = typeof strokeColor === 'string' ? strokeColor : defaults.strokeColor;
+      comp.fillColor = typeof fillColor === 'string' ? fillColor : defaults.fillColor;
+      comp.cornerRadius = cornerRadius;
+      ensureShapeDefaults(comp);
+
+      pushHistory();
+      render();
+      save();
+      selectComponent(comp);
+      return true;
+    }
+  });
+}
+
 function updateViewButtonLabel() {
   const btn = document.getElementById('view-menu-btn');
   if (!btn) return;
@@ -4445,8 +4734,12 @@ function normalizeComponent(c) {
     };
   }
   if (nc.type === 'annotation') {
-    nc.width = Number(nc.width) || compWidth;
-    nc.height = Number(nc.height) || compHeight;
+    const meta = componentMeta[nc.subtype] || {};
+    const fallbackWidth = Number.isFinite(Number(meta.width)) ? Number(meta.width) : compWidth;
+    const fallbackHeight = Number.isFinite(Number(meta.height)) ? Number(meta.height) : compHeight;
+    nc.width = Number(nc.width) || fallbackWidth;
+    nc.height = Number(nc.height) || fallbackHeight;
+    ensureShapeDefaults(nc);
   }
   if (resolveComponentCategory(nc) === 'load') {
     const basePorts = componentMeta[nc.subtype]?.ports?.length
@@ -5024,25 +5317,66 @@ function render() {
     }
     const meta = componentMeta[c.subtype] || {};
     if (c.type === 'annotation') {
-      const rect = document.createElementNS(svgNS, 'rect');
-      rect.setAttribute('x', c.x);
-      rect.setAttribute('y', c.y);
-      rect.setAttribute('width', w);
-      rect.setAttribute('height', h);
-      rect.setAttribute('fill', '#fff');
-      rect.setAttribute('stroke', '#333');
-      g.appendChild(rect);
-      const txt = document.createElementNS(svgNS, 'text');
-      txt.setAttribute('x', c.x + w / 2);
-      txt.setAttribute('y', c.y + h / 2 + 5);
-      txt.setAttribute('text-anchor', 'middle');
-      txt.textContent = c.text || c.label || '';
-      txt.addEventListener('dblclick', e => {
-        e.stopPropagation();
-        cancelPendingClickSelection();
-        selectComponent(c);
-      });
-      g.appendChild(txt);
+      if (c.subtype === 'annotation_text_box') {
+        const rect = document.createElementNS(svgNS, 'rect');
+        rect.setAttribute('x', c.x);
+        rect.setAttribute('y', c.y);
+        rect.setAttribute('width', w);
+        rect.setAttribute('height', h);
+        rect.setAttribute('fill', '#fff');
+        rect.setAttribute('stroke', '#333');
+        g.appendChild(rect);
+        const txt = document.createElementNS(svgNS, 'text');
+        txt.setAttribute('x', c.x + w / 2);
+        txt.setAttribute('y', c.y + h / 2 + 5);
+        txt.setAttribute('text-anchor', 'middle');
+        txt.textContent = c.text || c.label || '';
+        txt.addEventListener('dblclick', e => {
+          e.stopPropagation();
+          cancelPendingClickSelection();
+          selectComponent(c);
+        });
+        g.appendChild(txt);
+      } else {
+        if (c.subtype === 'annotation_custom_shape') ensureShapeDefaults(c);
+        const shapeType = (c.shapeType || 'rectangle').toLowerCase();
+        const strokeStyle = (c.strokeStyle || 'solid').toLowerCase();
+        const strokeColor = c.strokeColor || '#333';
+        const fillColor = c.fillColor && c.fillColor !== 'none' && c.fillColor !== 'transparent'
+          ? c.fillColor
+          : 'none';
+        const strokeWidth = Number(c.strokeWidth) || 1;
+        const dash = shapeDashPatterns[strokeStyle] || '';
+        let shape;
+        if (shapeType === 'circle') {
+          const ellipse = document.createElementNS(svgNS, 'ellipse');
+          ellipse.setAttribute('cx', c.x + w / 2);
+          ellipse.setAttribute('cy', c.y + h / 2);
+          ellipse.setAttribute('rx', w / 2);
+          ellipse.setAttribute('ry', h / 2);
+          shape = ellipse;
+        } else {
+          const rect = document.createElementNS(svgNS, 'rect');
+          rect.setAttribute('x', c.x);
+          rect.setAttribute('y', c.y);
+          rect.setAttribute('width', w);
+          rect.setAttribute('height', h);
+          if (shapeType === 'rounded' && Number.isFinite(Number(c.cornerRadius))) {
+            const radius = Math.max(0, Math.min(Number(c.cornerRadius), Math.min(w, h) / 2));
+            rect.setAttribute('rx', radius);
+            rect.setAttribute('ry', radius);
+          }
+          shape = rect;
+        }
+        shape.setAttribute('fill', fillColor);
+        shape.setAttribute('stroke', strokeColor);
+        shape.setAttribute('stroke-width', strokeWidth);
+        if (dash) shape.setAttribute('stroke-dasharray', dash);
+        if (strokeStyle === 'dotted') {
+          shape.setAttribute('stroke-linecap', 'round');
+        }
+        g.appendChild(shape);
+      }
     } else {
       if (c.type === 'cable') {
         const wLocal = c.width || compWidth;
@@ -5493,6 +5827,7 @@ function addComponent(cfg) {
     comp.height = comp.height || 60;
   }
   applyDefaults(comp);
+  ensureShapeDefaults(comp);
   components.push(comp);
   if (!skipHistory) pushHistory();
   if (gridEnabled) flashSnapIndicator(x, y);
@@ -6070,6 +6405,72 @@ function selectComponent(compOrId) {
           }
         }
       ];
+    } else if (targetComp.type === 'annotation') {
+      const isShapeAnnotation = targetComp.subtype === 'annotation_custom_shape';
+      baseFields = [
+        { name: 'label', label: 'Label', type: 'text' },
+        {
+          name: 'width',
+          label: 'Width (px)',
+          type: 'number',
+          help: isShapeAnnotation ? 'For circles width controls the diameter.' : undefined
+        },
+        {
+          name: 'height',
+          label: 'Height (px)',
+          type: 'number',
+          help: isShapeAnnotation ? 'Circles keep height equal to width.' : undefined
+        }
+      ];
+      if (isShapeAnnotation) {
+        baseFields.push(
+          {
+            name: 'shapeType',
+            label: 'Shape Type',
+            type: 'select',
+            options: [
+              { value: 'rectangle', label: 'Rectangle' },
+              { value: 'rounded', label: 'Rounded Rectangle' },
+              { value: 'circle', label: 'Circle' }
+            ]
+          },
+          {
+            name: 'strokeStyle',
+            label: 'Line Style',
+            type: 'select',
+            options: [
+              { value: 'solid', label: 'Solid' },
+              { value: 'dashed', label: 'Dashed' },
+              { value: 'dotted', label: 'Dotted' }
+            ]
+          },
+          {
+            name: 'strokeWidth',
+            label: 'Line Weight',
+            type: 'number'
+          },
+          {
+            name: 'strokeColor',
+            label: 'Line Color',
+            type: 'color'
+          },
+          {
+            name: 'fillColor',
+            label: 'Fill Color',
+            type: 'color',
+            getValue: comp => {
+              const raw = comp.fillColor || comp.props?.fillColor || defaultShapeProps.fillColor;
+              return raw && raw !== 'none' ? raw : defaultShapeProps.fillColor;
+            }
+          },
+          {
+            name: 'cornerRadius',
+            label: 'Corner Radius',
+            type: 'number',
+            help: 'Applied to rounded rectangles.'
+          }
+        );
+      }
     } else {
       baseFields = [
         { name: 'label', label: 'Label', type: 'text' },
@@ -6217,6 +6618,13 @@ function selectComponent(compOrId) {
     };
 
     let fields = [...baseFields, ...schema];
+    const seenFieldNames = new Set();
+    fields = fields.filter(field => {
+      if (!field || !field.name) return true;
+      if (seenFieldNames.has(field.name)) return false;
+      seenFieldNames.add(field.name);
+      return true;
+    });
     if (targetComp.subtype === 'motor_load') {
       fields = fields.filter(
         f => !['conductor_type', 'cable_assembly', 'breaker_frame', 'conductor_assembly'].includes(f.name)
@@ -6251,6 +6659,7 @@ function selectComponent(compOrId) {
       fields.forEach(f => {
         applyFieldFromForm(targetComp, f, fd);
       });
+      ensureShapeDefaults(targetComp);
       if (hasTccField) {
         targetComp.tccId = fd.get('tccId') || '';
       }
@@ -7575,6 +7984,12 @@ async function init() {
       connectSource = null;
       connectBtn.classList.toggle('active', connectMode);
       render();
+    });
+  }
+  const addShapeBtn = document.getElementById('add-shape-btn');
+  if (addShapeBtn) {
+    addShapeBtn.addEventListener('click', () => {
+      openShapeModal();
     });
   }
   // dimension tool removed
