@@ -1,5 +1,6 @@
 import componentLibrary from '../componentLibrary.json' with { type: 'json' };
 import { normalizeVoltageToVolts, toBaseKV } from '../utils/voltage.js';
+import { calculateTransformerImpedance } from '../utils/transformerImpedance.js';
 
 const DEFAULT_COMPONENT_DEFINITIONS = [
   { type: 'bus', subtype: 'Bus' }
@@ -220,18 +221,9 @@ function deriveTransformerImpedance(comp, fromRole, toRole, fromBus, toBus) {
     }
   }
   if (!kv) return null;
-  const baseMVA = kva / 1000;
-  if (!baseMVA) return null;
-  const baseZ = (kv * kv) / baseMVA;
-  const zMag = baseZ * (percent / 100);
   const xr = getTransformerXr(comp);
-  if (xr && Math.abs(xr) > 0.01) {
-    const r = zMag / Math.sqrt(1 + xr * xr);
-    return { r, x: r * xr };
-  }
-  const r = zMag * 0.1;
-  const x = Math.sqrt(Math.max(zMag * zMag - r * r, 0)) || zMag;
-  return { r, x };
+  const impedance = calculateTransformerImpedance({ kva, percentZ: percent, voltageKV: kv, xrRatio: xr });
+  return impedance || null;
 }
 
 function computeExistingTapRatio(tap) {

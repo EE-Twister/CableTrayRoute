@@ -1,4 +1,5 @@
 import { getOneLine } from '../dataStore.mjs';
+import { calculateTransformerImpedance } from '../utils/transformerImpedance.js';
 
 // Basic complex math utilities
 function add(a, b) {
@@ -141,19 +142,10 @@ function getTransformerImpedance(xfmr, portIndex) {
   const kva = getTransformerKvaForPort(xfmr, portIndex);
   const voltage = getTransformerVoltageForPort(xfmr, portIndex);
   const kv = toKV(voltage || pickValue(xfmr, 'voltage'));
-  if (!percent || !kva || !kv) return { r: 0, x: 0 };
-  const baseMVA = kva / 1000;
-  if (!baseMVA) return { r: 0, x: 0 };
-  const baseZ = (kv * kv) / baseMVA;
-  const zMag = baseZ * (percent / 100);
   const xr = parseNumeric(pickValue(xfmr, 'xr_ratio'));
-  if (xr && Math.abs(xr) > 0.01) {
-    const r = zMag / Math.sqrt(1 + xr * xr);
-    return { r, x: r * xr };
-  }
-  const r = zMag * 0.1;
-  const x = Math.sqrt(Math.max(zMag * zMag - r * r, 0)) || zMag;
-  return { r, x };
+  const impedance = calculateTransformerImpedance({ kva, percentZ: percent, voltageKV: kv, xrRatio: xr });
+  if (impedance && Number.isFinite(impedance.r) && Number.isFinite(impedance.x)) return impedance;
+  return { r: 0, x: 0 };
 }
 
 function getSourceImpedance(comp) {
