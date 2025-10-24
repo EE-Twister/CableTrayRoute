@@ -28,6 +28,7 @@
           const script = document.createElement('script');
           script.type = 'module';
           if (entry.defer) script.defer = true;
+          script.async = false;
           script.src = `${entry.src}?v=${version}`;
           document.head.appendChild(script);
         });
