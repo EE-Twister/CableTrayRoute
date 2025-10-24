@@ -6272,6 +6272,16 @@ function selectComponent(compOrId) {
       rawSchema = inferSchemaFromProps({ ...metaProps, ...(targetComp.props || {}) });
     }
 
+    const motorFieldIndicators = new Set(['hp', 'horsepower', 'load_kw', 'load_kvar']);
+    const rawSchemaFieldNames = new Set(
+      rawSchema
+        .map(field => field && field.name)
+        .filter(name => typeof name === 'string' && name)
+    );
+    const shouldApplyMotorDerivations =
+      isMotorComponent
+      || [...motorFieldIndicators].some(name => rawSchemaFieldNames.has(name));
+
     const generalLabelOverrides = {
       hp: 'Horsepower',
       pf: 'Power Factor',
@@ -6638,7 +6648,7 @@ function selectComponent(compOrId) {
       if (f.name === 'manufacturer') manufacturerInput = input;
       if (f.name === 'model') modelInput = input;
       if (f.name === 'tccId') tccInput = input;
-      if (isMotorComponent) {
+      if (shouldApplyMotorDerivations) {
         motorInputMap.set(f.name, input);
         if (motorCalculatedFields.has(f.name)) {
           lbl.classList.add('prop-field-calculated');
@@ -6863,7 +6873,7 @@ function selectComponent(compOrId) {
     createTabSection('manufacturer', 'Manufacturer', 'Manufacturer', manufacturerFields);
     createTabSection('notes', 'Notes', 'Notes', noteFields);
 
-    if (isMotorComponent) {
+    if (shouldApplyMotorDerivations) {
       const driverFieldNames = [
         'hp',
         'horsepower',
