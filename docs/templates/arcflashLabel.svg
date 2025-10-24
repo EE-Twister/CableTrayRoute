@@ -1,10 +1,10 @@
 <svg xmlns="http://www.w3.org/2000/svg" width="6in" height="4in" viewBox="0 0 600 400">
   <rect width="600" height="400" fill="#ffffff" stroke="#000000" stroke-width="6"/>
   <rect x="0" y="0" width="600" height="110" fill="{{signalColor}}"/>
-  <g transform="translate(30 14)">
-    <path d="M70 0L130 96H10Z" fill="#ffffff" stroke="#000000" stroke-width="6"/>
-    <path d="M70 14L112 92H28Z" fill="{{signalColor}}"/>
-    <text x="70" y="78" font-size="66" font-weight="bold" text-anchor="middle" fill="#ffffff">!</text>
+  <g transform="translate(36 20)">
+    <path d="M60 0L120 82H0Z" fill="#ffffff" stroke="#000000" stroke-width="6"/>
+    <path d="M60 14L104 68H16Z" fill="{{signalColor}}"/>
+    <text x="60" y="60" font-size="66" font-weight="bold" text-anchor="middle" fill="#ffffff">!</text>
   </g>
   <text x="190" y="60" font-size="60" font-weight="bold" fill="#ffffff" font-family="Helvetica, Arial, sans-serif">{{signalWord}}</text>
   <text x="190" y="95" font-size="22" fill="#ffffff" font-family="Helvetica, Arial, sans-serif">ARC FLASH HAZARD</text>
