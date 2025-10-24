@@ -6255,6 +6255,17 @@ function selectComponent(compOrId) {
 
     propertyHeading.textContent = `${getComponentListLabel(targetComp)} Properties`;
 
+    const isMotorComponent = targetComp.subtype === 'motor_load';
+    const motorInputMap = new Map();
+    const motorCalculatedFields = new Set([
+      'load_kw',
+      'load_kvar',
+      'impedance_r',
+      'impedance_x',
+      'thevenin_r',
+      'thevenin_x'
+    ]);
+
     let rawSchema = propSchemas[targetComp.subtype] || [];
     if (!rawSchema.length) {
       const metaProps = componentMeta[targetComp.subtype]?.props || {};
@@ -6627,6 +6638,19 @@ function selectComponent(compOrId) {
       if (f.name === 'manufacturer') manufacturerInput = input;
       if (f.name === 'model') modelInput = input;
       if (f.name === 'tccId') tccInput = input;
+      if (isMotorComponent) {
+        motorInputMap.set(f.name, input);
+        if (motorCalculatedFields.has(f.name)) {
+          lbl.classList.add('prop-field-calculated');
+          input.classList.add('prop-input-calculated');
+          input.readOnly = true;
+          input.setAttribute('aria-readonly', 'true');
+          const badge = document.createElement('span');
+          badge.className = 'prop-field-badge prop-field-badge-calculated';
+          badge.textContent = 'Calculated';
+          labelHeader.appendChild(badge);
+        }
+      }
       if (f.help) {
         const helpBtn = document.createElement('button');
         helpBtn.type = 'button';
@@ -6838,6 +6862,188 @@ function selectComponent(compOrId) {
     createTabSection('motor', 'Motor Start', 'Motor Start', motorStartFields);
     createTabSection('manufacturer', 'Manufacturer', 'Manufacturer', manufacturerFields);
     createTabSection('notes', 'Notes', 'Notes', noteFields);
+
+    if (isMotorComponent) {
+      const driverFieldNames = [
+        'hp',
+        'horsepower',
+        'pf',
+        'power_factor',
+        'efficiency',
+        'eff',
+        'voltage',
+        'volts',
+        'volts_primary',
+        'volts_secondary',
+        'baseKV',
+        'kV',
+        'kv',
+        'phases',
+        'phase_count',
+        'phaseCount',
+        'inrushMultiple',
+        'lr_current_pu',
+        'locked_rotor_multiple',
+        'lockedRotorMultiple'
+      ];
+
+      const parseNumericValue = raw => {
+        if (raw === null || raw === undefined) return null;
+        if (typeof raw === 'number') return Number.isFinite(raw) ? raw : null;
+        const text = String(raw).trim();
+        if (!text) return null;
+        const num = Number.parseFloat(text);
+        return Number.isFinite(num) ? num : null;
+      };
+
+      const parsePercentValue = raw => {
+        const num = parseNumericValue(raw);
+        if (num === null) return null;
+        let ratio = num;
+        if (Math.abs(ratio) > 1.5) ratio /= 100;
+        if (!Number.isFinite(ratio) || ratio <= 0) return null;
+        return ratio;
+      };
+
+      const readComponentValue = name => {
+        if (targetComp && Object.prototype.hasOwnProperty.call(targetComp, name)) {
+          const direct = targetComp[name];
+          if (direct !== undefined && direct !== null && direct !== '') return direct;
+        }
+        if (targetComp?.props && Object.prototype.hasOwnProperty.call(targetComp.props, name)) {
+          const propVal = targetComp.props[name];
+          if (propVal !== undefined && propVal !== null && propVal !== '') return propVal;
+        }
+        return null;
+      };
+
+      const getNumeric = (names, { percent = false } = {}) => {
+        for (const name of names) {
+          const input = motorInputMap.get(name);
+          if (!input) continue;
+          const value = percent ? parsePercentValue(input.value) : parseNumericValue(input.value);
+          if (value !== null) return value;
+        }
+        for (const name of names) {
+          const fromComp = readComponentValue(name);
+          if (fromComp === null) continue;
+          const value = percent ? parsePercentValue(fromComp) : parseNumericValue(fromComp);
+          if (value !== null) return value;
+        }
+        return null;
+      };
+
+      const clamp = (val, min, max) => {
+        if (!Number.isFinite(val)) return val;
+        if (val < min) return min;
+        if (val > max) return max;
+        return val;
+      };
+
+      const formatNumber = (val, decimals = 3) => {
+        if (!Number.isFinite(val)) return '';
+        const factor = 10 ** decimals;
+        const rounded = Math.round(val * factor) / factor;
+        let text = rounded.toFixed(decimals);
+        text = text.replace(/\.0+$/, '');
+        text = text.replace(/(\.[0-9]*[1-9])0+$/, '$1');
+        return text;
+      };
+
+      const updateMotorDerivedFields = () => {
+        const hpVal = getNumeric(['hp', 'horsepower', 'rating']);
+        let effVal = getNumeric(['efficiency', 'eff'], { percent: true });
+        let pfVal = getNumeric(['pf', 'power_factor'], { percent: true });
+        let voltageVal = getNumeric(['voltage', 'volts', 'volts_primary', 'volts_secondary']);
+        if (voltageVal === null) {
+          const baseKv = getNumeric(['baseKV', 'kV', 'kv']);
+          if (Number.isFinite(baseKv) && baseKv > 0) voltageVal = baseKv * 1000;
+        }
+        let phasesVal = getNumeric(['phases', 'phase_count', 'phaseCount']);
+        const multipleVal = getNumeric([
+          'inrushMultiple',
+          'lr_current_pu',
+          'locked_rotor_multiple',
+          'lockedRotorMultiple'
+        ]);
+
+        const loadKwInput = motorInputMap.get('load_kw');
+        const loadKvarInput = motorInputMap.get('load_kvar');
+        const impRInput = motorInputMap.get('impedance_r');
+        const impXInput = motorInputMap.get('impedance_x');
+        const thRInput = motorInputMap.get('thevenin_r');
+        const thXInput = motorInputMap.get('thevenin_x');
+
+        effVal = effVal !== null ? clamp(effVal, 0.01, 0.9999) : null;
+        pfVal = pfVal !== null ? clamp(pfVal, 0.01, 0.9999) : null;
+        phasesVal = Number.isFinite(phasesVal) && phasesVal > 0 ? phasesVal : 3;
+
+        let inputKw = null;
+        if (Number.isFinite(hpVal) && hpVal > 0 && Number.isFinite(effVal) && effVal > 0) {
+          const outputKw = hpVal * 0.746;
+          inputKw = outputKw / effVal;
+          if (loadKwInput) loadKwInput.value = formatNumber(inputKw, 3);
+        }
+
+        if (Number.isFinite(inputKw) && pfVal !== null && loadKvarInput) {
+          const kva = inputKw / pfVal;
+          const kvar = Math.sqrt(Math.max(kva * kva - inputKw * inputKw, 0));
+          loadKvarInput.value = formatNumber(kvar, 3);
+        }
+
+        const voltageValid = Number.isFinite(voltageVal) && voltageVal > 0 ? voltageVal : null;
+        let lineCurrent = null;
+        if (Number.isFinite(inputKw) && pfVal !== null && voltageValid !== null) {
+          const isSinglePhase = phasesVal <= 1.5;
+          const denom = isSinglePhase ? voltageValid * pfVal : Math.sqrt(3) * voltageValid * pfVal;
+          if (denom > 0) {
+            lineCurrent = (inputKw * 1000) / denom;
+          }
+          if (lineCurrent && lineCurrent > 0 && impRInput && impXInput) {
+            const phaseVoltage = isSinglePhase ? voltageValid : voltageValid / Math.sqrt(3);
+            const impedanceMag = phaseVoltage / lineCurrent;
+            if (Number.isFinite(impedanceMag) && impedanceMag > 0) {
+              const sinPhi = Math.sqrt(Math.max(1 - pfVal * pfVal, 0));
+              const resistance = impedanceMag * pfVal;
+              const reactance = impedanceMag * sinPhi;
+              impRInput.value = formatNumber(resistance, 4);
+              impXInput.value = formatNumber(reactance, 4);
+            }
+          }
+        }
+
+        const supplyPf = 0.25;
+        const sagTarget = 0.3;
+        if (lineCurrent && lineCurrent > 0 && voltageValid !== null && (thRInput || thXInput)) {
+          const inrushMultiple = Number.isFinite(multipleVal) && multipleVal > 0 ? multipleVal : 6;
+          const lockedRotorCurrent = lineCurrent * inrushMultiple;
+          if (lockedRotorCurrent > 0) {
+            const isSinglePhase = phasesVal <= 1.5;
+            const phaseVoltage = isSinglePhase ? voltageValid : voltageValid / Math.sqrt(3);
+            const theveninMag = (sagTarget * phaseVoltage) / lockedRotorCurrent;
+            if (Number.isFinite(theveninMag) && theveninMag > 0) {
+              const pfClamp = clamp(supplyPf, 0.01, 0.9999);
+              const sinSupply = Math.sqrt(Math.max(1 - pfClamp * pfClamp, 0));
+              if (thRInput) thRInput.value = formatNumber(theveninMag * pfClamp, 4);
+              if (thXInput) thXInput.value = formatNumber(theveninMag * sinSupply, 4);
+            }
+          }
+        }
+      };
+
+      const attachUpdate = input => {
+        if (!input) return;
+        input.addEventListener('input', updateMotorDerivedFields);
+        input.addEventListener('change', updateMotorDerivedFields);
+      };
+
+      driverFieldNames.forEach(name => {
+        const input = motorInputMap.get(name);
+        if (input) attachUpdate(input);
+      });
+
+      updateMotorDerivedFields();
+    }
 
     const getTabPanel = id => tabMap.get(id)?.panel || tabs[0]?.panel || null;
 
