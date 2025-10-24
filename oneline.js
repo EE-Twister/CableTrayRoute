@@ -1466,6 +1466,158 @@ let draggingConnection = null;
 let dragConnections = null;
 let draggingLabel = null;
 let clipboard = [];
+let propertyClipboard = null;
+
+const PROPERTY_CLIPBOARD_EXCLUDE_KEYS = new Set([
+  'id',
+  'label',
+  'name',
+  'tag',
+  'ref',
+  'x',
+  'y',
+  'z',
+  'connections',
+  'ports',
+  'portCounts',
+  'icon',
+  'width',
+  'height',
+  'rotation',
+  'flipped',
+  'labelOffset',
+  'category',
+  'type',
+  'subtype',
+  'defaultRotation',
+  'isVirtualNode',
+  'templateId',
+  'isTemplate',
+  'diagramId',
+  'diagramSheet',
+  'diagram',
+  'diagramScale',
+  'diagramViewport',
+  'diagramZoom',
+  'diagramOffset',
+  'locked',
+  'componentVersion'
+]);
+
+const PROPERTY_CLIPBOARD_UNIQUE_KEYS = new Set(['id', 'label', 'name', 'tag', 'ref']);
+
+function isDomNode(value) {
+  if (!value || typeof value !== 'object') return false;
+  if (typeof Element !== 'undefined' && value instanceof Element) return true;
+  if (typeof Node !== 'undefined' && value instanceof Node) return true;
+  return false;
+}
+
+function clonePropertyClipboardValue(value) {
+  if (Array.isArray(value)) {
+    return value.map(item => clonePropertyClipboardValue(item));
+  }
+  if (value === null || typeof value !== 'object') {
+    return value;
+  }
+  if (value instanceof Date) {
+    return new Date(value.getTime());
+  }
+  if (isDomNode(value)) return undefined;
+  const result = {};
+  Object.keys(value).forEach(key => {
+    if (PROPERTY_CLIPBOARD_UNIQUE_KEYS.has(key)) return;
+    const cloned = clonePropertyClipboardValue(value[key]);
+    if (cloned !== undefined) {
+      result[key] = cloned;
+    }
+  });
+  return result;
+}
+
+function buildPropertyClipboardData(comp) {
+  if (!comp || typeof comp !== 'object') return {};
+  const data = {};
+  Object.keys(comp).forEach(key => {
+    if (PROPERTY_CLIPBOARD_EXCLUDE_KEYS.has(key)) return;
+    const value = comp[key];
+    if (typeof value === 'function') return;
+    if (value === undefined) return;
+    if (isDomNode(value)) return;
+    const cloned = clonePropertyClipboardValue(value);
+    if (cloned !== undefined) {
+      data[key] = cloned;
+    }
+  });
+  return data;
+}
+
+function createPropertyClipboardFromComponent(comp) {
+  if (!comp || comp.isVirtualNode) return null;
+  const data = buildPropertyClipboardData(comp);
+  if (!Object.keys(data).length) return null;
+  return {
+    subtype: comp.subtype || '',
+    type: comp.type || '',
+    data
+  };
+}
+
+function canPastePropertyClipboard(clipboardData, target) {
+  if (!clipboardData || !clipboardData.data) return false;
+  if (!target || target.isVirtualNode) return false;
+  const sourceKey = clipboardData.subtype || clipboardData.type || '';
+  const targetKey = target.subtype || target.type || '';
+  if (!sourceKey || !targetKey) return true;
+  return sourceKey === targetKey;
+}
+
+function deepEqualValues(a, b) {
+  if (a === b) return true;
+  if (Number.isNaN(a) && Number.isNaN(b)) return true;
+  if (typeof a !== typeof b) return false;
+  if (Array.isArray(a) && Array.isArray(b)) {
+    if (a.length !== b.length) return false;
+    for (let i = 0; i < a.length; i += 1) {
+      if (!deepEqualValues(a[i], b[i])) return false;
+    }
+    return true;
+  }
+  if (a && typeof a === 'object' && b && typeof b === 'object') {
+    const keysA = Object.keys(a);
+    const keysB = Object.keys(b);
+    if (keysA.length !== keysB.length) return false;
+    for (const key of keysA) {
+      if (!Object.prototype.hasOwnProperty.call(b, key)) return false;
+      if (!deepEqualValues(a[key], b[key])) return false;
+    }
+    return true;
+  }
+  return false;
+}
+
+function applyPropertyClipboardToComponent(target, clipboardData) {
+  if (!target || !clipboardData || !clipboardData.data) return false;
+  const data = clipboardData.data;
+  let changed = false;
+  Object.keys(target).forEach(key => {
+    if (PROPERTY_CLIPBOARD_EXCLUDE_KEYS.has(key)) return;
+    if (Object.prototype.hasOwnProperty.call(data, key)) return;
+    if (Object.prototype.hasOwnProperty.call(target, key)) {
+      delete target[key];
+      changed = true;
+    }
+  });
+  Object.entries(data).forEach(([key, value]) => {
+    const cloned = clonePropertyClipboardValue(value);
+    if (cloned === undefined && value !== undefined) return;
+    if (!deepEqualValues(target[key], cloned)) {
+      target[key] = cloned;
+      changed = true;
+    }
+  });
+  return changed;
+}
 let contextTarget = null;
 let connectMode = false;
 let connectSource = null;
@@ -8196,9 +8348,17 @@ async function init() {
     const compItems = menu.querySelectorAll('[data-context="component"]');
     const connItems = menu.querySelectorAll('[data-context="connection"]');
     const canvasItems = menu.querySelectorAll('[data-context="canvas"]');
-    compItems.forEach(li => li.style.display = contextTarget && !contextTarget.connection ? 'block' : 'none');
+    const isComponentContext = !!(contextTarget && !contextTarget.connection);
+    compItems.forEach(li => li.style.display = isComponentContext ? 'block' : 'none');
     connItems.forEach(li => li.style.display = contextTarget && contextTarget.connection ? 'block' : 'none');
     canvasItems.forEach(li => li.style.display = contextTarget ? 'none' : 'block');
+    const copyPropsItem = menu.querySelector('[data-action="copy-properties"]');
+    if (copyPropsItem) copyPropsItem.style.display = isComponentContext ? 'block' : 'none';
+    const pastePropsItem = menu.querySelector('[data-action="paste-properties"]');
+    if (pastePropsItem) {
+      const canPaste = isComponentContext && canPastePropertyClipboard(propertyClipboard, contextTarget);
+      pastePropsItem.style.display = canPaste ? 'block' : 'none';
+    }
     const rect = canvasScroll?.getBoundingClientRect();
     if (rect) {
       const scrollLeft = canvasScroll?.scrollLeft ?? 0;
@@ -8271,6 +8431,38 @@ async function init() {
             render();
             save();
           }
+        }
+      }
+    } else if (action === 'copy-properties' && contextTarget && !contextTarget.connection) {
+      const clipboardData = createPropertyClipboardFromComponent(contextTarget);
+      if (clipboardData) {
+        propertyClipboard = clipboardData;
+        showToast('Properties copied');
+      } else {
+        propertyClipboard = null;
+        showToast('No properties available to copy');
+      }
+    } else if (action === 'paste-properties' && contextTarget && !contextTarget.connection) {
+      const targets = getContextTargets(contextTarget).filter(comp => comp && !comp.isVirtualNode);
+      if (!propertyClipboard || !propertyClipboard.data) {
+        showToast('Copy properties from a device first');
+      } else if (!targets.length) {
+        showToast('Select a device to paste properties');
+      } else if (targets.some(target => !canPastePropertyClipboard(propertyClipboard, target))) {
+        showToast('Properties can only be pasted to devices of the same type');
+      } else {
+        let changed = false;
+        targets.forEach(target => {
+          if (applyPropertyClipboardToComponent(target, propertyClipboard)) changed = true;
+        });
+        if (changed) {
+          pushHistory();
+          render();
+          save();
+          syncSchedules();
+          showToast('Properties pasted');
+        } else {
+          showToast('Properties already match');
         }
       }
     } else if (action === 'disconnect' && contextTarget) {
