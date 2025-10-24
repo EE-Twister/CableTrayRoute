@@ -8201,8 +8201,12 @@ async function init() {
     canvasItems.forEach(li => li.style.display = contextTarget ? 'none' : 'block');
     const rect = canvasScroll?.getBoundingClientRect();
     if (rect) {
-      menu.style.left = `${e.clientX - rect.left}px`;
-      menu.style.top = `${e.clientY - rect.top}px`;
+      const scrollLeft = canvasScroll?.scrollLeft ?? 0;
+      const scrollTop = canvasScroll?.scrollTop ?? 0;
+      const left = e.clientX - rect.left + scrollLeft;
+      const top = e.clientY - rect.top + scrollTop;
+      menu.style.left = `${left}px`;
+      menu.style.top = `${top}px`;
     } else {
       menu.style.left = `${e.pageX}px`;
       menu.style.top = `${e.pageY}px`;
