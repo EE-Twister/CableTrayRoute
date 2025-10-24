@@ -8214,6 +8214,14 @@ async function init() {
     menu.style.display = 'block';
   });
 
+  const getContextTargets = target => {
+    if (!target) return [];
+    if (selection.length && selection.includes(target)) {
+      return selection.slice();
+    }
+    return [target];
+  };
+
   menu.addEventListener('click', async e => {
     const action = e.target.dataset.action;
     if (!action) return;
@@ -8242,29 +8250,43 @@ async function init() {
     if (action === 'edit' && contextTarget) {
       selectComponent(contextTarget.id);
     } else if (action === 'rename' && contextTarget) {
+      const targets = getContextTargets(contextTarget);
+      if (!targets.length) return;
       const current = contextTarget.label || '';
       const next = prompt('Component label', current);
       if (next !== null) {
         const trimmed = next.trim();
         if (!trimmed) {
           showToast('Label cannot be empty');
-        } else if (trimmed !== current) {
-          contextTarget.label = trimmed;
-          pushHistory();
-          render();
-          save();
+        } else {
+          let changed = false;
+          targets.forEach(comp => {
+            if ((comp.label || '') !== trimmed) {
+              comp.label = trimmed;
+              changed = true;
+            }
+          });
+          if (changed) {
+            pushHistory();
+            render();
+            save();
+          }
         }
       }
     } else if (action === 'disconnect' && contextTarget) {
-      const targetId = contextTarget.id;
+      const targets = getContextTargets(contextTarget);
+      if (!targets.length) return;
+      const targetIds = new Set(targets.map(t => t.id));
       let changed = false;
-      if (Array.isArray(contextTarget.connections) && contextTarget.connections.length) {
-        contextTarget.connections = [];
-        changed = true;
-      }
+      targets.forEach(comp => {
+        if (Array.isArray(comp.connections) && comp.connections.length) {
+          comp.connections = [];
+          changed = true;
+        }
+      });
       components.forEach(comp => {
         if (!Array.isArray(comp.connections) || !comp.connections.length) return;
-        const filtered = comp.connections.filter(conn => conn.target !== targetId);
+        const filtered = comp.connections.filter(conn => !targetIds.has(conn.target));
         if (filtered.length !== comp.connections.length) {
           comp.connections = filtered;
           changed = true;
@@ -8273,7 +8295,7 @@ async function init() {
           }
         }
       });
-      if (selectedConnection && selectedConnection.component === contextTarget) {
+      if (selectedConnection && targetIds.has(selectedConnection.component?.id)) {
         selectedConnection = null;
       }
       if (changed) {
@@ -8282,12 +8304,15 @@ async function init() {
         save();
       }
     } else if (action === 'delete' && contextTarget) {
-      components = components.filter(c => c !== contextTarget);
+      const targets = getContextTargets(contextTarget);
+      if (!targets.length) return;
+      const ids = new Set(targets.map(c => c.id));
+      components = components.filter(c => !ids.has(c.id));
       components.forEach(c => {
-        c.connections = (c.connections || []).filter(conn => conn.target !== contextTarget.id);
+        c.connections = (c.connections || []).filter(conn => !ids.has(conn.target));
       });
-      selection = [];
-      selected = null;
+      selection = selection.filter(c => !ids.has(c.id));
+      selected = selection[0] || null;
       selectedConnection = null;
       pushHistory();
       render();
@@ -8295,22 +8320,41 @@ async function init() {
       const modal = ensurePropModal();
       if (modal) modal.classList.remove('show');
     } else if (action === 'duplicate' && contextTarget) {
-      const copy = {
-        ...JSON.parse(JSON.stringify(contextTarget)),
-        id: 'n' + Date.now(),
-        x: contextTarget.x + gridSize,
-        y: contextTarget.y + gridSize,
-        connections: []
-      };
-      applyNextLabel(copy);
-      components.push(copy);
-      selection = [copy];
-      selected = copy;
+      const targets = getContextTargets(contextTarget);
+      if (!targets.length) return;
+      const base = Date.now();
+      const idMap = {};
+      const newComps = targets.map((comp, idx) => {
+        const clone = {
+          ...JSON.parse(JSON.stringify(comp)),
+          id: 'n' + (base + idx),
+          x: comp.x + gridSize,
+          y: comp.y + gridSize,
+          connections: (comp.connections || []).map(conn => ({ ...conn }))
+        };
+        idMap[comp.id] = clone.id;
+        applyNextLabel(clone);
+        return clone;
+      });
+      newComps.forEach(clone => {
+        clone.connections = (clone.connections || [])
+          .filter(conn => idMap[conn.target])
+          .map(conn => ({ ...conn, target: idMap[conn.target] }));
+      });
+      components.push(...newComps);
+      selection = newComps;
+      selected = newComps[0] || null;
+      selectedConnection = null;
       pushHistory();
       render();
       save();
     } else if (action === 'rotate' && contextTarget) {
-      contextTarget.rotation = ((contextTarget.rotation || 0) + 90) % 360;
+      const targets = getContextTargets(contextTarget);
+      if (!targets.length) return;
+      targets.forEach(comp => {
+        comp.rotation = ((comp.rotation || 0) + 90) % 360;
+      });
+      selectedConnection = null;
       pushHistory();
       render();
       save();
