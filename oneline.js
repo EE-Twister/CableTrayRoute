@@ -7266,6 +7266,10 @@ function selectComponent(compOrId) {
           kvarVal = Math.sqrt(diff) * (Number.isFinite(pfVal) ? kvarSign : 1);
         }
 
+        const existingKvarVal = allowFallback
+          ? parseNumericValue(getNestedComponentValue(targetComp, ['load', 'kvar']))
+          : null;
+
         const skipManual = !commitFormatting;
 
         setFieldValue(wattsInput, wattsVal, 3, {
@@ -7293,6 +7297,7 @@ function selectComponent(compOrId) {
         }
         if (loadKvarInput) {
           if (Number.isFinite(kvarVal)) loadKvarInput.value = formatNumber(kvarVal, 3);
+          else if (Number.isFinite(existingKvarVal)) loadKvarInput.value = formatNumber(existingKvarVal, 3);
           else loadKvarInput.value = '';
         }
       };
