@@ -823,7 +823,13 @@ const builtinComponents = [
     ],
     props: {
       watts: 300000,
+      kva: 300,
+      pf: 1,
       volts: 480,
+      baseKV: 0.48,
+      kV: 0.48,
+      voltage: 480,
+      prefault_voltage: 0.48,
       load: {
         kw: 300.0,
         kvar: 0
@@ -6268,9 +6274,11 @@ function selectComponent(compOrId) {
     propertyHeading.textContent = `${getComponentListLabel(targetComp)} Properties`;
 
     const isMotorComponent = targetComp.subtype === 'motor_load';
+    const isStaticLoadComponent = targetComp.subtype === 'static_load';
     const isTransformerComponent = targetComp.type === 'transformer';
     const isSourceCategoryComponent = isSourceComponent(targetComp);
     const motorInputMap = new Map();
+    const staticInputMap = isStaticLoadComponent ? new Map() : null;
     const transformerInputMap = isTransformerComponent ? new Map() : null;
     const transformerCustomBadges = isTransformerComponent ? new Map() : null;
     const sourceInputMap = isSourceCategoryComponent ? new Map() : null;
@@ -6283,6 +6291,12 @@ function selectComponent(compOrId) {
       'thevenin_r',
       'thevenin_x'
     ]);
+    const staticCalculatedFields = isStaticLoadComponent
+      ? new Set(['load_kw', 'load_kvar', 'baseKV', 'kV', 'kv', 'prefault_voltage'])
+      : null;
+    const staticManualFields = isStaticLoadComponent
+      ? new Set(['watts', 'kva', 'pf', 'power_factor', 'volts', 'voltage'])
+      : null;
     const transformerCalculatedFields = new Set(['impedance_r', 'impedance_x']);
     const transformerAutoFieldNames = new Set(['baseKV', 'kV', 'kv', 'prefault_voltage']);
     const sourceCalculatedFields = new Set(['thevenin_mva']);
@@ -6710,6 +6724,9 @@ function selectComponent(compOrId) {
       if (shouldApplyMotorDerivations) {
         motorInputMap.set(f.name, input);
       }
+      if (isStaticLoadComponent && staticInputMap) {
+        staticInputMap.set(f.name, input);
+      }
       if (isTransformerComponent && transformerInputMap) {
         transformerInputMap.set(f.name, input);
       }
@@ -6717,9 +6734,17 @@ function selectComponent(compOrId) {
         sourceInputMap.set(f.name, input);
       }
       const isMotorCalculatedField = shouldApplyMotorDerivations && motorCalculatedFields.has(f.name);
+      const isStaticCalculatedField = isStaticLoadComponent && staticCalculatedFields?.has(f.name);
       const isTransformerCalculatedField = isTransformerComponent && transformerCalculatedFields.has(f.name);
       const isSourceCalculatedField = isSourceCategoryComponent && sourceCalculatedFields.has(f.name);
-      if (isMotorCalculatedField || isTransformerCalculatedField || isSourceCalculatedField) {
+      const isStaticManualField = isStaticLoadComponent && staticManualFields?.has(f.name);
+      if (isStaticManualField) {
+        const badge = document.createElement('span');
+        badge.className = 'prop-field-badge prop-field-badge-manual';
+        badge.textContent = 'Input';
+        labelHeader.appendChild(badge);
+      }
+      if (isMotorCalculatedField || isStaticCalculatedField || isTransformerCalculatedField || isSourceCalculatedField) {
         lbl.classList.add('prop-field-calculated');
         input.classList.add('prop-input-calculated');
         input.readOnly = true;
@@ -7143,6 +7168,234 @@ function selectComponent(compOrId) {
       });
 
       updateMotorDerivedFields();
+    }
+
+    if (isStaticLoadComponent && staticInputMap) {
+      const pfFieldNames = ['pf', 'power_factor'];
+      const wattsFieldNames = ['watts'];
+      const kvaFieldNames = ['kva'];
+      const voltageFieldNames = ['volts', 'voltage'];
+      const baseFieldNames = ['baseKV', 'kV', 'kv', 'prefault_voltage'];
+
+      const parsePfValue = raw => {
+        const numeric = parseNumericValue(raw);
+        if (numeric === null) return null;
+        let pf = numeric;
+        if (Math.abs(pf) > 1.5) pf /= 100;
+        if (!Number.isFinite(pf) || pf === 0) return null;
+        const sign = pf >= 0 ? 1 : -1;
+        pf = Math.abs(pf);
+        if (pf < 0.01) pf = 0.01;
+        if (pf > 1) pf = 1;
+        return sign * pf;
+      };
+
+      const getInputValue = (names, parser) => {
+        for (const name of names) {
+          const input = staticInputMap.get(name);
+          if (!input) continue;
+          const parsed = parser(input.value);
+          if (parsed !== null) return parsed;
+        }
+        return null;
+      };
+
+      const updateStaticPowerFields = (source, { commitFormatting = false, allowFallback = false } = {}) => {
+        const wattsInput = staticInputMap.get('watts');
+        const kvaInput = staticInputMap.get('kva');
+        const loadKwInput = staticInputMap.get('load_kw');
+        const loadKvarInput = staticInputMap.get('load_kvar');
+        const pfInput = staticInputMap.get('pf') || staticInputMap.get('power_factor');
+
+        const setFieldValue = (input, value, decimals, { skip = false, preserveOnInvalid = false } = {}) => {
+          if (!input || skip) return;
+          if (Number.isFinite(value)) {
+            input.value = formatNumber(value, decimals);
+          } else if (!preserveOnInvalid || commitFormatting) {
+            input.value = '';
+          }
+        };
+
+        let pfVal = getInputValue(pfFieldNames, parsePfValue);
+        if (pfVal === null && allowFallback) {
+          for (const name of pfFieldNames) {
+            const fallback = parsePfValue(readComponentValue(name));
+            if (fallback !== null) {
+              pfVal = fallback;
+              break;
+            }
+          }
+        }
+
+        let wattsVal = getInputValue(wattsFieldNames, parseNumericValue);
+        if (wattsVal === null && allowFallback) {
+          const fallbackWatts = parseNumericValue(readComponentValue('watts'));
+          if (fallbackWatts !== null) {
+            wattsVal = fallbackWatts;
+          } else {
+            const loadKwFallback = parseNumericValue(getNestedComponentValue(targetComp, ['load', 'kw']));
+            if (loadKwFallback !== null) wattsVal = loadKwFallback * 1000;
+          }
+        }
+
+        let kvaVal = getInputValue(kvaFieldNames, parseNumericValue);
+        if (kvaVal === null && allowFallback) {
+          const fallbackKva = parseNumericValue(readComponentValue('kva'));
+          if (fallbackKva !== null) kvaVal = fallbackKva;
+        }
+
+        const pfMagnitude = Number.isFinite(pfVal) ? Math.min(Math.max(Math.abs(pfVal), 0.01), 1) : null;
+        const kvarSign = Number.isFinite(pfVal) && pfVal < 0 ? -1 : 1;
+
+        let kwVal = Number.isFinite(wattsVal) ? wattsVal / 1000 : null;
+        if (!Number.isFinite(kwVal) && Number.isFinite(kvaVal) && pfMagnitude !== null) {
+          kwVal = kvaVal * pfMagnitude;
+        }
+
+        if (!Number.isFinite(kvaVal) && Number.isFinite(kwVal) && pfMagnitude !== null && pfMagnitude > 0) {
+          kvaVal = kwVal / pfMagnitude;
+        }
+
+        if (!Number.isFinite(wattsVal) && Number.isFinite(kwVal)) {
+          wattsVal = kwVal * 1000;
+        }
+
+        let kvarVal = null;
+        if (Number.isFinite(kvaVal) && Number.isFinite(kwVal)) {
+          const diff = Math.max(kvaVal * kvaVal - kwVal * kwVal, 0);
+          kvarVal = Math.sqrt(diff) * (Number.isFinite(pfVal) ? kvarSign : 1);
+        }
+
+        const skipManual = !commitFormatting;
+
+        setFieldValue(wattsInput, wattsVal, 3, {
+          skip: source === 'watts' && skipManual,
+          preserveOnInvalid: true
+        });
+        setFieldValue(kvaInput, kvaVal, 3, {
+          skip: source === 'kva' && skipManual,
+          preserveOnInvalid: true
+        });
+
+        if (pfInput) {
+          const pfNames = pfFieldNames.filter(name => staticInputMap.has(name));
+          const pfSkip = pfNames.includes(source) && skipManual;
+          if (Number.isFinite(pfVal)) {
+            if (!pfSkip) pfInput.value = formatNumber(pfVal, 3);
+          } else if (!pfSkip && commitFormatting) {
+            pfInput.value = '';
+          }
+        }
+
+        if (loadKwInput) {
+          if (Number.isFinite(kwVal)) loadKwInput.value = formatNumber(kwVal, 3);
+          else loadKwInput.value = '';
+        }
+        if (loadKvarInput) {
+          if (Number.isFinite(kvarVal)) loadKvarInput.value = formatNumber(kvarVal, 3);
+          else loadKvarInput.value = '';
+        }
+      };
+
+      const parseVoltageValue = raw => {
+        const normalized = normalizeVoltageToVolts(raw);
+        if (!Number.isFinite(normalized) || normalized <= 0) return null;
+        return normalized;
+      };
+
+      const updateStaticVoltageFields = (source, { commitFormatting = false, allowFallback = false } = {}) => {
+        const voltsInput = staticInputMap.get('volts');
+        const voltageInput = staticInputMap.get('voltage');
+        const baseInputs = baseFieldNames
+          .map(name => ({ name, input: staticInputMap.get(name) }))
+          .filter(entry => entry.input);
+
+        const getVoltageFromInput = input => {
+          if (!input) return null;
+          return parseVoltageValue(input.value);
+        };
+
+        let voltsVal = null;
+        if (source === 'volts') voltsVal = getVoltageFromInput(voltsInput);
+        if (voltsVal === null && source === 'voltage') voltsVal = getVoltageFromInput(voltageInput);
+        if (voltsVal === null) {
+          voltsVal = getVoltageFromInput(voltsInput) ?? getVoltageFromInput(voltageInput);
+        }
+        if (voltsVal === null) {
+          for (const entry of baseInputs) {
+            const parsed = parseVoltageValue(entry.input.value);
+            if (parsed !== null) {
+              voltsVal = parsed;
+              break;
+            }
+          }
+        }
+        if (voltsVal === null && allowFallback) {
+          const fallbackSources = [...voltageFieldNames, ...baseFieldNames];
+          for (const name of fallbackSources) {
+            const parsed = parseVoltageValue(readComponentValue(name));
+            if (parsed !== null) {
+              voltsVal = parsed;
+              break;
+            }
+          }
+          if (voltsVal === null) {
+            const nested = parseVoltageValue(getNestedComponentValue(targetComp, ['voltage']));
+            if (nested !== null) voltsVal = nested;
+          }
+        }
+
+        const kvVal = Number.isFinite(voltsVal) ? voltsVal / 1000 : null;
+
+        const skipManual = !commitFormatting;
+
+        if (voltsInput) {
+          const skip = source === 'volts' && skipManual;
+          if (Number.isFinite(voltsVal)) {
+            if (!skip) voltsInput.value = formatNumber(voltsVal, 3);
+          } else if (!skip && commitFormatting) {
+            voltsInput.value = '';
+          }
+        }
+
+        if (voltageInput) {
+          const skip = source === 'voltage' && skipManual;
+          if (Number.isFinite(voltsVal)) {
+            if (!skip) voltageInput.value = formatNumber(voltsVal, 3);
+          } else if (!skip && commitFormatting) {
+            voltageInput.value = '';
+          }
+        }
+
+        baseInputs.forEach(({ input }) => {
+          if (!input) return;
+          if (Number.isFinite(kvVal)) {
+            input.value = formatNumber(kvVal, 6);
+          } else if (commitFormatting || !input.value) {
+            input.value = '';
+          }
+        });
+      };
+
+      const attachPowerListener = name => {
+        const input = staticInputMap.get(name);
+        if (!input) return;
+        input.addEventListener('input', () => updateStaticPowerFields(name, { allowFallback: false }));
+        input.addEventListener('change', () => updateStaticPowerFields(name, { commitFormatting: true, allowFallback: false }));
+      };
+
+      const attachVoltageListener = name => {
+        const input = staticInputMap.get(name);
+        if (!input) return;
+        input.addEventListener('input', () => updateStaticVoltageFields(name, { allowFallback: false }));
+        input.addEventListener('change', () => updateStaticVoltageFields(name, { commitFormatting: true, allowFallback: false }));
+      };
+
+      [...wattsFieldNames, ...kvaFieldNames, ...pfFieldNames].forEach(attachPowerListener);
+      voltageFieldNames.forEach(attachVoltageListener);
+
+      updateStaticPowerFields(null, { commitFormatting: true, allowFallback: true });
+      updateStaticVoltageFields(null, { commitFormatting: true, allowFallback: true });
     }
 
     if (isSourceCategoryComponent && sourceInputMap) {

@@ -1249,6 +1249,12 @@ body.oneline-page .palette-scroll {
   border-color: rgba(255, 193, 7, 0.45);
 }
 
+.prop-field-badge-manual {
+  background: rgba(108, 117, 125, 0.15);
+  color: #495057;
+  border-color: rgba(108, 117, 125, 0.4);
+}
+
 .prop-modal form fieldset label input.prop-input-custom {
   background: rgba(255, 193, 7, 0.08);
   border-color: rgba(255, 193, 7, 0.55);

@@ -1907,6 +1907,8 @@
       "defaultRotation": 0,
       "props": {
         "watts": 300000,
+        "kva": 300,
+        "pf": 1,
         "volts": 480,
         "baseKV": 0.48,
         "kV": 0.48,
