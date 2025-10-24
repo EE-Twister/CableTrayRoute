@@ -7297,16 +7297,19 @@ function selectComponent(compOrId) {
             delete input.dataset.userOverride;
             setCustomIndicator(name, false);
             updateTransformerBaseFields();
+            updateTransformerDerivedFields();
             return;
           }
           input.dataset.userOverride = '1';
           setCustomIndicator(name, true);
+          updateTransformerDerivedFields();
         });
         input.addEventListener('change', () => {
           if (!input.value.trim()) {
             delete input.dataset.userOverride;
             setCustomIndicator(name, false);
             updateTransformerBaseFields();
+            updateTransformerDerivedFields();
             return;
           }
           const autoVal = parseNumericValue(input.dataset.autoValue);
@@ -7319,6 +7322,7 @@ function selectComponent(compOrId) {
             input.dataset.userOverride = '1';
             setCustomIndicator(name, true);
           }
+          updateTransformerDerivedFields();
         });
       });
 
