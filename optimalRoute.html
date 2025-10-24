@@ -11,11 +11,28 @@
     <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js" defer></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/PapaParse/5.4.1/papaparse.min.js" defer></script>
     <script src="dirtyTracker.js" defer></script>
-    <script type="module" src="site.js?v={{COMMIT_SHA}}"></script>
-    <script type="module" src="tableUtils.mjs?v={{COMMIT_SHA}}" defer></script>
-    <script type="module" src="e2e-helpers.js?v={{COMMIT_SHA}}"></script>
-    <script type="module" src="app.mjs?v={{COMMIT_SHA}}"></script>
-    <script type="module" src="./optimalRoute.js?v={{COMMIT_SHA}}" defer></script>
+    <script>
+      (function loadVersionedModules() {
+        const rawVersion = '{{COMMIT_SHA}}';
+        const version = typeof rawVersion === 'string' && !rawVersion.includes('{{')
+          ? rawVersion.trim() || Date.now().toString(36)
+          : Date.now().toString(36);
+        const modules = [
+          { src: 'site.js', defer: false },
+          { src: 'tableUtils.mjs', defer: true },
+          { src: 'e2e-helpers.js', defer: false },
+          { src: 'app.mjs', defer: false },
+          { src: './optimalRoute.js', defer: true }
+        ];
+        modules.forEach(entry => {
+          const script = document.createElement('script');
+          script.type = 'module';
+          if (entry.defer) script.defer = true;
+          script.src = `${entry.src}?v=${version}`;
+          document.head.appendChild(script);
+        });
+      })();
+    </script>
 </head>
 <body>
     <a href="#main-content" class="skip-link">Skip to main content</a>

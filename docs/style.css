@@ -5326,6 +5326,39 @@ body.dark-mode .panel-slot-meta span {
     margin-top: 0.75rem;
 }
 
+.shape-modal-form {
+    display: grid;
+    gap: 1rem;
+}
+
+.shape-modal-fieldset {
+    border: none;
+    margin: 0;
+    padding: 0;
+    display: grid;
+    gap: 1rem;
+}
+
+.shape-modal-fieldset legend {
+    font-weight: 600;
+    margin-bottom: 0.25rem;
+}
+
+.shape-field {
+    display: flex;
+    flex-direction: column;
+    gap: 0.35rem;
+}
+
+.shape-field-label {
+    font-weight: 600;
+}
+
+.shape-field-help {
+    font-size: 0.875rem;
+    color: var(--text-muted, #6c757d);
+}
+
 #tcc-chart.annotation-mode {
     cursor: crosshair;
 }

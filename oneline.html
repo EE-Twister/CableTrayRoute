@@ -9,9 +9,26 @@
   <link rel="icon" href="./icons/favicon.svg" type="image/svg+xml">
   <link rel="stylesheet" href="./style.css">
   <script src="https://cdn.jsdelivr.net/npm/handlebars@4.7.8/dist/handlebars.min.js"></script>
-  <script type="module" src="./dataStore.mjs?v={{COMMIT_SHA}}" defer></script>
-  <script type="module" src="./oneline.js?v={{COMMIT_SHA}}" defer></script>
-  <script type="module" src="./dist/scenarios.js?v={{COMMIT_SHA}}" defer></script>
+  <script>
+    (function loadVersionedModules() {
+      const rawVersion = '{{COMMIT_SHA}}';
+      const version = typeof rawVersion === 'string' && !rawVersion.includes('{{')
+        ? rawVersion.trim() || Date.now().toString(36)
+        : Date.now().toString(36);
+      const modules = [
+        './dataStore.mjs',
+        './oneline.js',
+        './dist/scenarios.js'
+      ];
+      modules.forEach(src => {
+        const script = document.createElement('script');
+        script.type = 'module';
+        script.defer = true;
+        script.src = `${src}?v=${version}`;
+        document.head.appendChild(script);
+      });
+    })();
+  </script>
 </head>
 <body class="oneline-page">
   <a href="#main-content" class="skip-link">Skip to main content</a>
