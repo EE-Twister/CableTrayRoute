@@ -172,14 +172,7 @@
   <script>
     window.addEventListener('load', () => {
       if (window.__CableScheduleInitOK !== true) {
-        const banner = document.createElement('div');
-        banner.textContent = 'CableSchedule JS failed to load—check script paths for GitHub Pages.';
-        banner.style.background = 'red';
-        banner.style.color = 'white';
-        banner.style.padding = '1em';
-        banner.style.textAlign = 'center';
-        banner.style.zIndex = '1000';
-        document.body.prepend(banner);
+        console.warn('CableSchedule JS failed to initialize.');
       }
     });
   </script>
