@@ -6786,6 +6786,21 @@ function selectComponent(compOrId) {
       else electricalFields.push(f);
     });
 
+    const moveMotorCalculatedToEnd = fieldArr => {
+      if (!shouldApplyMotorDerivations || !Array.isArray(fieldArr) || !fieldArr.length) return fieldArr;
+      const nonCalculated = [];
+      const calculated = [];
+      fieldArr.forEach(field => {
+        if (motorCalculatedFields.has(field.name)) calculated.push(field);
+        else nonCalculated.push(field);
+      });
+      fieldArr.length = 0;
+      fieldArr.push(...nonCalculated, ...calculated);
+      return fieldArr;
+    };
+
+    [generalFields, electricalFields, physicalFields, motorStartFields].forEach(moveMotorCalculatedToEnd);
+
     const createFieldset = (legendText, fieldArr) => {
       const fs = document.createElement('fieldset');
       if (legendText) {
@@ -6870,8 +6885,8 @@ function selectComponent(compOrId) {
     };
 
     createTabSection('general', 'General', 'General', generalFields);
-    createTabSection('physical', 'Physical', 'Physical', physicalFields);
     createTabSection('electrical', 'Electrical', 'Electrical', electricalFields);
+    createTabSection('physical', 'Physical', 'Physical', physicalFields);
     createTabSection('motor', 'Motor Start', 'Motor Start', motorStartFields);
     createTabSection('manufacturer', 'Manufacturer', 'Manufacturer', manufacturerFields);
     createTabSection('notes', 'Notes', 'Notes', noteFields);
