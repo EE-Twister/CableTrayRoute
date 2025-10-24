@@ -2,68 +2,116 @@ import { getItem, setItem, STORAGE_KEYS } from './dataStore.mjs';
 
 class ContextMenu {
   constructor(items = []) {
-    this.items = items;
+    this.items = [];
+    this.itemElements = [];
+    this.target = null;
+    this.focusReturnEl = null;
     this.menu = document.createElement('ul');
     this.menu.className = 'context-menu';
-    Object.assign(this.menu.style, {
-      position: 'absolute',
-      display: 'none',
-      listStyle: 'none',
-      margin: '0',
-      padding: '4px 0',
-      background: '#fff',
-      border: '1px solid #ccc',
-      zIndex: 1000,
-      color: '#000'
-    });
-    document.body.appendChild(this.menu);
-    document.addEventListener('mousedown', e => {
+    this.menu.setAttribute('role', 'menu');
+    this.menu.tabIndex = -1;
+    this.handleDocumentMouseDown = e => {
       if (e.button !== 0) return;
       if (!this.menu.contains(e.target)) this.hide();
-    });
-    document.addEventListener('keydown', e => { if (e.key === 'Escape') this.hide(); });
+    };
+    this.handleDocumentKeyDown = e => {
+      if (e.key === 'Escape') this.hide();
+    };
+    document.addEventListener('mousedown', this.handleDocumentMouseDown);
+    document.addEventListener('keydown', this.handleDocumentKeyDown);
+    document.body.appendChild(this.menu);
+    this.setItems(items);
   }
 
   setItems(items) {
-    this.items = items;
+    this.items = Array.isArray(items) ? items.slice() : [];
     this.menu.innerHTML = '';
-    items.forEach(({ label, action }) => {
+    this.itemElements = [];
+    this.items.forEach(item => {
+      const { label } = item;
       const li = document.createElement('li');
       li.textContent = label;
-      Object.assign(li.style, {
-        padding: '4px 12px',
-        cursor: 'pointer',
-        background: '#fff',
-        color: '#000'
-      });
-      li.tabIndex = 0;
+      li.setAttribute('role', 'menuitem');
+      li.tabIndex = -1;
       li.addEventListener('click', () => {
+        if (li.getAttribute('aria-disabled') === 'true') return;
         const target = this.target;
         this.hide();
-        action(target);
+        item.action(target);
       });
-      li.addEventListener('mouseenter', () => {
-        li.style.background = '#eee';
-        li.style.color = '#000';
-      });
-      li.addEventListener('mouseleave', () => {
-        li.style.background = '#fff';
-        li.style.color = '#000';
+      li.addEventListener('keydown', e => {
+        if (e.key === 'Enter' || e.key === ' ') {
+          e.preventDefault();
+          li.click();
+        } else if (e.key === 'ArrowDown' || e.key === 'ArrowUp') {
+          e.preventDefault();
+          const dir = e.key === 'ArrowDown' ? 1 : -1;
+          const total = this.itemElements.length;
+          if (!total) return;
+          let idx = this.itemElements.findIndex(entry => entry.element === li);
+          let next = idx;
+          do {
+            next = (next + dir + total) % total;
+          } while (
+            next !== idx &&
+            this.itemElements[next].element.getAttribute('aria-disabled') === 'true'
+          );
+          const nextEl = this.itemElements[next]?.element;
+          if (
+            nextEl &&
+            nextEl.getAttribute('aria-disabled') !== 'true'
+          ) {
+            nextEl.focus();
+          }
+        }
       });
       this.menu.appendChild(li);
+      this.itemElements.push({ element: li, item });
+    });
+  }
+
+  updateItemStates(target) {
+    this.itemElements.forEach(({ element, item }) => {
+      const disabled = typeof item.isDisabled === 'function' ? item.isDisabled(target) : false;
+      element.setAttribute('aria-disabled', disabled ? 'true' : 'false');
+      element.classList.toggle('is-disabled', disabled);
     });
   }
 
   show(x, y, target) {
     this.target = target;
+    this.focusReturnEl = document.activeElement instanceof HTMLElement ? document.activeElement : null;
+    this.updateItemStates(target);
+    this.menu.style.display = 'block';
     this.menu.style.left = `${x}px`;
     this.menu.style.top = `${y}px`;
-    this.menu.style.display = 'block';
+    requestAnimationFrame(() => {
+      const rect = this.menu.getBoundingClientRect();
+      const pageLeft = window.pageXOffset;
+      const pageTop = window.pageYOffset;
+      const maxLeft = pageLeft + window.innerWidth - rect.width - 8;
+      const maxTop = pageTop + window.innerHeight - rect.height - 8;
+      let left = x;
+      let top = y;
+      if (left > maxLeft) left = Math.max(pageLeft + 8, maxLeft);
+      if (top > maxTop) top = Math.max(pageTop + 8, maxTop);
+      if (left < pageLeft + 8) left = pageLeft + 8;
+      if (top < pageTop + 8) top = pageTop + 8;
+      this.menu.style.left = `${left}px`;
+      this.menu.style.top = `${top}px`;
+      const firstEnabled = this.itemElements.find(entry => entry.element.getAttribute('aria-disabled') !== 'true');
+      if (firstEnabled) firstEnabled.element.focus();
+    });
   }
 
   hide() {
+    if (this.menu.style.display === 'none') return;
     this.menu.style.display = 'none';
     this.target = null;
+    if (this.focusReturnEl && typeof this.focusReturnEl.focus === 'function') {
+      this.focusReturnEl.focus();
+    }
+    this.focusReturnEl = null;
   }
 }
 
@@ -989,7 +1037,16 @@ class TableManager {
       { label: 'Insert Row Below', action: tr => { if (!tr) return; const newRow = this.addRow(); this.tbody.insertBefore(newRow, tr.nextSibling); if (this.onChange) this.onChange(); } },
       { label: 'Duplicate Row', action: tr => { if (!tr) return; const data = this.getRowData(tr); const newRow = this.addRow(data); this.tbody.insertBefore(newRow, tr.nextSibling); if (this.onChange) this.onChange(); } },
       { label: 'Copy Row', action: tr => { if (!tr) return; clipboard = this.getRowData(tr); } },
-      { label: 'Paste Row', action: tr => { if (!tr || !clipboard) return; const newRow = this.addRow(clipboard); this.tbody.insertBefore(newRow, tr.nextSibling); if (this.onChange) this.onChange(); } },
+      {
+        label: 'Paste Row',
+        action: tr => {
+          if (!tr || !clipboard) return;
+          const newRow = this.addRow(clipboard);
+          this.tbody.insertBefore(newRow, tr.nextSibling);
+          if (this.onChange) this.onChange();
+        },
+        isDisabled: () => !clipboard
+      },
       { label: 'Delete Row', action: tr => { if (!tr) return; tr.remove(); this.save(); this.updateRowCount(); if (this.onChange) this.onChange(); } }
     );
     menu.setItems(items);
@@ -1002,6 +1059,17 @@ class TableManager {
       } else if (e.target.closest(`#${this.table.id}`)) {
         e.preventDefault();
       }
+    });
+
+    this.table.addEventListener('keydown', e => {
+      if (!((e.shiftKey && e.key === 'F10') || e.key === 'ContextMenu')) return;
+      const row = e.target.closest('tbody tr');
+      if (!row) return;
+      e.preventDefault();
+      const rect = e.target.getBoundingClientRect();
+      const x = rect.left + rect.width / 2 + window.pageXOffset;
+      const y = rect.bottom + window.pageYOffset;
+      menu.show(x, y, row);
     });
 
     document.addEventListener('keydown', e => {

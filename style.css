@@ -4655,6 +4655,17 @@ body.dark-mode .workflow-card-title {
     white-space: nowrap;
 }
 
+.context-menu li.is-disabled {
+    color: var(--text-muted, #6c757d);
+    cursor: not-allowed;
+    pointer-events: none;
+}
+
+.context-menu li.is-disabled:hover {
+    background: var(--secondary-color);
+    color: var(--text-muted, #6c757d);
+}
+
 .context-menu li:hover {
     background: var(--primary-color);
     color: #fff;

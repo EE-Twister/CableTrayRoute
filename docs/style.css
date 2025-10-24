@@ -2399,6 +2399,52 @@ body.modal-open {
     }
 }
 
+.library-list {
+    list-style: none;
+    margin: var(--spacing-base) 0 0;
+    padding: 0;
+    display: flex;
+    flex-direction: column;
+    gap: calc(var(--spacing-base) / 2);
+}
+
+.library-item {
+    display: flex;
+    flex-wrap: wrap;
+    justify-content: space-between;
+    align-items: center;
+    gap: var(--spacing-base);
+    padding: calc(var(--spacing-base) / 2) 0;
+    border-bottom: 1px solid var(--border-color, #d1d5db);
+}
+
+.library-item:last-child {
+    border-bottom: none;
+}
+
+.library-item-info {
+    display: flex;
+    flex-direction: column;
+    gap: calc(var(--spacing-base) / 4);
+    min-width: 200px;
+}
+
+.library-item-name {
+    font-weight: 600;
+}
+
+.library-item-detail {
+    font-size: 0.875rem;
+    color: var(--muted-text, #6b7280);
+}
+
+.library-item-actions {
+    display: flex;
+    flex-wrap: wrap;
+    gap: calc(var(--spacing-base) / 2);
+    justify-content: flex-end;
+}
+
 .view-modal-body {
     gap: calc(var(--spacing-base) * 2);
 }
@@ -4609,6 +4655,17 @@ body.dark-mode .workflow-card-title {
     white-space: nowrap;
 }
 
+.context-menu li.is-disabled {
+    color: var(--text-muted, #6c757d);
+    cursor: not-allowed;
+    pointer-events: none;
+}
+
+.context-menu li.is-disabled:hover {
+    background: var(--secondary-color);
+    color: var(--text-muted, #6c757d);
+}
+
 .context-menu li:hover {
     background: var(--primary-color);
     color: #fff;
@@ -5174,4 +5231,88 @@ body.dark-mode .panel-slot-meta span {
 #panel-totals {
     margin-top: 1rem;
     font-weight: 600;
+}
+
+.tcc-print-controls {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.75rem;
+    align-items: flex-end;
+    margin-top: 0.75rem;
+}
+
+.tcc-print-controls label {
+    display: flex;
+    flex-direction: column;
+    font-size: 0.85rem;
+    color: #333;
+    gap: 0.25rem;
+}
+
+.tcc-print-controls input {
+    padding: 0.4rem 0.5rem;
+    border: 1px solid #bcbcbc;
+    border-radius: 4px;
+    min-width: 14rem;
+}
+
+.tcc-print-controls button {
+    align-self: flex-start;
+    padding: 0.5rem 1rem;
+}
+
+.print-settings-form {
+    display: flex;
+    flex-direction: column;
+    gap: 0.75rem;
+    min-width: 20rem;
+}
+
+.print-settings-form label {
+    display: flex;
+    flex-direction: column;
+    gap: 0.35rem;
+    font-size: 0.95rem;
+    color: #333;
+}
+
+.print-settings-form input {
+    padding: 0.5rem 0.6rem;
+    border: 1px solid #bcbcbc;
+    border-radius: 4px;
+}
+
+#add-annotation-btn {
+    margin-top: 0.75rem;
+}
+
+#tcc-chart.annotation-mode {
+    cursor: crosshair;
+}
+
+.annotation-layer .annotation-connector {
+    pointer-events: none;
+}
+
+.annotation-layer .annotation-label {
+    cursor: move;
+}
+
+.annotation-layer .annotation-anchor {
+    fill: #fff;
+    stroke: #444;
+    stroke-width: 1.5;
+}
+
+.annotation-layer .annotation-label-bg {
+    fill: #fff;
+    stroke: #444;
+    stroke-width: 1;
+    filter: drop-shadow(0 1px 1px rgba(0, 0, 0, 0.2));
+}
+
+.annotation-layer .annotation-text {
+    font-size: 12px;
+    fill: #111;
+    pointer-events: none;
 }
