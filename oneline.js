@@ -7188,7 +7188,23 @@ function selectComponent(compOrId) {
         return null;
       };
 
-      const resolveAutoBaseKV = () => {
+      const getKvFromOverrideInputs = names => {
+        for (const name of names) {
+          const entry = sourceCustomBadges?.get(name);
+          const input = entry?.input ?? sourceInputMap.get(name);
+          if (!input) continue;
+          if (input.dataset.userOverride !== '1') continue;
+          const kv = parseKvValue(input.value);
+          if (kv !== null) return kv;
+        }
+        return null;
+      };
+
+      const resolveAutoBaseKV = ({ includeOverrides = false } = {}) => {
+        if (includeOverrides) {
+          const fromOverrides = getKvFromOverrideInputs(baseFieldNames);
+          if (Number.isFinite(fromOverrides) && fromOverrides > 0) return fromOverrides;
+        }
         const driverInputs = [
           'source_voltage_base',
           'voltage',
@@ -7202,6 +7218,10 @@ function selectComponent(compOrId) {
         if (Number.isFinite(fromInputs) && fromInputs > 0) return fromInputs;
         const fromComponentDrivers = getKvFromComponent(driverInputs);
         if (Number.isFinite(fromComponentDrivers) && fromComponentDrivers > 0) return fromComponentDrivers;
+        if (includeOverrides) {
+          const fromBaseInputs = getKvFromInputs(baseFieldNames);
+          if (Number.isFinite(fromBaseInputs) && fromBaseInputs > 0) return fromBaseInputs;
+        }
         const fromBase = getKvFromComponent(baseFieldNames);
         if (Number.isFinite(fromBase) && fromBase > 0) return fromBase;
         return null;
@@ -7274,7 +7294,7 @@ function selectComponent(compOrId) {
         const sc = getShortCircuitCapacity();
         if (sc) {
           if (sc.unit === 'ka') {
-            const baseKv = resolveAutoBaseKV();
+            const baseKv = resolveAutoBaseKV({ includeOverrides: true });
             if (Number.isFinite(baseKv) && baseKv > 0) {
               theveninMva = Math.sqrt(3) * baseKv * sc.value;
             }
