@@ -654,12 +654,21 @@ const defaultShapeProps = {
   shapeType: 'rectangle',
   strokeColor: '#333333',
   fillColor: '#ffffff',
+  fillOpacity: 1,
   strokeWidth: 2,
   strokeStyle: 'solid',
   cornerRadius: 12
 };
 
-const shapePropKeys = ['shapeType', 'strokeColor', 'fillColor', 'strokeWidth', 'strokeStyle', 'cornerRadius'];
+const shapePropKeys = [
+  'shapeType',
+  'strokeColor',
+  'fillColor',
+  'fillOpacity',
+  'strokeWidth',
+  'strokeStyle',
+  'cornerRadius'
+];
 
 const shapeDashPatterns = {
   solid: '',
@@ -721,6 +730,13 @@ function ensureShapeDefaults(comp) {
   comp.strokeColor = strokeColor || defaults.strokeColor || '#333333';
   const fillColor = typeof comp.fillColor === 'string' ? comp.fillColor.trim() : '';
   comp.fillColor = fillColor || defaults.fillColor || '#ffffff';
+  let fillOpacity = Number(comp.fillOpacity);
+  if (!Number.isFinite(fillOpacity)) {
+    const defaultOpacity = Number(defaults.fillOpacity);
+    fillOpacity = Number.isFinite(defaultOpacity) ? defaultOpacity : 1;
+  }
+  fillOpacity = Math.max(0, Math.min(1, fillOpacity));
+  comp.fillOpacity = fillOpacity;
   shapePropKeys.forEach(key => {
     comp.props[key] = comp[key];
   });
@@ -3599,6 +3615,7 @@ function openShapeModal() {
   let strokeWidthInput;
   let strokeColorInput;
   let fillColorInput;
+  let fillOpacityInput;
   let cornerRadiusInput;
 
   const createLabeledField = (labelText, input, helpText) => {
@@ -3693,6 +3710,15 @@ function openShapeModal() {
         ? defaults.fillColor
         : '#ffffff';
 
+      fillOpacityInput = document.createElement('input');
+      fillOpacityInput.type = 'number';
+      fillOpacityInput.name = 'fillOpacity';
+      fillOpacityInput.min = '0';
+      fillOpacityInput.max = '1';
+      fillOpacityInput.step = '0.05';
+      const defaultOpacity = Number(defaults.fillOpacity);
+      fillOpacityInput.value = Number.isFinite(defaultOpacity) ? defaultOpacity : 1;
+
       cornerRadiusInput = document.createElement('input');
       cornerRadiusInput.type = 'number';
       cornerRadiusInput.name = 'cornerRadius';
@@ -3707,6 +3733,7 @@ function openShapeModal() {
       fieldset.appendChild(createLabeledField('Line Weight', strokeWidthInput));
       fieldset.appendChild(createLabeledField('Line Color', strokeColorInput));
       fieldset.appendChild(createLabeledField('Fill Color', fillColorInput));
+      fieldset.appendChild(createLabeledField('Fill Opacity', fillOpacityInput, '0 is transparent, 1 is opaque.'));
       fieldset.appendChild(createLabeledField('Corner Radius', cornerRadiusInput, 'Applies to rounded rectangles.'));
 
       form.appendChild(fieldset);
@@ -3746,11 +3773,17 @@ function openShapeModal() {
       const strokeStyle = String(data.get('strokeStyle') || defaults.strokeStyle || 'solid').toLowerCase();
       const strokeColor = data.get('strokeColor') || defaults.strokeColor || '#333333';
       const fillColor = data.get('fillColor') || defaults.fillColor || '#ffffff';
+      let fillOpacity = Number.parseFloat(data.get('fillOpacity'));
       let cornerRadius = Number.parseFloat(data.get('cornerRadius'));
 
       if (!Number.isFinite(width) || width <= 0) width = Number(defaults.width) || 160;
       if (!Number.isFinite(height) || height <= 0) height = Number(defaults.height) || 100;
       if (!Number.isFinite(strokeWidth) || strokeWidth <= 0) strokeWidth = Number(defaults.strokeWidth) || 1;
+      if (!Number.isFinite(fillOpacity)) {
+        const fallback = Number(defaults.fillOpacity);
+        fillOpacity = Number.isFinite(fallback) ? fallback : 1;
+      }
+      fillOpacity = Math.max(0, Math.min(1, fillOpacity));
       if (!Number.isFinite(cornerRadius) || cornerRadius < 0) cornerRadius = Number(defaults.cornerRadius) || 0;
       if (shapeType === 'circle') {
         height = width;
@@ -3771,6 +3804,7 @@ function openShapeModal() {
       comp.strokeWidth = strokeWidth;
       comp.strokeColor = typeof strokeColor === 'string' ? strokeColor : defaults.strokeColor;
       comp.fillColor = typeof fillColor === 'string' ? fillColor : defaults.fillColor;
+      comp.fillOpacity = fillOpacity;
       comp.cornerRadius = cornerRadius;
       ensureShapeDefaults(comp);
 
@@ -5345,6 +5379,9 @@ function render() {
         const fillColor = c.fillColor && c.fillColor !== 'none' && c.fillColor !== 'transparent'
           ? c.fillColor
           : 'none';
+        const fillOpacity = Number.isFinite(Number(c.fillOpacity))
+          ? Math.max(0, Math.min(1, Number(c.fillOpacity)))
+          : 1;
         const strokeWidth = Number(c.strokeWidth) || 1;
         const dash = shapeDashPatterns[strokeStyle] || '';
         let shape;
@@ -5369,6 +5406,7 @@ function render() {
           shape = rect;
         }
         shape.setAttribute('fill', fillColor);
+        shape.setAttribute('fill-opacity', fillColor === 'none' ? 0 : fillOpacity);
         shape.setAttribute('stroke', strokeColor);
         shape.setAttribute('stroke-width', strokeWidth);
         if (dash) shape.setAttribute('stroke-dasharray', dash);
@@ -6464,6 +6502,22 @@ function selectComponent(compOrId) {
             }
           },
           {
+            name: 'fillOpacity',
+            label: 'Fill Opacity',
+            type: 'number',
+            help: '0 = transparent, 1 = opaque.',
+            min: 0,
+            max: 1,
+            step: 0.05,
+            getValue: comp => {
+              const value = comp.fillOpacity ?? comp.props?.fillOpacity ?? defaultShapeProps.fillOpacity;
+              const numeric = Number(value);
+              if (Number.isFinite(numeric)) return numeric;
+              const fallback = Number(defaultShapeProps.fillOpacity);
+              return Number.isFinite(fallback) ? fallback : 1;
+            }
+          },
+          {
             name: 'cornerRadius',
             label: 'Corner Radius',
             type: 'number',
@@ -6561,7 +6615,11 @@ function selectComponent(compOrId) {
       } else {
         input = document.createElement('input');
         input.type = f.type || 'text';
-        if (f.type === 'number') input.step = 'any';
+        if (f.type === 'number') {
+          input.step = f.step !== undefined ? String(f.step) : 'any';
+          if (f.min !== undefined) input.min = String(f.min);
+          if (f.max !== undefined) input.max = String(f.max);
+        }
         input.value = curVal ?? '';
       }
       input.name = f.name;
