@@ -166,6 +166,13 @@ const physicalFieldKeywordList = [
   'housing'
 ];
 
+const impedanceFieldNameSet = new Set([
+  'impedance_r',
+  'impedance_x',
+  'cable_impedance_r',
+  'cable_impedance_x'
+]);
+
 function isPhysicalPropertyField(field) {
   if (!field || typeof field !== 'object') return false;
   const rawName = typeof field.name === 'string' ? field.name.toLowerCase() : '';
@@ -468,6 +475,16 @@ function categoryForType(t) {
     default:
       return 'equipment';
   }
+}
+
+function isProtectionComponent(comp) {
+  if (!comp || typeof comp !== 'object') return false;
+  const subtypeMeta = componentMeta[comp.subtype];
+  if (subtypeMeta?.category === 'protection') return true;
+  if (subtypeMeta?.type && categoryForType(subtypeMeta.type) === 'protection') return true;
+  if (comp.category === 'protection') return true;
+  if (categoryForType(comp.type) === 'protection') return true;
+  return false;
 }
 
 function readNestedValue(holder, path = []) {
@@ -6206,7 +6223,9 @@ function selectComponent(compOrId) {
       );
     }
 
-    if (targetComp.type !== 'cable') {
+    const shouldShowTccField = targetComp.type !== 'cable' && isProtectionComponent(targetComp);
+
+    if (shouldShowTccField) {
       const tccOptions = [
         { value: '', label: '--Select Device--' },
         ...protectiveDevices.map(dev => ({ value: dev.id, label: dev.name }))
@@ -6223,6 +6242,8 @@ function selectComponent(compOrId) {
       });
     }
 
+    const hasTccField = fields.some(f => f.name === 'tccId');
+
     const applyChanges = () => {
       if (hasApplied) return;
       hasApplied = true;
@@ -6230,7 +6251,7 @@ function selectComponent(compOrId) {
       fields.forEach(f => {
         applyFieldFromForm(targetComp, f, fd);
       });
-      if (targetComp.type !== 'cable') {
+      if (hasTccField) {
         targetComp.tccId = fd.get('tccId') || '';
       }
       pushHistory();
@@ -6251,6 +6272,8 @@ function selectComponent(compOrId) {
     fields.forEach(f => {
       if (targetComp.subtype === 'motor_load' && motorStartFieldNames.includes(f.name)) {
         motorStartFields.push(f);
+      } else if (impedanceFieldNameSet.has(f.name)) {
+        electricalFields.push(f);
       } else if (isPhysicalPropertyField(f)) {
         physicalFields.push(f);
       } else if (['manufacturer', 'model'].includes(f.name)) manufacturerFields.push(f);
@@ -6526,7 +6549,9 @@ function selectComponent(compOrId) {
       fields.forEach(f => {
         applyFieldFromForm(data, f, fd);
       });
-      data.tccId = fd.get('tccId') || '';
+      if (hasTccField) {
+        data.tccId = fd.get('tccId') || '';
+      }
       templates.push({ name, component: data });
       saveTemplates();
       renderTemplates();
