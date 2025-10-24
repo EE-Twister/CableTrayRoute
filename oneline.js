@@ -5692,6 +5692,11 @@ function selectComponent(compOrId) {
   const categoryButtonMap = new Map();
   const buttonMap = new Map();
   let activeId = activeComponent?.id || null;
+  const applyPendingChanges = () => {
+    if (typeof modal._applyChanges === 'function') {
+      modal._applyChanges();
+    }
+  };
 
   function renderCategoryButtons() {
     categoryListEl.innerHTML = '';
@@ -5712,6 +5717,7 @@ function selectComponent(compOrId) {
         if (nextDevice) {
           setActiveComponent(nextDevice);
         } else {
+          applyPendingChanges();
           selected = null;
           selection = [];
           selectedConnection = null;
@@ -5753,6 +5759,7 @@ function selectComponent(compOrId) {
       button.setAttribute('aria-pressed', 'false');
       button.addEventListener('click', () => {
         if (activeId === device.id) return;
+        applyPendingChanges();
         activeComponent = device;
         activeId = device.id;
         if (device?.isVirtualNode) {
@@ -6688,6 +6695,7 @@ function selectComponent(compOrId) {
 
   function setActiveComponent(target) {
     if (!target) return;
+    applyPendingChanges();
     const targetCategory = getCategory(target) || activeCategory;
     if (targetCategory && targetCategory !== activeCategory) {
       activeCategory = targetCategory;
