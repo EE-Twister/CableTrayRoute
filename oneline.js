@@ -81,6 +81,15 @@ import { exportPDF } from './exporters/pdf.js';
 import { exportDXF, exportDWG } from './exporters/dxf.js';
 import { openModal } from './src/components/modal.js';
 import { normalizeVoltageToVolts, toBaseKV } from './utils/voltage.js';
+import { calculateTransformerImpedance } from './utils/transformerImpedance.js';
+import {
+  resolveTransformerKva,
+  resolveTransformerPercentZ,
+  resolveTransformerXrRatio,
+  deriveTransformerBaseKV,
+  computeTransformerBaseKV,
+  syncTransformerDefaults
+} from './utils/transformerProperties.js';
 import './site.js';
 
 let componentMeta = {};
@@ -5866,6 +5875,9 @@ function addComponent(cfg) {
   }
   applyDefaults(comp);
   ensureShapeDefaults(comp);
+  if (comp.type === 'transformer') {
+    syncTransformerDefaults(comp, { forceBase: true });
+  }
   components.push(comp);
   if (!skipHistory) pushHistory();
   if (gridEnabled) flashSnapIndicator(x, y);
@@ -6256,7 +6268,10 @@ function selectComponent(compOrId) {
     propertyHeading.textContent = `${getComponentListLabel(targetComp)} Properties`;
 
     const isMotorComponent = targetComp.subtype === 'motor_load';
+    const isTransformerComponent = targetComp.type === 'transformer';
     const motorInputMap = new Map();
+    const transformerInputMap = isTransformerComponent ? new Map() : null;
+    const transformerCustomBadges = isTransformerComponent ? new Map() : null;
     const motorCalculatedFields = new Set([
       'load_kw',
       'load_kvar',
@@ -6265,6 +6280,42 @@ function selectComponent(compOrId) {
       'thevenin_r',
       'thevenin_x'
     ]);
+    const transformerCalculatedFields = new Set(['impedance_r', 'impedance_x']);
+    const transformerAutoFieldNames = new Set(['baseKV', 'kV', 'kv', 'prefault_voltage']);
+
+    const parseNumericValue = raw => {
+      if (raw === null || raw === undefined) return null;
+      if (typeof raw === 'number') return Number.isFinite(raw) ? raw : null;
+      const text = String(raw).trim();
+      if (!text) return null;
+      const match = text.match(/[-+]?\d*\.?\d+(?:[eE][-+]?\d+)?/);
+      if (!match) return null;
+      const num = Number.parseFloat(match[0]);
+      return Number.isFinite(num) ? num : null;
+    };
+
+    const readComponentValue = name => {
+      if (!name) return null;
+      if (targetComp && Object.prototype.hasOwnProperty.call(targetComp, name)) {
+        const direct = targetComp[name];
+        if (direct !== undefined && direct !== null && direct !== '') return direct;
+      }
+      if (targetComp?.props && Object.prototype.hasOwnProperty.call(targetComp.props, name)) {
+        const propVal = targetComp.props[name];
+        if (propVal !== undefined && propVal !== null && propVal !== '') return propVal;
+      }
+      return null;
+    };
+
+    const formatNumber = (val, decimals = 3) => {
+      if (!Number.isFinite(val)) return '';
+      const factor = 10 ** decimals;
+      const rounded = Math.round(val * factor) / factor;
+      let text = rounded.toFixed(decimals);
+      text = text.replace(/\.0+$/, '');
+      text = text.replace(/(\.[0-9]*[1-9])0+$/, '$1');
+      return text;
+    };
 
     let rawSchema = propSchemas[targetComp.subtype] || [];
     if (!rawSchema.length) {
@@ -6653,16 +6704,29 @@ function selectComponent(compOrId) {
       if (f.name === 'tccId') tccInput = input;
       if (shouldApplyMotorDerivations) {
         motorInputMap.set(f.name, input);
-        if (motorCalculatedFields.has(f.name)) {
-          lbl.classList.add('prop-field-calculated');
-          input.classList.add('prop-input-calculated');
-          input.readOnly = true;
-          input.setAttribute('aria-readonly', 'true');
-          const badge = document.createElement('span');
-          badge.className = 'prop-field-badge prop-field-badge-calculated';
-          badge.textContent = 'Calculated';
-          labelHeader.appendChild(badge);
-        }
+      }
+      if (isTransformerComponent && transformerInputMap) {
+        transformerInputMap.set(f.name, input);
+      }
+      const isMotorCalculatedField = shouldApplyMotorDerivations && motorCalculatedFields.has(f.name);
+      const isTransformerCalculatedField = isTransformerComponent && transformerCalculatedFields.has(f.name);
+      if (isMotorCalculatedField || isTransformerCalculatedField) {
+        lbl.classList.add('prop-field-calculated');
+        input.classList.add('prop-input-calculated');
+        input.readOnly = true;
+        input.setAttribute('aria-readonly', 'true');
+        const badge = document.createElement('span');
+        badge.className = 'prop-field-badge prop-field-badge-calculated';
+        badge.textContent = 'Calculated';
+        labelHeader.appendChild(badge);
+      }
+      if (isTransformerComponent && transformerAutoFieldNames.has(f.name) && transformerCustomBadges) {
+        const customBadge = document.createElement('span');
+        customBadge.className = 'prop-field-badge prop-field-badge-custom';
+        customBadge.textContent = 'Custom';
+        customBadge.hidden = true;
+        labelHeader.appendChild(customBadge);
+        transformerCustomBadges.set(f.name, { badge: customBadge, input });
       }
       if (f.help) {
         const helpBtn = document.createElement('button');
@@ -6969,16 +7033,6 @@ function selectComponent(compOrId) {
         return val;
       };
 
-      const formatNumber = (val, decimals = 3) => {
-        if (!Number.isFinite(val)) return '';
-        const factor = 10 ** decimals;
-        const rounded = Math.round(val * factor) / factor;
-        let text = rounded.toFixed(decimals);
-        text = text.replace(/\.0+$/, '');
-        text = text.replace(/(\.[0-9]*[1-9])0+$/, '$1');
-        return text;
-      };
-
       const updateMotorDerivedFields = () => {
         const hpVal = getNumeric(['hp', 'horsepower', 'rating']);
         let effVal = getNumeric(['efficiency', 'eff'], { percent: true });
@@ -7072,6 +7126,204 @@ function selectComponent(compOrId) {
       });
 
       updateMotorDerivedFields();
+    }
+
+    if (isTransformerComponent && transformerInputMap) {
+      const impedanceDriverFields = [
+        'kva',
+        'kva_lv',
+        'kva_secondary',
+        'kva_primary',
+        'kva_hv',
+        'kva_tv',
+        'kva_tertiary',
+        'percent_z',
+        'z_percent',
+        'percent_primary',
+        'percent_secondary',
+        'percent_tertiary',
+        'z_hv_lv_percent',
+        'z_hv_tv_percent',
+        'z_lv_tv_percent',
+        'xr_ratio',
+        'xr'
+      ];
+      const voltageFieldPriority = [
+        'volts_secondary',
+        'volts_lv',
+        'volts_tv',
+        'volts_tertiary',
+        'volts_primary',
+        'volts_hv',
+        'voltage_secondary',
+        'voltage_primary',
+        'voltage'
+      ];
+      const baseFieldNames = ['baseKV', 'kV', 'kv', 'prefault_voltage'];
+
+      const setCustomIndicator = (name, active) => {
+        if (!transformerCustomBadges) return;
+        const entry = transformerCustomBadges.get(name);
+        if (!entry) return;
+        const { badge, input } = entry;
+        if (active) {
+          badge.hidden = false;
+          input.classList.add('prop-input-custom');
+        } else {
+          badge.hidden = true;
+          input.classList.remove('prop-input-custom');
+        }
+      };
+
+      const parseVoltageToKV = raw => {
+        const volts = normalizeVoltageToVolts(raw);
+        if (!Number.isFinite(volts) || volts <= 0) return null;
+        return volts / 1000;
+      };
+
+      const getNumericFromInputs = (names, { voltage = false } = {}) => {
+        for (const name of names) {
+          const input = transformerInputMap.get(name);
+          if (!input) continue;
+          const raw = input.value;
+          const value = voltage ? parseVoltageToKV(raw) : parseNumericValue(raw);
+          if (value !== null) return value;
+        }
+        return null;
+      };
+
+      const resolveAutoBaseKV = () => {
+        const fromInputs = getNumericFromInputs(voltageFieldPriority, { voltage: true });
+        if (Number.isFinite(fromInputs) && fromInputs > 0) return fromInputs;
+        const derived = deriveTransformerBaseKV(targetComp);
+        if (Number.isFinite(derived) && derived > 0) return derived;
+        const fallback = computeTransformerBaseKV(targetComp);
+        if (Number.isFinite(fallback) && fallback > 0) return fallback;
+        return null;
+      };
+
+      const updateTransformerDerivedFields = () => {
+        const kvaVal = getNumericFromInputs(impedanceDriverFields) ?? resolveTransformerKva(targetComp);
+        const percentVal = getNumericFromInputs([
+          'percent_z',
+          'z_percent',
+          'percent_primary',
+          'percent_secondary',
+          'percent_tertiary',
+          'z_hv_lv_percent',
+          'z_hv_tv_percent',
+          'z_lv_tv_percent'
+        ]) ?? resolveTransformerPercentZ(targetComp);
+        let baseKv = getNumericFromInputs(voltageFieldPriority, { voltage: true });
+        if (baseKv === null) {
+          const fromBaseInputs = getNumericFromInputs(baseFieldNames);
+          if (Number.isFinite(fromBaseInputs) && fromBaseInputs > 0) baseKv = fromBaseInputs;
+        }
+        if (baseKv === null) baseKv = computeTransformerBaseKV(targetComp);
+        const xrVal = getNumericFromInputs(['xr_ratio', 'xr']) ?? resolveTransformerXrRatio(targetComp);
+        const impRInput = transformerInputMap.get('impedance_r');
+        const impXInput = transformerInputMap.get('impedance_x');
+        if (
+          Number.isFinite(kvaVal)
+          && Number.isFinite(percentVal)
+          && Number.isFinite(baseKv)
+          && kvaVal !== 0
+          && percentVal !== 0
+          && baseKv !== 0
+        ) {
+          const impedance = calculateTransformerImpedance({ kva: kvaVal, percentZ: percentVal, voltageKV: baseKv, xrRatio: xrVal });
+          if (impedance && Number.isFinite(impedance.r) && Number.isFinite(impedance.x)) {
+            if (impRInput) impRInput.value = formatNumber(impedance.r, 6);
+            if (impXInput) impXInput.value = formatNumber(impedance.x, 6);
+            return;
+          }
+        }
+        if (impRInput) impRInput.value = '';
+        if (impXInput) impXInput.value = '';
+      };
+
+      const updateTransformerBaseFields = () => {
+        const autoKv = resolveAutoBaseKV();
+        const tolerance = 1e-6;
+        baseFieldNames.forEach(name => {
+          const input = transformerInputMap.get(name);
+          if (!input) return;
+          if (!Number.isFinite(autoKv) || autoKv <= 0) {
+            delete input.dataset.autoValue;
+            const isCustom = input.dataset.userOverride === '1';
+            setCustomIndicator(name, isCustom);
+            return;
+          }
+          const formatted = formatNumber(autoKv, 6);
+          input.dataset.autoValue = formatted;
+          const currentVal = parseNumericValue(input.value);
+          const hasValue = typeof input.value === 'string' && input.value.trim() !== '';
+          let isOverride = input.dataset.userOverride === '1';
+          if (!hasValue) {
+            isOverride = false;
+          } else if (Number.isFinite(currentVal) && Math.abs(currentVal - autoKv) <= tolerance) {
+            isOverride = false;
+          } else if (!isOverride) {
+            isOverride = true;
+          }
+          if (!isOverride) {
+            input.value = formatted;
+            delete input.dataset.userOverride;
+          } else {
+            input.dataset.userOverride = '1';
+          }
+          setCustomIndicator(name, isOverride);
+        });
+      };
+
+      const attachDerivedListener = name => {
+        const input = transformerInputMap.get(name);
+        if (!input) return;
+        const handler = () => {
+          updateTransformerDerivedFields();
+          if (voltageFieldPriority.includes(name)) updateTransformerBaseFields();
+        };
+        input.addEventListener('input', handler);
+        input.addEventListener('change', handler);
+      };
+
+      impedanceDriverFields.concat(voltageFieldPriority).forEach(attachDerivedListener);
+
+      baseFieldNames.forEach(name => {
+        const input = transformerInputMap.get(name);
+        if (!input) return;
+        input.addEventListener('input', () => {
+          if (!input.value.trim()) {
+            delete input.dataset.userOverride;
+            setCustomIndicator(name, false);
+            updateTransformerBaseFields();
+            return;
+          }
+          input.dataset.userOverride = '1';
+          setCustomIndicator(name, true);
+        });
+        input.addEventListener('change', () => {
+          if (!input.value.trim()) {
+            delete input.dataset.userOverride;
+            setCustomIndicator(name, false);
+            updateTransformerBaseFields();
+            return;
+          }
+          const autoVal = parseNumericValue(input.dataset.autoValue);
+          const currentVal = parseNumericValue(input.value);
+          if (Number.isFinite(autoVal) && Number.isFinite(currentVal) && Math.abs(currentVal - autoVal) <= 1e-6) {
+            delete input.dataset.userOverride;
+            setCustomIndicator(name, false);
+            updateTransformerBaseFields();
+          } else {
+            input.dataset.userOverride = '1';
+            setCustomIndicator(name, true);
+          }
+        });
+      });
+
+      updateTransformerDerivedFields();
+      updateTransformerBaseFields();
     }
 
     const getTabPanel = id => tabMap.get(id)?.panel || tabs[0]?.panel || null;

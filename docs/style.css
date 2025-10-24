@@ -1243,6 +1243,22 @@ body.oneline-page .palette-scroll {
   border-color: rgba(0, 123, 255, 0.35);
 }
 
+.prop-field-badge-custom {
+  background: rgba(255, 193, 7, 0.15);
+  color: #a56800;
+  border-color: rgba(255, 193, 7, 0.45);
+}
+
+.prop-modal form fieldset label input.prop-input-custom {
+  background: rgba(255, 193, 7, 0.08);
+  border-color: rgba(255, 193, 7, 0.55);
+}
+
+.prop-modal form fieldset label input.prop-input-custom:focus-visible {
+  outline: 2px solid rgba(255, 193, 7, 0.5);
+  outline-offset: 2px;
+}
+
 .prop-modal form fieldset label.prop-field-calculated input.prop-input-calculated {
   background: rgba(0, 123, 255, 0.08);
   border-color: rgba(0, 123, 255, 0.35);
