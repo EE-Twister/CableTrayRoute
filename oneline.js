@@ -6269,9 +6269,12 @@ function selectComponent(compOrId) {
 
     const isMotorComponent = targetComp.subtype === 'motor_load';
     const isTransformerComponent = targetComp.type === 'transformer';
+    const isSourceCategoryComponent = isSourceComponent(targetComp);
     const motorInputMap = new Map();
     const transformerInputMap = isTransformerComponent ? new Map() : null;
     const transformerCustomBadges = isTransformerComponent ? new Map() : null;
+    const sourceInputMap = isSourceCategoryComponent ? new Map() : null;
+    const sourceCustomBadges = isSourceCategoryComponent ? new Map() : null;
     const motorCalculatedFields = new Set([
       'load_kw',
       'load_kvar',
@@ -6282,6 +6285,8 @@ function selectComponent(compOrId) {
     ]);
     const transformerCalculatedFields = new Set(['impedance_r', 'impedance_x']);
     const transformerAutoFieldNames = new Set(['baseKV', 'kV', 'kv', 'prefault_voltage']);
+    const sourceCalculatedFields = new Set(['thevenin_mva']);
+    const sourceAutoFieldNames = new Set(['baseKV', 'kV', 'kv', 'prefault_voltage']);
 
     const parseNumericValue = raw => {
       if (raw === null || raw === undefined) return null;
@@ -6708,9 +6713,13 @@ function selectComponent(compOrId) {
       if (isTransformerComponent && transformerInputMap) {
         transformerInputMap.set(f.name, input);
       }
+      if (isSourceCategoryComponent && sourceInputMap) {
+        sourceInputMap.set(f.name, input);
+      }
       const isMotorCalculatedField = shouldApplyMotorDerivations && motorCalculatedFields.has(f.name);
       const isTransformerCalculatedField = isTransformerComponent && transformerCalculatedFields.has(f.name);
-      if (isMotorCalculatedField || isTransformerCalculatedField) {
+      const isSourceCalculatedField = isSourceCategoryComponent && sourceCalculatedFields.has(f.name);
+      if (isMotorCalculatedField || isTransformerCalculatedField || isSourceCalculatedField) {
         lbl.classList.add('prop-field-calculated');
         input.classList.add('prop-input-calculated');
         input.readOnly = true;
@@ -6727,6 +6736,14 @@ function selectComponent(compOrId) {
         customBadge.hidden = true;
         labelHeader.appendChild(customBadge);
         transformerCustomBadges.set(f.name, { badge: customBadge, input });
+      }
+      if (isSourceCategoryComponent && sourceAutoFieldNames.has(f.name) && sourceCustomBadges) {
+        const customBadge = document.createElement('span');
+        customBadge.className = 'prop-field-badge prop-field-badge-custom';
+        customBadge.textContent = 'Custom';
+        customBadge.hidden = true;
+        labelHeader.appendChild(customBadge);
+        sourceCustomBadges.set(f.name, { badge: customBadge, input });
       }
       if (f.help) {
         const helpBtn = document.createElement('button');
@@ -7126,6 +7143,223 @@ function selectComponent(compOrId) {
       });
 
       updateMotorDerivedFields();
+    }
+
+    if (isSourceCategoryComponent && sourceInputMap) {
+      const baseFieldNames = ['baseKV', 'kV', 'kv', 'prefault_voltage'];
+
+      const setCustomIndicator = (name, active) => {
+        if (!sourceCustomBadges) return;
+        const entry = sourceCustomBadges.get(name);
+        if (!entry) return;
+        const { badge, input } = entry;
+        if (badge) badge.hidden = !active;
+        if (input) {
+          if (active) input.classList.add('prop-input-custom');
+          else input.classList.remove('prop-input-custom');
+        }
+      };
+
+      const parseKvValue = raw => {
+        if (raw === null || raw === undefined) return null;
+        const directKv = toBaseKV(raw);
+        if (Number.isFinite(directKv) && directKv > 0.2) return directKv;
+        const numeric = parseNumericValue(raw);
+        if (!Number.isFinite(numeric) || numeric <= 0) return null;
+        if (numeric > 1000) return numeric / 1000;
+        return numeric;
+      };
+
+      const getKvFromInputs = names => {
+        for (const name of names) {
+          const input = sourceInputMap.get(name);
+          if (!input) continue;
+          const kv = parseKvValue(input.value);
+          if (kv !== null) return kv;
+        }
+        return null;
+      };
+
+      const getKvFromComponent = names => {
+        for (const name of names) {
+          const kv = parseKvValue(readComponentValue(name));
+          if (kv !== null) return kv;
+        }
+        return null;
+      };
+
+      const resolveAutoBaseKV = () => {
+        const driverInputs = [
+          'source_voltage_base',
+          'voltage',
+          'volts',
+          'voltage_primary',
+          'voltage_secondary',
+          'nominalVoltage',
+          'nominal_voltage'
+        ];
+        const fromInputs = getKvFromInputs(driverInputs);
+        if (Number.isFinite(fromInputs) && fromInputs > 0) return fromInputs;
+        const fromComponentDrivers = getKvFromComponent(driverInputs);
+        if (Number.isFinite(fromComponentDrivers) && fromComponentDrivers > 0) return fromComponentDrivers;
+        const fromBase = getKvFromComponent(baseFieldNames);
+        if (Number.isFinite(fromBase) && fromBase > 0) return fromBase;
+        return null;
+      };
+
+      const parseShortCircuitCapacity = raw => {
+        if (raw === null || raw === undefined) return null;
+        if (typeof raw === 'number') {
+          return Number.isFinite(raw) && raw > 0 ? { value: raw, unit: 'mva' } : null;
+        }
+        const text = String(raw).trim();
+        if (!text) return null;
+        const match = text.match(/[-+]?\d*\.?\d+(?:[eE][-+]?\d+)?/);
+        if (!match) return null;
+        const numeric = Number.parseFloat(match[0].replace(/,/g, ''));
+        if (!Number.isFinite(numeric) || numeric <= 0) return null;
+        const lowered = text.toLowerCase();
+        if (lowered.includes('ka')) return { value: numeric, unit: 'ka' };
+        if (lowered.includes('mva')) return { value: numeric, unit: 'mva' };
+        return { value: numeric, unit: 'mva' };
+      };
+
+      const getShortCircuitCapacity = () => {
+        const input = sourceInputMap.get('short_circuit_capacity');
+        const fromInput = parseShortCircuitCapacity(input?.value ?? null);
+        if (fromInput) return fromInput;
+        return parseShortCircuitCapacity(readComponentValue('short_circuit_capacity'));
+      };
+
+      const updateSourceBaseFields = () => {
+        const autoKv = resolveAutoBaseKV();
+        const tolerance = 1e-6;
+        baseFieldNames.forEach(name => {
+          const entry = sourceCustomBadges?.get(name);
+          const input = entry?.input ?? sourceInputMap.get(name);
+          if (!input) return;
+          if (!Number.isFinite(autoKv) || autoKv <= 0) {
+            delete input.dataset.autoValue;
+            if (!input.value.trim()) delete input.dataset.userOverride;
+            const active = input.dataset.userOverride === '1';
+            setCustomIndicator(name, active);
+            return;
+          }
+          const formatted = formatNumber(autoKv, 6);
+          input.dataset.autoValue = formatted;
+          const currentVal = parseNumericValue(input.value);
+          const hasValue = typeof input.value === 'string' && input.value.trim() !== '';
+          let isOverride = input.dataset.userOverride === '1';
+          if (!hasValue) {
+            isOverride = false;
+          } else if (Number.isFinite(currentVal) && Math.abs(currentVal - autoKv) <= tolerance) {
+            isOverride = false;
+          } else if (!isOverride) {
+            isOverride = true;
+          }
+          if (!isOverride) {
+            input.value = formatted;
+            delete input.dataset.userOverride;
+          } else {
+            input.dataset.userOverride = '1';
+          }
+          setCustomIndicator(name, isOverride);
+        });
+      };
+
+      const updateSourceDerivedFields = () => {
+        const theveninInput = sourceInputMap.get('thevenin_mva');
+        if (!theveninInput) return;
+        let theveninMva = null;
+        const sc = getShortCircuitCapacity();
+        if (sc) {
+          if (sc.unit === 'ka') {
+            const baseKv = resolveAutoBaseKV();
+            if (Number.isFinite(baseKv) && baseKv > 0) {
+              theveninMva = Math.sqrt(3) * baseKv * sc.value;
+            }
+          } else {
+            theveninMva = sc.value;
+          }
+        }
+        if (theveninMva === null) {
+          const existing = parseNumericValue(readComponentValue('thevenin_mva'));
+          if (Number.isFinite(existing)) theveninMva = existing;
+          else {
+            const fallback = parseNumericValue(readComponentValue('mva'));
+            if (Number.isFinite(fallback)) theveninMva = fallback;
+          }
+        }
+        theveninInput.value = Number.isFinite(theveninMva) ? formatNumber(theveninMva, 6) : '';
+      };
+
+      const attachBaseDriverListener = name => {
+        const input = sourceInputMap.get(name);
+        if (!input) return;
+        const handler = () => {
+          updateSourceBaseFields();
+          updateSourceDerivedFields();
+        };
+        input.addEventListener('input', handler);
+        input.addEventListener('change', handler);
+      };
+
+      ['source_voltage_base', 'voltage', 'volts', 'voltage_primary', 'voltage_secondary', 'nominalVoltage', 'nominal_voltage'].forEach(
+        attachBaseDriverListener
+      );
+
+      const attachDerivedListener = name => {
+        const input = sourceInputMap.get(name);
+        if (!input) return;
+        const handler = () => {
+          updateSourceDerivedFields();
+        };
+        input.addEventListener('input', handler);
+        input.addEventListener('change', handler);
+      };
+
+      ['short_circuit_capacity'].forEach(attachDerivedListener);
+
+      baseFieldNames.forEach(name => {
+        const entry = sourceCustomBadges?.get(name);
+        const input = entry?.input ?? sourceInputMap.get(name);
+        if (!input) return;
+        input.addEventListener('input', () => {
+          if (!input.value.trim()) {
+            delete input.dataset.userOverride;
+            setCustomIndicator(name, false);
+            updateSourceBaseFields();
+            updateSourceDerivedFields();
+            return;
+          }
+          input.dataset.userOverride = '1';
+          setCustomIndicator(name, true);
+          updateSourceDerivedFields();
+        });
+        input.addEventListener('change', () => {
+          if (!input.value.trim()) {
+            delete input.dataset.userOverride;
+            setCustomIndicator(name, false);
+            updateSourceBaseFields();
+            updateSourceDerivedFields();
+            return;
+          }
+          const autoVal = parseNumericValue(input.dataset.autoValue);
+          const currentVal = parseNumericValue(input.value);
+          if (Number.isFinite(autoVal) && Number.isFinite(currentVal) && Math.abs(currentVal - autoVal) <= 1e-6) {
+            delete input.dataset.userOverride;
+            setCustomIndicator(name, false);
+            updateSourceBaseFields();
+          } else {
+            input.dataset.userOverride = '1';
+            setCustomIndicator(name, true);
+          }
+          updateSourceDerivedFields();
+        });
+      });
+
+      updateSourceBaseFields();
+      updateSourceDerivedFields();
     }
 
     if (isTransformerComponent && transformerInputMap) {
