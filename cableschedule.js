@@ -726,7 +726,7 @@ async function initCableSchedule() {
         section.appendChild(legend);
       }
       const fieldsWrapper = document.createElement('div');
-      fieldsWrapper.className = 'modal-body';
+      fieldsWrapper.className = 'modal-field-grid';
       (grouped.get(groupName) || []).forEach(col => {
         const fieldId = `cable-editor-${col.key}`;
         const fieldContainer = document.createElement('div');

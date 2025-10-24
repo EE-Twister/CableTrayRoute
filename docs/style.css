@@ -2344,6 +2344,7 @@ body.modal-open {
     gap: var(--spacing-base);
 }
 
+.modal-field-grid,
 .cable-library-grid {
     display: grid;
     grid-template-columns: minmax(0, 1fr);
@@ -2353,11 +2354,13 @@ body.modal-open {
 }
 
 @media (min-width: 720px) {
+    .modal-field-grid,
     .cable-library-grid {
         grid-template-columns: repeat(2, minmax(0, 1fr));
     }
 }
 
+.modal-field-grid .modal-form-field,
 .cable-library-grid .modal-form-field {
     display: grid;
     grid-template-columns: minmax(120px, 0.45fr) minmax(0, 1fr);
@@ -2367,6 +2370,7 @@ body.modal-open {
     min-width: 0;
 }
 
+.modal-field-grid .modal-form-field label,
 .cable-library-grid .modal-form-field label {
     display: inline-flex;
     align-items: center;
@@ -2378,22 +2382,26 @@ body.modal-open {
     font-size: 0.95rem;
 }
 
+.modal-field-grid .modal-form-field label + *,
 .cable-library-grid .modal-form-field label + * {
     width: 100%;
     min-width: 0;
 }
 
 @media (max-width: 720px) {
+    .modal-field-grid,
     .cable-library-grid {
         grid-template-columns: 1fr;
         gap: var(--spacing-base);
     }
 
+    .modal-field-grid .modal-form-field,
     .cable-library-grid .modal-form-field {
         grid-template-columns: 1fr;
         align-items: stretch;
     }
 
+    .modal-field-grid .modal-form-field label,
     .cable-library-grid .modal-form-field label {
         align-items: flex-start;
     }
