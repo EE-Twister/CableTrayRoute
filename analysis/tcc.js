@@ -3231,7 +3231,13 @@ async function openComponentBrowserModal() {
         }
         return false;
       }
-      commitSelection(activeEntry);
+      const committed = commitSelection(activeEntry);
+      if (!committed) {
+        if (controller && typeof controller.setPrimaryDisabled === 'function') {
+          controller.setPrimaryDisabled(true);
+        }
+        return false;
+      }
       return activeEntry.componentId;
     },
     onCancel: () => {
@@ -3536,7 +3542,36 @@ function plot() {
   annotationContext = null;
   setPlotAvailability(false);
   chart.classed('annotation-mode', false);
-  const selections = selectedDeviceIds().map(id => deviceMap.get(id)).filter(Boolean);
+  let selectionIds = selectedDeviceIds();
+  let selections = selectionIds.map(id => deviceMap.get(id)).filter(Boolean);
+  const contextComponentId = getActiveComponentId();
+  if (contextComponentId) {
+    const ensureSelectionIds = () => {
+      const set = new Set(selectionIds);
+      let changed = false;
+      const addUid = uid => {
+        if (!uid || set.has(uid)) return;
+        if (!deviceMap.has(uid)) return;
+        set.add(uid);
+        selectionIds.push(uid);
+        changed = true;
+      };
+      const contextEntry = componentDeviceMap.get(contextComponentId);
+      if (contextEntry) {
+        addUid(contextEntry.uid);
+      }
+      collectNeighborDeviceDefaults(contextComponentId, 1).forEach(addUid);
+      if (!changed) return false;
+      applySelectionSet(selectionIds);
+      saved.devices = [...selectionIds];
+      saved.viewOptions = [...activeViewOptions];
+      setItem('tccSettings', saved);
+      return true;
+    };
+    if (ensureSelectionIds()) {
+      selections = selectionIds.map(id => deviceMap.get(id)).filter(Boolean);
+    }
+  }
   if (!selections.length) return;
 
   const devicePlots = [];
@@ -3934,9 +3969,126 @@ function plot() {
         event.preventDefault();
         event.stopPropagation();
         showCurveContextMenu(event, entry);
-      });
+    });
     return entry;
   });
+
+  const viewCalloutLayer = g.append('g').attr('class', 'view-callout-layer');
+
+  const buildViewCalloutData = () => {
+    const configs = getActiveViewConfigs();
+    if (!configs.length) return [];
+    return plotted
+      .map(entry => {
+        if (!entry || !entry.selection) return null;
+        if (entry.selection.kind !== 'library' && entry.selection.kind !== 'component') return null;
+        const summaries = formatViewSummaries(entry);
+        if (!summaries.length) return null;
+        const deviceLabel = entry.selection?.name
+          || entry.name
+          || entry.selection?.baseDevice?.name
+          || entry.selection?.component?.label
+          || entry.selection?.component?.name
+          || 'Device';
+        const curve = Array.isArray(entry.scaled?.curve) ? entry.scaled.curve : [];
+        if (!curve.length) return null;
+        const anchor = curve[Math.floor(curve.length / 2)] || curve[curve.length - 1] || curve[0];
+        if (!anchor || !(anchor.current > 0) || !(anchor.time > 0)) return null;
+        const anchorX = x(anchor.current);
+        const anchorY = y(anchor.time);
+        if (!Number.isFinite(anchorX) || !Number.isFinite(anchorY)) return null;
+        return {
+          id: entry.selection.uid || entry.selection.baseDeviceId || deviceLabel,
+          entry,
+          anchor,
+          anchorX,
+          anchorY,
+          lines: [deviceLabel, ...summaries]
+        };
+      })
+      .filter(Boolean);
+  };
+
+  const updateViewCallouts = () => {
+    const data = buildViewCalloutData();
+    if (!data.length) {
+      viewCalloutLayer.selectAll('*').remove();
+      return;
+    }
+    const callouts = viewCalloutLayer.selectAll('g.view-callout').data(data, datum => datum.id);
+    callouts.exit().remove();
+    const entered = callouts.enter().append('g').attr('class', 'view-callout');
+    entered.append('line').attr('class', 'view-callout-connector');
+    entered.append('circle').attr('class', 'view-callout-anchor').attr('r', 4);
+    const labelGroup = entered.append('g').attr('class', 'view-callout-label');
+    labelGroup.append('rect').attr('class', 'view-callout-bg').attr('rx', 6).attr('ry', 6);
+    labelGroup.append('text').attr('class', 'view-callout-text');
+
+    const merged = entered.merge(callouts);
+    merged.each(function renderViewCallout(datum, index) {
+      const group = d3.select(this);
+      const entry = datum.entry;
+      const curve = Array.isArray(entry.scaled?.curve) ? entry.scaled.curve : [];
+      const anchor = curve[Math.floor(curve.length / 2)] || curve[curve.length - 1] || curve[0] || datum.anchor;
+      if (!anchor || !(anchor.current > 0) || !(anchor.time > 0)) {
+        group.attr('display', 'none');
+        return;
+      }
+      const anchorX = x(anchor.current);
+      const anchorY = y(anchor.time);
+      if (!Number.isFinite(anchorX) || !Number.isFinite(anchorY)) {
+        group.attr('display', 'none');
+        return;
+      }
+      group.attr('display', null);
+      const baseOffsets = defaultAnnotationOffsets(anchorX, anchorY, width, height);
+      const horizontal = baseOffsets.offsetX >= 0 ? 1 : -1;
+      const vertical = baseOffsets.offsetY >= 0 ? 1 : -1;
+      const magnitudeX = Math.max(60, Math.abs(baseOffsets.offsetX)) + (index % 3) * 18;
+      const magnitudeY = Math.max(40, Math.abs(baseOffsets.offsetY)) + ((index + 1) % 3) * 14;
+      const rawLabelX = anchorX + horizontal * magnitudeX;
+      const rawLabelY = anchorY + vertical * magnitudeY;
+      const labelX = Math.max(24, Math.min(width - 24, rawLabelX));
+      const labelY = Math.max(24, Math.min(height - 24, rawLabelY));
+      group.select('line.view-callout-connector')
+        .attr('x1', anchorX)
+        .attr('y1', anchorY)
+        .attr('x2', labelX)
+        .attr('y2', labelY)
+        .attr('stroke', entry.color)
+        .attr('stroke-width', 1.4);
+      group.select('circle.view-callout-anchor')
+        .attr('cx', anchorX)
+        .attr('cy', anchorY)
+        .attr('stroke', entry.color)
+        .attr('stroke-width', 1.4);
+      const label = group.select('g.view-callout-label')
+        .attr('transform', `translate(${labelX},${labelY})`);
+      const text = label.select('text.view-callout-text')
+        .attr('text-anchor', 'start');
+      const tspans = text.selectAll('tspan').data(datum.lines, (line, lineIndex) => `${datum.id}:${lineIndex}`);
+      tspans.exit().remove();
+      const tspansEnter = tspans.enter().append('tspan');
+      tspansEnter.merge(tspans)
+        .attr('x', 0)
+        .attr('dy', (_, lineIndex) => (lineIndex === 0 ? '0' : '1.2em'))
+        .attr('class', (_, lineIndex) => (lineIndex === 0 ? 'view-callout-title' : null))
+        .text(line => line);
+      const textNode = text.node();
+      if (textNode) {
+        const bbox = textNode.getBBox();
+        const paddingX = 8;
+        const paddingY = 6;
+        label.select('rect.view-callout-bg')
+          .attr('x', bbox.x - paddingX)
+          .attr('y', bbox.y - paddingY)
+          .attr('width', bbox.width + paddingX * 2)
+          .attr('height', bbox.height + paddingY * 2)
+          .attr('stroke', entry.color)
+          .attr('stroke-width', 1.2);
+      }
+    });
+  };
 
   const updateDutyResults = violations => {
     if (violations.length) {
@@ -3987,6 +4139,7 @@ function plot() {
         });
     });
     updateDutyResults(violations);
+    updateViewCallouts();
   };
 
   const clampValue = (value, min, max) => {

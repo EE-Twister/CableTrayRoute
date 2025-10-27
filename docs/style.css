@@ -5701,6 +5701,45 @@ body.dark-mode .tcc-view-label {
     fill: rgba(255, 255, 255, 0.7);
 }
 
+.view-callout-layer {
+    pointer-events: none;
+}
+
+.view-callout-layer .view-callout-connector {
+    stroke-width: 1.4;
+}
+
+.view-callout-layer .view-callout-anchor {
+    fill: #fff;
+    stroke-width: 1.4;
+}
+
+body.dark-mode .view-callout-layer .view-callout-anchor {
+    fill: #1f2226;
+}
+
+.view-callout-layer .view-callout-bg {
+    fill: rgba(255, 255, 255, 0.95);
+    stroke-width: 1.2;
+}
+
+body.dark-mode .view-callout-layer .view-callout-bg {
+    fill: rgba(22, 25, 29, 0.95);
+}
+
+.view-callout-layer .view-callout-text {
+    font-size: 0.75rem;
+    fill: #111;
+}
+
+body.dark-mode .view-callout-layer .view-callout-text {
+    fill: #f8f9fa;
+}
+
+.view-callout-layer .view-callout-text tspan.view-callout-title {
+    font-weight: 600;
+}
+
 .device-settings.device-settings-highlight {
     outline: 2px solid var(--primary-color);
     box-shadow: 0 0 0 3px rgba(0, 0, 0, 0.08);
