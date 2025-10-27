@@ -3115,7 +3115,7 @@ async function openComponentBrowserModal() {
     if (entry.plotDisabledReason) {
       return false;
     }
-    setActiveComponent(entry.componentId);
+    setActiveComponent(entry.componentId, { preserveSelection: true });
     return true;
   };
 
@@ -3359,7 +3359,7 @@ async function openComponentBrowserModal() {
 
   if (resolvedComponentId) {
     if (getActiveComponentId() !== resolvedComponentId) {
-      setActiveComponent(resolvedComponentId);
+      setActiveComponent(resolvedComponentId, { preserveSelection: true });
     } else {
       renderOneLinePreview(resolvedComponentId);
       if (selectedDeviceIds().length) {
@@ -4637,6 +4637,51 @@ function renderOneLinePreview(componentId) {
   const DEFAULT_WIDTH = 120;
   const DEFAULT_HEIGHT = 60;
 
+  const normalizeRotation = value => {
+    const numeric = Number(value);
+    if (!Number.isFinite(numeric)) return 0;
+    const normalized = numeric % 360;
+    return normalized < 0 ? normalized + 360 : normalized;
+  };
+
+  const computeBounds = (x, y, width, height, rotation) => {
+    if (!rotation) {
+      return {
+        left: x,
+        top: y,
+        right: x + width,
+        bottom: y + height
+      };
+    }
+    const angle = rotation * Math.PI / 180;
+    const cx = x + width / 2;
+    const cy = y + height / 2;
+    const rotatePoint = (px, py) => {
+      const dx = px - cx;
+      const dy = py - cy;
+      return {
+        x: cx + dx * Math.cos(angle) - dy * Math.sin(angle),
+        y: cy + dx * Math.sin(angle) + dy * Math.cos(angle)
+      };
+    };
+    const points = [
+      rotatePoint(x, y),
+      rotatePoint(x + width, y),
+      rotatePoint(x, y + height),
+      rotatePoint(x + width, y + height)
+    ];
+    const xs = points.map(point => point.x);
+    const ys = points.map(point => point.y);
+    return {
+      left: Math.min(...xs),
+      top: Math.min(...ys),
+      right: Math.max(...xs),
+      bottom: Math.max(...ys)
+    };
+  };
+
+  const componentPreviewMeta = new Map();
+
   let minX = Infinity;
   let minY = Infinity;
   let maxX = -Infinity;
@@ -4649,10 +4694,18 @@ function renderOneLinePreview(componentId) {
     const compHeight = Number.isFinite(comp.height) ? Number(comp.height) : DEFAULT_HEIGHT;
     const compX = Number.isFinite(comp.x) ? Number(comp.x) : 0;
     const compY = Number.isFinite(comp.y) ? Number(comp.y) : 0;
-    minX = Math.min(minX, compX);
-    minY = Math.min(minY, compY);
-    maxX = Math.max(maxX, compX + compWidth);
-    maxY = Math.max(maxY, compY + compHeight);
+    const rotation = normalizeRotation(comp.rotation ?? comp.rot ?? 0);
+    const bounds = computeBounds(compX, compY, compWidth, compHeight, rotation);
+    minX = Math.min(minX, bounds.left);
+    minY = Math.min(minY, bounds.top);
+    maxX = Math.max(maxX, bounds.right);
+    maxY = Math.max(maxY, bounds.bottom);
+    componentPreviewMeta.set(id, {
+      bounds,
+      width: compWidth,
+      height: compHeight,
+      rotation
+    });
   });
 
   if (!Number.isFinite(minX) || !Number.isFinite(minY)) {
@@ -4674,12 +4727,13 @@ function renderOneLinePreview(componentId) {
 
   const nodes = displayedTargets.map(id => {
     const comp = componentMap.get(id);
-    const compWidth = Number.isFinite(comp.width) ? Number(comp.width) : DEFAULT_WIDTH;
-    const compHeight = Number.isFinite(comp.height) ? Number(comp.height) : DEFAULT_HEIGHT;
-    const compX = Number.isFinite(comp.x) ? Number(comp.x) : 0;
-    const compY = Number.isFinite(comp.y) ? Number(comp.y) : 0;
-    const centerX = (compX + compWidth / 2) * scale + offsetX;
-    const centerY = (compY + compHeight / 2) * scale + offsetY;
+    const meta = componentPreviewMeta.get(id);
+    if (!comp || !meta) return null;
+    const { bounds, width: compWidth, height: compHeight, rotation } = meta;
+    const centerX = ((bounds.left + bounds.right) / 2) * scale + offsetX;
+    const centerY = ((bounds.top + bounds.bottom) / 2) * scale + offsetY;
+    const scaledWidth = Math.max(0, (bounds.right - bounds.left) * scale);
+    const scaledHeight = Math.max(0, (bounds.bottom - bounds.top) * scale);
     return {
       id: comp.id,
       label: componentLabel(comp),
@@ -4688,9 +4742,12 @@ function renderOneLinePreview(componentId) {
       y: centerY,
       active: comp.id === componentId,
       component: comp,
-      selected: selectedIds.has(comp.id)
+      selected: selectedIds.has(comp.id),
+      width: scaledWidth,
+      height: scaledHeight,
+      rotation
     };
-  });
+  }).filter(Boolean);
 
   const displayedIdSet = new Set(nodes.map(node => node.id));
   const edgesMap = new Map();
@@ -4775,9 +4832,28 @@ function renderOneLinePreview(componentId) {
     })
     .attr('transform', d => `translate(${d.x},${d.y})`);
 
-  const iconSize = datum => (datum.active ? 56 : datum.selected ? 50 : 44);
+  const clamp = (value, min, max) => {
+    if (!Number.isFinite(value)) return min;
+    if (value < min) return min;
+    if (value > max) return max;
+    return value;
+  };
 
-  node.append('image')
+  const iconSize = datum => {
+    const baseSpan = Math.max(datum.width || 0, datum.height || 0);
+    const emphasis = datum.active ? 1.15 : datum.selected ? 1.05 : 1;
+    if (!Number.isFinite(baseSpan) || baseSpan <= 0) {
+      return Math.round((datum.active ? 56 : datum.selected ? 50 : 44) * emphasis);
+    }
+    const scaled = clamp(baseSpan, 32, 96);
+    return Math.round(clamp(scaled * emphasis, 32, 108));
+  };
+
+  const iconGroup = node.append('g')
+    .attr('class', 'preview-node-icon-group')
+    .attr('transform', d => (d.rotation ? `rotate(${d.rotation})` : null));
+
+  iconGroup.append('image')
     .attr('class', 'preview-node-icon')
     .attr('x', d => -(iconSize(d) / 2))
     .attr('y', d => -(iconSize(d) / 2))
@@ -4787,9 +4863,16 @@ function renderOneLinePreview(componentId) {
     .attr('href', d => getComponentIcon(d.component))
     .attr('xlink:href', d => getComponentIcon(d.component));
 
-  const labelOffset = datum => Math.round(iconSize(datum) / 2) + (datum.active ? 20 : 18);
+  const labelOffset = datum => {
+    const iconRadius = iconSize(datum) / 2;
+    const componentRadius = Math.max(datum.width || 0, datum.height || 0) / 2;
+    const emphasis = datum.active ? 22 : 18;
+    return Math.round(Math.max(iconRadius, componentRadius) + emphasis);
+  };
 
   const labels = node.append('text')
+    .attr('class', 'preview-node-label')
+    .attr('text-anchor', 'middle')
     .attr('y', d => labelOffset(d));
 
   labels.selectAll('tspan')
