@@ -5411,3 +5411,115 @@ body.dark-mode .panel-slot-meta span {
     fill: #111;
     pointer-events: none;
 }
+
+.tcc-visualization {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 1.5rem;
+    align-items: flex-start;
+    margin-top: 1.5rem;
+}
+
+.tcc-chart-container {
+    flex: 1 1 520px;
+    min-width: 320px;
+}
+
+.tcc-chart-container .violation {
+    margin-top: 1rem;
+}
+
+.tcc-oneline-preview {
+    flex: 0 1 320px;
+    display: flex;
+    flex-direction: column;
+    gap: 0.5rem;
+    padding: 1rem;
+    border: 1px solid var(--border-color);
+    border-radius: 8px;
+    background: var(--secondary-color);
+}
+
+body.dark-mode .tcc-oneline-preview {
+    background: #1f2226;
+}
+
+.tcc-oneline-preview h2 {
+    margin: 0 0 0.25rem;
+    font-size: 1.1rem;
+}
+
+.tcc-oneline-preview svg {
+    width: 100%;
+    height: auto;
+    max-height: 320px;
+}
+
+.tcc-oneline-preview .oneline-preview-note {
+    margin: 0;
+    font-size: 0.85rem;
+    color: var(--text-muted, #6c757d);
+}
+
+.tcc-oneline-preview.empty svg {
+    display: none;
+}
+
+.preview-link {
+    stroke: var(--border-color);
+    stroke-width: 1.5;
+}
+
+body.dark-mode .preview-link {
+    stroke: rgba(255, 255, 255, 0.35);
+}
+
+.preview-link-label {
+    fill: var(--text-muted, #6c757d);
+    font-size: 0.7rem;
+    text-anchor: middle;
+}
+
+.preview-node {
+    transition: transform 0.2s ease;
+}
+
+.preview-node circle {
+    fill: var(--secondary-color);
+    stroke: var(--border-color);
+    stroke-width: 1.5;
+}
+
+body.dark-mode .preview-node circle {
+    fill: #2c3034;
+    stroke: rgba(255, 255, 255, 0.35);
+}
+
+.preview-node.is-active circle {
+    fill: var(--primary-color);
+    stroke: var(--primary-color);
+}
+
+.preview-node text {
+    fill: var(--text-color);
+    font-size: 0.75rem;
+    text-anchor: middle;
+    pointer-events: none;
+}
+
+.preview-node:not(.is-active) {
+    cursor: pointer;
+}
+
+.preview-node:not(.is-active) circle:hover {
+    fill: rgba(0, 0, 0, 0.05);
+}
+
+body.dark-mode .preview-node:not(.is-active) circle:hover {
+    fill: rgba(255, 255, 255, 0.15);
+}
+
+.device-settings.device-settings-highlight {
+    outline: 2px solid var(--primary-color);
+    box-shadow: 0 0 0 3px rgba(0, 0, 0, 0.08);
+}
