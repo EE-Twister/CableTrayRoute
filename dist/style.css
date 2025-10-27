@@ -5323,6 +5323,88 @@ body.dark-mode .panel-slot-meta span {
     padding: 0.5rem 1rem;
 }
 
+.view-menu-btn {
+    margin-top: 0.75rem;
+    align-self: flex-start;
+}
+
+.tcc-view-option-list {
+    list-style: none;
+    margin: 0;
+    padding: 0;
+    display: grid;
+    gap: 0.75rem;
+}
+
+.tcc-view-option {
+    display: flex;
+    align-items: flex-start;
+    gap: 0.5rem;
+    font-size: 0.95rem;
+}
+
+.tcc-view-option input[type="radio"] {
+    margin-top: 0.2rem;
+}
+
+.tcc-view-option-label {
+    font-weight: 600;
+}
+
+.tcc-view-option-description {
+    display: block;
+    font-size: 0.8rem;
+    color: var(--text-muted, #6c757d);
+    margin-top: 0.2rem;
+}
+
+body.dark-mode .tcc-view-option-description {
+    color: rgba(255, 255, 255, 0.7);
+}
+
+.device-detail-settings {
+    border-top: 1px solid var(--border-color, #d9d9d9);
+    margin-top: 1.5rem;
+    padding-top: 1rem;
+    display: flex;
+    flex-direction: column;
+    gap: 0.75rem;
+}
+
+body.dark-mode .device-detail-settings {
+    border-color: rgba(255, 255, 255, 0.2);
+}
+
+.device-detail-settings h4 {
+    margin: 0;
+    font-size: 1rem;
+    font-weight: 600;
+}
+
+.device-setting-control {
+    display: flex;
+    flex-direction: column;
+    gap: 0.35rem;
+}
+
+.device-setting-control select,
+.device-setting-control input[type="number"] {
+    width: 100%;
+    max-width: 18rem;
+    padding: 0.45rem 0.6rem;
+    border: 1px solid var(--border-color, #d9d9d9);
+    border-radius: 4px;
+    background: var(--secondary-color, #f4f4f4);
+    color: var(--text-color, #212529);
+}
+
+body.dark-mode .device-setting-control select,
+body.dark-mode .device-setting-control input[type="number"] {
+    background: #2c3034;
+    border-color: rgba(255, 255, 255, 0.25);
+    color: #f8f9fa;
+}
+
 .print-settings-form {
     display: flex;
     flex-direction: column;
@@ -5490,6 +5572,10 @@ body.dark-mode .preview-link {
     stroke-width: 1.5;
 }
 
+.preview-node image {
+    pointer-events: none;
+}
+
 body.dark-mode .preview-node circle {
     fill: #2c3034;
     stroke: rgba(255, 255, 255, 0.35);
@@ -5517,6 +5603,15 @@ body.dark-mode .preview-node circle {
 
 body.dark-mode .preview-node:not(.is-active) circle:hover {
     fill: rgba(255, 255, 255, 0.15);
+}
+
+.tcc-view-label {
+    font-size: 0.85rem;
+    fill: var(--text-muted, #6c757d);
+}
+
+body.dark-mode .tcc-view-label {
+    fill: rgba(255, 255, 255, 0.7);
 }
 
 .device-settings.device-settings-highlight {
