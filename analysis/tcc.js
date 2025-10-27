@@ -4455,6 +4455,7 @@ function renderOneLinePreview(componentId) {
     if (!seedList.includes(id)) seedList.push(id);
   });
 
+  const MAX_COMPONENTS = 20;
   const adjacency = buildPreviewAdjacency(componentMap, sheet);
   const { order: connectedOrder } = gatherConnectedComponentIds(seedList, componentMap, adjacency, MAX_COMPONENTS * 3);
   const availableTargets = connectedOrder.filter(id => componentMap.has(id));
@@ -4485,7 +4486,6 @@ function renderOneLinePreview(componentId) {
   if (onelinePreviewContainer) onelinePreviewContainer.classList.remove('empty');
   if (onelinePreviewEmpty) onelinePreviewEmpty.classList.add('hidden');
 
-  const MAX_COMPONENTS = 20;
   const displayedTargets = availableTargets.slice(0, MAX_COMPONENTS);
   const truncatedCount = availableTargets.length - displayedTargets.length;
 
