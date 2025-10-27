@@ -51,6 +51,12 @@ const violationDiv = document.getElementById('violation');
 const printPlotBtn = document.getElementById('print-plot-btn');
 const annotationBtn = document.getElementById('add-annotation-btn');
 const chart = d3.select('#tcc-chart');
+const onelinePreviewSvgEl = document.getElementById('oneline-preview');
+const onelinePreviewSvg = onelinePreviewSvgEl ? d3.select(onelinePreviewSvgEl) : null;
+const onelinePreviewContainer = document.querySelector('.tcc-oneline-preview');
+const onelinePreviewEmpty = document.getElementById('oneline-preview-empty');
+const onelinePreviewNote = document.getElementById('oneline-preview-note');
+const contextMenu = createContextMenu();
 
 const params = new URLSearchParams(window.location.search);
 const compId = params.get('component');
@@ -146,6 +152,90 @@ function loadSavedSettings() {
   if (typeof stored.printHeader !== 'string') stored.printHeader = '';
   if (typeof stored.printFooter !== 'string') stored.printFooter = '';
   return stored;
+}
+
+function createContextMenu() {
+  const menu = document.createElement('ul');
+  menu.id = 'tcc-context-menu';
+  menu.className = 'context-menu';
+  menu.tabIndex = -1;
+  document.body.appendChild(menu);
+  let visible = false;
+
+  const hide = () => {
+    if (!visible) return;
+    visible = false;
+    menu.style.display = 'none';
+    menu.style.visibility = '';
+    menu.innerHTML = '';
+  };
+
+  const show = (event, items) => {
+    if (!items || !items.length) {
+      hide();
+      return;
+    }
+    event.preventDefault();
+    hide();
+    menu.innerHTML = '';
+    items.forEach(item => {
+      if (!item || typeof item.label !== 'string') return;
+      const li = document.createElement('li');
+      li.textContent = item.label;
+      if (item.disabled) {
+        li.classList.add('is-disabled');
+      } else if (typeof item.onSelect === 'function') {
+        li.addEventListener('click', () => {
+          hide();
+          item.onSelect();
+        }, { once: true });
+      }
+      menu.appendChild(li);
+    });
+    if (!menu.childElementCount) {
+      hide();
+      return;
+    }
+    menu.style.display = 'block';
+    menu.style.visibility = 'hidden';
+    menu.style.left = '0px';
+    menu.style.top = '0px';
+    const viewportWidth = window.innerWidth || document.documentElement.clientWidth || 0;
+    const viewportHeight = window.innerHeight || document.documentElement.clientHeight || 0;
+    const rect = menu.getBoundingClientRect();
+    const left = Math.min(event.clientX, viewportWidth - rect.width - 4);
+    const top = Math.min(event.clientY, viewportHeight - rect.height - 4);
+    menu.style.left = `${Math.max(0, left)}px`;
+    menu.style.top = `${Math.max(0, top)}px`;
+    menu.style.visibility = 'visible';
+    visible = true;
+    setTimeout(() => {
+      try {
+        menu.focus({ preventScroll: true });
+      } catch (err) {
+        // Ignore focus errors in browsers that disallow focusing lists
+      }
+    }, 0);
+  };
+
+  const handleOutside = event => {
+    if (!visible) return;
+    if (menu.contains(event.target)) return;
+    hide();
+  };
+
+  document.addEventListener('click', handleOutside);
+  document.addEventListener('contextmenu', handleOutside);
+  document.addEventListener('scroll', hide, true);
+  window.addEventListener('resize', hide);
+  window.addEventListener('blur', hide);
+  document.addEventListener('keydown', event => {
+    if (event.key === 'Escape') {
+      hide();
+    }
+  });
+
+  return { show, hide, element: menu };
 }
 
 let saved = loadSavedSettings();
@@ -327,6 +417,126 @@ function disableAnnotationMode() {
     annotationBtn.setAttribute('aria-pressed', 'false');
   }
   chart.classed('annotation-mode', false);
+}
+
+function editAnnotation(datum) {
+  if (!datum) return;
+  const updated = window.prompt('Edit annotation text (leave blank to remove):', datum.text);
+  if (updated === null) return;
+  const trimmed = updated.trim();
+  if (!trimmed) {
+    deleteAnnotation(datum.id);
+    return;
+  }
+  datum.text = trimmed;
+  persistAnnotations();
+  renderAnnotations();
+}
+
+function deleteAnnotation(annotationId) {
+  if (!annotationId) return;
+  const initialLength = annotations.length;
+  annotations = annotations.filter(item => item.id !== annotationId);
+  if (annotations.length !== initialLength) {
+    persistAnnotations();
+    renderAnnotations();
+  }
+}
+
+function buildAnnotationContextItems(datum) {
+  if (!datum) return [];
+  return [
+    {
+      label: 'Edit Annotation',
+      onSelect: () => editAnnotation(datum)
+    },
+    {
+      label: 'Delete Annotation',
+      onSelect: () => deleteAnnotation(datum.id)
+    }
+  ];
+}
+
+function focusDeviceSettings(uid) {
+  if (!settingsDiv || !uid) return;
+  const selectorValue = String(uid).replace(/"/g, '\\"');
+  const target = settingsDiv.querySelector(`.device-settings[data-uid="${selectorValue}"]`);
+  if (!target) return;
+  target.classList.add('device-settings-highlight');
+  const removeHighlight = () => target.classList.remove('device-settings-highlight');
+  setTimeout(removeHighlight, 1800);
+  const previousTabIndex = target.getAttribute('tabindex');
+  target.setAttribute('tabindex', '-1');
+  try {
+    target.focus({ preventScroll: true });
+  } catch (err) {
+    // Ignore focus errors
+  }
+  target.scrollIntoView({ behavior: 'smooth', block: 'center' });
+  setTimeout(() => {
+    if (previousTabIndex !== null) {
+      target.setAttribute('tabindex', previousTabIndex);
+    } else {
+      target.removeAttribute('tabindex');
+    }
+  }, 200);
+}
+
+function removeDeviceFromSelection(uid) {
+  if (!uid) return;
+  const current = selectedDeviceIds();
+  if (!current.includes(uid)) return;
+  const updated = current.filter(id => id !== uid);
+  applySelectionSet(updated, { persist: true });
+  if (updated.length) {
+    plot();
+  } else {
+    chart.selectAll('*').remove();
+    violationDiv.textContent = '';
+    setPlotAvailability(false);
+  }
+}
+
+function buildCurveContextItems(entry) {
+  if (!entry || !entry.selection) return [];
+  const selection = entry.selection;
+  const items = [];
+  if (selection.uid) {
+    items.push({
+      label: 'Focus Device Settings',
+      onSelect: () => focusDeviceSettings(selection.uid)
+    });
+  }
+  if (selection.kind === 'component' && selection.componentId) {
+    items.push({
+      label: 'Set as Active Component',
+      onSelect: () => setActiveComponent(selection.componentId, { preserveSelection: true })
+    });
+    items.push({
+      label: 'Open in One-Line',
+      onSelect: () => {
+        window.open(`oneline.html?component=${encodeURIComponent(selection.componentId)}`, '_blank');
+      }
+    });
+  } else if (selection.kind === 'library') {
+    const targetId = getActiveComponentId() || activeComponentId || compId;
+    items.push({
+      label: 'Assign to Active Component',
+      disabled: !targetId,
+      onSelect: () => linkComponent(selection)
+    });
+  }
+  if (selection.uid) {
+    items.push({
+      label: 'Remove from Plot',
+      onSelect: () => removeDeviceFromSelection(selection.uid)
+    });
+  }
+  return items;
+}
+
+function showCurveContextMenu(event, entry) {
+  contextMenu.show(event, buildCurveContextItems(entry));
 }
 
 function defaultAnnotationOffsets(xPos, yPos, width, height) {
@@ -548,16 +758,12 @@ function renderAnnotations() {
   merged.on('dblclick', (event, datum) => {
     event.stopPropagation();
     event.preventDefault();
-    const updated = window.prompt('Edit annotation text (leave blank to remove):', datum.text);
-    if (updated === null) return;
-    const trimmed = updated.trim();
-    if (!trimmed) {
-      annotations = annotations.filter(item => item.id !== datum.id);
-    } else {
-      datum.text = trimmed;
-    }
-    persistAnnotations();
-    renderAnnotations();
+    editAnnotation(datum);
+  });
+  merged.on('contextmenu', (event, datum) => {
+    event.preventDefault();
+    event.stopPropagation();
+    contextMenu.show(event, buildAnnotationContextItems(datum));
   });
   merged.each(function renderAnnotation(datum) {
     const group = d3.select(this);
@@ -972,6 +1178,7 @@ function setActiveComponent(componentId, { preserveSelection = false } = {}) {
     : null;
   activeComponentId = normalized;
   updateComponentContextUI();
+  renderOneLinePreview(normalized);
   if (!preserveSelection) {
     saved.devices = [];
   }
@@ -1006,6 +1213,8 @@ async function init() {
 
   const initialSelection = refreshCatalog({ includeComponentContext: true, includeDeviceParam: true });
 
+  renderOneLinePreview(getActiveComponentId());
+
   updateShortCircuitStudy();
 
   if (getActiveComponentId() && deviceSelect && deviceSelect.selectedOptions.length && initialSelection.length) {
@@ -1015,6 +1224,7 @@ async function init() {
   on(STORAGE_KEYS.oneLine, () => {
     const selection = refreshCatalog({ preserveSelection: true });
     updateShortCircuitStudy();
+    renderOneLinePreview(getActiveComponentId());
     if (getActiveComponentId() && deviceSelect && deviceSelect.selectedOptions.length && selection.length) {
       plot();
     }
@@ -1027,6 +1237,7 @@ async function init() {
     renderAnnotations();
     const selection = refreshCatalog({ includeComponentContext: true, includeDeviceParam: true });
     updateShortCircuitStudy();
+    renderOneLinePreview(getActiveComponentId());
     if (getActiveComponentId() && deviceSelect && deviceSelect.selectedOptions.length && selection.length) {
       plot();
     }
@@ -1089,6 +1300,7 @@ function buildComponentData() {
     activeComponentId = null;
     updateComponentContextUI();
   }
+  renderOneLinePreview(getActiveComponentId());
 }
 
 function rebuildCatalog() {
@@ -2288,6 +2500,9 @@ if (annotationBtn) {
   });
 }
 chart.on('click.annotation', handleAnnotationPlacement);
+chart.on('contextmenu.hideMenu', () => {
+  contextMenu.hide();
+});
 if (settingsDiv) {
   const handleSettingMutation = event => {
     const target = event.target;
@@ -2795,16 +3010,22 @@ function deepEqual(a, b) {
   return keysA.every(key => Object.is(objA[key], objB[key]));
 }
 
-function linkComponent() {
+function linkComponent(entryOverride = null) {
   const targetComponentId = getActiveComponentId() || compId;
   if (!targetComponentId) return;
-  const first = selectedDeviceIds().find(id => {
-    const entry = deviceMap.get(id);
-    return entry && (entry.kind === 'library' || entry.kind === 'component');
-  });
-  if (!first) return;
-  const entry = deviceMap.get(first);
-  if (!entry) return;
+  let entry = entryOverride;
+  if (entry && entry.uid && deviceMap.has(entry.uid)) {
+    entry = deviceMap.get(entry.uid);
+  }
+  if (!entry) {
+    const first = selectedDeviceIds().find(id => {
+      const candidate = deviceMap.get(id);
+      return candidate && (candidate.kind === 'library' || candidate.kind === 'component');
+    });
+    if (!first) return;
+    entry = deviceMap.get(first);
+  }
+  if (!entry || (entry.kind !== 'library' && entry.kind !== 'component')) return;
   const deviceId = entry.baseDeviceId;
   const overrides = snapOverridesToOptions(entry.baseDevice, entry.overrideSource || {});
   const data = getOneLine();
@@ -2828,6 +3049,7 @@ function linkComponent() {
     selectDefaults(new Set([`component:${targetComponentId}`]));
     renderSettings();
     plot();
+    renderOneLinePreview(targetComponentId);
   }
 }
 
@@ -2840,6 +3062,7 @@ function gatherOverridesFromInputs(uid) {
 }
 
 function plot() {
+  contextMenu.hide();
   chart.selectAll('*').remove();
   violationDiv.textContent = '';
   annotationContext = null;
@@ -3191,7 +3414,12 @@ function plot() {
       .attr('fill', 'none')
       .attr('stroke-width', 2)
       .attr('stroke', entry.color)
-      .style('cursor', 'move');
+      .style('cursor', 'move')
+      .on('contextmenu', event => {
+        event.preventDefault();
+        event.stopPropagation();
+        showCurveContextMenu(event, entry);
+      });
     return entry;
   });
 
@@ -3320,6 +3548,180 @@ function plot() {
   renderAnnotations();
 
   updateCurves();
+}
+
+function wrapPreviewLabel(text) {
+  const value = typeof text === 'string' ? text.trim() : '';
+  if (!value) return [''];
+  const maxLength = 18;
+  const words = value.split(/\s+/);
+  const lines = [];
+  let current = '';
+  words.forEach(word => {
+    const tentative = current ? `${current} ${word}` : word;
+    if (tentative.length > maxLength && current) {
+      lines.push(current);
+      current = word;
+    } else {
+      current = tentative;
+    }
+  });
+  if (current) lines.push(current);
+  return lines.slice(0, 3).map(line => (line.length > maxLength ? `${line.slice(0, maxLength - 1)}…` : line));
+}
+
+function describeConnectionLabel(conn) {
+  if (!conn || typeof conn !== 'object') return '';
+  const keys = ['label', 'name', 'id', 'type', 'circuit'];
+  for (const key of keys) {
+    const value = conn[key];
+    if (typeof value === 'string') {
+      const trimmed = value.trim();
+      if (trimmed) return trimmed;
+    }
+  }
+  return '';
+}
+
+function renderOneLinePreview(componentId) {
+  if (!onelinePreviewSvgEl || !onelinePreviewSvg) return;
+  if (!componentId || !componentLookup.has(componentId)) {
+    onelinePreviewSvg.selectAll('*').remove();
+    if (onelinePreviewSvgEl) onelinePreviewSvgEl.classList.add('hidden');
+    if (onelinePreviewContainer) onelinePreviewContainer.classList.add('empty');
+    if (onelinePreviewEmpty) {
+      onelinePreviewEmpty.textContent = 'Select a one-line component to see its connections.';
+      onelinePreviewEmpty.classList.remove('hidden');
+    }
+    if (onelinePreviewNote) onelinePreviewNote.classList.add('hidden');
+    return;
+  }
+
+  const record = componentLookup.get(componentId);
+  if (!record) {
+    renderOneLinePreview(null);
+    return;
+  }
+
+  onelinePreviewSvg.selectAll('*').remove();
+  onelinePreviewSvgEl.classList.remove('hidden');
+  if (onelinePreviewContainer) onelinePreviewContainer.classList.remove('empty');
+  if (onelinePreviewEmpty) onelinePreviewEmpty.classList.add('hidden');
+
+  const width = Number(onelinePreviewSvgEl.getAttribute('width')) || 320;
+  const height = Number(onelinePreviewSvgEl.getAttribute('height')) || 280;
+  onelinePreviewSvg.attr('viewBox', `0 0 ${width} ${height}`);
+
+  const centerX = width / 2;
+  const centerY = height / 2;
+  const neighborIds = [...(neighborMap.get(componentId) || [])].filter(id => componentLookup.has(id));
+  const maxDisplay = 8;
+  const displayedNeighbors = neighborIds.slice(0, maxDisplay);
+  const radius = Math.max(Math.min(width, height) / 2 - 50, 60);
+
+  const nodes = [
+    {
+      id: componentId,
+      label: componentLabel(record.component),
+      sheet: record.sheetName,
+      x: centerX,
+      y: centerY,
+      active: true
+    }
+  ];
+
+  displayedNeighbors.forEach((id, index) => {
+    const neighborRecord = componentLookup.get(id);
+    if (!neighborRecord) return;
+    const angle = (Math.PI * 2 * index) / Math.max(displayedNeighbors.length, 1);
+    const x = centerX + radius * Math.cos(angle);
+    const y = centerY + radius * Math.sin(angle);
+    nodes.push({
+      id,
+      label: componentLabel(neighborRecord.component),
+      sheet: neighborRecord.sheetName,
+      x,
+      y,
+      active: false
+    });
+  });
+
+  const nodeById = new Map(nodes.map(node => [node.id, node]));
+  const edges = displayedNeighbors.map(id => {
+    const connections = (connectionIndex.get(componentId) || []).filter(entry => entry.target?.id === id);
+    const label = connections.map(entry => describeConnectionLabel(entry.conn)).filter(Boolean).join(', ');
+    return { source: componentId, target: id, label };
+  });
+
+  const linkGroup = onelinePreviewSvg.append('g').attr('class', 'preview-links');
+  linkGroup.selectAll('line')
+    .data(edges)
+    .enter()
+    .append('line')
+    .attr('class', 'preview-link')
+    .attr('x1', d => nodeById.get(d.source)?.x ?? centerX)
+    .attr('y1', d => nodeById.get(d.source)?.y ?? centerY)
+    .attr('x2', d => nodeById.get(d.target)?.x ?? centerX)
+    .attr('y2', d => nodeById.get(d.target)?.y ?? centerY);
+
+  linkGroup.selectAll('text')
+    .data(edges.filter(edge => edge.label))
+    .enter()
+    .append('text')
+    .attr('class', 'preview-link-label')
+    .attr('x', d => {
+      const source = nodeById.get(d.source);
+      const target = nodeById.get(d.target);
+      return source && target ? (source.x + target.x) / 2 : centerX;
+    })
+    .attr('y', d => {
+      const source = nodeById.get(d.source);
+      const target = nodeById.get(d.target);
+      return source && target ? (source.y + target.y) / 2 : centerY;
+    })
+    .text(d => d.label);
+
+  const nodeGroup = onelinePreviewSvg.append('g').attr('class', 'preview-nodes');
+  const node = nodeGroup.selectAll('g')
+    .data(nodes)
+    .enter()
+    .append('g')
+    .attr('class', d => `preview-node${d.active ? ' is-active' : ''}`)
+    .attr('transform', d => `translate(${d.x},${d.y})`);
+
+  node.append('circle')
+    .attr('r', d => (d.active ? 30 : 22));
+
+  node.append('text')
+    .attr('y', d => (d.active ? -4 : -6))
+    .selectAll('tspan')
+    .data(d => wrapPreviewLabel(d.label))
+    .enter()
+    .append('tspan')
+    .attr('x', 0)
+    .attr('dy', (line, index) => (index === 0 ? 0 : 12))
+    .text(line => line);
+
+  node.append('title')
+    .text(d => (d.sheet ? `${d.label} (${d.sheet})` : d.label));
+
+  node.filter(d => !d.active)
+    .on('click', (event, datum) => {
+      event.preventDefault();
+      setActiveComponent(datum.id, { preserveSelection: true });
+    });
+
+  if (onelinePreviewNote) {
+    if (neighborIds.length > displayedNeighbors.length) {
+      onelinePreviewNote.textContent = `Showing ${displayedNeighbors.length} of ${neighborIds.length} connections.`;
+      onelinePreviewNote.classList.remove('hidden');
+    } else if (!displayedNeighbors.length) {
+      onelinePreviewNote.textContent = 'No connected components found for this selection.';
+      onelinePreviewNote.classList.remove('hidden');
+    } else {
+      onelinePreviewNote.classList.add('hidden');
+    }
+  }
 }
 
 function componentLabel(comp) {
