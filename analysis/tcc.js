@@ -156,8 +156,25 @@ function normalizeViewOption(id) {
   return viewOptionMap.has(trimmed) ? trimmed : 'none';
 }
 
-function getActiveViewConfig() {
-  return viewOptionMap.get(activeViewOption) || viewOptionMap.get('none') || { id: 'none', label: 'No Additional View' };
+function normalizeViewOptionList(input) {
+  if (!input) return [];
+  const list = Array.isArray(input) ? input : [input];
+  const seen = new Set();
+  const normalized = [];
+  list.forEach(value => {
+    const normalizedValue = normalizeViewOption(value);
+    if (normalizedValue === 'none') return;
+    if (seen.has(normalizedValue)) return;
+    seen.add(normalizedValue);
+    normalized.push(normalizedValue);
+  });
+  return normalized;
+}
+
+function getActiveViewConfigs() {
+  return activeViewOptions
+    .map(id => viewOptionMap.get(id))
+    .filter(option => option && option.field);
 }
 
 function formatViewValue(option, value) {
@@ -176,38 +193,53 @@ function formatViewValue(option, value) {
   return null;
 }
 
-function formatViewSummary(entry) {
-  const option = getActiveViewConfig();
-  if (!option || !option.field) return null;
-  if (!entry || !entry.scaled || !entry.scaled.settings) return null;
-  const raw = entry.scaled.settings[option.field];
-  const formatted = formatViewValue(option, raw);
-  if (!formatted) return null;
-  const prefix = option.shortLabel || option.label;
-  return `${prefix}: ${formatted}`;
+function formatViewSummaries(entry) {
+  if (!entry || !entry.scaled || !entry.scaled.settings) return [];
+  return getActiveViewConfigs()
+    .map(option => {
+      const raw = entry.scaled.settings[option.field];
+      const formatted = formatViewValue(option, raw);
+      if (!formatted) return null;
+      const prefix = option.shortLabel || option.label;
+      return `${prefix}: ${formatted}`;
+    })
+    .filter(Boolean);
+}
+
+function summarizeActiveViewLabels() {
+  const configs = getActiveViewConfigs();
+  if (!configs.length) return null;
+  if (configs.length === 1) {
+    return configs[0].shortLabel || configs[0].label;
+  }
+  const labels = configs.map(option => option.shortLabel || option.label);
+  if (labels.length <= 2) {
+    return labels.join(', ');
+  }
+  return `${labels[0]}, ${labels[1]}, +${labels.length - 2}`;
 }
 
 function updateViewButtonLabel() {
   if (!viewMenuBtn) return;
-  const option = getActiveViewConfig();
-  if (!option || !option.field) {
+  const summary = summarizeActiveViewLabels();
+  if (!summary) {
     viewMenuBtn.textContent = 'Views';
-    viewMenuBtn.title = 'Select a device characteristic to display on the chart';
+    viewMenuBtn.title = 'Select device characteristics to display on the chart';
   } else {
-    const shortLabel = option.shortLabel || option.label;
-    viewMenuBtn.textContent = `Views (${shortLabel})`;
-    viewMenuBtn.title = `Showing ${option.label}`;
+    viewMenuBtn.textContent = `Views (${summary})`;
+    viewMenuBtn.title = `Showing ${summary}`;
   }
   viewMenuBtn.disabled = false;
 }
 
-function setActiveViewOption(optionId, { persist = true } = {}) {
-  const normalized = normalizeViewOption(optionId);
-  const changed = normalized !== activeViewOption;
-  activeViewOption = normalized;
+function setActiveViewOptions(optionIds, { persist = true } = {}) {
+  const normalized = normalizeViewOptionList(optionIds);
+  const changed = normalized.length !== activeViewOptions.length
+    || normalized.some((value, index) => value !== activeViewOptions[index]);
+  activeViewOptions = normalized;
   if (changed) updateViewButtonLabel();
   if (persist) {
-    saved.viewOption = activeViewOption;
+    saved.viewOptions = [...activeViewOptions];
     setItem('tccSettings', saved);
   }
 }
@@ -305,7 +337,19 @@ function loadSavedSettings() {
   if (!Array.isArray(stored.annotations)) stored.annotations = [];
   if (typeof stored.printHeader !== 'string') stored.printHeader = '';
   if (typeof stored.printFooter !== 'string') stored.printFooter = '';
-  if (typeof stored.viewOption !== 'string') stored.viewOption = 'none';
+  if (!Array.isArray(stored.viewOptions)) {
+    if (Array.isArray(stored.viewOption)) {
+      stored.viewOptions = normalizeViewOptionList(stored.viewOption);
+    } else if (typeof stored.viewOption === 'string') {
+      stored.viewOptions = normalizeViewOptionList(stored.viewOption);
+    } else {
+      stored.viewOptions = [];
+    }
+  } else {
+    stored.viewOptions = normalizeViewOptionList(stored.viewOptions);
+  }
+  delete stored.viewOption;
+  if (typeof stored.printIncludePreview !== 'boolean') stored.printIncludePreview = false;
   return stored;
 }
 
@@ -395,8 +439,8 @@ function createContextMenu() {
 
 let saved = loadSavedSettings();
 
-let activeViewOption = normalizeViewOption(saved.viewOption);
-saved.viewOption = activeViewOption;
+let activeViewOptions = normalizeViewOptionList(saved.viewOptions);
+saved.viewOptions = [...activeViewOptions];
 
 annotations = (saved.annotations || []).map(sanitizeAnnotation).filter(Boolean);
 saved.annotations = annotations.map(exportAnnotation);
@@ -547,7 +591,7 @@ function exportAnnotation(annotation) {
 function persistAnnotations({ skipSetItem = false } = {}) {
   saved.annotations = annotations.map(exportAnnotation);
   if (!skipSetItem) {
-    saved.viewOption = activeViewOption;
+    saved.viewOptions = [...activeViewOptions];
     setItem('tccSettings', saved);
   }
 }
@@ -980,7 +1024,7 @@ function handleAnnotationPlacement(event) {
   disableAnnotationMode();
 }
 
-function buildPrintMarkup(svgMarkup, headerText, footerText) {
+function buildPrintMarkup(svgMarkup, headerText, footerText, { previewMarkup = '' } = {}) {
   const header = headerText || 'Time-Current Curves';
   const footer = footerText || `Generated ${new Date().toLocaleString()}`;
   return `<!DOCTYPE html>
@@ -994,6 +1038,11 @@ function buildPrintMarkup(svgMarkup, headerText, footerText) {
     .print-header { text-align: center; font-size: 1.5rem; font-weight: 600; margin-bottom: 16px; }
     .print-chart { display: flex; justify-content: center; align-items: center; margin: 16px 0; }
     .print-chart svg { max-width: 100%; height: auto; }
+    .print-preview { margin-top: 24px; }
+    .print-preview h2 { font-size: 1.1rem; margin: 0 0 12px; text-align: left; }
+    .print-preview-graphic { display: flex; justify-content: center; align-items: center; padding: 12px; border: 1px solid #ccc; border-radius: 8px; background: #f8f9fb; }
+    .print-preview-graphic svg { max-width: 100%; height: auto; }
+    .print-preview-empty { margin: 0; font-size: 0.95rem; color: #555; text-align: center; }
     .print-footer { text-align: center; font-size: 0.85rem; color: #555; margin-top: 24px; }
     @page { size: landscape; margin: 15mm; }
   </style>
@@ -1001,6 +1050,7 @@ function buildPrintMarkup(svgMarkup, headerText, footerText) {
 <body>
   <div class="print-header">${escapeHtml(header)}</div>
   <div class="print-chart">${svgMarkup}</div>
+  ${previewMarkup ? `<div class="print-preview"><h2>One-Line Preview</h2><div class="print-preview-graphic">${previewMarkup}</div></div>` : ''}
   <div class="print-footer">${escapeHtml(footer)}</div>
   <script>
     window.addEventListener('load', () => {
@@ -1020,12 +1070,14 @@ async function handlePrintPlot() {
 
   const initialHeader = typeof saved.printHeader === 'string' ? saved.printHeader : '';
   const initialFooter = typeof saved.printFooter === 'string' ? saved.printFooter : '';
+  const initialIncludePreview = saved.printIncludePreview === true;
   let headerInputEl = null;
   let footerInputEl = null;
+  let includePreviewEl = null;
 
   const modalResult = await openModal({
     title: 'Print Plot',
-    description: 'Enter header and footer text for the printout.',
+    description: 'Enter header and footer text for the printout and choose whether to include the one-line preview.',
     primaryText: 'Print',
     secondaryText: 'Cancel',
     closeOnBackdrop: true,
@@ -1055,7 +1107,14 @@ async function handlePrintPlot() {
       footerInputEl.value = initialFooter;
       footerLabel.appendChild(footerInputEl);
 
-      form.append(headerLabel, footerLabel);
+      const previewToggle = doc.createElement('label');
+      previewToggle.className = 'print-settings-toggle';
+      includePreviewEl = doc.createElement('input');
+      includePreviewEl.type = 'checkbox';
+      includePreviewEl.checked = initialIncludePreview;
+      previewToggle.append(includePreviewEl, ' Include one-line preview');
+
+      form.append(headerLabel, footerLabel, previewToggle);
       container.appendChild(form);
       if (controller && typeof controller.registerForm === 'function') {
         controller.registerForm(form);
@@ -1066,16 +1125,18 @@ async function handlePrintPlot() {
       return headerInputEl;
     },
     onSubmit() {
-      if (!headerInputEl || !footerInputEl) {
+      if (!headerInputEl || !footerInputEl || !includePreviewEl) {
         return false;
       }
       const headerValue = headerInputEl.value.trim();
       const footerValue = footerInputEl.value.trim();
+      const includePreview = includePreviewEl.checked;
       saved.printHeader = headerValue;
       saved.printFooter = footerValue;
-      saved.viewOption = activeViewOption;
+      saved.printIncludePreview = includePreview;
+      saved.viewOptions = [...activeViewOptions];
       setItem('tccSettings', saved);
-      return { header: headerValue, footer: footerValue };
+      return { header: headerValue, footer: footerValue, includePreview };
     }
   });
 
@@ -1090,7 +1151,21 @@ async function handlePrintPlot() {
   const markup = serializer.serializeToString(svgNode);
   const headerText = typeof modalResult.header === 'string' ? modalResult.header : '';
   const footerText = typeof modalResult.footer === 'string' ? modalResult.footer : '';
-  const html = buildPrintMarkup(markup, headerText, footerText);
+  let previewMarkup = '';
+  if (modalResult.includePreview) {
+    if (onelinePreviewSvgEl && !onelinePreviewSvgEl.classList.contains('hidden')) {
+      const previewNode = onelinePreviewSvgEl.cloneNode(true);
+      previewNode.classList.remove('hidden');
+      previewNode.removeAttribute('id');
+      if (!previewNode.getAttribute('xmlns')) {
+        previewNode.setAttribute('xmlns', 'http://www.w3.org/2000/svg');
+      }
+      previewMarkup = serializer.serializeToString(previewNode);
+    } else {
+      previewMarkup = '<p class="print-preview-empty">No one-line preview available for the current selection.</p>';
+    }
+  }
+  const html = buildPrintMarkup(markup, headerText, footerText, { previewMarkup });
   const win = window.open('', '_blank');
   if (!win) return;
   win.document.open();
@@ -1346,7 +1421,7 @@ function refreshCatalog({
   applySelectionSet(selection);
   saved.devices = selection;
   persistAnnotations({ skipSetItem: true });
-  saved.viewOption = activeViewOption;
+  saved.viewOptions = [...activeViewOptions];
   setItem('tccSettings', saved);
   return selection;
 }
@@ -1411,8 +1486,8 @@ async function init() {
 
   on('scenario', () => {
     saved = loadSavedSettings();
-    activeViewOption = normalizeViewOption(saved.viewOption);
-    saved.viewOption = activeViewOption;
+    activeViewOptions = normalizeViewOptionList(saved.viewOptions);
+    saved.viewOptions = [...activeViewOptions];
     annotations = (saved.annotations || []).map(sanitizeAnnotation).filter(Boolean);
     saved.annotations = annotations.map(exportAnnotation);
     renderAnnotations();
@@ -1431,7 +1506,7 @@ function selectDefaults(ids) {
   applySelectionSet(valid);
   saved.devices = valid;
   persistAnnotations({ skipSetItem: true });
-  saved.viewOption = activeViewOption;
+  saved.viewOptions = [...activeViewOptions];
   setItem('tccSettings', saved);
 }
 
@@ -1444,8 +1519,8 @@ function buildComponentData() {
   (sheets || []).forEach((sheet, idx) => {
     const sheetName = sheet?.name || `Sheet ${idx + 1}`;
     (sheet?.components || []).forEach(comp => {
-      records.push({ component: comp, sheetName });
-      lookup.set(comp.id, { component: comp, sheetName });
+      records.push({ component: comp, sheetName, sheetIndex: idx, sheet });
+      lookup.set(comp.id, { component: comp, sheetName, sheetIndex: idx, sheet });
       neighbors.set(comp.id, new Set());
       connections.set(comp.id, []);
     });
@@ -2755,17 +2830,17 @@ async function openDeviceSelectionModal() {
 async function openViewOptionModal() {
   if (!viewMenuBtn) return;
   viewMenuBtn.setAttribute('aria-expanded', 'true');
-  const initial = activeViewOption;
-  let pending = initial;
+  const initial = [...activeViewOptions];
+  const pending = new Set(initial);
 
   await openModal({
     title: 'Device Views',
-    description: 'Choose which device characteristic to display alongside the plotted curves.',
+    description: 'Choose which device characteristics to display alongside the plotted curves.',
     primaryText: 'Apply',
     secondaryText: 'Cancel',
     closeOnBackdrop: true,
     onSubmit() {
-      setActiveViewOption(pending);
+      setActiveViewOptions([...pending]);
       if (deviceSelect && deviceSelect.selectedOptions.length) {
         requestPlotRefresh();
       }
@@ -2773,7 +2848,7 @@ async function openViewOptionModal() {
       return true;
     },
     onCancel() {
-      setActiveViewOption(initial, { persist: false });
+      setActiveViewOptions(initial, { persist: false });
       updateViewButtonLabel();
       viewMenuBtn.setAttribute('aria-expanded', 'false');
     },
@@ -2785,33 +2860,55 @@ async function openViewOptionModal() {
       container.classList.add('tcc-view-modal');
       const list = doc.createElement('ul');
       list.className = 'tcc-view-option-list';
-      TCC_VIEW_OPTIONS.forEach(option => {
-        const item = doc.createElement('li');
-        const label = doc.createElement('label');
-        label.className = 'tcc-view-option';
-        const radio = doc.createElement('input');
-        radio.type = 'radio';
-        radio.name = 'tcc-view-option';
-        radio.value = option.id;
-        radio.checked = pending === option.id;
-        radio.addEventListener('change', () => {
-          pending = option.id;
+
+      const clearItem = doc.createElement('li');
+      clearItem.className = 'tcc-view-option-reset';
+      const clearButton = doc.createElement('button');
+      clearButton.type = 'button';
+      clearButton.className = 'tcc-view-option-clear';
+      clearButton.textContent = 'Clear all selections';
+      clearButton.addEventListener('click', () => {
+        pending.clear();
+        list.querySelectorAll('input[type="checkbox"]').forEach(input => {
+          input.checked = false;
         });
-        const textWrap = doc.createElement('div');
-        const title = doc.createElement('span');
-        title.className = 'tcc-view-option-label';
-        title.textContent = option.label;
-        textWrap.appendChild(title);
-        if (option.description) {
-          const desc = doc.createElement('span');
-          desc.className = 'tcc-view-option-description';
-          desc.textContent = option.description;
-          textWrap.appendChild(desc);
-        }
-        label.append(radio, textWrap);
-        item.appendChild(label);
-        list.appendChild(item);
       });
+      clearItem.appendChild(clearButton);
+      list.appendChild(clearItem);
+
+      TCC_VIEW_OPTIONS
+        .filter(option => option.id !== 'none')
+        .forEach(option => {
+          const item = doc.createElement('li');
+          const label = doc.createElement('label');
+          label.className = 'tcc-view-option';
+          const checkbox = doc.createElement('input');
+          checkbox.type = 'checkbox';
+          checkbox.name = 'tcc-view-option';
+          checkbox.value = option.id;
+          checkbox.checked = pending.has(option.id);
+          checkbox.addEventListener('change', () => {
+            if (checkbox.checked) {
+              pending.add(option.id);
+            } else {
+              pending.delete(option.id);
+            }
+          });
+          const textWrap = doc.createElement('div');
+          const title = doc.createElement('span');
+          title.className = 'tcc-view-option-label';
+          title.textContent = option.label;
+          textWrap.appendChild(title);
+          if (option.description) {
+            const desc = doc.createElement('span');
+            desc.className = 'tcc-view-option-description';
+            desc.textContent = option.description;
+            textWrap.appendChild(desc);
+          }
+          label.append(checkbox, textWrap);
+          item.appendChild(label);
+          list.appendChild(item);
+        });
       container.appendChild(list);
       const focusTarget = list.querySelector('input:checked') || list.querySelector('input');
       if (focusTarget && controls && typeof controls.setInitialFocus === 'function') {
@@ -3326,7 +3423,7 @@ function persistSettings() {
   saved.devices = selected;
   saved.settings = deviceSettings;
   saved.componentOverrides = componentSettings;
-  saved.viewOption = activeViewOption;
+  saved.viewOptions = [...activeViewOptions];
   persistAnnotations({ skipSetItem: true });
   setItem('tccSettings', saved);
   syncComponentOverrides(componentSettings);
@@ -3572,7 +3669,6 @@ function plot() {
     .attr('transform', `translate(${margin.left},${margin.top - 12})`);
 
   const plottables = [...devicePlots, ...overlays];
-  const activeView = getActiveViewConfig();
   plottables.forEach((entry, index) => {
     entry.color = color(index);
     const legendItem = legend.append('g').attr('transform', `translate(${index * 180},0)`);
@@ -3635,23 +3731,58 @@ function plot() {
         .attr('opacity', 0.6);
     }
     const baseLabel = entry.selection?.name || entry.name || entry.selection?.baseDevice?.name || '';
-    const summary = (entry.kind === 'library' || entry.kind === 'component') ? formatViewSummary(entry) : null;
-    const legendLabel = summary ? `${baseLabel} — ${summary}` : baseLabel;
+    const viewSummaries = (entry.kind === 'library' || entry.kind === 'component')
+      ? formatViewSummaries(entry)
+      : [];
+    const legendLabel = baseLabel || entry.name || entry.selection?.baseDevice?.name || 'Device';
     legendItem.append('text')
       .attr('x', 20)
       .attr('y', 12)
       .attr('fill', '#333')
       .attr('font-size', 12)
-      .text(legendLabel || baseLabel);
+      .text(legendLabel);
+
+    if (viewSummaries.length) {
+      const badgesGroup = legendItem.append('g')
+        .attr('class', 'tcc-view-badges')
+        .attr('transform', `translate(20, ${12 + 14})`);
+      let offsetX = 0;
+      viewSummaries.forEach(summary => {
+        const badge = badgesGroup.append('g')
+          .attr('class', 'tcc-view-badge')
+          .attr('transform', `translate(${offsetX},0)`);
+        const text = badge.append('text')
+          .attr('class', 'tcc-view-badge-text')
+          .attr('x', 0)
+          .attr('y', 10)
+          .attr('text-anchor', 'middle')
+          .attr('dominant-baseline', 'middle')
+          .text(summary);
+        const textNode = text.node();
+        const textWidth = Math.ceil(textNode ? textNode.getComputedTextLength() : summary.length * 7);
+        const badgeWidth = Math.max(32, textWidth + 16);
+        badge.insert('rect', 'text')
+          .attr('class', 'tcc-view-badge-bg')
+          .attr('x', 0)
+          .attr('y', -2)
+          .attr('rx', 6)
+          .attr('ry', 6)
+          .attr('width', badgeWidth)
+          .attr('height', 20);
+        text.attr('x', badgeWidth / 2);
+        offsetX += badgeWidth + 8;
+      });
+    }
   });
 
-  if (activeView && activeView.field) {
+  const viewSummaryLabel = summarizeActiveViewLabels();
+  if (viewSummaryLabel) {
     chart.append('text')
       .attr('class', 'tcc-view-label')
       .attr('x', margin.left + width)
       .attr('y', Math.max(16, margin.top - 24))
       .attr('text-anchor', 'end')
-      .text(`View: ${activeView.label}`);
+      .text(`Views: ${viewSummaryLabel}`);
   }
 
   if (fault) {
@@ -3989,65 +4120,153 @@ function renderOneLinePreview(componentId) {
     return;
   }
 
+  const sheet = record.sheet;
+  const sheetComponents = Array.isArray(sheet?.components) ? sheet.components : [];
+  const componentMap = new Map(sheetComponents.map(comp => [comp.id, comp]));
+
+  const selectedEntries = selectedDeviceIds()
+    .map(uid => deviceMap.get(uid))
+    .filter(entry => entry && entry.kind === 'component');
+  const selectedIds = new Set(selectedEntries.map(entry => entry.componentId));
+  const sameSheetSelections = [...selectedIds].filter(id => {
+    const info = componentLookup.get(id);
+    return info && info.sheetIndex === record.sheetIndex;
+  });
+  const offSheetCount = Math.max(0, selectedEntries.length - sameSheetSelections.length);
+  const targetIds = new Set(sameSheetSelections);
+  targetIds.add(componentId);
+
+  const availableTargets = [...targetIds].filter(id => componentMap.has(id));
+  if (!availableTargets.length) {
+    onelinePreviewSvg.selectAll('*').remove();
+    onelinePreviewSvgEl.classList.add('hidden');
+    if (onelinePreviewContainer) onelinePreviewContainer.classList.add('empty');
+    if (onelinePreviewEmpty) {
+      onelinePreviewEmpty.textContent = 'No one-line preview available for the current selection.';
+      onelinePreviewEmpty.classList.remove('hidden');
+    }
+    if (onelinePreviewNote) {
+      if (offSheetCount > 0) {
+        onelinePreviewNote.textContent = `${offSheetCount} selected ${offSheetCount === 1 ? 'device is' : 'devices are'} on other sheets and are not shown.`;
+        onelinePreviewNote.classList.remove('hidden');
+      } else {
+        onelinePreviewNote.classList.add('hidden');
+      }
+    }
+    return;
+  }
+
+  const width = Number(onelinePreviewSvgEl.getAttribute('width')) || 320;
+  const height = Number(onelinePreviewSvgEl.getAttribute('height')) || 280;
+  onelinePreviewSvg.attr('viewBox', `0 0 ${width} ${height}`);
   onelinePreviewSvg.selectAll('*').remove();
   onelinePreviewSvgEl.classList.remove('hidden');
   if (onelinePreviewContainer) onelinePreviewContainer.classList.remove('empty');
   if (onelinePreviewEmpty) onelinePreviewEmpty.classList.add('hidden');
 
-  const width = Number(onelinePreviewSvgEl.getAttribute('width')) || 320;
-  const height = Number(onelinePreviewSvgEl.getAttribute('height')) || 280;
-  onelinePreviewSvg.attr('viewBox', `0 0 ${width} ${height}`);
+  const MAX_COMPONENTS = 20;
+  const displayedTargets = availableTargets.slice(0, MAX_COMPONENTS);
+  const truncatedCount = availableTargets.length - displayedTargets.length;
 
-  const centerX = width / 2;
-  const centerY = height / 2;
-  const neighborIds = [...(neighborMap.get(componentId) || [])].filter(id => componentLookup.has(id));
-  const neighborRecords = neighborIds
-    .map(id => componentLookup.get(id))
-    .filter(record => record && record.component && record.component.id)
-    .sort((a, b) => componentLabel(a.component).localeCompare(
-      componentLabel(b.component),
-      undefined,
-      { sensitivity: 'base' }
-    ));
-  const maxDisplay = 8;
-  const displayedRecords = neighborRecords.slice(0, maxDisplay);
-  const displayedNeighbors = displayedRecords.map(record => record.component.id);
-  const radius = Math.max(Math.min(width, height) / 2 - 50, 60);
+  const DEFAULT_WIDTH = 120;
+  const DEFAULT_HEIGHT = 60;
 
-  const nodes = [
-    {
-      id: componentId,
-      label: componentLabel(record.component),
+  let minX = Infinity;
+  let minY = Infinity;
+  let maxX = -Infinity;
+  let maxY = -Infinity;
+
+  displayedTargets.forEach(id => {
+    const comp = componentMap.get(id);
+    if (!comp) return;
+    const compWidth = Number.isFinite(comp.width) ? Number(comp.width) : DEFAULT_WIDTH;
+    const compHeight = Number.isFinite(comp.height) ? Number(comp.height) : DEFAULT_HEIGHT;
+    const compX = Number.isFinite(comp.x) ? Number(comp.x) : 0;
+    const compY = Number.isFinite(comp.y) ? Number(comp.y) : 0;
+    minX = Math.min(minX, compX);
+    minY = Math.min(minY, compY);
+    maxX = Math.max(maxX, compX + compWidth);
+    maxY = Math.max(maxY, compY + compHeight);
+  });
+
+  if (!Number.isFinite(minX) || !Number.isFinite(minY)) {
+    minX = 0;
+    minY = 0;
+    maxX = width;
+    maxY = height;
+  }
+
+  const boundsWidth = Math.max(1, maxX - minX);
+  const boundsHeight = Math.max(1, maxY - minY);
+  const padding = Math.min(width, height) < 320 ? 24 : 36;
+  const scaleX = (width - padding * 2) / boundsWidth;
+  const scaleY = (height - padding * 2) / boundsHeight;
+  const rawScale = Math.min(scaleX, scaleY);
+  const scale = Number.isFinite(rawScale) && rawScale > 0 ? Math.min(rawScale, 2.5) : 1;
+  const offsetX = padding - minX * scale;
+  const offsetY = padding - minY * scale;
+
+  const nodes = displayedTargets.map(id => {
+    const comp = componentMap.get(id);
+    const compWidth = Number.isFinite(comp.width) ? Number(comp.width) : DEFAULT_WIDTH;
+    const compHeight = Number.isFinite(comp.height) ? Number(comp.height) : DEFAULT_HEIGHT;
+    const compX = Number.isFinite(comp.x) ? Number(comp.x) : 0;
+    const compY = Number.isFinite(comp.y) ? Number(comp.y) : 0;
+    const centerX = (compX + compWidth / 2) * scale + offsetX;
+    const centerY = (compY + compHeight / 2) * scale + offsetY;
+    return {
+      id: comp.id,
+      label: componentLabel(comp),
       sheet: record.sheetName,
       x: centerX,
       y: centerY,
-      active: true,
-      component: record.component
-    }
-  ];
+      active: comp.id === componentId,
+      component: comp,
+      selected: selectedIds.has(comp.id)
+    };
+  });
 
-  displayedRecords.forEach((neighborRecord, index) => {
-    const neighbor = neighborRecord.component;
-    const angle = (Math.PI * 2 * index) / Math.max(displayedNeighbors.length, 1);
-    const x = centerX + radius * Math.cos(angle);
-    const y = centerY + radius * Math.sin(angle);
-    nodes.push({
-      id: neighbor.id,
-      label: componentLabel(neighbor),
-      sheet: neighborRecord.sheetName,
-      x,
-      y,
-      active: false,
-      component: neighbor
+  const displayedIdSet = new Set(nodes.map(node => node.id));
+  const edgesMap = new Map();
+
+  const addEdge = (source, target, labelText) => {
+    if (!source || !target || source === target) return;
+    if (!displayedIdSet.has(source) || !displayedIdSet.has(target)) return;
+    const key = source < target ? `${source}--${target}` : `${target}--${source}`;
+    let entry = edgesMap.get(key);
+    if (!entry) {
+      entry = { source, target, labels: [] };
+      edgesMap.set(key, entry);
+    }
+    if (labelText) entry.labels.push(labelText);
+  };
+
+  (sheet?.connections || []).forEach(conn => {
+    if (!conn) return;
+    const from = conn.from ?? conn.source ?? conn.a ?? conn.start ?? null;
+    const to = conn.to ?? conn.target ?? conn.b ?? conn.end ?? null;
+    if (!from || !to) return;
+    addEdge(from, to, describeConnectionLabel(conn));
+  });
+
+  displayedTargets.forEach(id => {
+    const comp = componentMap.get(id);
+    if (!comp) return;
+    (comp.connections || []).forEach(conn => {
+      if (!conn) return;
+      const targetId = typeof conn.target === 'string' ? conn.target : conn.target?.id;
+      if (!targetId) return;
+      addEdge(comp.id, targetId, describeConnectionLabel(conn));
     });
   });
 
+  const edges = [...edgesMap.values()].map(edge => ({
+    source: edge.source,
+    target: edge.target,
+    label: edge.labels.filter(Boolean).join(', ')
+  }));
+
   const nodeById = new Map(nodes.map(node => [node.id, node]));
-  const edges = displayedNeighbors.map(id => {
-    const connections = (connectionIndex.get(componentId) || []).filter(entry => entry.target?.id === id);
-    const label = connections.map(entry => describeConnectionLabel(entry.conn)).filter(Boolean).join(', ');
-    return { source: componentId, target: id, label };
-  });
 
   const linkGroup = onelinePreviewSvg.append('g').attr('class', 'preview-links');
   linkGroup.selectAll('line')
@@ -4055,10 +4274,10 @@ function renderOneLinePreview(componentId) {
     .enter()
     .append('line')
     .attr('class', 'preview-link')
-    .attr('x1', d => nodeById.get(d.source)?.x ?? centerX)
-    .attr('y1', d => nodeById.get(d.source)?.y ?? centerY)
-    .attr('x2', d => nodeById.get(d.target)?.x ?? centerX)
-    .attr('y2', d => nodeById.get(d.target)?.y ?? centerY);
+    .attr('x1', d => nodeById.get(d.source)?.x ?? 0)
+    .attr('y1', d => nodeById.get(d.source)?.y ?? 0)
+    .attr('x2', d => nodeById.get(d.target)?.x ?? 0)
+    .attr('y2', d => nodeById.get(d.target)?.y ?? 0);
 
   linkGroup.selectAll('text')
     .data(edges.filter(edge => edge.label))
@@ -4068,12 +4287,12 @@ function renderOneLinePreview(componentId) {
     .attr('x', d => {
       const source = nodeById.get(d.source);
       const target = nodeById.get(d.target);
-      return source && target ? (source.x + target.x) / 2 : centerX;
+      return source && target ? (source.x + target.x) / 2 : width / 2;
     })
     .attr('y', d => {
       const source = nodeById.get(d.source);
       const target = nodeById.get(d.target);
-      return source && target ? (source.y + target.y) / 2 : centerY;
+      return source && target ? (source.y + target.y) / 2 : height / 2;
     })
     .text(d => d.label);
 
@@ -4082,11 +4301,16 @@ function renderOneLinePreview(componentId) {
     .data(nodes)
     .enter()
     .append('g')
-    .attr('class', d => `preview-node${d.active ? ' is-active' : ''}`)
+    .attr('class', d => {
+      const classes = ['preview-node'];
+      if (d.active) classes.push('is-active');
+      else if (d.selected) classes.push('is-selected');
+      return classes.join(' ');
+    })
     .attr('transform', d => `translate(${d.x},${d.y})`);
 
-  const iconSize = datum => (datum.active ? 56 : 44);
-  const circleRadius = datum => Math.max(24, Math.round(iconSize(datum) / 2) + (datum.active ? 6 : 4));
+  const iconSize = datum => (datum.active ? 56 : datum.selected ? 50 : 44);
+  const circleRadius = datum => Math.max(24, Math.round(iconSize(datum) / 2) + (datum.active ? 6 : datum.selected ? 5 : 4));
 
   node.append('circle')
     .attr('r', d => circleRadius(d));
@@ -4122,11 +4346,18 @@ function renderOneLinePreview(componentId) {
     });
 
   if (onelinePreviewNote) {
-    if (neighborIds.length > displayedNeighbors.length) {
-      onelinePreviewNote.textContent = `Showing ${displayedNeighbors.length} of ${neighborIds.length} connections.`;
-      onelinePreviewNote.classList.remove('hidden');
-    } else if (!displayedNeighbors.length) {
-      onelinePreviewNote.textContent = 'No connected components found for this selection.';
+    const noteMessages = [];
+    if (offSheetCount > 0) {
+      noteMessages.push(`${offSheetCount} selected ${offSheetCount === 1 ? 'device is' : 'devices are'} on other sheets and are not shown.`);
+    }
+    if (truncatedCount > 0) {
+      noteMessages.push(`Showing ${displayedTargets.length} of ${availableTargets.length} selected devices.`);
+    }
+    if (!noteMessages.length && selectedEntries.length && !displayedTargets.length) {
+      noteMessages.push('No one-line preview available for the current selection.');
+    }
+    if (noteMessages.length) {
+      onelinePreviewNote.textContent = noteMessages.join(' ');
       onelinePreviewNote.classList.remove('hidden');
     } else {
       onelinePreviewNote.classList.add('hidden');

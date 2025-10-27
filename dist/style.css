@@ -5343,8 +5343,42 @@ body.dark-mode .panel-slot-meta span {
     font-size: 0.95rem;
 }
 
-.tcc-view-option input[type="radio"] {
+.tcc-view-option input[type="radio"],
+.tcc-view-option input[type="checkbox"] {
     margin-top: 0.2rem;
+}
+
+.tcc-view-option-reset {
+    display: flex;
+    justify-content: flex-end;
+}
+
+.tcc-view-option-clear {
+    background: none;
+    border: none;
+    color: var(--primary-color, #0d6efd);
+    cursor: pointer;
+    font-size: 0.85rem;
+    padding: 0;
+    text-decoration: underline;
+}
+
+.tcc-view-option-clear:hover,
+.tcc-view-option-clear:focus {
+    color: #0a58ca;
+}
+
+body.dark-mode .tcc-view-option-clear {
+    color: #66b0ff;
+}
+
+body.dark-mode .tcc-view-option-clear:hover,
+body.dark-mode .tcc-view-option-clear:focus {
+    color: #99ccff;
+}
+
+.tcc-view-option-clear:focus {
+    outline: none;
 }
 
 .tcc-view-option-label {
@@ -5424,6 +5458,22 @@ body.dark-mode .device-setting-control input[type="number"] {
     padding: 0.5rem 0.6rem;
     border: 1px solid #bcbcbc;
     border-radius: 4px;
+}
+
+.print-settings-toggle {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    font-size: 0.9rem;
+    color: #333;
+}
+
+.print-settings-toggle input {
+    margin: 0;
+}
+
+body.dark-mode .print-settings-toggle {
+    color: #f8f9fa;
 }
 
 #add-annotation-btn {
@@ -5586,6 +5636,18 @@ body.dark-mode .preview-node circle {
     stroke: var(--primary-color);
 }
 
+.preview-node.is-selected circle {
+    fill: rgba(13, 110, 253, 0.12);
+    stroke: rgba(13, 110, 253, 0.6);
+    stroke-width: 2;
+}
+
+body.dark-mode .preview-node.is-selected circle {
+    fill: rgba(102, 176, 255, 0.18);
+    stroke: rgba(102, 176, 255, 0.65);
+    stroke-width: 2.2;
+}
+
 .preview-node text {
     fill: var(--text-color);
     font-size: 0.75rem;
@@ -5593,21 +5655,46 @@ body.dark-mode .preview-node circle {
     pointer-events: none;
 }
 
-.preview-node:not(.is-active) {
+.preview-node:not(.is-active):not(.is-selected) {
     cursor: pointer;
 }
 
-.preview-node:not(.is-active) circle:hover {
+.preview-node:not(.is-active):not(.is-selected) circle:hover {
     fill: rgba(0, 0, 0, 0.05);
 }
 
-body.dark-mode .preview-node:not(.is-active) circle:hover {
+body.dark-mode .preview-node:not(.is-active):not(.is-selected) circle:hover {
     fill: rgba(255, 255, 255, 0.15);
 }
 
 .tcc-view-label {
     font-size: 0.85rem;
     fill: var(--text-muted, #6c757d);
+}
+
+.tcc-view-badges {
+    display: flex;
+    gap: 0.5rem;
+}
+
+.tcc-view-badge-bg {
+    fill: rgba(13, 110, 253, 0.1);
+    stroke: rgba(13, 110, 253, 0.4);
+    stroke-width: 1;
+}
+
+body.dark-mode .tcc-view-badge-bg {
+    fill: rgba(102, 176, 255, 0.2);
+    stroke: rgba(102, 176, 255, 0.45);
+}
+
+.tcc-view-badge-text {
+    font-size: 0.75rem;
+    fill: #0d1b2a;
+}
+
+body.dark-mode .tcc-view-badge-text {
+    fill: #f8f9fa;
 }
 
 body.dark-mode .tcc-view-label {
