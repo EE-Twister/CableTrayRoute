@@ -219,6 +219,54 @@ function summarizeActiveViewLabels() {
   return `${labels[0]}, ${labels[1]}, +${labels.length - 2}`;
 }
 
+function estimateLegendItemMetrics(label, viewSummaries) {
+  const baseLabel = typeof label === 'string' && label.trim() ? label.trim() : 'Device';
+  const summaries = Array.isArray(viewSummaries) ? viewSummaries : [];
+  const textWidth = Math.ceil(baseLabel.length * 7);
+  const iconWidth = 24; // icon plus spacing before text
+  const badgeWidths = summaries.map(summary => {
+    const trimmed = summary ? String(summary) : '';
+    const estimatedText = Math.ceil(trimmed.length * 6.5);
+    return Math.max(32, estimatedText + 16);
+  });
+  const badgeSpacing = badgeWidths.length > 1 ? (badgeWidths.length - 1) * 8 : 0;
+  const badgesWidth = badgeWidths.reduce((sum, value) => sum + value, 0) + badgeSpacing;
+  const width = iconWidth + textWidth + (badgeWidths.length ? 8 + badgesWidth : 0);
+  const height = 20 + (badgeWidths.length ? 26 : 0);
+  return { width, height };
+}
+
+function computeLegendLayout(entries, availableWidth) {
+  const layouts = [];
+  if (!Array.isArray(entries) || !entries.length) {
+    return { layouts, height: 0 };
+  }
+  const safeWidth = Number.isFinite(availableWidth) && availableWidth > 0 ? availableWidth : 400;
+  let cursorX = 0;
+  let cursorY = 0;
+  let rowHeight = 0;
+  const columnSpacing = 16;
+  const rowSpacing = 12;
+
+  entries.forEach(entry => {
+    const baseLabel = entry.selection?.name || entry.name || entry.selection?.baseDevice?.name || '';
+    const legendLabel = baseLabel || entry.name || entry.selection?.baseDevice?.name || 'Device';
+    const viewSummaries = formatViewSummaries(entry);
+    const metrics = estimateLegendItemMetrics(legendLabel, viewSummaries);
+    if (cursorX > 0 && cursorX + metrics.width > safeWidth) {
+      cursorX = 0;
+      cursorY += rowHeight + rowSpacing;
+      rowHeight = 0;
+    }
+    layouts.push({ entry, x: cursorX, y: cursorY, width: metrics.width, height: metrics.height, legendLabel, viewSummaries });
+    cursorX += metrics.width + columnSpacing;
+    rowHeight = Math.max(rowHeight, metrics.height);
+  });
+
+  const totalHeight = layouts.length ? cursorY + rowHeight : 0;
+  return { layouts, height: totalHeight };
+}
+
 function updateViewButtonLabel() {
   if (!viewMenuBtn) return;
   const summary = summarizeActiveViewLabels();
@@ -3636,8 +3684,23 @@ function plot() {
     allCurrents.push(fault * 1000);
   }
 
-  const margin = { top: 50, right: 90, bottom: 70, left: 70 };
-  const width = +chart.attr('width') - margin.left - margin.right;
+  const BASE_MARGIN = { top: 24, right: 90, bottom: 70, left: 70 };
+  const baseWidth = +chart.attr('width') - BASE_MARGIN.left - BASE_MARGIN.right;
+  const color = d3.scaleOrdinal(d3.schemeCategory10);
+  const plottables = [...devicePlots, ...overlays];
+  plottables.forEach((entry, index) => {
+    entry.color = color(index);
+  });
+
+  const { layouts: legendLayouts, height: legendHeight } = computeLegendLayout(plottables, baseWidth);
+  const legendSpacing = legendHeight ? 12 : 0;
+  const margin = {
+    top: BASE_MARGIN.top + legendHeight + legendSpacing,
+    right: BASE_MARGIN.right,
+    bottom: BASE_MARGIN.bottom,
+    left: BASE_MARGIN.left
+  };
+  const width = baseWidth;
   const height = +chart.attr('height') - margin.top - margin.bottom;
   const g = chart.append('g').attr('transform', `translate(${margin.left},${margin.top})`);
   const minCurrent = d3.min(allCurrents) || 1;
@@ -3698,15 +3761,13 @@ function plot() {
     .attr('fill', '#333')
     .text('Time (s)');
 
-  const color = d3.scaleOrdinal(d3.schemeCategory10);
   const legend = chart.append('g')
     .attr('class', 'tcc-legend')
-    .attr('transform', `translate(${margin.left},${margin.top - 12})`);
+    .attr('transform', `translate(${margin.left},${BASE_MARGIN.top})`);
 
-  const plottables = [...devicePlots, ...overlays];
-  plottables.forEach((entry, index) => {
-    entry.color = color(index);
-    const legendItem = legend.append('g').attr('transform', `translate(${index * 180},0)`);
+  legendLayouts.forEach(layout => {
+    const { entry, viewSummaries, legendLabel, x: itemX, y: itemY } = layout;
+    const legendItem = legend.append('g').attr('transform', `translate(${itemX},${itemY})`);
     if (entry.kind === 'cable') {
       legendItem.append('line')
         .attr('x1', 0)
@@ -3765,11 +3826,6 @@ function plot() {
         .attr('fill', entry.color)
         .attr('opacity', 0.6);
     }
-    const baseLabel = entry.selection?.name || entry.name || entry.selection?.baseDevice?.name || '';
-    const viewSummaries = (entry.kind === 'library' || entry.kind === 'component')
-      ? formatViewSummaries(entry)
-      : [];
-    const legendLabel = baseLabel || entry.name || entry.selection?.baseDevice?.name || 'Device';
     legendItem.append('text')
       .attr('x', 20)
       .attr('y', 12)
@@ -4252,6 +4308,113 @@ function describeConnectionLabel(conn) {
   return '';
 }
 
+function resolveComponentId(value) {
+  if (typeof value === 'string') {
+    const trimmed = value.trim();
+    return trimmed || null;
+  }
+  if (value && typeof value === 'object') {
+    const keys = ['id', 'component', 'target', 'to', 'from', 'a', 'b'];
+    for (const key of keys) {
+      const candidate = value[key];
+      if (typeof candidate === 'string') {
+        const trimmed = candidate.trim();
+        if (trimmed) return trimmed;
+      }
+    }
+  }
+  return null;
+}
+
+function buildPreviewAdjacency(componentMap, sheet) {
+  const adjacency = new Map();
+  const ensureEntry = id => {
+    if (!adjacency.has(id)) adjacency.set(id, new Set());
+    return adjacency.get(id);
+  };
+  const addConnection = (source, target) => {
+    const sourceId = resolveComponentId(source);
+    const targetId = resolveComponentId(target);
+    if (!sourceId || !targetId || sourceId === targetId) return;
+    if (!componentMap.has(sourceId) || !componentMap.has(targetId)) return;
+    ensureEntry(sourceId).add(targetId);
+    ensureEntry(targetId).add(sourceId);
+  };
+
+  (sheet?.connections || []).forEach(conn => {
+    if (!conn) return;
+    const from = conn.from ?? conn.source ?? conn.a ?? conn.start ?? null;
+    const to = conn.to ?? conn.target ?? conn.b ?? conn.end ?? null;
+    addConnection(from, to);
+  });
+
+  componentMap.forEach((comp, id) => {
+    if (!comp) return;
+    const list = Array.isArray(comp.connections) ? comp.connections : [];
+    list.forEach(conn => {
+      if (!conn) return;
+      const candidates = [
+        conn.target,
+        conn.to,
+        conn.source,
+        conn.from,
+        conn.a,
+        conn.b,
+        conn.end,
+        conn.start,
+        conn.component
+      ];
+      let targetId = null;
+      for (const candidate of candidates) {
+        const resolved = resolveComponentId(candidate);
+        if (resolved && resolved !== id) {
+          targetId = resolved;
+          break;
+        }
+      }
+      if (!targetId && typeof conn.id === 'string' && conn.id !== id) {
+        targetId = conn.id;
+      }
+      if (targetId) {
+        addConnection(id, targetId);
+      }
+    });
+  });
+
+  return adjacency;
+}
+
+function gatherConnectedComponentIds(seedList, componentMap, adjacency, limit = 60) {
+  const visited = new Set();
+  const order = [];
+  const queue = [];
+  const seeds = Array.isArray(seedList) ? seedList : [];
+  seeds.forEach(seed => {
+    if (typeof seed !== 'string') return;
+    if (!componentMap.has(seed)) return;
+    if (visited.has(seed)) return;
+    visited.add(seed);
+    queue.push(seed);
+  });
+
+  while (queue.length && order.length < limit) {
+    const current = queue.shift();
+    if (!componentMap.has(current)) continue;
+    order.push(current);
+    const neighbors = adjacency.get(current);
+    if (!neighbors) continue;
+    neighbors.forEach(neighbor => {
+      if (!componentMap.has(neighbor)) return;
+      if (visited.has(neighbor)) return;
+      if (visited.size >= limit) return;
+      visited.add(neighbor);
+      queue.push(neighbor);
+    });
+  }
+
+  return { order, set: visited };
+}
+
 function renderOneLinePreview(componentId) {
   if (!onelinePreviewSvgEl || !onelinePreviewSvg) return;
   ensureComponentIcons();
@@ -4286,10 +4449,15 @@ function renderOneLinePreview(componentId) {
     return info && info.sheetIndex === record.sheetIndex;
   });
   const offSheetCount = Math.max(0, selectedEntries.length - sameSheetSelections.length);
-  const targetIds = new Set(sameSheetSelections);
-  targetIds.add(componentId);
+  const seedList = [];
+  if (componentId) seedList.push(componentId);
+  sameSheetSelections.forEach(id => {
+    if (!seedList.includes(id)) seedList.push(id);
+  });
 
-  const availableTargets = [...targetIds].filter(id => componentMap.has(id));
+  const adjacency = buildPreviewAdjacency(componentMap, sheet);
+  const { order: connectedOrder } = gatherConnectedComponentIds(seedList, componentMap, adjacency, MAX_COMPONENTS * 3);
+  const availableTargets = connectedOrder.filter(id => componentMap.has(id));
   if (!availableTargets.length) {
     onelinePreviewSvg.selectAll('*').remove();
     onelinePreviewSvgEl.classList.add('hidden');
