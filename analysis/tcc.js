@@ -58,6 +58,7 @@ const onelinePreviewContainer = document.querySelector('.tcc-oneline-preview');
 const onelinePreviewEmpty = document.getElementById('oneline-preview-empty');
 const onelinePreviewNote = document.getElementById('oneline-preview-note');
 const contextMenu = createContextMenu();
+const viewCalloutOffsets = new Map();
 
 const baseHref = document.querySelector('base')?.href || new URL('.', window.location.href).href;
 const asset = path => new URL(path, baseHref).href;
@@ -4069,10 +4070,17 @@ function plot() {
     const data = buildViewCalloutData();
     if (!data.length) {
       viewCalloutLayer.selectAll('*').remove();
+      viewCalloutOffsets.clear();
       return;
     }
+    const activeIds = new Set(data.map(datum => datum.id));
+    viewCalloutOffsets.forEach((_, key) => {
+      if (!activeIds.has(key)) viewCalloutOffsets.delete(key);
+    });
     const callouts = viewCalloutLayer.selectAll('g.view-callout').data(data, datum => datum.id);
-    callouts.exit().remove();
+    callouts.exit().each(datum => {
+      viewCalloutOffsets.delete(datum.id);
+    }).remove();
     const entered = callouts.enter().append('g').attr('class', 'view-callout');
     entered.append('line').attr('class', 'view-callout-connector');
     entered.append('circle').attr('class', 'view-callout-anchor').attr('r', 4);
@@ -4097,15 +4105,32 @@ function plot() {
         return;
       }
       group.attr('display', null);
+      datum.anchorX = anchorX;
+      datum.anchorY = anchorY;
       const baseOffsets = defaultAnnotationOffsets(anchorX, anchorY, width, height);
       const horizontal = baseOffsets.offsetX >= 0 ? 1 : -1;
       const vertical = baseOffsets.offsetY >= 0 ? 1 : -1;
-      const magnitudeX = Math.max(60, Math.abs(baseOffsets.offsetX)) + (index % 3) * 18;
-      const magnitudeY = Math.max(40, Math.abs(baseOffsets.offsetY)) + ((index + 1) % 3) * 14;
-      const rawLabelX = anchorX + horizontal * magnitudeX;
-      const rawLabelY = anchorY + vertical * magnitudeY;
-      const labelX = Math.max(24, Math.min(width - 24, rawLabelX));
-      const labelY = Math.max(24, Math.min(height - 24, rawLabelY));
+      const storedOffset = viewCalloutOffsets.get(datum.id);
+      let offsetX;
+      let offsetY;
+      if (storedOffset && Number.isFinite(storedOffset.dx) && Number.isFinite(storedOffset.dy)) {
+        offsetX = storedOffset.dx;
+        offsetY = storedOffset.dy;
+      } else {
+        const magnitudeX = Math.max(60, Math.abs(baseOffsets.offsetX)) + (index % 3) * 18;
+        const magnitudeY = Math.max(40, Math.abs(baseOffsets.offsetY)) + ((index + 1) % 3) * 14;
+        offsetX = horizontal * magnitudeX;
+        offsetY = vertical * magnitudeY;
+      }
+      let labelX = clampValue(anchorX + offsetX, 24, width - 24);
+      let labelY = clampValue(anchorY + offsetY, 24, height - 24);
+      const appliedOffset = {
+        dx: labelX - anchorX,
+        dy: labelY - anchorY
+      };
+      viewCalloutOffsets.set(datum.id, appliedOffset);
+      datum.labelX = labelX;
+      datum.labelY = labelY;
       group.select('line.view-callout-connector')
         .attr('x1', anchorX)
         .attr('y1', anchorY)
@@ -4119,7 +4144,44 @@ function plot() {
         .attr('stroke', entry.color)
         .attr('stroke-width', 1.4);
       const label = group.select('g.view-callout-label')
-        .attr('transform', `translate(${labelX},${labelY})`);
+        .attr('transform', `translate(${labelX},${labelY})`)
+        .style('touch-action', 'none')
+        .call(d3.drag()
+          .subject(() => ({ x: datum.labelX, y: datum.labelY }))
+          .on('start', event => {
+            if (event.sourceEvent) event.sourceEvent.stopPropagation();
+          })
+          .on('drag', function handleCalloutDrag(event) {
+            const newX = clampValue(event.x, 24, width - 24);
+            const newY = clampValue(event.y, 24, height - 24);
+            datum.labelX = newX;
+            datum.labelY = newY;
+            const offset = {
+              dx: newX - datum.anchorX,
+              dy: newY - datum.anchorY
+            };
+            viewCalloutOffsets.set(datum.id, offset);
+            d3.select(this).attr('transform', `translate(${newX},${newY})`);
+            group.select('line.view-callout-connector')
+              .attr('x2', newX)
+              .attr('y2', newY);
+          })
+          .on('end', function handleCalloutDragEnd() {
+            const stored = viewCalloutOffsets.get(datum.id);
+            if (!stored) return;
+            const finalX = clampValue(datum.anchorX + stored.dx, 24, width - 24);
+            const finalY = clampValue(datum.anchorY + stored.dy, 24, height - 24);
+            datum.labelX = finalX;
+            datum.labelY = finalY;
+            viewCalloutOffsets.set(datum.id, {
+              dx: finalX - datum.anchorX,
+              dy: finalY - datum.anchorY
+            });
+            d3.select(this).attr('transform', `translate(${finalX},${finalY})`);
+            group.select('line.view-callout-connector')
+              .attr('x2', finalX)
+              .attr('y2', finalY);
+          }));
       const text = label.select('text.view-callout-text')
         .attr('text-anchor', 'start');
       const tspans = text.selectAll('tspan').data(datum.lines, (line, lineIndex) => `${datum.id}:${lineIndex}`);
@@ -4631,10 +4693,6 @@ function renderOneLinePreview(componentId) {
     .attr('transform', d => `translate(${d.x},${d.y})`);
 
   const iconSize = datum => (datum.active ? 56 : datum.selected ? 50 : 44);
-  const circleRadius = datum => Math.max(24, Math.round(iconSize(datum) / 2) + (datum.active ? 6 : datum.selected ? 5 : 4));
-
-  node.append('circle')
-    .attr('r', d => circleRadius(d));
 
   node.append('image')
     .attr('class', 'preview-node-icon')
@@ -4646,8 +4704,10 @@ function renderOneLinePreview(componentId) {
     .attr('href', d => getComponentIcon(d.component))
     .attr('xlink:href', d => getComponentIcon(d.component));
 
+  const labelOffset = datum => Math.round(iconSize(datum) / 2) + (datum.active ? 20 : 18);
+
   const labels = node.append('text')
-    .attr('y', d => circleRadius(d) + 14);
+    .attr('y', d => labelOffset(d));
 
   labels.selectAll('tspan')
     .data(d => wrapPreviewLabel(d.label))

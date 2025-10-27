@@ -5547,14 +5547,16 @@ body.dark-mode .print-settings-toggle {
 .tcc-visualization {
     display: flex;
     flex-wrap: wrap;
-    gap: 1.5rem;
+    gap: 1rem;
     align-items: flex-start;
+    justify-content: flex-start;
     margin-top: 1.5rem;
 }
 
 .tcc-chart-container {
-    flex: 1 1 520px;
+    flex: 0 1 820px;
     min-width: 320px;
+    max-width: 820px;
 }
 
 .tcc-chart-container .violation {
@@ -5616,36 +5618,30 @@ body.dark-mode .preview-link {
     transition: transform 0.2s ease;
 }
 
-.preview-node circle {
-    fill: var(--secondary-color);
-    stroke: var(--border-color);
-    stroke-width: 1.5;
-}
-
 .preview-node image {
     pointer-events: none;
+    filter: drop-shadow(0 1px 2px rgba(0, 0, 0, 0.18));
+    transition: filter 0.2s ease, transform 0.2s ease;
 }
 
-body.dark-mode .preview-node circle {
-    fill: #2c3034;
-    stroke: rgba(255, 255, 255, 0.35);
+.preview-node.is-active image {
+    filter: drop-shadow(0 0 10px rgba(13, 110, 253, 0.55));
 }
 
-.preview-node.is-active circle {
-    fill: var(--primary-color);
-    stroke: var(--primary-color);
+.preview-node.is-selected image {
+    filter: drop-shadow(0 0 8px rgba(13, 110, 253, 0.4));
 }
 
-.preview-node.is-selected circle {
-    fill: rgba(13, 110, 253, 0.12);
-    stroke: rgba(13, 110, 253, 0.6);
-    stroke-width: 2;
+body.dark-mode .preview-node image {
+    filter: drop-shadow(0 1px 2px rgba(0, 0, 0, 0.5));
 }
 
-body.dark-mode .preview-node.is-selected circle {
-    fill: rgba(102, 176, 255, 0.18);
-    stroke: rgba(102, 176, 255, 0.65);
-    stroke-width: 2.2;
+body.dark-mode .preview-node.is-active image {
+    filter: drop-shadow(0 0 12px rgba(102, 176, 255, 0.7));
+}
+
+body.dark-mode .preview-node.is-selected image {
+    filter: drop-shadow(0 0 9px rgba(102, 176, 255, 0.55));
 }
 
 .preview-node text {
@@ -5659,12 +5655,12 @@ body.dark-mode .preview-node.is-selected circle {
     cursor: pointer;
 }
 
-.preview-node:not(.is-active):not(.is-selected) circle:hover {
-    fill: rgba(0, 0, 0, 0.05);
+.preview-node:not(.is-active):not(.is-selected):hover {
+    transform: translateY(-2px);
 }
 
-body.dark-mode .preview-node:not(.is-active):not(.is-selected) circle:hover {
-    fill: rgba(255, 255, 255, 0.15);
+body.dark-mode .preview-node:not(.is-active):not(.is-selected):hover {
+    transform: translateY(-2px);
 }
 
 .tcc-view-label {
@@ -5703,6 +5699,15 @@ body.dark-mode .tcc-view-label {
 
 .view-callout-layer {
     pointer-events: none;
+}
+
+.view-callout-layer .view-callout-label {
+    pointer-events: auto;
+    cursor: move;
+}
+
+.view-callout-layer .view-callout-label:focus-visible {
+    outline: none;
 }
 
 .view-callout-layer .view-callout-connector {
