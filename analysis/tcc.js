@@ -50,6 +50,7 @@ const componentModalBtn = document.getElementById('component-modal-btn');
 const violationDiv = document.getElementById('violation');
 const printPlotBtn = document.getElementById('print-plot-btn');
 const annotationBtn = document.getElementById('add-annotation-btn');
+const viewMenuBtn = document.getElementById('tcc-view-menu-btn');
 const chart = d3.select('#tcc-chart');
 const onelinePreviewSvgEl = document.getElementById('oneline-preview');
 const onelinePreviewSvg = onelinePreviewSvgEl ? d3.select(onelinePreviewSvgEl) : null;
@@ -57,6 +58,159 @@ const onelinePreviewContainer = document.querySelector('.tcc-oneline-preview');
 const onelinePreviewEmpty = document.getElementById('oneline-preview-empty');
 const onelinePreviewNote = document.getElementById('oneline-preview-note');
 const contextMenu = createContextMenu();
+
+const baseHref = document.querySelector('base')?.href || new URL('.', window.location.href).href;
+const asset = path => new URL(path, baseHref).href;
+const placeholderIcon = asset('icons/placeholder.svg');
+const componentIconMap = new Map();
+let componentIconLoadPromise = null;
+let componentIconsReady = false;
+
+const TCC_VIEW_OPTIONS = [
+  { id: 'none', label: 'No Additional View', field: null, description: 'Hide device settings in the legend.' },
+  { id: 'pickup', label: 'Pickup', field: 'pickup', unit: 'A', shortLabel: 'Pickup', description: 'Display the long-time pickup current.' },
+  { id: 'time', label: 'Delay', field: 'time', unit: 's', shortLabel: 'Delay', description: 'Display the long-time delay setting.' },
+  { id: 'shortTimePickup', label: 'Short-Time Pickup', field: 'shortTimePickup', unit: 'A', shortLabel: 'ST Pickup', description: 'Display the short-time pickup current.' },
+  { id: 'shortTimeDelay', label: 'Short-Time Delay', field: 'shortTimeDelay', unit: 's', shortLabel: 'ST Delay', description: 'Display the short-time delay setting.' },
+  { id: 'instantaneousPickup', label: 'Instantaneous Pickup (INST)', field: 'instantaneousPickup', unit: 'A', shortLabel: 'INST', description: 'Display the instantaneous pickup current.' },
+  { id: 'instantaneousDelay', label: 'Instantaneous Delay', field: 'instantaneousDelay', unit: 's', shortLabel: 'INST Delay', description: 'Display the instantaneous delay setting.' },
+  { id: 'instantaneousMax', label: 'Instantaneous Max', field: 'instantaneousMax', unit: 'A', shortLabel: 'INST Max', description: 'Display the instantaneous ceiling current.' },
+  { id: 'curveProfile', label: 'Curve Profile', field: 'curveProfileLabel', shortLabel: 'Curve', description: 'Display the selected curve profile.' }
+];
+
+const viewOptionMap = new Map(TCC_VIEW_OPTIONS.map(option => [option.id, option]));
+
+function resolveIconSource(iconPath, fallbackSymbol) {
+  if (typeof iconPath === 'string' && iconPath.trim()) {
+    const trimmed = iconPath.trim();
+    if (trimmed.startsWith('data:') || /^https?:/i.test(trimmed)) {
+      return trimmed;
+    }
+    return asset(trimmed);
+  }
+  if (fallbackSymbol) {
+    return asset(`icons/components/${fallbackSymbol}.svg`);
+  }
+  return placeholderIcon;
+}
+
+function normalizeComponentKey(value) {
+  return typeof value === 'string' ? value.trim().toLowerCase() : '';
+}
+
+function ensureComponentIcons() {
+  if (componentIconsReady) return componentIconLoadPromise || Promise.resolve(componentIconMap);
+  if (!componentIconLoadPromise) {
+    componentIconLoadPromise = (async () => {
+      try {
+        const response = await fetch(asset('componentLibrary.json'));
+        if (response && response.ok) {
+          const data = await response.json();
+          const components = Array.isArray(data?.components) ? data.components : [];
+          components.forEach(def => {
+            if (!def || typeof def !== 'object') return;
+            const iconHref = resolveIconSource(def.icon, def.symbol);
+            if (!iconHref) return;
+            const subtypeKey = normalizeComponentKey(def.subtype);
+            if (subtypeKey && !componentIconMap.has(subtypeKey)) {
+              componentIconMap.set(subtypeKey, iconHref);
+            }
+            const typeKey = normalizeComponentKey(def.type);
+            if (typeKey) {
+              const mapKey = `type:${typeKey}`;
+              if (!componentIconMap.has(mapKey)) componentIconMap.set(mapKey, iconHref);
+            }
+          });
+        }
+      } catch (err) {
+        console.error('Failed to load component icons', err);
+      } finally {
+        componentIconsReady = true;
+      }
+      return componentIconMap;
+    })();
+    componentIconLoadPromise.then(() => {
+      renderOneLinePreview(getActiveComponentId());
+    });
+  }
+  return componentIconLoadPromise;
+}
+
+function getComponentIcon(component) {
+  if (!component) return placeholderIcon;
+  const subtypeKey = normalizeComponentKey(component.subtype);
+  if (subtypeKey && componentIconMap.has(subtypeKey)) {
+    return componentIconMap.get(subtypeKey);
+  }
+  const typeKey = normalizeComponentKey(component.type);
+  if (typeKey) {
+    const byType = componentIconMap.get(`type:${typeKey}`) || componentIconMap.get(typeKey);
+    if (byType) return byType;
+  }
+  return placeholderIcon;
+}
+
+function normalizeViewOption(id) {
+  if (typeof id !== 'string') return 'none';
+  const trimmed = id.trim();
+  return viewOptionMap.has(trimmed) ? trimmed : 'none';
+}
+
+function getActiveViewConfig() {
+  return viewOptionMap.get(activeViewOption) || viewOptionMap.get('none') || { id: 'none', label: 'No Additional View' };
+}
+
+function formatViewValue(option, value) {
+  if (!option) return null;
+  if (value === undefined || value === null) return null;
+  if (typeof value === 'number') {
+    const formatted = formatSettingValue(value);
+    if (!formatted && formatted !== '0') return null;
+    return option.unit ? `${formatted} ${option.unit}`.trim() : formatted;
+  }
+  if (typeof value === 'string') {
+    const trimmed = value.trim();
+    if (!trimmed) return null;
+    return option.unit ? `${trimmed} ${option.unit}`.trim() : trimmed;
+  }
+  return null;
+}
+
+function formatViewSummary(entry) {
+  const option = getActiveViewConfig();
+  if (!option || !option.field) return null;
+  if (!entry || !entry.scaled || !entry.scaled.settings) return null;
+  const raw = entry.scaled.settings[option.field];
+  const formatted = formatViewValue(option, raw);
+  if (!formatted) return null;
+  const prefix = option.shortLabel || option.label;
+  return `${prefix}: ${formatted}`;
+}
+
+function updateViewButtonLabel() {
+  if (!viewMenuBtn) return;
+  const option = getActiveViewConfig();
+  if (!option || !option.field) {
+    viewMenuBtn.textContent = 'Views';
+    viewMenuBtn.title = 'Select a device characteristic to display on the chart';
+  } else {
+    const shortLabel = option.shortLabel || option.label;
+    viewMenuBtn.textContent = `Views (${shortLabel})`;
+    viewMenuBtn.title = `Showing ${option.label}`;
+  }
+  viewMenuBtn.disabled = false;
+}
+
+function setActiveViewOption(optionId, { persist = true } = {}) {
+  const normalized = normalizeViewOption(optionId);
+  const changed = normalized !== activeViewOption;
+  activeViewOption = normalized;
+  if (changed) updateViewButtonLabel();
+  if (persist) {
+    saved.viewOption = activeViewOption;
+    setItem('tccSettings', saved);
+  }
+}
 
 const params = new URLSearchParams(window.location.search);
 const compId = params.get('component');
@@ -151,6 +305,7 @@ function loadSavedSettings() {
   if (!Array.isArray(stored.annotations)) stored.annotations = [];
   if (typeof stored.printHeader !== 'string') stored.printHeader = '';
   if (typeof stored.printFooter !== 'string') stored.printFooter = '';
+  if (typeof stored.viewOption !== 'string') stored.viewOption = 'none';
   return stored;
 }
 
@@ -240,10 +395,17 @@ function createContextMenu() {
 
 let saved = loadSavedSettings();
 
+let activeViewOption = normalizeViewOption(saved.viewOption);
+saved.viewOption = activeViewOption;
+
 annotations = (saved.annotations || []).map(sanitizeAnnotation).filter(Boolean);
 saved.annotations = annotations.map(exportAnnotation);
 
 setPlotAvailability(false);
+
+ensureComponentIcons();
+
+updateViewButtonLabel();
 
 init();
 
@@ -385,6 +547,7 @@ function exportAnnotation(annotation) {
 function persistAnnotations({ skipSetItem = false } = {}) {
   saved.annotations = annotations.map(exportAnnotation);
   if (!skipSetItem) {
+    saved.viewOption = activeViewOption;
     setItem('tccSettings', saved);
   }
 }
@@ -501,7 +664,7 @@ function buildCurveContextItems(entry) {
   if (!entry || !entry.selection) return [];
   const selection = entry.selection;
   const items = [];
-  if (selection.uid) {
+  if (selection.uid && settingsDiv) {
     items.push({
       label: 'Focus Device Settings',
       onSelect: () => focusDeviceSettings(selection.uid)
@@ -910,6 +1073,7 @@ async function handlePrintPlot() {
       const footerValue = footerInputEl.value.trim();
       saved.printHeader = headerValue;
       saved.printFooter = footerValue;
+      saved.viewOption = activeViewOption;
       setItem('tccSettings', saved);
       return { header: headerValue, footer: footerValue };
     }
@@ -1127,6 +1291,20 @@ function collectOverridesFromDiv(div) {
   return overrides;
 }
 
+function updateEntryOverrideFromControl(entry, control) {
+  if (!entry || !control || !control.dataset) return;
+  const field = control.dataset.field;
+  if (!field) return;
+  const result = readOverrideFromInput(control);
+  const overrides = { ...(entry.overrideSource || {}) };
+  if (result && result.value !== undefined && result.value !== null) {
+    overrides[result.field] = result.value;
+  } else {
+    delete overrides[field];
+  }
+  entry.overrideSource = overrides;
+}
+
 function refreshCatalog({
   preserveSelection = false,
   includeComponentContext = !preserveSelection,
@@ -1168,6 +1346,7 @@ function refreshCatalog({
   applySelectionSet(selection);
   saved.devices = selection;
   persistAnnotations({ skipSetItem: true });
+  saved.viewOption = activeViewOption;
   setItem('tccSettings', saved);
   return selection;
 }
@@ -1232,9 +1411,12 @@ async function init() {
 
   on('scenario', () => {
     saved = loadSavedSettings();
+    activeViewOption = normalizeViewOption(saved.viewOption);
+    saved.viewOption = activeViewOption;
     annotations = (saved.annotations || []).map(sanitizeAnnotation).filter(Boolean);
     saved.annotations = annotations.map(exportAnnotation);
     renderAnnotations();
+    updateViewButtonLabel();
     const selection = refreshCatalog({ includeComponentContext: true, includeDeviceParam: true });
     updateShortCircuitStudy();
     renderOneLinePreview(getActiveComponentId());
@@ -1249,6 +1431,7 @@ function selectDefaults(ids) {
   applySelectionSet(valid);
   saved.devices = valid;
   persistAnnotations({ skipSetItem: true });
+  saved.viewOption = activeViewOption;
   setItem('tccSettings', saved);
 }
 
@@ -1733,6 +1916,12 @@ if (deviceModalBtn) {
   });
 }
 
+if (viewMenuBtn) {
+  viewMenuBtn.addEventListener('click', () => {
+    openViewOptionModal();
+  });
+}
+
 function manufacturerPriority(name) {
   if (name === COMPONENT_FALLBACK_GROUP) return -2;
   if (name === LIBRARY_FALLBACK_GROUP) return -1;
@@ -2205,6 +2394,75 @@ function renderDeviceDetails(entry, container, doc) {
     emptyProps.textContent = 'No adjustable properties available.';
     container.appendChild(emptyProps);
   }
+
+  if (entry.kind === 'library' || entry.kind === 'component') {
+    const base = entry.baseDevice || {};
+    const settingKeys = Object.keys(base.settings || {});
+    if (settingKeys.length) {
+      const settingsWrapper = docRef.createElement('div');
+      settingsWrapper.className = 'device-detail-settings';
+      const heading = docRef.createElement('h4');
+      heading.textContent = 'Adjust Settings';
+      settingsWrapper.appendChild(heading);
+      settingKeys.forEach(field => {
+        const label = docRef.createElement('div');
+        label.className = 'device-setting-control';
+        const title = docRef.createElement('span');
+        title.textContent = formatSettingLabel(field);
+        label.appendChild(title);
+        const options = Array.isArray(base.settingOptions?.[field]) ? base.settingOptions[field] : null;
+        const normalizedOptions = normalizeSettingOptions(options);
+        const defaultValue = base.settings?.[field];
+        const overrideValue = entry.overrideSource?.[field];
+        if (normalizedOptions.length) {
+          const select = docRef.createElement('select');
+          select.dataset.field = field;
+          select.dataset.valueType = resolveSettingType(defaultValue, options);
+          select.dataset.defaultValue = defaultValue !== undefined && defaultValue !== null ? String(defaultValue) : '';
+          normalizedOptions.forEach(opt => {
+            const optEl = docRef.createElement('option');
+            optEl.value = opt.valueStr;
+            optEl.textContent = opt.label;
+            select.appendChild(optEl);
+          });
+          const activeValue = overrideValue !== undefined ? overrideValue : defaultValue;
+          const snapped = snapSettingValue(base, field, activeValue);
+          const match = normalizedOptions.find(opt => valuesEqual(opt.value, snapped) || opt.valueStr === String(snapped ?? ''));
+          if (match) {
+            select.value = match.valueStr;
+          }
+          select.addEventListener('change', () => {
+            updateEntryOverrideFromControl(entry, select);
+          });
+          label.appendChild(select);
+        } else {
+          const valueType = resolveSettingType(defaultValue, options);
+          const input = docRef.createElement('input');
+          input.type = valueType === 'string' ? 'text' : 'number';
+          input.dataset.field = field;
+          input.dataset.valueType = valueType;
+          input.dataset.defaultValue = defaultValue !== undefined && defaultValue !== null ? String(defaultValue) : '';
+          const sanitizedOverride = snapSettingValue(base, field, overrideValue);
+          if (sanitizedOverride !== undefined && sanitizedOverride !== null && sanitizedOverride !== '') {
+            input.value = valueType === 'string'
+              ? String(sanitizedOverride)
+              : formatSettingValue(Number(sanitizedOverride));
+          }
+          if (defaultValue !== undefined && defaultValue !== null) {
+            input.placeholder = valueType === 'string'
+              ? String(defaultValue)
+              : formatSettingValue(Number(defaultValue));
+          }
+          input.addEventListener('change', () => {
+            updateEntryOverrideFromControl(entry, input);
+          });
+          label.appendChild(input);
+        }
+        settingsWrapper.appendChild(label);
+      });
+      container.appendChild(settingsWrapper);
+    }
+  }
 }
 
 async function openDeviceSelectionModal() {
@@ -2229,6 +2487,13 @@ async function openDeviceSelectionModal() {
 
   const initialSelection = new Set(selectedDeviceIds());
   const selectionSet = new Set(initialSelection);
+
+  const overrideSnapshots = new Map();
+  deviceEntries
+    .filter(entry => entry && (entry.kind === 'library' || entry.kind === 'component'))
+    .forEach(entry => {
+      overrideSnapshots.set(entry.uid, { ...(entry.overrideSource || {}) });
+    });
 
   const findSelectedContext = () => {
     for (const group of typeGroups) {
@@ -2417,10 +2682,18 @@ async function openDeviceSelectionModal() {
     closeOnBackdrop: false,
     onSubmit() {
       applySelectionSet(selectionSet, { persist: true });
+      requestPlotRefresh();
       return true;
     },
     onCancel() {
+      overrideSnapshots.forEach((overrides, uid) => {
+        const entry = deviceMap.get(uid);
+        if (entry && (entry.kind === 'library' || entry.kind === 'component')) {
+          entry.overrideSource = { ...overrides };
+        }
+      });
       applySelectionSet(initialSelection, { persist: true });
+      requestPlotRefresh();
     },
     render(container, controls) {
       const doc = container.ownerDocument;
@@ -2475,6 +2748,76 @@ async function openDeviceSelectionModal() {
         controls.setInitialFocus(initialFocus);
       }
       return initialFocus;
+    }
+  });
+}
+
+async function openViewOptionModal() {
+  if (!viewMenuBtn) return;
+  viewMenuBtn.setAttribute('aria-expanded', 'true');
+  const initial = activeViewOption;
+  let pending = initial;
+
+  await openModal({
+    title: 'Device Views',
+    description: 'Choose which device characteristic to display alongside the plotted curves.',
+    primaryText: 'Apply',
+    secondaryText: 'Cancel',
+    closeOnBackdrop: true,
+    onSubmit() {
+      setActiveViewOption(pending);
+      if (deviceSelect && deviceSelect.selectedOptions.length) {
+        requestPlotRefresh();
+      }
+      viewMenuBtn.setAttribute('aria-expanded', 'false');
+      return true;
+    },
+    onCancel() {
+      setActiveViewOption(initial, { persist: false });
+      updateViewButtonLabel();
+      viewMenuBtn.setAttribute('aria-expanded', 'false');
+    },
+    onClose() {
+      viewMenuBtn.setAttribute('aria-expanded', 'false');
+    },
+    render(container, controls) {
+      const doc = container.ownerDocument;
+      container.classList.add('tcc-view-modal');
+      const list = doc.createElement('ul');
+      list.className = 'tcc-view-option-list';
+      TCC_VIEW_OPTIONS.forEach(option => {
+        const item = doc.createElement('li');
+        const label = doc.createElement('label');
+        label.className = 'tcc-view-option';
+        const radio = doc.createElement('input');
+        radio.type = 'radio';
+        radio.name = 'tcc-view-option';
+        radio.value = option.id;
+        radio.checked = pending === option.id;
+        radio.addEventListener('change', () => {
+          pending = option.id;
+        });
+        const textWrap = doc.createElement('div');
+        const title = doc.createElement('span');
+        title.className = 'tcc-view-option-label';
+        title.textContent = option.label;
+        textWrap.appendChild(title);
+        if (option.description) {
+          const desc = doc.createElement('span');
+          desc.className = 'tcc-view-option-description';
+          desc.textContent = option.description;
+          textWrap.appendChild(desc);
+        }
+        label.append(radio, textWrap);
+        item.appendChild(label);
+        list.appendChild(item);
+      });
+      container.appendChild(list);
+      const focusTarget = list.querySelector('input:checked') || list.querySelector('input');
+      if (focusTarget && controls && typeof controls.setInitialFocus === 'function') {
+        controls.setInitialFocus(focusTarget);
+      }
+      return focusTarget || list;
     }
   });
 }
@@ -2863,6 +3206,7 @@ async function openComponentBrowserModal() {
 }
 
 function renderSettings() {
+  if (!settingsDiv) return;
   settingsDiv.innerHTML = '';
   selectedDeviceIds().forEach(uid => {
     const entry = deviceMap.get(uid);
@@ -2942,26 +3286,47 @@ function persistSettings() {
   const selected = selectedDeviceIds();
   const deviceSettings = {};
   const componentSettings = {};
-  settingsDiv.querySelectorAll('.device-settings').forEach(div => {
-    const uid = div.dataset.uid;
-    const entry = deviceMap.get(uid);
-    if (!entry) return;
-    const overrides = snapOverridesToOptions(entry.baseDevice, collectOverridesFromDiv(div));
-    if (entry.kind === 'component') {
-      if (Object.keys(overrides).length) {
-        componentSettings[entry.componentId] = overrides;
+  if (settingsDiv) {
+    settingsDiv.querySelectorAll('.device-settings').forEach(div => {
+      const uid = div.dataset.uid;
+      const entry = deviceMap.get(uid);
+      if (!entry) return;
+      const overrides = snapOverridesToOptions(entry.baseDevice, collectOverridesFromDiv(div));
+      if (entry.kind === 'component') {
+        if (Object.keys(overrides).length) {
+          componentSettings[entry.componentId] = overrides;
+        }
+        entry.overrideSource = overrides;
+      } else if (entry.kind === 'library') {
+        if (Object.keys(overrides).length) {
+          deviceSettings[entry.baseDeviceId] = overrides;
+        }
+        entry.overrideSource = overrides;
       }
-      entry.overrideSource = overrides;
-    } else if (entry.kind === 'library') {
-      if (Object.keys(overrides).length) {
-        deviceSettings[entry.baseDeviceId] = overrides;
+    });
+  } else {
+    selected.forEach(uid => {
+      const entry = deviceMap.get(uid);
+      if (!entry) return;
+      if (entry.kind !== 'component' && entry.kind !== 'library') return;
+      const overrides = snapOverridesToOptions(entry.baseDevice, entry.overrideSource || {});
+      if (entry.kind === 'component') {
+        if (Object.keys(overrides).length) {
+          componentSettings[entry.componentId] = overrides;
+        }
+        entry.overrideSource = overrides;
+      } else if (entry.kind === 'library') {
+        if (Object.keys(overrides).length) {
+          deviceSettings[entry.baseDeviceId] = overrides;
+        }
+        entry.overrideSource = overrides;
       }
-      entry.overrideSource = overrides;
-    }
-  });
+    });
+  }
   saved.devices = selected;
   saved.settings = deviceSettings;
   saved.componentOverrides = componentSettings;
+  saved.viewOption = activeViewOption;
   persistAnnotations({ skipSetItem: true });
   setItem('tccSettings', saved);
   syncComponentOverrides(componentSettings);
@@ -3054,10 +3419,16 @@ function linkComponent(entryOverride = null) {
 }
 
 function gatherOverridesFromInputs(uid) {
-  const div = settingsDiv.querySelector(`.device-settings[data-uid="${uid}"]`);
-  if (!div) return {};
   const entry = deviceMap.get(uid);
   if (!entry) return {};
+  if (!settingsDiv) {
+    return snapOverridesToOptions(entry.baseDevice, entry.overrideSource || {});
+  }
+  const selectorValue = String(uid).replace(/"/g, '\\"');
+  const div = settingsDiv.querySelector(`.device-settings[data-uid="${selectorValue}"]`);
+  if (!div) {
+    return snapOverridesToOptions(entry.baseDevice, entry.overrideSource || {});
+  }
   return snapOverridesToOptions(entry.baseDevice, collectOverridesFromDiv(div));
 }
 
@@ -3201,6 +3572,7 @@ function plot() {
     .attr('transform', `translate(${margin.left},${margin.top - 12})`);
 
   const plottables = [...devicePlots, ...overlays];
+  const activeView = getActiveViewConfig();
   plottables.forEach((entry, index) => {
     entry.color = color(index);
     const legendItem = legend.append('g').attr('transform', `translate(${index * 180},0)`);
@@ -3262,13 +3634,25 @@ function plot() {
         .attr('fill', entry.color)
         .attr('opacity', 0.6);
     }
+    const baseLabel = entry.selection?.name || entry.name || entry.selection?.baseDevice?.name || '';
+    const summary = (entry.kind === 'library' || entry.kind === 'component') ? formatViewSummary(entry) : null;
+    const legendLabel = summary ? `${baseLabel} — ${summary}` : baseLabel;
     legendItem.append('text')
       .attr('x', 20)
       .attr('y', 12)
       .attr('fill', '#333')
       .attr('font-size', 12)
-      .text(entry.selection?.name || entry.name || entry.selection?.baseDevice?.name || '');
+      .text(legendLabel || baseLabel);
   });
+
+  if (activeView && activeView.field) {
+    chart.append('text')
+      .attr('class', 'tcc-view-label')
+      .attr('x', margin.left + width)
+      .attr('y', Math.max(16, margin.top - 24))
+      .attr('text-anchor', 'end')
+      .text(`View: ${activeView.label}`);
+  }
 
   if (fault) {
     g.append('line')
@@ -3482,6 +3866,7 @@ function plot() {
   };
 
   const updateDeviceInputs = entry => {
+    if (!settingsDiv) return;
     const div = settingsDiv.querySelector(`.device-settings[data-uid="${entry.selection.uid}"]`);
     if (!div) return;
     Object.entries(entry.overrides).forEach(([field, value]) => {
@@ -3585,6 +3970,7 @@ function describeConnectionLabel(conn) {
 
 function renderOneLinePreview(componentId) {
   if (!onelinePreviewSvgEl || !onelinePreviewSvg) return;
+  ensureComponentIcons();
   if (!componentId || !componentLookup.has(componentId)) {
     onelinePreviewSvg.selectAll('*').remove();
     if (onelinePreviewSvgEl) onelinePreviewSvgEl.classList.add('hidden');
@@ -3615,8 +4001,17 @@ function renderOneLinePreview(componentId) {
   const centerX = width / 2;
   const centerY = height / 2;
   const neighborIds = [...(neighborMap.get(componentId) || [])].filter(id => componentLookup.has(id));
+  const neighborRecords = neighborIds
+    .map(id => componentLookup.get(id))
+    .filter(record => record && record.component && record.component.id)
+    .sort((a, b) => componentLabel(a.component).localeCompare(
+      componentLabel(b.component),
+      undefined,
+      { sensitivity: 'base' }
+    ));
   const maxDisplay = 8;
-  const displayedNeighbors = neighborIds.slice(0, maxDisplay);
+  const displayedRecords = neighborRecords.slice(0, maxDisplay);
+  const displayedNeighbors = displayedRecords.map(record => record.component.id);
   const radius = Math.max(Math.min(width, height) / 2 - 50, 60);
 
   const nodes = [
@@ -3626,23 +4021,24 @@ function renderOneLinePreview(componentId) {
       sheet: record.sheetName,
       x: centerX,
       y: centerY,
-      active: true
+      active: true,
+      component: record.component
     }
   ];
 
-  displayedNeighbors.forEach((id, index) => {
-    const neighborRecord = componentLookup.get(id);
-    if (!neighborRecord) return;
+  displayedRecords.forEach((neighborRecord, index) => {
+    const neighbor = neighborRecord.component;
     const angle = (Math.PI * 2 * index) / Math.max(displayedNeighbors.length, 1);
     const x = centerX + radius * Math.cos(angle);
     const y = centerY + radius * Math.sin(angle);
     nodes.push({
-      id,
-      label: componentLabel(neighborRecord.component),
+      id: neighbor.id,
+      label: componentLabel(neighbor),
       sheet: neighborRecord.sheetName,
       x,
       y,
-      active: false
+      active: false,
+      component: neighbor
     });
   });
 
@@ -3689,12 +4085,26 @@ function renderOneLinePreview(componentId) {
     .attr('class', d => `preview-node${d.active ? ' is-active' : ''}`)
     .attr('transform', d => `translate(${d.x},${d.y})`);
 
-  node.append('circle')
-    .attr('r', d => (d.active ? 30 : 22));
+  const iconSize = datum => (datum.active ? 56 : 44);
+  const circleRadius = datum => Math.max(24, Math.round(iconSize(datum) / 2) + (datum.active ? 6 : 4));
 
-  node.append('text')
-    .attr('y', d => (d.active ? -4 : -6))
-    .selectAll('tspan')
+  node.append('circle')
+    .attr('r', d => circleRadius(d));
+
+  node.append('image')
+    .attr('class', 'preview-node-icon')
+    .attr('x', d => -(iconSize(d) / 2))
+    .attr('y', d => -(iconSize(d) / 2))
+    .attr('width', d => iconSize(d))
+    .attr('height', d => iconSize(d))
+    .attr('preserveAspectRatio', 'xMidYMid meet')
+    .attr('href', d => getComponentIcon(d.component))
+    .attr('xlink:href', d => getComponentIcon(d.component));
+
+  const labels = node.append('text')
+    .attr('y', d => circleRadius(d) + 14);
+
+  labels.selectAll('tspan')
     .data(d => wrapPreviewLabel(d.label))
     .enter()
     .append('tspan')
