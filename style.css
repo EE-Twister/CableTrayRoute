@@ -5513,12 +5513,61 @@ body.dark-mode .print-settings-toggle {
     color: var(--text-muted, #6c757d);
 }
 
+#tcc-chart {
+    cursor: crosshair;
+}
+
 #tcc-chart.annotation-mode {
     cursor: crosshair;
 }
 
 .annotation-layer .annotation-connector {
     pointer-events: none;
+}
+
+.tcc-crosshair line {
+    stroke: rgba(51, 51, 51, 0.65);
+    stroke-width: 1;
+    stroke-dasharray: 4 4;
+}
+
+body.dark-mode .tcc-crosshair line {
+    stroke: rgba(255, 255, 255, 0.45);
+}
+
+.tcc-crosshair-point {
+    fill: #0d6efd;
+    stroke: #fff;
+    stroke-width: 1.5;
+}
+
+body.dark-mode .tcc-crosshair-point {
+    fill: #66b0ff;
+    stroke: #0a0a0a;
+}
+
+.tcc-crosshair-readout {
+    font-size: 12px;
+}
+
+.tcc-crosshair-bg {
+    fill: rgba(255, 255, 255, 0.92);
+    stroke: rgba(13, 110, 253, 0.45);
+    stroke-width: 1;
+}
+
+body.dark-mode .tcc-crosshair-bg {
+    fill: rgba(17, 20, 24, 0.92);
+    stroke: rgba(102, 176, 255, 0.6);
+}
+
+.tcc-crosshair-text {
+    fill: #111;
+    font-size: 12px;
+}
+
+body.dark-mode .tcc-crosshair-text {
+    fill: #f1f5f9;
 }
 
 .annotation-layer .annotation-label {

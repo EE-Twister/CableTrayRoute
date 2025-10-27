@@ -3349,12 +3349,24 @@ async function openComponentBrowserModal() {
     }
   });
 
-  modalPromise.finally(() => {
+  let resolvedComponentId = null;
+  try {
+    resolvedComponentId = await modalPromise;
+  } finally {
     controllerRef.current = null;
     if (componentModalBtn) componentModalBtn.setAttribute('aria-expanded', 'false');
-  });
+  }
 
-  await modalPromise;
+  if (resolvedComponentId) {
+    if (getActiveComponentId() !== resolvedComponentId) {
+      setActiveComponent(resolvedComponentId);
+    } else {
+      renderOneLinePreview(resolvedComponentId);
+      if (selectedDeviceIds().length) {
+        plot();
+      }
+    }
+  }
 }
 
 function renderSettings() {
@@ -4260,6 +4272,99 @@ function plot() {
     updateViewCallouts();
   };
 
+  const crosshairGroup = g.append('g')
+    .attr('class', 'tcc-crosshair')
+    .attr('pointer-events', 'none')
+    .style('display', 'none');
+  const crosshairVertical = crosshairGroup.append('line').attr('class', 'tcc-crosshair-line');
+  const crosshairHorizontal = crosshairGroup.append('line').attr('class', 'tcc-crosshair-line');
+  const crosshairPoint = crosshairGroup.append('circle')
+    .attr('class', 'tcc-crosshair-point')
+    .attr('r', 4);
+
+  const readoutGroup = g.append('g')
+    .attr('class', 'tcc-crosshair-readout')
+    .attr('pointer-events', 'none')
+    .style('display', 'none');
+  const readoutBackground = readoutGroup.append('rect')
+    .attr('class', 'tcc-crosshair-bg')
+    .attr('rx', 6)
+    .attr('ry', 6);
+  const readoutText = readoutGroup.append('text')
+    .attr('class', 'tcc-crosshair-text')
+    .attr('x', 8)
+    .attr('y', 6)
+    .attr('dominant-baseline', 'hanging');
+
+  const crosshairFormat = d3.format('.3~g');
+
+  const hideCrosshair = () => {
+    crosshairGroup.style('display', 'none');
+    readoutGroup.style('display', 'none');
+  };
+
+  const updateCrosshair = event => {
+    if (chart.classed('annotation-mode')) {
+      hideCrosshair();
+      return;
+    }
+    const [svgX, svgY] = d3.pointer(event, chart.node());
+    const localX = svgX - margin.left;
+    const localY = svgY - margin.top;
+    if (localX < 0 || localX > width || localY < 0 || localY > height) {
+      hideCrosshair();
+      return;
+    }
+    const currentValue = x.invert(localX);
+    const timeValue = y.invert(localY);
+    if (!Number.isFinite(currentValue) || !Number.isFinite(timeValue)) {
+      hideCrosshair();
+      return;
+    }
+
+    crosshairGroup.style('display', null);
+    readoutGroup.style('display', null);
+
+    crosshairVertical
+      .attr('x1', localX)
+      .attr('x2', localX)
+      .attr('y1', 0)
+      .attr('y2', height);
+    crosshairHorizontal
+      .attr('x1', 0)
+      .attr('x2', width)
+      .attr('y1', localY)
+      .attr('y2', localY);
+    crosshairPoint
+      .attr('cx', localX)
+      .attr('cy', localY);
+
+    const formattedCurrent = crosshairFormat(currentValue);
+    const formattedTime = crosshairFormat(timeValue);
+    readoutText.text(`I: ${formattedCurrent} A • t: ${formattedTime} s`);
+    const textNode = readoutText.node();
+    const bbox = textNode ? textNode.getBBox() : { width: 0, height: 0 };
+    const paddingX = 8;
+    const paddingY = 6;
+    const boxWidth = Math.max(48, bbox.width + paddingX * 2);
+    const boxHeight = Math.max(24, bbox.height + paddingY * 2);
+    const targetX = Math.min(Math.max(localX + 12, 0), width - boxWidth);
+    const targetY = Math.min(Math.max(localY - boxHeight - 12, 0), height - boxHeight);
+    readoutGroup.attr('transform', `translate(${targetX},${targetY})`);
+    readoutBackground
+      .attr('x', 0)
+      .attr('y', 0)
+      .attr('width', boxWidth)
+      .attr('height', boxHeight);
+  };
+
+  chart
+    .on('pointermove.crosshair', updateCrosshair)
+    .on('pointerenter.crosshair', updateCrosshair)
+    .on('pointerleave.crosshair', hideCrosshair);
+
+  hideCrosshair();
+
   const clampValue = (value, min, max) => {
     if (!Number.isFinite(value)) return min;
     if (value < min) return min;
@@ -4446,37 +4551,6 @@ function buildPreviewAdjacency(componentMap, sheet) {
   return adjacency;
 }
 
-function gatherConnectedComponentIds(seedList, componentMap, adjacency, limit = 60) {
-  const visited = new Set();
-  const order = [];
-  const queue = [];
-  const seeds = Array.isArray(seedList) ? seedList : [];
-  seeds.forEach(seed => {
-    if (typeof seed !== 'string') return;
-    if (!componentMap.has(seed)) return;
-    if (visited.has(seed)) return;
-    visited.add(seed);
-    queue.push(seed);
-  });
-
-  while (queue.length && order.length < limit) {
-    const current = queue.shift();
-    if (!componentMap.has(current)) continue;
-    order.push(current);
-    const neighbors = adjacency.get(current);
-    if (!neighbors) continue;
-    neighbors.forEach(neighbor => {
-      if (!componentMap.has(neighbor)) return;
-      if (visited.has(neighbor)) return;
-      if (visited.size >= limit) return;
-      visited.add(neighbor);
-      queue.push(neighbor);
-    });
-  }
-
-  return { order, set: visited };
-}
-
 function renderOneLinePreview(componentId) {
   if (!onelinePreviewSvgEl || !onelinePreviewSvg) return;
   ensureComponentIcons();
@@ -4511,16 +4585,21 @@ function renderOneLinePreview(componentId) {
     return info && info.sheetIndex === record.sheetIndex;
   });
   const offSheetCount = Math.max(0, selectedEntries.length - sameSheetSelections.length);
-  const seedList = [];
-  if (componentId) seedList.push(componentId);
-  sameSheetSelections.forEach(id => {
-    if (!seedList.includes(id)) seedList.push(id);
-  });
-
   const MAX_COMPONENTS = 20;
   const adjacency = buildPreviewAdjacency(componentMap, sheet);
-  const { order: connectedOrder } = gatherConnectedComponentIds(seedList, componentMap, adjacency, MAX_COMPONENTS * 3);
-  const availableTargets = connectedOrder.filter(id => componentMap.has(id));
+  const neighborSet = componentId && adjacency.has(componentId)
+    ? adjacency.get(componentId)
+    : new Set();
+  const orderedTargets = [];
+  if (componentId && componentMap.has(componentId)) {
+    orderedTargets.push(componentId);
+  }
+  neighborSet.forEach(id => {
+    if (!componentMap.has(id)) return;
+    if (orderedTargets.includes(id)) return;
+    orderedTargets.push(id);
+  });
+  const availableTargets = orderedTargets;
   if (!availableTargets.length) {
     onelinePreviewSvg.selectAll('*').remove();
     onelinePreviewSvgEl.classList.add('hidden');
@@ -4550,6 +4629,10 @@ function renderOneLinePreview(componentId) {
 
   const displayedTargets = availableTargets.slice(0, MAX_COMPONENTS);
   const truncatedCount = availableTargets.length - displayedTargets.length;
+  const hiddenSelectionCount = sameSheetSelections.filter(id => {
+    if (id === componentId) return false;
+    return !neighborSet.has(id);
+  }).length;
 
   const DEFAULT_WIDTH = 120;
   const DEFAULT_HEIGHT = 60;
@@ -4731,8 +4814,14 @@ function renderOneLinePreview(componentId) {
     if (offSheetCount > 0) {
       noteMessages.push(`${offSheetCount} selected ${offSheetCount === 1 ? 'device is' : 'devices are'} on other sheets and are not shown.`);
     }
+    if (hiddenSelectionCount > 0) {
+      noteMessages.push(`${hiddenSelectionCount} selected ${hiddenSelectionCount === 1 ? 'device is' : 'devices are'} not directly connected to the active component and are hidden.`);
+    }
     if (truncatedCount > 0) {
       noteMessages.push(`Showing ${displayedTargets.length} of ${availableTargets.length} selected devices.`);
+    }
+    if (noteMessages.length) {
+      noteMessages.push('Only devices directly connected to the selected component are displayed.');
     }
     if (!noteMessages.length && selectedEntries.length && !displayedTargets.length) {
       noteMessages.push('No one-line preview available for the current selection.');
