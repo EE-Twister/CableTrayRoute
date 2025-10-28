@@ -3786,8 +3786,10 @@ async function openCustomCurveBuilder(curveId = null) {
     }
     const containerRect = canvasContainer.getBoundingClientRect();
     const isDarkMode = document.body?.classList?.contains('dark-mode');
-    const offsetX = pointer.clientX - containerRect.left - MAGNIFIER_SIZE / 2;
-    const offsetY = pointer.clientY - containerRect.top - MAGNIFIER_SIZE / 2;
+    const scrollLeft = canvasContainer.scrollLeft || 0;
+    const scrollTop = canvasContainer.scrollTop || 0;
+    const offsetX = pointer.clientX - containerRect.left + scrollLeft - MAGNIFIER_SIZE / 2;
+    const offsetY = pointer.clientY - containerRect.top + scrollTop - MAGNIFIER_SIZE / 2;
     magnifierEl.style.transform = `translate(${Math.round(offsetX)}px, ${Math.round(offsetY)}px)`;
     magnifierEl.style.opacity = '1';
     const zoom = MAGNIFIER_ZOOM;
@@ -3896,6 +3898,26 @@ async function openCustomCurveBuilder(curveId = null) {
       ctx.fillText(formatSettingValue(value), metrics.plotLeft - 6, left.y);
       ctx.restore();
     });
+    ctx.save();
+    ctx.setLineDash([]);
+    ctx.fillStyle = labelColor;
+    ctx.font = 'bold 14px Inter, system-ui, sans-serif';
+    ctx.textAlign = 'center';
+    ctx.textBaseline = 'top';
+    const bottomLabelY = Math.min(metrics.height - 20, metrics.plotTop + metrics.plotHeight + 28);
+    ctx.fillText('Current (A)', metrics.plotLeft + metrics.plotWidth / 2, bottomLabelY);
+    ctx.restore();
+    ctx.save();
+    ctx.setLineDash([]);
+    ctx.fillStyle = labelColor;
+    ctx.font = 'bold 14px Inter, system-ui, sans-serif';
+    const leftLabelX = Math.max(24, metrics.plotLeft - 36);
+    ctx.translate(leftLabelX, metrics.plotTop + metrics.plotHeight / 2);
+    ctx.rotate(-Math.PI / 2);
+    ctx.textAlign = 'center';
+    ctx.textBaseline = 'top';
+    ctx.fillText('Time (s)', 0, 0);
+    ctx.restore();
     ctx.restore();
   };
 
@@ -4347,10 +4369,30 @@ async function openCustomCurveBuilder(curveId = null) {
       manufacturerLabel.appendChild(manufacturerInputEl);
 
       const deviceTypeLabel = doc.createElement('label');
-      deviceTypeLabel.textContent = 'Device type (optional)';
-      deviceTypeInputEl = doc.createElement('input');
-      deviceTypeInputEl.type = 'text';
-      deviceTypeInputEl.value = existing?.deviceType || '';
+      deviceTypeLabel.textContent = 'Device type';
+      deviceTypeInputEl = doc.createElement('select');
+      const typeOptions = [CUSTOM_CURVE_CATEGORY, ...Array.from(PROTECTIVE_TYPES).sort()];
+      typeOptions.forEach(typeValue => {
+        const option = doc.createElement('option');
+        option.value = typeValue;
+        option.textContent = typeValue
+          .split(/[_\s]+/)
+          .map(part => part.charAt(0).toUpperCase() + part.slice(1))
+          .join(' ');
+        deviceTypeInputEl.appendChild(option);
+      });
+      if (existing?.deviceType && !typeOptions.includes(existing.deviceType)) {
+        const customOption = doc.createElement('option');
+        customOption.value = existing.deviceType;
+        customOption.textContent = existing.deviceType
+          .split(/[_\s]+/)
+          .map(part => part.charAt(0).toUpperCase() + part.slice(1))
+          .join(' ');
+        deviceTypeInputEl.appendChild(customOption);
+      }
+      deviceTypeInputEl.value = existing?.deviceType && deviceTypeInputEl.querySelector(`option[value="${existing.deviceType}"]`)
+        ? existing.deviceType
+        : CUSTOM_CURVE_CATEGORY;
       deviceTypeLabel.appendChild(deviceTypeInputEl);
 
       detailsGrid.append(nameLabel, manufacturerLabel, deviceTypeLabel);
