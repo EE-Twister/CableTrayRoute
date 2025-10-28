@@ -106,6 +106,19 @@ const TCC_VIEW_OPTIONS = [
 
 const viewOptionMap = new Map(TCC_VIEW_OPTIONS.map(option => [option.id, option]));
 
+const CUSTOM_CURVE_SETTING_OPTIONS = TCC_VIEW_OPTIONS
+  .filter(option => option.field)
+  .map(option => ({
+    field: option.field,
+    label: option.label,
+    unit: option.unit || '',
+    numeric: !!option.unit
+  }));
+
+const CUSTOM_CURVE_SETTING_CONFIG = new Map(
+  CUSTOM_CURVE_SETTING_OPTIONS.map(option => [option.field, option])
+);
+
 function resolveIconSource(iconPath, fallbackSymbol) {
   if (typeof iconPath === 'string' && iconPath.trim()) {
     const trimmed = iconPath.trim();
@@ -586,6 +599,27 @@ function sanitizeToleranceSpec(raw = {}) {
   return Object.keys(tolerance).length ? tolerance : undefined;
 }
 
+function sanitizeCustomCurveSettings(raw = {}) {
+  if (!raw || typeof raw !== 'object') return {};
+  const sanitized = {};
+  Object.entries(raw).forEach(([field, value]) => {
+    if (!CUSTOM_CURVE_SETTING_CONFIG.has(field)) return;
+    const config = CUSTOM_CURVE_SETTING_CONFIG.get(field);
+    if (config.numeric) {
+      const numberValue = Number(value);
+      if (Number.isFinite(numberValue) && numberValue >= 0) {
+        sanitized[field] = numberValue;
+      }
+    } else if (value !== undefined && value !== null) {
+      const strValue = String(value).trim();
+      if (strValue) {
+        sanitized[field] = strValue;
+      }
+    }
+  });
+  return sanitized;
+}
+
 function sanitizeCustomCurve(raw) {
   if (!raw || typeof raw !== 'object') return null;
   const curvePoints = Array.isArray(raw.curve)
@@ -609,6 +643,7 @@ function sanitizeCustomCurve(raw) {
   const tolerance = sanitizeToleranceSpec(raw.tolerance);
   const axes = sanitizeAxisSpec(raw.axes ?? raw.axis ?? {});
   const bounds = sanitizeBoundsSpec(raw.bounds ?? raw.padding ?? {});
+  const settings = sanitizeCustomCurveSettings(raw.settings ?? raw.adjustableSettings ?? raw.deviceSettings ?? {});
   return {
     id,
     name,
@@ -618,6 +653,7 @@ function sanitizeCustomCurve(raw) {
     curve: sanitizedPoints,
     axes,
     bounds,
+    settings,
     sequence: Number.isFinite(sequence) ? sequence : null,
     tolerance
   };
@@ -2002,7 +2038,7 @@ function buildCustomCurveEntries() {
       name: curve.name,
       type: curve.deviceType || CUSTOM_CURVE_CATEGORY,
       curve: curve.curve || [],
-      settings: {},
+      settings: { ...(curve.settings || {}) },
       vendor,
       manufacturer: vendor,
       tolerance: curve.tolerance
@@ -2015,7 +2051,7 @@ function buildCustomCurveEntries() {
       baseDevice,
       deviceType: curve.deviceType || CUSTOM_CURVE_CATEGORY,
       deviceCategory: curve.deviceType || CUSTOM_CURVE_CATEGORY,
-      overrideSource: {},
+      overrideSource: { ...(curve.settings || {}) },
       isCustom: true,
       customCurveId: curve.id,
       customCurve: curve,
@@ -2075,6 +2111,7 @@ function persistCustomCurveState({ refresh = true } = {}) {
 
 function saveCustomCurve(curve, { select = false } = {}) {
   if (!curve || !Array.isArray(curve.curve) || !curve.curve.length) return null;
+  curve.settings = sanitizeCustomCurveSettings(curve.settings || {});
   let existing = curve.id ? getCustomCurveById(curve.id) : null;
   if (!existing) {
     const nextSequence = (saved.customCurveCounter || saved.customCurves.length || 0) + 1;
@@ -2090,6 +2127,7 @@ function saveCustomCurve(curve, { select = false } = {}) {
     existing.curve = curve.curve;
     existing.axes = curve.axes || {};
     existing.bounds = curve.bounds || {};
+    existing.settings = curve.settings || {};
     existing.tolerance = curve.tolerance;
     if (Number.isFinite(curve.sequence)) {
       existing.sequence = curve.sequence;
@@ -3721,6 +3759,8 @@ async function openCustomCurveBuilder(curveId = null) {
   let manualTimeInput = null;
   let pointCountEl = null;
 
+  let customSettings = { ...sanitizeCustomCurveSettings(existing?.settings || existing?.baseDevice?.settings || {}) };
+
   let magnifierEl = null;
   let magnifierCanvas = null;
   let magnifierCtx = null;
@@ -3756,6 +3796,47 @@ async function openCustomCurveBuilder(curveId = null) {
     return Math.min(Math.max(value, min), max);
   };
 
+  const getSettingOption = field => CUSTOM_CURVE_SETTING_CONFIG.get(field) || null;
+
+  const updateSettingValue = (field, value) => {
+    const option = getSettingOption(field);
+    if (!option) return;
+    if (option.numeric) {
+      const numberValue = Number(value);
+      if (Number.isFinite(numberValue) && numberValue >= 0) {
+        customSettings[field] = numberValue;
+      } else {
+        delete customSettings[field];
+      }
+    } else if (value !== undefined && value !== null) {
+      const strValue = String(value).trim();
+      if (strValue) {
+        customSettings[field] = strValue;
+      } else {
+        delete customSettings[field];
+      }
+    } else {
+      delete customSettings[field];
+    }
+  };
+
+  const bindSettingInput = (field, input) => {
+    if (!input) return;
+    const option = getSettingOption(field);
+    if (!option) return;
+    const existingValue = customSettings[field];
+    if (existingValue !== undefined && existingValue !== null) {
+      input.value = option.numeric
+        ? formatSettingValue(Number(existingValue))
+        : String(existingValue);
+    }
+    const handler = () => {
+      updateSettingValue(field, option.numeric ? Number(input.value) : input.value);
+    };
+    input.addEventListener('input', handler);
+    input.addEventListener('change', handler);
+  };
+
   const getPointerFromClient = (clientX, clientY) => {
     if (!canvas) return null;
     const rect = canvas.getBoundingClientRect();
@@ -3786,10 +3867,8 @@ async function openCustomCurveBuilder(curveId = null) {
     }
     const containerRect = canvasContainer.getBoundingClientRect();
     const isDarkMode = document.body?.classList?.contains('dark-mode');
-    const scrollLeft = canvasContainer.scrollLeft || 0;
-    const scrollTop = canvasContainer.scrollTop || 0;
-    const offsetX = pointer.clientX - containerRect.left + scrollLeft - MAGNIFIER_SIZE / 2;
-    const offsetY = pointer.clientY - containerRect.top + scrollTop - MAGNIFIER_SIZE / 2;
+    const offsetX = pointer.clientX - containerRect.left - MAGNIFIER_SIZE / 2;
+    const offsetY = pointer.clientY - containerRect.top - MAGNIFIER_SIZE / 2;
     magnifierEl.style.transform = `translate(${Math.round(offsetX)}px, ${Math.round(offsetY)}px)`;
     magnifierEl.style.opacity = '1';
     const zoom = MAGNIFIER_ZOOM;
@@ -3878,7 +3957,8 @@ async function openCustomCurveBuilder(curveId = null) {
       ctx.font = '12px Inter, system-ui, sans-serif';
       ctx.textAlign = 'center';
       ctx.textBaseline = 'top';
-      ctx.fillText(formatSettingValue(value), top.x, metrics.plotTop + metrics.plotHeight + 6);
+      const labelY = Math.min(metrics.height - 6, metrics.plotTop + metrics.plotHeight + 6);
+      ctx.fillText(formatSettingValue(value), top.x, labelY);
       ctx.restore();
     });
     horizontalTicks.forEach(value => {
@@ -3895,7 +3975,8 @@ async function openCustomCurveBuilder(curveId = null) {
       ctx.font = '12px Inter, system-ui, sans-serif';
       ctx.textAlign = 'right';
       ctx.textBaseline = 'middle';
-      ctx.fillText(formatSettingValue(value), metrics.plotLeft - 6, left.y);
+      const labelX = Math.max(6, metrics.plotLeft - 6);
+      ctx.fillText(formatSettingValue(value), labelX, left.y);
       ctx.restore();
     });
     ctx.save();
@@ -4404,7 +4485,42 @@ async function openCustomCurveBuilder(curveId = null) {
       descriptionInputEl.value = existing?.description || '';
       descriptionLabel.appendChild(descriptionInputEl);
 
-      detailsSection.append(detailsHeading, detailsGrid, descriptionLabel);
+      const settingsFieldset = doc.createElement('fieldset');
+      settingsFieldset.className = 'custom-curve-fieldset';
+      const settingsLegend = doc.createElement('legend');
+      settingsLegend.textContent = 'Adjustable settings (optional)';
+      const settingsHint = doc.createElement('p');
+      settingsHint.className = 'custom-curve-settings-hint';
+      settingsHint.textContent = 'Provide breaker pickup, delay, and instantaneous values when applicable. Leave fields blank to omit them.';
+      const settingsGrid = doc.createElement('div');
+      settingsGrid.className = 'custom-curve-settings-grid';
+      CUSTOM_CURVE_SETTING_OPTIONS.forEach(option => {
+        const label = doc.createElement('label');
+        label.className = 'custom-curve-setting';
+        const title = doc.createElement('span');
+        title.className = 'custom-curve-setting-title';
+        title.textContent = option.label;
+        const input = doc.createElement('input');
+        input.type = option.numeric ? 'number' : 'text';
+        if (option.numeric) {
+          input.min = '0';
+          input.step = 'any';
+        }
+        input.placeholder = option.unit ? option.unit : 'Value';
+        label.appendChild(title);
+        if (option.unit) {
+          const unitEl = doc.createElement('span');
+          unitEl.className = 'custom-curve-setting-unit';
+          unitEl.textContent = option.unit;
+          label.appendChild(unitEl);
+        }
+        label.appendChild(input);
+        bindSettingInput(option.field, input);
+        settingsGrid.appendChild(label);
+      });
+      settingsFieldset.append(settingsLegend, settingsHint, settingsGrid);
+
+      detailsSection.append(detailsHeading, detailsGrid, descriptionLabel, settingsFieldset);
 
       const referenceSection = doc.createElement('section');
       referenceSection.className = 'custom-curve-section';
@@ -4639,6 +4755,7 @@ async function openCustomCurveBuilder(curveId = null) {
         updateStatus('Add at least two curve points before saving.', 'error');
         return false;
       }
+      const sanitizedSettings = sanitizeCustomCurveSettings(customSettings);
       const payload = {
         id: existing?.id || null,
         name,
@@ -4648,6 +4765,7 @@ async function openCustomCurveBuilder(curveId = null) {
         curve: sanitizedPoints.map(point => ({ current: point.current, time: point.time })),
         axes: axisResult.values,
         bounds: getBoundValues(),
+        settings: sanitizedSettings,
         tolerance: existing?.tolerance
       };
       saveCustomCurve(payload, { select: !isEditing });
