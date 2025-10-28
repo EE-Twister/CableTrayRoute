@@ -3708,14 +3708,28 @@ async function openCustomCurveBuilder(curveId = null) {
   const axisKeys = ['currentMin', 'currentMax', 'timeMin', 'timeMax'];
   const boundKeys = ['left', 'right', 'top', 'bottom'];
 
+  const MAGNIFIER_SIZE = 160;
+  const MAGNIFIER_ZOOM = 3;
+
   let canvas = null;
   let ctx = null;
+  let canvasContainer = null;
   let tableBody = null;
   let statusEl = null;
   let readoutEl = null;
   let manualCurrentInput = null;
   let manualTimeInput = null;
   let pointCountEl = null;
+
+  let magnifierEl = null;
+  let magnifierCanvas = null;
+  let magnifierCtx = null;
+  let lastPointerClient = null;
+
+  let showAxisOverlay = false;
+  let showReferenceImage = true;
+  let referenceToggleInput = null;
+  let axisOverlayInput = null;
 
   let nameInputEl = null;
   let manufacturerInputEl = null;
@@ -3740,6 +3754,149 @@ async function openCustomCurveBuilder(curveId = null) {
   const clamp = (value, min, max) => {
     if (!Number.isFinite(value)) return min;
     return Math.min(Math.max(value, min), max);
+  };
+
+  const getPointerFromClient = (clientX, clientY) => {
+    if (!canvas) return null;
+    const rect = canvas.getBoundingClientRect();
+    if (!rect.width || !rect.height) return null;
+    const offsetX = clientX - rect.left;
+    const offsetY = clientY - rect.top;
+    if (offsetX < 0 || offsetY < 0 || offsetX > rect.width || offsetY > rect.height) return null;
+    const scaleX = canvas.width / rect.width || 1;
+    const scaleY = canvas.height / rect.height || 1;
+    return {
+      canvasX: offsetX * scaleX,
+      canvasY: offsetY * scaleY,
+      clientX,
+      clientY
+    };
+  };
+
+  const hideMagnifier = () => {
+    if (!magnifierEl) return;
+    magnifierEl.style.opacity = '0';
+    magnifierEl.style.transform = 'translate(-9999px, -9999px)';
+  };
+
+  const renderMagnifier = pointer => {
+    if (!pointer || !magnifierEl || !magnifierCanvas || !magnifierCtx || !canvasContainer) {
+      hideMagnifier();
+      return;
+    }
+    const containerRect = canvasContainer.getBoundingClientRect();
+    const isDarkMode = document.body?.classList?.contains('dark-mode');
+    const offsetX = pointer.clientX - containerRect.left - MAGNIFIER_SIZE / 2;
+    const offsetY = pointer.clientY - containerRect.top - MAGNIFIER_SIZE / 2;
+    magnifierEl.style.transform = `translate(${Math.round(offsetX)}px, ${Math.round(offsetY)}px)`;
+    magnifierEl.style.opacity = '1';
+    const zoom = MAGNIFIER_ZOOM;
+    const sourceWidth = magnifierCanvas.width / zoom;
+    const sourceHeight = magnifierCanvas.height / zoom;
+    const halfWidth = sourceWidth / 2;
+    const halfHeight = sourceHeight / 2;
+    const sx = clamp(pointer.canvasX - halfWidth, 0, canvas.width - sourceWidth);
+    const sy = clamp(pointer.canvasY - halfHeight, 0, canvas.height - sourceHeight);
+    magnifierCtx.clearRect(0, 0, magnifierCanvas.width, magnifierCanvas.height);
+    magnifierCtx.save();
+    magnifierCtx.beginPath();
+    const radius = magnifierCanvas.width / 2 - 2;
+    magnifierCtx.arc(magnifierCanvas.width / 2, magnifierCanvas.height / 2, radius, 0, Math.PI * 2);
+    magnifierCtx.closePath();
+    magnifierCtx.clip();
+    magnifierCtx.drawImage(
+      canvas,
+      sx,
+      sy,
+      sourceWidth,
+      sourceHeight,
+      0,
+      0,
+      magnifierCanvas.width,
+      magnifierCanvas.height
+    );
+    magnifierCtx.restore();
+    magnifierCtx.strokeStyle = isDarkMode ? 'rgba(96, 165, 250, 0.85)' : 'rgba(37, 99, 235, 0.85)';
+    magnifierCtx.lineWidth = 1;
+    magnifierCtx.beginPath();
+    magnifierCtx.moveTo(magnifierCanvas.width / 2, 0);
+    magnifierCtx.lineTo(magnifierCanvas.width / 2, magnifierCanvas.height);
+    magnifierCtx.moveTo(0, magnifierCanvas.height / 2);
+    magnifierCtx.lineTo(magnifierCanvas.width, magnifierCanvas.height / 2);
+    magnifierCtx.stroke();
+  };
+
+  const updateReferenceToggleState = () => {
+    if (!referenceToggleInput) return;
+    referenceToggleInput.disabled = !referenceImage;
+    if (!referenceImage) {
+      referenceToggleInput.checked = false;
+    } else {
+      referenceToggleInput.checked = showReferenceImage;
+    }
+  };
+
+  const generateLogTicks = (min, max) => {
+    if (!(Number.isFinite(min) && Number.isFinite(max) && min > 0 && max > min)) return [];
+    const ticks = [];
+    const minExp = Math.floor(Math.log10(min));
+    const maxExp = Math.ceil(Math.log10(max));
+    for (let exp = minExp; exp <= maxExp; exp++) {
+      [1, 2, 5].forEach(multiplier => {
+        const value = multiplier * 10 ** exp;
+        if (value >= min && value <= max) ticks.push(value);
+      });
+    }
+    return Array.from(new Set(ticks)).sort((a, b) => a - b);
+  };
+
+  const drawAxisOverlay = metrics => {
+    if (!ctx || !metrics?.axisValid) return;
+    const axis = metrics.axisValues;
+    const verticalTicks = generateLogTicks(axis.currentMin, axis.currentMax);
+    const horizontalTicks = generateLogTicks(axis.timeMin, axis.timeMax);
+    const isDarkMode = document.body?.classList?.contains('dark-mode');
+    const strokeColor = isDarkMode ? 'rgba(96, 165, 250, 0.55)' : 'rgba(30, 64, 175, 0.45)';
+    const labelColor = isDarkMode ? 'rgba(226, 232, 240, 0.95)' : 'rgba(15, 23, 42, 0.85)';
+    ctx.save();
+    ctx.setLineDash([6, 6]);
+    ctx.strokeStyle = strokeColor;
+    ctx.lineWidth = 1;
+    verticalTicks.forEach(value => {
+      const top = dataToPixel({ current: value, time: axis.timeMin }, metrics);
+      const bottom = dataToPixel({ current: value, time: axis.timeMax }, metrics);
+      if (!top || !bottom) return;
+      ctx.beginPath();
+      ctx.moveTo(top.x, metrics.plotTop);
+      ctx.lineTo(top.x, metrics.plotTop + metrics.plotHeight);
+      ctx.stroke();
+      ctx.save();
+      ctx.setLineDash([]);
+      ctx.fillStyle = labelColor;
+      ctx.font = '12px Inter, system-ui, sans-serif';
+      ctx.textAlign = 'center';
+      ctx.textBaseline = 'top';
+      ctx.fillText(formatSettingValue(value), top.x, metrics.plotTop + metrics.plotHeight + 6);
+      ctx.restore();
+    });
+    horizontalTicks.forEach(value => {
+      const left = dataToPixel({ current: axis.currentMin, time: value }, metrics);
+      const right = dataToPixel({ current: axis.currentMax, time: value }, metrics);
+      if (!left || !right) return;
+      ctx.beginPath();
+      ctx.moveTo(metrics.plotLeft, left.y);
+      ctx.lineTo(metrics.plotLeft + metrics.plotWidth, left.y);
+      ctx.stroke();
+      ctx.save();
+      ctx.setLineDash([]);
+      ctx.fillStyle = labelColor;
+      ctx.font = '12px Inter, system-ui, sans-serif';
+      ctx.textAlign = 'right';
+      ctx.textBaseline = 'middle';
+      ctx.fillText(formatSettingValue(value), metrics.plotLeft - 6, left.y);
+      ctx.restore();
+    });
+    ctx.restore();
   };
 
   const getAxisValues = () => {
@@ -3890,7 +4047,7 @@ async function openCustomCurveBuilder(curveId = null) {
     const metrics = computePlotMetrics();
     const { width, height, plotLeft, plotTop, plotWidth, plotHeight } = metrics;
     ctx.clearRect(0, 0, width, height);
-    if (referenceImage) {
+    if (referenceImage && showReferenceImage) {
       ctx.drawImage(referenceImage, 0, 0, width, height);
     } else {
       ctx.fillStyle = '#f9fafb';
@@ -3901,6 +4058,9 @@ async function openCustomCurveBuilder(curveId = null) {
     ctx.lineWidth = 2;
     ctx.strokeRect(plotLeft, plotTop, plotWidth, plotHeight);
     ctx.restore();
+    if (showAxisOverlay && metrics.axisValid) {
+      drawAxisOverlay(metrics);
+    }
     if (metrics.axisValid) {
       ctx.save();
       ctx.fillStyle = '#1d4ed8';
@@ -3923,6 +4083,16 @@ async function openCustomCurveBuilder(curveId = null) {
         ctx.fill();
         ctx.restore();
       }
+    }
+    if (lastPointerClient) {
+      const hoverPointer = getPointerFromClient(lastPointerClient.x, lastPointerClient.y);
+      if (hoverPointer) {
+        renderMagnifier(hoverPointer);
+      } else {
+        hideMagnifier();
+      }
+    } else {
+      hideMagnifier();
     }
   };
 
@@ -4020,11 +4190,11 @@ async function openCustomCurveBuilder(curveId = null) {
 
   const handleCanvasClick = event => {
     if (!canvas) return;
-    const rect = canvas.getBoundingClientRect();
-    const x = event.clientX - rect.left;
-    const y = event.clientY - rect.top;
+    const pointer = getPointerFromClient(event.clientX, event.clientY);
+    if (!pointer) return;
+    lastPointerClient = { x: event.clientX, y: event.clientY };
     const metrics = computePlotMetrics();
-    const point = pixelToData(x, y, metrics);
+    const point = pixelToData(pointer.canvasX, pointer.canvasY, metrics);
     if (!point) {
       updateStatus('Provide valid axis bounds before digitizing points.', 'error');
       return;
@@ -4032,11 +4202,29 @@ async function openCustomCurveBuilder(curveId = null) {
     lastCapturedPoint = point;
     updateReadout(point);
     addPoint(point.current, point.time, { announce: true });
+    renderMagnifier(pointer);
+  };
+
+  const handleCanvasHover = event => {
+    const pointer = getPointerFromClient(event.clientX, event.clientY);
+    if (!pointer) {
+      lastPointerClient = null;
+      hideMagnifier();
+      return;
+    }
+    lastPointerClient = { x: event.clientX, y: event.clientY };
+    renderMagnifier(pointer);
+  };
+
+  const handleCanvasLeave = () => {
+    lastPointerClient = null;
+    hideMagnifier();
   };
 
   const resetReference = () => {
     referenceImage = null;
     lastCapturedPoint = null;
+    showReferenceImage = true;
     if (referenceObjectUrl) {
       URL.revokeObjectURL(referenceObjectUrl);
       referenceObjectUrl = null;
@@ -4048,6 +4236,7 @@ async function openCustomCurveBuilder(curveId = null) {
     configureCanvasSize(null);
     refreshCanvas();
     updateReadout(null);
+    updateReferenceToggleState();
   };
 
   const loadImageFromSource = src => new Promise((resolve, reject) => {
@@ -4081,6 +4270,8 @@ async function openCustomCurveBuilder(curveId = null) {
         referenceImage = await loadImageFromSource(referenceObjectUrl);
       }
       configureCanvasSize(referenceImage);
+      showReferenceImage = true;
+      updateReferenceToggleState();
       refreshCanvas();
       updateStatus('Reference loaded. Click within the plot area to capture points.', 'info');
     } catch (err) {
@@ -4097,6 +4288,7 @@ async function openCustomCurveBuilder(curveId = null) {
         referenceObjectUrl = null;
       }
     }
+    updateReferenceToggleState();
   };
 
   const clearPoints = () => {
@@ -4204,6 +4396,18 @@ async function openCustomCurveBuilder(curveId = null) {
         updateStatus('Reference cleared.', 'info');
       });
 
+      const referenceToggleLabel = doc.createElement('label');
+      referenceToggleLabel.className = 'custom-curve-toggle';
+      referenceToggleInput = doc.createElement('input');
+      referenceToggleInput.type = 'checkbox';
+      referenceToggleInput.checked = showReferenceImage;
+      referenceToggleInput.disabled = !referenceImage;
+      referenceToggleInput.addEventListener('change', () => {
+        showReferenceImage = referenceToggleInput.checked;
+        refreshCanvas();
+      });
+      referenceToggleLabel.append(referenceToggleInput, doc.createTextNode('Show uploaded reference'));
+
       const axisFieldset = doc.createElement('fieldset');
       axisFieldset.className = 'custom-curve-fieldset';
       const axisLegend = doc.createElement('legend');
@@ -4248,20 +4452,54 @@ async function openCustomCurveBuilder(curveId = null) {
         boundsFieldset.appendChild(label);
       });
 
+      const axisOverlayLabel = doc.createElement('label');
+      axisOverlayLabel.className = 'custom-curve-toggle';
+      axisOverlayInput = doc.createElement('input');
+      axisOverlayInput.type = 'checkbox';
+      axisOverlayInput.checked = showAxisOverlay;
+      axisOverlayInput.addEventListener('change', () => {
+        showAxisOverlay = axisOverlayInput.checked;
+        refreshCanvas();
+      });
+      axisOverlayLabel.append(axisOverlayInput, doc.createTextNode('Show generated axes overlay'));
+
       statusEl = doc.createElement('p');
       statusEl.className = 'custom-curve-status';
       readoutEl = doc.createElement('p');
       readoutEl.className = 'custom-curve-readout';
 
-      referenceControls.append(uploadButton, uploadInput, clearRefButton, axisFieldset, boundsFieldset, statusEl, readoutEl);
+      referenceControls.append(
+        uploadButton,
+        uploadInput,
+        clearRefButton,
+        referenceToggleLabel,
+        axisFieldset,
+        boundsFieldset,
+        axisOverlayLabel,
+        statusEl,
+        readoutEl
+      );
 
-      const canvasContainer = doc.createElement('div');
+      canvasContainer = doc.createElement('div');
       canvasContainer.className = 'custom-curve-canvas-container';
       canvas = doc.createElement('canvas');
       canvas.className = 'custom-curve-canvas';
       ctx = canvas.getContext('2d');
       canvas.addEventListener('click', handleCanvasClick);
+      canvas.addEventListener('mousemove', handleCanvasHover);
+      canvas.addEventListener('mouseleave', handleCanvasLeave);
       canvasContainer.appendChild(canvas);
+
+      magnifierEl = doc.createElement('div');
+      magnifierEl.className = 'custom-curve-magnifier';
+      magnifierEl.setAttribute('aria-hidden', 'true');
+      magnifierCanvas = doc.createElement('canvas');
+      magnifierCanvas.width = MAGNIFIER_SIZE;
+      magnifierCanvas.height = MAGNIFIER_SIZE;
+      magnifierCanvas.setAttribute('aria-hidden', 'true');
+      magnifierCtx = magnifierCanvas.getContext('2d');
+      magnifierEl.appendChild(magnifierCanvas);
+      canvasContainer.appendChild(magnifierEl);
 
       referenceGrid.append(referenceControls, canvasContainer);
       referenceSection.append(referenceHeading, referenceGrid);
@@ -4326,6 +4564,9 @@ async function openCustomCurveBuilder(curveId = null) {
       setAxisInputValues();
       setBoundInputValues();
       configureCanvasSize(referenceImage);
+      updateReferenceToggleState();
+      hideMagnifier();
+      lastPointerClient = null;
       refreshPointTable();
       updateReadout(lastCapturedPoint);
       updateStatus('Use the reference or manual inputs to define the curve.', 'info');
