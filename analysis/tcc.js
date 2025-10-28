@@ -3764,12 +3764,16 @@ async function openCustomCurveBuilder(curveId = null) {
   let magnifierEl = null;
   let magnifierCanvas = null;
   let magnifierCtx = null;
+  let magnifierInfoEl = null;
   let lastPointerClient = null;
 
   let showAxisOverlay = false;
   let showReferenceImage = true;
   let referenceToggleInput = null;
   let axisOverlayInput = null;
+
+  let axisTitleXEl = null;
+  let axisTitleYEl = null;
 
   let nameInputEl = null;
   let manufacturerInputEl = null;
@@ -3854,10 +3858,28 @@ async function openCustomCurveBuilder(curveId = null) {
     };
   };
 
+  const updateMagnifierInfo = pointer => {
+    if (!magnifierInfoEl) return;
+    let currentLabel = '—';
+    let timeLabel = '—';
+    if (pointer) {
+      const metrics = computePlotMetrics();
+      if (metrics.axisValid) {
+        const dataPoint = pixelToData(pointer.canvasX, pointer.canvasY, metrics);
+        if (dataPoint) {
+          currentLabel = formatSettingValue(dataPoint.current) || '—';
+          timeLabel = formatSettingValue(dataPoint.time) || '—';
+        }
+      }
+    }
+    magnifierInfoEl.innerHTML = `<span>I: ${escapeHtml(currentLabel)} A</span><span>T: ${escapeHtml(timeLabel)} s</span>`;
+  };
+
   const hideMagnifier = () => {
     if (!magnifierEl) return;
     magnifierEl.style.opacity = '0';
     magnifierEl.style.transform = 'translate(-9999px, -9999px)';
+    updateMagnifierInfo(null);
   };
 
   const renderMagnifier = pointer => {
@@ -3867,8 +3889,10 @@ async function openCustomCurveBuilder(curveId = null) {
     }
     const containerRect = canvasContainer.getBoundingClientRect();
     const isDarkMode = document.body?.classList?.contains('dark-mode');
-    const offsetX = pointer.clientX - containerRect.left - MAGNIFIER_SIZE / 2;
-    const offsetY = pointer.clientY - containerRect.top - MAGNIFIER_SIZE / 2;
+    const scrollLeft = canvasContainer.scrollLeft || 0;
+    const scrollTop = canvasContainer.scrollTop || 0;
+    const offsetX = pointer.clientX - containerRect.left + scrollLeft - MAGNIFIER_SIZE / 2;
+    const offsetY = pointer.clientY - containerRect.top + scrollTop - MAGNIFIER_SIZE / 2;
     magnifierEl.style.transform = `translate(${Math.round(offsetX)}px, ${Math.round(offsetY)}px)`;
     magnifierEl.style.opacity = '1';
     const zoom = MAGNIFIER_ZOOM;
@@ -3905,6 +3929,7 @@ async function openCustomCurveBuilder(curveId = null) {
     magnifierCtx.moveTo(0, magnifierCanvas.height / 2);
     magnifierCtx.lineTo(magnifierCanvas.width, magnifierCanvas.height / 2);
     magnifierCtx.stroke();
+    updateMagnifierInfo(pointer);
   };
 
   const updateReferenceToggleState = () => {
@@ -3979,26 +4004,6 @@ async function openCustomCurveBuilder(curveId = null) {
       ctx.fillText(formatSettingValue(value), labelX, left.y);
       ctx.restore();
     });
-    ctx.save();
-    ctx.setLineDash([]);
-    ctx.fillStyle = labelColor;
-    ctx.font = 'bold 14px Inter, system-ui, sans-serif';
-    ctx.textAlign = 'center';
-    ctx.textBaseline = 'top';
-    const bottomLabelY = Math.min(metrics.height - 20, metrics.plotTop + metrics.plotHeight + 28);
-    ctx.fillText('Current (A)', metrics.plotLeft + metrics.plotWidth / 2, bottomLabelY);
-    ctx.restore();
-    ctx.save();
-    ctx.setLineDash([]);
-    ctx.fillStyle = labelColor;
-    ctx.font = 'bold 14px Inter, system-ui, sans-serif';
-    const leftLabelX = Math.max(24, metrics.plotLeft - 36);
-    ctx.translate(leftLabelX, metrics.plotTop + metrics.plotHeight / 2);
-    ctx.rotate(-Math.PI / 2);
-    ctx.textAlign = 'center';
-    ctx.textBaseline = 'top';
-    ctx.fillText('Time (s)', 0, 0);
-    ctx.restore();
     ctx.restore();
   };
 
@@ -4163,6 +4168,24 @@ async function openCustomCurveBuilder(curveId = null) {
     ctx.restore();
     if (showAxisOverlay && metrics.axisValid) {
       drawAxisOverlay(metrics);
+    }
+    if (axisTitleXEl && axisTitleYEl && canvasContainer) {
+      const shouldShow = showAxisOverlay && metrics.axisValid;
+      axisTitleXEl.style.display = shouldShow ? 'block' : 'none';
+      axisTitleYEl.style.display = shouldShow ? 'block' : 'none';
+      if (shouldShow) {
+        const canvasWidth = canvas.offsetWidth || canvas.width || 0;
+        const canvasHeight = canvas.offsetHeight || canvas.height || 0;
+        const offsetLeft = canvas.offsetLeft || 0;
+        const offsetTop = canvas.offsetTop || 0;
+        axisTitleXEl.style.left = `${offsetLeft + canvasWidth / 2}px`;
+        axisTitleXEl.style.top = `${offsetTop + canvasHeight + 12}px`;
+        axisTitleXEl.style.transform = 'translate(-50%, 0)';
+        const yBaseLeft = Math.max(0, offsetLeft) + 8;
+        axisTitleYEl.style.left = `${yBaseLeft}px`;
+        axisTitleYEl.style.top = `${offsetTop + canvasHeight / 2}px`;
+        axisTitleYEl.style.transform = 'translate(-100%, -50%) rotate(-90deg)';
+      }
     }
     if (metrics.axisValid) {
       ctx.save();
@@ -4657,7 +4680,22 @@ async function openCustomCurveBuilder(curveId = null) {
       magnifierCanvas.setAttribute('aria-hidden', 'true');
       magnifierCtx = magnifierCanvas.getContext('2d');
       magnifierEl.appendChild(magnifierCanvas);
+      magnifierInfoEl = doc.createElement('div');
+      magnifierInfoEl.className = 'custom-curve-magnifier-info';
+      magnifierEl.appendChild(magnifierInfoEl);
       canvasContainer.appendChild(magnifierEl);
+      axisTitleXEl = doc.createElement('div');
+      axisTitleXEl.className = 'custom-curve-axis-title custom-curve-axis-title-x';
+      axisTitleXEl.textContent = 'Current (A)';
+      axisTitleXEl.style.display = 'none';
+      canvasContainer.appendChild(axisTitleXEl);
+      axisTitleYEl = doc.createElement('div');
+      axisTitleYEl.className = 'custom-curve-axis-title custom-curve-axis-title-y';
+      axisTitleYEl.textContent = 'Time (s)';
+      axisTitleYEl.style.transformOrigin = 'left center';
+      axisTitleYEl.style.display = 'none';
+      canvasContainer.appendChild(axisTitleYEl);
+      updateMagnifierInfo(null);
 
       referenceGrid.append(referenceControls, canvasContainer);
       referenceSection.append(referenceHeading, referenceGrid);
