@@ -5914,6 +5914,7 @@ body.dark-mode .custom-curve-readout {
 }
 
 .custom-curve-canvas-container {
+    position: relative;
     border: 1px solid #cbd5e1;
     border-radius: 6px;
     padding: 0.75rem;
@@ -5928,9 +5929,57 @@ body.dark-mode .custom-curve-readout {
     display: block;
 }
 
+.custom-curve-magnifier {
+    position: absolute;
+    pointer-events: none;
+    width: 160px;
+    height: 160px;
+    border-radius: 50%;
+    border: 2px solid #1d4ed8;
+    box-shadow: 0 10px 25px rgba(15, 23, 42, 0.2);
+    background: rgba(255, 255, 255, 0.95);
+    transform: translate(-9999px, -9999px);
+    opacity: 0;
+    transition: opacity 0.15s ease;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    z-index: 2;
+}
+
+.custom-curve-magnifier canvas {
+    width: 100%;
+    height: 100%;
+    border-radius: 50%;
+}
+
 body.dark-mode .custom-curve-canvas-container {
     background: #0f172a;
     border-color: #334155;
+}
+
+body.dark-mode .custom-curve-magnifier {
+    border-color: #60a5fa;
+    background: rgba(15, 23, 42, 0.85);
+    box-shadow: 0 10px 25px rgba(8, 47, 73, 0.45);
+}
+
+.custom-curve-toggle {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    margin-top: 0.75rem;
+    font-weight: 500;
+    color: #0f172a;
+}
+
+.custom-curve-toggle input {
+    width: 1rem;
+    height: 1rem;
+}
+
+body.dark-mode .custom-curve-toggle {
+    color: #e2e8f0;
 }
 
 .custom-curve-toolbar {
