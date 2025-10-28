@@ -137,12 +137,14 @@ export function openModal(options = {}) {
     const forms = new Set();
     let initialFocus = null;
     let closed = false;
+    let backdropPointerDown = false;
 
     function cleanup(result, { cancelled = false } = {}) {
       if (closed) return;
       closed = true;
       overlay.removeEventListener('keydown', onKeyDown, true);
       overlay.removeEventListener('click', onOverlayClick);
+      overlay.removeEventListener('pointerdown', onOverlayPointerDown);
       closeBtn.removeEventListener('click', handleCancel);
       if (secondaryBtn) secondaryBtn.removeEventListener('click', handleCancel);
       primaryBtn.removeEventListener('click', handleSubmit);
@@ -179,11 +181,16 @@ export function openModal(options = {}) {
       cleanup(null, { cancelled: true });
     }
 
+    function onOverlayPointerDown(event) {
+      backdropPointerDown = event.target === overlay;
+    }
+
     function onOverlayClick(event) {
       if (!closeOnBackdrop) return;
-      if (event.target === overlay) {
+      if (event.target === overlay && backdropPointerDown) {
         cleanup(null, { cancelled: true });
       }
+      backdropPointerDown = false;
     }
 
     function onKeyDown(event) {
@@ -265,6 +272,7 @@ export function openModal(options = {}) {
     if (secondaryBtn) secondaryBtn.addEventListener('click', handleCancel);
     primaryBtn.addEventListener('click', handleSubmit);
     overlay.addEventListener('keydown', onKeyDown, true);
+    overlay.addEventListener('pointerdown', onOverlayPointerDown);
     overlay.addEventListener('click', onOverlayClick);
 
     doc.body.appendChild(overlay);

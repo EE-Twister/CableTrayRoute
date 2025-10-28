@@ -3752,9 +3752,11 @@ async function openCustomCurveBuilder(curveId = null) {
   let canvas = null;
   let ctx = null;
   let canvasContainer = null;
+  let canvasScrollEl = null;
   let tableBody = null;
   let statusEl = null;
   let readoutEl = null;
+  let cursorReadoutEl = null;
   let manualCurrentInput = null;
   let manualTimeInput = null;
   let pointCountEl = null;
@@ -3767,7 +3769,7 @@ async function openCustomCurveBuilder(curveId = null) {
   let magnifierInfoEl = null;
   let lastPointerClient = null;
 
-  let showAxisOverlay = false;
+  let showAxisOverlay = true;
   let showReferenceImage = true;
   let referenceToggleInput = null;
   let axisOverlayInput = null;
@@ -3793,6 +3795,28 @@ async function openCustomCurveBuilder(curveId = null) {
       return;
     }
     readoutEl.textContent = `Last point: ${formatSettingValue(point.current)} A @ ${formatSettingValue(point.time)} s`;
+  };
+
+  const CURSOR_DEFAULT_TEXT = 'Cursor: Hover over the plot to see amperage and time.';
+  const CURSOR_AXIS_PROMPT = 'Cursor: Enter valid axis bounds to enable readout.';
+
+  const updateCursorReadout = pointer => {
+    if (!cursorReadoutEl) return;
+    if (!pointer) {
+      cursorReadoutEl.textContent = CURSOR_DEFAULT_TEXT;
+      return;
+    }
+    const metrics = computePlotMetrics();
+    if (!metrics.axisValid) {
+      cursorReadoutEl.textContent = CURSOR_AXIS_PROMPT;
+      return;
+    }
+    const dataPoint = pixelToData(pointer.canvasX, pointer.canvasY, metrics);
+    if (!dataPoint) {
+      cursorReadoutEl.textContent = CURSOR_AXIS_PROMPT;
+      return;
+    }
+    cursorReadoutEl.textContent = `Cursor: ${formatSettingValue(dataPoint.current)} A @ ${formatSettingValue(dataPoint.time)} s`;
   };
 
   const clamp = (value, min, max) => {
@@ -3880,17 +3904,18 @@ async function openCustomCurveBuilder(curveId = null) {
     magnifierEl.style.opacity = '0';
     magnifierEl.style.transform = 'translate(-9999px, -9999px)';
     updateMagnifierInfo(null);
+    updateCursorReadout(null);
   };
 
   const renderMagnifier = pointer => {
-    if (!pointer || !magnifierEl || !magnifierCanvas || !magnifierCtx || !canvasContainer) {
+    if (!pointer || !magnifierEl || !magnifierCanvas || !magnifierCtx || !canvasContainer || !canvasScrollEl) {
       hideMagnifier();
       return;
     }
     const containerRect = canvasContainer.getBoundingClientRect();
     const isDarkMode = document.body?.classList?.contains('dark-mode');
-    const scrollLeft = canvasContainer.scrollLeft || 0;
-    const scrollTop = canvasContainer.scrollTop || 0;
+    const scrollLeft = canvasScrollEl.scrollLeft || 0;
+    const scrollTop = canvasScrollEl.scrollTop || 0;
     const offsetX = pointer.clientX - containerRect.left + scrollLeft - MAGNIFIER_SIZE / 2;
     const offsetY = pointer.clientY - containerRect.top + scrollTop - MAGNIFIER_SIZE / 2;
     magnifierEl.style.transform = `translate(${Math.round(offsetX)}px, ${Math.round(offsetY)}px)`;
@@ -3930,6 +3955,7 @@ async function openCustomCurveBuilder(curveId = null) {
     magnifierCtx.lineTo(magnifierCanvas.width, magnifierCanvas.height / 2);
     magnifierCtx.stroke();
     updateMagnifierInfo(pointer);
+    updateCursorReadout(pointer);
   };
 
   const updateReferenceToggleState = () => {
@@ -4169,19 +4195,23 @@ async function openCustomCurveBuilder(curveId = null) {
     if (showAxisOverlay && metrics.axisValid) {
       drawAxisOverlay(metrics);
     }
-    if (axisTitleXEl && axisTitleYEl && canvasContainer) {
+    if (axisTitleXEl && axisTitleYEl && canvasContainer && canvasScrollEl) {
       const shouldShow = showAxisOverlay && metrics.axisValid;
       axisTitleXEl.style.display = shouldShow ? 'block' : 'none';
       axisTitleYEl.style.display = shouldShow ? 'block' : 'none';
       if (shouldShow) {
-        const canvasWidth = canvas.offsetWidth || canvas.width || 0;
-        const canvasHeight = canvas.offsetHeight || canvas.height || 0;
-        const offsetLeft = canvas.offsetLeft || 0;
-        const offsetTop = canvas.offsetTop || 0;
+        const containerRect = canvasContainer.getBoundingClientRect();
+        const canvasRect = canvas.getBoundingClientRect();
+        const scrollLeft = canvasScrollEl.scrollLeft || 0;
+        const scrollTop = canvasScrollEl.scrollTop || 0;
+        const offsetLeft = canvasRect.left - containerRect.left + scrollLeft;
+        const offsetTop = canvasRect.top - containerRect.top + scrollTop;
+        const canvasWidth = canvasRect.width || canvas.width || 0;
+        const canvasHeight = canvasRect.height || canvas.height || 0;
         axisTitleXEl.style.left = `${offsetLeft + canvasWidth / 2}px`;
-        axisTitleXEl.style.top = `${offsetTop + canvasHeight + 12}px`;
+        axisTitleXEl.style.top = `${offsetTop + canvasHeight + 24}px`;
         axisTitleXEl.style.transform = 'translate(-50%, 0)';
-        const yBaseLeft = Math.max(0, offsetLeft) + 8;
+        const yBaseLeft = offsetLeft - 24;
         axisTitleYEl.style.left = `${yBaseLeft}px`;
         axisTitleYEl.style.top = `${offsetTop + canvasHeight / 2}px`;
         axisTitleYEl.style.transform = 'translate(-100%, -50%) rotate(-90deg)';
@@ -4646,6 +4676,9 @@ async function openCustomCurveBuilder(curveId = null) {
 
       statusEl = doc.createElement('p');
       statusEl.className = 'custom-curve-status';
+      cursorReadoutEl = doc.createElement('p');
+      cursorReadoutEl.className = 'custom-curve-readout custom-curve-cursor';
+      cursorReadoutEl.textContent = CURSOR_DEFAULT_TEXT;
       readoutEl = doc.createElement('p');
       readoutEl.className = 'custom-curve-readout';
 
@@ -4658,18 +4691,22 @@ async function openCustomCurveBuilder(curveId = null) {
         boundsFieldset,
         axisOverlayLabel,
         statusEl,
+        cursorReadoutEl,
         readoutEl
       );
 
       canvasContainer = doc.createElement('div');
       canvasContainer.className = 'custom-curve-canvas-container';
+      canvasScrollEl = doc.createElement('div');
+      canvasScrollEl.className = 'custom-curve-canvas-scroll';
       canvas = doc.createElement('canvas');
       canvas.className = 'custom-curve-canvas';
       ctx = canvas.getContext('2d');
       canvas.addEventListener('click', handleCanvasClick);
       canvas.addEventListener('mousemove', handleCanvasHover);
       canvas.addEventListener('mouseleave', handleCanvasLeave);
-      canvasContainer.appendChild(canvas);
+      canvasScrollEl.appendChild(canvas);
+      canvasContainer.appendChild(canvasScrollEl);
 
       magnifierEl = doc.createElement('div');
       magnifierEl.className = 'custom-curve-magnifier';
