@@ -5964,6 +5964,42 @@ body.dark-mode .custom-curve-magnifier {
     box-shadow: 0 10px 25px rgba(8, 47, 73, 0.45);
 }
 
+.custom-curve-settings-hint {
+    margin: 0;
+    font-size: 0.85rem;
+    color: #475569;
+}
+
+body.dark-mode .custom-curve-settings-hint {
+    color: #94a3b8;
+}
+
+.custom-curve-settings-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+    gap: 0.75rem;
+}
+
+.custom-curve-setting {
+    display: flex;
+    flex-direction: column;
+    gap: 0.25rem;
+}
+
+.custom-curve-setting-title {
+    font-weight: 600;
+    font-size: 0.9rem;
+}
+
+.custom-curve-setting-unit {
+    font-size: 0.75rem;
+    color: #64748b;
+}
+
+body.dark-mode .custom-curve-setting-unit {
+    color: #94a3b8;
+}
+
 .custom-curve-toggle {
     display: flex;
     align-items: center;
