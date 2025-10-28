@@ -4,7 +4,7 @@ const DEFAULT_TOLERANCE = {
   timeUpper: 1.2
 };
 
-function sanitizeCurve(points = []) {
+export function sanitizeCurve(points = []) {
   const filtered = points
     .map(point => ({
       current: Number(point?.current) || 0,
