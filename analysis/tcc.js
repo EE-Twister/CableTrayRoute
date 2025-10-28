@@ -10,7 +10,7 @@ import {
   STORAGE_KEYS
 } from '../dataStore.mjs';
 import { runShortCircuit } from './shortCircuit.mjs';
-import { scaleCurve, checkDuty } from './tccUtils.js';
+import { scaleCurve, checkDuty, sanitizeCurve } from './tccUtils.js';
 import { openModal } from '../src/components/modal.js';
 import conductorProperties from '../conductorPropertiesData.mjs';
 
@@ -38,12 +38,35 @@ const K_CONSTANTS = {
   copper: { 60: 103, 75: 118, 90: 143 },
   aluminum: { 60: 75, 75: 87, 90: 99 }
 };
+const CUSTOM_CURVE_VENDOR_FALLBACK = 'Custom Curves';
+const CUSTOM_CURVE_CATEGORY = 'custom curve';
+const CUSTOM_CURVE_DEFAULT_AXES = { currentMin: 10, currentMax: 10000, timeMin: 0.01, timeMax: 100 };
+const CUSTOM_CURVE_DEFAULT_BOUNDS = { left: 40, right: 20, top: 20, bottom: 40 };
+
+let pdfJsLibPromise = null;
+
+function ensurePdfJs() {
+  if (pdfJsLibPromise) return pdfJsLibPromise;
+  pdfJsLibPromise = import('https://cdn.jsdelivr.net/npm/pdfjs-dist@3.7.107/build/pdf.min.mjs')
+    .then(module => {
+      if (module?.GlobalWorkerOptions) {
+        module.GlobalWorkerOptions.workerSrc = 'https://cdn.jsdelivr.net/npm/pdfjs-dist@3.7.107/build/pdf.worker.min.js';
+      }
+      return module;
+    })
+    .catch(err => {
+      pdfJsLibPromise = null;
+      throw err;
+    });
+  return pdfJsLibPromise;
+}
 
 const deviceSelect = document.getElementById('device-select');
 const deviceModalBtn = document.getElementById('device-modal-btn');
 const selectedSummary = document.getElementById('selected-device-summary');
 const settingsDiv = document.getElementById('device-settings');
 const plotBtn = document.getElementById('plot-btn');
+const customCurveBtn = document.getElementById('custom-curve-btn');
 const linkBtn = document.getElementById('link-btn');
 const openBtn = document.getElementById('open-btn');
 const componentModalBtn = document.getElementById('component-modal-btn');
@@ -59,6 +82,8 @@ const onelinePreviewEmpty = document.getElementById('oneline-preview-empty');
 const onelinePreviewNote = document.getElementById('oneline-preview-note');
 const contextMenu = createContextMenu();
 const viewCalloutOffsets = new Map();
+
+let updatingActiveComponentFromSelect = false;
 
 const baseHref = document.querySelector('base')?.href || new URL('.', window.location.href).href;
 const asset = path => new URL(path, baseHref).href;
@@ -357,6 +382,7 @@ const TYPE_LABEL_OVERRIDES = {
   'lv breaker': 'LV Breaker',
   'mv breaker': 'MV Breaker',
   'hv breaker': 'HV Breaker',
+  'custom curve': 'Custom Curves',
   ats: 'ATS',
   ups: 'UPS'
 };
@@ -368,6 +394,7 @@ const TYPE_PRIORITY = new Map([
   ['fuse', -3],
   ['relay', -2],
   ['recloser', -1],
+  ['custom curve', -0.5],
   ['contactor', 0],
   ['switch', 1],
   ['transformer', 2],
@@ -399,6 +426,24 @@ function loadSavedSettings() {
   }
   delete stored.viewOption;
   if (typeof stored.printIncludePreview !== 'boolean') stored.printIncludePreview = false;
+  if (!Array.isArray(stored.customCurves)) stored.customCurves = [];
+  stored.customCurves = stored.customCurves.map(sanitizeCustomCurve).filter(Boolean);
+  if (!Number.isFinite(stored.customCurveCounter)) {
+    stored.customCurveCounter = stored.customCurves.reduce((max, curve) => {
+      const seq = Number(curve.sequence);
+      return Number.isFinite(seq) ? Math.max(max, seq) : max;
+    }, 0);
+  }
+  let maxSequence = Number.isFinite(stored.customCurveCounter) ? stored.customCurveCounter : 0;
+  stored.customCurves.forEach(curve => {
+    if (!Number.isFinite(curve.sequence)) {
+      maxSequence += 1;
+      curve.sequence = maxSequence;
+    } else {
+      maxSequence = Math.max(maxSequence, curve.sequence);
+    }
+  });
+  stored.customCurveCounter = maxSequence;
   return stored;
 }
 
@@ -486,10 +531,130 @@ function createContextMenu() {
   return { show, hide, element: menu };
 }
 
+function createCustomCurveId(counter = null) {
+  if (Number.isFinite(counter) && counter >= 0) {
+    return `custom-curve-${counter}`;
+  }
+  return `custom-curve-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 6)}`;
+}
+
+function sanitizeAxisSpec(raw = {}) {
+  if (!raw || typeof raw !== 'object') return {};
+  const axis = {};
+  const currentMin = Number(raw.currentMin ?? raw.minCurrent ?? raw.xMin ?? raw.minCurrentAmp);
+  const currentMax = Number(raw.currentMax ?? raw.maxCurrent ?? raw.xMax ?? raw.maxCurrentAmp);
+  const timeMin = Number(raw.timeMin ?? raw.minTime ?? raw.yMin ?? raw.minTimeSec);
+  const timeMax = Number(raw.timeMax ?? raw.maxTime ?? raw.yMax ?? raw.maxTimeSec);
+  if (Number.isFinite(currentMin) && currentMin > 0) axis.currentMin = currentMin;
+  if (Number.isFinite(currentMax) && currentMax > 0) axis.currentMax = currentMax;
+  if (Number.isFinite(timeMin) && timeMin > 0) axis.timeMin = timeMin;
+  if (Number.isFinite(timeMax) && timeMax > 0) axis.timeMax = timeMax;
+  if (axis.currentMin !== undefined && axis.currentMax !== undefined && axis.currentMax <= axis.currentMin) {
+    const swap = axis.currentMin;
+    axis.currentMin = Math.min(axis.currentMin, axis.currentMax / 1.5 || axis.currentMin);
+    axis.currentMax = Math.max(swap, axis.currentMax);
+  }
+  if (axis.timeMin !== undefined && axis.timeMax !== undefined && axis.timeMax <= axis.timeMin) {
+    const swap = axis.timeMin;
+    axis.timeMin = Math.min(axis.timeMin, axis.timeMax / 1.5 || axis.timeMin);
+    axis.timeMax = Math.max(swap, axis.timeMax);
+  }
+  return axis;
+}
+
+function sanitizeBoundsSpec(raw = {}) {
+  if (!raw || typeof raw !== 'object') return {};
+  const bounds = {};
+  const left = Number(raw.left ?? raw.leftOffset ?? raw.xPadding ?? raw.paddingLeft);
+  const right = Number(raw.right ?? raw.rightOffset ?? raw.paddingRight);
+  const top = Number(raw.top ?? raw.topOffset ?? raw.paddingTop);
+  const bottom = Number(raw.bottom ?? raw.bottomOffset ?? raw.paddingBottom);
+  if (Number.isFinite(left) && left >= 0) bounds.left = left;
+  if (Number.isFinite(right) && right >= 0) bounds.right = right;
+  if (Number.isFinite(top) && top >= 0) bounds.top = top;
+  if (Number.isFinite(bottom) && bottom >= 0) bounds.bottom = bottom;
+  return bounds;
+}
+
+function sanitizeToleranceSpec(raw = {}) {
+  if (!raw || typeof raw !== 'object') return undefined;
+  const lower = Number(raw.timeLower ?? raw.lower ?? raw.timeLowerBound);
+  const upper = Number(raw.timeUpper ?? raw.upper ?? raw.timeUpperBound);
+  const tolerance = {};
+  if (Number.isFinite(lower) && lower > 0) tolerance.timeLower = lower;
+  if (Number.isFinite(upper) && upper > 0) tolerance.timeUpper = upper;
+  return Object.keys(tolerance).length ? tolerance : undefined;
+}
+
+function sanitizeCustomCurve(raw) {
+  if (!raw || typeof raw !== 'object') return null;
+  const curvePoints = Array.isArray(raw.curve)
+    ? raw.curve
+    : Array.isArray(raw.points)
+      ? raw.points
+      : [];
+  const sanitizedPoints = sanitizeCurve(curvePoints);
+  if (!sanitizedPoints.length) return null;
+  const name = typeof raw.name === 'string' && raw.name.trim() ? raw.name.trim() : 'Custom Curve';
+  const id = typeof raw.id === 'string' && raw.id.trim() ? raw.id.trim() : createCustomCurveId();
+  const manufacturer = typeof raw.manufacturer === 'string' && raw.manufacturer.trim()
+    ? raw.manufacturer.trim()
+    : (typeof raw.vendor === 'string' && raw.vendor.trim() ? raw.vendor.trim() : '');
+  const deviceType = typeof raw.deviceType === 'string' && raw.deviceType.trim()
+    ? raw.deviceType.trim()
+    : CUSTOM_CURVE_CATEGORY;
+  const description = typeof raw.description === 'string' ? raw.description.trim() : '';
+  const sequenceSource = raw.sequence ?? raw.order ?? raw.index ?? raw.position;
+  const sequence = Number(sequenceSource);
+  const tolerance = sanitizeToleranceSpec(raw.tolerance);
+  const axes = sanitizeAxisSpec(raw.axes ?? raw.axis ?? {});
+  const bounds = sanitizeBoundsSpec(raw.bounds ?? raw.padding ?? {});
+  return {
+    id,
+    name,
+    manufacturer,
+    deviceType,
+    description,
+    curve: sanitizedPoints,
+    axes,
+    bounds,
+    sequence: Number.isFinite(sequence) ? sequence : null,
+    tolerance
+  };
+}
+
+function sortCustomCurveList(list = []) {
+  if (!Array.isArray(list)) return [];
+  return list
+    .slice()
+    .sort((a, b) => {
+      const seqA = Number(a?.sequence) || 0;
+      const seqB = Number(b?.sequence) || 0;
+      if (seqA !== seqB) return seqA - seqB;
+      const nameA = typeof a?.name === 'string' ? a.name : '';
+      const nameB = typeof b?.name === 'string' ? b.name : '';
+      return nameA.localeCompare(nameB, undefined, { sensitivity: 'base' });
+    });
+}
+
+function normalizeCustomCurveSequences(list = []) {
+  if (!Array.isArray(list)) return [];
+  let seq = 0;
+  return sortCustomCurveList(list).map(curve => ({
+    ...curve,
+    sequence: ++seq
+  }));
+}
+
 let saved = loadSavedSettings();
 
 let activeViewOptions = normalizeViewOptionList(saved.viewOptions);
 saved.viewOptions = [...activeViewOptions];
+saved.customCurves = normalizeCustomCurveSequences(saved.customCurves);
+saved.customCurveCounter = saved.customCurves.reduce((max, curve) => {
+  const seq = Number(curve.sequence);
+  return Number.isFinite(seq) ? Math.max(max, seq) : max;
+}, Number.isFinite(saved.customCurveCounter) ? saved.customCurveCounter : 0);
 
 annotations = (saved.annotations || []).map(sanitizeAnnotation).filter(Boolean);
 saved.annotations = annotations.map(exportAnnotation);
@@ -781,6 +946,16 @@ function buildCurveContextItems(entry) {
       disabled: !targetId,
       onSelect: () => linkComponent(selection)
     });
+    if (selection.isCustom && selection.customCurveId) {
+      items.push({
+        label: 'Edit Custom Curve',
+        onSelect: () => openCustomCurveBuilder(selection.customCurveId)
+      });
+      items.push({
+        label: 'Delete Custom Curve',
+        onSelect: () => confirmCustomCurveRemoval(selection)
+      });
+    }
   }
   if (selection.uid) {
     items.push({
@@ -1616,6 +1791,7 @@ function rebuildCatalog() {
   deviceGroups = [];
 
   const componentEntries = buildComponentEntries();
+  const customEntries = buildCustomCurveEntries();
   const libraryEntries = buildLibraryEntries();
   const fuseEntries = libraryEntries.filter(entry => (entry.baseDevice?.type || entry.deviceType) === 'fuse');
   const otherLibraryEntries = libraryEntries.filter(entry => (entry.baseDevice?.type || entry.deviceType) !== 'fuse');
@@ -1623,6 +1799,9 @@ function rebuildCatalog() {
 
   if (componentEntries.length) {
     deviceGroups.push({ id: 'oneline', label: 'One-Line Devices', items: componentEntries });
+  }
+  if (customEntries.length) {
+    deviceGroups.push({ id: 'customCurves', label: 'Custom Curves', items: customEntries });
   }
   if (otherLibraryEntries.length) {
     deviceGroups.push({ id: 'library', label: 'Library Devices', items: otherLibraryEntries });
@@ -1812,6 +1991,43 @@ function buildComponentDisplayEntries() {
   return entries.sort((a, b) => a.name.localeCompare(b.name, undefined, { sensitivity: 'base' }));
 }
 
+function buildCustomCurveEntries() {
+  if (!Array.isArray(saved.customCurves) || !saved.customCurves.length) return [];
+  const ordered = sortCustomCurveList(saved.customCurves);
+  return ordered.map(curve => {
+    const vendor = curve.manufacturer || CUSTOM_CURVE_VENDOR_FALLBACK;
+    const baseId = `custom:${curve.id}`;
+    const baseDevice = {
+      id: baseId,
+      name: curve.name,
+      type: curve.deviceType || CUSTOM_CURVE_CATEGORY,
+      curve: curve.curve || [],
+      settings: {},
+      vendor,
+      manufacturer: vendor,
+      tolerance: curve.tolerance
+    };
+    return {
+      uid: baseId,
+      kind: 'library',
+      name: curve.name,
+      baseDeviceId: baseId,
+      baseDevice,
+      deviceType: curve.deviceType || CUSTOM_CURVE_CATEGORY,
+      deviceCategory: curve.deviceType || CUSTOM_CURVE_CATEGORY,
+      overrideSource: {},
+      isCustom: true,
+      customCurveId: curve.id,
+      customCurve: curve,
+      description: curve.description || '',
+      metadata: {
+        axes: curve.axes || {},
+        bounds: curve.bounds || {}
+      }
+    };
+  });
+}
+
 function buildLibraryEntries() {
   return libraryDevices
     .filter(dev => PROTECTIVE_TYPES.has(dev.type))
@@ -1837,6 +2053,87 @@ function buildOverlayEntries() {
   overlays.push(...buildCableEntries(contextId));
   overlays.push(...buildMotorOverlayEntries(contextId));
   return overlays;
+}
+
+function getCustomCurveById(curveId) {
+  if (!curveId || !Array.isArray(saved.customCurves)) return null;
+  return saved.customCurves.find(curve => curve.id === curveId) || null;
+}
+
+function persistCustomCurveState({ refresh = true } = {}) {
+  saved.customCurves = normalizeCustomCurveSequences(saved.customCurves);
+  saved.customCurveCounter = saved.customCurves.reduce((max, curve) => {
+    const seq = Number(curve.sequence);
+    return Number.isFinite(seq) ? Math.max(max, seq) : max;
+  }, saved.customCurveCounter || 0);
+  saved.viewOptions = [...activeViewOptions];
+  setItem('tccSettings', saved);
+  if (refresh) {
+    refreshCatalog({ preserveSelection: true, includeComponentContext: true });
+  }
+}
+
+function saveCustomCurve(curve, { select = false } = {}) {
+  if (!curve || !Array.isArray(curve.curve) || !curve.curve.length) return null;
+  let existing = curve.id ? getCustomCurveById(curve.id) : null;
+  if (!existing) {
+    const nextSequence = (saved.customCurveCounter || saved.customCurves.length || 0) + 1;
+    curve.id = curve.id || createCustomCurveId(nextSequence);
+    curve.sequence = Number.isFinite(curve.sequence) ? curve.sequence : nextSequence;
+    saved.customCurveCounter = Math.max(saved.customCurveCounter || 0, curve.sequence);
+    saved.customCurves.push(curve);
+  } else {
+    existing.name = curve.name;
+    existing.manufacturer = curve.manufacturer;
+    existing.deviceType = curve.deviceType;
+    existing.description = curve.description;
+    existing.curve = curve.curve;
+    existing.axes = curve.axes || {};
+    existing.bounds = curve.bounds || {};
+    existing.tolerance = curve.tolerance;
+    if (Number.isFinite(curve.sequence)) {
+      existing.sequence = curve.sequence;
+    }
+  }
+  persistCustomCurveState({ refresh: true });
+  if (select && curve.id) {
+    const uid = `custom:${curve.id}`;
+    const updated = new Set(selectedDeviceIds());
+    updated.add(uid);
+    applySelectionSet([...updated], { persist: true });
+  }
+  return curve;
+}
+
+function removeCustomCurve(curveId) {
+  if (!curveId || !Array.isArray(saved.customCurves)) return false;
+  const index = saved.customCurves.findIndex(curve => curve.id === curveId);
+  if (index === -1) return false;
+  saved.customCurves.splice(index, 1);
+  persistCustomCurveState({ refresh: true });
+  const uid = `custom:${curveId}`;
+  if (selectedDeviceIds().includes(uid)) {
+    removeDeviceFromSelection(uid);
+  }
+  return true;
+}
+
+async function confirmCustomCurveRemoval(entry) {
+  const curveId = entry?.customCurveId;
+  if (!curveId) return;
+  const curve = getCustomCurveById(curveId);
+  if (!curve) return;
+  const response = await openModal({
+    title: 'Remove Custom Curve',
+    primaryText: 'Delete',
+    secondaryText: 'Cancel',
+    message: `Are you sure you want to delete "${curve.name}"? This action cannot be undone.`,
+    variant: 'danger',
+    onSubmit: () => true
+  });
+  if (response) {
+    removeCustomCurve(curveId);
+  }
 }
 
 function collectNeighborDeviceDefaults(targetId, depthLimit = MAX_NEIGHBOR_DEPTH) {
@@ -2171,6 +2468,15 @@ function describeEntryAttributes(entry) {
       value: formatSettingValue(base.settings?.[field]),
       range: describeSettingRange(base, field)
     }));
+    if (entry.isCustom) {
+      baseRows.unshift({
+        label: 'Data Points',
+        value: Array.isArray(entry.customCurve?.curve) ? `${entry.customCurve.curve.length} points` : '',
+        range: ''
+      });
+      const manufacturer = entry.baseDevice?.vendor || entry.baseDevice?.manufacturer || CUSTOM_CURVE_VENDOR_FALLBACK;
+      baseRows.unshift({ label: 'Manufacturer', value: manufacturer, range: '' });
+    }
     if (entry.kind === 'component') {
       const used = new Set(baseRows.map(row => row.label.toLowerCase()));
       const componentRows = describeComponentDetailRows(entry, used);
@@ -2972,7 +3278,23 @@ deviceSelect.addEventListener('change', () => {
   renderSelectedSummary();
   renderSettings();
   persistSettings();
+  if (!updatingActiveComponentFromSelect) {
+    const selectedEntries = selectedDeviceIds()
+      .map(id => deviceMap.get(id))
+      .filter(entry => entry && entry.kind === 'component' && entry.componentId);
+    const firstComponent = selectedEntries[0] || null;
+    if (firstComponent && getActiveComponentId() !== firstComponent.componentId) {
+      updatingActiveComponentFromSelect = true;
+      setActiveComponent(firstComponent.componentId, { preserveSelection: true });
+      updatingActiveComponentFromSelect = false;
+    }
+  }
 });
+if (customCurveBtn) {
+  customCurveBtn.addEventListener('click', () => {
+    openCustomCurveBuilder();
+  });
+}
 plotBtn.addEventListener('click', applyPlotAndPersistence);
 if (printPlotBtn) {
   printPlotBtn.addEventListener('click', handlePrintPlot);
@@ -3367,6 +3689,697 @@ async function openComponentBrowserModal() {
       }
     }
   }
+}
+
+async function openCustomCurveBuilder(curveId = null) {
+  const isEditing = !!curveId;
+  const existing = isEditing ? getCustomCurveById(curveId) : null;
+  const axes = { ...CUSTOM_CURVE_DEFAULT_AXES, ...(existing?.axes || {}) };
+  const bounds = { ...CUSTOM_CURVE_DEFAULT_BOUNDS, ...(existing?.bounds || {}) };
+  let workingPoints = sanitizeCurve(existing?.curve || []);
+  let referenceImage = null;
+  let referenceObjectUrl = null;
+  let pendingPdfUrl = null;
+  let lastCapturedPoint = null;
+
+  const doc = document;
+  const axisInputs = {};
+  const boundInputs = {};
+  const axisKeys = ['currentMin', 'currentMax', 'timeMin', 'timeMax'];
+  const boundKeys = ['left', 'right', 'top', 'bottom'];
+
+  let canvas = null;
+  let ctx = null;
+  let tableBody = null;
+  let statusEl = null;
+  let readoutEl = null;
+  let manualCurrentInput = null;
+  let manualTimeInput = null;
+  let pointCountEl = null;
+
+  let nameInputEl = null;
+  let manufacturerInputEl = null;
+  let deviceTypeInputEl = null;
+  let descriptionInputEl = null;
+
+  const updateStatus = (message, type = 'info') => {
+    if (!statusEl) return;
+    statusEl.textContent = message || '';
+    statusEl.dataset.variant = type;
+  };
+
+  const updateReadout = point => {
+    if (!readoutEl) return;
+    if (!point) {
+      readoutEl.textContent = 'Click within the plot area to capture a point.';
+      return;
+    }
+    readoutEl.textContent = `Last point: ${formatSettingValue(point.current)} A @ ${formatSettingValue(point.time)} s`;
+  };
+
+  const clamp = (value, min, max) => {
+    if (!Number.isFinite(value)) return min;
+    return Math.min(Math.max(value, min), max);
+  };
+
+  const getAxisValues = () => {
+    const values = { ...CUSTOM_CURVE_DEFAULT_AXES, ...axes };
+    let valid = true;
+    axisKeys.forEach(key => {
+      const input = axisInputs[key];
+      if (!input) return;
+      const parsed = Number(input.value);
+      if (Number.isFinite(parsed) && parsed > 0) {
+        values[key] = parsed;
+      } else {
+        valid = false;
+      }
+    });
+    if (!(values.currentMin > 0 && values.currentMax > values.currentMin)) valid = false;
+    if (!(values.timeMin > 0 && values.timeMax > values.timeMin)) valid = false;
+    if (valid) {
+      axes.currentMin = values.currentMin;
+      axes.currentMax = values.currentMax;
+      axes.timeMin = values.timeMin;
+      axes.timeMax = values.timeMax;
+    }
+    return { values, valid };
+  };
+
+  const getBoundValues = () => {
+    const values = { ...CUSTOM_CURVE_DEFAULT_BOUNDS, ...bounds };
+    boundKeys.forEach(key => {
+      const input = boundInputs[key];
+      if (!input) return;
+      const parsed = Number(input.value);
+      if (Number.isFinite(parsed) && parsed >= 0) {
+        values[key] = parsed;
+      }
+    });
+    bounds.left = values.left;
+    bounds.right = values.right;
+    bounds.top = values.top;
+    bounds.bottom = values.bottom;
+    return values;
+  };
+
+  const computePlotMetrics = () => {
+    if (!canvas) {
+      return {
+        axisValues: axes,
+        axisValid: true,
+        bounds,
+        width: 0,
+        height: 0,
+        plotLeft: 0,
+        plotTop: 0,
+        plotWidth: 0,
+        plotHeight: 0
+      };
+    }
+    const axisResult = getAxisValues();
+    const boundValues = getBoundValues();
+    const width = canvas.width || 720;
+    const height = canvas.height || 480;
+    const left = clamp(boundValues.left, 0, width - 40);
+    const right = clamp(boundValues.right, 0, width - left - 20);
+    const top = clamp(boundValues.top, 0, height - 40);
+    const bottom = clamp(boundValues.bottom, 0, height - top - 20);
+    const plotWidth = Math.max(width - left - right, 40);
+    const plotHeight = Math.max(height - top - bottom, 40);
+    return {
+      axisValues: axisResult.values,
+      axisValid: axisResult.valid,
+      bounds: { left, right, top, bottom },
+      width,
+      height,
+      plotLeft: left,
+      plotTop: top,
+      plotWidth,
+      plotHeight
+    };
+  };
+
+  const dataToPixel = (point, metrics) => {
+    if (!metrics || !metrics.axisValid) return null;
+    const axis = metrics.axisValues || {};
+    const currentMin = Number(axis.currentMin);
+    const currentMax = Number(axis.currentMax);
+    const timeMin = Number(axis.timeMin);
+    const timeMax = Number(axis.timeMax);
+    if (!(currentMin > 0 && currentMax > currentMin && timeMin > 0 && timeMax > timeMin)) {
+      return null;
+    }
+    const current = Number(point.current);
+    const time = Number(point.time);
+    if (!Number.isFinite(current) || current <= 0 || !Number.isFinite(time) || time <= 0) return null;
+    const currentRange = Math.log(currentMax / currentMin);
+    const timeRange = Math.log(timeMin / timeMax);
+    if (!Number.isFinite(currentRange) || currentRange <= 0) return null;
+    if (!Number.isFinite(timeRange) || timeRange >= 0) return null;
+    const normalizedX = clamp(Math.log(current / currentMin) / currentRange, 0, 1);
+    const normalizedY = clamp(Math.log(time / timeMax) / timeRange, 0, 1);
+    const x = metrics.plotLeft + normalizedX * metrics.plotWidth;
+    const y = metrics.plotTop + normalizedY * metrics.plotHeight;
+    return { x, y };
+  };
+
+  const pixelToData = (x, y, metrics) => {
+    if (!metrics || !metrics.axisValid) return null;
+    const axis = metrics.axisValues || {};
+    const currentMin = Number(axis.currentMin);
+    const currentMax = Number(axis.currentMax);
+    const timeMin = Number(axis.timeMin);
+    const timeMax = Number(axis.timeMax);
+    if (!(currentMin > 0 && currentMax > currentMin && timeMin > 0 && timeMax > timeMin)) {
+      return null;
+    }
+    const currentRange = Math.log(currentMax / currentMin);
+    const timeRange = Math.log(timeMin / timeMax);
+    if (!Number.isFinite(currentRange) || currentRange <= 0) return null;
+    if (!Number.isFinite(timeRange) || timeRange >= 0) return null;
+    const normalizedX = clamp((x - metrics.plotLeft) / metrics.plotWidth, 0, 1);
+    const normalizedY = clamp((y - metrics.plotTop) / metrics.plotHeight, 0, 1);
+    const current = currentMin * Math.exp(currentRange * normalizedX);
+    const time = timeMax * Math.exp(timeRange * normalizedY);
+    return { current, time };
+  };
+
+  const configureCanvasSize = image => {
+    if (!canvas) return;
+    if (image && image.width && image.height) {
+      const maxWidth = 960;
+      const maxHeight = 640;
+      const scale = Math.min(maxWidth / image.width, maxHeight / image.height, 1);
+      const width = Math.max(480, Math.round(image.width * scale));
+      const height = Math.max(360, Math.round(image.height * scale));
+      canvas.width = width;
+      canvas.height = height;
+      canvas.style.width = `${width}px`;
+      canvas.style.height = `${height}px`;
+    } else {
+      canvas.width = 720;
+      canvas.height = 480;
+      canvas.style.width = '720px';
+      canvas.style.height = '480px';
+    }
+  };
+
+  const refreshCanvas = () => {
+    if (!canvas || !ctx) return;
+    const metrics = computePlotMetrics();
+    const { width, height, plotLeft, plotTop, plotWidth, plotHeight } = metrics;
+    ctx.clearRect(0, 0, width, height);
+    if (referenceImage) {
+      ctx.drawImage(referenceImage, 0, 0, width, height);
+    } else {
+      ctx.fillStyle = '#f9fafb';
+      ctx.fillRect(0, 0, width, height);
+    }
+    ctx.save();
+    ctx.strokeStyle = '#2563eb';
+    ctx.lineWidth = 2;
+    ctx.strokeRect(plotLeft, plotTop, plotWidth, plotHeight);
+    ctx.restore();
+    if (metrics.axisValid) {
+      ctx.save();
+      ctx.fillStyle = '#1d4ed8';
+      workingPoints.forEach(point => {
+        const pixel = dataToPixel(point, metrics);
+        if (!pixel) return;
+        ctx.beginPath();
+        ctx.arc(pixel.x, pixel.y, 4, 0, Math.PI * 2);
+        ctx.fill();
+      });
+      ctx.restore();
+    }
+    if (lastCapturedPoint) {
+      const highlight = dataToPixel(lastCapturedPoint, metrics);
+      if (highlight) {
+        ctx.save();
+        ctx.fillStyle = '#dc2626';
+        ctx.beginPath();
+        ctx.arc(highlight.x, highlight.y, 5, 0, Math.PI * 2);
+        ctx.fill();
+        ctx.restore();
+      }
+    }
+  };
+
+  const refreshPointTable = () => {
+    if (!tableBody) return;
+    workingPoints = sanitizeCurve(workingPoints);
+    tableBody.innerHTML = '';
+    if (!workingPoints.length) {
+      const row = doc.createElement('tr');
+      const cell = doc.createElement('td');
+      cell.colSpan = 3;
+      cell.className = 'custom-curve-table-empty';
+      cell.textContent = 'No curve points defined. Capture points or add them manually to continue.';
+      row.appendChild(cell);
+      tableBody.appendChild(row);
+    } else {
+      workingPoints.forEach((point, index) => {
+        const row = doc.createElement('tr');
+        row.dataset.index = String(index);
+
+        const currentCell = doc.createElement('td');
+        const currentInput = doc.createElement('input');
+        currentInput.type = 'number';
+        currentInput.min = '0';
+        currentInput.step = 'any';
+        currentInput.value = formatSettingValue(point.current);
+        currentInput.addEventListener('input', () => {
+          workingPoints[index].current = Number(currentInput.value);
+        });
+        currentInput.addEventListener('change', () => {
+          workingPoints[index].current = Number(currentInput.value);
+          refreshPointTable();
+        });
+        currentCell.appendChild(currentInput);
+
+        const timeCell = doc.createElement('td');
+        const timeInput = doc.createElement('input');
+        timeInput.type = 'number';
+        timeInput.min = '0';
+        timeInput.step = 'any';
+        timeInput.value = formatSettingValue(point.time);
+        timeInput.addEventListener('input', () => {
+          workingPoints[index].time = Number(timeInput.value);
+        });
+        timeInput.addEventListener('change', () => {
+          workingPoints[index].time = Number(timeInput.value);
+          refreshPointTable();
+        });
+        timeCell.appendChild(timeInput);
+
+        const actionCell = doc.createElement('td');
+        const removeBtn = doc.createElement('button');
+        removeBtn.type = 'button';
+        removeBtn.className = 'custom-curve-remove';
+        removeBtn.textContent = 'Remove';
+        removeBtn.addEventListener('click', () => {
+          workingPoints.splice(index, 1);
+          refreshPointTable();
+        });
+        actionCell.appendChild(removeBtn);
+
+        row.append(currentCell, timeCell, actionCell);
+        tableBody.appendChild(row);
+      });
+    }
+    if (pointCountEl) {
+      pointCountEl.textContent = `${workingPoints.length} point${workingPoints.length === 1 ? '' : 's'}`;
+    }
+    refreshCanvas();
+  };
+
+  const addPoint = (current, time, { announce = true } = {}) => {
+    if (!Number.isFinite(current) || current <= 0 || !Number.isFinite(time) || time <= 0) {
+      return;
+    }
+    workingPoints.push({ current, time });
+    refreshPointTable();
+    if (announce) {
+      updateStatus(`Added point ${formatSettingValue(current)} A @ ${formatSettingValue(time)} s.`, 'info');
+    }
+  };
+
+  const handleManualAdd = () => {
+    const current = Number(manualCurrentInput.value);
+    const time = Number(manualTimeInput.value);
+    if (!Number.isFinite(current) || current <= 0 || !Number.isFinite(time) || time <= 0) {
+      updateStatus('Provide positive values for current and time before adding the point.', 'error');
+      return;
+    }
+    addPoint(current, time);
+    manualCurrentInput.value = '';
+    manualTimeInput.value = '';
+    manualCurrentInput.focus();
+  };
+
+  const handleCanvasClick = event => {
+    if (!canvas) return;
+    const rect = canvas.getBoundingClientRect();
+    const x = event.clientX - rect.left;
+    const y = event.clientY - rect.top;
+    const metrics = computePlotMetrics();
+    const point = pixelToData(x, y, metrics);
+    if (!point) {
+      updateStatus('Provide valid axis bounds before digitizing points.', 'error');
+      return;
+    }
+    lastCapturedPoint = point;
+    updateReadout(point);
+    addPoint(point.current, point.time, { announce: true });
+  };
+
+  const resetReference = () => {
+    referenceImage = null;
+    lastCapturedPoint = null;
+    if (referenceObjectUrl) {
+      URL.revokeObjectURL(referenceObjectUrl);
+      referenceObjectUrl = null;
+    }
+    if (pendingPdfUrl) {
+      URL.revokeObjectURL(pendingPdfUrl);
+      pendingPdfUrl = null;
+    }
+    configureCanvasSize(null);
+    refreshCanvas();
+    updateReadout(null);
+  };
+
+  const loadImageFromSource = src => new Promise((resolve, reject) => {
+    const image = new Image();
+    image.onload = () => resolve(image);
+    image.onerror = () => reject(new Error('Failed to load reference image.'));
+    image.src = src;
+  });
+
+  const handleReferenceFile = async file => {
+    if (!file) return;
+    updateStatus('Loading reference file…', 'info');
+    try {
+      resetReference();
+      const isPdf = /pdf$/i.test(file.type) || /\.pdf$/i.test(file.name);
+      if (isPdf) {
+        const pdfModule = await ensurePdfJs();
+        pendingPdfUrl = URL.createObjectURL(file);
+        const pdf = await pdfModule.getDocument({ url: pendingPdfUrl }).promise;
+        const page = await pdf.getPage(1);
+        const viewport = page.getViewport({ scale: 1.6 });
+        const tempCanvas = doc.createElement('canvas');
+        tempCanvas.width = viewport.width;
+        tempCanvas.height = viewport.height;
+        const tempCtx = tempCanvas.getContext('2d');
+        await page.render({ canvasContext: tempCtx, viewport }).promise;
+        const dataUrl = tempCanvas.toDataURL('image/png');
+        referenceImage = await loadImageFromSource(dataUrl);
+      } else {
+        referenceObjectUrl = URL.createObjectURL(file);
+        referenceImage = await loadImageFromSource(referenceObjectUrl);
+      }
+      configureCanvasSize(referenceImage);
+      refreshCanvas();
+      updateStatus('Reference loaded. Click within the plot area to capture points.', 'info');
+    } catch (err) {
+      console.error('Failed to load reference', err);
+      updateStatus('Unable to load the reference file. Try converting the PDF to an image if the issue persists.', 'error');
+      resetReference();
+    } finally {
+      if (pendingPdfUrl) {
+        URL.revokeObjectURL(pendingPdfUrl);
+        pendingPdfUrl = null;
+      }
+      if (referenceObjectUrl) {
+        URL.revokeObjectURL(referenceObjectUrl);
+        referenceObjectUrl = null;
+      }
+    }
+  };
+
+  const clearPoints = () => {
+    workingPoints = [];
+    refreshPointTable();
+    updateStatus('Removed all curve points.', 'info');
+  };
+
+  const setAxisInputValues = () => {
+    axisKeys.forEach(key => {
+      if (axisInputs[key]) {
+        axisInputs[key].value = axes[key];
+      }
+    });
+  };
+
+  const setBoundInputValues = () => {
+    boundKeys.forEach(key => {
+      if (boundInputs[key]) {
+        boundInputs[key].value = bounds[key];
+      }
+    });
+  };
+
+  const result = await openModal({
+    title: isEditing ? 'Edit Custom Curve' : 'Create Custom Curve',
+    primaryText: isEditing ? 'Save Curve' : 'Add Curve',
+    secondaryText: 'Cancel',
+    resizable: true,
+    defaultWidth: 920,
+    render(body, controls) {
+      const form = doc.createElement('form');
+      form.className = 'custom-curve-form';
+      controls.registerForm(form);
+
+      const detailsSection = doc.createElement('section');
+      detailsSection.className = 'custom-curve-section';
+      const detailsHeading = doc.createElement('h3');
+      detailsHeading.textContent = 'Curve Details';
+      const detailsGrid = doc.createElement('div');
+      detailsGrid.className = 'custom-curve-grid';
+
+      const nameLabel = doc.createElement('label');
+      nameLabel.textContent = 'Curve name';
+      nameInputEl = doc.createElement('input');
+      nameInputEl.type = 'text';
+      nameInputEl.required = true;
+      nameInputEl.value = existing?.name || '';
+      nameLabel.appendChild(nameInputEl);
+
+      const manufacturerLabel = doc.createElement('label');
+      manufacturerLabel.textContent = 'Manufacturer (optional)';
+      manufacturerInputEl = doc.createElement('input');
+      manufacturerInputEl.type = 'text';
+      manufacturerInputEl.value = existing?.manufacturer || '';
+      manufacturerLabel.appendChild(manufacturerInputEl);
+
+      const deviceTypeLabel = doc.createElement('label');
+      deviceTypeLabel.textContent = 'Device type (optional)';
+      deviceTypeInputEl = doc.createElement('input');
+      deviceTypeInputEl.type = 'text';
+      deviceTypeInputEl.value = existing?.deviceType || '';
+      deviceTypeLabel.appendChild(deviceTypeInputEl);
+
+      detailsGrid.append(nameLabel, manufacturerLabel, deviceTypeLabel);
+
+      const descriptionLabel = doc.createElement('label');
+      descriptionLabel.textContent = 'Description (optional)';
+      descriptionInputEl = doc.createElement('textarea');
+      descriptionInputEl.rows = 3;
+      descriptionInputEl.value = existing?.description || '';
+      descriptionLabel.appendChild(descriptionInputEl);
+
+      detailsSection.append(detailsHeading, detailsGrid, descriptionLabel);
+
+      const referenceSection = doc.createElement('section');
+      referenceSection.className = 'custom-curve-section';
+      const referenceHeading = doc.createElement('h3');
+      referenceHeading.textContent = 'Reference Mapping';
+      const referenceGrid = doc.createElement('div');
+      referenceGrid.className = 'custom-curve-reference';
+
+      const referenceControls = doc.createElement('div');
+      referenceControls.className = 'custom-curve-reference-controls';
+
+      const uploadButton = doc.createElement('button');
+      uploadButton.type = 'button';
+      uploadButton.textContent = 'Upload PDF or image';
+      const uploadInput = doc.createElement('input');
+      uploadInput.type = 'file';
+      uploadInput.accept = '.pdf,.png,.jpg,.jpeg,.gif,.webp';
+      uploadInput.className = 'visually-hidden';
+      uploadButton.addEventListener('click', () => uploadInput.click());
+      uploadInput.addEventListener('change', () => {
+        const [file] = uploadInput.files || [];
+        handleReferenceFile(file);
+        uploadInput.value = '';
+      });
+
+      const clearRefButton = doc.createElement('button');
+      clearRefButton.type = 'button';
+      clearRefButton.textContent = 'Clear reference';
+      clearRefButton.addEventListener('click', () => {
+        resetReference();
+        updateStatus('Reference cleared.', 'info');
+      });
+
+      const axisFieldset = doc.createElement('fieldset');
+      axisFieldset.className = 'custom-curve-fieldset';
+      const axisLegend = doc.createElement('legend');
+      axisLegend.textContent = 'Axis bounds';
+      axisFieldset.appendChild(axisLegend);
+      axisKeys.forEach(key => {
+        const label = doc.createElement('label');
+        label.textContent = key;
+        const input = doc.createElement('input');
+        input.type = 'number';
+        input.min = '0';
+        input.step = 'any';
+        axisInputs[key] = input;
+        label.appendChild(input);
+        input.addEventListener('input', () => refreshCanvas());
+        input.addEventListener('change', () => {
+          getAxisValues();
+          refreshCanvas();
+        });
+        axisFieldset.appendChild(label);
+      });
+
+      const boundsFieldset = doc.createElement('fieldset');
+      boundsFieldset.className = 'custom-curve-fieldset';
+      const boundsLegend = doc.createElement('legend');
+      boundsLegend.textContent = 'Plot padding (px)';
+      boundsFieldset.appendChild(boundsLegend);
+      boundKeys.forEach(key => {
+        const label = doc.createElement('label');
+        label.textContent = key;
+        const input = doc.createElement('input');
+        input.type = 'number';
+        input.min = '0';
+        input.step = '1';
+        boundInputs[key] = input;
+        label.appendChild(input);
+        input.addEventListener('input', () => refreshCanvas());
+        input.addEventListener('change', () => {
+          getBoundValues();
+          refreshCanvas();
+        });
+        boundsFieldset.appendChild(label);
+      });
+
+      statusEl = doc.createElement('p');
+      statusEl.className = 'custom-curve-status';
+      readoutEl = doc.createElement('p');
+      readoutEl.className = 'custom-curve-readout';
+
+      referenceControls.append(uploadButton, uploadInput, clearRefButton, axisFieldset, boundsFieldset, statusEl, readoutEl);
+
+      const canvasContainer = doc.createElement('div');
+      canvasContainer.className = 'custom-curve-canvas-container';
+      canvas = doc.createElement('canvas');
+      canvas.className = 'custom-curve-canvas';
+      ctx = canvas.getContext('2d');
+      canvas.addEventListener('click', handleCanvasClick);
+      canvasContainer.appendChild(canvas);
+
+      referenceGrid.append(referenceControls, canvasContainer);
+      referenceSection.append(referenceHeading, referenceGrid);
+
+      const pointsSection = doc.createElement('section');
+      pointsSection.className = 'custom-curve-section';
+      const pointsHeading = doc.createElement('h3');
+      pointsHeading.textContent = 'Curve Points';
+      const toolbar = doc.createElement('div');
+      toolbar.className = 'custom-curve-toolbar';
+      manualCurrentInput = doc.createElement('input');
+      manualCurrentInput.type = 'number';
+      manualCurrentInput.min = '0';
+      manualCurrentInput.step = 'any';
+      manualCurrentInput.placeholder = 'Current (A)';
+      manualTimeInput = doc.createElement('input');
+      manualTimeInput.type = 'number';
+      manualTimeInput.min = '0';
+      manualTimeInput.step = 'any';
+      manualTimeInput.placeholder = 'Time (s)';
+      const addManualBtn = doc.createElement('button');
+      addManualBtn.type = 'button';
+      addManualBtn.textContent = 'Add point';
+      addManualBtn.addEventListener('click', handleManualAdd);
+      const handleManualKey = event => {
+        if (event.key === 'Enter') {
+          event.preventDefault();
+          handleManualAdd();
+        }
+      };
+      manualCurrentInput.addEventListener('keydown', handleManualKey);
+      manualTimeInput.addEventListener('keydown', handleManualKey);
+      toolbar.append(manualCurrentInput, manualTimeInput, addManualBtn);
+
+      const clearBtn = doc.createElement('button');
+      clearBtn.type = 'button';
+      clearBtn.textContent = 'Clear points';
+      clearBtn.addEventListener('click', clearPoints);
+      toolbar.appendChild(clearBtn);
+
+      const table = doc.createElement('table');
+      table.className = 'custom-curve-table';
+      const thead = doc.createElement('thead');
+      const headerRow = doc.createElement('tr');
+      ['Current (A)', 'Time (s)', ''].forEach(label => {
+        const th = doc.createElement('th');
+        th.textContent = label;
+        headerRow.appendChild(th);
+      });
+      thead.appendChild(headerRow);
+      tableBody = doc.createElement('tbody');
+      table.append(thead, tableBody);
+
+      pointCountEl = doc.createElement('p');
+      pointCountEl.className = 'custom-curve-count';
+
+      pointsSection.append(pointsHeading, toolbar, pointCountEl, table);
+
+      form.append(detailsSection, referenceSection, pointsSection);
+      body.appendChild(form);
+
+      setAxisInputValues();
+      setBoundInputValues();
+      configureCanvasSize(referenceImage);
+      refreshPointTable();
+      updateReadout(lastCapturedPoint);
+      updateStatus('Use the reference or manual inputs to define the curve.', 'info');
+
+      if (controls && typeof controls.setInitialFocus === 'function') {
+        controls.setInitialFocus(nameInputEl);
+      }
+      return { initialFocus: nameInputEl };
+    },
+    onSubmit() {
+      const name = nameInputEl?.value.trim();
+      if (!name) {
+        updateStatus('Enter a curve name before saving.', 'error');
+        if (nameInputEl) nameInputEl.focus();
+        return false;
+      }
+      const axisResult = getAxisValues();
+      if (!axisResult.valid) {
+        updateStatus('Axis bounds must be positive values with the maximum greater than the minimum.', 'error');
+        return false;
+      }
+      if (workingPoints.length < 2) {
+        updateStatus('Add at least two curve points before saving.', 'error');
+        return false;
+      }
+      const sanitizedPoints = sanitizeCurve(workingPoints);
+      if (sanitizedPoints.length < 2) {
+        updateStatus('Add at least two curve points before saving.', 'error');
+        return false;
+      }
+      const payload = {
+        id: existing?.id || null,
+        name,
+        manufacturer: manufacturerInputEl?.value.trim() || '',
+        deviceType: deviceTypeInputEl?.value.trim() || CUSTOM_CURVE_CATEGORY,
+        description: descriptionInputEl?.value.trim() || '',
+        curve: sanitizedPoints.map(point => ({ current: point.current, time: point.time })),
+        axes: axisResult.values,
+        bounds: getBoundValues(),
+        tolerance: existing?.tolerance
+      };
+      saveCustomCurve(payload, { select: !isEditing });
+      updateStatus(isEditing ? 'Custom curve updated.' : 'Custom curve created.', 'info');
+      return payload;
+    }
+  });
+
+  if (referenceObjectUrl) {
+    URL.revokeObjectURL(referenceObjectUrl);
+  }
+  if (pendingPdfUrl) {
+    URL.revokeObjectURL(pendingPdfUrl);
+  }
+  return result;
 }
 
 function renderSettings() {
