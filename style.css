@@ -5925,7 +5925,7 @@ body.dark-mode .custom-curve-cursor {
 .custom-curve-canvas-container {
     position: relative;
     display: inline-block;
-    margin: 0 0 3rem 3rem;
+    margin: 0 1.5rem 4rem 4.5rem;
 }
 
 .custom-curve-canvas-scroll {

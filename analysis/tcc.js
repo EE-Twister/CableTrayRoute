@@ -3912,13 +3912,17 @@ async function openCustomCurveBuilder(curveId = null) {
       hideMagnifier();
       return;
     }
-    const containerRect = canvasContainer.getBoundingClientRect();
+    const scrollRect = canvasScrollEl.getBoundingClientRect();
     const isDarkMode = document.body?.classList?.contains('dark-mode');
     const scrollLeft = canvasScrollEl.scrollLeft || 0;
     const scrollTop = canvasScrollEl.scrollTop || 0;
-    const offsetX = pointer.clientX - containerRect.left + scrollLeft - MAGNIFIER_SIZE / 2;
-    const offsetY = pointer.clientY - containerRect.top + scrollTop - MAGNIFIER_SIZE / 2;
-    magnifierEl.style.transform = `translate(${Math.round(offsetX)}px, ${Math.round(offsetY)}px)`;
+    const rawOffsetX = pointer.clientX - scrollRect.left + scrollLeft - MAGNIFIER_SIZE / 2;
+    const rawOffsetY = pointer.clientY - scrollRect.top + scrollTop - MAGNIFIER_SIZE / 2;
+    const maxX = canvasScrollEl.scrollWidth - MAGNIFIER_SIZE;
+    const maxY = canvasScrollEl.scrollHeight - MAGNIFIER_SIZE;
+    const clampedOffsetX = clamp(rawOffsetX, -MAGNIFIER_SIZE / 2, Math.max(maxX, 0));
+    const clampedOffsetY = clamp(rawOffsetY, -MAGNIFIER_SIZE / 2, Math.max(maxY, 0));
+    magnifierEl.style.transform = `translate(${Math.round(clampedOffsetX)}px, ${Math.round(clampedOffsetY)}px)`;
     magnifierEl.style.opacity = '1';
     const zoom = MAGNIFIER_ZOOM;
     const sourceWidth = magnifierCanvas.width / zoom;
@@ -3994,6 +3998,7 @@ async function openCustomCurveBuilder(curveId = null) {
     ctx.setLineDash([6, 6]);
     ctx.strokeStyle = strokeColor;
     ctx.lineWidth = 1;
+    const labelOffset = 14;
     verticalTicks.forEach(value => {
       const top = dataToPixel({ current: value, time: axis.timeMin }, metrics);
       const bottom = dataToPixel({ current: value, time: axis.timeMax }, metrics);
@@ -4008,7 +4013,8 @@ async function openCustomCurveBuilder(curveId = null) {
       ctx.font = '12px Inter, system-ui, sans-serif';
       ctx.textAlign = 'center';
       ctx.textBaseline = 'top';
-      const labelY = Math.min(metrics.height - 6, metrics.plotTop + metrics.plotHeight + 6);
+      const targetY = metrics.plotTop + metrics.plotHeight + labelOffset;
+      const labelY = Math.min(metrics.height - 8, targetY);
       ctx.fillText(formatSettingValue(value), top.x, labelY);
       ctx.restore();
     });
@@ -4024,9 +4030,15 @@ async function openCustomCurveBuilder(curveId = null) {
       ctx.setLineDash([]);
       ctx.fillStyle = labelColor;
       ctx.font = '12px Inter, system-ui, sans-serif';
-      ctx.textAlign = 'right';
+      const targetX = metrics.plotLeft - labelOffset;
+      let labelX = Math.max(8, targetX);
+      let textAlign = 'right';
+      if (targetX < 8) {
+        textAlign = 'left';
+        labelX = Math.min(metrics.plotLeft + labelOffset, metrics.width - 8);
+      }
+      ctx.textAlign = textAlign;
       ctx.textBaseline = 'middle';
-      const labelX = Math.max(6, metrics.plotLeft - 6);
       ctx.fillText(formatSettingValue(value), labelX, left.y);
       ctx.restore();
     });
@@ -4208,13 +4220,23 @@ async function openCustomCurveBuilder(curveId = null) {
         const offsetTop = canvasRect.top - containerRect.top + scrollTop;
         const canvasWidth = canvasRect.width || canvas.width || 0;
         const canvasHeight = canvasRect.height || canvas.height || 0;
-        axisTitleXEl.style.left = `${offsetLeft + canvasWidth / 2}px`;
-        axisTitleXEl.style.top = `${offsetTop + canvasHeight + 24}px`;
+        const axisTitleXLeft = offsetLeft + canvasWidth / 2;
+        const baseAxisTitleXTop = offsetTop + canvasHeight + 24;
+        const maxAxisTitleXTop = canvasScrollEl.scrollHeight + 48;
+        axisTitleXEl.style.left = `${axisTitleXLeft}px`;
+        axisTitleXEl.style.top = `${Math.min(baseAxisTitleXTop, maxAxisTitleXTop)}px`;
         axisTitleXEl.style.transform = 'translate(-50%, 0)';
-        const yBaseLeft = offsetLeft - 24;
-        axisTitleYEl.style.left = `${yBaseLeft}px`;
+        const desiredYLeft = offsetLeft - 32;
+        const axisYWidth = axisTitleYEl.offsetWidth || 0;
+        const minYLeft = axisYWidth ? axisYWidth / 2 : 32;
+        let resolvedLeft = Math.max(minYLeft, desiredYLeft);
+        let transform = 'translate(-100%, -50%) rotate(-90deg)';
+        if (resolvedLeft === minYLeft) {
+          transform = 'translate(-50%, -50%) rotate(-90deg)';
+        }
+        axisTitleYEl.style.left = `${resolvedLeft}px`;
         axisTitleYEl.style.top = `${offsetTop + canvasHeight / 2}px`;
-        axisTitleYEl.style.transform = 'translate(-100%, -50%) rotate(-90deg)';
+        axisTitleYEl.style.transform = transform;
       }
     }
     if (metrics.axisValid) {
