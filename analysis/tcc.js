@@ -6868,15 +6868,6 @@ function renderOneLinePreview(componentId) {
   const DEFAULT_WIDTH = 120;
   const DEFAULT_HEIGHT = 60;
 
-  const layoutKey = record.sheet?.id
-    ? `sheet:${record.sheet.id}`
-    : record.sheetName
-      ? `sheet-name:${record.sheetName}`
-      : `sheet-index:${record.sheetIndex}`;
-  let layoutOverrides = layoutKey && saved.previewLayouts
-    ? saved.previewLayouts[layoutKey] || {}
-    : {};
-
   const normalizeRotation = value => {
     const numeric = Number(value);
     if (!Number.isFinite(numeric)) return 0;
@@ -6933,15 +6924,8 @@ function renderOneLinePreview(componentId) {
     const baseBounds = computeBounds(compX, compY, compWidth, compHeight, rotation);
     const spanWidth = baseBounds.right - baseBounds.left;
     const spanHeight = baseBounds.bottom - baseBounds.top;
-    let centerX = (baseBounds.left + baseBounds.right) / 2;
-    let centerY = (baseBounds.top + baseBounds.bottom) / 2;
-    const override = layoutOverrides && layoutOverrides[id];
-    if (override) {
-      const overrideX = Number(override.x);
-      const overrideY = Number(override.y);
-      if (Number.isFinite(overrideX)) centerX = overrideX;
-      if (Number.isFinite(overrideY)) centerY = overrideY;
-    }
+    const centerX = (baseBounds.left + baseBounds.right) / 2;
+    const centerY = (baseBounds.top + baseBounds.bottom) / 2;
     const adjustedBounds = {
       left: centerX - spanWidth / 2,
       right: centerX + spanWidth / 2,
@@ -6977,67 +6961,35 @@ function renderOneLinePreview(componentId) {
     return { minX, minY, maxX, maxY };
   };
 
-  const assignMetaPosition = (meta, centerX, centerY) => {
-    if (!meta) return;
-    const spanWidth = Number.isFinite(meta.spanWidth) && meta.spanWidth > 0 ? meta.spanWidth : DEFAULT_WIDTH;
-    const spanHeight = Number.isFinite(meta.spanHeight) && meta.spanHeight > 0 ? meta.spanHeight : DEFAULT_HEIGHT;
-    meta.center = { x: centerX, y: centerY };
-    meta.bounds = {
-      left: centerX - spanWidth / 2,
-      right: centerX + spanWidth / 2,
-      top: centerY - spanHeight / 2,
-      bottom: centerY + spanHeight / 2
-    };
-    meta.spanWidth = spanWidth;
-    meta.spanHeight = spanHeight;
-  };
-
-  const applyFallbackLayout = () => {
-    const entries = displayedTargets
-      .map(id => ({ id, meta: componentPreviewMeta.get(id) }))
-      .filter(entry => entry.meta);
-    if (!entries.length) return;
-    const activeIndex = entries.findIndex(entry => entry.id === componentId);
-    let centerEntry = null;
-    if (activeIndex >= 0) {
-      centerEntry = entries.splice(activeIndex, 1)[0];
-    } else {
-      centerEntry = entries.shift();
-    }
-    if (centerEntry && centerEntry.meta) {
-      assignMetaPosition(centerEntry.meta, 0, 0);
-    }
-    const others = entries.filter(Boolean);
-    if (!others.length) return;
-    const perRing = 6;
-    const radiusStep = Math.max(DEFAULT_WIDTH, DEFAULT_HEIGHT) * 1.6;
-    others.forEach((entry, index) => {
-      if (!entry.meta) return;
-      const ringIndex = Math.floor(index / perRing);
-      const indexInRing = index % perRing;
-      const nodesInRing = Math.min(perRing, others.length - ringIndex * perRing);
-      const angle = nodesInRing > 1 ? (2 * Math.PI * indexInRing) / nodesInRing : 0;
-      const radius = radiusStep * (ringIndex + 1);
-      const cx = Math.cos(angle) * radius;
-      const cy = Math.sin(angle) * radius;
-      assignMetaPosition(entry.meta, cx, cy);
-    });
-  };
-
-  const hasOverrides = layoutOverrides && typeof layoutOverrides === 'object' && Object.keys(layoutOverrides).length > 0;
-  const MIN_LAYOUT_SPAN = 32;
   let extents = computeMetaExtents();
-  if (!hasOverrides) {
-    const needsFallback = !extents
-      || (extents.maxX - extents.minX < MIN_LAYOUT_SPAN && extents.maxY - extents.minY < MIN_LAYOUT_SPAN);
-    if (needsFallback) {
-      applyFallbackLayout();
-      extents = computeMetaExtents();
-    }
-  }
   if (!extents) {
     extents = { minX: 0, minY: 0, maxX: width, maxY: height };
   }
+
+  const expandExtents = (current, minSpan) => {
+    const { minX, maxX, minY, maxY } = current;
+    const spanX = maxX - minX;
+    const spanY = maxY - minY;
+    const desiredX = Math.max(spanX, minSpan.width);
+    const desiredY = Math.max(spanY, minSpan.height);
+    let nextMinX = minX;
+    let nextMaxX = maxX;
+    let nextMinY = minY;
+    let nextMaxY = maxY;
+    if (spanX < desiredX) {
+      const centerX = (minX + maxX) / 2 || 0;
+      nextMinX = centerX - desiredX / 2;
+      nextMaxX = centerX + desiredX / 2;
+    }
+    if (spanY < desiredY) {
+      const centerY = (minY + maxY) / 2 || 0;
+      nextMinY = centerY - desiredY / 2;
+      nextMaxY = centerY + desiredY / 2;
+    }
+    return { minX: nextMinX, maxX: nextMaxX, minY: nextMinY, maxY: nextMaxY };
+  };
+
+  extents = expandExtents(extents, { width: DEFAULT_WIDTH, height: DEFAULT_HEIGHT });
 
   const boundsWidth = Math.max(1, extents.maxX - extents.minX);
   const boundsHeight = Math.max(1, extents.maxY - extents.minY);
@@ -7053,7 +7005,6 @@ function renderOneLinePreview(componentId) {
     scale,
     offsetX,
     offsetY,
-    layoutKey,
     width,
     height
   };
@@ -7157,39 +7108,6 @@ function renderOneLinePreview(componentId) {
       });
   };
 
-  const persistPreviewPosition = datum => {
-    if (!datum || !layoutKey || !onelinePreviewTransform) return;
-    const { scale, offsetX, offsetY } = onelinePreviewTransform;
-    if (!Number.isFinite(scale) || scale <= 0) return;
-    const baseX = (datum.x - offsetX) / scale;
-    const baseY = (datum.y - offsetY) / scale;
-    if (!saved.previewLayouts || typeof saved.previewLayouts !== 'object') {
-      saved.previewLayouts = {};
-    }
-    let layoutStore = saved.previewLayouts[layoutKey];
-    if (!layoutStore || typeof layoutStore !== 'object') {
-      layoutStore = {};
-      saved.previewLayouts[layoutKey] = layoutStore;
-    }
-    layoutStore[datum.id] = { x: baseX, y: baseY };
-    layoutOverrides = layoutStore;
-    const meta = componentPreviewMeta.get(datum.id);
-    if (meta) {
-      meta.center = { x: baseX, y: baseY };
-      const spanWidth = Number.isFinite(meta.spanWidth) ? meta.spanWidth : (meta.bounds?.right ?? 0) - (meta.bounds?.left ?? 0);
-      const spanHeight = Number.isFinite(meta.spanHeight) ? meta.spanHeight : (meta.bounds?.bottom ?? 0) - (meta.bounds?.top ?? 0);
-      if (Number.isFinite(spanWidth) && Number.isFinite(spanHeight)) {
-        meta.bounds = {
-          left: baseX - spanWidth / 2,
-          right: baseX + spanWidth / 2,
-          top: baseY - spanHeight / 2,
-          bottom: baseY + spanHeight / 2
-        };
-      }
-    }
-    setItem('tccSettings', saved);
-  };
-
   updateLinks();
 
   const nodeGroup = onelinePreviewSvg.append('g').attr('class', 'preview-nodes');
@@ -7272,71 +7190,6 @@ function renderOneLinePreview(componentId) {
       setActiveComponent(datum.id, { preserveSelection: true });
     });
 
-  node.each(function applyPreviewDrag(datum) {
-    const element = this;
-    if (!element) return;
-    element.style.touchAction = 'none';
-    element.addEventListener('pointerdown', event => {
-      if (event.button !== 0) return;
-      element.setPointerCapture(event.pointerId);
-      const startX = event.clientX;
-      const startY = event.clientY;
-      const initialX = datum.x;
-      const initialY = datum.y;
-      let moved = false;
-      const handleMove = moveEvent => {
-        const dx = moveEvent.clientX - startX;
-        const dy = moveEvent.clientY - startY;
-        if (!moved) {
-          if (Math.abs(dx) < 2 && Math.abs(dy) < 2) {
-            return;
-          }
-          moved = true;
-          moveEvent.preventDefault();
-          element.classList.add('is-dragging');
-          if (element.parentNode) {
-            element.parentNode.appendChild(element);
-          }
-        } else {
-          moveEvent.preventDefault();
-        }
-        datum.x = initialX + dx;
-        datum.y = initialY + dy;
-        element.setAttribute('transform', `translate(${datum.x},${datum.y})`);
-        nodeById.set(datum.id, datum);
-        updateLinks();
-      };
-      const handleUp = () => {
-        element.releasePointerCapture(event.pointerId);
-        element.removeEventListener('pointermove', handleMove);
-        element.removeEventListener('pointerup', handleUp);
-        element.removeEventListener('pointercancel', handleCancel);
-        if (moved) {
-          element.classList.remove('is-dragging');
-          persistPreviewPosition(datum);
-          updateLinks();
-        }
-      };
-      const handleCancel = () => {
-        element.releasePointerCapture(event.pointerId);
-        element.removeEventListener('pointermove', handleMove);
-        element.removeEventListener('pointerup', handleUp);
-        element.removeEventListener('pointercancel', handleCancel);
-        if (moved) {
-          element.classList.remove('is-dragging');
-          datum.x = initialX;
-          datum.y = initialY;
-          element.setAttribute('transform', `translate(${datum.x},${datum.y})`);
-          nodeById.set(datum.id, datum);
-          updateLinks();
-        }
-      };
-      element.addEventListener('pointermove', handleMove);
-      element.addEventListener('pointerup', handleUp);
-      element.addEventListener('pointercancel', handleCancel);
-    });
-  });
-
   if (onelinePreviewNote) {
     const noteMessages = [];
     if (offSheetCount > 0) {
@@ -7349,15 +7202,12 @@ function renderOneLinePreview(componentId) {
       noteMessages.push(`Showing ${displayedTargets.length} of ${availableTargets.length} selected devices.`);
     }
     if (noteMessages.length) {
-      noteMessages.push('Only devices directly connected to the selected component are displayed.');
+      noteMessages.push('Layout matches the one-line diagram; only directly connected devices are displayed.');
     }
     if (!noteMessages.length && selectedEntries.length && !displayedTargets.length) {
       noteMessages.push('No one-line preview available for the current selection.');
     }
     if (noteMessages.length) {
-      if (displayedTargets.length) {
-        noteMessages.unshift('Drag devices in the preview to reposition them as needed.');
-      }
       onelinePreviewNote.textContent = noteMessages.join(' ');
       onelinePreviewNote.classList.remove('hidden');
     } else {
