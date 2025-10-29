@@ -5667,7 +5667,6 @@ body.dark-mode .preview-link {
 }
 
 .preview-node {
-    transition: transform 0.2s ease;
     cursor: grab;
     user-select: none;
     pointer-events: bounding-box;
@@ -5713,13 +5712,16 @@ body.dark-mode .preview-node.is-selected image {
     fill: var(--text-color);
     font-size: 0.75rem;
     text-anchor: middle;
+    transition: transform 0.2s ease;
 }
 
-.preview-node:not(.is-active):not(.is-selected):hover {
+.preview-node:not(.is-active):not(.is-selected):hover image,
+.preview-node:not(.is-active):not(.is-selected):hover text {
     transform: translateY(-2px);
 }
 
-body.dark-mode .preview-node:not(.is-active):not(.is-selected):hover {
+body.dark-mode .preview-node:not(.is-active):not(.is-selected):hover image,
+body.dark-mode .preview-node:not(.is-active):not(.is-selected):hover text {
     transform: translateY(-2px);
 }
 
