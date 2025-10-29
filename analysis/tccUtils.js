@@ -3,6 +3,7 @@ const DEFAULT_TOLERANCE = {
   timeLower: 0.8,
   timeUpper: 1.2
 };
+const CURVE_ROLE_VALUES = new Set(['melting', 'clearing']);
 
 export function sanitizeCurve(points = []) {
   const filtered = points
@@ -31,6 +32,74 @@ export function sanitizeCurve(points = []) {
   });
 }
 
+function normalizeProfileRole(value) {
+  if (typeof value !== 'string') return null;
+  const trimmed = value.trim().toLowerCase();
+  return CURVE_ROLE_VALUES.has(trimmed) ? trimmed : null;
+}
+
+function interpolateTimeAtCurrent(curve, current) {
+  if (!Array.isArray(curve) || !curve.length || !Number.isFinite(current) || current <= 0) {
+    return MIN_TIME;
+  }
+  const first = curve[0];
+  if (!first || first.current >= current) {
+    return Math.max(first?.time ?? MIN_TIME, MIN_TIME);
+  }
+  for (let index = 1; index < curve.length; index += 1) {
+    const prev = curve[index - 1];
+    const next = curve[index];
+    if (!next) continue;
+    if (current <= next.current) {
+      const prevCurrent = Math.max(prev.current, MIN_TIME);
+      const nextCurrent = Math.max(next.current, MIN_TIME);
+      if (Math.abs(nextCurrent - prevCurrent) < 1e-12) {
+        return Math.max(Math.min(prev.time, next.time), MIN_TIME);
+      }
+      const logPrevC = Math.log(prevCurrent);
+      const logNextC = Math.log(nextCurrent);
+      const span = logNextC - logPrevC;
+      const ratio = span === 0 ? 0 : (Math.log(current) - logPrevC) / span;
+      const clampedRatio = Number.isFinite(ratio) ? Math.min(Math.max(ratio, 0), 1) : 0;
+      const logPrevT = Math.log(Math.max(prev.time, MIN_TIME));
+      const logNextT = Math.log(Math.max(next.time, MIN_TIME));
+      const interpolated = logPrevT + clampedRatio * (logNextT - logPrevT);
+      return Math.exp(interpolated);
+    }
+  }
+  const last = curve[curve.length - 1];
+  return Math.max(last?.time ?? MIN_TIME, MIN_TIME);
+}
+
+function buildEnvelopeFromCurves(lowerCurve = [], upperCurve = []) {
+  if (!Array.isArray(lowerCurve) || !Array.isArray(upperCurve) || !lowerCurve.length || !upperCurve.length) {
+    return [];
+  }
+  const currentSet = new Set();
+  lowerCurve.forEach(point => {
+    if (point && Number.isFinite(point.current) && point.current > 0) {
+      currentSet.add(point.current);
+    }
+  });
+  upperCurve.forEach(point => {
+    if (point && Number.isFinite(point.current) && point.current > 0) {
+      currentSet.add(point.current);
+    }
+  });
+  const currents = Array.from(currentSet).sort((a, b) => a - b);
+  return currents.map(current => {
+    const minTime = Math.max(interpolateTimeAtCurrent(lowerCurve, current), MIN_TIME);
+    const maxTime = Math.max(interpolateTimeAtCurrent(upperCurve, current), MIN_TIME);
+    const lower = Math.min(minTime, maxTime);
+    const upper = Math.max(minTime, maxTime);
+    return {
+      current,
+      minTime: lower,
+      maxTime: upper
+    };
+  });
+}
+
 function firstDefined(...values) {
   for (const value of values) {
     if (value !== undefined && value !== null) return value;
@@ -47,12 +116,14 @@ function normalizeCurveProfiles(device = {}) {
         if (!profile || typeof profile !== 'object') return null;
         const id = profile.id ?? profile.key ?? profile.name;
         if (!id) return null;
+        const role = normalizeProfileRole(profile.role ?? profile.kind);
         return {
           id: String(id),
           name: profile.name ?? profile.label ?? String(id),
           curve: Array.isArray(profile.curve) ? profile.curve : [],
           settings: profile.settings && typeof profile.settings === 'object' ? profile.settings : {},
-          tolerance: profile.tolerance && typeof profile.tolerance === 'object' ? profile.tolerance : undefined
+          tolerance: profile.tolerance && typeof profile.tolerance === 'object' ? profile.tolerance : undefined,
+          role: role ?? null
         };
       })
       .filter(Boolean);
@@ -62,12 +133,14 @@ function normalizeCurveProfiles(device = {}) {
       .map(([id, profile]) => {
         if (!profile || typeof profile !== 'object') return null;
         const resolvedId = profile.id ?? id;
+        const role = normalizeProfileRole(profile.role ?? profile.kind);
         return {
           id: String(resolvedId),
           name: profile.name ?? profile.label ?? String(resolvedId),
           curve: Array.isArray(profile.curve) ? profile.curve : [],
           settings: profile.settings && typeof profile.settings === 'object' ? profile.settings : {},
-          tolerance: profile.tolerance && typeof profile.tolerance === 'object' ? profile.tolerance : undefined
+          tolerance: profile.tolerance && typeof profile.tolerance === 'object' ? profile.tolerance : undefined,
+          role: role ?? null
         };
       })
       .filter(Boolean);
@@ -259,19 +332,36 @@ export function scaleCurve(device = {}, overrides = {}) {
 
   curve = sanitizeCurve(curve);
 
-  const minCurve = curve.map(p => ({
+  const scaleAdditionalCurve = profileCurve => sanitizeCurve(profileCurve || []).map(point => ({
+    current: point.current * scaleI,
+    time: Math.max(point.time * scaleT, MIN_TIME)
+  }));
+
+  const profiles = normalizeCurveProfiles(device);
+  const meltingProfile = profiles.find(item => normalizeProfileRole(item.role) === 'melting');
+  const clearingProfile = profiles.find(item => normalizeProfileRole(item.role) === 'clearing');
+  const meltingCurve = meltingProfile ? scaleAdditionalCurve(meltingProfile.curve) : null;
+  const clearingCurve = clearingProfile ? scaleAdditionalCurve(clearingProfile.curve) : null;
+
+  let minCurve = curve.map(p => ({
     current: p.current,
     time: Math.max(p.time * tolerance.timeLower, MIN_TIME)
   }));
-  const maxCurve = curve.map(p => ({
+  let maxCurve = curve.map(p => ({
     current: p.current,
     time: Math.max(p.time * tolerance.timeUpper, MIN_TIME)
   }));
-  const envelope = minCurve.map((p, idx) => ({
+  let envelope = minCurve.map((p, idx) => ({
     current: p.current,
     minTime: p.time,
     maxTime: maxCurve[idx].time
   }));
+
+  if (meltingCurve?.length && clearingCurve?.length) {
+    minCurve = meltingCurve;
+    maxCurve = clearingCurve;
+    envelope = buildEnvelopeFromCurves(meltingCurve, clearingCurve);
+  }
 
   return {
     ...device,
