@@ -643,6 +643,14 @@ function sanitizeCustomCurveSettings(raw = {}) {
   return sanitized;
 }
 
+const CUSTOM_CURVE_ALLOWED_ROLES = new Set(['melting', 'clearing']);
+
+function normalizeCustomCurveRole(value) {
+  if (typeof value !== 'string') return null;
+  const trimmed = value.trim().toLowerCase();
+  return CUSTOM_CURVE_ALLOWED_ROLES.has(trimmed) ? trimmed : null;
+}
+
 function sanitizeCustomCurveProfiles(rawProfiles = []) {
   if (!Array.isArray(rawProfiles)) return [];
   const seenIds = new Set();
@@ -692,12 +700,14 @@ function sanitizeCustomCurveProfiles(rawProfiles = []) {
       if (!curve.length) return null;
       const settings = sanitizeCustomCurveSettings(profile.settings ?? {});
       const tolerance = sanitizeToleranceSpec(profile.tolerance ?? {});
+      const role = normalizeCustomCurveRole(profile.role ?? profile.kind);
       return {
         id,
         name,
         curve,
         settings,
-        tolerance
+        tolerance,
+        role: role || undefined
       };
     })
     .filter(Boolean);
@@ -2235,22 +2245,28 @@ function saveCustomCurve(curve, { select = false } = {}) {
   const clonePoints = points => (Array.isArray(points)
     ? points.map(point => ({ current: point.current, time: point.time }))
     : []);
-  const cloneProfiles = profiles => (Array.isArray(profiles)
-    ? profiles.map(profile => {
-        const cloned = {
-          id: profile.id,
-          name: profile.name,
-          curve: clonePoints(profile.curve),
-          settings: { ...(profile.settings || {}) }
-        };
-        if (profile.tolerance !== undefined) {
-          cloned.tolerance = profile.tolerance && typeof profile.tolerance === 'object'
-            ? { ...profile.tolerance }
-            : profile.tolerance;
-        }
-        return cloned;
-      })
-    : []);
+      const cloneProfiles = profiles => (Array.isArray(profiles)
+        ? profiles.map(profile => {
+            const cloned = {
+              id: profile.id,
+              name: profile.name,
+              curve: clonePoints(profile.curve),
+              settings: { ...(profile.settings || {}) }
+            };
+            if (profile.tolerance !== undefined) {
+              cloned.tolerance = profile.tolerance && typeof profile.tolerance === 'object'
+                ? { ...profile.tolerance }
+                : profile.tolerance;
+            }
+            if (profile.role !== undefined) {
+              const normalizedRole = normalizeCustomCurveRole(profile.role);
+              if (normalizedRole) {
+                cloned.role = normalizedRole;
+              }
+            }
+            return cloned;
+          })
+        : []);
   curve.curve = clonePoints(resolvedCurve);
   curve.curveProfiles = cloneProfiles(normalizedProfiles);
   let existing = curve.id ? getCustomCurveById(curve.id) : null;
@@ -3966,9 +3982,26 @@ async function openCustomCurveBuilder(curveId = null) {
   let variantSelectEl = null;
   let variantNameInputEl = null;
   let removeVariantBtn = null;
+  let variantRoleSelectEl = null;
   let variantCounter = 0;
 
-  const defaultVariantName = index => `Curve ${index + 1}`;
+  const VARIANT_ROLE_OPTIONS = [
+    { value: 'standard', label: 'General curve' },
+    { value: 'melting', label: 'Melting (minimum melt)' },
+    { value: 'clearing', label: 'Clearing (total clearing)' }
+  ];
+
+  const normalizeVariantRole = value => {
+    if (typeof value !== 'string') return 'standard';
+    const trimmed = value.trim().toLowerCase();
+    return trimmed === 'melting' || trimmed === 'clearing' ? trimmed : 'standard';
+  };
+
+  const defaultVariantName = (index, role = 'standard') => {
+    if (role === 'melting') return 'Melting curve';
+    if (role === 'clearing') return 'Clearing curve';
+    return `Curve ${index + 1}`;
+  };
 
   const syncVariantCounter = id => {
     if (typeof id !== 'string') return;
@@ -4003,7 +4036,8 @@ async function openCustomCurveBuilder(curveId = null) {
   const getVariantDisplayName = (variant, index) => {
     if (!variant) return defaultVariantName(index);
     const trimmed = typeof variant.name === 'string' ? variant.name.trim() : '';
-    return trimmed || defaultVariantName(index);
+    const role = normalizeVariantRole(variant.role);
+    return trimmed || defaultVariantName(index, role);
   };
 
   const getActiveVariant = () => curveVariants.find(variant => variant.id === activeVariantId) || null;
@@ -4036,12 +4070,14 @@ async function openCustomCurveBuilder(curveId = null) {
       if (!points.length) return;
       const id = reserveVariantId(profile.id ?? profile.key ?? profile.name ?? profile.label ?? '');
       const nameSource = profile.name ?? profile.label;
+      const role = normalizeVariantRole(profile?.role ?? profile?.kind);
       const name = typeof nameSource === 'string' && nameSource.trim()
         ? nameSource.trim()
-        : defaultVariantName(curveVariants.length);
+        : defaultVariantName(curveVariants.length, role);
       curveVariants.push({
         id,
         name,
+        role,
         points: clonePoints(points),
         lastCaptured: points.length ? { ...points[points.length - 1] } : null
       });
@@ -4049,14 +4085,16 @@ async function openCustomCurveBuilder(curveId = null) {
     if (!curveVariants.length) {
       const fallbackPoints = sanitizeCurve(existing?.curve || []);
       const id = reserveVariantId(existing?.curveProfiles?.[0]?.id ?? '');
+      const fallbackRole = normalizeVariantRole(profileSource[0]?.role ?? profileSource[0]?.kind);
       const fallbackName = profileSource.length
         && typeof profileSource[0]?.name === 'string'
         && profileSource[0].name.trim()
           ? profileSource[0].name.trim()
-          : defaultVariantName(0);
+          : defaultVariantName(0, fallbackRole);
       curveVariants.push({
         id,
         name: fallbackName,
+        role: fallbackRole,
         points: clonePoints(fallbackPoints),
         lastCaptured: fallbackPoints.length ? { ...fallbackPoints[fallbackPoints.length - 1] } : null
       });
@@ -4066,6 +4104,7 @@ async function openCustomCurveBuilder(curveId = null) {
       curveVariants.push({
         id,
         name: defaultVariantName(0),
+        role: 'standard',
         points: [],
         lastCaptured: null
       });
@@ -4093,6 +4132,10 @@ async function openCustomCurveBuilder(curveId = null) {
     if (variantNameInputEl) {
       const variant = getActiveVariant();
       variantNameInputEl.value = variant?.name || '';
+    }
+    if (variantRoleSelectEl) {
+      const variant = getActiveVariant();
+      variantRoleSelectEl.value = normalizeVariantRole(variant?.role);
     }
     if (removeVariantBtn) {
       removeVariantBtn.disabled = curveVariants.length <= 1;
@@ -5275,8 +5318,12 @@ async function openCustomCurveBuilder(curveId = null) {
       hoverTooltipEl.className = 'custom-curve-hover-tooltip';
       hoverTooltipEl.setAttribute('aria-hidden', 'true');
       canvasContainer.appendChild(hoverTooltipEl);
-      referenceGrid.append(referenceControls, canvasContainer);
-      referenceSection.append(referenceHeading, displayControls, referenceGrid);
+      const canvasColumn = doc.createElement('div');
+      canvasColumn.className = 'custom-curve-canvas-column';
+      canvasColumn.append(displayControls, canvasContainer);
+
+      referenceGrid.append(referenceControls, canvasColumn);
+      referenceSection.append(referenceHeading, referenceGrid);
 
       const pointsSection = doc.createElement('section');
       pointsSection.className = 'custom-curve-section';
@@ -5286,7 +5333,7 @@ async function openCustomCurveBuilder(curveId = null) {
       variantControls.className = 'custom-curve-variant-controls';
 
       const variantSelectLabel = doc.createElement('label');
-      variantSelectLabel.textContent = 'Curve rating';
+      variantSelectLabel.textContent = 'Curve';
       variantSelectEl = doc.createElement('select');
       variantSelectEl.className = 'custom-curve-variant-select';
       variantSelectLabel.appendChild(variantSelectEl);
@@ -5294,7 +5341,19 @@ async function openCustomCurveBuilder(curveId = null) {
       variantNameInputEl = doc.createElement('input');
       variantNameInputEl.type = 'text';
       variantNameInputEl.className = 'custom-curve-variant-name';
-      variantNameInputEl.placeholder = 'Label (e.g., 601A)';
+      variantNameInputEl.placeholder = 'Label (e.g., Melting)';
+
+      const variantRoleLabel = doc.createElement('label');
+      variantRoleLabel.textContent = 'Curve type';
+      variantRoleSelectEl = doc.createElement('select');
+      variantRoleSelectEl.className = 'custom-curve-variant-role';
+      VARIANT_ROLE_OPTIONS.forEach(option => {
+        const opt = doc.createElement('option');
+        opt.value = option.value;
+        opt.textContent = option.label;
+        variantRoleSelectEl.appendChild(opt);
+      });
+      variantRoleLabel.appendChild(variantRoleSelectEl);
 
       const variantActions = doc.createElement('div');
       variantActions.className = 'custom-curve-variant-actions';
@@ -5306,7 +5365,7 @@ async function openCustomCurveBuilder(curveId = null) {
       removeVariantBtnEl.textContent = 'Remove curve';
       variantActions.append(addVariantBtn, removeVariantBtnEl);
 
-      variantControls.append(variantSelectLabel, variantNameInputEl, variantActions);
+      variantControls.append(variantSelectLabel, variantNameInputEl, variantRoleLabel, variantActions);
 
       variantSelectEl.addEventListener('change', () => {
         const nextId = variantSelectEl.value;
@@ -5320,11 +5379,29 @@ async function openCustomCurveBuilder(curveId = null) {
         updateVariantControls();
       });
 
+      variantRoleSelectEl.addEventListener('change', () => {
+        const variant = getActiveVariant();
+        if (!variant) return;
+        const nextRole = normalizeVariantRole(variantRoleSelectEl.value);
+        variant.role = nextRole;
+        if ((!variant.name || !variant.name.trim()) && nextRole !== 'standard') {
+          const match = VARIANT_ROLE_OPTIONS.find(option => option.value === nextRole);
+          if (match) {
+            const suggested = match.label.split(' (')[0];
+            variant.name = suggested;
+            if (variantNameInputEl) {
+              variantNameInputEl.value = variant.name;
+            }
+          }
+        }
+        updateVariantControls();
+      });
+
       addVariantBtn.addEventListener('click', () => {
         commitActiveVariant();
         const newId = reserveVariantId('');
         const defaultName = defaultVariantName(curveVariants.length);
-        const newVariant = { id: newId, name: defaultName, points: [], lastCaptured: null };
+        const newVariant = { id: newId, name: defaultName, role: 'standard', points: [], lastCaptured: null };
         curveVariants.push(newVariant);
         activeVariantId = newId;
         workingPoints = [];
@@ -5457,11 +5534,18 @@ async function openCustomCurveBuilder(curveId = null) {
       if (invalidVariant) {
         return false;
       }
-      const profilesPayload = curveVariants.map((variant, index) => ({
-        id: variant.id,
-        name: getVariantDisplayName(variant, index),
-        curve: clonePoints(variant.points)
-      }));
+      const profilesPayload = curveVariants.map((variant, index) => {
+        const role = normalizeVariantRole(variant.role);
+        const payload = {
+          id: variant.id,
+          name: getVariantDisplayName(variant, index),
+          curve: clonePoints(variant.points)
+        };
+        if (role !== 'standard') {
+          payload.role = role;
+        }
+        return payload;
+      });
       const sanitizedProfiles = sanitizeCustomCurveProfiles(profilesPayload);
       if (!sanitizedProfiles.length) {
         updateStatus('Add at least two curve points before saving.', 'error');
