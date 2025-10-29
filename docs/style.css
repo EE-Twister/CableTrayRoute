@@ -5869,6 +5869,17 @@ body.dark-mode .custom-curve-form textarea {
     align-self: flex-start;
 }
 
+.custom-curve-file-controls {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    flex-wrap: wrap;
+}
+
+.custom-curve-file-controls button {
+    align-self: center;
+}
+
 .custom-curve-fieldset {
     display: grid;
     gap: 0.5rem;
@@ -6017,16 +6028,19 @@ body.dark-mode .custom-curve-hover-tooltip {
     background: #cbd5e1;
     outline: none;
     appearance: none;
+    -webkit-appearance: none;
 }
 
 .custom-curve-zoom-slider::-webkit-slider-thumb {
     appearance: none;
+    -webkit-appearance: none;
     width: 14px;
     height: 14px;
     border-radius: 50%;
     background: #2563eb;
     border: none;
     cursor: pointer;
+    margin-top: -5px;
 }
 
 .custom-curve-zoom-slider::-moz-range-thumb {
@@ -6041,13 +6055,13 @@ body.dark-mode .custom-curve-hover-tooltip {
 .custom-curve-zoom-slider::-webkit-slider-runnable-track {
     height: 4px;
     border-radius: 999px;
-    background: transparent;
+    background: #cbd5e1;
 }
 
 .custom-curve-zoom-slider::-moz-range-track {
     height: 4px;
     border-radius: 999px;
-    background: transparent;
+    background: #cbd5e1;
 }
 
 .custom-curve-zoom-reset {

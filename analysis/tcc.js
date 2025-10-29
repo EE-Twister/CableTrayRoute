@@ -4094,6 +4094,10 @@ async function openCustomCurveBuilder(curveId = null) {
     const scrollTop = canvasScrollEl.scrollTop || 0;
     const offsetLeft = canvasRect.left - containerRect.left + scrollLeft;
     const offsetTop = canvasRect.top - containerRect.top + scrollTop;
+    const intrinsicWidth = canvas.width || canvasRect.width || 1;
+    const intrinsicHeight = canvas.height || canvasRect.height || 1;
+    const scaleX = canvasRect.width ? canvasRect.width / intrinsicWidth : 1;
+    const scaleY = canvasRect.height ? canvasRect.height / intrinsicHeight : 1;
     const axis = metrics.axisValues;
     const labelYOffset = 18;
     const labelXOffset = 18;
@@ -4103,8 +4107,10 @@ async function openCustomCurveBuilder(curveId = null) {
       const label = docRef.createElement('div');
       label.className = 'custom-curve-axis-tick custom-curve-axis-tick-x';
       label.textContent = formatSettingValue(value);
-      label.style.left = `${offsetLeft + point.x}px`;
-      label.style.top = `${offsetTop + metrics.plotTop + metrics.plotHeight + labelYOffset}px`;
+      const displayX = offsetLeft + point.x * scaleX;
+      const displayY = offsetTop + (metrics.plotTop + metrics.plotHeight) * scaleY + labelYOffset;
+      label.style.left = `${displayX}px`;
+      label.style.top = `${displayY}px`;
       axisTickContainerX.appendChild(label);
     });
     horizontalTicks.forEach(value => {
@@ -4113,8 +4119,10 @@ async function openCustomCurveBuilder(curveId = null) {
       const label = docRef.createElement('div');
       label.className = 'custom-curve-axis-tick custom-curve-axis-tick-y';
       label.textContent = formatSettingValue(value);
-      label.style.left = `${offsetLeft + metrics.plotLeft - labelXOffset}px`;
-      label.style.top = `${offsetTop + point.y}px`;
+      const displayLeft = offsetLeft + metrics.plotLeft * scaleX - labelXOffset;
+      const displayTop = offsetTop + point.y * scaleY;
+      label.style.left = `${displayLeft}px`;
+      label.style.top = `${displayTop}px`;
       axisTickContainerY.appendChild(label);
     });
   };
@@ -4734,6 +4742,10 @@ async function openCustomCurveBuilder(curveId = null) {
         updateStatus('Reference cleared.', 'info');
       });
 
+      const fileControls = doc.createElement('div');
+      fileControls.className = 'custom-curve-file-controls';
+      fileControls.append(uploadButton, clearRefButton);
+
       const referenceToggleLabel = doc.createElement('label');
       referenceToggleLabel.className = 'custom-curve-toggle';
       referenceToggleInput = doc.createElement('input');
@@ -4863,9 +4875,8 @@ async function openCustomCurveBuilder(curveId = null) {
       readoutEl.className = 'custom-curve-readout';
 
       referenceControls.append(
-        uploadButton,
+        fileControls,
         uploadInput,
-        clearRefButton,
         referenceToggleLabel,
         axisFieldset,
         boundsFieldset,
