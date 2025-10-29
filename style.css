@@ -5905,6 +5905,31 @@ body.dark-mode .custom-curve-form textarea {
     color: #1f2937;
 }
 
+.custom-curve-hover-tooltip {
+    position: absolute;
+    pointer-events: none;
+    display: flex;
+    flex-direction: column;
+    gap: 0.2rem;
+    background: rgba(15, 23, 42, 0.88);
+    color: #f8fafc;
+    font: 600 0.75rem/1.2 "Inter", system-ui, sans-serif;
+    padding: 0.35rem 0.6rem;
+    border-radius: 6px;
+    box-shadow: 0 12px 24px rgba(15, 23, 42, 0.35);
+    opacity: 0;
+    transition: opacity 0.12s ease;
+    z-index: 3;
+}
+
+.custom-curve-hover-tooltip.is-visible {
+    opacity: 1;
+}
+
+.custom-curve-hover-tooltip span {
+    white-space: nowrap;
+}
+
 body.dark-mode .custom-curve-status {
     color: #cbd5f5;
 }
@@ -5923,6 +5948,170 @@ body.dark-mode .custom-curve-readout {
 
 body.dark-mode .custom-curve-cursor {
     color: #e2e8f0;
+}
+
+body.dark-mode .custom-curve-hover-tooltip {
+    background: rgba(37, 99, 235, 0.88);
+    box-shadow: 0 12px 24px rgba(15, 23, 42, 0.5);
+}
+
+.custom-curve-zoom-controls {
+    display: flex;
+    flex-direction: column;
+    gap: 0.5rem;
+    padding: 0.25rem 0;
+}
+
+.custom-curve-zoom-header {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    font-weight: 600;
+    color: #0f172a;
+}
+
+.custom-curve-zoom-label {
+    font-size: 0.9rem;
+}
+
+.custom-curve-zoom-display {
+    font-size: 0.85rem;
+    color: #2563eb;
+    font-weight: 600;
+}
+
+.custom-curve-zoom-row {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+}
+
+.custom-curve-zoom-button {
+    width: 2rem;
+    height: 2rem;
+    border-radius: 999px;
+    border: 1px solid #cbd5e1;
+    background: #ffffff;
+    color: #0f172a;
+    font-size: 1.1rem;
+    font-weight: 600;
+    line-height: 1;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    cursor: pointer;
+    transition: border-color 0.15s ease, color 0.15s ease, background 0.15s ease;
+}
+
+.custom-curve-zoom-button:hover,
+.custom-curve-zoom-button:focus {
+    border-color: #2563eb;
+    color: #2563eb;
+    outline: none;
+}
+
+.custom-curve-zoom-slider {
+    width: 160px;
+    height: 4px;
+    border-radius: 999px;
+    background: #cbd5e1;
+    outline: none;
+    appearance: none;
+}
+
+.custom-curve-zoom-slider::-webkit-slider-thumb {
+    appearance: none;
+    width: 14px;
+    height: 14px;
+    border-radius: 50%;
+    background: #2563eb;
+    border: none;
+    cursor: pointer;
+}
+
+.custom-curve-zoom-slider::-moz-range-thumb {
+    width: 14px;
+    height: 14px;
+    border-radius: 50%;
+    background: #2563eb;
+    border: none;
+    cursor: pointer;
+}
+
+.custom-curve-zoom-slider::-webkit-slider-runnable-track {
+    height: 4px;
+    border-radius: 999px;
+    background: transparent;
+}
+
+.custom-curve-zoom-slider::-moz-range-track {
+    height: 4px;
+    border-radius: 999px;
+    background: transparent;
+}
+
+.custom-curve-zoom-reset {
+    align-self: flex-start;
+    border: 1px solid #cbd5e1;
+    background: #ffffff;
+    color: #1f2937;
+    border-radius: 999px;
+    padding: 0.25rem 0.75rem;
+    font-size: 0.8rem;
+    font-weight: 600;
+    cursor: pointer;
+    transition: border-color 0.15s ease, color 0.15s ease, background 0.15s ease;
+}
+
+.custom-curve-zoom-reset:hover,
+.custom-curve-zoom-reset:focus {
+    border-color: #2563eb;
+    color: #2563eb;
+    outline: none;
+}
+
+body.dark-mode .custom-curve-zoom-header {
+    color: #e2e8f0;
+}
+
+body.dark-mode .custom-curve-zoom-display {
+    color: #93c5fd;
+}
+
+body.dark-mode .custom-curve-zoom-button {
+    background: #1e293b;
+    color: #e2e8f0;
+    border-color: #475569;
+}
+
+body.dark-mode .custom-curve-zoom-button:hover,
+body.dark-mode .custom-curve-zoom-button:focus {
+    border-color: #93c5fd;
+    color: #93c5fd;
+}
+
+body.dark-mode .custom-curve-zoom-slider {
+    background: #475569;
+}
+
+body.dark-mode .custom-curve-zoom-slider::-webkit-slider-thumb {
+    background: #60a5fa;
+}
+
+body.dark-mode .custom-curve-zoom-slider::-moz-range-thumb {
+    background: #60a5fa;
+}
+
+body.dark-mode .custom-curve-zoom-reset {
+    background: #1e293b;
+    color: #e2e8f0;
+    border-color: #475569;
+}
+
+body.dark-mode .custom-curve-zoom-reset:hover,
+body.dark-mode .custom-curve-zoom-reset:focus {
+    border-color: #93c5fd;
+    color: #93c5fd;
 }
 
 .custom-curve-canvas-container {

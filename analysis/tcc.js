@@ -3777,6 +3777,7 @@ async function openCustomCurveBuilder(curveId = null) {
   let statusEl = null;
   let readoutEl = null;
   let cursorReadoutEl = null;
+  let hoverTooltipEl = null;
   let manualCurrentInput = null;
   let manualTimeInput = null;
   let pointCountEl = null;
@@ -3793,6 +3794,14 @@ async function openCustomCurveBuilder(curveId = null) {
   let axisTitleYEl = null;
   let axisTickContainerX = null;
   let axisTickContainerY = null;
+
+  const ZOOM_DEFAULT = 1;
+  const ZOOM_MIN = 0.5;
+  const ZOOM_MAX = 4;
+  const ZOOM_STEP = 0.1;
+  let zoomLevel = ZOOM_DEFAULT;
+  let zoomSliderEl = null;
+  let zoomValueEl = null;
 
   let nameInputEl = null;
   let manufacturerInputEl = null;
@@ -3817,23 +3826,112 @@ async function openCustomCurveBuilder(curveId = null) {
   const CURSOR_DEFAULT_TEXT = 'Cursor: Hover over the plot to see amperage and time.';
   const CURSOR_AXIS_PROMPT = 'Cursor: Enter valid axis bounds to enable readout.';
 
+  const formatZoomValue = value => `${Math.round(value * 100)}%`;
+
+  const applyZoom = () => {
+    if (!canvas) return;
+    const width = canvas.width || 720;
+    const height = canvas.height || 480;
+    canvas.style.width = `${Math.round(width * zoomLevel)}px`;
+    canvas.style.height = `${Math.round(height * zoomLevel)}px`;
+  };
+
+  const updateZoomDisplay = () => {
+    if (zoomSliderEl) zoomSliderEl.value = String(Math.round(zoomLevel * 100));
+    if (zoomValueEl) zoomValueEl.textContent = formatZoomValue(zoomLevel);
+  };
+
+  const updateHoverTooltip = pointer => {
+    if (!hoverTooltipEl || !canvasContainer) return;
+    if (!pointer) {
+      hoverTooltipEl.classList.remove('is-visible');
+      return;
+    }
+    const metrics = computePlotMetrics();
+    if (!metrics.axisValid) {
+      hoverTooltipEl.classList.remove('is-visible');
+      return;
+    }
+    const dataPoint = pixelToData(pointer.canvasX, pointer.canvasY, metrics);
+    if (!dataPoint) {
+      hoverTooltipEl.classList.remove('is-visible');
+      return;
+    }
+    const containerRect = canvasContainer.getBoundingClientRect();
+    if (!containerRect.width || !containerRect.height) {
+      hoverTooltipEl.classList.remove('is-visible');
+      return;
+    }
+    const currentText = `${formatSettingValue(dataPoint.current)} A`;
+    const timeText = `${formatSettingValue(dataPoint.time)} s`;
+    hoverTooltipEl.innerHTML = `<span>${currentText}</span><span>${timeText}</span>`;
+    const margin = 16;
+    const containerWidth = canvasContainer.offsetWidth || containerRect.width;
+    const containerHeight = canvasContainer.offsetHeight || containerRect.height;
+    let left = pointer.clientX - containerRect.left + margin;
+    let top = pointer.clientY - containerRect.top + margin;
+    const tooltipWidth = hoverTooltipEl.offsetWidth || 0;
+    const tooltipHeight = hoverTooltipEl.offsetHeight || 0;
+    if (left + tooltipWidth > containerWidth - margin) {
+      left = Math.max(margin, pointer.clientX - containerRect.left - margin - tooltipWidth);
+    }
+    if (top + tooltipHeight > containerHeight - margin) {
+      top = Math.max(margin, pointer.clientY - containerRect.top - margin - tooltipHeight);
+    }
+    hoverTooltipEl.style.left = `${left}px`;
+    hoverTooltipEl.style.top = `${top}px`;
+    hoverTooltipEl.classList.add('is-visible');
+  };
+
+  const setZoomLevel = value => {
+    const next = clamp(value, ZOOM_MIN, ZOOM_MAX);
+    if (Math.abs(next - zoomLevel) < 0.0001) return;
+    zoomLevel = next;
+    applyZoom();
+    if (lastPointer) {
+      const pointer = getPointerFromClient(lastPointer.clientX, lastPointer.clientY);
+      lastPointer = pointer;
+    }
+    updateZoomDisplay();
+    refreshCanvas();
+    if (lastPointer) updateHoverTooltip(lastPointer);
+    else updateHoverTooltip(null);
+  };
+
+  const adjustZoom = delta => {
+    setZoomLevel(zoomLevel + delta);
+  };
+
+  const handleZoomWheel = event => {
+    if (!event || (!event.ctrlKey && !event.metaKey)) return;
+    event.preventDefault();
+    const delta = Number(event.deltaY) || 0;
+    if (!delta) return;
+    const direction = delta > 0 ? -1 : 1;
+    adjustZoom(direction * ZOOM_STEP);
+  };
+
   const updateCursorReadout = pointer => {
     if (!cursorReadoutEl) return;
     if (!pointer) {
       cursorReadoutEl.textContent = CURSOR_DEFAULT_TEXT;
+      updateHoverTooltip(null);
       return;
     }
     const metrics = computePlotMetrics();
     if (!metrics.axisValid) {
       cursorReadoutEl.textContent = CURSOR_AXIS_PROMPT;
+      updateHoverTooltip(null);
       return;
     }
     const dataPoint = pixelToData(pointer.canvasX, pointer.canvasY, metrics);
     if (!dataPoint) {
       cursorReadoutEl.textContent = CURSOR_AXIS_PROMPT;
+      updateHoverTooltip(null);
       return;
     }
     cursorReadoutEl.textContent = `Cursor: ${formatSettingValue(dataPoint.current)} A @ ${formatSettingValue(dataPoint.time)} s`;
+    updateHoverTooltip(pointer);
   };
 
   const clamp = (value, min, max) => {
@@ -4162,6 +4260,7 @@ async function openCustomCurveBuilder(curveId = null) {
       canvas.style.width = '720px';
       canvas.style.height = '480px';
     }
+    applyZoom();
   };
 
   const refreshCanvas = () => {
@@ -4402,6 +4501,7 @@ async function openCustomCurveBuilder(curveId = null) {
   const handleCanvasLeave = () => {
     lastPointer = null;
     updateCursorReadout(null);
+    if (hoverTooltipEl) hoverTooltipEl.classList.remove('is-visible');
   };
 
   const resetReference = () => {
@@ -4701,6 +4801,59 @@ async function openCustomCurveBuilder(curveId = null) {
       });
       axisOverlayLabel.append(axisOverlayInput, doc.createTextNode('Show generated axes overlay'));
 
+      const zoomControls = doc.createElement('div');
+      zoomControls.className = 'custom-curve-zoom-controls';
+
+      const zoomHeader = doc.createElement('div');
+      zoomHeader.className = 'custom-curve-zoom-header';
+      const zoomLabel = doc.createElement('span');
+      zoomLabel.className = 'custom-curve-zoom-label';
+      zoomLabel.textContent = 'Zoom';
+      zoomValueEl = doc.createElement('span');
+      zoomValueEl.className = 'custom-curve-zoom-display';
+      zoomHeader.append(zoomLabel, zoomValueEl);
+
+      const zoomRow = doc.createElement('div');
+      zoomRow.className = 'custom-curve-zoom-row';
+      const zoomOutBtn = doc.createElement('button');
+      zoomOutBtn.type = 'button';
+      zoomOutBtn.className = 'custom-curve-zoom-button';
+      zoomOutBtn.textContent = '−';
+      zoomOutBtn.setAttribute('aria-label', 'Zoom out');
+      zoomOutBtn.addEventListener('click', () => adjustZoom(-ZOOM_STEP));
+
+      zoomSliderEl = doc.createElement('input');
+      zoomSliderEl.type = 'range';
+      zoomSliderEl.className = 'custom-curve-zoom-slider';
+      zoomSliderEl.min = String(Math.round(ZOOM_MIN * 100));
+      zoomSliderEl.max = String(Math.round(ZOOM_MAX * 100));
+      zoomSliderEl.step = String(Math.round(ZOOM_STEP * 100));
+      zoomSliderEl.value = String(Math.round(zoomLevel * 100));
+      zoomSliderEl.setAttribute('aria-label', 'Zoom level');
+      const syncZoom = () => {
+        const parsed = Number(zoomSliderEl.value);
+        if (Number.isFinite(parsed)) setZoomLevel(parsed / 100);
+      };
+      zoomSliderEl.addEventListener('input', syncZoom);
+      zoomSliderEl.addEventListener('change', syncZoom);
+
+      const zoomInBtn = doc.createElement('button');
+      zoomInBtn.type = 'button';
+      zoomInBtn.className = 'custom-curve-zoom-button';
+      zoomInBtn.textContent = '+';
+      zoomInBtn.setAttribute('aria-label', 'Zoom in');
+      zoomInBtn.addEventListener('click', () => adjustZoom(ZOOM_STEP));
+
+      zoomRow.append(zoomOutBtn, zoomSliderEl, zoomInBtn);
+
+      const zoomResetBtn = doc.createElement('button');
+      zoomResetBtn.type = 'button';
+      zoomResetBtn.className = 'custom-curve-zoom-reset';
+      zoomResetBtn.textContent = 'Reset';
+      zoomResetBtn.addEventListener('click', () => setZoomLevel(ZOOM_DEFAULT));
+
+      zoomControls.append(zoomHeader, zoomRow, zoomResetBtn);
+
       statusEl = doc.createElement('p');
       statusEl.className = 'custom-curve-status';
       cursorReadoutEl = doc.createElement('p');
@@ -4717,6 +4870,7 @@ async function openCustomCurveBuilder(curveId = null) {
         axisFieldset,
         boundsFieldset,
         axisOverlayLabel,
+        zoomControls,
         statusEl,
         cursorReadoutEl,
         readoutEl
@@ -4732,6 +4886,7 @@ async function openCustomCurveBuilder(curveId = null) {
       canvas.addEventListener('click', handleCanvasClick);
       canvas.addEventListener('mousemove', handleCanvasHover);
       canvas.addEventListener('mouseleave', handleCanvasLeave);
+      canvasScrollEl.addEventListener('wheel', handleZoomWheel, { passive: false });
       canvasScrollEl.appendChild(canvas);
       canvasContainer.appendChild(canvasScrollEl);
 
@@ -4754,6 +4909,10 @@ async function openCustomCurveBuilder(curveId = null) {
       axisTickContainerY.className = 'custom-curve-axis-ticks custom-curve-axis-ticks-y';
       axisTickContainerY.style.display = 'none';
       canvasContainer.appendChild(axisTickContainerY);
+      hoverTooltipEl = doc.createElement('div');
+      hoverTooltipEl.className = 'custom-curve-hover-tooltip';
+      hoverTooltipEl.setAttribute('aria-hidden', 'true');
+      canvasContainer.appendChild(hoverTooltipEl);
       referenceGrid.append(referenceControls, canvasContainer);
       referenceSection.append(referenceHeading, referenceGrid);
 
@@ -4818,6 +4977,7 @@ async function openCustomCurveBuilder(curveId = null) {
       setBoundInputValues();
       configureCanvasSize(referenceImage);
       updateReferenceToggleState();
+      updateZoomDisplay();
       lastPointer = null;
       updateCursorReadout(null);
       refreshPointTable();
@@ -6202,11 +6362,6 @@ function renderOneLinePreview(componentId) {
 
   const componentPreviewMeta = new Map();
 
-  let minX = Infinity;
-  let minY = Infinity;
-  let maxX = -Infinity;
-  let maxY = -Infinity;
-
   displayedTargets.forEach(id => {
     const comp = componentMap.get(id);
     if (!comp) return;
@@ -6233,10 +6388,6 @@ function renderOneLinePreview(componentId) {
       top: centerY - spanHeight / 2,
       bottom: centerY + spanHeight / 2
     };
-    minX = Math.min(minX, adjustedBounds.left);
-    minY = Math.min(minY, adjustedBounds.top);
-    maxX = Math.max(maxX, adjustedBounds.right);
-    maxY = Math.max(maxY, adjustedBounds.bottom);
     componentPreviewMeta.set(id, {
       bounds: adjustedBounds,
       width: compWidth,
@@ -6248,22 +6399,95 @@ function renderOneLinePreview(componentId) {
     });
   });
 
-  if (!Number.isFinite(minX) || !Number.isFinite(minY)) {
-    minX = 0;
-    minY = 0;
-    maxX = width;
-    maxY = height;
+  const computeMetaExtents = () => {
+    let minX = Infinity;
+    let minY = Infinity;
+    let maxX = -Infinity;
+    let maxY = -Infinity;
+    componentPreviewMeta.forEach(meta => {
+      if (!meta || !meta.bounds) return;
+      minX = Math.min(minX, meta.bounds.left);
+      minY = Math.min(minY, meta.bounds.top);
+      maxX = Math.max(maxX, meta.bounds.right);
+      maxY = Math.max(maxY, meta.bounds.bottom);
+    });
+    if (!Number.isFinite(minX) || !Number.isFinite(minY) || !Number.isFinite(maxX) || !Number.isFinite(maxY)) {
+      return null;
+    }
+    return { minX, minY, maxX, maxY };
+  };
+
+  const assignMetaPosition = (meta, centerX, centerY) => {
+    if (!meta) return;
+    const spanWidth = Number.isFinite(meta.spanWidth) && meta.spanWidth > 0 ? meta.spanWidth : DEFAULT_WIDTH;
+    const spanHeight = Number.isFinite(meta.spanHeight) && meta.spanHeight > 0 ? meta.spanHeight : DEFAULT_HEIGHT;
+    meta.center = { x: centerX, y: centerY };
+    meta.bounds = {
+      left: centerX - spanWidth / 2,
+      right: centerX + spanWidth / 2,
+      top: centerY - spanHeight / 2,
+      bottom: centerY + spanHeight / 2
+    };
+    meta.spanWidth = spanWidth;
+    meta.spanHeight = spanHeight;
+  };
+
+  const applyFallbackLayout = () => {
+    const entries = displayedTargets
+      .map(id => ({ id, meta: componentPreviewMeta.get(id) }))
+      .filter(entry => entry.meta);
+    if (!entries.length) return;
+    const activeIndex = entries.findIndex(entry => entry.id === componentId);
+    let centerEntry = null;
+    if (activeIndex >= 0) {
+      centerEntry = entries.splice(activeIndex, 1)[0];
+    } else {
+      centerEntry = entries.shift();
+    }
+    if (centerEntry && centerEntry.meta) {
+      assignMetaPosition(centerEntry.meta, 0, 0);
+    }
+    const others = entries.filter(Boolean);
+    if (!others.length) return;
+    const perRing = 6;
+    const radiusStep = Math.max(DEFAULT_WIDTH, DEFAULT_HEIGHT) * 1.6;
+    others.forEach((entry, index) => {
+      if (!entry.meta) return;
+      const ringIndex = Math.floor(index / perRing);
+      const indexInRing = index % perRing;
+      const nodesInRing = Math.min(perRing, others.length - ringIndex * perRing);
+      const angle = nodesInRing > 1 ? (2 * Math.PI * indexInRing) / nodesInRing : 0;
+      const radius = radiusStep * (ringIndex + 1);
+      const cx = Math.cos(angle) * radius;
+      const cy = Math.sin(angle) * radius;
+      assignMetaPosition(entry.meta, cx, cy);
+    });
+  };
+
+  const hasOverrides = layoutOverrides && typeof layoutOverrides === 'object' && Object.keys(layoutOverrides).length > 0;
+  const MIN_LAYOUT_SPAN = 32;
+  let extents = computeMetaExtents();
+  if (!hasOverrides) {
+    const needsFallback = !extents
+      || (extents.maxX - extents.minX < MIN_LAYOUT_SPAN && extents.maxY - extents.minY < MIN_LAYOUT_SPAN);
+    if (needsFallback) {
+      applyFallbackLayout();
+      extents = computeMetaExtents();
+    }
+  }
+  if (!extents) {
+    extents = { minX: 0, minY: 0, maxX: width, maxY: height };
   }
 
-  const boundsWidth = Math.max(1, maxX - minX);
-  const boundsHeight = Math.max(1, maxY - minY);
+  const boundsWidth = Math.max(1, extents.maxX - extents.minX);
+  const boundsHeight = Math.max(1, extents.maxY - extents.minY);
   const padding = Math.min(width, height) < 320 ? 24 : 36;
   const scaleX = (width - padding * 2) / boundsWidth;
   const scaleY = (height - padding * 2) / boundsHeight;
   const rawScale = Math.min(scaleX, scaleY);
   const scale = Number.isFinite(rawScale) && rawScale > 0 ? Math.min(rawScale, 2.5) : 1;
-  const offsetX = padding - minX * scale;
-  const offsetY = padding - minY * scale;
+  const offsetX = padding - extents.minX * scale;
+  const offsetY = padding - extents.minY * scale;
 
   onelinePreviewTransform = {
     scale,
@@ -6456,7 +6680,11 @@ function renderOneLinePreview(componentId) {
     const iconRadius = iconSize(datum) / 2;
     const componentRadius = Math.max(datum.width || 0, datum.height || 0) / 2;
     const baseGap = datum.active ? 32 : datum.selected ? 28 : 24;
-    return Math.round(Math.max(iconRadius, componentRadius) + baseGap);
+    const limitedRadius = Number.isFinite(componentRadius)
+      ? Math.min(componentRadius, iconRadius + 32)
+      : iconRadius;
+    const baseDistance = Math.max(iconRadius, limitedRadius);
+    return Math.round(baseDistance + baseGap);
   };
 
   const labels = node.append('text')
