@@ -5665,6 +5665,13 @@ body.dark-mode .preview-link {
 
 .preview-node {
     transition: transform 0.2s ease;
+    cursor: grab;
+}
+
+.preview-node.is-dragging {
+    cursor: grabbing;
+    transition: none;
+    transform: none !important;
 }
 
 .preview-node image {
@@ -5698,10 +5705,6 @@ body.dark-mode .preview-node.is-selected image {
     font-size: 0.75rem;
     text-anchor: middle;
     pointer-events: none;
-}
-
-.preview-node:not(.is-active):not(.is-selected) {
-    cursor: pointer;
 }
 
 .preview-node:not(.is-active):not(.is-selected):hover {
@@ -6006,6 +6009,47 @@ body.dark-mode .custom-curve-cursor {
 
 .custom-curve-axis-title-y {
     transform-origin: left center;
+}
+
+.custom-curve-axis-ticks {
+    position: absolute;
+    pointer-events: none;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    overflow: visible;
+    font: 600 0.75rem/1.2 "Inter", system-ui, sans-serif;
+    color: #1f2937;
+    z-index: 3;
+}
+
+.custom-curve-axis-tick {
+    position: absolute;
+    background: rgba(255, 255, 255, 0.95);
+    border: 1px solid rgba(148, 163, 184, 0.45);
+    border-radius: 6px;
+    padding: 0.2rem 0.45rem;
+    box-shadow: 0 6px 14px rgba(15, 23, 42, 0.12);
+    white-space: nowrap;
+}
+
+.custom-curve-axis-tick-x {
+    transform: translate(-50%, 0);
+}
+
+.custom-curve-axis-tick-y {
+    transform: translate(-100%, -50%);
+}
+
+body.dark-mode .custom-curve-axis-ticks {
+    color: #e2e8f0;
+}
+
+body.dark-mode .custom-curve-axis-tick {
+    background: rgba(15, 23, 42, 0.9);
+    border-color: rgba(148, 163, 184, 0.35);
+    box-shadow: 0 8px 18px rgba(15, 23, 42, 0.4);
 }
 
 body.dark-mode .custom-curve-canvas-scroll {
