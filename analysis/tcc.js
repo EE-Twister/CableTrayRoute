@@ -643,6 +643,66 @@ function sanitizeCustomCurveSettings(raw = {}) {
   return sanitized;
 }
 
+function sanitizeCustomCurveProfiles(rawProfiles = []) {
+  if (!Array.isArray(rawProfiles)) return [];
+  const seenIds = new Set();
+  let counter = 0;
+  const ensureName = (name, index) => {
+    if (typeof name === 'string' && name.trim()) return name.trim();
+    return `Curve ${index + 1}`;
+  };
+  const syncCounter = id => {
+    const match = /([0-9]+)$/.exec(id);
+    if (match) {
+      counter = Math.max(counter, Number(match[1]));
+    }
+  };
+  const reserveId = candidate => {
+    let base = '';
+    if (typeof candidate === 'string' && candidate.trim()) {
+      base = candidate.trim();
+    } else if (Number.isFinite(candidate)) {
+      base = `curve-${Math.abs(Math.trunc(candidate))}`;
+    }
+    if (!base) {
+      counter += 1;
+      base = `curve-${counter}`;
+    }
+    let id = base;
+    syncCounter(id);
+    while (seenIds.has(id)) {
+      counter += 1;
+      id = `${base}-${counter}`;
+    }
+    seenIds.add(id);
+    syncCounter(id);
+    return id;
+  };
+  return rawProfiles
+    .map((profile, index) => {
+      if (!profile || typeof profile !== 'object') return null;
+      const id = reserveId(profile.id ?? profile.key ?? profile.name ?? profile.label ?? '');
+      const name = ensureName(profile.name ?? profile.label, index);
+      const pointsSource = Array.isArray(profile.curve)
+        ? profile.curve
+        : Array.isArray(profile.points)
+          ? profile.points
+          : [];
+      const curve = sanitizeCurve(pointsSource);
+      if (!curve.length) return null;
+      const settings = sanitizeCustomCurveSettings(profile.settings ?? {});
+      const tolerance = sanitizeToleranceSpec(profile.tolerance ?? {});
+      return {
+        id,
+        name,
+        curve,
+        settings,
+        tolerance
+      };
+    })
+    .filter(Boolean);
+}
+
 function sanitizeCustomCurve(raw) {
   if (!raw || typeof raw !== 'object') return null;
   const curvePoints = Array.isArray(raw.curve)
@@ -650,7 +710,26 @@ function sanitizeCustomCurve(raw) {
     : Array.isArray(raw.points)
       ? raw.points
       : [];
-  const sanitizedPoints = sanitizeCurve(curvePoints);
+  let sanitizedPoints = sanitizeCurve(curvePoints);
+  const profileSource = Array.isArray(raw.curveProfiles)
+    ? raw.curveProfiles
+    : Array.isArray(raw.curves)
+      ? raw.curves
+      : [];
+  let curveProfiles = sanitizeCustomCurveProfiles(profileSource);
+  if (!curveProfiles.length && sanitizedPoints.length) {
+    curveProfiles = [
+      {
+        id: 'curve-1',
+        name: 'Curve 1',
+        curve: sanitizedPoints.map(point => ({ ...point })),
+        settings: {}
+      }
+    ];
+  }
+  if (!sanitizedPoints.length && curveProfiles.length) {
+    sanitizedPoints = curveProfiles[0].curve.map(point => ({ ...point }));
+  }
   if (!sanitizedPoints.length) return null;
   const name = typeof raw.name === 'string' && raw.name.trim() ? raw.name.trim() : 'Custom Curve';
   const id = typeof raw.id === 'string' && raw.id.trim() ? raw.id.trim() : createCustomCurveId();
@@ -674,6 +753,7 @@ function sanitizeCustomCurve(raw) {
     deviceType,
     description,
     curve: sanitizedPoints,
+    curveProfiles,
     axes,
     bounds,
     settings,
@@ -2056,11 +2136,20 @@ function buildCustomCurveEntries() {
   return ordered.map(curve => {
     const vendor = curve.manufacturer || CUSTOM_CURVE_VENDOR_FALLBACK;
     const baseId = `custom:${curve.id}`;
+    const profiles = Array.isArray(curve.curveProfiles)
+      ? curve.curveProfiles.filter(profile => Array.isArray(profile?.curve) && profile.curve.length)
+      : [];
+    const baseCurve = Array.isArray(curve.curve) && curve.curve.length
+      ? curve.curve
+      : profiles.length
+        ? profiles[0].curve || []
+        : [];
     const baseDevice = {
       id: baseId,
       name: curve.name,
       type: curve.deviceType || CUSTOM_CURVE_CATEGORY,
-      curve: curve.curve || [],
+      curve: baseCurve,
+      curveProfiles: profiles.length ? profiles : undefined,
       settings: { ...(curve.settings || {}) },
       vendor,
       manufacturer: vendor,
@@ -2133,28 +2222,68 @@ function persistCustomCurveState({ refresh = true } = {}) {
 }
 
 function saveCustomCurve(curve, { select = false } = {}) {
-  if (!curve || !Array.isArray(curve.curve) || !curve.curve.length) return null;
+  if (!curve) return null;
   curve.settings = sanitizeCustomCurveSettings(curve.settings || {});
+  const normalizedCurve = sanitizeCurve(curve.curve || []);
+  const normalizedProfiles = sanitizeCustomCurveProfiles(curve.curveProfiles || []);
+  const resolvedCurve = normalizedCurve.length
+    ? normalizedCurve
+    : normalizedProfiles.length
+      ? normalizedProfiles[0].curve.map(point => ({ ...point }))
+      : [];
+  if (!resolvedCurve.length) return null;
+  const clonePoints = points => (Array.isArray(points)
+    ? points.map(point => ({ current: point.current, time: point.time }))
+    : []);
+  const cloneProfiles = profiles => (Array.isArray(profiles)
+    ? profiles.map(profile => {
+        const cloned = {
+          id: profile.id,
+          name: profile.name,
+          curve: clonePoints(profile.curve),
+          settings: { ...(profile.settings || {}) }
+        };
+        if (profile.tolerance !== undefined) {
+          cloned.tolerance = profile.tolerance && typeof profile.tolerance === 'object'
+            ? { ...profile.tolerance }
+            : profile.tolerance;
+        }
+        return cloned;
+      })
+    : []);
+  curve.curve = clonePoints(resolvedCurve);
+  curve.curveProfiles = cloneProfiles(normalizedProfiles);
   let existing = curve.id ? getCustomCurveById(curve.id) : null;
   if (!existing) {
     const nextSequence = (saved.customCurveCounter || saved.customCurves.length || 0) + 1;
     curve.id = curve.id || createCustomCurveId(nextSequence);
     curve.sequence = Number.isFinite(curve.sequence) ? curve.sequence : nextSequence;
     saved.customCurveCounter = Math.max(saved.customCurveCounter || 0, curve.sequence);
-    saved.customCurves.push(curve);
+    const storedCurve = {
+      ...curve,
+      curve: clonePoints(curve.curve),
+      curveProfiles: cloneProfiles(curve.curveProfiles),
+      axes: { ...(curve.axes || {}) },
+      bounds: { ...(curve.bounds || {}) },
+      settings: { ...(curve.settings || {}) }
+    };
+    saved.customCurves.push(storedCurve);
+    curve = storedCurve;
   } else {
     existing.name = curve.name;
     existing.manufacturer = curve.manufacturer;
     existing.deviceType = curve.deviceType;
     existing.description = curve.description;
-    existing.curve = curve.curve;
-    existing.axes = curve.axes || {};
-    existing.bounds = curve.bounds || {};
-    existing.settings = curve.settings || {};
+    existing.curve = clonePoints(curve.curve);
+    existing.curveProfiles = cloneProfiles(curve.curveProfiles);
+    existing.axes = { ...(curve.axes || {}) };
+    existing.bounds = { ...(curve.bounds || {}) };
+    existing.settings = { ...(curve.settings || {}) };
     existing.tolerance = curve.tolerance;
     if (Number.isFinite(curve.sequence)) {
       existing.sequence = curve.sequence;
     }
+    curve = existing;
   }
   persistCustomCurveState({ refresh: true });
   if (select && curve.id) {
@@ -2530,11 +2659,30 @@ function describeEntryAttributes(entry) {
       range: describeSettingRange(base, field)
     }));
     if (entry.isCustom) {
+      const profileCount = Array.isArray(entry.customCurve?.curveProfiles)
+        ? entry.customCurve.curveProfiles.length
+        : 0;
+      const pointCount = Array.isArray(entry.customCurve?.curve)
+        ? entry.customCurve.curve.length
+        : 0;
+      let pointSummary = pointCount ? `${pointCount} point${pointCount === 1 ? '' : 's'}` : '';
+      if (profileCount > 1) {
+        pointSummary = pointSummary
+          ? `${pointSummary} (primary of ${profileCount} curves)`
+          : `Primary of ${profileCount} curves`;
+      }
       baseRows.unshift({
         label: 'Data Points',
-        value: Array.isArray(entry.customCurve?.curve) ? `${entry.customCurve.curve.length} points` : '',
+        value: pointSummary,
         range: ''
       });
+      if (profileCount > 1) {
+        baseRows.unshift({
+          label: 'Curve Profiles',
+          value: `${profileCount} curves`,
+          range: ''
+        });
+      }
       const manufacturer = entry.baseDevice?.vendor || entry.baseDevice?.manufacturer || CUSTOM_CURVE_VENDOR_FALLBACK;
       baseRows.unshift({ label: 'Manufacturer', value: manufacturer, range: '' });
     }
@@ -3757,7 +3905,7 @@ async function openCustomCurveBuilder(curveId = null) {
   const existing = isEditing ? getCustomCurveById(curveId) : null;
   const axes = { ...CUSTOM_CURVE_DEFAULT_AXES, ...(existing?.axes || {}) };
   const bounds = { ...CUSTOM_CURVE_DEFAULT_BOUNDS, ...(existing?.bounds || {}) };
-  let workingPoints = sanitizeCurve(existing?.curve || []);
+  let workingPoints = [];
   let referenceImage = null;
   let referenceObjectUrl = null;
   let pendingPdfUrl = null;
@@ -3808,6 +3956,171 @@ async function openCustomCurveBuilder(curveId = null) {
   let deviceTypeInputEl = null;
   let descriptionInputEl = null;
 
+  const clonePoints = points => (Array.isArray(points)
+    ? points.map(point => ({ current: point.current, time: point.time }))
+    : []);
+
+  const usedVariantIds = new Set();
+  let curveVariants = [];
+  let activeVariantId = null;
+  let variantSelectEl = null;
+  let variantNameInputEl = null;
+  let removeVariantBtn = null;
+  let variantCounter = 0;
+
+  const defaultVariantName = index => `Curve ${index + 1}`;
+
+  const syncVariantCounter = id => {
+    if (typeof id !== 'string') return;
+    const match = /([0-9]+)$/.exec(id);
+    if (match) {
+      variantCounter = Math.max(variantCounter, Number(match[1]));
+    }
+  };
+
+  const reserveVariantId = candidate => {
+    let base = '';
+    if (typeof candidate === 'string' && candidate.trim()) {
+      base = candidate.trim();
+    } else if (Number.isFinite(candidate)) {
+      base = `curve-${Math.abs(Math.trunc(candidate))}`;
+    }
+    if (!base) {
+      variantCounter += 1;
+      base = `curve-${variantCounter}`;
+    }
+    let id = base;
+    syncVariantCounter(id);
+    while (usedVariantIds.has(id)) {
+      variantCounter += 1;
+      id = `${base}-${variantCounter}`;
+    }
+    usedVariantIds.add(id);
+    syncVariantCounter(id);
+    return id;
+  };
+
+  const getVariantDisplayName = (variant, index) => {
+    if (!variant) return defaultVariantName(index);
+    const trimmed = typeof variant.name === 'string' ? variant.name.trim() : '';
+    return trimmed || defaultVariantName(index);
+  };
+
+  const getActiveVariant = () => curveVariants.find(variant => variant.id === activeVariantId) || null;
+
+  const updatePointCountLabel = () => {
+    if (!pointCountEl) return;
+    const variant = getActiveVariant();
+    const index = variant ? curveVariants.findIndex(item => item.id === variant.id) : -1;
+    const displayName = variant ? getVariantDisplayName(variant, index === -1 ? 0 : index) : '';
+    const baseCount = `${workingPoints.length} point${workingPoints.length === 1 ? '' : 's'}`;
+    pointCountEl.textContent = displayName ? `${baseCount} – ${displayName}` : baseCount;
+  };
+
+  const commitActiveVariant = () => {
+    const variant = getActiveVariant();
+    if (!variant) return;
+    variant.points = clonePoints(workingPoints);
+    variant.lastCaptured = lastCapturedPoint ? { ...lastCapturedPoint } : null;
+  };
+
+  const initializeVariants = () => {
+    const profileSource = Array.isArray(existing?.curveProfiles) ? existing.curveProfiles : [];
+    profileSource.forEach(profile => {
+      const rawPoints = Array.isArray(profile?.curve)
+        ? profile.curve
+        : Array.isArray(profile?.points)
+          ? profile.points
+          : [];
+      const points = sanitizeCurve(rawPoints);
+      if (!points.length) return;
+      const id = reserveVariantId(profile.id ?? profile.key ?? profile.name ?? profile.label ?? '');
+      const nameSource = profile.name ?? profile.label;
+      const name = typeof nameSource === 'string' && nameSource.trim()
+        ? nameSource.trim()
+        : defaultVariantName(curveVariants.length);
+      curveVariants.push({
+        id,
+        name,
+        points: clonePoints(points),
+        lastCaptured: points.length ? { ...points[points.length - 1] } : null
+      });
+    });
+    if (!curveVariants.length) {
+      const fallbackPoints = sanitizeCurve(existing?.curve || []);
+      const id = reserveVariantId(existing?.curveProfiles?.[0]?.id ?? '');
+      const fallbackName = profileSource.length
+        && typeof profileSource[0]?.name === 'string'
+        && profileSource[0].name.trim()
+          ? profileSource[0].name.trim()
+          : defaultVariantName(0);
+      curveVariants.push({
+        id,
+        name: fallbackName,
+        points: clonePoints(fallbackPoints),
+        lastCaptured: fallbackPoints.length ? { ...fallbackPoints[fallbackPoints.length - 1] } : null
+      });
+    }
+    if (!curveVariants.length) {
+      const id = reserveVariantId('');
+      curveVariants.push({
+        id,
+        name: defaultVariantName(0),
+        points: [],
+        lastCaptured: null
+      });
+    }
+    activeVariantId = curveVariants[0].id;
+    workingPoints = clonePoints(curveVariants[0].points);
+    lastCapturedPoint = curveVariants[0].lastCaptured
+      ? { ...curveVariants[0].lastCaptured }
+      : (workingPoints.length ? { ...workingPoints[workingPoints.length - 1] } : null);
+  };
+
+  const updateVariantControls = () => {
+    if (variantSelectEl) {
+      variantSelectEl.innerHTML = '';
+      curveVariants.forEach((variant, index) => {
+        const option = doc.createElement('option');
+        option.value = variant.id;
+        option.textContent = getVariantDisplayName(variant, index);
+        variantSelectEl.appendChild(option);
+      });
+      if (activeVariantId && curveVariants.some(variant => variant.id === activeVariantId)) {
+        variantSelectEl.value = activeVariantId;
+      }
+    }
+    if (variantNameInputEl) {
+      const variant = getActiveVariant();
+      variantNameInputEl.value = variant?.name || '';
+    }
+    if (removeVariantBtn) {
+      removeVariantBtn.disabled = curveVariants.length <= 1;
+    }
+    updatePointCountLabel();
+  };
+
+  const setActiveVariant = variantId => {
+    if (!variantId || variantId === activeVariantId) return;
+    commitActiveVariant();
+    activeVariantId = variantId;
+    const variant = getActiveVariant();
+    workingPoints = clonePoints(variant ? variant.points : []);
+    lastCapturedPoint = variant?.lastCaptured
+      ? { ...variant.lastCaptured }
+      : (workingPoints.length ? { ...workingPoints[workingPoints.length - 1] } : null);
+    refreshPointTable();
+    updateVariantControls();
+  };
+
+  initializeVariants();
+
+  const formatCustomCurveValue = value => {
+    const num = Number(value);
+    if (!Number.isFinite(num)) return '';
+    return num.toFixed(3);
+  };
+
   const updateStatus = (message, type = 'info') => {
     if (!statusEl) return;
     statusEl.textContent = message || '';
@@ -3820,7 +4133,7 @@ async function openCustomCurveBuilder(curveId = null) {
       readoutEl.textContent = 'Click within the plot area to capture a point.';
       return;
     }
-    readoutEl.textContent = `Last point: ${formatSettingValue(point.current)} A @ ${formatSettingValue(point.time)} s`;
+    readoutEl.textContent = `Last point: ${formatCustomCurveValue(point.current)} A @ ${formatCustomCurveValue(point.time)} s`;
   };
 
   const CURSOR_DEFAULT_TEXT = 'Cursor: Hover over the plot to see amperage and time.';
@@ -3862,8 +4175,8 @@ async function openCustomCurveBuilder(curveId = null) {
       hoverTooltipEl.classList.remove('is-visible');
       return;
     }
-    const currentText = `${formatSettingValue(dataPoint.current)} A`;
-    const timeText = `${formatSettingValue(dataPoint.time)} s`;
+    const currentText = `${formatCustomCurveValue(dataPoint.current)} A`;
+    const timeText = `${formatCustomCurveValue(dataPoint.time)} s`;
     hoverTooltipEl.innerHTML = `<span>${currentText}</span><span>${timeText}</span>`;
     const margin = 16;
     const containerWidth = canvasContainer.offsetWidth || containerRect.width;
@@ -3930,7 +4243,7 @@ async function openCustomCurveBuilder(curveId = null) {
       updateHoverTooltip(null);
       return;
     }
-    cursorReadoutEl.textContent = `Cursor: ${formatSettingValue(dataPoint.current)} A @ ${formatSettingValue(dataPoint.time)} s`;
+    cursorReadoutEl.textContent = `Cursor: ${formatCustomCurveValue(dataPoint.current)} A @ ${formatCustomCurveValue(dataPoint.time)} s`;
     updateHoverTooltip(pointer);
   };
 
@@ -4386,8 +4699,8 @@ async function openCustomCurveBuilder(curveId = null) {
     }
   };
 
-  const refreshPointTable = () => {
-    if (!tableBody) return;
+  const refreshPointTable = ({ highlight } = {}) => {
+    if (!tableBody) return lastCapturedPoint;
     workingPoints = sanitizeCurve(workingPoints);
     tableBody.innerHTML = '';
     if (!workingPoints.length) {
@@ -4398,71 +4711,103 @@ async function openCustomCurveBuilder(curveId = null) {
       cell.textContent = 'No curve points defined. Capture points or add them manually to continue.';
       row.appendChild(cell);
       tableBody.appendChild(row);
-    } else {
-      workingPoints.forEach((point, index) => {
-        const row = doc.createElement('tr');
-        row.dataset.index = String(index);
+      lastCapturedPoint = null;
+      commitActiveVariant();
+      updatePointCountLabel();
+      refreshCanvas();
+      updateReadout(null);
+      return lastCapturedPoint;
+    }
+    workingPoints.forEach((point, index) => {
+      const row = doc.createElement('tr');
+      row.dataset.index = String(index);
 
-        const currentCell = doc.createElement('td');
-        const currentInput = doc.createElement('input');
-        currentInput.type = 'number';
-        currentInput.min = '0';
-        currentInput.step = 'any';
-        currentInput.value = formatSettingValue(point.current);
-        currentInput.addEventListener('input', () => {
-          workingPoints[index].current = Number(currentInput.value);
-        });
-        currentInput.addEventListener('change', () => {
-          workingPoints[index].current = Number(currentInput.value);
-          refreshPointTable();
-        });
-        currentCell.appendChild(currentInput);
-
-        const timeCell = doc.createElement('td');
-        const timeInput = doc.createElement('input');
-        timeInput.type = 'number';
-        timeInput.min = '0';
-        timeInput.step = 'any';
-        timeInput.value = formatSettingValue(point.time);
-        timeInput.addEventListener('input', () => {
-          workingPoints[index].time = Number(timeInput.value);
-        });
-        timeInput.addEventListener('change', () => {
-          workingPoints[index].time = Number(timeInput.value);
-          refreshPointTable();
-        });
-        timeCell.appendChild(timeInput);
-
-        const actionCell = doc.createElement('td');
-        const removeBtn = doc.createElement('button');
-        removeBtn.type = 'button';
-        removeBtn.className = 'custom-curve-remove';
-        removeBtn.textContent = 'Remove';
-        removeBtn.addEventListener('click', () => {
-          workingPoints.splice(index, 1);
-          refreshPointTable();
-        });
-        actionCell.appendChild(removeBtn);
-
-        row.append(currentCell, timeCell, actionCell);
-        tableBody.appendChild(row);
+      const currentCell = doc.createElement('td');
+      const currentInput = doc.createElement('input');
+      currentInput.type = 'number';
+      currentInput.min = '0';
+      currentInput.step = '0.001';
+      currentInput.value = formatCustomCurveValue(point.current);
+      currentInput.addEventListener('input', () => {
+        workingPoints[index].current = Number(currentInput.value);
       });
+      currentInput.addEventListener('change', () => {
+        const nextCurrent = Number(currentInput.value);
+        workingPoints[index].current = nextCurrent;
+        refreshPointTable({ highlight: { current: nextCurrent, time: workingPoints[index].time } });
+      });
+      currentCell.appendChild(currentInput);
+
+      const timeCell = doc.createElement('td');
+      const timeInput = doc.createElement('input');
+      timeInput.type = 'number';
+      timeInput.min = '0';
+      timeInput.step = '0.001';
+      timeInput.value = formatCustomCurveValue(point.time);
+      timeInput.addEventListener('input', () => {
+        workingPoints[index].time = Number(timeInput.value);
+      });
+      timeInput.addEventListener('change', () => {
+        const nextTime = Number(timeInput.value);
+        workingPoints[index].time = nextTime;
+        refreshPointTable({ highlight: { current: workingPoints[index].current, time: nextTime } });
+      });
+      timeCell.appendChild(timeInput);
+
+      const actionCell = doc.createElement('td');
+      const removeBtn = doc.createElement('button');
+      removeBtn.type = 'button';
+      removeBtn.className = 'custom-curve-remove';
+      removeBtn.textContent = 'Remove';
+      removeBtn.addEventListener('click', () => {
+        workingPoints.splice(index, 1);
+        refreshPointTable();
+      });
+      actionCell.appendChild(removeBtn);
+
+      row.append(currentCell, timeCell, actionCell);
+      tableBody.appendChild(row);
+    });
+
+    const approxEqual = (a, b) => {
+      const diff = Math.abs(a - b);
+      const scale = Math.max(1, Math.abs(a), Math.abs(b));
+      return diff <= 1e-6 * scale;
+    };
+    const resolveHighlight = target => {
+      if (!target) return null;
+      const current = Number(target.current);
+      const time = Number(target.time);
+      if (!Number.isFinite(current) || !Number.isFinite(time)) return null;
+      return workingPoints.find(point => approxEqual(point.current, current) && approxEqual(point.time, time)) || null;
+    };
+    const matched = resolveHighlight(highlight) || resolveHighlight(lastCapturedPoint);
+    if (matched) {
+      lastCapturedPoint = { ...matched };
+    } else if (workingPoints.length) {
+      const fallback = workingPoints[workingPoints.length - 1];
+      lastCapturedPoint = { ...fallback };
+    } else {
+      lastCapturedPoint = null;
     }
-    if (pointCountEl) {
-      pointCountEl.textContent = `${workingPoints.length} point${workingPoints.length === 1 ? '' : 's'}`;
-    }
+
+    commitActiveVariant();
+    updatePointCountLabel();
     refreshCanvas();
+    updateReadout(lastCapturedPoint);
+    return lastCapturedPoint;
   };
 
   const addPoint = (current, time, { announce = true } = {}) => {
     if (!Number.isFinite(current) || current <= 0 || !Number.isFinite(time) || time <= 0) {
-      return;
+      return null;
     }
     workingPoints.push({ current, time });
-    refreshPointTable();
+    const captured = refreshPointTable({ highlight: { current, time } });
     if (announce) {
-      updateStatus(`Added point ${formatSettingValue(current)} A @ ${formatSettingValue(time)} s.`, 'info');
+      updateStatus(`Added point ${formatCustomCurveValue(current)} A @ ${formatCustomCurveValue(time)} s.`, 'info');
     }
+    return captured;
   };
 
   const handleManualAdd = () => {
@@ -4489,9 +4834,10 @@ async function openCustomCurveBuilder(curveId = null) {
       updateStatus('Provide valid axis bounds before digitizing points.', 'error');
       return;
     }
-    lastCapturedPoint = point;
-    updateReadout(point);
-    addPoint(point.current, point.time, { announce: true });
+    const captured = addPoint(point.current, point.time, { announce: true });
+    if (captured) {
+      lastCapturedPoint = captured;
+    }
     updateCursorReadout(pointer);
   };
 
@@ -4866,6 +5212,14 @@ async function openCustomCurveBuilder(curveId = null) {
 
       zoomControls.append(zoomHeader, zoomRow, zoomResetBtn);
 
+      const displayToggleGroup = doc.createElement('div');
+      displayToggleGroup.className = 'custom-curve-display-toggles';
+      displayToggleGroup.append(referenceToggleLabel, axisOverlayLabel);
+
+      const displayControls = doc.createElement('div');
+      displayControls.className = 'custom-curve-display-controls';
+      displayControls.append(displayToggleGroup, zoomControls);
+
       statusEl = doc.createElement('p');
       statusEl.className = 'custom-curve-status';
       cursorReadoutEl = doc.createElement('p');
@@ -4877,11 +5231,8 @@ async function openCustomCurveBuilder(curveId = null) {
       referenceControls.append(
         fileControls,
         uploadInput,
-        referenceToggleLabel,
         axisFieldset,
         boundsFieldset,
-        axisOverlayLabel,
-        zoomControls,
         statusEl,
         cursorReadoutEl,
         readoutEl
@@ -4925,23 +5276,106 @@ async function openCustomCurveBuilder(curveId = null) {
       hoverTooltipEl.setAttribute('aria-hidden', 'true');
       canvasContainer.appendChild(hoverTooltipEl);
       referenceGrid.append(referenceControls, canvasContainer);
-      referenceSection.append(referenceHeading, referenceGrid);
+      referenceSection.append(referenceHeading, displayControls, referenceGrid);
 
       const pointsSection = doc.createElement('section');
       pointsSection.className = 'custom-curve-section';
       const pointsHeading = doc.createElement('h3');
       pointsHeading.textContent = 'Curve Points';
+      const variantControls = doc.createElement('div');
+      variantControls.className = 'custom-curve-variant-controls';
+
+      const variantSelectLabel = doc.createElement('label');
+      variantSelectLabel.textContent = 'Curve rating';
+      variantSelectEl = doc.createElement('select');
+      variantSelectEl.className = 'custom-curve-variant-select';
+      variantSelectLabel.appendChild(variantSelectEl);
+
+      variantNameInputEl = doc.createElement('input');
+      variantNameInputEl.type = 'text';
+      variantNameInputEl.className = 'custom-curve-variant-name';
+      variantNameInputEl.placeholder = 'Label (e.g., 601A)';
+
+      const variantActions = doc.createElement('div');
+      variantActions.className = 'custom-curve-variant-actions';
+      const addVariantBtn = doc.createElement('button');
+      addVariantBtn.type = 'button';
+      addVariantBtn.textContent = 'Add curve';
+      const removeVariantBtnEl = doc.createElement('button');
+      removeVariantBtnEl.type = 'button';
+      removeVariantBtnEl.textContent = 'Remove curve';
+      variantActions.append(addVariantBtn, removeVariantBtnEl);
+
+      variantControls.append(variantSelectLabel, variantNameInputEl, variantActions);
+
+      variantSelectEl.addEventListener('change', () => {
+        const nextId = variantSelectEl.value;
+        if (nextId) setActiveVariant(nextId);
+      });
+
+      variantNameInputEl.addEventListener('input', () => {
+        const variant = getActiveVariant();
+        if (!variant) return;
+        variant.name = variantNameInputEl.value;
+        updateVariantControls();
+      });
+
+      addVariantBtn.addEventListener('click', () => {
+        commitActiveVariant();
+        const newId = reserveVariantId('');
+        const defaultName = defaultVariantName(curveVariants.length);
+        const newVariant = { id: newId, name: defaultName, points: [], lastCaptured: null };
+        curveVariants.push(newVariant);
+        activeVariantId = newId;
+        workingPoints = [];
+        lastCapturedPoint = null;
+        updateVariantControls();
+        refreshPointTable();
+        updateStatus('New curve added. Capture or enter points for this rating.', 'info');
+        if (variantNameInputEl) {
+          variantNameInputEl.focus();
+          variantNameInputEl.select();
+        }
+      });
+
+      removeVariantBtn = removeVariantBtnEl;
+      removeVariantBtn.addEventListener('click', () => {
+        if (curveVariants.length <= 1) {
+          updateStatus('At least one curve is required.', 'error');
+          return;
+        }
+        const removedIndex = curveVariants.findIndex(variant => variant.id === activeVariantId);
+        const removed = removedIndex !== -1 ? curveVariants[removedIndex] : null;
+        curveVariants = curveVariants.filter(variant => variant.id !== activeVariantId);
+        activeVariantId = curveVariants[0]?.id || null;
+        const activeVariant = getActiveVariant();
+        workingPoints = activeVariant ? clonePoints(activeVariant.points) : [];
+        lastCapturedPoint = activeVariant
+          ? (activeVariant.lastCaptured
+            ? { ...activeVariant.lastCaptured }
+            : (workingPoints.length ? { ...workingPoints[workingPoints.length - 1] } : null))
+          : null;
+        updateVariantControls();
+        refreshPointTable();
+        if (removed) {
+          const label = getVariantDisplayName(removed, removedIndex === -1 ? 0 : removedIndex);
+          updateStatus(`Removed curve ${label}.`, 'info');
+        } else {
+          updateStatus('Curve removed.', 'info');
+        }
+      });
+
       const toolbar = doc.createElement('div');
       toolbar.className = 'custom-curve-toolbar';
       manualCurrentInput = doc.createElement('input');
       manualCurrentInput.type = 'number';
       manualCurrentInput.min = '0';
-      manualCurrentInput.step = 'any';
+      manualCurrentInput.step = '0.001';
       manualCurrentInput.placeholder = 'Current (A)';
       manualTimeInput = doc.createElement('input');
       manualTimeInput.type = 'number';
       manualTimeInput.min = '0';
-      manualTimeInput.step = 'any';
+      manualTimeInput.step = '0.001';
       manualTimeInput.placeholder = 'Time (s)';
       const addManualBtn = doc.createElement('button');
       addManualBtn.type = 'button';
@@ -4979,7 +5413,7 @@ async function openCustomCurveBuilder(curveId = null) {
       pointCountEl = doc.createElement('p');
       pointCountEl.className = 'custom-curve-count';
 
-      pointsSection.append(pointsHeading, toolbar, pointCountEl, table);
+      pointsSection.append(pointsHeading, variantControls, toolbar, pointCountEl, table);
 
       form.append(detailsSection, referenceSection, pointsSection);
       body.appendChild(form);
@@ -4991,8 +5425,8 @@ async function openCustomCurveBuilder(curveId = null) {
       updateZoomDisplay();
       lastPointer = null;
       updateCursorReadout(null);
+      updateVariantControls();
       refreshPointTable();
-      updateReadout(lastCapturedPoint);
       updateStatus('Use the reference or manual inputs to define the curve.', 'info');
 
       if (controls && typeof controls.setInitialFocus === 'function') {
@@ -5012,15 +5446,28 @@ async function openCustomCurveBuilder(curveId = null) {
         updateStatus('Axis bounds must be positive values with the maximum greater than the minimum.', 'error');
         return false;
       }
-      if (workingPoints.length < 2) {
+      commitActiveVariant();
+      const invalidVariant = curveVariants.find((variant, index) => {
+        const points = sanitizeCurve(variant.points);
+        if (points.length >= 2) return false;
+        const label = getVariantDisplayName(variant, index);
+        updateStatus(`Add at least two curve points for ${label}.`, 'error');
+        return true;
+      });
+      if (invalidVariant) {
+        return false;
+      }
+      const profilesPayload = curveVariants.map((variant, index) => ({
+        id: variant.id,
+        name: getVariantDisplayName(variant, index),
+        curve: clonePoints(variant.points)
+      }));
+      const sanitizedProfiles = sanitizeCustomCurveProfiles(profilesPayload);
+      if (!sanitizedProfiles.length) {
         updateStatus('Add at least two curve points before saving.', 'error');
         return false;
       }
-      const sanitizedPoints = sanitizeCurve(workingPoints);
-      if (sanitizedPoints.length < 2) {
-        updateStatus('Add at least two curve points before saving.', 'error');
-        return false;
-      }
+      const primaryCurve = sanitizedProfiles[0].curve.map(point => ({ current: point.current, time: point.time }));
       const sanitizedSettings = sanitizeCustomCurveSettings(customSettings);
       const payload = {
         id: existing?.id || null,
@@ -5028,7 +5475,8 @@ async function openCustomCurveBuilder(curveId = null) {
         manufacturer: manufacturerInputEl?.value.trim() || '',
         deviceType: deviceTypeInputEl?.value.trim() || CUSTOM_CURVE_CATEGORY,
         description: descriptionInputEl?.value.trim() || '',
-        curve: sanitizedPoints.map(point => ({ current: point.current, time: point.time })),
+        curve: primaryCurve,
+        curveProfiles: sanitizedProfiles,
         axes: axisResult.values,
         bounds: getBoundValues(),
         settings: sanitizedSettings,
