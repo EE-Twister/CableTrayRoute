@@ -5859,6 +5859,25 @@ body.dark-mode .custom-curve-form textarea {
     align-items: start;
 }
 
+.custom-curve-display-controls {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 1rem;
+    align-items: center;
+    margin-bottom: 0.5rem;
+}
+
+.custom-curve-display-toggles {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 1rem;
+    align-items: center;
+}
+
+.custom-curve-display-controls .custom-curve-toggle {
+    margin: 0;
+}
+
 .custom-curve-reference-controls {
     display: flex;
     flex-direction: column;
@@ -6328,6 +6347,38 @@ body.dark-mode .custom-curve-setting-unit {
 .custom-curve-toggle input {
     width: 1rem;
     height: 1rem;
+}
+
+.custom-curve-variant-controls {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.75rem;
+    align-items: center;
+    margin-bottom: 0.75rem;
+}
+
+.custom-curve-variant-controls label {
+    display: flex;
+    flex-direction: column;
+    gap: 0.25rem;
+    font-weight: 600;
+}
+
+.custom-curve-variant-select {
+    min-width: 180px;
+}
+
+.custom-curve-variant-name {
+    min-width: 160px;
+}
+
+.custom-curve-variant-actions {
+    display: flex;
+    gap: 0.5rem;
+}
+
+.custom-curve-variant-actions button {
+    align-self: flex-start;
 }
 
 body.dark-mode .custom-curve-toggle {
