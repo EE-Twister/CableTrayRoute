@@ -5670,6 +5670,7 @@ body.dark-mode .preview-link {
     transition: transform 0.2s ease;
     cursor: grab;
     user-select: none;
+    pointer-events: bounding-box;
 }
 
 .preview-node.is-dragging,
@@ -5684,7 +5685,6 @@ body.dark-mode .preview-link {
 }
 
 .preview-node image {
-    pointer-events: none;
     filter: drop-shadow(0 1px 2px rgba(0, 0, 0, 0.18));
     transition: filter 0.2s ease, transform 0.2s ease;
 }
@@ -5713,7 +5713,6 @@ body.dark-mode .preview-node.is-selected image {
     fill: var(--text-color);
     font-size: 0.75rem;
     text-anchor: middle;
-    pointer-events: none;
 }
 
 .preview-node:not(.is-active):not(.is-selected):hover {
