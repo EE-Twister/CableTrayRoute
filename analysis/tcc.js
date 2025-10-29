@@ -5986,6 +5986,23 @@ function plot() {
     .attr('fill', '#333')
     .text('Time (s)');
 
+  const clipIdBase = chart.attr('id') || 'tcc-chart';
+  const clipId = `${clipIdBase}-plot-clip`;
+  const defs = chart.append('defs');
+  defs.append('clipPath')
+    .attr('id', clipId)
+    .attr('clipPathUnits', 'userSpaceOnUse')
+    .append('rect')
+    .attr('width', width)
+    .attr('height', height);
+
+  const plotLayer = g.append('g')
+    .attr('class', 'tcc-plot-layer')
+    .attr('clip-path', `url(#${clipId})`);
+  const overlayLayer = plotLayer.append('g').attr('class', 'tcc-overlay-layer');
+  const deviceLayer = plotLayer.append('g').attr('class', 'tcc-device-layer');
+  const indicatorLayer = plotLayer.append('g').attr('class', 'tcc-indicator-layer');
+
   const legend = chart.append('g')
     .attr('class', 'tcc-legend')
     .attr('transform', `translate(${margin.left},${BASE_MARGIN.top})`);
@@ -6102,7 +6119,7 @@ function plot() {
   }
 
   if (fault) {
-    g.append('line')
+    indicatorLayer.append('line')
       .attr('x1', x(fault * 1000))
       .attr('x2', x(fault * 1000))
       .attr('y1', 0)
@@ -6151,7 +6168,7 @@ function plot() {
   });
 
   overlays.filter(entry => entry.kind === 'cable').forEach(entry => {
-    g.append('path')
+    overlayLayer.append('path')
       .datum(entry.curve)
       .attr('fill', 'none')
       .attr('stroke', entry.color)
@@ -6161,7 +6178,7 @@ function plot() {
   });
 
   overlays.filter(entry => entry.kind === 'transformerDamage').forEach(entry => {
-    g.append('path')
+    overlayLayer.append('path')
       .datum(entry.curve)
       .attr('fill', 'none')
       .attr('stroke', entry.color)
@@ -6171,7 +6188,7 @@ function plot() {
   });
 
   overlays.filter(entry => entry.kind === 'motorThermal').forEach(entry => {
-    g.append('path')
+    overlayLayer.append('path')
       .datum(entry.curve)
       .attr('fill', 'none')
       .attr('stroke', entry.color)
@@ -6186,21 +6203,21 @@ function plot() {
     const xPos = x(entry.current);
     const yPos = y(duration);
     const size = 6;
-    g.append('line')
+    overlayLayer.append('line')
       .attr('x1', xPos - size)
       .attr('x2', xPos + size)
       .attr('y1', yPos - size)
       .attr('y2', yPos + size)
       .attr('stroke', entry.color)
       .attr('stroke-width', 2);
-    g.append('line')
+    overlayLayer.append('line')
       .attr('x1', xPos - size)
       .attr('x2', xPos + size)
       .attr('y1', yPos + size)
       .attr('y2', yPos - size)
       .attr('stroke', entry.color)
       .attr('stroke-width', 2);
-    g.append('text')
+    overlayLayer.append('text')
       .attr('x', xPos + size + 4)
       .attr('y', Math.max(12, yPos - size - 2))
       .attr('fill', entry.color)
@@ -6210,7 +6227,7 @@ function plot() {
 
   overlays.filter(entry => entry.kind === 'motorStart').forEach(entry => {
     const curve = motorStartCurves.get(entry) || entry.curve;
-    g.append('path')
+    overlayLayer.append('path')
       .datum(curve)
       .attr('fill', 'none')
       .attr('stroke', entry.color)
@@ -6223,24 +6240,24 @@ function plot() {
     const selection = plotEntry.selection;
     const scaled = plotEntry.scaled;
     const entry = { ...plotEntry, selection, scaled };
-    entry.bandPath = g.append('path')
+    entry.bandPath = deviceLayer.append('path')
       .datum(scaled.envelope || [])
       .attr('fill', entry.color)
       .attr('opacity', 0.15)
       .attr('stroke', 'none');
-    entry.minPath = g.append('path')
+    entry.minPath = deviceLayer.append('path')
       .datum(scaled.minCurve || [])
       .attr('fill', 'none')
       .attr('stroke-width', 1)
       .attr('stroke-opacity', 0.6)
       .attr('stroke-dasharray', '4,4');
-    entry.maxPath = g.append('path')
+    entry.maxPath = deviceLayer.append('path')
       .datum(scaled.maxCurve || [])
       .attr('fill', 'none')
       .attr('stroke-width', 1)
       .attr('stroke-opacity', 0.6)
       .attr('stroke-dasharray', '4,4');
-    entry.path = g.append('path')
+    entry.path = deviceLayer.append('path')
       .datum(scaled.curve)
       .attr('fill', 'none')
       .attr('stroke-width', 2)
@@ -7336,6 +7353,9 @@ function renderOneLinePreview(componentId) {
       noteMessages.push('No one-line preview available for the current selection.');
     }
     if (noteMessages.length) {
+      if (displayedTargets.length) {
+        noteMessages.unshift('Drag devices in the preview to reposition them as needed.');
+      }
       onelinePreviewNote.textContent = noteMessages.join(' ');
       onelinePreviewNote.classList.remove('hidden');
     } else {
