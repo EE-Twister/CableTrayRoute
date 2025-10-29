@@ -5597,7 +5597,7 @@ body.dark-mode .tcc-crosshair-text {
     display: flex;
     flex-wrap: wrap;
     gap: 1rem;
-    align-items: flex-start;
+    align-items: stretch;
     justify-content: flex-start;
     margin-top: 1.5rem;
 }
@@ -5621,6 +5621,8 @@ body.dark-mode .tcc-crosshair-text {
     border: 1px solid var(--border-color);
     border-radius: 8px;
     background: var(--secondary-color);
+    align-self: stretch;
+    min-height: 600px;
 }
 
 body.dark-mode .tcc-oneline-preview {
@@ -5634,8 +5636,9 @@ body.dark-mode .tcc-oneline-preview {
 
 .tcc-oneline-preview svg {
     width: 100%;
-    height: auto;
-    max-height: 320px;
+    flex: 1 1 auto;
+    height: 100%;
+    max-height: none;
 }
 
 .tcc-oneline-preview .oneline-preview-note {
@@ -5666,6 +5669,12 @@ body.dark-mode .preview-link {
 .preview-node {
     transition: transform 0.2s ease;
     cursor: grab;
+    user-select: none;
+}
+
+.preview-node.is-dragging,
+.preview-node.is-dragging * {
+    cursor: grabbing;
 }
 
 .preview-node.is-dragging {
