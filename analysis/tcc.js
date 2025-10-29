@@ -7203,7 +7203,9 @@ function renderOneLinePreview(componentId) {
       else if (d.selected) classes.push('is-selected');
       return classes.join(' ');
     })
-    .attr('transform', d => `translate(${d.x},${d.y})`);
+    .attr('transform', d => `translate(${d.x},${d.y})`)
+    .attr('pointer-events', 'bounding-box')
+    .style('pointer-events', 'bounding-box');
 
   const clamp = (value, min, max) => {
     if (!Number.isFinite(value)) return min;
