@@ -41,7 +41,7 @@ const K_CONSTANTS = {
 const CUSTOM_CURVE_VENDOR_FALLBACK = 'Custom Curves';
 const CUSTOM_CURVE_CATEGORY = 'custom curve';
 const CUSTOM_CURVE_DEFAULT_AXES = { currentMin: 10, currentMax: 10000, timeMin: 0.01, timeMax: 100 };
-const CUSTOM_CURVE_DEFAULT_BOUNDS = { left: 40, right: 20, top: 20, bottom: 40 };
+const CUSTOM_CURVE_DEFAULT_BOUNDS = { left: 0, right: 0, top: 0, bottom: 0 };
 
 let pdfJsLibPromise = null;
 
@@ -3769,9 +3769,6 @@ async function openCustomCurveBuilder(curveId = null) {
   const axisKeys = ['currentMin', 'currentMax', 'timeMin', 'timeMax'];
   const boundKeys = ['left', 'right', 'top', 'bottom'];
 
-  const MAGNIFIER_SIZE = 160;
-  const MAGNIFIER_ZOOM = 3;
-
   let canvas = null;
   let ctx = null;
   let canvasContainer = null;
@@ -3785,12 +3782,7 @@ async function openCustomCurveBuilder(curveId = null) {
   let pointCountEl = null;
 
   let customSettings = { ...sanitizeCustomCurveSettings(existing?.settings || existing?.baseDevice?.settings || {}) };
-
-  let magnifierEl = null;
-  let magnifierCanvas = null;
-  let magnifierCtx = null;
-  let magnifierInfoEl = null;
-  let lastPointerClient = null;
+  let lastPointer = null;
 
   let showAxisOverlay = true;
   let showReferenceImage = true;
@@ -3905,82 +3897,6 @@ async function openCustomCurveBuilder(curveId = null) {
       clientX,
       clientY
     };
-  };
-
-  const updateMagnifierInfo = pointer => {
-    if (!magnifierInfoEl) return;
-    let currentLabel = '—';
-    let timeLabel = '—';
-    if (pointer) {
-      const metrics = computePlotMetrics();
-      if (metrics.axisValid) {
-        const dataPoint = pixelToData(pointer.canvasX, pointer.canvasY, metrics);
-        if (dataPoint) {
-          currentLabel = formatSettingValue(dataPoint.current) || '—';
-          timeLabel = formatSettingValue(dataPoint.time) || '—';
-        }
-      }
-    }
-    magnifierInfoEl.innerHTML = `<span>I: ${escapeHtml(currentLabel)} A</span><span>T: ${escapeHtml(timeLabel)} s</span>`;
-  };
-
-  const hideMagnifier = () => {
-    if (!magnifierEl) return;
-    magnifierEl.style.opacity = '0';
-    magnifierEl.style.transform = 'translate(-9999px, -9999px)';
-    updateMagnifierInfo(null);
-    updateCursorReadout(null);
-  };
-
-  const renderMagnifier = pointer => {
-    if (!pointer || !magnifierEl || !magnifierCanvas || !magnifierCtx || !canvasContainer || !canvasScrollEl) {
-      hideMagnifier();
-      return;
-    }
-    const scrollRect = canvasScrollEl.getBoundingClientRect();
-    const isDarkMode = document.body?.classList?.contains('dark-mode');
-    const scrollLeft = canvasScrollEl.scrollLeft || 0;
-    const scrollTop = canvasScrollEl.scrollTop || 0;
-    const translateX = pointer.clientX - scrollRect.left + scrollLeft - MAGNIFIER_SIZE / 2;
-    const translateY = pointer.clientY - scrollRect.top + scrollTop - MAGNIFIER_SIZE / 2;
-    magnifierEl.style.transform = `translate(${Math.round(translateX)}px, ${Math.round(translateY)}px)`;
-    magnifierEl.style.opacity = '1';
-    const zoom = MAGNIFIER_ZOOM;
-    const sourceWidth = magnifierCanvas.width / zoom;
-    const sourceHeight = magnifierCanvas.height / zoom;
-    const halfWidth = sourceWidth / 2;
-    const halfHeight = sourceHeight / 2;
-    const sx = clamp(pointer.canvasX - halfWidth, 0, canvas.width - sourceWidth);
-    const sy = clamp(pointer.canvasY - halfHeight, 0, canvas.height - sourceHeight);
-    magnifierCtx.clearRect(0, 0, magnifierCanvas.width, magnifierCanvas.height);
-    magnifierCtx.save();
-    magnifierCtx.beginPath();
-    const radius = magnifierCanvas.width / 2 - 2;
-    magnifierCtx.arc(magnifierCanvas.width / 2, magnifierCanvas.height / 2, radius, 0, Math.PI * 2);
-    magnifierCtx.closePath();
-    magnifierCtx.clip();
-    magnifierCtx.drawImage(
-      canvas,
-      sx,
-      sy,
-      sourceWidth,
-      sourceHeight,
-      0,
-      0,
-      magnifierCanvas.width,
-      magnifierCanvas.height
-    );
-    magnifierCtx.restore();
-    magnifierCtx.strokeStyle = isDarkMode ? 'rgba(96, 165, 250, 0.85)' : 'rgba(37, 99, 235, 0.85)';
-    magnifierCtx.lineWidth = 1;
-    magnifierCtx.beginPath();
-    magnifierCtx.moveTo(magnifierCanvas.width / 2, 0);
-    magnifierCtx.lineTo(magnifierCanvas.width / 2, magnifierCanvas.height);
-    magnifierCtx.moveTo(0, magnifierCanvas.height / 2);
-    magnifierCtx.lineTo(magnifierCanvas.width, magnifierCanvas.height / 2);
-    magnifierCtx.stroke();
-    updateMagnifierInfo(pointer);
-    updateCursorReadout(pointer);
   };
 
   const updateReferenceToggleState = () => {
@@ -4313,6 +4229,27 @@ async function openCustomCurveBuilder(curveId = null) {
       }
     }
     if (metrics.axisValid) {
+      if (workingPoints.length >= 2) {
+        ctx.save();
+        ctx.strokeStyle = '#2563eb';
+        ctx.lineWidth = 2;
+        ctx.lineJoin = 'round';
+        ctx.lineCap = 'round';
+        let started = false;
+        workingPoints.forEach(point => {
+          const pixel = dataToPixel(point, metrics);
+          if (!pixel) return;
+          if (!started) {
+            ctx.beginPath();
+            ctx.moveTo(pixel.x, pixel.y);
+            started = true;
+          } else {
+            ctx.lineTo(pixel.x, pixel.y);
+          }
+        });
+        if (started) ctx.stroke();
+        ctx.restore();
+      }
       ctx.save();
       ctx.fillStyle = '#1d4ed8';
       workingPoints.forEach(point => {
@@ -4335,15 +4272,10 @@ async function openCustomCurveBuilder(curveId = null) {
         ctx.restore();
       }
     }
-    if (lastPointerClient) {
-      const hoverPointer = getPointerFromClient(lastPointerClient.x, lastPointerClient.y);
-      if (hoverPointer) {
-        renderMagnifier(hoverPointer);
-      } else {
-        hideMagnifier();
-      }
+    if (lastPointer) {
+      updateCursorReadout(lastPointer);
     } else {
-      hideMagnifier();
+      updateCursorReadout(null);
     }
   };
 
@@ -4443,7 +4375,7 @@ async function openCustomCurveBuilder(curveId = null) {
     if (!canvas) return;
     const pointer = getPointerFromClient(event.clientX, event.clientY);
     if (!pointer) return;
-    lastPointerClient = { x: event.clientX, y: event.clientY };
+    lastPointer = pointer;
     const metrics = computePlotMetrics();
     const point = pixelToData(pointer.canvasX, pointer.canvasY, metrics);
     if (!point) {
@@ -4453,23 +4385,23 @@ async function openCustomCurveBuilder(curveId = null) {
     lastCapturedPoint = point;
     updateReadout(point);
     addPoint(point.current, point.time, { announce: true });
-    renderMagnifier(pointer);
+    updateCursorReadout(pointer);
   };
 
   const handleCanvasHover = event => {
     const pointer = getPointerFromClient(event.clientX, event.clientY);
     if (!pointer) {
-      lastPointerClient = null;
-      hideMagnifier();
+      lastPointer = null;
+      updateCursorReadout(null);
       return;
     }
-    lastPointerClient = { x: event.clientX, y: event.clientY };
-    renderMagnifier(pointer);
+    lastPointer = pointer;
+    updateCursorReadout(pointer);
   };
 
   const handleCanvasLeave = () => {
-    lastPointerClient = null;
-    hideMagnifier();
+    lastPointer = null;
+    updateCursorReadout(null);
   };
 
   const resetReference = () => {
@@ -4803,19 +4735,6 @@ async function openCustomCurveBuilder(curveId = null) {
       canvasScrollEl.appendChild(canvas);
       canvasContainer.appendChild(canvasScrollEl);
 
-      magnifierEl = doc.createElement('div');
-      magnifierEl.className = 'custom-curve-magnifier';
-      magnifierEl.setAttribute('aria-hidden', 'true');
-      magnifierCanvas = doc.createElement('canvas');
-      magnifierCanvas.width = MAGNIFIER_SIZE;
-      magnifierCanvas.height = MAGNIFIER_SIZE;
-      magnifierCanvas.setAttribute('aria-hidden', 'true');
-      magnifierCtx = magnifierCanvas.getContext('2d');
-      magnifierEl.appendChild(magnifierCanvas);
-      magnifierInfoEl = doc.createElement('div');
-      magnifierInfoEl.className = 'custom-curve-magnifier-info';
-      magnifierEl.appendChild(magnifierInfoEl);
-      canvasContainer.appendChild(magnifierEl);
       axisTitleXEl = doc.createElement('div');
       axisTitleXEl.className = 'custom-curve-axis-title custom-curve-axis-title-x';
       axisTitleXEl.textContent = 'Current (A)';
@@ -4835,8 +4754,6 @@ async function openCustomCurveBuilder(curveId = null) {
       axisTickContainerY.className = 'custom-curve-axis-ticks custom-curve-axis-ticks-y';
       axisTickContainerY.style.display = 'none';
       canvasContainer.appendChild(axisTickContainerY);
-      updateMagnifierInfo(null);
-
       referenceGrid.append(referenceControls, canvasContainer);
       referenceSection.append(referenceHeading, referenceGrid);
 
@@ -4901,8 +4818,8 @@ async function openCustomCurveBuilder(curveId = null) {
       setBoundInputValues();
       configureCanvasSize(referenceImage);
       updateReferenceToggleState();
-      hideMagnifier();
-      lastPointerClient = null;
+      lastPointer = null;
+      updateCursorReadout(null);
       refreshPointTable();
       updateReadout(lastCapturedPoint);
       updateStatus('Use the reference or manual inputs to define the curve.', 'info');
@@ -6538,13 +6455,14 @@ function renderOneLinePreview(componentId) {
   const labelOffset = datum => {
     const iconRadius = iconSize(datum) / 2;
     const componentRadius = Math.max(datum.width || 0, datum.height || 0) / 2;
-    const emphasis = datum.active ? 22 : 18;
-    return Math.round(Math.max(iconRadius, componentRadius) + emphasis);
+    const baseGap = datum.active ? 32 : datum.selected ? 28 : 24;
+    return Math.round(Math.max(iconRadius, componentRadius) + baseGap);
   };
 
   const labels = node.append('text')
     .attr('class', 'preview-node-label')
     .attr('text-anchor', 'middle')
+    .attr('dominant-baseline', 'hanging')
     .attr('y', d => labelOffset(d));
 
   labels.selectAll('tspan')
@@ -6552,7 +6470,7 @@ function renderOneLinePreview(componentId) {
     .enter()
     .append('tspan')
     .attr('x', 0)
-    .attr('dy', (line, index) => (index === 0 ? 0 : 12))
+    .attr('dy', (line, index) => (index === 0 ? 0 : 16))
     .text(line => line);
 
   node.append('title')
