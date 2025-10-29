@@ -83,6 +83,8 @@ const onelinePreviewNote = document.getElementById('oneline-preview-note');
 const contextMenu = createContextMenu();
 const viewCalloutOffsets = new Map();
 
+let onelinePreviewTransform = null;
+
 let updatingActiveComponentFromSelect = false;
 
 const baseHref = document.querySelector('base')?.href || new URL('.', window.location.href).href;
@@ -446,6 +448,27 @@ function loadSavedSettings() {
       const seq = Number(curve.sequence);
       return Number.isFinite(seq) ? Math.max(max, seq) : max;
     }, 0);
+  }
+  if (!stored.previewLayouts || typeof stored.previewLayouts !== 'object') {
+    stored.previewLayouts = {};
+  } else {
+    Object.keys(stored.previewLayouts).forEach(key => {
+      const layout = stored.previewLayouts[key];
+      if (!layout || typeof layout !== 'object') {
+        delete stored.previewLayouts[key];
+        return;
+      }
+      const cleaned = {};
+      Object.keys(layout).forEach(componentId => {
+        const point = layout[componentId];
+        const x = Number(point?.x);
+        const y = Number(point?.y);
+        if (Number.isFinite(x) && Number.isFinite(y)) {
+          cleaned[componentId] = { x, y };
+        }
+      });
+      stored.previewLayouts[key] = cleaned;
+    });
   }
   let maxSequence = Number.isFinite(stored.customCurveCounter) ? stored.customCurveCounter : 0;
   stored.customCurves.forEach(curve => {
@@ -3776,6 +3799,8 @@ async function openCustomCurveBuilder(curveId = null) {
 
   let axisTitleXEl = null;
   let axisTitleYEl = null;
+  let axisTickContainerX = null;
+  let axisTickContainerY = null;
 
   let nameInputEl = null;
   let manufacturerInputEl = null;
@@ -3916,13 +3941,9 @@ async function openCustomCurveBuilder(curveId = null) {
     const isDarkMode = document.body?.classList?.contains('dark-mode');
     const scrollLeft = canvasScrollEl.scrollLeft || 0;
     const scrollTop = canvasScrollEl.scrollTop || 0;
-    const rawOffsetX = pointer.clientX - scrollRect.left + scrollLeft - MAGNIFIER_SIZE / 2;
-    const rawOffsetY = pointer.clientY - scrollRect.top + scrollTop - MAGNIFIER_SIZE / 2;
-    const maxX = canvasScrollEl.scrollWidth - MAGNIFIER_SIZE;
-    const maxY = canvasScrollEl.scrollHeight - MAGNIFIER_SIZE;
-    const clampedOffsetX = clamp(rawOffsetX, -MAGNIFIER_SIZE / 2, Math.max(maxX, 0));
-    const clampedOffsetY = clamp(rawOffsetY, -MAGNIFIER_SIZE / 2, Math.max(maxY, 0));
-    magnifierEl.style.transform = `translate(${Math.round(clampedOffsetX)}px, ${Math.round(clampedOffsetY)}px)`;
+    const translateX = pointer.clientX - scrollRect.left + scrollLeft - MAGNIFIER_SIZE / 2;
+    const translateY = pointer.clientY - scrollRect.top + scrollTop - MAGNIFIER_SIZE / 2;
+    magnifierEl.style.transform = `translate(${Math.round(translateX)}px, ${Math.round(translateY)}px)`;
     magnifierEl.style.opacity = '1';
     const zoom = MAGNIFIER_ZOOM;
     const sourceWidth = magnifierCanvas.width / zoom;
@@ -3972,34 +3993,42 @@ async function openCustomCurveBuilder(curveId = null) {
     }
   };
 
-  const generateLogTicks = (min, max) => {
-    if (!(Number.isFinite(min) && Number.isFinite(max) && min > 0 && max > min)) return [];
-    const ticks = [];
+  const generateLogGrid = (min, max) => {
+    if (!(Number.isFinite(min) && Number.isFinite(max) && min > 0 && max > min)) {
+      return { major: [], minor: [] };
+    }
+    const major = [];
+    const minor = [];
     const minExp = Math.floor(Math.log10(min));
     const maxExp = Math.ceil(Math.log10(max));
     for (let exp = minExp; exp <= maxExp; exp++) {
-      [1, 2, 5].forEach(multiplier => {
-        const value = multiplier * 10 ** exp;
-        if (value >= min && value <= max) ticks.push(value);
-      });
+      for (let digit = 1; digit < 10; digit += 1) {
+        const value = digit * 10 ** exp;
+        if (value < min || value > max) continue;
+        if (digit === 1) major.push(value);
+        else minor.push(value);
+      }
     }
-    return Array.from(new Set(ticks)).sort((a, b) => a - b);
+    const uniqueMajor = Array.from(new Set(major)).sort((a, b) => a - b);
+    const uniqueMinor = Array.from(new Set(minor)).sort((a, b) => a - b);
+    return { major: uniqueMajor, minor: uniqueMinor };
   };
 
   const drawAxisOverlay = metrics => {
-    if (!ctx || !metrics?.axisValid) return;
+    if (!ctx || !metrics?.axisValid) {
+      return { verticalMajor: [], horizontalMajor: [] };
+    }
     const axis = metrics.axisValues;
-    const verticalTicks = generateLogTicks(axis.currentMin, axis.currentMax);
-    const horizontalTicks = generateLogTicks(axis.timeMin, axis.timeMax);
+    const vertical = generateLogGrid(axis.currentMin, axis.currentMax);
+    const horizontal = generateLogGrid(axis.timeMin, axis.timeMax);
     const isDarkMode = document.body?.classList?.contains('dark-mode');
-    const strokeColor = isDarkMode ? 'rgba(96, 165, 250, 0.55)' : 'rgba(30, 64, 175, 0.45)';
-    const labelColor = isDarkMode ? 'rgba(226, 232, 240, 0.95)' : 'rgba(15, 23, 42, 0.85)';
+    const minorStroke = isDarkMode ? 'rgba(96, 165, 250, 0.25)' : 'rgba(30, 64, 175, 0.25)';
+    const majorStroke = isDarkMode ? 'rgba(96, 165, 250, 0.6)' : 'rgba(30, 64, 175, 0.55)';
     ctx.save();
-    ctx.setLineDash([6, 6]);
-    ctx.strokeStyle = strokeColor;
     ctx.lineWidth = 1;
-    const labelOffset = 14;
-    verticalTicks.forEach(value => {
+    ctx.setLineDash([4, 6]);
+    ctx.strokeStyle = minorStroke;
+    const drawVerticalLine = value => {
       const top = dataToPixel({ current: value, time: axis.timeMin }, metrics);
       const bottom = dataToPixel({ current: value, time: axis.timeMax }, metrics);
       if (!top || !bottom) return;
@@ -4007,18 +4036,8 @@ async function openCustomCurveBuilder(curveId = null) {
       ctx.moveTo(top.x, metrics.plotTop);
       ctx.lineTo(top.x, metrics.plotTop + metrics.plotHeight);
       ctx.stroke();
-      ctx.save();
-      ctx.setLineDash([]);
-      ctx.fillStyle = labelColor;
-      ctx.font = '12px Inter, system-ui, sans-serif';
-      ctx.textAlign = 'center';
-      ctx.textBaseline = 'top';
-      const targetY = metrics.plotTop + metrics.plotHeight + labelOffset;
-      const labelY = Math.min(metrics.height - 8, targetY);
-      ctx.fillText(formatSettingValue(value), top.x, labelY);
-      ctx.restore();
-    });
-    horizontalTicks.forEach(value => {
+    };
+    const drawHorizontalLine = value => {
       const left = dataToPixel({ current: axis.currentMin, time: value }, metrics);
       const right = dataToPixel({ current: axis.currentMax, time: value }, metrics);
       if (!left || !right) return;
@@ -4026,23 +4045,64 @@ async function openCustomCurveBuilder(curveId = null) {
       ctx.moveTo(metrics.plotLeft, left.y);
       ctx.lineTo(metrics.plotLeft + metrics.plotWidth, left.y);
       ctx.stroke();
-      ctx.save();
-      ctx.setLineDash([]);
-      ctx.fillStyle = labelColor;
-      ctx.font = '12px Inter, system-ui, sans-serif';
-      const targetX = metrics.plotLeft - labelOffset;
-      let labelX = Math.max(8, targetX);
-      let textAlign = 'right';
-      if (targetX < 8) {
-        textAlign = 'left';
-        labelX = Math.min(metrics.plotLeft + labelOffset, metrics.width - 8);
-      }
-      ctx.textAlign = textAlign;
-      ctx.textBaseline = 'middle';
-      ctx.fillText(formatSettingValue(value), labelX, left.y);
-      ctx.restore();
-    });
+    };
+    vertical.minor.forEach(drawVerticalLine);
+    horizontal.minor.forEach(drawHorizontalLine);
+    ctx.setLineDash([]);
+    ctx.strokeStyle = majorStroke;
+    ctx.lineWidth = 1.5;
+    vertical.major.forEach(drawVerticalLine);
+    horizontal.major.forEach(drawHorizontalLine);
     ctx.restore();
+    return { verticalMajor: vertical.major, horizontalMajor: horizontal.major };
+  };
+
+  const clearAxisTickLabels = () => {
+    if (axisTickContainerX) axisTickContainerX.innerHTML = '';
+    if (axisTickContainerY) axisTickContainerY.innerHTML = '';
+  };
+
+  const updateAxisTickLabels = (metrics, verticalTicks = [], horizontalTicks = []) => {
+    if (!axisTickContainerX || !axisTickContainerY || !canvasContainer || !canvasScrollEl || !canvas) {
+      return;
+    }
+    const shouldShow = showAxisOverlay && metrics?.axisValid;
+    axisTickContainerX.style.display = shouldShow ? 'block' : 'none';
+    axisTickContainerY.style.display = shouldShow ? 'block' : 'none';
+    clearAxisTickLabels();
+    if (!shouldShow) {
+      return;
+    }
+    const docRef = axisTickContainerX.ownerDocument || document;
+    const containerRect = canvasContainer.getBoundingClientRect();
+    const canvasRect = canvas.getBoundingClientRect();
+    const scrollLeft = canvasScrollEl.scrollLeft || 0;
+    const scrollTop = canvasScrollEl.scrollTop || 0;
+    const offsetLeft = canvasRect.left - containerRect.left + scrollLeft;
+    const offsetTop = canvasRect.top - containerRect.top + scrollTop;
+    const axis = metrics.axisValues;
+    const labelYOffset = 18;
+    const labelXOffset = 18;
+    verticalTicks.forEach(value => {
+      const point = dataToPixel({ current: value, time: axis.timeMin }, metrics);
+      if (!point) return;
+      const label = docRef.createElement('div');
+      label.className = 'custom-curve-axis-tick custom-curve-axis-tick-x';
+      label.textContent = formatSettingValue(value);
+      label.style.left = `${offsetLeft + point.x}px`;
+      label.style.top = `${offsetTop + metrics.plotTop + metrics.plotHeight + labelYOffset}px`;
+      axisTickContainerX.appendChild(label);
+    });
+    horizontalTicks.forEach(value => {
+      const point = dataToPixel({ current: axis.currentMin, time: value }, metrics);
+      if (!point) return;
+      const label = docRef.createElement('div');
+      label.className = 'custom-curve-axis-tick custom-curve-axis-tick-y';
+      label.textContent = formatSettingValue(value);
+      label.style.left = `${offsetLeft + metrics.plotLeft - labelXOffset}px`;
+      label.style.top = `${offsetTop + point.y}px`;
+      axisTickContainerY.appendChild(label);
+    });
   };
 
   const getAxisValues = () => {
@@ -4192,21 +4252,34 @@ async function openCustomCurveBuilder(curveId = null) {
     if (!canvas || !ctx) return;
     const metrics = computePlotMetrics();
     const { width, height, plotLeft, plotTop, plotWidth, plotHeight } = metrics;
+    const isDarkMode = document.body?.classList?.contains('dark-mode');
+    const canvasBackground = isDarkMode ? '#0f172a' : '#f8fafc';
+    const plotBackground = isDarkMode ? '#1e293b' : '#f1f5f9';
     ctx.clearRect(0, 0, width, height);
+    ctx.fillStyle = canvasBackground;
+    ctx.fillRect(0, 0, width, height);
     if (referenceImage && showReferenceImage) {
       ctx.drawImage(referenceImage, 0, 0, width, height);
     } else {
-      ctx.fillStyle = '#f9fafb';
-      ctx.fillRect(0, 0, width, height);
+      ctx.fillStyle = plotBackground;
+      ctx.fillRect(plotLeft, plotTop, plotWidth, plotHeight);
     }
+    ctx.save();
+    ctx.fillStyle = canvasBackground;
+    ctx.fillRect(0, 0, width, plotTop);
+    ctx.fillRect(0, plotTop + plotHeight, width, Math.max(0, height - (plotTop + plotHeight)));
+    ctx.fillRect(0, plotTop, plotLeft, plotHeight);
+    ctx.fillRect(plotLeft + plotWidth, plotTop, Math.max(0, width - (plotLeft + plotWidth)), plotHeight);
+    ctx.restore();
     ctx.save();
     ctx.strokeStyle = '#2563eb';
     ctx.lineWidth = 2;
     ctx.strokeRect(plotLeft, plotTop, plotWidth, plotHeight);
     ctx.restore();
-    if (showAxisOverlay && metrics.axisValid) {
-      drawAxisOverlay(metrics);
-    }
+    const overlayTicks = showAxisOverlay && metrics.axisValid
+      ? drawAxisOverlay(metrics)
+      : { verticalMajor: [], horizontalMajor: [] };
+    updateAxisTickLabels(metrics, overlayTicks.verticalMajor, overlayTicks.horizontalMajor);
     if (axisTitleXEl && axisTitleYEl && canvasContainer && canvasScrollEl) {
       const shouldShow = showAxisOverlay && metrics.axisValid;
       axisTitleXEl.style.display = shouldShow ? 'block' : 'none';
@@ -4754,6 +4827,14 @@ async function openCustomCurveBuilder(curveId = null) {
       axisTitleYEl.style.transformOrigin = 'left center';
       axisTitleYEl.style.display = 'none';
       canvasContainer.appendChild(axisTitleYEl);
+      axisTickContainerX = doc.createElement('div');
+      axisTickContainerX.className = 'custom-curve-axis-ticks custom-curve-axis-ticks-x';
+      axisTickContainerX.style.display = 'none';
+      canvasContainer.appendChild(axisTickContainerX);
+      axisTickContainerY = doc.createElement('div');
+      axisTickContainerY.className = 'custom-curve-axis-ticks custom-curve-axis-ticks-y';
+      axisTickContainerY.style.display = 'none';
+      canvasContainer.appendChild(axisTickContainerY);
       updateMagnifierInfo(null);
 
       referenceGrid.append(referenceControls, canvasContainer);
@@ -6066,6 +6147,7 @@ function renderOneLinePreview(componentId) {
   if (!onelinePreviewSvgEl || !onelinePreviewSvg) return;
   ensureComponentIcons();
   if (!componentId || !componentLookup.has(componentId)) {
+    onelinePreviewTransform = null;
     onelinePreviewSvg.selectAll('*').remove();
     if (onelinePreviewSvgEl) onelinePreviewSvgEl.classList.add('hidden');
     if (onelinePreviewContainer) onelinePreviewContainer.classList.add('empty');
@@ -6112,6 +6194,7 @@ function renderOneLinePreview(componentId) {
   });
   const availableTargets = orderedTargets;
   if (!availableTargets.length) {
+    onelinePreviewTransform = null;
     onelinePreviewSvg.selectAll('*').remove();
     onelinePreviewSvgEl.classList.add('hidden');
     if (onelinePreviewContainer) onelinePreviewContainer.classList.add('empty');
@@ -6147,6 +6230,15 @@ function renderOneLinePreview(componentId) {
 
   const DEFAULT_WIDTH = 120;
   const DEFAULT_HEIGHT = 60;
+
+  const layoutKey = record.sheet?.id
+    ? `sheet:${record.sheet.id}`
+    : record.sheetName
+      ? `sheet-name:${record.sheetName}`
+      : `sheet-index:${record.sheetIndex}`;
+  let layoutOverrides = layoutKey && saved.previewLayouts
+    ? saved.previewLayouts[layoutKey] || {}
+    : {};
 
   const normalizeRotation = value => {
     const numeric = Number(value);
@@ -6206,16 +6298,36 @@ function renderOneLinePreview(componentId) {
     const compX = Number.isFinite(comp.x) ? Number(comp.x) : 0;
     const compY = Number.isFinite(comp.y) ? Number(comp.y) : 0;
     const rotation = normalizeRotation(comp.rotation ?? comp.rot ?? 0);
-    const bounds = computeBounds(compX, compY, compWidth, compHeight, rotation);
-    minX = Math.min(minX, bounds.left);
-    minY = Math.min(minY, bounds.top);
-    maxX = Math.max(maxX, bounds.right);
-    maxY = Math.max(maxY, bounds.bottom);
+    const baseBounds = computeBounds(compX, compY, compWidth, compHeight, rotation);
+    const spanWidth = baseBounds.right - baseBounds.left;
+    const spanHeight = baseBounds.bottom - baseBounds.top;
+    let centerX = (baseBounds.left + baseBounds.right) / 2;
+    let centerY = (baseBounds.top + baseBounds.bottom) / 2;
+    const override = layoutOverrides && layoutOverrides[id];
+    if (override) {
+      const overrideX = Number(override.x);
+      const overrideY = Number(override.y);
+      if (Number.isFinite(overrideX)) centerX = overrideX;
+      if (Number.isFinite(overrideY)) centerY = overrideY;
+    }
+    const adjustedBounds = {
+      left: centerX - spanWidth / 2,
+      right: centerX + spanWidth / 2,
+      top: centerY - spanHeight / 2,
+      bottom: centerY + spanHeight / 2
+    };
+    minX = Math.min(minX, adjustedBounds.left);
+    minY = Math.min(minY, adjustedBounds.top);
+    maxX = Math.max(maxX, adjustedBounds.right);
+    maxY = Math.max(maxY, adjustedBounds.bottom);
     componentPreviewMeta.set(id, {
-      bounds,
+      bounds: adjustedBounds,
       width: compWidth,
       height: compHeight,
-      rotation
+      rotation,
+      center: { x: centerX, y: centerY },
+      spanWidth,
+      spanHeight
     });
   });
 
@@ -6236,13 +6348,22 @@ function renderOneLinePreview(componentId) {
   const offsetX = padding - minX * scale;
   const offsetY = padding - minY * scale;
 
+  onelinePreviewTransform = {
+    scale,
+    offsetX,
+    offsetY,
+    layoutKey,
+    width,
+    height
+  };
+
   const nodes = displayedTargets.map(id => {
     const comp = componentMap.get(id);
     const meta = componentPreviewMeta.get(id);
     if (!comp || !meta) return null;
-    const { bounds, width: compWidth, height: compHeight, rotation } = meta;
-    const centerX = ((bounds.left + bounds.right) / 2) * scale + offsetX;
-    const centerY = ((bounds.top + bounds.bottom) / 2) * scale + offsetY;
+    const { bounds, width: compWidth, height: compHeight, rotation, center } = meta;
+    const centerX = center ? center.x * scale + offsetX : ((bounds.left + bounds.right) / 2) * scale + offsetX;
+    const centerY = center ? center.y * scale + offsetY : ((bounds.top + bounds.bottom) / 2) * scale + offsetY;
     const scaledWidth = Math.max(0, (bounds.right - bounds.left) * scale);
     const scaledHeight = Math.max(0, (bounds.bottom - bounds.top) * scale);
     return {
@@ -6256,7 +6377,8 @@ function renderOneLinePreview(componentId) {
       selected: selectedIds.has(comp.id),
       width: scaledWidth,
       height: scaledHeight,
-      rotation
+      rotation,
+      baseCenter: center || { x: (bounds.left + bounds.right) / 2, y: (bounds.top + bounds.bottom) / 2 }
     };
   }).filter(Boolean);
 
@@ -6303,32 +6425,71 @@ function renderOneLinePreview(componentId) {
   const nodeById = new Map(nodes.map(node => [node.id, node]));
 
   const linkGroup = onelinePreviewSvg.append('g').attr('class', 'preview-links');
-  linkGroup.selectAll('line')
-    .data(edges)
-    .enter()
-    .append('line')
-    .attr('class', 'preview-link')
-    .attr('x1', d => nodeById.get(d.source)?.x ?? 0)
-    .attr('y1', d => nodeById.get(d.source)?.y ?? 0)
-    .attr('x2', d => nodeById.get(d.target)?.x ?? 0)
-    .attr('y2', d => nodeById.get(d.target)?.y ?? 0);
+  const edgeKey = edge => (edge.source < edge.target ? `${edge.source}--${edge.target}` : `${edge.target}--${edge.source}`);
+  const linkLines = linkGroup.selectAll('line')
+    .data(edges, edgeKey)
+    .join('line')
+    .attr('class', 'preview-link');
 
-  linkGroup.selectAll('text')
-    .data(edges.filter(edge => edge.label))
-    .enter()
-    .append('text')
+  const linkLabelSelection = linkGroup.selectAll('text')
+    .data(edges.filter(edge => edge.label), edgeKey)
+    .join('text')
     .attr('class', 'preview-link-label')
-    .attr('x', d => {
-      const source = nodeById.get(d.source);
-      const target = nodeById.get(d.target);
-      return source && target ? (source.x + target.x) / 2 : width / 2;
-    })
-    .attr('y', d => {
-      const source = nodeById.get(d.source);
-      const target = nodeById.get(d.target);
-      return source && target ? (source.y + target.y) / 2 : height / 2;
-    })
     .text(d => d.label);
+
+  const updateLinks = () => {
+    linkLines
+      .attr('x1', d => nodeById.get(d.source)?.x ?? 0)
+      .attr('y1', d => nodeById.get(d.source)?.y ?? 0)
+      .attr('x2', d => nodeById.get(d.target)?.x ?? 0)
+      .attr('y2', d => nodeById.get(d.target)?.y ?? 0);
+    linkLabelSelection
+      .attr('x', d => {
+        const source = nodeById.get(d.source);
+        const target = nodeById.get(d.target);
+        return source && target ? (source.x + target.x) / 2 : width / 2;
+      })
+      .attr('y', d => {
+        const source = nodeById.get(d.source);
+        const target = nodeById.get(d.target);
+        return source && target ? (source.y + target.y) / 2 : height / 2;
+      });
+  };
+
+  const persistPreviewPosition = datum => {
+    if (!datum || !layoutKey || !onelinePreviewTransform) return;
+    const { scale, offsetX, offsetY } = onelinePreviewTransform;
+    if (!Number.isFinite(scale) || scale <= 0) return;
+    const baseX = (datum.x - offsetX) / scale;
+    const baseY = (datum.y - offsetY) / scale;
+    if (!saved.previewLayouts || typeof saved.previewLayouts !== 'object') {
+      saved.previewLayouts = {};
+    }
+    let layoutStore = saved.previewLayouts[layoutKey];
+    if (!layoutStore || typeof layoutStore !== 'object') {
+      layoutStore = {};
+      saved.previewLayouts[layoutKey] = layoutStore;
+    }
+    layoutStore[datum.id] = { x: baseX, y: baseY };
+    layoutOverrides = layoutStore;
+    const meta = componentPreviewMeta.get(datum.id);
+    if (meta) {
+      meta.center = { x: baseX, y: baseY };
+      const spanWidth = Number.isFinite(meta.spanWidth) ? meta.spanWidth : (meta.bounds?.right ?? 0) - (meta.bounds?.left ?? 0);
+      const spanHeight = Number.isFinite(meta.spanHeight) ? meta.spanHeight : (meta.bounds?.bottom ?? 0) - (meta.bounds?.top ?? 0);
+      if (Number.isFinite(spanWidth) && Number.isFinite(spanHeight)) {
+        meta.bounds = {
+          left: baseX - spanWidth / 2,
+          right: baseX + spanWidth / 2,
+          top: baseY - spanHeight / 2,
+          bottom: baseY + spanHeight / 2
+        };
+      }
+    }
+    setItem('tccSettings', saved);
+  };
+
+  updateLinks();
 
   const nodeGroup = onelinePreviewSvg.append('g').attr('class', 'preview-nodes');
   const node = nodeGroup.selectAll('g')
@@ -6402,6 +6563,71 @@ function renderOneLinePreview(componentId) {
       event.preventDefault();
       setActiveComponent(datum.id, { preserveSelection: true });
     });
+
+  node.each(function applyPreviewDrag(datum) {
+    const element = this;
+    if (!element) return;
+    element.style.touchAction = 'none';
+    element.addEventListener('pointerdown', event => {
+      if (event.button !== 0) return;
+      element.setPointerCapture(event.pointerId);
+      const startX = event.clientX;
+      const startY = event.clientY;
+      const initialX = datum.x;
+      const initialY = datum.y;
+      let moved = false;
+      const handleMove = moveEvent => {
+        const dx = moveEvent.clientX - startX;
+        const dy = moveEvent.clientY - startY;
+        if (!moved) {
+          if (Math.abs(dx) < 2 && Math.abs(dy) < 2) {
+            return;
+          }
+          moved = true;
+          moveEvent.preventDefault();
+          element.classList.add('is-dragging');
+          if (element.parentNode) {
+            element.parentNode.appendChild(element);
+          }
+        } else {
+          moveEvent.preventDefault();
+        }
+        datum.x = initialX + dx;
+        datum.y = initialY + dy;
+        element.setAttribute('transform', `translate(${datum.x},${datum.y})`);
+        nodeById.set(datum.id, datum);
+        updateLinks();
+      };
+      const handleUp = () => {
+        element.releasePointerCapture(event.pointerId);
+        element.removeEventListener('pointermove', handleMove);
+        element.removeEventListener('pointerup', handleUp);
+        element.removeEventListener('pointercancel', handleCancel);
+        if (moved) {
+          element.classList.remove('is-dragging');
+          persistPreviewPosition(datum);
+          updateLinks();
+        }
+      };
+      const handleCancel = () => {
+        element.releasePointerCapture(event.pointerId);
+        element.removeEventListener('pointermove', handleMove);
+        element.removeEventListener('pointerup', handleUp);
+        element.removeEventListener('pointercancel', handleCancel);
+        if (moved) {
+          element.classList.remove('is-dragging');
+          datum.x = initialX;
+          datum.y = initialY;
+          element.setAttribute('transform', `translate(${datum.x},${datum.y})`);
+          nodeById.set(datum.id, datum);
+          updateLinks();
+        }
+      };
+      element.addEventListener('pointermove', handleMove);
+      element.addEventListener('pointerup', handleUp);
+      element.addEventListener('pointercancel', handleCancel);
+    });
+  });
 
   if (onelinePreviewNote) {
     const noteMessages = [];
