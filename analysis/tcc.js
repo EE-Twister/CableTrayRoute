@@ -7312,8 +7312,8 @@ function renderOneLinePreview(componentId) {
       return classes.join(' ');
     })
     .attr('transform', d => `translate(${d.x},${d.y})`)
-    .attr('pointer-events', 'all')
-    .style('pointer-events', 'all');
+    .attr('pointer-events', 'bounding-box')
+    .style('pointer-events', 'bounding-box');
 
   const computeOutlineRadius = datum => {
     if (datum.annotation) {
