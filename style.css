@@ -5743,6 +5743,7 @@ body.dark-mode .preview-node-icon-letter {
 .oneline-preview-grid-line {
     stroke: rgba(33, 33, 33, 0.12);
     stroke-width: 0.75;
+    fill: none;
 }
 
 body.dark-mode .oneline-preview-grid-line {
