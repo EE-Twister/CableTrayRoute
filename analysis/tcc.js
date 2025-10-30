@@ -7139,6 +7139,12 @@ function renderOneLinePreview(componentId) {
 
   node.call(dragBehavior);
 
+  node.filter(d => !d.active)
+    .on('click', (event, datum) => {
+      event.preventDefault();
+      setActiveComponent(datum.id, { preserveSelection: true });
+    });
+
   if (onelinePreviewNote) {
     const noteMessages = [];
     if (offSheetCount > 0) {
