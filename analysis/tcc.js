@@ -6933,16 +6933,21 @@ function renderOneLinePreview(componentId) {
   const neighborSet = componentId && adjacency.has(componentId)
     ? adjacency.get(componentId)
     : new Set();
-  const orderedTargets = [];
-  if (componentId && componentMap.has(componentId)) {
-    orderedTargets.push(componentId);
-  }
-  neighborSet.forEach(id => {
+  const addUnique = (list, id) => {
+    if (!id) return;
     if (!componentMap.has(id)) return;
-    if (orderedTargets.includes(id)) return;
-    orderedTargets.push(id);
-  });
-  const availableTargets = orderedTargets;
+    if (list.includes(id)) return;
+    list.push(id);
+  };
+
+  const orderedTargets = [];
+  addUnique(orderedTargets, componentId);
+  neighborSet.forEach(id => addUnique(orderedTargets, id));
+
+  const prioritizedTargets = [];
+  sameSheetSelections.forEach(id => addUnique(prioritizedTargets, id));
+
+  const availableTargets = prioritizedTargets.length ? prioritizedTargets : orderedTargets;
   if (!availableTargets.length) {
     onelinePreviewTransform = null;
     onelinePreviewSvg.selectAll('*').remove();
@@ -6973,10 +6978,8 @@ function renderOneLinePreview(componentId) {
 
   const displayedTargets = availableTargets.slice(0, MAX_COMPONENTS);
   const truncatedCount = availableTargets.length - displayedTargets.length;
-  const hiddenSelectionCount = sameSheetSelections.filter(id => {
-    if (id === componentId) return false;
-    return !neighborSet.has(id);
-  }).length;
+  const displayedSet = new Set(displayedTargets);
+  const hiddenSelectionCount = sameSheetSelections.filter(id => !displayedSet.has(id)).length;
 
   const DEFAULT_WIDTH = 120;
   const DEFAULT_HEIGHT = 60;
@@ -7519,10 +7522,11 @@ function renderOneLinePreview(componentId) {
       noteMessages.push(`${offSheetCount} selected ${offSheetCount === 1 ? 'device is' : 'devices are'} on other sheets and are not shown.`);
     }
     if (hiddenSelectionCount > 0) {
-      noteMessages.push(`${hiddenSelectionCount} selected ${hiddenSelectionCount === 1 ? 'device is' : 'devices are'} not directly connected to the active component and are hidden.`);
+      noteMessages.push(`${hiddenSelectionCount} selected ${hiddenSelectionCount === 1 ? 'device is' : 'devices are'} hidden due to preview limits.`);
     }
     if (truncatedCount > 0) {
-      noteMessages.push(`Showing ${displayedTargets.length} of ${availableTargets.length} selected devices.`);
+      const contextLabel = prioritizedTargets.length ? 'selected devices' : 'devices';
+      noteMessages.push(`Showing ${displayedTargets.length} of ${availableTargets.length} ${contextLabel}.`);
     }
     if (!noteMessages.length && selectedEntries.length && !displayedTargets.length) {
       noteMessages.push('No one-line preview available for the current selection.');
