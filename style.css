@@ -5683,29 +5683,41 @@ body.dark-mode .preview-link {
     transform: none !important;
 }
 
-.preview-node image {
+
+.preview-node-rect {
+    fill: var(--card-bg, #ffffff);
+    stroke: rgba(73, 80, 87, 0.6);
+    stroke-width: 2px;
     filter: drop-shadow(0 1px 2px rgba(0, 0, 0, 0.18));
-    transition: filter 0.2s ease, transform 0.2s ease;
+    transition: filter 0.2s ease, stroke 0.2s ease, stroke-width 0.2s ease;
 }
 
-.preview-node.is-active image {
-    filter: drop-shadow(0 0 10px rgba(13, 110, 253, 0.55));
+.preview-node.is-active .preview-node-rect {
+    stroke: #0d6efd;
+    stroke-width: 3px;
+    filter: drop-shadow(0 0 10px rgba(13, 110, 253, 0.45));
 }
 
-.preview-node.is-selected image {
-    filter: drop-shadow(0 0 8px rgba(13, 110, 253, 0.4));
+.preview-node.is-selected .preview-node-rect {
+    stroke: rgba(13, 110, 253, 0.75);
+    stroke-dasharray: 6 4;
+    filter: drop-shadow(0 0 8px rgba(13, 110, 253, 0.35));
 }
 
-body.dark-mode .preview-node image {
-    filter: drop-shadow(0 1px 2px rgba(0, 0, 0, 0.5));
+body.dark-mode .preview-node-rect {
+    fill: var(--card-bg, #212529);
+    stroke: rgba(222, 226, 230, 0.6);
+    filter: drop-shadow(0 1px 3px rgba(0, 0, 0, 0.6));
 }
 
-body.dark-mode .preview-node.is-active image {
-    filter: drop-shadow(0 0 12px rgba(102, 176, 255, 0.7));
+body.dark-mode .preview-node.is-active .preview-node-rect {
+    stroke: #66b0ff;
+    filter: drop-shadow(0 0 12px rgba(102, 176, 255, 0.6));
 }
 
-body.dark-mode .preview-node.is-selected image {
-    filter: drop-shadow(0 0 9px rgba(102, 176, 255, 0.55));
+body.dark-mode .preview-node.is-selected .preview-node-rect {
+    stroke: rgba(102, 176, 255, 0.75);
+    filter: drop-shadow(0 0 10px rgba(102, 176, 255, 0.5));
 }
 
 .preview-node text {
@@ -5715,12 +5727,12 @@ body.dark-mode .preview-node.is-selected image {
     transition: transform 0.2s ease;
 }
 
-.preview-node:not(.is-active):not(.is-selected):hover image,
+.preview-node:not(.is-active):not(.is-selected):hover .preview-node-rect,
 .preview-node:not(.is-active):not(.is-selected):hover text {
     transform: translateY(-2px);
 }
 
-body.dark-mode .preview-node:not(.is-active):not(.is-selected):hover image,
+body.dark-mode .preview-node:not(.is-active):not(.is-selected):hover .preview-node-rect,
 body.dark-mode .preview-node:not(.is-active):not(.is-selected):hover text {
     transform: translateY(-2px);
 }
