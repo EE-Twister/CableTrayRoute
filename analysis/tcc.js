@@ -84,15 +84,10 @@ const contextMenu = createContextMenu();
 const viewCalloutOffsets = new Map();
 
 let onelinePreviewTransform = null;
+const previewPositionOverrides = new Map();
 
 let updatingActiveComponentFromSelect = false;
 
-const baseHref = document.querySelector('base')?.href || new URL('.', window.location.href).href;
-const asset = path => new URL(path, baseHref).href;
-const placeholderIcon = asset('icons/placeholder.svg');
-const componentIconMap = new Map();
-let componentIconLoadPromise = null;
-let componentIconsReady = false;
 
 const TCC_VIEW_OPTIONS = [
   { id: 'none', label: 'No Additional View', field: null, description: 'Hide device settings in the legend.' },
@@ -120,76 +115,6 @@ const CUSTOM_CURVE_SETTING_OPTIONS = TCC_VIEW_OPTIONS
 const CUSTOM_CURVE_SETTING_CONFIG = new Map(
   CUSTOM_CURVE_SETTING_OPTIONS.map(option => [option.field, option])
 );
-
-function resolveIconSource(iconPath, fallbackSymbol) {
-  if (typeof iconPath === 'string' && iconPath.trim()) {
-    const trimmed = iconPath.trim();
-    if (trimmed.startsWith('data:') || /^https?:/i.test(trimmed)) {
-      return trimmed;
-    }
-    return asset(trimmed);
-  }
-  if (fallbackSymbol) {
-    return asset(`icons/components/${fallbackSymbol}.svg`);
-  }
-  return placeholderIcon;
-}
-
-function normalizeComponentKey(value) {
-  return typeof value === 'string' ? value.trim().toLowerCase() : '';
-}
-
-function ensureComponentIcons() {
-  if (componentIconsReady) return componentIconLoadPromise || Promise.resolve(componentIconMap);
-  if (!componentIconLoadPromise) {
-    componentIconLoadPromise = (async () => {
-      try {
-        const response = await fetch(asset('componentLibrary.json'));
-        if (response && response.ok) {
-          const data = await response.json();
-          const components = Array.isArray(data?.components) ? data.components : [];
-          components.forEach(def => {
-            if (!def || typeof def !== 'object') return;
-            const iconHref = resolveIconSource(def.icon, def.symbol);
-            if (!iconHref) return;
-            const subtypeKey = normalizeComponentKey(def.subtype);
-            if (subtypeKey && !componentIconMap.has(subtypeKey)) {
-              componentIconMap.set(subtypeKey, iconHref);
-            }
-            const typeKey = normalizeComponentKey(def.type);
-            if (typeKey) {
-              const mapKey = `type:${typeKey}`;
-              if (!componentIconMap.has(mapKey)) componentIconMap.set(mapKey, iconHref);
-            }
-          });
-        }
-      } catch (err) {
-        console.error('Failed to load component icons', err);
-      } finally {
-        componentIconsReady = true;
-      }
-      return componentIconMap;
-    })();
-    componentIconLoadPromise.then(() => {
-      renderOneLinePreview(getActiveComponentId());
-    });
-  }
-  return componentIconLoadPromise;
-}
-
-function getComponentIcon(component) {
-  if (!component) return placeholderIcon;
-  const subtypeKey = normalizeComponentKey(component.subtype);
-  if (subtypeKey && componentIconMap.has(subtypeKey)) {
-    return componentIconMap.get(subtypeKey);
-  }
-  const typeKey = normalizeComponentKey(component.type);
-  if (typeKey) {
-    const byType = componentIconMap.get(`type:${typeKey}`) || componentIconMap.get(typeKey);
-    if (byType) return byType;
-  }
-  return placeholderIcon;
-}
 
 function normalizeViewOption(id) {
   if (typeof id !== 'string') return 'none';
@@ -809,8 +734,6 @@ annotations = (saved.annotations || []).map(sanitizeAnnotation).filter(Boolean);
 saved.annotations = annotations.map(exportAnnotation);
 
 setPlotAvailability(false);
-
-ensureComponentIcons();
 
 updateViewButtonLabel();
 
@@ -6782,7 +6705,6 @@ function buildPreviewAdjacency(componentMap, sheet) {
 
 function renderOneLinePreview(componentId) {
   if (!onelinePreviewSvgEl || !onelinePreviewSvg) return;
-  ensureComponentIcons();
   if (!componentId || !componentLookup.has(componentId)) {
     onelinePreviewTransform = null;
     onelinePreviewSvg.selectAll('*').remove();
@@ -6867,6 +6789,8 @@ function renderOneLinePreview(componentId) {
 
   const DEFAULT_WIDTH = 120;
   const DEFAULT_HEIGHT = 60;
+  const MIN_NODE_WIDTH = 48;
+  const MIN_NODE_HEIGHT = 32;
 
   const normalizeRotation = value => {
     const numeric = Number(value);
@@ -7009,28 +6933,53 @@ function renderOneLinePreview(componentId) {
     height
   };
 
+  const overrideKeyForComponent = compId => {
+    const sheetKey = sheet?.id || sheet?.key || sheet?.name || record.sheetIndex || 'sheet';
+    return `${sheetKey}:${compId}`;
+  };
+
   const nodes = displayedTargets.map(id => {
     const comp = componentMap.get(id);
     const meta = componentPreviewMeta.get(id);
     if (!comp || !meta) return null;
-    const { bounds, width: compWidth, height: compHeight, rotation, center } = meta;
-    const centerX = center ? center.x * scale + offsetX : ((bounds.left + bounds.right) / 2) * scale + offsetX;
-    const centerY = center ? center.y * scale + offsetY : ((bounds.top + bounds.bottom) / 2) * scale + offsetY;
+    const { bounds, width: compWidth, height: compHeight, rotation, center, spanWidth, spanHeight } = meta;
+    const baseCenterX = center ? center.x * scale + offsetX : ((bounds.left + bounds.right) / 2) * scale + offsetX;
+    const baseCenterY = center ? center.y * scale + offsetY : ((bounds.top + bounds.bottom) / 2) * scale + offsetY;
     const scaledWidth = Math.max(0, (bounds.right - bounds.left) * scale);
     const scaledHeight = Math.max(0, (bounds.bottom - bounds.top) * scale);
+    const fallbackWidth = Number.isFinite(compWidth) ? compWidth * scale : 0;
+    const fallbackHeight = Number.isFinite(compHeight) ? compHeight * scale : 0;
+    const visualWidth = Math.max(
+      MIN_NODE_WIDTH,
+      scaledWidth || (Number.isFinite(spanWidth) ? spanWidth * scale : 0) || fallbackWidth || MIN_NODE_WIDTH
+    );
+    const visualHeight = Math.max(
+      MIN_NODE_HEIGHT,
+      scaledHeight || (Number.isFinite(spanHeight) ? spanHeight * scale : 0) || fallbackHeight || MIN_NODE_HEIGHT
+    );
+    const overrideKey = overrideKeyForComponent(comp.id);
+    const storedOverride = previewPositionOverrides.get(overrideKey);
+    const overrideDx = Number.isFinite(storedOverride?.dx) ? storedOverride.dx : 0;
+    const overrideDy = Number.isFinite(storedOverride?.dy) ? storedOverride.dy : 0;
+    const centerX = baseCenterX + overrideDx;
+    const centerY = baseCenterY + overrideDy;
     return {
       id: comp.id,
       label: componentLabel(comp),
       sheet: record.sheetName,
       x: centerX,
       y: centerY,
+      baseX: baseCenterX,
+      baseY: baseCenterY,
+      overrideKey,
+      overrideDx,
+      overrideDy,
       active: comp.id === componentId,
       component: comp,
       selected: selectedIds.has(comp.id),
-      width: scaledWidth,
-      height: scaledHeight,
-      rotation,
-      baseCenter: center || { x: (bounds.left + bounds.right) / 2, y: (bounds.top + bounds.bottom) / 2 }
+      width: visualWidth,
+      height: visualHeight,
+      rotation
     };
   }).filter(Boolean);
 
@@ -7125,46 +7074,22 @@ function renderOneLinePreview(componentId) {
     .attr('pointer-events', 'bounding-box')
     .style('pointer-events', 'bounding-box');
 
-  const clamp = (value, min, max) => {
-    if (!Number.isFinite(value)) return min;
-    if (value < min) return min;
-    if (value > max) return max;
-    return value;
-  };
-
-  const iconSize = datum => {
-    const baseSpan = Math.max(datum.width || 0, datum.height || 0);
-    const emphasis = datum.active ? 1.15 : datum.selected ? 1.05 : 1;
-    if (!Number.isFinite(baseSpan) || baseSpan <= 0) {
-      return Math.round((datum.active ? 56 : datum.selected ? 50 : 44) * emphasis);
-    }
-    const scaled = clamp(baseSpan, 32, 96);
-    return Math.round(clamp(scaled * emphasis, 32, 108));
-  };
-
-  const iconGroup = node.append('g')
-    .attr('class', 'preview-node-icon-group')
+  const shapeGroup = node.append('g')
+    .attr('class', 'preview-node-shape')
     .attr('transform', d => (d.rotation ? `rotate(${d.rotation})` : null));
 
-  iconGroup.append('image')
-    .attr('class', 'preview-node-icon')
-    .attr('x', d => -(iconSize(d) / 2))
-    .attr('y', d => -(iconSize(d) / 2))
-    .attr('width', d => iconSize(d))
-    .attr('height', d => iconSize(d))
-    .attr('preserveAspectRatio', 'xMidYMid meet')
-    .attr('href', d => getComponentIcon(d.component))
-    .attr('xlink:href', d => getComponentIcon(d.component));
+  shapeGroup.append('rect')
+    .attr('class', 'preview-node-rect')
+    .attr('x', d => -(d.width / 2))
+    .attr('y', d => -(d.height / 2))
+    .attr('width', d => d.width)
+    .attr('height', d => d.height)
+    .attr('rx', d => Math.min(18, Math.max(6, d.height / 4)))
+    .attr('ry', d => Math.min(18, Math.max(6, d.height / 4)));
 
   const labelOffset = datum => {
-    const iconRadius = iconSize(datum) / 2;
-    const componentRadius = Math.max(datum.width || 0, datum.height || 0) / 2;
     const baseGap = datum.active ? 32 : datum.selected ? 28 : 24;
-    const limitedRadius = Number.isFinite(componentRadius)
-      ? Math.min(componentRadius, iconRadius + 32)
-      : iconRadius;
-    const baseDistance = Math.max(iconRadius, limitedRadius);
-    return Math.round(baseDistance + baseGap);
+    return Math.round(datum.height / 2 + baseGap);
   };
 
   const labels = node.append('text')
@@ -7184,6 +7109,36 @@ function renderOneLinePreview(componentId) {
   node.append('title')
     .text(d => (d.sheet ? `${d.label} (${d.sheet})` : d.label));
 
+  const dragBehavior = d3.drag()
+    .on('start', function handlePreviewDragStart(event, datum) {
+      event.sourceEvent?.stopPropagation?.();
+      d3.select(this).classed('is-dragging', true);
+      if (this.parentNode) {
+        this.parentNode.appendChild(this);
+      }
+    })
+    .on('drag', function handlePreviewDrag(event, datum) {
+      const newX = clampValue(event.x, 32, width - 32);
+      const newY = clampValue(event.y, 32, height - 32);
+      datum.x = newX;
+      datum.y = newY;
+      d3.select(this).attr('transform', `translate(${datum.x},${datum.y})`);
+      const dx = datum.x - datum.baseX;
+      const dy = datum.y - datum.baseY;
+      previewPositionOverrides.set(datum.overrideKey, { dx, dy });
+      updateLinks();
+    })
+    .on('end', function handlePreviewDragEnd(event, datum) {
+      d3.select(this).classed('is-dragging', false);
+      const dx = datum.x - datum.baseX;
+      const dy = datum.y - datum.baseY;
+      if (Math.abs(dx) < 1 && Math.abs(dy) < 1) {
+        previewPositionOverrides.delete(datum.overrideKey);
+      }
+    });
+
+  node.call(dragBehavior);
+
   node.filter(d => !d.active)
     .on('click', (event, datum) => {
       event.preventDefault();
@@ -7201,11 +7156,11 @@ function renderOneLinePreview(componentId) {
     if (truncatedCount > 0) {
       noteMessages.push(`Showing ${displayedTargets.length} of ${availableTargets.length} selected devices.`);
     }
-    if (noteMessages.length) {
-      noteMessages.push('Layout matches the one-line diagram; only directly connected devices are displayed.');
-    }
     if (!noteMessages.length && selectedEntries.length && !displayedTargets.length) {
       noteMessages.push('No one-line preview available for the current selection.');
+    }
+    if (displayedTargets.length) {
+      noteMessages.push('Drag devices within the preview to adjust their layout.');
     }
     if (noteMessages.length) {
       onelinePreviewNote.textContent = noteMessages.join(' ');
