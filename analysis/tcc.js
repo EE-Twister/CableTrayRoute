@@ -13,6 +13,7 @@ import { runShortCircuit } from './shortCircuit.mjs';
 import { scaleCurve, checkDuty, sanitizeCurve } from './tccUtils.js';
 import { openModal } from '../src/components/modal.js';
 import conductorProperties from '../conductorPropertiesData.mjs';
+import componentLibrary from '../componentLibrary.json' with { type: 'json' };
 
 const PROTECTIVE_TYPES = new Set(['breaker', 'fuse', 'relay', 'recloser', 'contactor', 'switch']);
 const MOTOR_TYPES = new Set(['motor_load', 'motor', 'motor_starter', 'motor_controller']);
@@ -42,6 +43,196 @@ const CUSTOM_CURVE_VENDOR_FALLBACK = 'Custom Curves';
 const CUSTOM_CURVE_CATEGORY = 'custom curve';
 const CUSTOM_CURVE_DEFAULT_AXES = { currentMin: 10, currentMax: 10000, timeMin: 0.01, timeMax: 100 };
 const CUSTOM_CURVE_DEFAULT_BOUNDS = { left: 0, right: 0, top: 0, bottom: 0 };
+
+const baseHref = document.querySelector('base')?.href || new URL('.', window.location.href).href;
+const asset = path => {
+  if (!path) return null;
+  try {
+    return new URL(path, baseHref).href;
+  } catch {
+    return null;
+  }
+};
+
+const placeholderIcon = asset('icons/placeholder.svg');
+
+function compKey(type, subtype) {
+  const normalizedType = typeof type === 'string' ? type.trim() : '';
+  const normalizedSubtype = typeof subtype === 'string' ? subtype.trim() : '';
+  if (normalizedSubtype && normalizedType) return `${normalizedType}_${normalizedSubtype}`;
+  return normalizedSubtype || normalizedType;
+}
+
+function resolveIconSource(iconPath, fallbackSymbol) {
+  if (typeof iconPath === 'string' && iconPath.trim()) {
+    const trimmed = iconPath.trim();
+    if (trimmed.startsWith('data:') || /^https?:/i.test(trimmed)) {
+      return trimmed;
+    }
+    return asset(trimmed) || placeholderIcon;
+  }
+  if (fallbackSymbol) {
+    return asset(`icons/components/${fallbackSymbol}.svg`) || placeholderIcon;
+  }
+  return placeholderIcon;
+}
+
+const PREVIEW_SHAPE_DASH_PATTERNS = {
+  solid: '',
+  dashed: '8 4',
+  dotted: '2 2'
+};
+
+function normalizeAnnotationPreview(comp) {
+  if (!comp || comp.type !== 'annotation') return null;
+  const subtype = typeof comp.subtype === 'string' ? comp.subtype.trim() : '';
+  const rawProps = comp.props && typeof comp.props === 'object' ? comp.props : {};
+  const pick = key => {
+    const direct = comp[key];
+    if (direct !== undefined && direct !== null && direct !== '') return direct;
+    return rawProps[key];
+  };
+  const shapeTypeRaw = pick('shapeType');
+  const strokeStyleRaw = pick('strokeStyle');
+  const cornerRadiusRaw = pick('cornerRadius');
+  const strokeWidthRaw = pick('strokeWidth');
+  const fillOpacityRaw = pick('fillOpacity');
+  let shapeType = typeof shapeTypeRaw === 'string' ? shapeTypeRaw.trim().toLowerCase() : '';
+  if (shapeType === 'rounded_rectangle') shapeType = 'rounded';
+  if (!['rectangle', 'rounded', 'circle'].includes(shapeType)) shapeType = 'rectangle';
+  let strokeStyle = typeof strokeStyleRaw === 'string' ? strokeStyleRaw.trim().toLowerCase() : 'solid';
+  if (!['solid', 'dashed', 'dotted'].includes(strokeStyle)) strokeStyle = 'solid';
+  let cornerRadius = Number(cornerRadiusRaw);
+  if (!Number.isFinite(cornerRadius) || cornerRadius < 0) cornerRadius = 12;
+  let strokeWidth = Number(strokeWidthRaw);
+  if (!Number.isFinite(strokeWidth) || strokeWidth <= 0) strokeWidth = 2;
+  let fillOpacity = Number(fillOpacityRaw);
+  if (!Number.isFinite(fillOpacity)) fillOpacity = 1;
+  fillOpacity = Math.max(0, Math.min(1, fillOpacity));
+  const strokeColor = typeof pick('strokeColor') === 'string' && pick('strokeColor').trim()
+    ? pick('strokeColor').trim()
+    : '#333333';
+  const fillColor = typeof pick('fillColor') === 'string' && pick('fillColor').trim()
+    ? pick('fillColor').trim()
+    : '#ffffff';
+  const text = typeof pick('text') === 'string' ? pick('text') : (typeof comp.text === 'string' ? comp.text : '');
+  return {
+    subtype,
+    shapeType,
+    strokeStyle,
+    strokeColor,
+    fillColor,
+    fillOpacity,
+    strokeWidth,
+    cornerRadius,
+    text
+  };
+}
+
+function buildComponentPreviewDefinitionMap() {
+  const map = new Map();
+  const register = (definition, { allowOverride = true } = {}) => {
+    if (!definition || typeof definition !== 'object') return;
+    const rawSubtype = typeof definition.subtype === 'string' ? definition.subtype.trim() : '';
+    const rawType = typeof definition.type === 'string' ? definition.type.trim() : '';
+    const rawCategory = typeof definition.category === 'string' ? definition.category.trim() : '';
+    const resolvedType = rawType || rawCategory || rawSubtype;
+    if (!rawSubtype && !resolvedType) return;
+    const meta = {
+      icon: resolveIconSource(definition.icon, definition.symbol),
+      width: Number.isFinite(Number(definition.width)) ? Number(definition.width) : null,
+      height: Number.isFinite(Number(definition.height)) ? Number(definition.height) : null,
+      type: resolvedType,
+      subtype: rawSubtype,
+      category: rawCategory,
+      defaultRotation: Number.isFinite(Number(definition.defaultRotation))
+        ? Number(definition.defaultRotation)
+        : null
+    };
+    const keys = new Set();
+    if (resolvedType && rawSubtype) keys.add(compKey(resolvedType, rawSubtype));
+    if (rawSubtype) keys.add(rawSubtype);
+    if (resolvedType) keys.add(resolvedType);
+    if (rawCategory) keys.add(rawCategory);
+    keys.forEach(key => {
+      if (!key) return;
+      if (!map.has(key) || allowOverride) {
+        map.set(key, meta);
+      }
+    });
+  };
+
+  const definitions = Array.isArray(componentLibrary?.components) ? componentLibrary.components : [];
+  definitions.forEach(def => register(def));
+
+  const fallbackDefinitions = [
+    {
+      type: 'bus',
+      subtype: 'Bus',
+      icon: 'icons/components/Bus.svg',
+      width: 200,
+      height: 20,
+      category: 'bus'
+    },
+    {
+      type: 'equipment',
+      subtype: 'Equipment',
+      icon: 'icons/components/Equipment.svg',
+      width: 120,
+      height: 60,
+      category: 'equipment'
+    },
+    {
+      type: 'motor_load',
+      subtype: 'motor_load',
+      icon: 'icons/components/Motor.svg',
+      width: 100,
+      height: 100,
+      category: 'load'
+    },
+    {
+      type: 'static_load',
+      subtype: 'static_load',
+      icon: 'icons/components/Load.svg',
+      width: 100,
+      height: 100,
+      category: 'load'
+    },
+    {
+      type: 'transformer',
+      subtype: 'two_winding',
+      icon: 'icons/components/Transformer.svg',
+      width: 140,
+      height: 90,
+      category: 'equipment'
+    }
+  ];
+
+  fallbackDefinitions.forEach(def => register(def, { allowOverride: false }));
+
+  return map;
+}
+
+const componentPreviewDefinitionMap = buildComponentPreviewDefinitionMap();
+
+function getPreviewDefinition(comp) {
+  if (!comp) return null;
+  const type = typeof comp.type === 'string' ? comp.type.trim() : '';
+  const subtype = typeof comp.subtype === 'string' ? comp.subtype.trim() : '';
+  const category = typeof comp.category === 'string' ? comp.category.trim() : '';
+  const keys = [
+    compKey(type || category || subtype, subtype),
+    subtype,
+    type,
+    category
+  ];
+  for (const key of keys) {
+    if (!key) continue;
+    const meta = componentPreviewDefinitionMap.get(key);
+    if (meta) return meta;
+  }
+  return null;
+}
 
 let pdfJsLibPromise = null;
 
@@ -6856,14 +7047,27 @@ function renderOneLinePreview(componentId) {
       top: centerY - spanHeight / 2,
       bottom: centerY + spanHeight / 2
     };
+    const definition = getPreviewDefinition(comp);
+    const icon = definition?.icon || resolveIconSource(comp.icon, comp.symbol);
+    const category = definition?.category || definition?.type || comp.type || '';
+    const previewType = definition?.type || comp.type || '';
+    const annotation = normalizeAnnotationPreview(comp);
     componentPreviewMeta.set(id, {
       bounds: adjustedBounds,
       width: compWidth,
       height: compHeight,
+      originalWidth: compWidth,
+      originalHeight: compHeight,
       rotation,
       center: { x: centerX, y: centerY },
       spanWidth,
-      spanHeight
+      spanHeight,
+      icon: icon || placeholderIcon,
+      category,
+      type: previewType,
+      flipped: !!comp.flipped,
+      annotation,
+      definition
     });
   });
 
@@ -6963,6 +7167,10 @@ function renderOneLinePreview(componentId) {
     const overrideDy = Number.isFinite(storedOverride?.dy) ? storedOverride.dy : 0;
     const centerX = baseCenterX + overrideDx;
     const centerY = baseCenterY + overrideDy;
+    const originalWidth = Number.isFinite(meta.originalWidth) ? meta.originalWidth : compWidth;
+    const originalHeight = Number.isFinite(meta.originalHeight) ? meta.originalHeight : compHeight;
+    const widthScale = Number.isFinite(originalWidth) && originalWidth > 0 ? visualWidth / originalWidth : 1;
+    const heightScale = Number.isFinite(originalHeight) && originalHeight > 0 ? visualHeight / originalHeight : 1;
     return {
       id: comp.id,
       label: componentLabel(comp),
@@ -6979,7 +7187,17 @@ function renderOneLinePreview(componentId) {
       selected: selectedIds.has(comp.id),
       width: visualWidth,
       height: visualHeight,
-      rotation
+      rotation,
+      icon: meta.icon || placeholderIcon,
+      category: meta.category || '',
+      type: meta.type || '',
+      flipped: !!meta.flipped,
+      annotation: meta.annotation,
+      definition: meta.definition || null,
+      originalWidth,
+      originalHeight,
+      widthScale,
+      heightScale
     };
   }).filter(Boolean);
 
@@ -7074,37 +7292,172 @@ function renderOneLinePreview(componentId) {
     .attr('pointer-events', 'bounding-box')
     .style('pointer-events', 'bounding-box');
 
+  const computeOutlineRadius = datum => {
+    if (datum.annotation) {
+      if (datum.annotation.shapeType === 'circle') {
+        return Math.min(datum.width, datum.height) / 2;
+      }
+      if (datum.annotation.shapeType === 'rounded') {
+        const baseRadius = Number(datum.annotation.cornerRadius) || 0;
+        const scaleFactor = Math.min(datum.widthScale || 1, datum.heightScale || 1);
+        const scaledRadius = Math.max(0, baseRadius * scaleFactor);
+        return Math.min(Math.min(datum.width, datum.height) / 2, scaledRadius);
+      }
+      return 0;
+    }
+    return Math.min(18, Math.max(6, datum.height / 4));
+  };
+
   const shapeGroup = node.append('g')
     .attr('class', 'preview-node-shape')
-    .attr('transform', d => (d.rotation ? `rotate(${d.rotation})` : null));
+    .attr('transform', d => {
+      const transforms = [];
+      if (d.flipped) transforms.push('scale(-1,1)');
+      if (d.rotation) transforms.push(`rotate(${d.rotation})`);
+      return transforms.length ? transforms.join(' ') : null;
+    });
 
   shapeGroup.append('rect')
-    .attr('class', 'preview-node-rect')
+    .attr('class', 'preview-node-outline')
     .attr('x', d => -(d.width / 2))
     .attr('y', d => -(d.height / 2))
     .attr('width', d => d.width)
     .attr('height', d => d.height)
-    .attr('rx', d => Math.min(18, Math.max(6, d.height / 4)))
-    .attr('ry', d => Math.min(18, Math.max(6, d.height / 4)));
+    .attr('rx', d => computeOutlineRadius(d))
+    .attr('ry', d => computeOutlineRadius(d))
+    .attr('fill', 'transparent');
+
+  const standardShapeGroup = shapeGroup.filter(d => !d.annotation);
+
+  standardShapeGroup.append('image')
+    .attr('class', 'preview-node-icon')
+    .attr('href', d => d.icon || placeholderIcon)
+    .attr('x', d => -(d.width / 2))
+    .attr('y', d => -(d.height / 2))
+    .attr('width', d => d.width)
+    .attr('height', d => d.height)
+    .attr('preserveAspectRatio', d => (d.category === 'bus' ? 'none' : 'xMidYMid meet'));
+
+  standardShapeGroup.filter(d => d.component?.subtype === 'motor_load')
+    .append('text')
+    .attr('class', 'preview-node-icon-letter')
+    .attr('text-anchor', 'middle')
+    .attr('dominant-baseline', 'middle')
+    .attr('y', 4)
+    .attr('transform', d => (d.rotation ? `rotate(${-d.rotation})` : null))
+    .text('M');
+
+  const annotationShapeGroup = shapeGroup.filter(d => d.annotation);
+
+  annotationShapeGroup.each(function renderAnnotationShape(datum) {
+    const group = d3.select(this);
+    const config = datum.annotation;
+    if (!config) return;
+    if (config.subtype === 'annotation_text_box') {
+      group.append('rect')
+        .attr('class', 'preview-annotation-box')
+        .attr('x', -(datum.width / 2))
+        .attr('y', -(datum.height / 2))
+        .attr('width', datum.width)
+        .attr('height', datum.height)
+        .attr('rx', 8)
+        .attr('ry', 8);
+      const content = (config.text && config.text.trim()) || datum.label || '';
+      const lines = content
+        ? content.split(/\r?\n/).map(line => line.trim()).filter(Boolean)
+        : [];
+      if (lines.length) {
+        const textEl = group.append('text')
+          .attr('class', 'preview-annotation-text')
+          .attr('text-anchor', 'middle')
+          .attr('dominant-baseline', 'middle');
+        const lineHeight = 14;
+        const offset = ((lines.length - 1) * lineHeight) / 2;
+        lines.forEach((line, index) => {
+          textEl.append('tspan')
+            .attr('x', 0)
+            .attr('y', index === 0 ? -offset : undefined)
+            .attr('dy', index === 0 ? 0 : lineHeight)
+            .text(line);
+        });
+      }
+      return;
+    }
+
+    const dash = PREVIEW_SHAPE_DASH_PATTERNS[config.strokeStyle] || '';
+    const strokeColor = config.strokeColor || '#333333';
+    const strokeWidth = Number.isFinite(config.strokeWidth) ? config.strokeWidth : 2;
+    const fillColor = config.fillColor && config.fillColor !== 'none' && config.fillColor !== 'transparent'
+      ? config.fillColor
+      : 'none';
+    const fillOpacity = fillColor === 'none' ? 0 : config.fillOpacity;
+    if (config.shapeType === 'circle') {
+      group.append('ellipse')
+        .attr('class', 'preview-annotation-shape')
+        .attr('cx', 0)
+        .attr('cy', 0)
+        .attr('rx', datum.width / 2)
+        .attr('ry', datum.height / 2)
+        .attr('fill', fillColor)
+        .attr('fill-opacity', fillOpacity)
+        .attr('stroke', strokeColor)
+        .attr('stroke-width', strokeWidth)
+        .attr('stroke-dasharray', dash || null)
+        .attr('stroke-linecap', config.strokeStyle === 'dotted' ? 'round' : null);
+    } else {
+      const radius = config.shapeType === 'rounded'
+        ? Math.min(
+          Math.min(datum.width, datum.height) / 2,
+          Math.max(0, (config.cornerRadius || 0) * Math.min(datum.widthScale || 1, datum.heightScale || 1))
+        )
+        : 0;
+      group.append('rect')
+        .attr('class', 'preview-annotation-shape')
+        .attr('x', -(datum.width / 2))
+        .attr('y', -(datum.height / 2))
+        .attr('width', datum.width)
+        .attr('height', datum.height)
+        .attr('rx', radius)
+        .attr('ry', radius)
+        .attr('fill', fillColor)
+        .attr('fill-opacity', fillOpacity)
+        .attr('stroke', strokeColor)
+        .attr('stroke-width', strokeWidth)
+        .attr('stroke-dasharray', dash || null)
+        .attr('stroke-linecap', config.strokeStyle === 'dotted' ? 'round' : null);
+    }
+  });
 
   const labelOffset = datum => {
     const baseGap = datum.active ? 32 : datum.selected ? 28 : 24;
     return Math.round(datum.height / 2 + baseGap);
   };
 
-  const labels = node.append('text')
+  const labelLinesFor = datum => {
+    if (datum.annotation && datum.annotation.subtype === 'annotation_text_box') return [];
+    return wrapPreviewLabel(datum.label);
+  };
+
+  node.append('text')
     .attr('class', 'preview-node-label')
     .attr('text-anchor', 'middle')
     .attr('dominant-baseline', 'hanging')
-    .attr('y', d => labelOffset(d));
-
-  labels.selectAll('tspan')
-    .data(d => wrapPreviewLabel(d.label))
-    .enter()
-    .append('tspan')
-    .attr('x', 0)
-    .attr('dy', (line, index) => (index === 0 ? 0 : 16))
-    .text(line => line);
+    .attr('y', d => labelOffset(d))
+    .each(function renderLabel(datum) {
+      const lines = labelLinesFor(datum);
+      if (!lines.length) {
+        d3.select(this).attr('display', 'none');
+        return;
+      }
+      const label = d3.select(this);
+      label.selectAll('tspan')
+        .data(lines)
+        .enter()
+        .append('tspan')
+        .attr('x', 0)
+        .attr('dy', (line, index) => (index === 0 ? 0 : 16))
+        .text(line => line);
+    });
 
   node.append('title')
     .text(d => (d.sheet ? `${d.label} (${d.sheet})` : d.label));
@@ -7112,14 +7465,27 @@ function renderOneLinePreview(componentId) {
   const dragBehavior = d3.drag()
     .on('start', function handlePreviewDragStart(event, datum) {
       event.sourceEvent?.stopPropagation?.();
+      const target = onelinePreviewSvg?.node?.();
+      if (target) {
+        const pointerEvent = event?.sourceEvent || event;
+        const [pointerX, pointerY] = d3.pointer(pointerEvent, target);
+        datum.__dragOffsetX = datum.x - pointerX;
+        datum.__dragOffsetY = datum.y - pointerY;
+      }
       d3.select(this).classed('is-dragging', true);
       if (this.parentNode) {
         this.parentNode.appendChild(this);
       }
     })
     .on('drag', function handlePreviewDrag(event, datum) {
-      const newX = clampValue(event.x, 32, width - 32);
-      const newY = clampValue(event.y, 32, height - 32);
+      const target = onelinePreviewSvg?.node?.();
+      if (!target) return;
+      const pointerEvent = event?.sourceEvent || event;
+      const [pointerX, pointerY] = d3.pointer(pointerEvent, target);
+      const offsetX = Number.isFinite(datum.__dragOffsetX) ? datum.__dragOffsetX : 0;
+      const offsetY = Number.isFinite(datum.__dragOffsetY) ? datum.__dragOffsetY : 0;
+      const newX = clampValue(pointerX + offsetX, 32, width - 32);
+      const newY = clampValue(pointerY + offsetY, 32, height - 32);
       datum.x = newX;
       datum.y = newY;
       d3.select(this).attr('transform', `translate(${datum.x},${datum.y})`);
@@ -7135,6 +7501,8 @@ function renderOneLinePreview(componentId) {
       if (Math.abs(dx) < 1 && Math.abs(dy) < 1) {
         previewPositionOverrides.delete(datum.overrideKey);
       }
+      delete datum.__dragOffsetX;
+      delete datum.__dragOffsetY;
     });
 
   node.call(dragBehavior);
