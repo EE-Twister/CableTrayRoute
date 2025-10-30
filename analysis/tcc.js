@@ -6928,11 +6928,12 @@ function renderOneLinePreview(componentId) {
     return info && info.sheetIndex === record.sheetIndex;
   });
   const offSheetCount = Math.max(0, selectedEntries.length - sameSheetSelections.length);
-  const MAX_COMPONENTS = 20;
   const adjacency = buildPreviewAdjacency(componentMap, sheet);
   const neighborSet = componentId && adjacency.has(componentId)
     ? adjacency.get(componentId)
     : new Set();
+  const neighborCount = neighborSet.size + 1; // include the active component itself
+  const MAX_COMPONENTS = Math.max(20, neighborCount);
   const addUnique = (list, id) => {
     if (!id) return;
     if (!componentMap.has(id)) return;
@@ -6946,6 +6947,7 @@ function renderOneLinePreview(componentId) {
 
   const prioritizedTargets = [];
   addUnique(prioritizedTargets, componentId);
+  neighborSet.forEach(id => addUnique(prioritizedTargets, id));
   sameSheetSelections.forEach(id => addUnique(prioritizedTargets, id));
 
   const availableTargets = prioritizedTargets.length ? prioritizedTargets : orderedTargets;
@@ -6973,6 +6975,23 @@ function renderOneLinePreview(componentId) {
   const height = Number(onelinePreviewSvgEl.getAttribute('height')) || 280;
   onelinePreviewSvg.attr('viewBox', `0 0 ${width} ${height}`);
   onelinePreviewSvg.selectAll('*').remove();
+  const gridPatternId = 'oneline-preview-grid-pattern';
+  const gridSize = 24;
+  const defs = onelinePreviewSvg.append('defs');
+  defs.append('pattern')
+    .attr('id', gridPatternId)
+    .attr('patternUnits', 'userSpaceOnUse')
+    .attr('width', gridSize)
+    .attr('height', gridSize)
+    .append('path')
+    .attr('class', 'oneline-preview-grid-line')
+    .attr('d', `M ${gridSize} 0 L 0 0 0 ${gridSize}`);
+
+  onelinePreviewSvg.append('rect')
+    .attr('class', 'oneline-preview-grid')
+    .attr('width', width)
+    .attr('height', height)
+    .attr('fill', `url(#${gridPatternId})`);
   onelinePreviewSvgEl.classList.remove('hidden');
   if (onelinePreviewContainer) onelinePreviewContainer.classList.remove('empty');
   if (onelinePreviewEmpty) onelinePreviewEmpty.classList.add('hidden');

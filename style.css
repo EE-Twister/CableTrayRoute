@@ -5674,7 +5674,7 @@ body.dark-mode .preview-link-label {
 .preview-node {
     cursor: grab;
     user-select: none;
-    pointer-events: bounding-box;
+    pointer-events: all;
 }
 
 .preview-node.is-dragging,
@@ -5738,6 +5738,15 @@ body.dark-mode .preview-node-icon-letter {
     font-size: 0.75rem;
     text-anchor: middle;
     pointer-events: none;
+}
+
+.oneline-preview-grid-line {
+    stroke: rgba(33, 33, 33, 0.12);
+    stroke-width: 0.75;
+}
+
+body.dark-mode .oneline-preview-grid-line {
+    stroke: rgba(255, 255, 255, 0.1);
 }
 
 .preview-annotation-box {
