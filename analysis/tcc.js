@@ -6945,6 +6945,7 @@ function renderOneLinePreview(componentId) {
   neighborSet.forEach(id => addUnique(orderedTargets, id));
 
   const prioritizedTargets = [];
+  addUnique(prioritizedTargets, componentId);
   sameSheetSelections.forEach(id => addUnique(prioritizedTargets, id));
 
   const availableTargets = prioritizedTargets.length ? prioritizedTargets : orderedTargets;
