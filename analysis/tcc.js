@@ -83,6 +83,13 @@ const PREVIEW_SHAPE_DASH_PATTERNS = {
   dotted: '2 2'
 };
 
+const clampValue = (value, min, max) => {
+  if (!Number.isFinite(value)) return min;
+  if (value < min) return min;
+  if (value > max) return max;
+  return value;
+};
+
 function normalizeAnnotationPreview(comp) {
   if (!comp || comp.type !== 'annotation') return null;
   const subtype = typeof comp.subtype === 'string' ? comp.subtype.trim() : '';
@@ -6707,13 +6714,6 @@ function plot() {
     .on('pointerleave.crosshair', hideCrosshair);
 
   hideCrosshair();
-
-  const clampValue = (value, min, max) => {
-    if (!Number.isFinite(value)) return min;
-    if (value < min) return min;
-    if (value > max) return max;
-    return value;
-  };
 
   const updateDeviceInputs = entry => {
     if (!settingsDiv) return;
