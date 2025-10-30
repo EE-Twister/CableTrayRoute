@@ -7467,7 +7467,8 @@ function renderOneLinePreview(componentId) {
       event.sourceEvent?.stopPropagation?.();
       const target = onelinePreviewSvg?.node?.();
       if (target) {
-        const [pointerX, pointerY] = d3.pointer(event, target);
+        const pointerEvent = event?.sourceEvent || event;
+        const [pointerX, pointerY] = d3.pointer(pointerEvent, target);
         datum.__dragOffsetX = datum.x - pointerX;
         datum.__dragOffsetY = datum.y - pointerY;
       }
@@ -7479,7 +7480,8 @@ function renderOneLinePreview(componentId) {
     .on('drag', function handlePreviewDrag(event, datum) {
       const target = onelinePreviewSvg?.node?.();
       if (!target) return;
-      const [pointerX, pointerY] = d3.pointer(event, target);
+      const pointerEvent = event?.sourceEvent || event;
+      const [pointerX, pointerY] = d3.pointer(pointerEvent, target);
       const offsetX = Number.isFinite(datum.__dragOffsetX) ? datum.__dragOffsetX : 0;
       const offsetY = Number.isFinite(datum.__dragOffsetY) ? datum.__dragOffsetY : 0;
       const newX = clampValue(pointerX + offsetX, 32, width - 32);
