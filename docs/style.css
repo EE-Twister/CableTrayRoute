@@ -220,44 +220,6 @@
   font-weight: 600;
 }
 
-.device-model-btn {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 0.5rem;
-  padding: 0.5rem 0.75rem;
-  border-radius: 6px;
-  border: 1px solid transparent;
-  background: transparent;
-  color: var(--text-color);
-  cursor: pointer;
-  text-align: left;
-  transition: background 0.2s ease, border-color 0.2s ease, color 0.2s ease;
-}
-
-.device-model-btn:hover,
-.device-model-btn:focus {
-  background: var(--ol-hover-bg, rgba(59, 130, 246, 0.12));
-  border-color: var(--border-color, #d1d5db);
-  outline: none;
-}
-
-.device-model-btn.active {
-  border-color: var(--accent-color, #3b82f6);
-  background: rgba(59, 130, 246, 0.18);
-  color: var(--accent-color, #3b82f6);
-  font-weight: 600;
-}
-
-.device-model-btn.device-model-unavailable {
-  opacity: 0.65;
-}
-
-.device-model-btn.device-model-unavailable:hover,
-.device-model-btn.device-model-unavailable:focus {
-  opacity: 0.65;
-}
-
 .device-model-list {
   display: flex;
   flex-direction: column;
@@ -286,6 +248,23 @@
 .device-model-item.active {
   border-color: var(--accent-color, #3b82f6);
   background: rgba(59, 130, 246, 0.18);
+}
+
+.device-model-item.is-selected {
+  border-color: var(--accent-color, #3b82f6);
+}
+
+.device-model-item.is-selected:not(.active) {
+  background: rgba(59, 130, 246, 0.12);
+}
+
+.device-model-item.device-model-unavailable {
+  opacity: 0.65;
+}
+
+.device-model-item.device-model-unavailable:hover,
+.device-model-item.device-model-unavailable:focus-within {
+  opacity: 0.65;
 }
 
 .device-model-item input[type="checkbox"] {
@@ -5674,7 +5653,7 @@ body.dark-mode .preview-link-label {
 .preview-node {
     cursor: grab;
     user-select: none;
-    pointer-events: bounding-box;
+    pointer-events: all;
 }
 
 .preview-node.is-dragging,

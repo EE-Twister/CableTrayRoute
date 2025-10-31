@@ -3825,6 +3825,19 @@ async function openComponentBrowserModal() {
   const typeGroups = buildTypeGroups(componentEntries);
   const currentContextId = getActiveComponentId() || activeComponentId || compId;
   const initialEntry = (currentContextId && componentEntryMap.get(currentContextId)) || componentEntries[0] || null;
+  const initialSelection = new Set(selectedDeviceIds());
+  const selectionSet = new Set(initialSelection);
+  const sanitizeSelectionSet = () => {
+    componentEntries.forEach(entry => {
+      if (
+        entry.kind === 'component'
+        && entry.plotDisabledReason
+        && selectionSet.has(entry.uid)
+      ) {
+        selectionSet.delete(entry.uid);
+      }
+    });
+  };
   let activeEntry = initialEntry;
   let activeTypeId = initialEntry ? getTypeInfo(initialEntry).id : typeGroups[0]?.id || null;
   let activeManufacturer = initialEntry ? getManufacturerLabel(initialEntry) : null;
@@ -3855,40 +3868,118 @@ async function openComponentBrowserModal() {
   let modelsHeading;
   const firstButtonRef = { current: null };
 
-  const commitSelection = entry => {
-    if (!entry || entry.kind !== 'component' || !entry.componentId) {
-      return false;
+  const updateModelSelectionIndicators = () => {
+    modelElements.forEach(({ item, checkbox, entry: itemEntry }) => {
+      const selected = selectionSet.has(itemEntry.uid);
+      if (item) {
+        item.classList.toggle('is-selected', selected);
+      }
+      if (checkbox) {
+        checkbox.checked = selected;
+      }
+    });
+  };
+
+  const setEntrySelection = (entry, selected) => {
+    if (!entry || !entry.uid) return;
+    if (entry.plotDisabledReason) return;
+    if (selected) {
+      selectionSet.add(entry.uid);
+    } else {
+      selectionSet.delete(entry.uid);
     }
-    if (entry.plotDisabledReason) {
-      return false;
+    updateModelSelectionIndicators();
+    if (activeEntry && entry.uid === activeEntry.uid) {
+      updateActiveEntry(entry);
     }
-    setActiveComponent(entry.componentId, { preserveSelection: true });
-    return true;
+  };
+
+  const getSelectedComponentEntries = () => [...selectionSet]
+    .map(id => deviceMap.get(id))
+    .filter(entry => (
+      entry
+      && entry.kind === 'component'
+      && entry.componentId
+      && !entry.plotDisabledReason
+    ));
+
+  const applySelection = (activeComponentOverride = null) => {
+    const componentSelectionsBefore = getSelectedComponentEntries();
+    const activeEntrySelected = activeEntry && selectionSet.has(activeEntry.uid);
+    if (activeComponentOverride) {
+      const overrideEntry = componentEntryMap.get(activeComponentOverride);
+      if (overrideEntry && !overrideEntry.plotDisabledReason) {
+        selectionSet.add(overrideEntry.uid);
+      }
+    } else if (
+      activeEntry
+      && activeEntry.kind === 'component'
+      && activeEntry.componentId
+      && !activeEntry.plotDisabledReason
+      && !activeEntrySelected
+      && componentSelectionsBefore.length === 0
+    ) {
+      selectionSet.add(activeEntry.uid);
+    }
+    sanitizeSelectionSet();
+    const selectedIds = Array.from(selectionSet);
+    const orderMap = new Map([...deviceSelect.options].map((option, index) => [option.value, index]));
+    selectedIds.sort((a, b) => {
+      const orderA = orderMap.has(a) ? orderMap.get(a) : Number.MAX_SAFE_INTEGER;
+      const orderB = orderMap.has(b) ? orderMap.get(b) : Number.MAX_SAFE_INTEGER;
+      return orderA - orderB;
+    });
+    const selectedComponents = getSelectedComponentEntries();
+    const preferredComponentId = activeComponentOverride
+      || (activeEntry && activeEntry.kind === 'component' && activeEntry.componentId && !activeEntry.plotDisabledReason
+        ? activeEntry.componentId
+        : null)
+      || selectedComponents[0]?.componentId
+      || null;
+    if (preferredComponentId) {
+      setActiveComponent(preferredComponentId, { preserveSelection: true });
+    }
+    applySelectionSet(selectedIds, { persist: true });
+    plot();
+    return { appliedSelection: selectedIds, activeComponentId: preferredComponentId };
   };
 
   function updateActiveEntry(entry) {
     activeEntry = entry || null;
     modelElements.forEach(({ item, entry: itemEntry }, uid) => {
       const isActive = !!entry && uid === entry.uid;
-      item.classList.toggle('active', isActive);
-      item.setAttribute('aria-pressed', String(isActive));
-      item.tabIndex = isActive ? 0 : -1;
-      if (itemEntry?.plotDisabledReason) {
-        item.classList.add('device-model-unavailable');
-        item.title = itemEntry.plotDisabledReason;
-      } else {
-        item.classList.remove('device-model-unavailable');
-        item.removeAttribute('title');
+      if (item) {
+        item.classList.toggle('active', isActive);
+        item.setAttribute('aria-pressed', String(isActive));
+        item.tabIndex = isActive ? 0 : -1;
+        if (itemEntry?.plotDisabledReason) {
+          item.classList.add('device-model-unavailable');
+          item.title = itemEntry.plotDisabledReason;
+        } else {
+          item.classList.remove('device-model-unavailable');
+          item.removeAttribute('title');
+        }
       }
     });
     renderDeviceDetails(entry, detailContainer, docRef.current);
     if (controllerRef.current && typeof controllerRef.current.setPrimaryDisabled === 'function') {
-      const disable = !(entry && entry.kind === 'component' && entry.componentId && !entry.plotDisabledReason);
-      controllerRef.current.setPrimaryDisabled(disable);
+      controllerRef.current.setPrimaryDisabled(false);
     }
     if (entry && entry.kind === 'component' && detailContainer && docRef.current) {
       const actions = docRef.current.createElement('div');
       actions.className = 'device-detail-actions';
+      const toggleBtn = docRef.current.createElement('button');
+      toggleBtn.type = 'button';
+      toggleBtn.className = 'btn primary-btn';
+      const selected = selectionSet.has(entry.uid);
+      toggleBtn.textContent = selected ? 'Remove from Plot' : 'Add to Plot';
+      toggleBtn.disabled = !!entry.plotDisabledReason;
+      toggleBtn.addEventListener('click', () => {
+        if (entry.plotDisabledReason) return;
+        const nextSelected = !selectionSet.has(entry.uid);
+        setEntrySelection(entry, nextSelected);
+      });
+      actions.appendChild(toggleBtn);
       const openLink = docRef.current.createElement('a');
       openLink.className = 'btn secondary-btn';
       openLink.href = `oneline.html?component=${encodeURIComponent(entry.componentId)}`;
@@ -3898,6 +3989,7 @@ async function openComponentBrowserModal() {
       actions.appendChild(openLink);
       detailContainer.appendChild(actions);
     }
+    updateModelSelectionIndicators();
   }
 
   function getActiveTypeGroup() {
@@ -3918,7 +4010,8 @@ async function openComponentBrowserModal() {
         if (activeTypeId === group.id) return;
         activeTypeId = group.id;
         const manufacturer = ensureManufacturerForGroup(group);
-        activeEntry = manufacturer?.entries[0] || null;
+        const selectedInGroup = manufacturer?.entries.find(item => selectionSet.has(item.uid)) || null;
+        activeEntry = selectedInGroup || manufacturer?.entries[0] || null;
         renderDeviceTypes();
         renderManufacturers();
         renderModels();
@@ -3953,7 +4046,8 @@ async function openComponentBrowserModal() {
       button.addEventListener('click', () => {
         if (activeManufacturer === manufacturer.name) return;
         activeManufacturer = manufacturer.name;
-        activeEntry = manufacturer.entries[0] || null;
+        const selectedInManufacturer = manufacturer.entries.find(entry => selectionSet.has(entry.uid));
+        activeEntry = selectedInManufacturer || manufacturer.entries[0] || null;
         renderManufacturers();
         renderModels();
         updateActiveEntry(activeEntry);
@@ -3981,61 +4075,82 @@ async function openComponentBrowserModal() {
       return;
     }
     modelsHeading.textContent = `One-Line Devices – ${manufacturer.name}`;
-    manufacturer.entries.forEach(entry => {
-      const button = doc.createElement('button');
-      button.type = 'button';
-      button.className = 'device-model-btn';
-      button.dataset.uid = entry.uid;
-      button.textContent = entry.name;
+    manufacturer.entries.forEach((entry, index) => {
+      const item = doc.createElement('div');
+      item.className = 'device-model-item';
+      item.dataset.uid = entry.uid;
+      item.setAttribute('role', 'button');
+      const checkbox = doc.createElement('input');
+      checkbox.type = 'checkbox';
+      checkbox.className = 'device-model-checkbox';
+      const safeId = `component-model-${index}-${entry.uid.replace(/[^a-zA-Z0-9_-]/g, '_')}`;
+      checkbox.id = safeId;
+      checkbox.checked = selectionSet.has(entry.uid);
       if (entry.plotDisabledReason) {
-        button.classList.add('device-model-unavailable');
-        button.title = entry.plotDisabledReason;
+        item.classList.add('device-model-unavailable');
+        item.title = entry.plotDisabledReason;
+        checkbox.disabled = true;
       }
+      checkbox.addEventListener('click', event => {
+        event.stopPropagation();
+      });
+      checkbox.addEventListener('change', event => {
+        event.stopPropagation();
+        setEntrySelection(entry, checkbox.checked);
+      });
+
+      const label = doc.createElement('label');
+      label.className = 'device-model-label';
+      label.setAttribute('for', safeId);
+      label.textContent = entry.name;
+      label.addEventListener('mouseenter', () => updateActiveEntry(entry));
+      label.addEventListener('focus', () => updateActiveEntry(entry));
+
+      const badge = doc.createElement('span');
+      badge.className = 'device-model-badge';
+      badge.textContent = 'One-Line';
+
       const isActive = !!activeEntry && entry.uid === activeEntry.uid;
-      button.classList.toggle('active', isActive);
-      button.setAttribute('aria-pressed', String(isActive));
-      button.tabIndex = isActive ? 0 : -1;
-      button.addEventListener('click', () => {
+      item.classList.toggle('active', isActive);
+      item.setAttribute('aria-pressed', String(isActive));
+      item.tabIndex = isActive ? 0 : -1;
+      item.addEventListener('click', () => {
         if (activeEntry && activeEntry.uid === entry.uid) return;
-        activeEntry = entry;
         updateActiveEntry(entry);
       });
-      button.addEventListener('dblclick', () => {
-        if (commitSelection(entry) && controllerRef.current && typeof controllerRef.current.close === 'function') {
-          controllerRef.current.close(entry.componentId);
+      item.addEventListener('focus', () => {
+        if (activeEntry && activeEntry.uid === entry.uid) return;
+        updateActiveEntry(entry);
+      });
+      item.addEventListener('keydown', event => {
+        if (event.key === 'Enter' || event.key === ' ') {
+          event.preventDefault();
+          updateActiveEntry(entry);
         }
       });
-      if (!firstButtonRef.current) firstButtonRef.current = button;
-      modelElements.set(entry.uid, { item: button, entry });
-      modelContainer.appendChild(button);
+      item.addEventListener('dblclick', event => {
+        event.preventDefault();
+        if (entry.plotDisabledReason) return;
+        setEntrySelection(entry, true);
+        const payload = applySelection(entry.componentId);
+        if (controllerRef.current && typeof controllerRef.current.close === 'function') {
+          controllerRef.current.close(payload);
+        }
+      });
+
+      item.append(checkbox, label, badge);
+      if (!firstButtonRef.current) firstButtonRef.current = item;
+      modelElements.set(entry.uid, { item, entry, checkbox });
+      modelContainer.appendChild(item);
     });
+    updateModelSelectionIndicators();
   }
 
   const modalPromise = openModal({
     title: 'One-Line Components',
-    primaryText: 'Plot Component',
+    primaryText: 'Apply Selection',
     secondaryText: 'Close',
-    onSubmit: controller => {
-      if (
-        !activeEntry
-        || activeEntry.kind !== 'component'
-        || !activeEntry.componentId
-        || activeEntry.plotDisabledReason
-      ) {
-        if (controller && typeof controller.setPrimaryDisabled === 'function') {
-          controller.setPrimaryDisabled(true);
-        }
-        return false;
-      }
-      const committed = commitSelection(activeEntry);
-      if (!committed) {
-        if (controller && typeof controller.setPrimaryDisabled === 'function') {
-          controller.setPrimaryDisabled(true);
-        }
-        return false;
-      }
-      return activeEntry.componentId;
-    },
+    onSubmit: () => applySelection(),
     onCancel: () => {
       if (componentModalBtn) componentModalBtn.setAttribute('aria-expanded', 'false');
     },
@@ -4044,13 +4159,7 @@ async function openComponentBrowserModal() {
       docRef.current = doc;
       controllerRef.current = controller;
       if (controller && typeof controller.setPrimaryDisabled === 'function') {
-        const disable = !(
-          activeEntry
-          && activeEntry.kind === 'component'
-          && activeEntry.componentId
-          && !activeEntry.plotDisabledReason
-        );
-        controller.setPrimaryDisabled(disable);
+        controller.setPrimaryDisabled(false);
       }
       container.classList.add('device-selection-modal');
 
@@ -4096,23 +4205,11 @@ async function openComponentBrowserModal() {
     }
   });
 
-  let resolvedComponentId = null;
   try {
-    resolvedComponentId = await modalPromise;
+    await modalPromise;
   } finally {
     controllerRef.current = null;
     if (componentModalBtn) componentModalBtn.setAttribute('aria-expanded', 'false');
-  }
-
-  if (resolvedComponentId) {
-    if (getActiveComponentId() !== resolvedComponentId) {
-      setActiveComponent(resolvedComponentId, { preserveSelection: true });
-    } else {
-      renderOneLinePreview(resolvedComponentId);
-      if (selectedDeviceIds().length) {
-        plot();
-      }
-    }
   }
 }
 
@@ -4189,7 +4286,7 @@ async function openCustomCurveBuilder(curveId = null) {
     { value: 'standard', label: 'General curve' },
     { value: 'melting', label: 'Melting (minimum melt)' },
     { value: 'clearing', label: 'Clearing (total clearing)' },
-    { value: 'symmetrical_rms_peak', label: 'Symmetrical RMS peak-let-thru' }
+    { value: 'symmetrical_rms_peak', label: 'Peak let-through (symmetrical RMS)' }
   ];
 
   const normalizeVariantRole = value => {
@@ -4204,7 +4301,7 @@ async function openCustomCurveBuilder(curveId = null) {
   const defaultVariantName = (index, role = 'standard') => {
     if (role === 'melting') return 'Melting curve';
     if (role === 'clearing') return 'Clearing curve';
-    if (role === 'symmetrical_rms_peak') return 'Symmetrical RMS peak-let-thru curve';
+    if (role === 'symmetrical_rms_peak') return 'Peak let-through curve';
     return `Curve ${index + 1}`;
   };
 
@@ -6462,6 +6559,16 @@ function plot() {
       .attr('stroke-width', 1)
       .attr('stroke-opacity', 0.6)
       .attr('stroke-dasharray', '4,4');
+    entry.peakPath = deviceLayer.append('path')
+      .datum(scaled.peakCurve || [])
+      .attr('fill', 'none')
+      .attr('stroke-width', 1.5)
+      .attr('stroke-linecap', 'round')
+      .attr('stroke-dasharray', '6,4')
+      .attr('stroke', entry.color)
+      .attr('opacity', 0.85)
+      .attr('d', (Array.isArray(scaled.peakCurve) && scaled.peakCurve.length) ? line(scaled.peakCurve) : null)
+      .style('display', Array.isArray(scaled.peakCurve) && scaled.peakCurve.length ? null : 'none');
     entry.path = deviceLayer.append('path')
       .datum(scaled.curve)
       .attr('fill', 'none')
@@ -6690,6 +6797,24 @@ function plot() {
         .datum(maxCurve)
         .attr('d', maxCurve.length ? line(maxCurve) : null)
         .attr('stroke', entry.color);
+      const peakCurve = Array.isArray(entry.scaled?.peakCurve) ? entry.scaled.peakCurve : [];
+      if (entry.peakPath) {
+        entry.peakPath
+          .datum(peakCurve)
+          .attr('d', peakCurve.length ? line(peakCurve) : null)
+          .attr('stroke', entry.color)
+          .style('display', peakCurve.length ? null : 'none');
+      } else if (peakCurve.length) {
+        entry.peakPath = deviceLayer.append('path')
+          .datum(peakCurve)
+          .attr('fill', 'none')
+          .attr('stroke-width', 1.5)
+          .attr('stroke-linecap', 'round')
+          .attr('stroke-dasharray', '6,4')
+          .attr('stroke', entry.color)
+          .attr('opacity', 0.85)
+          .attr('d', line(peakCurve));
+      }
       entry.path
         .datum(mainCurve)
         .attr('d', mainCurve.length ? line(mainCurve) : null)
