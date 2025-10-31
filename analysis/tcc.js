@@ -3931,7 +3931,10 @@ async function openComponentBrowserModal() {
     });
     const selectedComponents = getSelectedComponentEntries();
     const preferredComponentId = activeComponentOverride
-      || (activeEntry && activeEntry.kind === 'component' && activeEntry.componentId && !activeEntry.plotDisabledReason
+      || (activeEntrySelected
+        && activeEntry.kind === 'component'
+        && activeEntry.componentId
+        && !activeEntry.plotDisabledReason
         ? activeEntry.componentId
         : null)
       || selectedComponents[0]?.componentId
