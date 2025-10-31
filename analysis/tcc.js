@@ -766,7 +766,7 @@ function sanitizeCustomCurveSettings(raw = {}) {
   return sanitized;
 }
 
-const CUSTOM_CURVE_ALLOWED_ROLES = new Set(['melting', 'clearing']);
+const CUSTOM_CURVE_ALLOWED_ROLES = new Set(['melting', 'clearing', 'symmetrical_rms_peak']);
 
 function normalizeCustomCurveRole(value) {
   if (typeof value !== 'string') return null;
@@ -2146,11 +2146,11 @@ function describeComponentPlotAvailability(component, baseDevice) {
     }
     return null;
   }
+  const basePhases = parsePhases(component.phases);
   const isCable = normalizedType.includes('cable')
     || normalizedSubtype.includes('cable')
     || normalizedBase.includes('cable');
   if (isCable) {
-    const basePhases = parsePhases(component.phases);
     const phaseCount = basePhases.length || 3;
     const attemptCurve = (descriptor, phases = basePhases) => {
       if (!descriptor) return null;
@@ -2178,6 +2178,25 @@ function describeComponentPlotAvailability(component, baseDevice) {
   const isProtective = PROTECTIVE_TYPES.has(normalizedType)
     || PROTECTIVE_TYPES.has(normalizedSubtype)
     || PROTECTIVE_TYPES.has(normalizedBase);
+  const isTransformer = normalizedType.includes('transformer')
+    || normalizedSubtype.includes('transformer')
+    || normalizedBase.includes('transformer');
+  if (isTransformer) {
+    const refPhases = basePhases.length || 3;
+    const refVoltage = inferVoltage(component);
+    const damage = buildTransformerDamageCurve(component, refVoltage, refPhases);
+    const inrush = computeTransformerInrush(component, refVoltage, refPhases);
+    if (!damage && !inrush) {
+      return 'Provide transformer kVA and voltage data to calculate damage and inrush before plotting this component.';
+    }
+    if (!damage) {
+      return 'Provide transformer kVA and voltage ratings to plot the damage curve before plotting this component.';
+    }
+    if (!inrush) {
+      return 'Provide transformer inrush multiple or duration before plotting this component.';
+    }
+    return null;
+  }
   if (!isProtective) {
     const label = formatOptionLabel(typeKey || 'Device');
     return `${label} components do not provide a protective TCC curve.`;
@@ -3012,6 +3031,31 @@ function describeComponentDetailRows(entry, usedLabels = new Set()) {
   const normalizedSkip = new Set([...COMPONENT_SKIP_KEYS]);
   const maxRows = 20;
 
+  const cableSources = [];
+  if (component && typeof component === 'object') cableSources.push(component);
+  if (component.cable && typeof component.cable === 'object') cableSources.push(component.cable);
+  if (component.props && typeof component.props === 'object' && typeof component.props.cable === 'object') {
+    cableSources.push(component.props.cable);
+  }
+
+  const pickValue = (keys, { sources = cableSources } = {}) => {
+    const list = Array.isArray(keys) ? keys : [keys];
+    for (const source of sources) {
+      if (!source || typeof source !== 'object') continue;
+      for (const key of list) {
+        if (Object.prototype.hasOwnProperty.call(source, key)) {
+          const value = source[key];
+          if (value !== undefined && value !== null && value !== '') return value;
+        }
+        if (source.props && typeof source.props === 'object' && Object.prototype.hasOwnProperty.call(source.props, key)) {
+          const value = source.props[key];
+          if (value !== undefined && value !== null && value !== '') return value;
+        }
+      }
+    }
+    return null;
+  };
+
   const pushRow = (label, value) => {
     const formatted = typeof value === 'string' ? value : formatDetailValue(value);
     if (!formatted) return;
@@ -3040,6 +3084,41 @@ function describeComponentDetailRows(entry, usedLabels = new Set()) {
   };
 
   COMPONENT_DETAIL_FIELDS.forEach(addField);
+
+  const componentType = String(component.type || component.subtype || '').toLowerCase();
+  if (componentType.includes('cable')) {
+    const sizeValue = pickValue(['conductor_size', 'conductorSize', 'size', 'awg']);
+    const conductorsDescriptor = pickValue(['conductors']);
+    const materialValue = pickValue(['conductor_material', 'material']);
+    const insulationRaw = pickValue(['insulation_rating', 'temperature_rating', 'insulation']);
+
+    const resolvedSize = (() => {
+      if (sizeValue) return formatDetailValue(sizeValue);
+      if (conductorsDescriptor) {
+        const parsed = parseConductorsDescriptor(conductorsDescriptor);
+        if (parsed?.size) return formatDetailValue(parsed.size);
+      }
+      return '';
+    })();
+
+    if (resolvedSize) {
+      pushRow('Conductor Size', resolvedSize);
+      ['conductor_size', 'conductorsize', 'size', 'awg', 'conductors'].forEach(key => normalizedSkip.add(key));
+    }
+    if (materialValue) {
+      pushRow('Conductor Material', formatOptionLabel(materialValue));
+      ['conductor_material', 'conductormaterial', 'material'].forEach(key => normalizedSkip.add(key));
+    }
+    if (insulationRaw !== null && insulationRaw !== undefined && insulationRaw !== '') {
+      const numeric = parseNumeric(insulationRaw);
+      const formatted = Number.isFinite(numeric) && numeric > 0
+        ? `${formatSettingValue(numeric)} °C`
+        : formatDetailValue(insulationRaw);
+      pushRow('Insulation Rating', formatted);
+      ['insulation_rating', 'insulationrating', 'temperature_rating', 'temperaturerating', 'insulation']
+        .forEach(key => normalizedSkip.add(key));
+    }
+  }
 
   const appendSimpleProps = source => {
     if (!source || typeof source !== 'object') return;
@@ -4109,18 +4188,23 @@ async function openCustomCurveBuilder(curveId = null) {
   const VARIANT_ROLE_OPTIONS = [
     { value: 'standard', label: 'General curve' },
     { value: 'melting', label: 'Melting (minimum melt)' },
-    { value: 'clearing', label: 'Clearing (total clearing)' }
+    { value: 'clearing', label: 'Clearing (total clearing)' },
+    { value: 'symmetrical_rms_peak', label: 'Symmetrical RMS peak-let-thru' }
   ];
 
   const normalizeVariantRole = value => {
     if (typeof value !== 'string') return 'standard';
     const trimmed = value.trim().toLowerCase();
-    return trimmed === 'melting' || trimmed === 'clearing' ? trimmed : 'standard';
+    if (trimmed === 'melting' || trimmed === 'clearing' || trimmed === 'symmetrical_rms_peak') {
+      return trimmed;
+    }
+    return 'standard';
   };
 
   const defaultVariantName = (index, role = 'standard') => {
     if (role === 'melting') return 'Melting curve';
     if (role === 'clearing') return 'Clearing curve';
+    if (role === 'symmetrical_rms_peak') return 'Symmetrical RMS peak-let-thru curve';
     return `Curve ${index + 1}`;
   };
 
