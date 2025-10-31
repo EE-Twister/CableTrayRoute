@@ -3,7 +3,7 @@ const DEFAULT_TOLERANCE = {
   timeLower: 0.8,
   timeUpper: 1.2
 };
-const CURVE_ROLE_VALUES = new Set(['melting', 'clearing']);
+const CURVE_ROLE_VALUES = new Set(['melting', 'clearing', 'symmetrical_rms_peak']);
 
 export function sanitizeCurve(points = []) {
   const filtered = points
@@ -340,8 +340,10 @@ export function scaleCurve(device = {}, overrides = {}) {
   const profiles = normalizeCurveProfiles(device);
   const meltingProfile = profiles.find(item => normalizeProfileRole(item.role) === 'melting');
   const clearingProfile = profiles.find(item => normalizeProfileRole(item.role) === 'clearing');
+  const peakProfile = profiles.find(item => normalizeProfileRole(item.role) === 'symmetrical_rms_peak');
   const meltingCurve = meltingProfile ? scaleAdditionalCurve(meltingProfile.curve) : null;
   const clearingCurve = clearingProfile ? scaleAdditionalCurve(clearingProfile.curve) : null;
+  const peakCurve = peakProfile ? scaleAdditionalCurve(peakProfile.curve) : null;
 
   let minCurve = curve.map(p => ({
     current: p.current,
@@ -369,6 +371,7 @@ export function scaleCurve(device = {}, overrides = {}) {
     minCurve,
     maxCurve,
     envelope,
+    peakCurve,
     settings: {
       curveProfile: profile.id ?? null,
       curveProfileLabel: profile.name ?? null,
