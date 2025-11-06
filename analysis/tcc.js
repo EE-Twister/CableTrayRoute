@@ -2280,6 +2280,50 @@ function buildComponentDisplayEntries() {
   return entries.sort((a, b) => a.name.localeCompare(b.name, undefined, { sensitivity: 'base' }));
 }
 
+function buildComponentAssignmentOptions(component) {
+  if (!component || typeof component !== 'object') return [];
+  const matches = [];
+  const others = [];
+  const normalizedComponentType = normalizeTypeKey(component.subtype || component.type || '');
+  const pushOption = (target, device) => {
+    const typeLabel = formatOptionLabel(device.type || 'Protective Device');
+    const vendor = (device.vendor || device.manufacturer || '').trim();
+    const name = device.name || device.id;
+    const labelParts = [typeLabel, name];
+    if (vendor) labelParts.push(vendor);
+    target.push({
+      id: device.id,
+      label: labelParts.join(' – ')
+    });
+  };
+
+  libraryDevices
+    .filter(dev => PROTECTIVE_TYPES.has(normalizeTypeKey(dev.type)))
+    .forEach(dev => {
+      const normalizedType = normalizeTypeKey(dev.type);
+      const isMatch = normalizedComponentType && (
+        normalizedType === normalizedComponentType
+        || normalizedType.includes(normalizedComponentType)
+        || normalizedComponentType.includes(normalizedType)
+      );
+      if (isMatch) pushOption(matches, dev);
+      else pushOption(others, dev);
+    });
+
+  const sortOptions = list => list.sort((a, b) => a.label.localeCompare(b.label, undefined, { sensitivity: 'base' }));
+  sortOptions(matches);
+  sortOptions(others);
+
+  const groups = [];
+  if (matches.length) {
+    groups.push({ label: 'Matching Type', options: matches });
+  }
+  if (others.length) {
+    groups.push({ label: matches.length ? 'Other Protective Devices' : 'All Protective Devices', options: others });
+  }
+  return groups;
+}
+
 function buildCustomCurveEntries() {
   if (!Array.isArray(saved.customCurves) || !saved.customCurves.length) return [];
   const ordered = sortCustomCurveList(saved.customCurves);
@@ -3143,11 +3187,16 @@ function describeComponentDetailRows(entry, usedLabels = new Set()) {
   return rows;
 }
 
-function renderDeviceDetails(entry, container, doc) {
+function renderDeviceDetails(entry, container, doc, options = {}) {
   if (!container) return;
   const docRef = doc || container.ownerDocument || (typeof document !== 'undefined' ? document : null);
   if (!docRef) return;
   container.innerHTML = '';
+  const {
+    allowAssignment = false,
+    onAssign = null,
+    assignmentBusy = false
+  } = options;
   if (!entry) {
     const empty = docRef.createElement('p');
     empty.className = 'device-detail-empty';
@@ -3318,6 +3367,162 @@ function renderDeviceDetails(entry, container, doc) {
       container.appendChild(settingsWrapper);
     }
   }
+
+  if (
+    allowAssignment
+    && entry.kind === 'component'
+    && entry.component
+    && entry.componentId
+    && typeof onAssign === 'function'
+  ) {
+    const assignmentSection = docRef.createElement('div');
+    assignmentSection.className = 'component-assignment';
+    const heading = docRef.createElement('h4');
+    heading.textContent = 'Assign TCC Device';
+    assignmentSection.appendChild(heading);
+
+    const helperText = docRef.createElement('p');
+    helperText.className = 'component-assignment-hint';
+    helperText.textContent = 'Choose a protective device from the library to associate with this component.';
+    assignmentSection.appendChild(helperText);
+
+    const controls = docRef.createElement('div');
+    controls.className = 'component-assignment-controls';
+
+    const select = docRef.createElement('select');
+    select.className = 'component-assignment-select';
+    select.disabled = assignmentBusy;
+
+    const currentDeviceId = entry.baseDeviceId
+      || entry.component?.tccId
+      || '';
+
+    const addPlaceholder = () => {
+      const placeholder = docRef.createElement('option');
+      placeholder.value = '';
+      placeholder.textContent = 'Select a device…';
+      placeholder.disabled = true;
+      placeholder.selected = !currentDeviceId;
+      select.appendChild(placeholder);
+    };
+
+    const optionGroups = buildComponentAssignmentOptions(entry.component);
+    if (!optionGroups.length) {
+      addPlaceholder();
+    } else {
+      let hasMatch = false;
+      optionGroups.forEach(group => {
+        const groupEl = docRef.createElement('optgroup');
+        if (group.label) groupEl.label = group.label;
+        group.options.forEach(option => {
+          const opt = docRef.createElement('option');
+          opt.value = option.id;
+          opt.textContent = option.label;
+          if (option.id === currentDeviceId) {
+            opt.selected = true;
+            hasMatch = true;
+          }
+          groupEl.appendChild(opt);
+        });
+        select.appendChild(groupEl);
+      });
+      if (!hasMatch) {
+        addPlaceholder();
+      }
+    }
+
+    const buttonBar = docRef.createElement('div');
+    buttonBar.className = 'component-assignment-buttons';
+
+    const assignBtn = docRef.createElement('button');
+    assignBtn.type = 'button';
+    assignBtn.className = 'btn primary-btn';
+    assignBtn.textContent = 'Assign Device';
+    assignBtn.disabled = assignmentBusy || !select.value || select.value === currentDeviceId;
+
+    const clearBtn = docRef.createElement('button');
+    clearBtn.type = 'button';
+    clearBtn.className = 'btn secondary-btn';
+    clearBtn.textContent = 'Clear Assignment';
+    const hasAssignment = !!currentDeviceId;
+    clearBtn.disabled = assignmentBusy || !hasAssignment;
+
+    const statusEl = docRef.createElement('p');
+    statusEl.className = 'component-assignment-status';
+
+    const setStatus = (message, variant = '') => {
+      statusEl.textContent = message || '';
+      if (!message) {
+        statusEl.classList.remove('is-error', 'is-success', 'is-pending');
+      } else {
+        statusEl.classList.remove('is-error', 'is-success', 'is-pending');
+        if (variant) statusEl.classList.add(`is-${variant}`);
+      }
+    };
+
+    const handleResult = success => {
+      select.disabled = false;
+      assignBtn.disabled = !select.value || select.value === currentDeviceId;
+      clearBtn.disabled = !select.value && !currentDeviceId;
+      if (success) {
+        setStatus('Assignment updated.', 'success');
+      } else {
+        setStatus('Assignment could not be updated.', 'error');
+      }
+    };
+
+    select.addEventListener('change', () => {
+      assignBtn.disabled = assignmentBusy || !select.value || select.value === currentDeviceId;
+      setStatus('');
+    });
+
+    assignBtn.addEventListener('click', async () => {
+      if (assignmentBusy || !select.value || select.value === currentDeviceId) return;
+      if (typeof onAssign !== 'function') return;
+      select.disabled = true;
+      assignBtn.disabled = true;
+      clearBtn.disabled = true;
+      setStatus('Assigning device…', 'pending');
+      try {
+        const result = await onAssign({
+          componentId: entry.componentId,
+          deviceId: select.value,
+          overrides: entry.overrideSource || {},
+          entry
+        });
+        handleResult(!!result);
+      } catch (err) {
+        console.error('Failed to assign TCC device', err);
+        handleResult(false);
+      }
+    });
+
+    clearBtn.addEventListener('click', async () => {
+      if (assignmentBusy || !hasAssignment) return;
+      if (typeof onAssign !== 'function') return;
+      select.disabled = true;
+      assignBtn.disabled = true;
+      clearBtn.disabled = true;
+      setStatus('Removing assignment…', 'pending');
+      try {
+        const result = await onAssign({
+          componentId: entry.componentId,
+          deviceId: null,
+          overrides: {},
+          entry
+        });
+        handleResult(!!result);
+      } catch (err) {
+        console.error('Failed to clear TCC assignment', err);
+        handleResult(false);
+      }
+    });
+
+    buttonBar.append(assignBtn, clearBtn);
+    controls.append(select, buttonBar);
+    assignmentSection.append(controls, statusEl);
+    container.appendChild(assignmentSection);
+  }
 }
 
 async function openDeviceSelectionModal() {
@@ -3387,7 +3592,10 @@ async function openDeviceSelectionModal() {
     modelElements.forEach(({ item }, uid) => {
       item.classList.toggle('active', !!entry && uid === entry.uid);
     });
-    renderDeviceDetails(entry, detailContainer, docRef.current);
+    renderDeviceDetails(entry, detailContainer, docRef.current, {
+      allowAssignment: true,
+      onAssign: handleAssignment
+    });
   }
 
   function renderDeviceTypes() {
@@ -3590,13 +3798,21 @@ async function openDeviceSelectionModal() {
       detailContainer = doc.createElement('div');
       detailContainer.className = 'device-selection-details';
 
-      layout.append(leftPane, detailContainer);
+      selectionSummaryContainer = doc.createElement('div');
+      selectionSummaryContainer.className = 'component-selection-summary-panel';
+
+      const rightPane = doc.createElement('div');
+      rightPane.className = 'device-selection-right';
+      rightPane.append(selectionSummaryContainer, detailContainer);
+
+      layout.append(leftPane, rightPane);
       container.appendChild(layout);
 
       renderDeviceTypes();
       renderManufacturers();
       renderModels();
       updateActiveEntry(activeEntry);
+      renderSelectionSummary();
 
       const initialFocus = firstButtonRef.current || leftPane;
       if (initialFocus && controls && typeof controls.setInitialFocus === 'function') {
@@ -3796,7 +4012,7 @@ async function openComponentBrowserModal() {
   // previously cached entries.
   refreshCatalog({ preserveSelection: true });
 
-  const componentEntries = buildComponentDisplayEntries();
+  let componentEntries = buildComponentDisplayEntries();
   if (!componentEntries.length) {
     await openModal({
       title: 'One-Line Components',
@@ -3821,8 +4037,8 @@ async function openComponentBrowserModal() {
     return;
   }
 
-  const componentEntryMap = new Map(componentEntries.map(entry => [entry.componentId, entry]));
-  const typeGroups = buildTypeGroups(componentEntries);
+  let componentEntryMap = new Map(componentEntries.map(entry => [entry.componentId, entry]));
+  let typeGroups = buildTypeGroups(componentEntries);
   const currentContextId = getActiveComponentId() || activeComponentId || compId;
   const initialEntry = (currentContextId && componentEntryMap.get(currentContextId)) || componentEntries[0] || null;
   const initialSelection = new Set(selectedDeviceIds());
@@ -3837,6 +4053,7 @@ async function openComponentBrowserModal() {
         selectionSet.delete(entry.uid);
       }
     });
+    renderSelectionSummary();
   };
   let activeEntry = initialEntry;
   let activeTypeId = initialEntry ? getTypeInfo(initialEntry).id : typeGroups[0]?.id || null;
@@ -3866,6 +4083,7 @@ async function openComponentBrowserModal() {
   let modelContainer;
   let detailContainer;
   let modelsHeading;
+  let selectionSummaryContainer;
   const firstButtonRef = { current: null };
 
   const updateModelSelectionIndicators = () => {
@@ -3892,6 +4110,7 @@ async function openComponentBrowserModal() {
     if (activeEntry && entry.uid === activeEntry.uid) {
       updateActiveEntry(entry);
     }
+    renderSelectionSummary();
   };
 
   const getSelectedComponentEntries = () => [...selectionSet]
@@ -3902,6 +4121,94 @@ async function openComponentBrowserModal() {
       && entry.componentId
       && !entry.plotDisabledReason
     ));
+
+  const renderSelectionSummary = () => {
+    if (!selectionSummaryContainer || !docRef.current) return;
+    const doc = docRef.current;
+    selectionSummaryContainer.innerHTML = '';
+    const selectedComponents = getSelectedComponentEntries();
+    const heading = doc.createElement('h3');
+    heading.className = 'device-selection-subtitle';
+    heading.textContent = 'Selected Components';
+    selectionSummaryContainer.appendChild(heading);
+    if (!selectedComponents.length) {
+      const empty = doc.createElement('p');
+      empty.className = 'device-detail-empty';
+      empty.textContent = 'No one-line components selected for plotting.';
+      selectionSummaryContainer.appendChild(empty);
+      return;
+    }
+    const typeLabels = new Map();
+    selectedComponents.forEach(entry => {
+      const info = getTypeInfo(entry);
+      typeLabels.set(info.label, (typeLabels.get(info.label) || 0) + 1);
+    });
+    const list = doc.createElement('ul');
+    list.className = 'component-selection-list';
+    selectedComponents.forEach(entry => {
+      const item = doc.createElement('li');
+      item.className = 'component-selection-item';
+      const name = doc.createElement('span');
+      name.className = 'component-selection-name';
+      name.textContent = entry.name;
+      const removeBtn = doc.createElement('button');
+      removeBtn.type = 'button';
+      removeBtn.className = 'component-selection-remove';
+      removeBtn.textContent = 'Remove';
+      removeBtn.addEventListener('click', () => {
+        selectionSet.delete(entry.uid);
+        updateModelSelectionIndicators();
+        renderSelectionSummary();
+      });
+      item.append(name, removeBtn);
+      list.appendChild(item);
+    });
+    selectionSummaryContainer.appendChild(list);
+    const summary = doc.createElement('p');
+    summary.className = 'component-selection-summary-text';
+    const typeSummary = [...typeLabels.entries()]
+      .map(([label, count]) => `${count} ${label}`)
+      .join(', ');
+    if (typeSummary) {
+      summary.textContent = `Selected across ${typeSummary}.`;
+      selectionSummaryContainer.appendChild(summary);
+    }
+  };
+
+  const handleAssignment = async ({ componentId, deviceId, overrides }) => {
+    if (!componentId) return false;
+    try {
+      const autoSelect = !!deviceId && (
+        selectionSet.has(`component:${componentId}`)
+        || getSelectedComponentEntries().length === 0
+      );
+      const result = updateComponentAssignment(componentId, deviceId, overrides || {}, {
+        autoSelect,
+        replaceSelection: false
+      });
+      if (result && Array.isArray(result.selection)) {
+        result.selection.forEach(id => selectionSet.add(id));
+      }
+      componentEntries = buildComponentDisplayEntries();
+      componentEntryMap = new Map(componentEntries.map(entry => [entry.componentId, entry]));
+      typeGroups = buildTypeGroups(componentEntries);
+      sanitizeSelectionSet();
+      renderDeviceTypes();
+      renderManufacturers();
+      renderModels();
+      const refreshed = componentEntryMap.get(componentId) || result.updatedEntry || null;
+      if (refreshed) {
+        updateActiveEntry(refreshed);
+      } else {
+        updateActiveEntry(activeEntry);
+      }
+      renderSelectionSummary();
+      return true;
+    } catch (err) {
+      console.error('Failed to update TCC assignment', err);
+      return false;
+    }
+  };
 
   const applySelection = (activeComponentOverride = null) => {
     const componentSelectionsBefore = getSelectedComponentEntries();
@@ -4008,7 +4315,23 @@ async function openComponentBrowserModal() {
       button.type = 'button';
       button.className = 'device-type-btn';
       if (group.id === activeTypeId) button.classList.add('active');
-      button.textContent = `${group.label} (${group.total})`;
+      const selectedCount = group.manufacturers
+        .reduce((total, manufacturer) => total + manufacturer.entries
+          .filter(entry => selectionSet.has(entry.uid)).length, 0);
+      button.innerHTML = '';
+      const labelSpan = doc.createElement('span');
+      labelSpan.className = 'device-type-label';
+      labelSpan.textContent = `${group.label} (${group.total})`;
+      button.appendChild(labelSpan);
+      if (selectedCount > 0) {
+        button.classList.add('has-selection');
+        const countSpan = doc.createElement('span');
+        countSpan.className = 'device-selection-count';
+        countSpan.textContent = selectedCount === 1 ? '1 selected' : `${selectedCount} selected`;
+        button.appendChild(countSpan);
+      } else {
+        button.classList.remove('has-selection');
+      }
       button.addEventListener('click', () => {
         if (activeTypeId === group.id) return;
         activeTypeId = group.id;
@@ -4045,7 +4368,21 @@ async function openComponentBrowserModal() {
       button.type = 'button';
       button.className = 'device-manufacturer-btn';
       if (manufacturer.name === activeManufacturer) button.classList.add('active');
-      button.textContent = `${manufacturer.name} (${manufacturer.entries.length})`;
+      const selectedCount = manufacturer.entries.filter(entry => selectionSet.has(entry.uid)).length;
+      button.innerHTML = '';
+      const labelSpan = doc.createElement('span');
+      labelSpan.className = 'device-type-label';
+      labelSpan.textContent = `${manufacturer.name} (${manufacturer.entries.length})`;
+      button.appendChild(labelSpan);
+      if (selectedCount > 0) {
+        button.classList.add('has-selection');
+        const countSpan = doc.createElement('span');
+        countSpan.className = 'device-selection-count';
+        countSpan.textContent = selectedCount === 1 ? '1 selected' : `${selectedCount} selected`;
+        button.appendChild(countSpan);
+      } else {
+        button.classList.remove('has-selection');
+      }
       button.addEventListener('click', () => {
         if (activeManufacturer === manufacturer.name) return;
         activeManufacturer = manufacturer.name;
@@ -6056,6 +6393,66 @@ function deepEqual(a, b) {
   return keysA.every(key => Object.is(objA[key], objB[key]));
 }
 
+function updateComponentAssignment(componentId, deviceId, overrides = {}, { autoSelect = false, replaceSelection = false } = {}) {
+  if (!componentId) {
+    return { updatedEntry: null, selection: selectedDeviceIds() };
+  }
+  const baseDevice = deviceId ? libraryDevices.find(dev => dev.id === deviceId) : null;
+  const sanitizedOverrides = snapOverridesToOptions(baseDevice, overrides || {});
+  const previousSelection = replaceSelection ? new Set() : new Set(selectedDeviceIds());
+  const data = getOneLine();
+  let updated = false;
+  (data.sheets || []).forEach(sheet => {
+    (sheet.components || []).forEach(comp => {
+      if (comp.id !== componentId) return;
+      if (deviceId) {
+        comp.tccId = deviceId;
+      } else if (comp.tccId) {
+        delete comp.tccId;
+      }
+      if (sanitizedOverrides && Object.keys(sanitizedOverrides).length) {
+        comp.tccOverrides = sanitizedOverrides;
+      } else if (comp.tccOverrides) {
+        delete comp.tccOverrides;
+      }
+      updated = true;
+    });
+  });
+  if (!updated) {
+    return { updatedEntry: null, selection: [...previousSelection] };
+  }
+
+  if (!saved.componentOverrides || typeof saved.componentOverrides !== 'object') {
+    saved.componentOverrides = {};
+  }
+  if (sanitizedOverrides && Object.keys(sanitizedOverrides).length) {
+    saved.componentOverrides[componentId] = sanitizedOverrides;
+  } else if (saved.componentOverrides[componentId]) {
+    delete saved.componentOverrides[componentId];
+  }
+
+  setOneLine(data);
+  buildComponentData();
+  rebuildCatalog();
+
+  const available = new Set(deviceEntries.map(entry => entry.uid));
+  if (autoSelect && deviceId) {
+    previousSelection.add(`component:${componentId}`);
+  }
+  const filteredSelection = [...previousSelection].filter(id => available.has(id));
+  if (!filteredSelection.length && autoSelect && deviceId) {
+    filteredSelection.push(`component:${componentId}`);
+  }
+  applySelectionSet(filteredSelection, { persist: true });
+  renderSettings();
+  plot();
+  renderOneLinePreview(componentId);
+  return {
+    updatedEntry: deviceMap.get(`component:${componentId}`) || null,
+    selection: filteredSelection
+  };
+}
+
 function linkComponent(entryOverride = null) {
   const targetComponentId = getActiveComponentId() || compId;
   if (!targetComponentId) return;
@@ -6074,29 +6471,10 @@ function linkComponent(entryOverride = null) {
   if (!entry || (entry.kind !== 'library' && entry.kind !== 'component')) return;
   const deviceId = entry.baseDeviceId;
   const overrides = snapOverridesToOptions(entry.baseDevice, entry.overrideSource || {});
-  const data = getOneLine();
-  let updated = false;
-  (data.sheets || []).forEach(sheet => {
-    (sheet.components || []).forEach(comp => {
-      if (comp.id !== targetComponentId) return;
-      comp.tccId = deviceId;
-      if (overrides && Object.keys(overrides).length) {
-        comp.tccOverrides = overrides;
-      } else {
-        delete comp.tccOverrides;
-      }
-      updated = true;
-    });
+  updateComponentAssignment(targetComponentId, deviceId, overrides, {
+    autoSelect: true,
+    replaceSelection: true
   });
-  if (updated) {
-    setOneLine(data);
-    buildComponentData();
-    rebuildCatalog();
-    selectDefaults(new Set([`component:${targetComponentId}`]));
-    renderSettings();
-    plot();
-    renderOneLinePreview(targetComponentId);
-  }
 }
 
 function gatherOverridesFromInputs(uid) {
@@ -7145,7 +7523,10 @@ function renderOneLinePreview(componentId) {
     ? adjacency.get(componentId)
     : new Set();
   const neighborCount = neighborSet.size + 1; // include the active component itself
-  const MAX_COMPONENTS = Math.max(20, neighborCount);
+  const includeEntireSheet = sameSheetSelections.length > 0;
+  const MAX_COMPONENTS = includeEntireSheet
+    ? Math.max(sheetComponents.length, sameSheetSelections.length + neighborCount, 50)
+    : Math.max(20, neighborCount, sameSheetSelections.length + 5);
   const addUnique = (list, id) => {
     if (!id) return;
     if (!componentMap.has(id)) return;
@@ -7208,15 +7589,20 @@ function renderOneLinePreview(componentId) {
   if (onelinePreviewContainer) onelinePreviewContainer.classList.remove('empty');
   if (onelinePreviewEmpty) onelinePreviewEmpty.classList.add('hidden');
 
-  const displayedTargets = availableTargets.slice(0, MAX_COMPONENTS);
-  const truncatedCount = availableTargets.length - displayedTargets.length;
+  let displayedTargets;
+  if (includeEntireSheet) {
+    displayedTargets = sheetComponents.map(comp => comp.id);
+  } else {
+    displayedTargets = availableTargets.slice(0, MAX_COMPONENTS);
+  }
+  const truncatedCount = includeEntireSheet ? 0 : Math.max(0, availableTargets.length - displayedTargets.length);
   const displayedSet = new Set(displayedTargets);
   const hiddenSelectionCount = sameSheetSelections.filter(id => !displayedSet.has(id)).length;
 
   const DEFAULT_WIDTH = 120;
   const DEFAULT_HEIGHT = 60;
-  const MIN_NODE_WIDTH = 48;
-  const MIN_NODE_HEIGHT = 32;
+  const MIN_NODE_WIDTH = 24;
+  const MIN_NODE_HEIGHT = 18;
 
   const normalizeRotation = value => {
     const numeric = Number(value);
@@ -7388,14 +7774,14 @@ function renderOneLinePreview(componentId) {
     const scaledHeight = Math.max(0, (bounds.bottom - bounds.top) * scale);
     const fallbackWidth = Number.isFinite(compWidth) ? compWidth * scale : 0;
     const fallbackHeight = Number.isFinite(compHeight) ? compHeight * scale : 0;
-    const visualWidth = Math.max(
-      MIN_NODE_WIDTH,
-      scaledWidth || (Number.isFinite(spanWidth) ? spanWidth * scale : 0) || fallbackWidth || MIN_NODE_WIDTH
-    );
-    const visualHeight = Math.max(
-      MIN_NODE_HEIGHT,
-      scaledHeight || (Number.isFinite(spanHeight) ? spanHeight * scale : 0) || fallbackHeight || MIN_NODE_HEIGHT
-    );
+    const spanWidthScaled = Number.isFinite(spanWidth) ? spanWidth * scale : 0;
+    const spanHeightScaled = Number.isFinite(spanHeight) ? spanHeight * scale : 0;
+    const widthCandidates = [scaledWidth, fallbackWidth, spanWidthScaled].filter(value => Number.isFinite(value) && value > 0);
+    const heightCandidates = [scaledHeight, fallbackHeight, spanHeightScaled].filter(value => Number.isFinite(value) && value > 0);
+    const baseWidth = widthCandidates.length ? widthCandidates[0] : MIN_NODE_WIDTH;
+    const baseHeight = heightCandidates.length ? heightCandidates[0] : MIN_NODE_HEIGHT;
+    const visualWidth = Math.max(12, baseWidth);
+    const visualHeight = Math.max(12, baseHeight);
     const overrideKey = overrideKeyForComponent(comp.id);
     const storedOverride = previewPositionOverrides.get(overrideKey);
     const overrideDx = Number.isFinite(storedOverride?.dx) ? storedOverride.dx : 0;
