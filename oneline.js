@@ -426,6 +426,7 @@ let viewAttributes = new Set(initialViewAttributes);
 let attributeOptions = [];
 const attributeOptionsMap = new Map();
 let componentAttributeOptions = new Map();
+let componentAttributeDisplayOverrides = new Map();
 let componentAttributeList = [];
 let componentAttributeLabelMap = new Map();
 const viewComponentStorageKey = 'diagramViewComponentSelection';
@@ -3276,6 +3277,36 @@ function formatAttributeLabel(key) {
     .trim();
 }
 
+function formatOptionSourceLabel(source) {
+  if (!source) return '';
+  if (source.startsWith('study:')) {
+    const label = formatAttributeLabel(source.slice(6));
+    return label ? `${label} Study` : 'Study';
+  }
+  if (source === 'component') return 'Component';
+  if (source === 'componentProps') return 'Component Settings';
+  if (source === 'template') return 'Template Defaults';
+  return formatAttributeLabel(source);
+}
+
+function deriveOptionContextLabel(optionKey, baseLabel) {
+  if (!optionKey) return '';
+  if (optionKey.includes('.')) {
+    const [namespace, ...rest] = optionKey.split('.');
+    const nsLabel = formatAttributeLabel(namespace);
+    const propLabel = rest.length ? formatAttributeLabel(rest.join('.')) : '';
+    if (propLabel && propLabel !== baseLabel) return `${nsLabel ? `${nsLabel}: ` : ''}${propLabel}`.trim();
+    return nsLabel && nsLabel !== baseLabel ? nsLabel : '';
+  }
+  const parts = optionKey.split('_');
+  if (parts.length > 1) {
+    const tail = formatAttributeLabel(parts.slice(-1)[0]);
+    if (tail && tail !== baseLabel) return tail;
+  }
+  const formatted = formatAttributeLabel(optionKey);
+  return formatted !== baseLabel ? formatted : '';
+}
+
 function formatOverlayMetric(value, unit, decimals = 2) {
   if (value === null || value === undefined) return '';
   const formatNumber = val => {
@@ -3300,11 +3331,11 @@ function formatOverlayMetric(value, unit, decimals = 2) {
 
 function inferAttributeUnit(key) {
   const lower = key.toLowerCase();
-  if (lower.includes('voltage') || lower.endsWith('volts')) return 'V';
-  if (lower.endsWith('_ka')) return 'kA';
-  if (lower.endsWith('_kv')) return 'kV';
-  if (lower.endsWith('_kw') || lower.endsWith('kw')) return 'kW';
   if (lower.endsWith('kva') || lower.endsWith('_kva')) return 'kVA';
+  if (lower.endsWith('_ka') || lower.includes('ka')) return 'kA';
+  if (lower.endsWith('_kv') || lower.includes('kv')) return 'kV';
+  if (lower.includes('voltage') || lower.endsWith('volts') || lower.endsWith('_v')) return 'V';
+  if (lower.endsWith('_kw') || lower.endsWith('kw')) return 'kW';
   if (lower.endsWith('_a') || lower.endsWith('amps') || lower.endsWith('current_a')) return 'A';
   if (lower.includes('percent') || lower.endsWith('_pct') || lower.includes('impedance') || lower.endsWith('%')) return '%';
   if (lower.includes('efficiency')) return '%';
@@ -3395,12 +3426,16 @@ function getComponentAttributeLines(comp) {
   keys.forEach(key => {
     const option = getAttributeOption(key);
     if (!option) return;
+    const compKey = comp?.subtype || comp?.type;
+    const displayMap = compKey ? componentAttributeDisplayOverrides.get(compKey) : null;
+    const displayLabel = displayMap?.get(option.key) || option.displayLabel || option.label;
     const value = resolveComponentAttribute(comp, option.key);
     const formatted = formatAttributeValue(option.key, value);
     if (formatted === null) return;
     const unit = option.unit || '';
     const valueText = unit ? `${formatted} ${unit}`.trim() : formatted;
-    const labelText = option.label || formatAttributeLabel(option.key);
+    const baseLabel = displayLabel || option.label || formatAttributeLabel(option.key);
+    const labelText = baseLabel || formatAttributeLabel(option.key);
     lines.push(`${labelText}: ${valueText}`.trim());
   });
   return lines;
@@ -3539,7 +3574,8 @@ function openViewModal() {
           });
           const text = document.createElement('span');
           text.className = 'view-property-label';
-          text.textContent = opt.unit ? `${opt.label} (${opt.unit})` : opt.label;
+          const baseLabel = opt.displayLabel || opt.label;
+          text.textContent = opt.unit ? `${baseLabel} (${opt.unit})` : baseLabel;
           label.classList.toggle('is-selected', input.checked);
           label.append(input, text);
           propertyList.appendChild(label);
@@ -3850,6 +3886,7 @@ function refreshAttributeOptions() {
   cachedStudyResults = getStudies();
   const optionMap = new Map();
   const componentOptionMap = new Map();
+  const componentOptionSourceMap = new Map();
   const componentLabelMap = new Map();
   const componentById = new Map();
 
@@ -3893,7 +3930,7 @@ function refreshAttributeOptions() {
     componentLabelMap.set(compKey, 'Component');
   };
 
-  const addComponentKey = (compKey, key) => {
+  const addComponentKey = (compKey, key, sourceHint = null) => {
     if (!compKey) return;
     const option = registerOption(key);
     if (!option) return;
@@ -3901,6 +3938,16 @@ function refreshAttributeOptions() {
       componentOptionMap.set(compKey, new Map());
     }
     componentOptionMap.get(compKey).set(option.key, option);
+    if (!componentOptionSourceMap.has(compKey)) {
+      componentOptionSourceMap.set(compKey, new Map());
+    }
+    const sourceMap = componentOptionSourceMap.get(compKey);
+    if (!sourceMap.has(option.key)) {
+      sourceMap.set(option.key, new Set());
+    }
+    if (sourceHint) {
+      sourceMap.get(option.key).add(sourceHint);
+    }
   };
 
   Object.entries(componentMeta).forEach(([compKey, meta]) => {
@@ -3908,7 +3955,7 @@ function refreshAttributeOptions() {
     Object.entries(meta.props || {}).forEach(([key, value]) => {
       if (value === undefined || value === null) return;
       if (typeof value === 'object') return;
-      addComponentKey(compKey, key);
+      addComponentKey(compKey, key, 'template');
     });
   });
 
@@ -3924,13 +3971,13 @@ function refreshAttributeOptions() {
       Object.entries(comp).forEach(([key, value]) => {
         if (value === undefined || value === null) return;
         if (typeof value === 'object') return;
-        addComponentKey(compKey, key);
+        addComponentKey(compKey, key, 'component');
       });
       if (comp.props && typeof comp.props === 'object') {
         Object.entries(comp.props).forEach(([key, value]) => {
           if (value === undefined || value === null) return;
           if (typeof value === 'object') return;
-          addComponentKey(compKey, key);
+          addComponentKey(compKey, key, 'componentProps');
         });
       }
     });
@@ -3950,7 +3997,7 @@ function refreshAttributeOptions() {
         const combinedKey = `${namespace}.${prop}`;
         const option = registerOption(combinedKey);
         if (!option) return;
-        addComponentKey(compKey, option.key);
+        addComponentKey(compKey, option.key, `study:${namespace}`);
       });
     });
   };
@@ -3979,13 +4026,59 @@ function refreshAttributeOptions() {
   componentAttributeOptions = new Map();
   componentAttributeList = [];
   componentAttributeLabelMap = new Map();
+  componentAttributeDisplayOverrides = new Map();
 
   componentOptionMap.forEach((options, compKey) => {
-    const list = Array.from(options.values()).sort((a, b) => a.label.localeCompare(b.label));
-    componentAttributeOptions.set(compKey, list);
+    const clones = Array.from(options.values()).map(opt => ({ ...opt }));
+    const sourceMap = componentOptionSourceMap.get(compKey) || new Map();
+    const grouped = new Map();
+    const displayMap = new Map();
+
+    clones.forEach(opt => {
+      const keyId = `${opt.label}__${opt.unit || ''}`;
+      if (!grouped.has(keyId)) grouped.set(keyId, []);
+      grouped.get(keyId).push(opt);
+    });
+
+    grouped.forEach(list => {
+      if (list.length === 1) {
+        const [single] = list;
+        single.displayLabel = single.label;
+        displayMap.set(single.key, single.displayLabel);
+        return;
+      }
+      list.forEach(opt => {
+        const sourceSet = sourceMap.get(opt.key);
+        const sources = sourceSet ? Array.from(sourceSet) : [];
+        const contextParts = sources.map(formatOptionSourceLabel).filter(Boolean);
+        if (!contextParts.length) {
+          const derived = deriveOptionContextLabel(opt.key, opt.label);
+          if (derived) contextParts.push(derived);
+        }
+        const context = contextParts.join(' • ');
+        opt.displayLabel = context ? `${opt.label} – ${context}` : opt.label;
+        displayMap.set(opt.key, opt.displayLabel);
+      });
+    });
+
+    clones.forEach(opt => {
+      if (!displayMap.has(opt.key)) {
+        opt.displayLabel = opt.label;
+        displayMap.set(opt.key, opt.displayLabel);
+      }
+    });
+
+    clones.sort((a, b) => {
+      const labelA = a.displayLabel || a.label;
+      const labelB = b.displayLabel || b.label;
+      return labelA.localeCompare(labelB);
+    });
+
+    componentAttributeOptions.set(compKey, clones);
     const label = componentLabelMap.get(compKey) || getComponentDisplayLabel(compKey);
     componentAttributeLabelMap.set(compKey, label);
     componentAttributeList.push({ key: compKey, label });
+    componentAttributeDisplayOverrides.set(compKey, displayMap);
   });
 
   const orphanKeys = new Set(viewAttributes);
@@ -3996,12 +4089,14 @@ function refreshAttributeOptions() {
     const orphanOptions = Array.from(orphanKeys)
       .map(key => attributeOptionsMap.get(key))
       .filter(Boolean)
-      .sort((a, b) => a.label.localeCompare(b.label));
+      .map(opt => ({ ...opt, displayLabel: opt.label }))
+      .sort((a, b) => (a.displayLabel || a.label).localeCompare(b.displayLabel || b.label));
     if (orphanOptions.length) {
       const orphanLabel = 'Other Attributes';
       componentAttributeOptions.set('__other__', orphanOptions);
       componentAttributeLabelMap.set('__other__', orphanLabel);
       componentAttributeList.push({ key: '__other__', label: orphanLabel });
+      componentAttributeDisplayOverrides.set('__other__', new Map(orphanOptions.map(opt => [opt.key, opt.displayLabel || opt.label])));
     }
   }
 
