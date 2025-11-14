@@ -116,24 +116,55 @@ function getNumericFromKeys(comp, keys) {
 
 function getTransformerVoltageForPort(xfmr, portIndex) {
   const subtypeKeys = transformerVoltageKeyMap[xfmr?.subtype] || [];
-  const fallbackKeys = portIndex === 0
-    ? ['volts_primary', 'voltage_primary', 'primary_voltage', 'volts_hv', 'voltage']
+  const kvFallbacks = portIndex === 0
+    ? ['kv_primary', 'kv_hv']
     : portIndex === 1
-      ? ['volts_secondary', 'voltage_secondary', 'secondary_voltage', 'volts_lv', 'voltage']
-      : ['volts_tv', 'volts_tertiary', 'tertiary_voltage', 'volts_lv', 'voltage'];
-  return getNumericFromKeys(xfmr, [subtypeKeys[portIndex], ...fallbackKeys]);
+      ? ['kv_secondary', 'kv_lv']
+      : ['kv_tertiary', 'kv_tv', 'kv_lv'];
+  const fallbackKeys = portIndex === 0
+    ? ['volts_primary', 'voltage_primary', 'primary_voltage', 'volts_hv', 'voltage_hv', 'voltage']
+    : portIndex === 1
+      ? ['volts_secondary', 'voltage_secondary', 'secondary_voltage', 'volts_lv', 'voltage_lv', 'voltage']
+      : ['volts_tv', 'volts_tertiary', 'tertiary_voltage', 'volts_lv', 'voltage_lv', 'voltage'];
+  return getNumericFromKeys(xfmr, [subtypeKeys[portIndex], ...kvFallbacks, ...fallbackKeys, 'baseKV', 'prefault_voltage']);
 }
 
 function getTransformerKvaForPort(xfmr, portIndex) {
   const subtypeKeys = transformerKvaKeyMap[xfmr?.subtype] || [];
-  return getNumericFromKeys(xfmr, [subtypeKeys[portIndex], 'kva']);
+  const kvaFallbacks = [
+    subtypeKeys[portIndex],
+    portIndex === 0 ? 'kva_primary' : portIndex === 1 ? 'kva_secondary' : 'kva_tertiary',
+    portIndex === 0 ? 'kva_hv' : portIndex === 1 ? 'kva_lv' : 'kva_tv',
+    'kva_hv_lv',
+    'kva_hv_tv',
+    'kva_lv_tv',
+    'rated_kva',
+    'kva'
+  ];
+  const kva = getNumericFromKeys(xfmr, kvaFallbacks);
+  if (kva !== null) return kva;
+  const mvaFallbacks = [
+    portIndex === 0 ? 'mva_primary' : portIndex === 1 ? 'mva_secondary' : 'mva_tertiary',
+    'mva_hv',
+    'mva_lv',
+    'mva'
+  ];
+  const mva = getNumericFromKeys(xfmr, mvaFallbacks);
+  return mva !== null ? mva * 1000 : null;
 }
 
 function getTransformerPercentForPort(xfmr, portIndex) {
   const subtypeKeys = transformerPercentKeyMap[xfmr?.subtype] || [];
-  const fallbacks = ['percent_z'];
-  if (xfmr?.subtype === 'three_winding' && portIndex === 2) fallbacks.unshift('z_lv_tv_percent');
-  return getNumericFromKeys(xfmr, [subtypeKeys[portIndex], ...fallbacks]);
+  const percentFallbacks = [
+    subtypeKeys[portIndex],
+    portIndex === 0 ? 'percent_primary' : portIndex === 1 ? 'percent_secondary' : 'percent_tertiary',
+    portIndex === 0 ? 'z_hv_lv_percent' : portIndex === 1 ? 'z_hv_lv_percent' : 'z_lv_tv_percent',
+    portIndex === 2 ? 'z_hv_tv_percent' : null,
+    'impedance_percent',
+    'z_percent',
+    'percent_z'
+  ];
+  return getNumericFromKeys(xfmr, percentFallbacks);
 }
 
 function getTransformerImpedance(xfmr, portIndex) {
@@ -141,10 +172,13 @@ function getTransformerImpedance(xfmr, portIndex) {
   const percent = getTransformerPercentForPort(xfmr, portIndex);
   const kva = getTransformerKvaForPort(xfmr, portIndex);
   const voltage = getTransformerVoltageForPort(xfmr, portIndex);
-  const kv = toKV(voltage || pickValue(xfmr, 'voltage'));
-  const xr = parseNumeric(pickValue(xfmr, 'xr_ratio'));
+  const kv = toKV(voltage ?? pickValue(xfmr, 'voltage') ?? pickValue(xfmr, 'baseKV'));
+  const xr = parseNumeric(pickValue(xfmr, 'xr_ratio') ?? pickValue(xfmr, 'xr'));
   const impedance = calculateTransformerImpedance({ kva, percentZ: percent, voltageKV: kv, xrRatio: xr });
   if (impedance && Number.isFinite(impedance.r) && Number.isFinite(impedance.x)) return impedance;
+  const direct = pickValue(xfmr, 'transformer_impedance');
+  const fallback = toImpedance(direct);
+  if (Math.abs(fallback.r) > 0 || Math.abs(fallback.x) > 0) return fallback;
   return { r: 0, x: 0 };
 }
 

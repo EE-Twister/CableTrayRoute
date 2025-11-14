@@ -40,6 +40,41 @@ global.localStorage = {
       assert(Math.abs(b.doubleLineGroundKA - 40.74) < 0.1);
       assert(Math.abs(b.asymKA - 32.44) < 0.1);
     });
+
+    it('propagates transformer impedance from secondary data fields', () => {
+      setOneLine({
+        activeSheet: 0,
+        sheets: [{
+          name: 'Impedance',
+          components: [
+            {
+              id: 'source',
+              type: 'utility_source',
+              voltage: 13800,
+              thevenin_mva: 500,
+              connections: [{ target: 'xf1', sourcePort: 0, targetPort: 0 }]
+            },
+            {
+              id: 'xf1',
+              type: 'transformer',
+              subtype: 'two_winding',
+              percent_secondary: 5.75,
+              kva_secondary: 1500,
+              volts_primary: 13800,
+              volts_secondary: 480,
+              connections: [{ target: 'bus480', sourcePort: 1, targetPort: 0 }]
+            },
+            { id: 'bus480', type: 'bus', subtype: 'Bus' }
+          ]
+        }]
+      });
+      const res = runShortCircuit();
+      const bus = res.bus480;
+      assert(bus, 'bus results should exist');
+      assert(bus.threePhaseKA > 0.1, 'three-phase fault current should be non-zero');
+      assert(bus.lineToGroundKA > 0.1, 'line-to-ground fault current should be non-zero');
+      assert(!bus.warnings, 'bus should not have impedance warnings');
+    });
   });
 })();
 
