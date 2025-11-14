@@ -82,6 +82,7 @@ import { exportDXF, exportDWG } from './exporters/dxf.js';
 import { openModal } from './src/components/modal.js';
 import { normalizeVoltageToVolts, toBaseKV } from './utils/voltage.js';
 import { calculateTransformerImpedance } from './utils/transformerImpedance.js';
+import { computeImpedanceFromPerKm } from './utils/cableImpedance.js';
 import {
   resolveTransformerKva,
   resolveTransformerPercentZ,
@@ -8922,12 +8923,38 @@ async function chooseCable(source, target, existingConn = null) {
       };
       setImpedancePart(cable, 'r', impedanceRInput.value, { keepEmpty: false });
       setImpedancePart(cable, 'x', impedanceXInput.value, { keepEmpty: false });
+      const manualImpedanceProvided =
+        (typeof impedanceRInput.value === 'string' && impedanceRInput.value.trim() !== '') ||
+        (typeof impedanceXInput.value === 'string' && impedanceXInput.value.trim() !== '');
       if (existingConn?.cable?.operating_voltage !== undefined) {
         cable.operating_voltage = existingConn.cable.operating_voltage;
       }
+      let resolvedLength = null;
       if (manualLen) {
-        cable.length = parseNumericValue(lengthInput);
+        const manualValue = parseNumericValue(lengthInput);
+        cable.length = manualValue;
         cable.manual_length = true;
+        if (typeof manualValue === 'number' && Number.isFinite(manualValue) && manualValue > 0) {
+          resolvedLength = manualValue;
+        }
+      } else {
+        const connLength = Number(existingConn?.length);
+        const unitPerPx = Number(diagramScale?.unitPerPx);
+        if (Number.isFinite(connLength) && connLength > 0) {
+          const scaleFactor = Number.isFinite(unitPerPx) && unitPerPx > 0 ? unitPerPx : 1;
+          resolvedLength = connLength * scaleFactor;
+        }
+      }
+      if (!manualImpedanceProvided && !hasImpedance(cable) && resolvedLength !== null) {
+        const derivedImpedance = computeImpedanceFromPerKm({
+          resistancePerKm: cable.resistance_per_km,
+          reactancePerKm: cable.reactance_per_km,
+          length: resolvedLength,
+          unit: diagramScale?.unit
+        });
+        if (derivedImpedance) {
+          cable.impedance = derivedImpedance;
+        }
       }
       modal.classList.remove('show');
       const resolvedCable = { ...cable, from_tag: source?.ref || source?.id || '', to_tag: target?.ref || target?.id || '' };
