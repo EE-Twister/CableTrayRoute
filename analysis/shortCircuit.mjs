@@ -222,6 +222,23 @@ function combineParallel(base, addition) {
   return parallel(base, addition);
 }
 
+function resolveUpstreamImpedance(comp, comps, compMap, cache) {
+  if (!comp?.id) return null;
+  const visited = new Set([comp.id]);
+  let current = comp;
+  while (current) {
+    const parent = findParentInfo(current, comps, compMap, visited);
+    if (!parent?.component?.id || visited.has(parent.component.id)) break;
+    const candidate = computeImpedance(parent.component, comps, compMap, cache);
+    if (candidate && (Math.abs(candidate.r) >= 1e-9 || Math.abs(candidate.x) >= 1e-9)) {
+      return { r: candidate.r, x: candidate.x };
+    }
+    visited.add(parent.component.id);
+    current = parent.component;
+  }
+  return null;
+}
+
 function computeImpedance(comp, comps, compMap, cache, visited = new Set()) {
   if (!comp?.id) return { r: 0, x: 0 };
   if (cache.has(comp.id)) return cache.get(comp.id);
@@ -336,10 +353,13 @@ export function runShortCircuit(modelOrOpts = {}, maybeOpts = {}) {
 
   const missingImpedanceComponents = new Set();
 
-  const ensureNonZero = (z, compId) => {
+  const ensureNonZero = (z, compId, fallbackZ) => {
     const r = Number(z?.r) || 0;
     const x = Number(z?.x) || 0;
     if (Math.abs(r) < 1e-9 && Math.abs(x) < 1e-9) {
+      if (fallbackZ && (Math.abs(fallbackZ.r) >= 1e-9 || Math.abs(fallbackZ.x) >= 1e-9)) {
+        return { r: fallbackZ.r, x: fallbackZ.x };
+      }
       if (compId) missingImpedanceComponents.add(compId);
       return { r: 1e6, x: 1e6 };
     }
@@ -348,19 +368,22 @@ export function runShortCircuit(modelOrOpts = {}, maybeOpts = {}) {
 
   buses.forEach(comp => {
     const baseZ = computeImpedance(comp, comps, compMap, impedanceCache);
+    const fallbackZ = (comp?.subtype === 'Bus' || comp?.type === 'bus')
+      ? resolveUpstreamImpedance(comp, comps, compMap, impedanceCache)
+      : null;
     let z1 = comp.z1 ? toImpedance(comp.z1) : baseZ;
     let z2 = comp.z2 ? toImpedance(comp.z2) : z1;
     let z0 = comp.z0 ? toImpedance(comp.z0) : z1;
 
     const sourceList = Array.isArray(comp.sources) ? comp.sources : [];
     if (sourceList.length) {
-      z1 = ensureNonZero(sourceList.reduce((acc, src) => combineParallel(acc, toImpedance(src.z1 || src.impedance || src)), z1), comp.id);
-      z2 = ensureNonZero(sourceList.reduce((acc, src) => combineParallel(acc, toImpedance(src.z2 || src.impedance || src)), z2), comp.id);
-      z0 = ensureNonZero(sourceList.reduce((acc, src) => combineParallel(acc, toImpedance(src.z0 || src.impedance || src)), z0), comp.id);
+      z1 = ensureNonZero(sourceList.reduce((acc, src) => combineParallel(acc, toImpedance(src.z1 || src.impedance || src)), z1), comp.id, fallbackZ);
+      z2 = ensureNonZero(sourceList.reduce((acc, src) => combineParallel(acc, toImpedance(src.z2 || src.impedance || src)), z2), comp.id, fallbackZ);
+      z0 = ensureNonZero(sourceList.reduce((acc, src) => combineParallel(acc, toImpedance(src.z0 || src.impedance || src)), z0), comp.id, fallbackZ);
     } else {
-      z1 = ensureNonZero(z1, comp.id);
-      z2 = ensureNonZero(z2, comp.id);
-      z0 = ensureNonZero(z0, comp.id);
+      z1 = ensureNonZero(z1, comp.id, fallbackZ);
+      z2 = ensureNonZero(z2, comp.id, fallbackZ);
+      z0 = ensureNonZero(z0, comp.id, fallbackZ);
     }
 
     const prefaultKV = computePrefaultKV(comp, comps, compMap, voltageCache) || 1;
