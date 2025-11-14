@@ -353,6 +353,36 @@ export function runShortCircuit(modelOrOpts = {}, maybeOpts = {}) {
 
   const missingImpedanceComponents = new Set();
   const defaultedLowImpedanceComponents = new Set();
+  const cablesMissingImpedance = new Set();
+  const cableDefaultTargets = new Set();
+
+  const reverseConnectionMap = new Map();
+  comps.forEach(component => {
+    if (!component?.id || !component?.connections || !component.connections.length) return;
+    component.connections.forEach(conn => {
+      const targetId = conn?.target;
+      if (!targetId) return;
+      if (!reverseConnectionMap.has(targetId)) reverseConnectionMap.set(targetId, new Set());
+      reverseConnectionMap.get(targetId).add(component.id);
+    });
+  });
+
+  comps.forEach(component => {
+    if (component?.type !== 'cable' || !component.id) return;
+    const base = toImpedance(component.impedance);
+    if (Math.abs(base.r) >= 1e-9 || Math.abs(base.x) >= 1e-9) return;
+    cablesMissingImpedance.add(component.id);
+    (component.connections || []).forEach(conn => {
+      if (typeof conn?.target === 'string') cableDefaultTargets.add(conn.target);
+      if (typeof conn?.source === 'string') cableDefaultTargets.add(conn.source);
+    });
+    const upstream = reverseConnectionMap.get(component.id);
+    if (upstream) {
+      upstream.forEach(id => {
+        if (typeof id === 'string') cableDefaultTargets.add(id);
+      });
+    }
+  });
 
   const ensureNonZero = (z, comp, fallbackZ) => {
     const r = Number(z?.r) || 0;
@@ -361,7 +391,9 @@ export function runShortCircuit(modelOrOpts = {}, maybeOpts = {}) {
       if (fallbackZ && (Math.abs(fallbackZ.r) >= 1e-9 || Math.abs(fallbackZ.x) >= 1e-9)) {
         return { r: fallbackZ.r, x: fallbackZ.x };
       }
-      if (comp?.type === 'cable' && comp?.id) {
+      const isCableMissing = comp?.type === 'cable' && comp?.id && cablesMissingImpedance.has(comp.id);
+      const isTargetOfMissingCable = comp?.id && cableDefaultTargets.has(comp.id);
+      if ((isCableMissing || isTargetOfMissingCable) && comp?.id) {
         defaultedLowImpedanceComponents.add(comp.id);
         return { r: 1e-6, x: 1e-6 };
       }
