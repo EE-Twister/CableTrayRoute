@@ -59,6 +59,7 @@ function pickValue(comp, key) {
 }
 
 const fallbackTypes = new Set(['motor_load', 'static_load', 'load', 'panel', 'equipment', 'bus', 'cable', 'mcc']);
+const protectionTypes = new Set(['breaker', 'fuse', 'recloser', 'relay', 'contactor', 'switch', 'protective_device']);
 const upstreamCandidateTypes = new Set([
   'transformer',
   'panel',
@@ -99,6 +100,18 @@ function normalizePortIndex(port) {
 
 function isSourceComponent(comp) {
   return ['utility_source', 'generator', 'pv_inverter'].includes(comp?.type);
+}
+
+function isProtectionComponent(comp) {
+  if (!comp || typeof comp !== 'object') return false;
+  if (comp.category === 'protection') return true;
+  const type = typeof comp.type === 'string' ? comp.type.toLowerCase() : '';
+  if (protectionTypes.has(type)) return true;
+  const subtype = typeof comp.subtype === 'string' ? comp.subtype.toLowerCase() : '';
+  if (protectionTypes.has(subtype)) return true;
+  const matchers = ['breaker', 'fuse', 'recloser', 'relay', 'contactor', 'switch'];
+  if (matchers.some(token => type.includes(token) || subtype.includes(token))) return true;
+  return false;
 }
 
 function getNumericFromKeys(comp, keys) {
@@ -352,7 +365,7 @@ export function runShortCircuit(modelOrOpts = {}, maybeOpts = {}) {
   const results = {};
 
   const missingImpedanceComponents = new Set();
-  const defaultedLowImpedanceComponents = new Set();
+  const defaultedLowImpedanceComponents = new Map();
   const cablesMissingImpedance = new Set();
   const cableDefaultTargets = new Set();
 
@@ -394,7 +407,17 @@ export function runShortCircuit(modelOrOpts = {}, maybeOpts = {}) {
       const isCableMissing = comp?.type === 'cable' && comp?.id && cablesMissingImpedance.has(comp.id);
       const isTargetOfMissingCable = comp?.id && cableDefaultTargets.has(comp.id);
       if ((isCableMissing || isTargetOfMissingCable) && comp?.id) {
-        defaultedLowImpedanceComponents.add(comp.id);
+        defaultedLowImpedanceComponents.set(
+          comp.id,
+          'Cable impedance incomplete; defaulted to very low resistance for fault monitoring.'
+        );
+        return { r: 1e-6, x: 1e-6 };
+      }
+      if (isProtectionComponent(comp) && comp?.id) {
+        defaultedLowImpedanceComponents.set(
+          comp.id,
+          'Protective device properties incomplete; defaulted to very low resistance for fault monitoring.'
+        );
         return { r: 1e-6, x: 1e-6 };
       }
       if (comp?.id) missingImpedanceComponents.add(comp.id);
@@ -447,8 +470,9 @@ export function runShortCircuit(modelOrOpts = {}, maybeOpts = {}) {
       doubleLineGroundKA: Number(IDLG.toFixed(2))
     };
 
-    if (defaultedLowImpedanceComponents.has(comp.id)) {
-      entry.warnings = ['Cable impedance incomplete; defaulted to very low resistance for fault monitoring.'];
+    const lowImpedanceWarning = defaultedLowImpedanceComponents.get(comp.id);
+    if (lowImpedanceWarning) {
+      entry.warnings = [lowImpedanceWarning];
     } else if (missingImpedanceComponents.has(comp.id)) {
       entry.warnings = ['Impedance data missing; results limited by default high resistance.'];
     }
