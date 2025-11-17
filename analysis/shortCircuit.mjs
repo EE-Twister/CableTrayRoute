@@ -1,4 +1,6 @@
-import { getOneLine } from '../dataStore.mjs';
+import { getOneLine, getItem } from '../dataStore.mjs';
+import { scaleCurve } from './tccUtils.js';
+import protectiveDevices from '../data/protectiveDevices.mjs';
 import { calculateTransformerImpedance } from '../utils/transformerImpedance.js';
 
 // Basic complex math utilities
@@ -57,6 +59,11 @@ function pickValue(comp, key) {
   }
   return undefined;
 }
+
+const protectiveDeviceLibrary = Array.isArray(protectiveDevices) ? protectiveDevices : [];
+const protectiveDeviceMap = new Map(protectiveDeviceLibrary.map(device => [device.id, device]));
+const DEFAULT_TCC_SETTINGS = { devices: [], settings: {}, componentOverrides: {} };
+const DEFAULT_LET_THROUGH_WINDOW = 0.008;
 
 const fallbackTypes = new Set(['motor_load', 'static_load', 'load', 'panel', 'equipment', 'bus', 'cable', 'mcc']);
 const protectionTypes = new Set(['breaker', 'fuse', 'recloser', 'relay', 'contactor', 'switch', 'protective_device']);
@@ -229,6 +236,142 @@ function findParentInfo(comp, comps, compMap, visited) {
   return null;
 }
 
+function loadTccSettings() {
+  try {
+    const stored = getItem('tccSettings', DEFAULT_TCC_SETTINGS);
+    if (stored && typeof stored === 'object') {
+      return {
+        devices: Array.isArray(stored.devices) ? stored.devices : [],
+        settings: stored.settings && typeof stored.settings === 'object' ? stored.settings : {},
+        componentOverrides: stored.componentOverrides && typeof stored.componentOverrides === 'object'
+          ? stored.componentOverrides
+          : {}
+      };
+    }
+  } catch (err) {
+    console.warn('Failed to load TCC settings; using defaults.', err);
+  }
+  return { devices: [], settings: {}, componentOverrides: {} };
+}
+
+function resolveTccOverrides(component, saved = {}, baseDevice) {
+  if (!component?.tccId || !baseDevice?.id) return {};
+  const deviceOverride = saved.settings?.[baseDevice.id]
+    || saved.settings?.[component.tccId]
+    || {};
+  const componentOverride = saved.componentOverrides?.[component.id] || {};
+  const inlineOverride = component.tccOverrides && typeof component.tccOverrides === 'object'
+    ? component.tccOverrides
+    : {};
+  return { ...deviceOverride, ...componentOverride, ...inlineOverride };
+}
+
+function getScaledDeviceForComponent(component, saved, cache) {
+  if (!component?.id || !component.tccId) return null;
+  if (cache.has(component.id)) return cache.get(component.id);
+  const base = protectiveDeviceMap.get(component.tccId);
+  if (!base) {
+    cache.set(component.id, null);
+    return null;
+  }
+  try {
+    const overrides = resolveTccOverrides(component, saved, base);
+    const scaled = scaleCurve(base, overrides);
+    const resolved = { base, scaled };
+    cache.set(component.id, resolved);
+    return resolved;
+  } catch (err) {
+    console.error('Failed to scale TCC curve for component', component.id, err);
+    cache.set(component.id, null);
+    return null;
+  }
+}
+
+function findNearestProtectiveComponent(comp, comps, compMap, cache) {
+  if (!comp?.id) return null;
+  if (cache.has(comp.id)) return cache.get(comp.id);
+  const visited = new Set([comp.id]);
+  let current = comp;
+  let result = null;
+  while (current) {
+    if (current !== comp && isProtectionComponent(current) && current.tccId) {
+      result = current;
+      break;
+    }
+    const parent = findParentInfo(current, comps, compMap, visited);
+    if (!parent?.component?.id || visited.has(parent.component.id)) break;
+    visited.add(parent.component.id);
+    current = parent.component;
+  }
+  cache.set(comp.id, result);
+  return result;
+}
+
+function computeLetThroughLimitKA(baseDevice, scaledDevice, faultKA) {
+  if (!baseDevice || !scaledDevice || !Number.isFinite(faultKA) || faultKA <= 0) return null;
+  const letThrough = baseDevice.letThrough && typeof baseDevice.letThrough === 'object'
+    ? baseDevice.letThrough
+    : null;
+  if (letThrough && Number.isFinite(letThrough.i2t) && letThrough.i2t > 0) {
+    const window = Number.isFinite(letThrough.window) && letThrough.window > 0
+      ? letThrough.window
+      : DEFAULT_LET_THROUGH_WINDOW;
+    const amps = Math.sqrt(letThrough.i2t / window);
+    if (Number.isFinite(amps) && amps > 0) return amps / 1000;
+  }
+  if (Array.isArray(scaledDevice.peakCurve) && scaledDevice.peakCurve.length) {
+    const maxPeak = scaledDevice.peakCurve.reduce((max, point) => {
+      const current = Number(point?.current) || 0;
+      return current > max ? current : max;
+    }, 0);
+    if (maxPeak > 0) return maxPeak / 1000;
+  }
+  if (Number.isFinite(baseDevice.interruptRating) && baseDevice.interruptRating > 0 && faultKA > baseDevice.interruptRating) {
+    return baseDevice.interruptRating;
+  }
+  return null;
+}
+
+function limitFaultByProtection(entry, comp, comps, compMap, protectiveCache, scaledCache, tccSettings) {
+  if (!comp?.id || !entry || !Number.isFinite(entry.threePhaseKA) || entry.threePhaseKA <= 0) return;
+  const protectiveComp = findNearestProtectiveComponent(comp, comps, compMap, protectiveCache);
+  if (!protectiveComp) return;
+  const resolved = getScaledDeviceForComponent(protectiveComp, tccSettings, scaledCache);
+  if (!resolved?.base || !resolved?.scaled) return;
+  const limitKA = computeLetThroughLimitKA(resolved.base, resolved.scaled, entry.threePhaseKA);
+  if (!Number.isFinite(limitKA) || limitKA <= 0 || limitKA >= entry.threePhaseKA - 1e-6) return;
+  const original = {
+    threePhaseKA: entry.threePhaseKA,
+    lineToGroundKA: entry.lineToGroundKA,
+    lineToLineKA: entry.lineToLineKA,
+    doubleLineGroundKA: entry.doubleLineGroundKA,
+    asymKA: entry.asymKA
+  };
+  const ratio = original.threePhaseKA > 0 ? limitKA / original.threePhaseKA : 0;
+  entry.threePhaseKA = Number(limitKA.toFixed(2));
+  const scaleField = key => {
+    if (!Number.isFinite(original[key]) || !Number.isFinite(ratio)) return;
+    entry[key] = Number((original[key] * ratio).toFixed(2));
+  };
+  scaleField('lineToGroundKA');
+  scaleField('lineToLineKA');
+  scaleField('doubleLineGroundKA');
+  scaleField('asymKA');
+  entry.protectionLimit = {
+    deviceId: resolved.base.id,
+    componentId: protectiveComp.id,
+    name: resolved.base.name || protectiveComp.tccId || resolved.base.id,
+    limitKA: Number(limitKA.toFixed(2)),
+    basis: resolved.base.letThrough?.i2t
+      ? 'i2t'
+      : Array.isArray(resolved.scaled.peakCurve) && resolved.scaled.peakCurve.length
+        ? 'peak_curve'
+        : Number.isFinite(resolved.base.interruptRating)
+          ? 'interrupt_rating'
+          : 'tcc'
+  };
+}
+
 function combineParallel(base, addition) {
   if (!addition || (Math.abs(addition.r) < 1e-9 && Math.abs(addition.x) < 1e-9)) return base;
   if (!base || (Math.abs(base.r) < 1e-9 && Math.abs(base.x) < 1e-9)) return addition;
@@ -362,6 +505,9 @@ export function runShortCircuit(modelOrOpts = {}, maybeOpts = {}) {
   const compMap = new Map(comps.map(c => [c.id, c]));
   const impedanceCache = new Map();
   const voltageCache = new Map();
+  const protectiveLookupCache = new Map();
+  const scaledDeviceCache = new Map();
+  const tccSettings = loadTccSettings();
   const results = {};
 
   const missingImpedanceComponents = new Set();
@@ -477,6 +623,7 @@ export function runShortCircuit(modelOrOpts = {}, maybeOpts = {}) {
       entry.warnings = ['Impedance data missing; results limited by default high resistance.'];
     }
 
+    limitFaultByProtection(entry, comp, comps, compMap, protectiveLookupCache, scaledDeviceCache, tccSettings);
     results[comp.id] = entry;
   });
 

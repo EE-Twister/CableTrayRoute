@@ -16,7 +16,7 @@ global.localStorage = {
 };
 
 (async () => {
-  const { setOneLine } = await import('../../dataStore.mjs');
+  const { setOneLine, setItem } = await import('../../dataStore.mjs');
   const { runShortCircuit } = await import('../../analysis/shortCircuit.mjs');
 
   describe('short circuit engine', () => {
@@ -74,6 +74,63 @@ global.localStorage = {
       assert(bus.threePhaseKA > 0.1, 'three-phase fault current should be non-zero');
       assert(bus.lineToGroundKA > 0.1, 'line-to-ground fault current should be non-zero');
       assert(!bus.warnings, 'bus should not have impedance warnings');
+    });
+
+    it('limits downstream fault current using protective device let-through data', () => {
+      const buildModel = withTcc => {
+        const fuse = {
+          id: 'fuse1',
+          type: 'fuse',
+          connections: [{ target: 'bus480', sourcePort: 1, targetPort: 0 }]
+        };
+        if (withTcc) fuse.tccId = 'mersen_trs200r';
+        return {
+          activeSheet: 0,
+          sheets: [{
+            name: 'Fuse Study',
+            components: [
+              {
+                id: 'utility',
+                type: 'utility_source',
+                voltage: 480,
+                thevenin_mva: 500,
+                connections: [{ target: 'fuse1', sourcePort: 0, targetPort: 0 }]
+              },
+              fuse,
+              {
+                id: 'bus480',
+                type: 'bus',
+                subtype: 'Bus',
+                kV: 0.48,
+                z1: { r: 0.0004, x: 0.0004 },
+                z2: { r: 0.0004, x: 0.0004 },
+                z0: { r: 0.0004, x: 0.0004 }
+              }
+            ]
+          }]
+        };
+      };
+
+      setItem('tccSettings', { devices: [], settings: {}, componentOverrides: {} });
+
+      setOneLine(buildModel(false));
+      const baseline = runShortCircuit();
+      const base = baseline.bus480;
+      assert(base, 'baseline bus should exist');
+      assert(base.threePhaseKA > 5, 'baseline short-circuit current should exceed 5 kA');
+
+      setOneLine(buildModel(true));
+      const limited = runShortCircuit();
+      const bus = limited.bus480;
+      assert(bus, 'limited bus should exist');
+      assert(bus.protectionLimit, 'protection limit metadata should be present');
+      assert.strictEqual(bus.protectionLimit.deviceId, 'mersen_trs200r');
+      assert.strictEqual(bus.protectionLimit.basis, 'i2t');
+      assert(bus.threePhaseKA < base.threePhaseKA, 'limited current should be lower than baseline');
+      assert(Math.abs(bus.threePhaseKA - bus.protectionLimit.limitKA) < 0.05, 'reported current should match limit');
+      const ratioBase = base.lineToGroundKA / base.threePhaseKA;
+      const ratioLimited = bus.lineToGroundKA / bus.threePhaseKA;
+      assert(Math.abs(ratioBase - ratioLimited) < 0.05, 'fault components should scale consistently');
     });
   });
 })();
