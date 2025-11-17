@@ -70,4 +70,52 @@ describe('loadFlowModel voltage inheritance', () => {
     assert.strictEqual(hvBus.prefault_voltage, hvPrefault, 'Primary bus should expose prefault voltage for studies');
     assert.strictEqual(lvBus.prefault_voltage, lvPrefault, 'Secondary bus should expose prefault voltage for studies');
   });
+
+  it('propagates loads across deep component chains when searching for a bus', () => {
+    const chainLength = 5;
+    const busId = 'source_bus';
+    const loadId = 'far_load';
+    const chainIds = Array.from({ length: chainLength }, (_, idx) => `link_${idx + 1}`);
+    const components = [
+      {
+        id: busId,
+        type: 'bus',
+        subtype: 'bus_Bus',
+        voltage: '13.8'
+      },
+      ...chainIds.map((id, idx) => ({
+        id,
+        type: 'cable',
+        connections: [
+          {
+            target: idx === 0 ? busId : chainIds[idx - 1]
+          }
+        ]
+      })),
+      {
+        id: loadId,
+        type: 'load',
+        kw: 125,
+        connections: [
+          {
+            target: chainIds[chainIds.length - 1]
+          }
+        ]
+      }
+    ];
+    const fixture = {
+      sheets: [
+        {
+          components,
+          connections: []
+        }
+      ]
+    };
+
+    const model = buildLoadFlowModel(fixture);
+    const sourceBus = model.buses.find(bus => bus.id === busId);
+    assert(sourceBus, 'The source bus should exist in the model');
+    assert(sourceBus.load, 'The bus should have an aggregated load');
+    assert.strictEqual(sourceBus.load.kw, 125, 'The bus should accumulate the remote load kW');
+  });
 });

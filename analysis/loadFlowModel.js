@@ -574,24 +574,42 @@ function findDirectBusId(comp, busMap) {
   return null;
 }
 
-function findNearestBusId(comp, busMap, adjacency) {
+const DEFAULT_BFS_WARN_THRESHOLD = 2000;
+const DEFAULT_BFS_MAX_NODES = 10000;
+
+function findNearestBusId(comp, busMap, adjacency, options) {
   if (!comp || !comp.id) return null;
   const direct = findDirectBusId(comp, busMap);
   if (direct) return direct;
   if (!adjacency) return null;
+  const { maxNodes = DEFAULT_BFS_MAX_NODES, warnThreshold = DEFAULT_BFS_WARN_THRESHOLD, onWarn } = options || {};
+  const warnFn = typeof onWarn === 'function'
+    ? onWarn
+    : (typeof console !== 'undefined' && typeof console.warn === 'function' ? (...args) => console.warn(...args) : null);
   const visited = new Set([comp.id]);
-  const queue = [{ id: comp.id, depth: 0 }];
-  const maxDepth = 3;
+  const queue = [comp.id];
+  let traversed = 0;
+  let warned = false;
   while (queue.length) {
-    const { id, depth } = queue.shift();
-    if (depth >= maxDepth) continue;
+    const id = queue.shift();
+    traversed += 1;
+    if (!warned && warnThreshold && Number.isFinite(warnThreshold) && traversed >= warnThreshold) {
+      if (warnFn) warnFn(`findNearestBusId traversed ${traversed} nodes while resolving bus for component ${comp.id}`);
+      warned = true;
+    }
+    if (maxNodes && Number.isFinite(maxNodes) && traversed > maxNodes) {
+      if (!warned && warnFn) {
+        warnFn(`findNearestBusId exceeded max traversal of ${maxNodes} nodes while resolving component ${comp.id}`);
+      }
+      return null;
+    }
     const neighbors = adjacency.get(id);
     if (!neighbors) continue;
     for (const neighbor of neighbors) {
       if (visited.has(neighbor)) continue;
       if (busMap.has(neighbor)) return neighbor;
       visited.add(neighbor);
-      queue.push({ id: neighbor, depth: depth + 1 });
+      queue.push(neighbor);
     }
   }
   return null;
