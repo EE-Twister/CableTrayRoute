@@ -2936,6 +2936,21 @@ body.dark-mode .sticky-table tbody tr:hover {
     z-index: 1;
 }
 
+.sticky-table th,
+.sticky-table td {
+    border-right: 1px dashed rgba(0, 0, 0, 0.15);
+}
+
+.sticky-table th:last-child,
+.sticky-table td:last-child {
+    border-right: none;
+}
+
+body.dark-mode .sticky-table th,
+body.dark-mode .sticky-table td {
+    border-right-color: rgba(255, 255, 255, 0.25);
+}
+
 /* Utilization Bars */
 .util-bar {
     position: relative;

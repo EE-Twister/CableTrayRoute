@@ -140,17 +140,20 @@ class TableManager {
     this.selectable = opts.selectable || false;
     this.colOffset = this.selectable ? 1 : 0;
     this.enableContextMenu = opts.enableContextMenu || false;
+    this.enableHeaderContextMenu = opts.enableHeaderContextMenu !== false;
     this.showActionColumn = opts.showActionColumn !== false;
     this.customFilters = new Map();
     this.handleHeaderDragStart = this.handleHeaderDragStart.bind(this);
     this.handleHeaderDragOver = this.handleHeaderDragOver.bind(this);
     this.handleHeaderDrop = this.handleHeaderDrop.bind(this);
+    this.handleHeaderContextMenu = this.handleHeaderContextMenu.bind(this);
     this.measureCanvas = null;
     this.measureCtx = null;
     this.buildHeader();
     this.initButtons(opts);
     this.load();
     if (this.enableContextMenu) this.initContextMenu();
+    if (this.enableHeaderContextMenu) this.initHeaderContextMenu();
     this.hiddenGroups = new Set();
     this.loadGroupState();
     this.updateRowCount();
@@ -198,6 +201,7 @@ class TableManager {
 
     if (this.selectable) {
       const selTh = document.createElement('th');
+      selTh.dataset.role = 'select';
       const selAll = document.createElement('input');
       selAll.type = 'checkbox';
       selAll.id = `${this.table.id}-select-all`;
@@ -318,6 +322,7 @@ class TableManager {
       const actTh = document.createElement('th');
       actTh.textContent = 'Actions';
       actTh.style.position='relative';
+      actTh.dataset.role = 'action';
       const res=document.createElement('span');
       res.className='col-resizer';
       actTh.appendChild(res);
@@ -342,6 +347,102 @@ class TableManager {
     headerRow.addEventListener('dragover', this.handleHeaderDragOver);
     headerRow.addEventListener('drop', this.handleHeaderDrop);
     this.syncGroupBlankWidth();
+  }
+
+  getColumnHeaderFromTarget(target) {
+    if (!target || !this.headerRow) return null;
+    const th = target.closest('th');
+    if (!th) return null;
+    if (th.parentElement !== this.headerRow) return null;
+    return th;
+  }
+
+  getColumnIndexFromHeaderCell(th) {
+    if (!th || th.parentElement !== this.headerRow) return null;
+    if (Object.prototype.hasOwnProperty.call(th.dataset, 'index')) {
+      const idx = Number(th.dataset.index);
+      return Number.isNaN(idx) ? null : idx;
+    }
+    if (th.dataset.role === 'action' && this.showActionColumn) {
+      return 'action';
+    }
+    return null;
+  }
+
+  isHeaderCellResizable(th) {
+    if (!th) return false;
+    const idx = this.getColumnIndexFromHeaderCell(th);
+    if (idx === null) return false;
+    if (th.dataset.role === 'select') return false;
+    return true;
+  }
+
+  getHeaderCellWidth(th) {
+    if (!th) return 0;
+    const rect = th.getBoundingClientRect();
+    return Math.max(30, Math.round(rect.width || 0));
+  }
+
+  setColumnWidthFromHeaderCell(th, width) {
+    if (!this.isHeaderCellResizable(th)) return;
+    const idx = this.getColumnIndexFromHeaderCell(th);
+    if (idx === null) return;
+    if (idx === 'action') {
+      const cellIndex = this.columns.length + this.colOffset;
+      const px = this.setCellWidth(cellIndex, width);
+      if (this.groupBlankTh) this.groupBlankTh.style.width = px;
+      return;
+    }
+    this.applyColumnWidth(idx, width);
+  }
+
+  promptColumnWidth(th) {
+    if (!this.isHeaderCellResizable(th)) return;
+    const current = this.getHeaderCellWidth(th);
+    const response = window.prompt('Enter column width in pixels', String(current));
+    if (response === null) return;
+    const parsed = Number.parseInt(response, 10);
+    if (Number.isNaN(parsed)) {
+      alert('Please enter a valid number of pixels.');
+      return;
+    }
+    const width = Math.min(Math.max(parsed, 60), 1000);
+    this.setColumnWidthFromHeaderCell(th, width);
+  }
+
+  initHeaderContextMenu() {
+    if (!this.thead) return;
+    this.headerContextMenu = new ContextMenu([
+      {
+        label: 'Auto Size Column',
+        action: th => {
+          if (!this.isHeaderCellResizable(th)) return;
+          const idx = this.getColumnIndexFromHeaderCell(th);
+          if (idx === null) return;
+          if (idx === 'action') {
+            this.autoSizeActionColumn();
+          } else {
+            this.autoSizeColumn(idx);
+          }
+        },
+        isDisabled: th => !this.isHeaderCellResizable(th)
+      },
+      {
+        label: 'Set Column Width…',
+        action: th => this.promptColumnWidth(th),
+        isDisabled: th => !this.isHeaderCellResizable(th)
+      }
+    ]);
+    this.thead.addEventListener('contextmenu', this.handleHeaderContextMenu);
+  }
+
+  handleHeaderContextMenu(e) {
+    if (!this.headerContextMenu) return;
+    const th = this.getColumnHeaderFromTarget(e.target);
+    if (!this.isHeaderCellResizable(th)) return;
+    e.preventDefault();
+    e.stopPropagation();
+    this.headerContextMenu.show(e.pageX, e.pageY, th);
   }
 
   setCellWidth(cellIndex, width) {
