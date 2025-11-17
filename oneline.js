@@ -4345,16 +4345,42 @@ function scheduleImplicitHistoryUpdate() {
   });
 }
 
-function assignInheritedVoltage(target, voltageValue, connection = null) {
+function applyInheritedBaseVoltage(target, resolvedVolts) {
+  if (!target || !Number.isFinite(resolvedVolts) || resolvedVolts <= 0) return false;
+  const kv = Number((resolvedVolts / 1000).toFixed(6));
+  let changed = false;
+  const assignValue = (holder, key, value) => {
+    if (!holder || typeof holder !== 'object') return false;
+    if (holder[key] === value) return false;
+    holder[key] = value;
+    return true;
+  };
+  changed = assignValue(target, 'baseKV', kv) || changed;
+  changed = assignValue(target, 'kV', kv) || changed;
+  changed = assignValue(target, 'kv', kv) || changed;
+  changed = assignValue(target, 'prefault_voltage', kv) || changed;
+  if (!target.props || typeof target.props !== 'object') target.props = {};
+  changed = assignValue(target.props, 'baseKV', kv) || changed;
+  changed = assignValue(target.props, 'kV', kv) || changed;
+  changed = assignValue(target.props, 'kv', kv) || changed;
+  changed = assignValue(target.props, 'prefault_voltage', kv) || changed;
+  return changed;
+}
+
+function assignInheritedVoltage(target, voltageValue, connection = null, resolvedVolts = null) {
   if (!target) return false;
   const num = parseVoltageNumber(voltageValue);
   if (num === null) return false;
   const formatted = formatVoltageString(num);
   if (!formatted) return false;
+  const normalizedVolts = Number.isFinite(resolvedVolts)
+    ? resolvedVolts
+    : normalizeVoltageToVolts(voltageValue ?? num);
+  if (!target.props || typeof target.props !== 'object') target.props = {};
+  const baseChanged = applyInheritedBaseVoltage(target, normalizedVolts);
   const current = target.voltage ?? '';
   const changed = String(current) !== formatted;
   const connectionChanged = connection ? String(connection.voltage ?? '') !== formatted : false;
-  if (!target.props || typeof target.props !== 'object') target.props = {};
   target.voltage = formatted;
   target.props.voltage = formatted;
   target.props.volts = formatted;
@@ -4364,8 +4390,8 @@ function assignInheritedVoltage(target, voltageValue, connection = null) {
     connection.props.voltage = formatted;
     connection.props.volts = formatted;
   }
-  if (changed || connectionChanged) scheduleImplicitHistoryUpdate();
-  return changed || connectionChanged;
+  if (changed || connectionChanged || baseChanged) scheduleImplicitHistoryUpdate();
+  return changed || connectionChanged || baseChanged;
 }
 
 function propagateTransformerVoltages(comps) {
@@ -4393,6 +4419,10 @@ function propagateTransformerVoltages(comps) {
     secondaryPorts.forEach(portIdx => {
       const voltageValue = resolveTransformerVoltageValue(transformer, portIdx);
       if (voltageValue === null) return;
+      const voltageInVolts = normalizeVoltageToVolts(voltageValue);
+      const resolvedVolts = Number.isFinite(voltageInVolts) && voltageInVolts > 0
+        ? voltageInVolts
+        : null;
       const queue = [];
       const visited = new Set([transformer.id]);
       (transformer.connections || []).forEach(conn => {
@@ -4411,7 +4441,7 @@ function propagateTransformerVoltages(comps) {
         const { component: current, connection } = queue.shift();
         if (!current || visited.has(current.id)) continue;
         visited.add(current.id);
-        assignInheritedVoltage(current, voltageValue, connection);
+        assignInheritedVoltage(current, voltageValue, connection, resolvedVolts);
         (current.connections || []).forEach(conn => {
           const neighbor = byId.get(conn.target);
           if (!neighbor || neighbor.type === 'transformer' || visited.has(neighbor.id)) return;
@@ -4464,6 +4494,10 @@ function propagateSourceVoltagesToBuses(comps) {
     if (!Number.isFinite(voltageValue)) voltageValue = parseVoltageNumber(source?.voltage);
     if (!Number.isFinite(voltageValue)) voltageValue = parseVoltageNumber(source?.props?.voltage || source?.props?.volts);
     if (!Number.isFinite(voltageValue)) return;
+    const voltageInVolts = normalizeVoltageToVolts(voltageValue);
+    const resolvedVolts = Number.isFinite(voltageInVolts) && voltageInVolts > 0
+      ? voltageInVolts
+      : null;
 
     const visited = new Set([source.id]);
     const queue = gatherNeighborEntries(source, byId, inbound);
@@ -4474,7 +4508,7 @@ function propagateSourceVoltagesToBuses(comps) {
       if (neighbor.type === 'transformer') continue;
       if (isSourceComponent(neighbor)) continue;
       if (isBusComponent(neighbor)) {
-        assignInheritedVoltage(neighbor, voltageValue, connection);
+        assignInheritedVoltage(neighbor, voltageValue, connection, resolvedVolts);
       }
       gatherNeighborEntries(neighbor, byId, inbound).forEach(entry => {
         if (!entry.component || visited.has(entry.component.id)) return;
