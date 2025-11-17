@@ -4325,6 +4325,26 @@ function formatOperatingVoltage(value) {
   return value;
 }
 
+let pendingImplicitHistoryUpdate = false;
+let implicitHistoryUpdateScheduled = false;
+
+function scheduleImplicitHistoryUpdate() {
+  if (implicitHistoryUpdateScheduled) {
+    pendingImplicitHistoryUpdate = true;
+    return;
+  }
+  if (historyIndex < 0 || historyIndex >= history.length) return;
+  pendingImplicitHistoryUpdate = true;
+  implicitHistoryUpdateScheduled = true;
+  Promise.resolve().then(() => {
+    implicitHistoryUpdateScheduled = false;
+    if (!pendingImplicitHistoryUpdate) return;
+    pendingImplicitHistoryUpdate = false;
+    if (historyIndex < 0 || historyIndex >= history.length) return;
+    history[historyIndex] = JSON.parse(JSON.stringify(components));
+  });
+}
+
 function assignInheritedVoltage(target, voltageValue, connection = null) {
   if (!target) return false;
   const num = parseVoltageNumber(voltageValue);
@@ -4333,9 +4353,19 @@ function assignInheritedVoltage(target, voltageValue, connection = null) {
   if (!formatted) return false;
   const current = target.voltage ?? '';
   const changed = String(current) !== formatted;
+  const connectionChanged = connection ? String(connection.voltage ?? '') !== formatted : false;
+  if (!target.props || typeof target.props !== 'object') target.props = {};
   target.voltage = formatted;
-  if (connection) connection.voltage = formatted;
-  return changed;
+  target.props.voltage = formatted;
+  target.props.volts = formatted;
+  if (connection) {
+    if (!connection.props || typeof connection.props !== 'object') connection.props = {};
+    connection.voltage = formatted;
+    connection.props.voltage = formatted;
+    connection.props.volts = formatted;
+  }
+  if (changed || connectionChanged) scheduleImplicitHistoryUpdate();
+  return changed || connectionChanged;
 }
 
 function propagateTransformerVoltages(comps) {
