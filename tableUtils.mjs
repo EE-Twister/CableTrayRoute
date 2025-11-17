@@ -145,6 +145,8 @@ class TableManager {
     this.handleHeaderDragStart = this.handleHeaderDragStart.bind(this);
     this.handleHeaderDragOver = this.handleHeaderDragOver.bind(this);
     this.handleHeaderDrop = this.handleHeaderDrop.bind(this);
+    this.measureCanvas = null;
+    this.measureCtx = null;
     this.buildHeader();
     this.initButtons(opts);
     this.load();
@@ -268,6 +270,7 @@ class TableManager {
       th.dataset.index = idx;
       const labelSpan=document.createElement('span');
       labelSpan.textContent=col.label;
+      labelSpan.className='header-label';
       th.appendChild(labelSpan);
       const btn=document.createElement('button');
       btn.className='filter-btn';
@@ -280,17 +283,19 @@ class TableManager {
       th.appendChild(resizer);
       let startX,startWidth;
       const onMove=e=>{
-        const newWidth=Math.max(30,startWidth+e.pageX-startX);
-        th.style.width=newWidth+'px';
-        Array.from(this.tbody.rows).forEach(r=>{if(r.cells[idx+offset]) r.cells[idx+offset].style.width=newWidth+'px';});
+        const newWidth=Math.max(60,startWidth+e.pageX-startX);
+        this.applyColumnWidth(idx,newWidth);
       };
       resizer.addEventListener('mousedown',e=>{
+        e.preventDefault();
+        e.stopPropagation();
         startX=e.pageX;startWidth=th.offsetWidth;
         document.addEventListener('mousemove',onMove);
         document.addEventListener('mouseup',()=>{
           document.removeEventListener('mousemove',onMove);
         },{once:true});
       });
+      resizer.addEventListener('dblclick',e=>{e.preventDefault();e.stopPropagation();this.autoSizeColumn(idx);});
       if (col.group && idx === this.groupFirstIndex[col.group] && this.groupOrder.indexOf(col.group) > 0) {
         th.classList.add('category-separator');
       }
@@ -318,19 +323,119 @@ class TableManager {
       actTh.appendChild(res);
       let startX,startWidth;
       const move=e=>{
-        const newWidth=Math.max(30,startWidth+e.pageX-startX);
-        actTh.style.width=newWidth+'px';
+        const newWidth=Math.max(60,startWidth+e.pageX-startX);
         const idx = this.columns.length + offset;
-        Array.from(this.tbody.rows).forEach(r=>{if(r.cells[idx]) r.cells[idx].style.width=newWidth+'px';});
-        if(this.groupBlankTh) this.groupBlankTh.style.width=newWidth+'px';
+        const px = this.setCellWidth(idx,newWidth);
+        if(this.groupBlankTh) this.groupBlankTh.style.width=px;
       };
-      res.addEventListener('mousedown',e=>{startX=e.pageX;startWidth=actTh.offsetWidth;document.addEventListener('mousemove',move);document.addEventListener('mouseup',()=>{document.removeEventListener('mousemove',move);},{once:true});});
+      res.addEventListener('mousedown',e=>{
+        e.preventDefault();
+        e.stopPropagation();
+        startX=e.pageX;startWidth=actTh.offsetWidth;
+        document.addEventListener('mousemove',move);
+        document.addEventListener('mouseup',()=>{document.removeEventListener('mousemove',move);},{once:true});
+      });
+      res.addEventListener('dblclick',e=>{e.preventDefault();e.stopPropagation();this.autoSizeActionColumn();});
       headerRow.appendChild(actTh);
     }
     headerRow.addEventListener('dragstart', this.handleHeaderDragStart);
     headerRow.addEventListener('dragover', this.handleHeaderDragOver);
     headerRow.addEventListener('drop', this.handleHeaderDrop);
     this.syncGroupBlankWidth();
+  }
+
+  setCellWidth(cellIndex, width) {
+    const pxWidth = `${Math.max(30, Math.floor(width))}px`;
+    if (this.headerRow && this.headerRow.cells[cellIndex]) {
+      this.headerRow.cells[cellIndex].style.width = pxWidth;
+    }
+    Array.from(this.tbody.rows).forEach(row => {
+      const cell = row.cells[cellIndex];
+      if (cell) cell.style.width = pxWidth;
+    });
+    return pxWidth;
+  }
+
+  applyColumnWidth(idx, width) {
+    const cellIndex = idx + this.colOffset;
+    return this.setCellWidth(cellIndex, width);
+  }
+
+  autoSizeColumn(idx) {
+    const width = this.computeAutoWidth(idx);
+    if (width) this.applyColumnWidth(idx, width);
+  }
+
+  autoSizeActionColumn() {
+    if (!this.showActionColumn) return;
+    const cellIndex = this.columns.length + this.colOffset;
+    const width = this.computeAutoWidthFromCellIndex(cellIndex);
+    if (!width) return;
+    const px = this.setCellWidth(cellIndex, width);
+    if (this.groupBlankTh) this.groupBlankTh.style.width = px;
+  }
+
+  computeAutoWidth(idx) {
+    const cellIndex = idx + this.colOffset;
+    return this.computeAutoWidthFromCellIndex(cellIndex);
+  }
+
+  computeAutoWidthFromCellIndex(cellIndex) {
+    if (!this.headerRow || !this.headerRow.cells[cellIndex]) return null;
+    const headerCell = this.headerRow.cells[cellIndex];
+    let maxWidth = this.measureCellContentWidth(headerCell, true);
+    Array.from(this.tbody.rows).forEach(row => {
+      const cell = row.cells[cellIndex];
+      if (!cell) return;
+      const width = this.measureCellContentWidth(cell);
+      if (width > maxWidth) maxWidth = width;
+    });
+    return Math.min(Math.max(Math.ceil(maxWidth), 60), 600);
+  }
+
+  measureCellContentWidth(cell, isHeader = false) {
+    const style = window.getComputedStyle(cell);
+    const paddingLeft = parseFloat(style.paddingLeft) || 0;
+    const paddingRight = parseFloat(style.paddingRight) || 0;
+    let font = style.font;
+    let text = cell.textContent || '';
+    let extra = isHeader ? 36 : 28;
+    if (isHeader) {
+      const label = cell.querySelector('.header-label');
+      if (label) {
+        const labelStyle = window.getComputedStyle(label);
+        font = labelStyle.font || font;
+        text = label.textContent || text;
+      }
+    }
+    const control = cell.querySelector('input,textarea,select');
+    if (control) {
+      const controlStyle = window.getComputedStyle(control);
+      font = controlStyle.font || font;
+      if (control.tagName === 'SELECT') {
+        if (control.multiple) {
+          const selections = Array.from(control.selectedOptions || []);
+          text = selections.length ? selections.map(opt => opt.text).join(', ') : '';
+        } else {
+          const selected = control.selectedIndex >= 0 ? control.options[control.selectedIndex] : null;
+          text = selected ? selected.text : '';
+        }
+        extra = 40;
+      } else {
+        text = control.value || control.placeholder || '';
+        extra = 32;
+      }
+    }
+    return this.measureText(text.trim(), font) + paddingLeft + paddingRight + extra;
+  }
+
+  measureText(text, font) {
+    if (!this.measureCanvas) {
+      this.measureCanvas = document.createElement('canvas');
+      this.measureCtx = this.measureCanvas.getContext('2d');
+    }
+    if (font) this.measureCtx.font = font;
+    return this.measureCtx.measureText(text || '').width;
   }
 
   setGroupVisibility(name, hide) {
