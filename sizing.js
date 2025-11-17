@@ -2,6 +2,7 @@ import ampacity from './ampacity.mjs';
 import { calculateVoltageDrop } from './src/voltageDrop.js';
 import nec from './codes/necTables.js';
 import iec from './codes/iecTables.js';
+import { normalizeCablePhases } from './utils/cablePhases.js';
 
 let conductorProps = {};
 try {
@@ -105,10 +106,11 @@ export function calculateAmpacity(cable, params = {}) {
 export { calculateVoltageDrop };
 
 export function summarizeCable(cable, params = {}) {
+  const normalizedPhases = normalizeCablePhases(cable);
   const load = {
     current: cable.est_load,
     voltage: cable.operating_voltage,
-    phases: cable.phases || 3,
+    phases: normalizedPhases.length || parseInt(cable.phases, 10) || 3,
     conductors: cable.conductors
   };
   const res = sizeConductor(load, {

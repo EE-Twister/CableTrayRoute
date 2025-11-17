@@ -83,6 +83,7 @@ import { openModal } from './src/components/modal.js';
 import { normalizeVoltageToVolts, toBaseKV } from './utils/voltage.js';
 import { calculateTransformerImpedance } from './utils/transformerImpedance.js';
 import { computeImpedanceFromPerKm } from './utils/cableImpedance.js';
+import { normalizeCablePhases, formatCablePhases } from './utils/cablePhases.js';
 import {
   resolveTransformerKva,
   resolveTransformerPercentZ,
@@ -3089,22 +3090,13 @@ function getCableForConnection(source, target, conn) {
   return conn?.cable || null;
 }
 
-function parseCablePhases(cable) {
-  if (!cable) return [];
-  if (Array.isArray(cable.phases)) return cable.phases.map(p => String(p).trim().toUpperCase()).filter(Boolean);
-  if (typeof cable.phases === 'number') {
-    if (cable.phases === 3) return ['A', 'B', 'C'];
-    if (cable.phases === 2) return ['A', 'B'];
-    if (cable.phases === 1) return ['A'];
-    return [];
-  }
-  if (typeof cable.phases === 'string') {
-    return cable.phases
-      .split(/[\s,]+/)
-      .map(p => p.trim().toUpperCase())
-      .filter(Boolean);
-  }
-  return [];
+function parseCablePhases(source) {
+  return normalizeCablePhases(source);
+}
+
+function hasStoredPhases(value) {
+  if (Array.isArray(value)) return true;
+  return value !== undefined && value !== null && value !== '';
 }
 
 // Phase sequence colors used for connection rendering
@@ -5338,9 +5330,8 @@ function render() {
       const cableInfo = getCableForConnection(c, target, conn);
       const vRange = getVoltageRange(conn.voltage || cableInfo?.voltage || c.voltage || target.voltage);
       if (vRange) usedVoltageRanges.add(vRange);
-      const rawPhases = conn.phases && conn.phases.length
-        ? (Array.isArray(conn.phases) ? conn.phases : parseCablePhases({ phases: conn.phases }))
-        : parseCablePhases(cableInfo);
+      const connPhaseList = parseCablePhases(conn?.phases);
+      const rawPhases = connPhaseList.length ? connPhaseList : parseCablePhases(cableInfo);
       const phaseKey = rawPhases.join('');
       const phaseColor = phaseColors[phaseKey];
       const stroke = phaseColor || vRange?.color || cableColors[cableInfo?.cable_type] || cableInfo?.color || '#000';
@@ -8414,7 +8405,7 @@ async function chooseCable(source, target, existingConn = null) {
     if (c.type === 'cable' && c.cable && !seen.has(c.cable.tag)) {
       const template = {
         ...c.cable,
-        phases: Array.isArray(c.cable.phases) ? c.cable.phases.join(',') : c.cable.phases,
+        phases: formatCablePhases(c.cable),
         conductors: c.cable.conductors
       };
       if (hasImpedance(c.cable)) template.impedance = { ...c.cable.impedance };
@@ -8425,7 +8416,7 @@ async function chooseCable(source, target, existingConn = null) {
       if (conn.cable && !seen.has(conn.cable.tag)) {
         const template = {
           ...conn.cable,
-          phases: (conn.phases || []).join(','),
+          phases: formatCablePhases(conn.phases),
           conductors: conn.conductors || conn.cable?.conductors
         };
         if (hasImpedance(conn.cable)) template.impedance = { ...conn.cable.impedance };
@@ -8881,9 +8872,10 @@ async function chooseCable(source, target, existingConn = null) {
       typeInput.value = existing.cable_type || '';
       ratingInput.value = existing.cable_rating || '';
       conductorsInput.value = existingConn.conductors || existing.conductors || '';
-      phasesInput.value = Array.isArray(existingConn.phases)
-        ? existingConn.phases.join(',')
-        : existing.phases || '';
+      const presetPhases = hasStoredPhases(existingConn.phases)
+        ? formatCablePhases(existingConn.phases)
+        : formatCablePhases(existing);
+      phasesInput.value = presetPhases || '';
       sizeInput.value = existing.conductor_size || '';
       materialInput.value = existing.conductor_material || '';
       resistancePerKmInput.value = existing.resistance_per_km ?? '';
@@ -8946,6 +8938,7 @@ async function chooseCable(source, target, existingConn = null) {
         .split(',')
         .map(p => p.trim().toUpperCase())
         .filter(Boolean);
+      const normalizedPhases = phases.slice();
       const conductors = conductorsInput.value;
       const manualLen = lengthInput.value.trim() !== '';
       const cable = {
@@ -8978,7 +8971,7 @@ async function chooseCable(source, target, existingConn = null) {
         core_configuration: coreConfigurationInput.value,
         ground_return_path_resistance: parseNumericValue(groundReturnInput),
         color: colorInput.value,
-        phases: phases.length,
+        phases: normalizedPhases,
         calc_ampacity: sizeInput.dataset.calcAmpacity || '',
         voltage_drop_pct: sizeInput.dataset.voltageDrop || '',
         sizing_warning: sizeInput.dataset.sizingWarning || '',
@@ -9025,7 +9018,7 @@ async function chooseCable(source, target, existingConn = null) {
       if (hasImpedance(cable)) resolvedCable.impedance = { ...cable.impedance };
       resolve({
         cable: resolvedCable,
-        phases,
+        phases: normalizedPhases.slice(),
         conductors,
         impedance: hasImpedance(cable) ? { ...cable.impedance } : undefined
       });
@@ -9044,7 +9037,7 @@ async function editCableComponent(comp) {
   const workingConn = outbound || {
     target: target.id || '',
     cable: comp.cable,
-    phases: Array.isArray(comp.cable?.phases) ? comp.cable.phases : parseCablePhases(comp.cable),
+    phases: parseCablePhases(comp.cable),
     conductors: comp.cable?.conductors || comp.cable?.conductors_count || ''
   };
   const hadOutboundCable = outbound ? Object.prototype.hasOwnProperty.call(outbound, 'cable') : false;
@@ -9062,11 +9055,13 @@ async function editCableComponent(comp) {
   if (!res) return;
   const updatedCable = { ...res.cable };
   if (hasImpedance(res.cable)) updatedCable.impedance = { ...res.cable.impedance };
+  const resolvedPhases = parseCablePhases(res.phases ?? updatedCable);
+  updatedCable.phases = resolvedPhases.slice();
   comp.cable = updatedCable;
   if (outbound) {
     outbound.cable = { ...updatedCable };
     if (hasImpedance(updatedCable)) outbound.cable.impedance = { ...updatedCable.impedance };
-    outbound.phases = res.phases;
+    outbound.phases = resolvedPhases.slice();
     outbound.conductors = res.conductors;
     if (res.impedance && typeof res.impedance === 'object') {
       outbound.impedance = { ...res.impedance };
@@ -10490,10 +10485,10 @@ function buildCableSpecFromComponent(comp, allComps) {
   if (!spec.tag) spec.tag = comp.label || comp.id;
   spec.from_tag = upstream?.ref || upstream?.id || '';
   spec.to_tag = target?.ref || outbound?.target || '';
-  const phases = outbound?.phases && outbound.phases.length
-    ? (Array.isArray(outbound.phases) ? outbound.phases : parseCablePhases({ phases: outbound.phases }))
-    : parseCablePhases(cable);
-  spec.phases = phases.join(',') || cable.phases || '';
+  const outboundPhases = parseCablePhases(outbound?.phases);
+  const cablePhases = parseCablePhases(cable);
+  const phases = outboundPhases.length ? outboundPhases : cablePhases;
+  spec.phases = phases.length ? phases.join(',') : formatCablePhases(cable);
   spec.conductors = outbound?.conductors || cable.conductors || '';
   const unitPerPx = diagramScale.unitPerPx || 1;
   const autoLen = (outbound?.length || 0) * unitPerPx;
@@ -10848,11 +10843,11 @@ function syncSchedules(notify = true) {
       ? src
       : all.find(item => item.type === 'cable' && (item.connections || []).some(cc => cc.target === c.id));
     const cableInfo = inboundCable?.cable || null;
-    const connPhases = conn?.phases
-      ? conn.phases.join(',')
-      : cableInfo
-      ? (Array.isArray(cableInfo.phases) ? cableInfo.phases.join(',') : cableInfo.phases || '')
-      : c.phases ?? '';
+    const connPhases = hasStoredPhases(conn?.phases)
+      ? formatCablePhases(conn.phases)
+      : hasStoredPhases(cableInfo?.phases)
+      ? formatCablePhases(cableInfo)
+      : formatCablePhases(c);
     const connConductors = conn?.conductors || cableInfo?.conductors || conn?.cable?.conductors || '';
     const fields = {
       id: c.ref || c.id,
@@ -10929,7 +10924,7 @@ function syncSchedules(notify = true) {
       const target = all.find(t => t.id === conn.target);
       const spec = {
         ...conn.cable,
-        phases: conn.phases ? conn.phases.join(',') : conn.cable.phases,
+        phases: hasStoredPhases(conn.phases) ? formatCablePhases(conn.phases) : formatCablePhases(conn.cable),
         conductors: conn.conductors || conn.cable.conductors,
         from_tag: c.ref || c.id,
         to_tag: target?.ref || conn.target
@@ -10956,11 +10951,11 @@ function serializeState() {
         ? src
         : comps.find(item => item.type === 'cable' && (item.connections || []).some(cc => cc.target === c.id));
       const cableInfo = inboundCable?.cable || null;
-      const connPhases = conn?.phases
-        ? conn.phases.join(',')
-        : cableInfo
-        ? (Array.isArray(cableInfo.phases) ? cableInfo.phases.join(',') : cableInfo.phases || '')
-        : c.phases ?? '';
+      const connPhases = hasStoredPhases(conn?.phases)
+        ? formatCablePhases(conn.phases)
+        : hasStoredPhases(cableInfo?.phases)
+        ? formatCablePhases(cableInfo)
+        : formatCablePhases(c);
       const connConductors = conn?.conductors || cableInfo?.conductors || conn?.cable?.conductors || '';
       const fields = {
         id: c.ref || c.id,
@@ -11023,7 +11018,7 @@ function serializeState() {
         const target = comps.find(t => t.id === conn.target);
         const spec = {
           ...conn.cable,
-          phases: conn.phases ? conn.phases.join(',') : conn.cable.phases,
+          phases: hasStoredPhases(conn.phases) ? formatCablePhases(conn.phases) : formatCablePhases(conn.cable),
           conductors: conn.conductors || conn.cable.conductors,
           from_tag: c.ref || c.id,
           to_tag: target?.ref || conn.target
