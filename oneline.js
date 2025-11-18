@@ -2292,6 +2292,38 @@ function componentSearchValues(comp) {
   return values;
 }
 
+function normalizeTagValue(value) {
+  if (value === null || value === undefined) return '';
+  return String(value).trim();
+}
+
+function getComponentTag(comp) {
+  if (!comp || typeof comp !== 'object') return '';
+  const directSources = [
+    comp.tag,
+    comp.props?.tag,
+    comp.label,
+    comp.props?.label,
+    comp.name,
+    comp.props?.name
+  ];
+  for (const source of directSources) {
+    const normalized = normalizeTagValue(source);
+    if (normalized) return normalized;
+  }
+  const fallbackSources = [
+    comp.ref,
+    comp.props?.ref,
+    comp.id,
+    comp.props?.id
+  ];
+  for (const source of fallbackSources) {
+    const normalized = normalizeTagValue(source);
+    if (normalized) return normalized;
+  }
+  return '';
+}
+
 function findComponentByTag(query) {
   const target = normalizeSearchValue(query);
   if (!target) return null;
@@ -4830,8 +4862,8 @@ function ensureConnection(fromComp, toComp, fromPort, toPort) {
   };
   fromComp.connections.push(newConn);
   try {
-    const fromTag = fromComp.tag || fromComp.ref || fromComp.id;
-    const toTag = toComp.tag || toComp.ref || toComp.id;
+    const fromTag = getComponentTag(fromComp) || fromComp?.id || '';
+    const toTag = getComponentTag(toComp) || toComp?.id || '';
     addRaceway({ conduit_id: `${fromTag}-${toTag}`, from_tag: fromTag, to_tag: toTag });
   } catch (err) {
     console.error('Failed to record connection', err);
@@ -9016,8 +9048,8 @@ async function chooseCable(source, target, existingConn = null) {
       modal.classList.remove('show');
       const resolvedCable = {
         ...cable,
-        from_tag: source?.tag || source?.ref || source?.id || '',
-        to_tag: target?.tag || target?.ref || target?.id || ''
+        from_tag: getComponentTag(source),
+        to_tag: getComponentTag(target)
       };
       if (hasImpedance(cable)) resolvedCable.impedance = { ...cable.impedance };
       resolve({
@@ -10487,8 +10519,8 @@ function buildCableSpecFromComponent(comp, allComps) {
   const spec = { ...cable };
   if (hasImpedance(cable)) spec.impedance = { ...cable.impedance };
   if (!spec.tag) spec.tag = comp.label || comp.id;
-  spec.from_tag = upstream?.tag || upstream?.ref || upstream?.id || '';
-  spec.to_tag = target?.tag || target?.ref || outbound?.target || '';
+  spec.from_tag = getComponentTag(upstream);
+  spec.to_tag = getComponentTag(target) || outbound?.target || '';
   const outboundPhases = parseCablePhases(outbound?.phases);
   const cablePhases = parseCablePhases(cable);
   const phases = outboundPhases.length ? outboundPhases : cablePhases;
@@ -10930,8 +10962,8 @@ function syncSchedules(notify = true) {
         ...conn.cable,
         phases: hasStoredPhases(conn.phases) ? formatCablePhases(conn.phases) : formatCablePhases(conn.cable),
         conductors: conn.conductors || conn.cable.conductors,
-        from_tag: c.tag || c.ref || c.id,
-        to_tag: target?.tag || target?.ref || conn.target
+        from_tag: getComponentTag(c),
+        to_tag: getComponentTag(target) || conn.target
       };
       const impedanceSource = conn.impedance || conn.cable?.impedance;
       if (impedanceSource && typeof impedanceSource === 'object') {
@@ -11024,8 +11056,8 @@ function serializeState() {
           ...conn.cable,
           phases: hasStoredPhases(conn.phases) ? formatCablePhases(conn.phases) : formatCablePhases(conn.cable),
           conductors: conn.conductors || conn.cable.conductors,
-          from_tag: c.tag || c.ref || c.id,
-          to_tag: target?.tag || target?.ref || conn.target
+          from_tag: getComponentTag(c),
+          to_tag: getComponentTag(target) || conn.target
         };
         const impedanceSource = conn.impedance || conn.cable?.impedance;
         if (impedanceSource && typeof impedanceSource === 'object') {

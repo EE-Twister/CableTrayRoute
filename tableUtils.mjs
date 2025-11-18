@@ -150,6 +150,10 @@ class TableManager {
     this.isResizingColumn = false;
     this.measureCanvas = null;
     this.measureCtx = null;
+    this.updateStickyHeaderOffsets = this.updateStickyHeaderOffsets.bind(this);
+    if (typeof window !== 'undefined') {
+      window.addEventListener('resize', this.updateStickyHeaderOffsets);
+    }
     this.buildHeader();
     this.initButtons(opts);
     this.load();
@@ -322,6 +326,7 @@ class TableManager {
     headerRow.addEventListener('dragover', this.handleHeaderDragOver);
     headerRow.addEventListener('drop', this.handleHeaderDrop);
     this.syncGroupBlankWidth();
+    this.updateStickyHeaderOffsets();
   }
 
   getColumnHeaderFromTarget(target) {
@@ -559,6 +564,7 @@ class TableManager {
     if (this.groupToggles[name]) this.groupToggles[name].textContent = hide ? '+' : '-';
     if (hide) this.hiddenGroups.add(name); else this.hiddenGroups.delete(name);
     this.syncGroupBlankWidth();
+    this.updateStickyHeaderOffsets();
   }
 
   toggleGroup(name) {
@@ -588,6 +594,19 @@ class TableManager {
       const w=this.headerRow.cells[idx].offsetWidth;
       this.groupBlankTh.style.width=w+'px';
     }
+  }
+
+  updateStickyHeaderOffsets() {
+    if (!this.thead) return;
+    let offset = 0;
+    Array.from(this.thead.rows).forEach(row => {
+      Array.from(row.cells).forEach(cell => {
+        if (cell.tagName === 'TH') {
+          cell.style.top = `${offset}px`;
+        }
+      });
+      offset += row.offsetHeight;
+    });
   }
 
   updateRowCount() {
