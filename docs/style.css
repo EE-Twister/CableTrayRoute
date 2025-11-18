@@ -1659,6 +1659,7 @@ g.component.scenario-diff > * {
     --spacing-base: 8px;
     --border-color: #dee2e6;
     --text-color: #212529;
+    --table-row-alt-bg: #edf2ff;
     --success-bg: #d4edda;
     --success-text: #155724;
     --warning-bg: #fff3cd;
@@ -1715,6 +1716,21 @@ g.component.scenario-diff > * {
 .overflow-x-auto {
     overflow-x: auto;
 }
+.table-viewport {
+    overflow-y: auto;
+    max-height: min(70vh, 720px);
+    border: 1px solid var(--border-color);
+    border-radius: 8px;
+    background-color: var(--card-bg, #fff);
+    position: relative;
+    scrollbar-gutter: stable both-edges;
+}
+.table-viewport table {
+    margin: 0;
+}
+body.dark-mode .table-viewport {
+    background-color: #2c3034;
+}
 .w-60 {
     width: 60px;
 }
@@ -1724,6 +1740,7 @@ body.dark-mode {
     --secondary-color: #343a40;
     --border-color: #495057;
     --text-color: #f8f9fa;
+    --table-row-alt-bg: rgba(23, 162, 184, 0.2);
     --success-text: #28a745;
     --warning-text: #ffc107;
     --focus-ring-color: #fff;
@@ -2898,13 +2915,13 @@ th {
     display: none;
 }
 .sticky-table tbody tr:nth-child(even) {
-    background-color: var(--secondary-color);
+    background-color: var(--table-row-alt-bg, #edf2ff);
 }
 .sticky-table tbody tr:hover {
     background-color: #e9ecef;
 }
 body.dark-mode .sticky-table tbody tr:nth-child(even) {
-    background-color: #343a40;
+    background-color: var(--table-row-alt-bg, rgba(23, 162, 184, 0.2));
 }
 body.dark-mode .sticky-table tbody tr:hover {
     background-color: #495057;
@@ -2969,6 +2986,48 @@ body.dark-mode .sticky-table tbody tr:hover {
 .sticky-table th:last-child,
 .sticky-table td:last-child {
     border-right: none;
+}
+
+.column-info-panel {
+    position: fixed;
+    z-index: 1200;
+    background-color: var(--card-bg, #fff);
+    color: var(--text-color);
+    border: 1px solid var(--border-color);
+    border-radius: 8px;
+    padding: 1rem 1.25rem;
+    box-shadow: 0 12px 24px rgba(0, 0, 0, 0.18);
+    width: min(320px, calc(100vw - 2rem));
+    display: none;
+}
+.column-info-panel.is-visible {
+    display: block;
+}
+.column-info-title {
+    margin: 0 0 0.5rem;
+    font-size: 1rem;
+}
+.column-info-body {
+    margin: 0;
+    font-size: 0.9rem;
+    line-height: 1.4;
+}
+.column-info-close {
+    position: absolute;
+    top: 0.5rem;
+    right: 0.5rem;
+    background: none;
+    border: none;
+    color: inherit;
+    font-size: 1rem;
+    cursor: pointer;
+}
+.column-info-close:focus-visible {
+    outline: 2px solid var(--focus-ring-color);
+    outline-offset: 2px;
+}
+body.dark-mode .column-info-panel {
+    background-color: #2c3034;
 }
 
 body.dark-mode .sticky-table th,
