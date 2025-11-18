@@ -151,6 +151,11 @@ class TableManager {
     this.measureCanvas = null;
     this.measureCtx = null;
     this.updateStickyHeaderOffsets = this.updateStickyHeaderOffsets.bind(this);
+    this.columnInfoPanel = null;
+    this.columnInfoTitle = null;
+    this.columnInfoBody = null;
+    this.handleColumnInfoOutsideClick = this.handleColumnInfoOutsideClick.bind(this);
+    this.handleColumnInfoKeyDown = this.handleColumnInfoKeyDown.bind(this);
     if (typeof window !== 'undefined') {
       window.addEventListener('resize', this.updateStickyHeaderOffsets);
     }
@@ -349,6 +354,12 @@ class TableManager {
     return null;
   }
 
+  getColumnDefinitionFromHeaderCell(th) {
+    const idx = this.getColumnIndexFromHeaderCell(th);
+    if (typeof idx !== 'number') return null;
+    return this.columns[idx] || null;
+  }
+
   isHeaderCellResizable(th) {
     if (!th) return false;
     const idx = this.getColumnIndexFromHeaderCell(th);
@@ -440,6 +451,11 @@ class TableManager {
         label: 'Set Column Width (px)…',
         action: th => this.promptColumnWidth(th),
         isDisabled: th => !this.isHeaderCellResizable(th)
+      },
+      {
+        label: 'ℹ Column Info',
+        action: th => this.showColumnInfo(th),
+        isDisabled: th => !this.getColumnDefinitionFromHeaderCell(th)
       }
     ]);
     this.thead.addEventListener('contextmenu', this.handleHeaderContextMenu);
@@ -448,10 +464,96 @@ class TableManager {
   handleHeaderContextMenu(e) {
     if (!this.headerContextMenu) return;
     const th = this.getColumnHeaderFromTarget(e.target);
-    if (!this.isHeaderCellResizable(th)) return;
+    const canResize = this.isHeaderCellResizable(th);
+    const hasInfo = !!this.getColumnDefinitionFromHeaderCell(th);
+    if (!canResize && !hasInfo) return;
     e.preventDefault();
     e.stopPropagation();
+    this.hideColumnInfo();
     this.headerContextMenu.show(e.pageX, e.pageY, th);
+  }
+
+  ensureColumnInfoPanel() {
+    if (this.columnInfoPanel) return this.columnInfoPanel;
+    if (typeof document === 'undefined') return null;
+    const panel = document.createElement('div');
+    panel.className = 'column-info-panel';
+    panel.setAttribute('role', 'dialog');
+    panel.setAttribute('aria-modal', 'false');
+    panel.setAttribute('aria-hidden', 'true');
+    panel.tabIndex = -1;
+    const closeBtn = document.createElement('button');
+    closeBtn.type = 'button';
+    closeBtn.className = 'column-info-close';
+    closeBtn.setAttribute('aria-label', 'Close column info');
+    closeBtn.textContent = '\u00d7';
+    closeBtn.addEventListener('click', () => this.hideColumnInfo());
+    const title = document.createElement('h4');
+    title.className = 'column-info-title';
+    const body = document.createElement('p');
+    body.className = 'column-info-body';
+    panel.appendChild(closeBtn);
+    panel.appendChild(title);
+    panel.appendChild(body);
+    document.body.appendChild(panel);
+    document.addEventListener('mousedown', this.handleColumnInfoOutsideClick);
+    document.addEventListener('keydown', this.handleColumnInfoKeyDown);
+    this.columnInfoPanel = panel;
+    this.columnInfoTitle = title;
+    this.columnInfoBody = body;
+    return panel;
+  }
+
+  showColumnInfo(th) {
+    const column = this.getColumnDefinitionFromHeaderCell(th);
+    if (!column) return;
+    const panel = this.ensureColumnInfoPanel();
+    if (!panel) return;
+    const description = column.tooltip || 'No additional information available for this column.';
+    if (this.columnInfoTitle) this.columnInfoTitle.textContent = column.label || 'Column';
+    if (this.columnInfoBody) this.columnInfoBody.textContent = description;
+    panel.setAttribute('aria-hidden', 'false');
+    panel.classList.add('is-visible');
+    panel.style.visibility = 'hidden';
+    panel.style.left = '0px';
+    panel.style.top = '0px';
+    const headerRect = th.getBoundingClientRect();
+    const panelRect = panel.getBoundingClientRect();
+    const margin = 12;
+    const scrollLeft = window.pageXOffset || document.documentElement.scrollLeft || 0;
+    const scrollTop = window.pageYOffset || document.documentElement.scrollTop || 0;
+    let left = headerRect.left + scrollLeft;
+    let top = headerRect.bottom + scrollTop + margin;
+    const maxLeft = scrollLeft + window.innerWidth - panelRect.width - margin;
+    const minLeft = scrollLeft + margin;
+    if (left > maxLeft) left = Math.max(minLeft, maxLeft);
+    if (left < minLeft) left = minLeft;
+    const maxTop = scrollTop + window.innerHeight - panelRect.height - margin;
+    const minTop = scrollTop + margin;
+    if (top > maxTop) top = Math.max(minTop, maxTop);
+    if (top < minTop) top = minTop;
+    panel.style.left = `${left}px`;
+    panel.style.top = `${top}px`;
+    panel.style.visibility = 'visible';
+    try { panel.focus(); } catch {}
+  }
+
+  hideColumnInfo() {
+    if (!this.columnInfoPanel) return;
+    this.columnInfoPanel.classList.remove('is-visible');
+    this.columnInfoPanel.setAttribute('aria-hidden', 'true');
+    this.columnInfoPanel.style.visibility = '';
+  }
+
+  handleColumnInfoOutsideClick(e) {
+    if (!this.columnInfoPanel) return;
+    if (this.columnInfoPanel.getAttribute('aria-hidden') !== 'false') return;
+    if (this.columnInfoPanel.contains(e.target)) return;
+    this.hideColumnInfo();
+  }
+
+  handleColumnInfoKeyDown(e) {
+    if (e.key === 'Escape') this.hideColumnInfo();
   }
 
   setCellWidth(cellIndex, width) {
