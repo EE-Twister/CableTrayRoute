@@ -1786,11 +1786,36 @@ async function initCableSchedule() {
     return valid;
   }
 
+  function highlightDuplicateTags(rows){
+    const activeTable = tableInstance || table;
+    if (!activeTable || !activeTable.tbody) return;
+    const list = Array.isArray(rows) ? rows : Array.from(activeTable.tbody.querySelectorAll('tr'));
+    const counts = new Map();
+    list.forEach(tr => {
+      const input = tr.querySelector('[name="tag"]');
+      if (!input) return;
+      const normalized = (input.value || '').trim().toLowerCase();
+      if (!normalized) return;
+      counts.set(normalized, (counts.get(normalized) || 0) + 1);
+    });
+    list.forEach(tr => {
+      const input = tr.querySelector('[name="tag"]');
+      if (!input) return;
+      const normalized = (input.value || '').trim().toLowerCase();
+      const isDuplicate = normalized && counts.get(normalized) > 1;
+      input.classList.toggle('duplicate-tag-input', !!isDuplicate);
+      const cell = input.closest('td');
+      if (cell) cell.classList.toggle('duplicate-tag-cell', !!isDuplicate);
+    });
+  }
+
   function validateAllRows(){
+    const rows = Array.from(table.tbody.querySelectorAll('tr'));
     let allValid = true;
-    Array.from(table.tbody.querySelectorAll('tr')).forEach(tr => {
+    rows.forEach(tr => {
       if(!validateRow(tr)) allValid = false;
     });
+    highlightDuplicateTags(rows);
     return allValid;
   }
 
@@ -1834,6 +1859,12 @@ async function initCableSchedule() {
   tableInstance = table;
   window.cableScheduleTable = table;
   initTableSearch();
+  validateAllRows();
+
+  if (typeof MutationObserver !== 'undefined' && table?.tbody) {
+    const observer = new MutationObserver(() => validateAllRows());
+    observer.observe(table.tbody, { childList: true });
+  }
 
   const addRowFromTemplate = templateValues => {
     if (!tableInstance) return null;

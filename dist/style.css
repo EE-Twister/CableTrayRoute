@@ -3097,7 +3097,11 @@ body.dark-mode .sticky-table thead th {
 
 .over-limit-row { background-color: var(--error-bg); }
 .missing-tag-row { background-color: var(--error-bg); }
-.missing-row { background-color: var(--warning-bg); }
+.missing-row {
+    background-color: transparent;
+    outline: 2px dashed var(--warning-text);
+    outline-offset: -2px;
+}
 
 .toast {
     position: fixed;
@@ -3491,7 +3495,30 @@ body.dark-mode .legalDisclaimer {
 .unit-label[title]{text-decoration:underline dotted;cursor:help;}
 
 /* Highlight missing values */
-.missing-value{background-color:var(--warning-bg);} 
+.missing-value{
+    background-color: transparent;
+    box-shadow: inset 0 0 0 2px var(--warning-text);
+    border-radius: 4px;
+}
+
+.duplicate-tag-cell{
+    background-color: var(--error-bg);
+    color: var(--error-text);
+}
+
+.duplicate-tag-cell input,
+.duplicate-tag-cell select,
+.duplicate-tag-cell textarea{
+    background-color: transparent;
+    color: inherit;
+}
+
+.duplicate-tag-input{
+    background-color: transparent;
+    box-shadow: inset 0 0 0 2px var(--error-text);
+    color: var(--error-text);
+    font-weight: 600;
+}
 
 /* Highlight voltage drop exceeding limit */
 .voltage-exceed{background-color:var(--warning-bg);color:var(--warning-text);}
