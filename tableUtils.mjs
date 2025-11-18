@@ -147,6 +147,7 @@ class TableManager {
     this.handleHeaderDragOver = this.handleHeaderDragOver.bind(this);
     this.handleHeaderDrop = this.handleHeaderDrop.bind(this);
     this.handleHeaderContextMenu = this.handleHeaderContextMenu.bind(this);
+    this.isResizingColumn = false;
     this.measureCanvas = null;
     this.measureCtx = null;
     this.buildHeader();
@@ -284,22 +285,9 @@ class TableManager {
       th.appendChild(btn);
       const resizer=document.createElement('span');
       resizer.className='col-resizer';
-      th.appendChild(resizer);
-      let startX,startWidth;
-      const onMove=e=>{
-        const newWidth=Math.max(60,startWidth+e.pageX-startX);
-        this.applyColumnWidth(idx,newWidth);
-      };
-      resizer.addEventListener('mousedown',e=>{
-        e.preventDefault();
-        e.stopPropagation();
-        startX=e.pageX;startWidth=th.offsetWidth;
-        document.addEventListener('mousemove',onMove);
-        document.addEventListener('mouseup',()=>{
-          document.removeEventListener('mousemove',onMove);
-        },{once:true});
-      });
+      resizer.addEventListener('mousedown',e=>this.startColumnResizeFromHandle(e,th));
       resizer.addEventListener('dblclick',e=>{e.preventDefault();e.stopPropagation();this.autoSizeColumn(idx);});
+      th.appendChild(resizer);
       if (col.group && idx === this.groupFirstIndex[col.group] && this.groupOrder.indexOf(col.group) > 0) {
         th.classList.add('category-separator');
       }
@@ -325,22 +313,9 @@ class TableManager {
       actTh.dataset.role = 'action';
       const res=document.createElement('span');
       res.className='col-resizer';
-      actTh.appendChild(res);
-      let startX,startWidth;
-      const move=e=>{
-        const newWidth=Math.max(60,startWidth+e.pageX-startX);
-        const idx = this.columns.length + offset;
-        const px = this.setCellWidth(idx,newWidth);
-        if(this.groupBlankTh) this.groupBlankTh.style.width=px;
-      };
-      res.addEventListener('mousedown',e=>{
-        e.preventDefault();
-        e.stopPropagation();
-        startX=e.pageX;startWidth=actTh.offsetWidth;
-        document.addEventListener('mousemove',move);
-        document.addEventListener('mouseup',()=>{document.removeEventListener('mousemove',move);},{once:true});
-      });
+      res.addEventListener('mousedown',e=>this.startColumnResizeFromHandle(e,actTh));
       res.addEventListener('dblclick',e=>{e.preventDefault();e.stopPropagation();this.autoSizeActionColumn();});
+      actTh.appendChild(res);
       headerRow.appendChild(actTh);
     }
     headerRow.addEventListener('dragstart', this.handleHeaderDragStart);
@@ -396,6 +371,35 @@ class TableManager {
     this.applyColumnWidth(idx, width);
   }
 
+  startColumnResizeFromHandle(e, th) {
+    if (!this.isHeaderCellResizable(th)) return;
+    if (this.isResizingColumn) return;
+    if (e.button !== 0) return;
+    e.preventDefault();
+    e.stopPropagation();
+    const wasDraggable = !!th.draggable;
+    if (wasDraggable) th.draggable = false;
+    this.isResizingColumn = true;
+    const startX = e.pageX;
+    const startWidth = this.getHeaderCellWidth(th);
+    const onMouseMove = moveEvt => {
+      const newWidth = Math.max(60, startWidth + moveEvt.pageX - startX);
+      this.setColumnWidthFromHeaderCell(th, newWidth);
+    };
+    let onMouseUp = null;
+    const cleanup = () => {
+      document.removeEventListener('mousemove', onMouseMove);
+      if (onMouseUp) document.removeEventListener('mouseup', onMouseUp);
+      if (wasDraggable) th.draggable = true;
+      this.isResizingColumn = false;
+    };
+    onMouseUp = () => {
+      cleanup();
+    };
+    document.addEventListener('mousemove', onMouseMove);
+    document.addEventListener('mouseup', onMouseUp);
+  }
+
   promptColumnWidth(th) {
     if (!this.isHeaderCellResizable(th)) return;
     const current = this.getHeaderCellWidth(th);
@@ -428,7 +432,7 @@ class TableManager {
         isDisabled: th => !this.isHeaderCellResizable(th)
       },
       {
-        label: 'Set Column Width…',
+        label: 'Set Column Width (px)…',
         action: th => this.promptColumnWidth(th),
         isDisabled: th => !this.isHeaderCellResizable(th)
       }
@@ -600,6 +604,10 @@ class TableManager {
   }
 
   handleHeaderDragStart(e) {
+    if (this.isResizingColumn) {
+      e.preventDefault();
+      return;
+    }
     const th = e.target.closest('th');
     if (!th || th.dataset.index === undefined) return;
     e.dataTransfer.setData('text/plain', th.dataset.index);
