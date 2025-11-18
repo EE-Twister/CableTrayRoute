@@ -746,7 +746,15 @@ class TableManager {
       if (isSticky) {
         const rect = typeof row.getBoundingClientRect === 'function' ? row.getBoundingClientRect() : null;
         const height = rect ? rect.height : row.offsetHeight;
-        offset += height || 0;
+        let gap = 0;
+        if (rowIndex + 1 < stickyLimit) {
+          const canMeasureGap = typeof window !== 'undefined' && typeof window.getComputedStyle === 'function';
+          const styles = canMeasureGap ? window.getComputedStyle(row) : null;
+          const border = styles ? parseFloat(styles.borderBottomWidth || '0') : 0;
+          const normalizedBorder = Number.isFinite(border) ? border : 0;
+          gap = Math.max(1, normalizedBorder);
+        }
+        offset += (height || 0) + gap;
       }
     });
   }
