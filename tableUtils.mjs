@@ -151,13 +151,20 @@ class TableManager {
     this.measureCanvas = null;
     this.measureCtx = null;
     this.updateStickyHeaderOffsets = this.updateStickyHeaderOffsets.bind(this);
+    this.queueStickyHeaderUpdate = this.queueStickyHeaderUpdate.bind(this);
     this.columnInfoPanel = null;
     this.columnInfoTitle = null;
     this.columnInfoBody = null;
     this.handleColumnInfoOutsideClick = this.handleColumnInfoOutsideClick.bind(this);
     this.handleColumnInfoKeyDown = this.handleColumnInfoKeyDown.bind(this);
+    this.pendingStickyHeaderUpdate = false;
+    this.headerResizeObserver = null;
+    this.stickyRowLimit = 1;
+    if (typeof ResizeObserver !== 'undefined') {
+      this.headerResizeObserver = new ResizeObserver(() => this.queueStickyHeaderUpdate());
+    }
     if (typeof window !== 'undefined') {
-      window.addEventListener('resize', this.updateStickyHeaderOffsets);
+      window.addEventListener('resize', this.queueStickyHeaderUpdate);
     }
     this.buildHeader();
     this.initButtons(opts);
@@ -186,6 +193,8 @@ class TableManager {
   buildHeader() {
     this.thead.innerHTML='';
     const hasGroups = this.columns.some(c=>c.group);
+    this.stickyRowLimit = hasGroups ? 2 : 1;
+    if (this.thead) this.thead.dataset.stickyRows = String(this.stickyRowLimit);
     const showActions = this.showActionColumn;
     let groupRow;
     if (hasGroups) {
@@ -331,7 +340,12 @@ class TableManager {
     headerRow.addEventListener('dragover', this.handleHeaderDragOver);
     headerRow.addEventListener('drop', this.handleHeaderDrop);
     this.syncGroupBlankWidth();
+    if (this.headerResizeObserver) {
+      this.headerResizeObserver.disconnect();
+      Array.from(this.thead.rows).forEach(row => this.headerResizeObserver.observe(row));
+    }
     this.updateStickyHeaderOffsets();
+    this.queueStickyHeaderUpdate();
   }
 
   getColumnHeaderFromTarget(target) {
@@ -666,7 +680,7 @@ class TableManager {
     if (this.groupToggles[name]) this.groupToggles[name].textContent = hide ? '+' : '-';
     if (hide) this.hiddenGroups.add(name); else this.hiddenGroups.delete(name);
     this.syncGroupBlankWidth();
-    this.updateStickyHeaderOffsets();
+    this.queueStickyHeaderUpdate();
   }
 
   toggleGroup(name) {
@@ -698,16 +712,42 @@ class TableManager {
     }
   }
 
+  queueStickyHeaderUpdate() {
+    if (this.pendingStickyHeaderUpdate) return;
+    this.pendingStickyHeaderUpdate = true;
+    const schedule = (typeof window !== 'undefined' && typeof window.requestAnimationFrame === 'function')
+      ? cb => window.requestAnimationFrame(cb)
+      : cb => setTimeout(cb, 16);
+    schedule(() => {
+      this.pendingStickyHeaderUpdate = false;
+      this.updateStickyHeaderOffsets();
+    });
+  }
+
   updateStickyHeaderOffsets() {
     if (!this.thead) return;
+    const totalRows = this.thead.rows.length;
+    const stickyLimit = Number.isFinite(this.stickyRowLimit) ? Math.min(this.stickyRowLimit, totalRows) : totalRows;
     let offset = 0;
-    Array.from(this.thead.rows).forEach(row => {
+    Array.from(this.thead.rows).forEach((row, rowIndex) => {
+      const isSticky = rowIndex < stickyLimit;
       Array.from(row.cells).forEach(cell => {
-        if (cell.tagName === 'TH') {
+        if (cell.tagName !== 'TH') return;
+        if (isSticky) {
+          cell.style.position = 'sticky';
           cell.style.top = `${offset}px`;
+          cell.style.zIndex = String(20 - rowIndex);
+        } else {
+          cell.style.position = '';
+          cell.style.top = '';
+          cell.style.zIndex = '';
         }
       });
-      offset += row.offsetHeight;
+      if (isSticky) {
+        const rect = typeof row.getBoundingClientRect === 'function' ? row.getBoundingClientRect() : null;
+        const height = rect ? rect.height : row.offsetHeight;
+        offset += height || 0;
+      }
     });
   }
 
