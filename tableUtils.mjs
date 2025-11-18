@@ -849,6 +849,15 @@ class TableManager {
 
   addRow(data = {}) {
     const tr = this.tbody.insertRow();
+    tr.tabIndex = 0;
+    tr.classList.add('table-row-focusable');
+    tr.addEventListener('keydown', e => {
+      if (e.key === 'Enter' && e.target === tr && typeof this.onView === 'function') {
+        e.preventDefault();
+        const row = this.getRowData(tr);
+        this.onView(row, tr);
+      }
+    });
     if (data.ref !== undefined) tr.dataset.ref = data.ref;
     if (data.id !== undefined) tr.dataset.id = data.id;
     if (this.selectable) {

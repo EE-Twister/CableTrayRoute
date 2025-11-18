@@ -215,6 +215,7 @@ async function initCableSchedule() {
     {key:'duty_cycle',label:'Duty Cycle (%)',type:'number',group:'Electrical Characteristics',tooltip:'Duty cycle percentage'},
     {key:'length',label:'Length (ft)',type:'number',group:'Electrical Characteristics',tooltip:'Length of cable run'},
     {key:'calc_ampacity',label:'Calc Ampacity (A)',type:'number',group:'Electrical Characteristics',tooltip:'Ampacity after code factors'},
+    {key:'impedance',label:'Impedance (Ω)',type:'number',group:'Electrical Characteristics',tooltip:'Circuit impedance used for voltage drop checks'},
     {key:'code_reference',label:'Code Ref',type:'text',group:'Electrical Characteristics',tooltip:'Code table used'},
     {key:'voltage_drop_pct',label:'Estimated Voltage Drop (%)',type:'number',group:'Electrical Characteristics',tooltip:'Estimated voltage drop percent'},
     {key:'sizing_warning',label:'Sizing Warning',type:'text',group:'Electrical Characteristics',tooltip:'Non-compliance details'},
@@ -299,6 +300,7 @@ async function initCableSchedule() {
   const editorBody = editorModal ? editorModal.querySelector('#cable-editor-body') : null;
   const editorCancelBtn = editorModal ? editorModal.querySelector('#cable-editor-cancel') : null;
   const editorCloseBtn = editorModal ? editorModal.querySelector('#close-cable-editor-btn') : null;
+  const editorSaveBtn = editorModal ? editorModal.querySelector('#cable-editor-save') : null;
   const editorTitle = editorModal ? editorModal.querySelector('#cable-editor-title') : null;
   const defaultEditorTitle = editorTitle ? editorTitle.textContent : '';
   let editorFieldMap = new Map();
@@ -312,6 +314,118 @@ async function initCableSchedule() {
   let applyTypicalBtn = null;
   let typicalFilterSelect = null;
   let tableInstance = null;
+  const modalValidationRules = [
+    { key: 'length', message: 'Length must be a positive number.' },
+    { key: 'calc_ampacity', message: 'Ampacity must be a positive number.' }
+  ];
+  const modalValidationState = { invalidFields: new Set() };
+
+  const updateEditorSaveState = () => {
+    if (!editorSaveBtn) return;
+    editorSaveBtn.disabled = modalValidationState.invalidFields.size > 0;
+  };
+
+  const resetModalValidationState = () => {
+    modalValidationState.invalidFields.clear();
+    updateEditorSaveState();
+  };
+
+  const ensureFieldErrorElement = (field, key, message) => {
+    if (!field) return null;
+    const container = field.closest('.modal-form-field') || field.parentElement;
+    if (!container) return null;
+    let errorEl = container.querySelector(`.modal-error[data-error-for="${key}"]`);
+    if (!errorEl) {
+      errorEl = document.createElement('p');
+      errorEl.className = 'modal-error';
+      errorEl.dataset.errorFor = key;
+      container.appendChild(errorEl);
+    }
+    errorEl.textContent = message;
+    errorEl.hidden = true;
+    return errorEl;
+  };
+
+  const setFieldValidity = (key, field, isValid, errorEl, message) => {
+    if (!field || !errorEl) return;
+    if (message) {
+      errorEl.textContent = message;
+    }
+    if (isValid) {
+      errorEl.hidden = true;
+      field.classList.remove('input-error');
+      field.removeAttribute('aria-invalid');
+      modalValidationState.invalidFields.delete(key);
+    } else {
+      errorEl.hidden = false;
+      field.classList.add('input-error');
+      field.setAttribute('aria-invalid', 'true');
+      modalValidationState.invalidFields.add(key);
+    }
+    updateEditorSaveState();
+  };
+
+  const attachCableModalValidation = () => {
+    modalValidationRules.forEach(rule => {
+      const field = editorFieldMap.get(rule.key);
+      if (!field) return;
+      field.setAttribute('inputmode', 'decimal');
+      field.setAttribute('min', '0');
+      const errorEl = ensureFieldErrorElement(field, rule.key, rule.message);
+      if (!errorEl) return;
+      const validate = () => {
+        const raw = typeof field.value === 'string' ? field.value.trim() : '';
+        const num = Number(raw);
+        const isValid = raw === '' ? true : (!Number.isNaN(num) && num > 0);
+        setFieldValidity(rule.key, field, isValid, errorEl, rule.message);
+      };
+      field.addEventListener('input', validate);
+      validate();
+    });
+  };
+
+  const calculateVoltageDrop = (length, current, impedance) => {
+    const len = Number(length);
+    const cur = Number(current);
+    const imp = Number(impedance);
+    if (!Number.isFinite(len) || !Number.isFinite(cur) || !Number.isFinite(imp)) return null;
+    if (len <= 0 || cur <= 0 || imp <= 0) return null;
+    return len * cur * imp;
+  };
+  window.calculateVoltageDrop = calculateVoltageDrop;
+
+  const attachVoltageDropAutomation = () => {
+    const lengthField = editorFieldMap.get('length');
+    const currentField = editorFieldMap.get('est_load');
+    const impedanceField = editorFieldMap.get('impedance');
+    const voltageField = editorFieldMap.get('voltage_drop_pct');
+    if (!lengthField || !currentField || !impedanceField || !voltageField) return;
+    voltageField.readOnly = true;
+    voltageField.setAttribute('aria-readonly', 'true');
+    voltageField.tabIndex = -1;
+    const updateVoltageDropField = () => {
+      const result = calculateVoltageDrop(lengthField.value, currentField.value, impedanceField.value);
+      if (result === null) {
+        voltageField.value = '';
+      } else {
+        voltageField.value = result.toFixed(2);
+      }
+      if (activeRowData) {
+        activeRowData.voltage_drop_pct = voltageField.value;
+      }
+    };
+    [lengthField, currentField, impedanceField].forEach(field => {
+      field.addEventListener('input', updateVoltageDropField);
+      field.addEventListener('change', updateVoltageDropField);
+    });
+    updateVoltageDropField();
+  };
+
+  const setupEditorFieldEnhancements = () => {
+    resetModalValidationState();
+    attachCableModalValidation();
+    attachVoltageDropAutomation();
+  };
 
   const cloneTemplates = templates => (Array.isArray(templates) ? templates.map(t => JSON.parse(JSON.stringify(t))) : []);
   const filterTemplateFields = (input = {}, options = {}) => {
@@ -487,6 +601,24 @@ async function initCableSchedule() {
     updateBatchActionState();
   }
 
+  const initTableSearch = () => {
+    const searchInput = document.getElementById('table-search');
+    if (!searchInput || !tableInstance || typeof tableInstance.setCustomFilter !== 'function') return;
+    const applySearch = () => {
+      const term = searchInput.value.trim().toLowerCase();
+      if (!term) {
+        tableInstance.setCustomFilter('table-search', null);
+        return;
+      }
+      tableInstance.setCustomFilter('table-search', tr => {
+        const text = (tr?.textContent || '').toLowerCase();
+        return text.includes(term);
+      });
+    };
+    searchInput.addEventListener('input', applySearch);
+    applySearch();
+  };
+
   const buildGroupMapForColumns = cols => {
     const order = [];
     const grouped = new Map();
@@ -650,6 +782,7 @@ async function initCableSchedule() {
     activeTable = null;
     activeRowData = null;
     if (editorTitle) editorTitle.textContent = defaultEditorTitle;
+    resetModalValidationState();
   };
 
   const handleEditorKeydown = e => {
@@ -791,6 +924,7 @@ async function initCableSchedule() {
       section.appendChild(fieldsWrapper);
       editorBody.appendChild(section);
     });
+    setupEditorFieldEnhancements();
     if (editorTitle) {
       const tag = activeRowData?.tag;
       editorTitle.textContent = tag ? `Cable Details – ${tag}` : (defaultEditorTitle || 'Cable Details');
@@ -1682,6 +1816,7 @@ async function initCableSchedule() {
   console.log('Cable schedule table created', table);
   tableInstance = table;
   window.cableScheduleTable = table;
+  initTableSearch();
 
   const addRowFromTemplate = templateValues => {
     if (!tableInstance) return null;
