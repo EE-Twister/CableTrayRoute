@@ -1659,7 +1659,7 @@ g.component.scenario-diff > * {
     --spacing-base: 8px;
     --border-color: #dee2e6;
     --text-color: #212529;
-    --table-row-alt-bg: #edf2ff;
+    --table-row-alt-bg: #f4f6fb;
     --success-bg: #d4edda;
     --success-text: #155724;
     --warning-bg: #fff3cd;
@@ -1740,7 +1740,7 @@ body.dark-mode {
     --secondary-color: #343a40;
     --border-color: #495057;
     --text-color: #f8f9fa;
-    --table-row-alt-bg: rgba(23, 162, 184, 0.2);
+    --table-row-alt-bg: rgba(255, 255, 255, 0.08);
     --success-text: #28a745;
     --warning-text: #ffc107;
     --focus-ring-color: #fff;
@@ -2915,16 +2915,16 @@ th {
     display: none;
 }
 .sticky-table tbody tr:nth-child(even) {
-    background-color: var(--table-row-alt-bg, #edf2ff);
+    background-color: var(--table-row-alt-bg, #f4f6fb);
 }
 .sticky-table tbody tr:hover {
-    background-color: #e9ecef;
+    background-color: rgba(13, 110, 253, 0.08);
 }
 body.dark-mode .sticky-table tbody tr:nth-child(even) {
-    background-color: var(--table-row-alt-bg, rgba(23, 162, 184, 0.2));
+    background-color: var(--table-row-alt-bg, rgba(255, 255, 255, 0.08));
 }
 body.dark-mode .sticky-table tbody tr:hover {
-    background-color: #495057;
+    background-color: rgba(23, 162, 184, 0.25);
 }
 .category-separator {
     border-left: 3px solid var(--primary-color);
@@ -2971,11 +2971,24 @@ body.dark-mode .sticky-table tbody tr:hover {
     margin-bottom: 0.25rem;
 }
 
+.sticky-table thead {
+    background-color: var(--card-bg, #fff);
+}
+.sticky-table thead tr {
+    background-color: var(--card-bg, #fff);
+}
 .sticky-table thead th {
     position: sticky;
     top: 0;
     background-color: var(--card-bg, #fff);
     z-index: 5;
+    box-shadow: inset 0 -1px 0 var(--border-color);
+}
+.sticky-table thead tr:first-child th {
+    z-index: 7;
+}
+.sticky-table thead tr:nth-child(2) th {
+    z-index: 6;
 }
 
 .sticky-table th,
@@ -3033,6 +3046,14 @@ body.dark-mode .column-info-panel {
 body.dark-mode .sticky-table th,
 body.dark-mode .sticky-table td {
     border-right-color: rgba(255, 255, 255, 0.25);
+}
+body.dark-mode .sticky-table thead,
+body.dark-mode .sticky-table thead tr,
+body.dark-mode .sticky-table thead th {
+    background-color: #2c3034;
+}
+body.dark-mode .sticky-table thead th {
+    box-shadow: inset 0 -1px 0 rgba(255, 255, 255, 0.1);
 }
 
 /* Utilization Bars */
