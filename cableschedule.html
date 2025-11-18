@@ -53,18 +53,6 @@
         <h1>Cable Schedule</h1>
         <p>Centralized table for managing cable data.</p>
       </header>
-      <details class="method-panel">
-        <summary>Method &amp; Assumptions</summary>
-        <p>Total length is aggregated as L_total = Σ L_segment.</p>
-        <p>Variables:</p>
-        <ul>
-          <li>L_segment – length of individual route segment</li>
-          <li>L_total – sum of all segments</li>
-        </ul>
-        <p>Citations: <a href="docs/templates.html">Template documentation</a></p>
-        <p>Applicability: tabular organization only; no capacity limits.</p>
-        <p>See also: <a href="docs/load_calculation_formulas.html">Load Calculation Formulas</a>, <a href="docs/cable_fill_rules.html">Cable Fill Rules</a>, <a href="docs/routing_assumptions.html">Routing Assumptions</a>.</p>
-      </details>
       <section class="card">
         <div class="mb-1">
           <button id="save-schedule-btn" class="btn" title="Save schedule">Save Schedule</button>
@@ -76,27 +64,34 @@
           <button id="import-xlsx-btn" class="btn" title="Import from Excel">Import XLSX</button>
           <button id="delete-all-btn" class="btn" title="Delete all rows">Delete All Rows</button>
           <button id="cable-library-btn" class="btn" title="Manage cable typicals" aria-haspopup="dialog" aria-expanded="false" aria-controls="cable-library-modal">Cable Library</button>
+          <button id="open-view-preset-btn" class="btn" type="button" title="Choose visible column groups" aria-haspopup="dialog" aria-expanded="false">View Preset</button>
+          <button id="open-typical-filter-btn" class="btn" type="button" title="Filter cables by typical" aria-haspopup="dialog" aria-expanded="false">Typical Filter</button>
+          <button id="open-apply-typical-btn" class="btn" type="button" title="Apply a typical to selected rows" aria-haspopup="dialog" aria-expanded="false">Apply Typical</button>
         </div>
-        <div class="mb-1" id="cable-preset-controls">
-          <label for="cable-preset-select">View Preset</label>
-          <select id="cable-preset-select">
-            <option value="full">Full Detail</option>
-            <option value="routing">Routing Focus</option>
-            <option value="electrical">Electrical Focus</option>
-            <option value="construction">Construction Specs</option>
-          </select>
-        </div>
-        <div class="mb-1" id="cable-typical-controls">
-          <label for="typical-filter-select">Typical Filter</label>
-          <select id="typical-filter-select" title="Filter cables by typical">
-            <option value="">All Typicals</option>
-            <option value="__none__">No Typical</option>
-          </select>
-          <label for="batch-typical-select">Apply Typical</label>
-          <select id="batch-typical-select" title="Choose a typical to apply">
-            <option value="">Select a typical…</option>
-          </select>
-          <button id="apply-typical-selected-btn" class="btn" type="button" disabled title="Apply selected typical to chosen rows">Apply to Selected</button>
+        <div id="cable-toolbar-hidden-controls" class="visually-hidden" aria-hidden="true">
+          <div id="cable-preset-controls" class="control-modal-group">
+            <label for="cable-preset-select">View Preset</label>
+            <select id="cable-preset-select">
+              <option value="full">Full Detail</option>
+              <option value="routing">Routing Focus</option>
+              <option value="electrical">Electrical Focus</option>
+              <option value="construction">Construction Specs</option>
+            </select>
+          </div>
+          <div id="typical-filter-controls" class="control-modal-group">
+            <label for="typical-filter-select">Typical Filter</label>
+            <select id="typical-filter-select" title="Filter cables by typical">
+              <option value="">All Typicals</option>
+              <option value="__none__">No Typical</option>
+            </select>
+          </div>
+          <div id="apply-typical-controls" class="control-modal-group">
+            <label for="batch-typical-select">Apply Typical</label>
+            <select id="batch-typical-select" title="Choose a typical to apply">
+              <option value="">Select a typical…</option>
+            </select>
+            <button id="apply-typical-selected-btn" class="btn" type="button" disabled title="Apply selected typical to chosen rows">Apply to Selected</button>
+          </div>
         </div>
         <div class="overflow-x-auto">
           <table id="cableScheduleTable" class="sticky-table">

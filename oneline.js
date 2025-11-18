@@ -4830,8 +4830,8 @@ function ensureConnection(fromComp, toComp, fromPort, toPort) {
   };
   fromComp.connections.push(newConn);
   try {
-    const fromTag = fromComp.ref || fromComp.id;
-    const toTag = toComp.ref || toComp.id;
+    const fromTag = fromComp.tag || fromComp.ref || fromComp.id;
+    const toTag = toComp.tag || toComp.ref || toComp.id;
     addRaceway({ conduit_id: `${fromTag}-${toTag}`, from_tag: fromTag, to_tag: toTag });
   } catch (err) {
     console.error('Failed to record connection', err);
@@ -9014,7 +9014,11 @@ async function chooseCable(source, target, existingConn = null) {
         }
       }
       modal.classList.remove('show');
-      const resolvedCable = { ...cable, from_tag: source?.ref || source?.id || '', to_tag: target?.ref || target?.id || '' };
+      const resolvedCable = {
+        ...cable,
+        from_tag: source?.tag || source?.ref || source?.id || '',
+        to_tag: target?.tag || target?.ref || target?.id || ''
+      };
       if (hasImpedance(cable)) resolvedCable.impedance = { ...cable.impedance };
       resolve({
         cable: resolvedCable,
@@ -10483,8 +10487,8 @@ function buildCableSpecFromComponent(comp, allComps) {
   const spec = { ...cable };
   if (hasImpedance(cable)) spec.impedance = { ...cable.impedance };
   if (!spec.tag) spec.tag = comp.label || comp.id;
-  spec.from_tag = upstream?.ref || upstream?.id || '';
-  spec.to_tag = target?.ref || outbound?.target || '';
+  spec.from_tag = upstream?.tag || upstream?.ref || upstream?.id || '';
+  spec.to_tag = target?.tag || target?.ref || outbound?.target || '';
   const outboundPhases = parseCablePhases(outbound?.phases);
   const cablePhases = parseCablePhases(cable);
   const phases = outboundPhases.length ? outboundPhases : cablePhases;
@@ -10926,8 +10930,8 @@ function syncSchedules(notify = true) {
         ...conn.cable,
         phases: hasStoredPhases(conn.phases) ? formatCablePhases(conn.phases) : formatCablePhases(conn.cable),
         conductors: conn.conductors || conn.cable.conductors,
-        from_tag: c.ref || c.id,
-        to_tag: target?.ref || conn.target
+        from_tag: c.tag || c.ref || c.id,
+        to_tag: target?.tag || target?.ref || conn.target
       };
       const impedanceSource = conn.impedance || conn.cable?.impedance;
       if (impedanceSource && typeof impedanceSource === 'object') {
@@ -11020,8 +11024,8 @@ function serializeState() {
           ...conn.cable,
           phases: hasStoredPhases(conn.phases) ? formatCablePhases(conn.phases) : formatCablePhases(conn.cable),
           conductors: conn.conductors || conn.cable.conductors,
-          from_tag: c.ref || c.id,
-          to_tag: target?.ref || conn.target
+          from_tag: c.tag || c.ref || c.id,
+          to_tag: target?.tag || target?.ref || conn.target
         };
         const impedanceSource = conn.impedance || conn.cable?.impedance;
         if (impedanceSource && typeof impedanceSource === 'object') {
