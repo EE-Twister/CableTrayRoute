@@ -46,6 +46,7 @@ import * as dataStore from './dataStore.mjs';
 import { sizeConductor } from './sizing.js';
 import ampacity from './ampacity.mjs';
 import { createTable, STORAGE_KEYS } from './tableUtils.mjs';
+import { openModal } from './src/components/modal.js';
 const { sizeToArea } = ampacity;
 
 suppressResumeIfE2E();
@@ -129,6 +130,51 @@ async function initCableSchedule() {
       });
     }catch(e){}
     return Array.from(names);
+  }
+
+  function attachControlModal(buttonId, containerId, options = {}) {
+    const trigger = document.getElementById(buttonId);
+    const container = document.getElementById(containerId);
+    if (!trigger || !container) return;
+    const modalTitle = options.title || trigger.textContent?.trim() || 'Settings';
+    const modalDescription = options.description || '';
+    const focusSelector = options.initialFocusSelector || 'select, button, input, textarea';
+    trigger.addEventListener('click', () => {
+      const parent = container.parentElement;
+      if (!parent) return;
+      const placeholder = document.createComment(`${containerId}-placeholder`);
+      parent.insertBefore(placeholder, container);
+      container.classList.remove('visually-hidden');
+      container.removeAttribute('aria-hidden');
+      trigger.setAttribute('aria-expanded', 'true');
+      const resolveInitialFocus = () => {
+        if (typeof options.getInitialFocus === 'function') {
+          const custom = options.getInitialFocus(container);
+          if (custom instanceof HTMLElement) return custom;
+        }
+        const auto = container.querySelector(focusSelector);
+        return auto instanceof HTMLElement ? auto : null;
+      };
+      openModal({
+        title: modalTitle,
+        description: modalDescription,
+        primaryText: options.primaryText || 'Close',
+        secondaryText: null,
+        closeLabel: options.closeLabel || `Close ${modalTitle}`,
+        render(body) {
+          body.appendChild(container);
+          return resolveInitialFocus();
+        },
+        onSubmit: () => true
+      }).finally(() => {
+        container.setAttribute('aria-hidden', 'true');
+        container.classList.add('visually-hidden');
+        const targetParent = placeholder.parentNode || parent;
+        targetParent.insertBefore(container, placeholder);
+        placeholder.remove();
+        trigger.setAttribute('aria-expanded', 'false');
+      });
+    });
   }
 
   const columns=[
@@ -1679,6 +1725,17 @@ async function initCableSchedule() {
   batchTypicalSelect = document.getElementById('batch-typical-select');
   applyTypicalBtn = document.getElementById('apply-typical-selected-btn');
   typicalFilterSelect = document.getElementById('typical-filter-select');
+  attachControlModal('open-typical-filter-btn', 'typical-filter-controls', {
+    title: 'Filter by Typical',
+    description: 'Display only cables that match the selected typical.',
+    closeLabel: 'Close typical filter dialog'
+  });
+  attachControlModal('open-apply-typical-btn', 'apply-typical-controls', {
+    title: 'Apply Cable Typical',
+    description: 'Select a typical and apply it to the currently selected rows.',
+    initialFocusSelector: 'select',
+    closeLabel: 'Close apply typical dialog'
+  });
 
   if (batchTypicalSelect) {
     batchTypicalSelect.addEventListener('change', () => {
@@ -1741,6 +1798,11 @@ async function initCableSchedule() {
   updateBatchTypicalControls();
 
   const presetSelect = document.getElementById('cable-preset-select');
+  attachControlModal('open-view-preset-btn', 'cable-preset-controls', {
+    title: 'Select View Preset',
+    description: 'Choose which column groups are visible in the cable schedule.',
+    closeLabel: 'Close view preset dialog'
+  });
   const presetStorageKey = dataStore.STORAGE_KEYS.cableSchedulePreset;
   const readStoredPreset = () => {
     let stored = DEFAULT_PRESET;

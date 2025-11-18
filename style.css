@@ -70,6 +70,16 @@
   border: 0;
 }
 
+.control-modal-group {
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+}
+
+.control-modal-group label {
+  font-weight: 600;
+}
+
 .device-select-group {
   display: flex;
   flex-direction: column;
