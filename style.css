@@ -3318,6 +3318,8 @@ th { position: relative; }
     height: 100%;
     cursor: col-resize;
     user-select: none;
+    touch-action: none;
+    z-index: 2;
 }
 
 th:last-child .col-resizer {
