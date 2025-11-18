@@ -2944,11 +2944,21 @@ body.dark-mode .sticky-table tbody tr:hover {
     box-sizing: border-box;
 }
 
+.table-search-container {
+    margin-bottom: 0.75rem;
+}
+
+.table-search-container label {
+    display: block;
+    font-weight: 600;
+    margin-bottom: 0.25rem;
+}
+
 .sticky-table thead th {
     position: sticky;
     top: 0;
-    background-color: var(--secondary-color);
-    z-index: 1;
+    background-color: var(--card-bg, #fff);
+    z-index: 5;
 }
 
 .sticky-table th,
