@@ -604,16 +604,33 @@ async function initCableSchedule() {
   const initTableSearch = () => {
     const searchInput = document.getElementById('table-search');
     if (!searchInput || !tableInstance || typeof tableInstance.setCustomFilter !== 'function') return;
+    const getRowMatchesTerm = (tr, term) => {
+      if (!tr || !tableInstance || !Array.isArray(tableInstance.columns)) return false;
+      const offset = typeof tableInstance.colOffset === 'number' ? tableInstance.colOffset : 0;
+      return tableInstance.columns.some((col, idx) => {
+        const cell = tr.cells[idx + offset];
+        if (!cell) return false;
+        const field = cell.firstElementChild || cell.firstChild;
+        if (field && typeof field.value === 'string') {
+          const value = field.value.toLowerCase();
+          if (value.includes(term)) return true;
+          if (col.multiple && field.selectedOptions) {
+            return Array.from(field.selectedOptions).some(option => option.value.toLowerCase().includes(term));
+          }
+          return false;
+        }
+        const cellText = (cell.textContent || '').toLowerCase();
+        return cellText.includes(term);
+      });
+    };
+
     const applySearch = () => {
       const term = searchInput.value.trim().toLowerCase();
       if (!term) {
         tableInstance.setCustomFilter('table-search', null);
         return;
       }
-      tableInstance.setCustomFilter('table-search', tr => {
-        const text = (tr?.textContent || '').toLowerCase();
-        return text.includes(term);
-      });
+      tableInstance.setCustomFilter('table-search', tr => getRowMatchesTerm(tr, term));
     };
     searchInput.addEventListener('input', applySearch);
     applySearch();
