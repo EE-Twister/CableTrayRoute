@@ -1,5 +1,7 @@
 import { getItem, setItem, STORAGE_KEYS } from './dataStore.mjs';
 
+const FILTER_ICON_SVG = '<svg viewBox="0 0 16 16" aria-hidden="true" focusable="false" class="filter-icon"><path d="M1.5 2a.5.5 0 0 0-.4.8L6 8.667V13.5a.5.5 0 0 0 .757.429l2-1.2A.5.5 0 0 0 9 12.3V8.667L14.9 2.8A.5.5 0 0 0 14.5 2h-13z" fill="currentColor"/></svg>';
+
 class ContextMenu {
   constructor(items = []) {
     this.items = [];
@@ -143,6 +145,9 @@ class TableManager {
     this.enableHeaderContextMenu = opts.enableHeaderContextMenu !== false;
     this.showActionColumn = opts.showActionColumn !== false;
     this.customFilters = new Map();
+    this.sortColumnIndex = null;
+    this.sortDirection = 'asc';
+    this.sortButtons = [];
     this.handleHeaderDragStart = this.handleHeaderDragStart.bind(this);
     this.handleHeaderDragOver = this.handleHeaderDragOver.bind(this);
     this.handleHeaderDrop = this.handleHeaderDrop.bind(this);
@@ -208,6 +213,7 @@ class TableManager {
     this.headerRow = headerRow;
     this.filters = Array(this.columns.length).fill('');
     this.filterButtons = [];
+    this.sortButtons = [];
     this.globalFilter = '';
     this.globalFilterCols = [];
     this.groupCols = {};
@@ -291,13 +297,25 @@ class TableManager {
       th.style.position = 'relative';
       th.draggable = true;
       th.dataset.index = idx;
+      const sortBtn=document.createElement('button');
+      sortBtn.type='button';
+      sortBtn.className='header-sort';
+      sortBtn.setAttribute('aria-label',`Sort ${col.label}`);
+      sortBtn.draggable=false;
       const labelSpan=document.createElement('span');
       labelSpan.textContent=col.label;
       labelSpan.className='header-label';
-      th.appendChild(labelSpan);
+      sortBtn.appendChild(labelSpan);
+      const sortIndicator=document.createElement('span');
+      sortIndicator.className='sort-indicator';
+      sortIndicator.setAttribute('aria-hidden','true');
+      sortBtn.appendChild(sortIndicator);
+      sortBtn.addEventListener('click',e=>{e.stopPropagation();this.toggleSort(idx);});
+      th.appendChild(sortBtn);
+      this.sortButtons.push(sortBtn);
       const btn=document.createElement('button');
       btn.className='filter-btn';
-      btn.innerHTML='\u25BC';
+      btn.innerHTML=FILTER_ICON_SVG;
       btn.setAttribute('aria-label','Filter column');
       btn.addEventListener('click',e=>{e.stopPropagation();this.showFilterPopup(btn,idx);});
       th.appendChild(btn);
@@ -346,6 +364,7 @@ class TableManager {
     }
     this.updateStickyHeaderOffsets();
     this.queueStickyHeaderUpdate();
+    this.updateSortIndicators();
   }
 
   getColumnHeaderFromTarget(target) {
@@ -1121,6 +1140,10 @@ class TableManager {
         td.style.width = this.headerRow.cells[idx + this.colOffset].style.width;
       }
       td.appendChild(el);
+      const handleValueChange = () => {
+        if (this.onChange) this.onChange();
+        if (this.sortColumnIndex !== null) this.applySort();
+      };
       let summaryEl, updateSummary;
       if (col.multiple) {
         summaryEl = document.createElement('button');
@@ -1153,11 +1176,14 @@ class TableManager {
         };
         el.addEventListener('change', () => {
           updateSummary();
-          if (this.onChange) this.onChange();
+          handleValueChange();
         });
         updateSummary();
       } else {
-        el.addEventListener('input', () => { if (this.onChange) this.onChange(); });
+        el.addEventListener('input', handleValueChange);
+        if (el.tagName === 'SELECT') {
+          el.addEventListener('change', handleValueChange);
+        }
       }
       el.addEventListener('focus',()=>{el.dataset.prevValue=el.value;});
       el.addEventListener('keydown', e => {
@@ -1281,6 +1307,7 @@ class TableManager {
     }
     this.updateRowCount();
     this.updateSelectAllState();
+    if (this.sortColumnIndex !== null) this.applySort();
     return tr;
   }
 
@@ -1391,6 +1418,83 @@ class TableManager {
       row.style.display = visible ? '' : 'none';
     });
     this.updateSelectAllState();
+  }
+
+  toggleSort(index) {
+    if (typeof index !== 'number' || index < 0 || index >= this.columns.length) return;
+    if (this.sortColumnIndex === index) {
+      this.sortDirection = this.sortDirection === 'asc' ? 'desc' : 'asc';
+    } else {
+      this.sortColumnIndex = index;
+      this.sortDirection = 'asc';
+    }
+    this.applySort();
+    this.updateSortIndicators();
+  }
+
+  updateSortIndicators() {
+    if (!this.sortButtons || !this.headerRow) return;
+    this.sortButtons.forEach((btn, idx) => {
+      if (!btn) return;
+      const isActive = idx === this.sortColumnIndex;
+      btn.dataset.sort = isActive ? this.sortDirection : 'none';
+      const th = btn.closest('th');
+      if (th) {
+        th.setAttribute('aria-sort', isActive ? (this.sortDirection === 'desc' ? 'descending' : 'ascending') : 'none');
+        th.classList.toggle('is-sorted', isActive);
+      }
+    });
+  }
+
+  getSortValue(row, columnIndex) {
+    if (!row) return '';
+    const cell = row.cells[columnIndex + this.colOffset];
+    if (!cell) return '';
+    const el = cell.querySelector('input,select,textarea');
+    if (!el) return '';
+    const col = this.columns[columnIndex] || {};
+    if (col.multiple) {
+      if (typeof el.getSelectedValues === 'function') {
+        return (el.getSelectedValues() || []).join(', ');
+      }
+      return Array.from(el.selectedOptions || []).map(o => o.value).join(', ');
+    }
+    return el.value ?? '';
+  }
+
+  applySort() {
+    if (typeof this.sortColumnIndex !== 'number' || this.sortColumnIndex < 0 || this.sortColumnIndex >= this.columns.length) return;
+    const dir = this.sortDirection === 'desc' ? -1 : 1;
+    const col = this.columns[this.sortColumnIndex] || {};
+    const rows = Array.from(this.tbody.rows);
+    rows.sort((a, b) => {
+      const aVal = this.getSortValue(a, this.sortColumnIndex);
+      const bVal = this.getSortValue(b, this.sortColumnIndex);
+      const aEmpty = aVal === '' || aVal === null || aVal === undefined;
+      const bEmpty = bVal === '' || bVal === null || bVal === undefined;
+      if (aEmpty && bEmpty) return 0;
+      if (aEmpty) return 1;
+      if (bEmpty) return -1;
+      let comparison = 0;
+      if (col.type === 'number') {
+        const numA = Number(aVal);
+        const numB = Number(bVal);
+        if (Number.isNaN(numA) && Number.isNaN(numB)) {
+          comparison = 0;
+        } else if (Number.isNaN(numA)) {
+          comparison = 1;
+        } else if (Number.isNaN(numB)) {
+          comparison = -1;
+        } else {
+          comparison = numA - numB;
+        }
+      } else {
+        comparison = String(aVal).localeCompare(String(bVal), undefined, { numeric: true, sensitivity: 'base' });
+      }
+      if (comparison === 0) return 0;
+      return comparison * dir;
+    });
+    rows.forEach(row => this.tbody.appendChild(row));
   }
 
   deleteAll() {
@@ -1656,7 +1760,8 @@ window.TableUtils = {
   loadFromStorage,
   applyValidation,
   showRacewayModal: TableManager.prototype.showRacewayModal,
-  STORAGE_KEYS
+  STORAGE_KEYS,
+  FILTER_ICON_SVG
 };
 
 export {
@@ -1664,5 +1769,6 @@ export {
   saveToStorage,
   loadFromStorage,
   applyValidation,
-  STORAGE_KEYS
+  STORAGE_KEYS,
+  FILTER_ICON_SVG
 };

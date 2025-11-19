@@ -1,4 +1,5 @@
 import { getItem, setItem, removeItem, keys as storeKeys } from './dataStore.mjs';
+import { FILTER_ICON_SVG } from './tableUtils.mjs';
 
 checkPrereqs([{key:'traySchedule',page:'racewayschedule.html',label:'Raceway Schedule'}]);
 
@@ -49,7 +50,7 @@ checkPrereqs([{key:'traySchedule',page:'racewayschedule.html',label:'Raceway Sch
         if (idx < headerCells.length - 2) {
           const btn = document.createElement('button');
           btn.className = 'filter-btn';
-          btn.innerHTML = '\u25BC';
+          btn.innerHTML = FILTER_ICON_SVG;
           btn.addEventListener('click', e => { e.stopPropagation(); showFilterPopup(btn, idx); });
           th.appendChild(btn);
           filters[idx] = '';
