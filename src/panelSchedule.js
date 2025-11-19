@@ -25,6 +25,9 @@ function getOrCreatePanel(panelId) {
     panels.push(panel);
     dataStore.setPanels(panels);
   }
+  if (!Array.isArray(panel.breakers)) {
+    panel.breakers = [];
+  }
   if (!Array.isArray(panel.breakerLayout)) {
     panel.breakerLayout = [];
   }
@@ -1512,7 +1515,10 @@ window.addEventListener("DOMContentLoaded", () => {
   if (systemInput) systemInput.value = getPanelSystem(panel);
   if (phasesInput) phasesInput.value = panel.phases || "";
   if (mainInput) mainInput.value = panel.mainRating || "";
-  if (circuitInput) circuitInput.value = panel.circuitCount || panel.breakers.length || 42;
+  if (circuitInput) {
+    const breakerCount = Array.isArray(panel.breakers) ? panel.breakers.length : 0;
+    circuitInput.value = panel.circuitCount || breakerCount || 42;
+  }
   if (sccrInput) sccrInput.value = panel.shortCircuitRating || panel.shortCircuitCurrentRating || "";
 
   const handleChange = (prop, input, options = {}) => {
