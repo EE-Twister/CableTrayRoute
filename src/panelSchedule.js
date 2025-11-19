@@ -716,9 +716,10 @@ export function calculatePanelTotals(panelId) {
 }
 
 function render(panelId = "P1") {
-  const { panel, panels } = getOrCreatePanel(panelId);
+  const state = getOrCreatePanel(panelId);
+  const { panel, panels } = state;
   const container = document.getElementById("panel-container");
-  if (!container) return;
+  if (!container) return state;
   container.innerHTML = "";
 
   const breakerDetails = ensureBreakerDetails(panel);
@@ -840,6 +841,7 @@ function render(panelId = "P1") {
   table.appendChild(tbody);
   container.appendChild(table);
   updateTotals(panelId);
+  return state;
 }
 
 function createCircuitCell(panel, panelId, loads, breaker, circuitCount, position, system, breakerDetails) {
@@ -1340,7 +1342,24 @@ function updateTotals(panelId) {
 window.addEventListener("DOMContentLoaded", () => {
   dataStore.loadProject(projectId);
   const panelId = "P1";
-  const { panel, panels } = getOrCreatePanel(panelId);
+  let panel;
+  let panels;
+  const syncPanelState = () => {
+    const state = getOrCreatePanel(panelId);
+    panel = state.panel;
+    panels = state.panels;
+    return state;
+  };
+  const rerender = () => {
+    const state = render(panelId);
+    if (state && state.panel && state.panels) {
+      panel = state.panel;
+      panels = state.panels;
+      return state;
+    }
+    return syncPanelState();
+  };
+  syncPanelState();
   let currentDragPoles = null;
 
   const tagInput = document.getElementById("panel-tag");
@@ -1428,7 +1447,7 @@ window.addEventListener("DOMContentLoaded", () => {
     }
     savePanels();
     updateOneline();
-    render(panelId);
+    rerender();
   };
 
   const removeBreaker = startCircuit => {
@@ -1463,7 +1482,7 @@ window.addEventListener("DOMContentLoaded", () => {
     }
     savePanels();
     updateOneline();
-    render(panelId);
+    rerender();
   };
 
   const normalizedSystem = getPanelSystem(panel);
@@ -1500,7 +1519,7 @@ window.addEventListener("DOMContentLoaded", () => {
     panel[prop] = input.value;
     savePanels();
     updateOneline();
-    if (options.render) render(panelId);
+    if (options.render) rerender();
   };
 
   if (tagInput) {
@@ -1601,7 +1620,7 @@ window.addEventListener("DOMContentLoaded", () => {
       ensurePanelBreakerLayout(panel, count);
       savePanels();
       updateOneline();
-      render(panelId);
+      rerender();
     });
   }
 
@@ -1618,7 +1637,7 @@ window.addEventListener("DOMContentLoaded", () => {
     });
   }
 
-  render(panelId);
+  rerender();
   const exportBtn = document.getElementById("export-panel-btn");
   if (exportBtn) {
     exportBtn.addEventListener("click", () => exportPanelSchedule(panelId));
@@ -1769,7 +1788,7 @@ window.addEventListener("DOMContentLoaded", () => {
           detail.deviceType = e.target.value === "fuse" ? "fuse" : "breaker";
           savePanels();
           updateOneline();
-          render(panelId);
+          rerender();
         }
         return;
       }
@@ -1785,7 +1804,7 @@ window.addEventListener("DOMContentLoaded", () => {
           }
           savePanels();
           updateOneline();
-          render(panelId);
+          rerender();
         }
         return;
       }
@@ -1803,7 +1822,7 @@ window.addEventListener("DOMContentLoaded", () => {
           }
           savePanels();
           updateOneline();
-          render(panelId);
+          rerender();
         }
         return;
       }
@@ -1864,7 +1883,7 @@ window.addEventListener("DOMContentLoaded", () => {
             });
           }
         }
-        render(panelId);
+        rerender();
       }
     });
 
