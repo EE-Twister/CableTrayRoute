@@ -1,5 +1,6 @@
 // Alias storage helpers to avoid name conflicts with local functions
 import { getDuctbanks as readStoredDuctbanks, setDuctbanks, setItem, getItem } from './dataStore.mjs';
+import { FILTER_ICON_SVG } from './tableUtils.mjs';
 
 (function(){
   let ductbanks=[];
@@ -113,7 +114,7 @@ import { getDuctbanks as readStoredDuctbanks, setDuctbanks, setItem, getItem } f
       if(idx>0&&idx<headerCells.length-1){
         const btn=document.createElement('button');
         btn.className='filter-btn';
-        btn.innerHTML='\u25BC';
+        btn.innerHTML=FILTER_ICON_SVG;
         btn.setAttribute('aria-label','Filter column');
         btn.addEventListener('click',e=>{e.stopPropagation();showFilterPopup(btn,idx);});
         th.appendChild(btn);
