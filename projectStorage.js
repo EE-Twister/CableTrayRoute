@@ -596,6 +596,18 @@ function handleStorageWriteError(prefix, keyOrError, maybeError) {
   const args = maybeError === undefined ? [prefix, error] : [prefix, keyOrError, error];
   console.warn(...args);
   if (isQuotaExceeded(error)) {
+    const key = typeof keyOrError === 'string' ? keyOrError : '';
+    if (key.includes('oneLineRevisions')) {
+      try {
+        const storage = getStorage();
+        if (storage) storage.removeItem(key);
+      } catch {}
+      memoryStorage.delete(key);
+      storageWriteBlocked = false;
+      quotaWarningShown = false;
+      console.warn('One-line revision history cleared to free storage.');
+      return;
+    }
     storageWriteBlocked = true;
     if (!quotaWarningShown) {
       quotaWarningShown = true;

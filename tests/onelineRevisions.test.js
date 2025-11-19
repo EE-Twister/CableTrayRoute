@@ -31,8 +31,8 @@ function resetStorage() {
     });
   }
   let revisions = dataStore.getRevisions();
-  assert.strictEqual(revisions.length, 10);
-  assert.strictEqual(revisions[0].sheets[0].components[0].id, 'C5');
+  assert.strictEqual(revisions.length, 6);
+  assert.strictEqual(revisions[0].sheets[0].components[0].id, 'C9');
   assert.strictEqual(revisions[revisions.length - 1].sheets[0].components[0].id, 'C14');
   console.log('\u2713 one-line revisions prune by count');
 
@@ -47,7 +47,7 @@ function resetStorage() {
   }
   revisions = dataStore.getRevisions();
   const serialized = JSON.stringify(revisions);
-  const limitBytes = 1.5 * 1024 * 1024;
+  const limitBytes = 512 * 1024;
   assert(revisions.length < 6, 'expected revision list to trim entries when exceeding byte limit');
   assert(serialized.length <= limitBytes, `expected revisions under byte limit (${limitBytes}), got ${serialized.length}`);
   console.log('\u2713 one-line revisions respect byte limit');
