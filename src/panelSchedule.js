@@ -1556,12 +1556,6 @@ window.addEventListener("DOMContentLoaded", () => {
   const circuitInput = document.getElementById("panel-circuit-count");
   const sccrInput = document.getElementById("panel-sccr");
 
-  ensurePanelDefaults();
-  updatePanelFormInputs();
-  refreshPanelSelector();
-  rerender();
-  updatePanelQueryParam(panel?.id || activePanelId);
-
   const savePanels = () => {
     dataStore.setPanels(panels);
     dataStore.saveProject(projectId);
@@ -1666,6 +1660,12 @@ window.addEventListener("DOMContentLoaded", () => {
       updateOneline();
     }
   };
+
+  ensurePanelDefaults();
+  updatePanelFormInputs();
+  refreshPanelSelector();
+  rerender();
+  updatePanelQueryParam(panel?.id || activePanelId);
 
   const setActivePanelId = (identifier, options = {}) => {
     if (!identifier) return;
