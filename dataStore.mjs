@@ -352,8 +352,8 @@ export const getOneLine = (scenario = getCurrentScenarioNameState()) => {
  * @param {OneLineSheet[]} sheets
  */
 const REVISION_KEY = 'oneLineRevisions';
-const MAX_REVISION_COUNT = 10;
-const MAX_REVISION_BYTES = 1.5 * 1024 * 1024;
+const MAX_REVISION_COUNT = 6;
+const MAX_REVISION_BYTES = 512 * 1024;
 
 function pruneRevisions(revisions) {
   if (!Array.isArray(revisions)) return [];
