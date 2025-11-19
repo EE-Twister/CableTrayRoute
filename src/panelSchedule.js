@@ -5,12 +5,152 @@ import { exportPanelSchedule } from "../exportPanelSchedule.js";
 
 const projectId = typeof window !== "undefined" ? (window.currentProjectId || "default") : undefined;
 
-function getOrCreatePanel(panelId) {
+function getPanelIdentifierCandidates(panel) {
+  if (!panel) return [];
+  return [panel.id, panel.ref, panel.panel_id, panel.tag]
+    .map(value => (value == null ? null : String(value)))
+    .filter(Boolean);
+}
+
+function panelMatchesIdentifier(panel, identifier) {
+  if (!panel || identifier == null) return false;
+  const normalized = String(identifier).toLowerCase();
+  if (!normalized) return false;
+  return getPanelIdentifierCandidates(panel)
+    .some(value => value.toLowerCase() === normalized);
+}
+
+function findPanelByIdentifier(panels, identifier) {
+  if (!Array.isArray(panels) || !identifier) return null;
+  return panels.find(panel => panelMatchesIdentifier(panel, identifier)) || null;
+}
+
+function generatePanelId(panels) {
+  const used = new Set();
+  if (Array.isArray(panels)) {
+    panels.forEach(panel => {
+      getPanelIdentifierCandidates(panel).forEach(value => used.add(value));
+    });
+  }
+  let max = 0;
+  used.forEach(value => {
+    const match = /^P(\d+)$/i.exec(value || "");
+    if (match) {
+      const parsed = Number.parseInt(match[1], 10);
+      if (Number.isFinite(parsed)) {
+        max = Math.max(max, parsed);
+      }
+    }
+  });
+  let candidateNumber = Math.max(1, max + 1);
+  while (used.has(`P${candidateNumber}`)) {
+    candidateNumber++;
+  }
+  return `P${candidateNumber}`;
+}
+
+function getPanelDisplayName(panel, index = 0) {
+  if (!panel) return `Panel ${index + 1}`;
+  const candidates = [panel.ref, panel.panel_id, panel.tag, panel.id];
+  for (const candidate of candidates) {
+    if (candidate != null && String(candidate).trim()) {
+      return String(candidate);
+    }
+  }
+  return `Panel ${index + 1}`;
+}
+
+function formatPanelSelectorLabel(panel, index = 0) {
+  const base = getPanelDisplayName(panel, index);
+  const meta = [];
+  const voltage = panel?.voltage;
+  if (voltage) {
+    const trimmed = String(voltage).trim();
+    if (trimmed) {
+      meta.push(/v$/i.test(trimmed) ? trimmed : `${trimmed} V`);
+    }
+  }
+  const fed = panel?.fedFrom || panel?.fed_from;
+  if (fed) {
+    meta.push(`Fed from ${fed}`);
+  }
+  return meta.length ? `${base} (${meta.join(" • ")})` : base;
+}
+
+function clonePanelState(panel) {
+  if (!panel) return null;
+  if (typeof structuredClone === "function") {
+    try {
+      return structuredClone(panel);
+    } catch {}
+  }
+  try {
+    return JSON.parse(JSON.stringify(panel));
+  } catch {
+    return { ...panel };
+  }
+}
+
+function duplicatePanelDefinition(panel, panels) {
+  if (!panel) return null;
+  const clone = clonePanelState(panel) || {};
+  const circuitCount = getPanelCircuitCount(panel);
+  clone.id = generatePanelId(panels);
+  const sourceLabel = getPanelDisplayName(panel);
+  const copyLabel = sourceLabel ? `${sourceLabel} Copy` : clone.id;
+  clone.ref = copyLabel;
+  clone.panel_id = copyLabel;
+  clone.tag = copyLabel;
+  clone.breakers = Array.from({ length: circuitCount }, () => null);
+  clone.breakerLayout = Array.isArray(panel.breakerLayout)
+    ? panel.breakerLayout.map(entry => (entry ? { ...entry } : null))
+    : [];
+  if (panel.breakerDetails && typeof panel.breakerDetails === "object") {
+    clone.breakerDetails = Object.fromEntries(
+      Object.entries(panel.breakerDetails).map(([key, detail]) => {
+        if (detail && typeof detail === "object") {
+          return [key, { ...detail }];
+        }
+        return [key, detail];
+      })
+    );
+  } else {
+    clone.breakerDetails = {};
+  }
+  return clone;
+}
+
+function clearLoadsForPanel(panel) {
+  if (!panel) return false;
+  const identifiers = new Set(
+    getPanelIdentifierCandidates(panel).map(id => id.toLowerCase())
+  );
+  if (!identifiers.size) return false;
+  const loads = dataStore.getLoads();
+  let changed = false;
+  loads.forEach(load => {
+    if (!load || load.panelId == null) return;
+    const normalized = String(load.panelId).toLowerCase();
+    if (identifiers.has(normalized)) {
+      delete load.panelId;
+      delete load.breaker;
+      delete load.breakerPoles;
+      changed = true;
+    }
+  });
+  if (changed) {
+    dataStore.setLoads(loads);
+  }
+  return changed;
+}
+
+function getOrCreatePanel(panelId = "P1") {
   const panels = dataStore.getPanels();
-  let panel = panels.find(p => p.id === panelId || p.ref === panelId || p.panel_id === panelId);
+  let panel = findPanelByIdentifier(panels, panelId);
   if (!panel) {
+    const newId = panelId || generatePanelId(panels);
     panel = {
-      id: panelId,
+      id: newId,
       breakers: [],
       breakerLayout: [],
       breakerDetails: {},
@@ -25,6 +165,7 @@ function getOrCreatePanel(panelId) {
     panels.push(panel);
     dataStore.setPanels(panels);
   }
+  let identifiersUpdated = false;
   if (!Array.isArray(panel.breakers)) {
     panel.breakers = [];
   }
@@ -48,6 +189,18 @@ function getOrCreatePanel(panelId) {
   }
   if (panel.shortCircuitRating == null && panel.shortCircuitCurrentRating != null) {
     panel.shortCircuitRating = panel.shortCircuitCurrentRating;
+  }
+  if (!panel.id) {
+    const fallback = panel.ref || panel.panel_id || panel.tag;
+    if (fallback) {
+      panel.id = fallback;
+    } else {
+      panel.id = generatePanelId(panels);
+    }
+    identifiersUpdated = true;
+  }
+  if (identifiersUpdated) {
+    dataStore.setPanels(panels);
   }
   return { panel, panels };
 }
@@ -619,7 +772,7 @@ export function assignLoadToBreaker(panelId, loadIndex, breaker) {
   if (!Array.isArray(loads) || loadIndex == null || loadIndex < 0 || loadIndex >= loads.length) {
     return;
   }
-  const panel = panels.find(p => p.id === panelId || p.ref === panelId || p.panel_id === panelId);
+  const panel = findPanelByIdentifier(panels, panelId);
   const load = loads[loadIndex];
   const loadTag = load.ref || load.id || load.tag;
   const circuitCount = panel ? getPanelCircuitCount(panel) : 0;
@@ -1344,26 +1497,53 @@ function updateTotals(panelId) {
 
 window.addEventListener("DOMContentLoaded", () => {
   dataStore.loadProject(projectId);
-  const panelId = "P1";
+  let panels = dataStore.getPanels();
+  const params = typeof window !== "undefined"
+    ? new URLSearchParams(window.location.search)
+    : new URLSearchParams();
+  const requestedPanelId = params.get("panel") || params.get("panelId") || params.get("panelboard");
+  const determineInitialPanelId = () => {
+    if (requestedPanelId) {
+      const match = findPanelByIdentifier(panels, requestedPanelId);
+      if (match) {
+        return match.id || requestedPanelId;
+      }
+    }
+    if (Array.isArray(panels) && panels.length) {
+      const first = panels[0];
+      return first?.id || first?.ref || first?.panel_id || first?.tag || "P1";
+    }
+    return "P1";
+  };
+  let activePanelId = determineInitialPanelId();
   let panel;
-  let panels;
   const syncPanelState = () => {
-    const state = getOrCreatePanel(panelId);
+    const state = getOrCreatePanel(activePanelId);
     panel = state.panel;
     panels = state.panels;
+    if (panel && panel.id && panel.id !== activePanelId) {
+      activePanelId = panel.id;
+    }
     return state;
   };
   const rerender = () => {
-    const state = render(panelId);
+    const state = render(activePanelId);
     if (state && state.panel && state.panels) {
       panel = state.panel;
       panels = state.panels;
+      updatePanelFormInputs();
       return state;
     }
-    return syncPanelState();
+    const fallback = syncPanelState();
+    updatePanelFormInputs();
+    return fallback;
   };
   syncPanelState();
   let currentDragPoles = null;
+  const panelSelect = document.getElementById("panel-select");
+  const newPanelBtn = document.getElementById("panel-add-btn");
+  const duplicatePanelBtn = document.getElementById("panel-duplicate-btn");
+  const deletePanelBtn = document.getElementById("panel-delete-btn");
 
   const tagInput = document.getElementById("panel-tag");
   const fedFromInput = document.getElementById("panel-fed-from");
@@ -1376,6 +1556,12 @@ window.addEventListener("DOMContentLoaded", () => {
   const circuitInput = document.getElementById("panel-circuit-count");
   const sccrInput = document.getElementById("panel-sccr");
 
+  ensurePanelDefaults();
+  updatePanelFormInputs();
+  refreshPanelSelector();
+  rerender();
+  updatePanelQueryParam(panel?.id || activePanelId);
+
   const savePanels = () => {
     dataStore.setPanels(panels);
     dataStore.saveProject(projectId);
@@ -1386,6 +1572,113 @@ window.addEventListener("DOMContentLoaded", () => {
     if (fn) {
       const id = panel.ref || panel.id;
       if (id) fn(id, panel);
+    }
+  };
+
+  const updatePanelQueryParam = id => {
+    if (typeof window === "undefined" || !window.history?.replaceState) return;
+    try {
+      const url = new URL(window.location.href);
+      if (id) {
+        url.searchParams.set("panel", id);
+      } else {
+        url.searchParams.delete("panel");
+      }
+      window.history.replaceState({}, "", url);
+    } catch {}
+  };
+
+  const updatePanelSelectorButtons = () => {
+    const totalPanels = Array.isArray(panels) ? panels.length : 0;
+    if (duplicatePanelBtn) {
+      duplicatePanelBtn.disabled = totalPanels === 0;
+    }
+    if (deletePanelBtn) {
+      deletePanelBtn.disabled = totalPanels <= 1;
+    }
+  };
+
+  const refreshPanelSelector = () => {
+    if (!panelSelect) {
+      updatePanelSelectorButtons();
+      return;
+    }
+    const fragment = document.createDocumentFragment();
+    const activeValue = panel?.id || activePanelId;
+    if (Array.isArray(panels)) {
+      panels.forEach((entry, index) => {
+        if (!entry) return;
+        const value = entry.id || entry.ref || entry.panel_id || entry.tag;
+        if (!value) return;
+        const option = document.createElement("option");
+        option.value = value;
+        const label = formatPanelSelectorLabel(entry, index);
+        option.textContent = label;
+        option.title = label;
+        if (value === activeValue) {
+          option.selected = true;
+        }
+        fragment.appendChild(option);
+      });
+    }
+    panelSelect.innerHTML = "";
+    panelSelect.appendChild(fragment);
+    updatePanelSelectorButtons();
+  };
+
+  const updatePanelFormInputs = () => {
+    if (!panel) return;
+    if (tagInput) tagInput.value = panel.ref || panel.panel_id || panel.tag || panel.id || "";
+    if (fedFromInput) fedFromInput.value = panel.fedFrom || panel.fed_from || "";
+    if (voltageInput) voltageInput.value = panel.voltage || "";
+    if (manufacturerInput) manufacturerInput.value = panel.manufacturer || "";
+    if (modelInput) modelInput.value = panel.model || "";
+    if (systemInput) systemInput.value = getPanelSystem(panel);
+    if (phasesInput) phasesInput.value = panel.phases || "";
+    if (mainInput) mainInput.value = panel.mainRating || "";
+    if (circuitInput) {
+      const breakerCount = Array.isArray(panel.breakers) ? panel.breakers.length : 0;
+      circuitInput.value = panel.circuitCount || breakerCount || 42;
+    }
+    if (sccrInput) {
+      sccrInput.value = panel.shortCircuitRating || panel.shortCircuitCurrentRating || "";
+    }
+  };
+
+  const ensurePanelDefaults = () => {
+    if (!panel) return;
+    const normalizedSystem = getPanelSystem(panel);
+    let defaultsChanged = false;
+    if (panel.powerType !== normalizedSystem) {
+      panel.powerType = normalizedSystem;
+      defaultsChanged = true;
+    }
+    if (!panel.phases) {
+      panel.phases = normalizedSystem === "dc" ? "2" : "3";
+      defaultsChanged = true;
+    }
+    if (!panel.circuitCount) {
+      panel.circuitCount = panel.breakers?.length || 42;
+      defaultsChanged = true;
+    }
+    if (defaultsChanged) {
+      savePanels();
+      updateOneline();
+    }
+  };
+
+  const setActivePanelId = (identifier, options = {}) => {
+    if (!identifier) return;
+    activePanelId = identifier;
+    syncPanelState();
+    ensurePanelDefaults();
+    updatePanelFormInputs();
+    refreshPanelSelector();
+    if (!options.skipRender) {
+      rerender();
+    }
+    if (!options.skipHistory) {
+      updatePanelQueryParam(panel?.id || identifier);
     }
   };
 
@@ -1421,7 +1714,7 @@ window.addEventListener("DOMContentLoaded", () => {
     const unchanged = existingSlots.length === targetSlots.length
       && existingSlots.every((slot, idx) => slot === targetSlots[idx]);
     const conflictLoad = loads.find(candidate => {
-      if (candidate.panelId !== panelId) return false;
+      if (candidate.panelId !== activePanelId) return false;
       const span = getLoadBreakerSpan(candidate, panel, count);
       if (!span.length) return false;
       if (unchanged && span[0] === start && span.length === size) return false;
@@ -1463,7 +1756,7 @@ window.addEventListener("DOMContentLoaded", () => {
     const loads = dataStore.getLoads();
     const blockSlots = getBlockCircuits(panel, block, count);
     const conflictLoad = loads.find(candidate => {
-      if (candidate.panelId !== panelId) return false;
+      if (candidate.panelId !== activePanelId) return false;
       const span = getLoadBreakerSpan(candidate, panel, count);
       if (!span.length) return false;
       return span.some(slot => blockSlots.includes(slot));
@@ -1488,74 +1781,94 @@ window.addEventListener("DOMContentLoaded", () => {
     rerender();
   };
 
-  const normalizedSystem = getPanelSystem(panel);
-  let defaultsChanged = false;
-  if (panel.powerType !== normalizedSystem) {
-    panel.powerType = normalizedSystem;
-    defaultsChanged = true;
-  }
-  if (!panel.phases) {
-    panel.phases = normalizedSystem === "dc" ? "2" : "3";
-    defaultsChanged = true;
-  }
-  if (!panel.circuitCount) {
-    panel.circuitCount = panel.breakers?.length || 42;
-    defaultsChanged = true;
-  }
-  if (defaultsChanged) {
-    savePanels();
-    updateOneline();
-  }
-
-  if (tagInput) tagInput.value = panel.ref || panel.panel_id || panel.tag || panel.id || "";
-  if (fedFromInput) fedFromInput.value = panel.fedFrom || panel.fed_from || "";
-  if (voltageInput) voltageInput.value = panel.voltage || "";
-  if (manufacturerInput) manufacturerInput.value = panel.manufacturer || "";
-  if (modelInput) modelInput.value = panel.model || "";
-  if (systemInput) systemInput.value = getPanelSystem(panel);
-  if (phasesInput) phasesInput.value = panel.phases || "";
-  if (mainInput) mainInput.value = panel.mainRating || "";
-  if (circuitInput) {
-    const breakerCount = Array.isArray(panel.breakers) ? panel.breakers.length : 0;
-    circuitInput.value = panel.circuitCount || breakerCount || 42;
-  }
-  if (sccrInput) sccrInput.value = panel.shortCircuitRating || panel.shortCircuitCurrentRating || "";
-
   const handleChange = (prop, input, options = {}) => {
     panel[prop] = input.value;
     savePanels();
     updateOneline();
+    if (options.refreshSelector) refreshPanelSelector();
     if (options.render) rerender();
   };
 
-  if (tagInput) {
-    tagInput.addEventListener("input", () => {
-      panel.ref = tagInput.value;
-      if (tagInput.value) {
-        panel.panel_id = tagInput.value;
-        panel.tag = tagInput.value;
-      } else {
-        delete panel.panel_id;
-        delete panel.tag;
+  if (panelSelect) {
+    panelSelect.addEventListener("change", () => {
+      const value = panelSelect.value;
+      if (value && value !== activePanelId) {
+        setActivePanelId(value);
       }
-      savePanels();
-      updateOneline();
-    });
-  }
-  if (fedFromInput) {
-    fedFromInput.addEventListener("input", () => {
-      panel.fedFrom = fedFromInput.value;
-      if (fedFromInput.value) {
-        panel.fed_from = fedFromInput.value;
-      } else {
-        delete panel.fed_from;
-      }
-      savePanels();
-      updateOneline();
     });
   }
 
-  if (voltageInput) voltageInput.addEventListener("input", () => handleChange("voltage", voltageInput));
+  if (newPanelBtn) {
+    newPanelBtn.addEventListener("click", () => {
+      const newId = generatePanelId(panels);
+      setActivePanelId(newId);
+    });
+  }
+
+  if (duplicatePanelBtn) {
+    duplicatePanelBtn.addEventListener("click", () => {
+      if (!panel) return;
+      const clone = duplicatePanelDefinition(panel, panels);
+      if (!clone) return;
+      panels.push(clone);
+      savePanels();
+      setActivePanelId(clone.id);
+    });
+  }
+
+  if (deletePanelBtn) {
+    deletePanelBtn.addEventListener("click", () => {
+      if (!panel || !Array.isArray(panels) || panels.length <= 1) return;
+      const label = getPanelDisplayName(panel);
+      const confirmed = window.confirm(`Delete ${label}? Loads assigned to this panel will be cleared.`);
+      if (!confirmed) return;
+      const idx = panels.findIndex(entry => entry && panelMatchesIdentifier(entry, activePanelId));
+      const [removed] = idx >= 0 ? panels.splice(idx, 1) : panels.splice(panels.length - 1, 1);
+      savePanels();
+      const loadsChanged = clearLoadsForPanel(removed || panel);
+      if (loadsChanged) {
+        dataStore.saveProject(projectId);
+      }
+      const nextPanel = panels[idx] || panels[idx - 1] || panels[0];
+      const nextId = nextPanel ? (nextPanel.id || nextPanel.ref || nextPanel.panel_id || nextPanel.tag) : null;
+      if (nextId) {
+        setActivePanelId(nextId);
+      } else {
+        setActivePanelId(generatePanelId(panels));
+      }
+    });
+  }
+
+    if (tagInput) {
+      tagInput.addEventListener("input", () => {
+        panel.ref = tagInput.value;
+        if (tagInput.value) {
+          panel.panel_id = tagInput.value;
+          panel.tag = tagInput.value;
+        } else {
+          delete panel.panel_id;
+          delete panel.tag;
+        }
+        savePanels();
+        updateOneline();
+        refreshPanelSelector();
+      });
+    }
+    if (fedFromInput) {
+      fedFromInput.addEventListener("input", () => {
+        panel.fedFrom = fedFromInput.value;
+        if (fedFromInput.value) {
+          panel.fed_from = fedFromInput.value;
+        } else {
+          delete panel.fed_from;
+        }
+        savePanels();
+        updateOneline();
+        refreshPanelSelector();
+      });
+    }
+
+  if (voltageInput) voltageInput.addEventListener("input", () => handleChange("voltage", voltageInput, { refreshSelector: true }));
   if (manufacturerInput) manufacturerInput.addEventListener("input", () => handleChange("manufacturer", manufacturerInput));
   if (modelInput) modelInput.addEventListener("input", () => handleChange("model", modelInput));
   if (systemInput) systemInput.addEventListener("change", () => handleChange("powerType", systemInput, { render: true }));
@@ -1643,15 +1956,14 @@ window.addEventListener("DOMContentLoaded", () => {
     });
   }
 
-  rerender();
   const exportBtn = document.getElementById("export-panel-btn");
   if (exportBtn) {
-    exportBtn.addEventListener("click", () => exportPanelSchedule(panelId));
+    exportBtn.addEventListener("click", () => exportPanelSchedule(activePanelId));
   }
   const addEquipmentBtn = document.getElementById("add-panel-to-equipment-btn");
   if (addEquipmentBtn) {
     addEquipmentBtn.addEventListener("click", () => {
-      const equipmentId = panel.ref || panel.panel_id || panel.tag || panel.id || panelId;
+      const equipmentId = panel.ref || panel.panel_id || panel.tag || panel.id || activePanelId;
       if (!equipmentId) {
         alert("Set a panelboard tag before adding it to the equipment list.");
         return;
@@ -1792,8 +2104,8 @@ window.addEventListener("DOMContentLoaded", () => {
         if (Number.isFinite(start)) {
           const detail = ensureBreakerDetail(panel, start);
           detail.deviceType = e.target.value === "fuse" ? "fuse" : "breaker";
-          savePanels();
-          updateOneline();
+        savePanels();
+        updateOneline();
           rerender();
         }
         return;
@@ -1808,8 +2120,8 @@ window.addEventListener("DOMContentLoaded", () => {
           } else {
             delete detail.rating;
           }
-          savePanels();
-          updateOneline();
+        savePanels();
+        updateOneline();
           rerender();
         }
         return;
@@ -1826,8 +2138,8 @@ window.addEventListener("DOMContentLoaded", () => {
             delete detail.cable;
             delete detail.cableId;
           }
-          savePanels();
-          updateOneline();
+        savePanels();
+        updateOneline();
           rerender();
         }
         return;
@@ -1836,15 +2148,15 @@ window.addEventListener("DOMContentLoaded", () => {
         const breaker = parseInt(e.target.dataset.breaker, 10);
         const loadIdx = e.target.value ? Number(e.target.value) : null;
         if (loadIdx !== null) {
-          assignLoadToBreaker(panelId, loadIdx, breaker);
+          assignLoadToBreaker(activePanelId, loadIdx, breaker);
         } else {
           const loads = dataStore.getLoads();
           const panelList = dataStore.getPanels();
-          const targetPanel = panelList.find(p => p.id === panelId || p.ref === panelId || p.panel_id === panelId);
+          const targetPanel = findPanelByIdentifier(panelList, activePanelId);
           const circuitCount = targetPanel ? getPanelCircuitCount(targetPanel) : 0;
           const removed = [];
           loads.forEach(load => {
-            if (load.panelId !== panelId) return;
+            if (load.panelId !== activePanelId) return;
             const span = getLoadBreakerSpan(load, targetPanel, circuitCount);
             if (!span.length) return;
             if (span.includes(breaker)) {
