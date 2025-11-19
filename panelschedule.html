@@ -53,6 +53,17 @@
         <p>Assign loads from the load list to panel breakers.</p>
       </header>
       <section class="card">
+          <div class="panel-switcher">
+            <label for="panel-select">Active Panelboard</label>
+            <div class="panel-switcher-controls">
+              <select id="panel-select" aria-label="Select a panelboard"></select>
+              <div class="panel-switcher-actions">
+                <button id="panel-add-btn" class="btn" type="button" title="Create a new panelboard">New</button>
+                <button id="panel-duplicate-btn" class="btn" type="button" title="Duplicate this panelboard">Duplicate</button>
+                <button id="panel-delete-btn" class="btn" type="button" title="Delete this panelboard">Delete</button>
+              </div>
+            </div>
+          </div>
           <div id="panel-info" class="mb-1">
             <label>Panelboard Tag <input id="panel-tag" type="text"></label>
             <label>Fed From <input id="panel-fed-from" type="text"></label>

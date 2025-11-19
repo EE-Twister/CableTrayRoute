@@ -5129,6 +5129,45 @@ body.dark-mode .workflow-card-title {
 }
 
 /* Panel schedule layout */
+.panel-switcher {
+    display: flex;
+    flex-direction: column;
+    gap: 0.35rem;
+    margin-bottom: 1rem;
+}
+
+.panel-switcher label {
+    font-weight: 600;
+    font-size: 0.95rem;
+    color: var(--text-color);
+}
+
+.panel-switcher-controls {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.5rem;
+    align-items: center;
+}
+
+.panel-switcher select {
+    min-width: 220px;
+    padding: 0.5rem;
+    border: 1px solid var(--border-color);
+    border-radius: 4px;
+    background: var(--secondary-color);
+    color: var(--text-color);
+}
+
+.panel-switcher-actions {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.4rem;
+}
+
+.panel-switcher .btn {
+    white-space: nowrap;
+}
+
 #panel-info {
     display: grid;
     grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
