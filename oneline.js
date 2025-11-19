@@ -10873,6 +10873,8 @@ function syncSchedules(notify = true) {
     return null;
   };
   const mapFields = c => {
+    const componentTag = getComponentTag(c);
+    const description = c.description || c.notes || '';
     const src = all.find(s => (s.connections || []).some(conn => conn.target === c.id));
     const conn = src ? (src.connections || []).find(cc => cc.target === c.id) : null;
     const inboundCable = src && src.type === 'cable'
@@ -10888,7 +10890,8 @@ function syncSchedules(notify = true) {
     const fields = {
       id: c.ref || c.id,
       ref: c.id,
-      description: c.label,
+      tag: componentTag,
+      description: description || (c.label && c.label !== componentTag ? c.label : ''),
       voltage: c.voltage ?? '',
       manufacturer: c.manufacturer ?? '',
       model: c.model ?? '',

@@ -269,6 +269,7 @@ function ensureEquipmentFields(eq) {
   return {
     id: '',
     ref: '',
+    tag: '',
     description: '',
     voltage: '',
     category: '',

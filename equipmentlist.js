@@ -11,7 +11,7 @@ if (typeof window !== 'undefined') {
     initNavToggle();
 
       const columns = [
-        { key: 'id', label: 'ID', type: 'text' },
+        { key: 'tag', label: 'Equipment Tag', type: 'text' },
         { key: 'description', label: 'Description', type: 'text' },
         { key: 'voltage', label: 'Voltage (V)', type: 'text' },
         { key: 'category', label: 'Category', type: 'text' },
@@ -25,9 +25,11 @@ if (typeof window !== 'undefined') {
         { key: 'z', label: 'Z', type: 'number', step: 'any', maxlength: 15, validate: 'numeric' }
       ];
 
-      const existing = new Set(columns.map(c => c.key));
+      const hiddenColumns = new Set(['id', 'ref']);
+      const existing = new Set(columns.map(c => c.key).concat(Array.from(hiddenColumns)));
       dataStore.getEquipment().forEach(eq => {
         Object.keys(eq).forEach(k => {
+          if (hiddenColumns.has(k)) return;
           if (!existing.has(k)) {
             existing.add(k);
             columns.push({ key: k, label: k.charAt(0).toUpperCase() + k.slice(1), type: 'text' });
@@ -64,7 +66,7 @@ if (typeof window !== 'undefined') {
 
     const searchInput = document.getElementById('equipment-search');
     if (searchInput) {
-      table.globalFilterCols = ['id', 'description', 'manufacturer'];
+      table.globalFilterCols = ['tag', 'description', 'manufacturer'];
       searchInput.addEventListener('input', e => {
         table.globalFilter = e.target.value;
         table.applyFilters();
@@ -137,6 +139,8 @@ if (typeof window !== 'undefined') {
     const fieldMap = {
       'EquipmentID': 'id',
       'ID': 'id',
+      'Tag': 'tag',
+      'Equipment Tag': 'tag',
       'Description': 'description',
       'Voltage': 'voltage',
       'Category': 'category',
