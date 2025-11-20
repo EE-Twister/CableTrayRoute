@@ -1009,6 +1009,33 @@ function render(panelId = "P1") {
     return { span: columnSpan.length, circuits: columnSpan };
   };
 
+  const mapCircuitToRow = circuit => Math.floor((circuit - 1) / 2);
+
+  const getDeviceRowSpanInfo = circuit => {
+    if (!Number.isFinite(circuit) || circuit < 1 || circuit > circuitCount) return null;
+    const block = layout[circuit - 1] || null;
+    if (!block || block.position !== 0) return null;
+    const spanCircuits = getBlockCircuits(panel, block, circuitCount);
+    if (!spanCircuits.includes(circuit)) return null;
+    const rowsCovered = spanCircuits.map(mapCircuitToRow);
+    const startRow = Math.min(...rowsCovered);
+    const rowSpan = new Set(rowsCovered).size;
+    return { spanCircuits, startRow, rowSpan };
+  };
+
+  const getDeviceSpanForRow = (rowIndex, odd, even) => {
+    const candidates = [getDeviceRowSpanInfo(odd), getDeviceRowSpanInfo(even)]
+      .filter(Boolean)
+      .filter(info => info.startRow === rowIndex);
+    if (!candidates.length) return null;
+    const combinedCircuits = new Set();
+    candidates.forEach(info => info.spanCircuits.forEach(value => combinedCircuits.add(value)));
+    const rowSpan = new Set(Array.from(combinedCircuits).map(mapCircuitToRow)).size;
+    return { circuits: Array.from(combinedCircuits).sort((a, b) => a - b), rowSpan };
+  };
+
+  const skippedDeviceRows = new Set();
+
   for (let i = 0; i < rows; i++) {
     const row = document.createElement("tr");
     const oddCircuit = i * 2 + 1;
@@ -1025,7 +1052,25 @@ function render(panelId = "P1") {
       }
       row.appendChild(oddCell);
     }
-    row.appendChild(createDeviceCell(panel, oddCircuit, evenCircuit, circuitCount, breakerDetails, system, phaseSequence));
+    if (!skippedDeviceRows.has(i)) {
+      const deviceSpan = getDeviceSpanForRow(i, oddCircuit, evenCircuit);
+      const deviceCell = createDeviceCell(
+        panel,
+        oddCircuit,
+        evenCircuit,
+        circuitCount,
+        breakerDetails,
+        system,
+        phaseSequence,
+        { rowSpan: deviceSpan?.rowSpan }
+      );
+      if (deviceSpan?.rowSpan > 1) {
+        for (let offset = 1; offset < deviceSpan.rowSpan; offset++) {
+          skippedDeviceRows.add(i + offset);
+        }
+      }
+      row.appendChild(deviceCell);
+    }
     if (!skippedEvenCircuits.has(evenCircuit)) {
       const evenCell = createCircuitCell(panel, panelId, loads, evenCircuit, circuitCount, "right", system, breakerDetails);
       const evenSpan = getSpanInfo(evenCircuit);
@@ -1434,17 +1479,24 @@ function createBusRails(phases, options = {}) {
   return rails;
 }
 
-function createDeviceCell(panel, oddCircuit, evenCircuit, circuitCount, breakerDetails, system, phaseSequence) {
+function createDeviceCell(panel, oddCircuit, evenCircuit, circuitCount, breakerDetails, system, phaseSequence, options = {}) {
   const td = document.createElement("td");
   td.className = "panel-device-cell";
-  const sequence = phaseSequence || getPanelPhaseSequence(panel);
+  const sequence = phaseSequence || getPanelPhaseSequence(panel) || [];
   td.style.setProperty("--panel-rail-count", String(Math.max(sequence.length, 1)));
+  const spanRows = Number.isFinite(options.rowSpan) && options.rowSpan > 1 ? Number(options.rowSpan) : 1;
+  const rowCount = Math.max(1, spanRows);
+  if (spanRows > 1) {
+    td.rowSpan = spanRows;
+    td.style.setProperty("--panel-device-row-span", String(spanRows));
+  }
 
   const rails = createBusRails(sequence, { variant: "body" });
-  td.appendChild(rails);
+  rails.classList.add("panel-device-rails--inline");
 
   const wrapper = document.createElement("div");
   wrapper.className = "panel-device-wrapper";
+  wrapper.style.setProperty("--panel-device-row-count", String(rowCount));
   const oddSlot = document.createElement("div");
   oddSlot.className = "panel-device-slot panel-device-slot--odd";
   const evenSlot = document.createElement("div");
@@ -1453,11 +1505,20 @@ function createDeviceCell(panel, oddCircuit, evenCircuit, circuitCount, breakerD
   const evenPhase = getPhaseLabel(panel, evenCircuit);
   if (oddPhase) oddSlot.dataset.phase = oddPhase;
   if (evenPhase) evenSlot.dataset.phase = evenPhase;
-
-  const railSpacer = document.createElement("div");
-  railSpacer.className = "panel-device-rail-space";
-
-  wrapper.append(oddSlot, railSpacer, evenSlot);
+  const applyRailOffset = (slot, phase) => {
+    if (!slot || !sequence.length || !phase) return;
+    const index = sequence.indexOf(phase);
+    if (index >= 0) {
+      const center = (sequence.length - 1) / 2;
+      const offset = index - center;
+      slot.style.setProperty("--panel-rail-offset", `${offset}`);
+      return;
+    }
+    slot.style.removeProperty("--panel-rail-offset");
+  };
+  applyRailOffset(oddSlot, oddPhase);
+  applyRailOffset(evenSlot, evenPhase);
+  wrapper.append(oddSlot, rails, evenSlot);
   td.appendChild(wrapper);
 
   const layout = Array.isArray(panel.breakerLayout) ? panel.breakerLayout : [];
@@ -1507,9 +1568,9 @@ function createDeviceCell(panel, oddCircuit, evenCircuit, circuitCount, breakerD
     if (icon) {
       icon.dataset.placement = placement;
       if (placement === "both") {
-        icon.style.gridRow = "1 / span 2";
+        icon.style.gridRow = rowCount > 1 ? "1 / span 2" : "1";
       } else if (placement === "even") {
-        icon.style.gridRow = "2";
+        icon.style.gridRow = "1";
       }
       icons.push(icon);
     }
