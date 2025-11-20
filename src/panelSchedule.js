@@ -1406,31 +1406,20 @@ function createDeviceCell(panel, oddCircuit, evenCircuit, circuitCount, breakerD
 
   const oddInfo = getBlockInfo(oddCircuit);
   const evenInfo = getBlockInfo(evenCircuit);
-  let chosen = null;
+  const icons = [];
 
-  if (oddInfo && evenInfo && oddInfo.start === evenInfo.start) {
-    const combinedSpan = Array.from(new Set([...oddInfo.span, ...evenInfo.span]));
-    chosen = { ...oddInfo, span: combinedSpan, size: combinedSpan.length, phase: oddInfo.phase || evenInfo.phase };
-  } else if (oddInfo?.isStart) {
-    chosen = oddInfo;
-  } else if (evenInfo?.isStart) {
-    chosen = evenInfo;
-  } else {
-    chosen = oddInfo || evenInfo;
-  }
-
-  if (chosen) {
-    const placement = chosen.span.includes(oddCircuit) && chosen.span.includes(evenCircuit)
+  const createIcon = info => {
+    const placement = info.span.includes(oddCircuit) && info.span.includes(evenCircuit)
       ? "both"
-      : chosen.span.includes(oddCircuit)
+      : info.span.includes(oddCircuit)
         ? "odd"
         : "even";
     const icon = createBranchDeviceIcon(
-      chosen.detail,
-      chosen.size,
-      chosen.start,
+      info.detail,
+      info.size,
+      info.start,
       system,
-      placement === "even" ? evenInfo?.phase : chosen.phase,
+      info.phase,
       { placement }
     );
     if (icon) {
@@ -1440,9 +1429,26 @@ function createDeviceCell(panel, oddCircuit, evenCircuit, circuitCount, breakerD
       } else if (placement === "even") {
         icon.style.gridRow = "2";
       }
-      wrapper.appendChild(icon);
+      icons.push(icon);
+    }
+  };
+
+  if (oddInfo && evenInfo && oddInfo.start === evenInfo.start) {
+    const combinedSpan = Array.from(new Set([...oddInfo.span, ...evenInfo.span]));
+    createIcon({ ...oddInfo, span: combinedSpan, size: combinedSpan.length, phase: oddInfo.phase || evenInfo.phase });
+  } else {
+    if (oddInfo?.isStart) {
+      createIcon(oddInfo);
+    }
+    if (evenInfo?.isStart) {
+      createIcon(evenInfo);
+    }
+    if (!icons.length && (oddInfo || evenInfo)) {
+      createIcon(oddInfo || evenInfo);
     }
   }
+
+  icons.forEach(icon => wrapper.appendChild(icon));
   return td;
 }
 
