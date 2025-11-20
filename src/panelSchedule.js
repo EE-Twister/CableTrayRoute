@@ -159,6 +159,7 @@ function getOrCreatePanel(panelId = "P1") {
       circuitCount: 42,
       powerType: "ac",
       phases: "3",
+      poles: "3",
       shortCircuitRating: "",
       fedFrom: ""
     };
@@ -232,15 +233,21 @@ function getMaxBranchPoleCount(system) {
   return system === "dc" ? 2 : 3;
 }
 
-function getAllowedBranchPoleCounts(system) {
-  const max = getMaxBranchPoleCount(system);
-  return Array.from({ length: Math.max(1, max) }, (_, idx) => idx + 1);
+function getAllowedBranchPoleCounts(system, maxPoles = null) {
+  const systemMax = getMaxBranchPoleCount(system);
+  const limit = Number.isFinite(maxPoles) && maxPoles > 0
+    ? Math.min(systemMax, maxPoles)
+    : systemMax;
+  return Array.from({ length: Math.max(1, limit) }, (_, idx) => idx + 1);
 }
 
-function clampBreakerPolesForSystem(system, poles) {
+function clampBreakerPolesForSystem(system, poles, maxPoles = null) {
   if (!Number.isFinite(poles) || poles < 1) return 1;
-  const max = getMaxBranchPoleCount(system);
-  return Math.min(poles, Math.max(1, max));
+  const systemMax = getMaxBranchPoleCount(system);
+  const limit = Number.isFinite(maxPoles) && maxPoles > 0
+    ? Math.min(systemMax, maxPoles)
+    : systemMax;
+  return Math.min(poles, Math.max(1, limit));
 }
 
 function parsePositiveInt(value) {
@@ -259,6 +266,14 @@ function getPanelCircuitCount(panel) {
 function getPanelSystem(panel) {
   const raw = (panel?.powerType || panel?.systemType || panel?.type || "").toString().toLowerCase();
   return raw === "dc" ? "dc" : "ac";
+}
+
+function getPanelPoleLimit(panel) {
+  const system = getPanelSystem(panel);
+  const systemMax = getMaxBranchPoleCount(system);
+  const explicit = parsePositiveInt(panel?.poles);
+  if (explicit) return Math.min(systemMax, explicit);
+  return systemMax;
 }
 
 function getPanelPhaseSequence(panel) {
@@ -563,27 +578,31 @@ function getPhaseLabel(panel, breaker) {
 }
 
 function getLoadPoleCount(load, panel) {
-  if (!load) return 1;
   const system = getPanelSystem(panel);
   const candidates = [
-    load.breakerPoles,
-    load.poles,
-    load.poleCount,
-    load.phaseCount,
-    load.phases
+    load?.breakerPoles,
+    load?.poles,
+    load?.poleCount,
+    load?.phaseCount,
+    load?.phases
   ];
+  let poleCount = 1;
   for (const candidate of candidates) {
     const parsed = parsePositiveInt(candidate);
     if (!parsed) continue;
-    if (system === "dc") return Math.min(parsed, 2);
-    if (system === "ac") {
-      if (parsed >= 3) return 3;
-      if (parsed === 2) return 2;
-      return 1;
+    if (system === "dc") {
+      poleCount = Math.min(parsed, 2);
+      break;
     }
-    return parsed;
+    if (system === "ac") {
+      poleCount = parsed >= 3 ? 3 : parsed === 2 ? 2 : 1;
+      break;
+    }
+    poleCount = parsed;
+    break;
   }
-  return 1;
+  const poleLimit = getPanelPoleLimit(panel);
+  return Math.min(poleCount, poleLimit);
 }
 
 function getLoadBreakerSpan(load, panel, circuitCount) {
@@ -922,7 +941,7 @@ function render(panelId = "P1") {
     dataStore.saveProject(projectId);
   }
   const system = getPanelSystem(panel);
-  const branchPoleOptions = getAllowedBranchPoleCounts(system);
+  const branchPoleOptions = getAllowedBranchPoleCounts(system, getPanelPoleLimit(panel));
   const sequence = getPanelPhaseSequence(panel);
 
   const legend = document.createElement("div");
@@ -1138,7 +1157,8 @@ function createCircuitCell(panel, panelId, loads, breaker, circuitCount, positio
 
     const quickAdd = document.createElement("div");
     quickAdd.className = "panel-slot-quick-add";
-    getAllowedBranchPoleCounts(system).forEach(poles => {
+    const poleLimit = getPanelPoleLimit(panel);
+    getAllowedBranchPoleCounts(system, poleLimit).forEach(poles => {
       const button = document.createElement("button");
       button.type = "button";
       button.className = "panel-slot-add-btn";
@@ -1552,6 +1572,7 @@ window.addEventListener("DOMContentLoaded", () => {
   const modelInput = document.getElementById("panel-model");
   const systemInput = document.getElementById("panel-system-type");
   const phasesInput = document.getElementById("panel-phases");
+  const polesInput = document.getElementById("panel-poles");
   const mainInput = document.getElementById("panel-main-rating");
   const circuitInput = document.getElementById("panel-circuit-count");
   const sccrInput = document.getElementById("panel-sccr");
@@ -1628,7 +1649,14 @@ window.addEventListener("DOMContentLoaded", () => {
     if (manufacturerInput) manufacturerInput.value = panel.manufacturer || "";
     if (modelInput) modelInput.value = panel.model || "";
     if (systemInput) systemInput.value = getPanelSystem(panel);
-    if (phasesInput) phasesInput.value = panel.phases || "";
+    if (phasesInput) {
+      const parsedPhases = parsePositiveInt(panel.phases);
+      const normalizedPhases = parsedPhases === 1 ? "1" : "3";
+      phasesInput.value = normalizedPhases;
+    }
+    if (polesInput) {
+      polesInput.value = String(getPanelPoleLimit(panel));
+    }
     if (mainInput) mainInput.value = panel.mainRating || "";
     if (circuitInput) {
       const breakerCount = Array.isArray(panel.breakers) ? panel.breakers.length : 0;
@@ -1647,9 +1675,25 @@ window.addEventListener("DOMContentLoaded", () => {
       panel.powerType = normalizedSystem;
       defaultsChanged = true;
     }
-    if (!panel.phases) {
-      panel.phases = normalizedSystem === "dc" ? "2" : "3";
+    const parsedPhases = parsePositiveInt(panel.phases);
+    if (!parsedPhases) {
+      panel.phases = normalizedSystem === "ac" ? "3" : "1";
       defaultsChanged = true;
+    } else if (parsedPhases !== 1 && parsedPhases !== 3) {
+      panel.phases = parsedPhases < 3 ? "1" : "3";
+      defaultsChanged = true;
+    }
+    const defaultPoleLimit = getMaxBranchPoleCount(normalizedSystem);
+    const parsedPoles = parsePositiveInt(panel.poles);
+    if (!parsedPoles) {
+      panel.poles = String(defaultPoleLimit);
+      defaultsChanged = true;
+    } else {
+      const cappedPoles = Math.min(defaultPoleLimit, parsedPoles);
+      if (String(cappedPoles) !== String(panel.poles)) {
+        panel.poles = String(cappedPoles);
+        defaultsChanged = true;
+      }
     }
     if (!panel.circuitCount) {
       panel.circuitCount = panel.breakers?.length || 42;
@@ -1688,7 +1732,8 @@ window.addEventListener("DOMContentLoaded", () => {
     let size = Number.parseInt(poles, 10);
     if (!Number.isFinite(size) || size < 1) size = 1;
     const systemType = getPanelSystem(panel);
-    size = clampBreakerPolesForSystem(systemType, size);
+    const poleLimit = getPanelPoleLimit(panel);
+    size = clampBreakerPolesForSystem(systemType, size, poleLimit);
     const count = getPanelCircuitCount(panel);
     ensurePanelBreakerCapacity(panel, count);
     const { layout } = ensurePanelBreakerLayout(panel, count);
@@ -1783,6 +1828,7 @@ window.addEventListener("DOMContentLoaded", () => {
 
   const handleChange = (prop, input, options = {}) => {
     panel[prop] = input.value;
+    ensurePanelDefaults();
     savePanels();
     updateOneline();
     if (options.refreshSelector) refreshPanelSelector();
@@ -1872,7 +1918,8 @@ window.addEventListener("DOMContentLoaded", () => {
   if (manufacturerInput) manufacturerInput.addEventListener("input", () => handleChange("manufacturer", manufacturerInput));
   if (modelInput) modelInput.addEventListener("input", () => handleChange("model", modelInput));
   if (systemInput) systemInput.addEventListener("change", () => handleChange("powerType", systemInput, { render: true }));
-  if (phasesInput) phasesInput.addEventListener("input", () => handleChange("phases", phasesInput, { render: true }));
+  if (phasesInput) phasesInput.addEventListener("change", () => handleChange("phases", phasesInput, { render: true }));
+  if (polesInput) polesInput.addEventListener("change", () => handleChange("poles", polesInput, { render: true }));
 
   if (mainInput) {
     mainInput.addEventListener("input", () => {
