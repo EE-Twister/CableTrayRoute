@@ -570,9 +570,15 @@ function getPhaseLabel(panel, breaker) {
   if (system === "dc") {
     return getDcPolarityForCircuit(index, sequence);
   }
-  if (sequence.length === 3 && system === "ac") {
-    const rowIndex = Math.floor((index - 1) / 2);
-    return sequence[rowIndex % sequence.length];
+  if (system === "ac") {
+    if (sequence.length === 3) {
+      const rowIndex = Math.floor((index - 1) / 2);
+      return sequence[rowIndex % sequence.length];
+    }
+    if (sequence.length === 2) {
+      const rowIndex = Math.floor((index - 1) / 2);
+      return sequence[rowIndex % sequence.length];
+    }
   }
   return sequence[(index - 1) % sequence.length] || "";
 }
@@ -941,7 +947,6 @@ function render(panelId = "P1") {
     dataStore.saveProject(projectId);
   }
   const system = getPanelSystem(panel);
-  const branchPoleOptions = getAllowedBranchPoleCounts(system, getPanelPoleLimit(panel));
   const sequence = getPanelPhaseSequence(panel);
 
   const legend = document.createElement("div");
@@ -953,30 +958,6 @@ function render(panelId = "P1") {
     legend.textContent = `${descriptor} Bus: ${sequence.join(" / ")}`;
   }
   container.appendChild(legend);
-
-  const toolbox = document.createElement("div");
-  toolbox.className = "panel-breaker-toolbox";
-  const toolboxTitle = document.createElement("div");
-  toolboxTitle.className = "panel-breaker-toolbox-title";
-  toolboxTitle.textContent = "Breaker Palette";
-  toolbox.appendChild(toolboxTitle);
-  const toolboxHelp = document.createElement("div");
-  toolboxHelp.className = "panel-breaker-toolbox-help";
-  toolboxHelp.textContent = "Drag a breaker onto the panel or use the Add buttons in each circuit.";
-  toolbox.appendChild(toolboxHelp);
-  const toolboxItems = document.createElement("div");
-  toolboxItems.className = "panel-breaker-toolbox-items";
-  branchPoleOptions.forEach(poles => {
-    const item = document.createElement("div");
-    item.className = "panel-breaker-toolbox-item";
-    item.draggable = true;
-    item.dataset.breakerPoles = String(poles);
-    item.textContent = `${poles}-Pole Breaker`;
-    item.title = "Drag onto the panel to add this breaker";
-    toolboxItems.appendChild(item);
-  });
-  toolbox.appendChild(toolboxItems);
-  container.appendChild(toolbox);
 
   const phaseSummary = createPhaseSummary(panel, panelId, loads, circuitCount);
   if (phaseSummary) {
@@ -1150,11 +1131,6 @@ function createCircuitCell(panel, panelId, loads, breaker, circuitCount, positio
   if (!block) {
     slot.classList.add("panel-slot--blank");
     control.classList.add("panel-slot-control--blank");
-    const dropZone = document.createElement("div");
-    dropZone.className = "panel-slot-dropzone";
-    dropZone.textContent = "Drag a breaker here";
-    control.appendChild(dropZone);
-
     const quickAdd = document.createElement("div");
     quickAdd.className = "panel-slot-quick-add";
     const poleLimit = getPanelPoleLimit(panel);
@@ -1410,12 +1386,13 @@ function createDeviceCell(panel, oddCircuit, evenCircuit, circuitCount, breakerD
   const appendDevice = (circuit, slotEl) => {
     if (!Number.isFinite(circuit) || circuit < 1 || circuit > circuitCount) return;
     const block = layout[circuit - 1] || null;
-    if (!block || block.position !== 0) return;
+    if (!block || !Number.isFinite(Number(block.start))) return;
+    const span = getBlockCircuits(panel, block, circuitCount);
+    if (!span.includes(circuit)) return;
     const start = Number(block.start);
-    if (!Number.isFinite(start)) return;
     const size = Number(block.size);
     const detail = breakerDetails ? breakerDetails[String(start)] || getBreakerDetail(panel, start) : getBreakerDetail(panel, start);
-    const phase = getPhaseLabel(panel, start);
+    const phase = getPhaseLabel(panel, circuit);
     const icon = createBranchDeviceIcon(
       detail,
       Number.isFinite(size) && size > 0 ? Number(size) : 1,
@@ -1423,6 +1400,16 @@ function createDeviceCell(panel, oddCircuit, evenCircuit, circuitCount, breakerD
       system,
       phase
     );
+    if (icon && span.length > 1) {
+      icon.classList.add("panel-device--spanning");
+      if (span[0] === circuit) {
+        icon.classList.add("panel-device--span-start");
+      } else if (span[span.length - 1] === circuit) {
+        icon.classList.add("panel-device--span-end");
+      } else {
+        icon.classList.add("panel-device--span-middle");
+      }
+    }
     if (icon) {
       slotEl.appendChild(icon);
     }
@@ -1559,7 +1546,6 @@ window.addEventListener("DOMContentLoaded", () => {
     return fallback;
   };
   syncPanelState();
-  let currentDragPoles = null;
   const panelSelect = document.getElementById("panel-select");
   const newPanelBtn = document.getElementById("panel-add-btn");
   const duplicatePanelBtn = document.getElementById("panel-duplicate-btn");
@@ -2118,32 +2104,6 @@ window.addEventListener("DOMContentLoaded", () => {
   }
   const panelContainer = document.getElementById("panel-container");
 
-  document.addEventListener("dragstart", e => {
-    const source = e.target.closest("[data-breaker-poles]");
-    if (!source) return;
-    const poles = Number.parseInt(source.dataset.breakerPoles, 10);
-    if (!Number.isFinite(poles) || poles < 1) return;
-    currentDragPoles = poles;
-    if (e.dataTransfer) {
-      e.dataTransfer.effectAllowed = "copy";
-      try {
-        e.dataTransfer.setData("application/panel-breaker", String(poles));
-      } catch {}
-      try {
-        e.dataTransfer.setData("text/plain", String(poles));
-      } catch {}
-    }
-  });
-
-  document.addEventListener("dragend", () => {
-    currentDragPoles = null;
-    if (panelContainer) {
-      panelContainer.querySelectorAll(".panel-slot--drop-hover").forEach(el => {
-        el.classList.remove("panel-slot--drop-hover");
-      });
-    }
-  });
-
   if (panelContainer) {
     panelContainer.addEventListener("change", e => {
       if (e.target.matches("select[data-breaker-device]")) {
@@ -2269,49 +2229,6 @@ window.addEventListener("DOMContentLoaded", () => {
           removeBreaker(circuit);
         }
       }
-    });
-
-    panelContainer.addEventListener("dragover", e => {
-      if (currentDragPoles == null && !(e.dataTransfer && e.dataTransfer.types?.includes("application/panel-breaker"))) {
-        return;
-      }
-      const slot = e.target.closest(".panel-slot");
-      if (!slot || !slot.dataset.circuit) return;
-      e.preventDefault();
-      if (e.dataTransfer) e.dataTransfer.dropEffect = "copy";
-      slot.classList.add("panel-slot--drop-hover");
-    });
-
-    panelContainer.addEventListener("dragleave", e => {
-      const slot = e.target.closest(".panel-slot");
-      if (!slot) return;
-      if (!slot.contains(e.relatedTarget)) {
-        slot.classList.remove("panel-slot--drop-hover");
-      }
-    });
-
-    panelContainer.addEventListener("drop", e => {
-      const slot = e.target.closest(".panel-slot");
-      if (!slot || !slot.dataset.circuit) return;
-      const transfer = e.dataTransfer?.getData("application/panel-breaker") || e.dataTransfer?.getData("text/plain");
-      const dataPoles = Number.parseInt(transfer, 10);
-      const poles = Number.isFinite(dataPoles) ? dataPoles : currentDragPoles;
-      if (!Number.isFinite(poles) || poles < 1) {
-        slot.classList.remove("panel-slot--drop-hover");
-        return;
-      }
-      e.preventDefault();
-      slot.classList.remove("panel-slot--drop-hover");
-      let circuit = Number.parseInt(slot.dataset.circuit, 10);
-      if (!Number.isFinite(circuit)) return;
-      if (slot.dataset.breakerStart) {
-        const startCandidate = Number.parseInt(slot.dataset.breakerStart, 10);
-        if (Number.isFinite(startCandidate)) {
-          circuit = startCandidate;
-        }
-      }
-      currentDragPoles = null;
-      configureBreaker(circuit, poles);
     });
   }
 });

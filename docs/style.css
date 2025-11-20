@@ -5348,20 +5348,55 @@ body.dark-mode .panel-breaker-toolbox-item {
     display: flex;
     flex-direction: column;
     align-items: center;
-    gap: 0.35rem;
-    padding: 0.5rem 0.4rem;
+    gap: 0.3rem;
+    padding: 0.45rem 0.35rem;
     border: 1px solid var(--border-color);
     border-radius: 6px;
     background: var(--secondary-color);
     color: var(--text-color);
-    min-width: 3.25rem;
-    max-width: 6.5rem;
+    min-width: 3rem;
+    max-width: 6rem;
     box-shadow: 0 1px 2px rgba(0, 0, 0, 0.05);
 }
 
 body.dark-mode .panel-device {
     background: rgba(255, 255, 255, 0.08);
     box-shadow: none;
+}
+
+.panel-device--spanning::before,
+.panel-device--spanning::after {
+    content: "";
+    position: absolute;
+    left: 50%;
+    width: 2px;
+    transform: translateX(-50%);
+    background: var(--border-color);
+}
+
+.panel-device--span-start::after {
+    top: 50%;
+    bottom: -0.75rem;
+}
+
+.panel-device--span-middle::before {
+    top: -0.75rem;
+    bottom: 50%;
+}
+
+.panel-device--span-middle::after {
+    top: 50%;
+    bottom: -0.75rem;
+}
+
+.panel-device--span-end::before {
+    top: -0.75rem;
+    bottom: 50%;
+}
+
+body.dark-mode .panel-device--spanning::before,
+body.dark-mode .panel-device--spanning::after {
+    background: rgba(255, 255, 255, 0.5);
 }
 
 .panel-device-graphic {
@@ -5457,13 +5492,13 @@ body.dark-mode .panel-device-tie {
 .panel-slot {
     display: flex;
     flex-direction: column;
-    gap: 0.5rem;
-    padding: 0.75rem;
+    gap: 0.35rem;
+    padding: 0.6rem;
     border: 1px solid var(--border-color);
     border-radius: 6px;
     background: var(--secondary-color);
     color: var(--text-color);
-    min-height: 8rem;
+    min-height: 6.5rem;
     box-shadow: 0 2px 4px rgba(0, 0, 0, 0.04);
 }
 
@@ -5528,19 +5563,6 @@ body.dark-mode .panel-slot-locked {
 
 .panel-slot-control--blank {
     align-items: stretch;
-}
-
-.panel-slot-dropzone {
-    padding: 0.75rem;
-    border: 1px dashed var(--border-color);
-    border-radius: 4px;
-    text-align: center;
-    font-size: 0.9rem;
-    background: rgba(0, 0, 0, 0.03);
-}
-
-body.dark-mode .panel-slot-dropzone {
-    background: rgba(255, 255, 255, 0.08);
 }
 
 .panel-slot-quick-add {
