@@ -5303,6 +5303,10 @@ body.dark-mode .panel-breaker-toolbox-item {
     vertical-align: top;
 }
 
+.panel-cell--spanning {
+    vertical-align: middle;
+}
+
 .panel-cell {
     width: 45%;
 }
@@ -5488,6 +5492,11 @@ body.dark-mode .panel-device-tie {
     color: var(--text-color);
     min-height: 5.75rem;
     box-shadow: 0 2px 4px rgba(0, 0, 0, 0.04);
+}
+
+.panel-slot--spanning {
+    height: 100%;
+    justify-content: center;
 }
 
 .panel-slot--blank {

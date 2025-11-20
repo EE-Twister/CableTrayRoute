@@ -985,13 +985,49 @@ function render(panelId = "P1") {
 
   const tbody = document.createElement("tbody");
   const rows = Math.ceil(circuitCount / 2);
+  const layout = Array.isArray(panel.breakerLayout) ? panel.breakerLayout : [];
+  const skippedOddCircuits = new Set();
+  const skippedEvenCircuits = new Set();
+
+  const getSpanInfo = circuit => {
+    const block = layout[circuit - 1] || null;
+    if (!block || block.position !== 0) return null;
+    const spanCircuits = getBlockCircuits(panel, block, circuitCount);
+    if (!spanCircuits.length) return null;
+    const columnSpan = spanCircuits.filter(value => value % 2 === circuit % 2);
+    if (!columnSpan.length) return null;
+    return { span: columnSpan.length, circuits: columnSpan };
+  };
+
   for (let i = 0; i < rows; i++) {
     const row = document.createElement("tr");
     const oddCircuit = i * 2 + 1;
     const evenCircuit = oddCircuit + 1;
-    row.appendChild(createCircuitCell(panel, panelId, loads, oddCircuit, circuitCount, "left", system, breakerDetails));
+    if (!skippedOddCircuits.has(oddCircuit)) {
+      const oddCell = createCircuitCell(panel, panelId, loads, oddCircuit, circuitCount, "left", system, breakerDetails);
+      const oddSpan = getSpanInfo(oddCircuit);
+      if (oddSpan?.span > 1) {
+        oddCell.rowSpan = oddSpan.span;
+        oddCell.classList.add("panel-cell--spanning");
+        const slot = oddCell.querySelector(".panel-slot");
+        if (slot) slot.classList.add("panel-slot--spanning");
+        oddSpan.circuits.slice(1).forEach(circuit => skippedOddCircuits.add(circuit));
+      }
+      row.appendChild(oddCell);
+    }
     row.appendChild(createDeviceCell(panel, oddCircuit, evenCircuit, circuitCount, breakerDetails, system));
-    row.appendChild(createCircuitCell(panel, panelId, loads, evenCircuit, circuitCount, "right", system, breakerDetails));
+    if (!skippedEvenCircuits.has(evenCircuit)) {
+      const evenCell = createCircuitCell(panel, panelId, loads, evenCircuit, circuitCount, "right", system, breakerDetails);
+      const evenSpan = getSpanInfo(evenCircuit);
+      if (evenSpan?.span > 1) {
+        evenCell.rowSpan = evenSpan.span;
+        evenCell.classList.add("panel-cell--spanning");
+        const slot = evenCell.querySelector(".panel-slot");
+        if (slot) slot.classList.add("panel-slot--spanning");
+        evenSpan.circuits.slice(1).forEach(circuit => skippedEvenCircuits.add(circuit));
+      }
+      row.appendChild(evenCell);
+    }
     tbody.appendChild(row);
   }
   table.appendChild(tbody);
