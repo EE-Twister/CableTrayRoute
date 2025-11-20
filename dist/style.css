@@ -5320,16 +5320,17 @@ body.dark-mode .panel-breaker-toolbox-item {
 
 .panel-device-header-content {
     position: relative;
-    padding: 0.35rem 0.35rem 0.6rem;
+    padding: 0.45rem 0.35rem 0.8rem;
     display: flex;
     flex-direction: column;
-    align-items: center;
-    gap: 0.25rem;
+    align-items: stretch;
+    gap: 0.4rem;
 }
 
 .panel-device-title {
     font-weight: 700;
     letter-spacing: 0.02em;
+    text-align: center;
 }
 
 .panel-device-cell {
@@ -5340,23 +5341,30 @@ body.dark-mode .panel-breaker-toolbox-item {
 }
 
 .panel-device-rails {
-    position: absolute;
-    inset: 0.35rem 0.15rem;
+    position: relative;
     display: grid;
     grid-template-columns: repeat(var(--panel-rail-count, 1), 1fr);
-    column-gap: 0.25rem;
+    column-gap: 0.35rem;
+    align-items: stretch;
+    justify-items: center;
+    padding: 0.35rem 0.15rem;
     pointer-events: none;
     z-index: 0;
 }
 
 .panel-device-rails--header {
-    inset: 0 0.35rem 0.1rem;
-    align-items: flex-start;
-    padding-top: 0.25rem;
+    width: 100%;
+    padding: 0.25rem 0.15rem 0.1rem;
 }
 
 .panel-device-rails--body {
-    inset: 0.2rem 0.15rem;
+    height: 100%;
+    padding: 0.2rem 0.15rem;
+}
+
+.panel-device-rails--inline {
+    grid-column: 2;
+    grid-row: 1 / -1;
 }
 
 .panel-device-rail-line {
@@ -5364,7 +5372,8 @@ body.dark-mode .panel-breaker-toolbox-item {
     display: flex;
     flex-direction: column;
     align-items: center;
-    justify-content: flex-start;
+    justify-content: stretch;
+    width: 100%;
 }
 
 .panel-device-rail-line::before {
@@ -5372,10 +5381,12 @@ body.dark-mode .panel-breaker-toolbox-item {
     position: absolute;
     top: 0;
     bottom: 0;
+    left: 50%;
     width: 2px;
     background: var(--muted-text-color);
     border-radius: 999px;
     opacity: 0.9;
+    transform: translateX(-50%);
 }
 
 .panel-device-rails--header .panel-device-rail-line::before {
@@ -5394,20 +5405,14 @@ body.dark-mode .panel-breaker-toolbox-item {
 
 .panel-device-wrapper {
     display: grid;
-    grid-template-columns: 1fr 0.9rem 1fr;
-    grid-template-rows: repeat(2, minmax(3rem, 1fr));
+    grid-template-columns: 1fr minmax(1rem, 1.25rem) 1fr;
+    grid-template-rows: repeat(var(--panel-device-row-count, 2), minmax(3rem, 1fr));
     gap: 0.35rem 0.5rem;
     justify-items: stretch;
     align-items: center;
     min-height: 7rem;
     position: relative;
     z-index: 1;
-}
-
-.panel-device-rail-space {
-    grid-column: 2;
-    grid-row: 1 / span 2;
-    width: 0.9rem;
 }
 
 .panel-device-slot {
@@ -5419,7 +5424,10 @@ body.dark-mode .panel-breaker-toolbox-item {
     min-height: 2.75rem;
     padding: 0.35rem 0.5rem;
     --panel-phase-color: var(--muted-text-color);
+    --panel-rail-offset: 0;
+    --panel-rail-step: 0.65rem;
     color: var(--panel-phase-color);
+    z-index: 1;
 }
 
 .panel-device-slot::after {
@@ -5428,8 +5436,8 @@ body.dark-mode .panel-breaker-toolbox-item {
     top: 50%;
     height: 2px;
     background: var(--panel-phase-color);
-    width: calc(100% - 0.1rem);
-    transform: translateY(-50%);
+    width: 1.4rem;
+    transform: translate(calc(var(--panel-rail-offset) * var(--panel-rail-step)), -50%);
     opacity: 0.9;
 }
 
@@ -5437,12 +5445,12 @@ body.dark-mode .panel-breaker-toolbox-item {
     content: "";
     position: absolute;
     top: 50%;
-    width: 0.55rem;
-    height: 0.55rem;
+    width: 0.6rem;
+    height: 0.6rem;
     border-radius: 999px;
     border: 2px solid var(--panel-phase-color);
-    background: var(--background-color);
-    transform: translateY(-50%);
+    background: var(--panel-phase-color);
+    transform: translate(calc(var(--panel-rail-offset) * var(--panel-rail-step)), -50%);
     z-index: 1;
 }
 
@@ -5454,18 +5462,18 @@ body.dark-mode .panel-breaker-toolbox-item {
 
 .panel-device-slot--odd::after,
 .panel-device-slot--odd::before {
-    right: -0.45rem;
+    right: -0.2rem;
 }
 
 .panel-device-slot--even {
     grid-column: 3;
-    grid-row: 2;
+    grid-row: 1;
     justify-content: flex-start;
 }
 
 .panel-device-slot--even::after,
 .panel-device-slot--even::before {
-    left: -0.45rem;
+    left: -0.2rem;
 }
 
 .panel-device-slot[data-phase="A"] {
@@ -5533,7 +5541,7 @@ body.dark-mode .panel-breaker-toolbox-item {
 
 .panel-device--span {
     grid-column: 1 / span 3;
-    grid-row: 1 / span 2;
+    grid-row: 1 / -1;
     justify-self: center;
     align-self: center;
 }
@@ -5554,39 +5562,64 @@ body.dark-mode .panel-device {
 .panel-device-symbol {
     position: relative;
     display: flex;
-    gap: 0.5rem;
+    flex-direction: column;
+    gap: 0.4rem;
     justify-content: center;
-    align-items: center;
+    align-items: stretch;
     width: 100%;
+    padding: 0.05rem 0;
+}
+
+.panel-device-symbol::before {
+    content: "";
+    position: absolute;
+    top: 0.2rem;
+    bottom: 0.2rem;
+    left: 50%;
+    border-left: 2px dashed var(--primary-color);
+    opacity: 0.45;
+    transform: translateX(-50%);
+}
+
+.panel-device-symbol[data-poles="1"] {
+    flex-direction: row;
+    gap: 0.5rem;
+    align-items: center;
+    padding: 0;
+}
+
+.panel-device-symbol[data-poles="1"]::before {
+    display: none;
 }
 
 .panel-device-pole {
     position: relative;
     display: block;
-    width: 1.6rem;
+    width: 100%;
     height: 1rem;
 }
 
 .panel-device--breaker .panel-device-pole::before {
     content: "";
     position: absolute;
-    left: 0;
-    right: 0;
+    left: 50%;
+    width: 70%;
     bottom: 0;
     height: 0.85rem;
     border: 2px solid var(--primary-color);
     border-bottom: 0;
     border-radius: 0.85rem 0.85rem 0 0;
     background: transparent;
+    transform: translateX(-50%);
 }
 
 .panel-device--breaker .panel-device-pole::after {
     content: "";
     position: absolute;
-    bottom: -0.15rem;
+    bottom: -0.2rem;
     left: 50%;
-    width: 0.42rem;
-    height: 0.42rem;
+    width: 0.44rem;
+    height: 0.44rem;
     border: 2px solid var(--primary-color);
     border-radius: 999px;
     background: var(--background-color);
