@@ -1383,44 +1383,70 @@ function createDeviceCell(panel, oddCircuit, evenCircuit, circuitCount, breakerD
     system = getPanelSystem(panel);
   }
 
-  const appendDevice = (circuit, slotEl) => {
-    if (!Number.isFinite(circuit) || circuit < 1 || circuit > circuitCount) return;
+  const getBlockInfo = circuit => {
+    if (!Number.isFinite(circuit) || circuit < 1 || circuit > circuitCount) return null;
     const block = layout[circuit - 1] || null;
-    if (!block || !Number.isFinite(Number(block.start))) return;
+    const start = block && Number.isFinite(Number(block.start)) ? Number(block.start) : null;
+    if (!start) return null;
     const span = getBlockCircuits(panel, block, circuitCount);
-    if (!span.includes(circuit)) return;
-    const start = Number(block.start);
-    const size = Number(block.size);
+    if (!span.includes(circuit)) return null;
+    const size = Number.isFinite(Number(block.size)) && Number(block.size) > 0 ? Number(block.size) : span.length || 1;
     const detail = breakerDetails ? breakerDetails[String(start)] || getBreakerDetail(panel, start) : getBreakerDetail(panel, start);
     const phase = getPhaseLabel(panel, circuit);
-    const icon = createBranchDeviceIcon(
-      detail,
-      Number.isFinite(size) && size > 0 ? Number(size) : 1,
+    return {
+      block,
       start,
-      system,
-      phase
-    );
-    if (icon && span.length > 1) {
-      icon.classList.add("panel-device--spanning");
-      if (span[0] === circuit) {
-        icon.classList.add("panel-device--span-start");
-      } else if (span[span.length - 1] === circuit) {
-        icon.classList.add("panel-device--span-end");
-      } else {
-        icon.classList.add("panel-device--span-middle");
-      }
-    }
-    if (icon) {
-      slotEl.appendChild(icon);
-    }
+      size,
+      span,
+      detail,
+      phase,
+      isStart: block?.position === 0
+    };
   };
 
-  appendDevice(oddCircuit, oddSlot);
-  appendDevice(evenCircuit, evenSlot);
+  const oddInfo = getBlockInfo(oddCircuit);
+  const evenInfo = getBlockInfo(evenCircuit);
+  let chosen = null;
+
+  if (oddInfo && evenInfo && oddInfo.start === evenInfo.start) {
+    const combinedSpan = Array.from(new Set([...oddInfo.span, ...evenInfo.span]));
+    chosen = { ...oddInfo, span: combinedSpan, size: combinedSpan.length, phase: oddInfo.phase || evenInfo.phase };
+  } else if (oddInfo?.isStart) {
+    chosen = oddInfo;
+  } else if (evenInfo?.isStart) {
+    chosen = evenInfo;
+  } else {
+    chosen = oddInfo || evenInfo;
+  }
+
+  if (chosen) {
+    const placement = chosen.span.includes(oddCircuit) && chosen.span.includes(evenCircuit)
+      ? "both"
+      : chosen.span.includes(oddCircuit)
+        ? "odd"
+        : "even";
+    const icon = createBranchDeviceIcon(
+      chosen.detail,
+      chosen.size,
+      chosen.start,
+      system,
+      placement === "even" ? evenInfo?.phase : chosen.phase,
+      { placement }
+    );
+    if (icon) {
+      icon.dataset.placement = placement;
+      if (placement === "both") {
+        icon.style.gridRow = "1 / span 2";
+      } else if (placement === "even") {
+        icon.style.gridRow = "2";
+      }
+      wrapper.appendChild(icon);
+    }
+  }
   return td;
 }
 
-function createBranchDeviceIcon(detail, poleCount, startCircuit, system, phaseLabel) {
+function createBranchDeviceIcon(detail, poleCount, startCircuit, system, phaseLabel, options = {}) {
   const type = getDeviceType(detail);
   const poles = Number.isFinite(poleCount) && poleCount > 0 ? poleCount : 1;
   const icon = document.createElement("div");
@@ -1441,19 +1467,23 @@ function createBranchDeviceIcon(detail, poleCount, startCircuit, system, phaseLa
 
   const graphic = document.createElement("div");
   graphic.className = "panel-device-graphic";
-  const handles = document.createElement("div");
-  handles.className = "panel-device-handles";
-  for (let i = 0; i < poles; i++) {
-    const handle = document.createElement("span");
-    handle.className = "panel-device-handle";
-    handles.appendChild(handle);
+  const symbol = document.createElement("div");
+  symbol.className = "panel-device-symbol";
+  symbol.dataset.poles = String(poles);
+  if (options.placement) {
+    symbol.dataset.placement = options.placement;
   }
-  graphic.appendChild(handles);
+  for (let i = 0; i < poles; i++) {
+    const pole = document.createElement("span");
+    pole.className = "panel-device-pole";
+    symbol.appendChild(pole);
+  }
   if (poles > 1) {
     const tie = document.createElement("span");
     tie.className = "panel-device-tie";
-    graphic.appendChild(tie);
+    symbol.appendChild(tie);
   }
+  graphic.appendChild(symbol);
   icon.appendChild(graphic);
 
   const ratingValue = detail && detail.rating != null && detail.rating !== "" ? String(detail.rating) : "";
