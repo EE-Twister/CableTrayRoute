@@ -967,6 +967,7 @@ function render(panelId = "P1") {
   const table = document.createElement("table");
   table.id = "panel-table";
   table.className = "panel-schedule-table";
+  table.style.setProperty("--panel-rail-count", String(Math.max(phaseSequence.length, 1)));
   const thead = document.createElement("thead");
   const headRow = document.createElement("tr");
   const leftHeader = document.createElement("th");
@@ -975,7 +976,15 @@ function render(panelId = "P1") {
   const deviceHeader = document.createElement("th");
   deviceHeader.scope = "col";
   deviceHeader.className = "panel-device-header";
-  deviceHeader.textContent = "Device";
+  const deviceHeaderContent = document.createElement("div");
+  deviceHeaderContent.className = "panel-device-header-content";
+  const deviceTitle = document.createElement("div");
+  deviceTitle.className = "panel-device-title";
+  deviceTitle.textContent = "Device";
+  deviceHeaderContent.appendChild(deviceTitle);
+  const headerRails = createBusRails(phaseSequence, { variant: "header", showLabels: true });
+  deviceHeaderContent.appendChild(headerRails);
+  deviceHeader.appendChild(deviceHeaderContent);
   const rightHeader = document.createElement("th");
   rightHeader.scope = "col";
   rightHeader.textContent = "Even Circuits";
@@ -1015,7 +1024,7 @@ function render(panelId = "P1") {
       }
       row.appendChild(oddCell);
     }
-    row.appendChild(createDeviceCell(panel, oddCircuit, evenCircuit, circuitCount, breakerDetails, system));
+    row.appendChild(createDeviceCell(panel, oddCircuit, evenCircuit, circuitCount, breakerDetails, system, phaseSequence));
     if (!skippedEvenCircuits.has(evenCircuit)) {
       const evenCell = createCircuitCell(panel, panelId, loads, evenCircuit, circuitCount, "right", system, breakerDetails);
       const evenSpan = getSpanInfo(evenCircuit);
@@ -1401,9 +1410,37 @@ function createCircuitCell(panel, panelId, loads, breaker, circuitCount, positio
   return td;
 }
 
-function createDeviceCell(panel, oddCircuit, evenCircuit, circuitCount, breakerDetails, system) {
+function createBusRails(phases, options = {}) {
+  const rails = document.createElement("div");
+  rails.className = "panel-device-rails";
+  if (options.variant) {
+    rails.classList.add(`panel-device-rails--${options.variant}`);
+  }
+  const sequence = Array.isArray(phases) && phases.length ? phases : [];
+  rails.style.setProperty("--panel-rail-count", String(Math.max(sequence.length, 1)));
+  sequence.forEach(phase => {
+    const line = document.createElement("div");
+    line.className = "panel-device-rail-line";
+    line.dataset.phase = phase;
+    if (options.showLabels) {
+      const label = document.createElement("span");
+      label.className = "panel-device-rail-label";
+      label.textContent = phase;
+      line.appendChild(label);
+    }
+    rails.appendChild(line);
+  });
+  return rails;
+}
+
+function createDeviceCell(panel, oddCircuit, evenCircuit, circuitCount, breakerDetails, system, phaseSequence) {
   const td = document.createElement("td");
   td.className = "panel-device-cell";
+  const sequence = phaseSequence || getPanelPhaseSequence(panel);
+  td.style.setProperty("--panel-rail-count", String(Math.max(sequence.length, 1)));
+
+  const rails = createBusRails(sequence, { variant: "body" });
+  td.appendChild(rails);
 
   const wrapper = document.createElement("div");
   wrapper.className = "panel-device-wrapper";
@@ -1416,19 +1453,10 @@ function createDeviceCell(panel, oddCircuit, evenCircuit, circuitCount, breakerD
   if (oddPhase) oddSlot.dataset.phase = oddPhase;
   if (evenPhase) evenSlot.dataset.phase = evenPhase;
 
-  const bus = document.createElement("div");
-  bus.className = "panel-device-bus";
-  const phaseSequence = getPanelPhaseSequence(panel);
-  if (phaseSequence.length) {
-    phaseSequence.forEach(phase => {
-      const bar = document.createElement("span");
-      bar.className = "panel-device-bus-bar";
-      bar.dataset.phase = phase;
-      bar.textContent = phase;
-      bus.appendChild(bar);
-    });
-  }
-  wrapper.append(oddSlot, bus, evenSlot);
+  const railSpacer = document.createElement("div");
+  railSpacer.className = "panel-device-rail-space";
+
+  wrapper.append(oddSlot, railSpacer, evenSlot);
   td.appendChild(wrapper);
 
   const layout = Array.isArray(panel.breakerLayout) ? panel.breakerLayout : [];
