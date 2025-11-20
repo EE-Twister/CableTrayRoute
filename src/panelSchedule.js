@@ -1411,7 +1411,24 @@ function createDeviceCell(panel, oddCircuit, evenCircuit, circuitCount, breakerD
   oddSlot.className = "panel-device-slot panel-device-slot--odd";
   const evenSlot = document.createElement("div");
   evenSlot.className = "panel-device-slot panel-device-slot--even";
-  wrapper.append(oddSlot, evenSlot);
+  const oddPhase = getPhaseLabel(panel, oddCircuit);
+  const evenPhase = getPhaseLabel(panel, evenCircuit);
+  if (oddPhase) oddSlot.dataset.phase = oddPhase;
+  if (evenPhase) evenSlot.dataset.phase = evenPhase;
+
+  const bus = document.createElement("div");
+  bus.className = "panel-device-bus";
+  const phaseSequence = getPanelPhaseSequence(panel);
+  if (phaseSequence.length) {
+    phaseSequence.forEach(phase => {
+      const bar = document.createElement("span");
+      bar.className = "panel-device-bus-bar";
+      bar.dataset.phase = phase;
+      bar.textContent = phase;
+      bus.appendChild(bar);
+    });
+  }
+  wrapper.append(oddSlot, bus, evenSlot);
   td.appendChild(wrapper);
 
   const layout = Array.isArray(panel.breakerLayout) ? panel.breakerLayout : [];
@@ -1484,7 +1501,17 @@ function createDeviceCell(panel, oddCircuit, evenCircuit, circuitCount, breakerD
     }
   }
 
-  icons.forEach(icon => wrapper.appendChild(icon));
+  icons.forEach(icon => {
+    const placement = icon.dataset.placement;
+    if (placement === "odd") {
+      oddSlot.appendChild(icon);
+    } else if (placement === "even") {
+      evenSlot.appendChild(icon);
+    } else {
+      icon.classList.add("panel-device--span");
+      wrapper.appendChild(icon);
+    }
+  });
   return td;
 }
 

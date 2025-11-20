@@ -5325,26 +5325,161 @@ body.dark-mode .panel-breaker-toolbox-item {
 
 .panel-device-wrapper {
     display: grid;
-    grid-template-rows: repeat(2, minmax(0, 1fr));
-    gap: 0.35rem;
-    justify-items: center;
-    align-items: stretch;
-    min-height: 6.5rem;
+    grid-template-columns: 1fr 0.9rem 1fr;
+    grid-template-rows: repeat(2, minmax(3rem, 1fr));
+    gap: 0.35rem 0.5rem;
+    justify-items: stretch;
+    align-items: center;
+    min-height: 7rem;
+    position: relative;
+}
+
+.panel-device-bus {
+    grid-column: 2;
+    grid-row: 1 / span 2;
+    display: flex;
+    flex-direction: column;
+    justify-content: space-between;
+    align-items: center;
+    width: 0.9rem;
+    padding: 0.15rem 0.1rem;
+    border-radius: 10px;
+    border: 1px solid var(--border-color);
+    background: linear-gradient(180deg, rgba(0, 0, 0, 0.04), rgba(0, 0, 0, 0.02));
+    box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.6);
+}
+
+body.dark-mode .panel-device-bus {
+    background: linear-gradient(180deg, rgba(255, 255, 255, 0.05), rgba(255, 255, 255, 0.02));
+    box-shadow: inset 0 0 0 1px rgba(0, 0, 0, 0.2);
+}
+
+.panel-device-bus-bar {
+    flex: 1;
+    width: 100%;
+    border-radius: 8px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    writing-mode: vertical-rl;
+    text-transform: uppercase;
+    font-size: 0.65rem;
+    font-weight: 700;
+    letter-spacing: 0.02em;
+    color: #fff;
+    padding: 0.15rem 0.05rem;
+}
+
+.panel-device-bus-bar + .panel-device-bus-bar {
+    margin-top: 0.2rem;
 }
 
 .panel-device-slot {
+    position: relative;
     display: flex;
     justify-content: center;
-    align-items: stretch;
-    min-height: 2.25rem;
+    align-items: center;
+    gap: 0.3rem;
+    min-height: 2.75rem;
+    padding: 0.35rem 0.5rem;
+    --panel-phase-color: var(--muted-text-color);
+    color: var(--panel-phase-color);
+}
+
+.panel-device-slot::after {
+    content: "";
+    position: absolute;
+    top: 50%;
+    height: 2px;
+    background: var(--panel-phase-color);
+    width: calc(100% - 0.1rem);
+    transform: translateY(-50%);
+    opacity: 0.9;
+}
+
+.panel-device-slot::before {
+    content: "";
+    position: absolute;
+    top: 50%;
+    width: 0.55rem;
+    height: 0.55rem;
+    border-radius: 999px;
+    border: 2px solid var(--panel-phase-color);
+    background: var(--background-color);
+    transform: translateY(-50%);
+    z-index: 1;
 }
 
 .panel-device-slot--odd {
+    grid-column: 1;
+    grid-row: 1;
     justify-content: flex-end;
 }
 
+.panel-device-slot--odd::after,
+.panel-device-slot--odd::before {
+    right: -0.45rem;
+}
+
 .panel-device-slot--even {
+    grid-column: 3;
+    grid-row: 2;
     justify-content: flex-start;
+}
+
+.panel-device-slot--even::after,
+.panel-device-slot--even::before {
+    left: -0.45rem;
+}
+
+.panel-device-slot[data-phase="A"] {
+    --panel-phase-color: #4a90e2;
+}
+
+.panel-device-slot[data-phase="B"] {
+    --panel-phase-color: #43a047;
+}
+
+.panel-device-slot[data-phase="C"] {
+    --panel-phase-color: #f57c00;
+}
+
+.panel-device-slot[data-phase="+"] {
+    --panel-phase-color: #c62828;
+}
+
+.panel-device-slot[data-phase="-"] {
+    --panel-phase-color: #263238;
+}
+
+.panel-device-bus-bar[data-phase="A"] {
+    --panel-phase-color: #4a90e2;
+    background: linear-gradient(180deg, #4a90e2, #2f6cb3);
+}
+
+.panel-device-bus-bar[data-phase="B"] {
+    --panel-phase-color: #43a047;
+    background: linear-gradient(180deg, #43a047, #2e7d32);
+}
+
+.panel-device-bus-bar[data-phase="C"] {
+    --panel-phase-color: #f57c00;
+    background: linear-gradient(180deg, #f57c00, #e65100);
+}
+
+.panel-device-bus-bar[data-phase="+"] {
+    --panel-phase-color: #c62828;
+    background: linear-gradient(180deg, #ef5350, #c62828);
+}
+
+.panel-device-bus-bar[data-phase="-"] {
+    --panel-phase-color: #263238;
+    background: linear-gradient(180deg, #607d8b, #263238);
+}
+
+.panel-device-slot[data-phase=""],
+.panel-device-slot:not([data-phase]) {
+    --panel-phase-color: var(--muted-text-color);
 }
 
 .panel-device {
@@ -5362,6 +5497,14 @@ body.dark-mode .panel-breaker-toolbox-item {
     max-width: 6rem;
     box-shadow: 0 1px 2px rgba(0, 0, 0, 0.05);
     height: 100%;
+    z-index: 2;
+}
+
+.panel-device--span {
+    grid-column: 1 / span 3;
+    grid-row: 1 / span 2;
+    justify-self: center;
+    align-self: center;
 }
 
 body.dark-mode .panel-device {
