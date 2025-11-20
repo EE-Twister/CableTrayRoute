@@ -948,6 +948,7 @@ function render(panelId = "P1") {
   }
   const system = getPanelSystem(panel);
   const sequence = getPanelPhaseSequence(panel);
+  const phaseSequence = sequence;
 
   const legend = document.createElement("div");
   legend.className = "panel-bus-legend";
