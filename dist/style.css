@@ -5336,9 +5336,10 @@ body.dark-mode .panel-breaker-toolbox-item {
 
 .panel-device-cell {
     width: 10%;
-    padding: 0.5rem 0.35rem;
+    padding: 0;
     vertical-align: top;
     position: relative;
+    overflow: visible;
 }
 
 .panel-device-rails {
@@ -5369,6 +5370,8 @@ body.dark-mode .panel-breaker-toolbox-item {
     grid-row: 1 / -1;
     width: 100%;
     height: 100%;
+    position: absolute;
+    inset: 0;
 }
 
 .panel-device-rail-line {
@@ -5417,6 +5420,8 @@ body.dark-mode .panel-breaker-toolbox-item {
     min-height: 7rem;
     position: relative;
     z-index: 1;
+    padding: 0.65rem 0.35rem;
+    box-sizing: border-box;
 }
 
 .panel-device-slot,
@@ -5883,6 +5888,23 @@ body.dark-mode .panel-slot-add-btn {
     width: 100%;
 }
 
+.panel-slot-select-row {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    flex: 1 1 100%;
+}
+
+.panel-slot-select-row .panel-slot-select {
+    flex: 1 1 12rem;
+}
+
+.panel-slot-availability {
+    font-size: 0.85rem;
+    color: var(--muted-text-color);
+    white-space: nowrap;
+}
+
 .panel-slot-device-config {
     display: flex;
     align-items: center;
@@ -5933,6 +5955,11 @@ body.dark-mode .panel-slot-select {
     min-height: 3.25rem;
 }
 
+.panel-slot-details--compact {
+    min-height: 0;
+    gap: 0.2rem;
+}
+
 .panel-slot-phase-load {
     display: flex;
     flex-wrap: wrap;
@@ -5961,6 +5988,14 @@ body.dark-mode .panel-slot-phase-chip {
     gap: 0.5rem;
     font-size: 0.75rem;
     opacity: 0.85;
+}
+
+.panel-slot-meta--compact {
+    gap: 0.35rem;
+}
+
+.panel-slot-meta--compact span {
+    padding: 0.1rem 0.4rem;
 }
 
 .panel-slot-meta span {

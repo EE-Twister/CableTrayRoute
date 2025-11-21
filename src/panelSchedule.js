@@ -278,14 +278,20 @@ function getPanelPoleLimit(panel) {
 
 function getPanelPhaseSequence(panel) {
   const system = getPanelSystem(panel);
-  if (system === "dc") return resolveDcSequence(DC_PHASE_LABELS);
-  const phases = parseInt(panel?.phases, 10);
-  if (Number.isFinite(phases)) {
-    if (phases <= 1) return SINGLE_PHASE_LABELS;
-    if (phases === 2) return SINGLE_PHASE_LABELS;
-    if (phases >= 3) return THREE_PHASE_LABELS;
+  const poleLimit = getPanelPoleLimit(panel) || 1;
+  if (system === "dc") {
+    const sequence = resolveDcSequence(DC_PHASE_LABELS);
+    return sequence.slice(0, Math.max(1, Math.min(sequence.length, poleLimit)));
   }
-  return THREE_PHASE_LABELS;
+  const phases = parseInt(panel?.phases, 10);
+  let sequence;
+  if (Number.isFinite(phases)) {
+    if (phases <= 1) sequence = SINGLE_PHASE_LABELS;
+    else if (phases === 2) sequence = SINGLE_PHASE_LABELS;
+    else if (phases >= 3) sequence = THREE_PHASE_LABELS;
+  }
+  const normalized = Array.isArray(sequence) && sequence.length ? sequence : THREE_PHASE_LABELS;
+  return normalized.slice(0, Math.max(1, Math.min(normalized.length, poleLimit)));
 }
 
 function computeBreakerSpan(startCircuit, poleCount, circuitCount) {
@@ -1257,7 +1263,23 @@ function createCircuitCell(panel, panelId, loads, breaker, circuitCount, positio
       select.appendChild(opt);
     });
 
-    control.appendChild(select);
+    const selectRow = document.createElement("div");
+    selectRow.className = "panel-slot-select-row";
+    selectRow.appendChild(select);
+
+    if (!assignedLoad) {
+      const availability = document.createElement("span");
+      availability.className = "panel-slot-availability";
+      const availabilitySegments = [];
+      if (blockLabel) availabilitySegments.push(blockLabel);
+      if (ratingValue) availabilitySegments.push(`${ratingValue}A`);
+      availability.textContent = availabilitySegments.length
+        ? `${availabilitySegments.join(" — ")} available`
+        : "Breaker available";
+      selectRow.appendChild(availability);
+    }
+
+    control.appendChild(selectRow);
 
     const config = document.createElement("div");
     config.className = "panel-slot-device-config";
@@ -1427,18 +1449,12 @@ function createCircuitCell(panel, panelId, loads, breaker, circuitCount, positio
   } else if (block) {
     details.classList.add("panel-slot-details-empty");
     if (isBlockStart) {
-      const infoSegments = [];
-      if (blockLabel) infoSegments.push(blockLabel);
-      const ratingValue = breakerDetail && breakerDetail.rating != null && breakerDetail.rating !== ""
-        ? String(breakerDetail.rating)
-        : "";
-      if (ratingValue) infoSegments.push(`${ratingValue}A`);
-      const summary = infoSegments.length ? infoSegments.join(" — ") : "Breaker";
-      details.textContent = `${summary} available`;
+      details.classList.add("panel-slot-details--compact");
+      details.textContent = "";
       const cableTag = breakerDetail?.cableTag || breakerDetail?.cable || breakerDetail?.cableId;
       if (cableTag) {
         const meta = document.createElement("div");
-        meta.className = "panel-slot-meta";
+        meta.className = "panel-slot-meta panel-slot-meta--compact";
         meta.appendChild(createMetaChip(`Cable ${cableTag}`));
         details.appendChild(meta);
       }
