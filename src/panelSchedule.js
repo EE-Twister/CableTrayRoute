@@ -1062,7 +1062,7 @@ function render(panelId = "P1") {
         breakerDetails,
         system,
         phaseSequence,
-        { rowSpan: deviceSpan?.rowSpan }
+        { rowSpan: deviceSpan?.rowSpan, circuits: deviceSpan?.circuits, baseRow: i }
       );
       if (deviceSpan?.rowSpan > 1) {
         for (let offset = 1; offset < deviceSpan.rowSpan; offset++) {
@@ -1485,7 +1485,12 @@ function createDeviceCell(panel, oddCircuit, evenCircuit, circuitCount, breakerD
   const sequence = phaseSequence || getPanelPhaseSequence(panel) || [];
   td.style.setProperty("--panel-rail-count", String(Math.max(sequence.length, 1)));
   const spanRows = Number.isFinite(options.rowSpan) && options.rowSpan > 1 ? Number(options.rowSpan) : 1;
-  const rowCount = Math.max(1, spanRows);
+  const baseRowIndex = Number.isFinite(options.baseRow) && options.baseRow >= 0 ? Number(options.baseRow) : 0;
+  const spanCircuits = Array.isArray(options.circuits) && options.circuits.length
+    ? options.circuits
+    : [oddCircuit, evenCircuit].filter(value => Number.isFinite(value));
+  const rowSpanFromCircuits = new Set(spanCircuits.map(circuit => Math.floor((circuit - 1) / 2))).size;
+  const rowCount = Math.max(1, spanRows, rowSpanFromCircuits || 1);
   if (spanRows > 1) {
     td.rowSpan = spanRows;
     td.style.setProperty("--panel-device-row-span", String(spanRows));
@@ -1497,14 +1502,7 @@ function createDeviceCell(panel, oddCircuit, evenCircuit, circuitCount, breakerD
   const wrapper = document.createElement("div");
   wrapper.className = "panel-device-wrapper";
   wrapper.style.setProperty("--panel-device-row-count", String(rowCount));
-  const oddSlot = document.createElement("div");
-  oddSlot.className = "panel-device-slot panel-device-slot--odd";
-  const evenSlot = document.createElement("div");
-  evenSlot.className = "panel-device-slot panel-device-slot--even";
-  const oddPhase = getPhaseLabel(panel, oddCircuit);
-  const evenPhase = getPhaseLabel(panel, evenCircuit);
-  if (oddPhase) oddSlot.dataset.phase = oddPhase;
-  if (evenPhase) evenSlot.dataset.phase = evenPhase;
+  const slots = new Map();
   const applyRailOffset = (slot, phase) => {
     if (!slot || !sequence.length || !phase) return;
     const index = sequence.indexOf(phase);
@@ -1516,9 +1514,34 @@ function createDeviceCell(panel, oddCircuit, evenCircuit, circuitCount, breakerD
     }
     slot.style.removeProperty("--panel-rail-offset");
   };
-  applyRailOffset(oddSlot, oddPhase);
-  applyRailOffset(evenSlot, evenPhase);
-  wrapper.append(oddSlot, rails, evenSlot);
+
+  const createSlot = circuit => {
+    if (!Number.isFinite(circuit) || circuit < 1 || circuit > circuitCount) return null;
+    const slot = document.createElement("div");
+    const isEven = circuit % 2 === 0;
+    slot.className = `panel-device-slot panel-device-slot--${isEven ? "even" : "odd"}`;
+    const phase = getPhaseLabel(panel, circuit);
+    if (phase) slot.dataset.phase = phase;
+    const relativeRow = Math.max(1, Math.min(rowCount, Math.floor((circuit - 1) / 2) - baseRowIndex + 1));
+    slot.style.gridRow = String(relativeRow);
+    applyRailOffset(slot, phase);
+    slots.set(circuit, slot);
+    return slot;
+  };
+
+  if (spanCircuits.length) {
+    spanCircuits.forEach(circuit => {
+      const slot = createSlot(circuit);
+      if (slot) wrapper.appendChild(slot);
+    });
+  } else {
+    const oddSlot = createSlot(oddCircuit);
+    const evenSlot = createSlot(evenCircuit);
+    if (oddSlot) wrapper.appendChild(oddSlot);
+    if (evenSlot) wrapper.appendChild(evenSlot);
+  }
+
+  wrapper.appendChild(rails);
   td.appendChild(wrapper);
 
   const layout = Array.isArray(panel.breakerLayout) ? panel.breakerLayout : [];
@@ -1547,67 +1570,68 @@ function createDeviceCell(panel, oddCircuit, evenCircuit, circuitCount, breakerD
     };
   };
 
-  const oddInfo = getBlockInfo(oddCircuit);
-  const evenInfo = getBlockInfo(evenCircuit);
-  const icons = [];
+  const blockSlots = new Map();
+  slots.forEach((_, circuit) => {
+    const info = getBlockInfo(circuit);
+    if (!info) return;
+    const entry = blockSlots.get(info.start) || { info, circuits: [] };
+    entry.circuits.push(circuit);
+    blockSlots.set(info.start, entry);
+  });
 
-  const createIcon = info => {
-    const placement = info.span.includes(oddCircuit) && info.span.includes(evenCircuit)
-      ? "both"
-      : info.span.includes(oddCircuit)
-        ? "odd"
-        : "even";
+  const ensureIconForCircuit = (info, circuit) => {
+    const slot = slots.get(circuit);
+    if (!slot) return;
+    const phase = getPhaseLabel(panel, circuit);
     const icon = createBranchDeviceIcon(
-      info.detail,
-      info.size,
-      info.start,
+      info?.detail,
+      1,
+      info?.start ?? circuit,
       system,
-      info.phase,
-      { placement }
+      phase,
+      { placement: circuit % 2 === 0 ? "even" : "odd", labelPoles: info?.size }
     );
     if (icon) {
-      icon.dataset.placement = placement;
-      if (placement === "both") {
-        icon.style.gridRow = rowCount > 1 ? "1 / span 2" : "1";
-      } else if (placement === "even") {
-        icon.style.gridRow = "1";
-      }
-      icons.push(icon);
+      slot.appendChild(icon);
     }
   };
 
-  if (oddInfo && evenInfo && oddInfo.start === evenInfo.start) {
-    const combinedSpan = Array.from(new Set([...oddInfo.span, ...evenInfo.span]));
-    createIcon({ ...oddInfo, span: combinedSpan, size: combinedSpan.length, phase: oddInfo.phase || evenInfo.phase });
-  } else {
-    if (oddInfo?.isStart) {
-      createIcon(oddInfo);
+  if (blockSlots.size === 0) {
+    const oddInfo = getBlockInfo(oddCircuit);
+    if (oddInfo?.isStart || !evenCircuit) {
+      ensureIconForCircuit(oddInfo, oddCircuit);
     }
+    const evenInfo = getBlockInfo(evenCircuit);
     if (evenInfo?.isStart) {
-      createIcon(evenInfo);
+      ensureIconForCircuit(evenInfo, evenCircuit);
     }
-    if (!icons.length && (oddInfo || evenInfo)) {
-      createIcon(oddInfo || evenInfo);
-    }
+  } else {
+    blockSlots.forEach(entry => {
+      const { info, circuits: circuitList } = entry;
+      circuitList.forEach(circuit => ensureIconForCircuit(info, circuit));
+      if (info.size > 1 && circuitList.length > 1) {
+        const rows = circuitList.map(circuit => Math.floor((circuit - 1) / 2));
+        const minRow = Math.min(...rows);
+        const maxRow = Math.max(...rows);
+        const column = circuitList[0] % 2 === 0 ? 3 : 1;
+        const tie = document.createElement("div");
+        tie.className = "panel-device-tie-vertical";
+        const startRow = Math.max(1, minRow - baseRowIndex + 1);
+        const endRow = Math.max(startRow + 1, Math.min(rowCount + 1, maxRow - baseRowIndex + 2));
+        tie.style.gridColumn = String(column);
+        tie.style.gridRow = `${startRow} / ${endRow}`;
+        tie.setAttribute("aria-hidden", "true");
+        wrapper.appendChild(tie);
+      }
+    });
   }
-
-  icons.forEach(icon => {
-    const placement = icon.dataset.placement;
-    if (placement === "odd") {
-      oddSlot.appendChild(icon);
-    } else if (placement === "even") {
-      evenSlot.appendChild(icon);
-    } else {
-      icon.classList.add("panel-device--span");
-      wrapper.appendChild(icon);
-    }
-  });
   return td;
 }
 
 function createBranchDeviceIcon(detail, poleCount, startCircuit, system, phaseLabel, options = {}) {
   const type = getDeviceType(detail);
   const poles = Number.isFinite(poleCount) && poleCount > 0 ? poleCount : 1;
+  const labelPoles = Number.isFinite(options.labelPoles) && options.labelPoles > 0 ? options.labelPoles : poles;
   const icon = document.createElement("div");
   icon.className = `panel-device panel-device--${type}`;
   icon.dataset.breaker = String(startCircuit);
@@ -1646,7 +1670,7 @@ function createBranchDeviceIcon(detail, poleCount, startCircuit, system, phaseLa
   icon.appendChild(graphic);
 
   const ratingValue = detail && detail.rating != null && detail.rating !== "" ? String(detail.rating) : "";
-  const labelText = ratingValue ? `${ratingValue}A` : formatDeviceLabel(detail, poles);
+  const labelText = ratingValue ? `${ratingValue}A` : formatDeviceLabel(detail, labelPoles);
   if (labelText) {
     const label = document.createElement("span");
     label.className = "panel-device-label";
@@ -1667,7 +1691,7 @@ function createBranchDeviceIcon(detail, poleCount, startCircuit, system, phaseLa
   }
 
   const tooltipParts = [];
-  tooltipParts.push(formatDeviceLabel(detail, poles));
+  tooltipParts.push(formatDeviceLabel(detail, labelPoles));
   if (ratingValue) tooltipParts.push(`${ratingValue}A`);
   if (cableTag) tooltipParts.push(`Cable ${cableTag}`);
   const tooltip = tooltipParts.filter(Boolean).join(" • ");

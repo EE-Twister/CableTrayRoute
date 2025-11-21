@@ -5678,6 +5678,20 @@ body.dark-mode .panel-device-tie {
     background: rgba(255, 255, 255, 0.7);
 }
 
+.panel-device-tie-vertical {
+    position: relative;
+    justify-self: center;
+    width: 0;
+    height: 100%;
+    border-left: 2px dotted var(--primary-color);
+    opacity: 0.75;
+    z-index: 1;
+}
+
+body.dark-mode .panel-device-tie-vertical {
+    border-color: rgba(255, 255, 255, 0.75);
+}
+
 .panel-device-label {
     font-size: 0.75rem;
     font-weight: 600;
