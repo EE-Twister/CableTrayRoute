@@ -902,9 +902,20 @@ export function calculatePanelTotals(panelId) {
   }, { connectedKva: 0, connectedKw: 0, demandKva: 0, demandKw: 0 });
 }
 
-function createColumnHeaders(label) {
+const COLUMN_HEADERS = {
+  cable: "Cable Tag",
+  load: "Load Served",
+  poles: "Poles",
+  rating: "Rating (A)"
+};
+
+const ODD_COLUMN_ORDER = ["cable", "load", "poles", "rating"];
+const EVEN_COLUMN_ORDER = ["rating", "poles", "load", "cable"];
+
+function createColumnHeaders(label, order = ODD_COLUMN_ORDER) {
   const headers = [];
-  ["Cable Tag", "Load Served", "Poles", "Rating (A)"].forEach(text => {
+  order.forEach(key => {
+    const text = COLUMN_HEADERS[key] || key;
     const th = document.createElement("th");
     th.scope = "col";
     th.textContent = text.toUpperCase();
@@ -1015,8 +1026,8 @@ function render(panelId = "P1") {
   thead.appendChild(headRow);
 
   const subHeader = document.createElement("tr");
-  createColumnHeaders("odd").forEach(header => subHeader.appendChild(header));
-  createColumnHeaders("even").forEach(header => subHeader.appendChild(header));
+  createColumnHeaders("odd", ODD_COLUMN_ORDER).forEach(header => subHeader.appendChild(header));
+  createColumnHeaders("even", EVEN_COLUMN_ORDER).forEach(header => subHeader.appendChild(header));
   thead.appendChild(subHeader);
   table.appendChild(thead);
 
@@ -1039,41 +1050,55 @@ function render(panelId = "P1") {
     return Array.from(circuits).filter(value => Number.isFinite(value)).sort((a, b) => a - b);
   };
 
-  const createSummaryCells = result => {
+  const createSummaryCells = (result, order = ODD_COLUMN_ORDER) => {
     const cells = [];
     const summary = result?.summary || {};
     const columnContent = result?.columnContent || {};
 
-    const cable = document.createElement("td");
-    cable.className = "panel-column panel-column--cable";
-    if (columnContent.cable) {
-      cable.appendChild(columnContent.cable);
-    } else {
-      cable.textContent = summary.cableTag || "";
-    }
-    cells.push(cable);
+    const builders = {
+      cable: () => {
+        const cable = document.createElement("td");
+        cable.className = "panel-column panel-column--cable";
+        if (columnContent.cable) {
+          cable.appendChild(columnContent.cable);
+        } else {
+          cable.textContent = summary.cableTag || "";
+        }
+        return cable;
+      },
+      load: () => {
+        const loadCell = result?.cell || document.createElement("td");
+        loadCell.classList.add("panel-column", "panel-column--load");
+        return loadCell;
+      },
+      poles: () => {
+        const poleCell = document.createElement("td");
+        poleCell.className = "panel-column panel-column--poles";
+        if (columnContent.poles) {
+          poleCell.appendChild(columnContent.poles);
+        } else {
+          poleCell.textContent = summary.poles || "";
+        }
+        return poleCell;
+      },
+      rating: () => {
+        const ratingCell = document.createElement("td");
+        ratingCell.className = "panel-column panel-column--rating";
+        if (columnContent.rating) {
+          ratingCell.appendChild(columnContent.rating);
+        } else {
+          ratingCell.textContent = summary.rating || "";
+        }
+        return ratingCell;
+      }
+    };
 
-    const loadCell = result?.cell || document.createElement("td");
-    loadCell.classList.add("panel-column", "panel-column--load");
-    cells.push(loadCell);
-
-    const poleCell = document.createElement("td");
-    poleCell.className = "panel-column panel-column--poles";
-    if (columnContent.poles) {
-      poleCell.appendChild(columnContent.poles);
-    } else {
-      poleCell.textContent = summary.poles || "";
-    }
-    cells.push(poleCell);
-
-    const ratingCell = document.createElement("td");
-    ratingCell.className = "panel-column panel-column--rating";
-    if (columnContent.rating) {
-      ratingCell.appendChild(columnContent.rating);
-    } else {
-      ratingCell.textContent = summary.rating || "";
-    }
-    cells.push(ratingCell);
+    order.forEach(key => {
+      const builder = builders[key];
+      if (builder) {
+        cells.push(builder());
+      }
+    });
 
     return cells;
   };
@@ -1084,7 +1109,7 @@ function render(panelId = "P1") {
     const evenCircuit = oddCircuit + 1;
 
     const oddResult = createCircuitCell(panel, panelId, loads, oddCircuit, circuitCount, "left", system, breakerDetails);
-    createSummaryCells(oddResult).forEach(cell => row.appendChild(cell));
+    createSummaryCells(oddResult, ODD_COLUMN_ORDER).forEach(cell => row.appendChild(cell));
 
     const deviceCircuits = collectDeviceCircuits(oddCircuit, evenCircuit);
     const deviceCell = createDeviceCell(
@@ -1100,7 +1125,7 @@ function render(panelId = "P1") {
     row.appendChild(deviceCell);
 
     const evenResult = createCircuitCell(panel, panelId, loads, evenCircuit, circuitCount, "right", system, breakerDetails);
-    createSummaryCells(evenResult).forEach(cell => row.appendChild(cell));
+    createSummaryCells(evenResult, EVEN_COLUMN_ORDER).forEach(cell => row.appendChild(cell));
 
     tbody.appendChild(row);
   }
@@ -1252,16 +1277,35 @@ function createCircuitCell(panel, panelId, loads, breaker, circuitCount, positio
     const quickAdd = document.createElement("div");
     quickAdd.className = "panel-slot-quick-add";
     const poleLimit = getPanelPoleLimit(panel);
-    getAllowedBranchPoleCounts(system, poleLimit).forEach(poles => {
-      const button = document.createElement("button");
-      button.type = "button";
-      button.className = "panel-slot-add-btn";
-      button.dataset.action = "add-breaker";
-      button.dataset.poles = String(poles);
-      button.dataset.circuit = String(breaker);
-      button.textContent = `${poles}-Pole`;
-      quickAdd.appendChild(button);
+    const allowedPoles = getAllowedBranchPoleCounts(system, poleLimit);
+    const poleOptions = [1, 2, 3].filter(count => allowedPoles.includes(count));
+    const optionsToRender = (poleOptions.length ? poleOptions : allowedPoles).slice();
+    if (!optionsToRender.length) {
+      optionsToRender.push(1);
+    }
+    const poleLabel = document.createElement("label");
+    poleLabel.className = "panel-slot-field";
+    poleLabel.textContent = "Poles";
+    const poleSelect = document.createElement("select");
+    poleSelect.className = "panel-slot-input panel-slot-pole-select";
+    optionsToRender.forEach(poles => {
+      const option = document.createElement("option");
+      option.value = String(poles);
+      option.textContent = String(poles);
+      poleSelect.appendChild(option);
     });
+    const addButton = document.createElement("button");
+    addButton.type = "button";
+    addButton.className = "panel-slot-add-btn";
+    addButton.dataset.action = "add-breaker";
+    addButton.dataset.circuit = String(breaker);
+    addButton.dataset.poles = poleSelect.value || "1";
+    addButton.textContent = "Add";
+    poleSelect.addEventListener("change", () => {
+      addButton.dataset.poles = poleSelect.value || "1";
+    });
+    poleLabel.appendChild(poleSelect);
+    quickAdd.append(poleLabel, addButton);
     const poleWrapper = document.createElement("div");
     poleWrapper.className = "panel-column-content";
     poleWrapper.appendChild(quickAdd);
@@ -1562,6 +1606,7 @@ function createDeviceCell(panel, oddCircuit, evenCircuit, circuitCount, breakerD
   wrapper.style.setProperty("--panel-device-row-count", String(rowCount));
   wrapper.style.setProperty("--panel-bus-span", `${railSpan}rem`);
   const slots = new Map();
+  const rowMarkers = new Map();
   const applyRailOffset = (slot, phase) => {
     if (!slot || !sequence.length || !phase) return;
     const index = sequence.indexOf(phase);
@@ -1574,6 +1619,30 @@ function createDeviceCell(panel, oddCircuit, evenCircuit, circuitCount, breakerD
     slot.style.removeProperty("--panel-rail-offset");
   };
 
+  const getRowMarker = (relativeRow, phase) => {
+    let markerEntry = rowMarkers.get(relativeRow);
+    if (!markerEntry) {
+      const marker = document.createElement("div");
+      marker.className = "panel-device-slot-marker";
+      marker.style.gridRow = String(relativeRow);
+      markerEntry = { marker, phases: new Set() };
+      rowMarkers.set(relativeRow, markerEntry);
+      wrapper.appendChild(marker);
+    }
+    if (phase) {
+      markerEntry.phases.add(phase);
+    }
+    const [primaryPhase] = markerEntry.phases;
+    if (markerEntry.phases.size === 1 && primaryPhase) {
+      markerEntry.marker.dataset.phase = primaryPhase;
+      applyRailOffset(markerEntry.marker, primaryPhase);
+    } else if (markerEntry.phases.size > 1) {
+      markerEntry.marker.removeAttribute("data-phase");
+      markerEntry.marker.style.removeProperty("--panel-rail-offset");
+    }
+    return markerEntry.marker;
+  };
+
   const createSlot = circuit => {
     if (!Number.isFinite(circuit) || circuit < 1 || circuit > circuitCount) return null;
     const slot = document.createElement("div");
@@ -1584,12 +1653,7 @@ function createDeviceCell(panel, oddCircuit, evenCircuit, circuitCount, breakerD
     const relativeRow = Math.max(1, Math.min(rowCount, Math.floor((circuit - 1) / 2) - baseRowIndex + 1));
     slot.style.gridRow = String(relativeRow);
     applyRailOffset(slot, phase);
-    const marker = document.createElement("div");
-    marker.className = "panel-device-slot-marker";
-    marker.style.gridRow = String(relativeRow);
-    if (phase) marker.dataset.phase = phase;
-    applyRailOffset(marker, phase);
-    wrapper.appendChild(marker);
+    getRowMarker(relativeRow, phase);
     slots.set(circuit, slot);
     return slot;
   };
@@ -1685,6 +1749,11 @@ function createDeviceCell(panel, oddCircuit, evenCircuit, circuitCount, breakerD
         const endRow = Math.max(startRow + 1, Math.min(rowCount + 1, maxRow - baseRowIndex + 2));
         tie.style.gridColumn = String(column);
         tie.style.gridRow = `${startRow} / ${endRow}`;
+        const referencePhase = getPhaseLabel(panel, circuitList[0]);
+        if (referencePhase) {
+          tie.dataset.phase = referencePhase;
+          applyRailOffset(tie, referencePhase);
+        }
         tie.setAttribute("aria-hidden", "true");
         wrapper.appendChild(tie);
       }
