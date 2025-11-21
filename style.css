@@ -5419,6 +5419,16 @@ body.dark-mode .panel-breaker-toolbox-item {
     z-index: 1;
 }
 
+.panel-device-slot,
+.panel-device-slot-marker {
+    --panel-phase-color: var(--muted-text-color);
+    --panel-rail-offset: 0;
+    --panel-rail-step: calc(var(--panel-bus-span, var(--panel-rail-spacing, 1rem)) / var(--panel-rail-count, 1));
+    --panel-device-tie-offset: calc(var(--panel-bus-span, var(--panel-rail-spacing, 1rem)) / 2);
+    --panel-slot-center: calc(50% + (var(--panel-rail-offset) * var(--panel-rail-step)));
+    color: var(--panel-phase-color);
+}
+
 .panel-device-slot {
     position: relative;
     display: flex;
@@ -5427,26 +5437,32 @@ body.dark-mode .panel-breaker-toolbox-item {
     gap: 0.3rem;
     min-height: 2.75rem;
     padding: 0.35rem 0.5rem;
-    --panel-phase-color: var(--muted-text-color);
-    --panel-rail-offset: 0;
-    --panel-rail-step: calc(var(--panel-bus-span, var(--panel-rail-spacing, 1rem)) / var(--panel-rail-count, 1));
-    --panel-device-tie-offset: calc(var(--panel-bus-span, var(--panel-rail-spacing, 1rem)) / 2);
-    color: var(--panel-phase-color);
+    z-index: 2;
+}
+
+.panel-device-slot-marker {
+    position: relative;
+    grid-column: 1 / -1;
+    min-height: 2.75rem;
+    pointer-events: none;
     z-index: 1;
 }
 
-.panel-device-slot::after {
+.panel-device-slot-marker::after {
     content: "";
     position: absolute;
     top: 50%;
     height: 2px;
     background: var(--panel-phase-color);
-    width: calc(var(--panel-rail-step) + var(--panel-device-tie-offset));
-    transform: translate(calc(var(--panel-rail-offset) * var(--panel-rail-step)), -50%);
+    left: 0;
+    right: 0;
+    width: 100%;
+    transform: translateY(-50%);
+    transform-origin: var(--panel-slot-center) 50%;
     opacity: 0.9;
 }
 
-.panel-device-slot::before {
+.panel-device-slot-marker::before {
     content: "";
     position: absolute;
     top: 50%;
@@ -5455,7 +5471,8 @@ body.dark-mode .panel-breaker-toolbox-item {
     border-radius: 999px;
     border: 2px solid var(--panel-phase-color);
     background: var(--panel-phase-color);
-    transform: translate(calc(var(--panel-rail-offset) * var(--panel-rail-step)), -50%);
+    left: var(--panel-slot-center);
+    transform: translate(-50%, -50%);
     z-index: 1;
 }
 
@@ -5465,39 +5482,34 @@ body.dark-mode .panel-breaker-toolbox-item {
     justify-content: flex-end;
 }
 
-.panel-device-slot--odd::after,
-.panel-device-slot--odd::before {
-    right: calc(var(--panel-device-tie-offset) * -1);
-}
-
 .panel-device-slot--even {
     grid-column: 3;
     grid-row: 1;
     justify-content: flex-start;
 }
 
-.panel-device-slot--even::after,
-.panel-device-slot--even::before {
-    left: calc(var(--panel-device-tie-offset) * -1);
-}
-
-.panel-device-slot[data-phase="A"] {
+.panel-device-slot[data-phase="A"],
+.panel-device-slot-marker[data-phase="A"] {
     --panel-phase-color: #4a90e2;
 }
 
-.panel-device-slot[data-phase="B"] {
+.panel-device-slot[data-phase="B"],
+.panel-device-slot-marker[data-phase="B"] {
     --panel-phase-color: #43a047;
 }
 
-.panel-device-slot[data-phase="C"] {
+.panel-device-slot[data-phase="C"],
+.panel-device-slot-marker[data-phase="C"] {
     --panel-phase-color: #f57c00;
 }
 
-.panel-device-slot[data-phase="+"] {
+.panel-device-slot[data-phase="+"],
+.panel-device-slot-marker[data-phase="+"] {
     --panel-phase-color: #c62828;
 }
 
-.panel-device-slot[data-phase="-"] {
+.panel-device-slot[data-phase="-"],
+.panel-device-slot-marker[data-phase="-"] {
     --panel-phase-color: #263238;
 }
 
@@ -5522,7 +5534,9 @@ body.dark-mode .panel-breaker-toolbox-item {
 }
 
 .panel-device-slot[data-phase=""],
-.panel-device-slot:not([data-phase]) {
+.panel-device-slot-marker[data-phase=""],
+.panel-device-slot:not([data-phase]),
+.panel-device-slot-marker:not([data-phase]) {
     --panel-phase-color: var(--muted-text-color);
 }
 
@@ -5776,6 +5790,7 @@ body.dark-mode .panel-slot-locked {
 }
 
 .panel-slot-control--blank {
+    flex-direction: column;
     align-items: stretch;
 }
 
@@ -5840,7 +5855,7 @@ body.dark-mode .panel-slot-add-btn {
     align-items: baseline;
     gap: 0.5rem;
     font-weight: 600;
-    padding-right: 1.8rem;
+    padding-right: 2.35rem;
 }
 
 .panel-slot-phase {
@@ -5860,26 +5875,32 @@ body.dark-mode .panel-slot-add-btn {
 
 .panel-slot-control {
     display: flex;
-    flex-direction: column;
-    gap: 0.35rem;
-    align-items: flex-start;
+    flex-direction: row;
+    flex-wrap: wrap;
+    gap: 0.5rem 0.75rem;
+    align-items: center;
+    justify-content: space-between;
+    width: 100%;
 }
 
 .panel-slot-device-config {
-    display: grid;
-    gap: 0.5rem;
-    grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
+    display: flex;
+    align-items: center;
+    gap: 0.65rem;
+    flex-wrap: nowrap;
 }
 
 .panel-slot-field {
-    display: flex;
-    flex-direction: column;
-    gap: 0.25rem;
+    display: inline-flex;
+    align-items: center;
+    gap: 0.35rem;
     font-size: 0.75rem;
+    white-space: nowrap;
 }
 
 .panel-slot-input {
-    width: 100%;
+    width: auto;
+    min-width: 5.5rem;
     padding: 0.35rem 0.5rem;
     border: 1px solid var(--border-color);
     border-radius: 4px;
