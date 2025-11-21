@@ -1531,6 +1531,12 @@ function createDeviceCell(panel, oddCircuit, evenCircuit, circuitCount, breakerD
     const relativeRow = Math.max(1, Math.min(rowCount, Math.floor((circuit - 1) / 2) - baseRowIndex + 1));
     slot.style.gridRow = String(relativeRow);
     applyRailOffset(slot, phase);
+    const marker = document.createElement("div");
+    marker.className = "panel-device-slot-marker";
+    marker.style.gridRow = String(relativeRow);
+    if (phase) marker.dataset.phase = phase;
+    applyRailOffset(marker, phase);
+    wrapper.appendChild(marker);
     slots.set(circuit, slot);
     return slot;
   };
