@@ -5297,6 +5297,7 @@ body.dark-mode .panel-breaker-toolbox-item {
     padding: 0.5rem 0;
     border-bottom: 1px solid var(--border-color);
     color: var(--text-color);
+    white-space: nowrap;
 }
 
 .panel-schedule-table td {
@@ -5304,12 +5305,36 @@ body.dark-mode .panel-breaker-toolbox-item {
     vertical-align: top;
 }
 
+.panel-column-subheader {
+    font-size: 0.75rem;
+    letter-spacing: 0.08em;
+}
+
 .panel-cell--spanning {
     vertical-align: middle;
 }
 
 .panel-cell {
-    width: 45%;
+    width: 100%;
+}
+
+.panel-column {
+    padding: 0 0.25rem;
+}
+
+.panel-column--cable,
+.panel-column--poles,
+.panel-column--rating {
+    width: 8%;
+    text-align: center;
+}
+
+.panel-column--load {
+    width: 20%;
+}
+
+.panel-column--load .panel-cell {
+    width: 100%;
 }
 
 .panel-device-header {
