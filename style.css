@@ -5754,6 +5754,8 @@ body.dark-mode .panel-device-tie {
 }
 
 .panel-device-tie-vertical {
+    --panel-rail-offset: 0;
+    --panel-rail-step: calc(var(--panel-bus-span, var(--panel-rail-spacing, 1rem)) / var(--panel-rail-count, 1));
     position: relative;
     justify-self: center;
     width: 0;
@@ -5762,7 +5764,8 @@ body.dark-mode .panel-device-tie {
     opacity: 0.75;
     z-index: 1;
     align-self: stretch;
-    margin: -0.45rem 0;
+    margin: 0;
+    transform: translateX(calc(var(--panel-rail-offset, 0) * var(--panel-rail-step)));
 }
 
 body.dark-mode .panel-device-tie-vertical {
