@@ -5409,7 +5409,7 @@ body.dark-mode .panel-breaker-toolbox-item {
 
 .panel-device-wrapper {
     display: grid;
-    grid-template-columns: 1fr minmax(1rem, 1.25rem) 1fr;
+    grid-template-columns: 1fr var(--panel-bus-span, var(--panel-rail-spacing, 1.15rem)) 1fr;
     grid-template-rows: repeat(var(--panel-device-row-count, 2), minmax(3rem, 1fr));
     gap: 0.35rem 0.5rem;
     justify-items: stretch;
@@ -5429,7 +5429,8 @@ body.dark-mode .panel-breaker-toolbox-item {
     padding: 0.35rem 0.5rem;
     --panel-phase-color: var(--muted-text-color);
     --panel-rail-offset: 0;
-    --panel-rail-step: var(--panel-rail-spacing, 1rem);
+    --panel-rail-step: calc(var(--panel-bus-span, var(--panel-rail-spacing, 1rem)) / var(--panel-rail-count, 1));
+    --panel-device-tie-offset: calc(var(--panel-bus-span, var(--panel-rail-spacing, 1rem)) / 2);
     color: var(--panel-phase-color);
     z-index: 1;
 }
@@ -5440,7 +5441,7 @@ body.dark-mode .panel-breaker-toolbox-item {
     top: 50%;
     height: 2px;
     background: var(--panel-phase-color);
-    width: calc(var(--panel-rail-step) + 0.9rem);
+    width: calc(var(--panel-rail-step) + var(--panel-device-tie-offset));
     transform: translate(calc(var(--panel-rail-offset) * var(--panel-rail-step)), -50%);
     opacity: 0.9;
 }
@@ -5466,7 +5467,7 @@ body.dark-mode .panel-breaker-toolbox-item {
 
 .panel-device-slot--odd::after,
 .panel-device-slot--odd::before {
-    right: -0.2rem;
+    right: calc(var(--panel-device-tie-offset) * -1);
 }
 
 .panel-device-slot--even {
@@ -5477,7 +5478,7 @@ body.dark-mode .panel-breaker-toolbox-item {
 
 .panel-device-slot--even::after,
 .panel-device-slot--even::before {
-    left: -0.2rem;
+    left: calc(var(--panel-device-tie-offset) * -1);
 }
 
 .panel-device-slot[data-phase="A"] {
@@ -5531,15 +5532,15 @@ body.dark-mode .panel-breaker-toolbox-item {
     flex-direction: column;
     align-items: center;
     gap: 0.25rem;
-    padding: 0.35rem 0.3rem;
-    border: 1px solid var(--border-color);
-    border-radius: 6px;
-    background: var(--secondary-color);
+    padding: 0.1rem;
+    border: none;
+    border-radius: 0;
+    background: transparent;
     color: var(--text-color);
-    min-width: 2.85rem;
+    min-width: 0;
     max-width: 6rem;
-    box-shadow: 0 1px 2px rgba(0, 0, 0, 0.05);
-    height: 100%;
+    box-shadow: none;
+    height: auto;
     z-index: 2;
 }
 
@@ -5551,7 +5552,7 @@ body.dark-mode .panel-breaker-toolbox-item {
 }
 
 body.dark-mode .panel-device {
-    background: rgba(255, 255, 255, 0.08);
+    background: transparent;
     box-shadow: none;
 }
 
@@ -5560,34 +5561,27 @@ body.dark-mode .panel-device {
     display: flex;
     justify-content: center;
     align-items: center;
-    min-height: 1.85rem;
+    min-height: 1.25rem;
 }
 
 .panel-device-symbol {
     position: relative;
     display: flex;
-    flex-direction: column;
-    gap: 0.4rem;
+    flex-direction: row;
+    gap: 0.35rem;
     justify-content: center;
     align-items: stretch;
     width: 100%;
-    padding: 0.05rem 0;
+    padding: 0;
 }
 
 .panel-device-symbol::before {
-    content: "";
-    position: absolute;
-    top: 0.2rem;
-    bottom: 0.2rem;
-    left: 50%;
-    border-left: 2px dashed var(--primary-color);
-    opacity: 0.45;
-    transform: translateX(-50%);
+    display: none;
 }
 
 .panel-device-symbol[data-poles="1"] {
     flex-direction: row;
-    gap: 0.5rem;
+    gap: 0.35rem;
     align-items: center;
     padding: 0;
 }
@@ -5599,35 +5593,26 @@ body.dark-mode .panel-device {
 .panel-device-pole {
     position: relative;
     display: block;
-    width: 100%;
-    height: 1rem;
+    width: 0.65rem;
+    height: 0.65rem;
+    border-radius: 999px;
+    background: currentColor;
+    border: 2px solid currentColor;
 }
 
 .panel-device--breaker .panel-device-pole::before {
-    content: "";
-    position: absolute;
-    left: 50%;
-    width: 70%;
-    bottom: 0;
-    height: 0.85rem;
-    border: 2px solid var(--primary-color);
-    border-bottom: 0;
-    border-radius: 0.85rem 0.85rem 0 0;
-    background: transparent;
-    transform: translateX(-50%);
+    display: none;
 }
 
 .panel-device--breaker .panel-device-pole::after {
     content: "";
     position: absolute;
-    bottom: -0.2rem;
     left: 50%;
-    width: 0.44rem;
-    height: 0.44rem;
-    border: 2px solid var(--primary-color);
-    border-radius: 999px;
-    background: var(--background-color);
-    transform: translateX(-50%);
+    width: 1rem;
+    height: 2px;
+    background: currentColor;
+    transform: translate(-50%, -50%);
+    top: 50%;
 }
 
 .panel-device--dc-positive {
@@ -5697,7 +5682,7 @@ body.dark-mode .panel-device-tie-vertical {
 }
 
 .panel-device-label {
-    font-size: 0.75rem;
+    font-size: 0.72rem;
     font-weight: 600;
     text-align: center;
     line-height: 1.1;
@@ -5723,6 +5708,7 @@ body.dark-mode .panel-device-tie-vertical {
     color: var(--text-color);
     min-height: 5.75rem;
     box-shadow: 0 2px 4px rgba(0, 0, 0, 0.04);
+    position: relative;
 }
 
 .panel-slot--spanning {
@@ -5825,18 +5811,26 @@ body.dark-mode .panel-slot-add-btn {
 }
 
 .panel-slot-remove {
-    align-self: flex-start;
-    padding: 0.35rem 0.75rem;
-    border-radius: 4px;
-    border: 1px solid var(--border-color);
-    background: transparent;
-    color: var(--text-color);
-    font-size: 0.75rem;
+    position: absolute;
+    top: 0.35rem;
+    right: 0.35rem;
+    width: 1.75rem;
+    height: 1.75rem;
+    padding: 0;
+    border-radius: 6px;
+    border: none;
+    background: #c62828;
+    color: #fff;
+    font-size: 1rem;
+    font-weight: 700;
     cursor: pointer;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
 }
 
 .panel-slot-remove[disabled] {
-    opacity: 0.6;
+    opacity: 0.55;
     cursor: not-allowed;
 }
 
@@ -5846,6 +5840,7 @@ body.dark-mode .panel-slot-add-btn {
     align-items: baseline;
     gap: 0.5rem;
     font-weight: 600;
+    padding-right: 1.8rem;
 }
 
 .panel-slot-phase {
@@ -5866,7 +5861,8 @@ body.dark-mode .panel-slot-add-btn {
 .panel-slot-control {
     display: flex;
     flex-direction: column;
-    gap: 0.5rem;
+    gap: 0.35rem;
+    align-items: flex-start;
 }
 
 .panel-slot-device-config {
@@ -5897,6 +5893,7 @@ body.dark-mode .panel-slot-input {
 
 .panel-slot-select {
     width: 100%;
+    max-width: 16rem;
     padding: 0.4rem 0.5rem;
     border: 1px solid var(--border-color);
     border-radius: 4px;

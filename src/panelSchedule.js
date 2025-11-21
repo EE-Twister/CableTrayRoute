@@ -1326,14 +1326,15 @@ function createCircuitCell(panel, panelId, loads, breaker, circuitCount, positio
     removeBtn.dataset.action = "remove-breaker";
     removeBtn.dataset.circuit = String(primaryStart);
     const removeLabel = deviceType === "fuse" ? "Fuse" : "Breaker";
-    removeBtn.textContent = `Remove ${removeLabel}`;
+    removeBtn.textContent = "×";
+    removeBtn.setAttribute("aria-label", `Remove ${removeLabel}`);
     if (assignedLoad) {
       removeBtn.disabled = true;
       removeBtn.title = `Remove the load before deleting this ${removeLabel.toLowerCase()}.`;
     } else {
       removeBtn.title = `Remove ${removeLabel.toLowerCase()}`;
     }
-    control.appendChild(removeBtn);
+    slot.appendChild(removeBtn);
   } else {
     slot.classList.add("panel-slot--locked");
     const locked = document.createElement("div");
@@ -1483,7 +1484,10 @@ function createDeviceCell(panel, oddCircuit, evenCircuit, circuitCount, breakerD
   const td = document.createElement("td");
   td.className = "panel-device-cell";
   const sequence = phaseSequence || getPanelPhaseSequence(panel) || [];
-  td.style.setProperty("--panel-rail-count", String(Math.max(sequence.length, 1)));
+  const railCount = Math.max(sequence.length, 1);
+  const railSpan = railCount * 1.15;
+  td.style.setProperty("--panel-rail-count", String(railCount));
+  td.style.setProperty("--panel-bus-span", `${railSpan}rem`);
   const spanRows = Number.isFinite(options.rowSpan) && options.rowSpan > 1 ? Number(options.rowSpan) : 1;
   const baseRowIndex = Number.isFinite(options.baseRow) && options.baseRow >= 0 ? Number(options.baseRow) : 0;
   const spanCircuits = Array.isArray(options.circuits) && options.circuits.length
@@ -1498,10 +1502,12 @@ function createDeviceCell(panel, oddCircuit, evenCircuit, circuitCount, breakerD
 
   const rails = createBusRails(sequence, { variant: "body" });
   rails.classList.add("panel-device-rails--inline");
+  rails.style.setProperty("--panel-bus-span", `${railSpan}rem`);
 
   const wrapper = document.createElement("div");
   wrapper.className = "panel-device-wrapper";
   wrapper.style.setProperty("--panel-device-row-count", String(rowCount));
+  wrapper.style.setProperty("--panel-bus-span", `${railSpan}rem`);
   const slots = new Map();
   const applyRailOffset = (slot, phase) => {
     if (!slot || !sequence.length || !phase) return;
