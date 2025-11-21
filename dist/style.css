@@ -5288,6 +5288,7 @@ body.dark-mode .panel-breaker-toolbox-item {
     table-layout: fixed;
     border-collapse: separate;
     border-spacing: 0.75rem 0;
+    --panel-rail-spacing: 1.15rem;
 }
 
 .panel-schedule-table thead th {
@@ -5343,10 +5344,11 @@ body.dark-mode .panel-breaker-toolbox-item {
 .panel-device-rails {
     position: relative;
     display: grid;
-    grid-template-columns: repeat(var(--panel-rail-count, 1), 1fr);
-    column-gap: 0.35rem;
+    grid-template-columns: repeat(var(--panel-rail-count, 1), var(--panel-rail-spacing, 1rem));
+    column-gap: 0;
     align-items: stretch;
     justify-items: center;
+    justify-content: center;
     padding: 0.35rem 0.15rem;
     pointer-events: none;
     z-index: 0;
@@ -5363,8 +5365,10 @@ body.dark-mode .panel-breaker-toolbox-item {
 }
 
 .panel-device-rails--inline {
-    grid-column: 2;
+    grid-column: 1 / -1;
     grid-row: 1 / -1;
+    width: 100%;
+    height: 100%;
 }
 
 .panel-device-rail-line {
@@ -5425,7 +5429,7 @@ body.dark-mode .panel-breaker-toolbox-item {
     padding: 0.35rem 0.5rem;
     --panel-phase-color: var(--muted-text-color);
     --panel-rail-offset: 0;
-    --panel-rail-step: 0.65rem;
+    --panel-rail-step: var(--panel-rail-spacing, 1rem);
     color: var(--panel-phase-color);
     z-index: 1;
 }
@@ -5436,7 +5440,7 @@ body.dark-mode .panel-breaker-toolbox-item {
     top: 50%;
     height: 2px;
     background: var(--panel-phase-color);
-    width: 1.4rem;
+    width: calc(var(--panel-rail-step) + 0.9rem);
     transform: translate(calc(var(--panel-rail-offset) * var(--panel-rail-step)), -50%);
     opacity: 0.9;
 }
@@ -5676,6 +5680,20 @@ body.dark-mode .panel-device--fuse .panel-device-pole {
 
 body.dark-mode .panel-device-tie {
     background: rgba(255, 255, 255, 0.7);
+}
+
+.panel-device-tie-vertical {
+    position: relative;
+    justify-self: center;
+    width: 0;
+    height: 100%;
+    border-left: 2px dotted var(--primary-color);
+    opacity: 0.75;
+    z-index: 1;
+}
+
+body.dark-mode .panel-device-tie-vertical {
+    border-color: rgba(255, 255, 255, 0.75);
 }
 
 .panel-device-label {
