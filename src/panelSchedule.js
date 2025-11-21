@@ -357,9 +357,9 @@ function getDeviceType(detail) {
 
 function formatDeviceLabel(detail, poleCount) {
   const type = getDeviceType(detail);
-  const base = type === "fuse" ? "Fuse" : "Breaker";
+  const base = type === "fuse" ? "Fuse" : "";
   if (Number.isFinite(poleCount) && poleCount > 1) {
-    return `${poleCount}-Pole ${base}`;
+    return type === "fuse" ? `${poleCount}-Pole Fuse` : `${poleCount}-Pole`;
   }
   return base;
 }
@@ -902,6 +902,19 @@ export function calculatePanelTotals(panelId) {
   }, { connectedKva: 0, connectedKw: 0, demandKva: 0, demandKw: 0 });
 }
 
+function createColumnHeaders(label) {
+  const headers = [];
+  ["Cable Tag", "Load Served", "Poles", "Rating (A)"].forEach(text => {
+    const th = document.createElement("th");
+    th.scope = "col";
+    th.textContent = text.toUpperCase();
+    th.className = "panel-column-subheader";
+    th.dataset.columnGroup = label.toLowerCase();
+    headers.push(th);
+  });
+  return headers;
+}
+
 function render(panelId = "P1") {
   const state = getOrCreatePanel(panelId);
   const { panel, panels } = state;
@@ -978,10 +991,12 @@ function render(panelId = "P1") {
   const thead = document.createElement("thead");
   const headRow = document.createElement("tr");
   const leftHeader = document.createElement("th");
-  leftHeader.scope = "col";
+  leftHeader.scope = "colgroup";
+  leftHeader.colSpan = 4;
   leftHeader.textContent = "Odd Circuits";
   const deviceHeader = document.createElement("th");
   deviceHeader.scope = "col";
+  deviceHeader.rowSpan = 2;
   deviceHeader.className = "panel-device-header";
   const deviceHeaderContent = document.createElement("div");
   deviceHeaderContent.className = "panel-device-header-content";
@@ -993,102 +1008,87 @@ function render(panelId = "P1") {
   deviceHeaderContent.appendChild(headerRails);
   deviceHeader.appendChild(deviceHeaderContent);
   const rightHeader = document.createElement("th");
-  rightHeader.scope = "col";
+  rightHeader.scope = "colgroup";
+  rightHeader.colSpan = 4;
   rightHeader.textContent = "Even Circuits";
   headRow.append(leftHeader, deviceHeader, rightHeader);
   thead.appendChild(headRow);
+
+  const subHeader = document.createElement("tr");
+  createColumnHeaders("odd").forEach(header => subHeader.appendChild(header));
+  createColumnHeaders("even").forEach(header => subHeader.appendChild(header));
+  thead.appendChild(subHeader);
   table.appendChild(thead);
 
   const tbody = document.createElement("tbody");
   const rows = Math.ceil(circuitCount / 2);
   const layout = Array.isArray(panel.breakerLayout) ? panel.breakerLayout : [];
-  const skippedOddCircuits = new Set();
-  const skippedEvenCircuits = new Set();
 
-  const getSpanInfo = circuit => {
-    const block = layout[circuit - 1] || null;
-    if (!block || block.position !== 0) return null;
-    const spanCircuits = getBlockCircuits(panel, block, circuitCount);
-    if (!spanCircuits.length) return null;
-    const columnSpan = spanCircuits.filter(value => value % 2 === circuit % 2);
-    if (!columnSpan.length) return null;
-    return { span: columnSpan.length, circuits: columnSpan };
+  const collectDeviceCircuits = (odd, even) => {
+    const circuits = new Set();
+    [odd, even].forEach(circuit => {
+      const block = layout[circuit - 1] || null;
+      if (block?.position === 0) {
+        getBlockCircuits(panel, block, circuitCount).forEach(value => circuits.add(value));
+      } else if (block) {
+        circuits.add(Number(block.start));
+      } else if (Number.isFinite(circuit) && circuit <= circuitCount) {
+        circuits.add(circuit);
+      }
+    });
+    return Array.from(circuits).filter(value => Number.isFinite(value)).sort((a, b) => a - b);
   };
 
-  const mapCircuitToRow = circuit => Math.floor((circuit - 1) / 2);
+  const createSummaryCells = result => {
+    const cells = [];
+    const summary = result?.summary || {};
 
-  const getDeviceRowSpanInfo = circuit => {
-    if (!Number.isFinite(circuit) || circuit < 1 || circuit > circuitCount) return null;
-    const block = layout[circuit - 1] || null;
-    if (!block || block.position !== 0) return null;
-    const spanCircuits = getBlockCircuits(panel, block, circuitCount);
-    if (!spanCircuits.includes(circuit)) return null;
-    const rowsCovered = spanCircuits.map(mapCircuitToRow);
-    const startRow = Math.min(...rowsCovered);
-    const rowSpan = new Set(rowsCovered).size;
-    return { spanCircuits, startRow, rowSpan };
+    const cable = document.createElement("td");
+    cable.className = "panel-column panel-column--cable";
+    cable.textContent = summary.cableTag || "";
+    cells.push(cable);
+
+    const loadCell = result?.cell || document.createElement("td");
+    loadCell.classList.add("panel-column", "panel-column--load");
+    cells.push(loadCell);
+
+    const poleCell = document.createElement("td");
+    poleCell.className = "panel-column panel-column--poles";
+    poleCell.textContent = summary.poles || "";
+    cells.push(poleCell);
+
+    const ratingCell = document.createElement("td");
+    ratingCell.className = "panel-column panel-column--rating";
+    ratingCell.textContent = summary.rating || "";
+    cells.push(ratingCell);
+
+    return cells;
   };
-
-  const getDeviceSpanForRow = (rowIndex, odd, even) => {
-    const candidates = [getDeviceRowSpanInfo(odd), getDeviceRowSpanInfo(even)]
-      .filter(Boolean)
-      .filter(info => info.startRow === rowIndex);
-    if (!candidates.length) return null;
-    const combinedCircuits = new Set();
-    candidates.forEach(info => info.spanCircuits.forEach(value => combinedCircuits.add(value)));
-    const rowSpan = new Set(Array.from(combinedCircuits).map(mapCircuitToRow)).size;
-    return { circuits: Array.from(combinedCircuits).sort((a, b) => a - b), rowSpan };
-  };
-
-  const skippedDeviceRows = new Set();
 
   for (let i = 0; i < rows; i++) {
     const row = document.createElement("tr");
     const oddCircuit = i * 2 + 1;
     const evenCircuit = oddCircuit + 1;
-    if (!skippedOddCircuits.has(oddCircuit)) {
-      const oddCell = createCircuitCell(panel, panelId, loads, oddCircuit, circuitCount, "left", system, breakerDetails);
-      const oddSpan = getSpanInfo(oddCircuit);
-      if (oddSpan?.span > 1) {
-        oddCell.rowSpan = oddSpan.span;
-        oddCell.classList.add("panel-cell--spanning");
-        const slot = oddCell.querySelector(".panel-slot");
-        if (slot) slot.classList.add("panel-slot--spanning");
-        oddSpan.circuits.slice(1).forEach(circuit => skippedOddCircuits.add(circuit));
-      }
-      row.appendChild(oddCell);
-    }
-    if (!skippedDeviceRows.has(i)) {
-      const deviceSpan = getDeviceSpanForRow(i, oddCircuit, evenCircuit);
-      const deviceCell = createDeviceCell(
-        panel,
-        oddCircuit,
-        evenCircuit,
-        circuitCount,
-        breakerDetails,
-        system,
-        phaseSequence,
-        { rowSpan: deviceSpan?.rowSpan, circuits: deviceSpan?.circuits, baseRow: i }
-      );
-      if (deviceSpan?.rowSpan > 1) {
-        for (let offset = 1; offset < deviceSpan.rowSpan; offset++) {
-          skippedDeviceRows.add(i + offset);
-        }
-      }
-      row.appendChild(deviceCell);
-    }
-    if (!skippedEvenCircuits.has(evenCircuit)) {
-      const evenCell = createCircuitCell(panel, panelId, loads, evenCircuit, circuitCount, "right", system, breakerDetails);
-      const evenSpan = getSpanInfo(evenCircuit);
-      if (evenSpan?.span > 1) {
-        evenCell.rowSpan = evenSpan.span;
-        evenCell.classList.add("panel-cell--spanning");
-        const slot = evenCell.querySelector(".panel-slot");
-        if (slot) slot.classList.add("panel-slot--spanning");
-        evenSpan.circuits.slice(1).forEach(circuit => skippedEvenCircuits.add(circuit));
-      }
-      row.appendChild(evenCell);
-    }
+
+    const oddResult = createCircuitCell(panel, panelId, loads, oddCircuit, circuitCount, "left", system, breakerDetails);
+    createSummaryCells(oddResult).forEach(cell => row.appendChild(cell));
+
+    const deviceCircuits = collectDeviceCircuits(oddCircuit, evenCircuit);
+    const deviceCell = createDeviceCell(
+      panel,
+      oddCircuit,
+      evenCircuit,
+      circuitCount,
+      breakerDetails,
+      system,
+      phaseSequence,
+      { circuits: deviceCircuits, baseRow: i }
+    );
+    row.appendChild(deviceCell);
+
+    const evenResult = createCircuitCell(panel, panelId, loads, evenCircuit, circuitCount, "right", system, breakerDetails);
+    createSummaryCells(evenResult).forEach(cell => row.appendChild(cell));
+
     tbody.appendChild(row);
   }
   table.appendChild(tbody);
@@ -1101,6 +1101,7 @@ function createCircuitCell(panel, panelId, loads, breaker, circuitCount, positio
   const td = document.createElement("td");
   td.className = "panel-cell";
   if (position) td.classList.add(`panel-cell--${position}`);
+  const summary = { cableTag: "", loadServed: "", poles: "", rating: "" };
 
   if (breaker > circuitCount) {
     const slot = document.createElement("div");
@@ -1110,7 +1111,7 @@ function createCircuitCell(panel, panelId, loads, breaker, circuitCount, positio
     empty.textContent = "—";
     slot.appendChild(empty);
     td.appendChild(slot);
-    return td;
+    return { cell: td, summary };
   }
 
   const slot = document.createElement("div");
@@ -1126,6 +1127,9 @@ function createCircuitCell(panel, panelId, loads, breaker, circuitCount, positio
   const isBlockContinuation = Boolean(block && block.position > 0);
   const detailMap = breakerDetails || ensureBreakerDetails(panel);
   const breakerDetail = Number.isFinite(blockStart) ? (detailMap[String(blockStart)] || null) : null;
+  const ratingValue = breakerDetail && breakerDetail.rating != null ? String(breakerDetail.rating) : "";
+  const cableValue = breakerDetail?.cableTag || breakerDetail?.cable || breakerDetail?.cableId || "";
+  const deviceType = getDeviceType(breakerDetail);
   slot.dataset.circuit = String(breaker);
   if (!block) {
     slot.dataset.breakerDrop = "available";
@@ -1224,6 +1228,10 @@ function createCircuitCell(panel, panelId, loads, breaker, circuitCount, positio
   const primaryStart = blockStart || (blockCircuits.length ? blockCircuits[0] : breaker);
   const blockPoleCount = Number.isFinite(blockSize) && blockSize > 0 ? Number(blockSize) : null;
   const blockLabel = formatDeviceLabel(breakerDetail, blockPoleCount || (assignedSpan.length || 1));
+  if (cableValue) summary.cableTag = cableValue;
+  if (ratingValue) summary.rating = ratingValue;
+  const poleCount = blockPoleCount || assignedSpan.length || (assignedLoad ? Math.max(1, getLoadPoleCount(assignedLoad, panel)) : null);
+  if (poleCount) summary.poles = String(poleCount);
 
   if (!block) {
     slot.classList.add("panel-slot--blank");
@@ -1252,10 +1260,6 @@ function createCircuitCell(panel, panelId, loads, breaker, circuitCount, positio
     placeholder.value = "";
     placeholder.textContent = "— Assign Load —";
     select.appendChild(placeholder);
-
-    const deviceType = getDeviceType(breakerDetail);
-    const ratingValue = breakerDetail && breakerDetail.rating != null ? String(breakerDetail.rating) : "";
-    const cableValue = breakerDetail?.cableTag || breakerDetail?.cable || breakerDetail?.cableId || "";
 
     loads.forEach((load, idx) => {
       const opt = document.createElement("option");
@@ -1340,7 +1344,7 @@ function createCircuitCell(panel, panelId, loads, breaker, circuitCount, positio
     const infoSegments = [];
     if (blockLabel) infoSegments.push(blockLabel);
     if (ratingValue) infoSegments.push(`${ratingValue}A`);
-    breakerInfo.textContent = infoSegments.length ? infoSegments.join(" — ") : "Breaker";
+    breakerInfo.textContent = infoSegments.length ? infoSegments.join(" — ") : deviceType === "fuse" ? "Fuse" : "—";
     control.appendChild(breakerInfo);
 
     const removeBtn = document.createElement("button");
@@ -1382,7 +1386,9 @@ function createCircuitCell(panel, panelId, loads, breaker, circuitCount, positio
     const tag = assignedLoad.tag || assignedLoad.ref || assignedLoad.id;
     if (tag) parts.push(tag);
     if (assignedLoad.description) parts.push(assignedLoad.description);
-    descriptor.textContent = parts.join(" — ") || "Assigned Load";
+    const descriptorText = parts.join(" — ") || "Assigned Load";
+    descriptor.textContent = descriptorText;
+    summary.loadServed = descriptorText;
     details.appendChild(descriptor);
 
     const meta = document.createElement("div");
@@ -1464,14 +1470,20 @@ function createCircuitCell(panel, panelId, loads, breaker, circuitCount, positio
         ? `Part of ${blockLabel} starting at Circuit ${primaryStart}`
         : `Part of breaker starting at Circuit ${primaryStart}`;
     }
+    if (!summary.loadServed && blockLabel) {
+      summary.loadServed = blockLabel;
+    }
   } else {
     details.classList.add("panel-slot-details-empty");
     details.textContent = "No breaker configured";
   }
 
+  if (!summary.loadServed && blockLabel) {
+    summary.loadServed = blockLabel;
+  }
   slot.appendChild(details);
   td.appendChild(slot);
-  return td;
+  return { cell: td, summary };
 }
 
 function createBusRails(phases, options = {}) {
@@ -1510,8 +1522,7 @@ function createDeviceCell(panel, oddCircuit, evenCircuit, circuitCount, breakerD
   const spanCircuits = Array.isArray(options.circuits) && options.circuits.length
     ? options.circuits
     : [oddCircuit, evenCircuit].filter(value => Number.isFinite(value));
-  const rowSpanFromCircuits = new Set(spanCircuits.map(circuit => Math.floor((circuit - 1) / 2))).size;
-  const rowCount = Math.max(1, spanRows, rowSpanFromCircuits || 1);
+  const rowCount = Math.max(1, spanRows);
   if (spanRows > 1) {
     td.rowSpan = spanRows;
     td.style.setProperty("--panel-device-row-span", String(spanRows));
@@ -1728,7 +1739,7 @@ function createBranchDeviceIcon(detail, poleCount, startCircuit, system, phaseLa
     icon.title = tooltip;
     icon.setAttribute("aria-label", tooltip);
   } else {
-    const fallback = formatDeviceLabel(detail, poles);
+    const fallback = formatDeviceLabel(detail, poles) || (getDeviceType(detail) === "fuse" ? "Fuse" : "Device");
     icon.title = fallback;
     icon.setAttribute("aria-label", fallback);
   }
