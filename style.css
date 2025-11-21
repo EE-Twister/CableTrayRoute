@@ -5354,6 +5354,10 @@ body.dark-mode .panel-breaker-toolbox-item {
     vertical-align: top;
 }
 
+.panel-column--rating {
+    width: 4%;
+}
+
 .panel-column--load {
     width: 20%;
 }
@@ -5865,8 +5869,10 @@ body.dark-mode .panel-slot-locked {
 
 .panel-slot-quick-add {
     display: flex;
+    flex-direction: column;
     gap: 0.5rem;
     flex-wrap: wrap;
+    align-items: flex-start;
 }
 
 .panel-slot-add-btn {

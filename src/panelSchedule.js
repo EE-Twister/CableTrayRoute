@@ -965,6 +965,18 @@ function render(panelId = "P1") {
   ensurePanelBreakerCapacity(panel, circuitCount);
   const { changed: layoutAdjusted } = ensurePanelBreakerLayout(panel, circuitCount);
   const loads = dataStore.getLoads();
+  const loadLabelList = document.createElement("datalist");
+  loadLabelList.id = "panel-load-label-options";
+  const loadLabelSet = new Set();
+  loads.forEach((load, index) => {
+    const label = formatLoadLabel(load, index);
+    if (!label || loadLabelSet.has(label)) return;
+    loadLabelSet.add(label);
+    const option = document.createElement("option");
+    option.value = label;
+    loadLabelList.appendChild(option);
+  });
+  container.appendChild(loadLabelList);
   const sanitizedLoads = sanitizeDcLoadBreakerPoles(loads, panel, panelId);
   const seeded = initializeLayoutFromLoads(panel, panelId, loads, circuitCount);
   if (layoutAdjusted || seeded) {
@@ -1042,7 +1054,9 @@ function render(panelId = "P1") {
       if (block?.position === 0) {
         getBlockCircuits(panel, block, circuitCount).forEach(value => circuits.add(value));
       } else if (block) {
-        circuits.add(Number(block.start));
+        if (Number.isFinite(circuit) && circuit <= circuitCount) {
+          circuits.add(circuit);
+        }
       } else if (Number.isFinite(circuit) && circuit <= circuitCount) {
         circuits.add(circuit);
       }
@@ -1168,6 +1182,8 @@ function createCircuitCell(panel, panelId, loads, breaker, circuitCount, positio
   const breakerDetail = Number.isFinite(blockStart) ? (detailMap[String(blockStart)] || null) : null;
   const ratingValue = breakerDetail && breakerDetail.rating != null ? String(breakerDetail.rating) : "";
   const cableValue = breakerDetail?.cableTag || breakerDetail?.cable || breakerDetail?.cableId || "";
+  const customLoadLabel = typeof breakerDetail?.customLoad === "string" ? breakerDetail.customLoad.trim() : "";
+  const cableTag = cableValue;
   const deviceType = getDeviceType(breakerDetail);
   slot.dataset.circuit = String(breaker);
   if (!block) {
@@ -1271,6 +1287,9 @@ function createCircuitCell(panel, panelId, loads, breaker, circuitCount, positio
   if (ratingValue) summary.rating = ratingValue;
   const poleCount = blockPoleCount || assignedSpan.length || (assignedLoad ? Math.max(1, getLoadPoleCount(assignedLoad, panel)) : null);
   if (poleCount) summary.poles = String(poleCount);
+  if (customLoadLabel && !summary.loadServed) {
+    summary.loadServed = customLoadLabel;
+  }
 
   if (!block) {
     slot.classList.add("panel-slot--blank");
@@ -1349,6 +1368,22 @@ function createCircuitCell(panel, panelId, loads, breaker, circuitCount, positio
     }
 
     control.appendChild(selectRow);
+
+    const customLoad = document.createElement("label");
+    customLoad.className = "panel-column-field";
+    customLoad.textContent = "Custom Load";
+    const customLoadInput = document.createElement("input");
+    customLoadInput.type = "text";
+    customLoadInput.className = "panel-slot-input";
+    customLoadInput.placeholder = "Describe load";
+    customLoadInput.dataset.breakerCustomLoad = String(primaryStart);
+    customLoadInput.setAttribute("list", "panel-load-label-options");
+    customLoadInput.value = customLoadLabel;
+    customLoad.appendChild(customLoadInput);
+    const customLoadWrapper = document.createElement("div");
+    customLoadWrapper.className = "panel-column-content";
+    customLoadWrapper.appendChild(customLoad);
+    control.appendChild(customLoadWrapper);
 
     const config = document.createElement("div");
     config.className = "panel-slot-device-config";
@@ -1524,10 +1559,21 @@ function createCircuitCell(panel, panelId, loads, breaker, circuitCount, positio
     }
   } else if (block) {
     details.classList.add("panel-slot-details-empty");
-    if (isBlockStart) {
+    if (customLoadLabel) {
+      details.textContent = customLoadLabel;
+      const metaSegments = [];
+      if (blockLabel) metaSegments.push(blockLabel);
+      if (ratingValue) metaSegments.push(`${ratingValue}A`);
+      if (cableTag) metaSegments.push(`Cable ${cableTag}`);
+      if (metaSegments.length) {
+        const meta = document.createElement("div");
+        meta.className = "panel-slot-meta panel-slot-meta--compact";
+        metaSegments.forEach(segment => meta.appendChild(createMetaChip(segment)));
+        details.appendChild(meta);
+      }
+    } else if (isBlockStart) {
       details.classList.add("panel-slot-details--compact");
       details.textContent = "";
-      const cableTag = breakerDetail?.cableTag || breakerDetail?.cable || breakerDetail?.cableId;
       if (cableTag) {
         const meta = document.createElement("div");
         meta.className = "panel-slot-meta panel-slot-meta--compact";
@@ -2448,8 +2494,8 @@ window.addEventListener("DOMContentLoaded", () => {
         if (Number.isFinite(start)) {
           const detail = ensureBreakerDetail(panel, start);
           detail.deviceType = e.target.value === "fuse" ? "fuse" : "breaker";
-        savePanels();
-        updateOneline();
+          savePanels();
+          updateOneline();
           rerender();
         }
         return;
@@ -2464,8 +2510,8 @@ window.addEventListener("DOMContentLoaded", () => {
           } else {
             delete detail.rating;
           }
-        savePanels();
-        updateOneline();
+          savePanels();
+          updateOneline();
           rerender();
         }
         return;
@@ -2482,8 +2528,24 @@ window.addEventListener("DOMContentLoaded", () => {
             delete detail.cable;
             delete detail.cableId;
           }
-        savePanels();
-        updateOneline();
+          savePanels();
+          updateOneline();
+          rerender();
+        }
+        return;
+      }
+      if (e.target.matches("input[data-breaker-custom-load]")) {
+        const start = Number.parseInt(e.target.dataset.breakerCustomLoad, 10);
+        if (Number.isFinite(start)) {
+          const detail = ensureBreakerDetail(panel, start);
+          const value = e.target.value.trim();
+          if (value) {
+            detail.customLoad = value;
+          } else {
+            delete detail.customLoad;
+          }
+          savePanels();
+          updateOneline();
           rerender();
         }
         return;
