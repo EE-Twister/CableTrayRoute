@@ -1253,6 +1253,10 @@ function createCircuitCell(panel, panelId, loads, breaker, circuitCount, positio
     placeholder.textContent = "— Assign Load —";
     select.appendChild(placeholder);
 
+    const deviceType = getDeviceType(breakerDetail);
+    const ratingValue = breakerDetail && breakerDetail.rating != null ? String(breakerDetail.rating) : "";
+    const cableValue = breakerDetail?.cableTag || breakerDetail?.cable || breakerDetail?.cableId || "";
+
     loads.forEach((load, idx) => {
       const opt = document.createElement("option");
       opt.value = String(idx);
@@ -1283,9 +1287,6 @@ function createCircuitCell(panel, panelId, loads, breaker, circuitCount, positio
 
     const config = document.createElement("div");
     config.className = "panel-slot-device-config";
-    const deviceType = getDeviceType(breakerDetail);
-    const ratingValue = breakerDetail && breakerDetail.rating != null ? String(breakerDetail.rating) : "";
-    const cableValue = breakerDetail?.cableTag || breakerDetail?.cable || breakerDetail?.cableId || "";
 
     const typeLabel = document.createElement("label");
     typeLabel.className = "panel-slot-field";
