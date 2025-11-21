@@ -1042,10 +1042,15 @@ function render(panelId = "P1") {
   const createSummaryCells = result => {
     const cells = [];
     const summary = result?.summary || {};
+    const columnContent = result?.columnContent || {};
 
     const cable = document.createElement("td");
     cable.className = "panel-column panel-column--cable";
-    cable.textContent = summary.cableTag || "";
+    if (columnContent.cable) {
+      cable.appendChild(columnContent.cable);
+    } else {
+      cable.textContent = summary.cableTag || "";
+    }
     cells.push(cable);
 
     const loadCell = result?.cell || document.createElement("td");
@@ -1054,12 +1059,20 @@ function render(panelId = "P1") {
 
     const poleCell = document.createElement("td");
     poleCell.className = "panel-column panel-column--poles";
-    poleCell.textContent = summary.poles || "";
+    if (columnContent.poles) {
+      poleCell.appendChild(columnContent.poles);
+    } else {
+      poleCell.textContent = summary.poles || "";
+    }
     cells.push(poleCell);
 
     const ratingCell = document.createElement("td");
     ratingCell.className = "panel-column panel-column--rating";
-    ratingCell.textContent = summary.rating || "";
+    if (columnContent.rating) {
+      ratingCell.appendChild(columnContent.rating);
+    } else {
+      ratingCell.textContent = summary.rating || "";
+    }
     cells.push(ratingCell);
 
     return cells;
@@ -1102,6 +1115,7 @@ function createCircuitCell(panel, panelId, loads, breaker, circuitCount, positio
   td.className = "panel-cell";
   if (position) td.classList.add(`panel-cell--${position}`);
   const summary = { cableTag: "", loadServed: "", poles: "", rating: "" };
+  const columnContent = { cable: null, poles: null, rating: null };
 
   if (breaker > circuitCount) {
     const slot = document.createElement("div");
@@ -1111,7 +1125,7 @@ function createCircuitCell(panel, panelId, loads, breaker, circuitCount, positio
     empty.textContent = "—";
     slot.appendChild(empty);
     td.appendChild(slot);
-    return { cell: td, summary };
+    return { cell: td, summary, columnContent };
   }
 
   const slot = document.createElement("div");
@@ -1235,7 +1249,6 @@ function createCircuitCell(panel, panelId, loads, breaker, circuitCount, positio
 
   if (!block) {
     slot.classList.add("panel-slot--blank");
-    control.classList.add("panel-slot-control--blank");
     const quickAdd = document.createElement("div");
     quickAdd.className = "panel-slot-quick-add";
     const poleLimit = getPanelPoleLimit(panel);
@@ -1249,7 +1262,11 @@ function createCircuitCell(panel, panelId, loads, breaker, circuitCount, positio
       button.textContent = `${poles}-Pole`;
       quickAdd.appendChild(button);
     });
-    control.appendChild(quickAdd);
+    const poleWrapper = document.createElement("div");
+    poleWrapper.className = "panel-column-content";
+    poleWrapper.appendChild(quickAdd);
+    columnContent.poles = poleWrapper;
+    control.classList.add("panel-slot-control--blank");
   } else if (isBlockStart) {
     const select = document.createElement("select");
     select.dataset.breaker = primaryStart;
@@ -1309,8 +1326,10 @@ function createCircuitCell(panel, panelId, loads, breaker, circuitCount, positio
     typeLabel.appendChild(typeSelect);
     config.appendChild(typeLabel);
 
+    control.appendChild(config);
+
     const ratingLabel = document.createElement("label");
-    ratingLabel.className = "panel-slot-field";
+    ratingLabel.className = "panel-column-field";
     ratingLabel.textContent = "Rating (A)";
     const ratingInput = document.createElement("input");
     ratingInput.type = "number";
@@ -1322,10 +1341,13 @@ function createCircuitCell(panel, panelId, loads, breaker, circuitCount, positio
     ratingInput.setAttribute("list", "panel-breaker-rating-options");
     ratingInput.value = ratingValue;
     ratingLabel.appendChild(ratingInput);
-    config.appendChild(ratingLabel);
+    const ratingWrapper = document.createElement("div");
+    ratingWrapper.className = "panel-column-content";
+    ratingWrapper.appendChild(ratingLabel);
+    columnContent.rating = ratingWrapper;
 
     const cableLabel = document.createElement("label");
-    cableLabel.className = "panel-slot-field";
+    cableLabel.className = "panel-column-field";
     cableLabel.textContent = "Cable";
     const cableInput = document.createElement("input");
     cableInput.type = "text";
@@ -1335,9 +1357,10 @@ function createCircuitCell(panel, panelId, loads, breaker, circuitCount, positio
     cableInput.setAttribute("list", "panel-breaker-cable-options");
     cableInput.value = cableValue;
     cableLabel.appendChild(cableInput);
-    config.appendChild(cableLabel);
-
-    control.appendChild(config);
+    const cableWrapper = document.createElement("div");
+    cableWrapper.className = "panel-column-content";
+    cableWrapper.appendChild(cableLabel);
+    columnContent.cable = cableWrapper;
 
     const breakerInfo = document.createElement("div");
     breakerInfo.className = "panel-slot-breaker-info";
@@ -1375,7 +1398,9 @@ function createCircuitCell(panel, panelId, loads, breaker, circuitCount, positio
     }
     control.appendChild(locked);
   }
-  slot.appendChild(control);
+  if (control.childElementCount) {
+    slot.appendChild(control);
+  }
 
   const details = document.createElement("div");
   details.className = "panel-slot-details";
@@ -1483,7 +1508,7 @@ function createCircuitCell(panel, panelId, loads, breaker, circuitCount, positio
   }
   slot.appendChild(details);
   td.appendChild(slot);
-  return { cell: td, summary };
+  return { cell: td, summary, columnContent };
 }
 
 function createBusRails(phases, options = {}) {
@@ -1711,23 +1736,13 @@ function createBranchDeviceIcon(detail, poleCount, startCircuit, system, phaseLa
 
   const ratingValue = detail && detail.rating != null && detail.rating !== "" ? String(detail.rating) : "";
   const labelText = ratingValue ? `${ratingValue}A` : formatDeviceLabel(detail, labelPoles);
-  if (labelText) {
-    const label = document.createElement("span");
-    label.className = "panel-device-label";
-    label.textContent = labelText;
-    icon.appendChild(label);
-    if (ratingValue) {
-      icon.dataset.rating = ratingValue;
-    }
+  if (labelText && ratingValue) {
+    icon.dataset.rating = ratingValue;
   }
 
   const cableTag = detail?.cableTag || detail?.cable || detail?.cableId;
   if (cableTag) {
-    const subtext = document.createElement("span");
-    subtext.className = "panel-device-subtext";
-    subtext.textContent = cableTag;
     icon.dataset.cable = cableTag;
-    icon.appendChild(subtext);
   }
 
   const tooltipParts = [];

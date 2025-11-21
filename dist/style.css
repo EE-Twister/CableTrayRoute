@@ -5322,15 +5322,48 @@ body.dark-mode .panel-breaker-toolbox-item {
     padding: 0 0.25rem;
 }
 
+.panel-column-content {
+    display: flex;
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 0.35rem;
+}
+
+.panel-column-field {
+    display: flex;
+    flex-direction: column;
+    gap: 0.25rem;
+    font-size: 0.8rem;
+    color: var(--muted-text-color);
+}
+
+.panel-column-field .panel-slot-input {
+    width: 100%;
+    min-width: 7.5rem;
+}
+
+.panel-column--poles .panel-slot-quick-add {
+    justify-content: flex-start;
+}
+
 .panel-column--cable,
 .panel-column--poles,
 .panel-column--rating {
     width: 8%;
     text-align: center;
+    vertical-align: top;
 }
 
 .panel-column--load {
     width: 20%;
+}
+
+.panel-column--cable .panel-column-content,
+.panel-column--rating .panel-column-content,
+.panel-column--poles .panel-column-content {
+    width: 100%;
+    align-items: stretch;
+    text-align: left;
 }
 
 .panel-column--load .panel-cell {
@@ -5394,9 +5427,9 @@ body.dark-mode .panel-breaker-toolbox-item {
     grid-column: 1 / -1;
     grid-row: 1 / -1;
     width: 100%;
-    height: 100%;
+    height: calc(100% + 1rem);
     position: absolute;
-    inset: 0;
+    inset: -0.5rem 0;
 }
 
 .panel-device-rail-line {
@@ -5411,8 +5444,8 @@ body.dark-mode .panel-breaker-toolbox-item {
 .panel-device-rail-line::before {
     content: "";
     position: absolute;
-    top: 0;
-    bottom: 0;
+    top: -0.35rem;
+    bottom: -0.35rem;
     left: 50%;
     width: 2px;
     background: var(--muted-text-color);
@@ -5612,7 +5645,7 @@ body.dark-mode .panel-device {
     position: relative;
     display: flex;
     flex-direction: row;
-    gap: 0.35rem;
+    gap: 0.2rem;
     justify-content: center;
     align-items: stretch;
     width: 100%;
@@ -5637,26 +5670,35 @@ body.dark-mode .panel-device {
 .panel-device-pole {
     position: relative;
     display: block;
-    width: 0.65rem;
-    height: 0.65rem;
-    border-radius: 999px;
-    background: currentColor;
+    width: 0.6rem;
+    height: 1.45rem;
+    border-radius: 6px;
+    background: linear-gradient(180deg, rgba(0, 0, 0, 0.05), rgba(0, 0, 0, 0));
     border: 2px solid currentColor;
 }
 
 .panel-device--breaker .panel-device-pole::before {
-    display: none;
+    content: "";
+    position: absolute;
+    left: 50%;
+    top: 12%;
+    bottom: 12%;
+    width: 2px;
+    background: currentColor;
+    transform: translateX(-50%);
+    opacity: 0.65;
 }
 
 .panel-device--breaker .panel-device-pole::after {
     content: "";
     position: absolute;
     left: 50%;
-    width: 1rem;
+    width: 0.85rem;
     height: 2px;
     background: currentColor;
     transform: translate(-50%, -50%);
     top: 50%;
+    opacity: 0.7;
 }
 
 .panel-device--dc-positive {
@@ -5719,6 +5761,8 @@ body.dark-mode .panel-device-tie {
     border-left: 2px dotted var(--primary-color);
     opacity: 0.75;
     z-index: 1;
+    align-self: stretch;
+    margin: -0.45rem 0;
 }
 
 body.dark-mode .panel-device-tie-vertical {
@@ -5726,19 +5770,11 @@ body.dark-mode .panel-device-tie-vertical {
 }
 
 .panel-device-label {
-    font-size: 0.72rem;
-    font-weight: 600;
-    text-align: center;
-    line-height: 1.1;
-    word-break: break-word;
+    display: none;
 }
 
 .panel-device-subtext {
-    font-size: 0.65rem;
-    opacity: 0.7;
-    text-align: center;
-    line-height: 1.1;
-    word-break: break-word;
+    display: none;
 }
 
 .panel-slot {
