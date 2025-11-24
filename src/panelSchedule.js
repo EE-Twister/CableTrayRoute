@@ -920,6 +920,7 @@ function createColumnHeaders(label, order = ODD_COLUMN_ORDER) {
     th.scope = "col";
     th.textContent = text.toUpperCase();
     th.className = "panel-column-subheader";
+    th.dataset.columnKey = key;
     th.dataset.columnGroup = label.toLowerCase();
     headers.push(th);
   });
@@ -1011,6 +1012,13 @@ function render(panelId = "P1") {
   table.id = "panel-table";
   table.className = "panel-schedule-table";
   table.style.setProperty("--panel-rail-count", String(Math.max(phaseSequence.length, 1)));
+  const colgroup = document.createElement("colgroup");
+  [...ODD_COLUMN_ORDER, "device", ...EVEN_COLUMN_ORDER].forEach(key => {
+    const col = document.createElement("col");
+    col.dataset.columnKey = key;
+    col.className = `panel-column-col panel-column-col--${key}`;
+    colgroup.appendChild(col);
+  });
   const thead = document.createElement("thead");
   const headRow = document.createElement("tr");
   const leftHeader = document.createElement("th");
@@ -1040,6 +1048,7 @@ function render(panelId = "P1") {
   const subHeader = document.createElement("tr");
   createColumnHeaders("odd", ODD_COLUMN_ORDER).forEach(header => subHeader.appendChild(header));
   createColumnHeaders("even", EVEN_COLUMN_ORDER).forEach(header => subHeader.appendChild(header));
+  table.appendChild(colgroup);
   thead.appendChild(subHeader);
   table.appendChild(thead);
 
@@ -1784,7 +1793,10 @@ function createDeviceCell(panel, oddCircuit, evenCircuit, circuitCount, breakerD
     const resolveAnchor = circuit => {
       const slot = slots.get(circuit);
       if (!slot) return null;
-      const anchor = slot.querySelector(".panel-device") || slot;
+      const anchor = slot.querySelector(".panel-device-graphic")
+        || slot.querySelector(".panel-device-symbol")
+        || slot.querySelector(".panel-device");
+      if (!anchor) return null;
       return { slot, anchor };
     };
 
@@ -1817,9 +1829,43 @@ function createDeviceCell(panel, oddCircuit, evenCircuit, circuitCount, breakerD
       tieElement.style.top = `${topOffset}px`;
       tieElement.style.height = `${tieLength}px`;
       tieElement.style.left = `${anchorCenter}px`;
-      tieElement.style.transform = "translateX(0)";
     };
 
+    const scheduleUpdate = () => {
+      if (!tieElement.isConnected) return;
+      requestAnimationFrame(update);
+    };
+
+    const cleanup = () => {
+      resizeObserver.disconnect();
+      window.removeEventListener("resize", scheduleUpdate);
+    };
+
+    const resizeObserver = new ResizeObserver(entries => {
+      if (!tieElement.isConnected) {
+        cleanup();
+        return;
+      }
+      if (!entries?.length) return;
+      scheduleUpdate();
+    });
+
+    [wrapper, startAnchor.anchor, endAnchor.anchor].forEach(element => {
+      if (element && element.isConnected) {
+        resizeObserver.observe(element);
+      }
+    });
+
+    window.addEventListener("resize", scheduleUpdate, { passive: true });
+
+    const disconnectObserver = new MutationObserver(() => {
+      if (!tieElement.isConnected) {
+        cleanup();
+        disconnectObserver.disconnect();
+      }
+    });
+
+    disconnectObserver.observe(wrapper, { childList: true, subtree: true });
     requestAnimationFrame(update);
   };
 
