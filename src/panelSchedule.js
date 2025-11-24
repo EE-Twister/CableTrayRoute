@@ -1773,15 +1773,19 @@ function createDeviceCell(panel, oddCircuit, evenCircuit, circuitCount, breakerD
       let bottomOffset;
 
       if (direction === "full" && startAnchor && endAnchor) {
-        const endRect = endAnchor.anchor.getBoundingClientRect();
-        const endCenter = {
-          x: endRect.left + endRect.width / 2,
-          y: endRect.top + endRect.height / 2
-        };
-        const offsetStart = anchorCenter.y - wrapperRect.top;
-        const offsetEnd = endCenter.y - wrapperRect.top;
-        topOffset = Math.min(offsetStart, offsetEnd);
-        bottomOffset = Math.max(offsetStart, offsetEnd);
+        const startSlotRect = startAnchor.slot.getBoundingClientRect();
+        const endSlotRect = endAnchor.slot.getBoundingClientRect();
+        const startCenterY = startSlotRect.top + startSlotRect.height / 2;
+        const endCenterY = endSlotRect.top + endSlotRect.height / 2;
+        const poles = Math.max(1, bottomCircuit - topCircuit + 1);
+        const rowGap = Number.parseFloat(window.getComputedStyle(wrapper).rowGap) || 0;
+        const derivedRowHeight = poles > 1
+          ? (endCenterY - startCenterY) / (poles - 1)
+          : startSlotRect.height + rowGap;
+        const yStart = startCenterY - wrapperRect.top;
+        const yEnd = yStart + derivedRowHeight * (poles - 1);
+        topOffset = Math.min(yStart, yEnd);
+        bottomOffset = Math.max(yStart, yEnd);
       } else {
         const slotRect = referenceAnchor.slot.getBoundingClientRect();
         const anchorOffset = anchorCenter.y - wrapperRect.top;
