@@ -1749,13 +1749,23 @@ function createDeviceCell(panel, oddCircuit, evenCircuit, circuitCount, breakerD
     const referenceAnchor = resolveAnchor(referenceCircuit);
     if (!referenceAnchor || (!startAnchor && direction === "full") || (!endAnchor && direction === "full")) return;
 
+    const getSlotCenter = slot => {
+      if (!slot || typeof window === "undefined" || !slot.getBoundingClientRect) return null;
+      const rect = slot.getBoundingClientRect();
+      const styles = window.getComputedStyle(slot);
+      const offset = Number.parseFloat(styles.getPropertyValue("--panel-rail-offset")) || 0;
+      const step = Number.parseFloat(styles.getPropertyValue("--panel-rail-step")) || 0;
+      return rect.left + rect.width / 2 + offset * step;
+    };
+
     const update = () => {
       if (!tieElement.isConnected || !wrapper.isConnected) return;
       const wrapperRect = wrapper.getBoundingClientRect();
       const targetAnchor = direction === "full" ? startAnchor : referenceAnchor;
       const targetRect = targetAnchor.anchor.getBoundingClientRect();
+      const slotCenterX = getSlotCenter(targetAnchor.slot);
       const anchorCenter = {
-        x: targetRect.left + targetRect.width / 2,
+        x: Number.isFinite(slotCenterX) ? slotCenterX : targetRect.left + targetRect.width / 2,
         y: targetRect.top + targetRect.height / 2
       };
 
