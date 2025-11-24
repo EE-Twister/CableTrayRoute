@@ -1287,9 +1287,11 @@ function createCircuitCell(panel, panelId, loads, breaker, circuitCount, positio
     if (!primaryStart) return null;
     const ratingLabel = document.createElement("label");
     ratingLabel.className = "panel-column-field";
-    ratingLabel.textContent = "Rating (A)";
+    ratingLabel.textContent = "";
+    ratingLabel.setAttribute("aria-label", "Rating (A)");
     const ratingSelect = document.createElement("select");
     ratingSelect.className = "panel-slot-input";
+    ratingSelect.setAttribute("aria-label", "Rating (A)");
     ratingSelect.dataset.breakerRating = String(primaryStart);
     ratingSelect.setAttribute("aria-label", `Breaker starting at circuit ${primaryStart} rating`);
     const placeholder = document.createElement("option");
@@ -1381,44 +1383,6 @@ function createCircuitCell(panel, panelId, loads, breaker, circuitCount, positio
     columnContent.poles = poleWrapper;
     control.classList.add("panel-slot-control--blank");
   } else if (isBlockStart) {
-    const select = document.createElement("select");
-    select.dataset.breaker = primaryStart;
-    select.id = `panel-breaker-${primaryStart}`;
-    select.className = "panel-slot-select";
-    select.setAttribute("aria-label", `Assign load to breaker starting at circuit ${primaryStart}`);
-    const placeholder = document.createElement("option");
-    placeholder.value = "";
-    placeholder.textContent = "— Assign Load —";
-    select.appendChild(placeholder);
-
-    loads.forEach((load, idx) => {
-      const opt = document.createElement("option");
-      opt.value = String(idx);
-      opt.textContent = formatLoadLabel(load, idx);
-      if (assignedLoad && idx === assignedIndex && isStart) {
-        opt.selected = true;
-      }
-      select.appendChild(opt);
-    });
-
-    const selectRow = document.createElement("div");
-    selectRow.className = "panel-slot-select-row";
-    selectRow.appendChild(select);
-
-    if (!assignedLoad) {
-      const availability = document.createElement("span");
-      availability.className = "panel-slot-availability";
-      const availabilitySegments = [];
-      if (blockLabel) availabilitySegments.push(blockLabel);
-      if (ratingValue) availabilitySegments.push(`${ratingValue}A`);
-      availability.textContent = availabilitySegments.length
-        ? `${availabilitySegments.join(" — ")} available`
-        : "Breaker available";
-      selectRow.appendChild(availability);
-    }
-
-    control.appendChild(selectRow);
-
     const customLoad = document.createElement("label");
     customLoad.className = "panel-column-field";
     customLoad.textContent = "Custom Load";
@@ -1459,14 +1423,6 @@ function createCircuitCell(panel, panelId, loads, breaker, circuitCount, positio
 
     columnContent.rating = createRatingField();
     columnContent.cable = createCableField();
-
-    const breakerInfo = document.createElement("div");
-    breakerInfo.className = "panel-slot-breaker-info";
-    const infoSegments = [];
-    if (blockLabel) infoSegments.push(blockLabel);
-    if (ratingValue) infoSegments.push(`${ratingValue}A`);
-    breakerInfo.textContent = infoSegments.length ? infoSegments.join(" — ") : deviceType === "fuse" ? "Fuse" : "—";
-    control.appendChild(breakerInfo);
 
     const removeBtn = document.createElement("button");
     removeBtn.type = "button";
@@ -1592,32 +1548,6 @@ function createCircuitCell(panel, panelId, loads, breaker, circuitCount, positio
     }
   } else if (block) {
     details.classList.add("panel-slot-details-empty");
-    if (customLoadLabel) {
-      details.textContent = customLoadLabel;
-      const metaSegments = [];
-      if (blockLabel) metaSegments.push(blockLabel);
-      if (ratingValue) metaSegments.push(`${ratingValue}A`);
-      if (cableTag) metaSegments.push(`Cable ${cableTag}`);
-      if (metaSegments.length) {
-        const meta = document.createElement("div");
-        meta.className = "panel-slot-meta panel-slot-meta--compact";
-        metaSegments.forEach(segment => meta.appendChild(createMetaChip(segment)));
-        details.appendChild(meta);
-      }
-    } else if (isBlockStart) {
-      details.classList.add("panel-slot-details--compact");
-      details.textContent = "";
-      if (cableTag) {
-        const meta = document.createElement("div");
-        meta.className = "panel-slot-meta panel-slot-meta--compact";
-        meta.appendChild(createMetaChip(`Cable ${cableTag}`));
-        details.appendChild(meta);
-      }
-    } else {
-      details.textContent = blockLabel
-        ? `Part of ${blockLabel} starting at Circuit ${primaryStart}`
-        : `Part of breaker starting at Circuit ${primaryStart}`;
-    }
     if (!summary.loadServed && blockLabel) {
       summary.loadServed = blockLabel;
     }
