@@ -5350,12 +5350,14 @@ body.dark-mode .panel-breaker-toolbox-item {
 .panel-column--poles,
 .panel-column--rating {
     width: 8%;
+    max-width: 8rem;
     text-align: center;
     vertical-align: top;
 }
 
 .panel-column--rating {
     width: 4%;
+    max-width: 6rem;
 }
 
 .panel-column--load {
@@ -5512,7 +5514,7 @@ body.dark-mode .panel-breaker-toolbox-item {
     grid-column: 1 / -1;
     min-height: 2.75rem;
     pointer-events: none;
-    z-index: 1;
+    z-index: 3;
 }
 
 .panel-device-slot-marker::after {
@@ -5654,6 +5656,9 @@ body.dark-mode .panel-device {
     align-items: stretch;
     width: 100%;
     padding: 0;
+    transform: rotate(90deg);
+    transform-origin: center;
+    min-width: 2.5rem;
 }
 
 .panel-device-symbol::before {
