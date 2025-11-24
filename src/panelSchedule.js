@@ -1291,6 +1291,46 @@ function createCircuitCell(panel, panelId, loads, breaker, circuitCount, positio
     summary.loadServed = customLoadLabel;
   }
 
+  const createRatingField = () => {
+    if (!primaryStart) return null;
+    const ratingLabel = document.createElement("label");
+    ratingLabel.className = "panel-column-field";
+    ratingLabel.textContent = "Rating (A)";
+    const ratingInput = document.createElement("input");
+    ratingInput.type = "number";
+    ratingInput.min = "0";
+    ratingInput.step = "1";
+    ratingInput.placeholder = "e.g. 20";
+    ratingInput.className = "panel-slot-input";
+    ratingInput.dataset.breakerRating = String(primaryStart);
+    ratingInput.setAttribute("list", "panel-breaker-rating-options");
+    ratingInput.value = ratingValue;
+    ratingLabel.appendChild(ratingInput);
+    const ratingWrapper = document.createElement("div");
+    ratingWrapper.className = "panel-column-content";
+    ratingWrapper.appendChild(ratingLabel);
+    return ratingWrapper;
+  };
+
+  const createCableField = () => {
+    if (!primaryStart) return null;
+    const cableLabel = document.createElement("label");
+    cableLabel.className = "panel-column-field";
+    cableLabel.textContent = "Cable";
+    const cableInput = document.createElement("input");
+    cableInput.type = "text";
+    cableInput.className = "panel-slot-input";
+    cableInput.placeholder = "Cable Tag";
+    cableInput.dataset.breakerCable = String(primaryStart);
+    cableInput.setAttribute("list", "panel-breaker-cable-options");
+    cableInput.value = cableValue;
+    cableLabel.appendChild(cableInput);
+    const cableWrapper = document.createElement("div");
+    cableWrapper.className = "panel-column-content";
+    cableWrapper.appendChild(cableLabel);
+    return cableWrapper;
+  };
+
   if (!block) {
     slot.classList.add("panel-slot--blank");
     const quickAdd = document.createElement("div");
@@ -1407,39 +1447,8 @@ function createCircuitCell(panel, panelId, loads, breaker, circuitCount, positio
 
     control.appendChild(config);
 
-    const ratingLabel = document.createElement("label");
-    ratingLabel.className = "panel-column-field";
-    ratingLabel.textContent = "Rating (A)";
-    const ratingInput = document.createElement("input");
-    ratingInput.type = "number";
-    ratingInput.min = "0";
-    ratingInput.step = "1";
-    ratingInput.placeholder = "e.g. 20";
-    ratingInput.className = "panel-slot-input";
-    ratingInput.dataset.breakerRating = String(primaryStart);
-    ratingInput.setAttribute("list", "panel-breaker-rating-options");
-    ratingInput.value = ratingValue;
-    ratingLabel.appendChild(ratingInput);
-    const ratingWrapper = document.createElement("div");
-    ratingWrapper.className = "panel-column-content";
-    ratingWrapper.appendChild(ratingLabel);
-    columnContent.rating = ratingWrapper;
-
-    const cableLabel = document.createElement("label");
-    cableLabel.className = "panel-column-field";
-    cableLabel.textContent = "Cable";
-    const cableInput = document.createElement("input");
-    cableInput.type = "text";
-    cableInput.className = "panel-slot-input";
-    cableInput.placeholder = "Cable Tag";
-    cableInput.dataset.breakerCable = String(primaryStart);
-    cableInput.setAttribute("list", "panel-breaker-cable-options");
-    cableInput.value = cableValue;
-    cableLabel.appendChild(cableInput);
-    const cableWrapper = document.createElement("div");
-    cableWrapper.className = "panel-column-content";
-    cableWrapper.appendChild(cableLabel);
-    columnContent.cable = cableWrapper;
+    columnContent.rating = createRatingField();
+    columnContent.cable = createCableField();
 
     const breakerInfo = document.createElement("div");
     breakerInfo.className = "panel-slot-breaker-info";
@@ -1479,6 +1488,20 @@ function createCircuitCell(panel, panelId, loads, breaker, circuitCount, positio
   }
   if (control.childElementCount) {
     slot.appendChild(control);
+  }
+
+  if (block && !columnContent.rating) {
+    const ratingField = createRatingField();
+    if (ratingField) {
+      columnContent.rating = ratingField;
+    }
+  }
+
+  if (block && !columnContent.cable) {
+    const cableField = createCableField();
+    if (cableField) {
+      columnContent.cable = cableField;
+    }
   }
 
   const details = document.createElement("div");
@@ -1637,10 +1660,16 @@ function createDeviceCell(panel, oddCircuit, evenCircuit, circuitCount, breakerD
   const spanCircuits = Array.isArray(options.circuits) && options.circuits.length
     ? options.circuits
     : [oddCircuit, evenCircuit].filter(value => Number.isFinite(value));
-  const rowCount = Math.max(1, spanRows);
-  if (spanRows > 1) {
-    td.rowSpan = spanRows;
-    td.style.setProperty("--panel-device-row-span", String(spanRows));
+
+  const coveredRowIndexes = spanCircuits
+    .map(circuit => Number.isFinite(circuit) ? Math.floor((circuit - 1) / 2) : null)
+    .filter(index => index != null && Number.isFinite(index));
+  const maxCoveredRow = coveredRowIndexes.length ? Math.max(...coveredRowIndexes) : baseRowIndex;
+  const derivedRowCount = Math.max(1, maxCoveredRow - baseRowIndex + 1);
+  const rowCount = Math.max(derivedRowCount, spanRows);
+  if (rowCount > 1) {
+    td.rowSpan = rowCount;
+    td.style.setProperty("--panel-device-row-span", String(rowCount));
   }
 
   const rails = createBusRails(sequence, { variant: "body" });
@@ -1696,7 +1725,7 @@ function createDeviceCell(panel, oddCircuit, evenCircuit, circuitCount, breakerD
     slot.className = `panel-device-slot panel-device-slot--${isEven ? "even" : "odd"}`;
     const phase = getPhaseLabel(panel, circuit);
     if (phase) slot.dataset.phase = phase;
-    const relativeRow = Math.max(1, Math.min(rowCount, Math.floor((circuit - 1) / 2) - baseRowIndex + 1));
+    const relativeRow = Math.max(1, Math.floor((circuit - 1) / 2) - baseRowIndex + 1);
     slot.style.gridRow = String(relativeRow);
     applyRailOffset(slot, phase);
     getRowMarker(relativeRow, phase);
@@ -1805,6 +1834,12 @@ function createDeviceCell(panel, oddCircuit, evenCircuit, circuitCount, breakerD
       }
     });
   }
+
+  rowMarkers.forEach(entry => {
+    if (entry?.marker?.parentElement === wrapper) {
+      wrapper.appendChild(entry.marker);
+    }
+  });
   return td;
 }
 
