@@ -5178,10 +5178,11 @@ body.dark-mode .workflow-card-title {
 }
 
 .panel-info-tight-group {
-    display: grid;
-    grid-template-columns: repeat(auto-fit, minmax(120px, max-content));
-    gap: 0.25rem 0.35rem;
-    align-items: end;
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.35rem 0.5rem;
+    align-items: flex-end;
+    grid-column: 1 / -1;
 }
 
 #panel-info label {
@@ -5211,8 +5212,8 @@ body.dark-mode .workflow-card-title {
 
 #panel-info .panel-info-compact input,
 #panel-info .panel-info-compact select {
-    width: auto;
-    min-width: 0;
+    width: 100%;
+    min-width: 140px;
     align-self: flex-start;
 }
 
@@ -5819,48 +5820,35 @@ body.dark-mode .panel-device-tie {
     background: rgba(255, 255, 255, 0.7);
 }
 
-.panel-device-tie-vertical {
-    --panel-rail-offset: 0;
-    --panel-rail-step: calc(var(--panel-bus-span, var(--panel-rail-spacing, 1rem)) / var(--panel-rail-count, 1));
-    --panel-device-tie-start: 0px;
-    --panel-device-tie-length: 0px;
-    --panel-device-tie-left: 50%;
-    --panel-device-tie-offset: 0px;
-    position: absolute;
-    left: var(--panel-device-tie-left);
-    top: var(--panel-device-tie-start);
-    width: 0;
-    height: var(--panel-device-tie-length);
-    border-left: 3px dotted var(--primary-color);
-    opacity: 0.9;
-    z-index: 4;
-    pointer-events: none;
-    transform: translateX(var(--panel-device-tie-offset, 0px));
+.panel-device[data-connector-role] .panel-device-graphic {
+    padding: 0.35rem 0;
 }
 
-.panel-device-tie-vertical::before,
-.panel-device-tie-vertical::after {
+.panel-device[data-connector-role="start"] .panel-device-graphic::after,
+.panel-device[data-connector-role="continue"] .panel-device-graphic::before {
     content: "";
     position: absolute;
     left: 50%;
-    width: 0.55rem;
-    height: 0.55rem;
-    border-radius: 50%;
-    background: var(--primary-color);
-    transform: translate(-50%, -50%);
-    box-shadow: 0 0 0 2px var(--secondary-color);
+    width: 0;
+    transform: translateX(-50%);
+    opacity: 0.9;
+    pointer-events: none;
 }
 
-.panel-device-tie-vertical::before {
-    top: 0;
-}
-
-.panel-device-tie-vertical::after {
+.panel-device[data-connector-role="start"] .panel-device-graphic::after {
     top: 100%;
-    transform: translate(-50%, -50%);
+    height: 0.9rem;
+    border-left: 2px dotted var(--primary-color);
 }
 
-body.dark-mode .panel-device-tie-vertical {
+.panel-device[data-connector-role="continue"] .panel-device-graphic::before {
+    bottom: 100%;
+    height: 0.9rem;
+    border-left: 2px dashed var(--primary-color);
+}
+
+body.dark-mode .panel-device[data-connector-role="start"] .panel-device-graphic::after,
+body.dark-mode .panel-device[data-connector-role="continue"] .panel-device-graphic::before {
     border-color: rgba(255, 255, 255, 0.75);
 }
 
