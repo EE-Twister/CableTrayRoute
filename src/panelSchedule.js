@@ -1659,8 +1659,8 @@ function createDeviceCell(panel, oddCircuit, evenCircuit, circuitCount, breakerD
   const maxCoveredRow = coveredRowIndexes.length ? Math.max(...coveredRowIndexes) : baseRowIndex;
   const derivedRowCount = Math.max(1, maxCoveredRow - baseRowIndex + 1);
   const calculatedRowCount = Math.max(derivedRowCount, spanRows);
-  const rowCount = disableRowSpan ? 1 : calculatedRowCount;
-  if (rowCount > 1) {
+  const rowCount = calculatedRowCount;
+  if (!disableRowSpan && rowCount > 1) {
     td.rowSpan = rowCount;
     td.style.setProperty("--panel-device-row-span", String(rowCount));
   }
@@ -1776,6 +1776,37 @@ function createDeviceCell(panel, oddCircuit, evenCircuit, circuitCount, breakerD
     blockSlots.set(info.start, entry);
   });
 
+  const scheduleTiePosition = (tieElement, topCircuit, bottomCircuit) => {
+    if (!tieElement) return;
+    const startCircuit = Math.min(topCircuit, bottomCircuit);
+    const endCircuit = Math.max(topCircuit, bottomCircuit);
+    const startSlot = slots.get(startCircuit);
+    const endSlot = slots.get(endCircuit);
+    if (!startSlot || !endSlot) return;
+
+    const update = () => {
+      if (!tieElement.isConnected || !wrapper.isConnected) return;
+      const wrapperRect = wrapper.getBoundingClientRect();
+      const startRect = startSlot.getBoundingClientRect();
+      const endRect = endSlot.getBoundingClientRect();
+      const startOffset = startRect.top + startRect.height / 2 - wrapperRect.top;
+      const endOffset = endRect.top + endRect.height / 2 - wrapperRect.top;
+      const topOffset = Math.min(startOffset, endOffset);
+      const bottomOffset = Math.max(startOffset, endOffset);
+      const anchorCenter = startRect.left + startRect.width / 2 - wrapperRect.left;
+      tieElement.style.setProperty("--panel-device-tie-left", `${anchorCenter}px`);
+      tieElement.style.setProperty("--panel-device-tie-offset", "0px");
+      tieElement.style.setProperty("--panel-device-tie-start", `${topOffset}px`);
+      tieElement.style.setProperty("--panel-device-tie-length", `${Math.max(0, bottomOffset - topOffset)}px`);
+      tieElement.style.top = `${topOffset}px`;
+      tieElement.style.height = `${Math.max(0, bottomOffset - topOffset)}px`;
+      tieElement.style.left = `${anchorCenter}px`;
+      tieElement.style.transform = "translateX(0)";
+    };
+
+    requestAnimationFrame(update);
+  };
+
   const ensureIconForCircuit = (info, circuit) => {
     const slot = slots.get(circuit);
     if (!slot) return;
@@ -1815,14 +1846,10 @@ function createDeviceCell(panel, oddCircuit, evenCircuit, circuitCount, breakerD
         const column = circuitList[0] % 2 === 0 ? 3 : 1;
         const tie = document.createElement("div");
         tie.className = "panel-device-tie-vertical";
-        const spanRows = Math.max(1, maxRow - minRow + 1);
-        tie.style.setProperty("--panel-device-span-rows", String(spanRows));
-        if (baseRowIndex > minRow) tie.dataset.extendsUp = "true";
-        if (baseRowIndex < maxRow) tie.dataset.extendsDown = "true";
+        tie.style.gridColumn = String(column);
         const startRow = Math.max(1, minRow - baseRowIndex + 1);
         const endRow = Math.max(startRow + 1, Math.min(rowCount + 1, maxRow - baseRowIndex + 2));
-        tie.style.gridColumn = String(column);
-        tie.style.gridRow = disableRowSpan ? "1 / -1" : `${startRow} / ${endRow}`;
+        tie.style.gridRow = `${startRow} / ${endRow}`;
         const referencePhase = getPhaseLabel(panel, circuitList[0]);
         if (referencePhase) {
           tie.dataset.phase = referencePhase;
@@ -1830,6 +1857,9 @@ function createDeviceCell(panel, oddCircuit, evenCircuit, circuitCount, breakerD
         }
         tie.setAttribute("aria-hidden", "true");
         wrapper.appendChild(tie);
+        const topCircuit = Math.min(...circuitList);
+        const bottomCircuit = Math.max(...circuitList);
+        scheduleTiePosition(tie, topCircuit, bottomCircuit);
       }
     });
   }
