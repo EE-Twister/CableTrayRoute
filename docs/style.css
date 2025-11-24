@@ -5347,8 +5347,8 @@ body.dark-mode .panel-breaker-toolbox-item {
 }
 
 .panel-column--cable {
-    width: 15%;
-    max-width: 15%;
+    width: 12%;
+    max-width: 12%;
     text-align: center;
     vertical-align: top;
 }
@@ -5362,9 +5362,9 @@ body.dark-mode .panel-breaker-toolbox-item {
 }
 
 .panel-column--rating {
-    width: 0.5%;
-    min-width: 5.5ch;
-    max-width: 6.5ch;
+    width: 0.75%;
+    min-width: 7.5ch;
+    max-width: 9ch;
     text-align: center;
     vertical-align: top;
 }
@@ -5379,8 +5379,8 @@ body.dark-mode .panel-breaker-toolbox-item {
 .panel-schedule-table col[data-column-key="rating"],
 .panel-schedule-table th[data-column-key="rating"],
 .panel-schedule-table td.panel-column--rating {
-    width: 6.5ch;
-    max-width: 6.5ch;
+    width: 9ch;
+    max-width: 9ch;
 }
 
 .panel-column--load {
