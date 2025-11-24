@@ -1729,124 +1729,7 @@ function createDeviceCell(panel, oddCircuit, evenCircuit, circuitCount, breakerD
     blockSlots.set(info.start, entry);
   });
 
-  const scheduleTiePosition = (tieElement, topCircuit, bottomCircuit, options = {}) => {
-    if (!tieElement) return;
-    const direction = options.direction === "up" || options.direction === "down" ? options.direction : "full";
-    const referenceCircuit = Number.isFinite(options.referenceCircuit) ? options.referenceCircuit : topCircuit;
-
-    const resolveAnchor = circuit => {
-      const slot = slots.get(circuit);
-      if (!slot) return null;
-      const anchor = slot.querySelector(".panel-device-graphic")
-        || slot.querySelector(".panel-device-symbol")
-        || slot.querySelector(".panel-device");
-      if (!anchor) return null;
-      return { slot, anchor };
-    };
-
-    const startAnchor = resolveAnchor(topCircuit);
-    const endAnchor = resolveAnchor(bottomCircuit);
-    const referenceAnchor = resolveAnchor(referenceCircuit);
-    if (!referenceAnchor || (!startAnchor && direction === "full") || (!endAnchor && direction === "full")) return;
-
-    const getSlotCenter = slot => {
-      if (!slot || typeof window === "undefined" || !slot.getBoundingClientRect) return null;
-      const rect = slot.getBoundingClientRect();
-      const styles = window.getComputedStyle(slot);
-      const offset = Number.parseFloat(styles.getPropertyValue("--panel-rail-offset")) || 0;
-      const step = Number.parseFloat(styles.getPropertyValue("--panel-rail-step")) || 0;
-      return rect.left + rect.width / 2 + offset * step;
-    };
-
-    const update = () => {
-      if (!tieElement.isConnected || !wrapper.isConnected) return;
-      const wrapperRect = wrapper.getBoundingClientRect();
-      const targetAnchor = direction === "full" ? startAnchor : referenceAnchor;
-      const targetRect = targetAnchor.anchor.getBoundingClientRect();
-      const slotCenterX = getSlotCenter(targetAnchor.slot);
-      const anchorCenter = {
-        x: Number.isFinite(slotCenterX) ? slotCenterX : targetRect.left + targetRect.width / 2,
-        y: targetRect.top + targetRect.height / 2
-      };
-
-      let topOffset;
-      let bottomOffset;
-
-      if (direction === "full" && startAnchor && endAnchor) {
-        const startSlotRect = startAnchor.slot.getBoundingClientRect();
-        const endSlotRect = endAnchor.slot.getBoundingClientRect();
-        const startCenterY = startSlotRect.top + startSlotRect.height / 2;
-        const endCenterY = endSlotRect.top + endSlotRect.height / 2;
-        const poles = Math.max(1, bottomCircuit - topCircuit + 1);
-        const rowGap = Number.parseFloat(window.getComputedStyle(wrapper).rowGap) || 0;
-        const derivedRowHeight = poles > 1
-          ? (endCenterY - startCenterY) / (poles - 1)
-          : startSlotRect.height + rowGap;
-        const yStart = startCenterY - wrapperRect.top;
-        const yEnd = yStart + derivedRowHeight * (poles - 1);
-        topOffset = Math.min(yStart, yEnd);
-        bottomOffset = Math.max(yStart, yEnd);
-      } else {
-        const slotRect = referenceAnchor.slot.getBoundingClientRect();
-        const anchorOffset = anchorCenter.y - wrapperRect.top;
-        if (direction === "down") {
-          topOffset = anchorOffset;
-          bottomOffset = slotRect.bottom - wrapperRect.top;
-        } else {
-          topOffset = slotRect.top - wrapperRect.top;
-          bottomOffset = anchorOffset;
-        }
-      }
-
-      const disconnectObserver = new MutationObserver(mutations => {
-        mutations.forEach(mutation => {
-          if (!mutation.removedNodes || mutation.removedNodes.length === 0) return;
-          mutation.removedNodes.forEach(node => {
-            if (!node.contains || !node.contains(tieElement)) return;
-            disconnectObserver.disconnect();
-          });
-        });
-      });
-
-      const tieLength = Math.max(0, bottomOffset - topOffset);
-      tieElement.style.setProperty("--panel-rail-offset", "0");
-      tieElement.style.setProperty("--panel-device-tie-left", `${anchorCenter.x - wrapperRect.left}px`);
-      tieElement.style.setProperty("--panel-device-tie-offset", "0px");
-      tieElement.style.setProperty("--panel-device-tie-start", `${topOffset}px`);
-      tieElement.style.setProperty("--panel-device-tie-length", `${tieLength}px`);
-      tieElement.style.top = `${topOffset}px`;
-      tieElement.style.height = `${tieLength}px`;
-      tieElement.style.left = `${anchorCenter.x - wrapperRect.left}px`;
-      disconnectObserver.observe(wrapper, { childList: true, subtree: true });
-      requestAnimationFrame(update);
-    };
-
-    const observer = new ResizeObserver(entries => {
-      entries.forEach(entry => {
-        if (!tieElement.isConnected || !wrapper.isConnected) return;
-        const { target } = entry;
-        if (!wrapper.contains(target)) return;
-        update();
-      });
-    });
-    const observerTargets = direction === "full" ? [wrapper, startAnchor?.slot, endAnchor?.slot] : [wrapper, referenceAnchor.slot];
-    observerTargets.filter(Boolean).forEach(element => {
-      observer.observe(element);
-    });
-
-    const disconnectObserver = new MutationObserver(mutations => {
-      mutations.forEach(mutation => {
-        if (Array.from(mutation.removedNodes || []).includes(wrapper)) {
-          observer.disconnect();
-        }
-      });
-    });
-
-    disconnectObserver.observe(wrapper, { childList: true, subtree: true });
-    requestAnimationFrame(update);
-  };
-
-  const ensureIconForCircuit = (info, circuit) => {
+  const ensureIconForCircuit = (info, circuit, connectorRole = null) => {
     const slot = slots.get(circuit);
     if (!slot) return;
     const phase = getPhaseLabel(panel, circuit);
@@ -1856,7 +1739,11 @@ function createDeviceCell(panel, oddCircuit, evenCircuit, circuitCount, breakerD
       info?.start ?? circuit,
       system,
       phase,
-      { placement: circuit % 2 === 0 ? "even" : "odd", labelPoles: info?.size }
+      {
+        placement: circuit % 2 === 0 ? "even" : "odd",
+        labelPoles: info?.size,
+        connectorRole: connectorRole && info?.size > 1 ? connectorRole : null
+      }
     );
     if (icon) {
       slot.appendChild(icon);
@@ -1875,29 +1762,11 @@ function createDeviceCell(panel, oddCircuit, evenCircuit, circuitCount, breakerD
   } else {
     blockSlots.forEach(entry => {
       const { info, circuits: circuitList } = entry;
-      circuitList.forEach(circuit => ensureIconForCircuit(info, circuit));
-      if (info.size > 1 && circuitList.length) {
-        const blockSpan = Array.isArray(info.span) && info.span.length ? info.span : circuitList;
-        const topCircuit = Math.min(...blockSpan);
-        const bottomCircuit = Math.max(...blockSpan);
-        const column = topCircuit % 2 === 0 ? 3 : 1;
-        const tie = document.createElement("div");
-        tie.className = "panel-device-tie-vertical";
-        tie.style.gridColumn = String(column);
-        const startRowIndex = Math.floor((topCircuit - 1) / 2);
-        const endRowIndex = Math.floor((bottomCircuit - 1) / 2);
-        const startRow = Math.max(1, startRowIndex - baseRowIndex + 1);
-        const endRow = Math.min(rowCount + 1, endRowIndex - baseRowIndex + 2);
-        tie.style.gridRow = `${startRow} / ${endRow}`;
-        const referenceCircuit = info.isStart ? topCircuit : bottomCircuit;
-        const referencePhase = getPhaseLabel(panel, referenceCircuit);
-        if (referencePhase) {
-          tie.dataset.phase = referencePhase;
-        }
-        tie.setAttribute("aria-hidden", "true");
-        wrapper.appendChild(tie);
-        scheduleTiePosition(tie, topCircuit, bottomCircuit, { referenceCircuit });
-      }
+      const orderedCircuits = [...circuitList].sort((a, b) => a - b);
+      orderedCircuits.forEach((circuit, index) => {
+        const connectorRole = info.size > 1 ? (index === 0 ? "start" : "continue") : null;
+        ensureIconForCircuit(info, circuit, connectorRole);
+      });
     });
   }
 
@@ -1936,6 +1805,9 @@ function createBranchDeviceIcon(detail, poleCount, startCircuit, system, phaseLa
   symbol.dataset.poles = String(poles);
   if (options.placement) {
     symbol.dataset.placement = options.placement;
+  }
+  if (options.connectorRole) {
+    icon.dataset.connectorRole = options.connectorRole;
   }
   for (let i = 0; i < poles; i++) {
     const pole = document.createElement("span");
