@@ -5354,9 +5354,9 @@ body.dark-mode .panel-breaker-toolbox-item {
 }
 
 .panel-column--poles {
-    width: 5ch;
-    min-width: 4.5ch;
-    max-width: 6ch;
+    width: 6ch;
+    min-width: 5ch;
+    max-width: 7ch;
     text-align: center;
     vertical-align: top;
 }
@@ -5372,8 +5372,8 @@ body.dark-mode .panel-breaker-toolbox-item {
 .panel-schedule-table col[data-column-key="poles"],
 .panel-schedule-table th[data-column-key="poles"],
 .panel-schedule-table td.panel-column--poles {
-    width: 5ch;
-    max-width: 6ch;
+    width: 6ch;
+    max-width: 7ch;
 }
 
 .panel-schedule-table col[data-column-key="rating"],
@@ -5802,7 +5802,7 @@ body.dark-mode .panel-device-tie {
     top: var(--panel-device-tie-start);
     width: 0;
     height: var(--panel-device-tie-length);
-    border-left: 3px solid var(--primary-color);
+    border-left: 3px dotted var(--primary-color);
     opacity: 0.9;
     z-index: 4;
     pointer-events: none;
