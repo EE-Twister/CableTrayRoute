@@ -5177,6 +5177,13 @@ body.dark-mode .workflow-card-title {
     justify-items: start;
 }
 
+.panel-info-tight-group {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(120px, max-content));
+    gap: 0.25rem 0.35rem;
+    align-items: end;
+}
+
 #panel-info label {
     display: flex;
     flex-direction: column;
