@@ -5354,17 +5354,17 @@ body.dark-mode .panel-breaker-toolbox-item {
 }
 
 .panel-column--poles {
-    width: 0.35%;
-    min-width: 3.25ch;
-    max-width: 3.5ch;
+    width: 5ch;
+    min-width: 4.5ch;
+    max-width: 6ch;
     text-align: center;
     vertical-align: top;
 }
 
 .panel-column--rating {
-    width: 0.75%;
-    min-width: 7.5ch;
-    max-width: 9ch;
+    width: 11ch;
+    min-width: 10ch;
+    max-width: 12ch;
     text-align: center;
     vertical-align: top;
 }
@@ -5372,15 +5372,15 @@ body.dark-mode .panel-breaker-toolbox-item {
 .panel-schedule-table col[data-column-key="poles"],
 .panel-schedule-table th[data-column-key="poles"],
 .panel-schedule-table td.panel-column--poles {
-    width: 3.5ch;
-    max-width: 3.5ch;
+    width: 5ch;
+    max-width: 6ch;
 }
 
 .panel-schedule-table col[data-column-key="rating"],
 .panel-schedule-table th[data-column-key="rating"],
 .panel-schedule-table td.panel-column--rating {
-    width: 9ch;
-    max-width: 9ch;
+    width: 11ch;
+    max-width: 12ch;
 }
 
 .panel-column--load {
@@ -5800,13 +5800,13 @@ body.dark-mode .panel-device-tie {
     position: absolute;
     left: var(--panel-device-tie-left);
     top: var(--panel-device-tie-start);
-    width: 3px;
+    width: 0;
     height: var(--panel-device-tie-length);
-    border-left: 3px dotted var(--primary-color);
+    border-left: 3px solid var(--primary-color);
     opacity: 0.9;
     z-index: 4;
     pointer-events: none;
-    transform: translateX(calc(var(--panel-device-tie-offset, 0px) - 50%));
+    transform: translateX(var(--panel-device-tie-offset, 0px));
 }
 
 .panel-device-tie-vertical::before,

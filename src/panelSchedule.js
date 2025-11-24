@@ -1553,13 +1553,15 @@ function createCircuitCell(panel, panelId, loads, breaker, circuitCount, positio
     }
   } else {
     details.classList.add("panel-slot-details-empty");
-    details.textContent = "No breaker configured";
+    details.textContent = "Space";
   }
 
   if (!summary.loadServed && blockLabel) {
     summary.loadServed = blockLabel;
   }
-  slot.appendChild(details);
+  if (details.childElementCount || details.textContent.trim()) {
+    slot.appendChild(details);
+  }
   td.appendChild(slot);
   return { cell: td, summary, columnContent };
 }
