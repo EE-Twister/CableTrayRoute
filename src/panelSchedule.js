@@ -1048,20 +1048,9 @@ function render(panelId = "P1") {
   const layout = Array.isArray(panel.breakerLayout) ? panel.breakerLayout : [];
 
   const collectDeviceCircuits = (odd, even) => {
-    const circuits = new Set();
-    [odd, even].forEach(circuit => {
-      const block = layout[circuit - 1] || null;
-      if (block?.position === 0) {
-        getBlockCircuits(panel, block, circuitCount).forEach(value => circuits.add(value));
-      } else if (block) {
-        if (Number.isFinite(circuit) && circuit <= circuitCount) {
-          circuits.add(circuit);
-        }
-      } else if (Number.isFinite(circuit) && circuit <= circuitCount) {
-        circuits.add(circuit);
-      }
-    });
-    return Array.from(circuits).filter(value => Number.isFinite(value)).sort((a, b) => a - b);
+    return [odd, even]
+      .filter(circuit => Number.isFinite(circuit) && circuit <= circuitCount)
+      .sort((a, b) => a - b);
   };
 
   const createSummaryCells = (result, order = ODD_COLUMN_ORDER) => {
@@ -1117,8 +1106,6 @@ function render(panelId = "P1") {
     return cells;
   };
 
-  let deviceRowSpan = 0;
-
   for (let i = 0; i < rows; i++) {
     const row = document.createElement("tr");
     const oddCircuit = i * 2 + 1;
@@ -1127,24 +1114,17 @@ function render(panelId = "P1") {
     const oddResult = createCircuitCell(panel, panelId, loads, oddCircuit, circuitCount, "left", system, breakerDetails);
     createSummaryCells(oddResult, ODD_COLUMN_ORDER).forEach(cell => row.appendChild(cell));
 
-    let deviceCell = null;
-    if (deviceRowSpan > 0) {
-      deviceRowSpan--;
-    } else {
-      const deviceCircuits = collectDeviceCircuits(oddCircuit, evenCircuit);
-      deviceCell = createDeviceCell(
-        panel,
-        oddCircuit,
-        evenCircuit,
-        circuitCount,
-        breakerDetails,
-        system,
-        phaseSequence,
-        { circuits: deviceCircuits, baseRow: i }
-      );
-      const span = Number.isFinite(deviceCell?.rowSpan) && deviceCell.rowSpan > 0 ? Number(deviceCell.rowSpan) : 1;
-      deviceRowSpan = span - 1;
-    }
+    const deviceCircuits = collectDeviceCircuits(oddCircuit, evenCircuit);
+    const deviceCell = createDeviceCell(
+      panel,
+      oddCircuit,
+      evenCircuit,
+      circuitCount,
+      breakerDetails,
+      system,
+      phaseSequence,
+      { circuits: deviceCircuits, baseRow: i, disableRowSpan: true }
+    );
     if (deviceCell) {
       row.appendChild(deviceCell);
     }
@@ -1668,6 +1648,7 @@ function createDeviceCell(panel, oddCircuit, evenCircuit, circuitCount, breakerD
   td.style.setProperty("--panel-bus-span", `${railSpan}rem`);
   const spanRows = Number.isFinite(options.rowSpan) && options.rowSpan > 1 ? Number(options.rowSpan) : 1;
   const baseRowIndex = Number.isFinite(options.baseRow) && options.baseRow >= 0 ? Number(options.baseRow) : 0;
+  const disableRowSpan = options.disableRowSpan === true;
   const spanCircuits = Array.isArray(options.circuits) && options.circuits.length
     ? options.circuits
     : [oddCircuit, evenCircuit].filter(value => Number.isFinite(value));
@@ -1677,7 +1658,8 @@ function createDeviceCell(panel, oddCircuit, evenCircuit, circuitCount, breakerD
     .filter(index => index != null && Number.isFinite(index));
   const maxCoveredRow = coveredRowIndexes.length ? Math.max(...coveredRowIndexes) : baseRowIndex;
   const derivedRowCount = Math.max(1, maxCoveredRow - baseRowIndex + 1);
-  const rowCount = Math.max(derivedRowCount, spanRows);
+  const calculatedRowCount = Math.max(derivedRowCount, spanRows);
+  const rowCount = disableRowSpan ? 1 : calculatedRowCount;
   if (rowCount > 1) {
     td.rowSpan = rowCount;
     td.style.setProperty("--panel-device-row-span", String(rowCount));
