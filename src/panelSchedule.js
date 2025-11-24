@@ -1806,17 +1806,23 @@ function createDeviceCell(panel, oddCircuit, evenCircuit, circuitCount, breakerD
     blockSlots.forEach(entry => {
       const { info, circuits: circuitList } = entry;
       circuitList.forEach(circuit => ensureIconForCircuit(info, circuit));
-      if (info.size > 1 && circuitList.length > 1) {
-        const rows = circuitList.map(circuit => Math.floor((circuit - 1) / 2));
-        const minRow = Math.min(...rows);
-        const maxRow = Math.max(...rows);
+      if (info.size > 1 && circuitList.length) {
+        const blockRows = Array.isArray(info.span)
+          ? info.span.map(circuit => Math.floor((circuit - 1) / 2))
+          : circuitList.map(circuit => Math.floor((circuit - 1) / 2));
+        const minRow = blockRows.length ? Math.min(...blockRows) : baseRowIndex;
+        const maxRow = blockRows.length ? Math.max(...blockRows) : baseRowIndex;
         const column = circuitList[0] % 2 === 0 ? 3 : 1;
         const tie = document.createElement("div");
         tie.className = "panel-device-tie-vertical";
+        const spanRows = Math.max(1, maxRow - minRow + 1);
+        tie.style.setProperty("--panel-device-span-rows", String(spanRows));
+        if (baseRowIndex > minRow) tie.dataset.extendsUp = "true";
+        if (baseRowIndex < maxRow) tie.dataset.extendsDown = "true";
         const startRow = Math.max(1, minRow - baseRowIndex + 1);
         const endRow = Math.max(startRow + 1, Math.min(rowCount + 1, maxRow - baseRowIndex + 2));
         tie.style.gridColumn = String(column);
-        tie.style.gridRow = `${startRow} / ${endRow}`;
+        tie.style.gridRow = disableRowSpan ? "1 / -1" : `${startRow} / ${endRow}`;
         const referencePhase = getPhaseLabel(panel, circuitList[0]);
         if (referencePhase) {
           tie.dataset.phase = referencePhase;
