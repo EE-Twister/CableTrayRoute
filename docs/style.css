@@ -5347,27 +5347,26 @@ body.dark-mode .panel-breaker-toolbox-item {
 }
 
 .panel-column--cable {
-    width: 8%;
-    max-width: 8rem;
-    text-align: center;
-    vertical-align: top;
-}
-
-.panel-column--poles,
-.panel-column--rating {
-    width: 0.35%;
+    width: 15%;
+    max-width: 15%;
     text-align: center;
     vertical-align: top;
 }
 
 .panel-column--poles {
+    width: 0.35%;
     min-width: 3.25ch;
     max-width: 3.5ch;
+    text-align: center;
+    vertical-align: top;
 }
 
 .panel-column--rating {
-    min-width: 4.25ch;
-    max-width: 4.75ch;
+    width: 0.5%;
+    min-width: 5.5ch;
+    max-width: 6.5ch;
+    text-align: center;
+    vertical-align: top;
 }
 
 .panel-schedule-table col[data-column-key="poles"],
@@ -5380,8 +5379,8 @@ body.dark-mode .panel-breaker-toolbox-item {
 .panel-schedule-table col[data-column-key="rating"],
 .panel-schedule-table th[data-column-key="rating"],
 .panel-schedule-table td.panel-column--rating {
-    width: 4.75ch;
-    max-width: 4.75ch;
+    width: 6.5ch;
+    max-width: 6.5ch;
 }
 
 .panel-column--load {

@@ -935,14 +935,6 @@ function render(panelId = "P1") {
   container.innerHTML = "";
 
   const breakerDetails = ensureBreakerDetails(panel);
-  const ratingList = document.createElement("datalist");
-  ratingList.id = "panel-breaker-rating-options";
-  BREAKER_RATING_VALUES.forEach(value => {
-    const option = document.createElement("option");
-    option.value = String(value);
-    ratingList.appendChild(option);
-  });
-  container.appendChild(ratingList);
 
   const cableList = document.createElement("datalist");
   cableList.id = "panel-breaker-cable-options";
@@ -1296,16 +1288,32 @@ function createCircuitCell(panel, panelId, loads, breaker, circuitCount, positio
     const ratingLabel = document.createElement("label");
     ratingLabel.className = "panel-column-field";
     ratingLabel.textContent = "Rating (A)";
-    const ratingInput = document.createElement("input");
-    ratingInput.type = "number";
-    ratingInput.min = "0";
-    ratingInput.step = "1";
-    ratingInput.placeholder = "e.g. 20";
-    ratingInput.className = "panel-slot-input";
-    ratingInput.dataset.breakerRating = String(primaryStart);
-    ratingInput.setAttribute("list", "panel-breaker-rating-options");
-    ratingInput.value = ratingValue;
-    ratingLabel.appendChild(ratingInput);
+    const ratingSelect = document.createElement("select");
+    ratingSelect.className = "panel-slot-input";
+    ratingSelect.dataset.breakerRating = String(primaryStart);
+    ratingSelect.setAttribute("aria-label", `Breaker starting at circuit ${primaryStart} rating`);
+    const placeholder = document.createElement("option");
+    placeholder.value = "";
+    placeholder.textContent = "Select rating";
+    ratingSelect.appendChild(placeholder);
+    const renderRatingOption = value => {
+      const option = document.createElement("option");
+      option.value = String(value);
+      option.textContent = String(value);
+      ratingSelect.appendChild(option);
+    };
+    BREAKER_RATING_VALUES.forEach(renderRatingOption);
+    const normalizedRating = ratingValue != null && ratingValue !== "" ? String(ratingValue) : "";
+    if (normalizedRating) {
+      if (!Array.from(ratingSelect.options).some(opt => opt.value === normalizedRating)) {
+        const customOption = document.createElement("option");
+        customOption.value = normalizedRating;
+        customOption.textContent = normalizedRating;
+        ratingSelect.appendChild(customOption);
+      }
+      ratingSelect.value = normalizedRating;
+    }
+    ratingLabel.appendChild(ratingSelect);
     const ratingWrapper = document.createElement("div");
     ratingWrapper.className = "panel-column-content";
     ratingWrapper.appendChild(ratingLabel);
@@ -1344,9 +1352,11 @@ function createCircuitCell(panel, panelId, loads, breaker, circuitCount, positio
     }
     const poleLabel = document.createElement("label");
     poleLabel.className = "panel-slot-field";
-    poleLabel.textContent = "Poles";
+    poleLabel.textContent = "";
+    poleLabel.setAttribute("aria-label", "Poles");
     const poleSelect = document.createElement("select");
     poleSelect.className = "panel-slot-input panel-slot-pole-select";
+    poleSelect.setAttribute("aria-label", "Select poles");
     optionsToRender.forEach(poles => {
       const option = document.createElement("option");
       option.value = String(poles);
@@ -2625,7 +2635,7 @@ window.addEventListener("DOMContentLoaded", () => {
         }
         return;
       }
-      if (e.target.matches("input[data-breaker-rating]")) {
+      if (e.target.matches("[data-breaker-rating]")) {
         const start = Number.parseInt(e.target.dataset.breakerRating, 10);
         if (Number.isFinite(start)) {
           const detail = ensureBreakerDetail(panel, start);
