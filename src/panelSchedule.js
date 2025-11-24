@@ -1780,26 +1780,42 @@ function createDeviceCell(panel, oddCircuit, evenCircuit, circuitCount, breakerD
     if (!tieElement) return;
     const startCircuit = Math.min(topCircuit, bottomCircuit);
     const endCircuit = Math.max(topCircuit, bottomCircuit);
-    const startSlot = slots.get(startCircuit);
-    const endSlot = slots.get(endCircuit);
-    if (!startSlot || !endSlot) return;
+
+    const resolveAnchor = circuit => {
+      const slot = slots.get(circuit);
+      if (!slot) return null;
+      const anchor = slot.querySelector(".panel-device") || slot;
+      return { slot, anchor };
+    };
+
+    const startAnchor = resolveAnchor(startCircuit);
+    const endAnchor = resolveAnchor(endCircuit);
+    if (!startAnchor || !endAnchor) return;
 
     const update = () => {
       if (!tieElement.isConnected || !wrapper.isConnected) return;
       const wrapperRect = wrapper.getBoundingClientRect();
-      const startRect = startSlot.getBoundingClientRect();
-      const endRect = endSlot.getBoundingClientRect();
-      const startOffset = startRect.top + startRect.height / 2 - wrapperRect.top;
-      const endOffset = endRect.top + endRect.height / 2 - wrapperRect.top;
-      const topOffset = Math.min(startOffset, endOffset);
-      const bottomOffset = Math.max(startOffset, endOffset);
-      const anchorCenter = startRect.left + startRect.width / 2 - wrapperRect.left;
+      const startRect = startAnchor.anchor.getBoundingClientRect();
+      const endRect = endAnchor.anchor.getBoundingClientRect();
+      const startCenter = {
+        x: startRect.left + startRect.width / 2,
+        y: startRect.top + startRect.height / 2
+      };
+      const endCenter = {
+        x: endRect.left + endRect.width / 2,
+        y: endRect.top + endRect.height / 2
+      };
+      const anchorCenter = (startCenter.x + endCenter.x) / 2 - wrapperRect.left;
+      const topOffset = Math.min(startCenter.y, endCenter.y) - wrapperRect.top;
+      const bottomOffset = Math.max(startCenter.y, endCenter.y) - wrapperRect.top;
+      const tieLength = Math.max(0, bottomOffset - topOffset);
+      tieElement.style.setProperty("--panel-rail-offset", "0");
       tieElement.style.setProperty("--panel-device-tie-left", `${anchorCenter}px`);
       tieElement.style.setProperty("--panel-device-tie-offset", "0px");
       tieElement.style.setProperty("--panel-device-tie-start", `${topOffset}px`);
-      tieElement.style.setProperty("--panel-device-tie-length", `${Math.max(0, bottomOffset - topOffset)}px`);
+      tieElement.style.setProperty("--panel-device-tie-length", `${tieLength}px`);
       tieElement.style.top = `${topOffset}px`;
-      tieElement.style.height = `${Math.max(0, bottomOffset - topOffset)}px`;
+      tieElement.style.height = `${tieLength}px`;
       tieElement.style.left = `${anchorCenter}px`;
       tieElement.style.transform = "translateX(0)";
     };
@@ -1853,7 +1869,6 @@ function createDeviceCell(panel, oddCircuit, evenCircuit, circuitCount, breakerD
         const referencePhase = getPhaseLabel(panel, circuitList[0]);
         if (referencePhase) {
           tie.dataset.phase = referencePhase;
-          applyRailOffset(tie, referencePhase);
         }
         tie.setAttribute("aria-hidden", "true");
         wrapper.appendChild(tie);

@@ -5361,13 +5361,13 @@ body.dark-mode .panel-breaker-toolbox-item {
 }
 
 .panel-column--poles {
-    min-width: 4.5ch;
-    max-width: 5.5ch;
+    min-width: 4.25ch;
+    max-width: 4.75ch;
 }
 
 .panel-column--rating {
-    min-width: 7.5ch;
-    max-width: 9ch;
+    min-width: 7ch;
+    max-width: 7.5ch;
 }
 
 .panel-column--load {
@@ -5793,7 +5793,7 @@ body.dark-mode .panel-device-tie {
     opacity: 0.75;
     z-index: 1;
     pointer-events: none;
-    transform: translateX(calc(var(--panel-device-tie-offset, 0px) + (var(--panel-rail-offset, 0) * var(--panel-rail-step))));
+    transform: translateX(var(--panel-device-tie-offset, 0px));
 }
 
 body.dark-mode .panel-device-tie-vertical {
