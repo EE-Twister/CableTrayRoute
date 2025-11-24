@@ -5802,7 +5802,7 @@ body.dark-mode .panel-device-tie {
     top: var(--panel-device-tie-start);
     width: 0;
     height: var(--panel-device-tie-length);
-    border-left: 3px solid var(--primary-color);
+    border-left: 3px dotted var(--primary-color);
     opacity: 0.9;
     z-index: 4;
     pointer-events: none;

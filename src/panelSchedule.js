@@ -1326,13 +1326,14 @@ function createCircuitCell(panel, panelId, loads, breaker, circuitCount, positio
     if (!primaryStart) return null;
     const cableLabel = document.createElement("label");
     cableLabel.className = "panel-column-field";
-    cableLabel.textContent = "Cable";
+    cableLabel.textContent = "";
     const cableInput = document.createElement("input");
     cableInput.type = "text";
     cableInput.className = "panel-slot-input";
     cableInput.placeholder = "Cable Tag";
     cableInput.dataset.breakerCable = String(primaryStart);
     cableInput.setAttribute("list", "panel-breaker-cable-options");
+    cableInput.setAttribute("aria-label", "Cable Tag");
     cableInput.value = cableValue;
     cableLabel.appendChild(cableInput);
     const cableWrapper = document.createElement("div");
@@ -1385,13 +1386,14 @@ function createCircuitCell(panel, panelId, loads, breaker, circuitCount, positio
   } else if (isBlockStart) {
     const customLoad = document.createElement("label");
     customLoad.className = "panel-column-field";
-    customLoad.textContent = "Custom Load";
+    customLoad.textContent = "";
     const customLoadInput = document.createElement("input");
     customLoadInput.type = "text";
     customLoadInput.className = "panel-slot-input";
     customLoadInput.placeholder = "Describe load";
     customLoadInput.dataset.breakerCustomLoad = String(primaryStart);
     customLoadInput.setAttribute("list", "panel-load-label-options");
+    customLoadInput.setAttribute("aria-label", "Load served");
     customLoadInput.value = customLoadLabel;
     customLoad.appendChild(customLoadInput);
     const customLoadWrapper = document.createElement("div");
@@ -1861,23 +1863,26 @@ function createDeviceCell(panel, oddCircuit, evenCircuit, circuitCount, breakerD
       const { info, circuits: circuitList } = entry;
       circuitList.forEach(circuit => ensureIconForCircuit(info, circuit));
       if (info.size > 1 && circuitList.length) {
-        const column = circuitList[0] % 2 === 0 ? 3 : 1;
+        const blockSpan = Array.isArray(info.span) && info.span.length ? info.span : circuitList;
+        const topCircuit = Math.min(...blockSpan);
+        const bottomCircuit = Math.max(...blockSpan);
+        const column = topCircuit % 2 === 0 ? 3 : 1;
         const tie = document.createElement("div");
         tie.className = "panel-device-tie-vertical";
         tie.style.gridColumn = String(column);
-        const referenceCircuit = circuitList[0];
-        const rowIndex = Math.floor((referenceCircuit - 1) / 2);
-        const startRow = Math.max(1, rowIndex - baseRowIndex + 1);
-        const endRow = Math.max(startRow + 1, Math.min(rowCount + 1, startRow + 1));
+        const startRowIndex = Math.floor((topCircuit - 1) / 2);
+        const endRowIndex = Math.floor((bottomCircuit - 1) / 2);
+        const startRow = Math.max(1, startRowIndex - baseRowIndex + 1);
+        const endRow = Math.min(rowCount + 1, endRowIndex - baseRowIndex + 2);
         tie.style.gridRow = `${startRow} / ${endRow}`;
-        const referencePhase = getPhaseLabel(panel, circuitList[0]);
+        const referenceCircuit = info.isStart ? topCircuit : bottomCircuit;
+        const referencePhase = getPhaseLabel(panel, referenceCircuit);
         if (referencePhase) {
           tie.dataset.phase = referencePhase;
         }
         tie.setAttribute("aria-hidden", "true");
         wrapper.appendChild(tie);
-        const direction = info.isStart ? "down" : "up";
-        scheduleTiePosition(tie, referenceCircuit, referenceCircuit, { direction, referenceCircuit });
+        scheduleTiePosition(tie, topCircuit, bottomCircuit, { referenceCircuit });
       }
     });
   }
