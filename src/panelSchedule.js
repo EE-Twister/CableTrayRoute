@@ -1463,7 +1463,7 @@ function createCircuitCell(panel, panelId, loads, breaker, circuitCount, positio
     }
   }
 
-  if (block && !columnContent.cable) {
+  if (block && isBlockStart && !columnContent.cable) {
     const cableField = createCableField();
     if (cableField) {
       columnContent.cable = cableField;
@@ -1727,10 +1727,10 @@ function createDeviceCell(panel, oddCircuit, evenCircuit, circuitCount, breakerD
     blockSlots.set(info.start, entry);
   });
 
-  const scheduleTiePosition = (tieElement, topCircuit, bottomCircuit) => {
+  const scheduleTiePosition = (tieElement, topCircuit, bottomCircuit, options = {}) => {
     if (!tieElement) return;
-    const startCircuit = Math.min(topCircuit, bottomCircuit);
-    const endCircuit = Math.max(topCircuit, bottomCircuit);
+    const direction = options.direction === "up" || options.direction === "down" ? options.direction : "full";
+    const referenceCircuit = Number.isFinite(options.referenceCircuit) ? options.referenceCircuit : topCircuit;
 
     const resolveAnchor = circuit => {
       const slot = slots.get(circuit);
@@ -1742,69 +1742,88 @@ function createDeviceCell(panel, oddCircuit, evenCircuit, circuitCount, breakerD
       return { slot, anchor };
     };
 
-    const startAnchor = resolveAnchor(startCircuit);
-    const endAnchor = resolveAnchor(endCircuit);
-    if (!startAnchor || !endAnchor) return;
+    const startAnchor = resolveAnchor(topCircuit);
+    const endAnchor = resolveAnchor(bottomCircuit);
+    const referenceAnchor = resolveAnchor(referenceCircuit);
+    if (!referenceAnchor || (!startAnchor && direction === "full") || (!endAnchor && direction === "full")) return;
 
     const update = () => {
       if (!tieElement.isConnected || !wrapper.isConnected) return;
       const wrapperRect = wrapper.getBoundingClientRect();
-      const startRect = startAnchor.anchor.getBoundingClientRect();
-      const endRect = endAnchor.anchor.getBoundingClientRect();
-      const startCenter = {
-        x: startRect.left + startRect.width / 2,
-        y: startRect.top + startRect.height / 2
+      const targetAnchor = direction === "full" ? startAnchor : referenceAnchor;
+      const targetRect = targetAnchor.anchor.getBoundingClientRect();
+      const anchorCenter = {
+        x: targetRect.left + targetRect.width / 2,
+        y: targetRect.top + targetRect.height / 2
       };
-      const endCenter = {
-        x: endRect.left + endRect.width / 2,
-        y: endRect.top + endRect.height / 2
-      };
-      const anchorCenter = (startCenter.x + endCenter.x) / 2 - wrapperRect.left;
-      const topOffset = Math.min(startCenter.y, endCenter.y) - wrapperRect.top;
-      const bottomOffset = Math.max(startCenter.y, endCenter.y) - wrapperRect.top;
+
+      let topOffset;
+      let bottomOffset;
+
+      if (direction === "full" && startAnchor && endAnchor) {
+        const endRect = endAnchor.anchor.getBoundingClientRect();
+        const endCenter = {
+          x: endRect.left + endRect.width / 2,
+          y: endRect.top + endRect.height / 2
+        };
+        const offsetStart = anchorCenter.y - wrapperRect.top;
+        const offsetEnd = endCenter.y - wrapperRect.top;
+        topOffset = Math.min(offsetStart, offsetEnd);
+        bottomOffset = Math.max(offsetStart, offsetEnd);
+      } else {
+        const slotRect = referenceAnchor.slot.getBoundingClientRect();
+        const anchorOffset = anchorCenter.y - wrapperRect.top;
+        if (direction === "down") {
+          topOffset = anchorOffset;
+          bottomOffset = slotRect.bottom - wrapperRect.top;
+        } else {
+          topOffset = slotRect.top - wrapperRect.top;
+          bottomOffset = anchorOffset;
+        }
+      }
+
+      const disconnectObserver = new MutationObserver(mutations => {
+        mutations.forEach(mutation => {
+          if (!mutation.removedNodes || mutation.removedNodes.length === 0) return;
+          mutation.removedNodes.forEach(node => {
+            if (!node.contains || !node.contains(tieElement)) return;
+            disconnectObserver.disconnect();
+          });
+        });
+      });
+
       const tieLength = Math.max(0, bottomOffset - topOffset);
       tieElement.style.setProperty("--panel-rail-offset", "0");
-      tieElement.style.setProperty("--panel-device-tie-left", `${anchorCenter}px`);
+      tieElement.style.setProperty("--panel-device-tie-left", `${anchorCenter.x - wrapperRect.left}px`);
       tieElement.style.setProperty("--panel-device-tie-offset", "0px");
       tieElement.style.setProperty("--panel-device-tie-start", `${topOffset}px`);
       tieElement.style.setProperty("--panel-device-tie-length", `${tieLength}px`);
       tieElement.style.top = `${topOffset}px`;
       tieElement.style.height = `${tieLength}px`;
-      tieElement.style.left = `${anchorCenter}px`;
-    };
-
-    const scheduleUpdate = () => {
-      if (!tieElement.isConnected) return;
+      tieElement.style.left = `${anchorCenter.x - wrapperRect.left}px`;
+      disconnectObserver.observe(wrapper, { childList: true, subtree: true });
       requestAnimationFrame(update);
     };
 
-    const cleanup = () => {
-      resizeObserver.disconnect();
-      window.removeEventListener("resize", scheduleUpdate);
-    };
-
-    const resizeObserver = new ResizeObserver(entries => {
-      if (!tieElement.isConnected) {
-        cleanup();
-        return;
-      }
-      if (!entries?.length) return;
-      scheduleUpdate();
+    const observer = new ResizeObserver(entries => {
+      entries.forEach(entry => {
+        if (!tieElement.isConnected || !wrapper.isConnected) return;
+        const { target } = entry;
+        if (!wrapper.contains(target)) return;
+        update();
+      });
+    });
+    const observerTargets = direction === "full" ? [wrapper, startAnchor?.slot, endAnchor?.slot] : [wrapper, referenceAnchor.slot];
+    observerTargets.filter(Boolean).forEach(element => {
+      observer.observe(element);
     });
 
-    [wrapper, startAnchor.anchor, endAnchor.anchor].forEach(element => {
-      if (element && element.isConnected) {
-        resizeObserver.observe(element);
-      }
-    });
-
-    window.addEventListener("resize", scheduleUpdate, { passive: true });
-
-    const disconnectObserver = new MutationObserver(() => {
-      if (!tieElement.isConnected) {
-        cleanup();
-        disconnectObserver.disconnect();
-      }
+    const disconnectObserver = new MutationObserver(mutations => {
+      mutations.forEach(mutation => {
+        if (Array.from(mutation.removedNodes || []).includes(wrapper)) {
+          observer.disconnect();
+        }
+      });
     });
 
     disconnectObserver.observe(wrapper, { childList: true, subtree: true });
@@ -1842,17 +1861,14 @@ function createDeviceCell(panel, oddCircuit, evenCircuit, circuitCount, breakerD
       const { info, circuits: circuitList } = entry;
       circuitList.forEach(circuit => ensureIconForCircuit(info, circuit));
       if (info.size > 1 && circuitList.length) {
-        const blockRows = Array.isArray(info.span)
-          ? info.span.map(circuit => Math.floor((circuit - 1) / 2))
-          : circuitList.map(circuit => Math.floor((circuit - 1) / 2));
-        const minRow = blockRows.length ? Math.min(...blockRows) : baseRowIndex;
-        const maxRow = blockRows.length ? Math.max(...blockRows) : baseRowIndex;
         const column = circuitList[0] % 2 === 0 ? 3 : 1;
         const tie = document.createElement("div");
         tie.className = "panel-device-tie-vertical";
         tie.style.gridColumn = String(column);
-        const startRow = Math.max(1, minRow - baseRowIndex + 1);
-        const endRow = Math.max(startRow + 1, Math.min(rowCount + 1, maxRow - baseRowIndex + 2));
+        const referenceCircuit = circuitList[0];
+        const rowIndex = Math.floor((referenceCircuit - 1) / 2);
+        const startRow = Math.max(1, rowIndex - baseRowIndex + 1);
+        const endRow = Math.max(startRow + 1, Math.min(rowCount + 1, startRow + 1));
         tie.style.gridRow = `${startRow} / ${endRow}`;
         const referencePhase = getPhaseLabel(panel, circuitList[0]);
         if (referencePhase) {
@@ -1860,9 +1876,8 @@ function createDeviceCell(panel, oddCircuit, evenCircuit, circuitCount, breakerD
         }
         tie.setAttribute("aria-hidden", "true");
         wrapper.appendChild(tie);
-        const topCircuit = Math.min(...circuitList);
-        const bottomCircuit = Math.max(...circuitList);
-        scheduleTiePosition(tie, topCircuit, bottomCircuit);
+        const direction = info.isStart ? "down" : "up";
+        scheduleTiePosition(tie, referenceCircuit, referenceCircuit, { direction, referenceCircuit });
       }
     });
   }
