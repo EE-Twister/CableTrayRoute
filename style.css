@@ -5170,9 +5170,11 @@ body.dark-mode .workflow-card-title {
 
 #panel-info {
     display: grid;
-    grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
-    gap: 0.75rem;
+    grid-template-columns: repeat(auto-fit, minmax(140px, max-content));
+    gap: 0.5rem;
     align-items: end;
+    justify-content: start;
+    justify-items: start;
 }
 
 #panel-info label {
@@ -5181,16 +5183,30 @@ body.dark-mode .workflow-card-title {
     font-size: 0.9rem;
     font-weight: 600;
     gap: 0.25rem;
+    width: max-content;
+    max-width: 320px;
 }
 
 #panel-info input,
 #panel-info select {
     width: 100%;
+    max-width: 260px;
     padding: 0.5rem;
     border: 1px solid var(--border-color);
     border-radius: 4px;
     background: var(--secondary-color);
     color: var(--text-color);
+}
+
+#panel-info .panel-info-compact {
+    width: fit-content;
+}
+
+#panel-info .panel-info-compact input,
+#panel-info .panel-info-compact select {
+    width: auto;
+    min-width: 0;
+    align-self: flex-start;
 }
 
 #panel-container {
@@ -5426,8 +5442,14 @@ body.dark-mode .panel-breaker-toolbox-item {
     text-align: center;
 }
 
+.panel-schedule-table col[data-column-key="device"],
+.panel-device-header,
 .panel-device-cell {
-    width: 10%;
+    width: clamp(14rem, 18vw, 18rem);
+    min-width: 14rem;
+}
+
+.panel-device-cell {
     padding: 0;
     vertical-align: top;
     position: relative;
