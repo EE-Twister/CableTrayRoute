@@ -5703,6 +5703,8 @@ body.dark-mode .panel-device {
     justify-content: center;
     align-items: center;
     min-height: 1.25rem;
+    --panel-connector-bottom: 0.9rem;
+    --panel-connector-top: 0.9rem;
 }
 
 .panel-device-symbol {
@@ -5837,13 +5839,13 @@ body.dark-mode .panel-device-tie {
 
 .panel-device[data-connector-role="start"] .panel-device-graphic::after {
     top: 100%;
-    height: 0.9rem;
+    height: var(--panel-connector-bottom, 0.9rem);
     border-left: 2px dotted var(--primary-color);
 }
 
 .panel-device[data-connector-role="continue"] .panel-device-graphic::before {
     bottom: 100%;
-    height: 0.9rem;
+    height: var(--panel-connector-top, 0.9rem);
     border-left: 2px dashed var(--primary-color);
 }
 

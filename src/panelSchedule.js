@@ -1729,6 +1729,27 @@ function createDeviceCell(panel, oddCircuit, evenCircuit, circuitCount, breakerD
     blockSlots.set(info.start, entry);
   });
 
+  function applyConnectorLength(icon, slot) {
+    if (!icon || !slot) return;
+    if (!icon.dataset.connectorRole) return;
+    const graphic = icon.querySelector(".panel-device-graphic");
+    if (!graphic) return;
+    const measure = () => {
+      const slotRect = slot.getBoundingClientRect();
+      const graphicRect = graphic.getBoundingClientRect();
+      if (!slotRect || !graphicRect) return;
+      const toBottom = Math.max(0, slotRect.bottom - graphicRect.bottom);
+      const toTop = Math.max(0, graphicRect.top - slotRect.top);
+      graphic.style.setProperty("--panel-connector-bottom", `${toBottom}px`);
+      graphic.style.setProperty("--panel-connector-top", `${toTop}px`);
+    };
+    if (typeof requestAnimationFrame === "function") {
+      requestAnimationFrame(measure);
+    } else {
+      measure();
+    }
+  }
+
   const ensureIconForCircuit = (info, circuit, connectorRole = null) => {
     const slot = slots.get(circuit);
     if (!slot) return;
@@ -1747,6 +1768,7 @@ function createDeviceCell(panel, oddCircuit, evenCircuit, circuitCount, breakerD
     );
     if (icon) {
       slot.appendChild(icon);
+      applyConnectorLength(icon, slot);
     }
   };
 
