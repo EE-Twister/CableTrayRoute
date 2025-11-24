@@ -1729,6 +1729,9 @@ function createDeviceCell(panel, oddCircuit, evenCircuit, circuitCount, breakerD
     blockSlots.set(info.start, entry);
   });
 
+  const connectorObservers = new WeakMap();
+  const connectorFallbacks = new WeakMap();
+
   function applyConnectorLength(icon, slot) {
     if (!icon || !slot) return;
     if (!icon.dataset.connectorRole) return;
@@ -1737,16 +1740,33 @@ function createDeviceCell(panel, oddCircuit, evenCircuit, circuitCount, breakerD
     const measure = () => {
       const slotRect = slot.getBoundingClientRect();
       const graphicRect = graphic.getBoundingClientRect();
-      if (!slotRect || !graphicRect) return;
       const toBottom = Math.max(0, slotRect.bottom - graphicRect.bottom);
       const toTop = Math.max(0, graphicRect.top - slotRect.top);
       graphic.style.setProperty("--panel-connector-bottom", `${toBottom}px`);
       graphic.style.setProperty("--panel-connector-top", `${toTop}px`);
     };
-    if (typeof requestAnimationFrame === "function") {
-      requestAnimationFrame(measure);
-    } else {
-      measure();
+    const scheduleMeasure = () => {
+      if (typeof requestAnimationFrame === "function") {
+        requestAnimationFrame(() => requestAnimationFrame(measure));
+      } else {
+        measure();
+      }
+    };
+    scheduleMeasure();
+    if (typeof ResizeObserver === "function") {
+      const existingObserver = connectorObservers.get(slot);
+      if (existingObserver) {
+        existingObserver.observe(graphic);
+      } else {
+        const observer = new ResizeObserver(scheduleMeasure);
+        observer.observe(slot);
+        observer.observe(graphic);
+        connectorObservers.set(slot, observer);
+      }
+    } else if (typeof window !== "undefined" && !connectorFallbacks.has(slot)) {
+      const handler = () => scheduleMeasure();
+      window.addEventListener("resize", handler, { passive: true });
+      connectorFallbacks.set(slot, handler);
     }
   }
 
