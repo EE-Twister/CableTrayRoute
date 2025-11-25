@@ -779,12 +779,53 @@ function getPhasePowerValue(load, system) {
   return null;
 }
 
+function getPhaseLoadKey(phaseLabel, block) {
+  const normalizedPhase = phaseLabel != null ? String(phaseLabel).trim() : "";
+  if (normalizedPhase) return normalizedPhase;
+  const position = block && Number.isFinite(Number(block.position)) ? Number(block.position) : null;
+  if (position != null) return `pole-${position + 1}`;
+  return null;
+}
+
+function getDetailPhaseLoad(detail, phaseKey) {
+  if (!detail || detail.loadVaPerPhase == null) return null;
+  const source = detail.loadVaPerPhase;
+  const collection = source && typeof source === "object" && !Array.isArray(source)
+    ? source
+    : { default: source };
+  const keys = phaseKey ? [phaseKey, "default"] : ["default"];
+  for (const key of keys) {
+    if (!(key in collection)) continue;
+    const value = collection[key];
+    const parsed = parseFloat(value);
+    if (Number.isFinite(parsed)) return parsed;
+    if (value === 0 || value === "0") return 0;
+  }
+  return null;
+}
+
+function getCustomPhaseLoadsForSpan(panel, detail, spanCircuits) {
+  const totals = new Map();
+  if (!panel || !detail || detail.loadVaPerPhase == null || !Array.isArray(spanCircuits)) return totals;
+  spanCircuits.forEach(circuit => {
+    const block = getBreakerBlock(panel, circuit);
+    const phaseLabel = getPhaseLabel(panel, circuit);
+    const phaseKey = getPhaseLoadKey(phaseLabel, block);
+    const load = getDetailPhaseLoad(detail, phaseKey);
+    if (load == null) return;
+    const label = phaseLabel || phaseKey || `Circuit ${circuit}`;
+    totals.set(label, (totals.get(label) || 0) + load);
+  });
+  return totals;
+}
+
 function createPhaseSummary(panel, panelId, loads, circuitCount) {
   const sequence = getPanelPhaseSequence(panel);
   if (!sequence.length) return null;
   const phases = Array.from(new Set(sequence)).filter(Boolean);
   if (!phases.length) return null;
   const system = getPanelSystem(panel);
+  const breakerDetails = ensureBreakerDetails(panel);
   const totals = {};
   phases.forEach(phase => {
     totals[phase] = 0;
@@ -792,6 +833,30 @@ function createPhaseSummary(panel, panelId, loads, circuitCount) {
 
   const seenLoads = new Set();
   const totalBreakers = Number.isFinite(circuitCount) && circuitCount > 0 ? circuitCount : panel.breakers?.length || 0;
+  const customPhaseStarts = new Set();
+
+  Object.entries(breakerDetails).forEach(([key, detail]) => {
+    if (!detail || detail.loadVaPerPhase == null) return;
+    const parsed = Number.parseInt(key, 10);
+    if (Number.isFinite(parsed)) {
+      customPhaseStarts.add(parsed);
+    }
+  });
+
+  for (let circuit = 1; circuit <= totalBreakers; circuit++) {
+    const block = getBreakerBlock(panel, circuit);
+    const start = block && Number.isFinite(Number(block.start)) ? Number(block.start) : circuit;
+    const detail = getBreakerDetail(panel, start);
+    if (!detail || detail.loadVaPerPhase == null) continue;
+    const phase = getPhaseLabel(panel, circuit);
+    if (!phase) continue;
+    const phaseKey = getPhaseLoadKey(phase, block);
+    const load = getDetailPhaseLoad(detail, phaseKey);
+    if (load == null) continue;
+    if (!(phase in totals)) totals[phase] = 0;
+    totals[phase] += load;
+  }
+
   loads.forEach(load => {
     if (load.panelId !== panelId) return;
     const id = getLoadDisplayId(load) || `idx-${loads.indexOf(load)}`;
@@ -799,6 +864,8 @@ function createPhaseSummary(panel, panelId, loads, circuitCount) {
     seenLoads.add(id);
     const span = getLoadBreakerSpan(load, panel, totalBreakers);
     if (!span.length) return;
+    const startCircuit = span[0];
+    if (customPhaseStarts.has(startCircuit)) return;
     const value = getPhasePowerValue(load, system);
     if (value == null) return;
     const share = span.length > 0 ? value / span.length : value;
@@ -1217,10 +1284,12 @@ function createCircuitCell(panel, panelId, loads, breaker, circuitCount, positio
   const breakerDetail = Number.isFinite(blockStart) ? (detailMap[String(blockStart)] || null) : null;
   const ratingValue = breakerDetail && breakerDetail.rating != null ? String(breakerDetail.rating) : "";
   const cableValue = breakerDetail?.cableTag || breakerDetail?.cable || breakerDetail?.cableId || "";
-  const loadPerPhaseValue = breakerDetail?.loadVaPerPhase;
   const customLoadLabel = typeof breakerDetail?.customLoad === "string" ? breakerDetail.customLoad.trim() : "";
   const cableTag = cableValue;
   const deviceType = getPanelBranchDeviceType(panel);
+  const phaseLabel = getPhaseLabel(panel, breaker);
+  const phaseKey = getPhaseLoadKey(phaseLabel, block);
+  const loadPerPhaseValue = getDetailPhaseLoad(breakerDetail, phaseKey);
   slot.dataset.circuit = String(breaker);
   if (!block) {
     slot.dataset.breakerDrop = "available";
@@ -1243,7 +1312,6 @@ function createCircuitCell(panel, panelId, loads, breaker, circuitCount, positio
       delete slot.dataset.deviceRating;
     }
   }
-  const phaseLabel = getPhaseLabel(panel, breaker);
   if (phaseLabel) slot.dataset.phase = phaseLabel;
 
   const header = document.createElement("div");
@@ -1455,7 +1523,8 @@ function createCircuitCell(panel, panelId, loads, breaker, circuitCount, positio
     loadPerPhaseInput.step = "any";
     loadPerPhaseInput.min = "0";
     loadPerPhaseInput.dataset.breakerPhaseLoad = String(primaryStart);
-    if (loadPerPhaseValue != null && loadPerPhaseValue !== "") {
+    if (phaseKey) loadPerPhaseInput.dataset.phase = phaseKey;
+    if (loadPerPhaseValue != null) {
       loadPerPhaseInput.value = String(loadPerPhaseValue);
     }
     loadPerPhase.appendChild(loadPerPhaseInput);
@@ -1492,6 +1561,27 @@ function createCircuitCell(panel, panelId, loads, breaker, circuitCount, positio
       locked.textContent = `Reserved for breaker starting at Circuit ${startCircuit}`;
     }
     control.appendChild(locked);
+
+    const loadPerPhase = document.createElement("label");
+    loadPerPhase.className = "panel-column-field";
+    loadPerPhase.textContent = "";
+    const loadPerPhaseInput = document.createElement("input");
+    loadPerPhaseInput.type = "number";
+    loadPerPhaseInput.className = "panel-slot-input";
+    loadPerPhaseInput.placeholder = "Load (VA) per Phase";
+    loadPerPhaseInput.inputMode = "numeric";
+    loadPerPhaseInput.step = "any";
+    loadPerPhaseInput.min = "0";
+    loadPerPhaseInput.dataset.breakerPhaseLoad = String(primaryStart);
+    if (phaseKey) loadPerPhaseInput.dataset.phase = phaseKey;
+    if (loadPerPhaseValue != null) {
+      loadPerPhaseInput.value = String(loadPerPhaseValue);
+    }
+    loadPerPhase.appendChild(loadPerPhaseInput);
+    const phaseWrapper = document.createElement("div");
+    phaseWrapper.className = "panel-column-content";
+    phaseWrapper.appendChild(loadPerPhase);
+    control.appendChild(phaseWrapper);
   }
   if (control.childElementCount) {
     slot.appendChild(control);
@@ -1566,10 +1656,23 @@ function createCircuitCell(panel, panelId, loads, breaker, circuitCount, positio
       details.appendChild(meta);
     }
 
-    const totalPower = getPhasePowerValue(assignedLoad, system);
-    if (totalPower != null) {
-      const spanCircuits = assignedSpan.length ? assignedSpan : (blockCircuits.length ? blockCircuits : [breaker]);
-      if (spanCircuits.length) {
+    const spanCircuits = assignedSpan.length ? assignedSpan : (blockCircuits.length ? blockCircuits : [breaker]);
+    const customPhaseLoads = getCustomPhaseLoadsForSpan(panel, breakerDetail, spanCircuits);
+    if (customPhaseLoads.size) {
+      const contribution = document.createElement("div");
+      contribution.className = "panel-slot-phase-load";
+      const formatter = new Intl.NumberFormat(undefined, { maximumFractionDigits: 0 });
+      const unit = system === "dc" ? "W" : "VA";
+      customPhaseLoads.forEach((amount, phase) => {
+        const chip = document.createElement("span");
+        chip.className = "panel-slot-phase-chip";
+        chip.textContent = `${phase}: ${formatter.format(amount)} ${unit}`;
+        contribution.appendChild(chip);
+      });
+      details.appendChild(contribution);
+    } else {
+      const totalPower = getPhasePowerValue(assignedLoad, system);
+      if (totalPower != null && spanCircuits.length) {
         const phaseTotals = new Map();
         const share = spanCircuits.length ? totalPower / spanCircuits.length : totalPower;
         spanCircuits.forEach(slotNumber => {
@@ -2043,13 +2146,13 @@ function createBranchDeviceIcon(detail, poleCount, startCircuit, system, phaseLa
 
   const createFuseSymbol = fusePoles => {
     const svgNS = "http://www.w3.org/2000/svg";
-    const poleSpan = 14;
-    const poleGap = 18;
+    const poleSpan = 18;
+    const poleGap = 24;
     const width = (fusePoles - 1) * poleGap + poleSpan;
-    const height = 26;
+    const height = 28;
     const midY = height / 2;
-    const bodyWidth = Math.min(width - 6, Math.max(14, width * 0.6));
-    const bodyHeight = Math.max(8, height * 0.45);
+    const bodyWidth = Math.min(width - 6, Math.max(18, width * 0.72));
+    const bodyHeight = Math.max(10, height * 0.5);
     const bodyX = (width - bodyWidth) / 2;
     const bodyY = midY - bodyHeight / 2;
     const svg = document.createElementNS(svgNS, "svg");
@@ -2813,11 +2916,28 @@ window.addEventListener("DOMContentLoaded", () => {
         const start = Number.parseInt(e.target.dataset.breakerPhaseLoad, 10);
         if (Number.isFinite(start)) {
           const detail = ensureBreakerDetail(panel, start);
+          const phaseKey = e.target.dataset.phase;
           const value = e.target.value.trim();
-          if (value) {
-            detail.loadVaPerPhase = value;
+          if (phaseKey) {
+            const current = detail.loadVaPerPhase;
+            const collection = current && typeof current === "object" && !Array.isArray(current) ? { ...current } : {};
+            if (value || value === "0") {
+              collection[phaseKey] = value;
+            } else {
+              delete collection[phaseKey];
+            }
+            const cleaned = Object.entries(collection).filter(([, v]) => v != null && v !== "");
+            if (cleaned.length) {
+              detail.loadVaPerPhase = Object.fromEntries(cleaned);
+            } else {
+              delete detail.loadVaPerPhase;
+            }
           } else {
-            delete detail.loadVaPerPhase;
+            if (value || value === "0") {
+              detail.loadVaPerPhase = value;
+            } else {
+              delete detail.loadVaPerPhase;
+            }
           }
           savePanels();
           updateOneline();
