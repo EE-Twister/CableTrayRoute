@@ -5598,15 +5598,6 @@ body.dark-mode .panel-breaker-toolbox-item {
     transform: translateX(-50%);
 }
 
-.panel-tie-overlay-cap {
-    position: absolute;
-    width: 0.55rem;
-    height: 0.55rem;
-    background: rgba(0, 0, 0, 0.65);
-    border-radius: 50%;
-    transform: translate(-50%, -50%);
-}
-
 .panel-device-slot-marker::after {
     content: "";
     position: absolute;
@@ -5756,16 +5747,11 @@ body.dark-mode .panel-device {
     height: 100%;
 }
 
-.panel-device-breaker-arch,
-.panel-device-breaker-stem {
+.panel-device-breaker-arch {
     stroke: currentColor;
     stroke-width: 2.2;
     fill: none;
     stroke-linecap: round;
-}
-
-.panel-device-breaker-stem {
-    stroke-width: 2.4;
 }
 
 .panel-device-pole {
