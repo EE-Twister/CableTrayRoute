@@ -5412,6 +5412,16 @@ body.dark-mode .panel-breaker-toolbox-item {
     width: 20%;
 }
 
+.panel-column--load .panel-column-content {
+    width: 100%;
+    align-items: stretch;
+    gap: 0.175rem;
+}
+
+.panel-column--load .panel-column-field {
+    width: 100%;
+}
+
 .panel-column--cable .panel-column-content,
 .panel-column--rating .panel-column-content,
 .panel-column--poles .panel-column-content {
@@ -5702,7 +5712,7 @@ body.dark-mode .panel-breaker-toolbox-item {
     background: transparent;
     color: var(--text-color);
     min-width: 0;
-    max-width: 6rem;
+    max-width: 12rem;
     box-shadow: none;
     height: auto;
     z-index: 2;
@@ -5748,8 +5758,8 @@ body.dark-mode .panel-device {
 }
 
 .panel-device-symbol--fuse {
-    width: 5.5rem;
-    height: 2.4rem;
+    width: 11rem;
+    height: 4.8rem;
 }
 
 .panel-device-fuse-line {
@@ -6004,14 +6014,14 @@ body.dark-mode .panel-slot-add-btn {
     position: absolute;
     top: 0.35rem;
     right: 0.35rem;
-    width: 1.75rem;
-    height: 1.75rem;
+    width: 1.25rem;
+    height: 1.25rem;
     padding: 0;
     border-radius: 6px;
     border: none;
     background: #c62828;
     color: #fff;
-    font-size: 1rem;
+    font-size: 0.75rem;
     font-weight: 700;
     cursor: pointer;
     display: inline-flex;
