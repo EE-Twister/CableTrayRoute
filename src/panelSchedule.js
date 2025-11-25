@@ -1737,11 +1737,18 @@ function createDeviceCell(panel, oddCircuit, evenCircuit, circuitCount, breakerD
     if (!icon.dataset.connectorRole) return;
     const graphic = icon.querySelector(".panel-device-graphic");
     if (!graphic) return;
+    const connectorIndex = Number.parseInt(icon.dataset.connectorIndex, 10);
+    const connectorCount = Number.parseInt(icon.dataset.connectorCount, 10);
+    const hasConnectorIndex = Number.isFinite(connectorIndex) && Number.isFinite(connectorCount) && connectorCount > 0;
+    const wrapper = slot.closest(".panel-device-wrapper") || slot.parentElement || slot;
+    const extendTop = hasConnectorIndex ? connectorIndex > 0 : icon.dataset.connectorRole === "continue";
+    const extendBottom = hasConnectorIndex ? connectorIndex < connectorCount - 1 : icon.dataset.connectorRole === "start";
     const measure = () => {
       const slotRect = slot.getBoundingClientRect();
+      const wrapperRect = wrapper?.getBoundingClientRect?.() || slotRect;
       const graphicRect = graphic.getBoundingClientRect();
-      const toBottom = Math.max(0, slotRect.bottom - graphicRect.bottom);
-      const toTop = Math.max(0, graphicRect.top - slotRect.top);
+      const toBottom = extendBottom ? Math.max(0, wrapperRect.bottom - graphicRect.bottom) : 0;
+      const toTop = extendTop ? Math.max(0, graphicRect.top - wrapperRect.top) : 0;
       graphic.style.setProperty("--panel-connector-bottom", `${toBottom}px`);
       graphic.style.setProperty("--panel-connector-top", `${toTop}px`);
     };
@@ -1757,10 +1764,12 @@ function createDeviceCell(panel, oddCircuit, evenCircuit, circuitCount, breakerD
       const existingObserver = connectorObservers.get(slot);
       if (existingObserver) {
         existingObserver.observe(graphic);
+        if (wrapper && wrapper !== slot) existingObserver.observe(wrapper);
       } else {
         const observer = new ResizeObserver(scheduleMeasure);
         observer.observe(slot);
         observer.observe(graphic);
+        if (wrapper && wrapper !== slot) observer.observe(wrapper);
         connectorObservers.set(slot, observer);
       }
     } else if (typeof window !== "undefined" && !connectorFallbacks.has(slot)) {
@@ -1769,8 +1778,7 @@ function createDeviceCell(panel, oddCircuit, evenCircuit, circuitCount, breakerD
       connectorFallbacks.set(slot, handler);
     }
   }
-
-  const ensureIconForCircuit = (info, circuit, connectorRole = null) => {
+  const ensureIconForCircuit = (info, circuit, connectorRole = null, connectorIndex = null, connectorCount = null) => {
     const slot = slots.get(circuit);
     if (!slot) return;
     const phase = getPhaseLabel(panel, circuit);
@@ -1783,7 +1791,9 @@ function createDeviceCell(panel, oddCircuit, evenCircuit, circuitCount, breakerD
       {
         placement: circuit % 2 === 0 ? "even" : "odd",
         labelPoles: info?.size,
-        connectorRole: connectorRole && info?.size > 1 ? connectorRole : null
+        connectorRole: connectorRole && info?.size > 1 ? connectorRole : null,
+        connectorIndex: connectorIndex,
+        connectorCount: connectorCount
       }
     );
     if (icon) {
@@ -1807,7 +1817,7 @@ function createDeviceCell(panel, oddCircuit, evenCircuit, circuitCount, breakerD
       const orderedCircuits = [...circuitList].sort((a, b) => a - b);
       orderedCircuits.forEach((circuit, index) => {
         const connectorRole = info.size > 1 ? (index === 0 ? "start" : "continue") : null;
-        ensureIconForCircuit(info, circuit, connectorRole);
+        ensureIconForCircuit(info, circuit, connectorRole, index, orderedCircuits.length);
       });
     });
   }
@@ -1851,15 +1861,82 @@ function createBranchDeviceIcon(detail, poleCount, startCircuit, system, phaseLa
   if (options.connectorRole) {
     icon.dataset.connectorRole = options.connectorRole;
   }
-  for (let i = 0; i < poles; i++) {
-    const pole = document.createElement("span");
-    pole.className = "panel-device-pole";
-    symbol.appendChild(pole);
+  if (Number.isFinite(options.connectorIndex)) {
+    icon.dataset.connectorIndex = String(options.connectorIndex);
   }
-  if (poles > 1) {
-    const tie = document.createElement("span");
-    tie.className = "panel-device-tie";
-    symbol.appendChild(tie);
+  if (Number.isFinite(options.connectorCount)) {
+    icon.dataset.connectorCount = String(options.connectorCount);
+  }
+  symbol.style.setProperty("--panel-device-pole-count", String(poles));
+  const createBreakerSymbol = () => {
+    const svgNS = "http://www.w3.org/2000/svg";
+    const poleSpan = 14;
+    const poleGap = 18;
+    const baseY = 11;
+    const rise = 8;
+    const stem = 7;
+    const width = (poles - 1) * poleGap + poleSpan;
+    const height = baseY + stem + 3;
+    const svg = document.createElementNS(svgNS, "svg");
+    svg.setAttribute("class", "panel-device-symbol-graphic panel-device-symbol--breaker");
+    svg.setAttribute("viewBox", `0 0 ${width} ${height}`);
+    svg.setAttribute("preserveAspectRatio", "xMidYMid meet");
+    svg.dataset.poles = String(poles);
+    svg.style.setProperty("--panel-device-pole-count", String(poles));
+
+    const archGroup = document.createElementNS(svgNS, "g");
+    archGroup.setAttribute("class", "panel-device-breaker-arches");
+    const tieGroup = document.createElementNS(svgNS, "g");
+    tieGroup.setAttribute("class", "panel-device-breaker-ties");
+
+    for (let i = 0; i < poles; i++) {
+      const cx = (poleSpan / 2) + i * poleGap;
+      const leftX = cx - poleSpan / 2;
+      const rightX = cx + poleSpan / 2;
+      const arch = document.createElementNS(svgNS, "path");
+      arch.setAttribute("class", "panel-device-breaker-arch");
+      arch.setAttribute("d", `M ${leftX} ${baseY} Q ${cx} ${baseY - rise} ${rightX} ${baseY}`);
+      archGroup.appendChild(arch);
+
+      const stemLine = document.createElementNS(svgNS, "line");
+      stemLine.setAttribute("class", "panel-device-breaker-stem");
+      stemLine.setAttribute("x1", cx);
+      stemLine.setAttribute("x2", cx);
+      stemLine.setAttribute("y1", baseY);
+      stemLine.setAttribute("y2", baseY + stem);
+      archGroup.appendChild(stemLine);
+
+      const nextCx = (poleSpan / 2) + (i + 1) * poleGap;
+      if (i < poles - 1) {
+        const tie = document.createElementNS(svgNS, "line");
+        const tieOffset = 4;
+        tie.setAttribute("class", "panel-device-tie");
+        tie.setAttribute("x1", cx + poleSpan / 2 - 1);
+        tie.setAttribute("x2", nextCx - poleSpan / 2 + 1);
+        tie.setAttribute("y1", baseY + tieOffset);
+        tie.setAttribute("y2", baseY + tieOffset);
+        tieGroup.appendChild(tie);
+      }
+    }
+
+    svg.appendChild(archGroup);
+    svg.appendChild(tieGroup);
+    return svg;
+  };
+
+  if (type === "breaker") {
+    symbol.replaceChildren(createBreakerSymbol());
+  } else {
+    for (let i = 0; i < poles; i++) {
+      const pole = document.createElement("span");
+      pole.className = "panel-device-pole";
+      symbol.appendChild(pole);
+    }
+    if (poles > 1) {
+      const tie = document.createElement("span");
+      tie.className = "panel-device-tie";
+      symbol.appendChild(tie);
+    }
   }
   graphic.appendChild(symbol);
   icon.appendChild(graphic);
