@@ -1852,6 +1852,10 @@ function renderTieOverlay(panelContainer, table, panel, circuitCount, tieAnchors
     panelContainer.appendChild(overlay);
   }
 
+  if (overlay._resizeHandler) {
+    window.removeEventListener("resize", overlay._resizeHandler);
+  }
+
   const drawTies = () => {
     overlay.innerHTML = "";
     const containerRect = panelContainer.getBoundingClientRect();
@@ -1889,22 +1893,20 @@ function renderTieOverlay(panelContainer, table, panel, circuitCount, tieAnchors
       connector.style.top = `${minY}px`;
       connector.style.height = `${Math.max(8, maxY - minY)}px`;
       overlay.appendChild(connector);
-
-      points.forEach(point => {
-        const cap = document.createElement("div");
-        cap.className = "panel-tie-overlay-cap";
-        cap.style.left = `${point.x}px`;
-        cap.style.top = `${point.y}px`;
-        overlay.appendChild(cap);
-      });
     });
   };
 
-  if (typeof requestAnimationFrame === "function") {
-    requestAnimationFrame(() => requestAnimationFrame(drawTies));
-  } else {
-    drawTies();
-  }
+  const scheduleDraw = () => {
+    if (typeof requestAnimationFrame === "function") {
+      requestAnimationFrame(() => requestAnimationFrame(drawTies));
+    } else {
+      drawTies();
+    }
+  };
+
+  overlay._resizeHandler = () => scheduleDraw();
+  window.addEventListener("resize", overlay._resizeHandler);
+  scheduleDraw();
 }
 
 function createBranchDeviceIcon(detail, poleCount, startCircuit, system, phaseLabel, options = {}) {
@@ -1951,9 +1953,8 @@ function createBranchDeviceIcon(detail, poleCount, startCircuit, system, phaseLa
     const poleGap = 18;
     const baseY = 11;
     const rise = 8;
-    const stem = 7;
     const width = (poles - 1) * poleGap + poleSpan;
-    const height = baseY + stem + 3;
+    const height = baseY + 3;
     const svg = document.createElementNS(svgNS, "svg");
     svg.setAttribute("class", "panel-device-symbol-graphic panel-device-symbol--breaker");
     svg.setAttribute("viewBox", `0 0 ${width} ${height}`);
@@ -1974,14 +1975,6 @@ function createBranchDeviceIcon(detail, poleCount, startCircuit, system, phaseLa
       arch.setAttribute("class", "panel-device-breaker-arch");
       arch.setAttribute("d", `M ${leftX} ${baseY} Q ${cx} ${baseY - rise} ${rightX} ${baseY}`);
       archGroup.appendChild(arch);
-
-      const stemLine = document.createElementNS(svgNS, "line");
-      stemLine.setAttribute("class", "panel-device-breaker-stem");
-      stemLine.setAttribute("x1", cx);
-      stemLine.setAttribute("x2", cx);
-      stemLine.setAttribute("y1", baseY);
-      stemLine.setAttribute("y2", baseY + stem);
-      archGroup.appendChild(stemLine);
 
       const nextCx = (poleSpan / 2) + (i + 1) * poleGap;
       if (i < poles - 1) {
