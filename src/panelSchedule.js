@@ -2053,33 +2053,17 @@ function createBranchDeviceIcon(detail, poleCount, startCircuit, system, phaseLa
     svg.setAttribute("viewBox", `0 0 ${width} ${height}`);
     svg.setAttribute("preserveAspectRatio", "xMidYMid meet");
 
-    const leftLine = document.createElementNS(svgNS, "line");
-    leftLine.setAttribute("class", "panel-device-fuse-line");
-    leftLine.setAttribute("x1", "4");
-    leftLine.setAttribute("y1", String(midY));
-    leftLine.setAttribute("x2", String((width - rectWidth) / 2 - 4));
-    leftLine.setAttribute("y2", String(midY));
-
-    const rightLine = document.createElementNS(svgNS, "line");
-    rightLine.setAttribute("class", "panel-device-fuse-line");
-    rightLine.setAttribute("x1", String((width + rectWidth) / 2 + 4));
-    rightLine.setAttribute("y1", String(midY));
-    rightLine.setAttribute("x2", String(width - 4));
-    rightLine.setAttribute("y2", String(midY));
-
     const rect = document.createElementNS(svgNS, "rect");
     rect.setAttribute("class", "panel-device-fuse-body");
     rect.setAttribute("x", String((width - rectWidth) / 2));
-    rect.setAttribute("y", String(midY - rectHeight / 2));
+    rect.setAttribute("y", "0");
     rect.setAttribute("width", String(rectWidth));
     rect.setAttribute("height", String(rectHeight));
     rect.setAttribute("rx", "2");
     rect.setAttribute("ry", "2");
     rect.setAttribute("transform", `rotate(-18 ${width / 2} ${midY})`);
 
-    svg.appendChild(leftLine);
     svg.appendChild(rect);
-    svg.appendChild(rightLine);
     return svg;
   };
 
