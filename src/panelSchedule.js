@@ -1217,6 +1217,7 @@ function createCircuitCell(panel, panelId, loads, breaker, circuitCount, positio
   const breakerDetail = Number.isFinite(blockStart) ? (detailMap[String(blockStart)] || null) : null;
   const ratingValue = breakerDetail && breakerDetail.rating != null ? String(breakerDetail.rating) : "";
   const cableValue = breakerDetail?.cableTag || breakerDetail?.cable || breakerDetail?.cableId || "";
+  const loadPerPhaseValue = breakerDetail?.loadVaPerPhase;
   const customLoadLabel = typeof breakerDetail?.customLoad === "string" ? breakerDetail.customLoad.trim() : "";
   const cableTag = cableValue;
   const deviceType = getPanelBranchDeviceType(panel);
@@ -1442,6 +1443,23 @@ function createCircuitCell(panel, panelId, loads, breaker, circuitCount, positio
     const customLoadWrapper = document.createElement("div");
     customLoadWrapper.className = "panel-column-content";
     customLoadWrapper.appendChild(customLoad);
+
+    const loadPerPhase = document.createElement("label");
+    loadPerPhase.className = "panel-column-field";
+    loadPerPhase.textContent = "";
+    const loadPerPhaseInput = document.createElement("input");
+    loadPerPhaseInput.type = "number";
+    loadPerPhaseInput.className = "panel-slot-input";
+    loadPerPhaseInput.placeholder = "Load (VA) per Phase";
+    loadPerPhaseInput.inputMode = "numeric";
+    loadPerPhaseInput.step = "any";
+    loadPerPhaseInput.min = "0";
+    loadPerPhaseInput.dataset.breakerPhaseLoad = String(primaryStart);
+    if (loadPerPhaseValue != null && loadPerPhaseValue !== "") {
+      loadPerPhaseInput.value = String(loadPerPhaseValue);
+    }
+    loadPerPhase.appendChild(loadPerPhaseInput);
+    customLoadWrapper.appendChild(loadPerPhase);
     control.appendChild(customLoadWrapper);
 
     columnContent.rating = createRatingField();
@@ -1538,6 +1556,11 @@ function createCircuitCell(panel, panelId, loads, breaker, circuitCount, positio
     const cableTag = breakerDetail?.cableTag || breakerDetail?.cable || breakerDetail?.cableId;
     if (cableTag) {
       meta.appendChild(createMetaChip(`Cable ${cableTag}`));
+    }
+    const loadPerPhase = parseFloat(loadPerPhaseValue);
+    if (Number.isFinite(loadPerPhase)) {
+      const formatter = new Intl.NumberFormat(undefined, { maximumFractionDigits: 2 });
+      meta.appendChild(createMetaChip(`${formatter.format(loadPerPhase)} VA/phase`));
     }
     if (meta.childElementCount > 0) {
       details.appendChild(meta);
@@ -2018,19 +2041,52 @@ function createBranchDeviceIcon(detail, poleCount, startCircuit, system, phaseLa
     return svg;
   };
 
+  const createFuseSymbol = () => {
+    const svgNS = "http://www.w3.org/2000/svg";
+    const width = 120;
+    const height = 40;
+    const midY = height / 2;
+    const rectWidth = 54;
+    const rectHeight = 18;
+    const svg = document.createElementNS(svgNS, "svg");
+    svg.setAttribute("class", "panel-device-symbol-graphic panel-device-symbol--fuse");
+    svg.setAttribute("viewBox", `0 0 ${width} ${height}`);
+    svg.setAttribute("preserveAspectRatio", "xMidYMid meet");
+
+    const leftLine = document.createElementNS(svgNS, "line");
+    leftLine.setAttribute("class", "panel-device-fuse-line");
+    leftLine.setAttribute("x1", "4");
+    leftLine.setAttribute("y1", String(midY));
+    leftLine.setAttribute("x2", String((width - rectWidth) / 2 - 4));
+    leftLine.setAttribute("y2", String(midY));
+
+    const rightLine = document.createElementNS(svgNS, "line");
+    rightLine.setAttribute("class", "panel-device-fuse-line");
+    rightLine.setAttribute("x1", String((width + rectWidth) / 2 + 4));
+    rightLine.setAttribute("y1", String(midY));
+    rightLine.setAttribute("x2", String(width - 4));
+    rightLine.setAttribute("y2", String(midY));
+
+    const rect = document.createElementNS(svgNS, "rect");
+    rect.setAttribute("class", "panel-device-fuse-body");
+    rect.setAttribute("x", String((width - rectWidth) / 2));
+    rect.setAttribute("y", String(midY - rectHeight / 2));
+    rect.setAttribute("width", String(rectWidth));
+    rect.setAttribute("height", String(rectHeight));
+    rect.setAttribute("rx", "2");
+    rect.setAttribute("ry", "2");
+    rect.setAttribute("transform", `rotate(-18 ${width / 2} ${midY})`);
+
+    svg.appendChild(leftLine);
+    svg.appendChild(rect);
+    svg.appendChild(rightLine);
+    return svg;
+  };
+
   if (type === "breaker") {
     symbol.replaceChildren(createBreakerSymbol());
   } else {
-    for (let i = 0; i < poles; i++) {
-      const pole = document.createElement("span");
-      pole.className = "panel-device-pole";
-      symbol.appendChild(pole);
-    }
-    if (poles > 1) {
-      const tie = document.createElement("span");
-      tie.className = "panel-device-tie";
-      symbol.appendChild(tie);
-    }
+    symbol.replaceChildren(createFuseSymbol());
   }
   graphic.appendChild(symbol);
   icon.appendChild(graphic);
@@ -2740,6 +2796,22 @@ window.addEventListener("DOMContentLoaded", () => {
             detail.customLoad = value;
           } else {
             delete detail.customLoad;
+          }
+          savePanels();
+          updateOneline();
+          rerender();
+        }
+        return;
+      }
+      if (e.target.matches("input[data-breaker-phase-load]") || e.target.matches("input[data-breaker-phase-load][type=number]")) {
+        const start = Number.parseInt(e.target.dataset.breakerPhaseLoad, 10);
+        if (Number.isFinite(start)) {
+          const detail = ensureBreakerDetail(panel, start);
+          const value = e.target.value.trim();
+          if (value) {
+            detail.loadVaPerPhase = value;
+          } else {
+            delete detail.loadVaPerPhase;
           }
           savePanels();
           updateOneline();
