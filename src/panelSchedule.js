@@ -154,6 +154,7 @@ function getOrCreatePanel(panelId = "P1") {
       breakers: [],
       breakerLayout: [],
       breakerDetails: {},
+      branchDeviceType: "breaker",
       voltage: "",
       mainRating: "",
       circuitCount: 42,
@@ -167,6 +168,7 @@ function getOrCreatePanel(panelId = "P1") {
     dataStore.setPanels(panels);
   }
   let identifiersUpdated = false;
+  let branchTypeUpdated = false;
   if (!Array.isArray(panel.breakers)) {
     panel.breakers = [];
   }
@@ -175,6 +177,18 @@ function getOrCreatePanel(panelId = "P1") {
   }
   if (!panel.breakerDetails || typeof panel.breakerDetails !== "object") {
     panel.breakerDetails = {};
+  }
+  if (!panel.branchDeviceType) {
+    const details = panel.breakerDetails;
+    const hasFuse = details && typeof details === "object" && Object.values(details).some(detail => getDeviceType(detail) === "fuse");
+    panel.branchDeviceType = hasFuse ? "fuse" : "breaker";
+    branchTypeUpdated = true;
+  } else {
+    const normalizedBranch = getPanelBranchDeviceType(panel);
+    if (normalizedBranch !== panel.branchDeviceType) {
+      panel.branchDeviceType = normalizedBranch;
+      branchTypeUpdated = true;
+    }
   }
   if (panel.fedFrom == null && panel.fed_from != null) {
     panel.fedFrom = panel.fed_from;
@@ -200,7 +214,7 @@ function getOrCreatePanel(panelId = "P1") {
     }
     identifiersUpdated = true;
   }
-  if (identifiersUpdated) {
+  if (identifiersUpdated || branchTypeUpdated) {
     dataStore.setPanels(panels);
   }
   return { panel, panels };
@@ -268,6 +282,10 @@ function getPanelSystem(panel) {
   return raw === "dc" ? "dc" : "ac";
 }
 
+function getPanelBranchDeviceType(panel) {
+  return panel?.branchDeviceType === "fuse" ? "fuse" : "breaker";
+}
+
 function getPanelPoleLimit(panel) {
   const system = getPanelSystem(panel);
   const systemMax = getMaxBranchPoleCount(system);
@@ -322,16 +340,32 @@ function ensureBreakerDetails(panel) {
   return panel.breakerDetails;
 }
 
+function syncBranchDeviceType(panel) {
+  if (!panel) return { branchType: "breaker", updated: false };
+  const branchType = getPanelBranchDeviceType(panel);
+  const details = ensureBreakerDetails(panel);
+  let updated = false;
+  Object.values(details).forEach(detail => {
+    if (detail && typeof detail === "object" && detail.deviceType !== branchType) {
+      detail.deviceType = branchType;
+      updated = true;
+    }
+  });
+  return { branchType, updated };
+}
+
 function ensureBreakerDetail(panel, startCircuit) {
   if (!panel || !Number.isFinite(startCircuit)) return null;
   const details = ensureBreakerDetails(panel);
   const key = String(startCircuit);
   const existing = details[key];
   if (existing && typeof existing === "object") {
-    if (!existing.deviceType) existing.deviceType = "breaker";
+    if (!existing.deviceType || existing.deviceType !== getPanelBranchDeviceType(panel)) {
+      existing.deviceType = getPanelBranchDeviceType(panel);
+    }
     return existing;
   }
-  const created = { deviceType: "breaker" };
+  const created = { deviceType: getPanelBranchDeviceType(panel) };
   details[key] = created;
   return created;
 }
@@ -341,7 +375,7 @@ function getBreakerDetail(panel, startCircuit) {
   const details = ensureBreakerDetails(panel);
   const detail = details[String(startCircuit)];
   if (detail && !detail.deviceType) {
-    detail.deviceType = "breaker";
+    detail.deviceType = getPanelBranchDeviceType(panel);
   }
   return detail || null;
 }
@@ -391,6 +425,7 @@ function ensurePanelBreakerLayout(panel, circuitCount) {
   if (!panel) {
     return { layout: [], changed: false };
   }
+  const branchType = getPanelBranchDeviceType(panel);
   if (!Array.isArray(panel.breakerLayout)) {
     panel.breakerLayout = [];
   }
@@ -467,7 +502,10 @@ function ensurePanelBreakerLayout(panel, circuitCount) {
       const detail = details[String(start)];
       if (detail) {
         detail.poles = Number.isFinite(size) && size > 0 ? Number(size) : detail.poles;
-        if (!detail.deviceType) detail.deviceType = "breaker";
+        detail.deviceType = branchType;
+      } else {
+        const created = ensureBreakerDetail(panel, start);
+        created.poles = Number.isFinite(size) && size > 0 ? Number(size) : created.poles;
       }
     }
   });
@@ -507,7 +545,10 @@ function ensurePanelBreakerLayout(panel, circuitCount) {
         const detail = details[key];
         if (detail) {
           detail.poles = Number(entry.size) && Number(entry.size) > 0 ? Number(entry.size) : detail.poles;
-          if (!detail.deviceType) detail.deviceType = "breaker";
+          detail.deviceType = branchType;
+        } else {
+          const created = ensureBreakerDetail(panel, start);
+          created.poles = Number(entry.size) && Number(entry.size) > 0 ? Number(entry.size) : created.poles;
         }
       }
     });
@@ -1178,7 +1219,7 @@ function createCircuitCell(panel, panelId, loads, breaker, circuitCount, positio
   const cableValue = breakerDetail?.cableTag || breakerDetail?.cable || breakerDetail?.cableId || "";
   const customLoadLabel = typeof breakerDetail?.customLoad === "string" ? breakerDetail.customLoad.trim() : "";
   const cableTag = cableValue;
-  const deviceType = getDeviceType(breakerDetail);
+  const deviceType = getPanelBranchDeviceType(panel);
   slot.dataset.circuit = String(breaker);
   if (!block) {
     slot.dataset.breakerDrop = "available";
@@ -1193,8 +1234,8 @@ function createCircuitCell(panel, panelId, loads, breaker, circuitCount, positio
       }
     }
   }
+  slot.dataset.deviceType = deviceType;
   if (breakerDetail) {
-    slot.dataset.deviceType = getDeviceType(breakerDetail);
     if (breakerDetail.rating != null && breakerDetail.rating !== "") {
       slot.dataset.deviceRating = String(breakerDetail.rating);
     } else {
@@ -1402,28 +1443,6 @@ function createCircuitCell(panel, panelId, loads, breaker, circuitCount, positio
     customLoadWrapper.className = "panel-column-content";
     customLoadWrapper.appendChild(customLoad);
     control.appendChild(customLoadWrapper);
-
-    const config = document.createElement("div");
-    config.className = "panel-slot-device-config";
-
-    const typeLabel = document.createElement("label");
-    typeLabel.className = "panel-slot-field";
-    typeLabel.textContent = "Device Type";
-    const typeSelect = document.createElement("select");
-    typeSelect.className = "panel-slot-input";
-    typeSelect.dataset.breakerDevice = String(primaryStart);
-    const breakerOption = document.createElement("option");
-    breakerOption.value = "breaker";
-    breakerOption.textContent = "Breaker";
-    const fuseOption = document.createElement("option");
-    fuseOption.value = "fuse";
-    fuseOption.textContent = "Fuse";
-    typeSelect.append(breakerOption, fuseOption);
-    typeSelect.value = deviceType === "fuse" ? "fuse" : "breaker";
-    typeLabel.appendChild(typeSelect);
-    config.appendChild(typeLabel);
-
-    control.appendChild(config);
 
     columnContent.rating = createRatingField();
     columnContent.cable = createCableField();
@@ -2109,6 +2128,7 @@ window.addEventListener("DOMContentLoaded", () => {
   const systemInput = document.getElementById("panel-system-type");
   const phasesInput = document.getElementById("panel-phases");
   const polesInput = document.getElementById("panel-poles");
+  const branchTypeInput = document.getElementById("panel-branch-device-type");
   const mainInput = document.getElementById("panel-main-rating");
   const circuitInput = document.getElementById("panel-circuit-count");
   const sccrInput = document.getElementById("panel-sccr");
@@ -2193,6 +2213,7 @@ window.addEventListener("DOMContentLoaded", () => {
     if (polesInput) {
       polesInput.value = String(getPanelPoleLimit(panel));
     }
+    if (branchTypeInput) branchTypeInput.value = getPanelBranchDeviceType(panel);
     if (mainInput) mainInput.value = panel.mainRating || "";
     if (circuitInput) {
       const breakerCount = Array.isArray(panel.breakers) ? panel.breakers.length : 0;
@@ -2230,6 +2251,17 @@ window.addEventListener("DOMContentLoaded", () => {
         panel.poles = String(cappedPoles);
         defaultsChanged = true;
       }
+    }
+    const details = ensureBreakerDetails(panel);
+    const hasFuseDetail = Object.values(details).some(detail => getDeviceType(detail) === "fuse");
+    const normalizedBranch = panel.branchDeviceType ? getPanelBranchDeviceType(panel) : (hasFuseDetail ? "fuse" : "breaker");
+    if (!panel.branchDeviceType || panel.branchDeviceType !== normalizedBranch) {
+      panel.branchDeviceType = normalizedBranch;
+      defaultsChanged = true;
+    }
+    const { updated: branchUpdated } = syncBranchDeviceType(panel);
+    if (branchUpdated) {
+      defaultsChanged = true;
     }
     if (!panel.circuitCount) {
       panel.circuitCount = panel.breakers?.length || 42;
@@ -2456,6 +2488,15 @@ window.addEventListener("DOMContentLoaded", () => {
   if (systemInput) systemInput.addEventListener("change", () => handleChange("powerType", systemInput, { render: true }));
   if (phasesInput) phasesInput.addEventListener("change", () => handleChange("phases", phasesInput, { render: true }));
   if (polesInput) polesInput.addEventListener("change", () => handleChange("poles", polesInput, { render: true }));
+  if (branchTypeInput) {
+    branchTypeInput.addEventListener("change", () => {
+      panel.branchDeviceType = branchTypeInput.value === "fuse" ? "fuse" : "breaker";
+      syncBranchDeviceType(panel);
+      savePanels();
+      updateOneline();
+      rerender();
+    });
+  }
 
   if (mainInput) {
     mainInput.addEventListener("input", () => {
@@ -2656,17 +2697,6 @@ window.addEventListener("DOMContentLoaded", () => {
 
   if (panelContainer) {
     panelContainer.addEventListener("change", e => {
-      if (e.target.matches("select[data-breaker-device]")) {
-        const start = Number.parseInt(e.target.dataset.breakerDevice, 10);
-        if (Number.isFinite(start)) {
-          const detail = ensureBreakerDetail(panel, start);
-          detail.deviceType = e.target.value === "fuse" ? "fuse" : "breaker";
-          savePanels();
-          updateOneline();
-          rerender();
-        }
-        return;
-      }
       if (e.target.matches("[data-breaker-rating]")) {
         const start = Number.parseInt(e.target.dataset.breakerRating, 10);
         if (Number.isFinite(start)) {
