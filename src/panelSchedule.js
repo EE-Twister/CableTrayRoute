@@ -1047,6 +1047,7 @@ function render(panelId = "P1") {
   const tbody = document.createElement("tbody");
   const rows = Math.ceil(circuitCount / 2);
   const layout = Array.isArray(panel.breakerLayout) ? panel.breakerLayout : [];
+  const tieAnchors = new Map();
 
   const collectDeviceCircuits = (odd, even) => {
     return [odd, even]
@@ -1124,7 +1125,7 @@ function render(panelId = "P1") {
       breakerDetails,
       system,
       phaseSequence,
-      { circuits: deviceCircuits, baseRow: i, disableRowSpan: true }
+      { circuits: deviceCircuits, baseRow: i, disableRowSpan: true, tieAnchorsMap: tieAnchors }
     );
     if (deviceCell) {
       row.appendChild(deviceCell);
@@ -1137,6 +1138,7 @@ function render(panelId = "P1") {
   }
   table.appendChild(tbody);
   container.appendChild(table);
+  renderTieOverlay(container, table, panel, circuitCount, tieAnchors);
   updateTotals(panelId);
   return state;
 }
@@ -1628,6 +1630,7 @@ function createDeviceCell(panel, oddCircuit, evenCircuit, circuitCount, breakerD
   wrapper.style.setProperty("--panel-bus-span", `${railSpan}rem`);
   const slots = new Map();
   const rowMarkers = new Map();
+  const tieAnchorsMap = options.tieAnchorsMap instanceof Map ? options.tieAnchorsMap : null;
   const applyRailOffset = (slot, phase) => {
     if (!slot || !sequence.length || !phase) return;
     const index = sequence.indexOf(phase);
@@ -1673,8 +1676,18 @@ function createDeviceCell(panel, oddCircuit, evenCircuit, circuitCount, breakerD
     if (phase) slot.dataset.phase = phase;
     const relativeRow = Math.max(1, Math.floor((circuit - 1) / 2) - baseRowIndex + 1);
     slot.style.gridRow = String(relativeRow);
+    slot.dataset.circuit = String(circuit);
     applyRailOffset(slot, phase);
     getRowMarker(relativeRow, phase);
+    const tieAnchor = document.createElement("div");
+    tieAnchor.className = "panel-device-tie-anchor";
+    slot.appendChild(tieAnchor);
+    if (tieAnchorsMap) {
+      const key = String(circuit);
+      const anchors = tieAnchorsMap.get(key) || [];
+      anchors.push(tieAnchor);
+      tieAnchorsMap.set(key, anchors);
+    }
     slots.set(circuit, slot);
     return slot;
   };
@@ -1828,6 +1841,70 @@ function createDeviceCell(panel, oddCircuit, evenCircuit, circuitCount, breakerD
     }
   });
   return td;
+}
+
+function renderTieOverlay(panelContainer, table, panel, circuitCount, tieAnchors) {
+  if (!panelContainer || !table || !(tieAnchors instanceof Map)) return;
+  let overlay = panelContainer.querySelector(".panel-tie-overlay");
+  if (!overlay) {
+    overlay = document.createElement("div");
+    overlay.className = "panel-tie-overlay";
+    panelContainer.appendChild(overlay);
+  }
+
+  const drawTies = () => {
+    overlay.innerHTML = "";
+    const containerRect = panelContainer.getBoundingClientRect();
+    const tableRect = table.getBoundingClientRect();
+    overlay.style.left = `${tableRect.left - containerRect.left}px`;
+    overlay.style.top = `${tableRect.top - containerRect.top}px`;
+    overlay.style.width = `${tableRect.width}px`;
+    overlay.style.height = `${tableRect.height}px`;
+    const overlayRect = overlay.getBoundingClientRect();
+    const layout = Array.isArray(panel?.breakerLayout) ? panel.breakerLayout : [];
+
+    layout.forEach(block => {
+      if (!block || block.position !== 0) return;
+      const span = getBlockCircuits(panel, block, circuitCount);
+      if (!span.length || span.length <= 1) return;
+      const points = span.flatMap(circuit => {
+        const anchors = tieAnchors.get(String(circuit)) || [];
+        return anchors.map(anchor => {
+          const rect = anchor.getBoundingClientRect();
+          return {
+            x: rect.left + rect.width / 2 - overlayRect.left,
+            y: rect.top + rect.height / 2 - overlayRect.top
+          };
+        });
+      }).filter(Boolean);
+
+      if (points.length <= 1) return;
+      points.sort((a, b) => (a.y - b.y) || (a.x - b.x));
+      const minY = points[0].y;
+      const maxY = points[points.length - 1].y;
+      const centerX = points.reduce((sum, point) => sum + point.x, 0) / points.length;
+      const connector = document.createElement("div");
+      connector.className = "panel-tie-overlay-bar";
+      connector.style.left = `${centerX}px`;
+      connector.style.top = `${minY}px`;
+      connector.style.height = `${Math.max(8, maxY - minY)}px`;
+      overlay.appendChild(connector);
+
+      points.forEach(point => {
+        const cap = document.createElement("div");
+        cap.className = "panel-tie-overlay-cap";
+        cap.style.left = `${point.x}px`;
+        cap.style.top = `${point.y}px`;
+        overlay.appendChild(cap);
+      });
+    });
+  };
+
+  if (typeof requestAnimationFrame === "function") {
+    requestAnimationFrame(() => requestAnimationFrame(drawTies));
+  } else {
+    drawTies();
+  }
 }
 
 function createBranchDeviceIcon(detail, poleCount, startCircuit, system, phaseLabel, options = {}) {

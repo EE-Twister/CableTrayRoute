@@ -5219,6 +5219,7 @@ body.dark-mode .workflow-card-title {
 
 #panel-container {
     margin-top: 1rem;
+    position: relative;
 }
 
 .panel-bus-legend {
@@ -5556,6 +5557,15 @@ body.dark-mode .panel-breaker-toolbox-item {
     color: var(--panel-phase-color);
 }
 
+.panel-device-tie-anchor {
+    position: absolute;
+    left: var(--panel-slot-center);
+    top: 50%;
+    width: 0;
+    height: 0;
+    pointer-events: none;
+}
+
 .panel-device-slot {
     position: relative;
     display: flex;
@@ -5573,6 +5583,28 @@ body.dark-mode .panel-breaker-toolbox-item {
     min-height: 2.75rem;
     pointer-events: none;
     z-index: 3;
+}
+
+.panel-tie-overlay {
+    position: absolute;
+    pointer-events: none;
+    z-index: 6;
+}
+
+.panel-tie-overlay-bar {
+    position: absolute;
+    width: 0;
+    border-left: 2px dotted rgba(0, 0, 0, 0.55);
+    transform: translateX(-50%);
+}
+
+.panel-tie-overlay-cap {
+    position: absolute;
+    width: 0.55rem;
+    height: 0.55rem;
+    background: rgba(0, 0, 0, 0.65);
+    border-radius: 50%;
+    transform: translate(-50%, -50%);
 }
 
 .panel-device-slot-marker::after {
