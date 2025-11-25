@@ -5758,8 +5758,9 @@ body.dark-mode .panel-device {
 }
 
 .panel-device-symbol--fuse {
-    width: 100%;
+    width: calc(2rem + (var(--panel-device-pole-count, 1) - 1) * 1.5rem);
     height: 100%;
+    max-width: none;
 }
 
 .panel-device-fuse-line {
