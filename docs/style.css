@@ -5702,38 +5702,38 @@ body.dark-mode .panel-device {
     display: flex;
     justify-content: center;
     align-items: center;
-    min-height: 1.25rem;
-    --panel-connector-bottom: 0.9rem;
-    --panel-connector-top: 0.9rem;
+    min-height: 2rem;
+    --panel-connector-bottom: 1rem;
+    --panel-connector-top: 1rem;
 }
 
 .panel-device-symbol {
     position: relative;
-    display: flex;
-    flex-direction: row;
-    gap: 0.2rem;
+    display: inline-flex;
     justify-content: center;
-    align-items: stretch;
-    width: 100%;
-    padding: 0;
-    transform: rotate(90deg);
-    transform-origin: center;
-    min-width: 2.5rem;
-}
-
-.panel-device-symbol::before {
-    display: none;
-}
-
-.panel-device-symbol[data-poles="1"] {
-    flex-direction: row;
-    gap: 0.35rem;
     align-items: center;
+    width: calc(1.4rem + (var(--panel-device-pole-count, 1) - 1) * 1.05rem);
+    height: 2rem;
     padding: 0;
+    transform: none;
+    min-width: 0;
 }
 
-.panel-device-symbol[data-poles="1"]::before {
-    display: none;
+.panel-device-symbol-graphic {
+    width: 100%;
+    height: 100%;
+}
+
+.panel-device-breaker-arch,
+.panel-device-breaker-stem {
+    stroke: currentColor;
+    stroke-width: 2.2;
+    fill: none;
+    stroke-linecap: round;
+}
+
+.panel-device-breaker-stem {
+    stroke-width: 2.4;
 }
 
 .panel-device-pole {
@@ -5744,30 +5744,6 @@ body.dark-mode .panel-device {
     border-radius: 6px;
     background: linear-gradient(180deg, rgba(0, 0, 0, 0.05), rgba(0, 0, 0, 0));
     border: 2px solid currentColor;
-}
-
-.panel-device--breaker .panel-device-pole::before {
-    content: "";
-    position: absolute;
-    left: 50%;
-    top: 12%;
-    bottom: 12%;
-    width: 2px;
-    background: currentColor;
-    transform: translateX(-50%);
-    opacity: 0.65;
-}
-
-.panel-device--breaker .panel-device-pole::after {
-    content: "";
-    position: absolute;
-    left: 50%;
-    width: 0.85rem;
-    height: 2px;
-    background: currentColor;
-    transform: translate(-50%, -50%);
-    top: 50%;
-    opacity: 0.7;
 }
 
 .panel-device--dc-positive {
@@ -5809,6 +5785,12 @@ body.dark-mode .panel-device--fuse .panel-device-pole {
 }
 
 .panel-device-tie {
+    stroke: var(--primary-color);
+    stroke-width: 2.25;
+    stroke-linecap: round;
+}
+
+.panel-device-symbol span.panel-device-tie {
     position: absolute;
     left: 0;
     right: 0;
@@ -5816,9 +5798,14 @@ body.dark-mode .panel-device--fuse .panel-device-pole {
     height: 2px;
     border-radius: 2px;
     background: var(--primary-color);
+    display: block;
 }
 
 body.dark-mode .panel-device-tie {
+    stroke: rgba(255, 255, 255, 0.85);
+}
+
+body.dark-mode .panel-device-symbol span.panel-device-tie {
     background: rgba(255, 255, 255, 0.7);
 }
 
@@ -5826,32 +5813,32 @@ body.dark-mode .panel-device-tie {
     padding: 0.35rem 0;
 }
 
-.panel-device[data-connector-role="start"] .panel-device-graphic::after,
-.panel-device[data-connector-role="continue"] .panel-device-graphic::before {
+.panel-device[data-connector-role] .panel-device-graphic::before,
+.panel-device[data-connector-role] .panel-device-graphic::after {
     content: "";
     position: absolute;
     left: 50%;
-    width: 0;
+    width: 2px;
     transform: translateX(-50%);
     opacity: 0.9;
     pointer-events: none;
+    background: var(--primary-color);
+    border-radius: 2px;
 }
 
-.panel-device[data-connector-role="start"] .panel-device-graphic::after {
-    top: 100%;
-    height: var(--panel-connector-bottom, 0.9rem);
-    border-left: 2px dotted var(--primary-color);
+.panel-device[data-connector-role] .panel-device-graphic::after {
+    top: calc(100% - 1px);
+    height: var(--panel-connector-bottom, 0);
 }
 
-.panel-device[data-connector-role="continue"] .panel-device-graphic::before {
-    bottom: 100%;
-    height: var(--panel-connector-top, 0.9rem);
-    border-left: 2px dashed var(--primary-color);
+.panel-device[data-connector-role] .panel-device-graphic::before {
+    bottom: calc(100% - 1px);
+    height: var(--panel-connector-top, 0);
 }
 
-body.dark-mode .panel-device[data-connector-role="start"] .panel-device-graphic::after,
-body.dark-mode .panel-device[data-connector-role="continue"] .panel-device-graphic::before {
-    border-color: rgba(255, 255, 255, 0.75);
+body.dark-mode .panel-device[data-connector-role] .panel-device-graphic::before,
+body.dark-mode .panel-device[data-connector-role] .panel-device-graphic::after {
+    background: rgba(255, 255, 255, 0.8);
 }
 
 .panel-device-label {
