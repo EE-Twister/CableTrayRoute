@@ -2041,36 +2041,58 @@ function createBranchDeviceIcon(detail, poleCount, startCircuit, system, phaseLa
     return svg;
   };
 
-  const createFuseSymbol = () => {
+  const createFuseSymbol = fusePoles => {
     const svgNS = "http://www.w3.org/2000/svg";
-    const width = 120;
-    const height = 40;
+    const poleSpan = 14;
+    const poleGap = 18;
+    const width = (fusePoles - 1) * poleGap + poleSpan;
+    const height = 26;
     const midY = height / 2;
-    const rectWidth = 54;
-    const rectHeight = 18;
+    const bodyWidth = Math.min(width - 6, Math.max(14, width * 0.6));
+    const bodyHeight = Math.max(8, height * 0.45);
+    const bodyX = (width - bodyWidth) / 2;
+    const bodyY = midY - bodyHeight / 2;
     const svg = document.createElementNS(svgNS, "svg");
     svg.setAttribute("class", "panel-device-symbol-graphic panel-device-symbol--fuse");
     svg.setAttribute("viewBox", `0 0 ${width} ${height}`);
     svg.setAttribute("preserveAspectRatio", "xMidYMid meet");
+    svg.dataset.poles = String(fusePoles);
+    svg.style.setProperty("--panel-device-pole-count", String(fusePoles));
+
+    const leftLead = document.createElementNS(svgNS, "line");
+    leftLead.setAttribute("class", "panel-device-fuse-line");
+    leftLead.setAttribute("x1", "0");
+    leftLead.setAttribute("y1", String(midY));
+    leftLead.setAttribute("x2", String(bodyX));
+    leftLead.setAttribute("y2", String(midY));
+
+    const rightLead = document.createElementNS(svgNS, "line");
+    rightLead.setAttribute("class", "panel-device-fuse-line");
+    rightLead.setAttribute("x1", String(bodyX + bodyWidth));
+    rightLead.setAttribute("y1", String(midY));
+    rightLead.setAttribute("x2", String(width));
+    rightLead.setAttribute("y2", String(midY));
 
     const rect = document.createElementNS(svgNS, "rect");
     rect.setAttribute("class", "panel-device-fuse-body");
-    rect.setAttribute("x", String((width - rectWidth) / 2));
-    rect.setAttribute("y", "0");
-    rect.setAttribute("width", String(rectWidth));
-    rect.setAttribute("height", String(rectHeight));
+    rect.setAttribute("x", String(bodyX));
+    rect.setAttribute("y", String(bodyY));
+    rect.setAttribute("width", String(bodyWidth));
+    rect.setAttribute("height", String(bodyHeight));
     rect.setAttribute("rx", "2");
     rect.setAttribute("ry", "2");
-    rect.setAttribute("transform", `rotate(-18 ${width / 2} ${midY})`);
+    rect.setAttribute("transform", `rotate(-14 ${width / 2} ${midY})`);
 
+    svg.appendChild(leftLead);
     svg.appendChild(rect);
+    svg.appendChild(rightLead);
     return svg;
   };
 
   if (type === "breaker") {
     symbol.replaceChildren(createBreakerSymbol());
   } else {
-    symbol.replaceChildren(createFuseSymbol());
+    symbol.replaceChildren(createFuseSymbol(poles));
   }
   graphic.appendChild(symbol);
   icon.appendChild(graphic);
