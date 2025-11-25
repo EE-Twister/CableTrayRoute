@@ -5747,6 +5747,23 @@ body.dark-mode .panel-device {
     height: 100%;
 }
 
+.panel-device-symbol--fuse {
+    width: 5.5rem;
+    height: 2.4rem;
+}
+
+.panel-device-fuse-line {
+    stroke: currentColor;
+    stroke-width: 2.5;
+    stroke-linecap: round;
+}
+
+.panel-device-fuse-body {
+    fill: none;
+    stroke: currentColor;
+    stroke-width: 2.5;
+}
+
 .panel-device-breaker-arch {
     stroke: currentColor;
     stroke-width: 2.2;
