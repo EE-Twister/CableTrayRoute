@@ -90,10 +90,18 @@
                   <option value="3">3</option>
                 </select>
               </label>
+              <label class="panel-info-compact">Short-Circuit Rating (A) <input id="panel-sccr" type="number" min="0"></label>
               <label class="panel-info-compact">Main Device Rating (A) <input id="panel-main-rating" type="number" min="0"></label>
             </div>
-            <label>Number of Circuits <input id="panel-circuit-count" type="number" min="1"></label>
-            <label class="panel-info-compact">Short-Circuit Rating (A) <input id="panel-sccr" type="number" min="0"></label>
+            <div class="panel-info-tight-group panel-info-circuit-group">
+              <label>Number of Circuits <input id="panel-circuit-count" type="number" min="1"></label>
+              <label class="panel-info-compact">Branch Device Type
+                <select id="panel-branch-device-type">
+                  <option value="breaker">Breakers</option>
+                  <option value="fuse">Fuses</option>
+                </select>
+              </label>
+            </div>
           </div>
         <div id="panel-container"></div>
         <div id="panel-totals" class="mt-1"></div>
