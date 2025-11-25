@@ -5725,7 +5725,7 @@ body.dark-mode .panel-device {
     display: flex;
     justify-content: center;
     align-items: center;
-    min-height: 2rem;
+    min-height: 3rem;
     --panel-connector-bottom: 1rem;
     --panel-connector-top: 1rem;
 }

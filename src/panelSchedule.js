@@ -1875,8 +1875,13 @@ function renderTieOverlay(panelContainer, table, panel, circuitCount, tieAnchors
         const anchors = tieAnchors.get(String(circuit)) || [];
         return anchors.map(anchor => {
           const rect = anchor.getBoundingClientRect();
+          const graphicRect = anchor.closest(".panel-device-slot")
+            ?.querySelector(".panel-device-symbol-graphic.panel-device-symbol--breaker")
+            ?.getBoundingClientRect();
           return {
-            x: rect.left + rect.width / 2 - overlayRect.left,
+            x: graphicRect
+              ? graphicRect.left + graphicRect.width / 2 - overlayRect.left
+              : rect.left + rect.width / 2 - overlayRect.left,
             y: rect.top + rect.height / 2 - overlayRect.top
           };
         });
