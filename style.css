@@ -5256,8 +5256,28 @@ body.dark-mode .workflow-card-title {
     background: rgba(0, 0, 0, 0.05);
 }
 
+.panel-phase-summary-chip--warning {
+    background: #fff4e5;
+    color: #8a4b00;
+}
+
+.panel-phase-summary-chip--critical {
+    background: #ffe5e5;
+    color: #8a1c1c;
+}
+
 body.dark-mode .panel-phase-summary-chip {
     background: rgba(255, 255, 255, 0.1);
+}
+
+body.dark-mode .panel-phase-summary-chip--warning {
+    background: rgba(255, 193, 111, 0.2);
+    color: #ffcd7a;
+}
+
+body.dark-mode .panel-phase-summary-chip--critical {
+    background: rgba(255, 128, 128, 0.2);
+    color: #ff9b9b;
 }
 
 .panel-breaker-toolbox {
@@ -5365,6 +5385,12 @@ body.dark-mode .panel-breaker-toolbox-item {
 .panel-column-field .panel-slot-input {
     width: 100%;
     min-width: 7.5rem;
+}
+
+.panel-cable-meta {
+    font-size: 0.78rem;
+    color: var(--muted-text-color);
+    line-height: 1.2;
 }
 
 .panel-column--poles .panel-slot-quick-add {
@@ -5758,7 +5784,7 @@ body.dark-mode .panel-device {
 }
 
 .panel-device-symbol--fuse {
-    width: calc(2rem + (var(--panel-device-pole-count, 1) - 1) * 1.5rem);
+    width: calc(2.6rem + (var(--panel-device-pole-count, 1) - 1) * 1.8rem);
     height: 100%;
     max-width: none;
 }
