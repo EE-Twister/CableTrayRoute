@@ -411,6 +411,26 @@ function getCableLabel(cable) {
   return id || desc || null;
 }
 
+function normalizeCableIdentifier(id) {
+  return id != null ? String(id).trim().toLowerCase() : "";
+}
+
+function findCableByIdentifier(cables, identifier) {
+  const normalized = normalizeCableIdentifier(identifier);
+  if (!normalized || !Array.isArray(cables)) return null;
+  return cables.find(cable => normalizeCableIdentifier(getCableDisplayId(cable)) === normalized) || null;
+}
+
+function formatCableDetails(cable) {
+  if (!cable || typeof cable !== "object") return "";
+  const size = cable.conductor_size || cable.size || cable.conductorSize;
+  const type = cable.cable_type || cable.type || cable.cableType;
+  const sizeLabel = size != null ? String(size).trim() : "";
+  const typeLabel = type != null ? String(type).trim() : "";
+  if (sizeLabel && typeLabel) return `${sizeLabel} • ${typeLabel}`;
+  return sizeLabel || typeLabel || "";
+}
+
 function clearBreakerBlock(layout, startCircuit) {
   if (!Array.isArray(layout)) return;
   for (let i = 0; i < layout.length; i++) {
@@ -887,11 +907,30 @@ function createPhaseSummary(panel, panelId, loads, circuitCount) {
   values.className = "panel-phase-summary-values";
   const formatter = new Intl.NumberFormat(undefined, { maximumFractionDigits: 0 });
   const unit = system === "dc" ? "W" : "VA";
+  const deviationMap = new Map();
+  const phaseTotals = phases.map(phase => totals[phase] || 0);
+  phases.forEach((phase, index) => {
+    const total = phaseTotals[index] || 0;
+    const comparisons = phaseTotals.map((other, otherIndex) => {
+      if (otherIndex === index) return 0;
+      if (other > 0) return (total - other) / other;
+      return total > 0 ? Infinity : 0;
+    });
+    deviationMap.set(phase, Math.max(0, ...comparisons));
+  });
   phases.forEach(phase => {
     const chip = document.createElement("span");
     chip.className = "panel-phase-summary-chip";
     const total = totals[phase] || 0;
     chip.textContent = `${phase}: ${formatter.format(total)} ${unit}`;
+    const deviation = deviationMap.get(phase) || 0;
+    if (deviation >= 0.2) {
+      chip.classList.add("panel-phase-summary-chip--critical");
+      chip.title = "More than 20% above other phases";
+    } else if (deviation >= 0.1) {
+      chip.classList.add("panel-phase-summary-chip--warning");
+      chip.title = "10-20% above other phases";
+    }
     values.appendChild(chip);
   });
   summary.appendChild(values);
@@ -1040,6 +1079,7 @@ function render(panelId = "P1") {
   const { panel, panels } = state;
   const container = document.getElementById("panel-container");
   if (!container) return state;
+  const activePanelId = panel?.id || panelId;
   container.innerHTML = "";
 
   const breakerDetails = ensureBreakerDetails(panel);
@@ -1048,10 +1088,13 @@ function render(panelId = "P1") {
   cableList.id = "panel-breaker-cable-options";
   const cables = dataStore.getCables();
   const seenCableIds = new Set();
+  const cableLookup = new Map();
   cables.forEach(cable => {
     const id = getCableDisplayId(cable);
-    if (!id || seenCableIds.has(id)) return;
-    seenCableIds.add(id);
+    const normalized = normalizeCableIdentifier(id);
+    if (!normalized || seenCableIds.has(normalized)) return;
+    seenCableIds.add(normalized);
+    cableLookup.set(normalized, cable);
     const option = document.createElement("option");
     option.value = id;
     const label = getCableLabel(cable);
@@ -1103,7 +1146,7 @@ function render(panelId = "P1") {
   }
   container.appendChild(legend);
 
-  const phaseSummary = createPhaseSummary(panel, panelId, loads, circuitCount);
+  const phaseSummary = createPhaseSummary(panel, activePanelId, loads, circuitCount);
   if (phaseSummary) {
     container.appendChild(phaseSummary);
   }
@@ -1221,7 +1264,7 @@ function render(panelId = "P1") {
     const oddCircuit = i * 2 + 1;
     const evenCircuit = oddCircuit + 1;
 
-    const oddResult = createCircuitCell(panel, panelId, loads, oddCircuit, circuitCount, "left", system, breakerDetails);
+    const oddResult = createCircuitCell(panel, activePanelId, loads, oddCircuit, circuitCount, "left", system, breakerDetails, cableLookup);
     createSummaryCells(oddResult, ODD_COLUMN_ORDER).forEach(cell => row.appendChild(cell));
 
     const deviceCircuits = collectDeviceCircuits(oddCircuit, evenCircuit);
@@ -1239,7 +1282,7 @@ function render(panelId = "P1") {
       row.appendChild(deviceCell);
     }
 
-    const evenResult = createCircuitCell(panel, panelId, loads, evenCircuit, circuitCount, "right", system, breakerDetails);
+    const evenResult = createCircuitCell(panel, activePanelId, loads, evenCircuit, circuitCount, "right", system, breakerDetails, cableLookup);
     createSummaryCells(evenResult, EVEN_COLUMN_ORDER).forEach(cell => row.appendChild(cell));
 
     tbody.appendChild(row);
@@ -1247,11 +1290,11 @@ function render(panelId = "P1") {
   table.appendChild(tbody);
   container.appendChild(table);
   renderTieOverlay(container, table, panel, circuitCount, tieAnchors);
-  updateTotals(panelId);
+  updateTotals(activePanelId);
   return state;
 }
 
-function createCircuitCell(panel, panelId, loads, breaker, circuitCount, position, system, breakerDetails) {
+function createCircuitCell(panel, panelId, loads, breaker, circuitCount, position, system, breakerDetails, cableLookup) {
   const td = document.createElement("td");
   td.className = "panel-cell";
   if (position) td.classList.add(`panel-cell--${position}`);
@@ -1451,6 +1494,27 @@ function createCircuitCell(panel, panelId, loads, breaker, circuitCount, positio
     const cableWrapper = document.createElement("div");
     cableWrapper.className = "panel-column-content";
     cableWrapper.appendChild(cableLabel);
+    const cableMeta = document.createElement("div");
+    cableMeta.className = "panel-cable-meta";
+    const renderCableMeta = value => {
+      const normalized = normalizeCableIdentifier(value);
+      const match = cableLookup ? cableLookup.get(normalized) : null;
+      const details = formatCableDetails(match);
+      if (details) {
+        cableMeta.textContent = details;
+        cableMeta.hidden = false;
+        return;
+      }
+      if (value) {
+        cableMeta.textContent = "New cable will be added to the schedule";
+        cableMeta.hidden = false;
+        return;
+      }
+      cableMeta.textContent = "";
+      cableMeta.hidden = true;
+    };
+    renderCableMeta(cableValue);
+    cableWrapper.appendChild(cableMeta);
     return cableWrapper;
   };
 
@@ -2146,13 +2210,13 @@ function createBranchDeviceIcon(detail, poleCount, startCircuit, system, phaseLa
 
   const createFuseSymbol = fusePoles => {
     const svgNS = "http://www.w3.org/2000/svg";
-    const poleSpan = 18;
-    const poleGap = 24;
+    const poleSpan = 24;
+    const poleGap = 30;
     const width = (fusePoles - 1) * poleGap + poleSpan;
-    const height = 28;
+    const height = 30;
     const midY = height / 2;
-    const bodyWidth = Math.min(width - 6, Math.max(18, width * 0.72));
-    const bodyHeight = Math.max(10, height * 0.5);
+    const bodyWidth = Math.min(width - 6, Math.max(20, width * 0.78));
+    const bodyHeight = Math.max(12, height * 0.5);
     const bodyX = (width - bodyWidth) / 2;
     const bodyY = midY - bodyHeight / 2;
     const svg = document.createElementNS(svgNS, "svg");
@@ -2885,6 +2949,16 @@ window.addEventListener("DOMContentLoaded", () => {
           const value = e.target.value.trim();
           if (value) {
             detail.cableTag = value;
+            detail.cable = value;
+            detail.cableId = value;
+            const cables = dataStore.getCables();
+            const existingCable = findCableByIdentifier(cables, value);
+            if (!existingCable) {
+              const newCable = { tag: value, panel_id: activePanelId, circuit_number: start };
+              cables.push(newCable);
+              dataStore.setCables(cables);
+              dataStore.saveProject(projectId);
+            }
           } else {
             delete detail.cableTag;
             delete detail.cable;
