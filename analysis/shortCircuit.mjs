@@ -78,6 +78,16 @@ const upstreamCandidateTypes = new Set([
   'mcc',
   'feeder'
 ]);
+const shortCircuitResultTypes = new Set([
+  ...fallbackTypes,
+  ...upstreamCandidateTypes,
+  'breaker',
+  'disconnect',
+  'fuse',
+  'protective_device',
+  'switch',
+  'switchgear'
+]);
 
 const transformerVoltageKeyMap = {
   two_winding: ['volts_primary', 'volts_secondary'],
@@ -500,8 +510,13 @@ export function runShortCircuit(modelOrOpts = {}, maybeOpts = {}) {
       : sheets;
     comps = comps.filter(c => c && c.type !== 'annotation' && c.type !== 'dimension');
   }
-  let buses = comps.filter(c => c.subtype === 'Bus');
-  if (buses.length === 0) buses = comps;
+  const nodeCandidates = comps.filter(comp => {
+    if (!comp) return false;
+    if (comp.subtype === 'Bus') return true;
+    if (!comp.type) return false;
+    return shortCircuitResultTypes.has(comp.type);
+  });
+  const buses = nodeCandidates.length ? nodeCandidates : comps;
   const compMap = new Map(comps.map(c => [c.id, c]));
   const impedanceCache = new Map();
   const voltageCache = new Map();
