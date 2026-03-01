@@ -5222,6 +5222,31 @@ body.dark-mode .workflow-card-title {
     position: relative;
 }
 
+.panel-main-device {
+    display: flex;
+    align-items: center;
+    gap: 0.75rem;
+    margin-bottom: 0.5rem;
+    padding: 0.55rem 0.7rem;
+    border: 1px solid var(--border-color);
+    border-radius: 6px;
+    background: var(--secondary-color);
+}
+
+body.dark-mode .panel-main-device {
+    background: rgba(255, 255, 255, 0.05);
+}
+
+.panel-main-device-icon {
+    flex-shrink: 0;
+}
+
+.panel-main-device-rating {
+    font-size: 0.9rem;
+    font-weight: 600;
+    color: var(--text-color);
+}
+
 .panel-bus-legend {
     font-size: 0.9rem;
     font-weight: 600;

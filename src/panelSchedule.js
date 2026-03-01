@@ -1136,6 +1136,11 @@ function render(panelId = "P1") {
   const sequence = getPanelPhaseSequence(panel);
   const phaseSequence = sequence;
 
+  const mainDeviceSummary = createMainDeviceSummary(panel, system, phaseSequence);
+  if (mainDeviceSummary) {
+    container.appendChild(mainDeviceSummary);
+  }
+
   const legend = document.createElement("div");
   legend.className = "panel-bus-legend";
   if (system === "dc") {
@@ -1292,6 +1297,40 @@ function render(panelId = "P1") {
   renderTieOverlay(container, table, panel, circuitCount, tieAnchors);
   updateTotals(activePanelId);
   return state;
+}
+
+function createMainDeviceSummary(panel, system, phaseSequence) {
+  if (!panel) return null;
+  const wrapper = document.createElement("div");
+  wrapper.className = "panel-main-device";
+
+  const icon = createBranchDeviceIcon(
+    {
+      deviceType: getPanelBranchDeviceType(panel),
+      rating: panel.mainRating != null ? String(panel.mainRating).trim() : ""
+    },
+    {
+      poles: getPanelPoleCount(panel),
+      phaseLabel: phaseSequence[0] || "",
+      startCircuit: 1,
+      system,
+      labelPoles: getPanelPoleCount(panel)
+    }
+  );
+  if (icon) {
+    icon.classList.add("panel-main-device-icon");
+    wrapper.appendChild(icon);
+  }
+
+  const rating = panel.mainRating != null ? String(panel.mainRating).trim() : "";
+  const ratingLabel = document.createElement("div");
+  ratingLabel.className = "panel-main-device-rating";
+  ratingLabel.textContent = rating
+    ? `Main Device Rating: ${rating} A`
+    : "Main Device Rating: —";
+  wrapper.appendChild(ratingLabel);
+
+  return wrapper;
 }
 
 function createCircuitCell(panel, panelId, loads, breaker, circuitCount, position, system, breakerDetails, cableLookup) {
