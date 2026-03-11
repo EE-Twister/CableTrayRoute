@@ -1,5 +1,11 @@
 const FOCUSABLE_SELECTORS = "a[href], button:not([disabled]), textarea:not([disabled]), input:not([disabled]), select:not([disabled]), [tabindex]:not([tabindex='-1'])";
 
+const MODAL_WIDTH_TOKENS = {
+  small: 'var(--size-modal-sm)',
+  medium: 'var(--size-modal-md)',
+  wide: 'var(--size-modal-lg)'
+};
+
 function getFocusableElements(container) {
   if (!container) return [];
   const doc = container.ownerDocument || (typeof document !== 'undefined' ? document : null);
@@ -87,8 +93,13 @@ export function openModal(options = {}) {
       content.classList.add('modal-resizable');
     }
     if (defaultWidth !== null && defaultWidth !== undefined) {
-      const widthValue = typeof defaultWidth === 'number' ? `${defaultWidth}px` : String(defaultWidth);
-      content.style.width = widthValue;
+      let widthValue = defaultWidth;
+      if (typeof defaultWidth === 'string' && MODAL_WIDTH_TOKENS[defaultWidth]) {
+        widthValue = MODAL_WIDTH_TOKENS[defaultWidth];
+      } else if (typeof defaultWidth === 'number') {
+        widthValue = `${defaultWidth}px`;
+      }
+      content.style.width = String(widthValue);
     }
 
     const closeBtn = doc.createElement('button');

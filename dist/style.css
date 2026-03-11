@@ -1,27 +1,6 @@
+@import "./src/styles/tokens.css";
+
 /* --- One-line diagram styles (merged from oneline.css) --- */
-:root {
-  /* shared theme variables */
-  --primary-color: #007bff;
-  --secondary-color: #f8f9fa;
-  --font-family-base: 'Segoe UI', Arial, sans-serif;
-  --spacing-base: 0.5rem;
-
-  /* existing oneline variables leveraging shared tokens */
-  --ol-font: var(--font-family-base);
-  --ol-spacing: var(--spacing-base);
-  --ol-card-bg: var(--secondary-color);
-  --ol-border-color: #dcdcdc;
-  --ol-shadow: 0 2px 6px rgba(0,0,0,0.1);
-  --ol-radius: 8px;
-  --ol-hover-bg: rgba(0,0,0,0.05);
-}
-
-@media (prefers-color-scheme: dark) {
-  :root {
-    --primary-color: #17a2b8;
-    --secondary-color: #343a40;
-  }
-}
 
 .btn {
   background: var(--primary-color);
@@ -517,7 +496,7 @@
   }
 
   .device-selection-details {
-    padding: 1rem;
+    padding: var(--space-4);
   }
 
   .device-model-list {
@@ -1652,34 +1631,6 @@ g.component.scenario-diff > * {
 
 
 /* --- Basic Setup --- */
-:root {
-    --primary-color: #0d6efd;
-    --secondary-color: #f8f9fa;
-    --font-family-base: Arial, sans-serif;
-    --spacing-base: 8px;
-    --border-color: #dee2e6;
-    --text-color: #212529;
-    --table-row-alt-bg: #f4f6fb;
-    --success-bg: #d4edda;
-    --success-text: #155724;
-    --warning-bg: #fff3cd;
-    --warning-text: #856404;
-    --error-bg: #f8d7da;
-    --error-text: #721c24;
-    --focus-ring-color: #000;
-    --button-bg: var(--primary-color);
-    --button-hover-bg: #0056b3;
-    --button-text: #fff;
-    --button-padding: var(--spacing-base) calc(var(--spacing-base) * 1.5);
-    --button-margin: calc(var(--spacing-base) / 2);
-    --panel-phase-a: #f25c54;
-    --panel-phase-b: #3a86ff;
-    --panel-phase-c: #43aa8b;
-    --panel-phase-pos: #f6aa1c;
-    --panel-phase-neg: #495057;
-    --row-divider-color: rgba(15, 23, 42, 0.12);
-}
-
 /* Utility classes */
 .btn {
     background: var(--button-bg);
@@ -1736,24 +1687,6 @@ body.dark-mode .table-viewport {
     width: 60px;
 }
 
-body.dark-mode {
-    --primary-color: #17a2b8;
-    --secondary-color: #343a40;
-    --border-color: #495057;
-    --text-color: #f8f9fa;
-    --table-row-alt-bg: rgba(255, 255, 255, 0.08);
-    --success-text: #28a745;
-    --warning-text: #ffc107;
-    --focus-ring-color: #fff;
-    --button-hover-bg: #1558b0;
-    --panel-phase-a: #ff8a80;
-    --panel-phase-b: #74c0fc;
-    --panel-phase-c: #8ce99a;
-    --panel-phase-pos: #ffd43b;
-    --panel-phase-neg: #ced4da;
-    --row-divider-color: rgba(255, 255, 255, 0.18);
-    background-color: #212529;
-}
 
 body.compact-mode {
     --button-padding: 0.25rem 0.5rem;
@@ -1836,7 +1769,7 @@ body.compact-mode td {
 .top-nav {
     background: var(--secondary-color);
     border-bottom: 1px solid var(--border-color);
-    padding: 0.5rem 1rem;
+    padding: var(--space-2) var(--space-4);
     display: flex;
     align-items: center;
 }
@@ -1852,7 +1785,7 @@ body.compact-mode td {
     margin-left: auto;
 }
 .top-nav a {
-    margin-right: 1rem;
+    margin-right: var(--space-4);
     text-decoration: none;
     color: var(--text-color);
 }
@@ -2124,7 +2057,7 @@ body.dark-mode .auth-note {
     .auth-top-bar {
         flex-direction: column;
         align-items: flex-start;
-        padding: 1rem;
+        padding: var(--space-4);
     }
     .auth-top-links {
         width: 100%;
@@ -2156,6 +2089,7 @@ body.dark-mode .auth-note {
 .container {
     display: flex;
     height: 100vh;
+    gap: var(--space-4);
 }
 
 /* --- Layout: Sidebar and Main Content --- */
@@ -2163,7 +2097,7 @@ body.dark-mode .auth-note {
     width: 350px;
     flex-shrink: 0; /* Prevent sidebar from shrinking when results are shown */
     background-color: var(--secondary-color);
-    padding: 1rem;
+    padding: var(--space-4);
     overflow-y: auto;
     border-right: 1px solid var(--border-color);
 }
@@ -2174,7 +2108,7 @@ body.dark-mode .auth-note {
 
 .main-content {
     flex-grow: 1;
-    padding: 1.5rem;
+    padding: var(--space-5);
     overflow-y: auto;
 }
 
@@ -2195,11 +2129,11 @@ header h1, header h2 {
 
 /* --- UI Components --- */
 .card {
-    background: #fff;
-    border-radius: 8px;
-    padding: 1.5rem;
-    margin-top: 1.5rem;
-    box-shadow: 0 2px 4px rgba(0,0,0,0.05);
+    background: var(--color-surface-strong);
+    border-radius: var(--radius-md);
+    padding: var(--space-5);
+    margin-top: var(--space-5);
+    box-shadow: var(--elevation-sm);
 }
 
 body.dark-mode .card {
@@ -2502,9 +2436,9 @@ details > summary {
     position: fixed;
     top: 0;
     left: 0;
-    width: 100%;
-    height: 100%;
-    background: rgba(0,0,0,0.6);
+    width: var(--size-full);
+    height: var(--size-full);
+    background: var(--color-overlay);
     display: none;
     align-items: center;
     justify-content: center;
@@ -2515,7 +2449,7 @@ details > summary {
     display: flex;
     align-items: center;
     justify-content: center;
-    padding: var(--spacing-base);
+    padding: var(--space-2);
 }
 
 body.modal-open {
@@ -2525,11 +2459,11 @@ body.modal-open {
 .modal-content {
     background: var(--secondary-color);
     color: var(--text-color);
-    padding: calc(var(--spacing-base) * 2);
-    border-radius: 4px;
-    max-width: 840px;
+    padding: var(--space-4);
+    border-radius: var(--radius-sm);
+    max-width: var(--size-modal-md);
     width: 90%;
-    max-height: 80vh;
+    max-height: var(--size-help-modal-height);
     overflow-y: auto;
     position: relative;
 }
@@ -2538,12 +2472,12 @@ body.modal-open {
     resize: both;
     overflow: auto;
     max-width: none;
-    min-width: 520px;
-    min-height: 360px;
+    min-width: var(--size-modal-sm);
+    min-height: 22.5rem;
 }
 
 .modal-content[data-variant="wide"] {
-    max-width: 960px;
+    max-width: var(--size-modal-lg);
 }
 
 .modal-body {
@@ -2805,10 +2739,10 @@ body.modal-open {
 .modal-body input,
 .modal-body select,
 .modal-body textarea {
-    padding: calc(var(--spacing-base) * 0.75);
+    padding: var(--space-3);
     border: 1px solid var(--border-color);
-    border-radius: 4px;
-    font-size: 1rem;
+    border-radius: var(--radius-sm);
+    font-size: var(--font-size-md);
     color: var(--text-color);
     background: var(--secondary-color);
 }
@@ -2864,11 +2798,11 @@ body.dark-mode .btn.secondary-btn:hover {
 
 .close-btn {
     position: absolute;
-    top: 0.5rem;
-    right: 0.5rem;
+    top: var(--space-2);
+    right: var(--space-2);
     background: none;
     border: none;
-    font-size: 1.2rem;
+    font-size: var(--font-size-lg);
     cursor: pointer;
     color: var(--text-color);
 }
@@ -3253,7 +3187,7 @@ body.dark-mode .sticky-table thead th {
 
 /* --- Messages --- */
 .message {
-    padding: 1rem;
+    padding: var(--space-4);
     margin-bottom: 1rem;
     border-radius: 4px;
     border: 1px solid transparent;
@@ -3403,7 +3337,7 @@ body.dark-mode #debug-console {
     }
     .main-content {
         order: 1;
-        padding: 1rem;
+        padding: var(--space-4);
     }
     .sidebar-toggle {
         display: inline-block;
@@ -4543,7 +4477,7 @@ body.dark-mode .workflow-card-title {
     background: var(--secondary-color);
     color: var(--text-color);
     border-top: 1px solid var(--border-color);
-    padding: 1rem;
+    padding: var(--space-4);
     display: flex;
     flex-wrap: wrap;
     align-items: center;
@@ -4668,7 +4602,7 @@ body.dark-mode .workflow-card-title {
     color: var(--text-color);
     border: 1px solid var(--border-color);
     box-shadow: 0 2px 6px rgba(0,0,0,0.15);
-    padding: 1rem;
+    padding: var(--space-4);
     z-index: 1000;
 }
 
@@ -4718,7 +4652,7 @@ body.dark-mode .workflow-card-title {
     grid-column: 2;
     grid-row: 1;
     overflow: auto;
-    padding: 1rem;
+    padding: var(--space-4);
     padding-left: 1.5rem;
     display: flex;
     flex-direction: column;
@@ -4893,7 +4827,7 @@ body.dark-mode .workflow-card-title {
 .icon-fieldset {
     border: 1px solid var(--ol-border-color);
     border-radius: var(--ol-radius);
-    padding: 1rem;
+    padding: var(--space-4);
     display: flex;
     flex-direction: column;
     gap: 0.75rem;
@@ -6845,7 +6779,7 @@ body.dark-mode .tcc-crosshair-text {
     display: flex;
     flex-direction: column;
     gap: 0.5rem;
-    padding: 1rem;
+    padding: var(--space-4);
     border: 1px solid var(--border-color);
     border-radius: 8px;
     background: var(--secondary-color);

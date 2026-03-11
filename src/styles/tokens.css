@@ -1,0 +1,95 @@
+:root {
+  --color-primary: #0d6efd;
+  --color-surface: #f8f9fa;
+  --color-surface-strong: #ffffff;
+  --color-text: #212529;
+  --color-border: #dee2e6;
+  --color-overlay: rgba(0, 0, 0, 0.6);
+
+  --font-family-base: Arial, sans-serif;
+  --font-size-xs: 0.75rem;
+  --font-size-sm: 0.875rem;
+  --font-size-md: 1rem;
+  --font-size-lg: 1.125rem;
+  --font-size-xl: 1.4rem;
+
+  --space-1: 0.25rem;
+  --space-2: 0.5rem;
+  --space-3: 0.75rem;
+  --space-4: 1rem;
+  --space-5: 1.5rem;
+  --space-6: 2rem;
+
+  --radius-sm: 4px;
+  --radius-md: 8px;
+  --radius-pill: 999px;
+
+  --elevation-sm: 0 2px 4px rgba(0, 0, 0, 0.05);
+  --elevation-md: 0 2px 6px rgba(0, 0, 0, 0.1);
+
+  --size-full: 100%;
+  --size-modal-sm: 32rem;
+  --size-modal-md: 52.5rem;
+  --size-modal-lg: 60rem;
+  --size-help-modal-height: 80vh;
+
+  /* Backward-compatible aliases */
+  --primary-color: var(--color-primary);
+  --secondary-color: var(--color-surface);
+  --border-color: var(--color-border);
+  --text-color: var(--color-text);
+  --spacing-base: var(--space-2);
+  --button-bg: var(--primary-color);
+  --button-hover-bg: #0056b3;
+  --button-text: #fff;
+  --button-padding: var(--space-2) var(--space-3);
+  --button-margin: var(--space-1);
+
+  --table-row-alt-bg: #f4f6fb;
+  --success-bg: #d4edda;
+  --success-text: #155724;
+  --warning-bg: #fff3cd;
+  --warning-text: #856404;
+  --error-bg: #f8d7da;
+  --error-text: #721c24;
+  --focus-ring-color: #000;
+  --panel-phase-a: #f25c54;
+  --panel-phase-b: #3a86ff;
+  --panel-phase-c: #43aa8b;
+  --panel-phase-pos: #f6aa1c;
+  --panel-phase-neg: #495057;
+  --row-divider-color: rgba(15, 23, 42, 0.12);
+
+  --ol-font: var(--font-family-base);
+  --ol-spacing: var(--spacing-base);
+  --ol-card-bg: var(--secondary-color);
+  --ol-border-color: #dcdcdc;
+  --ol-shadow: var(--elevation-md);
+  --ol-radius: var(--radius-md);
+  --ol-hover-bg: rgba(0, 0, 0, 0.05);
+}
+
+@media (prefers-color-scheme: dark) {
+  :root {
+    --primary-color: #17a2b8;
+    --secondary-color: #343a40;
+  }
+}
+
+body.dark-mode {
+  --primary-color: #17a2b8;
+  --secondary-color: #343a40;
+  --border-color: #495057;
+  --text-color: #f8f9fa;
+  --table-row-alt-bg: rgba(255, 255, 255, 0.08);
+  --success-text: #28a745;
+  --warning-text: #ffc107;
+  --focus-ring-color: #fff;
+  --button-hover-bg: #1558b0;
+  --panel-phase-a: #ff8a80;
+  --panel-phase-b: #74c0fc;
+  --panel-phase-c: #8ce99a;
+  --panel-phase-pos: #ffd43b;
+  --panel-phase-neg: #ced4da;
+  --row-divider-color: rgba(255, 255, 255, 0.18);
+}
