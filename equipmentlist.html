@@ -67,9 +67,21 @@
           <input type="file" id="import-xml-input" accept=".xml" class="hidden" title="Import from XML">
           <button id="import-xml-btn" class="btn" title="Import from XML">Import XML</button>
         </div>
-        <div class="mb-1">
-          <input type="text" id="equipment-search" class="table-search" placeholder="Search..." title="Search by tag, description, or manufacturer">
+        <div class="equipment-toolbar mb-1">
+          <input type="text" id="equipment-search" class="table-search" placeholder="Search tag, description, manufacturer, category, or model" title="Search by equipment details">
+          <select id="equipment-category-filter" class="table-filter-select" title="Filter by category">
+            <option value="">All categories</option>
+          </select>
+          <select id="equipment-preset-select" class="table-filter-select" title="Saved filter presets">
+            <option value="">Filter preset...</option>
+          </select>
+          <button id="save-equipment-preset-btn" class="btn" type="button" title="Save current search and category as a preset">Save Preset</button>
+          <button id="bulk-category-btn" class="btn" type="button" title="Apply category to selected rows">Bulk Set Category</button>
+          <button id="clear-equipment-filters-btn" class="btn" type="button" title="Clear search and category filter">Clear Filters</button>
+          <p id="equipment-results-count" class="equipment-results-count" aria-live="polite"></p>
         </div>
+        <div id="equipment-quick-filters" class="equipment-quick-filters mb-1" aria-label="Quick filters"></div>
+        <p id="equipment-validation-summary" class="equipment-validation-summary mb-1" aria-live="polite"></p>
         <div class="overflow-x-auto">
           <table id="equipment-table" class="sticky-table">
             <thead></thead>
