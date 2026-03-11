@@ -54,6 +54,7 @@
       </header>
       <section class="card">
         <div class="mb-1">
+          <button id="add-row-btn" class="btn" title="Add a new load row">Add Row</button>
           <button id="delete-selected-btn" class="btn" title="Delete selected rows">Delete Selected</button>
           <button id="export-btn" class="btn" title="Export as JSON">Export JSON</button>
           <button id="import-btn" class="btn" title="Import from JSON">Import JSON</button>
@@ -62,6 +63,19 @@
           <button id="copy-btn" class="btn" title="Copy to clipboard">Copy to Clipboard</button>
           <input type="file" id="import-input" accept=".json" class="hidden" title="Import JSON file">
           <input type="file" id="import-csv-input" accept=".csv" class="hidden" title="Import CSV file">
+        </div>
+        <div class="loadlist-toolbar mb-1">
+          <label for="load-search" class="sr-only">Search loads</label>
+          <input id="load-search" class="table-search" type="search" placeholder="Search source, tag, description, manufacturer, model, or notes">
+          <button id="clear-search-btn" class="btn" type="button" title="Clear search">Clear</button>
+          <span id="load-results-count" class="load-results-count" aria-live="polite"></span>
+        </div>
+        <div class="loadlist-filter-chips mb-1" role="group" aria-label="Quick load filters">
+          <button class="loadlist-chip active" type="button" data-filter="all">All</button>
+          <button class="loadlist-chip" type="button" data-filter="missingSource">Missing Source</button>
+          <button class="loadlist-chip" type="button" data-filter="missingElectrical">Missing Electrical</button>
+          <button class="loadlist-chip" type="button" data-filter="highDemand">High Demand</button>
+          <span class="loadlist-shortcuts">Shortcuts: <kbd>/</kbd> search, <kbd>Ctrl</kbd>+<kbd>Shift</kbd>+<kbd>N</kbd> add row</span>
         </div>
         <div class="overflow-x-auto">
           <table id="load-table" class="sticky-table">
