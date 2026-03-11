@@ -47,9 +47,18 @@
   <header class="hero" role="banner">
     <h1>Integrated Cable Routing Workflow</h1>
     <p class="hero-tagline">Browser-based toolkit unifying cable scheduling, analysis, and routing for streamlined design.</p>
+    <div class="hero-actions" aria-label="Primary actions">
+      <a class="hero-action-btn" href="cableschedule.html">Start Workflow</a>
+      <a class="hero-action-btn secondary" href="docs/quickstart.html">Open Quick Start</a>
+    </div>
   </header>
   <div class="container">
     <main id="main-content" class="main-content">
+      <section class="workflow-summary card" aria-live="polite">
+        <h2>Progress Overview</h2>
+        <p id="workflow-progress-text">0 of 7 workflow steps complete.</p>
+        <p id="workflow-next-step">Next recommended step: <a href="cableschedule.html">1. Cable Schedule</a></p>
+      </section>
       <section class="about" id="about">
         <h2>Why CableTrayRoute?</h2>
         <p>CableTrayRoute streamlines electrical design by linking scheduling, analysis, and routing tools in one browser-based workflow. Engineers can define cables, assess tray and conduit capacity, and generate optimal paths without juggling spreadsheets. Automated checks against fill limits and thermal constraints reduce errors and rework. The unified interface accelerates planning and helps deliver consistent, code-compliant results on complex projects.</p>
