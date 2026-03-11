@@ -169,7 +169,7 @@ async function updateProjectDisplay(snapshot){
         span=document.createElement('span');
         span.id='project-display';
         span.style.marginLeft='auto';
-        span.style.marginRight='1rem';
+        span.style.marginRight='var(--space-4)';
         nav.insertBefore(span,settingsBtn);
         if(settingsBtn) settingsBtn.style.marginLeft='0';
       }
@@ -828,8 +828,8 @@ function initHelpModal(btnId='help-btn',modalId='help-modal',closeId){
       if(!iframe){
         iframe=document.createElement('iframe');
         iframe.id='help-iframe';
-        iframe.style.width='100%';
-        iframe.style.height='80vh';
+        iframe.style.width='var(--size-full)';
+        iframe.style.height='var(--size-help-modal-height)';
         content.appendChild(iframe);
       }
       defaults.forEach(el=>{if(el!==closeBtn)el.style.display='none';});
