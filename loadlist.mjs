@@ -115,8 +115,15 @@ if (typeof window !== 'undefined') {
     const deleteBtn = document.getElementById('delete-selected-btn');
     const selectAll = document.getElementById('select-all');
     const summaryDiv = document.getElementById('source-summary');
+    const addRowBtn = document.getElementById('add-row-btn');
+    const searchInput = document.getElementById('load-search');
+    const clearSearchBtn = document.getElementById('clear-search-btn');
+    const resultsCount = document.getElementById('load-results-count');
+    const quickFilterButtons = Array.from(document.querySelectorAll ? document.querySelectorAll('.loadlist-chip') : []);
     let clipboard = null;
     let rendering = false;
+    let filterQuery = '';
+    let activeQuickFilter = 'all';
     const rowClass = tbody.dataset.rowClass || 'load-row';
     const blankLoad = {
       source: '',
@@ -152,10 +159,28 @@ if (typeof window !== 'undefined') {
       return load;
     }
 
+    function getStoreIndex(tr) {
+      return Number(tr.dataset.storeIndex ?? tr.dataset.index);
+    }
+
+    function validateRange(input, min, max) {
+      if (!input) return true;
+      const raw = input.value.trim();
+      if (raw === '') return true;
+      const value = Number(raw);
+      return Number.isFinite(value) && value >= min && value <= max;
+    }
+
   function saveRow(tr) {
-    const idx = Number(tr.dataset.index);
+    const idx = getStoreIndex(tr);
     const load = gatherRow(tr);
     const numericFields = ['quantity','voltage','kw','powerFactor','loadFactor','efficiency','demandFactor','phases'];
+    const rangeFields = [
+      { name: 'powerFactor', min: 0, max: 1 },
+      { name: 'loadFactor', min: 0, max: 100 },
+      { name: 'efficiency', min: 0, max: 100 },
+      { name: 'demandFactor', min: 0, max: 100 }
+    ];
     let valid = true;
     numericFields.forEach(name => {
       const input = tr.querySelector(`input[name="${name}"]`);
@@ -167,6 +192,16 @@ if (typeof window !== 'undefined') {
         } else {
           input.classList.remove('input-error');
         }
+      }
+    });
+    rangeFields.forEach(({ name, min, max }) => {
+      const input = tr.querySelector(`input[name="${name}"]`);
+      if (!validateRange(input, min, max)) {
+        input.classList.add('input-error');
+        input.title = `${name} must be between ${min} and ${max}.`;
+        valid = false;
+      } else if (input) {
+        input.removeAttribute('title');
       }
     });
     if (!valid) {
@@ -193,7 +228,7 @@ if (typeof window !== 'undefined') {
   function insertLoad(index, load) {
     dataStore.insertLoad(index, load);
     render();
-    const row = tbody.querySelector(`tr[data-index="${index}"]`);
+    const row = tbody.querySelector(`tr[data-store-index="${index}"]`);
     if (row) {
       const inp = row.querySelector('input[name="description"]');
       inp && inp.focus();
@@ -213,7 +248,7 @@ if (typeof window !== 'undefined') {
     const btn = e.target;
     const tr = btn.closest('tr');
     if (!tr) return;
-    const idx = Number(tr.dataset.index);
+    const idx = getStoreIndex(tr);
     if (btn.classList.contains('duplicateBtn')) {
       const load = gatherRow(tr);
       const ids = dataStore.getLoads().map(l => l.id).filter(Boolean);
@@ -260,9 +295,10 @@ if (typeof window !== 'undefined') {
     }
   }
 
-  function createRow(load, idx) {
+  function createRow(load, idx, storeIndex = idx) {
     const tr = document.createElement('tr');
     tr.dataset.index = idx;
+    tr.dataset.storeIndex = storeIndex;
     if (load.ref) tr.dataset.ref = load.ref;
     if (load.id) tr.dataset.id = load.id;
     tr.classList.add(rowClass);
@@ -314,14 +350,14 @@ if (typeof window !== 'undefined') {
 
   const menu = new ContextMenu();
   menu.setItems([
-    { label: 'Insert Row Above', action: tr => { if (!tr) return; insertLoad(Number(tr.dataset.index), blankLoad); } },
-    { label: 'Insert Row Below', action: tr => { if (!tr) return; insertLoad(Number(tr.dataset.index) + 1, blankLoad); } },
+    { label: 'Insert Row Above', action: tr => { if (!tr) return; insertLoad(getStoreIndex(tr), blankLoad); } },
+    { label: 'Insert Row Below', action: tr => { if (!tr) return; insertLoad(getStoreIndex(tr) + 1, blankLoad); } },
     { label: 'Copy Row', action: tr => { if (!tr) return; clipboard = JSON.parse(JSON.stringify(gatherRow(tr))); } },
     { label: 'Paste Row', action: tr => {
         if (!tr) return;
         if (!clipboard) return;
         const load = JSON.parse(JSON.stringify(clipboard));
-        const idx = Number(tr.dataset.index);
+        const idx = getStoreIndex(tr);
         const loads = dataStore.getLoads();
         if (idx >= loads.length - 1) {
           dataStore.addLoad(load);
@@ -331,7 +367,7 @@ if (typeof window !== 'undefined') {
         render();
       }
     },
-    { label: 'Delete Row', action: tr => { if (!tr) return; dataStore.deleteLoad(Number(tr.dataset.index)); render(); } }
+    { label: 'Delete Row', action: tr => { if (!tr) return; dataStore.deleteLoad(getStoreIndex(tr)); render(); } }
   ]);
 
   table.addEventListener('contextmenu', e => {
@@ -355,7 +391,7 @@ if (typeof window !== 'undefined') {
     } else if (e.ctrlKey && e.key.toLowerCase() === 'v') {
       if (!clipboard) return;
       const load = JSON.parse(JSON.stringify(clipboard));
-      const idx = Number(row.dataset.index);
+      const idx = getStoreIndex(row);
       const loads = dataStore.getLoads();
       if (idx >= loads.length - 1) {
         dataStore.addLoad(load);
@@ -364,6 +400,13 @@ if (typeof window !== 'undefined') {
       }
       render();
       e.preventDefault();
+    } else if (e.key === '/' && searchInput) {
+      e.preventDefault();
+      searchInput.focus();
+      searchInput.select();
+    } else if (e.ctrlKey && e.shiftKey && e.key.toLowerCase() === 'n' && addRowBtn) {
+      e.preventDefault();
+      addRowBtn.click();
     }
   });
 
@@ -407,23 +450,71 @@ if (typeof window !== 'undefined') {
     summaryDiv.innerHTML = html;
   }
 
+  function matchesQuickFilter(load) {
+    if (activeQuickFilter === 'missingSource') {
+      return !String(load.source || '').trim();
+    }
+    if (activeQuickFilter === 'missingElectrical') {
+      return !String(load.kw || '').trim() || !String(load.voltage || '').trim();
+    }
+    if (activeQuickFilter === 'highDemand') {
+      const { demandKva } = calculateDerived(load);
+      return Number(demandKva) >= 50;
+    }
+    return true;
+  }
+
+  function matchesLoadFilter(load, query) {
+    if (!matchesQuickFilter(load)) return false;
+    if (!query) return true;
+    const haystack = [
+      load.source,
+      load.tag,
+      load.description,
+      load.manufacturer,
+      load.model,
+      load.notes
+    ].join(' ').toLowerCase();
+    return haystack.includes(query);
+  }
+
   function render() {
     if (rendering) return;
     rendering = true;
     try {
       tbody.innerHTML = '';
       let loads = dataStore.getLoads();
-      if (!loads.length) {
+      const hasStoredLoads = loads.length > 0;
+      if (!hasStoredLoads) {
         // Ensure at least one editable row renders even with no stored data
         loads = [{}];
-      } else {
-        // Recalculate derived fields for display without rewriting storage
-        loads = loads.map(l => ({ ...l, ...calculateDerived(l) }));
       }
-      loads.forEach((load, idx) => tbody.appendChild(createRow(load, idx)));
+      // Recalculate derived fields for display without rewriting storage
+      loads = loads.map(l => ({ ...l, ...calculateDerived(l) }));
+
+      const filtered = loads
+        .map((load, storeIndex) => ({ load, storeIndex }))
+        .filter(entry => matchesLoadFilter(entry.load, filterQuery));
+
+      if (hasStoredLoads && !filtered.length) {
+        tbody.innerHTML = `<tr><td colspan="22" class="empty-state">No matching loads for the current search.</td></tr>`;
+      } else {
+        filtered.forEach((entry, idx) => tbody.appendChild(createRow(entry.load, idx, entry.storeIndex)));
+      }
+
       selectAll.checked = false;
       recalculateTotals(loads);
       updateSummary(loads);
+
+      if (resultsCount) {
+        const resultCount = filtered.length;
+        const totalCount = hasStoredLoads ? loads.length : 0;
+        if (!filterQuery) {
+          resultsCount.textContent = totalCount ? `${totalCount} load${totalCount === 1 ? '' : 's'}` : '';
+        } else {
+          resultsCount.textContent = `${resultCount} of ${totalCount} shown`;
+        }
+      }
     } finally {
       rendering = false;
     }
@@ -679,7 +770,7 @@ if (typeof window !== 'undefined') {
     const rows = Array.from(tbody.querySelectorAll('tr')).filter(r => r.querySelector('.row-select').checked);
     if (!rows.length) return;
     if (!confirm('Delete selected loads?')) return;
-    const indices = rows.map(r => Number(r.dataset.index));
+    const indices = rows.map(r => getStoreIndex(r));
     const loads = dataStore.getLoads().filter((_, idx) => !indices.includes(idx));
     dataStore.setLoads(loads);
     render();
@@ -786,6 +877,45 @@ if (typeof window !== 'undefined') {
     });
     e.target.value = '';
   });
+
+
+
+  quickFilterButtons.forEach(btn => {
+    btn.addEventListener('click', () => {
+      activeQuickFilter = btn.dataset.filter || 'all';
+      quickFilterButtons.forEach(chip => chip.classList.toggle('active', chip === btn));
+      render();
+    });
+  });
+
+  if (addRowBtn) {
+    addRowBtn.addEventListener('click', () => {
+      dataStore.addLoad({ ...blankLoad });
+      render();
+      const rows = tbody.querySelectorAll('tr');
+      const row = rows[rows.length - 1];
+      const input = row?.querySelector('input[name="description"]');
+      if (input) input.focus();
+    });
+  }
+
+  if (searchInput) {
+    searchInput.addEventListener('input', e => {
+      filterQuery = e.target.value.trim().toLowerCase();
+      render();
+    });
+  }
+
+  if (clearSearchBtn) {
+    clearSearchBtn.addEventListener('click', () => {
+      filterQuery = '';
+      if (searchInput) {
+        searchInput.value = '';
+        searchInput.focus();
+      }
+      render();
+    });
+  }
 
   // Initial render for an empty table; rows populate on 'loadList' events
   render();
