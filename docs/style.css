@@ -1724,6 +1724,33 @@ body.dark-mode .settings-menu {
     background: var(--secondary-color);
 }
 
+
+.settings-menu select,
+.settings-menu input[type="text"] {
+    background: var(--theme-control-bg);
+    color: var(--theme-control-text);
+    border: 1px solid var(--border-color);
+}
+
+.legacy-dark-toggle {
+    opacity: 0.85;
+}
+
+body.theme-high-contrast a,
+body.theme-high-contrast .btn,
+body.theme-high-contrast button {
+    text-decoration-thickness: 2px;
+}
+
+body.theme-high-contrast .top-nav,
+body.theme-high-contrast .settings-menu,
+body.theme-high-contrast .card,
+body.theme-high-contrast table,
+body.theme-high-contrast th,
+body.theme-high-contrast td {
+    border-color: #000;
+}
+
 h1, h2, h3 {
     font-family: var(--font-family-base);
     color: var(--primary-color);

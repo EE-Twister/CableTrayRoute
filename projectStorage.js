@@ -25,8 +25,18 @@ function defaultProject() {
     trays: [],
     cables: [],
     cableTypicals: [],
-    settings: { session: {}, collapsedGroups: {}, units: 'imperial' }
+    settings: { session: {}, collapsedGroups: {}, units: 'imperial', theme: 'system' }
   };
+}
+
+const VALID_THEMES = new Set(['system', 'light', 'dark', 'high-contrast']);
+
+function normalizeThemePreference(value) {
+  if (typeof value !== 'string') return '';
+  const normalized = value.trim().toLowerCase();
+  if (VALID_THEMES.has(normalized)) return normalized;
+  if (normalized === 'contrast' || normalized === 'high_contrast') return 'high-contrast';
+  return '';
 }
 
 function migrateProject(old = {}) {
@@ -35,6 +45,12 @@ function migrateProject(old = {}) {
     collapsedGroups: old.collapsedGroups || {}
   };
   if (!settings.units) settings.units = 'imperial';
+  const sessionDarkMode = settings.session && typeof settings.session === 'object'
+    ? settings.session.darkMode
+    : undefined;
+  settings.theme = normalizeThemePreference(settings.theme)
+    || normalizeThemePreference(old.themePreference)
+    || (typeof sessionDarkMode === 'boolean' ? (sessionDarkMode ? 'dark' : 'light') : 'system');
   return {
     name: old.name || '',
     ductbanks: old.ductbanks || old.ductbankSchedule || [],
@@ -462,6 +478,23 @@ export function wasSavedProjectMigrated(projectId) {
   ensureSavedProjectsCache();
   if (savedProjectsError) return false;
   return migratedSavedProjects.has(name);
+}
+
+
+export function getThemePreference() {
+  const settings = project.settings;
+  const raw = settings && typeof settings === 'object' ? settings.theme : undefined;
+  return normalizeThemePreference(raw) || 'system';
+}
+
+export function setThemePreference(theme) {
+  const normalized = normalizeThemePreference(theme) || 'system';
+  try {
+    setProjectKey('theme', JSON.stringify(normalized));
+  } catch (e) {
+    console.warn('theme preference save failed', e);
+  }
+  return getThemePreference();
 }
 
 export function getSessionPreferences() {
@@ -1027,6 +1060,8 @@ const api = {
   getSessionPreferences,
   setSessionPreferences,
   updateSessionPreferences,
+  getThemePreference,
+  setThemePreference,
   getConduitCache,
   setConduitCache,
   clearConduitCache,

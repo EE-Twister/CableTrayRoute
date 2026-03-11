@@ -11,6 +11,8 @@ import {
   onProjectChange,
   getSessionPreferences,
   updateSessionPreferences,
+  getThemePreference,
+  setThemePreference,
   setConduitCache,
   getConduitCache
 } from "./projectStorage.js";
@@ -729,35 +731,85 @@ function initSettings(){
 }
 
 function initDarkMode(){
+  const settingsMenu=document.getElementById('settings-menu');
   const darkToggle=document.getElementById('dark-toggle');
-  let session=getSessionPreferences();
-  if(session.darkMode===undefined){
-    const prefersDark=window.matchMedia&&window.matchMedia('(prefers-color-scheme: dark)').matches;
-    session=updateSessionPreferences(prev=>({...(prev&&typeof prev==='object'?prev:{}),darkMode:prefersDark}));
+  const prefersDarkQuery=window.matchMedia?window.matchMedia('(prefers-color-scheme: dark)'):null;
+  const prefersContrastQuery=window.matchMedia?window.matchMedia('(prefers-contrast: more)'):null;
+
+  let themeSelect=document.getElementById('theme-select');
+  if(!themeSelect&&settingsMenu){
+    const wrapper=document.createElement('label');
+    wrapper.setAttribute('for','theme-select');
+    wrapper.textContent='Theme';
+    themeSelect=document.createElement('select');
+    themeSelect.id='theme-select';
+    themeSelect.innerHTML=`
+      <option value="system">System</option>
+      <option value="light">Light</option>
+      <option value="dark">Dark</option>
+      <option value="high-contrast">High Contrast</option>
+    `;
+    wrapper.appendChild(themeSelect);
+    settingsMenu.insertBefore(wrapper,settingsMenu.firstChild);
   }
-  const applyState=value=>{
-    document.body.classList.toggle('dark-mode',!!value);
-    if(darkToggle) darkToggle.checked=!!value;
+
+  const resolveTheme=theme=>{
+    if(theme==='dark'||theme==='light'||theme==='high-contrast') return theme;
+    if(prefersContrastQuery&&prefersContrastQuery.matches) return 'high-contrast';
+    return prefersDarkQuery&&prefersDarkQuery.matches?'dark':'light';
   };
-  applyState(session.darkMode);
-  if(darkToggle){
-    darkToggle.addEventListener('change',()=>{
-      const value=!!darkToggle.checked;
-      applyState(value);
-      session=updateSessionPreferences(prev=>({...(prev&&typeof prev==='object'?prev:{}),darkMode:value}));
+
+  const applyTheme=(themePreference,{syncControls=true}={})=>{
+    const theme=resolveTheme(themePreference);
+    document.body.classList.toggle('dark-mode',theme==='dark');
+    document.body.classList.toggle('theme-light',theme==='light');
+    document.body.classList.toggle('theme-high-contrast',theme==='high-contrast');
+    document.body.dataset.theme=theme;
+    document.documentElement.style.colorScheme=theme==='dark'?'dark':(theme==='high-contrast'?'only light':'light');
+    if(syncControls){
+      if(themeSelect) themeSelect.value=themePreference;
+      if(darkToggle) darkToggle.checked=theme==='dark';
+    }
+  };
+
+  const syncFromStorage=()=>{
+    const storedTheme=getThemePreference();
+    applyTheme(storedTheme);
+  };
+
+  syncFromStorage();
+
+  if(themeSelect){
+    themeSelect.addEventListener('change',()=>{
+      const nextTheme=themeSelect.value||'system';
+      setThemePreference(nextTheme);
+      applyTheme(nextTheme,{syncControls:false});
       if(typeof window.saveSession==='function') window.saveSession();
       if(typeof window.saveDuctbankSession==='function') window.saveDuctbankSession();
     });
   }
-  window.addEventListener('storage',e=>{
-    if(e.key==='ctrSession'){
-      try{
-        const data=e.newValue?JSON.parse(e.newValue):{};
-        applyState(data&&data.darkMode);
-        session=data||{};
-      }catch{}
-    }
-  });
+
+  if(darkToggle){
+    darkToggle.closest('label')?.classList.add('legacy-dark-toggle');
+    darkToggle.addEventListener('change',()=>{
+      const nextTheme=darkToggle.checked?'dark':'light';
+      setThemePreference(nextTheme);
+      applyTheme(nextTheme,{syncControls:false});
+      if(themeSelect) themeSelect.value=nextTheme;
+    });
+  }
+
+  if(prefersDarkQuery){
+    prefersDarkQuery.addEventListener('change',()=>{
+      if(getThemePreference()==='system') applyTheme('system');
+    });
+  }
+  if(prefersContrastQuery){
+    prefersContrastQuery.addEventListener('change',()=>{
+      if(getThemePreference()==='system') applyTheme('system');
+    });
+  }
+  onProjectChange(()=>syncFromStorage());
 }
 
 function initCompactMode(){
