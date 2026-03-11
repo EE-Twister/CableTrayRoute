@@ -28,6 +28,20 @@ Environment variables let you tune behaviour without code changes:
 
 Existing installs that contain plaintext passwords will be migrated automatically: the first successful login rehashes the credential using the secure format.
 
+
+## Static Asset Caching & Compression
+
+The deployment server applies cache and compression defaults optimized for fingerprinted static assets:
+
+- Fingerprinted assets matching `<name>.<hash>.<ext>` are served with `Cache-Control: public, max-age=31536000, immutable`.
+- HTML entry points are served with `Cache-Control: public, max-age=60, must-revalidate`.
+- Other static files use `Cache-Control: public, max-age=600, must-revalidate`.
+- Text-like responses larger than 1 KB (HTML/CSS/JS/JSON/XML/SVG) are gzip-compressed by default.
+
+The build copy pipeline (`scripts/copyAssets.js`) now emits fingerprinted copies and an `asset-manifest.json` map in both `dist/` and `docs/` so deployments can adopt immutable URLs while keeping HTML short-lived.
+
+For rollout safety, keep older fingerprinted files available until all clients have refreshed to the new HTML references.
+
 ## Landing Page and Workflow
 
 The new landing page (`index.html`) links to every tool in the suite and outlines

@@ -1,4 +1,5 @@
 import express from 'express';
+import zlib from 'zlib';
 import fs from 'fs/promises';
 import path from 'path';
 import crypto from 'crypto';
@@ -17,6 +18,7 @@ const DEFAULT_RATE_LIMIT_WINDOW_MS = Number.parseInt(
 const DEFAULT_RATE_LIMIT_MAX = Number.parseInt(process.env.PROJECT_RATE_LIMIT_MAX || '100', 10);
 const PASSWORD_ALGORITHM = 'scrypt';
 const PASSWORD_KEYLEN = 64;
+const FINGERPRINTED_ASSET_PATTERN = /\.[0-9a-f]{8,}\.[^.]+$/i;
 
 function formatDurationMs(startNs, endNs = process.hrtime.bigint()) {
   return Number(endNs - startNs) / 1e6;
@@ -31,6 +33,20 @@ function appendServerTiming(res, metricName, durationMs) {
     return;
   }
   res.setHeader('Server-Timing', metric);
+}
+
+function setStaticCacheHeaders(res, filePath) {
+  const relative = path.relative(process.cwd(), filePath).replace(/\\/g, '/');
+  const baseName = path.basename(filePath);
+  if (FINGERPRINTED_ASSET_PATTERN.test(baseName)) {
+    res.setHeader('Cache-Control', 'public, max-age=31536000, immutable');
+    return;
+  }
+  if (relative.endsWith('.html')) {
+    res.setHeader('Cache-Control', 'public, max-age=60, must-revalidate');
+    return;
+  }
+  res.setHeader('Cache-Control', 'public, max-age=600, must-revalidate');
 }
 
 function applyMergePatch(target, patch) {
@@ -394,7 +410,53 @@ export async function createApp(options = {}) {
   }
 
   app.use(express.json({ limit: '1mb' }));
-  app.use(express.static(staticRoot));
+  app.use((req, res, next) => {
+    const acceptEncoding = req.headers['accept-encoding'] || '';
+    const allowCompression =
+      !req.headers['x-no-compression'] &&
+      typeof acceptEncoding === 'string' &&
+      /\bgzip\b/i.test(acceptEncoding);
+
+    if (!allowCompression) {
+      next();
+      return;
+    }
+
+    const originalSend = res.send.bind(res);
+    res.send = body => {
+      const contentType = String(res.getHeader('Content-Type') || '').toLowerCase();
+      const compressibleType =
+        contentType.includes('text/') ||
+        contentType.includes('json') ||
+        contentType.includes('javascript') ||
+        contentType.includes('xml') ||
+        contentType.includes('svg');
+
+      if (!compressibleType || res.getHeader('Content-Encoding')) {
+        return originalSend(body);
+      }
+
+      const source = Buffer.isBuffer(body)
+        ? body
+        : Buffer.from(typeof body === 'string' ? body : JSON.stringify(body ?? ''));
+      if (source.length < 1024) {
+        return originalSend(body);
+      }
+
+      const compressed = zlib.gzipSync(source, { level: 6 });
+      res.setHeader('Content-Encoding', 'gzip');
+      res.setHeader('Vary', 'Accept-Encoding');
+      res.setHeader('Content-Length', String(compressed.length));
+      return originalSend(compressed);
+    };
+
+    next();
+  });
+  app.use(
+    express.static(staticRoot, {
+      setHeaders: setStaticCacheHeaders
+    })
+  );
 
   const rateLimiter = createRateLimiter({ windowMs: rateLimitWindowMs, max: rateLimitMax });
   app.use('/projects', rateLimiter);
