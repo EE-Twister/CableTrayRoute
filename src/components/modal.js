@@ -44,6 +44,68 @@ function defaultDoc() {
 
 let modalCount = 0;
 
+export function ensureFieldAssistiveText(field, {
+  helperText = '',
+  helperClass = 'form-helper-text',
+  errorClass = 'form-field-error'
+} = {}) {
+  if (!(field instanceof HTMLElement)) return null;
+  const doc = field.ownerDocument;
+  if (!doc) return null;
+  const baseId = field.id || `field-${Math.random().toString(36).slice(2)}`;
+  if (!field.id) field.id = baseId;
+  const existingDescribedBy = (field.getAttribute('aria-describedby') || '')
+    .split(/\s+/)
+    .filter(Boolean);
+
+  const container = field.closest('.modal-form-field, .panel-info-compact, label, .modal-form') || field.parentElement;
+  if (!(container instanceof HTMLElement)) return null;
+
+  const helperId = `${baseId}-helper`;
+  let helperEl = doc.getElementById(helperId);
+  if (!helperEl) {
+    helperEl = doc.createElement('p');
+    helperEl.id = helperId;
+    helperEl.className = helperClass;
+    container.appendChild(helperEl);
+  }
+  helperEl.textContent = helperText;
+
+  const errorId = `${baseId}-error`;
+  let errorEl = doc.getElementById(errorId);
+  if (!errorEl) {
+    errorEl = doc.createElement('p');
+    errorEl.id = errorId;
+    errorEl.className = errorClass;
+    errorEl.setAttribute('role', 'alert');
+    container.appendChild(errorEl);
+  }
+
+  const describedBy = new Set(existingDescribedBy);
+  if (helperText) describedBy.add(helperId);
+  describedBy.add(errorId);
+  field.setAttribute('aria-describedby', Array.from(describedBy).join(' '));
+
+  const setError = message => {
+    const nextMessage = String(message || '').trim();
+    errorEl.textContent = nextMessage;
+    if (nextMessage) {
+      errorEl.classList.add('is-visible');
+      field.setAttribute('aria-invalid', 'true');
+    } else {
+      errorEl.classList.remove('is-visible');
+      field.removeAttribute('aria-invalid');
+    }
+  };
+
+  setError('');
+  return {
+    helperEl,
+    errorEl,
+    setError
+  };
+}
+
 export function openModal(options = {}) {
   const doc = defaultDoc();
   if (!doc) {

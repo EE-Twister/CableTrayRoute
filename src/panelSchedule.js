@@ -2,6 +2,7 @@ import "./workflowStatus.js";
 import "../site.js";
 import * as dataStore from "../dataStore.mjs";
 import { exportPanelSchedule } from "../exportPanelSchedule.js";
+import { ensureFieldAssistiveText } from "./components/modal.js";
 
 const projectId = typeof window !== "undefined" ? (window.currentProjectId || "default") : undefined;
 
@@ -2426,6 +2427,7 @@ window.addEventListener("DOMContentLoaded", () => {
   const jumpUnassignedBtn = document.getElementById("panel-jump-unassigned-btn");
   const clearAssignmentsBtn = document.getElementById("panel-clear-assignments-btn");
   const validationHints = document.getElementById("panel-validation-hints");
+  const fieldAssistive = new Map();
 
   const savePanels = () => {
     dataStore.setPanels(panels);
@@ -2493,6 +2495,12 @@ window.addEventListener("DOMContentLoaded", () => {
 
   const validatePanelInputs = () => {
     const hints = [];
+    const fieldErrors = {
+      voltage: '',
+      circuitCount: '',
+      mainRating: '',
+      shortCircuitRating: ''
+    };
     const markInvalid = (input, invalid) => {
       if (!input) return;
       input.setAttribute("aria-invalid", invalid ? "true" : "false");
@@ -2503,14 +2511,16 @@ window.addEventListener("DOMContentLoaded", () => {
     const voltageInvalid = Boolean(voltageValue) && (!Number.isFinite(parsedVoltage) || parsedVoltage <= 0);
     markInvalid(voltageInput, voltageInvalid);
     if (voltageInvalid) {
-      hints.push("Voltage should be a positive number (for example: 480). ");
+      fieldErrors.voltage = 'Enter a positive voltage value (example: 480).';
+      hints.push('Voltage should be a positive number (for example: 480).');
     }
 
     const circuitValue = circuitInput ? Number.parseInt(circuitInput.value, 10) : null;
     const circuitInvalid = Number.isFinite(circuitValue) ? circuitValue < 1 : false;
     markInvalid(circuitInput, circuitInvalid);
     if (circuitInvalid) {
-      hints.push("Number of circuits must be 1 or greater.");
+      fieldErrors.circuitCount = 'Use 1 or greater for number of circuits.';
+      hints.push('Number of circuits must be 1 or greater.');
     }
 
     const mainRating = mainInput ? Number.parseFloat(mainInput.value) : null;
@@ -2519,14 +2529,23 @@ window.addEventListener("DOMContentLoaded", () => {
     markInvalid(mainInput, ratingConflict);
     markInvalid(sccrInput, ratingConflict);
     if (ratingConflict) {
-      hints.push("Short-circuit rating should be greater than or equal to the main device rating.");
+      fieldErrors.mainRating = 'Lower than short-circuit rating allowed. Reduce main or increase SCCR.';
+      fieldErrors.shortCircuitRating = 'SCCR must be greater than or equal to main device rating.';
+      hints.push('Short-circuit rating should be greater than or equal to the main device rating.');
+    }
+
+    if (fieldAssistive.size) {
+      fieldAssistive.get('voltage')?.setError(fieldErrors.voltage);
+      fieldAssistive.get('circuitCount')?.setError(fieldErrors.circuitCount);
+      fieldAssistive.get('mainRating')?.setError(fieldErrors.mainRating);
+      fieldAssistive.get('shortCircuitRating')?.setError(fieldErrors.shortCircuitRating);
     }
 
     if (validationHints) {
       if (!hints.length) {
-        validationHints.textContent = "All key panel inputs look valid.";
+        validationHints.textContent = 'All key panel inputs look valid.';
       } else {
-        validationHints.innerHTML = hints.map(message => `<div class="panel-hint">⚠ ${message}</div>`).join("");
+        validationHints.innerHTML = hints.map(message => `<div class="panel-hint">⚠ ${message} Fix the highlighted field to continue.</div>`).join('');
       }
     }
 
@@ -2831,6 +2850,18 @@ window.addEventListener("DOMContentLoaded", () => {
   }
 
   const panelInfo = document.getElementById("panel-info");
+  fieldAssistive.set('voltage', ensureFieldAssistiveText(voltageInput, {
+    helperText: 'Required for panel calculations and scheduling. Use a positive numeric value in volts.'
+  }));
+  fieldAssistive.set('circuitCount', ensureFieldAssistiveText(circuitInput, {
+    helperText: 'Set the total branch circuit positions available in this panel.'
+  }));
+  fieldAssistive.set('mainRating', ensureFieldAssistiveText(mainInput, {
+    helperText: 'Main device ampere rating used for checks against short-circuit capacity.'
+  }));
+  fieldAssistive.set('shortCircuitRating', ensureFieldAssistiveText(sccrInput, {
+    helperText: 'Panel SCCR in amperes. This should be greater than or equal to main rating.'
+  }));
   if (panelInfo) {
     panelInfo.addEventListener("input", () => validatePanelInputs());
     panelInfo.addEventListener("change", () => validatePanelInputs());
