@@ -113,6 +113,95 @@ async function authScenario() {
       assert(payload.version);
     });
 
+    const firstVersion = await check('stores initial version metadata for incremental updates', async () => {
+      const res = await fetch(`${baseUrl}/projects/incremental`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${session.token}`,
+          'X-CSRF-Token': session.csrfToken
+        },
+        body: JSON.stringify({ data: { counters: { a: 1, b: 2 }, note: 'base' } })
+      });
+      assert.strictEqual(res.status, 200);
+      const payload = await res.json();
+      assert(payload.version);
+      assert.strictEqual(payload.unchanged, false);
+      return payload.version;
+    });
+
+    const patchedVersion = await check('applies merge patch updates incrementally', async () => {
+      const res = await fetch(`${baseUrl}/projects/incremental`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${session.token}`,
+          'X-CSRF-Token': session.csrfToken
+        },
+        body: JSON.stringify({
+          baseVersion: firstVersion,
+          patch: { counters: { b: 3 }, added: true }
+        })
+      });
+      assert.strictEqual(res.status, 200);
+      const payload = await res.json();
+      assert(payload.version);
+      assert.notStrictEqual(payload.version, firstVersion);
+
+      const read = await fetch(`${baseUrl}/projects/incremental`, {
+        headers: { Authorization: `Bearer ${session.token}` }
+      });
+      assert.strictEqual(read.status, 200);
+      const loaded = await read.json();
+      assert.deepStrictEqual(loaded.data, { counters: { a: 1, b: 3 }, note: 'base', added: true });
+      return payload.version;
+    });
+
+    await check('rejects incremental updates with stale baseVersion', async () => {
+      const res = await fetch(`${baseUrl}/projects/incremental`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${session.token}`,
+          'X-CSRF-Token': session.csrfToken
+        },
+        body: JSON.stringify({
+          baseVersion: firstVersion,
+          patch: { stale: true }
+        })
+      });
+      assert.strictEqual(res.status, 409);
+      const payload = await res.json();
+      assert.strictEqual(payload.error, 'Version conflict');
+      assert.strictEqual(payload.currentVersion, patchedVersion);
+    });
+
+    await check('skips writes when payload is unchanged and emits timing metrics', async () => {
+      const res = await fetch(`${baseUrl}/projects/incremental`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${session.token}`,
+          'X-CSRF-Token': session.csrfToken
+        },
+        body: JSON.stringify({ patch: {} })
+      });
+      assert.strictEqual(res.status, 200);
+      const payload = await res.json();
+      assert.strictEqual(payload.unchanged, true);
+      const timing = res.headers.get('server-timing') || '';
+      assert.match(timing, /project\.persist;dur=/);
+      assert.match(timing, /project\.write;dur=/);
+
+      const getRes = await fetch(`${baseUrl}/projects/incremental`, {
+        headers: { Authorization: `Bearer ${session.token}` }
+      });
+      assert.strictEqual(getRes.status, 200);
+      const getTiming = getRes.headers.get('server-timing') || '';
+      assert.match(getTiming, /project\.read;dur=/);
+      assert.match(getTiming, /project\.parse;dur=/);
+    });
+
     await check('serves stored project data before expiry', async () => {
       const res = await fetch(`${baseUrl}/projects/test`, {
         headers: { Authorization: `Bearer ${session.token}` }

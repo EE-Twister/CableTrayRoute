@@ -18,6 +18,176 @@ const DEFAULT_RATE_LIMIT_MAX = Number.parseInt(process.env.PROJECT_RATE_LIMIT_MA
 const PASSWORD_ALGORITHM = 'scrypt';
 const PASSWORD_KEYLEN = 64;
 
+function formatDurationMs(startNs, endNs = process.hrtime.bigint()) {
+  return Number(endNs - startNs) / 1e6;
+}
+
+function appendServerTiming(res, metricName, durationMs) {
+  const normalizedDuration = Math.max(0, durationMs);
+  const metric = `${metricName};dur=${normalizedDuration.toFixed(2)}`;
+  const existing = res.getHeader('Server-Timing');
+  if (typeof existing === 'string' && existing.length > 0) {
+    res.setHeader('Server-Timing', `${existing}, ${metric}`);
+    return;
+  }
+  res.setHeader('Server-Timing', metric);
+}
+
+function applyMergePatch(target, patch) {
+  if (patch === null || typeof patch !== 'object' || Array.isArray(patch)) {
+    return patch;
+  }
+
+  const base = target && typeof target === 'object' && !Array.isArray(target) ? { ...target } : {};
+  for (const [key, value] of Object.entries(patch)) {
+    if (value === null) {
+      delete base[key];
+      continue;
+    }
+    base[key] = applyMergePatch(base[key], value);
+  }
+  return base;
+}
+
+function normalizeSaveRequest(body) {
+  if (!body || typeof body !== 'object' || Array.isArray(body)) {
+    return { mode: 'replace', data: body ?? {} };
+  }
+
+  if (Object.prototype.hasOwnProperty.call(body, 'patch')) {
+    return {
+      mode: 'patch',
+      patch: body.patch ?? {},
+      baseVersion: body.baseVersion
+    };
+  }
+
+  if (Object.prototype.hasOwnProperty.call(body, 'data')) {
+    return {
+      mode: 'replace',
+      data: body.data ?? {},
+      baseVersion: body.baseVersion
+    };
+  }
+
+  return { mode: 'replace', data: body };
+}
+
+class ProjectStore {
+  constructor(dataDir) {
+    this.dataDir = dataDir;
+    this.cache = new Map();
+  }
+
+  #cacheKey(username, project) {
+    return `${username}:${project}`;
+  }
+
+  #projectDir(username, project) {
+    return path.join(this.dataDir, username, project);
+  }
+
+  async loadLatest(username, project) {
+    const startedAt = process.hrtime.bigint();
+    const cacheKey = this.#cacheKey(username, project);
+    const cached = this.cache.get(cacheKey);
+    if (cached) {
+      return {
+        version: cached.version,
+        data: cached.data,
+        metrics: { readMs: 0, parseMs: 0, cacheHit: true }
+      };
+    }
+
+    const projDir = this.#projectDir(username, project);
+    const files = await fs.readdir(projDir);
+    const versions = files.filter(f => f.endsWith('.json')).sort();
+    if (!versions.length) {
+      throw new Error('not-found');
+    }
+
+    const latest = versions[versions.length - 1];
+    const readDoneAt = process.hrtime.bigint();
+    const text = await fs.readFile(path.join(projDir, latest), 'utf-8');
+    const parsed = JSON.parse(text);
+    const parseDoneAt = process.hrtime.bigint();
+    const entry = {
+      version: latest.replace('.json', ''),
+      data: parsed,
+      json: JSON.stringify(parsed)
+    };
+    this.cache.set(cacheKey, entry);
+
+    return {
+      version: entry.version,
+      data: entry.data,
+      metrics: {
+        readMs: formatDurationMs(startedAt, readDoneAt),
+        parseMs: formatDurationMs(readDoneAt, parseDoneAt),
+        cacheHit: false
+      }
+    };
+  }
+
+  async save(username, project, requestBody) {
+    const input = normalizeSaveRequest(requestBody);
+    const metrics = { loadMs: 0, mergeMs: 0, serializeMs: 0, writeMs: 0, skippedWrite: false };
+    let current = { version: null, data: {} };
+
+    const loadStartedAt = process.hrtime.bigint();
+    try {
+      const loaded = await this.loadLatest(username, project);
+      current = { version: loaded.version, data: loaded.data };
+      metrics.loadMs = loaded.metrics.readMs + loaded.metrics.parseMs;
+    } catch (err) {
+      if (err.code !== 'ENOENT' && err.message !== 'not-found') {
+        throw err;
+      }
+    }
+    const loadDoneAt = process.hrtime.bigint();
+    if (!metrics.loadMs) {
+      metrics.loadMs = formatDurationMs(loadStartedAt, loadDoneAt);
+    }
+
+    if (input.baseVersion && current.version && input.baseVersion !== current.version) {
+      const conflict = new Error('version-conflict');
+      conflict.code = 'VERSION_CONFLICT';
+      conflict.currentVersion = current.version;
+      throw conflict;
+    }
+
+    const mergeStartedAt = process.hrtime.bigint();
+    const nextData = input.mode === 'patch' ? applyMergePatch(current.data, input.patch ?? {}) : input.data ?? {};
+    const mergeDoneAt = process.hrtime.bigint();
+    metrics.mergeMs = formatDurationMs(mergeStartedAt, mergeDoneAt);
+
+    const serializeStartedAt = process.hrtime.bigint();
+    const compactJson = JSON.stringify(nextData ?? {});
+    const prettyJson = `${JSON.stringify(nextData ?? {}, null, 2)}\n`;
+    const serializeDoneAt = process.hrtime.bigint();
+    metrics.serializeMs = formatDurationMs(serializeStartedAt, serializeDoneAt);
+
+    const cacheKey = this.#cacheKey(username, project);
+    const cached = this.cache.get(cacheKey);
+    const currentJson = cached?.json ?? JSON.stringify(current.data ?? {});
+    if (currentJson === compactJson) {
+      metrics.skippedWrite = true;
+      return { version: current.version ?? null, data: nextData, metrics };
+    }
+
+    const userDir = this.#projectDir(username, project);
+    await fs.mkdir(userDir, { recursive: true });
+    const writeStartedAt = process.hrtime.bigint();
+    const version = Date.now().toString();
+    await fs.writeFile(path.join(userDir, `${version}.json`), prettyJson);
+    const writeDoneAt = process.hrtime.bigint();
+    metrics.writeMs = formatDurationMs(writeStartedAt, writeDoneAt);
+
+    this.cache.set(cacheKey, { version, data: nextData, json: compactJson });
+    return { version, data: nextData, metrics };
+  }
+}
+
 function createRateLimiter({ windowMs, max }) {
   const hits = new Map();
 
@@ -200,6 +370,7 @@ export async function createApp(options = {}) {
 
   const sessionStore = new FileSessionStore(sessionsFile, tokenTtlMs);
   await sessionStore.init();
+  const projectStore = new ProjectStore(dataDir);
 
   async function saveUsers() {
     await fs.writeFile(usersFile, JSON.stringify(users, null, 2));
@@ -335,11 +506,28 @@ export async function createApp(options = {}) {
     asyncHandler(async (req, res) => {
       const project = req.params.project;
       const username = req.username;
-      const userDir = path.join(dataDir, username, project);
-      await fs.mkdir(userDir, { recursive: true });
-      const version = Date.now().toString();
-      await fs.writeFile(path.join(userDir, `${version}.json`), JSON.stringify(req.body ?? {}, null, 2));
-      res.json({ version });
+      const persistStartedAt = process.hrtime.bigint();
+      try {
+        const saved = await projectStore.save(username, project, req.body);
+        const persistMs = formatDurationMs(persistStartedAt);
+        appendServerTiming(res, 'project.persist', persistMs);
+        appendServerTiming(res, 'project.load', saved.metrics.loadMs);
+        appendServerTiming(res, 'project.merge', saved.metrics.mergeMs);
+        appendServerTiming(res, 'project.serialize', saved.metrics.serializeMs);
+        appendServerTiming(res, 'project.write', saved.metrics.writeMs);
+        appendServerTiming(res, 'project.total', persistMs);
+
+        res.json({
+          version: saved.version,
+          unchanged: saved.metrics.skippedWrite
+        });
+      } catch (err) {
+        if (err.code === 'VERSION_CONFLICT') {
+          res.status(409).json({ error: 'Version conflict', currentVersion: err.currentVersion });
+          return;
+        }
+        throw err;
+      }
     })
   );
 
@@ -348,17 +536,14 @@ export async function createApp(options = {}) {
     asyncHandler(async (req, res) => {
       const project = req.params.project;
       const username = req.username;
-      const projDir = path.join(dataDir, username, project);
+      const loadStartedAt = process.hrtime.bigint();
       try {
-        const files = await fs.readdir(projDir);
-        const versions = files.filter(f => f.endsWith('.json')).sort();
-        if (!versions.length) {
-          res.status(404).json({ error: 'Not found' });
-          return;
-        }
-        const latest = versions[versions.length - 1];
-        const data = JSON.parse(await fs.readFile(path.join(projDir, latest), 'utf-8'));
-        res.json({ version: latest.replace('.json', ''), data });
+        const latest = await projectStore.loadLatest(username, project);
+        const totalMs = formatDurationMs(loadStartedAt);
+        appendServerTiming(res, 'project.read', latest.metrics.readMs);
+        appendServerTiming(res, 'project.parse', latest.metrics.parseMs);
+        appendServerTiming(res, 'project.total', totalMs);
+        res.json({ version: latest.version, data: latest.data });
       } catch {
         res.status(404).json({ error: 'Not found' });
       }
@@ -386,4 +571,3 @@ if (import.meta.url === `file://${process.argv[1]}`) {
     console.log(`Server listening on port ${actualPort}`);
   });
 }
-
