@@ -1,0 +1,61 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Caching and Asset Invalidation</title>
+  <link rel="stylesheet" href="../style.css">
+</head>
+<body>
+  <a href="#main-content" class="skip-link">Skip to main content</a>
+  <nav class="top-nav">
+    <button id="nav-toggle" class="nav-toggle" aria-label="Toggle navigation" aria-controls="nav-links" aria-expanded="false">☰</button>
+    <div id="nav-links" class="nav-links">
+      <a href="../index.html">Home</a>
+      <a href="../cableschedule.html">Cable Schedule</a>
+      <a href="../racewayschedule.html">Raceway Schedule</a>
+      <a href="../ductbankroute.html">Ductbank</a>
+      <a href="../cabletrayfill.html">Tray Fill</a>
+      <a href="../conduitfill.html">Conduit Fill</a>
+      <a href="../optimalRoute.html">Optimal Route</a>
+      <a href="index.html" class="active" aria-current="page">Docs</a>
+    </div>
+  </nav>
+
+  <main id="main-content" class="doc-main">
+    <h1>Caching and Asset Invalidation</h1>
+
+    <h2>Build fingerprint strategy</h2>
+    <p>
+      During <code>npm run build</code>, <code>scripts/copyAssets.js</code> now fingerprints distributable CSS/JS/MJS files by
+      appending a SHA-256 hash fragment to each filename (for example, <code>index.1a2b3c4d5e6f.js</code>). The script also
+      writes <code>asset-manifest.json</code> files in both <code>dist/</code> and <code>docs/</code> so deployments can map logical
+      asset names to immutable fingerprinted files.
+    </p>
+
+    <h2>Server cache headers</h2>
+    <ul>
+      <li>Fingerprinted files: <code>Cache-Control: public, max-age=31536000, immutable</code>.</li>
+      <li>HTML entry points: <code>Cache-Control: public, max-age=60, must-revalidate</code>.</li>
+      <li>Other static assets: <code>Cache-Control: public, max-age=600, must-revalidate</code>.</li>
+    </ul>
+    <p>
+      This keeps HTML fresh while allowing browsers and CDNs to aggressively cache immutable bundles.
+    </p>
+
+    <h2>Compression behavior</h2>
+    <p>
+      The server enables gzip compression for text-like responses (HTML, CSS, JS, JSON, XML, SVG) when payload size is at
+      least 1 KB. Clients can bypass compression for troubleshooting by sending <code>x-no-compression</code>.
+    </p>
+
+    <h2>Invalidation process</h2>
+    <ol>
+      <li>Run <code>npm run build</code> to regenerate bundles and fingerprinted assets.</li>
+      <li>Deploy both the updated HTML entry points and new fingerprinted files.</li>
+      <li>Keep old fingerprinted files available during rollout to avoid transient 404s from in-flight clients.</li>
+      <li>After traffic has fully shifted, old fingerprinted files can be pruned safely.</li>
+    </ol>
+  </main>
+</body>
+</html>
