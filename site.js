@@ -7,6 +7,7 @@ import {
   defaultProject,
   initializeProjectStorage,
   getProjectState,
+  setProjectKey,
   setProjectState,
   onProjectChange,
   getSessionPreferences,
@@ -23,10 +24,31 @@ const FOCUSABLE="a[href],button:not([disabled]),textarea:not([disabled]),input:n
 const CHECKPOINT_KEY='CTR_CHECKPOINT';
 const MAX_CHECKPOINT_SIZE=2*1024*1024; // ~2MB
 const AUTO_SAVE_INTERVAL_MS=5*60*1000;
+const ONBOARDING_STATE_KEY='onboarding';
+const ONBOARDING_VERSION='2026.03';
 let cachedProjectFileHandle=null;
 let autoSaveSchedulerInstance=null;
 let dirtyTrackerInstance=null;
 let operationToastTimer=null;
+
+const ONBOARDING_SAMPLE_PROJECT={
+  name:'Sample Project - Getting Started',
+  cables:[
+    {id:'CABLE-001',from:'MCC-1',to:'PANEL-A',conductor_size:'500 kcmil',insulation_type:'XLPE',voltage_rating:'5kV',length:180,route_preference:'TRAY-01'},
+    {id:'CABLE-002',from:'PANEL-A',to:'MOTOR-101',conductor_size:'2/0 AWG',insulation_type:'THHN',voltage_rating:'600V',length:95,route_preference:'TRAY-02'},
+    {id:'CABLE-003',from:'PANEL-A',to:'UPS-1',conductor_size:'1/0 AWG',insulation_type:'THHN',voltage_rating:'600V',length:110,route_preference:'C-101'}
+  ],
+  trays:[
+    {tray_id:'TRAY-01',start_x:0,start_y:0,start_z:12,end_x:140,end_y:0,end_z:12,inside_width:24,tray_depth:4,tray_type:'Ladder (50 % fill)',allowed_cable_group:'power'},
+    {tray_id:'TRAY-02',start_x:140,start_y:0,start_z:12,end_x:140,end_y:80,end_z:12,inside_width:18,tray_depth:4,tray_type:'Ladder (50 % fill)',allowed_cable_group:'power'}
+  ],
+  conduits:[
+    {conduit_id:'C-101',type:'RMC',trade_size:'3',start_x:140,start_y:80,start_z:0,end_x:200,end_y:80,end_z:0,allowed_cable_group:'control'}
+  ],
+  ductbanks:[
+    {tag:'DB-01',from:'SUB-1',to:'MCC-1',concrete_encasement:true,start_x:-80,start_y:0,start_z:-4,end_x:0,end_y:0,end_z:-4}
+  ]
+};
 
 function ensureOperationToast(){
   if(typeof document==='undefined') return null;
@@ -53,6 +75,133 @@ function showOperationToast(message,kind='success'){
     toast.classList.remove('show','toast-error','toast-success');
     operationToastTimer=null;
   },3200);
+}
+
+function getOnboardingSettings(){
+  try{
+    const state=getProjectState();
+    const onboarding=state?.settings?.[ONBOARDING_STATE_KEY];
+    return onboarding&&typeof onboarding==='object'?onboarding:{};
+  }catch{
+    return {};
+  }
+}
+
+function saveOnboardingSettings(patch={}){
+  const next={
+    ...getOnboardingSettings(),
+    ...patch,
+    version:ONBOARDING_VERSION,
+    updatedAt:new Date().toISOString()
+  };
+  setProjectKey(ONBOARDING_STATE_KEY,JSON.stringify(next));
+  return next;
+}
+
+async function initializeSampleProject(){
+  setProjectKey('cableSchedule',JSON.stringify(ONBOARDING_SAMPLE_PROJECT.cables));
+  setProjectKey('traySchedule',JSON.stringify(ONBOARDING_SAMPLE_PROJECT.trays));
+  setProjectKey('conduitSchedule',JSON.stringify(ONBOARDING_SAMPLE_PROJECT.conduits));
+  setProjectKey('ductbankSchedule',JSON.stringify(ONBOARDING_SAMPLE_PROJECT.ductbanks));
+  const state=getProjectState();
+  state.name=ONBOARDING_SAMPLE_PROJECT.name;
+  setProjectState(state);
+  saveOnboardingSettings({sampleLoadedAt:new Date().toISOString()});
+  await updateProjectDisplay();
+}
+
+async function runOnboardingFlow({force=false,source='auto'}={}){
+  if(typeof document==='undefined') return;
+  const state=getOnboardingSettings();
+  if(!force&&state.completed===true&&state.version===ONBOARDING_VERSION) return;
+  if(!force&&state.dismissedVersion===ONBOARDING_VERSION) return;
+  const steps=[
+    {
+      title:'Welcome to CableTrayRoute',
+      description:'This quick onboarding walks you through the core actions to start routing in under a minute.',
+      details:'Use “Start Workflow” to begin in Cable Schedule, then continue through Raceway and routing tools in order.'
+    },
+    {
+      title:'Load a sample project in one click',
+      description:'Need a working baseline? Seed the workflow with sample cables, raceways, and a ductbank.',
+      details:'Choose “Load Sample Project” below to initialize sample data through project storage APIs.',
+      showSampleLoader:true
+    },
+    {
+      title:'Settings and help',
+      description:'You can always reopen this tour from Settings > Reopen Onboarding.',
+      details:'Use Site Help for docs and keep the tour handy for onboarding new team members.'
+    }
+  ];
+
+  let index=0;
+  while(index<steps.length){
+    const isFirst=index===0;
+    const isLast=index===steps.length-1;
+    const step=steps[index];
+    let move='next';
+    const result=await openModal({
+      title:step.title,
+      description:step.description,
+      primaryText:isLast?'Finish':'Next',
+      secondaryText:isFirst?'Skip':'Back',
+      defaultWidth:'medium',
+      onSubmit(){
+        move='next';
+        return true;
+      },
+      onCancel(){
+        move=isFirst?'skip':'back';
+      },
+      render(container){
+        const note=document.createElement('p');
+        note.className='modal-message';
+        note.textContent=step.details;
+        container.appendChild(note);
+        if(!step.showSampleLoader) return null;
+        const loadSampleBtn=document.createElement('button');
+        loadSampleBtn.type='button';
+        loadSampleBtn.className='btn secondary-btn';
+        loadSampleBtn.textContent='Load Sample Project';
+        loadSampleBtn.addEventListener('click',async()=>{
+          try{
+            loadSampleBtn.disabled=true;
+            await initializeSampleProject();
+            loadSampleBtn.textContent='Sample Project Loaded';
+            showOperationToast('Sample project initialized.','success');
+          }catch(err){
+            console.error('Sample project initialization failed',err);
+            loadSampleBtn.disabled=false;
+            loadSampleBtn.textContent='Load Sample Project';
+            showOperationToast('Sample project initialization failed.','error');
+          }
+        });
+        container.appendChild(loadSampleBtn);
+        return loadSampleBtn;
+      }
+    });
+    if(result===null){
+      if(move==='back'){
+        index=Math.max(0,index-1);
+        continue;
+      }
+      saveOnboardingSettings({
+        completed:false,
+        dismissedVersion:ONBOARDING_VERSION,
+        dismissedAt:new Date().toISOString(),
+        source
+      });
+      return;
+    }
+    index+=1;
+  }
+
+  saveOnboardingSettings({
+    completed:true,
+    completedAt:new Date().toISOString(),
+    dismissedVersion:'',
+    source
+  });
 }
 
 function initOperationStatusHost(container){
@@ -728,6 +877,18 @@ function initSettings(){
     });
 
     const exportBtn=document.getElementById('export-project-btn');
+    const helpBtn=document.getElementById('help-btn');
+    if(helpBtn&&!document.getElementById('reopen-onboarding-btn')){
+      const onboardingBtn=document.createElement('button');
+      onboardingBtn.id='reopen-onboarding-btn';
+      onboardingBtn.textContent='Reopen Onboarding';
+      helpBtn.insertAdjacentElement('afterend',onboardingBtn);
+      onboardingBtn.addEventListener('click',()=>{
+        runOnboardingFlow({force:true,source:'settings'}).catch(err=>{
+          console.error('Onboarding reopen failed',err);
+        });
+      });
+    }
     const shareBtn=document.createElement('button');
     shareBtn.id='copy-share-link-btn';
     shareBtn.textContent='Copy Share Link';
@@ -973,6 +1134,17 @@ function initHelpModal(btnId='help-btn',modalId='help-modal',closeId){
     modal.setAttribute('aria-hidden','true');
     const content=modal.querySelector('.modal-content') || closeBtn.parentElement || modal;
     const defaults=Array.from(content.children);
+    if(btnId==='help-btn'&&!content.querySelector('#help-reopen-onboarding-btn')){
+      const onboardingBtn=document.createElement('button');
+      onboardingBtn.type='button';
+      onboardingBtn.id='help-reopen-onboarding-btn';
+      onboardingBtn.textContent='Reopen Onboarding';
+      content.appendChild(onboardingBtn);
+      onboardingBtn.addEventListener('click',()=>{
+        close();
+        runOnboardingFlow({force:true,source:'help'}).catch(err=>console.error('Help onboarding reopen failed',err));
+      });
+    }
     let iframe=null;
 
     const handleKey=e=>{
@@ -1424,6 +1596,9 @@ function initProjectIO(){
 }
 
 globalThis.addEventListener?.('DOMContentLoaded',initProjectIO);
+globalThis.addEventListener?.('DOMContentLoaded',()=>{
+  runOnboardingFlow({source:'auto'}).catch(err=>console.error('Onboarding startup failed',err));
+});
 
 function applyUnitLabels(){
   const sys=globalThis.units?.getUnitSystem()?globalThis.units.getUnitSystem():'imperial';
