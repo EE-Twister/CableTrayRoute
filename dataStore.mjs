@@ -90,7 +90,8 @@ const EXTRA_KEYS = {
   equipmentColumns: 'equipmentColumns',
   collapsedGroups: 'collapsedGroups',
   cableSchedulePreset: 'cableSchedulePreset',
-  cableTemplates: 'cableTemplates'
+  cableTemplates: 'cableTemplates',
+  equipmentFilterPresets: 'equipmentFilterPresets'
 };
 
 export const STORAGE_KEYS = { ...KEYS, ...EXTRA_KEYS };
@@ -184,6 +185,11 @@ export const setCableTypicals = typicals => write(KEYS.cableTypicals, typicals);
 
 export const getCableTemplates = () => read(EXTRA_KEYS.cableTemplates, []);
 export const setCableTemplates = templates => write(EXTRA_KEYS.cableTemplates, templates);
+
+
+export const getEquipmentFilterPresets = () => read(EXTRA_KEYS.equipmentFilterPresets, []);
+export const setEquipmentFilterPresets = presets => write(EXTRA_KEYS.equipmentFilterPresets, presets);
+
 
 /**
  * Append a cable record to the existing cable schedule.

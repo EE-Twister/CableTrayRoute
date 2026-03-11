@@ -3008,6 +3008,65 @@ body.dark-mode .table-row-focusable:focus-within::after {
     margin-bottom: 0.25rem;
 }
 
+.equipment-toolbar {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.5rem;
+    align-items: center;
+}
+
+.equipment-toolbar .table-search {
+    flex: 1 1 320px;
+    margin-bottom: 0;
+}
+
+.table-filter-select {
+    min-width: 180px;
+    padding: 0.45rem 0.5rem;
+    border-radius: 4px;
+    border: 1px solid var(--border-color);
+    background: var(--card-bg, #fff);
+    color: var(--text-color);
+}
+
+.equipment-results-count {
+    margin: 0 0 0 auto;
+    font-size: 0.9rem;
+    color: var(--text-color);
+}
+
+
+.equipment-quick-filters {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.4rem;
+}
+
+.equipment-chip {
+    border: 1px solid var(--border-color);
+    background: var(--card-bg, #fff);
+    color: var(--text-color);
+    border-radius: 999px;
+    padding: 0.2rem 0.7rem;
+    cursor: pointer;
+}
+
+.equipment-chip.active,
+.equipment-chip:hover {
+    background: var(--primary-color);
+    color: #fff;
+}
+
+.equipment-validation-summary {
+    font-size: 0.9rem;
+    color: var(--text-color);
+}
+
+.equipment-input-error {
+    border-color: #c92a2a !important;
+    background: rgba(201, 42, 42, 0.08);
+}
+
 .sticky-table thead {
     background-color: var(--card-bg, #fff);
 }
