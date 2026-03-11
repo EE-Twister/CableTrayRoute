@@ -1296,6 +1296,8 @@ function render(panelId = "P1") {
   container.appendChild(table);
   renderTieOverlay(container, table, panel, circuitCount, tieAnchors);
   updateTotals(activePanelId);
+  updatePanelStickySummary(panel, activePanelId, loads, circuitCount);
+  updateAssignmentStatus(activePanelId, loads, circuitCount);
   return state;
 }
 
@@ -1304,18 +1306,18 @@ function createMainDeviceSummary(panel, system, phaseSequence) {
   const wrapper = document.createElement("div");
   wrapper.className = "panel-main-device";
 
+  const panelPoleCount = getPanelPoleLimit(panel) || 1;
+
   const icon = createBranchDeviceIcon(
     {
       deviceType: getPanelBranchDeviceType(panel),
       rating: panel.mainRating != null ? String(panel.mainRating).trim() : ""
     },
-    {
-      poles: getPanelPoleCount(panel),
-      phaseLabel: phaseSequence[0] || "",
-      startCircuit: 1,
-      system,
-      labelPoles: getPanelPoleCount(panel)
-    }
+    panelPoleCount,
+    1,
+    system,
+    phaseSequence[0] || "",
+    { labelPoles: panelPoleCount }
   );
   if (icon) {
     icon.classList.add("panel-main-device-icon");
@@ -2339,6 +2341,27 @@ function updateTotals(panelId) {
   }
 }
 
+function updatePanelStickySummary(panel, panelId, loads, circuitCount) {
+  const summary = document.getElementById("panel-sticky-summary");
+  if (!summary) return;
+  const displayName = getPanelDisplayName(panel);
+  const assignedCount = Array.isArray(loads)
+    ? loads.filter(load => load?.panelId === panelId).length
+    : 0;
+  const totals = calculatePanelTotals(panelId);
+  summary.textContent = `${displayName} • ${assignedCount} Assigned Loads • ${circuitCount} Circuits • ${totals.connectedKva.toFixed(2)} kVA Connected`;
+}
+
+function updateAssignmentStatus(panelId, loads, circuitCount) {
+  const status = document.getElementById("panel-assignment-status");
+  if (!status) return;
+  const assigned = Array.isArray(loads)
+    ? loads.filter(load => load?.panelId === panelId).length
+    : 0;
+  const remaining = Math.max(0, circuitCount - assigned);
+  status.textContent = `Assigned loads: ${assigned}. Open circuits available: ${remaining}.`;
+}
+
 window.addEventListener("DOMContentLoaded", () => {
   dataStore.loadProject(projectId);
   let panels = dataStore.getPanels();
@@ -2400,6 +2423,9 @@ window.addEventListener("DOMContentLoaded", () => {
   const mainInput = document.getElementById("panel-main-rating");
   const circuitInput = document.getElementById("panel-circuit-count");
   const sccrInput = document.getElementById("panel-sccr");
+  const jumpUnassignedBtn = document.getElementById("panel-jump-unassigned-btn");
+  const clearAssignmentsBtn = document.getElementById("panel-clear-assignments-btn");
+  const validationHints = document.getElementById("panel-validation-hints");
 
   const savePanels = () => {
     dataStore.setPanels(panels);
@@ -2465,6 +2491,48 @@ window.addEventListener("DOMContentLoaded", () => {
     updatePanelSelectorButtons();
   };
 
+  const validatePanelInputs = () => {
+    const hints = [];
+    const markInvalid = (input, invalid) => {
+      if (!input) return;
+      input.setAttribute("aria-invalid", invalid ? "true" : "false");
+    };
+
+    const voltageValue = voltageInput ? String(voltageInput.value || "").trim() : "";
+    const parsedVoltage = voltageValue ? Number.parseFloat(voltageValue) : null;
+    const voltageInvalid = Boolean(voltageValue) && (!Number.isFinite(parsedVoltage) || parsedVoltage <= 0);
+    markInvalid(voltageInput, voltageInvalid);
+    if (voltageInvalid) {
+      hints.push("Voltage should be a positive number (for example: 480). ");
+    }
+
+    const circuitValue = circuitInput ? Number.parseInt(circuitInput.value, 10) : null;
+    const circuitInvalid = Number.isFinite(circuitValue) ? circuitValue < 1 : false;
+    markInvalid(circuitInput, circuitInvalid);
+    if (circuitInvalid) {
+      hints.push("Number of circuits must be 1 or greater.");
+    }
+
+    const mainRating = mainInput ? Number.parseFloat(mainInput.value) : null;
+    const sccrRating = sccrInput ? Number.parseFloat(sccrInput.value) : null;
+    const ratingConflict = Number.isFinite(mainRating) && Number.isFinite(sccrRating) && sccrRating < mainRating;
+    markInvalid(mainInput, ratingConflict);
+    markInvalid(sccrInput, ratingConflict);
+    if (ratingConflict) {
+      hints.push("Short-circuit rating should be greater than or equal to the main device rating.");
+    }
+
+    if (validationHints) {
+      if (!hints.length) {
+        validationHints.textContent = "All key panel inputs look valid.";
+      } else {
+        validationHints.innerHTML = hints.map(message => `<div class="panel-hint">⚠ ${message}</div>`).join("");
+      }
+    }
+
+    return hints.length === 0;
+  };
+
   const updatePanelFormInputs = () => {
     if (!panel) return;
     if (tagInput) tagInput.value = panel.ref || panel.panel_id || panel.tag || panel.id || "";
@@ -2490,6 +2558,7 @@ window.addEventListener("DOMContentLoaded", () => {
     if (sccrInput) {
       sccrInput.value = panel.shortCircuitRating || panel.shortCircuitCurrentRating || "";
     }
+    validatePanelInputs();
   };
 
   const ensurePanelDefaults = () => {
@@ -2719,6 +2788,52 @@ window.addEventListener("DOMContentLoaded", () => {
         setActivePanelId(generatePanelId(panels));
       }
     });
+  }
+
+  if (jumpUnassignedBtn) {
+    jumpUnassignedBtn.addEventListener("click", () => {
+      const panelContainer = document.getElementById("panel-container");
+      const firstUnassigned = panelContainer
+        ? panelContainer.querySelector("select[data-breaker][value=''], select[data-breaker]:not([value])")
+        : null;
+      const fallbackUnassigned = panelContainer
+        ? Array.from(panelContainer.querySelectorAll("select[data-breaker]")).find(select => !String(select.value || "").trim())
+        : null;
+      const target = firstUnassigned || fallbackUnassigned;
+      if (!target) {
+        if (validationHints) validationHints.textContent = "All visible breaker positions currently have assignments.";
+        return;
+      }
+      target.scrollIntoView({ behavior: "smooth", block: "center" });
+      target.focus();
+    });
+  }
+
+  if (clearAssignmentsBtn) {
+    clearAssignmentsBtn.addEventListener("click", () => {
+      if (!panel) return;
+      const label = getPanelDisplayName(panel);
+      const confirmed = window.confirm(`Clear all load assignments for ${label}?`);
+      if (!confirmed) return;
+      const changed = clearLoadsForPanel(panel);
+      if (!changed) {
+        if (validationHints) validationHints.textContent = "No assignments were found to clear for this panel.";
+        return;
+      }
+      panel.breakers = Array.from({ length: getPanelCircuitCount(panel) }, () => null);
+      panel.breakerLayout = [];
+      panel.breakerDetails = {};
+      savePanels();
+      dataStore.saveProject(projectId);
+      updateOneline();
+      rerender();
+    });
+  }
+
+  const panelInfo = document.getElementById("panel-info");
+  if (panelInfo) {
+    panelInfo.addEventListener("input", () => validatePanelInputs());
+    panelInfo.addEventListener("change", () => validatePanelInputs());
   }
 
     if (tagInput) {
