@@ -25,6 +25,81 @@ const AUTO_SAVE_INTERVAL_MS=5*60*1000;
 let cachedProjectFileHandle=null;
 let autoSaveSchedulerInstance=null;
 let dirtyTrackerInstance=null;
+let operationToastTimer=null;
+
+function ensureOperationToast(){
+  if(typeof document==='undefined') return null;
+  let toast=document.getElementById('toast');
+  if(!toast){
+    toast=document.createElement('div');
+    toast.id='toast';
+    toast.className='toast';
+    toast.setAttribute('role','status');
+    toast.setAttribute('aria-live','polite');
+    document.body.appendChild(toast);
+  }
+  return toast;
+}
+
+function showOperationToast(message,kind='success'){
+  const toast=ensureOperationToast();
+  if(!toast) return;
+  toast.textContent=message;
+  toast.classList.remove('toast-error','toast-success');
+  toast.classList.add(kind==='error'?'toast-error':'toast-success','show');
+  if(operationToastTimer) clearTimeout(operationToastTimer);
+  operationToastTimer=setTimeout(()=>{
+    toast.classList.remove('show','toast-error','toast-success');
+    operationToastTimer=null;
+  },3200);
+}
+
+function initOperationStatusHost(container){
+  if(!container||typeof document==='undefined') return null;
+  let host=document.getElementById('settings-operation-status');
+  if(host) return host;
+  host=document.createElement('div');
+  host.id='settings-operation-status';
+  host.className='settings-operation-status';
+  host.setAttribute('aria-live','polite');
+  host.setAttribute('aria-atomic','true');
+  host.setAttribute('role','status');
+  host.innerHTML='\n    <div class="operation-placeholder" aria-hidden="true">\n      <span class="operation-spinner"></span>\n      <span class="operation-progress-text">Idle</span>\n    </div>\n    <p class="operation-status-screenreader visually-hidden">Ready</p>\n  ';
+  container.appendChild(host);
+  return host;
+}
+
+function setOperationStatus(statusHost,phase,statusText){
+  if(!statusHost) return;
+  const placeholder=statusHost.querySelector('.operation-placeholder');
+  const progressText=statusHost.querySelector('.operation-progress-text');
+  const sr=statusHost.querySelector('.operation-status-screenreader');
+  if(!placeholder||!progressText||!sr) return;
+  progressText.textContent=statusText;
+  sr.textContent=statusText;
+  statusHost.dataset.phase=phase;
+  const isBusy=phase==='busy';
+  placeholder.classList.toggle('is-active',isBusy);
+  placeholder.classList.toggle('is-complete',phase==='success');
+  placeholder.classList.toggle('is-error',phase==='error');
+}
+
+async function runOperationWithStatus(statusHost,{pendingText,successText,errorText,operation}){
+  setOperationStatus(statusHost,'busy',pendingText);
+  try{
+    const result=await operation();
+    setOperationStatus(statusHost,'success',successText);
+    showOperationToast(successText,'success');
+    return result;
+  }catch(err){
+    console.error(errorText,err);
+    const detail=err instanceof Error&&err.message?` ${err.message}`:'';
+    const message=`${errorText}.${detail}`.trim();
+    setOperationStatus(statusHost,'error',message);
+    showOperationToast(errorText,'error');
+    throw err;
+  }
+}
 
 function currentProjectFromHash(){
   if(typeof location==='undefined') return '';
@@ -540,6 +615,7 @@ async function generateTechnicalReport(format='pdf'){
 function initSettings(){
   const settingsBtn=document.getElementById('settings-btn');
   const settingsMenu=document.getElementById('settings-menu');
+  const operationStatusHost=initOperationStatusHost(settingsMenu);
   if(settingsBtn&&settingsMenu){
     settingsMenu.setAttribute('role','dialog');
     settingsMenu.setAttribute('aria-modal','true');
@@ -656,7 +732,14 @@ function initSettings(){
     shareBtn.textContent='Copy Share Link';
     if(exportBtn) exportBtn.insertAdjacentElement('beforebegin',shareBtn);
     else settingsMenu.appendChild(shareBtn);
-    shareBtn.addEventListener('click',copyShareLink);
+    shareBtn.addEventListener('click',async()=>{
+      await runOperationWithStatus(operationStatusHost,{
+        pendingText:'Preparing share link…',
+        successText:'Share link ready.',
+        errorText:'Share link generation failed',
+        operation:copyShareLink
+      });
+    });
 
     const selfCheckBtn=document.createElement('button');
     selfCheckBtn.id='run-self-check-btn';
@@ -669,9 +752,16 @@ function initSettings(){
     refreshLibBtn.textContent='Refresh Library';
     settingsMenu.appendChild(refreshLibBtn);
     refreshLibBtn.addEventListener('click',async()=>{
-      if(typeof globalThis.loadComponentLibrary==='function') await globalThis.loadComponentLibrary();
-      if(typeof globalThis.loadManufacturerLibrary==='function') await globalThis.loadManufacturerLibrary();
-      await showAlertModal('Library Refreshed','Component and manufacturer libraries were reloaded.');
+      await runOperationWithStatus(operationStatusHost,{
+        pendingText:'Refreshing component and manufacturer libraries…',
+        successText:'Library refresh complete.',
+        errorText:'Library refresh failed',
+        operation:async()=>{
+          if(typeof globalThis.loadComponentLibrary==='function') await globalThis.loadComponentLibrary();
+          if(typeof globalThis.loadManufacturerLibrary==='function') await globalThis.loadManufacturerLibrary();
+          await showAlertModal('Library Refreshed','Component and manufacturer libraries were reloaded.');
+        }
+      });
     });
 
     const reportBtn=document.createElement('button');
@@ -680,7 +770,12 @@ function initSettings(){
     settingsMenu.appendChild(reportBtn);
     reportBtn.addEventListener('click',async()=>{
       const useDocx=confirm('Generate DOCX? Cancel for PDF');
-      await generateTechnicalReport(useDocx?'docx':'pdf');
+      await runOperationWithStatus(operationStatusHost,{
+        pendingText:`Generating technical report (${useDocx?'DOCX':'PDF'})…`,
+        successText:'Technical report generated.',
+        errorText:'Technical report generation failed',
+        operation:()=>generateTechnicalReport(useDocx?'docx':'pdf')
+      });
     });
 
     const exportReportsBtn=document.createElement('button');
@@ -688,14 +783,21 @@ function initSettings(){
     exportReportsBtn.textContent='Export Reports';
     settingsMenu.appendChild(exportReportsBtn);
     exportReportsBtn.addEventListener('click',async()=>{
-      const { downloadCSV } = await import('./reports/reporting.mjs');
-      const headers=['sample'];
-      const rows=[{sample:'demo'}];
-      downloadCSV(headers,rows,'reports.csv');
-      const issues=runValidation(getOneLine().sheets,getStudies());
-      const vHeaders=['component','message'];
-      const vRows=issues.length?issues:[{component:'-',message:'No issues'}];
-      downloadCSV(vHeaders,vRows,'validation-report.csv');
+      await runOperationWithStatus(operationStatusHost,{
+        pendingText:'Exporting report files…',
+        successText:'Report export complete.',
+        errorText:'Report export failed',
+        operation:async()=>{
+          const { downloadCSV } = await import('./reports/reporting.mjs');
+          const headers=['sample'];
+          const rows=[{sample:'demo'}];
+          downloadCSV(headers,rows,'reports.csv');
+          const issues=runValidation(getOneLine().sheets,getStudies());
+          const vHeaders=['component','message'];
+          const vRows=issues.length?issues:[{component:'-',message:'No issues'}];
+          downloadCSV(vHeaders,vRows,'validation-report.csv');
+        }
+      });
     });
 
     const printLabelsBtn=document.createElement('button');
@@ -703,14 +805,21 @@ function initSettings(){
     printLabelsBtn.textContent='Print Labels';
     settingsMenu.appendChild(printLabelsBtn);
     printLabelsBtn.addEventListener('click',async()=>{
-      const { generateArcFlashLabel } = await import('./reports/labels.mjs');
-      const svg=generateArcFlashLabel({equipment:'Demo',incidentEnergy:'--',boundary:'--'});
-      const win=window.open('');
-      if(win){
-        win.document.write(svg);
-        win.document.close();
-        win.print();
-      }
+      await runOperationWithStatus(operationStatusHost,{
+        pendingText:'Preparing printable labels…',
+        successText:'Labels ready for printing.',
+        errorText:'Label preparation failed',
+        operation:async()=>{
+          const { generateArcFlashLabel } = await import('./reports/labels.mjs');
+          const svg=generateArcFlashLabel({equipment:'Demo',incidentEnergy:'--',boundary:'--'});
+          const win=window.open('');
+          if(win){
+            win.document.write(svg);
+            win.document.close();
+            win.print();
+          }
+        }
+      });
     });
   }
   const unitSelect=document.getElementById('unit-select');
@@ -1215,8 +1324,16 @@ if(typeof window!=='undefined'){
 }
 
 function initProjectIO(){
-  loadProjectFromHash();
-  applyProjectHash();
+  const operationStatusHost=initOperationStatusHost(document.getElementById('settings-menu'));
+  runOperationWithStatus(operationStatusHost,{
+    pendingText:'Loading project from URL…',
+    successText:'Project URL sync complete.',
+    errorText:'Project URL sync failed',
+    operation:async()=>{
+      await loadProjectFromHash();
+      applyProjectHash();
+    }
+  }).catch(()=>{});
   updateSaveButtonState();
   const exportBtn=document.getElementById('export-project-btn');
   const importBtn=document.getElementById('import-project-btn');
@@ -1224,43 +1341,69 @@ function initProjectIO(){
   console.assert(importBtn&&fileInput,'Project import controls missing');
   if(exportBtn){
     exportBtn.addEventListener('click',async()=>{
-      if(typeof globalThis.showSaveFilePicker==='function'){
-        try{
-          const handle=await globalThis.showSaveFilePicker({
-            suggestedName:'project.ctr.json',
-            types:[{
-              description:'CableTrayRoute Project',
-              accept:{'application/json':['.ctr.json','.json']}
-            }]
-          });
-          if(!handle)return;
-          cachedProjectFileHandle=handle;
-          updateSaveButtonState();
-          await writeProjectToHandle(handle);
-        }catch(err){
-          if(err?.name==='AbortError')return;
-          console.error('showSaveFilePicker failed',err);
-          downloadProjectAsBlob();
+      await runOperationWithStatus(operationStatusHost,{
+        pendingText:'Exporting project file…',
+        successText:'Project export complete.',
+        errorText:'Project export failed',
+        operation:async()=>{
+          if(typeof globalThis.showSaveFilePicker==='function'){
+            try{
+              const handle=await globalThis.showSaveFilePicker({
+                suggestedName:'project.ctr.json',
+                types:[{
+                  description:'CableTrayRoute Project',
+                  accept:{'application/json':['.ctr.json','.json']}
+                }]
+              });
+              if(!handle) return;
+              cachedProjectFileHandle=handle;
+              updateSaveButtonState();
+              await writeProjectToHandle(handle);
+            }catch(err){
+              if(err?.name==='AbortError') return;
+              console.error('showSaveFilePicker failed',err);
+              downloadProjectAsBlob();
+            }
+          }else{
+            downloadProjectAsBlob();
+          }
         }
-      }else{
-        downloadProjectAsBlob();
-      }
+      }).catch(()=>{});
     });
   }
   if(importBtn&&fileInput){
     importBtn.addEventListener('click',()=>fileInput.click());
     fileInput.addEventListener('change',e=>{
       const file=e.target.files[0];
-      if(!file)return;
-      const reader=new FileReader();
-      reader.onload=ev=>{
-        try{
-          const obj=JSON.parse(ev.target.result);
-          if(importProject(obj)) location.reload();
-        }catch(err){console.error('Import failed',err);}
-      };
-      reader.readAsText(file);
-      fileInput.value='';
+      if(!file) return;
+      runOperationWithStatus(operationStatusHost,{
+        pendingText:'Importing project file…',
+        successText:'Project import complete. Reloading…',
+        errorText:'Project import failed',
+        operation:()=>new Promise((resolve,reject)=>{
+          const reader=new FileReader();
+          reader.onload=ev=>{
+            try{
+              const obj=JSON.parse(ev.target.result);
+              if(importProject(obj)){
+                resolve(true);
+                location.reload();
+                return;
+              }
+              reject(new Error('Import canceled or invalid project data.'));
+            }catch(err){
+              reject(err);
+            }
+          };
+          reader.onerror=()=>reject(reader.error||new Error('Unable to read import file.'));
+          reader.readAsText(file);
+        })
+      }).catch(err=>{
+        if(err?.message==='Import canceled or invalid project data.') return;
+        console.error('Import failed',err);
+      }).finally(()=>{
+        fileInput.value='';
+      });
     });
   }
   ensureAutoSaveScheduler().start();
