@@ -82,6 +82,56 @@ let savedProjectsCache = {};
 let savedProjectsLoaded = false;
 let savedProjectsError = null;
 const migratedSavedProjects = new Set();
+const DERIVED_SYNC_KEYS = {
+  cables: 'cableSchedule',
+  trays: 'traySchedule',
+  conduits: 'conduitSchedule',
+  ductbanks: 'ductbankSchedule',
+  cableTypicals: 'cableTypicals'
+};
+const UNDO_COALESCE_WINDOW_MS = 200;
+const derivedStorageCache = new Map();
+const mutationCounters = new Map();
+let undoCoalesceState = null;
+
+function getNowMs() {
+  if (typeof performance !== 'undefined' && typeof performance.now === 'function') {
+    return performance.now();
+  }
+  return Date.now();
+}
+
+function isDevMutationLoggingEnabled() {
+  if (typeof window === 'undefined') return false;
+  if (window.__CTR_DEBUG_PROJECT_STORAGE__ === true) return true;
+  const query = String(window.location?.search || '');
+  if (query.includes('debugProjectStorage=1')) return true;
+  const hostname = String(window.location?.hostname || '');
+  return hostname === 'localhost' || hostname === '127.0.0.1' || hostname.endsWith('.local');
+}
+
+function logMutationMetric(type, startedAt, details = {}) {
+  if (!isDevMutationLoggingEnabled()) return;
+  const count = (mutationCounters.get(type) || 0) + 1;
+  mutationCounters.set(type, count);
+  const durationMs = Math.round((getNowMs() - startedAt) * 100) / 100;
+  console.debug('[projectStorage]', {
+    type,
+    count,
+    durationMs,
+    undoDepth: undoStack.length,
+    redoDepth: redoStack.length,
+    ...details
+  });
+}
+
+function createChangeSet(changes = []) {
+  return new Set(changes.filter(Boolean));
+}
+
+function hasChange(changeSet, change) {
+  return !changeSet || changeSet.has(change);
+}
 
 function readRawStorage(key) {
   const storage = getStorage();
@@ -698,64 +748,104 @@ function notifyChange() {
   });
 }
 
-function syncDerivedStorage(storage) {
+function syncDerivedStorage(storage, changeSet = null) {
   if (!storage || storageWriteBlocked) return;
-  const derivedKeys = [
-    ['cableSchedule', JSON.stringify(project.cables || [])],
-    ['traySchedule', JSON.stringify(project.trays || [])],
-    ['conduitSchedule', JSON.stringify(project.conduits || [])],
-    ['ductbankSchedule', JSON.stringify(project.ductbanks || [])],
-    ['cableTypicals', JSON.stringify(project.cableTypicals || [])]
-  ];
-  for (const [key, value] of derivedKeys) {
-    if (!trySetStorage(storage, key, value)) return;
-  }
 
-  const session = project.settings?.session;
-  if (session === undefined) {
-    if (!storageWriteBlocked) {
-      try { storage.removeItem('ctrSession'); } catch {}
+  let writes = 0;
+  let skips = 0;
+  const setDerived = (key, nextValue) => {
+    const previous = derivedStorageCache.get(key);
+    if (previous === nextValue) {
+      skips++;
+      return true;
     }
-  } else {
-    if (!trySetStorage(storage, 'ctrSession', JSON.stringify(session))) return;
-  }
-
-  const collapsed = project.settings?.collapsedGroups;
-  if (collapsed === undefined) {
-    if (!storageWriteBlocked) {
-      try { storage.removeItem('collapsedGroups'); } catch {}
+    if (!trySetStorage(storage, key, nextValue)) return false;
+    derivedStorageCache.set(key, nextValue);
+    writes++;
+    return true;
+  };
+  const removeDerived = key => {
+    if (derivedStorageCache.get(key) === null) {
+      skips++;
+      return;
     }
-  } else {
-    if (!trySetStorage(storage, 'collapsedGroups', JSON.stringify(collapsed))) return;
+    if (!storageWriteBlocked) {
+      try { storage.removeItem(key); } catch {}
+    }
+    derivedStorageCache.set(key, null);
+    writes++;
+  };
+
+  if (hasChange(changeSet, 'cables')) {
+    if (!setDerived(DERIVED_SYNC_KEYS.cables, JSON.stringify(project.cables || []))) return { writes, skips };
+  }
+  if (hasChange(changeSet, 'trays')) {
+    if (!setDerived(DERIVED_SYNC_KEYS.trays, JSON.stringify(project.trays || []))) return { writes, skips };
+  }
+  if (hasChange(changeSet, 'conduits')) {
+    if (!setDerived(DERIVED_SYNC_KEYS.conduits, JSON.stringify(project.conduits || []))) return { writes, skips };
+  }
+  if (hasChange(changeSet, 'ductbanks')) {
+    if (!setDerived(DERIVED_SYNC_KEYS.ductbanks, JSON.stringify(project.ductbanks || []))) return { writes, skips };
+  }
+  if (hasChange(changeSet, 'cableTypicals')) {
+    if (!setDerived(DERIVED_SYNC_KEYS.cableTypicals, JSON.stringify(project.cableTypicals || []))) return { writes, skips };
   }
 
-  const settings = project.settings && typeof project.settings === 'object' ? project.settings : {};
-  const filteredKeys = Object.keys(settings).filter(k => k !== 'session' && k !== 'collapsedGroups');
+  if (hasChange(changeSet, 'settings:session')) {
+    const session = project.settings?.session;
+    if (session === undefined) {
+      removeDerived('ctrSession');
+    } else {
+      if (!setDerived('ctrSession', JSON.stringify(session))) return { writes, skips };
+    }
+  }
 
-  for (const key of trackedSettingsKeys) {
-    if (!filteredKeys.includes(key)) {
-      if (!storageWriteBlocked) {
-        try { storage.removeItem(key); } catch {}
+  if (hasChange(changeSet, 'settings:collapsedGroups')) {
+    const collapsed = project.settings?.collapsedGroups;
+    if (collapsed === undefined) {
+      removeDerived('collapsedGroups');
+    } else {
+      if (!setDerived('collapsedGroups', JSON.stringify(collapsed))) return { writes, skips };
+    }
+  }
+
+  if (hasChange(changeSet, 'settings:other')) {
+    const settings = project.settings && typeof project.settings === 'object' ? project.settings : {};
+    const filteredKeys = Object.keys(settings).filter(k => k !== 'session' && k !== 'collapsedGroups');
+
+    for (const key of trackedSettingsKeys) {
+      if (!filteredKeys.includes(key)) {
+        removeDerived(key);
       }
     }
+    for (const key of filteredKeys) {
+      const value = settings[key];
+      if (!setDerived(key, JSON.stringify(value))) return { writes, skips };
+    }
+    trackedSettingsKeys = new Set(filteredKeys);
   }
-  for (const key of filteredKeys) {
-    const value = settings[key];
-    if (!trySetStorage(storage, key, JSON.stringify(value))) return;
-  }
-  trackedSettingsKeys = new Set(filteredKeys);
+
+  return { writes, skips };
 }
 
-function persistProject({ notify = true } = {}) {
+function persistProject({ notify = true, changeSet = null, mutationType = 'persist' } = {}) {
+  const startedAt = getNowMs();
   const storage = getStorage();
+  let syncStats = { writes: 0, skips: 0 };
   if (storage && !storageWriteBlocked) {
-    syncDerivedStorage(storage);
+    syncStats = syncDerivedStorage(storage, changeSet) || syncStats;
     if (!storageWriteBlocked) {
       try { storage.setItem(PROJECT_KEY, JSON.stringify(project)); }
       catch (e) { handleStorageWriteError('project save failed', e); }
     }
   }
   if (notify) notifyChange();
+  logMutationMetric(mutationType, startedAt, {
+    derivedWrites: syncStats.writes,
+    derivedSkips: syncStats.skips,
+    changedScopes: changeSet ? [...changeSet] : ['*']
+  });
 }
 
 function loadLegacyProject(storage) {
@@ -800,14 +890,35 @@ function loadExistingProject() {
   persistProject({ notify: false });
 }
 
-function pushUndo(oldProject) {
+function pushUndo(oldProject, { coalesceKey = '', allowCoalesce = false } = {}) {
   if (!compare) return;
   try {
     const patch = compare(project, oldProject);
     if (Array.isArray(patch) && patch.length) {
-      undoStack.push(patch);
+      const now = getNowMs();
+      const canCoalesce = allowCoalesce
+        && undoCoalesceState
+        && undoCoalesceState.key === coalesceKey
+        && (now - undoCoalesceState.timestamp) <= UNDO_COALESCE_WINDOW_MS
+        && undoStack.length > 0;
+      if (canCoalesce) {
+        const mergedPatch = compare(project, undoCoalesceState.baseProject);
+        if (Array.isArray(mergedPatch) && mergedPatch.length) {
+          undoStack[undoStack.length - 1] = mergedPatch;
+          undoCoalesceState.timestamp = now;
+        }
+      } else {
+        undoStack.push(patch);
+        undoCoalesceState = {
+          key: coalesceKey,
+          timestamp: now,
+          baseProject: oldProject
+        };
+      }
       redoStack.length = 0;
+      return;
     }
+    if (!allowCoalesce) undoCoalesceState = null;
   } catch (e) {
     console.warn('undo capture failed', e);
   }
@@ -882,8 +993,18 @@ export function getProjectState() {
 export function setProjectState(next) {
   const oldProject = cloneProject();
   project = migrateProject(next || {});
-  pushUndo(oldProject);
-  persistProject();
+  const changeSet = createChangeSet([
+    'cables',
+    'trays',
+    'conduits',
+    'ductbanks',
+    'cableTypicals',
+    'settings:session',
+    'settings:collapsedGroups',
+    'settings:other'
+  ]);
+  pushUndo(oldProject, { coalesceKey: 'setProjectState', allowCoalesce: false });
+  persistProject({ changeSet, mutationType: 'setProjectState' });
 }
 
 export function setProjectKey(key, value, options = {}) {
@@ -923,12 +1044,27 @@ export function setProjectKey(key, value, options = {}) {
       project.settings[key] = value;
     }
   }
-  pushUndo(oldProject);
+  const changeSet = key === 'cableSchedule'
+    ? createChangeSet(['cables'])
+    : key === 'traySchedule'
+      ? createChangeSet(['trays'])
+      : key === 'conduitSchedule'
+        ? createChangeSet(['conduits'])
+        : key === 'ductbankSchedule'
+          ? createChangeSet(['ductbanks'])
+          : key === 'cableTypicals'
+            ? createChangeSet(['cableTypicals'])
+            : key === 'collapsedGroups'
+              ? createChangeSet(['settings:collapsedGroups'])
+              : key === 'ctrSession'
+                ? createChangeSet(['settings:session'])
+                : createChangeSet(['settings:other']);
+  pushUndo(oldProject, { coalesceKey: `setProjectKey:${key}`, allowCoalesce: true });
   if (!options.skipLocalStorage) {
     const storage = getStorage();
     trySetStorage(storage, key, value);
   }
-  persistProject();
+  persistProject({ changeSet, mutationType: `setProjectKey:${key}` });
 }
 
 export function removeProjectKey(key, options = {}) {
@@ -960,18 +1096,34 @@ export function removeProjectKey(key, options = {}) {
   } else {
     if (project.settings) delete project.settings[key];
   }
-  pushUndo(oldProject);
+  const changeSet = key === 'cableSchedule'
+    ? createChangeSet(['cables'])
+    : key === 'traySchedule'
+      ? createChangeSet(['trays'])
+      : key === 'conduitSchedule'
+        ? createChangeSet(['conduits'])
+        : key === 'ductbankSchedule'
+          ? createChangeSet(['ductbanks'])
+          : key === 'cableTypicals'
+            ? createChangeSet(['cableTypicals'])
+            : key === 'collapsedGroups'
+              ? createChangeSet(['settings:collapsedGroups'])
+              : key === 'ctrSession'
+                ? createChangeSet(['settings:session'])
+                : createChangeSet(['settings:other']);
+  pushUndo(oldProject, { coalesceKey: `removeProjectKey:${key}`, allowCoalesce: true });
   if (!options.skipLocalStorage) {
     const storage = getStorage();
     if (storage && !storageWriteBlocked) {
       try { storage.removeItem(key); } catch {}
     }
   }
-  persistProject();
+  persistProject({ changeSet, mutationType: `removeProjectKey:${key}` });
 }
 
 export function undoProjectChange() {
   if (!undoStack.length || !applyPatch) return;
+  undoCoalesceState = null;
   const patch = undoStack.pop();
   const current = cloneProject();
   try {
@@ -983,7 +1135,7 @@ export function undoProjectChange() {
       redoStack.push([]);
     }
     project = migrateProject(result);
-    persistProject();
+    persistProject({ mutationType: 'undoProjectChange' });
   } catch (e) {
     console.warn('undo failed', e);
   }
@@ -991,6 +1143,7 @@ export function undoProjectChange() {
 
 export function redoProjectChange() {
   if (!redoStack.length || !applyPatch) return;
+  undoCoalesceState = null;
   const patch = redoStack.pop();
   const current = cloneProject();
   try {
@@ -1002,7 +1155,7 @@ export function redoProjectChange() {
       undoStack.push([]);
     }
     project = migrateProject(result);
-    persistProject();
+    persistProject({ mutationType: 'redoProjectChange' });
   } catch (e) {
     console.warn('redo failed', e);
   }
