@@ -17,6 +17,7 @@ import {
   getConduitCache
 } from "./projectStorage.js";
 import { openModal, showAlertModal } from "./src/components/modal.js";
+import { createDomWriteBatcher, createElementCache, createHandlerProfiler } from "./src/utils/domLifecycle.js";
 
 const FOCUSABLE="a[href],button:not([disabled]),textarea:not([disabled]),input:not([disabled]),select:not([disabled]),[tabindex]:not([tabindex='-1'])";
 const CHECKPOINT_KEY='CTR_CHECKPOINT';
@@ -840,12 +841,15 @@ function initSettings(){
 }
 
 function initDarkMode(){
-  const settingsMenu=document.getElementById('settings-menu');
-  const darkToggle=document.getElementById('dark-toggle');
+  const elementCache=createElementCache(document);
+  const settingsMenu=elementCache.getById('settings-menu');
+  const darkToggle=elementCache.getById('dark-toggle');
+  const domBatcher=createDomWriteBatcher();
   const prefersDarkQuery=window.matchMedia?window.matchMedia('(prefers-color-scheme: dark)'):null;
   const prefersContrastQuery=window.matchMedia?window.matchMedia('(prefers-contrast: more)'):null;
+  const profileHandler=createHandlerProfiler('initDarkMode');
 
-  let themeSelect=document.getElementById('theme-select');
+  let themeSelect=elementCache.getById('theme-select');
   if(!themeSelect&&settingsMenu){
     const wrapper=document.createElement('label');
     wrapper.setAttribute('for','theme-select');
@@ -870,15 +874,17 @@ function initDarkMode(){
 
   const applyTheme=(themePreference,{syncControls=true}={})=>{
     const theme=resolveTheme(themePreference);
-    document.body.classList.toggle('dark-mode',theme==='dark');
-    document.body.classList.toggle('theme-light',theme==='light');
-    document.body.classList.toggle('theme-high-contrast',theme==='high-contrast');
-    document.body.dataset.theme=theme;
-    document.documentElement.style.colorScheme=theme==='dark'?'dark':(theme==='high-contrast'?'only light':'light');
-    if(syncControls){
-      if(themeSelect) themeSelect.value=themePreference;
-      if(darkToggle) darkToggle.checked=theme==='dark';
-    }
+    domBatcher.write(()=>{
+      document.body.classList.toggle('dark-mode',theme==='dark');
+      document.body.classList.toggle('theme-light',theme==='light');
+      document.body.classList.toggle('theme-high-contrast',theme==='high-contrast');
+      document.body.dataset.theme=theme;
+      document.documentElement.style.colorScheme=theme==='dark'?'dark':(theme==='high-contrast'?'only light':'light');
+      if(syncControls){
+        if(themeSelect) themeSelect.value=themePreference;
+        if(darkToggle) darkToggle.checked=theme==='dark';
+      }
+    });
   };
 
   const syncFromStorage=()=>{
@@ -889,59 +895,64 @@ function initDarkMode(){
   syncFromStorage();
 
   if(themeSelect){
-    themeSelect.addEventListener('change',()=>{
+    themeSelect.addEventListener('change',profileHandler('themeSelect.change',()=>{
       const nextTheme=themeSelect.value||'system';
       setThemePreference(nextTheme);
       applyTheme(nextTheme,{syncControls:false});
       if(typeof window.saveSession==='function') window.saveSession();
       if(typeof window.saveDuctbankSession==='function') window.saveDuctbankSession();
-    });
+    }));
   }
 
   if(darkToggle){
     darkToggle.closest('label')?.classList.add('legacy-dark-toggle');
-    darkToggle.addEventListener('change',()=>{
+    darkToggle.addEventListener('change',profileHandler('darkToggle.change',()=>{
       const nextTheme=darkToggle.checked?'dark':'light';
       setThemePreference(nextTheme);
       applyTheme(nextTheme,{syncControls:false});
       if(themeSelect) themeSelect.value=nextTheme;
-    });
+    }));
   }
 
   if(prefersDarkQuery){
-    prefersDarkQuery.addEventListener('change',()=>{
+    prefersDarkQuery.addEventListener('change',profileHandler('prefersDark.change',()=>{
       if(getThemePreference()==='system') applyTheme('system');
-    });
+    }));
   }
   if(prefersContrastQuery){
-    prefersContrastQuery.addEventListener('change',()=>{
+    prefersContrastQuery.addEventListener('change',profileHandler('prefersContrast.change',()=>{
       if(getThemePreference()==='system') applyTheme('system');
-    });
+    }));
   }
   onProjectChange(()=>syncFromStorage());
 }
 
 function initCompactMode(){
-  const compactToggle=document.getElementById('compact-toggle');
+  const elementCache=createElementCache(document);
+  const compactToggle=elementCache.getById('compact-toggle');
+  const domBatcher=createDomWriteBatcher();
+  const profileHandler=createHandlerProfiler('initCompactMode');
   let session=getSessionPreferences();
   if(session.compactMode===undefined){
     session=updateSessionPreferences(prev=>({...(prev&&typeof prev==='object'?prev:{}),compactMode:false}));
   }
   const applyState=value=>{
-    document.body.classList.toggle('compact-mode',!!value);
-    if(compactToggle) compactToggle.checked=!!value;
+    domBatcher.write(()=>{
+      document.body.classList.toggle('compact-mode',!!value);
+      if(compactToggle) compactToggle.checked=!!value;
+    });
   };
   applyState(session.compactMode);
   if(compactToggle){
-    compactToggle.addEventListener('change',()=>{
+    compactToggle.addEventListener('change',profileHandler('compactToggle.change',()=>{
       const value=!!compactToggle.checked;
       applyState(value);
       session=updateSessionPreferences(prev=>({...(prev&&typeof prev==='object'?prev:{}),compactMode:value}));
       if(typeof window.saveSession==='function') window.saveSession();
       if(typeof window.saveDuctbankSession==='function') window.saveDuctbankSession();
-    });
+    }));
   }
-  window.addEventListener('storage',e=>{
+  window.addEventListener('storage',profileHandler('window.storage',e=>{
     if(e.key==='ctrSession'){
       try{
         const data=e.newValue?JSON.parse(e.newValue):{};
@@ -949,7 +960,7 @@ function initCompactMode(){
         session=data||{};
       }catch{}
     }
-  });
+  }));
 }
 
 function initHelpModal(btnId='help-btn',modalId='help-modal',closeId){
@@ -1006,25 +1017,27 @@ function initHelpModal(btnId='help-btn',modalId='help-modal',closeId){
 }
 
 function initNavToggle(){
-  const toggle=document.querySelector('.nav-toggle');
+  const elementCache=createElementCache(document);
+  const toggle=elementCache.query('.nav-toggle');
   if(!toggle) return;
-  const target=document.getElementById(toggle.getAttribute('aria-controls'));
+  const target=elementCache.getById(toggle.getAttribute('aria-controls'));
   if(!target) return;
+  const profileHandler=createHandlerProfiler('initNavToggle');
 
   function closeMenu(){
     toggle.setAttribute('aria-expanded','false');
     target.classList.remove('open');
   }
 
-  toggle.addEventListener('click',()=>{
+  toggle.addEventListener('click',profileHandler('toggle.click',()=>{
     const expanded=toggle.getAttribute('aria-expanded')==='true';
     toggle.setAttribute('aria-expanded',String(!expanded));
     target.classList.toggle('open',!expanded);
-  });
+  }));
 
-  document.addEventListener('keydown',e=>{
+  document.addEventListener('keydown',profileHandler('document.keydown',e=>{
     if(e.key==='Escape') closeMenu();
-  });
+  }));
 }
 
   function checkPrereqs(prereqs=[]){
@@ -1034,7 +1047,8 @@ function initNavToggle(){
   }
 
 function initTableNav(){
-  document.addEventListener('keydown',e=>{
+  const profileHandler=createHandlerProfiler('initTableNav',{logEvery:250});
+  document.addEventListener('keydown',profileHandler('document.keydown',e=>{
     if(e.key!=='ArrowUp'&&e.key!=='ArrowDown')return;
     const target=e.target;
     if(!['INPUT','SELECT','TEXTAREA'].includes(target.tagName))return;
@@ -1051,7 +1065,7 @@ function initTableNav(){
     e.preventDefault();
     focusable.focus();
     if(typeof focusable.select==='function') focusable.select();
-  });
+  }));
 }
 
 function persistConduits(data){
@@ -1415,8 +1429,13 @@ function applyUnitLabels(){
   const sys=globalThis.units?.getUnitSystem()?globalThis.units.getUnitSystem():'imperial';
   const d=sys==='imperial'?'ft':'m';
   const c=sys==='imperial'?'in':'mm';
-  document.querySelectorAll('[data-unit="distance"]').forEach(el=>el.textContent=d);
-  document.querySelectorAll('[data-unit="conduit"]').forEach(el=>el.textContent=c);
+  const domBatcher=createDomWriteBatcher();
+  const distanceNodes=document.querySelectorAll('[data-unit="distance"]');
+  const conduitNodes=document.querySelectorAll('[data-unit="conduit"]');
+  domBatcher.write(()=>{
+    distanceNodes.forEach(el=>el.textContent=d);
+    conduitNodes.forEach(el=>el.textContent=c);
+  });
 }
 
 function showSelfCheckModal(data){
