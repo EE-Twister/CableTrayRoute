@@ -13,6 +13,8 @@ The bundled Express server now persists credentials and sessions securely:
 - `/login` verifies hashes, rotates any existing sessions for the account, and stores bearer tokens with CSRF secrets and expiry timestamps in `server_data/sessions.json`.
 - Client code stores the issued bearer token, CSRF token, and expiry. Authenticated project requests must supply both the `Authorization: Bearer <token>` header and the matching `X-CSRF-Token` header for state-changing calls.
 - `/projects` endpoints are guarded by a lightweight rate limiter and will return HTTP `429` if the per-IP ceiling defined by `PROJECT_RATE_LIMIT_MAX` within `PROJECT_RATE_LIMIT_WINDOW_MS` is exceeded.
+- `POST /projects/:project` supports full saves (`{ data }`) and incremental merge-patch updates (`{ patch, baseVersion }`). Matching payloads are de-duplicated server-side to avoid unnecessary version writes.
+- Persistence routes emit `Server-Timing` metrics (`project.read`, `project.parse`, `project.merge`, `project.write`, and `project.total`) for backend observability.
 - When `NODE_ENV=production`, the server assumes it is behind a TLS terminator and redirects HTTP requests to HTTPS. For self-hosted deployments, terminate TLS at a reverse proxy or run the app behind an HTTPS-capable load balancer.
 
 Environment variables let you tune behaviour without code changes:
