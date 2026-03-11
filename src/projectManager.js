@@ -1,3 +1,4 @@
+import './components/navigation.js';
 import { saveProject as dsSaveProject, loadProject as dsLoadProject, exportProject, importProject } from '../dataStore.mjs';
 import {
   getProjectState,
