@@ -11,7 +11,7 @@ import {
   readSavedProject,
   removeSavedProject
 } from '../projectStorage.js';
-import { openModal, showAlertModal } from './components/modal.js';
+import { openModal, showAlertModal, ensureFieldAssistiveText } from './components/modal.js';
 
 function listProjects() {
   return listSavedProjectsStorage();
@@ -101,9 +101,8 @@ async function promptProjectName({
   if (typeof document === 'undefined') return '';
   const existing = listProjects();
   const inputId = `project-name-${Math.random().toString(36).slice(2)}`;
-  const errorId = `${inputId}-error`;
   let input;
-  let errorMsg;
+  let inputAssistive;
   const result = await openModal({
     title: title || 'Project Name',
     description: message || (allowExisting ? 'Enter a project name. Existing projects with the same name will be overwritten.' : 'Enter a unique name for the project.'),
@@ -112,13 +111,11 @@ async function promptProjectName({
       const value = input.value.trim();
       const validation = validateProjectName(value, existing, { allowExisting, currentName });
       if (validation) {
-        errorMsg.textContent = validation;
-        input.setAttribute('aria-invalid', 'true');
+        inputAssistive.setError(validation);
         input.focus();
         return false;
       }
-      input.removeAttribute('aria-invalid');
-      errorMsg.textContent = '';
+      inputAssistive.setError('');
       return value;
     },
     render(container, controls) {
@@ -137,23 +134,27 @@ async function promptProjectName({
       input.autocomplete = 'off';
       input.spellcheck = false;
       if (controls.descriptionId) {
-        input.setAttribute('aria-describedby', `${controls.descriptionId} ${errorId}`.trim());
-      } else {
-        input.setAttribute('aria-describedby', errorId);
+        input.setAttribute('aria-describedby', controls.descriptionId);
       }
       input.addEventListener('input', () => {
-        errorMsg.textContent = '';
-        input.removeAttribute('aria-invalid');
-        controls.setPrimaryDisabled(!input.value.trim());
+        const value = input.value.trim();
+        const validation = validateProjectName(value, existing, { allowExisting, currentName });
+        inputAssistive.setError(validation);
+        controls.setPrimaryDisabled(!value);
+      });
+      input.addEventListener('change', () => {
+        const value = input.value.trim();
+        const validation = validateProjectName(value, existing, { allowExisting, currentName });
+        inputAssistive.setError(validation);
       });
       label.appendChild(input);
       form.appendChild(label);
-      errorMsg = doc.createElement('p');
-      errorMsg.id = errorId;
-      errorMsg.className = 'modal-error';
-      errorMsg.setAttribute('role', 'alert');
-      errorMsg.textContent = '';
-      form.appendChild(errorMsg);
+      inputAssistive = ensureFieldAssistiveText(input, {
+        helperText: allowExisting
+          ? 'Use a clear project name. Existing names will overwrite on save.'
+          : 'Use a unique project name. Example: Building A - Phase 2.',
+        errorClass: 'modal-error'
+      });
       controls.registerForm(form);
       controls.setPrimaryDisabled(!initialValue.trim());
       controls.setInitialFocus(input);

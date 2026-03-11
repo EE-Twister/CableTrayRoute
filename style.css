@@ -2864,10 +2864,38 @@ body.modal-open {
     line-height: 1.5;
 }
 
+
+.form-helper-text {
+    margin: 0;
+    color: var(--text-muted, #666);
+    font-size: 0.82rem;
+    line-height: 1.35;
+    font-weight: 400;
+}
+
+.form-field-error,
 .modal-error {
     margin: 0;
     color: var(--error-text);
-    font-size: 0.9rem;
+    font-size: 0.88rem;
+    line-height: 1.35;
+    min-height: 1.15rem;
+}
+
+.form-field-error:not(.is-visible),
+.modal-error:not(.is-visible) {
+    visibility: hidden;
+}
+
+.form-field-error.is-visible,
+.modal-error.is-visible {
+    visibility: visible;
+}
+
+.modal-body :is(input, select, textarea)[aria-invalid="true"],
+#panel-info :is(input, select, textarea)[aria-invalid="true"] {
+    border-color: var(--error-text);
+    box-shadow: 0 0 0 1px color-mix(in srgb, var(--error-text) 45%, transparent);
 }
 
 .modal-actions {
