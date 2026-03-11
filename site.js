@@ -1,3 +1,4 @@
+import "./src/components/navigation.js";
 import "./units.js";
 import { exportProject, importProject, getOneLine, getStudies, loadProject, getDuctbanks, getConduits } from "./dataStore.mjs";
 import { runValidation } from "./validation/rules.js";

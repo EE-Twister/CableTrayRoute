@@ -1,3 +1,4 @@
+import './src/components/navigation.js';
 import { getItem as getStoredItem, setItem as setStoredItem } from './dataStore.mjs';
 
 const STORAGE_KEY = 'customComponents';
@@ -37,9 +38,6 @@ const emptyMessage = document.getElementById('no-components-message');
 const submitBtn = form?.querySelector('button[type="submit"]');
 const alignButtonList = iconAlignButtons ? Array.from(iconAlignButtons.querySelectorAll('button[data-align]')) : [];
 
-const navToggle = document.getElementById('nav-toggle');
-const navLinks = document.getElementById('nav-links');
-
 let components = loadComponents();
 let editingIndex = null;
 let currentIconData = null;
@@ -75,15 +73,6 @@ let suppressTextControlEvents = false;
 const urlParams = new URLSearchParams(window.location.search);
 const initialEditSubtype = urlParams.get('edit');
 let editQueryHandled = false;
-
-if (navToggle && navLinks) {
-  navToggle.addEventListener('click', () => {
-    const expanded = navToggle.getAttribute('aria-expanded') === 'true';
-    navToggle.setAttribute('aria-expanded', String(!expanded));
-    navLinks.classList.toggle('open', !expanded);
-  });
-}
-
 function showToast(message, kind = 'info') {
   const toast = document.getElementById('custom-toast');
   if (!toast) return;
