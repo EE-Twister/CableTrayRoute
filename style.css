@@ -5245,6 +5245,23 @@ body.dark-mode .workflow-card-title {
     white-space: nowrap;
 }
 
+.panel-quick-actions {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.4rem;
+    margin-top: 0.15rem;
+}
+
+.panel-quick-actions .btn-secondary {
+    background: var(--secondary-color);
+    border: 1px solid var(--border-color);
+    color: var(--text-color);
+}
+
+.panel-quick-actions .btn-secondary:hover {
+    background: color-mix(in srgb, var(--secondary-color) 80%, var(--primary-color) 20%);
+}
+
 #panel-info {
     display: grid;
     grid-template-columns: repeat(auto-fit, minmax(140px, max-content));
@@ -5292,6 +5309,41 @@ body.dark-mode .workflow-card-title {
     width: 100%;
     min-width: 140px;
     align-self: flex-start;
+}
+
+#panel-sticky-summary {
+    position: sticky;
+    top: 0.5rem;
+    z-index: 7;
+    margin-top: 0.75rem;
+    margin-bottom: 0.5rem;
+    padding: 0.5rem 0.65rem;
+    border: 1px solid var(--border-color);
+    border-radius: 6px;
+    background: color-mix(in srgb, var(--secondary-color) 90%, var(--primary-color) 10%);
+    font-size: 0.88rem;
+    font-weight: 600;
+}
+
+.panel-validation-hints,
+.panel-assignment-status {
+    margin-top: 0.45rem;
+    font-size: 0.86rem;
+    color: var(--muted-text-color);
+}
+
+.panel-validation-hints {
+    min-height: 1.2rem;
+}
+
+.panel-validation-hints .panel-hint {
+    margin: 0.15rem 0;
+    color: #b54708;
+}
+
+#panel-info input[aria-invalid="true"] {
+    border-color: #d9480f;
+    box-shadow: 0 0 0 1px rgba(217, 72, 15, 0.25);
 }
 
 #panel-container {

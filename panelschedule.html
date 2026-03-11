@@ -63,6 +63,10 @@
                 <button id="panel-delete-btn" class="btn" type="button" title="Delete this panelboard">Delete</button>
               </div>
             </div>
+            <div class="panel-quick-actions" role="group" aria-label="Panel quick actions">
+              <button id="panel-jump-unassigned-btn" class="btn" type="button" title="Jump to the first unassigned circuit">Jump to First Unassigned</button>
+              <button id="panel-clear-assignments-btn" class="btn btn-secondary" type="button" title="Clear load assignments for this panelboard">Clear Assignments</button>
+            </div>
           </div>
           <div id="panel-info" class="mb-1">
             <label>Panelboard Tag <input id="panel-tag" type="text"></label>
@@ -103,8 +107,11 @@
               </label>
             </div>
           </div>
+        <div id="panel-sticky-summary" class="panel-sticky-summary" aria-live="polite"></div>
+        <div id="panel-validation-hints" class="panel-validation-hints" aria-live="polite"></div>
         <div id="panel-container"></div>
         <div id="panel-totals" class="mt-1"></div>
+        <div id="panel-assignment-status" class="panel-assignment-status" aria-live="polite"></div>
         <button id="add-panel-to-equipment-btn" class="btn" type="button" title="Add this panelboard to the equipment list">Add to Equipment List</button>
         <button id="export-panel-btn" class="btn" type="button" title="Export panel to Excel">Export to Excel</button>
       </section>
