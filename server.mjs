@@ -24,6 +24,12 @@ function formatDurationMs(startNs, endNs = process.hrtime.bigint()) {
   return Number(endNs - startNs) / 1e6;
 }
 
+// Only allow alphanumeric, dashes, and underscores to prevent path traversal.
+const VALID_NAME_RE = /^[a-zA-Z0-9_-]{1,100}$/;
+function isValidName(name) {
+  return typeof name === 'string' && VALID_NAME_RE.test(name);
+}
+
 function appendServerTiming(res, metricName, durationMs) {
   const normalizedDuration = Math.max(0, durationMs);
   const metric = `${metricName};dur=${normalizedDuration.toFixed(2)}`;
@@ -609,6 +615,14 @@ export async function createApp(options = {}) {
         res.status(400).json({ error: 'Missing credentials' });
         return;
       }
+      if (!isValidName(trimmedUser)) {
+        res.status(400).json({ error: 'Invalid username' });
+        return;
+      }
+      if (password.length > 1000) {
+        res.status(400).json({ error: 'Password too long' });
+        return;
+      }
       if (users[trimmedUser]) {
         res.status(409).json({ error: 'User exists' });
         return;
@@ -629,6 +643,10 @@ export async function createApp(options = {}) {
         return;
       }
       const trimmedUser = username.trim();
+      if (!isValidName(trimmedUser) || password.length > 1000) {
+        res.status(401).json({ error: 'Invalid credentials' });
+        return;
+      }
       const record = users[trimmedUser];
       if (!record) {
         res.status(401).json({ error: 'Invalid credentials' });
@@ -678,6 +696,10 @@ export async function createApp(options = {}) {
     }
     const header = req.headers['x-csrf-token'];
     if (typeof header !== 'string') {
+      res.status(403).json({ error: 'Invalid CSRF token' });
+      return;
+    }
+    if (!/^[0-9a-fA-F]+$/.test(header)) {
       res.status(403).json({ error: 'Invalid CSRF token' });
       return;
     }
@@ -747,6 +769,10 @@ export async function createApp(options = {}) {
     asyncHandler(async (req, res) => {
       const project = req.params.project;
       const username = req.username;
+      if (!isValidName(project) || !isValidName(username)) {
+        res.status(400).json({ error: 'Invalid project name' });
+        return;
+      }
       const persistStartedAt = process.hrtime.bigint();
       try {
         const saved = await projectStore.save(username, project, req.body);
@@ -777,6 +803,10 @@ export async function createApp(options = {}) {
     asyncHandler(async (req, res) => {
       const project = req.params.project;
       const username = req.username;
+      if (!isValidName(project) || !isValidName(username)) {
+        res.status(400).json({ error: 'Invalid project name' });
+        return;
+      }
       const loadStartedAt = process.hrtime.bigint();
       try {
         const latest = await projectStore.loadLatest(username, project);
@@ -794,6 +824,10 @@ export async function createApp(options = {}) {
   app.get(
     '/projects/:project/snapshots',
     asyncHandler(async (req, res) => {
+      if (!isValidName(req.params.project) || !isValidName(req.username)) {
+        res.status(400).json({ error: 'Invalid project name' });
+        return;
+      }
       const rows = await snapshotStore.listByOwner(req.username, req.params.project);
       res.json({ snapshots: rows });
     })
@@ -803,6 +837,10 @@ export async function createApp(options = {}) {
     '/projects/:project/snapshots',
     asyncHandler(async (req, res) => {
       const project = req.params.project;
+      if (!isValidName(project) || !isValidName(req.username)) {
+        res.status(400).json({ error: 'Invalid project name' });
+        return;
+      }
       const mode = req.body?.mode === 'edit' ? 'edit' : 'read';
       let latestVersion = null;
       try {
@@ -838,6 +876,10 @@ export async function createApp(options = {}) {
   app.delete(
     '/projects/:project/snapshots/:snapshotId',
     asyncHandler(async (req, res) => {
+      if (!isValidName(req.params.project) || !isValidName(req.username)) {
+        res.status(400).json({ error: 'Invalid project name' });
+        return;
+      }
       const ok = await snapshotStore.revoke(req.username, req.params.project, req.params.snapshotId);
       if (!ok) {
         res.status(404).json({ error: 'Not found' });

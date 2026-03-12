@@ -117,7 +117,7 @@ class CableRoutingSystem {
             utilization[id] = {
                 current_fill: tray.current_fill,
                 max_fill: tray.maxFill,
-                utilization_percentage: (tray.current_fill / tray.maxFill) * 100,
+                utilization_percentage: tray.maxFill ? (tray.current_fill / tray.maxFill) * 100 : 0,
                 available_capacity: tray.maxFill - tray.current_fill,
             };
         }
@@ -556,7 +556,7 @@ class CableRoutingSystem {
                 return { success: false, manual: true, manual_raceway: true, message: `${segment} not allowed`, exclusions, mismatched_records: this._formatMismatchedRecords() };
             }
             if (tray.current_fill + cableArea > tray.maxFill) {
-                const fillPct = ((tray.current_fill + cableArea) / (tray.width * tray.height)) * 100;
+                const fillPct = (tray.width * tray.height) ? ((tray.current_fill + cableArea) / (tray.width * tray.height)) * 100 : 0;
                 const maxPct = this.fillLimit * 100;
                 const record = { tray_id: id, reason: 'over_capacity', cable_id: cableId, conduit_id: tray.conduit_id, ductbank_tag: tray.ductbankTag, filter, message: `Rejected ${id}: ${fillPct.toFixed(1)}% fill > Max ${maxPct.toFixed(0)}%` };
                 exclusions.push(record);
@@ -623,7 +623,7 @@ class CableRoutingSystem {
             const segment = tray.ductbankTag ? `conduit ${tray.conduit_id} in ductbank ${tray.ductbankTag}` : `tray ${tray.tray_id}`;
             const filter = tray.ductbankTag ? `racewayschedule.html?db=${encodeURIComponent(tray.ductbankTag)}` : `racewayschedule.html?tray=${encodeURIComponent(tray.tray_id)}`;
             if (tray.current_fill + cableArea > tray.maxFill) {
-                const fillPct = ((tray.current_fill + cableArea) / (tray.width * tray.height)) * 100;
+                const fillPct = (tray.width * tray.height) ? ((tray.current_fill + cableArea) / (tray.width * tray.height)) * 100 : 0;
                 const maxPct = this.fillLimit * 100;
                 const record = { tray_id: tray.tray_id, reason: 'over_capacity', cable_id: cableId, conduit_id: tray.conduit_id, ductbank_tag: tray.ductbankTag, filter, message: `Rejected ${tray.tray_id}: ${fillPct.toFixed(1)}% fill > Max ${maxPct.toFixed(0)}%` };
                 exclusions.push(record);
@@ -791,7 +791,8 @@ class CableRoutingSystem {
             let tray_id = edge.trayId;
             if (!tray_id) { // Infer tray_id if not on edge
                 const node_id = u.includes('_') ? u : v;
-                tray_id = node_id.split('_')[0]
+                const inferred = node_id.split('_')[0];
+                tray_id = (inferred && this.trays.has(inferred)) ? inferred : null;
             }
             if (type === 'tray') traySegments.add(tray_id);
 

@@ -1729,18 +1729,22 @@ async function initCableSchedule() {
       const warnIn = tr.querySelector('[name="sizing_warning"]');
       const codeRefIn = tr.querySelector('[name="code_reference"]');
       if (!sizeSel || !loadIn) return;
+      const rawVoltage = parseFloat(voltIn?.value);
+      const rawConductors = parseInt(condIn?.value);
+      const rawAmbient = parseFloat(ambIn?.value);
+      const rawInsulation = parseFloat(insSel?.value);
       const load = {
-        current: parseFloat(loadIn.value) || 0,
-        voltage: parseFloat(voltIn?.value) || 0,
+        current: Math.max(0, parseFloat(loadIn.value) || 0),
+        voltage: (Number.isFinite(rawVoltage) && rawVoltage > 0) ? rawVoltage : 0,
         phases: 3,
-        conductors: parseInt(condIn?.value) || 1
+        conductors: (Number.isFinite(rawConductors) && rawConductors >= 1) ? rawConductors : 1
       };
       const params = {
         material: matSel?.value || 'cu',
-        insulation_rating: parseFloat(insSel?.value) || 90,
-        length: parseFloat(lenIn?.value) || 0,
-        conductors: parseInt(condIn?.value) || 1,
-        ambient: parseFloat(ambIn?.value) || 30,
+        insulation_rating: (Number.isFinite(rawInsulation) && rawInsulation > 0) ? rawInsulation : 90,
+        length: Math.max(0, parseFloat(lenIn?.value) || 0),
+        conductors: (Number.isFinite(rawConductors) && rawConductors >= 1) ? rawConductors : 1,
+        ambient: (Number.isFinite(rawAmbient) && rawAmbient > -273) ? rawAmbient : 30,
         maxVoltageDrop: limit
       };
       const res = sizeConductor(load, params);

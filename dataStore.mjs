@@ -145,7 +145,9 @@ if (typeof window !== 'undefined' && typeof window.addEventListener === 'functio
     try {
       const val = e.newValue ? JSON.parse(e.newValue) : undefined;
       emit(key, val);
-    } catch {}
+    } catch (err) {
+      console.warn('storage event: failed to parse value for key', e.key, err);
+    }
   });
 }
 
