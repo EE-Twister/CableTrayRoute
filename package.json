@@ -8,16 +8,16 @@
     "server": "node server.mjs"
   },
   "devDependencies": {
+    "@playwright/test": "^1.41.1",
     "@rollup/plugin-terser": "^0.4.3",
-    "rollup": "^3.29.0",
-    "@playwright/test": "^1.41.1"
+    "rollup": "^3.30.0"
   },
   "dependencies": {
+    "express": "^4.19.2",
     "fast-json-patch": "^3.1.0",
-    "jspdf": "^2.5.1",
-    "svg2pdf.js": "^2.0.1",
     "handlebars": "^4.7.8",
+    "jspdf": "^2.5.1",
     "pdfkit": "^0.13.0",
-    "express": "^4.19.2"
+    "svg2pdf.js": "^2.0.1"
   }
 }
