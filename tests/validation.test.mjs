@@ -1,0 +1,212 @@
+import assert from 'assert';
+import { runValidation } from '../validation/rules.js';
+
+function describe(name, fn) {
+  console.log(name);
+  fn();
+}
+
+function it(name, fn) {
+  try {
+    fn();
+    console.log('  \u2713', name);
+  } catch (err) {
+    console.error('  \u2717', name, err.message || err);
+    process.exitCode = 1;
+  }
+}
+
+describe('runValidation - basic', () => {
+  it('returns empty array for empty component list', () => {
+    const issues = runValidation([], {});
+    assert.deepStrictEqual(issues, []);
+  });
+
+  it('returns empty array when no violations exist', () => {
+    const components = [
+      { id: 'bus-1', type: 'bus', connections: [{ target: 'bus-2' }] },
+      { id: 'bus-2', type: 'bus', connections: [{ target: 'bus-1' }] }
+    ];
+    const issues = runValidation(components, {});
+    assert.deepStrictEqual(issues, []);
+  });
+});
+
+describe('runValidation - unconnected bus detection', () => {
+  it('flags a bus with no inbound and no outbound connections', () => {
+    const components = [
+      { id: 'isolated-bus', type: 'bus', connections: [] }
+    ];
+    const issues = runValidation(components, {});
+    assert.strictEqual(issues.length, 1);
+    assert.strictEqual(issues[0].component, 'isolated-bus');
+    assert.ok(issues[0].message.toLowerCase().includes('unconnected'));
+  });
+
+  it('does not flag a bus with at least one outbound connection', () => {
+    const components = [
+      { id: 'source-bus', type: 'bus', connections: [{ target: 'load-bus' }] },
+      { id: 'load-bus', type: 'bus', connections: [] }
+    ];
+    const issues = runValidation(components, {});
+    // load-bus has inbound from source-bus, so not unconnected; source-bus has outbound
+    assert.deepStrictEqual(issues, []);
+  });
+
+  it('does not flag a bus missing connections array (treated as empty)', () => {
+    const components = [
+      { id: 'ref-bus', type: 'bus' },
+      { id: 'target-bus', type: 'bus', connections: [{ target: 'ref-bus' }] }
+    ];
+    // ref-bus has inbound from target-bus, so not flagged
+    const issues = runValidation(components, {});
+    assert.deepStrictEqual(issues, []);
+  });
+
+  it('does not flag non-bus components that have no connections', () => {
+    const components = [
+      { id: 'breaker-1', type: 'breaker', connections: [] }
+    ];
+    const issues = runValidation(components, {});
+    assert.deepStrictEqual(issues, []);
+  });
+});
+
+describe('runValidation - transformer overload', () => {
+  it('flags a transformer where load exceeds rating', () => {
+    const components = [
+      { id: 'xfmr-1', type: 'transformer', load_kva: 1500, kva: 1000 }
+    ];
+    const issues = runValidation(components, {});
+    assert.strictEqual(issues.length, 1);
+    assert.strictEqual(issues[0].component, 'xfmr-1');
+    assert.ok(issues[0].message.includes('overload'));
+    assert.ok(issues[0].message.includes('1500kVA'));
+    assert.ok(issues[0].message.includes('1000kVA'));
+  });
+
+  it('does not flag a transformer where load equals rating', () => {
+    const components = [
+      { id: 'xfmr-2', type: 'transformer', load_kva: 1000, kva: 1000 }
+    ];
+    assert.deepStrictEqual(runValidation(components, {}), []);
+  });
+
+  it('does not flag a transformer where load is below rating', () => {
+    const components = [
+      { id: 'xfmr-3', type: 'transformer', load_kva: 750, kva: 1000 }
+    ];
+    assert.deepStrictEqual(runValidation(components, {}), []);
+  });
+
+  it('does not flag when rating is 0 (unrated)', () => {
+    const components = [
+      { id: 'xfmr-4', type: 'transformer', load_kva: 500, kva: 0 }
+    ];
+    assert.deepStrictEqual(runValidation(components, {}), []);
+  });
+
+  it('uses load/rating field name fallbacks', () => {
+    const components = [
+      { id: 'xfmr-5', type: 'transformer', load: 2000, rating: 1500 }
+    ];
+    const issues = runValidation(components, {});
+    assert.strictEqual(issues.length, 1);
+    assert.strictEqual(issues[0].component, 'xfmr-5');
+  });
+
+  it('does not flag when neither load nor rating is defined', () => {
+    const components = [
+      { id: 'xfmr-6', type: 'transformer' }
+    ];
+    assert.deepStrictEqual(runValidation(components, {}), []);
+  });
+});
+
+describe('runValidation - breaker interrupt rating', () => {
+  it('flags a breaker where fault current exceeds interrupt rating', () => {
+    const components = [
+      { id: 'brk-1', type: 'breaker', fault_current: 50000, interrupt_rating: 42000 }
+    ];
+    const issues = runValidation(components, {});
+    assert.strictEqual(issues.length, 1);
+    assert.strictEqual(issues[0].component, 'brk-1');
+    assert.ok(issues[0].message.includes('interrupt'));
+    assert.ok(issues[0].message.includes('50000A'));
+    assert.ok(issues[0].message.includes('42000A'));
+  });
+
+  it('does not flag a breaker where fault current equals interrupt rating', () => {
+    const components = [
+      { id: 'brk-2', type: 'breaker', fault_current: 42000, interrupt_rating: 42000 }
+    ];
+    assert.deepStrictEqual(runValidation(components, {}), []);
+  });
+
+  it('does not flag a breaker where fault current is below interrupt rating', () => {
+    const components = [
+      { id: 'brk-3', type: 'breaker', fault_current: 30000, interrupt_rating: 42000 }
+    ];
+    assert.deepStrictEqual(runValidation(components, {}), []);
+  });
+
+  it('does not flag when interrupt_rating is 0 (unrated)', () => {
+    const components = [
+      { id: 'brk-4', type: 'breaker', fault_current: 99999, interrupt_rating: 0 }
+    ];
+    assert.deepStrictEqual(runValidation(components, {}), []);
+  });
+
+  it('does not flag when fault_current is missing', () => {
+    const components = [
+      { id: 'brk-5', type: 'breaker', interrupt_rating: 42000 }
+    ];
+    assert.deepStrictEqual(runValidation(components, {}), []);
+  });
+});
+
+describe('runValidation - TCC duty violations', () => {
+  it('passes through duty violation messages from studies', () => {
+    const studies = {
+      duty: {
+        'comp-A': ['Duty violation at 0.5s', 'Coordination gap detected'],
+        'comp-B': ['Upstream device slower than downstream']
+      }
+    };
+    const issues = runValidation([], studies);
+    assert.strictEqual(issues.length, 3);
+    const compAIssues = issues.filter(i => i.component === 'comp-A');
+    assert.strictEqual(compAIssues.length, 2);
+    const compBIssues = issues.filter(i => i.component === 'comp-B');
+    assert.strictEqual(compBIssues.length, 1);
+    assert.strictEqual(compBIssues[0].message, 'Upstream device slower than downstream');
+  });
+
+  it('handles missing studies.duty gracefully', () => {
+    const issues = runValidation([], {});
+    assert.deepStrictEqual(issues, []);
+  });
+
+  it('handles studies object being undefined', () => {
+    const issues = runValidation([]);
+    assert.deepStrictEqual(issues, []);
+  });
+});
+
+describe('runValidation - multiple simultaneous violations', () => {
+  it('reports all violations across mixed component types', () => {
+    const components = [
+      { id: 'isolated', type: 'bus', connections: [] },
+      { id: 'xfmr-ov', type: 'transformer', load_kva: 2000, kva: 1500 },
+      { id: 'brk-ov', type: 'breaker', fault_current: 60000, interrupt_rating: 42000 }
+    ];
+    const studies = { duty: { 'brk-ov': ['TCC coordination issue'] } };
+    const issues = runValidation(components, studies);
+    assert.strictEqual(issues.length, 4);
+    const ids = issues.map(i => i.component);
+    assert.ok(ids.includes('isolated'));
+    assert.ok(ids.includes('xfmr-ov'));
+    const brkIssues = issues.filter(i => i.component === 'brk-ov');
+    assert.strictEqual(brkIssues.length, 2); // interrupt + TCC
+  });
+});
