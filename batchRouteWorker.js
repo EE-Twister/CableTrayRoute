@@ -13,12 +13,13 @@ function processFrom(index) {
             return;
         }
         if (results[i]) {
-            self.postMessage({ type: 'progress', completed: i + 1, total: cables.length });
+            self.postMessage({ type: 'progress', completed: i + 1, total: cables.length, cableName: cables[i].name });
             continue;
         }
 
         const cable = cables[i];
         const cableArea = Math.PI * (cable.diameter / 2) ** 2;
+        const routeStart = performance.now();
         const result = system.calculateRoute(
             cable.start,
             cable.end,
@@ -28,6 +29,7 @@ function processFrom(index) {
             cable.raceway_ids || [],
             cable.id || cable.name || null
         );
+        const routeMs = performance.now() - routeStart;
 
         if (result.success) {
             system.updateTrayFill(result.tray_segments, cableArea);
@@ -45,7 +47,7 @@ function processFrom(index) {
 
         results[i] = result;
         state.index = i + 1;
-        self.postMessage({ type: 'progress', completed: i + 1, total: cables.length });
+        self.postMessage({ type: 'progress', completed: i + 1, total: cables.length, cableName: cable.name, routeMs, success: result.success });
     }
 
     const wallTime = performance.now() - state.startTime - (state.pausedDuration || 0);

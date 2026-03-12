@@ -602,17 +602,19 @@ class CableRoutingSystem {
             if (manualResult && manualResult.exclusions) exclusions = exclusions.concat(manualResult.exclusions);
         }
         if (!this.baseGraph) this.prepareBaseGraph();
-        // 1. Start from the precomputed graph
+        // 1. Start from the precomputed graph.
+        // Shallow-copy both the nodes and edge maps so that deleting excluded tray
+        // entries and adding start/end nodes doesn't mutate baseGraph.  Individual
+        // edge objects are shared by reference and only cloned lazily when their
+        // weight needs to be modified (utilization multiplier).  This avoids the
+        // O(nodes + edges) deep-clone that would otherwise happen for every cable.
         const cloneGraph = (base) => {
-            const g = { nodes: {}, edges: {} };
-            for (const [id, n] of Object.entries(base.nodes)) {
-                g.nodes[id] = { point: n.point.slice(), type: n.type };
-            }
-            for (const [id, edges] of Object.entries(base.edges)) {
-                g.edges[id] = {};
-                for (const [k, e] of Object.entries(edges)) {
-                    g.edges[id][k] = { weight: e.weight, type: e.type, trayId: e.trayId };
-                }
+            const g = {
+                nodes: Object.assign(Object.create(null), base.nodes),
+                edges: {}
+            };
+            for (const id in base.edges) {
+                g.edges[id] = Object.assign(Object.create(null), base.edges[id]);
             }
             return g;
         };
@@ -649,14 +651,19 @@ class CableRoutingSystem {
         }
 
         // Adjust tray edge weights based on current utilization so that
-        // highly filled trays become less desirable during routing. The
-        // weight multiplier is 1 + (current_fill / maxFill).
-        for (const edges of Object.values(graph.edges)) {
-            for (const edge of Object.values(edges)) {
+        // highly filled trays become less desirable during routing.
+        // The weight multiplier is 1 + (current_fill / maxFill).
+        // Clone edge objects lazily before mutation to avoid corrupting baseGraph.
+        for (const [fromId, edgeMap] of Object.entries(graph.edges)) {
+            for (const [toId, edge] of Object.entries(edgeMap)) {
                 if (edge.type === 'tray' && edge.trayId && this.trays.has(edge.trayId)) {
                     const t = this.trays.get(edge.trayId);
                     const util = t.maxFill ? t.current_fill / t.maxFill : 0;
-                    edge.weight *= (1 + util);
+                    if (util > 0) {
+                        // Lazy clone: only copy the edge object when we actually mutate it
+                        const cloned = { weight: edge.weight * (1 + util), type: edge.type, trayId: edge.trayId };
+                        graph.edges[fromId][toId] = cloned;
+                    }
                 }
             }
         }
