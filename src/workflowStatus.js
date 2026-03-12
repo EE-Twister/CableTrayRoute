@@ -1,4 +1,4 @@
-import { getTrays, getCables, getDuctbanks, getConduits, getItem } from '../dataStore.mjs';
+import { getTrays, getCables, getDuctbanks, getConduits, getOneLine } from '../dataStore.mjs';
 
 const workflowOrder = [
   { key: 'cableSchedule', label: '1. Cable Schedule', href: 'cableschedule.html' },
@@ -11,13 +11,29 @@ const workflowOrder = [
 ];
 
 function isStepComplete(key) {
+  if (key === 'cableSchedule') {
+    return getCables().length > 0;
+  }
   if (key === 'racewaySchedule') {
     return getDuctbanks().length > 0 || getTrays().length > 0 || getConduits().length > 0;
+  }
+  if (key === 'ductbankSchedule') {
+    return getDuctbanks().length > 0;
+  }
+  if (key === 'traySchedule') {
+    return getTrays().length > 0;
+  }
+  if (key === 'conduitSchedule') {
+    return getConduits().length > 0;
   }
   if (key === 'optimalRoute') {
     return getCables().length > 0 && getTrays().length > 0;
   }
-  return !!getItem(key);
+  if (key === 'oneLineDiagram') {
+    const { sheets } = getOneLine();
+    return sheets.some(s => (s.components || []).length > 0);
+  }
+  return false;
 }
 
 window.addEventListener('DOMContentLoaded', () => {
