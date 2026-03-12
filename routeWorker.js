@@ -865,23 +865,31 @@ function gatherPullSegments(segs) {
 }
 
 self.onmessage = function(e) {
-    const { trays, options, baseGraph, cable, cableArea } = e.data;
-    const system = new CableRoutingSystem(options);
-    trays.forEach(t => system.addTraySegment(t));
-    system.baseGraph = baseGraph;
-    const result = system.calculateRoute(
-        cable.start,
-        cable.end,
-        cableArea,
-        cable.allowed_cable_group,
-        cable.manual_path || '',
-        cable.raceway_ids || [],
-        cable.id || cable.name || null
-    );
-    if (result && result.success) {
-        const pullSegs = gatherPullSegments(result.route_segments || []);
-        const pull = calcPullTension(pullSegs, cable);
-        result.pull_check = pull;
+    try {
+        const { trays, options, baseGraph, cable, cableArea } = e.data;
+        if (!cable || !Array.isArray(trays)) {
+            self.postMessage({ success: false, error: 'Invalid routing input data.' });
+            return;
+        }
+        const system = new CableRoutingSystem(options);
+        trays.forEach(t => system.addTraySegment(t));
+        system.baseGraph = baseGraph;
+        const result = system.calculateRoute(
+            cable.start,
+            cable.end,
+            cableArea,
+            cable.allowed_cable_group,
+            cable.manual_path || '',
+            cable.raceway_ids || [],
+            cable.id || cable.name || null
+        );
+        if (result && result.success) {
+            const pullSegs = gatherPullSegments(result.route_segments || []);
+            const pull = calcPullTension(pullSegs, cable);
+            result.pull_check = pull;
+        }
+        self.postMessage(result);
+    } catch (err) {
+        self.postMessage({ success: false, error: err && err.message ? err.message : 'Routing calculation failed.' });
     }
-    self.postMessage(result);
 };

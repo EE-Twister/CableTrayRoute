@@ -55,7 +55,11 @@ window.addEventListener('DOMContentLoaded', () => {
   const nextStepEl = document.getElementById('workflow-next-step');
   if (nextStepEl) {
     if (nextStep) {
-      nextStepEl.innerHTML = `Next recommended step: <a href="${nextStep.href}">${nextStep.label}</a>`;
+      nextStepEl.textContent = 'Next recommended step: ';
+      const link = document.createElement('a');
+      link.href = nextStep.href;
+      link.textContent = nextStep.label;
+      nextStepEl.appendChild(link);
     } else {
       nextStepEl.textContent = 'All workflow steps are complete. You are ready to generate reports.';
     }
