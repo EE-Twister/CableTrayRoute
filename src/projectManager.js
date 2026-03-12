@@ -24,7 +24,170 @@ function normalizeProjectName(name) {
 function currentProjectName() {
   const hashName = normalizeProjectName(currentProject());
   if (hashName) return hashName;
-  if (typeof window !== 'undefined') {
+  
+
+async function requestSnapshotList(projectName) {
+  const auth = getAuthContext();
+  if (!auth) throw new Error('Login required to manage snapshots.');
+  const res = await fetch(`/projects/${encodeURIComponent(projectName)}/snapshots`, {
+    headers: {
+      'Authorization': `Bearer ${auth.token}`,
+      'X-CSRF-Token': auth.csrfToken
+    }
+  });
+  if (res.status === 401 || res.status === 403) clearAuthContext();
+  if (!res.ok) throw new Error('Could not load snapshots.');
+  const payload = await res.json();
+  return Array.isArray(payload.snapshots) ? payload.snapshots : [];
+}
+
+async function createSnapshot(projectName, mode) {
+  const auth = getAuthContext();
+  if (!auth) throw new Error('Login required to create share links.');
+  const res = await fetch(`/projects/${encodeURIComponent(projectName)}/snapshots`, {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      'Authorization': `Bearer ${auth.token}`,
+      'X-CSRF-Token': auth.csrfToken
+    },
+    body: JSON.stringify({ mode })
+  });
+  if (res.status === 401 || res.status === 403) clearAuthContext();
+  if (!res.ok) throw new Error('Could not create share link.');
+  return res.json();
+}
+
+async function revokeSnapshot(projectName, snapshotId) {
+  const auth = getAuthContext();
+  if (!auth) throw new Error('Login required to revoke share links.');
+  const res = await fetch(`/projects/${encodeURIComponent(projectName)}/snapshots/${encodeURIComponent(snapshotId)}`, {
+    method: 'DELETE',
+    headers: {
+      'Authorization': `Bearer ${auth.token}`,
+      'X-CSRF-Token': auth.csrfToken
+    }
+  });
+  if (res.status === 401 || res.status === 403) clearAuthContext();
+  if (!res.ok) throw new Error('Could not revoke share link.');
+}
+
+function renderSnapshotRows(container, snapshots, projectName, refresh) {
+  container.innerHTML = '';
+  if (!snapshots.length) {
+    const empty = document.createElement('p');
+    empty.textContent = 'No active share links for this project.';
+    container.appendChild(empty);
+    return;
+  }
+  snapshots.forEach(snapshot => {
+    const row = document.createElement('div');
+    row.className = 'snapshot-row';
+    const status = snapshot.revokedAt ? 'Revoked' : snapshot.expired ? 'Expired' : 'Active';
+    row.innerHTML = `<strong>${snapshot.mode === 'edit' ? 'Editable' : 'Read-only'}</strong> · ${status}<br><small>Created ${new Date(snapshot.createdAt).toLocaleString()} · Expires ${new Date(snapshot.expiresAt).toLocaleString()}</small>`;
+    if (!snapshot.revokedAt) {
+      const revokeButton = document.createElement('button');
+      revokeButton.className = 'btn';
+      revokeButton.type = 'button';
+      revokeButton.textContent = 'Revoke';
+      revokeButton.addEventListener('click', async () => {
+        try {
+          await revokeSnapshot(projectName, snapshot.id);
+          await refresh();
+        } catch (err) {
+          await showAlertModal('Revocation Failed', err.message || 'Unable to revoke link.');
+        }
+      });
+      row.appendChild(document.createElement('br'));
+      row.appendChild(revokeButton);
+    }
+    container.appendChild(row);
+  });
+}
+
+async function openShareModal() {
+  const projectName = currentProjectName();
+  if (!projectName) {
+    await showAlertModal('Save Required', 'Save the project before creating a share link.');
+    return;
+  }
+  if (!getAuthContext()) {
+    await showAlertModal('Login Required', 'Login to create and manage share links.');
+    return;
+  }
+
+  let listContainer;
+  let infoText;
+
+  async function refresh() {
+    const snapshots = await requestSnapshotList(projectName);
+    renderSnapshotRows(listContainer, snapshots, projectName, refresh);
+  }
+
+  await openModal({
+    title: 'Share Project Snapshot',
+    description: 'Create read-only or editable links, then revoke links you no longer want active.',
+    primaryText: 'Close',
+    render(container) {
+      const controls = document.createElement('div');
+      controls.className = 'modal-form';
+
+      const readOnlyBtn = document.createElement('button');
+      readOnlyBtn.type = 'button';
+      readOnlyBtn.className = 'btn';
+      readOnlyBtn.textContent = 'Create Read-only Link';
+      const editBtn = document.createElement('button');
+      editBtn.type = 'button';
+      editBtn.className = 'btn';
+      editBtn.textContent = 'Create Editable Link';
+
+      infoText = document.createElement('p');
+      infoText.textContent = 'Links expire with your auth token lifetime.';
+
+      listContainer = document.createElement('div');
+      listContainer.className = 'snapshot-list';
+      listContainer.textContent = 'Loading links...';
+
+      const handleCreate = async mode => {
+        try {
+          const snapshot = await createSnapshot(projectName, mode);
+          const link = snapshot.url || `${location.origin}/oneline.html?snapshotToken=${snapshot.token}`;
+          await navigator.clipboard.writeText(link);
+          infoText.textContent = `${mode === 'edit' ? 'Editable' : 'Read-only'} link copied. Expires ${new Date(snapshot.expiresAt).toLocaleString()}.`;
+          await refresh();
+        } catch (err) {
+          await showAlertModal('Share Failed', err.message || 'Unable to create link.');
+        }
+      };
+
+      readOnlyBtn.addEventListener('click', () => { handleCreate('read').catch(console.error); });
+      editBtn.addEventListener('click', () => { handleCreate('edit').catch(console.error); });
+
+      controls.append(readOnlyBtn, editBtn, infoText, listContainer);
+      container.appendChild(controls);
+      refresh().catch(async err => {
+        listContainer.textContent = 'Could not load links.';
+        await showAlertModal('Share Failed', err.message || 'Unable to load links.');
+      });
+    }
+  });
+}
+
+function mountShareControls() {
+  const header = document.querySelector('.page-header');
+  if (!header || document.getElementById('project-share-btn')) return;
+  const btn = document.createElement('button');
+  btn.id = 'project-share-btn';
+  btn.type = 'button';
+  btn.className = 'btn';
+  btn.textContent = 'Share Project';
+  btn.addEventListener('click', () => {
+    openShareModal().catch(console.error);
+  });
+  header.appendChild(btn);
+}
+
+if (typeof window !== 'undefined') {
     const globalName = normalizeProjectName(window.currentProjectId || '');
     if (globalName) return globalName;
   }
@@ -400,12 +563,176 @@ async function loadProject() {
   location.reload();
 }
 
+
+
+async function requestSnapshotList(projectName) {
+  const auth = getAuthContext();
+  if (!auth) throw new Error('Login required to manage snapshots.');
+  const res = await fetch(`/projects/${encodeURIComponent(projectName)}/snapshots`, {
+    headers: {
+      'Authorization': `Bearer ${auth.token}`,
+      'X-CSRF-Token': auth.csrfToken
+    }
+  });
+  if (res.status === 401 || res.status === 403) clearAuthContext();
+  if (!res.ok) throw new Error('Could not load snapshots.');
+  const payload = await res.json();
+  return Array.isArray(payload.snapshots) ? payload.snapshots : [];
+}
+
+async function createSnapshot(projectName, mode) {
+  const auth = getAuthContext();
+  if (!auth) throw new Error('Login required to create share links.');
+  const res = await fetch(`/projects/${encodeURIComponent(projectName)}/snapshots`, {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      'Authorization': `Bearer ${auth.token}`,
+      'X-CSRF-Token': auth.csrfToken
+    },
+    body: JSON.stringify({ mode })
+  });
+  if (res.status === 401 || res.status === 403) clearAuthContext();
+  if (!res.ok) throw new Error('Could not create share link.');
+  return res.json();
+}
+
+async function revokeSnapshot(projectName, snapshotId) {
+  const auth = getAuthContext();
+  if (!auth) throw new Error('Login required to revoke share links.');
+  const res = await fetch(`/projects/${encodeURIComponent(projectName)}/snapshots/${encodeURIComponent(snapshotId)}`, {
+    method: 'DELETE',
+    headers: {
+      'Authorization': `Bearer ${auth.token}`,
+      'X-CSRF-Token': auth.csrfToken
+    }
+  });
+  if (res.status === 401 || res.status === 403) clearAuthContext();
+  if (!res.ok) throw new Error('Could not revoke share link.');
+}
+
+function renderSnapshotRows(container, snapshots, projectName, refresh) {
+  container.innerHTML = '';
+  if (!snapshots.length) {
+    const empty = document.createElement('p');
+    empty.textContent = 'No active share links for this project.';
+    container.appendChild(empty);
+    return;
+  }
+  snapshots.forEach(snapshot => {
+    const row = document.createElement('div');
+    row.className = 'snapshot-row';
+    const status = snapshot.revokedAt ? 'Revoked' : snapshot.expired ? 'Expired' : 'Active';
+    row.innerHTML = `<strong>${snapshot.mode === 'edit' ? 'Editable' : 'Read-only'}</strong> · ${status}<br><small>Created ${new Date(snapshot.createdAt).toLocaleString()} · Expires ${new Date(snapshot.expiresAt).toLocaleString()}</small>`;
+    if (!snapshot.revokedAt) {
+      const revokeButton = document.createElement('button');
+      revokeButton.className = 'btn';
+      revokeButton.type = 'button';
+      revokeButton.textContent = 'Revoke';
+      revokeButton.addEventListener('click', async () => {
+        try {
+          await revokeSnapshot(projectName, snapshot.id);
+          await refresh();
+        } catch (err) {
+          await showAlertModal('Revocation Failed', err.message || 'Unable to revoke link.');
+        }
+      });
+      row.appendChild(document.createElement('br'));
+      row.appendChild(revokeButton);
+    }
+    container.appendChild(row);
+  });
+}
+
+async function openShareModal() {
+  const projectName = currentProjectName();
+  if (!projectName) {
+    await showAlertModal('Save Required', 'Save the project before creating a share link.');
+    return;
+  }
+  if (!getAuthContext()) {
+    await showAlertModal('Login Required', 'Login to create and manage share links.');
+    return;
+  }
+
+  let listContainer;
+  let infoText;
+
+  async function refresh() {
+    const snapshots = await requestSnapshotList(projectName);
+    renderSnapshotRows(listContainer, snapshots, projectName, refresh);
+  }
+
+  await openModal({
+    title: 'Share Project Snapshot',
+    description: 'Create read-only or editable links, then revoke links you no longer want active.',
+    primaryText: 'Close',
+    render(container) {
+      const controls = document.createElement('div');
+      controls.className = 'modal-form';
+
+      const readOnlyBtn = document.createElement('button');
+      readOnlyBtn.type = 'button';
+      readOnlyBtn.className = 'btn';
+      readOnlyBtn.textContent = 'Create Read-only Link';
+      const editBtn = document.createElement('button');
+      editBtn.type = 'button';
+      editBtn.className = 'btn';
+      editBtn.textContent = 'Create Editable Link';
+
+      infoText = document.createElement('p');
+      infoText.textContent = 'Links expire with your auth token lifetime.';
+
+      listContainer = document.createElement('div');
+      listContainer.className = 'snapshot-list';
+      listContainer.textContent = 'Loading links...';
+
+      const handleCreate = async mode => {
+        try {
+          const snapshot = await createSnapshot(projectName, mode);
+          const link = snapshot.url || `${location.origin}/oneline.html?snapshotToken=${snapshot.token}`;
+          await navigator.clipboard.writeText(link);
+          infoText.textContent = `${mode === 'edit' ? 'Editable' : 'Read-only'} link copied. Expires ${new Date(snapshot.expiresAt).toLocaleString()}.`;
+          await refresh();
+        } catch (err) {
+          await showAlertModal('Share Failed', err.message || 'Unable to create link.');
+        }
+      };
+
+      readOnlyBtn.addEventListener('click', () => { handleCreate('read').catch(console.error); });
+      editBtn.addEventListener('click', () => { handleCreate('edit').catch(console.error); });
+
+      controls.append(readOnlyBtn, editBtn, infoText, listContainer);
+      container.appendChild(controls);
+      refresh().catch(async err => {
+        listContainer.textContent = 'Could not load links.';
+        await showAlertModal('Share Failed', err.message || 'Unable to load links.');
+      });
+    }
+  });
+}
+
+function mountShareControls() {
+  const header = document.querySelector('.page-header');
+  if (!header || document.getElementById('project-share-btn')) return;
+  const btn = document.createElement('button');
+  btn.id = 'project-share-btn';
+  btn.type = 'button';
+  btn.className = 'btn';
+  btn.textContent = 'Share Project';
+  btn.addEventListener('click', () => {
+    openShareModal().catch(console.error);
+  });
+  header.appendChild(btn);
+}
+
 if (typeof window !== 'undefined') {
   window.projectManager = { listProjects, newProject, renameProject, saveProject, loadProject };
   window.addEventListener('DOMContentLoaded', () => {
     document.getElementById('new-project-btn')?.addEventListener('click', () => { newProject().catch(console.error); });
     document.getElementById('save-project-btn')?.addEventListener('click', () => { saveProject().catch(console.error); });
     document.getElementById('load-project-btn')?.addEventListener('click', () => { loadProject().catch(console.error); });
+    mountShareControls();
 
     // Add login/logout button
     const menu = document.getElementById('settings-menu');
