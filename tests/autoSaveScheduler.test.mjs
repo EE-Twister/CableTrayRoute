@@ -16,7 +16,7 @@ globalThis.localStorage={
 
 globalThis.alert=()=>{};
 globalThis.confirm=()=>false;
-globalThis.navigator={clipboard:{writeText:async()=>{}}};
+Object.defineProperty(globalThis,'navigator',{value:{clipboard:{writeText:async()=>{}}},configurable:true,writable:true});
 globalThis.location={origin:'http://localhost',pathname:'/index.html',hash:'',reload:()=>{}};
 
 globalThis.btoa=str=>Buffer.from(str,'binary').toString('base64');

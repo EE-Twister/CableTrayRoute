@@ -23,5 +23,5 @@ function createDirtyTracker(win = (typeof window !== 'undefined' ? window : unde
     isDirty() { return dirty; }
   };
 }
-if (typeof module !== 'undefined') module.exports = { createDirtyTracker };
 if (typeof window !== 'undefined') window.createDirtyTracker = createDirtyTracker;
+export { createDirtyTracker };
