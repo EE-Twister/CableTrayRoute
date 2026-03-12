@@ -2344,15 +2344,24 @@ const renderPullChecks = (results) => {
 const renderBatchResults = (results) => {
         let totalLength = 0;
         let totalField = 0;
+        let routedCount = 0;
+        let failedCount = 0;
         let html = '';
         const reasonCounts = {};
+        const fmt = globalThis.units?.formatDistance || (v => `${v.toFixed(2)} ft`);
         results.forEach((res, idx) => {
             const tl = parseFloat(res.total_length);
             const fl = parseFloat(res.field_length);
             if (!isNaN(tl)) totalLength += tl;
             if (!isNaN(fl)) totalField += fl;
+            const isSuccess = res.status && res.status.startsWith('✓');
+            if (isSuccess) routedCount++; else failedCount++;
             const lockBtn = state.cableList[idx]?.locked ? '' : ` <button class="lock-route-btn" data-idx="${idx}">Lock Route</button>`;
-            html += `<details><summary>${res.cable} | ${res.status} | ${res.mode} | Total ${res.total_length} | Field ${res.field_length} | Segments ${res.segments_count} <button class="view-map-btn" data-index="${idx}">View on Map</button>${lockBtn}</summary>`;
+            const rowClass = isSuccess ? 'route-success' : 'route-failed';
+            const totalLabel = isSuccess ? `${fmt(tl)}` : 'N/A';
+            const fieldLabel = isSuccess ? `${fmt(fl)} field` : '';
+            const segsLabel = isSuccess ? ` · ${res.segments_count} segs` : '';
+            html += `<details class="${rowClass}"><summary>${res.cable} <span class="route-status-badge">${res.status}</span> <span class="route-mode-badge">${res.mode}</span> ${totalLabel}${fieldLabel ? ' · ' + fieldLabel : ''}${segsLabel} <button class="view-map-btn" data-index="${idx}">View on Map</button>${lockBtn}</summary>`;
             if (res.exclusions && res.exclusions.length > 0) {
                 res.exclusions.forEach(ex => {
                     if (ex.reason) {
@@ -2392,8 +2401,13 @@ const renderBatchResults = (results) => {
             }
             html += '</details>';
         });
-        const fmt = globalThis.units?.formatDistance || (v=>`${v.toFixed(2)} ft`);
-        const overall = `<p class="overall-stats"><strong>Overall Total Length:</strong> ${fmt(totalLength)} | <strong>Overall Field Length:</strong> ${fmt(totalField)}</p>`;
+        const summaryClass = failedCount > 0 ? 'route-summary-warn' : 'route-summary-ok';
+        const overall = `<div class="route-summary-banner ${summaryClass}">` +
+            `<span class="rs-routed">✓ ${routedCount} routed</span>` +
+            (failedCount > 0 ? `<span class="rs-failed">✗ ${failedCount} failed</span>` : '') +
+            `<span class="rs-total">${fmt(totalLength)} total</span>` +
+            `<span class="rs-field">${fmt(totalField)} field</span>` +
+            `</div>`;
         elements.routeBreakdownContainer.innerHTML = overall + html;
         const mismatches = [];
         results.forEach(r => {
@@ -3222,13 +3236,33 @@ const renderBatchResults = (results) => {
             routingWorker = new Worker('batchRouteWorker.js');
             routingPaused = false;
             elements.cancelRoutingBtn.textContent = 'Cancel Routing';
+            const routingStartTime = performance.now();
+            const recentRouteTimes = [];
             routingWorker.onmessage = e => {
                 const msg = e.data;
                 if (msg.type === 'progress') {
-                    const pct = (msg.completed / state.cableList.length) * 100;
+                    const total = state.cableList.length;
+                    const pct = (msg.completed / total) * 100;
                     elements.progressBar.style.width = `${pct}%`;
                     elements.progressBar.setAttribute('aria-valuenow', Math.round(pct).toString());
-                    elements.progressLabel.textContent = `Routing (${msg.completed}/${state.cableList.length})`;
+
+                    // Track recent per-cable times for ETA estimation
+                    if (msg.routeMs != null) {
+                        recentRouteTimes.push(msg.routeMs);
+                        if (recentRouteTimes.length > 10) recentRouteTimes.shift();
+                    }
+                    const remaining = total - msg.completed;
+                    let etaText = '';
+                    if (recentRouteTimes.length >= 3 && remaining > 0) {
+                        const avgMs = recentRouteTimes.reduce((a, b) => a + b, 0) / recentRouteTimes.length;
+                        const etaSec = (avgMs * remaining) / 1000;
+                        etaText = etaSec < 60
+                            ? ` — ~${etaSec.toFixed(0)}s left`
+                            : ` — ~${(etaSec / 60).toFixed(1)}m left`;
+                    }
+                    const statusIcon = msg.success === false ? '✗' : '✓';
+                    const cableLabel = msg.cableName ? `: ${msg.cableName}` : '';
+                    elements.progressLabel.textContent = `${statusIcon} Routing cable ${msg.completed}/${total}${cableLabel}${etaText}`;
                 } else if (msg.type === 'cancelled') {
                     elements.progressLabel.textContent = `Paused (${msg.completed}/${state.cableList.length})`;
                 } else if (msg.type === 'done') {
@@ -3637,13 +3671,18 @@ const renderBatchResults = (results) => {
             return segments.map(seg => meshForSegment(seg[0], seg[1], tray));
         };
 
+        // Combine all tray ID labels into one trace for much faster rendering
+        const labelX = [], labelY = [], labelZ = [], labelText = [];
         trays.forEach(tray => {
             trayMesh(tray).forEach(t => traces.push(t));
-            const midX = (tray.start_x + tray.end_x) / 2;
-            const midY = (tray.start_y + tray.end_y) / 2;
-            const midZ = (tray.start_z + tray.end_z) / 2 + (tray.height / 12) / 2 + 0.5;
-            traces.push({type:'scatter3d', mode:'text', x:[midX], y:[midY], z:[midZ], text:[tray.tray_id], showlegend:false, hoverinfo:'none'});
+            labelX.push((tray.start_x + tray.end_x) / 2);
+            labelY.push((tray.start_y + tray.end_y) / 2);
+            labelZ.push((tray.start_z + tray.end_z) / 2 + (tray.height / 12) / 2 + 0.5);
+            labelText.push(tray.tray_id);
         });
+        if (labelX.length > 0) {
+            traces.push({type:'scatter3d', mode:'text', x:labelX, y:labelY, z:labelZ, text:labelText, showlegend:false, hoverinfo:'none'});
+        }
 
         if (routes && routes.length > 0) {
             // Sort routes alphanumerically by label so the legend order is predictable
@@ -3668,14 +3707,35 @@ const renderBatchResults = (results) => {
                     line: { color, width: 5 }, hoverinfo: 'skip'
                 });
 
+                // Consolidate all tray segments into one trace and all field segments into
+                // another using null separators. This dramatically reduces trace count
+                // (from one trace per segment to two traces per route) for faster rendering.
+                const trayXs = [], trayYs = [], trayZs = [];
+                const fieldXs = [], fieldYs = [], fieldZs = [];
                 route.segments.forEach(seg => {
+                    const xs = seg.type === 'tray' ? trayXs : fieldXs;
+                    const ys = seg.type === 'tray' ? trayYs : fieldYs;
+                    const zs = seg.type === 'tray' ? trayZs : fieldZs;
+                    xs.push(seg.start[0], seg.end[0], null);
+                    ys.push(seg.start[1], seg.end[1], null);
+                    zs.push(seg.start[2], seg.end[2], null);
+                });
+                if (trayXs.length > 0) {
                     traces.push({
-                        x: [seg.start[0], seg.end[0]], y: [seg.start[1], seg.end[1]], z: [seg.start[2], seg.end[2]],
+                        x: trayXs, y: trayYs, z: trayZs,
                         mode: 'lines', type: 'scatter3d',
                         name: label, legendgroup: label, showlegend: false,
-                        line: { color: seg.type === 'tray' ? color : 'red', width: 5 }
+                        line: { color, width: 5 }, hoverinfo: 'skip'
                     });
-                });
+                }
+                if (fieldXs.length > 0) {
+                    traces.push({
+                        x: fieldXs, y: fieldYs, z: fieldZs,
+                        mode: 'lines', type: 'scatter3d',
+                        name: label, legendgroup: label, showlegend: false,
+                        line: { color: 'red', width: 3, dash: 'dash' }, hoverinfo: 'skip'
+                    });
+                }
 
                 if (route.startPoint && route.endPoint) {
                     traces.push({
@@ -3726,9 +3786,10 @@ const renderBatchResults = (results) => {
     };
     Plotly.newPlot(elements.plot3d, traces, layout, {responsive: true});
     window.current3DPlot = { traces: traces, layout: layout };
+    // structuredClone is faster than JSON.parse(JSON.stringify()) for deep copies
     window.base3DPlot = {
-        traces: JSON.parse(JSON.stringify(traces)),
-        layout: JSON.parse(JSON.stringify(layout))
+        traces: structuredClone(traces),
+        layout: structuredClone(layout)
     };
     };
 
@@ -3826,8 +3887,8 @@ const renderBatchResults = (results) => {
             return;
         }
         if (!window.base3DPlot) return;
-        const traces = JSON.parse(JSON.stringify(window.base3DPlot.traces));
-        const layout = JSON.parse(JSON.stringify(window.base3DPlot.layout));
+        const traces = structuredClone(window.base3DPlot.traces);
+        const layout = structuredClone(window.base3DPlot.layout);
         Plotly.react(elements.plot3d, traces, layout);
         window.current3DPlot = { traces, layout };
         updateDuctbankVisibility(state.ductbankVisible);
@@ -3887,7 +3948,7 @@ const renderBatchResults = (results) => {
         }
         Plotly.relayout(elements.plot3d, layout);
         window.current3DPlot.layout = layout;
-        window.base3DPlot.layout = JSON.parse(JSON.stringify(layout));
+        window.base3DPlot.layout = structuredClone(layout);
     };
 
     const toggle2D3D = () => {
@@ -3996,6 +4057,12 @@ Plotly.newPlot(document.getElementById('plot'), data, layout, {responsive: true}
     }
 
     document.addEventListener('keydown', e => {
+        // Ctrl+Enter triggers routing calculation from anywhere on the page
+        if ((e.ctrlKey || e.metaKey) && e.key === 'Enter') {
+            e.preventDefault();
+            elements.calculateBtn.click();
+            return;
+        }
         if (e.target.tagName === 'INPUT' || e.target.tagName === 'TEXTAREA') return;
         if (e.key === 'r') elements.calculateBtn.click();
         if (e.key === 'c') document.getElementById('cable-list-details').open = !document.getElementById('cable-list-details').open;
