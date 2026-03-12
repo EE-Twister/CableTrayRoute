@@ -633,6 +633,44 @@ export function getAuthContextState() {
   return { token, csrfToken, expiresAt, user: user || null };
 }
 
+const SESSION_WARNING_MS = 5 * 60 * 1000; // warn 5 minutes before expiry
+let _expiryWarningTimer = null;
+let _expiryTimer = null;
+
+function clearSessionTimers() {
+  if (_expiryWarningTimer !== null) {
+    clearTimeout(_expiryWarningTimer);
+    _expiryWarningTimer = null;
+  }
+  if (_expiryTimer !== null) {
+    clearTimeout(_expiryTimer);
+    _expiryTimer = null;
+  }
+}
+
+function scheduleSessionTimers(expiresAt) {
+  clearSessionTimers();
+  if (typeof dispatchEvent === 'undefined') return;
+  const now = Date.now();
+  const msUntilExpiry = expiresAt - now;
+  if (msUntilExpiry <= 0) return;
+
+  const msUntilWarning = msUntilExpiry - SESSION_WARNING_MS;
+  if (msUntilWarning > 0) {
+    _expiryWarningTimer = setTimeout(() => {
+      dispatchEvent(new CustomEvent('session-expiring', { detail: { expiresAt } }));
+    }, msUntilWarning);
+  } else {
+    // Already within the warning window — fire immediately
+    dispatchEvent(new CustomEvent('session-expiring', { detail: { expiresAt } }));
+  }
+
+  _expiryTimer = setTimeout(() => {
+    clearAuthContextState();
+    dispatchEvent(new CustomEvent('session-expired'));
+  }, msUntilExpiry);
+}
+
 export function setAuthContextState({ token, csrfToken, expiresAt, user }) {
   if (!token || !csrfToken) return;
   const expiresValue = Number(expiresAt);
@@ -645,9 +683,11 @@ export function setAuthContextState({ token, csrfToken, expiresAt, user }) {
   } else {
     writeRawStorage(AUTH_USER_KEY, String(user));
   }
+  scheduleSessionTimers(expiresValue);
 }
 
 export function clearAuthContextState() {
+  clearSessionTimers();
   writeRawStorage(AUTH_TOKEN_KEY, null);
   writeRawStorage(AUTH_CSRF_KEY, null);
   writeRawStorage(AUTH_EXPIRES_KEY, null);

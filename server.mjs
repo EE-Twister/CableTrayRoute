@@ -719,6 +719,16 @@ export async function createApp(options = {}) {
   };
 
 
+  app.post(
+    '/session/refresh',
+    auth,
+    csrfProtection,
+    asyncHandler(async (req, res) => {
+      const newSession = await sessionStore.createSession(req.username);
+      res.json(newSession);
+    })
+  );
+
   app.get(
     '/shared/:token',
     asyncHandler(async (req, res) => {

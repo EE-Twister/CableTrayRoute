@@ -354,8 +354,103 @@ async function rateLimitScenario() {
   }
 }
 
+async function sessionRefreshScenario() {
+  console.log('server security - session refresh');
+  const tmpDir = await fs.mkdtemp(path.join(os.tmpdir(), 'ctr-refresh-'));
+  const { server, port } = await startServer({
+    dataDir: tmpDir,
+    tokenTtlMs: 5000,
+    rateLimit: { windowMs: 60000, max: 100 },
+    enforceHttps: false
+  });
+  const baseUrl = `http://127.0.0.1:${port}`;
+
+  try {
+    const username = 'carol';
+    const password = 'Refr3sh!Pass';
+
+    await fetch(`${baseUrl}/signup`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ username, password })
+    });
+    const loginRes = await fetch(`${baseUrl}/login`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ username, password })
+    });
+    const session = await loginRes.json();
+
+    const refreshed = await check('issues a new token and csrfToken on refresh', async () => {
+      const res = await fetch(`${baseUrl}/session/refresh`, {
+        method: 'POST',
+        headers: {
+          Authorization: `Bearer ${session.token}`,
+          'X-CSRF-Token': session.csrfToken
+        }
+      });
+      assert.strictEqual(res.status, 200);
+      const payload = await res.json();
+      assert(payload.token, 'new token missing');
+      assert(payload.csrfToken, 'new csrfToken missing');
+      assert(payload.expiresAt > Date.now(), 'expiresAt should be in the future');
+      assert.notStrictEqual(payload.token, session.token, 'new token should differ from old');
+      return payload;
+    });
+
+    await check('old token is invalidated after refresh', async () => {
+      const res = await fetch(`${baseUrl}/projects/test`, {
+        headers: { Authorization: `Bearer ${session.token}` }
+      });
+      assert.strictEqual(res.status, 401, 'old token should be rejected');
+    });
+
+    await check('new token grants access to protected resources', async () => {
+      const res = await fetch(`${baseUrl}/projects/refreshed-project`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${refreshed.token}`,
+          'X-CSRF-Token': refreshed.csrfToken
+        },
+        body: JSON.stringify({ data: { v: 1 } })
+      });
+      assert.strictEqual(res.status, 200);
+    });
+
+    await check('rejects refresh with missing CSRF token', async () => {
+      // Login again to get a fresh session
+      const loginRes2 = await fetch(`${baseUrl}/login`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ username, password })
+      });
+      const session2 = await loginRes2.json();
+      const res = await fetch(`${baseUrl}/session/refresh`, {
+        method: 'POST',
+        headers: { Authorization: `Bearer ${session2.token}` }
+      });
+      assert.strictEqual(res.status, 403);
+    });
+
+    await check('rejects refresh with invalid bearer token', async () => {
+      const res = await fetch(`${baseUrl}/session/refresh`, {
+        method: 'POST',
+        headers: {
+          Authorization: 'Bearer invalidtoken',
+          'X-CSRF-Token': 'aaaa'
+        }
+      });
+      assert.strictEqual(res.status, 401);
+    });
+  } finally {
+    await closeServer(server);
+  }
+}
+
 (async () => {
   await authScenario();
   await rateLimitScenario();
+  await sessionRefreshScenario();
 })();
 
