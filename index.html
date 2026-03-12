@@ -109,10 +109,90 @@
     </main>
   </div>
   <div id="help-modal" class="modal" aria-hidden="true" role="dialog" aria-labelledby="help-title">
-    <div class="modal-content">
+    <div class="modal-content" data-variant="wide">
       <button id="close-help-btn" class="close-btn" aria-label="Close Help">&times;</button>
-      <h2 id="help-title">CableTrayRoute</h2>
-      <p>Select a step to begin the workflow. For more details visit the <a href="help.html">Help page</a>.</p>
+      <h2 id="help-title">CableTrayRoute Help</h2>
+      <p class="modal-description">Browser-based toolkit for cable scheduling, analysis, and optimal routing. Work through the steps in order — data flows automatically from one tool to the next.</p>
+
+      <h3>7-Step Workflow</h3>
+      <ol class="help-workflow-list">
+        <li>
+          <img src="icons/cable.svg" alt="" class="workflow-icon" aria-hidden="true">
+          <div>
+            <strong><a href="cableschedule.html">Cable Schedule</a></strong>
+            <span>Define cables: tag, size, conductor type, allowed raceway groups, and start/end coordinates.</span>
+          </div>
+        </li>
+        <li>
+          <img src="icons/raceway.svg" alt="" class="workflow-icon" aria-hidden="true">
+          <div>
+            <strong><a href="racewayschedule.html">Raceway Schedule</a></strong>
+            <span>Catalog trays, conduits, and ductbanks — including dimensions, fill limits, and node coordinates.</span>
+          </div>
+        </li>
+        <li>
+          <img src="icons/ductbank.svg" alt="" class="workflow-icon" aria-hidden="true">
+          <div>
+            <strong><a href="ductbankroute.html">Ductbank Analysis</a></strong>
+            <span>Analyze underground ductbanks for thermal constraints and cable placement.</span>
+          </div>
+        </li>
+        <li>
+          <img src="icons/tray.svg" alt="" class="workflow-icon" aria-hidden="true">
+          <div>
+            <strong><a href="cabletrayfill.html">Tray Fill</a></strong>
+            <span>Visualize cross-sectional cable placement in trays and check fill percentages.</span>
+          </div>
+        </li>
+        <li>
+          <img src="icons/conduit.svg" alt="" class="workflow-icon" aria-hidden="true">
+          <div>
+            <strong><a href="conduitfill.html">Conduit Fill</a></strong>
+            <span>Evaluate standalone conduit loading against NEC fill limits.</span>
+          </div>
+        </li>
+        <li>
+          <img src="icons/route.svg" alt="" class="workflow-icon" aria-hidden="true">
+          <div>
+            <strong><a href="optimalRoute.html">Optimal Cable Route</a></strong>
+            <span>Run Dijkstra-based pathfinding to find least-cost routes respecting tray capacity and thermal limits. View results in 3D.</span>
+          </div>
+        </li>
+        <li>
+          <img src="icons/oneline.svg" alt="" class="workflow-icon" aria-hidden="true">
+          <div>
+            <strong><a href="oneline.html">One-Line Diagram</a></strong>
+            <span>Draw and edit interactive electrical single-line diagrams, then export to PDF or DXF.</span>
+          </div>
+        </li>
+      </ol>
+
+      <h3>Keyboard Shortcuts</h3>
+      <table class="help-shortcuts-table">
+        <thead>
+          <tr><th>Key</th><th>Action</th></tr>
+        </thead>
+        <tbody>
+          <tr><td><kbd>Ctrl</kbd>+<kbd>Z</kbd></td><td>Undo</td></tr>
+          <tr><td><kbd>Ctrl</kbd>+<kbd>Shift</kbd>+<kbd>Z</kbd></td><td>Redo</td></tr>
+          <tr><td><kbd>Ctrl</kbd>+<kbd>S</kbd></td><td>Save project to server</td></tr>
+          <tr><td><kbd>Ctrl</kbd>+<kbd>K</kbd></td><td>Open command palette</td></tr>
+          <tr><td><kbd>Escape</kbd></td><td>Close modal / cancel action</td></tr>
+        </tbody>
+      </table>
+
+      <h3>Tips</h3>
+      <ul class="help-tips-list">
+        <li>Use <strong>Settings ⚙</strong> in the nav to switch themes (Light, Dark, High Contrast) and units (Imperial / Metric).</li>
+        <li>Projects auto-save to your browser. Use <strong>Save Project</strong> to sync to the server or <strong>Export Project</strong> to download a <code>.ctr.json</code> backup.</li>
+        <li>The <strong>Progress Overview</strong> on this page tracks which steps have data and shows your next recommended action.</li>
+        <li>Most tables support CSV import and export — look for the import/export toolbar on each page.</li>
+      </ul>
+
+      <div class="help-modal-footer">
+        <a href="docs/quickstart.html" class="hero-action-btn">Open Quick Start Guide</a>
+        <a href="docs/index.html" class="hero-action-btn secondary">Browse Full Docs</a>
+      </div>
     </div>
   </div>
   <footer class="site-footer">
@@ -121,10 +201,9 @@
       <span>CableTrayRoute</span>
     </div>
     <nav class="footer-links">
-      <a href="README.md">README</a>
       <a href="docs/quickstart.html">Quick Start</a>
       <a href="docs/index.html">Docs</a>
-      <a href="mailto:contact@example.com">Contact</a>
+      <a href="help.html">Help</a>
     </nav>
   </footer>
   <script type="module" src="dist/index.js" defer></script>

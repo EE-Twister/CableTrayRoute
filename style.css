@@ -2680,6 +2680,86 @@ details > summary {
     display: none;
 }
 
+/* --- Help Modal Content --- */
+.help-workflow-list {
+    list-style: none;
+    padding: 0;
+    margin: var(--space-3) 0;
+    display: flex;
+    flex-direction: column;
+    gap: var(--space-3);
+}
+
+.help-workflow-list li {
+    display: flex;
+    align-items: flex-start;
+    gap: var(--space-3);
+}
+
+.help-workflow-list .workflow-icon {
+    flex-shrink: 0;
+    width: 1.5rem;
+    height: 1.5rem;
+    margin-top: 0.15rem;
+}
+
+.help-workflow-list li > div {
+    display: flex;
+    flex-direction: column;
+    gap: 0.2rem;
+}
+
+.help-workflow-list li span {
+    font-size: 0.9rem;
+    opacity: 0.8;
+}
+
+.help-shortcuts-table {
+    width: 100%;
+    border-collapse: collapse;
+    margin: var(--space-3) 0;
+    font-size: 0.9rem;
+}
+
+.help-shortcuts-table th,
+.help-shortcuts-table td {
+    text-align: left;
+    padding: var(--space-2) var(--space-3);
+    border-bottom: 1px solid var(--border-color);
+}
+
+.help-shortcuts-table th {
+    font-weight: 600;
+    opacity: 0.75;
+}
+
+.help-shortcuts-table kbd {
+    display: inline-block;
+    padding: 0.1rem 0.35rem;
+    border: 1px solid var(--border-color);
+    border-radius: var(--radius-sm);
+    background: var(--secondary-color);
+    font-family: var(--font-family-mono, monospace);
+    font-size: 0.82rem;
+    line-height: 1.4;
+}
+
+.help-tips-list {
+    padding-left: 1.25rem;
+    margin: var(--space-3) 0;
+    display: flex;
+    flex-direction: column;
+    gap: var(--space-2);
+    font-size: 0.9rem;
+}
+
+.help-modal-footer {
+    display: flex;
+    gap: var(--space-3);
+    margin-top: var(--space-4);
+    flex-wrap: wrap;
+}
+
 /* --- Help Modal --- */
 .modal {
     position: fixed;
