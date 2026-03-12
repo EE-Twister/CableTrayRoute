@@ -49,7 +49,10 @@ export const adjustmentFactors = [
   { max: 3, factor: 1 },
   { max: 6, factor: 0.8 },
   { max: 9, factor: 0.7 },
-  { max: 20, factor: 0.5 }
+  { max: 20, factor: 0.5 },
+  { max: 30, factor: 0.45 },
+  { max: 40, factor: 0.4 },
+  { max: Infinity, factor: 0.35 }
 ];
 
 export default { ampacity, temperatureCorrection, adjustmentFactors };

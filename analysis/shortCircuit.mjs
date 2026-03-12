@@ -604,7 +604,7 @@ export function runShortCircuit(modelOrOpts = {}, maybeOpts = {}) {
     const IDLG = (3 * V) / mag(add(z1, Z2Z0));
 
     const xr = Math.abs(comp.xr_ratio || 0);
-    const asym = I3 * (1 + Math.exp(-Math.PI / Math.max(xr, 0.01)));
+    const asym = I3 * Math.SQRT2 * (1 + Math.exp(-Math.PI / Math.max(xr, 0.01)));
 
     const entry = {
       method,
