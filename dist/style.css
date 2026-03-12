@@ -7883,3 +7883,19 @@ body.dark-mode .custom-curve-remove:focus {
     font-weight: 600;
     margin: 0.5rem 0 0;
 }
+
+.page-header #project-share-btn {
+    margin-top: 0.5rem;
+}
+
+.snapshot-list {
+    display: flex;
+    flex-direction: column;
+    gap: 0.5rem;
+}
+
+.snapshot-row {
+    border: 1px solid var(--border-color);
+    border-radius: 4px;
+    padding: 0.5rem;
+}

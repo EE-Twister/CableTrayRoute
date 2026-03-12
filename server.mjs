@@ -204,6 +204,121 @@ class ProjectStore {
   }
 }
 
+class SnapshotStore {
+  constructor(filePath, ttlMs) {
+    this.filePath = filePath;
+    this.ttlMs = ttlMs;
+    this.snapshots = new Map();
+    this.ready = false;
+  }
+
+  async init() {
+    await fs.mkdir(path.dirname(this.filePath), { recursive: true });
+    try {
+      const data = JSON.parse(await fs.readFile(this.filePath, 'utf-8'));
+      if (Array.isArray(data)) {
+        data.forEach(item => {
+          if (!item || typeof item !== 'object' || !item.id) return;
+          this.snapshots.set(item.id, item);
+        });
+      }
+    } catch (err) {
+      if (err.code !== 'ENOENT') throw err;
+    }
+    this.ready = true;
+    await this.#persist();
+  }
+
+  async #persist() {
+    if (!this.ready) return;
+    const payload = Array.from(this.snapshots.values()).sort((a, b) => {
+      if (a.createdAt < b.createdAt) return 1;
+      if (a.createdAt > b.createdAt) return -1;
+      return 0;
+    });
+    await fs.writeFile(this.filePath, JSON.stringify(payload, null, 2));
+  }
+
+  #isExpired(entry, now = Date.now()) {
+    return !entry || entry.expiresAt <= now;
+  }
+
+  async create({ username, project, mode, version }) {
+    const createdAt = Date.now();
+    const token = crypto.randomBytes(32).toString('hex');
+    const tokenHash = crypto.createHash('sha256').update(token).digest('hex');
+    const id = crypto.randomUUID();
+    const entry = {
+      id,
+      owner: username,
+      project,
+      mode: mode === 'edit' ? 'edit' : 'read',
+      version: version ?? null,
+      createdAt,
+      expiresAt: createdAt + this.ttlMs,
+      revokedAt: null,
+      lastAccessAt: null,
+      tokenHash
+    };
+    this.snapshots.set(id, entry);
+    await this.#persist();
+    return { entry, token };
+  }
+
+  async listByOwner(username, project) {
+    const now = Date.now();
+    const rows = [];
+    for (const entry of this.snapshots.values()) {
+      if (entry.owner !== username || entry.project !== project) continue;
+      rows.push({
+        id: entry.id,
+        project: entry.project,
+        mode: entry.mode,
+        version: entry.version,
+        createdAt: entry.createdAt,
+        expiresAt: entry.expiresAt,
+        revokedAt: entry.revokedAt,
+        lastAccessAt: entry.lastAccessAt,
+        expired: this.#isExpired(entry, now)
+      });
+    }
+    rows.sort((a, b) => b.createdAt - a.createdAt);
+    return rows;
+  }
+
+  async revoke(username, project, snapshotId) {
+    const entry = this.snapshots.get(snapshotId);
+    if (!entry || entry.owner !== username || entry.project !== project) {
+      return false;
+    }
+    if (!entry.revokedAt) {
+      entry.revokedAt = Date.now();
+      this.snapshots.set(entry.id, entry);
+      await this.#persist();
+    }
+    return true;
+  }
+
+  async findByToken(token) {
+    if (!token || typeof token !== 'string') return null;
+    const tokenHash = crypto.createHash('sha256').update(token).digest('hex');
+    for (const entry of this.snapshots.values()) {
+      if (entry.tokenHash === tokenHash) {
+        return entry;
+      }
+    }
+    return null;
+  }
+
+  async touch(snapshotId) {
+    const entry = this.snapshots.get(snapshotId);
+    if (!entry) return;
+    entry.lastAccessAt = Date.now();
+    this.snapshots.set(snapshotId, entry);
+    await this.#persist();
+  }
+}
+
 function createRateLimiter({ windowMs, max }) {
   const hits = new Map();
 
@@ -375,6 +490,7 @@ export async function createApp(options = {}) {
   await fs.mkdir(dataDir, { recursive: true });
   const usersFile = path.join(dataDir, 'users.json');
   const sessionsFile = path.join(dataDir, 'sessions.json');
+  const snapshotsFile = path.join(dataDir, 'snapshots.json');
 
   let users = {};
   try {
@@ -387,6 +503,8 @@ export async function createApp(options = {}) {
   const sessionStore = new FileSessionStore(sessionsFile, tokenTtlMs);
   await sessionStore.init();
   const projectStore = new ProjectStore(dataDir);
+  const snapshotStore = new SnapshotStore(snapshotsFile, tokenTtlMs);
+  await snapshotStore.init();
 
   async function saveUsers() {
     await fs.writeFile(usersFile, JSON.stringify(users, null, 2));
@@ -460,6 +578,7 @@ export async function createApp(options = {}) {
 
   const rateLimiter = createRateLimiter({ windowMs: rateLimitWindowMs, max: rateLimitMax });
   app.use('/projects', rateLimiter);
+  app.use('/shared', rateLimiter);
 
   app.post(
     '/signup',
@@ -561,6 +680,50 @@ export async function createApp(options = {}) {
     next();
   };
 
+
+  app.get(
+    '/shared/:token',
+    asyncHandler(async (req, res) => {
+      const snapshot = await snapshotStore.findByToken(req.params.token);
+      if (!snapshot || snapshot.revokedAt || snapshot.expiresAt <= Date.now()) {
+        res.status(404).json({ error: 'Not found' });
+        return;
+      }
+      const latest = await projectStore.loadLatest(snapshot.owner, snapshot.project);
+      await snapshotStore.touch(snapshot.id);
+      res.json({
+        snapshot: {
+          id: snapshot.id,
+          project: snapshot.project,
+          mode: snapshot.mode,
+          version: snapshot.version,
+          createdAt: snapshot.createdAt,
+          expiresAt: snapshot.expiresAt,
+          revokedAt: snapshot.revokedAt
+        },
+        data: latest.data
+      });
+    })
+  );
+
+  app.post(
+    '/shared/:token',
+    asyncHandler(async (req, res) => {
+      const snapshot = await snapshotStore.findByToken(req.params.token);
+      if (!snapshot || snapshot.revokedAt || snapshot.expiresAt <= Date.now()) {
+        res.status(404).json({ error: 'Not found' });
+        return;
+      }
+      if (snapshot.mode !== 'edit') {
+        res.status(403).json({ error: 'Read-only snapshot' });
+        return;
+      }
+      const saved = await projectStore.save(snapshot.owner, snapshot.project, req.body);
+      await snapshotStore.touch(snapshot.id);
+      res.json({ version: saved.version, unchanged: saved.metrics.skippedWrite });
+    })
+  );
+
   app.use('/projects', auth, csrfProtection);
 
   app.post(
@@ -611,6 +774,63 @@ export async function createApp(options = {}) {
       }
     })
   );
+
+  app.get(
+    '/projects/:project/snapshots',
+    asyncHandler(async (req, res) => {
+      const rows = await snapshotStore.listByOwner(req.username, req.params.project);
+      res.json({ snapshots: rows });
+    })
+  );
+
+  app.post(
+    '/projects/:project/snapshots',
+    asyncHandler(async (req, res) => {
+      const project = req.params.project;
+      const mode = req.body?.mode === 'edit' ? 'edit' : 'read';
+      let latestVersion = null;
+      try {
+        const latest = await projectStore.loadLatest(req.username, project);
+        latestVersion = latest.version;
+      } catch {
+        res.status(404).json({ error: 'Project not found' });
+        return;
+      }
+      const created = await snapshotStore.create({
+        username: req.username,
+        project,
+        mode,
+        version: latestVersion
+      });
+      const host = req.get('host');
+      const protocol = req.secure || req.headers['x-forwarded-proto'] === 'https' ? 'https' : 'http';
+      const url = host ? `${protocol}://${host}/oneline.html?snapshotToken=${created.token}` : null;
+      res.status(201).json({
+        id: created.entry.id,
+        project: created.entry.project,
+        mode: created.entry.mode,
+        version: created.entry.version,
+        createdAt: created.entry.createdAt,
+        expiresAt: created.entry.expiresAt,
+        revokedAt: created.entry.revokedAt,
+        token: created.token,
+        url
+      });
+    })
+  );
+
+  app.delete(
+    '/projects/:project/snapshots/:snapshotId',
+    asyncHandler(async (req, res) => {
+      const ok = await snapshotStore.revoke(req.username, req.params.project, req.params.snapshotId);
+      if (!ok) {
+        res.status(404).json({ error: 'Not found' });
+        return;
+      }
+      res.status(204).end();
+    })
+  );
+
 
   app.use((err, req, res, next) => {
     console.error(err);

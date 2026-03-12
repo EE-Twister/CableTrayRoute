@@ -98,6 +98,93 @@ async function authScenario() {
       assert.strictEqual(res.status, 403);
     });
 
+
+    const snapshot = await check('creates read-only and editable snapshot links with metadata', async () => {
+      await fetch(`${baseUrl}/projects/test`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${session.token}`,
+          'X-CSRF-Token': session.csrfToken
+        },
+        body: JSON.stringify({ value: 1 })
+      });
+      const readRes = await fetch(`${baseUrl}/projects/test/snapshots`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${session.token}`,
+          'X-CSRF-Token': session.csrfToken
+        },
+        body: JSON.stringify({ mode: 'read' })
+      });
+      assert.strictEqual(readRes.status, 201);
+      const readPayload = await readRes.json();
+      assert.strictEqual(readPayload.mode, 'read');
+      assert(readPayload.token);
+      assert(readPayload.id);
+      assert(readPayload.expiresAt > Date.now());
+
+      const editRes = await fetch(`${baseUrl}/projects/test/snapshots`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${session.token}`,
+          'X-CSRF-Token': session.csrfToken
+        },
+        body: JSON.stringify({ mode: 'edit' })
+      });
+      assert.strictEqual(editRes.status, 201);
+      const editPayload = await editRes.json();
+      assert.strictEqual(editPayload.mode, 'edit');
+
+      const listRes = await fetch(`${baseUrl}/projects/test/snapshots`, {
+        headers: {
+          Authorization: `Bearer ${session.token}`
+        }
+      });
+      assert.strictEqual(listRes.status, 200);
+      const listPayload = await listRes.json();
+      assert(Array.isArray(listPayload.snapshots));
+      assert(listPayload.snapshots.length >= 2);
+      return { read: readPayload, edit: editPayload };
+    });
+
+    await check('enforces read-only snapshot constraints for token routes', async () => {
+      const readFetch = await fetch(`${baseUrl}/shared/${snapshot.read.token}`);
+      assert.strictEqual(readFetch.status, 200);
+      const readData = await readFetch.json();
+      assert.strictEqual(readData.snapshot.mode, 'read');
+
+      const writeAttempt = await fetch(`${baseUrl}/shared/${snapshot.read.token}`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ value: 7 })
+      });
+      assert.strictEqual(writeAttempt.status, 403);
+    });
+
+    await check('allows editable snapshot updates and revocation', async () => {
+      const writeAttempt = await fetch(`${baseUrl}/shared/${snapshot.edit.token}`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ value: 9 })
+      });
+      assert.strictEqual(writeAttempt.status, 200);
+
+      const revokeRes = await fetch(`${baseUrl}/projects/test/snapshots/${snapshot.edit.id}`, {
+        method: 'DELETE',
+        headers: {
+          Authorization: `Bearer ${session.token}`,
+          'X-CSRF-Token': session.csrfToken
+        }
+      });
+      assert.strictEqual(revokeRes.status, 204);
+
+      const afterRevoke = await fetch(`${baseUrl}/shared/${snapshot.edit.token}`);
+      assert.strictEqual(afterRevoke.status, 404);
+    });
+
     await check('allows project writes with CSRF header', async () => {
       const res = await fetch(`${baseUrl}/projects/test`, {
         method: 'POST',
