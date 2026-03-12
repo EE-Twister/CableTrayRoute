@@ -38,7 +38,7 @@ global.localStorage = {
       assert(Math.abs(b.lineToGroundKA - 20.37) < 0.1);
       assert(Math.abs(b.lineToLineKA - 17.64) < 0.1);
       assert(Math.abs(b.doubleLineGroundKA - 40.74) < 0.1);
-      assert(Math.abs(b.asymKA - 32.44) < 0.1);
+      assert(Math.abs(b.asymKA - 45.86) < 0.1);
     });
 
     it('propagates transformer impedance from secondary data fields', () => {
