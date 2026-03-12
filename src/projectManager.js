@@ -5,6 +5,7 @@ import {
   setProjectState,
   listSavedProjects as listSavedProjectsStorage,
   getAuthContextState,
+  setAuthContextState,
   clearAuthContextState,
   getSavedProjectsError,
   writeSavedProject,
@@ -740,6 +741,60 @@ function mountShareControls() {
   header.appendChild(btn);
 }
 
+function showSessionBanner(message, actions) {
+  let banner = document.getElementById('session-expiry-banner');
+  if (!banner) {
+    banner = document.createElement('div');
+    banner.id = 'session-expiry-banner';
+    Object.assign(banner.style, {
+      position: 'fixed', top: '0', left: '0', right: '0',
+      padding: '10px 16px', background: '#f59e0b', color: '#1c1917',
+      display: 'flex', alignItems: 'center', gap: '12px',
+      zIndex: '9999', fontWeight: '500', fontSize: '14px'
+    });
+    document.body.prepend(banner);
+  }
+  banner.innerHTML = '';
+  const text = document.createElement('span');
+  text.style.flex = '1';
+  text.textContent = message;
+  banner.appendChild(text);
+  for (const { label, onClick } of actions) {
+    const btn = document.createElement('button');
+    btn.textContent = label;
+    Object.assign(btn.style, {
+      padding: '4px 12px', background: '#1c1917', color: '#fff',
+      border: 'none', borderRadius: '4px', cursor: 'pointer', fontWeight: '600'
+    });
+    btn.addEventListener('click', onClick);
+    banner.appendChild(btn);
+  }
+}
+
+function dismissSessionBanner() {
+  document.getElementById('session-expiry-banner')?.remove();
+}
+
+async function refreshSession() {
+  const auth = getAuthContext();
+  if (!auth) return false;
+  try {
+    const res = await fetch('/session/refresh', {
+      method: 'POST',
+      headers: {
+        'Authorization': `Bearer ${auth.token}`,
+        'X-CSRF-Token': auth.csrfToken
+      }
+    });
+    if (!res.ok) return false;
+    const { token, csrfToken, expiresAt } = await res.json();
+    setAuthContextState({ token, csrfToken, expiresAt, user: auth.user });
+    return true;
+  } catch {
+    return false;
+  }
+}
+
 if (typeof window !== 'undefined') {
   window.projectManager = { listProjects, newProject, renameProject, saveProject, loadProject };
   window.addEventListener('DOMContentLoaded', () => {
@@ -766,5 +821,33 @@ if (typeof window !== 'undefined') {
       });
       menu.appendChild(btn);
     }
+
+    // Session expiry warning banner
+    window.addEventListener('session-expiring', () => {
+      showSessionBanner('Your session expires in 5 minutes. Unsaved server changes may be lost.', [
+        {
+          label: 'Stay Logged In',
+          onClick: async () => {
+            const ok = await refreshSession();
+            if (ok) {
+              dismissSessionBanner();
+            } else {
+              showSessionBanner('Could not refresh session. Please save your work and log in again.', [
+                { label: 'Go to Login', onClick: () => { location.href = 'login.html'; } },
+                { label: 'Dismiss', onClick: dismissSessionBanner }
+              ]);
+            }
+          }
+        },
+        { label: 'Dismiss', onClick: dismissSessionBanner }
+      ]);
+    });
+
+    window.addEventListener('session-expired', () => {
+      showSessionBanner('Your session has expired. Server sync is paused until you log in again.', [
+        { label: 'Log In', onClick: () => { location.href = 'login.html'; } },
+        { label: 'Dismiss', onClick: dismissSessionBanner }
+      ]);
+    });
   });
 }
