@@ -31,3 +31,24 @@ Use this checklist when shipping UI updates so layout and component styling stay
 - Keep modal surfaces and controls (`.modal`, `.modal-content`, `.modal-body`, `.modal-actions`, `.close-btn`) token-driven for width, padding, border radius, and font sizing.
 - For script-generated UI in `site.js` and `src/components/modal.js`, prefer CSS variable references (for example `var(--space-4)` and `var(--size-help-modal-height)`) over literal `px`/`rem` values.
 - Validate both light and dark mode appearances after UI changes.
+
+## Command palette rollout slices
+
+To keep command-palette delivery incremental and easy to validate, ship it in the following slices:
+
+1. **Slice 1: Trigger + shell**
+   - Add `Ctrl/Cmd + K` keyboard trigger.
+   - Render an accessible dialog shell with a search input and keyboard hints.
+   - Support close behaviors (`Esc`, backdrop click).
+2. **Slice 2: Action index**
+   - Add common global actions (new/import/export/save/help).
+   - Add navigation commands to common workflow pages.
+   - Add study commands that activate existing run buttons when available.
+3. **Slice 3: Search relevance + recent commands**
+   - Add fuzzy search ranking across command labels and keywords.
+   - Track recent successful commands in session preferences.
+   - Prefer recent commands when the query is blank.
+4. **Slice 4: Accessibility hardening + UX polish**
+   - Ensure full keyboard operation (arrow keys, enter, escape) and readable empty states.
+   - Refine hover/active visual states for discoverability in light/dark themes.
+   - Add docs and regression checks for activation and command execution.

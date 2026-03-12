@@ -7964,3 +7964,81 @@ body.dark-mode .custom-curve-remove:focus {
     border-radius: 4px;
     padding: 0.5rem;
 }
+
+.command-palette-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 1200;
+  background: rgba(6, 10, 24, 0.55);
+  display: grid;
+  place-items: start center;
+  padding: 12vh 1rem 2rem;
+}
+
+.command-palette-panel {
+  width: min(680px, 96vw);
+  background: var(--card-bg, #fff);
+  border: 1px solid var(--border, #d6dbe7);
+  border-radius: 12px;
+  box-shadow: 0 20px 55px rgba(5, 10, 30, 0.28);
+  padding: 1rem;
+}
+
+.command-palette-title {
+  margin: 0 0 0.5rem;
+  font-size: 1rem;
+}
+
+.command-palette-input {
+  width: 100%;
+  border: 1px solid var(--border, #d6dbe7);
+  border-radius: 8px;
+  padding: 0.65rem 0.75rem;
+  font-size: 0.95rem;
+}
+
+.command-palette-hint {
+  margin: 0.5rem 0;
+  color: #5b6478;
+  font-size: 0.82rem;
+}
+
+.command-palette-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  max-height: 340px;
+  overflow: auto;
+}
+
+.command-palette-item,
+.command-palette-empty {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 0.55rem 0.65rem;
+  border-radius: 8px;
+}
+
+.command-palette-item {
+  cursor: pointer;
+}
+
+.command-palette-item.is-active,
+.command-palette-item:hover {
+  background: rgba(42, 101, 232, 0.12);
+}
+
+.command-palette-item kbd {
+  border: 1px solid #c6cede;
+  border-bottom-width: 2px;
+  border-radius: 6px;
+  font-size: 0.72rem;
+  padding: 0.1rem 0.35rem;
+  color: #4b566a;
+  background: #f7f8fb;
+}
+
+.command-palette-empty {
+  color: #5b6478;
+}
