@@ -695,6 +695,24 @@ function handleStorageWriteError(prefix, keyOrError, maybeError) {
     if (!quotaWarningShown) {
       quotaWarningShown = true;
       console.warn('Local storage quota exceeded. Further saves will be kept in memory only for this session.');
+      if (typeof window !== 'undefined') {
+        window.dispatchEvent(new CustomEvent('ctr:storageQuotaExceeded'));
+        // Show a visible banner if no listener handles it within this tick.
+        setTimeout(() => {
+          if (document.querySelector('.ctr-quota-banner')) return;
+          const banner = document.createElement('div');
+          banner.className = 'ctr-quota-banner';
+          banner.setAttribute('role', 'alert');
+          banner.style.cssText = 'position:fixed;bottom:0;left:0;right:0;background:#c0392b;color:#fff;padding:10px 16px;z-index:9999;font-size:14px;display:flex;justify-content:space-between;align-items:center;';
+          banner.innerHTML = '<span>&#9888; Local storage is full. Changes are saved in memory only and will be lost on page reload. Clear browser data or export your project to free space.</span>';
+          const close = document.createElement('button');
+          close.textContent = '\u00d7';
+          close.style.cssText = 'background:none;border:none;color:#fff;font-size:18px;cursor:pointer;margin-left:12px;';
+          close.onclick = () => banner.remove();
+          banner.appendChild(close);
+          document.body?.appendChild(banner);
+        }, 0);
+      }
     }
   }
 }

@@ -32,11 +32,13 @@ async function login(e) {
       window.location.href = 'index.html';
       return;
     }
+    clearAuthContextState();
+    alert('Login failed');
   } catch (err) {
     console.error('Login request failed', err);
+    clearAuthContextState();
+    alert('Login failed');
   }
-  clearAuthContextState();
-  alert('Login failed');
 }
 
 document.getElementById('signup-form').addEventListener('submit', signup);
