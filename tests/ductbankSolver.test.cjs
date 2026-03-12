@@ -4,7 +4,7 @@ const {
   SMALL_CONDUITS,
   SMALL_CABLES,
   PARAMS,
-} = require("../test");
+} = require("../test.cjs");
 
 function describe(name, fn) {
   console.log(name);

@@ -1,6 +1,6 @@
 import assert from "assert";
 import ampacityLib from "../ampacity.mjs";
-import testLib from "../test.js";
+import testLib from "../test.cjs";
 
 const { ampacity } = ampacityLib;
 const { computeDuctbankTemperatures, calcFiniteAmpacity } = testLib;
