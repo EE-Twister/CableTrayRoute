@@ -79,7 +79,7 @@ import { sizeConductor } from './sizing.js';
 import { runValidation } from './validation/rules.js';
 import { exportPDF } from './exporters/pdf.js';
 import { exportDXF, exportDWG } from './exporters/dxf.js';
-import { openModal } from './src/components/modal.js';
+import { ensureFieldAssistiveText, openModal } from './src/components/modal.js';
 import { normalizeVoltageToVolts, toBaseKV } from './utils/voltage.js';
 import { calculateTransformerImpedance } from './utils/transformerImpedance.js';
 import { computeImpedanceFromPerKm } from './utils/cableImpedance.js';
@@ -1817,6 +1817,10 @@ let gridEnabled = getItem('gridEnabled', true);
 let snapIndicatorTimeout = null;
 let history = [];
 let historyIndex = -1;
+let checkpointCounter = 0;
+let historyEvents = [];
+let checkpoints = [];
+const MAX_HISTORY_EVENTS = 200;
 let validationIssues = [];
 const marqueeThreshold = 4;
 let templates = [];
@@ -2983,10 +2987,198 @@ function hideTooltip() {
   tooltip.style.display = 'none';
 }
 
-function pushHistory() {
+
+function formatHistoryTimestamp(timestamp) {
+  const date = new Date(Number(timestamp) || Date.now());
+  return date.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' });
+}
+
+function recordHistoryEvent(type, description, extra = {}) {
+  const event = {
+    id: `evt-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
+    type,
+    description,
+    timestamp: Date.now(),
+    historyIndex,
+    ...extra
+  };
+  historyEvents.push(event);
+  if (historyEvents.length > MAX_HISTORY_EVENTS) {
+    historyEvents = historyEvents.slice(historyEvents.length - MAX_HISTORY_EVENTS);
+  }
+  renderHistorySidebar();
+}
+
+function pruneCheckpoints() {
+  checkpoints = checkpoints.filter(point => point && Number.isInteger(point.historyIndex) && point.historyIndex >= 0 && point.historyIndex < history.length);
+}
+
+function renderHistorySidebar() {
+  const eventsList = document.getElementById('history-events');
+  const checkpointList = document.getElementById('checkpoint-list');
+  if (!eventsList || !checkpointList) return;
+
+  eventsList.innerHTML = '';
+  const eventItems = [...historyEvents].sort((a, b) => b.timestamp - a.timestamp);
+  if (!eventItems.length) {
+    const empty = document.createElement('li');
+    empty.className = 'history-item';
+    empty.textContent = 'No events yet.';
+    eventsList.appendChild(empty);
+  } else {
+    eventItems.forEach(event => {
+      const li = document.createElement('li');
+      li.className = 'history-item';
+      const title = document.createElement('p');
+      title.className = 'history-item-title';
+      title.textContent = event.description;
+      const time = document.createElement('p');
+      time.className = 'history-item-time';
+      time.textContent = `${formatHistoryTimestamp(event.timestamp)} • step ${event.historyIndex + 1}`;
+      li.append(title, time);
+      eventsList.appendChild(li);
+    });
+  }
+
+  checkpointList.innerHTML = '';
+  pruneCheckpoints();
+  if (!checkpoints.length) {
+    const empty = document.createElement('li');
+    empty.className = 'history-item';
+    empty.textContent = 'No checkpoints yet.';
+    checkpointList.appendChild(empty);
+  } else {
+    const sorted = [...checkpoints].sort((a, b) => b.createdAt - a.createdAt);
+    sorted.forEach(point => {
+      const li = document.createElement('li');
+      li.className = 'history-item';
+      const title = document.createElement('p');
+      title.className = 'history-item-title';
+      title.textContent = point.name;
+      const time = document.createElement('p');
+      time.className = 'history-item-time';
+      time.textContent = `${formatHistoryTimestamp(point.createdAt)} • step ${point.historyIndex + 1}`;
+      const restoreBtn = document.createElement('button');
+      restoreBtn.type = 'button';
+      restoreBtn.className = 'btn';
+      restoreBtn.textContent = 'Restore';
+      restoreBtn.addEventListener('click', () => jumpToCheckpoint(point.id));
+      li.append(title, time, restoreBtn);
+      checkpointList.appendChild(li);
+    });
+  }
+}
+
+async function promptCheckpointName(defaultValue = '') {
+  const result = await openModal({
+    title: 'Create checkpoint',
+    description: 'Save a named milestone for the current undo/redo state.',
+    primaryText: 'Save checkpoint',
+    secondaryText: 'Cancel',
+    onSubmit: controller => {
+      const input = controller.body.querySelector('input[name="checkpointName"]');
+      const assistive = input ? ensureFieldAssistiveText(input, { helperText: 'Example: Before panel redesign' }) : null;
+      const value = input ? input.value.trim() : '';
+      if (!value) {
+        if (assistive) assistive.setError('Checkpoint name is required.');
+        return false;
+      }
+      if (assistive) assistive.setError('');
+      return value;
+    },
+    render: ({ body }) => {
+      const label = document.createElement('label');
+      label.className = 'modal-form-field';
+      label.textContent = 'Checkpoint name';
+      const input = document.createElement('input');
+      input.type = 'text';
+      input.name = 'checkpointName';
+      input.value = defaultValue;
+      label.appendChild(input);
+      body.appendChild(label);
+      ensureFieldAssistiveText(input, { helperText: 'Example: Before panel redesign' });
+      return { initialFocus: input };
+    }
+  });
+  return typeof result === 'string' ? result.trim() : '';
+}
+
+async function addCheckpoint() {
+  if (historyIndex < 0 || historyIndex >= history.length) {
+    showToast('No history state available for checkpoint');
+    return;
+  }
+  checkpointCounter += 1;
+  const defaultName = `Checkpoint ${checkpointCounter}`;
+  const name = await promptCheckpointName(defaultName);
+  if (!name) {
+    checkpointCounter -= 1;
+    return;
+  }
+  const checkpoint = {
+    id: `cp-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
+    name,
+    historyIndex,
+    createdAt: Date.now()
+  };
+  checkpoints.push(checkpoint);
+  recordHistoryEvent('checkpoint', `Checkpoint “${name}” created`, { checkpointId: checkpoint.id });
+  showToast(`Checkpoint “${name}” saved`);
+}
+
+async function jumpToCheckpoint(checkpointId) {
+  const checkpoint = checkpoints.find(point => point.id === checkpointId);
+  if (!checkpoint) return;
+  const confirmed = await openModal({
+    title: 'Restore checkpoint',
+    description: `Restore to “${checkpoint.name}”? Unsaved edits after this point will be discarded.`,
+    primaryText: 'Restore',
+    secondaryText: 'Cancel'
+  });
+  if (!confirmed) return;
+  if (checkpoint.historyIndex < 0 || checkpoint.historyIndex >= history.length) {
+    showToast('Checkpoint no longer available');
+    checkpoints = checkpoints.filter(point => point.id !== checkpointId);
+    renderHistorySidebar();
+    return;
+  }
+  historyIndex = checkpoint.historyIndex;
+  components = JSON.parse(JSON.stringify(history[historyIndex]));
+  selected = null;
+  selection = [];
+  selectedConnection = null;
+  render();
+  save();
+  recordHistoryEvent('restore', `Restored checkpoint “${checkpoint.name}”`, { checkpointId: checkpoint.id });
+}
+
+function bindHistorySidebarControls() {
+  const toggleBtn = document.getElementById('history-sidebar-toggle');
+  const sidebar = document.getElementById('history-sidebar');
+  const workspace = document.querySelector('.workspace');
+  const addCheckpointBtn = document.getElementById('add-checkpoint-btn');
+  if (toggleBtn && sidebar && workspace) {
+    toggleBtn.addEventListener('click', () => {
+      const expanded = toggleBtn.getAttribute('aria-expanded') === 'true';
+      const nextExpanded = !expanded;
+      toggleBtn.setAttribute('aria-expanded', String(nextExpanded));
+      sidebar.classList.toggle('hidden', !nextExpanded);
+      workspace.classList.toggle('history-collapsed', !nextExpanded);
+    });
+  }
+  if (addCheckpointBtn) {
+    addCheckpointBtn.addEventListener('click', () => {
+      addCheckpoint();
+    });
+  }
+}
+
+function pushHistory(reason = 'Diagram updated') {
   history = history.slice(0, historyIndex + 1);
   history.push(JSON.parse(JSON.stringify(components)));
   historyIndex = history.length - 1;
+  pruneCheckpoints();
+  recordHistoryEvent('change', reason);
 }
 
 function undo() {
@@ -2998,6 +3190,7 @@ function undo() {
     selectedConnection = null;
     render();
     save();
+    recordHistoryEvent('undo', 'Undo applied');
   }
 }
 
@@ -3010,6 +3203,7 @@ function redo() {
     selectedConnection = null;
     render();
     save();
+    recordHistoryEvent('redo', 'Redo applied');
   }
 }
 
@@ -5874,6 +6068,9 @@ function loadSheet(idx) {
   connections = sheets[activeSheet].connections;
   history = [JSON.parse(JSON.stringify(components))];
   historyIndex = 0;
+  checkpoints = [];
+  historyEvents = [];
+  recordHistoryEvent('sheet', `Switched to sheet ${idx + 1}`);
   selection = [];
   selected = null;
   selectedConnection = null;
@@ -9227,6 +9424,9 @@ async function init() {
   connections = sheets[activeSheet].connections;
   history = [JSON.parse(JSON.stringify(components))];
   historyIndex = 0;
+  checkpoints = [];
+  historyEvents = [];
+  recordHistoryEvent('init', 'History initialized');
   refreshAttributeOptions();
   renderSheetTabs();
   render();
@@ -9273,6 +9473,8 @@ async function init() {
   // dimension tool removed
   document.getElementById('undo-btn').addEventListener('click', undo);
   document.getElementById('redo-btn').addEventListener('click', redo);
+  bindHistorySidebarControls();
+  renderHistorySidebar();
   document.getElementById('align-left-btn').addEventListener('click', () => alignSelection('left'));
   document.getElementById('align-right-btn').addEventListener('click', () => alignSelection('right'));
   document.getElementById('align-top-btn').addEventListener('click', () => alignSelection('top'));
