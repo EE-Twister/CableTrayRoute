@@ -113,14 +113,22 @@ function mountPersistentNavigation() {
   heading.textContent = 'Navigate';
   sidebar.appendChild(heading);
 
-  const sidebarList = document.createElement('ul');
-  sidebarList.className = 'sidebar-nav-list';
-  NAV_ROUTES.forEach(route => {
-    const item = document.createElement('li');
-    item.appendChild(buildLink(route, currentRoute));
-    sidebarList.appendChild(item);
+  const sections = [...new Set(NAV_ROUTES.map(r => r.section))];
+  sections.forEach(section => {
+    const sectionRoutes = NAV_ROUTES.filter(r => r.section === section);
+    const sectionLabel = document.createElement('p');
+    sectionLabel.className = 'sidebar-section-label';
+    sectionLabel.textContent = section;
+    sidebar.appendChild(sectionLabel);
+    const sectionList = document.createElement('ul');
+    sectionList.className = 'sidebar-nav-list';
+    sectionRoutes.forEach(route => {
+      const item = document.createElement('li');
+      item.appendChild(buildLink(route, currentRoute));
+      sectionList.appendChild(item);
+    });
+    sidebar.appendChild(sectionList);
   });
-  sidebar.appendChild(sidebarList);
 
   document.body.appendChild(sidebar);
   document.body.classList.add('has-sidebar-nav');

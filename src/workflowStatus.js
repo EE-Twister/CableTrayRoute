@@ -51,6 +51,14 @@ window.addEventListener('DOMContentLoaded', () => {
     progressText.textContent = `${completeCount} of ${workflowOrder.length} workflow steps complete.`;
   }
 
+  const progressTrack = document.getElementById('workflow-progress-bar-track');
+  const progressFill = document.getElementById('workflow-progress-fill');
+  if (progressTrack && progressFill) {
+    const pct = Math.round((completeCount / workflowOrder.length) * 100);
+    progressFill.style.width = `${pct}%`;
+    progressTrack.setAttribute('aria-valuenow', completeCount);
+  }
+
   const nextStep = workflowOrder.find(step => !isStepComplete(step.key));
   const nextStepEl = document.getElementById('workflow-next-step');
   if (nextStepEl) {

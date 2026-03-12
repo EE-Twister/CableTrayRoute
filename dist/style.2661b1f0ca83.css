@@ -945,7 +945,7 @@ body.compact-mode .palette-section .section-buttons {
 .workspace {
   --palette-width: 250px;
   display: grid;
-  grid-template-columns: var(--palette-width) 1fr;
+  grid-template-columns: var(--palette-width) 1fr 320px;
   position: relative;
   align-items: start;
 }
@@ -1059,6 +1059,71 @@ body.oneline-page .palette-scroll {
   cursor: col-resize;
   background: var(--ol-border-color);
   z-index: 2;
+}
+
+.history-sidebar {
+  border-left: 1px solid var(--ol-border-color);
+  background: var(--ol-card-bg);
+  padding: 0.75rem;
+  overflow: auto;
+  min-width: 0;
+}
+
+.history-sidebar.hidden {
+  display: none;
+}
+
+.workspace.history-collapsed {
+  grid-template-columns: var(--palette-width) 1fr;
+}
+
+.history-sidebar-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.5rem;
+  margin-bottom: 0.75rem;
+}
+
+.history-sidebar-header h3,
+.history-sidebar-section h4 {
+  margin: 0;
+}
+
+.history-sidebar-section {
+  margin-bottom: 0.9rem;
+}
+
+.history-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 0.45rem;
+}
+
+.history-item {
+  border: 1px solid var(--ol-border-color);
+  border-radius: var(--ol-radius);
+  padding: 0.45rem;
+  background: var(--secondary-color);
+}
+
+.history-item-title {
+  margin: 0;
+  font-size: 0.9rem;
+  font-weight: 600;
+}
+
+.history-item-time {
+  margin: 0.2rem 0 0;
+  font-size: 0.75rem;
+  color: #666;
+}
+
+.history-item button {
+  margin-top: 0.4rem;
 }
 
 .palette-toggle {
@@ -1732,6 +1797,15 @@ body.dark-mode .settings-menu {
     border: 1px solid var(--border-color);
 }
 
+/* Visual divider before project actions in the settings menu */
+.settings-menu #new-project-btn {
+    margin-top: var(--space-2);
+    padding-top: var(--space-2);
+    border-top: 1px solid var(--color-border);
+    width: 100%;
+    text-align: left;
+}
+
 .legacy-dark-toggle {
     opacity: 0.85;
 }
@@ -1912,6 +1986,22 @@ body.compact-mode td {
     text-transform: uppercase;
     letter-spacing: 0.04em;
     color: var(--muted-text-color);
+}
+
+.sidebar-section-label {
+    margin: var(--space-4) 0 var(--space-1);
+    padding: 0 0.5rem;
+    font-size: var(--font-size-xs);
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.08em;
+    color: var(--color-primary);
+    border-bottom: 1px solid var(--color-border);
+    padding-bottom: var(--space-1);
+}
+
+.sidebar-section-label:first-of-type {
+    margin-top: 0;
 }
 
 .sidebar-nav-list {
@@ -2443,6 +2533,39 @@ body.compact-mode #palette button .palette-icon {
 
 .add-row-btn {
     width: auto;
+}
+
+.btn-danger {
+    background: var(--error-bg);
+    color: var(--error-text);
+    border-color: var(--error-text);
+}
+
+.btn-danger:hover,
+.btn-danger:focus {
+    background: var(--error-text);
+    color: #fff;
+    border-color: var(--error-text);
+}
+
+.cable-toolbar {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: var(--space-2);
+}
+
+.cable-toolbar .toolbar-group {
+    display: flex;
+    align-items: center;
+    gap: var(--space-1);
+    padding-right: var(--space-2);
+    border-right: 1px solid var(--color-border);
+}
+
+.cable-toolbar .toolbar-group:last-child {
+    border-right: none;
+    padding-right: 0;
 }
 
 .info-text {
@@ -4624,6 +4747,25 @@ body.dark-mode .hero-action-btn.secondary {
     margin: 0;
 }
 
+.workflow-progress-track {
+    margin: var(--space-2) 0 var(--space-3);
+    height: 10px;
+    background: var(--color-border);
+    border-radius: var(--radius-pill);
+    overflow: hidden;
+}
+
+.workflow-progress-fill {
+    height: 100%;
+    background: var(--color-primary);
+    border-radius: var(--radius-pill);
+    transition: width 0.4s ease;
+}
+
+body.dark-mode .workflow-progress-track {
+    background: var(--border-color);
+}
+
 .workflow-card .status {
     font-size: 0.85rem;
     color: var(--warning-text);
@@ -4666,10 +4808,21 @@ body.dark-mode .workflow-card-title {
 .step-nav a {
     color: var(--primary-color);
     text-decoration: none;
+    padding: var(--space-2) var(--space-3);
+    border: 1px solid var(--color-border);
+    border-radius: var(--radius-sm);
+    font-size: var(--font-size-sm);
+    transition: background 0.15s, border-color 0.15s;
 }
 
 .step-nav a:hover {
-    text-decoration: underline;
+    background: color-mix(in srgb, var(--color-primary) 8%, transparent);
+    border-color: var(--color-primary);
+    text-decoration: none;
+}
+
+.step-nav-next {
+    margin-left: auto;
 }
 
 /* --- Footer --- */
@@ -7898,4 +8051,82 @@ body.dark-mode .custom-curve-remove:focus {
     border: 1px solid var(--border-color);
     border-radius: 4px;
     padding: 0.5rem;
+}
+
+.command-palette-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 1200;
+  background: rgba(6, 10, 24, 0.55);
+  display: grid;
+  place-items: start center;
+  padding: 12vh 1rem 2rem;
+}
+
+.command-palette-panel {
+  width: min(680px, 96vw);
+  background: var(--card-bg, #fff);
+  border: 1px solid var(--border, #d6dbe7);
+  border-radius: 12px;
+  box-shadow: 0 20px 55px rgba(5, 10, 30, 0.28);
+  padding: 1rem;
+}
+
+.command-palette-title {
+  margin: 0 0 0.5rem;
+  font-size: 1rem;
+}
+
+.command-palette-input {
+  width: 100%;
+  border: 1px solid var(--border, #d6dbe7);
+  border-radius: 8px;
+  padding: 0.65rem 0.75rem;
+  font-size: 0.95rem;
+}
+
+.command-palette-hint {
+  margin: 0.5rem 0;
+  color: #5b6478;
+  font-size: 0.82rem;
+}
+
+.command-palette-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  max-height: 340px;
+  overflow: auto;
+}
+
+.command-palette-item,
+.command-palette-empty {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 0.55rem 0.65rem;
+  border-radius: 8px;
+}
+
+.command-palette-item {
+  cursor: pointer;
+}
+
+.command-palette-item.is-active,
+.command-palette-item:hover {
+  background: rgba(42, 101, 232, 0.12);
+}
+
+.command-palette-item kbd {
+  border: 1px solid #c6cede;
+  border-bottom-width: 2px;
+  border-radius: 6px;
+  font-size: 0.72rem;
+  padding: 0.1rem 0.35rem;
+  color: #4b566a;
+  background: #f7f8fb;
+}
+
+.command-palette-empty {
+  color: #5b6478;
 }

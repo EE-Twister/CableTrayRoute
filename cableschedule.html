@@ -54,19 +54,27 @@
         <p>Centralized table for managing cable data.</p>
       </header>
       <section class="card">
-        <div class="mb-1">
-          <button id="save-schedule-btn" class="btn" title="Save schedule">Save Schedule</button>
-          <button id="load-schedule-btn" class="btn" title="Load schedule">Load Schedule</button>
-          <button id="load-sample-cables-btn" class="btn" title="Load sample cables">Load Sample Data</button>
-          <button id="clear-filters-btn" class="btn" title="Clear filters">Clear Filters</button>
-          <button id="export-xlsx-btn" class="btn" title="Export as Excel">Export XLSX</button>
-          <input type="file" id="import-xlsx-input" accept=".xlsx" class="hidden" title="Import from Excel">
-          <button id="import-xlsx-btn" class="btn" title="Import from Excel">Import XLSX</button>
-          <button id="delete-all-btn" class="btn" title="Delete all rows">Delete All Rows</button>
-          <button id="cable-library-btn" class="btn" title="Manage cable typicals" aria-haspopup="dialog" aria-expanded="false" aria-controls="cable-library-modal">Cable Library</button>
-          <button id="open-view-preset-btn" class="btn" type="button" title="Choose visible column groups" aria-haspopup="dialog" aria-expanded="false">View Preset</button>
-          <button id="open-typical-filter-btn" class="btn" type="button" title="Filter cables by typical" aria-haspopup="dialog" aria-expanded="false">Typical Filter</button>
-          <button id="open-apply-typical-btn" class="btn" type="button" title="Apply a typical to selected rows" aria-haspopup="dialog" aria-expanded="false">Apply Typical</button>
+        <div class="cable-toolbar mb-1" role="toolbar" aria-label="Cable schedule actions">
+          <div class="toolbar-group">
+            <button id="save-schedule-btn" class="btn" title="Save schedule">Save Schedule</button>
+            <button id="load-schedule-btn" class="btn" title="Load schedule">Load Schedule</button>
+            <button id="load-sample-cables-btn" class="btn" title="Load sample cables">Load Sample Data</button>
+          </div>
+          <div class="toolbar-group">
+            <button id="export-xlsx-btn" class="btn" title="Export as Excel">Export XLSX</button>
+            <input type="file" id="import-xlsx-input" accept=".xlsx" class="hidden" title="Import from Excel">
+            <button id="import-xlsx-btn" class="btn" title="Import from Excel">Import XLSX</button>
+          </div>
+          <div class="toolbar-group">
+            <button id="cable-library-btn" class="btn" title="Manage cable typicals" aria-haspopup="dialog" aria-expanded="false" aria-controls="cable-library-modal">Cable Library</button>
+            <button id="open-view-preset-btn" class="btn" type="button" title="Choose visible column groups" aria-haspopup="dialog" aria-expanded="false">View Preset</button>
+            <button id="open-typical-filter-btn" class="btn" type="button" title="Filter cables by typical" aria-haspopup="dialog" aria-expanded="false">Typical Filter</button>
+            <button id="open-apply-typical-btn" class="btn" type="button" title="Apply a typical to selected rows" aria-haspopup="dialog" aria-expanded="false">Apply Typical</button>
+          </div>
+          <div class="toolbar-group">
+            <button id="clear-filters-btn" class="btn" title="Clear filters">Clear Filters</button>
+            <button id="delete-all-btn" class="btn btn-danger" title="Delete all rows">Delete All Rows</button>
+          </div>
         </div>
         <div id="cable-toolbar-hidden-controls" class="visually-hidden" aria-hidden="true">
           <div id="cable-preset-controls" class="control-modal-group">
@@ -107,10 +115,9 @@
           <button id="add-row-btn" class="btn primary-btn add-row-btn" title="Add cable">Add Cable</button>
         </div>
       </section>
-      <nav class="step-nav">
-        <a href="index.html">Previous</a>
-        <a href="loadlist.html">Load List</a>
-        <a href="panelschedule.html">Next</a>
+      <nav class="step-nav" aria-label="Workflow navigation">
+        <a href="index.html" class="step-nav-prev">&#8592; Home</a>
+        <a href="panelschedule.html" class="step-nav-next">Panel Schedule &#8594;</a>
       </nav>
     </main>
   </div>
