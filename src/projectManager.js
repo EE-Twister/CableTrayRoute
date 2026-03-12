@@ -84,7 +84,14 @@ function renderSnapshotRows(container, snapshots, projectName, refresh) {
     const row = document.createElement('div');
     row.className = 'snapshot-row';
     const status = snapshot.revokedAt ? 'Revoked' : snapshot.expired ? 'Expired' : 'Active';
-    row.innerHTML = `<strong>${snapshot.mode === 'edit' ? 'Editable' : 'Read-only'}</strong> · ${status}<br><small>Created ${new Date(snapshot.createdAt).toLocaleString()} · Expires ${new Date(snapshot.expiresAt).toLocaleString()}</small>`;
+    const modeStrong = document.createElement('strong');
+    modeStrong.textContent = snapshot.mode === 'edit' ? 'Editable' : 'Read-only';
+    row.appendChild(modeStrong);
+    row.appendChild(document.createTextNode(` · ${status}`));
+    row.appendChild(document.createElement('br'));
+    const dateSmall = document.createElement('small');
+    dateSmall.textContent = `Created ${new Date(snapshot.createdAt).toLocaleString()} · Expires ${new Date(snapshot.expiresAt).toLocaleString()}`;
+    row.appendChild(dateSmall);
     if (!snapshot.revokedAt) {
       const revokeButton = document.createElement('button');
       revokeButton.className = 'btn';
@@ -623,7 +630,14 @@ function renderSnapshotRows(container, snapshots, projectName, refresh) {
     const row = document.createElement('div');
     row.className = 'snapshot-row';
     const status = snapshot.revokedAt ? 'Revoked' : snapshot.expired ? 'Expired' : 'Active';
-    row.innerHTML = `<strong>${snapshot.mode === 'edit' ? 'Editable' : 'Read-only'}</strong> · ${status}<br><small>Created ${new Date(snapshot.createdAt).toLocaleString()} · Expires ${new Date(snapshot.expiresAt).toLocaleString()}</small>`;
+    const modeStrong = document.createElement('strong');
+    modeStrong.textContent = snapshot.mode === 'edit' ? 'Editable' : 'Read-only';
+    row.appendChild(modeStrong);
+    row.appendChild(document.createTextNode(` · ${status}`));
+    row.appendChild(document.createElement('br'));
+    const dateSmall = document.createElement('small');
+    dateSmall.textContent = `Created ${new Date(snapshot.createdAt).toLocaleString()} · Expires ${new Date(snapshot.expiresAt).toLocaleString()}`;
+    row.appendChild(dateSmall);
     if (!snapshot.revokedAt) {
       const revokeButton = document.createElement('button');
       revokeButton.className = 'btn';

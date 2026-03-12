@@ -89,10 +89,19 @@ function normalizeSaveRequest(body) {
   return { mode: 'replace', data: body };
 }
 
+const PROJECT_CACHE_MAX = 200;
+
 class ProjectStore {
   constructor(dataDir) {
     this.dataDir = dataDir;
     this.cache = new Map();
+  }
+
+  #evictIfNeeded() {
+    if (this.cache.size < PROJECT_CACHE_MAX) return;
+    // Evict the least-recently-inserted entry (first key in insertion order).
+    const firstKey = this.cache.keys().next().value;
+    this.cache.delete(firstKey);
   }
 
   #cacheKey(username, project) {
@@ -132,6 +141,7 @@ class ProjectStore {
       data: parsed,
       json: JSON.stringify(parsed)
     };
+    this.#evictIfNeeded();
     this.cache.set(cacheKey, entry);
 
     return {
@@ -199,6 +209,7 @@ class ProjectStore {
     const writeDoneAt = process.hrtime.bigint();
     metrics.writeMs = formatDurationMs(writeStartedAt, writeDoneAt);
 
+    this.#evictIfNeeded();
     this.cache.set(cacheKey, { version, data: nextData, json: compactJson });
     return { version, data: nextData, metrics };
   }
@@ -579,6 +590,11 @@ export async function createApp(options = {}) {
   const rateLimiter = createRateLimiter({ windowMs: rateLimitWindowMs, max: rateLimitMax });
   app.use('/projects', rateLimiter);
   app.use('/shared', rateLimiter);
+
+  // Stricter rate limit for auth endpoints to prevent brute-force attacks.
+  const authRateLimiter = createRateLimiter({ windowMs: rateLimitWindowMs, max: 20 });
+  app.use('/login', authRateLimiter);
+  app.use('/signup', authRateLimiter);
 
   app.post(
     '/signup',
