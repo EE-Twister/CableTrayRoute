@@ -113,6 +113,7 @@
             <button id="connect-btn" class="icon-button" title="Connect" aria-label="Connect"><img src="./icons/toolbar/connect.svg" alt=""></button>
             <button id="undo-btn" class="icon-button" title="Undo" aria-label="Undo"><img src="./icons/toolbar/undo.svg" alt=""></button>
             <button id="redo-btn" class="icon-button" title="Redo" aria-label="Redo"><img src="./icons/toolbar/redo.svg" alt=""></button>
+            <button id="history-sidebar-toggle" class="btn" type="button" aria-controls="history-sidebar" aria-expanded="true">History</button>
           </div>
           <div class="toolbar-group" aria-label="Shapes">
             <span class="toolbar-group-label">Shapes</span>
@@ -295,6 +296,20 @@
               </ul>
             </div>
           </div>
+          <aside id="history-sidebar" class="history-sidebar" aria-label="History and checkpoints">
+            <div class="history-sidebar-header">
+              <h3>History</h3>
+              <button id="add-checkpoint-btn" type="button" class="btn">Add checkpoint</button>
+            </div>
+            <section class="history-sidebar-section" aria-labelledby="checkpoint-list-heading">
+              <h4 id="checkpoint-list-heading">Checkpoints</h4>
+              <ul id="checkpoint-list" class="history-list"></ul>
+            </section>
+            <section class="history-sidebar-section" aria-labelledby="history-events-heading">
+              <h4 id="history-events-heading">Change events</h4>
+              <ul id="history-events" class="history-list"></ul>
+            </section>
+          </aside>
         </div>
         </section>
     </main>
