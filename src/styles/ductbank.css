@@ -1,0 +1,629 @@
+/* --- Ductbank Route Shared Styles --- */
+.db-table {
+    border-collapse: collapse;
+    width: 100%;
+    margin-top: 8px;
+}
+.db-table, .db-table th, .db-table td {
+    border: 1px solid #999;
+}
+body.dark-mode .db-table,
+body.dark-mode .db-table th,
+body.dark-mode .db-table td {
+    border-color: #495057;
+}
+.db-table th, .db-table td {
+    padding: 4px;
+    text-align: center;
+    font-size: 0.85rem;
+}
+.db-table th {
+    background: #f0f0f0;
+}
+body.dark-mode .db-table th {
+    background: #343a40;
+    color: #f8f9fa;
+}
+body.dark-mode .db-table td {
+    background: #2c3034;
+}
+
+.ampacity-container {
+    overflow-x: auto;
+}
+
+.ampacity-table th,
+.ampacity-table td {
+    white-space: nowrap;
+    min-width: 60px;
+}
+
+#grid {
+    border: 1px solid #aaa;
+    margin-top: 12px;
+    display: block;
+    margin: auto;
+    background: #fff;
+}
+
+#gridContainer {
+    overflow-x: auto;
+    scrollbar-width: thin;
+    scrollbar-color: #ccc transparent;
+}
+
+#scrollTopBtn {
+    margin-top: 4px;
+}
+
+#gridContainer.hidden {
+    height: 0;
+    overflow: hidden;
+}
+
+.db-button-panel {
+    margin-top: 8px;
+    display: flex;
+    flex-wrap: wrap;
+    gap: 4px;
+}
+
+.removeBtn {
+    background: #e74c3c;
+    color: #fff;
+    border: none;
+}
+
+.duplicateBtn {
+    background: #95a5a6;
+    color: #fff;
+    border: none;
+}
+
+.viewBtn {
+    background: #3498db;
+    color: #fff;
+    border: none;
+}
+
+.insertAboveBtn,
+.insertBelowBtn {
+    background: #2ecc71;
+    color: #fff;
+    border: none;
+}
+
+/* Ensure action buttons share consistent sizing and icon color */
+.removeBtn,
+.duplicateBtn,
+.insertAboveBtn,
+.insertBelowBtn,
+.viewBtn {
+    width: 28px;
+    height: 28px;
+    padding: 0;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 0.9rem;
+    color: #fff;
+    vertical-align: middle;
+}
+
+.filter-btn {
+    margin-left: 4px;
+    background: transparent;
+    border: none;
+    cursor: pointer;
+    width: 28px;
+    height: 28px;
+    border-radius: 4px;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    color: inherit;
+    transition: background-color 0.2s ease, color 0.2s ease;
+}
+
+.filter-btn svg {
+    width: 0.9rem;
+    height: 0.9rem;
+    fill: currentColor;
+}
+
+.filter-btn:hover,
+.filter-btn:focus-visible {
+    background: rgba(0, 0, 0, 0.05);
+    outline: none;
+}
+
+body.dark-mode .filter-btn:hover,
+body.dark-mode .filter-btn:focus-visible {
+    background: rgba(255, 255, 255, 0.1);
+}
+
+.filter-btn.filtered {
+    color: var(--primary-color);
+}
+
+.header-sort {
+    background: none;
+    border: none;
+    color: inherit;
+    font: inherit;
+    display: inline-flex;
+    align-items: center;
+    gap: 0.25rem;
+    cursor: pointer;
+    padding: 0;
+}
+
+.header-sort:focus-visible {
+    outline: 2px solid var(--primary-color);
+    outline-offset: 2px;
+}
+
+.header-sort .sort-indicator {
+    width: 0.8rem;
+    height: 0.8rem;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 0.65rem;
+    opacity: 0.35;
+    transition: opacity 0.2s ease, transform 0.2s ease;
+}
+
+.header-sort .sort-indicator::before {
+    content: '\2195';
+}
+
+.header-sort[data-sort='asc'] .sort-indicator {
+    opacity: 1;
+    transform: translateY(-1px);
+}
+
+.header-sort[data-sort='asc'] .sort-indicator::before {
+    content: '\25B2';
+}
+
+.header-sort[data-sort='desc'] .sort-indicator {
+    opacity: 1;
+    transform: translateY(1px);
+}
+
+.header-sort[data-sort='desc'] .sort-indicator::before {
+    content: '\25BC';
+}
+
+th.is-sorted .header-sort {
+    color: var(--primary-color);
+}
+
+.group-toggle {
+    background: var(--primary-color);
+    border: 1px solid var(--primary-color);
+    color: #fff;
+    cursor: pointer;
+    padding: 0 0.4rem;
+    font-size: 0.75rem;
+    border-radius: 4px;
+    font-weight: 600;
+    transition: background-color 0.2s, color 0.2s;
+}
+
+.group-toggle:hover,
+.group-toggle:focus {
+    background: var(--secondary-color);
+    color: var(--primary-color);
+}
+
+.group-toggle:focus-visible {
+    outline: 2px solid var(--primary-color);
+    outline-offset: 2px;
+}
+
+body.dark-mode .group-toggle {
+    background: var(--primary-color);
+    border-color: var(--primary-color);
+    color: #fff;
+}
+
+body.dark-mode .group-toggle:hover,
+body.dark-mode .group-toggle:focus {
+    background: #fff;
+    color: #000;
+}
+
+.filter-popup {
+    position: absolute;
+    background: var(--secondary-color);
+    border: 1px solid var(--border-color);
+    padding: 4px;
+    z-index: 1000;
+}
+
+th { position: relative; }
+.col-resizer {
+    position: absolute;
+    top: 0;
+    right: -3px;
+    width: 12px;
+    height: 100%;
+    cursor: col-resize;
+    user-select: none;
+    touch-action: none;
+    z-index: 2;
+}
+
+th:last-child .col-resizer {
+    right: 0;
+}
+
+.listbox-popup {
+    position: absolute;
+    background: var(--secondary-color);
+    border: 1px solid var(--border-color);
+    padding: 4px;
+    z-index: 1000;
+}
+
+#helpOverlay {
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    background: rgba(0,0,0,0.5);
+    display: none;
+    justify-content: center;
+    align-items: center;
+    z-index: 1000;
+}
+
+#helpPopup {
+    background: #fff;
+    padding: 12px;
+    border-radius: 8px;
+    max-width: 90%;
+    max-height: 90%;
+    overflow: auto;
+    position: relative;
+}
+
+body.dark-mode #helpPopup {
+    background: #2c3034;
+    color: #f8f9fa;
+}
+
+#helpClose {
+    position: absolute;
+    top: 8px;
+    right: 8px;
+    background: #e74c3c;
+    color: #fff;
+    border: none;
+    padding: 4px 8px;
+}
+
+.legalDisclaimer {
+    font-size: 0.8rem;
+    color: #555;
+    margin-top: 16px;
+}
+body.dark-mode .legalDisclaimer {
+    color: #ccc;
+}
+
+/* Input unit label */
+.unit-label{margin-left:4px;font-size:0.85rem;}
+.unit-label[title]{text-decoration:underline dotted;cursor:help;}
+
+/* Highlight missing values */
+.missing-value{
+    background-color: transparent;
+    box-shadow: inset 0 0 0 2px var(--warning-text);
+    border-radius: 4px;
+}
+
+.duplicate-tag-cell{
+    background-color: var(--error-bg);
+    color: var(--error-text);
+}
+
+.duplicate-tag-cell input,
+.duplicate-tag-cell select,
+.duplicate-tag-cell textarea{
+    background-color: transparent;
+    color: inherit;
+}
+
+.duplicate-tag-input{
+    background-color: transparent;
+    box-shadow: inset 0 0 0 2px var(--error-text);
+    color: var(--error-text);
+    font-weight: 600;
+}
+
+/* Highlight voltage drop exceeding limit */
+.voltage-exceed{background-color:var(--warning-bg);color:var(--warning-text);}
+.sizing-violation{background-color:var(--error-bg);color:var(--error-text);}
+.cable-lead{
+    stroke:#555;
+    stroke-width:2;
+    stroke-linecap:round;
+    pointer-events:none;
+}
+.drag-preview{
+    position:fixed;
+    top:-1000px;
+    left:-1000px;
+    pointer-events:none;
+    border:1px solid var(--primary-color);
+    border-radius:4px;
+    background:var(--ol-card-bg);
+    display:inline-flex;
+    align-items:center;
+    justify-content:center;
+    padding:4px;
+    box-sizing:border-box;
+}
+.drag-preview img{
+    width:100%;
+    height:100%;
+    object-fit:contain;
+    transform-origin:center;
+}
+.drag-preview[data-rotation="90"] img{
+    transform:rotate(90deg);
+}
+.drag-preview[data-rotation="180"] img{
+    transform:rotate(180deg);
+}
+.drag-preview[data-rotation="270"] img{
+    transform:rotate(270deg);
+}
+body.dark-mode .cable-lead{
+    stroke:#bbb;
+}
+.connection.sizing-violation{stroke:var(--error-text)!important;}
+.connection.voltage-exceed{stroke:var(--warning-text)!important;}
+.component-label{
+    fill:var(--text-color);
+    cursor:move;
+    user-select:none;
+}
+
+.component-attribute{
+    fill:var(--text-color);
+    opacity:0.8;
+    font-size:0.75rem;
+    cursor:move;
+    user-select:none;
+}
+
+/* --- Raceway Schedule Page --- */
+.ductbank-row > td {
+    background-color: var(--secondary-color);
+    font-weight: bold;
+}
+
+.conduit-container {
+    background-color: var(--secondary-color);
+}
+
+.conduit-container table {
+    margin-left: 1.5rem;
+    width: 100%;
+    border-collapse: collapse;
+}
+
+.nested-table th, .nested-table td {
+    padding: 4px;
+    border-bottom: 1px solid var(--border-color);
+}
+
+/* --- Ductbank Route Page --- */
+body.ductbank-page {
+    margin: 0;
+}
+body.ductbank-page h1 {
+    margin-bottom: 8px;
+    font-size: 1.4rem;
+    font-family: inherit;
+}
+body.ductbank-page label {
+    display: inline-block;
+    margin-bottom: 4px;
+    font-size: 0.9rem;
+}
+body.ductbank-page input,
+body.ductbank-page select {
+    width: auto;
+    padding: 2px 4px;
+    font-size: 0.9rem;
+    margin-right: 8px;
+    margin-bottom: 0;
+    background: var(--secondary-color);
+    color: var(--text-color);
+    border: 1px solid var(--border-color);
+}
+body.ductbank-page button {
+    padding: var(--button-padding);
+    margin: var(--button-margin);
+    cursor: pointer;
+}
+
+/* --- Conduit Fill Page --- */
+body.conduitfill-page {
+    margin: 0;
+}
+body.conduitfill-page h1 {
+    margin-bottom: 8px;
+    font-size: 1.4rem;
+}
+body.conduitfill-page label {
+    display: inline-block;
+    margin-bottom: 4px;
+    font-size: 0.9rem;
+}
+body.conduitfill-page input[type="text"],
+body.conduitfill-page input[type="number"],
+body.conduitfill-page select {
+    width: auto;
+    padding: 2px 4px;
+    font-size: 0.9rem;
+    margin-right: 8px;
+    margin-bottom: 0;
+    background: var(--secondary-color);
+    color: var(--text-color);
+    border: 1px solid var(--border-color);
+}
+body.conduitfill-page button {
+    padding: var(--button-padding);
+    font-size: 0.9rem;
+    margin: var(--button-margin);
+    cursor: pointer;
+}
+body.conduitfill-page table {
+    border-collapse: collapse;
+    width: 100%;
+    margin-top: 12px;
+}
+body.conduitfill-page table,
+body.conduitfill-page th,
+body.conduitfill-page td {
+    border: 1px solid var(--border-color);
+}
+body.conduitfill-page th,
+body.conduitfill-page td {
+    padding: 6px;
+    text-align: center;
+    font-size: 0.9rem;
+}
+body.conduitfill-page th {
+    background: var(--secondary-color);
+    color: var(--text-color);
+}
+body.conduitfill-page td {
+    background: #fff;
+}
+body.dark-mode.conduitfill-page td {
+    background: var(--secondary-color);
+}
+body.conduitfill-page #controls {
+    margin-bottom: 12px;
+}
+body.conduitfill-page #results {
+    margin-top: 16px;
+    font-size: 0.95rem;
+}
+body.conduitfill-page #svgContainer {
+    border: 1px solid var(--border-color);
+    margin-top: 12px;
+    background: #fff;
+}
+body.conduitfill-page #expandedSVG {
+    display: block;
+    margin-top: 48px;
+    background: #fff;
+}
+body.conduitfill-page .removeBtn,
+body.conduitfill-page .duplicateBtn {
+    border: none;
+    padding: 4px 8px;
+    font-size: 0.85rem;
+    cursor: pointer;
+    color: #fff;
+}
+body.conduitfill-page .removeBtn {
+    background-color: #e74c3c;
+}
+body.conduitfill-page .removeBtn:hover {
+    background-color: #c0392b;
+}
+body.conduitfill-page .duplicateBtn {
+    background-color: #95a5a6;
+}
+body.conduitfill-page .duplicateBtn:hover {
+    background-color: #7f8c8d;
+}
+body.conduitfill-page .warning {
+    color: var(--warning-text);
+    font-weight: bold;
+}
+body.conduitfill-page #overlay {
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    background: rgba(0,0,0,0.5);
+    display: none;
+    justify-content: center;
+    align-items: center;
+    z-index: 1000;
+}
+body.conduitfill-page #popup {
+    position: relative;
+    background: var(--secondary-color);
+    padding: 12px;
+    border-radius: 8px;
+    max-width: 90%;
+    max-height: 90%;
+    overflow: auto;
+    box-shadow: 0 0 10px rgba(0,0,0,0.5);
+    color: var(--text-color);
+}
+body.conduitfill-page #popupClose {
+    position: absolute;
+    top: 8px;
+    right: 8px;
+    background: #e74c3c;
+    color: #fff;
+    border: none;
+    font-size: 1rem;
+    padding: 4px 8px;
+    cursor: pointer;
+    border-radius: 4px;
+}
+body.conduitfill-page #copyBtn,
+body.conduitfill-page #printBtn,
+body.conduitfill-page #copyPngBtn {
+    position: absolute;
+    top: 8px;
+    font-size: 0.9rem;
+    padding: 4px 8px;
+    border-radius: 4px;
+}
+body.conduitfill-page #copyBtn {
+    right: 80px;
+    background: #2ecc71;
+    color: #fff;
+    border: none;
+    cursor: pointer;
+}
+body.conduitfill-page #copyBtn:hover {
+    background: #27ae60;
+}
+body.conduitfill-page #printBtn {
+    right: 160px;
+    background: #3498db;
+    color: #fff;
+    border: none;
+    cursor: pointer;
+}
+body.conduitfill-page #printBtn:hover {
+    background: #2980b9;
+}
+body.conduitfill-page #copyPngBtn {
+    right: 240px;
+    background: #9b59b6;
+    color: #fff;
+    border: none;
+    cursor: pointer;
+}
+body.conduitfill-page #copyPngBtn:hover {
+    background: #8e44ad;
+}
+

@@ -1,0 +1,35 @@
+/* --- Layout: Sidebar and Main Content --- */
+.sidebar {
+    width: 350px;
+    flex-shrink: 0; /* Prevent sidebar from shrinking when results are shown */
+    background-color: var(--secondary-color);
+    padding: var(--space-4);
+    overflow-y: auto;
+    border-right: 1px solid var(--border-color);
+}
+
+.sidebar.collapsed {
+    display: none;
+}
+
+.main-content {
+    flex-grow: 1;
+    padding: var(--space-5);
+    overflow-y: auto;
+}
+
+header h1, header h2 {
+    margin-top: 0;
+}
+
+.sidebar header h2 {
+    font-size: 1.4rem;
+    color: var(--primary-color);
+    border-bottom: 2px solid var(--primary-color);
+    padding-bottom: 0.5rem;
+}
+
+.sidebar section {
+    margin-bottom: 2rem;
+}
+

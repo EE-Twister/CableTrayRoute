@@ -1,0 +1,61 @@
+/* ---- Routing result enhancements ---- */
+
+/* Summary banner shown above the route breakdown list */
+.route-summary-banner {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem 1rem;
+  align-items: center;
+  padding: 0.55rem 0.85rem;
+  border-radius: 6px;
+  font-size: 0.9rem;
+  font-weight: 600;
+  margin-bottom: 0.75rem;
+}
+.route-summary-ok {
+  background: #e6f9ee;
+  border-left: 4px solid #22c55e;
+  color: #166534;
+}
+.route-summary-warn {
+  background: #fff7ed;
+  border-left: 4px solid #f97316;
+  color: #7c2d12;
+}
+.route-summary-banner .rs-routed  { color: #16a34a; }
+.route-summary-banner .rs-failed  { color: #dc2626; }
+.route-summary-banner .rs-total   { color: inherit; }
+.route-summary-banner .rs-field   { opacity: 0.75; font-weight: 400; }
+
+/* Color-coded route entries */
+details.route-success > summary { border-left: 4px solid #22c55e; }
+details.route-failed  > summary { border-left: 4px solid #ef4444; background: #fff5f5; }
+
+/* Status & mode badges in route summaries */
+.route-status-badge {
+  display: inline-block;
+  padding: 0 0.35em;
+  border-radius: 4px;
+  font-size: 0.82em;
+  font-weight: 700;
+  margin: 0 0.2em;
+}
+details.route-success .route-status-badge { background: #dcfce7; color: #15803d; }
+details.route-failed  .route-status-badge { background: #fee2e2; color: #b91c1c; }
+
+.route-mode-badge {
+  display: inline-block;
+  padding: 0 0.35em;
+  border-radius: 4px;
+  font-size: 0.78em;
+  font-weight: 500;
+  background: #f1f5f9;
+  color: #475569;
+  margin: 0 0.2em;
+}
+
+/* Dark-mode adjustments */
+body.dark .route-summary-ok  { background: #14532d; color: #86efac; border-left-color: #22c55e; }
+body.dark .route-summary-warn { background: #431407; color: #fdba74; border-left-color: #f97316; }
+body.dark details.route-failed > summary { background: #3b0000; }
+body.dark .route-mode-badge { background: #1e293b; color: #94a3b8; }
