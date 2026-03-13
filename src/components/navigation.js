@@ -72,6 +72,27 @@ function buildBreadcrumb(currentRoute) {
   return breadcrumb;
 }
 
+function mountPageTransitions() {
+  // Progress bar on every page load
+  const bar = document.createElement('div');
+  bar.className = 'nav-progress-bar';
+  document.body.insertBefore(bar, document.body.firstChild);
+
+  // Intercept nav link clicks: fade out, then navigate
+  document.addEventListener('click', (e) => {
+    const link = e.target.closest('a[href]');
+    if (!link) return;
+    const href = link.getAttribute('href');
+    if (!href || href.startsWith('#') || href.startsWith('mailto:') || href.startsWith('http')) return;
+    if (e.ctrlKey || e.metaKey || e.shiftKey || e.altKey) return;
+    if (link.target && link.target !== '_self') return;
+
+    e.preventDefault();
+    document.body.classList.add('page-exit');
+    setTimeout(() => { window.location.href = href; }, 150);
+  });
+}
+
 function mountPersistentNavigation() {
   if (document.body?.dataset.navMounted === 'true') return;
   const topNav = document.querySelector('.top-nav');
@@ -136,7 +157,10 @@ function mountPersistentNavigation() {
 }
 
 if (typeof window !== 'undefined') {
-  window.addEventListener('DOMContentLoaded', mountPersistentNavigation);
+  window.addEventListener('DOMContentLoaded', () => {
+    mountPersistentNavigation();
+    mountPageTransitions();
+  });
 }
 
 export { mountPersistentNavigation };

@@ -1595,10 +1595,48 @@ g.component.scenario-diff > * {
   to { opacity: 0.35; }
 }
 
+@keyframes pageFadeIn {
+  from { opacity: 0; transform: translateY(5px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+
+@keyframes navProgressIn {
+  0%   { width: 0%;   opacity: 1; }
+  60%  { width: 80%;  opacity: 1; }
+  85%  { width: 100%; opacity: 1; }
+  100% { width: 100%; opacity: 0; }
+}
+
 @media (prefers-reduced-motion: no-preference) {
+  body {
+    animation: pageFadeIn 0.2s ease-out;
+  }
+
+  body.page-exit {
+    pointer-events: none;
+    opacity: 0;
+    transform: translateY(-4px);
+    transition: opacity 0.15s ease-in, transform 0.15s ease-in;
+  }
+
   .prop-modal.show {
     animation: fadeIn 0.3s ease-out;
   }
+
+  .nav-progress-bar {
+    animation: navProgressIn 0.5s ease-out forwards;
+  }
+}
+
+.nav-progress-bar {
+  position: fixed;
+  top: 0;
+  left: 0;
+  height: 3px;
+  width: 100%;
+  background: var(--primary-color, #0d6efd);
+  z-index: 9999;
+  pointer-events: none;
 }
 
 .tour-overlay {
@@ -2025,12 +2063,22 @@ body.compact-mode td {
     text-decoration: none;
     color: var(--text-color);
     padding: 0.35rem 0.5rem;
+    border-left: 3px solid transparent;
+    transition: background-color 0.15s ease, color 0.15s ease, border-color 0.15s ease;
+}
+
+.sidebar-nav-list a:hover {
+    background: color-mix(in srgb, var(--primary-color) 8%, transparent);
+    color: var(--primary-color);
 }
 
 .sidebar-nav-list a.active,
 .sidebar-nav-list a[aria-current="page"] {
     font-weight: 600;
     background: color-mix(in srgb, var(--primary-color) 14%, transparent);
+    border-left-color: var(--primary-color);
+    color: var(--primary-color);
+    padding-left: calc(0.5rem - 1px);
 }
 
 .sidebar-nav-list a:focus-visible,
