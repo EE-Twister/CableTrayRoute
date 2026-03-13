@@ -75,6 +75,20 @@
   :root {
     --primary-color: #17a2b8;
     --secondary-color: #343a40;
+    --border-color: #495057;
+    --text-color: #f8f9fa;
+    --table-row-alt-bg: rgba(255, 255, 255, 0.08);
+    --success-text: #28a745;
+    --warning-text: #ffc107;
+    --focus-ring-color: #fff;
+    --button-hover-bg: #1558b0;
+    --panel-phase-a: #ff8a80;
+    --panel-phase-b: #74c0fc;
+    --panel-phase-c: #8ce99a;
+    --panel-phase-pos: #ffd43b;
+    --panel-phase-neg: #ced4da;
+    --row-divider-color: rgba(255, 255, 255, 0.18);
+    color-scheme: dark;
   }
 }
 

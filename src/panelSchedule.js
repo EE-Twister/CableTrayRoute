@@ -2545,7 +2545,13 @@ window.addEventListener("DOMContentLoaded", () => {
       if (!hints.length) {
         validationHints.textContent = 'All key panel inputs look valid.';
       } else {
-        validationHints.innerHTML = hints.map(message => `<div class="panel-hint">⚠ ${message} Fix the highlighted field to continue.</div>`).join('');
+        validationHints.textContent = '';
+        hints.forEach(message => {
+          const div = document.createElement('div');
+          div.className = 'panel-hint';
+          div.textContent = `⚠ ${message} Fix the highlighted field to continue.`;
+          validationHints.appendChild(div);
+        });
       }
     }
 

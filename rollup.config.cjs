@@ -28,13 +28,14 @@ const entries = {
   '404': 'src/404.js'
 };
 
-module.exports = Object.entries(entries).map(([name, input]) => ({
-  input,
+module.exports = {
+  input: entries,
   output: {
-    file: `dist/${name}.js`,
+    dir: 'dist',
     format: 'es',
     sourcemap: false,
-    inlineDynamicImports: true
+    entryFileNames: '[name].js',
+    chunkFileNames: 'chunks/[name]-[hash].js'
   },
   plugins: [terser()]
-}));
+};

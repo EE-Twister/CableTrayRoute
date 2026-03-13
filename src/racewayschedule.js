@@ -663,7 +663,9 @@ document.addEventListener('DOMContentLoaded', async () => {
       rows.forEach(r=>{
         const tr=document.createElement('tr');
         if(r._unmapped) tr.classList.add('missing-tag-row');
-        tr.innerHTML=`<td>${r.ductbankTag||''}</td><td>${r.conduit_id||''}</td>`;
+        const td1=document.createElement('td');td1.textContent=r.ductbankTag||'';
+        const td2=document.createElement('td');td2.textContent=r.conduit_id||'';
+        tr.appendChild(td1);tr.appendChild(td2);
         tbody.appendChild(tr);
       });
     };

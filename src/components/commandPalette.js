@@ -165,7 +165,12 @@ function createPalette() {
       if (index === activeIndex) {
         item.classList.add("is-active");
       }
-      item.innerHTML = `<span>${action.label}</span><kbd>Enter</kbd>`;
+      const labelSpan = document.createElement('span');
+      labelSpan.textContent = action.label;
+      const kbd = document.createElement('kbd');
+      kbd.textContent = 'Enter';
+      item.appendChild(labelSpan);
+      item.appendChild(kbd);
       item.addEventListener("mouseenter", () => {
         activeIndex = index;
         render();
