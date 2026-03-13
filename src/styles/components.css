@@ -9,60 +9,80 @@
     background: none;
     border: none;
     cursor: pointer;
+
+    &.placeholder {
+        color: #6c757d;
+        font-style: italic;
+    }
 }
 
-.raceway-summary.placeholder {
-    color: #6c757d;
-    font-style: italic;
+/* Dual listbox modal layout — uses container query so it adapts
+   to the dialog width rather than the viewport width. */
+.dual-listbox-wrapper {
+    container-type: inline-size;
+    container-name: dual-listbox-wrapper;
 }
 
-/* Dual listbox modal layout */
 .dual-listbox {
     display: flex;
     gap: 1rem;
+
+    & .list-container {
+        flex: 1;
+        display: flex;
+        flex-direction: column;
+
+        & h3 {
+            margin: 0 0 0.25rem 0;
+        }
+
+        & input {
+            margin-bottom: 0.5rem;
+        }
+
+        & select {
+            flex: 1;
+            min-height: 200px;
+            background: var(--secondary-color);
+            color: var(--text-color);
+            border: 1px solid var(--border-color);
+        }
+    }
+
+    & .button-column {
+        display: flex;
+        flex-direction: column;
+        justify-content: center;
+        gap: 0.5rem;
+
+        & button {
+            padding: 0.25rem 0.5rem;
+        }
+    }
 }
 
-.dual-listbox .list-container {
-    flex: 1;
-    display: flex;
-    flex-direction: column;
-}
-
-.dual-listbox .list-container h3 {
-    margin: 0 0 0.25rem 0;
-}
-
-.dual-listbox .list-container input {
-    margin-bottom: 0.5rem;
-}
-
-.dual-listbox .list-container select {
-    flex: 1;
-    min-height: 200px;
-    background: var(--secondary-color);
-    color: var(--text-color);
-    border: 1px solid var(--border-color);
-}
-
-.dual-listbox .button-column {
-    display: flex;
-    flex-direction: column;
-    justify-content: center;
-    gap: 0.5rem;
-}
-
-.dual-listbox .button-column button {
-    padding: 0.25rem 0.5rem;
-}
-
-@media (max-width: 600px) {
+@container dual-listbox-wrapper (max-width: 500px) {
     .dual-listbox {
         flex-direction: column;
         align-items: stretch;
+
+        & .button-column {
+            flex-direction: row;
+            justify-content: center;
+        }
     }
-    .dual-listbox .button-column {
-        flex-direction: row;
-        justify-content: center;
+}
+
+/* Fallback for when the wrapper class is absent (legacy markup) */
+@media (max-width: 600px) {
+    .dual-listbox:not(.dual-listbox-wrapper .dual-listbox) {
+        flex-direction: column;
+        align-items: stretch;
+
+        & .button-column {
+            flex-direction: row;
+            justify-content: center;
+        }
     }
 }
 
@@ -90,29 +110,31 @@
     box-shadow: 0 2px 6px rgba(0,0,0,0.15);
     padding: var(--space-4);
     z-index: 1000;
-}
 
-.lint-panel.hidden {
-    display: none;
-}
+    &.hidden {
+        display: none;
+    }
 
-.lint-panel ul {
-    list-style: none;
-    padding-left: 0;
-    margin: 0;
+    & ul {
+        list-style: none;
+        padding-left: 0;
+        margin: 0;
+    }
+
+    & li {
+        cursor: pointer;
+        margin-bottom: 0.5rem;
+    }
 }
 
 /* Highlight components that are single points of failure */
-.component.reliability-spf rect,
-.component.reliability-spf path,
-.component.reliability-spf polygon {
-  stroke: #c00;
-  stroke-width: 3px;
-}
-
-.lint-panel li {
-    cursor: pointer;
-    margin-bottom: 0.5rem;
+.component.reliability-spf {
+    & rect,
+    & path,
+    & polygon {
+        stroke: #c00;
+        stroke-width: 3px;
+    }
 }
 
 .studies-panel {
@@ -275,6 +297,8 @@
 
 .component-builder-card,
 .component-list-card {
+    container-type: inline-size;
+    container-name: component-card;
     margin-bottom: var(--ol-spacing);
 }
 
@@ -282,30 +306,36 @@
     display: flex;
     flex-direction: column;
     gap: 1.5rem;
-}
 
-.component-form .form-grid {
-    display: grid;
-    gap: 1rem;
-    grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
-}
+    & .form-grid {
+        display: grid;
+        gap: 1rem;
+        grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+    }
 
-.component-form label {
-    display: flex;
-    flex-direction: column;
-    gap: 0.25rem;
-    font-weight: 500;
-}
+    & label {
+        display: flex;
+        flex-direction: column;
+        gap: 0.25rem;
+        font-weight: 500;
+    }
 
-.component-form input,
-.component-form select,
-.component-form textarea {
-    padding: 0.4rem 0.6rem;
-    border: 1px solid var(--ol-border-color);
-    border-radius: var(--ol-radius);
-    font: inherit;
-    background: var(--secondary-color);
-    color: var(--text-color);
+    & input,
+    & select,
+    & textarea {
+        padding: 0.4rem 0.6rem;
+        border: 1px solid var(--ol-border-color);
+        border-radius: var(--ol-radius);
+        font: inherit;
+        background: var(--secondary-color);
+        color: var(--text-color);
+    }
+
+    & .form-actions {
+        display: flex;
+        gap: 0.75rem;
+        flex-wrap: wrap;
+    }
 }
 
 .ports-fieldset,
@@ -544,12 +574,6 @@
     filter: drop-shadow(0 0 4px rgba(0, 123, 255, 0.6));
 }
 
-.component-form .form-actions {
-    display: flex;
-    gap: 0.75rem;
-    flex-wrap: wrap;
-}
-
 .component-list-header {
     display: flex;
     align-items: center;
@@ -597,7 +621,7 @@
     font-style: italic;
 }
 
-@media (max-width: 800px) {
+@container component-card (max-width: 600px) {
     .component-form .form-grid {
         grid-template-columns: 1fr;
     }
@@ -607,6 +631,22 @@
     .component-table .actions {
         flex-direction: column;
         align-items: flex-start;
+    }
+}
+
+/* Fallback for browsers that predate container queries */
+@supports not (container-type: inline-size) {
+    @media (max-width: 800px) {
+        .component-form .form-grid {
+            grid-template-columns: 1fr;
+        }
+        .property-row {
+            grid-template-columns: 1fr;
+        }
+        .component-table .actions {
+            flex-direction: column;
+            align-items: flex-start;
+        }
     }
 }
 
