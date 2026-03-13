@@ -189,7 +189,7 @@ body.modal-open {
     resize: both;
     overflow: auto;
     max-width: none;
-    min-width: var(--size-modal-sm);
+    min-width: min(var(--size-modal-sm), calc(100vw - 2rem));
     min-height: 22.5rem;
 }
 
