@@ -123,6 +123,10 @@ class ProjectStore {
     const cacheKey = this.#cacheKey(username, project);
     const cached = this.cache.get(cacheKey);
     if (cached) {
+      // Move to end of insertion order so LRU eviction keeps recently-accessed
+      // entries alive longer than stale ones.
+      this.cache.delete(cacheKey);
+      this.cache.set(cacheKey, cached);
       return {
         version: cached.version,
         data: cached.data,
@@ -601,6 +605,7 @@ export async function createApp(options = {}) {
   const authRateLimiter = createRateLimiter({ windowMs: rateLimitWindowMs, max: 20 });
   app.use('/login', authRateLimiter);
   app.use('/signup', authRateLimiter);
+  app.use('/session/refresh', authRateLimiter);
 
   app.post(
     '/signup',
@@ -617,6 +622,10 @@ export async function createApp(options = {}) {
       }
       if (!isValidName(trimmedUser)) {
         res.status(400).json({ error: 'Invalid username' });
+        return;
+      }
+      if (password.length < 8) {
+        res.status(400).json({ error: 'Password must be at least 8 characters' });
         return;
       }
       if (password.length > 1000) {
