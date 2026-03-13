@@ -1,0 +1,168 @@
+/* --- Messages --- */
+.message {
+    padding: var(--space-4);
+    margin-bottom: 1rem;
+    border-radius: 4px;
+    border: 1px solid transparent;
+}
+.message.success { background-color: var(--success-bg); border-color: var(--success-text); color: var(--success-text); }
+.message.warning { background-color: var(--warning-bg); border-color: var(--warning-text); color: var(--warning-text); }
+.message.error { background-color: var(--error-bg); border-color: var(--error-text); color: var(--error-text); }
+
+.over-limit-row { background-color: var(--error-bg); }
+.missing-tag-row { background-color: var(--error-bg); }
+.missing-row {
+    background-color: transparent;
+    outline: 2px dashed var(--warning-text);
+    outline-offset: -2px;
+}
+
+.toast {
+    position: fixed;
+    bottom: 10px;
+    left: 50%;
+    transform: translateX(-50%);
+    background: var(--secondary-color);
+    color: var(--text-color);
+    border: 1px solid var(--border-color);
+    padding: 8px 12px;
+    border-radius: 4px;
+    box-shadow: 0 2px 4px rgba(0,0,0,0.2);
+    opacity: 0;
+    transition: opacity 0.3s ease;
+    z-index: 2000;
+}
+.toast.show { opacity: 1; }
+body.dark-mode .toast { background: #2c3034; color: #f8f9fa; }
+.toast-success { background: #28a745; color: #fff; }
+.toast-error { background: #dc3545; color: #fff; }
+body.dark-mode .toast-success { background: #28a745; }
+body.dark-mode .toast-error { background: #dc3545; }
+
+/* Debug console */
+#debug-console {
+    position: fixed;
+    bottom: 0;
+    left: 0;
+    right: 0;
+    max-height: 200px;
+    overflow: auto;
+    background: #1e1e1e;
+    color: #0f0;
+    font-family: monospace;
+    padding: 4px 8px;
+    z-index: 1500;
+    display: none;
+}
+#debug-console summary {
+    cursor: pointer;
+    color: #fff;
+}
+#debug-console pre {
+    margin: 0;
+    white-space: pre-wrap;
+}
+body.dark-mode #debug-console {
+    background: #000;
+}
+
+#warning-area { margin-top: 8px; }
+#soilWarning { margin-top:4px; font-size:0.8rem; color: var(--warning-text); }
+#moistureWarning { margin-top:4px; font-size:0.8rem; color: var(--warning-text); }
+
+/* --- Plots --- */
+#plot-3d {
+    width: 100%;
+    height: 600px;
+}
+
+#popout-plot-btn {
+    margin-top: 10px;
+}
+
+.plot-controls {
+    display: flex;
+    gap: 10px;
+    align-items: center;
+    margin-bottom: 10px;
+}
+
+/* Progress Bar */
+#progress-container,
+#analysis-progress-container {
+    width: 100%;
+    height: 20px;
+    background-color: #e9ecef;
+    border-radius: 10px;
+    overflow: hidden;
+    position: relative;
+    margin-top: 10px;
+}
+#progress-bar,
+#analysis-progress-bar {
+    height: 100%;
+    width: 0;
+    background-color: var(--primary-color);
+    transition: width 0.2s ease;
+}
+
+#progress-label,
+#analysis-progress-label {
+    position: absolute;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 0.8rem;
+    color: #fff;
+    pointer-events: none;
+}
+
+#cancel-routing-btn {
+    width: 100%;
+    margin-top: 10px;
+}
+
+/* Responsive layout for smaller screens */
+@media (max-width: 768px) {
+    .container {
+        flex-direction: column;
+        height: auto;
+    }
+    .sidebar {
+        position: fixed;
+        top: 0;
+        left: 0;
+        height: 100%;
+        width: 250px;
+        max-width: 80%;
+        transform: translateX(0);
+        transition: transform 0.3s ease;
+        z-index: 1000;
+        border-right: 1px solid var(--border-color);
+        border-bottom: none;
+    }
+    .sidebar.collapsed {
+        transform: translateX(-100%);
+    }
+    .main-content {
+        order: 1;
+        padding: var(--space-4);
+    }
+    .sidebar-toggle {
+        display: inline-block;
+        background: none;
+        border: none;
+        font-size: 1.5rem;
+        margin-right: 1rem;
+        cursor: pointer;
+        color: var(--text-color);
+    }
+    .top-nav {
+        display: flex;
+        align-items: center;
+    }
+}

@@ -1,0 +1,258 @@
+/* --- Top Navigation --- */
+.top-nav {
+    background: var(--secondary-color);
+    border-bottom: 1px solid var(--border-color);
+    padding: var(--space-2) var(--space-4);
+    display: flex;
+    align-items: center;
+}
+.nav-toggle {
+    display: none;
+}
+.top-nav .nav-links {
+    display: flex;
+    align-items: center;
+    width: 100%;
+}
+.top-nav .settings-btn {
+    margin-left: auto;
+}
+.top-nav a {
+    margin-right: var(--space-4);
+    text-decoration: none;
+    color: var(--text-color);
+}
+.top-nav a:hover {
+    text-decoration: underline;
+}
+
+.top-nav a.active,
+.top-nav a[aria-current="page"] {
+    font-weight: bold;
+    text-decoration: underline;
+}
+
+@media (max-width: 700px) {
+    .nav-toggle {
+        display: block;
+        background: none;
+        border: none;
+        font-size: 1.5rem;
+        cursor: pointer;
+        color: var(--text-color);
+        margin-right: 1rem;
+    }
+    .top-nav {
+        flex-direction: column;
+        align-items: flex-start;
+    }
+    .top-nav .nav-links {
+        display: none;
+        flex-direction: column;
+        width: 100%;
+    }
+    .top-nav .nav-links.open {
+        display: flex;
+    }
+    .top-nav .settings-btn {
+        margin-left: 0;
+    }
+    .app-sidebar-nav {
+        position: static;
+        width: auto;
+        border-right: none;
+        border-bottom: 1px solid var(--border-color);
+    }
+    .has-sidebar-nav .container,
+    .has-sidebar-nav .page-layout,
+    .has-sidebar-nav .main-content {
+        margin-left: 0;
+    }
+}
+
+
+.breadcrumb-trail {
+    padding: var(--space-2) var(--space-4);
+    border-bottom: 1px solid var(--border-color);
+    background: color-mix(in srgb, var(--secondary-color) 92%, var(--primary-color) 8%);
+}
+
+.breadcrumb-list {
+    margin: 0;
+    padding: 0;
+    display: flex;
+    flex-wrap: wrap;
+    gap: var(--space-2);
+    list-style: none;
+    font-size: 0.9rem;
+}
+
+.breadcrumb-list li+li::before {
+    content: '/';
+    margin-right: var(--space-2);
+    color: var(--muted-text-color);
+}
+
+.has-sidebar-nav .container,
+.has-sidebar-nav .page-layout,
+.has-sidebar-nav .main-content {
+    margin-left: 16rem;
+}
+
+.app-sidebar-nav {
+    position: fixed;
+    top: 7.5rem;
+    left: 0;
+    bottom: 0;
+    width: 15rem;
+    overflow-y: auto;
+    border-right: 1px solid var(--border-color);
+    background: var(--secondary-color);
+    padding: var(--space-3);
+    z-index: 80;
+}
+
+.sidebar-title {
+    margin: 0 0 var(--space-3);
+    font-size: 0.9rem;
+    text-transform: uppercase;
+    letter-spacing: 0.04em;
+    color: var(--muted-text-color);
+}
+
+.sidebar-section-label {
+    margin: var(--space-4) 0 var(--space-1);
+    padding: 0 0.5rem;
+    font-size: var(--font-size-xs);
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.08em;
+    color: var(--color-primary);
+    border-bottom: 1px solid var(--color-border);
+    padding-bottom: var(--space-1);
+}
+
+.sidebar-section-label:first-of-type {
+    margin-top: 0;
+}
+
+.sidebar-nav-list {
+    margin: 0;
+    padding: 0;
+    list-style: none;
+    display: grid;
+    gap: var(--space-1);
+}
+
+.sidebar-nav-list a,
+.top-nav .nav-links a,
+.settings-btn,
+.nav-toggle,
+.breadcrumb-list a {
+    border-radius: 0.35rem;
+}
+
+.sidebar-nav-list a {
+    display: block;
+    text-decoration: none;
+    color: var(--text-color);
+    padding: 0.35rem 0.5rem;
+    border-left: 3px solid transparent;
+    transition: background-color 0.15s ease, color 0.15s ease, border-color 0.15s ease;
+}
+
+.sidebar-nav-list a:hover {
+    background: color-mix(in srgb, var(--primary-color) 8%, transparent);
+    color: var(--primary-color);
+}
+
+.sidebar-nav-list a.active,
+.sidebar-nav-list a[aria-current="page"] {
+    font-weight: 600;
+    background: color-mix(in srgb, var(--primary-color) 14%, transparent);
+    border-left-color: var(--primary-color);
+    color: var(--primary-color);
+    padding-left: calc(0.5rem - 1px);
+}
+
+.sidebar-nav-list a:focus-visible,
+.top-nav .nav-links a:focus-visible,
+.settings-btn:focus-visible,
+.nav-toggle:focus-visible,
+.breadcrumb-list a:focus-visible {
+    outline: 2px solid var(--primary-color);
+    outline-offset: 2px;
+}
+
+
+/* --- Step Navigation --- */
+.step-nav {
+    margin-top: 2rem;
+    padding-top: 1rem;
+    border-top: 1px solid var(--border-color);
+    display: flex;
+    justify-content: space-between;
+    flex-wrap: wrap;
+    gap: 1rem;
+}
+
+.step-nav a {
+    color: var(--primary-color);
+    text-decoration: none;
+    padding: var(--space-2) var(--space-3);
+    border: 1px solid var(--color-border);
+    border-radius: var(--radius-sm);
+    font-size: var(--font-size-sm);
+    transition: background 0.15s, border-color 0.15s;
+}
+
+.step-nav a:hover {
+    background: color-mix(in srgb, var(--color-primary) 8%, transparent);
+    border-color: var(--color-primary);
+    text-decoration: none;
+}
+
+.step-nav-next {
+    margin-left: auto;
+}
+
+/* --- Footer --- */
+.site-footer {
+    background: var(--secondary-color);
+    color: var(--text-color);
+    border-top: 1px solid var(--border-color);
+    padding: var(--space-4);
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    justify-content: space-between;
+    gap: 0.5rem;
+}
+
+.footer-left {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+}
+
+.footer-logo {
+    width: 20px;
+    height: 20px;
+    max-width: 100%;
+}
+
+.footer-links {
+    display: flex;
+    gap: 1rem;
+    flex-wrap: wrap;
+}
+
+.footer-links a {
+    color: var(--text-color);
+    text-decoration: none;
+}
+
+.footer-links a:hover {
+    text-decoration: underline;
+}
+
