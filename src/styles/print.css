@@ -1,0 +1,321 @@
+/* ============================================================
+   Print Stylesheet — CableTrayRoute Engineering Reports
+   Optimised for A3/A4 landscape output of engineering data.
+   ============================================================ */
+
+@media print {
+  /* --- Page setup --- */
+  @page {
+    size: A4 landscape;
+    margin: 15mm 12mm 18mm 12mm;
+
+    @top-center {
+      content: "CableTrayRoute — " attr(data-report-title);
+      font-size: 8pt;
+      color: #555;
+    }
+
+    @bottom-left {
+      content: attr(data-project-name);
+      font-size: 7pt;
+      color: #777;
+    }
+
+    @bottom-right {
+      content: "Page " counter(page) " of " counter(pages);
+      font-size: 7pt;
+      color: #777;
+    }
+  }
+
+  /* --- Reset screen-only chrome --- */
+  *,
+  *::before,
+  *::after {
+    box-shadow: none !important;
+    text-shadow: none !important;
+    animation: none !important;
+    transition: none !important;
+  }
+
+  /* Force light theme for print regardless of user preference */
+  :root,
+  body,
+  body.dark-mode,
+  body.theme-high-contrast {
+    --primary-color: #0d6efd;
+    --secondary-color: #f8f9fa;
+    --border-color: #dee2e6;
+    --text-color: #212529;
+    --table-row-alt-bg: #f4f6fb;
+    --success-bg: #d4edda;
+    --success-text: #155724;
+    --warning-bg: #fff3cd;
+    --warning-text: #856404;
+    --error-bg: #f8d7da;
+    --error-text: #721c24;
+    --color-primary: #0d6efd;
+    --color-surface: #f8f9fa;
+    --color-text: #212529;
+    --color-border: #dee2e6;
+  }
+
+  body {
+    background: #fff !important;
+    color: #212529 !important;
+    font-size: 9pt;
+    font-family: Arial, sans-serif;
+  }
+
+  /* --- Hide non-print elements --- */
+  .top-nav,
+  .nav-toggle,
+  .breadcrumb-trail,
+  .app-sidebar-nav,
+  .site-footer,
+  .settings-btn,
+  .settings-menu,
+  .settings-overlay,
+  #settings-menu,
+  #settings-overlay,
+  .step-nav,
+  .modal-overlay,
+  .modal:not(.print-include),
+  .toast,
+  .skip-link,
+  .column-info-panel,
+  .command-palette,
+  [data-no-print],
+  .no-print,
+  .print-hidden,
+  /* Action toolbars */
+  .toolbar,
+  .page-actions,
+  .import-export-bar,
+  .add-row-btn,
+  .delete-row-btn,
+  .bulk-actions,
+  /* Drag handles and row controls */
+  .drag-handle,
+  .row-actions,
+  td .btn-icon,
+  /* Inline edit controls */
+  td input,
+  td select,
+  td textarea,
+  /* Filter & search controls */
+  .table-search-container,
+  .loadlist-toolbar,
+  .equipment-toolbar,
+  .loadlist-filter-chips,
+  .equipment-quick-filters,
+  /* Sidebar panels on route/3D pages */
+  .sidebar,
+  /* Help & onboarding */
+  .help-btn,
+  .onboarding-overlay,
+  .onboarding-modal {
+    display: none !important;
+  }
+
+  /* --- Show print-only elements --- */
+  .print-only {
+    display: block !important;
+  }
+
+  /* --- Layout: expand to full width --- */
+  .has-sidebar-nav .container,
+  .has-sidebar-nav .page-layout,
+  .has-sidebar-nav .main-content,
+  .main-content,
+  .container,
+  .page-layout {
+    margin-left: 0 !important;
+    padding: 0 !important;
+    max-width: none !important;
+    width: 100% !important;
+  }
+
+  /* --- Page title / report header --- */
+  h1, h2 {
+    page-break-after: avoid;
+    break-after: avoid;
+  }
+
+  h1 { font-size: 14pt; }
+  h2 { font-size: 12pt; }
+  h3 { font-size: 10pt; }
+
+  /* --- Tables --- */
+  table {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: 8pt;
+    page-break-inside: auto;
+    break-inside: auto;
+  }
+
+  thead {
+    display: table-header-group; /* repeat header on each page */
+  }
+
+  tfoot {
+    display: table-footer-group;
+  }
+
+  tr {
+    page-break-inside: avoid;
+    break-inside: avoid;
+  }
+
+  th {
+    background-color: #e9ecef !important;
+    color: #212529 !important;
+    font-weight: 700;
+    font-size: 7.5pt;
+    padding: 4px 6px;
+    border: 1px solid #adb5bd !important;
+  }
+
+  td {
+    padding: 3px 6px;
+    border: 1px solid #dee2e6 !important;
+    color: #212529 !important;
+    background: transparent !important;
+    vertical-align: top;
+  }
+
+  /* Restore alternating rows for readability */
+  .sticky-table tbody tr:nth-child(even) td {
+    background-color: #f4f6fb !important;
+  }
+
+  /* Utilisation colour bands — use print-safe colours */
+  .util-high { background-color: #f8d7da !important; color: #721c24 !important; }
+  .util-medium { background-color: #fff3cd !important; color: #856404 !important; }
+  .util-low { background-color: #d4edda !important; color: #155724 !important; }
+
+  /* Remove interactive table scroll wrapper so all rows print */
+  .table-scroll {
+    max-height: none !important;
+    overflow: visible !important;
+  }
+
+  /* Expand collapsed groups */
+  .group-hidden {
+    display: table-row !important;
+  }
+
+  /* Sticky header reset */
+  .sticky-table thead th {
+    position: static !important;
+  }
+
+  /* --- Utilisation bars: replace with text --- */
+  .util-bar {
+    display: none;
+  }
+
+  /* --- Cards and panels --- */
+  .card,
+  .panel,
+  [class*="-card"] {
+    border: 1px solid #dee2e6 !important;
+    box-shadow: none !important;
+    break-inside: avoid;
+    page-break-inside: avoid;
+    margin-bottom: 8pt;
+    padding: 6pt;
+  }
+
+  /* --- Page breaks --- */
+  /* Force a new page before major sections */
+  .page-break-before,
+  [data-print-page-break] {
+    page-break-before: always;
+    break-before: page;
+  }
+
+  /* Avoid breaking within summary sections */
+  .summary-section,
+  .route-summary,
+  .panel-section,
+  .report-section {
+    page-break-inside: avoid;
+    break-inside: avoid;
+  }
+
+  /* --- Links: show URL inline --- */
+  a[href]::after {
+    content: none; /* suppress for engineering reports — URLs add noise */
+  }
+
+  /* --- Panel schedule print layout --- */
+  .panel-schedule-grid {
+    font-size: 7.5pt;
+  }
+
+  .panel-phase-a { color: #c0392b !important; }
+  .panel-phase-b { color: #2471a3 !important; }
+  .panel-phase-c { color: #1e8449 !important; }
+
+  /* --- One-line diagram: keep SVG visible --- */
+  #oneline-canvas,
+  .oneline-svg-container,
+  svg.oneline-diagram {
+    max-width: 100% !important;
+    height: auto !important;
+    page-break-inside: avoid;
+    break-inside: avoid;
+  }
+
+  /* --- Plotly 3D route chart: flatten for print --- */
+  .plotly-graph-div .modebar,
+  .js-plotly-plot .modebar {
+    display: none !important;
+  }
+
+  /* --- Ductbank thermal map --- */
+  #ductbank-canvas,
+  .ductbank-visualisation {
+    max-width: 100%;
+    page-break-inside: avoid;
+    break-inside: avoid;
+  }
+
+  /* --- Tray fill cross-section --- */
+  #tray-fill-canvas,
+  .tray-fill-svg {
+    max-width: 100%;
+    page-break-inside: avoid;
+    break-inside: avoid;
+  }
+
+  /* --- Report metadata block (print-only) --- */
+  .print-report-meta {
+    display: flex !important;
+    justify-content: space-between;
+    font-size: 7.5pt;
+    color: #555;
+    border-bottom: 1pt solid #adb5bd;
+    padding-bottom: 4pt;
+    margin-bottom: 8pt;
+  }
+
+  /* --- Chips / badges: keep colours --- */
+  .loadlist-chip,
+  .equipment-chip {
+    border: 1px solid #adb5bd !important;
+    padding: 1pt 4pt;
+    border-radius: 3pt;
+    font-size: 7pt;
+  }
+
+  /* --- Row count and footer meta --- */
+  .row-count,
+  .load-results-count,
+  .equipment-results-count,
+  .equipment-validation-summary {
+    display: none !important;
+  }
+}

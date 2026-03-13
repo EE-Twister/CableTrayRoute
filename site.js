@@ -1,3 +1,6 @@
+import { installErrorTracking } from "./src/utils/errorTracking.js";
+installErrorTracking();
+
 import "./src/components/navigation.js";
 import "./src/components/commandPalette.js";
 import "./units.js";

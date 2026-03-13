@@ -1,4 +1,17 @@
 /* --- Layout: Sidebar and Main Content --- */
+
+/*
+ * Container query context for the app shell.
+ * Child components can use @container app-shell (...) to respond to the
+ * available width of the shell rather than the viewport width.
+ */
+.app-shell {
+    container-type: inline-size;
+    container-name: app-shell;
+    display: flex;
+    height: 100%;
+}
+
 .sidebar {
     width: 350px;
     flex-shrink: 0; /* Prevent sidebar from shrinking when results are shown */
@@ -6,13 +19,26 @@
     padding: var(--space-4);
     overflow-y: auto;
     border-right: 1px solid var(--border-color);
-}
 
-.sidebar.collapsed {
-    display: none;
+    &.collapsed {
+        display: none;
+    }
+
+    & header h2 {
+        font-size: 1.4rem;
+        color: var(--primary-color);
+        border-bottom: 2px solid var(--primary-color);
+        padding-bottom: 0.5rem;
+    }
+
+    & section {
+        margin-bottom: 2rem;
+    }
 }
 
 .main-content {
+    container-type: inline-size;
+    container-name: main-content;
     flex-grow: 1;
     padding: var(--space-5);
     overflow-y: auto;
@@ -22,14 +48,41 @@ header h1, header h2 {
     margin-top: 0;
 }
 
-.sidebar header h2 {
-    font-size: 1.4rem;
-    color: var(--primary-color);
-    border-bottom: 2px solid var(--primary-color);
-    padding-bottom: 0.5rem;
+/*
+ * Responsive page-level layout via container queries.
+ * When the app shell is narrower than 768px, collapse the sidebar
+ * into a stacked (column) layout automatically.
+ */
+@container app-shell (max-width: 768px) {
+    .app-shell {
+        flex-direction: column;
+    }
+
+    .sidebar {
+        width: 100%;
+        border-right: none;
+        border-bottom: 1px solid var(--border-color);
+    }
 }
 
-.sidebar section {
-    margin-bottom: 2rem;
-}
+/*
+ * Compact table toolbar: when the main content area is narrow,
+ * switch filter chips and search bars to a column layout.
+ */
+@container main-content (max-width: 560px) {
+    .loadlist-toolbar,
+    .equipment-toolbar {
+        flex-direction: column;
+        align-items: stretch;
+    }
 
+    .loadlist-toolbar .table-search,
+    .equipment-toolbar .table-search {
+        flex: none;
+        width: 100%;
+    }
+
+    .loadlist-shortcuts {
+        display: none;
+    }
+}

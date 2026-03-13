@@ -5,35 +5,57 @@
     padding: var(--space-2) var(--space-4);
     display: flex;
     align-items: center;
+
+    & .nav-links {
+        display: flex;
+        align-items: center;
+        width: 100%;
+    }
+
+    & .settings-btn {
+        margin-left: auto;
+    }
+
+    & a {
+        margin-right: var(--space-4);
+        text-decoration: none;
+        color: var(--text-color);
+
+        &:hover {
+            text-decoration: underline;
+        }
+
+        &.active,
+        &[aria-current="page"] {
+            font-weight: bold;
+            text-decoration: underline;
+        }
+    }
+
+    @media (max-width: 700px) {
+        flex-direction: column;
+        align-items: flex-start;
+
+        & .nav-links {
+            display: none;
+            flex-direction: column;
+            width: 100%;
+
+            &.open {
+                display: flex;
+            }
+        }
+
+        & .settings-btn {
+            margin-left: 0;
+        }
+    }
 }
+
 .nav-toggle {
     display: none;
-}
-.top-nav .nav-links {
-    display: flex;
-    align-items: center;
-    width: 100%;
-}
-.top-nav .settings-btn {
-    margin-left: auto;
-}
-.top-nav a {
-    margin-right: var(--space-4);
-    text-decoration: none;
-    color: var(--text-color);
-}
-.top-nav a:hover {
-    text-decoration: underline;
-}
 
-.top-nav a.active,
-.top-nav a[aria-current="page"] {
-    font-weight: bold;
-    text-decoration: underline;
-}
-
-@media (max-width: 700px) {
-    .nav-toggle {
+    @media (max-width: 700px) {
         display: block;
         background: none;
         border: none;
@@ -42,27 +64,16 @@
         color: var(--text-color);
         margin-right: 1rem;
     }
-    .top-nav {
-        flex-direction: column;
-        align-items: flex-start;
-    }
-    .top-nav .nav-links {
-        display: none;
-        flex-direction: column;
-        width: 100%;
-    }
-    .top-nav .nav-links.open {
-        display: flex;
-    }
-    .top-nav .settings-btn {
-        margin-left: 0;
-    }
+}
+
+@media (max-width: 700px) {
     .app-sidebar-nav {
         position: static;
         width: auto;
         border-right: none;
         border-bottom: 1px solid var(--border-color);
     }
+
     .has-sidebar-nav .container,
     .has-sidebar-nav .page-layout,
     .has-sidebar-nav .main-content {
@@ -85,12 +96,12 @@
     gap: var(--space-2);
     list-style: none;
     font-size: 0.9rem;
-}
 
-.breadcrumb-list li+li::before {
-    content: '/';
-    margin-right: var(--space-2);
-    color: var(--muted-text-color);
+    & li+li::before {
+        content: '/';
+        margin-right: var(--space-2);
+        color: var(--muted-text-color);
+    }
 }
 
 .has-sidebar-nav .container,
@@ -130,10 +141,10 @@
     color: var(--color-primary);
     border-bottom: 1px solid var(--color-border);
     padding-bottom: var(--space-1);
-}
 
-.sidebar-section-label:first-of-type {
-    margin-top: 0;
+    &:first-of-type {
+        margin-top: 0;
+    }
 }
 
 .sidebar-nav-list {
@@ -142,6 +153,34 @@
     list-style: none;
     display: grid;
     gap: var(--space-1);
+
+    & a {
+        display: block;
+        text-decoration: none;
+        color: var(--text-color);
+        padding: 0.35rem 0.5rem;
+        border-left: 3px solid transparent;
+        transition: background-color 0.15s ease, color 0.15s ease, border-color 0.15s ease;
+
+        &:hover {
+            background: color-mix(in srgb, var(--primary-color) 8%, transparent);
+            color: var(--primary-color);
+        }
+
+        &.active,
+        &[aria-current="page"] {
+            font-weight: 600;
+            background: color-mix(in srgb, var(--primary-color) 14%, transparent);
+            border-left-color: var(--primary-color);
+            color: var(--primary-color);
+            padding-left: calc(0.5rem - 1px);
+        }
+
+        &:focus-visible {
+            outline: 2px solid var(--primary-color);
+            outline-offset: 2px;
+        }
+    }
 }
 
 .sidebar-nav-list a,
@@ -152,30 +191,6 @@
     border-radius: 0.35rem;
 }
 
-.sidebar-nav-list a {
-    display: block;
-    text-decoration: none;
-    color: var(--text-color);
-    padding: 0.35rem 0.5rem;
-    border-left: 3px solid transparent;
-    transition: background-color 0.15s ease, color 0.15s ease, border-color 0.15s ease;
-}
-
-.sidebar-nav-list a:hover {
-    background: color-mix(in srgb, var(--primary-color) 8%, transparent);
-    color: var(--primary-color);
-}
-
-.sidebar-nav-list a.active,
-.sidebar-nav-list a[aria-current="page"] {
-    font-weight: 600;
-    background: color-mix(in srgb, var(--primary-color) 14%, transparent);
-    border-left-color: var(--primary-color);
-    color: var(--primary-color);
-    padding-left: calc(0.5rem - 1px);
-}
-
-.sidebar-nav-list a:focus-visible,
 .top-nav .nav-links a:focus-visible,
 .settings-btn:focus-visible,
 .nav-toggle:focus-visible,
@@ -194,22 +209,22 @@
     justify-content: space-between;
     flex-wrap: wrap;
     gap: 1rem;
-}
 
-.step-nav a {
-    color: var(--primary-color);
-    text-decoration: none;
-    padding: var(--space-2) var(--space-3);
-    border: 1px solid var(--color-border);
-    border-radius: var(--radius-sm);
-    font-size: var(--font-size-sm);
-    transition: background 0.15s, border-color 0.15s;
-}
+    & a {
+        color: var(--primary-color);
+        text-decoration: none;
+        padding: var(--space-2) var(--space-3);
+        border: 1px solid var(--color-border);
+        border-radius: var(--radius-sm);
+        font-size: var(--font-size-sm);
+        transition: background 0.15s, border-color 0.15s;
 
-.step-nav a:hover {
-    background: color-mix(in srgb, var(--color-primary) 8%, transparent);
-    border-color: var(--color-primary);
-    text-decoration: none;
+        &:hover {
+            background: color-mix(in srgb, var(--color-primary) 8%, transparent);
+            border-color: var(--color-primary);
+            text-decoration: none;
+        }
+    }
 }
 
 .step-nav-next {
@@ -245,14 +260,13 @@
     display: flex;
     gap: 1rem;
     flex-wrap: wrap;
-}
 
-.footer-links a {
-    color: var(--text-color);
-    text-decoration: none;
-}
+    & a {
+        color: var(--text-color);
+        text-decoration: none;
 
-.footer-links a:hover {
-    text-decoration: underline;
+        &:hover {
+            text-decoration: underline;
+        }
+    }
 }
-

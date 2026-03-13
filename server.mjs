@@ -601,6 +601,44 @@ export async function createApp(options = {}) {
   app.use('/projects', rateLimiter);
   app.use('/shared', rateLimiter);
 
+  // Client-side error reporting endpoint.
+  // No authentication required; rate-limited to prevent abuse.
+  const errorRateLimiter = createRateLimiter({ windowMs: rateLimitWindowMs, max: 50 });
+  app.post(
+    '/api/errors',
+    errorRateLimiter,
+    (req, res) => {
+      const { type, error, source, lineno, colno, page, userAgent, timestamp } = req.body || {};
+      // Validate minimally — just ensure there's something useful to log.
+      const message = error?.message ?? error?.name ?? '(no message)';
+      if (typeof message !== 'string' || message.length > 2000) {
+        res.status(400).json({ error: 'Invalid payload' });
+        return;
+      }
+      const safeType = typeof type === 'string' ? type.slice(0, 50) : 'unknown';
+      const safePage = typeof page === 'string' ? page.slice(0, 200) : '';
+      const safeSource = typeof source === 'string' ? source.slice(0, 300) : '';
+      const safeStack = typeof error?.stack === 'string' ? error.stack.slice(0, 3000) : '';
+      const safeUA = typeof userAgent === 'string' ? userAgent.slice(0, 300) : '';
+      const safeTs = typeof timestamp === 'string' ? timestamp.slice(0, 30) : new Date().toISOString();
+      console.error(
+        '[client-error]',
+        JSON.stringify({
+          type: safeType,
+          message,
+          stack: safeStack || undefined,
+          source: safeSource || undefined,
+          lineno: typeof lineno === 'number' ? lineno : undefined,
+          colno: typeof colno === 'number' ? colno : undefined,
+          page: safePage || undefined,
+          userAgent: safeUA || undefined,
+          timestamp: safeTs,
+        })
+      );
+      res.status(204).end();
+    }
+  );
+
   // Stricter rate limit for auth endpoints to prevent brute-force attacks.
   const authRateLimiter = createRateLimiter({ windowMs: rateLimitWindowMs, max: 20 });
   app.use('/login', authRateLimiter);
