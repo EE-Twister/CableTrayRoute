@@ -1595,10 +1595,48 @@ g.component.scenario-diff > * {
   to { opacity: 0.35; }
 }
 
+@keyframes pageFadeIn {
+  from { opacity: 0; transform: translateY(5px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+
+@keyframes navProgressIn {
+  0%   { width: 0%;   opacity: 1; }
+  60%  { width: 80%;  opacity: 1; }
+  85%  { width: 100%; opacity: 1; }
+  100% { width: 100%; opacity: 0; }
+}
+
 @media (prefers-reduced-motion: no-preference) {
+  body {
+    animation: pageFadeIn 0.2s ease-out;
+  }
+
+  body.page-exit {
+    pointer-events: none;
+    opacity: 0;
+    transform: translateY(-4px);
+    transition: opacity 0.15s ease-in, transform 0.15s ease-in;
+  }
+
   .prop-modal.show {
     animation: fadeIn 0.3s ease-out;
   }
+
+  .nav-progress-bar {
+    animation: navProgressIn 0.5s ease-out forwards;
+  }
+}
+
+.nav-progress-bar {
+  position: fixed;
+  top: 0;
+  left: 0;
+  height: 3px;
+  width: 100%;
+  background: var(--primary-color, #0d6efd);
+  z-index: 9999;
+  pointer-events: none;
 }
 
 .tour-overlay {
@@ -2025,12 +2063,22 @@ body.compact-mode td {
     text-decoration: none;
     color: var(--text-color);
     padding: 0.35rem 0.5rem;
+    border-left: 3px solid transparent;
+    transition: background-color 0.15s ease, color 0.15s ease, border-color 0.15s ease;
+}
+
+.sidebar-nav-list a:hover {
+    background: color-mix(in srgb, var(--primary-color) 8%, transparent);
+    color: var(--primary-color);
 }
 
 .sidebar-nav-list a.active,
 .sidebar-nav-list a[aria-current="page"] {
     font-weight: 600;
     background: color-mix(in srgb, var(--primary-color) 14%, transparent);
+    border-left-color: var(--primary-color);
+    color: var(--primary-color);
+    padding-left: calc(0.5rem - 1px);
 }
 
 .sidebar-nav-list a:focus-visible,
@@ -2381,7 +2429,8 @@ input[type="number"], input[type="text"], select {
 
 /* Highlight invalid fields */
 .input-error {
-    border-color: red;
+    border-color: #c92a2a;
+    background: rgba(201, 42, 42, 0.05);
 }
 
 .manufacturer-input,
@@ -2678,6 +2727,86 @@ details > summary {
     white-space: pre;
     z-index: 1000;
     display: none;
+}
+
+/* --- Help Modal Content --- */
+.help-workflow-list {
+    list-style: none;
+    padding: 0;
+    margin: var(--space-3) 0;
+    display: flex;
+    flex-direction: column;
+    gap: var(--space-3);
+}
+
+.help-workflow-list li {
+    display: flex;
+    align-items: flex-start;
+    gap: var(--space-3);
+}
+
+.help-workflow-list .workflow-icon {
+    flex-shrink: 0;
+    width: 1.5rem;
+    height: 1.5rem;
+    margin-top: 0.15rem;
+}
+
+.help-workflow-list li > div {
+    display: flex;
+    flex-direction: column;
+    gap: 0.2rem;
+}
+
+.help-workflow-list li span {
+    font-size: 0.9rem;
+    opacity: 0.8;
+}
+
+.help-shortcuts-table {
+    width: 100%;
+    border-collapse: collapse;
+    margin: var(--space-3) 0;
+    font-size: 0.9rem;
+}
+
+.help-shortcuts-table th,
+.help-shortcuts-table td {
+    text-align: left;
+    padding: var(--space-2) var(--space-3);
+    border-bottom: 1px solid var(--border-color);
+}
+
+.help-shortcuts-table th {
+    font-weight: 600;
+    opacity: 0.75;
+}
+
+.help-shortcuts-table kbd {
+    display: inline-block;
+    padding: 0.1rem 0.35rem;
+    border: 1px solid var(--border-color);
+    border-radius: var(--radius-sm);
+    background: var(--secondary-color);
+    font-family: var(--font-family-mono, monospace);
+    font-size: 0.82rem;
+    line-height: 1.4;
+}
+
+.help-tips-list {
+    padding-left: 1.25rem;
+    margin: var(--space-3) 0;
+    display: flex;
+    flex-direction: column;
+    gap: var(--space-2);
+    font-size: 0.9rem;
+}
+
+.help-modal-footer {
+    display: flex;
+    gap: var(--space-3);
+    margin-top: var(--space-4);
+    flex-wrap: wrap;
 }
 
 /* --- Help Modal --- */
@@ -3142,6 +3271,15 @@ th {
 }
 .sticky-table tbody tr:last-child {
     box-shadow: none;
+}
+
+/* Inputs inside table cells: compact padding, no extra margin */
+td input[type="text"],
+td input[type="number"],
+td select,
+td textarea {
+    margin-bottom: 0;
+    padding: 4px 6px;
 }
 body.dark-mode .sticky-table tbody tr:nth-child(even) {
     background-color: var(--table-row-alt-bg, rgba(255, 255, 255, 0.08));
@@ -8130,3 +8268,65 @@ body.dark-mode .custom-curve-remove:focus {
 .command-palette-empty {
   color: #5b6478;
 }
+
+/* ---- Routing result enhancements ---- */
+
+/* Summary banner shown above the route breakdown list */
+.route-summary-banner {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem 1rem;
+  align-items: center;
+  padding: 0.55rem 0.85rem;
+  border-radius: 6px;
+  font-size: 0.9rem;
+  font-weight: 600;
+  margin-bottom: 0.75rem;
+}
+.route-summary-ok {
+  background: #e6f9ee;
+  border-left: 4px solid #22c55e;
+  color: #166534;
+}
+.route-summary-warn {
+  background: #fff7ed;
+  border-left: 4px solid #f97316;
+  color: #7c2d12;
+}
+.route-summary-banner .rs-routed  { color: #16a34a; }
+.route-summary-banner .rs-failed  { color: #dc2626; }
+.route-summary-banner .rs-total   { color: inherit; }
+.route-summary-banner .rs-field   { opacity: 0.75; font-weight: 400; }
+
+/* Color-coded route entries */
+details.route-success > summary { border-left: 4px solid #22c55e; }
+details.route-failed  > summary { border-left: 4px solid #ef4444; background: #fff5f5; }
+
+/* Status & mode badges in route summaries */
+.route-status-badge {
+  display: inline-block;
+  padding: 0 0.35em;
+  border-radius: 4px;
+  font-size: 0.82em;
+  font-weight: 700;
+  margin: 0 0.2em;
+}
+details.route-success .route-status-badge { background: #dcfce7; color: #15803d; }
+details.route-failed  .route-status-badge { background: #fee2e2; color: #b91c1c; }
+
+.route-mode-badge {
+  display: inline-block;
+  padding: 0 0.35em;
+  border-radius: 4px;
+  font-size: 0.78em;
+  font-weight: 500;
+  background: #f1f5f9;
+  color: #475569;
+  margin: 0 0.2em;
+}
+
+/* Dark-mode adjustments */
+body.dark .route-summary-ok  { background: #14532d; color: #86efac; border-left-color: #22c55e; }
+body.dark .route-summary-warn { background: #431407; color: #fdba74; border-left-color: #f97316; }
+body.dark details.route-failed > summary { background: #3b0000; }
+body.dark .route-mode-badge { background: #1e293b; color: #94a3b8; }

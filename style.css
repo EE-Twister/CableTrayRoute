@@ -2429,7 +2429,8 @@ input[type="number"], input[type="text"], select {
 
 /* Highlight invalid fields */
 .input-error {
-    border-color: red;
+    border-color: #c92a2a;
+    background: rgba(201, 42, 42, 0.05);
 }
 
 .manufacturer-input,
@@ -3270,6 +3271,15 @@ th {
 }
 .sticky-table tbody tr:last-child {
     box-shadow: none;
+}
+
+/* Inputs inside table cells: compact padding, no extra margin */
+td input[type="text"],
+td input[type="number"],
+td select,
+td textarea {
+    margin-bottom: 0;
+    padding: 4px 6px;
 }
 body.dark-mode .sticky-table tbody tr:nth-child(even) {
     background-color: var(--table-row-alt-bg, rgba(255, 255, 255, 0.08));
