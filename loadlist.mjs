@@ -5,17 +5,7 @@ class ContextMenu {
     this.items = items;
     this.menu = document.createElement('ul');
     this.menu.className = 'context-menu';
-    Object.assign(this.menu.style, {
-      position: 'absolute',
-      display: 'none',
-      listStyle: 'none',
-      margin: '0',
-      padding: '4px 0',
-      background: '#fff',
-      border: '1px solid #ccc',
-      zIndex: 1000,
-      color: '#000'
-    });
+    this.menu.setAttribute('role', 'menu');
     document.body.appendChild(this.menu);
     document.addEventListener('click', () => this.hide());
     document.addEventListener('keydown', e => { if (e.key === 'Escape') this.hide(); });
@@ -27,25 +17,15 @@ class ContextMenu {
     items.forEach(({ label, action }) => {
       const li = document.createElement('li');
       li.textContent = label;
-      Object.assign(li.style, {
-        padding: '4px 12px',
-        cursor: 'pointer',
-        background: '#fff',
-        color: '#000'
-      });
+      li.setAttribute('role', 'menuitem');
       li.tabIndex = 0;
       li.addEventListener('click', () => {
         const target = this.target;
         this.hide();
         action(target);
       });
-      li.addEventListener('mouseenter', () => {
-        li.style.background = '#eee';
-        li.style.color = '#000';
-      });
-      li.addEventListener('mouseleave', () => {
-        li.style.background = '#fff';
-        li.style.color = '#000';
+      li.addEventListener('keydown', e => {
+        if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); li.click(); }
       });
       this.menu.appendChild(li);
     });
@@ -188,9 +168,11 @@ if (typeof window !== 'undefined') {
         const val = input.value.trim();
         if (val !== '' && isNaN(Number(val))) {
           input.classList.add('input-error');
+          input.title = `${name} must be a number.`;
           valid = false;
         } else {
           input.classList.remove('input-error');
+          input.removeAttribute('title');
         }
       }
     });
@@ -201,13 +183,11 @@ if (typeof window !== 'undefined') {
         input.title = `${name} must be between ${min} and ${max}.`;
         valid = false;
       } else if (input) {
+        input.classList.remove('input-error');
         input.removeAttribute('title');
       }
     });
-    if (!valid) {
-      alert('Please correct highlighted numeric fields.');
-      return;
-    }
+    if (!valid) return;
     const computed = calculateDerived(load);
     Object.assign(load, computed);
     dataStore.updateLoad(idx, load);
@@ -249,7 +229,9 @@ if (typeof window !== 'undefined') {
     const tr = btn.closest('tr');
     if (!tr) return;
     const idx = getStoreIndex(tr);
-    if (btn.classList.contains('duplicateBtn')) {
+    if (btn.classList.contains('insertBelowBtn')) {
+      insertLoad(idx + 1, { ...blankLoad });
+    } else if (btn.classList.contains('duplicateBtn')) {
       const load = gatherRow(tr);
       const ids = dataStore.getLoads().map(l => l.id).filter(Boolean);
       load.id = generateId(ids, load.id || load.tag);
@@ -262,6 +244,7 @@ if (typeof window !== 'undefined') {
   });
 
   function handleNav(e, td) {
+    const tr = td.parentElement;
     if (e.key === 'ArrowLeft' || e.key === 'ArrowRight') {
       let allSelected = true;
       if (e.target.tagName === 'INPUT' || e.target.tagName === 'TEXTAREA') {
@@ -281,16 +264,32 @@ if (typeof window !== 'undefined') {
           }
         }
       }
+    } else if (e.key === 'ArrowUp' || e.key === 'ArrowDown') {
+      e.preventDefault();
+      let targetRow = tr;
+      const dir = e.key === 'ArrowUp' ? 'previousElementSibling' : 'nextElementSibling';
+      do { targetRow = targetRow[dir]; } while (targetRow && targetRow.style.display === 'none');
+      if (targetRow && targetRow.cells[td.cellIndex]) {
+        const next = targetRow.cells[td.cellIndex].querySelector('input,select,textarea');
+        if (next) { next.focus(); if (typeof next.select === 'function') next.select(); }
+      }
     } else if (e.key === 'Enter') {
       e.preventDefault();
       const col = td.cellIndex;
-      const nextRow = td.parentElement.nextElementSibling;
+      const nextRow = tr.nextElementSibling;
       if (nextRow && nextRow.cells[col]) {
         const next = nextRow.cells[col].querySelector('input,select,textarea');
         if (next) {
           next.focus();
           if (typeof next.select === 'function') next.select();
         }
+      }
+    } else if (e.key === 'Escape') {
+      e.preventDefault();
+      const el = e.target;
+      if (el.dataset.prevValue !== undefined) {
+        el.value = el.dataset.prevValue;
+        el.classList.remove('input-error');
       }
     }
   }
@@ -329,16 +328,43 @@ if (typeof window !== 'undefined') {
       <td class="kva">${format(load.kva)}</td>
       <td class="current">${format(load.current)}</td>
       <td class="demand-kva">${format(load.demandKva)}</td>
-      <td class="demand-kw">${format(load.demandKw)}</td>`;
+      <td class="demand-kw">${format(load.demandKw)}</td>
+      <td class="row-actions"></td>`;
 
     Array.from(tr.querySelectorAll('input[type="text"],input[type="number"],select,textarea')).forEach(input => {
       const td = input.parentElement;
+      input.addEventListener('focus', () => { input.dataset.prevValue = input.value; });
       input.addEventListener('blur', () => saveRow(tr));
       if (input.tagName === 'SELECT') {
         input.addEventListener('change', () => saveRow(tr));
       }
       input.addEventListener('keydown', e => handleNav(e, td));
     });
+
+    const actTd = tr.querySelector('.row-actions');
+    const insertBtn = document.createElement('button');
+    insertBtn.type = 'button';
+    insertBtn.textContent = '+';
+    insertBtn.className = 'insertBelowBtn';
+    insertBtn.title = 'Insert row below';
+    insertBtn.setAttribute('aria-label', 'Insert row below');
+    actTd.appendChild(insertBtn);
+
+    const dupBtn = document.createElement('button');
+    dupBtn.type = 'button';
+    dupBtn.textContent = '\u29C9';
+    dupBtn.className = 'duplicateBtn';
+    dupBtn.title = 'Duplicate row';
+    dupBtn.setAttribute('aria-label', 'Duplicate row');
+    actTd.appendChild(dupBtn);
+
+    const delBtn = document.createElement('button');
+    delBtn.type = 'button';
+    delBtn.textContent = '\u2716';
+    delBtn.className = 'removeBtn';
+    delBtn.title = 'Delete row';
+    delBtn.setAttribute('aria-label', 'Delete row');
+    actTd.appendChild(delBtn);
 
     const chk = tr.querySelector('.row-select');
     chk.addEventListener('change', () => {
@@ -431,6 +457,7 @@ if (typeof window !== 'undefined') {
       <td></td>
       <td>${totals.demandKVA.toFixed(2)}</td>
       <td>${totals.demandKW.toFixed(2)}</td>
+      <td></td>
     </tr>`;
   }
 
@@ -497,7 +524,7 @@ if (typeof window !== 'undefined') {
         .filter(entry => matchesLoadFilter(entry.load, filterQuery));
 
       if (hasStoredLoads && !filtered.length) {
-        tbody.innerHTML = `<tr><td colspan="22" class="empty-state">No matching loads for the current search.</td></tr>`;
+        tbody.innerHTML = `<tr><td colspan="23" class="empty-state">No matching loads for the current search.</td></tr>`;
       } else {
         filtered.forEach((entry, idx) => tbody.appendChild(createRow(entry.load, idx, entry.storeIndex)));
       }
