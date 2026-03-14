@@ -583,6 +583,38 @@ export async function createApp(options = {}) {
     });
   }
 
+  // Security headers applied to every response.
+  app.use((req, res, next) => {
+    // Prevent MIME-type sniffing.
+    res.setHeader('X-Content-Type-Options', 'nosniff');
+    // Disallow framing of this app by other origins (clickjacking protection).
+    res.setHeader('X-Frame-Options', 'DENY');
+    // Limit referrer information sent to third parties.
+    res.setHeader('Referrer-Policy', 'strict-origin-when-cross-origin');
+    // Content Security Policy. 'unsafe-inline' is retained for scripts and
+    // styles because the existing codebase relies on inline handlers; this
+    // still blocks external script injection, javascript: URIs, data: scripts,
+    // and loading resources from untrusted origins.
+    res.setHeader(
+      'Content-Security-Policy',
+      [
+        "default-src 'self'",
+        "script-src 'self' 'unsafe-inline'",
+        "style-src 'self' 'unsafe-inline'",
+        "img-src 'self' data: blob:",
+        "connect-src 'self'",
+        "font-src 'self'",
+        "object-src 'none'",
+        "frame-ancestors 'none'"
+      ].join('; ')
+    );
+    // HSTS: only sent when HTTPS is enforced to avoid breaking HTTP-only setups.
+    if (enforceHttps) {
+      res.setHeader('Strict-Transport-Security', 'max-age=31536000; includeSubDomains');
+    }
+    next();
+  });
+
   app.use(express.json({ limit: '1mb' }));
   app.use((req, res, next) => {
     const acceptEncoding = req.headers['accept-encoding'] || '';
@@ -828,8 +860,14 @@ export async function createApp(options = {}) {
         return;
       }
       const token = resetTokenStore.create(trimmedUser);
-      // Log to server console — admin retrieves and shares with user
-      console.log(`[password-reset] Token for "${trimmedUser}": ${token} (expires in 15 min)`);
+      // Write token to a dedicated audit log file so it is never exposed in general
+      // stdout log streams. Administrators retrieve the token from this file only.
+      const auditLogPath = path.join(dataDir, 'password-reset-audit.log');
+      const auditEntry = `${new Date().toISOString()} [password-reset] token_for="${trimmedUser}" expires_in=15min token=${token}\n`;
+      await fs.appendFile(auditLogPath, auditEntry).catch(err => {
+        console.error(`[password-reset] Failed to write audit log: ${err.message}`);
+      });
+      console.error(`[password-reset] Reset requested for "${trimmedUser}". Token written to ${auditLogPath}`);
       res.json({ message: 'If that account exists, a reset token has been generated. Contact your administrator for the token.' });
     })
   );
