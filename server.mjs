@@ -440,6 +440,40 @@ class FileSessionStore {
   }
 }
 
+const RESET_TOKEN_TTL_MS = 15 * 60 * 1000; // 15 minutes
+
+class ResetTokenStore {
+  constructor() {
+    this.tokens = new Map(); // token -> { username, expiresAt }
+  }
+
+  create(username) {
+    // Invalidate any existing token for this user
+    for (const [tok, entry] of this.tokens.entries()) {
+      if (entry.username === username) this.tokens.delete(tok);
+    }
+    const token = crypto.randomBytes(32).toString('hex');
+    this.tokens.set(token, { username, expiresAt: Date.now() + RESET_TOKEN_TTL_MS });
+    return token;
+  }
+
+  validate(token) {
+    const entry = this.tokens.get(token);
+    if (!entry) return null;
+    if (entry.expiresAt <= Date.now()) {
+      this.tokens.delete(token);
+      return null;
+    }
+    return entry.username;
+  }
+
+  consume(token) {
+    const username = this.validate(token);
+    if (username) this.tokens.delete(token);
+    return username;
+  }
+}
+
 async function hashPassword(password) {
   const salt = crypto.randomBytes(16).toString('hex');
   const derivedKey = await scrypt(password, salt, PASSWORD_KEYLEN);
@@ -526,6 +560,7 @@ export async function createApp(options = {}) {
   const projectStore = new ProjectStore(dataDir);
   const snapshotStore = new SnapshotStore(snapshotsFile, tokenTtlMs);
   await snapshotStore.init();
+  const resetTokenStore = new ResetTokenStore();
 
   async function saveUsers() {
     await fs.writeFile(usersFile, JSON.stringify(users, null, 2));
@@ -644,6 +679,8 @@ export async function createApp(options = {}) {
   app.use('/login', authRateLimiter);
   app.use('/signup', authRateLimiter);
   app.use('/session/refresh', authRateLimiter);
+  app.use('/forgot-password', authRateLimiter);
+  app.use('/reset-password', authRateLimiter);
 
   app.post(
     '/signup',
@@ -773,6 +810,94 @@ export async function createApp(options = {}) {
     asyncHandler(async (req, res) => {
       const newSession = await sessionStore.createSession(req.username);
       res.json(newSession);
+    })
+  );
+
+  app.post(
+    '/forgot-password',
+    asyncHandler(async (req, res) => {
+      const { username } = req.body || {};
+      if (typeof username !== 'string' || !isValidName(username.trim())) {
+        // Always respond with success to avoid user enumeration
+        res.json({ message: 'If that account exists, a reset token has been generated.' });
+        return;
+      }
+      const trimmedUser = username.trim();
+      if (!users[trimmedUser]) {
+        res.json({ message: 'If that account exists, a reset token has been generated.' });
+        return;
+      }
+      const token = resetTokenStore.create(trimmedUser);
+      // Log to server console — admin retrieves and shares with user
+      console.log(`[password-reset] Token for "${trimmedUser}": ${token} (expires in 15 min)`);
+      res.json({ message: 'If that account exists, a reset token has been generated. Contact your administrator for the token.' });
+    })
+  );
+
+  app.post(
+    '/reset-password',
+    asyncHandler(async (req, res) => {
+      const { token, newPassword } = req.body || {};
+      if (typeof token !== 'string' || typeof newPassword !== 'string') {
+        res.status(400).json({ error: 'Missing token or password' });
+        return;
+      }
+      if (newPassword.length < 8) {
+        res.status(400).json({ error: 'Password must be at least 8 characters' });
+        return;
+      }
+      if (newPassword.length > 1000) {
+        res.status(400).json({ error: 'Password too long' });
+        return;
+      }
+      const username = resetTokenStore.consume(token);
+      if (!username) {
+        res.status(400).json({ error: 'Invalid or expired reset token' });
+        return;
+      }
+      if (!users[username]) {
+        res.status(400).json({ error: 'Invalid or expired reset token' });
+        return;
+      }
+      users[username].password = await hashPassword(newPassword);
+      await saveUsers();
+      // Invalidate any active sessions for this user
+      await sessionStore.createSession(username); // replaces existing session, then drop it
+      res.json({ message: 'Password reset successfully. You may now sign in.' });
+    })
+  );
+
+  app.post(
+    '/account/change-password',
+    auth,
+    csrfProtection,
+    asyncHandler(async (req, res) => {
+      const { currentPassword, newPassword } = req.body || {};
+      if (typeof currentPassword !== 'string' || typeof newPassword !== 'string') {
+        res.status(400).json({ error: 'Missing passwords' });
+        return;
+      }
+      if (newPassword.length < 8) {
+        res.status(400).json({ error: 'New password must be at least 8 characters' });
+        return;
+      }
+      if (newPassword.length > 1000) {
+        res.status(400).json({ error: 'Password too long' });
+        return;
+      }
+      const record = users[req.username];
+      if (!record) {
+        res.status(401).json({ error: 'Unauthorized' });
+        return;
+      }
+      const verification = await verifyPassword(currentPassword, record.password);
+      if (!verification.valid) {
+        res.status(401).json({ error: 'Current password is incorrect' });
+        return;
+      }
+      users[req.username].password = await hashPassword(newPassword);
+      await saveUsers();
+      res.json({ message: 'Password changed successfully.' });
     })
   );
 

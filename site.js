@@ -1,6 +1,8 @@
 import { installErrorTracking } from "./src/utils/errorTracking.js";
 installErrorTracking();
 
+import { UndoRedoManager } from "./undoRedo.mjs";
+
 import "./src/components/navigation.js";
 import "./src/components/commandPalette.js";
 import "./units.js";
@@ -2007,6 +2009,40 @@ function showSelfCheckModal(data){
   document.body.appendChild(modal);
   modal.style.display='flex';
 }
+
+// ─── Global Undo/Redo ───────────────────────────────────────────────────────
+const _undoManager = new UndoRedoManager({
+  maxSize: 50,
+  onUndo: (label) => {
+    if (typeof showOperationToast === 'function') {
+      showOperationToast(label ? `Undone: ${label}` : 'Undone', 'success');
+    }
+  },
+  onRedo: (label) => {
+    if (typeof showOperationToast === 'function') {
+      showOperationToast(label ? `Redone: ${label}` : 'Redone', 'success');
+    }
+  }
+});
+
+globalThis.__undoManager = _undoManager;
+
+globalThis.document?.addEventListener('keydown', (e) => {
+  if (!e.ctrlKey && !e.metaKey) return;
+  const active = document.activeElement;
+  // Don't intercept inside contenteditable or text inputs where browser undo should apply
+  if (active && (active.isContentEditable || active.tagName === 'TEXTAREA')) return;
+  if (e.key === 'z' && !e.shiftKey) {
+    e.preventDefault();
+    _undoManager.undo();
+  } else if (e.key === 'z' && e.shiftKey) {
+    e.preventDefault();
+    _undoManager.redo();
+  } else if (e.key === 'y') {
+    e.preventDefault();
+    _undoManager.redo();
+  }
+});
 
 globalThis.initSettings=initSettings;
 globalThis.initDarkMode=initDarkMode;
