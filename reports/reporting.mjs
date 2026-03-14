@@ -1,5 +1,7 @@
 let jsPdfPromise = null;
 
+const dynamicImport = specifier => Function('s', 'return import(s);')(specifier);
+
 function getJsPdfNamespace() {
   const globalScope = typeof window !== 'undefined' ? window : globalThis;
   const namespace = globalScope.jspdf || {};
@@ -13,7 +15,7 @@ async function ensureJsPDF() {
     return namespace.jsPDF;
   }
   if (!jsPdfPromise) {
-    jsPdfPromise = import('https://cdn.jsdelivr.net/npm/jspdf@2.5.1/+esm')
+    jsPdfPromise = dynamicImport('https://cdn.jsdelivr.net/npm/jspdf@2.5.1/+esm')
       .then(mod => {
         const ctor = mod?.jsPDF || mod?.default || mod;
         if (!ctor) {
@@ -153,8 +155,8 @@ export function buildMotorStartRows(result = {}) {
  */
 export async function renderTemplatePDF(template = '', context = {}) {
   const [HandlebarsMod, PDFKitMod] = await Promise.all([
-    import('handlebars').catch(() => null),
-    import('pdfkit').catch(() => null)
+    dynamicImport('handlebars').catch(() => null),
+    dynamicImport('pdfkit').catch(() => null)
   ]);
   if (!HandlebarsMod || !PDFKitMod) {
     throw new Error('handlebars and pdfkit are required for template based PDF generation');
