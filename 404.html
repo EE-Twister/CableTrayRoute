@@ -3,10 +3,90 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <meta name="description" content="404 page for missing routes.">
-  <title>Page Not Found</title>
+  <meta name="description" content="Page not found — CableTrayRoute">
+  <title>Page Not Found — CableTrayRoute</title>
   <link rel="icon" href="icons/favicon.svg" type="image/svg+xml">
   <link rel="stylesheet" href="style.css">
+  <style>
+    .error-page {
+      max-width: 720px;
+      margin: 3rem auto;
+      padding: 0 var(--space-4);
+      text-align: center;
+    }
+    .error-code {
+      font-size: clamp(4rem, 15vw, 7rem);
+      font-weight: 700;
+      color: var(--color-primary);
+      line-height: 1;
+      margin: 0 0 var(--space-3);
+      opacity: 0.85;
+    }
+    .error-title {
+      font-size: var(--font-size-xl);
+      margin: 0 0 var(--space-2);
+    }
+    .error-body {
+      color: var(--color-text-muted, #6c757d);
+      margin: 0 0 var(--space-5);
+    }
+    .error-actions {
+      display: flex;
+      flex-wrap: wrap;
+      gap: var(--space-3);
+      justify-content: center;
+      margin-bottom: var(--space-6);
+    }
+    .error-nav-grid {
+      text-align: left;
+      margin-top: var(--space-5);
+    }
+    .error-nav-grid h2 {
+      font-size: 1rem;
+      text-transform: uppercase;
+      letter-spacing: 0.07em;
+      color: var(--color-text-muted, #6c757d);
+      margin-bottom: var(--space-3);
+    }
+    .quick-links {
+      display: grid;
+      grid-template-columns: repeat(auto-fill, minmax(180px, 1fr));
+      gap: var(--space-3);
+      list-style: none;
+      padding: 0;
+      margin: 0;
+    }
+    .quick-links li a {
+      display: flex;
+      align-items: center;
+      gap: var(--space-2);
+      padding: var(--space-3) var(--space-4);
+      border: 1px solid var(--border-color);
+      border-radius: var(--radius-md);
+      text-decoration: none;
+      color: var(--text-color);
+      background: var(--color-surface-strong);
+      transition: border-color 0.15s, background 0.15s;
+      font-size: var(--font-size-sm);
+    }
+    .quick-links li a:hover {
+      border-color: var(--color-primary);
+      background: color-mix(in srgb, var(--color-primary) 8%, var(--color-surface-strong));
+      color: var(--color-primary);
+    }
+    .quick-links li a .ql-icon {
+      font-size: 1.2em;
+      flex-shrink: 0;
+    }
+    body.dark-mode .quick-links li a {
+      background: #2c3034;
+    }
+    .kbd-hint {
+      margin-top: var(--space-5);
+      font-size: var(--font-size-sm);
+      color: var(--color-text-muted, #6c757d);
+    }
+  </style>
 </head>
 <body>
   <nav class="top-nav">
@@ -14,15 +94,17 @@
     <div id="nav-links" class="nav-links">
       <a href="index.html">Home</a>
       <a href="equipmentlist.html">Equipment List</a>
+      <a href="loadlist.html">Load List</a>
       <a href="cableschedule.html">Cable Schedule</a>
       <a href="panelschedule.html">Panel Schedule</a>
       <a href="racewayschedule.html">Raceway Schedule</a>
       <a href="ductbankroute.html">Ductbank</a>
       <a href="cabletrayfill.html">Tray Fill</a>
       <a href="conduitfill.html">Conduit Fill</a>
-      <a href="optimalRoute.html">Optimal Route</a>    </div>
-
-      <button id="settings-btn" class="settings-btn" aria-label="Settings" aria-expanded="false">⚙</button>
+      <a href="optimalRoute.html">Optimal Route</a>
+      <a href="oneline.html">One-Line</a>
+    </div>
+    <button id="settings-btn" class="settings-btn" aria-label="Settings" aria-expanded="false">⚙</button>
   </nav>
   <div id="settings-menu" class="settings-menu">
     <label><input type="checkbox" id="dark-toggle"> Dark Mode</label>
@@ -41,15 +123,39 @@
     <button id="import-project-btn">Import Project</button>
     <input type="file" id="import-project-input" accept=".ctr.json" style="display:none;">
   </div>
-  <div class="container">
-    <main class="main-content">
-      <section class="card">
-        <h1>Page Not Found</h1>
-        <p>The page you requested could not be found.</p>
-        <p><a href="index.html">Return to the homepage</a></p>
-      </section>
-    </main>
-  </div>
+
+  <main class="error-page" id="main-content">
+    <p class="error-code" aria-hidden="true">404</p>
+    <h1 class="error-title">Page Not Found</h1>
+    <p class="error-body">The page you requested doesn't exist or may have moved. Try searching for what you need, or pick a page below.</p>
+    <div class="error-actions">
+      <a href="index.html" class="hero-action-btn">Go to Home</a>
+      <button class="hero-action-btn secondary" id="open-command-palette-btn" title="Open command palette (Ctrl+K)">Search with Ctrl+K</button>
+    </div>
+
+    <div class="error-nav-grid">
+      <h2>Available pages</h2>
+      <ul class="quick-links">
+        <li><a href="index.html"><span class="ql-icon" aria-hidden="true">🏠</span> Home</a></li>
+        <li><a href="equipmentlist.html"><span class="ql-icon" aria-hidden="true">🗂️</span> Equipment List</a></li>
+        <li><a href="loadlist.html"><span class="ql-icon" aria-hidden="true">⚡</span> Load List</a></li>
+        <li><a href="cableschedule.html"><span class="ql-icon" aria-hidden="true">🔌</span> Cable Schedule</a></li>
+        <li><a href="panelschedule.html"><span class="ql-icon" aria-hidden="true">🔲</span> Panel Schedule</a></li>
+        <li><a href="racewayschedule.html"><span class="ql-icon" aria-hidden="true">🛤️</span> Raceway Schedule</a></li>
+        <li><a href="ductbankroute.html"><span class="ql-icon" aria-hidden="true">🏗️</span> Ductbank</a></li>
+        <li><a href="cabletrayfill.html"><span class="ql-icon" aria-hidden="true">📐</span> Tray Fill</a></li>
+        <li><a href="conduitfill.html"><span class="ql-icon" aria-hidden="true">🔩</span> Conduit Fill</a></li>
+        <li><a href="optimalRoute.html"><span class="ql-icon" aria-hidden="true">🗺️</span> Optimal Route</a></li>
+        <li><a href="oneline.html"><span class="ql-icon" aria-hidden="true">📊</span> One-Line Diagram</a></li>
+        <li><a href="help.html"><span class="ql-icon" aria-hidden="true">❓</span> Help</a></li>
+      </ul>
+    </div>
+
+    <p class="kbd-hint">
+      Press <kbd>Ctrl</kbd>+<kbd>K</kbd> to search all commands and pages
+    </p>
+  </main>
+
   <div id="help-modal" class="modal" aria-hidden="true" role="dialog" aria-labelledby="help-title">
     <div class="modal-content">
       <button id="close-help-btn" class="close-btn" aria-label="Close Help">&times;</button>
@@ -65,6 +171,10 @@
       initCompactMode();
       initHelpModal('help-btn','help-modal','close-help-btn');
       initNavToggle();
+      // Wire the "Search with Ctrl+K" button to open the command palette
+      document.getElementById('open-command-palette-btn')?.addEventListener('click', () => {
+        document.dispatchEvent(new KeyboardEvent('keydown', {key:'k', ctrlKey:true, bubbles:true}));
+      });
     });
   </script>
   <script type="module" src="dist/projectManager.js"></script>
