@@ -250,7 +250,6 @@ function neherMcGrathTemp(power, Rth, ambient, k, r){
 function runNeherMcGrathTests(){
   const t = neherMcGrathTemp(10, 0.5, 20, 1, 0.5);
   console.assert(Math.abs(t-28.7)<0.5, 'neherMcGrathTemp basic test');
-  console.log('neherMcGrathTemp(10W,0.5m,Rth=0.5,k=1) ->', t.toFixed(2),'°C');
 }
 
 const CTR_VERSION='1.0.0';

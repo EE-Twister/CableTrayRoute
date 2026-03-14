@@ -63,10 +63,8 @@ if (document.readyState === 'loading') {
 // behaviour needed to populate the schedule table.
 
 async function initCableSchedule() {
-  console.log('Cable Schedule DOMContentLoaded event fired');
   const projectId = window.currentProjectId || 'default';
   dataStore.loadProject(projectId);
-  console.log('Loaded project', projectId);
   initSettings();
   initDarkMode();
   initCompactMode();
@@ -1709,7 +1707,6 @@ async function initCableSchedule() {
 
   // Retrieve existing cables from project storage.
   let tableData = dataStore.getCables();
-  console.log('Initial cable data from store:', tableData);
   const DEFAULT_VD_LIMIT = 3;
   const getVoltageDropLimit = () => DEFAULT_VD_LIMIT;
 
@@ -1840,7 +1837,6 @@ async function initCableSchedule() {
     columns,
     onView:(row,tr)=>openEditor(row,tr,table),
     onChange:() => {
-      console.log('Table changed');
       const before = tableData ? [...tableData] : [];
       const data = table.getData();
       suppressCablesUpdate = true;
@@ -1887,14 +1883,12 @@ async function initCableSchedule() {
       }
     },
     onSave:() => {
-      console.log('Save triggered');
       markSaved();
       tableData = table.getData();
       dataStore.setCables(tableData); // persist only when user saves
       dataStore.saveProject(projectId);
     }
   });
-  console.log('Cable schedule table created', table);
   tableInstance = table;
   window.cableScheduleTable = table;
   initTableSearch();
@@ -1927,7 +1921,6 @@ async function initCableSchedule() {
     addRowBtn.addEventListener('click', async e => {
       e.preventDefault();
       e.stopImmediatePropagation();
-      console.log('Button add-row-btn clicked');
       const template = await chooseTemplateForNewRow();
       if (template === null) return;
       if (template) {
@@ -2067,26 +2060,6 @@ async function initCableSchedule() {
     presetSelect.value = initialPreset;
   }
 
-  const debugButtons = [
-    'add-row-btn',
-    'save-schedule-btn',
-    'load-schedule-btn',
-    'clear-filters-btn',
-    'export-xlsx-btn',
-    'import-xlsx-btn',
-    'delete-all-btn',
-    'load-sample-cables-btn',
-    'cable-library-btn'
-  ];
-  debugButtons.forEach(id => {
-    const btn = document.getElementById(id);
-    if (btn) {
-      btn.addEventListener('click', () => console.log(`Button ${id} clicked`));
-    } else {
-      console.warn(`Debug: Button with id '${id}' not found`);
-    }
-  });
-
   function generateId(existing, base) {
     let id = base || 'item';
     let i = 1;
@@ -2144,7 +2117,6 @@ async function initCableSchedule() {
 
   // Update the table whenever cables are modified elsewhere (e.g. One-Line).
   dataStore.on(dataStore.STORAGE_KEYS.cables, cables => {
-    console.log('dataStore cables updated', cables);
     if (suppressCablesUpdate) return;
     table.setData(cables || []);
     tableData = cables || [];
@@ -2154,7 +2126,6 @@ async function initCableSchedule() {
   });
 
   document.getElementById('load-sample-cables-btn').addEventListener('click', async () => {
-    console.log('load-sample-cables-btn clicked');
     try {
       const res = await fetch('./examples/sampleCables.json', { cache: 'no-store' });
       if (!res.ok) throw new Error(`Sample cables request failed: ${res.status}`);
