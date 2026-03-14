@@ -188,8 +188,48 @@ body.dark-mode .workflow-progress-track {
     color: var(--warning-text);
 }
 
+.workflow-card .status.status-complete {
+    color: var(--success-text);
+    font-weight: 600;
+}
+
+.workflow-card .status.status-incomplete {
+    color: var(--warning-text);
+}
+
 .workflow-card.complete .status {
     color: var(--success-text);
+}
+
+/* Keyboard shortcut discovery hint in the hero */
+.hero-keyboard-hint {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.35rem;
+    margin-top: 1rem;
+    font-size: 0.8rem;
+    color: rgba(255, 255, 255, 0.7);
+    letter-spacing: 0.01em;
+
+    & kbd {
+        background: rgba(255, 255, 255, 0.18);
+        border: 1px solid rgba(255, 255, 255, 0.4);
+        border-radius: 3px;
+        padding: 0.1em 0.35em;
+        font-size: 0.75rem;
+        font-family: inherit;
+        color: rgba(255, 255, 255, 0.9);
+    }
+}
+
+body.dark-mode .hero-keyboard-hint {
+    color: rgba(226, 232, 240, 0.6);
+
+    & kbd {
+        background: rgba(226, 232, 240, 0.12);
+        border-color: rgba(226, 232, 240, 0.3);
+        color: rgba(226, 232, 240, 0.8);
+    }
 }
 
 body.dark-mode .workflow-card {
