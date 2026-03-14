@@ -149,7 +149,7 @@ function mountPersistentNavigation() {
     searchBtn.className = 'nav-search-btn';
     searchBtn.setAttribute('aria-label', 'Search commands');
     searchBtn.setAttribute('title', 'Search commands');
-    searchBtn.textContent = '🔍';
+    searchBtn.innerHTML = '<img src="icons/toolbar/grid-size.svg" alt="" aria-hidden="true" class="control-icon">';
     searchBtn.addEventListener('click', () => {
       document.dispatchEvent(new KeyboardEvent('keydown', { key: 'k', ctrlKey: true, bubbles: true }));
     });
@@ -202,7 +202,7 @@ function mountPersistentNavigation() {
     toggleBtn.setAttribute('aria-label', 'Toggle sidebar navigation');
     toggleBtn.setAttribute('aria-expanded', 'false');
     toggleBtn.setAttribute('aria-controls', 'app-sidebar-nav');
-    toggleBtn.textContent = '☰';
+    toggleBtn.innerHTML = '<img src="icons/toolbar/grid.svg" alt="" aria-hidden="true" class="control-icon">';
     topNav.insertBefore(toggleBtn, topNav.firstChild);
   }
 

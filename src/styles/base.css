@@ -98,6 +98,34 @@ body.compact-mode {
 }
 
 
+
+.control-icon {
+    width: 1rem;
+    height: 1rem;
+    flex-shrink: 0;
+}
+
+button .control-icon,
+.btn .control-icon,
+.hero-action-btn .control-icon {
+    margin-right: 0.45rem;
+}
+
+.settings-btn .control-icon,
+.nav-toggle .control-icon,
+.nav-search-btn .control-icon,
+.sidebar-toggle-btn .control-icon {
+    margin-right: 0;
+    width: 1.1rem;
+    height: 1.1rem;
+}
+
+.settings-menu button,
+.settings-menu .btn {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.45rem;
+}
 .settings-btn {
     background: none;
     border: none;
