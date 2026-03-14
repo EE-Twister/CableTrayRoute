@@ -252,6 +252,61 @@
     margin-left: auto;
 }
 
+/* --- Workflow Step Navigator --- */
+.workflow-step-nav {
+    display: flex;
+    align-items: center;
+    gap: var(--space-3);
+    flex-wrap: wrap;
+    padding: var(--space-2) var(--space-4);
+    background: color-mix(in srgb, var(--color-primary) 8%, transparent);
+    border-bottom: 1px solid color-mix(in srgb, var(--color-primary) 25%, transparent);
+    font-size: var(--font-size-sm);
+    color: var(--text-color);
+}
+
+.workflow-step-nav-label {
+    font-weight: 600;
+    color: var(--color-primary);
+    white-space: nowrap;
+}
+
+.workflow-step-nav-links {
+    display: flex;
+    align-items: center;
+    gap: var(--space-2);
+    flex-wrap: wrap;
+}
+
+.workflow-step-nav-link {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.2em;
+    padding: var(--space-1) var(--space-2);
+    border-radius: var(--radius-sm);
+    border: 1px solid var(--border-color);
+    color: var(--text-color);
+    text-decoration: none;
+    white-space: nowrap;
+    background: var(--color-surface-strong);
+    transition: background 0.15s, border-color 0.15s;
+}
+
+.workflow-step-nav-link:hover {
+    background: color-mix(in srgb, var(--color-primary) 10%, var(--color-surface-strong));
+    border-color: var(--color-primary);
+    color: var(--color-primary);
+}
+
+body.dark-mode .workflow-step-nav {
+    background: color-mix(in srgb, var(--color-primary) 12%, #1a1d20);
+    border-bottom-color: color-mix(in srgb, var(--color-primary) 30%, transparent);
+}
+
+body.dark-mode .workflow-step-nav-link {
+    background: #2c3034;
+}
+
 /* --- Footer --- */
 .site-footer {
     background: var(--secondary-color);

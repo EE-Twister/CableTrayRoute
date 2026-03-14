@@ -202,6 +202,48 @@ body.dark-mode .table-row-focusable:focus-within::after {
     font-style: italic;
 }
 
+/* Rich empty state card shown below empty data tables */
+.table-empty-state {
+    display: none;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: var(--space-3);
+    padding: var(--space-6) var(--space-4);
+    text-align: center;
+    color: var(--color-text-muted, #6c757d);
+    border: 2px dashed var(--border-color);
+    border-radius: var(--radius-md);
+    margin-top: var(--space-3);
+}
+
+.table-empty-state.is-visible {
+    display: flex;
+}
+
+.table-empty-state-icon {
+    font-size: 2.5rem;
+    line-height: 1;
+    opacity: 0.5;
+}
+
+.table-empty-state-title {
+    font-size: var(--font-size-lg);
+    font-weight: 600;
+    color: var(--text-color);
+    margin: 0;
+}
+
+.table-empty-state-body {
+    font-size: var(--font-size-sm);
+    margin: 0;
+    max-width: 36ch;
+}
+
+.table-empty-state-action {
+    margin-top: var(--space-1);
+}
+
 .sr-only {
     position: absolute;
     width: 1px;

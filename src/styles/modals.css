@@ -552,3 +552,96 @@ body.dark-mode .btn.secondary-btn:hover {
     color: var(--text-color);
 }
 
+/* --- Keyboard Shortcuts Overlay (? key) --- */
+.shortcuts-overlay {
+    position: fixed;
+    inset: 0;
+    z-index: 3000;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background: var(--color-overlay);
+    opacity: 0;
+    pointer-events: none;
+    transition: opacity 0.15s ease;
+}
+
+.shortcuts-overlay.is-open {
+    opacity: 1;
+    pointer-events: auto;
+}
+
+.shortcuts-overlay-panel {
+    background: var(--color-surface-strong);
+    color: var(--text-color);
+    border: 1px solid var(--border-color);
+    border-radius: var(--radius-md);
+    box-shadow: var(--elevation-md);
+    padding: var(--space-5);
+    width: min(560px, calc(100vw - 2rem));
+    max-height: calc(100dvh - 4rem);
+    overflow-y: auto;
+    position: relative;
+}
+
+body.dark-mode .shortcuts-overlay-panel {
+    background: #2c3034;
+}
+
+.shortcuts-overlay-title {
+    margin: 0 0 var(--space-4);
+    font-size: var(--font-size-xl);
+}
+
+.shortcuts-table {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: var(--font-size-sm);
+}
+
+.shortcuts-table th {
+    text-align: left;
+    padding: var(--space-2) var(--space-3);
+    background: var(--color-surface);
+    border-bottom: 2px solid var(--border-color);
+    font-weight: 600;
+}
+
+body.dark-mode .shortcuts-table th {
+    background: #1a1d20;
+}
+
+.shortcuts-table td {
+    padding: var(--space-2) var(--space-3);
+    border-bottom: 1px solid var(--border-color);
+    vertical-align: middle;
+}
+
+.shortcuts-table tr:last-child td {
+    border-bottom: none;
+}
+
+.shortcuts-table kbd {
+    display: inline-block;
+    padding: 0.1em 0.4em;
+    border: 1px solid var(--border-color);
+    border-bottom-width: 2px;
+    border-radius: 3px;
+    background: var(--color-surface);
+    font-family: inherit;
+    font-size: 0.9em;
+    white-space: nowrap;
+}
+
+body.dark-mode .shortcuts-table kbd {
+    background: #1a1d20;
+    border-color: rgba(255,255,255,0.2);
+}
+
+.shortcuts-overlay-hint {
+    margin-top: var(--space-4);
+    font-size: var(--font-size-xs);
+    color: var(--color-text-muted, #6c757d);
+    text-align: center;
+}
+

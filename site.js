@@ -1287,6 +1287,305 @@ function initTableNav(){
   }));
 }
 
+// ─── Keyboard Shortcuts Overlay (? key) ────────────────────────────────────
+const SHORTCUT_GROUPS=[
+  {
+    heading:'Navigation',
+    rows:[
+      {keys:['Ctrl','K'],desc:'Open command palette'},
+      {keys:['?'],desc:'Show this keyboard shortcuts overlay'},
+      {keys:['Escape'],desc:'Close modal / cancel action'},
+    ]
+  },
+  {
+    heading:'Project',
+    rows:[
+      {keys:['Ctrl','S'],desc:'Save project to server'},
+      {keys:['Ctrl','Z'],desc:'Undo last action (where supported)'},
+      {keys:['Ctrl','Shift','Z'],desc:'Redo (where supported)'},
+    ]
+  },
+  {
+    heading:'Tables',
+    rows:[
+      {keys:['↑'],desc:'Move focus up one row in the same column'},
+      {keys:['↓'],desc:'Move focus down one row in the same column'},
+      {keys:['Tab'],desc:'Move to next cell / field'},
+    ]
+  },
+  {
+    heading:'Tour',
+    rows:[
+      {keys:['→',' '],desc:'Next tour step'},
+      {keys:['←'],desc:'Previous tour step'},
+    ]
+  },
+];
+
+function initShortcutsOverlay(){
+  if(typeof document==='undefined') return;
+  // Build overlay DOM
+  const overlay=document.createElement('div');
+  overlay.className='shortcuts-overlay';
+  overlay.id='shortcuts-overlay';
+  overlay.setAttribute('role','dialog');
+  overlay.setAttribute('aria-modal','true');
+  overlay.setAttribute('aria-labelledby','shortcuts-overlay-title');
+  overlay.setAttribute('aria-hidden','true');
+
+  const panel=document.createElement('div');
+  panel.className='shortcuts-overlay-panel';
+
+  const closeBtn=document.createElement('button');
+  closeBtn.className='close-btn';
+  closeBtn.setAttribute('aria-label','Close keyboard shortcuts');
+  closeBtn.textContent='\u00D7';
+
+  const title=document.createElement('h2');
+  title.id='shortcuts-overlay-title';
+  title.className='shortcuts-overlay-title';
+  title.textContent='Keyboard Shortcuts';
+
+  const table=document.createElement('table');
+  table.className='shortcuts-table';
+  const thead=document.createElement('thead');
+  const headRow=document.createElement('tr');
+  ['Key','Action'].forEach(h=>{const th=document.createElement('th');th.textContent=h;headRow.appendChild(th);});
+  thead.appendChild(headRow);
+  table.appendChild(thead);
+  const tbody=document.createElement('tbody');
+
+  SHORTCUT_GROUPS.forEach(group=>{
+    const groupRow=document.createElement('tr');
+    const groupCell=document.createElement('td');
+    groupCell.setAttribute('colspan','2');
+    groupCell.style.cssText='font-weight:600;padding-top:0.75rem;color:var(--color-primary)';
+    groupCell.textContent=group.heading;
+    groupRow.appendChild(groupCell);
+    tbody.appendChild(groupRow);
+
+    group.rows.forEach(({keys,desc})=>{
+      const tr=document.createElement('tr');
+      const keyTd=document.createElement('td');
+      keyTd.style.whiteSpace='nowrap';
+      keys.forEach((k,i)=>{
+        if(i>0){const plus=document.createElement('span');plus.textContent=' + ';keyTd.appendChild(plus);}
+        const kbd=document.createElement('kbd');kbd.textContent=k;keyTd.appendChild(kbd);
+      });
+      const descTd=document.createElement('td');
+      descTd.textContent=desc;
+      tr.appendChild(keyTd);
+      tr.appendChild(descTd);
+      tbody.appendChild(tr);
+    });
+  });
+
+  table.appendChild(tbody);
+
+  const hint=document.createElement('p');
+  hint.className='shortcuts-overlay-hint';
+  hint.textContent='Press ? or Escape to dismiss';
+
+  panel.appendChild(closeBtn);
+  panel.appendChild(title);
+  panel.appendChild(table);
+  panel.appendChild(hint);
+  overlay.appendChild(panel);
+  document.body.appendChild(overlay);
+
+  function open(){
+    overlay.classList.add('is-open');
+    overlay.setAttribute('aria-hidden','false');
+    closeBtn.focus();
+  }
+  function close(){
+    overlay.classList.remove('is-open');
+    overlay.setAttribute('aria-hidden','true');
+  }
+
+  closeBtn.addEventListener('click',close);
+  overlay.addEventListener('click',e=>{if(e.target===overlay)close();});
+  document.addEventListener('keydown',e=>{
+    const active=document.activeElement;
+    const inInput=['INPUT','SELECT','TEXTAREA'].includes(active?.tagName);
+    if(e.key==='?' && !inInput && !e.ctrlKey && !e.metaKey){
+      e.preventDefault();
+      overlay.classList.contains('is-open')?close():open();
+    }
+    if(e.key==='Escape'&&overlay.classList.contains('is-open')) close();
+  });
+}
+
+globalThis.document?.addEventListener('DOMContentLoaded',initShortcutsOverlay);
+
+// ─── Rich Empty States for Data Tables ─────────────────────────────────────
+const TABLE_EMPTY_CONFIGS={
+  'equipment-table':{icon:'🗂️',title:'No equipment yet',body:'Add a row to start building your equipment list, or import from XLSX or CSV.',actionId:'add-row-btn',actionLabel:'Add Row'},
+  'cable-table':{icon:'🔌',title:'No cables yet',body:'Add your first cable entry, load sample data, or import from Excel to begin.',actionId:'load-sample-cables-btn',actionLabel:'Load Sample Data'},
+  'load-table':{icon:'⚡',title:'No load items yet',body:'Add a row to define load items for this project.',actionId:'add-load-btn',actionLabel:'Add Row'},
+  'raceway-table':{icon:'🛤️',title:'No raceways yet',body:'Add trays, conduits, or ductbanks to build the raceway schedule.',actionId:'add-tray-btn',actionLabel:'Add Tray'},
+  'panel-table':{icon:'🔲',title:'No panels yet',body:'Add a panel to begin building the panel schedule.',actionId:'add-panel-btn',actionLabel:'Add Panel'},
+};
+
+function initTableEmptyStates(){
+  if(typeof document==='undefined') return;
+
+  function makeEmptyState(config,addRowBtn){
+    const div=document.createElement('div');
+    div.className='table-empty-state';
+    div.setAttribute('aria-live','polite');
+
+    const icon=document.createElement('span');
+    icon.className='table-empty-state-icon';
+    icon.setAttribute('aria-hidden','true');
+    icon.textContent=config.icon||'📋';
+
+    const ttl=document.createElement('p');
+    ttl.className='table-empty-state-title';
+    ttl.textContent=config.title||'No data yet';
+
+    const body=document.createElement('p');
+    body.className='table-empty-state-body';
+    body.textContent=config.body||'Add a row to get started.';
+
+    div.appendChild(icon);
+    div.appendChild(ttl);
+    div.appendChild(body);
+
+    // Mirror the existing add-row button as a CTA if found
+    if(addRowBtn){
+      const cta=document.createElement('button');
+      cta.className='btn primary-btn table-empty-state-action';
+      cta.textContent=config.actionLabel||'Add Row';
+      cta.addEventListener('click',()=>addRowBtn.click());
+      div.appendChild(cta);
+    }
+    return div;
+  }
+
+  Object.entries(TABLE_EMPTY_CONFIGS).forEach(([tableId,config])=>{
+    const table=document.getElementById(tableId);
+    if(!table) return;
+    const tbody=table.querySelector('tbody');
+    if(!tbody) return;
+
+    const actionBtn=config.actionId?document.getElementById(config.actionId):null;
+    const emptyState=makeEmptyState(config,actionBtn);
+
+    // Insert after the table's closest scrollable wrapper or the table itself
+    const wrapper=table.closest('.overflow-x-auto')||table.closest('.table-scroll-x')||table;
+    wrapper.insertAdjacentElement('afterend',emptyState);
+
+    function syncVisibility(){
+      const hasRows=tbody.rows.length>0;
+      emptyState.classList.toggle('is-visible',!hasRows);
+      table.style.display=hasRows?'':'none';
+    }
+
+    syncVisibility();
+    const mo=new MutationObserver(syncVisibility);
+    mo.observe(tbody,{childList:true});
+  });
+}
+
+globalThis.document?.addEventListener('DOMContentLoaded',initTableEmptyStates);
+
+// ─── Workflow Step Navigator ────────────────────────────────────────────────
+const WORKFLOW_STEPS=[
+  {href:'cableschedule.html',label:'Cable Schedule',short:'1. Cables'},
+  {href:'racewayschedule.html',label:'Raceway Schedule',short:'2. Raceways'},
+  {href:'ductbankroute.html',label:'Ductbank',short:'3. Ductbank'},
+  {href:'cabletrayfill.html',label:'Tray Fill',short:'4. Tray Fill'},
+  {href:'conduitfill.html',label:'Conduit Fill',short:'5. Conduit Fill'},
+  {href:'optimalRoute.html',label:'Optimal Cable Route',short:'6. Routing'},
+  {href:'oneline.html',label:'One-Line Diagram',short:'7. One-Line'},
+];
+
+function initWorkflowStepNav(){
+  if(typeof document==='undefined') return;
+  const page=window.location.pathname.split('/').pop()||'index.html';
+  const idx=WORKFLOW_STEPS.findIndex(s=>s.href===page);
+  if(idx<0) return; // Not a workflow page
+
+  const step=WORKFLOW_STEPS[idx];
+  const prev=WORKFLOW_STEPS[idx-1]||null;
+  const next=WORKFLOW_STEPS[idx+1]||null;
+
+  const nav=document.createElement('nav');
+  nav.className='workflow-step-nav';
+  nav.setAttribute('aria-label','Workflow step navigation');
+
+  const label=document.createElement('span');
+  label.className='workflow-step-nav-label';
+  label.textContent=`Step ${idx+1} of ${WORKFLOW_STEPS.length}: ${step.label}`;
+
+  const links=document.createElement('div');
+  links.className='workflow-step-nav-links';
+
+  function makeLink(target,text){
+    const a=document.createElement('a');
+    a.href=target.href;
+    a.className='workflow-step-nav-link';
+    a.textContent=text;
+    return a;
+  }
+
+  if(prev) links.appendChild(makeLink(prev,`\u2190 ${prev.short}`));
+
+  const home=document.createElement('a');
+  home.href='index.html';
+  home.className='workflow-step-nav-link';
+  home.textContent='Home';
+  links.appendChild(home);
+
+  if(next) links.appendChild(makeLink(next,`${next.short} \u2192`));
+
+  nav.appendChild(label);
+  nav.appendChild(links);
+
+  // Insert before the first <section> inside main, or at the top of main
+  const main=document.getElementById('main-content');
+  if(!main) return;
+  const firstSection=main.querySelector(':scope > section, :scope > header');
+  if(firstSection){
+    main.insertBefore(nav,firstSection);
+  }else{
+    main.prepend(nav);
+  }
+}
+
+globalThis.document?.addEventListener('DOMContentLoaded',initWorkflowStepNav);
+
+// ─── Unsaved-Changes Navigation Warning ────────────────────────────────────
+let _projectDirty=false;
+
+function initUnsavedChangesWarning(){
+  // Track project mutations via onProjectChange; mark clean after saves
+  onProjectChange(()=>{_projectDirty=true;});
+
+  window.addEventListener('beforeunload',e=>{
+    if(!_projectDirty) return;
+    // Modern browsers show their own generic message; the return value triggers the dialog
+    e.preventDefault();
+    e.returnValue='You have unsaved changes. Leave anyway?';
+    return e.returnValue;
+  });
+
+  // Mark clean when the user explicitly saves (listen for our toast signal)
+  // We hook into the existing save infrastructure by watching for markClean calls
+  const origShowToast=globalThis.showOperationToast;
+  if(typeof origShowToast==='function'){
+    globalThis.showOperationToast=(msg,kind)=>{
+      if(kind!=='error'&&(msg.toLowerCase().includes('saved')||msg.toLowerCase().includes('save'))){
+        _projectDirty=false;
+      }
+      return origShowToast(msg,kind);
+    };
+  }
+}
+
+globalThis.document?.addEventListener('DOMContentLoaded',initUnsavedChangesWarning);
+
 function persistConduits(data){
   try{
     setConduitCache(data);
