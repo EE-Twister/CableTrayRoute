@@ -926,7 +926,7 @@ function initSettings(){
     if(helpBtn&&!document.getElementById('reopen-onboarding-btn')){
       const onboardingBtn=document.createElement('button');
       onboardingBtn.id='reopen-onboarding-btn';
-      onboardingBtn.textContent='Reopen Onboarding';
+      onboardingBtn.innerHTML='<img src="icons/oneline.svg" alt="" aria-hidden="true" class="control-icon"><span>Reopen Onboarding</span>';
       helpBtn.insertAdjacentElement('afterend',onboardingBtn);
     }
     const onboardingReopenBtn=document.getElementById('reopen-onboarding-btn');
@@ -940,7 +940,7 @@ function initSettings(){
     }
     const shareBtn=document.createElement('button');
     shareBtn.id='copy-share-link-btn';
-    shareBtn.textContent='Copy Share Link';
+    shareBtn.innerHTML='<img src="icons/toolbar/copy.svg" alt="" aria-hidden="true" class="control-icon"><span>Copy Share Link</span>';
     if(exportBtn) exportBtn.insertAdjacentElement('beforebegin',shareBtn);
     else settingsMenu.appendChild(shareBtn);
     shareBtn.addEventListener('click',async()=>{
@@ -954,13 +954,13 @@ function initSettings(){
 
     const selfCheckBtn=document.createElement('button');
     selfCheckBtn.id='run-self-check-btn';
-    selfCheckBtn.textContent='Run Self-Check';
+    selfCheckBtn.innerHTML='<img src="icons/toolbar/validate.svg" alt="" aria-hidden="true" class="control-icon"><span>Run Self-Check</span>';
     settingsMenu.appendChild(selfCheckBtn);
     selfCheckBtn.addEventListener('click',()=>{ location.href='optimalRoute.html?selfcheck=1'; });
 
     const refreshLibBtn=document.createElement('button');
     refreshLibBtn.id='refresh-library-btn';
-    refreshLibBtn.textContent='Refresh Library';
+    refreshLibBtn.innerHTML='<img src="icons/toolbar/redo.svg" alt="" aria-hidden="true" class="control-icon"><span>Refresh Library</span>';
     settingsMenu.appendChild(refreshLibBtn);
     refreshLibBtn.addEventListener('click',async()=>{
       await runOperationWithStatus(operationStatusHost,{
@@ -977,7 +977,7 @@ function initSettings(){
 
     const reportBtn=document.createElement('button');
     reportBtn.id='generate-report-btn';
-    reportBtn.textContent='Generate Technical Report';
+    reportBtn.innerHTML='<img src="icons/toolbar/dimension.svg" alt="" aria-hidden="true" class="control-icon"><span>Generate Technical Report</span>';
     settingsMenu.appendChild(reportBtn);
     reportBtn.addEventListener('click',async()=>{
       const useDocx=confirm('Generate DOCX? Cancel for PDF');
@@ -991,7 +991,7 @@ function initSettings(){
 
     const exportReportsBtn=document.createElement('button');
     exportReportsBtn.id='export-reports-btn';
-    exportReportsBtn.textContent='Export Reports';
+    exportReportsBtn.innerHTML='<img src="icons/toolbar/export.svg" alt="" aria-hidden="true" class="control-icon"><span>Export Reports</span>';
     settingsMenu.appendChild(exportReportsBtn);
     exportReportsBtn.addEventListener('click',async()=>{
       await runOperationWithStatus(operationStatusHost,{
@@ -1013,7 +1013,7 @@ function initSettings(){
 
     const printLabelsBtn=document.createElement('button');
     printLabelsBtn.id='print-labels-btn';
-    printLabelsBtn.textContent='Print Labels';
+    printLabelsBtn.innerHTML='<img src="icons/annotation.svg" alt="" aria-hidden="true" class="control-icon"><span>Print Labels</span>';
     settingsMenu.appendChild(printLabelsBtn);
     printLabelsBtn.addEventListener('click',async()=>{
       await runOperationWithStatus(operationStatusHost,{
@@ -1187,7 +1187,7 @@ function initHelpModal(btnId='help-btn',modalId='help-modal',closeId){
       const onboardingBtn=document.createElement('button');
       onboardingBtn.type='button';
       onboardingBtn.id='help-reopen-onboarding-btn';
-      onboardingBtn.textContent='Reopen Onboarding';
+      onboardingBtn.innerHTML='<img src="icons/oneline.svg" alt="" aria-hidden="true" class="control-icon"><span>Reopen Onboarding</span>';
       content.appendChild(onboardingBtn);
       onboardingBtn.addEventListener('click',()=>{
         close();
