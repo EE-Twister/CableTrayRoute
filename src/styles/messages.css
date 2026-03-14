@@ -19,7 +19,7 @@
 
 .toast {
     position: fixed;
-    bottom: 10px;
+    bottom: max(10px, env(safe-area-inset-bottom));
     left: 50%;
     transform: translateX(-50%);
     background: var(--secondary-color);
@@ -31,6 +31,10 @@
     opacity: 0;
     transition: opacity 0.3s ease;
     z-index: 2000;
+    /* Ensure toast doesn't overflow on narrow screens */
+    max-width: calc(100vw - 2rem);
+    white-space: normal;
+    text-align: center;
 }
 .toast.show { opacity: 1; }
 body.dark-mode .toast { background: var(--secondary-color); color: var(--text-color); }

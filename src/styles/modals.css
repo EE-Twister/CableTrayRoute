@@ -160,6 +160,10 @@
     align-items: center;
     justify-content: center;
     z-index: 200;
+    /* Allow scrolling when modal content is taller than viewport (e.g. mobile with keyboard) */
+    overflow-y: auto;
+    padding: var(--space-3);
+    box-sizing: border-box;
 }
 
 .component-modal {
@@ -183,6 +187,15 @@ body.modal-open {
     max-height: var(--size-help-modal-height);
     overflow-y: auto;
     position: relative;
+}
+
+@media (max-width: 480px) {
+    .modal-content {
+        width: calc(100% - 1rem);
+        padding: var(--space-3);
+        max-height: calc(100dvh - 2rem);
+        border-radius: var(--radius-sm);
+    }
 }
 
 .modal-content.modal-resizable {
@@ -521,6 +534,18 @@ body.modal-open {
     display: flex;
     gap: var(--spacing-base);
     justify-content: flex-end;
+    flex-wrap: wrap;
+}
+
+@media (max-width: 480px) {
+    .modal-actions {
+        flex-direction: column-reverse;
+    }
+
+    .modal-actions .btn {
+        width: 100%;
+        justify-content: center;
+    }
 }
 
 .btn.secondary-btn {
