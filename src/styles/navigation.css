@@ -117,29 +117,6 @@
     }
 }
 
-@media (max-width: 700px) {
-    .app-sidebar-nav {
-        top: 0;
-        width: min(75vw, 13rem);
-        height: 100%;
-        border-right: 1px solid var(--border-color);
-        border-bottom: none;
-        transform: translateX(-100%);
-        transition: transform 0.25s ease;
-        z-index: 200;
-    }
-
-    .app-sidebar-nav.sidebar-open {
-        transform: translateX(0);
-    }
-
-    .has-sidebar-nav .container,
-    .has-sidebar-nav .page-layout,
-    .has-sidebar-nav .main-content {
-        margin-left: 0;
-    }
-}
-
 .sidebar-backdrop {
     display: none;
     position: fixed;
@@ -217,6 +194,30 @@
     background: var(--secondary-color);
     padding: var(--space-3);
     z-index: 80;
+}
+
+/* Mobile overrides — must come after the desktop rules above to win the cascade */
+@media (max-width: 700px) {
+    .app-sidebar-nav {
+        top: 0;
+        width: min(75vw, 13rem);
+        height: 100%;
+        border-right: 1px solid var(--border-color);
+        border-bottom: none;
+        transform: translateX(-100%);
+        transition: transform 0.25s ease;
+        z-index: 200;
+    }
+
+    .app-sidebar-nav.sidebar-open {
+        transform: translateX(0);
+    }
+
+    .has-sidebar-nav .container,
+    .has-sidebar-nav .page-layout,
+    .has-sidebar-nav .main-content {
+        margin-left: 0;
+    }
 }
 
 .sidebar-title {
