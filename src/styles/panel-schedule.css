@@ -2437,6 +2437,9 @@ body.dark-mode .custom-curve-remove:focus {
   display: grid;
   place-items: start center;
   padding: 12vh 1rem 2rem;
+  /* Use dvh so the overlay shrinks when the virtual keyboard appears on mobile */
+  padding-top: min(12vh, 12dvh);
+  overflow-y: auto;
 }
 
 .command-palette-panel {
@@ -2446,11 +2449,16 @@ body.dark-mode .custom-curve-remove:focus {
   border-radius: 12px;
   box-shadow: 0 20px 55px rgba(5, 10, 30, 0.28);
   padding: 1rem;
+  /* Prevent the panel from overflowing the viewport height */
+  max-height: calc(100dvh - 3rem);
+  display: flex;
+  flex-direction: column;
 }
 
 .command-palette-title {
   margin: 0 0 0.5rem;
   font-size: 1rem;
+  flex-shrink: 0;
 }
 
 .command-palette-input {
@@ -2459,12 +2467,17 @@ body.dark-mode .custom-curve-remove:focus {
   border-radius: 8px;
   padding: 0.65rem 0.75rem;
   font-size: 0.95rem;
+  /* Prevent iOS Safari from auto-zooming on focus (requires font-size >= 16px on mobile) */
+  flex-shrink: 0;
+  min-height: 44px;
+  box-sizing: border-box;
 }
 
 .command-palette-hint {
   margin: 0.5rem 0;
   color: #5b6478;
   font-size: 0.82rem;
+  flex-shrink: 0;
 }
 
 .command-palette-list {
@@ -2473,6 +2486,9 @@ body.dark-mode .custom-curve-remove:focus {
   padding: 0;
   max-height: 340px;
   overflow: auto;
+  /* Allow the list to shrink so the panel stays within max-height */
+  flex: 1 1 auto;
+  min-height: 0;
 }
 
 .command-palette-item,
@@ -2482,6 +2498,8 @@ body.dark-mode .custom-curve-remove:focus {
   align-items: center;
   padding: 0.55rem 0.65rem;
   border-radius: 8px;
+  /* Ensure comfortable touch targets */
+  min-height: 44px;
 }
 
 .command-palette-item {
@@ -2501,9 +2519,40 @@ body.dark-mode .custom-curve-remove:focus {
   padding: 0.1rem 0.35rem;
   color: #4b566a;
   background: #f7f8fb;
+  /* Hide keyboard shortcuts on small touch screens to save space */
+  flex-shrink: 0;
 }
 
 .command-palette-empty {
   color: #5b6478;
+}
+
+/* Small phone adjustments for the command palette */
+@media (max-width: 480px) {
+  .command-palette-overlay {
+    padding: 5vh 0.5rem 1rem;
+    padding-top: min(5vh, 5dvh);
+    align-items: start;
+  }
+
+  .command-palette-panel {
+    width: calc(100vw - 1rem);
+    border-radius: 8px;
+    max-height: calc(100dvh - 2rem);
+  }
+
+  /* Prevent iOS Safari auto-zoom: font-size must be >= 16px on inputs */
+  .command-palette-input {
+    font-size: 1rem;
+  }
+
+  .command-palette-list {
+    max-height: 220px;
+  }
+
+  /* Hide keyboard shortcuts on small screens to save horizontal space */
+  .command-palette-item kbd {
+    display: none;
+  }
 }
 
