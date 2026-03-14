@@ -1,12 +1,12 @@
 :root {
-  --color-primary: #0d6efd;
-  --color-surface: #f8f9fa;
+  --color-primary: #2563eb;
+  --color-surface: #f8fafc;
   --color-surface-strong: #ffffff;
-  --color-text: #212529;
-  --color-border: #dee2e6;
-  --color-overlay: rgba(0, 0, 0, 0.6);
+  --color-text: #0f172a;
+  --color-border: #e2e8f0;
+  --color-overlay: rgba(0, 0, 0, 0.55);
 
-  --font-family-base: Arial, sans-serif;
+  --font-family-base: 'Inter', system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
   --font-size-xs: 0.75rem;
   --font-size-sm: 0.875rem;
   --font-size-md: 1rem;
@@ -19,13 +19,18 @@
   --space-4: 1rem;
   --space-5: 1.5rem;
   --space-6: 2rem;
+  --space-7: 3rem;
+  --space-8: 4rem;
 
-  --radius-sm: 4px;
-  --radius-md: 8px;
+  --radius-sm: 6px;
+  --radius-md: 10px;
+  --radius-lg: 16px;
   --radius-pill: 999px;
 
-  --elevation-sm: 0 2px 4px rgba(0, 0, 0, 0.05);
-  --elevation-md: 0 2px 6px rgba(0, 0, 0, 0.1);
+  --elevation-sm: 0 1px 3px rgba(0, 0, 0, 0.05), 0 1px 2px rgba(0, 0, 0, 0.04);
+  --elevation-md: 0 4px 16px rgba(0, 0, 0, 0.08), 0 2px 6px rgba(0, 0, 0, 0.04);
+  --elevation-lg: 0 20px 40px rgba(0, 0, 0, 0.12), 0 8px 16px rgba(0, 0, 0, 0.06);
+  --elevation-nav: 0 1px 0 rgba(0, 0, 0, 0.08), 0 2px 8px rgba(0, 0, 0, 0.04);
 
   --size-full: 100%;
   --size-modal-sm: 32rem;
@@ -40,7 +45,7 @@
   --text-color: var(--color-text);
   --spacing-base: var(--space-2);
   --button-bg: var(--primary-color);
-  --button-hover-bg: #0056b3;
+  --button-hover-bg: #1d4ed8;
   --button-text: #fff;
   --button-padding: var(--space-2) var(--space-3);
   --button-margin: var(--space-1);
@@ -79,7 +84,7 @@
   --color-debug-bg: #1e1e1e;
   --color-debug-text: #00ff00;
   --color-progress-track: #e9ecef;
-  --color-text-muted: #6c757d;
+  --color-text-muted: #64748b;
 }
 
 @media (prefers-color-scheme: dark) {

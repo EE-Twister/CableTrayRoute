@@ -94,6 +94,27 @@ function mountPageTransitions() {
   });
 }
 
+function buildBrand() {
+  const brand = document.createElement('a');
+  brand.href = 'index.html';
+  brand.className = 'nav-brand';
+  brand.setAttribute('aria-label', 'CableTrayRoute home');
+
+  const logo = document.createElement('img');
+  logo.src = 'icons/route.svg';
+  logo.alt = '';
+  logo.setAttribute('aria-hidden', 'true');
+  logo.className = 'nav-brand-logo';
+
+  const name = document.createElement('span');
+  name.className = 'nav-brand-name';
+  name.textContent = 'CableTrayRoute';
+
+  brand.appendChild(logo);
+  brand.appendChild(name);
+  return brand;
+}
+
 function mountPersistentNavigation() {
   if (document.body?.dataset.navMounted === 'true') return;
   const topNav = document.querySelector('.top-nav');
@@ -101,6 +122,11 @@ function mountPersistentNavigation() {
 
   const pageName = currentPageName();
   const currentRoute = routeForPage(pageName);
+
+  // Insert brand if not already present
+  if (!topNav.querySelector('.nav-brand')) {
+    topNav.insertBefore(buildBrand(), topNav.firstChild);
+  }
 
   const existingSettingsBtn = document.getElementById('settings-btn');
   const navLinks = document.createElement('div');
