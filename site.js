@@ -710,7 +710,7 @@ function applyProjectHash(){
       try{
         const stateName=(getProjectState().name||'').trim();
         if(stateName) activeName=stateName;
-      }catch{}
+      }catch(e){ console.warn('Could not read project name from state:', e); }
       if(!activeName){
         const globalName=typeof window.currentProjectId==='string'?window.currentProjectId.trim():'';
         if(globalName&&globalName!=='default') activeName=globalName;
@@ -858,7 +858,7 @@ function initSettings(){
     nameInput.type='text';
     nameInput.id='project-name-input';
     let initialProjectName='';
-    try{initialProjectName=getProjectState().name||'';}catch{}
+    try{initialProjectName=getProjectState().name||'';}catch(e){ console.warn('Could not read initial project name:', e); }
     nameInput.value=initialProjectName;
     nameInput.dataset.originalName=(initialProjectName||'').trim();
     nameLabel.appendChild(nameInput);
@@ -911,7 +911,7 @@ function initSettings(){
         proj.name=e.target.value;
         setProjectState(proj);
         save(proj,{flush:true,reason:'name-input'});
-      }catch{}
+      }catch(e){ console.warn('Could not save project name during input:', e); }
     });
     nameInput.addEventListener('change',()=>{commitProjectNameChange().catch(console.error);});
     nameInput.addEventListener('keydown',e=>{
@@ -1035,14 +1035,14 @@ function initSettings(){
   }
   const unitSelect=document.getElementById('unit-select');
   if(unitSelect){
-    try{ unitSelect.value=getProjectState().settings?.units||'imperial'; }catch{}
+    try{ unitSelect.value=getProjectState().settings?.units||'imperial'; }catch(e){ console.warn('Could not read unit setting:', e); }
     unitSelect.addEventListener('change',e=>{
       try{
         const proj=getProjectState();
         proj.settings=proj.settings||{};
         proj.settings.units=e.target.value;
         setProjectState(proj);
-      }catch{}
+      }catch(e){ console.warn('Could not save unit setting:', e); }
       applyUnitLabels();
     });
   }
@@ -1168,7 +1168,7 @@ function initCompactMode(){
         const data=e.newValue?JSON.parse(e.newValue):{};
         applyState(data&&data.compactMode);
         session=data||{};
-      }catch{}
+      }catch(e){ console.warn('Could not parse ctrSession storage event:', e); }
     }
   }));
 }
