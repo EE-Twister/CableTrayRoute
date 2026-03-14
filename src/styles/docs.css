@@ -93,3 +93,42 @@
     margin-top: 2rem;
 }
 
+/* --- Help Page --- */
+.help-content {
+    max-width: 800px;
+    margin: 2rem auto;
+    padding: 0 1rem;
+}
+
+.help-content section {
+    margin-bottom: 2rem;
+}
+
+.help-workflow-diagram {
+    margin-top: 1rem;
+    padding: var(--space-4);
+    background: color-mix(in srgb, var(--secondary-color) 90%, var(--primary-color) 10%);
+    border: 1px solid var(--border-color);
+    border-radius: var(--radius-md);
+}
+
+.help-workflow-steps {
+    margin: 0;
+    padding-left: 1.5rem;
+    display: flex;
+    flex-direction: column;
+    gap: var(--space-2);
+    font-size: var(--font-size-sm);
+    line-height: 1.6;
+}
+
+.help-sample-status {
+    font-size: var(--font-size-xs);
+    margin-left: var(--space-2);
+    color: var(--color-text-muted, #6c757d);
+}
+
+.help-sample-unavailable {
+    color: var(--error-text);
+}
+

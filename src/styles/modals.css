@@ -4,8 +4,8 @@
     display: inline-block;
     width: 16px;
     height: 16px;
-    background-color: #aaa;
-    color: #fff;
+    background-color: var(--color-icon-badge-bg);
+    color: var(--color-tooltip-text);
     border-radius: 50%;
     text-align: center;
     font-size: 12px;
@@ -18,8 +18,8 @@
 .help-icon .tooltip {
     visibility: hidden;
     width: 220px;
-    background-color: #333;
-    color: #fff;
+    background-color: var(--color-tooltip-bg);
+    color: var(--color-tooltip-text);
     text-align: left;
     border-radius: 4px;
     padding: 6px 8px;
@@ -41,7 +41,7 @@
     transform: translateX(-50%);
     border-width: 5px;
     border-style: solid;
-    border-color: #333 transparent transparent transparent;
+    border-color: var(--color-tooltip-bg) transparent transparent transparent;
 }
 
 .help-icon:hover .tooltip,

@@ -33,11 +33,9 @@
     z-index: 2000;
 }
 .toast.show { opacity: 1; }
-body.dark-mode .toast { background: #2c3034; color: #f8f9fa; }
-.toast-success { background: #28a745; color: #fff; }
-.toast-error { background: #dc3545; color: #fff; }
-body.dark-mode .toast-success { background: #28a745; }
-body.dark-mode .toast-error { background: #dc3545; }
+body.dark-mode .toast { background: var(--secondary-color); color: var(--text-color); }
+.toast-success { background: var(--color-success); color: var(--color-tooltip-text); }
+.toast-error { background: var(--color-error); color: var(--color-tooltip-text); }
 
 /* Debug console */
 #debug-console {
@@ -47,8 +45,8 @@ body.dark-mode .toast-error { background: #dc3545; }
     right: 0;
     max-height: 200px;
     overflow: auto;
-    background: #1e1e1e;
-    color: #0f0;
+    background: var(--color-debug-bg);
+    color: var(--color-debug-text);
     font-family: monospace;
     padding: 4px 8px;
     z-index: 1500;
@@ -56,14 +54,20 @@ body.dark-mode .toast-error { background: #dc3545; }
 }
 #debug-console summary {
     cursor: pointer;
-    color: #fff;
+    color: var(--color-tooltip-text);
 }
 #debug-console pre {
     margin: 0;
     white-space: pre-wrap;
 }
-body.dark-mode #debug-console {
-    background: #000;
+
+/* Last-saved indicator */
+.last-saved-indicator {
+    display: block;
+    font-size: var(--font-size-xs);
+    color: var(--color-text-muted, #6c757d);
+    padding: var(--space-1) 0;
+    min-height: 1rem;
 }
 
 #warning-area { margin-top: 8px; }
@@ -92,7 +96,7 @@ body.dark-mode #debug-console {
 #analysis-progress-container {
     width: 100%;
     height: 20px;
-    background-color: #e9ecef;
+    background-color: var(--color-progress-track);
     border-radius: 10px;
     overflow: hidden;
     position: relative;
@@ -117,7 +121,7 @@ body.dark-mode #debug-console {
     align-items: center;
     justify-content: center;
     font-size: 0.8rem;
-    color: #fff;
+    color: var(--color-tooltip-text);
     pointer-events: none;
 }
 

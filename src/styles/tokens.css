@@ -69,6 +69,17 @@
   --ol-shadow: var(--elevation-md);
   --ol-radius: var(--radius-md);
   --ol-hover-bg: rgba(0, 0, 0, 0.05);
+
+  /* Semantic color tokens */
+  --color-success: #28a745;
+  --color-error: #dc3545;
+  --color-tooltip-bg: #333333;
+  --color-tooltip-text: #ffffff;
+  --color-icon-badge-bg: #aaaaaa;
+  --color-debug-bg: #1e1e1e;
+  --color-debug-text: #00ff00;
+  --color-progress-track: #e9ecef;
+  --color-text-muted: #6c757d;
 }
 
 @media (prefers-color-scheme: dark) {
@@ -108,6 +119,10 @@ body.dark-mode {
   --panel-phase-pos: #ffd43b;
   --panel-phase-neg: #ced4da;
   --row-divider-color: rgba(255, 255, 255, 0.18);
+  --color-tooltip-bg: #555555;
+  --color-progress-track: #495057;
+  --color-text-muted: #adb5bd;
+  --color-debug-bg: #000000;
 }
 
 

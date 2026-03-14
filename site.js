@@ -34,6 +34,8 @@ let cachedProjectFileHandle=null;
 let autoSaveSchedulerInstance=null;
 let dirtyTrackerInstance=null;
 let operationToastTimer=null;
+let lastSavedAt=null;
+let lastSavedIndicatorTimer=null;
 
 const ONBOARDING_SAMPLE_PROJECT={
   name:'Sample Project - Getting Started',
@@ -74,6 +76,9 @@ function showOperationToast(message,kind='success'){
   toast.textContent=message;
   toast.classList.remove('toast-error','toast-success');
   toast.classList.add(kind==='error'?'toast-error':'toast-success','show');
+  // Errors need immediate screen-reader announcement
+  toast.setAttribute('aria-live', kind==='error' ? 'assertive' : 'polite');
+  toast.setAttribute('role', kind==='error' ? 'alert' : 'status');
   if(operationToastTimer) clearTimeout(operationToastTimer);
   operationToastTimer=setTimeout(()=>{
     toast.classList.remove('show','toast-error','toast-success');
@@ -220,6 +225,14 @@ function initOperationStatusHost(container){
   host.setAttribute('role','status');
   host.innerHTML='\n    <div class="operation-placeholder" aria-hidden="true">\n      <span class="operation-spinner"></span>\n      <span class="operation-progress-text">Idle</span>\n    </div>\n    <p class="operation-status-screenreader visually-hidden">Ready</p>\n  ';
   container.appendChild(host);
+  // Inject last-saved indicator if not already present
+  if(!document.getElementById('last-saved-indicator')){
+    const indicator=document.createElement('span');
+    indicator.id='last-saved-indicator';
+    indicator.className='last-saved-indicator';
+    indicator.setAttribute('aria-live','polite');
+    container.appendChild(indicator);
+  }
   return host;
 }
 
@@ -296,6 +309,32 @@ function setAutoSaveFlag(active){
 }
 if(typeof window!=='undefined'&&!('autoSaveEnabled'in window)){
   window.autoSaveEnabled=false;
+}
+
+function formatLastSaved(date){
+  if(!date) return '';
+  const diff=Math.round((Date.now()-date.getTime())/1000);
+  if(diff<5) return 'Saved just now';
+  if(diff<60) return `Saved ${diff}s ago`;
+  const mins=Math.floor(diff/60);
+  if(mins<60) return `Saved ${mins}m ago`;
+  const hrs=Math.floor(mins/60);
+  return `Saved ${hrs}h ago`;
+}
+
+function updateLastSavedIndicator(){
+  if(typeof document==='undefined') return;
+  const el=document.getElementById('last-saved-indicator');
+  if(!el) return;
+  el.textContent=formatLastSaved(lastSavedAt);
+}
+
+function recordSave(){
+  lastSavedAt=new Date();
+  updateLastSavedIndicator();
+  // Refresh "X ago" text every 30 seconds while the page is open
+  if(lastSavedIndicatorTimer) clearInterval(lastSavedIndicatorTimer);
+  lastSavedIndicatorTimer=setInterval(updateLastSavedIndicator,30000);
 }
 
 initializeProjectStorage().catch(e=>console.error('fast-json-patch load failed',e));
@@ -1285,6 +1324,24 @@ function loadConduits(){
 
  globalThis.document?.addEventListener('DOMContentLoaded',initTableNav);
 
+function initTableScrollIndicators(){
+  if(typeof document==='undefined') return;
+  const update=(el)=>{
+    el.classList.toggle('has-overflow', el.scrollWidth > el.clientWidth + 4);
+  };
+  const els=document.querySelectorAll('.table-scroll-x');
+  if(!els.length) return;
+  const ro=typeof ResizeObserver!=='undefined'
+    ? new ResizeObserver(entries=>entries.forEach(e=>update(e.target)))
+    : null;
+  els.forEach(el=>{
+    update(el);
+    el.addEventListener('scroll',()=>update(el),{passive:true});
+    ro?.observe(el);
+  });
+}
+globalThis.document?.addEventListener('DOMContentLoaded',initTableScrollIndicators);
+
 function downloadProjectAsBlob(precomputedJson){
   try{
     const json=typeof precomputedJson==='string'?precomputedJson:JSON.stringify(exportProject(),null,2);
@@ -1443,7 +1500,7 @@ function ensureAutoSaveScheduler(){
   autoSaveSchedulerInstance=createAutoSaveScheduler({
     getHandle:()=>cachedProjectFileHandle,
     writer:handle=>writeProjectToHandle(handle),
-    markClean:()=>getDirtyTracker()?.markClean?.(),
+    markClean:()=>{getDirtyTracker()?.markClean?.(); recordSave();},
     setFlag:setAutoSaveFlag,
     warn:()=>{updateSaveButtonState(); console.warn('Autosave skipped: choose Save Project to select a file for updates.');}
   });
@@ -1495,6 +1552,7 @@ export async function manualSaveProject({
   try{saved=await writer(handle);}catch(err){console.error('Manual save write failed',err);}
   if(saved){
     markClean?.();
+    recordSave();
     return true;
   }
   return null;
