@@ -19,10 +19,11 @@ body.dark-mode h4 {
 
 .columns {
     display: flex;
+    flex-wrap: wrap;
     gap: 1rem;
 }
 .column {
-    flex: 1;
+    flex: 1 1 min(100%, 280px);
 }
 
 input[type="number"], input[type="text"], select {
