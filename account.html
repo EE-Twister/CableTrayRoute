@@ -1,0 +1,68 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="description" content="Manage your CableTrayRoute account settings.">
+  <title>Account Settings – CableTrayRoute</title>
+  <link rel="icon" href="icons/favicon.svg" type="image/svg+xml">
+  <link rel="stylesheet" href="style.css">
+</head>
+<body class="auth-page">
+  <a href="#main-content" class="skip-link">Skip to main content</a>
+  <header class="auth-top-bar">
+    <a href="index.html" class="auth-brand">
+      <img src="icons/route.svg" alt="" class="auth-brand-icon" aria-hidden="true">
+      <span>CableTrayRoute</span>
+    </a>
+    <nav class="auth-top-links" aria-label="Primary">
+      <a href="index.html">Dashboard</a>
+      <a href="help.html">Help</a>
+      <a href="docs/index.html">Docs</a>
+    </nav>
+  </header>
+  <main id="main-content" class="auth-main">
+    <section class="auth-card" aria-labelledby="auth-title">
+      <header class="auth-header">
+        <h1 id="auth-title">Account Settings</h1>
+        <p class="auth-subtitle">Signed in as <strong id="display-username">…</strong></p>
+      </header>
+      <div class="auth-panels" style="grid-template-columns: 1fr;">
+        <section class="auth-pane" aria-labelledby="change-pass-title">
+          <h2 id="change-pass-title">Change Password</h2>
+          <form id="change-pass-form" class="auth-form">
+            <div class="auth-field">
+              <label for="current-pass">Current Password</label>
+              <input id="current-pass" name="current-pass" type="password" autocomplete="current-password" placeholder="Current password" required>
+            </div>
+            <div class="auth-field">
+              <label for="new-pass">New Password</label>
+              <input id="new-pass" name="new-pass" type="password" autocomplete="new-password" placeholder="New password (min 8 characters)" required minlength="8">
+            </div>
+            <div class="auth-field">
+              <label for="new-pass-confirm">Confirm New Password</label>
+              <input id="new-pass-confirm" name="new-pass-confirm" type="password" autocomplete="new-password" placeholder="Confirm new password" required minlength="8">
+            </div>
+            <button type="submit" class="primary-btn">Change Password</button>
+          </form>
+        </section>
+      </div>
+      <p class="auth-note" style="margin-top:1.5rem;">
+        <a href="index.html">&larr; Back to Dashboard</a>
+      </p>
+    </section>
+  </main>
+  <footer class="site-footer">
+    <div class="footer-left">
+      <img src="icons/route.svg" alt="CableTrayRoute logo" class="footer-logo">
+      <span>CableTrayRoute</span>
+    </div>
+    <nav class="footer-links" aria-label="Footer">
+      <a href="index.html">Dashboard</a>
+      <a href="docs/quickstart.html">Quick Start</a>
+      <a href="docs/index.html">Docs</a>
+    </nav>
+  </footer>
+  <script type="module" src="account.js"></script>
+</body>
+</html>

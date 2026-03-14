@@ -17,7 +17,8 @@ const NAV_ROUTES = [
   { href: 'shortCircuit.html', label: 'Short Circuit', section: 'Studies' },
   { href: 'arcFlash.html', label: 'Arc Flash', section: 'Studies' },
   { href: 'custom-components.html', label: 'Custom Components', section: 'Library' },
-  { href: 'help.html', label: 'Help', section: 'Support' }
+  { href: 'help.html', label: 'Help', section: 'Support' },
+  { href: 'account.html', label: 'Account', section: 'Support' }
 ];
 
 function currentPageName() {

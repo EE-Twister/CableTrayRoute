@@ -1841,6 +1841,7 @@ async function initCableSchedule() {
     onView:(row,tr)=>openEditor(row,tr,table),
     onChange:() => {
       console.log('Table changed');
+      const before = tableData ? [...tableData] : [];
       const data = table.getData();
       suppressCablesUpdate = true;
       dataStore.setCables(data); // auto-persist edits
@@ -1850,6 +1851,40 @@ async function initCableSchedule() {
       applySizingHighlight();
       validateAllRows();
       updateBatchTypicalControls();
+
+      // Register undo/redo entry (skip during undo/redo restoration)
+      if (!window.__isUndoRedoOp && window.__undoManager) {
+        const after = [...data];
+        window.__undoManager.push(
+          () => {
+            window.__isUndoRedoOp = true;
+            table.setData(before);
+            suppressCablesUpdate = true;
+            dataStore.setCables(before);
+            suppressCablesUpdate = false;
+            tableData = [...before];
+            markUnsaved();
+            applySizingHighlight();
+            validateAllRows();
+            updateBatchTypicalControls();
+            window.__isUndoRedoOp = false;
+          },
+          () => {
+            window.__isUndoRedoOp = true;
+            table.setData(after);
+            suppressCablesUpdate = true;
+            dataStore.setCables(after);
+            suppressCablesUpdate = false;
+            tableData = [...after];
+            markUnsaved();
+            applySizingHighlight();
+            validateAllRows();
+            updateBatchTypicalControls();
+            window.__isUndoRedoOp = false;
+          },
+          'Edit cable schedule'
+        );
+      }
     },
     onSave:() => {
       console.log('Save triggered');
