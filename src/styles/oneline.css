@@ -1022,6 +1022,53 @@ body.oneline-page .oneline-editor {
   overflow: hidden;
 }
 
+.diagram-status-bar {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  padding: 0.15rem 0.6rem;
+  border-bottom: 1px solid var(--ol-border-color);
+  background: var(--ol-card-bg);
+  font-size: 0.75rem;
+  color: var(--text-muted, #6c757d);
+  font-family: var(--ol-font);
+  flex-shrink: 0;
+  min-height: 1.5rem;
+  user-select: none;
+}
+
+.status-divider {
+  width: 1px;
+  height: 0.85rem;
+  background: var(--ol-border-color);
+  flex-shrink: 0;
+}
+
+.status-coords {
+  font-variant-numeric: tabular-nums;
+  min-width: 9rem;
+}
+
+.status-mode {
+  color: var(--primary-color);
+  font-weight: 600;
+}
+
+.status-shortcuts {
+  margin-left: auto;
+  opacity: 0.6;
+  font-size: 0.7rem;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+@media (max-width: 900px) {
+  .status-shortcuts {
+    display: none;
+  }
+}
+
 .oneline-canvas-scroll {
   position: relative;
   flex: 1;

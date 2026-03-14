@@ -75,10 +75,6 @@
   </div>
   <div class="container">
     <main id="main-content" class="main-content">
-      <header class="page-header">
-        <h1>One-Line Diagram</h1>
-        <p>Create and link components to schedules.</p>
-      </header>
       <section class="card oneline-card">
         <div class="sheet-controls">
           <div class="scenario-controls">
@@ -110,9 +106,9 @@
         <div class="toolbar">
           <div class="toolbar-group" aria-label="Edit">
             <span class="toolbar-group-label">Edit</span>
-            <button id="connect-btn" class="icon-button" title="Connect" aria-label="Connect"><img src="./icons/toolbar/connect.svg" alt=""></button>
-            <button id="undo-btn" class="icon-button" title="Undo" aria-label="Undo"><img src="./icons/toolbar/undo.svg" alt=""></button>
-            <button id="redo-btn" class="icon-button" title="Redo" aria-label="Redo"><img src="./icons/toolbar/redo.svg" alt=""></button>
+            <button id="connect-btn" class="icon-button" title="Connect components (C)" aria-label="Connect"><img src="./icons/toolbar/connect.svg" alt=""></button>
+            <button id="undo-btn" class="icon-button" title="Undo (Ctrl+Z)" aria-label="Undo"><img src="./icons/toolbar/undo.svg" alt=""></button>
+            <button id="redo-btn" class="icon-button" title="Redo (Ctrl+Y)" aria-label="Redo"><img src="./icons/toolbar/redo.svg" alt=""></button>
             <button id="history-sidebar-toggle" class="btn" type="button" aria-controls="history-sidebar" aria-expanded="true">History</button>
           </div>
           <div class="toolbar-group" aria-label="Shapes">
@@ -159,7 +155,8 @@
               <button id="zoom-out-btn" type="button" class="icon-button" title="Zoom out" aria-label="Zoom out">&minus;</button>
               <span id="zoom-display" aria-live="polite">100%</span>
               <button id="zoom-in-btn" type="button" class="icon-button" title="Zoom in" aria-label="Zoom in">+</button>
-              <button id="zoom-reset-btn" type="button" class="btn" title="Reset zoom">Reset</button>
+              <button id="zoom-reset-btn" type="button" class="btn" title="Reset zoom to 100%">Reset</button>
+              <button id="zoom-fit-btn" type="button" class="btn" title="Fit all components in view (F)">Fit</button>
             </div>
             <div class="pan-controls" role="group" aria-label="Pan diagram">
               <button id="pan-up-btn" type="button" class="icon-button" title="Pan up" aria-label="Pan up">&#8593;</button>
@@ -264,6 +261,14 @@
           </aside>
           <div class="splitter"></div>
           <div class="oneline-editor">
+            <div id="diagram-status-bar" class="diagram-status-bar" aria-live="polite" aria-atomic="true">
+              <span id="status-coords" class="status-coords"></span>
+              <span class="status-divider"></span>
+              <span id="status-selection" class="status-selection"></span>
+              <span class="status-divider"></span>
+              <span id="status-mode" class="status-mode"></span>
+              <span class="status-shortcuts">Del: delete &nbsp;·&nbsp; R: rotate &nbsp;·&nbsp; F: fit &nbsp;·&nbsp; Ctrl+A: select all &nbsp;·&nbsp; Ctrl+C/V: copy/paste</span>
+            </div>
             <div class="oneline-canvas-scroll">
               <svg id="diagram" width="100%" height="100%" xmlns="http://www.w3.org/2000/svg">
                 <defs>
