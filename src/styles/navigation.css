@@ -97,6 +97,26 @@
     }
 }
 
+/* Search button shown only on mobile — opens command palette without Ctrl+K */
+.nav-search-btn {
+    display: none;
+
+    @media (max-width: 700px) {
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        order: 2;
+        margin-left: auto;
+        background: none;
+        border: none;
+        font-size: 1.4rem;
+        cursor: pointer;
+        color: var(--text-color);
+        min-width: 44px;
+        min-height: 44px;
+    }
+}
+
 @media (max-width: 700px) {
     .app-sidebar-nav {
         position: static;

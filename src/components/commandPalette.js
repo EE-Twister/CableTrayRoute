@@ -149,7 +149,7 @@ function createPalette() {
 
   const hint = document.createElement("p");
   hint.className = "command-palette-hint";
-  hint.textContent = "Type to search · ↑/↓ to move · Enter to run";
+  hint.textContent = "Type to search · ↑/↓ to move · Enter to run · Esc to close";
 
   const list = document.createElement("ul");
   list.className = "command-palette-list";

@@ -152,6 +152,11 @@ body.dark-mode .hero-action-btn.secondary {
     .hero-action-btn {
         width: 100%;
     }
+
+    /* Ctrl+K doesn't apply on touch devices — hide the keyboard shortcut hint */
+    .hero-keyboard-hint {
+        display: none;
+    }
 }
 
 /* Homepage workflow */
