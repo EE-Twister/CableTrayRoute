@@ -5,27 +5,31 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <meta name="description" content="Build custom one-line diagram components.">
   <title>Custom Components</title>
-  <link rel="icon" href="./icons/favicon.svg" type="image/svg+xml">
-  <link rel="stylesheet" href="./style.css">
+  <link rel="icon" href="icons/favicon.svg" type="image/svg+xml">
+  <link rel="stylesheet" href="style.css">
 </head>
 <body>
-  <a class="skip-link" href="#main-content">Skip to main content</a>
+  <a href="#main-content" class="skip-link">Skip to main content</a>
   <nav class="top-nav">
     <button id="nav-toggle" class="nav-toggle" aria-label="Toggle navigation" aria-controls="nav-links" aria-expanded="false" title="Toggle navigation">☰</button>
     <div id="nav-links" class="nav-links">
-      <a href="./index.html">Home</a>
-      <a href="./equipmentlist.html">Equipment List</a>
-      <a href="./loadlist.html">Load List</a>
-      <a href="./cableschedule.html">Cable Schedule</a>
-      <a href="./panelschedule.html">Panel Schedule</a>
-      <a href="./racewayschedule.html">Raceway Schedule</a>
-      <a href="./ductbankroute.html">Ductbank</a>
-      <a href="./cabletrayfill.html">Tray Fill</a>
-      <a href="./conduitfill.html">Conduit Fill</a>
-      <a href="./optimalRoute.html">Optimal Route</a>
-      <a href="./oneline.html">One-Line</a>
+      <a href="index.html">Home</a>
+      <a href="equipmentlist.html">Equipment List</a>
+      <a href="loadlist.html">Load List</a>
+      <a href="cableschedule.html">Cable Schedule</a>
+      <a href="panelschedule.html">Panel Schedule</a>
+      <a href="racewayschedule.html">Raceway Schedule</a>
+      <a href="ductbankroute.html">Ductbank</a>
+      <a href="cabletrayfill.html">Tray Fill</a>
+      <a href="conduitfill.html">Conduit Fill</a>
+      <a href="optimalRoute.html">Optimal Route</a>
+      <a href="oneline.html">One-Line</a>
     </div>
+    <button id="settings-btn" class="settings-btn" aria-label="Settings" aria-expanded="false" title="Settings">⚙</button>
   </nav>
+  <div id="settings-menu" class="settings-menu">
+    <label><input type="checkbox" id="dark-toggle"> Dark Mode</label>
+  </div>
   <div class="container">
     <main id="main-content" class="main-content">
       <header class="page-header">
@@ -178,6 +182,6 @@
     </main>
   </div>
   <div id="custom-toast" class="toast" role="status" aria-live="polite"></div>
-  <script type="module" src="./custom-components.js"></script>
+  <script type="module" src="custom-components.js"></script>
 </body>
 </html>
