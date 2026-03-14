@@ -4,20 +4,36 @@ const RECENT_KEY = "commandPaletteRecent";
 const RECENT_LIMIT = 6;
 const MAX_RESULTS = 10;
 
+function toggleCheckbox(id) {
+  const el = document.getElementById(id);
+  if (!(el instanceof HTMLInputElement) || el.type !== "checkbox") return false;
+  el.checked = !el.checked;
+  el.dispatchEvent(new Event("change", { bubbles: true }));
+  return true;
+}
+
 const ACTIONS = [
   { id: "project:new", label: "New Project", keywords: ["create", "fresh", "reset"], trigger: () => clickById("new-project-btn") },
   { id: "project:import", label: "Import Project", keywords: ["open", "upload"], trigger: () => clickById("import-project-btn") },
   { id: "project:export", label: "Export Project", keywords: ["download", "backup"], trigger: () => clickById("export-project-btn") },
   { id: "project:save", label: "Save Project", keywords: ["persist", "write"], trigger: () => clickById("save-project-btn") },
   { id: "help:open", label: "Open Help", keywords: ["docs", "support"], trigger: () => clickById("help-btn") },
+  { id: "settings:dark-mode", label: "Toggle Dark Mode", keywords: ["theme", "light", "dark", "appearance"], trigger: () => toggleCheckbox("dark-toggle") },
+  { id: "settings:compact-mode", label: "Toggle Compact Mode", keywords: ["density", "table", "compact"], trigger: () => toggleCheckbox("compact-toggle") },
+  { id: "settings:units", label: "Switch Units (Imperial / Metric)", keywords: ["imperial", "metric", "measurement"], trigger: () => { const sel = document.getElementById("unit-select"); if (!sel) return false; sel.value = sel.value === "imperial" ? "metric" : "imperial"; sel.dispatchEvent(new Event("change", { bubbles: true })); return true; } },
   { id: "workflow:equipment", label: "Go to Equipment List", keywords: ["navigation", "equipment"], href: "equipmentlist.html" },
   { id: "workflow:load", label: "Go to Load List", keywords: ["navigation", "load"], href: "loadlist.html" },
   { id: "workflow:cable", label: "Go to Cable Schedule", keywords: ["navigation", "cables"], href: "cableschedule.html" },
   { id: "workflow:raceway", label: "Go to Raceway Schedule", keywords: ["navigation", "tray", "conduit"], href: "racewayschedule.html" },
-  { id: "workflow:oneline", label: "Go to One-Line", keywords: ["navigation", "diagram"], href: "oneline.html" },
+  { id: "workflow:ductbank", label: "Go to Ductbank Analysis", keywords: ["navigation", "underground", "thermal"], href: "ductbankroute.html" },
+  { id: "workflow:trayfill", label: "Go to Tray Fill", keywords: ["navigation", "fill", "capacity"], href: "cabletrayfill.html" },
+  { id: "workflow:conduitfill", label: "Go to Conduit Fill", keywords: ["navigation", "fill", "nec"], href: "conduitfill.html" },
+  { id: "workflow:route", label: "Go to Optimal Route", keywords: ["navigation", "routing", "dijkstra", "pathfinding"], href: "optimalRoute.html" },
+  { id: "workflow:oneline", label: "Go to One-Line Diagram", keywords: ["navigation", "diagram", "schematic"], href: "oneline.html" },
+  { id: "workflow:panel", label: "Go to Panel Schedule", keywords: ["navigation", "panel", "branch"], href: "panelschedule.html" },
   { id: "calc:loadflow", label: "Run Load Flow", keywords: ["calculation", "study", "analysis"], trigger: () => clickById("run-loadflow-btn") },
-  { id: "calc:shortcircuit", label: "Run Short Circuit", keywords: ["calculation", "study", "analysis"], trigger: () => clickById("run-shortcircuit-btn") },
-  { id: "calc:arcflash", label: "Run Arc Flash", keywords: ["calculation", "study", "analysis"], trigger: () => clickById("run-arcflash-btn") }
+  { id: "calc:shortcircuit", label: "Run Short Circuit", keywords: ["calculation", "study", "analysis", "fault"], trigger: () => clickById("run-shortcircuit-btn") },
+  { id: "calc:arcflash", label: "Run Arc Flash", keywords: ["calculation", "study", "analysis", "hazard"], trigger: () => clickById("run-arcflash-btn") }
 ];
 
 function clickById(id) {

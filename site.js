@@ -926,7 +926,11 @@ function initSettings(){
       onboardingBtn.id='reopen-onboarding-btn';
       onboardingBtn.textContent='Reopen Onboarding';
       helpBtn.insertAdjacentElement('afterend',onboardingBtn);
-      onboardingBtn.addEventListener('click',()=>{
+    }
+    const onboardingReopenBtn=document.getElementById('reopen-onboarding-btn');
+    if(onboardingReopenBtn&&!onboardingReopenBtn.dataset.wired){
+      onboardingReopenBtn.dataset.wired='1';
+      onboardingReopenBtn.addEventListener('click',()=>{
         runOnboardingFlow({force:true,source:'settings'}).catch(err=>{
           console.error('Onboarding reopen failed',err);
         });

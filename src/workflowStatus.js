@@ -10,30 +10,59 @@ const workflowOrder = [
   { key: 'oneLineDiagram', label: '7. One-Line Diagram', href: 'oneline.html' }
 ];
 
-function isStepComplete(key) {
+function pluralize(count, singular, plural) {
+  return `${count} ${count === 1 ? singular : plural}`;
+}
+
+function getStepStatus(key) {
   if (key === 'cableSchedule') {
-    return getCables().length > 0;
+    const count = getCables().length;
+    if (count > 0) return { complete: true, label: pluralize(count, 'cable', 'cables') };
+    return { complete: false, label: 'Add cables to begin', hint: 'Define the cables to be routed.' };
   }
   if (key === 'racewaySchedule') {
-    return getDuctbanks().length > 0 || getTrays().length > 0 || getConduits().length > 0;
+    const trays = getTrays().length;
+    const conduits = getConduits().length;
+    const ductbanks = getDuctbanks().length;
+    const total = trays + conduits + ductbanks;
+    if (total > 0) {
+      const parts = [];
+      if (trays > 0) parts.push(pluralize(trays, 'tray', 'trays'));
+      if (conduits > 0) parts.push(pluralize(conduits, 'conduit', 'conduits'));
+      if (ductbanks > 0) parts.push(pluralize(ductbanks, 'ductbank', 'ductbanks'));
+      return { complete: true, label: parts.join(', ') };
+    }
+    return { complete: false, label: 'Add trays or conduits', hint: 'Catalog the raceway infrastructure.' };
   }
   if (key === 'ductbankSchedule') {
-    return getDuctbanks().length > 0;
+    const count = getDuctbanks().length;
+    if (count > 0) return { complete: true, label: pluralize(count, 'ductbank', 'ductbanks') };
+    return { complete: false, label: 'Optional — no ductbanks yet', hint: 'Analyze underground ductbanks for thermal constraints.' };
   }
   if (key === 'traySchedule') {
-    return getTrays().length > 0;
+    const count = getTrays().length;
+    if (count > 0) return { complete: true, label: pluralize(count, 'tray', 'trays') };
+    return { complete: false, label: 'Add trays in Raceway Schedule', hint: 'Tray fill requires trays defined in Raceway Schedule.' };
   }
   if (key === 'conduitSchedule') {
-    return getConduits().length > 0;
+    const count = getConduits().length;
+    if (count > 0) return { complete: true, label: pluralize(count, 'conduit', 'conduits') };
+    return { complete: false, label: 'Add conduits in Raceway Schedule', hint: 'Conduit fill requires conduits defined in Raceway Schedule.' };
   }
   if (key === 'optimalRoute') {
-    return getCables().length > 0 && getTrays().length > 0;
+    const cables = getCables().length;
+    const trays = getTrays().length;
+    if (cables > 0 && trays > 0) return { complete: true, label: `${pluralize(cables, 'cable', 'cables')} ready to route` };
+    if (cables === 0) return { complete: false, label: 'Needs cables first', hint: 'Define cables in Cable Schedule before routing.' };
+    return { complete: false, label: 'Needs raceway data', hint: 'Add trays or conduits in Raceway Schedule before routing.' };
   }
   if (key === 'oneLineDiagram') {
     const { sheets } = getOneLine();
-    return sheets.some(s => (s.components || []).length > 0);
+    const componentCount = sheets.reduce((sum, s) => sum + (s.components || []).length, 0);
+    if (componentCount > 0) return { complete: true, label: pluralize(componentCount, 'component', 'components') };
+    return { complete: false, label: 'Not started', hint: 'Draw a single-line diagram and export to PDF or DXF.' };
   }
-  return false;
+  return { complete: false, label: 'Not started', hint: null };
 }
 
 window.addEventListener('DOMContentLoaded', () => {
@@ -45,21 +74,22 @@ window.addEventListener('DOMContentLoaded', () => {
     const statusEl = card.querySelector('.status');
     if (!statusEl || !key) return;
 
-    const complete = isStepComplete(key);
+    const { complete, label, hint } = getStepStatus(key);
+
+    statusEl.textContent = label;
+
     if (complete) {
       card.classList.add('complete');
-      statusEl.textContent = 'Complete';
-      statusEl.setAttribute('aria-label', 'Completed');
+      statusEl.classList.add('status-complete');
+      statusEl.setAttribute('aria-label', `Complete — ${label}`);
       completeCount += 1;
-      return;
+    } else {
+      statusEl.classList.add('status-incomplete');
+      if (hint) {
+        card.setAttribute('title', hint);
+        card.setAttribute('aria-description', hint);
+      }
     }
-
-    if (key === 'optimalRoute' && getCables().length > 0) {
-      statusEl.textContent = 'Needs raceway data';
-      return;
-    }
-
-    statusEl.textContent = 'Not started';
   });
 
   const progressText = document.getElementById('workflow-progress-text');
@@ -75,7 +105,7 @@ window.addEventListener('DOMContentLoaded', () => {
     progressTrack.setAttribute('aria-valuenow', completeCount);
   }
 
-  const nextStep = workflowOrder.find(step => !isStepComplete(step.key));
+  const nextStep = workflowOrder.find(step => !getStepStatus(step.key).complete);
   const nextStepEl = document.getElementById('workflow-next-step');
   if (nextStepEl) {
     if (nextStep) {
