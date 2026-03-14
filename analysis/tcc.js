@@ -4862,7 +4862,7 @@ async function openCustomCurveBuilder(curveId = null) {
     }
     const currentText = `${formatCustomCurveValue(dataPoint.current)} A`;
     const timeText = `${formatCustomCurveValue(dataPoint.time)} s`;
-    hoverTooltipEl.innerHTML = `<span>${currentText}</span><span>${timeText}</span>`;
+    hoverTooltipEl.innerHTML = `<span>${escapeHtml(currentText)}</span><span>${escapeHtml(timeText)}</span>`;
     const margin = 16;
     const containerWidth = canvasContainer.offsetWidth || containerRect.width;
     const containerHeight = canvasContainer.offsetHeight || containerRect.height;
@@ -7144,7 +7144,7 @@ function plot() {
 
   const updateDutyResults = violations => {
     if (violations.length) {
-      violationDiv.innerHTML = violations.map(v => `<p>${v}</p>`).join('');
+      violationDiv.innerHTML = violations.map(v => `<p>${escapeHtml(v)}</p>`).join('');
     } else {
       violationDiv.textContent = '';
     }

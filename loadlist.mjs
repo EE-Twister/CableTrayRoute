@@ -1,4 +1,5 @@
 import * as dataStore from './dataStore.mjs';
+import { escapeHtml as escapeAttr, escapeHtml } from './src/htmlUtils.mjs';
 
 class ContextMenu {
   constructor(items = []) {
@@ -303,28 +304,28 @@ if (typeof window !== 'undefined') {
     tr.classList.add(rowClass);
     tr.innerHTML = `
       <td><input type="checkbox" class="row-select" aria-label="Select row"></td>
-      <td><input name="source" type="text" value="${load.source || ''}"></td>
-      <td><input name="tag" type="text" value="${load.tag || ''}"></td>
-      <td><input name="description" type="text" value="${load.description || ''}"></td>
-      <td><input name="manufacturer" type="text" class="manufacturer-input" value="${load.manufacturer || ''}"></td>
-      <td><input name="model" type="text" class="model-input" value="${load.model || ''}"></td>
-      <td><input name="quantity" type="number" step="any" maxlength="15" value="${load.quantity || ''}"></td>
-      <td><input name="voltage" type="number" step="any" maxlength="15" value="${load.voltage || ''}"></td>
-      <td><input name="loadType" type="text" value="${load.loadType || ''}"></td>
+      <td><input name="source" type="text" value="${escapeAttr(load.source || '')}"></td>
+      <td><input name="tag" type="text" value="${escapeAttr(load.tag || '')}"></td>
+      <td><input name="description" type="text" value="${escapeAttr(load.description || '')}"></td>
+      <td><input name="manufacturer" type="text" class="manufacturer-input" value="${escapeAttr(load.manufacturer || '')}"></td>
+      <td><input name="model" type="text" class="model-input" value="${escapeAttr(load.model || '')}"></td>
+      <td><input name="quantity" type="number" step="any" maxlength="15" value="${escapeAttr(load.quantity || '')}"></td>
+      <td><input name="voltage" type="number" step="any" maxlength="15" value="${escapeAttr(load.voltage || '')}"></td>
+      <td><input name="loadType" type="text" value="${escapeAttr(load.loadType || '')}"></td>
       <td><select name="duty">
         <option value=""></option>
         <option value="Continuous"${load.duty === 'Continuous' ? ' selected' : ''}>Continuous</option>
         <option value="Intermittent"${load.duty === 'Intermittent' ? ' selected' : ''}>Intermittent</option>
         <option value="Stand-by"${load.duty === 'Stand-by' ? ' selected' : ''}>Stand-by</option>
       </select></td>
-      <td><input name="kw" type="number" step="any" maxlength="15" value="${load.kw || ''}"></td>
-      <td><input name="powerFactor" type="number" step="any" maxlength="15" value="${load.powerFactor || ''}"></td>
-      <td><input name="loadFactor" type="number" step="any" maxlength="15" value="${load.loadFactor || ''}"></td>
-      <td><input name="efficiency" type="number" step="any" maxlength="15" value="${load.efficiency || ''}"></td>
-      <td><input name="demandFactor" type="number" step="any" maxlength="15" value="${load.demandFactor || ''}"></td>
-      <td><input name="phases" type="number" step="any" maxlength="15" value="${load.phases || ''}"></td>
-      <td><input name="circuit" type="text" value="${load.circuit || ''}"></td>
-      <td><textarea name="notes">${load.notes || ''}</textarea></td>
+      <td><input name="kw" type="number" step="any" maxlength="15" value="${escapeAttr(load.kw || '')}"></td>
+      <td><input name="powerFactor" type="number" step="any" maxlength="15" value="${escapeAttr(load.powerFactor || '')}"></td>
+      <td><input name="loadFactor" type="number" step="any" maxlength="15" value="${escapeAttr(load.loadFactor || '')}"></td>
+      <td><input name="efficiency" type="number" step="any" maxlength="15" value="${escapeAttr(load.efficiency || '')}"></td>
+      <td><input name="demandFactor" type="number" step="any" maxlength="15" value="${escapeAttr(load.demandFactor || '')}"></td>
+      <td><input name="phases" type="number" step="any" maxlength="15" value="${escapeAttr(load.phases || '')}"></td>
+      <td><input name="circuit" type="text" value="${escapeAttr(load.circuit || '')}"></td>
+      <td><textarea name="notes">${escapeHtml(load.notes || '')}</textarea></td>
       <td class="kva">${format(load.kva)}</td>
       <td class="current">${format(load.current)}</td>
       <td class="demand-kva">${format(load.demandKva)}</td>
@@ -471,7 +472,7 @@ if (typeof window !== 'undefined') {
     }
     let html = '<table><thead><tr><th>Source</th><th>kW</th><th>kVA</th><th>Demand kW</th><th>Demand kVA</th></tr></thead><tbody>';
     for (const [src, totals] of entries) {
-      html += `<tr><td>${src}</td><td>${totals.kW.toFixed(2)}</td><td>${totals.kVA.toFixed(2)}</td><td>${totals.demandKW.toFixed(2)}</td><td>${totals.demandKVA.toFixed(2)}</td></tr>`;
+      html += `<tr><td>${escapeHtml(src)}</td><td>${totals.kW.toFixed(2)}</td><td>${totals.kVA.toFixed(2)}</td><td>${totals.demandKW.toFixed(2)}</td><td>${totals.demandKVA.toFixed(2)}</td></tr>`;
     }
     html += '</tbody></table>';
     summaryDiv.innerHTML = html;

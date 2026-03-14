@@ -34,12 +34,14 @@ function suppressResumeIfE2E() {
 window.E2E = E2E;
 
 import { emitAsync } from './utils/safeEvents.mjs';
+import { fetchDataFile } from './src/fetchUtils.mjs';
 
 /**
  * Escape a string for safe insertion into HTML content or attributes.
  * Use instead of raw template literals in innerHTML assignments.
  */
 function escapeHtml(str) {
+    if (str === null || str === undefined) return '';
     return String(str)
         .replace(/&/g, '&amp;')
         .replace(/</g, '&lt;')
@@ -47,6 +49,8 @@ function escapeHtml(str) {
         .replace(/"/g, '&quot;')
         .replace(/'/g, '&#39;');
 }
+/** Alias for escapeHtml — use in attribute value contexts for readability. */
+const escapeAttr = escapeHtml;
 
 /**
  * Return true only for URLs that are safe to use as href values.
@@ -127,13 +131,7 @@ if (typeof OffscreenCanvas !== 'undefined') {
 // Lazy-load conductor property data when needed.
 async function ensureConductorProps() {
     if (!globalThis.CONDUCTOR_PROPS) {
-        try {
-            const resp = await fetch('data/conductor_properties.json');
-            globalThis.CONDUCTOR_PROPS = await resp.json();
-        } catch (err) {
-            console.error('Failed to load conductor properties', err);
-            globalThis.CONDUCTOR_PROPS = {};
-        }
+        globalThis.CONDUCTOR_PROPS = await fetchDataFile('data/conductor_properties.json', {});
     }
     return globalThis.CONDUCTOR_PROPS;
 }
@@ -494,14 +492,7 @@ async function initializeApp() {
             return;
         }
         state.geometryWarnings = { ductbanks: [], conduits: [] };
-        try {
-            const res = await fetch('data/ductbank_geometry.json');
-            if (res.ok) {
-                state.ductbankData = await res.json();
-            }
-        } catch (e) {
-            console.warn('Unable to load ductbank geometry', e);
-        }
+        state.ductbankData = await fetchDataFile('data/ductbank_geometry.json', null);
         if (state.ductbankData && Array.isArray(state.ductbankData.ductbanks)) {
             state.ductbankData.ductbanks = state.ductbankData.ductbanks.filter(db => {
                 const hasOutline = Array.isArray(db.outline) && db.outline.length >= 2;
@@ -1863,7 +1854,7 @@ async function initializeApp() {
                 if (formatters[h.key]) {
                     table += `<td>${formatters[h.key](val, row)}</td>`;
                 } else {
-                    table += `<td>${val !== undefined ? val : 'N/A'}</td>`;
+                    table += `<td>${val !== undefined ? escapeHtml(val) : 'N/A'}</td>`;
                 }
             });
             table += '</tr>';
@@ -2096,7 +2087,7 @@ const openDuctbankRoute = (dbId, conduitId) => {
             '<th></th><th></th></tr></thead><tbody>';
         state.manualTrays.forEach((t, idx) => {
             table += `<tr data-idx="${idx}">
-                        <td><input type="text" class="tray-id-input" data-idx="${idx}" value="${t.tray_id}" style="width:80px;"></td>
+                        <td><input type="text" class="tray-id-input" data-idx="${idx}" value="${escapeAttr(t.tray_id)}" style="width:80px;"></td>
                         <td>
                             <input type="number" class="tray-start-input" data-idx="${idx}" data-coord="0" value="${t.start_x}" step="0.1" style="width:70px;">
                             <input type="number" class="tray-start-input" data-idx="${idx}" data-coord="1" value="${t.start_y}" step="0.1" style="width:70px;">
@@ -2110,7 +2101,7 @@ const openDuctbankRoute = (dbId, conduitId) => {
                         <td><input type="number" class="tray-width-input" data-idx="${idx}" value="${t.width}" min="0" step="0.1" style="width:60px;"></td>
                         <td><input type="number" class="tray-height-input" data-idx="${idx}" value="${t.height}" min="0" step="0.1" style="width:60px;"></td>
                         <td><input type="number" class="tray-fill-input" data-idx="${idx}" value="${t.current_fill}" min="0" step="0.1" style="width:80px;"></td>
-                        <td><input type="text" class="tray-group-input" data-idx="${idx}" value="${t.allowed_cable_group || ''}" style="width:100px;"></td>
+                        <td><input type="text" class="tray-group-input" data-idx="${idx}" value="${escapeAttr(t.allowed_cable_group || '')}" style="width:100px;"></td>
                         <td>
                             <select class="tray-shape-select" data-idx="${idx}" style="width:100px;">
                                 ${SHAPE_CODES.map(s => `<option value="${s}" ${t.shape === s ? 'selected' : ''}>${s}</option>`).join('')}
@@ -2363,7 +2354,7 @@ const renderPullChecks = (results) => {
         const tAllow = pc.allowableTension;
         const p = pc.maxSidewallPressure;
         const pAllow = pc.allowableSidewallPressure;
-        html += `<tr><td>${r.cable}</td><td>${t !== undefined ? Number(t).toFixed(2) : 'N/A'}</td><td>${tAllow !== undefined && isFinite(tAllow) ? Number(tAllow).toFixed(2) : 'N/A'}</td><td>${p !== undefined ? Number(p).toFixed(2) : 'N/A'}</td><td>${pAllow !== undefined && isFinite(pAllow) ? Number(pAllow).toFixed(2) : 'N/A'}</td></tr>`;
+        html += `<tr><td>${escapeHtml(r.cable)}</td><td>${t !== undefined ? Number(t).toFixed(2) : 'N/A'}</td><td>${tAllow !== undefined && isFinite(tAllow) ? Number(tAllow).toFixed(2) : 'N/A'}</td><td>${p !== undefined ? Number(p).toFixed(2) : 'N/A'}</td><td>${pAllow !== undefined && isFinite(pAllow) ? Number(pAllow).toFixed(2) : 'N/A'}</td></tr>`;
     });
     html += '</tbody></table></div>';
     elements.pullChecksContainer.innerHTML = html;
@@ -2390,7 +2381,7 @@ const renderBatchResults = (results) => {
             const totalLabel = isSuccess ? `${fmt(tl)}` : 'N/A';
             const fieldLabel = isSuccess ? `${fmt(fl)} field` : '';
             const segsLabel = isSuccess ? ` · ${res.segments_count} segs` : '';
-            html += `<details class="${rowClass}"><summary>${res.cable} <span class="route-status-badge">${res.status}</span> <span class="route-mode-badge">${res.mode}</span> ${totalLabel}${fieldLabel ? ' · ' + fieldLabel : ''}${segsLabel} <button class="view-map-btn" data-index="${idx}">View on Map</button>${lockBtn}</summary>`;
+            html += `<details class="${rowClass}"><summary>${escapeHtml(res.cable)} <span class="route-status-badge">${escapeHtml(res.status)}</span> <span class="route-mode-badge">${escapeHtml(res.mode)}</span> ${escapeHtml(totalLabel)}${fieldLabel ? ' · ' + escapeHtml(fieldLabel) : ''}${escapeHtml(segsLabel)} <button class="view-map-btn" data-index="${idx}">View on Map</button>${lockBtn}</summary>`;
             if (res.exclusions && res.exclusions.length > 0) {
                 res.exclusions.forEach(ex => {
                     if (ex.reason) {
@@ -2405,7 +2396,7 @@ const renderBatchResults = (results) => {
                     const reason = m.reason.replace(/_/g, ' ');
                     const cable = m.cable_id ? ` (cable ${m.cable_id})` : '';
                     const link = m.filter ? ` <a href="${m.filter}">Filter</a>` : '';
-                    html += `<li>${id}: ${reason}${cable}${link}</li>`;
+                    html += `<li>${escapeHtml(id)}: ${escapeHtml(reason)}${escapeHtml(cable)}${link}</li>`;
                 });
                 html += '</ul>';
             }
@@ -2424,7 +2415,7 @@ const renderBatchResults = (results) => {
                     } else if (b.tray_id && b.tray_id !== 'Field Route' && b.tray_id !== 'N/A') {
                         link = `<button class="tray-fill-btn" data-tray="${b.tray_id}">Fill</button>`;
                     }
-                    html += `<tr><td>${b.segment}</td><td>${racewayId}</td><td>${conduit}</td><td>${b.type}</td><td>${b.from}</td><td>${b.to}</td><td>${b.length}</td><td>${b.raceway || ''}</td><td>${link}</td></tr>`;
+                    html += `<tr><td>${escapeHtml(b.segment)}</td><td>${escapeHtml(racewayId)}</td><td>${escapeHtml(conduit)}</td><td>${escapeHtml(b.type)}</td><td>${escapeHtml(b.from)}</td><td>${escapeHtml(b.to)}</td><td>${escapeHtml(b.length)}</td><td>${escapeHtml(b.raceway || '')}</td><td>${link}</td></tr>`;
                 });
                 html += '</tbody></table></div>';
             }
@@ -2540,9 +2531,9 @@ const renderBatchResults = (results) => {
             '<th data-key="locked">Locked</th><th></th><th></th></tr></thead><tbody>';
         state.cableList.forEach((c, idx) => {
             html += `<tr>
-                        <td><input type="text" class="cable-tag-input" data-idx="${idx}" value="${c.name}"></td>
-                        <td><input type="text" class="cable-start-tag-input" data-idx="${idx}" value="${c.start_tag || ''}" style="width:180px;"></td>
-                        <td><input type="text" class="cable-end-tag-input" data-idx="${idx}" value="${c.end_tag || ''}" style="width:180px;"></td>
+                        <td><input type="text" class="cable-tag-input" data-idx="${idx}" value="${escapeAttr(c.name)}"></td>
+                        <td><input type="text" class="cable-start-tag-input" data-idx="${idx}" value="${escapeAttr(c.start_tag || '')}" style="width:180px;"></td>
+                        <td><input type="text" class="cable-end-tag-input" data-idx="${idx}" value="${escapeAttr(c.end_tag || '')}" style="width:180px;"></td>
                         <td>
                             <select class="cable-type-select" data-idx="${idx}">
                                 <option value="Power" ${c.cable_type === 'Power' ? 'selected' : ''}>Power</option>
@@ -2578,7 +2569,7 @@ const renderBatchResults = (results) => {
                         </td>
                         <td><input type="number" class="cable-diameter-input" data-idx="${idx}" value="${c.diameter}" min="0" step="0.01" style="width:60px;"></td>
                         <td><input type="number" class="cable-weight-input" data-idx="${idx}" value="${c.weight || 0}" min="0" step="0.01" style="width:80px;"></td>
-                        <td><input type="text" class="cable-group-input" data-idx="${idx}" value="${c.allowed_cable_group || ''}" style="width:120px;"></td>
+                        <td><input type="text" class="cable-group-input" data-idx="${idx}" value="${escapeAttr(c.allowed_cable_group || '')}" style="width:120px;"></td>
                         <td>
                             <input type="number" class="cable-start-input" data-idx="${idx}" data-coord="0" value="${c.start[0]}" step="0.1" style="width:60px;">
                             <input type="number" class="cable-start-input" data-idx="${idx}" data-coord="1" value="${c.start[1]}" step="0.1" style="width:60px;">
@@ -2589,7 +2580,7 @@ const renderBatchResults = (results) => {
                             <input type="number" class="cable-end-input" data-idx="${idx}" data-coord="1" value="${c.end[1]}" step="0.1" style="width:60px;">
                             <input type="number" class="cable-end-input" data-idx="${idx}" data-coord="2" value="${c.end[2]}" step="0.1" style="width:60px;">
                         </td>
-                        <td><input type="text" class="cable-manual-input" data-idx="${idx}" value="${c.manual_path || ''}" placeholder="Tray1>Tray2 or x,y,z;..." style="width:180px;"></td>
+                        <td><input type="text" class="cable-manual-input" data-idx="${idx}" value="${escapeAttr(c.manual_path || '')}" placeholder="Tray1>Tray2 or x,y,z;..." style="width:180px;"></td>
                         <td><span class="lock-indicator">${c.locked ? '🔒' : ''}</span>${c.locked ? `<button class="unlock-cable" data-idx="${idx}">Unlock</button>` : (c.route_segments && c.route_segments.length ? `<button class="relock-cable" data-idx="${idx}">Relock</button>` : '')}</td>
                         <td><button class="icon-button dup-cable" data-idx="${idx}" title="Duplicate">📋</button></td>
                         <td><button class="icon-button del-cable icon-delete" data-idx="${idx}" title="Delete">\u274C</button></td>
@@ -2891,8 +2882,8 @@ const renderBatchResults = (results) => {
             return;
         }
         const [conductorProps, materialCosts] = await Promise.all([
-            fetch('data/conductor_properties.json').then(r => r.json()),
-            fetch('data/material_costs.json').then(r => r.json())
+            fetchDataFile('data/conductor_properties.json', {}),
+            fetchDataFile('data/material_costs.json', {})
         ]);
         const { raceways, cables } = buildBOM(state.latestRouteData, state.trayData, state.cableList, conductorProps, materialCosts);
         const wb = XLSX.utils.book_new();
@@ -3413,7 +3404,7 @@ const renderBatchResults = (results) => {
                             if (c.recommendation === 'conduit') {
                                 fillLink = ` <a href="#" class="conduit-fill-link" data-route-index="${idx}">Fill</a>`;
                             }
-                            html += `<li class="shared-route-item" data-route-index="${idx}">${c.name}${group}: ${formatPoint(c.start)} to ${formatPoint(c.end)} - ${c.cables.join(', ')} | ${recText}${fillLink}</li>`;
+                            html += `<li class="shared-route-item" data-route-index="${idx}">${escapeHtml(c.name)}${escapeHtml(group)}: ${escapeHtml(formatPoint(c.start))} to ${escapeHtml(formatPoint(c.end))} - ${escapeHtml(c.cables.join(', '))} | ${escapeHtml(recText)}${fillLink}</li>`;
                         });
                         html += '</ul></details>';
                         elements.metrics.innerHTML = html;
@@ -4178,8 +4169,8 @@ Plotly.newPlot(document.getElementById('plot'), data, layout, {responsive: true}
             setProjectState({name:'',ductbanks:[],conduits:[],trays:[],cables:[],settings:{session:{},collapsedGroups:{},units:'imperial'}});
             diag.cleared=true;
             const [raceways,cables]=await Promise.all([
-                fetch('examples/sample_raceways.json').then(r=>r.json()),
-                fetch('examples/sample_cables.json').then(r=>r.json())
+                fetchDataFile('examples/sample_raceways.json', {}),
+                fetchDataFile('examples/sample_cables.json', [])
             ]);
             const proj=getProjectState();
             proj.ductbanks=raceways.ductbanks||[];
