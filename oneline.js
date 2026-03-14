@@ -8688,7 +8688,9 @@ async function chooseCable(source, target, existingConn = null) {
     const res = await fetch('cableTemplates.json');
     const arr = await res.json();
     arr.forEach(t => templateData.push(t));
-  } catch (e) {}
+  } catch (e) {
+    console.warn('chooseCable: could not load cableTemplates.json', e);
+  }
 
   const existingTemplates = [];
   const seen = new Set();

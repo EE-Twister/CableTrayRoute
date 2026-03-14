@@ -456,7 +456,6 @@ async function initializeApp() {
     };
 
     const displayConduitCount = (count, hasSchedule) => {
-        console.log(`Conduits added: ${count}`);
         const el = typeof document !== 'undefined' && document.getElementById('conduit-count');
         if (el) {
             el.textContent = `Conduits added: ${count}`;
@@ -2681,7 +2680,7 @@ const renderBatchResults = (results) => {
         elements.cableListContainer.querySelectorAll('.dup-cable').forEach(btn => {
             btn.addEventListener('click', e => {
                 const i = parseInt(e.target.dataset.idx, 10);
-                const copy = JSON.parse(JSON.stringify(state.cableList[i]));
+                const copy = structuredClone(state.cableList[i]);
                 copy.name = nextCableName(copy.name);
                 state.cableList.splice(i + 1, 0, copy);
                 updateCableListDisplay();
@@ -3189,7 +3188,7 @@ const renderBatchResults = (results) => {
         };
 
         // Deep copy tray data so original state isn't mutated during batch routing
-        const trayDataForRun = JSON.parse(JSON.stringify(state.trayData));
+        const trayDataForRun = structuredClone(state.trayData);
 
         const showManualPathError = (idx, message, trayId) => {
             const input = elements.cableListContainer.querySelector(`.cable-manual-input[data-idx='${idx}']`);

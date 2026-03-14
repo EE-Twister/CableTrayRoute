@@ -80,13 +80,8 @@ function formatPanelSelectorLabel(panel, index = 0) {
 
 function clonePanelState(panel) {
   if (!panel) return null;
-  if (typeof structuredClone === "function") {
-    try {
-      return structuredClone(panel);
-    } catch {}
-  }
   try {
-    return JSON.parse(JSON.stringify(panel));
+    return structuredClone(panel);
   } catch {
     return { ...panel };
   }

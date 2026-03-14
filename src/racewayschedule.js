@@ -272,8 +272,8 @@ document.addEventListener('DOMContentLoaded', async () => {
 
   function loadRacewayOptions(){
     const ids=new Set();
-    try{ dataStore.getTrays().forEach(t=>{ if(t.tray_id) ids.add(t.tray_id); }); }catch(e){}
-    try{ dataStore.getConduits().forEach(c=>{ const id=c.tray_id||c.conduit_id; if(id) ids.add(id); }); }catch(e){}
+    try{ dataStore.getTrays().forEach(t=>{ if(t.tray_id) ids.add(t.tray_id); }); }catch(e){ console.warn('loadRacewayOptions: failed to read trays', e); }
+    try{ dataStore.getConduits().forEach(c=>{ const id=c.tray_id||c.conduit_id; if(id) ids.add(id); }); }catch(e){ console.warn('loadRacewayOptions: failed to read conduits', e); }
     racewaySelect.innerHTML='';
     Array.from(ids).forEach(id=>{const o=document.createElement('option');o.value=id;o.textContent=id;racewaySelect.appendChild(o);});
   }
@@ -533,7 +533,6 @@ document.addEventListener('DOMContentLoaded', async () => {
         dataStore.setConduits(conduitRowsRaw);
       } catch(e) { console.error('Failed to store sample data', e); }
       markSaved();
-      console.log(`Loaded samples: ductbanks=${dbRows.length}, trays=${trayRows.length}, conduits=${conduitRowsRaw.length}`);
       showToast(`Loaded samples: ${dbRows.length} ductbanks, ${conduitRowsRaw.length} conduits, ${trayRows.length} trays.`, 'success');
     }catch(err){
       console.error(err);

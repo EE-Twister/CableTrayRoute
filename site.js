@@ -1603,10 +1603,10 @@ function loadConduits(){
         conduits:Array.isArray(cached.conduits)?cached.conduits:[]
       };
     }
-  }catch(e){}
+  }catch(e){ console.warn('loadConduits: cache read failed', e); }
   let ductbanks=[];let conduits=[];
-  try{ductbanks=getDuctbanks();}catch(e){}
-  try{conduits=getConduits();}catch(e){}
+  try{ductbanks=getDuctbanks();}catch(e){ console.warn('loadConduits: getDuctbanks failed', e); }
+  try{conduits=getConduits();}catch(e){ console.warn('loadConduits: getConduits failed', e); }
   const flattened=[];
   ductbanks=ductbanks.map(db=>{
     (db.conduits||[]).forEach(c=>{

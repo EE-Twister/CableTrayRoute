@@ -77,13 +77,11 @@ describe("displayConduitCount", () => {
     const document = {
       getElementById: (id) => (id === "conduit-count" ? el : null),
     };
-    let logged = "";
-    const consoleStub = { log: (msg) => (logged = msg), warn: () => {} };
+    const consoleStub = { log: () => {}, warn: () => {} };
 
     displayConduitCount(count, false, document, {}, consoleStub);
 
     assert.strictEqual(el.textContent, "Conduits added: 2");
-    assert.strictEqual(logged, "Conduits added: 2");
   });
 });
 
