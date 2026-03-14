@@ -1,6 +1,16 @@
 // ---- Inline E2E helpers (no external import) ----
 const E2E = new URLSearchParams(location.search).has('e2e');
 
+function escapeHtml(value) {
+  if (value === null || value === undefined) return '';
+  return String(value)
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&#39;');
+}
+
 function markReady(flagName) {
   try {
     document.documentElement.setAttribute(flagName, '1');
@@ -974,7 +984,7 @@ function updateAmpacityReport(scroll=false){
  const over=(isFinite(neherNum)&&load>neherNum) ||
              (isFinite(finiteNum)&&load>finiteNum);
  if(window.cableOverLimit) window.cableOverLimit[c.tag]=over;
- return `<tr class="${over?'over-limit-row':''}"><td>${c.tag}</td>`+
+ return `<tr class="${over?'over-limit-row':''}"><td>${escapeHtml(c.tag)}</td>`+
         `<td>${d.Rdc.toFixed(4)}</td><td>${d.Yc.toFixed(3)}</td><td>${d.deltaTd.toFixed(2)}</td>`+
         `<td>${d.Rcond.toFixed(3)}</td><td>${d.Rins.toFixed(3)}</td><td>${d.Rduct.toFixed(3)}</td>`+
         `<td>${d.Rsoil.toFixed(3)}</td><td>${d.Rca.toFixed(3)}</td>`+
@@ -1499,7 +1509,7 @@ function validateThermalInputs(){
  const warnEl=document.getElementById('warning-area');
  if(warnEl){
    if(warnings.length){
-     warnEl.innerHTML=`<div class="message warning"><ul>${warnings.map(w=>`<li>${w}</li>`).join('')}</ul></div>`;
+     warnEl.innerHTML=`<div class="message warning"><ul>${warnings.map(w=>`<li>${escapeHtml(w)}</li>`).join('')}</ul></div>`;
      warnEl.style.display='block';
    }else{
      warnEl.innerHTML='';
@@ -2497,13 +2507,13 @@ function populateSoilReferences(data){
   const list=document.getElementById('soilResList');
   const table=document.getElementById('soilTableBody');
   if(list){
-    list.innerHTML=Object.values(data).map(o=>`<option value="${o.resistivity}">${o.desc}</option>`).join('');
+    list.innerHTML=Object.values(data).map(o=>`<option value="${escapeHtml(o.resistivity)}">${escapeHtml(o.desc)}</option>`).join('');
   }
   if(table){
     table.innerHTML='';
     Object.values(data).forEach(o=>{
       const tr=document.createElement('tr');
-      tr.innerHTML=`<td>${o.desc}</td><td>${o.resistivity}</td>`;
+      tr.innerHTML=`<td>${escapeHtml(o.desc)}</td><td>${escapeHtml(o.resistivity)}</td>`;
       table.appendChild(tr);
     });
   }

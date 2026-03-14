@@ -1,4 +1,5 @@
 import "./workflowStatus.js";
+import { fetchDataFile } from "./fetchUtils.mjs";
 import "../site.js";
 import "../tableUtils.mjs";
 import "../ductbankTable.js";
@@ -514,11 +515,10 @@ document.addEventListener('DOMContentLoaded', async () => {
     try{
       resetTableLoadState();
       let ductbanks=[],trays=[],conduits=[];
-      try{
-        const res=await fetch('examples/sampleRaceways.json');
-        ({ductbanks=[],trays=[],conduits=[]}=await res.json());
-      }catch(fetchErr){
-        console.warn('Sample raceways fetch failed, using built-in samples',fetchErr);
+      const sampleData=await fetchDataFile('examples/sampleRaceways.json', null);
+      if(sampleData){
+        ({ductbanks=[],trays=[],conduits=[]}=sampleData);
+      }else{
         ductbanks=sampleDuctbanks;
         trays=sampleTrays;
         conduits=sampleConduits;
@@ -672,9 +672,14 @@ document.addEventListener('DOMContentLoaded', async () => {
     overlay.querySelector('#wizard-conduit-file').addEventListener('change',async e=>{
       const f=e.target.files[0];if(f){const rows=await parseConduitFile(f);processRows(rows);} });
     overlay.querySelector('#wizard-load-sample').addEventListener('click',async()=>{
-      const res=await fetch('examples/ductbank_schedule_conduits.csv');
-      const txt=await res.text();
-      processRows(parseCsv(txt));
+      try{
+        const res=await fetch('examples/ductbank_schedule_conduits.csv');
+        if(!res.ok) throw new Error(`HTTP ${res.status}`);
+        const txt=await res.text();
+        processRows(parseCsv(txt));
+      }catch(err){
+        console.warn('Failed to load sample conduits CSV',err);
+      }
     });
   }
 

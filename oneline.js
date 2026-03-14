@@ -1,6 +1,16 @@
 // ---- Inline E2E helpers (no external import) ----
 const E2E = new URLSearchParams(location.search).has('e2e');
 
+function escapeHtml(value) {
+  if (value === null || value === undefined) return '';
+  return String(value)
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&#39;');
+}
+
 function e2eOpenDetails() {
   if (!new URLSearchParams(location.search).has('e2e')) return;
   document.querySelectorAll('details').forEach(d => { d.open = true; });
@@ -8387,34 +8397,34 @@ function selectComponent(compOrId) {
         const cableInfo = document.createElement('div');
         cableInfo.className = 'cable-info';
         cableInfo.innerHTML = `
-          <p><strong>Tag:</strong> ${cable.tag || ''}</p>
-          <p><strong>Type:</strong> ${cable.cable_type || ''}</p>
-          <p><strong>Cable Rating (V):</strong> ${cable.cable_rating ?? ''}</p>
-          <p><strong>Operating Voltage (V):</strong> ${formatOperatingVoltage(cable.operating_voltage) || ''}</p>
-          <p><strong>Conductors:</strong> ${cable.conductors || ''}</p>
-          <p><strong>Phases:</strong> ${Array.isArray(cable.phases) ? cable.phases.join(',') : cable.phases || ''}</p>
-          <p><strong>Conductor Size (AWG or mm²):</strong> ${cable.conductor_size || ''}</p>
-          <p><strong>Conductor Material (Cu/Al):</strong> ${cable.conductor_material || ''}</p>
-          <p><strong>Resistance (Ω/km):</strong> ${cable.resistance_per_km ?? ''}</p>
-          <p><strong>Reactance (Ω/km):</strong> ${cable.reactance_per_km ?? ''}</p>
-          <p><strong>Zero Sequence Impedance:</strong> ${cable.zero_sequence_impedance || ''}</p>
-          <p><strong>Mutual Coupling:</strong> ${cable.mutual_coupling || ''}</p>
-          <p><strong>Length:</strong> ${cable.length ?? ''}</p>
-          <p><strong>Operating Temperature (°C):</strong> ${cable.operating_temp ?? ''}</p>
-          <p><strong>Ambient Temperature (°C):</strong> ${cable.ambient_temp ?? ''}</p>
-          <p><strong>Thermal Rating/Ampacity (A):</strong> ${cable.thermal_rating_ampacity ?? ''}</p>
-          <p><strong>Shield/Armor Data:</strong> ${cable.shield_armor || ''}</p>
-          <p><strong>Impedance per Length:</strong> ${cable.impedance_per_length || ''}</p>
-          <p><strong>Capacitance (µF/km):</strong> ${cable.capacitance_per_km ?? ''}</p>
-          <p><strong>Insulation Type:</strong> ${cable.insulation_type || ''}</p>
-          <p><strong>Installation Type (in conduit, tray, buried):</strong> ${cable.install_method || ''}</p>
-          <p><strong>Short Circuit Rating (kA):</strong> ${cable.short_circuit_rating ?? ''}</p>
-          <p><strong>Grouping Factor:</strong> ${cable.grouping_factor ?? ''}</p>
-          <p><strong>Resistance Temp Correction Coeff:</strong> ${cable.resistance_temp_correction_coeff ?? ''}</p>
-          <p><strong>Core Configuration (1C,3C):</strong> ${cable.core_configuration || ''}</p>
-          <p><strong>Ground Return Path Resistance:</strong> ${cable.ground_return_path_resistance ?? ''}</p>
-          <p><strong>Impedance R (Ω):</strong> ${getImpedancePart(cable, 'r') || ''}</p>
-          <p><strong>Impedance X (Ω):</strong> ${getImpedancePart(cable, 'x') || ''}</p>
+          <p><strong>Tag:</strong> ${escapeHtml(cable.tag)}</p>
+          <p><strong>Type:</strong> ${escapeHtml(cable.cable_type)}</p>
+          <p><strong>Cable Rating (V):</strong> ${escapeHtml(cable.cable_rating ?? '')}</p>
+          <p><strong>Operating Voltage (V):</strong> ${escapeHtml(formatOperatingVoltage(cable.operating_voltage) || '')}</p>
+          <p><strong>Conductors:</strong> ${escapeHtml(cable.conductors)}</p>
+          <p><strong>Phases:</strong> ${escapeHtml(Array.isArray(cable.phases) ? cable.phases.join(',') : cable.phases || '')}</p>
+          <p><strong>Conductor Size (AWG or mm²):</strong> ${escapeHtml(cable.conductor_size)}</p>
+          <p><strong>Conductor Material (Cu/Al):</strong> ${escapeHtml(cable.conductor_material)}</p>
+          <p><strong>Resistance (Ω/km):</strong> ${escapeHtml(cable.resistance_per_km ?? '')}</p>
+          <p><strong>Reactance (Ω/km):</strong> ${escapeHtml(cable.reactance_per_km ?? '')}</p>
+          <p><strong>Zero Sequence Impedance:</strong> ${escapeHtml(cable.zero_sequence_impedance)}</p>
+          <p><strong>Mutual Coupling:</strong> ${escapeHtml(cable.mutual_coupling)}</p>
+          <p><strong>Length:</strong> ${escapeHtml(cable.length ?? '')}</p>
+          <p><strong>Operating Temperature (°C):</strong> ${escapeHtml(cable.operating_temp ?? '')}</p>
+          <p><strong>Ambient Temperature (°C):</strong> ${escapeHtml(cable.ambient_temp ?? '')}</p>
+          <p><strong>Thermal Rating/Ampacity (A):</strong> ${escapeHtml(cable.thermal_rating_ampacity ?? '')}</p>
+          <p><strong>Shield/Armor Data:</strong> ${escapeHtml(cable.shield_armor)}</p>
+          <p><strong>Impedance per Length:</strong> ${escapeHtml(cable.impedance_per_length)}</p>
+          <p><strong>Capacitance (µF/km):</strong> ${escapeHtml(cable.capacitance_per_km ?? '')}</p>
+          <p><strong>Insulation Type:</strong> ${escapeHtml(cable.insulation_type)}</p>
+          <p><strong>Installation Type (in conduit, tray, buried):</strong> ${escapeHtml(cable.install_method)}</p>
+          <p><strong>Short Circuit Rating (kA):</strong> ${escapeHtml(cable.short_circuit_rating ?? '')}</p>
+          <p><strong>Grouping Factor:</strong> ${escapeHtml(cable.grouping_factor ?? '')}</p>
+          <p><strong>Resistance Temp Correction Coeff:</strong> ${escapeHtml(cable.resistance_temp_correction_coeff ?? '')}</p>
+          <p><strong>Core Configuration (1C,3C):</strong> ${escapeHtml(cable.core_configuration)}</p>
+          <p><strong>Ground Return Path Resistance:</strong> ${escapeHtml(cable.ground_return_path_resistance ?? '')}</p>
+          <p><strong>Impedance R (Ω):</strong> ${escapeHtml(getImpedancePart(cable, 'r') || '')}</p>
+          <p><strong>Impedance X (Ω):</strong> ${escapeHtml(getImpedancePart(cable, 'x') || '')}</p>
         `;
         generalPanel.appendChild(cableInfo);
 
