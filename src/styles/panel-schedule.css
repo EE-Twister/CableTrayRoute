@@ -2429,6 +2429,13 @@ body.dark-mode .custom-curve-remove:focus {
     padding: 0.5rem;
 }
 
+/* The [hidden] attribute relies on the UA stylesheet's [hidden]{display:none}, but
+   author-level display:grid has the same specificity and wins in cascade order.
+   This rule explicitly enforces hidden when the attribute is present. */
+.command-palette-overlay[hidden] {
+  display: none;
+}
+
 .command-palette-overlay {
   position: fixed;
   inset: 0;
@@ -2580,6 +2587,11 @@ body.dark-mode .custom-curve-remove:focus {
 
   /* Hide keyboard shortcuts on small screens to save horizontal space */
   .command-palette-item kbd {
+    display: none;
+  }
+
+  /* Hide keyboard navigation hints on touch devices — ↑/↓ and Enter don't apply */
+  .command-palette-hint {
     display: none;
   }
 }

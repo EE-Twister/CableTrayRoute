@@ -143,6 +143,19 @@ function mountPersistentNavigation() {
   topNav.querySelectorAll('.nav-links').forEach(node => node.remove());
   topNav.appendChild(navLinks);
 
+  // Add a search button visible only on mobile (Ctrl+K is unavailable on touch devices)
+  if (!topNav.querySelector('.nav-search-btn')) {
+    const searchBtn = document.createElement('button');
+    searchBtn.className = 'nav-search-btn';
+    searchBtn.setAttribute('aria-label', 'Search commands');
+    searchBtn.setAttribute('title', 'Search commands');
+    searchBtn.textContent = '🔍';
+    searchBtn.addEventListener('click', () => {
+      document.dispatchEvent(new KeyboardEvent('keydown', { key: 'k', ctrlKey: true, bubbles: true }));
+    });
+    topNav.appendChild(searchBtn);
+  }
+
   const oldBreadcrumb = document.querySelector('.breadcrumb-trail');
   if (oldBreadcrumb) {
     oldBreadcrumb.remove();
