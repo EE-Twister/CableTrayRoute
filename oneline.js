@@ -2241,6 +2241,65 @@ function adjustZoom(factor, opts = {}) {
   setDiagramZoom((diagramZoom || DEFAULT_DIAGRAM_ZOOM) * factor, opts);
 }
 
+function zoomToFit() {
+  if (!components.length) return;
+  const svg = document.getElementById('diagram');
+  const editor = svg?.parentElement;
+  if (!(editor instanceof HTMLElement)) return;
+  let minX = Infinity, minY = Infinity, maxX = -Infinity, maxY = -Infinity;
+  components.forEach(comp => {
+    const b = componentBounds(comp);
+    minX = Math.min(minX, b.left);
+    minY = Math.min(minY, b.top);
+    maxX = Math.max(maxX, b.right);
+    maxY = Math.max(maxY, b.bottom);
+  });
+  if (!Number.isFinite(minX)) return;
+  const pad = 60;
+  const contentW = maxX - minX + pad * 2;
+  const contentH = maxY - minY + pad * 2;
+  const containerW = editor.clientWidth;
+  const containerH = editor.clientHeight;
+  if (!containerW || !containerH) return;
+  const fitZoom = clampZoom(Math.min(containerW / contentW, containerH / contentH));
+  const prevZoom = diagramZoom || DEFAULT_DIAGRAM_ZOOM;
+  diagramZoom = fitZoom;
+  setItem('diagramZoom', Number(diagramZoom.toFixed(2)));
+  applyDiagramZoom({ adjustScroll: false, previousZoom: prevZoom });
+  const centerX = (minX + maxX) / 2;
+  const centerY = (minY + maxY) / 2;
+  const nextLeft = (centerX - diagramViewport.minX) * diagramZoom - editor.clientWidth / 2;
+  const nextTop = (centerY - diagramViewport.minY) * diagramZoom - editor.clientHeight / 2;
+  editor.scrollLeft = Math.max(0, nextLeft);
+  editor.scrollTop = Math.max(0, nextTop);
+  updateZoomDisplay();
+}
+
+function updateStatusBar() {
+  const coordsEl = document.getElementById('status-coords');
+  const selEl = document.getElementById('status-selection');
+  const modeEl = document.getElementById('status-mode');
+  if (coordsEl) {
+    coordsEl.textContent = cursorPosValid
+      ? `x: ${Math.round(cursorPos.x)}, y: ${Math.round(cursorPos.y)}`
+      : '';
+  }
+  if (selEl) {
+    if (selection.length > 1) {
+      selEl.textContent = `${selection.length} items selected`;
+    } else if (selected) {
+      selEl.textContent = selected.label || selected.subtype || selected.id || '1 item selected';
+    } else if (selectedConnection) {
+      selEl.textContent = 'Connection selected';
+    } else {
+      selEl.textContent = '';
+    }
+  }
+  if (modeEl) {
+    modeEl.textContent = connectMode ? 'Connect mode — click a port to start, another to finish (Esc to cancel)' : '';
+  }
+}
+
 function panDiagram(direction, container) {
   if (!(container instanceof HTMLElement)) return;
   const scrollHost = getScrollableContainer(container) || container;
@@ -6013,6 +6072,7 @@ function render() {
   updateDiagramViewport(boundsState);
   applyDiagramZoom();
   updateLegend(usedVoltageRanges);
+  updateStatusBar();
   if (lengthsChanged && !syncing) {
     syncing = true;
     syncSchedules(false);
@@ -9558,6 +9618,8 @@ async function init() {
     const focus = getViewportCenter();
     setDiagramZoom(DEFAULT_DIAGRAM_ZOOM, focus ? { focusPoint: focus } : {});
   });
+  const zoomFitBtn = document.getElementById('zoom-fit-btn');
+  zoomFitBtn?.addEventListener('click', () => zoomToFit());
 
   const panUpBtn = document.getElementById('pan-up-btn');
   const panDownBtn = document.getElementById('pan-down-btn');
@@ -9930,6 +9992,7 @@ async function init() {
       const pointerY = coords.y;
       cursorPos = { x: pointerX, y: pointerY };
       cursorPosValid = Number.isFinite(pointerX) && Number.isFinite(pointerY);
+      updateStatusBar();
       if (resizingAnnotation) {
         const data = resizingAnnotation;
         const comp = data.comp;
@@ -10618,6 +10681,32 @@ async function init() {
         render();
         save();
       }
+    } else if (mod && key === 'a') {
+      e.preventDefault();
+      selection = [...components];
+      selected = components[0] || null;
+      selectedConnection = null;
+      render();
+      updateStatusBar();
+    } else if (!mod && key === 'f') {
+      e.preventDefault();
+      zoomToFit();
+    } else if (!mod && e.key === 'Escape') {
+      // Cancel connect mode or deselect
+      const anyModalOpen = document.querySelector('.prop-modal.show');
+      if (!anyModalOpen) {
+        if (connectMode) {
+          connectMode = false;
+          connectSource = null;
+          const connectBtn = document.getElementById('connect-btn');
+          if (connectBtn) connectBtn.classList.remove('active');
+        }
+        selection = [];
+        selected = null;
+        selectedConnection = null;
+        render();
+        updateStatusBar();
+      }
     }
   });
 
@@ -10647,6 +10736,7 @@ async function init() {
   });
   svg.addEventListener('mouseleave', () => {
     cursorPosValid = false;
+    updateStatusBar();
   });
   window.addEventListener('resize', closePaletteContextMenu);
   document.addEventListener('scroll', closePaletteContextMenu, true);
