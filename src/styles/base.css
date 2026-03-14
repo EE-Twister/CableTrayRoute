@@ -51,6 +51,30 @@
 body.dark-mode .table-viewport {
     background-color: #2c3034;
 }
+
+/* Horizontal scroll wrapper for wide tables on mobile */
+.table-scroll-x {
+    overflow-x: auto;
+    -webkit-overflow-scrolling: touch;
+    position: relative;
+}
+
+/* Fade hint on the right edge when the table overflows horizontally */
+.table-scroll-x::after {
+    content: '';
+    position: absolute;
+    top: 0;
+    right: 0;
+    bottom: 0;
+    width: 2.5rem;
+    background: linear-gradient(to right, transparent, color-mix(in srgb, var(--secondary-color) 80%, transparent));
+    pointer-events: none;
+    opacity: 0;
+    transition: opacity 0.2s;
+}
+.table-scroll-x.has-overflow::after {
+    opacity: 1;
+}
 .w-60 {
     width: 60px;
 }
@@ -97,8 +121,10 @@ body.compact-mode {
         top: auto;
         right: 0.5rem;
         left: 0.5rem;
+        bottom: max(0.5rem, env(safe-area-inset-bottom));
         width: auto;
         max-width: none;
+        max-height: calc(100dvh - 4rem);
     }
 }
 

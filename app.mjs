@@ -3126,11 +3126,11 @@ const renderBatchResults = (results) => {
             routingWorker.postMessage({ type: 'cancel' });
             routingPaused = true;
             elements.cancelRoutingBtn.textContent = 'Resume Routing';
-            elements.progressLabel.textContent = 'Cancelling...';
+            elements.progressLabel.textContent = 'Paused';
         } else {
             routingWorker.postMessage({ type: 'resume' });
             routingPaused = false;
-            elements.cancelRoutingBtn.textContent = 'Cancel Routing';
+            elements.cancelRoutingBtn.textContent = 'Pause Routing';
         }
     };
 
@@ -3235,7 +3235,7 @@ const renderBatchResults = (results) => {
 
             routingWorker = new Worker('batchRouteWorker.js');
             routingPaused = false;
-            elements.cancelRoutingBtn.textContent = 'Cancel Routing';
+            elements.cancelRoutingBtn.textContent = 'Pause Routing';
             const routingStartTime = performance.now();
             const recentRouteTimes = [];
             routingWorker.onmessage = e => {

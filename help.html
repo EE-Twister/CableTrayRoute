@@ -49,17 +49,23 @@
         <li>Analyze fill, sizing, and optimal routes.</li>
         <li>Export reports and drawings.</li>
       </ol>
-      <div class="help-screenshots">
-        <img src="icons/placeholder.svg" alt="Screenshot of workflow dashboard">
-        <img src="icons/placeholder.svg" alt="Screenshot of tray fill tool">
+      <div class="help-workflow-diagram" aria-label="Workflow diagram">
+        <ol class="help-workflow-steps">
+          <li><strong>Equipment &amp; Load Lists</strong> — define equipment tags and connected loads</li>
+          <li><strong>Cable Schedule</strong> — assign cables between equipment with conductor sizing</li>
+          <li><strong>Panel Schedule</strong> — configure panels and their circuit loads</li>
+          <li><strong>Raceway Schedule</strong> — model cable trays, conduits, and ductbanks</li>
+          <li><strong>Fill &amp; Route Analysis</strong> — check NEC fill limits and compute optimal cable paths</li>
+          <li><strong>One-Line Diagram</strong> — build and annotate single-line diagrams with study results</li>
+        </ol>
       </div>
     </section>
     <section>
       <h2>Sample Projects</h2>
-      <p>Download sample data sets to explore the application.</p>
+      <p>Download sample data sets to explore the application. Use <strong>Load Project</strong> in the ⚙ settings menu to open a downloaded file.</p>
       <ul>
-        <li><a id="tray-sample-link" href="#">Tray routing sample project</a></li>
-        <li><a id="ductbank-sample-link" href="#">Ductbank sample project</a></li>
+        <li><a id="tray-sample-link" href="#" aria-disabled="true">Tray routing sample project</a> <span id="tray-sample-status" class="help-sample-status"></span></li>
+        <li><a id="ductbank-sample-link" href="#" aria-disabled="true">Ductbank sample project</a> <span id="ductbank-sample-status" class="help-sample-status"></span></li>
       </ul>
     </section>
     <section>
@@ -69,10 +75,10 @@
       <p>Use <strong>Load Project</strong> to switch between saved projects. To clear the saved entries, open the ⚙ settings menu and choose <strong>Delete Saved Data</strong>. <strong>Export Project</strong> remains available whenever you need a separate checkpoint or shareable archive.</p>
     </section>
     <section>
-      <h2>Video Walkthroughs</h2>
+      <h2>Documentation</h2>
       <ul>
-        <li><a href="https://example.com/videos/tray-workflow" target="_blank" rel="noopener">Tray workflow overview</a></li>
-        <li><a href="https://example.com/videos/ductbank-workflow" target="_blank" rel="noopener">Ductbank workflow overview</a></li>
+        <li><a href="docs/quickstart.html">Quick Start Guide</a> — get up and running in minutes</li>
+        <li><a href="docs/index.html">Full Documentation</a> — detailed reference for all tools</li>
       </ul>
     </section>
   </main>
@@ -85,7 +91,7 @@
       <a href="README.md">README</a>
       <a href="docs/quickstart.html">Quick Start</a>
       <a href="docs/index.html">Docs</a>
-      <a href="mailto:contact@example.com">Contact</a>
+      <a href="https://github.com/EE-Twister/CableTrayRoute/issues" target="_blank" rel="noopener">Feedback</a>
     </nav>
   </footer>
   <script type="module" src="dist/index.js" defer></script>
@@ -96,19 +102,26 @@
       initCompactMode();
       initNavToggle();
 
-      const setLink = async (id, file, name) => {
+      const setLink = async (id, statusId, file, name) => {
+        const link = document.getElementById(id);
+        const status = document.getElementById(statusId);
         try {
-          const base64 = await fetch(file).then(r => r.text());
-          const link = document.getElementById(id);
+          const res = await fetch(file);
+          if (!res.ok) throw new Error(`HTTP ${res.status}`);
+          const base64 = await res.text();
           link.href = `data:application/zip;base64,${base64.trim()}`;
           link.setAttribute('download', name);
+          link.removeAttribute('aria-disabled');
+          if (status) status.textContent = '';
         } catch (err) {
           console.error('Failed to load sample project', file, err);
+          link.removeAttribute('href');
+          if (status) { status.textContent = '(not available)'; status.className = 'help-sample-status help-sample-unavailable'; }
         }
       };
 
-      setLink('tray-sample-link', 'examples/tray_project.b64', 'tray_project.zip');
-      setLink('ductbank-sample-link', 'examples/ductbank_project.b64', 'ductbank_project.zip');
+      setLink('tray-sample-link', 'tray-sample-status', 'examples/tray_project.b64', 'tray_project.zip');
+      setLink('ductbank-sample-link', 'ductbank-sample-status', 'examples/ductbank_project.b64', 'ductbank_project.zip');
     });
   </script>
 </body>
