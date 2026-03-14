@@ -125,10 +125,21 @@ function createPalette() {
   panel.setAttribute("aria-modal", "true");
   panel.setAttribute("aria-labelledby", "command-palette-title");
 
+  const header = document.createElement("div");
+  header.className = "command-palette-header";
+
   const title = document.createElement("h2");
   title.id = "command-palette-title";
   title.className = "command-palette-title";
   title.textContent = "Command Palette";
+
+  const closeBtn = document.createElement("button");
+  closeBtn.className = "command-palette-close";
+  closeBtn.setAttribute("aria-label", "Close command palette");
+  closeBtn.textContent = "✕";
+  closeBtn.addEventListener("click", () => closePalette());
+
+  header.append(title, closeBtn);
 
   const input = document.createElement("input");
   input.type = "text";
@@ -138,12 +149,12 @@ function createPalette() {
 
   const hint = document.createElement("p");
   hint.className = "command-palette-hint";
-  hint.textContent = "Type to search · ↑/↓ to move · Enter to run · Esc to close";
+  hint.textContent = "Type to search · ↑/↓ to move · Enter to run";
 
   const list = document.createElement("ul");
   list.className = "command-palette-list";
 
-  panel.append(title, input, hint, list);
+  panel.append(header, input, hint, list);
   overlay.appendChild(panel);
   document.body.appendChild(overlay);
 

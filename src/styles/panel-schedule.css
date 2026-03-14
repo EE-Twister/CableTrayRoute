@@ -2455,10 +2455,38 @@ body.dark-mode .custom-curve-remove:focus {
   flex-direction: column;
 }
 
-.command-palette-title {
+.command-palette-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
   margin: 0 0 0.5rem;
-  font-size: 1rem;
   flex-shrink: 0;
+}
+
+.command-palette-title {
+  margin: 0;
+  font-size: 1rem;
+}
+
+.command-palette-close {
+  background: none;
+  border: none;
+  cursor: pointer;
+  font-size: 1rem;
+  line-height: 1;
+  color: #5b6478;
+  padding: 0.25rem 0.4rem;
+  border-radius: 6px;
+  min-width: 44px;
+  min-height: 44px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.command-palette-close:hover {
+  background: rgba(42, 101, 232, 0.1);
+  color: #1a202c;
 }
 
 .command-palette-input {
