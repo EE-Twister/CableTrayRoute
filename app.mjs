@@ -136,7 +136,7 @@ async function ensureConductorProps() {
     return globalThis.CONDUCTOR_PROPS;
 }
 // start loading early
-ensureConductorProps();
+ensureConductorProps().catch(e => console.warn('Failed to preload conductor properties:', e));
 
 const CONDUIT_SPECS = {
     "EMT": {"1/2":0.304,"3/4":0.533,"1":0.864,"1-1/4":1.496,"1-1/2":2.036,"2":3.356,"2-1/2":5.858,"3":8.846,"3-1/2":11.545,"4":14.753},
@@ -1907,7 +1907,7 @@ async function initializeApp() {
                     current_fill: tray.current_fill,
                     utilization_pct: ((tray.current_fill / maxCapacity) * 100).toFixed(1),
                     available_space: (maxCapacity - tray.current_fill).toFixed(2),
-                    fill: `<button class="fill-btn" data-tray="${tray.tray_id}">Open</button>`
+                    fill: `<button class="fill-btn" data-tray="${escapeAttr(tray.tray_id)}">Open</button>`
                 };
             });
 
@@ -2106,8 +2106,8 @@ const openDuctbankRoute = (dbId, conduitId) => {
                                 ${SHAPE_CODES.map(s => `<option value="${s}" ${t.shape === s ? 'selected' : ''}>${s}</option>`).join('')}
                             </select>
                         </td>
-                        <td><button class="icon-button dup-tray" data-idx="${idx}" title="Duplicate">📋</button></td>
-                        <td><button class="icon-button delete-tray icon-delete" data-idx="${idx}" title="Delete">\u274C</button></td>
+                        <td><button class="icon-button dup-tray" data-idx="${idx}" title="Duplicate" aria-label="Duplicate tray">📋</button></td>
+                        <td><button class="icon-button delete-tray icon-delete" data-idx="${idx}" title="Delete" aria-label="Delete tray">\u274C</button></td>
                      </tr>`;
         });
         table += '</tbody></table>';
@@ -2394,7 +2394,7 @@ const renderBatchResults = (results) => {
                     const id = m.tray_id || m.id || 'unknown';
                     const reason = m.reason.replace(/_/g, ' ');
                     const cable = m.cable_id ? ` (cable ${m.cable_id})` : '';
-                    const link = m.filter ? ` <a href="${m.filter}">Filter</a>` : '';
+                    const link = m.filter && isSafeUrl(m.filter) ? ` <a href="${escapeAttr(m.filter)}">Filter</a>` : '';
                     html += `<li>${escapeHtml(id)}: ${escapeHtml(reason)}${escapeHtml(cable)}${link}</li>`;
                 });
                 html += '</ul>';
@@ -2406,13 +2406,13 @@ const renderBatchResults = (results) => {
                     let racewayId = b.tray_id || '';
                     let conduit = '';
                     if (b.type === 'field') {
-                        link = `<button class="conduit-fill-btn" data-seg="${b.segment_key}">Open</button>`;
+                        link = `<button class="conduit-fill-btn" data-seg="${escapeAttr(b.segment_key || '')}">Open</button>`;
                     } else if (b.ductbankTag) {
                         racewayId = b.ductbankTag;
                         conduit = b.conduit_id || '';
-                        link = `<button class="ductbank-fill-btn" data-ductbank="${b.ductbankTag}" data-conduit="${b.conduit_id}">Fill</button>`;
+                        link = `<button class="ductbank-fill-btn" data-ductbank="${escapeAttr(b.ductbankTag)}" data-conduit="${escapeAttr(b.conduit_id || '')}">Fill</button>`;
                     } else if (b.tray_id && b.tray_id !== 'Field Route' && b.tray_id !== 'N/A') {
-                        link = `<button class="tray-fill-btn" data-tray="${b.tray_id}">Fill</button>`;
+                        link = `<button class="tray-fill-btn" data-tray="${escapeAttr(b.tray_id)}">Fill</button>`;
                     }
                     html += `<tr><td>${escapeHtml(b.segment)}</td><td>${escapeHtml(racewayId)}</td><td>${escapeHtml(conduit)}</td><td>${escapeHtml(b.type)}</td><td>${escapeHtml(b.from)}</td><td>${escapeHtml(b.to)}</td><td>${escapeHtml(b.length)}</td><td>${escapeHtml(b.raceway || '')}</td><td>${link}</td></tr>`;
                 });
@@ -2581,8 +2581,8 @@ const renderBatchResults = (results) => {
                         </td>
                         <td><input type="text" class="cable-manual-input" data-idx="${idx}" value="${escapeAttr(c.manual_path || '')}" placeholder="Tray1>Tray2 or x,y,z;..." style="width:180px;"></td>
                         <td><span class="lock-indicator">${c.locked ? '🔒' : ''}</span>${c.locked ? `<button class="unlock-cable" data-idx="${idx}">Unlock</button>` : (c.route_segments && c.route_segments.length ? `<button class="relock-cable" data-idx="${idx}">Relock</button>` : '')}</td>
-                        <td><button class="icon-button dup-cable" data-idx="${idx}" title="Duplicate">📋</button></td>
-                        <td><button class="icon-button del-cable icon-delete" data-idx="${idx}" title="Delete">\u274C</button></td>
+                        <td><button class="icon-button dup-cable" data-idx="${idx}" title="Duplicate" aria-label="Duplicate cable">📋</button></td>
+                        <td><button class="icon-button del-cable icon-delete" data-idx="${idx}" title="Delete" aria-label="Delete cable">\u274C</button></td>
                     </tr>`;
         });
         html += '</tbody></table>';
@@ -3990,6 +3990,8 @@ const renderBatchResults = (results) => {
 
     const popOutPlot = () => {
         if (!window.current3DPlot) return;
+        // Escape </script> sequences in JSON to prevent script tag breakout
+        const safeJson = val => JSON.stringify(val).replace(/<\/script/gi, '<\\/script');
         const html = `<!DOCTYPE html>
 <html><head><title>3D Route Visualization</title>
 <meta charset="UTF-8">
@@ -3997,12 +3999,14 @@ const renderBatchResults = (results) => {
 <style>html,body{margin:0;height:100%;overflow:hidden;}#plot{width:100%;height:100%;}</style>
 </head><body>
 <div id="plot"></div>
-<script>const data = ${JSON.stringify(window.current3DPlot.traces)};
-const layout = ${JSON.stringify(window.current3DPlot.layout)};
+<script>const data = ${safeJson(window.current3DPlot.traces)};
+const layout = ${safeJson(window.current3DPlot.layout)};
 Plotly.newPlot(document.getElementById('plot'), data, layout, {responsive: true});<\/script>
 </body></html>`;
-        const pop = window.open('', '_blank');
-        if (pop) { pop.document.write(html); pop.document.close(); }
+        const blob = new Blob([html], { type: 'text/html' });
+        const url = URL.createObjectURL(blob);
+        window.open(url, '_blank');
+        setTimeout(() => URL.revokeObjectURL(url), 60000);
     };
     
     
