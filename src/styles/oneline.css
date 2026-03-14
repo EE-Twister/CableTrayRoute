@@ -477,6 +477,7 @@
 @media (max-width: 720px) {
   .device-selection-layout {
     flex-direction: column;
+    min-height: auto;
   }
 
   .device-selection-left {
@@ -1746,6 +1747,18 @@ g.component.scenario-diff > * {
   font-size: 10px;
   fill: #000;
   pointer-events: none;
+}
+
+/* On medium screens (tablet range), collapse the 320px history sidebar so the
+   diagram canvas has enough room. The user can still reveal it via the JS toggle. */
+@media (max-width: 900px) {
+  .workspace:not(.history-collapsed) {
+    grid-template-columns: var(--palette-width) 1fr;
+  }
+
+  .workspace:not(.history-collapsed) .history-sidebar {
+    display: none;
+  }
 }
 
 @media (max-width: 600px) {
