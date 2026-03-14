@@ -35,6 +35,35 @@ window.E2E = E2E;
 
 import { emitAsync } from './utils/safeEvents.mjs';
 
+/**
+ * Escape a string for safe insertion into HTML content or attributes.
+ * Use instead of raw template literals in innerHTML assignments.
+ */
+function escapeHtml(str) {
+    return String(str)
+        .replace(/&/g, '&amp;')
+        .replace(/</g, '&lt;')
+        .replace(/>/g, '&gt;')
+        .replace(/"/g, '&quot;')
+        .replace(/'/g, '&#39;');
+}
+
+/**
+ * Return true only for URLs that are safe to use as href values.
+ * Allows relative URLs and only http/https absolute URLs.
+ * Blocks javascript:, data:, vbscript:, and other dangerous schemes.
+ */
+function isSafeUrl(url) {
+    if (typeof url !== 'string' || url.trim() === '') return false;
+    if (/^[#/?.]/.test(url.trim())) return true;
+    try {
+        const parsed = new URL(url);
+        return parsed.protocol === 'http:' || parsed.protocol === 'https:';
+    } catch {
+        return false;
+    }
+}
+
 function emitSticky(name, flagKey) {
   if (!window.__e2eFlags) window.__e2eFlags = {};
   window.__e2eFlags[flagKey] = true;
@@ -424,7 +453,7 @@ async function initializeApp() {
         if (gw.conduits?.length) parts.push(`conduits ${gw.conduits.join(', ')}`);
         if (typeof elements !== 'undefined' && elements.messages) {
             const link = '<a href="docs/geometry-fields.html" target="_blank" rel="noopener noreferrer">Required geometry fields</a>';
-            elements.messages.innerHTML += `<div class="message warning">Skipped ${parts.join('; ')}. ${link}</div>`;
+            elements.messages.innerHTML += `<div class="message warning">Skipped ${escapeHtml(parts.join('; '))}. ${link}</div>`;
         }
     };
 
@@ -2417,10 +2446,10 @@ const renderBatchResults = (results) => {
         });
         if (mismatches.length) {
             elements.mismatchedRacewaysList.innerHTML = mismatches.map(m => {
-                const id = m.tray_id || m.id || 'unknown';
-                const reason = m.reason.replace(/_/g, ' ');
-                const cable = m.cable_id ? ` (cable ${m.cable_id})` : '';
-                const link = m.filter ? ` <a href="${m.filter}">Filter</a>` : '';
+                const id = escapeHtml(m.tray_id || m.id || 'unknown');
+                const reason = escapeHtml(m.reason.replace(/_/g, ' '));
+                const cable = m.cable_id ? ` (cable ${escapeHtml(m.cable_id)})` : '';
+                const link = isSafeUrl(m.filter) ? ` <a href="${escapeHtml(m.filter)}">Filter</a>` : '';
                 return `<li>${id}: ${reason}${cable}${link}</li>`;
             }).join('');
             elements.mismatchedRacewaysDetails.style.display = '';
@@ -2428,7 +2457,7 @@ const renderBatchResults = (results) => {
             elements.mismatchedRacewaysList.innerHTML = '';
             elements.mismatchedRacewaysDetails.style.display = 'none';
         }
-        const summaryParts = Object.entries(reasonCounts).map(([r, c]) => `${c} ${r.replace(/_/g, ' ')}`);
+        const summaryParts = Object.entries(reasonCounts).map(([r, c]) => `${escapeHtml(c)} ${escapeHtml(r.replace(/_/g, ' '))}`);
         if (summaryParts.length) {
             const summaryHtml = `<div class="message info">Rejected segments: ${summaryParts.join('; ')}</div>`;
             elements.messages.insertAdjacentHTML('afterbegin', summaryHtml);
@@ -2756,7 +2785,7 @@ const renderBatchResults = (results) => {
     };
 
     const showMessage = (type, text) => {
-        elements.messages.innerHTML += `<div class="message ${type}">${text}</div>`;
+        elements.messages.innerHTML += `<div class="message ${escapeHtml(type)}">${escapeHtml(text)}</div>`;
     };
 
     const exportRoutesJSON = () => {
