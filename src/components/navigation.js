@@ -94,6 +94,43 @@ function mountPageTransitions() {
   });
 }
 
+function buildAccountIndicator() {
+  const token = localStorage.getItem('authToken');
+  const expiresRaw = localStorage.getItem('authExpiresAt');
+  const user = localStorage.getItem('authUser');
+  const expiresAt = Number.parseInt(expiresRaw, 10);
+  const isLoggedIn = token && Number.isFinite(expiresAt) && Date.now() < expiresAt;
+
+  const el = document.createElement('a');
+  el.className = 'nav-account-btn';
+
+  const avatar = document.createElement('span');
+  avatar.className = 'nav-account-avatar';
+  avatar.setAttribute('aria-hidden', 'true');
+
+  const label = document.createElement('span');
+  label.className = 'nav-account-name';
+
+  if (isLoggedIn && user) {
+    el.href = 'account.html';
+    el.setAttribute('aria-label', `Signed in as ${user} — account settings`);
+    el.setAttribute('title', `Signed in as ${user}`);
+    avatar.textContent = user.charAt(0).toUpperCase();
+    label.textContent = user;
+  } else {
+    el.href = 'login.html';
+    el.setAttribute('aria-label', 'Sign in to your account');
+    el.classList.add('nav-account-btn--guest');
+    avatar.classList.add('nav-account-avatar--guest');
+    avatar.innerHTML = '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="8" r="4"/><path d="M4 20c0-4 3.6-7 8-7s8 3 8 7"/></svg>';
+    label.textContent = 'Sign In';
+  }
+
+  el.appendChild(avatar);
+  el.appendChild(label);
+  return el;
+}
+
 function buildBrand() {
   const brand = document.createElement('a');
   brand.href = 'index.html';
@@ -154,6 +191,10 @@ function mountPersistentNavigation() {
       document.dispatchEvent(new KeyboardEvent('keydown', { key: 'k', ctrlKey: true, bubbles: true }));
     });
     topNav.appendChild(searchBtn);
+  }
+
+  if (!topNav.querySelector('.nav-account-btn')) {
+    topNav.appendChild(buildAccountIndicator());
   }
 
   const oldBreadcrumb = document.querySelector('.breadcrumb-trail');
