@@ -318,4 +318,40 @@
   .equipment-validation-summary {
     display: none !important;
   }
+
+  /* --- Analysis/Study pages: show output content --- */
+  #arcflash-output,
+  #shortcircuit-output,
+  #loadflow-output {
+    font-size: 8pt;
+    white-space: pre-wrap;
+    word-break: break-word;
+    max-height: none !important;
+    overflow: visible !important;
+    page-break-inside: auto;
+    break-inside: auto;
+  }
+
+  /* --- SVG charts in analysis pages --- */
+  #tcc-chart,
+  #harmonics-chart,
+  #motorstart-chart {
+    max-width: 100%;
+    height: auto !important;
+    page-break-inside: avoid;
+    break-inside: avoid;
+  }
+
+  /* --- Hide form controls on analysis pages when printing --- */
+  #arcflash-form,
+  #shortcircuit-form,
+  #loadflow-form,
+  .tcc-controls,
+  .tcc-print-controls,
+  .cable-toolbar,
+  .method-panel,
+  .table-import-export,
+  .table-controls {
+    display: none !important;
+  }
 }

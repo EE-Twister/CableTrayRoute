@@ -18,6 +18,8 @@
   <link rel="canonical" href="loadlist.html">
     <!-- Performance: early CDN connection -->
   <link rel="preconnect" href="https://cdnjs.cloudflare.com" crossorigin>
+  <link rel="dns-prefetch" href="https://fonts.gstatic.com">
+  <meta name="color-scheme" content="light dark">
   <link rel="stylesheet" href="style.css">
   <script type="module" src="dataStore.mjs" defer></script>
   <script type="module" src="dist/loadlist.js" defer></script>
@@ -107,31 +109,32 @@
         </div>
         <div class="overflow-x-auto">
           <table id="load-table" class="sticky-table">
+            <caption class="visually-hidden">Load list with electrical specifications and demand calculations</caption>
             <thead>
               <tr>
-                <th><input type="checkbox" id="select-all" aria-label="Select all loads"></th>
-                <th>Source</th>
-                <th>Tag/ID</th>
-                <th>Description</th>
-                <th>Manufacturer</th>
-                <th>Model</th>
-                <th>Qty</th>
-                <th>Voltage (V)</th>
-                <th>Load Type</th>
-                <th>Duty</th>
-                <th>kW</th>
-                <th>Power Factor</th>
-                <th>Load Factor (%)</th>
-                <th>Efficiency (%)</th>
-                <th>Demand Factor (%)</th>
-                <th>Phases</th>
-                <th>Panel Circuit</th>
-                <th>Notes</th>
-                <th>kVA</th>
-                <th>Current (A)</th>
-                <th>Demand kVA</th>
-                <th>Demand kW</th>
-                <th>Actions</th>
+                <th scope="col"><input type="checkbox" id="select-all" aria-label="Select all loads"></th>
+                <th scope="col" aria-sort="none">Source</th>
+                <th scope="col" aria-sort="none">Tag/ID</th>
+                <th scope="col">Description</th>
+                <th scope="col">Manufacturer</th>
+                <th scope="col">Model</th>
+                <th scope="col">Qty</th>
+                <th scope="col">Voltage (V)</th>
+                <th scope="col">Load Type</th>
+                <th scope="col">Duty</th>
+                <th scope="col">kW</th>
+                <th scope="col">Power Factor</th>
+                <th scope="col">Load Factor (%)</th>
+                <th scope="col">Efficiency (%)</th>
+                <th scope="col">Demand Factor (%)</th>
+                <th scope="col">Phases</th>
+                <th scope="col">Panel Circuit</th>
+                <th scope="col">Notes</th>
+                <th scope="col">kVA</th>
+                <th scope="col">Current (A)</th>
+                <th scope="col">Demand kVA</th>
+                <th scope="col">Demand kW</th>
+                <th scope="col">Actions</th>
               </tr>
             </thead>
             <tbody data-row-class="load-row"></tbody>

@@ -195,7 +195,7 @@ body.compact-mode #palette button .palette-icon {
     background-color: rgba(0, 0, 0, 0.1);
 }
 .icon-delete {
-    color: red;
+    color: var(--color-error, red);
 }
 
 .fill-btn {
@@ -208,7 +208,7 @@ body.compact-mode #palette button .palette-icon {
     cursor: pointer;
 }
 .fill-btn:hover {
-    background-color: #0056b3;
+    background-color: var(--button-hover-bg, #0056b3);
 }
 
 .primary-btn {
@@ -218,7 +218,7 @@ body.compact-mode #palette button .palette-icon {
     padding: 12px;
 }
 .primary-btn:hover {
-    background-color: #0056b3;
+    background-color: var(--button-hover-bg, #0056b3);
 }
 
 .add-row-btn {
@@ -260,7 +260,7 @@ body.compact-mode #palette button .palette-icon {
 
 .info-text {
     font-size: 0.9em;
-    color: #555;
+    color: var(--color-text-muted, #555);
     margin-top: -5px;
 }
 
@@ -298,5 +298,28 @@ details > summary {
 
 .table-controls .table-import-export {
     margin-top: 0;
+}
+
+/* ---- Touch Target Sizing ---- */
+/* Ensure interactive elements meet WCAG 2.5.8 minimum 44px touch target on mobile */
+@media (pointer: coarse) {
+    button,
+    .btn,
+    .primary-btn,
+    input[type="checkbox"],
+    input[type="radio"],
+    select {
+        min-height: 44px;
+        min-width: 44px;
+    }
+
+    input[type="text"],
+    input[type="number"],
+    input[type="search"],
+    input[type="password"],
+    input[type="email"],
+    textarea {
+        min-height: 44px;
+    }
 }
 

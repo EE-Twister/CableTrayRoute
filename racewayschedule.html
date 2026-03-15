@@ -18,6 +18,8 @@
   <link rel="canonical" href="racewayschedule.html">
     <!-- Performance: early CDN connection -->
   <link rel="preconnect" href="https://cdnjs.cloudflare.com" crossorigin>
+  <link rel="dns-prefetch" href="https://fonts.gstatic.com">
+  <meta name="color-scheme" content="light dark">
   <link rel="stylesheet" href="style.css">
   <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"
           integrity="sha512-NUCODRwZ2jFiGEBLSXH6JLBZK2+ZCIkHoOWGWxzULe0rKnbRbEQN3aN0B9HAWa9U0BqmzBt4RnV+L49SXqsA=="
@@ -85,7 +87,7 @@
         <button id="raceway-load-samples">Load Sample Data</button>
         <button id="validate-raceway-btn">Validate</button>
         <button id="import-cad-btn" onclick="document.getElementById('import-cad-input').click()">Import CAD</button>
-        <input type="file" id="import-cad-input" accept=".json,.ifc" style="display:none;">
+        <input type="file" id="import-cad-input" accept=".json,.ifc" class="hidden">
         <button id="export-cad-btn" onclick="dataStore.exportToCad('json')">Export CAD</button>
       </header>
       <details class="method-panel">
@@ -104,32 +106,33 @@
       <!-- Ductbank / Conduit Hierarchy -->
       <section class="card">
         <h2>Ductbank Schedule</h2>
-        <div style="margin-bottom:10px;">
+        <div class="table-import-export">
           <button id="save-ductbank-btn">Save</button>
           <button id="load-ductbank-btn">Load</button>
           <button id="clear-ductbank-filters-btn">Clear Filters</button>
           <button id="export-ductbank-xlsx-btn">Export XLSX</button>
-          <input type="file" id="import-ductbank-xlsx-input" accept=".xlsx" style="display:none;">
+          <input type="file" id="import-ductbank-xlsx-input" accept=".xlsx" class="hidden">
           <button id="import-ductbank-xlsx-btn">Import XLSX</button>
           <button id="delete-ductbank-btn">Delete All</button>
           <button id="ductbank-help-btn" aria-expanded="false">Help</button>
         </div>
         <div id="ductbank-table" class="table-scroll">
           <table id="ductbankTable" class="sticky-table">
+            <caption class="visually-hidden">Ductbank schedule with tags, coordinates, and encasement details</caption>
             <thead>
               <tr>
-                <th></th>
-                <th>Tag</th>
-                <th>From</th>
-                <th>To</th>
-                <th>Concrete Encasement</th>
-                <th>Start X</th>
-                <th>Start Y</th>
-                <th>Start Z</th>
-                <th>End X</th>
-                <th>End Y</th>
-                <th>End Z</th>
-                <th>Actions</th>
+                <th scope="col"></th>
+                <th scope="col">Tag</th>
+                <th scope="col">From</th>
+                <th scope="col">To</th>
+                <th scope="col">Concrete Encasement</th>
+                <th scope="col">Start X</th>
+                <th scope="col">Start Y</th>
+                <th scope="col">Start Z</th>
+                <th scope="col">End X</th>
+                <th scope="col">End Y</th>
+                <th scope="col">End Z</th>
+                <th scope="col">Actions</th>
               </tr>
             </thead>
             <tbody></tbody>
@@ -144,18 +147,19 @@
       <!-- Tray Table -->
       <section class="card">
         <h2>Tray Schedule</h2>
-        <div style="margin-bottom:10px;">
+        <div class="table-import-export">
           <button id="save-tray-btn">Save</button>
           <button id="load-tray-btn">Load</button>
           <button id="clear-tray-filters-btn">Clear Filters</button>
           <button id="export-tray-xlsx-btn">Export XLSX</button>
-          <input type="file" id="import-tray-xlsx-input" accept=".xlsx" style="display:none;">
+          <input type="file" id="import-tray-xlsx-input" accept=".xlsx" class="hidden">
           <button id="import-tray-xlsx-btn">Import XLSX</button>
           <button id="delete-tray-btn">Delete All Rows</button>
           <button id="tray-help-btn" aria-expanded="false">Help</button>
         </div>
         <div id="tray-table" class="table-scroll">
           <table id="trayTable" class="sticky-table">
+            <caption class="visually-hidden">Tray schedule with segment dimensions and coordinates</caption>
             <thead></thead>
             <tbody></tbody>
           </table>
@@ -169,18 +173,19 @@
       <!-- Conduit Table -->
       <section class="card">
         <h2>Conduit Schedule</h2>
-        <div style="margin-bottom:10px;">
+        <div class="table-import-export">
           <button id="save-conduit-btn">Save</button>
           <button id="load-conduit-btn">Load</button>
           <button id="clear-conduit-filters-btn">Clear Filters</button>
           <button id="export-conduit-xlsx-btn">Export XLSX</button>
-          <input type="file" id="import-conduit-xlsx-input" accept=".xlsx" style="display:none;">
+          <input type="file" id="import-conduit-xlsx-input" accept=".xlsx" class="hidden">
           <button id="import-conduit-xlsx-btn">Import XLSX</button>
           <button id="delete-conduit-btn">Delete All Rows</button>
           <button id="conduit-help-btn" aria-expanded="false">Help</button>
         </div>
         <div id="conduit-table" class="table-scroll">
           <table id="conduitTable" class="sticky-table">
+            <caption class="visually-hidden">Conduit schedule with type, trade size, and capacity</caption>
             <thead></thead>
             <tbody></tbody>
           </table>

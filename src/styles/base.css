@@ -60,7 +60,7 @@ html {
     margin-bottom: calc(var(--spacing-base) * 2);
 }
 .ml-1 {
-    margin-left: var(--spacing-base);
+    margin-inline-start: var(--spacing-base);
 }
 .overflow-x-auto {
     overflow-x: auto;
@@ -129,7 +129,7 @@ body.compact-mode {
 button .control-icon,
 .btn .control-icon,
 .hero-action-btn .control-icon {
-    margin-right: 0.45rem;
+    margin-inline-end: 0.45rem;
 }
 
 .settings-btn .control-icon,
@@ -249,6 +249,16 @@ table input[type="number"] {
 }
 
 /* Compact table mode */
+/* ---- CSS Containment for Performance ---- */
+/* Isolate heavy table and visualization regions from layout recalculation */
+.table-viewport {
+    contain: layout style;
+}
+
+.card {
+    contain: layout;
+}
+
 body.compact-mode table {
     font-size: 0.85rem;
 }
