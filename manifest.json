@@ -1,0 +1,42 @@
+{
+  "name": "CableTrayRoute",
+  "short_name": "CableTrayRoute",
+  "description": "Browser-based toolkit for cable scheduling, tray fill analysis, and optimal routing in electrical design.",
+  "start_url": "/index.html",
+  "display": "standalone",
+  "background_color": "#f8fafc",
+  "theme_color": "#2563eb",
+  "orientation": "any",
+  "icons": [
+    {
+      "src": "icons/favicon.svg",
+      "sizes": "any",
+      "type": "image/svg+xml",
+      "purpose": "any maskable"
+    }
+  ],
+  "categories": ["productivity", "utilities"],
+  "shortcuts": [
+    {
+      "name": "Cable Schedule",
+      "short_name": "Cables",
+      "description": "Define cables to route",
+      "url": "/cableschedule.html",
+      "icons": [{ "src": "icons/cable.svg", "sizes": "any" }]
+    },
+    {
+      "name": "Optimal Route",
+      "short_name": "Route",
+      "description": "Run cable routing engine",
+      "url": "/optimalRoute.html",
+      "icons": [{ "src": "icons/route.svg", "sizes": "any" }]
+    },
+    {
+      "name": "One-Line Diagram",
+      "short_name": "One-Line",
+      "description": "Draw electrical single-line diagrams",
+      "url": "/oneline.html",
+      "icons": [{ "src": "icons/oneline.svg", "sizes": "any" }]
+    }
+  ]
+}

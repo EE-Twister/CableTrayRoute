@@ -236,17 +236,168 @@ body.compact-mode td {
     padding: 2px 4px;
 }
 
+/* ---- Accessibility Utilities ---- */
+
+/* Visually hidden but available to screen readers */
+.visually-hidden,
+.sr-only {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    padding: 0;
+    margin: -1px;
+    overflow: hidden;
+    clip: rect(0, 0, 0, 0);
+    white-space: nowrap;
+    border: 0;
+}
+
+/* Off-screen element that acts as an ARIA live announcement region */
+.sr-announce {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    overflow: hidden;
+    clip: rect(0, 0, 0, 0);
+    white-space: nowrap;
+}
+
+/* Skip-to-content link */
 .skip-link {
     position: absolute;
-    top: -40px;
-    left: 0;
-    background: var(--secondary-color);
-    color: var(--text-color);
-    padding: 8px;
-    z-index: 100;
+    top: -48px;
+    left: 0.5rem;
+    background: var(--color-primary, #2563eb);
+    color: #ffffff;
+    padding: 0.5rem 1rem;
+    border-radius: 0 0 var(--radius-sm, 6px) var(--radius-sm, 6px);
+    font-weight: 600;
+    font-size: 0.875rem;
+    z-index: 9999;
+    text-decoration: none;
+    transition: top 0.1s;
 }
 
 .skip-link:focus {
     top: 0;
+    outline: 3px solid var(--focus-ring-color, #0a58ca);
+    outline-offset: 2px;
+}
+
+/* ---- Focus Visible ---- */
+
+/* Consistent keyboard focus ring for interactive elements */
+:focus-visible {
+    outline: 2px solid var(--focus-ring-color, #0a58ca);
+    outline-offset: 2px;
+}
+
+.btn:focus-visible,
+button:focus-visible {
+    outline: 2px solid var(--focus-ring-color, #0a58ca);
+    outline-offset: 2px;
+    box-shadow: 0 0 0 4px color-mix(in srgb, var(--focus-ring-color, #0a58ca) 18%, transparent);
+}
+
+a:focus-visible {
+    outline: 2px solid var(--focus-ring-color, #0a58ca);
+    outline-offset: 2px;
+    border-radius: 2px;
+}
+
+/* ---- Loading Spinner ---- */
+
+@keyframes ctr-spin {
+    to { transform: rotate(360deg); }
+}
+
+.loading-spinner {
+    display: inline-block;
+    width: 1.25rem;
+    height: 1.25rem;
+    border: 2px solid var(--color-border, #e2e8f0);
+    border-top-color: var(--color-primary, #2563eb);
+    border-radius: 50%;
+    animation: ctr-spin 0.7s linear infinite;
+    flex-shrink: 0;
+}
+
+.loading-spinner--sm {
+    width: 0.875rem;
+    height: 0.875rem;
+    border-width: 1.5px;
+}
+
+.loading-spinner--lg {
+    width: 2rem;
+    height: 2rem;
+    border-width: 3px;
+}
+
+/* Full-area loading overlay */
+.loading-overlay {
+    position: absolute;
+    inset: 0;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background: color-mix(in srgb, var(--color-surface, #f8fafc) 80%, transparent);
+    border-radius: inherit;
+    z-index: 10;
+}
+
+/* Skeleton shimmer for content placeholders */
+@keyframes ctr-shimmer {
+    from { background-position: -200% 0; }
+    to   { background-position:  200% 0; }
+}
+
+.skeleton {
+    background: linear-gradient(
+        90deg,
+        var(--color-border, #e2e8f0) 25%,
+        color-mix(in srgb, var(--color-border, #e2e8f0) 50%, var(--color-surface, #f8fafc)) 50%,
+        var(--color-border, #e2e8f0) 75%
+    );
+    background-size: 200% 100%;
+    animation: ctr-shimmer 1.4s ease infinite;
+    border-radius: var(--radius-sm, 6px);
+    color: transparent;
+}
+
+/* ---- Scroll-to-Top Button ---- */
+
+.scroll-top-btn {
+    position: fixed;
+    bottom: max(1.5rem, env(safe-area-inset-bottom, 0px) + 1rem);
+    right: 1.5rem;
+    width: 2.5rem;
+    height: 2.5rem;
+    border-radius: 50%;
+    background: var(--color-primary, #2563eb);
+    color: #fff;
+    border: none;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 1rem;
+    line-height: 1;
+    box-shadow: var(--elevation-md, 0 4px 16px rgba(0,0,0,0.12));
+    opacity: 0;
+    transform: translateY(0.5rem);
+    pointer-events: none;
+    transition: opacity 0.2s, transform 0.2s;
+    z-index: 50;
+}
+
+.scroll-top-btn.visible {
+    opacity: 1;
+    transform: translateY(0);
+    pointer-events: auto;
+}
+
+.scroll-top-btn:hover {
+    background: var(--button-hover-bg, #1d4ed8);
 }
 

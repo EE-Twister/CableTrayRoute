@@ -212,6 +212,12 @@ body.dark-mode .auth-form input:focus {
     color: rgba(33, 37, 41, 0.88);
 }
 
+.auth-note--sm {
+    margin-top: 0.5rem;
+    font-size: 0.85rem;
+    text-align: left;
+}
+
 body.dark-mode .auth-note {
     color: rgba(248, 249, 250, 0.88);
 }

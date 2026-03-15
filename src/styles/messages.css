@@ -1,3 +1,52 @@
+/* --- Session expiry banner --- */
+.session-expiry-banner {
+    position: fixed;
+    top: 0;
+    left: 0;
+    right: 0;
+    padding: 0.625rem 1rem;
+    background: #d97706;
+    color: #1c1917;
+    display: flex;
+    align-items: center;
+    gap: 0.75rem;
+    z-index: 9999;
+    font-weight: 500;
+    font-size: 0.875rem;
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.18);
+}
+
+body.dark-mode .session-expiry-banner {
+    background: #92400e;
+    color: #fef3c7;
+}
+
+.session-expiry-banner__text {
+    flex: 1;
+}
+
+.session-expiry-banner__btn {
+    padding: 0.25rem 0.75rem;
+    background: #1c1917;
+    color: #fff;
+    border: none;
+    border-radius: var(--radius-sm, 6px);
+    cursor: pointer;
+    font-weight: 600;
+    font-size: 0.8125rem;
+    white-space: nowrap;
+    transition: opacity 0.15s;
+}
+
+.session-expiry-banner__btn:hover {
+    opacity: 0.88;
+}
+
+body.dark-mode .session-expiry-banner__btn {
+    background: #fef3c7;
+    color: #1c1917;
+}
+
 /* --- Messages --- */
 .message {
     padding: var(--space-4);

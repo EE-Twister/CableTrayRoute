@@ -6,10 +6,27 @@
     <meta name="description" content="Landing page for configuring the optimal 3D cable routing system.">
     <title>Optimal 3D Cable Routing System</title>
     <link rel="icon" href="icons/favicon.svg" type="image/svg+xml">
+    <link rel="apple-touch-icon" href="icons/favicon.svg">
     <link rel="stylesheet" href="style.css">
-    <script src="https://cdn.plot.ly/plotly-2.27.0.min.js" defer></script>
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js" defer></script>
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/PapaParse/5.4.1/papaparse.min.js" defer></script>
+    <script src="https://cdn.plot.ly/plotly-2.27.0.min.js" crossorigin="anonymous" defer></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"
+            integrity="sha512-NUCODRwZ2jFiGEBLSXH6JLBZK2+ZCIkHoOWGWxzULe0rKnbRbEQN3aN0B9HAWa9U0BqmzBt4RnV+L49SXqsA=="
+            crossorigin="anonymous" referrerpolicy="no-referrer" defer></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/PapaParse/5.4.1/papaparse.min.js"
+            integrity="sha512-dfX5uYVXzyU8+KHqj8bjo7UkOdg18PaOtpa48djpNbZHwExddghZ+ZmzWT06R5v6NSk3ZUfsH6FNEDepLx9hPQ=="
+            crossorigin="anonymous" referrerpolicy="no-referrer" defer></script>
+    <script src="cdnFallback.js" defer></script>
+    <script>
+      window.addEventListener('load', function () {
+        if (typeof initCdnFallback === 'function') {
+          initCdnFallback([
+            { global: 'Plotly', label: '3D route visualisation (Plotly)' },
+            { global: 'XLSX', label: 'Excel import/export (XLSX)' },
+            { global: 'Papa', label: 'CSV import (PapaParse)' }
+          ]);
+        }
+      });
+    </script>
     <script type="module" src="dirtyTracker.js"></script>
     <script>
       (function loadVersionedModules() {

@@ -746,26 +746,20 @@ function showSessionBanner(message, actions) {
   if (!banner) {
     banner = document.createElement('div');
     banner.id = 'session-expiry-banner';
-    Object.assign(banner.style, {
-      position: 'fixed', top: '0', left: '0', right: '0',
-      padding: '10px 16px', background: '#f59e0b', color: '#1c1917',
-      display: 'flex', alignItems: 'center', gap: '12px',
-      zIndex: '9999', fontWeight: '500', fontSize: '14px'
-    });
+    banner.className = 'session-expiry-banner';
+    banner.setAttribute('role', 'alert');
+    banner.setAttribute('aria-live', 'assertive');
     document.body.prepend(banner);
   }
   banner.innerHTML = '';
   const text = document.createElement('span');
-  text.style.flex = '1';
+  text.className = 'session-expiry-banner__text';
   text.textContent = message;
   banner.appendChild(text);
   for (const { label, onClick } of actions) {
     const btn = document.createElement('button');
     btn.textContent = label;
-    Object.assign(btn.style, {
-      padding: '4px 12px', background: '#1c1917', color: '#fff',
-      border: 'none', borderRadius: '4px', cursor: 'pointer', fontWeight: '600'
-    });
+    btn.className = 'session-expiry-banner__btn';
     btn.addEventListener('click', onClick);
     banner.appendChild(btn);
   }

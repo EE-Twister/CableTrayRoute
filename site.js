@@ -2055,3 +2055,31 @@ globalThis.loadConduits=loadConduits;
 globalThis.applyUnitLabels=applyUnitLabels;
 globalThis.applyProjectHash=applyProjectHash;
 globalThis.showSelfCheckModal=showSelfCheckModal;
+
+// ----- Scroll-to-top button -----
+(function initScrollTopBtn() {
+  if (typeof document === 'undefined') return;
+  document.addEventListener('DOMContentLoaded', () => {
+    const btn = document.createElement('button');
+    btn.className = 'scroll-top-btn';
+    btn.setAttribute('aria-label', 'Scroll to top');
+    btn.setAttribute('title', 'Scroll to top');
+    btn.innerHTML = '&#8679;'; // ↑ upward arrow
+    document.body.appendChild(btn);
+
+    const SHOW_AFTER_PX = 300;
+    let ticking = false;
+    window.addEventListener('scroll', () => {
+      if (ticking) return;
+      ticking = true;
+      requestAnimationFrame(() => {
+        btn.classList.toggle('visible', window.scrollY > SHOW_AFTER_PX);
+        ticking = false;
+      });
+    }, { passive: true });
+
+    btn.addEventListener('click', () => {
+      window.scrollTo({ top: 0, behavior: 'smooth' });
+    });
+  });
+}());

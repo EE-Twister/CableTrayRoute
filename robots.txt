@@ -1,0 +1,6 @@
+User-agent: *
+Allow: /
+Disallow: /api/
+Disallow: /server_data/
+
+Sitemap: https://ee-twister.github.io/CableTrayRoute/sitemap.xml
