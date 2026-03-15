@@ -6,8 +6,19 @@
   <meta name="description" content="Interactive table for organizing cable data and exporting schedules.">
   <title>Cable Schedule</title>
   <link rel="icon" href="icons/favicon.svg" type="image/svg+xml">
+  <link rel="apple-touch-icon" href="icons/favicon.svg">
   <link rel="stylesheet" href="style.css">
-  <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js" defer></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"
+          integrity="sha512-NUCODRwZ2jFiGEBLSXH6JLBZK2+ZCIkHoOWGWxzULe0rKnbRbEQN3aN0B9HAWa9U0BqmzBt4RnV+L49SXqsA=="
+          crossorigin="anonymous" referrerpolicy="no-referrer" defer></script>
+  <script src="cdnFallback.js" defer></script>
+  <script>
+    window.addEventListener('load', function () {
+      if (typeof initCdnFallback === 'function') {
+        initCdnFallback([{ global: 'XLSX', label: 'Excel import/export (XLSX)' }]);
+      }
+    });
+  </script>
   <!-- Bundled cable schedule logic -->
   <script type="module" src="dist/cableschedule.js" defer></script>
 </head>

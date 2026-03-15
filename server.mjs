@@ -595,18 +595,26 @@ export async function createApp(options = {}) {
     // styles because the existing codebase relies on inline handlers; this
     // still blocks external script injection, javascript: URIs, data: scripts,
     // and loading resources from untrusted origins.
+    // CDN sources (xlsx, plotly, papaparse, gpu.js, docx, handlebars) are
+    // explicitly allowed so the browser does not silently block them.
     res.setHeader(
       'Content-Security-Policy',
       [
         "default-src 'self'",
-        "script-src 'self' 'unsafe-inline'",
+        "script-src 'self' 'unsafe-inline' https://cdn.plot.ly https://cdnjs.cloudflare.com https://cdn.jsdelivr.net https://unpkg.com",
         "style-src 'self' 'unsafe-inline'",
         "img-src 'self' data: blob:",
         "connect-src 'self'",
         "font-src 'self'",
         "object-src 'none'",
+        "worker-src 'self' blob:",
         "frame-ancestors 'none'"
       ].join('; ')
+    );
+    // Restrict access to browser features that this app does not use.
+    res.setHeader(
+      'Permissions-Policy',
+      'camera=(), microphone=(), geolocation=(), payment=(), usb=(), interest-cohort=()'
     );
     // HSTS: only sent when HTTPS is enforced to avoid breaking HTTP-only setups.
     if (enforceHttps) {

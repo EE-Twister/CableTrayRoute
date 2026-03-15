@@ -89,15 +89,37 @@
 
 @media (prefers-color-scheme: dark) {
   :root {
+    /* Semantic tokens */
+    --color-primary: #60a5fa;
+    --color-surface: #0f172a;
+    --color-surface-strong: #1e293b;
+    --color-text: #f1f5f9;
+    --color-border: #334155;
+    --color-text-muted: #94a3b8;
+    --color-success: #4ade80;
+    --color-error: #f87171;
+    --color-tooltip-bg: #475569;
+    --color-tooltip-text: #f8fafc;
+    --color-progress-track: #334155;
+    --color-debug-bg: #000000;
+    --color-debug-text: #4ade80;
+    /* Backward-compatible aliases */
     --primary-color: #17a2b8;
     --secondary-color: #343a40;
     --border-color: #495057;
     --text-color: #f8f9fa;
     --table-row-alt-bg: rgba(255, 255, 255, 0.08);
-    --success-text: #28a745;
+    --success-bg: #1a3a2a;
+    --success-text: #4ade80;
+    --warning-bg: #3a2e00;
     --warning-text: #ffc107;
-    --focus-ring-color: #fff;
+    --error-bg: #3a1a1a;
+    --error-text: #f87171;
+    --focus-ring-color: #93c5fd;
+    --button-bg: #2563eb;
     --button-hover-bg: #1558b0;
+    --theme-control-bg: #1e293b;
+    --theme-control-text: #f1f5f9;
     --panel-phase-a: #ff8a80;
     --panel-phase-b: #74c0fc;
     --panel-phase-c: #8ce99a;
@@ -109,25 +131,43 @@
 }
 
 body.dark-mode {
+  /* Semantic tokens */
+  --color-primary: #60a5fa;
+  --color-surface: #0f172a;
+  --color-surface-strong: #1e293b;
+  --color-text: #f1f5f9;
+  --color-border: #334155;
+  --color-text-muted: #94a3b8;
+  --color-success: #4ade80;
+  --color-error: #f87171;
+  --color-tooltip-bg: #475569;
+  --color-tooltip-text: #f8fafc;
+  --color-progress-track: #334155;
+  --color-debug-bg: #000000;
+  --color-debug-text: #4ade80;
+  /* Backward-compatible aliases */
   --primary-color: #17a2b8;
   --secondary-color: #343a40;
   --border-color: #495057;
   --text-color: #f8f9fa;
   --table-row-alt-bg: rgba(255, 255, 255, 0.08);
-  --success-text: #28a745;
+  --success-bg: #1a3a2a;
+  --success-text: #4ade80;
+  --warning-bg: #3a2e00;
   --warning-text: #ffc107;
-  --focus-ring-color: #fff;
+  --error-bg: #3a1a1a;
+  --error-text: #f87171;
+  --focus-ring-color: #93c5fd;
+  --button-bg: #2563eb;
   --button-hover-bg: #1558b0;
+  --theme-control-bg: #1e293b;
+  --theme-control-text: #f1f5f9;
   --panel-phase-a: #ff8a80;
   --panel-phase-b: #74c0fc;
   --panel-phase-c: #8ce99a;
   --panel-phase-pos: #ffd43b;
   --panel-phase-neg: #ced4da;
   --row-divider-color: rgba(255, 255, 255, 0.18);
-  --color-tooltip-bg: #555555;
-  --color-progress-track: #495057;
-  --color-text-muted: #adb5bd;
-  --color-debug-bg: #000000;
 }
 
 

@@ -3,9 +3,25 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <meta name="description" content="Homepage for Cable Tray Route workflow.">
+  <meta name="description" content="Browser-based toolkit for cable scheduling, tray fill analysis, and optimal routing in electrical design.">
   <title>Cable Tray Route</title>
+  <!-- Open Graph / Social sharing -->
+  <meta property="og:type" content="website">
+  <meta property="og:title" content="CableTrayRoute — Integrated Cable Routing Workflow">
+  <meta property="og:description" content="Browser-based toolkit unifying cable scheduling, analysis, and routing for streamlined electrical design.">
+  <meta property="og:image" content="icons/route.svg">
+  <meta property="og:site_name" content="CableTrayRoute">
+  <!-- Twitter / X card -->
+  <meta name="twitter:card" content="summary">
+  <meta name="twitter:title" content="CableTrayRoute — Integrated Cable Routing Workflow">
+  <meta name="twitter:description" content="Browser-based toolkit unifying cable scheduling, analysis, and routing for streamlined electrical design.">
+  <!-- PWA -->
+  <link rel="manifest" href="manifest.json">
+  <meta name="theme-color" content="#2563eb" media="(prefers-color-scheme: light)">
+  <meta name="theme-color" content="#0f172a" media="(prefers-color-scheme: dark)">
+  <!-- Icons -->
   <link rel="icon" href="icons/favicon.svg" type="image/svg+xml">
+  <link rel="apple-touch-icon" href="icons/favicon.svg">
   <link rel="stylesheet" href="style.css">
 </head>
 <body>
@@ -208,6 +224,7 @@
     <div class="footer-left">
       <img src="icons/route.svg" alt="CableTrayRoute logo" class="footer-logo">
       <span>CableTrayRoute</span>
+      <span class="footer-copyright">&copy; <span id="footer-year">2026</span> CableTrayRoute contributors</span>
     </div>
     <nav class="footer-links">
       <a href="docs/quickstart.html">Quick Start</a>
@@ -224,6 +241,10 @@
       initHelpModal('help-btn','help-modal','close-help-btn');
       initNavToggle();
     });
+    // Register service worker for offline support.
+    if ('serviceWorker' in navigator) {
+      navigator.serviceWorker.register('/sw.js').catch(() => { /* non-critical */ });
+    }
   </script>
 </body>
 </html>

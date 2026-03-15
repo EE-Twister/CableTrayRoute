@@ -1,0 +1,95 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="description" content="You are offline — CableTrayRoute">
+  <title>Offline — CableTrayRoute</title>
+  <link rel="icon" href="icons/favicon.svg" type="image/svg+xml">
+  <link rel="apple-touch-icon" href="icons/favicon.svg">
+  <style>
+    :root {
+      --color-primary: #2563eb;
+      --color-text: #0f172a;
+      --color-surface: #f8fafc;
+      --color-border: #e2e8f0;
+      --color-text-muted: #64748b;
+      --radius-md: 10px;
+      --font-family-base: 'Inter', system-ui, -apple-system, sans-serif;
+    }
+    @media (prefers-color-scheme: dark) {
+      :root {
+        --color-primary: #60a5fa;
+        --color-text: #f1f5f9;
+        --color-surface: #0f172a;
+        --color-border: #334155;
+        --color-text-muted: #94a3b8;
+      }
+    }
+    *, *::before, *::after { box-sizing: border-box; }
+    body {
+      font-family: var(--font-family-base);
+      background: var(--color-surface);
+      color: var(--color-text);
+      margin: 0;
+      min-height: 100vh;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      text-align: center;
+      padding: 2rem;
+    }
+    .offline-card {
+      max-width: 480px;
+      width: 100%;
+    }
+    .offline-icon {
+      font-size: 4rem;
+      margin-bottom: 1rem;
+      display: block;
+      line-height: 1;
+    }
+    h1 {
+      font-size: 1.75rem;
+      font-weight: 700;
+      color: var(--color-primary);
+      margin: 0 0 0.75rem;
+    }
+    p {
+      color: var(--color-text-muted);
+      line-height: 1.6;
+      margin: 0 0 1.5rem;
+    }
+    .btn-retry {
+      display: inline-flex;
+      align-items: center;
+      gap: 0.4rem;
+      background: var(--color-primary);
+      color: #fff;
+      border: none;
+      border-radius: 999px;
+      padding: 0.65rem 1.5rem;
+      font-size: 0.9375rem;
+      font-weight: 600;
+      cursor: pointer;
+      text-decoration: none;
+      transition: opacity 0.15s;
+    }
+    .btn-retry:hover { opacity: 0.88; }
+    .note {
+      margin-top: 1.5rem;
+      font-size: 0.8rem;
+      color: var(--color-text-muted);
+    }
+  </style>
+</head>
+<body>
+  <div class="offline-card">
+    <span class="offline-icon" aria-hidden="true">📡</span>
+    <h1>You're Offline</h1>
+    <p>CableTrayRoute can't reach the server right now. Your locally saved project data is still available in your browser — reconnect to sync changes or access analysis tools.</p>
+    <button class="btn-retry" onclick="location.reload()">Try Again</button>
+    <p class="note">Your project data is stored locally and will not be lost.</p>
+  </div>
+</body>
+</html>

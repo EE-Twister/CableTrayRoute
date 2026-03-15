@@ -439,6 +439,12 @@ body.dark-mode .workflow-step-nav-link {
     color: var(--color-text);
 }
 
+.footer-copyright {
+    font-size: 0.78rem;
+    font-weight: 400;
+    color: var(--color-text-muted, #64748b);
+}
+
 .footer-logo {
     width: 18px;
     height: 18px;
