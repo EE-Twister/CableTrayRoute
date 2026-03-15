@@ -100,7 +100,9 @@
 <body>
   <a href="#main-content" class="skip-link">Skip to main content</a>
   <nav class="top-nav">
-    <button id="nav-toggle" class="nav-toggle" aria-label="Toggle navigation" aria-controls="nav-links" aria-expanded="false">☰</button>
+    <button id="nav-toggle" class="nav-toggle" aria-label="Toggle navigation" aria-controls="nav-links" aria-expanded="false" title="Toggle navigation">
+      <img src="icons/toolbar/grid.svg" alt="" aria-hidden="true" class="control-icon" loading="lazy" decoding="async">
+    </button>
     <div id="nav-links" class="nav-links">
       <a href="index.html">Home</a>
       <a href="equipmentlist.html">Equipment List</a>
@@ -114,7 +116,9 @@
       <a href="optimalRoute.html">Optimal Route</a>
       <a href="oneline.html">One-Line</a>
     </div>
-    <button id="settings-btn" class="settings-btn" aria-label="Settings" aria-expanded="false">⚙</button>
+    <button id="settings-btn" class="settings-btn" aria-label="Settings" aria-expanded="false" title="Settings">
+        <img src="icons/toolbar/validate.svg" alt="" aria-hidden="true" class="control-icon" loading="lazy" decoding="async">
+      </button>
   </nav>
   <div id="settings-menu" class="settings-menu">
     <label for="theme-select">Theme
@@ -132,13 +136,13 @@
         <option value="metric">Metric</option>
       </select>
     </label>
-    <button id="help-btn" aria-expanded="false">Site Help</button>
-    <button id="new-project-btn">New Project</button>
-    <button id="save-project-btn">Save Project</button>
-    <button id="load-project-btn">Load Project</button>
-    <button id="export-project-btn">Export Project</button>
-    <button id="import-project-btn">Import Project</button>
-    <input type="file" id="import-project-input" accept=".ctr.json" class="hidden">
+    <button id="help-btn" class="btn" aria-expanded="false" title="Show help"><img src="icons/toolbar/validate.svg" alt="" aria-hidden="true" class="control-icon" loading="lazy" decoding="async"><span>Site Help</span></button>
+    <button id="new-project-btn" title="Start a new project"><img src="icons/toolbar/copy.svg" alt="" aria-hidden="true" class="control-icon" loading="lazy" decoding="async"><span>New Project</span></button>
+    <button id="save-project-btn" title="Save current project"><img src="icons/toolbar/export.svg" alt="" aria-hidden="true" class="control-icon" loading="lazy" decoding="async"><span>Save Project</span></button>
+    <button id="load-project-btn" title="Load an existing project"><img src="icons/toolbar/import.svg" alt="" aria-hidden="true" class="control-icon" loading="lazy" decoding="async"><span>Load Project</span></button>
+    <button id="export-project-btn" title="Export project data"><img src="icons/toolbar/export.svg" alt="" aria-hidden="true" class="control-icon" loading="lazy" decoding="async"><span>Export Project</span></button>
+    <button id="import-project-btn" title="Import project data"><img src="icons/toolbar/import.svg" alt="" aria-hidden="true" class="control-icon" loading="lazy" decoding="async"><span>Import Project</span></button>
+    <input type="file" id="import-project-input" accept=".ctr.json" class="hidden" title="Select project file">
   </div>
 
   <main class="error-page" id="main-content">
@@ -173,7 +177,7 @@
     </p>
   </main>
 
-  <div id="help-modal" class="modal" aria-hidden="true" role="dialog" aria-labelledby="help-title">
+  <div id="help-modal" class="modal" aria-hidden="true" role="dialog" aria-modal="true" aria-labelledby="help-title">
     <div class="modal-content">
       <button id="close-help-btn" class="close-btn" aria-label="Close Help">&times;</button>
       <h2 id="help-title">Need Help?</h2>
@@ -194,6 +198,18 @@
       });
     });
   </script>
+  <footer class="site-footer">
+    <div class="footer-left">
+      <img src="icons/route.svg" alt="CableTrayRoute logo" class="footer-logo" loading="lazy" decoding="async">
+      <span>CableTrayRoute</span>
+      <span class="footer-copyright">&copy; <span id="footer-year">2026</span> CableTrayRoute contributors</span>
+    </div>
+    <nav class="footer-links" aria-label="Footer">
+      <a href="docs/quickstart.html">Quick Start</a>
+      <a href="docs/index.html">Docs</a>
+      <a href="help.html">Help</a>
+    </nav>
+  </footer>
   <script type="module" src="dist/projectManager.js"></script>
 </body>
 </html>
