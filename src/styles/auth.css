@@ -103,11 +103,11 @@ body.dark-mode .auth-card {
     margin: 0;
     font-size: 1.05rem;
     line-height: 1.6;
-    color: rgba(33, 37, 41, 0.75);
+    color: rgba(33, 37, 41, 0.88);
 }
 
 body.dark-mode .auth-subtitle {
-    color: rgba(248, 249, 250, 0.75);
+    color: rgba(248, 249, 250, 0.88);
 }
 
 .auth-panels {
@@ -140,11 +140,11 @@ body.dark-mode .auth-pane {
     margin: 0;
     font-size: 0.95rem;
     line-height: 1.5;
-    color: rgba(33, 37, 41, 0.7);
+    color: rgba(33, 37, 41, 0.88);
 }
 
 body.dark-mode .auth-description {
-    color: rgba(248, 249, 250, 0.75);
+    color: rgba(248, 249, 250, 0.88);
 }
 
 .auth-form {
@@ -181,6 +181,14 @@ body.dark-mode .auth-form input {
     border-color: rgba(23, 162, 184, 0.35);
 }
 
+.auth-form input::placeholder {
+    color: rgba(33, 37, 41, 0.45);
+}
+
+body.dark-mode .auth-form input::placeholder {
+    color: rgba(248, 249, 250, 0.45);
+}
+
 .auth-form input:focus {
     outline: none;
     border-color: var(--primary-color);
@@ -201,11 +209,11 @@ body.dark-mode .auth-form input:focus {
     margin: 0;
     font-size: 0.95rem;
     text-align: center;
-    color: rgba(33, 37, 41, 0.7);
+    color: rgba(33, 37, 41, 0.88);
 }
 
 body.dark-mode .auth-note {
-    color: rgba(248, 249, 250, 0.75);
+    color: rgba(248, 249, 250, 0.88);
 }
 
 .auth-note a {
