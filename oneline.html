@@ -8,6 +8,17 @@
   <base href="/CableTrayRoute/">
   <link rel="icon" href="icons/favicon.svg" type="image/svg+xml">
   <link rel="apple-touch-icon" href="icons/favicon.svg">
+  <!-- Open Graph / Social sharing -->
+  <meta property="og:type" content="website">
+  <meta property="og:title" content="One-Line Diagram — CableTrayRoute">
+  <meta property="og:description" content="Draw and export electrical single-line diagrams with annotation and PDF/DXF export.">
+  <meta property="og:image" content="icons/route.svg">
+  <meta property="og:site_name" content="CableTrayRoute">
+  <meta property="og:url" content="oneline.html">
+  <!-- Canonical URL -->
+  <link rel="canonical" href="oneline.html">
+    <!-- Performance: early CDN connection -->
+  <link rel="preconnect" href="https://cdn.jsdelivr.net" crossorigin>
   <link rel="stylesheet" href="style.css">
   <script src="https://cdn.jsdelivr.net/npm/handlebars@4.7.8/dist/handlebars.min.js"></script>
   <script>
@@ -31,7 +42,7 @@
     })();
   </script>
 </head>
-<body class="oneline-page">
+<body class="oneline-page" data-report-title="One-Line Diagram">
   <a href="#main-content" class="skip-link">Skip to main content</a>
   <nav class="top-nav">
     <button id="nav-toggle" class="nav-toggle" aria-label="Toggle navigation" aria-controls="nav-links" aria-expanded="false" title="Toggle navigation">☰</button>
@@ -52,7 +63,14 @@
       <button id="settings-btn" class="settings-btn" aria-label="Settings" aria-expanded="false" title="Settings">⚙</button>
   </nav>
   <div id="settings-menu" class="settings-menu">
-    <label><input type="checkbox" id="dark-toggle"> Dark Mode</label>
+    <label for="theme-select">Theme
+    <select id="theme-select">
+      <option value="system">System</option>
+      <option value="light">Light</option>
+      <option value="dark">Dark</option>
+      <option value="high-contrast">High Contrast</option>
+    </select>
+  </label>
     <label><input type="checkbox" id="compact-toggle" aria-label="Enable compact table mode"> Compact Mode</label>
     <label for="unit-select">Units
       <select id="unit-select">
@@ -77,6 +95,13 @@
   </div>
   <div class="container">
     <main id="main-content" class="main-content">
+  <nav aria-label="Breadcrumb">
+    <ol class="breadcrumb-trail">
+      <li><a href="index.html">Home</a></li>
+      <li aria-current="page">One-Line Diagram</li>
+    </ol>
+  </nav>
+
       <section class="card oneline-card">
         <div class="sheet-controls">
           <div class="scenario-controls">
@@ -95,9 +120,9 @@
             <button id="add-sheet-btn" class="icon-button" title="Add Sheet" aria-label="Add Sheet">+</button>
             <button id="rename-sheet-btn" class="icon-button" title="Rename Sheet" aria-label="Rename Sheet">✎</button>
             <button id="delete-sheet-btn" class="icon-button" title="Delete Sheet" aria-label="Delete Sheet">🗑</button>
-            <button id="diagram-export-btn" type="button" class="icon-button" title="Export Diagram" aria-label="Export Diagram"><img src="./icons/toolbar/export.svg" alt=""></button>
+            <button id="diagram-export-btn" type="button" class="icon-button" title="Export Diagram" aria-label="Export Diagram"><img src="./icons/toolbar/export.svg" alt="" loading="lazy" decoding="async"></button>
             <input type="file" id="diagram-import-input" accept=".json" class="hidden-input">
-            <button id="diagram-import-btn" type="button" class="icon-button" title="Import Diagram" aria-label="Import Diagram"><img src="./icons/toolbar/import.svg" alt=""></button>
+            <button id="diagram-import-btn" type="button" class="icon-button" title="Import Diagram" aria-label="Import Diagram"><img src="./icons/toolbar/import.svg" alt="" loading="lazy" decoding="async"></button>
             <button id="sample-diagram-btn" type="button" class="btn" title="Load sample diagram">Load Sample</button>
             <button id="diagram-share-btn" type="button" class="btn" title="Share diagram">Share</button>
             <button id="studies-panel-btn" type="button" class="btn" title="Open studies panel">Studies</button>
@@ -108,9 +133,9 @@
         <div class="toolbar">
           <div class="toolbar-group" aria-label="Edit">
             <span class="toolbar-group-label">Edit</span>
-            <button id="connect-btn" class="icon-button" title="Connect components (C)" aria-label="Connect"><img src="./icons/toolbar/connect.svg" alt=""></button>
-            <button id="undo-btn" class="icon-button" title="Undo (Ctrl+Z)" aria-label="Undo"><img src="./icons/toolbar/undo.svg" alt=""></button>
-            <button id="redo-btn" class="icon-button" title="Redo (Ctrl+Y)" aria-label="Redo"><img src="./icons/toolbar/redo.svg" alt=""></button>
+            <button id="connect-btn" class="icon-button" title="Connect components (C)" aria-label="Connect"><img src="./icons/toolbar/connect.svg" alt="" loading="lazy" decoding="async"></button>
+            <button id="undo-btn" class="icon-button" title="Undo (Ctrl+Z)" aria-label="Undo"><img src="./icons/toolbar/undo.svg" alt="" loading="lazy" decoding="async"></button>
+            <button id="redo-btn" class="icon-button" title="Redo (Ctrl+Y)" aria-label="Redo"><img src="./icons/toolbar/redo.svg" alt="" loading="lazy" decoding="async"></button>
             <button id="history-sidebar-toggle" class="btn" type="button" aria-controls="history-sidebar" aria-expanded="true">History</button>
           </div>
           <div class="toolbar-group" aria-label="Shapes">
@@ -119,17 +144,17 @@
           </div>
           <div class="toolbar-group" aria-label="Align">
             <span class="toolbar-group-label">Align</span>
-            <button id="align-left-btn" class="icon-button" title="Align Left" aria-label="Align Left"><img src="./icons/toolbar/align-left.svg" alt=""></button>
-            <button id="align-right-btn" class="icon-button" title="Align Right" aria-label="Align Right"><img src="./icons/toolbar/align-right.svg" alt=""></button>
-            <button id="align-top-btn" class="icon-button" title="Align Top" aria-label="Align Top"><img src="./icons/toolbar/align-top.svg" alt=""></button>
-            <button id="align-bottom-btn" class="icon-button" title="Align Bottom" aria-label="Align Bottom"><img src="./icons/toolbar/align-bottom.svg" alt=""></button>
-            <button id="distribute-h-btn" class="icon-button" title="Distribute Horizontal" aria-label="Distribute Horizontal"><img src="./icons/toolbar/distribute-h.svg" alt=""></button>
-            <button id="distribute-v-btn" class="icon-button" title="Distribute Vertical" aria-label="Distribute Vertical"><img src="./icons/toolbar/distribute-v.svg" alt=""></button>
+            <button id="align-left-btn" class="icon-button" title="Align Left" aria-label="Align Left"><img src="./icons/toolbar/align-left.svg" alt="" loading="lazy" decoding="async"></button>
+            <button id="align-right-btn" class="icon-button" title="Align Right" aria-label="Align Right"><img src="./icons/toolbar/align-right.svg" alt="" loading="lazy" decoding="async"></button>
+            <button id="align-top-btn" class="icon-button" title="Align Top" aria-label="Align Top"><img src="./icons/toolbar/align-top.svg" alt="" loading="lazy" decoding="async"></button>
+            <button id="align-bottom-btn" class="icon-button" title="Align Bottom" aria-label="Align Bottom"><img src="./icons/toolbar/align-bottom.svg" alt="" loading="lazy" decoding="async"></button>
+            <button id="distribute-h-btn" class="icon-button" title="Distribute Horizontal" aria-label="Distribute Horizontal"><img src="./icons/toolbar/distribute-h.svg" alt="" loading="lazy" decoding="async"></button>
+            <button id="distribute-v-btn" class="icon-button" title="Distribute Vertical" aria-label="Distribute Vertical"><img src="./icons/toolbar/distribute-v.svg" alt="" loading="lazy" decoding="async"></button>
           </div>
           <div class="toolbar-group" aria-label="Files">
             <span class="toolbar-group-label">Files</span>
             <div class="export-group">
-              <button id="export-btn" class="icon-button" title="Export" aria-label="Export" aria-haspopup="true" aria-expanded="false"><img src="./icons/toolbar/export.svg" alt=""></button>
+              <button id="export-btn" class="icon-button" title="Export" aria-label="Export" aria-haspopup="true" aria-expanded="false"><img src="./icons/toolbar/export.svg" alt="" loading="lazy" decoding="async"></button>
               <ul id="export-menu" class="export-menu" role="menu">
                 <li data-format="pdf" role="menuitem">Export PDF</li>
                 <li data-format="dxf" role="menuitem">Export DXF</li>
@@ -137,17 +162,17 @@
               </ul>
             </div>
             <input type="file" id="import-input" accept=".json" class="hidden-input">
-            <button id="import-btn" class="icon-button" title="Import" aria-label="Import"><img src="./icons/toolbar/import.svg" alt=""></button>
-            <button id="validate-btn" class="icon-button" title="Validate" aria-label="Validate"><img src="./icons/toolbar/validate.svg" alt=""></button>
+            <button id="import-btn" class="icon-button" title="Import" aria-label="Import"><img src="./icons/toolbar/import.svg" alt="" loading="lazy" decoding="async"></button>
+            <button id="validate-btn" class="icon-button" title="Validate" aria-label="Validate"><img src="./icons/toolbar/validate.svg" alt="" loading="lazy" decoding="async"></button>
           </div>
           <div class="grid-controls toolbar-group" aria-label="Grid">
             <span class="toolbar-group-label">Grid</span>
             <label class="icon-button" title="Toggle Grid" aria-label="Toggle Grid">
               <input type="checkbox" id="grid-toggle" class="hidden-input" checked>
-              <img src="./icons/toolbar/grid.svg" alt="">
+              <img src="./icons/toolbar/grid.svg" alt="" loading="lazy" decoding="async">
             </label>
             <label class="icon-button" title="Grid size" aria-label="Grid size">
-              <img src="./icons/toolbar/grid-size.svg" alt="">
+              <img src="./icons/toolbar/grid-size.svg" alt="" loading="lazy" decoding="async">
               <input type="number" id="grid-size" value="20" min="1">
             </label>
           </div>
@@ -195,63 +220,63 @@
                 <div class="palette-card card">
                   <h3>Sources</h3>
                   <details id="sources-section" class="palette-section">
-                    <summary><img src="./icons/sources.svg" alt="" class="summary-icon"> Sources</summary>
+                    <summary><img src="./icons/sources.svg" alt="" class="summary-icon" loading="lazy" decoding="async"> Sources</summary>
                     <div id="sources-buttons" class="section-buttons"></div>
                   </details>
                 </div>
                 <div class="palette-card card">
                   <h3>Equipment</h3>
                   <details id="equipment-section" class="palette-section">
-                    <summary><img src="./icons/equipment.svg" alt="" class="summary-icon"> Equipment</summary>
+                    <summary><img src="./icons/equipment.svg" alt="" class="summary-icon" loading="lazy" decoding="async"> Equipment</summary>
                     <div id="equipment-buttons" class="section-buttons"></div>
                   </details>
                 </div>
                 <div class="palette-card card">
                   <h3>Protection</h3>
                   <details id="protection-section" class="palette-section">
-                    <summary><img src="./icons/components/Breaker.svg" alt="" class="summary-icon"> Protection</summary>
+                    <summary><img src="./icons/components/Breaker.svg" alt="" class="summary-icon" loading="lazy" decoding="async"> Protection</summary>
                     <div id="protection-buttons" class="section-buttons"></div>
                   </details>
                 </div>
                 <div class="palette-card card">
                   <h3>Bus</h3>
                   <details id="bus-section" class="palette-section">
-                    <summary><img src="./icons/Bus.svg" alt="" class="summary-icon"> Bus</summary>
+                    <summary><img src="./icons/Bus.svg" alt="" class="summary-icon" loading="lazy" decoding="async"> Bus</summary>
                     <div id="bus-buttons" class="section-buttons"></div>
                   </details>
                 </div>
                 <div class="palette-card card">
                   <h3>Load</h3>
                   <details id="load-section" class="palette-section">
-                    <summary><img src="./icons/load.svg" alt="" class="summary-icon"> Load</summary>
+                    <summary><img src="./icons/load.svg" alt="" class="summary-icon" loading="lazy" decoding="async"> Load</summary>
                     <div id="load-buttons" class="section-buttons"></div>
                   </details>
                 </div>
                 <div class="palette-card card">
                   <h3>Cable</h3>
                   <details id="cable-section" class="palette-section">
-                    <summary><img src="./icons/oneline.svg" alt="" class="summary-icon"> Cable</summary>
+                    <summary><img src="./icons/oneline.svg" alt="" class="summary-icon" loading="lazy" decoding="async"> Cable</summary>
                     <div id="cable-buttons" class="section-buttons"></div>
                   </details>
                 </div>
                 <div class="palette-card card">
                   <h3>Links</h3>
                   <details id="links-section" class="palette-section">
-                    <summary><img src="./icons/links.svg" alt="" class="summary-icon"> Links</summary>
+                    <summary><img src="./icons/links.svg" alt="" class="summary-icon" loading="lazy" decoding="async"> Links</summary>
                     <div id="links-buttons" class="section-buttons"></div>
                   </details>
                 </div>
                 <div class="palette-card card">
                   <h3>Annotations</h3>
                   <details id="annotations-section" class="palette-section">
-                    <summary><img src="./icons/annotation.svg" alt="" class="summary-icon"> Annotations</summary>
+                    <summary><img src="./icons/annotation.svg" alt="" class="summary-icon" loading="lazy" decoding="async"> Annotations</summary>
                     <div id="annotations-buttons" class="section-buttons"></div>
                   </details>
                 </div>
                 <div class="palette-card card">
                   <h3>Templates</h3>
                   <details id="template-section" class="palette-section">
-                    <summary><img src="./icons/oneline.svg" alt="" class="summary-icon"> Templates</summary>
+                    <summary><img src="./icons/oneline.svg" alt="" class="summary-icon" loading="lazy" decoding="async"> Templates</summary>
                     <div id="template-buttons" class="section-buttons"></div>
                   </details>
                 </div>
@@ -364,7 +389,7 @@
       </form>
       <div class="study-results-wrapper">
         <button id="study-results-copy-btn" type="button" class="icon-button study-results-copy-btn" aria-label="Copy study results" title="Copy study results">
-          <img src="./icons/toolbar/copy.svg" alt="">
+          <img src="./icons/toolbar/copy.svg" alt="" loading="lazy" decoding="async">
         </button>
         <pre id="study-results" class="study-results"></pre>
       </div>

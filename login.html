@@ -6,13 +6,22 @@
   <meta name="description" content="Secure access to CableTrayRoute for managing cable routing workflows.">
   <title>CableTrayRoute Login</title>
   <link rel="icon" href="icons/favicon.svg" type="image/svg+xml">
+  <!-- Open Graph / Social sharing -->
+  <meta property="og:type" content="website">
+  <meta property="og:title" content="Sign In — CableTrayRoute">
+  <meta property="og:description" content="Secure access to CableTrayRoute for managing cable routing workflows.">
+  <meta property="og:image" content="icons/route.svg">
+  <meta property="og:site_name" content="CableTrayRoute">
+  <meta property="og:url" content="login.html">
+  <!-- Canonical URL -->
+  <link rel="canonical" href="login.html">
   <link rel="stylesheet" href="style.css">
 </head>
 <body class="auth-page">
   <a href="#main-content" class="skip-link">Skip to main content</a>
   <header class="auth-top-bar">
     <a href="index.html" class="auth-brand">
-      <img src="icons/route.svg" alt="" class="auth-brand-icon" aria-hidden="true">
+      <img src="icons/route.svg" alt="" class="auth-brand-icon" aria-hidden="true" loading="lazy" decoding="async">
       <span>CableTrayRoute</span>
     </a>
     <nav class="auth-top-links" aria-label="Primary">
@@ -31,14 +40,20 @@
         <section class="auth-pane" aria-labelledby="signup-title">
           <h2 id="signup-title">Create an account</h2>
           <p class="auth-description">Set up credentials to keep cable schedules, tray fill analyses, and routing studies in sync across the suite.</p>
-          <form id="signup-form" class="auth-form">
+          <form id="signup-form" class="auth-form" novalidate>
             <div class="auth-field">
               <label for="signup-user">Username</label>
-              <input id="signup-user" name="signup-user" type="text" autocomplete="username" placeholder="Username" required>
+              <input id="signup-user" name="signup-user" type="text" autocomplete="username"
+                     placeholder="Username" required
+                     aria-describedby="signup-user-hint" aria-required="true">
+              <span id="signup-user-hint" class="field-hint">Choose a unique username for your account.</span>
             </div>
             <div class="auth-field">
               <label for="signup-pass">Password</label>
-              <input id="signup-pass" name="signup-pass" type="password" autocomplete="new-password" placeholder="Password (min 8 characters)" required minlength="8">
+              <input id="signup-pass" name="signup-pass" type="password" autocomplete="new-password"
+                     placeholder="Password" required minlength="8"
+                     aria-describedby="signup-pass-hint" aria-required="true">
+              <span id="signup-pass-hint" class="field-hint">Minimum 8 characters.</span>
             </div>
             <button type="submit" class="primary-btn">Sign Up</button>
           </form>
@@ -46,14 +61,20 @@
         <section class="auth-pane" aria-labelledby="login-title">
           <h2 id="login-title">Sign in</h2>
           <p class="auth-description">Return to your saved workspaces and continue coordinating load lists, one-line diagrams, and routes.</p>
-          <form id="login-form" class="auth-form">
+          <form id="login-form" class="auth-form" novalidate>
             <div class="auth-field">
               <label for="login-user">Username</label>
-              <input id="login-user" name="login-user" type="text" autocomplete="username" placeholder="Username" required>
+              <input id="login-user" name="login-user" type="text" autocomplete="username"
+                     placeholder="Username" required
+                     aria-describedby="login-user-hint" aria-required="true">
+              <span id="login-user-hint" class="field-hint sr-only">Enter your username.</span>
             </div>
             <div class="auth-field">
               <label for="login-pass">Password</label>
-              <input id="login-pass" name="login-pass" type="password" autocomplete="current-password" placeholder="Password" required>
+              <input id="login-pass" name="login-pass" type="password" autocomplete="current-password"
+                     placeholder="Password" required
+                     aria-describedby="login-pass-hint" aria-required="true">
+              <span id="login-pass-hint" class="field-hint sr-only">Enter your account password.</span>
             </div>
             <button type="submit" class="primary-btn">Log In</button>
             <p class="auth-note auth-note--sm">
@@ -67,7 +88,7 @@
   </main>
   <footer class="site-footer">
     <div class="footer-left">
-      <img src="icons/route.svg" alt="CableTrayRoute logo" class="footer-logo">
+      <img src="icons/route.svg" alt="CableTrayRoute logo" class="footer-logo" loading="lazy" decoding="async">
       <span>CableTrayRoute</span>
       <span class="footer-copyright">&copy; 2026 CableTrayRoute contributors</span>
     </div>

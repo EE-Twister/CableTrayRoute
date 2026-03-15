@@ -84,12 +84,56 @@
   </style>
 </head>
 <body>
-  <div class="offline-card">
+  <div class="offline-card" role="main">
     <span class="offline-icon" aria-hidden="true">📡</span>
     <h1>You're Offline</h1>
     <p>CableTrayRoute can't reach the server right now. Your locally saved project data is still available in your browser — reconnect to sync changes or access analysis tools.</p>
-    <button class="btn-retry" onclick="location.reload()">Try Again</button>
-    <p class="note">Your project data is stored locally and will not be lost.</p>
+    <div style="display:flex;flex-wrap:wrap;gap:0.75rem;justify-content:center;margin-bottom:0.5rem;">
+      <button class="btn-retry" id="retry-btn" aria-live="polite">
+        <span id="retry-text">Try Again</span>
+      </button>
+      <a href="index.html" class="btn-retry" style="background:transparent;border:1.5px solid var(--color-primary);color:var(--color-primary);">Go to Home</a>
+    </div>
+    <p class="note" id="offline-status">Your project data is stored locally and will not be lost.</p>
+    <p class="note" id="offline-time"></p>
   </div>
+  <script>
+    // Show when the page went offline
+    const timeEl = document.getElementById('offline-time');
+    if (timeEl) timeEl.textContent = 'Since: ' + new Date().toLocaleTimeString();
+
+    const retryBtn = document.getElementById('retry-btn');
+    const retryText = document.getElementById('retry-text');
+    const statusEl = document.getElementById('offline-status');
+
+    let checking = false;
+    retryBtn.addEventListener('click', async () => {
+      if (checking) return;
+      checking = true;
+      retryText.textContent = 'Checking connection…';
+      retryBtn.disabled = true;
+      try {
+        // Ping a small cacheable asset to test connectivity
+        const resp = await fetch('icons/favicon.svg', { cache: 'no-store', signal: AbortSignal.timeout(5000) });
+        if (resp.ok) {
+          statusEl.textContent = 'Connection restored! Reloading…';
+          setTimeout(() => location.reload(), 500);
+          return;
+        }
+      } catch {
+        // Still offline
+      }
+      retryText.textContent = 'Try Again';
+      retryBtn.disabled = false;
+      statusEl.textContent = 'Still offline. Please check your network connection.';
+      checking = false;
+    });
+
+    // Auto-reconnect when browser comes back online
+    window.addEventListener('online', () => {
+      statusEl.textContent = 'Connection restored! Reloading…';
+      setTimeout(() => location.reload(), 800);
+    });
+  </script>
 </body>
 </html>

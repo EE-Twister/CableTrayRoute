@@ -7,11 +7,20 @@
   <title>Time-Current Curves</title>
   <link rel="icon" href="icons/favicon.svg" type="image/svg+xml">
   <link rel="apple-touch-icon" href="icons/favicon.svg">
+  <!-- Open Graph / Social sharing -->
+  <meta property="og:type" content="website">
+  <meta property="og:title" content="Time-Current Curves — CableTrayRoute">
+  <meta property="og:description" content="Plot and analyze time-current curves for overcurrent protective device coordination.">
+  <meta property="og:image" content="icons/route.svg">
+  <meta property="og:site_name" content="CableTrayRoute">
+  <meta property="og:url" content="tcc.html">
+  <!-- Canonical URL -->
+  <link rel="canonical" href="tcc.html">
   <link rel="stylesheet" href="style.css">
   <script type="module" src="dataStore.mjs" defer></script>
   <script type="module" src="analysis/tcc.js" defer></script>
 </head>
-<body>
+<body data-report-title="Time-Current Curves">
   <a href="#main-content" class="skip-link">Skip to main content</a>
   <nav class="top-nav">
     <button id="nav-toggle" class="nav-toggle" aria-label="Toggle navigation" aria-controls="nav-links" aria-expanded="false" title="Toggle navigation">☰</button>
@@ -33,7 +42,14 @@
       <button id="settings-btn" class="settings-btn" aria-label="Settings" aria-expanded="false" title="Settings">⚙</button>
   </nav>
   <div id="settings-menu" class="settings-menu">
-    <label><input type="checkbox" id="dark-toggle"> Dark Mode</label>
+    <label for="theme-select">Theme
+    <select id="theme-select">
+      <option value="system">System</option>
+      <option value="light">Light</option>
+      <option value="dark">Dark</option>
+      <option value="high-contrast">High Contrast</option>
+    </select>
+  </label>
     <label><input type="checkbox" id="compact-toggle" aria-label="Enable compact table mode"> Compact Mode</label>
     <label for="unit-select">Units
       <select id="unit-select">
@@ -51,6 +67,13 @@
   </div>
   <div class="container">
     <main id="main-content" class="main-content">
+  <nav aria-label="Breadcrumb">
+    <ol class="breadcrumb-trail">
+      <li><a href="index.html">Home</a></li>
+      <li aria-current="page">Time-Current Curves</li>
+    </ol>
+  </nav>
+
       <header class="page-header">
         <h1>Time-Current Curves</h1>
         <p>Plot and compare protective device curves.</p>

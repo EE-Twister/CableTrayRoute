@@ -36,9 +36,22 @@ input[type="number"], input[type="text"], select {
 }
 
 /* Highlight invalid fields */
-.input-error {
-    border-color: #c92a2a;
-    background: rgba(201, 42, 42, 0.05);
+.input-error,
+input[aria-invalid="true"],
+select[aria-invalid="true"] {
+    border-color: var(--color-error, #dc3545) !important;
+    background: color-mix(in srgb, var(--error-bg, #f8d7da) 20%, transparent);
+}
+
+/* Native CSS validation — only show after user interaction */
+input:invalid:not(:placeholder-shown):not(:focus),
+select:invalid:not(:focus) {
+    border-color: var(--color-error, #dc3545);
+    background: color-mix(in srgb, var(--error-bg, #f8d7da) 15%, transparent);
+}
+
+input:valid:not(:placeholder-shown) {
+    border-color: var(--color-success, #28a745);
 }
 
 .manufacturer-input,
@@ -46,9 +59,29 @@ input[type="number"], input[type="text"], select {
     text-align: left;
 }
 
-.error-message {
-    color: red;
+.error-message,
+.field-error {
+    color: var(--color-error, #dc3545);
     font-size: 0.85em;
+    margin-top: -4px;
+    margin-bottom: 8px;
+    display: block;
+}
+
+/* Success message */
+.success-message,
+.field-success {
+    color: var(--color-success, #28a745);
+    font-size: 0.85em;
+    margin-top: -4px;
+    margin-bottom: 8px;
+    display: block;
+}
+
+/* Hint / helper text below fields */
+.field-hint {
+    color: var(--color-text-muted, #64748b);
+    font-size: 0.8em;
     margin-top: -4px;
     margin-bottom: 8px;
     display: block;

@@ -278,3 +278,24 @@ body.dark-mode .auth-note {
     gap: var(--space-4);
 }
 
+/* ---- Browser Autofill Override ---- */
+/* Match autofill background to our design tokens */
+input:-webkit-autofill,
+input:-webkit-autofill:hover,
+input:-webkit-autofill:focus,
+input:-webkit-autofill:active {
+    -webkit-box-shadow: 0 0 0 1000px var(--color-surface-strong, #ffffff) inset;
+    -webkit-text-fill-color: var(--color-text, #0f172a);
+    caret-color: var(--color-text, #0f172a);
+    transition: background-color 9999s ease-in-out 0s;
+}
+
+body.dark-mode input:-webkit-autofill,
+body.dark-mode input:-webkit-autofill:hover,
+body.dark-mode input:-webkit-autofill:focus,
+body.dark-mode input:-webkit-autofill:active {
+    -webkit-box-shadow: 0 0 0 1000px #1e293b inset;
+    -webkit-text-fill-color: #f1f5f9;
+    caret-color: #f1f5f9;
+}
+

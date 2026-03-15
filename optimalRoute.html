@@ -7,7 +7,19 @@
     <title>Optimal 3D Cable Routing System</title>
     <link rel="icon" href="icons/favicon.svg" type="image/svg+xml">
     <link rel="apple-touch-icon" href="icons/favicon.svg">
-    <link rel="stylesheet" href="style.css">
+  <!-- Open Graph / Social sharing -->
+  <meta property="og:type" content="website">
+  <meta property="og:title" content="Optimal Cable Routing — CableTrayRoute">
+  <meta property="og:description" content="Compute optimal 3D cable routes using Dijkstra pathfinding with capacity and thermal constraints.">
+  <meta property="og:image" content="icons/route.svg">
+  <meta property="og:site_name" content="CableTrayRoute">
+  <meta property="og:url" content="optimalRoute.html">
+  <!-- Canonical URL -->
+  <link rel="canonical" href="optimalRoute.html">
+      <!-- Performance: early CDN connection -->
+  <link rel="preconnect" href="https://cdn.plot.ly" crossorigin>
+  <link rel="preconnect" href="https://cdnjs.cloudflare.com" crossorigin>
+  <link rel="stylesheet" href="style.css">
     <script src="https://cdn.plot.ly/plotly-2.27.0.min.js" crossorigin="anonymous" defer></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"
             integrity="sha512-NUCODRwZ2jFiGEBLSXH6JLBZK2+ZCIkHoOWGWxzULe0rKnbRbEQN3aN0B9HAWa9U0BqmzBt4RnV+L49SXqsA=="
@@ -52,7 +64,7 @@
       })();
     </script>
 </head>
-<body>
+<body data-report-title="Optimal Cable Route">
     <a href="#main-content" class="skip-link">Skip to main content</a>
     <nav class="top-nav">
         <button id="sidebar-toggle" class="sidebar-toggle" aria-label="Toggle Sidebar">☰</button>
@@ -74,7 +86,14 @@
 <button id="settings-btn" class="settings-btn" aria-label="Settings" aria-expanded="false" title="Settings">⚙</button>
   </nav>
     <div id="settings-menu" class="settings-menu">
-        <label><input type="checkbox" id="dark-toggle"> Dark Mode</label>
+        <label for="theme-select">Theme
+    <select id="theme-select">
+      <option value="system">System</option>
+      <option value="light">Light</option>
+      <option value="dark">Dark</option>
+      <option value="high-contrast">High Contrast</option>
+    </select>
+  </label>
         <label><input type="checkbox" id="compact-toggle" aria-label="Enable compact table mode"> Compact Mode</label>
         <label><input type="checkbox" id="debug-toggle" class="no-dirty"> Debug Mode</label>
         <label for="unit-select">Units
@@ -164,6 +183,13 @@
         </aside>
 
         <main id="main-content" class="main-content">
+  <nav aria-label="Breadcrumb">
+    <ol class="breadcrumb-trail">
+      <li><a href="index.html">Home</a></li>
+      <li aria-current="page">Optimal Route</li>
+    </ol>
+  </nav>
+
             <header class="page-header">
                 <h1>Optimal 3D Cable Routing System</h1>
                 <p>Find the most efficient path for routing cables through tray networks with capacity constraints.</p>
