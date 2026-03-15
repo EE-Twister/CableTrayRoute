@@ -4,7 +4,7 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <meta name="description" content="Interactive table for organizing cable data and exporting schedules.">
-  <title>Cable Schedule</title>
+  <title>Cable Schedule — CableTrayRoute</title>
   <link rel="icon" href="icons/favicon.svg" type="image/svg+xml">
   <link rel="apple-touch-icon" href="icons/favicon.svg">
   <!-- Open Graph / Social sharing -->
@@ -16,6 +16,17 @@
   <meta property="og:url" content="cableschedule.html">
   <!-- Canonical URL -->
   <link rel="canonical" href="cableschedule.html">
+  <!-- JSON-LD Breadcrumb -->
+  <script type="application/ld+json">
+  {
+    "@context": "https://schema.org",
+    "@type": "BreadcrumbList",
+    "itemListElement": [
+      { "@type": "ListItem", "position": 1, "name": "Home", "item": "index.html" },
+      { "@type": "ListItem", "position": 2, "name": "Cable Schedule", "item": "cableschedule.html" }
+    ]
+  }
+  </script>
     <!-- Performance: early CDN connection -->
   <link rel="preconnect" href="https://cdnjs.cloudflare.com" crossorigin>
   <link rel="stylesheet" href="style.css">
@@ -36,7 +47,9 @@
 <body data-report-title="Cable Schedule">
   <a href="#main-content" class="skip-link">Skip to main content</a>
   <nav class="top-nav">
-    <button id="nav-toggle" class="nav-toggle" aria-label="Toggle navigation" aria-controls="nav-links" aria-expanded="false" title="Toggle navigation">☰</button>
+    <button id="nav-toggle" class="nav-toggle" aria-label="Toggle navigation" aria-controls="nav-links" aria-expanded="false" title="Toggle navigation">
+      <img src="icons/toolbar/grid.svg" alt="" aria-hidden="true" class="control-icon" loading="lazy" decoding="async">
+    </button>
     <div id="nav-links" class="nav-links">
       <a href="index.html">Home</a>
       <a href="equipmentlist.html">Equipment List</a>
@@ -109,6 +122,7 @@
             <button id="open-apply-typical-btn" class="btn" type="button" title="Apply a typical to selected rows" aria-haspopup="dialog" aria-expanded="false">Apply Typical</button>
           </div>
           <div class="toolbar-group">
+            <button type="button" class="btn" title="Print schedule" onclick="window.print()">Print</button>
             <button id="clear-filters-btn" class="btn" title="Clear filters">Clear Filters</button>
             <button id="delete-all-btn" class="btn btn-danger" title="Delete all rows">Delete All Rows</button>
           </div>
@@ -158,7 +172,7 @@
       </nav>
     </main>
   </div>
-  <div id="help-modal" class="modal" aria-hidden="true" role="dialog" aria-labelledby="help-title">
+  <div id="help-modal" class="modal" aria-hidden="true" role="dialog" aria-modal="true" aria-labelledby="help-title">
     <div class="modal-content">
       <button id="close-help-btn" class="close-btn" aria-label="Close Help" title="Close help">&times;</button>
       <h2 id="help-title">Cable Schedule Help</h2>
@@ -167,7 +181,7 @@
       <p>Loading the sample project seeds a starter set of typicals so you can explore the workflow immediately. Edit or duplicate them to match your standards, and export the schedule when you are ready to share the data.</p>
     </div>
   </div>
-  <div id="cable-editor-modal" class="modal" aria-hidden="true" role="dialog" aria-labelledby="cable-editor-title">
+  <div id="cable-editor-modal" class="modal" aria-hidden="true" role="dialog" aria-modal="true" aria-labelledby="cable-editor-title">
     <div class="modal-content" data-variant="wide">
       <button id="close-cable-editor-btn" class="close-btn" aria-label="Close cable editor" title="Close cable editor">&times;</button>
       <form id="cable-editor-form" class="modal-form" novalidate>

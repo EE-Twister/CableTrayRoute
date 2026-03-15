@@ -4,7 +4,7 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <meta name="description" content="Interactive tables for organizing raceway data and exporting schedules.">
-  <title>Raceway Schedule</title>
+  <title>Raceway Schedule — CableTrayRoute</title>
   <link rel="icon" href="icons/favicon.svg" type="image/svg+xml">
   <link rel="apple-touch-icon" href="icons/favicon.svg">
   <!-- Open Graph / Social sharing -->
@@ -27,7 +27,9 @@
 <body data-report-title="Raceway Schedule">
   <a href="#main-content" class="skip-link">Skip to main content</a>
   <nav class="top-nav">
-    <button id="nav-toggle" class="nav-toggle" aria-label="Toggle navigation" aria-controls="nav-links" aria-expanded="false" title="Toggle navigation">☰</button>
+    <button id="nav-toggle" class="nav-toggle" aria-label="Toggle navigation" aria-controls="nav-links" aria-expanded="false" title="Toggle navigation">
+      <img src="icons/toolbar/grid.svg" alt="" aria-hidden="true" class="control-icon" loading="lazy" decoding="async">
+    </button>
     <div id="nav-links" class="nav-links">
       <a href="index.html">Home</a>
       <a href="equipmentlist.html">Equipment List</a>
@@ -195,7 +197,7 @@
     </main>
   </div>
 
-  <div id="help-modal" class="modal" aria-hidden="true" role="dialog" aria-labelledby="help-title">
+  <div id="help-modal" class="modal" aria-hidden="true" role="dialog" aria-modal="true" aria-labelledby="help-title">
     <div class="modal-content">
       <button id="close-help-btn" class="close-btn" aria-label="Close Help">&times;</button>
       <h2 id="help-title">Raceway Schedule Help</h2>
@@ -203,7 +205,7 @@
     </div>
   </div>
 
-  <div id="ductbank-help-modal" class="modal" aria-hidden="true" role="dialog" aria-labelledby="ductbank-help-title">
+  <div id="ductbank-help-modal" class="modal" aria-hidden="true" role="dialog" aria-modal="true" aria-labelledby="ductbank-help-title">
     <div class="modal-content">
       <button class="close-btn" aria-label="Close Help">&times;</button>
       <h2 id="ductbank-help-title">Ductbank Schedule Help</h2>
@@ -211,7 +213,7 @@
     </div>
   </div>
 
-  <div id="tray-help-modal" class="modal" aria-hidden="true" role="dialog" aria-labelledby="tray-help-title">
+  <div id="tray-help-modal" class="modal" aria-hidden="true" role="dialog" aria-modal="true" aria-labelledby="tray-help-title">
     <div class="modal-content">
       <button class="close-btn" aria-label="Close Help">&times;</button>
       <h2 id="tray-help-title">Tray Schedule Help</h2>
@@ -219,7 +221,7 @@
     </div>
   </div>
 
-    <div id="conduit-help-modal" class="modal" aria-hidden="true" role="dialog" aria-labelledby="conduit-help-title">
+    <div id="conduit-help-modal" class="modal" aria-hidden="true" role="dialog" aria-modal="true" aria-labelledby="conduit-help-title">
       <div class="modal-content">
         <button class="close-btn" aria-label="Close Help">&times;</button>
         <h2 id="conduit-help-title">Conduit Schedule Help</h2>

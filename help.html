@@ -25,7 +25,9 @@
 <body>
   <a href="#main-content" class="skip-link">Skip to main content</a>
   <nav class="top-nav">
-    <button id="nav-toggle" class="nav-toggle" aria-label="Toggle navigation" aria-controls="nav-links" aria-expanded="false">☰</button>
+    <button id="nav-toggle" class="nav-toggle" aria-label="Toggle navigation" aria-controls="nav-links" aria-expanded="false" title="Toggle navigation">
+      <img src="icons/toolbar/grid.svg" alt="" aria-hidden="true" class="control-icon" loading="lazy" decoding="async">
+    </button>
     <div id="nav-links" class="nav-links">
       <a href="index.html">Home</a>
       <a href="equipmentlist.html">Equipment List</a>
@@ -40,7 +42,9 @@
       <a href="oneline.html">One-Line</a>
       <a href="help.html" class="active" aria-current="page">Help</a>    </div>
 
-      <button id="settings-btn" class="settings-btn" aria-label="Settings" aria-expanded="false">⚙</button>
+      <button id="settings-btn" class="settings-btn" aria-label="Settings" aria-expanded="false" title="Settings">
+        <img src="icons/toolbar/validate.svg" alt="" aria-hidden="true" class="control-icon" loading="lazy" decoding="async">
+      </button>
   </nav>
   <div id="settings-menu" class="settings-menu">
     <label for="theme-select">Theme
@@ -102,8 +106,8 @@
       <table class="shortcuts-table">
         <thead>
           <tr>
-            <th>Shortcut</th>
-            <th>Action</th>
+            <th scope="col">Shortcut</th>
+            <th scope="col">Action</th>
           </tr>
         </thead>
         <tbody>
@@ -151,9 +155,10 @@
     <div class="footer-left">
       <img src="icons/route.svg" alt="CableTrayRoute logo" class="footer-logo" loading="lazy" decoding="async">
       <span>CableTrayRoute</span>
+      <span class="footer-copyright">&copy; <span id="footer-year">2026</span> CableTrayRoute contributors</span>
     </div>
-    <nav class="footer-links">
-      <a href="README.md">README</a>
+    <nav class="footer-links" aria-label="Footer">
+      <a href="docs/index.html">Overview</a>
       <a href="docs/quickstart.html">Quick Start</a>
       <a href="docs/index.html">Docs</a>
       <a href="https://github.com/EE-Twister/CableTrayRoute/issues" target="_blank" rel="noopener">Feedback</a>
