@@ -401,3 +401,144 @@ a:focus-visible {
     background: var(--button-hover-bg, #1d4ed8);
 }
 
+/* ---- Keyboard Key Styling ---- */
+
+kbd {
+    display: inline-block;
+    padding: 0.1em 0.4em;
+    font-family: ui-monospace, 'SFMono-Regular', 'Cascadia Code', Consolas, monospace;
+    font-size: 0.8em;
+    line-height: 1.4;
+    color: var(--color-text, #0f172a);
+    background: var(--color-surface-strong, #ffffff);
+    border: 1px solid var(--color-border, #e2e8f0);
+    border-bottom-width: 2px;
+    border-radius: var(--radius-sm, 6px);
+    box-shadow: 0 1px 0 var(--color-border, #e2e8f0);
+    white-space: nowrap;
+    vertical-align: baseline;
+}
+
+/* ---- Abbreviation Styling ---- */
+
+abbr[title] {
+    text-decoration: underline dotted;
+    cursor: help;
+    text-underline-offset: 2px;
+}
+
+/* ---- Code Block Styling ---- */
+
+code:not([class]) {
+    font-family: ui-monospace, 'SFMono-Regular', 'Cascadia Code', Consolas, monospace;
+    font-size: 0.875em;
+    padding: 0.15em 0.4em;
+    background: color-mix(in srgb, var(--color-border, #e2e8f0) 40%, transparent);
+    border-radius: var(--radius-sm, 6px);
+    color: var(--color-text, #0f172a);
+}
+
+pre {
+    font-family: ui-monospace, 'SFMono-Regular', 'Cascadia Code', Consolas, monospace;
+    font-size: 0.875rem;
+    line-height: 1.6;
+    background: var(--color-debug-bg, #1e1e1e);
+    color: var(--color-debug-text, #00ff00);
+    padding: var(--space-4, 1rem);
+    border-radius: var(--radius-md, 10px);
+    overflow-x: auto;
+    tab-size: 2;
+}
+
+pre code {
+    font-size: inherit;
+    padding: 0;
+    background: none;
+    border-radius: 0;
+    color: inherit;
+}
+
+/* ---- Horizontal Rule ---- */
+
+hr {
+    border: none;
+    border-top: 1px solid var(--color-border, #e2e8f0);
+    margin: var(--space-5, 1.5rem) 0;
+}
+
+/* ---- Breadcrumb Navigation ---- */
+
+.breadcrumb-trail {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: var(--space-1, 0.25rem);
+    padding: var(--space-2, 0.5rem) var(--space-4, 1rem);
+    font-size: var(--font-size-sm, 0.875rem);
+    color: var(--color-text-muted, #64748b);
+    border-bottom: 1px solid var(--color-border, #e2e8f0);
+    background: color-mix(in srgb, var(--color-surface, #f8fafc) 60%, transparent);
+    list-style: none;
+    margin: 0;
+}
+
+.breadcrumb-trail li {
+    display: flex;
+    align-items: center;
+    gap: var(--space-1, 0.25rem);
+}
+
+.breadcrumb-trail li + li::before {
+    content: '/';
+    color: var(--color-border, #e2e8f0);
+    font-size: 0.85em;
+}
+
+.breadcrumb-trail a {
+    color: var(--color-text-muted, #64748b);
+    text-decoration: none;
+}
+
+.breadcrumb-trail a:hover {
+    color: var(--color-primary, #2563eb);
+    text-decoration: underline;
+}
+
+.breadcrumb-trail [aria-current="page"] {
+    color: var(--color-text, #0f172a);
+    font-weight: 500;
+}
+
+/* ---- Keyboard Shortcuts Table ---- */
+
+.shortcuts-table {
+    width: 100%;
+    border-collapse: collapse;
+    margin: var(--space-4, 1rem) 0;
+    font-size: var(--font-size-sm, 0.875rem);
+}
+
+.shortcuts-table th,
+.shortcuts-table td {
+    padding: var(--space-2, 0.5rem) var(--space-3, 0.75rem);
+    text-align: left;
+    border-bottom: 1px solid var(--color-border, #e2e8f0);
+}
+
+.shortcuts-table th {
+    font-weight: 600;
+    color: var(--color-text-muted, #64748b);
+    font-size: var(--font-size-xs, 0.75rem);
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+    background: color-mix(in srgb, var(--color-surface, #f8fafc) 50%, transparent);
+}
+
+.shortcuts-table td:first-child {
+    white-space: nowrap;
+}
+
+.shortcuts-table tbody tr:hover {
+    background: color-mix(in srgb, var(--color-primary, #2563eb) 4%, transparent);
+}
+

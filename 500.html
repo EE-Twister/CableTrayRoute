@@ -1,0 +1,158 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="description" content="Server error — CableTrayRoute">
+  <title>Server Error — CableTrayRoute</title>
+  <link rel="icon" href="icons/favicon.svg" type="image/svg+xml">
+  <link rel="apple-touch-icon" href="icons/favicon.svg">
+  <!-- Open Graph / Social sharing -->
+  <meta property="og:type" content="website">
+  <meta property="og:title" content="Server Error — CableTrayRoute">
+  <meta property="og:description" content="An unexpected server error occurred. Please try again or return to CableTrayRoute.">
+  <meta property="og:image" content="icons/route.svg">
+  <meta property="og:site_name" content="CableTrayRoute">
+  <meta property="og:url" content="500.html">
+  <!-- Canonical URL -->
+  <link rel="canonical" href="500.html">
+  <link rel="stylesheet" href="style.css">
+  <style>
+    .error-page {
+      max-width: 720px;
+      margin: 3rem auto;
+      padding: 0 var(--space-4);
+      text-align: center;
+    }
+    .error-code {
+      font-size: clamp(4rem, 15vw, 7rem);
+      font-weight: 700;
+      color: var(--color-error, #dc3545);
+      line-height: 1;
+      margin: 0 0 var(--space-3);
+      opacity: 0.85;
+    }
+    .error-title {
+      font-size: var(--font-size-xl);
+      margin: 0 0 var(--space-2);
+    }
+    .error-body {
+      color: var(--color-text-muted, #6c757d);
+      margin: 0 0 var(--space-5);
+    }
+    .error-actions {
+      display: flex;
+      flex-wrap: wrap;
+      gap: var(--space-3);
+      justify-content: center;
+      margin-bottom: var(--space-6);
+    }
+    .error-details {
+      background: var(--color-surface-strong, #ffffff);
+      border: 1px solid var(--color-border, #e2e8f0);
+      border-radius: var(--radius-md);
+      padding: var(--space-4);
+      text-align: left;
+      margin-top: var(--space-5);
+      font-size: var(--font-size-sm);
+    }
+    .error-details summary {
+      cursor: pointer;
+      font-weight: 600;
+      color: var(--color-text-muted, #64748b);
+    }
+    .error-details pre {
+      margin-top: var(--space-3);
+      font-size: 0.8rem;
+    }
+    .error-time {
+      margin-top: var(--space-4);
+      font-size: var(--font-size-sm);
+      color: var(--color-text-muted, #64748b);
+    }
+  </style>
+</head>
+<body>
+  <a href="#main-content" class="skip-link">Skip to main content</a>
+  <nav class="top-nav">
+    <button id="nav-toggle" class="nav-toggle" aria-label="Toggle navigation" aria-controls="nav-links" aria-expanded="false">☰</button>
+    <div id="nav-links" class="nav-links">
+      <a href="index.html">Home</a>
+      <a href="equipmentlist.html">Equipment List</a>
+      <a href="loadlist.html">Load List</a>
+      <a href="cableschedule.html">Cable Schedule</a>
+      <a href="panelschedule.html">Panel Schedule</a>
+      <a href="racewayschedule.html">Raceway Schedule</a>
+      <a href="ductbankroute.html">Ductbank</a>
+      <a href="cabletrayfill.html">Tray Fill</a>
+      <a href="conduitfill.html">Conduit Fill</a>
+      <a href="optimalRoute.html">Optimal Route</a>
+      <a href="oneline.html">One-Line</a>
+    </div>
+    <button id="settings-btn" class="settings-btn" aria-label="Settings" aria-expanded="false">⚙</button>
+  </nav>
+  <div id="settings-menu" class="settings-menu">
+    <label for="theme-select">Theme
+    <select id="theme-select">
+      <option value="system">System</option>
+      <option value="light">Light</option>
+      <option value="dark">Dark</option>
+      <option value="high-contrast">High Contrast</option>
+    </select>
+  </label>
+    <label><input type="checkbox" id="compact-toggle" aria-label="Enable compact table mode"> Compact Mode</label>
+    <label for="unit-select">Units
+      <select id="unit-select">
+        <option value="imperial">Imperial</option>
+        <option value="metric">Metric</option>
+      </select>
+    </label>
+  </div>
+
+  <main class="error-page" id="main-content">
+    <p class="error-code" aria-hidden="true">500</p>
+    <h1 class="error-title">Internal Server Error</h1>
+    <p class="error-body">Something went wrong on our end. Your project data in the browser is safe. Try refreshing the page, or go back to the home page.</p>
+    <div class="error-actions">
+      <button class="hero-action-btn" onclick="location.reload()">Refresh Page</button>
+      <a href="index.html" class="hero-action-btn secondary">Go to Home</a>
+      <a href="https://github.com/EE-Twister/CableTrayRoute/issues" class="hero-action-btn secondary" target="_blank" rel="noopener">Report Issue</a>
+    </div>
+
+    <details class="error-details">
+      <summary>Technical details</summary>
+      <p>If this error persists, please report it with the information below:</p>
+      <pre id="error-info">Loading error details...</pre>
+    </details>
+
+    <p class="error-time" id="error-timestamp"></p>
+  </main>
+
+  <script>
+    window.addEventListener('DOMContentLoaded', () => {
+      if (typeof initSettings === 'function') initSettings();
+      if (typeof initDarkMode === 'function') initDarkMode();
+      if (typeof initCompactMode === 'function') initCompactMode();
+      if (typeof initNavToggle === 'function') initNavToggle();
+
+      // Populate error timestamp
+      const ts = document.getElementById('error-timestamp');
+      if (ts) ts.textContent = 'Error occurred at: ' + new Date().toLocaleString();
+
+      // Populate error info if query params present (e.g. ?msg=...)
+      const info = document.getElementById('error-info');
+      if (info) {
+        const params = new URLSearchParams(location.search);
+        const msg = params.get('msg');
+        info.textContent = [
+          'Page: ' + document.referrer || '(unknown)',
+          'Time: ' + new Date().toISOString(),
+          msg ? 'Message: ' + msg : '',
+          'User-Agent: ' + navigator.userAgent,
+        ].filter(Boolean).join('\n');
+      }
+    });
+  </script>
+  <script src="site.js" defer></script>
+</body>
+</html>

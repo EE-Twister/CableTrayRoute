@@ -22,13 +22,55 @@
   <!-- Icons -->
   <link rel="icon" href="icons/favicon.svg" type="image/svg+xml">
   <link rel="apple-touch-icon" href="icons/favicon.svg">
+    <!-- Performance: early CDN connection -->
+  <link rel="preconnect" href="https://cdnjs.cloudflare.com" crossorigin>
+  <link rel="preconnect" href="https://cdn.jsdelivr.net" crossorigin>
   <link rel="stylesheet" href="style.css">
+  <!-- Canonical URL -->
+  <link rel="canonical" href="index.html">
+  <!-- JSON-LD Structured Data -->
+  <script type="application/ld+json">
+  {
+    "@context": "https://schema.org",
+    "@graph": [
+      {
+        "@type": "Organization",
+        "name": "CableTrayRoute",
+        "description": "Browser-based toolkit for cable scheduling, tray fill analysis, and optimal routing in electrical design.",
+        "logo": {
+          "@type": "ImageObject",
+          "url": "icons/route.svg"
+        }
+      },
+      {
+        "@type": "WebApplication",
+        "name": "CableTrayRoute",
+        "description": "Browser-based toolkit unifying cable scheduling, analysis, and routing for streamlined electrical design.",
+        "applicationCategory": "BusinessApplication",
+        "operatingSystem": "Any",
+        "offers": {
+          "@type": "Offer",
+          "price": "0",
+          "priceCurrency": "USD"
+        },
+        "featureList": [
+          "Cable Schedule Management",
+          "Raceway & Tray Fill Analysis",
+          "Optimal Cable Routing",
+          "One-Line Diagram Editor",
+          "Arc Flash & Short Circuit Analysis",
+          "PDF and DXF Export"
+        ]
+      }
+    ]
+  }
+  </script>
 </head>
 <body>
   <a href="#main-content" class="skip-link">Skip to main content</a>
   <nav class="top-nav">
     <button id="nav-toggle" class="nav-toggle" aria-label="Toggle navigation" aria-controls="nav-links" aria-expanded="false" title="Toggle navigation">
-      <img src="icons/toolbar/grid.svg" alt="" aria-hidden="true" class="control-icon">
+      <img src="icons/toolbar/grid.svg" alt="" aria-hidden="true" class="control-icon" loading="lazy" decoding="async">
     </button>
     <div id="nav-links" class="nav-links">
       <a href="index.html" class="active" aria-current="page">Home</a>
@@ -45,11 +87,18 @@
     </div>
 
       <button id="settings-btn" class="settings-btn" aria-label="Settings" aria-expanded="false" title="Settings">
-        <img src="icons/toolbar/validate.svg" alt="" aria-hidden="true" class="control-icon">
+        <img src="icons/toolbar/validate.svg" alt="" aria-hidden="true" class="control-icon" loading="lazy" decoding="async">
       </button>
   </nav>
   <div id="settings-menu" class="settings-menu">
-    <label><input type="checkbox" id="dark-toggle"> Dark Mode</label>
+    <label for="theme-select">Theme
+    <select id="theme-select">
+      <option value="system">System</option>
+      <option value="light">Light</option>
+      <option value="dark">Dark</option>
+      <option value="high-contrast">High Contrast</option>
+    </select>
+  </label>
     <label><input type="checkbox" id="compact-toggle" aria-label="Enable compact table mode"> Compact Mode</label>
     <label for="unit-select">Units
       <select id="unit-select">
@@ -57,21 +106,21 @@
         <option value="metric">Metric</option>
       </select>
     </label>
-    <button id="help-btn" class="btn" aria-expanded="false" title="Show help"><img src="icons/toolbar/validate.svg" alt="" aria-hidden="true" class="control-icon"><span>Site Help</span></button>
-    <button id="reopen-onboarding-btn"><img src="icons/oneline.svg" alt="" aria-hidden="true" class="control-icon"><span>Reopen Onboarding</span></button>
-    <button id="new-project-btn"><img src="icons/toolbar/copy.svg" alt="" aria-hidden="true" class="control-icon"><span>New Project</span></button>
-    <button id="save-project-btn"><img src="icons/toolbar/export.svg" alt="" aria-hidden="true" class="control-icon"><span>Save Project</span></button>
-    <button id="load-project-btn"><img src="icons/toolbar/import.svg" alt="" aria-hidden="true" class="control-icon"><span>Load Project</span></button>
-    <button id="export-project-btn"><img src="icons/toolbar/export.svg" alt="" aria-hidden="true" class="control-icon"><span>Export Project</span></button>
-    <button id="import-project-btn"><img src="icons/toolbar/import.svg" alt="" aria-hidden="true" class="control-icon"><span>Import Project</span></button>
+    <button id="help-btn" class="btn" aria-expanded="false" title="Show help"><img src="icons/toolbar/validate.svg" alt="" aria-hidden="true" class="control-icon" loading="lazy" decoding="async"><span>Site Help</span></button>
+    <button id="reopen-onboarding-btn"><img src="icons/oneline.svg" alt="" aria-hidden="true" class="control-icon" loading="lazy" decoding="async"><span>Reopen Onboarding</span></button>
+    <button id="new-project-btn"><img src="icons/toolbar/copy.svg" alt="" aria-hidden="true" class="control-icon" loading="lazy" decoding="async"><span>New Project</span></button>
+    <button id="save-project-btn"><img src="icons/toolbar/export.svg" alt="" aria-hidden="true" class="control-icon" loading="lazy" decoding="async"><span>Save Project</span></button>
+    <button id="load-project-btn"><img src="icons/toolbar/import.svg" alt="" aria-hidden="true" class="control-icon" loading="lazy" decoding="async"><span>Load Project</span></button>
+    <button id="export-project-btn"><img src="icons/toolbar/export.svg" alt="" aria-hidden="true" class="control-icon" loading="lazy" decoding="async"><span>Export Project</span></button>
+    <button id="import-project-btn"><img src="icons/toolbar/import.svg" alt="" aria-hidden="true" class="control-icon" loading="lazy" decoding="async"><span>Import Project</span></button>
     <input type="file" id="import-project-input" accept=".ctr.json" class="hidden" title="Select project file">
   </div>
   <header class="hero" role="banner">
     <h1>Integrated Cable Routing Workflow</h1>
     <p class="hero-tagline">Browser-based toolkit unifying cable scheduling, analysis, and routing for streamlined design.</p>
     <div class="hero-actions" aria-label="Primary actions">
-      <a class="hero-action-btn" href="cableschedule.html"><img src="icons/cable.svg" alt="" aria-hidden="true" class="control-icon">Start Workflow</a>
-      <a class="hero-action-btn secondary" href="docs/quickstart.html"><img src="icons/route.svg" alt="" aria-hidden="true" class="control-icon">Open Quick Start</a>
+      <a class="hero-action-btn" href="cableschedule.html"><img src="icons/cable.svg" alt="" aria-hidden="true" class="control-icon" loading="lazy" decoding="async">Start Workflow</a>
+      <a class="hero-action-btn secondary" href="docs/quickstart.html"><img src="icons/route.svg" alt="" aria-hidden="true" class="control-icon" loading="lazy" decoding="async">Open Quick Start</a>
     </div>
     <p class="hero-keyboard-hint" aria-label="Press Control plus K to open the command palette">
       Press <kbd>Ctrl</kbd>+<kbd>K</kbd> to search commands &amp; navigate
@@ -95,37 +144,37 @@
         <h2>Workflow</h2>
         <div class="workflow-grid">
           <a href="cableschedule.html" class="workflow-card" data-storage-key="cableSchedule">
-            <img src="icons/cable.svg" alt="Cable icon" class="workflow-icon">
+            <img src="icons/cable.svg" alt="Cable icon" class="workflow-icon" loading="lazy" decoding="async">
             <span>1. Cable Schedule</span>
             <span class="status">Incomplete</span>
           </a>
           <a href="racewayschedule.html" class="workflow-card" data-storage-key="racewaySchedule">
-            <img src="icons/raceway.svg" alt="Raceway icon" class="workflow-icon">
+            <img src="icons/raceway.svg" alt="Raceway icon" class="workflow-icon" loading="lazy" decoding="async">
             <span>2. Raceway Schedule</span>
             <span class="status">Incomplete</span>
           </a>
           <a href="ductbankroute.html" class="workflow-card" data-storage-key="ductbankSchedule">
-            <img src="icons/ductbank.svg" alt="Ductbank icon" class="workflow-icon">
+            <img src="icons/ductbank.svg" alt="Ductbank icon" class="workflow-icon" loading="lazy" decoding="async">
             <span>3. Ductbank</span>
             <span class="status">Incomplete</span>
           </a>
           <a href="cabletrayfill.html" class="workflow-card" data-storage-key="traySchedule">
-            <img src="icons/tray.svg" alt="Tray icon" class="workflow-icon">
+            <img src="icons/tray.svg" alt="Tray icon" class="workflow-icon" loading="lazy" decoding="async">
             <span>4. Tray Fill</span>
             <span class="status">Incomplete</span>
           </a>
           <a href="conduitfill.html" class="workflow-card" data-storage-key="conduitSchedule">
-            <img src="icons/conduit.svg" alt="Conduit icon" class="workflow-icon">
+            <img src="icons/conduit.svg" alt="Conduit icon" class="workflow-icon" loading="lazy" decoding="async">
             <span>5. Conduit Fill</span>
             <span class="status">Incomplete</span>
           </a>
           <a href="optimalRoute.html" class="workflow-card" data-storage-key="optimalRoute">
-            <img src="icons/route.svg" alt="Route icon" class="workflow-icon">
+            <img src="icons/route.svg" alt="Route icon" class="workflow-icon" loading="lazy" decoding="async">
             <span>6. Optimal Cable Route</span>
             <span class="status">Incomplete</span>
           </a>
           <a href="oneline.html" class="workflow-card" data-storage-key="oneLineDiagram">
-            <img src="icons/oneline.svg" alt="One-line icon" class="workflow-icon">
+            <img src="icons/oneline.svg" alt="One-line icon" class="workflow-icon" loading="lazy" decoding="async">
             <span>7. One-Line Diagram</span>
             <span class="status">Incomplete</span>
           </a>
@@ -142,49 +191,49 @@
       <h3>7-Step Workflow</h3>
       <ol class="help-workflow-list">
         <li>
-          <img src="icons/cable.svg" alt="" class="workflow-icon" aria-hidden="true">
+          <img src="icons/cable.svg" alt="" class="workflow-icon" aria-hidden="true" loading="lazy" decoding="async">
           <div>
             <strong><a href="cableschedule.html">Cable Schedule</a></strong>
             <span>Define cables: tag, size, conductor type, allowed raceway groups, and start/end coordinates.</span>
           </div>
         </li>
         <li>
-          <img src="icons/raceway.svg" alt="" class="workflow-icon" aria-hidden="true">
+          <img src="icons/raceway.svg" alt="" class="workflow-icon" aria-hidden="true" loading="lazy" decoding="async">
           <div>
             <strong><a href="racewayschedule.html">Raceway Schedule</a></strong>
             <span>Catalog trays, conduits, and ductbanks — including dimensions, fill limits, and node coordinates.</span>
           </div>
         </li>
         <li>
-          <img src="icons/ductbank.svg" alt="" class="workflow-icon" aria-hidden="true">
+          <img src="icons/ductbank.svg" alt="" class="workflow-icon" aria-hidden="true" loading="lazy" decoding="async">
           <div>
             <strong><a href="ductbankroute.html">Ductbank Analysis</a></strong>
             <span>Analyze underground ductbanks for thermal constraints and cable placement.</span>
           </div>
         </li>
         <li>
-          <img src="icons/tray.svg" alt="" class="workflow-icon" aria-hidden="true">
+          <img src="icons/tray.svg" alt="" class="workflow-icon" aria-hidden="true" loading="lazy" decoding="async">
           <div>
             <strong><a href="cabletrayfill.html">Tray Fill</a></strong>
             <span>Visualize cross-sectional cable placement in trays and check fill percentages.</span>
           </div>
         </li>
         <li>
-          <img src="icons/conduit.svg" alt="" class="workflow-icon" aria-hidden="true">
+          <img src="icons/conduit.svg" alt="" class="workflow-icon" aria-hidden="true" loading="lazy" decoding="async">
           <div>
             <strong><a href="conduitfill.html">Conduit Fill</a></strong>
             <span>Evaluate standalone conduit loading against NEC fill limits.</span>
           </div>
         </li>
         <li>
-          <img src="icons/route.svg" alt="" class="workflow-icon" aria-hidden="true">
+          <img src="icons/route.svg" alt="" class="workflow-icon" aria-hidden="true" loading="lazy" decoding="async">
           <div>
             <strong><a href="optimalRoute.html">Optimal Cable Route</a></strong>
             <span>Run Dijkstra-based pathfinding to find least-cost routes respecting tray capacity and thermal limits. View results in 3D.</span>
           </div>
         </li>
         <li>
-          <img src="icons/oneline.svg" alt="" class="workflow-icon" aria-hidden="true">
+          <img src="icons/oneline.svg" alt="" class="workflow-icon" aria-hidden="true" loading="lazy" decoding="async">
           <div>
             <strong><a href="oneline.html">One-Line Diagram</a></strong>
             <span>Draw and edit interactive electrical single-line diagrams, then export to PDF or DXF.</span>
@@ -222,7 +271,7 @@
   </div>
   <footer class="site-footer">
     <div class="footer-left">
-      <img src="icons/route.svg" alt="CableTrayRoute logo" class="footer-logo">
+      <img src="icons/route.svg" alt="CableTrayRoute logo" class="footer-logo" loading="lazy" decoding="async">
       <span>CableTrayRoute</span>
       <span class="footer-copyright">&copy; <span id="footer-year">2026</span> CableTrayRoute contributors</span>
     </div>

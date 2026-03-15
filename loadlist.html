@@ -7,11 +7,22 @@
   <title>Load List</title>
   <link rel="icon" href="icons/favicon.svg" type="image/svg+xml">
   <link rel="apple-touch-icon" href="icons/favicon.svg">
+  <!-- Open Graph / Social sharing -->
+  <meta property="og:type" content="website">
+  <meta property="og:title" content="Load List — CableTrayRoute">
+  <meta property="og:description" content="Define and organize load specifications and power requirements for your electrical system.">
+  <meta property="og:image" content="icons/route.svg">
+  <meta property="og:site_name" content="CableTrayRoute">
+  <meta property="og:url" content="loadlist.html">
+  <!-- Canonical URL -->
+  <link rel="canonical" href="loadlist.html">
+    <!-- Performance: early CDN connection -->
+  <link rel="preconnect" href="https://cdnjs.cloudflare.com" crossorigin>
   <link rel="stylesheet" href="style.css">
   <script type="module" src="dataStore.mjs" defer></script>
   <script type="module" src="dist/loadlist.js" defer></script>
 </head>
-<body>
+<body data-report-title="Load List">
   <a href="#main-content" class="skip-link">Skip to main content</a>
   <nav class="top-nav">
     <button id="nav-toggle" class="nav-toggle" aria-label="Toggle navigation" aria-controls="nav-links" aria-expanded="false" title="Toggle navigation">☰</button>
@@ -31,7 +42,14 @@
 <button id="settings-btn" class="settings-btn" aria-label="Settings" aria-expanded="false" title="Settings">⚙</button>
   </nav>
   <div id="settings-menu" class="settings-menu">
-    <label><input type="checkbox" id="dark-toggle"> Dark Mode</label>
+    <label for="theme-select">Theme
+    <select id="theme-select">
+      <option value="system">System</option>
+      <option value="light">Light</option>
+      <option value="dark">Dark</option>
+      <option value="high-contrast">High Contrast</option>
+    </select>
+  </label>
     <label><input type="checkbox" id="compact-toggle" aria-label="Enable compact table mode"> Compact Mode</label>
     <label for="unit-select">Units
       <select id="unit-select">
@@ -49,6 +67,13 @@
   </div>
   <div class="container">
     <main id="main-content" class="main-content">
+  <nav aria-label="Breadcrumb">
+    <ol class="breadcrumb-trail">
+      <li><a href="index.html">Home</a></li>
+      <li aria-current="page">Load List</li>
+    </ol>
+  </nav>
+
       <header class="page-header">
         <h1>Load List</h1>
         <p>Manage connected loads for panels or equipment.</p>

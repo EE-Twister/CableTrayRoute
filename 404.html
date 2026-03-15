@@ -6,6 +6,15 @@
   <meta name="description" content="Page not found — CableTrayRoute">
   <title>Page Not Found — CableTrayRoute</title>
   <link rel="icon" href="icons/favicon.svg" type="image/svg+xml">
+  <!-- Open Graph / Social sharing -->
+  <meta property="og:type" content="website">
+  <meta property="og:title" content="Page Not Found — CableTrayRoute">
+  <meta property="og:description" content="The page you requested could not be found. Navigate back to CableTrayRoute.">
+  <meta property="og:image" content="icons/route.svg">
+  <meta property="og:site_name" content="CableTrayRoute">
+  <meta property="og:url" content="404.html">
+  <!-- Canonical URL -->
+  <link rel="canonical" href="404.html">
   <link rel="stylesheet" href="style.css">
   <style>
     .error-page {
@@ -89,6 +98,7 @@
   </style>
 </head>
 <body>
+  <a href="#main-content" class="skip-link">Skip to main content</a>
   <nav class="top-nav">
     <button id="nav-toggle" class="nav-toggle" aria-label="Toggle navigation" aria-controls="nav-links" aria-expanded="false">☰</button>
     <div id="nav-links" class="nav-links">
@@ -107,7 +117,14 @@
     <button id="settings-btn" class="settings-btn" aria-label="Settings" aria-expanded="false">⚙</button>
   </nav>
   <div id="settings-menu" class="settings-menu">
-    <label><input type="checkbox" id="dark-toggle"> Dark Mode</label>
+    <label for="theme-select">Theme
+    <select id="theme-select">
+      <option value="system">System</option>
+      <option value="light">Light</option>
+      <option value="dark">Dark</option>
+      <option value="high-contrast">High Contrast</option>
+    </select>
+  </label>
     <label><input type="checkbox" id="compact-toggle" aria-label="Enable compact table mode"> Compact Mode</label>
     <label for="unit-select">Units
       <select id="unit-select">

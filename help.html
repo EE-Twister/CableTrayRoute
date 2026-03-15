@@ -3,9 +3,23 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Help &amp; Tutorials</title>
+  <title>Help &amp; Tutorials — CableTrayRoute</title>
+  <meta name="description" content="Tutorials, workflow guides, and keyboard shortcuts reference for CableTrayRoute electrical design software.">
+  <!-- Twitter / X card -->
+  <meta name="twitter:card" content="summary">
+  <meta name="twitter:title" content="Help &amp; Tutorials — CableTrayRoute">
+  <meta name="twitter:description" content="Tutorials, workflow guides, and keyboard shortcuts reference for CableTrayRoute.">
   <link rel="icon" href="icons/favicon.svg" type="image/svg+xml">
   <link rel="apple-touch-icon" href="icons/favicon.svg">
+  <!-- Open Graph / Social sharing -->
+  <meta property="og:type" content="website">
+  <meta property="og:title" content="Help & Tutorials — CableTrayRoute">
+  <meta property="og:description" content="Tutorials, workflow guides, and reference documentation for CableTrayRoute.">
+  <meta property="og:image" content="icons/route.svg">
+  <meta property="og:site_name" content="CableTrayRoute">
+  <meta property="og:url" content="help.html">
+  <!-- Canonical URL -->
+  <link rel="canonical" href="help.html">
   <link rel="stylesheet" href="style.css">
 </head>
 <body>
@@ -29,7 +43,14 @@
       <button id="settings-btn" class="settings-btn" aria-label="Settings" aria-expanded="false">⚙</button>
   </nav>
   <div id="settings-menu" class="settings-menu">
-    <label><input type="checkbox" id="dark-toggle"> Dark Mode</label>
+    <label for="theme-select">Theme
+    <select id="theme-select">
+      <option value="system">System</option>
+      <option value="light">Light</option>
+      <option value="dark">Dark</option>
+      <option value="high-contrast">High Contrast</option>
+    </select>
+  </label>
     <label><input type="checkbox" id="compact-toggle" aria-label="Enable compact table mode"> Compact Mode</label>
     <label for="unit-select">Units
       <select id="unit-select">
@@ -75,6 +96,49 @@
       <p>After a location is chosen the same file is reused for manual saves and the autosave loop. If direct file access is unavailable, the button falls back to downloading a JSON snapshot so you can keep a copy locally.</p>
       <p>Use <strong>Load Project</strong> to switch between saved projects. To clear the saved entries, open the ⚙ settings menu and choose <strong>Delete Saved Data</strong>. <strong>Export Project</strong> remains available whenever you need a separate checkpoint or shareable archive.</p>
     </section>
+    <section id="keyboard-shortcuts">
+      <h2>Keyboard Shortcuts</h2>
+      <p>These shortcuts work across all CableTrayRoute pages:</p>
+      <table class="shortcuts-table">
+        <thead>
+          <tr>
+            <th>Shortcut</th>
+            <th>Action</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td><kbd>Ctrl</kbd> + <kbd>K</kbd></td>
+            <td>Open command palette</td>
+          </tr>
+          <tr>
+            <td><kbd>Ctrl</kbd> + <kbd>Z</kbd></td>
+            <td>Undo last change</td>
+          </tr>
+          <tr>
+            <td><kbd>Ctrl</kbd> + <kbd>Shift</kbd> + <kbd>Z</kbd></td>
+            <td>Redo</td>
+          </tr>
+          <tr>
+            <td><kbd>Ctrl</kbd> + <kbd>S</kbd></td>
+            <td>Save project</td>
+          </tr>
+          <tr>
+            <td><kbd>Escape</kbd></td>
+            <td>Close modal / command palette</td>
+          </tr>
+          <tr>
+            <td><kbd>Tab</kbd> / <kbd>Shift</kbd> + <kbd>Tab</kbd></td>
+            <td>Move focus between interactive elements</td>
+          </tr>
+          <tr>
+            <td><kbd>Enter</kbd> / <kbd>Space</kbd></td>
+            <td>Activate focused button or link</td>
+          </tr>
+        </tbody>
+      </table>
+      <p>Use <strong>Settings ⚙</strong> in the nav to switch themes (Light, Dark, High Contrast) and units (Imperial / Metric).</p>
+    </section>
     <section>
       <h2>Documentation</h2>
       <ul>
@@ -85,7 +149,7 @@
   </main>
   <footer class="site-footer">
     <div class="footer-left">
-      <img src="icons/route.svg" alt="CableTrayRoute logo" class="footer-logo">
+      <img src="icons/route.svg" alt="CableTrayRoute logo" class="footer-logo" loading="lazy" decoding="async">
       <span>CableTrayRoute</span>
     </div>
     <nav class="footer-links">
