@@ -92,7 +92,7 @@ function whenPresent(selector, cb, timeoutMs = 5000) {
   poll();
 }
 import { getItem, setItem, removeItem, getTrays, getCables, getDuctbanks, getConduits, exportProject, importProject, setCables } from './dataStore.mjs';
-import { buildSegmentRows, buildSummaryRows, buildBOM } from './resultsExport.mjs';
+import { buildSegmentRows, buildSummaryRows, buildBOM, buildTrayHardwareBOM } from './resultsExport.mjs';
 import './site.js';
 import { getProjectState, setProjectState } from './projectStorage.js';
 import { calculateVoltageDrop } from './src/voltageDrop.js';
@@ -2885,6 +2885,20 @@ const renderBatchResults = (results) => {
             fetchDataFile('data/material_costs.json', {})
         ]);
         const { raceways, cables } = buildBOM(state.latestRouteData, state.trayData, state.cableList, conductorProps, materialCosts);
+
+        // Build per-tray cable weight map from route results for support span calculation
+        const trayWeights = {};
+        state.latestRouteData.forEach(res => {
+            (res.breakdown || []).forEach(seg => {
+                if (!seg.tray_id) return;
+                const cable = state.cableList.find(c => (c.tag || c.cable_tag) === res.cable);
+                const w = cable && cable.weight_lb_ft != null ? parseFloat(cable.weight_lb_ft) || 0 : 0;
+                trayWeights[seg.tray_id] = (trayWeights[seg.tray_id] || 0) + w;
+            });
+        });
+
+        const { fittings, supports, sections, summary } = buildTrayHardwareBOM(state.trayData, { trayWeights });
+
         const wb = XLSX.utils.book_new();
         if (raceways.length) {
             const wsR = XLSX.utils.json_to_sheet(raceways);
@@ -2893,6 +2907,27 @@ const renderBatchResults = (results) => {
         if (cables.length) {
             const wsC = XLSX.utils.json_to_sheet(cables);
             XLSX.utils.book_append_sheet(wb, wsC, 'Cables');
+        }
+        if (summary.length) {
+            const wsS = XLSX.utils.json_to_sheet(summary);
+            XLSX.utils.book_append_sheet(wb, wsS, 'Tray Hardware Summary');
+        }
+        if (fittings.length) {
+            const wsF = XLSX.utils.json_to_sheet(fittings.map(f => ({
+                type: f.type,
+                tray_ids: f.tray_ids.join(', '),
+                angle: f.angle != null ? f.angle : '',
+                widths: f.widths.join(', '),
+            })));
+            XLSX.utils.book_append_sheet(wb, wsF, 'Fittings Detail');
+        }
+        if (supports.length) {
+            const wsSup = XLSX.utils.json_to_sheet(supports);
+            XLSX.utils.book_append_sheet(wb, wsSup, 'Support Brackets');
+        }
+        if (sections.length) {
+            const wsSec = XLSX.utils.json_to_sheet(sections);
+            XLSX.utils.book_append_sheet(wb, wsSec, 'Tray Sections');
         }
         XLSX.writeFile(wb, 'bom.xlsx');
     };

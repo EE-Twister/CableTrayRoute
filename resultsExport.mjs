@@ -51,6 +51,8 @@ export function buildSummaryRows(results = []) {
     }));
 }
 
+export { buildTrayHardwareBOM } from './analysis/trayHardware.mjs';
+
 export function buildBOM(results = [], trayData = [], cableList = [], conductorProps = {}, materialCosts = {}) {
     const trayLookup = new Map();
     trayData.forEach(t => {
