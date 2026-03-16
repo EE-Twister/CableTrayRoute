@@ -3,8 +3,10 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="description" content="Browse and manage the component library for one-line diagram elements.">
   <title>Library Manager — CableTrayRoute</title>
-  <link rel="stylesheet" href="style.css">
+  <link rel="icon" href="icons/favicon.svg" type="image/svg+xml">
+  <link rel="apple-touch-icon" href="icons/favicon.svg">
   <!-- Open Graph / Social sharing -->
   <meta property="og:type" content="website">
   <meta property="og:title" content="Component Library — CableTrayRoute">
@@ -12,28 +14,93 @@
   <meta property="og:image" content="icons/route.svg">
   <meta property="og:site_name" content="CableTrayRoute">
   <meta property="og:url" content="library.html">
+  <!-- Twitter / X card -->
+  <meta name="twitter:card" content="summary">
+  <meta name="twitter:title" content="Component Library — CableTrayRoute">
+  <meta name="twitter:description" content="Browse and manage the component library for one-line diagram elements.">
   <!-- Canonical URL -->
   <link rel="canonical" href="library.html">
+  <link rel="dns-prefetch" href="https://fonts.gstatic.com">
+  <meta name="color-scheme" content="light dark">
+  <link rel="stylesheet" href="style.css">
 </head>
 <body>
   <a href="#main-content" class="skip-link">Skip to main content</a>
-  <main id="main-content">
-  <h1>Library Manager</h1>
-  <section>
-    <h2>Component Library</h2>
-    <label>Version <input id="library-version" type="text" size="10"></label><br>
-    <textarea id="component-text" rows="10" cols="80"></textarea><br>
-    <textarea id="icon-text" rows="10" cols="80"></textarea><br>
-    <input type="file" id="library-upload" accept="application/json"><br>
-    <button id="component-save">Save</button>
-    <button id="component-download">Download</button>
-  </section>
-  <section>
-    <h2>Manufacturer Library</h2>
-    <textarea id="manufacturer-text" rows="20" cols="80"></textarea><br>
-    <button id="manufacturer-save">Save</button>
-    <button id="manufacturer-download">Download</button>
-  </section>
+  <nav class="top-nav">
+    <button id="nav-toggle" class="nav-toggle" aria-label="Toggle navigation" aria-controls="nav-links" aria-expanded="false" title="Toggle navigation">
+      <img src="icons/toolbar/grid.svg" alt="" aria-hidden="true" class="control-icon" loading="lazy" decoding="async">
+    </button>
+    <div id="nav-links" class="nav-links">
+      <a href="index.html">Home</a>
+      <a href="equipmentlist.html">Equipment List</a>
+      <a href="loadlist.html">Load List</a>
+      <a href="cableschedule.html">Cable Schedule</a>
+      <a href="panelschedule.html">Panel Schedule</a>
+      <a href="racewayschedule.html">Raceway Schedule</a>
+      <a href="ductbankroute.html">Ductbank</a>
+      <a href="cabletrayfill.html">Tray Fill</a>
+      <a href="conduitfill.html">Conduit Fill</a>
+      <a href="optimalRoute.html">Optimal Route</a>
+      <a href="oneline.html">One-Line</a>
+    </div>
+    <button id="settings-btn" class="settings-btn" aria-label="Settings" aria-expanded="false" title="Settings">
+      <img src="icons/toolbar/validate.svg" alt="" aria-hidden="true" class="control-icon" loading="lazy" decoding="async">
+    </button>
+  </nav>
+  <div id="settings-menu" class="settings-menu">
+    <label for="theme-select">Theme
+    <select id="theme-select">
+      <option value="system">System</option>
+      <option value="light">Light</option>
+      <option value="dark">Dark</option>
+      <option value="high-contrast">High Contrast</option>
+    </select>
+  </label>
+    <label><input type="checkbox" id="compact-toggle" aria-label="Enable compact table mode"> Compact Mode</label>
+    <label for="unit-select">Units
+      <select id="unit-select">
+        <option value="imperial">Imperial</option>
+        <option value="metric">Metric</option>
+      </select>
+    </label>
+  </div>
+  <div class="container">
+    <main id="main-content" class="main-content">
+      <h1>Library Manager</h1>
+      <section class="card">
+        <h2>Component Library</h2>
+        <label for="library-version">Version</label>
+        <input id="library-version" type="text" size="10"><br>
+        <label for="component-text">Component definitions (JSON)</label>
+        <textarea id="component-text" rows="10" cols="80"></textarea><br>
+        <label for="icon-text">Icon definitions (JSON)</label>
+        <textarea id="icon-text" rows="10" cols="80"></textarea><br>
+        <label for="library-upload" class="visually-hidden">Upload library file</label>
+        <input type="file" id="library-upload" accept="application/json"><br>
+        <button id="component-save" class="btn primary-btn">Save</button>
+        <button id="component-download" class="btn">Download</button>
+      </section>
+      <section class="card">
+        <h2>Manufacturer Library</h2>
+        <label for="manufacturer-text">Manufacturer defaults (JSON)</label>
+        <textarea id="manufacturer-text" rows="20" cols="80"></textarea><br>
+        <button id="manufacturer-save" class="btn primary-btn">Save</button>
+        <button id="manufacturer-download" class="btn">Download</button>
+      </section>
+    </main>
+  </div>
+  <footer class="site-footer">
+    <div class="footer-left">
+      <img src="icons/route.svg" alt="CableTrayRoute logo" class="footer-logo" loading="lazy" decoding="async">
+      <span>CableTrayRoute</span>
+      <span class="footer-copyright">&copy; <span id="footer-year">2026</span> CableTrayRoute contributors</span>
+    </div>
+    <nav class="footer-links" aria-label="Footer">
+      <a href="docs/quickstart.html">Quick Start</a>
+      <a href="docs/index.html">Docs</a>
+      <a href="help.html">Help</a>
+    </nav>
+  </footer>
   <script type="module">
     import { getItem, setItem } from './dataStore.mjs';
 
@@ -174,7 +241,14 @@
 
     load();
   </script>
-  </main>
+  <script src="site.js" defer></script>
+  <script>
+    window.addEventListener('DOMContentLoaded', () => {
+      if (typeof initSettings === 'function') initSettings();
+      if (typeof initDarkMode === 'function') initDarkMode();
+      if (typeof initCompactMode === 'function') initCompactMode();
+      if (typeof initNavToggle === 'function') initNavToggle();
+    });
+  </script>
 </body>
 </html>
-

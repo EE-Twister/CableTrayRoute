@@ -2,7 +2,8 @@
   "name": "CableTrayRoute",
   "short_name": "CableTrayRoute",
   "description": "Browser-based toolkit for cable scheduling, tray fill analysis, and optimal routing in electrical design.",
-  "start_url": "/index.html",
+  "start_url": "/",
+  "scope": "/",
   "display": "standalone",
   "background_color": "#f8fafc",
   "theme_color": "#2563eb",
@@ -12,10 +13,25 @@
       "src": "icons/favicon.svg",
       "sizes": "any",
       "type": "image/svg+xml",
-      "purpose": "any maskable"
+      "purpose": "any"
+    },
+    {
+      "src": "icons/favicon.svg",
+      "sizes": "any",
+      "type": "image/svg+xml",
+      "purpose": "maskable"
     }
   ],
-  "categories": ["productivity", "utilities"],
+  "categories": ["productivity", "utilities", "business"],
+  "screenshots": [
+    {
+      "src": "icons/route.svg",
+      "sizes": "any",
+      "type": "image/svg+xml",
+      "form_factor": "wide",
+      "label": "CableTrayRoute integrated cable routing workflow"
+    }
+  ],
   "shortcuts": [
     {
       "name": "Cable Schedule",
@@ -37,6 +53,13 @@
       "description": "Draw electrical single-line diagrams",
       "url": "/oneline.html",
       "icons": [{ "src": "icons/oneline.svg", "sizes": "any" }]
+    },
+    {
+      "name": "Raceway Schedule",
+      "short_name": "Raceways",
+      "description": "Manage trays, conduits, and ductbanks",
+      "url": "/racewayschedule.html",
+      "icons": [{ "src": "icons/raceway.svg", "sizes": "any" }]
     }
   ]
 }

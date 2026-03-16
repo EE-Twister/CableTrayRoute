@@ -13,6 +13,7 @@ const CACHE_NAME = 'ctr-shell-v1';
 // Core shell assets to pre-cache on install.
 const PRECACHE_URLS = [
   '/offline.html',
+  '/404.html',
   '/style.css',
   '/icons/favicon.svg',
   '/icons/route.svg',
@@ -22,6 +23,11 @@ const PRECACHE_URLS = [
   '/icons/tray.svg',
   '/icons/conduit.svg',
   '/icons/oneline.svg',
+  '/icons/toolbar/grid.svg',
+  '/icons/toolbar/validate.svg',
+  '/icons/toolbar/export.svg',
+  '/icons/toolbar/import.svg',
+  '/icons/toolbar/copy.svg',
 ];
 
 // Install: cache shell assets.

@@ -121,6 +121,8 @@
   /* --- Show print-only elements --- */
   .print-only {
     display: block !important;
+    page-break-inside: avoid;
+    break-inside: avoid;
   }
 
   /* --- Layout: expand to full width --- */
