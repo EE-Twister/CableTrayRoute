@@ -15,7 +15,7 @@
   <meta property="og:site_name" content="CableTrayRoute">
   <meta property="og:url" content="equipmentlist.html">
   <!-- Canonical URL -->
-  <link rel="canonical" href="equipmentlist.html">
+  <link rel="canonical" href="https://ee-twister.github.io/CableTrayRoute/equipmentlist.html">
     <!-- Performance: early CDN connection -->
   <link rel="preconnect" href="https://cdnjs.cloudflare.com" crossorigin>
   <link rel="dns-prefetch" href="https://fonts.gstatic.com">
@@ -31,6 +31,10 @@
 <body data-report-title="Equipment List">
   <a href="#main-content" class="skip-link">Skip to main content</a>
   <nav class="top-nav">
+    <a href="index.html" class="nav-brand" aria-label="CableTrayRoute home">
+      <img src="icons/route.svg" alt="" class="nav-brand-logo" aria-hidden="true">
+      <span class="nav-brand-name">CableTrayRoute</span>
+    </a>
     <button id="nav-toggle" class="nav-toggle" aria-label="Toggle navigation" aria-controls="nav-links" aria-expanded="false" title="Toggle navigation">
       <img src="icons/toolbar/grid.svg" alt="" aria-hidden="true" class="control-icon" loading="lazy" decoding="async">
     </button>
@@ -139,5 +143,26 @@
   </div>
   <script type="module" src="dist/index.js" defer></script>
   <script type="module" src="dist/projectManager.js"></script>
+  <!-- Mobile Bottom Tab Bar -->
+  <nav class="mobile-bottom-nav" aria-label="Quick navigation">
+    <a href="index.html"><img src="icons/route.svg" alt="" aria-hidden="true" loading="lazy" decoding="async"><span>Home</span></a>
+    <a href="cableschedule.html"><img src="icons/cable.svg" alt="" aria-hidden="true" loading="lazy" decoding="async"><span>Cables</span></a>
+    <a href="cabletrayfill.html"><img src="icons/tray.svg" alt="" aria-hidden="true" loading="lazy" decoding="async"><span>Tray Fill</span></a>
+    <a href="optimalRoute.html"><img src="icons/route.svg" alt="" aria-hidden="true" loading="lazy" decoding="async"><span>Route</span></a>
+    <a href="oneline.html"><img src="icons/oneline.svg" alt="" aria-hidden="true" loading="lazy" decoding="async"><span>One-Line</span></a>
+  </nav>
+  <footer class="site-footer">
+    <div class="footer-left">
+      <img src="icons/route.svg" alt="CableTrayRoute logo" class="footer-logo" loading="lazy" decoding="async">
+      <span>CableTrayRoute</span>
+      <span class="footer-copyright">&copy; <span id="footer-year">2026</span> CableTrayRoute contributors</span>
+    </div>
+    <nav class="footer-links" aria-label="Footer">
+      <a href="docs/quickstart.html">Quick Start</a>
+      <a href="docs/index.html">Docs</a>
+      <a href="help.html">Help</a>
+      <a href="https://github.com/EE-Twister/CableTrayRoute" target="_blank" rel="noopener">GitHub</a>
+    </nav>
+  </footer>
 </body>
 </html>

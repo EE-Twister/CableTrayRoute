@@ -9,12 +9,16 @@
   <meta property="og:type" content="website">
   <meta property="og:title" content="CableTrayRoute — Integrated Cable Routing Workflow">
   <meta property="og:description" content="Browser-based toolkit unifying cable scheduling, analysis, and routing for streamlined electrical design.">
-  <meta property="og:image" content="icons/route.svg">
+  <meta property="og:image" content="https://ee-twister.github.io/CableTrayRoute/icons/og-preview.svg">
+  <meta property="og:image:width" content="1200">
+  <meta property="og:image:height" content="630">
+  <meta property="og:url" content="https://ee-twister.github.io/CableTrayRoute/">
   <meta property="og:site_name" content="CableTrayRoute">
   <!-- Twitter / X card -->
-  <meta name="twitter:card" content="summary">
+  <meta name="twitter:card" content="summary_large_image">
   <meta name="twitter:title" content="CableTrayRoute — Integrated Cable Routing Workflow">
   <meta name="twitter:description" content="Browser-based toolkit unifying cable scheduling, analysis, and routing for streamlined electrical design.">
+  <meta name="twitter:image" content="https://ee-twister.github.io/CableTrayRoute/icons/og-preview.svg">
   <!-- PWA -->
   <link rel="manifest" href="manifest.json">
   <meta name="theme-color" content="#2563eb" media="(prefers-color-scheme: light)">
@@ -31,7 +35,7 @@
   <meta name="color-scheme" content="light dark">
   <link rel="stylesheet" href="style.css">
   <!-- Canonical URL -->
-  <link rel="canonical" href="index.html">
+  <link rel="canonical" href="https://ee-twister.github.io/CableTrayRoute/">
   <!-- JSON-LD Structured Data -->
   <script type="application/ld+json">
   {
@@ -73,6 +77,10 @@
 <body>
   <a href="#main-content" class="skip-link">Skip to main content</a>
   <nav class="top-nav">
+    <a href="index.html" class="nav-brand" aria-label="CableTrayRoute home">
+      <img src="icons/route.svg" alt="" class="nav-brand-logo" aria-hidden="true">
+      <span class="nav-brand-name">CableTrayRoute</span>
+    </a>
     <button id="nav-toggle" class="nav-toggle" aria-label="Toggle navigation" aria-controls="nav-links" aria-expanded="false" title="Toggle navigation">
       <img src="icons/toolbar/grid.svg" alt="" aria-hidden="true" class="control-icon" loading="lazy" decoding="async">
     </button>
@@ -90,6 +98,10 @@
       <a href="oneline.html">One-Line</a>
     </div>
 
+      <button id="theme-toggle" class="theme-toggle-btn" aria-label="Toggle dark mode" title="Toggle dark mode">
+        <span class="theme-icon-dark" aria-hidden="true">&#9790;</span>
+        <span class="theme-icon-light" aria-hidden="true">&#9788;</span>
+      </button>
       <button id="settings-btn" class="settings-btn" aria-label="Settings" aria-expanded="false" title="Settings">
         <img src="icons/toolbar/validate.svg" alt="" aria-hidden="true" class="control-icon" loading="lazy" decoding="async">
       </button>
@@ -184,7 +196,78 @@
           </a>
         </div>
       </section>
+
+      <section class="features-section card" id="features">
+        <h2>Key Features</h2>
+        <div class="features-grid">
+          <div class="feature-item">
+            <div class="feature-icon-wrap"><img src="icons/cable.svg" alt="" aria-hidden="true" loading="lazy" decoding="async"></div>
+            <h3>Cable Scheduling</h3>
+            <p>Define cables with tag, size, conductor type, routing groups, and coordinates. Import from CSV or Excel.</p>
+          </div>
+          <div class="feature-item">
+            <div class="feature-icon-wrap"><img src="icons/tray.svg" alt="" aria-hidden="true" loading="lazy" decoding="async"></div>
+            <h3>NEC Fill Analysis</h3>
+            <p>Visualize cross-sectional tray and conduit fill. Automated checks against NEC fill limits and thermal constraints.</p>
+          </div>
+          <div class="feature-item">
+            <div class="feature-icon-wrap"><img src="icons/route.svg" alt="" aria-hidden="true" loading="lazy" decoding="async"></div>
+            <h3>Optimal Routing</h3>
+            <p>Dijkstra-based pathfinding finds least-cost cable routes respecting tray capacity. View results in interactive 3D.</p>
+          </div>
+          <div class="feature-item">
+            <div class="feature-icon-wrap"><img src="icons/oneline.svg" alt="" aria-hidden="true" loading="lazy" decoding="async"></div>
+            <h3>One-Line Diagrams</h3>
+            <p>Draw and edit interactive single-line diagrams with arc flash and short circuit study integration. Export to PDF or DXF.</p>
+          </div>
+          <div class="feature-item">
+            <div class="feature-icon-wrap"><img src="icons/ductbank.svg" alt="" aria-hidden="true" loading="lazy" decoding="async"></div>
+            <h3>Ductbank Analysis</h3>
+            <p>Underground ductbank thermal analysis with cable placement optimization and soil resistivity modeling.</p>
+          </div>
+          <div class="feature-item">
+            <div class="feature-icon-wrap"><img src="icons/raceway.svg" alt="" aria-hidden="true" loading="lazy" decoding="async"></div>
+            <h3>Works Offline</h3>
+            <p>Full PWA support. Install on any device and work offline. Auto-saves locally with optional server sync.</p>
+          </div>
+        </div>
+      </section>
+
+      <section class="changelog-section card" id="whats-new">
+        <h2>What's New</h2>
+        <ul class="changelog-list">
+          <li>
+            <span class="changelog-badge changelog-badge--feature">Feature</span>
+            <strong>One-Line Diagram Studies</strong> — Arc flash, short circuit, and load flow analysis integrated into the one-line editor.
+          </li>
+          <li>
+            <span class="changelog-badge changelog-badge--improvement">Improvement</span>
+            <strong>Dark Mode</strong> — System-aware theme switching with Light, Dark, and High Contrast options.
+          </li>
+          <li>
+            <span class="changelog-badge changelog-badge--improvement">Improvement</span>
+            <strong>Command Palette</strong> — Press <kbd>Ctrl</kbd>+<kbd>K</kbd> to search commands and navigate instantly.
+          </li>
+          <li>
+            <span class="changelog-badge changelog-badge--feature">Feature</span>
+            <strong>Custom Components</strong> — Build custom one-line diagram components with the icon editor.
+          </li>
+          <li>
+            <span class="changelog-badge changelog-badge--improvement">Improvement</span>
+            <strong>CSV/Excel Import</strong> — Import cable and equipment data from CSV and Excel spreadsheets.
+          </li>
+        </ul>
+      </section>
     </main>
+  </div>
+
+  <!-- PWA Install Prompt -->
+  <div id="pwa-install-banner" class="pwa-install-banner hidden" role="banner" aria-label="Install application">
+    <p>Install CableTrayRoute for quick access and offline use.</p>
+    <div class="pwa-install-actions">
+      <button id="pwa-install-btn" class="btn">Install</button>
+      <button id="pwa-dismiss-btn" class="pwa-dismiss-btn" aria-label="Dismiss">&times;</button>
+    </div>
   </div>
   <div id="help-modal" class="modal" aria-hidden="true" role="dialog" aria-modal="true" aria-labelledby="help-title">
     <div class="modal-content" data-variant="wide">
@@ -284,8 +367,27 @@
       <a href="docs/quickstart.html">Quick Start</a>
       <a href="docs/index.html">Docs</a>
       <a href="help.html">Help</a>
+      <a href="https://github.com/EE-Twister/CableTrayRoute" target="_blank" rel="noopener">GitHub</a>
     </nav>
+    <div class="footer-shortcut-hint">
+      <kbd>Ctrl</kbd>+<kbd>K</kbd> Command Palette
+    </div>
   </footer>
+  <!-- Privacy Notice -->
+  <div id="privacy-notice" class="privacy-notice hidden" role="banner">
+    <p>This app stores project data in your browser's local storage. No data is sent to external servers unless you use the server sync feature.</p>
+    <div class="privacy-notice-actions">
+      <button id="privacy-accept-btn" class="btn">Got it</button>
+    </div>
+  </div>
+  <!-- Mobile Bottom Tab Bar -->
+  <nav class="mobile-bottom-nav" aria-label="Quick navigation">
+    <a href="index.html" aria-current="page" class="active"><img src="icons/route.svg" alt="" aria-hidden="true" loading="lazy" decoding="async"><span>Home</span></a>
+    <a href="cableschedule.html"><img src="icons/cable.svg" alt="" aria-hidden="true" loading="lazy" decoding="async"><span>Cables</span></a>
+    <a href="cabletrayfill.html"><img src="icons/tray.svg" alt="" aria-hidden="true" loading="lazy" decoding="async"><span>Tray Fill</span></a>
+    <a href="optimalRoute.html"><img src="icons/route.svg" alt="" aria-hidden="true" loading="lazy" decoding="async"><span>Route</span></a>
+    <a href="oneline.html"><img src="icons/oneline.svg" alt="" aria-hidden="true" loading="lazy" decoding="async"><span>One-Line</span></a>
+  </nav>
   <noscript>
     <style>.hero-actions, .workflow-grid, #settings-menu { display: none !important; }</style>
     <div style="text-align:center;padding:2rem 1rem;background:#fff3cd;color:#856404;border-bottom:1px solid #ffc107;">
@@ -305,6 +407,57 @@
     if ('serviceWorker' in navigator) {
       navigator.serviceWorker.register('/sw.js').catch(() => { /* non-critical */ });
     }
+    // PWA Install Prompt
+    let deferredPrompt;
+    window.addEventListener('beforeinstallprompt', (e) => {
+      e.preventDefault();
+      deferredPrompt = e;
+      const banner = document.getElementById('pwa-install-banner');
+      if (banner && !localStorage.getItem('pwa-install-dismissed')) {
+        banner.classList.remove('hidden');
+      }
+    });
+    document.getElementById('pwa-install-btn')?.addEventListener('click', async () => {
+      if (deferredPrompt) {
+        deferredPrompt.prompt();
+        await deferredPrompt.userChoice;
+        deferredPrompt = null;
+        document.getElementById('pwa-install-banner')?.classList.add('hidden');
+      }
+    });
+    document.getElementById('pwa-dismiss-btn')?.addEventListener('click', () => {
+      document.getElementById('pwa-install-banner')?.classList.add('hidden');
+      localStorage.setItem('pwa-install-dismissed', '1');
+    });
+    // Privacy notice
+    if (!localStorage.getItem('privacy-accepted')) {
+      document.getElementById('privacy-notice')?.classList.remove('hidden');
+    }
+    document.getElementById('privacy-accept-btn')?.addEventListener('click', () => {
+      document.getElementById('privacy-notice')?.classList.add('hidden');
+      localStorage.setItem('privacy-accepted', '1');
+    });
+    // Quick theme toggle
+    document.getElementById('theme-toggle')?.addEventListener('click', () => {
+      document.body.classList.toggle('dark-mode');
+      const isDark = document.body.classList.contains('dark-mode');
+      localStorage.setItem('darkMode', isDark ? 'true' : 'false');
+      const sel = document.getElementById('theme-select');
+      if (sel) sel.value = isDark ? 'dark' : 'light';
+    });
+    // Global error handler UI
+    window.addEventListener('error', (e) => {
+      const existing = document.getElementById('global-error-toast');
+      if (existing) existing.remove();
+      const toast = document.createElement('div');
+      toast.id = 'global-error-toast';
+      toast.className = 'toast toast--error';
+      toast.setAttribute('role', 'alert');
+      toast.textContent = 'Something went wrong. Check the console for details.';
+      document.body.appendChild(toast);
+      requestAnimationFrame(() => toast.classList.add('toast--visible'));
+      setTimeout(() => { toast.classList.remove('toast--visible'); setTimeout(() => toast.remove(), 300); }, 5000);
+    });
   </script>
 </body>
 </html>

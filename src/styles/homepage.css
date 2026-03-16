@@ -185,6 +185,23 @@ body.dark-mode .hero-action-btn.secondary {
     transition: border-color 0.2s ease, box-shadow 0.2s ease, transform 0.2s ease;
 }
 
+.workflow-card {
+    animation: card-fade-in 0.4s ease both;
+}
+
+.workflow-card:nth-child(1) { animation-delay: 0.05s; }
+.workflow-card:nth-child(2) { animation-delay: 0.1s; }
+.workflow-card:nth-child(3) { animation-delay: 0.15s; }
+.workflow-card:nth-child(4) { animation-delay: 0.2s; }
+.workflow-card:nth-child(5) { animation-delay: 0.25s; }
+.workflow-card:nth-child(6) { animation-delay: 0.3s; }
+.workflow-card:nth-child(7) { animation-delay: 0.35s; }
+
+@keyframes card-fade-in {
+    from { opacity: 0; transform: translateY(12px); }
+    to   { opacity: 1; transform: translateY(0); }
+}
+
 .workflow-card:hover {
     border-color: var(--color-primary);
     box-shadow: var(--elevation-md), 0 0 0 3px color-mix(in srgb, var(--color-primary) 12%, transparent);
@@ -289,5 +306,328 @@ body.dark-mode .workflow-card img {
 
 body.dark-mode .workflow-card-title {
     color: var(--text-color);
+}
+
+/* --- Features Grid --- */
+.features-section {
+    max-width: 960px;
+    margin-left: auto;
+    margin-right: auto;
+}
+
+.features-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
+    gap: 1.5rem;
+    margin-top: 1.5rem;
+}
+
+.feature-item {
+    text-align: center;
+    padding: 1.25rem 1rem;
+    border-radius: var(--radius-md, 10px);
+    border: 1px solid var(--color-border);
+    background: var(--color-surface-strong);
+    transition: border-color 0.2s ease, transform 0.2s ease;
+}
+
+.feature-item:hover {
+    border-color: var(--color-primary);
+    transform: translateY(-2px);
+}
+
+.feature-icon-wrap {
+    width: 48px;
+    height: 48px;
+    margin: 0 auto 0.75rem;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background: color-mix(in srgb, var(--color-primary) 10%, transparent);
+    border-radius: var(--radius-md, 10px);
+    padding: 0.5rem;
+}
+
+.feature-icon-wrap img {
+    width: 28px;
+    height: 28px;
+}
+
+.feature-item h3 {
+    font-size: 1rem;
+    margin: 0 0 0.35rem;
+}
+
+.feature-item p {
+    font-size: 0.875rem;
+    color: var(--color-text-muted, #64748b);
+    margin: 0;
+    line-height: 1.5;
+}
+
+body.dark-mode .feature-item {
+    background: #1e2124;
+    border-color: #3a3f46;
+}
+
+/* --- Changelog / What's New --- */
+.changelog-section {
+    max-width: 800px;
+    margin-left: auto;
+    margin-right: auto;
+}
+
+.changelog-list {
+    list-style: none;
+    padding: 0;
+    margin: 1rem 0 0;
+    display: flex;
+    flex-direction: column;
+    gap: 0.75rem;
+}
+
+.changelog-list li {
+    padding: 0.6rem 0.75rem;
+    border-left: 3px solid var(--color-primary);
+    background: color-mix(in srgb, var(--color-primary) 4%, transparent);
+    border-radius: 0 var(--radius-sm, 6px) var(--radius-sm, 6px) 0;
+    font-size: 0.9rem;
+    line-height: 1.5;
+}
+
+.changelog-badge {
+    display: inline-block;
+    font-size: 0.7rem;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+    padding: 0.1em 0.5em;
+    border-radius: var(--radius-sm, 6px);
+    margin-right: 0.4rem;
+    vertical-align: middle;
+}
+
+.changelog-badge--feature {
+    background: color-mix(in srgb, var(--color-success, #28a745) 15%, transparent);
+    color: var(--success-text, #155724);
+}
+
+.changelog-badge--improvement {
+    background: color-mix(in srgb, var(--color-primary) 15%, transparent);
+    color: var(--color-primary);
+}
+
+.changelog-badge--fix {
+    background: color-mix(in srgb, var(--color-error, #dc3545) 15%, transparent);
+    color: var(--error-text, #721c24);
+}
+
+body.dark-mode .changelog-list li {
+    background: color-mix(in srgb, var(--color-primary) 8%, #1e2124);
+}
+
+/* --- PWA Install Banner --- */
+.pwa-install-banner {
+    position: fixed;
+    bottom: max(1rem, env(safe-area-inset-bottom));
+    left: 50%;
+    transform: translateX(-50%);
+    background: var(--color-surface-strong);
+    border: 1px solid var(--color-border);
+    border-radius: var(--radius-md, 10px);
+    box-shadow: var(--elevation-lg);
+    padding: 0.75rem 1.25rem;
+    display: flex;
+    align-items: center;
+    gap: 1rem;
+    z-index: 95;
+    max-width: calc(100vw - 2rem);
+    font-size: 0.875rem;
+    animation: pwa-slide-up 0.3s ease;
+}
+
+.pwa-install-banner.hidden {
+    display: none;
+}
+
+.pwa-install-banner p {
+    margin: 0;
+}
+
+.pwa-install-actions {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    flex-shrink: 0;
+}
+
+.pwa-dismiss-btn {
+    background: none;
+    border: none;
+    font-size: 1.2rem;
+    cursor: pointer;
+    color: var(--color-text-muted, #64748b);
+    padding: 0.25rem;
+    line-height: 1;
+}
+
+@keyframes pwa-slide-up {
+    from { opacity: 0; transform: translateX(-50%) translateY(1rem); }
+    to   { opacity: 1; transform: translateX(-50%) translateY(0); }
+}
+
+/* --- Toast Notifications --- */
+.toast {
+    position: fixed;
+    bottom: max(1.5rem, env(safe-area-inset-bottom, 0px) + 1rem);
+    left: 50%;
+    transform: translateX(-50%) translateY(1rem);
+    background: var(--color-surface-strong);
+    color: var(--color-text);
+    border: 1px solid var(--color-border);
+    border-radius: var(--radius-md, 10px);
+    padding: 0.75rem 1.25rem;
+    box-shadow: var(--elevation-lg);
+    font-size: 0.875rem;
+    z-index: 9000;
+    opacity: 0;
+    transition: opacity 0.3s ease, transform 0.3s ease;
+    pointer-events: none;
+    max-width: calc(100vw - 2rem);
+}
+
+.toast--visible {
+    opacity: 1;
+    transform: translateX(-50%) translateY(0);
+    pointer-events: auto;
+}
+
+.toast--error {
+    border-color: var(--color-error, #dc3545);
+    background: var(--error-bg, #f8d7da);
+    color: var(--error-text, #721c24);
+}
+
+.toast--success {
+    border-color: var(--color-success, #28a745);
+    background: var(--success-bg, #d4edda);
+    color: var(--success-text, #155724);
+}
+
+.toast--warning {
+    border-color: #ffc107;
+    background: var(--warning-bg, #fff3cd);
+    color: var(--warning-text, #856404);
+}
+
+/* --- Page View Transition --- */
+@view-transition {
+    navigation: auto;
+}
+
+::view-transition-old(root) {
+    animation: fade-out 0.15s ease;
+}
+
+::view-transition-new(root) {
+    animation: fade-in 0.15s ease;
+}
+
+@keyframes fade-out {
+    from { opacity: 1; }
+    to   { opacity: 0; }
+}
+
+@keyframes fade-in {
+    from { opacity: 0; }
+    to   { opacity: 1; }
+}
+
+/* --- Footer Shortcut Hint --- */
+.footer-shortcut-hint {
+    font-size: 0.78rem;
+    color: var(--color-text-muted, #64748b);
+    display: flex;
+    align-items: center;
+    gap: 0.35rem;
+}
+
+.footer-shortcut-hint kbd {
+    font-size: 0.7rem;
+    padding: 0.05em 0.3em;
+}
+
+@media (max-width: 600px) {
+    .footer-shortcut-hint {
+        display: none;
+    }
+
+    .features-grid {
+        grid-template-columns: 1fr;
+    }
+}
+
+/* --- Mobile Bottom Tab Bar --- */
+.mobile-bottom-nav {
+    display: none;
+}
+
+@media (max-width: 700px) {
+    .mobile-bottom-nav {
+        display: flex;
+        position: fixed;
+        bottom: 0;
+        left: 0;
+        right: 0;
+        background: var(--color-surface-strong);
+        border-top: 1px solid var(--color-border);
+        box-shadow: 0 -2px 8px rgba(0, 0, 0, 0.08);
+        z-index: 90;
+        padding: env(safe-area-inset-bottom, 0) 0 0 0;
+        justify-content: space-around;
+        align-items: stretch;
+    }
+
+    .mobile-bottom-nav a {
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        justify-content: center;
+        gap: 0.15rem;
+        padding: 0.5rem 0.25rem;
+        flex: 1;
+        text-decoration: none;
+        color: var(--color-text-muted, #64748b);
+        font-size: 0.65rem;
+        font-weight: 500;
+        min-height: 50px;
+        transition: color 0.15s ease;
+    }
+
+    .mobile-bottom-nav a.active,
+    .mobile-bottom-nav a[aria-current="page"] {
+        color: var(--color-primary);
+        font-weight: 600;
+    }
+
+    .mobile-bottom-nav a img {
+        width: 20px;
+        height: 20px;
+        opacity: 0.6;
+    }
+
+    .mobile-bottom-nav a.active img,
+    .mobile-bottom-nav a[aria-current="page"] img {
+        opacity: 1;
+    }
+
+    /* Add bottom padding to body to account for the bottom nav */
+    body {
+        padding-bottom: 60px;
+    }
+
+    .site-footer {
+        padding-bottom: calc(60px + env(safe-area-inset-bottom, 0px));
+    }
 }
 

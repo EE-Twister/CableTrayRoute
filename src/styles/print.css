@@ -70,6 +70,7 @@
   /* --- Hide non-print elements --- */
   .top-nav,
   .nav-toggle,
+  .nav-brand,
   .breadcrumb-trail,
   .app-sidebar-nav,
   .site-footer,
@@ -85,6 +86,10 @@
   .skip-link,
   .column-info-panel,
   .command-palette,
+  .mobile-bottom-nav,
+  .pwa-install-banner,
+  .privacy-notice,
+  .theme-toggle-btn,
   [data-no-print],
   .no-print,
   .print-hidden,
