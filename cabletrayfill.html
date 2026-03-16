@@ -18,6 +18,8 @@
   <link rel="canonical" href="cabletrayfill.html">
     <!-- Performance: early CDN connection -->
   <link rel="preconnect" href="https://cdn.jsdelivr.net" crossorigin>
+  <link rel="dns-prefetch" href="https://fonts.gstatic.com">
+  <meta name="color-scheme" content="light dark">
   <link rel="stylesheet" href="style.css">
 
   <!-- SheetJS / xlsx for Excel import/export -->
@@ -156,20 +158,21 @@
     <button id="clearCableFiltersBtn" type="button">Clear Filters</button>
     <div id="cableTableWrapper">
     <table id="cableTable">
+      <caption class="visually-hidden">Cable entries for tray fill calculation</caption>
       <thead>
         <tr>
-          <th>Tag <span class="required">*</span> <button class="helpBtn" data-help="Unique identifier or label for the cable." data-doc="docs/tutorial.html#trayfill">?</button></th>
-          <th>Cable Type <span class="required">*</span> <button class="helpBtn" data-help="Classify as Power, Control, or Signal." data-doc="docs/tutorial.html#trayfill">?</button></th>
-          <th>Conductors <span class="required">*</span> <button class="helpBtn" data-help="Number of conductors in the cable." data-doc="docs/tutorial.html#trayfill">?</button></th>
-          <th>Conductor Size <span class="required">*</span> <button class="helpBtn" data-help="Gauge or size of each conductor." data-doc="docs/tutorial.html#trayfill">?</button></th>
-          <th>Cable Rating (V) <button class="helpBtn" data-help="Voltage rating of the cable insulation." data-doc="docs/tutorial.html#trayfill">?</button></th>
-          <th>Operating Voltage (V) <button class="helpBtn" data-help="Actual working voltage on the cable." data-doc="docs/tutorial.html#trayfill">?</button></th>
-          <th>OD (in) <span class="required">*</span> <button class="helpBtn" data-help="Outer diameter of the cable in inches." data-doc="docs/tutorial.html#trayfill">?</button></th>
-          <th>Weight (lbs/ft) <span class="required">*</span> <button class="helpBtn" data-help="Cable weight per foot." data-doc="docs/tutorial.html#trayfill">?</button></th>
-          <th>Cable Zone <button class="helpBtn" data-help="Numeric zone for organizing cables. If Stackable and Non-Stackable Cables are placed in the same zone then a divider will automatically be added." data-doc="docs/tutorial.html#trayfill">?</button></th>
-          <th>Circuit Group <button class="helpBtn" data-help="Numeric group for bundling single conductor cables in groups of 3 or 4 conductors." data-doc="docs/tutorial.html#trayfill">?</button></th>
-          <th>Duplicate</th>
-          <th>Remove</th>
+          <th scope="col">Tag <span class="required">*</span> <button class="helpBtn" data-help="Unique identifier or label for the cable." data-doc="docs/tutorial.html#trayfill">?</button></th>
+          <th scope="col">Cable Type <span class="required">*</span> <button class="helpBtn" data-help="Classify as Power, Control, or Signal." data-doc="docs/tutorial.html#trayfill">?</button></th>
+          <th scope="col">Conductors <span class="required">*</span> <button class="helpBtn" data-help="Number of conductors in the cable." data-doc="docs/tutorial.html#trayfill">?</button></th>
+          <th scope="col">Conductor Size <span class="required">*</span> <button class="helpBtn" data-help="Gauge or size of each conductor." data-doc="docs/tutorial.html#trayfill">?</button></th>
+          <th scope="col">Cable Rating (V) <button class="helpBtn" data-help="Voltage rating of the cable insulation." data-doc="docs/tutorial.html#trayfill">?</button></th>
+          <th scope="col">Operating Voltage (V) <button class="helpBtn" data-help="Actual working voltage on the cable." data-doc="docs/tutorial.html#trayfill">?</button></th>
+          <th scope="col">OD (in) <span class="required">*</span> <button class="helpBtn" data-help="Outer diameter of the cable in inches." data-doc="docs/tutorial.html#trayfill">?</button></th>
+          <th scope="col">Weight (lbs/ft) <span class="required">*</span> <button class="helpBtn" data-help="Cable weight per foot." data-doc="docs/tutorial.html#trayfill">?</button></th>
+          <th scope="col">Cable Zone <button class="helpBtn" data-help="Numeric zone for organizing cables. If Stackable and Non-Stackable Cables are placed in the same zone then a divider will automatically be added." data-doc="docs/tutorial.html#trayfill">?</button></th>
+          <th scope="col">Circuit Group <button class="helpBtn" data-help="Numeric group for bundling single conductor cables in groups of 3 or 4 conductors." data-doc="docs/tutorial.html#trayfill">?</button></th>
+          <th scope="col">Duplicate</th>
+          <th scope="col">Remove</th>
         </tr>
       </thead>
       <tbody>
@@ -177,7 +180,7 @@
       </tbody>
     </table>
     </div>
-    <p style="font-size:0.85rem; color:#555; margin-top:8px;">
+    <p class="info-text">
       <strong>Conductors/Size:</strong> Enter the number of conductors and conductor size or pick one of the defaults.<br>
       OD & Weight auto-fill if you select a default.
     </p>
@@ -200,7 +203,7 @@
     <button id="exportExcelBtn" type="button">Export Excel</button>
     <button id="importHelpBtn" type="button">Import Help</button>
     <!-- Hidden file‐picker for .xlsx input -->
-    <input type="file" id="importExcelInput" accept=".xlsx" style="display:none" />
+    <input type="file" id="importExcelInput" accept=".xlsx" class="hidden" />
   </div>
 
   <div id="results"></div>

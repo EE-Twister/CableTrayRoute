@@ -16,6 +16,8 @@
   <meta property="og:url" content="conduitfill.html">
   <!-- Canonical URL -->
   <link rel="canonical" href="conduitfill.html">
+  <link rel="dns-prefetch" href="https://fonts.gstatic.com">
+  <meta name="color-scheme" content="light dark">
   <link rel="stylesheet" href="style.css" />
   <script type="module" src="dirtyTracker.js"></script>
   <script type="module" src="dist/conduitfill.js" defer></script>
@@ -104,15 +106,16 @@
         <legend><strong>Enter Cables</strong></legend>
         <button id="addCableBtn" type="button">Add Cable</button>
         <table id="cableTable">
+      <caption class="visually-hidden">Cable entries for conduit fill calculation</caption>
       <thead>
         <tr>
-          <th>Tag</th>
-          <th>Cable Type</th>
-          <th>Conductors</th>
-          <th>Conductor Size <button class="helpBtn" data-doc="docs/nec_reference.html#ampacity-adjustments">?</button></th>
-          <th>OD (in) <button class="helpBtn" data-doc="docs/nec_reference.html#derating-factors">?</button></th>
-          <th>Duplicate</th>
-          <th>Remove</th>
+          <th scope="col">Tag</th>
+          <th scope="col">Cable Type</th>
+          <th scope="col">Conductors</th>
+          <th scope="col">Conductor Size <button class="helpBtn" data-doc="docs/nec_reference.html#ampacity-adjustments">?</button></th>
+          <th scope="col">OD (in) <button class="helpBtn" data-doc="docs/nec_reference.html#derating-factors">?</button></th>
+          <th scope="col">Duplicate</th>
+          <th scope="col">Remove</th>
         </tr>
       </thead>
       <tbody></tbody>

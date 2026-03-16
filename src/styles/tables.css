@@ -121,7 +121,7 @@ body.dark-mode .table-row-focusable:focus-within::after {
 }
 
 .row-count {
-    margin-left: auto;
+    margin-inline-start: auto;
     text-align: right;
     font-size: 0.9rem;
 }
@@ -155,7 +155,7 @@ body.dark-mode .table-row-focusable:focus-within::after {
 }
 
 .load-results-count {
-    margin-left: auto;
+    margin-inline-start: auto;
     font-size: 0.9rem;
 }
 
@@ -182,7 +182,7 @@ body.dark-mode .table-row-focusable:focus-within::after {
 }
 
 .loadlist-shortcuts {
-    margin-left: auto;
+    margin-inline-start: auto;
     font-size: 0.85rem;
     color: var(--text-color);
 }
@@ -198,7 +198,7 @@ body.dark-mode .table-row-focusable:focus-within::after {
 
 .empty-state {
     text-align: center;
-    color: #6c757d;
+    color: var(--color-text-muted, #6c757d);
     font-style: italic;
 }
 
@@ -277,7 +277,8 @@ body.dark-mode .table-row-focusable:focus-within::after {
 }
 
 .equipment-results-count {
-    margin: 0 0 0 auto;
+    margin: 0;
+    margin-inline-start: auto;
     font-size: 0.9rem;
     color: var(--text-color);
 }
@@ -310,8 +311,8 @@ body.dark-mode .table-row-focusable:focus-within::after {
 }
 
 .equipment-input-error {
-    border-color: #c92a2a !important;
-    background: rgba(201, 42, 42, 0.08);
+    border-color: var(--color-error, #c92a2a) !important;
+    background: color-mix(in srgb, var(--error-bg, #f8d7da) 20%, transparent);
 }
 
 .sticky-table thead {
@@ -404,7 +405,7 @@ body.dark-mode .sticky-table thead th {
     position: relative;
     width: 100%;
     height: 16px;
-    background-color: #e9ecef;
+    background-color: var(--color-surface, #e9ecef);
     border-radius: 8px;
     overflow: hidden;
     border: 1px solid var(--border-color);
@@ -419,10 +420,10 @@ body.dark-mode .sticky-table thead th {
     top: 0;
     bottom: 0;
     width: 2px;
-    background-color: #000;
+    background-color: var(--color-text, #000);
 }
 .util-label {
-    margin-left: 4px;
+    margin-inline-start: 4px;
     font-size: 0.8rem;
 }
 
@@ -456,18 +457,18 @@ body.dark-mode .sticky-table thead th {
     animation: operation-spin 0.8s linear infinite;
 }
 .operation-placeholder.is-complete {
-    border-color: #28a745;
+    border-color: var(--color-success, #28a745);
 }
 .operation-placeholder.is-complete .operation-spinner {
     opacity: 1;
-    border: 2px solid #28a745;
+    border: 2px solid var(--color-success, #28a745);
 }
 .operation-placeholder.is-error {
-    border-color: #dc3545;
+    border-color: var(--color-error, #dc3545);
 }
 .operation-placeholder.is-error .operation-spinner {
     opacity: 1;
-    border: 2px solid #dc3545;
+    border: 2px solid var(--color-error, #dc3545);
 }
 @keyframes operation-spin {
     to { transform: rotate(360deg); }
