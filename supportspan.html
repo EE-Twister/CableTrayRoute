@@ -1,0 +1,226 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <meta name="description" content="Cable tray support span calculator per NEMA VE 1. Determine the maximum allowable support spacing based on cable weight and tray load class." />
+  <title>Support Span — CableTrayRoute</title>
+  <link rel="icon" href="icons/favicon.svg" type="image/svg+xml">
+  <link rel="apple-touch-icon" href="icons/favicon.svg">
+  <!-- Open Graph / Social sharing -->
+  <meta property="og:type" content="website">
+  <meta property="og:title" content="Support Span Calculator — CableTrayRoute">
+  <meta property="og:description" content="Calculate the maximum cable tray support span per NEMA VE 1 load classes.">
+  <meta property="og:image" content="icons/route.svg">
+  <meta property="og:site_name" content="CableTrayRoute">
+  <meta property="og:url" content="supportspan.html">
+  <!-- Canonical URL -->
+  <link rel="canonical" href="supportspan.html">
+  <link rel="dns-prefetch" href="https://fonts.gstatic.com">
+  <meta name="color-scheme" content="light dark">
+  <link rel="stylesheet" href="style.css" />
+  <script type="module" src="dirtyTracker.js"></script>
+  <script type="module" src="dist/supportspan.js" defer></script>
+</head>
+<body class="supportspan-page" data-report-title="Support Span">
+  <a href="#main-content" class="skip-link">Skip to main content</a>
+  <nav class="top-nav">
+    <button id="nav-toggle" class="nav-toggle" aria-label="Toggle navigation" aria-controls="nav-links" aria-expanded="false" title="Toggle navigation">
+      <img src="icons/toolbar/grid.svg" alt="" aria-hidden="true" class="control-icon" loading="lazy" decoding="async">
+    </button>
+    <div id="nav-links" class="nav-links">
+      <a href="index.html">Home</a>
+      <a href="equipmentlist.html">Equipment List</a>
+      <a href="loadlist.html">Load List</a>
+      <a href="cableschedule.html">Cable Schedule</a>
+      <a href="panelschedule.html">Panel Schedule</a>
+      <a href="racewayschedule.html">Raceway Schedule</a>
+      <a href="ductbankroute.html">Ductbank</a>
+      <a href="cabletrayfill.html">Tray Fill</a>
+      <a href="conduitfill.html">Conduit Fill</a>
+      <a href="supportspan.html" class="active" aria-current="page">Support Span</a>
+      <a href="optimalRoute.html">Optimal Route</a>
+      <a href="oneline.html">One-Line</a>
+    </div>
+    <button id="settings-btn" class="settings-btn" aria-label="Settings" aria-expanded="false" title="Settings">⚙</button>
+  </nav>
+
+  <div id="settings-menu" class="settings-menu">
+    <label for="theme-select">Theme
+      <select id="theme-select">
+        <option value="system">System</option>
+        <option value="light">Light</option>
+        <option value="dark">Dark</option>
+        <option value="high-contrast">High Contrast</option>
+      </select>
+    </label>
+    <label><input type="checkbox" id="compact-toggle" aria-label="Enable compact table mode"> Compact Mode</label>
+    <label for="unit-select">Units
+      <select id="unit-select">
+        <option value="imperial">Imperial</option>
+        <option value="metric">Metric</option>
+      </select>
+    </label>
+    <button id="help-btn" class="btn" aria-expanded="false" title="Show help">Site Help</button>
+    <button id="new-project-btn">New Project</button>
+    <button id="save-project-btn">Save Project</button>
+    <button id="load-project-btn">Load Project</button>
+    <button id="export-project-btn">Export Project</button>
+    <button id="import-project-btn">Import Project</button>
+    <input type="file" id="import-project-input" accept=".ctr.json" class="hidden" title="Select project file">
+  </div>
+
+  <div class="container">
+    <main id="main-content" class="main-content">
+      <nav aria-label="Breadcrumb">
+        <ol class="breadcrumb-trail">
+          <li><a href="index.html">Home</a></li>
+          <li>Workflow</li>
+          <li aria-current="page">Support Span</li>
+        </ol>
+      </nav>
+
+      <header class="page-header">
+        <h1>Cable Tray Support Span Calculator</h1>
+      </header>
+
+      <details class="method-panel">
+        <summary>Method &amp; Assumptions</summary>
+        <p>Maximum support span is governed by the <strong>L/100 deflection limit</strong> defined in
+        NEMA VE 1-2017 §4. For a uniformly distributed cable load on a simple span,
+        midpoint deflection is:</p>
+        <pre>δ = 5wL⁴ / (384EI)  ≤  L/100</pre>
+        <p>Normalising against the tray's rated conditions at the class test span gives:</p>
+        <pre>max_span = L_rated × (w_rated / w_actual)^(1/3)</pre>
+        <p>Variables:</p>
+        <ul>
+          <li><strong>w_actual</strong> — total cable weight per linear foot of tray (lbs/ft)</li>
+          <li><strong>w_rated</strong> — NEMA load-class working load (lbs/ft)</li>
+          <li><strong>L_rated</strong> — class test span (12 ft for all standard classes)</li>
+        </ul>
+        <p>Citations: <a href="docs/standards.html">NEMA VE 1-2017</a></p>
+        <p>Applicability: aluminum and steel ladder trays, solid-bottom trays, and wire-mesh
+        trays with standard NEMA load classes. Fiberglass trays (NEMA FG 1) use identical
+        load-class designations and the same formula.</p>
+        <p>See also:
+          <a href="cabletrayfill.html">Cable Tray Fill</a>,
+          <a href="racewayschedule.html">Raceway Schedule</a>.
+        </p>
+      </details>
+
+      <!-- Common: load class selector (used by both modes) -->
+      <fieldset>
+        <legend><strong>Tray Load Class</strong></legend>
+        <label for="loadClass">NEMA Load Class
+          <button class="helpBtn" data-doc="docs/standards.html#nema-load-classes"
+                  aria-label="Help — NEMA load classes">?</button>
+        </label>
+        <select id="loadClass" aria-describedby="loadClassHint"></select>
+        <p id="loadClassHint" class="field-hint">
+          Select the load class stamped on the tray or specified by the manufacturer.
+          Class 16A (16 lbs/ft, 12 ft span) is typical for industrial installations.
+        </p>
+      </fieldset>
+
+      <!-- Mode toggle -->
+      <fieldset>
+        <legend><strong>Input Mode</strong></legend>
+        <label>
+          <input type="radio" name="inputMode" id="modeManual" value="manual" checked>
+          Manual — enter cable weight directly or build a cable list
+        </label>
+        <label>
+          <input type="radio" name="inputMode" id="modeSchedule" value="schedule">
+          From Project — evaluate all trays in the Raceway Schedule
+        </label>
+      </fieldset>
+
+      <!-- Manual mode section -->
+      <section id="manualSection" aria-label="Manual cable input">
+        <fieldset>
+          <legend><strong>Cable List</strong></legend>
+          <p class="field-hint">Add cables below and the total weight per foot will be
+          computed automatically, or type a value directly in the field beneath the table.</p>
+
+          <table id="cableEntryTable" aria-label="Cable weight entries">
+            <caption class="visually-hidden">Cable entries for weight calculation</caption>
+            <thead>
+              <tr>
+                <th scope="col">Conductors</th>
+                <th scope="col">Conductor Size
+                  <button class="helpBtn" data-doc="docs/nec_reference.html#ampacity-adjustments"
+                          aria-label="Help — conductor sizes">?</button>
+                </th>
+                <th scope="col">Quantity</th>
+                <th scope="col">Weight (lbs/ft)</th>
+                <th scope="col">Remove</th>
+              </tr>
+            </thead>
+            <tbody></tbody>
+          </table>
+          <datalist id="cableSizeList"></datalist>
+
+          <button type="button" id="addCableRowBtn">Add Cable</button>
+        </fieldset>
+
+        <fieldset>
+          <legend><strong>Total Cable Weight</strong></legend>
+          <label for="cableWeightPerFt">
+            Cable weight per linear foot of tray (lbs/ft)
+            <button class="helpBtn" data-doc="docs/standards.html#cable-weights"
+                    aria-label="Help — cable weights">?</button>
+          </label>
+          <input type="number" id="cableWeightPerFt" min="0.001" step="0.001"
+                 placeholder="e.g. 4.5"
+                 aria-describedby="weightHint">
+          <p id="weightHint" class="field-hint">
+            Summed automatically from the cable list above, or enter a value manually.
+            Include all cables sharing this tray section.
+          </p>
+        </fieldset>
+
+        <div id="controls">
+          <button id="calcBtn" type="button">Calculate Span</button>
+        </div>
+
+        <div id="results" role="region" aria-live="polite" aria-label="Span results"></div>
+      </section>
+
+      <!-- Schedule mode section -->
+      <section id="scheduleSection" hidden aria-label="Schedule evaluation">
+        <p>This mode reads trays from the Raceway Schedule and estimates cable weight
+        per tray from cables assigned via their <em>Route Preference</em> field.</p>
+        <p><strong>Note:</strong> Cable weights are looked up from built-in NEMA/ICEA
+        tables. For cables not in the table the weight will show as 0. You can add an
+        explicit <code>weight_lb_ft</code> value to a cable in the Cable Schedule to
+        override the lookup.</p>
+        <button type="button" id="loadScheduleBtn">Evaluate Trays from Schedule</button>
+        <div id="scheduleResults" role="region" aria-live="polite"
+             aria-label="Schedule evaluation results"></div>
+      </section>
+
+      <nav class="step-nav" aria-label="Workflow navigation">
+        <a href="conduitfill.html" class="step-nav-prev">&#8592; Conduit Fill</a>
+        <a href="optimalRoute.html" class="step-nav-next">Optimal Route &#8594;</a>
+      </nav>
+    </main>
+  </div>
+
+  <div id="help-modal" class="modal" aria-hidden="true" role="dialog" aria-modal="true"
+       aria-labelledby="help-title">
+    <div class="modal-content">
+      <button id="close-help-btn" class="close-btn" aria-label="Close Help">&times;</button>
+      <h2 id="help-title">Support Span Help</h2>
+      <p>This tool calculates the maximum cable tray support span per
+      NEMA VE 1 using the L/100 deflection criterion.</p>
+      <p><strong>Manual mode:</strong> build a cable list or enter a total weight directly,
+      then click <em>Calculate Span</em>.</p>
+      <p><strong>Schedule mode:</strong> reads trays and cables from the current project
+      and evaluates every tray at once.</p>
+      <p><button class="helpBtn" data-doc="docs/standards.html">Standards Reference</button></p>
+    </div>
+  </div>
+
+  <script type="module" src="dist/projectManager.js"></script>
+</body>
+</html>

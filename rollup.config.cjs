@@ -25,6 +25,7 @@ const entries = {
   equipmentlist: 'src/equipmentlist.js',
   projectManager: 'src/projectManager.js',
   scenarios: 'src/scenarios.js',
+  supportspan: 'src/supportspan.js',
   '404': 'src/404.js'
 };
 

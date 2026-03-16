@@ -8,6 +8,7 @@ const NAV_ROUTES = [
   { href: 'ductbankroute.html', label: 'Ductbank', section: 'Workflow' },
   { href: 'cabletrayfill.html', label: 'Tray Fill', section: 'Workflow' },
   { href: 'conduitfill.html', label: 'Conduit Fill', section: 'Workflow' },
+  { href: 'supportspan.html', label: 'Support Span', section: 'Workflow' },
   { href: 'optimalRoute.html', label: 'Optimal Route', section: 'Workflow' },
   { href: 'oneline.html', label: 'One-Line', section: 'Workflow' },
   { href: 'tcc.html', label: 'TCC', section: 'Studies' },
