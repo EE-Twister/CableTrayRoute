@@ -1,0 +1,195 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <meta name="description" content="Cable pull cards and pull table generator. Groups cables by type and route for simultaneous pulling and generates construction documents." />
+  <title>Pull Cards — CableTrayRoute</title>
+  <link rel="icon" href="icons/favicon.svg" type="image/svg+xml">
+  <link rel="apple-touch-icon" href="icons/favicon.svg">
+  <meta property="og:type" content="website">
+  <meta property="og:title" content="Pull Cards — CableTrayRoute">
+  <meta property="og:description" content="Generate cable pull cards and pull tables grouping cables by type and route for field construction.">
+  <meta property="og:image" content="icons/route.svg">
+  <meta property="og:site_name" content="CableTrayRoute">
+  <meta property="og:url" content="pullcards.html">
+  <link rel="canonical" href="pullcards.html">
+  <link rel="dns-prefetch" href="https://fonts.gstatic.com">
+  <meta name="color-scheme" content="light dark">
+  <link rel="stylesheet" href="style.css" />
+  <script type="module" src="dirtyTracker.js"></script>
+  <script type="module" src="dist/pullcards.js" defer></script>
+</head>
+<body class="pullcards-page" data-report-title="Pull Cards">
+  <a href="#main-content" class="skip-link">Skip to main content</a>
+  <nav class="top-nav">
+    <button id="nav-toggle" class="nav-toggle" aria-label="Toggle navigation" aria-controls="nav-links" aria-expanded="false" title="Toggle navigation">
+      <img src="icons/toolbar/grid.svg" alt="" aria-hidden="true" class="control-icon" loading="lazy" decoding="async">
+    </button>
+    <div id="nav-links" class="nav-links">
+      <a href="index.html">Home</a>
+      <a href="equipmentlist.html">Equipment List</a>
+      <a href="loadlist.html">Load List</a>
+      <a href="cableschedule.html">Cable Schedule</a>
+      <a href="panelschedule.html">Panel Schedule</a>
+      <a href="racewayschedule.html">Raceway Schedule</a>
+      <a href="ductbankroute.html">Ductbank</a>
+      <a href="cabletrayfill.html">Tray Fill</a>
+      <a href="conduitfill.html">Conduit Fill</a>
+      <a href="supportspan.html">Support Span</a>
+      <a href="optimalRoute.html">Optimal Route</a>
+      <a href="pullcards.html" class="active" aria-current="page">Pull Cards</a>
+      <a href="oneline.html">One-Line</a>
+    </div>
+    <button id="settings-btn" class="settings-btn" aria-label="Settings" aria-expanded="false" title="Settings">⚙</button>
+  </nav>
+
+  <div id="settings-menu" class="settings-menu">
+    <label for="theme-select">Theme
+      <select id="theme-select">
+        <option value="system">System</option>
+        <option value="light">Light</option>
+        <option value="dark">Dark</option>
+        <option value="high-contrast">High Contrast</option>
+      </select>
+    </label>
+    <label><input type="checkbox" id="compact-toggle" aria-label="Enable compact table mode"> Compact Mode</label>
+    <label for="unit-select">Units
+      <select id="unit-select">
+        <option value="imperial">Imperial</option>
+        <option value="metric">Metric</option>
+      </select>
+    </label>
+    <button id="help-btn" class="btn" aria-expanded="false" title="Show help">Site Help</button>
+    <button id="new-project-btn">New Project</button>
+    <button id="save-project-btn">Save Project</button>
+    <button id="load-project-btn">Load Project</button>
+    <button id="export-project-btn">Export Project</button>
+    <button id="import-project-btn">Import Project</button>
+    <input type="file" id="import-project-input" accept=".ctr.json" class="hidden" title="Select project file">
+  </div>
+
+  <div class="container">
+    <main id="main-content" class="main-content">
+      <nav aria-label="Breadcrumb">
+        <ol class="breadcrumb-trail">
+          <li><a href="index.html">Home</a></li>
+          <li>Workflow</li>
+          <li aria-current="page">Pull Cards</li>
+        </ol>
+      </nav>
+
+      <header class="page-header">
+        <h1>Cable Pull Cards &amp; Pull Table</h1>
+      </header>
+
+      <details class="method-panel">
+        <summary>Method &amp; Assumptions</summary>
+        <p>Cables are grouped into <strong>pulls</strong> — sets of cables that share the
+        same <em>cable type</em> (Power, Control, Signal) and traverse the
+        <em>same ordered sequence of raceway segments</em>. Cables in the same pull
+        can be pulled simultaneously by field crews.</p>
+        <p><strong>Pull tension</strong> is estimated using the capstan equation for
+        bends and a constant friction coefficient (μ = 0.35) for straight runs.
+        Combined cable weight per foot is used for multi-cable pulls.</p>
+        <p>References: NEC Article 300.31, IEEE Std 1185, AEIC CG5.</p>
+        <p>See also:
+          <a href="optimalRoute.html">Optimal Route</a>,
+          <a href="cabletrayfill.html">Cable Tray Fill</a>.
+        </p>
+      </details>
+
+      <!-- Import section -->
+      <fieldset>
+        <legend><strong>Import Route Data</strong></legend>
+        <p class="field-hint">Import the <code>route_data.xlsx</code> file exported
+        from the Optimal Route page, or load pull cards directly from project data
+        if routes have been computed in this session.</p>
+        <div class="btn-row">
+          <button type="button" id="importXlsxBtn">Import Route XLSX</button>
+          <input type="file" id="xlsxFileInput" accept=".xlsx,.xls" class="hidden" title="Select route data file">
+          <button type="button" id="loadFromProjectBtn">Load from Project</button>
+        </div>
+      </fieldset>
+
+      <!-- Summary section -->
+      <section id="summarySection" hidden aria-label="Pull summary">
+        <h2>Pull Summary</h2>
+        <div id="summaryCards" class="summary-cards" role="status" aria-live="polite"></div>
+      </section>
+
+      <!-- Pull Table -->
+      <section id="pullTableSection" hidden aria-label="Pull table">
+        <h2>Pull Table</h2>
+        <p class="field-hint">Cables grouped by type and shared route. Multi-cable
+        pulls indicate cables that can be pulled together.</p>
+        <div class="btn-row">
+          <button type="button" id="exportPullTableBtn">Export Pull Table (XLSX)</button>
+          <button type="button" id="exportPullCardsBtn">Export Pull Cards (XLSX)</button>
+        </div>
+        <table id="pullTable" class="result-table" aria-label="Pull table">
+          <caption class="visually-hidden">Cable pull groupings</caption>
+          <thead>
+            <tr>
+              <th scope="col">Pull #</th>
+              <th scope="col">Cable Type</th>
+              <th scope="col">Cables</th>
+              <th scope="col">Cable Tags</th>
+              <th scope="col">From</th>
+              <th scope="col">To</th>
+              <th scope="col">Length (ft)</th>
+              <th scope="col">Weight (lbs/ft)</th>
+              <th scope="col">Est. Tension (lbs)</th>
+              <th scope="col">Segments</th>
+              <th scope="col">Detail</th>
+            </tr>
+          </thead>
+          <tbody></tbody>
+        </table>
+      </section>
+
+      <!-- Pull Card Detail (shown when clicking a pull row) -->
+      <section id="pullCardDetail" hidden aria-label="Pull card detail">
+        <h2 id="pullCardTitle">Pull Card</h2>
+        <button type="button" id="backToTableBtn" class="btn">&larr; Back to Pull Table</button>
+        <div id="pullCardContent" role="region" aria-live="polite"></div>
+      </section>
+
+      <nav class="step-nav" aria-label="Workflow navigation">
+        <a href="optimalRoute.html" class="step-nav-prev">&#8592; Optimal Route</a>
+        <a href="oneline.html" class="step-nav-next">One-Line &#8594;</a>
+      </nav>
+    </main>
+  </div>
+
+  <div id="help-modal" class="modal" aria-hidden="true" role="dialog" aria-modal="true"
+       aria-labelledby="help-title">
+    <div class="modal-content">
+      <button id="close-help-btn" class="close-btn" aria-label="Close Help">&times;</button>
+      <h2 id="help-title">Pull Cards Help</h2>
+      <p>This tool generates <strong>cable pull cards</strong> and a <strong>pull
+      table</strong> from routing results.</p>
+      <p><strong>Pull table:</strong> Groups cables by type and shared route path.
+      Cables of the same type traversing the same raceways in the same order are
+      combined into a single pull for simultaneous installation.</p>
+      <p><strong>Pull cards:</strong> Click any row to view a detailed pull card
+      showing the step-by-step route, cable list, tension estimate, and
+      physical properties.</p>
+      <p><strong>Import:</strong> Use the <code>route_data.xlsx</code> file from the
+      Optimal Route page, or load directly from the current project if routes
+      have already been computed.</p>
+    </div>
+  </div>
+
+  <script src="https://cdn.sheetjs.com/xlsx-0.20.3/package/dist/xlsx.full.min.js" defer></script>
+  <script src="cdnFallback.js" defer></script>
+  <script>
+    window.addEventListener('load', function () {
+      if (typeof initCdnFallback === 'function') {
+        initCdnFallback([{ global: 'XLSX', label: 'Excel import/export (XLSX)' }]);
+      }
+    });
+  </script>
+  <script type="module" src="dist/projectManager.js"></script>
+</body>
+</html>
