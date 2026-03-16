@@ -1,26 +1,26 @@
 const NAV_ROUTES = [
-  { href: 'index.html', label: 'Home', section: 'Home' },
-  { href: 'equipmentlist.html', label: 'Equipment List', section: 'Workflow' },
-  { href: 'loadlist.html', label: 'Load List', section: 'Workflow' },
-  { href: 'cableschedule.html', label: 'Cable Schedule', section: 'Workflow' },
-  { href: 'panelschedule.html', label: 'Panel Schedule', section: 'Workflow' },
-  { href: 'racewayschedule.html', label: 'Raceway Schedule', section: 'Workflow' },
-  { href: 'ductbankroute.html', label: 'Ductbank', section: 'Workflow' },
-  { href: 'cabletrayfill.html', label: 'Tray Fill', section: 'Workflow' },
-  { href: 'conduitfill.html', label: 'Conduit Fill', section: 'Workflow' },
-  { href: 'supportspan.html', label: 'Support Span', section: 'Workflow' },
-  { href: 'optimalRoute.html', label: 'Optimal Route', section: 'Workflow' },
-  { href: 'pullcards.html', label: 'Pull Cards', section: 'Workflow' },
-  { href: 'oneline.html', label: 'One-Line', section: 'Workflow' },
-  { href: 'tcc.html', label: 'TCC', section: 'Studies' },
-  { href: 'harmonics.html', label: 'Harmonics', section: 'Studies' },
-  { href: 'motorStart.html', label: 'Motor Start', section: 'Studies' },
-  { href: 'loadFlow.html', label: 'Load Flow', section: 'Studies' },
-  { href: 'shortCircuit.html', label: 'Short Circuit', section: 'Studies' },
-  { href: 'arcFlash.html', label: 'Arc Flash', section: 'Studies' },
-  { href: 'custom-components.html', label: 'Custom Components', section: 'Library' },
-  { href: 'help.html', label: 'Help', section: 'Support' },
-  { href: 'account.html', label: 'Account', section: 'Support' }
+  { href: 'index.html', label: 'Home', section: 'Home', icon: 'icons/route.svg' },
+  { href: 'equipmentlist.html', label: 'Equipment List', section: 'Workflow', icon: 'icons/equipment.svg' },
+  { href: 'loadlist.html', label: 'Load List', section: 'Workflow', icon: 'icons/load.svg' },
+  { href: 'cableschedule.html', label: 'Cable Schedule', section: 'Workflow', icon: 'icons/cable.svg' },
+  { href: 'panelschedule.html', label: 'Panel Schedule', section: 'Workflow', icon: 'icons/panel.svg' },
+  { href: 'racewayschedule.html', label: 'Raceway Schedule', section: 'Workflow', icon: 'icons/raceway.svg' },
+  { href: 'ductbankroute.html', label: 'Ductbank', section: 'Workflow', icon: 'icons/ductbank.svg' },
+  { href: 'cabletrayfill.html', label: 'Tray Fill', section: 'Workflow', icon: 'icons/tray.svg' },
+  { href: 'conduitfill.html', label: 'Conduit Fill', section: 'Workflow', icon: 'icons/conduit.svg' },
+  { href: 'supportspan.html', label: 'Support Span', section: 'Workflow', icon: 'icons/toolbar/dimension.svg' },
+  { href: 'optimalRoute.html', label: 'Optimal Route', section: 'Workflow', icon: 'icons/route.svg' },
+  { href: 'pullcards.html', label: 'Pull Cards', section: 'Workflow', icon: 'icons/toolbar/copy.svg' },
+  { href: 'oneline.html', label: 'One-Line', section: 'Workflow', icon: 'icons/oneline.svg' },
+  { href: 'tcc.html', label: 'TCC', section: 'Studies', icon: 'icons/toolbar/validate.svg' },
+  { href: 'harmonics.html', label: 'Harmonics', section: 'Studies', icon: 'icons/toolbar/grid-size.svg' },
+  { href: 'motorStart.html', label: 'Motor Start', section: 'Studies', icon: 'icons/Motor.svg' },
+  { href: 'loadFlow.html', label: 'Load Flow', section: 'Studies', icon: 'icons/Load.svg' },
+  { href: 'shortCircuit.html', label: 'Short Circuit', section: 'Studies', icon: 'icons/components/Breaker.svg' },
+  { href: 'arcFlash.html', label: 'Arc Flash', section: 'Studies', icon: 'icons/toolbar/connect.svg' },
+  { href: 'custom-components.html', label: 'Custom Components', section: 'Library', icon: 'icons/components/TextBox.svg' },
+  { href: 'help.html', label: 'Help', section: 'Support', icon: 'icons/toolbar/validate.svg' },
+  { href: 'account.html', label: 'Account', section: 'Support', icon: 'icons/toolbar/grid.svg' }
 ];
 
 function currentPageName() {
@@ -35,7 +35,22 @@ function routeForPage(pageName) {
 function buildLink(route, currentRoute) {
   const link = document.createElement('a');
   link.href = route.href;
-  link.textContent = route.label;
+
+  const icon = document.createElement('img');
+  icon.src = route.icon;
+  icon.alt = '';
+  icon.setAttribute('aria-hidden', 'true');
+  icon.className = 'nav-link-icon';
+  icon.loading = 'lazy';
+  icon.decoding = 'async';
+
+  const label = document.createElement('span');
+  label.className = 'nav-link-label';
+  label.textContent = route.label;
+
+  link.appendChild(icon);
+  link.appendChild(label);
+
   if (currentRoute && currentRoute.href === route.href) {
     link.classList.add('active');
     link.setAttribute('aria-current', 'page');
