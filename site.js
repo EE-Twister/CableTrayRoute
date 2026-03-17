@@ -72,6 +72,37 @@ function ensureOperationToast(){
   return toast;
 }
 
+function applyPageVisualIdentity(){
+  if(typeof document==='undefined') return;
+  const body=document.body;
+  if(!body) return;
+  const file=(window.location.pathname.split('/').pop()||'index.html').toLowerCase();
+  const visualMap=[
+    {match:/schedule|list/,value:'schedule'},
+    {match:/route|ductbank|pullcards|supportspan/,value:'routing'},
+    {match:/fill/,value:'capacity'},
+    {match:/arcflash|harmonics|motorstart|shortcircuit|loadflow|tcc/,value:'analysis'},
+    {match:/oneline|custom-components/,value:'diagram'},
+    {match:/account|login|forgot-password|reset-password/,value:'account'},
+    {match:/index/,value:'home'}
+  ];
+  const visual=visualMap.find(entry=>entry.match.test(file))?.value||'default';
+  body.dataset.pageVisual=visual;
+
+  document.querySelectorAll('.page-header').forEach((header,index)=>{
+    if(!(header instanceof HTMLElement)) return;
+    header.classList.add('page-header-graphic');
+    const title=header.querySelector('h1,h2');
+    if(title&&title.id){
+      header.setAttribute('aria-labelledby',title.id);
+    }else if(title&&index===0){
+      const generatedId='page-header-title';
+      title.id=generatedId;
+      header.setAttribute('aria-labelledby',generatedId);
+    }
+  });
+}
+
 function showOperationToast(message,kind='success'){
   const toast=ensureOperationToast();
   if(!toast) return;
@@ -1646,6 +1677,7 @@ function initTableScrollIndicators(){
   });
 }
 globalThis.document?.addEventListener('DOMContentLoaded',initTableScrollIndicators);
+globalThis.document?.addEventListener('DOMContentLoaded',applyPageVisualIdentity);
 
 function downloadProjectAsBlob(precomputedJson){
   try{

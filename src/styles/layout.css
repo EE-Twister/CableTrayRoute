@@ -117,3 +117,90 @@ header h1, header h2 {
         margin-left: 0;
     }
 }
+
+
+.page-header-graphic {
+    position: relative;
+    overflow: hidden;
+    border-radius: var(--radius-lg, 16px);
+    border: 1px solid color-mix(in srgb, var(--primary-color) 18%, var(--border-color));
+    padding: var(--space-4);
+    background:
+        radial-gradient(circle at 90% -30%, color-mix(in srgb, var(--primary-color) 24%, transparent), transparent 58%),
+        linear-gradient(130deg, color-mix(in srgb, var(--secondary-color) 94%, #ffffff 6%), color-mix(in srgb, var(--secondary-color) 98%, var(--primary-color) 2%));
+    box-shadow: 0 18px 35px -32px rgba(15, 23, 42, 0.55);
+    isolation: isolate;
+}
+
+.page-header-graphic::before,
+.page-header-graphic::after {
+    content: '';
+    position: absolute;
+    pointer-events: none;
+    z-index: -1;
+}
+
+.page-header-graphic::before {
+    inset: auto -2.8rem -3rem auto;
+    width: 11rem;
+    height: 11rem;
+    border-radius: 50%;
+    border: 1px solid color-mix(in srgb, var(--primary-color) 24%, transparent);
+    opacity: 0.45;
+}
+
+.page-header-graphic::after {
+    inset: -2.2rem auto auto -2.6rem;
+    width: 7.5rem;
+    height: 7.5rem;
+    border-radius: 1.5rem;
+    transform: rotate(24deg);
+    background: color-mix(in srgb, var(--primary-color) 11%, transparent);
+}
+
+.page-header-graphic h1,
+.page-header-graphic h2 {
+    margin-bottom: 0.25rem;
+}
+
+body[data-page-visual='routing'] .page-header-graphic {
+    background:
+        linear-gradient(135deg, rgba(29, 78, 216, 0.14), rgba(56, 189, 248, 0.08) 42%, rgba(37, 99, 235, 0.03)),
+        var(--secondary-color);
+}
+
+body[data-page-visual='analysis'] .page-header-graphic {
+    background:
+        linear-gradient(135deg, rgba(124, 58, 237, 0.15), rgba(168, 85, 247, 0.08) 40%, rgba(30, 64, 175, 0.05)),
+        var(--secondary-color);
+}
+
+body[data-page-visual='capacity'] .page-header-graphic {
+    background:
+        linear-gradient(135deg, rgba(5, 150, 105, 0.16), rgba(16, 185, 129, 0.08) 45%, rgba(45, 212, 191, 0.05)),
+        var(--secondary-color);
+}
+
+body[data-page-visual='schedule'] .page-header-graphic {
+    background:
+        linear-gradient(135deg, rgba(37, 99, 235, 0.16), rgba(59, 130, 246, 0.08) 46%, rgba(14, 165, 233, 0.04)),
+        var(--secondary-color);
+}
+
+body[data-page-visual='diagram'] .page-header-graphic {
+    background:
+        linear-gradient(135deg, rgba(217, 119, 6, 0.17), rgba(251, 191, 36, 0.08) 42%, rgba(245, 158, 11, 0.04)),
+        var(--secondary-color);
+}
+
+body[data-page-visual='account'] .page-header-graphic {
+    background:
+        linear-gradient(135deg, rgba(71, 85, 105, 0.2), rgba(148, 163, 184, 0.1) 48%, rgba(203, 213, 225, 0.05)),
+        var(--secondary-color);
+}
+
+@media (max-width: 700px) {
+    .page-header-graphic {
+        padding: var(--space-3);
+    }
+}
