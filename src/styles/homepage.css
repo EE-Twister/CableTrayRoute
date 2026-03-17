@@ -160,6 +160,93 @@ body.dark-mode .hero-action-btn.secondary {
     }
 }
 
+
+
+.tool-graphics {
+    margin-top: 1.5rem;
+}
+
+.tool-graphics > p {
+    margin-top: 0;
+    margin-bottom: 1.25rem;
+    color: var(--text-muted);
+}
+
+.tool-graphics-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+    gap: 1rem;
+}
+
+.tool-graphic-card {
+    text-decoration: none;
+    color: var(--text-color);
+    border-radius: var(--radius-lg, 16px);
+    border: 1px solid var(--color-border);
+    background: var(--color-surface-strong);
+    padding: 1rem;
+    display: grid;
+    gap: 0.7rem;
+    transition: transform 0.2s ease, box-shadow 0.2s ease, border-color 0.2s ease;
+}
+
+.tool-graphic-card:hover {
+    transform: translateY(-3px);
+    border-color: var(--color-primary);
+    box-shadow: var(--elevation-md);
+}
+
+.tool-graphic-card img {
+    width: 100%;
+    height: 130px;
+    object-fit: cover;
+    border-radius: 12px;
+    border: 1px solid rgba(255, 255, 255, 0.22);
+}
+
+.tool-graphic-title {
+    font-weight: 700;
+    font-size: 1rem;
+}
+
+.tool-graphic-meta {
+    font-size: 0.88rem;
+    color: var(--text-muted);
+    line-height: 1.45;
+}
+
+.tool-graphic-card--schedules {
+    background: linear-gradient(165deg, color-mix(in srgb, var(--color-primary) 16%, #ffffff) 0%, var(--color-surface-strong) 72%);
+}
+
+.tool-graphic-card--fill {
+    background: linear-gradient(165deg, color-mix(in srgb, #0ea5e9 16%, #ffffff) 0%, var(--color-surface-strong) 72%);
+}
+
+.tool-graphic-card--routing {
+    background: linear-gradient(165deg, color-mix(in srgb, #2563eb 14%, #ffffff) 0%, var(--color-surface-strong) 72%);
+}
+
+.tool-graphic-card--studies {
+    background: linear-gradient(165deg, color-mix(in srgb, #7c3aed 16%, #ffffff) 0%, var(--color-surface-strong) 72%);
+}
+
+body.dark-mode .tool-graphic-card {
+    border-color: #3a3f46;
+    background: #1e2124;
+}
+
+body.dark-mode .tool-graphic-card img {
+    border-color: rgba(148, 163, 184, 0.35);
+}
+
+body.dark-mode .tool-graphic-card--schedules,
+body.dark-mode .tool-graphic-card--fill,
+body.dark-mode .tool-graphic-card--routing,
+body.dark-mode .tool-graphic-card--studies {
+    background: linear-gradient(170deg, rgba(37, 99, 235, 0.18) 0%, #1e2124 76%);
+}
+
 /* Homepage workflow */
 .workflow-grid {
     display: grid;
