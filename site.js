@@ -6,7 +6,7 @@ import { UndoRedoManager } from "./undoRedo.mjs";
 import "./src/components/navigation.js";
 import "./src/components/commandPalette.js";
 import "./units.js";
-import { exportProject, importProject, getOneLine, getStudies, loadProject, getDuctbanks, getConduits } from "./dataStore.mjs";
+import { exportProject, importProject, getOneLine, getStudies, loadProject, saveProject, getDuctbanks, getConduits } from "./dataStore.mjs";
 import { runValidation } from "./validation/rules.js";
 import {
   PROJECT_KEY,
@@ -148,6 +148,7 @@ async function initializeSampleProject(){
   const state=getProjectState();
   state.name=ONBOARDING_SAMPLE_PROJECT.name;
   setProjectState(state);
+  saveProject(ONBOARDING_SAMPLE_PROJECT.name);
   saveOnboardingSettings({sampleLoadedAt:new Date().toISOString()});
   await updateProjectDisplay();
 }
