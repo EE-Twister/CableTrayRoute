@@ -1,0 +1,374 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <meta name="description" content="International cable sizing tool supporting IEC 60364-5-52, BS 7671 (18th Edition), and AS/NZS 3008. Size cables by design current with ambient temperature and grouping derating." />
+  <title>International Cable Sizing — CableTrayRoute</title>
+  <link rel="icon" href="icons/favicon.svg" type="image/svg+xml">
+  <link rel="apple-touch-icon" href="icons/favicon.svg">
+  <!-- Open Graph / Social sharing -->
+  <meta property="og:type" content="website">
+  <meta property="og:title" content="International Cable Sizing — CableTrayRoute">
+  <meta property="og:description" content="Size cables per IEC 60364, BS 7671, and AS/NZS 3008 with ambient temperature and grouping derating.">
+  <meta property="og:image" content="icons/route.svg">
+  <meta property="og:site_name" content="CableTrayRoute">
+  <meta property="og:url" content="intlCableSize.html">
+  <!-- Canonical URL -->
+  <link rel="canonical" href="intlCableSize.html">
+  <link rel="dns-prefetch" href="https://fonts.gstatic.com">
+  <meta name="color-scheme" content="light dark">
+  <link rel="stylesheet" href="style.css" />
+  <script type="module" src="dirtyTracker.js"></script>
+  <script type="module" src="dist/intlCableSize.js" defer></script>
+</head>
+<body class="intlcablesize-page" data-report-title="International Cable Sizing">
+  <a href="#main-content" class="skip-link">Skip to main content</a>
+  <nav class="top-nav">
+    <button id="nav-toggle" class="nav-toggle" aria-label="Toggle navigation" aria-controls="nav-links" aria-expanded="false" title="Toggle navigation">
+      <img src="icons/toolbar/grid.svg" alt="" aria-hidden="true" class="control-icon" loading="lazy" decoding="async">
+    </button>
+    <div id="nav-links" class="nav-links">
+      <a href="index.html">Home</a>
+      <a href="equipmentlist.html">Equipment List</a>
+      <a href="loadlist.html">Load List</a>
+      <a href="cableschedule.html">Cable Schedule</a>
+      <a href="panelschedule.html">Panel Schedule</a>
+      <a href="racewayschedule.html">Raceway Schedule</a>
+      <a href="ductbankroute.html">Ductbank</a>
+      <a href="cabletrayfill.html">Tray Fill</a>
+      <a href="conduitfill.html">Conduit Fill</a>
+      <a href="supportspan.html">Support Span</a>
+      <a href="seismicBracing.html">Seismic Bracing</a>
+      <a href="optimalRoute.html">Optimal Route</a>
+      <a href="pullcards.html">Pull Cards</a>
+      <a href="intlCableSize.html" class="active" aria-current="page">Intl Cable Sizing</a>
+      <a href="oneline.html">One-Line</a>
+      <a href="tcc.html">TCC</a>
+      <a href="harmonics.html">Harmonics</a>
+      <a href="motorStart.html">Motor Start</a>
+      <a href="loadFlow.html">Load Flow</a>
+      <a href="shortCircuit.html">Short Circuit</a>
+      <a href="arcFlash.html">Arc Flash</a>
+      <a href="custom-components.html">Custom Components</a>
+      <a href="help.html">Help</a>
+      <a href="account.html">Account</a>
+    </div>
+    <button id="settings-btn" class="settings-btn" aria-label="Settings" aria-expanded="false" title="Settings">
+      <img src="icons/toolbar/validate.svg" alt="" aria-hidden="true" class="control-icon" loading="lazy" decoding="async">
+    </button>
+  </nav>
+
+  <div id="settings-menu" class="settings-menu">
+    <label for="theme-select">Theme
+      <select id="theme-select">
+        <option value="system">System</option>
+        <option value="light">Light</option>
+        <option value="dark">Dark</option>
+        <option value="high-contrast">High Contrast</option>
+      </select>
+    </label>
+    <label><input type="checkbox" id="compact-toggle" aria-label="Enable compact table mode"> Compact Mode</label>
+    <label for="unit-select">Units
+      <select id="unit-select">
+        <option value="imperial">Imperial</option>
+        <option value="metric">Metric</option>
+      </select>
+    </label>
+    <button id="help-btn" class="btn" aria-expanded="false" title="Show help">
+      <img src="icons/toolbar/validate.svg" alt="" aria-hidden="true" class="control-icon" loading="lazy" decoding="async">
+      <span>Site Help</span>
+    </button>
+    <button id="new-project-btn" title="Start a new project">
+      <img src="icons/toolbar/copy.svg" alt="" aria-hidden="true" class="control-icon" loading="lazy" decoding="async">
+      <span>New Project</span>
+    </button>
+    <button id="save-project-btn" title="Save current project">
+      <img src="icons/toolbar/export.svg" alt="" aria-hidden="true" class="control-icon" loading="lazy" decoding="async">
+      <span>Save Project</span>
+    </button>
+    <button id="load-project-btn" title="Load an existing project">
+      <img src="icons/toolbar/import.svg" alt="" aria-hidden="true" class="control-icon" loading="lazy" decoding="async">
+      <span>Load Project</span>
+    </button>
+    <button id="export-project-btn" title="Export project data">
+      <img src="icons/toolbar/export.svg" alt="" aria-hidden="true" class="control-icon" loading="lazy" decoding="async">
+      <span>Export Project</span>
+    </button>
+    <button id="import-project-btn" title="Import project data">
+      <img src="icons/toolbar/import.svg" alt="" aria-hidden="true" class="control-icon" loading="lazy" decoding="async">
+      <span>Import Project</span>
+    </button>
+    <input type="file" id="import-project-input" accept=".ctr.json" class="hidden" title="Select project file">
+  </div>
+
+  <div class="container">
+    <main id="main-content" class="main-content">
+      <nav aria-label="Breadcrumb">
+        <ol class="breadcrumb-trail">
+          <li><a href="index.html">Home</a></li>
+          <li>Studies</li>
+          <li aria-current="page">International Cable Sizing</li>
+        </ol>
+      </nav>
+
+      <header class="page-header">
+        <h1>International Cable Sizing Calculator</h1>
+      </header>
+
+      <details class="method-panel">
+        <summary>Method &amp; Assumptions</summary>
+        <p>Cable sizing determines the minimum conductor cross-section that carries
+        the design current (I<sub>b</sub>) without exceeding the conductor's rated
+        maximum temperature. The derated ampacity must satisfy:</p>
+        <pre>I<sub>b</sub> &le; I<sub>z</sub>&prime; = I<sub>z</sub> &times; C<sub>a</sub> &times; C<sub>g</sub></pre>
+        <p>Where:</p>
+        <ul>
+          <li><strong>I<sub>z</sub></strong> — tabulated base ampacity at reference conditions (A)</li>
+          <li><strong>C<sub>a</sub></strong> — ambient temperature correction factor</li>
+          <li><strong>C<sub>g</sub></strong> — grouping (bunching) derating factor</li>
+        </ul>
+
+        <p><strong>Supported standards:</strong></p>
+        <ul>
+          <li><strong>IEC 60364-5-52:2009</strong> — International, reference ambient 30 °C.
+            Ampacity tables from Annex B (Tables B.52.2–B.52.9). Temperature
+            correction from Table B.52.14. Grouping factors from Table B.52.17.</li>
+          <li><strong>BS 7671:2018 (18th Edition)</strong> — UK wiring regulations.
+            Base ampacity tables are identical to IEC 60364-5-52 Annex B
+            (Tables 4D1A–4E4A in Appendix 4). Reference ambient 30 °C.</li>
+          <li><strong>AS/NZS 3008.1.1:2017</strong> — Australia and New Zealand.
+            Independent ampacity tables at reference ambient 40 °C (Tables 7, 8).
+            Temperature correction from Table 27.</li>
+        </ul>
+
+        <p><strong>Installation methods:</strong></p>
+        <ul>
+          <li><strong>B2</strong> — Multicore cable in conduit on wall or surface trunking.
+            Grouping factor from enclosed-conduit table.</li>
+          <li><strong>C</strong> — Single layer multicore cable clipped direct to a
+            non-metallic surface (wall, structure).</li>
+          <li><strong>E</strong> — Multicore cable in free air on a ventilated cable tray.</li>
+          <li><strong>F</strong> — Single-core cables touching in trefoil in free air.</li>
+        </ul>
+
+        <p><strong>Aluminium conductors:</strong> available in 16 mm² and above only.
+        Values are from the published standard tables and are typically 75–82%
+        of equivalent copper ratings.</p>
+
+        <p><strong>Limitations:</strong> This tool covers the single-cable ampacity
+        check. Voltage drop, short-circuit withstand, and protection coordination
+        require separate analysis. Ground burial (Method D1/D2) and harmonic
+        derating are not included in this calculator. Values are representative —
+        always verify against the current edition of the applicable standard before
+        final design.</p>
+
+        <p>Citations:
+          <a href="docs/standards.html">IEC 60364-5-52, BS 7671:2018, AS/NZS 3008.1.1</a>
+        </p>
+        <p>See also:
+          <a href="cableschedule.html">Cable Schedule</a>,
+          <a href="cabletrayfill.html">Tray Fill</a>.
+        </p>
+      </details>
+
+      <!-- Standard and installation parameters -->
+      <fieldset>
+        <legend><strong>Standard &amp; Installation Method</strong></legend>
+
+        <div class="field-row">
+          <label for="standard">
+            Electrical Standard
+            <button class="helpBtn" data-doc="docs/standards.html"
+                    aria-label="Help — electrical standard selection">?</button>
+          </label>
+          <select id="standard" aria-describedby="standardHint">
+            <!-- Populated by JS -->
+          </select>
+          <p id="standardHint" class="field-hint">
+            Select the standard that governs cable sizing for your project jurisdiction.
+            IEC 60364 is the international baseline; BS 7671 applies in the UK;
+            AS/NZS 3008 applies in Australia and New Zealand.
+          </p>
+        </div>
+
+        <div class="field-row">
+          <label for="method">
+            Installation Method
+            <button class="helpBtn" data-doc="docs/standards.html#installation-methods"
+                    aria-label="Help — installation method">?</button>
+          </label>
+          <select id="method" aria-describedby="methodHint">
+            <!-- Populated by JS -->
+          </select>
+          <p id="methodHint" class="field-hint">
+            How the cable is installed affects heat dissipation and therefore
+            rated current. Method C (clipped) and E (free air) allow more
+            current than B2 (in conduit). Refer to the Method &amp; Assumptions
+            panel above for detailed definitions.
+          </p>
+        </div>
+
+        <div class="field-row">
+          <label for="phases">Configuration (loaded conductors)</label>
+          <select id="phases" aria-describedby="phasesHint">
+            <option value="3">Three-phase (3 loaded conductors)</option>
+            <option value="2">Single-phase (2 loaded conductors)</option>
+          </select>
+          <p id="phasesHint" class="field-hint">
+            Three-phase circuits carry 3 current-carrying conductors; single-phase
+            circuits carry 2. Balanced three-phase neutral currents are zero and
+            are not counted.
+          </p>
+        </div>
+      </fieldset>
+
+      <!-- Conductor parameters -->
+      <fieldset>
+        <legend><strong>Conductor Parameters</strong></legend>
+
+        <div class="field-row">
+          <label for="material">Conductor Material</label>
+          <select id="material" aria-describedby="materialHint">
+            <option value="Cu">Copper (Cu)</option>
+            <option value="Al">Aluminium (Al)</option>
+          </select>
+          <p id="materialHint" class="field-hint">
+            Aluminium conductors are approximately 78–82% of the equivalent copper
+            rating. Aluminium is only available from 16 mm² upwards.
+          </p>
+        </div>
+
+        <div class="field-row">
+          <label for="insulation">Insulation Type</label>
+          <select id="insulation" aria-describedby="insulationHint">
+            <option value="XLPE">XLPE / EPR — 90 °C thermosetting</option>
+            <option value="PVC">PVC — 70 °C thermoplastic</option>
+          </select>
+          <p id="insulationHint" class="field-hint">
+            90 °C thermosetting insulation (XLPE or EPR) allows higher continuous
+            current than 70 °C thermoplastic (PVC) for the same conductor size.
+          </p>
+        </div>
+      </fieldset>
+
+      <!-- Design conditions -->
+      <fieldset>
+        <legend><strong>Design Conditions</strong></legend>
+
+        <div class="field-row">
+          <label for="loadAmps">
+            Design Current — I<sub>b</sub> (A)
+            <button class="helpBtn" data-doc="docs/standards.html#design-current"
+                    aria-label="Help — design current">?</button>
+          </label>
+          <input type="number" id="loadAmps" min="0.1" step="0.1"
+                 aria-describedby="loadAmpsHint" aria-required="true"
+                 placeholder="e.g. 125">
+          <p id="loadAmpsHint" class="field-hint">
+            The maximum continuous operating current the cable must carry.
+            For motors, use the full-load current. For feeders, use the
+            maximum demand current.
+          </p>
+        </div>
+
+        <div class="field-row">
+          <label for="ambientTemp">
+            Ambient Temperature (°C)
+            <button class="helpBtn" data-doc="docs/standards.html#temperature-correction"
+                    aria-label="Help — ambient temperature derating">?</button>
+          </label>
+          <input type="number" id="ambientTemp" min="-20" max="90" step="1"
+                 aria-describedby="ambientTempHint">
+          <p id="ambientTempHint" class="field-hint">
+            <span id="refAmbientHint"></span>
+            Higher ambient temperatures reduce the allowable cable current.
+            Leave blank to use the standard reference temperature.
+          </p>
+        </div>
+
+        <div class="field-row">
+          <label for="numGroups">
+            Number of Grouped Circuits
+            <button class="helpBtn" data-doc="docs/standards.html#grouping-derating"
+                    aria-label="Help — grouping derating">?</button>
+          </label>
+          <input type="number" id="numGroups" min="1" max="50" step="1"
+                 value="1" aria-describedby="numGroupsHint">
+          <p id="numGroupsHint" class="field-hint">
+            Number of cables or circuits bundled together in the same conduit,
+            tray, or trunking. Each additional circuit reduces the allowable
+            current due to mutual heating. Enter 1 for a single isolated cable.
+          </p>
+        </div>
+      </fieldset>
+
+      <!-- Sizing mode -->
+      <fieldset>
+        <legend><strong>Calculation Mode</strong></legend>
+        <label>
+          <input type="radio" name="sizingModeRadio" id="sizingModeSize" value="size" checked
+                 onchange="document.getElementById('sizingMode').value='size';document.getElementById('sizingMode').dispatchEvent(new Event('change'))">
+          Size cable — find minimum adequate conductor cross-section
+        </label>
+        <label>
+          <input type="radio" name="sizingModeRadio" id="sizingModeCheck" value="check"
+                 onchange="document.getElementById('sizingMode').value='check';document.getElementById('sizingMode').dispatchEvent(new Event('change'))">
+          Check adequacy — verify a specific cable size
+        </label>
+        <!-- Hidden select used by JS for mode state; radios drive it -->
+        <select id="sizingMode" class="hidden" aria-hidden="true">
+          <option value="size">size</option>
+          <option value="check">check</option>
+        </select>
+
+        <div id="checkSizeRow" class="field-row" hidden>
+          <label for="checkSize">Cable Size to Check (mm²)</label>
+          <select id="checkSize" aria-describedby="checkSizeHint">
+            <!-- Populated by JS -->
+          </select>
+          <p id="checkSizeHint" class="field-hint">
+            Select the specific conductor cross-section you want to verify.
+          </p>
+        </div>
+      </fieldset>
+
+      <div id="controls">
+        <button id="calcBtn" type="button">Size Cable</button>
+      </div>
+
+      <div id="results" role="region" aria-live="polite" aria-label="Cable sizing results"></div>
+
+      <nav class="step-nav" aria-label="Workflow navigation">
+        <a href="pullcards.html" class="step-nav-prev">&#8592; Pull Cards</a>
+        <a href="oneline.html" class="step-nav-next">One-Line &#8594;</a>
+      </nav>
+    </main>
+  </div>
+
+  <div id="help-modal" class="modal" aria-hidden="true" role="dialog" aria-modal="true"
+       aria-labelledby="help-title">
+    <div class="modal-content">
+      <button id="close-help-btn" class="close-btn" aria-label="Close Help">&times;</button>
+      <h2 id="help-title">International Cable Sizing Help</h2>
+      <p>This tool sizes low-voltage power cables per three international standards:
+      IEC 60364-5-52, BS 7671 (UK), and AS/NZS 3008 (Australia/New Zealand).</p>
+      <p><strong>To size a cable:</strong> select the standard, installation method,
+      conductor type, and enter the design current. Optionally enter the ambient
+      temperature and number of grouped circuits to apply derating. Click
+      <em>Size Cable</em> to find the minimum adequate cross-section.</p>
+      <p><strong>To check an existing size:</strong> switch to <em>Check Adequacy</em>
+      mode, select the conductor size, and verify it meets your design current
+      under the specified conditions.</p>
+      <p>The derated ampacity I<sub>z</sub>&prime; = I<sub>z</sub> × C<sub>a</sub>
+      × C<sub>g</sub> must equal or exceed the design current I<sub>b</sub>.</p>
+      <p>See also: <a href="cableschedule.html">Cable Schedule</a>,
+      <a href="cabletrayfill.html">Tray Fill</a>,
+      <a href="supportspan.html">Support Span</a>.</p>
+      <p><button class="helpBtn" data-doc="docs/standards.html">Standards Reference</button></p>
+    </div>
+  </div>
+
+  <script type="module" src="dist/projectManager.js"></script>
+</body>
+</html>
