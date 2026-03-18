@@ -204,3 +204,52 @@ body[data-page-visual='account'] .page-header-graphic {
         padding: var(--space-3);
     }
 }
+
+.page-visual-showcase {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) auto;
+    gap: var(--space-4);
+    align-items: center;
+}
+
+.page-visual-copy {
+    display: grid;
+    gap: var(--space-2);
+}
+
+.page-visual-kicker {
+    margin: 0;
+    font-size: 0.78rem;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    font-weight: 700;
+    color: color-mix(in srgb, var(--text-color) 66%, var(--primary-color));
+}
+
+.page-visual-copy h2 {
+    margin: 0;
+    font-size: 1.25rem;
+}
+
+.page-visual-copy p {
+    margin: 0;
+    color: color-mix(in srgb, var(--text-color) 75%, transparent);
+    max-width: 54ch;
+}
+
+.page-visual-showcase img {
+    width: clamp(160px, 25vw, 260px);
+    max-width: 100%;
+    height: auto;
+    filter: drop-shadow(0 10px 20px rgba(15, 23, 42, 0.18));
+}
+
+@media (max-width: 760px) {
+    .page-visual-showcase {
+        grid-template-columns: 1fr;
+    }
+
+    .page-visual-showcase img {
+        justify-self: center;
+    }
+}
