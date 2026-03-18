@@ -20,9 +20,15 @@ async function signup(e) {
   const form = e.currentTarget;
   const username = document.getElementById('signup-user').value.trim();
   const password = document.getElementById('signup-pass').value;
+  const confirm = document.getElementById('signup-pass-confirm').value;
 
   if (password.length < MIN_PASSWORD_LENGTH) {
     showStatus(form, `Password must be at least ${MIN_PASSWORD_LENGTH} characters.`, true);
+    return;
+  }
+
+  if (password !== confirm) {
+    showStatus(form, 'Passwords do not match.', true);
     return;
   }
 

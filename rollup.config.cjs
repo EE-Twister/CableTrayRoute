@@ -27,6 +27,7 @@ const entries = {
   scenarios: 'src/scenarios.js',
   supportspan: 'src/supportspan.js',
   pullcards: 'src/pullcards.js',
+  seismicBracing: 'src/seismicBracing.js',
   '404': 'src/404.js'
 };
 

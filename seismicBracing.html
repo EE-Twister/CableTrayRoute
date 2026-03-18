@@ -1,0 +1,318 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <meta name="description" content="Cable tray seismic bracing calculator per ASCE 7-22 Chapter 13 and IBC 2021. Determine lateral and longitudinal brace forces and maximum brace spacing." />
+  <title>Seismic Bracing — CableTrayRoute</title>
+  <link rel="icon" href="icons/favicon.svg" type="image/svg+xml">
+  <link rel="apple-touch-icon" href="icons/favicon.svg">
+  <!-- Open Graph / Social sharing -->
+  <meta property="og:type" content="website">
+  <meta property="og:title" content="Seismic Bracing Calculator — CableTrayRoute">
+  <meta property="og:description" content="Calculate cable tray seismic brace forces and spacing per ASCE 7-22 and IBC 2021.">
+  <meta property="og:image" content="icons/route.svg">
+  <meta property="og:site_name" content="CableTrayRoute">
+  <meta property="og:url" content="seismicBracing.html">
+  <!-- Canonical URL -->
+  <link rel="canonical" href="seismicBracing.html">
+  <link rel="dns-prefetch" href="https://fonts.gstatic.com">
+  <meta name="color-scheme" content="light dark">
+  <link rel="stylesheet" href="style.css" />
+  <script type="module" src="dirtyTracker.js"></script>
+  <script type="module" src="dist/seismicBracing.js" defer></script>
+</head>
+<body class="seismicbracing-page" data-report-title="Seismic Bracing">
+  <a href="#main-content" class="skip-link">Skip to main content</a>
+  <nav class="top-nav">
+    <button id="nav-toggle" class="nav-toggle" aria-label="Toggle navigation" aria-controls="nav-links" aria-expanded="false" title="Toggle navigation">
+      <img src="icons/toolbar/grid.svg" alt="" aria-hidden="true" class="control-icon" loading="lazy" decoding="async">
+    </button>
+    <div id="nav-links" class="nav-links">
+      <a href="index.html">Home</a>
+      <a href="equipmentlist.html">Equipment List</a>
+      <a href="loadlist.html">Load List</a>
+      <a href="cableschedule.html">Cable Schedule</a>
+      <a href="panelschedule.html">Panel Schedule</a>
+      <a href="racewayschedule.html">Raceway Schedule</a>
+      <a href="ductbankroute.html">Ductbank</a>
+      <a href="cabletrayfill.html">Tray Fill</a>
+      <a href="conduitfill.html">Conduit Fill</a>
+      <a href="supportspan.html">Support Span</a>
+      <a href="seismicBracing.html" class="active" aria-current="page">Seismic Bracing</a>
+      <a href="optimalRoute.html">Optimal Route</a>
+      <a href="pullcards.html">Pull Cards</a>
+      <a href="oneline.html">One-Line</a>
+      <a href="tcc.html">TCC</a>
+      <a href="harmonics.html">Harmonics</a>
+      <a href="motorStart.html">Motor Start</a>
+      <a href="loadFlow.html">Load Flow</a>
+      <a href="shortCircuit.html">Short Circuit</a>
+      <a href="arcFlash.html">Arc Flash</a>
+      <a href="custom-components.html">Custom Components</a>
+      <a href="help.html">Help</a>
+      <a href="account.html">Account</a>
+    </div>
+    <button id="settings-btn" class="settings-btn" aria-label="Settings" aria-expanded="false" title="Settings">
+      <img src="icons/toolbar/validate.svg" alt="" aria-hidden="true" class="control-icon" loading="lazy" decoding="async">
+    </button>
+  </nav>
+
+  <div id="settings-menu" class="settings-menu">
+    <label for="theme-select">Theme
+      <select id="theme-select">
+        <option value="system">System</option>
+        <option value="light">Light</option>
+        <option value="dark">Dark</option>
+        <option value="high-contrast">High Contrast</option>
+      </select>
+    </label>
+    <label><input type="checkbox" id="compact-toggle" aria-label="Enable compact table mode"> Compact Mode</label>
+    <label for="unit-select">Units
+      <select id="unit-select">
+        <option value="imperial">Imperial</option>
+        <option value="metric">Metric</option>
+      </select>
+    </label>
+    <button id="help-btn" class="btn" aria-expanded="false" title="Show help">
+      <img src="icons/toolbar/validate.svg" alt="" aria-hidden="true" class="control-icon" loading="lazy" decoding="async">
+      <span>Site Help</span>
+    </button>
+    <button id="new-project-btn" title="Start a new project">
+      <img src="icons/toolbar/copy.svg" alt="" aria-hidden="true" class="control-icon" loading="lazy" decoding="async">
+      <span>New Project</span>
+    </button>
+    <button id="save-project-btn" title="Save current project">
+      <img src="icons/toolbar/export.svg" alt="" aria-hidden="true" class="control-icon" loading="lazy" decoding="async">
+      <span>Save Project</span>
+    </button>
+    <button id="load-project-btn" title="Load an existing project">
+      <img src="icons/toolbar/import.svg" alt="" aria-hidden="true" class="control-icon" loading="lazy" decoding="async">
+      <span>Load Project</span>
+    </button>
+    <button id="export-project-btn" title="Export project data">
+      <img src="icons/toolbar/export.svg" alt="" aria-hidden="true" class="control-icon" loading="lazy" decoding="async">
+      <span>Export Project</span>
+    </button>
+    <button id="import-project-btn" title="Import project data">
+      <img src="icons/toolbar/import.svg" alt="" aria-hidden="true" class="control-icon" loading="lazy" decoding="async">
+      <span>Import Project</span>
+    </button>
+    <input type="file" id="import-project-input" accept=".ctr.json" class="hidden" title="Select project file">
+  </div>
+
+  <div class="container">
+    <main id="main-content" class="main-content">
+      <nav aria-label="Breadcrumb">
+        <ol class="breadcrumb-trail">
+          <li><a href="index.html">Home</a></li>
+          <li>Workflow</li>
+          <li aria-current="page">Seismic Bracing</li>
+        </ol>
+      </nav>
+
+      <header class="page-header">
+        <h1>Cable Tray Seismic Bracing Calculator</h1>
+      </header>
+
+      <details class="method-panel">
+        <summary>Method &amp; Assumptions</summary>
+        <p>Seismic brace forces are computed per <strong>ASCE 7-22 §13.3.1</strong>
+        (Nonstructural Component Seismic Force) and brace spacing limits from
+        <strong>ASCE 7-22 §13.5.6</strong> (Cable Tray and Conduit Installation).</p>
+
+        <p>Design seismic force:</p>
+        <pre>Fp = (0.4 × ap × SDS × Wp) / (Rp / Ip) × (1 + 2z/h)</pre>
+        <p>Subject to:</p>
+        <pre>Fp_min = 0.3 × SDS × Ip × Wp
+Fp_max = 1.6 × SDS × Ip × Wp</pre>
+        <p>Cable tray component factors from ASCE 7-22 Table 13.6-1:</p>
+        <ul>
+          <li><strong>ap = 1.0</strong> — component amplification factor</li>
+          <li><strong>Rp = 2.5</strong> — component response modification factor</li>
+        </ul>
+        <p>Brace force components:</p>
+        <ul>
+          <li><strong>Lateral</strong> (transverse): <code>Fp × Wp</code></li>
+          <li><strong>Longitudinal</strong>: <code>0.4 × Fp × Wp</code> (ASCE 7 §13.5.6.1)</li>
+          <li><strong>Vertical</strong>: <code>±0.2 × SDS × Ip × Wp</code></li>
+        </ul>
+        <p>Maximum brace spacing (SDC C–F): lateral ≤ 12 ft, longitudinal ≤ 40 ft.
+        No bracing required for SDC A and B.</p>
+        <p>Citations:
+          <a href="docs/standards.html">ASCE 7-22 §13.3.1 and §13.5.6</a>,
+          IBC 2021 §1613, NEMA VE 2-2006.
+        </p>
+        <p>See also:
+          <a href="supportspan.html">Support Span Calculator</a>,
+          <a href="racewayschedule.html">Raceway Schedule</a>.
+        </p>
+      </details>
+
+      <!-- Site seismic parameters -->
+      <fieldset>
+        <legend><strong>Site Seismic Parameters</strong></legend>
+
+        <div class="field-row">
+          <label for="sds">
+            S<sub>DS</sub> — Design spectral acceleration, short period (g)
+            <button class="helpBtn" data-doc="docs/standards.html#seismic-parameters"
+                    aria-label="Help — SDS parameter">?</button>
+          </label>
+          <input type="number" id="sds" min="0" max="4" step="0.001"
+                 value="0.500" aria-describedby="sdsHint" aria-required="true">
+          <p id="sdsHint" class="field-hint">
+            Obtain from ASCE 7 ground motion maps or USGS Seismic Design Maps tool
+            (mapped value S<sub>S</sub> × F<sub>a</sub>). Typical range: 0.1–2.5 g.
+          </p>
+        </div>
+
+        <div class="field-row">
+          <label for="sd1">
+            S<sub>D1</sub> — Design spectral acceleration, 1-second period (g)
+            <button class="helpBtn" data-doc="docs/standards.html#seismic-parameters"
+                    aria-label="Help — SD1 parameter">?</button>
+          </label>
+          <input type="number" id="sd1" min="0" max="4" step="0.001"
+                 value="0.200" aria-describedby="sd1Hint" aria-required="true">
+          <p id="sd1Hint" class="field-hint">
+            Mapped value S<sub>1</sub> × F<sub>v</sub>. Used to determine the
+            Seismic Design Category.
+          </p>
+        </div>
+
+        <div class="field-row">
+          <label for="riskCategory">Risk Category (Occupancy Category)</label>
+          <select id="riskCategory" aria-describedby="riskCategoryHint">
+            <option value="I">I — Low hazard to human life</option>
+            <option value="II" selected>II — Ordinary (most buildings)</option>
+            <option value="III">III — Substantial hazard (schools, hospitals &lt;50 beds)</option>
+            <option value="IV">IV — Essential facilities (hospitals, emergency services)</option>
+          </select>
+          <p id="riskCategoryHint" class="field-hint">
+            Per IBC 2021 Table 1604.5. Affects the Importance Factor (Ip) and SDC
+            thresholds.
+          </p>
+        </div>
+
+        <div class="field-row">
+          <label for="ip">
+            I<sub>p</sub> — Component Importance Factor
+          </label>
+          <select id="ip" aria-describedby="ipHint">
+            <option value="1.0" selected>1.0 — Standard (non-life-safety)</option>
+            <option value="1.5">1.5 — Life-safety or essential-facility component</option>
+          </select>
+          <p id="ipHint" class="field-hint">
+            Use 1.5 for components required for continued operation of Risk Category IV
+            facilities, or when component failure could pose a life-safety hazard
+            (ASCE 7-22 §13.1.3).
+          </p>
+        </div>
+      </fieldset>
+
+      <!-- Installation parameters -->
+      <fieldset>
+        <legend><strong>Installation Parameters</strong></legend>
+
+        <div class="field-row">
+          <label for="trayHeight">
+            z — Tray attachment height above base (ft)
+            <button class="helpBtn" data-doc="docs/standards.html#seismic-height"
+                    aria-label="Help — attachment height">?</button>
+          </label>
+          <input type="number" id="trayHeight" min="0" step="0.5"
+                 value="12" aria-describedby="trayHeightHint" aria-required="true">
+          <p id="trayHeightHint" class="field-hint">
+            Height of the tray support attachment to the structure above the building
+            base (grade for ground-floor, top of foundation for elevated structures).
+          </p>
+        </div>
+
+        <div class="field-row">
+          <label for="buildingHeight">
+            h — Average roof height above base (ft)
+            <button class="helpBtn" data-doc="docs/standards.html#seismic-height"
+                    aria-label="Help — building height">?</button>
+          </label>
+          <input type="number" id="buildingHeight" min="1" step="0.5"
+                 value="30" aria-describedby="buildingHeightHint" aria-required="true">
+          <p id="buildingHeightHint" class="field-hint">
+            Average height of the roof or highest supported floor above the building
+            base. Must be ≥ tray attachment height.
+          </p>
+        </div>
+
+        <div class="field-row">
+          <label for="wpPerFt">
+            W<sub>p</sub> — Tray + cable operating weight per linear foot (lbs/ft)
+            <button class="helpBtn" data-doc="docs/standards.html#cable-weights"
+                    aria-label="Help — component weight">?</button>
+          </label>
+          <input type="number" id="wpPerFt" min="0.1" step="0.1"
+                 value="10.0" aria-describedby="wpPerFtHint" aria-required="true">
+          <p id="wpPerFtHint" class="field-hint">
+            Sum of tray self-weight and total cable weight per foot of tray.
+            Use the <a href="supportspan.html">Support Span Calculator</a> to
+            determine cable weight per foot from the cable schedule.
+            Typical empty ladder tray: 2–6 lbs/ft. Full tray: 10–30 lbs/ft.
+          </p>
+        </div>
+      </fieldset>
+
+      <!-- Mode toggle -->
+      <fieldset>
+        <legend><strong>Evaluation Mode</strong></legend>
+        <label>
+          <input type="radio" name="evalMode" id="modeSingle" value="single" checked>
+          Single tray — enter weight directly above
+        </label>
+        <label>
+          <input type="radio" name="evalMode" id="modeSchedule" value="schedule">
+          From Project — evaluate all trays in the Raceway Schedule
+        </label>
+      </fieldset>
+
+      <div id="controls">
+        <button id="calcBtn" type="button">Calculate Brace Forces</button>
+      </div>
+
+      <div id="results" role="region" aria-live="polite" aria-label="Seismic bracing results"></div>
+
+      <!-- Schedule mode section -->
+      <section id="scheduleSection" hidden aria-label="Schedule evaluation">
+        <p>This mode reads trays from the Raceway Schedule and combines their
+        cable weights with tray self-weight to evaluate every tray section.</p>
+        <button type="button" id="loadScheduleBtn">Evaluate Trays from Schedule</button>
+        <div id="scheduleResults" role="region" aria-live="polite"
+             aria-label="Schedule seismic evaluation results"></div>
+      </section>
+
+      <nav class="step-nav" aria-label="Workflow navigation">
+        <a href="supportspan.html" class="step-nav-prev">&#8592; Support Span</a>
+        <a href="optimalRoute.html" class="step-nav-next">Optimal Route &#8594;</a>
+      </nav>
+    </main>
+  </div>
+
+  <div id="help-modal" class="modal" aria-hidden="true" role="dialog" aria-modal="true"
+       aria-labelledby="help-title">
+    <div class="modal-content">
+      <button id="close-help-btn" class="close-btn" aria-label="Close Help">&times;</button>
+      <h2 id="help-title">Seismic Bracing Help</h2>
+      <p>This tool calculates cable tray seismic brace forces and maximum brace
+      spacing per ASCE 7-22 §13.3.1 and §13.5.6.</p>
+      <p><strong>Single tray mode:</strong> enter site parameters and tray weight,
+      then click <em>Calculate Brace Forces</em>.</p>
+      <p><strong>Schedule mode:</strong> reads trays and cables from the current
+      project and evaluates every tray section using the same site parameters.</p>
+      <p>Get S<sub>DS</sub> and S<sub>D1</sub> values from the
+      <a href="https://seismicmaps.org" target="_blank" rel="noopener">USGS Seismic Design Maps</a>
+      tool for your project location.</p>
+      <p><button class="helpBtn" data-doc="docs/standards.html">Standards Reference</button></p>
+    </div>
+  </div>
+
+  <script type="module" src="dist/projectManager.js"></script>
+</body>
+</html>
