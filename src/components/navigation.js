@@ -12,6 +12,7 @@ const NAV_ROUTES = [
   { href: 'seismicBracing.html', label: 'Seismic Bracing', section: 'Workflow', icon: 'icons/toolbar/validate.svg' },
   { href: 'optimalRoute.html', label: 'Optimal Route', section: 'Workflow', icon: 'icons/route.svg' },
   { href: 'pullcards.html', label: 'Pull Cards', section: 'Workflow', icon: 'icons/toolbar/copy.svg' },
+  { href: 'intlCableSize.html', label: 'Intl Cable Sizing', section: 'Studies', icon: 'icons/cable.svg' },
   { href: 'oneline.html', label: 'One-Line', section: 'Workflow', icon: 'icons/oneline.svg' },
   { href: 'tcc.html', label: 'TCC', section: 'Studies', icon: 'icons/toolbar/validate.svg' },
   { href: 'harmonics.html', label: 'Harmonics', section: 'Studies', icon: 'icons/toolbar/grid-size.svg' },
