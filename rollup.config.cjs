@@ -26,6 +26,7 @@ const entries = {
   projectManager: 'src/projectManager.js',
   scenarios: 'src/scenarios.js',
   supportspan: 'src/supportspan.js',
+  trayhardware: 'src/trayhardware.js',
   pullcards: 'src/pullcards.js',
   '404': 'src/404.js'
 };

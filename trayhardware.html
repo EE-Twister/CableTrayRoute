@@ -1,0 +1,274 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <meta name="description" content="Tray Hardware BOM and Take-Off generator. Automatically detects fittings (elbows, tees, crosses, reducers) and calculates support bracket quantities from tray geometry per NEMA VE 1." />
+  <title>Tray Hardware BOM — CableTrayRoute</title>
+  <link rel="icon" href="icons/favicon.svg" type="image/svg+xml">
+  <link rel="apple-touch-icon" href="icons/favicon.svg">
+  <meta property="og:type" content="website">
+  <meta property="og:title" content="Tray Hardware BOM — CableTrayRoute">
+  <meta property="og:description" content="Generate a complete tray hardware bill of materials including fittings, straight sections, covers, and support brackets from raceway geometry.">
+  <meta property="og:image" content="icons/route.svg">
+  <meta property="og:site_name" content="CableTrayRoute">
+  <meta property="og:url" content="trayhardware.html">
+  <link rel="canonical" href="trayhardware.html">
+  <link rel="dns-prefetch" href="https://fonts.gstatic.com">
+  <meta name="color-scheme" content="light dark">
+  <link rel="stylesheet" href="style.css" />
+  <script type="module" src="dirtyTracker.js"></script>
+  <script type="module" src="dist/trayhardware.js" defer></script>
+</head>
+<body class="trayhardware-page" data-report-title="Tray Hardware BOM">
+  <a href="#main-content" class="skip-link">Skip to main content</a>
+  <nav class="top-nav">
+    <button id="nav-toggle" class="nav-toggle" aria-label="Toggle navigation" aria-controls="nav-links" aria-expanded="false" title="Toggle navigation">
+      <img src="icons/toolbar/grid.svg" alt="" aria-hidden="true" class="control-icon" loading="lazy" decoding="async">
+    </button>
+    <div id="nav-links" class="nav-links">
+      <a href="index.html">Home</a>
+      <a href="equipmentlist.html">Equipment List</a>
+      <a href="loadlist.html">Load List</a>
+      <a href="cableschedule.html">Cable Schedule</a>
+      <a href="panelschedule.html">Panel Schedule</a>
+      <a href="racewayschedule.html">Raceway Schedule</a>
+      <a href="ductbankroute.html">Ductbank</a>
+      <a href="cabletrayfill.html">Tray Fill</a>
+      <a href="conduitfill.html">Conduit Fill</a>
+      <a href="supportspan.html">Support Span</a>
+      <a href="trayhardware.html" class="active" aria-current="page">Tray Hardware BOM</a>
+      <a href="optimalRoute.html">Optimal Route</a>
+      <a href="pullcards.html">Pull Cards</a>
+      <a href="oneline.html">One-Line</a>
+    </div>
+    <button id="settings-btn" class="settings-btn" aria-label="Settings" aria-expanded="false" title="Settings">⚙</button>
+  </nav>
+
+  <div id="settings-menu" class="settings-menu">
+    <label for="theme-select">Theme
+      <select id="theme-select">
+        <option value="system">System</option>
+        <option value="light">Light</option>
+        <option value="dark">Dark</option>
+        <option value="high-contrast">High Contrast</option>
+      </select>
+    </label>
+    <label><input type="checkbox" id="compact-toggle" aria-label="Enable compact table mode"> Compact Mode</label>
+    <label for="unit-select">Units
+      <select id="unit-select">
+        <option value="imperial">Imperial</option>
+        <option value="metric">Metric</option>
+      </select>
+    </label>
+    <button id="help-btn" class="btn" aria-expanded="false" title="Show help">Site Help</button>
+    <button id="new-project-btn">New Project</button>
+    <button id="save-project-btn">Save Project</button>
+    <button id="load-project-btn">Load Project</button>
+    <button id="export-project-btn">Export Project</button>
+    <button id="import-project-btn">Import Project</button>
+    <input type="file" id="import-project-input" accept=".ctr.json" class="hidden" title="Select project file">
+  </div>
+
+  <div class="container">
+    <main id="main-content" class="main-content">
+      <nav aria-label="Breadcrumb">
+        <ol class="breadcrumb-trail">
+          <li><a href="index.html">Home</a></li>
+          <li>Workflow</li>
+          <li aria-current="page">Tray Hardware BOM</li>
+        </ol>
+      </nav>
+
+      <header class="page-header">
+        <h1>Tray Hardware BOM &amp; Take-Off</h1>
+      </header>
+
+      <details class="method-panel">
+        <summary>Method &amp; Assumptions</summary>
+        <p>Tray geometry is analyzed to detect <strong>junctions</strong> between
+        adjacent tray segments. Each junction is classified as an
+        <em>elbow</em>, <em>tee</em>, <em>cross</em>, <em>reducer</em>, or
+        <em>splice plate</em> based on the number of trays meeting and the
+        angle between them.</p>
+        <ul>
+          <li><strong>Splice plate</strong> — two collinear trays of equal width (bend ≤ 10°)</li>
+          <li><strong>Reducer</strong> — two collinear trays of different widths</li>
+          <li><strong>Elbow</strong> — two trays at an angle (&gt; 10°)</li>
+          <li><strong>Tee</strong> — three trays meeting at a point</li>
+          <li><strong>Cross</strong> — four trays meeting at a point</li>
+        </ul>
+        <p><strong>Straight sections</strong> are counted using a
+        standard section length (default 12 ft per NEMA VE 2 §3.4).
+        <strong>Support brackets</strong> are calculated so that no span
+        between supports exceeds the NEMA VE 1 maximum for the selected
+        load class, per the L/100 deflection criterion.</p>
+        <p>References: NEMA VE 1-2017 §4 (Load Classification),
+        NEMA VE 2 (Installation Guidelines).</p>
+        <p>See also:
+          <a href="supportspan.html">Support Span Calculator</a>,
+          <a href="racewayschedule.html">Raceway Schedule</a>,
+          <a href="optimalRoute.html">Optimal Route</a>.
+        </p>
+      </details>
+
+      <!-- Options -->
+      <fieldset>
+        <legend><strong>BOM Options</strong></legend>
+        <div class="form-row">
+          <label for="loadClassSel">NEMA Load Class
+            <select id="loadClassSel"></select>
+          </label>
+          <label for="sectionLenInput">Standard Section Length (ft)
+            <input type="number" id="sectionLenInput" min="1" max="40" step="1" value="12"
+                   aria-describedby="sectionLenHint">
+          </label>
+          <label>
+            <input type="checkbox" id="includeCoversCb" checked>
+            Include Cover Sections
+          </label>
+        </div>
+        <p id="sectionLenHint" class="field-hint">
+          Standard straight sections ship in 10 ft or 12 ft lengths. Use 12 ft for most
+          steel/aluminum ladder tray; 10 ft for wire-mesh or fiberglass.
+        </p>
+      </fieldset>
+
+      <!-- Data source -->
+      <fieldset>
+        <legend><strong>Tray Data Source</strong></legend>
+        <p class="field-hint">Load tray geometry from the current project (requires a
+        Raceway Schedule saved in this session) or import a raceway XLSX file exported
+        from the Raceway Schedule page.</p>
+        <div class="btn-row">
+          <button type="button" id="loadProjectBtn">Load from Project</button>
+          <button type="button" id="importXlsxBtn">Import Raceway XLSX</button>
+          <input type="file" id="xlsxFileInput" accept=".xlsx,.xls" class="hidden" title="Select raceway file">
+        </div>
+      </fieldset>
+
+      <!-- Summary stats -->
+      <section id="summarySection" hidden aria-label="BOM summary">
+        <h2>Summary</h2>
+        <div id="summaryCards" class="summary-cards" role="status" aria-live="polite"></div>
+        <div class="btn-row" id="exportRow">
+          <button type="button" id="exportBomBtn">Export BOM (XLSX)</button>
+          <button type="button" id="exportCsvBtn">Export BOM (CSV)</button>
+        </div>
+      </section>
+
+      <!-- Procurement summary table -->
+      <section id="procurementSection" hidden aria-label="Procurement summary">
+        <h2>Procurement Summary</h2>
+        <p class="field-hint">Aggregated quantities grouped by item type and tray width
+        for placing orders. Adjust quantities as needed before exporting.</p>
+        <table id="procurementTable" class="result-table" aria-label="Procurement BOM">
+          <caption class="visually-hidden">Tray hardware procurement summary</caption>
+          <thead>
+            <tr>
+              <th scope="col">Category</th>
+              <th scope="col">Item</th>
+              <th scope="col">Width (in)</th>
+              <th scope="col">Qty</th>
+              <th scope="col">Unit</th>
+            </tr>
+          </thead>
+          <tbody></tbody>
+        </table>
+      </section>
+
+      <!-- Fittings detail table -->
+      <section id="fittingsSection" hidden aria-label="Fittings detail">
+        <h2>Fittings Detail</h2>
+        <p class="field-hint">Individual fitting instances detected from tray geometry.</p>
+        <table id="fittingsTable" class="result-table" aria-label="Fittings detail">
+          <caption class="visually-hidden">Detected tray fittings</caption>
+          <thead>
+            <tr>
+              <th scope="col">Type</th>
+              <th scope="col">Angle (°)</th>
+              <th scope="col">Tray IDs</th>
+              <th scope="col">Widths (in)</th>
+            </tr>
+          </thead>
+          <tbody></tbody>
+        </table>
+      </section>
+
+      <!-- Straight sections detail table -->
+      <section id="sectionsSection" hidden aria-label="Sections detail">
+        <h2>Straight Sections &amp; Covers</h2>
+        <table id="sectionsTable" class="result-table" aria-label="Straight sections">
+          <caption class="visually-hidden">Straight sections and covers per tray</caption>
+          <thead>
+            <tr>
+              <th scope="col">Tray ID</th>
+              <th scope="col">Type</th>
+              <th scope="col">Width (in)</th>
+              <th scope="col">Length (ft)</th>
+              <th scope="col">Straight Sections</th>
+              <th scope="col">Cover Sections</th>
+            </tr>
+          </thead>
+          <tbody></tbody>
+        </table>
+      </section>
+
+      <!-- Support brackets detail table -->
+      <section id="supportsSection" hidden aria-label="Support brackets detail">
+        <h2>Support Brackets</h2>
+        <table id="supportsTable" class="result-table" aria-label="Support brackets">
+          <caption class="visually-hidden">Support bracket quantities per tray</caption>
+          <thead>
+            <tr>
+              <th scope="col">Tray ID</th>
+              <th scope="col">Type</th>
+              <th scope="col">Width (in)</th>
+              <th scope="col">Length (ft)</th>
+              <th scope="col">Max Span (ft)</th>
+              <th scope="col">Brackets</th>
+            </tr>
+          </thead>
+          <tbody></tbody>
+        </table>
+      </section>
+
+      <nav class="step-nav" aria-label="Workflow navigation">
+        <a href="supportspan.html" class="step-nav-prev">&#8592; Support Span</a>
+        <a href="optimalRoute.html" class="step-nav-next">Optimal Route &#8594;</a>
+      </nav>
+    </main>
+  </div>
+
+  <div id="help-modal" class="modal" aria-hidden="true" role="dialog" aria-modal="true"
+       aria-labelledby="help-title">
+    <div class="modal-content">
+      <button id="close-help-btn" class="close-btn" aria-label="Close Help">&times;</button>
+      <h2 id="help-title">Tray Hardware BOM Help</h2>
+      <p>This tool generates a <strong>bill of materials</strong> for all cable tray
+      hardware — fittings, straight sections, covers, and support brackets — from the
+      tray geometry in your Raceway Schedule.</p>
+      <p><strong>Load from Project:</strong> reads tray data saved in this browser
+      session from the Raceway Schedule page.</p>
+      <p><strong>Import Raceway XLSX:</strong> import the <code>.xlsx</code> file
+      exported from the Raceway Schedule page to use tray geometry from a saved file.</p>
+      <p><strong>NEMA Load Class</strong> controls the maximum support span used to
+      calculate bracket quantities. Class 16A (16 lbs/ft rated) is typical for
+      industrial cable tray.</p>
+      <p><strong>Export BOM:</strong> downloads an Excel workbook with four sheets —
+      Procurement Summary, Fittings, Sections, and Supports.</p>
+    </div>
+  </div>
+
+  <script src="https://cdn.sheetjs.com/xlsx-0.20.3/package/dist/xlsx.full.min.js" defer></script>
+  <script src="cdnFallback.js" defer></script>
+  <script>
+    window.addEventListener('load', function () {
+      if (typeof initCdnFallback === 'function') {
+        initCdnFallback([{ global: 'XLSX', label: 'Excel import/export (XLSX)' }]);
+      }
+    });
+  </script>
+  <script type="module" src="dist/projectManager.js"></script>
+</body>
+</html>
