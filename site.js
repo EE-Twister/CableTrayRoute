@@ -369,6 +369,9 @@ function recordSave(){
   // Refresh "X ago" text every 30 seconds while the page is open
   if(lastSavedIndicatorTimer) clearInterval(lastSavedIndicatorTimer);
   lastSavedIndicatorTimer=setInterval(updateLastSavedIndicator,30000);
+  if(lastSavedIndicatorTimer&&typeof lastSavedIndicatorTimer.unref==='function'){
+    lastSavedIndicatorTimer.unref();
+  }
 }
 
 initializeProjectStorage().catch(e=>console.error('fast-json-patch load failed',e));
