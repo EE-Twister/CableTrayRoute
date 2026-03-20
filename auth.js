@@ -15,6 +15,16 @@ function showStatus(formEl, message, isError) {
   statusEl.dataset.error = isError ? 'true' : 'false';
 }
 
+async function withSubmitDisabled(form, fn) {
+  const btn = form.querySelector('[type=submit]');
+  if (btn) btn.disabled = true;
+  try {
+    return await fn();
+  } finally {
+    if (btn) btn.disabled = false;
+  }
+}
+
 async function signup(e) {
   e.preventDefault();
   const form = e.currentTarget;
@@ -32,25 +42,23 @@ async function signup(e) {
     return;
   }
 
-  const submitBtn = form.querySelector('[type=submit]');
-  if (submitBtn) submitBtn.disabled = true;
   try {
-    const res = await fetch('/signup', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ username, password })
+    await withSubmitDisabled(form, async () => {
+      const res = await fetch('/signup', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ username, password })
+      });
+      if (res.ok) {
+        showStatus(form, 'Account created. You may now sign in.', false);
+      } else {
+        const body = await res.json().catch(() => ({}));
+        showStatus(form, body.error || 'Signup failed. Please try again.', true);
+      }
     });
-    if (res.ok) {
-      showStatus(form, 'Account created. You may now sign in.', false);
-    } else {
-      const body = await res.json().catch(() => ({}));
-      showStatus(form, body.error || 'Signup failed. Please try again.', true);
-    }
   } catch (err) {
     console.error('Signup request failed', err);
     showStatus(form, 'Signup failed. Check your connection and try again.', true);
-  } finally {
-    if (submitBtn) submitBtn.disabled = false;
   }
 }
 
@@ -59,29 +67,27 @@ async function login(e) {
   const form = e.currentTarget;
   const username = document.getElementById('login-user').value.trim();
   const password = document.getElementById('login-pass').value;
-  const submitBtn = form.querySelector('[type=submit]');
-  if (submitBtn) submitBtn.disabled = true;
   try {
-    const res = await fetch('/login', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ username, password })
+    await withSubmitDisabled(form, async () => {
+      const res = await fetch('/login', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ username, password })
+      });
+      if (res.ok) {
+        const { token, csrfToken, expiresAt } = await res.json();
+        setAuthContextState({ token, csrfToken, expiresAt, user: username });
+        window.location.href = 'index.html';
+        return;
+      }
+      clearAuthContextState();
+      const body = await res.json().catch(() => ({}));
+      showStatus(form, body.error || 'Login failed. Check your credentials.', true);
     });
-    if (res.ok) {
-      const { token, csrfToken, expiresAt } = await res.json();
-      setAuthContextState({ token, csrfToken, expiresAt, user: username });
-      window.location.href = 'index.html';
-      return;
-    }
-    clearAuthContextState();
-    const body = await res.json().catch(() => ({}));
-    showStatus(form, body.error || 'Login failed. Check your credentials.', true);
   } catch (err) {
     console.error('Login request failed', err);
     clearAuthContextState();
     showStatus(form, 'Login failed. Check your connection and try again.', true);
-  } finally {
-    if (submitBtn) submitBtn.disabled = false;
   }
 }
 
