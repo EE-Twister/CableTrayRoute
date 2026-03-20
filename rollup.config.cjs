@@ -30,6 +30,8 @@ const entries = {
   seismicBracing: 'src/seismicBracing.js',
   trayhardwarebom: 'src/trayhardwarebom.js',
   intlCableSize: 'src/intlCableSize.js',
+  groundgrid: 'src/groundgrid.js',
+  autosize: 'src/autosize.js',
   '404': 'src/404.js'
 };
 

@@ -2,7 +2,7 @@
   "name": "CableTrayRoute",
   "short_name": "CableTrayRoute",
   "description": "Browser-based toolkit for cable scheduling, tray fill analysis, and optimal routing in electrical design.",
-  "start_url": "/index.html",
+  "start_url": "./index.html",
   "display": "standalone",
   "background_color": "#f8fafc",
   "theme_color": "#2563eb",

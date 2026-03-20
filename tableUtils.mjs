@@ -132,7 +132,7 @@ class TableManager {
         } else {
           setItem(this.columnsKey, this.columns);
         }
-      } catch(e) {}
+      } catch(e) { console.warn('Failed to restore column config from storage', e); }
     }
     this.storageKey = opts.storageKey || opts.tableId;
     this.onChange = opts.onChange || null;
@@ -710,14 +710,14 @@ class TableManager {
 
   saveGroupState() {
     let all = {};
-    try { all = getItem(STORAGE_KEYS.collapsedGroups, {}); } catch(e) {}
+    try { all = getItem(STORAGE_KEYS.collapsedGroups, {}); } catch(e) { console.warn('Failed to read group state from storage', e); }
     all[this.storageKey] = Array.from(this.hiddenGroups);
-    try { setItem(STORAGE_KEYS.collapsedGroups, all); } catch(e) {}
+    try { setItem(STORAGE_KEYS.collapsedGroups, all); } catch(e) { console.warn('Failed to save group state to storage', e); }
   }
 
   loadGroupState() {
     let all = {};
-    try { all = getItem(STORAGE_KEYS.collapsedGroups, {}); } catch(e) {}
+    try { all = getItem(STORAGE_KEYS.collapsedGroups, {}); } catch(e) { console.warn('Failed to load group state from storage', e); }
     const hidden = all[this.storageKey] || [];
     hidden.forEach(g => this.setGroupVisibility(g, true));
   }
@@ -787,7 +787,7 @@ class TableManager {
 
   persistColumns() {
     if (this.columnsKey) {
-      try { setItem(this.columnsKey, this.columns); } catch(e) {}
+      try { setItem(this.columnsKey, this.columns); } catch(e) { console.warn('Failed to persist column config', e); }
     }
   }
 
@@ -1377,7 +1377,7 @@ class TableManager {
 
   load() {
     let data = [];
-    try { data = getItem(this.storageKey, []); } catch(e) {}
+    try { data = getItem(this.storageKey, []); } catch(e) { console.warn('Failed to load table data from storage', e); }
     data.forEach(row => this.addRow(row));
     this.updateRowCount();
   }
@@ -1714,10 +1714,10 @@ class TableManager {
 }
 
 function saveToStorage(key, data){
-  try { setItem(key, data); } catch(e){}
+  try { setItem(key, data); } catch(e){ console.warn('saveToStorage failed for key', key, e); }
 }
 function loadFromStorage(key){
-  try { return getItem(key, []); } catch(e){ return []; }
+  try { return getItem(key, []); } catch(e){ console.warn('loadFromStorage failed for key', key, e); return []; }
 }
 
 function createTable(opts){ return new TableManager(opts); }

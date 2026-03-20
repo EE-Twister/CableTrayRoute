@@ -94,24 +94,24 @@ async function initCableSchedule() {
 
   function getRacewayOptions(){
     const ids = new Set();
-    try{ dataStore.getTrays().forEach(t=>{ if(t.tray_id) ids.add(t.tray_id); }); }catch(e){}
+    try{ dataStore.getTrays().forEach(t=>{ if(t.tray_id) ids.add(t.tray_id); }); }catch(e){ console.warn('getRacewayOptions: failed to read trays', e); }
     try{ dataStore.getConduits().forEach(c=>{
       const id=c.tray_id||(c.ductbank_id&&c.conduit_id?`${c.ductbank_id}-${c.conduit_id}`:c.conduit_id);
       if(id) ids.add(id);
-    }); }catch(e){}
+    }); }catch(e){ console.warn('getRacewayOptions: failed to read conduits', e); }
     try{ dataStore.getDuctbanks().forEach(db=>{
       const dbId=db.ductbank_id||db.id||db.tag;
       (db.conduits||[]).forEach(c=>{
         const id=c.tray_id||(dbId&&c.conduit_id?`${dbId}-${c.conduit_id}`:c.conduit_id);
         if(id) ids.add(id);
       });
-    }); }catch(e){}
+    }); }catch(e){ console.warn('getRacewayOptions: failed to read ductbanks', e); }
     return Array.from(ids);
   }
 
   function getPanelOptions(){
     const ids=new Set();
-    try{ dataStore.getPanels().forEach(p=>{ if(p.panel_id) ids.add(p.panel_id); }); }catch(e){}
+    try{ dataStore.getPanels().forEach(p=>{ if(p.panel_id) ids.add(p.panel_id); }); }catch(e){ console.warn('getPanelOptions: failed to read panels', e); }
     return Array.from(ids);
   }
 
@@ -126,7 +126,7 @@ async function initCableSchedule() {
         const friendly=toLabel(eq?.ref)||toLabel(eq?.description)||toLabel(eq?.id);
         if(friendly) names.add(friendly);
       });
-    }catch(e){}
+    }catch(e){ console.warn('getEquipmentOptions: failed to read equipment', e); }
     return Array.from(names);
   }
 

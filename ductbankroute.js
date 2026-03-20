@@ -93,11 +93,11 @@ function initPanZoom(){
       panY=s.y||0;
       scale=s.scale||1;
     }
-  }catch(e){}
+  }catch(e){ console.warn('Failed to restore ductbank pan/zoom state', e); }
   apply();
   function apply(){
     container.style.transform=`translate(${panX}px,${panY}px) scale(${scale})`;
-    try{setItem('ductbankPanZoom',JSON.stringify({x:panX,y:panY,scale}));}catch(e){}
+    try{setItem('ductbankPanZoom',JSON.stringify({x:panX,y:panY,scale}));}catch(e){ console.warn('Failed to save ductbank pan/zoom state', e); }
   }
   function zoomAt(cx,cy,f){
     const ns=Math.min(Math.max(scale*f,0.5),5);
