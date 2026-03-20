@@ -1,0 +1,368 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <meta name="description" content="Ground grid and substation grounding analysis per IEEE 80-2013. Calculate grid resistance, mesh voltage, step voltage, and GPR." />
+  <title>Ground Grid Analysis — CableTrayRoute</title>
+  <link rel="icon" href="icons/favicon.svg" type="image/svg+xml">
+  <link rel="apple-touch-icon" href="icons/favicon.svg">
+  <!-- Open Graph / Social sharing -->
+  <meta property="og:type" content="website">
+  <meta property="og:title" content="Ground Grid Analysis — CableTrayRoute">
+  <meta property="og:description" content="Substation grounding design per IEEE 80-2013: grid resistance, touch/step voltage, and GPR.">
+  <meta property="og:image" content="icons/route.svg">
+  <meta property="og:site_name" content="CableTrayRoute">
+  <meta property="og:url" content="groundgrid.html">
+  <!-- Canonical URL -->
+  <link rel="canonical" href="groundgrid.html">
+  <link rel="dns-prefetch" href="https://fonts.gstatic.com">
+  <meta name="color-scheme" content="light dark">
+  <link rel="stylesheet" href="style.css" />
+  <script type="module" src="dirtyTracker.js"></script>
+  <script type="module" src="dist/groundgrid.js" defer></script>
+</head>
+<body class="groundgrid-page" data-report-title="Ground Grid Analysis">
+  <a href="#main-content" class="skip-link">Skip to main content</a>
+  <nav class="top-nav">
+    <button id="nav-toggle" class="nav-toggle" aria-label="Toggle navigation" aria-controls="nav-links" aria-expanded="false" title="Toggle navigation">
+      <img src="icons/toolbar/grid.svg" alt="" aria-hidden="true" class="control-icon" loading="lazy" decoding="async">
+    </button>
+    <div id="nav-links" class="nav-links">
+      <a href="index.html">Home</a>
+      <a href="equipmentlist.html">Equipment List</a>
+      <a href="loadlist.html">Load List</a>
+      <a href="cableschedule.html">Cable Schedule</a>
+      <a href="panelschedule.html">Panel Schedule</a>
+      <a href="racewayschedule.html">Raceway Schedule</a>
+      <a href="ductbankroute.html">Ductbank</a>
+      <a href="cabletrayfill.html">Tray Fill</a>
+      <a href="conduitfill.html">Conduit Fill</a>
+      <a href="supportspan.html">Support Span</a>
+      <a href="seismicBracing.html">Seismic Bracing</a>
+      <a href="trayhardwarebom.html">Tray Hardware BOM</a>
+      <a href="optimalRoute.html">Optimal Route</a>
+      <a href="pullcards.html">Pull Cards</a>
+      <a href="oneline.html">One-Line</a>
+      <a href="tcc.html">TCC</a>
+      <a href="harmonics.html">Harmonics</a>
+      <a href="motorStart.html">Motor Start</a>
+      <a href="loadFlow.html">Load Flow</a>
+      <a href="shortCircuit.html">Short Circuit</a>
+      <a href="arcFlash.html">Arc Flash</a>
+      <a href="intlCableSize.html">Intl Cable Sizing</a>
+      <a href="groundgrid.html" class="active" aria-current="page">Ground Grid</a>
+      <a href="custom-components.html">Custom Components</a>
+      <a href="help.html">Help</a>
+      <a href="account.html">Account</a>
+    </div>
+    <button id="settings-btn" class="settings-btn" aria-label="Settings" aria-expanded="false" title="Settings">
+      <img src="icons/toolbar/validate.svg" alt="" aria-hidden="true" class="control-icon" loading="lazy" decoding="async">
+    </button>
+  </nav>
+
+  <div id="settings-menu" class="settings-menu">
+    <label for="theme-select">Theme
+      <select id="theme-select">
+        <option value="system">System</option>
+        <option value="light">Light</option>
+        <option value="dark">Dark</option>
+        <option value="high-contrast">High Contrast</option>
+      </select>
+    </label>
+    <label><input type="checkbox" id="compact-toggle" aria-label="Enable compact table mode"> Compact Mode</label>
+    <label for="unit-select">Units
+      <select id="unit-select">
+        <option value="imperial">Imperial (ft, in)</option>
+        <option value="metric">Metric (m, mm)</option>
+      </select>
+    </label>
+    <button id="help-btn" class="btn" aria-expanded="false" title="Show help">
+      <img src="icons/toolbar/validate.svg" alt="" aria-hidden="true" class="control-icon" loading="lazy" decoding="async">
+      <span>Site Help</span>
+    </button>
+    <button id="new-project-btn" title="Start a new project">
+      <img src="icons/toolbar/copy.svg" alt="" aria-hidden="true" class="control-icon" loading="lazy" decoding="async">
+      <span>New Project</span>
+    </button>
+    <button id="save-project-btn" title="Save current project">
+      <img src="icons/toolbar/export.svg" alt="" aria-hidden="true" class="control-icon" loading="lazy" decoding="async">
+      <span>Save Project</span>
+    </button>
+    <button id="load-project-btn" title="Load an existing project">
+      <img src="icons/toolbar/import.svg" alt="" aria-hidden="true" class="control-icon" loading="lazy" decoding="async">
+      <span>Load Project</span>
+    </button>
+    <button id="export-project-btn" title="Export project data">
+      <img src="icons/toolbar/export.svg" alt="" aria-hidden="true" class="control-icon" loading="lazy" decoding="async">
+      <span>Export Project</span>
+    </button>
+    <button id="import-project-btn" title="Import project data">
+      <img src="icons/toolbar/import.svg" alt="" aria-hidden="true" class="control-icon" loading="lazy" decoding="async">
+      <span>Import Project</span>
+    </button>
+    <input type="file" id="import-project-input" accept=".ctr.json" class="hidden" title="Select project file">
+  </div>
+
+  <div class="container">
+    <main id="main-content" class="main-content">
+      <nav aria-label="Breadcrumb">
+        <ol class="breadcrumb-trail">
+          <li><a href="index.html">Home</a></li>
+          <li>Studies</li>
+          <li aria-current="page">Ground Grid Analysis</li>
+        </ol>
+      </nav>
+
+      <header class="page-header">
+        <h1>Ground Grid / Substation Grounding Analysis</h1>
+      </header>
+
+      <details class="method-panel">
+        <summary>Method &amp; Assumptions</summary>
+        <p>Ground grid analysis follows <strong>IEEE 80-2013</strong> — IEEE Guide for Safety
+        in AC Substation Grounding. The tool evaluates a rectangular grid of horizontal
+        conductors buried at uniform depth.</p>
+
+        <p><strong>Grid resistance</strong> (Sverak, IEEE 80-2013 Eq. 57):</p>
+        <pre>Rg = ρ/L + ρ/√(20A) × (1 + 1/(1 + h×√(20/A)))</pre>
+
+        <p><strong>Mesh voltage</strong> (IEEE 80-2013 Eq. 86):</p>
+        <pre>Em = ρ × Ig × Km × Ki / L</pre>
+
+        <p><strong>Step voltage</strong> (IEEE 80-2013 Eq. 92):</p>
+        <pre>Es = ρ × Ig × Ks × Ki / L</pre>
+
+        <p><strong>Ground potential rise:</strong></p>
+        <pre>GPR = Ig × Rg</pre>
+
+        <p><strong>Tolerable touch voltage</strong> (70 kg person, IEEE 80-2013 Eq. 33):</p>
+        <pre>Etouch70 = (1000 + 1.5·Cs·ρs) × 0.157 / √tf</pre>
+
+        <p><strong>Tolerable step voltage</strong> (70 kg person, IEEE 80-2013 Eq. 30):</p>
+        <pre>Estep70 = (1000 + 6·Cs·ρs) × 0.157 / √tf</pre>
+
+        <p>Where Cs is the surface layer reduction factor per IEEE 80-2013 Eq. 27, accounting
+        for a high-resistivity surface material (e.g. crushed stone) that reduces the shock
+        current through a person's feet.</p>
+
+        <p>Citations: <a href="docs/standards.html">IEEE 80-2013, IEEE 81-2012</a>.
+        See also: <a href="arcFlash.html">Arc Flash</a>,
+        <a href="shortCircuit.html">Short Circuit</a>.</p>
+      </details>
+
+      <form id="ground-grid-form" novalidate>
+
+        <!-- Soil Parameters -->
+        <fieldset>
+          <legend><strong>Soil Parameters</strong></legend>
+
+          <div class="field-row">
+            <label for="soil-rho">
+              ρ — Soil resistivity (Ω·m)
+              <button type="button" class="helpBtn" aria-label="Help — soil resistivity">?</button>
+            </label>
+            <input type="number" id="soil-rho" min="1" max="100000" step="1"
+                   value="100" aria-describedby="soil-rho-hint" required>
+            <p id="soil-rho-hint" class="field-hint">
+              Measured by Wenner four-pin method (IEEE 81). Typical values: sand 200–2000, clay 10–100,
+              rock 1000–10000 Ω·m. Use the lowest seasonal value for conservative design.
+            </p>
+          </div>
+        </fieldset>
+
+        <!-- Grid Geometry -->
+        <fieldset>
+          <legend><strong>Grid Geometry</strong></legend>
+
+          <div class="field-row">
+            <label for="grid-lx">
+              Grid length L<sub>x</sub> (<span class="unit-label-ft">ft</span><span class="unit-label-m" hidden>m</span>)
+            </label>
+            <input type="number" id="grid-lx" min="1" step="1"
+                   value="100" required aria-describedby="grid-lx-hint">
+            <p id="grid-lx-hint" class="field-hint">Length of the grid in the x-direction (perimeter dimension).</p>
+          </div>
+
+          <div class="field-row">
+            <label for="grid-ly">
+              Grid width L<sub>y</sub> (<span class="unit-label-ft">ft</span><span class="unit-label-m" hidden>m</span>)
+            </label>
+            <input type="number" id="grid-ly" min="1" step="1"
+                   value="100" required aria-describedby="grid-ly-hint">
+            <p id="grid-ly-hint" class="field-hint">Width of the grid in the y-direction (perimeter dimension).</p>
+          </div>
+
+          <div class="field-row">
+            <label for="nx">
+              n<sub>x</sub> — Number of conductors in x-direction (parallel to x-axis)
+            </label>
+            <input type="number" id="nx" min="2" max="100" step="1"
+                   value="7" required aria-describedby="nx-hint">
+            <p id="nx-hint" class="field-hint">
+              Number of horizontal runs parallel to the x-axis. Spacing = L<sub>y</sub> / (n<sub>x</sub>−1).
+              A typical square grid has equal nx and ny.
+            </p>
+          </div>
+
+          <div class="field-row">
+            <label for="ny">
+              n<sub>y</sub> — Number of conductors in y-direction (parallel to y-axis)
+            </label>
+            <input type="number" id="ny" min="2" max="100" step="1"
+                   value="7" required aria-describedby="ny-hint">
+            <p id="ny-hint" class="field-hint">
+              Number of horizontal runs parallel to the y-axis. Spacing = L<sub>x</sub> / (n<sub>y</sub>−1).
+            </p>
+          </div>
+
+          <div class="field-row">
+            <label for="burial-depth">
+              h — Burial depth (<span class="unit-label-ft">ft</span><span class="unit-label-m" hidden>m</span>)
+            </label>
+            <input type="number" id="burial-depth" min="0.1" step="0.1"
+                   value="1.5" required aria-describedby="burial-depth-hint">
+            <p id="burial-depth-hint" class="field-hint">
+              Depth of grid conductors below grade. Per IEEE 80-2013: typically 0.5 m (1.5 ft)
+              minimum; deeper burial lowers Rg.
+            </p>
+          </div>
+
+          <div class="field-row">
+            <label for="conductor-diameter">
+              d — Conductor diameter (<span class="unit-label-ft">in</span><span class="unit-label-m" hidden>mm</span>)
+            </label>
+            <input type="number" id="conductor-diameter" min="0.01" step="0.01"
+                   value="0.5" required aria-describedby="conductor-diameter-hint">
+            <p id="conductor-diameter-hint" class="field-hint">
+              Diameter of the buried conductor. 2/0 AWG Cu ≈ 0.418 in, 4/0 AWG ≈ 0.528 in,
+              250 kcmil ≈ 0.575 in.
+            </p>
+          </div>
+
+          <div class="field-row">
+            <label>
+              <input type="checkbox" id="has-rods" aria-describedby="has-rods-hint">
+              Include perimeter / corner ground rods
+            </label>
+            <p id="has-rods-hint" class="field-hint">
+              When checked, uses the Kii correction in the mesh factor Km for grids
+              with rods at perimeter corners (IEEE 80-2013 §16.5).
+            </p>
+          </div>
+        </fieldset>
+
+        <!-- Electrical Parameters -->
+        <fieldset>
+          <legend><strong>Electrical Parameters</strong></legend>
+
+          <div class="field-row">
+            <label for="grid-current">
+              I<sub>g</sub> — Maximum grid current (A)
+              <button type="button" class="helpBtn" aria-label="Help — grid current">?</button>
+            </label>
+            <input type="number" id="grid-current" min="1" step="1"
+                   value="5000" required aria-describedby="grid-current-hint">
+            <p id="grid-current-hint" class="field-hint">
+              Maximum symmetrical grid current = split factor × 3I₀ (zero-sequence fault current).
+              Obtain from the Short Circuit study. For a conservative design, use the maximum
+              available fault current without applying a split factor (Sf = 1).
+            </p>
+          </div>
+
+          <div class="field-row">
+            <label for="fault-duration">
+              t<sub>f</sub> — Fault clearing time (s)
+            </label>
+            <input type="number" id="fault-duration" min="0.01" max="3.0" step="0.01"
+                   value="0.5" required aria-describedby="fault-duration-hint">
+            <p id="fault-duration-hint" class="field-hint">
+              Duration of the fault before protective device clears. Typical values:
+              primary relay + breaker: 0.1–0.5 s; backup clearing: 0.5–1.0 s.
+            </p>
+          </div>
+
+          <div class="field-row">
+            <label for="body-weight">Body weight for tolerable voltage limits</label>
+            <select id="body-weight" aria-describedby="body-weight-hint">
+              <option value="70" selected>70 kg — Standard (IEEE 80-2013 §8.3)</option>
+              <option value="50">50 kg — Conservative (IEEE 80-2013 §8.3)</option>
+            </select>
+            <p id="body-weight-hint" class="field-hint">
+              IEEE 80-2013 provides limits for both 50 kg and 70 kg body weights.
+              70 kg is used for most utility substations; 50 kg for conservative designs.
+            </p>
+          </div>
+        </fieldset>
+
+        <!-- Surface Layer (optional) -->
+        <fieldset>
+          <legend><strong>Surface Layer (optional)</strong></legend>
+          <p class="field-hint">A high-resistivity surface material (e.g. 3–6 in crushed stone) raises
+          the tolerable touch and step voltages, improving safety margins significantly.</p>
+
+          <div class="field-row">
+            <label for="surface-rho">
+              ρ<sub>s</sub> — Surface layer resistivity (Ω·m, 0 = none)
+            </label>
+            <input type="number" id="surface-rho" min="0" step="100"
+                   value="0" aria-describedby="surface-rho-hint">
+            <p id="surface-rho-hint" class="field-hint">
+              Resistivity of surface material. Crushed granite: 2000–5000 Ω·m;
+              asphalt: 10,000–2,000,000 Ω·m; concrete: 10,000–1,000,000 Ω·m.
+              Leave 0 if no surface layer.
+            </p>
+          </div>
+
+          <div class="field-row">
+            <label for="surface-hs">
+              h<sub>s</sub> — Surface layer thickness (<span class="unit-label-ft">ft</span><span class="unit-label-m" hidden>m</span>, 0 = none)
+            </label>
+            <input type="number" id="surface-hs" min="0" step="0.01"
+                   value="0" aria-describedby="surface-hs-hint">
+            <p id="surface-hs-hint" class="field-hint">
+              Thickness of the surface material. Typical crushed stone layer: 0.1–0.2 m (4–6 in).
+            </p>
+          </div>
+        </fieldset>
+
+        <div id="controls">
+          <button type="submit" class="primary-btn">Analyze Ground Grid</button>
+        </div>
+      </form>
+
+      <div id="results" role="region" aria-live="polite" aria-label="Ground grid analysis results"></div>
+
+      <nav class="step-nav" aria-label="Workflow navigation">
+        <a href="arcFlash.html" class="step-nav-prev">&#8592; Arc Flash</a>
+        <a href="intlCableSize.html" class="step-nav-next">Intl Cable Sizing &#8594;</a>
+      </nav>
+    </main>
+  </div>
+
+  <div id="help-modal" class="modal" aria-hidden="true" role="dialog" aria-modal="true"
+       aria-labelledby="help-title">
+    <div class="modal-content">
+      <button id="close-help-btn" class="close-btn" aria-label="Close Help">&times;</button>
+      <h2 id="help-title">Ground Grid Analysis Help</h2>
+      <p>This tool calculates substation grounding safety per <strong>IEEE 80-2013</strong>
+      for a rectangular grid of buried conductors.</p>
+      <h3>Workflow</h3>
+      <ol>
+        <li>Enter soil resistivity from field measurements (IEEE 81 Wenner method).</li>
+        <li>Define grid geometry: length, width, conductor count, burial depth.</li>
+        <li>Enter the maximum grid current from the
+          <a href="shortCircuit.html">Short Circuit</a> study, applying a current split
+          factor if overhead ground wires divert current away from the grid.</li>
+        <li>Optionally add a surface layer (crushed stone improves safety margins).</li>
+        <li>Click <strong>Analyze Ground Grid</strong> and review mesh and step voltage
+          results against IEEE 80-2013 tolerable limits.</li>
+      </ol>
+      <p>If mesh or step voltages <em>fail</em>, consider: increasing grid conductor
+      density, adding ground rods, enlarging the grid area, or adding crushed stone surface.</p>
+    </div>
+  </div>
+
+  <script type="module" src="dist/projectManager.js"></script>
+</body>
+</html>

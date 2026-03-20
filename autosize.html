@@ -1,0 +1,387 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <meta name="description" content="NEC equipment auto-sizing: conductor, overcurrent device, motor branch circuit, and transformer sizing per NEC 2023." />
+  <title>Auto-Size Equipment — CableTrayRoute</title>
+  <link rel="icon" href="icons/favicon.svg" type="image/svg+xml">
+  <link rel="apple-touch-icon" href="icons/favicon.svg">
+  <!-- Open Graph / Social sharing -->
+  <meta property="og:type" content="website">
+  <meta property="og:title" content="Auto-Size Equipment — CableTrayRoute">
+  <meta property="og:description" content="Automatically size conductors, breakers, and transformers per NEC 2023.">
+  <meta property="og:image" content="icons/route.svg">
+  <meta property="og:site_name" content="CableTrayRoute">
+  <meta property="og:url" content="autosize.html">
+  <!-- Canonical URL -->
+  <link rel="canonical" href="autosize.html">
+  <link rel="dns-prefetch" href="https://fonts.gstatic.com">
+  <meta name="color-scheme" content="light dark">
+  <link rel="stylesheet" href="style.css" />
+  <script type="module" src="dirtyTracker.js"></script>
+  <script type="module" src="dist/autosize.js" defer></script>
+</head>
+<body class="autosize-page" data-report-title="Auto-Size Equipment">
+  <a href="#main-content" class="skip-link">Skip to main content</a>
+  <nav class="top-nav">
+    <button id="nav-toggle" class="nav-toggle" aria-label="Toggle navigation" aria-controls="nav-links" aria-expanded="false" title="Toggle navigation">
+      <img src="icons/toolbar/grid.svg" alt="" aria-hidden="true" class="control-icon" loading="lazy" decoding="async">
+    </button>
+    <div id="nav-links" class="nav-links">
+      <a href="index.html">Home</a>
+      <a href="equipmentlist.html">Equipment List</a>
+      <a href="loadlist.html">Load List</a>
+      <a href="cableschedule.html">Cable Schedule</a>
+      <a href="panelschedule.html">Panel Schedule</a>
+      <a href="racewayschedule.html">Raceway Schedule</a>
+      <a href="ductbankroute.html">Ductbank</a>
+      <a href="cabletrayfill.html">Tray Fill</a>
+      <a href="conduitfill.html">Conduit Fill</a>
+      <a href="supportspan.html">Support Span</a>
+      <a href="seismicBracing.html">Seismic Bracing</a>
+      <a href="trayhardwarebom.html">Tray Hardware BOM</a>
+      <a href="optimalRoute.html">Optimal Route</a>
+      <a href="pullcards.html">Pull Cards</a>
+      <a href="oneline.html">One-Line</a>
+      <a href="tcc.html">TCC</a>
+      <a href="harmonics.html">Harmonics</a>
+      <a href="motorStart.html">Motor Start</a>
+      <a href="loadFlow.html">Load Flow</a>
+      <a href="shortCircuit.html">Short Circuit</a>
+      <a href="arcFlash.html">Arc Flash</a>
+      <a href="intlCableSize.html">Intl Cable Sizing</a>
+      <a href="groundgrid.html">Ground Grid</a>
+      <a href="autosize.html" class="active" aria-current="page">Auto-Size</a>
+      <a href="custom-components.html">Custom Components</a>
+      <a href="help.html">Help</a>
+      <a href="account.html">Account</a>
+    </div>
+    <button id="settings-btn" class="settings-btn" aria-label="Settings" aria-expanded="false" title="Settings">
+      <img src="icons/toolbar/validate.svg" alt="" aria-hidden="true" class="control-icon" loading="lazy" decoding="async">
+    </button>
+  </nav>
+
+  <div id="settings-menu" class="settings-menu">
+    <label for="theme-select">Theme
+      <select id="theme-select">
+        <option value="system">System</option>
+        <option value="light">Light</option>
+        <option value="dark">Dark</option>
+        <option value="high-contrast">High Contrast</option>
+      </select>
+    </label>
+    <label><input type="checkbox" id="compact-toggle" aria-label="Enable compact table mode"> Compact Mode</label>
+    <label for="unit-select">Units
+      <select id="unit-select">
+        <option value="imperial">Imperial</option>
+        <option value="metric">Metric</option>
+      </select>
+    </label>
+    <button id="help-btn" class="btn" aria-expanded="false" title="Show help">
+      <img src="icons/toolbar/validate.svg" alt="" aria-hidden="true" class="control-icon" loading="lazy" decoding="async">
+      <span>Site Help</span>
+    </button>
+    <button id="new-project-btn" title="Start a new project">
+      <img src="icons/toolbar/copy.svg" alt="" aria-hidden="true" class="control-icon" loading="lazy" decoding="async">
+      <span>New Project</span>
+    </button>
+    <button id="save-project-btn" title="Save current project">
+      <img src="icons/toolbar/export.svg" alt="" aria-hidden="true" class="control-icon" loading="lazy" decoding="async">
+      <span>Save Project</span>
+    </button>
+    <button id="load-project-btn" title="Load an existing project">
+      <img src="icons/toolbar/import.svg" alt="" aria-hidden="true" class="control-icon" loading="lazy" decoding="async">
+      <span>Load Project</span>
+    </button>
+    <button id="export-project-btn" title="Export project data">
+      <img src="icons/toolbar/export.svg" alt="" aria-hidden="true" class="control-icon" loading="lazy" decoding="async">
+      <span>Export Project</span>
+    </button>
+    <button id="import-project-btn" title="Import project data">
+      <img src="icons/toolbar/import.svg" alt="" aria-hidden="true" class="control-icon" loading="lazy" decoding="async">
+      <span>Import Project</span>
+    </button>
+    <input type="file" id="import-project-input" accept=".ctr.json" class="hidden" title="Select project file">
+  </div>
+
+  <div class="container">
+    <main id="main-content" class="main-content">
+      <nav aria-label="Breadcrumb">
+        <ol class="breadcrumb-trail">
+          <li><a href="index.html">Home</a></li>
+          <li>Studies</li>
+          <li aria-current="page">Auto-Size Equipment</li>
+        </ol>
+      </nav>
+
+      <header class="page-header">
+        <h1>Auto-Size Equipment</h1>
+        <p class="page-subtitle">Automatically select conductor sizes, overcurrent device ratings,
+        and transformer kVA per NEC 2023. Covers feeders, branch circuits, motor circuits,
+        and transformer protection.</p>
+      </header>
+
+      <!-- Tab navigation -->
+      <div class="tab-bar" role="tablist" aria-label="Auto-sizing categories">
+        <button class="tab-btn active" role="tab" data-tab="feeder"
+                aria-selected="true" aria-controls="panel-feeder" id="tab-feeder">
+          Feeder / Branch Circuit
+        </button>
+        <button class="tab-btn" role="tab" data-tab="motor"
+                aria-selected="false" aria-controls="panel-motor" id="tab-motor">
+          Motor Branch Circuit
+        </button>
+        <button class="tab-btn" role="tab" data-tab="xfmr"
+                aria-selected="false" aria-controls="panel-xfmr" id="tab-xfmr">
+          Transformer
+        </button>
+      </div>
+
+      <!-- Panel 1: Feeder / Branch Circuit -->
+      <div class="tab-panel" id="panel-feeder" role="tabpanel" aria-labelledby="tab-feeder">
+        <details class="method-panel">
+          <summary>Method — NEC 210.20 / 215.3 / 240.4</summary>
+          <p>For <strong>continuous loads</strong> (≥3 hours): conductor ampacity and OCPD rating
+          must be at least 125% of the load current (NEC 210.20(A), 215.3).</p>
+          <p>Conductor size is selected from NEC Table 310.15(B)(16) (copper or aluminum,
+          in conduit, 30°C ambient, ≤3 current-carrying conductors).</p>
+          <p>OCPD rating is the next standard rating from NEC 240.6(A) at or above
+          the conductor's ampacity (NEC 240.4(B)).</p>
+        </details>
+
+        <form id="feeder-form" novalidate>
+          <fieldset>
+            <legend><strong>Input Mode</strong></legend>
+            <label>
+              <input type="radio" name="feeder-mode" value="amps" checked>
+              Enter load current directly (A)
+            </label>
+            <label>
+              <input type="radio" name="feeder-mode" value="kw">
+              Calculate from kW load
+            </label>
+          </fieldset>
+
+          <fieldset>
+            <legend><strong>Load Parameters</strong></legend>
+
+            <div class="field-row" id="row-amps">
+              <label for="feeder-amps">Load current (A)</label>
+              <input type="number" id="feeder-amps" min="0.1" step="0.1" value="60">
+            </div>
+
+            <div class="field-row" id="row-kw" hidden>
+              <label for="feeder-kw">Load (kW)</label>
+              <input type="number" id="feeder-kw" min="0.1" step="0.1" value="25">
+            </div>
+            <div class="field-row" id="row-pf" hidden>
+              <label for="feeder-pf">Power factor</label>
+              <input type="number" id="feeder-pf" min="0.01" max="1" step="0.01" value="0.85">
+            </div>
+            <div class="field-row" id="row-voltage" hidden>
+              <label for="feeder-voltage">System voltage (V line-to-line)</label>
+              <input type="number" id="feeder-voltage" min="1" step="1" value="480">
+            </div>
+            <div class="field-row" id="row-phase" hidden>
+              <label for="feeder-phase">Phase</label>
+              <select id="feeder-phase">
+                <option value="3ph">3-Phase</option>
+                <option value="1ph">1-Phase</option>
+              </select>
+            </div>
+
+            <div class="field-row">
+              <label>
+                <input type="checkbox" id="feeder-continuous" checked>
+                Continuous load (≥3 hours) — applies 125% factor per NEC 210.20(A)
+              </label>
+            </div>
+
+            <div class="field-row">
+              <label for="feeder-material">Conductor material</label>
+              <select id="feeder-material">
+                <option value="copper">Copper</option>
+                <option value="aluminum">Aluminum</option>
+              </select>
+            </div>
+
+            <div class="field-row">
+              <label for="feeder-temp">Insulation temperature rating (°C)</label>
+              <select id="feeder-temp">
+                <option value="60">60°C (Type TW)</option>
+                <option value="75" selected>75°C (Type THWN, XHHW) — most common</option>
+                <option value="90">90°C (Type THHN, XHHW-2)</option>
+              </select>
+            </div>
+          </fieldset>
+
+          <div id="controls">
+            <button type="submit" class="primary-btn">Size Feeder</button>
+          </div>
+        </form>
+        <div id="feeder-results" role="region" aria-live="polite" aria-label="Feeder sizing results"></div>
+      </div>
+
+      <!-- Panel 2: Motor Branch Circuit -->
+      <div class="tab-panel" id="panel-motor" role="tabpanel" aria-labelledby="tab-motor" hidden>
+        <details class="method-panel">
+          <summary>Method — NEC 430 (Motor Branch Circuits)</summary>
+          <p><strong>Full load current (FLC):</strong> from NEC Table 430.250 (3-phase) or
+          Table 430.248 (single-phase). Note: always use the NEC table values, not the motor
+          nameplate current, for sizing branch circuit components.</p>
+          <p><strong>Branch circuit conductor:</strong> ≥ 125% of motor FLC (NEC 430.22(A)).</p>
+          <p><strong>Branch circuit OCPD (inverse time breaker):</strong> ≤ 250% of FLC
+          per NEC Table 430.52. Next standard OCPD size is selected.</p>
+          <p><strong>Overload relay:</strong> set at 115% of FLC for motors with service
+          factor ≥ 1.15 or temperature rise ≤ 40°C, otherwise 125% (NEC 430.32(A)(1)).</p>
+        </details>
+
+        <form id="motor-form" novalidate>
+          <fieldset>
+            <legend><strong>Motor Parameters</strong></legend>
+
+            <div class="field-row">
+              <label for="motor-hp">Motor nameplate HP</label>
+              <input type="number" id="motor-hp" min="0.1" step="0.1" value="25"
+                     aria-describedby="motor-flc-preview">
+              <p id="motor-flc-preview" class="field-hint"></p>
+            </div>
+
+            <div class="field-row">
+              <label for="motor-voltage">System voltage (V)</label>
+              <select id="motor-voltage">
+                <option value="208">208V</option>
+                <option value="230">230V</option>
+                <option value="460" selected>460/480V</option>
+                <option value="575">575/600V</option>
+                <option value="200">200V</option>
+                <option value="115">115/120V (single-phase)</option>
+              </select>
+            </div>
+
+            <div class="field-row">
+              <label for="motor-phase">Motor phase</label>
+              <select id="motor-phase">
+                <option value="3ph" selected>3-Phase</option>
+                <option value="1ph">1-Phase</option>
+              </select>
+            </div>
+
+            <div class="field-row">
+              <label for="motor-material">Conductor material</label>
+              <select id="motor-material">
+                <option value="copper">Copper</option>
+                <option value="aluminum">Aluminum</option>
+              </select>
+            </div>
+
+            <div class="field-row">
+              <label>
+                <input type="checkbox" id="motor-highsf" checked>
+                Service factor ≥ 1.15 or temp rise ≤ 40°C (overload relay at 115% of FLC)
+              </label>
+            </div>
+          </fieldset>
+
+          <div id="controls">
+            <button type="submit" class="primary-btn">Size Motor Circuit</button>
+          </div>
+        </form>
+        <div id="motor-results" role="region" aria-live="polite" aria-label="Motor circuit sizing results"></div>
+      </div>
+
+      <!-- Panel 3: Transformer -->
+      <div class="tab-panel" id="panel-xfmr" role="tabpanel" aria-labelledby="tab-xfmr" hidden>
+        <details class="method-panel">
+          <summary>Method — NEC 450.3(B) (Transformers ≤ 600V)</summary>
+          <p><strong>Transformer kVA:</strong> next standard kVA rating at or above the required load.</p>
+          <p><strong>Primary OCPD:</strong> ≤ 125% of primary rated current (or 167% if primary
+          current ≤ 9A) per NEC Table 450.3(B). Next standard OCPD size is selected.</p>
+          <p><strong>Secondary OCPD:</strong> ≤ 125% of secondary rated current per NEC 450.3(B).</p>
+          <p><strong>Secondary conductors:</strong> sized at 125% of secondary rated current
+          (continuous load per NEC 310.15(B)(16)).</p>
+        </details>
+
+        <form id="xfmr-form" novalidate>
+          <fieldset>
+            <legend><strong>Transformer Parameters</strong></legend>
+
+            <div class="field-row">
+              <label for="xfmr-kva">Required load (kVA)</label>
+              <input type="number" id="xfmr-kva" min="0.1" step="0.5" value="75">
+            </div>
+
+            <div class="field-row">
+              <label for="xfmr-phase">Phase</label>
+              <select id="xfmr-phase">
+                <option value="3ph" selected>3-Phase</option>
+                <option value="1ph">1-Phase</option>
+              </select>
+            </div>
+
+            <div class="field-row">
+              <label for="xfmr-primary">Primary voltage (V)</label>
+              <input type="number" id="xfmr-primary" min="1" step="1" value="480">
+            </div>
+
+            <div class="field-row">
+              <label for="xfmr-secondary">Secondary voltage (V)</label>
+              <input type="number" id="xfmr-secondary" min="1" step="1" value="208">
+            </div>
+          </fieldset>
+
+          <div id="controls">
+            <button type="submit" class="primary-btn">Size Transformer</button>
+          </div>
+        </form>
+        <div id="xfmr-results" role="region" aria-live="polite" aria-label="Transformer sizing results"></div>
+      </div>
+
+      <nav class="step-nav" aria-label="Workflow navigation">
+        <a href="groundgrid.html" class="step-nav-prev">&#8592; Ground Grid</a>
+        <a href="loadFlow.html" class="step-nav-next">Load Flow &#8594;</a>
+      </nav>
+    </main>
+  </div>
+
+  <div id="help-modal" class="modal" aria-hidden="true" role="dialog" aria-modal="true"
+       aria-labelledby="help-title">
+    <div class="modal-content">
+      <button id="close-help-btn" class="close-btn" aria-label="Close Help">&times;</button>
+      <h2 id="help-title">Auto-Size Equipment Help</h2>
+      <p>This tool applies NEC 2023 rules to automatically size conductors, overcurrent
+      protection devices (OCPD), and transformers.</p>
+      <h3>Feeder / Branch Circuit</h3>
+      <p>Enter the load current (or kW/PF), check if the load is continuous, and select
+      conductor material and temperature rating. The tool selects the smallest NEC-compliant
+      conductor from Table 310.15(B)(16) and the next standard OCPD from NEC 240.6(A).</p>
+      <h3>Motor Branch Circuit</h3>
+      <p>Enter motor HP, voltage, and phase. The tool looks up NEC table FLC values and
+      applies NEC 430.22 (conductor) and NEC 430.52 (breaker) rules automatically.</p>
+      <h3>Transformer</h3>
+      <p>Enter required kVA, primary voltage, and secondary voltage. The tool selects the
+      next standard transformer kVA and sizes primary and secondary overcurrent protection
+      per NEC 450.3(B), Table 450.3(B).</p>
+    </div>
+  </div>
+
+  <script type="module" src="dist/projectManager.js"></script>
+
+  <script>
+    // Show/hide input rows based on mode selection
+    document.addEventListener('DOMContentLoaded', () => {
+      document.querySelectorAll('input[name="feeder-mode"]').forEach(radio => {
+        radio.addEventListener('change', () => {
+          const isKw = document.querySelector('input[name="feeder-mode"]:checked').value === 'kw';
+          document.getElementById('row-amps').hidden = isKw;
+          document.getElementById('row-kw').hidden = !isKw;
+          document.getElementById('row-pf').hidden = !isKw;
+          document.getElementById('row-voltage').hidden = !isKw;
+          document.getElementById('row-phase').hidden = !isKw;
+        });
+      });
+    });
+  </script>
+</body>
+</html>

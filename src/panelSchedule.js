@@ -2447,7 +2447,7 @@ window.addEventListener("DOMContentLoaded", () => {
         url.searchParams.delete("panel");
       }
       window.history.replaceState({}, "", url);
-    } catch {}
+    } catch (e) { console.warn('Failed to update URL history state', e); }
   };
 
   const updatePanelSelectorButtons = () => {

@@ -21,7 +21,10 @@ const NAV_ROUTES = [
   { href: 'loadFlow.html', label: 'Load Flow', section: 'Studies', icon: 'icons/Load.svg' },
   { href: 'shortCircuit.html', label: 'Short Circuit', section: 'Studies', icon: 'icons/components/Breaker.svg' },
   { href: 'arcFlash.html', label: 'Arc Flash', section: 'Studies', icon: 'icons/toolbar/connect.svg' },
+  { href: 'groundgrid.html', label: 'Ground Grid', section: 'Studies', icon: 'icons/toolbar/validate.svg' },
+  { href: 'autosize.html', label: 'Auto-Size', section: 'Studies', icon: 'icons/toolbar/grid-size.svg' },
   { href: 'custom-components.html', label: 'Custom Components', section: 'Library', icon: 'icons/components/TextBox.svg' },
+  { href: 'library.html', label: 'Library Manager', section: 'Library', icon: 'icons/toolbar/grid.svg' },
   { href: 'help.html', label: 'Help', section: 'Support', icon: 'icons/toolbar/validate.svg' },
   { href: 'account.html', label: 'Account', section: 'Support', icon: 'icons/toolbar/grid.svg' }
 ];

@@ -202,7 +202,7 @@ if (typeof window !== 'undefined') {
   try {
     const stateName = normalizeProjectName(getProjectState().name || '');
     if (stateName) return stateName;
-  } catch {}
+  } catch (e) { console.warn('Failed to read project state name', e); }
   return '';
 }
 
@@ -494,7 +494,7 @@ async function saveProject(options = {}) {
   let name = currentProjectName();
   if (!name) {
     let suggested = '';
-    try { suggested = getProjectState().name || ''; } catch {}
+    try { suggested = getProjectState().name || ''; } catch (e) { console.warn('Failed to read project name for save dialog', e); }
     name = await promptProjectName({
       title: 'Save Project',
       confirmLabel: 'Save',

@@ -33,5 +33,11 @@
   <url><loc>docs/geometry-fields.html</loc><priority>0.4</priority></url>
   <url><loc>docs/load_calculation_formulas.html</loc><priority>0.4</priority></url>
   <url><loc>docs/troubleshooting.html</loc><priority>0.4</priority></url>
+  <url><loc>intlCableSize.html</loc><priority>0.6</priority></url>
+  <url><loc>groundgrid.html</loc><priority>0.6</priority></url>
+  <url><loc>autosize.html</loc><priority>0.6</priority></url>
+  <url><loc>account.html</loc><priority>0.3</priority></url>
+  <url><loc>forgot-password.html</loc><priority>0.2</priority></url>
+  <url><loc>reset-password.html</loc><priority>0.2</priority></url>
   <url><loc>login.html</loc><priority>0.3</priority></url>
 </urlset>
