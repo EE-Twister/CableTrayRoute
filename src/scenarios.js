@@ -1,4 +1,5 @@
 import { listScenarios, getCurrentScenario, switchScenario, cloneScenario, getOneLine, getRevisions, restoreRevision } from '../dataStore.mjs';
+import { showAlertModal } from './components/modal.js';
 
 function ensureDefaults() {
   const defaults = ['base', 'future', 'emergency'];
@@ -82,7 +83,7 @@ function initScenarioUI() {
   const revBtn = document.getElementById('revision-btn');
   revBtn?.addEventListener('click', () => {
     const revs = getRevisions();
-    if (!revs.length) { alert('No revisions'); return; }
+    if (!revs.length) { showAlertModal('Notice', 'No revisions available.'); return; }
     const msg = revs.map((r,i) => `${i}: ${new Date(r.time).toLocaleString()}`).join('\n');
     const choice = prompt(`Restore which revision?\n${msg}`);
     const idx = Number(choice);

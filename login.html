@@ -47,6 +47,7 @@
               <label for="signup-user">Username</label>
               <input id="signup-user" name="signup-user" type="text" autocomplete="username"
                      placeholder="Username" required
+                     pattern="[a-zA-Z0-9_\-]{1,100}" title="Letters, numbers, underscores, and hyphens only (1–100 characters)"
                      aria-describedby="signup-user-hint" aria-required="true">
               <span id="signup-user-hint" class="field-hint">Choose a unique username for your account.</span>
             </div>
@@ -75,6 +76,7 @@
               <label for="login-user">Username</label>
               <input id="login-user" name="login-user" type="text" autocomplete="username"
                      placeholder="Username" required
+                     pattern="[a-zA-Z0-9_\-]{1,100}" title="Letters, numbers, underscores, and hyphens only (1–100 characters)"
                      aria-describedby="login-user-hint" aria-required="true">
               <span id="login-user-hint" class="field-hint sr-only">Enter your username.</span>
             </div>

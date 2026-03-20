@@ -2,7 +2,7 @@ import "./workflowStatus.js";
 import "../site.js";
 import * as dataStore from "../dataStore.mjs";
 import { exportPanelSchedule } from "../exportPanelSchedule.js";
-import { ensureFieldAssistiveText } from "./components/modal.js";
+import { ensureFieldAssistiveText, showAlertModal } from "./components/modal.js";
 
 const projectId = typeof window !== "undefined" ? (window.currentProjectId || "default") : undefined;
 
@@ -956,23 +956,23 @@ export function assignLoadToBreaker(panelId, loadIndex, breaker) {
   const block = panel ? getBreakerBlock(panel, breaker) : null;
   const startCircuit = block && Number.isFinite(Number(block.start)) ? Number(block.start) : breaker;
   if (!block || block.position !== 0) {
-    alert("Configure a breaker at this circuit before assigning a load.");
+    showAlertModal('Configuration Error', 'Configure a breaker at this circuit before assigning a load.');
     return;
   }
   const blockSize = Number(block.size) && Number(block.size) > 0 ? Number(block.size) : 1;
   const loadWithBreaker = { ...load, breaker: startCircuit, breakerPoles: blockSize };
   const span = getLoadBreakerSpan(loadWithBreaker, panel, circuitCount);
   if (!span.length) {
-    alert("Unable to assign load: invalid breaker selection.");
+    showAlertModal('Configuration Error', 'Unable to assign load: invalid breaker selection.');
     return;
   }
   const requiredPoles = Math.max(blockSize, getLoadPoleCount(loadWithBreaker, panel));
   if (circuitCount && span[span.length - 1] > circuitCount) {
-    alert(`Breaker selection requires ${requiredPoles} spaces on the same side of the panel but exceeds the available circuits.`);
+    showAlertModal('Configuration Error', `Breaker selection requires ${requiredPoles} spaces on the same side of the panel but exceeds the available circuits.`);
     return;
   }
   if (span.length !== requiredPoles) {
-    alert(`Breaker selection requires ${requiredPoles} spaces on the same side of the panel but only ${span.length} are available before the panel ends.`);
+    showAlertModal('Configuration Error', `Breaker selection requires ${requiredPoles} spaces on the same side of the panel but only ${span.length} are available before the panel ends.`);
     return;
   }
   const conflict = loads.find((candidate, idx) => {
@@ -983,7 +983,7 @@ export function assignLoadToBreaker(panelId, loadIndex, breaker) {
     return otherSpan.some(slot => span.includes(slot));
   });
   if (conflict) {
-    alert(`Cannot assign load: circuits conflict with ${formatLoadLabel(conflict, loads.indexOf(conflict))}.`);
+    showAlertModal('Configuration Error', `Cannot assign load: circuits conflict with ${formatLoadLabel(conflict, loads.indexOf(conflict))}.`);
     return;
   }
   // remove existing assignment of this load
@@ -2665,7 +2665,7 @@ window.addEventListener("DOMContentLoaded", () => {
     const loads = dataStore.getLoads();
     const targetSlots = computeBreakerSpan(start, size, count);
     if (targetSlots.length !== size) {
-      alert(`Breaker requires ${size} spaces on the same side of the panel but exceeds the available circuits.`);
+      showAlertModal('Configuration Error', `Breaker requires ${size} spaces on the same side of the panel but exceeds the available circuits.`);
       return;
     }
     const conflictSlot = targetSlots.find(slot => {
@@ -2673,7 +2673,7 @@ window.addEventListener("DOMContentLoaded", () => {
       return entry && entry.start !== start;
     });
     if (conflictSlot) {
-      alert("Target circuits already belong to another breaker. Remove it first.");
+      showAlertModal('Configuration Error', 'Target circuits already belong to another breaker. Remove it first.');
       return;
     }
     const existing = getBreakerBlock(panel, start);
@@ -2692,7 +2692,7 @@ window.addEventListener("DOMContentLoaded", () => {
     });
     if (conflictLoad) {
       const label = formatLoadLabel(conflictLoad, loads.indexOf(conflictLoad));
-      alert(label ? `Remove load ${label} before changing this breaker.` : "Remove the load before changing this breaker.");
+      showAlertModal('Configuration Error', label ? `Remove load ${label} before changing this breaker.` : 'Remove the load before changing this breaker.');
       return;
     }
     const detail = ensureBreakerDetail(panel, start);
@@ -2733,7 +2733,7 @@ window.addEventListener("DOMContentLoaded", () => {
     });
     if (conflictLoad) {
       const label = formatLoadLabel(conflictLoad, loads.indexOf(conflictLoad));
-      alert(label ? `Remove load ${label} before deleting this breaker.` : "Remove the load before deleting this breaker.");
+      showAlertModal('Configuration Error', label ? `Remove load ${label} before deleting this breaker.` : 'Remove the load before deleting this breaker.');
       return;
     }
     clearBreakerBlock(panel.breakerLayout, start);
@@ -3004,7 +3004,7 @@ window.addEventListener("DOMContentLoaded", () => {
     addEquipmentBtn.addEventListener("click", () => {
       const equipmentId = panel.ref || panel.panel_id || panel.tag || panel.id || activePanelId;
       if (!equipmentId) {
-        alert("Set a panelboard tag before adding it to the equipment list.");
+        showAlertModal('Configuration Error', 'Set a panelboard tag before adding it to the equipment list.');
         return;
       }
       const system = getPanelSystem(panel);

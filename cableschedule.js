@@ -46,7 +46,7 @@ import * as dataStore from './dataStore.mjs';
 import { sizeConductor } from './sizing.js';
 import ampacity from './ampacity.mjs';
 import { createTable, STORAGE_KEYS } from './tableUtils.mjs';
-import { openModal } from './src/components/modal.js';
+import { openModal, showAlertModal } from './src/components/modal.js';
 const { sizeToArea } = ampacity;
 
 suppressResumeIfE2E();
@@ -1087,7 +1087,7 @@ async function initCableSchedule() {
     exportTemplates() {
       if (!this.templates || this.templates.length === 0) {
         if (typeof window !== 'undefined' && window.alert) {
-          window.alert('No cable typicals to export yet.');
+          showAlertModal('Notice', 'No cable typicals to export yet.');
         }
         return;
       }
@@ -1121,7 +1121,7 @@ async function initCableSchedule() {
         } catch (err) {
           console.error('Failed to export cable typicals to Excel', err);
           if (typeof window !== 'undefined' && window.alert) {
-            window.alert('Unable to export cable typicals to Excel.');
+            showAlertModal('Export Error', 'Unable to export cable typicals to Excel.');
           }
           return;
         }
@@ -1137,21 +1137,21 @@ async function initCableSchedule() {
       } catch (err) {
         console.error('Failed to create cable typical export blob', err);
         if (typeof window !== 'undefined' && window.alert) {
-          window.alert('Unable to export cable typicals.');
+          showAlertModal('Export Error', 'Unable to export cable typicals.');
         }
         return;
       }
       if (typeof URL === 'undefined' || typeof URL.createObjectURL !== 'function') {
         console.error('Export is not supported: missing URL.createObjectURL');
         if (typeof window !== 'undefined' && window.alert) {
-          window.alert('Export is not supported in this environment.');
+          showAlertModal('Export Error', 'Export is not supported in this environment.');
         }
         return;
       }
       if (typeof document === 'undefined' || !document.body) {
         console.error('Export is not supported: missing document body');
         if (typeof window !== 'undefined' && window.alert) {
-          window.alert('Export is not supported in this environment.');
+          showAlertModal('Export Error', 'Export is not supported in this environment.');
         }
         return;
       }
@@ -1192,7 +1192,7 @@ async function initCableSchedule() {
           if (typeof XLSX === 'undefined' || !XLSX || typeof XLSX.read !== 'function' || !XLSX.utils || typeof XLSX.utils.sheet_to_json !== 'function') {
             console.error('Excel import requested but XLSX library is unavailable');
             if (typeof window !== 'undefined' && window.alert) {
-              window.alert('Excel import is not supported in this environment.');
+              showAlertModal('Import Error', 'Excel import is not supported in this environment.');
             }
             resetInput();
             return;
@@ -1204,7 +1204,7 @@ async function initCableSchedule() {
           } catch (err) {
             console.error('Failed to read cable typical Excel file', err);
             if (typeof window !== 'undefined' && window.alert) {
-              window.alert('Unable to import cable typicals. The Excel file could not be read.');
+              showAlertModal('Import Error', 'Unable to import cable typicals. The Excel file could not be read.');
             }
             resetInput();
             return;
@@ -1212,7 +1212,7 @@ async function initCableSchedule() {
           const sheetName = workbook.SheetNames && workbook.SheetNames[0];
           if (!sheetName) {
             if (typeof window !== 'undefined' && window.alert) {
-              window.alert('No sheets were found in the selected file.');
+              showAlertModal('Import Error', 'No sheets were found in the selected file.');
             }
             resetInput();
             return;
@@ -1221,7 +1221,7 @@ async function initCableSchedule() {
           const rows = XLSX.utils.sheet_to_json(sheet, { defval: '', raw: true });
           if (!Array.isArray(rows) || rows.length === 0) {
             if (typeof window !== 'undefined' && window.alert) {
-              window.alert('No cable typicals found in the selected file.');
+              showAlertModal('Import Error', 'No cable typicals found in the selected file.');
             }
             resetInput();
             return;
@@ -1237,7 +1237,7 @@ async function initCableSchedule() {
           } catch (err) {
             console.error('Failed to parse cable typical import', err);
             if (typeof window !== 'undefined' && window.alert) {
-              window.alert('Unable to import cable typicals. The file is not valid JSON.');
+              showAlertModal('Import Error', 'Unable to import cable typicals. The file is not valid JSON.');
             }
             resetInput();
             return;
@@ -1248,7 +1248,7 @@ async function initCableSchedule() {
         }
         if (!candidates.length) {
           if (typeof window !== 'undefined' && window.alert) {
-            window.alert('No cable typicals found in the selected file.');
+            showAlertModal('Import Error', 'No cable typicals found in the selected file.');
           }
           resetInput();
           return;
@@ -1272,7 +1272,7 @@ async function initCableSchedule() {
           .filter(tpl => Object.keys(tpl).length > 0);
         if (!imported.length) {
           if (typeof window !== 'undefined' && window.alert) {
-            window.alert('No valid cable typicals found in the selected file.');
+            showAlertModal('Import Error', 'No valid cable typicals found in the selected file.');
           }
           resetInput();
           return;
@@ -1284,7 +1284,7 @@ async function initCableSchedule() {
       } catch (err) {
         console.error('Unexpected error importing cable typicals', err);
         if (typeof window !== 'undefined' && window.alert) {
-          window.alert('Unable to import cable typicals.');
+          showAlertModal('Import Error', 'Unable to import cable typicals.');
         }
       } finally {
         resetInput();
@@ -1543,11 +1543,11 @@ async function initCableSchedule() {
             if (typeof this.labelInput.reportValidity === 'function') {
               this.labelInput.reportValidity();
             } else if (window.alert) {
-              window.alert('Enter a unique name for this cable typical.');
+              showAlertModal('Validation Error', 'Enter a unique name for this cable typical.');
             }
             this.labelInput.setCustomValidity('');
           } else if (window.alert) {
-            window.alert('Enter a unique name for this cable typical.');
+            showAlertModal('Validation Error', 'Enter a unique name for this cable typical.');
           }
         }
         return;
@@ -2158,7 +2158,7 @@ async function initCableSchedule() {
   const origExport = table.exportXlsx.bind(table);
   table.exportXlsx = function(){
     if(!validateAllRows()){
-      alert('Please complete required fields before exporting.');
+      showAlertModal('Validation Error', 'Please complete required fields before exporting.');
       return;
     }
     origExport();

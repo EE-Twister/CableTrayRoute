@@ -6,6 +6,7 @@ import "../ductbankTable.js";
 import "../e2e-helpers.js";
 import { emitAsync } from "../utils/safeEvents.mjs";
 import * as dataStore from "../dataStore.mjs";
+import { showAlertModal } from "./components/modal.js";
 import {
   normalizeDuctbankRow,
   normalizeConduitRow,
@@ -287,7 +288,7 @@ document.addEventListener('DOMContentLoaded', async () => {
     for(const [name,t] of Object.entries(tables)){
       if(!t || typeof t.setData !== 'function'){
         console.error(`Table '${name}' not initialized`);
-        alert("Raceway tables not initialized. See console.");
+        showAlertModal('Initialization Error', 'Raceway tables not initialized. See console.');
         return false;
       }
     }

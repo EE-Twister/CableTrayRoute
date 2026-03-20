@@ -1,0 +1,254 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <meta name="description" content="Generate a cable tray hardware bill of materials (BOM) including fittings, supports, and straight sections from the project raceway schedule." />
+  <title>Tray Hardware BOM — CableTrayRoute</title>
+  <link rel="icon" href="icons/favicon.svg" type="image/svg+xml">
+  <link rel="apple-touch-icon" href="icons/favicon.svg">
+  <!-- Open Graph / Social sharing -->
+  <meta property="og:type" content="website">
+  <meta property="og:title" content="Tray Hardware BOM — CableTrayRoute">
+  <meta property="og:description" content="Generate a cable tray hardware bill of materials including fittings, support brackets, and sections.">
+  <meta property="og:image" content="icons/route.svg">
+  <meta property="og:site_name" content="CableTrayRoute">
+  <meta property="og:url" content="trayhardwarebom.html">
+  <!-- Canonical URL -->
+  <link rel="canonical" href="trayhardwarebom.html">
+  <link rel="dns-prefetch" href="https://fonts.gstatic.com">
+  <meta name="color-scheme" content="light dark">
+  <link rel="stylesheet" href="style.css" />
+  <script src="cdnFallback.js" defer></script>
+  <script>
+    initCdnFallback([{ global: 'XLSX', label: 'Excel export (XLSX)' }]);
+  </script>
+  <script type="module" src="dist/trayhardwarebom.js" defer></script>
+</head>
+<body class="trayhardwarebom-page" data-report-title="Tray Hardware BOM">
+  <a href="#main-content" class="skip-link">Skip to main content</a>
+  <nav class="top-nav">
+    <button id="nav-toggle" class="nav-toggle" aria-label="Toggle navigation" aria-controls="nav-links" aria-expanded="false" title="Toggle navigation">
+      <img src="icons/toolbar/grid.svg" alt="" aria-hidden="true" class="control-icon" loading="lazy" decoding="async">
+    </button>
+    <div id="nav-links" class="nav-links">
+      <a href="index.html">Home</a>
+      <a href="equipmentlist.html">Equipment List</a>
+      <a href="loadlist.html">Load List</a>
+      <a href="cableschedule.html">Cable Schedule</a>
+      <a href="panelschedule.html">Panel Schedule</a>
+      <a href="racewayschedule.html">Raceway Schedule</a>
+      <a href="ductbankroute.html">Ductbank</a>
+      <a href="cabletrayfill.html">Tray Fill</a>
+      <a href="conduitfill.html">Conduit Fill</a>
+      <a href="supportspan.html">Support Span</a>
+      <a href="seismicBracing.html">Seismic Bracing</a>
+      <a href="trayhardwarebom.html" class="active" aria-current="page">Tray Hardware BOM</a>
+      <a href="optimalRoute.html">Optimal Route</a>
+      <a href="pullcards.html">Pull Cards</a>
+      <a href="oneline.html">One-Line</a>
+      <a href="tcc.html">TCC</a>
+      <a href="harmonics.html">Harmonics</a>
+      <a href="motorStart.html">Motor Start</a>
+      <a href="loadFlow.html">Load Flow</a>
+      <a href="shortCircuit.html">Short Circuit</a>
+      <a href="arcFlash.html">Arc Flash</a>
+      <a href="custom-components.html">Custom Components</a>
+      <a href="help.html">Help</a>
+      <a href="account.html">Account</a>
+    </div>
+    <button id="settings-btn" class="settings-btn" aria-label="Settings" aria-expanded="false" title="Settings">
+      <img src="icons/toolbar/validate.svg" alt="" aria-hidden="true" class="control-icon" loading="lazy" decoding="async">
+    </button>
+  </nav>
+
+  <div id="settings-menu" class="settings-menu">
+    <label for="theme-select">Theme
+      <select id="theme-select">
+        <option value="system">System</option>
+        <option value="light">Light</option>
+        <option value="dark">Dark</option>
+        <option value="high-contrast">High Contrast</option>
+      </select>
+    </label>
+    <label><input type="checkbox" id="compact-toggle" aria-label="Enable compact table mode"> Compact Mode</label>
+    <label for="unit-select">Units
+      <select id="unit-select">
+        <option value="imperial">Imperial</option>
+        <option value="metric">Metric</option>
+      </select>
+    </label>
+    <button id="help-btn" class="btn" aria-expanded="false" title="Show help">
+      <img src="icons/toolbar/validate.svg" alt="" aria-hidden="true" class="control-icon" loading="lazy" decoding="async">
+      <span>Site Help</span>
+    </button>
+    <button id="new-project-btn" title="Start a new project">
+      <img src="icons/toolbar/copy.svg" alt="" aria-hidden="true" class="control-icon" loading="lazy" decoding="async">
+      <span>New Project</span>
+    </button>
+    <button id="save-project-btn" title="Save current project">
+      <img src="icons/toolbar/export.svg" alt="" aria-hidden="true" class="control-icon" loading="lazy" decoding="async">
+      <span>Save Project</span>
+    </button>
+    <button id="load-project-btn" title="Load an existing project">
+      <img src="icons/toolbar/import.svg" alt="" aria-hidden="true" class="control-icon" loading="lazy" decoding="async">
+      <span>Load Project</span>
+    </button>
+    <button id="export-project-btn" title="Export project data">
+      <img src="icons/toolbar/export.svg" alt="" aria-hidden="true" class="control-icon" loading="lazy" decoding="async">
+      <span>Export Project</span>
+    </button>
+    <button id="import-project-btn" title="Import project data">
+      <img src="icons/toolbar/import.svg" alt="" aria-hidden="true" class="control-icon" loading="lazy" decoding="async">
+      <span>Import Project</span>
+    </button>
+    <input type="file" id="import-project-input" accept=".ctr.json" class="hidden" title="Select project file">
+  </div>
+
+  <div class="container">
+    <main id="main-content" class="main-content">
+      <nav aria-label="Breadcrumb">
+        <ol class="breadcrumb-trail">
+          <li><a href="index.html">Home</a></li>
+          <li>Workflow</li>
+          <li aria-current="page">Tray Hardware BOM</li>
+        </ol>
+      </nav>
+
+      <header class="page-header">
+        <h1>Cable Tray Hardware Bill of Materials</h1>
+      </header>
+
+      <details class="method-panel">
+        <summary>Method &amp; Assumptions</summary>
+        <p>The hardware BOM is generated by analyzing tray geometry from the
+        <a href="racewayschedule.html">Raceway Schedule</a>. Trays must have
+        valid start and end coordinates (X, Y, Z) for the analysis to work.</p>
+
+        <p><strong>Fittings</strong> are detected at endpoints where two or more
+        trays meet:</p>
+        <ul>
+          <li><strong>Splice Plate</strong> — two collinear trays (≤10° bend), same width</li>
+          <li><strong>Reducer</strong> — two collinear trays with different widths</li>
+          <li><strong>Elbow</strong> — two trays with bend angle &gt;10°</li>
+          <li><strong>Tee</strong> — three trays meeting at a junction</li>
+          <li><strong>Cross</strong> — four trays meeting at a junction</li>
+        </ul>
+
+        <p><strong>Support brackets</strong> are counted per NEMA VE 2 spacing rules.
+        Maximum span is determined from the selected NEMA load class and cable weight
+        per foot. Minimum 2 brackets per segment (one at each end).</p>
+
+        <p><strong>Straight sections</strong> are counted using the standard section
+        length (default 12 ft). Cover sections are optionally included for the
+        same quantity.</p>
+
+        <p>References: NEMA VE 1-2017 §4 (Load Classification), NEMA VE 2 (Installation).</p>
+
+        <p>See also:
+          <a href="supportspan.html">Support Span Calculator</a>,
+          <a href="racewayschedule.html">Raceway Schedule</a>,
+          <a href="seismicBracing.html">Seismic Bracing</a>.
+        </p>
+      </details>
+
+      <fieldset>
+        <legend><strong>BOM Parameters</strong></legend>
+
+        <div class="field-row">
+          <label for="loadClass">
+            NEMA Load Class
+            <button class="helpBtn" data-doc="docs/standards.html#nema-load-class"
+                    aria-label="Help — NEMA load class">?</button>
+          </label>
+          <select id="loadClass" aria-describedby="loadClassHint">
+            <option value="8A">8A — 8 lbs/ft rated</option>
+            <option value="12A">12A — 12 lbs/ft rated</option>
+            <option value="16A" selected>16A — 16 lbs/ft rated (default)</option>
+            <option value="20A">20A — 20 lbs/ft rated</option>
+            <option value="25A">25A — 25 lbs/ft rated</option>
+            <option value="32A">32A — 32 lbs/ft rated</option>
+          </select>
+          <p id="loadClassHint" class="field-hint">
+            Per NEMA VE 1-2017 §4. Determines maximum allowable support span.
+            Use the <a href="supportspan.html">Support Span Calculator</a> to verify.
+          </p>
+        </div>
+
+        <div class="field-row">
+          <label for="cableLoadPerFt">
+            Cable weight per foot (lbs/ft)
+            <button class="helpBtn" data-doc="docs/standards.html#cable-weights"
+                    aria-label="Help — cable weight">?</button>
+          </label>
+          <input type="number" id="cableLoadPerFt" min="0" step="0.5"
+                 value="0" aria-describedby="cableLoadHint">
+          <p id="cableLoadHint" class="field-hint">
+            Average cable weight per linear foot across all trays. Set to 0 to
+            use the NEMA rated load (most conservative). Use the
+            <a href="supportspan.html">Support Span Calculator</a> for
+            per-tray values.
+          </p>
+        </div>
+
+        <div class="field-row">
+          <label for="sectionLength">
+            Standard section length (ft)
+          </label>
+          <input type="number" id="sectionLength" min="1" max="24" step="1"
+                 value="12" aria-describedby="sectionLenHint">
+          <p id="sectionLenHint" class="field-hint">
+            Length of straight tray sections. Typical: 10 ft or 12 ft.
+          </p>
+        </div>
+
+        <div class="field-row">
+          <label for="includeCovers">
+            <input type="checkbox" id="includeCovers" checked>
+            Include cover sections in BOM
+          </label>
+          <p class="field-hint">
+            Check to include tray cover sections (same count as straight sections).
+            Covers are typically used on solid-bottom and ventilated trays.
+          </p>
+        </div>
+      </fieldset>
+
+      <div id="controls">
+        <button id="generateBtn" type="button">Generate BOM from Raceway Schedule</button>
+        <button id="exportXlsxBtn" type="button" disabled>Export to Excel (XLSX)</button>
+      </div>
+
+      <div id="results" role="region" aria-live="polite" aria-label="Tray hardware BOM results"></div>
+
+      <nav class="step-nav" aria-label="Workflow navigation">
+        <a href="seismicBracing.html" class="step-nav-prev">&#8592; Seismic Bracing</a>
+        <a href="optimalRoute.html" class="step-nav-next">Optimal Route &#8594;</a>
+      </nav>
+    </main>
+  </div>
+
+  <div id="help-modal" class="modal" aria-hidden="true" role="dialog" aria-modal="true"
+       aria-labelledby="help-title">
+    <div class="modal-content">
+      <button id="close-help-btn" class="close-btn" aria-label="Close Help">&times;</button>
+      <h2 id="help-title">Tray Hardware BOM Help</h2>
+      <p>This tool generates a cable tray hardware bill of materials from the
+      tray geometry defined in the Raceway Schedule.</p>
+      <p><strong>Prerequisites:</strong> Trays must have start/end coordinates
+      (X, Y, Z) in the Raceway Schedule. Trays without coordinates will be excluded.</p>
+      <p><strong>To use:</strong></p>
+      <ol>
+        <li>Enter trays with coordinates in the <a href="racewayschedule.html">Raceway Schedule</a>.</li>
+        <li>Select the NEMA load class and cable weight per foot.</li>
+        <li>Click <em>Generate BOM from Raceway Schedule</em>.</li>
+        <li>Review the fittings, supports, and sections tables.</li>
+        <li>Click <em>Export to Excel</em> to download the BOM.</li>
+      </ol>
+      <p><button class="helpBtn" data-doc="docs/standards.html">Standards Reference</button></p>
+    </div>
+  </div>
+
+  <script type="module" src="dist/projectManager.js"></script>
+</body>
+</html>

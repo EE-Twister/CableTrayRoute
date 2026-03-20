@@ -538,7 +538,7 @@ async function saveProject(options = {}) {
   } else {
     message = `Project "${name}" successfully saved.`;
   }
-  alert(message);
+  await showAlertModal('Project Saved', message);
 }
 
 async function loadProject() {
