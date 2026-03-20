@@ -33,4 +33,5 @@
   <url><loc>docs/load_calculation_formulas.html</loc><priority>0.4</priority></url>
   <url><loc>docs/troubleshooting.html</loc><priority>0.4</priority></url>
   <url><loc>login.html</loc><priority>0.3</priority></url>
+  <url><loc>account.html</loc><priority>0.3</priority></url>
 </urlset>

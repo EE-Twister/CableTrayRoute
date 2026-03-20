@@ -32,6 +32,8 @@ async function signup(e) {
     return;
   }
 
+  const submitBtn = form.querySelector('[type=submit]');
+  if (submitBtn) submitBtn.disabled = true;
   try {
     const res = await fetch('/signup', {
       method: 'POST',
@@ -47,6 +49,8 @@ async function signup(e) {
   } catch (err) {
     console.error('Signup request failed', err);
     showStatus(form, 'Signup failed. Check your connection and try again.', true);
+  } finally {
+    if (submitBtn) submitBtn.disabled = false;
   }
 }
 
@@ -55,6 +59,8 @@ async function login(e) {
   const form = e.currentTarget;
   const username = document.getElementById('login-user').value.trim();
   const password = document.getElementById('login-pass').value;
+  const submitBtn = form.querySelector('[type=submit]');
+  if (submitBtn) submitBtn.disabled = true;
   try {
     const res = await fetch('/login', {
       method: 'POST',
@@ -74,6 +80,8 @@ async function login(e) {
     console.error('Login request failed', err);
     clearAuthContextState();
     showStatus(form, 'Login failed. Check your connection and try again.', true);
+  } finally {
+    if (submitBtn) submitBtn.disabled = false;
   }
 }
 
