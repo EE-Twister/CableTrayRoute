@@ -89,7 +89,7 @@ import { sizeConductor } from './sizing.js';
 import { runValidation } from './validation/rules.js';
 import { exportPDF } from './exporters/pdf.js';
 import { exportDXF, exportDWG } from './exporters/dxf.js';
-import { ensureFieldAssistiveText, openModal } from './src/components/modal.js';
+import { ensureFieldAssistiveText, openModal, showAlertModal } from './src/components/modal.js';
 import { normalizeVoltageToVolts, toBaseKV } from './utils/voltage.js';
 import { calculateTransformerImpedance } from './utils/transformerImpedance.js';
 import { computeImpedanceFromPerKm } from './utils/cableImpedance.js';
@@ -9041,7 +9041,7 @@ async function chooseCable(source, target, existingConn = null) {
         sizeInput.dataset.codeRef = res.codeRef;
         sizeInput.dataset.sizingReport = JSON.stringify(res.report || {});
         sizeInput.classList.remove('sizing-violation');
-        alert(`Sized to ${res.size}`);
+        showAlertModal('Cable Sized', `Sized to ${res.size}`);
       } else {
         sizeInput.dataset.calcAmpacity = '';
         sizeInput.dataset.voltageDrop = '';
@@ -9049,7 +9049,7 @@ async function chooseCable(source, target, existingConn = null) {
         sizeInput.dataset.codeRef = res.codeRef || '';
         sizeInput.dataset.sizingReport = JSON.stringify(res.report || {});
         sizeInput.classList.add('sizing-violation');
-        alert(res.violation);
+        showAlertModal('Sizing Violation', res.violation);
       }
     });
     form.appendChild(sizeBtn);

@@ -1,5 +1,6 @@
 import { getItem, setItem, removeItem, keys as storeKeys } from './dataStore.mjs';
 import { FILTER_ICON_SVG } from './tableUtils.mjs';
+import { showAlertModal } from './src/components/modal.js';
 
 checkPrereqs([{key:'traySchedule',page:'racewayschedule.html',label:'Raceway Schedule'}]);
 
@@ -717,19 +718,19 @@ checkPrereqs([{key:'traySchedule',page:'racewayschedule.html',label:'Raceway Sch
           const multiVal   = countVal > 1;
 
           if (!tagVal) {
-            alert("ERROR: Every cable row requires a Tag.");
+            showAlertModal('Validation Error', 'Every cable row requires a Tag.');
             return;
           }
           if (!cableType) {
-            alert(`ERROR: Every cable row requires a Cable Type.`);
+            showAlertModal('Validation Error', 'Every cable row requires a Cable Type.');
             return;
           }
           if (!countVal || !sizeVal) {
-            alert(`ERROR: Every cable row requires Conductor count and size.`);
+            showAlertModal('Validation Error', 'Every cable row requires Conductor count and size.');
             return;
           }
           if (isNaN(odVal) || isNaN(wtVal)) {
-            alert(`ERROR: Every cable row requires numeric OD and Weight.`);
+            showAlertModal('Validation Error', 'Every cable row requires numeric OD and Weight.');
             return;
           }
 
@@ -749,7 +750,7 @@ checkPrereqs([{key:'traySchedule',page:'racewayschedule.html',label:'Raceway Sch
           });
         }
         if (cables.length === 0) {
-          alert("ERROR: Add at least one cable before drawing the tray.");
+          showAlertModal('Validation Error', 'Add at least one cable before drawing the tray.');
           return;
         }
         const totalArea = sumAreas(cables);
@@ -1229,7 +1230,7 @@ Wt: ${p.weight.toFixed(2)} lbs/ft
       // ─────────────────────────────────────────────────────────────
       document.getElementById("expandBtn").addEventListener("click", () => {
         if (!lastPlaced) {
-          alert("Please click “Draw Tray” first, then Expand.");
+          showAlertModal('Action Required', 'Please click “Draw Tray” first, then Expand.');
           return;
         }
         const bigScale = 160;  // 160 px/in for high resolution
@@ -1439,14 +1440,14 @@ Wt: ${m.weight.toFixed(2)} lbs/ft
         const container = document.getElementById("expandedSVG");
         const svgElem = container.querySelector("svg");
         if (!svgElem) {
-          alert("No expanded SVG found to copy.");
+          showAlertModal('Notice', 'No expanded SVG found to copy.');
           return;
         }
         const svgText = svgElem.outerHTML;
         navigator.clipboard.writeText(svgText).then(() => {
-          alert("SVG markup copied to clipboard!");
+          showAlertModal('Copied', 'SVG markup copied to clipboard!');
         }).catch(err => {
-          alert("Error copying SVG: " + err);
+          showAlertModal('Copy Error', 'Error copying SVG: ' + err);
         });
       });
 
@@ -1457,7 +1458,7 @@ Wt: ${m.weight.toFixed(2)} lbs/ft
         const container = document.getElementById("expandedSVG");
         const svgElem = container.querySelector("svg");
         if (!svgElem) {
-          alert("No expanded SVG found to print.");
+          showAlertModal('Notice', 'No expanded SVG found to print.');
           return;
         }
         const svgText = svgElem.outerHTML;
@@ -1485,7 +1486,7 @@ Wt: ${m.weight.toFixed(2)} lbs/ft
         const container = document.getElementById("expandedSVG");
         const svgElem = container.querySelector("svg");
         if (!svgElem) {
-          alert("No expanded SVG found to copy as PNG.");
+          showAlertModal('Notice', 'No expanded SVG found to copy as PNG.');
           return;
         }
         const serializer = new XMLSerializer();
@@ -1504,22 +1505,22 @@ Wt: ${m.weight.toFixed(2)} lbs/ft
           ctx.drawImage(img, 0, 0);
           canvas.toBlob(pngBlob => {
             if (!pngBlob) {
-              alert("Failed to create PNG blob.");
+              showAlertModal('Export Error', 'Failed to create PNG blob.');
               URL.revokeObjectURL(url);
               return;
             }
             const clipboardItem = new ClipboardItem({ "image/png": pngBlob });
             navigator.clipboard.write([clipboardItem]).then(() => {
-              alert("PNG copied to clipboard!");
+              showAlertModal('Copied', 'PNG copied to clipboard!');
               URL.revokeObjectURL(url);
             }).catch(err => {
-              alert("Error copying PNG: " + err);
+              showAlertModal('Copy Error', 'Error copying PNG: ' + err);
               URL.revokeObjectURL(url);
             });
           }, "image/png");
         };
         img.onerror = () => {
-          alert("Failed to load SVG into image for PNG conversion.");
+          showAlertModal('Export Error', 'Failed to load SVG into image for PNG conversion.');
           URL.revokeObjectURL(url);
         };
         img.src = url;
@@ -1537,12 +1538,12 @@ Wt: ${m.weight.toFixed(2)} lbs/ft
       // ─────────────────────────────────────────────────────────────
       function exportCableXlsx(){
         if(typeof XLSX==='undefined'){
-          alert('XLSX library not loaded');
+          showAlertModal('Library Error', 'XLSX library not loaded.');
           return;
         }
         const rows=Array.from(cableTbody.querySelectorAll('tr'));
         if(rows.length===0){
-          alert('No cables to export.');
+          showAlertModal('Notice', 'No cables to export.');
           return;
         }
         const data=[['Tag','Cable Type','Conductors','Conductor Size','Cable Rating (V)','Operating Voltage (V)','OD','Weight','Zone','Circuit Group']];
@@ -1568,7 +1569,7 @@ Wt: ${m.weight.toFixed(2)} lbs/ft
       function importCableXlsx(file){
         if(!file) return;
         if(typeof XLSX==='undefined'){
-          alert('XLSX library not loaded');
+          showAlertModal('Library Error', 'XLSX library not loaded.');
           return;
         }
         const reader=new FileReader();
@@ -1577,7 +1578,7 @@ Wt: ${m.weight.toFixed(2)} lbs/ft
           const firstSheet=wb.Sheets[wb.SheetNames[0]];
           const jsonArr=XLSX.utils.sheet_to_json(firstSheet,{defval:""});
           if(jsonArr.length===0){
-            alert('Excel sheet is empty.');
+            showAlertModal('Import Error', 'Excel sheet is empty.');
             return;
           }
           cableTbody.innerHTML='';
@@ -1605,7 +1606,7 @@ Wt: ${m.weight.toFixed(2)} lbs/ft
               typeof OD==='undefined'||
               typeof Weight==='undefined'
             ){
-              alert(`Row ${idx+2} missing one of: Tag, Cable Type, Conductors, Conductor Size, Cable Rating (V), Operating Voltage (V), OD, Weight.`);
+              showAlertModal('Import Error', `Row ${idx+2} missing one of: Tag, Cable Type, Conductors, Conductor Size, Cable Rating (V), Operating Voltage (V), OD, Weight.`);
               return;
             }
             const idx2=cables.length;
@@ -1639,7 +1640,7 @@ Wt: ${m.weight.toFixed(2)} lbs/ft
             cableTbody.appendChild(newRow);
           });
           applyFilters();
-          alert('Excel imported. Correct any unrecognized conductor details if needed.');
+          showAlertModal('Import Complete', 'Excel imported. Correct any unrecognized conductor details if needed.');
           document.getElementById('importExcelInput').value='';
         };
         reader.readAsBinaryString(file);
@@ -1651,10 +1652,9 @@ Wt: ${m.weight.toFixed(2)} lbs/ft
 
       // (L2) Import Help button
       document.getElementById("importHelpBtn").addEventListener("click", () => {
-        alert(
-          "Import Instructions:\n" +
+        showAlertModal('Import Instructions',
           "1. Click 'Export Excel' to download a template.\n" +
-            "2. Fill in Tag, Cable Type, Conductors, Conductor Size, Cable Rating (V), Operating Voltage (V), OD, Weight, Zone, and Circuit Group.\n" +
+          "2. Fill in Tag, Cable Type, Conductors, Conductor Size, Cable Rating (V), Operating Voltage (V), OD, Weight, Zone, and Circuit Group.\n" +
           "3. Save the file then choose it with 'Import Excel'."
         );
       });
@@ -1725,7 +1725,7 @@ Wt: ${m.weight.toFixed(2)} lbs/ft
           const groupVal   = groupRaw ? parseInt(groupRaw) : null;
           const multiVal  = countVal > 1;
           if (!tagVal || !cableType || !countVal || !sizeVal || isNaN(odVal) || isNaN(wtVal)) {
-            alert("All rows must have Tag, Cable Type, conductor count/size, OD, and Weight before saving.");
+            showAlertModal('Validation Error', 'All rows must have Tag, Cable Type, conductor count/size, OD, and Weight before saving.');
             return;
           }
           arr.push({
@@ -1750,10 +1750,10 @@ Wt: ${m.weight.toFixed(2)} lbs/ft
         };
         try {
           trayProfiles.save(name, { tray: trayData, cables: arr });
-          alert(`Profile "${name}" saved.`);
+          showAlertModal('Profile Saved', `Profile "${name}" saved.`);
           refreshProfileList();
         } catch (e) {
-          alert("Error saving profile: " + e.message);
+          showAlertModal('Profile Error', 'Error saving profile: ' + e.message);
         }
       });
 
@@ -1761,12 +1761,12 @@ Wt: ${m.weight.toFixed(2)} lbs/ft
       document.getElementById("loadProfileBtn").addEventListener("click", () => {
         const profileName = profileList.value;
         if (!profileName) {
-          alert("Select a profile to load.");
+          showAlertModal('Notice', 'Select a profile to load.');
           return;
         }
         const data = trayProfiles.load(profileName);
         if (!data) {
-          alert(`Profile "${profileName}" not found.`);
+          showAlertModal('Profile Not Found', `Profile "${profileName}" not found.`);
           refreshProfileList();
           return;
         }
@@ -1806,19 +1806,19 @@ Wt: ${m.weight.toFixed(2)} lbs/ft
           cableTbody.appendChild(newRow);
         });
         applyFilters();
-        alert(`Profile "${profileName}" loaded.`);
+        showAlertModal('Profile Loaded', `Profile "${profileName}" loaded.`);
       });
 
       // Delete profile
       document.getElementById("deleteProfileBtn").addEventListener("click", () => {
         const profileName = profileList.value;
         if (!profileName) {
-          alert("Select a profile to delete.");
+          showAlertModal('Notice', 'Select a profile to delete.');
           return;
         }
         if (!confirm(`Delete profile "${profileName}"?`)) return;
         trayProfiles.remove(profileName);
-        alert(`Profile "${profileName}" deleted.`);
+        showAlertModal('Profile Deleted', `Profile "${profileName}" deleted.`);
         refreshProfileList();
       });
 
@@ -1874,7 +1874,7 @@ Wt: ${m.weight.toFixed(2)} lbs/ft
           const doc = btn.getAttribute('data-doc');
           if(doc && globalThis.showHelpDoc) showHelpDoc(doc);
           else if(doc) window.open(doc, '_blank');
-          else alert(btn.getAttribute('data-help'));
+          else showAlertModal('Help', btn.getAttribute('data-help') || '');
         });
       });
     });

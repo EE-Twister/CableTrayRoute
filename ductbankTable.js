@@ -1,6 +1,7 @@
 // Alias storage helpers to avoid name conflicts with local functions
 import { getDuctbanks as readStoredDuctbanks, setDuctbanks, setItem, getItem } from './dataStore.mjs';
 import { FILTER_ICON_SVG } from './tableUtils.mjs';
+import { showAlertModal } from './src/components/modal.js';
 
 (function(){
   let ductbanks=[];
@@ -429,7 +430,7 @@ import { FILTER_ICON_SVG } from './tableUtils.mjs';
     }));
     renderDuctbanks();
     if(hasError){
-      alert('Every conduit must have a matching ductbank tag.');
+      showAlertModal('Validation Error', 'Every conduit must have a matching ductbank tag.');
       return;
     }
     ductbanks.forEach(db=>db.conduits.forEach(c=>{c.ductbankTag=db.tag;}));
@@ -463,7 +464,7 @@ import { FILTER_ICON_SVG } from './tableUtils.mjs';
 
   function exportDuctbankXlsx(){
     if(typeof XLSX==='undefined'){
-      alert('XLSX library not loaded');
+      showAlertModal('Library Error', 'XLSX library not loaded.');
       return;
     }
     const dbData=[['ductbank_id','tag','from','to','concrete_encasement','start_x','start_y','start_z','end_x','end_y','end_z']];
@@ -479,7 +480,7 @@ import { FILTER_ICON_SVG } from './tableUtils.mjs';
   function importDuctbankXlsx(file){
     if(!file) return;
     if(typeof XLSX==='undefined'){
-      alert('XLSX library not loaded');
+      showAlertModal('Library Error', 'XLSX library not loaded.');
       return;
     }
     const reader=new FileReader();
@@ -489,11 +490,11 @@ import { FILTER_ICON_SVG } from './tableUtils.mjs';
       const cSheet=wb.Sheets['Conduits']||wb.Sheets[wb.SheetNames[1]];
 
       if(!dbSheet){
-        alert('Ductbanks sheet not found');
+        showAlertModal('Import Error', 'Ductbanks sheet not found.');
         return;
       }
       if(!cSheet){
-        alert('Conduits sheet not found');
+        showAlertModal('Import Error', 'Conduits sheet not found.');
         return;
       }
 
@@ -501,7 +502,7 @@ import { FILTER_ICON_SVG } from './tableUtils.mjs';
       const dbHeaders=(XLSX.utils.sheet_to_json(dbSheet,{header:1})[0]||[]).map(h=>String(h).toLowerCase());
       const missingDb=requiredDbHeaders.filter(h=>!dbHeaders.includes(h));
       if(missingDb.length){
-        alert('Missing required Ductbanks headers: '+missingDb.join(', '));
+        showAlertModal('Import Error', 'Missing required Ductbanks headers: '+missingDb.join(', '));
         return;
       }
 
@@ -511,7 +512,7 @@ import { FILTER_ICON_SVG } from './tableUtils.mjs';
       const hasLegacyId=cHeaders.includes('ductbank_id');
       if(missingC.length){
         if(!(missingC.length===1&&missingC[0]==='ductbanktag'&&hasLegacyId)){
-          alert('Missing required Conduits headers: '+missingC.join(', '));
+          showAlertModal('Import Error', 'Missing required Conduits headers: '+missingC.join(', '));
           return;
         }
       }

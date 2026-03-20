@@ -28,6 +28,7 @@ const entries = {
   supportspan: 'src/supportspan.js',
   pullcards: 'src/pullcards.js',
   seismicBracing: 'src/seismicBracing.js',
+  trayhardwarebom: 'src/trayhardwarebom.js',
   intlCableSize: 'src/intlCableSize.js',
   '404': 'src/404.js'
 };

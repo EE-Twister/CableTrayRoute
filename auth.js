@@ -18,9 +18,15 @@ function showStatus(formEl, message, isError) {
 async function signup(e) {
   e.preventDefault();
   const form = e.currentTarget;
+  const submitBtn = form.querySelector('button[type="submit"]');
   const username = document.getElementById('signup-user').value.trim();
   const password = document.getElementById('signup-pass').value;
   const confirm = document.getElementById('signup-pass-confirm').value;
+
+  if (!/^[a-zA-Z0-9_-]{1,100}$/.test(username)) {
+    showStatus(form, 'Username may only contain letters, numbers, underscores, and hyphens (1–100 characters).', true);
+    return;
+  }
 
   if (password.length < MIN_PASSWORD_LENGTH) {
     showStatus(form, `Password must be at least ${MIN_PASSWORD_LENGTH} characters.`, true);
@@ -32,6 +38,7 @@ async function signup(e) {
     return;
   }
 
+  submitBtn.disabled = true;
   try {
     const res = await fetch('/signup', {
       method: 'POST',
@@ -47,14 +54,18 @@ async function signup(e) {
   } catch (err) {
     console.error('Signup request failed', err);
     showStatus(form, 'Signup failed. Check your connection and try again.', true);
+  } finally {
+    submitBtn.disabled = false;
   }
 }
 
 async function login(e) {
   e.preventDefault();
   const form = e.currentTarget;
+  const submitBtn = form.querySelector('button[type="submit"]');
   const username = document.getElementById('login-user').value.trim();
   const password = document.getElementById('login-pass').value;
+  submitBtn.disabled = true;
   try {
     const res = await fetch('/login', {
       method: 'POST',
@@ -74,6 +85,8 @@ async function login(e) {
     console.error('Login request failed', err);
     clearAuthContextState();
     showStatus(form, 'Login failed. Check your connection and try again.', true);
+  } finally {
+    submitBtn.disabled = false;
   }
 }
 

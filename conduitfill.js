@@ -1,4 +1,5 @@
 import { getItem, removeItem } from './dataStore.mjs';
+import { showAlertModal } from './src/components/modal.js';
 
 checkPrereqs([{key:'conduitSchedule',page:'racewayschedule.html',label:'Raceway Schedule'}]);
 
@@ -241,11 +242,11 @@ checkPrereqs([{key:'conduitSchedule',page:'racewayschedule.html',label:'Raceway 
           const tag = row.children[0].querySelector('input').value.trim();
           // OD input is in the fifth column (index 4) of each row
           const od = parseFloat(row.children[4].querySelector('input').value);
-          if(!tag){ alert('Each cable requires a Tag.'); return; }
-          if(isNaN(od)){ alert('Each cable requires an OD.'); return; }
+          if(!tag){ showAlertModal('Validation Error', 'Each cable requires a Tag.'); return; }
+          if(isNaN(od)){ showAlertModal('Validation Error', 'Each cable requires an OD.'); return; }
           cables.push({tag,r:od/2});
         }
-        if(cables.length===0){ alert('Add at least one cable.'); return; }
+        if(cables.length===0){ showAlertModal('Validation Error', 'Add at least one cable.'); return; }
         const placed = packCircles(cables,R);
 
         const sumArea = cables.reduce((s,c)=> s + Math.PI*(c.r**2),0);
@@ -275,7 +276,7 @@ checkPrereqs([{key:'conduitSchedule',page:'racewayschedule.html',label:'Raceway 
       // Expand Image button
       document.getElementById('expandBtn').addEventListener('click', () => {
         if(!lastPlaced){
-          alert('Please draw the conduit first, then expand.');
+          showAlertModal('Action Required', 'Please draw the conduit first, then expand.');
           return;
         }
         const SCALE = 160;
@@ -303,19 +304,19 @@ checkPrereqs([{key:'conduitSchedule',page:'racewayschedule.html',label:'Raceway 
       // Copy SVG
       document.getElementById('copyBtn').addEventListener('click', () => {
         const svgElem = document.getElementById('expandedSVG').querySelector('svg');
-        if(!svgElem){ alert('No expanded SVG found to copy.'); return; }
+        if(!svgElem){ showAlertModal('Notice', 'No expanded SVG found to copy.'); return; }
         const svgText = svgElem.outerHTML;
         navigator.clipboard.writeText(svgText).then(()=>{
-          alert('SVG markup copied to clipboard!');
+          showAlertModal('Copied', 'SVG markup copied to clipboard!');
         }).catch(err=>{
-          alert('Error copying SVG: ' + err);
+          showAlertModal('Copy Error', 'Error copying SVG: ' + err);
         });
       });
 
       // Print SVG
       document.getElementById('printBtn').addEventListener('click', () => {
         const svgElem = document.getElementById('expandedSVG').querySelector('svg');
-        if(!svgElem){ alert('No expanded SVG found to print.'); return; }
+        if(!svgElem){ showAlertModal('Notice', 'No expanded SVG found to print.'); return; }
         const svgText = svgElem.outerHTML;
         const w = window.open('', '_blank');
         w.document.write(`<!DOCTYPE html><html><head><title>Print Conduit</title></head><body style="margin:0;">${svgText}</body></html>`);
@@ -327,7 +328,7 @@ checkPrereqs([{key:'conduitSchedule',page:'racewayschedule.html',label:'Raceway 
       // Copy PNG
       document.getElementById('copyPngBtn').addEventListener('click', () => {
         const svgElem = document.getElementById('expandedSVG').querySelector('svg');
-        if(!svgElem){ alert('No expanded SVG found to copy as PNG.'); return; }
+        if(!svgElem){ showAlertModal('Notice', 'No expanded SVG found to copy as PNG.'); return; }
         const serializer = new XMLSerializer();
         const svgString = serializer.serializeToString(svgElem);
         const blob = new Blob([svgString], {type:'image/svg+xml;charset=utf-8'});
@@ -342,18 +343,18 @@ checkPrereqs([{key:'conduitSchedule',page:'racewayschedule.html',label:'Raceway 
           ctx.fillRect(0,0,canvas.width,canvas.height);
           ctx.drawImage(img,0,0);
           canvas.toBlob(pngBlob => {
-            if(!pngBlob){ alert('Failed to create PNG blob.'); URL.revokeObjectURL(url); return; }
+            if(!pngBlob){ showAlertModal('Export Error', 'Failed to create PNG blob.'); URL.revokeObjectURL(url); return; }
             const item = new ClipboardItem({'image/png': pngBlob});
             navigator.clipboard.write([item]).then(()=>{
-              alert('PNG copied to clipboard!');
+              showAlertModal('Copied', 'PNG copied to clipboard!');
               URL.revokeObjectURL(url);
             }).catch(err=>{
-              alert('Error copying PNG: ' + err);
+              showAlertModal('Copy Error', 'Error copying PNG: ' + err);
               URL.revokeObjectURL(url);
             });
           }, 'image/png');
         };
-        img.onerror = () => { alert('Failed to load SVG for PNG conversion.'); URL.revokeObjectURL(url); };
+        img.onerror = () => { showAlertModal('Export Error', 'Failed to load SVG for PNG conversion.'); URL.revokeObjectURL(url); };
         img.src = url;
       });
 
@@ -401,7 +402,7 @@ checkPrereqs([{key:'conduitSchedule',page:'racewayschedule.html',label:'Raceway 
           const doc=btn.getAttribute('data-doc');
           if(doc && globalThis.showHelpDoc) showHelpDoc(doc);
           else if(doc) window.open(doc,'_blank');
-          else alert(btn.getAttribute('data-help'));
+          else showAlertModal('Help', btn.getAttribute('data-help') || '');
         });
       });
     });
