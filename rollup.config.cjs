@@ -32,6 +32,10 @@ const entries = {
   intlCableSize: 'src/intlCableSize.js',
   groundgrid: 'src/groundgrid.js',
   autosize: 'src/autosize.js',
+  submittal: 'src/submittal.js',
+  reliability: 'src/reliability.js',
+  costestimate: 'src/costestimate.js',
+  emf: 'src/emf.js',
   '404': 'src/404.js'
 };
 

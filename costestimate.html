@@ -1,0 +1,156 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <meta name="description" content="Project cost estimation for cable trays, conduit, and cables. Compute material and labor cost estimates from your project schedule with configurable unit prices." />
+  <title>Cost Estimate — CableTrayRoute</title>
+  <link rel="icon" href="icons/favicon.svg" type="image/svg+xml">
+  <link rel="apple-touch-icon" href="icons/favicon.svg">
+  <meta property="og:type" content="website">
+  <meta property="og:title" content="Cost Estimate — CableTrayRoute">
+  <meta property="og:description" content="Estimate cable, tray, conduit, and labor costs from your project schedule.">
+  <meta property="og:image" content="icons/route.svg">
+  <meta property="og:site_name" content="CableTrayRoute">
+  <meta property="og:url" content="costestimate.html">
+  <link rel="canonical" href="costestimate.html">
+  <link rel="dns-prefetch" href="https://fonts.gstatic.com">
+  <meta name="color-scheme" content="light dark">
+  <link rel="stylesheet" href="style.css" />
+  <script type="module" src="dirtyTracker.js"></script>
+  <script type="module" src="dist/costestimate.js" defer></script>
+</head>
+<body class="costestimate-page" data-report-title="Cost Estimate">
+  <a href="#main-content" class="skip-link">Skip to main content</a>
+  <nav class="top-nav">
+    <button id="nav-toggle" class="nav-toggle" aria-label="Toggle navigation" aria-controls="nav-links" aria-expanded="false" title="Toggle navigation">
+      <img src="icons/toolbar/grid.svg" alt="" aria-hidden="true" class="control-icon" loading="lazy" decoding="async">
+    </button>
+    <div id="nav-links" class="nav-links">
+      <a href="index.html">Home</a>
+      <a href="optimalRoute.html">Optimal Route</a>
+      <a href="costestimate.html" class="active" aria-current="page">Cost Estimate</a>
+    </div>
+    <button id="settings-btn" class="settings-btn" aria-label="Settings" aria-expanded="false" title="Settings">⚙</button>
+  </nav>
+
+  <div id="settings-menu" class="settings-menu">
+    <label for="theme-select">Theme
+      <select id="theme-select">
+        <option value="system">System</option>
+        <option value="light">Light</option>
+        <option value="dark">Dark</option>
+        <option value="high-contrast">High Contrast</option>
+      </select>
+    </label>
+    <label><input type="checkbox" id="compact-toggle" aria-label="Enable compact table mode"> Compact Mode</label>
+    <label for="unit-select">Units
+      <select id="unit-select">
+        <option value="imperial">Imperial</option>
+        <option value="metric">Metric</option>
+      </select>
+    </label>
+    <button id="help-btn" class="btn" aria-expanded="false" title="Show help">Site Help</button>
+    <button id="new-project-btn">New Project</button>
+    <button id="save-project-btn">Save Project</button>
+    <button id="load-project-btn">Load Project</button>
+    <button id="export-project-btn">Export Project</button>
+    <button id="import-project-btn">Import Project</button>
+    <input type="file" id="import-project-input" accept=".ctr.json" class="hidden" title="Select project file">
+  </div>
+
+  <div class="container">
+    <main id="main-content" class="main-content">
+      <nav aria-label="Breadcrumb">
+        <ol class="breadcrumb-trail">
+          <li><a href="index.html">Home</a></li>
+          <li>Workflow</li>
+          <li aria-current="page">Cost Estimate</li>
+        </ol>
+      </nav>
+
+      <header class="page-header">
+        <h1>Project Cost Estimator</h1>
+      </header>
+
+      <details class="method-panel">
+        <summary>Method &amp; Pricing Basis</summary>
+        <p>Material costs are estimated from unit prices ($/ft for cable, tray, conduit)
+        multiplied by quantities from the project schedules. Cable lengths come from routing
+        results if available, otherwise from the cable schedule.</p>
+        <p>Labor costs use standard productivity rates (RS Means Electrical Cost Data basis):</p>
+        <ul>
+          <li>Cable pull: 150 ft/hr → $75/hr = $0.50/ft installed</li>
+          <li>Tray installation: 30 ft/hr → $90/hr = $3.00/ft installed</li>
+          <li>Conduit installation: 25 ft/hr → $85/hr = $3.40/ft installed</li>
+        </ul>
+        <p>Default unit prices reflect mid-range contractor pricing (2024 USD). Adjust prices
+        in the <strong>Price Overrides</strong> section for your specific project conditions.</p>
+        <p>This estimate does not include: engineering fees, permits, switchgear, transformers,
+        or conduit fittings beyond a default unit cost per fitting.</p>
+      </details>
+
+      <!-- Price override inputs -->
+      <details id="price-overrides">
+        <summary><strong>Price Overrides (optional)</strong></summary>
+        <div class="form-row">
+          <label for="labor-cable-rate">Cable pull labor ($/hr)</label>
+          <input type="number" id="labor-cable-rate" min="0" step="0.5" placeholder="75">
+        </div>
+        <div class="form-row">
+          <label for="labor-tray-rate">Tray install labor ($/hr)</label>
+          <input type="number" id="labor-tray-rate" min="0" step="0.5" placeholder="90">
+        </div>
+        <div class="form-row">
+          <label for="labor-conduit-rate">Conduit install labor ($/hr)</label>
+          <input type="number" id="labor-conduit-rate" min="0" step="0.5" placeholder="85">
+        </div>
+        <div class="form-row">
+          <label for="fitting-price">Tray fitting unit price ($)</label>
+          <input type="number" id="fitting-price" min="0" step="1" placeholder="35">
+        </div>
+        <div class="form-row">
+          <label for="contingency-pct">Contingency (%)</label>
+          <input type="number" id="contingency-pct" min="0" max="100" step="1" value="15"
+                 aria-describedby="contingency-hint">
+          <p id="contingency-hint" class="field-hint">Added to the grand total as a percentage allowance.</p>
+        </div>
+      </details>
+
+      <!-- Actions -->
+      <div id="controls" class="controls-row">
+        <button id="estimate-btn" type="button">Generate Estimate</button>
+        <button id="export-xlsx-btn" type="button">Export XLSX</button>
+      </div>
+
+      <!-- Results -->
+      <div id="results" role="region" aria-live="polite" aria-label="Cost estimate results">
+        <p class="field-hint">Click <strong>Generate Estimate</strong> to compute project costs from your schedules.</p>
+      </div>
+
+      <nav class="step-nav" aria-label="Workflow navigation">
+        <a href="optimalRoute.html" class="step-nav-prev">&#8592; Optimal Route</a>
+        <a href="submittal.html" class="step-nav-next">Submittal &#8594;</a>
+      </nav>
+    </main>
+  </div>
+
+  <div id="help-modal" class="modal" aria-hidden="true" role="dialog" aria-modal="true"
+       aria-labelledby="help-title">
+    <div class="modal-content">
+      <button id="close-help-btn" class="close-btn" aria-label="Close Help">&times;</button>
+      <h2 id="help-title">Cost Estimator Help</h2>
+      <p>This tool estimates project material and labor costs from your cable, tray, and conduit schedules.</p>
+      <p><strong>For best results:</strong></p>
+      <ul>
+        <li>Run <a href="optimalRoute.html">Optimal Route</a> first — cable lengths from routing are used when available.</li>
+        <li>Enter tray lengths in the <a href="racewayschedule.html">Raceway Schedule</a>.</li>
+        <li>Override unit prices in the Price Overrides section to match your region.</li>
+      </ul>
+      <p><strong>Contingency:</strong> A percentage added to the grand total to cover unknowns. 15% is typical for early estimates.</p>
+    </div>
+  </div>
+
+  <script type="module" src="dist/projectManager.js"></script>
+</body>
+</html>
