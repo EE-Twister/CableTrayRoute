@@ -1,0 +1,141 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <meta name="description" content="System reliability and N-1 contingency analysis for power distribution systems. Computes MTBF/MTTR availability, expected outage hours, and N-1/N-2 failure impact from your one-line diagram." />
+  <title>Reliability Analysis — CableTrayRoute</title>
+  <link rel="icon" href="icons/favicon.svg" type="image/svg+xml">
+  <link rel="apple-touch-icon" href="icons/favicon.svg">
+  <meta property="og:type" content="website">
+  <meta property="og:title" content="Reliability Analysis — CableTrayRoute">
+  <meta property="og:description" content="N-1 contingency and MTBF/MTTR system availability analysis for power distribution projects.">
+  <meta property="og:image" content="icons/route.svg">
+  <meta property="og:site_name" content="CableTrayRoute">
+  <meta property="og:url" content="reliability.html">
+  <link rel="canonical" href="reliability.html">
+  <link rel="dns-prefetch" href="https://fonts.gstatic.com">
+  <meta name="color-scheme" content="light dark">
+  <link rel="stylesheet" href="style.css" />
+  <script type="module" src="dirtyTracker.js"></script>
+  <script type="module" src="dist/reliability.js" defer></script>
+</head>
+<body class="reliability-page" data-report-title="Reliability Analysis">
+  <a href="#main-content" class="skip-link">Skip to main content</a>
+  <nav class="top-nav">
+    <button id="nav-toggle" class="nav-toggle" aria-label="Toggle navigation" aria-controls="nav-links" aria-expanded="false" title="Toggle navigation">
+      <img src="icons/toolbar/grid.svg" alt="" aria-hidden="true" class="control-icon" loading="lazy" decoding="async">
+    </button>
+    <div id="nav-links" class="nav-links">
+      <a href="index.html">Home</a>
+      <a href="oneline.html">One-Line</a>
+      <a href="reliability.html" class="active" aria-current="page">Reliability</a>
+    </div>
+    <button id="settings-btn" class="settings-btn" aria-label="Settings" aria-expanded="false" title="Settings">⚙</button>
+  </nav>
+
+  <div id="settings-menu" class="settings-menu">
+    <label for="theme-select">Theme
+      <select id="theme-select">
+        <option value="system">System</option>
+        <option value="light">Light</option>
+        <option value="dark">Dark</option>
+        <option value="high-contrast">High Contrast</option>
+      </select>
+    </label>
+    <label><input type="checkbox" id="compact-toggle" aria-label="Enable compact table mode"> Compact Mode</label>
+    <label for="unit-select">Units
+      <select id="unit-select">
+        <option value="imperial">Imperial</option>
+        <option value="metric">Metric</option>
+      </select>
+    </label>
+    <button id="help-btn" class="btn" aria-expanded="false" title="Show help">Site Help</button>
+    <button id="new-project-btn">New Project</button>
+    <button id="save-project-btn">Save Project</button>
+    <button id="load-project-btn">Load Project</button>
+    <button id="export-project-btn">Export Project</button>
+    <button id="import-project-btn">Import Project</button>
+    <input type="file" id="import-project-input" accept=".ctr.json" class="hidden" title="Select project file">
+  </div>
+
+  <div class="container">
+    <main id="main-content" class="main-content">
+      <nav aria-label="Breadcrumb">
+        <ol class="breadcrumb-trail">
+          <li><a href="index.html">Home</a></li>
+          <li>Studies</li>
+          <li aria-current="page">Reliability Analysis</li>
+        </ol>
+      </nav>
+
+      <header class="page-header">
+        <h1>Reliability &amp; N-1 Contingency Analysis</h1>
+      </header>
+
+      <details class="method-panel">
+        <summary>Method &amp; Assumptions</summary>
+        <p>Component availability is computed from Mean Time Between Failures (MTBF) and
+        Mean Time To Repair (MTTR) values per IEEE Std 493 (Gold Book) and IEEE Std 1366:</p>
+        <pre>A = MTBF / (MTBF + MTTR)</pre>
+        <p>Expected outage hours per year per component:</p>
+        <pre>downtime = (8760 / MTBF) × MTTR</pre>
+        <p>System unavailability is computed using minimal cut sets up to N-2 failure
+        combinations. Components are loaded from the active One-Line Diagram. Set MTBF
+        and MTTR values on each component in the One-Line editor to enable analysis.</p>
+        <p>Connector elements (cables, feeders, links) are excluded from the component
+        count — they contribute to path unavailability rather than as standalone components.</p>
+        <p>References: IEEE Std 493-2007, IEEE Std 1366-2012, IEC 60300-3-2.</p>
+      </details>
+
+      <!-- Component MTBF/MTTR override table -->
+      <fieldset>
+        <legend><strong>Component Override Values</strong></legend>
+        <p class="field-hint">Leave blank to use values stored on the One-Line component.
+        Overrides here are applied only for this analysis session.</p>
+        <div id="component-override-area">
+          <p class="field-hint">Click <strong>Load from One-Line</strong> to populate component list.</p>
+        </div>
+      </fieldset>
+
+      <div id="controls" class="controls-row">
+        <button id="run-btn" type="button">Load from One-Line &amp; Analyse</button>
+      </div>
+
+      <!-- Results -->
+      <div id="results" role="region" aria-live="polite" aria-label="Reliability analysis results"></div>
+
+      <!-- Chart -->
+      <div id="chart-container" hidden aria-label="Component availability chart">
+        <h2>Component Availability</h2>
+        <svg id="reliability-chart" width="700" height="350"
+             role="img" aria-label="Bar chart of component availability">
+          <title>Component Availability</title>
+        </svg>
+      </div>
+
+      <nav class="step-nav" aria-label="Workflow navigation">
+        <a href="oneline.html" class="step-nav-prev">&#8592; One-Line</a>
+        <a href="arcFlash.html" class="step-nav-next">Arc Flash &#8594;</a>
+      </nav>
+    </main>
+  </div>
+
+  <div id="help-modal" class="modal" aria-hidden="true" role="dialog" aria-modal="true"
+       aria-labelledby="help-title">
+    <div class="modal-content">
+      <button id="close-help-btn" class="close-btn" aria-label="Close Help">&times;</button>
+      <h2 id="help-title">Reliability Analysis Help</h2>
+      <p>This tool computes system reliability metrics from your One-Line Diagram component data.</p>
+      <p><strong>Requirements:</strong> Components in the One-Line Diagram must have MTBF and MTTR
+      values set (in hours). Edit component properties in the One-Line editor.</p>
+      <p><strong>Override values:</strong> After loading, you can adjust MTBF/MTTR for any component
+      and re-run the analysis without modifying the stored diagram data.</p>
+      <p><strong>N-1 analysis:</strong> Shows which single component failure causes the greatest
+      system unavailability impact.</p>
+    </div>
+  </div>
+
+  <script type="module" src="dist/projectManager.js"></script>
+</body>
+</html>

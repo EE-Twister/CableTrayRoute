@@ -1,0 +1,189 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <meta name="description" content="Magnetic field (EMF) analysis for cable trays. Calculates magnetic flux density from cables and checks compliance with ICNIRP 2010 reference levels and IEC 62110." />
+  <title>EMF Analysis — CableTrayRoute</title>
+  <link rel="icon" href="icons/favicon.svg" type="image/svg+xml">
+  <link rel="apple-touch-icon" href="icons/favicon.svg">
+  <meta property="og:type" content="website">
+  <meta property="og:title" content="Magnetic Field (EMF) Analysis — CableTrayRoute">
+  <meta property="og:description" content="Calculate magnetic flux density from cable tray installations and check ICNIRP compliance.">
+  <meta property="og:image" content="icons/route.svg">
+  <meta property="og:site_name" content="CableTrayRoute">
+  <meta property="og:url" content="emf.html">
+  <link rel="canonical" href="emf.html">
+  <link rel="dns-prefetch" href="https://fonts.gstatic.com">
+  <meta name="color-scheme" content="light dark">
+  <link rel="stylesheet" href="style.css" />
+  <script type="module" src="dirtyTracker.js"></script>
+  <script type="module" src="dist/emf.js" defer></script>
+</head>
+<body class="emf-page" data-report-title="EMF Analysis">
+  <a href="#main-content" class="skip-link">Skip to main content</a>
+  <nav class="top-nav">
+    <button id="nav-toggle" class="nav-toggle" aria-label="Toggle navigation" aria-controls="nav-links" aria-expanded="false" title="Toggle navigation">
+      <img src="icons/toolbar/grid.svg" alt="" aria-hidden="true" class="control-icon" loading="lazy" decoding="async">
+    </button>
+    <div id="nav-links" class="nav-links">
+      <a href="index.html">Home</a>
+      <a href="cableschedule.html">Cable Schedule</a>
+      <a href="emf.html" class="active" aria-current="page">EMF Analysis</a>
+    </div>
+    <button id="settings-btn" class="settings-btn" aria-label="Settings" aria-expanded="false" title="Settings">⚙</button>
+  </nav>
+
+  <div id="settings-menu" class="settings-menu">
+    <label for="theme-select">Theme
+      <select id="theme-select">
+        <option value="system">System</option>
+        <option value="light">Light</option>
+        <option value="dark">Dark</option>
+        <option value="high-contrast">High Contrast</option>
+      </select>
+    </label>
+    <label><input type="checkbox" id="compact-toggle" aria-label="Enable compact table mode"> Compact Mode</label>
+    <label for="unit-select">Units
+      <select id="unit-select">
+        <option value="imperial">Imperial</option>
+        <option value="metric">Metric</option>
+      </select>
+    </label>
+    <button id="help-btn" class="btn" aria-expanded="false" title="Show help">Site Help</button>
+    <button id="new-project-btn">New Project</button>
+    <button id="save-project-btn">Save Project</button>
+    <button id="load-project-btn">Load Project</button>
+    <button id="export-project-btn">Export Project</button>
+    <button id="import-project-btn">Import Project</button>
+    <input type="file" id="import-project-input" accept=".ctr.json" class="hidden" title="Select project file">
+  </div>
+
+  <div class="container">
+    <main id="main-content" class="main-content">
+      <nav aria-label="Breadcrumb">
+        <ol class="breadcrumb-trail">
+          <li><a href="index.html">Home</a></li>
+          <li>Studies</li>
+          <li aria-current="page">EMF Analysis</li>
+        </ol>
+      </nav>
+
+      <header class="page-header">
+        <h1>Magnetic Field (EMF) Analysis</h1>
+      </header>
+
+      <details class="method-panel">
+        <summary>Method &amp; Standards</summary>
+        <p>Magnetic flux density is calculated using the Biot–Savart law for infinite
+        straight conductors. Vector superposition is used to combine contributions from
+        all conductors in the cable tray cross-section:</p>
+        <pre>B = (µ₀ / 2π) × (I / d)   [per conductor]</pre>
+        <p>where µ₀ = 4π × 10⁻⁷ H/m, I is the RMS current (A), and d is the
+        perpendicular distance from the conductor axis (m). The resultant peak field
+        is found by scanning the 360° phase cycle.</p>
+        <p><strong>Compliance limits (ICNIRP 2010):</strong></p>
+        <ul>
+          <li>Occupational (50/60 Hz): 1000 µT</li>
+          <li>General public (50/60 Hz): 200 µT</li>
+        </ul>
+        <p>References: IEC 62110:2009, ICNIRP 2010 Guidelines, IEEE C95.6-2002,
+        WHO EHC 238 (2007).</p>
+      </details>
+
+      <!-- Inputs -->
+      <fieldset>
+        <legend><strong>Cable Tray Configuration</strong></legend>
+        <div class="form-row">
+          <label for="frequency">Power Frequency
+            <select id="frequency">
+              <option value="60">60 Hz (North America)</option>
+              <option value="50">50 Hz (Europe/Asia)</option>
+            </select>
+          </label>
+        </div>
+        <div class="form-row">
+          <label for="load-current">Load Current per Phase (A)
+            <button class="helpBtn" data-doc="docs/standards.html"
+                    aria-label="Help — load current">?</button>
+          </label>
+          <input type="number" id="load-current" min="0.1" step="1" value="100"
+                 aria-describedby="current-hint">
+          <p id="current-hint" class="field-hint">RMS current per phase in each cable set.</p>
+        </div>
+        <div class="form-row">
+          <label for="n-cables">Number of 3-Phase Cable Sets</label>
+          <input type="number" id="n-cables" min="1" max="20" step="1" value="1">
+        </div>
+        <div class="form-row">
+          <label for="tray-width">Tray Inside Width (in)</label>
+          <input type="number" id="tray-width" min="1" max="48" step="0.5" value="12"
+                 aria-describedby="tray-width-hint">
+          <p id="tray-width-hint" class="field-hint">Cable tray inside width in inches.</p>
+        </div>
+        <div class="form-row">
+          <label for="cable-od">Cable Outer Diameter (in)</label>
+          <input type="number" id="cable-od" min="0.1" max="6" step="0.05" value="1.0">
+        </div>
+      </fieldset>
+
+      <fieldset>
+        <legend><strong>Measurement</strong></legend>
+        <div class="form-row">
+          <label for="meas-distance">Distance from Tray Edge (in)
+            <button class="helpBtn" data-doc="docs/standards.html"
+                    aria-label="Help — measurement distance">?</button>
+          </label>
+          <input type="number" id="meas-distance" min="0" step="1" value="36"
+                 aria-describedby="dist-hint">
+          <p id="dist-hint" class="field-hint">
+            Perpendicular distance from the outer edge of the tray to the measurement point.
+            IEC 62110 recommends 0.3 m (≈12 in) for close-field assessment; 1 m (≈39 in)
+            for general workplace compliance.
+          </p>
+        </div>
+      </fieldset>
+
+      <div id="controls" class="controls-row">
+        <button id="calc-btn" type="button">Calculate Field</button>
+        <button id="profile-btn" type="button">Field Profile (0–120 in)</button>
+      </div>
+
+      <!-- Results -->
+      <div id="results" role="region" aria-live="polite" aria-label="EMF analysis results"></div>
+
+      <!-- Profile chart -->
+      <div id="profile-container" hidden aria-label="Field profile chart">
+        <h2>Field Profile vs. Distance from Tray Edge</h2>
+        <svg id="emf-chart" width="680" height="320"
+             role="img" aria-label="Line chart of magnetic field vs. distance">
+          <title>Magnetic field vs. distance</title>
+        </svg>
+      </div>
+
+      <nav class="step-nav" aria-label="Workflow navigation">
+        <a href="arcFlash.html" class="step-nav-prev">&#8592; Arc Flash</a>
+      </nav>
+    </main>
+  </div>
+
+  <div id="help-modal" class="modal" aria-hidden="true" role="dialog" aria-modal="true"
+       aria-labelledby="help-title">
+    <div class="modal-content">
+      <button id="close-help-btn" class="close-btn" aria-label="Close Help">&times;</button>
+      <h2 id="help-title">EMF Analysis Help</h2>
+      <p>Enter the cable tray configuration and current level, then click <em>Calculate Field</em>
+      to determine the magnetic flux density at the specified measurement distance.</p>
+      <p><strong>Compliance check:</strong> Results are compared to ICNIRP 2010 reference levels
+      for occupational (1000 µT) and general public (200 µT) exposure at power frequency.</p>
+      <p><strong>Field Profile:</strong> Plots the field strength from 0 to 120 inches from the
+      tray edge, showing where ICNIRP limits are met.</p>
+      <p><strong>Typical results:</strong> A fully loaded 12-inch tray with 100 A per phase will
+      produce &lt;2 µT at 1 metre — well within ICNIRP general public limits. Fields drop rapidly
+      with distance due to the inverse-distance relationship.</p>
+    </div>
+  </div>
+
+  <script type="module" src="dist/projectManager.js"></script>
+</body>
+</html>
