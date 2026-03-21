@@ -448,9 +448,38 @@ async function sessionRefreshScenario() {
   }
 }
 
+async function httpsRedirectScenario() {
+  console.log('server security - HTTPS redirect');
+  const tmpDir = await fs.mkdtemp(path.join(os.tmpdir(), 'ctr-https-'));
+  const { server, port } = await startServer({
+    dataDir: tmpDir,
+    tokenTtlMs: 5000,
+    rateLimit: { windowMs: 60000, max: 100 },
+    enforceHttps: true
+  });
+  const baseUrl = `http://127.0.0.1:${port}`;
+
+  try {
+    await check('redirects HTTP requests with 308 to preserve POST method', async () => {
+      const res = await fetch(`${baseUrl}/signup`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', host: '127.0.0.1' },
+        body: JSON.stringify({ username: 'dave', password: 'testpass1' }),
+        redirect: 'manual'
+      });
+      assert.strictEqual(res.status, 308, 'should use 308 (not 301) to preserve POST method');
+      const location = res.headers.get('location');
+      assert(location && location.startsWith('https://'), 'should redirect to HTTPS');
+    });
+  } finally {
+    await closeServer(server);
+  }
+}
+
 (async () => {
   await authScenario();
   await rateLimitScenario();
   await sessionRefreshScenario();
+  await httpsRedirectScenario();
 })();
 

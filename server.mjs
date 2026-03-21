@@ -579,7 +579,7 @@ export async function createApp(options = {}) {
         res.status(400).json({ error: 'HTTPS required' });
         return;
       }
-      res.redirect(301, `https://${req.headers.host}${req.originalUrl}`);
+      res.redirect(308, `https://${req.headers.host}${req.originalUrl}`);
     });
   }
 
