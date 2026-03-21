@@ -38,6 +38,8 @@ const entries = {
   emf: 'src/emf.js',
   clashdetect: 'src/clashdetect.js',
   spoolsheets: 'src/spoolsheets.js',
+  windload: 'src/windload.js',
+  transientstability: 'src/transientstability.js',
   '404': 'src/404.js'
 };
 

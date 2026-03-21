@@ -1,0 +1,318 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <meta name="description" content="Wind load analysis for outdoor cable tray installations per ASCE 7-22. Calculate design wind pressure and lateral forces on exposed cable trays." />
+  <title>Wind Load Analysis — CableTrayRoute</title>
+  <link rel="icon" href="icons/favicon.svg" type="image/svg+xml">
+  <link rel="apple-touch-icon" href="icons/favicon.svg">
+  <meta property="og:type" content="website">
+  <meta property="og:title" content="Wind Load Analysis — CableTrayRoute">
+  <meta property="og:description" content="Calculate design wind pressure and lateral forces on outdoor cable trays per ASCE 7-22.">
+  <meta property="og:image" content="icons/route.svg">
+  <meta property="og:site_name" content="CableTrayRoute">
+  <meta property="og:url" content="windload.html">
+  <link rel="canonical" href="windload.html">
+  <link rel="dns-prefetch" href="https://fonts.gstatic.com">
+  <meta name="color-scheme" content="light dark">
+  <link rel="stylesheet" href="style.css" />
+  <script type="module" src="dirtyTracker.js"></script>
+  <script type="module" src="dist/windload.js" defer></script>
+</head>
+<body class="windload-page" data-report-title="Wind Load Analysis">
+  <a href="#main-content" class="skip-link">Skip to main content</a>
+  <nav class="top-nav">
+    <button id="nav-toggle" class="nav-toggle" aria-label="Toggle navigation" aria-controls="nav-links" aria-expanded="false" title="Toggle navigation">
+      <img src="icons/toolbar/grid.svg" alt="" aria-hidden="true" class="control-icon" loading="lazy" decoding="async">
+    </button>
+    <div id="nav-links" class="nav-links">
+      <a href="index.html">Home</a>
+      <a href="supportspan.html">Support Span</a>
+      <a href="seismicBracing.html">Seismic Bracing</a>
+      <a href="windload.html" class="active" aria-current="page">Wind Load</a>
+      <a href="optimalRoute.html">Optimal Route</a>
+      <a href="help.html">Help</a>
+      <a href="account.html">Account</a>
+    </div>
+    <button id="settings-btn" class="settings-btn" aria-label="Settings" aria-expanded="false" title="Settings">
+      <img src="icons/toolbar/validate.svg" alt="" aria-hidden="true" class="control-icon" loading="lazy" decoding="async">
+    </button>
+  </nav>
+
+  <div id="settings-menu" class="settings-menu">
+    <label for="theme-select">Theme
+      <select id="theme-select">
+        <option value="system">System</option>
+        <option value="light">Light</option>
+        <option value="dark">Dark</option>
+        <option value="high-contrast">High Contrast</option>
+      </select>
+    </label>
+    <label><input type="checkbox" id="compact-toggle" aria-label="Enable compact table mode"> Compact Mode</label>
+    <label for="unit-select">Units
+      <select id="unit-select">
+        <option value="imperial">Imperial</option>
+        <option value="metric">Metric</option>
+      </select>
+    </label>
+    <button id="help-btn" class="btn" aria-expanded="false" title="Show help">
+      <img src="icons/toolbar/validate.svg" alt="" aria-hidden="true" class="control-icon" loading="lazy" decoding="async">
+      <span>Site Help</span>
+    </button>
+    <button id="new-project-btn" title="Start a new project">
+      <img src="icons/toolbar/copy.svg" alt="" aria-hidden="true" class="control-icon" loading="lazy" decoding="async">
+      <span>New Project</span>
+    </button>
+    <button id="save-project-btn" title="Save current project">
+      <img src="icons/toolbar/export.svg" alt="" aria-hidden="true" class="control-icon" loading="lazy" decoding="async">
+      <span>Save Project</span>
+    </button>
+    <button id="load-project-btn" title="Load an existing project">
+      <img src="icons/toolbar/import.svg" alt="" aria-hidden="true" class="control-icon" loading="lazy" decoding="async">
+      <span>Load Project</span>
+    </button>
+    <button id="export-project-btn" title="Export project data">
+      <img src="icons/toolbar/export.svg" alt="" aria-hidden="true" class="control-icon" loading="lazy" decoding="async">
+      <span>Export Project</span>
+    </button>
+    <button id="import-project-btn" title="Import project data">
+      <img src="icons/toolbar/import.svg" alt="" aria-hidden="true" class="control-icon" loading="lazy" decoding="async">
+      <span>Import Project</span>
+    </button>
+    <input type="file" id="import-project-input" accept=".ctr.json" class="hidden" title="Select project file">
+  </div>
+
+  <div class="container">
+    <main id="main-content" class="main-content">
+      <nav aria-label="Breadcrumb">
+        <ol class="breadcrumb-trail">
+          <li><a href="index.html">Home</a></li>
+          <li>Workflow</li>
+          <li aria-current="page">Wind Load Analysis</li>
+        </ol>
+      </nav>
+
+      <header class="page-header">
+        <h1>Cable Tray Wind Load Analysis</h1>
+      </header>
+
+      <details class="method-panel">
+        <summary>Method &amp; Assumptions</summary>
+        <p>Wind loads are calculated per <strong>ASCE 7-22 Chapter 26</strong> (General Wind
+        Requirements) and <strong>Chapter 29</strong> (Wind Loads on Other Structures).</p>
+
+        <p>Velocity pressure at height <em>z</em>:</p>
+        <pre>q_z = 0.00256 × K_z × K_zt × K_e × V²   (lbs/ft²)</pre>
+
+        <p>Design wind force on tray projected area:</p>
+        <pre>F = q_z × G × C_f × A_f</pre>
+
+        <p>Parameters:</p>
+        <ul>
+          <li><strong>K_z</strong> — velocity pressure exposure coefficient per ASCE 7-22 Table 26.10-1 (power-law formula)</li>
+          <li><strong>K_zt</strong> — topographic factor (1.0 flat terrain, &gt;1.0 near hilltops or ridges)</li>
+          <li><strong>V</strong> — basic wind speed (mph) from ASCE 7-22 Fig. 26.5-1A (Risk Cat II)</li>
+          <li><strong>G = 0.85</strong> — gust factor for rigid structures (ASCE 7-22 §26.11)</li>
+          <li><strong>C_f</strong> — force coefficient: 1.3 empty tray, 1.6 partial fill, 2.0 full/solid fill</li>
+          <li><strong>A_f</strong> — projected area = tray width (ft) × span length (ft)</li>
+        </ul>
+
+        <p>NEMA tray capacity check uses NEMA VE 1-2017 load class definitions, scaled
+        inversely with span length (conservative linear approximation — verify with
+        manufacturer load tables).</p>
+
+        <p>Citations:
+          <a href="docs/standards.html">ASCE 7-22 §26 and §29</a>,
+          NEMA VE 1-2017, NEMA VE 2-2006.
+        </p>
+        <p>See also:
+          <a href="supportspan.html">Support Span Calculator</a>,
+          <a href="seismicBracing.html">Seismic Bracing Calculator</a>.
+        </p>
+      </details>
+
+      <!-- Wind parameters -->
+      <fieldset>
+        <legend><strong>Wind Parameters</strong></legend>
+
+        <div class="field-row">
+          <label for="wind-speed">
+            V — Basic Wind Speed (mph)
+            <button class="helpBtn" data-doc="docs/standards.html#wind-speed"
+                    aria-label="Help — basic wind speed">?</button>
+          </label>
+          <input type="number" id="wind-speed" min="40" max="300" step="1"
+                 value="115" aria-describedby="windSpeedHint" aria-required="true">
+          <p id="windSpeedHint" class="field-hint">
+            From ASCE 7-22 Fig. 26.5-1A (Risk Category II, 3-second gust at 33 ft).
+            Typical values: coastal US 130–160 mph, inland US 90–115 mph.
+            Use the
+            <a href="https://asce7hazardtool.online/" target="_blank" rel="noopener">ASCE 7 Hazard Tool</a>
+            for site-specific speeds.
+          </p>
+        </div>
+
+        <div class="field-row">
+          <label for="exposure">Exposure Category</label>
+          <select id="exposure" aria-describedby="exposureHint">
+            <option value="B">B — Suburban/urban terrain, wooded areas</option>
+            <option value="C" selected>C — Open terrain with scattered obstructions (most industrial)</option>
+            <option value="D">D — Flat unobstructed areas — coastal, lake shores</option>
+          </select>
+          <p id="exposureHint" class="field-hint">
+            Per ASCE 7-22 §26.7. Most industrial and petrochemical sites are Exposure C.
+            Use Exposure D for sites near large bodies of water.
+          </p>
+        </div>
+
+        <div class="field-row">
+          <label for="k-zt">
+            K<sub>zt</sub> — Topographic Factor
+          </label>
+          <input type="number" id="k-zt" min="1.0" max="3.0" step="0.01"
+                 value="1.00" aria-describedby="kztHint">
+          <p id="kztHint" class="field-hint">
+            1.0 for flat terrain (ASCE 7-22 §26.8). Values &gt;1.0 apply near hilltops,
+            ridges, or escarpments. See ASCE 7-22 Fig. 26.8-1.
+          </p>
+        </div>
+      </fieldset>
+
+      <!-- Installation parameters -->
+      <fieldset>
+        <legend><strong>Installation Parameters</strong></legend>
+
+        <div class="field-row">
+          <label for="tray-height">
+            z — Tray Installation Height (ft)
+            <button class="helpBtn" data-doc="docs/standards.html#wind-height"
+                    aria-label="Help — installation height">?</button>
+          </label>
+          <input type="number" id="tray-height" min="0" step="0.5"
+                 value="20" aria-describedby="trayHeightHint" aria-required="true">
+          <p id="trayHeightHint" class="field-hint">
+            Centerline height of the tray above grade. Minimum 15 ft applied per
+            ASCE 7-22 Table 26.10-1 for K_z computation.
+          </p>
+        </div>
+
+        <div class="field-row">
+          <label for="tray-width">
+            Tray Inside Width (inches)
+          </label>
+          <input type="number" id="tray-width" min="4" max="48" step="2"
+                 value="12" aria-describedby="trayWidthHint" aria-required="true">
+          <p id="trayWidthHint" class="field-hint">
+            Standard widths: 4, 6, 9, 12, 18, 24, 30, 36 inches.
+            This is the projected dimension exposed to wind (parallel to wind direction).
+          </p>
+        </div>
+
+        <div class="field-row">
+          <label for="span-length">
+            Support Span Length (ft)
+          </label>
+          <input type="number" id="span-length" min="1" max="30" step="0.5"
+                 value="12" aria-describedby="spanHint" aria-required="true">
+          <p id="spanHint" class="field-hint">
+            Distance between tray supports. Use the
+            <a href="supportspan.html">Support Span Calculator</a> to determine the
+            appropriate span for your cable load. Typical: 8–20 ft.
+          </p>
+        </div>
+
+        <div class="field-row">
+          <label for="fill-level">Tray Fill Level</label>
+          <select id="fill-level" aria-describedby="fillHint">
+            <option value="empty">Empty — open ladder tray (C_f = 1.3)</option>
+            <option value="partial" selected>Partially filled (C_f = 1.6)</option>
+            <option value="full">Fully filled / solid (C_f = 2.0)</option>
+          </select>
+          <p id="fillHint" class="field-hint">
+            Affects the force coefficient C_f. A fully filled or solid-bottom tray
+            acts as a flat plate; an empty ladder tray allows wind to pass through.
+          </p>
+        </div>
+
+        <div class="field-row">
+          <label for="cable-weight">
+            Cable Load (lbs/ft of tray)
+          </label>
+          <input type="number" id="cable-weight" min="0" step="0.5"
+                 value="0" aria-describedby="cableWeightHint">
+          <p id="cableWeightHint" class="field-hint">
+            Total vertical cable weight per foot of tray. Use the
+            <a href="supportspan.html">Support Span Calculator</a> to derive this
+            from the cable schedule. Used for NEMA capacity check only.
+          </p>
+        </div>
+
+        <div class="field-row">
+          <label for="nema-class">NEMA Tray Load Class</label>
+          <select id="nema-class" aria-describedby="nemaHint">
+            <!-- Options populated by JS -->
+          </select>
+          <p id="nemaHint" class="field-hint">
+            NEMA VE 1-2017 load class. Used to check vertical cable load capacity
+            against the tray's rated capacity at the specified span.
+            Verify with manufacturer load tables for final design.
+          </p>
+        </div>
+      </fieldset>
+
+      <!-- Evaluation mode -->
+      <fieldset>
+        <legend><strong>Evaluation Mode</strong></legend>
+        <label>
+          <input type="radio" name="eval-mode" id="mode-single" value="single" checked>
+          Single tray — use parameters entered above
+        </label>
+        <label>
+          <input type="radio" name="eval-mode" id="mode-schedule" value="schedule">
+          From Project — evaluate all trays in the Raceway Schedule
+        </label>
+      </fieldset>
+
+      <div id="controls">
+        <button id="calc-btn" type="button">Calculate Wind Load</button>
+      </div>
+
+      <div id="results" role="region" aria-live="polite" aria-label="Wind load results"></div>
+
+      <!-- Schedule mode section -->
+      <section id="schedule-section" hidden aria-label="Schedule evaluation">
+        <p>Reads tray widths from the Raceway Schedule and cable weights from the
+        cable schedule to evaluate each tray at the wind parameters entered above.</p>
+        <button type="button" id="schedule-btn">Evaluate Trays from Schedule</button>
+        <div id="schedule-results" role="region" aria-live="polite"
+             aria-label="Schedule wind load results"></div>
+      </section>
+
+      <nav class="step-nav" aria-label="Workflow navigation">
+        <a href="seismicBracing.html" class="step-nav-prev">&#8592; Seismic Bracing</a>
+        <a href="optimalRoute.html" class="step-nav-next">Optimal Route &#8594;</a>
+      </nav>
+    </main>
+  </div>
+
+  <div id="help-modal" class="modal" aria-hidden="true" role="dialog" aria-modal="true"
+       aria-labelledby="help-title">
+    <div class="modal-content">
+      <button id="close-help-btn" class="close-btn" aria-label="Close Help">&times;</button>
+      <h2 id="help-title">Wind Load Analysis Help</h2>
+      <p>This tool calculates design wind pressure and lateral forces on outdoor
+      cable tray installations per ASCE 7-22.</p>
+      <p><strong>Single tray mode:</strong> enter wind parameters and tray geometry,
+      then click <em>Calculate Wind Load</em>.</p>
+      <p><strong>Schedule mode:</strong> reads tray widths from the current project's
+      Raceway Schedule and evaluates every tray using the entered wind parameters.</p>
+      <p>Get basic wind speed V from the
+      <a href="https://asce7hazardtool.online/" target="_blank" rel="noopener">ASCE 7 Hazard Tool</a>
+      for your project location.</p>
+    </div>
+  </div>
+
+  <script type="module" src="dist/projectManager.js"></script>
+</body>
+</html>

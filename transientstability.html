@@ -1,0 +1,292 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <meta name="description" content="Transient stability analysis using the classical swing equation (OMIB model). Simulate rotor angle response to faults and find critical clearing time per IEEE standards." />
+  <title>Transient Stability — CableTrayRoute</title>
+  <link rel="icon" href="icons/favicon.svg" type="image/svg+xml">
+  <link rel="apple-touch-icon" href="icons/favicon.svg">
+  <meta property="og:type" content="website">
+  <meta property="og:title" content="Transient Stability Analysis — CableTrayRoute">
+  <meta property="og:description" content="Simulate rotor angle dynamics and find critical clearing time for power system transient stability studies.">
+  <meta property="og:image" content="icons/route.svg">
+  <meta property="og:site_name" content="CableTrayRoute">
+  <meta property="og:url" content="transientstability.html">
+  <link rel="canonical" href="transientstability.html">
+  <link rel="dns-prefetch" href="https://fonts.gstatic.com">
+  <meta name="color-scheme" content="light dark">
+  <link rel="stylesheet" href="style.css" />
+  <script type="module" src="dirtyTracker.js"></script>
+  <script type="module" src="dist/transientstability.js" defer></script>
+  <!-- Plotly for rotor angle plot -->
+  <script src="https://cdn.plot.ly/plotly-2.27.0.min.js" defer></script>
+</head>
+<body class="transientstability-page" data-report-title="Transient Stability">
+  <a href="#main-content" class="skip-link">Skip to main content</a>
+  <nav class="top-nav">
+    <button id="nav-toggle" class="nav-toggle" aria-label="Toggle navigation" aria-controls="nav-links" aria-expanded="false" title="Toggle navigation">
+      <img src="icons/toolbar/grid.svg" alt="" aria-hidden="true" class="control-icon" loading="lazy" decoding="async">
+    </button>
+    <div id="nav-links" class="nav-links">
+      <a href="index.html">Home</a>
+      <a href="loadFlow.html">Load Flow</a>
+      <a href="shortCircuit.html">Short Circuit</a>
+      <a href="motorStart.html">Motor Start</a>
+      <a href="transientstability.html" class="active" aria-current="page">Transient Stability</a>
+      <a href="help.html">Help</a>
+      <a href="account.html">Account</a>
+    </div>
+    <button id="settings-btn" class="settings-btn" aria-label="Settings" aria-expanded="false" title="Settings">
+      <img src="icons/toolbar/validate.svg" alt="" aria-hidden="true" class="control-icon" loading="lazy" decoding="async">
+    </button>
+  </nav>
+
+  <div id="settings-menu" class="settings-menu">
+    <label for="theme-select">Theme
+      <select id="theme-select">
+        <option value="system">System</option>
+        <option value="light">Light</option>
+        <option value="dark">Dark</option>
+        <option value="high-contrast">High Contrast</option>
+      </select>
+    </label>
+    <label><input type="checkbox" id="compact-toggle" aria-label="Enable compact table mode"> Compact Mode</label>
+    <label for="unit-select">Units
+      <select id="unit-select">
+        <option value="imperial">Imperial</option>
+        <option value="metric">Metric</option>
+      </select>
+    </label>
+    <button id="help-btn" class="btn" aria-expanded="false" title="Show help">
+      <img src="icons/toolbar/validate.svg" alt="" aria-hidden="true" class="control-icon" loading="lazy" decoding="async">
+      <span>Site Help</span>
+    </button>
+    <button id="new-project-btn" title="Start a new project">
+      <img src="icons/toolbar/copy.svg" alt="" aria-hidden="true" class="control-icon" loading="lazy" decoding="async">
+      <span>New Project</span>
+    </button>
+    <button id="save-project-btn" title="Save current project">
+      <img src="icons/toolbar/export.svg" alt="" aria-hidden="true" class="control-icon" loading="lazy" decoding="async">
+      <span>Save Project</span>
+    </button>
+    <button id="load-project-btn" title="Load an existing project">
+      <img src="icons/toolbar/import.svg" alt="" aria-hidden="true" class="control-icon" loading="lazy" decoding="async">
+      <span>Load Project</span>
+    </button>
+    <button id="export-project-btn" title="Export project data">
+      <img src="icons/toolbar/export.svg" alt="" aria-hidden="true" class="control-icon" loading="lazy" decoding="async">
+      <span>Export Project</span>
+    </button>
+    <button id="import-project-btn" title="Import project data">
+      <img src="icons/toolbar/import.svg" alt="" aria-hidden="true" class="control-icon" loading="lazy" decoding="async">
+      <span>Import Project</span>
+    </button>
+    <input type="file" id="import-project-input" accept=".ctr.json" class="hidden" title="Select project file">
+  </div>
+
+  <div class="container">
+    <main id="main-content" class="main-content">
+      <nav aria-label="Breadcrumb">
+        <ol class="breadcrumb-trail">
+          <li><a href="index.html">Home</a></li>
+          <li>Studies</li>
+          <li aria-current="page">Transient Stability</li>
+        </ol>
+      </nav>
+
+      <header class="page-header">
+        <h1>Transient Stability Analysis</h1>
+      </header>
+
+      <details class="method-panel">
+        <summary>Method &amp; Assumptions</summary>
+        <p>This tool uses the <strong>classical one-machine infinite-bus (OMIB)</strong>
+        swing equation model for single-generator transient stability analysis.</p>
+
+        <p>The swing equation:</p>
+        <pre>M × d²δ/dt² = Pm − Pe
+where M = 2H / ωs,  Pe = Pmax × sin(δ)</pre>
+
+        <p>Three operating periods are modeled:</p>
+        <ol>
+          <li><strong>Pre-fault</strong>: normal operating power flow establishes δ₀</li>
+          <li><strong>During fault</strong>: reduced electrical power transfer (Pmax_fault),
+              rotor accelerates</li>
+          <li><strong>Post-fault</strong>: fault cleared, power transfer restored (Pmax_post)</li>
+        </ol>
+
+        <p>Integration method: <strong>4th-order Runge-Kutta</strong> at 1 ms time steps.</p>
+
+        <p>The <strong>Critical Clearing Time (CCT)</strong> is found by bisection: the
+        latest clearing time at which the system remains stable (δ &lt; 180°).</p>
+
+        <p>The <strong>Equal-Area Criterion (EAC)</strong> provides a fast analytical
+        estimate of CCT, valid for OMIB systems.</p>
+
+        <p>Inputs are in per-unit (pu) on the machine's rated MVA base.</p>
+
+        <p>References: Kundur (1994), Anderson &amp; Fouad (2003),
+        IEEE Std 1110-2002.</p>
+      </details>
+
+      <!-- Machine parameters -->
+      <fieldset>
+        <legend><strong>Machine Parameters</strong></legend>
+
+        <div class="field-row">
+          <label for="inertia">
+            H — Inertia Constant (MW·s / MVA)
+            <button class="helpBtn" data-doc="docs/standards.html#inertia"
+                    aria-label="Help — inertia constant">?</button>
+          </label>
+          <input type="number" id="inertia" min="0.5" max="20" step="0.1"
+                 value="5.0" aria-describedby="inertiaHint" aria-required="true">
+          <p id="inertiaHint" class="field-hint">
+            Machine inertia constant. Typical values: hydro generators 2–4 s,
+            steam turbines 4–8 s, gas turbines 3–6 s.
+          </p>
+        </div>
+
+        <div class="field-row">
+          <label for="frequency">System Frequency (Hz)</label>
+          <select id="frequency" aria-describedby="freqHint">
+            <option value="60" selected>60 Hz (North America, Brazil)</option>
+            <option value="50">50 Hz (Europe, Asia, Africa, Australia)</option>
+          </select>
+          <p id="freqHint" class="field-hint">Affects the machine inertia coefficient M = 2H/ωs.</p>
+        </div>
+
+        <div class="field-row">
+          <label for="mech-power">
+            P<sub>m</sub> — Mechanical Power Input (pu)
+          </label>
+          <input type="number" id="mech-power" min="0.01" max="1.5" step="0.01"
+                 value="0.80" aria-describedby="pmHint" aria-required="true">
+          <p id="pmHint" class="field-hint">
+            Pre-disturbance generator loading. Assumed constant during the transient.
+            Typical: 0.7–1.0 pu. Do not exceed pre-fault Pmax.
+          </p>
+        </div>
+      </fieldset>
+
+      <!-- Network parameters -->
+      <fieldset>
+        <legend><strong>Network Power Transfer (pu)</strong></legend>
+        <p class="field-hint">
+          Maximum power transfer <em>Pmax = E'V / X</em> depends on the transient
+          reactance E' (assumed = 1.05 pu), terminal voltage V (1.0 pu), and
+          the Thevenin reactance between generator and infinite bus.
+          Enter directly from a load flow study or reactance calculation.
+        </p>
+
+        <div class="field-row">
+          <label for="pmax-pre">
+            P<sub>max,pre</sub> — Pre-fault Maximum Power (pu)
+          </label>
+          <input type="number" id="pmax-pre" min="0.1" max="5" step="0.01"
+                 value="2.10" aria-describedby="pmaxPreHint" aria-required="true">
+          <p id="pmaxPreHint" class="field-hint">
+            E'V / X_pre (normal network). Must be ≥ Pm for a stable operating point.
+          </p>
+        </div>
+
+        <div class="field-row">
+          <label for="pmax-fault">
+            P<sub>max,fault</sub> — During-Fault Maximum Power (pu)
+          </label>
+          <input type="number" id="pmax-fault" min="0" max="5" step="0.01"
+                 value="0.60" aria-describedby="pmaxFaultHint" aria-required="true">
+          <p id="pmaxFaultHint" class="field-hint">
+            E'V / X_fault (reduced — fault depresses terminal voltage). Bolted 3-phase
+            fault at generator bus → Pmax_fault = 0.
+          </p>
+        </div>
+
+        <div class="field-row">
+          <label for="pmax-post">
+            P<sub>max,post</sub> — Post-fault Maximum Power (pu)
+          </label>
+          <input type="number" id="pmax-post" min="0.01" max="5" step="0.01"
+                 value="1.75" aria-describedby="pmaxPostHint" aria-required="true">
+          <p id="pmaxPostHint" class="field-hint">
+            E'V / X_post (post-fault network, e.g. after line tripped). Must be &gt; Pm
+            for stable post-fault equilibrium to exist.
+          </p>
+        </div>
+      </fieldset>
+
+      <!-- Simulation parameters -->
+      <fieldset>
+        <legend><strong>Simulation Parameters</strong></legend>
+
+        <div class="field-row">
+          <label for="t-clear">
+            t<sub>clear</sub> — Fault Clearing Time (s)
+          </label>
+          <input type="number" id="t-clear" min="0.001" max="2.0" step="0.001"
+                 value="0.100" aria-describedby="tClearHint" aria-required="true">
+          <p id="tClearHint" class="field-hint">
+            Time from fault inception to circuit breaker interruption.
+            Typical: 3–6 cycles (0.05–0.10 s) for high-speed relaying.
+            Enter 0.083 s for 5-cycle breaker at 60 Hz.
+          </p>
+        </div>
+
+        <div class="field-row">
+          <label for="t-end">Simulation Duration (s)</label>
+          <input type="number" id="t-end" min="0.5" max="10" step="0.1"
+                 value="2.0" aria-describedby="tEndHint">
+          <p id="tEndHint" class="field-hint">
+            Total simulation time. 2–3 s is sufficient for most transient stability studies.
+          </p>
+        </div>
+      </fieldset>
+
+      <div id="controls">
+        <button id="calc-btn" type="button">Simulate</button>
+        <button id="cct-btn" type="button">Simulate + Find CCT</button>
+      </div>
+
+      <div id="results" role="region" aria-live="polite" aria-label="Transient stability results"></div>
+
+      <div id="plot-container" hidden>
+        <h2>Rotor Angle vs Time</h2>
+        <div id="plot-div" style="width:100%;height:400px;" aria-label="Rotor angle plot"></div>
+      </div>
+
+      <nav class="step-nav" aria-label="Workflow navigation">
+        <a href="motorStart.html" class="step-nav-prev">&#8592; Motor Start</a>
+        <a href="reliability.html" class="step-nav-next">Reliability &#8594;</a>
+      </nav>
+    </main>
+  </div>
+
+  <div id="help-modal" class="modal" aria-hidden="true" role="dialog" aria-modal="true"
+       aria-labelledby="help-title">
+    <div class="modal-content">
+      <button id="close-help-btn" class="close-btn" aria-label="Close Help">&times;</button>
+      <h2 id="help-title">Transient Stability Help</h2>
+      <p>This tool performs single-machine infinite-bus (OMIB) transient stability
+      analysis using the classical swing equation.</p>
+      <p><strong>Simulate:</strong> run the rotor angle trajectory for the specified
+      clearing time and plot δ(t).</p>
+      <p><strong>Simulate + Find CCT:</strong> also performs a bisection search for
+      the Critical Clearing Time (CCT) — the maximum clearing time at which the
+      system remains stable.</p>
+      <p><strong>Key outputs:</strong></p>
+      <ul>
+        <li>Stability status (stable = δ never exceeds 180°)</li>
+        <li>Maximum rotor angle δ_max</li>
+        <li>Critical Clearing Time (numerical + EAC estimate)</li>
+        <li>Rotor angle vs. time plot</li>
+      </ul>
+      <p>Obtain Pmax values from the
+      <a href="loadFlow.html">Load Flow</a> study. Use
+      <a href="shortCircuit.html">Short Circuit</a> to determine fault impedances.</p>
+    </div>
+  </div>
+
+  <script type="module" src="dist/projectManager.js"></script>
+</body>
+</html>
