@@ -1,0 +1,285 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <meta name="description" content="Cable tray product configurator. Select tray type, NEMA load class, material, and finish based on cable weight, span, and installation environment. Generates a specification paragraph." />
+  <title>Product Configurator — CableTrayRoute</title>
+  <link rel="icon" href="icons/favicon.svg" type="image/svg+xml">
+  <link rel="apple-touch-icon" href="icons/favicon.svg">
+  <!-- Open Graph / Social sharing -->
+  <meta property="og:type" content="website">
+  <meta property="og:title" content="Cable Tray Product Configurator — CableTrayRoute">
+  <meta property="og:description" content="Select the right cable tray type, load class, material, and finish for your project.">
+  <meta property="og:image" content="icons/route.svg">
+  <meta property="og:site_name" content="CableTrayRoute">
+  <meta property="og:url" content="productconfig.html">
+  <!-- Canonical URL -->
+  <link rel="canonical" href="productconfig.html">
+  <link rel="dns-prefetch" href="https://fonts.gstatic.com">
+  <meta name="color-scheme" content="light dark">
+  <link rel="stylesheet" href="style.css" />
+  <style>
+    .spec-box {
+      font-family: monospace;
+      font-size: 0.9rem;
+      background: var(--color-surface, #f5f5f5);
+      border: 1px solid var(--color-border, #ccc);
+      border-radius: 4px;
+      padding: 1rem;
+      white-space: pre-wrap;
+      word-break: break-word;
+      margin: 0.5rem 0;
+    }
+    .btn-row {
+      display: flex;
+      gap: 0.5rem;
+      flex-wrap: wrap;
+      margin-top: 1rem;
+    }
+  </style>
+  <script type="module" src="dirtyTracker.js"></script>
+  <script type="module" src="dist/productconfig.js" defer></script>
+</head>
+<body class="productconfig-page" data-report-title="Product Configurator">
+  <a href="#main-content" class="skip-link">Skip to main content</a>
+  <nav class="top-nav">
+    <button id="nav-toggle" class="nav-toggle" aria-label="Toggle navigation" aria-controls="nav-links" aria-expanded="false" title="Toggle navigation">
+      <img src="icons/toolbar/grid.svg" alt="" aria-hidden="true" class="control-icon" loading="lazy" decoding="async">
+    </button>
+    <div id="nav-links" class="nav-links">
+      <a href="index.html">Home</a>
+      <a href="cabletrayfill.html">Tray Fill</a>
+      <a href="supportspan.html">Support Span</a>
+      <a href="productconfig.html" class="active" aria-current="page">Product Configurator</a>
+    </div>
+    <button id="settings-btn" class="settings-btn" aria-label="Settings" aria-expanded="false" title="Settings">⚙</button>
+  </nav>
+
+  <div id="settings-menu" class="settings-menu">
+    <label for="theme-select">Theme
+      <select id="theme-select">
+        <option value="system">System</option>
+        <option value="light">Light</option>
+        <option value="dark">Dark</option>
+        <option value="high-contrast">High Contrast</option>
+      </select>
+    </label>
+    <label><input type="checkbox" id="compact-toggle" aria-label="Enable compact table mode"> Compact Mode</label>
+    <label for="unit-select">Units
+      <select id="unit-select">
+        <option value="imperial">Imperial</option>
+        <option value="metric">Metric</option>
+      </select>
+    </label>
+    <button id="help-btn" class="btn" aria-expanded="false" title="Show help">Site Help</button>
+    <button id="new-project-btn">New Project</button>
+    <button id="save-project-btn">Save Project</button>
+    <button id="load-project-btn">Load Project</button>
+    <button id="export-project-btn">Export Project</button>
+    <button id="import-project-btn">Import Project</button>
+    <input type="file" id="import-project-input" accept=".ctr.json" class="hidden" title="Select project file">
+  </div>
+
+  <div id="help-modal" class="modal" role="dialog" aria-modal="true" aria-labelledby="help-modal-title" hidden>
+    <div class="modal-content">
+      <h2 id="help-modal-title">Help</h2>
+      <button id="close-help-btn" class="modal-close" aria-label="Close help">×</button>
+      <p>See <a href="help.html">Help</a> for full documentation.</p>
+    </div>
+  </div>
+
+  <div class="container">
+    <main id="main-content" class="main-content">
+      <nav aria-label="Breadcrumb">
+        <ol class="breadcrumb-trail">
+          <li><a href="index.html">Home</a></li>
+          <li>Workflow</li>
+          <li aria-current="page">Product Configurator</li>
+        </ol>
+      </nav>
+
+      <header class="page-header">
+        <h1>Cable Tray Product Configurator</h1>
+      </header>
+
+      <details class="method-panel">
+        <summary>Method &amp; References</summary>
+        <p>This tool recommends cable tray type, NEMA load class, width, and material based on
+        your project inputs.</p>
+        <h3>Load Class Selection</h3>
+        <p>For a simple span, the equivalent uniform load at the design span scales from the
+        NEMA VE 1-2017 test span (12 ft) as:</p>
+        <pre>w_required = w_actual × (L_actual / 12)³</pre>
+        <p>The minimum NEMA class whose rated working load ≥ w_required is selected.</p>
+        <h3>Width Selection</h3>
+        <p>Minimum inside width is chosen so that the allowed cable fill area (NEC 392.22(A),
+        default 50% of W × D) accommodates the total cable cross-sectional area.
+        Standard widths: 6, 9, 12, 18, 24, 30, 36 in.</p>
+        <h3>Tray Type &amp; Material</h3>
+        <p>Tray type and material are recommended based on application and installation
+        environment, following NEMA VE 1-2017 and NEC Article 392 guidance.</p>
+        <p>References:</p>
+        <ul>
+          <li>NEMA VE 1-2017 — Cable Tray Systems</li>
+          <li>NEMA VE 2-2013 — Cable Tray Installation Guidelines</li>
+          <li>NEMA FG 1-2014 — Fiberglass Cable Tray Systems</li>
+          <li>NEC 2023 Article 392 — Cable Trays</li>
+          <li>ASTM A123 — Hot-Dip Galvanized Coatings</li>
+        </ul>
+      </details>
+
+      <!-- ------------------------------------------------------------------ -->
+      <!-- Inputs                                                               -->
+      <!-- ------------------------------------------------------------------ -->
+      <section aria-label="Configurator inputs">
+        <h2>Project Inputs</h2>
+
+        <fieldset>
+          <legend><strong>Load &amp; Span</strong></legend>
+
+          <div class="form-row">
+            <label for="cable-weight">Total cable weight per linear foot of tray (lbs/ft)
+              <button class="helpBtn" data-doc="docs/standards.html#cable-weights"
+                      aria-label="Help — cable weight">?</button>
+            </label>
+            <input type="number" id="cable-weight" min="0.001" step="0.1"
+                   placeholder="e.g. 8.5"
+                   aria-describedby="cable-weight-hint">
+            <p id="cable-weight-hint" class="field-hint">
+              Sum of all cable weights in lbs/ft sharing this tray section.
+              Use the <a href="supportspan.html">Support Span</a> calculator
+              or cable manufacturer data.
+            </p>
+          </div>
+
+          <div class="form-row">
+            <label for="span">Required support span (ft)</label>
+            <input type="number" id="span" min="1" max="40" step="0.5"
+                   value="10" aria-describedby="span-hint">
+            <p id="span-hint" class="field-hint">
+              Distance between cable tray supports. Typical range: 6–20 ft for standard
+              NEMA classes. Longer spans require heavier load classes.
+            </p>
+          </div>
+        </fieldset>
+
+        <fieldset>
+          <legend><strong>Cable Fill</strong></legend>
+
+          <div class="form-row">
+            <label for="cable-csa">Total cable cross-sectional area (in²)
+              <button class="helpBtn" data-doc="docs/nec_reference.html"
+                      aria-label="Help — cable fill">?</button>
+            </label>
+            <input type="number" id="cable-csa" min="0.001" step="0.1"
+                   placeholder="e.g. 18.5"
+                   aria-describedby="cable-csa-hint">
+            <p id="cable-csa-hint" class="field-hint">
+              Sum of π/4 × OD² for all cables. See the
+              <a href="cabletrayfill.html">Tray Fill</a> calculator for automatic
+              computation from the cable schedule.
+            </p>
+          </div>
+
+          <div class="form-row">
+            <label for="fill-pct">Fill fraction (%)
+              <button class="helpBtn" data-doc="docs/nec_reference.html"
+                      aria-label="Help — fill fraction">?</button>
+            </label>
+            <input type="number" id="fill-pct" min="1" max="100" step="1" value="50"
+                   aria-describedby="fill-pct-hint">
+            <p id="fill-pct-hint" class="field-hint">
+              NEC 392.22(A) limits cable cross-sectional area to 50% of the tray
+              cross-section for ladder and ventilated trays carrying power cables.
+              Use 40% for solid-bottom trays with control cables.
+            </p>
+          </div>
+        </fieldset>
+
+        <fieldset>
+          <legend><strong>Environment &amp; Application</strong></legend>
+
+          <div class="form-row">
+            <label for="environment">Installation environment</label>
+            <select id="environment" aria-describedby="env-hint">
+              <option value="indoorDry">Indoor, dry (NEMA Type 1 / IP20)</option>
+              <option value="indoorWet">Indoor, wet / damp (NEMA Type 4 / IP44)</option>
+              <option value="outdoor">Outdoor (exposed)</option>
+              <option value="corrosive">Corrosive / chemical / marine</option>
+            </select>
+            <p id="env-hint" class="field-hint">
+              Environment determines acceptable material and finish options.
+            </p>
+          </div>
+
+          <div class="form-row">
+            <label for="application">Cable application</label>
+            <select id="application" aria-describedby="app-hint">
+              <option value="power">Power cables (≥ 4/0 AWG)</option>
+              <option value="mixed">Mixed power &amp; control</option>
+              <option value="control">Control cables</option>
+              <option value="instrumentation">Instrumentation / signal cables</option>
+              <option value="communication">Communication / data</option>
+              <option value="corrosive">Corrosive / hazardous area</option>
+            </select>
+            <p id="app-hint" class="field-hint">
+              Application guides tray type selection (e.g., ladder for power,
+              solid-bottom for instrumentation).
+            </p>
+          </div>
+        </fieldset>
+
+        <fieldset>
+          <legend><strong>Tray Geometry Preference</strong></legend>
+
+          <div class="form-row">
+            <label for="tray-type">Tray type preference</label>
+            <select id="tray-type" aria-describedby="type-hint">
+              <option value="">Auto-select from application</option>
+              <option value="ladder">Ladder Tray</option>
+              <option value="ventilated">Ventilated Trough</option>
+              <option value="solidBottom">Solid-Bottom Tray</option>
+              <option value="wireMesh">Wire Mesh / Cable Basket</option>
+              <option value="fiberglass">Fiberglass (FRP) Ladder Tray</option>
+            </select>
+            <p id="type-hint" class="field-hint">
+              Leave blank to let the tool recommend based on application.
+            </p>
+          </div>
+
+          <div class="form-row">
+            <label for="depth">Nominal tray depth (in)</label>
+            <select id="depth" aria-describedby="depth-hint">
+              <option value="3">3 in</option>
+              <option value="4" selected>4 in</option>
+              <option value="6">6 in</option>
+            </select>
+            <p id="depth-hint" class="field-hint">
+              Tray depth affects allowable cable fill area.
+              4 in is typical for most industrial applications.
+            </p>
+          </div>
+        </fieldset>
+
+        <div id="controls">
+          <button id="configure-btn" type="button">Configure Tray</button>
+        </div>
+      </section>
+
+      <!-- ------------------------------------------------------------------ -->
+      <!-- Results                                                              -->
+      <!-- ------------------------------------------------------------------ -->
+      <section id="results-section" hidden aria-label="Configuration results">
+        <div id="results" role="region" aria-live="polite" aria-label="Configuration results"></div>
+
+        <div class="btn-row">
+          <button id="copy-spec-btn" type="button">Copy Specification Text</button>
+          <button id="print-btn" type="button">Print / Save as PDF</button>
+        </div>
+      </section>
+
+    </main>
+  </div>
+</body>
+</html>

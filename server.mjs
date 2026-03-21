@@ -579,7 +579,18 @@ export async function createApp(options = {}) {
         res.status(400).json({ error: 'HTTPS required' });
         return;
       }
-      res.redirect(301, `https://${req.headers.host}${req.originalUrl}`);
+      // For API/AJAX requests, return a JSON error instead of redirecting.
+      // A redirect from HTTP to HTTPS crosses origins (different protocol),
+      // which triggers a CORS preflight that the redirected server may not
+      // support, resulting in a 405 or CORS failure on the client side.
+      const contentType = req.headers['content-type'] || '';
+      const isApiRequest = contentType.includes('application/json') ||
+        req.headers['x-requested-with'] === 'XMLHttpRequest';
+      if (isApiRequest) {
+        res.status(400).json({ error: 'HTTPS required' });
+        return;
+      }
+      res.redirect(308, `https://${req.headers.host}${req.originalUrl}`);
     });
   }
 

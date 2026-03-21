@@ -20,7 +20,9 @@ function setUnitSystem(sys){
       proj.settings = proj.settings || {};
       proj.settings.units = val;
       storage.setProjectState(proj);
-    } catch {}
+    } catch (e) {
+      console.warn('Failed to persist unit preference to project storage', e);
+    }
   }
   cached = val;
 }

@@ -18,6 +18,7 @@ const NAV_ROUTES = [
   { href: 'pullcards.html', label: 'Pull Cards', section: 'Workflow', icon: 'icons/toolbar/copy.svg' },
   { href: 'costestimate.html', label: 'Cost Estimate', section: 'Workflow', icon: 'icons/toolbar/grid-size.svg' },
   { href: 'submittal.html', label: 'Submittal Package', section: 'Workflow', icon: 'icons/toolbar/copy.svg' },
+  { href: 'productconfig.html', label: 'Product Configurator', section: 'Workflow', icon: 'icons/toolbar/grid-size.svg' },
   { href: 'intlCableSize.html', label: 'Intl Cable Sizing', section: 'Studies', icon: 'icons/cable.svg' },
   { href: 'oneline.html', label: 'One-Line', section: 'Workflow', icon: 'icons/oneline.svg' },
   { href: 'tcc.html', label: 'TCC', section: 'Studies', icon: 'icons/toolbar/validate.svg' },
