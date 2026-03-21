@@ -32,6 +32,7 @@ const NAV_ROUTES = [
   { href: 'reliability.html', label: 'Reliability', section: 'Studies', icon: 'icons/toolbar/validate.svg' },
   { href: 'emf.html', label: 'EMF Analysis', section: 'Studies', icon: 'icons/toolbar/connect.svg' },
   { href: 'transientstability.html', label: 'Transient Stability', section: 'Studies', icon: 'icons/toolbar/validate.svg' },
+  { href: 'contingency.html', label: 'N-1 Contingency', section: 'Studies', icon: 'icons/toolbar/validate.svg' },
   { href: 'custom-components.html', label: 'Custom Components', section: 'Library', icon: 'icons/components/TextBox.svg' },
   { href: 'library.html', label: 'Library Manager', section: 'Library', icon: 'icons/toolbar/grid.svg' },
   { href: 'help.html', label: 'Help', section: 'Support', icon: 'icons/toolbar/validate.svg' },

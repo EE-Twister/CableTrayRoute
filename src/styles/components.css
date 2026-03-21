@@ -664,3 +664,101 @@
     color: var(--text-color);
 }
 
+
+/* ---------------------------------------------------------------------------
+ * Presence bar — shows who else is editing the same project in real time
+ * --------------------------------------------------------------------------- */
+.presence-bar {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-2, 0.5rem);
+  align-items: center;
+  min-height: 1.5rem;
+  padding: var(--space-1, 0.25rem) 0;
+}
+
+.presence-chip {
+  display: inline-flex;
+  align-items: center;
+  padding: 0.15rem 0.6rem;
+  border-radius: 99px;
+  font-size: var(--font-size-sm, 0.8rem);
+  font-weight: 500;
+  background: color-mix(in srgb, var(--color-primary, #2563eb) 15%, transparent);
+  color: var(--color-primary, #2563eb);
+  border: 1px solid color-mix(in srgb, var(--color-primary, #2563eb) 30%, transparent);
+  white-space: nowrap;
+}
+
+/* ---------------------------------------------------------------------------
+ * Manufacturer catalog browser
+ * --------------------------------------------------------------------------- */
+.catalog-filter-bar {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-3, 0.75rem);
+  align-items: flex-end;
+  margin-bottom: var(--space-4, 1rem);
+}
+
+.catalog-filter-label {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-1, 0.25rem);
+  font-size: var(--font-size-sm, 0.8rem);
+}
+
+.catalog-filter-select,
+.catalog-filter-input {
+  min-width: 140px;
+  padding: var(--space-1, 0.25rem) var(--space-2, 0.5rem);
+  border: 1px solid var(--border-color);
+  border-radius: var(--radius-sm);
+  background: var(--color-surface);
+  color: var(--text-color);
+}
+
+.catalog-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: var(--font-size-sm, 0.8rem);
+}
+
+.catalog-table th,
+.catalog-table td {
+  padding: var(--space-2, 0.5rem) var(--space-3, 0.75rem);
+  border-bottom: 1px solid var(--border-color);
+  text-align: left;
+}
+
+.catalog-table th {
+  background: var(--color-surface-strong);
+  font-weight: 600;
+  position: sticky;
+  top: 0;
+  z-index: 1;
+}
+
+.catalog-table tbody tr {
+  cursor: pointer;
+  transition: background 0.1s;
+}
+
+.catalog-table tbody tr:hover,
+.catalog-table tbody tr:focus {
+  background: color-mix(in srgb, var(--color-primary, #2563eb) 8%, transparent);
+  outline: 2px solid var(--color-primary, #2563eb);
+  outline-offset: -2px;
+}
+
+.catalog-empty,
+.catalog-error,
+.catalog-loading {
+  padding: var(--space-4, 1rem);
+  color: var(--color-text-muted, #6c757d);
+  font-size: var(--font-size-sm, 0.8rem);
+}
+
+.catalog-error {
+  color: var(--color-error, #dc3545);
+}
