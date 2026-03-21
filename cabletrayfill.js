@@ -1,6 +1,6 @@
 import { getItem, setItem, removeItem, keys as storeKeys } from './dataStore.mjs';
 import { FILTER_ICON_SVG } from './tableUtils.mjs';
-import { showAlertModal } from './src/components/modal.js';
+import { showAlertModal, openModal } from './src/components/modal.js';
 
 checkPrereqs([{key:'traySchedule',page:'racewayschedule.html',label:'Raceway Schedule'}]);
 
@@ -1810,13 +1810,20 @@ Wt: ${m.weight.toFixed(2)} lbs/ft
       });
 
       // Delete profile
-      document.getElementById("deleteProfileBtn").addEventListener("click", () => {
+      document.getElementById("deleteProfileBtn").addEventListener("click", async () => {
         const profileName = profileList.value;
         if (!profileName) {
           showAlertModal('Notice', 'Select a profile to delete.');
           return;
         }
-        if (!confirm(`Delete profile "${profileName}"?`)) return;
+        const confirmed = await openModal({
+          title: 'Delete Profile',
+          description: `Delete profile "${profileName}"?`,
+          primaryText: 'Delete',
+          secondaryText: 'Cancel',
+          variant: 'danger'
+        });
+        if (!confirmed) return;
         trayProfiles.remove(profileName);
         showAlertModal('Profile Deleted', `Profile "${profileName}" deleted.`);
         refreshProfileList();

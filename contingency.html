@@ -1,0 +1,213 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="description" content="N-1 Contingency Analysis — automatically remove each branch and check for violations.">
+  <title>N-1 Contingency Analysis — CableTrayRoute</title>
+  <link rel="icon" href="icons/favicon.svg" type="image/svg+xml">
+  <link rel="apple-touch-icon" href="icons/favicon.svg">
+  <!-- Open Graph / Social sharing -->
+  <meta property="og:type" content="website">
+  <meta property="og:title" content="N-1 Contingency Analysis — CableTrayRoute">
+  <meta property="og:description" content="Automated N-1 contingency analysis: remove each branch one at a time and identify voltage violations and overloads.">
+  <meta property="og:image" content="icons/route.svg">
+  <meta property="og:site_name" content="CableTrayRoute">
+  <meta property="og:url" content="contingency.html">
+  <!-- Canonical URL -->
+  <link rel="canonical" href="contingency.html">
+  <link rel="dns-prefetch" href="https://fonts.gstatic.com">
+  <meta name="color-scheme" content="light dark">
+  <link rel="stylesheet" href="style.css">
+  <!-- JSON-LD Breadcrumb -->
+  <script type="application/ld+json">
+  {
+    "@context": "https://schema.org",
+    "@type": "BreadcrumbList",
+    "itemListElement": [
+      { "@type": "ListItem", "position": 1, "name": "Home", "item": "index.html" },
+      { "@type": "ListItem", "position": 2, "name": "N-1 Contingency", "item": "contingency.html" }
+    ]
+  }
+  </script>
+  <style>
+    .contingency-critical { background: color-mix(in srgb, var(--color-error, #dc3545) 8%, transparent); }
+    .contingency-fail { color: var(--color-error, #dc3545); font-weight: 600; }
+    .contingency-ok { color: var(--color-success, #198754); }
+    #contingency-summary { margin: var(--space-3) 0; font-size: var(--font-size-sm); }
+    #contingency-status { color: var(--color-text-muted, #6c757d); font-size: var(--font-size-sm); margin-top: var(--space-2); }
+    .contingency-table { width: 100%; border-collapse: collapse; font-size: var(--font-size-sm); margin-top: var(--space-4); }
+    .contingency-table th, .contingency-table td { padding: var(--space-2) var(--space-3); border-bottom: 1px solid var(--border-color); text-align: left; }
+    .contingency-table th { background: var(--color-surface-strong); font-weight: 600; }
+  </style>
+  <script type="module" src="dataStore.mjs" defer></script>
+  <script type="module" src="studies/contingency.js" defer></script>
+</head>
+<body data-report-title="N-1 Contingency Analysis">
+  <a href="#main-content" class="skip-link">Skip to main content</a>
+  <nav class="top-nav">
+    <button id="nav-toggle" class="nav-toggle" aria-label="Toggle navigation" aria-controls="nav-links" aria-expanded="false" title="Toggle navigation">
+      <img src="icons/toolbar/grid.svg" alt="" aria-hidden="true" class="control-icon" loading="lazy" decoding="async">
+    </button>
+    <div id="nav-links" class="nav-links">
+      <a href="index.html">Home</a>
+      <a href="equipmentlist.html">Equipment List</a>
+      <a href="loadlist.html">Load List</a>
+      <a href="cableschedule.html">Cable Schedule</a>
+      <a href="panelschedule.html">Panel Schedule</a>
+      <a href="racewayschedule.html">Raceway Schedule</a>
+      <a href="ductbankroute.html">Ductbank</a>
+      <a href="cabletrayfill.html">Tray Fill</a>
+      <a href="conduitfill.html">Conduit Fill</a>
+      <a href="supportspan.html">Support Span</a>
+      <a href="seismicBracing.html">Seismic Bracing</a>
+      <a href="trayhardwarebom.html">Tray Hardware BOM</a>
+      <a href="clashdetect.html">Clash Detection</a>
+      <a href="spoolsheets.html">Spool Sheets</a>
+      <a href="windload.html">Wind Load</a>
+      <a href="optimalRoute.html">Optimal Route</a>
+      <a href="pullcards.html">Pull Cards</a>
+      <a href="costestimate.html">Cost Estimate</a>
+      <a href="submittal.html">Submittal Package</a>
+      <a href="oneline.html">One-Line</a>
+      <a href="intlCableSize.html">Intl Cable Sizing</a>
+      <a href="tcc.html">TCC</a>
+      <a href="harmonics.html">Harmonics</a>
+      <a href="motorStart.html">Motor Start</a>
+      <a href="loadFlow.html">Load Flow</a>
+      <a href="shortCircuit.html">Short Circuit</a>
+      <a href="arcFlash.html">Arc Flash</a>
+      <a href="groundgrid.html">Ground Grid</a>
+      <a href="autosize.html">Auto-Size</a>
+      <a href="reliability.html">Reliability</a>
+      <a href="emf.html">EMF Analysis</a>
+      <a href="transientstability.html">Transient Stability</a>
+      <a href="contingency.html" class="active" aria-current="page">N-1 Contingency</a>
+      <a href="custom-components.html">Custom Components</a>
+      <a href="library.html">Library Manager</a>
+      <a href="help.html">Help</a>
+      <a href="account.html">Account</a>
+    </div>
+    <button id="settings-btn" class="settings-btn" aria-label="Settings" aria-expanded="false" title="Settings">
+      <img src="icons/toolbar/validate.svg" alt="" aria-hidden="true" class="control-icon" loading="lazy" decoding="async">
+    </button>
+  </nav>
+  <div id="settings-menu" class="settings-menu">
+    <label for="theme-select">Theme
+    <select id="theme-select">
+      <option value="system">System</option>
+      <option value="light">Light</option>
+      <option value="dark">Dark</option>
+      <option value="high-contrast">High Contrast</option>
+    </select>
+  </label>
+    <label><input type="checkbox" id="compact-toggle" aria-label="Enable compact table mode"> Compact Mode</label>
+    <label for="unit-select">Units
+      <select id="unit-select">
+        <option value="imperial">Imperial</option>
+        <option value="metric">Metric</option>
+      </select>
+    </label>
+    <button id="help-btn" class="btn" aria-expanded="false" title="Show help">Site Help</button>
+    <button id="new-project-btn">New Project</button>
+    <button id="save-project-btn">Save Project</button>
+    <button id="load-project-btn">Load Project</button>
+    <button id="export-project-btn">Export Project</button>
+    <button id="import-project-btn">Import Project</button>
+    <input type="file" id="import-project-input" accept=".ctr.json" class="hidden" title="Select project file">
+  </div>
+  <div class="container">
+    <main id="main-content" class="main-content">
+      <nav aria-label="Breadcrumb">
+        <ol class="breadcrumb-trail">
+          <li><a href="index.html">Home</a></li>
+          <li aria-current="page">N-1 Contingency</li>
+        </ol>
+      </nav>
+
+      <header class="page-header">
+        <h1>N-1 Contingency Analysis</h1>
+        <p>Automatically remove each branch in the one-line model and check for voltage violations and branch overloads.</p>
+      </header>
+
+      <details class="method-panel">
+        <summary>Method &amp; Assumptions</summary>
+        <p>For each branch (cable, transformer, or tie) in the one-line diagram, the branch is removed and a Newton–Raphson load flow is re-solved. Violations are flagged when:</p>
+        <ul>
+          <li>Bus voltage departs from the configured per-unit bounds (default 0.95–1.05 pu)</li>
+          <li>A branch loading exceeds the configurable threshold (default 100% of rating)</li>
+          <li>The modified network fails to converge (indicates an island or severe overload)</li>
+        </ul>
+        <p>Results are stored in the project's Studies object and can be referenced by other tools.</p>
+        <p>Prerequisites: Define buses and branches in the <a href="oneline.html">One-Line Diagram</a> editor and run a base-case <a href="loadFlow.html">Load Flow</a> study first.</p>
+      </details>
+
+      <section class="card">
+        <h2>Study Parameters</h2>
+        <form id="contingency-form" novalidate>
+          <label>
+            Base MVA
+            <input type="number" name="baseMVA" value="100" min="0.1" step="any" aria-describedby="basemva-hint">
+          </label>
+          <span id="basemva-hint" class="field-hint">System base power in MVA (typically 100).</span>
+
+          <label>
+            Voltage Min (pu)
+            <input type="number" name="voltageMin" value="0.95" min="0.5" max="1.0" step="0.01" aria-describedby="vmin-hint">
+          </label>
+          <span id="vmin-hint" class="field-hint">Lower voltage threshold in per-unit (default 0.95).</span>
+
+          <label>
+            Voltage Max (pu)
+            <input type="number" name="voltageMax" value="1.05" min="1.0" max="1.2" step="0.01" aria-describedby="vmax-hint">
+          </label>
+          <span id="vmax-hint" class="field-hint">Upper voltage threshold in per-unit (default 1.05).</span>
+
+          <label>
+            Overload Threshold (%)
+            <input type="number" name="overloadPct" value="100" min="50" max="200" step="1" aria-describedby="overload-hint">
+          </label>
+          <span id="overload-hint" class="field-hint">Branch loading percentage above which a violation is flagged (default 100%).</span>
+
+          <button type="submit" class="primary-btn">Run N-1 Contingency</button>
+        </form>
+        <p id="contingency-status" aria-live="polite"></p>
+      </section>
+
+      <section class="card" id="contingency-results-section" aria-label="Contingency results">
+        <h2>Results</h2>
+        <div id="contingency-summary" aria-live="polite"></div>
+        <div style="overflow-x:auto">
+          <table class="contingency-table" aria-label="N-1 contingency results">
+            <thead>
+              <tr>
+                <th scope="col">Branch Removed</th>
+                <th scope="col">Type</th>
+                <th scope="col">Converged</th>
+                <th scope="col">Violations</th>
+                <th scope="col">Status</th>
+              </tr>
+            </thead>
+            <tbody id="contingency-tbody">
+              <tr><td colspan="5">Run the study to see results.</td></tr>
+            </tbody>
+          </table>
+        </div>
+      </section>
+    </main>
+  </div>
+  <footer class="site-footer">
+    <div class="footer-left">
+      <img src="icons/route.svg" alt="CableTrayRoute logo" class="footer-logo" loading="lazy" decoding="async">
+      <span>CableTrayRoute</span>
+      <span class="footer-copyright">&copy; 2026 CableTrayRoute contributors</span>
+    </div>
+    <nav class="footer-links" aria-label="Footer">
+      <a href="docs/quickstart.html">Quick Start</a>
+      <a href="docs/index.html">Docs</a>
+      <a href="help.html">Help</a>
+    </nav>
+  </footer>
+  <script type="module" src="dist/projectManager.js"></script>
+</body>
+</html>

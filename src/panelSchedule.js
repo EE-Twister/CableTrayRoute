@@ -2,7 +2,7 @@ import "./workflowStatus.js";
 import "../site.js";
 import * as dataStore from "../dataStore.mjs";
 import { exportPanelSchedule } from "../exportPanelSchedule.js";
-import { ensureFieldAssistiveText, showAlertModal } from "./components/modal.js";
+import { ensureFieldAssistiveText, showAlertModal, openModal } from "./components/modal.js";
 
 const projectId = typeof window !== "undefined" ? (window.currentProjectId || "default") : undefined;
 
@@ -2788,10 +2788,16 @@ window.addEventListener("DOMContentLoaded", () => {
   }
 
   if (deletePanelBtn) {
-    deletePanelBtn.addEventListener("click", () => {
+    deletePanelBtn.addEventListener("click", async () => {
       if (!panel || !Array.isArray(panels) || panels.length <= 1) return;
       const label = getPanelDisplayName(panel);
-      const confirmed = window.confirm(`Delete ${label}? Loads assigned to this panel will be cleared.`);
+      const confirmed = await openModal({
+        title: 'Delete Panel',
+        description: `Delete ${label}? Loads assigned to this panel will be cleared.`,
+        primaryText: 'Delete',
+        secondaryText: 'Cancel',
+        variant: 'danger'
+      });
       if (!confirmed) return;
       const idx = panels.findIndex(entry => entry && panelMatchesIdentifier(entry, activePanelId));
       const [removed] = idx >= 0 ? panels.splice(idx, 1) : panels.splice(panels.length - 1, 1);
@@ -2830,10 +2836,16 @@ window.addEventListener("DOMContentLoaded", () => {
   }
 
   if (clearAssignmentsBtn) {
-    clearAssignmentsBtn.addEventListener("click", () => {
+    clearAssignmentsBtn.addEventListener("click", async () => {
       if (!panel) return;
       const label = getPanelDisplayName(panel);
-      const confirmed = window.confirm(`Clear all load assignments for ${label}?`);
+      const confirmed = await openModal({
+        title: 'Clear Assignments',
+        description: `Clear all load assignments for ${label}?`,
+        primaryText: 'Clear',
+        secondaryText: 'Cancel',
+        variant: 'danger'
+      });
       if (!confirmed) return;
       const changed = clearLoadsForPanel(panel);
       if (!changed) {

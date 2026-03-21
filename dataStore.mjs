@@ -554,6 +554,12 @@ export function saveProject(projectId, scenario = getCurrentScenarioNameState())
       oneLine: getOneLine(scenario)
     };
     writeSavedProject(projectId, payload);
+    // Notify collaboration layer so remote clients receive the update
+    if (typeof document !== 'undefined') {
+      try {
+        document.dispatchEvent(new CustomEvent('ctr:project-saved', { detail: payload }));
+      } catch { /* non-critical */ }
+    }
   } catch (e) {
     console.error('Failed to save project', e);
   }

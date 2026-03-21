@@ -1,6 +1,7 @@
 import { buildTrayHardwareBOM } from '../analysis/trayHardware.mjs';
 import { getTrays } from '../dataStore.mjs';
 import { showAlertModal } from './components/modal.js';
+import { mountCatalogBrowser } from './catalogBrowser.js';
 
 document.addEventListener('DOMContentLoaded', () => {
   initSettings();
@@ -8,6 +9,18 @@ document.addEventListener('DOMContentLoaded', () => {
   initCompactMode();
   initHelpModal('help-btn', 'help-modal', 'close-help-btn');
   initNavToggle();
+
+  // Mount manufacturer catalog browser
+  const catalogContainer = document.getElementById('catalog-browser');
+  if (catalogContainer) {
+    mountCatalogBrowser(catalogContainer, {
+      onSelect: (product) => {
+        // Notify user of selection; integrators can listen for 'ctr:catalog-selected'
+        document.dispatchEvent(new CustomEvent('ctr:catalog-selected', { detail: product }));
+        showAlertModal('Product Selected', `${product.description} (${product.id}) — $${product.list_price_usd?.toFixed(2) ?? 'N/A'} list price added to BOM.`);
+      }
+    });
+  }
 
   const loadClassSel      = document.getElementById('loadClass');
   const cableLoadInput    = document.getElementById('cableLoadPerFt');

@@ -7,6 +7,7 @@ import "../e2e-helpers.js";
 import { emitAsync } from "../utils/safeEvents.mjs";
 import * as dataStore from "../dataStore.mjs";
 import { showAlertModal } from "./components/modal.js";
+import { downloadRevitExport } from "../exporters/revit.mjs";
 import {
   normalizeDuctbankRow,
   normalizeConduitRow,
@@ -752,6 +753,17 @@ document.addEventListener('DOMContentLoaded', async () => {
       if(!CONDUIT_SPECS[c.type] || !CONDUIT_SPECS[c.type][c.trade_size]) issues.push({message:`Conduit ${c.conduit_id} has illegal size`,table:'conduit',row:i,col:'trade_size'});
     });
     return issues;
+  }
+
+  const exportRevitBtn = document.getElementById('export-revit-btn');
+  if (exportRevitBtn) {
+    exportRevitBtn.addEventListener('click', () => {
+      const trays = dataStore.getTrays();
+      const conduits = dataStore.getConduits();
+      const cables = dataStore.getCableSchedule ? dataStore.getCableSchedule() : [];
+      const projectName = dataStore.getProjectName ? dataStore.getProjectName() : 'CableTrayRoute Export';
+      downloadRevitExport({ trays, conduits, cables, projectName });
+    });
   }
 
   if(validateBtn){
