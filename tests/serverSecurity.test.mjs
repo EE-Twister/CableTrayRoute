@@ -448,9 +448,49 @@ async function sessionRefreshScenario() {
   }
 }
 
+async function httpsRedirectScenario() {
+  console.log('server security - HTTPS redirect');
+  const tmpDir = await fs.mkdtemp(path.join(os.tmpdir(), 'ctr-https-'));
+  const { server, port } = await startServer({
+    dataDir: tmpDir,
+    tokenTtlMs: 5000,
+    rateLimit: { windowMs: 60000, max: 100 },
+    enforceHttps: true
+  });
+  const baseUrl = `http://127.0.0.1:${port}`;
+
+  try {
+    await check('returns JSON error for API requests over HTTP (avoids cross-origin CORS issues)', async () => {
+      const res = await fetch(`${baseUrl}/signup`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', host: '127.0.0.1' },
+        body: JSON.stringify({ username: 'dave', password: 'testpass1' }),
+        redirect: 'manual'
+      });
+      assert.strictEqual(res.status, 400, 'API requests should get JSON error, not a redirect');
+      const body = await res.json();
+      assert.strictEqual(body.error, 'HTTPS required');
+    });
+
+    await check('redirects non-API HTTP requests with 308 to preserve method', async () => {
+      const res = await fetch(`${baseUrl}/login.html`, {
+        method: 'GET',
+        headers: { host: '127.0.0.1' },
+        redirect: 'manual'
+      });
+      assert.strictEqual(res.status, 308, 'navigation requests should use 308 redirect');
+      const location = res.headers.get('location');
+      assert(location && location.startsWith('https://'), 'should redirect to HTTPS');
+    });
+  } finally {
+    await closeServer(server);
+  }
+}
+
 (async () => {
   await authScenario();
   await rateLimitScenario();
   await sessionRefreshScenario();
+  await httpsRedirectScenario();
 })();
 
