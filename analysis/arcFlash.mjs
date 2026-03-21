@@ -1,6 +1,7 @@
 import { runShortCircuit } from './shortCircuit.mjs';
 import { scaleCurve } from './tccUtils.js';
 import { getOneLine, getItem } from '../dataStore.mjs';
+import { showAlertModal } from '../src/components/modal.js';
 
 let deviceCache = null;
 
@@ -208,13 +209,8 @@ async function loadDevices() {
       console.info('Consider updating your browser or adding polyfills for missing features.');
       if (typeof window.showToast === 'function') {
         window.showToast('Protective device library failed to load', 'error', JSON.stringify(diag));
-      } else if (typeof alert === 'function') {
-        alert('Protective device library failed to load');
       } else if (typeof document !== 'undefined') {
-        const banner = document.createElement('div');
-        banner.className = 'message error';
-        banner.textContent = 'Protective device library failed to load';
-        document.body.prepend(banner);
+        showAlertModal('Library Error', 'Protective device library failed to load.');
       }
     }
     deviceCache = [];

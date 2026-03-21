@@ -1,4 +1,5 @@
 import { getItem, setItem, STORAGE_KEYS } from './dataStore.mjs';
+import { showAlertModal } from './src/components/modal.js';
 
 const FILTER_ICON_SVG = '<svg viewBox="0 0 16 16" aria-hidden="true" focusable="false" class="filter-icon"><path d="M1.5 2a.5.5 0 0 0-.4.8L6 8.667V13.5a.5.5 0 0 0 .757.429l2-1.2A.5.5 0 0 0 9 12.3V8.667L14.9 2.8A.5.5 0 0 0 14.5 2h-13z" fill="currentColor"/></svg>';
 
@@ -456,7 +457,7 @@ class TableManager {
     if (response === null) return;
     const parsed = Number.parseInt(response, 10);
     if (Number.isNaN(parsed)) {
-      alert('Please enter a valid number of pixels.');
+      showAlertModal('Invalid Input', 'Please enter a valid number of pixels.');
       return;
     }
     const width = Math.min(Math.max(parsed, 60), 1000);

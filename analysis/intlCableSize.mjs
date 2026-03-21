@@ -8,6 +8,10 @@
  *               IEC 60364-5-52 Annex B / BS 7671 Appendix 4. They differ only in
  *               grouping-factor table selection and labelling.
  *   AS_NZS_3008 — AS/NZS 3008.1.1:2017 (Australia/New Zealand, reference ambient 40 °C)
+ *   NF_C15_100  — NF C15-100:2002+A1:2008 (France). Base ampacity tables identical
+ *                 to IEC 60364-5-52; reference ambient 30 °C.
+ *   IEC_60092   — IEC 60092-352:2016 (marine / shipboard, reference ambient 45 °C)
+ *                 Copper conductors only; XLPE (90 °C) or EPR / PVC (60 °C) insulation.
  *
  * Installation methods (IEC / BS labels; AS/NZS equivalent shown in parentheses):
  *   B2 — Multicore cable in conduit on wall or surface trunking (≈ wiring method C2/C3)
@@ -25,6 +29,8 @@
  *   IEC 60364-5-52:2009 Annex B tables B.52.2 – B.52.17
  *   BS 7671:2018 Appendix 4 tables 4D1A–4E4A, 4B1, 4B2, 4C1, 4C2
  *   AS/NZS 3008.1.1:2017 Tables 7, 8, 22, 25, 27
+ *   NF C15-100:2002+A1:2008 — same base tables as IEC 60364-5-52
+ *   IEC 60092-352:2016 Tables 1–4 (shipboard power cables, Cu, XLPE/PVC, free air)
  */
 
 // ---------------------------------------------------------------------------
@@ -47,6 +53,16 @@ export const STANDARDS = {
     name: 'AS/NZS 3008.1.1:2017',
     refAmbient: 40,
     note: 'Australia/New Zealand. Reference ambient 40 °C; separate ampacity tables.',
+  },
+  NF_C15_100: {
+    name: 'NF C15-100:2002+A1 (French)',
+    refAmbient: 30,
+    note: 'French residential/commercial wiring standard. Base ampacity tables identical to IEC 60364-5-52; reference ambient 30 °C.',
+  },
+  IEC_60092: {
+    name: 'IEC 60092-352:2016 (Marine)',
+    refAmbient: 45,
+    note: 'Shipboard / offshore power cables. Copper conductors only. Reference ambient 45 °C.',
   },
 };
 
@@ -274,6 +290,105 @@ const AMPACITY_ASNZS = {
 };
 
 // ---------------------------------------------------------------------------
+// IEC 60092-352:2016 — Marine / shipboard cable ampacity tables
+// Reference ambient 45 °C, copper conductors only.
+// XLPE (EPR) — 90 °C max conductor temp; PVC — 60 °C max conductor temp.
+// Installation methods: C (clipped), E (free air / cable tray), B2 (enclosed)
+// Source: IEC 60092-352:2016 Tables 1–4.
+// Al conductors are not used in shipboard applications per this standard.
+// ---------------------------------------------------------------------------
+const AMPACITY_IEC60092 = {
+  B2: {
+    2: {
+      Cu: {
+        PVC:  [12,   16,   22,   28,   38,   50,   66,   80,   98,  124,  150,  173,  198,  225,  264,  303],
+        XLPE: [16,   22,   30,   38,   52,   70,   91,  111,  135,  172,  208,  240,  276,  314,  368,  422],
+      },
+      Al: {
+        PVC:  [null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null],
+        XLPE: [null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null],
+      },
+    },
+    3: {
+      Cu: {
+        PVC:  [10,   14,   19,   25,   34,   45,   58,   71,   86,  109,  132,  152,  174,  197,  231,  265],
+        XLPE: [14,   19,   26,   34,   46,   62,   80,   99,  120,  153,  186,  215,  247,  281,  330,  380],
+      },
+      Al: {
+        PVC:  [null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null],
+        XLPE: [null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null],
+      },
+    },
+  },
+  C: {
+    2: {
+      Cu: {
+        PVC:  [14,   19,   26,   34,   46,   61,   78,   97,  117,  150,  181,  210,  243,  277,  327,  376],
+        XLPE: [18,   25,   33,   43,   59,   79,  100,  124,  151,  194,  236,  274,  316,  362,  428,  494],
+      },
+      Al: {
+        PVC:  [null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null],
+        XLPE: [null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null],
+      },
+    },
+    3: {
+      Cu: {
+        PVC:  [12,   17,   23,   30,   41,   54,   69,   86,  104,  132,  160,  185,  213,  243,  286,  329],
+        XLPE: [16,   22,   29,   38,   52,   70,   88,  110,  134,  171,  207,  241,  278,  317,  373,  430],
+      },
+      Al: {
+        PVC:  [null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null],
+        XLPE: [null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null],
+      },
+    },
+  },
+  E: {
+    2: {
+      Cu: {
+        PVC:  [16,   21,   29,   37,   51,   68,   88,  109,  131,  167,  201,  233,  267,  304,  357,  410],
+        XLPE: [20,   27,   37,   47,   65,   87,  113,  140,  171,  220,  268,  312,  360,  413,  489,  564],
+      },
+      Al: {
+        PVC:  [null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null],
+        XLPE: [null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null],
+      },
+    },
+    3: {
+      Cu: {
+        PVC:  [14,   19,   26,   33,   45,   60,   78,   97,  117,  149,  179,  207,  238,  271,  318,  365],
+        XLPE: [18,   24,   33,   42,   57,   77,  100,  124,  152,  196,  238,  277,  319,  365,  432,  499],
+      },
+      Al: {
+        PVC:  [null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null],
+        XLPE: [null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null],
+      },
+    },
+  },
+  F: {
+    2: {
+      Cu: {
+        PVC:  [16,   21,   29,   37,   51,   68,   88,  109,  131,  167,  201,  233,  267,  304,  357,  410],
+        XLPE: [20,   27,   37,   47,   65,   87,  113,  140,  171,  220,  268,  312,  360,  413,  489,  564],
+      },
+      Al: {
+        PVC:  [null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null],
+        XLPE: [null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null],
+      },
+    },
+    3: {
+      Cu: {
+        PVC:  [14,   19,   26,   33,   45,   60,   78,   97,  117,  149,  179,  207,  238,  271,  318,  365],
+        XLPE: [18,   24,   33,   42,   57,   77,  100,  124,  152,  196,  238,  277,  319,  365,  432,  499],
+      },
+      Al: {
+        PVC:  [null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null],
+        XLPE: [null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null],
+      },
+    },
+  },
+};
+
+// ---------------------------------------------------------------------------
 // Temperature correction factors
 // ---------------------------------------------------------------------------
 
@@ -292,6 +407,26 @@ export const TEMP_CORRECTION_IEC = {
     10: 1.15, 15: 1.12, 20: 1.08, 25: 1.04, 30: 1.00,
     35: 0.96, 40: 0.91, 45: 0.87, 50: 0.82, 55: 0.76, 60: 0.71,
     65: 0.65, 70: 0.58, 75: 0.50, 80: 0.41,
+  },
+};
+
+/**
+ * Ambient temperature correction factors for IEC 60092-352 (marine).
+ * Reference ambient = 45 °C. Conductor ratings: PVC 60 °C, XLPE 90 °C.
+ * Source: IEC 60092-352:2016 Table 5.
+ * @type {Object.<string, Object.<number,number>>}
+ */
+export const TEMP_CORRECTION_IEC60092 = {
+  PVC: {
+    // Max conductor temp 60 °C, reference ambient 45 °C
+    25: 1.41, 30: 1.32, 35: 1.22, 40: 1.12, 45: 1.00,
+    50: 0.87, 55: 0.71,
+  },
+  XLPE: {
+    // Max conductor temp 90 °C, reference ambient 45 °C
+    25: 1.14, 30: 1.11, 35: 1.07, 40: 1.04, 45: 1.00,
+    50: 0.96, 55: 0.92, 60: 0.88, 65: 0.83, 70: 0.79,
+    75: 0.74, 80: 0.69,
   },
 };
 
@@ -368,10 +503,21 @@ export function lookupAmpacity(standard, method, phases, material, insulation, s
     );
   }
 
-  const table = standard === 'AS_NZS_3008' ? AMPACITY_ASNZS : AMPACITY_IEC;
+  let table;
+  if (standard === 'AS_NZS_3008') {
+    table = AMPACITY_ASNZS;
+  } else if (standard === 'IEC_60092') {
+    table = AMPACITY_IEC60092;
+  } else {
+    // IEC_60364, BS_7671, NF_C15_100 share the same base ampacity tables
+    table = AMPACITY_IEC;
+  }
   const amps = table[method]?.[phases]?.[material]?.[insulation]?.[idx];
 
   if (amps == null) {
+    if (standard === 'IEC_60092' && material === 'Al') {
+      throw new Error('IEC 60092-352 (marine) does not cover aluminium conductors.');
+    }
     if (material === 'Al' && sizeMm2 < 16) {
       throw new Error(
         `Aluminium conductors are not rated below 16 mm² (requested ${sizeMm2} mm²)`
@@ -406,9 +552,16 @@ export function getTempCorrectionFactor(standard, insulation, ambientTemp) {
     throw new Error('insulation must be PVC or XLPE');
   }
 
-  const table = standard === 'AS_NZS_3008'
-    ? TEMP_CORRECTION_ASNZS[insulation]
-    : TEMP_CORRECTION_IEC[insulation];
+  let corrTable;
+  if (standard === 'AS_NZS_3008') {
+    corrTable = TEMP_CORRECTION_ASNZS[insulation];
+  } else if (standard === 'IEC_60092') {
+    corrTable = TEMP_CORRECTION_IEC60092[insulation];
+  } else {
+    // IEC_60364, BS_7671, NF_C15_100 share the same temperature correction tables
+    corrTable = TEMP_CORRECTION_IEC[insulation];
+  }
+  const table = corrTable;
 
   const keys = Object.keys(table).map(Number).sort((a, b) => a - b);
   const min = keys[0];
