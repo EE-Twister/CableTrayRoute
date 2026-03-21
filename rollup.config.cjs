@@ -36,6 +36,8 @@ const entries = {
   reliability: 'src/reliability.js',
   costestimate: 'src/costestimate.js',
   emf: 'src/emf.js',
+  clashdetect: 'src/clashdetect.js',
+  spoolsheets: 'src/spoolsheets.js',
   '404': 'src/404.js'
 };
 

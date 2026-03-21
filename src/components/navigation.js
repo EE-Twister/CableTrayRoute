@@ -11,6 +11,8 @@ const NAV_ROUTES = [
   { href: 'supportspan.html', label: 'Support Span', section: 'Workflow', icon: 'icons/toolbar/dimension.svg' },
   { href: 'seismicBracing.html', label: 'Seismic Bracing', section: 'Workflow', icon: 'icons/toolbar/validate.svg' },
   { href: 'trayhardwarebom.html', label: 'Tray Hardware BOM', section: 'Workflow', icon: 'icons/raceway.svg' },
+  { href: 'clashdetect.html', label: 'Clash Detection', section: 'Workflow', icon: 'icons/toolbar/validate.svg' },
+  { href: 'spoolsheets.html', label: 'Spool Sheets', section: 'Workflow', icon: 'icons/toolbar/copy.svg' },
   { href: 'optimalRoute.html', label: 'Optimal Route', section: 'Workflow', icon: 'icons/route.svg' },
   { href: 'pullcards.html', label: 'Pull Cards', section: 'Workflow', icon: 'icons/toolbar/copy.svg' },
   { href: 'costestimate.html', label: 'Cost Estimate', section: 'Workflow', icon: 'icons/toolbar/grid-size.svg' },

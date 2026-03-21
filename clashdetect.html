@@ -1,0 +1,209 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <meta name="description" content="Detect cable tray routing clashes and clearance violations in 3D space. Hard clashes indicate physical interference; soft clashes flag insufficient maintenance clearance." />
+  <title>Clash Detection — CableTrayRoute</title>
+  <link rel="icon" href="icons/favicon.svg" type="image/svg+xml">
+  <link rel="apple-touch-icon" href="icons/favicon.svg">
+  <!-- Open Graph / Social sharing -->
+  <meta property="og:type" content="website">
+  <meta property="og:title" content="Clash Detection — CableTrayRoute">
+  <meta property="og:description" content="Detect cable tray 3D routing clashes and clearance violations from the project raceway schedule.">
+  <meta property="og:image" content="icons/route.svg">
+  <meta property="og:site_name" content="CableTrayRoute">
+  <meta property="og:url" content="clashdetect.html">
+  <!-- Canonical URL -->
+  <link rel="canonical" href="clashdetect.html">
+  <link rel="dns-prefetch" href="https://fonts.gstatic.com">
+  <meta name="color-scheme" content="light dark">
+  <link rel="stylesheet" href="style.css" />
+  <script type="module" src="dirtyTracker.js"></script>
+  <script type="module" src="dist/clashdetect.js" defer></script>
+</head>
+<body class="clashdetect-page" data-report-title="Clash Detection">
+  <a href="#main-content" class="skip-link">Skip to main content</a>
+  <nav class="top-nav">
+    <button id="nav-toggle" class="nav-toggle" aria-label="Toggle navigation" aria-controls="nav-links" aria-expanded="false" title="Toggle navigation">
+      <img src="icons/toolbar/grid.svg" alt="" aria-hidden="true" class="control-icon" loading="lazy" decoding="async">
+    </button>
+    <div id="nav-links" class="nav-links">
+      <a href="index.html">Home</a>
+      <a href="equipmentlist.html">Equipment List</a>
+      <a href="loadlist.html">Load List</a>
+      <a href="cableschedule.html">Cable Schedule</a>
+      <a href="panelschedule.html">Panel Schedule</a>
+      <a href="racewayschedule.html">Raceway Schedule</a>
+      <a href="ductbankroute.html">Ductbank</a>
+      <a href="cabletrayfill.html">Tray Fill</a>
+      <a href="conduitfill.html">Conduit Fill</a>
+      <a href="supportspan.html">Support Span</a>
+      <a href="seismicBracing.html">Seismic Bracing</a>
+      <a href="trayhardwarebom.html">Tray Hardware BOM</a>
+      <a href="clashdetect.html" class="active" aria-current="page">Clash Detection</a>
+      <a href="optimalRoute.html">Optimal Route</a>
+      <a href="pullcards.html">Pull Cards</a>
+      <a href="oneline.html">One-Line</a>
+      <a href="tcc.html">TCC</a>
+      <a href="harmonics.html">Harmonics</a>
+      <a href="motorStart.html">Motor Start</a>
+      <a href="loadFlow.html">Load Flow</a>
+      <a href="shortCircuit.html">Short Circuit</a>
+      <a href="arcFlash.html">Arc Flash</a>
+      <a href="custom-components.html">Custom Components</a>
+      <a href="help.html">Help</a>
+      <a href="account.html">Account</a>
+    </div>
+    <button id="settings-btn" class="settings-btn" aria-label="Settings" aria-expanded="false" title="Settings">
+      <img src="icons/toolbar/validate.svg" alt="" aria-hidden="true" class="control-icon" loading="lazy" decoding="async">
+    </button>
+  </nav>
+
+  <div id="settings-menu" class="settings-menu">
+    <label for="theme-select">Theme
+      <select id="theme-select">
+        <option value="system">System</option>
+        <option value="light">Light</option>
+        <option value="dark">Dark</option>
+        <option value="high-contrast">High Contrast</option>
+      </select>
+    </label>
+    <label><input type="checkbox" id="compact-toggle" aria-label="Enable compact table mode"> Compact Mode</label>
+    <label for="unit-select">Units
+      <select id="unit-select">
+        <option value="imperial">Imperial</option>
+        <option value="metric">Metric</option>
+      </select>
+    </label>
+    <button id="help-btn" class="btn" aria-expanded="false" title="Show help">
+      <img src="icons/toolbar/validate.svg" alt="" aria-hidden="true" class="control-icon" loading="lazy" decoding="async">
+      <span>Site Help</span>
+    </button>
+    <button id="new-project-btn" title="Start a new project">
+      <img src="icons/toolbar/copy.svg" alt="" aria-hidden="true" class="control-icon" loading="lazy" decoding="async">
+      <span>New Project</span>
+    </button>
+    <button id="save-project-btn" title="Save current project">
+      <img src="icons/toolbar/export.svg" alt="" aria-hidden="true" class="control-icon" loading="lazy" decoding="async">
+      <span>Save Project</span>
+    </button>
+    <button id="load-project-btn" title="Load an existing project">
+      <img src="icons/toolbar/import.svg" alt="" aria-hidden="true" class="control-icon" loading="lazy" decoding="async">
+      <span>Load Project</span>
+    </button>
+    <button id="export-project-btn" title="Export project data">
+      <img src="icons/toolbar/export.svg" alt="" aria-hidden="true" class="control-icon" loading="lazy" decoding="async">
+      <span>Export Project</span>
+    </button>
+    <button id="import-project-btn" title="Import project data">
+      <img src="icons/toolbar/import.svg" alt="" aria-hidden="true" class="control-icon" loading="lazy" decoding="async">
+      <span>Import Project</span>
+    </button>
+    <input type="file" id="import-project-input" accept=".ctr.json" class="hidden" title="Select project file">
+  </div>
+
+  <div class="container">
+    <main id="main-content" class="main-content">
+      <nav aria-label="Breadcrumb">
+        <ol class="breadcrumb-trail">
+          <li><a href="index.html">Home</a></li>
+          <li>Workflow</li>
+          <li aria-current="page">Clash Detection</li>
+        </ol>
+      </nav>
+
+      <header class="page-header">
+        <h1>Cable Tray Clash Detection</h1>
+      </header>
+
+      <details class="method-panel">
+        <summary>Method &amp; Assumptions</summary>
+        <p>Clash detection uses Axis-Aligned Bounding Box (AABB) tests to check
+        for interference between every pair of tray segments defined in the
+        <a href="racewayschedule.html">Raceway Schedule</a>.</p>
+
+        <p><strong>Hard Clash</strong> — The 3D bounding envelopes of two trays
+        physically overlap. This is a definite routing conflict that must be
+        resolved before installation.</p>
+
+        <p><strong>Soft Clash / Clearance Violation</strong> — Two trays are
+        separated by less than the minimum clearance distance. Per NEMA VE 2
+        §8.4, a minimum 3-inch (0.25 ft) clear space is recommended between
+        adjacent runs for maintenance access and future cable pulling.</p>
+
+        <p>Each tray envelope is computed as a box centred on the run axis:
+        ½ × width in the plan axes and full depth in the vertical axis. Trays
+        must have start/end coordinates (X, Y, Z), inside width, and tray depth
+        populated in the Raceway Schedule.</p>
+
+        <p>References: NEMA VE 2-2013 §8.4 (Clearances), IEC 61537 §8.3.</p>
+        <p>See also:
+          <a href="racewayschedule.html">Raceway Schedule</a>,
+          <a href="trayhardwarebom.html">Tray Hardware BOM</a>,
+          <a href="supportspan.html">Support Span Calculator</a>.
+        </p>
+      </details>
+
+      <fieldset>
+        <legend><strong>Detection Parameters</strong></legend>
+
+        <div class="field-row">
+          <label for="clearanceFt">
+            Minimum clearance (ft)
+            <button class="helpBtn" data-doc="docs/standards.html#clearances"
+                    aria-label="Help — minimum clearance">?</button>
+          </label>
+          <input type="number" id="clearanceFt" min="0" max="5" step="0.05"
+                 value="0.25" aria-describedby="clearanceFtHint">
+          <p id="clearanceFtHint" class="field-hint">
+            NEMA VE 2 §8.4 recommends ≥ 3 in (0.25 ft) between adjacent runs.
+            Enter 0 to report hard clashes only.
+          </p>
+        </div>
+
+        <div class="field-row">
+          <label for="showSoft">
+            <input type="checkbox" id="showSoft" checked>
+            Include soft clash (clearance) warnings in results
+          </label>
+        </div>
+      </fieldset>
+
+      <div id="controls">
+        <button id="runBtn" type="button">Run Clash Detection</button>
+      </div>
+
+      <div id="results" role="region" aria-live="polite" aria-label="Clash detection results"></div>
+
+      <nav class="step-nav" aria-label="Workflow navigation">
+        <a href="trayhardwarebom.html" class="step-nav-prev">&#8592; Tray Hardware BOM</a>
+        <a href="optimalRoute.html" class="step-nav-next">Optimal Route &#8594;</a>
+      </nav>
+    </main>
+  </div>
+
+  <div id="help-modal" class="modal" aria-hidden="true" role="dialog" aria-modal="true"
+       aria-labelledby="help-title">
+    <div class="modal-content">
+      <button id="close-help-btn" class="close-btn" aria-label="Close Help">&times;</button>
+      <h2 id="help-title">Clash Detection Help</h2>
+      <p>This tool checks every pair of tray segments from the Raceway Schedule
+      for 3D interference and clearance violations.</p>
+      <p><strong>Prerequisites:</strong> Trays must have start/end X, Y, Z
+      coordinates, inside width (inches), and tray depth (inches) in the
+      Raceway Schedule.</p>
+      <p><strong>To use:</strong></p>
+      <ol>
+        <li>Enter trays with 3D coordinates in the <a href="racewayschedule.html">Raceway Schedule</a>.</li>
+        <li>Set the minimum clearance distance (default 0.25 ft per NEMA VE 2).</li>
+        <li>Click <em>Run Clash Detection</em>.</li>
+        <li>Review the clash table. Hard clashes (red) must be resolved; soft clashes (yellow) are warnings.</li>
+        <li>Reroute conflicting trays in the Raceway Schedule and re-run to verify.</li>
+      </ol>
+    </div>
+  </div>
+
+  <script type="module" src="dist/projectManager.js"></script>
+</body>
+</html>

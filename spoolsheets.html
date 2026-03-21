@@ -1,0 +1,249 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <meta name="description" content="Generate prefabrication spool sheets for cable tray assemblies. Group tray segments into spools with material lists, cable assignments, and estimated weights." />
+  <title>Spool Sheets — CableTrayRoute</title>
+  <link rel="icon" href="icons/favicon.svg" type="image/svg+xml">
+  <link rel="apple-touch-icon" href="icons/favicon.svg">
+  <!-- Open Graph / Social sharing -->
+  <meta property="og:type" content="website">
+  <meta property="og:title" content="Spool Sheets — CableTrayRoute">
+  <meta property="og:description" content="Generate prefabrication spool sheets for cable tray assemblies from the project raceway and cable schedules.">
+  <meta property="og:image" content="icons/route.svg">
+  <meta property="og:site_name" content="CableTrayRoute">
+  <meta property="og:url" content="spoolsheets.html">
+  <!-- Canonical URL -->
+  <link rel="canonical" href="spoolsheets.html">
+  <link rel="dns-prefetch" href="https://fonts.gstatic.com">
+  <meta name="color-scheme" content="light dark">
+  <link rel="stylesheet" href="style.css" />
+  <script src="cdnFallback.js" defer></script>
+  <script>
+    initCdnFallback([{ global: 'XLSX', label: 'Excel export (XLSX)' }]);
+  </script>
+  <script type="module" src="dirtyTracker.js"></script>
+  <script type="module" src="dist/spoolsheets.js" defer></script>
+</head>
+<body class="spoolsheets-page" data-report-title="Spool Sheets">
+  <a href="#main-content" class="skip-link">Skip to main content</a>
+  <nav class="top-nav">
+    <button id="nav-toggle" class="nav-toggle" aria-label="Toggle navigation" aria-controls="nav-links" aria-expanded="false" title="Toggle navigation">
+      <img src="icons/toolbar/grid.svg" alt="" aria-hidden="true" class="control-icon" loading="lazy" decoding="async">
+    </button>
+    <div id="nav-links" class="nav-links">
+      <a href="index.html">Home</a>
+      <a href="equipmentlist.html">Equipment List</a>
+      <a href="loadlist.html">Load List</a>
+      <a href="cableschedule.html">Cable Schedule</a>
+      <a href="panelschedule.html">Panel Schedule</a>
+      <a href="racewayschedule.html">Raceway Schedule</a>
+      <a href="ductbankroute.html">Ductbank</a>
+      <a href="cabletrayfill.html">Tray Fill</a>
+      <a href="conduitfill.html">Conduit Fill</a>
+      <a href="supportspan.html">Support Span</a>
+      <a href="seismicBracing.html">Seismic Bracing</a>
+      <a href="trayhardwarebom.html">Tray Hardware BOM</a>
+      <a href="clashdetect.html">Clash Detection</a>
+      <a href="spoolsheets.html" class="active" aria-current="page">Spool Sheets</a>
+      <a href="optimalRoute.html">Optimal Route</a>
+      <a href="pullcards.html">Pull Cards</a>
+      <a href="oneline.html">One-Line</a>
+      <a href="tcc.html">TCC</a>
+      <a href="harmonics.html">Harmonics</a>
+      <a href="motorStart.html">Motor Start</a>
+      <a href="loadFlow.html">Load Flow</a>
+      <a href="shortCircuit.html">Short Circuit</a>
+      <a href="arcFlash.html">Arc Flash</a>
+      <a href="custom-components.html">Custom Components</a>
+      <a href="help.html">Help</a>
+      <a href="account.html">Account</a>
+    </div>
+    <button id="settings-btn" class="settings-btn" aria-label="Settings" aria-expanded="false" title="Settings">
+      <img src="icons/toolbar/validate.svg" alt="" aria-hidden="true" class="control-icon" loading="lazy" decoding="async">
+    </button>
+  </nav>
+
+  <div id="settings-menu" class="settings-menu">
+    <label for="theme-select">Theme
+      <select id="theme-select">
+        <option value="system">System</option>
+        <option value="light">Light</option>
+        <option value="dark">Dark</option>
+        <option value="high-contrast">High Contrast</option>
+      </select>
+    </label>
+    <label><input type="checkbox" id="compact-toggle" aria-label="Enable compact table mode"> Compact Mode</label>
+    <label for="unit-select">Units
+      <select id="unit-select">
+        <option value="imperial">Imperial</option>
+        <option value="metric">Metric</option>
+      </select>
+    </label>
+    <button id="help-btn" class="btn" aria-expanded="false" title="Show help">
+      <img src="icons/toolbar/validate.svg" alt="" aria-hidden="true" class="control-icon" loading="lazy" decoding="async">
+      <span>Site Help</span>
+    </button>
+    <button id="new-project-btn" title="Start a new project">
+      <img src="icons/toolbar/copy.svg" alt="" aria-hidden="true" class="control-icon" loading="lazy" decoding="async">
+      <span>New Project</span>
+    </button>
+    <button id="save-project-btn" title="Save current project">
+      <img src="icons/toolbar/export.svg" alt="" aria-hidden="true" class="control-icon" loading="lazy" decoding="async">
+      <span>Save Project</span>
+    </button>
+    <button id="load-project-btn" title="Load an existing project">
+      <img src="icons/toolbar/import.svg" alt="" aria-hidden="true" class="control-icon" loading="lazy" decoding="async">
+      <span>Load Project</span>
+    </button>
+    <button id="export-project-btn" title="Export project data">
+      <img src="icons/toolbar/export.svg" alt="" aria-hidden="true" class="control-icon" loading="lazy" decoding="async">
+      <span>Export Project</span>
+    </button>
+    <button id="import-project-btn" title="Import project data">
+      <img src="icons/toolbar/import.svg" alt="" aria-hidden="true" class="control-icon" loading="lazy" decoding="async">
+      <span>Import Project</span>
+    </button>
+    <input type="file" id="import-project-input" accept=".ctr.json" class="hidden" title="Select project file">
+  </div>
+
+  <div class="container">
+    <main id="main-content" class="main-content">
+      <nav aria-label="Breadcrumb">
+        <ol class="breadcrumb-trail">
+          <li><a href="index.html">Home</a></li>
+          <li>Workflow</li>
+          <li aria-current="page">Spool Sheets</li>
+        </ol>
+      </nav>
+
+      <header class="page-header">
+        <h1>Prefabrication Spool Sheets</h1>
+      </header>
+
+      <details class="method-panel">
+        <summary>Method &amp; Assumptions</summary>
+        <p>Spool sheets group cable tray segments into prefabricated assemblies
+        ("spools") that can be built in a workshop before field installation,
+        reducing on-site labour by 30–50 % (NEMA VE 2 §9).</p>
+
+        <p><strong>Grouping logic:</strong> Tray segments are grouped by
+        elevation band, tray width, and plan position (grid cell). Each spool is
+        limited to a configurable maximum number of segments to keep assemblies
+        manageable for shop fabrication and transport.</p>
+
+        <p><strong>Material quantities per spool:</strong></p>
+        <ul>
+          <li><strong>Straight sections</strong> — Total run length ÷ section length (rounded up).</li>
+          <li><strong>Support brackets</strong> — One per 10 ft span plus one at each end (minimum 2 per segment).</li>
+          <li><strong>Estimated weight</strong> — Tray self-weight based on width. Does not include cable weight.</li>
+          <li><strong>Cable assignments</strong> — Cables whose <em>Route Preference</em> matches a tray in the spool.</li>
+        </ul>
+
+        <p>References: NEMA VE 2-2013 §9 (Prefabrication), BICSI TDM-1 §12,
+        Trimble SysQue LOD-400 spool sheet methodology.</p>
+
+        <p>See also:
+          <a href="racewayschedule.html">Raceway Schedule</a>,
+          <a href="cableschedule.html">Cable Schedule</a>,
+          <a href="trayhardwarebom.html">Tray Hardware BOM</a>.
+        </p>
+      </details>
+
+      <fieldset>
+        <legend><strong>Spool Parameters</strong></legend>
+
+        <div class="field-row">
+          <label for="sectionLength">
+            Standard section length (ft)
+          </label>
+          <input type="number" id="sectionLength" min="1" max="24" step="1"
+                 value="12" aria-describedby="sectionLenHint">
+          <p id="sectionLenHint" class="field-hint">
+            Length of straight tray sections. Typical: 10 ft or 12 ft.
+          </p>
+        </div>
+
+        <div class="field-row">
+          <label for="gridCell">
+            Grouping grid cell size (ft)
+            <button class="helpBtn" data-doc="docs/standards.html"
+                    aria-label="Help — grid cell">?</button>
+          </label>
+          <input type="number" id="gridCell" min="5" max="100" step="5"
+                 value="20" aria-describedby="gridCellHint">
+          <p id="gridCellHint" class="field-hint">
+            Tray segments within the same grid square, at the same elevation and
+            width, are grouped into one spool. Larger values create fewer, larger spools.
+          </p>
+        </div>
+
+        <div class="field-row">
+          <label for="elevBand">
+            Elevation band (ft)
+          </label>
+          <input type="number" id="elevBand" min="0.5" max="20" step="0.5"
+                 value="2" aria-describedby="elevBandHint">
+          <p id="elevBandHint" class="field-hint">
+            Trays within this elevation range are considered to be at the same
+            level for grouping purposes.
+          </p>
+        </div>
+
+        <div class="field-row">
+          <label for="maxSegs">
+            Max segments per spool
+          </label>
+          <input type="number" id="maxSegs" min="2" max="50" step="1"
+                 value="10" aria-describedby="maxSegsHint">
+          <p id="maxSegsHint" class="field-hint">
+            Maximum number of tray segments in one spool assembly. Keeps each
+            spool manageable for shop fabrication and transport.
+          </p>
+        </div>
+      </fieldset>
+
+      <div id="controls">
+        <button id="generateBtn" type="button">Generate Spool Sheets</button>
+        <button id="exportXlsxBtn" type="button" disabled>Export to Excel (XLSX)</button>
+        <button id="printBtn" type="button" disabled>Print Spool Sheets</button>
+      </div>
+
+      <div id="results" role="region" aria-live="polite" aria-label="Spool sheet results"></div>
+
+      <nav class="step-nav" aria-label="Workflow navigation">
+        <a href="clashdetect.html" class="step-nav-prev">&#8592; Clash Detection</a>
+        <a href="optimalRoute.html" class="step-nav-next">Optimal Route &#8594;</a>
+      </nav>
+    </main>
+  </div>
+
+  <div id="help-modal" class="modal" aria-hidden="true" role="dialog" aria-modal="true"
+       aria-labelledby="help-title">
+    <div class="modal-content">
+      <button id="close-help-btn" class="close-btn" aria-label="Close Help">&times;</button>
+      <h2 id="help-title">Spool Sheets Help</h2>
+      <p>This tool generates prefabrication spool sheets by grouping tray segments
+      from the Raceway Schedule into workshop-fabricated assemblies.</p>
+      <p><strong>Prerequisites:</strong></p>
+      <ul>
+        <li>Trays must have start/end X, Y, Z coordinates in the Raceway Schedule.</li>
+        <li>Optionally assign cables to trays via the <em>Route Preference</em> field
+        in the Cable Schedule to include cable assignments in each spool.</li>
+      </ul>
+      <p><strong>To use:</strong></p>
+      <ol>
+        <li>Enter trays in the <a href="racewayschedule.html">Raceway Schedule</a>.</li>
+        <li>Optionally assign cables in the <a href="cableschedule.html">Cable Schedule</a>.</li>
+        <li>Adjust grouping parameters if needed.</li>
+        <li>Click <em>Generate Spool Sheets</em>.</li>
+        <li>Review each spool's materials and cable list.</li>
+        <li>Click <em>Export to Excel</em> or <em>Print</em> for shop drawings.</li>
+      </ol>
+    </div>
+  </div>
+
+  <script type="module" src="dist/projectManager.js"></script>
+</body>
+</html>
