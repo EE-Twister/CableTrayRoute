@@ -59,7 +59,9 @@ function setReadyWhen(selector, attrName, id, timeoutMs = 25000) {
 function storeResumeChoice(choice) {
   try {
     sessionStorage.setItem('resume:choice', choice);
-  } catch {}
+  } catch (e) {
+    console.warn('Failed to store resume choice in sessionStorage', e);
+  }
 }
 
 let wiredResumeTracking = false;

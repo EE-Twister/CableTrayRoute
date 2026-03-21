@@ -35,6 +35,7 @@ window.E2E = E2E;
 
 import { emitAsync } from './utils/safeEvents.mjs';
 import { fetchDataFile } from './src/fetchUtils.mjs';
+import { showAlertModal } from './src/components/modal.js';
 
 /**
  * Escape a string for safe insertion into HTML content or attributes.
@@ -2771,7 +2772,7 @@ const renderBatchResults = (results) => {
         updateCableListDisplay();
         updateTrayDisplay();
         updateTableCounts();
-        alert('All saved data cleared.');
+        showAlertModal('Data Cleared', 'All saved data cleared.');
     };
 
     const showMessage = (type, text) => {
@@ -2780,7 +2781,7 @@ const renderBatchResults = (results) => {
 
     const exportRoutesJSON = () => {
         if (!state.latestRouteData || state.latestRouteData.length === 0) {
-            alert('No route data to export.');
+            showAlertModal('Export Error', 'No route data to export.');
             return;
         }
         const routes = state.latestRouteData.map(r => ({
@@ -2809,7 +2810,7 @@ const renderBatchResults = (results) => {
 
     const exportRouteXLSX = () => {
         if (!state.latestRouteData || state.latestRouteData.length === 0) {
-            alert('No route data to export.');
+            showAlertModal('Export Error', 'No route data to export.');
             return;
         }
 
@@ -2877,7 +2878,7 @@ const renderBatchResults = (results) => {
 
     const exportBOMXLSX = async () => {
         if (!state.latestRouteData || state.latestRouteData.length === 0) {
-            alert('No route data to export.');
+            showAlertModal('Export Error', 'No route data to export.');
             return;
         }
         const [conductorProps, materialCosts] = await Promise.all([
@@ -3073,11 +3074,11 @@ const renderBatchResults = (results) => {
 
     const exportTrayFills = async () => {
         if (!state.updatedUtilData || state.updatedUtilData.length === 0) {
-            alert('No tray fill data available.');
+            showAlertModal('Export Error', 'No tray fill data available.');
             return;
         }
         if (!window.jspdf || !window.jspdf.jsPDF) {
-            alert('jsPDF library not loaded.');
+            showAlertModal('Export Error', 'PDF export library not loaded. Please refresh the page and try again.');
             return;
         }
         const { jsPDF } = window.jspdf;
@@ -3089,7 +3090,7 @@ const renderBatchResults = (results) => {
         const utilDataForExport = traysWithCables;
 
         if (traysWithCables.length === 0) {
-            alert('No tray fills to export.');
+            showAlertModal('Export Error', 'No tray fills to export.');
             return;
         }
 
@@ -3497,7 +3498,7 @@ const renderBatchResults = (results) => {
             };
             routingWorker.postMessage({ type: 'start', trays: trayDataForRun, options, cables: state.cableList });
         } else {
-            alert('Please add at least one cable to route.');
+            showAlertModal('Routing Error', 'Please add at least one cable to route.');
             elements.cancelRoutingBtn.style.display = 'none';
             elements.progressContainer.style.display = 'none';
             return;
@@ -3508,7 +3509,7 @@ const renderBatchResults = (results) => {
 
     const rebalanceTrayFill = async () => {
         if (!state.finalTrays || state.finalTrays.length === 0) {
-            alert('Run routing first.');
+            showAlertModal('Routing Error', 'Run routing first.');
             return;
         }
 
@@ -3529,7 +3530,7 @@ const renderBatchResults = (results) => {
 
         const overfilled = trayData.filter(t => t.current_fill > t.maxFill);
         if (overfilled.length === 0) {
-            alert('No overfilled trays detected.');
+            showAlertModal('Rebalance', 'No overfilled trays detected.');
             return;
         }
 

@@ -1,5 +1,6 @@
 import * as dataStore from './dataStore.mjs';
 import { escapeHtml as escapeAttr, escapeHtml } from './src/htmlUtils.mjs';
+import { showAlertModal } from './src/components/modal.js';
 
 class ContextMenu {
   constructor(items = []) {
@@ -835,7 +836,7 @@ if (typeof window !== 'undefined') {
   document.getElementById('copy-btn').addEventListener('click', () => {
     const tsv = loadsToCSV(dataStore.getLoads(), '\t');
     navigator.clipboard.writeText(tsv).catch(() => {
-      alert('Copy failed');
+      showAlertModal('Copy Failed', 'Unable to copy to clipboard. Please try again.');
     });
   });
 
@@ -880,10 +881,10 @@ if (typeof window !== 'undefined') {
           dataStore.setLoads(loads);
           render();
         } else {
-          alert('Invalid load data');
+          showAlertModal('Import Error', 'Invalid load data. Please check the file format and try again.');
         }
       } catch {
-        alert('Invalid load data');
+        showAlertModal('Import Error', 'Invalid load data. Please check the file format and try again.');
       }
     });
     e.target.value = '';
@@ -900,7 +901,7 @@ if (typeof window !== 'undefined') {
         dataStore.setLoads(loads);
         render();
       } catch {
-        alert('Invalid CSV load data');
+        showAlertModal('Import Error', 'Invalid CSV load data. Please check the file format and try again.');
       }
     });
     e.target.value = '';
