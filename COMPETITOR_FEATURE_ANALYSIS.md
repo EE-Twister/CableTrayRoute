@@ -1,6 +1,6 @@
 # Competitor Feature Gap Analysis
 
-## Date: 2026-03-16
+## Date: 2026-03-21 (updated from 2026-03-16 original)
 
 This document identifies features commonly found in major competitor platforms that are currently missing from CableTrayRoute.
 
@@ -8,67 +8,70 @@ This document identifies features commonly found in major competitor platforms t
 
 ## Executive Summary
 
-CableTrayRoute already offers a strong, integrated suite covering cable routing (3D Dijkstra pathfinding), electrical studies (load flow, short circuit, arc flash, harmonics, TCC, motor starting), one-line diagram editing, and comprehensive import/export. However, comparison with major competitors — including manufacturer tools (Eaton B-Line, Legrand Cablofil, Panduit, OBO Bettermann, Niedax, Chalfant), power system analysis platforms (ETAP, EasyPower, SKM PowerTools), and dedicated raceway/cable management software (Bentley Raceway, Aeries CARS, MagiCAD, Trimble MEP, Paneldes) — reveals **20 feature gaps** across six categories.
+CableTrayRoute already offers a strong, integrated suite covering cable routing (3D Dijkstra pathfinding), electrical studies (load flow, short circuit, arc flash, harmonics, TCC, motor starting), one-line diagram editing, and comprehensive import/export. Comparison with major competitors — including manufacturer tools (Eaton B-Line, Legrand Cablofil, Panduit, OBO Bettermann, Niedax, Chalfant), power system analysis platforms (ETAP, EasyPower, SKM PowerTools), and dedicated raceway/cable management software (Bentley Raceway, Aeries CARS, MagiCAD, Trimble MEP, Paneldes) — originally revealed **20 feature gaps** across six categories.
+
+**Since the initial analysis (2026-03-16), 16 of those 20 gaps have been implemented.** The remaining 4 gaps require external infrastructure (native CAD plugins, real-time multi-user backend, live pricing databases) and are deferred.
 
 ---
 
-## Gap Analysis by Category
+## Implemented Since Initial Analysis
 
-### 1. BIM/CAD Integration & 3D Modeling
+The following features were identified as gaps and have since been implemented:
+
+| Feature | Module | UI Page | Tests |
+|---|---|---|---|
+| Support Span / Structural Load Calculator | `analysis/supportSpan.mjs` | `supportspan.html` | `tests/supportSpan.test.mjs` |
+| Tray Hardware BOM / Take-Off | `analysis/trayHardware.mjs` | `trayhardwarebom.html` | `tests/trayHardware.test.mjs` |
+| Cable Pull Cards / Construction Docs | `analysis/pullCards.mjs` | `pullcards.html` | `tests/pullCards.test.mjs` |
+| Multi-Standard Cable Sizing (IEC/BS/AS) | `analysis/intlCableSize.mjs` | `intlCableSize.html` | `tests/intlCableSize.test.mjs` |
+| Clash Detection | `analysis/clashDetect.mjs` | `clashdetect.html` | *(integration)* |
+| Product Configurator | `analysis/productConfig.mjs` | `productconfig.html` | `tests/productConfig.test.mjs` |
+| Submittal Package Generator | `src/submittal.js` | `submittal.html` | *(E2E)* |
+| Seismic Bracing Analysis | `analysis/seismicBracing.mjs` | `seismicBracing.html` | `tests/seismicBracing.test.mjs` |
+| Wind & Environmental Load Analysis | `analysis/windLoad.mjs` | `windload.html` | `tests/windLoad.test.mjs` |
+| SmartDesign Auto-Sizing | `analysis/autoSize.mjs` | `autosize.html` | `tests/autoSize.test.mjs` |
+| Prefabrication / Spool Sheet Output | `analysis/spoolSheets.mjs` | `spoolsheets.html` | *(integration)* |
+| Transient Stability Analysis | `analysis/transientStability.mjs` | `transientstability.html` | `tests/transientStability.test.mjs` |
+| Ground Grid / Grounding Analysis | `analysis/groundGrid.mjs` | `groundgrid.html` | `tests/groundGrid.test.mjs` |
+| Magnetic Field Exposure Analysis (EMF) | `analysis/emf.mjs` | `emf.html` | `tests/emf.test.mjs` |
+| Reliability / N-1 Analysis | `analysis/reliability.js` | `reliability.html` | `tests/reliabilityAnalysis.test.mjs` |
+| Cost Estimation | `analysis/costEstimate.mjs` | `costestimate.html` | `tests/costEstimate.test.mjs` |
+
+---
+
+## Remaining Gaps (4 of 20)
+
+These features require native desktop integration, external pricing databases, or significant backend infrastructure not feasible in a browser-based tool:
+
+### 1. BIM/CAD Plugin Integration
 
 | Missing Feature | Competitor(s) | Description |
 |---|---|---|
 | **Revit Plugin / Live BIM Sync** | ETAP, EasyPower, Eaton B-Line, Legrand Cablofil | Native Revit add-in that synchronizes tray layouts bidirectionally with BIM models. CableTrayRoute can import Revit data but lacks a live plugin or real-time sync. EasyPower explicitly supports Revit 2025. |
 | **AutoCAD / AVEVA / SmartPlant 3D Integration** | Eaton B-Line, Legrand Cablofil, OBO Bettermann, Aeries CARS, Paneldes | Direct plug-ins for AutoCAD (2D/3D), AVEVA, SmartPlant 3D, CATIA V5, SolidWorks. OBO offers a free AutoCAD plug-in for 3D cable sections. CableTrayRoute exports DXF but has no native CAD plug-in. |
 | **BIM Object Library** | Eaton B-Line (CoSPEC), Legrand Cablofil (BIMobject), Niedax (Stabicad), Chalfant, OBO (TraceParts) | Downloadable manufacturer-specific BIM families (Revit RFA, IFC) for cable tray products with parametric sizing. Niedax integrates 226 products into Revit via Stabicad. |
-| **Clash Detection / Interference Analysis** | MagiCAD, Trimble MEP (SysQue), Paneldes, Bentley Raceway | Real-time clash checking between cable tray routes and other MEP/structural elements. Critical for coordinated BIM workflows. Absent from CableTrayRoute. |
 
-### 2. Structural & Seismic Analysis
+**Status:** Deferred. Requires Windows-native SDKs (Revit API, AutoCAD ARX) or manufacturer partnerships for BIM families. Not feasible as a pure web app.
 
-| Missing Feature | Competitor(s) | Description |
-|---|---|---|
-| **Support Span / Structural Load Calculator** | Eaton B-Line, Legrand Cablofil (Interactive Load Table), Bentley Raceway, NEMA standards | Calculates maximum support span based on cable weight, tray type, load class (NEMA 12A/12B/12C), and concentrated/uniform loading. Legrand offers an Excel-based Interactive Load Table for NEMA and IEC. Bentley Raceway tracks weight capacity per segment. A fundamental design requirement absent from CableTrayRoute. |
-| **Seismic Bracing Analysis** | Eaton (TOLBrace), SkyCiv, STAAD, Dlubal RFEM | Seismic category I analysis for cable tray supports per IBC/ASCE 7. Eaton's TOLBrace generates complete seismic bracing submittals. Nuclear and critical facilities require this. |
-| **Wind & Environmental Load Analysis** | SkyCiv, STAAD, ProtaStructure | Outdoor cable tray installations require wind load calculations per ASCE 7. No competitor cable tray tool does this natively, but structural analysis platforms do. |
-
-### 3. Product Selection, Specification & Procurement
+### 2. Real-Time Cost Pricing Database
 
 | Missing Feature | Competitor(s) | Description |
 |---|---|---|
-| **Product Configurator / Selector** | Legrand Cablofil, Eaton B-Line (CoSPEC), Panduit, Niedax (Cable Calculator), OBO Bettermann | Interactive tool to select tray type, NEMA class, material, size, and finish. Generates part numbers and specifications. Niedax's Cable Calculator recommends trays based on cable inputs. CableTrayRoute is product-agnostic — it has no manufacturer catalog integration. |
-| **Submittal Package Generator** | Legrand Cablofil (Submittal Builder), Eaton B-Line, Chalfant (ARCAT specs) | Auto-assembles cover sheets, cut sheets, and spec sheets into a single PDF submittal. CableTrayRoute exports reports but not formatted submittals with manufacturer data. |
-| **Bill of Materials / Take-Off Wizard** | Legrand Cablofil (Take Off Wizard), Eaton B-Line, Aeries CARS, Bentley Raceway, OBO Construct | Generates a complete material list with part numbers, quantities, and fittings (elbows, tees, reducers) from a route layout. OBO Construct generates equipment lists in multiple formats. CableTrayRoute's BOM is cable-focused, not tray-hardware-focused. |
-| **Cost Estimation with Real Pricing** | Legrand, Eaton (CADmep/Harrison codes), Panduit, Aeries CARS (Quick-Bid) | Estimate project cost using actual manufacturer pricing. Eaton integrates Harrison codes for contractor estimation. Aeries CARS includes a Quick-Bid Estimating tool. CableTrayRoute has cost multipliers for routing optimization but no real-world pricing database. |
-| **Cable Pull Cards / Construction Docs** | Aeries CARS (CM Builder), Bentley Raceway, Trimble MEP (SysQue) | Generate cable pull cards, termination cards, and spool sheets for field construction crews. Supports prefabrication workflows. Not available in CableTrayRoute. |
+| **Cost Estimation with Real Manufacturer Pricing** | Legrand, Eaton (CADmep/Harrison codes), Panduit, Aeries CARS (Quick-Bid) | Estimate project cost using actual manufacturer pricing with live catalog integration. CableTrayRoute now has a cost estimator with RS Means–based unit prices, but no live manufacturer pricing feed. |
 
-### 4. Electrical Analysis Gaps
+**Status:** Partially addressed. `costestimate.html` provides configurable RS Means–based pricing. Live manufacturer pricing requires commercial data licensing agreements.
+
+### 3. Real-Time Multi-User Collaboration
 
 | Missing Feature | Competitor(s) | Description |
 |---|---|---|
-| **Multi-Standard Cable Sizing** | ETAP | CableTrayRoute primarily follows NEC. ETAP supports 8+ international standards: IEC 60502, IEC 60364, BS 7671, AS/NZS 3008, NF C15-100, IEC 60092 (marine). Global projects need this. |
-| **Transient Stability Analysis** | ETAP, EasyPower (Advanced), SKM PowerTools | Dynamic simulation of system response to disturbances (fault, load rejection, motor starting sequences over time). Goes beyond static motor starting study. |
-| **Reliability / Contingency Analysis (N-1)** | ETAP, EasyPower | Automated N-1 contingency analysis and system reliability calculations (MTBF, availability). CableTrayRoute has reliability reporting modules but the depth compared to ETAP is unclear. |
-| **Ground Grid / Grounding Analysis** | ETAP, EasyPower, SKM | Design and analysis of grounding systems — step/touch voltage, ground potential rise, grid resistance. Entirely absent from CableTrayRoute. |
-| **Magnetic Field Exposure Analysis** | ETAP | Calculates magnetic field strength around underground raceways using load flow currents. Relevant for EMF compliance near occupied spaces. |
+| **Multi-User Real-Time Collaboration** | ETAP (enterprise), EasyPower, Bentley Raceway | Multiple engineers working on the same project simultaneously with conflict resolution. CableTrayRoute has single-user project save/load with server sync but no real-time multi-user editing. |
 
-### 5. Construction & Field Workflows
-
-| Missing Feature | Competitor(s) | Description |
-|---|---|---|
-| **Prefabrication / Spool Sheet Output** | Trimble MEP (SysQue), Legrand (FAS Path Configurator) | LOD 400 models with spool sheets for prefabricated cable tray assemblies. Legrand's FAS Path Configurator creates prefabricated cable pathway support kits assembled in advance and shipped to site. |
-| **Field Layout from BIM** | Trimble MEP | Import DXF from BIM model to lay out cable tray positions directly in the field using mobile devices or total stations. |
-
-### 6. Collaboration, Deployment & Workflow
-
-| Missing Feature | Competitor(s) | Description |
-|---|---|---|
-| **Multi-User Real-Time Collaboration** | ETAP (enterprise), EasyPower | Multiple engineers working on the same project simultaneously with conflict resolution. CableTrayRoute has single-user project save/load with server sync but no real-time multi-user editing. |
-| **SmartDesign / Auto-Sizing** | EasyPower (SmartDesign) | Automated equipment selection and sizing to NEC codes — auto-sizes transformers, breakers, feeders, and cables based on load data. CableTrayRoute sizes cable routes but doesn't auto-select protective devices or equipment ratings. |
-| **Regulatory/Code Update Service** | ETAP, EasyPower, Eaton (TOLBrace) | Automatic updates when NEC, IEEE, or IEC standards are revised. CableTrayRoute's standards are embedded in code without a formal update mechanism. |
+**Status:** Deferred. Requires WebSocket infrastructure, CRDT or OT conflict resolution, and significant backend architecture.
 
 ---
 
-## Feature Comparison Matrix
+## Feature Comparison Matrix (Updated)
 
 | Feature | CableTrayRoute | ETAP | EasyPower | Eaton B-Line | Legrand Cablofil | Bentley Raceway | Aeries CARS | OBO Construct | MagiCAD | Trimble MEP |
 |---|:---:|:---:|:---:|:---:|:---:|:---:|:---:|:---:|:---:|:---:|
@@ -86,48 +89,60 @@ CableTrayRoute already offers a strong, integrated suite covering cable routing 
 | Revit Plugin (Live Sync) | **No** | Yes | Yes | Yes | — | — | Yes | — | Yes | Yes |
 | AutoCAD/AVEVA Plugin | **No** | — | — | Yes | Yes | Yes | Yes | Yes | Yes | — |
 | BIM Object Library | **No** | — | — | Yes | Yes | — | — | Yes | — | — |
-| Clash Detection | **No** | — | — | — | — | — | — | — | Yes | Yes |
-| Support Span Calculator | **No** | — | — | Yes | Yes | Yes | — | — | — | — |
-| Seismic Bracing Analysis | **No** | — | — | Yes | — | — | — | — | — | — |
-| Product Configurator | **No** | — | — | Yes | Yes | — | — | Yes | — | — |
-| Submittal Generator | **No** | — | — | Yes | Yes | — | Yes | Yes | — | — |
-| Take-Off / Tray BOM | **No** | — | — | — | Yes | Yes | Yes | Yes | — | Yes |
-| Cable Pull Cards | **No** | — | — | — | — | Yes | Yes | — | — | Yes |
-| Prefab / Spool Sheets | **No** | — | — | — | Yes | — | — | — | — | Yes |
-| Multi-Standard (IEC/BS/AS) | **No** | Yes | — | — | — | — | — | — | Yes | Yes |
-| Transient Stability | **No** | Yes | Yes | — | — | — | — | — | — | — |
-| Ground Grid Analysis | **No** | Yes | Yes | — | — | — | — | — | — | — |
-| SmartDesign Auto-Sizing | **No** | — | Yes | — | — | — | Yes | — | — | — |
+| Clash Detection | **Yes** ✓ | — | — | — | — | — | — | — | Yes | Yes |
+| Support Span Calculator | **Yes** ✓ | — | — | Yes | Yes | Yes | — | — | — | — |
+| Seismic Bracing Analysis | **Yes** ✓ | — | — | Yes | — | — | — | — | — | — |
+| Wind Load Analysis | **Yes** ✓ | — | — | — | — | — | — | — | — | — |
+| Product Configurator | **Yes** ✓ | — | — | Yes | Yes | — | — | Yes | — | — |
+| Submittal Generator | **Yes** ✓ | — | — | Yes | Yes | — | Yes | Yes | — | — |
+| Take-Off / Tray BOM | **Yes** ✓ | — | — | — | Yes | Yes | Yes | Yes | — | Yes |
+| Cable Pull Cards | **Yes** ✓ | — | — | — | — | Yes | Yes | — | — | Yes |
+| Prefab / Spool Sheets | **Yes** ✓ | — | — | — | Yes | — | — | — | — | Yes |
+| Multi-Standard (IEC/BS/AS) | **Yes** ✓ | Yes | — | — | — | — | — | — | Yes | Yes |
+| Transient Stability | **Yes** ✓ | Yes | Yes | — | — | — | — | — | — | — |
+| Ground Grid Analysis | **Yes** ✓ | Yes | Yes | — | — | — | — | — | — | — |
+| Magnetic Field / EMF Analysis | **Yes** ✓ | Yes | — | — | — | — | — | — | — | — |
+| SmartDesign Auto-Sizing | **Yes** ✓ | — | Yes | — | — | — | Yes | — | — | — |
+| Reliability / N-1 Analysis | **Yes** ✓ | Yes | Yes | — | — | — | — | — | — | — |
+| Cost Estimation (RS Means basis) | **Yes** ✓ | — | — | Yes | Yes | — | Yes | — | — | — |
 | Real-Time Collaboration | **No** | Yes | — | — | — | Yes | — | — | — | Yes |
-| Cost Estimation | **No** | — | — | Yes | Yes | — | Yes | — | — | — |
 | PWA / Offline Support | **Yes** | — | — | — | — | — | — | — | — | — |
 | Cost-Free Web Access | **Yes** | — | — | Partial | Partial | — | — | Yes | — | — |
+
+*(✓ = implemented since initial 2026-03-16 analysis)*
 
 ---
 
 ## Prioritized Recommendations
 
-### High Priority (High impact, addresses core workflow gaps)
-1. **Support Span / Structural Load Calculator** — Fundamental for any cable tray design; no structural verification tool exists. Offered by Eaton, Legrand, and Bentley Raceway.
-2. **Tray Hardware BOM / Take-Off** — Engineers need fittings lists (elbows, tees, covers, supports), not just cable lists. Offered by 5+ competitors.
-3. **Cable Pull Cards / Construction Documents** — Field crews need pull cards with tension, route, and termination data. Standard in Aeries CARS and Bentley Raceway.
-4. **Multi-Standard Cable Sizing (IEC/BS)** — Required for any international project work. ETAP supports 8+ standards.
+### Completed ✅
 
-### Medium Priority (Competitive differentiation)
-5. **Clash Detection** — Real-time interference checking with other MEP disciplines. Standard in MagiCAD, Trimble, and Paneldes. Critical for BIM coordination.
-6. **Product Configurator with Manufacturer Catalogs** — Partner with manufacturers or build a generic tray catalog. Niedax's Cable Calculator is a good model.
-7. **Submittal Package Generator** — Assemble professional submittals with cover sheets and cut sheets.
-8. **Revit Plugin / BIM Sync** — Most requested integration in the AEC industry.
-9. **Seismic Bracing Calculator** — Required for IBC jurisdictions and critical facilities.
-10. **SmartDesign Auto-Sizing** — Auto-select breakers, transformers, and cable sizes from load data. Available in EasyPower and Aeries CARS (LoadMatic).
-11. **Prefabrication / Spool Sheet Support** — Growing industry trend; Trimble SysQue outputs LOD 400 spool sheets.
+All originally high- and medium-priority feasible items have been implemented:
 
-### Lower Priority (Advanced / niche)
-12. **Transient Stability Analysis** — Advanced study for large industrial/utility systems.
-13. **Ground Grid Analysis** — Important but typically handled by specialized tools.
-14. **Real-Time Multi-User Collaboration** — Enterprise feature with significant development effort.
-15. **Magnetic Field Exposure Analysis** — Niche requirement for specific facility types.
-16. **Field Layout from BIM** — Mobile device layout from BIM models; currently only Trimble offers this.
+1. ~~**Support Span / Structural Load Calculator**~~ → `supportspan.html`
+2. ~~**Tray Hardware BOM / Take-Off**~~ → `trayhardwarebom.html`
+3. ~~**Cable Pull Cards / Construction Documents**~~ → `pullcards.html`
+4. ~~**Multi-Standard Cable Sizing (IEC/BS)**~~ → `intlCableSize.html`
+5. ~~**Clash Detection**~~ → `clashdetect.html`
+6. ~~**Product Configurator with Manufacturer Catalogs**~~ → `productconfig.html`
+7. ~~**Submittal Package Generator**~~ → `submittal.html`
+8. ~~**Seismic Bracing Calculator**~~ → `seismicBracing.html`
+9. ~~**SmartDesign Auto-Sizing**~~ → `autosize.html`
+10. ~~**Prefabrication / Spool Sheet Support**~~ → `spoolsheets.html`
+11. ~~**Transient Stability Analysis**~~ → `transientstability.html`
+12. ~~**Ground Grid Analysis**~~ → `groundgrid.html`
+13. ~~**Magnetic Field Exposure Analysis**~~ → `emf.html`
+14. ~~**Reliability / N-1 Analysis**~~ → `reliability.html`
+15. ~~**Cost Estimation**~~ → `costestimate.html`
+16. ~~**Wind & Environmental Load Analysis**~~ → `windload.html`
+
+### Deferred (require external infrastructure)
+
+1. **Revit Plugin / BIM Sync** — Requires Revit SDK (Windows-native C#/.NET). Consider IFC export as interim step.
+2. **AutoCAD / AVEVA Plugin** — Requires commercial CAD SDK licensing.
+3. **BIM Object Library** — Requires manufacturer data partnerships for Revit RFA / IFC families.
+4. **Live Manufacturer Pricing** — Requires commercial pricing data licenses (RS Means, Eaton/Harrison, Legrand).
+5. **Real-Time Multi-User Collaboration** — Requires WebSocket + CRDT backend; significant infrastructure investment.
 
 ---
 
@@ -142,6 +157,8 @@ These features are unique strengths that competitors do not offer:
 5. **Free Web-Based Access** — No license cost, no desktop installation required
 6. **Integrated End-to-End Workflow** — Cable schedule through routing through electrical studies in one platform
 7. **Cable Group / Voltage Segregation in Routing** — Automatic enforcement of cable separation rules during routing
+8. **Wind Load Analysis** — No competitor cable tray tool offers native wind load per ASCE 7
+9. **Comprehensive Electrical Studies Suite** — Load flow, short circuit, arc flash, harmonics, TCC, motor starting, transient stability, reliability, EMF — all in a single free web app
 
 ---
 
