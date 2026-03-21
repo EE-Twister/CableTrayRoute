@@ -460,14 +460,25 @@ async function httpsRedirectScenario() {
   const baseUrl = `http://127.0.0.1:${port}`;
 
   try {
-    await check('redirects HTTP requests with 308 to preserve POST method', async () => {
+    await check('returns JSON error for API requests over HTTP (avoids cross-origin CORS issues)', async () => {
       const res = await fetch(`${baseUrl}/signup`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json', host: '127.0.0.1' },
         body: JSON.stringify({ username: 'dave', password: 'testpass1' }),
         redirect: 'manual'
       });
-      assert.strictEqual(res.status, 308, 'should use 308 (not 301) to preserve POST method');
+      assert.strictEqual(res.status, 400, 'API requests should get JSON error, not a redirect');
+      const body = await res.json();
+      assert.strictEqual(body.error, 'HTTPS required');
+    });
+
+    await check('redirects non-API HTTP requests with 308 to preserve method', async () => {
+      const res = await fetch(`${baseUrl}/login.html`, {
+        method: 'GET',
+        headers: { host: '127.0.0.1' },
+        redirect: 'manual'
+      });
+      assert.strictEqual(res.status, 308, 'navigation requests should use 308 redirect');
       const location = res.headers.get('location');
       assert(location && location.startsWith('https://'), 'should redirect to HTTPS');
     });
