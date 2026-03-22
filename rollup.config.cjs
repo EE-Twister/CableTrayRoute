@@ -33,6 +33,7 @@ const entries = {
   groundgrid: 'src/groundgrid.js',
   autosize: 'src/autosize.js',
   submittal: 'src/submittal.js',
+  projectreport: 'src/projectreport.js',
   reliability: 'src/reliability.js',
   costestimate: 'src/costestimate.js',
   emf: 'src/emf.js',

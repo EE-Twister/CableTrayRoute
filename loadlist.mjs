@@ -883,7 +883,8 @@ if (typeof window !== 'undefined') {
         } else {
           showAlertModal('Import Error', 'Invalid load data. Please check the file format and try again.');
         }
-      } catch {
+      } catch (err) {
+        console.error('[loadlist] JSON import failed:', err);
         showAlertModal('Import Error', 'Invalid load data. Please check the file format and try again.');
       }
     });
@@ -900,7 +901,8 @@ if (typeof window !== 'undefined') {
         const loads = csvToLoads(text);
         dataStore.setLoads(loads);
         render();
-      } catch {
+      } catch (err) {
+        console.error('[loadlist] CSV import failed:', err);
         showAlertModal('Import Error', 'Invalid CSV load data. Please check the file format and try again.');
       }
     });

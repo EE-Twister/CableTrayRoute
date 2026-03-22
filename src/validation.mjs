@@ -91,7 +91,8 @@ export function validateCsvHeaders(actualHeaders, requiredHeaders) {
 export function safeParseJson(text, fallback = null) {
     try {
         return JSON.parse(text);
-    } catch {
+    } catch (err) {
+        console.debug('[validation] safeParseJson: invalid JSON, returning fallback.', err.message);
         return fallback;
     }
 }
@@ -107,7 +108,8 @@ export function localStorageGetJson(key, fallback = null) {
         const raw = localStorage.getItem(key);
         if (raw === null) return fallback;
         return JSON.parse(raw);
-    } catch {
+    } catch (err) {
+        console.debug(`[validation] localStorageGetJson: could not read key "${key}", returning fallback.`, err.message);
         return fallback;
     }
 }

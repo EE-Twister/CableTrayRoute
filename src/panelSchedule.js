@@ -82,7 +82,8 @@ function clonePanelState(panel) {
   if (!panel) return null;
   try {
     return structuredClone(panel);
-  } catch {
+  } catch (err) {
+    console.warn('[panelSchedule] structuredClone failed, using shallow copy:', err.message);
     return { ...panel };
   }
 }

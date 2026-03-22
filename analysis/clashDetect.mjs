@@ -69,7 +69,7 @@ function trayAABB(tray) {
 function axisGap(minA, maxA, minB, maxB) {
   if (maxA < minB) return minB - maxA;
   if (maxB < minA) return minA - maxB;
-  return Math.min(maxA, maxB) - Math.max(minA, minB); // negative = overlap depth
+  return Math.max(minA, minB) - Math.min(maxA, maxB); // negative = overlap depth
 }
 
 /**
