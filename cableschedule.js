@@ -2215,3 +2215,6 @@ if (document.readyState === 'loading') {
 } else {
   initCableSchedule();
 }
+
+// Reload the schedule whenever a remote collaborator's patch is applied
+document.addEventListener('ctr:remote-applied', () => { initCableSchedule(); });

@@ -632,6 +632,9 @@ function loadDuctbankSession(){
  }catch(e){console.error('load session failed',e);}
 }
 
+// Reload the ductbank form whenever a remote collaborator's patch is applied
+document.addEventListener('ctr:remote-applied', () => { loadDuctbankSession(); });
+
 function loadCablesFromSchedule(){
   const tbody=document.querySelector('#cableTable tbody');
   if(!tbody||tbody.children.length>0) return;

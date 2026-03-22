@@ -804,5 +804,14 @@ document.addEventListener('DOMContentLoaded', async () => {
   });
   e2eOpenDetailsAndControls();
   setReadyWhen('#raceway-load-samples', 'data-raceway-ready', 'raceway-ready-beacon');
+
+  // Reload all three tables whenever a remote collaborator's patch is applied
+  document.addEventListener('ctr:remote-applied', async () => {
+    await renderRacewaySamples({
+      ductbanks: dataStore.getDuctbanks ? dataStore.getDuctbanks() : [],
+      trays:     dataStore.getTrays    ? dataStore.getTrays()     : [],
+      conduits:  dataStore.getConduits ? dataStore.getConduits()  : [],
+    });
+  });
 });
 
