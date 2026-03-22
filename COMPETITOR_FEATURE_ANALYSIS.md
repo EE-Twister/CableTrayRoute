@@ -36,10 +36,12 @@ The following features were identified as gaps and have since been implemented:
 | Magnetic Field Exposure Analysis (EMF) | `analysis/emf.mjs` | `emf.html` | `tests/emf.test.mjs` |
 | Reliability / N-1 Analysis | `analysis/reliability.js` | `reliability.html` | `tests/reliabilityAnalysis.test.mjs` |
 | Cost Estimation | `analysis/costEstimate.mjs` | `costestimate.html` | `tests/costEstimate.test.mjs` |
+| Real-Time Multi-User Collaboration | `src/collaborationServer.mjs`, `src/collabManager.js` | *(all pages via presence bar)* | `tests/collaboration.test.mjs`, `tests/collaborationServer.test.mjs` |
+| Voltage Drop Compliance Study | `analysis/voltageDropStudy.mjs` | `voltagedropstudy.html` | `tests/voltageDropStudy.test.mjs` |
 
 ---
 
-## Remaining Gaps (4 of 20)
+## Remaining Gaps (3 of 20)
 
 These features require native desktop integration, external pricing databases, or significant backend infrastructure not feasible in a browser-based tool:
 
@@ -60,14 +62,6 @@ These features require native desktop integration, external pricing databases, o
 | **Cost Estimation with Real Manufacturer Pricing** | Legrand, Eaton (CADmep/Harrison codes), Panduit, Aeries CARS (Quick-Bid) | Estimate project cost using actual manufacturer pricing with live catalog integration. CableTrayRoute now has a cost estimator with RS Means–based unit prices, but no live manufacturer pricing feed. |
 
 **Status:** Partially addressed. `costestimate.html` provides configurable RS Means–based pricing. Live manufacturer pricing requires commercial data licensing agreements.
-
-### 3. Real-Time Multi-User Collaboration
-
-| Missing Feature | Competitor(s) | Description |
-|---|---|---|
-| **Multi-User Real-Time Collaboration** | ETAP (enterprise), EasyPower, Bentley Raceway | Multiple engineers working on the same project simultaneously with conflict resolution. CableTrayRoute has single-user project save/load with server sync but no real-time multi-user editing. |
-
-**Status:** Deferred. Requires WebSocket infrastructure, CRDT or OT conflict resolution, and significant backend architecture.
 
 ---
 
@@ -105,7 +99,7 @@ These features require native desktop integration, external pricing databases, o
 | SmartDesign Auto-Sizing | **Yes** ✓ | — | Yes | — | — | — | Yes | — | — | — |
 | Reliability / N-1 Analysis | **Yes** ✓ | Yes | Yes | — | — | — | — | — | — | — |
 | Cost Estimation (RS Means basis) | **Yes** ✓ | — | — | Yes | Yes | — | Yes | — | — | — |
-| Real-Time Collaboration | **No** | Yes | — | — | — | Yes | — | — | — | Yes |
+| Real-Time Collaboration | **Yes ✓** | Yes | — | — | — | Yes | — | — | — | Yes |
 | PWA / Offline Support | **Yes** | — | — | — | — | — | — | — | — | — |
 | Cost-Free Web Access | **Yes** | — | — | Partial | Partial | — | — | Yes | — | — |
 
@@ -142,7 +136,7 @@ All originally high- and medium-priority feasible items have been implemented:
 2. **AutoCAD / AVEVA Plugin** — Requires commercial CAD SDK licensing.
 3. **BIM Object Library** — Requires manufacturer data partnerships for Revit RFA / IFC families.
 4. **Live Manufacturer Pricing** — Requires commercial pricing data licenses (RS Means, Eaton/Harrison, Legrand).
-5. **Real-Time Multi-User Collaboration** — Requires WebSocket + CRDT backend; significant infrastructure investment.
+5. ~~**Real-Time Multi-User Collaboration**~~ → Implemented via WebSocket presence bar and `src/collaborationServer.mjs`.
 
 ---
 

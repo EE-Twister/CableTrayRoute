@@ -2991,7 +2991,7 @@ const renderBatchResults = (results) => {
             };
             try {
                 setItem('trayFillData', { tray, cables });
-            } catch {}
+            } catch (e) { console.warn('[app] failed to set trayFillData:', e); }
             iframe.src = 'cabletrayfill.html';
         });
     };
