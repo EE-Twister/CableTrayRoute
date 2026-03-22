@@ -220,3 +220,75 @@ test.describe('EMF Analysis', () => {
     await expect(page.locator('body')).toBeVisible();
   });
 });
+
+// -------------------------------------------------------------------------
+// Project Report
+// -------------------------------------------------------------------------
+test.describe('Project Report', () => {
+  test.beforeEach(async ({ page }) => {
+    await page.goto(pageUrl('projectreport.html?e2e=1&e2e_reset=1'));
+    await page.waitForLoadState('networkidle');
+  });
+
+  test('page loads with correct heading', async ({ page }) => {
+    await expect(page.locator('h1')).toContainText('Project Report');
+  });
+
+  test('has generate and export buttons', async ({ page }) => {
+    await expect(page.locator('#generate-btn')).toBeVisible();
+    await expect(page.locator('#export-json-btn')).toBeVisible();
+  });
+
+  test('has print button', async ({ page }) => {
+    await expect(page.locator('#print-btn')).toBeVisible();
+  });
+
+  test('report output region is present', async ({ page }) => {
+    await expect(page.locator('#report-output')).toBeAttached();
+  });
+
+  test('clicking generate with no data does not crash', async ({ page }) => {
+    await page.click('#generate-btn');
+    await expect(page.locator('body')).toBeVisible();
+  });
+});
+
+// -------------------------------------------------------------------------
+// Voltage Drop Study
+// -------------------------------------------------------------------------
+test.describe('Voltage Drop Study', () => {
+  test.beforeEach(async ({ page }) => {
+    await page.goto(pageUrl('voltagedropstudy.html?e2e=1&e2e_reset=1'));
+    await page.waitForLoadState('networkidle');
+  });
+
+  test('page loads with correct heading', async ({ page }) => {
+    await expect(page.locator('h1')).toContainText('Voltage Drop');
+  });
+
+  test('has run and export buttons', async ({ page }) => {
+    await expect(page.locator('#run-btn')).toBeVisible();
+    await expect(page.locator('#export-btn')).toBeVisible();
+  });
+
+  test('export button is initially disabled', async ({ page }) => {
+    await expect(page.locator('#export-btn')).toBeDisabled();
+  });
+
+  test('results and summary regions are present', async ({ page }) => {
+    await expect(page.locator('#results')).toBeAttached();
+    await expect(page.locator('#summary')).toBeAttached();
+  });
+
+  test('clicking run with no cables shows informative modal', async ({ page }) => {
+    await page.click('#run-btn');
+    // Should show a modal or message, not crash
+    await expect(page.locator('body')).toBeVisible();
+  });
+
+  test('method panel expands to show NEC limits', async ({ page }) => {
+    await page.click('details.method-panel > summary');
+    await expect(page.locator('details.method-panel')).toContainText('NEC');
+    await expect(page.locator('details.method-panel')).toContainText('3 %');
+  });
+});

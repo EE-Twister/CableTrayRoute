@@ -1,0 +1,137 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <meta name="description" content="Project-wide voltage drop compliance study. Checks all cables against NEC 215.2 / 210.19 limits (3% feeder, 3% branch) and flags circuits that exceed recommended thresholds." />
+  <title>Voltage Drop Study — CableTrayRoute</title>
+  <link rel="icon" href="icons/favicon.svg" type="image/svg+xml">
+  <link rel="apple-touch-icon" href="icons/favicon.svg">
+  <meta property="og:type" content="website">
+  <meta property="og:title" content="Voltage Drop Compliance Study — CableTrayRoute">
+  <meta property="og:description" content="Analyse all project cables for NEC voltage drop compliance in a single report.">
+  <meta property="og:image" content="https://cabletrayroute.com/icons/og-preview.png">
+  <meta property="og:site_name" content="CableTrayRoute">
+  <meta property="og:url" content="voltagedropstudy.html">
+  <link rel="canonical" href="voltagedropstudy.html">
+  <link rel="dns-prefetch" href="https://fonts.gstatic.com">
+  <meta name="color-scheme" content="light dark">
+  <link rel="stylesheet" href="style.css" />
+  <script type="module" src="dirtyTracker.js"></script>
+  <script type="module" src="dist/voltagedropstudy.js" defer></script>
+</head>
+<body class="voltagedropstudy-page" data-report-title="Voltage Drop Study">
+  <a href="#main-content" class="skip-link">Skip to main content</a>
+  <nav class="top-nav">
+    <button id="nav-toggle" class="nav-toggle" aria-label="Toggle navigation" aria-controls="nav-links" aria-expanded="false" title="Toggle navigation">
+      <img src="icons/toolbar/grid.svg" alt="" aria-hidden="true" class="control-icon" loading="lazy" decoding="async">
+    </button>
+    <div id="nav-links" class="nav-links">
+      <a href="index.html">Home</a>
+      <a href="cableschedule.html">Cable Schedule</a>
+      <a href="voltagedropstudy.html" class="active" aria-current="page">Voltage Drop</a>
+    </div>
+    <button id="settings-btn" class="settings-btn" aria-label="Settings" aria-expanded="false" title="Settings">⚙</button>
+  </nav>
+
+  <div id="settings-menu" class="settings-menu">
+    <label for="theme-select">Theme
+      <select id="theme-select">
+        <option value="system">System</option>
+        <option value="light">Light</option>
+        <option value="dark">Dark</option>
+        <option value="high-contrast">High Contrast</option>
+      </select>
+    </label>
+    <label><input type="checkbox" id="compact-toggle" aria-label="Enable compact table mode"> Compact Mode</label>
+    <label for="unit-select">Units
+      <select id="unit-select">
+        <option value="imperial">Imperial</option>
+        <option value="metric">Metric</option>
+      </select>
+    </label>
+    <button id="help-btn" class="btn" aria-expanded="false" title="Show help">Site Help</button>
+    <button id="new-project-btn">New Project</button>
+    <button id="save-project-btn">Save Project</button>
+    <button id="load-project-btn">Load Project</button>
+    <button id="export-project-btn">Export Project</button>
+    <button id="import-project-btn">Import Project</button>
+    <input type="file" id="import-project-input" accept=".ctr.json" class="hidden" title="Select project file">
+  </div>
+
+  <div class="container">
+    <main id="main-content" class="main-content">
+      <nav aria-label="Breadcrumb">
+        <ol class="breadcrumb-trail">
+          <li><a href="index.html">Home</a></li>
+          <li>Studies</li>
+          <li aria-current="page">Voltage Drop</li>
+        </ol>
+      </nav>
+
+      <header class="page-header">
+        <h1>Voltage Drop Compliance Study</h1>
+      </header>
+
+      <details class="method-panel">
+        <summary>Method &amp; Standards</summary>
+        <p>Voltage drop is calculated using the DC resistance method adjusted for AC impedance
+        and temperature correction per conductor material:</p>
+        <pre>VD% = (√3 × I × R × L) / V × 100   [3-phase]
+VD% = (2 × I × R × L) / V × 100   [single-phase]</pre>
+        <p>where <em>I</em> = load current (A), <em>R</em> = conductor resistance per unit length
+        (Ω/m at operating temperature), <em>L</em> = one-way length (m), and <em>V</em> = nominal
+        line voltage (V).</p>
+        <p><strong>NEC limits (informational notes):</strong></p>
+        <ul>
+          <li>NEC 215.2(A)(3): Feeder circuits — ≤ 3 % recommended</li>
+          <li>NEC 210.19(A)(1): Branch circuits — ≤ 3 % recommended</li>
+          <li>Combined feeder + branch — ≤ 5 % recommended</li>
+        </ul>
+        <p>Cables without length, load current, or voltage data are excluded from compliance
+        checking but are listed in the table. Circuit type (feeder/branch) is determined from
+        the <em>Circuit Type</em> or <em>Service Type</em> field in the cable schedule.</p>
+      </details>
+
+      <div id="controls" class="controls-row">
+        <button id="run-btn" type="button">Run Study</button>
+        <button id="export-btn" type="button" disabled>Export CSV</button>
+      </div>
+
+      <!-- Summary cards -->
+      <div id="summary" hidden role="region" aria-live="polite" aria-label="Study summary"></div>
+
+      <!-- Detailed results table -->
+      <div id="results" role="region" aria-live="polite" aria-label="Voltage drop compliance table"></div>
+
+      <nav class="step-nav" aria-label="Workflow navigation">
+        <a href="contingency.html" class="step-nav-prev">&#8592; N-1 Contingency</a>
+      </nav>
+    </main>
+  </div>
+
+  <div id="help-modal" class="modal" aria-hidden="true" role="dialog" aria-modal="true"
+       aria-labelledby="help-title">
+    <div class="modal-content">
+      <button id="close-help-btn" class="close-btn" aria-label="Close Help">&times;</button>
+      <h2 id="help-title">Voltage Drop Study Help</h2>
+      <p>Click <em>Run Study</em> to analyse all cables in the current project against NEC
+      voltage drop limits. Cables are retrieved from the Cable Schedule.</p>
+      <p><strong>Status indicators:</strong></p>
+      <ul>
+        <li><strong>PASS</strong> — drop is below 80 % of the NEC recommended limit</li>
+        <li><strong>WARN</strong> — drop is between 80 % and 100 % of the limit (near-limit)</li>
+        <li><strong>FAIL</strong> — drop exceeds the NEC recommended limit</li>
+      </ul>
+      <p>Rows without sufficient data (missing length, current, or voltage) show a dash and
+      are counted as PASS.</p>
+      <p>Use <em>Export CSV</em> to download the full table for inclusion in project
+      documentation or submittals.</p>
+      <p><strong>Improving compliance:</strong> Increase conductor size, reduce run length,
+      or add intermediate distribution panels to reduce voltage drop on failing circuits.</p>
+    </div>
+  </div>
+
+  <script type="module" src="dist/projectManager.js"></script>
+</body>
+</html>

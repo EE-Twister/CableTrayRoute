@@ -129,7 +129,7 @@ if (typeof window !== 'undefined') {
       try {
         const decoded = decodeURIComponent(hash.slice(1)).trim();
         if (decoded) projectId = decoded;
-      } catch {}
+      } catch (e) { console.warn('[oneline] failed to decode URL hash as project id:', e); }
     } else if (window.currentProjectId && window.currentProjectId.trim()) {
       projectId = window.currentProjectId;
     }

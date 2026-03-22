@@ -42,6 +42,7 @@ const entries = {
   spoolsheets: 'src/spoolsheets.js',
   windload: 'src/windload.js',
   transientstability: 'src/transientstability.js',
+  voltagedropstudy: 'src/voltagedropstudy.js',
   productconfig: 'src/productconfig.js',
   '404': 'src/404.js'
 };

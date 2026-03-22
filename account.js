@@ -62,7 +62,8 @@ function init() {
       } else {
         showStatus(form, body.error || 'Failed to change password. Please try again.', true);
       }
-    } catch {
+    } catch (err) {
+      console.error('[account] change password request failed:', err);
       showStatus(form, 'Request failed. Check your connection and try again.', true);
     } finally {
       btn.disabled = false;
