@@ -94,6 +94,11 @@ function normalizeConduit(c = {}) {
  * entity name includes `CABLECARRIER` it is treated as a tray; otherwise
  * it is treated as a conduit segment.
  *
+ * Supports two formats:
+ *   1. Inline simplified: #N=IFCCABLECARRIERSEGMENTIFCPOLYLINE((x,y,z),(x,y,z))
+ *   2. Referenced-entity (IFC4 proper): separate IFCCARTESIANPOINT / IFCPOLYLINE /
+ *      IFCCABLECARRIERSEGMENT entities linked by entity references (#N).
+ *
  * This is a best‑effort helper and is not meant to cover the entire IFC
  * specification, but it is sufficient for small test files and demos.
  *
@@ -102,6 +107,8 @@ function normalizeConduit(c = {}) {
 function parseIFC(text) {
   const trays = [];
   const conduits = [];
+
+  // --- Pass 1: inline simplified format (existing behaviour) ---
   const segRegex =
     /#\d+=IFC([^;]*?)SEGMENT[^;]*?IFCPOLYLINE\(\(([^)]+)\),\(([^)]+)\)\)/gi;
   let match;
@@ -122,6 +129,73 @@ function parseIFC(text) {
     if (/CABLECARRIER/i.test(kind)) trays.push(seg);
     else conduits.push(seg);
   }
+
+  // If inline format found something, return it
+  if (trays.length > 0 || conduits.length > 0) return { trays, conduits };
+
+  // --- Pass 2: referenced-entity IFC4 format ---
+  // Build a map from entity id → parsed content for CartesianPoint and Polyline
+  const cartesianPoints = new Map(); // entityId → [x, y, z]
+  const polylines = new Map();       // entityId → [pt1Id, pt2Id]
+
+  // Parse IFCCARTESIANPOINT(( x, y, z ));
+  const ptRegex = /#(\d+)=IFCCARTESIANPOINT\(\(([^)]+)\)\)/gi;
+  let ptMatch;
+  while ((ptMatch = ptRegex.exec(text))) {
+    const coords = ptMatch[2].split(",").map(v => parseFloat(v.trim()));
+    cartesianPoints.set(ptMatch[1], coords);
+  }
+
+  // Parse IFCPOLYLINE(( #id1, #id2 ));
+  const plRegex = /#(\d+)=IFCPOLYLINE\(\(([^)]+)\)\)/gi;
+  let plMatch;
+  while ((plMatch = plRegex.exec(text))) {
+    const refs = plMatch[2].match(/#(\d+)/g)?.map(r => r.slice(1)) || [];
+    if (refs.length >= 2) polylines.set(plMatch[1], refs);
+  }
+
+  // Parse IFCCABLECARRIERSEGMENT entries and trace geometry via shape references
+  // Format: #N=IFCCABLECARRIERSEGMENT('guid',#owner,'name',...,#placement,#repMap,...,.TYPE.);
+  const segEntityRegex = /#\d+=IFCCABLECARRIERSEGMENT\(([^;]+)\);/gi;
+  let segEMatch;
+  let j = 0;
+  while ((segEMatch = segEntityRegex.exec(text))) {
+    const body = segEMatch[1];
+    // Extract the name (3rd positional argument, single-quoted)
+    const nameMatch = body.match(/'([^']*)'/g);
+    const segName = nameMatch && nameMatch[1] ? nameMatch[1].replace(/'/g, '') : `SEG-${j}`;
+    // Determine type: .CABLETRAY. or .CONDUIT.
+    const isTray = /\.CABLETRAY\./i.test(body);
+
+    // Find the first IFCPOLYLINE entity referenced anywhere in this segment's geometry chain.
+    // Rather than fully tracing the shape graph, we find the polyline closest before this segment.
+    // Strategy: find the polyline that was defined most recently before this segment entry.
+    const segOffset = segEMatch.index;
+    let bestPolyId = null;
+    for (const pid of polylines.keys()) {
+      const pidMatch = text.indexOf(`#${pid}=IFCPOLYLINE`);
+      if (pidMatch < segOffset) bestPolyId = pid;
+    }
+
+    if (bestPolyId) {
+      const ptIds = polylines.get(bestPolyId);
+      const pt1 = cartesianPoints.get(ptIds[0]) || [0, 0, 0];
+      const pt2 = cartesianPoints.get(ptIds[1]) || [0, 0, 0];
+      const seg = {
+        id: segName || `SEG-${j}`,
+        start_x: pt1[0],
+        start_y: pt1[1],
+        start_z: pt1[2],
+        end_x: pt2[0],
+        end_y: pt2[1],
+        end_z: pt2[2],
+      };
+      if (isTray) trays.push(seg);
+      else conduits.push(seg);
+    }
+    j++;
+  }
+
   return { trays, conduits };
 }
 

@@ -1,5 +1,6 @@
 import assert from 'assert';
 import { parseRevit } from '../src/importers/revit.mjs';
+import { exportToIFC4 } from '../src/exporters/ifc4.mjs';
 
 function describe(name, fn) {
   console.log(name);
@@ -260,5 +261,117 @@ describe('parseRevit - IFC STEP input', () => {
     const result = parseRevit(ifc);
     assert.strictEqual(result.trays.length, 2);
     assert.strictEqual(result.conduits.length, 1);
+  });
+});
+
+// ---------------------------------------------------------------------------
+describe('exportToIFC4 — output content', () => {
+  it('produces a valid ISO-10303-21 header', () => {
+    const step = exportToIFC4({ trays: [], conduits: [] });
+    assert.ok(step.startsWith('ISO-10303-21;'));
+    assert.ok(step.includes('FILE_SCHEMA((\'IFC4\'));'));
+    assert.ok(step.includes('END-ISO-10303-21;'));
+  });
+
+  it('includes IFCCABLECARRIERSEGMENT for each tray', () => {
+    const step = exportToIFC4({
+      trays: [{ id: 'TR-1', start_x: 0, start_y: 0, start_z: 0, end_x: 5, end_y: 0, end_z: 0 }],
+      conduits: []
+    });
+    assert.ok(step.includes('IFCCABLECARRIERSEGMENT'), 'must contain IFCCABLECARRIERSEGMENT');
+    assert.ok(step.includes("'TR-1'"), 'must embed tray id');
+    assert.ok(step.includes('.CABLETRAY.'), 'must mark tray type');
+  });
+
+  it('includes IFCCABLECARRIERSEGMENT for each conduit with .CONDUIT. type', () => {
+    const step = exportToIFC4({
+      trays: [],
+      conduits: [{ conduit_id: 'CD-1', start_x: 0, start_y: 0, start_z: 0, end_x: 3, end_y: 0, end_z: 0 }]
+    });
+    assert.ok(step.includes('IFCCABLECARRIERSEGMENT'));
+    assert.ok(step.includes("'CD-1'"));
+    assert.ok(step.includes('.CONDUIT.'));
+  });
+
+  it('embeds IFCCARTESIANPOINT coordinates in output', () => {
+    const step = exportToIFC4({
+      trays: [{ id: 'T1', start_x: 1.5, start_y: 2.5, start_z: 3.5, end_x: 10, end_y: 0, end_z: 0 }],
+      conduits: []
+    });
+    assert.ok(step.includes('IFCCARTESIANPOINT'));
+    assert.ok(step.includes('1.5'), 'start_x must appear');
+    assert.ok(step.includes('2.5'), 'start_y must appear');
+    assert.ok(step.includes('3.5'), 'start_z must appear');
+  });
+
+  it('produces empty data section for no trays and no conduits', () => {
+    const step = exportToIFC4({});
+    assert.ok(step.includes('IFCPROJECT'));
+    assert.ok(!step.includes('IFCCABLECARRIERSEGMENT'));
+  });
+
+  it('uses projectName in FILE_NAME header', () => {
+    const step = exportToIFC4({ projectName: 'Substation A', trays: [], conduits: [] });
+    assert.ok(step.includes('Substation A'));
+  });
+});
+
+// ---------------------------------------------------------------------------
+describe('IFC4 round-trip: export → parseRevit', () => {
+  it('round-trips a single tray with coordinates', () => {
+    const original = {
+      trays: [{ id: 'RT-1', start_x: 0, start_y: 0, start_z: 0, end_x: 20, end_y: 5, end_z: 3 }],
+      conduits: []
+    };
+    const step = exportToIFC4(original);
+    const parsed = parseRevit(step);
+
+    assert.strictEqual(parsed.trays.length, 1, 'must parse one tray');
+    assert.strictEqual(parsed.trays[0].id, 'RT-1');
+    assert.ok(Math.abs(parsed.trays[0].start_x - 0) < 1e-9, 'start_x must match');
+    assert.ok(Math.abs(parsed.trays[0].start_y - 0) < 1e-9, 'start_y must match');
+    assert.ok(Math.abs(parsed.trays[0].start_z - 0) < 1e-9, 'start_z must match');
+    assert.ok(Math.abs(parsed.trays[0].end_x - 20) < 1e-9, 'end_x must match');
+    assert.ok(Math.abs(parsed.trays[0].end_y - 5) < 1e-9, 'end_y must match');
+    assert.ok(Math.abs(parsed.trays[0].end_z - 3) < 1e-9, 'end_z must match');
+  });
+
+  it('round-trips a single conduit with coordinates', () => {
+    const original = {
+      trays: [],
+      conduits: [{ conduit_id: 'RC-1', start_x: 1, start_y: 2, start_z: 3, end_x: 11, end_y: 12, end_z: 13 }]
+    };
+    const step = exportToIFC4(original);
+    const parsed = parseRevit(step);
+
+    assert.strictEqual(parsed.conduits.length, 1, 'must parse one conduit');
+    assert.strictEqual(parsed.conduits[0].id, 'RC-1');
+    assert.ok(Math.abs(parsed.conduits[0].start_x - 1) < 1e-9);
+    assert.ok(Math.abs(parsed.conduits[0].end_x - 11) < 1e-9);
+  });
+
+  it('round-trips multiple mixed segments', () => {
+    const original = {
+      trays: [
+        { id: 'T-A', start_x: 0, start_y: 0, start_z: 0, end_x: 10, end_y: 0, end_z: 0 },
+        { id: 'T-B', start_x: 10, start_y: 0, start_z: 0, end_x: 20, end_y: 0, end_z: 0 },
+      ],
+      conduits: [
+        { conduit_id: 'C-A', start_x: 0, start_y: 5, start_z: 0, end_x: 10, end_y: 5, end_z: 0 },
+      ]
+    };
+    const step = exportToIFC4(original);
+    const parsed = parseRevit(step);
+
+    assert.strictEqual(parsed.trays.length, 2);
+    assert.strictEqual(parsed.conduits.length, 1);
+  });
+
+  it('round-trips zero-coordinate segments without errors', () => {
+    const step = exportToIFC4({
+      trays: [{ id: 'ZERO', start_x: 0, start_y: 0, start_z: 0, end_x: 0, end_y: 0, end_z: 0 }],
+      conduits: []
+    });
+    assert.doesNotThrow(() => parseRevit(step));
   });
 });
