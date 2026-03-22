@@ -21,10 +21,12 @@ import {
   getThemePreference,
   setThemePreference,
   setConduitCache,
-  getConduitCache
+  getConduitCache,
+  getAuthContextState
 } from "./projectStorage.js";
 import { openModal, showAlertModal } from "./src/components/modal.js";
 import { createDomWriteBatcher, createElementCache, createHandlerProfiler } from "./src/utils/domLifecycle.js";
+import { initCollaboration, stopCollaboration } from "./src/collabManager.js";
 
 const FOCUSABLE="a[href],button:not([disabled]),textarea:not([disabled]),input:not([disabled]),select:not([disabled]),[tabindex]:not([tabindex='-1'])";
 const CHECKPOINT_KEY='CTR_CHECKPOINT';
@@ -158,22 +160,46 @@ async function runOnboardingFlow({force=false,source='auto'}={}){
   const state=getOnboardingSettings();
   if(!force&&state.completed===true&&state.version===ONBOARDING_VERSION) return;
   if(!force&&state.dismissedVersion===ONBOARDING_VERSION) return;
+  const totalSteps=6;
+  const stepIndicator=i=>`Step ${i+1} of ${totalSteps}`;
   const steps=[
     {
       title:'Welcome to CableTrayRoute',
-      description:'This quick onboarding walks you through the core actions to start routing in under a minute.',
-      details:'Use “Start Workflow” to begin in Cable Schedule, then continue through Raceway and routing tools in order.'
+      description:'This quick onboarding walks you through the core workflow in under a minute.',
+      details:`${stepIndicator(0)}\n\nCableTrayRoute is a browser-based electrical raceway design tool. Everything is saved locally in your browser — no account needed to get started.\n\nYou will set up cables, trays, conduits, and ductbanks, then run routing, fill, clash detection, and generate reports.`
     },
     {
       title:'Load a sample project in one click',
       description:'Need a working baseline? Seed the workflow with sample cables, raceways, and a ductbank.',
-      details:'Choose “Load Sample Project” below to initialize sample data through project storage APIs.',
+      details:`${stepIndicator(1)}\n\nClick “Load Sample Project” to populate a sample dataset: 3 cables, 2 trays, 1 conduit, and 1 ductbank. This lets you explore every feature without manual data entry.`,
       showSampleLoader:true
     },
     {
-      title:'Settings and help',
-      description:'You can always reopen this tour from Settings > Reopen Onboarding.',
-      details:'Use Site Help for docs and keep the tour handy for onboarding new team members.'
+      title:'Step 1 — Build your Cable Schedule',
+      description:'Start by defining the cables in your project.',
+      details:`${stepIndicator(2)}\n\nGo to Cable Schedule to enter each cable's ID, endpoints, conductor size, insulation type, voltage rating, and length.\n\nTip: assign a “Route Preference” (tray or conduit ID) to each cable so the routing engine knows where to place it.`,
+      link:{href:'cableschedule.html',label:'Open Cable Schedule'}
+    },
+    {
+      title:'Step 2 — Define Raceways',
+      description:'Add cable trays, conduits, and ductbanks.',
+      details:`${stepIndicator(3)}\n\nGo to Raceway Schedule to enter tray dimensions (width, depth), start/end coordinates, and tray type.\n\nThe fill analysis uses NEC §392.22 limits. Tray fill is automatically computed when you navigate to Cable Tray Fill.`,
+      link:{href:'racewayschedule.html',label:'Open Raceway Schedule'}
+    },
+    {
+      title:'Step 3 — Run Routing and Analysis',
+      description:'Compute the optimal route and run clash detection.',
+      details:`${stepIndicator(4)}\n\n• Optimal Route — finds shortest paths for each cable through the tray network.\n• Clash Detection — flags 3D interference and clearance violations (NEMA VE 2 §8.4).\n• Spool Sheets — generates prefab assembly groups for field installation.\n• Project Report — aggregates all analysis results into one printable document.`,
+      links:[
+        {href:'optimalRoute.html',label:'Optimal Route'},
+        {href:'clashdetect.html',label:'Clash Detection'},
+        {href:'projectreport.html',label:'Project Report'},
+      ]
+    },
+    {
+      title:'Settings, help, and collaboration',
+      description:'Find everything you need from the ⚙ Settings menu.',
+      details:`${stepIndicator(5)}\n\n• Use ⚙ Settings > Site Help for reference documentation.\n• Save and load projects using the project buttons in Settings.\n• When logged in, real-time collaboration is active automatically — co-editors appear in the presence bar at the top of the page.\n• Reopen this tour at any time from Settings > Reopen Onboarding.`
     }
   ];
 
@@ -197,10 +223,28 @@ async function runOnboardingFlow({force=false,source='auto'}={}){
         move=isFirst?'skip':'back';
       },
       render(container){
-        const note=document.createElement('p');
-        note.className='modal-message';
+        const note=document.createElement('pre');
+        note.className='modal-message onboarding-details';
+        note.style.cssText='white-space:pre-wrap;font-family:inherit;margin:0 0 0.75rem;font-size:0.88rem;';
         note.textContent=step.details;
         container.appendChild(note);
+
+        // Quick-link buttons for workflow steps
+        const allLinks=[...(step.links||[]),...(step.link?[step.link]:[])];
+        if(allLinks.length){
+          const linkRow=document.createElement('div');
+          linkRow.style.cssText='display:flex;flex-wrap:wrap;gap:0.5rem;margin-top:0.5rem;';
+          allLinks.forEach(({href,label})=>{
+            const a=document.createElement('a');
+            a.href=href;
+            a.textContent=label;
+            a.className='btn secondary-btn';
+            a.style.fontSize='0.8rem';
+            linkRow.appendChild(a);
+          });
+          container.appendChild(linkRow);
+        }
+
         if(!step.showSampleLoader) return null;
         const loadSampleBtn=document.createElement('button');
         loadSampleBtn.type='button';
@@ -210,7 +254,7 @@ async function runOnboardingFlow({force=false,source='auto'}={}){
           try{
             loadSampleBtn.disabled=true;
             await initializeSampleProject();
-            loadSampleBtn.textContent='Sample Project Loaded';
+            loadSampleBtn.textContent='Sample Project Loaded ✓';
             showOperationToast('Sample project initialized.','success');
           }catch(err){
             console.error('Sample project initialization failed',err);
@@ -2091,6 +2135,29 @@ globalThis.loadConduits=loadConduits;
 globalThis.applyUnitLabels=applyUnitLabels;
 globalThis.applyProjectHash=applyProjectHash;
 globalThis.showSelfCheckModal=showSelfCheckModal;
+
+// ----- Real-time collaboration -----
+(function initCollabOnLoad() {
+  if (typeof document === 'undefined') return;
+  document.addEventListener('DOMContentLoaded', () => {
+    function startCollab() {
+      const auth = getAuthContextState ? getAuthContextState() : null;
+      if (!auth) return; // only start when logged in
+      const projectId = (window.currentProjectId || 'default').trim();
+      initCollaboration({ projectId, username: auth.user });
+    }
+    startCollab();
+    // Re-init when project changes (project manager fires storage events)
+    window.addEventListener('storage', (e) => {
+      if (e.key === 'currentProjectId' || e.key === 'authToken') {
+        stopCollaboration();
+        startCollab();
+      }
+    });
+    // Clean up on page unload
+    window.addEventListener('beforeunload', () => stopCollaboration());
+  });
+}());
 
 // ----- Scroll-to-top button -----
 (function initScrollTopBtn() {

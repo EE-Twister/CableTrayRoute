@@ -784,7 +784,8 @@ async function refreshSession() {
     const { token, csrfToken, expiresAt } = await res.json();
     setAuthContextState({ token, csrfToken, expiresAt, user: auth.user });
     return true;
-  } catch {
+  } catch (err) {
+    console.warn('[projectManager] Auth token refresh failed:', err.message || err);
     return false;
   }
 }

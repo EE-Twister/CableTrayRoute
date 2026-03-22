@@ -16,8 +16,8 @@ export function parseRevit(input) {
     try {
       const obj = JSON.parse(input);
       return parseRevitJSON(obj);
-    } catch {
-      // Treat as IFC STEP text
+    } catch (err) {
+      console.debug('[revit] Input is not JSON, attempting IFC STEP parse:', err.message);
       return parseIFC(input);
     }
   }

@@ -1,0 +1,145 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <meta name="description" content="Unified project report: cable schedule, raceway fill, clash detection, spool sheets, and validation in one document." />
+  <title>Project Report — CableTrayRoute</title>
+  <link rel="icon" href="icons/favicon.svg" type="image/svg+xml">
+  <link rel="apple-touch-icon" href="icons/favicon.svg">
+  <meta property="og:type" content="website">
+  <meta property="og:title" content="Unified Project Report — CableTrayRoute">
+  <meta property="og:description" content="Generate a comprehensive engineering report covering cables, raceways, clashes, spool sheets, and validation.">
+  <meta property="og:image" content="icons/route.svg">
+  <meta property="og:site_name" content="CableTrayRoute">
+  <meta property="og:url" content="projectreport.html">
+  <link rel="canonical" href="projectreport.html">
+  <link rel="dns-prefetch" href="https://fonts.gstatic.com">
+  <meta name="color-scheme" content="light dark">
+  <link rel="stylesheet" href="style.css" />
+  <script type="module" src="dirtyTracker.js"></script>
+  <script type="module" src="dist/projectreport.js" defer></script>
+</head>
+<body class="projectreport-page" data-report-title="Project Report">
+  <a href="#main-content" class="skip-link">Skip to main content</a>
+  <nav class="top-nav">
+    <button id="nav-toggle" class="nav-toggle" aria-label="Toggle navigation" aria-controls="nav-links" aria-expanded="false" title="Toggle navigation">
+      <img src="icons/toolbar/grid.svg" alt="" aria-hidden="true" class="control-icon" loading="lazy" decoding="async">
+    </button>
+    <div id="nav-links" class="nav-links">
+      <a href="index.html">Home</a>
+      <a href="submittal.html">Submittal</a>
+      <a href="projectreport.html" class="active" aria-current="page">Project Report</a>
+    </div>
+    <button id="settings-btn" class="settings-btn" aria-label="Settings" aria-expanded="false" title="Settings">⚙</button>
+  </nav>
+
+  <div id="settings-menu" class="settings-menu">
+    <label for="theme-select">Theme
+      <select id="theme-select">
+        <option value="system">System</option>
+        <option value="light">Light</option>
+        <option value="dark">Dark</option>
+        <option value="high-contrast">High Contrast</option>
+      </select>
+    </label>
+    <label><input type="checkbox" id="compact-toggle" aria-label="Enable compact table mode"> Compact Mode</label>
+    <label for="unit-select">Units
+      <select id="unit-select">
+        <option value="imperial">Imperial</option>
+        <option value="metric">Metric</option>
+      </select>
+    </label>
+    <button id="help-btn" class="btn" aria-expanded="false" title="Show help">Site Help</button>
+    <button id="new-project-btn">New Project</button>
+    <button id="save-project-btn">Save Project</button>
+    <button id="load-project-btn">Load Project</button>
+    <button id="export-project-btn">Export Project</button>
+    <button id="import-project-btn">Import Project</button>
+    <input type="file" id="import-project-input" accept=".ctr.json" class="hidden" title="Select project file">
+  </div>
+
+  <div class="container">
+    <main id="main-content" class="main-content">
+      <nav aria-label="Breadcrumb">
+        <ol class="breadcrumb-trail">
+          <li><a href="index.html">Home</a></li>
+          <li>Workflow</li>
+          <li aria-current="page">Project Report</li>
+        </ol>
+      </nav>
+
+      <header class="page-header">
+        <h1>Unified Project Report</h1>
+      </header>
+
+      <details class="method-panel">
+        <summary>About This Report</summary>
+        <p>The Project Report aggregates all analysis results into a single printable document. It covers:</p>
+        <ul>
+          <li><strong>Cable Schedule</strong> — all cables with routing status and lengths</li>
+          <li><strong>Raceway Fill</strong> — tray and conduit utilisation vs NEC §392.22 limits</li>
+          <li><strong>Clash Detection</strong> — 3D interference analysis (NEMA VE 2 §8.4)</li>
+          <li><strong>Spool Sheets</strong> — prefabrication assembly groups (NEMA VE 2 §9)</li>
+          <li><strong>Validation</strong> — unrouted cables, empty trays, missing data</li>
+        </ul>
+        <p>Use <strong>Print / Save as PDF</strong> to produce the final deliverable.</p>
+      </details>
+
+      <!-- Project name override -->
+      <fieldset id="rpt-options">
+        <legend><strong>Report Options</strong></legend>
+        <div class="form-row">
+          <label for="rpt-project-name">Project Name Override</label>
+          <input type="text" id="rpt-project-name" placeholder="Loaded from project data if blank" autocomplete="off">
+        </div>
+      </fieldset>
+
+      <!-- Actions -->
+      <div id="controls" class="controls-row">
+        <button id="generate-report-btn" type="button" class="btn primary-btn">Generate Report</button>
+        <button id="print-report-btn"    type="button" class="btn">Print / Save as PDF</button>
+        <button id="export-json-btn"     type="button" class="btn secondary-btn">Export JSON</button>
+      </div>
+
+      <!-- Status bar -->
+      <div id="report-status" class="report-status" role="status" aria-live="polite"></div>
+
+      <!-- Table of contents (visible once report is generated) -->
+      <nav id="report-toc" class="report-toc" aria-label="Report sections" hidden>
+        <strong>Jump to:</strong>
+        <a href="#rpt-summary">Summary</a>
+        <a href="#rpt-cables">Cables</a>
+        <a href="#rpt-fill">Fill</a>
+        <a href="#rpt-clashes">Clashes</a>
+        <a href="#rpt-spools">Spools</a>
+        <a href="#rpt-validation">Validation</a>
+      </nav>
+
+      <!-- Preview area -->
+      <div id="report-preview" class="report-preview" role="region" aria-live="polite" aria-label="Report preview" hidden>
+        <p class="field-hint">Click <strong>Generate Report</strong> to build the report from your project data.</p>
+      </div>
+
+      <nav class="step-nav" aria-label="Workflow navigation">
+        <a href="submittal.html" class="step-nav-prev">&#8592; Submittal</a>
+      </nav>
+    </main>
+  </div>
+
+  <div id="help-modal" class="modal" aria-hidden="true" role="dialog" aria-modal="true"
+       aria-labelledby="help-title">
+    <div class="modal-content">
+      <button id="close-help-btn" class="close-btn" aria-label="Close Help">&times;</button>
+      <h2 id="help-title">Project Report Help</h2>
+      <p>Click <em>Generate Report</em> to compile all project data into a single document.</p>
+      <p>The report reads your current project from storage — make sure your cable and raceway
+      schedules are saved before generating.</p>
+      <p>Use <em>Print / Save as PDF</em> to export the report via the browser print dialog.</p>
+      <p>Use <em>Export JSON</em> to download the raw report data for integration with other tools.</p>
+    </div>
+  </div>
+
+  <script type="module" src="dist/projectManager.js"></script>
+</body>
+</html>
