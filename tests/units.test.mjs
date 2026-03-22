@@ -1,5 +1,5 @@
-const assert = require("assert");
-const units = require("../units.js");
+import assert from "assert";
+import units from "../units.js";
 
 function describe(name, fn) {
   console.log(name);
