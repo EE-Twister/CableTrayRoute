@@ -6,7 +6,7 @@ import { UndoRedoManager } from "./undoRedo.mjs";
 import "./src/components/navigation.js";
 import "./src/components/commandPalette.js";
 import "./units.js";
-import { exportProject, importProject, getOneLine, getStudies, loadProject, saveProject, getDuctbanks, getConduits } from "./dataStore.mjs";
+import { exportProject, importProject, getOneLine, getStudies, loadProject, saveProject, getDuctbanks, getConduits, applyRemoteSnapshot } from "./dataStore.mjs";
 import { runValidation } from "./validation/rules.js";
 import {
   PROJECT_KEY,
@@ -2153,6 +2153,13 @@ globalThis.showSelfCheckModal=showSelfCheckModal;
         stopCollaboration();
         startCollab();
       }
+    });
+    // Apply incoming remote patches to local state
+    document.addEventListener('ctr:remote-patch', (ev) => {
+      const patch = ev.detail && ev.detail.patch;
+      if (!patch || typeof patch !== 'object') return;
+      const projectId = (window.currentProjectId || 'default').trim();
+      applyRemoteSnapshot(patch, projectId);
     });
     // Clean up on page unload
     window.addEventListener('beforeunload', () => stopCollaboration());

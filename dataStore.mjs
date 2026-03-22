@@ -602,6 +602,54 @@ export function loadProject(projectId, scenario = getCurrentScenarioNameState())
   }
 }
 
+/**
+ * Apply a remote project snapshot received from the collaboration server.
+ *
+ * Unlike saveProject() + loadProject(), this function applies data directly
+ * to in-memory state and persists it WITHOUT dispatching 'ctr:project-saved'
+ * (which would echo the patch back to the server and cause an infinite loop).
+ *
+ * After applying, it dispatches 'ctr:remote-applied' so page-level code can
+ * refresh its rendered tables.
+ *
+ * @param {object} snapshot - Full project payload as sent by saveProject()
+ * @param {string} [projectId] - Target project ID (defaults to window.currentProjectId)
+ */
+export function applyRemoteSnapshot(snapshot, projectId) {
+  if (!snapshot || typeof snapshot !== 'object') return;
+  try {
+    const { equipment, panels, loads, cables, cableTypicals, cableTemplates, raceways = {}, oneLine } = snapshot;
+    if (Array.isArray(equipment)) setEquipment(equipment);
+    if (Array.isArray(panels)) setPanels(panels);
+    if (Array.isArray(loads)) setLoads(loads);
+    if (Array.isArray(cables)) setCables(cables);
+    if (Array.isArray(cableTypicals)) setCableTypicals(cableTypicals);
+    if (Array.isArray(cableTemplates)) setCableTemplates(cableTemplates);
+    setTrays(Array.isArray(raceways.trays) ? raceways.trays : []);
+    setConduits(Array.isArray(raceways.conduits) ? raceways.conduits : []);
+    setDuctbanks(Array.isArray(raceways.ductbanks) ? raceways.ductbanks : []);
+    const scenario = getCurrentScenarioNameState();
+    if (oneLine !== undefined) {
+      if (Array.isArray(oneLine)) {
+        setOneLine({ activeSheet: 0, sheets: oneLine }, scenario);
+      } else {
+        setOneLine(oneLine || { activeSheet: 0, sheets: [] }, scenario);
+      }
+    }
+    // Persist to storage so subsequent loadProject() calls see the updated data
+    const pid = projectId || (typeof window !== 'undefined' && window.currentProjectId) || null;
+    if (pid) writeSavedProject(pid, snapshot);
+    // Notify page-level code that remote data has been applied
+    if (typeof document !== 'undefined') {
+      try {
+        document.dispatchEvent(new CustomEvent('ctr:remote-applied', { detail: { projectId: pid } }));
+      } catch { /* non-critical */ }
+    }
+  } catch (e) {
+    console.warn('[collab] Failed to apply remote snapshot', e);
+  }
+}
+
 // Simple schema validator replacing Ajv. Checks for required fields,
 // disallows extras, and verifies basic types.
 function validateProjectSchema(obj) {
@@ -843,6 +891,7 @@ if (typeof window !== 'undefined') {
     importProject,
     saveProject,
     loadProject,
+    applyRemoteSnapshot,
     importFromCad,
     exportToCad
   };
