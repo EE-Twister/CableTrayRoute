@@ -21,9 +21,7 @@ jobs:
           npx eslint . --max-warnings=0
           npx prettier --check '**/*.js'
       - name: Run tests
-        run: |
-          node test.js
-          npm test
+        run: npm test
       - name: Install Playwright browsers
         run: npx playwright install --with-deps msedge firefox
       - name: Playwright tests
