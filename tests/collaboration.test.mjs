@@ -248,3 +248,82 @@ describe('renderPresenceBar', () => {
     assert.doesNotThrow(() => renderPresenceBar(null, ['alice'], 'alice'));
   });
 });
+
+// ---------------------------------------------------------------------------
+describe('CollabClient — sequence numbers & conflict detection', () => {
+  it('includes baseSeq in sendPatch message', () => {
+    reset();
+    const client = makeClient();
+    const ws = connectAndOpen(client);
+    // Simulate server sync on join
+    ws._message({ type: 'sync', seq: 5 });
+    client.sendPatch({ cables: [] });
+    const patchMsg = ws.sent.find(m => m.type === 'patch');
+    assert.ok(patchMsg, 'patch message must be sent');
+    assert.strictEqual(patchMsg.baseSeq, 5, 'baseSeq must reflect last known seq');
+  });
+
+  it('updates lastSeq on sync message', () => {
+    reset();
+    const client = makeClient();
+    const ws = connectAndOpen(client);
+    ws._message({ type: 'sync', seq: 10 });
+    // Send a patch — baseSeq should now be 10
+    client.sendPatch({ foo: 1 });
+    const patchMsg = ws.sent.find(m => m.type === 'patch');
+    assert.strictEqual(patchMsg.baseSeq, 10);
+  });
+
+  it('updates lastSeq on ack message', () => {
+    reset();
+    const client = makeClient();
+    const ws = connectAndOpen(client);
+    ws._message({ type: 'ack', seq: 3 });
+    client.sendPatch({ bar: 2 });
+    const patchMsg = ws.sent.find(m => m.type === 'patch');
+    assert.strictEqual(patchMsg.baseSeq, 3);
+  });
+
+  it('fires conflict event when incoming seq has a gap', () => {
+    reset();
+    const client = makeClient();
+    const ws = connectAndOpen(client);
+    // Start at seq 2
+    ws._message({ type: 'sync', seq: 2 });
+
+    let conflict = null;
+    client.onConflict(d => { conflict = d; });
+
+    // Next expected seq is 3 but we receive seq 5 — gap of 2
+    ws._message({ type: 'patch', username: 'bob', patch: { cables: [] }, seq: 5 });
+    assert.ok(conflict, 'conflict event must fire');
+    assert.strictEqual(conflict.username, 'bob');
+    assert.strictEqual(conflict.gap, 2);
+  });
+
+  it('does not fire conflict when seq is consecutive', () => {
+    reset();
+    const client = makeClient();
+    const ws = connectAndOpen(client);
+    ws._message({ type: 'sync', seq: 0 });
+
+    let conflict = null;
+    client.onConflict(d => { conflict = d; });
+
+    ws._message({ type: 'patch', username: 'bob', patch: { x: 1 }, seq: 1 });
+    assert.strictEqual(conflict, null, 'no conflict for consecutive seq');
+  });
+
+  it('includes seq in remotePatch event detail', () => {
+    reset();
+    const client = makeClient();
+    const ws = connectAndOpen(client);
+    ws._message({ type: 'sync', seq: 0 });
+
+    let detail = null;
+    client.onRemotePatch(d => { detail = d; });
+    ws._message({ type: 'patch', username: 'carol', patch: { y: 2 }, seq: 1 });
+    assert.ok(detail);
+    assert.strictEqual(detail.seq, 1);
+  });
+});

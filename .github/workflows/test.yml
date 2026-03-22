@@ -12,6 +12,8 @@ jobs:
       - uses: actions/setup-node@v3
         with:
           node-version: 18
+      - name: Install dependencies
+        run: npm ci
       - name: Install lint tools
         run: npm install --no-save eslint prettier
       - name: Lint

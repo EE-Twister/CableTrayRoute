@@ -45,6 +45,31 @@ const entries = {
   '404': 'src/404.js'
 };
 
+/**
+ * Split frequently-shared internal modules into named vendor chunks so that
+ * browsers only download and parse them once regardless of how many pages the
+ * user visits.  Each key becomes the chunk file name; the value is a list of
+ * module IDs (resolved absolute paths or partial path fragments) whose code
+ * should be grouped into that chunk.
+ *
+ * Only group modules that are genuinely shared by ≥3 entry points; smaller
+ * groupings are handled by Rollup's automatic code-splitting.
+ */
+function manualChunks(id) {
+  // Core project state — imported by nearly every page
+  if (id.includes('projectStorage') || id.includes('dataStore') || id.includes('dirtyTracker')) {
+    return 'core-storage';
+  }
+  // Shared UI primitives
+  if (id.includes('/src/components/') || id.includes('workflowStatus') || id.includes('site.js')) {
+    return 'core-ui';
+  }
+  // Analysis utilities shared across study pages
+  if (id.includes('/analysis/loadFlow') || id.includes('/analysis/loadFlowModel')) {
+    return 'analysis-loadflow';
+  }
+}
+
 module.exports = {
   input: entries,
   output: {
@@ -52,7 +77,8 @@ module.exports = {
     format: 'es',
     sourcemap: false,
     entryFileNames: '[name].js',
-    chunkFileNames: 'chunks/[name]-[hash].js'
+    chunkFileNames: 'chunks/[name]-[hash].js',
+    manualChunks,
   },
   plugins: [terser()]
 };

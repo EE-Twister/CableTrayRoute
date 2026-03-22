@@ -34,6 +34,8 @@ export class CollabClient extends EventTarget {
   #reconnectAttempt = 0;
   #intentionalClose = false;
   #pingTimer = null;
+  /** Sequence number of the last patch received from the server. */
+  #lastSeq = 0;
 
   constructor({ projectId, username }) {
     super();
@@ -51,6 +53,7 @@ export class CollabClient extends EventTarget {
     if (!WS_URL) return;
 
     this.#intentionalClose = false;
+    this.#lastSeq = 0;
     this.#ws = new WebSocket(WS_URL);
 
     this.#ws.addEventListener('open', () => {
@@ -96,7 +99,23 @@ export class CollabClient extends EventTarget {
    */
   sendPatch(patch) {
     if (!this.connected) return;
-    this.#send({ type: 'patch', projectId: this.#projectId, username: this.#username, patch });
+    this.#send({
+      type: 'patch',
+      projectId: this.#projectId,
+      username: this.#username,
+      patch,
+      baseSeq: this.#lastSeq,
+    });
+  }
+
+  /**
+   * Register a callback for conflict notifications.
+   * Fired when a remote patch is received out of sequence, indicating
+   * that a concurrent edit overwrote a local change.
+   * @param {function({username:string, gap:number}):void} handler
+   */
+  onConflict(handler) {
+    this.addEventListener('conflict', ev => handler(ev.detail));
   }
 
   /**
@@ -131,10 +150,31 @@ export class CollabClient extends EventTarget {
       case 'presence':
         this.dispatchEvent(new CustomEvent('presence', { detail: msg.users || [] }));
         break;
-      case 'patch':
+      case 'patch': {
+        const incomingSeq = typeof msg.seq === 'number' ? msg.seq : null;
+        if (incomingSeq !== null) {
+          const expected = this.#lastSeq + 1;
+          if (incomingSeq > expected) {
+            // One or more patches were missed — signal a conflict so the UI
+            // can warn the user that remote changes may have overwritten theirs.
+            this.dispatchEvent(new CustomEvent('conflict', {
+              detail: { username: msg.username, gap: incomingSeq - expected }
+            }));
+          }
+          this.#lastSeq = incomingSeq;
+        }
         this.dispatchEvent(new CustomEvent('remotePatch', {
-          detail: { username: msg.username, patch: msg.patch }
+          detail: { username: msg.username, patch: msg.patch, seq: incomingSeq }
         }));
+        break;
+      }
+      case 'sync':
+        // Server sends the current sequence on join so the client starts in sync
+        if (typeof msg.seq === 'number') this.#lastSeq = msg.seq;
+        break;
+      case 'ack':
+        // Server acknowledges our patch and confirms the assigned sequence
+        if (typeof msg.seq === 'number') this.#lastSeq = msg.seq;
         break;
       case 'pong':
         // keepalive acknowledged

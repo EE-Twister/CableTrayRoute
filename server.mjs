@@ -1182,6 +1182,8 @@ if (import.meta.url === `file://${process.argv[1]}`) {
 export function attachCollaborationServer(httpServer, wss) {
   // projectId → Set of { ws, username }
   const rooms = new Map();
+  // projectId → monotonically increasing sequence counter
+  const seqCounters = new Map();
 
   function broadcastPresence(projectId) {
     const room = rooms.get(projectId);
@@ -1250,7 +1252,10 @@ export function attachCollaborationServer(httpServer, wss) {
         currentProjectId = String(msg.projectId || '');
         currentUsername = String(msg.username || 'Anonymous').slice(0, 100);
         if (!rooms.has(currentProjectId)) rooms.set(currentProjectId, new Set());
+        if (!seqCounters.has(currentProjectId)) seqCounters.set(currentProjectId, 0);
         rooms.get(currentProjectId).add({ ws, username: currentUsername });
+        // Send the current sequence to the joining client so it starts in sync
+        ws.send(JSON.stringify({ type: 'sync', seq: seqCounters.get(currentProjectId) }));
         broadcastPresence(currentProjectId);
         return;
       }
@@ -1267,13 +1272,19 @@ export function attachCollaborationServer(httpServer, wss) {
           ws.send(JSON.stringify({ type: 'error', message: 'Join a project first' }));
           return;
         }
-        // Relay the patch to all other clients in the same room
+        // Assign the next sequence number to this patch
+        const seq = (seqCounters.get(currentProjectId) || 0) + 1;
+        seqCounters.set(currentProjectId, seq);
+        // Relay the patch with its sequence number to all other clients in the room
         broadcast(currentProjectId, ws, {
           type: 'patch',
           projectId: currentProjectId,
           username: currentUsername,
           patch: msg.patch,
+          seq,
         });
+        // Acknowledge the sequence back to the sender
+        ws.send(JSON.stringify({ type: 'ack', seq }));
         return;
       }
     });
