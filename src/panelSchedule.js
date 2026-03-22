@@ -3298,6 +3298,12 @@ window.addEventListener("DOMContentLoaded", () => {
       }
     });
   }
+
+  // Reload the panel view whenever a remote collaborator's patch is applied
+  document.addEventListener('ctr:remote-applied', () => {
+    panels = dataStore.getPanels();
+    rerender();
+  });
 });
 
 // expose for debugging
