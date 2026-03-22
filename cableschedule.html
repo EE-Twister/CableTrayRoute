@@ -11,7 +11,7 @@
   <meta property="og:type" content="website">
   <meta property="og:title" content="Cable Schedule — CableTrayRoute">
   <meta property="og:description" content="Interactive cable schedule for organizing cable data, conductor sizing, and routing assignments.">
-  <meta property="og:image" content="icons/route.svg">
+  <meta property="og:image" content="https://cabletrayroute.com/icons/og-preview.png">
   <meta property="og:site_name" content="CableTrayRoute">
   <meta property="og:url" content="cableschedule.html">
   <!-- Canonical URL -->
@@ -130,6 +130,12 @@
             <button id="open-view-preset-btn" class="btn" type="button" title="Choose visible column groups" aria-haspopup="dialog" aria-expanded="false">View Preset</button>
             <button id="open-typical-filter-btn" class="btn" type="button" title="Filter cables by typical" aria-haspopup="dialog" aria-expanded="false">Typical Filter</button>
             <button id="open-apply-typical-btn" class="btn" type="button" title="Apply a typical to selected rows" aria-haspopup="dialog" aria-expanded="false">Apply Typical</button>
+          </div>
+          <div class="toolbar-group">
+            <button id="auto-route-all-btn" class="btn btn-accent" title="Route all cables with coordinates in the Optimal Route tool" aria-describedby="auto-route-hint">
+              Route All Cables →
+            </button>
+            <span id="auto-route-hint" class="field-hint sr-only">Routes all cables that have start and end coordinates defined. Navigates to the Optimal Route tool.</span>
           </div>
           <div class="toolbar-group">
             <button type="button" class="btn" title="Print schedule" onclick="window.print()">Print</button>

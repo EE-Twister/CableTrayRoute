@@ -98,6 +98,45 @@ document.addEventListener('exclusions-found', () => {
   if (details) details.open = true;
 });
 
+/**
+ * When navigated from the Cable Schedule with ?autoRoute=1, automatically
+ * trigger the "Calculate Optimal Route" button once the page is ready.
+ * The trigger waits for the calculate button to become available and for
+ * any resume-session modal to be dismissed (by simulating a "Yes" click).
+ */
+function autoTriggerRouteIfRequested() {
+  const params = new URLSearchParams(location.search);
+  if (!params.has('autoRoute')) return;
+
+  // Auto-dismiss the resume modal by clicking "Yes" to load saved data
+  const tryResumeYes = () => {
+    const yesBtn = document.getElementById('resume-yes-btn');
+    if (yesBtn && !yesBtn.disabled && yesBtn.offsetParent !== null) {
+      yesBtn.click();
+    }
+  };
+
+  // Poll until the calculate button is present and enabled, then click it
+  const startMs = performance.now();
+  const MAX_WAIT_MS = 15000;
+  const poll = () => {
+    tryResumeYes();
+    const btn = document.getElementById('calculate-route-btn');
+    if (btn && !btn.disabled) {
+      btn.click();
+      // Clean up the query param so refreshing doesn't re-trigger
+      const url = new URL(location.href);
+      url.searchParams.delete('autoRoute');
+      history.replaceState(null, '', url.toString());
+      return;
+    }
+    if (performance.now() - startMs < MAX_WAIT_MS) {
+      setTimeout(poll, 200);
+    }
+  };
+  setTimeout(poll, 500);
+}
+
 function initializePage() {
   e2eOpenDetailsAndControls();
   wireResumeTracking();
@@ -109,6 +148,7 @@ function initializePage() {
       { key: 'traySchedule', page: 'racewayschedule.html', label: 'Raceway Schedule' }
     ]);
   }
+  autoTriggerRouteIfRequested();
 }
 
 if (document.readyState === 'loading') {

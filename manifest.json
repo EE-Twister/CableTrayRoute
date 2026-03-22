@@ -21,21 +21,21 @@
       "name": "Cable Schedule",
       "short_name": "Cables",
       "description": "Define cables to route",
-      "url": "/cableschedule.html",
+      "url": "./cableschedule.html",
       "icons": [{ "src": "icons/cable.svg", "sizes": "any" }]
     },
     {
       "name": "Optimal Route",
       "short_name": "Route",
       "description": "Run cable routing engine",
-      "url": "/optimalRoute.html",
+      "url": "./optimalRoute.html",
       "icons": [{ "src": "icons/route.svg", "sizes": "any" }]
     },
     {
       "name": "One-Line Diagram",
       "short_name": "One-Line",
       "description": "Draw electrical single-line diagrams",
-      "url": "/oneline.html",
+      "url": "./oneline.html",
       "icons": [{ "src": "icons/oneline.svg", "sizes": "any" }]
     }
   ]
