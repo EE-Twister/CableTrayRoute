@@ -36,6 +36,7 @@
   </section>
   <script type="module">
     import { getItem, setItem } from './dataStore.mjs';
+    import { showAlertModal } from './src/components/modal.js';
 
     async function load() {
       const compArea = document.getElementById('component-text');
@@ -73,7 +74,7 @@
       }
     }
 
-    function saveComponents() {
+    async function saveComponents() {
       const compArea = document.getElementById('component-text');
       const iconArea = document.getElementById('icon-text');
       const versionInput = document.getElementById('library-version');
@@ -85,13 +86,13 @@
         const categories = Array.isArray(data.categories) ? data.categories : [];
         setItem('componentLibraryVersion', version);
         setItem('componentLibrary_' + version, { components, categories, icons });
-        alert('Saved');
+        await showAlertModal('Saved', 'Component library saved successfully.');
       } catch {
-        alert('Invalid JSON');
+        await showAlertModal('Invalid JSON', 'Please check your JSON syntax and try again.');
       }
     }
 
-    function downloadComponents() {
+    async function downloadComponents() {
       const compArea = document.getElementById('component-text');
       const iconArea = document.getElementById('icon-text');
       const versionInput = document.getElementById('library-version');
@@ -112,7 +113,7 @@
         document.body.removeChild(a);
         URL.revokeObjectURL(a.href);
       } catch {
-        alert('Invalid JSON');
+        await showAlertModal('Invalid JSON', 'Please check your JSON syntax and try again.');
       }
     }
 
@@ -137,20 +138,20 @@
           }, null, 2);
           document.getElementById('icon-text').value = JSON.stringify(obj.icons || {}, null, 2);
         } catch {
-          alert('Invalid file');
+          await showAlertModal('Invalid File', 'Please select a valid JSON library file.');
         }
       };
       reader.readAsText(file);
     }
 
-    function save(id, key) {
+    async function save(id, key) {
       const area = document.getElementById(id);
       try {
         const json = JSON.parse(area.value);
         setItem(key, json);
-        alert('Saved');
+        await showAlertModal('Saved', 'Library saved successfully.');
       } catch {
-        alert('Invalid JSON');
+        await showAlertModal('Invalid JSON', 'Please check your JSON syntax and try again.');
       }
     }
 

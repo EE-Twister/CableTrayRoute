@@ -21,6 +21,7 @@
  */
 
 import { CollabClient, renderPresenceBar } from './collaboration.js';
+import { initConflictNotifications } from './collaborationConflict.js';
 import { getAuthContextState } from '../projectStorage.js';
 
 let activeClient = null;
@@ -41,6 +42,9 @@ export function initCollaboration({ projectId, username } = {}) {
   const resolvedUsername = username || (authState && authState.user) || 'Guest';
 
   activeClient = new CollabClient({ projectId, username: resolvedUsername });
+
+  // Conflict notifications (out-of-order patches warning)
+  initConflictNotifications(activeClient);
 
   // Presence updates
   activeClient.onPresence(users => {
