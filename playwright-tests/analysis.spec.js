@@ -4,8 +4,10 @@
  * - Arc Flash (IEEE 1584)
  * - Short Circuit (ANSI / IEC)
  */
-const { test, expect } = require('@playwright/test');
-const path = require('path');
+import { test, expect } from '@playwright/test';
+import path from 'path';
+import { fileURLToPath } from 'url';
+const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const root = path.join(__dirname, '..');
 const pageUrl = file => 'file://' + path.join(root, file);
 

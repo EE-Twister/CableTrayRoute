@@ -1,5 +1,8 @@
-const { test, expect } = require("@playwright/test");
-const path = require("path");
+import { test, expect } from "@playwright/test";
+import path from "path";
+import fs from "fs";
+import { fileURLToPath } from "url";
+const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const root = path.join(__dirname, "..");
 
 function pageUrl(file) {
@@ -77,9 +80,9 @@ test.describe("CableTrayRoute workflow", () => {
 
   test("lock a cable and reroute", async ({ page }) => {
     const traySample = path.join(root, "examples", "trayNetwork.json");
-    const trayJson = require("fs").readFileSync(traySample, "utf-8");
+    const trayJson = fs.readFileSync(traySample, "utf-8");
     const cableSample = path.join(root, "examples", "cableList.json");
-    const cableJson = require("fs").readFileSync(cableSample, "utf-8");
+    const cableJson = fs.readFileSync(cableSample, "utf-8");
     await page.addInitScript(({ trayJson, cableJson }) => {
       const originalFetch = window.fetch;
       window.fetch = (input, init) => {
