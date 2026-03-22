@@ -569,7 +569,7 @@ class TableManager {
     panel.style.left = `${left}px`;
     panel.style.top = `${top}px`;
     panel.style.visibility = 'visible';
-    try { panel.focus(); } catch {}
+    try { panel.focus(); } catch { /* focus may fail in detached/sandboxed contexts — intentionally silent */ }
   }
 
   hideColumnInfo() {
