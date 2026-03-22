@@ -11617,6 +11617,22 @@ async function __oneline_init() {
 
   await init();
 
+  // Reload the diagram canvas whenever a remote collaborator's patch is applied
+  document.addEventListener('ctr:remote-applied', () => {
+    const { sheets: remoteSheets, activeSheet: remoteActiveSheet = 0 } = getOneLine();
+    sheets = (Array.isArray(remoteSheets) ? remoteSheets : []).map((s, i) => ({
+      name: s.name || `Sheet ${i + 1}`,
+      components: (Array.isArray(s.components) ? s.components : []).map(normalizeComponent),
+      connections: Array.isArray(s.connections) ? s.connections : [],
+    }));
+    if (!sheets.length) sheets = [{ name: 'Sheet 1', components: [], connections: [] }];
+    activeSheet = Math.min(remoteActiveSheet, sheets.length - 1);
+    components = sheets[activeSheet].components;
+    connections = sheets[activeSheet].connections;
+    renderSheetTabs();
+    render();
+  });
+
   document.body.dataset.onelineReady = '1';
 
   e2eOpenDetails();

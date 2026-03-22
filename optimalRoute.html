@@ -230,6 +230,22 @@
         </div>
         <img src="icons/graphics/routing-visual.svg" alt="Illustration for routing planner" loading="lazy" decoding="async">
       </section>
+
+      <div id="empty-state-banner" class="card empty-state-banner" role="region" aria-label="Getting started" hidden>
+        <div class="empty-state-content">
+          <img src="icons/route.svg" alt="" aria-hidden="true" class="empty-state-icon">
+          <h2 class="empty-state-heading">No tray network loaded yet</h2>
+          <p class="empty-state-description">Add cable tray segments and cables below, or load the sample network to explore the routing engine.</p>
+          <div class="empty-state-actions">
+            <button class="btn primary-btn" onclick="document.getElementById('load-sample-trays-btn').click(); document.getElementById('load-sample-cables-btn').click();">
+              Load Sample Network
+            </button>
+            <a class="btn" href="racewayschedule.html">Go to Raceway Schedule</a>
+            <a class="btn" href="cableschedule.html">Go to Cable Schedule</a>
+          </div>
+        </div>
+      </div>
+
       <section class="card">
                 <h2>Cable Tray Network</h2>
                 <div class="table-controls">

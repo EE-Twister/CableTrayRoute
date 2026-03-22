@@ -4200,6 +4200,26 @@ Plotly.newPlot(document.getElementById('plot'), data, layout, {responsive: true}
         await finalizeLoad();
     }
 
+    // Show empty-state banner when the user has no tray/cable data loaded,
+    // and hide it as soon as any data is added.
+    const emptyStateBanner = document.getElementById('empty-state-banner');
+    if (emptyStateBanner) {
+        const trayTbody = document.querySelector('#trayTable tbody');
+        const cableContainer = document.getElementById('cable-list-container');
+        const updateEmptyState = () => {
+            const noTrays = !trayTbody || trayTbody.rows.length === 0;
+            const noCables = state.cableList.length === 0;
+            emptyStateBanner.hidden = !(noTrays && noCables);
+        };
+        updateEmptyState();
+        // Re-evaluate when table rows are added/removed
+        if (trayTbody) {
+            new MutationObserver(updateEmptyState).observe(trayTbody, { childList: true });
+        }
+        if (cableContainer) {
+            new MutationObserver(updateEmptyState).observe(cableContainer, { childList: true, subtree: true });
+        }
+    }
 
     async function runSelfCheck(){
         const diag={};

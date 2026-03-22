@@ -434,7 +434,7 @@ import { showAlertModal } from './src/components/modal.js';
       return;
     }
     ductbanks.forEach(db=>db.conduits.forEach(c=>{c.ductbankTag=db.tag;}));
-    try{setDuctbanks(ductbanks);}catch(e){}
+    try{setDuctbanks(ductbanks);}catch(e){console.warn('setDuctbanks failed', e);}
     applyFilters();
   }
 
