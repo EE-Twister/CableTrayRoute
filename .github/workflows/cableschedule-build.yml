@@ -24,9 +24,9 @@ jobs:
       - uses: actions/setup-node@v3
         with:
           node-version: '20'
-      - run: npm install
-      - name: Rebuild cableschedule bundle
-        run: npx rollup src/cableschedule.js --file dist/cableschedule.js --format es --inlineDynamicImports -p @rollup/plugin-terser
+      - run: npm ci
+      - name: Rebuild bundles
+        run: npm run build
       - name: Ensure bundle up to date
         run: |
           git status --short
