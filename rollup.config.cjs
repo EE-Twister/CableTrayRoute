@@ -38,6 +38,7 @@ const entries = {
   costestimate: 'src/costestimate.js',
   emf: 'src/emf.js',
   clashdetect: 'src/clashdetect.js',
+  designrulechecker: 'src/designrulechecker.js',
   spoolsheets: 'src/spoolsheets.js',
   windload: 'src/windload.js',
   transientstability: 'src/transientstability.js',

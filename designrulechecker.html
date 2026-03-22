@@ -1,0 +1,188 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <meta name="description" content="Design Rule Checker (DRC) validates your cable routing project against NEC and IEEE requirements, flagging fill violations, voltage segregation conflicts, ampacity exceedances, and unrouted cables." />
+  <title>Design Rule Checker — CableTrayRoute</title>
+  <link rel="icon" href="icons/favicon.svg" type="image/svg+xml">
+  <link rel="apple-touch-icon" href="icons/favicon.svg">
+  <!-- Open Graph / Social sharing -->
+  <meta property="og:type" content="website">
+  <meta property="og:title" content="Design Rule Checker — CableTrayRoute">
+  <meta property="og:description" content="Post-routing NEC/IEEE design validation for cable trays, conduits, and cable schedules.">
+  <meta property="og:image" content="https://cabletrayroute.com/icons/og-preview.png">
+  <meta property="og:site_name" content="CableTrayRoute">
+  <meta property="og:url" content="designrulechecker.html">
+  <!-- Canonical URL -->
+  <link rel="canonical" href="designrulechecker.html">
+  <link rel="dns-prefetch" href="https://fonts.gstatic.com">
+  <meta name="color-scheme" content="light dark">
+  <link rel="stylesheet" href="style.css" />
+  <script type="module" src="dirtyTracker.js"></script>
+  <script type="module" src="dist/designrulechecker.js" defer></script>
+</head>
+<body class="drc-page" data-report-title="Design Rule Checker">
+  <a href="#main-content" class="skip-link">Skip to main content</a>
+  <nav class="top-nav" aria-label="Primary">
+    <button id="nav-toggle" class="nav-toggle" aria-label="Toggle navigation" aria-controls="nav-links" aria-expanded="false" title="Toggle navigation">
+      <img src="icons/toolbar/grid.svg" alt="" aria-hidden="true" class="control-icon" loading="lazy" decoding="async">
+    </button>
+    <div id="nav-links" class="nav-links" role="list">
+      <!-- Populated dynamically by navigation.js -->
+    </div>
+    <button id="settings-btn" class="settings-btn" aria-label="Settings" aria-expanded="false" title="Settings">
+      <img src="icons/toolbar/validate.svg" alt="" aria-hidden="true" class="control-icon" loading="lazy" decoding="async">
+    </button>
+  </nav>
+
+  <div id="settings-menu" class="settings-menu">
+    <label for="theme-select">Theme
+      <select id="theme-select">
+        <option value="system">System</option>
+        <option value="light">Light</option>
+        <option value="dark">Dark</option>
+        <option value="high-contrast">High Contrast</option>
+      </select>
+    </label>
+    <label><input type="checkbox" id="compact-toggle" aria-label="Enable compact table mode"> Compact Mode</label>
+    <label for="unit-select">Units
+      <select id="unit-select">
+        <option value="imperial">Imperial</option>
+        <option value="metric">Metric</option>
+      </select>
+    </label>
+    <button id="help-btn" class="btn" aria-expanded="false" title="Show help">
+      <img src="icons/toolbar/validate.svg" alt="" aria-hidden="true" class="control-icon" loading="lazy" decoding="async">
+      <span>Site Help</span>
+    </button>
+    <button id="new-project-btn" title="Start a new project">
+      <img src="icons/toolbar/copy.svg" alt="" aria-hidden="true" class="control-icon" loading="lazy" decoding="async">
+      <span>New Project</span>
+    </button>
+    <button id="save-project-btn" title="Save current project">
+      <img src="icons/toolbar/export.svg" alt="" aria-hidden="true" class="control-icon" loading="lazy" decoding="async">
+      <span>Save Project</span>
+    </button>
+    <button id="load-project-btn" title="Load an existing project">
+      <img src="icons/toolbar/import.svg" alt="" aria-hidden="true" class="control-icon" loading="lazy" decoding="async">
+      <span>Load Project</span>
+    </button>
+    <button id="export-project-btn" title="Export project data">
+      <img src="icons/toolbar/export.svg" alt="" aria-hidden="true" class="control-icon" loading="lazy" decoding="async">
+      <span>Export Project</span>
+    </button>
+    <button id="import-project-btn" title="Import project data">
+      <img src="icons/toolbar/import.svg" alt="" aria-hidden="true" class="control-icon" loading="lazy" decoding="async">
+      <span>Import Project</span>
+    </button>
+    <input type="file" id="import-project-input" accept=".ctr.json" class="hidden" title="Select project file">
+  </div>
+
+  <div class="container">
+    <main id="main-content" class="main-content">
+      <nav aria-label="Breadcrumb">
+        <ol class="breadcrumb-trail">
+          <li><a href="index.html">Home</a></li>
+          <li>Workflow</li>
+          <li aria-current="page">Design Rule Checker</li>
+        </ol>
+      </nav>
+
+      <header class="page-header">
+        <h1>Design Rule Checker</h1>
+      </header>
+
+      <details class="method-panel" open>
+        <summary>Method &amp; Checks Performed</summary>
+        <p>The Design Rule Checker (DRC) validates your routing project against
+        NEC and IEEE requirements after routing has been completed in the
+        <a href="optimalRoute.html">Optimal Route</a> tool. Run the DRC after
+        every routing session to catch code violations early.</p>
+
+        <dl class="drc-rule-list">
+          <dt>DRC-01 — Tray Fill (NEC 392.22(A))</dt>
+          <dd>Flags any tray whose cable fill exceeds the configured limit
+          (default 40 %). Reports a warning when fill is within 10 % of the
+          limit.</dd>
+
+          <dt>DRC-02 — Voltage Segregation (NEC 392.6(H))</dt>
+          <dd>Detects tray segments containing cables from different cable
+          groups (e.g., HV and LV cables sharing the same tray without a
+          physical barrier).</dd>
+
+          <dt>DRC-03 — Ampacity Derating (NEC 310.15)</dt>
+          <dd>Applies bundling derating factors based on the number of
+          current-carrying conductors in each tray section and flags cables
+          whose design current exceeds the derated ampacity.</dd>
+
+          <dt>DRC-04 — Grounding Conductor (NEC 250.122)</dt>
+          <dd>Warns when a power cable record does not include a grounding
+          (EGC) conductor size.</dd>
+
+          <dt>DRC-05 — Unrouted Cables</dt>
+          <dd>Lists cables present in the Cable Schedule that have no assigned
+          tray or field route after routing.</dd>
+        </dl>
+      </details>
+
+      <section class="drc-controls card" aria-labelledby="drc-controls-heading">
+        <h2 id="drc-controls-heading">Run Options</h2>
+        <div class="control-row">
+          <label for="drc-fill-limit">
+            Tray fill limit (%)
+            <input id="drc-fill-limit" type="number" min="1" max="100" value="40"
+                   class="input-sm" aria-describedby="drc-fill-limit-hint">
+          </label>
+          <span id="drc-fill-limit-hint" class="field-hint">NEC 392.22(A) default is 40 %.</span>
+        </div>
+        <div class="control-row">
+          <label>
+            <input type="checkbox" id="drc-skip-grounding">
+            Skip grounding checks (DRC-04)
+          </label>
+        </div>
+        <div class="control-row">
+          <label>
+            <input type="checkbox" id="drc-skip-ampacity">
+            Skip ampacity derating checks (DRC-03)
+          </label>
+        </div>
+        <div class="btn-row">
+          <button id="drc-run-btn" class="primary-btn">
+            Run Design Rule Check
+          </button>
+          <button id="drc-export-btn" class="btn" disabled>
+            Export Report (.txt)
+          </button>
+        </div>
+      </section>
+
+      <section class="drc-output" aria-live="polite" aria-atomic="false">
+        <div id="drc-summary"></div>
+        <div id="drc-results"></div>
+      </section>
+
+    </main>
+  </div>
+
+  <div id="help-modal" class="modal" role="dialog" aria-modal="true" aria-labelledby="help-modal-title" hidden>
+    <div class="modal-content">
+      <h2 id="help-modal-title">Design Rule Checker Help</h2>
+      <p>The DRC reads your Cable Schedule and Raceway Schedule from the
+      project store, then applies a set of NEC and IEEE rules to identify
+      potential code violations.</p>
+      <p><strong>Prerequisites:</strong> Complete the
+      <a href="cableschedule.html">Cable Schedule</a>,
+      <a href="racewayschedule.html">Raceway Schedule</a>, and
+      <a href="optimalRoute.html">Optimal Route</a> before running the DRC
+      so that tray-fill data and routing assignments are available.</p>
+      <p>Results are colour-coded: <strong>red = error</strong> (must resolve),
+      <strong>amber = warning</strong> (review), <strong>blue = info</strong>
+      (advisory).</p>
+      <button id="close-help-btn" class="btn">Close</button>
+    </div>
+  </div>
+
+</body>
+</html>

@@ -12,6 +12,7 @@ const NAV_ROUTES = [
   { href: 'seismicBracing.html', label: 'Seismic Bracing', section: 'Workflow', icon: 'icons/toolbar/validate.svg' },
   { href: 'trayhardwarebom.html', label: 'Tray Hardware BOM', section: 'Workflow', icon: 'icons/raceway.svg' },
   { href: 'clashdetect.html', label: 'Clash Detection', section: 'Workflow', icon: 'icons/toolbar/validate.svg' },
+  { href: 'designrulechecker.html', label: 'Design Rule Checker', section: 'Workflow', icon: 'icons/toolbar/validate.svg' },
   { href: 'spoolsheets.html', label: 'Spool Sheets', section: 'Workflow', icon: 'icons/toolbar/copy.svg' },
   { href: 'windload.html', label: 'Wind Load', section: 'Workflow', icon: 'icons/toolbar/validate.svg' },
   { href: 'optimalRoute.html', label: 'Optimal Route', section: 'Workflow', icon: 'icons/route.svg' },

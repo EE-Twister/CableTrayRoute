@@ -2169,6 +2169,43 @@ async function initCableSchedule() {
     return table.getData();
   }
   window.getCableSchedule = getCableSchedule;
+
+  // "Route All Cables" — count cables with coordinates and navigate to optimalRoute
+  const autoRouteAllBtn = document.getElementById('auto-route-all-btn');
+  if (autoRouteAllBtn) {
+    autoRouteAllBtn.addEventListener('click', () => {
+      const cables = getCableSchedule();
+      const routable = cables.filter(c => {
+        const hasStart = (parseFloat(c.start_x) || parseFloat(c.start_y) || parseFloat(c.start_z));
+        const hasEnd   = (parseFloat(c.end_x)   || parseFloat(c.end_y)   || parseFloat(c.end_z));
+        return hasStart && hasEnd;
+      });
+      const unroutable = cables.length - routable.length;
+
+      if (cables.length === 0) {
+        showAlertModal('No Cables', 'Add cables to the schedule before routing.');
+        return;
+      }
+
+      const body = `${routable.length} cable${routable.length !== 1 ? 's' : ''} with ` +
+        `start and end coordinates will be routed automatically.` +
+        (unroutable > 0
+          ? ` ${unroutable} cable${unroutable !== 1 ? 's' : ''} without coordinates will be skipped.`
+          : '') +
+        '\n\nOpen the Optimal Route tool and start routing?';
+
+      openModal({
+        title: 'Route All Cables',
+        description: body,
+        primaryText: 'Open Optimal Route →',
+        secondaryText: 'Cancel',
+        onPrimary: () => {
+          window.location.href = 'optimalRoute.html?autoRoute=1';
+        },
+      });
+    });
+  }
+
   window.dispatchEvent(new Event('cableschedule-ready'));
   window.__CableScheduleInitOK = true;
 }
