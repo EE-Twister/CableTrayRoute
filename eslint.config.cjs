@@ -6,7 +6,7 @@ module.exports = [
     files: ['**/*.{js,mjs}'],
     languageOptions: {
       sourceType: 'module',
-      ecmaVersion: 2022,
+      ecmaVersion: 2025,
     },
     rules: {},
   },
