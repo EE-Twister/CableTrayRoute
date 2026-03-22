@@ -8,13 +8,15 @@
  *  - API requests bypass the cache entirely.
  */
 
-const CACHE_NAME = 'ctr-shell-v1';
+const CACHE_NAME = 'ctr-shell-v2';
 
 // Core shell assets to pre-cache on install.
+// Includes all icons referenced by navigation.js so the sidebar renders correctly offline.
 const PRECACHE_URLS = [
   '/offline.html',
   '/style.css',
   '/icons/favicon.svg',
+  // Workflow section icons
   '/icons/route.svg',
   '/icons/cable.svg',
   '/icons/raceway.svg',
@@ -22,6 +24,23 @@ const PRECACHE_URLS = [
   '/icons/tray.svg',
   '/icons/conduit.svg',
   '/icons/oneline.svg',
+  '/icons/equipment.svg',
+  '/icons/load.svg',
+  '/icons/panel.svg',
+  // Studies section icons
+  '/icons/Motor.svg',
+  '/icons/Load.svg',
+  '/icons/components/Breaker.svg',
+  '/icons/components/TextBox.svg',
+  // Toolbar icons used in navigation and settings
+  '/icons/toolbar/validate.svg',
+  '/icons/toolbar/grid.svg',
+  '/icons/toolbar/grid-size.svg',
+  '/icons/toolbar/copy.svg',
+  '/icons/toolbar/connect.svg',
+  '/icons/toolbar/dimension.svg',
+  '/icons/toolbar/export.svg',
+  '/icons/toolbar/import.svg',
 ];
 
 // Install: cache shell assets.
