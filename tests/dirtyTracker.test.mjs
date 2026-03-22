@@ -1,5 +1,5 @@
-const assert = require("assert");
-const { createDirtyTracker } = require("../dirtyTracker");
+import assert from "assert";
+import { createDirtyTracker } from "../dirtyTracker.js";
 
 function describe(name, fn) {
   console.log(name);
