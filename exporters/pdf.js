@@ -1,4 +1,4 @@
-const { jsPDF } = window.jspdf || await import('https://cdn.jsdelivr.net/npm/jspdf@2.5.1/+esm');
+const { jsPDF } = window.jspdf || await import('https://cdn.jsdelivr.net/npm/jspdf@4.2.1/+esm');
 // Use ESM build of svg2pdf from jsDelivr. Previous URL pointed to a
 // non-existent file and caused a 404 in the browser. The `+esm` suffix
 // ensures the module entry in the package is used, which serves

@@ -15,7 +15,7 @@ async function ensureJsPDF() {
     return namespace.jsPDF;
   }
   if (!jsPdfPromise) {
-    jsPdfPromise = dynamicImport('https://cdn.jsdelivr.net/npm/jspdf@2.5.1/+esm')
+    jsPdfPromise = dynamicImport('https://cdn.jsdelivr.net/npm/jspdf@4.2.1/+esm')
       .then(mod => {
         const ctor = mod?.jsPDF || mod?.default || mod;
         if (!ctor) {

@@ -1,4 +1,4 @@
-const { jsPDF } = window.jspdf || await import('https://cdn.jsdelivr.net/npm/jspdf@2.5.1/+esm');
+const { jsPDF } = window.jspdf || await import('https://cdn.jsdelivr.net/npm/jspdf@4.2.1/+esm');
 import { toCSV } from './reporting.mjs';
 import { generateArcFlashLabel } from './labels.mjs';
 import { buildArcFlashLabelData, getArcFlashLabelBaseName } from './arcFlashReport.mjs';

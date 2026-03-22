@@ -11,16 +11,16 @@
   "devDependencies": {
     "@axe-core/playwright": "^4.8.5",
     "@playwright/test": "^1.41.1",
-    "@rollup/plugin-terser": "^0.4.3",
+    "@rollup/plugin-terser": "^1.0.0",
     "rollup": "^3.30.0"
   },
   "dependencies": {
     "express": "^4.19.2",
     "fast-json-patch": "^3.1.0",
     "handlebars": "^4.7.8",
-    "jspdf": "^2.5.1",
+    "jspdf": "^4.2.1",
     "pdfkit": "^0.13.0",
-    "svg2pdf.js": "^2.0.1",
+    "svg2pdf.js": "^2.7.0",
     "ws": "^8.16.0"
   }
 }
