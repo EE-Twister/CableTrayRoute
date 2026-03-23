@@ -8,13 +8,15 @@
  *  - API requests bypass the cache entirely.
  */
 
-const CACHE_NAME = 'ctr-shell-v2';
+const CACHE_NAME = 'ctr-shell-v3';
 
 // Core shell assets to pre-cache on install.
-// Includes all icons referenced by navigation.js so the sidebar renders correctly offline.
+// Includes all icons referenced by navigation.js so the sidebar renders correctly offline,
+// plus manifest.json so the PWA manifest is available when the device goes offline.
 const PRECACHE_URLS = [
   '/offline.html',
   '/style.css',
+  '/manifest.json',
   '/icons/favicon.svg',
   // Workflow section icons
   '/icons/route.svg',
