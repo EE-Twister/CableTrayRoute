@@ -2,6 +2,7 @@ import { installErrorTracking } from "./src/utils/errorTracking.js";
 installErrorTracking();
 
 import { UndoRedoManager } from "./undoRedo.mjs";
+import { mountCopilot } from "./src/copilot.js";
 
 import "./src/components/navigation.js";
 import "./src/components/commandPalette.js";
@@ -2191,5 +2192,18 @@ globalThis.showSelfCheckModal=showSelfCheckModal;
     btn.addEventListener('click', () => {
       window.scrollTo({ top: 0, behavior: 'smooth' });
     });
+  });
+}());
+
+// ----- AI Copilot -----
+(function initCopilot() {
+  if (typeof document === 'undefined') return;
+  // Inject copilot stylesheet
+  const link = document.createElement('link');
+  link.rel = 'stylesheet';
+  link.href = 'src/styles/copilot.css';
+  document.head.appendChild(link);
+  document.addEventListener('DOMContentLoaded', () => {
+    mountCopilot();
   });
 }());
