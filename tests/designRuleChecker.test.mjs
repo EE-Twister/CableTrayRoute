@@ -73,6 +73,14 @@ describe('trayFillPercent()', () => {
     const pct = trayFillPercent(tray, 24); // 24 / 48 = 50 %
     assert.ok(Math.abs(pct - 50) < 0.01, `Expected 50, got ${pct}`);
   });
+
+  it('halves effective area for a 2-slot compartmented tray', () => {
+    // 12" × 4" = 48 in² total; 2 slots → 24 in² per slot
+    // fill = 9.6 in² → 9.6 / 24 = 40 %  (same fill that would be 20 % undivided)
+    const tray = { ...makeTray('T1', 9.6, 12, 4), num_slots: 2 };
+    const pct = trayFillPercent(tray);
+    assert.ok(Math.abs(pct - 40) < 0.01, `Expected 40, got ${pct}`);
+  });
 });
 
 // ---------------------------------------------------------------------------

@@ -94,7 +94,8 @@ class CableRoutingSystem {
     }
 
     addTraySegment(tray) {
-        const maxFill = tray.width * tray.height * this.fillLimit;
+        const numSlots = Math.max(1, parseInt(tray.num_slots) || 1);
+        const maxFill = (tray.width * tray.height * this.fillLimit) / numSlots;
         // Preserve ductbank association for later lookups
         this.trays.set(
             tray.tray_id,

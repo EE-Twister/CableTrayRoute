@@ -205,6 +205,7 @@ async function initCableSchedule() {
     {key:'insulation_rating',label:'Insul Rating (°C)',type:'select',options:insulationRatings,group:'Cable Construction & Specs',tooltip:'Maximum temperature rating of insulation'},
     {key:'insulation_thickness',label:'Insul Thick (in)',type:'number',group:'Cable Construction & Specs',tooltip:'Insulation thickness in inches'},
     {key:'cable_od',label:'Cable O.D. (in)',type:'number',group:'Cable Construction & Specs',tooltip:'Outside diameter of the cable in inches'},
+    {key:'parallel_count',label:'Parallel Runs',type:'number',group:'Cable Construction & Specs',tooltip:'Number of identical cables run in parallel for this circuit (e.g. 3 × 240 kcmil in parallel). Tray fill and ampacity are multiplied by this count.'},
     {key:'shielding_jacket',label:'Shielding/Jacket',type:'select',options:shieldingOptions,group:'Cable Construction & Specs',tooltip:'Shielding or outer jacket type'},
     {key:'cable_rating',label:'Cable Rating (V)',type:'number',group:'Electrical Characteristics',tooltip:'Maximum voltage rating'},
     {key:'operating_voltage',label:'Operating Voltage (V)',type:'number',group:'Electrical Characteristics',tooltip:'Nominal operating voltage'},

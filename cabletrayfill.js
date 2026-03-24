@@ -123,7 +123,8 @@ checkPrereqs([{key:'traySchedule',page:'racewayschedule.html',label:'Raceway Sch
           const trayArea=trayW*trayD;
           const totalArea=cables.reduce((sum,c)=>{
             const od=parseFloat(c.od||c.OD);
-            return isNaN(od)?sum:sum+Math.PI*Math.pow(od/2,2);
+            const p=c.parallelCount||1;
+            return isNaN(od)?sum:sum+Math.PI*Math.pow(od/2,2)*p;
           },0);
           const fillP=trayArea?totalArea/trayArea*100:0;
           const allow=document.getElementById('trayType').value==='ladder'?50:40;
@@ -142,6 +143,10 @@ checkPrereqs([{key:'traySchedule',page:'racewayschedule.html',label:'Raceway Sch
       // ─────────────────────────────────────────────────────────────
       function createCableRow(data = {}, idx) {
         const tr = document.createElement("tr");
+        // Store parallelCount as a dataset attribute so draw handler can read it
+        if (data.parallelCount && data.parallelCount > 1) {
+          tr.dataset.parallelCount = String(data.parallelCount);
+        }
 
         // (1) Tag cell
         const tdTag = document.createElement("td");
@@ -429,7 +434,7 @@ checkPrereqs([{key:'traySchedule',page:'racewayschedule.html',label:'Raceway Sch
         return arr.reduce((sum, c) => sum + c.OD, 0);
       }
       function sumAreas(arr) {
-        return arr.reduce((sum, c) => sum + Math.PI * (c.OD/2)**2, 0);
+        return arr.reduce((sum, c) => sum + Math.PI * (c.OD/2)**2 * (c.parallelCount || 1), 0);
       }
       function getAllowableArea(width, trayType) {
         const base = allowableAreaByWidth[width] || 0;
@@ -701,7 +706,7 @@ checkPrereqs([{key:'traySchedule',page:'racewayschedule.html',label:'Raceway Sch
 
         // 2) Gather cables from the table
         const rows = Array.from(cableTbody.querySelectorAll("tr"));
-        const cables = [];
+        const drawCables = [];
         for (const row of rows) {
           const tagVal     = row.children[0].querySelector("input").value.trim();
           const cableType  = row.children[1].querySelector("select").value;
@@ -716,6 +721,8 @@ checkPrereqs([{key:'traySchedule',page:'racewayschedule.html',label:'Raceway Sch
           const groupRaw   = row.children[9].querySelector("input").value;
           const groupVal   = groupRaw ? parseInt(groupRaw) : null;
           const multiVal   = countVal > 1;
+          // Read parallelCount stored on the row element (set when cable was loaded from schedule)
+          const parallelCount = Math.max(1, parseInt(row.dataset.parallelCount) || 1);
 
           if (!tagVal) {
             showAlertModal('Validation Error', 'Every cable row requires a Tag.');
@@ -734,7 +741,7 @@ checkPrereqs([{key:'traySchedule',page:'racewayschedule.html',label:'Raceway Sch
             return;
           }
 
-          cables.push({
+          drawCables.push({
             tag: tagVal,
             cableType: cableType,
             count: countVal,
@@ -746,9 +753,11 @@ checkPrereqs([{key:'traySchedule',page:'racewayschedule.html',label:'Raceway Sch
             weight: wtVal,
             multi: multiVal,
             zone: zoneVal,
-            circuitGroup: groupVal
+            circuitGroup: groupVal,
+            parallelCount,
           });
         }
+        const cables = drawCables;
         if (cables.length === 0) {
           showAlertModal('Validation Error', 'Add at least one cable before drawing the tray.');
           return;
@@ -1860,6 +1869,7 @@ Wt: ${m.weight.toFixed(2)} lbs/ft
               rating: c.rating || '',
               voltage: c.voltage || '',
               od: (() => { const dia = parseFloat(c.cable_od ?? c.diameter ?? c.OD ?? c.od); return Number.isFinite(dia) ? dia.toFixed(2) : ''; })(),
+              parallelCount: Math.max(1, parseInt(c.parallel_count) || 1),
               weight: (parseFloat(c.weight) || '').toString(),
               zone: c.zone || c.cable_zone || 1,
               circuitGroup: c.circuitGroup || c.circuit_group || ''

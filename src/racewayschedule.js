@@ -413,6 +413,7 @@ document.addEventListener('DOMContentLoaded', async () => {
     {key:'inside_width',label:'Inside Width (in)',type:'select',options:TRAY_WIDTH_OPTIONS,default:TRAY_WIDTH_OPTIONS[0],validate:['required']},
     {key:'tray_depth',label:'Tray Depth (in)',type:'select',options:TRAY_DEPTH_OPTIONS,default:TRAY_DEPTH_OPTIONS[0],validate:['required']},
     {key:'tray_type',label:'Tray Type',type:'select',options:TRAY_TYPE_OPTIONS,default:TRAY_TYPE_OPTIONS[0],validate:['required']},
+    {key:'num_slots',label:'Slots',type:'number',tooltip:'Number of longitudinal compartments (divider strips). Fill capacity is divided equally among slots. Default: 1 (single undivided tray).'},
     {key:'allowed_cable_group',label:'Allowed Group',type:'text'}
   ];
   const trayTable=TableUtils.createTable({
