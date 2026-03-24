@@ -130,6 +130,7 @@ function checkTrayFill(trays, options = {}) {
                 `depth: ${tray.tray_depth ?? tray.height ?? '?'} in, ` +
                 `fill: ${parseFloat(tray.current_fill).toFixed(2)} in².`,
         reference: 'NEC 392.22(A)',
+        remediation: 'Widen or deepen the tray, add a parallel tray segment, or use the Optimal Route page to reroute cables to adjacent trays with available capacity.',
       });
     } else if (pct / 100 > limit * 0.9) {
       findings.push({
@@ -139,6 +140,7 @@ function checkTrayFill(trays, options = {}) {
         message:
           `Tray fill ${pct.toFixed(1)} % is within 10 % of the NEC 392.22(A) limit.`,
         reference: 'NEC 392.22(A)',
+        remediation: 'Monitor future cable additions to this tray. Consider reserving a parallel tray for overflow capacity.',
       });
     }
   }
@@ -179,6 +181,7 @@ function checkSegregation(trays, trayCableMap) {
           `Cables: ${cables.slice(0, 5).map(c => c.name ?? c.tag).join(', ')}` +
           (cables.length > 5 ? ` … +${cables.length - 5} more` : '.'),
         reference: 'NEC 392.6(H)',
+        remediation: 'Assign each cable group to a dedicated tray, or install a listed metallic divider strip to physically separate voltage classes within the same tray.',
       });
     }
   }
@@ -250,6 +253,7 @@ function checkAmpacity(cables, trayCableMap) {
             `${conductorCount} current-carrying conductors in tray "${trayId}" ` +
             `(NEC 310.15 derating factor ${factor}).`,
           reference: 'NEC 310.15',
+          remediation: `Upgrade the conductor to the next larger standard size, reduce the number of bundled conductors by splitting into a separate tray, or reduce the design load current for "${name}".`,
         });
       } else if (factor < 1.0) {
         // Advisory: derating applied even if not over limit
@@ -261,6 +265,7 @@ function checkAmpacity(cables, trayCableMap) {
             `Tray bundling derating applied: ${ratedAmpacity} A → ${deratedAmpacity.toFixed(1)} A ` +
             `(factor ${factor}, ${conductorCount} current-carrying conductors).`,
           reference: 'NEC 310.15',
+          remediation: 'No action required if the derated ampacity remains above the design current. Consider segregating conductors into separate tray sections to reduce derating.',
         });
       }
     }
@@ -297,6 +302,7 @@ function checkGrounding(cables) {
         message:
           `Power cable "${name}" has no grounding (EGC) conductor recorded. ` +
           `Verify NEC 250.122 compliance.`,
+        remediation: `Add an equipment grounding conductor (EGC) sized per NEC Table 250.122 based on the OCPD rating for cable "${name}". Record the EGC size in the Cable Schedule ground_size column.`,
         reference: 'NEC 250.122',
       });
     }
@@ -333,6 +339,7 @@ function checkUnroutedCables(cables, trayCableMap, routedNames = new Set()) {
         location: name,
         message: `Cable "${name}" has no assigned route. Run optimal routing or assign manually.`,
         reference: null,
+        remediation: `Open the Optimal Route page and run automatic routing, or open the Cable Schedule and manually assign a tray to cable "${name}" in the Allowed Raceways column.`,
       });
     }
   }
@@ -359,12 +366,13 @@ function checkUnroutedCables(cables, trayCableMap, routedNames = new Set()) {
  * @returns {{ findings: DrcFinding[], summary: DrcSummary }}
  *
  * @typedef {{
- *   ruleId:    string,
- *   severity:  'error'|'warning'|'info',
- *   location:  string,
- *   message:   string,
- *   detail?:   string,
- *   reference: string|null,
+ *   ruleId:       string,
+ *   severity:     'error'|'warning'|'info',
+ *   location:     string,
+ *   message:      string,
+ *   detail?:      string,
+ *   reference:    string|null,
+ *   remediation?: string,
  * }} DrcFinding
  *
  * @typedef {{
