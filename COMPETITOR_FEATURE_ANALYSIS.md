@@ -12,7 +12,7 @@ CableTrayRoute already offers a strong, integrated suite covering cable routing 
 
 **Since the initial analysis (2026-03-16), 16 of those 20 gaps have been implemented.** The remaining 4 gaps require external infrastructure (native CAD plugins, live pricing databases) and are deferred.
 
-**The 2026-03-24 refresh of competitor products** (ETAP 2024/2025, EasyPower 2025, MagiCAD 2026, Eplan Platform 2025/2026, Revit 2026, Bentley Raceway 2024/2025, Paneldes 2025) reveals **10 additional feature gaps** across AI/ML interfaces, interoperability standards, field operations, and emerging infrastructure patterns. These are documented below under "Newly Identified Gaps (2026-03-24)".
+**The 2026-03-24 refresh of competitor products** (ETAP 2024/2025, EasyPower 2025, MagiCAD 2026, Eplan Platform 2025/2026, Revit 2026, Bentley Raceway 2024/2025, Paneldes 2025) revealed **10 additional feature gaps** across AI/ML interfaces, interoperability standards, field operations, and emerging infrastructure patterns. **Of those 10, six have since been implemented** (AI/LLM Copilot, IFC Export, QR Code generation, REST API, Alert() replacement, and navigation consistency). Additionally, two calculation completeness gaps (asymmetric fault types and VFD/soft-starter motor starting) have also been implemented. The remaining open gaps are documented below.
 
 A **second pass on 2026-03-24** examines the application through two additional lenses not covered in the feature-presence analysis: **usability quality** (how CableTrayRoute behaves vs. competitor UX standards) and **calculation completeness** (simplified models, missing correction factors, and analysis gaps relative to ETAP, EasyPower, SKM, and Aeries CARS). These findings are documented under "Usability Gaps vs. Competitors" and "Calculation Completeness Gaps".
 
@@ -42,6 +42,14 @@ The following features were identified as gaps and have since been implemented:
 | Cost Estimation | `analysis/costEstimate.mjs` | `costestimate.html` | `tests/costEstimate.test.mjs` |
 | Real-Time Multi-User Collaboration | `src/collaborationServer.mjs`, `src/collabManager.js` | *(all pages via presence bar)* | `tests/collaboration.test.mjs`, `tests/collaborationServer.test.mjs` |
 | Voltage Drop Compliance Study | `analysis/voltageDropStudy.mjs` | `voltagedropstudy.html` | `tests/voltageDropStudy.test.mjs` |
+| AI/LLM Copilot (Natural Language Queries) | `src/copilot.js`, `/api/copilot` in `server.mjs` | All pages (floating panel) | `tests/copilot.test.mjs` |
+| QR Code Tag Generation for Field Access | `analysis/pullCards.mjs`, `analysis/trayHardware.mjs` | `pullcards.html`, `trayhardwarebom.html` | `tests/pullCards.test.mjs` |
+| Open REST API / Scripting Interface | `server.mjs` (`/api/v1/` routes) | *(API)* | `tests/api.test.mjs` |
+| IFC 4.x Export | `src/exporters/ifc4.mjs` | *(export action)* | — |
+| Asymmetric Fault Types (SLG, L-L, DLG) | `analysis/shortCircuit.mjs` | `shortcircuit.html` | `tests/shortCircuit.test.mjs` |
+| Alert() Replacement with Modal Dialogs | `src/components/modal.js` (applied app-wide) | All pages | — |
+| Navigation Consistency on Static Pages | `src/components/navigation.js` (injected on all pages) | `index.html`, `help.html`, `404.html`, `500.html` | — |
+| VFD / Soft Starter Motor Starting Models | `analysis/motorStart.js` | `motorstart.html` | — |
 
 ---
 
@@ -81,7 +89,7 @@ The following gaps were discovered by reviewing competitor release notes and pro
 |---|---|---|
 | **AI/LLM Copilot (Natural Language Queries)** | ETAP (Electric Copilot™, 2024/2025) | ETAP's Electric Copilot™ lets engineers query the project in plain English — e.g., "list all cables exceeding 80% fill" or "show overloaded feeders" — and receive instant filtered results and summaries. CableTrayRoute has no natural language or AI-assisted query layer; all data interrogation requires manual navigation through tables and filters. |
 
-**Status:** Not implemented. Feasible as a browser-based LLM integration (Anthropic Claude API, streaming responses) without any native-app dependency. High user-experience value.
+**Status:** Implemented. `src/copilot.js` provides a floating panel with Claude API (Haiku) integration on every page. Server endpoint at `/api/copilot` in `server.mjs`, rate-limited at 10 req/min.
 
 ---
 
@@ -91,7 +99,7 @@ The following gaps were discovered by reviewing competitor release notes and pro
 |---|---|---|
 | **IFC 4.x Export (with Cable Tray Properties)** | MagiCAD 2026, Bentley Raceway, Trimble MEP | MagiCAD 2026 exports cable tray material codes, material names, and type-name properties directly into IFC property sets, enabling downstream BIM workflows (clash detection in Navisworks, federated models, COBie handover). CableTrayRoute exports DXF only; there is no IFC output at any level. This is the most practical BIM interoperability gap that does not require a native plugin. |
 
-**Status:** Not implemented. IFC export is browser-feasible via the `web-ifc` or `ifcjs` libraries and represents the recommended interim step before a full Revit plugin.
+**Status:** Implemented. `src/exporters/ifc4.mjs` exports IFC4 STEP-Physical-File format with cable tray spatial hierarchy (Project → Site → Building → Storey → IfcCableTray / IfcCableSegment).
 
 ---
 
@@ -111,7 +119,7 @@ The following gaps were discovered by reviewing competitor release notes and pro
 |---|---|---|
 | **QR Code Embedding in Cable / Equipment Tags** | ETAP 2024/2025 | ETAP 2024 added QR code generation embedded in text boxes and equipment annotations so field technicians can scan a tag and immediately access the relevant equipment datasheet, test record, or one-line location on a mobile device. CableTrayRoute generates cable pull cards and submittal packages as PDFs but does not embed scannable QR codes linking back to live project data. |
 
-**Status:** Not implemented. QR code generation is straightforward (e.g., `qrcode.js` in-browser) and could be added to pull cards, cable schedules, and tray BOM exports.
+**Status:** Implemented. `analysis/pullCards.mjs` and `analysis/trayHardware.mjs` embed QR codes in pull card and hardware BOM PDFs via the `qrcode` npm package (v1.5.4). QR payloads encode cable-specific URLs for field scanning.
 
 ---
 
@@ -152,7 +160,7 @@ The following gaps were discovered by reviewing competitor release notes and pro
 |---|---|---|
 | **Public REST API or Scripting Layer** | Revit 2026 (Dynamo scripting), AutoCAD Plant 3D 2026 (Python API), ETAP (COM/API) | Revit 2026 exposes all conductor sizing logic via Dynamo; AutoCAD Plant 3D 2026 added a Python cable tray scripting API; ETAP has a long-standing COM/API for automated study execution. CableTrayRoute has no documented public API, no webhook endpoints, and no scripting interface for external tools to programmatically create projects, run analyses, or export results. This blocks integration with ERP/procurement systems (SAP, Maximo) and CI/CD pipelines for automated design checks. |
 
-**Status:** Not implemented. A REST API surface on top of the existing Express.js backend is feasible and would unlock ERP integration, automated testing pipelines, and third-party plugin development.
+**Status:** Implemented. `server.mjs` exposes `/api/v1/` endpoints for cables, trays, short-circuit, motor start, and voltage drop studies with Bearer token + CSRF authentication and rate limiting. Documented in `docs/api-reference.md`.
 
 ---
 
@@ -190,7 +198,7 @@ These gaps describe areas where CableTrayRoute's user experience lags behind com
 |---|---|---|
 | **Consistent in-app modal error handling** | ETAP, EasyPower (modal dialogs throughout) | Over 50 instances of `alert()` are used for error messages instead of the application's existing modal component: `cabletrayfill.js` (40+ instances), `src/panelSchedule.js` (13 instances), `src/racewayschedule.js`, `src/scenarios.js`, and `src/projectManager.js`. Browser `alert()` blocks the entire UI, cannot be styled or dismissed gracefully, and is inconsistent with the rest of the application. The modal component (`src/components/modal.js`) is already implemented and used correctly in many places — it is simply not applied consistently. |
 
-**Status:** Not addressed. Low implementation effort (search/replace pattern); high UX impact.
+**Status:** Implemented. App-wide `alert()` replacement using `src/components/modal.js`, applied across `cabletrayfill.js`, `panelSchedule.js`, `racewayschedule.js`, `scenarios.js`, and `projectManager.js`.
 
 ---
 
@@ -280,7 +288,7 @@ These gaps describe areas where CableTrayRoute's user experience lags behind com
 |---|---|---|
 | **Consistent application navigation** | All competitors (consistent navigation patterns) | `index.html`, `help.html`, `404.html`, and `500.html` use hardcoded navigation HTML that is missing all Studies pages (TCC, Harmonics, Motor Start, Load Flow, Short Circuit, Arc Flash) and the Custom Components and Account links. The dynamic navigation component (`src/components/navigation.js`) that correctly defines all 21 routes is not used on these pages. Users who arrive at the landing page or error pages cannot navigate to any electrical study. |
 
-**Status:** Previously flagged in `AUDIT_WEBSITE_GAPS.md` (2026-03-16). Not yet resolved.
+**Status:** Implemented. `src/components/navigation.js` is now injected dynamically on all pages including `index.html`, `help.html`, `404.html`, and `500.html`, providing consistent access to all 21+ routes.
 
 ---
 
@@ -326,7 +334,7 @@ These gaps describe areas where CableTrayRoute's calculation engine uses simplif
 |---|---|---|
 | **Full fault matrix: SLG, L-L, DLG, and impedance faults** | ETAP, EasyPower, SKM PowerTools (complete ANSI/IEC fault matrix) | `analysis/shortCircuit.mjs` calculates three-phase symmetric (3Φ) bolted fault currents using Thevenin impedance. The single line-to-ground (SLG) fault is the most common distribution fault type and typically produces the highest ground fault current in effectively-grounded systems. Line-to-line (L-L) and double line-to-ground (DLG) faults are required for full protective device coordination and arc flash boundary determination. Impedance faults (non-bolted) are required for high-resistance grounded systems. All three competitor platforms support the complete fault matrix. |
 
-**Status:** Not addressed. Requires adding sequence network (positive/negative/zero sequence) impedance modeling to `analysis/shortCircuit.mjs`.
+**Status:** Implemented. `analysis/shortCircuit.mjs` now computes SLG, L-L, and DLG faults using sequence network (positive/negative/zero sequence) impedance modeling alongside the existing 3LG calculation.
 
 ---
 
@@ -346,7 +354,7 @@ These gaps describe areas where CableTrayRoute's calculation engine uses simplif
 |---|---|---|
 | **Reduced-voltage and VFD starting transient models** | ETAP (soft-starter and VFD motor starting), EasyPower (dynamic motor starting) | `analysis/motorStart.js` models direct-on-line (DOL) inrush current only: a multiplier (typically 6–8× FLA) applied as a step function. Variable-frequency drives (VFDs) limit inrush to approximately 1.0–1.5× FLA with a controlled ramp; reduced-voltage soft starters limit inrush to 2–4× FLA with a linear voltage ramp. These are the most common motor starting methods in modern industrial installations. Without VFD/soft-starter models, voltage drop analysis during motor starting is significantly overstated, leading to unnecessarily conservative cable and transformer sizing. |
 
-**Status:** Not addressed. Requires adding VFD and soft-starter current profiles to `analysis/motorStart.js`.
+**Status:** Implemented. `analysis/motorStart.js` models VFD (1.0–1.5× FLA controlled ramp) and soft-starter (2–4× FLA linear voltage ramp) starting transients in addition to direct-on-line (DOL).
 
 ---
 
@@ -366,7 +374,7 @@ These gaps describe areas where CableTrayRoute's calculation engine uses simplif
 |---|---|---|
 | **Functional IFC 4.x geometry and property export** | MagiCAD 2026, Bentley Raceway, Trimble MEP (fully populated IFC property sets) | `bimExport.mjs` contains `IfcElectricDistributionBoard` stub objects and placeholder geometry without actual tray coordinates, cable segment data, or NEC/IEC property sets. The file is imported in the codebase but produces an IFC shell that downstream BIM tools (Navisworks, Revit, Solibri) cannot use for clash detection or COBie handover. This gap was previously identified (Gap #4) but is restated here because the existing code creates a false impression that IFC export is implemented — it is not functional. The `web-ifc` or `ifcjs` libraries are recommended to replace the stub with real geometry output. |
 
-**Status:** Stub exists (`bimExport.mjs`); not functional. Previously identified as Gap #4 (high priority).
+**Status:** Implemented. See Gap #4 above. `src/exporters/ifc4.mjs` provides functional IFC4 export with spatial hierarchy and cable tray geometry.
 
 ---
 
@@ -437,17 +445,17 @@ These gaps describe areas where CableTrayRoute's calculation engine uses simplif
 | Real-Time Collaboration | **Yes ✓** | Yes | — | — | — | Yes | — | — | — | Yes |
 | PWA / Offline Support | **Yes** | — | — | — | — | — | — | — | — | — |
 | Cost-Free Web Access | **Yes** | — | — | Partial | Partial | — | — | Yes | — | — |
-| AI/LLM Natural Language Interface | **No** | Yes | — | — | — | — | — | — | — | — |
-| IFC Export (Rich Property Sets) | **No** | — | — | — | — | Yes | Yes | — | Yes | Yes |
+| AI/LLM Natural Language Interface | **Yes** ✓ | Yes | — | — | — | — | — | — | — | — |
+| IFC Export (Rich Property Sets) | **Yes** ✓ | — | — | — | — | Yes | Yes | — | Yes | Yes |
 | Multi-Slot / Compartmented Tray Fill | **No** | — | — | — | — | — | — | — | Yes | — |
-| QR Code Tag Generation | **No** | Yes | — | — | — | — | — | — | — | — |
+| QR Code Tag Generation | **Yes** ✓ | Yes | — | — | — | — | — | — | — | — |
 | Electrical Digital Twin Integration | **No** | Yes | — | — | — | — | — | — | — | — |
 | Data Center Infrastructure Templates | **No** | — | — | — | — | — | — | — | — | — |
 | Ordered-Length Cable Procurement | **No** | — | — | — | — | — | — | — | — | — |
-| Open REST API / Scripting Automation | **No** | Yes | — | — | — | — | Yes | — | — | — |
+| Open REST API / Scripting Automation | **Yes** ✓ | Yes | — | — | — | — | Yes | — | — | — |
 | Parallel Cable / Multi-Core Runs | **No** | Yes | — | — | — | — | — | — | — | — |
 | Cloud-Based Component Library | **No** | — | — | — | — | Yes | — | — | — | — |
-| **Usability: Modal error dialogs (no alert())** | **No** | Yes | Yes | — | — | — | — | — | — | — |
+| **Usability: Modal error dialogs (no alert())** | **Yes** ✓ | Yes | Yes | — | — | — | — | — | — | — |
 | **Usability: Contextual fix guidance in violations** | **No** | Yes | Yes | — | — | — | — | — | — | — |
 | **Usability: Visual fill gauges / heat-maps** | **No** | — | — | — | — | Yes | — | — | Yes | — |
 | **Usability: Configuration profiles / templates** | **No** | Yes | — | — | — | — | Yes | — | — | — |
@@ -456,9 +464,9 @@ These gaps describe areas where CableTrayRoute's calculation engine uses simplif
 | **Usability: Results annotation / approval workflow** | **No** | Yes | — | — | — | Yes | — | — | — | — |
 | **Usability: Workflow progress dashboard** | **No** | — | Yes | — | — | — | Yes | — | — | — |
 | **Usability: Mobile-optimized field access** | **No** | Yes | — | — | — | — | Yes | — | — | — |
-| **Calc: Short circuit full fault matrix (SLG/LL/DLG)** | **No** | Yes | Yes | — | — | — | — | — | — | — |
+| **Calc: Short circuit full fault matrix (SLG/LL/DLG)** | **Yes** ✓ | Yes | Yes | — | — | — | — | — | — | — |
 | **Calc: Auto-sizing with tray derating + ambient temp** | **No** | Yes | Yes | — | — | — | — | — | — | — |
-| **Calc: Motor starting VFD / soft-starter models** | **No** | Yes | Yes | — | — | — | — | — | — | — |
+| **Calc: Motor starting VFD / soft-starter models** | **Yes** ✓ | Yes | Yes | — | — | — | — | — | — | — |
 | **Calc: TCC auto-coordination algorithm** | **No** | Yes | Yes | — | — | — | — | — | — | — |
 | **Calc: Unbalanced per-phase harmonics** | **No** | Yes | Yes | — | — | — | — | — | — | — |
 | **Calc: Combined seismic + wind load scenario** | **No** | — | — | Yes | — | — | — | — | — | — |
@@ -491,15 +499,15 @@ All originally high- and medium-priority feasible items have been implemented:
 15. ~~**Cost Estimation**~~ → `costestimate.html`
 16. ~~**Wind & Environmental Load Analysis**~~ → `windload.html`
 
-### New High-Priority (Feasible in Web App — 2026-03-24)
+### New High-Priority (Feasible in Web App — 2026-03-24) — All Implemented ✅
 
-1. **IFC Export (Rich Property Sets)** — Use `web-ifc` / `ifcjs` libraries for browser-side IFC 4.x generation. Unlocks downstream BIM workflows without a native plugin. Best practical BIM interoperability step available now.
-2. **AI/LLM Natural Language Interface** — Integrate Anthropic Claude API for a project copilot that answers plain-English queries about fills, overloads, routing, and study results. No backend infrastructure change needed.
-3. **QR Code Tag Generation** — Add `qrcode.js` to pull cards, cable schedule exports, and tray BOM PDFs. Low-effort, high field-operations value.
+1. ~~**IFC Export (Rich Property Sets)**~~ → `src/exporters/ifc4.mjs`
+2. ~~**AI/LLM Natural Language Interface**~~ → `src/copilot.js`, `/api/copilot`
+3. ~~**QR Code Tag Generation**~~ → `analysis/pullCards.mjs`, `analysis/trayHardware.mjs`
 
 ### New Medium-Priority (Feasible in Web App — 2026-03-24)
 
-4. **Open REST API / Scripting Automation** — Expose a documented REST API on top of the existing Express.js server for programmatic project creation, analysis execution, and data export. Enables ERP (SAP, Maximo) integration and automated design-check pipelines.
+4. ~~**Open REST API / Scripting Automation**~~ → `server.mjs` `/api/v1/` routes, `docs/api-reference.md` ✅
 5. **Ordered-Length Cable Procurement Planning** — Extend `spoolSheets.mjs` and `pullCards.mjs` to compute factory cut lengths, apply standard reel lengths, and minimize waste. Produces a cable procurement schedule.
 6. **Multi-Slot / Compartmented Tray Fill** — Extend the tray data model to support longitudinal divider strips with per-slot fill tracking. Needed for instrumentation/power segregation in one physical tray.
 7. **Data Center Infrastructure Templates** — Add AI data center wizard: hot/cold aisle overhead ladder rack presets, structured cabling (Cat6A/fiber) cable types, top-of-rack routing templates, and high-density fill density guidance.
@@ -521,8 +529,8 @@ All originally high- and medium-priority feasible items have been implemented:
 
 **High Priority — Usability (quick wins with large UX impact):**
 
-1. **Replace `alert()` with modal dialogs** (Gaps #13) — `src/components/modal.js` already exists; replace 50+ `alert()` calls in `cabletrayfill.js` and `src/panelSchedule.js`. Immediate, highly visible UX improvement with minimal risk.
-2. **Sync navigation on static pages** (Gap #22) — Apply `src/components/navigation.js` to `index.html`, `help.html`, `404.html`, and `500.html` to expose all 21 routes. Zero calculation risk, critical discoverability fix.
+1. ~~**Replace `alert()` with modal dialogs**~~ (Gap #13) → Implemented. `src/components/modal.js` applied app-wide. ✅
+2. ~~**Sync navigation on static pages**~~ (Gap #22) → Implemented. `src/components/navigation.js` injected on all pages. ✅
 3. **Add contextual "how to fix" guidance to violations** (Gap #14) — Extend `analysis/designRuleChecker.mjs` violation objects with a `remediation` field (add a tray, reroute cables, upsize conductor). The pattern exists in `analysis/arcFlash.mjs`; apply it project-wide.
 4. **Workflow progress dashboard** (Gap #20) — Surface `src/workflowStatus.js` in a project overview page showing completion status and violation counts per module.
 
@@ -535,9 +543,9 @@ All originally high- and medium-priority feasible items have been implemented:
 
 **High Priority — Calculation Completeness:**
 
-9. **Short circuit full fault matrix** (Gap #26) — Add SLG, L-L, and DLG fault types to `analysis/shortCircuit.mjs` using sequence network decomposition. Required for complete protective device coordination and accurate arc flash boundary calculation.
+9. ~~**Short circuit full fault matrix**~~ (Gap #26) → Implemented. SLG, L-L, DLG in `analysis/shortCircuit.mjs`. ✅
 10. **Auto-sizing with derating factors** (Gap #23) — Apply NEC 310.15(B) ambient correction and NEC 310.15(C) bundling derating in `analysis/autoSize.mjs` using the existing correction tables in `analysis/ampacity.mjs`.
-11. **Motor starting VFD and soft-starter models** (Gap #28) — Add controlled-ramp current profiles to `analysis/motorStart.js` for VFD (≈1.0–1.5× FLA) and reduced-voltage soft-starter (≈2–4× FLA) starting methods.
+11. ~~**Motor starting VFD and soft-starter models**~~ (Gap #28) → Implemented. VFD and soft-starter profiles in `analysis/motorStart.js`. ✅
 
 **Medium Priority — Calculation Completeness:**
 
@@ -649,3 +657,57 @@ These features are unique strengths that competitors do not offer:
 - [AI Data Center Cabling Solutions (SnakeTray)](https://www.snaketray.com/ai-data-center-cabling-solutions/)
 - [Rockwell & Eplan Digital Twin Partnership (SPS 2025)](https://www.rockwellautomation.com/en-no/company/news/press-releases/digital-twin-driven-electrical-simulation.html)
 - [IFC Material Overrides for Cable Tray](https://digitalbbq.au/index.php/2025/08/07/setting-ifc-material-overrides-for-cable-tray-and-conduit/)
+
+---
+
+## Next Major Steps — Recommended Roadmap (as of 2026-03-24)
+
+The following features were implemented in the most recent development cycle and are complete:
+navigation consistency, password confirmation, auth button disabling, alert() replacement, AI Copilot, IFC export, QR codes, REST API, and asymmetric fault types (SLG/L-L/DLG).
+
+The table below lists the recommended next work items in priority order.
+
+### Priority 1 — Low Effort, High Impact
+
+| # | Gap | Files | Notes |
+|---|---|---|---|
+| 1 | **Workflow Progress Dashboard** (#20) | `src/workflowStatus.js` → new `workflowdashboard.html` | Infrastructure already exists; needs a UI to surface step completion and violation counts. |
+| 2 | **Contextual "How to Fix" Guidance in Violations** (#14) | `analysis/designRuleChecker.mjs`, `analysis/autoSize.mjs` | Add `remediation` field to violation objects. Pattern already exists in `analysis/arcFlash.mjs:412`. |
+| 3 | **IntlCableSize Silent-Skip Warning** (#33) | `analysis/intlCableSize.mjs:528` | Replace `continue` with an explicit warning result entry. Single-line change. |
+
+### Priority 2 — Medium Effort, High Calculation Value
+
+| # | Gap | Files | Notes |
+|---|---|---|---|
+| 4 | **Auto-Sizing with NEC Derating** (#23) | `analysis/autoSize.mjs`, `analysis/ampacity.mjs` | Apply ambient temp (310.15(B)) and bundling (310.15(C)) derating. Correction tables already in `ampacity.mjs`. |
+| 5 | **Combined Seismic + Wind Load** (#31) | new `analysis/combinedLoads.mjs` | Wrap both `seismicBracing.mjs` and `windLoad.mjs` under ASCE 7 Section 2.3 load combinations. |
+| 6 | **Visual Fill Gauges / Heat-Map** (#15) | `cabletrayfill.html`, `cabletrayfill.js` | Add Plotly progress bars and color-coded violation cells. Significant UX improvement over plain tables. |
+
+### Priority 3 — Medium Effort, UX / Feature Completeness
+
+| # | Gap | Files | Notes |
+|---|---|---|---|
+| 7 | **Project Templates / Configuration Profiles** (#16) | `src/projectManager.js`, new `src/projectTemplates.js` | Preset JSON for Oil & Gas, Data Center, Industrial applied on new-project creation. |
+| 8 | **Multi-Slot Compartmented Tray Fill** (#5) | `analysis/`, `racewayschedule.html`, `cabletrayfill.html` | Data model change to track per-slot fill independently. Needed for power/instrumentation segregation. |
+| 9 | **Scenario Comparison UI** (#17) | `src/scenarios.js`, `scenarios.html` | `scenarios.js` exists; add side-by-side comparison view for two selected study variants. |
+| 10 | **Prefabricated Cable Length Optimization** (#9) | new `analysis/cableProcurement.mjs` | Extends `spoolSheets.mjs` and `pullCards.mjs` with cut-length BOM and reel-waste minimization. |
+
+### Priority 4 — Longer Term
+
+| # | Gap | Notes |
+|---|---|---|
+| 11 | **TCC Auto-Coordination Algorithm** (#29) | Greedy source-to-load coordination over existing `analysis/tcc.js` curve library. |
+| 12 | **Unbalanced Per-Phase Harmonics** (#27) | Extend `analysis/harmonics.js` for independent phase spectra and neutral triplen current calculation. |
+| 13 | **Post-Contingency Transient Stability** (#32) | Couple `analysis/transientStability.mjs` into `analysis/contingency.mjs` for generator buses. |
+| 14 | **Auto-Sizing Cu/Al Cost Optimization** (#24) | Integrate `analysis/costEstimate.mjs` into `analysis/autoSize.mjs` sizing loop. |
+| 15 | **Results Annotation / Approval Workflow** (#19) | Notes fields and Draft/Reviewed/Approved status on cable and tray records. |
+| 16 | **Mobile-Optimized Field Access View** (#21) | Simplified responsive read-only view for cable schedules and pull cards. |
+| 17 | **Data Center Infrastructure Templates** (#8) | Hot/cold aisle presets, structured cabling types, ToR patch routing templates. |
+| 18 | **Cloud-Based Component Library** (#12) | Shared org-wide product library over existing collaboration backend. |
+
+### Deferred (Requires Native Desktop Infrastructure)
+
+- Revit Plugin / Live BIM Sync — Requires Revit SDK (Windows-native C#/.NET)
+- AutoCAD / AVEVA / SmartPlant 3D Plugin — Requires commercial CAD SDK licensing
+- BIM Object Library — Requires manufacturer data partnerships
+- Live Manufacturer Pricing Feed — Requires commercial data licensing (RS Means, Eaton, Legrand)
