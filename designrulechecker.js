@@ -110,6 +110,9 @@ document.addEventListener('DOMContentLoaded', () => {
       const detail = f.detail
         ? `<p class="drc-detail">${escapeHtml(f.detail)}</p>`
         : '';
+      const remediation = f.remediation
+        ? `<p class="drc-remediation"><strong>How to fix:</strong> ${escapeHtml(f.remediation)}</p>`
+        : '';
       return `
         <div class="drc-finding drc-finding--${f.severity}">
           <div class="drc-finding-header">
@@ -120,6 +123,7 @@ document.addEventListener('DOMContentLoaded', () => {
           </div>
           <p class="drc-message">${escapeHtml(f.message)}</p>
           ${detail}
+          ${remediation}
         </div>`;
     }).join('');
 

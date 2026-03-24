@@ -439,8 +439,9 @@ export function formatDrcReport(result) {
     const prefix = f.severity === 'error' ? '[ERROR]' : f.severity === 'warning' ? '[WARN] ' : '[INFO] ';
     lines.push(`${prefix} ${f.ruleId}  ${f.location}`);
     lines.push(`        ${f.message}`);
-    if (f.detail)     lines.push(`        ${f.detail}`);
-    if (f.reference)  lines.push(`        Ref: ${f.reference}`);
+    if (f.detail)       lines.push(`        ${f.detail}`);
+    if (f.reference)    lines.push(`        Ref: ${f.reference}`);
+    if (f.remediation)  lines.push(`        HOW TO FIX: ${f.remediation}`);
     lines.push('');
   }
 
