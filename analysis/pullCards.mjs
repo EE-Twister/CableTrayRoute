@@ -17,6 +17,42 @@
 import { calcPullTension } from '../src/pullCalc.js';
 
 // ---------------------------------------------------------------------------
+// QR code generation
+// ---------------------------------------------------------------------------
+
+/**
+ * Generate a QR code as a PNG data URL for the given text.
+ *
+ * Uses the `qrcode` npm package in Node.js or server environments.
+ * In the browser this function may also be called if the package is bundled.
+ * Falls back gracefully if the package is unavailable (returns null).
+ *
+ * @param {string} text - The content to encode in the QR code
+ * @returns {Promise<string|null>} PNG data URL (data:image/png;base64,...) or null
+ */
+export async function generateQRDataURL(text) {
+  try {
+    const mod = await import('qrcode');
+    const QRCode = mod.default ?? mod;
+    return await QRCode.toDataURL(String(text), { margin: 1, width: 120 });
+  } catch {
+    return null;
+  }
+}
+
+/**
+ * Build a cable schedule URL fragment for use in QR codes.
+ * Scanning the QR code opens the cable schedule filtered to the given tag.
+ *
+ * @param {string} cableTag
+ * @param {string} [baseURL='https://cabletrayroute.com']
+ * @returns {string}
+ */
+export function cableQRPayload(cableTag, baseURL = 'https://cabletrayroute.com') {
+  return `${baseURL}/cableschedule.html#cable=${encodeURIComponent(cableTag)}`;
+}
+
+// ---------------------------------------------------------------------------
 // Route signature — canonical key for grouping cables by shared path
 // ---------------------------------------------------------------------------
 

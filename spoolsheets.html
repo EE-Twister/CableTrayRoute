@@ -204,13 +204,41 @@
         </div>
       </fieldset>
 
-      <div id="controls">
+      <div id="controls" role="group" aria-label="View selection">
         <button id="generateBtn" type="button">Generate Spool Sheets</button>
         <button id="exportXlsxBtn" type="button" disabled>Export to Excel (XLSX)</button>
         <button id="printBtn" type="button" disabled>Print Spool Sheets</button>
       </div>
 
-      <div id="results" role="region" aria-live="polite" aria-label="Spool sheet results"></div>
+      <!-- Tab bar for switching between Spool Sheets and Procurement Schedule -->
+      <div class="tab-bar" role="tablist" aria-label="Output view">
+        <button class="tab-btn active" id="tab-spools" role="tab" aria-selected="true"
+                aria-controls="panel-spools">Spool Sheets</button>
+        <button class="tab-btn" id="tab-procurement" role="tab" aria-selected="false"
+                aria-controls="panel-procurement">Procurement Schedule</button>
+      </div>
+
+      <div id="panel-spools" role="tabpanel" aria-labelledby="tab-spools">
+        <div id="results" role="region" aria-live="polite" aria-label="Spool sheet results"></div>
+      </div>
+
+      <div id="panel-procurement" role="tabpanel" aria-labelledby="tab-procurement" hidden>
+        <section aria-labelledby="procurement-heading">
+          <h2 id="procurement-heading">Cable Procurement Schedule</h2>
+          <p class="field-hint">
+            Cables are grouped by conductor specification and assigned to standard reel lengths
+            using a first-fit decreasing algorithm. A 10% field-trim allowance is added per
+            <a href="https://standards.ieee.org/ieee/1185/1766/" rel="noopener noreferrer" target="_blank">IEEE 1185 §6.4</a>.
+            Requires route results from the <a href="optimalRoute.html">Optimal Route</a> page.
+          </p>
+          <div class="btn-row">
+            <button type="button" id="generateProcurementBtn">Generate Procurement Schedule</button>
+            <button type="button" id="exportProcurementBtn" disabled>Export (XLSX)</button>
+          </div>
+          <div id="procurementResults" role="region" aria-live="polite"
+               aria-label="Procurement schedule results"></div>
+        </section>
+      </div>
 
       <nav class="step-nav" aria-label="Workflow navigation">
         <a href="clashdetect.html" class="step-nav-prev">&#8592; Clash Detection</a>

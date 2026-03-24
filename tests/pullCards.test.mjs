@@ -6,6 +6,8 @@ import {
   groupCablesIntoPulls,
   buildPullCard,
   buildPullTable,
+  generateQRDataURL,
+  cableQRPayload,
 } from '../analysis/pullCards.mjs';
 
 function describe(name, fn) {
@@ -289,6 +291,56 @@ describe('buildPullTable', () => {
     assert.strictEqual(pulls[0].cable_count, 2);
   });
 });
+
+// Sync tests for cableQRPayload
+describe('cableQRPayload', () => {
+  it('produces a URL with the cable tag in the fragment', () => {
+    const payload = cableQRPayload('CABLE-001');
+    assert.ok(payload.includes('cableschedule.html#cable=CABLE-001'), `Got: ${payload}`);
+  });
+
+  it('URL-encodes special characters in the cable tag', () => {
+    const payload = cableQRPayload('CABLE A/B');
+    assert.ok(payload.includes('CABLE%20A%2FB'), `Got: ${payload}`);
+  });
+
+  it('uses custom base URL when provided', () => {
+    const payload = cableQRPayload('X', 'http://localhost:3000');
+    assert.ok(payload.startsWith('http://localhost:3000'), `Got: ${payload}`);
+  });
+});
+
+// Async tests for generateQRDataURL — run after all sync tests via top-level await
+console.log('generateQRDataURL (async)');
+async function runQRTests() {
+  const tests = [
+    ['returns a PNG data URL string for a simple text input', async () => {
+      const url = await generateQRDataURL('TEST-CABLE-001');
+      assert.ok(typeof url === 'string', 'Should return a string');
+      assert.ok(url.startsWith('data:image/png;base64,'), `Expected PNG data URL, got: ${url?.slice(0, 40)}`);
+    }],
+    ['returns a non-empty base64 payload', async () => {
+      const url = await generateQRDataURL('CABLE-TAG-X1');
+      const b64 = url.replace('data:image/png;base64,', '');
+      assert.ok(b64.length > 100, 'Base64 payload should be substantial');
+    }],
+    ['gracefully handles empty string input', async () => {
+      const url = await generateQRDataURL('');
+      assert.ok(url === null || (typeof url === 'string' && url.startsWith('data:image/')),
+        'Should return data URL or null');
+    }],
+  ];
+  for (const [name, fn] of tests) {
+    try {
+      await fn();
+      console.log('  \u2713', name);
+    } catch (err) {
+      console.error('  \u2717', name, err.message || err);
+      process.exitCode = 1;
+    }
+  }
+}
+await runQRTests();
 
 describe('edge cases', () => {
   it('handles cables with no matching cable list entry', () => {

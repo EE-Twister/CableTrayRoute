@@ -268,3 +268,125 @@ export function generateSpoolSheets(trays, cables, options = {}) {
 
   return { spools, summary };
 }
+
+// ---------------------------------------------------------------------------
+// Cable Procurement / Ordered-Length Planning
+// ---------------------------------------------------------------------------
+
+/**
+ * Build a cable procurement schedule from routed cable lengths.
+ *
+ * Groups cables by conductor specification (conductors × size × cable_type),
+ * applies a field-trim allowance per IEEE 1185 §6.4, then uses a
+ * first-fit-decreasing bin-packing algorithm to assign cables to standard
+ * reel lengths — minimising offcut waste.
+ *
+ * @param {Array<{cable: string, total_length: number}>} routeResults
+ *   Batch routing results. Each entry must have `.cable` (tag) and
+ *   `.total_length` (routed length in ft).
+ *
+ * @param {Array<{name?: string, tag?: string, cable_tag?: string,
+ *   conductors?: number|string, conductor_size?: string, cable_type?: string,
+ *   pull_allowance_pct?: number}>} cableList
+ *   Full cable schedule. Matched by tag/name.
+ *
+ * @param {number[]} [reelCatalog=[500,1000,2000,5000]]
+ *   Available standard reel lengths in feet, sorted ascending.
+ *
+ * @returns {Array<{
+ *   reelSpec: string,
+ *   conductorSpec: string,
+ *   standardLengthFt: number,
+ *   cableAssignments: Array<{cableTag: string, routedLengthFt: number,
+ *                            addedAllowanceFt: number, totalCutFt: number}>,
+ *   offcutFt: number,
+ *   reelUtilizationPct: number,
+ * }>} One entry per reel, sorted by conductorSpec then reel number.
+ */
+export function buildCableProcurementSchedule(
+  routeResults = [],
+  cableList = [],
+  reelCatalog = [500, 1000, 2000, 5000]
+) {
+  if (!Array.isArray(routeResults)) return [];
+  const catalog = [...reelCatalog].sort((a, b) => a - b);
+  const safeCableList = Array.isArray(cableList) ? cableList : [];
+  const lookup = new Map(
+    safeCableList.map(c => [c.name || c.tag || c.cable_tag, c])
+  );
+
+  // Build per-cable cut lengths with allowance
+  const items = [];
+  for (const r of routeResults) {
+    if (!r || !r.cable || !Number.isFinite(parseFloat(r.total_length))) continue;
+    const routedFt = parseFloat(r.total_length);
+    const spec = lookup.get(r.cable) || {};
+    const allowancePct = parseFloat(spec.pull_allowance_pct) || 10;
+    const addedFt = routedFt * (allowancePct / 100);
+    const cutFt = routedFt + addedFt;
+    const conductors = spec.conductors || r.conductors || '';
+    const size = spec.conductor_size || r.conductor_size || '';
+    const cableType = (spec.cable_type || r.cable_type || 'Power').trim();
+    const conductorSpec = [cableType, conductors, size].filter(Boolean).join(' ');
+    items.push({ cableTag: r.cable, routedFt, addedFt, cutFt, conductorSpec });
+  }
+
+  // Group by conductorSpec
+  const specGroups = new Map();
+  for (const item of items) {
+    if (!specGroups.has(item.conductorSpec)) specGroups.set(item.conductorSpec, []);
+    specGroups.get(item.conductorSpec).push(item);
+  }
+
+  const reels = [];
+
+  for (const [conductorSpec, group] of specGroups) {
+    // First-fit decreasing: sort cables by cut length descending
+    const sorted = [...group].sort((a, b) => b.cutFt - a.cutFt);
+
+    // Each reel: { standardLengthFt, remainingFt, assignments[] }
+    const openReels = [];
+
+    for (const item of sorted) {
+      // Find the smallest reel that fits this cable
+      let placed = false;
+      for (const reel of openReels) {
+        if (reel.remainingFt >= item.cutFt) {
+          reel.assignments.push(item);
+          reel.remainingFt -= item.cutFt;
+          placed = true;
+          break;
+        }
+      }
+
+      if (!placed) {
+        // Open a new reel: smallest standard length that fits
+        const reelLen = catalog.find(l => l >= item.cutFt) ?? catalog[catalog.length - 1];
+        const newReel = { standardLengthFt: reelLen, remainingFt: reelLen - item.cutFt, assignments: [item] };
+        openReels.push(newReel);
+      }
+    }
+
+    // Convert internal reels to output format
+    openReels.forEach((reel, idx) => {
+      const usedFt = reel.standardLengthFt - reel.remainingFt;
+      reels.push({
+        reelSpec: `${conductorSpec} — Reel ${idx + 1}`,
+        conductorSpec,
+        standardLengthFt: reel.standardLengthFt,
+        cableAssignments: reel.assignments.map(a => ({
+          cableTag: a.cableTag,
+          routedLengthFt: +a.routedFt.toFixed(1),
+          addedAllowanceFt: +a.addedFt.toFixed(1),
+          totalCutFt: +a.cutFt.toFixed(1),
+        })),
+        offcutFt: +Math.max(0, reel.remainingFt).toFixed(1),
+        reelUtilizationPct: +(usedFt / reel.standardLengthFt * 100).toFixed(1),
+      });
+    });
+  }
+
+  // Sort by conductorSpec then reelSpec for stable output
+  reels.sort((a, b) => a.reelSpec.localeCompare(b.reelSpec));
+  return reels;
+}
