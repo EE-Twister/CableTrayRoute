@@ -73,7 +73,8 @@ export function trayFillPercent(tray, fillInSqIn) {
   const width = parseFloat(tray.inside_width ?? tray.width) || 0;
   const depth = parseFloat(tray.tray_depth ?? tray.height) || 0;
   if (width <= 0 || depth <= 0) return null;
-  const totalArea = width * depth;
+  const numSlots = Math.max(1, parseInt(tray.num_slots) || 1);
+  const totalArea = (width * depth) / numSlots;
   const fill = fillInSqIn !== undefined ? fillInSqIn : (parseFloat(tray.current_fill) || 0);
   return (fill / totalArea) * 100;
 }

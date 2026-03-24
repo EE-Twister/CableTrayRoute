@@ -696,6 +696,7 @@ async function initializeApp() {
                 end_z: parseFloat(t.end_z),
                 width: parseFloat(t.inside_width),
                 height: parseFloat(t.tray_depth),
+                num_slots: Math.max(1, parseInt(t.num_slots) || 1),
                 current_fill: 0,
                 shape: 'STR',
                 allowed_cable_group: t.allowed_cable_group || '',
@@ -1216,7 +1217,8 @@ async function initializeApp() {
         }
 
         addTraySegment(tray) {
-            const maxFill = tray.width * tray.height * this.fillLimit;
+            const numSlots = Math.max(1, parseInt(tray.num_slots) || 1);
+            const maxFill = (tray.width * tray.height * this.fillLimit) / numSlots;
             // Preserve ductbank association for later use
             this.trays.set(tray.tray_id, { ...tray, ductbankTag: tray.ductbankTag, maxFill });
         }
@@ -1955,7 +1957,7 @@ const openConduitFill = (cables) => {
     }).filter(Boolean);
     const spec = CONDUIT_SPECS[conduitType] || {};
     const count = cableObjs.length;
-    const totalArea = cableObjs.reduce((s, c) => s + Math.PI * Math.pow(c.diameter / 2, 2), 0);
+    const totalArea = cableObjs.reduce((s, c) => s + Math.PI * Math.pow(c.diameter / 2, 2) * (parseInt(c.parallel_count) || 1), 0);
     /* NEC Chapter 9 Table 1 fill limits (see docs/standards.md) */
     const fillPct = count === 1 ? 0.53 : count === 2 ? 0.31 : 0.40;
     let tradeSize = null;
@@ -3553,7 +3555,7 @@ const renderBatchResults = (results) => {
             const cable = cableMap.get(name);
             const info = resultMap.get(name);
             if (!cable || !info) return;
-            const area = Math.PI * (cable.diameter / 2) ** 2;
+            const area = Math.PI * (cable.diameter / 2) ** 2 * (parseInt(cable.parallel_count) || 1);
             if (Array.isArray(info.row.tray_segments)) {
                 routingSystem.updateTrayFill(info.row.tray_segments, -area);
             }
