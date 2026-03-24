@@ -1130,6 +1130,54 @@ export async function createApp(options = {}) {
   );
 
 
+  const copilotRateLimiter = createRateLimiter({ windowMs: 60000, max: 10 });
+
+  app.post(
+    '/api/copilot',
+    auth,
+    csrfProtection,
+    copilotRateLimiter,
+    asyncHandler(async (req, res) => {
+      const { query, projectData } = req.body || {};
+      if (!query || typeof query !== 'string' || query.length > 2000) {
+        res.status(400).json({ error: 'Invalid query' });
+        return;
+      }
+
+      const Anthropic = (await import('@anthropic-ai/sdk')).default;
+      const client = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY });
+
+      const systemPrompt = `You are an AI assistant for CableTrayRoute, an electrical design platform.
+You help electrical engineers query and analyze their project data.
+
+Project data schema:
+- cables: array of { id, from, to, size, type, length, trayId, voltage, ampacity }
+- trays: array of { id, width, depth, fill, capacity, utilization }
+- violations: array of { rule, severity, message, trayId, cableId }
+
+When answering queries:
+- Be concise and specific
+- Format lists as markdown tables when appropriate
+- Focus on actionable insights
+- If data is empty or missing, say so clearly`;
+
+      const dataContext = JSON.stringify(projectData || {}, null, 2).slice(0, 8000);
+
+      const message = await client.messages.create({
+        model: 'claude-haiku-4-5-20251001',
+        max_tokens: 1024,
+        messages: [{
+          role: 'user',
+          content: `Project data:\n${dataContext}\n\nQuery: ${query}`
+        }],
+        system: systemPrompt
+      });
+
+      const answer = message.content[0]?.type === 'text' ? message.content[0].text : 'No response';
+      res.json({ answer });
+    })
+  );
+
   app.use((err, req, res, next) => {
     console.error(err);
     if (res.headersSent) {
