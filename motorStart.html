@@ -98,6 +98,46 @@
       <section class="card">
         <svg id="motorstart-chart" width="800" height="600" xmlns="http://www.w3.org/2000/svg"></svg>
       </section>
+      <section class="card" aria-labelledby="starter-types-heading">
+        <h2 id="starter-types-heading">Supported Starter Types</h2>
+        <p>Set <code>starter_type</code> on each motor component in the <a href="oneline.html">One-Line Diagram</a> to model different starting methods.</p>
+        <table class="data-table" aria-label="Starter type reference">
+          <thead>
+            <tr>
+              <th scope="col">starter_type</th>
+              <th scope="col">Inrush Model</th>
+              <th scope="col">Key Parameters</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr>
+              <td><code>dol</code> (default)</td>
+              <td>Full locked-rotor current (6× FLC typical)</td>
+              <td><code>inrushMultiple</code></td>
+            </tr>
+            <tr>
+              <td><code>vfd</code></td>
+              <td>Current limited to <code>vfd_current_limit_pu</code> × FLC (default 1.1×)</td>
+              <td><code>vfd_current_limit_pu</code>, <code>ramp_time_s</code></td>
+            </tr>
+            <tr>
+              <td><code>soft_starter</code></td>
+              <td>Voltage ramps from <code>initial_voltage_pu</code> to 1.0; inrush ∝ V²</td>
+              <td><code>initial_voltage_pu</code> (0.3), <code>ramp_time_s</code> (10)</td>
+            </tr>
+            <tr>
+              <td><code>wye_delta</code></td>
+              <td>Inrush = Ilr ÷ 3 during wye phase; full inrush after switch</td>
+              <td><code>wye_delta_switch_time_s</code> (5)</td>
+            </tr>
+            <tr>
+              <td><code>autotransformer</code></td>
+              <td>Inrush × tap²; typical tap 0.65</td>
+              <td><code>autotransformer_tap</code> (0.65)</td>
+            </tr>
+          </tbody>
+        </table>
+      </section>
     </main>
   </div>
   <footer class="site-footer">

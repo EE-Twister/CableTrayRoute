@@ -42,9 +42,39 @@ function parseTorqueCurve(spec) {
 }
 
 /**
+ * Return starting profile parameters for a motor component.
+ * Supported starter_type values:
+ *   'dol'             – Direct-on-line (default): full locked-rotor current
+ *   'vfd'             – Variable-frequency drive: current capped at vfd_current_limit_pu × Ifl
+ *   'soft_starter'    – Reduced-voltage ramp from initial_voltage_pu to 1.0 over ramp_time_s
+ *   'wye_delta'       – Wye-phase inrush = Ilr/3 for first wye_delta_switch_time_s seconds
+ *   'autotransformer' – Inrush reduced by autotransformer_tap²
+ *
+ * @param {Object} c - Component object from the one-line diagram
+ * @returns {{ type: string, vfdCurrentLimitPu: number, initialVoltagePu: number,
+ *             rampTimeSec: number, wyeDeltaSwitchTimeSec: number, autotransformerTap: number }}
+ */
+export function getStarterProfile(c) {
+  const type = (
+    c.starter_type
+    ?? c.props?.starter_type
+    ?? 'dol'
+  ).toString().toLowerCase().replace(/[-\s]/g, '_');
+  return {
+    type,
+    vfdCurrentLimitPu: Number(c.vfd_current_limit_pu ?? c.props?.vfd_current_limit_pu) || 1.1,
+    initialVoltagePu:  Number(c.initial_voltage_pu   ?? c.props?.initial_voltage_pu)   || 0.3,
+    rampTimeSec:       Number(c.ramp_time_s           ?? c.props?.ramp_time_s)           || 10,
+    wyeDeltaSwitchTimeSec: Number(c.wye_delta_switch_time_s ?? c.props?.wye_delta_switch_time_s) || 5,
+    autotransformerTap: Number(c.autotransformer_tap  ?? c.props?.autotransformer_tap)   || 0.65,
+  };
+}
+
+/**
  * Estimate voltage sag during motor starting using a simple Thevenin model.
- * Motors may define inrushMultiple, thevenin_r, thevenin_x, inertia and load_torque.
- * @returns {Object<string,{inrushKA:number,voltageSagPct:number,accelTime:number}>}
+ * Motors may define inrushMultiple, thevenin_r, thevenin_x, inertia, load_torque,
+ * and starter_type ('dol'|'vfd'|'soft_starter'|'wye_delta'|'autotransformer').
+ * @returns {Object<string,{inrushKA:number,voltageSagPct:number,accelTime:number,starterType:string}>}
  */
 export function runMotorStart() {
   const { sheets } = getOneLine();
@@ -98,6 +128,20 @@ export function runMotorStart() {
       ?? c.props?.load_torque_curve
       ?? c.props?.load_torque
     );
+    const profile = getStarterProfile(c);
+
+    // VFD: drive limits current; voltage sag is negligible; accel follows ramp time
+    if (profile.type === 'vfd') {
+      const limitedI = Ifl * profile.vfdCurrentLimitPu;
+      const Vdrop = limitedI * Zth;
+      results[c.id] = {
+        inrushKA: Number((limitedI / 1000).toFixed(2)),
+        voltageSagPct: Number(((Vdrop / V) * 100).toFixed(2)),
+        accelTime: Number(profile.rampTimeSec.toFixed(2)),
+        starterType: 'vfd',
+      };
+      return;
+    }
 
     let w = 0; // mechanical speed rad/s
     const wSync = 2 * Math.PI * speed / 60;
@@ -106,10 +150,26 @@ export function runMotorStart() {
     let maxDrop = 0;
     while (w < wSync && time < 60) {
       const slip = Math.max(1 - w / wSync, 0.001);
-      let I = Ilr * slip;
+
+      // Effective locked-rotor current depends on starter type
+      let effectiveIlr;
+      if (profile.type === 'soft_starter') {
+        const rampFrac = Math.min(time / profile.rampTimeSec, 1.0);
+        const vRamp = profile.initialVoltagePu + (1.0 - profile.initialVoltagePu) * rampFrac;
+        effectiveIlr = Ilr * vRamp * vRamp; // current scales as V²
+      } else if (profile.type === 'wye_delta') {
+        effectiveIlr = time < profile.wyeDeltaSwitchTimeSec ? Ilr / 3 : Ilr;
+      } else if (profile.type === 'autotransformer') {
+        const tap = profile.autotransformerTap;
+        effectiveIlr = Ilr * tap * tap;
+      } else {
+        effectiveIlr = Ilr; // 'dol' or unrecognised
+      }
+
+      let I = effectiveIlr * slip;
       let Vdrop = I * Zth;
       let Vterm = V - Vdrop;
-      I = Ilr * slip * (Vterm / V);
+      I = effectiveIlr * slip * (Vterm / V);
       Vdrop = I * Zth;
       Vterm = V - Vdrop;
       const Tm = baseTorque * (Vterm / V) * (Vterm / V) * slip;
@@ -124,7 +184,8 @@ export function runMotorStart() {
     results[c.id] = {
       inrushKA: Number((Ilr / 1000).toFixed(2)),
       voltageSagPct: Number(sagPct.toFixed(2)),
-      accelTime: Number(time.toFixed(2))
+      accelTime: Number(time.toFixed(2)),
+      starterType: profile.type,
     };
   });
   return results;

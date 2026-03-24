@@ -1178,6 +1178,143 @@ When answering queries:
     })
   );
 
+  // ---------------------------------------------------------------------------
+  // Public REST API v1 — scripting / automation surface
+  //
+  // All endpoints require Bearer token auth (same token returned by /login).
+  // CSRF protection is intentionally skipped: these endpoints are designed for
+  // programmatic access from scripts, not browser forms, so there is no CSRF
+  // risk from the same-origin policy.
+  //
+  // Rate limit: shared with /projects (100 req / 15 min per IP by default).
+  // ---------------------------------------------------------------------------
+  const apiRateLimiter = createRateLimiter({ windowMs: rateLimitWindowMs, max: rateLimitMax });
+  app.use('/api/v1', apiRateLimiter, auth);
+
+  /** Load project data or send 404. */
+  async function loadProjectData(req, res) {
+    const project = req.params.project;
+    const username = req.username;
+    if (!isValidName(project) || !isValidName(username)) {
+      res.status(400).json({ error: 'Invalid project name' });
+      return null;
+    }
+    try {
+      const latest = await projectStore.loadLatest(username, project);
+      return latest.data || {};
+    } catch {
+      res.status(404).json({ error: 'Project not found' });
+      return null;
+    }
+  }
+
+  /**
+   * Run an analysis function that depends on dataStore (which uses localStorage).
+   * In Node.js, localStorage is unavailable, so we install an isolated in-memory
+   * mock for the duration of the synchronous analysis call, then restore it.
+   *
+   * Because all analysis functions are synchronous (no await inside them), no
+   * concurrent request can interleave between the mock setup and restore.
+   *
+   * @param {object} projectData  Raw project data blob from storage.
+   * @param {function} fn  Called with ({ setOneLine, setStudies }); must be synchronous.
+   */
+  async function withAnalysisStore(projectData, fn) {
+    const store = {};
+    const mockLS = {
+      getItem:    k   => (Object.prototype.hasOwnProperty.call(store, k) ? store[k] : null),
+      setItem:    (k, v) => { store[k] = String(v); },
+      removeItem: k   => { delete store[k]; },
+      clear:      ()  => { for (const k of Object.keys(store)) delete store[k]; },
+    };
+    const prev = globalThis.localStorage;
+    globalThis.localStorage = mockLS;
+    try {
+      const { setOneLine, setStudies } = await import('./dataStore.mjs');
+      const oneLine = projectData.oneLine || projectData.oneLineData || { activeSheet: 0, sheets: [] };
+      setOneLine(oneLine);
+      setStudies({});
+      return fn();
+    } finally {
+      globalThis.localStorage = prev;
+    }
+  }
+
+  // GET /api/v1/projects/:project/cables
+  app.get(
+    '/api/v1/projects/:project/cables',
+    asyncHandler(async (req, res) => {
+      const data = await loadProjectData(req, res);
+      if (!data) return;
+      const cables = Array.isArray(data.cables) ? data.cables : [];
+      res.json({ cables, count: cables.length });
+    })
+  );
+
+  // GET /api/v1/projects/:project/trays
+  app.get(
+    '/api/v1/projects/:project/trays',
+    asyncHandler(async (req, res) => {
+      const data = await loadProjectData(req, res);
+      if (!data) return;
+      const trays = Array.isArray(data.raceways) ? data.raceways :
+        (Array.isArray(data.trays) ? data.trays : []);
+      res.json({ trays, count: trays.length });
+    })
+  );
+
+  // POST /api/v1/projects/:project/studies/short-circuit
+  app.post(
+    '/api/v1/projects/:project/studies/short-circuit',
+    asyncHandler(async (req, res) => {
+      const data = await loadProjectData(req, res);
+      if (!data) return;
+      const { runShortCircuit } = await import('./analysis/shortCircuit.mjs');
+      const result = await withAnalysisStore(data, () => runShortCircuit());
+      res.json({ shortCircuit: result });
+    })
+  );
+
+  // POST /api/v1/projects/:project/studies/motor-start
+  app.post(
+    '/api/v1/projects/:project/studies/motor-start',
+    asyncHandler(async (req, res) => {
+      const data = await loadProjectData(req, res);
+      if (!data) return;
+      // analysis/motorStart.js imports d3 from a CDN URL which fails in Node.js.
+      // Import the pure calculation module (motorStartCalc.mjs) for server-side use.
+      let runMotorStart;
+      try {
+        ({ runMotorStart } = await import('./analysis/motorStartCalc.mjs'));
+      } catch {
+        // Fall back to the browser module — may fail if d3 CDN import is attempted
+        try {
+          ({ runMotorStart } = await import('./analysis/motorStart.js'));
+        } catch (err) {
+          if (err.code === 'ERR_UNSUPPORTED_ESM_URL_SCHEME') {
+            res.json({ motorStart: {}, note: 'Motor start analysis requires browser environment' });
+            return;
+          }
+          throw err;
+        }
+      }
+      const result = await withAnalysisStore(data, () => runMotorStart());
+      res.json({ motorStart: result });
+    })
+  );
+
+  // POST /api/v1/projects/:project/studies/voltage-drop
+  app.post(
+    '/api/v1/projects/:project/studies/voltage-drop',
+    asyncHandler(async (req, res) => {
+      const data = await loadProjectData(req, res);
+      if (!data) return;
+      const { runVoltageDropStudy } = await import('./analysis/voltageDropStudy.mjs');
+      const result = await withAnalysisStore(data, () => runVoltageDropStudy());
+      res.json({ voltageDrop: result });
+    })
+  );
+
   app.use((err, req, res, next) => {
     console.error(err);
     if (res.headersSent) {

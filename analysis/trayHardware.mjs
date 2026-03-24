@@ -10,6 +10,7 @@
  */
 
 import { calcMaxSpan, NEMA_LOAD_CLASSES } from './supportSpan.mjs';
+import { generateQRDataURL } from './pullCards.mjs';
 
 /** Distance threshold (ft) for treating two endpoints as coincident. */
 const COINCIDENCE_TOL = 0.5;
@@ -326,6 +327,7 @@ export function buildTrayHardwareBOM(trays, options = {}) {
     }
 
     const bracketQty = supportBracketCount(len, maxSpan);
+
     supports.push({
       tray_id: id,
       tray_type: tray.tray_type || '',
@@ -445,6 +447,40 @@ function formatFittingName(type) {
     splice_plate: 'Splice Plate',
   };
   return names[type] || type.charAt(0).toUpperCase() + type.slice(1).replace(/_/g, ' ');
+}
+
+// ---------------------------------------------------------------------------
+// QR enrichment — optional async post-processing
+// ---------------------------------------------------------------------------
+
+/**
+ * Enrich a BOM from buildTrayHardwareBOM with QR code data URLs per tray row.
+ * This is a separate async step so that the synchronous buildTrayHardwareBOM API
+ * is not affected.
+ *
+ * Each entry in `supports` and `sections` gains a `qr_data_url` field whose value
+ * is a PNG data URL encoding a URL that links to the raceway schedule filtered to
+ * that tray ID.
+ *
+ * @param {{ supports: Array, sections: Array }} bom - result of buildTrayHardwareBOM
+ * @param {{ baseURL?: string }} [options]
+ * @returns {Promise<void>} mutates bom in place
+ */
+export async function enrichTrayBOMWithQR(bom, options = {}) {
+  const baseURL = options.baseURL || 'https://cabletrayroute.com';
+  const allRows = [...(bom.supports || []), ...(bom.sections || [])];
+  const seen = new Map();
+  await Promise.all(
+    allRows.map(async row => {
+      const id = row.tray_id;
+      if (!id) return;
+      if (!seen.has(id)) {
+        const url = `${baseURL}/racewayschedule.html#tray=${encodeURIComponent(id)}`;
+        seen.set(id, generateQRDataURL(url));
+      }
+      row.qr_data_url = await seen.get(id);
+    })
+  );
 }
 
 // Exported for testing

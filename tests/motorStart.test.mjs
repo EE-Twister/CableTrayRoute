@@ -205,3 +205,131 @@ describe('motorTorque', () => {
     assert.strictEqual(Tm, 0);
   });
 });
+
+// ---------------------------------------------------------------------------
+// Starter type profile helpers — extracted from analysis/motorStart.js
+// ---------------------------------------------------------------------------
+
+/** Returns effective inrush current for a given starter type at time t. */
+function effectiveInrush(Ilr, Ifl, profile, time) {
+  if (profile.type === 'vfd') {
+    return Ifl * profile.vfdCurrentLimitPu;
+  }
+  if (profile.type === 'soft_starter') {
+    const rampFrac = Math.min(time / profile.rampTimeSec, 1.0);
+    const vRamp = profile.initialVoltagePu + (1.0 - profile.initialVoltagePu) * rampFrac;
+    return Ilr * vRamp * vRamp;
+  }
+  if (profile.type === 'wye_delta') {
+    return time < profile.wyeDeltaSwitchTimeSec ? Ilr / 3 : Ilr;
+  }
+  if (profile.type === 'autotransformer') {
+    return Ilr * profile.autotransformerTap * profile.autotransformerTap;
+  }
+  return Ilr; // dol
+}
+
+/** Build a profile with defaults matching analysis/motorStart.js getStarterProfile. */
+function makeProfile(type, overrides = {}) {
+  return {
+    type,
+    vfdCurrentLimitPu: 1.1,
+    initialVoltagePu: 0.3,
+    rampTimeSec: 10,
+    wyeDeltaSwitchTimeSec: 5,
+    autotransformerTap: 0.65,
+    ...overrides,
+  };
+}
+
+// ---------------------------------------------------------------------------
+describe('getStarterProfile — VFD', () => {
+  it('VFD inrush is vfd_current_limit_pu × Ifl (default 1.1×), far less than DOL 6× Ifl', () => {
+    const Ifl = fullLoadCurrent(100, 480, 0.9, 0.9);
+    const Ilr = lockedRotorCurrent(Ifl, 6);
+    const profile = makeProfile('vfd');
+    const vfdInrush = effectiveInrush(Ilr, Ifl, profile, 0);
+    const dolInrush = effectiveInrush(Ilr, Ifl, makeProfile('dol'), 0);
+    assert.ok(vfdInrush < dolInrush / 4, `VFD inrush ${vfdInrush.toFixed(1)} A should be << DOL ${dolInrush.toFixed(1)} A`);
+  });
+
+  it('VFD inrush equals exactly Ifl × vfd_current_limit_pu', () => {
+    const Ifl = 100;
+    const Ilr = 600;
+    const profile = makeProfile('vfd', { vfdCurrentLimitPu: 1.5 });
+    const inrush = effectiveInrush(Ilr, Ifl, profile, 0);
+    assert.ok(approxEqual(inrush, 150, 1e-9), `Got ${inrush}`);
+  });
+});
+
+// ---------------------------------------------------------------------------
+describe('getStarterProfile — Soft Starter', () => {
+  it('at t=0 inrush is initialVoltagePu² × Ilr', () => {
+    const Ilr = 600;
+    const Ifl = 100;
+    const profile = makeProfile('soft_starter', { initialVoltagePu: 0.3, rampTimeSec: 10 });
+    const inrush0 = effectiveInrush(Ilr, Ifl, profile, 0);
+    const expected = Ilr * 0.3 * 0.3;
+    assert.ok(approxEqual(inrush0, expected, 0.01), `Got ${inrush0.toFixed(2)}, expected ${expected.toFixed(2)}`);
+  });
+
+  it('at t=rampTimeSec inrush equals full DOL inrush', () => {
+    const Ilr = 600;
+    const Ifl = 100;
+    const profile = makeProfile('soft_starter', { initialVoltagePu: 0.3, rampTimeSec: 10 });
+    const inrushFull = effectiveInrush(Ilr, Ifl, profile, 10);
+    assert.ok(approxEqual(inrushFull, Ilr, 1e-9), `Got ${inrushFull}`);
+  });
+
+  it('inrush increases monotonically during ramp', () => {
+    const Ilr = 600;
+    const Ifl = 100;
+    const profile = makeProfile('soft_starter', { initialVoltagePu: 0.3, rampTimeSec: 10 });
+    const i0  = effectiveInrush(Ilr, Ifl, profile, 0);
+    const i5  = effectiveInrush(Ilr, Ifl, profile, 5);
+    const i10 = effectiveInrush(Ilr, Ifl, profile, 10);
+    assert.ok(i0 < i5 && i5 < i10, `Not monotonic: ${i0.toFixed(1)} ${i5.toFixed(1)} ${i10.toFixed(1)}`);
+  });
+});
+
+// ---------------------------------------------------------------------------
+describe('getStarterProfile — Wye-Delta', () => {
+  it('before switch time inrush is exactly Ilr / 3', () => {
+    const Ilr = 600;
+    const profile = makeProfile('wye_delta', { wyeDeltaSwitchTimeSec: 5 });
+    const inrushWye = effectiveInrush(Ilr, 100, profile, 0);
+    assert.ok(approxEqual(inrushWye, Ilr / 3, 1e-9), `Got ${inrushWye}`);
+  });
+
+  it('after switch time inrush equals full DOL inrush', () => {
+    const Ilr = 600;
+    const profile = makeProfile('wye_delta', { wyeDeltaSwitchTimeSec: 5 });
+    const inrushDelta = effectiveInrush(Ilr, 100, profile, 5);
+    assert.ok(approxEqual(inrushDelta, Ilr, 1e-9), `Got ${inrushDelta}`);
+  });
+});
+
+// ---------------------------------------------------------------------------
+describe('getStarterProfile — Autotransformer', () => {
+  it('default 0.65 tap reduces inrush to 0.65² = 0.4225 of DOL', () => {
+    const Ilr = 600;
+    const profile = makeProfile('autotransformer', { autotransformerTap: 0.65 });
+    const inrush = effectiveInrush(Ilr, 100, profile, 0);
+    const expected = Ilr * 0.65 * 0.65;
+    assert.ok(approxEqual(inrush, expected, 1e-9), `Got ${inrush.toFixed(2)}, expected ${expected.toFixed(2)}`);
+  });
+
+  it('custom 0.80 tap gives 64% of DOL inrush', () => {
+    const Ilr = 1000;
+    const profile = makeProfile('autotransformer', { autotransformerTap: 0.80 });
+    const inrush = effectiveInrush(Ilr, 100, profile, 0);
+    assert.ok(approxEqual(inrush / Ilr, 0.64, 1e-9), `Ratio ${inrush / Ilr}`);
+  });
+
+  it('autotransformer inrush is always less than DOL inrush for tap < 1', () => {
+    const Ilr = 600;
+    const profile = makeProfile('autotransformer', { autotransformerTap: 0.50 });
+    const inrush = effectiveInrush(Ilr, 100, profile, 0);
+    assert.ok(inrush < Ilr, `Expected inrush (${inrush}) < Ilr (${Ilr})`);
+  });
+});
