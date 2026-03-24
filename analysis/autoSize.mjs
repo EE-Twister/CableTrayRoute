@@ -120,8 +120,72 @@ export const STANDARD_XFMR_KVA = [
 ];
 
 // ---------------------------------------------------------------------------
+// NEC Table 310.15(B)(1)(a) — Ambient temperature correction factors
+// Applied when ambient temperature differs from the 30°C reference.
+// Rows: [maxAmbientC, factor_60C, factor_75C, factor_90C]
+// ---------------------------------------------------------------------------
+const AMBIENT_TEMP_CORRECTION = [
+  { maxAmbientC: 10,  cu60: 1.29, cu75: 1.20, cu90: 1.15 },
+  { maxAmbientC: 15,  cu60: 1.22, cu75: 1.15, cu90: 1.12 },
+  { maxAmbientC: 20,  cu60: 1.15, cu75: 1.11, cu90: 1.08 },
+  { maxAmbientC: 25,  cu60: 1.08, cu75: 1.05, cu90: 1.04 },
+  { maxAmbientC: 30,  cu60: 1.00, cu75: 1.00, cu90: 1.00 },
+  { maxAmbientC: 35,  cu60: 0.91, cu75: 0.94, cu90: 0.96 },
+  { maxAmbientC: 40,  cu60: 0.82, cu75: 0.88, cu90: 0.91 },
+  { maxAmbientC: 45,  cu60: 0.71, cu75: 0.82, cu90: 0.87 },
+  { maxAmbientC: 50,  cu60: 0.58, cu75: 0.75, cu90: 0.82 },
+  { maxAmbientC: 55,  cu60: 0.41, cu75: 0.67, cu90: 0.76 },
+  { maxAmbientC: 60,  cu60: 0.00, cu75: 0.58, cu90: 0.71 },
+  { maxAmbientC: 65,  cu60: 0.00, cu75: 0.47, cu90: 0.65 },
+  { maxAmbientC: 70,  cu60: 0.00, cu75: 0.33, cu90: 0.58 },
+  { maxAmbientC: 75,  cu60: 0.00, cu75: 0.00, cu90: 0.50 },
+  { maxAmbientC: 80,  cu60: 0.00, cu75: 0.00, cu90: 0.41 },
+  { maxAmbientC: 85,  cu60: 0.00, cu75: 0.00, cu90: 0.29 },
+  { maxAmbientC: 90,  cu60: 0.00, cu75: 0.00, cu90: 0.00 },
+];
+
+// ---------------------------------------------------------------------------
+// NEC 310.15(C)(1) — Bundling / adjustment factors for more than 3
+// current-carrying conductors in a raceway or cable.
+// ---------------------------------------------------------------------------
+const BUNDLING_FACTORS = [
+  { maxConductors:  3, factor: 1.00 },
+  { maxConductors:  6, factor: 0.80 },
+  { maxConductors:  9, factor: 0.70 },
+  { maxConductors: 20, factor: 0.50 },
+  { maxConductors: 30, factor: 0.45 },
+  { maxConductors: 40, factor: 0.40 },
+  { maxConductors: Infinity, factor: 0.35 },
+];
+
+// ---------------------------------------------------------------------------
 // Helpers
 // ---------------------------------------------------------------------------
+
+/**
+ * Return the NEC 310.15(B)(1)(a) ambient temperature correction factor.
+ *
+ * @param {number} ambientTempC  Actual ambient temperature in °C.
+ * @param {60|75|90} tempRating  Conductor insulation temperature rating.
+ * @returns {number}  Correction factor (≤1.0 above 30°C, ≥1.0 below 30°C).
+ *                   Returns 0 when the ambient exceeds the conductor rating.
+ */
+export function ambientTempFactor(ambientTempC, tempRating = 75) {
+  const col = tempRating >= 90 ? 'cu90' : tempRating >= 75 ? 'cu75' : 'cu60';
+  const row = AMBIENT_TEMP_CORRECTION.find(r => ambientTempC <= r.maxAmbientC);
+  return row ? (row[col] ?? 0) : 0;
+}
+
+/**
+ * Return the NEC 310.15(C)(1) bundling adjustment factor.
+ *
+ * @param {number} bundledConductors  Number of current-carrying conductors in raceway/cable.
+ * @returns {number}  Derating factor (1.0 when ≤3 conductors).
+ */
+export function bundlingFactor(bundledConductors) {
+  const row = BUNDLING_FACTORS.find(r => bundledConductors <= r.maxConductors);
+  return row ? row.factor : BUNDLING_FACTORS[BUNDLING_FACTORS.length - 1].factor;
+}
 
 /**
  * Find the next standard OCPD rating at or above the required ampacity.
@@ -144,24 +208,43 @@ export function nextStandardXfmrKva(requiredKva) {
 }
 
 /**
- * Select conductor size from NEC Table 310.15(B)(16) for a required ampacity.
+ * Select conductor size from NEC Table 310.15(B)(16) for a required ampacity,
+ * optionally applying ambient temperature and bundling correction factors.
  *
- * @param {number} requiredAmps  Load current requiring protection
+ * When derating factors are provided the required ampacity is divided by the
+ * combined factor before table lookup, ensuring the installed (derated) ampacity
+ * meets the load requirement per NEC 310.15(B)(1)(a) and 310.15(C)(1).
+ *
+ * @param {number} requiredAmps         Load current requiring protection
  * @param {'copper'|'aluminum'} material
- * @param {60|75|90} tempRating  Conductor insulation temperature rating (°C)
- * @returns {{size: string, ampacity: number}|null}
+ * @param {60|75|90} tempRating         Conductor insulation temperature rating (°C)
+ * @param {object}  [options]
+ * @param {number}  [options.ambientTempC=30]        Ambient temperature in °C
+ * @param {number}  [options.bundledConductors=1]    Number of current-carrying conductors in raceway
+ * @returns {{size: string, ampacity: number, deratingFactor: number}|null}
  */
-export function selectConductorSize(requiredAmps, material = 'copper', tempRating = 75) {
+export function selectConductorSize(requiredAmps, material = 'copper', tempRating = 75, options = {}) {
+  const { ambientTempC = 30, bundledConductors = 1 } = options;
+
+  const tempFactor = ambientTempFactor(ambientTempC, tempRating);
+  const bundleFactor = bundlingFactor(bundledConductors);
+  const combinedFactor = tempFactor * bundleFactor;
+
+  if (combinedFactor <= 0) return null; // ambient exceeds conductor rating
+
+  // Gross up required ampacity so that: table_value × combined_factor ≥ requiredAmps
+  const adjustedRequired = combinedFactor < 1 ? requiredAmps / combinedFactor : requiredAmps;
+
   const col = material === 'aluminum'
     ? (tempRating >= 90 ? 'al90' : 'al75')
     : (tempRating >= 90 ? 'cu90' : tempRating >= 75 ? 'cu75' : 'cu60');
 
   const entry = NEC_AMPACITY_TABLE.find(row => {
     const amp = row[col];
-    return amp !== null && amp >= requiredAmps;
+    return amp !== null && amp >= adjustedRequired;
   });
   if (!entry) return null;
-  return { size: entry.size, ampacity: entry[col] };
+  return { size: entry.size, ampacity: entry[col], deratingFactor: combinedFactor };
 }
 
 /**
@@ -214,14 +297,18 @@ export function motorFLC1Ph(hp, voltage) {
  * Rules applied:
  *   - If continuous: required ampacity = 125% of load current (NEC 210.20/215.3)
  *   - If non-continuous: required ampacity = 100% of load current
- *   - Conductor: select smallest NEC 310.15(B)(16) size ≥ required ampacity
+ *   - Conductor: select smallest NEC 310.15(B)(16) size ≥ required ampacity after
+ *     applying ambient temperature correction (NEC 310.15(B)(1)(a)) and bundling
+ *     adjustment factor (NEC 310.15(C)(1)) when installation conditions are provided
  *   - OCPD: next standard size ≥ conductor ampacity (NEC 240.4(B))
  *
  * @param {object} params
- * @param {number} params.loadAmps        Load current (A)
- * @param {boolean} [params.continuous]   True if load is continuous (≥3 hours). Default: true
+ * @param {number} params.loadAmps              Load current (A)
+ * @param {boolean} [params.continuous]         True if load is continuous (≥3 hours). Default: true
  * @param {'copper'|'aluminum'} [params.material]  Conductor material. Default: 'copper'
- * @param {60|75|90} [params.tempRating]  Conductor temperature rating. Default: 75
+ * @param {60|75|90} [params.tempRating]        Conductor temperature rating. Default: 75
+ * @param {number} [params.ambientTempC]        Ambient temperature in °C. Default: 30
+ * @param {number} [params.bundledConductors]   Number of current-carrying conductors in raceway. Default: 1
  * @returns {object} Sizing results
  */
 export function sizeFeeder(params) {
@@ -229,16 +316,19 @@ export function sizeFeeder(params) {
     loadAmps,
     continuous = true,
     material = 'copper',
-    tempRating = 75
+    tempRating = 75,
+    ambientTempC = 30,
+    bundledConductors = 1,
   } = params;
 
   if (loadAmps <= 0) throw new Error('Load current must be positive');
 
   const requiredAmps = continuous ? loadAmps * 1.25 : loadAmps;
-  const conductor = selectConductorSize(requiredAmps, material, tempRating);
+  const conductor = selectConductorSize(requiredAmps, material, tempRating, { ambientTempC, bundledConductors });
   if (!conductor) return { error: 'Load exceeds maximum single-conductor capacity; use parallel conductors' };
 
   const ocpd = nextStandardOcpd(conductor.ampacity);
+  const derating = conductor.deratingFactor;
 
   return {
     loadAmps,
@@ -246,12 +336,18 @@ export function sizeFeeder(params) {
     requiredAmps: Math.round(requiredAmps * 100) / 100,
     conductorSize: conductor.size,
     conductorAmpacity: conductor.ampacity,
+    installedAmpacity: Math.round(conductor.ampacity * derating * 10) / 10,
+    deratingFactor: derating,
+    ambientTempC,
+    bundledConductors,
     material,
     tempRating,
     ocpdRating: ocpd,
     nec: {
       continuousRule: 'NEC 210.20(A) / 215.3 — 125% of continuous load',
       conductorRule: 'NEC 310.15(B)(16) — 75°C column',
+      ambientRule: ambientTempC !== 30 ? `NEC 310.15(B)(1)(a) — ambient ${ambientTempC}°C correction factor ${derating.toFixed(2)}` : null,
+      bundlingRule: bundledConductors > 3 ? `NEC 310.15(C)(1) — ${bundledConductors} conductors bundling factor ${bundlingFactor(bundledConductors).toFixed(2)}` : null,
       ocpdRule: 'NEC 240.4(B) — next standard size above conductor ampacity',
     }
   };
@@ -270,13 +366,17 @@ export function sizeFeeder(params) {
  *     (NEC 430.52, Table 430.52 — standard AC squirrel cage motor)
  *   - Overload relay (thermal protection): 115% of FLC for motors > 1.15 service factor
  *     or 125% otherwise (NEC 430.32(A))
+ *   - Ambient temperature and bundling correction factors applied when provided
+ *     (NEC 310.15(B)(1)(a) and 310.15(C)(1))
  *
  * @param {object} params
- * @param {number} params.hp             Motor nameplate HP
- * @param {number} params.voltage        System voltage (V)
- * @param {'3ph'|'1ph'} [params.phase]  Motor phase. Default '3ph'
+ * @param {number} params.hp                     Motor nameplate HP
+ * @param {number} params.voltage                System voltage (V)
+ * @param {'3ph'|'1ph'} [params.phase]           Motor phase. Default '3ph'
  * @param {'copper'|'aluminum'} [params.material]  Default 'copper'
- * @param {boolean} [params.highSF]     True if service factor ≥ 1.15. Default: true
+ * @param {boolean} [params.highSF]              True if service factor ≥ 1.15. Default: true
+ * @param {number} [params.ambientTempC]         Ambient temperature in °C. Default: 30
+ * @param {number} [params.bundledConductors]    Number of current-carrying conductors in raceway. Default: 1
  * @returns {object} Motor branch circuit sizing
  */
 export function sizeMotorBranch(params) {
@@ -285,7 +385,9 @@ export function sizeMotorBranch(params) {
     voltage,
     phase = '3ph',
     material = 'copper',
-    highSF = true
+    highSF = true,
+    ambientTempC = 30,
+    bundledConductors = 1,
   } = params;
 
   if (hp <= 0) throw new Error('Motor HP must be positive');
@@ -298,7 +400,7 @@ export function sizeMotorBranch(params) {
 
   // Branch circuit conductor: 125% of FLC (NEC 430.22)
   const conductorRequired = flc * 1.25;
-  const conductor = selectConductorSize(conductorRequired, material, 75);
+  const conductor = selectConductorSize(conductorRequired, material, 75, { ambientTempC, bundledConductors });
 
   // Branch circuit OCPD: 250% for inverse time breaker (NEC 430.52, Table 430.52)
   // If 250% doesn't correspond to a standard size, next standard size above is allowed
@@ -310,6 +412,8 @@ export function sizeMotorBranch(params) {
   const overloadPercent = highSF ? 1.15 : 1.25;
   const overloadSetpoint = flc * overloadPercent;
 
+  const derating = conductor ? conductor.deratingFactor : 1;
+
   return {
     hp,
     voltage,
@@ -319,6 +423,10 @@ export function sizeMotorBranch(params) {
     conductorRequired: Math.round(conductorRequired * 100) / 100,
     conductorSize: conductor ? conductor.size : null,
     conductorAmpacity: conductor ? conductor.ampacity : null,
+    installedAmpacity: conductor ? Math.round(conductor.ampacity * derating * 10) / 10 : null,
+    deratingFactor: derating,
+    ambientTempC,
+    bundledConductors,
     material,
     // Branch circuit OCPD (inverse time breaker)
     ocpdRequired: Math.round(ocpdRequired * 100) / 100,
@@ -330,6 +438,8 @@ export function sizeMotorBranch(params) {
     nec: {
       flcSource: phase === '1ph' ? 'NEC Table 430.248' : 'NEC Table 430.250',
       conductorRule: 'NEC 430.22 — 125% of motor FLC',
+      ambientRule: ambientTempC !== 30 ? `NEC 310.15(B)(1)(a) — ambient ${ambientTempC}°C correction factor ${ambientTempFactor(ambientTempC, 75).toFixed(2)}` : null,
+      bundlingRule: bundledConductors > 3 ? `NEC 310.15(C)(1) — ${bundledConductors} conductors bundling factor ${bundlingFactor(bundledConductors).toFixed(2)}` : null,
       ocpdRule: 'NEC 430.52, Table 430.52 — 250% FLC (inverse time breaker)',
       overloadRule: `NEC 430.32(A)(1) — ${overloadPercent * 100}% of FLC`,
     }
