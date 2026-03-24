@@ -1,6 +1,6 @@
 # Competitor Feature Gap Analysis
 
-## Date: 2026-03-24 (updated from 2026-03-21; original 2026-03-16)
+## Date: 2026-03-24 (updated from 2026-03-21; original 2026-03-16; usability/calculation pass added 2026-03-24)
 
 This document identifies features commonly found in major competitor platforms that are currently missing from CableTrayRoute.
 
@@ -13,6 +13,8 @@ CableTrayRoute already offers a strong, integrated suite covering cable routing 
 **Since the initial analysis (2026-03-16), 16 of those 20 gaps have been implemented.** The remaining 4 gaps require external infrastructure (native CAD plugins, live pricing databases) and are deferred.
 
 **The 2026-03-24 refresh of competitor products** (ETAP 2024/2025, EasyPower 2025, MagiCAD 2026, Eplan Platform 2025/2026, Revit 2026, Bentley Raceway 2024/2025, Paneldes 2025) reveals **10 additional feature gaps** across AI/ML interfaces, interoperability standards, field operations, and emerging infrastructure patterns. These are documented below under "Newly Identified Gaps (2026-03-24)".
+
+A **second pass on 2026-03-24** examines the application through two additional lenses not covered in the feature-presence analysis: **usability quality** (how CableTrayRoute behaves vs. competitor UX standards) and **calculation completeness** (simplified models, missing correction factors, and analysis gaps relative to ETAP, EasyPower, SKM, and Aeries CARS). These findings are documented under "Usability Gaps vs. Competitors" and "Calculation Completeness Gaps".
 
 ---
 
@@ -174,6 +176,230 @@ The following gaps were discovered by reviewing competitor release notes and pro
 
 ---
 
+---
+
+## Usability Gaps vs. Competitors (2026-03-24 Pass)
+
+These gaps describe areas where CableTrayRoute's user experience lags behind competitor UX standards, independent of whether the underlying calculation feature exists.
+
+---
+
+### 13. Error Dialogs Use Browser `alert()` Instead of Modal Dialogs
+
+| Missing UX Pattern | Competitor Benchmark | Description |
+|---|---|---|
+| **Consistent in-app modal error handling** | ETAP, EasyPower (modal dialogs throughout) | Over 50 instances of `alert()` are used for error messages instead of the application's existing modal component: `cabletrayfill.js` (40+ instances), `src/panelSchedule.js` (13 instances), `src/racewayschedule.js`, `src/scenarios.js`, and `src/projectManager.js`. Browser `alert()` blocks the entire UI, cannot be styled or dismissed gracefully, and is inconsistent with the rest of the application. The modal component (`src/components/modal.js`) is already implemented and used correctly in many places — it is simply not applied consistently. |
+
+**Status:** Not addressed. Low implementation effort (search/replace pattern); high UX impact.
+
+---
+
+### 14. No Contextual "Why / How to Fix" Guidance in Violation Messages
+
+| Missing UX Pattern | Competitor Benchmark | Description |
+|---|---|---|
+| **Inline corrective-action suggestions** | ETAP Electric Copilot™, EasyPower (contextual rule explanations) | `analysis/designRuleChecker.mjs` reports violations such as "Tray fill 52.3% exceeds NEC 392.22(A) limit of 40%" but provides no explanation of why the limit exists, no guidance on how to resolve it (add a tray, reroute cables, use a wider tray), and no indication of which specific cables are contributing most to the excess. The only place in the codebase where this is done correctly is `analysis/arcFlash.mjs` line 412: `'Incident energy exceeds 40 cal/cm²; verify protective coordination and consider mitigation.'` — that pattern should be applied everywhere. |
+
+**Status:** Not addressed. Requires adding corrective-action text to violation objects in `designRuleChecker.mjs`, `autoSize.mjs`, and other reporting modules.
+
+---
+
+### 15. No Visual Dashboards or Fill Gauges
+
+| Missing UX Pattern | Competitor Benchmark | Description |
+|---|---|---|
+| **Graphical utilization heat-maps and progress gauges** | MagiCAD 2026, Bentley Raceway 2024/2025 (graphical fill heat-maps and color-coded tray schedules) | All analysis results are displayed as plain text or unstyled HTML tables. There are no fill gauge/progress bars showing % utilization per tray, no per-tray utilization heat-maps highlighting overloaded segments, no color-coded violation cells in result tables, and no summary charts (bar charts, pie charts) showing distribution of fill levels across the project. MagiCAD and Bentley both provide graphical utilization overlays on the 3D model. At minimum, a visual fill gauge for `cabletrayfill.html` and a sorted worst-offenders list would bring the UX in line with competitors. |
+
+**Status:** Not addressed. Requires adding chart/gauge components to result pages.
+
+---
+
+### 16. No Configuration Profiles or Project Templates
+
+| Missing UX Pattern | Competitor Benchmark | Description |
+|---|---|---|
+| **Industry-specific project templates** | ETAP (industry configuration wizards), Aeries CARS (industrial/oil & gas defaults), SnakeTray (AI data center application guides) | Users must manually configure every project from scratch: select voltage standards, fill limits, cable groups, ambient conditions, and code edition individually. Competitors offer "Oil & Gas", "Data Center", "Industrial", and "Utility" templates that pre-populate sensible defaults. CableTrayRoute has no such template system. This is especially relevant given the separately identified gap for data center infrastructure templates (Gap #8 above). |
+
+**Status:** Not addressed. Feasible as a preset JSON configuration applied on new-project creation.
+
+---
+
+### 17. No Sensitivity Analysis or Scenario Comparison UI
+
+| Missing UX Pattern | Competitor Benchmark | Description |
+|---|---|---|
+| **Side-by-side scenario comparison and parameter sweeps** | ETAP (scenario manager with comparison view), EasyPower (study case comparison) | `src/scenarios.js` exists and stores multiple study variants, but there is no UI for comparing scenarios side-by-side (e.g., "Design A: avg fill 42%, 3 violations" vs "Design B: avg fill 38%, 0 violations") or for sweeping a parameter (e.g., "show tray fill as ambient temperature increases from 25°C to 50°C"). Users cannot perform "what-if" analysis without manually switching scenarios and recording results manually. |
+
+**Status:** Not addressed. Requires extending the existing `src/scenarios.js` with a comparison view UI.
+
+---
+
+### 18. Minimal Onboarding — 3-Step Tour for One Module Only
+
+| Missing UX Pattern | Competitor Benchmark | Description |
+|---|---|---|
+| **Guided setup wizards and workflow walkthroughs** | EasyPower (step-by-step setup wizards), Bentley Raceway (workflow guidance panels) | `tour.js` provides only a 3-step interactive tour that targets the one-line diagram editor (palette → canvas → properties). There is no walkthrough for the core cable routing workflow (schedule → tray setup → fill → route), no guided introduction to any electrical study, and no "first-time user" wizard that walks through creating a complete project. New engineers face a steep learning curve with no in-app guidance beyond a help page. |
+
+**Status:** Not addressed. Requires expanding `tour.js` to cover the full 6-step routing workflow and key analysis tools.
+
+---
+
+### 19. No Results Annotation or Engineer Approval Workflow
+
+| Missing UX Pattern | Competitor Benchmark | Description |
+|---|---|---|
+| **Engineer notes and approval status on study results** | ETAP (comments on study results), Bentley Raceway (approval workflow with status stamps) | There is no way for an engineer to add notes to individual cables, flag a design rule violation as "accepted by engineer", mark a study result as "Approved by PE", or leave review comments for collaborators. This is a significant gap for multi-user collaboration — the existing real-time collaboration (`src/collabManager.js`) allows simultaneous editing but has no review/approval layer. |
+
+**Status:** Not addressed. Could be implemented as optional text fields on cable/tray records and a status column in result tables.
+
+---
+
+### 20. No Workflow Progress Dashboard
+
+| Missing UX Pattern | Competitor Benchmark | Description |
+|---|---|---|
+| **Project health summary showing completion status** | EasyPower (project health view), Aeries CARS (progress tracking view) | `src/workflowStatus.js` exists in the codebase but there is no UI that surfaces a project-level health summary: which workflow steps are complete, which analyses have violations, and what the next recommended action is. Users must navigate to each of the 47+ pages individually to discover outstanding issues. A single dashboard showing "Cable Schedule ✓ · Tray Fill ⚠ (3 violations) · Routing ✓ · Arc Flash ✗ (not run)" would significantly reduce time-to-discovery. |
+
+**Status:** Not addressed. `src/workflowStatus.js` infrastructure exists; requires a dashboard UI to surface it.
+
+---
+
+### 21. No Mobile-Optimized Field Access
+
+| Missing UX Pattern | Competitor Benchmark | Description |
+|---|---|---|
+| **Mobile / tablet views for field inspection** | ETAP 2025 (dedicated mobile app), Aeries CARS (field access module) | Pages declare `<meta name="viewport">` and the navigation has a hamburger toggle, but complex tables, 3D Plotly visualizations, and multi-column forms are not usable on mobile screens. Competitors offer dedicated mobile views or companion apps that let field technicians view cable schedules, pull cards, and tray assignments on tablets during installation. This is particularly relevant given the QR code gap (Gap #6) — QR codes on pull cards are meaningless without a mobile-friendly target view. |
+
+**Status:** Not addressed. Requires responsive table/form layouts and a simplified read-only field-access view.
+
+---
+
+### 22. Navigation Out of Sync on Static Pages
+
+| Missing UX Pattern | Competitor Benchmark | Description |
+|---|---|---|
+| **Consistent application navigation** | All competitors (consistent navigation patterns) | `index.html`, `help.html`, `404.html`, and `500.html` use hardcoded navigation HTML that is missing all Studies pages (TCC, Harmonics, Motor Start, Load Flow, Short Circuit, Arc Flash) and the Custom Components and Account links. The dynamic navigation component (`src/components/navigation.js`) that correctly defines all 21 routes is not used on these pages. Users who arrive at the landing page or error pages cannot navigate to any electrical study. |
+
+**Status:** Previously flagged in `AUDIT_WEBSITE_GAPS.md` (2026-03-16). Not yet resolved.
+
+---
+
+## Calculation Completeness Gaps (2026-03-24 Pass)
+
+These gaps describe areas where CableTrayRoute's calculation engine uses simplified models, omits required correction factors, or lacks analysis modes that best-in-class competitors (ETAP, EasyPower, SKM, Aeries CARS) provide.
+
+---
+
+### 23. Auto-Sizing Ignores Tray Derating and Ambient Temperature Corrections
+
+| Missing Calculation | Competitor Benchmark | Description |
+|---|---|---|
+| **NEC 310.15(B) & (C) derating in conductor auto-selection** | ETAP cable sizing, EasyPower SmartDesign | `analysis/autoSize.mjs` looks up NEC ampacity tables at the 30°C baseline and selects the next-larger standard conductor size. It does not apply: (1) ambient temperature correction factors per NEC Table 310.15(B)(1)(a); (2) more-than-3-conductors bundling/grouping derating per NEC 310.15(C); or (3) tray fill derating per NEC 392.80(A). The result is that auto-selected conductors may be undersized once installation conditions are accounted for. ETAP and EasyPower both apply all three derating sequences before finalizing a conductor size. |
+
+**Status:** Not addressed. `analysis/ampacity.mjs` has the correction factor tables; `autoSize.mjs` needs to call them with actual installation parameters.
+
+---
+
+### 24. Auto-Sizing Does Not Minimize Cost or Evaluate Cu/Al Tradeoff
+
+| Missing Calculation | Competitor Benchmark | Description |
+|---|---|---|
+| **Cost-optimized conductor selection** | ETAP (cost-optimized sizing with material tradeoff), EasyPower | `analysis/autoSize.mjs` selects the next-larger standard size meeting ampacity requirements without evaluating whether a larger aluminum conductor would meet the same requirement at lower cost, or whether two smaller parallel conductors would be cheaper than one large conductor. Competitors perform a cost/weight optimization across material choices. The `analysis/costEstimate.mjs` cost data and `analysis/intlCableSize.mjs` size tables are both available and could be used to build this tradeoff. |
+
+**Status:** Not addressed. Moderate complexity; requires integrating cost data into the sizing loop.
+
+---
+
+### 25. Pull Tension Uses Simplified Capstan Friction Model
+
+| Missing Calculation | Competitor Benchmark | Description |
+|---|---|---|
+| **Advanced pull tension with conductor stiffness and temperature effects** | Aeries CARS CableMatic (detailed pulling simulation), Bentley Raceway (pulling calculations) | `src/pullCalc.js` implements the standard exponential capstan friction model (T₂ = T₁ × e^(μθ)) for bends and constant friction for straight runs. Missing: (1) conductor jacket stiffness — large cables resist bending at corners, increasing effective tension beyond the capstan model; (2) temperature-dependent friction coefficient — jacket material (PVC, XLPE) stiffness varies significantly with ambient temperature; (3) acceleration forces for long pulls in inclined trays; (4) dynamic vs. static friction transition at start-of-pull. Aeries CARS models all four effects. |
+
+**Status:** Not addressed. Requires extending the pull tension model with stiffness and temperature correction terms.
+
+---
+
+### 26. Short Circuit Analysis Limited to Three-Phase Symmetric Faults
+
+| Missing Calculation | Competitor Benchmark | Description |
+|---|---|---|
+| **Full fault matrix: SLG, L-L, DLG, and impedance faults** | ETAP, EasyPower, SKM PowerTools (complete ANSI/IEC fault matrix) | `analysis/shortCircuit.mjs` calculates three-phase symmetric (3Φ) bolted fault currents using Thevenin impedance. The single line-to-ground (SLG) fault is the most common distribution fault type and typically produces the highest ground fault current in effectively-grounded systems. Line-to-line (L-L) and double line-to-ground (DLG) faults are required for full protective device coordination and arc flash boundary determination. Impedance faults (non-bolted) are required for high-resistance grounded systems. All three competitor platforms support the complete fault matrix. |
+
+**Status:** Not addressed. Requires adding sequence network (positive/negative/zero sequence) impedance modeling to `analysis/shortCircuit.mjs`.
+
+---
+
+### 27. Harmonics Analysis Assumes Balanced Three-Phase Spectrum
+
+| Missing Calculation | Competitor Benchmark | Description |
+|---|---|---|
+| **Per-phase unbalanced harmonic injection** | ETAP harmonic load flow, EasyPower harmonic analysis | `analysis/harmonics.js` calculates Total Harmonic Distortion (THD) and individual harmonic orders using a single-phase model with a quality-factor approximation (`const q = Number(f.q) || 1`). It does not support per-phase unbalanced harmonic spectra, which are common when single-phase VFDs, switch-mode power supplies, or EV chargers create different harmonic current magnitudes on each phase. Unbalanced harmonics drive triplen harmonic currents in the neutral conductor — a safety concern not detectable with a balanced model. |
+
+**Status:** Not addressed. Requires extending the harmonic model to three independent phase spectra with neutral current calculation.
+
+---
+
+### 28. Motor Starting Does Not Model VFDs or Soft Starters
+
+| Missing Calculation | Competitor Benchmark | Description |
+|---|---|---|
+| **Reduced-voltage and VFD starting transient models** | ETAP (soft-starter and VFD motor starting), EasyPower (dynamic motor starting) | `analysis/motorStart.js` models direct-on-line (DOL) inrush current only: a multiplier (typically 6–8× FLA) applied as a step function. Variable-frequency drives (VFDs) limit inrush to approximately 1.0–1.5× FLA with a controlled ramp; reduced-voltage soft starters limit inrush to 2–4× FLA with a linear voltage ramp. These are the most common motor starting methods in modern industrial installations. Without VFD/soft-starter models, voltage drop analysis during motor starting is significantly overstated, leading to unnecessarily conservative cable and transformer sizing. |
+
+**Status:** Not addressed. Requires adding VFD and soft-starter current profiles to `analysis/motorStart.js`.
+
+---
+
+### 29. No TCC Auto-Coordination Algorithm
+
+| Missing Calculation | Competitor Benchmark | Description |
+|---|---|---|
+| **Automated protective device coordination** | ETAP Auto-Coordination, EasyPower Smart Coordination | `analysis/tcc.js` (320 KB) provides a full time-current curve library and manual curve plotting/overlay. Engineers must manually select and adjust device settings to achieve selective coordination. Neither ETAP's Auto-Coordination nor EasyPower's Smart Coordination require manual curve fitting — they automatically select device settings (pickup, time dial, instantaneous) that achieve coordination across the protection zone while minimizing arc flash incident energy. This is one of the most time-consuming tasks in electrical design and represents a high-value automation target. |
+
+**Status:** Not addressed. A greedy coordination algorithm working from the source toward loads could be implemented on top of the existing TCC curve library.
+
+---
+
+### 30. IFC Export Is a Non-Functional Stub
+
+| Missing Calculation | Competitor Benchmark | Description |
+|---|---|---|
+| **Functional IFC 4.x geometry and property export** | MagiCAD 2026, Bentley Raceway, Trimble MEP (fully populated IFC property sets) | `bimExport.mjs` contains `IfcElectricDistributionBoard` stub objects and placeholder geometry without actual tray coordinates, cable segment data, or NEC/IEC property sets. The file is imported in the codebase but produces an IFC shell that downstream BIM tools (Navisworks, Revit, Solibri) cannot use for clash detection or COBie handover. This gap was previously identified (Gap #4) but is restated here because the existing code creates a false impression that IFC export is implemented — it is not functional. The `web-ifc` or `ifcjs` libraries are recommended to replace the stub with real geometry output. |
+
+**Status:** Stub exists (`bimExport.mjs`); not functional. Previously identified as Gap #4 (high priority).
+
+---
+
+### 31. No Combined Seismic + Wind Load Scenario
+
+| Missing Calculation | Competitor Benchmark | Description |
+|---|---|---|
+| **ASCE 7 combined load combinations (D + W + E)** | Eaton B-Line (combined load tables per NEMA VE 2), structural engineering standards | `analysis/seismicBracing.mjs` and `analysis/windLoad.mjs` operate as independent tools. NEMA VE 2 Section 4 and ASCE 7 Section 2.3 require checking combined load cases: dead load + wind (D + W) and dead load + seismic (D + 0.7E) simultaneously. A cable tray support designed for seismic alone may be inadequate for the combined wind + gravity case, and vice versa. No tool currently produces combined load demand vs. capacity ratios per support location. Eaton B-Line's CoSPEC tool includes combined load tables for their standard support products. |
+
+**Status:** Not addressed. Requires a combined load case wrapper that calls both analysis modules and checks support capacity against the envelope of governing load combinations.
+
+---
+
+### 32. Contingency Analysis Does Not Check Transient Stability Limits
+
+| Missing Calculation | Competitor Benchmark | Description |
+|---|---|---|
+| **Integrated post-contingency transient stability assessment** | ETAP (integrated dynamic contingency), EasyPower (dynamic study integration) | `analysis/contingency.mjs` runs a post-contingency steady-state load flow (N-1 outage) and flags voltage and thermal violations. It does not assess whether the post-fault power system trajectory violates transient stability limits: rotor angle stability (swing equation), rate-of-change-of-frequency (ROCOF), or inertia-dependent frequency nadir. A contingency that appears acceptable in steady-state load flow may cause loss of synchronism within the first few cycles. ETAP integrates its transient stability engine (`analysis/transientStability.mjs` equivalent) into the contingency sequence. |
+
+**Status:** Not addressed. Requires coupling `analysis/transientStability.mjs` into the contingency analysis loop for generator-connected buses.
+
+---
+
+### 33. International Cable Sizer Silently Skips Unavailable Combinations
+
+| Missing Calculation | Competitor Benchmark | Description |
+|---|---|---|
+| **Explicit warnings for unsupported size/insulation/installation combinations** | ETAP multi-standard cable sizing (explicit limitation notices) | `analysis/intlCableSize.mjs` line 528 contains `continue; // skip sizes with no data for this combination`. When no tabulated data exists for a user-selected combination of cable standard, insulation type, conductor material, and installation method, the size is silently omitted from the results. Users have no indication that certain options were not evaluated and may incorrectly assume the presented result is the only feasible size. ETAP and other professional tools explicitly flag "No data available for this configuration" rather than silently skipping. |
+
+**Status:** Not addressed. Requires replacing the `continue` with a warning entry in the results explaining which combinations were skipped and why.
+
+---
+
 ## Feature Comparison Matrix (Updated)
 
 | Feature | CableTrayRoute | ETAP | EasyPower | Eaton B-Line | Legrand Cablofil | Bentley Raceway | Aeries CARS | OBO Construct | MagiCAD | Trimble MEP |
@@ -221,8 +447,24 @@ The following gaps were discovered by reviewing competitor release notes and pro
 | Open REST API / Scripting Automation | **No** | Yes | — | — | — | — | Yes | — | — | — |
 | Parallel Cable / Multi-Core Runs | **No** | Yes | — | — | — | — | — | — | — | — |
 | Cloud-Based Component Library | **No** | — | — | — | — | Yes | — | — | — | — |
+| **Usability: Modal error dialogs (no alert())** | **No** | Yes | Yes | — | — | — | — | — | — | — |
+| **Usability: Contextual fix guidance in violations** | **No** | Yes | Yes | — | — | — | — | — | — | — |
+| **Usability: Visual fill gauges / heat-maps** | **No** | — | — | — | — | Yes | — | — | Yes | — |
+| **Usability: Configuration profiles / templates** | **No** | Yes | — | — | — | — | Yes | — | — | — |
+| **Usability: Scenario comparison UI** | **No** | Yes | Yes | — | — | — | — | — | — | — |
+| **Usability: Full workflow onboarding tour** | **No** | Yes | Yes | — | — | Yes | — | — | — | — |
+| **Usability: Results annotation / approval workflow** | **No** | Yes | — | — | — | Yes | — | — | — | — |
+| **Usability: Workflow progress dashboard** | **No** | — | Yes | — | — | — | Yes | — | — | — |
+| **Usability: Mobile-optimized field access** | **No** | Yes | — | — | — | — | Yes | — | — | — |
+| **Calc: Short circuit full fault matrix (SLG/LL/DLG)** | **No** | Yes | Yes | — | — | — | — | — | — | — |
+| **Calc: Auto-sizing with tray derating + ambient temp** | **No** | Yes | Yes | — | — | — | — | — | — | — |
+| **Calc: Motor starting VFD / soft-starter models** | **No** | Yes | Yes | — | — | — | — | — | — | — |
+| **Calc: TCC auto-coordination algorithm** | **No** | Yes | Yes | — | — | — | — | — | — | — |
+| **Calc: Unbalanced per-phase harmonics** | **No** | Yes | Yes | — | — | — | — | — | — | — |
+| **Calc: Combined seismic + wind load scenario** | **No** | — | — | Yes | — | — | — | — | — | — |
+| **Calc: Post-contingency transient stability check** | **No** | Yes | Yes | — | — | — | — | — | — | — |
 
-*(✓ = implemented since initial 2026-03-16 analysis; new rows = gaps identified in 2026-03-24 refresh)*
+*(✓ = implemented since initial 2026-03-16 analysis; new rows = gaps identified in 2026-03-24 refresh; **Usability** rows = UX pattern gaps; **Calc** rows = calculation completeness gaps)*
 
 ---
 
@@ -272,6 +514,45 @@ All originally high- and medium-priority feasible items have been implemented:
 13. **BIM Object Library** — Requires manufacturer data partnerships for Revit RFA / IFC families.
 14. **Live Manufacturer Pricing** — Requires commercial pricing data licenses (RS Means, Eaton/Harrison, Legrand).
 15. ~~**Real-Time Multi-User Collaboration**~~ → Implemented via WebSocket presence bar and `src/collaborationServer.mjs`.
+
+---
+
+### Usability & Calculation Quality (2026-03-24 Pass)
+
+**High Priority — Usability (quick wins with large UX impact):**
+
+1. **Replace `alert()` with modal dialogs** (Gaps #13) — `src/components/modal.js` already exists; replace 50+ `alert()` calls in `cabletrayfill.js` and `src/panelSchedule.js`. Immediate, highly visible UX improvement with minimal risk.
+2. **Sync navigation on static pages** (Gap #22) — Apply `src/components/navigation.js` to `index.html`, `help.html`, `404.html`, and `500.html` to expose all 21 routes. Zero calculation risk, critical discoverability fix.
+3. **Add contextual "how to fix" guidance to violations** (Gap #14) — Extend `analysis/designRuleChecker.mjs` violation objects with a `remediation` field (add a tray, reroute cables, upsize conductor). The pattern exists in `analysis/arcFlash.mjs`; apply it project-wide.
+4. **Workflow progress dashboard** (Gap #20) — Surface `src/workflowStatus.js` in a project overview page showing completion status and violation counts per module.
+
+**Medium Priority — Usability:**
+
+5. **Visual fill gauges and violation heat-map** (Gap #15) — Add SVG/CSS progress bars to `cabletrayfill.html` results; color-code violation rows in all analysis result tables.
+6. **Scenario comparison UI** (Gap #17) — Extend `src/scenarios.js` to render a side-by-side comparison table for two selected scenarios.
+7. **Configuration profiles / project templates** (Gap #16) — Add an "Industry Template" selector to the new-project flow with Oil & Gas, Data Center, and Industrial presets.
+8. **Expanded onboarding tour** (Gap #18) — Extend `tour.js` to cover the 6-step cable routing workflow and at least one electrical study.
+
+**High Priority — Calculation Completeness:**
+
+9. **Short circuit full fault matrix** (Gap #26) — Add SLG, L-L, and DLG fault types to `analysis/shortCircuit.mjs` using sequence network decomposition. Required for complete protective device coordination and accurate arc flash boundary calculation.
+10. **Auto-sizing with derating factors** (Gap #23) — Apply NEC 310.15(B) ambient correction and NEC 310.15(C) bundling derating in `analysis/autoSize.mjs` using the existing correction tables in `analysis/ampacity.mjs`.
+11. **Motor starting VFD and soft-starter models** (Gap #28) — Add controlled-ramp current profiles to `analysis/motorStart.js` for VFD (≈1.0–1.5× FLA) and reduced-voltage soft-starter (≈2–4× FLA) starting methods.
+
+**Medium Priority — Calculation Completeness:**
+
+12. **TCC auto-coordination algorithm** (Gap #29) — Implement a greedy source-to-load coordination pass on top of the existing `analysis/tcc.js` device curve library.
+13. **Combined seismic + wind load scenario** (Gap #31) — Add an ASCE 7 load combination wrapper that invokes both `analysis/seismicBracing.mjs` and `analysis/windLoad.mjs` and checks against combined demand.
+14. **Fix IntlCableSize silent skipping** (Gap #33) — Replace `continue` on line 528 of `analysis/intlCableSize.mjs` with an explicit warning result entry.
+15. **Unbalanced per-phase harmonic injection** (Gap #27) — Extend `analysis/harmonics.js` to accept independent per-phase harmonic spectra and calculate neutral conductor THD and triplen harmonic currents.
+
+**Low Priority — Calculation Completeness:**
+
+16. **Pull tension conductor stiffness model** (Gap #25) — Extend `src/pullCalc.js` with stiffness and temperature-dependent friction corrections for large conductors.
+17. **Post-contingency transient stability coupling** (Gap #32) — Invoke `analysis/transientStability.mjs` for generator buses during contingency analysis in `analysis/contingency.mjs`.
+18. **Auto-sizing Cu/Al cost optimization** (Gap #24) — Integrate `analysis/costEstimate.mjs` pricing into `analysis/autoSize.mjs` to evaluate copper vs. aluminum tradeoffs.
+19. **Results annotation and approval workflow** (Gap #19) — Add optional notes fields and status labels (Draft / Reviewed / Approved) to cable and tray records.
+20. **Mobile-optimized field access view** (Gap #21) — Create a simplified read-only responsive view for cable schedules and pull cards, prerequisite for the QR code gap (Gap #6).
 
 ---
 
