@@ -208,7 +208,7 @@ These gaps describe areas where CableTrayRoute's user experience lags behind com
 |---|---|---|
 | **Inline corrective-action suggestions** | ETAP Electric Copilot™, EasyPower (contextual rule explanations) | `analysis/designRuleChecker.mjs` reports violations such as "Tray fill 52.3% exceeds NEC 392.22(A) limit of 40%" but provides no explanation of why the limit exists, no guidance on how to resolve it (add a tray, reroute cables, use a wider tray), and no indication of which specific cables are contributing most to the excess. The only place in the codebase where this is done correctly is `analysis/arcFlash.mjs` line 412: `'Incident energy exceeds 40 cal/cm²; verify protective coordination and consider mitigation.'` — that pattern should be applied everywhere. |
 
-**Status:** Not addressed. Requires adding corrective-action text to violation objects in `designRuleChecker.mjs`, `autoSize.mjs`, and other reporting modules.
+**Status:** ✅ Implemented (2026-03-24). Every DRC finding (DRC-01 through DRC-05) now carries a `remediation` field with actionable fix guidance. The UI (`designrulechecker.js`) renders a blue "How to fix:" section beneath each finding card, and the plain-text export (`formatDrcReport`) includes a `HOW TO FIX:` line for each finding. CSS styles for all DRC finding cards were also added to `src/styles/components.css`.
 
 ---
 
@@ -531,7 +531,7 @@ All originally high- and medium-priority feasible items have been implemented:
 
 1. ~~**Replace `alert()` with modal dialogs**~~ (Gap #13) → Implemented. `src/components/modal.js` applied app-wide. ✅
 2. ~~**Sync navigation on static pages**~~ (Gap #22) → Implemented. `src/components/navigation.js` injected on all pages. ✅
-3. **Add contextual "how to fix" guidance to violations** (Gap #14) — Extend `analysis/designRuleChecker.mjs` violation objects with a `remediation` field (add a tray, reroute cables, upsize conductor). The pattern exists in `analysis/arcFlash.mjs`; apply it project-wide.
+3. ~~**Add contextual "how to fix" guidance to violations**~~ (Gap #14) → Implemented. `remediation` field added to all DRC findings; rendered as "How to fix:" in the UI and included in text exports. ✅
 4. **Workflow progress dashboard** (Gap #20) — Surface `src/workflowStatus.js` in a project overview page showing completion status and violation counts per module.
 
 **Medium Priority — Usability:**

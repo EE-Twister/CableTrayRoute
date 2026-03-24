@@ -853,6 +853,68 @@
 
 .report-preview { margin-top: var(--space-4, 1rem); }
 
+/* --- Design Rule Checker --- */
+.result-ok   { color: #166534; background: #dcfce7; border-left: 3px solid #22c55e; padding: 0.5rem 0.75rem; border-radius: 4px; }
+.result-fail { color: #991b1b; background: #fee2e2; border-left: 3px solid #ef4444; padding: 0.5rem 0.75rem; border-radius: 4px; }
+.result-warn { color: #92400e; background: #fef3c7; border-left: 3px solid #f59e0b; padding: 0.5rem 0.75rem; border-radius: 4px; }
+
+.drc-status { font-size: 1rem; margin-bottom: 0.75rem; }
+
+.drc-finding {
+  border: 1px solid var(--border-color, #e2e8f0);
+  border-radius: 6px;
+  padding: 0.75rem 1rem;
+  margin-bottom: 0.75rem;
+  background: var(--card-bg, #fff);
+}
+.drc-finding--error   { border-left: 4px solid #ef4444; }
+.drc-finding--warning { border-left: 4px solid #f59e0b; }
+.drc-finding--info    { border-left: 4px solid #3b82f6; }
+
+.drc-finding-header {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.4rem 0.6rem;
+  margin-bottom: 0.4rem;
+}
+
+.drc-badge {
+  display: inline-block;
+  padding: 0.1rem 0.45rem;
+  border-radius: 4px;
+  font-size: 0.75rem;
+  font-weight: 700;
+  letter-spacing: 0.03em;
+  text-transform: uppercase;
+}
+.drc-rule-id  { font-weight: 600; font-size: 0.85rem; }
+.drc-location { font-family: monospace; font-size: 0.85rem; color: var(--color-text-muted, #64748b); }
+.drc-ref      { font-size: 0.78rem; color: var(--color-text-muted, #64748b); margin-left: auto; }
+
+.drc-message { margin: 0.25rem 0 0.1rem; font-size: 0.9rem; }
+.drc-detail  { margin: 0.15rem 0 0; font-size: 0.83rem; color: var(--color-text-muted, #64748b); }
+
+.drc-remediation {
+  margin: 0.5rem 0 0;
+  padding: 0.45rem 0.65rem;
+  background: var(--info-bg, #eff6ff);
+  border-left: 3px solid #3b82f6;
+  border-radius: 0 4px 4px 0;
+  font-size: 0.85rem;
+  color: var(--color-text, #1e293b);
+}
+.drc-remediation strong { color: #1d4ed8; }
+
+.drc-no-findings { color: var(--color-text-muted, #64748b); font-style: italic; }
+
+body.dark-mode .drc-finding { background: var(--card-bg, #1e293b); }
+body.dark-mode .drc-remediation { background: #172554; color: #bfdbfe; }
+body.dark-mode .drc-remediation strong { color: #93c5fd; }
+body.dark-mode .result-ok   { background: #14532d; color: #86efac; }
+body.dark-mode .result-fail { background: #450a0a; color: #fca5a5; }
+body.dark-mode .result-warn { background: #451a03; color: #fcd34d; }
+
 @media print {
   .top-nav, .settings-menu, #controls, .report-toc, .step-nav, .breadcrumb-trail,
   #rpt-options, .method-panel, .report-status { display: none !important; }

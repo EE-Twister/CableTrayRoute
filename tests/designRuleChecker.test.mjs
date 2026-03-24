@@ -331,4 +331,56 @@ describe('formatDrcReport()', () => {
     const report = formatDrcReport(result);
     assert.ok(report.includes('NEC 392.22'), 'Report should cite NEC reference');
   });
+
+  it('includes remediation guidance in formatted report', () => {
+    const cables = [makeCable('UnroutedCable')];
+    const result = runDRC({ trays: [], cables, trayCableMap: {} });
+    const report = formatDrcReport(result);
+    assert.ok(report.includes('HOW TO FIX'), 'Report should include HOW TO FIX section');
+    assert.ok(report.includes('Optimal Route'), 'Should mention Optimal Route page in guidance');
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Remediation field presence
+// ---------------------------------------------------------------------------
+describe('Remediation guidance', () => {
+  it('DRC-01 finding includes non-empty remediation text', () => {
+    const trays = [makeTray('T1', 25, 12, 4)]; // >40% fill → error
+    const { findings } = runDRC({ trays, cables: [], trayCableMap: {} });
+    const drc01 = findings.find(f => f.ruleId === 'DRC-01');
+    assert.ok(drc01, 'Expected DRC-01 finding');
+    assert.ok(typeof drc01.remediation === 'string' && drc01.remediation.length > 0,
+      'DRC-01 finding should have non-empty remediation');
+  });
+
+  it('DRC-02 finding includes remediation text', () => {
+    const trays = [makeTray('T1', 10, 12, 4, { allowed_cable_group: 'HV' })];
+    const { findings } = runDRC({
+      trays, cables: [],
+      trayCableMap: { T1: [{ name: 'C1', allowed_cable_group: 'HV' }, { name: 'C2', allowed_cable_group: 'LV' }] },
+    });
+    const drc02 = findings.find(f => f.ruleId === 'DRC-02');
+    assert.ok(drc02, 'Expected DRC-02 finding');
+    assert.ok(typeof drc02.remediation === 'string' && drc02.remediation.length > 0,
+      'DRC-02 finding should have non-empty remediation');
+  });
+
+  it('DRC-04 finding includes remediation text', () => {
+    const cables = [makeCable('C1', { cable_type: 'Power', ground_size: null })];
+    const { findings } = runDRC({ trays: [], cables, trayCableMap: {} });
+    const drc04 = findings.find(f => f.ruleId === 'DRC-04');
+    assert.ok(drc04, 'Expected DRC-04 finding');
+    assert.ok(typeof drc04.remediation === 'string' && drc04.remediation.length > 0,
+      'DRC-04 finding should have non-empty remediation');
+  });
+
+  it('DRC-05 finding includes remediation text', () => {
+    const cables = [makeCable('UnroutedCable')];
+    const { findings } = runDRC({ trays: [], cables, trayCableMap: {} });
+    const drc05 = findings.find(f => f.ruleId === 'DRC-05');
+    assert.ok(drc05, 'Expected DRC-05 finding');
+    assert.ok(typeof drc05.remediation === 'string' && drc05.remediation.length > 0,
+      'DRC-05 finding should have non-empty remediation');
+  });
 });
