@@ -1,5 +1,6 @@
 import { getItem, removeItem } from './dataStore.mjs';
 import { showAlertModal } from './src/components/modal.js';
+import { createFillGauge } from './src/components/fillGauge.js';
 
 checkPrereqs([{key:'conduitSchedule',page:'racewayschedule.html',label:'Raceway Schedule'}]);
 
@@ -24,6 +25,7 @@ checkPrereqs([{key:'conduitSchedule',page:'racewayschedule.html',label:'Raceway 
       initCompactMode();
       initHelpModal('help-btn','help-modal','close-help-btn');
       initNavToggle();
+      const conduitGauge = createFillGauge('fill-gauge-container', { label: 'Conduit Fill %' });
       const dirty = createDirtyTracker();
       const markSaved = () => { dirty.markClean(); };
       const markUnsaved = () => { dirty.markDirty(); };
@@ -251,6 +253,7 @@ checkPrereqs([{key:'conduitSchedule',page:'racewayschedule.html',label:'Raceway 
 
         const sumArea = cables.reduce((s,c)=> s + Math.PI*(c.r**2),0);
         const fillPct = (sumArea / area) * 100;
+        conduitGauge.update(fillPct);
         const allowed = cables.length===1?53:(cables.length===2?31:40);
         let results = `<p><strong>Conduit:</strong> ${type} ${size}" (ID ${(2*R).toFixed(2)}")</p>`;
         results += `<p><strong>Fill:</strong> ${fillPct.toFixed(1)} % (Allowed ${allowed}% )</p>`;

@@ -1,6 +1,7 @@
 import { getItem, setItem, removeItem, keys as storeKeys } from './dataStore.mjs';
 import { FILTER_ICON_SVG } from './tableUtils.mjs';
 import { showAlertModal, openModal } from './src/components/modal.js';
+import { createFillGauge } from './src/components/fillGauge.js';
 
 checkPrereqs([{key:'traySchedule',page:'racewayschedule.html',label:'Raceway Schedule'}]);
 
@@ -10,6 +11,7 @@ checkPrereqs([{key:'traySchedule',page:'racewayschedule.html',label:'Raceway Sch
       initCompactMode();
       initHelpModal('help-btn','helpOverlay','helpClose');
       initNavToggle();
+      const trayGauge = createFillGauge('fill-gauge-container', { label: 'Tray Fill %' });
       const dirty = createDirtyTracker();
       const markSaved = () => { dirty.markClean(); };
       const markUnsaved = () => { dirty.markDirty(); };
@@ -135,6 +137,7 @@ checkPrereqs([{key:'traySchedule',page:'racewayschedule.html',label:'Raceway Sch
           }
           fillSummaryEl.textContent=`Total Cable Area: ${totalArea.toFixed(2)} in², Fill: ${fillP.toFixed(1)}%`;
           fillSummaryEl.style.color=fillP>allow?'red':'';
+          trayGauge.update(fillP);
           return {totalArea,fillP,allow};
         }
 
