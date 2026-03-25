@@ -1,6 +1,6 @@
 import { getTrays, getCables, getDuctbanks, getConduits, getOneLine } from '../dataStore.mjs';
 
-const workflowOrder = [
+export const workflowOrder = [
   { key: 'cableSchedule', label: '1. Cable Schedule', href: 'cableschedule.html' },
   { key: 'racewaySchedule', label: '2. Raceway Schedule', href: 'racewayschedule.html' },
   { key: 'ductbankSchedule', label: '3. Ductbank', href: 'ductbankroute.html' },
@@ -14,7 +14,7 @@ function pluralize(count, singular, plural) {
   return `${count} ${count === 1 ? singular : plural}`;
 }
 
-function getStepStatus(key) {
+export function getStepStatus(key) {
   if (key === 'cableSchedule') {
     const count = getCables().length;
     if (count > 0) return { complete: true, label: pluralize(count, 'cable', 'cables') };
