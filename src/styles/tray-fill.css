@@ -274,3 +274,17 @@ body.cabletrayfill-page #helpClose {
     border-radius: 4px;
 }
 
+/* ── Fill Gauge Component ────────────────────────────────────────────────── */
+.fill-gauge-wrapper {
+    display: flex;
+    justify-content: center;
+    margin: 8px 0 4px;
+}
+
+.fill-gauge-wrapper svg {
+    max-width: 200px;
+    width: 100%;
+    height: auto;
+    overflow: visible;
+}
+
