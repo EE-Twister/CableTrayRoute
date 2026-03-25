@@ -151,6 +151,20 @@ document.addEventListener('DOMContentLoaded', () => {
 
     const stdName = esc(STANDARDS[params.standard]?.name ?? params.standard);
 
+    let skippedWarning = '';
+    if (r.skippedSizes && r.skippedSizes.length > 0) {
+      const items = r.skippedSizes
+        .map(s => `<li><strong>${esc(String(s.sizeMm2))} mm²</strong> — ${esc(s.reason)}</li>`)
+        .join('');
+      skippedWarning = `
+      <div class="result-warn" role="alert">
+        <strong>Warning: ${r.skippedSizes.length} size(s) not evaluated</strong>
+        <p>The following candidate size(s) were skipped because no ampacity data exists for the selected combination of standard, method, conductor, and insulation:</p>
+        <ul>${items}</ul>
+        <p>The result above reflects only the sizes that were evaluated. Consider selecting a different installation method or conductor material if these sizes are required.</p>
+      </div>`;
+    }
+
     resultsDiv.innerHTML = `
       <div class="result-card ${statusClass}" role="status">
         <h2>${mode === 'check' ? 'Adequacy Check' : 'Cable Sizing'} Result</h2>
@@ -199,7 +213,8 @@ document.addEventListener('DOMContentLoaded', () => {
           <p>The design current I\u1D47 = ${params.loadAmps.toFixed(1)} A must satisfy
           I\u1D47 \u2264 I\u2082\u2032.</p>
         </details>
-      </div>`;
+      </div>
+      ${skippedWarning}`;
   }
 
   function esc(s) {
