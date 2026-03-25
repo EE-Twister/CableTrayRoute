@@ -14,6 +14,7 @@ try {
 
 const entries = {
   index: 'src/index.js',
+  workflowdashboard: 'src/workflowDashboard.js',
   cableschedule: 'src/cableschedule.js',
   panelschedule: 'src/panelSchedule.js',
   racewayschedule: 'src/racewayschedule.js',

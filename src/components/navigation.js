@@ -1,5 +1,6 @@
 const NAV_ROUTES = [
   { href: 'index.html', label: 'Home', section: 'Home', icon: 'icons/route.svg' },
+  { href: 'workflowdashboard.html', label: 'Project Dashboard', section: 'Workflow', icon: 'icons/toolbar/grid.svg' },
   { href: 'equipmentlist.html', label: 'Equipment List', section: 'Workflow', icon: 'icons/equipment.svg' },
   { href: 'loadlist.html', label: 'Load List', section: 'Workflow', icon: 'icons/load.svg' },
   { href: 'cableschedule.html', label: 'Cable Schedule', section: 'Workflow', icon: 'icons/cable.svg' },

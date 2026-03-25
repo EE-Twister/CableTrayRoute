@@ -1,0 +1,186 @@
+/* =========================================================
+   Project Dashboard — workflowdashboard.html
+   ========================================================= */
+
+.dashboard-grid {
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: var(--space-4, 1rem);
+}
+
+@media (min-width: 768px) {
+  .dashboard-grid {
+    grid-template-columns: 1fr 1fr;
+  }
+  .dashboard-grid .dash-full-width {
+    grid-column: 1 / -1;
+  }
+}
+
+/* ---- Shared icon ---- */
+.dash-icon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 1.5rem;
+  height: 1.5rem;
+  border-radius: 50%;
+  font-size: 0.8rem;
+  font-weight: 700;
+  flex-shrink: 0;
+}
+
+.dash-icon--complete {
+  background: var(--color-success, #16a34a);
+  color: #fff;
+}
+
+.dash-icon--incomplete {
+  background: var(--color-border, #d1d5db);
+  color: var(--color-text-muted, #6b7280);
+}
+
+/* ---- Workflow steps list ---- */
+.dash-step-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+}
+
+.dash-step-card {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  padding: 0.5rem 0.75rem;
+  border-radius: var(--radius, 6px);
+  background: var(--color-surface-alt, #f9fafb);
+  border: 1px solid var(--color-border, #e5e7eb);
+}
+
+.dash-step-card--complete {
+  border-color: var(--color-success, #16a34a);
+}
+
+.dash-step-name {
+  font-weight: 600;
+  flex: 1;
+  text-decoration: none;
+  color: var(--color-text, inherit);
+}
+
+.dash-step-name:hover {
+  text-decoration: underline;
+}
+
+.dash-step-label {
+  font-size: 0.8rem;
+  color: var(--color-text-muted, #6b7280);
+}
+
+/* ---- Summary stats ---- */
+.dash-stat-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(8rem, 1fr));
+  gap: 0.75rem;
+}
+
+.dash-stat-item {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.25rem;
+  padding: 0.75rem 0.5rem;
+  border-radius: var(--radius, 6px);
+  background: var(--color-surface-alt, #f9fafb);
+  border: 1px solid var(--color-border, #e5e7eb);
+  text-align: center;
+}
+
+.dash-stat-item--warn {
+  border-color: var(--color-warning, #d97706);
+  background: var(--color-warning-bg, #fffbeb);
+}
+
+.dash-stat-value {
+  font-size: 1.75rem;
+  font-weight: 700;
+  line-height: 1;
+  color: var(--color-accent, #2563eb);
+  text-decoration: none;
+}
+
+.dash-stat-value:hover {
+  text-decoration: underline;
+}
+
+.dash-stat-item--warn .dash-stat-value {
+  color: var(--color-warning, #d97706);
+}
+
+.dash-stat-label {
+  font-size: 0.75rem;
+  color: var(--color-text-muted, #6b7280);
+}
+
+/* ---- Studies list ---- */
+.dash-study-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+}
+
+.dash-study-item {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  padding: 0.4rem 0.75rem;
+  border-radius: var(--radius, 6px);
+  background: var(--color-surface-alt, #f9fafb);
+  border: 1px solid var(--color-border, #e5e7eb);
+}
+
+.dash-study-name {
+  flex: 1;
+  text-decoration: none;
+  color: var(--color-text, inherit);
+}
+
+.dash-study-name:hover {
+  text-decoration: underline;
+}
+
+.dash-study-status {
+  font-size: 0.75rem;
+  color: var(--color-text-muted, #6b7280);
+}
+
+.dash-study-item--run .dash-study-status {
+  color: var(--color-success, #16a34a);
+}
+
+/* ---- Dark mode overrides ---- */
+body.dark-mode .dash-step-card,
+body.dark-mode .dash-stat-item,
+body.dark-mode .dash-study-item {
+  background: var(--color-surface-alt, #1e293b);
+  border-color: var(--color-border, #334155);
+}
+
+body.dark-mode .dash-step-name,
+body.dark-mode .dash-study-name {
+  color: var(--color-text, #e2e8f0);
+}
+
+body.dark-mode .dash-icon--incomplete {
+  background: var(--color-border, #334155);
+  color: var(--color-text-muted, #94a3b8);
+}
