@@ -547,3 +547,53 @@ describe('Combined temperature and grouping derating — hand calculation', () =
       `Derated ampacity ${r.correctedAmpacity} A must be ≥ 100 A`);
   });
 });
+
+// ---------------------------------------------------------------------------
+// skippedSizes field — Gap #33: warn when candidate sizes have no data
+// ---------------------------------------------------------------------------
+describe('sizeCable — skippedSizes field present in result', () => {
+  it('returns an empty skippedSizes array for a fully-tabulated Cu/XLPE PASS result', () => {
+    const r = sizeCable({
+      standard: 'IEC_60364', method: 'C', phases: 3,
+      material: 'Cu', insulation: 'XLPE', loadAmps: 100,
+    });
+    assert.strictEqual(r.status, 'PASS');
+    assert.ok(Array.isArray(r.skippedSizes), 'skippedSizes must be an array');
+    assert.strictEqual(r.skippedSizes.length, 0,
+      'no sizes should be skipped for a complete Cu/XLPE combination');
+  });
+
+  it('returns an empty skippedSizes array for a NO_SIZE_AVAILABLE result', () => {
+    const r = sizeCable({
+      standard: 'IEC_60364', method: 'B2', phases: 3,
+      material: 'Cu', insulation: 'PVC', loadAmps: 9999,
+    });
+    assert.strictEqual(r.status, 'NO_SIZE_AVAILABLE');
+    assert.ok(Array.isArray(r.skippedSizes), 'skippedSizes must be an array on NO_SIZE_AVAILABLE');
+    assert.strictEqual(r.skippedSizes.length, 0);
+  });
+
+  it('returns an empty skippedSizes array for AS/NZS Cu/XLPE combination', () => {
+    const r = sizeCable({
+      standard: 'AS_NZS_3008', method: 'E', phases: 3,
+      material: 'Cu', insulation: 'PVC', loadAmps: 50,
+    });
+    assert.ok(Array.isArray(r.skippedSizes));
+    assert.strictEqual(r.skippedSizes.length, 0);
+  });
+
+  it('each entry in skippedSizes has the required sizeMm2 and reason fields', () => {
+    // For all current combinations the array is empty, so verify shape via a fully-tabulated call.
+    // If a future data gap populates the array, ensure the fields are correct.
+    const r = sizeCable({
+      standard: 'IEC_60364', method: 'C', phases: 3,
+      material: 'Cu', insulation: 'XLPE', loadAmps: 50,
+    });
+    assert.ok(Array.isArray(r.skippedSizes));
+    r.skippedSizes.forEach(entry => {
+      assert.ok(typeof entry.sizeMm2 === 'number', 'sizeMm2 must be a number');
+      assert.ok(typeof entry.reason  === 'string',  'reason must be a string');
+      assert.ok(entry.reason.length > 0,            'reason must be non-empty');
+    });
+  });
+});

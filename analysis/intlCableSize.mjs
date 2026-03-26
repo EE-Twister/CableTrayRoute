@@ -487,6 +487,7 @@ export function getGroupingFactor(method, numGroups) {
  * @property {number}      totalFactor    — tempFactor × groupFactor
  * @property {string}      status         — 'PASS' | 'UNDERSIZED' | 'NO_SIZE_AVAILABLE'
  * @property {string}      recommendation — human-readable guidance
+ * @property {Array<{sizeMm2:number,reason:string}>} skippedSizes — sizes omitted due to missing data
  */
 
 /**
@@ -520,11 +521,14 @@ export function sizeCable(params) {
   const minSize = material === 'Al' ? 16 : 1.5;
   const candidateSizes = CABLE_SIZES_MM2.filter(s => s >= minSize);
 
+  const skippedSizes = [];
+
   for (const sizeMm2 of candidateSizes) {
     let baseAmpacity;
     try {
       baseAmpacity = lookupAmpacity(standard, method, phases, material, insulation, sizeMm2);
-    } catch {
+    } catch (err) {
+      skippedSizes.push({ sizeMm2, reason: err.message });
       continue; // skip sizes with no data for this combination
     }
 
@@ -545,6 +549,7 @@ export function sizeCable(params) {
           `Derated ampacity ${correctedAmpacity} A ≥ design current ${loadAmps} A ` +
           `(${utilizationPct}% utilisation). ` +
           `Derating: temperature factor ${tempFactor} × grouping factor ${groupFactor} = ${totalFactor}.`,
+        skippedSizes,
       };
     }
   }
@@ -574,6 +579,7 @@ export function sizeCable(params) {
       `(${largest} mm², ${largestCorrected} A derated). ` +
       `Consider parallel conductors, a different installation method, ` +
       `or a lower ambient temperature.`,
+    skippedSizes,
   };
 }
 
