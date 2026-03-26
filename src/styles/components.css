@@ -961,6 +961,67 @@ body.dark-mode .cmp-added   { background: #14532d; color: #86efac; }
 body.dark-mode .cmp-removed { background: #450a0a; color: #fca5a5; }
 body.dark-mode .cmp-changed { background: #451a03; color: #fcd34d; }
 
+/* ── Industry project template picker (Gap #16) ─────────────────────── */
+.template-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
+  gap: 0.75rem;
+  padding: 0.25rem 0;
+}
+
+.template-card {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.35rem;
+  padding: 1rem 0.75rem;
+  background: var(--surface, #fff);
+  border: 2px solid var(--border, #d1d5db);
+  border-radius: var(--radius, 6px);
+  cursor: pointer;
+  text-align: center;
+  transition: border-color 0.15s, background 0.15s;
+  color: inherit;
+  font: inherit;
+}
+
+.template-card:hover,
+.template-card:focus-visible {
+  border-color: var(--accent, #2563eb);
+  outline: none;
+}
+
+.template-card.selected {
+  border-color: var(--accent, #2563eb);
+  background: var(--accent-subtle, #eff6ff);
+}
+
+.template-card__icon {
+  font-size: 2rem;
+  line-height: 1;
+}
+
+.template-card__name {
+  font-weight: 600;
+  font-size: 0.9rem;
+}
+
+.template-card__desc {
+  font-size: 0.75rem;
+  color: var(--text-muted, #6b7280);
+  line-height: 1.35;
+}
+
+body.dark-mode .template-card {
+  background: var(--card-bg, #1e293b);
+  border-color: var(--border, #334155);
+}
+
+body.dark-mode .template-card.selected {
+  border-color: var(--accent, #3b82f6);
+  background: color-mix(in srgb, var(--accent, #3b82f6) 15%, transparent);
+}
+
 @media print {
   .top-nav, .settings-menu, #controls, .report-toc, .step-nav, .breadcrumb-trail,
   #rpt-options, .method-panel, .report-status { display: none !important; }
