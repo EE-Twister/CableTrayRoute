@@ -141,11 +141,12 @@
       <!-- Panel 1: Feeder / Branch Circuit -->
       <div class="tab-panel" id="panel-feeder" role="tabpanel" aria-labelledby="tab-feeder">
         <details class="method-panel">
-          <summary>Method — NEC 210.20 / 215.3 / 240.4</summary>
+          <summary>Method — NEC 210.20 / 215.3 / 240.4 / 310.15 / 392.80</summary>
           <p>For <strong>continuous loads</strong> (≥3 hours): conductor ampacity and OCPD rating
           must be at least 125% of the load current (NEC 210.20(A), 215.3).</p>
-          <p>Conductor size is selected from NEC Table 310.15(B)(16) (copper or aluminum,
-          in conduit, 30°C ambient, ≤3 current-carrying conductors).</p>
+          <p>Conductor size is selected from NEC Table 310.15(B)(16). Ambient temperature,
+          bundling, and cable tray correction factors per NEC 310.15(B)(1)(a), 310.15(C)(1),
+          and 392.80(A) are applied based on the Installation Conditions you enter below.</p>
           <p>OCPD rating is the next standard rating from NEC 240.6(A) at or above
           the conductor's ampacity (NEC 240.4(B)).</p>
         </details>
@@ -216,6 +217,32 @@
             </div>
           </fieldset>
 
+          <fieldset>
+            <legend><strong>Installation Conditions</strong></legend>
+
+            <div class="field-row">
+              <label for="feeder-ambient">Ambient temperature (°C)</label>
+              <input type="number" id="feeder-ambient" min="10" max="85" step="5" value="30">
+              <p class="field-hint">NEC Table 310.15(B)(1)(a) — reference 30°C; derating applies above 30°C</p>
+            </div>
+
+            <div class="field-row">
+              <label for="feeder-bundled">Current-carrying conductors in raceway / bundle</label>
+              <input type="number" id="feeder-bundled" min="1" max="50" step="1" value="3">
+              <p class="field-hint">NEC 310.15(C)(1) — derating applies when &gt; 3 conductors</p>
+            </div>
+
+            <div class="field-row">
+              <label for="feeder-install">Installation type</label>
+              <select id="feeder-install">
+                <option value="conduit" selected>Conduit / Raceway</option>
+                <option value="tray_spaced">Cable tray — single layer, maintained spacing (≥ 1 cable OD)</option>
+                <option value="tray_touching">Cable tray — single layer, cables touching (no maintained spacing)</option>
+              </select>
+              <p class="field-hint">NEC 392.80(A) — 0.65× factor applies when single-conductor cables touch in tray</p>
+            </div>
+          </fieldset>
+
           <div id="controls">
             <button type="submit" class="primary-btn">Size Feeder</button>
           </div>
@@ -226,11 +253,14 @@
       <!-- Panel 2: Motor Branch Circuit -->
       <div class="tab-panel" id="panel-motor" role="tabpanel" aria-labelledby="tab-motor" hidden>
         <details class="method-panel">
-          <summary>Method — NEC 430 (Motor Branch Circuits)</summary>
+          <summary>Method — NEC 430 / 310.15 / 392.80 (Motor Branch Circuits)</summary>
           <p><strong>Full load current (FLC):</strong> from NEC Table 430.250 (3-phase) or
           Table 430.248 (single-phase). Note: always use the NEC table values, not the motor
           nameplate current, for sizing branch circuit components.</p>
-          <p><strong>Branch circuit conductor:</strong> ≥ 125% of motor FLC (NEC 430.22(A)).</p>
+          <p><strong>Branch circuit conductor:</strong> ≥ 125% of motor FLC (NEC 430.22(A)).
+          Ambient temperature, bundling, and cable tray correction factors per
+          NEC 310.15(B)(1)(a), 310.15(C)(1), and 392.80(A) are applied based on the
+          Installation Conditions you enter below.</p>
           <p><strong>Branch circuit OCPD (inverse time breaker):</strong> ≤ 250% of FLC
           per NEC Table 430.52. Next standard OCPD size is selected.</p>
           <p><strong>Overload relay:</strong> set at 115% of FLC for motors with service
@@ -281,6 +311,32 @@
                 <input type="checkbox" id="motor-highsf" checked>
                 Service factor ≥ 1.15 or temp rise ≤ 40°C (overload relay at 115% of FLC)
               </label>
+            </div>
+          </fieldset>
+
+          <fieldset>
+            <legend><strong>Installation Conditions</strong></legend>
+
+            <div class="field-row">
+              <label for="motor-ambient">Ambient temperature (°C)</label>
+              <input type="number" id="motor-ambient" min="10" max="85" step="5" value="30">
+              <p class="field-hint">NEC Table 310.15(B)(1)(a) — reference 30°C; derating applies above 30°C</p>
+            </div>
+
+            <div class="field-row">
+              <label for="motor-bundled">Current-carrying conductors in raceway / bundle</label>
+              <input type="number" id="motor-bundled" min="1" max="50" step="1" value="3">
+              <p class="field-hint">NEC 310.15(C)(1) — derating applies when &gt; 3 conductors</p>
+            </div>
+
+            <div class="field-row">
+              <label for="motor-install">Installation type</label>
+              <select id="motor-install">
+                <option value="conduit" selected>Conduit / Raceway</option>
+                <option value="tray_spaced">Cable tray — single layer, maintained spacing (≥ 1 cable OD)</option>
+                <option value="tray_touching">Cable tray — single layer, cables touching (no maintained spacing)</option>
+              </select>
+              <p class="field-hint">NEC 392.80(A) — 0.65× factor applies when single-conductor cables touch in tray</p>
             </div>
           </fieldset>
 
