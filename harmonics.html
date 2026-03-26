@@ -98,6 +98,63 @@
       <section class="card">
         <svg id="harmonics-chart" width="800" height="600" xmlns="http://www.w3.org/2000/svg"></svg>
       </section>
+
+      <section class="card" id="unbalanced-section">
+        <h2>Unbalanced Analysis <small style="font-weight:normal;font-size:0.8em;">(per-phase spectra)</small></h2>
+        <p>Enter independent harmonic spectra for each phase using <code>order:pct</code> notation (e.g. <code>3:30,5:14</code>). Leave a field blank to inherit the balanced spectrum from the one-line component.</p>
+        <label style="display:flex;align-items:center;gap:0.5rem;margin-bottom:1rem;">
+          <input type="checkbox" id="unbalanced-mode-toggle" aria-controls="unbalanced-inputs">
+          Enable per-phase unbalanced analysis
+        </label>
+
+        <div id="unbalanced-inputs" hidden>
+          <div id="unbalanced-table-wrap" style="overflow-x:auto;">
+            <table class="data-table" id="unbalanced-input-table" aria-label="Per-phase harmonic spectra">
+              <thead>
+                <tr>
+                  <th scope="col">Component ID</th>
+                  <th scope="col">Phase A spectrum</th>
+                  <th scope="col">Phase B spectrum</th>
+                  <th scope="col">Phase C spectrum</th>
+                </tr>
+              </thead>
+              <tbody id="unbalanced-input-tbody">
+                <tr><td colspan="4" style="text-align:center;color:var(--text-muted,#666);">No harmonic source components found. Add components with Harmonic Source enabled in the one-line editor.</td></tr>
+              </tbody>
+            </table>
+          </div>
+          <button id="run-unbalanced-btn" class="btn btn-primary" style="margin-top:1rem;">Run Unbalanced Analysis</button>
+        </div>
+
+        <div id="unbalanced-results" hidden style="margin-top:1.5rem;">
+          <div id="neutral-overload-banner" hidden role="alert"
+               style="background:var(--color-danger-bg,#fef2f2);border:1px solid var(--color-danger,crimson);border-radius:4px;padding:0.75rem 1rem;margin-bottom:1rem;color:var(--color-danger,crimson);font-weight:600;">
+            ⚠ Neutral conductor overload detected — neutral current exceeds 100 % of phase FLA on one or more components. Upsize neutral conductor or add triplen harmonic filters.
+          </div>
+          <div id="phase-imbalance-banner" hidden role="status"
+               style="background:var(--color-warning-bg,#fffbeb);border:1px solid var(--color-warning,orange);border-radius:4px;padding:0.75rem 1rem;margin-bottom:1rem;">
+            ⚠ Phase imbalance detected — per-phase ITHD varies by more than 10 percentage points on one or more components.
+          </div>
+          <div style="overflow-x:auto;">
+            <table class="data-table" id="unbalanced-results-table" aria-label="Unbalanced harmonic analysis results">
+              <thead>
+                <tr>
+                  <th scope="col">Component</th>
+                  <th scope="col">ITHD-A (%)</th>
+                  <th scope="col">ITHD-B (%)</th>
+                  <th scope="col">ITHD-C (%)</th>
+                  <th scope="col">VTHD worst (%)</th>
+                  <th scope="col">IEEE 519 limit (%)</th>
+                  <th scope="col">Neutral I (% phase)</th>
+                  <th scope="col">Neutral dominant order</th>
+                  <th scope="col">Status</th>
+                </tr>
+              </thead>
+              <tbody id="unbalanced-results-tbody"></tbody>
+            </table>
+          </div>
+        </div>
+      </section>
     </main>
   </div>
   <footer class="site-footer">
@@ -113,5 +170,126 @@
     </nav>
   </footer>
   <script type="module" src="dist/projectManager.js"></script>
+  <script type="module">
+    import { getOneLine, getStudies, setStudies } from './dataStore.mjs';
+    import { runHarmonicsUnbalanced } from './analysis/harmonics.js';
+
+    const toggle = document.getElementById('unbalanced-mode-toggle');
+    const inputsDiv = document.getElementById('unbalanced-inputs');
+    const tbody = document.getElementById('unbalanced-input-tbody');
+    const runBtn = document.getElementById('run-unbalanced-btn');
+    const resultsDiv = document.getElementById('unbalanced-results');
+    const resultsTbody = document.getElementById('unbalanced-results-tbody');
+    const overloadBanner = document.getElementById('neutral-overload-banner');
+    const imbalanceBanner = document.getElementById('phase-imbalance-banner');
+
+    // Restore saved per-phase inputs from studies store
+    function savedInputs() {
+      return getStudies()?.harmonicsPhaseInputs || {};
+    }
+
+    function saveInputs(data) {
+      const studies = getStudies() || {};
+      studies.harmonicsPhaseInputs = data;
+      setStudies(studies);
+    }
+
+    // Build the per-component input table from one-line harmonic sources
+    function buildInputTable() {
+      const { sheets } = getOneLine();
+      const comps = (Array.isArray(sheets[0]?.components)
+        ? sheets.flatMap(s => s.components)
+        : sheets).filter(c => c && c.harmonicSource);
+
+      if (!comps.length) return;
+
+      const saved = savedInputs();
+      tbody.innerHTML = '';
+      comps.forEach(c => {
+        const s = saved[c.id] || {};
+        const tr = document.createElement('tr');
+        tr.innerHTML = `
+          <td><code>${c.id}</code></td>
+          <td><input type="text" class="phase-input" data-id="${c.id}" data-phase="A"
+               value="${s.harmonicsA || ''}" placeholder="e.g. 3:20,5:14"
+               aria-label="Phase A spectrum for ${c.id}"></td>
+          <td><input type="text" class="phase-input" data-id="${c.id}" data-phase="B"
+               value="${s.harmonicsB || ''}" placeholder="e.g. 3:20,5:14"
+               aria-label="Phase B spectrum for ${c.id}"></td>
+          <td><input type="text" class="phase-input" data-id="${c.id}" data-phase="C"
+               value="${s.harmonicsC || ''}" placeholder="e.g. 3:20,5:14"
+               aria-label="Phase C spectrum for ${c.id}"></td>`;
+        tbody.appendChild(tr);
+      });
+    }
+
+    // Collect current input values into phaseData map
+    function collectPhaseData() {
+      const data = {};
+      document.querySelectorAll('.phase-input').forEach(inp => {
+        const id = inp.dataset.id;
+        const phase = inp.dataset.phase;
+        if (!data[id]) data[id] = {};
+        const v = inp.value.trim();
+        if (v) data[id][`harmonics${phase}`] = v;
+      });
+      return data;
+    }
+
+    toggle.addEventListener('change', () => {
+      inputsDiv.hidden = !toggle.checked;
+      if (toggle.checked) buildInputTable();
+    });
+
+    runBtn.addEventListener('click', () => {
+      const phaseData = collectPhaseData();
+      saveInputs(phaseData);
+
+      const results = runHarmonicsUnbalanced(phaseData);
+      const entries = Object.entries(results);
+
+      if (!entries.length) {
+        resultsTbody.innerHTML = '<tr><td colspan="9" style="text-align:center">No harmonic source components found.</td></tr>';
+        resultsDiv.hidden = false;
+        return;
+      }
+
+      let anyOverload = false;
+      let anyImbalance = false;
+      resultsTbody.innerHTML = '';
+
+      entries.forEach(([id, r]) => {
+        if (r.neutral.overload_warning) anyOverload = true;
+        if (r.phase_imbalance_flag) anyImbalance = true;
+
+        const worstVthd = Math.max(r.phaseA.vthd, r.phaseB.vthd, r.phaseC.vthd);
+        const vthdStyle = worstVthd > r.limit ? 'color:crimson;font-weight:600' : '';
+        const neutralStyle = r.neutral.overload_warning ? 'color:crimson;font-weight:600' : '';
+
+        let statusParts = [];
+        if (r.warning) statusParts.push('⚠ VTHD exceeds IEEE 519');
+        if (r.neutral.overload_warning) statusParts.push('⚠ Neutral overload');
+        if (r.phase_imbalance_flag) statusParts.push('⚠ Phase imbalance');
+        if (!statusParts.length) statusParts.push('✓ OK');
+
+        const tr = document.createElement('tr');
+        tr.innerHTML = `
+          <td><code>${id}</code></td>
+          <td>${r.phaseA.ithd}</td>
+          <td>${r.phaseB.ithd}</td>
+          <td>${r.phaseC.ithd}</td>
+          <td style="${vthdStyle}">${worstVthd.toFixed(2)}</td>
+          <td>${r.limit}</td>
+          <td style="${neutralStyle}">${r.neutral.ithd_pct_of_phase}</td>
+          <td>${r.neutral.dominant_order || '—'}</td>
+          <td>${statusParts.join('; ')}</td>`;
+        resultsTbody.appendChild(tr);
+      });
+
+      overloadBanner.hidden = !anyOverload;
+      imbalanceBanner.hidden = !anyImbalance;
+      resultsDiv.hidden = false;
+    });
+  </script>
 </body>
 </html>

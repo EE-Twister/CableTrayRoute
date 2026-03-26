@@ -344,7 +344,7 @@ These gaps describe areas where CableTrayRoute's calculation engine uses simplif
 |---|---|---|
 | **Per-phase unbalanced harmonic injection** | ETAP harmonic load flow, EasyPower harmonic analysis | `analysis/harmonics.js` calculates Total Harmonic Distortion (THD) and individual harmonic orders using a single-phase model with a quality-factor approximation (`const q = Number(f.q) || 1`). It does not support per-phase unbalanced harmonic spectra, which are common when single-phase VFDs, switch-mode power supplies, or EV chargers create different harmonic current magnitudes on each phase. Unbalanced harmonics drive triplen harmonic currents in the neutral conductor — a safety concern not detectable with a balanced model. |
 
-**Status:** Not addressed. Requires extending the harmonic model to three independent phase spectra with neutral current calculation.
+**Status:** ✅ Implemented. `analysis/harmonics.js` exports `runHarmonicsUnbalanced(phaseData)`, which accepts optional per-phase spectra (`harmonicsA`, `harmonicsB`, `harmonicsC`) per component and falls back to the balanced `harmonics` field when absent. Triplen harmonic orders (3rd, 9th, 15th… — zero-sequence) are summed arithmetically across all three phases to compute neutral conductor RMS current; an overload flag is raised when the neutral exceeds 100 % of phase FLA. A phase imbalance flag is raised when per-phase ITHD values differ by more than 10 percentage points. The `harmonics.html` page adds an "Unbalanced Analysis" panel where engineers can enter independent Phase A/B/C spectra per component and view per-phase ITHD, worst VTHD, neutral current percentage, and overload/imbalance warnings. Neutral current summation math is tested in `tests/harmonics.test.mjs`.
 
 ---
 
