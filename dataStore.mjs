@@ -182,6 +182,22 @@ export const getCables = () => read(KEYS.cables, []);
  */
 export const setCables = cables => write(KEYS.cables, cables);
 
+/**
+ * Read the cable schedule for a specific named scenario without switching the
+ * active scenario.  Used by the scenario comparison UI.
+ * @param {string} scenarioName
+ * @returns {Cable[]}
+ */
+export const getCablesForScenario = scenarioName => read(KEYS.cables, [], scenarioName);
+
+/**
+ * Read the tray schedule for a specific named scenario without switching the
+ * active scenario.  Used by the scenario comparison UI.
+ * @param {string} scenarioName
+ * @returns {Tray[]}
+ */
+export const getTraysForScenario = scenarioName => read(KEYS.trays, [], scenarioName);
+
 export const getCableTypicals = () => read(KEYS.cableTypicals, []);
 export const setCableTypicals = typicals => write(KEYS.cableTypicals, typicals);
 
