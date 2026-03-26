@@ -1,4 +1,4 @@
-import { generateSpoolSheets } from './analysis/spoolSheets.mjs';
+import { generateSpoolSheets, buildCableProcurementSchedule } from './analysis/spoolSheets.mjs';
 import { getTrays, getCables } from './dataStore.mjs';
 
 document.addEventListener('DOMContentLoaded', () => {
@@ -18,6 +18,26 @@ document.addEventListener('DOMContentLoaded', () => {
   const resultsDiv      = document.getElementById('results');
 
   let lastResult = null;
+  let lastProcurementResult = null;
+
+  // Tab switching
+  const tabSpools       = document.getElementById('tab-spools');
+  const tabProcurement  = document.getElementById('tab-procurement');
+  const panelSpools     = document.getElementById('panel-spools');
+  const panelProcurement = document.getElementById('panel-procurement');
+
+  function activateTab(activeTab) {
+    const isSpools = activeTab === tabSpools;
+    tabSpools.classList.toggle('active', isSpools);
+    tabSpools.setAttribute('aria-selected', String(isSpools));
+    tabProcurement.classList.toggle('active', !isSpools);
+    tabProcurement.setAttribute('aria-selected', String(!isSpools));
+    panelSpools.hidden = !isSpools;
+    panelProcurement.hidden = isSpools;
+  }
+
+  tabSpools.addEventListener('click', () => activateTab(tabSpools));
+  tabProcurement.addEventListener('click', () => activateTab(tabProcurement));
 
   generateBtn.addEventListener('click', () => {
     const trays  = getTrays();
@@ -170,6 +190,162 @@ document.addEventListener('DOMContentLoaded', () => {
 
     const stamp = new Date().toISOString().split('T')[0];
     XLSX.writeFile(wb, `spool-sheets-${stamp}.xlsx`);
+  }
+
+  // Procurement schedule
+  const generateProcurementBtn = document.getElementById('generateProcurementBtn');
+  const exportProcurementBtn   = document.getElementById('exportProcurementBtn');
+  const procurementResultsDiv  = document.getElementById('procurementResults');
+
+  generateProcurementBtn.addEventListener('click', () => {
+    const cables = getCables();
+    const routeResults = cables
+      .filter(c => c.total_length != null && parseFloat(c.total_length) > 0)
+      .map(c => ({ cable: c.name || c.cable_tag || c.tag, total_length: parseFloat(c.total_length) }));
+
+    if (routeResults.length === 0) {
+      procurementResultsDiv.innerHTML = '<p class="field-hint">No routed cable lengths found. Run the <a href="optimalRoute.html">Optimal Route</a> tool first to populate cable lengths.</p>';
+      return;
+    }
+
+    let reels;
+    try {
+      reels = buildCableProcurementSchedule(routeResults, cables);
+    } catch (err) {
+      showAlertModal('Procurement Error', err.message);
+      return;
+    }
+
+    lastProcurementResult = reels;
+    renderProcurementResults(reels);
+    exportProcurementBtn.disabled = false;
+  });
+
+  exportProcurementBtn.addEventListener('click', () => {
+    if (!lastProcurementResult) return;
+    if (typeof XLSX === 'undefined') {
+      showAlertModal('Library Error', 'XLSX library not loaded. Check your network connection.');
+      return;
+    }
+    exportProcurementXlsx(lastProcurementResult);
+  });
+
+  function renderProcurementResults(reels) {
+    if (reels.length === 0) {
+      procurementResultsDiv.innerHTML = '<p>No procurement data generated. Ensure cables have conductor specifications in the Cable Schedule.</p>';
+      return;
+    }
+
+    const totalReels   = reels.length;
+    const totalEntries = reels.reduce((s, r) => s + r.cableAssignments.length, 0);
+    const totalOffcut  = reels.reduce((s, r) => s + r.offcutFt, 0);
+    const avgUtil      = reels.reduce((s, r) => s + r.reelUtilizationPct, 0) / totalReels;
+
+    let html = `
+      <section>
+        <h3>Summary</h3>
+        <table class="result-table" aria-label="Procurement summary">
+          <tbody>
+            <tr><th scope="row">Total Reels</th><td>${totalReels}</td></tr>
+            <tr><th scope="row">Total Cable Entries</th><td>${totalEntries}</td></tr>
+            <tr><th scope="row">Total Offcut</th><td>${totalOffcut.toFixed(1)} ft</td></tr>
+            <tr><th scope="row">Average Reel Utilization</th><td>${avgUtil.toFixed(1)}%</td></tr>
+          </tbody>
+        </table>
+      </section>`;
+
+    // Group reels by conductorSpec for display
+    const bySpec = new Map();
+    for (const reel of reels) {
+      if (!bySpec.has(reel.conductorSpec)) bySpec.set(reel.conductorSpec, []);
+      bySpec.get(reel.conductorSpec).push(reel);
+    }
+
+    for (const [spec, specReels] of bySpec) {
+      html += `<section class="spool-card"><h3>${esc(spec)}</h3>`;
+      for (const reel of specReels) {
+        const rows = reel.cableAssignments.map(a => `
+          <tr>
+            <td>${esc(a.cableTag)}</td>
+            <td>${a.routedLengthFt} ft</td>
+            <td>${a.addedAllowanceFt} ft</td>
+            <td>${a.totalCutFt} ft</td>
+          </tr>`).join('');
+
+        html += `
+          <h4>${esc(reel.reelSpec)}</h4>
+          <table class="result-table" aria-label="${esc(reel.reelSpec)} assignments">
+            <thead>
+              <tr>
+                <th scope="col">Cable Tag</th>
+                <th scope="col">Routed Length</th>
+                <th scope="col">Allowance (10%)</th>
+                <th scope="col">Cut Length</th>
+              </tr>
+            </thead>
+            <tbody>${rows}</tbody>
+            <tfoot>
+              <tr>
+                <th scope="row" colspan="3">Reel Size</th>
+                <td>${reel.standardLengthFt} ft</td>
+              </tr>
+              <tr>
+                <th scope="row" colspan="3">Offcut</th>
+                <td>${reel.offcutFt} ft</td>
+              </tr>
+              <tr>
+                <th scope="row" colspan="3">Utilization</th>
+                <td>${reel.reelUtilizationPct}%</td>
+              </tr>
+            </tfoot>
+          </table>`;
+      }
+      html += '</section>';
+    }
+
+    procurementResultsDiv.innerHTML = html;
+  }
+
+  function exportProcurementXlsx(reels) {
+    const wb = XLSX.utils.book_new();
+
+    // Summary sheet
+    const summaryData = [
+      ['Reel', 'Conductor Spec', 'Reel Size (ft)', '# Cables', 'Total Used (ft)', 'Offcut (ft)', 'Utilization (%)'],
+      ...reels.map(r => [
+        r.reelSpec,
+        r.conductorSpec,
+        r.standardLengthFt,
+        r.cableAssignments.length,
+        +(r.standardLengthFt - r.offcutFt).toFixed(1),
+        r.offcutFt,
+        r.reelUtilizationPct,
+      ]),
+    ];
+    XLSX.utils.book_append_sheet(wb, XLSX.utils.aoa_to_sheet(summaryData), 'Procurement Summary');
+
+    // Per-spec detail sheets
+    const bySpec = new Map();
+    for (const reel of reels) {
+      if (!bySpec.has(reel.conductorSpec)) bySpec.set(reel.conductorSpec, []);
+      bySpec.get(reel.conductorSpec).push(reel);
+    }
+
+    for (const [spec, specReels] of bySpec) {
+      const sheetName = spec.replace(/[\\/?*[\]]/g, '-').slice(0, 31);
+      const rows = [
+        ['Reel', 'Cable Tag', 'Routed Length (ft)', 'Allowance (ft)', 'Cut Length (ft)', 'Reel Size (ft)', 'Offcut (ft)', 'Utilization (%)'],
+      ];
+      for (const reel of specReels) {
+        for (const a of reel.cableAssignments) {
+          rows.push([reel.reelSpec, a.cableTag, a.routedLengthFt, a.addedAllowanceFt, a.totalCutFt, reel.standardLengthFt, reel.offcutFt, reel.reelUtilizationPct]);
+        }
+      }
+      XLSX.utils.book_append_sheet(wb, XLSX.utils.aoa_to_sheet(rows), sheetName);
+    }
+
+    const stamp = new Date().toISOString().split('T')[0];
+    XLSX.writeFile(wb, `cable-procurement-${stamp}.xlsx`);
   }
 
   function esc(s) {
