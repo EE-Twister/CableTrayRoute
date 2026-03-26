@@ -5,6 +5,7 @@ import {
   sizeTransformer,
   motorFLC3Ph,
   motorFLC1Ph,
+  trayFillFactor,
 } from './analysis/autoSize.mjs';
 
 document.addEventListener('DOMContentLoaded', () => {
@@ -38,17 +39,20 @@ document.addEventListener('DOMContentLoaded', () => {
     const continuous = document.getElementById('feeder-continuous').checked;
     const material = document.getElementById('feeder-material').value;
     const tempRating = parseInt(document.getElementById('feeder-temp').value, 10);
+    const ambientTempC = parseFloat(document.getElementById('feeder-ambient').value) || 30;
+    const bundledConductors = parseInt(document.getElementById('feeder-bundled').value, 10) || 3;
+    const installationType = document.getElementById('feeder-install').value;
     let result;
     try {
       if (mode === 'amps') {
         const loadAmps = parseFloat(document.getElementById('feeder-amps').value);
-        result = sizeFeeder({ loadAmps, continuous, material, tempRating });
+        result = sizeFeeder({ loadAmps, continuous, material, tempRating, ambientTempC, bundledConductors, installationType });
       } else {
         const kw = parseFloat(document.getElementById('feeder-kw').value);
         const pf = parseFloat(document.getElementById('feeder-pf').value);
         const voltage = parseFloat(document.getElementById('feeder-voltage').value);
         const phase = document.getElementById('feeder-phase').value;
-        result = sizeFeederFromKw({ kw, pf, voltage, phase, continuous, material, tempRating });
+        result = sizeFeederFromKw({ kw, pf, voltage, phase, continuous, material, tempRating, ambientTempC, bundledConductors, installationType });
       }
     } catch (err) {
       renderError('feeder-results', err.message);
@@ -67,9 +71,12 @@ document.addEventListener('DOMContentLoaded', () => {
     const phase = document.getElementById('motor-phase').value;
     const material = document.getElementById('motor-material').value;
     const highSF = document.getElementById('motor-highsf').checked;
+    const ambientTempC = parseFloat(document.getElementById('motor-ambient').value) || 30;
+    const bundledConductors = parseInt(document.getElementById('motor-bundled').value, 10) || 3;
+    const installationType = document.getElementById('motor-install').value;
     let result;
     try {
-      result = sizeMotorBranch({ hp, voltage, phase, material, highSF });
+      result = sizeMotorBranch({ hp, voltage, phase, material, highSF, ambientTempC, bundledConductors, installationType });
     } catch (err) {
       renderError('motor-results', err.message);
       return;
@@ -128,24 +135,30 @@ document.addEventListener('DOMContentLoaded', () => {
   function renderFeederResult(containerId, r) {
     const div = document.getElementById(containerId);
     if (r.error) { div.innerHTML = `<p class="alert-error">${r.error}</p>`; return; }
+    const installLabel = { conduit: 'Conduit / Raceway', tray_spaced: 'Cable tray (maintained spacing)', tray_touching: 'Cable tray (cables touching)' };
     div.innerHTML = `
       <section class="results-panel" aria-label="Feeder sizing results">
         <h3>Feeder / Branch Circuit Sizing</h3>
         <table class="results-table">
           <tbody>
             ${r.kw !== undefined ? row('Load (kW)', `${r.kw} kW @ PF ${r.pf}`) : ''}
-            ${row('Load Current', `${(r.loadAmps || r.loadAmps).toFixed ? (r.loadAmps).toFixed(1) : r.loadAmps} A`)}
+            ${row('Load Current', `${(r.loadAmps).toFixed(1)} A`)}
             ${row('Continuous load', r.continuous ? 'Yes (125% factor applied)' : 'No')}
             ${row('Required ampacity', `${r.requiredAmps} A`)}
+            ${r.ambientTempC !== 30 ? row('Ambient temperature', `${r.ambientTempC}°C (derating applied)`) : ''}
+            ${r.bundledConductors > 3 ? row('Bundled conductors', `${r.bundledConductors} (derating applied)`) : ''}
+            ${r.installationType !== 'conduit' ? row('Installation type', installLabel[r.installationType] || r.installationType) : ''}
+            ${r.deratingFactor < 1 ? row('Combined derating factor', r.deratingFactor.toFixed(3)) : ''}
             ${row('Conductor size', `${r.conductorSize} (${r.material}, ${r.tempRating}°C)`)}
             ${row('Conductor ampacity', `${r.conductorAmpacity} A`)}
+            ${r.deratingFactor < 1 ? row('Installed ampacity (derated)', `${r.installedAmpacity} A`) : ''}
             ${row('OCPD rating', `${r.ocpdRating} A`)}
           </tbody>
         </table>
         <details class="method-panel">
           <summary>NEC References</summary>
           <ul>
-            ${Object.values(r.nec).map(ref => `<li>${ref}</li>`).join('')}
+            ${Object.values(r.nec).filter(Boolean).map(ref => `<li>${ref}</li>`).join('')}
           </ul>
         </details>
       </section>`;
@@ -154,6 +167,7 @@ document.addEventListener('DOMContentLoaded', () => {
   function renderMotorResult(containerId, r) {
     const div = document.getElementById(containerId);
     if (r.error) { div.innerHTML = `<p class="alert-error">${r.error}</p>`; return; }
+    const installLabel = { conduit: 'Conduit / Raceway', tray_spaced: 'Cable tray (maintained spacing)', tray_touching: 'Cable tray (cables touching)' };
     div.innerHTML = `
       <section class="results-panel" aria-label="Motor branch circuit results">
         <h3>Motor Branch Circuit Sizing</h3>
@@ -162,8 +176,13 @@ document.addEventListener('DOMContentLoaded', () => {
             ${row('Motor HP', `${r.hp} HP`)}
             ${row('Phase / Voltage', `${r.phase === '3ph' ? '3-Phase' : '1-Phase'} / ${r.voltage}V`)}
             ${row('Full Load Current (FLC)', `${r.flc} A`)}
+            ${r.ambientTempC !== 30 ? row('Ambient temperature', `${r.ambientTempC}°C (derating applied)`) : ''}
+            ${r.bundledConductors > 3 ? row('Bundled conductors', `${r.bundledConductors} (derating applied)`) : ''}
+            ${r.installationType !== 'conduit' ? row('Installation type', installLabel[r.installationType] || r.installationType) : ''}
+            ${r.deratingFactor < 1 ? row('Combined derating factor', r.deratingFactor.toFixed(3)) : ''}
             ${row('Branch circuit conductor', `${r.conductorSize || 'N/A'} (${r.material})`)}
             ${row('Conductor ampacity', r.conductorAmpacity ? `${r.conductorAmpacity} A` : 'N/A')}
+            ${r.deratingFactor < 1 ? row('Installed ampacity (derated)', r.installedAmpacity ? `${r.installedAmpacity} A` : 'N/A') : ''}
             ${row('Branch circuit OCPD', `${r.ocpdRating} A ${r.ocpdType}`)}
             ${row('Overload relay setpoint', `${r.overloadSetpoint} A (${r.overloadPercent}% of FLC)`)}
           </tbody>
@@ -171,7 +190,7 @@ document.addEventListener('DOMContentLoaded', () => {
         <details class="method-panel">
           <summary>NEC References</summary>
           <ul>
-            ${Object.values(r.nec).map(ref => `<li>${ref}</li>`).join('')}
+            ${Object.values(r.nec).filter(Boolean).map(ref => `<li>${ref}</li>`).join('')}
           </ul>
         </details>
       </section>`;

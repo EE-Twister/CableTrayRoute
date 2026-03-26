@@ -16,6 +16,9 @@ import {
   sizeTransformer,
   sizeFeederFromKw,
   STANDARD_OCPD_RATINGS,
+  trayFillFactor,
+  ambientTempFactor,
+  bundlingFactor,
 } from '../analysis/autoSize.mjs';
 
 function describe(name, fn) {
@@ -326,5 +329,145 @@ describe('sizeFeederFromKw — convenience wrapper', () => {
 
   it('throws for zero kW', () => {
     assert.throws(() => sizeFeederFromKw({ kw: 0, pf: 0.9, voltage: 480 }));
+  });
+});
+
+// ---------------------------------------------------------------------------
+// trayFillFactor — NEC 392.80(A)
+// ---------------------------------------------------------------------------
+describe('trayFillFactor — NEC 392.80(A)', () => {
+  it('conduit returns 1.00', () => {
+    assert.strictEqual(trayFillFactor('conduit'), 1.00);
+  });
+
+  it('tray_spaced returns 1.00', () => {
+    assert.strictEqual(trayFillFactor('tray_spaced'), 1.00);
+  });
+
+  it('tray_touching returns 0.65', () => {
+    assert.strictEqual(trayFillFactor('tray_touching'), 0.65);
+  });
+
+  it('unknown type falls back to 1.00', () => {
+    assert.strictEqual(trayFillFactor('unknown_type'), 1.00);
+  });
+
+  it('defaults to 1.00 when no argument provided', () => {
+    assert.strictEqual(trayFillFactor(), 1.00);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// selectConductorSize — tray installation (NEC 392.80(A))
+// ---------------------------------------------------------------------------
+describe('selectConductorSize — tray installation', () => {
+  it('tray_spaced gives same result as conduit at same conditions', () => {
+    const conduit = selectConductorSize(100, 'copper', 75, { installationType: 'conduit' });
+    const traySpaced = selectConductorSize(100, 'copper', 75, { installationType: 'tray_spaced' });
+    assert.ok(conduit && traySpaced);
+    assert.strictEqual(conduit.size, traySpaced.size);
+    assert.strictEqual(conduit.deratingFactor, traySpaced.deratingFactor);
+  });
+
+  it('tray_touching requires a larger conductor than conduit for 100A', () => {
+    // tray_touching factor = 0.65 → adjusted required = 100 / 0.65 ≈ 153.8A
+    // conduit for 100A → #3 AWG (100A)
+    // tray_touching for 100A → must select conductor whose table ampacity ≥ 153.8A
+    const conduit = selectConductorSize(100, 'copper', 75, { installationType: 'conduit' });
+    const trayTouching = selectConductorSize(100, 'copper', 75, { installationType: 'tray_touching' });
+    assert.ok(conduit && trayTouching);
+    assert.ok(trayTouching.ampacity > conduit.ampacity,
+      `Expected tray_touching (${trayTouching.ampacity}A) > conduit (${conduit.ampacity}A)`);
+  });
+
+  it('tray_touching deratingFactor is 0.65', () => {
+    const r = selectConductorSize(100, 'copper', 75, { installationType: 'tray_touching' });
+    assert.ok(r);
+    assert.ok(Math.abs(r.deratingFactor - 0.65) < 0.001);
+  });
+
+  it('tray_touching installed ampacity meets load', () => {
+    const r = selectConductorSize(100, 'copper', 75, { installationType: 'tray_touching' });
+    assert.ok(r);
+    const installedAmpacity = r.ampacity * r.deratingFactor;
+    assert.ok(installedAmpacity >= 100,
+      `Installed ampacity ${installedAmpacity.toFixed(1)}A must be ≥ 100A`);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// sizeFeeder — installation conditions (ambient + bundling + tray)
+// ---------------------------------------------------------------------------
+describe('sizeFeeder — installation conditions', () => {
+  it('default conditions (30°C, 3 conductors, conduit) give derating factor 1.0', () => {
+    const r = sizeFeeder({ loadAmps: 60, continuous: true, ambientTempC: 30, bundledConductors: 3, installationType: 'conduit' });
+    assert.strictEqual(r.deratingFactor, 1.00);
+  });
+
+  it('40°C ambient with copper 75°C insulation gives correct derating', () => {
+    // NEC Table 310.15(B)(1)(a): 40°C ambient, 75°C insulation → 0.88
+    const expectedTempFactor = ambientTempFactor(40, 75);
+    assert.ok(Math.abs(expectedTempFactor - 0.88) < 0.001);
+    const r = sizeFeeder({ loadAmps: 60, continuous: false, ambientTempC: 40, bundledConductors: 1, installationType: 'conduit' });
+    assert.ok(Math.abs(r.deratingFactor - 0.88) < 0.001);
+  });
+
+  it('6 bundled conductors gives 0.80 bundling factor', () => {
+    // NEC 310.15(C)(1): 4-6 conductors → 0.80
+    assert.strictEqual(bundlingFactor(6), 0.80);
+    const r = sizeFeeder({ loadAmps: 60, continuous: false, ambientTempC: 30, bundledConductors: 6, installationType: 'conduit' });
+    assert.strictEqual(r.deratingFactor, 0.80);
+  });
+
+  it('tray_touching gives 0.65 combined derating at default temp/bundling', () => {
+    const r = sizeFeeder({ loadAmps: 60, continuous: false, ambientTempC: 30, bundledConductors: 1, installationType: 'tray_touching' });
+    assert.ok(Math.abs(r.deratingFactor - 0.65) < 0.001);
+  });
+
+  it('combined conditions upsize conductor vs defaults', () => {
+    // 40°C ambient (0.88) × 6 conductors (0.80) × tray_touching (0.65) ≈ 0.457
+    const baseline = sizeFeeder({ loadAmps: 100, continuous: false });
+    const derated = sizeFeeder({ loadAmps: 100, continuous: false, ambientTempC: 40, bundledConductors: 6, installationType: 'tray_touching' });
+    assert.ok(derated.conductorAmpacity >= baseline.conductorAmpacity,
+      `Derated conductor (${derated.conductorAmpacity}A) should be ≥ baseline (${baseline.conductorAmpacity}A)`);
+    assert.ok(derated.deratingFactor < 1);
+  });
+
+  it('includes trayRule NEC reference when tray_touching', () => {
+    const r = sizeFeeder({ loadAmps: 50, installationType: 'tray_touching' });
+    assert.ok(r.nec.trayRule && r.nec.trayRule.includes('392.80'));
+  });
+
+  it('trayRule is null for conduit installation', () => {
+    const r = sizeFeeder({ loadAmps: 50, installationType: 'conduit' });
+    assert.strictEqual(r.nec.trayRule, null);
+  });
+
+  it('installedAmpacity meets load requirement after derating', () => {
+    const r = sizeFeeder({ loadAmps: 100, continuous: false, ambientTempC: 40, bundledConductors: 6, installationType: 'tray_touching' });
+    assert.ok(r.installedAmpacity >= 100,
+      `Installed ampacity ${r.installedAmpacity}A must be ≥ 100A`);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// sizeMotorBranch — installation conditions
+// ---------------------------------------------------------------------------
+describe('sizeMotorBranch — installation conditions', () => {
+  it('tray_touching upsizes motor branch conductor', () => {
+    const baseline = sizeMotorBranch({ hp: 25, voltage: 460 });
+    const tray = sizeMotorBranch({ hp: 25, voltage: 460, installationType: 'tray_touching' });
+    assert.ok(tray.conductorAmpacity >= baseline.conductorAmpacity,
+      `Tray conductor (${tray.conductorAmpacity}A) should be ≥ baseline (${baseline.conductorAmpacity}A)`);
+  });
+
+  it('includes trayRule NEC reference when tray_touching', () => {
+    const r = sizeMotorBranch({ hp: 25, voltage: 460, installationType: 'tray_touching' });
+    assert.ok(r.nec.trayRule && r.nec.trayRule.includes('392.80'));
+  });
+
+  it('default installationType is conduit', () => {
+    const r = sizeMotorBranch({ hp: 10, voltage: 460 });
+    assert.strictEqual(r.installationType, 'conduit');
   });
 });

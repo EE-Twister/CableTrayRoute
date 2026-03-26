@@ -187,6 +187,28 @@ export function bundlingFactor(bundledConductors) {
   return row ? row.factor : BUNDLING_FACTORS[BUNDLING_FACTORS.length - 1].factor;
 }
 
+// ---------------------------------------------------------------------------
+// NEC 392.80(A) — Cable tray ampacity correction for single-conductor cables
+//   conduit:       standard conduit / raceway — no tray correction (100%)
+//   tray_spaced:   single layer, maintained spacing ≥ 1 cable OD (100%) NEC 392.80(A)(1)(a)
+//   tray_touching: single layer, cables touching / no maintained spacing (65%) NEC 392.80(A)(1)(b)
+// ---------------------------------------------------------------------------
+const TRAY_FILL_FACTORS = {
+  conduit:       1.00,
+  tray_spaced:   1.00,
+  tray_touching: 0.65,
+};
+
+/**
+ * Return the NEC 392.80(A) cable tray fill correction factor.
+ *
+ * @param {'conduit'|'tray_spaced'|'tray_touching'} installationType
+ * @returns {number}  Correction factor (0.65 for touching cables in tray, 1.0 otherwise).
+ */
+export function trayFillFactor(installationType = 'conduit') {
+  return TRAY_FILL_FACTORS[installationType] ?? 1.00;
+}
+
 /**
  * Find the next standard OCPD rating at or above the required ampacity.
  *
@@ -209,11 +231,11 @@ export function nextStandardXfmrKva(requiredKva) {
 
 /**
  * Select conductor size from NEC Table 310.15(B)(16) for a required ampacity,
- * optionally applying ambient temperature and bundling correction factors.
+ * optionally applying ambient temperature, bundling, and cable tray correction factors.
  *
  * When derating factors are provided the required ampacity is divided by the
  * combined factor before table lookup, ensuring the installed (derated) ampacity
- * meets the load requirement per NEC 310.15(B)(1)(a) and 310.15(C)(1).
+ * meets the load requirement per NEC 310.15(B)(1)(a), 310.15(C)(1), and 392.80(A).
  *
  * @param {number} requiredAmps         Load current requiring protection
  * @param {'copper'|'aluminum'} material
@@ -221,14 +243,16 @@ export function nextStandardXfmrKva(requiredKva) {
  * @param {object}  [options]
  * @param {number}  [options.ambientTempC=30]        Ambient temperature in °C
  * @param {number}  [options.bundledConductors=1]    Number of current-carrying conductors in raceway
- * @returns {{size: string, ampacity: number, deratingFactor: number}|null}
+ * @param {'conduit'|'tray_spaced'|'tray_touching'} [options.installationType='conduit']
+ * @returns {{size: string, ampacity: number, deratingFactor: number, trayFactor: number}|null}
  */
 export function selectConductorSize(requiredAmps, material = 'copper', tempRating = 75, options = {}) {
-  const { ambientTempC = 30, bundledConductors = 1 } = options;
+  const { ambientTempC = 30, bundledConductors = 1, installationType = 'conduit' } = options;
 
   const tempFactor = ambientTempFactor(ambientTempC, tempRating);
   const bundleFactor = bundlingFactor(bundledConductors);
-  const combinedFactor = tempFactor * bundleFactor;
+  const trayFactor = trayFillFactor(installationType);
+  const combinedFactor = tempFactor * bundleFactor * trayFactor;
 
   if (combinedFactor <= 0) return null; // ambient exceeds conductor rating
 
@@ -244,7 +268,7 @@ export function selectConductorSize(requiredAmps, material = 'copper', tempRatin
     return amp !== null && amp >= adjustedRequired;
   });
   if (!entry) return null;
-  return { size: entry.size, ampacity: entry[col], deratingFactor: combinedFactor };
+  return { size: entry.size, ampacity: entry[col], deratingFactor: combinedFactor, trayFactor };
 }
 
 /**
@@ -319,12 +343,13 @@ export function sizeFeeder(params) {
     tempRating = 75,
     ambientTempC = 30,
     bundledConductors = 1,
+    installationType = 'conduit',
   } = params;
 
   if (loadAmps <= 0) throw new Error('Load current must be positive');
 
   const requiredAmps = continuous ? loadAmps * 1.25 : loadAmps;
-  const conductor = selectConductorSize(requiredAmps, material, tempRating, { ambientTempC, bundledConductors });
+  const conductor = selectConductorSize(requiredAmps, material, tempRating, { ambientTempC, bundledConductors, installationType });
   if (!conductor) return { error: 'Load exceeds maximum single-conductor capacity; use parallel conductors' };
 
   const ocpd = nextStandardOcpd(conductor.ampacity);
@@ -340,14 +365,16 @@ export function sizeFeeder(params) {
     deratingFactor: derating,
     ambientTempC,
     bundledConductors,
+    installationType,
     material,
     tempRating,
     ocpdRating: ocpd,
     nec: {
       continuousRule: 'NEC 210.20(A) / 215.3 — 125% of continuous load',
       conductorRule: 'NEC 310.15(B)(16) — 75°C column',
-      ambientRule: ambientTempC !== 30 ? `NEC 310.15(B)(1)(a) — ambient ${ambientTempC}°C correction factor ${derating.toFixed(2)}` : null,
+      ambientRule: ambientTempC !== 30 ? `NEC 310.15(B)(1)(a) — ambient ${ambientTempC}°C correction factor ${ambientTempFactor(ambientTempC, tempRating).toFixed(2)}` : null,
       bundlingRule: bundledConductors > 3 ? `NEC 310.15(C)(1) — ${bundledConductors} conductors bundling factor ${bundlingFactor(bundledConductors).toFixed(2)}` : null,
+      trayRule: installationType === 'tray_touching' ? 'NEC 392.80(A)(1)(b) — cable tray, cables touching: 0.65× derating factor' : null,
       ocpdRule: 'NEC 240.4(B) — next standard size above conductor ampacity',
     }
   };
@@ -388,6 +415,7 @@ export function sizeMotorBranch(params) {
     highSF = true,
     ambientTempC = 30,
     bundledConductors = 1,
+    installationType = 'conduit',
   } = params;
 
   if (hp <= 0) throw new Error('Motor HP must be positive');
@@ -400,7 +428,7 @@ export function sizeMotorBranch(params) {
 
   // Branch circuit conductor: 125% of FLC (NEC 430.22)
   const conductorRequired = flc * 1.25;
-  const conductor = selectConductorSize(conductorRequired, material, 75, { ambientTempC, bundledConductors });
+  const conductor = selectConductorSize(conductorRequired, material, 75, { ambientTempC, bundledConductors, installationType });
 
   // Branch circuit OCPD: 250% for inverse time breaker (NEC 430.52, Table 430.52)
   // If 250% doesn't correspond to a standard size, next standard size above is allowed
@@ -427,6 +455,7 @@ export function sizeMotorBranch(params) {
     deratingFactor: derating,
     ambientTempC,
     bundledConductors,
+    installationType,
     material,
     // Branch circuit OCPD (inverse time breaker)
     ocpdRequired: Math.round(ocpdRequired * 100) / 100,
@@ -440,6 +469,7 @@ export function sizeMotorBranch(params) {
       conductorRule: 'NEC 430.22 — 125% of motor FLC',
       ambientRule: ambientTempC !== 30 ? `NEC 310.15(B)(1)(a) — ambient ${ambientTempC}°C correction factor ${ambientTempFactor(ambientTempC, 75).toFixed(2)}` : null,
       bundlingRule: bundledConductors > 3 ? `NEC 310.15(C)(1) — ${bundledConductors} conductors bundling factor ${bundlingFactor(bundledConductors).toFixed(2)}` : null,
+      trayRule: installationType === 'tray_touching' ? 'NEC 392.80(A)(1)(b) — cable tray, cables touching: 0.65× derating factor' : null,
       ocpdRule: 'NEC 430.52, Table 430.52 — 250% FLC (inverse time breaker)',
       overloadRule: `NEC 430.32(A)(1) — ${overloadPercent * 100}% of FLC`,
     }
