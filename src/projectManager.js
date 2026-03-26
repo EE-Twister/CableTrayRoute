@@ -1,5 +1,6 @@
 import './components/navigation.js';
 import { saveProject as dsSaveProject, loadProject as dsLoadProject, exportProject, importProject } from '../dataStore.mjs';
+import { PROJECT_TEMPLATES } from './projectTemplates.js';
 import {
   getProjectState,
   setProjectState,
@@ -395,6 +396,53 @@ async function promptLoadProject(projects) {
   return typeof result === 'string' ? result : '';
 }
 
+async function selectProjectTemplate() {
+  return openModal({
+    title: 'Choose a Project Template',
+    primaryText: 'Use Template',
+    secondaryText: 'Skip',
+    defaultWidth: 'wide',
+    render(body, controller) {
+      controller.setPrimaryDisabled(true);
+      let chosen = null;
+
+      const grid = document.createElement('div');
+      grid.className = 'template-grid';
+
+      const allOptions = [
+        { id: 'blank', name: 'Blank', icon: '📄', description: 'Start with an empty project.' },
+        ...PROJECT_TEMPLATES
+      ];
+
+      allOptions.forEach(tpl => {
+        const card = document.createElement('button');
+        card.type = 'button';
+        card.className = 'template-card';
+        card.dataset.templateId = tpl.id;
+        card.innerHTML = `
+          <span class="template-card__icon" aria-hidden="true">${tpl.icon}</span>
+          <span class="template-card__name">${tpl.name}</span>
+          <span class="template-card__desc">${tpl.description}</span>
+        `;
+        card.addEventListener('click', () => {
+          grid.querySelectorAll('.template-card').forEach(c => c.classList.remove('selected'));
+          card.classList.add('selected');
+          chosen = tpl.id === 'blank' ? null : PROJECT_TEMPLATES.find(t => t.id === tpl.id);
+          controller.setPrimaryDisabled(false);
+        });
+        card.addEventListener('dblclick', () => {
+          controller.close(chosen);
+        });
+        grid.appendChild(card);
+      });
+
+      body.appendChild(grid);
+
+      controller.onSubmit = () => controller.close(chosen);
+    }
+  });
+}
+
 async function newProject() {
   const name = await promptProjectName({
     title: 'Create New Project',
@@ -404,10 +452,20 @@ async function newProject() {
   });
   const trimmed = normalizeProjectName(name);
   if (!trimmed) return;
+
+  const template = await selectProjectTemplate();
+
   setProjectHash(trimmed);
   applyProjectStateName(trimmed);
   try {
-    writeSavedProject(trimmed, createEmptyProjectSections());
+    const sections = createEmptyProjectSections();
+    if (template) {
+      sections.cables = Array.isArray(template.sections.cables) ? [...template.sections.cables] : [];
+      sections.raceways.trays = Array.isArray(template.sections.raceways?.trays) ? [...template.sections.raceways.trays] : [];
+      sections.raceways.conduits = Array.isArray(template.sections.raceways?.conduits) ? [...template.sections.raceways.conduits] : [];
+      sections.raceways.ductbanks = Array.isArray(template.sections.raceways?.ductbanks) ? [...template.sections.raceways.ductbanks] : [];
+    }
+    writeSavedProject(trimmed, sections);
   } catch (e) {
     console.error('Failed to initialize new project storage', e);
   }
