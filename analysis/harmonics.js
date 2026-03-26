@@ -2,7 +2,7 @@ import * as d3 from 'https://cdn.jsdelivr.net/npm/d3@7/+esm';
 import { getOneLine, getStudies, setStudies } from '../dataStore.mjs';
 
 // Convert spectrum description to a map of harmonic order to percent
-function parseSpectrum(spec) {
+export function parseSpectrum(spec) {
   const map = {};
   if (!spec) return map;
   if (Array.isArray(spec)) {
@@ -95,6 +95,139 @@ export function runHarmonics() {
       vthd: Number(vthd.toFixed(2)),
       limit,
       warning: vthd > limit
+    };
+  });
+
+  return results;
+}
+
+/**
+ * Per-phase unbalanced harmonic study.
+ *
+ * Each harmonic source component may carry independent per-phase spectra via
+ * `harmonicsA`, `harmonicsB`, and `harmonicsC` fields. The caller may also
+ * supply a `phaseData` override map keyed by component id:
+ *   { [id]: { harmonicsA?, harmonicsB?, harmonicsC? } }
+ *
+ * Triplen harmonic orders (3, 6, 9 … = zero-sequence) do not cancel in the
+ * neutral conductor of a 4-wire system — they sum arithmetically from all three
+ * phases.  This function computes the resulting neutral RMS current and flags
+ * overload (neutral > 100 % of phase FLA).
+ *
+ * @param {Object} [phaseData={}] Optional per-component per-phase override map.
+ * @returns {Object<string,{
+ *   phaseA:{ithd:number,vthd:number},
+ *   phaseB:{ithd:number,vthd:number},
+ *   phaseC:{ithd:number,vthd:number},
+ *   neutral:{ithd_pct_of_phase:number,rms_amps:number,dominant_order:number,overload_warning:boolean},
+ *   balanced:boolean,
+ *   phase_imbalance_flag:boolean,
+ *   limit:number,
+ *   warning:boolean
+ * }>}
+ */
+export function runHarmonicsUnbalanced(phaseData = {}) {
+  const { sheets } = getOneLine();
+  const comps = (Array.isArray(sheets[0]?.components)
+    ? sheets.flatMap(s => s.components)
+    : sheets).filter(c => c && c.type !== 'annotation' && c.type !== 'dimension');
+  const results = {};
+
+  comps.forEach(c => {
+    if (!c.harmonicSource) return;
+
+    const V = Number(c.voltage) || (Number(c.baseKV) || 0) * 1000;
+    const P = Number(c.load?.kw || c.load?.P || c.kw || 0);
+    const I1 = V ? P * 1000 / (Math.sqrt(3) * V) : 0;
+    const kv = V / 1000;
+
+    // Per-phase spectra — fall back to balanced single spectrum
+    const override = phaseData[c.id] || {};
+    const specA = parseSpectrum(override.harmonicsA ?? c.harmonicsA ?? c.harmonics);
+    const specB = parseSpectrum(override.harmonicsB ?? c.harmonicsB ?? c.harmonics);
+    const specC = parseSpectrum(override.harmonicsC ?? c.harmonicsC ?? c.harmonics);
+    const balanced = !override.harmonicsA && !override.harmonicsB && !override.harmonicsC
+      && !c.harmonicsA && !c.harmonicsB && !c.harmonicsC;
+
+    // Admittance network (same as runHarmonics)
+    const scMVA = Number(c.scMVA) || 0;
+    const yBase = V ? (scMVA ? scMVA / (kv ** 2) : 1) : 1;
+    const capB = (c.capacitors || []).reduce((sum, cap) => {
+      const kvar = Number(cap.kvar) || 0;
+      const cv = Number(cap.kv) || kv || 1;
+      return sum + (kvar / (cv * cv));
+    }, 0);
+    const filterMap = {};
+    (c.filters || []).forEach(f => {
+      const ord = Number(f.order);
+      if (!ord) return;
+      const kvar = Number(f.kvar) || 0;
+      const fv = Number(f.kv) || kv || 1;
+      const q = Number(f.q) || 1;
+      filterMap[ord] = (filterMap[ord] || 0) + (kvar / (fv * fv)) * q;
+    });
+
+    // Compute ITHD and VTHD for a single phase spectrum
+    function phaseResult(spectrum) {
+      let i2 = 0, v2 = 0;
+      Object.entries(spectrum).forEach(([ordStr, pct]) => {
+        const h = Number(ordStr);
+        if (h <= 1) return;
+        const Ih = I1 * (pct / 100);
+        i2 += Ih * Ih;
+        const y = yBase + capB * h + (filterMap[h] || 0);
+        const Vh = y ? Ih / y : 0;
+        v2 += (Vh / V) * (Vh / V);
+      });
+      const ithd = I1 ? Math.sqrt(i2) / I1 * 100 : 0;
+      const vthd = V ? Math.sqrt(v2) * 100 : 0;
+      return { ithd: Number(ithd.toFixed(2)), vthd: Number(vthd.toFixed(2)) };
+    }
+
+    const phaseA = phaseResult(specA);
+    const phaseB = phaseResult(specB);
+    const phaseC = phaseResult(specC);
+
+    // Neutral current: triplen (zero-sequence) orders sum arithmetically
+    const allOrders = new Set(
+      [...Object.keys(specA), ...Object.keys(specB), ...Object.keys(specC)]
+        .map(Number).filter(h => h > 1 && h % 3 === 0)
+    );
+    let neutralI2 = 0;
+    let dominantOrder = 0;
+    let dominantContrib = 0;
+    allOrders.forEach(h => {
+      const IAh = I1 * ((specA[h] || 0) / 100);
+      const IBh = I1 * ((specB[h] || 0) / 100);
+      const ICh = I1 * ((specC[h] || 0) / 100);
+      const INh = IAh + IBh + ICh;
+      neutralI2 += INh * INh;
+      if (INh > dominantContrib) { dominantContrib = INh; dominantOrder = h; }
+    });
+    const neutralRms = Math.sqrt(neutralI2);
+    const neutralPct = I1 ? neutralRms / I1 * 100 : 0;
+
+    // Phase imbalance: flag if per-phase ITHD range exceeds 10 percentage points
+    const ithdValues = [phaseA.ithd, phaseB.ithd, phaseC.ithd];
+    const ithdRange = Math.max(...ithdValues) - Math.min(...ithdValues);
+
+    const limit = limitForVoltage(kv);
+    const worstVthd = Math.max(phaseA.vthd, phaseB.vthd, phaseC.vthd);
+
+    results[c.id] = {
+      phaseA,
+      phaseB,
+      phaseC,
+      neutral: {
+        ithd_pct_of_phase: Number(neutralPct.toFixed(2)),
+        rms_amps: Number(neutralRms.toFixed(2)),
+        dominant_order: dominantOrder,
+        overload_warning: neutralPct > 100
+      },
+      balanced,
+      phase_imbalance_flag: ithdRange > 10,
+      limit,
+      warning: worstVthd > limit
     };
   });
 

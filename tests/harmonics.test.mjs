@@ -220,6 +220,104 @@ describe('singleHarmonicVTHD', () => {
 });
 
 // ---------------------------------------------------------------------------
+// Neutral current formula extracted from analysis/harmonics.js runHarmonicsUnbalanced.
+//
+// For triplen orders (h % 3 === 0, zero-sequence): harmonic currents from all
+// three phases sum arithmetically in the neutral.  Non-triplen orders cancel.
+//
+//   I_Nh  = I_Ah + I_Bh + I_Ch   (triplen only)
+//   I_N   = sqrt( Σ I_Nh² )      (RMS over all triplen orders)
+//   I_Npct = I_N / I1 × 100
+//
+function neutralTriplenRms(specA, specB, specC, I1) {
+  const orders = new Set(
+    [...Object.keys(specA), ...Object.keys(specB), ...Object.keys(specC)]
+      .map(Number).filter(h => h > 1 && h % 3 === 0)
+  );
+  let sum2 = 0;
+  orders.forEach(h => {
+    const INh = I1 * ((specA[h] || 0) / 100)
+              + I1 * ((specB[h] || 0) / 100)
+              + I1 * ((specC[h] || 0) / 100);
+    sum2 += INh * INh;
+  });
+  return Math.sqrt(sum2);
+}
+
+describe('neutral triplen current — unbalanced harmonic model', () => {
+  it('balanced 3-phase: all phases same 3rd harmonic → neutral = 3× each phase contribution', () => {
+    // Each phase: 20 % of 100 A = 20 A at 3rd.  Neutral = 20+20+20 = 60 A.
+    const spec = { 3: 20 };
+    const neutral = neutralTriplenRms(spec, spec, spec, 100);
+    assert.ok(approxEqual(neutral, 60, 1e-9), `Got ${neutral}`);
+  });
+
+  it('only phase A has 3rd harmonic → neutral equals phase A contribution only', () => {
+    const specA = { 3: 20 };
+    const neutral = neutralTriplenRms(specA, {}, {}, 100);
+    assert.ok(approxEqual(neutral, 20, 1e-9), `Got ${neutral}`);
+  });
+
+  it('non-triplen orders (5th, 7th) do not contribute to neutral', () => {
+    const spec = { 5: 20, 7: 14 };
+    const neutral = neutralTriplenRms(spec, spec, spec, 100);
+    assert.ok(approxEqual(neutral, 0, 1e-9), `Got ${neutral}`);
+  });
+
+  it('mixed spectrum: only the 3rd harmonic contributes, 5th does not', () => {
+    const spec = { 3: 20, 5: 14 };
+    // 3rd: 20+20+20 = 60; 5th: not triplen → 0.  Total = 60.
+    const neutral = neutralTriplenRms(spec, spec, spec, 100);
+    assert.ok(approxEqual(neutral, 60, 1e-9), `Got ${neutral}`);
+  });
+
+  it('neutral overload: balanced 3rd at 40 % → neutral 120 % of phase FLA', () => {
+    const spec = { 3: 40 };
+    const I1 = 100;
+    const neutral = neutralTriplenRms(spec, spec, spec, I1);
+    // Each phase: 40 A; neutral = 120 A = 120 % of I1
+    assert.ok(approxEqual(neutral, 120, 1e-9), `Got ${neutral}`);
+    const neutralPct = neutral / I1 * 100;
+    assert.ok(neutralPct > 100, `Expected overload (>100 %), got ${neutralPct.toFixed(1)} %`);
+  });
+
+  it('two triplen orders present: RMS combines both', () => {
+    // Phase A only: 3rd at 20% (20A) and 9th at 10% (10A).  Neutral = same (only A contributes).
+    // I_N = sqrt(20²+10²) = sqrt(500) ≈ 22.36 A
+    const specA = { 3: 20, 9: 10 };
+    const neutral = neutralTriplenRms(specA, {}, {}, 100);
+    const expected = Math.sqrt(20 * 20 + 10 * 10);
+    assert.ok(approxEqual(neutral, expected, 1e-9), `Got ${neutral}, expected ${expected}`);
+  });
+
+  it('phase imbalance: max ITHD range over 10 pp triggers flag', () => {
+    // Inline the flag logic: flag when (max - min) > 10
+    function phaseImbalanceFlag(ithdA, ithdB, ithdC) {
+      const vals = [ithdA, ithdB, ithdC];
+      return Math.max(...vals) - Math.min(...vals) > 10;
+    }
+    assert.strictEqual(phaseImbalanceFlag(30, 0, 0), true,  'Range 30 should flag');
+    assert.strictEqual(phaseImbalanceFlag(20, 15, 18), false, 'Range 5 should not flag');
+    assert.strictEqual(phaseImbalanceFlag(25, 14, 20), true,  'Range 11 should flag');
+    assert.strictEqual(phaseImbalanceFlag(10, 10, 10), false, 'All equal should not flag');
+  });
+
+  it('zero fundamental → no division-by-zero, neutral = 0', () => {
+    const spec = { 3: 20 };
+    // neutralTriplenRms with I1=0 → all harmonic currents = 0
+    const neutral = neutralTriplenRms(spec, spec, spec, 0);
+    assert.ok(approxEqual(neutral, 0, 1e-9), `Got ${neutral}`);
+  });
+
+  it('9th harmonic (also triplen) adds to neutral just like 3rd', () => {
+    const spec = { 9: 15 };
+    const neutral = neutralTriplenRms(spec, spec, spec, 100);
+    // 15+15+15 = 45 A
+    assert.ok(approxEqual(neutral, 45, 1e-9), `Got ${neutral}`);
+  });
+});
+
+// ---------------------------------------------------------------------------
 describe('combined harmonic flow — illustrative scenario', () => {
   it('VFD-typical spectrum produces THD within expected range', () => {
     // 6-pulse VFD: dominant harmonics 5th (20%), 7th (14%), 11th (9%), 13th (7%)
