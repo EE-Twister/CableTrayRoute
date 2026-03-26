@@ -915,6 +915,52 @@ body.dark-mode .result-ok   { background: #14532d; color: #86efac; }
 body.dark-mode .result-fail { background: #450a0a; color: #fca5a5; }
 body.dark-mode .result-warn { background: #451a03; color: #fcd34d; }
 
+/* ── Scenario Comparison Table (Gap #17) ─────────────────────────────────── */
+.scenario-compare-summary {
+  font-weight: 600;
+  margin-bottom: 0.5rem;
+}
+
+.scenario-compare-scroll {
+  overflow-x: auto;
+  max-height: 60vh;
+  overflow-y: auto;
+  border: 1px solid var(--color-border, #dee2e6);
+  border-radius: 4px;
+}
+
+.scenario-compare-table {
+  border-collapse: collapse;
+  min-width: 600px;
+  width: 100%;
+  font-size: 0.875rem;
+}
+
+.scenario-compare-table th,
+.scenario-compare-table td {
+  padding: 6px 10px;
+  border: 1px solid var(--color-border, #dee2e6);
+  white-space: nowrap;
+}
+
+.scenario-compare-table th {
+  background: var(--table-header-bg, #f1f5f9);
+  font-weight: 600;
+  text-align: left;
+  position: sticky;
+  top: 0;
+  z-index: 1;
+}
+
+.cmp-added   { background: #d4edda; color: #155724; }
+.cmp-removed { background: #f8d7da; color: #721c24; }
+.cmp-changed { background: #fff3cd; color: #856404; }
+
+body.dark-mode .scenario-compare-table th { background: var(--card-bg, #1e293b); }
+body.dark-mode .cmp-added   { background: #14532d; color: #86efac; }
+body.dark-mode .cmp-removed { background: #450a0a; color: #fca5a5; }
+body.dark-mode .cmp-changed { background: #451a03; color: #fcd34d; }
+
 @media print {
   .top-nav, .settings-menu, #controls, .report-toc, .step-nav, .breadcrumb-trail,
   #rpt-options, .method-panel, .report-status { display: none !important; }
