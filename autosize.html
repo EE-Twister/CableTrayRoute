@@ -21,6 +21,22 @@
   <link rel="stylesheet" href="style.css" />
   <script type="module" src="dirtyTracker.js"></script>
   <script type="module" src="dist/autosize.js" defer></script>
+  <style>
+    /* Cost comparison table styles */
+    .cost-comparison-table th { white-space: nowrap; }
+    .cost-row-selected { background: var(--color-info-bg, #e8f4fd); }
+    .cost-row-best     { background: var(--color-success-bg, #e8f8ee); }
+    .cost-cheaper      { color: var(--color-success, #1a7f37); font-weight: 600; }
+    .cost-pricier      { color: var(--color-muted, #888); }
+    .cost-baseline     { color: var(--color-muted, #888); font-style: italic; }
+    .cost-badge        { display: inline-block; font-size: 0.7em; padding: 1px 5px;
+                         border-radius: 3px; vertical-align: middle; margin-left: 4px;
+                         font-weight: 600; text-transform: uppercase; }
+    .cost-badge-selected { background: var(--color-info-bg, #dbeafe); color: var(--color-info, #1d4ed8); }
+    .cost-badge-best     { background: var(--color-success-bg, #dcfce7); color: var(--color-success, #15803d); }
+    .cost-subtitle     { font-size: 0.75em; font-weight: normal; color: var(--color-muted, #888); }
+    .cost-notes        { color: var(--color-muted, #666); }
+  </style>
 </head>
 <body class="autosize-page" data-report-title="Auto-Size Equipment">
   <a href="#main-content" class="skip-link">Skip to main content</a>
@@ -248,6 +264,7 @@
           </div>
         </form>
         <div id="feeder-results" role="region" aria-live="polite" aria-label="Feeder sizing results"></div>
+        <div id="feeder-cost-comparison" role="region" aria-live="polite" aria-label="Conductor cost comparison" hidden></div>
       </div>
 
       <!-- Panel 2: Motor Branch Circuit -->

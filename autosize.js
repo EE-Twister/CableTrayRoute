@@ -6,6 +6,7 @@ import {
   motorFLC3Ph,
   motorFLC1Ph,
   trayFillFactor,
+  minimizeCostConductors,
 } from './analysis/autoSize.mjs';
 
 document.addEventListener('DOMContentLoaded', () => {
@@ -59,6 +60,19 @@ document.addEventListener('DOMContentLoaded', () => {
       return;
     }
     renderFeederResult('feeder-results', result);
+
+    if (!result.error && result.requiredAmps) {
+      const costOptions = minimizeCostConductors(result.requiredAmps, tempRating, {
+        ambientTempC,
+        bundledConductors,
+        installationType,
+        allowAluminum: true,
+        maxParallel: 4,
+      });
+      renderCostComparison('feeder-cost-comparison', costOptions, material, result.conductorSize);
+    } else {
+      document.getElementById('feeder-cost-comparison').hidden = true;
+    }
   });
 
   // -------------------------------------------------------------------------
@@ -222,6 +236,82 @@ document.addEventListener('DOMContentLoaded', () => {
           </ul>
         </details>
       </section>`;
+  }
+
+  function renderCostComparison(containerId, options, baseMaterial, baseSize) {
+    const div = document.getElementById(containerId);
+    if (!options || options.length === 0) { div.hidden = true; return; }
+
+    // Baseline = single conductor with the originally-selected material
+    const baseOpt = options.find(o => o.nParallel === 1 && o.material === baseMaterial);
+    const baseCost = baseOpt ? baseOpt.costPerFtPerPhase : null;
+
+    const matAbbr = { copper: 'Cu', aluminum: 'Al' };
+
+    const rows = options.map((opt, i) => {
+      const config = `${opt.nParallel === 1 ? '1×' : opt.nParallel + '×'}${opt.size} ${matAbbr[opt.material] || opt.material}`;
+      const ampLabel = `${opt.installedAmpacity} A`;
+      const costLabel = opt.costPerFtPerPhase !== null ? `$${opt.costPerFtPerPhase.toFixed(2)}` : 'N/A';
+
+      let vsLabel = '—';
+      let vsClass = '';
+      if (baseCost !== null && opt.costPerFtPerPhase !== null) {
+        const pct = ((opt.costPerFtPerPhase - baseCost) / baseCost) * 100;
+        if (Math.abs(pct) < 0.5) { vsLabel = 'baseline'; vsClass = 'cost-baseline'; }
+        else if (pct < 0) { vsLabel = `−${Math.abs(pct).toFixed(0)}%`; vsClass = 'cost-cheaper'; }
+        else { vsLabel = `+${pct.toFixed(0)}%`; vsClass = 'cost-pricier'; }
+      }
+
+      const isCheapest = i === 0;
+      const isSelected = opt.nParallel === 1 && opt.material === baseMaterial && opt.size === baseSize;
+      const rowClass = isSelected ? 'cost-row-selected' : isCheapest ? 'cost-row-best' : '';
+
+      const badge = isSelected
+        ? '<span class="cost-badge cost-badge-selected">selected</span>'
+        : isCheapest ? '<span class="cost-badge cost-badge-best">cheapest</span>' : '';
+
+      const notesHtml = opt.notes.length > 0
+        ? `<small class="cost-notes">${opt.notes.join(' · ')}</small>`
+        : '';
+
+      return `<tr class="${rowClass}">
+        <td>${config} ${badge}</td>
+        <td>${ampLabel}</td>
+        <td>${costLabel}</td>
+        <td class="${vsClass}">${vsLabel}</td>
+        <td>${notesHtml}</td>
+      </tr>`;
+    }).join('');
+
+    div.innerHTML = `
+      <section class="results-panel" aria-label="Conductor cost comparison">
+        <h3>Conductor Cost Comparison
+          <small class="cost-subtitle"> — est. $/ft per phase conductor</small>
+        </h3>
+        <p class="field-hint">Indicative pricing (RS Means-based).
+          Verify with current supplier quotes before procurement.</p>
+        <table class="results-table cost-comparison-table">
+          <thead>
+            <tr>
+              <th>Configuration</th>
+              <th>Installed Ampacity</th>
+              <th>$/ft/phase</th>
+              <th>vs. Selected</th>
+              <th>Notes</th>
+            </tr>
+          </thead>
+          <tbody>${rows}</tbody>
+        </table>
+        <details class="method-panel">
+          <summary>NEC References</summary>
+          <ul>
+            <li>NEC 310.10(H) — Parallel conductors ≥ 1/0 AWG; same size, material, length; separate conduit per set</li>
+            <li>NEC 110.14 — Aluminum conductors require Al-rated terminals and connectors</li>
+            <li>NEC 310.14(C) — Aluminum building wire ≥ #8 AWG for most applications</li>
+          </ul>
+        </details>
+      </section>`;
+    div.hidden = false;
   }
 
   // Activate first tab

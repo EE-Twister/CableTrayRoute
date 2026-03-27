@@ -120,6 +120,34 @@ export const STANDARD_XFMR_KVA = [
 ];
 
 // ---------------------------------------------------------------------------
+// Conductor cost data — indicative $/ft per conductor
+// Source: RS Means Electrical Cost Data (use for comparison only;
+// verify with current supplier quotes before procurement).
+// Cu: THWN-2 copper building wire
+// Al: XHHW-2 aluminum building wire (≥ #8 AWG per NEC 310.14(C))
+// ---------------------------------------------------------------------------
+export const CU_COST_PER_FT = {
+  '#14 AWG': 0.18, '#12 AWG': 0.25, '#10 AWG': 0.40,
+  '#8 AWG':  0.65, '#6 AWG':  0.90, '#4 AWG':  1.30,
+  '#3 AWG':  1.60, '#2 AWG':  1.90, '#1 AWG':  2.40,
+  '1/0 AWG': 3.10, '2/0 AWG': 3.80, '3/0 AWG': 4.80,
+  '4/0 AWG': 6.00,
+  '250 kcmil': 7.50, '300 kcmil':  9.00, '350 kcmil': 10.00,
+  '400 kcmil': 11.50, '500 kcmil': 13.00, '600 kcmil': 16.00,
+  '750 kcmil': 19.00, '1000 kcmil': 25.00,
+};
+
+export const AL_COST_PER_FT = {
+  '#8 AWG':  0.30, '#6 AWG':  0.40, '#4 AWG':  0.55,
+  '#3 AWG':  0.65, '#2 AWG':  0.70, '#1 AWG':  0.90,
+  '1/0 AWG': 1.10, '2/0 AWG': 1.35, '3/0 AWG': 1.65,
+  '4/0 AWG': 2.10,
+  '250 kcmil': 2.75, '300 kcmil': 3.20, '350 kcmil': 3.60,
+  '400 kcmil': 4.20, '500 kcmil': 4.80, '600 kcmil': 6.00,
+  '750 kcmil': 7.00, '1000 kcmil': 9.50,
+};
+
+// ---------------------------------------------------------------------------
 // NEC Table 310.15(B)(1)(a) — Ambient temperature correction factors
 // Applied when ambient temperature differs from the 30°C reference.
 // Rows: [maxAmbientC, factor_60C, factor_75C, factor_90C]
@@ -269,6 +297,152 @@ export function selectConductorSize(requiredAmps, material = 'copper', tempRatin
   });
   if (!entry) return null;
   return { size: entry.size, ampacity: entry[col], deratingFactor: combinedFactor, trayFactor };
+}
+
+// ---------------------------------------------------------------------------
+// Cost & parallel conductor helpers
+// ---------------------------------------------------------------------------
+
+// Sizes eligible for parallel installation per NEC 310.10(H) (≥ 1/0 AWG)
+const PARALLEL_ELIGIBLE_SIZES = new Set(
+  NEC_AMPACITY_TABLE
+    .slice(NEC_AMPACITY_TABLE.findIndex(r => r.size === '1/0 AWG'))
+    .map(r => r.size)
+);
+
+/**
+ * Return the installed cost per linear foot for a single conductor of the
+ * given size and material (indicative RS Means pricing; verify with supplier).
+ *
+ * @param {string} size              Conductor size matching NEC_AMPACITY_TABLE (e.g. '1/0 AWG')
+ * @param {'copper'|'aluminum'} material
+ * @returns {number|null}            $/ft, or null if size is not in the cost table
+ */
+export function conductorCostPerFt(size, material) {
+  return material === 'aluminum'
+    ? (AL_COST_PER_FT[size] ?? null)
+    : (CU_COST_PER_FT[size] ?? null);
+}
+
+/**
+ * Return true if the conductor size meets the NEC 310.10(H) minimum for
+ * parallel installations (1/0 AWG or larger).
+ *
+ * @param {string} size
+ * @returns {boolean}
+ */
+export function meetsParallelRequirement(size) {
+  return PARALLEL_ELIGIBLE_SIZES.has(size);
+}
+
+/**
+ * Evaluate a single conductor configuration (material + parallel count) for
+ * ampacity adequacy, cost, and NEC 310.10(H) code compliance.
+ *
+ * When nParallel > 1 the NEC requires each set to be run in its own separate
+ * conduit/raceway.  The bundling factor is therefore computed with 3 current-
+ * carrying conductors per conduit (one per phase, balanced 3-phase), overriding
+ * the caller's bundledConductors value which only applies to single-set runs.
+ *
+ * @param {number} requiredAmps                Total required ampacity (after continuous-load factor)
+ * @param {'copper'|'aluminum'} material
+ * @param {60|75|90} tempRating
+ * @param {number} nParallel                   Parallel conductor sets per phase (1–4)
+ * @param {object} [options]
+ * @param {number} [options.ambientTempC=30]
+ * @param {number} [options.bundledConductors=1]   Applies only when nParallel === 1
+ * @param {'conduit'|'tray_spaced'|'tray_touching'} [options.installationType='conduit']
+ * @returns {object|null}  null when no table entry can satisfy the requirement
+ */
+export function evaluateConductorOption(requiredAmps, material, tempRating, nParallel, options = {}) {
+  const { ambientTempC = 30, installationType = 'conduit' } = options;
+  // Parallel sets each run in a separate conduit → 3 current-carrying conductors/conduit
+  const bundledConductors = nParallel > 1 ? 3 : (options.bundledConductors ?? 1);
+
+  const conductor = selectConductorSize(requiredAmps / nParallel, material, tempRating, {
+    ambientTempC, bundledConductors, installationType,
+  });
+  if (!conductor) return null;
+
+  const violatesParallelRule = nParallel > 1 && !meetsParallelRequirement(conductor.size);
+  const costEach = conductorCostPerFt(conductor.size, material);
+  const costPerFtPerPhase = costEach !== null
+    ? Math.round(costEach * nParallel * 100) / 100
+    : null;
+
+  const notes = [];
+  if (nParallel > 1) {
+    notes.push(`${nParallel} conductors/phase in ${nParallel} separate conduits — NEC 310.10(H)`);
+  }
+  if (material === 'aluminum') {
+    notes.push('Al-rated terminals required — NEC 110.14');
+  }
+  if (violatesParallelRule) {
+    notes.push('⚠ Parallel minimum not met — NEC 310.10(H) requires ≥ 1/0 AWG');
+  }
+
+  return {
+    size: conductor.size,
+    material,
+    tempRating,
+    nParallel,
+    tableAmpacity: conductor.ampacity,
+    installedAmpacity: Math.round(conductor.ampacity * conductor.deratingFactor * nParallel * 10) / 10,
+    deratingFactor: conductor.deratingFactor,
+    costPerFtEach: costEach,
+    costPerFtPerPhase,
+    violatesParallelRule,
+    notes,
+  };
+}
+
+/**
+ * Evaluate all valid conductor configurations (Cu/Al × 1–maxParallel sets) for
+ * a given load and return them sorted cheapest first ($/ft per phase).
+ *
+ * Configurations that violate NEC 310.10(H) (parallel < 1/0 AWG) are excluded.
+ *
+ * @param {number} requiredAmps    Total required ampacity (after continuous-load factor)
+ * @param {60|75|90} [tempRating=75]
+ * @param {object}  [options]
+ * @param {number}  [options.ambientTempC=30]
+ * @param {number}  [options.bundledConductors=1]
+ * @param {'conduit'|'tray_spaced'|'tray_touching'} [options.installationType='conduit']
+ * @param {boolean} [options.allowAluminum=true]
+ * @param {number}  [options.maxParallel=4]
+ * @returns {Array<object>}   Code-compliant options sorted by costPerFtPerPhase ascending
+ */
+export function minimizeCostConductors(requiredAmps, tempRating = 75, options = {}) {
+  const {
+    ambientTempC = 30,
+    bundledConductors = 1,
+    installationType = 'conduit',
+    allowAluminum = true,
+    maxParallel = 4,
+  } = options;
+
+  const results = [];
+  const materials = allowAluminum ? ['copper', 'aluminum'] : ['copper'];
+
+  for (const material of materials) {
+    for (let nParallel = 1; nParallel <= maxParallel; nParallel++) {
+      const opt = evaluateConductorOption(requiredAmps, material, tempRating, nParallel, {
+        ambientTempC, bundledConductors, installationType,
+      });
+      if (!opt || opt.violatesParallelRule) continue;
+      results.push(opt);
+    }
+  }
+
+  // Sort by cost ascending; entries without cost data go last
+  results.sort((a, b) => {
+    if (a.costPerFtPerPhase === null && b.costPerFtPerPhase === null) return 0;
+    if (a.costPerFtPerPhase === null) return 1;
+    if (b.costPerFtPerPhase === null) return -1;
+    return a.costPerFtPerPhase - b.costPerFtPerPhase;
+  });
+
+  return results;
 }
 
 /**
