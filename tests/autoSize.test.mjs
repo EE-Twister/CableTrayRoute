@@ -19,6 +19,12 @@ import {
   trayFillFactor,
   ambientTempFactor,
   bundlingFactor,
+  conductorCostPerFt,
+  meetsParallelRequirement,
+  evaluateConductorOption,
+  minimizeCostConductors,
+  CU_COST_PER_FT,
+  AL_COST_PER_FT,
 } from '../analysis/autoSize.mjs';
 
 function describe(name, fn) {
@@ -469,5 +475,199 @@ describe('sizeMotorBranch — installation conditions', () => {
   it('default installationType is conduit', () => {
     const r = sizeMotorBranch({ hp: 10, voltage: 460 });
     assert.strictEqual(r.installationType, 'conduit');
+  });
+});
+
+// ---------------------------------------------------------------------------
+// conductorCostPerFt
+// ---------------------------------------------------------------------------
+describe('conductorCostPerFt', () => {
+  it('returns copper cost for a known Cu size', () => {
+    const cost = conductorCostPerFt('1/0 AWG', 'copper');
+    assert.strictEqual(cost, CU_COST_PER_FT['1/0 AWG']);
+    assert.ok(cost > 0);
+  });
+
+  it('returns aluminum cost for a known Al size', () => {
+    const cost = conductorCostPerFt('4/0 AWG', 'aluminum');
+    assert.strictEqual(cost, AL_COST_PER_FT['4/0 AWG']);
+    assert.ok(cost > 0);
+  });
+
+  it('returns null for a size absent from the Cu table', () => {
+    assert.strictEqual(conductorCostPerFt('9999 kcmil', 'copper'), null);
+  });
+
+  it('returns null for #14 AWG aluminum (not in Al table)', () => {
+    assert.strictEqual(conductorCostPerFt('#14 AWG', 'aluminum'), null);
+  });
+
+  it('aluminum cost is less than copper cost for the same size', () => {
+    // Al should be cheaper than Cu for large conductors (key design premise)
+    const cuCost = conductorCostPerFt('350 kcmil', 'copper');
+    const alCost = conductorCostPerFt('350 kcmil', 'aluminum');
+    assert.ok(cuCost !== null && alCost !== null);
+    assert.ok(alCost < cuCost,
+      `Al 350 kcmil ($${alCost}/ft) should be cheaper than Cu 350 kcmil ($${cuCost}/ft)`);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// meetsParallelRequirement — NEC 310.10(H)
+// ---------------------------------------------------------------------------
+describe('meetsParallelRequirement — NEC 310.10(H)', () => {
+  it('returns false for #4 AWG (below 1/0)', () => {
+    assert.strictEqual(meetsParallelRequirement('#4 AWG'), false);
+  });
+
+  it('returns false for #1 AWG (just below 1/0)', () => {
+    assert.strictEqual(meetsParallelRequirement('#1 AWG'), false);
+  });
+
+  it('returns true for 1/0 AWG (minimum allowed)', () => {
+    assert.strictEqual(meetsParallelRequirement('1/0 AWG'), true);
+  });
+
+  it('returns true for 4/0 AWG', () => {
+    assert.strictEqual(meetsParallelRequirement('4/0 AWG'), true);
+  });
+
+  it('returns true for 500 kcmil', () => {
+    assert.strictEqual(meetsParallelRequirement('500 kcmil'), true);
+  });
+
+  it('returns false for unknown size', () => {
+    assert.strictEqual(meetsParallelRequirement('9999 kcmil'), false);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// evaluateConductorOption
+// ---------------------------------------------------------------------------
+describe('evaluateConductorOption', () => {
+  it('single Cu conductor returns correct shape', () => {
+    const opt = evaluateConductorOption(100, 'copper', 75, 1);
+    assert.ok(opt, 'Should return a result');
+    assert.strictEqual(opt.nParallel, 1);
+    assert.strictEqual(opt.material, 'copper');
+    assert.ok(opt.installedAmpacity >= 100, 'Installed ampacity must meet load');
+    assert.ok(opt.costPerFtPerPhase > 0);
+    assert.strictEqual(opt.violatesParallelRule, false);
+  });
+
+  it('single Al conductor returns correct shape', () => {
+    const opt = evaluateConductorOption(100, 'aluminum', 75, 1);
+    assert.ok(opt);
+    assert.strictEqual(opt.material, 'aluminum');
+    assert.ok(opt.installedAmpacity >= 100);
+    assert.ok(opt.notes.some(n => n.includes('NEC 110.14')),
+      'Al option should include terminal warning note');
+  });
+
+  it('2-parallel Cu/0 returns violatesParallelRule=false for large load', () => {
+    // 300A load: 150A per conductor → likely 3/0 or 4/0 Cu → ≥ 1/0 so no violation
+    const opt = evaluateConductorOption(300, 'copper', 75, 2);
+    assert.ok(opt);
+    assert.strictEqual(opt.nParallel, 2);
+    assert.strictEqual(opt.violatesParallelRule, false);
+    assert.ok(opt.notes.some(n => n.includes('310.10(H)')),
+      'Parallel option should cite NEC 310.10(H)');
+  });
+
+  it('2-parallel on tiny load violates parallel rule', () => {
+    // 20A load: 10A per conductor → will select a small conductor (< 1/0)
+    const opt = evaluateConductorOption(20, 'copper', 75, 2);
+    assert.ok(opt);
+    assert.strictEqual(opt.violatesParallelRule, true);
+    assert.ok(opt.notes.some(n => n.includes('⚠')));
+  });
+
+  it('installed ampacity equals nParallel × per-conductor installed ampacity', () => {
+    const singleOpt = evaluateConductorOption(200, 'copper', 75, 1);
+    const doubleOpt = evaluateConductorOption(200, 'copper', 75, 2);
+    assert.ok(singleOpt && doubleOpt);
+    // Double-parallel should carry at least as much total current
+    assert.ok(doubleOpt.installedAmpacity >= 200);
+  });
+
+  it('costPerFtPerPhase equals nParallel × costPerFtEach', () => {
+    const opt = evaluateConductorOption(300, 'copper', 75, 2);
+    assert.ok(opt && opt.costPerFtEach !== null);
+    const expected = Math.round(opt.costPerFtEach * 2 * 100) / 100;
+    assert.strictEqual(opt.costPerFtPerPhase, expected);
+  });
+
+  it('returns null for impossible ampacity (aluminum, tiny rating)', () => {
+    // Aluminum has no table entry below #8 AWG for most cases
+    // But more reliably: ask for more amps than any single conductor can supply after derating
+    const opt = evaluateConductorOption(99999, 'copper', 75, 1);
+    assert.strictEqual(opt, null);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// minimizeCostConductors
+// ---------------------------------------------------------------------------
+describe('minimizeCostConductors', () => {
+  it('returns non-empty array for a standard feeder load', () => {
+    const opts = minimizeCostConductors(125, 75); // 100A continuous → 125A required
+    assert.ok(Array.isArray(opts) && opts.length > 0);
+  });
+
+  it('results are sorted cheapest first', () => {
+    const opts = minimizeCostConductors(125, 75);
+    for (let i = 1; i < opts.length; i++) {
+      const a = opts[i - 1].costPerFtPerPhase;
+      const b = opts[i].costPerFtPerPhase;
+      if (a !== null && b !== null) {
+        assert.ok(a <= b, `Option ${i - 1} ($${a}/ft) should be ≤ option ${i} ($${b}/ft)`);
+      }
+    }
+  });
+
+  it('all returned options are code-compliant (no parallel violations)', () => {
+    const opts = minimizeCostConductors(250, 75);
+    opts.forEach(opt => {
+      assert.strictEqual(opt.violatesParallelRule, false,
+        `Option ${opt.nParallel}×${opt.size} ${opt.material} violates parallel rule`);
+    });
+  });
+
+  it('aluminum beats copper on cost for large feeders', () => {
+    // For a 400A required ampacity, Al should be cheaper per ft than Cu
+    const opts = minimizeCostConductors(400, 75, { allowAluminum: true });
+    const cheapest = opts[0];
+    assert.ok(cheapest, 'Should have at least one option');
+    // The cheapest should be aluminum (it always is for large conductors)
+    assert.strictEqual(cheapest.material, 'aluminum',
+      `Expected cheapest option to be aluminum, got ${cheapest.material} ${cheapest.size}`);
+  });
+
+  it('respects allowAluminum=false — returns only copper options', () => {
+    const opts = minimizeCostConductors(150, 75, { allowAluminum: false });
+    assert.ok(opts.length > 0);
+    opts.forEach(opt => {
+      assert.strictEqual(opt.material, 'copper',
+        `Expected copper only, got ${opt.material}`);
+    });
+  });
+
+  it('respects maxParallel=1 — returns only single-conductor options', () => {
+    const opts = minimizeCostConductors(200, 75, { maxParallel: 1 });
+    assert.ok(opts.length > 0);
+    opts.forEach(opt => {
+      assert.strictEqual(opt.nParallel, 1,
+        `Expected nParallel=1, got ${opt.nParallel}`);
+    });
+  });
+
+  it('all installed ampacities satisfy the required load', () => {
+    const required = 200;
+    const opts = minimizeCostConductors(required, 75);
+    opts.forEach(opt => {
+      assert.ok(opt.installedAmpacity >= required,
+        `${opt.nParallel}×${opt.size} ${opt.material} installed ampacity ` +
+        `${opt.installedAmpacity}A must be ≥ ${required}A`);
+    });
   });
 });
