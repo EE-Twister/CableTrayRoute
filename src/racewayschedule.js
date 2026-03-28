@@ -7,6 +7,15 @@ import "../e2e-helpers.js";
 import { emitAsync } from "../utils/safeEvents.mjs";
 import * as dataStore from "../dataStore.mjs";
 import { showAlertModal } from "./components/modal.js";
+import { start as startTour, hasDoneTour } from "../tour.js";
+
+const RACEWAY_TOUR_STEPS = [
+  { selector: '#add-tray-btn',          message: 'Add a Cable Tray — enter width, depth, start/end 3D coordinates, and tray type (ladder, solid bottom, wire mesh).' },
+  { selector: '#trayTable',             message: 'Each row defines one tray segment. The X1/Y1/Z1 → X2/Y2/Z2 coordinates place it in 3D space for the routing engine.' },
+  { selector: '#add-conduit-btn',       message: 'Add conduits here. Conduits follow the same coordinate scheme as trays and participate in the same Dijkstra routing.' },
+  { selector: '#raceway-load-samples',  message: 'Load sample raceway data to see a complete tray network with coordinates already filled in.' },
+  { selector: '#export-revit-btn',      message: 'Export tray and conduit data as Revit-compatible JSON for round-trip BIM workflows.' }
+];
 import { downloadRevitExport } from "../exporters/revit.mjs";
 import {
   normalizeDuctbankRow,
@@ -814,5 +823,14 @@ document.addEventListener('DOMContentLoaded', async () => {
       conduits:  dataStore.getConduits ? dataStore.getConduits()  : [],
     });
   });
+
+  // --- Tour ---
+  const tourBtn = document.getElementById('tour-btn');
+  if (tourBtn) {
+    tourBtn.addEventListener('click', () => startTour(RACEWAY_TOUR_STEPS, 'racewaySchedule'));
+  }
+  if (!hasDoneTour('racewaySchedule')) {
+    startTour(RACEWAY_TOUR_STEPS, 'racewaySchedule');
+  }
 });
 

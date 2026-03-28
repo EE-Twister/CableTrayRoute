@@ -47,7 +47,16 @@ import { sizeConductor } from './sizing.js';
 import ampacity from './ampacity.mjs';
 import { createTable, STORAGE_KEYS } from './tableUtils.mjs';
 import { openModal, showAlertModal } from './src/components/modal.js';
+import { start as startTour, hasDoneTour } from './tour.js';
 const { sizeToArea } = ampacity;
+
+const CABLE_TOUR_STEPS = [
+  { selector: '#add-row-btn',            message: 'Click "Add Cable" to create your first cable entry. Each cable needs a Tag, source/destination endpoints, conductor size, and voltage rating.' },
+  { selector: '#cableScheduleTable',     message: 'Fill in the cable schedule. Every row is one cable. The "Route Preference" column lets you assign a cable to a specific tray or conduit ID.' },
+  { selector: '#load-sample-cables-btn', message: 'New here? Click "Load Sample Data" to populate 3 example cables so you can explore the workflow right away.' },
+  { selector: '#auto-route-all-btn',     message: 'Once cables and raceways are defined, use "Route All" to send every cable to the Optimal Route tool automatically.' },
+  { selector: '#export-xlsx-btn',        message: 'Export to Excel at any time to share your cable schedule or back it up offline.' }
+];
 
 suppressResumeIfE2E();
 if (document.readyState === 'loading') {
@@ -2179,6 +2188,15 @@ async function initCableSchedule() {
         },
       });
     });
+  }
+
+  // --- Tour ---
+  const tourBtn = document.getElementById('tour-btn');
+  if (tourBtn) {
+    tourBtn.addEventListener('click', () => startTour(CABLE_TOUR_STEPS, 'cableSchedule'));
+  }
+  if (!hasDoneTour('cableSchedule')) {
+    startTour(CABLE_TOUR_STEPS, 'cableSchedule');
   }
 
   window.dispatchEvent(new Event('cableschedule-ready'));
