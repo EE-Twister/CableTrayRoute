@@ -288,3 +288,113 @@ body.cabletrayfill-page #helpClose {
     overflow: visible;
 }
 
+/* ── Per-Zone Result Blocks (Heat-Map) ─────────────────────────────────── */
+.zone-result-block {
+    border-left: 4px solid var(--color-border);
+    border-radius: var(--radius-sm);
+    padding: 8px 12px;
+    margin: 8px 0;
+    background: var(--color-surface);
+    display: flex;
+    align-items: center;
+    gap: 16px;
+    flex-wrap: wrap;
+}
+
+.zone-result-block.zone-fill-ok {
+    border-left-color: var(--color-success);
+    background: var(--success-bg);
+}
+
+.zone-result-block.zone-fill-warning {
+    border-left-color: var(--warning-text);
+    background: var(--warning-bg);
+}
+
+.zone-result-block.zone-fill-danger {
+    border-left-color: var(--color-error);
+    background: var(--error-bg);
+}
+
+.zone-result-header {
+    font-size: 0.95rem;
+    min-width: 150px;
+    flex-shrink: 0;
+}
+
+.zone-gauge-container {
+    flex-shrink: 0;
+}
+
+.zone-gauge-container svg {
+    max-width: 150px;
+    width: 100%;
+    height: auto;
+    overflow: visible;
+}
+
+/* ── Zone Fill Summary (Worst Offenders) ───────────────────────────────── */
+.worst-offenders {
+    background: var(--color-surface-strong, var(--color-surface));
+    border: 1px solid var(--color-border);
+    border-radius: var(--radius-md);
+    padding: 12px 16px;
+    margin-bottom: 16px;
+}
+
+.worst-offenders-title {
+    margin: 0 0 8px 0;
+    font-size: 1rem;
+    font-weight: 600;
+    color: var(--color-text);
+}
+
+.worst-offenders-list {
+    list-style: none;
+    margin: 0;
+    padding: 0;
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+}
+
+.worst-offenders-item {
+    display: grid;
+    grid-template-columns: 90px 1fr 52px;
+    align-items: center;
+    gap: 8px;
+    font-size: 0.875rem;
+}
+
+.wo-label {
+    font-weight: 500;
+    color: var(--color-text);
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+.wo-bar-track {
+    height: 10px;
+    background: var(--color-progress-track);
+    border-radius: var(--radius-pill, 9999px);
+    overflow: hidden;
+}
+
+.wo-bar-fill {
+    height: 100%;
+    border-radius: var(--radius-pill, 9999px);
+    transition: width 0.3s ease;
+}
+
+.wo-bar-fill.zone-fill-ok      { background: var(--color-success); }
+.wo-bar-fill.zone-fill-warning { background: var(--warning-text); }
+.wo-bar-fill.zone-fill-danger  { background: var(--color-error); }
+
+.wo-pct {
+    text-align: right;
+    font-variant-numeric: tabular-nums;
+    color: var(--color-text-muted);
+    font-size: 0.8rem;
+}
+

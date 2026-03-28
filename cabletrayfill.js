@@ -909,6 +909,13 @@ checkPrereqs([{key:'traySchedule',page:'racewayschedule.html',label:'Raceway Sch
 
         let scaleFactor = totalWidthNeeded > trayW ? trayW / totalWidthNeeded : 1;
 
+        // Returns a CSS class name based on fill percentage for heat-map coloring
+        function fillHeatClass(pct) {
+          if (pct >= 80) return 'zone-fill-danger';
+          if (pct >= 40) return 'zone-fill-warning';
+          return 'zone-fill-ok';
+        }
+
         // Helper to place all zones using a given scale factor
         function layoutZones(scale) {
           let off = 0;
@@ -916,6 +923,7 @@ checkPrereqs([{key:'traySchedule',page:'racewayschedule.html',label:'Raceway Sch
           const lines = [];
           const names = [];
           const placed = [];
+          const zoneData = [];
           zoneInfo.forEach(info => {
             const widthLimit = info.width * scale;
             const result = placeZone(info.cables, widthLimit, spacingEnabled);
@@ -928,12 +936,27 @@ checkPrereqs([{key:'traySchedule',page:'racewayschedule.html',label:'Raceway Sch
               const widthSmall = widthUsed - result.barrierX;
               const fillLarge = widthLarge > 0 ? Math.min(100, (areaLarge / (widthLarge * trayD)) * 100) : 0;
               const fillSmall = widthSmall > 0 ? Math.min(100, (areaSmall / (widthSmall * trayD)) * 100) : 0;
-              html += `<p><strong>Zone ${info.zid}.1 Fill %:</strong> ${fillLarge.toFixed(0)} %</p>`;
-              html += `<p><strong>Zone ${info.zid}.2 Fill %:</strong> ${fillSmall.toFixed(0)} %</p>`;
+              const gaugeId1 = `zone-gauge-${info.zid}-1`;
+              const gaugeId2 = `zone-gauge-${info.zid}-2`;
+              html += `<div class="zone-result-block ${fillHeatClass(fillLarge)}">
+                <div class="zone-result-header"><strong>Zone ${info.zid}.1 Fill:</strong> ${fillLarge.toFixed(0)}%</div>
+                <div id="${gaugeId1}" class="zone-gauge-container"></div>
+              </div>`;
+              html += `<div class="zone-result-block ${fillHeatClass(fillSmall)}">
+                <div class="zone-result-header"><strong>Zone ${info.zid}.2 Fill:</strong> ${fillSmall.toFixed(0)}%</div>
+                <div id="${gaugeId2}" class="zone-gauge-container"></div>
+              </div>`;
+              zoneData.push({ id: gaugeId1, label: `Zone ${info.zid}.1 Fill %`, pct: fillLarge });
+              zoneData.push({ id: gaugeId2, label: `Zone ${info.zid}.2 Fill %`, pct: fillSmall });
             } else {
               const areaAll = sumAreas(info.orig);
               const fillP = widthUsed > 0 ? Math.min(100, (areaAll / (widthUsed * trayD)) * 100) : 0;
-              html += `<p><strong>Zone ${info.zid} Fill %:</strong> ${fillP.toFixed(0)} %</p>`;
+              const gaugeId = `zone-gauge-${info.zid}`;
+              html += `<div class="zone-result-block ${fillHeatClass(fillP)}">
+                <div class="zone-result-header"><strong>Zone ${info.zid} Fill:</strong> ${fillP.toFixed(0)}%</div>
+                <div id="${gaugeId}" class="zone-gauge-container"></div>
+              </div>`;
+              zoneData.push({ id: gaugeId, label: `Zone ${info.zid} Fill %`, pct: fillP });
             }
             if (off > 0) lines.push(off);
             if (result.largeCount > 0 && result.smallCount > 0) {
@@ -946,7 +969,7 @@ checkPrereqs([{key:'traySchedule',page:'racewayschedule.html',label:'Raceway Sch
             result.placed.forEach(p => { p.x += off; placed.push(p); });
             off += widthUsed;
           });
-          return { placed, lines, names, width: off, html };
+          return { placed, lines, names, width: off, html, zoneData };
         }
 
         // Try packing with iterative scaling until width fits within the tray
@@ -960,7 +983,8 @@ checkPrereqs([{key:'traySchedule',page:'racewayschedule.html',label:'Raceway Sch
         barrierLines = layout.lines;
         zoneNames    = layout.names;
         offset       = layout.width;
-        zoneHTML    = layout.html;
+        zoneHTML     = layout.html;
+        const allZoneData = layout.zoneData;
 
         // If combined width exceeds tray width, simply report overflow.
         // Previously the code scaled x positions to "squish" the layout, but
@@ -1011,7 +1035,28 @@ checkPrereqs([{key:'traySchedule',page:'racewayschedule.html',label:'Raceway Sch
 
         // 10) Summarize metrics + total weight
         const totalWeight = cables.reduce((sum, c) => sum + c.weight, 0);
-        let resultsHTML = `
+
+        // Build Zone Fill Summary (Worst Offenders) bar chart
+        const sortedZones = [...allZoneData].sort((a, b) => b.pct - a.pct);
+        let worstHTML = '';
+        if (sortedZones.length > 0) {
+          worstHTML = `<section class="worst-offenders" aria-label="Zone Fill Summary">
+            <h3 class="worst-offenders-title">Zone Fill Summary</h3>
+            <ul class="worst-offenders-list">`;
+          for (const zd of sortedZones) {
+            const barPct = Math.min(100, zd.pct).toFixed(1);
+            worstHTML += `<li class="worst-offenders-item">
+              <span class="wo-label">${zd.label.replace(' Fill %', '')}</span>
+              <div class="wo-bar-track" role="meter" aria-valuenow="${zd.pct.toFixed(1)}" aria-valuemin="0" aria-valuemax="100" aria-label="${zd.label}: ${zd.pct.toFixed(1)}%">
+                <div class="wo-bar-fill ${fillHeatClass(zd.pct)}" style="width:${barPct}%"></div>
+              </div>
+              <span class="wo-pct">${zd.pct.toFixed(1)}%</span>
+            </li>`;
+          }
+          worstHTML += `</ul></section>`;
+        }
+
+        let resultsHTML = `${worstHTML}
           <p>
             <strong>Using Tray Width:</strong> ${trayW}"<br>
             <strong>Tray Depth:</strong> ${trayD}"<br>
@@ -1234,6 +1279,12 @@ Wt: ${p.weight.toFixed(2)} lbs/ft
           }
         }
         document.getElementById("results").innerHTML = resultsHTML;
+
+        // Initialize per-zone fill gauges (DOM nodes must exist before calling createFillGauge)
+        for (const zd of allZoneData) {
+          const gauge = createFillGauge(zd.id, { label: zd.label, width: 150, strokeWidth: 14 });
+          gauge.update(zd.pct);
+        }
       });
 
       // ─────────────────────────────────────────────────────────────
