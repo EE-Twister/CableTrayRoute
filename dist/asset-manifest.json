@@ -34,5 +34,6 @@
   "voltagedropstudy.js": "voltagedropstudy.295c0dbf093f.js",
   "windload.js": "windload.3ea6e49d9266.js",
   "workflowdashboard.js": "workflowdashboard.75b446f6ede5.js",
-  "vendor/fast-json-patch.mjs": "fast-json-patch.361648778823.mjs"
+  "vendor/fast-json-patch.mjs": "fast-json-patch.361648778823.mjs",
+  "procurementschedule.js": "procurementschedule.8bfddacdd910.js"
 }

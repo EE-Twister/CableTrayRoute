@@ -19,6 +19,7 @@ const NAV_ROUTES = [
   { href: 'loadcombinations.html', label: 'Load Combinations', section: 'Workflow', icon: 'icons/toolbar/validate.svg' },
   { href: 'optimalRoute.html', label: 'Optimal Route', section: 'Workflow', icon: 'icons/route.svg' },
   { href: 'pullcards.html', label: 'Pull Cards', section: 'Workflow', icon: 'icons/toolbar/copy.svg' },
+  { href: 'procurementschedule.html', label: 'Procurement Schedule', section: 'Workflow', icon: 'icons/toolbar/copy.svg' },
   { href: 'costestimate.html', label: 'Cost Estimate', section: 'Workflow', icon: 'icons/toolbar/grid-size.svg' },
   { href: 'submittal.html', label: 'Submittal Package', section: 'Workflow', icon: 'icons/toolbar/copy.svg' },
   { href: 'projectreport.html', label: 'Project Report', section: 'Workflow', icon: 'icons/toolbar/copy.svg' },

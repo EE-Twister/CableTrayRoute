@@ -28,6 +28,7 @@ const entries = {
   scenarios: 'src/scenarios.js',
   supportspan: 'src/supportspan.js',
   pullcards: 'src/pullcards.js',
+  procurementschedule: 'src/procurementschedule.js',
   seismicBracing: 'src/seismicBracing.js',
   trayhardwarebom: 'src/trayhardwarebom.js',
   intlCableSize: 'src/intlCableSize.js',
