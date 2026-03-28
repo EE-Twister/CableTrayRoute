@@ -46,10 +46,12 @@ checkPrereqs([{key:'traySchedule',page:'racewayschedule.html',label:'Raceway Sch
       let lastBarriers = [];   // x positions of separation barriers
       let lastTrayW   = 0;     // in inches
       let lastTrayD   = 0;     // in inches
-      let lastType    = "";    // “ladder” or “solid”
+      let lastType    = “”;    // “ladder” or “solid”
       let lastScale   = 20;    // px/in for small view
       let lastZones   = [];    // array of zone labels in order
-      let lastColor   = '#66ccff'; // default cable color
+      let lastColor   = ‘#66ccff’; // default cable color
+      // Multi-compartment layout data for Expand Image
+      let lastCompartmentLayouts = null; // array of per-compartment layout objects
 
       // Reference to <tbody> in the cable table
       const cableTbody = document.querySelector("#cableTable tbody");
@@ -58,6 +60,8 @@ checkPrereqs([{key:'traySchedule',page:'racewayschedule.html',label:'Raceway Sch
       const filters = [];
       const filterBtns = [];
       let cables = [];
+      // compartments: up to 5 compartments, each with id, width (in), depth (in), label
+      let compartments = [{ id: 1, width: 12, depth: 3, label: '' }];
       headerCells.forEach((th, idx) => {
         if (idx < headerCells.length - 2) {
           const btn = document.createElement('button');
@@ -127,28 +131,154 @@ checkPrereqs([{key:'traySchedule',page:'racewayschedule.html',label:'Raceway Sch
 
       const clearFiltersBtn=document.getElementById('clearCableFiltersBtn');
       if(clearFiltersBtn) clearFiltersBtn.addEventListener('click',clearFilters);
-        let fillSummaryEl;
-        function updateTotals(){
-          const trayW=parseFloat(document.getElementById('trayWidth').value)||0;
-          const trayD=parseFloat(document.getElementById('trayDepth').value)||0;
-          const trayArea=trayW*trayD;
-          const totalArea=cables.reduce((sum,c)=>{
-            const od=parseFloat(c.od||c.OD);
-            const p=c.parallelCount||1;
-            return isNaN(od)?sum:sum+Math.PI*Math.pow(od/2,2)*p;
-          },0);
-          const fillP=trayArea?totalArea/trayArea*100:0;
-          const allow=document.getElementById('trayType').value==='ladder'?50:40;
-          if(!fillSummaryEl){
-            fillSummaryEl=document.createElement('p');
-            fillSummaryEl.id='trayFillInfo';
-            cableTable.parentElement.appendChild(fillSummaryEl);
-          }
-          fillSummaryEl.textContent=`Total Cable Area: ${totalArea.toFixed(2)} in², Fill: ${fillP.toFixed(1)}%`;
-          fillSummaryEl.style.color=fillP>allow?'red':'';
-          trayGauge.update(fillP);
-          return {totalArea,fillP,allow};
+
+      // ── Compartment UI ────────────────────────────────────────────
+      function renderCompartmentUI() {
+        const container = document.getElementById('compartmentRows');
+        if (!container) return;
+        container.innerHTML = '';
+        compartments.forEach((comp, i) => {
+          const row = document.createElement('div');
+          row.className = 'compartment-row';
+          // Badge
+          const badge = document.createElement('span');
+          badge.className = 'comp-badge';
+          badge.textContent = `Compartment ${comp.id}`;
+          row.appendChild(badge);
+          // Width input
+          const wLabel = document.createElement('label');
+          wLabel.textContent = ' Width (in): ';
+          const wInp = document.createElement('input');
+          wInp.type = 'number'; wInp.min = '0.5'; wInp.step = '0.5'; wInp.style.width = '60px';
+          wInp.value = comp.width;
+          wInp.addEventListener('input', e => {
+            compartments[i].width = parseFloat(e.target.value) || comp.width;
+            validateCompartmentWidths();
+            updateTotals();
+          });
+          wLabel.appendChild(wInp);
+          row.appendChild(wLabel);
+          // Depth input
+          const dLabel = document.createElement('label');
+          dLabel.textContent = ' Depth (in): ';
+          const dInp = document.createElement('input');
+          dInp.type = 'number'; dInp.min = '0.5'; dInp.step = '0.5'; dInp.style.width = '60px';
+          dInp.value = comp.depth;
+          dInp.addEventListener('input', e => {
+            compartments[i].depth = parseFloat(e.target.value) || comp.depth;
+            updateTotals();
+          });
+          dLabel.appendChild(dInp);
+          row.appendChild(dLabel);
+          // Label input
+          const lLabel = document.createElement('label');
+          lLabel.textContent = ' Label: ';
+          const lInp = document.createElement('input');
+          lInp.type = 'text'; lInp.placeholder = 'e.g. Power'; lInp.style.width = '90px';
+          lInp.value = comp.label || '';
+          lInp.addEventListener('input', e => { compartments[i].label = e.target.value; });
+          lLabel.appendChild(lInp);
+          row.appendChild(lLabel);
+          // Remove button
+          const rmBtn = document.createElement('button');
+          rmBtn.type = 'button'; rmBtn.textContent = '✖';
+          rmBtn.className = 'comp-remove-btn';
+          rmBtn.disabled = compartments.length === 1;
+          rmBtn.addEventListener('click', () => {
+            compartments.splice(i, 1);
+            // Re-number ids to stay 1..N
+            compartments.forEach((c, j) => { c.id = j + 1; });
+            renderCompartmentUI();
+            updateTotals();
+          });
+          row.appendChild(rmBtn);
+          container.appendChild(row);
+        });
+        validateCompartmentWidths();
+        // Sync addCompartmentBtn disabled state
+        const addBtn = document.getElementById('addCompartmentBtn');
+        if (addBtn) addBtn.disabled = compartments.length >= 5;
+      }
+
+      function validateCompartmentWidths() {
+        const outerW = parseFloat(document.getElementById('trayWidth').value) || 0;
+        const sumW = compartments.reduce((s, c) => s + (parseFloat(c.width) || 0), 0);
+        const warn = document.getElementById('compartmentWidthWarning');
+        if (!warn) return;
+        if (outerW > 0 && Math.abs(sumW - outerW) > 0.01) {
+          warn.textContent = `Note: compartment widths sum to ${sumW.toFixed(2)}" but tray outer width is ${outerW.toFixed(2)}".`;
+          warn.hidden = false;
+        } else {
+          warn.hidden = true;
         }
+      }
+
+      document.getElementById('addCompartmentBtn').addEventListener('click', () => {
+        if (compartments.length >= 5) {
+          showAlertModal('Limit Reached', 'A maximum of 5 compartments is supported.');
+          return;
+        }
+        const lastComp = compartments[compartments.length - 1];
+        compartments.push({ id: compartments.length + 1, width: lastComp.width, depth: lastComp.depth, label: '' });
+        renderCompartmentUI();
+        updateTotals();
+      });
+
+      // Initialize compartment UI from trayWidth/trayDepth defaults
+      (function initCompartments() {
+        const w = parseFloat(document.getElementById('trayWidth').value) || 12;
+        const d = parseFloat(document.getElementById('trayDepth').value) || 3;
+        compartments[0].width = w;
+        compartments[0].depth = d;
+        renderCompartmentUI();
+      })();
+
+      // Keep single-compartment synced with trayWidth/trayDepth when only 1 compartment
+      document.getElementById('trayWidth').addEventListener('change', () => {
+        if (compartments.length === 1) {
+          compartments[0].width = parseFloat(document.getElementById('trayWidth').value) || 12;
+          renderCompartmentUI();
+        } else {
+          validateCompartmentWidths();
+        }
+        updateTotals();
+      });
+      document.getElementById('trayDepth').addEventListener('input', () => {
+        if (compartments.length === 1) {
+          compartments[0].depth = parseFloat(document.getElementById('trayDepth').value) || 3;
+          renderCompartmentUI();
+        }
+        updateTotals();
+      });
+
+      let fillSummaryEl;
+      function updateTotals() {
+        const allow = document.getElementById('trayType').value === 'ladder' ? 50 : 40;
+        let totalArea = 0;
+        let worstFill = 0;
+        compartments.forEach(comp => {
+          const compArea = (parseFloat(comp.width) || 0) * (parseFloat(comp.depth) || 0);
+          const compCables = cables.filter(c => (parseInt(c.zone) || 1) === comp.id);
+          const cableArea = compCables.reduce((sum, c) => {
+            const od = parseFloat(c.od || c.OD);
+            const p = c.parallelCount || 1;
+            return isNaN(od) ? sum : sum + Math.PI * Math.pow(od / 2, 2) * p;
+          }, 0);
+          totalArea += cableArea;
+          const fillP = compArea ? cableArea / compArea * 100 : 0;
+          if (fillP > worstFill) worstFill = fillP;
+        });
+        if (!fillSummaryEl) {
+          fillSummaryEl = document.createElement('p');
+          fillSummaryEl.id = 'trayFillInfo';
+          cableTable.parentElement.appendChild(fillSummaryEl);
+        }
+        const compLabel = compartments.length > 1 ? ' (worst compartment)' : '';
+        fillSummaryEl.textContent = `Total Cable Area: ${totalArea.toFixed(2)} in², Fill: ${worstFill.toFixed(1)}%${compLabel}`;
+        fillSummaryEl.style.color = worstFill > allow ? 'red' : '';
+        trayGauge.update(worstFill);
+        return { totalArea, fillP: worstFill, allow };
+      }
 
       // ─────────────────────────────────────────────────────────────
       // (B) Helper: create one cable‐entry <tr> (Tag / Cable Type / Configuration / OD / Weight / Remove)
@@ -385,8 +515,6 @@ checkPrereqs([{key:'traySchedule',page:'racewayschedule.html',label:'Raceway Sch
       cables.push({ tag:"", cableType:"", count:"", size:"", rating:"", voltage:"", od:"", weight:"", zone:1, circuitGroup:"" });
       renderCableRows();
 
-      document.getElementById('trayWidth').addEventListener('change',updateTotals);
-      document.getElementById('trayDepth').addEventListener('input',updateTotals);
       document.getElementById('trayType').addEventListener('change',updateTotals);
 
       // ─────────────────────────────────────────────────────────────
@@ -877,47 +1005,7 @@ checkPrereqs([{key:'traySchedule',page:'racewayschedule.html',label:'Raceway Sch
         // 5) Check if user wants one‐diameter spacing between 4/0+ cables
         const spacingEnabled = document.getElementById("largeSpacing").checked;
 
-        // 6) Place cables zone by zone
-        const zoneIds = [...new Set(placementCables.map(c => c.zone))].sort((a,b) => a - b);
-        let placedAll = [];
-        let barrierLines = [];
-        let offset = 0;
-        let zoneHTML = "";
-        let voltageWarning = "";
-        let zoneNames = [];
-
-        // First pass: determine natural width of each zone
-        const zoneInfo = [];
-        let totalWidthNeeded = 0;
-        zoneIds.forEach(zid => {
-          const gCables = placementCables.filter(c => c.zone === zid);
-          const measure = placeZone(gCables, trayW, spacingEnabled);
-          const origCables = cables.filter(c => c.zone === zid);
-          zoneInfo.push({ zid, cables: gCables, orig: origCables, width: measure.widthUsed });
-          totalWidthNeeded += measure.widthUsed;
-
-          const volts   = origCables.map(c => c.voltage).filter(v => !isNaN(v));
-          const ratings = origCables.map(c => c.rating).filter(v => !isNaN(v));
-          if (volts.length > 0 && ratings.length > 0) {
-            const maxV = Math.max(...volts);
-            const minR = Math.min(...ratings);
-            if (maxV > minR + 1e-6) {
-              voltageWarning += `
-                <p class="warning">
-                  WARNING: In Zone ${zid}, operating voltage (${maxV.toFixed(0)} V) exceeds the lowest cable rating (${minR.toFixed(0)} V).
-                </p>`;
-            }
-          }
-        });
-
-        // Adjust recommended width based on actual layout requirement
-        const layoutWidth = standardWidths.find(w => w >= totalWidthNeeded) || null;
-        if (!recommendedWidth || (layoutWidth && layoutWidth > recommendedWidth)) {
-          recommendedWidth = layoutWidth;
-        }
-
-        let scaleFactor = totalWidthNeeded > trayW ? trayW / totalWidthNeeded : 1;
-
+        // 6) Place cables by compartment
         // Returns a CSS class name based on fill percentage for heat-map coloring
         function fillHeatClass(pct) {
           if (pct >= 80) return 'zone-fill-danger';
@@ -925,75 +1013,72 @@ checkPrereqs([{key:'traySchedule',page:'racewayschedule.html',label:'Raceway Sch
           return 'zone-fill-ok';
         }
 
-        // Helper to place all zones using a given scale factor
-        function layoutZones(scale) {
-          let off = 0;
-          let html = "";
-          const lines = [];
-          const names = [];
-          const placed = [];
-          const zoneData = [];
-          zoneInfo.forEach(info => {
-            const widthLimit = info.width * scale;
-            const result = placeZone(info.cables, widthLimit, spacingEnabled);
-            const widthUsed = result.widthUsed;
-            const { large: origLarge, small: origSmall } = splitLargeSmall(info.orig);
-            if (result.largeCount > 0 && result.smallCount > 0) {
-              const areaLarge = sumAreas(origLarge);
-              const areaSmall = sumAreas(origSmall);
-              const widthLarge = result.barrierX;
-              const widthSmall = widthUsed - result.barrierX;
-              const fillLarge = widthLarge > 0 ? Math.min(100, (areaLarge / (widthLarge * trayD)) * 100) : 0;
-              const fillSmall = widthSmall > 0 ? Math.min(100, (areaSmall / (widthSmall * trayD)) * 100) : 0;
-              const gaugeId1 = `zone-gauge-${info.zid}-1`;
-              const gaugeId2 = `zone-gauge-${info.zid}-2`;
-              html += `<div class="zone-result-block ${fillHeatClass(fillLarge)}">
-                <div class="zone-result-header"><strong>Zone ${info.zid}.1 Fill:</strong> ${fillLarge.toFixed(0)}%</div>
-                <div id="${gaugeId1}" class="zone-gauge-container"></div>
-              </div>`;
-              html += `<div class="zone-result-block ${fillHeatClass(fillSmall)}">
-                <div class="zone-result-header"><strong>Zone ${info.zid}.2 Fill:</strong> ${fillSmall.toFixed(0)}%</div>
-                <div id="${gaugeId2}" class="zone-gauge-container"></div>
-              </div>`;
-              zoneData.push({ id: gaugeId1, label: `Zone ${info.zid}.1 Fill %`, pct: fillLarge });
-              zoneData.push({ id: gaugeId2, label: `Zone ${info.zid}.2 Fill %`, pct: fillSmall });
-            } else {
-              const areaAll = sumAreas(info.orig);
-              const fillP = widthUsed > 0 ? Math.min(100, (areaAll / (widthUsed * trayD)) * 100) : 0;
-              const gaugeId = `zone-gauge-${info.zid}`;
-              html += `<div class="zone-result-block ${fillHeatClass(fillP)}">
-                <div class="zone-result-header"><strong>Zone ${info.zid} Fill:</strong> ${fillP.toFixed(0)}%</div>
-                <div id="${gaugeId}" class="zone-gauge-container"></div>
-              </div>`;
-              zoneData.push({ id: gaugeId, label: `Zone ${info.zid} Fill %`, pct: fillP });
-            }
-            if (off > 0) lines.push(off);
-            if (result.largeCount > 0 && result.smallCount > 0) {
-              lines.push(off + result.barrierX);
-              names.push(`${info.zid}.1`);
-              names.push(`${info.zid}.2`);
-            } else {
-              names.push(`${info.zid}`);
-            }
-            result.placed.forEach(p => { p.x += off; placed.push(p); });
-            off += widthUsed;
-          });
-          return { placed, lines, names, width: off, html, zoneData };
-        }
+        let voltageWarning = "";
+        const allZoneData = [];
+        let zoneHTML = "";
 
-        // Try packing with iterative scaling until width fits within the tray
-        let layout = layoutZones(scaleFactor);
-        for (let i = 0; i < 8 && layout.width > trayW + 1e-6; i++) {
-          scaleFactor *= trayW / layout.width;
-          layout = layoutZones(scaleFactor);
-        }
+        // Build per-compartment layout data
+        const compLayouts = compartments.map(comp => {
+          const compId = comp.id;
+          const compWidth = parseFloat(comp.width) || trayW;
+          const compDepth = parseFloat(comp.depth) || trayD;
+          const compCables = placementCables.filter(c => (parseInt(c.zone) || 1) === compId);
+          const origCables = cables.filter(c => (parseInt(c.zone) || 1) === compId);
 
-        placedAll    = layout.placed;
-        barrierLines = layout.lines;
-        zoneNames    = layout.names;
-        offset       = layout.width;
-        zoneHTML     = layout.html;
-        const allZoneData = layout.zoneData;
+          const result = placeZone(compCables, compWidth, spacingEnabled);
+          const { large: origLarge, small: origSmall } = splitLargeSmall(origCables);
+
+          // Voltage check per compartment
+          const volts = origCables.map(c => c.voltage).filter(v => !isNaN(v));
+          const ratings = origCables.map(c => c.rating).filter(v => !isNaN(v));
+          if (volts.length > 0 && ratings.length > 0) {
+            const maxV = Math.max(...volts);
+            const minR = Math.min(...ratings);
+            if (maxV > minR + 1e-6) {
+              const lbl = comp.label || `Compartment ${compId}`;
+              voltageWarning += `<p class="warning">WARNING: In ${lbl}, operating voltage (${maxV.toFixed(0)} V) exceeds the lowest cable rating (${minR.toFixed(0)} V).</p>`;
+            }
+          }
+
+          // Per-compartment fill HTML
+          const lbl = comp.label || `Compartment ${compId}`;
+          if (result.largeCount > 0 && result.smallCount > 0) {
+            const areaLarge = sumAreas(origLarge);
+            const areaSmall = sumAreas(origSmall);
+            const widthLarge = result.barrierX;
+            const widthSmall = result.widthUsed - result.barrierX;
+            const fillLarge = widthLarge > 0 ? Math.min(100, (areaLarge / (widthLarge * compDepth)) * 100) : 0;
+            const fillSmall = widthSmall > 0 ? Math.min(100, (areaSmall / (widthSmall * compDepth)) * 100) : 0;
+            const gId1 = `comp-gauge-${compId}-1`;
+            const gId2 = `comp-gauge-${compId}-2`;
+            zoneHTML += `<div class="zone-result-block ${fillHeatClass(fillLarge)}">
+              <div class="zone-result-header"><strong>${lbl} (Stackable) Fill:</strong> ${fillLarge.toFixed(0)}%</div>
+              <div id="${gId1}" class="zone-gauge-container"></div>
+            </div>`;
+            zoneHTML += `<div class="zone-result-block ${fillHeatClass(fillSmall)}">
+              <div class="zone-result-header"><strong>${lbl} (Non-Stackable) Fill:</strong> ${fillSmall.toFixed(0)}%</div>
+              <div id="${gId2}" class="zone-gauge-container"></div>
+            </div>`;
+            allZoneData.push({ id: gId1, label: `${lbl} Stackable Fill %`, pct: fillLarge });
+            allZoneData.push({ id: gId2, label: `${lbl} Non-Stackable Fill %`, pct: fillSmall });
+          } else {
+            const areaAll = sumAreas(origCables);
+            const compArea = compWidth * compDepth;
+            const fillP = compArea > 0 ? Math.min(100, (areaAll / compArea) * 100) : 0;
+            const gId = `comp-gauge-${compId}`;
+            zoneHTML += `<div class="zone-result-block ${fillHeatClass(fillP)}">
+              <div class="zone-result-header"><strong>${lbl} Fill:</strong> ${fillP.toFixed(0)}%</div>
+              <div id="${gId}" class="zone-gauge-container"></div>
+            </div>`;
+            allZoneData.push({ id: gId, label: `${lbl} Fill %`, pct: fillP });
+          }
+
+          return { comp, compWidth, compDepth, placed: result.placed, barrierX: result.barrierX, largeCount: result.largeCount, smallCount: result.smallCount };
+        });
+
+        // Flat placed list (for overflow checks)
+        let placedAll = [];
+        compLayouts.forEach(cl => placedAll.push(...cl.placed));
 
         // If combined width exceeds tray width, simply report overflow.
         // Previously the code scaled x positions to "squish" the layout, but
@@ -1067,439 +1152,225 @@ checkPrereqs([{key:'traySchedule',page:'racewayschedule.html',label:'Raceway Sch
 
         let resultsHTML = `${worstHTML}
           <p>
-            <strong>Using Tray Width:</strong> ${trayW}"<br>
-            <strong>Tray Depth:</strong> ${trayD}"<br>
-            <strong>Type:</strong> ${trayType === "ladder" ? "Ladder (50 % fill)" : "Solid Bottom (40 % fill)"}
+            <strong>Tray Type:</strong> ${trayType === “ladder” ? “Ladder (50 % fill)” : “Solid Bottom (40 % fill)”}<br>
+            <strong>Compartments:</strong> ${compartments.length}
           </p>
-
           <p>
-            <strong>Stackable Cables Cross-Sectional Area:</strong>
-            ${sumSmallArea.toFixed(2)} in²
+            <strong>Stackable Cables Cross-Sectional Area:</strong> ${sumSmallArea.toFixed(2)} in²<br>
+            <strong>Non-Stackable Cables Sum of Diameters:</strong> ${sumLargeDiam.toFixed(2)} in
           </p>
           ${zoneHTML}
-          <p>
-            <strong>Non-Stackable Cables Sum of Diameters:</strong>
-            ${sumLargeDiam.toFixed(2)} in
-          </p>
-
-          <p>
-          <strong>Total Cable Weight:</strong> ${totalWeight.toFixed(2)} lbs/ft
-        </p>
-        ${nfpaWarning}
-        ${csWarning}
-        ${singleWarning}
-        ${groupWarning}
-        ${voltageWarning}
-      `;
+          <p><strong>Total Cable Weight:</strong> ${totalWeight.toFixed(2)} lbs/ft</p>
+          ${nfpaWarning}
+          ${csWarning}
+          ${singleWarning}
+          ${groupWarning}
+          ${voltageWarning}
+        `;
 
         // Store for “Expand Image”
-        lastPlaced   = placedAll;
-        lastBarriers = barrierLines;
-        lastTrayW    = trayW;
-        lastTrayD    = trayD;
-        lastType     = trayType;
-        lastScale    = 20;  // px/in for small view
-        lastZones    = zoneNames.slice();
+        lastPlaced           = placedAll;
+        lastTrayW            = trayW;
+        lastTrayD            = trayD;
+        lastType             = trayType;
+        lastScale            = 20;
+        lastCompartmentLayouts = compLayouts.map(cl => ({ ...cl }));
 
-        // 14) Detect overflow horizontally/vertically
+        // 14) Detect overflow per compartment
         let overflowHoriz = false;
         let overflowVert  = false;
-        placedAll.forEach(p => {
-          if (p.x + p.r > trayW + 1e-6) overflowHoriz = true;
-          if (p.y + p.r > trayD + 1e-6) overflowVert  = true;
+        compLayouts.forEach(cl => {
+          cl.placed.forEach(p => {
+            if (p.x + p.r > cl.compWidth + 1e-6) overflowHoriz = true;
+            if (p.y + p.r > cl.compDepth + 1e-6) overflowVert  = true;
+          });
         });
 
-        // 15) Draw the SVG (20 px/in) but with extra rows for “name” and “dimension”
-        const scale = lastScale;
-        const nameRowPx    = 20;   // 20px for the tray name
-        const dimRowPx     = 24;   // more room for dimension text
-        const trayRowPx    = trayD * scale;
-        const totalSvgH    = nameRowPx + dimRowPx + trayRowPx;
-        const totalSvgW    = trayW * scale;
-        const nameTextY    = 14;   // Y‐coordinate to place the tray name text
-        const dimLineY     = nameRowPx + 8;         // mid‐height of dimension row
-        const trayTopY     = nameRowPx + dimRowPx;  // Y‐coordinate of tray top edge
+        // 15) Draw the SVG — one rect per compartment, stacked vertically
+        document.getElementById(“svgContainer”).innerHTML = buildCompartmentSvg(compLayouts, trayName, cableColor, 20);
 
-        let svg = `
-          <svg xmlns="http://www.w3.org/2000/svg"
-            width="${totalSvgW}"
-            height="${totalSvgH}"
-            style="background:#f9f9f9; border:1px solid #999;"
-          >
-        `;
-
-        // (A) Draw the tray name (if provided)
-        if (trayName) {
-          svg += `
-            <text
-              x="${(totalSvgW/2).toFixed(2)}"
-              y="${nameTextY}"
-              font-size="16px"
-              text-anchor="middle"
-              fill="#000"
-              font-family="Arial, sans-serif"
-            >${trayName}</text>
-          `;
-        }
-
-        // (B) Draw separation barriers
-        barrierLines.forEach(x => {
-          const xp = (x * scale).toFixed(2);
-          svg += `
-            <line
-              x1="${xp}" y1="${trayTopY}"
-              x2="${xp}" y2="${(trayTopY + trayRowPx).toFixed(2)}"
-              stroke="#aa3300"
-              stroke-width="2"
-              stroke-dasharray="4 2"
-            />
-          `;
-        });
-
-        // (B2) Dimension lines for each zone
-        const zoneBounds = [0, ...barrierLines, trayW];
-        for (let i = 0; i < zoneBounds.length - 1; i++) {
-          const xs = zoneBounds[i] * scale;
-          const xe = zoneBounds[i+1] * scale;
-          const mid = (xs + xe) / 2;
-          const wText = (zoneBounds[i+1] - zoneBounds[i]).toFixed(1) + '"';
-          const zoneLabel = zoneNames[i] ? `Zone ${zoneNames[i]}` : 'Zone Unknown';
-          svg += `
-            <line x1="${xs.toFixed(2)}" y1="${dimLineY}" x2="${xe.toFixed(2)}" y2="${dimLineY}" stroke="#000" stroke-width="1" />
-            <line x1="${xs.toFixed(2)}" y1="${dimLineY-4}" x2="${xs.toFixed(2)}" y2="${dimLineY+4}" stroke="#000" stroke-width="1" />
-            <line x1="${xe.toFixed(2)}" y1="${dimLineY-4}" x2="${xe.toFixed(2)}" y2="${dimLineY+4}" stroke="#000" stroke-width="1" />
-            <text x="${mid.toFixed(2)}" y="${dimLineY-6}" font-size="10px" text-anchor="middle" font-family="Arial, sans-serif">${zoneLabel}</text>
-            <text x="${mid.toFixed(2)}" y="${dimLineY+10}" font-size="10px" text-anchor="middle" font-family="Arial, sans-serif">${wText}</text>
-          `;
-        }
-
-        // (C) Draw the tray rectangle (starts at trayTopY)
-        svg += `
-          <rect
-            x="0" y="${trayTopY}"
-            width="${(trayW * scale).toFixed(2)}"
-            height="${(trayD * scale).toFixed(2)}"
-            fill="none"
-            stroke="#333"
-            stroke-width="2"
-          />
-        `;
-
-        // (E) Draw each circle (all shifted down by trayTopY, and Y‐flipped inside the tray)
-        placedAll.forEach(p => {
-          if (p.isGroup && p.members && p.offsets) {
-            const gcx = p.x * scale;
-            const gcy = trayTopY + ((trayD - p.y) * scale);
-            const gr  = p.r * scale;
-            svg += `
-              <circle
-                cx="${gcx.toFixed(2)}"
-                cy="${gcy.toFixed(2)}"
-                r="${gr.toFixed(2)}"
-                fill="none"
-                stroke="#0066aa"
-                stroke-width="1"
-                stroke-dasharray="4 2"
-              />
-            `;
-            p.members.forEach((m, idx) => {
-              const mx = (p.x + p.offsets[idx].x) * scale;
-              const my = trayTopY + ((trayD - (p.y + p.offsets[idx].y)) * scale);
-              const mr = (m.OD / 2) * scale;
-              svg += `
-                <circle
-                  cx="${mx.toFixed(2)}"
-                  cy="${my.toFixed(2)}"
-                  r="${mr.toFixed(2)}"
-                  fill="${cableColor}"
-                  stroke="#0066aa"
-                  stroke-width="1"
-                >
-                  <title>
-Cable Tag: ${m.tag}
-Cable Type: ${m.cableType}
-Conductors: ${m.count}
-Size: ${m.size}
-OD: ${m.OD.toFixed(2)}″
-Wt: ${m.weight.toFixed(2)} lbs/ft
-                  </title>
-                </circle>
-              `;
-            });
+        // 16) Show overflow warnings
+        if (overflowHoriz) {
+          if (recommendedWidth && recommendedWidth > trayW) {
+            resultsHTML += `<p class=”warning”>WARNING: Some cables extend beyond their compartment width.</p>
+              <p class=”recommend”>Recommend larger standard width: ${recommendedWidth}”</p>`;
           } else {
-            const cx = p.x * scale;
-            const cy = trayTopY + ((trayD - p.y) * scale);
-            const r  = p.r * scale;
-            svg += `
-              <circle
-                cx="${cx.toFixed(2)}"
-                cy="${cy.toFixed(2)}"
-                r="${r.toFixed(2)}"
-                fill="${cableColor}"
-                stroke="#0066aa"
-                stroke-width="1"
-              >
-                <title>
-Cable Tag: ${p.tag}
-Cable Type: ${p.cableType}
-Conductors: ${p.count}
-Size: ${p.size}
-OD: ${p.OD.toFixed(2)}″
-Wt: ${p.weight.toFixed(2)} lbs/ft
-                </title>
-              </circle>
-            `;
-          }
-        });
-
-        svg += `</svg>`;
-        document.getElementById("svgContainer").innerHTML = svg;
-
-        // 16) Show overflow warnings & recommendations
-        if (overflowHoriz || overflowVert) {
-          if (overflowHoriz) {
-            if (recommendedWidth && recommendedWidth > trayW) {
-              resultsHTML += `
-                <p class="warning">
-                  WARNING: Some cables extend beyond the tray width (${trayW}").
-                </p>
-                <p class="recommend">
-                  Recommend larger standard width: ${recommendedWidth}" 
-                </p>`;
-            } else {
-              resultsHTML += `
-                <p class="warning">
-                  WARNING: Some cables extend beyond the tray width (${trayW}").
-                </p>
-                <p class="recommend">
-                  No larger standard width can accommodate all cables.
-                </p>`;
-            }
-          }
-          if (overflowVert) {
-            const neededDepth = Math.max(...placedAll.map(p => p.y + p.r));
-            resultsHTML += `
-              <p class="warning">
-                WARNING: Some cables extend above the tray depth (${trayD}").
-              </p>
-              <p class="recommend">
-                Recommend increasing tray depth to at least ${neededDepth.toFixed(2)}".
-              </p>`;
+            resultsHTML += `<p class=”warning”>WARNING: Some cables extend beyond their compartment width.</p>`;
           }
         }
-        document.getElementById("results").innerHTML = resultsHTML;
+        if (overflowVert) {
+          resultsHTML += `<p class=”warning”>WARNING: Some cables extend above their compartment depth.</p>
+            <p class=”recommend”>Recommend increasing the affected compartment's depth.</p>`;
+        }
+        document.getElementById(“results”).innerHTML = resultsHTML;
 
-        // Initialize per-zone fill gauges (DOM nodes must exist before calling createFillGauge)
+        // Initialize per-compartment fill gauges (DOM nodes must exist first)
         for (const zd of allZoneData) {
           const gauge = createFillGauge(zd.id, { label: zd.label, width: 150, strokeWidth: 14 });
           gauge.update(zd.pct);
         }
       });
 
+      // ── Shared SVG builder for compartment-based tray cross-section ──────
+      function buildCompartmentSvg(compLayouts, trayName, cableColor, scale) {
+        const nameRowPx    = trayName ? 24 : 0;
+        const perCompHeaderPx = 24;  // dimension label row per compartment
+        const compGapPx    = 8;      // vertical gap between compartments
+
+        // Compute SVG dimensions
+        let svgH = nameRowPx;
+        const compPositions = compLayouts.map(cl => {
+          const headerY = svgH;
+          const rectY   = svgH + perCompHeaderPx;
+          svgH += perCompHeaderPx + cl.compDepth * scale + compGapPx;
+          return { headerY, rectY };
+        });
+        svgH = Math.max(svgH - compGapPx, nameRowPx + 10); // trim last gap
+        const svgW = Math.max(...compLayouts.map(cl => cl.compWidth)) * scale;
+
+        let svg = `<svg xmlns=”http://www.w3.org/2000/svg” width=”${svgW.toFixed(0)}” height=”${svgH.toFixed(0)}” style=”background:#f9f9f9;border:1px solid #999;”>`;
+
+        // Tray name
+        if (trayName) {
+          svg += `<text x=”${(svgW/2).toFixed(2)}” y=”${(nameRowPx*0.7).toFixed(2)}” font-size=”14px” text-anchor=”middle” fill=”#000” font-family=”Arial,sans-serif”>${trayName}</text>`;
+        }
+
+        // Per-compartment elements
+        compLayouts.forEach((cl, ci) => {
+          const { headerY, rectY } = compPositions[ci];
+          const compW = cl.compWidth * scale;
+          const compH = cl.compDepth * scale;
+          const label = cl.comp.label || `Compartment ${cl.comp.id}`;
+          const dimLineY = headerY + 12;
+
+          // Dimension line + label
+          svg += `<line x1=”0” y1=”${dimLineY}” x2=”${compW.toFixed(2)}” y2=”${dimLineY}” stroke=”#000” stroke-width=”1”/>`;
+          svg += `<line x1=”0” y1=”${dimLineY-4}” x2=”0” y2=”${dimLineY+4}” stroke=”#000” stroke-width=”1”/>`;
+          svg += `<line x1=”${compW.toFixed(2)}” y1=”${dimLineY-4}” x2=”${compW.toFixed(2)}” y2=”${dimLineY+4}” stroke=”#000” stroke-width=”1”/>`;
+          svg += `<text x=”${(compW/2).toFixed(2)}” y=”${dimLineY-4}” font-size=”9px” text-anchor=”middle” font-family=”Arial,sans-serif”>${label}</text>`;
+          svg += `<text x=”${(compW/2).toFixed(2)}” y=”${dimLineY+9}” font-size=”9px” text-anchor=”middle” font-family=”Arial,sans-serif”>${cl.compWidth.toFixed(1)}” × ${cl.compDepth.toFixed(1)}”</text>`;
+
+          // Compartment rectangle
+          svg += `<rect x=”0” y=”${rectY}” width=”${compW.toFixed(2)}” height=”${compH.toFixed(2)}” fill=”none” stroke=”#333” stroke-width=”2”/>`;
+
+          // Inner barrier (stackable vs non-stackable divider)
+          if (cl.largeCount > 0 && cl.smallCount > 0) {
+            const bxp = (cl.barrierX * scale).toFixed(2);
+            svg += `<line x1=”${bxp}” y1=”${rectY}” x2=”${bxp}” y2=”${(rectY + compH).toFixed(2)}” stroke=”#aa3300” stroke-width=”2” stroke-dasharray=”4 2”/>`;
+          }
+
+          // Cables in this compartment
+          cl.placed.forEach(p => {
+            if (p.isGroup && p.members && p.offsets) {
+              const gcx = (p.x * scale).toFixed(2);
+              const gcy = (rectY + (cl.compDepth - p.y) * scale).toFixed(2);
+              const gr  = (p.r * scale).toFixed(2);
+              svg += `<circle cx=”${gcx}” cy=”${gcy}” r=”${gr}” fill=”none” stroke=”#0066aa” stroke-width=”1” stroke-dasharray=”4 2”/>`;
+              p.members.forEach((m, mi) => {
+                const mx = ((p.x + p.offsets[mi].x) * scale).toFixed(2);
+                const my = (rectY + (cl.compDepth - (p.y + p.offsets[mi].y)) * scale).toFixed(2);
+                const mr = ((m.OD / 2) * scale).toFixed(2);
+                svg += `<circle cx=”${mx}” cy=”${my}” r=”${mr}” fill=”${cableColor}” stroke=”#0066aa” stroke-width=”1”><title>Cable Tag: ${m.tag}\nCable Type: ${m.cableType}\nConductors: ${m.count}\nSize: ${m.size}\nOD: ${m.OD.toFixed(2)}″\nWt: ${m.weight.toFixed(2)} lbs/ft</title></circle>`;
+              });
+            } else {
+              const cx = (p.x * scale).toFixed(2);
+              const cy = (rectY + (cl.compDepth - p.y) * scale).toFixed(2);
+              const r  = (p.r * scale).toFixed(2);
+              svg += `<circle cx=”${cx}” cy=”${cy}” r=”${r}” fill=”${cableColor}” stroke=”#0066aa” stroke-width=”1”><title>Cable Tag: ${p.tag}\nCable Type: ${p.cableType}\nConductors: ${p.count}\nSize: ${p.size}\nOD: ${p.OD.toFixed(2)}″\nWt: ${p.weight.toFixed(2)} lbs/ft</title></circle>`;
+            }
+          });
+        });
+
+        svg += '</svg>';
+        return svg;
+      }
+
       // ─────────────────────────────────────────────────────────────
-      // (F) “Expand Image” button: popup at 160 px/in (double the 80 px/in)
-      //           (We apply the same “name + dimension + tray” logic, but with a larger scale.)
+      // (F) “Expand Image” button: popup at 160 px/in with text labels
       // ─────────────────────────────────────────────────────────────
-      document.getElementById("expandBtn").addEventListener("click", () => {
-        if (!lastPlaced) {
+      document.getElementById(“expandBtn”).addEventListener(“click”, () => {
+        if (!lastCompartmentLayouts) {
           showAlertModal('Action Required', 'Please click “Draw Tray” first, then Expand.');
           return;
         }
-        const bigScale = 160;  // 160 px/in for high resolution
-        const trayW = lastTrayW, trayD = lastTrayD;
-        const trayName = document.getElementById("trayName").value.trim();
-        const nameRowPx    = 40;   // give more room for big text and spacing
-        const dimRowPx     = 36;   // more room for dimension text
-        const trayRowPx    = trayD * bigScale;
-        const totalSvgH    = nameRowPx + dimRowPx + trayRowPx;
-        const totalSvgW    = trayW * bigScale;
-        const nameTextY    = 24;
-        const dimLineY     = nameRowPx + 12;    
-        const trayTopY     = nameRowPx + dimRowPx;
+        const bigScale = 160;
+        const trayName = document.getElementById(“trayName”).value.trim();
 
-        let svg = `
-          <svg xmlns="http://www.w3.org/2000/svg"
-            width="${totalSvgW}"
-            height="${totalSvgH}"
-            style="background:#f9f9f9; border:1px solid #333;"
-          >
-        `;
+        // Build base SVG using shared helper at bigScale
+        let svg = buildCompartmentSvg(lastCompartmentLayouts, trayName, lastColor, bigScale);
 
-        // (A) Tray Name
+        // Inject text labels into each circle by post-processing the placed data
+        // Re-render with text labels: build a richer SVG directly
+        const nameRowPx = trayName ? 24 : 0;
+        const perCompHeaderPx = 24;
+        const compGapPx = 8;
+        let svgH = nameRowPx;
+        const compPositions = lastCompartmentLayouts.map(cl => {
+          const headerY = svgH;
+          const rectY   = svgH + perCompHeaderPx;
+          svgH += perCompHeaderPx + cl.compDepth * bigScale + compGapPx;
+          return { headerY, rectY };
+        });
+        svgH = Math.max(svgH - compGapPx, nameRowPx + 10);
+        const svgW = Math.max(...lastCompartmentLayouts.map(cl => cl.compWidth)) * bigScale;
+
+        let bigSvg = `<svg xmlns=”http://www.w3.org/2000/svg” width=”${svgW.toFixed(0)}” height=”${svgH.toFixed(0)}” style=”background:#f9f9f9;border:1px solid #333;”>`;
         if (trayName) {
-          svg += `
-            <text
-              x="${(totalSvgW/2).toFixed(2)}"
-              y="${nameTextY}"
-              font-size="24px"
-              text-anchor="middle"
-              fill="#000"
-              font-family="Arial, sans-serif"
-            >${trayName}</text>
-          `;
+          bigSvg += `<text x=”${(svgW/2).toFixed(2)}” y=”${(nameRowPx*0.7).toFixed(2)}” font-size=”20px” text-anchor=”middle” fill=”#000” font-family=”Arial,sans-serif”>${trayName}</text>`;
         }
 
-        // (B) Draw separation barriers
-        lastBarriers.forEach(x => {
-          const xp = (x * bigScale).toFixed(2);
-          svg += `
-            <line
-              x1="${xp}" y1="${trayTopY}"
-              x2="${xp}" y2="${(trayTopY + trayRowPx).toFixed(2)}"
-              stroke="#aa3300"
-              stroke-width="4"
-              stroke-dasharray="12 6"
-            />
-          `;
-        });
+        lastCompartmentLayouts.forEach((cl, ci) => {
+          const { headerY, rectY } = compPositions[ci];
+          const compW = cl.compWidth * bigScale;
+          const compH = cl.compDepth * bigScale;
+          const label = cl.comp.label || `Compartment ${cl.comp.id}`;
+          const dimLineY = headerY + 14;
 
-        // (B2) Dimension lines for each zone
-        const bigZone = [0, ...lastBarriers, trayW];
-        for (let i = 0; i < bigZone.length - 1; i++) {
-          const xs = bigZone[i] * bigScale;
-          const xe = bigZone[i+1] * bigScale;
-          const mid = (xs + xe) / 2;
-          const wText = (bigZone[i+1] - bigZone[i]).toFixed(1) + '"';
-          const zoneLabel = lastZones[i] ? `Zone ${lastZones[i]}` : 'Zone Unknown';
-          svg += `
-            <line x1="${xs.toFixed(2)}" y1="${dimLineY}" x2="${xe.toFixed(2)}" y2="${dimLineY}" stroke="#000" stroke-width="2" />
-            <line x1="${xs.toFixed(2)}" y1="${dimLineY-8}" x2="${xs.toFixed(2)}" y2="${dimLineY+8}" stroke="#000" stroke-width="2" />
-            <line x1="${xe.toFixed(2)}" y1="${dimLineY-8}" x2="${xe.toFixed(2)}" y2="${dimLineY+8}" stroke="#000" stroke-width="2" />
-            <text x="${mid.toFixed(2)}" y="${dimLineY-12}" font-size="18px" text-anchor="middle" font-family="Arial, sans-serif">${zoneLabel}</text>
-            <text x="${mid.toFixed(2)}" y="${dimLineY+16}" font-size="18px" text-anchor="middle" font-family="Arial, sans-serif">${wText}</text>
-          `;
-        }
+          bigSvg += `<line x1=”0” y1=”${dimLineY}” x2=”${compW.toFixed(2)}” y2=”${dimLineY}” stroke=”#000” stroke-width=”2”/>`;
+          bigSvg += `<line x1=”0” y1=”${dimLineY-6}” x2=”0” y2=”${dimLineY+6}” stroke=”#000” stroke-width=”2”/>`;
+          bigSvg += `<line x1=”${compW.toFixed(2)}” y1=”${dimLineY-6}” x2=”${compW.toFixed(2)}” y2=”${dimLineY+6}” stroke=”#000” stroke-width=”2”/>`;
+          bigSvg += `<text x=”${(compW/2).toFixed(2)}” y=”${dimLineY-5}” font-size=”14px” text-anchor=”middle” font-family=”Arial,sans-serif”>${label}</text>`;
+          bigSvg += `<text x=”${(compW/2).toFixed(2)}” y=”${dimLineY+11}” font-size=”14px” text-anchor=”middle” font-family=”Arial,sans-serif”>${cl.compWidth.toFixed(1)}” × ${cl.compDepth.toFixed(1)}”</text>`;
+          bigSvg += `<rect x=”0” y=”${rectY}” width=”${compW.toFixed(2)}” height=”${compH.toFixed(2)}” fill=”none” stroke=”#333” stroke-width=”4”/>`;
 
-        // (C) Draw the tray rectangle
-        svg += `
-          <rect
-            x="0" y="${trayTopY}"
-            width="${(trayW * bigScale).toFixed(2)}"
-            height="${(trayD * bigScale).toFixed(2)}"
-            fill="none"
-            stroke="#333"
-            stroke-width="4"
-          />
-        `;
-
-        // (D) Draw each circle
-        lastPlaced.forEach(p => {
-          if (p.isGroup && p.members && p.offsets) {
-            const gcx = p.x * bigScale;
-            const gcy = trayTopY + ((trayD - p.y) * bigScale);
-            const gr  = p.r * bigScale;
-            svg += `
-              <circle
-                cx="${gcx.toFixed(2)}"
-                cy="${gcy.toFixed(2)}"
-                r="${gr.toFixed(2)}"
-                fill="none"
-                stroke="#0066aa"
-                stroke-width="2"
-                stroke-dasharray="8 4"
-              />
-            `;
-            p.members.forEach((m, idx) => {
-              const mx = (p.x + p.offsets[idx].x) * bigScale;
-              const my = trayTopY + ((trayD - (p.y + p.offsets[idx].y)) * bigScale);
-              const mr = (m.OD / 2) * bigScale;
-              svg += `
-                <circle
-                  cx="${mx.toFixed(2)}"
-                  cy="${my.toFixed(2)}"
-                  r="${mr.toFixed(2)}"
-                  fill="${lastColor}"
-                  stroke="#0066aa"
-                  stroke-width="2"
-                >
-                  <title>
-Cable Tag: ${m.tag}
-Cable Type: ${m.cableType}
-Conductors: ${m.count}
-Size: ${m.size}
-OD: ${m.OD.toFixed(2)}″
-Wt: ${m.weight.toFixed(2)} lbs/ft
-                  </title>
-                </circle>
-              `;
-
-              const fontSize = Math.min(mr * 0.15, 20);
-              const lines = [
-                `${m.tag}`,
-                `${m.cableType}`,
-                `${m.count}C ${m.size}`,
-                `OD: ${m.OD.toFixed(2)}″`,
-                `Wt: ${m.weight.toFixed(2)}`
-              ];
-              const lineHeight = fontSize * 1.1;
-              const textBlockHeight = lines.length * lineHeight;
-              let yStart = my - textBlockHeight / 2 + lineHeight / 2;
-
-              lines.forEach((ln, idx2) => {
-                svg += `
-                  <text
-                    x="${mx.toFixed(2)}"
-                    y="${(yStart + idx2 * lineHeight).toFixed(2)}"
-                    font-size="${fontSize}px"
-                    text-anchor="middle"
-                    fill="#000"
-                    stroke="none"
-                    font-family="Arial, sans-serif"
-                    pointer-events="none"
-                  >
-                    ${ln}
-                  </text>
-                `;
-              });
-            });
-          } else {
-            const cx = p.x * bigScale;
-            const cy = trayTopY + ((trayD - p.y) * bigScale);
-            const r  = p.r * bigScale;
-            svg += `
-              <circle
-                cx="${cx.toFixed(2)}"
-                cy="${cy.toFixed(2)}"
-                r="${r.toFixed(2)}"
-                fill="${lastColor}"
-                stroke="#0066aa"
-                stroke-width="2"
-              />
-            `;
-
-            // Insert multiline <text> inside each circle
-            const fontSize = Math.min(r * 0.15, 20);
-            const lines = [
-              `${p.tag}`,
-              `${p.cableType}`,
-              `${p.count}C ${p.size}`,
-              `OD: ${p.OD.toFixed(2)}″`,
-              `Wt: ${p.weight.toFixed(2)}`
-            ];
-            const lineHeight = fontSize * 1.1;
-            const textBlockHeight = lines.length * lineHeight;
-            let yStart = cy - textBlockHeight / 2 + lineHeight / 2;
-
-            lines.forEach((ln, idx) => {
-              svg += `
-                <text
-                  x="${cx.toFixed(2)}"
-                  y="${(yStart + idx * lineHeight).toFixed(2)}"
-                  font-size="${fontSize}px"
-                  text-anchor="middle"
-                  fill="#000"
-                  stroke="none"
-                  font-family="Arial, sans-serif"
-                  pointer-events="none"
-                >
-                  ${ln}
-                </text>
-              `;
-            });
+          if (cl.largeCount > 0 && cl.smallCount > 0) {
+            const bxp = (cl.barrierX * bigScale).toFixed(2);
+            bigSvg += `<line x1=”${bxp}” y1=”${rectY}” x2=”${bxp}” y2=”${(rectY+compH).toFixed(2)}” stroke=”#aa3300” stroke-width=”4” stroke-dasharray=”12 6”/>`;
           }
+
+          cl.placed.forEach(p => {
+            if (p.isGroup && p.members && p.offsets) {
+              const gcx = (p.x * bigScale).toFixed(2);
+              const gcy = (rectY + (cl.compDepth - p.y) * bigScale).toFixed(2);
+              const gr  = (p.r * bigScale).toFixed(2);
+              bigSvg += `<circle cx=”${gcx}” cy=”${gcy}” r=”${gr}” fill=”none” stroke=”#0066aa” stroke-width=”2” stroke-dasharray=”8 4”/>`;
+              p.members.forEach((m, mi) => {
+                const mx = (p.x + p.offsets[mi].x) * bigScale;
+                const my = rectY + (cl.compDepth - (p.y + p.offsets[mi].y)) * bigScale;
+                const mr = (m.OD / 2) * bigScale;
+                bigSvg += `<circle cx=”${mx.toFixed(2)}” cy=”${my.toFixed(2)}” r=”${mr.toFixed(2)}” fill=”${lastColor}” stroke=”#0066aa” stroke-width=”2”/>`;
+                const fs = Math.min(mr * 0.15, 20);
+                const lbls = [`${m.tag}`, `${m.cableType}`, `${m.count}C ${m.size}`, `OD:${m.OD.toFixed(2)}″`, `${m.weight.toFixed(2)}lb/ft`];
+                const lh = fs * 1.1;
+                let y0 = my - (lbls.length * lh) / 2 + lh / 2;
+                lbls.forEach((ln, li) => { bigSvg += `<text x=”${mx.toFixed(2)}” y=”${(y0+li*lh).toFixed(2)}” font-size=”${fs}px” text-anchor=”middle” fill=”#000” font-family=”Arial,sans-serif” pointer-events=”none”>${ln}</text>`; });
+              });
+            } else {
+              const cx = p.x * bigScale;
+              const cy = rectY + (cl.compDepth - p.y) * bigScale;
+              const r  = p.r * bigScale;
+              bigSvg += `<circle cx=”${cx.toFixed(2)}” cy=”${cy.toFixed(2)}” r=”${r.toFixed(2)}” fill=”${lastColor}” stroke=”#0066aa” stroke-width=”2”/>`;
+              const fs = Math.min(r * 0.15, 20);
+              const lbls = [`${p.tag}`, `${p.cableType}`, `${p.count}C ${p.size}`, `OD:${p.OD.toFixed(2)}″`, `${p.weight.toFixed(2)}lb/ft`];
+              const lh = fs * 1.1;
+              let y0 = cy - (lbls.length * lh) / 2 + lh / 2;
+              lbls.forEach((ln, li) => { bigSvg += `<text x=”${cx.toFixed(2)}” y=”${(y0+li*lh).toFixed(2)}” font-size=”${fs}px” text-anchor=”middle” fill=”#000” font-family=”Arial,sans-serif” pointer-events=”none”>${ln}</text>`; });
+            }
+          });
         });
 
-        svg += `</svg>`;
+        bigSvg += '</svg>';
+        svg = bigSvg;
 
         document.getElementById("expandedSVG").innerHTML = svg;
         document.getElementById("overlay").style.display = "flex";
@@ -1618,7 +1489,7 @@ Wt: ${m.weight.toFixed(2)} lbs/ft
           showAlertModal('Notice', 'No cables to export.');
           return;
         }
-        const data=[['Tag','Cable Type','Conductors','Conductor Size','Cable Rating (V)','Operating Voltage (V)','OD','Weight','Zone','Circuit Group']];
+        const data=[['Tag','Cable Type','Conductors','Conductor Size','Cable Rating (V)','Operating Voltage (V)','OD','Weight','Compartment','Circuit Group']];
         rows.forEach(row=>{
           const tag=row.children[0].querySelector('input').value.trim();
           const cableType=row.children[1].querySelector('select').value;
@@ -1635,6 +1506,10 @@ Wt: ${m.weight.toFixed(2)} lbs/ft
         const wb=XLSX.utils.book_new();
         const ws=XLSX.utils.aoa_to_sheet(data);
         XLSX.utils.book_append_sheet(wb,ws,'Cables');
+        // Compartments sheet
+        const compData=[['Compartment ID','Width (in)','Depth (in)','Label']];
+        compartments.forEach(c=>compData.push([c.id,c.width,c.depth,c.label||'']));
+        XLSX.utils.book_append_sheet(wb,XLSX.utils.aoa_to_sheet(compData),'Compartments');
         XLSX.writeFile(wb,'CableList.xlsx');
       }
 
@@ -1653,21 +1528,34 @@ Wt: ${m.weight.toFixed(2)} lbs/ft
             showAlertModal('Import Error', 'Excel sheet is empty.');
             return;
           }
+          // Load compartments from second sheet if present
+          const compSheetName=wb.SheetNames.find(n=>n.toLowerCase()==='compartments');
+          if(compSheetName){
+            const compSheet=wb.Sheets[compSheetName];
+            const compArr=XLSX.utils.sheet_to_json(compSheet,{defval:""});
+            if(compArr.length>0){
+              compartments=compArr.map(r=>({
+                id:parseInt(r['Compartment ID'])||1,
+                width:parseFloat(r['Width (in)'])||12,
+                depth:parseFloat(r['Depth (in)'])||3,
+                label:String(r['Label']||'')
+              })).filter(c=>c.id>=1&&c.id<=5);
+              renderCompartmentUI();
+            }
+          }
           cableTbody.innerHTML='';
           cables=[];
           jsonArr.forEach((obj,idx)=>{
-            const {
-              Tag,
-              'Cable Type':CableType,
-              Conductors,
-              'Conductor Size':Size,
-              'Cable Rating (V)':Rating,
-              'Operating Voltage (V)':Voltage,
-              OD,
-              Weight,
-              Zone,
-              'Circuit Group':CircuitGroup
-            }=obj;
+            const Tag=obj['Tag'];
+            const CableType=obj['Cable Type'];
+            const Conductors=obj['Conductors'];
+            const Size=obj['Conductor Size'];
+            const Rating=obj['Cable Rating (V)'];
+            const Voltage=obj['Operating Voltage (V)'];
+            const OD=obj['OD'];
+            const Weight=obj['Weight'];
+            // Support both 'Compartment' (new) and 'Zone' (legacy)
+            const ZoneVal=obj['Compartment']||obj['Zone'];
             if(
               typeof Tag==='undefined'||
               typeof CableType==='undefined'||
@@ -1707,7 +1595,7 @@ Wt: ${m.weight.toFixed(2)} lbs/ft
               odInput.readOnly=false;
               wtInput.readOnly=false;
             }
-            zoneInput.value=Zone||1;
+            zoneInput.value=ZoneVal||1;
             groupInput.value=obj['Circuit Group']||'';
             cableTbody.appendChild(newRow);
           });
@@ -1726,8 +1614,9 @@ Wt: ${m.weight.toFixed(2)} lbs/ft
       document.getElementById("importHelpBtn").addEventListener("click", () => {
         showAlertModal('Import Instructions',
           "1. Click 'Export Excel' to download a template.\n" +
-          "2. Fill in Tag, Cable Type, Conductors, Conductor Size, Cable Rating (V), Operating Voltage (V), OD, Weight, Zone, and Circuit Group.\n" +
-          "3. Save the file then choose it with 'Import Excel'."
+          "2. Fill in Tag, Cable Type, Conductors, Conductor Size, Cable Rating (V), Operating Voltage (V), OD, Weight, Compartment (1–5), and Circuit Group.\n" +
+          "3. Optionally edit the 'Compartments' sheet to define compartment widths, depths, and labels.\n" +
+          "4. Save the file then choose it with 'Import Excel'."
         );
       });
 
@@ -1821,7 +1710,7 @@ Wt: ${m.weight.toFixed(2)} lbs/ft
           tray_id: document.getElementById("trayName").value.trim()
         };
         try {
-          trayProfiles.save(name, { tray: trayData, cables: arr });
+          trayProfiles.save(name, { tray: trayData, cables: arr, compartments: compartments.map(c=>({...c})) });
           showAlertModal('Profile Saved', `Profile "${name}" saved.`);
           refreshProfileList();
         } catch (e) {
@@ -1842,11 +1731,18 @@ Wt: ${m.weight.toFixed(2)} lbs/ft
           refreshProfileList();
           return;
         }
-        const { tray = {}, cables: arr = [] } = data;
+        const { tray = {}, cables: arr = [], compartments: savedComps } = data;
         document.getElementById("trayWidth").value = tray.width ?? tray.w ?? "";
         document.getElementById("trayDepth").value = tray.depth ?? tray.height ?? "";
         if (tray.type) document.getElementById("trayType").value = tray.type;
         document.getElementById("trayName").value = tray.tray_id || tray.name || "";
+        // Restore compartments (backward compat: default to single compartment from tray dims)
+        if (savedComps && Array.isArray(savedComps) && savedComps.length > 0) {
+          compartments = savedComps.map(c => ({ ...c }));
+        } else {
+          compartments = [{ id: 1, width: parseFloat(tray.width || tray.w) || 12, depth: parseFloat(tray.depth || tray.height) || 3, label: '' }];
+        }
+        renderCompartmentUI();
         cableTbody.innerHTML = "";
         cables = [];
         arr.forEach(cable => {
@@ -1923,6 +1819,9 @@ Wt: ${m.weight.toFixed(2)} lbs/ft
           document.getElementById('trayWidth').value = tray.width;
           document.getElementById('trayDepth').value = tray.height;
           document.getElementById('trayName').value = tray.tray_id || '';
+          // Initialize single compartment from tray dimensions for this navigation flow
+          compartments = [{ id: 1, width: parseFloat(tray.width) || 12, depth: parseFloat(tray.height) || 3, label: '' }];
+          renderCompartmentUI();
           if (Array.isArray(storedCables)) {
             cables = storedCables.map(c => ({
               tag: c.name || c.tag || '',
