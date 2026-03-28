@@ -16,12 +16,19 @@
 import { getOneLine } from '../dataStore.mjs';
 import { buildLoadFlowModel, cloneData } from './loadFlowModel.js';
 import { runLoadFlow } from './loadFlow.js';
+import { simulateSwingEquation, initialRotorAngle } from './transientStability.mjs';
 
 const DEFAULT_OPTS = {
   voltageMinPu: 0.95,
   voltageMaxPu: 1.05,
   overloadThresholdPct: 100,
   baseMVA: 100,
+  // Transient stability options (opt-in — adds per-contingency swing-equation check)
+  checkTransientStability: false,
+  generatorInertiaH: 5.0,       // MW·s/MVA — typical medium steam/hydro unit
+  systemFrequency: 60,           // Hz
+  faultClearingTime_s: 0.1,      // s — 6-cycle primary clearing at 60 Hz
+  transientSimDuration_s: 2.0,   // s — simulation window
 };
 
 /**
@@ -86,6 +93,70 @@ function voltageStatus(vm, min, max) {
 }
 
 /**
+ * Identify generator-connected buses in the load-flow model.
+ * A bus is a generator bus when its scheduled active generation Pg > 0.
+ *
+ * @param {object} model - load-flow model with .buses array
+ * @param {number} baseMVA
+ * @returns {Array<{busId:string, Pm_pu:number}>}
+ */
+function identifyGeneratorBuses(model, baseMVA) {
+  const gens = [];
+  for (const bus of (model.buses || [])) {
+    const Pg = bus.Pg ?? bus.gen_MW ?? bus.generation ?? 0;
+    if (Number.isFinite(Pg) && Pg > 0) {
+      gens.push({ busId: bus.id, Pm_pu: Pg / baseMVA });
+    }
+  }
+  return gens;
+}
+
+/**
+ * Run a classical OMIB transient stability check for one generator.
+ *
+ * Power-transfer estimates:
+ *   Pmax_pre   = Pm_pu / sin(π/6)          — 30° pre-fault operating angle
+ *   Pmax_fault = 0                          — 3-phase bolted fault (conservative)
+ *   Pmax_post  = Pmax_pre × (V_post/V_pre)² — proportional to voltage squared
+ *
+ * @param {number} Pm_pu   - scheduled mechanical power (pu)
+ * @param {number} V_pre   - pre-fault generator bus voltage magnitude (pu)
+ * @param {number} V_post  - post-contingency generator bus voltage magnitude (pu)
+ * @param {object} opts    - merged options from DEFAULT_OPTS
+ * @returns {{checked:boolean, stable:boolean|null, deltaMax_deg:number|null, cct_s:null}}
+ */
+function runTransientCheck(Pm_pu, V_pre, V_post, opts) {
+  try {
+    const Pmax_pre  = Pm_pu / Math.sin(Math.PI / 6);  // Pm at 30° operating angle
+    const Pmax_fault = 0;
+    const Pmax_post  = Pmax_pre * Math.pow((V_post / V_pre), 2);
+    const delta0 = initialRotorAngle(Pm_pu, Pmax_pre);
+
+    const result = simulateSwingEquation({
+      H:           opts.generatorInertiaH,
+      f:           opts.systemFrequency,
+      Pm:          Pm_pu,
+      Pmax_pre,
+      Pmax_fault,
+      Pmax_post,
+      delta0,
+      t_fault:     0,
+      t_clear:     opts.faultClearingTime_s,
+      t_end:       opts.transientSimDuration_s,
+    });
+
+    return {
+      checked:      true,
+      stable:       result.stable,
+      deltaMax_deg: result.deltaMax_deg,
+      cct_s:        null,
+    };
+  } catch {
+    return { checked: false, stable: null, deltaMax_deg: null, cct_s: null };
+  }
+}
+
+/**
  * Extract violations from a single load-flow result.
  * @param {object} result - runLoadFlow return value
  * @param {object} opts
@@ -144,12 +215,14 @@ function extractViolations(result, opts) {
  *     branchType: string,
  *     converged: boolean,
  *     violations: Array,
- *     critical: boolean
+ *     critical: boolean,
+ *     transientStability: {checked:boolean, stable:boolean|null, deltaMax_deg:number|null, cct_s:null}
  *   }>,
  *   summary: {
  *     totalBranches: number,
  *     criticalContingencies: number,
- *     totalViolations: number
+ *     totalViolations: number,
+ *     transientlyUnstable: number
  *   }
  * }}
  */
@@ -166,6 +239,11 @@ export function runContingency(inputModel = null, userOpts = {}) {
   // Enumerate all removable branches
   const branches = collectBranches(baseModel);
 
+  // Identify generator buses once for transient stability checks.
+  const generatorBuses = opts.checkTransientStability
+    ? identifyGeneratorBuses(baseModel, opts.baseMVA)
+    : [];
+
   const contingencies = [];
   for (const branch of branches) {
     const contingencyModel = buildContingencyModel(baseModel, branch.id);
@@ -177,6 +255,24 @@ export function runContingency(inputModel = null, userOpts = {}) {
     }
 
     const violations = extractViolations(result, opts);
+
+    // --- Transient stability check (opt-in) ---
+    let transientStability = { checked: false, stable: null, deltaMax_deg: null, cct_s: null };
+    if (opts.checkTransientStability && generatorBuses.length > 0) {
+      for (const gen of generatorBuses) {
+        const preV  = baseResult.buses?.find(b => b.id === gen.busId)?.Vm ?? 1.0;
+        const postV = result.buses?.find(b => b.id === gen.busId)?.Vm ?? preV;
+        const tsCheck = runTransientCheck(gen.Pm_pu, preV, postV, opts);
+        // Track worst case — prefer unstable over stable over unchecked.
+        if (!transientStability.checked ||
+            (tsCheck.checked && transientStability.stable !== false && tsCheck.stable === false)) {
+          transientStability = tsCheck;
+        } else if (!transientStability.checked && tsCheck.checked) {
+          transientStability = tsCheck;
+        }
+      }
+    }
+
     contingencies.push({
       branchId: branch.id,
       branchName: branch.name,
@@ -184,11 +280,15 @@ export function runContingency(inputModel = null, userOpts = {}) {
       converged: result.converged ?? false,
       violations,
       critical: violations.length > 0,
+      transientStability,
     });
   }
 
   const criticalCount = contingencies.filter(c => c.critical).length;
   const totalViolations = contingencies.reduce((sum, c) => sum + c.violations.length, 0);
+  const transientlyUnstable = contingencies.filter(
+    c => c.transientStability.checked && c.transientStability.stable === false
+  ).length;
 
   return {
     baseCase: baseResult,
@@ -197,6 +297,7 @@ export function runContingency(inputModel = null, userOpts = {}) {
       totalBranches: branches.length,
       criticalContingencies: criticalCount,
       totalViolations,
+      transientlyUnstable,
     },
   };
 }

@@ -39,6 +39,9 @@
     .contingency-table { width: 100%; border-collapse: collapse; font-size: var(--font-size-sm); margin-top: var(--space-4); }
     .contingency-table th, .contingency-table td { padding: var(--space-2) var(--space-3); border-bottom: 1px solid var(--border-color); text-align: left; }
     .contingency-table th { background: var(--color-surface-strong); font-weight: 600; }
+    .contingency-ts-unstable { color: var(--color-error, #dc3545); font-weight: 600; }
+    .contingency-ts-stable   { color: var(--color-success, #198754); }
+    .contingency-ts-na       { color: var(--color-text-muted, #6c757d); }
   </style>
   <script type="module" src="dataStore.mjs" defer></script>
   <script type="module" src="studies/contingency.js" defer></script>
@@ -138,6 +141,7 @@
           <li>A branch loading exceeds the configurable threshold (default 100% of rating)</li>
           <li>The modified network fails to converge (indicates an island or severe overload)</li>
         </ul>
+        <p>When "Check rotor angle stability" is enabled, a classical one-machine infinite-bus (OMIB) swing equation is solved for each generator-connected bus. Pre-fault and post-fault maximum power transfer are estimated from the 30° operating-angle assumption and the post-contingency voltage ratio. If the rotor angle exceeds 180° before re-synchronisation, the contingency is flagged as transient instability.</p>
         <p>Results are stored in the project's Studies object and can be referenced by other tools.</p>
         <p>Prerequisites: Define buses and branches in the <a href="oneline.html">One-Line Diagram</a> editor and run a base-case <a href="loadFlow.html">Load Flow</a> study first.</p>
       </details>
@@ -169,6 +173,27 @@
           </label>
           <span id="overload-hint" class="field-hint">Branch loading percentage above which a violation is flagged (default 100%).</span>
 
+          <fieldset>
+            <legend>Transient Stability (optional)</legend>
+            <label>
+              <input type="checkbox" name="checkTransientStability" value="1">
+              Check rotor angle stability after each contingency
+            </label>
+            <span class="field-hint">Requires generator buses (Pg &gt; 0) in the one-line model.</span>
+
+            <label>
+              Generator Inertia H (MW·s/MVA)
+              <input type="number" name="generatorInertiaH" value="5.0" min="1" max="20" step="0.5" aria-describedby="inertia-hint">
+            </label>
+            <span id="inertia-hint" class="field-hint">Machine inertia constant. Typical: 2–4 s (gas turbine), 4–6 s (steam), 6–10 s (hydro).</span>
+
+            <label>
+              Fault Clearing Time (s)
+              <input type="number" name="faultClearingTime_s" value="0.1" min="0.02" max="1.0" step="0.01" aria-describedby="fct-hint">
+            </label>
+            <span id="fct-hint" class="field-hint">Primary protection clearing time (default 0.1 s = 6-cycle at 60 Hz).</span>
+          </fieldset>
+
           <button type="submit" class="primary-btn">Run N-1 Contingency</button>
         </form>
         <p id="contingency-status" aria-live="polite"></p>
@@ -186,10 +211,11 @@
                 <th scope="col">Converged</th>
                 <th scope="col">Violations</th>
                 <th scope="col">Status</th>
+                <th scope="col">Transient Stability</th>
               </tr>
             </thead>
             <tbody id="contingency-tbody">
-              <tr><td colspan="5">Run the study to see results.</td></tr>
+              <tr><td colspan="6">Run the study to see results.</td></tr>
             </tbody>
           </table>
         </div>

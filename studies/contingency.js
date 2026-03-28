@@ -32,6 +32,9 @@ if (typeof document !== 'undefined') {
       const voltageMin = Number(form.voltageMin?.value) || 0.95;
       const voltageMax = Number(form.voltageMax?.value) || 1.05;
       const overloadPct = Number(form.overloadPct?.value) || 100;
+      const checkTransientStability = !!form.checkTransientStability?.checked;
+      const generatorInertiaH = Number(form.generatorInertiaH?.value) || 5.0;
+      const faultClearingTime_s = Number(form.faultClearingTime_s?.value) || 0.1;
 
       if (statusEl) statusEl.textContent = 'Running…';
       if (summaryEl) summaryEl.textContent = '';
@@ -39,7 +42,15 @@ if (typeof document !== 'undefined') {
 
       let results;
       try {
-        results = runContingencyStudy({ baseMVA, voltageMinPu: voltageMin, voltageMaxPu: voltageMax, overloadThresholdPct: overloadPct });
+        results = runContingencyStudy({
+          baseMVA,
+          voltageMinPu: voltageMin,
+          voltageMaxPu: voltageMax,
+          overloadThresholdPct: overloadPct,
+          checkTransientStability,
+          generatorInertiaH,
+          faultClearingTime_s,
+        });
       } catch (err) {
         if (statusEl) statusEl.textContent = `Error: ${err.message}`;
         return;
@@ -49,10 +60,14 @@ if (typeof document !== 'undefined') {
 
       const { summary, contingencies } = results;
       if (summaryEl) {
+        const tsCount = summary.transientlyUnstable ?? 0;
         summaryEl.innerHTML = `
           <strong>Total branches checked:</strong> ${summary.totalBranches} &nbsp;|&nbsp;
           <strong>Critical contingencies:</strong> ${summary.criticalContingencies} &nbsp;|&nbsp;
-          <strong>Total violations:</strong> ${summary.totalViolations}
+          <strong>Total violations:</strong> ${summary.totalViolations}${
+            checkTransientStability
+              ? ` &nbsp;|&nbsp; <strong${tsCount > 0 ? ' class="contingency-fail"' : ''}>Transient instabilities: ${tsCount}</strong>`
+              : ''}
         `;
       }
 
@@ -60,7 +75,7 @@ if (typeof document !== 'undefined') {
         if (!contingencies || contingencies.length === 0) {
           const tr = document.createElement('tr');
           const td = document.createElement('td');
-          td.colSpan = 5;
+          td.colSpan = 6;
           td.textContent = 'No branches found in the one-line diagram. Add buses and branches in the One-Line editor first.';
           tr.appendChild(td);
           tableBody.appendChild(tr);
@@ -89,11 +104,25 @@ if (typeof document !== 'undefined') {
             tdStatus.textContent = c.critical ? 'Critical' : 'OK';
             tdStatus.className = c.critical ? 'contingency-fail' : 'contingency-ok';
 
+            const tdTs = document.createElement('td');
+            const ts = c.transientStability;
+            if (!ts || !ts.checked) {
+              tdTs.textContent = 'N/A';
+              tdTs.className = 'contingency-ts-na';
+            } else if (ts.stable === false) {
+              tdTs.textContent = `Unstable (δ_max ${ts.deltaMax_deg != null ? ts.deltaMax_deg.toFixed(1) : '?'}°)`;
+              tdTs.className = 'contingency-ts-unstable';
+            } else {
+              tdTs.textContent = `Stable (δ_max ${ts.deltaMax_deg != null ? ts.deltaMax_deg.toFixed(1) : '?'}°)`;
+              tdTs.className = 'contingency-ts-stable';
+            }
+
             tr.appendChild(tdName);
             tr.appendChild(tdType);
             tr.appendChild(tdConverged);
             tr.appendChild(tdViolations);
             tr.appendChild(tdStatus);
+            tr.appendChild(tdTs);
             tableBody.appendChild(tr);
           }
         }
