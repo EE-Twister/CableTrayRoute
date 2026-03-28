@@ -1,3 +1,13 @@
+import { start as startTour, hasDoneTour } from './tour.js';
+
+const OPTIMALROUTE_TOUR_STEPS = [
+  { selector: '#fill-limit',            message: 'Set the maximum fill limit (default 40%). The routing engine will not assign cables to trays that exceed this threshold.' },
+  { selector: '#field-route-penalty',   message: 'The field routing penalty makes routing in open air more expensive than using trays. A value of 3 means 1 ft of field routing costs as much as 3 ft in a tray.' },
+  { selector: '#calculate-route-btn',   message: 'Click to run the 3D Dijkstra algorithm. It finds the shortest path for each cable through your tray network, respecting fill limits and segregation rules.' },
+  { selector: '#progress-container',    message: 'Progress is shown here for large networks. You can pause and resume routing without losing results.' },
+  { selector: '#main-content',          message: 'Results appear in the 3D visualization. Each cable\'s optimal path is highlighted. Click any cable to see its full route details and tray fill contribution.' }
+];
+
 const searchParams = new URLSearchParams(globalThis.location?.search || '');
 const E2E = typeof globalThis.E2E === 'boolean' ? globalThis.E2E : searchParams.has('e2e');
 
@@ -149,6 +159,15 @@ function initializePage() {
     ]);
   }
   autoTriggerRouteIfRequested();
+
+  // --- Tour ---
+  const tourBtn = document.getElementById('tour-btn');
+  if (tourBtn) {
+    tourBtn.addEventListener('click', () => startTour(OPTIMALROUTE_TOUR_STEPS, 'optimalRoute'));
+  }
+  if (!hasDoneTour('optimalRoute')) {
+    startTour(OPTIMALROUTE_TOUR_STEPS, 'optimalRoute');
+  }
 }
 
 if (document.readyState === 'loading') {

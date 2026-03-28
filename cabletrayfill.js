@@ -2,6 +2,15 @@ import { getItem, setItem, removeItem, keys as storeKeys } from './dataStore.mjs
 import { FILTER_ICON_SVG } from './tableUtils.mjs';
 import { showAlertModal, openModal } from './src/components/modal.js';
 import { createFillGauge } from './src/components/fillGauge.js';
+import { start as startTour, hasDoneTour } from './tour.js';
+
+const TRAYFILL_TOUR_STEPS = [
+  { selector: '#trayParameters',       message: 'Select the tray you want to analyze: choose width, depth, and tray type. These parameters are used to calculate the NEC-compliant fill percentage.' },
+  { selector: '#addCableBtn',          message: 'Add cables to this tray. The tool will visualize how they pack into the cross-section.' },
+  { selector: '#fill-gauge-container', message: 'The fill gauge shows the current fill percentage. NEC §392.22(A) limits tray fill to 40% for multi-conductor cables. Yellow = near limit, red = over limit.' },
+  { selector: '#drawBtn',              message: 'Click Draw Tray to render the cross-section visualization with each cable shown to scale.' },
+  { selector: '#exportExcelBtn',       message: 'Export the fill analysis to Excel for design documentation or submittal packages.' }
+];
 
 checkPrereqs([{key:'traySchedule',page:'racewayschedule.html',label:'Raceway Schedule'}]);
 
@@ -1948,5 +1957,14 @@ Wt: ${m.weight.toFixed(2)} lbs/ft
           else showAlertModal('Help', btn.getAttribute('data-help') || '');
         });
       });
+
+      // --- Tour ---
+      const tourBtn = document.getElementById('tour-btn');
+      if (tourBtn) {
+        tourBtn.addEventListener('click', () => startTour(TRAYFILL_TOUR_STEPS, 'trayFill'));
+      }
+      if (!hasDoneTour('trayFill')) {
+        startTour(TRAYFILL_TOUR_STEPS, 'trayFill');
+      }
     });
   

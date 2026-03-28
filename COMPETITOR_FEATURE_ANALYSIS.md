@@ -248,7 +248,7 @@ These gaps describe areas where CableTrayRoute's user experience lags behind com
 |---|---|---|
 | **Guided setup wizards and workflow walkthroughs** | EasyPower (step-by-step setup wizards), Bentley Raceway (workflow guidance panels) | `tour.js` provides only a 3-step interactive tour that targets the one-line diagram editor (palette → canvas → properties). There is no walkthrough for the core cable routing workflow (schedule → tray setup → fill → route), no guided introduction to any electrical study, and no "first-time user" wizard that walks through creating a complete project. New engineers face a steep learning curve with no in-app guidance beyond a help page. |
 
-**Status:** Not addressed. Requires expanding `tour.js` to cover the full 6-step routing workflow and key analysis tools.
+**Status:** ✅ Implemented. `tour.js` refactored into a reusable tour runner: `start(steps, tourKey)` accepts per-page step arrays and records completion in `localStorage` via `hasDoneTour(tourKey)`. Interactive 5-step tours added to all four core workflow pages: `cableschedule.html` (add cable, table, sample data, route-all, export), `racewayschedule.html` (add tray, tray table, add conduit, sample data, Revit export), `cabletrayfill.html` (tray params, add cable, fill gauge, draw, export), and `optimalRoute.html` (fill limit, field penalty, calculate, progress, results). Each page shows a "Take Tour" button and auto-triggers on first visit.
 
 ---
 
@@ -460,7 +460,7 @@ These gaps describe areas where CableTrayRoute's calculation engine uses simplif
 | **Usability: Visual fill gauges / heat-maps** | **No** | — | — | — | — | Yes | — | — | Yes | — |
 | **Usability: Configuration profiles / templates** | **No** | Yes | — | — | — | — | Yes | — | — | — |
 | **Usability: Scenario comparison UI** | **No** | Yes | Yes | — | — | — | — | — | — | — |
-| **Usability: Full workflow onboarding tour** | **No** | Yes | Yes | — | — | Yes | — | — | — | — |
+| **Usability: Full workflow onboarding tour** | **Yes** ✓ | Yes | Yes | — | — | Yes | — | — | — | — |
 | **Usability: Results annotation / approval workflow** | **No** | Yes | — | — | — | Yes | — | — | — | — |
 | **Usability: Workflow progress dashboard** | **No** | — | Yes | — | — | — | Yes | — | — | — |
 | **Usability: Mobile-optimized field access** | **No** | Yes | — | — | — | — | Yes | — | — | — |
@@ -539,7 +539,7 @@ All originally high- and medium-priority feasible items have been implemented:
 5. **Visual fill gauges and violation heat-map** (Gap #15) — Add SVG/CSS progress bars to `cabletrayfill.html` results; color-code violation rows in all analysis result tables.
 6. **Scenario comparison UI** (Gap #17) — Extend `src/scenarios.js` to render a side-by-side comparison table for two selected scenarios.
 7. **Configuration profiles / project templates** (Gap #16) — Add an "Industry Template" selector to the new-project flow with Oil & Gas, Data Center, and Industrial presets.
-8. **Expanded onboarding tour** (Gap #18) — Extend `tour.js` to cover the 6-step cable routing workflow and at least one electrical study.
+8. ~~**Expanded onboarding tour**~~ (Gap #18) → Implemented. `tour.js` refactored; 5-step interactive tours on Cable Schedule, Raceway Schedule, Tray Fill, and Optimal Route pages with auto-trigger on first visit. ✅
 
 **High Priority — Calculation Completeness:**
 
