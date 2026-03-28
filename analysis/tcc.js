@@ -11,6 +11,7 @@ import {
 } from '../dataStore.mjs';
 import { runShortCircuit } from './shortCircuit.mjs';
 import { scaleCurve, checkDuty, sanitizeCurve } from './tccUtils.js';
+import { checkCoordination, greedyCoordinate, generateFaultCurrents } from './tccAutoCoord.mjs';
 import { openModal } from '../src/components/modal.js';
 import conductorProperties from '../conductorPropertiesData.mjs';
 import componentLibrary from '../componentLibrary.json' with { type: 'json' };
@@ -271,6 +272,11 @@ const componentModalBtn = document.getElementById('component-modal-btn');
 const violationDiv = document.getElementById('violation');
 const printPlotBtn = document.getElementById('print-plot-btn');
 const annotationBtn = document.getElementById('add-annotation-btn');
+const autoCoordBtn = document.getElementById('auto-coord-btn');
+const coordPanel = document.getElementById('coordination-panel');
+const coordResultsDiv = document.getElementById('coord-results');
+const coordOrderList = document.getElementById('coord-order-list');
+const coordMarginInput = document.getElementById('coord-margin');
 const viewMenuBtn = document.getElementById('tcc-view-menu-btn');
 const chart = d3.select('#tcc-chart');
 const onelinePreviewSvgEl = document.getElementById('oneline-preview');
@@ -283,6 +289,12 @@ const viewCalloutOffsets = new Map();
 
 let onelinePreviewTransform = null;
 const previewPositionOverrides = new Map();
+
+// Auto-coordination state — populated at the end of each plot() call
+let activePlotted = null;
+let activeCurvesUpdater = null;
+let activeCoordMarkerDrawer = null;
+let coordOrderIds = [];
 
 let updatingActiveComponentFromSelect = false;
 
@@ -3937,6 +3949,9 @@ if (customCurveBtn) {
   });
 }
 plotBtn.addEventListener('click', applyPlotAndPersistence);
+if (autoCoordBtn) {
+  autoCoordBtn.addEventListener('click', autoCoordinate);
+}
 if (printPlotBtn) {
   printPlotBtn.addEventListener('click', handlePrintPlot);
 }
@@ -7372,7 +7387,207 @@ function plot() {
   setPlotAvailability(true);
   renderAnnotations();
 
+  // Expose closures for autoCoordinate() which runs outside plot()
+  activePlotted = plotted;
+  activeCurvesUpdater = updateCurves;
+  activeCoordMarkerDrawer = (coordResults, orderedEntries) => {
+    indicatorLayer.selectAll('.tcc-coord-violation').remove();
+    if (!coordResults) return;
+    coordResults.forEach((r, i) => {
+      if (i === 0 || !r.violations?.length) return;
+      const upEntry = orderedEntries[i];
+      const dnEntry = orderedEntries[i - 1];
+      const upColor = upEntry?.color ?? 'red';
+      const dnColor = dnEntry?.color ?? 'orange';
+      r.violations.forEach(v => {
+        const cx = x(v.current);
+        if (!Number.isFinite(cx)) return;
+        const s = 6;
+        const uy = y(v.upstreamMinTime);
+        if (Number.isFinite(uy)) {
+          indicatorLayer.append('path')
+            .attr('class', 'tcc-coord-violation')
+            .attr('d', `M${cx},${uy - s} L${cx + s},${uy} L${cx},${uy + s} L${cx - s},${uy} Z`)
+            .attr('fill', upColor)
+            .attr('stroke', 'red')
+            .attr('stroke-width', 1.5)
+            .attr('opacity', 0.85);
+        }
+        const dy = y(v.downstreamMaxTime);
+        if (Number.isFinite(dy)) {
+          indicatorLayer.append('path')
+            .attr('class', 'tcc-coord-violation')
+            .attr('d', `M${cx},${dy - s} L${cx + s},${dy} L${cx},${dy + s} L${cx - s},${dy} Z`)
+            .attr('fill', dnColor)
+            .attr('stroke', 'darkorange')
+            .attr('stroke-width', 1.5)
+            .attr('opacity', 0.85);
+        }
+        if (Number.isFinite(uy) && Number.isFinite(dy)) {
+          indicatorLayer.append('line')
+            .attr('class', 'tcc-coord-violation')
+            .attr('x1', cx).attr('x2', cx)
+            .attr('y1', Math.min(uy, dy)).attr('y2', Math.max(uy, dy))
+            .attr('stroke', 'red')
+            .attr('stroke-width', 1)
+            .attr('stroke-dasharray', '3,2')
+            .attr('opacity', 0.7);
+        }
+      });
+    });
+  };
+
+  renderCoordOrderList();
   updateCurves();
+}
+
+function autoCoordinate() {
+  if (!activePlotted || !activePlotted.length) {
+    showCoordResults(null, false, 'Plot devices first before running Auto-Coordinate.');
+    return;
+  }
+
+  const contextId = getActiveComponentId();
+  const faultKA = contextId ? getStudies().shortCircuit?.[contextId]?.threePhaseKA : null;
+  const maxCurveA = activePlotted.reduce((acc, entry) => {
+    const last = entry.scaled?.curve?.[entry.scaled.curve.length - 1]?.current ?? 0;
+    return Math.max(acc, last);
+  }, 0);
+  const maxFaultA = faultKA ? faultKA * 1000 : Math.max(maxCurveA, 10000);
+
+  // Build load→source order from coordOrderIds or reverse of plotted order
+  let orderedEntries;
+  if (coordOrderIds.length >= 2) {
+    orderedEntries = coordOrderIds
+      .map(uid => activePlotted.find(e => e.selection.uid === uid))
+      .filter(Boolean);
+  } else {
+    orderedEntries = [...activePlotted].reverse();
+  }
+
+  // Filter to protective devices only
+  orderedEntries = orderedEntries.filter(e =>
+    PROTECTIVE_TYPES.has(e.selection?.baseDevice?.type)
+  );
+
+  if (orderedEntries.length < 2) {
+    showCoordResults(null, false, 'At least 2 protective devices required for coordination.');
+    return;
+  }
+
+  const deviceEntries = orderedEntries.map(entry => ({
+    id: entry.selection.name || entry.selection.baseDevice?.name || entry.selection.uid,
+    device: entry.selection.baseDevice,
+    overrides: { ...entry.overrides }
+  }));
+
+  const margin = parseFloat(coordMarginInput?.value) || 0.3;
+  const result = greedyCoordinate(deviceEntries, maxFaultA, { margin, sampleCount: 50 });
+
+  // Apply suggested time dials back to each device's mutable overrides
+  result.results.forEach((r, i) => {
+    if (i === 0) return; // downstream reference device is fixed
+    const entry = orderedEntries[i];
+    if (!entry || !r.found) return;
+    entry.overrides = { ...entry.overrides, time: r.timeDial };
+    if (typeof updateDeviceInputs === 'function') updateDeviceInputs(entry);
+  });
+
+  if (activeCurvesUpdater) activeCurvesUpdater();
+  if (activeCoordMarkerDrawer) activeCoordMarkerDrawer(result.results, orderedEntries);
+  showCoordResults(result.results, result.allCoordinated);
+}
+
+function showCoordResults(results, allCoordinated, message) {
+  if (!coordPanel || !coordResultsDiv) return;
+  coordPanel.open = true;
+  coordPanel.classList.remove('hidden');
+
+  if (message || !results) {
+    coordResultsDiv.innerHTML = `<p class="coord-status">${escapeHtml(message || 'No results.')}</p>`;
+    return;
+  }
+
+  const lines = [];
+  if (allCoordinated) {
+    lines.push('<p class="coord-status coord-ok">All adjacent device pairs are coordinated.</p>');
+  } else {
+    lines.push('<p class="coord-status coord-fail">Coordination gaps remain — see details below.</p>');
+  }
+
+  results.forEach((r, i) => {
+    if (i === 0) {
+      lines.push(`<p><strong>${escapeHtml(r.id)}</strong> – reference (load-side, fixed)</p>`);
+      return;
+    }
+    if (r.found) {
+      lines.push(
+        `<p class="coord-ok-item"><strong>${escapeHtml(r.id)}</strong> – time dial set to ${r.timeDial.toFixed(3)}</p>`
+      );
+    } else {
+      lines.push(
+        `<p class="coord-warn"><strong>${escapeHtml(r.id)}</strong> – cannot achieve coordination (${r.violations?.length ?? 0} violations at max dial)</p>`
+      );
+      (r.violations ?? []).slice(0, 3).forEach(v => {
+        if (!Number.isFinite(v.gap)) return;
+        lines.push(
+          `<p class="coord-violation-detail">&nbsp;&nbsp;I=${formatSettingValue(v.current)} A: gap ${v.gap.toFixed(3)} s (need ${(parseFloat(coordMarginInput?.value) || 0.3).toFixed(2)} s)</p>`
+        );
+      });
+    }
+  });
+
+  coordResultsDiv.innerHTML = lines.join('');
+}
+
+function renderCoordOrderList() {
+  if (!coordOrderList) return;
+  const entries = activePlotted ?? [];
+  const protective = entries.filter(e =>
+    PROTECTIVE_TYPES.has(e.selection?.baseDevice?.type)
+  );
+  if (!protective.length) {
+    coordOrderList.innerHTML = '';
+    return;
+  }
+
+  // Merge existing coordOrderIds with newly plotted devices
+  const plotted = new Set(protective.map(e => e.selection.uid));
+  coordOrderIds = coordOrderIds.filter(uid => plotted.has(uid));
+  protective.forEach(e => {
+    if (!coordOrderIds.includes(e.selection.uid)) coordOrderIds.push(e.selection.uid);
+  });
+
+  coordOrderList.innerHTML = '';
+  coordOrderIds.forEach((uid, index) => {
+    const entry = protective.find(e => e.selection.uid === uid);
+    if (!entry) return;
+    const name = entry.selection.name || entry.selection.baseDevice?.name || uid;
+    const item = document.createElement('div');
+    item.className = 'coord-order-item';
+    item.dataset.uid = uid;
+    item.draggable = true;
+    item.innerHTML =
+      `<span class="coord-order-badge" style="background:${escapeHtml(entry.color)};color:#fff">${index + 1}</span> ` +
+      escapeHtml(name);
+    item.addEventListener('dragstart', ev => { ev.dataTransfer.setData('uid', uid); });
+    item.addEventListener('dragover', ev => ev.preventDefault());
+    item.addEventListener('drop', ev => {
+      const fromUid = ev.dataTransfer.getData('uid');
+      if (fromUid === uid) return;
+      const fromIdx = coordOrderIds.indexOf(fromUid);
+      const toIdx = coordOrderIds.indexOf(uid);
+      if (fromIdx === -1 || toIdx === -1) return;
+      coordOrderIds.splice(fromIdx, 1);
+      coordOrderIds.splice(toIdx, 0, fromUid);
+      renderCoordOrderList();
+    });
+    coordOrderList.appendChild(item);
+  });
+  const hint = document.createElement('p');
+  hint.className = 'coord-order-hint';
+  hint.textContent = 'Drag to reorder: top = load side, bottom = source side.';
+  coordOrderList.appendChild(hint);
 }
 
 function wrapPreviewLabel(text) {
