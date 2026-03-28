@@ -1,0 +1,197 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <meta name="description" content="Ordered-length cable procurement schedule. Groups cables by specification and assigns to standard reel lengths to minimise offcut waste." />
+  <title>Procurement Schedule — CableTrayRoute</title>
+  <link rel="icon" href="icons/favicon.svg" type="image/svg+xml">
+  <link rel="apple-touch-icon" href="icons/favicon.svg">
+  <meta property="og:type" content="website">
+  <meta property="og:title" content="Procurement Schedule — CableTrayRoute">
+  <meta property="og:description" content="Generate an ordered-length cable procurement schedule with reel assignments and waste analysis.">
+  <meta property="og:image" content="https://cabletrayroute.com/icons/og-preview.png">
+  <meta property="og:site_name" content="CableTrayRoute">
+  <meta property="og:url" content="procurementschedule.html">
+  <link rel="canonical" href="procurementschedule.html">
+  <link rel="dns-prefetch" href="https://fonts.gstatic.com">
+  <meta name="color-scheme" content="light dark">
+  <link rel="stylesheet" href="style.css" />
+  <script type="module" src="dirtyTracker.js"></script>
+  <script type="module" src="dist/procurementschedule.js" defer></script>
+</head>
+<body class="procurementschedule-page" data-report-title="Procurement Schedule">
+  <a href="#main-content" class="skip-link">Skip to main content</a>
+  <nav class="top-nav">
+    <button id="nav-toggle" class="nav-toggle" aria-label="Toggle navigation" aria-controls="nav-links" aria-expanded="false" title="Toggle navigation">
+      <img src="icons/toolbar/grid.svg" alt="" aria-hidden="true" class="control-icon" loading="lazy" decoding="async">
+    </button>
+    <div id="nav-links" class="nav-links">
+      <a href="index.html">Home</a>
+      <a href="equipmentlist.html">Equipment List</a>
+      <a href="cableschedule.html">Cable Schedule</a>
+      <a href="racewayschedule.html">Raceway Schedule</a>
+      <a href="optimalRoute.html">Optimal Route</a>
+      <a href="pullcards.html">Pull Cards</a>
+      <a href="procurementschedule.html" class="active" aria-current="page">Procurement Schedule</a>
+      <a href="oneline.html">One-Line</a>
+    </div>
+    <button id="settings-btn" class="settings-btn" aria-label="Settings" aria-expanded="false" title="Settings">⚙</button>
+  </nav>
+
+  <div id="settings-menu" class="settings-menu">
+    <label for="theme-select">Theme
+      <select id="theme-select">
+        <option value="system">System</option>
+        <option value="light">Light</option>
+        <option value="dark">Dark</option>
+        <option value="high-contrast">High Contrast</option>
+      </select>
+    </label>
+    <label><input type="checkbox" id="compact-toggle" aria-label="Enable compact table mode"> Compact Mode</label>
+    <label for="unit-select">Units
+      <select id="unit-select">
+        <option value="imperial">Imperial</option>
+        <option value="metric">Metric</option>
+      </select>
+    </label>
+    <button id="help-btn" class="btn" aria-expanded="false" title="Show help">Site Help</button>
+    <button id="new-project-btn">New Project</button>
+    <button id="save-project-btn">Save Project</button>
+    <button id="load-project-btn">Load Project</button>
+    <button id="export-project-btn">Export Project</button>
+    <button id="import-project-btn">Import Project</button>
+    <input type="file" id="import-project-input" accept=".ctr.json" class="hidden" title="Select project file">
+  </div>
+
+  <div class="container">
+    <main id="main-content" class="main-content">
+      <nav aria-label="Breadcrumb">
+        <ol class="breadcrumb-trail">
+          <li><a href="index.html">Home</a></li>
+          <li>Workflow</li>
+          <li aria-current="page">Procurement Schedule</li>
+        </ol>
+      </nav>
+
+      <header class="page-header">
+        <h1>Ordered-Length Cable Procurement Schedule</h1>
+      </header>
+
+      <details class="method-panel">
+        <summary>Method &amp; Assumptions</summary>
+        <p>Cables are grouped by conductor specification (type + size + material).
+        A <strong>field-trim tolerance</strong> (default 3%) is added to each cable's
+        routed length per IEEE 1185 §6.4 to account for connector strain relief and
+        termination offcuts.</p>
+        <p>The required cut lengths are assigned to standard reel sizes using a
+        <strong>greedy first-fit-decreasing</strong> bin-packing algorithm. Cuts are
+        placed on the first reel with sufficient remaining capacity; a new reel is
+        opened only when no existing reel can accommodate the cut. A 5% residual
+        threshold prevents reels from being used when only a tiny sliver remains.</p>
+        <p>References: IEEE Std 1185 §6.4, ICEA S-93-639, NEC Article 310.</p>
+        <p>See also:
+          <a href="pullcards.html">Pull Cards</a>,
+          <a href="spoolsheets.html">Spool Sheets</a>,
+          <a href="optimalRoute.html">Optimal Route</a>.
+        </p>
+      </details>
+
+      <!-- Parameters -->
+      <fieldset>
+        <legend><strong>Procurement Parameters</strong></legend>
+        <div class="field-row">
+          <label for="tolerancePct">Field Trim Tolerance (%)</label>
+          <input type="number" id="tolerancePct" min="0" max="25" step="0.5" value="3"
+                 aria-describedby="tolerancePctHint">
+          <p id="tolerancePctHint" class="field-hint">
+            Added to each cable's routed length. Default 3% per IEEE 1185 §6.4.
+          </p>
+        </div>
+        <fieldset>
+          <legend>Standard Reel Sizes</legend>
+          <div id="reelSizeGroup" class="option-row" role="group" aria-label="Standard reel sizes">
+            <!-- Populated by procurementschedule.js from STANDARD_REEL_SIZES -->
+          </div>
+        </fieldset>
+      </fieldset>
+
+      <!-- Action buttons -->
+      <div class="btn-row">
+        <button type="button" id="generateBtn">Generate Procurement Schedule</button>
+        <button type="button" id="exportCsvBtn" disabled>Export CSV</button>
+      </div>
+
+      <!-- No data message -->
+      <p id="noDataMsg" class="field-hint" hidden>
+        No routing results found in the current session. Please run cable routing on
+        the <a href="optimalRoute.html">Optimal Route</a> page first, then return here
+        to generate the procurement schedule.
+      </p>
+
+      <!-- Summary -->
+      <section id="summarySection" hidden aria-label="Procurement summary">
+        <h2>Summary</h2>
+        <table id="summaryTable" class="result-table" aria-label="Procurement summary">
+          <tbody></tbody>
+        </table>
+      </section>
+
+      <!-- Line items -->
+      <section id="lineItemsSection" hidden aria-label="Procurement line items">
+        <h2>Line Items</h2>
+        <p class="field-hint">One row per cable specification. Expand the Cuts column
+        to see individual cable assignments.</p>
+        <table id="lineItemsTable" class="result-table" aria-label="Cable procurement line items">
+          <caption class="visually-hidden">Cable procurement line items by specification</caption>
+          <thead>
+            <tr>
+              <th scope="col">Spec</th>
+              <th scope="col">Type</th>
+              <th scope="col">Size</th>
+              <th scope="col">Conductors</th>
+              <th scope="col">Cut Count</th>
+              <th scope="col">Total Req. (ft)</th>
+              <th scope="col">Reel Size</th>
+              <th scope="col"># Reels</th>
+              <th scope="col">Total Ordered (ft)</th>
+              <th scope="col">Waste (ft)</th>
+              <th scope="col">Waste (%)</th>
+              <th scope="col">Cuts</th>
+            </tr>
+          </thead>
+          <tbody></tbody>
+        </table>
+      </section>
+
+      <nav class="step-nav" aria-label="Workflow navigation">
+        <a href="pullcards.html" class="step-nav-prev">&#8592; Pull Cards</a>
+        <a href="costestimate.html" class="step-nav-next">Cost Estimate &#8594;</a>
+      </nav>
+    </main>
+  </div>
+
+  <div id="help-modal" class="modal" aria-hidden="true" role="dialog" aria-modal="true"
+       aria-labelledby="help-title">
+    <div class="modal-content">
+      <button id="close-help-btn" class="close-btn" aria-label="Close Help">&times;</button>
+      <h2 id="help-title">Procurement Schedule Help</h2>
+      <p>This tool generates an <strong>ordered-length cable procurement schedule</strong>
+      from your routing results.</p>
+      <p><strong>How it works:</strong> Cables are grouped by conductor specification
+      (type + size + material). A configurable field-trim tolerance is applied to each
+      cable's routed length. The resulting cut lengths are bin-packed into standard
+      reel sizes to minimise waste.</p>
+      <p><strong>Line items:</strong> Each row represents one cable specification.
+      Click <em>Show</em> in the Cuts column to see the individual cable-level
+      assignments with pull references.</p>
+      <p><strong>Export:</strong> Use <em>Export CSV</em> to download the schedule for
+      use in purchasing systems or spreadsheets.</p>
+      <p><strong>Prerequisites:</strong> Route results must be present in the current
+      session. Run the <a href="optimalRoute.html">Optimal Route</a> tool first.</p>
+    </div>
+  </div>
+
+  <script type="module" src="dist/projectManager.js"></script>
+</body>
+</html>
