@@ -139,6 +139,14 @@
     </div>
   </fieldset>
 
+  <!-- COMPARTMENT CONFIGURATION -->
+  <fieldset id="compartmentConfig">
+    <legend><strong>Compartment Configuration</strong> <button class="helpBtn" data-help="Define up to 5 tray compartments (e.g. divided by separator strips). Each compartment has its own width, depth, and NEC fill limit. Assign cables to compartments using the Compartment column in the cable table." data-doc="docs/tutorial.html#trayfill">?</button></legend>
+    <div id="compartmentRows"></div>
+    <button id="addCompartmentBtn" type="button">+ Add Compartment</button>
+    <p id="compartmentWidthWarning" class="warning" hidden></p>
+  </fieldset>
+
   <!-- PROFILE CONTROLS -->
   <div id="profileControls">
     <h2>Profile Management <button class="helpBtn" data-help="Profiles are saved locally to your browser." data-doc="docs/tutorial.html#trayfill">?</button></h2>
@@ -169,7 +177,7 @@
           <th scope="col">Operating Voltage (V) <button class="helpBtn" data-help="Actual working voltage on the cable." data-doc="docs/tutorial.html#trayfill">?</button></th>
           <th scope="col">OD (in) <span class="required">*</span> <button class="helpBtn" data-help="Outer diameter of the cable in inches." data-doc="docs/tutorial.html#trayfill">?</button></th>
           <th scope="col">Weight (lbs/ft) <span class="required">*</span> <button class="helpBtn" data-help="Cable weight per foot." data-doc="docs/tutorial.html#trayfill">?</button></th>
-          <th scope="col">Cable Zone <button class="helpBtn" data-help="Numeric zone for organizing cables. If Stackable and Non-Stackable Cables are placed in the same zone then a divider will automatically be added." data-doc="docs/tutorial.html#trayfill">?</button></th>
+          <th scope="col">Compartment <button class="helpBtn" data-help="Compartment number (1–5). Cables with the same compartment number are packed together in that physical compartment. A divider is automatically shown between stackable and non-stackable cables within a compartment." data-doc="docs/tutorial.html#trayfill">?</button></th>
           <th scope="col">Circuit Group <button class="helpBtn" data-help="Numeric group for bundling single conductor cables in groups of 3 or 4 conductors." data-doc="docs/tutorial.html#trayfill">?</button></th>
           <th scope="col">Duplicate</th>
           <th scope="col">Remove</th>
