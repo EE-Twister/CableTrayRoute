@@ -191,3 +191,97 @@ describe('runContingency — summary counts', () => {
     assert.strictEqual(summary.totalViolations, expectedTotal);
   });
 });
+
+// ---------------------------------------------------------------------------
+describe('runContingency — transient stability coupling', () => {
+  it('transientStability field present on every contingency entry', () => {
+    const { contingencies } = runContingency(twobusBranchModel());
+    assert.ok(contingencies.length > 0, 'expected at least one contingency');
+    assert.ok('transientStability' in contingencies[0], 'missing transientStability field');
+  });
+
+  it('transientStability.checked is false by default (opt-in)', () => {
+    const { contingencies } = runContingency(twobusBranchModel());
+    assert.strictEqual(contingencies[0].transientStability.checked, false);
+  });
+
+  it('summary.transientlyUnstable exists and is 0 when check disabled', () => {
+    const { summary } = runContingency(twobusBranchModel());
+    assert.ok('transientlyUnstable' in summary, 'missing transientlyUnstable in summary');
+    assert.strictEqual(summary.transientlyUnstable, 0);
+  });
+
+  it('summary.transientlyUnstable exists on empty model', () => {
+    const { summary } = runContingency({ buses: [], branches: [] });
+    assert.ok('transientlyUnstable' in summary);
+    assert.strictEqual(summary.transientlyUnstable, 0);
+  });
+
+  it('with checkTransientStability:true and no generator buses, checked remains false', () => {
+    // twobusBranchModel has no Pg on buses — no generators found
+    const { contingencies } = runContingency(twobusBranchModel(), { checkTransientStability: true });
+    assert.strictEqual(contingencies[0].transientStability.checked, false);
+  });
+
+  it('with checkTransientStability:true and a generator bus, checked is true', () => {
+    const model = {
+      buses: [
+        { id: 'G1', label: 'Gen Bus', Vm: 1.02, Va: 0, Pg: 50, connections: [] },
+        { id: 'B2', label: 'Load Bus', Vm: 1.0,  Va: 0, connections: [] },
+      ],
+      branches: [{ id: 'L1', name: 'Line 1', type: 'line' }],
+    };
+    const { contingencies } = runContingency(model, {
+      checkTransientStability: true,
+      generatorInertiaH: 5.0,
+      baseMVA: 100,
+    });
+    assert.strictEqual(contingencies[0].transientStability.checked, true);
+  });
+
+  it('transientStability result has stable and deltaMax_deg fields when checked', () => {
+    const model = {
+      buses: [
+        { id: 'G1', label: 'Gen Bus', Vm: 1.0, Va: 0, Pg: 50, connections: [] },
+        { id: 'B2', label: 'Load Bus', Vm: 1.0, Va: 0, connections: [] },
+      ],
+      branches: [{ id: 'L1', name: 'Line 1', type: 'line' }],
+    };
+    const { contingencies } = runContingency(model, { checkTransientStability: true });
+    const ts = contingencies[0].transientStability;
+    assert.ok('stable' in ts, 'missing stable field');
+    assert.ok('deltaMax_deg' in ts, 'missing deltaMax_deg field');
+    assert.ok('cct_s' in ts, 'missing cct_s field');
+  });
+
+  it('stable is boolean when checked', () => {
+    const model = {
+      buses: [
+        { id: 'G1', label: 'Gen Bus', Vm: 1.0, Va: 0, Pg: 30, connections: [] },
+        { id: 'B2', label: 'Load Bus', Vm: 1.0, Va: 0, connections: [] },
+      ],
+      branches: [{ id: 'L1', name: 'Line 1', type: 'line' }],
+    };
+    const { contingencies } = runContingency(model, { checkTransientStability: true });
+    const ts = contingencies[0].transientStability;
+    assert.strictEqual(typeof ts.stable, 'boolean');
+  });
+
+  it('transientlyUnstable increments when generator is unstable', () => {
+    // Use a very long clearing time to force instability
+    const model = {
+      buses: [
+        { id: 'G1', label: 'Gen Bus', Vm: 1.0, Va: 0, Pg: 90, connections: [] },
+        { id: 'B2', label: 'Load Bus', Vm: 1.0, Va: 0, connections: [] },
+      ],
+      branches: [{ id: 'L1', name: 'Line 1', type: 'line' }],
+    };
+    const { contingencies, summary } = runContingency(model, {
+      checkTransientStability: true,
+      faultClearingTime_s: 0.9,  // very slow clearing — likely unstable
+      generatorInertiaH: 2.0,
+    });
+    const ts = contingencies[0].transientStability;
+    assert.strictEqual(summary.transientlyUnstable, ts.stable === false ? 1 : 0);
+  });
+});
