@@ -400,9 +400,25 @@ export function runDRC(input, options = {}) {
     ...checkUnroutedCables(cables, trayMap, routedCableNames),
   ];
 
-  const errors   = findings.filter(f => f.severity === DRC_SEVERITY.ERROR).length;
-  const warnings = findings.filter(f => f.severity === DRC_SEVERITY.WARNING).length;
-  const info     = findings.filter(f => f.severity === DRC_SEVERITY.INFO).length;
+  // Mark each finding with its unique accept-risk key and any matching acceptance.
+  const acceptedList = Array.isArray(options.acceptedFindings) ? options.acceptedFindings : [];
+  for (const f of findings) {
+    f.acceptedKey = `${f.ruleId}:${f.location}`;
+    const acceptance = acceptedList.find(a => a.key === f.acceptedKey);
+    if (acceptance) {
+      f.isAccepted     = true;
+      f.acceptanceNote = acceptance.note;
+      f.acceptedBy     = acceptance.reviewedBy ?? '';
+      f.acceptedAt     = acceptance.acceptedAt ?? '';
+    } else {
+      f.isAccepted = false;
+    }
+  }
+
+  const accepted = findings.filter(f => f.isAccepted).length;
+  const errors   = findings.filter(f => f.severity === DRC_SEVERITY.ERROR   && !f.isAccepted).length;
+  const warnings = findings.filter(f => f.severity === DRC_SEVERITY.WARNING && !f.isAccepted).length;
+  const info     = findings.filter(f => f.severity === DRC_SEVERITY.INFO    && !f.isAccepted).length;
 
   return {
     findings,
@@ -410,6 +426,7 @@ export function runDRC(input, options = {}) {
       errors,
       warnings,
       info,
+      accepted,
       total: findings.length,
       passed: errors === 0,
     },
@@ -423,19 +440,24 @@ export function runDRC(input, options = {}) {
  */
 export function formatDrcReport(result) {
   const { findings, summary } = result;
+  const accepted = summary.accepted ?? 0;
   const lines = [
     '=== Design Rule Check Report ===',
     `Status: ${summary.passed ? 'PASSED' : 'FAILED'}`,
-    `Errors: ${summary.errors}  Warnings: ${summary.warnings}  Info: ${summary.info}`,
+    `Errors: ${summary.errors}  Warnings: ${summary.warnings}  Info: ${summary.info}` +
+      (accepted > 0 ? `  Accepted Risk: ${accepted}` : ''),
     '',
   ];
 
-  if (findings.length === 0) {
+  const activeFindings  = findings.filter(f => !f.isAccepted);
+  const acceptedFindings = findings.filter(f => f.isAccepted);
+
+  if (activeFindings.length === 0 && acceptedFindings.length === 0) {
     lines.push('No findings. All checks passed.');
     return lines.join('\n');
   }
 
-  for (const f of findings) {
+  for (const f of activeFindings) {
     const prefix = f.severity === 'error' ? '[ERROR]' : f.severity === 'warning' ? '[WARN] ' : '[INFO] ';
     lines.push(`${prefix} ${f.ruleId}  ${f.location}`);
     lines.push(`        ${f.message}`);
@@ -443,6 +465,20 @@ export function formatDrcReport(result) {
     if (f.reference)    lines.push(`        Ref: ${f.reference}`);
     if (f.remediation)  lines.push(`        HOW TO FIX: ${f.remediation}`);
     lines.push('');
+  }
+
+  if (acceptedFindings.length > 0) {
+    lines.push('--- Accepted Risk Findings ---');
+    lines.push('');
+    for (const f of acceptedFindings) {
+      lines.push(`[ACCEPTED RISK] ${f.ruleId}  ${f.location}`);
+      lines.push(`        ${f.message}`);
+      if (f.reference)     lines.push(`        Ref: ${f.reference}`);
+      lines.push(`        ACCEPTANCE NOTE: ${f.acceptanceNote}`);
+      if (f.acceptedBy)    lines.push(`        Reviewed by: ${f.acceptedBy}`);
+      if (f.acceptedAt)    lines.push(`        Accepted at: ${f.acceptedAt}`);
+      lines.push('');
+    }
   }
 
   return lines.join('\n');
