@@ -91,7 +91,8 @@ const EXTRA_KEYS = {
   collapsedGroups: 'collapsedGroups',
   cableSchedulePreset: 'cableSchedulePreset',
   cableTemplates: 'cableTemplates',
-  equipmentFilterPresets: 'equipmentFilterPresets'
+  equipmentFilterPresets: 'equipmentFilterPresets',
+  drcAcceptedFindings: 'drcAcceptedFindings',
 };
 
 export const STORAGE_KEYS = { ...KEYS, ...EXTRA_KEYS };
@@ -207,6 +208,14 @@ export const setCableTemplates = templates => write(EXTRA_KEYS.cableTemplates, t
 
 export const getEquipmentFilterPresets = () => read(EXTRA_KEYS.equipmentFilterPresets, []);
 export const setEquipmentFilterPresets = presets => write(EXTRA_KEYS.equipmentFilterPresets, presets);
+
+/**
+ * DRC accepted findings — engineer "Accept Risk" annotations persisted per scenario.
+ * Each entry: { key, ruleId, location, note, reviewedBy?, acceptedAt }
+ * @returns {object[]}
+ */
+export const getDrcAcceptedFindings = () => read(EXTRA_KEYS.drcAcceptedFindings, []);
+export const setDrcAcceptedFindings = list => write(EXTRA_KEYS.drcAcceptedFindings, list);
 
 
 /**

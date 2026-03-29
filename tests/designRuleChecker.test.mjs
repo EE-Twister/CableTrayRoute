@@ -384,3 +384,52 @@ describe('Remediation guidance', () => {
       'DRC-05 finding should have non-empty remediation');
   });
 });
+
+// ---------------------------------------------------------------------------
+// runDRC — accepted findings
+// ---------------------------------------------------------------------------
+describe('runDRC — accepted findings', () => {
+  it('marks a finding as accepted when its key matches acceptedFindings option', () => {
+    // 12" × 4" = 48 in²; 20 in² → 41.7 % → triggers DRC-01 ERROR
+    const trays = [makeTray('T1', 20, 12, 4)];
+    const result = runDRC({ trays, cables: [], trayCableMap: {} }, {
+      acceptedFindings: [{ key: 'DRC-01:T1', ruleId: 'DRC-01', location: 'T1', note: 'Approved per EE-001' }],
+    });
+    const finding = result.findings.find(f => f.ruleId === 'DRC-01' && f.location === 'T1');
+    assert.ok(finding, 'DRC-01 finding should exist');
+    assert.strictEqual(finding.isAccepted, true);
+    assert.strictEqual(finding.acceptanceNote, 'Approved per EE-001');
+  });
+
+  it('summary.passed is true when all errors are accepted', () => {
+    const trays = [makeTray('T1', 20, 12, 4)];
+    const result = runDRC({ trays, cables: [], trayCableMap: {} }, {
+      acceptedFindings: [{ key: 'DRC-01:T1', ruleId: 'DRC-01', location: 'T1', note: 'OK' }],
+    });
+    assert.strictEqual(result.summary.errors, 0);
+    assert.strictEqual(result.summary.accepted, 1);
+    assert.strictEqual(result.summary.passed, true);
+  });
+
+  it('summary.accepted counts only accepted findings, unaccepted errors remain', () => {
+    const trays = [
+      makeTray('T1', 20, 12, 4), // overfill → DRC-01 ERROR
+      makeTray('T2', 20, 12, 4), // overfill → DRC-01 ERROR
+    ];
+    const result = runDRC({ trays, cables: [], trayCableMap: {} }, {
+      acceptedFindings: [{ key: 'DRC-01:T1', ruleId: 'DRC-01', location: 'T1', note: 'OK' }],
+    });
+    assert.strictEqual(result.summary.accepted, 1);
+    assert.strictEqual(result.summary.errors, 1);   // T2 still an error
+    assert.strictEqual(result.summary.passed, false);
+  });
+
+  it('non-matching key does not mark finding as accepted', () => {
+    const trays = [makeTray('T1', 20, 12, 4)];
+    const result = runDRC({ trays, cables: [], trayCableMap: {} }, {
+      acceptedFindings: [{ key: 'DRC-01:T9', ruleId: 'DRC-01', location: 'T9', note: 'Wrong tray' }],
+    });
+    const finding = result.findings.find(f => f.ruleId === 'DRC-01');
+    assert.strictEqual(finding.isAccepted, false);
+  });
+});

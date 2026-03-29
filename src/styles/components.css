@@ -908,6 +908,55 @@
 
 .drc-no-findings { color: var(--color-text-muted, #64748b); font-style: italic; }
 
+/* ── DRC Accept-Risk workflow (Gap #19) ──────────────────────────────────── */
+.drc-finding--accepted { border-left: 4px solid #b45309; }
+
+.badge-accepted { background: #b45309; color: #fff; }
+
+.drc-accepted-block {
+  margin-top: 0.5rem;
+  padding: 0.4rem 0.6rem;
+  border-left: 3px solid #b45309;
+  background: #fffbeb;
+}
+
+.drc-acceptance-note { font-style: italic; margin: 0.15rem 0; font-size: 0.88rem; }
+.drc-accepted-by { font-size: 0.82rem; color: var(--color-text-muted, #64748b); margin: 0.1rem 0; }
+
+.drc-accept-modal-msg {
+  font-size: 0.88rem;
+  color: var(--color-text-muted, #64748b);
+  margin: 0.25rem 0 0;
+  font-style: italic;
+}
+
+.drc-accept-btn {
+  font-size: 0.8rem;
+  padding: 0.2rem 0.6rem;
+  background: transparent;
+  border: 1px solid var(--color-text-muted, #94a3b8);
+  border-radius: 4px;
+  cursor: pointer;
+  margin-top: 0.4rem;
+}
+.drc-accept-btn:hover { border-color: #b45309; color: #b45309; }
+
+.drc-revoke-btn {
+  font-size: 0.8rem;
+  padding: 0.2rem 0.6rem;
+  background: transparent;
+  border: 1px solid #b45309;
+  color: #b45309;
+  border-radius: 4px;
+  cursor: pointer;
+  margin-top: 0.25rem;
+}
+.drc-revoke-btn:hover { background: #b45309; color: #fff; }
+
+body.dark-mode .drc-finding--accepted { background: var(--card-bg, #1e293b); }
+body.dark-mode .drc-accepted-block { background: #1c1007; }
+body.dark-mode .drc-accepted-by { color: #94a3b8; }
+
 body.dark-mode .drc-finding { background: var(--card-bg, #1e293b); }
 body.dark-mode .drc-remediation { background: #172554; color: #bfdbfe; }
 body.dark-mode .drc-remediation strong { color: #93c5fd; }
