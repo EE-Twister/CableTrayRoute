@@ -29,25 +29,17 @@
 </head>
   <body class="cabletrayfill-page" data-report-title="Cable Tray Fill">
     <a href="#main-content" class="skip-link">Skip to main content</a>
-    <nav class="top-nav">
+    <nav class="top-nav" aria-label="Primary">
       <button id="nav-toggle" class="nav-toggle" aria-label="Toggle navigation" aria-controls="nav-links" aria-expanded="false" title="Toggle navigation">
       <img src="icons/toolbar/grid.svg" alt="" aria-hidden="true" class="control-icon" loading="lazy" decoding="async">
     </button>
-    <div id="nav-links" class="nav-links">
-      <a href="index.html">Home</a>
-      <a href="equipmentlist.html">Equipment List</a>
-      <a href="loadlist.html">Load List</a>
-      <a href="cableschedule.html">Cable Schedule</a>
-      <a href="panelschedule.html">Panel Schedule</a>
-      <a href="racewayschedule.html">Raceway Schedule</a>
-      <a href="ductbankroute.html">Ductbank</a>
-      <a href="cabletrayfill.html" class="active" aria-current="page">Tray Fill</a>
-      <a href="conduitfill.html">Conduit Fill</a>
-      <a href="optimalRoute.html">Optimal Route</a>
-      <a href="oneline.html">One-Line</a>
+    <div id="nav-links" class="nav-links" role="list">
+      <!-- Populated dynamically by navigation.js -->
     </div>
 
-<button id="settings-btn" class="settings-btn" aria-label="Settings" aria-expanded="false" title="Settings">⚙</button>
+<button id="settings-btn" class="settings-btn" aria-label="Settings" aria-expanded="false" title="Settings">
+      <img src="icons/toolbar/validate.svg" alt="" aria-hidden="true" class="control-icon" loading="lazy" decoding="async">
+    </button>
     </nav>
     <div id="settings-menu" class="settings-menu">
       <label for="theme-select">Theme
@@ -75,12 +67,6 @@
     </div>
     <div class="container">
       <main id="main-content" class="main-content">
-  <nav aria-label="Breadcrumb">
-    <ol class="breadcrumb-trail">
-      <li><a href="index.html">Home</a></li>
-      <li aria-current="page">Tray Fill</li>
-    </ol>
-  </nav>
 
         <header class="page-header">
           <h1>Cable Tray Packing</h1>
