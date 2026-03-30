@@ -3191,8 +3191,8 @@ async function addCheckpoint() {
     createdAt: Date.now()
   };
   checkpoints.push(checkpoint);
-  recordHistoryEvent('checkpoint', `Checkpoint “${name}” created`, { checkpointId: checkpoint.id });
-  showToast(`Checkpoint “${name}” saved`);
+  recordHistoryEvent('checkpoint', `Checkpoint "${name}" created`, { checkpointId: checkpoint.id });
+  showToast(`Checkpoint "${name}" saved`);
 }
 
 async function jumpToCheckpoint(checkpointId) {
@@ -3200,7 +3200,7 @@ async function jumpToCheckpoint(checkpointId) {
   if (!checkpoint) return;
   const confirmed = await openModal({
     title: 'Restore checkpoint',
-    description: `Restore to “${checkpoint.name}”? Unsaved edits after this point will be discarded.`,
+    description: `Restore to "${checkpoint.name}"? Unsaved edits after this point will be discarded.`,
     primaryText: 'Restore',
     secondaryText: 'Cancel'
   });
@@ -3218,7 +3218,7 @@ async function jumpToCheckpoint(checkpointId) {
   selectedConnection = null;
   render();
   save();
-  recordHistoryEvent('restore', `Restored checkpoint “${checkpoint.name}”`, { checkpointId: checkpoint.id });
+  recordHistoryEvent('restore', `Restored checkpoint "${checkpoint.name}"`, { checkpointId: checkpoint.id });
 }
 
 function bindHistorySidebarControls() {

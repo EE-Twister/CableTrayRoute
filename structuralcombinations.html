@@ -1,0 +1,405 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <meta name="description" content="ASCE 7-22 combined seismic and wind load combinations for cable tray supports. Evaluate LRFD and ASD demand against support capacity per ASCE 7-22 §2.3 and §2.4." />
+  <title>Structural Load Combinations — CableTrayRoute</title>
+  <link rel="icon" href="icons/favicon.svg" type="image/svg+xml">
+  <link rel="apple-touch-icon" href="icons/favicon.svg">
+  <!-- Open Graph / Social sharing -->
+  <meta property="og:type" content="website">
+  <meta property="og:title" content="Structural Load Combinations — CableTrayRoute">
+  <meta property="og:description" content="Combine seismic and wind loads per ASCE 7-22 §2.3 for cable tray support design.">
+  <meta property="og:image" content="https://cabletrayroute.com/icons/og-preview.png">
+  <meta property="og:site_name" content="CableTrayRoute">
+  <meta property="og:url" content="structuralcombinations.html">
+  <!-- Canonical URL -->
+  <link rel="canonical" href="structuralcombinations.html">
+  <link rel="dns-prefetch" href="https://fonts.gstatic.com">
+  <meta name="color-scheme" content="light dark">
+  <link rel="stylesheet" href="style.css" />
+  <script type="module" src="dirtyTracker.js"></script>
+  <script type="module" src="dist/structuralcombinations.js" defer></script>
+</head>
+<body class="structuralcombinations-page" data-report-title="Structural Load Combinations">
+  <a href="#main-content" class="skip-link">Skip to main content</a>
+  <nav class="top-nav" aria-label="Primary">
+    <button id="nav-toggle" class="nav-toggle" aria-label="Toggle navigation" aria-controls="nav-links" aria-expanded="false" title="Toggle navigation">
+      <img src="icons/toolbar/grid.svg" alt="" aria-hidden="true" class="control-icon" loading="lazy" decoding="async">
+    </button>
+    <div id="nav-links" class="nav-links" role="list">
+      <!-- Populated dynamically by navigation.js -->
+    </div>
+    <button id="settings-btn" class="settings-btn" aria-label="Settings" aria-expanded="false" title="Settings">
+      <img src="icons/toolbar/validate.svg" alt="" aria-hidden="true" class="control-icon" loading="lazy" decoding="async">
+    </button>
+  </nav>
+
+  <div id="settings-menu" class="settings-menu">
+    <label for="theme-select">Theme
+      <select id="theme-select">
+        <option value="system">System</option>
+        <option value="light">Light</option>
+        <option value="dark">Dark</option>
+        <option value="high-contrast">High Contrast</option>
+      </select>
+    </label>
+    <label><input type="checkbox" id="compact-toggle" aria-label="Enable compact table mode"> Compact Mode</label>
+    <label for="unit-select">Units
+      <select id="unit-select">
+        <option value="imperial">Imperial</option>
+        <option value="metric">Metric</option>
+      </select>
+    </label>
+    <button id="help-btn" class="btn" aria-expanded="false" title="Show help">
+      <img src="icons/toolbar/validate.svg" alt="" aria-hidden="true" class="control-icon" loading="lazy" decoding="async">
+      <span>Site Help</span>
+    </button>
+    <button id="new-project-btn" title="Start a new project">
+      <img src="icons/toolbar/copy.svg" alt="" aria-hidden="true" class="control-icon" loading="lazy" decoding="async">
+      <span>New Project</span>
+    </button>
+    <button id="save-project-btn" title="Save current project">
+      <img src="icons/toolbar/export.svg" alt="" aria-hidden="true" class="control-icon" loading="lazy" decoding="async">
+      <span>Save Project</span>
+    </button>
+    <button id="load-project-btn" title="Load an existing project">
+      <img src="icons/toolbar/import.svg" alt="" aria-hidden="true" class="control-icon" loading="lazy" decoding="async">
+      <span>Load Project</span>
+    </button>
+    <button id="export-project-btn" title="Export project data">
+      <img src="icons/toolbar/export.svg" alt="" aria-hidden="true" class="control-icon" loading="lazy" decoding="async">
+      <span>Export Project</span>
+    </button>
+    <button id="import-project-btn" title="Import project data">
+      <img src="icons/toolbar/import.svg" alt="" aria-hidden="true" class="control-icon" loading="lazy" decoding="async">
+      <span>Import Project</span>
+    </button>
+    <input type="file" id="import-project-input" accept=".ctr.json" class="hidden" title="Select project file">
+  </div>
+
+  <div class="container">
+    <main id="main-content" class="main-content">
+      <nav aria-label="Breadcrumb">
+        <ol class="breadcrumb-trail">
+          <li><a href="index.html">Home</a></li>
+          <li>Workflow</li>
+          <li aria-current="page">Structural Load Combinations</li>
+        </ol>
+      </nav>
+
+      <header class="page-header">
+        <h1>Structural Load Combinations (ASCE 7-22 §2.3 / §2.4)</h1>
+      </header>
+
+      <details class="method-panel">
+        <summary>Method &amp; Assumptions</summary>
+        <p>This tool combines seismic and wind load effects per <strong>ASCE 7-22</strong>
+        to determine the governing structural demand on cable tray supports.
+        It wraps the individual
+        <a href="seismicBracing.html">Seismic Bracing</a> and
+        <a href="windload.html">Wind Load</a> calculators.</p>
+
+        <p><strong>Dead load D</strong> = tray self-weight + cable load (lbs/ft)</p>
+        <p><strong>Wind lateral W</strong> per ASCE 7-22 Chapter 27/30 using velocity
+        pressure q<sub>z</sub> = 0.00256 × K<sub>z</sub> × K<sub>zt</sub> × K<sub>e</sub> × V²
+        and force coefficient C<sub>f</sub> (1.3 empty / 1.6 partial / 2.0 full).</p>
+        <p><strong>Seismic lateral E<sub>h</sub></strong> per ASCE 7-22 §13.3.1:
+        F<sub>p</sub> = (0.4·a<sub>p</sub>·S<sub>DS</sub>·W<sub>p</sub>) / (R<sub>p</sub>/I<sub>p</sub>)
+        × (1 + 2z/h).</p>
+        <p><strong>Vertical seismic effect E<sub>v</sub></strong> per ASCE 7-22 §12.4.2.2:
+        E<sub>v</sub> = 0.2·S<sub>DS</sub>·D.</p>
+
+        <p><strong>LRFD combinations</strong> per §2.3.1 (gravity) and §2.3.6 (seismic):</p>
+        <ul>
+          <li>LC-1: 1.4D</li>
+          <li>LC-2: 1.2D (L = 0 for fixed cable tray)</li>
+          <li>LC-3: 1.2D + 1.0W</li>
+          <li>LC-4: 0.9D + 1.0W (uplift check)</li>
+          <li>LC-5: (1.2 + 0.2·S<sub>DS</sub>)D + 1.0E<sub>h</sub></li>
+          <li>LC-6: (0.9 − 0.2·S<sub>DS</sub>)D + 1.0E<sub>h</sub> (uplift check)</li>
+        </ul>
+        <p><strong>ASD combinations</strong> per §2.4.1 (gravity) and §2.4.5 (seismic).</p>
+        <p>Citations: ASCE 7-22 §2.3, §2.4, §12.4.2, §13.3.1, §13.5.6; NEMA VE 2.</p>
+        <p>See also:
+          <a href="seismicBracing.html">Seismic Bracing Calculator</a>,
+          <a href="windload.html">Wind Load Calculator</a>,
+          <a href="supportspan.html">Support Span Calculator</a>.
+        </p>
+      </details>
+
+      <!-- ---- Design method ---- -->
+      <fieldset>
+        <legend><strong>Design Method</strong></legend>
+        <div class="field-row">
+          <label class="radio-label">
+            <input type="radio" name="design-method" id="method-lrfd" value="LRFD" checked>
+            LRFD (Strength Design) — ASCE 7-22 §2.3
+          </label>
+          <label class="radio-label">
+            <input type="radio" name="design-method" id="method-asd" value="ASD">
+            ASD (Allowable Stress Design) — ASCE 7-22 §2.4
+          </label>
+        </div>
+      </fieldset>
+
+      <!-- ---- Dead Load ---- -->
+      <fieldset>
+        <legend><strong>Dead Load</strong></legend>
+
+        <div class="field-row">
+          <label for="tray-weight">
+            Tray self-weight (lbs/ft)
+          </label>
+          <input type="number" id="tray-weight" min="0" step="0.1" value="2.0"
+                 aria-describedby="trayWeightHint" aria-required="true">
+          <p id="trayWeightHint" class="field-hint">
+            Tray structural weight per linear foot. Refer to manufacturer data
+            (typically 1–5 lbs/ft depending on width and material).
+          </p>
+        </div>
+
+        <div class="field-row">
+          <label for="cable-weight">
+            Cable load (lbs/ft)
+          </label>
+          <input type="number" id="cable-weight" min="0" step="0.1" value="12.0"
+                 aria-describedby="cableWeightHint" aria-required="true">
+          <p id="cableWeightHint" class="field-hint">
+            Total cable weight per linear foot of tray. Use the
+            <a href="supportspan.html">Support Span Calculator</a> to derive
+            this value from your cable schedule.
+          </p>
+        </div>
+      </fieldset>
+
+      <!-- ---- Wind Parameters ---- -->
+      <fieldset>
+        <legend><strong>Wind Parameters (ASCE 7-22 Chapter 27/30)</strong></legend>
+
+        <div class="field-row">
+          <label for="wind-speed">
+            Basic wind speed V (mph)
+            <button class="helpBtn" data-doc="docs/standards.html#wind-load"
+                    aria-label="Help — basic wind speed">?</button>
+          </label>
+          <input type="number" id="wind-speed" min="0" max="250" step="1"
+                 value="115" aria-describedby="windSpeedHint" aria-required="true">
+          <p id="windSpeedHint" class="field-hint">
+            ASCE 7-22 Figure 26.5-1 3-second gust speed for Risk Category II.
+            Typical range: 90–200 mph.
+          </p>
+        </div>
+
+        <div class="field-row">
+          <label for="wind-exposure">Exposure category</label>
+          <select id="wind-exposure" aria-required="true">
+            <option value="B">B — Urban/suburban, wooded terrain</option>
+            <option value="C" selected>C — Open terrain with scattered obstructions</option>
+            <option value="D">D — Open water, flat coastal areas</option>
+          </select>
+        </div>
+
+        <div class="field-row">
+          <label for="wind-kzt">
+            Topographic factor K<sub>zt</sub>
+          </label>
+          <input type="number" id="wind-kzt" min="1.0" max="3.0" step="0.01"
+                 value="1.00" aria-describedby="kztHint">
+          <p id="kztHint" class="field-hint">
+            Per ASCE 7-22 §26.8. Use 1.0 for flat terrain; &gt;1.0 for
+            hilltops and escarpments.
+          </p>
+        </div>
+
+        <div class="field-row">
+          <label for="fill-level">Tray fill level (affects C<sub>f</sub>)</label>
+          <select id="fill-level">
+            <option value="empty">Empty — C<sub>f</sub> = 1.3</option>
+            <option value="partial" selected>Partial — C<sub>f</sub> = 1.6</option>
+            <option value="full">Full — C<sub>f</sub> = 2.0</option>
+          </select>
+        </div>
+      </fieldset>
+
+      <!-- ---- Seismic Parameters ---- -->
+      <fieldset>
+        <legend><strong>Seismic Parameters (ASCE 7-22 §13.3.1)</strong></legend>
+
+        <div class="field-row">
+          <label for="sds">
+            S<sub>DS</sub> — Design spectral acceleration, short period (g)
+            <button class="helpBtn" data-doc="docs/standards.html#seismic-parameters"
+                    aria-label="Help — SDS parameter">?</button>
+          </label>
+          <input type="number" id="sds" min="0" max="4" step="0.001"
+                 value="0.500" aria-describedby="sdsHint" aria-required="true">
+          <p id="sdsHint" class="field-hint">
+            From ASCE 7-22 ground motion maps or USGS Seismic Design Maps
+            (S<sub>S</sub> × F<sub>a</sub>). Typical range: 0.1–2.5 g.
+          </p>
+        </div>
+
+        <div class="field-row">
+          <label for="sd1">
+            S<sub>D1</sub> — Design spectral acceleration, 1-second period (g)
+          </label>
+          <input type="number" id="sd1" min="0" max="4" step="0.001"
+                 value="0.200" aria-describedby="sd1Hint" aria-required="true">
+          <p id="sd1Hint" class="field-hint">
+            From ASCE 7-22 ground motion maps (S<sub>1</sub> × F<sub>v</sub>).
+            Used to determine Seismic Design Category.
+          </p>
+        </div>
+
+        <div class="field-row">
+          <label for="risk-category">Risk Category (Occupancy Category)</label>
+          <select id="risk-category" aria-required="true">
+            <option value="I">I — Low hazard (storage, minor facilities)</option>
+            <option value="II" selected>II — Normal hazard (typical industrial)</option>
+            <option value="III">III — Substantial hazard (large assembly, utilities)</option>
+            <option value="IV">IV — Essential facilities (hospitals, emergency)</option>
+          </select>
+        </div>
+
+        <div class="field-row">
+          <label for="ip">
+            I<sub>p</sub> — Component importance factor
+          </label>
+          <select id="ip">
+            <option value="1.0" selected>1.0 — Standard (Risk Cat I, II, III)</option>
+            <option value="1.5">1.5 — Essential/hazardous (Risk Cat IV, or seismic life-safety)</option>
+          </select>
+        </div>
+      </fieldset>
+
+      <!-- ---- Geometry ---- -->
+      <fieldset>
+        <legend><strong>Installation Geometry</strong></legend>
+
+        <div class="field-row">
+          <label for="height">
+            Tray height above grade z (ft)
+          </label>
+          <input type="number" id="height" min="0.1" step="0.5"
+                 value="20" aria-describedby="heightHint" aria-required="true">
+          <p id="heightHint" class="field-hint">
+            Height of the cable tray attachment point above the base of the
+            structure. Used for both wind velocity pressure and seismic height factor.
+          </p>
+        </div>
+
+        <div class="field-row">
+          <label for="building-height">
+            Average roof height h (ft)
+          </label>
+          <input type="number" id="building-height" min="0.1" step="1"
+                 value="30" aria-describedby="buildingHtHint" aria-required="true">
+          <p id="buildingHtHint" class="field-hint">
+            Average height of the roof above the base of the structure.
+            Used in ASCE 7-22 §13.3.1 height factor (1 + 2z/h).
+          </p>
+        </div>
+
+        <div class="field-row">
+          <label for="tray-width">
+            Tray inside width (in)
+          </label>
+          <input type="number" id="tray-width" min="1" max="48" step="1"
+                 value="12" aria-required="true">
+        </div>
+
+        <div class="field-row">
+          <label for="span-length">
+            Support span length (ft)
+          </label>
+          <input type="number" id="span-length" min="0.5" max="30" step="0.5"
+                 value="12" aria-describedby="spanHint" aria-required="true">
+          <p id="spanHint" class="field-hint">
+            Distance between support points. Wind force per foot is
+            calculated as total wind force per span divided by span length.
+            See <a href="supportspan.html">Support Span Calculator</a>.
+          </p>
+        </div>
+      </fieldset>
+
+      <!-- ---- Support Capacity (optional) ---- -->
+      <fieldset>
+        <legend><strong>Support Capacity (optional)</strong></legend>
+        <p class="field-hint">
+          Enter the allowable support capacity to calculate utilization ratios.
+          Leave blank to skip the capacity check.
+          Use <strong>LRFD factored</strong> capacity for LRFD method;
+          <strong>allowable</strong> capacity for ASD.
+        </p>
+
+        <div class="field-row">
+          <label for="vert-capacity">
+            Vertical capacity (lbs/ft)
+          </label>
+          <input type="number" id="vert-capacity" min="0" step="1"
+                 placeholder="Optional" aria-describedby="vertCapHint">
+          <p id="vertCapHint" class="field-hint">
+            Tray + support vertical load rating per linear foot (from
+            NEMA VE 1 load class or manufacturer tables).
+          </p>
+        </div>
+
+        <div class="field-row">
+          <label for="lat-capacity">
+            Lateral capacity (lbs/ft)
+          </label>
+          <input type="number" id="lat-capacity" min="0" step="1"
+                 placeholder="Optional">
+        </div>
+      </fieldset>
+
+      <div class="action-row">
+        <button id="calc-btn" class="btn btn-primary" type="button">
+          Calculate Combined Loads
+        </button>
+      </div>
+
+      <!-- Results -->
+      <div id="results" role="region" aria-live="polite" aria-label="Load combination results"></div>
+
+    </main>
+  </div>
+
+  <!-- Help modal -->
+  <div id="help-modal" class="modal" role="dialog" aria-modal="true" aria-labelledby="help-modal-title" hidden>
+    <div class="modal-content">
+      <div class="modal-header">
+        <h2 id="help-modal-title">Help — Structural Load Combinations</h2>
+        <button id="close-help-btn" class="modal-close" aria-label="Close help">×</button>
+      </div>
+      <div class="modal-body">
+        <p>This tool evaluates ASCE 7-22 load combinations for cable tray support
+        design, combining dead load (D), wind lateral force (W), and seismic forces
+        (E<sub>h</sub>, E<sub>v</sub>).</p>
+        <h3>Required inputs</h3>
+        <ul>
+          <li><strong>Dead load</strong>: tray self-weight + cable load (lbs/ft)</li>
+          <li><strong>Wind</strong>: wind speed (mph), exposure category, tray fill level</li>
+          <li><strong>Seismic</strong>: S<sub>DS</sub>, S<sub>D1</sub>, risk category</li>
+          <li><strong>Geometry</strong>: height above grade, building height, tray width, span</li>
+        </ul>
+        <h3>Result interpretation</h3>
+        <p>The <strong>governing combination</strong> produces the highest demand in
+        each direction. Compare against your support capacity (NEMA VE 1 class or
+        manufacturer load tables) to verify adequacy.</p>
+        <p>For supports subject to both significant wind and seismic loading, the
+        governing combination may differ by direction — a support could be
+        controlled by wind laterally but by gravity (LC-1) vertically.</p>
+        <p>See also:
+          <a href="seismicBracing.html">Seismic Bracing</a>,
+          <a href="windload.html">Wind Load</a>,
+          <a href="supportspan.html">Support Span</a>.
+        </p>
+      </div>
+    </div>
+  </div>
+
+</body>
+</html>

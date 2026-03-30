@@ -41,15 +41,15 @@ checkPrereqs([{key:'traySchedule',page:'racewayschedule.html',label:'Raceway Sch
         typeDatalist.appendChild(option);
       });
 
-      // We’ll store last‐drawn data here (for “Expand Image”)
+      // We'll store last‐drawn data here (for "Expand Image")
       let lastPlaced = null;   // array of { x, y, r, OD, tag, cableType, count, size, weight }
       let lastBarriers = [];   // x positions of separation barriers
       let lastTrayW   = 0;     // in inches
       let lastTrayD   = 0;     // in inches
-      let lastType    = “”;    // “ladder” or “solid”
+      let lastType    = "";    // "ladder" or "solid"
       let lastScale   = 20;    // px/in for small view
       let lastZones   = [];    // array of zone labels in order
-      let lastColor   = ‘#66ccff’; // default cable color
+      let lastColor   = '#66ccff'; // default cable color
       // Multi-compartment layout data for Expand Image
       let lastCompartmentLayouts = null; // array of per-compartment layout objects
 
@@ -506,7 +506,7 @@ checkPrereqs([{key:'traySchedule',page:'racewayschedule.html',label:'Raceway Sch
         updateTotals();
       }
 
-      // “Add Cable” button → append a blank row
+      // "Add Cable" button → append a blank row
       document.getElementById("addCableBtn").addEventListener("click", () => {
         cables.push({ tag:"", cableType:"", count:"", size:"", rating:"", voltage:"", od:"", weight:"", zone:1, circuitGroup:"" });
         renderCableRows();
@@ -531,7 +531,7 @@ checkPrereqs([{key:'traySchedule',page:'racewayschedule.html',label:'Raceway Sch
       };
       const standardWidths = [6, 9, 12, 18, 24, 30, 36];
 
-      // NFPA 70 Table 392.22(A) “Column 2a” for Ladder (in²)
+      // NFPA 70 Table 392.22(A) "Column 2a" for Ladder (in²)
       const nfpaLadder = {
         6:  7.0,
         9: 10.5,
@@ -541,7 +541,7 @@ checkPrereqs([{key:'traySchedule',page:'racewayschedule.html',label:'Raceway Sch
         30:32.5,
         36:39.0
       };
-      // NFPA 70 Table 392.22(A) “Column 4a” for Solid Bottom (in²)
+      // NFPA 70 Table 392.22(A) "Column 4a" for Solid Bottom (in²)
       const nfpaSolid = {
         6:  5.5,
         9:  8.0,
@@ -617,11 +617,11 @@ checkPrereqs([{key:'traySchedule',page:'racewayschedule.html',label:'Raceway Sch
       // ─────────────────────────────────────────────────────────────
       // (D) Placement Helpers
       //   (1) placeLargeIgnoreBounds – bottom row for large (with optional spacing by larger OD)
-      //   (2) placeSmallByPacking – true “tangent‐circle” packing
+      //   (2) placeSmallByPacking – true "tangent‐circle" packing
       // ─────────────────────────────────────────────────────────────
 
       // (1) Bottom‐row placement for large cables (y = r), ignoring tray width,
-      //     but if spacingEnabled, add a gap based on each item’s spacingGap property.
+      //     but if spacingEnabled, add a gap based on each item's spacingGap property.
       function placeLargeIgnoreBounds(largeCables, spacingEnabled) {
         // --- SORT largeCables BY DESCENDING OD (largest → smallest) ---
         const sortedLarge = largeCables.slice().sort((a, b) => b.OD - a.OD);
@@ -655,7 +655,7 @@ checkPrereqs([{key:'traySchedule',page:'racewayschedule.html',label:'Raceway Sch
         return placed;
       }
 
-      // (2) True “tangent‐circle” packing for small cables
+      // (2) True "tangent‐circle" packing for small cables
       function placeSmallByPacking(smallCables, trayW, barrierX, basePlaced) {
         // Copy basePlaced into new array
         const placed = basePlaced.map(p => ({
@@ -835,7 +835,7 @@ checkPrereqs([{key:'traySchedule',page:'racewayschedule.html',label:'Raceway Sch
 
 
       // ─────────────────────────────────────────────────────────────
-      // (E) “Draw Tray” button: gather inputs → metrics → placement → draw SVG → show warnings
+      // (E) "Draw Tray" button: gather inputs → metrics → placement → draw SVG → show warnings
       // ─────────────────────────────────────────────────────────────
       document.getElementById("drawBtn").addEventListener("click", () => {
         // 1) Tray parameters
@@ -1152,7 +1152,7 @@ checkPrereqs([{key:'traySchedule',page:'racewayschedule.html',label:'Raceway Sch
 
         let resultsHTML = `${worstHTML}
           <p>
-            <strong>Tray Type:</strong> ${trayType === “ladder” ? “Ladder (50 % fill)” : “Solid Bottom (40 % fill)”}<br>
+            <strong>Tray Type:</strong> ${trayType === "ladder" ? "Ladder (50 % fill)" : "Solid Bottom (40 % fill)"}<br>
             <strong>Compartments:</strong> ${compartments.length}
           </p>
           <p>
@@ -1168,7 +1168,7 @@ checkPrereqs([{key:'traySchedule',page:'racewayschedule.html',label:'Raceway Sch
           ${voltageWarning}
         `;
 
-        // Store for “Expand Image”
+        // Store for "Expand Image"
         lastPlaced           = placedAll;
         lastTrayW            = trayW;
         lastTrayD            = trayD;
@@ -1187,22 +1187,22 @@ checkPrereqs([{key:'traySchedule',page:'racewayschedule.html',label:'Raceway Sch
         });
 
         // 15) Draw the SVG — one rect per compartment, stacked vertically
-        document.getElementById(“svgContainer”).innerHTML = buildCompartmentSvg(compLayouts, trayName, cableColor, 20);
+        document.getElementById("svgContainer").innerHTML = buildCompartmentSvg(compLayouts, trayName, cableColor, 20);
 
         // 16) Show overflow warnings
         if (overflowHoriz) {
           if (recommendedWidth && recommendedWidth > trayW) {
-            resultsHTML += `<p class=”warning”>WARNING: Some cables extend beyond their compartment width.</p>
-              <p class=”recommend”>Recommend larger standard width: ${recommendedWidth}”</p>`;
+            resultsHTML += `<p class="warning">WARNING: Some cables extend beyond their compartment width.</p>
+              <p class="recommend">Recommend larger standard width: ${recommendedWidth}"</p>`;
           } else {
-            resultsHTML += `<p class=”warning”>WARNING: Some cables extend beyond their compartment width.</p>`;
+            resultsHTML += `<p class="warning">WARNING: Some cables extend beyond their compartment width.</p>`;
           }
         }
         if (overflowVert) {
-          resultsHTML += `<p class=”warning”>WARNING: Some cables extend above their compartment depth.</p>
-            <p class=”recommend”>Recommend increasing the affected compartment's depth.</p>`;
+          resultsHTML += `<p class="warning">WARNING: Some cables extend above their compartment depth.</p>
+            <p class="recommend">Recommend increasing the affected compartment's depth.</p>`;
         }
-        document.getElementById(“results”).innerHTML = resultsHTML;
+        document.getElementById("results").innerHTML = resultsHTML;
 
         // Initialize per-compartment fill gauges (DOM nodes must exist first)
         for (const zd of allZoneData) {
@@ -1228,11 +1228,11 @@ checkPrereqs([{key:'traySchedule',page:'racewayschedule.html',label:'Raceway Sch
         svgH = Math.max(svgH - compGapPx, nameRowPx + 10); // trim last gap
         const svgW = Math.max(...compLayouts.map(cl => cl.compWidth)) * scale;
 
-        let svg = `<svg xmlns=”http://www.w3.org/2000/svg” width=”${svgW.toFixed(0)}” height=”${svgH.toFixed(0)}” style=”background:#f9f9f9;border:1px solid #999;”>`;
+        let svg = `<svg xmlns="http://www.w3.org/2000/svg" width="${svgW.toFixed(0)}" height="${svgH.toFixed(0)}" style="background:#f9f9f9;border:1px solid #999;">`;
 
         // Tray name
         if (trayName) {
-          svg += `<text x=”${(svgW/2).toFixed(2)}” y=”${(nameRowPx*0.7).toFixed(2)}” font-size=”14px” text-anchor=”middle” fill=”#000” font-family=”Arial,sans-serif”>${trayName}</text>`;
+          svg += `<text x="${(svgW/2).toFixed(2)}" y="${(nameRowPx*0.7).toFixed(2)}" font-size="14px" text-anchor="middle" fill="#000" font-family="Arial,sans-serif">${trayName}</text>`;
         }
 
         // Per-compartment elements
@@ -1244,19 +1244,19 @@ checkPrereqs([{key:'traySchedule',page:'racewayschedule.html',label:'Raceway Sch
           const dimLineY = headerY + 12;
 
           // Dimension line + label
-          svg += `<line x1=”0” y1=”${dimLineY}” x2=”${compW.toFixed(2)}” y2=”${dimLineY}” stroke=”#000” stroke-width=”1”/>`;
-          svg += `<line x1=”0” y1=”${dimLineY-4}” x2=”0” y2=”${dimLineY+4}” stroke=”#000” stroke-width=”1”/>`;
-          svg += `<line x1=”${compW.toFixed(2)}” y1=”${dimLineY-4}” x2=”${compW.toFixed(2)}” y2=”${dimLineY+4}” stroke=”#000” stroke-width=”1”/>`;
-          svg += `<text x=”${(compW/2).toFixed(2)}” y=”${dimLineY-4}” font-size=”9px” text-anchor=”middle” font-family=”Arial,sans-serif”>${label}</text>`;
-          svg += `<text x=”${(compW/2).toFixed(2)}” y=”${dimLineY+9}” font-size=”9px” text-anchor=”middle” font-family=”Arial,sans-serif”>${cl.compWidth.toFixed(1)}” × ${cl.compDepth.toFixed(1)}”</text>`;
+          svg += `<line x1="0" y1="${dimLineY}" x2="${compW.toFixed(2)}" y2="${dimLineY}" stroke="#000" stroke-width="1"/>`;
+          svg += `<line x1="0" y1="${dimLineY-4}" x2="0" y2="${dimLineY+4}" stroke="#000" stroke-width="1"/>`;
+          svg += `<line x1="${compW.toFixed(2)}" y1="${dimLineY-4}" x2="${compW.toFixed(2)}" y2="${dimLineY+4}" stroke="#000" stroke-width="1"/>`;
+          svg += `<text x="${(compW/2).toFixed(2)}" y="${dimLineY-4}" font-size="9px" text-anchor="middle" font-family="Arial,sans-serif">${label}</text>`;
+          svg += `<text x="${(compW/2).toFixed(2)}" y="${dimLineY+9}" font-size="9px" text-anchor="middle" font-family="Arial,sans-serif">${cl.compWidth.toFixed(1)}" × ${cl.compDepth.toFixed(1)}"</text>`;
 
           // Compartment rectangle
-          svg += `<rect x=”0” y=”${rectY}” width=”${compW.toFixed(2)}” height=”${compH.toFixed(2)}” fill=”none” stroke=”#333” stroke-width=”2”/>`;
+          svg += `<rect x="0" y="${rectY}" width="${compW.toFixed(2)}" height="${compH.toFixed(2)}" fill="none" stroke="#333" stroke-width="2"/>`;
 
           // Inner barrier (stackable vs non-stackable divider)
           if (cl.largeCount > 0 && cl.smallCount > 0) {
             const bxp = (cl.barrierX * scale).toFixed(2);
-            svg += `<line x1=”${bxp}” y1=”${rectY}” x2=”${bxp}” y2=”${(rectY + compH).toFixed(2)}” stroke=”#aa3300” stroke-width=”2” stroke-dasharray=”4 2”/>`;
+            svg += `<line x1="${bxp}" y1="${rectY}" x2="${bxp}" y2="${(rectY + compH).toFixed(2)}" stroke="#aa3300" stroke-width="2" stroke-dasharray="4 2"/>`;
           }
 
           // Cables in this compartment
@@ -1265,18 +1265,18 @@ checkPrereqs([{key:'traySchedule',page:'racewayschedule.html',label:'Raceway Sch
               const gcx = (p.x * scale).toFixed(2);
               const gcy = (rectY + (cl.compDepth - p.y) * scale).toFixed(2);
               const gr  = (p.r * scale).toFixed(2);
-              svg += `<circle cx=”${gcx}” cy=”${gcy}” r=”${gr}” fill=”none” stroke=”#0066aa” stroke-width=”1” stroke-dasharray=”4 2”/>`;
+              svg += `<circle cx="${gcx}" cy="${gcy}" r="${gr}" fill="none" stroke="#0066aa" stroke-width="1" stroke-dasharray="4 2"/>`;
               p.members.forEach((m, mi) => {
                 const mx = ((p.x + p.offsets[mi].x) * scale).toFixed(2);
                 const my = (rectY + (cl.compDepth - (p.y + p.offsets[mi].y)) * scale).toFixed(2);
                 const mr = ((m.OD / 2) * scale).toFixed(2);
-                svg += `<circle cx=”${mx}” cy=”${my}” r=”${mr}” fill=”${cableColor}” stroke=”#0066aa” stroke-width=”1”><title>Cable Tag: ${m.tag}\nCable Type: ${m.cableType}\nConductors: ${m.count}\nSize: ${m.size}\nOD: ${m.OD.toFixed(2)}″\nWt: ${m.weight.toFixed(2)} lbs/ft</title></circle>`;
+                svg += `<circle cx="${mx}" cy="${my}" r="${mr}" fill="${cableColor}" stroke="#0066aa" stroke-width="1"><title>Cable Tag: ${m.tag}\nCable Type: ${m.cableType}\nConductors: ${m.count}\nSize: ${m.size}\nOD: ${m.OD.toFixed(2)}″\nWt: ${m.weight.toFixed(2)} lbs/ft</title></circle>`;
               });
             } else {
               const cx = (p.x * scale).toFixed(2);
               const cy = (rectY + (cl.compDepth - p.y) * scale).toFixed(2);
               const r  = (p.r * scale).toFixed(2);
-              svg += `<circle cx=”${cx}” cy=”${cy}” r=”${r}” fill=”${cableColor}” stroke=”#0066aa” stroke-width=”1”><title>Cable Tag: ${p.tag}\nCable Type: ${p.cableType}\nConductors: ${p.count}\nSize: ${p.size}\nOD: ${p.OD.toFixed(2)}″\nWt: ${p.weight.toFixed(2)} lbs/ft</title></circle>`;
+              svg += `<circle cx="${cx}" cy="${cy}" r="${r}" fill="${cableColor}" stroke="#0066aa" stroke-width="1"><title>Cable Tag: ${p.tag}\nCable Type: ${p.cableType}\nConductors: ${p.count}\nSize: ${p.size}\nOD: ${p.OD.toFixed(2)}″\nWt: ${p.weight.toFixed(2)} lbs/ft</title></circle>`;
             }
           });
         });
@@ -1286,15 +1286,15 @@ checkPrereqs([{key:'traySchedule',page:'racewayschedule.html',label:'Raceway Sch
       }
 
       // ─────────────────────────────────────────────────────────────
-      // (F) “Expand Image” button: popup at 160 px/in with text labels
+      // (F) "Expand Image" button: popup at 160 px/in with text labels
       // ─────────────────────────────────────────────────────────────
-      document.getElementById(“expandBtn”).addEventListener(“click”, () => {
+      document.getElementById("expandBtn").addEventListener("click", () => {
         if (!lastCompartmentLayouts) {
-          showAlertModal('Action Required', 'Please click “Draw Tray” first, then Expand.');
+          showAlertModal('Action Required', 'Please click "Draw Tray" first, then Expand.');
           return;
         }
         const bigScale = 160;
-        const trayName = document.getElementById(“trayName”).value.trim();
+        const trayName = document.getElementById("trayName").value.trim();
 
         // Build base SVG using shared helper at bigScale
         let svg = buildCompartmentSvg(lastCompartmentLayouts, trayName, lastColor, bigScale);
@@ -1314,9 +1314,9 @@ checkPrereqs([{key:'traySchedule',page:'racewayschedule.html',label:'Raceway Sch
         svgH = Math.max(svgH - compGapPx, nameRowPx + 10);
         const svgW = Math.max(...lastCompartmentLayouts.map(cl => cl.compWidth)) * bigScale;
 
-        let bigSvg = `<svg xmlns=”http://www.w3.org/2000/svg” width=”${svgW.toFixed(0)}” height=”${svgH.toFixed(0)}” style=”background:#f9f9f9;border:1px solid #333;”>`;
+        let bigSvg = `<svg xmlns="http://www.w3.org/2000/svg" width="${svgW.toFixed(0)}" height="${svgH.toFixed(0)}" style="background:#f9f9f9;border:1px solid #333;">`;
         if (trayName) {
-          bigSvg += `<text x=”${(svgW/2).toFixed(2)}” y=”${(nameRowPx*0.7).toFixed(2)}” font-size=”20px” text-anchor=”middle” fill=”#000” font-family=”Arial,sans-serif”>${trayName}</text>`;
+          bigSvg += `<text x="${(svgW/2).toFixed(2)}" y="${(nameRowPx*0.7).toFixed(2)}" font-size="20px" text-anchor="middle" fill="#000" font-family="Arial,sans-serif">${trayName}</text>`;
         }
 
         lastCompartmentLayouts.forEach((cl, ci) => {
@@ -1326,16 +1326,16 @@ checkPrereqs([{key:'traySchedule',page:'racewayschedule.html',label:'Raceway Sch
           const label = cl.comp.label || `Compartment ${cl.comp.id}`;
           const dimLineY = headerY + 14;
 
-          bigSvg += `<line x1=”0” y1=”${dimLineY}” x2=”${compW.toFixed(2)}” y2=”${dimLineY}” stroke=”#000” stroke-width=”2”/>`;
-          bigSvg += `<line x1=”0” y1=”${dimLineY-6}” x2=”0” y2=”${dimLineY+6}” stroke=”#000” stroke-width=”2”/>`;
-          bigSvg += `<line x1=”${compW.toFixed(2)}” y1=”${dimLineY-6}” x2=”${compW.toFixed(2)}” y2=”${dimLineY+6}” stroke=”#000” stroke-width=”2”/>`;
-          bigSvg += `<text x=”${(compW/2).toFixed(2)}” y=”${dimLineY-5}” font-size=”14px” text-anchor=”middle” font-family=”Arial,sans-serif”>${label}</text>`;
-          bigSvg += `<text x=”${(compW/2).toFixed(2)}” y=”${dimLineY+11}” font-size=”14px” text-anchor=”middle” font-family=”Arial,sans-serif”>${cl.compWidth.toFixed(1)}” × ${cl.compDepth.toFixed(1)}”</text>`;
-          bigSvg += `<rect x=”0” y=”${rectY}” width=”${compW.toFixed(2)}” height=”${compH.toFixed(2)}” fill=”none” stroke=”#333” stroke-width=”4”/>`;
+          bigSvg += `<line x1="0" y1="${dimLineY}" x2="${compW.toFixed(2)}" y2="${dimLineY}" stroke="#000" stroke-width="2"/>`;
+          bigSvg += `<line x1="0" y1="${dimLineY-6}" x2="0" y2="${dimLineY+6}" stroke="#000" stroke-width="2"/>`;
+          bigSvg += `<line x1="${compW.toFixed(2)}" y1="${dimLineY-6}" x2="${compW.toFixed(2)}" y2="${dimLineY+6}" stroke="#000" stroke-width="2"/>`;
+          bigSvg += `<text x="${(compW/2).toFixed(2)}" y="${dimLineY-5}" font-size="14px" text-anchor="middle" font-family="Arial,sans-serif">${label}</text>`;
+          bigSvg += `<text x="${(compW/2).toFixed(2)}" y="${dimLineY+11}" font-size="14px" text-anchor="middle" font-family="Arial,sans-serif">${cl.compWidth.toFixed(1)}" × ${cl.compDepth.toFixed(1)}"</text>`;
+          bigSvg += `<rect x="0" y="${rectY}" width="${compW.toFixed(2)}" height="${compH.toFixed(2)}" fill="none" stroke="#333" stroke-width="4"/>`;
 
           if (cl.largeCount > 0 && cl.smallCount > 0) {
             const bxp = (cl.barrierX * bigScale).toFixed(2);
-            bigSvg += `<line x1=”${bxp}” y1=”${rectY}” x2=”${bxp}” y2=”${(rectY+compH).toFixed(2)}” stroke=”#aa3300” stroke-width=”4” stroke-dasharray=”12 6”/>`;
+            bigSvg += `<line x1="${bxp}" y1="${rectY}" x2="${bxp}" y2="${(rectY+compH).toFixed(2)}" stroke="#aa3300" stroke-width="4" stroke-dasharray="12 6"/>`;
           }
 
           cl.placed.forEach(p => {
@@ -1343,28 +1343,28 @@ checkPrereqs([{key:'traySchedule',page:'racewayschedule.html',label:'Raceway Sch
               const gcx = (p.x * bigScale).toFixed(2);
               const gcy = (rectY + (cl.compDepth - p.y) * bigScale).toFixed(2);
               const gr  = (p.r * bigScale).toFixed(2);
-              bigSvg += `<circle cx=”${gcx}” cy=”${gcy}” r=”${gr}” fill=”none” stroke=”#0066aa” stroke-width=”2” stroke-dasharray=”8 4”/>`;
+              bigSvg += `<circle cx="${gcx}" cy="${gcy}" r="${gr}" fill="none" stroke="#0066aa" stroke-width="2" stroke-dasharray="8 4"/>`;
               p.members.forEach((m, mi) => {
                 const mx = (p.x + p.offsets[mi].x) * bigScale;
                 const my = rectY + (cl.compDepth - (p.y + p.offsets[mi].y)) * bigScale;
                 const mr = (m.OD / 2) * bigScale;
-                bigSvg += `<circle cx=”${mx.toFixed(2)}” cy=”${my.toFixed(2)}” r=”${mr.toFixed(2)}” fill=”${lastColor}” stroke=”#0066aa” stroke-width=”2”/>`;
+                bigSvg += `<circle cx="${mx.toFixed(2)}" cy="${my.toFixed(2)}" r="${mr.toFixed(2)}" fill="${lastColor}" stroke="#0066aa" stroke-width="2"/>`;
                 const fs = Math.min(mr * 0.15, 20);
                 const lbls = [`${m.tag}`, `${m.cableType}`, `${m.count}C ${m.size}`, `OD:${m.OD.toFixed(2)}″`, `${m.weight.toFixed(2)}lb/ft`];
                 const lh = fs * 1.1;
                 let y0 = my - (lbls.length * lh) / 2 + lh / 2;
-                lbls.forEach((ln, li) => { bigSvg += `<text x=”${mx.toFixed(2)}” y=”${(y0+li*lh).toFixed(2)}” font-size=”${fs}px” text-anchor=”middle” fill=”#000” font-family=”Arial,sans-serif” pointer-events=”none”>${ln}</text>`; });
+                lbls.forEach((ln, li) => { bigSvg += `<text x="${mx.toFixed(2)}" y="${(y0+li*lh).toFixed(2)}" font-size="${fs}px" text-anchor="middle" fill="#000" font-family="Arial,sans-serif" pointer-events="none">${ln}</text>`; });
               });
             } else {
               const cx = p.x * bigScale;
               const cy = rectY + (cl.compDepth - p.y) * bigScale;
               const r  = p.r * bigScale;
-              bigSvg += `<circle cx=”${cx.toFixed(2)}” cy=”${cy.toFixed(2)}” r=”${r.toFixed(2)}” fill=”${lastColor}” stroke=”#0066aa” stroke-width=”2”/>`;
+              bigSvg += `<circle cx="${cx.toFixed(2)}" cy="${cy.toFixed(2)}" r="${r.toFixed(2)}" fill="${lastColor}" stroke="#0066aa" stroke-width="2"/>`;
               const fs = Math.min(r * 0.15, 20);
               const lbls = [`${p.tag}`, `${p.cableType}`, `${p.count}C ${p.size}`, `OD:${p.OD.toFixed(2)}″`, `${p.weight.toFixed(2)}lb/ft`];
               const lh = fs * 1.1;
               let y0 = cy - (lbls.length * lh) / 2 + lh / 2;
-              lbls.forEach((ln, li) => { bigSvg += `<text x=”${cx.toFixed(2)}” y=”${(y0+li*lh).toFixed(2)}” font-size=”${fs}px” text-anchor=”middle” fill=”#000” font-family=”Arial,sans-serif” pointer-events=”none”>${ln}</text>`; });
+              lbls.forEach((ln, li) => { bigSvg += `<text x="${cx.toFixed(2)}" y="${(y0+li*lh).toFixed(2)}" font-size="${fs}px" text-anchor="middle" fill="#000" font-family="Arial,sans-serif" pointer-events="none">${ln}</text>`; });
             }
           });
         });
@@ -1470,7 +1470,7 @@ checkPrereqs([{key:'traySchedule',page:'racewayschedule.html',label:'Raceway Sch
       });
 
       // ─────────────────────────────────────────────────────────────
-      // (J) “Close” button hides the overlay
+      // (J) "Close" button hides the overlay
       // ─────────────────────────────────────────────────────────────
       document.getElementById("popupClose").addEventListener("click", () => {
         document.getElementById("overlay").style.display = "none";
