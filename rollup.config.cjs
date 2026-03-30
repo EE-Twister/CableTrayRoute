@@ -43,6 +43,7 @@ const entries = {
   designrulechecker: 'src/designrulechecker.js',
   spoolsheets: 'src/spoolsheets.js',
   windload: 'src/windload.js',
+  structuralcombinations: 'src/structuralcombinations.js',
   loadCombinations: 'src/loadCombinations.js',
   transientstability: 'src/transientstability.js',
   voltagedropstudy: 'src/voltagedropstudy.js',

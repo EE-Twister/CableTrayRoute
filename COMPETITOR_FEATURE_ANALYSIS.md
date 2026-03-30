@@ -384,7 +384,7 @@ These gaps describe areas where CableTrayRoute's calculation engine uses simplif
 |---|---|---|
 | **ASCE 7 combined load combinations (D + W + E)** | Eaton B-Line (combined load tables per NEMA VE 2), structural engineering standards | `analysis/seismicBracing.mjs` and `analysis/windLoad.mjs` operate as independent tools. NEMA VE 2 Section 4 and ASCE 7 Section 2.3 require checking combined load cases: dead load + wind (D + W) and dead load + seismic (D + 0.7E) simultaneously. A cable tray support designed for seismic alone may be inadequate for the combined wind + gravity case, and vice versa. No tool currently produces combined load demand vs. capacity ratios per support location. Eaton B-Line's CoSPEC tool includes combined load tables for their standard support products. |
 
-**Status:** Not addressed. Requires a combined load case wrapper that calls both analysis modules and checks support capacity against the envelope of governing load combinations.
+**Status:** Implemented. `analysis/structuralLoadCombinations.mjs` wraps both `seismicBracing.mjs` and `windLoad.mjs` to evaluate ASCE 7-22 §2.3.1 (LRFD) and §2.4.1 (ASD) combined load combinations for cable tray supports: gravity (1.4D, 1.2D), wind-dominant (1.2D+W, 0.9D+W), and seismic-dominant ((1.2+0.2·S_DS)D+E_h and (0.9−0.2·S_DS)D+E_h). Vertical seismic effect E_v = 0.2·S_DS·D is applied per §12.4.2.2. The UI page `structuralcombinations.html` provides unified inputs, a full combination table with governing rows highlighted, and an optional capacity utilization check. Tested in `tests/structuralLoadCombinations.test.mjs`.
 
 ---
 
@@ -469,7 +469,7 @@ These gaps describe areas where CableTrayRoute's calculation engine uses simplif
 | **Calc: Motor starting VFD / soft-starter models** | **Yes** ✓ | Yes | Yes | — | — | — | — | — | — | — |
 | **Calc: TCC auto-coordination algorithm** | **No** | Yes | Yes | — | — | — | — | — | — | — |
 | **Calc: Unbalanced per-phase harmonics** | **No** | Yes | Yes | — | — | — | — | — | — | — |
-| **Calc: Combined seismic + wind load scenario** | **No** | — | — | Yes | — | — | — | — | — | — |
+| **Calc: Combined seismic + wind load scenario** | **Yes** ✓ | — | — | Yes | — | — | — | — | — | — |
 | **Calc: Post-contingency transient stability check** | **No** | Yes | Yes | — | — | — | — | — | — | — |
 
 *(✓ = implemented since initial 2026-03-16 analysis; new rows = gaps identified in 2026-03-24 refresh; **Usability** rows = UX pattern gaps; **Calc** rows = calculation completeness gaps)*

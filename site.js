@@ -172,13 +172,13 @@ async function runOnboardingFlow({force=false,source='auto'}={}){
     {
       title:'Load a sample project in one click',
       description:'Need a working baseline? Seed the workflow with sample cables, raceways, and a ductbank.',
-      details:`${stepIndicator(1)}\n\nClick “Load Sample Project” to populate a sample dataset: 3 cables, 2 trays, 1 conduit, and 1 ductbank. This lets you explore every feature without manual data entry.`,
+      details:`${stepIndicator(1)}\n\nClick "Load Sample Project" to populate a sample dataset: 3 cables, 2 trays, 1 conduit, and 1 ductbank. This lets you explore every feature without manual data entry.`,
       showSampleLoader:true
     },
     {
       title:'Step 1 — Build your Cable Schedule',
       description:'Start by defining the cables in your project.',
-      details:`${stepIndicator(2)}\n\nGo to Cable Schedule to enter each cable's ID, endpoints, conductor size, insulation type, voltage rating, and length.\n\nTip: assign a “Route Preference” (tray or conduit ID) to each cable so the routing engine knows where to place it.`,
+      details:`${stepIndicator(2)}\n\nGo to Cable Schedule to enter each cable's ID, endpoints, conductor size, insulation type, voltage rating, and length.\n\nTip: assign a "Route Preference" (tray or conduit ID) to each cable so the routing engine knows where to place it.`,
       link:{href:'cableschedule.html',label:'Open Cable Schedule'}
     },
     {
