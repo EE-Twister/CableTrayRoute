@@ -433,3 +433,32 @@ describe('runDRC — accepted findings', () => {
     assert.strictEqual(finding.isAccepted, false);
   });
 });
+
+// ---------------------------------------------------------------------------
+// formatDrcReport — accepted risk section
+// ---------------------------------------------------------------------------
+describe('formatDrcReport() — accepted risk section', () => {
+  it('includes accepted risk section header and note when findings are accepted', () => {
+    const trays = [makeTray('T1', 20, 12, 4)];
+    const result = runDRC({ trays, cables: [], trayCableMap: {} }, {
+      acceptedFindings: [{
+        key: 'DRC-01:T1',
+        ruleId: 'DRC-01',
+        location: 'T1',
+        note: 'Approved per ENG-042',
+        reviewedBy: 'J. Smith, PE',
+        acceptedAt: '2026-03-30T00:00:00.000Z',
+      }],
+    });
+    const report = formatDrcReport(result);
+    assert.ok(report.includes('Accepted Risk'), 'Report should include accepted risk section header');
+    assert.ok(report.includes('Approved per ENG-042'), 'Report should include the engineering note');
+    assert.ok(report.includes('J. Smith, PE'), 'Report should include the reviewer name');
+  });
+
+  it('omits accepted risk section when no findings are accepted', () => {
+    const result = runDRC({ trays: [], cables: [], trayCableMap: {} });
+    const report = formatDrcReport(result);
+    assert.ok(!report.includes('Accepted Risk'), 'Report should not include accepted risk section when none exist');
+  });
+});

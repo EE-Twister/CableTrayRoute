@@ -227,7 +227,9 @@ async function initCableSchedule() {
     {key:'code_reference',label:'Code Ref',type:'text',group:'Electrical Characteristics',tooltip:'Code table used'},
     {key:'voltage_drop_pct',label:'Estimated Voltage Drop (%)',type:'number',group:'Electrical Characteristics',tooltip:'Estimated voltage drop percent'},
     {key:'sizing_warning',label:'Sizing Warning',type:'text',group:'Electrical Characteristics',tooltip:'Non-compliance details'},
-    {key:'notes',label:'Notes',type:'text',group:'Notes',tooltip:'Additional comments or notes'}
+    {key:'notes',label:'Notes',type:'text',group:'Notes',tooltip:'Additional comments or notes'},
+    {key:'engineer_note',label:'Engineer Note',type:'text',group:'Notes',tooltip:'Engineering annotation, design decision rationale, or field observation'},
+    {key:'review_status',label:'Review Status',type:'select',options:['','pending','approved','flagged'],group:'Notes',tooltip:'Engineer review/approval status for this cable record'}
   ];
 
   const TYPICAL_EXCLUDED_GROUPS = new Set(['Identification', 'Routing / Termination']);
@@ -241,7 +243,8 @@ async function initCableSchedule() {
     'length',
     'calc_ampacity',
     'voltage_drop_pct',
-    'sizing_warning'
+    'sizing_warning',
+    'review_status'
   ];
   const TYPICAL_EXCLUDED_KEYS = new Set(
     columns
@@ -1745,6 +1748,16 @@ async function initCableSchedule() {
     });
   }
 
+  function applyReviewStatusHighlight(){
+    Array.from(table.tbody.querySelectorAll('tr')).forEach(tr => {
+      const sel = tr.querySelector('[name="review_status"]');
+      const cell = sel && sel.closest('td');
+      if (!cell) return;
+      cell.classList.remove('review-status-pending', 'review-status-approved', 'review-status-flagged');
+      if (sel.value) cell.classList.add(`review-status-${sel.value}`);
+    });
+  }
+
   function validateRow(tr){
     const tagIn = tr.querySelector('[name="tag"]');
     const sizeIn = tr.querySelector('[name="conductor_size"]');
@@ -1829,6 +1842,7 @@ async function initCableSchedule() {
       tableData = data;
       markUnsaved();
       applySizingHighlight();
+      applyReviewStatusHighlight();
       validateAllRows();
       updateBatchTypicalControls();
 
@@ -1845,6 +1859,7 @@ async function initCableSchedule() {
             tableData = [...before];
             markUnsaved();
             applySizingHighlight();
+            applyReviewStatusHighlight();
             validateAllRows();
             updateBatchTypicalControls();
             window.__isUndoRedoOp = false;
@@ -1858,6 +1873,7 @@ async function initCableSchedule() {
             tableData = [...after];
             markUnsaved();
             applySizingHighlight();
+            applyReviewStatusHighlight();
             validateAllRows();
             updateBatchTypicalControls();
             window.__isUndoRedoOp = false;
@@ -2097,6 +2113,7 @@ async function initCableSchedule() {
   }
 
   applySizingHighlight();
+  applyReviewStatusHighlight();
   validateAllRows();
 
   // Update the table whenever cables are modified elsewhere (e.g. One-Line).
@@ -2105,6 +2122,7 @@ async function initCableSchedule() {
     table.setData(cables || []);
     tableData = cables || [];
     applySizingHighlight();
+    applyReviewStatusHighlight();
     validateAllRows();
     markSaved();
   });

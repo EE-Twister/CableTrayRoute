@@ -15,9 +15,10 @@ document.addEventListener('DOMContentLoaded', () => {
   initHelpModal('help-btn', 'help-modal', 'close-help-btn');
   initNavToggle();
 
-  const runBtn        = document.getElementById('drc-run-btn');
-  const exportBtn     = document.getElementById('drc-export-btn');
-  const fillLimitIn   = document.getElementById('drc-fill-limit');
+  const runBtn            = document.getElementById('drc-run-btn');
+  const exportBtn         = document.getElementById('drc-export-btn');
+  const clearAcceptedBtn  = document.getElementById('drc-clear-accepted-btn');
+  const fillLimitIn       = document.getElementById('drc-fill-limit');
   const skipGndChk    = document.getElementById('drc-skip-grounding');
   const skipAmpChk    = document.getElementById('drc-skip-ampacity');
   const resultsDiv    = document.getElementById('drc-results');
@@ -28,6 +29,24 @@ document.addEventListener('DOMContentLoaded', () => {
 
   runBtn.addEventListener('click', runAndRender);
   exportBtn.addEventListener('click', exportReport);
+  clearAcceptedBtn.addEventListener('click', async () => {
+    if (!acceptedFindings.length) return;
+    const confirmed = await openModal({
+      title: 'Clear All Accepted Risks',
+      primaryText: 'Clear',
+      secondaryText: 'Cancel',
+      render(body) {
+        const p = document.createElement('p');
+        p.textContent = `This will remove all ${acceptedFindings.length} accepted risk record(s). Are you sure?`;
+        body.appendChild(p);
+      },
+      onSubmit() { return true; },
+    });
+    if (!confirmed) return;
+    acceptedFindings = [];
+    setDrcAcceptedFindings(acceptedFindings);
+    if (lastResult) runAndRender();
+  });
 
   // Event delegation: "Accept Risk" and "Revoke" buttons inside findings
   resultsDiv.addEventListener('click', async e => {
@@ -170,6 +189,7 @@ document.addEventListener('DOMContentLoaded', () => {
     renderSummary(result.summary);
     renderFindings(result.findings);
     exportBtn.disabled = false;
+    clearAcceptedBtn.disabled = acceptedFindings.length === 0;
   }
 
   function renderSummary(summary) {

@@ -964,6 +964,11 @@ body.dark-mode .result-ok   { background: #14532d; color: #86efac; }
 body.dark-mode .result-fail { background: #450a0a; color: #fca5a5; }
 body.dark-mode .result-warn { background: #451a03; color: #fcd34d; }
 
+/* ── Cable schedule review_status cell colours (Gap #19) ─────────────────── */
+.review-status-approved { color: #166534; font-weight: 600; }
+.review-status-pending   { color: #92400e; }
+.review-status-flagged   { color: #991b1b; font-weight: 600; }
+
 /* ── Scenario Comparison Table (Gap #17) ─────────────────────────────────── */
 .scenario-compare-summary {
   font-weight: 600;
