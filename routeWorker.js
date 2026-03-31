@@ -6,21 +6,52 @@ const calcSidewallPressure = globalThis.calcSidewallPressure || function(bendRad
     return tension / bendRadius;
 };
 
+const calcStiffnessTension = globalThis.calcStiffnessTension || function(sizeKcmil, outerDiameterIn, conductorMaterial, angleRad, radiusFt) {
+    if (!sizeKcmil || !outerDiameterIn || !radiusFt) return 0;
+    const E_PSI = { cu: 17500000, al: 10150000 };
+    const ePsi   = E_PSI[conductorMaterial] ?? E_PSI.cu;
+    const eLbFt2 = ePsi * 144;
+    const aFt2   = (sizeKcmil * 0.000785398) / 144;
+    const dFt    = outerDiameterIn / 12;
+    const iFt4   = aFt2 * Math.pow(dFt / 4, 2) * 0.1;
+    const EI     = eLbFt2 * iFt4;
+    return EI * angleRad / (radiusFt * radiusFt);
+};
+
 const calcPullTension = globalThis.calcPullTension || function(routeSegments = [], cableProps = {}) {
-    const mu = cableProps.coeffFriction ?? cableProps.mu ?? 0.35;
-    const weight = cableProps.weight ?? 0;
+    const JACKET_TEMP_ALPHA = { PVC: 0.005, XLPE: 0.003 };
+    const STATIC_FRICTION_FACTOR = 1.35;
+    const mu                = cableProps.coeffFriction ?? cableProps.mu ?? 0.35;
+    const weight            = cableProps.weight ?? 0;
+    const conductorMaterial = cableProps.conductorMaterial ?? 'cu';
+    const jacketMaterial    = cableProps.jacketMaterial    ?? 'XLPE';
+    const ambientTempC      = cableProps.ambientTempC      ?? 30;
+    const sizeKcmil         = cableProps.sizeKcmil         ?? 0;
+    const outerDiameterIn   = cableProps.outerDiameterIn   ?? 0;
+    const isInitialPull     = cableProps.isInitialPull     ?? false;
+    const alpha  = JACKET_TEMP_ALPHA[jacketMaterial] ?? 0.004;
+    const muAdj  = Math.min(2.0 * mu, Math.max(0.5 * mu, mu * (1 + alpha * (ambientTempC - 30))));
     let tension = 0;
     let maxTension = 0;
     let maxSidewall = 0;
+    let stiffnessLbs = 0;
+    let staticApplied = false;
+    let firstSegment = true;
     for (const seg of routeSegments) {
         if (!seg) continue;
+        const muEff = (isInitialPull && firstSegment) ? muAdj * STATIC_FRICTION_FACTOR : muAdj;
+        if (firstSegment) { if (isInitialPull) staticApplied = true; firstSegment = false; }
         if (seg.type === 'bend') {
-            tension += weight * mu * (seg.length || 0);
-            tension *= Math.exp(mu * (seg.angle || 0));
-            const swp = calcSidewallPressure(seg.radius || 1, tension);
+            const angle  = seg.angle  || 0;
+            const radius = seg.radius || 1;
+            tension += weight * muEff * (seg.length || 0);
+            tension *= Math.exp(muEff * angle);
+            const dT = calcStiffnessTension(sizeKcmil, outerDiameterIn, conductorMaterial, angle, radius);
+            tension += dT; stiffnessLbs += dT;
+            const swp = calcSidewallPressure(radius, tension);
             if (swp > maxSidewall) maxSidewall = swp;
         } else {
-            tension += weight * mu * (seg.length || 0);
+            tension += weight * muEff * (seg.length || 0);
         }
         if (tension > maxTension) maxTension = tension;
     }
@@ -30,6 +61,10 @@ const calcPullTension = globalThis.calcPullTension || function(routeSegments = [
         maxSidewallPressure: maxSidewall,
         allowableTension: cableProps.maxTension ?? cableProps.allowableTension ?? cableProps.max_tension ?? Infinity,
         allowableSidewallPressure: cableProps.maxSidewallPressure ?? cableProps.allowableSidewallPressure ?? cableProps.max_sidewall_pressure ?? Infinity,
+        effectiveMu: muAdj,
+        tempFrictionFactor: mu > 0 ? Math.round((muAdj / mu) * 10000) / 10000 : 1,
+        stiffnessCorrectionLbs: Math.round(stiffnessLbs * 100) / 100,
+        staticFrictionApplied: staticApplied,
     };
 };
 class MinHeap {
