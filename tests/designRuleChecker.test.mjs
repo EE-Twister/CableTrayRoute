@@ -14,6 +14,7 @@ import assert from 'assert';
 import {
   runDRC,
   trayFillPercent,
+  traySlotFillPercent,
   formatDrcReport,
   DRC_SEVERITY,
 } from '../analysis/designRuleChecker.mjs';
@@ -431,6 +432,117 @@ describe('runDRC — accepted findings', () => {
     });
     const finding = result.findings.find(f => f.ruleId === 'DRC-01');
     assert.strictEqual(finding.isAccepted, false);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// traySlotFillPercent helper
+// ---------------------------------------------------------------------------
+describe('traySlotFillPercent()', () => {
+  it('returns correct percentage for slot in a 2-slot tray', () => {
+    // 12" × 4" = 48 in² total; 2 slots → 24 in² per slot
+    // slot 0 fill = 12 in² → 50 %
+    const tray = makeTray('T1', 0, 12, 4, { num_slots: 2 });
+    const pct = traySlotFillPercent(tray, 0, 12);
+    assert.ok(Math.abs(pct - 50) < 0.01, `Expected 50, got ${pct}`);
+  });
+
+  it('returns null for invalid slot index', () => {
+    const tray = makeTray('T1', 0, 12, 4, { num_slots: 2 });
+    assert.strictEqual(traySlotFillPercent(tray, 5, 0), null);
+    assert.strictEqual(traySlotFillPercent(tray, -1, 0), null);
+  });
+
+  it('returns null when tray dimensions are missing', () => {
+    const tray = { tray_id: 'T1', num_slots: 2 };
+    assert.strictEqual(traySlotFillPercent(tray, 0, 5), null);
+  });
+
+  it('works correctly for a single-slot tray (same as trayFillPercent)', () => {
+    // 12" × 4" = 48 in²; fill = 24 in² → 50 %
+    const tray = makeTray('T1', 0, 12, 4, { num_slots: 1 });
+    const pct = traySlotFillPercent(tray, 0, 24);
+    assert.ok(Math.abs(pct - 50) < 0.01, `Expected 50, got ${pct}`);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// DRC-01 per-slot fill checks
+// ---------------------------------------------------------------------------
+describe('DRC-01 Per-Slot Fill', () => {
+  it('raises ERROR for an overfilled individual slot in a 2-slot tray', () => {
+    // 12" × 4" = 48 in²; 2 slots → 24 in² per slot; 40 % limit = 9.6 in²
+    // slot 0: 15 in² → 62.5 % (overfilled), slot 1: 0 in²
+    const tray = {
+      ...makeTray('T_SLOT', 0, 12, 4),
+      num_slots: 2,
+      slotFills: [15, 0],
+    };
+    const { findings } = runDRC({ trays: [tray], cables: [], trayCableMap: {} });
+    const drc01 = findings.filter(f => f.ruleId === 'DRC-01' && f.severity === DRC_SEVERITY.ERROR);
+    assert.ok(drc01.length > 0, 'Expected DRC-01 ERROR for overfilled slot 0');
+    assert.ok(drc01[0].location.includes('T_SLOT'), 'Finding location should reference the tray');
+  });
+
+  it('no ERROR when only slot 1 is within limit in a 2-slot tray', () => {
+    // slot 0: 5 in² → 20.8 %, slot 1: 5 in² → 20.8 % — both fine
+    const tray = {
+      ...makeTray('T_SLOT2', 0, 12, 4),
+      num_slots: 2,
+      slotFills: [5, 5],
+    };
+    const { findings } = runDRC({ trays: [tray], cables: [], trayCableMap: {} });
+    const drc01 = findings.filter(f => f.ruleId === 'DRC-01' && f.severity === DRC_SEVERITY.ERROR);
+    assert.strictEqual(drc01.length, 0);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// DRC-02 multi-slot tray suppression
+// ---------------------------------------------------------------------------
+describe('DRC-02 Multi-Slot Tray Suppression', () => {
+  it('does NOT raise DRC-02 for a 2-slot tray with a valid slot_groups mapping', () => {
+    const tray = makeTray('T_COMP', 10, 12, 4, {
+      num_slots: 2,
+      slot_groups: '{"0":"power","1":"instrument"}',
+    });
+    const cable1 = { name: 'C1', allowed_cable_group: 'power' };
+    const cable2 = { name: 'C2', allowed_cable_group: 'instrument' };
+    const { findings } = runDRC({
+      trays: [tray],
+      cables: [],
+      trayCableMap: { T_COMP: [cable1, cable2] },
+    });
+    const drc02 = findings.filter(f => f.ruleId === 'DRC-02');
+    assert.strictEqual(drc02.length, 0,
+      'DRC-02 should be suppressed for compartmented tray with valid slot_groups');
+  });
+
+  it('still raises DRC-02 for a 2-slot tray with no slot_groups mapping', () => {
+    const tray = makeTray('T_NOMAP', 10, 12, 4, { num_slots: 2 });
+    const cable1 = { name: 'C1', allowed_cable_group: 'power' };
+    const cable2 = { name: 'C2', allowed_cable_group: 'instrument' };
+    const { findings } = runDRC({
+      trays: [tray],
+      cables: [],
+      trayCableMap: { T_NOMAP: [cable1, cable2] },
+    });
+    const drc02 = findings.filter(f => f.ruleId === 'DRC-02');
+    assert.ok(drc02.length > 0,
+      'DRC-02 should still fire for a multi-slot tray without slot_groups');
+  });
+
+  it('still raises DRC-02 for a single-slot tray even with mixed groups', () => {
+    const tray = makeTray('T_SINGLE', 10, 12, 4, { num_slots: 1 });
+    const cable1 = { name: 'C1', allowed_cable_group: 'power' };
+    const cable2 = { name: 'C2', allowed_cable_group: 'instrument' };
+    const { findings } = runDRC({
+      trays: [tray],
+      cables: [],
+      trayCableMap: { T_SINGLE: [cable1, cable2] },
+    });
+    const drc02 = findings.filter(f => f.ruleId === 'DRC-02');
+    assert.ok(drc02.length > 0, 'DRC-02 should fire for single-slot tray with mixed groups');
   });
 });
 

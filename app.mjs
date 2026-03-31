@@ -299,7 +299,7 @@ async function initializeApp() {
         'tray_id','start_x','start_y','start_z','end_x','end_y','end_z',
         ['inside_width','width'],
         ['tray_depth','height'],
-        'tray_type','current_fill','allowed_cable_group','shape'
+        'tray_type','current_fill','num_slots','slot_groups','allowed_cable_group','shape'
     ];
     const cableTemplateHeaders=[
         'tag',
@@ -697,6 +697,7 @@ async function initializeApp() {
                 width: parseFloat(t.inside_width),
                 height: parseFloat(t.tray_depth),
                 num_slots: Math.max(1, parseInt(t.num_slots) || 1),
+                slot_groups: t.slot_groups || null,
                 current_fill: 0,
                 shape: 'STR',
                 allowed_cable_group: t.allowed_cable_group || '',
@@ -1218,28 +1219,99 @@ async function initializeApp() {
 
         addTraySegment(tray) {
             const numSlots = Math.max(1, parseInt(tray.num_slots) || 1);
-            const maxFill = (tray.width * tray.height * this.fillLimit) / numSlots;
+            const slotArea = (tray.width * tray.height) / numSlots;
+            const maxFill  = slotArea * this.fillLimit;
+
+            // Parse slot_groups: JSON string or plain object → Map<slotIndex, groupName>
+            const slotGroups = new Map();
+            const raw = tray.slot_groups;
+            if (raw) {
+                try {
+                    const parsed = typeof raw === 'string' ? JSON.parse(raw) : raw;
+                    for (const [k, v] of Object.entries(parsed)) {
+                        const idx = parseInt(k, 10);
+                        if (!isNaN(idx) && idx >= 0 && idx < numSlots)
+                            slotGroups.set(idx, String(v).trim());
+                    }
+                } catch { /* invalid JSON — treat as no slot-group mapping */ }
+            }
+
+            // Seed slotFills from current_fill for backward compatibility.
+            // Single-slot trays map current_fill → slotFills[0] directly.
+            // Multi-slot trays without per-slot data distribute fill evenly.
+            const existingFill = parseFloat(tray.current_fill) || 0;
+            const slotFills = new Array(numSlots).fill(0);
+            if (existingFill > 0) {
+                const fillPerSlot = existingFill / numSlots;
+                for (let i = 0; i < numSlots; i++) slotFills[i] = fillPerSlot;
+            }
+
             // Preserve ductbank association for later use
-            this.trays.set(tray.tray_id, { ...tray, ductbankTag: tray.ductbankTag, maxFill });
+            this.trays.set(tray.tray_id, {
+                ...tray, ductbankTag: tray.ductbankTag,
+                numSlots, maxFill,
+                slotFills,
+                slotGroups,
+            });
         }
 
-        updateTrayFill(trayIds, cableArea) {
+        // Return the slot index a cable should occupy, or -1 if no slot is available.
+        _findSlotForCable(tray, cableGroup) {
+            if (tray.slotGroups.size === 0) {
+                // No group mapping — use the slot with most remaining capacity.
+                let bestSlot = 0;
+                let bestRemaining = tray.maxFill - tray.slotFills[0];
+                for (let i = 1; i < tray.numSlots; i++) {
+                    const rem = tray.maxFill - tray.slotFills[i];
+                    if (rem > bestRemaining) { bestRemaining = rem; bestSlot = i; }
+                }
+                return bestSlot;
+            }
+            // Group mapping — find the slot whose group matches the cable group.
+            const group = (cableGroup || '').trim();
+            for (const [idx, slotGroup] of tray.slotGroups) {
+                if (!slotGroup || !group || slotGroup === group) return idx;
+            }
+            return -1; // no matching slot
+        }
+
+        // Return true when the cable fits in the correct slot for its group.
+        _trayHasCapacityForCable(tray, cableArea, cableGroup) {
+            const slot = this._findSlotForCable(tray, cableGroup);
+            if (slot < 0) return false;
+            return (tray.slotFills[slot] + cableArea) <= tray.maxFill;
+        }
+
+        updateTrayFill(trayIds, cableArea, cableGroup = '') {
              if (!Array.isArray(trayIds)) return;
              trayIds.forEach(trayId => {
-                if (this.trays.has(trayId)) {
-                    this.trays.get(trayId).current_fill += cableArea;
-                }
+                if (!this.trays.has(trayId)) return;
+                const tray = this.trays.get(trayId);
+                const slot = this._findSlotForCable(tray, cableGroup);
+                if (slot >= 0) tray.slotFills[slot] += cableArea;
              });
         }
-        
+
         getTrayUtilization() {
             const utilization = {};
             for (const [id, tray] of this.trays.entries()) {
-                utilization[id] = {
-                    current_fill: tray.current_fill,
+                const totalFill   = tray.slotFills.reduce((a, b) => a + b, 0);
+                const worstFill   = Math.max(...tray.slotFills);
+                const totalMax    = tray.maxFill * tray.numSlots;
+                const slots = tray.slotFills.map((fill, i) => ({
+                    slot_index: i,
+                    group: tray.slotGroups.get(i) ?? null,
+                    current_fill: fill,
                     max_fill: tray.maxFill,
-                    utilization_percentage: (tray.current_fill / tray.maxFill) * 100,
-                    available_capacity: tray.maxFill - tray.current_fill,
+                    utilization_percentage: tray.maxFill ? (fill / tray.maxFill) * 100 : 0,
+                }));
+                utilization[id] = {
+                    current_fill: totalFill,
+                    max_fill: totalMax,
+                    utilization_percentage: totalMax ? (totalFill / totalMax) * 100 : 0,
+                    available_capacity: totalMax - totalFill,
+                    worst_slot_utilization: tray.maxFill ? (worstFill / tray.maxFill) * 100 : 0,
+                    slots,
                 };
             }
             return utilization;
@@ -1549,7 +1621,7 @@ async function initializeApp() {
 
             // Remove trays without remaining capacity
             this.trays.forEach(tray => {
-                if (tray.current_fill + cableArea > tray.maxFill ||
+                if (!this._trayHasCapacityForCable(tray, cableArea, allowedGroup) ||
                     (tray.allowed_cable_group &&
                      tray.allowed_cable_group !== allowedGroup)) {
                     const remove = Object.keys(graph.nodes).filter(n => n.includes(tray.tray_id));
@@ -3557,11 +3629,11 @@ const renderBatchResults = (results) => {
             if (!cable || !info) return;
             const area = Math.PI * (cable.diameter / 2) ** 2 * (parseInt(cable.parallel_count) || 1);
             if (Array.isArray(info.row.tray_segments)) {
-                routingSystem.updateTrayFill(info.row.tray_segments, -area);
+                routingSystem.updateTrayFill(info.row.tray_segments, -area, cable.allowed_cable_group);
             }
             const res = routingSystem.calculateRoute(cable.start, cable.end, area, cable.allowed_cable_group);
             if (res.success) {
-                routingSystem.updateTrayFill(res.tray_segments, area);
+                routingSystem.updateTrayFill(res.tray_segments, area, cable.allowed_cable_group);
                 routingSystem.recordSharedFieldSegments(res.route_segments);
                 info.row = {
                     cable: cable.name,
@@ -3592,7 +3664,7 @@ const renderBatchResults = (results) => {
                 };
                 resultMap.set(name, info);
             } else {
-                routingSystem.updateTrayFill(info.row.tray_segments, area);
+                routingSystem.updateTrayFill(info.row.tray_segments, area, cable.allowed_cable_group);
             }
             completed++;
             const pct = Math.round((completed / total) * 100);
@@ -3702,7 +3774,11 @@ const renderBatchResults = (results) => {
             const k = [2,3,6,7,6,7,5,4,7,4,6,5];
             let color;
             if (state.heatmapEnabled && tray.maxFill) {
-                const pct = (tray.current_fill / tray.maxFill) * 100;
+                const totalFill = Array.isArray(tray.slotFills)
+                    ? tray.slotFills.reduce((a, b) => a + b, 0)
+                    : (tray.current_fill || 0);
+                const totalMax = tray.maxFill * (tray.numSlots || 1);
+                const pct = totalMax ? (totalFill / totalMax) * 100 : 0;
                 color = heatColor(pct);
             } else {
                 color = tray.raceway_type === 'conduit'

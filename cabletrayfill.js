@@ -1819,8 +1819,28 @@ checkPrereqs([{key:'traySchedule',page:'racewayschedule.html',label:'Raceway Sch
           document.getElementById('trayWidth').value = tray.width;
           document.getElementById('trayDepth').value = tray.height;
           document.getElementById('trayName').value = tray.tray_id || '';
-          // Initialize single compartment from tray dimensions for this navigation flow
-          compartments = [{ id: 1, width: parseFloat(tray.width) || 12, depth: parseFloat(tray.height) || 3, label: '' }];
+          // Initialize compartments from num_slots/slot_groups when the tray is compartmented
+          const numSlots = Math.max(1, parseInt(tray.num_slots) || 1);
+          if (numSlots > 1) {
+            let slotGroupMap = {};
+            if (tray.slot_groups) {
+              try {
+                slotGroupMap = typeof tray.slot_groups === 'string'
+                  ? JSON.parse(tray.slot_groups)
+                  : tray.slot_groups;
+              } catch { /* ignore malformed JSON */ }
+            }
+            const n = Math.min(5, numSlots);
+            const slotWidth = (parseFloat(tray.width) || 12) / n;
+            compartments = Array.from({ length: n }, (_, i) => ({
+              id: i + 1,
+              width: slotWidth,
+              depth: parseFloat(tray.height) || 3,
+              label: slotGroupMap[String(i)] || `Slot ${i + 1}`,
+            }));
+          } else {
+            compartments = [{ id: 1, width: parseFloat(tray.width) || 12, depth: parseFloat(tray.height) || 3, label: '' }];
+          }
           renderCompartmentUI();
           if (Array.isArray(storedCables)) {
             cables = storedCables.map(c => ({
