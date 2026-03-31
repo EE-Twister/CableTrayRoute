@@ -423,6 +423,7 @@ document.addEventListener('DOMContentLoaded', async () => {
     {key:'tray_depth',label:'Tray Depth (in)',type:'select',options:TRAY_DEPTH_OPTIONS,default:TRAY_DEPTH_OPTIONS[0],validate:['required']},
     {key:'tray_type',label:'Tray Type',type:'select',options:TRAY_TYPE_OPTIONS,default:TRAY_TYPE_OPTIONS[0],validate:['required']},
     {key:'num_slots',label:'Slots',type:'number',tooltip:'Number of longitudinal compartments (divider strips). Fill capacity is divided equally among slots. Default: 1 (single undivided tray).'},
+    {key:'slot_groups',label:'Slot Groups (JSON)',type:'text',tooltip:'Optional JSON mapping slot index (0-based) to cable group name. Example: {"0":"power","1":"instrument"}. Leave blank for an undivided tray.'},
     {key:'allowed_cable_group',label:'Allowed Group',type:'text'}
   ];
   const trayTable=TableUtils.createTable({
@@ -443,7 +444,7 @@ document.addEventListener('DOMContentLoaded', async () => {
     onView:(row)=>{
       try{
         trayTable.save();
-        const tray={tray_id:row.tray_id,width:parseFloat(row.inside_width),height:parseFloat(row.tray_depth),allowed_cable_group:row.allowed_cable_group};
+        const tray={tray_id:row.tray_id,width:parseFloat(row.inside_width),height:parseFloat(row.tray_depth),allowed_cable_group:row.allowed_cable_group,num_slots:Math.max(1,parseInt(row.num_slots)||1),slot_groups:row.slot_groups||null};
         const cables=cablesForRaceway(row.tray_id);
         dataStore.setItem('trayFillData',{tray,cables});
       }catch(e){console.error('Failed to store tray fill data',e);}

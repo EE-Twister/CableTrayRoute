@@ -109,7 +109,7 @@ The following gaps were discovered by reviewing competitor release notes and pro
 |---|---|---|
 | **Multi-Slot Cable Tray Layouts** | MagiCAD 2026 (up to 5 slots per tray) | MagiCAD 2026 evaluates cable fill ratios for trays divided into multiple internal compartments (up to 5 slots), each tracked independently. CableTrayRoute models trays as single-fill containers; it does not support compartmented trays where different cable groups occupy separate longitudinal dividers within one physical tray. This matters for instrumentation/power segregation using divider strips. |
 
-**Status:** Not implemented. Requires data model changes to represent per-slot fill independently alongside the existing single-fill model.
+**Status:** Implemented. `app.mjs` and `routeWorker.js` `CableRoutingSystem` now tracks per-slot fill via `slotFills[]`; `slot_groups` JSON field maps each slot to a cable group; `addTraySegment` parses the mapping; `_findSlotForCable` / `_trayHasCapacityForCable` / `updateTrayFill` operate at slot granularity; `getTrayUtilization` returns per-slot detail. `analysis/designRuleChecker.mjs` runs DRC-01 per slot and suppresses DRC-02 for correctly compartmented trays. `cabletrayfill.js` auto-populates compartments from `num_slots`/`slot_groups`. `src/racewayschedule.js` exposes both new fields in the raceway schedule UI. Backward compatible — single-slot trays behave identically to prior code.
 
 ---
 
@@ -447,7 +447,7 @@ These gaps describe areas where CableTrayRoute's calculation engine uses simplif
 | Cost-Free Web Access | **Yes** | — | — | Partial | Partial | — | — | Yes | — | — |
 | AI/LLM Natural Language Interface | **Yes** ✓ | Yes | — | — | — | — | — | — | — | — |
 | IFC Export (Rich Property Sets) | **Yes** ✓ | — | — | — | — | Yes | Yes | — | Yes | Yes |
-| Multi-Slot / Compartmented Tray Fill | **No** | — | — | — | — | — | — | — | Yes | — |
+| Multi-Slot / Compartmented Tray Fill | **Yes ✓** | — | — | — | — | — | — | — | Yes | — |
 | QR Code Tag Generation | **Yes** ✓ | Yes | — | — | — | — | — | — | — | — |
 | Electrical Digital Twin Integration | **No** | Yes | — | — | — | — | — | — | — | — |
 | Data Center Infrastructure Templates | **No** | — | — | — | — | — | — | — | — | — |
@@ -509,7 +509,7 @@ All originally high- and medium-priority feasible items have been implemented:
 
 4. ~~**Open REST API / Scripting Automation**~~ → `server.mjs` `/api/v1/` routes, `docs/api-reference.md` ✅
 5. **Ordered-Length Cable Procurement Planning** — Extend `spoolSheets.mjs` and `pullCards.mjs` to compute factory cut lengths, apply standard reel lengths, and minimize waste. Produces a cable procurement schedule.
-6. **Multi-Slot / Compartmented Tray Fill** — Extend the tray data model to support longitudinal divider strips with per-slot fill tracking. Needed for instrumentation/power segregation in one physical tray.
+6. ~~**Multi-Slot / Compartmented Tray Fill**~~ — Per-slot fill tracking via `slotFills[]`, `slot_groups` JSON field, per-slot DRC-01/DRC-02 in the DRC, and auto-populated fill UI. ✅
 7. **Data Center Infrastructure Templates** — Add AI data center wizard: hot/cold aisle overhead ladder rack presets, structured cabling (Cat6A/fiber) cable types, top-of-rack routing templates, and high-density fill density guidance.
 8. **Parallel Cable / Multi-Core Runs** — Extend the cable schedule data model to represent parallel runs (n × conductor size) as a first-class object with aggregate ampacity and combined tray fill.
 
@@ -688,7 +688,7 @@ The table below lists the recommended next work items in priority order.
 | # | Gap | Files | Notes |
 |---|---|---|---|
 | 7 | **Project Templates / Configuration Profiles** (#16) | `src/projectManager.js`, new `src/projectTemplates.js` | Preset JSON for Oil & Gas, Data Center, Industrial applied on new-project creation. |
-| 8 | **Multi-Slot Compartmented Tray Fill** (#5) | `analysis/`, `racewayschedule.html`, `cabletrayfill.html` | Data model change to track per-slot fill independently. Needed for power/instrumentation segregation. |
+| 8 | ~~**Multi-Slot Compartmented Tray Fill** (#5)~~ | `app.mjs`, `routeWorker.js`, `analysis/designRuleChecker.mjs`, `cabletrayfill.js`, `src/racewayschedule.js` | ✅ Implemented — per-slot `slotFills[]`, `slot_groups` JSON, per-slot DRC-01/DRC-02, auto-populated fill UI. |
 | 9 | **Scenario Comparison UI** (#17) | `src/scenarios.js`, `scenarios.html` | `scenarios.js` exists; add side-by-side comparison view for two selected study variants. |
 | 10 | **Prefabricated Cable Length Optimization** (#9) | new `analysis/cableProcurement.mjs` | Extends `spoolSheets.mjs` and `pullCards.mjs` with cut-length BOM and reel-waste minimization. |
 

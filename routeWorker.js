@@ -130,31 +130,100 @@ class CableRoutingSystem {
 
     addTraySegment(tray) {
         const numSlots = Math.max(1, parseInt(tray.num_slots) || 1);
-        const maxFill = (tray.width * tray.height * this.fillLimit) / numSlots;
+        const slotArea = (tray.width * tray.height) / numSlots;
+        const maxFill  = slotArea * this.fillLimit;
+
+        // Parse slot_groups: JSON string or plain object → Map<slotIndex, groupName>
+        const slotGroups = new Map();
+        const raw = tray.slot_groups;
+        if (raw) {
+            try {
+                const parsed = typeof raw === 'string' ? JSON.parse(raw) : raw;
+                for (const [k, v] of Object.entries(parsed)) {
+                    const idx = parseInt(k, 10);
+                    if (!isNaN(idx) && idx >= 0 && idx < numSlots)
+                        slotGroups.set(idx, String(v).trim());
+                }
+            } catch { /* invalid JSON — treat as no slot-group mapping */ }
+        }
+
+        // Seed slotFills from current_fill for backward compatibility.
+        // Single-slot trays map current_fill → slotFills[0] directly.
+        // Multi-slot trays without per-slot data distribute fill evenly.
+        const existingFill = parseFloat(tray.current_fill) || 0;
+        const slotFills = new Array(numSlots).fill(0);
+        if (existingFill > 0) {
+            const fillPerSlot = existingFill / numSlots;
+            for (let i = 0; i < numSlots; i++) slotFills[i] = fillPerSlot;
+        }
+
         // Preserve ductbank association for later lookups
-        this.trays.set(
-            tray.tray_id,
-            { ...tray, ductbank_id: tray.ductbank_id, ductbankTag: tray.ductbankTag, maxFill },
-        );
+        this.trays.set(tray.tray_id, {
+            ...tray,
+            ductbank_id: tray.ductbank_id, ductbankTag: tray.ductbankTag,
+            numSlots, maxFill,
+            slotFills,
+            slotGroups,
+        });
     }
 
-    updateTrayFill(trayIds, cableArea) {
+    // Return the slot index a cable should occupy, or -1 if no slot is available.
+    _findSlotForCable(tray, cableGroup) {
+        if (tray.slotGroups.size === 0) {
+            // No group mapping — use the slot with most remaining capacity.
+            let bestSlot = 0;
+            let bestRemaining = tray.maxFill - tray.slotFills[0];
+            for (let i = 1; i < tray.numSlots; i++) {
+                const rem = tray.maxFill - tray.slotFills[i];
+                if (rem > bestRemaining) { bestRemaining = rem; bestSlot = i; }
+            }
+            return bestSlot;
+        }
+        // Group mapping — find the slot whose group matches the cable group.
+        const group = (cableGroup || '').trim();
+        for (const [idx, slotGroup] of tray.slotGroups) {
+            if (!slotGroup || !group || slotGroup === group) return idx;
+        }
+        return -1; // no matching slot
+    }
+
+    // Return true when the cable fits in the correct slot for its group.
+    _trayHasCapacityForCable(tray, cableArea, cableGroup) {
+        const slot = this._findSlotForCable(tray, cableGroup);
+        if (slot < 0) return false;
+        return (tray.slotFills[slot] + cableArea) <= tray.maxFill;
+    }
+
+    updateTrayFill(trayIds, cableArea, cableGroup = '') {
          if (!Array.isArray(trayIds)) return;
          trayIds.forEach(trayId => {
-            if (this.trays.has(trayId)) {
-                this.trays.get(trayId).current_fill += cableArea;
-            }
+            if (!this.trays.has(trayId)) return;
+            const tray = this.trays.get(trayId);
+            const slot = this._findSlotForCable(tray, cableGroup);
+            if (slot >= 0) tray.slotFills[slot] += cableArea;
          });
     }
-    
+
     getTrayUtilization() {
         const utilization = {};
         for (const [id, tray] of this.trays.entries()) {
-            utilization[id] = {
-                current_fill: tray.current_fill,
+            const totalFill   = tray.slotFills.reduce((a, b) => a + b, 0);
+            const worstFill   = Math.max(...tray.slotFills);
+            const totalMax    = tray.maxFill * tray.numSlots;
+            const slots = tray.slotFills.map((fill, i) => ({
+                slot_index: i,
+                group: tray.slotGroups.get(i) ?? null,
+                current_fill: fill,
                 max_fill: tray.maxFill,
-                utilization_percentage: tray.maxFill ? (tray.current_fill / tray.maxFill) * 100 : 0,
-                available_capacity: tray.maxFill - tray.current_fill,
+                utilization_percentage: tray.maxFill ? (fill / tray.maxFill) * 100 : 0,
+            }));
+            utilization[id] = {
+                current_fill: totalFill,
+                max_fill: totalMax,
+                utilization_percentage: totalMax ? (totalFill / totalMax) * 100 : 0,
+                available_capacity: totalMax - totalFill,
+                worst_slot_utilization: tray.maxFill ? (worstFill / tray.maxFill) * 100 : 0,
+                slots,
             };
         }
         return utilization;
@@ -479,7 +548,7 @@ class CableRoutingSystem {
                         error: { tray_id: id, reason: 'not_allowed', conduit_id: tray.conduit_id, ductbank_tag: tray.ductbankTag, filter },
                     };
                 }
-                if (tray.current_fill + cableArea > tray.maxFill) {
+                if (!this._trayHasCapacityForCable(tray, cableArea, allowedGroup)) {
                     return {
                         success: false,
                         manual: true,
@@ -591,8 +660,10 @@ class CableRoutingSystem {
                 this.mismatchedRecords.push(record);
                 return { success: false, manual: true, manual_raceway: true, message: `${segment} not allowed`, exclusions, mismatched_records: this._formatMismatchedRecords() };
             }
-            if (tray.current_fill + cableArea > tray.maxFill) {
-                const fillPct = (tray.width * tray.height) ? ((tray.current_fill + cableArea) / (tray.width * tray.height)) * 100 : 0;
+            if (!this._trayHasCapacityForCable(tray, cableArea, allowedGroup)) {
+                const slotForMsg = this._findSlotForCable(tray, allowedGroup);
+                const slotFill = slotForMsg >= 0 ? tray.slotFills[slotForMsg] : 0;
+                const fillPct = tray.maxFill ? ((slotFill + cableArea) / tray.maxFill) * 100 : 0;
                 const maxPct = this.fillLimit * 100;
                 const record = { tray_id: id, reason: 'over_capacity', cable_id: cableId, conduit_id: tray.conduit_id, ductbank_tag: tray.ductbankTag, filter, message: `Rejected ${id}: ${fillPct.toFixed(1)}% fill > Max ${maxPct.toFixed(0)}%` };
                 exclusions.push(record);
@@ -660,8 +731,10 @@ class CableRoutingSystem {
         this.trays.forEach(tray => {
             const segment = tray.ductbankTag ? `conduit ${tray.conduit_id} in ductbank ${tray.ductbankTag}` : `tray ${tray.tray_id}`;
             const filter = tray.ductbankTag ? `racewayschedule.html?db=${encodeURIComponent(tray.ductbankTag)}` : `racewayschedule.html?tray=${encodeURIComponent(tray.tray_id)}`;
-            if (tray.current_fill + cableArea > tray.maxFill) {
-                const fillPct = (tray.width * tray.height) ? ((tray.current_fill + cableArea) / (tray.width * tray.height)) * 100 : 0;
+            if (!this._trayHasCapacityForCable(tray, cableArea, allowedGroup)) {
+                const slotForMsg = this._findSlotForCable(tray, allowedGroup);
+                const slotFill = slotForMsg >= 0 ? tray.slotFills[slotForMsg] : 0;
+                const fillPct = tray.maxFill ? ((slotFill + cableArea) / tray.maxFill) * 100 : 0;
                 const maxPct = this.fillLimit * 100;
                 const record = { tray_id: tray.tray_id, reason: 'over_capacity', cable_id: cableId, conduit_id: tray.conduit_id, ductbank_tag: tray.ductbankTag, filter, message: `Rejected ${tray.tray_id}: ${fillPct.toFixed(1)}% fill > Max ${maxPct.toFixed(0)}%` };
                 exclusions.push(record);
@@ -694,7 +767,8 @@ class CableRoutingSystem {
             for (const [toId, edge] of Object.entries(edgeMap)) {
                 if (edge.type === 'tray' && edge.trayId && this.trays.has(edge.trayId)) {
                     const t = this.trays.get(edge.trayId);
-                    const util = t.maxFill ? t.current_fill / t.maxFill : 0;
+                    const worstFill = Math.max(...t.slotFills);
+                    const util = t.maxFill ? worstFill / t.maxFill : 0;
                     if (util > 0) {
                         // Lazy clone: only copy the edge object when we actually mutate it
                         const cloned = { weight: edge.weight * (1 + util), type: edge.type, trayId: edge.trayId };
@@ -937,3 +1011,8 @@ self.onmessage = function(e) {
         self.postMessage({ success: false, error: err && err.message ? err.message : 'Routing calculation failed.' });
     }
 };
+
+// Allow Node.js test environment to import the routing class directly.
+if (typeof module !== 'undefined' && module.exports) {
+    module.exports = { CableRoutingSystem };
+}

@@ -80,6 +80,24 @@ export function trayFillPercent(tray, fillInSqIn) {
 }
 
 /**
+ * Return the fill percentage (0–100) for a single slot of a multi-compartment tray.
+ *
+ * @param {object} tray        Raceway schedule row (must have width/height dimensions).
+ * @param {number} slotIndex   Zero-based slot index.
+ * @param {number} slotFillSqIn  Current fill area for this slot in square inches.
+ * @returns {number|null}  Fill percentage, or null if dimensions are unknown.
+ */
+export function traySlotFillPercent(tray, slotIndex, slotFillSqIn) {
+  const width = parseFloat(tray.inside_width ?? tray.width) || 0;
+  const depth = parseFloat(tray.tray_depth ?? tray.height) || 0;
+  if (width <= 0 || depth <= 0) return null;
+  const numSlots = Math.max(1, parseInt(tray.num_slots) || 1);
+  if (slotIndex < 0 || slotIndex >= numSlots) return null;
+  const slotArea = (width * depth) / numSlots;
+  return (slotFillSqIn / slotArea) * 100;
+}
+
+/**
  * Return the derating factor for a given number of current-carrying conductors.
  * @param {number} conductorCount
  * @returns {number}
@@ -118,6 +136,41 @@ function checkTrayFill(trays, options = {}) {
   const limit = options.fillLimit ?? NEC_TRAY_FILL_LIMIT;
   const findings = [];
   for (const tray of trays) {
+    // Per-slot DRC-01 when routing system has provided slotFills[]
+    if (Array.isArray(tray.slotFills) && tray.slotFills.length > 1) {
+      const numSlots = tray.slotFills.length;
+      for (let i = 0; i < numSlots; i++) {
+        const pct = traySlotFillPercent(tray, i, tray.slotFills[i]);
+        if (pct === null) continue;
+        const slotLabel = tray.slotGroups?.get?.(i) ?? `slot ${i}`;
+        if (pct / 100 > limit) {
+          findings.push({
+            ruleId: 'DRC-01',
+            severity: DRC_SEVERITY.ERROR,
+            location: `${tray.tray_id} (${slotLabel})`,
+            message:
+              `Slot fill ${pct.toFixed(1)} % exceeds NEC 392.22(A) limit of ${(limit * 100).toFixed(0)} % ` +
+              `in compartment "${slotLabel}" of tray "${tray.tray_id}".`,
+            detail: `Slot ${i} fill: ${tray.slotFills[i].toFixed(2)} in².`,
+            reference: 'NEC 392.22(A)',
+            remediation: 'Reroute cables from this slot to a tray with available capacity, or widen the tray.',
+          });
+        } else if (pct / 100 > limit * 0.9) {
+          findings.push({
+            ruleId: 'DRC-01',
+            severity: DRC_SEVERITY.WARNING,
+            location: `${tray.tray_id} (${slotLabel})`,
+            message:
+              `Slot fill ${pct.toFixed(1)} % is within 10 % of the NEC 392.22(A) limit ` +
+              `in compartment "${slotLabel}" of tray "${tray.tray_id}".`,
+            reference: 'NEC 392.22(A)',
+            remediation: 'Monitor future cable additions to this slot.',
+          });
+        }
+      }
+      continue; // slot-level checks replace the whole-tray check
+    }
+
     const pct = trayFillPercent(tray);
     if (pct === null) continue;
     if (pct / 100 > limit) {
@@ -170,6 +223,29 @@ function checkSegregation(trays, trayCableMap) {
     );
 
     if (groups.size > 1) {
+      // Suppress DRC-02 when the tray is physically compartmented with a valid
+      // slot_groups mapping — mixed groups are intentional in that configuration
+      // because a listed metallic divider strip separates the voltage classes.
+      const numSlots = Math.max(1, parseInt(tray.num_slots) || 1);
+      if (numSlots > 1) {
+        const rawSlotGroups = tray.slot_groups;
+        let slotGroupsValid = false;
+        if (rawSlotGroups) {
+          try {
+            const parsed = typeof rawSlotGroups === 'string'
+              ? JSON.parse(rawSlotGroups)
+              : rawSlotGroups;
+            // Valid if at least one slot has a group assignment
+            slotGroupsValid = Object.keys(parsed).length > 0;
+          } catch { /* malformed JSON — not valid */ }
+        }
+        // Also accept a slotGroups Map (from the routing system)
+        if (!slotGroupsValid && tray.slotGroups instanceof Map) {
+          slotGroupsValid = tray.slotGroups.size > 0;
+        }
+        if (slotGroupsValid) continue;
+      }
+
       const trayGroup = (tray.allowed_cable_group ?? '').trim();
       findings.push({
         ruleId: 'DRC-02',
