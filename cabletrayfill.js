@@ -52,6 +52,7 @@ checkPrereqs([{key:'traySchedule',page:'racewayschedule.html',label:'Raceway Sch
       let lastColor   = '#66ccff'; // default cable color
       // Multi-compartment layout data for Expand Image
       let lastCompartmentLayouts = null; // array of per-compartment layout objects
+      let lastFillMap = {};              // worst fill % per compartment id (for expand heat-map)
 
       // Reference to <tbody> in the cable table
       const cableTbody = document.querySelector("#cableTable tbody");
@@ -1008,9 +1009,15 @@ checkPrereqs([{key:'traySchedule',page:'racewayschedule.html',label:'Raceway Sch
         // 6) Place cables by compartment
         // Returns a CSS class name based on fill percentage for heat-map coloring
         function fillHeatClass(pct) {
-          if (pct >= 80) return 'zone-fill-danger';
+          if (pct > 50) return 'zone-fill-danger';
           if (pct >= 40) return 'zone-fill-warning';
           return 'zone-fill-ok';
+        }
+        // Returns an rgba fill color for SVG heat-map backgrounds
+        function svgFillColor(pct) {
+          if (pct > 50) return 'rgba(220,53,69,0.18)';
+          if (pct >= 40) return 'rgba(255,193,7,0.20)';
+          return 'rgba(40,167,69,0.12)';
         }
 
         let voltageWarning = "";
@@ -1075,6 +1082,16 @@ checkPrereqs([{key:'traySchedule',page:'racewayschedule.html',label:'Raceway Sch
 
           return { comp, compWidth, compDepth, placed: result.placed, barrierX: result.barrierX, largeCount: result.largeCount, smallCount: result.smallCount };
         });
+
+        // Worst fill per compartment (for SVG heat-map background coloring)
+        const fillMap = {};
+        for (const zd of allZoneData) {
+          const m = zd.id.match(/^comp-gauge-(\d+)/);
+          if (m) {
+            const cid = parseInt(m[1], 10);
+            fillMap[cid] = Math.max(fillMap[cid] || 0, zd.pct);
+          }
+        }
 
         // Flat placed list (for overflow checks)
         let placedAll = [];
@@ -1150,7 +1167,28 @@ checkPrereqs([{key:'traySchedule',page:'racewayschedule.html',label:'Raceway Sch
           worstHTML += `</ul></section>`;
         }
 
-        let resultsHTML = `${worstHTML}
+        // NEC violations panel
+        const necLimit = (allCS || trayType === 'ladder') ? 50 : 40;
+        const violatingZones = allZoneData.filter(zd => zd.pct > necLimit);
+        let violationsHTML = '';
+        if (violatingZones.length > 0) {
+          const items = violatingZones
+            .map(zd => `<li><strong>${zd.label.replace(' Fill %', '')}</strong>: ${zd.pct.toFixed(1)}% (limit ${necLimit}%)</li>`)
+            .join('');
+          violationsHTML = `<div class="fill-violations-panel" role="alert">
+            <strong>&#9888; NEC Fill Violations (${violatingZones.length})</strong>
+            <ul>${items}</ul>
+          </div>`;
+        }
+
+        // Color legend
+        const legendHTML = `<div class="fill-heat-legend" aria-label="Fill color legend">
+          <span class="fhl-item fhl-ok">0\u201340% Safe</span>
+          <span class="fhl-item fhl-warn">40\u201350% Caution</span>
+          <span class="fhl-item fhl-danger">50%+ Violation</span>
+        </div>`;
+
+        let resultsHTML = `${violationsHTML}${worstHTML}
           <p>
             <strong>Tray Type:</strong> ${trayType === "ladder" ? "Ladder (50 % fill)" : "Solid Bottom (40 % fill)"}<br>
             <strong>Compartments:</strong> ${compartments.length}
@@ -1166,6 +1204,7 @@ checkPrereqs([{key:'traySchedule',page:'racewayschedule.html',label:'Raceway Sch
           ${singleWarning}
           ${groupWarning}
           ${voltageWarning}
+          ${legendHTML}
         `;
 
         // Store for "Expand Image"
@@ -1175,6 +1214,7 @@ checkPrereqs([{key:'traySchedule',page:'racewayschedule.html',label:'Raceway Sch
         lastType             = trayType;
         lastScale            = 20;
         lastCompartmentLayouts = compLayouts.map(cl => ({ ...cl }));
+        lastFillMap            = fillMap;
 
         // 14) Detect overflow per compartment
         let overflowHoriz = false;
@@ -1187,7 +1227,7 @@ checkPrereqs([{key:'traySchedule',page:'racewayschedule.html',label:'Raceway Sch
         });
 
         // 15) Draw the SVG — one rect per compartment, stacked vertically
-        document.getElementById("svgContainer").innerHTML = buildCompartmentSvg(compLayouts, trayName, cableColor, 20);
+        document.getElementById("svgContainer").innerHTML = buildCompartmentSvg(compLayouts, trayName, cableColor, 20, fillMap);
 
         // 16) Show overflow warnings
         if (overflowHoriz) {
@@ -1212,7 +1252,7 @@ checkPrereqs([{key:'traySchedule',page:'racewayschedule.html',label:'Raceway Sch
       });
 
       // ── Shared SVG builder for compartment-based tray cross-section ──────
-      function buildCompartmentSvg(compLayouts, trayName, cableColor, scale) {
+      function buildCompartmentSvg(compLayouts, trayName, cableColor, scale, fillMap = {}) {
         const nameRowPx    = trayName ? 24 : 0;
         const perCompHeaderPx = 24;  // dimension label row per compartment
         const compGapPx    = 8;      // vertical gap between compartments
@@ -1250,7 +1290,9 @@ checkPrereqs([{key:'traySchedule',page:'racewayschedule.html',label:'Raceway Sch
           svg += `<text x="${(compW/2).toFixed(2)}" y="${dimLineY-4}" font-size="9px" text-anchor="middle" font-family="Arial,sans-serif">${label}</text>`;
           svg += `<text x="${(compW/2).toFixed(2)}" y="${dimLineY+9}" font-size="9px" text-anchor="middle" font-family="Arial,sans-serif">${cl.compWidth.toFixed(1)}" × ${cl.compDepth.toFixed(1)}"</text>`;
 
-          // Compartment rectangle
+          // Compartment rectangle (heat-map background + border)
+          const compFillPct = fillMap[cl.comp.id] || 0;
+          svg += `<rect x="0" y="${rectY}" width="${compW.toFixed(2)}" height="${compH.toFixed(2)}" fill="${svgFillColor(compFillPct)}"/>`;
           svg += `<rect x="0" y="${rectY}" width="${compW.toFixed(2)}" height="${compH.toFixed(2)}" fill="none" stroke="#333" stroke-width="2"/>`;
 
           // Inner barrier (stackable vs non-stackable divider)
@@ -1297,7 +1339,7 @@ checkPrereqs([{key:'traySchedule',page:'racewayschedule.html',label:'Raceway Sch
         const trayName = document.getElementById("trayName").value.trim();
 
         // Build base SVG using shared helper at bigScale
-        let svg = buildCompartmentSvg(lastCompartmentLayouts, trayName, lastColor, bigScale);
+        let svg = buildCompartmentSvg(lastCompartmentLayouts, trayName, lastColor, bigScale, lastFillMap);
 
         // Inject text labels into each circle by post-processing the placed data
         // Re-render with text labels: build a richer SVG directly
@@ -1331,6 +1373,8 @@ checkPrereqs([{key:'traySchedule',page:'racewayschedule.html',label:'Raceway Sch
           bigSvg += `<line x1="${compW.toFixed(2)}" y1="${dimLineY-6}" x2="${compW.toFixed(2)}" y2="${dimLineY+6}" stroke="#000" stroke-width="2"/>`;
           bigSvg += `<text x="${(compW/2).toFixed(2)}" y="${dimLineY-5}" font-size="14px" text-anchor="middle" font-family="Arial,sans-serif">${label}</text>`;
           bigSvg += `<text x="${(compW/2).toFixed(2)}" y="${dimLineY+11}" font-size="14px" text-anchor="middle" font-family="Arial,sans-serif">${cl.compWidth.toFixed(1)}" × ${cl.compDepth.toFixed(1)}"</text>`;
+          const bigBgFill = svgFillColor(lastFillMap[cl.comp.id] || 0);
+          bigSvg += `<rect x="0" y="${rectY}" width="${compW.toFixed(2)}" height="${compH.toFixed(2)}" fill="${bigBgFill}"/>`;
           bigSvg += `<rect x="0" y="${rectY}" width="${compW.toFixed(2)}" height="${compH.toFixed(2)}" fill="none" stroke="#333" stroke-width="4"/>`;
 
           if (cl.largeCount > 0 && cl.smallCount > 0) {
