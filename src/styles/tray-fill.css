@@ -443,3 +443,51 @@ body.cabletrayfill-page .comp-remove-btn:disabled {
     font-size: 0.8rem;
 }
 
+/* ── NEC Violations Panel ──────────────────────────────────────────────── */
+.fill-violations-panel {
+    background: var(--error-bg);
+    border: 1px solid var(--color-error);
+    border-left: 4px solid var(--color-error);
+    border-radius: var(--radius-md);
+    padding: 10px 14px;
+    margin-bottom: 12px;
+    font-size: 0.9rem;
+    color: var(--color-text);
+}
+.fill-violations-panel ul {
+    margin: 6px 0 0 0;
+    padding-left: 18px;
+}
+.fill-violations-panel li {
+    margin: 2px 0;
+}
+
+/* ── Heat-Map Color Legend ─────────────────────────────────────────────── */
+.fill-heat-legend {
+    display: flex;
+    gap: 16px;
+    flex-wrap: wrap;
+    font-size: 0.78rem;
+    margin-top: 12px;
+    padding: 6px 10px;
+    background: var(--color-surface);
+    border: 1px solid var(--color-border);
+    border-radius: var(--radius-md);
+}
+.fhl-item {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+}
+.fhl-item::before {
+    content: '';
+    display: inline-block;
+    width: 14px;
+    height: 14px;
+    border-radius: 3px;
+    flex-shrink: 0;
+}
+.fhl-ok::before     { background: var(--color-success); }
+.fhl-warn::before   { background: var(--warning-text); }
+.fhl-danger::before { background: var(--color-error); }
+
