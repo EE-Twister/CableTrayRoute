@@ -296,7 +296,7 @@ describe('buildPullTable', () => {
 describe('cableQRPayload', () => {
   it('produces a URL with the cable tag in the fragment', () => {
     const payload = cableQRPayload('CABLE-001');
-    assert.ok(payload.includes('cableschedule.html#cable=CABLE-001'), `Got: ${payload}`);
+    assert.ok(payload.includes('fieldview.html#cable=CABLE-001'), `Got: ${payload}`);
   });
 
   it('URL-encodes special characters in the cable tag', () => {
