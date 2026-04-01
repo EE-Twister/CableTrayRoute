@@ -48,6 +48,7 @@ const entries = {
   transientstability: 'src/transientstability.js',
   voltagedropstudy: 'src/voltagedropstudy.js',
   productconfig: 'src/productconfig.js',
+  fieldview: 'src/fieldview.js',
   '404': 'src/404.js'
 };
 

@@ -1,0 +1,264 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <meta name="description" content="Mobile-optimized cable and tray detail view for field technicians scanning QR codes during cable installation." />
+  <title>Field View — CableTrayRoute</title>
+  <link rel="icon" href="icons/favicon.svg" type="image/svg+xml">
+  <link rel="apple-touch-icon" href="icons/favicon.svg">
+  <!-- Open Graph / Social sharing -->
+  <meta property="og:type" content="website">
+  <meta property="og:title" content="Field View — CableTrayRoute">
+  <meta property="og:description" content="Mobile cable and tray detail view for field installation.">
+  <meta property="og:image" content="https://cabletrayroute.com/icons/og-preview.png">
+  <meta property="og:site_name" content="CableTrayRoute">
+  <meta property="og:url" content="fieldview.html">
+  <!-- Canonical URL -->
+  <link rel="canonical" href="fieldview.html">
+  <meta name="color-scheme" content="light dark">
+  <link rel="stylesheet" href="style.css" />
+  <script type="module" src="dist/fieldview.js" defer></script>
+  <style>
+    /* -----------------------------------------------------------------------
+     * Field View — mobile-first layout
+     * Optimised for ~375px–600px viewport (smartphone / tablet in portrait).
+     * All typography is larger than the desktop app to be readable at arm's
+     * length on a bright job-site.
+     * --------------------------------------------------------------------- */
+
+    /* Minimal top bar — just logo + nav toggle; no wide desktop nav */
+    .fv-topbar {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 0.5rem 1rem;
+      background: var(--color-surface, #fff);
+      border-bottom: 1px solid var(--color-border, #ddd);
+    }
+    .fv-topbar-brand {
+      font-size: 1rem;
+      font-weight: 700;
+      color: var(--color-primary, #1a56db);
+      text-decoration: none;
+    }
+    .fv-topbar-brand span {
+      color: var(--color-muted, #555);
+      font-weight: 400;
+    }
+
+    .fv-container {
+      max-width: 640px;
+      margin: 0 auto;
+      padding: 1rem;
+    }
+
+    /* -----------------------------------------------------------------------
+     * Cable / tray card
+     * --------------------------------------------------------------------- */
+    .fv-card {
+      background: var(--color-surface, #fff);
+      border: 1px solid var(--color-border, #ddd);
+      border-radius: 10px;
+      overflow: hidden;
+      box-shadow: 0 2px 8px rgba(0,0,0,.08);
+    }
+
+    .fv-card-header {
+      display: flex;
+      align-items: center;
+      gap: 0.75rem;
+      padding: 1rem 1.25rem 0.75rem;
+      background: var(--color-primary-subtle, #eff6ff);
+      border-bottom: 1px solid var(--color-border, #ddd);
+    }
+
+    .fv-tag {
+      font-size: 1.6rem;
+      font-weight: 700;
+      letter-spacing: -0.02em;
+      color: var(--color-primary, #1a56db);
+      line-height: 1.1;
+      word-break: break-all;
+    }
+
+    .fv-type-badge {
+      display: inline-block;
+      padding: 0.2em 0.55em;
+      border-radius: 4px;
+      font-size: 0.75rem;
+      font-weight: 700;
+      text-transform: uppercase;
+      white-space: nowrap;
+    }
+    .fv-type-power   { background: #fee2e2; color: #b91c1c; }
+    .fv-type-control { background: #fef3c7; color: #92400e; }
+    .fv-type-signal  { background: #d1fae5; color: #065f46; }
+    .fv-tray-label   { font-size: 1rem; color: var(--color-muted, #555); }
+
+    /* Field rows — label above value for narrow screens */
+    .fv-fields {
+      padding: 0.25rem 0;
+    }
+
+    .fv-row {
+      display: flex;
+      flex-direction: column;
+      gap: 0.1rem;
+      padding: 0.65rem 1.25rem;
+      border-bottom: 1px solid var(--color-border-subtle, #f0f0f0);
+    }
+    .fv-row:last-child { border-bottom: none; }
+
+    .fv-label {
+      font-size: 0.7rem;
+      font-weight: 600;
+      text-transform: uppercase;
+      letter-spacing: 0.07em;
+      color: var(--color-muted, #666);
+    }
+
+    .fv-value {
+      font-size: 1.15rem;
+      font-weight: 500;
+      color: var(--color-fg, #111);
+      word-break: break-word;
+    }
+
+    /* -----------------------------------------------------------------------
+     * Action buttons
+     * --------------------------------------------------------------------- */
+    .fv-actions {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 0.5rem;
+      padding: 1rem 1.25rem;
+      background: var(--color-surface-alt, #f9f9f9);
+      border-top: 1px solid var(--color-border, #ddd);
+    }
+
+    .fv-btn {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      min-height: 44px;     /* touch target */
+      padding: 0.55rem 1.1rem;
+      border-radius: 6px;
+      font-size: 0.9rem;
+      font-weight: 600;
+      text-decoration: none;
+      cursor: pointer;
+      border: none;
+      white-space: nowrap;
+    }
+
+    .fv-btn-primary {
+      background: var(--color-primary, #1a56db);
+      color: #fff;
+    }
+    .fv-btn-primary:hover { background: var(--color-primary-dark, #1343b5); }
+
+    .fv-btn-secondary {
+      background: var(--color-surface, #fff);
+      color: var(--color-primary, #1a56db);
+      border: 1.5px solid var(--color-primary, #1a56db);
+    }
+    .fv-btn-secondary:hover { background: var(--color-primary-subtle, #eff6ff); }
+
+    .fv-btn-print {
+      background: var(--color-surface, #fff);
+      color: var(--color-fg, #111);
+      border: 1.5px solid var(--color-border, #ddd);
+    }
+    .fv-btn-print:hover { background: var(--color-surface-alt, #f5f5f5); }
+
+    /* -----------------------------------------------------------------------
+     * Status / info messages
+     * --------------------------------------------------------------------- */
+    .fv-message {
+      text-align: center;
+      padding: 2.5rem 1.5rem;
+      border-radius: 10px;
+      border: 1px solid var(--color-border, #ddd);
+    }
+    .fv-message-info  { background: var(--color-info-bg, #eff6ff); }
+    .fv-message-warn  { background: var(--color-warning-bg, #fffbeb); }
+
+    .fv-message-icon {
+      font-size: 2.5rem;
+      margin-bottom: 0.5rem;
+      line-height: 1;
+    }
+
+    .fv-message h2 {
+      font-size: 1.25rem;
+      margin: 0.25rem 0 0.75rem;
+    }
+
+    .fv-message p {
+      font-size: 0.95rem;
+      margin: 0 0 1rem;
+      color: var(--color-muted, #555);
+    }
+
+    /* -----------------------------------------------------------------------
+     * Print styles — strip nav, keep card only
+     * --------------------------------------------------------------------- */
+    @media print {
+      .fv-topbar,
+      .fv-actions,
+      .top-nav { display: none !important; }
+      .fv-card {
+        box-shadow: none;
+        border: 1px solid #999;
+      }
+      .fv-tag { font-size: 1.4rem; }
+    }
+
+    /* -----------------------------------------------------------------------
+     * Larger screens — minor cosmetic adjustments only
+     * --------------------------------------------------------------------- */
+    @media (min-width: 600px) {
+      .fv-row {
+        flex-direction: row;
+        align-items: baseline;
+        gap: 1rem;
+      }
+      .fv-label { width: 9rem; flex-shrink: 0; }
+    }
+  </style>
+</head>
+<body class="fieldview-page" data-report-title="Field View">
+  <a href="#main-content" class="skip-link">Skip to main content</a>
+
+  <!-- Minimal top bar — replaces the full desktop nav for this mobile page -->
+  <header class="fv-topbar" role="banner">
+    <a href="index.html" class="fv-topbar-brand" aria-label="CableTrayRoute home">
+      CableTray<span>Route</span>
+    </a>
+    <!-- Full nav available via hamburger inherited from navigation.js -->
+    <nav class="top-nav" aria-label="Primary" style="border:none;padding:0;background:transparent;">
+      <button id="nav-toggle" class="nav-toggle" aria-label="Toggle navigation"
+              aria-controls="nav-links" aria-expanded="false" title="Toggle navigation">
+        <img src="icons/toolbar/grid.svg" alt="" aria-hidden="true"
+             class="control-icon" loading="lazy" decoding="async">
+      </button>
+      <div id="nav-links" class="nav-links" role="list">
+        <!-- Populated dynamically by navigation.js -->
+      </div>
+    </nav>
+  </header>
+
+  <div class="fv-container">
+    <main id="main-content">
+      <!-- Cable or tray card injected here by fieldview.js -->
+      <div id="fv-content" aria-live="polite" aria-label="Field view content">
+        <!-- Loading placeholder — replaced immediately by JS -->
+        <p class="field-hint" style="text-align:center;padding:2rem 0;">Loading…</p>
+      </div>
+    </main>
+  </div>
+
+  <script type="module" src="dist/projectManager.js"></script>
+</body>
+</html>

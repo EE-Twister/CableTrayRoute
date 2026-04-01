@@ -41,15 +41,26 @@ export async function generateQRDataURL(text) {
 }
 
 /**
- * Build a cable schedule URL fragment for use in QR codes.
- * Scanning the QR code opens the cable schedule filtered to the given tag.
+ * Build a mobile field-view URL for use in QR codes on pull cards.
+ * Scanning the QR code opens the mobile-optimized field view for the cable.
  *
  * @param {string} cableTag
  * @param {string} [baseURL='https://cabletrayroute.com']
  * @returns {string}
  */
 export function cableQRPayload(cableTag, baseURL = 'https://cabletrayroute.com') {
-  return `${baseURL}/cableschedule.html#cable=${encodeURIComponent(cableTag)}`;
+  return `${baseURL}/fieldview.html#cable=${encodeURIComponent(cableTag)}`;
+}
+
+/**
+ * Build a mobile field-view URL for tray QR codes on hardware BOM / tray tags.
+ *
+ * @param {string} trayId
+ * @param {string} [baseURL='https://cabletrayroute.com']
+ * @returns {string}
+ */
+export function trayQRPayload(trayId, baseURL = 'https://cabletrayroute.com') {
+  return `${baseURL}/fieldview.html#tray=${encodeURIComponent(trayId)}`;
 }
 
 // ---------------------------------------------------------------------------
