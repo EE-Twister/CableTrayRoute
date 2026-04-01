@@ -1,5 +1,5 @@
 /**
- * Industry project templates for Gap #16.
+ * Industry project templates for Gap #16 and Gap #8 (AI Data Center).
  * Each template pre-populates cables and raceways when a new project is created.
  */
 
@@ -31,23 +31,39 @@ export const PROJECT_TEMPLATES = [
   },
   {
     id: 'data-center',
-    name: 'Data Center',
+    name: 'AI Data Center',
     icon: '🖥️',
-    description: 'Redundant A/B 480 V feeds, 208 V PDU branches, overhead wire-basket tray.',
+    // Gap #8: hot/cold aisle layout, structured cabling (Cat6A + fiber), power segregation.
+    // Power trays run overhead in hot aisles (A+B redundant feeds).
+    // Fiber backbone runs overhead in the cold aisle.
+    // Cat6A horizontal distribution runs under raised-floor (z = 1.5 ft).
+    description: 'Redundant A/B 480 V UPS feeds, 208 V PDU branches, overhead fiber backbone (OM4 + OS2), and Cat6A horizontal distribution in hot/cold aisle layout.',
     sections: {
       cables: [
-        { id: 'DC-CBL-FEED-A', from: 'UTILITY-A', to: 'UPS-A', conductor_size: '500 kcmil', insulation_type: 'THHN', voltage_rating: '480V', length: 95, route_preference: 'TRAY-PWR-A' },
-        { id: 'DC-CBL-FEED-B', from: 'UTILITY-B', to: 'UPS-B', conductor_size: '500 kcmil', insulation_type: 'THHN', voltage_rating: '480V', length: 100, route_preference: 'TRAY-PWR-B' },
-        { id: 'DC-CBL-PDU-A1', from: 'UPS-A', to: 'PDU-A1', conductor_size: '250 kcmil', insulation_type: 'THHN', voltage_rating: '480V', length: 55, route_preference: 'TRAY-PWR-A' },
-        { id: 'DC-CBL-PDU-B1', from: 'UPS-B', to: 'PDU-B1', conductor_size: '250 kcmil', insulation_type: 'THHN', voltage_rating: '480V', length: 55, route_preference: 'TRAY-PWR-B' },
-        { id: 'DC-CBL-BRANCH-01', from: 'PDU-A1', to: 'RACK-ROW-1', conductor_size: '#4 AWG', insulation_type: 'THHN', voltage_rating: '208V', length: 30, route_preference: 'TRAY-LOW-01' },
-        { id: 'DC-CBL-BRANCH-02', from: 'PDU-B1', to: 'RACK-ROW-1', conductor_size: '#4 AWG', insulation_type: 'THHN', voltage_rating: '208V', length: 32, route_preference: 'TRAY-LOW-01' }
+        // --- Power (hot-aisle overhead trays) ---
+        { id: 'DC-FEED-A', from: 'UTILITY-A', to: 'UPS-A', cable_type: 'Power', conductor_size: '500 kcmil', insulation_type: 'THHN', voltage_rating: '480V', length: 95, route_preference: 'TRAY-PWR-A', cable_od: 1.15 },
+        { id: 'DC-FEED-B', from: 'UTILITY-B', to: 'UPS-B', cable_type: 'Power', conductor_size: '500 kcmil', insulation_type: 'THHN', voltage_rating: '480V', length: 100, route_preference: 'TRAY-PWR-B', cable_od: 1.15 },
+        { id: 'DC-PDU-A1', from: 'UPS-A', to: 'PDU-A1', cable_type: 'Power', conductor_size: '250 kcmil', insulation_type: 'THHN', voltage_rating: '480V', length: 55, route_preference: 'TRAY-PWR-A', cable_od: 0.88 },
+        { id: 'DC-PDU-B1', from: 'UPS-B', to: 'PDU-B1', cable_type: 'Power', conductor_size: '250 kcmil', insulation_type: 'THHN', voltage_rating: '480V', length: 55, route_preference: 'TRAY-PWR-B', cable_od: 0.88 },
+        { id: 'DC-BRANCH-01', from: 'PDU-A1', to: 'RACK-ROW-1', cable_type: 'Power', conductor_size: '#4 AWG', insulation_type: 'THHN', voltage_rating: '208V', length: 30, route_preference: 'TRAY-PWR-A', cable_od: 0.54 },
+        { id: 'DC-BRANCH-02', from: 'PDU-B1', to: 'RACK-ROW-1', cable_type: 'Power', conductor_size: '#4 AWG', insulation_type: 'THHN', voltage_rating: '208V', length: 32, route_preference: 'TRAY-PWR-B', cable_od: 0.54 },
+        // --- Fiber backbone (cold-aisle overhead tray) ---
+        { id: 'DC-FIBER-OM4-01', from: 'MDA-PATCH-1', to: 'HDA-ROW-1', cable_type: 'Fiber', conductor_size: '#22 AWG', insulation_type: 'LSZH', voltage_rating: 'N/A', length: 60, route_preference: 'TRAY-FIBER-SPINE', cable_od: 0.35, notes: '12-strand OM4 multimode fiber backbone' },
+        { id: 'DC-FIBER-OS2-01', from: 'MDA-PATCH-1', to: 'HDA-ROW-2', cable_type: 'Fiber', conductor_size: '#22 AWG', insulation_type: 'LSZH', voltage_rating: 'N/A', length: 75, route_preference: 'TRAY-FIBER-SPINE', cable_od: 0.28, notes: '6-strand OS2 singlemode fiber backbone' },
+        // --- Cat6A horizontal distribution (under raised floor) ---
+        { id: 'DC-CAT6A-ROW1-01', from: 'HDA-ROW-1', to: 'RACK-A01', cable_type: 'Data', conductor_size: '#22 AWG', insulation_type: 'LSZH', voltage_rating: 'N/A', length: 25, route_preference: 'TRAY-DATA-ROW1', cable_od: 0.33, notes: 'Cat6A 10GBase-T horizontal run' },
+        { id: 'DC-CAT6A-ROW2-01', from: 'HDA-ROW-2', to: 'RACK-B01', cable_type: 'Data', conductor_size: '#22 AWG', insulation_type: 'LSZH', voltage_rating: 'N/A', length: 28, route_preference: 'TRAY-DATA-ROW2', cable_od: 0.33, notes: 'Cat6A 10GBase-T horizontal run' }
       ],
       raceways: {
         trays: [
-          { tray_id: 'TRAY-PWR-A', start_x: 0, start_y: 0, start_z: 12, end_x: 150, end_y: 0, end_z: 12, inside_width: 24, tray_depth: 4, tray_type: 'Wire Basket (50 % fill)', allowed_cable_group: 'power' },
-          { tray_id: 'TRAY-PWR-B', start_x: 0, start_y: 6, start_z: 12, end_x: 150, end_y: 6, end_z: 12, inside_width: 24, tray_depth: 4, tray_type: 'Wire Basket (50 % fill)', allowed_cable_group: 'power' },
-          { tray_id: 'TRAY-LOW-01', start_x: 0, start_y: 0, start_z: 1.5, end_x: 150, end_y: 0, end_z: 1.5, inside_width: 18, tray_depth: 4, tray_type: 'Solid Bottom (40 % fill)', allowed_cable_group: 'power' }
+          // Hot-aisle overhead power trays — Feed A and B run parallel at 10 ft and 10.5 ft
+          { tray_id: 'TRAY-PWR-A', start_x: 0, start_y: 0, start_z: 10, end_x: 150, end_y: 0, end_z: 10, inside_width: 24, tray_depth: 4, tray_type: 'Ladder (50 % fill)', allowed_cable_group: 'power' },
+          { tray_id: 'TRAY-PWR-B', start_x: 0, start_y: 6, start_z: 10.5, end_x: 150, end_y: 6, end_z: 10.5, inside_width: 24, tray_depth: 4, tray_type: 'Ladder (50 % fill)', allowed_cable_group: 'power' },
+          // Cold-aisle overhead fiber backbone — wire basket at 12 ft for maximum clearance
+          { tray_id: 'TRAY-FIBER-SPINE', start_x: 0, start_y: 3, start_z: 12, end_x: 150, end_y: 3, end_z: 12, inside_width: 12, tray_depth: 3, tray_type: 'Wire Basket (40 % fill)', allowed_cable_group: 'fiber' },
+          // Under-raised-floor Cat6A distribution trays — 1.5 ft AFF, one per server row
+          { tray_id: 'TRAY-DATA-ROW1', start_x: 0, start_y: 0, start_z: 1.5, end_x: 150, end_y: 0, end_z: 1.5, inside_width: 18, tray_depth: 3, tray_type: 'Solid Bottom (40 % fill)', allowed_cable_group: 'data' },
+          { tray_id: 'TRAY-DATA-ROW2', start_x: 0, start_y: 6, start_z: 1.5, end_x: 150, end_y: 6, end_z: 1.5, inside_width: 18, tray_depth: 3, tray_type: 'Solid Bottom (40 % fill)', allowed_cable_group: 'data' }
         ],
         conduits: [],
         ductbanks: []

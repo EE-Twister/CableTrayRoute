@@ -95,7 +95,7 @@ async function initCableSchedule() {
     THHN:90,XLPE:90,PVC:75,XHHW:90,'XHHW-2':90,'THWN-2':90,THW:75,THWN:75,TW:60,UF:60
   };
   const conductorSizes = ['#22 AWG','#20 AWG','#18 AWG','#16 AWG','#14 AWG','#12 AWG','#10 AWG','#8 AWG','#6 AWG','#4 AWG','#2 AWG','#1 AWG','1/0 AWG','2/0 AWG','3/0 AWG','4/0 AWG','250 kcmil','350 kcmil','500 kcmil','750 kcmil','1000 kcmil'];
-  const cableTypes = ['Power','Control','Signal'];
+  const cableTypes = ['Power','Control','Signal','Data','Fiber'];
   const conductorMaterials = ['Copper','Aluminum'];
   const insulationRatings = ['60','75','90'];
   const shieldingOptions = ['', 'Lead', 'Copper Tape'];
