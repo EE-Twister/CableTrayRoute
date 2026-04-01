@@ -10,6 +10,7 @@
  *   DRC-03  NEC 310.15     — Cable exceeds rated ampacity (with tray derating)
  *   DRC-04  NEC 250.122    — Power cables have no grounding conductor defined
  *   DRC-05  (advisory)     — Cables with no assigned route (unrouted cables)
+ *   DRC-06  TIA-568.0-D §4.5 — Structured cabling (Data/Fiber) shares tray with Power cables
  *
  * @module designRuleChecker
  */
@@ -423,6 +424,55 @@ function checkUnroutedCables(cables, trayCableMap, routedNames = new Set()) {
   return findings;
 }
 
+/**
+ * DRC-06 — Structured cabling EMI segregation.
+ * Flags tray segments where Data or Fiber cables share space with Power cables.
+ * Structured cabling (Category-rated copper and optical fiber) is susceptible to
+ * induced noise from nearby power conductors.  TIA-568.0-D §4.5 requires
+ * physical separation; NEC Article 800 governs communications cables near power.
+ *
+ * @param {Map<string, object[]>} trayCableMap  Map of tray_id → cable objects.
+ * @returns {DrcFinding[]}
+ */
+function checkDataCableSegregation(trayCableMap) {
+  const findings = [];
+  for (const [trayId, cables] of trayCableMap) {
+    if (cables.length < 2) continue;
+    const hasPower = cables.some(c =>
+      (c.cable_type ?? c.type ?? '').toLowerCase() === 'power'
+    );
+    const hasStructured = cables.some(c => {
+      const t = (c.cable_type ?? c.type ?? '').toLowerCase();
+      return t === 'data' || t === 'fiber';
+    });
+    if (!hasPower || !hasStructured) continue;
+    const structuredNames = cables
+      .filter(c => {
+        const t = (c.cable_type ?? c.type ?? '').toLowerCase();
+        return t === 'data' || t === 'fiber';
+      })
+      .map(c => c.name ?? c.tag)
+      .filter(Boolean);
+    findings.push({
+      ruleId: 'DRC-06',
+      severity: DRC_SEVERITY.WARNING,
+      location: trayId,
+      message:
+        `EMI segregation: structured cabling [${structuredNames.join(', ')}] ` +
+        `shares tray "${trayId}" with power cables.`,
+      detail:
+        'TIA-568.0-D §4.5 requires separation of Category-rated copper and optical fiber cables ' +
+        'from power conductors to prevent induced noise and signal degradation.',
+      reference: 'TIA-568.0-D §4.5 / NEC Article 800',
+      remediation:
+        'Route structured cabling (Data/Fiber) in a dedicated tray separate from power conductors. ' +
+        'Maintain ≥ 6 inches of clearance from power trays carrying conductors above 50 V. ' +
+        'Where proximity is unavoidable, install a grounded metallic barrier between power and data cables.',
+    });
+  }
+  return findings;
+}
+
 // ---------------------------------------------------------------------------
 // Public API
 // ---------------------------------------------------------------------------
@@ -474,6 +524,7 @@ export function runDRC(input, options = {}) {
     ...(options.skipAmpacity ? [] : checkAmpacity(cables, trayMap)),
     ...(options.skipGrounding ? [] : checkGrounding(cables)),
     ...checkUnroutedCables(cables, trayMap, routedCableNames),
+    ...checkDataCableSegregation(trayMap),
   ];
 
   // Mark each finding with its unique accept-risk key and any matching acceptance.

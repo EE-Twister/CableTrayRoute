@@ -7,6 +7,7 @@
  *   DRC-03 — Ampacity derating (NEC 310.15)
  *   DRC-04 — Grounding conductor (NEC 250.122)
  *   DRC-05 — Unrouted cables
+ *   DRC-06 — Structured cabling EMI segregation (TIA-568.0-D §4.5)
  *   Summary counts and passed flag
  *   formatDrcReport output
  */
@@ -572,5 +573,129 @@ describe('formatDrcReport() — accepted risk section', () => {
     const result = runDRC({ trays: [], cables: [], trayCableMap: {} });
     const report = formatDrcReport(result);
     assert.ok(!report.includes('Accepted Risk'), 'Report should not include accepted risk section when none exist');
+  });
+});
+
+// ---------------------------------------------------------------------------
+// DRC-06 — Structured cabling EMI segregation (TIA-568.0-D §4.5)
+// ---------------------------------------------------------------------------
+describe('DRC-06 — Structured cabling EMI segregation', () => {
+  it('fires WARNING when a Data cable shares a tray with a Power cable', () => {
+    const trayCableMap = {
+      'TRAY-MIXED': [
+        makeCable('PWR-001', { cable_type: 'Power' }),
+        makeCable('DATA-001', { cable_type: 'Data' }),
+      ],
+    };
+    const { findings } = runDRC({
+      trays: [makeTray('TRAY-MIXED', 0)],
+      cables: [],
+      trayCableMap,
+    });
+    const drc06 = findings.filter(f => f.ruleId === 'DRC-06');
+    assert.strictEqual(drc06.length, 1, 'Expected exactly 1 DRC-06 finding');
+    assert.strictEqual(drc06[0].severity, DRC_SEVERITY.WARNING, 'DRC-06 should be WARNING severity');
+    assert.ok(drc06[0].location === 'TRAY-MIXED', 'Location should be the tray ID');
+  });
+
+  it('fires WARNING when a Fiber cable shares a tray with a Power cable', () => {
+    const trayCableMap = {
+      'TRAY-FIBER-PWR': [
+        makeCable('FIBER-SPINE-01', { cable_type: 'Fiber' }),
+        makeCable('PWR-FEED-A', { cable_type: 'Power' }),
+      ],
+    };
+    const { findings } = runDRC({
+      trays: [makeTray('TRAY-FIBER-PWR', 0)],
+      cables: [],
+      trayCableMap,
+    });
+    const drc06 = findings.filter(f => f.ruleId === 'DRC-06');
+    assert.strictEqual(drc06.length, 1, 'Expected 1 DRC-06 for Fiber + Power mixing');
+    assert.ok(drc06[0].message.includes('FIBER-SPINE-01'), 'Message should name the structured cable');
+  });
+
+  it('does NOT fire when only Data cables share a tray (no power)', () => {
+    const trayCableMap = {
+      'TRAY-DATA-ONLY': [
+        makeCable('DATA-001', { cable_type: 'Data' }),
+        makeCable('FIBER-001', { cable_type: 'Fiber' }),
+      ],
+    };
+    const { findings } = runDRC({
+      trays: [makeTray('TRAY-DATA-ONLY', 0)],
+      cables: [],
+      trayCableMap,
+    });
+    const drc06 = findings.filter(f => f.ruleId === 'DRC-06');
+    assert.strictEqual(drc06.length, 0, 'No DRC-06 when tray has only structured cabling');
+  });
+
+  it('does NOT fire when Power and Control cables share a tray (covered by DRC-02)', () => {
+    const trayCableMap = {
+      'TRAY-PWR-CTRL': [
+        makeCable('PWR-001', { cable_type: 'Power', allowed_cable_group: 'power' }),
+        makeCable('CTRL-001', { cable_type: 'Control', allowed_cable_group: 'control' }),
+      ],
+    };
+    const { findings } = runDRC({
+      trays: [makeTray('TRAY-PWR-CTRL', 0)],
+      cables: [],
+      trayCableMap,
+    });
+    const drc06 = findings.filter(f => f.ruleId === 'DRC-06');
+    assert.strictEqual(drc06.length, 0, 'DRC-06 should not fire for Power + Control (only Power + Data/Fiber)');
+  });
+
+  it('does NOT fire when a single cable is in the tray', () => {
+    const trayCableMap = {
+      'TRAY-SINGLE': [makeCable('DATA-001', { cable_type: 'Data' })],
+    };
+    const { findings } = runDRC({
+      trays: [makeTray('TRAY-SINGLE', 0)],
+      cables: [],
+      trayCableMap,
+    });
+    const drc06 = findings.filter(f => f.ruleId === 'DRC-06');
+    assert.strictEqual(drc06.length, 0, 'No DRC-06 for a single-cable tray');
+  });
+
+  it('fires once per mixed tray even with multiple structured cables', () => {
+    const trayCableMap = {
+      'TRAY-MULTI-DATA': [
+        makeCable('PWR-001', { cable_type: 'Power' }),
+        makeCable('DATA-001', { cable_type: 'Data' }),
+        makeCable('DATA-002', { cable_type: 'Data' }),
+        makeCable('FIBER-001', { cable_type: 'Fiber' }),
+      ],
+    };
+    const { findings } = runDRC({
+      trays: [makeTray('TRAY-MULTI-DATA', 0)],
+      cables: [],
+      trayCableMap,
+    });
+    const drc06 = findings.filter(f => f.ruleId === 'DRC-06');
+    assert.strictEqual(drc06.length, 1, 'Exactly one DRC-06 per tray regardless of cable count');
+    assert.ok(drc06[0].message.includes('DATA-001'), 'Message lists first structured cable');
+  });
+
+  it('DRC-06 finding includes non-empty remediation text', () => {
+    const trayCableMap = {
+      'TRAY-REM': [
+        makeCable('PWR-X', { cable_type: 'Power' }),
+        makeCable('CAT6A-X', { cable_type: 'Data' }),
+      ],
+    };
+    const { findings } = runDRC({
+      trays: [makeTray('TRAY-REM', 0)],
+      cables: [],
+      trayCableMap,
+    });
+    const drc06 = findings.find(f => f.ruleId === 'DRC-06');
+    assert.ok(drc06, 'Expected a DRC-06 finding');
+    assert.ok(typeof drc06.remediation === 'string' && drc06.remediation.length > 0,
+      'DRC-06 finding should have non-empty remediation text');
+    assert.ok(drc06.reference.includes('TIA-568'),
+      'DRC-06 reference should cite TIA-568');
   });
 });

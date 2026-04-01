@@ -140,7 +140,7 @@ The following gaps were discovered by reviewing competitor release notes and pro
 |---|---|---|
 | **Data Center Cable Tray Rack Templates** | SnakeTray, Chatsworth Products, industry trend | The AI data center buildout (2025–2026) has driven demand for specialized cable tray configurations: overhead ladder rack in hot/cold aisle arrangements, top-of-rack (ToR) patch routing, power whip scheduling, and structured cabling density calculations for 400G/800G optical links. No competitor has fully addressed this, but SnakeTray and Chatsworth have published application guides and product families specifically targeting AI data centers. CableTrayRoute has no data center–specific templates, typical aisle configurations, or structured cabling (Cat6A/fiber) fill models. |
 
-**Status:** Not implemented. Represents a significant growth market. Feasible as template presets, structured cabling cable types, and aisle-configuration wizards.
+**Status:** ✅ Implemented. `src/projectTemplates.js` provides an **AI Data Center** project template with hot/cold aisle overhead ladder rack topology: redundant 480 V A/B UPS feeds and 208 V PDU branches on dedicated power trays (`TRAY-PWR-A`, `TRAY-PWR-B`), OM4 and OS2 fiber backbone on a cold-aisle wire-basket tray (`TRAY-FIBER-SPINE`), and Cat6A horizontal distribution under raised-floor (`TRAY-DATA-ROW1/2`). `cableschedule.js` adds `'Data'` and `'Fiber'` cable type options to the cable schedule, enabling structured cabling entries alongside power and control cables. `analysis/designRuleChecker.mjs` **DRC-06** (TIA-568.0-D §4.5 / NEC Article 800) raises a WARNING when Data or Fiber cables share a tray with Power cables, with actionable remediation guidance.
 
 ---
 
@@ -450,7 +450,7 @@ These gaps describe areas where CableTrayRoute's calculation engine uses simplif
 | Multi-Slot / Compartmented Tray Fill | **Yes ✓** | — | — | — | — | — | — | — | Yes | — |
 | QR Code Tag Generation | **Yes** ✓ | Yes | — | — | — | — | — | — | — | — |
 | Electrical Digital Twin Integration | **No** | Yes | — | — | — | — | — | — | — | — |
-| Data Center Infrastructure Templates | **No** | — | — | — | — | — | — | — | — | — |
+| Data Center Infrastructure Templates | **Yes** ✓ | — | — | — | — | — | — | — | — | — |
 | Ordered-Length Cable Procurement | **No** | — | — | — | — | — | — | — | — | — |
 | Open REST API / Scripting Automation | **Yes** ✓ | Yes | — | — | — | — | Yes | — | — | — |
 | Parallel Cable / Multi-Core Runs | **No** | Yes | — | — | — | — | — | — | — | — |
@@ -510,7 +510,7 @@ All originally high- and medium-priority feasible items have been implemented:
 4. ~~**Open REST API / Scripting Automation**~~ → `server.mjs` `/api/v1/` routes, `docs/api-reference.md` ✅
 5. **Ordered-Length Cable Procurement Planning** — Extend `spoolSheets.mjs` and `pullCards.mjs` to compute factory cut lengths, apply standard reel lengths, and minimize waste. Produces a cable procurement schedule.
 6. ~~**Multi-Slot / Compartmented Tray Fill**~~ — Per-slot fill tracking via `slotFills[]`, `slot_groups` JSON field, per-slot DRC-01/DRC-02 in the DRC, and auto-populated fill UI. ✅
-7. **Data Center Infrastructure Templates** — Add AI data center wizard: hot/cold aisle overhead ladder rack presets, structured cabling (Cat6A/fiber) cable types, top-of-rack routing templates, and high-density fill density guidance.
+7. ~~**Data Center Infrastructure Templates**~~ — AI Data Center template with hot/cold aisle topology, Cat6A/fiber cable types, and DRC-06 EMI segregation rule. ✅
 8. **Parallel Cable / Multi-Core Runs** — Extend the cable schedule data model to represent parallel runs (n × conductor size) as a first-class object with aggregate ampacity and combined tray fill.
 
 ### New Low-Priority / Deferred (2026-03-24)
@@ -702,7 +702,7 @@ The table below lists the recommended next work items in priority order.
 | 14 | **Auto-Sizing Cu/Al Cost Optimization** (#24) | Integrate `analysis/costEstimate.mjs` into `analysis/autoSize.mjs` sizing loop. |
 | 15 | **Results Annotation / Approval Workflow** (#19) | Notes fields and Draft/Reviewed/Approved status on cable and tray records. |
 | 16 | **Mobile-Optimized Field Access View** (#21) | Simplified responsive read-only view for cable schedules and pull cards. |
-| 17 | **Data Center Infrastructure Templates** (#8) | Hot/cold aisle presets, structured cabling types, ToR patch routing templates. |
+| 17 | ~~**Data Center Infrastructure Templates** (#8)~~ | ✅ AI Data Center template, Cat6A/Fiber cable types, DRC-06 EMI segregation. |
 | 18 | **Cloud-Based Component Library** (#12) | Shared org-wide product library over existing collaboration backend. |
 
 ### Deferred (Requires Native Desktop Infrastructure)
