@@ -83,6 +83,53 @@ function buildLink(route, currentRoute) {
   return link;
 }
 
+function buildDropdown(section, routes, currentRoute) {
+  const wrapper = document.createElement('div');
+  wrapper.className = 'nav-dropdown';
+
+  const trigger = document.createElement('button');
+  trigger.className = 'nav-dropdown-trigger';
+  trigger.type = 'button';
+  trigger.textContent = section;
+  trigger.setAttribute('aria-haspopup', 'true');
+  trigger.setAttribute('aria-expanded', 'false');
+
+  if (currentRoute && currentRoute.section === section) {
+    trigger.classList.add('active');
+  }
+
+  const menu = document.createElement('ul');
+  menu.className = 'nav-dropdown-menu';
+  menu.setAttribute('role', 'menu');
+
+  routes.forEach(route => {
+    const item = document.createElement('li');
+    item.setAttribute('role', 'none');
+    const link = buildLink(route, currentRoute);
+    link.setAttribute('role', 'menuitem');
+    item.appendChild(link);
+    menu.appendChild(item);
+  });
+
+  wrapper.appendChild(trigger);
+  wrapper.appendChild(menu);
+
+  trigger.addEventListener('click', (e) => {
+    e.stopPropagation();
+    const isOpen = wrapper.classList.contains('open');
+    document.querySelectorAll('.nav-dropdown.open').forEach(d => {
+      if (d !== wrapper) {
+        d.classList.remove('open');
+        d.querySelector('.nav-dropdown-trigger')?.setAttribute('aria-expanded', 'false');
+      }
+    });
+    wrapper.classList.toggle('open', !isOpen);
+    trigger.setAttribute('aria-expanded', String(!isOpen));
+  });
+
+  return wrapper;
+}
+
 function buildBreadcrumb(currentRoute) {
   const breadcrumb = document.createElement('nav');
   breadcrumb.className = 'breadcrumb-trail';
@@ -174,8 +221,14 @@ function mountPersistentNavigation() {
   const navLinks = document.createElement('div');
   navLinks.id = 'nav-links';
   navLinks.className = 'nav-links';
-  NAV_ROUTES.forEach(route => {
-    navLinks.appendChild(buildLink(route, currentRoute));
+  const navSections = [...new Set(NAV_ROUTES.map(r => r.section))];
+  navSections.forEach(section => {
+    const sectionRoutes = NAV_ROUTES.filter(r => r.section === section);
+    if (section === 'Home') {
+      navLinks.appendChild(buildLink(sectionRoutes[0], currentRoute));
+    } else {
+      navLinks.appendChild(buildDropdown(section, sectionRoutes, currentRoute));
+    }
   });
 
   if (existingSettingsBtn) {
@@ -289,6 +342,24 @@ function mountPersistentNavigation() {
   document.addEventListener('keydown', (e) => {
     if (e.key === 'Escape' && sidebar.classList.contains('sidebar-open')) {
       closeSidebar();
+    }
+  });
+
+  // Close dropdowns on outside click
+  document.addEventListener('click', () => {
+    document.querySelectorAll('.nav-dropdown.open').forEach(d => {
+      d.classList.remove('open');
+      d.querySelector('.nav-dropdown-trigger')?.setAttribute('aria-expanded', 'false');
+    });
+  });
+
+  // Close dropdowns on Escape
+  document.addEventListener('keydown', (e) => {
+    if (e.key === 'Escape') {
+      document.querySelectorAll('.nav-dropdown.open').forEach(d => {
+        d.classList.remove('open');
+        d.querySelector('.nav-dropdown-trigger')?.setAttribute('aria-expanded', 'false');
+      });
     }
   });
 
