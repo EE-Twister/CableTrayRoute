@@ -189,11 +189,19 @@ export function groupCablesIntoPulls(routeResults = [], cableList = []) {
  * @returns {PullCard} enriched pull card with tension and route detail
  */
 export function buildPullCard(pull) {
-  const totalWeight = pull.cables.reduce((sum, c) => sum + (c.weight || 0), 0);
+  const totalWeight = pull.cables.reduce((sum, c) => {
+    const p = Math.max(1, parseInt(c.parallel_count) || 1);
+    return sum + (c.weight || 0) * p;
+  }, 0);
   const maxDiameter = Math.max(...pull.cables.map(c => c.diameter || 0), 0);
   const totalArea = pull.cables.reduce((sum, c) => {
     const d = c.diameter || 0;
-    return sum + Math.PI * (d / 2) ** 2;
+    const p = Math.max(1, parseInt(c.parallel_count) || 1);
+    return sum + Math.PI * (d / 2) ** 2 * p;
+  }, 0);
+  // Total physical cable count accounts for parallel sets
+  const parallelCableCount = pull.cables.reduce((sum, c) => {
+    return sum + Math.max(1, parseInt(c.parallel_count) || 1);
   }, 0);
 
   // Build route description with from/to tags
@@ -236,6 +244,7 @@ export function buildPullCard(pull) {
     pull_number: pull.pull_number,
     cable_type: pull.cable_type,
     cable_count: pull.cable_count,
+    parallel_cable_count: parallelCableCount,
     cables: pull.cables,
     cable_tags: pull.cables.map(c => c.tag),
     from: formatPt(firstSeg?.start),

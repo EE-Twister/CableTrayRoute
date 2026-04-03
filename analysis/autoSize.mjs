@@ -524,7 +524,28 @@ export function sizeFeeder(params) {
 
   const requiredAmps = continuous ? loadAmps * 1.25 : loadAmps;
   const conductor = selectConductorSize(requiredAmps, material, tempRating, { ambientTempC, bundledConductors, installationType });
-  if (!conductor) return { error: 'Load exceeds maximum single-conductor capacity; use parallel conductors' };
+  if (!conductor) {
+    // Find the minimum parallel set count that satisfies the load (NEC 310.10(H))
+    let parallelSuggestion = null;
+    for (let nParallel = 2; nParallel <= 6; nParallel++) {
+      const opt = evaluateConductorOption(requiredAmps, material, tempRating, nParallel, {
+        ambientTempC, installationType,
+      });
+      if (opt && !opt.violatesParallelRule) {
+        parallelSuggestion = {
+          count: nParallel,
+          size: opt.size,
+          installedAmpacity: opt.installedAmpacity,
+          note: `${nParallel} × ${opt.size} ${material} (NEC 310.10(H) — min size 1/0 AWG, each set in a separate conduit)`,
+        };
+        break;
+      }
+    }
+    return {
+      error: 'Load exceeds maximum single-conductor capacity; use parallel conductors',
+      parallelSuggestion,
+    };
+  }
 
   const ocpd = nextStandardOcpd(conductor.ampacity);
   const derating = conductor.deratingFactor;

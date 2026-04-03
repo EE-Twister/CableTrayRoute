@@ -11,6 +11,7 @@
  *   DRC-04  NEC 250.122    — Power cables have no grounding conductor defined
  *   DRC-05  (advisory)     — Cables with no assigned route (unrouted cables)
  *   DRC-06  TIA-568.0-D §4.5 — Structured cabling (Data/Fiber) shares tray with Power cables
+ *   DRC-07  NEC 310.10(H) — Parallel conductor requirements (min size, equal length)
  *
  * @module designRuleChecker
  */
@@ -304,20 +305,26 @@ function checkAmpacity(cables, trayCableMap) {
 
     if (ratedAmpacity === null) continue;
 
+    // Parallel sets multiply the effective ampacity (NEC 310.10(H))
+    const parallelCount = Math.max(1, parseInt(cable.parallel_count) || 1);
+    const aggregateAmpacity = ratedAmpacity * parallelCount;
+
     const trayIds = cableTrayMap.get(name) ?? [];
     for (const trayId of trayIds) {
       const cohabitants = trayCableMap.get(trayId) ?? [];
-      // Count current-carrying conductors (power cables × their conductors per phase)
+      // Count current-carrying conductors (power cables × conductors × parallel sets)
       const conductorCount = cohabitants.reduce((sum, c) => {
         const type = (c.cable_type ?? c.type ?? '').toLowerCase();
         if (type && type !== 'power' && type !== 'pwr') return sum;
         const conductors = parseInt(c.conductors, 10) || 3;
-        return sum + conductors;
+        const parallelSets = Math.max(1, parseInt(c.parallel_count) || 1);
+        return sum + conductors * parallelSets;
       }, 0);
 
       const factor = derateFactor(conductorCount);
-      const deratedAmpacity = ratedAmpacity * factor;
+      const deratedAmpacity = aggregateAmpacity * factor;
       const designCurrent = parseFloat(cable.design_current ?? cable.load_amps) || null;
+      const parallelLabel = parallelCount > 1 ? ` (${parallelCount} × ${ratedAmpacity} A)` : '';
 
       if (designCurrent !== null && designCurrent > deratedAmpacity) {
         findings.push({
@@ -326,12 +333,12 @@ function checkAmpacity(cables, trayCableMap) {
           location: `${name} @ ${trayId}`,
           message:
             `Cable "${name}" design current ${designCurrent} A exceeds derated ampacity ` +
-            `${deratedAmpacity.toFixed(1)} A (${ratedAmpacity} A × ${factor} derating).`,
+            `${deratedAmpacity.toFixed(1)} A (${aggregateAmpacity} A aggregate${parallelLabel} × ${factor} derating).`,
           detail:
             `${conductorCount} current-carrying conductors in tray "${trayId}" ` +
             `(NEC 310.15 derating factor ${factor}).`,
           reference: 'NEC 310.15',
-          remediation: `Upgrade the conductor to the next larger standard size, reduce the number of bundled conductors by splitting into a separate tray, or reduce the design load current for "${name}".`,
+          remediation: `Upgrade the conductor to the next larger standard size, increase the number of parallel sets (NEC 310.10(H)), split into a separate tray to reduce bundling derating, or reduce the design load current for "${name}".`,
         });
       } else if (factor < 1.0) {
         // Advisory: derating applied even if not over limit
@@ -340,12 +347,81 @@ function checkAmpacity(cables, trayCableMap) {
           severity: DRC_SEVERITY.INFO,
           location: `${name} @ ${trayId}`,
           message:
-            `Tray bundling derating applied: ${ratedAmpacity} A → ${deratedAmpacity.toFixed(1)} A ` +
+            `Tray bundling derating applied: ${aggregateAmpacity} A aggregate${parallelLabel} → ${deratedAmpacity.toFixed(1)} A ` +
             `(factor ${factor}, ${conductorCount} current-carrying conductors).`,
           reference: 'NEC 310.15',
           remediation: 'No action required if the derated ampacity remains above the design current. Consider segregating conductors into separate tray sections to reduce derating.',
         });
       }
+    }
+  }
+  return findings;
+}
+
+// ---------------------------------------------------------------------------
+// NEC 310.10(H)(1) — AWG sizes smaller than 1/0 AWG are too small for parallel
+// conductor sets.  The metric threshold is 50 mm² (≈ 1/0 AWG).
+// ---------------------------------------------------------------------------
+const PARALLEL_UNDERSIZED_AWG = new Set([
+  '#14 AWG', '#12 AWG', '#10 AWG', '#8 AWG',
+  '#6 AWG', '#4 AWG', '#3 AWG', '#2 AWG', '#1 AWG',
+]);
+
+/**
+ * DRC-07 — NEC 310.10(H) parallel conductor requirements.
+ * When a cable record specifies parallel_count > 1, validate:
+ *   (a) Conductor size is at least 1/0 AWG (NEC 310.10(H)(1)).
+ *   (b) A cable length is recorded so equal-length compliance can be verified.
+ *
+ * @param {object[]} cables  Cable schedule rows.
+ * @returns {DrcFinding[]}
+ */
+function checkParallelConductors(cables) {
+  const findings = [];
+  for (const cable of cables) {
+    const name = cable.name ?? cable.tag;
+    if (!name) continue;
+    const parallelCount = parseInt(cable.parallel_count) || 1;
+    if (parallelCount <= 1) continue;
+
+    const size = (cable.conductor_size ?? cable.conductor ?? '').trim();
+
+    // (a) Minimum size check — AWG sizes below 1/0 AWG are not permitted
+    if (size && PARALLEL_UNDERSIZED_AWG.has(size)) {
+      findings.push({
+        ruleId: 'DRC-07',
+        severity: DRC_SEVERITY.ERROR,
+        location: name,
+        message:
+          `Cable "${name}" uses ${parallelCount} parallel sets of ${size}, ` +
+          `but NEC 310.10(H)(1) requires each parallel conductor to be 1/0 AWG or larger.`,
+        detail:
+          `Conductor size "${size}" is below the NEC 310.10(H)(1) minimum of 1/0 AWG ` +
+          `for parallel conductor sets.`,
+        reference: 'NEC 310.10(H)(1)',
+        remediation:
+          `Upsize the conductor to at least 1/0 AWG, or redesign as a single larger conductor. ` +
+          `Parallel sets are intended for large feeders where a single conductor of adequate ` +
+          `ampacity is not available or practical.`,
+      });
+    }
+
+    // (b) Length not recorded — cannot verify equal-length compliance
+    const length = parseFloat(cable.length ?? cable.length_ft);
+    if (!(length > 0)) {
+      findings.push({
+        ruleId: 'DRC-07',
+        severity: DRC_SEVERITY.WARNING,
+        location: name,
+        message:
+          `Cable "${name}" has ${parallelCount} parallel sets but no length is recorded. ` +
+          `NEC 310.10(H)(1) requires all parallel conductors in a set to be the same length.`,
+        reference: 'NEC 310.10(H)(1)',
+        remediation:
+          `Enter the cable run length in the Cable Schedule. ` +
+          `All ${parallelCount} parallel conductors must have the same length, conductor size, ` +
+          `insulation type, and conductor material to ensure balanced current sharing.`,
+      });
     }
   }
   return findings;
@@ -488,7 +564,8 @@ function checkDataCableSegregation(trayCableMap) {
  * @param {object}   [options]
  * @param {number}   [options.fillLimit=0.40]   Tray fill fraction limit.
  * @param {boolean}  [options.skipGrounding]    Skip DRC-04 grounding checks.
- * @param {boolean}  [options.skipAmpacity]     Skip DRC-03 ampacity checks.
+ * @param {boolean}  [options.skipAmpacity]       Skip DRC-03 ampacity checks.
+ * @param {boolean}  [options.skipParallelCheck] Skip DRC-07 parallel conductor checks.
  *
  * @returns {{ findings: DrcFinding[], summary: DrcSummary }}
  *
@@ -525,6 +602,7 @@ export function runDRC(input, options = {}) {
     ...(options.skipGrounding ? [] : checkGrounding(cables)),
     ...checkUnroutedCables(cables, trayMap, routedCableNames),
     ...checkDataCableSegregation(trayMap),
+    ...(options.skipParallelCheck ? [] : checkParallelConductors(cables)),
   ];
 
   // Mark each finding with its unique accept-risk key and any matching acceptance.
