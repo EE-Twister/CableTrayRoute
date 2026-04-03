@@ -49,6 +49,7 @@ const entries = {
   voltagedropstudy: 'src/voltagedropstudy.js',
   productconfig: 'src/productconfig.js',
   fieldview: 'src/fieldview.js',
+  scenariocomparison: 'src/scenarioComparison.js',
   '404': 'src/404.js'
 };
 
