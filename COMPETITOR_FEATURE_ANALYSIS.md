@@ -459,7 +459,7 @@ These gaps describe areas where CableTrayRoute's calculation engine uses simplif
 | **Usability: Contextual fix guidance in violations** | **No** | Yes | Yes | — | — | — | — | — | — | — |
 | **Usability: Visual fill gauges / heat-maps** | **No** | — | — | — | — | Yes | — | — | Yes | — |
 | **Usability: Configuration profiles / templates** | **No** | Yes | — | — | — | — | Yes | — | — | — |
-| **Usability: Scenario comparison UI** | **No** | Yes | Yes | — | — | — | — | — | — | — |
+| **Usability: Scenario comparison UI** | **Yes** ✓ | Yes | Yes | — | — | — | — | — | — | — |
 | **Usability: Full workflow onboarding tour** | **Yes** ✓ | Yes | Yes | — | — | Yes | — | — | — | — |
 | **Usability: Results annotation / approval workflow** | **No** | Yes | — | — | — | Yes | — | — | — | — |
 | **Usability: Workflow progress dashboard** | **No** | — | Yes | — | — | — | Yes | — | — | — |
@@ -537,7 +537,7 @@ All originally high- and medium-priority feasible items have been implemented:
 **Medium Priority — Usability:**
 
 5. **Visual fill gauges and violation heat-map** (Gap #15) — Add SVG/CSS progress bars to `cabletrayfill.html` results; color-code violation rows in all analysis result tables.
-6. **Scenario comparison UI** (Gap #17) — Extend `src/scenarios.js` to render a side-by-side comparison table for two selected scenarios.
+6. ~~**Scenario comparison UI**~~ (Gap #17) → Implemented. Dedicated `scenarios.html` page with side-by-side cable schedule diff (Added/Removed/Changed), tray fill gauges, and study results comparison. `src/scenarioComparison.js`, `src/styles/scenarioComparison.css`. ✅
 7. **Configuration profiles / project templates** (Gap #16) — Add an "Industry Template" selector to the new-project flow with Oil & Gas, Data Center, and Industrial presets.
 8. ~~**Expanded onboarding tour**~~ (Gap #18) → Implemented. `tour.js` refactored; 5-step interactive tours on Cable Schedule, Raceway Schedule, Tray Fill, and Optimal Route pages with auto-trigger on first visit. ✅
 

@@ -1,0 +1,266 @@
+/* =========================================================
+   Scenario Comparison Page — scenarios.html
+   ========================================================= */
+
+/* ---- Scenario selector row ---- */
+.sc-selectors {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-end;
+  gap: 1rem;
+  margin-bottom: 1.25rem;
+}
+
+.sc-selectors label {
+  display: flex;
+  flex-direction: column;
+  gap: 0.25rem;
+  font-weight: 600;
+  font-size: 0.875rem;
+}
+
+.sc-selectors select {
+  min-width: 10rem;
+  padding: 0.4rem 0.6rem;
+  border-radius: var(--radius, 6px);
+  border: 1px solid var(--color-border, #d1d5db);
+  background: var(--color-surface, #fff);
+  color: var(--color-text, inherit);
+  font-size: 0.875rem;
+}
+
+.sc-compare-btn {
+  align-self: flex-end;
+  padding: 0.45rem 1.2rem;
+  border-radius: var(--radius, 6px);
+  background: var(--color-accent, #2563eb);
+  color: #fff;
+  border: none;
+  font-weight: 600;
+  font-size: 0.875rem;
+  cursor: pointer;
+}
+
+.sc-compare-btn:hover {
+  background: var(--color-accent-hover, #1d4ed8);
+}
+
+/* ---- Summary badges ---- */
+.sc-summary-badges {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.75rem;
+  margin-bottom: 1.25rem;
+}
+
+.sc-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+  padding: 0.3rem 0.75rem;
+  border-radius: 999px;
+  font-size: 0.8rem;
+  font-weight: 700;
+  white-space: nowrap;
+}
+
+.sc-badge--added {
+  background: #dcfce7;
+  color: #15803d;
+  border: 1px solid #86efac;
+}
+
+.sc-badge--removed {
+  background: #fee2e2;
+  color: #b91c1c;
+  border: 1px solid #fca5a5;
+}
+
+.sc-badge--changed {
+  background: #fef3c7;
+  color: #92400e;
+  border: 1px solid #fcd34d;
+}
+
+.sc-badge--unchanged {
+  background: var(--color-surface-alt, #f9fafb);
+  color: var(--color-text-muted, #6b7280);
+  border: 1px solid var(--color-border, #e5e7eb);
+}
+
+/* ---- Cable diff table ---- */
+.sc-diff-scroll {
+  overflow-x: auto;
+  border-radius: var(--radius, 6px);
+  border: 1px solid var(--color-border, #e5e7eb);
+}
+
+.sc-diff-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 0.85rem;
+}
+
+.sc-diff-table th {
+  padding: 0.45rem 0.75rem;
+  text-align: left;
+  font-weight: 600;
+  background: var(--color-surface-alt, #f9fafb);
+  border-bottom: 2px solid var(--color-border, #e5e7eb);
+  white-space: nowrap;
+}
+
+.sc-diff-table td {
+  padding: 0.35rem 0.75rem;
+  border-bottom: 1px solid var(--color-border, #e5e7eb);
+  vertical-align: middle;
+}
+
+.sc-diff-table tbody tr:last-child td {
+  border-bottom: none;
+}
+
+/* Row status colours */
+.sc-diff-table tr.cmp-added   { background: #f0fdf4; }
+.sc-diff-table tr.cmp-removed { background: #fff5f5; }
+.sc-diff-table tr.cmp-changed { background: #fffbeb; }
+
+.sc-diff-table tr.cmp-added   td:first-child { color: #15803d; font-weight: 700; }
+.sc-diff-table tr.cmp-removed td:first-child { color: #b91c1c; font-weight: 700; }
+.sc-diff-table tr.cmp-changed td:first-child { color: #92400e; font-weight: 700; }
+
+.sc-empty-note {
+  padding: 1rem;
+  color: var(--color-text-muted, #6b7280);
+  font-style: italic;
+  text-align: center;
+}
+
+/* ---- Side-by-side two-column layout ---- */
+.sc-side-by-side {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 1rem;
+}
+
+@media (max-width: 640px) {
+  .sc-side-by-side {
+    grid-template-columns: 1fr;
+  }
+}
+
+.sc-scenario-col {
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+}
+
+.sc-col-heading {
+  font-size: 0.8rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: var(--color-text-muted, #6b7280);
+  border-bottom: 2px solid var(--color-accent, #2563eb);
+  padding-bottom: 0.25rem;
+}
+
+/* ---- Tray gauge cards ---- */
+.sc-gauge-list {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(160px, 1fr));
+  gap: 0.75rem;
+}
+
+.sc-gauge-card {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  padding: 0.75rem 0.5rem 0.5rem;
+  border-radius: var(--radius, 6px);
+  border: 1px solid var(--color-border, #e5e7eb);
+  background: var(--color-surface-alt, #f9fafb);
+}
+
+.sc-gauge-card--warn {
+  border-color: var(--color-warning, #d97706);
+  background: var(--color-warning-bg, #fffbeb);
+}
+
+.sc-gauge-tray-label {
+  font-size: 0.75rem;
+  font-weight: 600;
+  color: var(--color-text-muted, #6b7280);
+  margin-top: 0.25rem;
+  text-align: center;
+}
+
+/* ---- Study comparison rows ---- */
+.sc-study-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 0.4rem;
+}
+
+.sc-study-row {
+  display: flex;
+  align-items: center;
+  gap: 0.6rem;
+  padding: 0.35rem 0.75rem;
+  border-radius: var(--radius, 6px);
+  background: var(--color-surface-alt, #f9fafb);
+  border: 1px solid var(--color-border, #e5e7eb);
+  font-size: 0.85rem;
+}
+
+.sc-study-row--run {
+  border-color: var(--color-success, #16a34a);
+}
+
+.sc-study-name {
+  flex: 1;
+  text-decoration: none;
+  color: var(--color-text, inherit);
+}
+
+.sc-study-name:hover {
+  text-decoration: underline;
+}
+
+.sc-study-status {
+  font-size: 0.75rem;
+  color: var(--color-text-muted, #6b7280);
+}
+
+.sc-study-row--run .sc-study-status {
+  color: var(--color-success, #16a34a);
+}
+
+/* ---- Dark mode overrides ---- */
+body.dark-mode .sc-selectors select,
+body.dark-mode .sc-gauge-card,
+body.dark-mode .sc-study-row {
+  background: var(--color-surface-alt, #1e293b);
+  border-color: var(--color-border, #334155);
+  color: var(--color-text, #e2e8f0);
+}
+
+body.dark-mode .sc-diff-table th {
+  background: var(--color-surface-alt, #1e293b);
+  border-color: var(--color-border, #334155);
+}
+
+body.dark-mode .sc-diff-table td {
+  border-color: var(--color-border, #334155);
+}
+
+body.dark-mode .sc-diff-table tr.cmp-added   { background: #052e16; }
+body.dark-mode .sc-diff-table tr.cmp-removed { background: #450a0a; }
+body.dark-mode .sc-diff-table tr.cmp-changed { background: #422006; }
+
+body.dark-mode .sc-badge--added   { background: #052e16; color: #86efac; border-color: #166534; }
+body.dark-mode .sc-badge--removed { background: #450a0a; color: #fca5a5; border-color: #991b1b; }
+body.dark-mode .sc-badge--changed { background: #422006; color: #fcd34d; border-color: #92400e; }

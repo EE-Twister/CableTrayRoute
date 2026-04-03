@@ -1,0 +1,154 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <meta name="description" content="Compare two design scenarios side-by-side — cable schedule differences, tray fill status, and electrical study results." />
+  <title>Scenario Comparison — CableTrayRoute</title>
+  <link rel="icon" href="icons/favicon.svg" type="image/svg+xml">
+  <link rel="apple-touch-icon" href="icons/favicon.svg">
+  <!-- Open Graph / Social sharing -->
+  <meta property="og:type" content="website">
+  <meta property="og:title" content="Scenario Comparison — CableTrayRoute">
+  <meta property="og:description" content="Compare two design scenarios side-by-side: cable differences, tray fill, and study results.">
+  <meta property="og:image" content="https://cabletrayroute.com/icons/og-preview.png">
+  <meta property="og:site_name" content="CableTrayRoute">
+  <meta property="og:url" content="scenarios.html">
+  <!-- Canonical URL -->
+  <link rel="canonical" href="scenarios.html">
+  <link rel="dns-prefetch" href="https://fonts.gstatic.com">
+  <meta name="color-scheme" content="light dark">
+  <link rel="stylesheet" href="style.css" />
+  <script type="module" src="dirtyTracker.js"></script>
+  <script type="module" src="dist/scenariocomparison.js" defer></script>
+</head>
+<body class="dashboard-page" data-report-title="Scenario Comparison">
+  <a href="#main-content" class="skip-link">Skip to main content</a>
+  <nav class="top-nav" aria-label="Primary">
+    <button id="nav-toggle" class="nav-toggle" aria-label="Toggle navigation" aria-controls="nav-links" aria-expanded="false" title="Toggle navigation">
+      <img src="icons/toolbar/grid.svg" alt="" aria-hidden="true" class="control-icon" loading="lazy" decoding="async">
+    </button>
+    <div id="nav-links" class="nav-links" role="list">
+      <!-- Populated dynamically by navigation.js -->
+    </div>
+    <button id="settings-btn" class="settings-btn" aria-label="Settings" aria-expanded="false" title="Settings">
+      <img src="icons/toolbar/validate.svg" alt="" aria-hidden="true" class="control-icon" loading="lazy" decoding="async">
+    </button>
+  </nav>
+
+  <div id="settings-menu" class="settings-menu">
+    <label for="theme-select">Theme
+      <select id="theme-select">
+        <option value="system">System</option>
+        <option value="light">Light</option>
+        <option value="dark">Dark</option>
+        <option value="high-contrast">High Contrast</option>
+      </select>
+    </label>
+    <label><input type="checkbox" id="compact-toggle" aria-label="Enable compact table mode"> Compact Mode</label>
+    <label for="unit-select">Units
+      <select id="unit-select">
+        <option value="imperial">Imperial</option>
+        <option value="metric">Metric</option>
+      </select>
+    </label>
+    <button id="help-btn" class="btn" aria-expanded="false" title="Show help">
+      <img src="icons/toolbar/validate.svg" alt="" aria-hidden="true" class="control-icon" loading="lazy" decoding="async">
+      <span>Site Help</span>
+    </button>
+    <button id="new-project-btn" title="Start a new project">
+      <img src="icons/toolbar/copy.svg" alt="" aria-hidden="true" class="control-icon" loading="lazy" decoding="async">
+      <span>New Project</span>
+    </button>
+    <button id="save-project-btn" title="Save current project">
+      <img src="icons/toolbar/export.svg" alt="" aria-hidden="true" class="control-icon" loading="lazy" decoding="async">
+      <span>Save Project</span>
+    </button>
+    <button id="load-project-btn" title="Load an existing project">
+      <img src="icons/toolbar/import.svg" alt="" aria-hidden="true" class="control-icon" loading="lazy" decoding="async">
+      <span>Load Project</span>
+    </button>
+    <button id="export-project-btn" title="Export project data">
+      <img src="icons/toolbar/export.svg" alt="" aria-hidden="true" class="control-icon" loading="lazy" decoding="async">
+      <span>Export Project</span>
+    </button>
+    <button id="import-project-btn" title="Import project data">
+      <img src="icons/toolbar/import.svg" alt="" aria-hidden="true" class="control-icon" loading="lazy" decoding="async">
+      <span>Import Project</span>
+    </button>
+    <input type="file" id="import-project-input" accept=".ctr.json" class="hidden" title="Select project file">
+  </div>
+
+  <div class="container">
+    <main id="main-content" class="main-content">
+      <nav aria-label="Breadcrumb">
+        <ol class="breadcrumb-trail">
+          <li><a href="index.html">Home</a></li>
+          <li>Workflow</li>
+          <li aria-current="page">Scenario Comparison</li>
+        </ol>
+      </nav>
+
+      <header class="page-header">
+        <h1>Scenario Comparison</h1>
+        <p class="page-subtitle">Select two scenarios and compare their cable schedules, tray fill status, and electrical study results side-by-side.</p>
+      </header>
+
+      <!-- Scenario selector -->
+      <section class="card" aria-label="Scenario selection">
+        <h2>Select Scenarios</h2>
+        <div class="sc-selectors">
+          <label for="sc-select-a">
+            Scenario A (baseline)
+            <select id="sc-select-a" aria-label="Baseline scenario">
+              <option value="">— loading —</option>
+            </select>
+          </label>
+          <label for="sc-select-b">
+            Scenario B (comparison)
+            <select id="sc-select-b" aria-label="Comparison scenario">
+              <option value="">— loading —</option>
+            </select>
+          </label>
+          <button id="sc-compare-btn" class="sc-compare-btn" type="button">Compare</button>
+        </div>
+        <div id="sc-summary-badges" class="sc-summary-badges" aria-live="polite"></div>
+      </section>
+
+      <!-- Results (hidden until first comparison is run) -->
+      <div id="sc-results" hidden>
+
+        <!-- Cable Schedule Diff -->
+        <section class="card" aria-label="Cable schedule differences" aria-live="polite">
+          <h2>Cable Schedule Differences</h2>
+          <div id="sc-cable-diff-content">
+            <p class="text-muted">Loading…</p>
+          </div>
+        </section>
+
+        <!-- Tray Fill Comparison -->
+        <section class="card" aria-label="Tray fill comparison" aria-live="polite">
+          <h2>Tray Fill Status</h2>
+          <p class="text-muted" style="margin-bottom:0.75rem">Fill gauges for all trays in each scenario. Trays over 80% fill are highlighted.</p>
+          <div class="sc-side-by-side">
+            <div id="sc-tray-col-a" class="sc-scenario-col"></div>
+            <div id="sc-tray-col-b" class="sc-scenario-col"></div>
+          </div>
+        </section>
+
+        <!-- Study Results Comparison -->
+        <section class="card" aria-label="Electrical study results comparison" aria-live="polite">
+          <h2>Electrical Studies</h2>
+          <p class="text-muted" style="margin-bottom:0.75rem">Studies with saved results are shown as complete for each scenario.</p>
+          <div class="sc-side-by-side">
+            <div id="sc-study-col-a" class="sc-scenario-col"></div>
+            <div id="sc-study-col-b" class="sc-scenario-col"></div>
+          </div>
+        </section>
+
+      </div><!-- /#sc-results -->
+
+    </main>
+  </div>
+</body>
+</html>
