@@ -3,7 +3,7 @@
     background: var(--color-surface-strong);
     border-bottom: 1px solid var(--color-border);
     box-shadow: var(--elevation-nav, 0 1px 0 rgba(0,0,0,0.08));
-    padding: var(--space-2) var(--space-4);
+    padding: var(--space-1) var(--space-4);
     display: flex;
     align-items: center;
     position: sticky;
@@ -159,6 +159,20 @@
     margin: 0;
 }
 
+.nav-dropdown-menu[data-cols="2"] {
+    display: none;
+    grid-template-columns: repeat(2, minmax(180px, 1fr));
+    min-width: 400px;
+    max-height: none;
+    overflow-y: visible;
+    padding: 0.35rem;
+    gap: 0;
+}
+
+.nav-dropdown.open .nav-dropdown-menu[data-cols="2"] {
+    display: grid;
+}
+
 .nav-dropdown.open .nav-dropdown-menu {
     display: block;
 }
@@ -295,15 +309,10 @@
     }
 }
 
-.has-sidebar-nav .container,
-.has-sidebar-nav .page-layout,
-.has-sidebar-nav .main-content {
-    margin-left: 16rem;
-}
-
 .app-sidebar-nav {
+    display: none;
     position: fixed;
-    top: 7.5rem;
+    top: 0;
     left: 0;
     bottom: 0;
     width: 15rem;
@@ -314,9 +323,10 @@
     z-index: 80;
 }
 
-/* Mobile overrides — must come after the desktop rules above to win the cascade */
+/* Mobile overrides — sidebar slides in from left on mobile only */
 @media (max-width: 700px) {
     .app-sidebar-nav {
+        display: block;
         top: 0;
         width: min(75vw, 13rem);
         height: 100%;
@@ -329,12 +339,6 @@
 
     .app-sidebar-nav.sidebar-open {
         transform: translateX(0);
-    }
-
-    .has-sidebar-nav .container,
-    .has-sidebar-nav .page-layout,
-    .has-sidebar-nav .main-content {
-        margin-left: 0;
     }
 }
 

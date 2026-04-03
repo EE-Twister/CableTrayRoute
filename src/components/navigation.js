@@ -101,6 +101,9 @@ function buildDropdown(section, routes, currentRoute) {
   const menu = document.createElement('ul');
   menu.className = 'nav-dropdown-menu';
   menu.setAttribute('role', 'menu');
+  if (routes.length >= 12) {
+    menu.dataset.cols = '2';
+  }
 
   routes.forEach(route => {
     const item = document.createElement('li');
@@ -255,7 +258,6 @@ function mountPersistentNavigation() {
   if (oldBreadcrumb) {
     oldBreadcrumb.remove();
   }
-  topNav.insertAdjacentElement('afterend', buildBreadcrumb(currentRoute));
 
   const oldSidebar = document.querySelector('.app-sidebar-nav');
   if (oldSidebar) {
@@ -288,7 +290,6 @@ function mountPersistentNavigation() {
   });
 
   document.body.appendChild(sidebar);
-  document.body.classList.add('has-sidebar-nav');
 
   // Mobile sidebar toggle button
   if (!topNav.querySelector('.sidebar-toggle-btn')) {
