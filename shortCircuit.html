@@ -99,6 +99,9 @@
         </form>
         <pre id="shortcircuit-output"></pre>
       </section>
+      <section class="card" aria-labelledby="study-review-panel-heading">
+        <div id="study-review-panel"></div>
+      </section>
     </main>
   </div>
   <footer class="site-footer">
@@ -114,5 +117,9 @@
     </nav>
   </footer>
   <script type="module" src="dist/projectManager.js"></script>
+  <script type="module">
+    import { initStudyApprovalPanel } from './src/components/studyApproval.js';
+    document.addEventListener('DOMContentLoaded', () => initStudyApprovalPanel('shortCircuit'));
+  </script>
 </body>
 </html>
