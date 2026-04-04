@@ -1076,6 +1076,76 @@ body.dark-mode .template-card.selected {
   background: color-mix(in srgb, var(--accent, #3b82f6) 15%, transparent);
 }
 
+/* ── Study Review / PE Approval Panel (Gap #19) ──────────────────────────── */
+.study-review-panel__heading {
+  margin: 0 0 0.75rem;
+  font-size: 1rem;
+  font-weight: 600;
+}
+
+.study-review-panel__current {
+  margin-bottom: 1rem;
+  min-height: 1.4em;
+}
+
+.study-review-panel__form {
+  display: grid;
+  gap: 0.75rem;
+}
+
+.study-review-panel__actions {
+  display: flex;
+  gap: 0.5rem;
+  flex-wrap: wrap;
+  margin-top: 0.25rem;
+}
+
+.approval-badge {
+  display: inline-block;
+  font-weight: 500;
+  font-size: 0.9rem;
+  padding: 0.2em 0.5em;
+  border-radius: var(--radius, 6px);
+}
+
+.approval-badge--approved {
+  color: #166534;
+  background: #dcfce7;
+  font-weight: 700;
+}
+
+.approval-badge--flagged {
+  color: #991b1b;
+  background: #fee2e2;
+  font-weight: 700;
+}
+
+.approval-badge--pending {
+  color: #92400e;
+  background: #fef3c7;
+}
+
+body.dark-mode .approval-badge--approved {
+  color: #86efac;
+  background: #14532d;
+}
+
+body.dark-mode .approval-badge--flagged {
+  color: #fca5a5;
+  background: #450a0a;
+}
+
+body.dark-mode .approval-badge--pending {
+  color: #fcd34d;
+  background: #451a03;
+}
+
+@media print {
+  .study-review-panel__form,
+  .study-review-panel__actions { display: none !important; }
+  .study-review-panel__current { display: block; }
+}
+
 @media print {
   .top-nav, .settings-menu, #controls, .report-toc, .step-nav, .breadcrumb-trail,
   #rpt-options, .method-panel, .report-status { display: none !important; }

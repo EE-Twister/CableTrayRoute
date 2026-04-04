@@ -93,6 +93,7 @@ const EXTRA_KEYS = {
   cableTemplates: 'cableTemplates',
   equipmentFilterPresets: 'equipmentFilterPresets',
   drcAcceptedFindings: 'drcAcceptedFindings',
+  studyApprovals: 'studyApprovals',
 };
 
 export const STORAGE_KEYS = { ...KEYS, ...EXTRA_KEYS };
@@ -216,6 +217,35 @@ export const setEquipmentFilterPresets = presets => write(EXTRA_KEYS.equipmentFi
  */
 export const getDrcAcceptedFindings = () => read(EXTRA_KEYS.drcAcceptedFindings, []);
 export const setDrcAcceptedFindings = list => write(EXTRA_KEYS.drcAcceptedFindings, list);
+
+/**
+ * Study-level engineer approval / PE stamp records.
+ * Keyed by study name (e.g. 'arcFlash', 'loadFlow', 'shortCircuit').
+ * Each entry: { status: 'pending'|'approved'|'flagged', reviewedBy, approvedAt, note }
+ * @returns {Object.<string, {status:string, reviewedBy:string, approvedAt:string, note:string}>}
+ */
+export const getStudyApprovals = () => read(EXTRA_KEYS.studyApprovals, {});
+
+/**
+ * Set or merge the approval record for a single study.
+ * @param {string} studyKey
+ * @param {{status?:string, reviewedBy?:string, approvedAt?:string, note?:string}} approval
+ */
+export const setStudyApproval = (studyKey, approval) => {
+  const all = getStudyApprovals();
+  all[studyKey] = { ...all[studyKey], ...approval };
+  write(EXTRA_KEYS.studyApprovals, all);
+};
+
+/**
+ * Remove the approval record for a single study (resets to "no review").
+ * @param {string} studyKey
+ */
+export const clearStudyApproval = studyKey => {
+  const all = getStudyApprovals();
+  delete all[studyKey];
+  write(EXTRA_KEYS.studyApprovals, all);
+};
 
 
 /**

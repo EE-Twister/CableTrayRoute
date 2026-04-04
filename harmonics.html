@@ -138,6 +138,9 @@
           </div>
         </div>
       </section>
+      <section class="card" aria-labelledby="study-review-panel-heading">
+        <div id="study-review-panel"></div>
+      </section>
     </main>
   </div>
   <footer class="site-footer">
@@ -273,6 +276,10 @@
       imbalanceBanner.hidden = !anyImbalance;
       resultsDiv.hidden = false;
     });
+  </script>
+  <script type="module">
+    import { initStudyApprovalPanel } from './src/components/studyApproval.js';
+    document.addEventListener('DOMContentLoaded', () => initStudyApprovalPanel('harmonics'));
   </script>
 </body>
 </html>

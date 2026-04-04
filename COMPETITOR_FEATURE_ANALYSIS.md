@@ -258,7 +258,10 @@ These gaps describe areas where CableTrayRoute's user experience lags behind com
 |---|---|---|
 | **Engineer notes and approval status on study results** | ETAP (comments on study results), Bentley Raceway (approval workflow with status stamps) | There is no way for an engineer to add notes to individual cables, flag a design rule violation as "accepted by engineer", mark a study result as "Approved by PE", or leave review comments for collaborators. This is a significant gap for multi-user collaboration — the existing real-time collaboration (`src/collabManager.js`) allows simultaneous editing but has no review/approval layer. |
 
-**Status:** Not addressed. Could be implemented as optional text fields on cable/tray records and a status column in result tables.
+**Status:** ✅ Implemented. The full approval workflow now spans three layers:
+1. **Cable records** — `cableschedule.js` exposes `engineer_note` (free-text) and `review_status` (Pending / Approved / Flagged) columns on every cable row. Color-coded cells use `.review-status-*` CSS classes.
+2. **DRC violations** — `designrulechecker.js` lets engineers "Accept Risk" on individual violations via `getDrcAcceptedFindings` / `setDrcAcceptedFindings` in `dataStore.mjs`, with documented rationale stored per finding.
+3. **Study results** — `src/components/studyApproval.js` adds a reusable "Engineer Review" panel to all seven electrical study pages (Arc Flash, Load Flow, Short Circuit, Harmonics, Motor Start, TCC, Contingency). Each panel lets a PE set status, enter their name, set the review date, and add engineering notes. Data persists to project storage under `studyApprovals` (added to `dataStore.mjs`). A `getApprovalBadgeHTML()` helper is available for embedding the stamp in PDF/export outputs. Tests in `tests/studyApproval.test.mjs`.
 
 ---
 
@@ -461,7 +464,7 @@ These gaps describe areas where CableTrayRoute's calculation engine uses simplif
 | **Usability: Configuration profiles / templates** | **No** | Yes | — | — | — | — | Yes | — | — | — |
 | **Usability: Scenario comparison UI** | **Yes** ✓ | Yes | Yes | — | — | — | — | — | — | — |
 | **Usability: Full workflow onboarding tour** | **Yes** ✓ | Yes | Yes | — | — | Yes | — | — | — | — |
-| **Usability: Results annotation / approval workflow** | **No** | Yes | — | — | — | Yes | — | — | — | — |
+| **Usability: Results annotation / approval workflow** | **Yes ✓** | Yes | — | — | — | Yes | — | — | — | — |
 | **Usability: Workflow progress dashboard** | **No** | — | Yes | — | — | — | Yes | — | — | — |
 | **Usability: Mobile-optimized field access** | **Yes ✓** | Yes | — | — | — | — | Yes | — | — | — |
 | **Calc: Short circuit full fault matrix (SLG/LL/DLG)** | **Yes** ✓ | Yes | Yes | — | — | — | — | — | — | — |
