@@ -1,0 +1,321 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <meta name="description" content="Combined seismic and wind load scenario for cable tray supports per ASCE 7-22. Evaluates all four LRFD load combinations (LC-W1 through LC-S2) and identifies the governing demand." />
+  <title>Seismic + Wind Combined — CableTrayRoute</title>
+  <link rel="icon" href="icons/favicon.svg" type="image/svg+xml">
+  <link rel="apple-touch-icon" href="icons/favicon.svg">
+  <!-- Open Graph / Social sharing -->
+  <meta property="og:type" content="website">
+  <meta property="og:title" content="Seismic + Wind Combined — CableTrayRoute">
+  <meta property="og:description" content="Combined seismic and wind load scenario for cable tray supports per ASCE 7-22 §2.3.2.">
+  <meta property="og:image" content="https://cabletrayroute.com/icons/og-preview.png">
+  <meta property="og:site_name" content="CableTrayRoute">
+  <meta property="og:url" content="seismicwindcombined.html">
+  <!-- Canonical URL -->
+  <link rel="canonical" href="seismicwindcombined.html">
+  <link rel="dns-prefetch" href="https://fonts.gstatic.com">
+  <meta name="color-scheme" content="light dark">
+  <link rel="stylesheet" href="style.css" />
+  <script type="module" src="dirtyTracker.js"></script>
+  <script type="module" src="dist/seismicwindcombined.js" defer></script>
+</head>
+<body class="seismicwindcombined-page" data-report-title="Seismic + Wind Combined">
+  <a href="#main-content" class="skip-link">Skip to main content</a>
+  <nav class="top-nav" aria-label="Primary">
+    <button id="nav-toggle" class="nav-toggle" aria-label="Toggle navigation" aria-controls="nav-links" aria-expanded="false" title="Toggle navigation">
+      <img src="icons/toolbar/grid.svg" alt="" aria-hidden="true" class="control-icon" loading="lazy" decoding="async">
+    </button>
+    <div id="nav-links" class="nav-links" role="list">
+      <!-- Populated dynamically by navigation.js -->
+    </div>
+    <button id="settings-btn" class="settings-btn" aria-label="Settings" aria-expanded="false" title="Settings">
+      <img src="icons/toolbar/validate.svg" alt="" aria-hidden="true" class="control-icon" loading="lazy" decoding="async">
+    </button>
+  </nav>
+
+  <div id="settings-menu" class="settings-menu">
+    <label for="theme-select">Theme
+      <select id="theme-select">
+        <option value="system">System</option>
+        <option value="light">Light</option>
+        <option value="dark">Dark</option>
+        <option value="high-contrast">High Contrast</option>
+      </select>
+    </label>
+    <label><input type="checkbox" id="compact-toggle" aria-label="Enable compact table mode"> Compact Mode</label>
+    <label for="unit-select">Units
+      <select id="unit-select">
+        <option value="imperial">Imperial</option>
+        <option value="metric">Metric</option>
+      </select>
+    </label>
+    <button id="help-btn" class="btn" aria-expanded="false" title="Show help">
+      <img src="icons/toolbar/validate.svg" alt="" aria-hidden="true" class="control-icon" loading="lazy" decoding="async">
+      <span>Site Help</span>
+    </button>
+    <button id="new-project-btn" title="Start a new project">
+      <img src="icons/toolbar/copy.svg" alt="" aria-hidden="true" class="control-icon" loading="lazy" decoding="async">
+      <span>New Project</span>
+    </button>
+    <button id="save-project-btn" title="Save current project">
+      <img src="icons/toolbar/export.svg" alt="" aria-hidden="true" class="control-icon" loading="lazy" decoding="async">
+      <span>Save Project</span>
+    </button>
+    <button id="load-project-btn" title="Load an existing project">
+      <img src="icons/toolbar/import.svg" alt="" aria-hidden="true" class="control-icon" loading="lazy" decoding="async">
+      <span>Load Project</span>
+    </button>
+    <button id="export-project-btn" title="Export project data">
+      <img src="icons/toolbar/export.svg" alt="" aria-hidden="true" class="control-icon" loading="lazy" decoding="async">
+      <span>Export Project</span>
+    </button>
+    <button id="import-project-btn" title="Import project data">
+      <img src="icons/toolbar/import.svg" alt="" aria-hidden="true" class="control-icon" loading="lazy" decoding="async">
+      <span>Import Project</span>
+    </button>
+    <input type="file" id="import-project-input" accept=".ctr.json" class="hidden" title="Select project file">
+  </div>
+
+  <div class="container">
+    <main id="main-content" class="main-content">
+
+      <header class="page-header">
+        <h1>Seismic + Wind Combined Load Scenario</h1>
+      </header>
+
+      <details class="method-panel">
+        <summary>Method &amp; Assumptions</summary>
+        <p>This tool orchestrates three ASCE 7-22 analysis modules to produce a unified
+        combined-scenario result for cable tray structural support design:</p>
+        <ol>
+          <li><strong>Seismic brace forces</strong> per <strong>ASCE 7-22 §13.3.1</strong>:
+            <pre>Fp = (0.4·ap·SDS·Wp / (Rp/Ip)) × (1 + 2z/h)</pre>
+            Lateral force E = Fp × Wp; vertical E<sub>v</sub> = ±0.2·SDS·Ip·Wp.
+          </li>
+          <li><strong>Wind force</strong> per <strong>ASCE 7-22 §29.4</strong>:
+            <pre>q_z = 0.00256·Kz·Kzt·Ke·V²   (lbs/ft²)
+W = q_z·G·Cf·(width × span) / span   (lbs/ft)</pre>
+          </li>
+          <li><strong>LRFD load combinations</strong> per <strong>ASCE 7-22 §2.3.2</strong>:
+            <pre>LC-W1: 1.2D + 1.6W      (wind dominant)
+LC-W2: 0.9D + 1.0W      (wind + minimum gravity)
+LC-S1: 1.2D + 1.0E + 0.2S  (seismic + snow)
+LC-S2: 0.9D + 1.0E      (seismic + minimum gravity)</pre>
+            The governing (envelope) combination is identified by maximum resultant force.
+          </li>
+        </ol>
+        <p><em>Note:</em> This page uses the §2.3.2 four-combination model.
+        For LRFD/ASD toggle with six combinations and capacity utilization checks,
+        see the <a href="structuralcombinations.html">Combined Loads (§2.3.1)</a> page.
+        Set wind speed to 0 for indoor or sheltered installations — wind combinations
+        will be marked N/A.</p>
+        <p>See also:
+          <a href="seismicBracing.html">Seismic Bracing</a>,
+          <a href="windload.html">Wind Load</a>,
+          <a href="loadcombinations.html">Load Combinations</a>.
+        </p>
+      </details>
+
+      <!-- Dead load -->
+      <fieldset>
+        <legend><strong>Dead Load</strong></legend>
+        <div class="field-row">
+          <label for="wp-per-ft">
+            W<sub>p</sub> — Tray + cable operating weight per linear foot (lbs/ft)
+          </label>
+          <input type="number" id="wp-per-ft" min="0.1" step="0.1"
+                 value="15.0" aria-describedby="wpHint" aria-required="true">
+          <p id="wpHint" class="field-hint">
+            Sum of tray self-weight and total cable weight per foot of tray.
+            Use the <a href="supportspan.html">Support Span Calculator</a> for
+            guidance. Typical empty ladder tray: 2–6 lbs/ft. Full tray: 10–30 lbs/ft.
+          </p>
+        </div>
+      </fieldset>
+
+      <!-- Seismic parameters -->
+      <fieldset>
+        <legend><strong>Seismic Parameters</strong> <span id="sdc-preview" class="field-hint sdc-preview" aria-live="polite"></span></legend>
+
+        <div class="field-row">
+          <label for="sds">S<sub>DS</sub> — Design spectral acceleration, short period (g)</label>
+          <input type="number" id="sds" min="0" max="4" step="0.001"
+                 value="0.500" aria-describedby="sdsHint" aria-required="true">
+          <p id="sdsHint" class="field-hint">
+            From ASCE 7 ground motion maps or USGS Seismic Design Maps. Typical range 0.1–2.5 g.
+          </p>
+        </div>
+
+        <div class="field-row">
+          <label for="sd1">S<sub>D1</sub> — Design spectral acceleration, 1-second period (g)</label>
+          <input type="number" id="sd1" min="0" max="4" step="0.001"
+                 value="0.200" aria-describedby="sd1Hint" aria-required="true">
+          <p id="sd1Hint" class="field-hint">
+            Mapped value S<sub>1</sub> × F<sub>v</sub>. Used to determine Seismic Design Category.
+          </p>
+        </div>
+
+        <div class="field-row">
+          <label for="risk-category">Risk Category (Occupancy Category)</label>
+          <select id="risk-category" aria-describedby="riskHint">
+            <option value="I">I — Low hazard to human life</option>
+            <option value="II" selected>II — Ordinary (most buildings)</option>
+            <option value="III">III — Substantial hazard (schools, hospitals &lt;50 beds)</option>
+            <option value="IV">IV — Essential facilities (hospitals, emergency services)</option>
+          </select>
+          <p id="riskHint" class="field-hint">Per IBC 2021 Table 1604.5.</p>
+        </div>
+
+        <div class="field-row">
+          <label for="ip">I<sub>p</sub> — Component Importance Factor</label>
+          <select id="ip">
+            <option value="1.0" selected>1.0 — Standard (non-life-safety)</option>
+            <option value="1.5">1.5 — Life-safety or essential-facility component</option>
+          </select>
+        </div>
+
+        <div class="field-row">
+          <label for="z-ft">z — Tray attachment height above base (ft)</label>
+          <input type="number" id="z-ft" min="0" step="0.5"
+                 value="20" aria-required="true">
+        </div>
+
+        <div class="field-row">
+          <label for="h-ft">h — Average roof height above base (ft)</label>
+          <input type="number" id="h-ft" min="1" step="0.5"
+                 value="30" aria-required="true">
+        </div>
+      </fieldset>
+
+      <!-- Wind parameters -->
+      <fieldset>
+        <legend><strong>Wind Parameters</strong></legend>
+
+        <div class="field-row">
+          <label for="wind-speed">V — Basic wind speed (mph) — set 0 for sheltered/indoor</label>
+          <input type="number" id="wind-speed" min="0" max="300" step="1"
+                 value="115" aria-describedby="windSpeedHint" aria-required="true">
+          <p id="windSpeedHint" class="field-hint">
+            ASCE 7-22 Figure 26.5-1A (Risk Cat II). Set to 0 for indoor or fully
+            sheltered installations — wind combinations (LC-W1, LC-W2) will be marked N/A.
+          </p>
+        </div>
+
+        <div class="field-row">
+          <label for="wind-exposure">Exposure Category</label>
+          <select id="wind-exposure">
+            <option value="B">B — Urban/suburban, forested areas</option>
+            <option value="C" selected>C — Open terrain, scattered obstructions</option>
+            <option value="D">D — Flat, unobstructed areas near water</option>
+          </select>
+        </div>
+
+        <div class="field-row">
+          <label for="k-zt">K<sub>zt</sub> — Topographic factor</label>
+          <input type="number" id="k-zt" min="1.0" max="3.0" step="0.01"
+                 value="1.00" aria-describedby="kztHint">
+          <p id="kztHint" class="field-hint">
+            = 1.0 for flat terrain. Increase for hilltop or escarpment sites
+            (ASCE 7-22 §26.8).
+          </p>
+        </div>
+
+        <div class="field-row">
+          <label for="tray-width">Tray inside width (in)</label>
+          <input type="number" id="tray-width" min="4" max="48" step="2"
+                 value="12" aria-required="true">
+        </div>
+
+        <div class="field-row">
+          <label for="span-length">Support span length (ft)</label>
+          <input type="number" id="span-length" min="1" max="30" step="0.5"
+                 value="12" aria-required="true">
+        </div>
+
+        <div class="field-row">
+          <label for="fill-level">Tray fill level (affects wind drag coefficient C<sub>f</sub>)</label>
+          <select id="fill-level">
+            <option value="empty">Empty — C<sub>f</sub> = 1.3</option>
+            <option value="partial" selected>Partial fill — C<sub>f</sub> = 1.6</option>
+            <option value="full">Full — C<sub>f</sub> = 2.0</option>
+          </select>
+        </div>
+      </fieldset>
+
+      <!-- Snow load (optional) -->
+      <fieldset>
+        <legend><strong>Snow Load</strong> <small>(optional — leave 0 for no snow)</small></legend>
+        <div class="field-row">
+          <label for="snow-load">S — Snow load per linear foot of tray (lbs/ft)</label>
+          <input type="number" id="snow-load" min="0" step="0.1"
+                 value="0" aria-describedby="snowHint">
+          <p id="snowHint" class="field-hint">
+            Applied in LC-S1 only (factor 0.2S). Typically 0 for indoor installations
+            and sites outside snow regions. Compute from ground snow load × tray width ×
+            exposure/thermal/slope factors (ASCE 7-22 Chapter 7).
+          </p>
+        </div>
+      </fieldset>
+
+      <!-- Evaluation mode -->
+      <fieldset>
+        <legend><strong>Evaluation Mode</strong></legend>
+        <label>
+          <input type="radio" name="eval-mode" id="mode-single" value="single" checked>
+          Single tray — use parameters above
+        </label>
+        <label>
+          <input type="radio" name="eval-mode" id="mode-schedule" value="schedule">
+          From Project — evaluate all trays in the Raceway Schedule
+        </label>
+      </fieldset>
+
+      <div id="controls">
+        <button id="calc-btn" type="button">Calculate Combined Loads</button>
+      </div>
+
+      <div id="results" role="region" aria-live="polite" aria-label="Combined load results"></div>
+
+      <!-- Schedule mode section -->
+      <section id="schedule-section" hidden aria-label="Schedule evaluation">
+        <p>This mode reads trays and cable weights from the current project and
+        evaluates every tray section using the same site parameters.</p>
+        <button type="button" id="schedule-btn">Evaluate Trays from Schedule</button>
+        <div id="schedule-results" role="region" aria-live="polite"
+             aria-label="Schedule combined load results"></div>
+      </section>
+
+      <nav class="step-nav" aria-label="Workflow navigation">
+        <a href="loadcombinations.html" class="step-nav-prev">&#8592; Load Combinations</a>
+        <a href="optimalRoute.html" class="step-nav-next">Optimal Route &#8594;</a>
+      </nav>
+    </main>
+  </div>
+
+  <div id="help-modal" class="modal" aria-hidden="true" role="dialog" aria-modal="true"
+       aria-labelledby="help-title">
+    <div class="modal-content">
+      <button id="close-help-btn" class="close-btn" aria-label="Close Help">&times;</button>
+      <h2 id="help-title">Seismic + Wind Combined Help</h2>
+      <p>This tool combines seismic and wind loads on cable tray supports and evaluates
+      all four ASCE 7-22 §2.3.2 LRFD combinations to identify the governing demand.</p>
+      <p><strong>Single tray mode:</strong> enter site seismic and wind parameters and
+      tray weight, then click <em>Calculate Combined Loads</em>. The result table shows
+      all four LRFD combinations with the governing row highlighted.</p>
+      <p><strong>Schedule mode:</strong> reads all trays and cables from the current
+      project and evaluates each tray section using the same site parameters.</p>
+      <p>Get S<sub>DS</sub> and S<sub>D1</sub> values from the
+      <a href="https://seismicmaps.org" target="_blank" rel="noopener">USGS Seismic Design Maps</a>.
+      Get basic wind speed from ASCE 7-22 Figure 26.5-1.</p>
+      <p>For LRFD/ASD six-combination analysis with capacity utilization checks,
+      use the <a href="structuralcombinations.html">Combined Loads (§2.3.1)</a> page.</p>
+      <p><button class="helpBtn" data-doc="docs/standards.html">Standards Reference</button></p>
+    </div>
+  </div>
+
+  <script type="module" src="dist/projectManager.js"></script>
+</body>
+</html>

@@ -19,6 +19,7 @@ const NAV_ROUTES = [
   { href: 'spoolsheets.html', label: 'Spool Sheets', section: 'Workflow', icon: 'icons/toolbar/copy.svg' },
   { href: 'windload.html', label: 'Wind Load', section: 'Workflow', icon: 'icons/toolbar/validate.svg' },
   { href: 'structuralcombinations.html', label: 'Combined Loads', section: 'Workflow', icon: 'icons/toolbar/validate.svg' },
+  { href: 'seismicwindcombined.html', label: 'Seismic + Wind', section: 'Workflow', icon: 'icons/toolbar/validate.svg' },
   { href: 'loadcombinations.html', label: 'Load Combinations', section: 'Workflow', icon: 'icons/toolbar/validate.svg' },
   { href: 'optimalRoute.html', label: 'Optimal Route', section: 'Workflow', icon: 'icons/route.svg' },
   { href: 'pullcards.html', label: 'Pull Cards', section: 'Workflow', icon: 'icons/toolbar/copy.svg' },
