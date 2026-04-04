@@ -1,0 +1,348 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <meta name="description" content="Cable fault bracing calculator — determine the tensile strength required of cable cleats or securing components in a raceway during a short-circuit fault condition." />
+  <title>Fault Cable Bracing — CableTrayRoute</title>
+  <link rel="icon" href="icons/favicon.svg" type="image/svg+xml">
+  <link rel="apple-touch-icon" href="icons/favicon.svg">
+  <!-- Open Graph / Social sharing -->
+  <meta property="og:type" content="website">
+  <meta property="og:title" content="Fault Cable Bracing Calculator — CableTrayRoute">
+  <meta property="og:description" content="Calculate required cleat tensile strength for cables in raceways during short-circuit fault conditions per IEC 61914.">
+  <meta property="og:image" content="https://cabletrayroute.com/icons/og-preview.png">
+  <meta property="og:site_name" content="CableTrayRoute">
+  <meta property="og:url" content="cableFaultBracing.html">
+  <!-- Canonical URL -->
+  <link rel="canonical" href="cableFaultBracing.html">
+  <link rel="dns-prefetch" href="https://fonts.gstatic.com">
+  <meta name="color-scheme" content="light dark">
+  <link rel="stylesheet" href="style.css" />
+  <script type="module" src="dirtyTracker.js"></script>
+  <script type="module" src="dist/cableFaultBracing.js" defer></script>
+</head>
+<body class="cablefaultbracing-page" data-report-title="Fault Cable Bracing">
+  <a href="#main-content" class="skip-link">Skip to main content</a>
+  <nav class="top-nav" aria-label="Primary">
+    <button id="nav-toggle" class="nav-toggle" aria-label="Toggle navigation" aria-controls="nav-links" aria-expanded="false" title="Toggle navigation">
+      <img src="icons/toolbar/grid.svg" alt="" aria-hidden="true" class="control-icon" loading="lazy" decoding="async">
+    </button>
+    <div id="nav-links" class="nav-links" role="list">
+      <!-- Populated dynamically by navigation.js -->
+    </div>
+    <button id="settings-btn" class="settings-btn" aria-label="Settings" aria-expanded="false" title="Settings">
+      <img src="icons/toolbar/validate.svg" alt="" aria-hidden="true" class="control-icon" loading="lazy" decoding="async">
+    </button>
+  </nav>
+
+  <div id="settings-menu" class="settings-menu">
+    <label for="theme-select">Theme
+      <select id="theme-select">
+        <option value="system">System</option>
+        <option value="light">Light</option>
+        <option value="dark">Dark</option>
+        <option value="high-contrast">High Contrast</option>
+      </select>
+    </label>
+    <label><input type="checkbox" id="compact-toggle" aria-label="Enable compact table mode"> Compact Mode</label>
+    <label for="unit-select">Units
+      <select id="unit-select">
+        <option value="imperial">Imperial</option>
+        <option value="metric">Metric</option>
+      </select>
+    </label>
+    <button id="help-btn" class="btn" aria-expanded="false" title="Show help">
+      <img src="icons/toolbar/validate.svg" alt="" aria-hidden="true" class="control-icon" loading="lazy" decoding="async">
+      <span>Site Help</span>
+    </button>
+    <button id="new-project-btn" title="Start a new project">
+      <img src="icons/toolbar/copy.svg" alt="" aria-hidden="true" class="control-icon" loading="lazy" decoding="async">
+      <span>New Project</span>
+    </button>
+    <button id="save-project-btn" title="Save current project">
+      <img src="icons/toolbar/export.svg" alt="" aria-hidden="true" class="control-icon" loading="lazy" decoding="async">
+      <span>Save Project</span>
+    </button>
+    <button id="load-project-btn" title="Load an existing project">
+      <img src="icons/toolbar/import.svg" alt="" aria-hidden="true" class="control-icon" loading="lazy" decoding="async">
+      <span>Load Project</span>
+    </button>
+    <button id="export-project-btn" title="Export project data">
+      <img src="icons/toolbar/export.svg" alt="" aria-hidden="true" class="control-icon" loading="lazy" decoding="async">
+      <span>Export Project</span>
+    </button>
+    <button id="import-project-btn" title="Import project data">
+      <img src="icons/toolbar/import.svg" alt="" aria-hidden="true" class="control-icon" loading="lazy" decoding="async">
+      <span>Import Project</span>
+    </button>
+    <input type="file" id="import-project-input" accept=".ctr.json" class="hidden" title="Select project file">
+  </div>
+
+  <div class="container">
+    <main id="main-content" class="main-content">
+
+      <header class="page-header">
+        <h1>Cable Fault Bracing Calculator</h1>
+      </header>
+
+      <details class="method-panel">
+        <summary>Method &amp; Assumptions</summary>
+        <p>During a short-circuit fault, the peak current flowing through adjacent
+        conductors generates repulsive electromagnetic forces.  Cable cleats or
+        securing ties must resist these forces across their tributary span.
+        This calculator quantifies the required rated tensile strength of the
+        securing component per <strong>IEC 61914:2015</strong>.</p>
+
+        <p><strong>1. Peak factor κ</strong> (IEC 60909-0:2016 §4.3.1.1):</p>
+        <pre>κ = 1.02 + 0.98 × e^(−3R/X)</pre>
+        <p>Range: 1.02 (purely resistive) to ≈ 2.0 (purely inductive).
+        Typical values: LV switchboard X/R ≈ 5 → κ ≈ 1.36;
+        MV cable fault X/R ≈ 15 → κ ≈ 1.73.</p>
+
+        <p><strong>2. Peak fault current:</strong></p>
+        <pre>i_peak = κ × √2 × I_sc</pre>
+
+        <p><strong>3. Electromagnetic force per unit length</strong>
+        (Biot–Savart / Ampère's force law):</p>
+        <pre>Single-phase:   F = 2×10⁻⁷ × i_peak² / d   [N/m]
+Three-phase:    F = √3×10⁻⁷ × i_peak² / d  [N/m]</pre>
+        <p>where <em>d</em> is the centre-to-centre cable spacing in metres.
+        The three-phase formula applies to both trefoil and flat (single-layer)
+        arrangements and represents the analytically derived maximum force on
+        the worst-case conductor over one fault cycle.</p>
+
+        <p><strong>4. Cleat tensile load:</strong></p>
+        <pre>T = F × L_cleat_spacing   [N]</pre>
+
+        <p><strong>5. Required rated cleat strength</strong>
+        (IEC 61914 default safety factor = 2.5):</p>
+        <pre>T_req = T × SF   [kN]</pre>
+        <p>Select a cleat whose IEC 61914 rated strength ≥ T_req.
+        Verify the cleat OD range covers the cable outer diameter.</p>
+
+        <p>Citations:
+          <a href="docs/standards.html">IEC 60909-0:2016</a>,
+          IEC 61914:2015 — Cable cleats for electrical installations.
+        </p>
+        <p>See also:
+          <a href="seismicBracing.html">Seismic Bracing Calculator</a>,
+          <a href="supportspan.html">Support Span Calculator</a>,
+          <a href="shortCircuit.html">Short Circuit Study</a>.
+        </p>
+      </details>
+
+      <!-- Fault system parameters -->
+      <fieldset>
+        <legend><strong>Fault System Parameters</strong></legend>
+
+        <div class="field-row">
+          <label for="faultCurrent">
+            I<sub>sc</sub> — Symmetrical RMS fault current (kA)
+            <button class="helpBtn" data-doc="docs/standards.html#fault-current"
+                    aria-label="Help — fault current">?</button>
+          </label>
+          <input type="number" id="faultCurrent" min="0.1" max="250" step="0.1"
+                 value="25" aria-describedby="faultCurrentHint" aria-required="true">
+          <p id="faultCurrentHint" class="field-hint">
+            Obtain from a short-circuit study at the fault location.
+            Typical values: LV (≤1 kV) 10–25 kA; MV (1–36 kV) 16–50 kA;
+            HV (&gt;36 kV) up to 85 kA.  Use the prospective (maximum) fault
+            current for a conservative cleat selection.
+          </p>
+        </div>
+
+        <div class="field-row">
+          <label for="xrRatio">
+            X/R — Reactance-to-resistance ratio at fault point
+          </label>
+          <input type="number" id="xrRatio" min="0" max="100" step="0.5"
+                 value="10" aria-describedby="xrRatioHint" aria-required="true">
+          <p id="xrRatioHint" class="field-hint">
+            Determines the DC offset (asymmetry) of the fault current.
+            Typical: LV distribution board 2–10; MV cable system 10–25;
+            MV/HV transformer terminals 15–40.  A higher X/R gives a higher
+            peak current (more conservative).
+          </p>
+        </div>
+
+        <div class="field-row">
+          <label for="systemType">System type</label>
+          <select id="systemType" aria-describedby="systemTypeHint">
+            <option value="three-phase" selected>Three-phase AC</option>
+            <option value="single-phase">Single-phase / DC (2-conductor)</option>
+          </select>
+          <p id="systemTypeHint" class="field-hint">
+            Three-phase: uses √3×10⁻⁷ coefficient (worst-case conductor).
+            Single-phase or DC 2-conductor: uses 2×10⁻⁷ coefficient.
+          </p>
+        </div>
+
+        <div class="field-row" id="arrangementRow">
+          <label for="arrangement">Cable arrangement in raceway</label>
+          <select id="arrangement" aria-describedby="arrangementHint">
+            <option value="trefoil" selected>Trefoil (equilateral triangle)</option>
+            <option value="flat">Flat / single-layer</option>
+          </select>
+          <p id="arrangementHint" class="field-hint">
+            Both trefoil and flat arrangements produce the same peak force on
+            the worst-case conductor for a balanced three-phase fault.
+            The arrangement affects spacing: for touching trefoil/flat cables,
+            spacing equals the cable OD.
+          </p>
+        </div>
+      </fieldset>
+
+      <!-- Cable geometry -->
+      <fieldset>
+        <legend><strong>Cable Geometry</strong></legend>
+
+        <div class="field-row">
+          <label>
+            Spacing input method
+          </label>
+          <label style="display:inline-flex;align-items:center;gap:0.4em">
+            <input type="radio" name="spacingMode" id="spacingDirect" value="direct" checked>
+            Enter centre-to-centre spacing directly
+          </label>
+          <label style="display:inline-flex;align-items:center;gap:0.4em">
+            <input type="radio" name="spacingMode" id="spacingFromOD" value="od">
+            Cables touching — derive from cable OD
+          </label>
+        </div>
+
+        <div class="field-row" id="spacingDirectRow">
+          <label for="spacing">
+            d — Centre-to-centre cable spacing (mm)
+          </label>
+          <input type="number" id="spacing" min="1" max="2000" step="1"
+                 value="50" aria-describedby="spacingHint" aria-required="true">
+          <p id="spacingHint" class="field-hint">
+            Distance between the centres of adjacent conductors.  For touching
+            cables this equals the cable OD.  For separated cables use the
+            actual centre-to-centre distance.  Smaller spacing increases the
+            force (more conservative).
+          </p>
+        </div>
+
+        <div class="field-row hidden" id="spacingODRow">
+          <label for="cableOD">
+            Cable outer diameter (mm)
+          </label>
+          <input type="number" id="cableOD" min="1" max="500" step="0.5"
+                 value="40" aria-describedby="cableODHint">
+          <p id="cableODHint" class="field-hint">
+            For touching cables the centre-to-centre spacing equals the OD.
+            Check the manufacturer data sheet or use the
+            <a href="cableschedule.html">Cable Schedule</a>.
+          </p>
+        </div>
+
+        <p id="derivedSpacingNote" class="field-hint hidden"></p>
+      </fieldset>
+
+      <!-- Cleat parameters -->
+      <fieldset>
+        <legend><strong>Cleat / Securing Device Parameters</strong></legend>
+
+        <div class="field-row">
+          <label for="cleatSpacing">
+            L — Cleat spacing / support interval (mm)
+            <button class="helpBtn" data-doc="docs/standards.html#cleat-spacing"
+                    aria-label="Help — cleat spacing">?</button>
+          </label>
+          <input type="number" id="cleatSpacing" min="1" max="10000" step="50"
+                 value="900" aria-describedby="cleatSpacingHint" aria-required="true">
+          <p id="cleatSpacingHint" class="field-hint">
+            Distance between adjacent cleats along the cable run.  Each cleat
+            must resist the cumulative force over this span.  Shorter spacing
+            reduces the load per cleat.  Typical range: 300–1500 mm.
+          </p>
+        </div>
+
+        <div class="field-row">
+          <label for="safetyFactor">
+            Safety factor (IEC 61914 default: 2.5)
+          </label>
+          <input type="number" id="safetyFactor" min="1" max="10" step="0.1"
+                 value="2.5" aria-describedby="safetyFactorHint" aria-required="true">
+          <p id="safetyFactorHint" class="field-hint">
+            IEC 61914:2015 requires cleats to be proof-tested to 2.5× their
+            rated load.  The calculated cleat load is multiplied by this factor
+            to give the minimum rated strength to specify.
+          </p>
+        </div>
+
+        <div class="field-row">
+          <label for="cleatRating">
+            Known cleat rated strength (kN) — optional, for pass/fail check
+          </label>
+          <input type="number" id="cleatRating" min="0" step="0.1"
+                 placeholder="e.g. 5.0" aria-describedby="cleatRatingHint">
+          <p id="cleatRatingHint" class="field-hint">
+            If you have already selected a cleat, enter its IEC 61914 rated
+            tensile strength to see whether it is adequate.  Leave blank to
+            skip the pass/fail check.
+          </p>
+        </div>
+      </fieldset>
+
+      <!-- Mode toggle -->
+      <fieldset>
+        <legend><strong>Evaluation Mode</strong></legend>
+        <label>
+          <input type="radio" name="evalMode" id="modeSingle" value="single" checked>
+          Single cable — enter parameters above
+        </label>
+        <label>
+          <input type="radio" name="evalMode" id="modeSchedule" value="schedule">
+          From Project — evaluate all cables in the Cable Schedule
+        </label>
+      </fieldset>
+
+      <div id="controls">
+        <button id="calcBtn" type="button">Calculate Required Cleat Strength</button>
+      </div>
+
+      <div id="results" role="region" aria-live="polite" aria-label="Fault bracing results"></div>
+
+      <!-- Schedule mode section -->
+      <section id="scheduleSection" hidden aria-label="Schedule evaluation">
+        <p>This mode reads cables from the Cable Schedule and evaluates the
+        required cleat strength for each cable using the fault system parameters
+        entered above.  Cable spacing is derived from the cable OD in the
+        schedule where available.</p>
+        <button type="button" id="loadScheduleBtn">Evaluate Cables from Schedule</button>
+        <div id="scheduleResults" role="region" aria-live="polite"
+             aria-label="Schedule fault bracing results"></div>
+      </section>
+
+      <nav class="step-nav" aria-label="Workflow navigation">
+        <a href="seismicBracing.html" class="step-nav-prev">&#8592; Seismic Bracing</a>
+        <a href="windload.html" class="step-nav-next">Wind Load &#8594;</a>
+      </nav>
+    </main>
+  </div>
+
+  <div id="help-modal" class="modal" aria-hidden="true" role="dialog" aria-modal="true"
+       aria-labelledby="help-title">
+    <div class="modal-content">
+      <button id="close-help-btn" class="close-btn" aria-label="Close Help">&times;</button>
+      <h2 id="help-title">Fault Cable Bracing Help</h2>
+      <p>This calculator determines the tensile strength required of cable cleats
+      or securing ties in a raceway during a short-circuit fault event.</p>
+      <p><strong>Single cable mode:</strong> enter the fault system parameters and
+      cable geometry, then click <em>Calculate Required Cleat Strength</em>.</p>
+      <p><strong>Schedule mode:</strong> reads cables from the current project and
+      evaluates each cable using the same fault current and X/R ratio.</p>
+      <p>Obtain the fault current (I<sub>sc</sub>) and X/R ratio from a short-circuit
+      study — use the <a href="shortCircuit.html">Short Circuit Study</a> page.
+      Select a cleat whose IEC 61914 rated strength meets or exceeds the
+      calculated required strength.</p>
+      <p><button class="helpBtn" data-doc="docs/standards.html">Standards Reference</button></p>
+    </div>
+  </div>
+
+  <script type="module" src="dist/projectManager.js"></script>
+</body>
+</html>

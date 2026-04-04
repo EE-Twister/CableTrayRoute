@@ -30,6 +30,7 @@ const entries = {
   pullcards: 'src/pullcards.js',
   procurementschedule: 'src/procurementschedule.js',
   seismicBracing: 'src/seismicBracing.js',
+  cableFaultBracing: 'src/cableFaultBracing.js',
   trayhardwarebom: 'src/trayhardwarebom.js',
   intlCableSize: 'src/intlCableSize.js',
   groundgrid: 'src/groundgrid.js',

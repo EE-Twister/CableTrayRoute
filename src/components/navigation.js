@@ -12,6 +12,7 @@ const NAV_ROUTES = [
   { href: 'conduitfill.html', label: 'Conduit Fill', section: 'Workflow', icon: 'icons/conduit.svg' },
   { href: 'supportspan.html', label: 'Support Span', section: 'Workflow', icon: 'icons/toolbar/dimension.svg' },
   { href: 'seismicBracing.html', label: 'Seismic Bracing', section: 'Workflow', icon: 'icons/toolbar/validate.svg' },
+  { href: 'cableFaultBracing.html', label: 'Fault Cable Bracing', section: 'Workflow', icon: 'icons/toolbar/validate.svg' },
   { href: 'trayhardwarebom.html', label: 'Tray Hardware BOM', section: 'Workflow', icon: 'icons/raceway.svg' },
   { href: 'clashdetect.html', label: 'Clash Detection', section: 'Workflow', icon: 'icons/toolbar/validate.svg' },
   { href: 'designrulechecker.html', label: 'Design Rule Checker', section: 'Workflow', icon: 'icons/toolbar/validate.svg' },
