@@ -45,6 +45,7 @@ const entries = {
   spoolsheets: 'src/spoolsheets.js',
   windload: 'src/windload.js',
   structuralcombinations: 'src/structuralcombinations.js',
+  seismicwindcombined: 'src/seismicwindcombined.js',
   loadCombinations: 'src/loadCombinations.js',
   transientstability: 'src/transientstability.js',
   voltagedropstudy: 'src/voltagedropstudy.js',
