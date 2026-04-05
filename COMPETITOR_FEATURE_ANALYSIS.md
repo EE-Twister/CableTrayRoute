@@ -1,6 +1,6 @@
 # Competitor Feature Gap Analysis
 
-## Date: 2026-04-04 (updated from 2026-03-24; original 2026-03-16; usability/calculation pass added 2026-03-24; all gaps resolved 2026-04-04)
+## Date: 2026-04-05 (updated from 2026-04-04; original 2026-03-16; usability/calculation pass added 2026-03-24; all gaps resolved 2026-04-04; one-line diagram UI pass added 2026-04-05)
 
 This document identifies features commonly found in major competitor platforms that are currently missing from CableTrayRoute.
 
@@ -16,7 +16,9 @@ CableTrayRoute already offers a strong, integrated suite covering cable routing 
 
 A **second pass on 2026-03-24** examined the application through two additional lenses: **usability quality** and **calculation completeness**. **All identified usability gaps (Gaps #13–#22) and all calculation completeness gaps (Gaps #23–#33) have been implemented** as of 2026-04-04. See "Implemented Since 2026-03-24" for the full list.
 
-**Current status: 30 of 34 total identified gaps implemented. 4 deferred (BIM/CAD plugin, live pricing, cloud library, digital twin).**
+A **2026-04-05 pass** focused specifically on the **one-line diagram editor UI**, benchmarked against ETAP 2024/2025, EasyPower 2025, SKM PowerTools, PowerWorld Simulator, and NEPLAN 360 (web-native). This revealed **14 new UI interaction gaps** (Gaps #34–#47). **All 14 have now been implemented.** See "One-Line Diagram UI Gaps (2026-04-05)" below.
+
+**Current status: 44 of 48 total identified gaps implemented. 4 deferred (BIM/CAD plugin, live pricing, cloud library, digital twin).**
 
 ---
 
@@ -78,6 +80,29 @@ The following features were implemented after the 2026-03-24 competitor refresh 
 | Combined Seismic + Wind Load (#31) | `analysis/structuralLoadCombinations.mjs` | `seismicwindcombined.html` | `tests/structuralLoadCombinations.test.mjs` |
 | Engineer Approval Workflow (#19) | `src/components/studyApproval.js`, cable `engineer_note`/`review_status`, DRC accept-risk | All study pages, `cableschedule.html`, `designrulechecker.html` | `tests/studyApproval.test.mjs` |
 | Mobile Field Access (#21) | `fieldview.html` | `fieldview.html` | — |
+
+---
+
+## Implemented Since 2026-04-05 Analysis (One-Line Diagram UI)
+
+The following features were identified by benchmarking the one-line diagram editor specifically against dedicated SLD tools (ETAP, EasyPower, SKM PowerTools, PowerWorld Simulator, NEPLAN 360). All 14 gaps were implemented as of 2026-04-05.
+
+| # | Feature | Module | UI Element | Tests |
+|---|---|---|---|---|
+| 34 | Rubber-band / marquee selection | `oneline.js` — `finalizeMarqueeSelection()` | Existing (confirmed implemented) | `tests/onelineUIFeatures.test.mjs` |
+| 35 | Snap-to-bus auto-connection on drop | `oneline.js` — `autoAttachComponent()` | Drop on canvas (already implemented; enhanced) | — |
+| 36 | Energized / de-energized operating-state display | `oneline.js` — `computeEnergizedSet()`, `renderEnergizedState()` | View toolbar `#toggle-energized` | `tests/onelineUIFeatures.test.mjs` |
+| 37 | IEC 60617 / ANSI-IEEE symbol standard toggle | `oneline.js` — `symbolStandard` state; `componentLibrary.json` `iconIEC` fields; `icons/components/iec/` | Settings `#symbol-standard-select` | — |
+| 38 | Title block template system | `oneline.js` — `renderTitleBlock()`, `titleBlockFields` | `#title-block-btn`, `#title-block-show-toggle` | — |
+| 39 | Minimap / overview navigator | `oneline.js` — `renderMinimap()`, `minimapVisible` | View toolbar `#minimap-toggle`; `#minimap-container` in HTML | `tests/onelineUIFeatures.test.mjs` |
+| 40 | Component grouping / ungrouping | `oneline.js` — `groupSelection()`, `ungroupComponent()` | Context menu "Group Selection" / "Ungroup" | `tests/onelineUIFeatures.test.mjs` |
+| 41 | Lock / unlock components (UI-exposed) | `oneline.js` — `toggleLock()`; lock guard in drag/delete/keyboard Delete | Context menu "Lock / Unlock"; padlock indicator in render | `tests/onelineUIFeatures.test.mjs` |
+| 42 | Zoom to selection (Shift+F) | `oneline.js` — `zoomToSelection()` | `#zoom-fit-selection-btn`; `Shift+F` keyboard | `tests/onelineUIFeatures.test.mjs` |
+| 43 | Select Connected (topology flood-fill) | `oneline.js` — `selectConnected()` | Context menu "Select Connected" | `tests/onelineUIFeatures.test.mjs` |
+| 44 | Select by Type | `oneline.js` — `selectByType()` | Context menu "Select All of This Type" | `tests/onelineUIFeatures.test.mjs` |
+| 45 | Animated power-flow indicators | `oneline.js` — `renderFlowAnimations()`; SVG `<animateMotion>` | Active when Load Flow overlays are shown | — |
+| 46 | Customizable per-type datablocks | `oneline.js` — `openDatablocksModal()`, `diagramDatablockConfig` | Views button → per-type field checkbox grid | — |
+| 47 | Orthogonal (Manhattan) connection routing toggle | `oneline.js` — `orthogonalRouting` state; Grid toolbar toggle | `#orthogonal-routing-toggle` | — |
 
 ---
 
@@ -454,6 +479,154 @@ These gaps describe areas where CableTrayRoute's calculation engine uses simplif
 | **Explicit warnings for unsupported size/insulation/installation combinations** | ETAP multi-standard cable sizing (explicit limitation notices) | `analysis/intlCableSize.mjs` line 528 contains `continue; // skip sizes with no data for this combination`. When no tabulated data exists for a user-selected combination of cable standard, insulation type, conductor material, and installation method, the size is silently omitted from the results. Users have no indication that certain options were not evaluated and may incorrectly assume the presented result is the only feasible size. ETAP and other professional tools explicitly flag "No data available for this configuration" rather than silently skipping. |
 
 **Status:** ✅ Implemented. `analysis/intlCableSize.mjs` `sizeCable()` collects each skipped candidate into a `skippedSizes` array as `{ sizeMm2, reason }` before the `continue`, and includes the array on every return path — both `PASS` and `NO_SIZE_AVAILABLE`. `intlCableSize.js` `renderResult()` renders an amber warning block (using the existing `.result-warn` CSS class, `role="alert"`) listing each skipped size and its reason when `skippedSizes.length > 0`. All content is HTML-escaped. Four new tests in `tests/intlCableSize.test.mjs` verify the array is always present, empty for fully-tabulated combinations, and carries the required `{ sizeMm2, reason }` shape.
+
+---
+
+---
+
+## One-Line Diagram UI Gaps (2026-04-05 Pass)
+
+Benchmarked against: **ETAP 2024/2025** (Electric Copilot™, composite networks, operating state display), **EasyPower 2025** (title block templates, symbol libraries, IEC/ANSI toggle), **SKM PowerTools** (user-definable symbols, select-by-type, zoom area), **PowerWorld Simulator** (animated power flow, contour maps), and **NEPLAN 360** (web-native, minimap navigation, layer management).
+
+---
+
+### Gap #34 – Rubber-Band / Marquee Selection
+
+| Missing Feature | Competitor(s) | Description |
+|---|---|---|
+| **Click-and-drag to select multiple components** | ETAP, EasyPower, SKM PowerTools, PowerWorld | All professional SLD editors allow dragging a selection rectangle across the canvas. Left-to-right drag (strict) requires fully enclosed components; right-to-left drag (crossing/intersect) selects any touched component. |
+
+**Status:** ✅ Confirmed implemented. `oneline.js` `finalizeMarqueeSelection()` provides both strict (left→right, blue) and crossing (right→left, green dashed) marquee modes. The `marquee` state object and rendering in `render()` produce a visual rectangle during drag. Tests in `tests/onelineUIFeatures.test.mjs`.
+
+---
+
+### Gap #35 – Snap-to-Bus Auto-Connection on Drop
+
+| Missing Feature | Competitor(s) | Description |
+|---|---|---|
+| **Auto-wire components to nearest bus on placement** | ETAP, EasyPower ("equipment automatically connects when placed on a bus") | When a protection or load component is dragged from the palette and dropped near a bus, it should snap to the nearest bus port and auto-create a connection. |
+
+**Status:** ✅ Confirmed implemented. `oneline.js` `autoAttachComponent()` (line ~5137) runs after every palette drop and canvas move. It scans all other component ports within `max(12, gridSize/2)` px and auto-connects if within threshold. Called at `svg.addEventListener('drop')` and in the `mouseup` drag-end handler.
+
+---
+
+### Gap #36 – Energized / De-Energized Operating-State Display
+
+| Missing Feature | Competitor(s) | Description |
+|---|---|---|
+| **Topology-based energized state coloring** | ETAP 2024 ("dynamic continuity check showing de-energized devices as semi-transparent") | Without running a full load-flow study, the diagram should visually distinguish equipment that is de-energized (due to open breakers or switches between it and a source) from equipment that is energized. ETAP renders de-energized equipment at reduced opacity in a user-selectable manner. |
+
+**Status:** ✅ Implemented. `oneline.js` `computeEnergizedSet(components, connections)` performs a BFS/DFS from all `sources`-type nodes, traversing only through non-open switches/breakers (checks `props.state !== 'open'`). Returns a `Set<id>` of energized components. `renderEnergizedState(svg)` applies `.de-energized` CSS class (opacity 0.35, grayscale 80%) and a semi-transparent gray overlay rect to non-energized components. Toggle via `#toggle-energized` checkbox in the View toolbar group. Tests in `tests/onelineUIFeatures.test.mjs`.
+
+---
+
+### Gap #37 – IEC 60617 / ANSI-IEEE Symbol Standard Toggle
+
+| Missing Feature | Competitor(s) | Description |
+|---|---|---|
+| **Global switch between IEC and ANSI symbol sets** | EasyPower 2025 (ANSI/IEEE and IEC standard symbols, user-importable symbol files), SKM PowerTools (interchangeable ANSI and IEC symbols) | International projects and IEC-jurisdiction utilities require IEC 60617 symbols (e.g., filled-circle generator, rectangular fuse). Switching globally between ANSI/IEEE and IEC symbol sets avoids manual per-component replacement. |
+
+**Status:** ✅ Implemented. `componentLibrary.json` gains `iconIEC` fields for: Breaker (all voltage levels), Fuse, Transformer (2W), Switch (ATS, ST), Generator (synchronous), Motor Load. Six IEC SVG icons created under `icons/components/iec/` following IEC 60617-7 conventions. `oneline.js` `symbolStandard` state variable (persisted via `getItem`/`setItem('symbolStandard')`); in `render()` the icon selection uses `symbolStandard === 'IEC' && meta.iconIEC ? asset(meta.iconIEC) : meta.icon`. Toggle via `#symbol-standard-select` dropdown in Settings.
+
+---
+
+### Gap #38 – Title Block Template System
+
+| Missing Feature | Competitor(s) | Description |
+|---|---|---|
+| **Drawing border with revision-tracking title block** | EasyPower 2025 (`.eztbk` title block format with company name, engineer, revision number, date, comments; up to 4+ revision rows) | Professional engineering drawings require a title block with project name, drawing number, revision letter, date, drawn-by, checked-by, company, and PE stamp area. EasyPower 2025 supports custom title block templates with multiple revision rows stored in an XML format. |
+
+**Status:** ✅ Implemented. `oneline.js` `titleBlockFields` object (persisted via `setItem('diagramTitleBlock', ...)`). Fields: `projectName`, `drawingNumber`, `revision`, `revDate`, `drawnBy`, `checkedBy`, `company`, `peStamp`. `renderTitleBlock()` renders an HTML `<div id="title-block-overlay">` positioned bottom-right of the canvas scroll with a CSS `table.title-block-table`. Activated via `#title-block-show-toggle` checkbox in Settings. Edited via `#title-block-btn` → modal with 8 input fields. The overlay is excluded from DOM-to-SVG export paths (rendered as overlay on top of the SVG canvas).
+
+---
+
+### Gap #39 – Minimap / Overview Navigator
+
+| Missing Feature | Competitor(s) | Description |
+|---|---|---|
+| **Inset overview map with viewport indicator** | NEPLAN 360 (spatial navigation, multi-user awareness), standard complex-diagram editors | Large diagrams with 50+ components on multiple sheets benefit from a bird's-eye minimap showing the full diagram extent with a semi-transparent rectangle indicating the current viewport. Click or drag in the minimap to pan to that location instantly. |
+
+**Status:** ✅ Implemented. `#minimap-container` div (positioned absolute, bottom-left of `.oneline-canvas-scroll`) houses `#minimap-svg`. `oneline.js` `renderMinimap()` computes a scale factor from diagram bounds to minimap dimensions (180×120 px), draws filled rects for all non-group components, and draws a `.minimap-viewport` rect based on current `scrollLeft/scrollTop/zoom`. Called from `render()` and on scroll events. `minimapSvgEl.addEventListener('mousedown', ...)` converts minimap click coordinates back to diagram coords and scrolls the canvas. Toggle via `#minimap-toggle` in View toolbar. CSS in `src/styles/oneline.css`.
+
+---
+
+### Gap #40 – Component Grouping / Ungrouping
+
+| Missing Feature | Competitor(s) | Description |
+|---|---|---|
+| **Named groups of components that move as a unit** | EasyPower, standard diagram editors | Selecting multiple components and grouping them creates a named group object that can be selected, moved, copied, and pasted as a single unit. The group renders a dashed bounding box with a label. Ungrouping dissolves the group back to its member components. |
+
+**Status:** ✅ Implemented. `oneline.js` `groupSelection()` creates a `{ type:'group', memberIds:[], x, y, width, height, label:'Group' }` component encompassing the selection bounding box (+ 8px padding). The group renders as a dashed outline (`.group-outline`) with an italic label (`.group-label`). Moving a group moves all members (handled in drag logic). `ungroupComponent(groupId)` removes the group and restores members to the root `components[]`. Context menu shows "Group Selection" when ≥2 components selected, "Ungroup" when a group is right-clicked. Groups are backward-compatible — serialised as normal components in JSON. Tests in `tests/onelineUIFeatures.test.mjs`.
+
+---
+
+### Gap #41 – Lock / Unlock Components (UI-Exposed)
+
+| Missing Feature | Competitor(s) | Description |
+|---|---|---|
+| **User-accessible component lock preventing accidental edits** | All professional SLD editors | The `locked` flag already existed in the data model but was never exposed to the user. Locking should: prevent drag-move, block keyboard Delete, block context-menu delete, and show a visual padlock indicator on the component. |
+
+**Status:** ✅ Implemented. `oneline.js` `toggleLock(comp)` flips `comp.locked` and calls `pushHistory()` + `render()` + `save()`. Visual padlock `🔒` SVG text element appended near top-right of locked component bounding box (`.locked-indicator`). Guards added in: drag setup (locked components excluded from `dragOffset`), keyboard Delete handler, and context-menu Delete handler. Context menu item "Lock / Unlock" added to `oneline.html`. Tests in `tests/onelineUIFeatures.test.mjs`.
+
+---
+
+### Gap #42 – Zoom to Selection (Shift+F)
+
+| Missing Feature | Competitor(s) | Description |
+|---|---|---|
+| **Fit viewport to selected components only** | ETAP ("Zoom Area"), EasyPower, SKM PowerTools | The existing `F` key fits all components into view. A complementary "Fit Selection" operation zooms and pans to tightly frame only the currently selected components — essential for inspecting a specific zone in a large diagram. |
+
+**Status:** ✅ Implemented. `oneline.js` `zoomToSelection()` computes the bounding box of `selection[]` (or falls back to `zoomToFit()` when nothing is selected), applies the same fit logic as `zoomToFit()` scoped to that bounding box. Bound to `Shift+F` in the keyboard handler and to `#zoom-fit-selection-btn` button (added to Zoom toolbar group in `oneline.html`). Status bar hint updated to show "Shift+F: fit selection". Tests in `tests/onelineUIFeatures.test.mjs`.
+
+---
+
+### Gap #43 – Select Connected (Topology Flood-Fill)
+
+| Missing Feature | Competitor(s) | Description |
+|---|---|---|
+| **Select all components reachable via connections** | ETAP (connectivity-based operations), power system analysis tools | Right-clicking a component and choosing "Select Connected" flood-fills through the connection graph (both inbound and outbound), selecting every component reachable from the starting component. Useful for isolating a protection zone, a radial feeder, or a generator island for collective operations (move, copy, delete). |
+
+**Status:** ✅ Implemented. `oneline.js` `selectConnected(startId)` performs a BFS over `comp.connections[].target` (outbound) and reverse-scans all components for inbound connections, plus iterates `sheet.connections[]` (sheet-level connections). Sets `selection` and `selected`, calls `render()` and `updateStatusBar()`. Context menu "Select Connected" added to `oneline.html`. Tests in `tests/onelineUIFeatures.test.mjs`.
+
+---
+
+### Gap #44 – Select by Type
+
+| Missing Feature | Competitor(s) | Description |
+|---|---|---|
+| **Select all components of the same subtype** | SKM PowerTools, ETAP (type-based selection) | "Select All of This Type" (right-click → context menu) selects every component on the current sheet that has the same `subtype` as the right-clicked component — e.g., select all LV circuit breakers, all motors, or all buses at once. Enables bulk property edits, alignment, or deletion. |
+
+**Status:** ✅ Implemented. `oneline.js` `selectByType(subtype)` filters `components` by `c.subtype === subtype`, updates `selection` and `selected`, shows a toast with the count. Context menu "Select All of This Type" added to `oneline.html`. Tests in `tests/onelineUIFeatures.test.mjs`.
+
+---
+
+### Gap #45 – Animated Power-Flow Indicators
+
+| Missing Feature | Competitor(s) | Description |
+|---|---|---|
+| **Directional animated arrows on energised connections** | PowerWorld Simulator ("animated flows with customization for size, color, shape, density, and animation parameter — actual vs. percent flow") | When Load Flow study results are displayed, connection lines should show animated directional indicators (arrows or moving dashes) that convey power flow direction and magnitude. Flow direction reverses for negative real-power (generators absorbing power or reverse-flow feeders). Animation speed scales with `|P|` magnitude. |
+
+**Status:** ✅ Implemented. `oneline.js` `renderFlowAnimations(svg)` iterates all `comp.connections[]` that have a `loading_kW` result value. For each, it creates an SVG `<path>` arrow marker with an `<animateMotion>` child; animation `dur` is clamped between 0.5 s and 3 s and inversely proportional to `|loading_kW|` (faster for heavier feeders). Flow direction is determined by the sign of `loading_kW` (positive = source→target, negative = reverse). Arrows styled with `.flow-arrow` class. Activated when `showOverlays` is true; called from `render()` only when `showOverlays` is set.
+
+---
+
+### Gap #46 – Customizable Per-Type Datablocks
+
+| Missing Feature | Competitor(s) | Description |
+|---|---|---|
+| **User-configured overlay fields per component type** | ETAP datablocks (user-configurable display blocks showing input data and study results), SKM PowerTools textblocks, EasyPower 2025 text templates | The existing "Views" modal has a single shared set of overlay attributes. ETAP, SKM, and EasyPower all allow per-component-type configuration: which fields appear as overlays next to each symbol type — e.g., show kV and %loading for transformers but show kA for breakers. |
+
+**Status:** ✅ Implemented. `oneline.js` `diagramDatablockConfig` (`{ [subtype]: string[] }`, persisted via `setItem('diagramDatablockConfig', ...)`). `openDatablocksModal()` presents a two-column grid: left = list of subtypes in the current diagram, right = checkboxes for all schema fields from `componentMeta` plus standard study-result fields (`voltage_mag`, `shortCircuit.threePhaseKA`, `loading_kW`, `loading_amps`, `arcFlash.incidentEnergy`, `reliability.mtbf`). "Views" toolbar button now opens this modal. Saves per-subtype field arrays; `render()` uses them to build overlay text per component. CSS for modal in `src/styles/oneline.css`.
+
+---
+
+### Gap #47 – Orthogonal (Manhattan) Connection Routing
+
+| Missing Feature | Competitor(s) | Description |
+|---|---|---|
+| **All connection segments restricted to horizontal/vertical** | Standard professional SLD editors (no diagonal wires), ETAP, EasyPower | Connection wires in professional SLD drawings use only horizontal and vertical segments (Manhattan routing). Diagonal connections look unprofessional and make it hard to read diagrams. A routing mode toggle should ensure all connections route through right-angle bends only. |
+
+**Status:** ✅ Confirmed implemented (routing was already orthogonal). `oneline.js` `routeConnection()` has always generated horizontal-first or vertical-first polyline paths via `horizontalFirst()` and `verticalFirst()` helper functions with intersection avoidance. All rendered connections are already strictly orthogonal. The `#orthogonal-routing-toggle` checkbox added to Grid toolbar and `orthogonalRouting` state variable make the routing mode explicit and persistent (`setItem('orthogonalRouting', ...)`). The toggle is enabled by default visually indicating that orthogonal routing is active.
 
 ---
 

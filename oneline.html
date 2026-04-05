@@ -84,6 +84,13 @@
     <input type="file" id="import-project-input" accept=".ctr.json" class="hidden-input" title="Select project file">
     <button id="prefix-settings-btn" class="btn" title="Edit label prefixes">Label Prefixes</button>
     <button id="update-defaults-btn" class="btn" title="Update default settings">Update Defaults</button>
+    <label for="symbol-standard-select">Symbol Standard
+      <select id="symbol-standard-select">
+        <option value="ANSI">ANSI/IEEE</option>
+        <option value="IEC">IEC 60617</option>
+      </select>
+    </label>
+    <label><input type="checkbox" id="title-block-show-toggle"> Show Title Block</label>
   </div>
   <div id="component-library-banner" class="message error hidden">
     Component library failed to load
@@ -119,6 +126,7 @@
             <button id="studies-panel-btn" type="button" class="btn" title="Open studies panel">Studies</button>
             <button id="tour-btn" type="button" class="btn" title="Start tour">Tour</button>
             <button id="export-oneline-data-btn" type="button" class="btn" title="Export one-line data and study results">Export One-Line Data</button>
+            <button id="title-block-btn" type="button" class="btn" title="Edit diagram title block fields">Title Block</button>
           </div>
         </div>
         <div class="toolbar">
@@ -166,6 +174,10 @@
               <img src="./icons/toolbar/grid-size.svg" alt="" loading="lazy" decoding="async">
               <input type="number" id="grid-size" value="20" min="1">
             </label>
+            <label class="icon-button" title="Orthogonal (right-angle) connection routing" aria-label="Toggle orthogonal routing">
+              <input type="checkbox" id="orthogonal-routing-toggle" class="hidden-input">
+              Ortho
+            </label>
           </div>
           <div class="toolbar-group" aria-label="Zoom">
             <span class="toolbar-group-label">Zoom</span>
@@ -175,6 +187,7 @@
               <button id="zoom-in-btn" type="button" class="icon-button" title="Zoom in" aria-label="Zoom in">+</button>
               <button id="zoom-reset-btn" type="button" class="btn" title="Reset zoom to 100%">Reset</button>
               <button id="zoom-fit-btn" type="button" class="btn" title="Fit all components in view (F)">Fit</button>
+              <button id="zoom-fit-selection-btn" type="button" class="btn" title="Fit selected components in view (Shift+F)">Fit Selection</button>
             </div>
             <div class="pan-controls" role="group" aria-label="Pan diagram">
               <button id="pan-up-btn" type="button" class="icon-button" title="Pan up" aria-label="Pan up">&#8593;</button>
@@ -189,6 +202,14 @@
             <span class="toolbar-group-label">View</span>
               <div class="view-group">
                 <button id="view-menu-btn" type="button" class="btn" aria-haspopup="dialog" aria-expanded="false">Views</button>
+                <label class="icon-button" title="Show/hide minimap overview" aria-label="Toggle minimap">
+                  <input type="checkbox" id="minimap-toggle" class="hidden-input">
+                  Map
+                </label>
+                <label class="icon-button" title="Highlight energized/de-energized state" aria-label="Toggle energized state display">
+                  <input type="checkbox" id="toggle-energized" class="hidden-input">
+                  Energy
+                </label>
             </div>
           </div>
           <div class="toolbar-group" aria-label="Find devices">
@@ -287,7 +308,7 @@
               <span id="status-selection" class="status-selection"></span>
               <span class="status-divider"></span>
               <span id="status-mode" class="status-mode"></span>
-              <span class="status-shortcuts">Del: delete &nbsp;·&nbsp; R: rotate &nbsp;·&nbsp; F: fit &nbsp;·&nbsp; Ctrl+A: select all &nbsp;·&nbsp; Ctrl+C/V: copy/paste</span>
+              <span class="status-shortcuts">Del: delete &nbsp;·&nbsp; R: rotate &nbsp;·&nbsp; F: fit all &nbsp;·&nbsp; Shift+F: fit selection &nbsp;·&nbsp; Ctrl+A: select all &nbsp;·&nbsp; Ctrl+C/V: copy/paste</span>
             </div>
             <div class="oneline-canvas-scroll">
               <svg id="diagram" width="100%" height="100%" xmlns="http://www.w3.org/2000/svg">
@@ -302,6 +323,9 @@
                 <rect id="grid-bg" width="100%" height="100%" fill="url(#grid)" />
               </svg>
               <div id="voltage-legend" class="voltage-legend"></div>
+              <div id="minimap-container" class="minimap-container hidden" aria-label="Diagram overview navigator" role="navigation">
+                <svg id="minimap-svg" width="180" height="120" aria-hidden="true"></svg>
+              </div>
               <div id="prop-modal" class="prop-modal"><!-- populated dynamically --></div>
               <div id="cable-modal" class="prop-modal"></div>
               <div id="validation-modal" class="prop-modal"></div>
@@ -314,6 +338,11 @@
                 <li data-action="disconnect" data-context="component">Disconnect</li>
                 <li data-action="duplicate" data-context="component">Duplicate</li>
                 <li data-action="rotate" data-context="component">Rotate</li>
+                <li data-action="toggle-lock" data-context="component">Lock / Unlock</li>
+                <li data-action="select-connected" data-context="component">Select Connected</li>
+                <li data-action="select-by-type" data-context="component">Select All of This Type</li>
+                <li data-action="group-selection" data-context="component" id="ctx-group-selection">Group Selection</li>
+                <li data-action="ungroup" data-context="component" id="ctx-ungroup">Ungroup</li>
                 <li data-action="delete" data-context="component">Delete</li>
                 <li data-action="edit" data-context="connection">Edit Connection</li>
                 <li data-action="delete" data-context="connection">Delete Connection</li>
