@@ -1,36 +1,42 @@
 # Website Gaps & Missing Functionality Audit
 
-**Date:** 2026-03-16
+**Date:** 2026-03-16 (last updated 2026-04-05)
 **Scope:** Full website audit covering navigation, forms, accessibility, SEO, and code quality
 
 ---
 
 ## Executive Summary
 
-The CableTrayRoute website is a mature, feature-complete electrical design platform. Accessibility and SEO are strong (9/10). The main gaps are: **inconsistent navigation across pages**, **missing signup password confirmation**, **excessive use of `alert()` for error handling**, and **silent error swallowing** in several modules.
+The CableTrayRoute website is a mature, feature-complete electrical design platform. Accessibility and SEO are strong (9/10). ~~The main gaps are: **inconsistent navigation across pages**, **missing signup password confirmation**, **excessive use of `alert()` for error handling**, and **silent error swallowing** in several modules.~~
+
+**Updated 2026-04-05:** Navigation inconsistencies (P0-1) are fully resolved. All pages now use the dynamic `navigation.js` component. See section 1 for details.
 
 ---
 
-## 1. Navigation Inconsistencies
+## 1. Navigation Inconsistencies ✅ RESOLVED (2026-04-05)
 
-### CRITICAL: Pages missing the Studies section in navigation
+### ~~CRITICAL: Pages missing the Studies section in navigation~~ FIXED
 
-The dynamic navigation component (`src/components/navigation.js`) defines 21 routes across 5 sections, but several pages use hardcoded nav HTML that is out of sync:
+~~The dynamic navigation component (`src/components/navigation.js`) defines 21 routes across 5 sections, but several pages use hardcoded nav HTML that is out of sync:~~
 
-| Page | Missing Links |
-|------|--------------|
-| `index.html` | TCC, Harmonics, Motor Start, Load Flow, Short Circuit, Arc Flash, Custom Components, Account |
-| `help.html` | TCC, Harmonics, Motor Start, Load Flow, Short Circuit, Arc Flash, Custom Components, Account |
-| `404.html` | TCC, Harmonics, Motor Start, Load Flow, Short Circuit, Arc Flash, Custom Components, Account |
-| `500.html` | TCC, Harmonics, Motor Start, Load Flow, Short Circuit, Arc Flash, Custom Components, Account |
+All pages now use the dynamic `navigation.js` component (51 routes across 6 sections):
 
-**Root cause:** These pages have manually-written nav HTML instead of using the shared `navigation.js` component. The 6 Studies pages and Custom Components are entirely absent from their nav bars.
+| Page | Status |
+|------|--------|
+| `index.html` | ✅ Fixed (prior to this audit) |
+| `help.html` | ✅ Fixed (prior to this audit) |
+| `404.html` | ✅ Fixed (prior to this audit) |
+| `500.html` | ✅ Fixed (prior to this audit) |
+| `library.html` | ✅ Fixed 2026-04-05 — added `<nav class="top-nav">` + `navigation.js` import |
+| `account.html` | ✅ Fixed 2026-04-05 — replaced hardcoded 3-link auth nav with dynamic nav |
 
-### Medium: Orphaned / unlinked pages
+Test coverage added: `tests/pageNavigation.test.cjs` (6 assertions).
 
-- **`library.html`** - Exists and is in `sitemap.xml` but is NOT linked from any navigation menu
-- **`account.html`** - In navigation.js but missing from `sitemap.xml`
-- **`forgot-password.html`** and **`reset-password.html`** - Not in `sitemap.xml`
+### ~~Medium: Orphaned / unlinked pages~~ FIXED
+
+- **`library.html`** - ✅ Now has full navigation; reachable from all pages via Library dropdown
+- **`account.html`** - ✅ In `sitemap.xml` and now has full dynamic navigation
+- **`forgot-password.html`** and **`reset-password.html`** - In `sitemap.xml` (added in earlier fix)
 
 ### Minor: Manifest / deployment path issues
 
@@ -151,7 +157,7 @@ Several modules log errors to `console.error()` without any user-facing feedback
 
 ### P0 - Critical
 
-1. **Sync navigation across all pages** - Either render nav from `navigation.js` on all pages, or update hardcoded nav HTML in `index.html`, `help.html`, `404.html`, `500.html` to include Studies section and all 21 routes
+1. ~~**Sync navigation across all pages**~~ ✅ **RESOLVED 2026-04-05** — All 6 pages now use `navigation.js` (51 routes). See section 1.
 2. **Add password confirmation to signup form** in `login.html` with matching validation in `auth.js`
 
 ### P1 - Important
