@@ -4,6 +4,10 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Library Manager — CableTrayRoute</title>
+  <link rel="icon" href="icons/favicon.svg" type="image/svg+xml">
+  <link rel="apple-touch-icon" href="icons/favicon.svg">
+  <link rel="dns-prefetch" href="https://fonts.gstatic.com">
+  <meta name="color-scheme" content="light dark">
   <link rel="stylesheet" href="style.css">
   <!-- Open Graph / Social sharing -->
   <meta property="og:type" content="website">
@@ -17,6 +21,16 @@
 </head>
 <body>
   <a href="#main-content" class="skip-link">Skip to main content</a>
+  <nav class="top-nav" aria-label="Primary">
+    <button id="nav-toggle" class="nav-toggle" aria-label="Toggle navigation"
+            aria-controls="nav-links" aria-expanded="false" title="Toggle navigation">
+      <img src="icons/toolbar/grid.svg" alt="" aria-hidden="true"
+           class="control-icon" loading="lazy" decoding="async">
+    </button>
+    <div id="nav-links" class="nav-links" role="list">
+      <!-- Populated dynamically by navigation.js -->
+    </div>
+  </nav>
   <main id="main-content">
   <h1>Library Manager</h1>
   <section>
@@ -35,6 +49,7 @@
     <button id="manufacturer-download">Download</button>
   </section>
   <script type="module">
+    import './src/components/navigation.js';
     import { getItem, setItem } from './dataStore.mjs';
     import { showAlertModal } from './src/components/modal.js';
 

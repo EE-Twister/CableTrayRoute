@@ -1,3 +1,4 @@
+import './src/components/navigation.js';
 import { getAuthContextState, clearAuthContextState } from './projectStorage.js';
 
 const MIN_PASSWORD_LENGTH = 8;
