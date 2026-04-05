@@ -174,6 +174,7 @@
       "subtype": "two_winding",
       "label": "XFMR 2W",
       "icon": "icons/components/Transformer.svg",
+      "iconIEC": "icons/components/iec/IEC_Transformer.svg",
       "props": {
         "kva": 2500,
         "volts_primary": 13800,
@@ -800,6 +801,7 @@
       "subtype": "lv_cb",
       "label": "LV CB",
       "icon": "icons/components/Breaker.svg",
+      "iconIEC": "icons/components/iec/IEC_Breaker.svg",
       "props": {
         "interrupt_rating_ka": 65,
         "frame_a": 1600,
@@ -876,6 +878,7 @@
       "subtype": "mv_cb",
       "label": "MV CB",
       "icon": "icons/components/Breaker.svg",
+      "iconIEC": "icons/components/iec/IEC_Breaker.svg",
       "props": {
         "interrupt_rating_ka": 25,
         "frame_a": 1200,
@@ -952,6 +955,7 @@
       "subtype": "hv_cb",
       "label": "HV CB",
       "icon": "icons/components/Breaker.svg",
+      "iconIEC": "icons/components/iec/IEC_Breaker.svg",
       "props": {
         "interrupt_rating_ka": 63,
         "frame_a": 2000,
@@ -1028,6 +1032,7 @@
       "subtype": "class_rk1",
       "label": "Fuse",
       "icon": "icons/components/Fuse.svg",
+      "iconIEC": "icons/components/iec/IEC_Fuse.svg",
       "width": 80,
       "height": 40,
       "props": {
@@ -1099,6 +1104,7 @@
       "subtype": "ats",
       "label": "ATS",
       "icon": "icons/components/Switch.svg",
+      "iconIEC": "icons/components/iec/IEC_Switch.svg",
       "props": {
         "rating_a": 800,
         "transition": "open",
@@ -1118,6 +1124,7 @@
       "subtype": "single_throw",
       "label": "ST Switch",
       "icon": "icons/components/Switch.svg",
+      "iconIEC": "icons/components/iec/IEC_Switch.svg",
       "props": {
         "rating_a": 800,
         "transition": "open",
@@ -1242,6 +1249,7 @@
       "subtype": "synchronous",
       "label": "Synchronous Gen",
       "icon": "icons/components/SynchronousGenerator.svg",
+      "iconIEC": "icons/components/iec/IEC_Generator.svg",
       "ports": [
         {
           "x": 80,
@@ -1728,6 +1736,7 @@
       "subtype": "motor_load",
       "label": "Motor Load",
       "icon": "icons/components/Motor.svg",
+      "iconIEC": "icons/components/iec/IEC_Motor.svg",
       "defaultRotation": 0,
       "ports": [
         {

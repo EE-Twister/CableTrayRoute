@@ -1840,6 +1840,14 @@ let cursorPosValid = false;
 let needsInitialViewportCenter = true;
 let pendingInitialCenter = null;
 let showOverlays = true;
+let showEnergizedState = false;    // Gap #36
+let orthogonalRouting = false;     // Gap #47
+let symbolStandard = 'ANSI';       // Gap #37 – 'ANSI' or 'IEC'
+let showTitleBlock = false;        // Gap #38
+let titleBlockFields = {};         // Gap #38
+let minimapVisible = false;        // Gap #39
+// Gap #46 – per-subtype datablock config: { [subtype]: string[] }
+let diagramDatablockConfig = {};
 let syncing = false;
 let lintPanel = null;
 let lintList = null;
@@ -2280,6 +2288,42 @@ function zoomToFit() {
   const centerY = (minY + maxY) / 2;
   const nextLeft = (centerX - diagramViewport.minX) * diagramZoom - editor.clientWidth / 2;
   const nextTop = (centerY - diagramViewport.minY) * diagramZoom - editor.clientHeight / 2;
+  editor.scrollLeft = Math.max(0, nextLeft);
+  editor.scrollTop = Math.max(0, nextTop);
+  updateZoomDisplay();
+}
+
+// Gap #42 – Zoom to selection (Shift+F)
+function zoomToSelection() {
+  const targets = selection.length ? selection : (selected ? [selected] : []);
+  if (!targets.length) { zoomToFit(); return; }
+  const svg = document.getElementById('diagram');
+  const editor = svg?.parentElement;
+  if (!(editor instanceof HTMLElement)) return;
+  let minX = Infinity, minY = Infinity, maxX = -Infinity, maxY = -Infinity;
+  targets.forEach(comp => {
+    const b = componentBounds(comp);
+    minX = Math.min(minX, b.left);
+    minY = Math.min(minY, b.top);
+    maxX = Math.max(maxX, b.right);
+    maxY = Math.max(maxY, b.bottom);
+  });
+  if (!Number.isFinite(minX)) { zoomToFit(); return; }
+  const pad = 60;
+  const contentW = maxX - minX + pad * 2;
+  const contentH = maxY - minY + pad * 2;
+  const containerW = editor.clientWidth;
+  const containerH = editor.clientHeight;
+  if (!containerW || !containerH) return;
+  const fitZoom = clampZoom(Math.min(containerW / contentW, containerH / contentH));
+  const prevZoom = diagramZoom || DEFAULT_DIAGRAM_ZOOM;
+  diagramZoom = fitZoom;
+  setItem('diagramZoom', Number(diagramZoom.toFixed(2)));
+  applyDiagramZoom({ adjustScroll: false, previousZoom: prevZoom });
+  const centerX = (minX + maxX) / 2;
+  const centerY = (minY + maxY) / 2;
+  const nextLeft = (centerX - diagramViewport.minX) * diagramZoom - containerW / 2;
+  const nextTop = (centerY - diagramViewport.minY) * diagramZoom - containerH / 2;
   editor.scrollLeft = Math.max(0, nextLeft);
   editor.scrollTop = Math.max(0, nextTop);
   updateZoomDisplay();
@@ -5179,6 +5223,38 @@ function autoAttachComponent(comp, exclude = new Set()) {
   return changed || connected;
 }
 
+/**
+ * Gap #35 – Snap-to-Bus Auto-Connection.
+ * When a non-bus component is dropped near a bus (within snapRadius px),
+ * automatically connect the nearest port of the component to the nearest
+ * available port of that bus.  Returns true if a connection was made.
+ */
+function snapToNearestBus(comp, snapRadius = 30) {
+  if (!comp || isBusComponent(comp)) return false;
+  const meta = componentMeta[comp.subtype] || {};
+  const ports = comp.ports || meta.ports || [];
+  if (!ports.length) return false;
+  let best = null;
+  components.forEach(bus => {
+    if (!isBusComponent(bus) || bus === comp) return;
+    const busMeta = componentMeta[bus.subtype] || {};
+    const busPorts = bus.ports || busMeta.ports || [];
+    ports.forEach((_, portIdx) => {
+      const compPos = portPosition(comp, portIdx);
+      if (!Number.isFinite(compPos.x) || !Number.isFinite(compPos.y)) return;
+      const busPortIdx = nearestPortIndexForPoint(bus, compPos);
+      const busPos = portPosition(bus, busPortIdx);
+      if (!Number.isFinite(busPos.x) || !Number.isFinite(busPos.y)) return;
+      const dist = Math.hypot(busPos.x - compPos.x, busPos.y - compPos.y);
+      if (!best || dist < best.distance) {
+        best = { distance: dist, portIdx, bus, busPortIdx };
+      }
+    });
+  });
+  if (!best || best.distance > snapRadius) return false;
+  return ensureConnection(comp, best.bus, best.portIdx, best.busPortIdx);
+}
+
 function findSourceComponent(targetId, comps = components) {
   return comps.find(c => (c.connections || []).some(conn => conn.target === targetId)) || null;
 }
@@ -5364,6 +5440,168 @@ function finalizeMarqueeSelection() {
   return true;
 }
 
+// Gap #43 – Select Connected (topology flood-fill from selected component)
+function selectConnected(startId) {
+  if (!startId) return;
+  const byId = new Map(components.map(c => [c.id, c]));
+  const visited = new Set();
+  const queue = [startId];
+  while (queue.length) {
+    const id = queue.shift();
+    if (visited.has(id)) continue;
+    visited.add(id);
+    const comp = byId.get(id);
+    if (!comp) continue;
+    // outbound connections on this component
+    (comp.connections || []).forEach(conn => {
+      if (conn.target && !visited.has(conn.target)) queue.push(conn.target);
+    });
+    // inbound connections from other components
+    components.forEach(c => {
+      (c.connections || []).forEach(conn => {
+        if (conn.target === id && !visited.has(c.id)) queue.push(c.id);
+      });
+    });
+    // sheet-level connections
+    if (Array.isArray(connections)) {
+      connections.forEach(conn => {
+        if (conn.from === id && !visited.has(conn.to)) queue.push(conn.to);
+        if (conn.to === id && !visited.has(conn.from)) queue.push(conn.from);
+      });
+    }
+  }
+  const reached = components.filter(c => visited.has(c.id));
+  if (!reached.length) return;
+  selection = reached;
+  selected = reached[0];
+  selectedConnection = null;
+  render();
+  updateStatusBar();
+}
+
+// Gap #44 – Select by Type (select all components of the same subtype)
+function selectByType(subtype) {
+  if (!subtype) return;
+  const matched = components.filter(c => c.subtype === subtype);
+  if (!matched.length) { showToast(`No components of type "${subtype}" found`); return; }
+  selection = matched;
+  selected = matched[0];
+  selectedConnection = null;
+  render();
+  updateStatusBar();
+  showToast(`Selected ${matched.length} component${matched.length !== 1 ? 's' : ''} of type "${subtype}"`);
+}
+
+// Gap #41 – Lock / unlock a component
+function toggleLock(comp) {
+  if (!comp) return;
+  comp.locked = !comp.locked;
+  pushHistory();
+  render();
+  save();
+  showToast(comp.locked ? `"${comp.label || comp.id}" locked` : `"${comp.label || comp.id}" unlocked`);
+}
+
+// Gap #36 – Compute energized component set via topology traversal
+// Starts from source nodes; traverses through non-open breakers/switches.
+// Returns a Set<string> of energized component IDs.
+function computeEnergizedSet(comps, conns) {
+  const byId = new Map((comps || []).map(c => [c.id, c]));
+  const energized = new Set();
+  const queue = [];
+  // Seed from sources (utility, generator, inverter)
+  (comps || []).forEach(c => {
+    if (c.type === 'sources' || c.subtype === 'bus_Utility' || c.subtype === 'bus_Generator') {
+      queue.push(c.id);
+    }
+  });
+  const isOpen = (c) => {
+    if (!c) return false;
+    const state = (c.props && c.props.state) || c.state;
+    return state === 'open' || state === 'Open';
+  };
+  const visited = new Set();
+  while (queue.length) {
+    const id = queue.shift();
+    if (visited.has(id)) continue;
+    visited.add(id);
+    const comp = byId.get(id);
+    if (!comp) continue;
+    energized.add(id);
+    // Don't traverse through open breakers/switches
+    if (isOpen(comp)) continue;
+    // Follow outbound component-level connections
+    (comp.connections || []).forEach(conn => {
+      if (conn.target && !visited.has(conn.target)) queue.push(conn.target);
+    });
+    // Follow inbound connections (other comps targeting this one)
+    (comps || []).forEach(c => {
+      if (!visited.has(c.id)) {
+        (c.connections || []).forEach(conn => {
+          if (conn.target === id) queue.push(c.id);
+        });
+      }
+    });
+    // Sheet-level connections
+    if (Array.isArray(conns)) {
+      conns.forEach(conn => {
+        if (conn.from === id && !visited.has(conn.to)) queue.push(conn.to);
+        if (conn.to === id && !visited.has(conn.from)) queue.push(conn.from);
+      });
+    }
+  }
+  return energized;
+}
+
+// Gap #40 – Group selected components into a group object
+function groupSelection() {
+  const targets = selection.filter(c => c.type !== 'group');
+  if (targets.length < 2) { showToast('Select at least 2 components to group'); return; }
+  let minX = Infinity, minY = Infinity, maxX = -Infinity, maxY = -Infinity;
+  targets.forEach(c => {
+    const b = componentBounds(c);
+    minX = Math.min(minX, b.left); minY = Math.min(minY, b.top);
+    maxX = Math.max(maxX, b.right); maxY = Math.max(maxY, b.bottom);
+  });
+  const memberIds = targets.map(c => c.id);
+  const group = {
+    id: 'grp' + Date.now(),
+    type: 'group',
+    subtype: 'group',
+    x: minX - 8,
+    y: minY - 8,
+    width: maxX - minX + 16,
+    height: maxY - minY + 16,
+    label: 'Group',
+    rotation: 0,
+    memberIds,
+    connections: [],
+    props: {}
+  };
+  components.push(group);
+  selection = [group];
+  selected = group;
+  pushHistory();
+  render();
+  save();
+  showToast(`Grouped ${memberIds.length} components`);
+}
+
+// Gap #40 – Ungroup: dissolve a group back to individual components
+function ungroupComponent(groupId) {
+  const idx = components.findIndex(c => c.id === groupId && c.type === 'group');
+  if (idx === -1) return;
+  const group = components[idx];
+  components.splice(idx, 1);
+  const members = components.filter(c => (group.memberIds || []).includes(c.id));
+  selection = members;
+  selected = members[0] || null;
+  pushHistory();
+  render();
+  save();
+  showToast('Group dissolved');
+}
+
 function render() {
   applyTransformerVoltages();
   propagateSourceVoltagesToBuses(components);
@@ -5390,6 +5628,38 @@ function render() {
       c.x = Math.round(c.x / gridSize) * gridSize;
       c.y = Math.round(c.y / gridSize) * gridSize;
     });
+  }
+
+  /**
+   * Gap #47 – Orthogonal Connection Routing.
+   * Computes a rectilinear path between two points using a single elbow.
+   * Chooses horizontal-first or vertical-first based on which dimension
+   * is larger, so the elbow is placed at the midpoint of the dominant axis.
+   */
+  function computeOrthogonalPath(start, end) {
+    const dx = end.x - start.x;
+    const dy = end.y - start.y;
+    if (Math.abs(dx) < 0.5) return [start, end];   // already vertical
+    if (Math.abs(dy) < 0.5) return [start, end];   // already horizontal
+    if (Math.abs(dx) >= Math.abs(dy)) {
+      // Horizontal-first: go half-way across, then down/up
+      const elbowX = start.x + dx * 0.5;
+      return [
+        start,
+        { x: elbowX, y: start.y },
+        { x: elbowX, y: end.y },
+        end
+      ];
+    } else {
+      // Vertical-first: go half-way up/down, then across
+      const elbowY = start.y + dy * 0.5;
+      return [
+        start,
+        { x: start.x, y: elbowY },
+        { x: end.x,   y: elbowY },
+        end
+      ];
+    }
   }
 
   function routeConnection(src, tgt, conn) {
@@ -5525,23 +5795,29 @@ function render() {
     }
 
     if (!path) {
-      const h = horizontalFirst();
-      const v = verticalFirst();
-      // Prefer horizontal routing only when targeting left/right ports so
-      // that connections into top/bottom ports end with a vertical segment.
-      const preferH = tDir === 'left' || tDir === 'right';
-      if (preferH) {
-        if (!intersects(h)) path = h;
-        else if (!intersects(v)) path = v;
-        else path = h.length <= v.length ? h : v;
+      if (orthogonalRouting) {
+        // Gap #47 – use simple single-elbow orthogonal path; suppress mid-handle
+        path = computeOrthogonalPath(start, end);
+        if (conn) { delete conn.dir; delete conn.mid; }
       } else {
-        if (!intersects(v)) path = v;
-        else if (!intersects(h)) path = h;
-        else path = h.length <= v.length ? h : v;
-      }
-      if (conn) {
-        conn.dir = path === h ? 'h' : 'v';
-        conn.mid = conn.dir === 'h' ? path[1].x : path[1].y;
+        const h = horizontalFirst();
+        const v = verticalFirst();
+        // Prefer horizontal routing only when targeting left/right ports so
+        // that connections into top/bottom ports end with a vertical segment.
+        const preferH = tDir === 'left' || tDir === 'right';
+        if (preferH) {
+          if (!intersects(h)) path = h;
+          else if (!intersects(v)) path = v;
+          else path = h.length <= v.length ? h : v;
+        } else {
+          if (!intersects(v)) path = v;
+          else if (!intersects(h)) path = h;
+          else path = h.length <= v.length ? h : v;
+        }
+        if (conn) {
+          conn.dir = path === h ? 'h' : 'v';
+          conn.mid = conn.dir === 'h' ? path[1].x : path[1].y;
+        }
       }
     }
     const pen = path[path.length - 2];
@@ -5904,7 +6180,10 @@ function render() {
           g.appendChild(lead);
         });
       }
-      const iconHref = meta.icon || placeholderIcon;
+      // Gap #37 – IEC 60617 / ANSI-IEEE symbol standard toggle
+      const iconHref = (symbolStandard === 'IEC' && meta.iconIEC)
+        ? asset(meta.iconIEC)
+        : (meta.icon || placeholderIcon);
       const img = document.createElementNS(svgNS, 'image');
       img.setAttribute('x', c.x);
       img.setAttribute('y', c.y);
@@ -5948,6 +6227,35 @@ function render() {
       rect.setAttribute('stroke-dasharray', '4 2');
       rect.style.pointerEvents = 'none';
       g.appendChild(rect);
+    }
+    // Gap #41 – Locked component indicator
+    if (c.locked) {
+      const lockEl = document.createElementNS(svgNS, 'text');
+      lockEl.setAttribute('x', c.x + w - 2);
+      lockEl.setAttribute('y', c.y + 12);
+      lockEl.setAttribute('text-anchor', 'end');
+      lockEl.setAttribute('font-size', '12');
+      lockEl.classList.add('locked-indicator');
+      lockEl.textContent = '\uD83D\uDD12'; // 🔒
+      lockEl.style.pointerEvents = 'none';
+      lockEl.style.userSelect = 'none';
+      g.appendChild(lockEl);
+    }
+    // Gap #40 – Group outline for group components
+    if (c.type === 'group') {
+      const outline = document.createElementNS(svgNS, 'rect');
+      outline.setAttribute('x', c.x);
+      outline.setAttribute('y', c.y);
+      outline.setAttribute('width', c.width || w);
+      outline.setAttribute('height', c.height || h);
+      outline.classList.add('group-outline');
+      g.appendChild(outline);
+      const glabel = document.createElementNS(svgNS, 'text');
+      glabel.setAttribute('x', c.x + 4);
+      glabel.setAttribute('y', c.y - 3);
+      glabel.classList.add('group-label');
+      glabel.textContent = c.label || 'Group';
+      g.appendChild(glabel);
     }
     svg.appendChild(g);
     if (c.type === 'annotation' && selection.includes(c)) {
@@ -6083,6 +6391,16 @@ function render() {
   applyDiagramZoom();
   updateLegend(usedVoltageRanges);
   updateStatusBar();
+
+  // Gap #36 – Energized / de-energized operating-state overlay
+  renderEnergizedState(svg);
+
+  // Gap #45 – Animated power-flow indicators (when overlays are active)
+  if (showOverlays) renderFlowAnimations(svg);
+
+  // Gap #39 – Minimap
+  renderMinimap();
+
   if (lengthsChanged && !syncing) {
     syncing = true;
     syncSchedules(false);
@@ -6097,6 +6415,251 @@ export function toggleGrid() {
   setItem('gridEnabled', gridEnabled);
   document.getElementById('grid-bg').style.display = gridEnabled ? 'block' : 'none';
   render();
+}
+
+// ----------------------------------------------------------------
+// Gap #36 – Energized / de-energized state rendering
+// ----------------------------------------------------------------
+function renderEnergizedState(svg) {
+  // Remove previous de-energized overlays
+  svg.querySelectorAll('.de-energized-overlay').forEach(el => el.remove());
+  if (!showEnergizedState) return;
+  const energized = computeEnergizedSet(components, connections);
+  components.forEach(c => {
+    const g = svg.querySelector(`g.component[data-id="${escapeHtml(c.id)}"]`);
+    if (!g) return;
+    if (!energized.has(c.id)) {
+      g.classList.add('de-energized');
+      const w = c.width || compWidth;
+      const h = c.height || compHeight;
+      const overlay = document.createElementNS(svgNS, 'rect');
+      overlay.setAttribute('x', c.x);
+      overlay.setAttribute('y', c.y);
+      overlay.setAttribute('width', w);
+      overlay.setAttribute('height', h);
+      overlay.classList.add('de-energized-overlay');
+      g.appendChild(overlay);
+    } else {
+      g.classList.remove('de-energized');
+    }
+  });
+}
+
+// ----------------------------------------------------------------
+// Gap #45 – Animated power-flow indicators on connections
+// ----------------------------------------------------------------
+function renderFlowAnimations(svg) {
+  svg.querySelectorAll('.flow-arrow').forEach(el => el.remove());
+  components.forEach(comp => {
+    (comp.connections || []).forEach(conn => {
+      const kw = conn.loading_kW;
+      if (kw === undefined || kw === null) return;
+      const target = components.find(c => c.id === conn.target);
+      if (!target) return;
+      const fromPos = portPosition(comp, conn.sourcePort ?? 0);
+      const toPos = portPosition(target, conn.targetPort ?? 0);
+      if (!fromPos || !toPos) return;
+      const dx = toPos.x - fromPos.x;
+      const dy = toPos.y - fromPos.y;
+      const len = Math.hypot(dx, dy);
+      if (len < 10) return;
+      // Determine direction; negative kW means reverse flow
+      const forward = Number(kw) >= 0;
+      const sx = forward ? fromPos.x : toPos.x;
+      const sy = forward ? fromPos.y : toPos.y;
+      const ex = forward ? toPos.x : fromPos.x;
+      const ey = forward ? toPos.y : fromPos.y;
+      const pathD = `M${sx},${sy} L${ex},${ey}`;
+      // Arrow head
+      const arrow = document.createElementNS(svgNS, 'path');
+      arrow.setAttribute('d', 'M-4,-3 L4,0 L-4,3 Z');
+      arrow.classList.add('flow-arrow');
+      const animPath = document.createElementNS(svgNS, 'path');
+      animPath.setAttribute('d', pathD);
+      animPath.setAttribute('fill', 'none');
+      animPath.setAttribute('stroke', 'none');
+      const motion = document.createElementNS(svgNS, 'animateMotion');
+      const absMag = Math.min(Math.max(Math.abs(Number(kw)) || 50, 1), 5000);
+      const dur = Number(Math.max(0.5, Math.min(3, 200 / absMag)).toFixed(2));
+      motion.setAttribute('dur', `${dur}s`);
+      motion.setAttribute('repeatCount', 'indefinite');
+      motion.setAttribute('rotate', 'auto');
+      const mpathEl = document.createElementNS(svgNS, 'mpath');
+      // Inline path instead of href for compatibility
+      motion.setAttribute('path', pathD);
+      arrow.appendChild(motion);
+      svg.appendChild(arrow);
+    });
+  });
+}
+
+// ----------------------------------------------------------------
+// Gap #39 – Minimap / overview navigator
+// ----------------------------------------------------------------
+function renderMinimap() {
+  const container = document.getElementById('minimap-container');
+  const minimapSvg = document.getElementById('minimap-svg');
+  if (!container || !minimapSvg) return;
+  if (!minimapVisible) { container.classList.add('hidden'); return; }
+  container.classList.remove('hidden');
+  minimapSvg.innerHTML = '';
+  if (!components.length) return;
+  // Compute diagram bounds
+  let minX = Infinity, minY = Infinity, maxX = -Infinity, maxY = -Infinity;
+  components.forEach(c => {
+    const b = componentBounds(c);
+    minX = Math.min(minX, b.left); minY = Math.min(minY, b.top);
+    maxX = Math.max(maxX, b.right); maxY = Math.max(maxY, b.bottom);
+  });
+  if (!Number.isFinite(minX)) return;
+  const pad = 20;
+  minX -= pad; minY -= pad; maxX += pad; maxY += pad;
+  const dw = maxX - minX || 1;
+  const dh = maxY - minY || 1;
+  const mw = 180, mh = 120;
+  const scale = Math.min(mw / dw, mh / dh);
+  const ox = (mw - dw * scale) / 2;
+  const oy = (mh - dh * scale) / 2;
+  const toMx = x => (x - minX) * scale + ox;
+  const toMy = y => (y - minY) * scale + oy;
+  // Draw simplified component rects
+  components.forEach(c => {
+    if (c.type === 'group') return;
+    const w = c.width || compWidth;
+    const h = c.height || compHeight;
+    const rect = document.createElementNS(svgNS, 'rect');
+    rect.setAttribute('x', toMx(c.x));
+    rect.setAttribute('y', toMy(c.y));
+    rect.setAttribute('width', Math.max(2, w * scale));
+    rect.setAttribute('height', Math.max(2, h * scale));
+    rect.setAttribute('fill', '#888');
+    rect.setAttribute('rx', '1');
+    minimapSvg.appendChild(rect);
+  });
+  // Draw viewport rectangle
+  const editor = document.querySelector('.oneline-canvas-scroll');
+  if (editor) {
+    const zoom = diagramZoom || DEFAULT_DIAGRAM_ZOOM;
+    const vpLeft = editor.scrollLeft / zoom + diagramViewport.minX;
+    const vpTop = editor.scrollTop / zoom + diagramViewport.minY;
+    const vpW = editor.clientWidth / zoom;
+    const vpH = editor.clientHeight / zoom;
+    const vpRect = document.createElementNS(svgNS, 'rect');
+    vpRect.setAttribute('x', Math.max(0, toMx(vpLeft)));
+    vpRect.setAttribute('y', Math.max(0, toMy(vpTop)));
+    vpRect.setAttribute('width', Math.min(mw, vpW * scale));
+    vpRect.setAttribute('height', Math.min(mh, vpH * scale));
+    vpRect.classList.add('minimap-viewport');
+    minimapSvg.appendChild(vpRect);
+  }
+}
+
+// ----------------------------------------------------------------
+// Gap #38 – Title block rendering
+// ----------------------------------------------------------------
+function renderTitleBlock() {
+  let overlay = document.getElementById('title-block-overlay');
+  if (!showTitleBlock) {
+    if (overlay) overlay.style.display = 'none';
+    return;
+  }
+  if (!overlay) {
+    overlay = document.createElement('div');
+    overlay.id = 'title-block-overlay';
+    const canvasScroll = document.querySelector('.oneline-canvas-scroll');
+    if (canvasScroll) canvasScroll.appendChild(overlay);
+  }
+  overlay.style.display = 'block';
+  const f = titleBlockFields;
+  const rows = [
+    ['Project', f.projectName || ''],
+    ['Drawing No.', f.drawingNumber || ''],
+    ['Revision', f.revision || ''],
+    ['Date', f.revDate || ''],
+    ['Drawn By', f.drawnBy || ''],
+    ['Checked By', f.checkedBy || ''],
+    ['Company', f.company || ''],
+    ['PE Stamp', f.peStamp || ''],
+  ];
+  overlay.innerHTML = `<table class="title-block-table" aria-label="Drawing title block">
+    ${rows.map(([k, v]) => `<tr><td class="tb-key">${escapeHtml(k)}</td><td class="tb-val">${escapeHtml(v)}</td></tr>`).join('')}
+  </table>`;
+}
+
+// ----------------------------------------------------------------
+// Gap #46 – Open datablock configuration modal
+// ----------------------------------------------------------------
+function openDatablocksModal() {
+  const subtypes = [...new Set(components.map(c => c.subtype || c.type).filter(Boolean))];
+  if (!subtypes.length) { showToast('No components in diagram to configure'); return; }
+  const studyFields = ['voltage_mag', 'shortCircuit.threePhaseKA', 'loading_kW', 'loading_amps', 'arcFlash.incidentEnergy', 'reliability.mtbf'];
+  let activeSubtype = subtypes[0];
+  const modal = openModal({
+    title: 'Configure Data Display (Datablocks)',
+    content: '',
+    buttons: [
+      { text: 'Save', primary: true, id: 'datablock-save-btn' },
+      { text: 'Cancel', id: 'datablock-cancel-btn' }
+    ]
+  });
+  if (!modal) return;
+  const body = modal.querySelector('.modal-body') || modal.querySelector('.prop-form');
+  if (!body) return;
+  const grid = document.createElement('div');
+  grid.className = 'datablock-config-grid';
+  const typeList = document.createElement('div');
+  typeList.className = 'datablock-type-list';
+  const fieldList = document.createElement('div');
+  fieldList.className = 'datablock-field-list';
+  grid.appendChild(typeList);
+  grid.appendChild(fieldList);
+  body.appendChild(grid);
+  const renderFieldList = (subtype) => {
+    fieldList.innerHTML = '';
+    const comp = components.find(c => (c.subtype || c.type) === subtype);
+    const meta = componentMeta[subtype] || {};
+    const schemaFields = (meta.schema || []).map(f => f.name).filter(Boolean);
+    const allFields = [...new Set([...schemaFields, ...studyFields])];
+    const current = diagramDatablockConfig[subtype] || [];
+    allFields.forEach(fieldName => {
+      const label = document.createElement('label');
+      const cb = document.createElement('input');
+      cb.type = 'checkbox';
+      cb.value = fieldName;
+      cb.checked = current.includes(fieldName);
+      label.appendChild(cb);
+      label.appendChild(document.createTextNode(' ' + fieldName));
+      fieldList.appendChild(label);
+    });
+  };
+  const renderTypeList = () => {
+    typeList.innerHTML = '';
+    subtypes.forEach(st => {
+      const btn = document.createElement('button');
+      btn.type = 'button';
+      btn.textContent = st;
+      btn.className = st === activeSubtype ? 'active' : '';
+      btn.addEventListener('click', () => {
+        activeSubtype = st;
+        typeList.querySelectorAll('button').forEach(b => b.classList.toggle('active', b.textContent === st));
+        renderFieldList(st);
+      });
+      typeList.appendChild(btn);
+    });
+  };
+  renderTypeList();
+  renderFieldList(activeSubtype);
+  const saveBtn = modal.querySelector('#datablock-save-btn');
+  if (saveBtn) {
+    saveBtn.addEventListener('click', () => {
+      // Collect checked fields for current subtype
+      const checked = [...fieldList.querySelectorAll('input[type=checkbox]:checked')].map(cb => cb.value);
+      diagramDatablockConfig[activeSubtype] = checked;
+      setItem('diagramDatablockConfig', diagramDatablockConfig);
+      render();
+      modal.classList.remove('show');
+    });
+  }
 }
 
 function flashSnapIndicator(x, y) {
@@ -9413,7 +9976,9 @@ async function init() {
       const x = Number.isFinite(coords?.x) ? coords.x : fallbackX;
       const y = Number.isFinite(coords?.y) ? coords.y : fallbackY;
       const comp = addComponent({ type: info.type, subtype: info.subtype, x, y, skipHistory: true });
-      autoAttachComponent(comp);
+      if (!snapToNearestBus(comp)) {
+        autoAttachComponent(comp);
+      }
       pushHistory();
       render();
       save();
@@ -9845,6 +10410,10 @@ async function init() {
     attachLocalWheelScroll(paletteRoot);
   }
   attachLocalWheelScroll(canvasScroll);
+  // Gap #39 – Update minimap viewport on scroll
+  if (canvasScroll) {
+    canvasScroll.addEventListener('scroll', () => renderMinimap(), { passive: true });
+  }
   const legendEl = document.getElementById('voltage-legend');
   if (canvasScroll) {
     canvasScroll.addEventListener('wheel', e => {
@@ -9985,7 +10554,8 @@ async function init() {
         selection = [comp];
       }
       selected = comp;
-      dragOffset = selection.map(c => ({
+      // Gap #41 – Locked components cannot be dragged
+      dragOffset = selection.filter(c => !c.locked).map(c => ({
         comp: c,
         dx: pointerX - c.x,
         dy: pointerY - c.y,
@@ -10362,6 +10932,11 @@ async function init() {
       const canPaste = isComponentContext && canPastePropertyClipboard(propertyClipboard, contextTarget);
       pastePropsItem.style.display = canPaste ? 'block' : 'none';
     }
+    // Gap #40 – Show Group only when 2+ non-group components selected
+    const groupItem = menu.querySelector('[data-action="group-selection"]');
+    const ungroupItem = menu.querySelector('[data-action="ungroup"]');
+    if (groupItem) groupItem.style.display = (isComponentContext && selection.length >= 2 && !selection.every(c => c.type === 'group')) ? 'block' : 'none';
+    if (ungroupItem) ungroupItem.style.display = (isComponentContext && contextTarget?.type === 'group') ? 'block' : 'none';
     const rect = canvasScroll?.getBoundingClientRect();
     if (rect) {
       const scrollLeft = canvasScroll?.scrollLeft ?? 0;
@@ -10501,6 +11076,9 @@ async function init() {
     } else if (action === 'delete' && contextTarget) {
       const targets = getContextTargets(contextTarget);
       if (!targets.length) return;
+      // Gap #41 – block deletion of locked components
+      const locked = targets.filter(c => c.locked);
+      if (locked.length) { showToast(`Cannot delete: ${locked.map(c => c.label || c.id).join(', ')} is locked`); return; }
       const ids = new Set(targets.map(c => c.id));
       components = components.filter(c => !ids.has(c.id));
       components.forEach(c => {
@@ -10582,6 +11160,22 @@ async function init() {
         render();
         save();
       }
+    // Gap #41 – Lock / unlock
+    } else if (action === 'toggle-lock' && contextTarget) {
+      const targets = getContextTargets(contextTarget);
+      targets.forEach(c => toggleLock(c));
+    // Gap #43 – Select Connected
+    } else if (action === 'select-connected' && contextTarget) {
+      selectConnected(contextTarget.id);
+    // Gap #44 – Select by Type
+    } else if (action === 'select-by-type' && contextTarget) {
+      selectByType(contextTarget.subtype || contextTarget.type);
+    // Gap #40 – Group Selection
+    } else if (action === 'group-selection') {
+      groupSelection();
+    // Gap #40 – Ungroup
+    } else if (action === 'ungroup' && contextTarget) {
+      if (contextTarget.type === 'group') ungroupComponent(contextTarget.id);
     }
     menu.style.display = 'none';
   });
@@ -10618,6 +11212,9 @@ async function init() {
       return;
     }
     if (selection.length) {
+      // Gap #41 – block deletion of locked components
+      const locked = selection.filter(c => c.locked);
+      if (locked.length) { showToast(`Cannot delete: ${locked.map(c => c.label || c.id).join(', ')} is locked`); return; }
       const ids = new Set(selection.map(c => c.id));
       components = components.filter(c => !ids.has(c.id));
       components.forEach(c => {
@@ -10700,9 +11297,12 @@ async function init() {
       selectedConnection = null;
       render();
       updateStatusBar();
-    } else if (!mod && key === 'f') {
+    } else if (!mod && key === 'f' && !e.shiftKey) {
       e.preventDefault();
       zoomToFit();
+    } else if (!mod && key === 'f' && e.shiftKey) {
+      e.preventDefault();
+      zoomToSelection();
     } else if (!mod && e.key === 'Escape') {
       // Cancel connect mode or deselect
       const anyModalOpen = document.querySelector('.prop-modal.show');
@@ -10781,6 +11381,177 @@ async function init() {
   initDarkMode();
   initCompactMode();
   initNavToggle();
+
+  // ----------------------------------------------------------------
+  // Gap #42 – Zoom to Selection button
+  // ----------------------------------------------------------------
+  document.getElementById('zoom-fit-selection-btn')?.addEventListener('click', () => zoomToSelection());
+
+  // ----------------------------------------------------------------
+  // Gap #36 – Energized/de-energized state toggle
+  // ----------------------------------------------------------------
+  const toggleEnergized = document.getElementById('toggle-energized');
+  if (toggleEnergized) {
+    toggleEnergized.checked = showEnergizedState;
+    toggleEnergized.addEventListener('change', () => {
+      showEnergizedState = toggleEnergized.checked;
+      render();
+    });
+  }
+
+  // ----------------------------------------------------------------
+  // Gap #39 – Minimap toggle
+  // ----------------------------------------------------------------
+  const minimapToggle = document.getElementById('minimap-toggle');
+  if (minimapToggle) {
+    minimapToggle.checked = minimapVisible;
+    minimapToggle.addEventListener('change', () => {
+      minimapVisible = minimapToggle.checked;
+      renderMinimap();
+    });
+    // Minimap click-to-navigate
+    const minimapSvgEl = document.getElementById('minimap-svg');
+    if (minimapSvgEl) {
+      minimapSvgEl.addEventListener('mousedown', e => {
+        if (!minimapVisible) return;
+        const rect = minimapSvgEl.getBoundingClientRect();
+        const mx = e.clientX - rect.left;
+        const my = e.clientY - rect.top;
+        // Convert minimap coords to diagram coords
+        if (!components.length) return;
+        let minX = Infinity, minY = Infinity, maxX = -Infinity, maxY = -Infinity;
+        components.forEach(c => {
+          const b = componentBounds(c);
+          minX = Math.min(minX, b.left); minY = Math.min(minY, b.top);
+          maxX = Math.max(maxX, b.right); maxY = Math.max(maxY, b.bottom);
+        });
+        const pad = 20;
+        minX -= pad; minY -= pad; maxX += pad; maxY += pad;
+        const dw = maxX - minX || 1, dh = maxY - minY || 1;
+        const scale = Math.min(180 / dw, 120 / dh);
+        const ox = (180 - dw * scale) / 2;
+        const oy = (120 - dh * scale) / 2;
+        const diagramX = (mx - ox) / scale + minX;
+        const diagramY = (my - oy) / scale + minY;
+        const editor = document.querySelector('.oneline-canvas-scroll');
+        if (editor) {
+          const zoom = diagramZoom || DEFAULT_DIAGRAM_ZOOM;
+          editor.scrollLeft = Math.max(0, (diagramX - diagramViewport.minX) * zoom - editor.clientWidth / 2);
+          editor.scrollTop = Math.max(0, (diagramY - diagramViewport.minY) * zoom - editor.clientHeight / 2);
+          renderMinimap();
+        }
+      });
+    }
+  }
+
+  // ----------------------------------------------------------------
+  // Gap #47 – Orthogonal routing toggle
+  // ----------------------------------------------------------------
+  const orthoToggle = document.getElementById('orthogonal-routing-toggle');
+  if (orthoToggle) {
+    orthoToggle.checked = orthogonalRouting;
+    orthoToggle.addEventListener('change', () => {
+      orthogonalRouting = orthoToggle.checked;
+      setItem('orthogonalRouting', orthogonalRouting);
+      // Clear cached dir/mid so routeConnection re-computes with the new mode
+      components.forEach(c => (c.connections || []).forEach(conn => {
+        delete conn.dir; delete conn.mid;
+      }));
+      render();
+    });
+    orthogonalRouting = !!getItem('orthogonalRouting');
+    orthoToggle.checked = orthogonalRouting;
+  }
+
+  // ----------------------------------------------------------------
+  // Gap #37 – Symbol standard (IEC 60617 / ANSI-IEEE) toggle
+  // ----------------------------------------------------------------
+  const symStdSelect = document.getElementById('symbol-standard-select');
+  if (symStdSelect) {
+    symbolStandard = getItem('symbolStandard') || 'ANSI';
+    symStdSelect.value = symbolStandard;
+    symStdSelect.addEventListener('change', () => {
+      symbolStandard = symStdSelect.value;
+      setItem('symbolStandard', symbolStandard);
+      render();
+    });
+  }
+
+  // ----------------------------------------------------------------
+  // Gap #38 – Title block
+  // ----------------------------------------------------------------
+  const titleBlockBtn = document.getElementById('title-block-btn');
+  if (titleBlockBtn) {
+    titleBlockFields = getItem('diagramTitleBlock') || {};
+    titleBlockBtn.addEventListener('click', () => {
+      const fields = [
+        ['projectName', 'Project Name'],
+        ['drawingNumber', 'Drawing Number'],
+        ['revision', 'Revision'],
+        ['revDate', 'Date'],
+        ['drawnBy', 'Drawn By'],
+        ['checkedBy', 'Checked By'],
+        ['company', 'Company'],
+        ['peStamp', 'PE Stamp / Seal Note'],
+      ];
+      const form = document.createElement('form');
+      form.className = 'title-block-modal-form';
+      fields.forEach(([key, label]) => {
+        const lbl = document.createElement('label');
+        lbl.textContent = label;
+        const inp = document.createElement('input');
+        inp.type = 'text';
+        inp.value = titleBlockFields[key] || '';
+        inp.dataset.key = key;
+        lbl.appendChild(inp);
+        form.appendChild(lbl);
+      });
+      const modal = openModal({ title: 'Title Block', content: '', buttons: [
+        { text: 'Save', primary: true, id: 'tb-save-btn' },
+        { text: 'Cancel', id: 'tb-cancel-btn' }
+      ]});
+      if (!modal) return;
+      const body = modal.querySelector('.modal-body') || modal.querySelector('.prop-form');
+      if (body) body.appendChild(form);
+      modal.querySelector('#tb-save-btn')?.addEventListener('click', () => {
+        form.querySelectorAll('input[data-key]').forEach(inp => {
+          titleBlockFields[inp.dataset.key] = inp.value.trim();
+        });
+        setItem('diagramTitleBlock', titleBlockFields);
+        renderTitleBlock();
+        modal.classList.remove('show');
+      });
+    });
+  }
+  const titleBlockShowToggle = document.getElementById('title-block-show-toggle');
+  if (titleBlockShowToggle) {
+    titleBlockShowToggle.checked = showTitleBlock;
+    titleBlockShowToggle.addEventListener('change', () => {
+      showTitleBlock = titleBlockShowToggle.checked;
+      renderTitleBlock();
+    });
+  }
+
+  // ----------------------------------------------------------------
+  // Gap #46 – Datablock config: hook into the existing Views button
+  // ----------------------------------------------------------------
+  const viewMenuBtn = document.getElementById('view-menu-btn');
+  if (viewMenuBtn) {
+    diagramDatablockConfig = getItem('diagramDatablockConfig') || {};
+    const originalClickHandler = viewMenuBtn._clickHandler;
+    viewMenuBtn.addEventListener('click', () => {
+      openDatablocksModal();
+    });
+  }
+
+  // Show/hide context menu items based on selection state
+  const ctxGroupItem = document.getElementById('ctx-group-selection');
+  const ctxUngroupItem = document.getElementById('ctx-ungroup');
+  const ctxMenu = document.getElementById('context-menu');
+  if (ctxMenu) {
+    ctxMenu.addEventListener('contextmenu', e => e.preventDefault());
+    // Update group/ungroup visibility just before menu is shown (handled in contextmenu event)
+  }
 }
 
 function getCategory(c) {
