@@ -12,7 +12,7 @@ import {
 import { runShortCircuit } from './shortCircuit.mjs';
 import { scaleCurve, checkDuty, sanitizeCurve } from './tccUtils.js';
 import { checkCoordination, greedyCoordinate, generateFaultCurrents } from './tccAutoCoord.mjs';
-import { openModal } from '../src/components/modal.js';
+import { openModal, showAlertModal } from '../src/components/modal.js';
 import conductorProperties from '../conductorPropertiesData.mjs';
 import componentLibrary from '../componentLibrary.json' with { type: 'json' };
 
@@ -1968,6 +1968,7 @@ async function init() {
     libraryDevices = Array.isArray(list) ? list : [];
   } catch (e) {
     console.error('Failed to load device data', e);
+    showAlertModal('Library Error', 'Protective device data could not be loaded. Some device catalog features may be limited.');
     libraryDevices = [];
   }
 
@@ -3505,6 +3506,7 @@ function renderDeviceDetails(entry, container, doc, options = {}) {
         handleResult(!!result);
       } catch (err) {
         console.error('Failed to assign TCC device', err);
+        showAlertModal('Assignment Error', 'The device could not be assigned. Please try again.');
         handleResult(false);
       }
     });
@@ -3526,6 +3528,7 @@ function renderDeviceDetails(entry, container, doc, options = {}) {
         handleResult(!!result);
       } catch (err) {
         console.error('Failed to clear TCC assignment', err);
+        showAlertModal('Assignment Error', 'The device assignment could not be cleared. Please try again.');
         handleResult(false);
       }
     });
@@ -4221,6 +4224,7 @@ async function openComponentBrowserModal() {
       return true;
     } catch (err) {
       console.error('Failed to update TCC assignment', err);
+      showAlertModal('Assignment Error', 'The device assignment could not be updated. Please try again.');
       return false;
     }
   };

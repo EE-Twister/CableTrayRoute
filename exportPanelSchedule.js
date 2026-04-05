@@ -1,4 +1,5 @@
 import * as dataStore from './dataStore.mjs';
+import { showAlertModal } from './src/components/modal.js';
 
 function parsePositiveInt(value) {
   if (value == null) return null;
@@ -193,6 +194,7 @@ function getDemandValue(load) {
 export function exportPanelSchedule(panelId) {
   if (typeof XLSX === 'undefined') {
     console.error('XLSX library not loaded');
+    showAlertModal('Library Error', 'The Excel export library did not load. Please refresh the page and try again.');
     return;
   }
   const panels = dataStore.getPanels();
