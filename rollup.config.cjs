@@ -1,6 +1,7 @@
 const fs = require('fs');
 const path = require('path');
 const terser = require('@rollup/plugin-terser');
+const json = require('@rollup/plugin-json');
 
 // Auto-generate an ES module wrapper for JSON data so it can be imported in browsers
 const jsonPath = path.resolve(__dirname, 'data/protectiveDevices.json');
@@ -90,5 +91,5 @@ module.exports = {
     chunkFileNames: 'chunks/[name]-[hash].js',
     manualChunks,
   },
-  plugins: [terser()]
+  plugins: [json(), terser()]
 };

@@ -214,6 +214,11 @@ function mountPersistentNavigation() {
   const topNav = document.querySelector('.top-nav');
   if (!topNav) return;
 
+  // Ensure the primary nav landmark is labelled for WCAG 2.4.1 SC
+  if (!topNav.getAttribute('aria-label')) {
+    topNav.setAttribute('aria-label', 'Primary');
+  }
+
   const pageName = currentPageName();
   const currentRoute = routeForPage(pageName);
 

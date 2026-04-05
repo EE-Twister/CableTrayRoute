@@ -1,0 +1,7 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 80 40" fill="none" stroke="currentColor" stroke-width="2">
+  <!-- IEC 60617-7: generator — circle with G label -->
+  <line x1="40" y1="0" x2="40" y2="10"/>
+  <circle cx="40" cy="22" r="12"/>
+  <text x="40" y="26" text-anchor="middle" font-size="11" font-family="sans-serif" fill="currentColor" stroke="none">G</text>
+  <line x1="40" y1="34" x2="40" y2="40"/>
+</svg>
