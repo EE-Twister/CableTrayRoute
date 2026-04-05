@@ -330,7 +330,10 @@ document.addEventListener('DOMContentLoaded', async () => {
             zone:c.zone??c.cable_zone
           };
         });
-    }catch(e){console.error('Failed to load cables for',id,e);return[];}
+    }catch(e){
+      // Non-critical: returns [] as a safe fallback so the UI can still render
+      console.warn('Failed to load cables for',id,e);return[];
+    }
   }
   const dirty = createDirtyTracker();
   const markSaved = () => dirty.markClean();

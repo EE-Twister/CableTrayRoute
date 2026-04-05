@@ -2024,7 +2024,8 @@ async function initCableSchedule() {
     try {
       stored = dataStore.getItem(presetStorageKey, DEFAULT_PRESET) || DEFAULT_PRESET;
     } catch (e) {
-      console.error('Failed to load cable schedule preset', e);
+      // Non-critical: localStorage preference unavailable; falling back to default preset
+      console.warn('Failed to load cable schedule preset', e);
     }
     return PRESETS[stored] ? stored : DEFAULT_PRESET;
   };
@@ -2039,7 +2040,8 @@ async function initCableSchedule() {
       try {
         dataStore.setItem(presetStorageKey, presetName);
       } catch (e) {
-        console.error('Failed to store cable schedule preset', e);
+        // Non-critical: localStorage write failed; preset selection won't persist across sessions
+        console.warn('Failed to store cable schedule preset', e);
       }
     }
     if (presetSelect && presetSelect.value !== presetName) {

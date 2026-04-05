@@ -203,7 +203,10 @@ if (typeof window !== 'undefined') {
   try {
     const stateName = normalizeProjectName(getProjectState().name || '');
     if (stateName) return stateName;
-  } catch (e) { console.warn('Failed to read project state name', e); }
+  } catch (e) {
+    // Non-critical: falls back to '' — no user action needed
+    console.warn('Failed to read project state name', e);
+  }
   return '';
 }
 
@@ -217,6 +220,7 @@ function applyProjectStateName(name) {
       setProjectState(state);
     }
   } catch (e) {
+    // Non-critical: name will re-sync on next load — no user action needed
     console.warn('Project state update failed', e);
   }
   return trimmed;
@@ -468,6 +472,8 @@ async function newProject() {
     writeSavedProject(trimmed, sections);
   } catch (e) {
     console.error('Failed to initialize new project storage', e);
+    await showAlertModal('Project Error', 'Failed to create new project storage. Please try again or reload the page.');
+    return;
   }
   location.reload();
 }
@@ -488,6 +494,8 @@ function renameProject(name) {
       }
     } catch (e) {
       console.error('Project rename persistence failed', e);
+      // Fire-and-forget: renameProject is synchronous so we don't await the modal
+      showAlertModal('Rename Warning', 'The project was renamed but could not be saved to storage. Your changes may be lost on reload.');
     }
   }
   setProjectHash(trimmed);
