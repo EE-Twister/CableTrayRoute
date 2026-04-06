@@ -448,3 +448,47 @@ export async function runArcFlash(options = {}) {
   return results;
 }
 
+/**
+ * Generate a "constant incident energy" limit curve for overlay on a TCC chart.
+ *
+ * For each fault current in currentRangeKA, computes the maximum clearing time
+ * that keeps incident energy at or below thresholdCalCm2 using the IEEE 1584-2018
+ * simplified model (same formulas as runArcFlash). Returns an array of
+ * { current, time } points where current is in Amps (for TCC chart axes).
+ *
+ * @param {object} params
+ * @param {number} params.Cf           - 1.0 for open air, 1.5 for enclosed equipment
+ * @param {number} params.sizeFactor   - enclosure size factor (cube-root of volume ratio)
+ * @param {number} params.gap          - conductor gap in mm
+ * @param {number} params.dist         - working distance in mm
+ * @param {number} params.V            - system voltage in kV
+ * @param {string} params.cfg          - electrode configuration (VCB, VCBB, HCB, VOA, HOA)
+ * @param {string} params.enclosure    - 'open' or 'box'
+ * @param {number} thresholdCalCm2     - incident energy limit in cal/cm²
+ * @param {number[]} currentRangeKA    - array of bolted fault current values in kA to sweep
+ * @returns {{ current: number, time: number }[]} sorted by ascending current
+ */
+export function incidentEnergyLimitCurve(params, thresholdCalCm2, currentRangeKA) {
+  const { Cf = 1.5, sizeFactor = 1, gap = 25, dist = 455, V = 0.48, cfg = 'VCB', enclosure = 'box' } = params || {};
+  const E = thresholdCalCm2;
+  if (!(E > 0) || !Array.isArray(currentRangeKA) || currentRangeKA.length === 0) return [];
+
+  const denomBase = 1.6 * Cf * sizeFactor * (gap / 25) * Math.pow(610 / dist, 2);
+  if (!(denomBase > 0)) return [];
+
+  const points = [];
+  for (const Ibf of currentRangeKA) {
+    if (!(Ibf > 0)) continue;
+    const Ia = arcingCurrent(Ibf, V, gap, cfg, enclosure);
+    if (!(Ia > 0)) continue;
+    const Ia12 = Math.pow(Math.min(Ia, Ibf), 1.2);
+    if (!(Ia12 > 0)) continue;
+    const t = E / (denomBase * Ia12);
+    if (t > 0 && t <= 100) {
+      points.push({ current: Ibf * 1000, time: t });
+    }
+  }
+  points.sort((a, b) => a.current - b.current);
+  return points;
+}
+

@@ -20,7 +20,7 @@ A **2026-04-05 pass** focused specifically on the **one-line diagram editor UI**
 
 A **2026-04-06 pass** performed a focused deep dive on **one-line diagram connectivity features** and the **TCC (Time-Current Curve) engine**, benchmarked against ETAP 2024/2025, EasyPower 2025, SKM PTW 9, PowerWorld Simulator 23, and DIgSILENT PowerFactory 2024. This revealed **10 new gaps** (Gaps #48–#57) across two areas: (1) multi-sheet diagramming and diagram annotation capabilities missing from the one-line editor and (2) advanced TCC curve types, arc flash integration, ground fault protection, and reporting absent from the coordination study tool. See "One-Line Diagram & TCC Deep Dive (2026-04-06)" below.
 
-**Current status: 47 of 58 total identified gaps implemented. 3 deferred (BIM/CAD plugin, live pricing, digital twin). 8 open (Gaps #48–#52, #54–#55, #57).**
+**Current status: 48 of 58 total identified gaps implemented. 3 deferred (BIM/CAD plugin, live pricing, digital twin). 7 open (Gaps #48–#52, #55, #57).**
 
 ---
 
@@ -190,7 +190,7 @@ Benchmarked against: **ETAP 2024/2025** (composite networks, protection zone ove
 |---|---|---|
 | **Cal/cm² incident energy curve overlaid on TCC log-log chart** | ETAP 2024/2025, EasyPower 2025 | After running an arc flash study, ETAP and EasyPower overlay a "constant incident energy" curve on the TCC chart. This curve shows, for a given fault current, the maximum allowable clearing time to remain below a target incident energy threshold (e.g., 8 cal/cm² for PPE Category 2 or 40 cal/cm² for PPE Category 4). Engineers can visually verify that the upstream protective device's TCC is entirely to the left of / below the incident energy limit curve — if any part of the device curve intersects or exceeds it, an arc flash hazard exists at that current level. This is one of the most actionable displays in a coordination study. CableTrayRoute's `analysis/tcc.js` has no arc flash overlay; `analysis/arcFlash.mjs` results (incident energy, clearing time) are not surfaced on the TCC chart in any form. |
 
-**Status:** New gap identified 2026-04-06. Not yet implemented.
+**Status:** ✅ **Implemented 2026-04-06.** `analysis/arcFlash.mjs` exports `incidentEnergyLimitCurve(params, thresholdCalCm2, currentRangeKA)` which inverts the IEEE 1584-2018 incident energy formula to produce a `{ current, time }` point array for any cal/cm² threshold. In `analysis/tcc.js`, a new `'arcFlashOverlay'` view option (added to `TCC_VIEW_OPTIONS`) reads `studies.arcFlash` via `getStudies()`, sweeps 200 log-spaced current points across the chart domain, calls `incidentEnergyLimitCurve()`, and pushes an `'arcFlashLimit'` overlay entry that is rendered as a red dashed path (`stroke-dasharray: 10,5`, stroke-width 2.5) with a matching legend entry. After each `plot()` call, the `#arc-flash-overlay-controls` selector in `tcc.html` is shown only when arc flash results exist; the dropdown offers 8 / 25 / 40 cal/cm² thresholds (PPE Cat 2–4) and re-renders on change. Tests: `tests/tcc/arcFlashOverlay.test.mjs` (19 assertions covering return shape, monotonicity, threshold scaling, enclosure effect, edge cases, and IEEE 1584 spot-checks).
 
 ---
 
@@ -883,7 +883,7 @@ All originally high- and medium-priority feasible items have been implemented:
 
 2. ~~**CTI Tabular Coordination Report** (Gap #56)~~ — ✅ **Implemented.** `reports/coordinationReport.mjs` `buildCTIRows()` + "Export CTI Report" button in `tcc.html`. Tests: `tests/tcc/ctiReport.test.mjs`.
 
-3. **Arc Flash Incident Energy Overlay on TCC** (Gap #54) — High-visibility safety feature. Recommended: after arc flash study is run, read `studies.arcFlash` results in `analysis/tcc.js` and render a dashed limit curve on the log-log chart at the incident energy threshold the user selects (8 / 25 / 40 cal/cm²).
+3. ~~**Arc Flash Incident Energy Overlay on TCC** (Gap #54)~~ — ✅ **Implemented 2026-04-06.** `analysis/arcFlash.mjs` `incidentEnergyLimitCurve()` + `'arcFlashOverlay'` view option in `analysis/tcc.js` + threshold selector in `tcc.html`. Tests: `tests/tcc/arcFlashOverlay.test.mjs`.
 
 4. ~~**SVG / Vector Chart Export** (Gap #57)~~ — ✅ **Implemented.** `analysis/tcc.js` `handleExportSVG()` / `handleExportPNG()` + "Export SVG" / "Export PNG" buttons in `tcc.html`. Utilities in `analysis/chartExportUtils.mjs`. Tests: `tests/tcc/chartExport.test.mjs`.
 
