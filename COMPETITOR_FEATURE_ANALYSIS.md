@@ -20,7 +20,7 @@ A **2026-04-05 pass** focused specifically on the **one-line diagram editor UI**
 
 A **2026-04-06 pass** performed a focused deep dive on **one-line diagram connectivity features** and the **TCC (Time-Current Curve) engine**, benchmarked against ETAP 2024/2025, EasyPower 2025, SKM PTW 9, PowerWorld Simulator 23, and DIgSILENT PowerFactory 2024. This revealed **10 new gaps** (Gaps #48–#57) across two areas: (1) multi-sheet diagramming and diagram annotation capabilities missing from the one-line editor and (2) advanced TCC curve types, arc flash integration, ground fault protection, and reporting absent from the coordination study tool. See "One-Line Diagram & TCC Deep Dive (2026-04-06)" below.
 
-**Current status: 48 of 58 total identified gaps implemented. 3 deferred (BIM/CAD plugin, live pricing, digital twin). 7 open (Gaps #48–#52, #55, #57).**
+**Current status: 49 of 58 total identified gaps implemented. 3 deferred (BIM/CAD plugin, live pricing, digital twin). 6 open (Gaps #48–#50, #52, #55, #57).**
 
 ---
 
@@ -156,11 +156,11 @@ Benchmarked against: **ETAP 2024/2025** (composite networks, protection zone ove
 
 ### Gap #51 – Named Layer Management
 
-| Missing Feature | Competitor(s) | Description |
+| Implemented Feature | Competitor(s) | Description |
 |---|---|---|
-| **Named show/hide diagram layers** | ETAP, EasyPower, SKM PTW, NEPLAN 360 | All major SLD editors support a layer system: named layers (e.g., "Protection Devices", "Loads", "Generation", "Annotations", "Voltage Labels") each with independent visibility and lock state. Toggling a layer hides all its member components without deleting them, allowing engineers to produce clean presentation diagrams (loads hidden, only protection shown) from the same single-line model. CableTrayRoute has component grouping (Gap #40, implemented) but groups are ad-hoc collections without named layer semantics; there is no layer panel, no layer visibility toggle, and no layer assignment for newly placed components. |
+| **Named show/hide diagram layers** | ETAP, EasyPower, SKM PTW, NEPLAN 360 | All major SLD editors support a layer system: named layers (e.g., "Protection Devices", "Loads", "Generation", "Annotations", "Voltage Labels") each with independent visibility and lock state. Toggling a layer hides all its member components without deleting them, allowing engineers to produce clean presentation diagrams (loads hidden, only protection shown) from the same single-line model. |
 
-**Status:** New gap identified 2026-04-06. Not yet implemented.
+**Status:** ✅ **Implemented 2026-04-06.** `oneline.js` `createLayer()` / `deleteLayer()` / `renameLayer()` / `setLayerVisibility()` / `setLayerLocked()` / `assignSelectedToLayer()` / `renderLayerPanel()`. A `layers` array is persisted per sheet in `dataStore.mjs`; each component gains an optional `layer` string property. Components on hidden layers are excluded from `render()`; components on locked layers have pointer-events disabled. The Layers panel sidebar (`#layers-panel`) is toggled via a toolbar button. Layer state is snapshot in undo/redo history. Tests: `tests/onelineLayerManagement.test.mjs`. Documentation: `docs/layer-management.md`.
 
 ---
 
@@ -814,7 +814,7 @@ Benchmarked against: **ETAP 2024/2025** (Electric Copilot™, composite networks
 | **SLD: Cross-sheet off-page connectors** | **No** | Yes | Yes | — | — | — | Yes | — | — | — |
 | **SLD: Arc flash warning label generation** | **No** | Yes | Yes | — | — | — | — | — | — | — |
 | **SLD: Protection zone overlay / coloring** | **No** | Yes | — | — | — | — | — | — | — | — |
-| **SLD: Named layer management** | **No** | Yes | Yes | — | — | — | — | — | Yes | — |
+| **SLD: Named layer management** | **Yes** ✅ | Yes | Yes | — | — | — | — | — | Yes | — |
 | **SLD: Background image / site plan underlay** | **No** | Yes | Yes | — | — | — | — | — | — | — |
 | **TCC: IEC 60255 formula-based relay curves** | **No** | Yes | Yes | — | — | — | — | — | — | — |
 | **TCC: Arc flash incident energy overlay** | **No** | Yes | Yes | — | — | — | — | — | — | — |
@@ -899,7 +899,7 @@ All originally high- and medium-priority feasible items have been implemented:
 
 7. **Arc Flash Warning Label Generation** (Gap #49) — Directly supports NFPA 70E field labeling compliance. Recommended: add a "Generate Arc Flash Labels" action to `oneline.html` that renders NFPA 70E–format label blocks from `arcFlash.*` study result fields on each analyzed bus component.
 
-8. **Named Layer Management** (Gap #51) — Significant UX improvement for large diagrams. Recommended: add a `layer` string property to every component; add a layer panel in `oneline.html` with per-layer visibility and lock toggles; components on hidden layers are excluded from `render()`.
+8. **Named Layer Management** (Gap #51) — ✅ Implemented 2026-04-06. See `docs/layer-management.md`.
 
 **Lower Priority — One-Line Diagram:**
 

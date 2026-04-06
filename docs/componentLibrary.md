@@ -24,6 +24,25 @@ The one-line editor loads component definitions from `componentLibrary.json`. Ea
 - `ports` – array of connection points relative to an 80×40 component.
 - `schema` – optional property descriptors with `name`, `label`, and `type`.
 
+## Component Instance Properties
+
+At runtime each placed component also carries these standard properties on its saved JSON object:
+
+| Property | Type | Description |
+|----------|------|-------------|
+| `id` | string | Unique identifier (e.g. `n1712345678901`) |
+| `type` | string | Resolved component type (`bus`, `breaker`, `load`, …) |
+| `subtype` | string | Library subtype key |
+| `x`, `y` | number | Canvas position in diagram units |
+| `label` | string | Display tag shown on the diagram |
+| `ref` | string | Linked schedule row id |
+| `rotation` | number | 0, 90, 180, or 270 degrees |
+| `flipped` | boolean | Mirror along primary axis |
+| `locked` | boolean | When `true`, prevents selection/drag (Gap #41) |
+| `layer` | string (optional) | Named layer id this component belongs to (Gap #51) — see [layer-management.md](layer-management.md) |
+| `connections` | array | Outbound connection descriptors |
+| `props` | object | Subtype-specific properties |
+
 Add new objects to the JSON array and provide matching icons to extend the palette without modifying JavaScript code.
 
 ## Icons

@@ -136,6 +136,7 @@
             <button id="undo-btn" class="icon-button" title="Undo (Ctrl+Z)" aria-label="Undo"><img src="./icons/toolbar/undo.svg" alt="" loading="lazy" decoding="async"></button>
             <button id="redo-btn" class="icon-button" title="Redo (Ctrl+Y)" aria-label="Redo"><img src="./icons/toolbar/redo.svg" alt="" loading="lazy" decoding="async"></button>
             <button id="history-sidebar-toggle" class="btn" type="button" aria-controls="history-sidebar" aria-expanded="true">History</button>
+            <button id="layers-panel-toggle" class="btn" type="button" aria-controls="layers-panel" aria-expanded="false" title="Toggle named layers panel">Layers</button>
           </div>
           <div class="toolbar-group" aria-label="Shapes">
             <span class="toolbar-group-label">Shapes</span>
@@ -363,6 +364,17 @@
               <h4 id="history-events-heading">Change events</h4>
               <ul id="history-events" class="history-list"></ul>
             </section>
+          </aside>
+          <!-- Gap #51: Named Layer Management panel -->
+          <aside id="layers-panel" class="layers-panel hidden" aria-label="Diagram Layers">
+            <div class="layers-panel-header">
+              <h3>Layers</h3>
+              <button id="layers-close-btn" type="button" class="btn btn-icon" aria-label="Close layers panel" title="Close">&times;</button>
+            </div>
+            <div class="layers-panel-toolbar">
+              <button id="add-layer-btn" type="button" class="btn btn-sm">+ Add Layer</button>
+            </div>
+            <ul id="layer-list" class="layer-list" role="listbox" aria-label="Diagram layers"></ul>
           </aside>
         </div>
         </section>

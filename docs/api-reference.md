@@ -423,6 +423,47 @@ This is called automatically by the "Export CTI Report" button in `tcc.html` aft
 
 ---
 
+## One-Line Diagram Schema
+
+### `OneLineSheet`
+
+Each sheet in the `oneLine` storage object conforms to:
+
+```json
+{
+  "name": "Sheet 1",
+  "components": [ /* OneLineComponent[] */ ],
+  "connections": [ /* connection descriptors */ ],
+  "layers": [
+    { "id": "layer_1712345678901", "name": "Protection Devices", "visible": true, "locked": false }
+  ]
+}
+```
+
+The `layers` array (Gap #51) is optional for backward compatibility. When absent, the sheet is treated as having an empty layer list and all components are rendered as usual.
+
+### `OneLineLayer`
+
+| Field | Type | Description |
+|-------|------|-------------|
+| `id` | string | Unique identifier (format: `layer_{timestamp}`) |
+| `name` | string | Display name — not required to be unique |
+| `visible` | boolean | When `false`, member components are excluded from rendering |
+| `locked` | boolean | When `true`, member components are non-interactive (pointer-events disabled) |
+
+### `OneLineComponent` (partial)
+
+Relevant fields for layer management:
+
+| Field | Type | Description |
+|-------|------|-------------|
+| `layer` | string (optional) | Id of the layer this component belongs to |
+| `locked` | boolean (optional) | Component-level lock (Gap #41) — independent of layer lock |
+
+See [layer-management.md](layer-management.md) for full workflow documentation.
+
+---
+
 ## Error Responses
 
 | Status | Meaning |
