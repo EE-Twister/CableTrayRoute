@@ -57,6 +57,20 @@ the recommended end-to-end workflow:
 Each tool can be used independently, but the homepage lets you access the
 entire sequence from one place.
 
+## New Feature: Cloud-Synchronized Component Library
+
+The **Library Manager** (`library.html`) now persists your one-line diagram component library to the server, keeping it synchronized across all your devices and sessions — closing the gap with Bentley Raceway's Components Center.
+
+**Key capabilities:**
+
+- **Auto-sync on save** — clicking **Save** while logged in automatically pushes the library to your cloud account via `PUT /api/v1/library`.
+- **Load from Cloud** — on page load the editor fetches your cloud library automatically; use **Load from Cloud** to refresh manually at any time.
+- **Save to Cloud** — explicit one-click upload for when you want to push without saving locally.
+- **Share Library** — generates a 30-day read-only share link. Team members can load it with **Load Shared Library** or by opening the URL directly, with no account required.
+- **Fallback** — if you are not logged in or the server is offline, the editor falls back to `localStorage` and the static `componentLibrary.json` so no data is lost.
+
+REST API: `GET/PUT /api/v1/library`, share management via `POST/DELETE /api/v1/library/shares`, and public access via `GET /api/v1/library/shared/:token`. See [docs/api-reference.md](docs/api-reference.md) for full documentation.
+
 ## New Feature: Rebalance Tray Fill
 
 After running the standard routing process, click **Rebalance Tray Fill** to

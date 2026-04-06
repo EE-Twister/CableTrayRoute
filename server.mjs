@@ -97,6 +97,7 @@ function normalizeSaveRequest(body) {
 }
 
 const PROJECT_CACHE_MAX = 200;
+const LIBRARY_SHARE_TTL_MS = 30 * 24 * 60 * 60 * 1000; // 30 days
 
 class ProjectStore {
   constructor(dataDir) {
@@ -223,6 +224,233 @@ class ProjectStore {
     this.#evictIfNeeded();
     this.cache.set(cacheKey, { version, data: nextData, json: compactJson });
     return { version, data: nextData, metrics };
+  }
+}
+
+class CloudLibraryStore {
+  constructor(dataDir) {
+    this.dataDir = dataDir;
+    this.cache = new Map();
+  }
+
+  #evictIfNeeded() {
+    if (this.cache.size < PROJECT_CACHE_MAX) return;
+    const firstKey = this.cache.keys().next().value;
+    this.cache.delete(firstKey);
+  }
+
+  #libraryDir(username) {
+    return path.join(this.dataDir, 'libraries', username);
+  }
+
+  async loadLatest(username) {
+    const startedAt = process.hrtime.bigint();
+    const cached = this.cache.get(username);
+    if (cached) {
+      this.cache.delete(username);
+      this.cache.set(username, cached);
+      return {
+        version: cached.version,
+        data: cached.data,
+        metrics: { readMs: 0, parseMs: 0, cacheHit: true }
+      };
+    }
+
+    const libDir = this.#libraryDir(username);
+    const files = await fs.readdir(libDir);
+    const versions = files.filter(f => f.endsWith('.json')).sort();
+    if (!versions.length) {
+      throw new Error('not-found');
+    }
+
+    const latest = versions[versions.length - 1];
+    const readDoneAt = process.hrtime.bigint();
+    const text = await fs.readFile(path.join(libDir, latest), 'utf-8');
+    const parsed = JSON.parse(text);
+    const parseDoneAt = process.hrtime.bigint();
+    const entry = {
+      version: latest.replace('.json', ''),
+      data: parsed,
+      json: JSON.stringify(parsed)
+    };
+    this.#evictIfNeeded();
+    this.cache.set(username, entry);
+
+    return {
+      version: entry.version,
+      data: entry.data,
+      metrics: {
+        readMs: formatDurationMs(startedAt, readDoneAt),
+        parseMs: formatDurationMs(readDoneAt, parseDoneAt),
+        cacheHit: false
+      }
+    };
+  }
+
+  async save(username, requestBody) {
+    const input = normalizeSaveRequest(requestBody);
+    const metrics = { loadMs: 0, mergeMs: 0, serializeMs: 0, writeMs: 0, skippedWrite: false };
+    let current = { version: null, data: {} };
+
+    const loadStartedAt = process.hrtime.bigint();
+    try {
+      const loaded = await this.loadLatest(username);
+      current = { version: loaded.version, data: loaded.data };
+      metrics.loadMs = loaded.metrics.readMs + loaded.metrics.parseMs;
+    } catch (err) {
+      if (err.code !== 'ENOENT' && err.message !== 'not-found') {
+        throw err;
+      }
+    }
+    const loadDoneAt = process.hrtime.bigint();
+    if (!metrics.loadMs) {
+      metrics.loadMs = formatDurationMs(loadStartedAt, loadDoneAt);
+    }
+
+    if (input.baseVersion && current.version && input.baseVersion !== current.version) {
+      const conflict = new Error('version-conflict');
+      conflict.code = 'VERSION_CONFLICT';
+      conflict.currentVersion = current.version;
+      throw conflict;
+    }
+
+    const mergeStartedAt = process.hrtime.bigint();
+    const nextData = input.mode === 'patch' ? applyMergePatch(current.data, input.patch ?? {}) : input.data ?? {};
+    const mergeDoneAt = process.hrtime.bigint();
+    metrics.mergeMs = formatDurationMs(mergeStartedAt, mergeDoneAt);
+
+    const serializeStartedAt = process.hrtime.bigint();
+    const compactJson = JSON.stringify(nextData ?? {});
+    const prettyJson = `${JSON.stringify(nextData ?? {}, null, 2)}\n`;
+    const serializeDoneAt = process.hrtime.bigint();
+    metrics.serializeMs = formatDurationMs(serializeStartedAt, serializeDoneAt);
+
+    const cached = this.cache.get(username);
+    const currentJson = cached?.json ?? JSON.stringify(current.data ?? {});
+    if (currentJson === compactJson) {
+      metrics.skippedWrite = true;
+      return { version: current.version ?? null, data: nextData, metrics };
+    }
+
+    const libDir = this.#libraryDir(username);
+    await fs.mkdir(libDir, { recursive: true });
+    const writeStartedAt = process.hrtime.bigint();
+    const version = Date.now().toString();
+    await fs.writeFile(path.join(libDir, `${version}.json`), prettyJson);
+    const writeDoneAt = process.hrtime.bigint();
+    metrics.writeMs = formatDurationMs(writeStartedAt, writeDoneAt);
+
+    this.#evictIfNeeded();
+    this.cache.set(username, { version, data: nextData, json: compactJson });
+    return { version, data: nextData, metrics };
+  }
+}
+
+class LibraryShareStore {
+  constructor(filePath) {
+    this.filePath = filePath;
+    this.shares = new Map();
+    this.ready = false;
+  }
+
+  async init() {
+    await fs.mkdir(path.dirname(this.filePath), { recursive: true });
+    try {
+      const data = JSON.parse(await fs.readFile(this.filePath, 'utf-8'));
+      if (Array.isArray(data)) {
+        data.forEach(item => {
+          if (!item || typeof item !== 'object' || !item.id) return;
+          this.shares.set(item.id, item);
+        });
+      }
+    } catch (err) {
+      if (err.code !== 'ENOENT') throw err;
+    }
+    this.ready = true;
+    await this.#persist();
+  }
+
+  async #persist() {
+    if (!this.ready) return;
+    const payload = Array.from(this.shares.values()).sort((a, b) => {
+      if (a.createdAt < b.createdAt) return 1;
+      if (a.createdAt > b.createdAt) return -1;
+      return 0;
+    });
+    await fs.writeFile(this.filePath, JSON.stringify(payload, null, 2));
+  }
+
+  #isExpired(entry, now = Date.now()) {
+    return !entry || entry.expiresAt <= now;
+  }
+
+  async create(username) {
+    const createdAt = Date.now();
+    const token = crypto.randomBytes(32).toString('hex');
+    const tokenHash = crypto.createHash('sha256').update(token).digest('hex');
+    const id = crypto.randomUUID();
+    const entry = {
+      id,
+      owner: username,
+      createdAt,
+      expiresAt: createdAt + LIBRARY_SHARE_TTL_MS,
+      revokedAt: null,
+      lastAccessAt: null,
+      tokenHash
+    };
+    this.shares.set(id, entry);
+    await this.#persist();
+    return { entry, token };
+  }
+
+  async listByOwner(username) {
+    const now = Date.now();
+    const rows = [];
+    for (const entry of this.shares.values()) {
+      if (entry.owner !== username) continue;
+      rows.push({
+        id: entry.id,
+        createdAt: entry.createdAt,
+        expiresAt: entry.expiresAt,
+        revokedAt: entry.revokedAt,
+        lastAccessAt: entry.lastAccessAt,
+        expired: this.#isExpired(entry, now)
+      });
+    }
+    rows.sort((a, b) => b.createdAt - a.createdAt);
+    return rows;
+  }
+
+  async revoke(username, shareId) {
+    const entry = this.shares.get(shareId);
+    if (!entry || entry.owner !== username) {
+      return false;
+    }
+    if (!entry.revokedAt) {
+      entry.revokedAt = Date.now();
+      this.shares.set(entry.id, entry);
+      await this.#persist();
+    }
+    return true;
+  }
+
+  async findByToken(token) {
+    if (!token || typeof token !== 'string') return null;
+    const tokenHash = crypto.createHash('sha256').update(token).digest('hex');
+    for (const entry of this.shares.values()) {
+      if (entry.tokenHash === tokenHash) {
+        return entry;
+      }
+    }
+    return null;
+  }
+
+  async touch(shareId) {
+    const entry = this.shares.get(shareId);
+    if (!entry) return;
+    entry.lastAccessAt = Date.now();
+    this.shares.set(shareId, entry);
+    await this.#persist();
   }
 }
 
@@ -547,6 +775,7 @@ export async function createApp(options = {}) {
   const usersFile = path.join(dataDir, 'users.json');
   const sessionsFile = path.join(dataDir, 'sessions.json');
   const snapshotsFile = path.join(dataDir, 'snapshots.json');
+  const librarySharesFile = path.join(dataDir, 'library-shares.json');
 
   let users = {};
   try {
@@ -561,6 +790,9 @@ export async function createApp(options = {}) {
   const projectStore = new ProjectStore(dataDir);
   const snapshotStore = new SnapshotStore(snapshotsFile, tokenTtlMs);
   await snapshotStore.init();
+  const cloudLibraryStore = new CloudLibraryStore(dataDir);
+  const libraryShareStore = new LibraryShareStore(librarySharesFile);
+  await libraryShareStore.init();
   const resetTokenStore = new ResetTokenStore();
 
   async function saveUsers() {
@@ -1189,6 +1421,28 @@ When answering queries:
   // Rate limit: shared with /projects (100 req / 15 min per IP by default).
   // ---------------------------------------------------------------------------
   const apiRateLimiter = createRateLimiter({ windowMs: rateLimitWindowMs, max: rateLimitMax });
+
+  // GET /api/v1/library/shared/:token — public endpoint; must be registered BEFORE
+  // the global /api/v1 auth middleware so no Bearer token is required.
+  app.get(
+    '/api/v1/library/shared/:token',
+    rateLimiter,
+    asyncHandler(async (req, res) => {
+      const entry = await libraryShareStore.findByToken(req.params.token);
+      if (!entry || entry.revokedAt || entry.expiresAt <= Date.now()) {
+        res.status(404).json({ error: 'Share not found or expired' });
+        return;
+      }
+      try {
+        const latest = await cloudLibraryStore.loadLatest(entry.owner);
+        await libraryShareStore.touch(entry.id);
+        res.json({ version: latest.version, data: latest.data, owner: entry.owner });
+      } catch {
+        res.status(404).json({ error: 'Library not found' });
+      }
+    })
+  );
+
   app.use('/api/v1', apiRateLimiter, auth);
 
   /** Load project data or send 404. */
@@ -1312,6 +1566,82 @@ When answering queries:
       const { runVoltageDropStudy } = await import('./analysis/voltageDropStudy.mjs');
       const result = await withAnalysisStore(data, () => runVoltageDropStudy());
       res.json({ voltageDrop: result });
+    })
+  );
+
+  // Cloud Library endpoints — authenticated via existing auth + csrfProtection middleware
+  app.use('/api/v1/library', rateLimiter);
+
+  // GET /api/v1/library — load the authenticated user's cloud library
+  app.get(
+    '/api/v1/library',
+    auth,
+    asyncHandler(async (req, res) => {
+      try {
+        const latest = await cloudLibraryStore.loadLatest(req.username);
+        res.json({ version: latest.version, data: latest.data });
+      } catch {
+        res.status(404).json({ error: 'No library saved yet' });
+      }
+    })
+  );
+
+  // PUT /api/v1/library — save/update the authenticated user's cloud library
+  app.put(
+    '/api/v1/library',
+    auth,
+    csrfProtection,
+    asyncHandler(async (req, res) => {
+      try {
+        const saved = await cloudLibraryStore.save(req.username, req.body);
+        res.json({ version: saved.version, unchanged: saved.metrics.skippedWrite });
+      } catch (err) {
+        if (err.code === 'VERSION_CONFLICT') {
+          res.status(409).json({ error: 'Version conflict', currentVersion: err.currentVersion });
+          return;
+        }
+        throw err;
+      }
+    })
+  );
+
+  // GET /api/v1/library/shares — list the authenticated user's active share tokens
+  app.get(
+    '/api/v1/library/shares',
+    auth,
+    asyncHandler(async (req, res) => {
+      const shares = await libraryShareStore.listByOwner(req.username);
+      res.json({ shares });
+    })
+  );
+
+  // POST /api/v1/library/shares — create a share token for the user's library
+  app.post(
+    '/api/v1/library/shares',
+    auth,
+    csrfProtection,
+    asyncHandler(async (req, res) => {
+      const { entry, token } = await libraryShareStore.create(req.username);
+      res.status(201).json({
+        id: entry.id,
+        token,
+        expiresAt: entry.expiresAt
+      });
+    })
+  );
+
+  // DELETE /api/v1/library/shares/:shareId — revoke a share token
+  app.delete(
+    '/api/v1/library/shares/:shareId',
+    auth,
+    csrfProtection,
+    asyncHandler(async (req, res) => {
+      const revoked = await libraryShareStore.revoke(req.username, req.params.shareId);
+      if (!revoked) {
+        res.status(404).json({ error: 'Share not found' });
+        return;
+      }
+      res.json({ revoked: true });
     })
   );
 

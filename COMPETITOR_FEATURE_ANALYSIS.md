@@ -18,7 +18,7 @@ A **second pass on 2026-03-24** examined the application through two additional 
 
 A **2026-04-05 pass** focused specifically on the **one-line diagram editor UI**, benchmarked against ETAP 2024/2025, EasyPower 2025, SKM PowerTools, PowerWorld Simulator, and NEPLAN 360 (web-native). This revealed **14 new UI interaction gaps** (Gaps #34–#47). **All 14 have now been implemented.** See "One-Line Diagram UI Gaps (2026-04-05)" below.
 
-**Current status: 44 of 48 total identified gaps implemented. 4 deferred (BIM/CAD plugin, live pricing, cloud library, digital twin).**
+**Current status: 45 of 48 total identified gaps implemented. 3 deferred (BIM/CAD plugin, live pricing, digital twin).**
 
 ---
 
@@ -54,6 +54,7 @@ The following features were identified as gaps and have since been implemented:
 | Alert() Replacement with Modal Dialogs | `src/components/modal.js` (applied app-wide) | All pages | — |
 | Navigation Consistency on Static Pages | `src/components/navigation.js` (injected on all pages) | `index.html`, `help.html`, `404.html`, `500.html` | — |
 | VFD / Soft Starter Motor Starting Models | `analysis/motorStart.js` | `motorstart.html` | — |
+| Cloud-Synchronized Component Library (#12) | `server.mjs` — `CloudLibraryStore`, `LibraryShareStore`; `/api/v1/library` endpoints | `library.html` (sync badge, cloud save/load/share) | `tests/cloudLibrary.test.mjs` |
 
 ---
 
@@ -80,6 +81,14 @@ The following features were implemented after the 2026-03-24 competitor refresh 
 | Combined Seismic + Wind Load (#31) | `analysis/structuralLoadCombinations.mjs` | `seismicwindcombined.html` | `tests/structuralLoadCombinations.test.mjs` |
 | Engineer Approval Workflow (#19) | `src/components/studyApproval.js`, cable `engineer_note`/`review_status`, DRC accept-risk | All study pages, `cableschedule.html`, `designrulechecker.html` | `tests/studyApproval.test.mjs` |
 | Mobile Field Access (#21) | `fieldview.html` | `fieldview.html` | — |
+
+---
+
+## Implemented Since 2026-04-06 Analysis (Cloud Library)
+
+| # | Feature | Module | UI Element | Tests |
+|---|---|---|---|---|
+| 12 | Cloud-Synchronized Component Library | `server.mjs` — `CloudLibraryStore`, `LibraryShareStore`; 6 REST endpoints under `/api/v1/library` | `library.html` — sync badge, Save/Load/Share to Cloud buttons; auto-sync on save; `?share=` URL param for direct link access | `tests/cloudLibrary.test.mjs` |
 
 ---
 
@@ -233,7 +242,7 @@ The following gaps were discovered by reviewing competitor release notes and pro
 |---|---|---|
 | **Cloud-Synchronized Equipment Library** | Bentley Components Center (2024/2025) | Bentley Raceway 2024 integrated the Components Center — a cloud-hosted library of cell-based equipment that stays synchronized across projects and teams, with automatic property propagation to all tray segments using a product definition. CableTrayRoute's product configurator (`productconfig.html`) is project-local; there is no shared organization-wide or community-maintained library of tray products, connectors, and fittings that updates automatically when manufacturer specs change. |
 
-**Status:** Deferred. Requires a server-side cloud storage layer for shared component definitions. The real-time collaboration infrastructure (`src/collaborationServer.mjs`) provides the WebSocket backbone, but persistent cross-project component synchronization requires a dedicated database schema and API endpoints. This is the lowest-priority remaining gap.
+**Status:** ✅ Implemented. `server.mjs` — `CloudLibraryStore` (versioned file storage under `server_data/libraries/{username}/`) and `LibraryShareStore` (30-day token-based sharing, `server_data/library-shares.json`). REST API: `GET/PUT /api/v1/library` (authenticated), `GET/POST/DELETE /api/v1/library/shares` (authenticated), `GET /api/v1/library/shared/:token` (public). `library.html` updated with sync status badge, **Save to Cloud**, **Load from Cloud**, **Share Library**, and **Load Shared Library** buttons, auto-sync on save, and `?share=<token>` URL parameter for direct link access. Tests: `tests/cloudLibrary.test.mjs` (16 assertions).
 
 ---
 
@@ -933,4 +942,4 @@ All formerly-pending gaps have been implemented as of 2026-04-04. The tables bel
 - **AutoCAD / AVEVA / SmartPlant 3D Plugin** — Requires commercial CAD SDK licensing
 - **BIM Object Library** — Requires manufacturer data partnerships for Revit RFA / IFC families
 - **Live Manufacturer Pricing Feed** — Requires commercial data licensing (RS Means, Eaton, Legrand)
-- **Cloud-Based Component Library** (#12) — Requires server-side persistent storage layer; lowest-priority feasible item
+- ~~**Cloud-Based Component Library** (#12)~~ — ✅ **Implemented 2026-04-06** — see `tests/cloudLibrary.test.mjs` and `docs/api-reference.md#library-endpoints`
