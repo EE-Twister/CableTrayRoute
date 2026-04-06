@@ -1988,4 +1988,121 @@ g.component.scenario-diff > * {
   accent-color: var(--primary-color, #0078d7);
 }
 
+/* ============================================================
+   Gap #51 – Named Layer Management panel
+   ============================================================ */
+.layers-panel {
+  border-left: 1px solid var(--ol-border-color);
+  background: var(--ol-card-bg);
+  overflow: auto;
+  min-width: 0;
+  width: 200px;
+  display: flex;
+  flex-direction: column;
+}
+
+.layers-panel.hidden {
+  display: none;
+}
+
+.layers-panel-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.5rem;
+  padding: 0.75rem 0.75rem 0.5rem;
+  border-bottom: 1px solid var(--ol-border-color);
+}
+
+.layers-panel-header h3 {
+  margin: 0;
+  font-size: 0.95rem;
+}
+
+.layers-panel-toolbar {
+  padding: 0.5rem 0.75rem;
+  border-bottom: 1px solid var(--ol-border-color);
+}
+
+.layer-list {
+  list-style: none;
+  margin: 0;
+  padding: 0.25rem 0;
+  flex: 1;
+  overflow-y: auto;
+}
+
+.layer-row {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  padding: 4px 8px;
+  cursor: pointer;
+  border-radius: 3px;
+  font-size: 0.85rem;
+  user-select: none;
+}
+
+.layer-row:hover {
+  background: var(--ol-hover-bg, rgba(0,0,0,0.05));
+}
+
+.layer-row.active-layer {
+  background: var(--accent-subtle, rgba(0, 120, 215, 0.12));
+  font-weight: 600;
+}
+
+.layer-row.layer-locked .layer-row-name {
+  opacity: 0.6;
+}
+
+.layer-row-icon {
+  font-size: 0.7rem;
+  color: var(--text-muted, #888);
+  flex-shrink: 0;
+}
+
+.layer-row-name {
+  flex: 1;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.layer-rename-input {
+  flex: 1;
+  font-size: 0.85rem;
+  padding: 1px 4px;
+  border: 1px solid var(--primary-color, #0078d7);
+  border-radius: 3px;
+  width: 0; /* flex will expand it */
+}
+
+.layer-row-count {
+  font-size: 0.75rem;
+  color: var(--text-muted, #888);
+  flex-shrink: 0;
+  min-width: 1.5em;
+  text-align: right;
+}
+
+.layer-vis-btn,
+.layer-lock-btn,
+.layer-del-btn {
+  background: none;
+  border: none;
+  padding: 0 2px;
+  cursor: pointer;
+  font-size: 0.85rem;
+  line-height: 1;
+  flex-shrink: 0;
+  opacity: 0.6;
+}
+
+.layer-vis-btn:hover,
+.layer-lock-btn:hover,
+.layer-del-btn:hover {
+  opacity: 1;
+}
+
 

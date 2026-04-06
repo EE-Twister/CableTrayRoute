@@ -381,12 +381,22 @@ export const removeEquipment = index => {
  * @property {string} [label] Display label
  * @property {string} [ref] Linked schedule id
  * @property {{target:string, cable?:Cable}[]} [connections] Connections to other components with optional cable spec
+ * @property {string} [layer] Named layer id this component belongs to (Gap #51)
+ */
+
+/**
+ * @typedef {Object} OneLineLayer
+ * @property {string} id Unique layer identifier
+ * @property {string} name Display name
+ * @property {boolean} visible Whether components on this layer are rendered
+ * @property {boolean} locked Whether components on this layer are selectable/editable
  */
 
 /**
  * @typedef {Object} OneLineSheet
  * @property {string} name
  * @property {OneLineComponent[]} components
+ * @property {OneLineLayer[]} [layers] Named layers for this sheet (Gap #51)
  */
 
 /**
@@ -397,7 +407,7 @@ export const getOneLine = (scenario = getCurrentScenarioNameState()) => {
   const data = read(KEYS.oneLine, {}, scenario);
   if (Array.isArray(data)) {
     // legacy array of components
-    return { activeSheet: 0, sheets: [{ name: 'Sheet 1', components: data, connections: [] }] };
+    return { activeSheet: 0, sheets: [{ name: 'Sheet 1', components: data, connections: [], layers: [] }] };
   }
   if (data && Array.isArray(data.sheets)) {
     return {
@@ -405,7 +415,8 @@ export const getOneLine = (scenario = getCurrentScenarioNameState()) => {
       sheets: data.sheets.map(s => ({
         name: s.name,
         components: Array.isArray(s.components) ? s.components : [],
-        connections: Array.isArray(s.connections) ? s.connections : []
+        connections: Array.isArray(s.connections) ? s.connections : [],
+        layers: Array.isArray(s.layers) ? s.layers : []
       }))
     };
   }

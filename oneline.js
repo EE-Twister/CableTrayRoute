@@ -1834,7 +1834,7 @@ const MAX_HISTORY_EVENTS = 200;
 let validationIssues = [];
 const marqueeThreshold = 4;
 let templates = [];
-const DIAGRAM_VERSION = 2;
+const DIAGRAM_VERSION = 3; // bumped for Gap #51 layers field
 let cursorPos = { x: 20, y: 20 };
 let cursorPosValid = false;
 let needsInitialViewportCenter = true;
@@ -1848,6 +1848,11 @@ let titleBlockFields = {};         // Gap #38
 let minimapVisible = false;        // Gap #39
 // Gap #46 – per-subtype datablock config: { [subtype]: string[] }
 let diagramDatablockConfig = {};
+// Gap #51 – Named Layer Management
+let layers = [];             // layer definitions for the active sheet: [{id,name,visible,locked}]
+let layersHistory = [];      // parallel snapshot array to history[], each entry is deep copy of layers
+let layersHistoryIndex = -1; // mirrors historyIndex
+let activeLayerId = null;    // layer id assigned to newly placed components (null = unassigned)
 let syncing = false;
 let lintPanel = null;
 let lintList = null;
@@ -3289,7 +3294,11 @@ function bindHistorySidebarControls() {
 function pushHistory(reason = 'Diagram updated') {
   history = history.slice(0, historyIndex + 1);
   history.push(JSON.parse(JSON.stringify(components)));
+  // Gap #51: snapshot layers alongside components
+  layersHistory = layersHistory.slice(0, historyIndex + 1);
+  layersHistory.push(JSON.parse(JSON.stringify(layers)));
   historyIndex = history.length - 1;
+  layersHistoryIndex = historyIndex;
   pruneCheckpoints();
   recordHistoryEvent('change', reason);
 }
@@ -3298,9 +3307,15 @@ function undo() {
   if (historyIndex > 0) {
     historyIndex--;
     components = JSON.parse(JSON.stringify(history[historyIndex]));
+    // Gap #51: restore layers alongside components
+    layersHistoryIndex = historyIndex;
+    if (layersHistory[layersHistoryIndex] !== undefined) {
+      layers = JSON.parse(JSON.stringify(layersHistory[layersHistoryIndex]));
+    }
     selected = null;
     selection = [];
     selectedConnection = null;
+    renderLayerPanel();
     render();
     save();
     recordHistoryEvent('undo', 'Undo applied');
@@ -3311,9 +3326,15 @@ function redo() {
   if (historyIndex < history.length - 1) {
     historyIndex++;
     components = JSON.parse(JSON.stringify(history[historyIndex]));
+    // Gap #51: restore layers alongside components
+    layersHistoryIndex = historyIndex;
+    if (layersHistory[layersHistoryIndex] !== undefined) {
+      layers = JSON.parse(JSON.stringify(layersHistory[layersHistoryIndex]));
+    }
     selected = null;
     selection = [];
     selectedConnection = null;
+    renderLayerPanel();
     render();
     save();
     recordHistoryEvent('redo', 'Redo applied');
@@ -5602,6 +5623,235 @@ function ungroupComponent(groupId) {
   showToast('Group dissolved');
 }
 
+// ─── Gap #51: Named Layer Management ───────────────────────────────────────
+
+/**
+ * Create a new named layer on the active sheet.
+ * @param {string} name
+ * @returns {{ id: string, name: string, visible: boolean, locked: boolean }}
+ */
+function createLayer(name) {
+  const layer = { id: 'layer_' + Date.now(), name: name.trim() || 'Layer', visible: true, locked: false };
+  layers.push(layer);
+  pushHistory('Created layer: ' + layer.name);
+  save();
+  renderLayerPanel();
+  return layer;
+}
+
+/**
+ * Rename an existing layer. Does not affect component assignments.
+ * @param {string} id
+ * @param {string} newName
+ */
+function renameLayer(id, newName) {
+  const layer = layers.find(l => l.id === id);
+  if (!layer || !newName.trim()) return;
+  layer.name = newName.trim();
+  pushHistory('Renamed layer: ' + layer.name);
+  save();
+  renderLayerPanel();
+}
+
+/**
+ * Delete a layer. Components previously on it become unassigned (always visible/interactive).
+ * @param {string} id
+ */
+function deleteLayer(id) {
+  const idx = layers.findIndex(l => l.id === id);
+  if (idx === -1) return;
+  layers.splice(idx, 1);
+  // Clear layer assignment on all components that were on this layer
+  components.forEach(c => { if (c.layer === id) delete c.layer; });
+  if (activeLayerId === id) activeLayerId = null;
+  pushHistory('Deleted layer');
+  save();
+  render();
+  renderLayerPanel();
+}
+
+/**
+ * Set a layer's visibility. Not recorded in undo history (view preference).
+ * @param {string} id
+ * @param {boolean} visible
+ */
+function setLayerVisibility(id, visible) {
+  const layer = layers.find(l => l.id === id);
+  if (!layer) return;
+  layer.visible = visible;
+  save();
+  render();
+  renderLayerPanel();
+}
+
+/**
+ * Set a layer's locked state. Not recorded in undo history (view preference).
+ * Locked layers have pointer-events disabled on all member components.
+ * @param {string} id
+ * @param {boolean} locked
+ */
+function setLayerLocked(id, locked) {
+  const layer = layers.find(l => l.id === id);
+  if (!layer) return;
+  layer.locked = locked;
+  // Deselect any selected components on this now-locked layer
+  if (locked) {
+    selection = selection.filter(c => c.layer !== id);
+    if (selected && selected.layer === id) {
+      selected = selection[0] || null;
+    }
+  }
+  save();
+  render();
+  renderLayerPanel();
+}
+
+/**
+ * Assign selected components to a layer (or remove assignment when layerId is null).
+ * @param {string|null} layerId
+ */
+function assignSelectedToLayer(layerId) {
+  if (!selection.length && !selected) return;
+  const targets = selection.length ? selection : [selected];
+  targets.forEach(c => {
+    if (layerId) {
+      c.layer = layerId;
+    } else {
+      delete c.layer;
+    }
+  });
+  pushHistory('Assigned to layer');
+  save();
+  render();
+  renderLayerPanel();
+}
+
+/**
+ * Render (or refresh) the layers panel sidebar.
+ * Idempotent — safe to call whenever layer state changes.
+ */
+function renderLayerPanel() {
+  const list = document.getElementById('layer-list');
+  if (!list) return;
+  list.innerHTML = '';
+
+  // Count unassigned components for the default row
+  const assignedIds = new Set(layers.map(l => l.id));
+  const unassignedCount = components.filter(c => !c.layer || !assignedIds.has(c.layer)).length;
+
+  // Synthetic "(Default)" row — always shown, represents unassigned components
+  const defaultLi = document.createElement('li');
+  defaultLi.className = 'layer-row' + (activeLayerId === null ? ' active-layer' : '');
+  defaultLi.title = 'Default (unassigned) — always visible';
+  defaultLi.innerHTML = `
+    <span class="layer-row-icon" aria-hidden="true">&#9673;</span>
+    <span class="layer-row-name">(Default)</span>
+    <span class="layer-row-count">${unassignedCount}</span>`;
+  defaultLi.addEventListener('click', () => {
+    activeLayerId = null;
+    renderLayerPanel();
+  });
+  list.appendChild(defaultLi);
+
+  layers.forEach(layer => {
+    const count = components.filter(c => c.layer === layer.id).length;
+    const li = document.createElement('li');
+    li.className = 'layer-row' +
+      (activeLayerId === layer.id ? ' active-layer' : '') +
+      (layer.locked ? ' layer-locked' : '');
+    li.dataset.layerId = layer.id;
+
+    const visBtn = document.createElement('button');
+    visBtn.className = 'layer-vis-btn';
+    visBtn.title = layer.visible ? 'Hide layer' : 'Show layer';
+    visBtn.setAttribute('aria-label', layer.visible ? 'Hide layer' : 'Show layer');
+    visBtn.textContent = layer.visible ? '👁' : '🚫';
+    visBtn.addEventListener('click', e => {
+      e.stopPropagation();
+      setLayerVisibility(layer.id, !layer.visible);
+    });
+
+    const lockBtn = document.createElement('button');
+    lockBtn.className = 'layer-lock-btn';
+    lockBtn.title = layer.locked ? 'Unlock layer' : 'Lock layer';
+    lockBtn.setAttribute('aria-label', layer.locked ? 'Unlock layer' : 'Lock layer');
+    lockBtn.textContent = layer.locked ? '🔒' : '🔓';
+    lockBtn.addEventListener('click', e => {
+      e.stopPropagation();
+      setLayerLocked(layer.id, !layer.locked);
+    });
+
+    const nameSpan = document.createElement('span');
+    nameSpan.className = 'layer-row-name';
+    nameSpan.textContent = layer.name;
+    nameSpan.title = 'Double-click to rename';
+    nameSpan.addEventListener('dblclick', e => {
+      e.stopPropagation();
+      const input = document.createElement('input');
+      input.type = 'text';
+      input.value = layer.name;
+      input.className = 'layer-rename-input';
+      nameSpan.replaceWith(input);
+      input.focus();
+      input.select();
+      const commit = () => {
+        const newName = input.value.trim();
+        if (newName && newName !== layer.name) renameLayer(layer.id, newName);
+        else renderLayerPanel();
+      };
+      input.addEventListener('blur', commit);
+      input.addEventListener('keydown', e2 => {
+        if (e2.key === 'Enter') { commit(); }
+        if (e2.key === 'Escape') { renderLayerPanel(); }
+      });
+    });
+
+    const countSpan = document.createElement('span');
+    countSpan.className = 'layer-row-count';
+    countSpan.textContent = count;
+
+    const delBtn = document.createElement('button');
+    delBtn.className = 'layer-del-btn';
+    delBtn.title = 'Delete layer';
+    delBtn.setAttribute('aria-label', 'Delete layer');
+    delBtn.textContent = '✕';
+    delBtn.addEventListener('click', e => {
+      e.stopPropagation();
+      deleteLayer(layer.id);
+    });
+
+    li.appendChild(visBtn);
+    li.appendChild(lockBtn);
+    li.appendChild(nameSpan);
+    li.appendChild(countSpan);
+    li.appendChild(delBtn);
+
+    // Click row to make it the active layer for new components
+    li.addEventListener('click', () => {
+      activeLayerId = activeLayerId === layer.id ? null : layer.id;
+      renderLayerPanel();
+    });
+
+    list.appendChild(li);
+  });
+
+  // Update the "Assign to layer" dropdown in properties if selection exists
+  refreshLayerAssignDropdown();
+}
+
+/**
+ * Refresh the layer-assign dropdown in the properties panel (if present).
+ */
+function refreshLayerAssignDropdown() {
+  const sel = document.getElementById('prop-layer-assign');
+  if (!sel) return;
+  const currentLayer = selected?.layer || '';
+  sel.innerHTML = '<option value="">— Default (unassigned) —</option>' +
+    layers.map(l => `<option value="${l.id}"${currentLayer === l.id ? ' selected' : ''}>${l.name}</option>`).join('');
+}
+
+// ─── End Gap #51 ────────────────────────────────────────────────────────────
+
 function render() {
   applyTransformerVoltages();
   propagateSourceVoltagesToBuses(components);
@@ -5886,11 +6136,23 @@ function render() {
 
   // dimension tool removed
 
+  // Gap #51: build a Set of hidden-layer component ids for O(1) lookup
+  const hiddenLayerIds = new Set(
+    layers.filter(l => !l.visible).map(l => l.id)
+  );
+  const isHiddenByLayer = comp => comp.layer && hiddenLayerIds.has(comp.layer);
+  const isLockedByLayer = comp => {
+    const l = comp.layer ? layers.find(ly => ly.id === comp.layer) : null;
+    return l ? l.locked : false;
+  };
+
   // draw connections
   components.forEach(c => {
     (c.connections || []).forEach((conn, idx) => {
       const target = components.find(t => t.id === conn.target);
       if (!target) return;
+      // Gap #51: skip connection if either endpoint is on a hidden layer
+      if (isHiddenByLayer(c) || isHiddenByLayer(target)) return;
       const pts = routeConnection(c, target, conn);
       pts.forEach(pt => includePoint(pt.x, pt.y));
       const lenPx = pts.reduce((sum, p, i) => (i ? sum + Math.hypot(p.x - pts[i - 1].x, p.y - pts[i - 1].y) : 0), 0);
@@ -5995,10 +6257,18 @@ function render() {
   // draw nodes
   components.filter(c => c.type !== 'dimension').forEach(c => {
     includeComponentBounds(c);
+    // Gap #51: skip rendering components on hidden layers
+    if (isHiddenByLayer(c)) return;
     const g = document.createElementNS(svgNS, 'g');
     g.dataset.id = c.id;
     g.classList.add('component');
-    g.setAttribute('pointer-events', 'bounding-box');
+    // Gap #51: suppress pointer events for components on locked layers
+    if (isLockedByLayer(c)) {
+      g.setAttribute('pointer-events', 'none');
+      g.style.opacity = '0.5';
+    } else {
+      g.setAttribute('pointer-events', 'bounding-box');
+    }
     g.addEventListener('dblclick', e => {
       e.stopPropagation();
       cancelPendingClickSelection();
@@ -6699,8 +6969,13 @@ function loadSheet(idx) {
   activeSheet = idx;
   components = sheets[activeSheet].components;
   connections = sheets[activeSheet].connections;
+  // Gap #51: load layers for this sheet
+  layers = Array.isArray(sheets[activeSheet].layers) ? sheets[activeSheet].layers : [];
+  activeLayerId = null;
   history = [JSON.parse(JSON.stringify(components))];
+  layersHistory = [JSON.parse(JSON.stringify(layers))];
   historyIndex = 0;
+  layersHistoryIndex = 0;
   checkpoints = [];
   historyEvents = [];
   recordHistoryEvent('sheet', `Switched to sheet ${idx + 1}`);
@@ -6709,6 +6984,7 @@ function loadSheet(idx) {
   selectedConnection = null;
   refreshAttributeOptions();
   renderSheetTabs();
+  renderLayerPanel();
   needsInitialViewportCenter = true;
   pendingInitialCenter = null;
   render();
@@ -6718,7 +6994,7 @@ function loadSheet(idx) {
 function addSheet(name) {
   const sheetName = name || prompt('Sheet name', `Sheet ${sheets.length + 1}`);
   if (!sheetName) return;
-  sheets.push({ name: sheetName, components: [], connections: [] });
+  sheets.push({ name: sheetName, components: [], connections: [], layers: [] });
   loadSheet(sheets.length - 1);
   save();
 }
@@ -6742,8 +7018,12 @@ function deleteSheet(id) {
   activeSheet = Math.max(0, idx - 1);
   components = sheets[activeSheet].components;
   connections = sheets[activeSheet].connections;
+  // Gap #51: reload layers for the new active sheet
+  layers = Array.isArray(sheets[activeSheet].layers) ? sheets[activeSheet].layers : [];
+  activeLayerId = null;
   refreshAttributeOptions();
   renderSheetTabs();
+  renderLayerPanel();
   render();
   save();
 }
@@ -6766,7 +7046,9 @@ function save(notify = true) {
     return {
       name: s.name,
       components: comps,
-      connections: buildConnections(comps)
+      connections: buildConnections(comps),
+      // Gap #51: persist layers for each sheet
+      layers: i === activeSheet ? JSON.parse(JSON.stringify(layers)) : (Array.isArray(s.layers) ? s.layers : [])
     };
   });
   sheets = sheetData;
@@ -6896,6 +7178,10 @@ function addComponent(cfg) {
   ensureShapeDefaults(comp);
   if (comp.type === 'transformer') {
     syncTransformerDefaults(comp, { forceBase: true });
+  }
+  // Gap #51: assign to active layer when a layer is selected
+  if (activeLayerId && layers.some(l => l.id === activeLayerId)) {
+    comp.layer = activeLayerId;
   }
   components.push(comp);
   if (!skipHistory) pushHistory();
@@ -10059,14 +10345,20 @@ async function init() {
   activeSheet = Math.min(storedActive, sheets.length - 1);
   components = sheets[activeSheet].components;
   connections = sheets[activeSheet].connections;
+  // Gap #51: load layers for the initial active sheet
+  layers = Array.isArray(sheets[activeSheet]?.layers) ? sheets[activeSheet].layers : [];
+  activeLayerId = null;
   history = [JSON.parse(JSON.stringify(components))];
+  layersHistory = [JSON.parse(JSON.stringify(layers))];
   historyIndex = 0;
+  layersHistoryIndex = 0;
   checkpoints = [];
   historyEvents = [];
   recordHistoryEvent('init', 'History initialized');
   refreshAttributeOptions();
   renderSheetTabs();
   render();
+  renderLayerPanel();
   const initIssues = validateDiagram();
   if (!initIssues.length) syncSchedules(false);
 
@@ -10112,6 +10404,35 @@ async function init() {
   document.getElementById('redo-btn').addEventListener('click', redo);
   bindHistorySidebarControls();
   renderHistorySidebar();
+
+  // Gap #51: wire up the layers panel
+  const layersToggleBtn = document.getElementById('layers-panel-toggle');
+  const layersPanel = document.getElementById('layers-panel');
+  const layersCloseBtn = document.getElementById('layers-close-btn');
+  const addLayerBtn = document.getElementById('add-layer-btn');
+  if (layersToggleBtn && layersPanel) {
+    const layersPanelOpen = getItem('layersPanelOpen', false);
+    if (!layersPanelOpen) layersPanel.classList.add('hidden');
+    layersToggleBtn.setAttribute('aria-expanded', String(!layersPanel.classList.contains('hidden')));
+    layersToggleBtn.addEventListener('click', () => {
+      const nowHidden = layersPanel.classList.toggle('hidden');
+      layersToggleBtn.setAttribute('aria-expanded', String(!nowHidden));
+      setItem('layersPanelOpen', !nowHidden);
+    });
+  }
+  if (layersCloseBtn && layersPanel) {
+    layersCloseBtn.addEventListener('click', () => {
+      layersPanel.classList.add('hidden');
+      if (layersToggleBtn) layersToggleBtn.setAttribute('aria-expanded', 'false');
+      setItem('layersPanelOpen', false);
+    });
+  }
+  if (addLayerBtn) {
+    addLayerBtn.addEventListener('click', () => {
+      const name = prompt('Layer name', `Layer ${layers.length + 1}`);
+      if (name) createLayer(name);
+    });
+  }
   document.getElementById('align-left-btn').addEventListener('click', () => alignSelection('left'));
   document.getElementById('align-right-btn').addEventListener('click', () => alignSelection('right'));
   document.getElementById('align-top-btn').addEventListener('click', () => alignSelection('top'));
@@ -12158,7 +12479,8 @@ function serializeState() {
         rotation: c.rotation || 0,
         flipped: !!c.flipped
       }));
-      return { name: s.name, components: comps, schedules: extractSchedules(comps) };
+      // Gap #51: include layers in serialized state
+      return { name: s.name, components: comps, schedules: extractSchedules(comps), layers: Array.isArray(s.layers) ? s.layers.map(l => ({ ...l })) : [] };
     })
   };
 }
@@ -12168,7 +12490,9 @@ function exportDiagram() {
     sheets: sheets.map(s => ({
       name: s.name,
       components: s.components.map(c => ({ ...c })),
-      connections: (s.connections || []).map(conn => ({ ...conn }))
+      connections: (s.connections || []).map(conn => ({ ...conn })),
+      // Gap #51: export layers
+      layers: Array.isArray(s.layers) ? s.layers.map(l => ({ ...l })) : []
     }))
   };
   const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' });
@@ -12319,6 +12643,13 @@ function migrateDiagram(data) {
   if (version < 2) {
     migrated.scale = data.scale || { unitPerPx: 1, unit: 'in' };
   }
+  if (version < 3) {
+    // Gap #51: ensure every sheet has a layers array
+    migrated.sheets = (migrated.sheets || []).map(s => ({
+      ...s,
+      layers: Array.isArray(s.layers) ? s.layers : []
+    }));
+  }
   migrated.version = DIAGRAM_VERSION;
   return migrated;
 }
@@ -12349,7 +12680,9 @@ async function importDiagram(data) {
   sheets = (data.sheets || []).map((s, i) => ({
     name: s.name || `Sheet ${i + 1}`,
     components: (s.components || []).map(normalizeComponent),
-    connections: Array.isArray(s.connections) ? s.connections : []
+    connections: Array.isArray(s.connections) ? s.connections : [],
+    // Gap #51: load layers from imported diagram
+    layers: Array.isArray(s.layers) ? s.layers : []
   }));
   if (sheets.length) {
     loadSheet(0);
