@@ -29,3 +29,29 @@ Add new objects to the JSON array and provide matching icons to extend the palet
 ## Icons
 
 Place custom SVG files under `icons/components/` and reference them in `componentLibrary.json`. Missing icons fall back to `icons/placeholder.svg`.
+
+## Cloud Synchronization
+
+The **Library Manager** (`library.html`) supports saving your component library to the server so it persists across devices and browser sessions.
+
+### Saving to the Cloud
+
+1. Open **Library Manager** from the navigation menu.
+2. Edit or upload your component library JSON in the editor.
+3. Click **Save to Cloud** — the library is sent to `PUT /api/v1/library` and a "☁ Synced" badge confirms success.
+
+When you click the regular **Save** button while logged in, the library is also auto-synced to the cloud.
+
+### Loading from the Cloud
+
+On page load, the Library Manager automatically fetches your cloud library (if you are logged in) and populates the editor. To reload manually at any time, click **Load from Cloud**.
+
+### Sharing a Library
+
+Click **Share Library** to generate a 30-day read-only share link. Send the URL to teammates; they can paste it into **Load Shared Library** (or open it directly in their browser) without needing an account.
+
+Share tokens can be revoked at any time via `DELETE /api/v1/library/shares/:shareId`. See [api-reference.md](api-reference.md) for the full REST API.
+
+### Fallback Behaviour
+
+If you are not logged in, or the server is unreachable, the Library Manager falls back to browser `localStorage` and the static `componentLibrary.json` file — no data is lost.

@@ -172,13 +172,179 @@ curl -s -X POST \
 
 ---
 
+## Library Endpoints
+
+These endpoints manage a per-user **cloud-synchronized component library** for the one-line diagram editor. The library is shared across all projects owned by the authenticated user, and can be shared read-only with other users via time-limited tokens.
+
+---
+
+### GET /api/v1/library
+
+Returns the authenticated user's saved component library.
+
+**Response:**
+```json
+{
+  "version": "1712345678901",
+  "data": {
+    "categories": ["bus", "protection"],
+    "components": [{ "type": "bus", "label": "Bus" }],
+    "icons": {}
+  }
+}
+```
+
+Returns `404` if no library has been saved yet.
+
+**Example:**
+```bash
+curl -H "Authorization: Bearer $TOKEN" \
+  http://localhost:3000/api/v1/library
+```
+
+---
+
+### PUT /api/v1/library
+
+Saves or updates the authenticated user's cloud library. Supports full replace or merge-patch modes.
+
+**Request body (full replace):**
+```json
+{ "data": { "categories": ["bus"], "components": [], "icons": {} } }
+```
+
+**Request body (merge patch):**
+```json
+{ "patch": { "newField": "value" }, "baseVersion": "1712345678901" }
+```
+
+Omit `baseVersion` to skip conflict detection. Include it to get a `409` response if the library was updated by another session since you last read it.
+
+**Response:**
+```json
+{ "version": "1712345679000", "unchanged": false }
+```
+
+**Example:**
+```bash
+curl -s -X PUT \
+  -H "Authorization: Bearer $TOKEN" \
+  -H "X-Csrf-Token: $CSRF" \
+  -H "Content-Type: application/json" \
+  -d '{"data":{"categories":["bus"],"components":[],"icons":{}}}' \
+  http://localhost:3000/api/v1/library
+```
+
+---
+
+### GET /api/v1/library/shares
+
+Lists all active share tokens for the authenticated user's library.
+
+**Response:**
+```json
+{
+  "shares": [
+    {
+      "id": "uuid",
+      "createdAt": 1712345678901,
+      "expiresAt": 1714937678901,
+      "revokedAt": null,
+      "lastAccessAt": null,
+      "expired": false
+    }
+  ]
+}
+```
+
+**Example:**
+```bash
+curl -H "Authorization: Bearer $TOKEN" \
+  http://localhost:3000/api/v1/library/shares
+```
+
+---
+
+### POST /api/v1/library/shares
+
+Creates a new 30-day read-only share token for the authenticated user's library. The plain token is returned once and never stored — save it immediately.
+
+**Response:**
+```json
+{
+  "id": "uuid",
+  "token": "64-hex-chars",
+  "expiresAt": 1714937678901
+}
+```
+
+**Example:**
+```bash
+curl -s -X POST \
+  -H "Authorization: Bearer $TOKEN" \
+  -H "X-Csrf-Token: $CSRF" \
+  -H "Content-Type: application/json" \
+  -d '{}' \
+  http://localhost:3000/api/v1/library/shares
+```
+
+---
+
+### DELETE /api/v1/library/shares/:shareId
+
+Revokes an active share token by its ID. The token immediately becomes invalid.
+
+**Parameters:**
+- `:shareId` — share UUID from the list or create response
+
+**Response:**
+```json
+{ "revoked": true }
+```
+
+Returns `404` if the share ID is not found or belongs to a different user.
+
+**Example:**
+```bash
+curl -s -X DELETE \
+  -H "Authorization: Bearer $TOKEN" \
+  -H "X-Csrf-Token: $CSRF" \
+  http://localhost:3000/api/v1/library/shares/uuid-here
+```
+
+---
+
+### GET /api/v1/library/shared/:token
+
+Loads a library by share token. **No authentication required** — this endpoint is public so recipients do not need an account. Returns `404` if the token is expired, revoked, or invalid.
+
+**Parameters:**
+- `:token` — 64-char hex token from `POST /api/v1/library/shares`
+
+**Response:**
+```json
+{
+  "version": "1712345679000",
+  "data": { "categories": ["bus"], "components": [], "icons": {} },
+  "owner": "alice"
+}
+```
+
+**Example:**
+```bash
+curl http://localhost:3000/api/v1/library/shared/abc123...
+```
+
+---
+
 ## Error Responses
 
 | Status | Meaning |
 |--------|---------|
 | 400 | Invalid project name |
 | 401 | Missing or invalid Bearer token |
-| 404 | Project not found |
+| 404 | Project or library not found |
+| 409 | Version conflict (include `currentVersion` in response) |
 | 429 | Rate limit exceeded |
 | 500 | Internal server error |
 

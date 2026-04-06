@@ -18,6 +18,28 @@
   <meta property="og:url" content="library.html">
   <!-- Canonical URL -->
   <link rel="canonical" href="library.html">
+  <style>
+    .sync-status {
+      display: inline-block;
+      padding: 2px 10px;
+      border-radius: 12px;
+      font-size: 0.82em;
+      font-weight: 600;
+      margin-left: 8px;
+      vertical-align: middle;
+    }
+    .sync-status.synced   { background: #d4edda; color: #155724; }
+    .sync-status.pending  { background: #fff3cd; color: #856404; }
+    .sync-status.offline  { background: #f8d7da; color: #721c24; }
+    .sync-status.local    { background: #e2e3e5; color: #383d41; }
+    @media (prefers-color-scheme: dark) {
+      .sync-status.synced  { background: #1a3a24; color: #6fe08d; }
+      .sync-status.pending { background: #3a3000; color: #ffc947; }
+      .sync-status.offline { background: #3a1020; color: #f07080; }
+      .sync-status.local   { background: #2a2a2a; color: #aaa; }
+    }
+    .cloud-actions { margin-top: 6px; display: flex; gap: 6px; flex-wrap: wrap; align-items: center; }
+  </style>
 </head>
 <body>
   <a href="#main-content" class="skip-link">Skip to main content</a>
@@ -34,13 +56,21 @@
   <main id="main-content">
   <h1>Library Manager</h1>
   <section>
-    <h2>Component Library</h2>
+    <h2>Component Library
+      <span id="sync-badge" class="sync-status local" aria-live="polite">Local</span>
+    </h2>
     <label>Version <input id="library-version" type="text" size="10"></label><br>
     <textarea id="component-text" rows="10" cols="80"></textarea><br>
     <textarea id="icon-text" rows="10" cols="80"></textarea><br>
     <input type="file" id="library-upload" accept="application/json"><br>
     <button id="component-save">Save</button>
     <button id="component-download">Download</button>
+    <div class="cloud-actions">
+      <button id="cloud-save-btn" title="Save library to your cloud account">Save to Cloud</button>
+      <button id="cloud-load-btn" title="Reload library from cloud">Load from Cloud</button>
+      <button id="cloud-share-btn" title="Generate a shareable link for this library">Share Library</button>
+      <button id="cloud-import-btn" title="Load a library shared by someone else">Load Shared Library</button>
+    </div>
   </section>
   <section>
     <h2>Manufacturer Library</h2>
@@ -52,31 +82,119 @@
     import './src/components/navigation.js';
     import { getItem, setItem } from './dataStore.mjs';
     import { showAlertModal } from './src/components/modal.js';
+    import { getAuthContextState } from './projectStorage.js';
 
-    async function load() {
+    // -------------------------------------------------------------------------
+    // Sync status badge
+    // -------------------------------------------------------------------------
+    function setStatus(state, label) {
+      const badge = document.getElementById('sync-badge');
+      badge.className = `sync-status ${state}`;
+      badge.textContent = label;
+    }
+
+    // -------------------------------------------------------------------------
+    // Cloud API helpers
+    // -------------------------------------------------------------------------
+    function authState() {
+      return getAuthContextState();
+    }
+
+    async function cloudGet() {
+      const auth = authState();
+      if (!auth) return null;
+      const res = await fetch('/api/v1/library', {
+        headers: { 'Authorization': `Bearer ${auth.token}` },
+      });
+      if (res.status === 404) return { notFound: true };
+      if (!res.ok) return null;
+      return res.json();
+    }
+
+    async function cloudPut(data, baseVersion) {
+      const auth = authState();
+      if (!auth) return null;
+      const body = baseVersion
+        ? { data, baseVersion }
+        : { data };
+      const res = await fetch('/api/v1/library', {
+        method: 'PUT',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${auth.token}`,
+          'X-Csrf-Token': auth.csrfToken,
+        },
+        body: JSON.stringify(body),
+      });
+      if (!res.ok) return null;
+      return res.json();
+    }
+
+    async function cloudShare() {
+      const auth = authState();
+      if (!auth) return null;
+      const res = await fetch('/api/v1/library/shares', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${auth.token}`,
+          'X-Csrf-Token': auth.csrfToken,
+        },
+        body: '{}',
+      });
+      if (!res.ok) return null;
+      return res.json();
+    }
+
+    async function cloudLoadShared(token) {
+      const res = await fetch(`/api/v1/library/shared/${encodeURIComponent(token)}`);
+      if (!res.ok) return null;
+      return res.json();
+    }
+
+    // -------------------------------------------------------------------------
+    // Populate textareas from a library data object
+    // -------------------------------------------------------------------------
+    function populateFromData(data) {
       const compArea = document.getElementById('component-text');
       const iconArea = document.getElementById('icon-text');
       const versionInput = document.getElementById('library-version');
+      compArea.value = JSON.stringify({
+        categories: data.categories || [],
+        components: data.components || [],
+      }, null, 2);
+      iconArea.value = JSON.stringify(data.icons || {}, null, 2);
+      if (data.version) versionInput.value = data.version;
+    }
+
+    // -------------------------------------------------------------------------
+    // Page load
+    // -------------------------------------------------------------------------
+    let _cloudVersion = null;
+
+    async function load() {
       const manufArea = document.getElementById('manufacturer-text');
 
-      const currentVersion = getItem('componentLibraryVersion', '');
-      versionInput.value = currentVersion || '';
-      let stored = currentVersion ? getItem('componentLibrary_' + currentVersion, null) : null;
-      if (stored) {
-        compArea.value = JSON.stringify({
-          categories: stored.categories || [],
-          components: stored.components || []
-        }, null, 2);
-        iconArea.value = JSON.stringify(stored.icons || {}, null, 2);
-      } else {
-        try {
-          const res = await fetch('componentLibrary.json');
-          const data = await res.json();
-          compArea.value = JSON.stringify(data, null, 2);
-        } catch {
-          compArea.value = '[]';
+      // Try cloud first
+      setStatus('pending', '⟳ Syncing…');
+      try {
+        const result = await cloudGet();
+        if (result && !result.notFound) {
+          populateFromData(result.data);
+          _cloudVersion = result.version;
+          setStatus('synced', '☁ Synced');
+        } else {
+          // Fall back to localStorage / static file
+          await loadFromLocal();
+          if (authState()) {
+            setStatus('local', '☁ Not saved yet');
+          } else {
+            setStatus('local', 'Local');
+          }
         }
-        iconArea.value = '{}';
+      } catch {
+        await loadFromLocal();
+        setStatus('offline', '⚠ Offline');
       }
 
       try {
@@ -89,6 +207,34 @@
       }
     }
 
+    async function loadFromLocal() {
+      const compArea = document.getElementById('component-text');
+      const iconArea = document.getElementById('icon-text');
+      const versionInput = document.getElementById('library-version');
+      const currentVersion = getItem('componentLibraryVersion', '');
+      versionInput.value = currentVersion || '';
+      const stored = currentVersion ? getItem('componentLibrary_' + currentVersion, null) : null;
+      if (stored) {
+        compArea.value = JSON.stringify({
+          categories: stored.categories || [],
+          components: stored.components || [],
+        }, null, 2);
+        iconArea.value = JSON.stringify(stored.icons || {}, null, 2);
+      } else {
+        try {
+          const res = await fetch('componentLibrary.json');
+          const data = await res.json();
+          compArea.value = JSON.stringify(data, null, 2);
+        } catch {
+          compArea.value = '[]';
+        }
+        iconArea.value = '{}';
+      }
+    }
+
+    // -------------------------------------------------------------------------
+    // Save locally (and auto-sync to cloud if authenticated)
+    // -------------------------------------------------------------------------
     async function saveComponents() {
       const compArea = document.getElementById('component-text');
       const iconArea = document.getElementById('icon-text');
@@ -101,12 +247,29 @@
         const categories = Array.isArray(data.categories) ? data.categories : [];
         setItem('componentLibraryVersion', version);
         setItem('componentLibrary_' + version, { components, categories, icons });
+
+        // Auto-sync to cloud if authenticated
+        if (authState()) {
+          setStatus('pending', '⟳ Saving…');
+          const cloudData = { categories, components, icons };
+          const saved = await cloudPut(cloudData, _cloudVersion || undefined);
+          if (saved) {
+            _cloudVersion = saved.version;
+            setStatus('synced', '☁ Synced');
+          } else {
+            setStatus('offline', '⚠ Cloud save failed');
+          }
+        }
+
         await showAlertModal('Saved', 'Component library saved successfully.');
       } catch {
         await showAlertModal('Invalid JSON', 'Please check your JSON syntax and try again.');
       }
     }
 
+    // -------------------------------------------------------------------------
+    // Download component library
+    // -------------------------------------------------------------------------
     async function downloadComponents() {
       const compArea = document.getElementById('component-text');
       const iconArea = document.getElementById('icon-text');
@@ -116,9 +279,9 @@
         const icons = JSON.parse(iconArea.value);
         const version = versionInput.value.trim() || 'user';
         const components = Array.isArray(data) ? data : data.components || [];
-        const categories = Array.isArray(data.categories) ? data.categories : [];
+        const categories = Array.isArray(data) ? [] : (Array.isArray(data.categories) ? data.categories : []);
         const blob = new Blob([
-          JSON.stringify({ version, categories, components, icons }, null, 2)
+          JSON.stringify({ version, categories, components, icons }, null, 2),
         ], { type: 'application/json' });
         const a = document.createElement('a');
         a.href = URL.createObjectURL(blob);
@@ -132,6 +295,9 @@
       }
     }
 
+    // -------------------------------------------------------------------------
+    // File upload
+    // -------------------------------------------------------------------------
     function handleUpload(e) {
       const file = e.target.files[0];
       if (!file) return;
@@ -149,16 +315,158 @@
           document.getElementById('library-version').value = version;
           document.getElementById('component-text').value = JSON.stringify({
             categories,
-            components
+            components,
           }, null, 2);
           document.getElementById('icon-text').value = JSON.stringify(obj.icons || {}, null, 2);
+          setStatus('pending', '⟳ Unsaved');
         } catch {
-          await showAlertModal('Invalid File', 'Please select a valid JSON library file.');
+          showAlertModal('Invalid File', 'Please select a valid JSON library file.');
         }
       };
       reader.readAsText(file);
     }
 
+    // -------------------------------------------------------------------------
+    // Cloud: explicit Save to Cloud
+    // -------------------------------------------------------------------------
+    async function handleCloudSave() {
+      if (!authState()) {
+        await showAlertModal('Not logged in', 'Please log in to save your library to the cloud.');
+        return;
+      }
+      const compArea = document.getElementById('component-text');
+      const iconArea = document.getElementById('icon-text');
+      try {
+        const data = JSON.parse(compArea.value);
+        const icons = JSON.parse(iconArea.value);
+        const components = Array.isArray(data) ? data : data.components || [];
+        const categories = Array.isArray(data) ? [] : (Array.isArray(data.categories) ? data.categories : []);
+        setStatus('pending', '⟳ Saving…');
+        const saved = await cloudPut({ categories, components, icons });
+        if (saved) {
+          _cloudVersion = saved.version;
+          setStatus('synced', '☁ Synced');
+          await showAlertModal('Saved to Cloud', 'Library saved to your cloud account.');
+        } else {
+          setStatus('offline', '⚠ Cloud save failed');
+          await showAlertModal('Cloud Save Failed', 'Could not save to cloud. Check your connection or log in again.');
+        }
+      } catch {
+        await showAlertModal('Invalid JSON', 'Please check your JSON syntax and try again.');
+      }
+    }
+
+    // -------------------------------------------------------------------------
+    // Cloud: Load from Cloud
+    // -------------------------------------------------------------------------
+    async function handleCloudLoad() {
+      if (!authState()) {
+        await showAlertModal('Not logged in', 'Please log in to load your library from the cloud.');
+        return;
+      }
+      setStatus('pending', '⟳ Loading…');
+      try {
+        const result = await cloudGet();
+        if (!result || result.notFound) {
+          setStatus('local', '☁ Not saved yet');
+          await showAlertModal('No Cloud Library', 'No library has been saved to your cloud account yet.');
+          return;
+        }
+        populateFromData(result.data);
+        _cloudVersion = result.version;
+        setStatus('synced', '☁ Synced');
+        await showAlertModal('Loaded from Cloud', 'Library loaded from your cloud account.');
+      } catch {
+        setStatus('offline', '⚠ Offline');
+        await showAlertModal('Load Failed', 'Could not load from cloud. Check your connection.');
+      }
+    }
+
+    // -------------------------------------------------------------------------
+    // Cloud: Share Library
+    // -------------------------------------------------------------------------
+    async function handleCloudShare() {
+      if (!authState()) {
+        await showAlertModal('Not logged in', 'Please log in to share your library.');
+        return;
+      }
+      try {
+        const share = await cloudShare();
+        if (!share) {
+          await showAlertModal('Share Failed', 'Could not create a share link. Make sure your library is saved to the cloud first.');
+          return;
+        }
+        const url = `${location.origin}/library.html?share=${encodeURIComponent(share.token)}`;
+        const expires = new Date(share.expiresAt).toLocaleDateString();
+        await showAlertModal(
+          'Library Share Link',
+          `Share this URL with your team (expires ${expires}):\n\n${url}`
+        );
+      } catch {
+        await showAlertModal('Share Failed', 'An error occurred creating the share link.');
+      }
+    }
+
+    // -------------------------------------------------------------------------
+    // Cloud: Load Shared Library
+    // -------------------------------------------------------------------------
+    async function handleCloudImport() {
+      const input = prompt('Paste the share token or share URL:');
+      if (!input) return;
+      // Accept full URL or raw token
+      let token = input.trim();
+      try {
+        const u = new URL(token);
+        token = u.searchParams.get('share') || token;
+      } catch {
+        // not a URL — treat as raw token
+      }
+      setStatus('pending', '⟳ Loading shared…');
+      try {
+        const result = await cloudLoadShared(token);
+        if (!result) {
+          setStatus('local', '⚠ Not found');
+          await showAlertModal('Not Found', 'The share link is invalid, expired, or revoked.');
+          return;
+        }
+        populateFromData(result.data);
+        _cloudVersion = null; // read-only; do not overwrite the sharer's version
+        setStatus('local', `Shared by ${result.owner}`);
+        await showAlertModal('Library Loaded', `Loaded library shared by ${result.owner}. Use "Save to Cloud" or "Save" to keep it.`);
+      } catch {
+        setStatus('offline', '⚠ Offline');
+        await showAlertModal('Load Failed', 'Could not load the shared library. Check your connection.');
+      }
+    }
+
+    // -------------------------------------------------------------------------
+    // Auto-load shared library if ?share=<token> is in the URL
+    // -------------------------------------------------------------------------
+    async function maybeLoadShareFromUrl() {
+      const params = new URLSearchParams(location.search);
+      const shareToken = params.get('share');
+      if (!shareToken) return false;
+      setStatus('pending', '⟳ Loading shared…');
+      try {
+        const result = await cloudLoadShared(shareToken);
+        if (!result) {
+          setStatus('local', '⚠ Expired link');
+          await showAlertModal('Expired Link', 'This share link is invalid, expired, or revoked.');
+          return false;
+        }
+        populateFromData(result.data);
+        _cloudVersion = null;
+        setStatus('local', `Shared by ${result.owner}`);
+        return true;
+      } catch {
+        setStatus('offline', '⚠ Offline');
+        return false;
+      }
+    }
+
+    // -------------------------------------------------------------------------
+    // Manufacturer library helpers (unchanged)
+    // -------------------------------------------------------------------------
     async function save(id, key) {
       const area = document.getElementById(id);
       try {
@@ -182,15 +490,25 @@
       URL.revokeObjectURL(a.href);
     }
 
+    // -------------------------------------------------------------------------
+    // Wire up events
+    // -------------------------------------------------------------------------
     document.getElementById('component-save').addEventListener('click', saveComponents);
     document.getElementById('component-download').addEventListener('click', downloadComponents);
     document.getElementById('library-upload').addEventListener('change', handleUpload);
     document.getElementById('manufacturer-save').addEventListener('click', () => save('manufacturer-text', 'manufacturerDefaults'));
     document.getElementById('manufacturer-download').addEventListener('click', () => download('manufacturer-text', 'manufacturerLibrary.json'));
+    document.getElementById('cloud-save-btn').addEventListener('click', handleCloudSave);
+    document.getElementById('cloud-load-btn').addEventListener('click', handleCloudLoad);
+    document.getElementById('cloud-share-btn').addEventListener('click', handleCloudShare);
+    document.getElementById('cloud-import-btn').addEventListener('click', handleCloudImport);
 
-    load();
+    // Initial load: check URL for share token, otherwise normal load
+    const sharedLoaded = await maybeLoadShareFromUrl();
+    if (!sharedLoaded) {
+      await load();
+    }
   </script>
   </main>
 </body>
 </html>
-
