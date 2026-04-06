@@ -22,6 +22,17 @@ const LOG_SPACE_POINTS = 50;
 const DEFAULT_MARGIN = 0.3;
 
 /**
+ * Return the override key used to vary the time dial for a device.
+ * IEC 60255-151 formula-based relays use 'tms'; all others use 'time'.
+ *
+ * @param {object} device - Raw device object from protectiveDevices.json
+ * @returns {string} 'tms' | 'time'
+ */
+function dialOverrideKey(device) {
+  return device?.iec60255 === true ? 'tms' : 'time';
+}
+
+/**
  * Log-log linear interpolation of time from a curve at a given current.
  * Mirrors the private interpolateTimeAtCurrent() in tccUtils.js.
  *
@@ -139,16 +150,17 @@ export function checkCoordination(upstreamScaled, downstreamScaled, testCurrents
  */
 export function findCoordinatingTimeDial(device, currentOverrides, downstreamScaled, testCurrents, margin = DEFAULT_MARGIN) {
   const overrides = currentOverrides && typeof currentOverrides === 'object' ? currentOverrides : {};
+  const dialKey = dialOverrideKey(device);
 
   // Quick check: does the maximum dial coordinate?
-  const scaledHi = scaleCurve(device, { ...overrides, time: TIME_DIAL_MAX });
+  const scaledHi = scaleCurve(device, { ...overrides, [dialKey]: TIME_DIAL_MAX });
   const checkHi = checkCoordination(scaledHi, downstreamScaled, testCurrents, margin);
   if (!checkHi.coordinated) {
     return { found: false, timeDial: TIME_DIAL_MAX, scaledResult: scaledHi, violations: checkHi.violations };
   }
 
   // Quick check: is the minimum dial already coordinated?
-  const scaledLo = scaleCurve(device, { ...overrides, time: TIME_DIAL_MIN });
+  const scaledLo = scaleCurve(device, { ...overrides, [dialKey]: TIME_DIAL_MIN });
   const checkLo = checkCoordination(scaledLo, downstreamScaled, testCurrents, margin);
   if (checkLo.coordinated) {
     return { found: true, timeDial: TIME_DIAL_MIN, scaledResult: scaledLo, violations: [] };
@@ -162,7 +174,7 @@ export function findCoordinatingTimeDial(device, currentOverrides, downstreamSca
 
   for (let iter = 0; iter < BINARY_SEARCH_ITERATIONS; iter += 1) {
     const mid = (lo + hi) / 2;
-    const scaled = scaleCurve(device, { ...overrides, time: mid });
+    const scaled = scaleCurve(device, { ...overrides, [dialKey]: mid });
     if (checkCoordination(scaled, downstreamScaled, testCurrents, margin).coordinated) {
       bestDial = mid;
       bestScaled = scaled;
@@ -199,7 +211,7 @@ export function greedyCoordinate(deviceEntries, faultCurrentA, options = {}) {
   if (deviceEntries.length === 1) {
     const e = deviceEntries[0];
     const scaled = scaleCurve(e.device, e.overrides ?? {});
-    const timeDial = scaled.settings?.time ?? scaled.settings?.longTimeDelay ?? 1;
+    const timeDial = scaled.settings?.tms ?? scaled.settings?.time ?? scaled.settings?.longTimeDelay ?? 1;
     return {
       results: [{ id: e.id, found: true, timeDial, scaledResult: scaled, violations: [] }],
       allCoordinated: true
@@ -212,7 +224,7 @@ export function greedyCoordinate(deviceEntries, faultCurrentA, options = {}) {
   // Scale the downstream reference device
   const entry0 = deviceEntries[0];
   const scaled0 = scaleCurve(entry0.device, entry0.overrides ?? {});
-  const timeDial0 = scaled0.settings?.time ?? scaled0.settings?.longTimeDelay ?? 1;
+  const timeDial0 = scaled0.settings?.tms ?? scaled0.settings?.time ?? scaled0.settings?.longTimeDelay ?? 1;
   const minTestCurrent = scaled0.curve?.[0]?.current ?? 1;
   const maxTestCurrent = Math.max(faultCurrentA, minTestCurrent * 10);
   const testCurrents = generateFaultCurrents(minTestCurrent, maxTestCurrent, sampleCount);

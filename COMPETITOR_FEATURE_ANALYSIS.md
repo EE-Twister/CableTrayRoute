@@ -20,7 +20,7 @@ A **2026-04-05 pass** focused specifically on the **one-line diagram editor UI**
 
 A **2026-04-06 pass** performed a focused deep dive on **one-line diagram connectivity features** and the **TCC (Time-Current Curve) engine**, benchmarked against ETAP 2024/2025, EasyPower 2025, SKM PTW 9, PowerWorld Simulator 23, and DIgSILENT PowerFactory 2024. This revealed **10 new gaps** (Gaps #48–#57) across two areas: (1) multi-sheet diagramming and diagram annotation capabilities missing from the one-line editor and (2) advanced TCC curve types, arc flash integration, ground fault protection, and reporting absent from the coordination study tool. See "One-Line Diagram & TCC Deep Dive (2026-04-06)" below.
 
-**Current status: 45 of 58 total identified gaps implemented. 3 deferred (BIM/CAD plugin, live pricing, digital twin). 10 newly identified (Gaps #48–#57, status: open).**
+**Current status: 46 of 58 total identified gaps implemented. 3 deferred (BIM/CAD plugin, live pricing, digital twin). 9 open (Gaps #48–#52, #54–#57).**
 
 ---
 
@@ -179,7 +179,7 @@ Benchmarked against: **ETAP 2024/2025** (composite networks, protection zone ove
 |---|---|---|
 | **Mathematical IEC inverse-time relay curves (NI / VI / EI / LTI)** | ETAP, EasyPower, SKM PTW, DIgSILENT PowerFactory | IEC 60255-151 defines four standard inverse-time relay curve families computed from the formula **t = TMS × k / [(I/Is)^α − 1]**: Normal Inverse (k = 0.14, α = 0.02), Very Inverse (k = 13.5, α = 1), Extremely Inverse (k = 80, α = 2), and Long-Time Inverse (k = 120, α = 1). These are the dominant relay characteristic types used in IEC-jurisdiction utilities and international projects. All professional TCC tools generate these curves parametrically from user-entered Time Multiplier Setting (TMS) and pickup current (Is). CableTrayRoute's `analysis/tcc.js` device library uses only sampled point-based curves; it contains no IEC 60255 curve formula engine and no TMS/Is parameter inputs for IEC relay types. This is a critical gap for any coordination study in a non-ANSI jurisdiction. |
 
-**Status:** New gap identified 2026-04-06. Not yet implemented.
+**Status:** ✅ Implemented 2026-04-06. `analysis/iecRelayCurves.mjs` exports `computeIecCurvePoints(familyKey, tms, pickupAmps)` which generates 80 log-spaced `{current, time}` points from the IEC 60255-151 formula for all four curve families (NI, VI, EI, LTI). `analysis/tccUtils.js` `scaleCurve()` detects `device.iec60255 === true` and generates the curve directly from the formula (with ±5% Class E1 tolerance bands) instead of scaling point arrays. Four device entries (`iec_ni_relay`, `iec_vi_relay`, `iec_ei_relay`, `iec_lti_relay`) added to `data/protectiveDevices.json` with `tms`/`pickup` settings and `settingOptions`. The TCC settings panel renders TMS and Pickup (A) controls automatically via the existing `renderSettings()` field-iteration loop. `analysis/tccAutoCoord.mjs` `findCoordinatingTimeDial()` and `greedyCoordinate()` updated to pass `tms` (not `time`) as the dial override key for IEC devices, enabling Auto-Coordinate to find the minimum TMS for selective coordination. Tests in `tests/tcc/iecRelayCurves.test.mjs` cover formula accuracy, monotonicity, TMS linearity, tolerance bands, and `scaleCurve` integration. Documented in `docs/standards.md` (IEC 60255-151 citation) and `docs/api-reference.md` (device IDs and settings reference).
 
 ---
 
