@@ -20,7 +20,7 @@ A **2026-04-05 pass** focused specifically on the **one-line diagram editor UI**
 
 A **2026-04-06 pass** performed a focused deep dive on **one-line diagram connectivity features** and the **TCC (Time-Current Curve) engine**, benchmarked against ETAP 2024/2025, EasyPower 2025, SKM PTW 9, PowerWorld Simulator 23, and DIgSILENT PowerFactory 2024. This revealed **10 new gaps** (Gaps #48–#57) across two areas: (1) multi-sheet diagramming and diagram annotation capabilities missing from the one-line editor and (2) advanced TCC curve types, arc flash integration, ground fault protection, and reporting absent from the coordination study tool. See "One-Line Diagram & TCC Deep Dive (2026-04-06)" below.
 
-**Current status: 46 of 58 total identified gaps implemented. 3 deferred (BIM/CAD plugin, live pricing, digital twin). 9 open (Gaps #48–#52, #54–#57).**
+**Current status: 47 of 58 total identified gaps implemented. 3 deferred (BIM/CAD plugin, live pricing, digital twin). 8 open (Gaps #48–#52, #54–#55, #57).**
 
 ---
 
@@ -91,6 +91,7 @@ The following features were implemented after the 2026-03-24 competitor refresh 
 | # | Feature | Module | UI Element | Tests |
 |---|---|---|---|---|
 | 12 | Cloud-Synchronized Component Library | `server.mjs` — `CloudLibraryStore`, `LibraryShareStore`; 6 REST endpoints under `/api/v1/library` | `library.html` — sync badge, Save/Load/Share to Cloud buttons; auto-sync on save; `?share=` URL param for direct link access | `tests/cloudLibrary.test.mjs` |
+| 13 | CTI Tabular Coordination Report (#56) | `reports/coordinationReport.mjs` — `buildCTIRows(deviceEntries, coordResult, faultCurrentA, margin)` + `CTI_HEADERS`; uses `interpolateTime()` from `tccAutoCoord.mjs`; 5 standard test-current levels per adjacent device pair | `tcc.html` — "Export CTI Report" button (shown after Auto-Coordinate); downloads `coordination-cti-report.csv` via `downloadCSV()` from `reports/reporting.mjs` | `tests/tcc/ctiReport.test.mjs` |
 
 ---
 
@@ -209,7 +210,7 @@ Benchmarked against: **ETAP 2024/2025** (composite networks, protection zone ove
 |---|---|---|
 | **Tabular selectivity report with device-pair CTI margins** | ETAP, EasyPower, SKM PTW | The standard deliverable for a protective device coordination study is a CTI (Coordination Time Interval) table: for each upstream–downstream device pair, the report lists the operating time of each device at key fault current levels (maximum bolted fault, minimum fault, 200 % FLA, motor starting current) and the margin between them. For electromechanical relays, the required CTI is ≥ 0.2 s; for digital/static relays ≥ 0.1 s; for fuse-breaker combinations ≥ 0.1 s. CableTrayRoute's `greedyCoordinate()` in `analysis/tccAutoCoord.mjs` computes margin values and the `#coordination-panel` shows pass/fail per device pair, but produces no tabular CTI report — no downloadable table listing device names, settings, test current levels, individual operating times, and margin columns. Without this, the coordination study has no formal documentation artifact. |
 
-**Status:** New gap identified 2026-04-06. Not yet implemented.
+**Status:** ✅ Implemented 2026-04-06. `reports/coordinationReport.mjs` exports `buildCTIRows(deviceEntries, coordResult, faultCurrentA, margin)` which produces one row per adjacent device pair × 5 standard test-current levels (100 / 60 / 25 / 10 / 5 % of max fault current). Each row includes upstream device name, downstream device name, test current [A], upstream trip time [s], downstream trip time [s], actual margin [s], required CTI [s], and Pass/Fail status. Uses `interpolateTime()` from `tccAutoCoord.mjs` with conservative `minCurve`/`maxCurve` bands where available. The `autoCoordinate()` function in `analysis/tcc.js` now stores the last coordination state and reveals an "Export CTI Report" button which calls `buildCTIRows()` and `downloadCSV()` from `reports/reporting.mjs` to download `coordination-cti-report.csv`. Column headers are exported as `CTI_HEADERS`. Tests in `tests/tcc/ctiReport.test.mjs` cover row counts, column completeness, Pass/Fail logic, three-device scenarios, and edge-case input validation.
 
 ---
 
@@ -818,7 +819,7 @@ Benchmarked against: **ETAP 2024/2025** (Electric Copilot™, composite networks
 | **TCC: IEC 60255 formula-based relay curves** | **No** | Yes | Yes | — | — | — | — | — | — | — |
 | **TCC: Arc flash incident energy overlay** | **No** | Yes | Yes | — | — | — | — | — | — | — |
 | **TCC: Ground fault / residual protection curves** | **No** | Yes | Yes | — | — | — | — | — | — | — |
-| **TCC: CTI tabular coordination report** | **No** | Yes | Yes | — | — | — | — | — | — | — |
+| **TCC: CTI tabular coordination report** | ✅ Yes | Yes | Yes | — | — | — | — | — | — | — |
 | **TCC: SVG / vector chart export** | **No** | Yes | Yes | — | — | — | — | — | — | — |
 
 *(✓ = implemented since initial 2026-03-16 analysis; new rows = gaps identified in 2026-03-24 refresh; **Usability** rows = UX pattern gaps; **Calc** rows = calculation completeness gaps; **SLD** rows = one-line diagram gaps; **TCC** rows = TCC engine gaps; all ✓ rows implemented as of 2026-04-05; **SLD/TCC** rows = newly identified 2026-04-06, not yet implemented)*
@@ -880,7 +881,7 @@ All originally high- and medium-priority feasible items have been implemented:
 
 1. **IEC 60255 Formula-Based Relay Curves** (Gap #53) — Critical for any international or IEC-jurisdiction project. Formula engine for Normal Inverse / Very Inverse / Extremely Inverse / Long-Time Inverse curves from TMS and Is inputs. Recommended implementation: add a `computeIECCurve(curveType, TMS, Is, currentRange)` function in `analysis/tccUtils.js` and a new "IEC Relay" device type in `tcc.html`'s device modal.
 
-2. **CTI Tabular Coordination Report** (Gap #56) — Without a downloadable report, the coordination study cannot be submitted to a utility or AHJ. Recommended: extend `greedyCoordinate()` output in `analysis/tccAutoCoord.mjs` to include a full per-pair CTI matrix at configurable test current levels, and add a "Download Report (CSV/PDF)" button to `tcc.html`.
+2. ~~**CTI Tabular Coordination Report** (Gap #56)~~ — ✅ **Implemented.** `reports/coordinationReport.mjs` `buildCTIRows()` + "Export CTI Report" button in `tcc.html`. Tests: `tests/tcc/ctiReport.test.mjs`.
 
 3. **Arc Flash Incident Energy Overlay on TCC** (Gap #54) — High-visibility safety feature. Recommended: after arc flash study is run, read `studies.arcFlash` results in `analysis/tcc.js` and render a dashed limit curve on the log-log chart at the incident energy threshold the user selects (8 / 25 / 40 cal/cm²).
 

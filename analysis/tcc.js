@@ -12,6 +12,8 @@ import {
 import { runShortCircuit } from './shortCircuit.mjs';
 import { scaleCurve, checkDuty, sanitizeCurve } from './tccUtils.js';
 import { checkCoordination, greedyCoordinate, generateFaultCurrents } from './tccAutoCoord.mjs';
+import { buildCTIRows, CTI_HEADERS } from '../reports/coordinationReport.mjs';
+import { downloadCSV } from '../reports/reporting.mjs';
 import { openModal, showAlertModal } from '../src/components/modal.js';
 import conductorProperties from '../conductorPropertiesData.mjs';
 import componentLibrary from '../componentLibrary.json' with { type: 'json' };
@@ -273,6 +275,7 @@ const violationDiv = document.getElementById('violation');
 const printPlotBtn = document.getElementById('print-plot-btn');
 const annotationBtn = document.getElementById('add-annotation-btn');
 const autoCoordBtn = document.getElementById('auto-coord-btn');
+const exportCtiBtn = document.getElementById('export-cti-btn');
 const coordPanel = document.getElementById('coordination-panel');
 const coordResultsDiv = document.getElementById('coord-results');
 const coordOrderList = document.getElementById('coord-order-list');
@@ -295,6 +298,9 @@ let activePlotted = null;
 let activeCurvesUpdater = null;
 let activeCoordMarkerDrawer = null;
 let coordOrderIds = [];
+
+// Last completed auto-coordination result; enables CTI report export
+let lastCoordState = null;
 
 let updatingActiveComponentFromSelect = false;
 
@@ -3956,6 +3962,14 @@ plotBtn.addEventListener('click', applyPlotAndPersistence);
 if (autoCoordBtn) {
   autoCoordBtn.addEventListener('click', autoCoordinate);
 }
+if (exportCtiBtn) {
+  exportCtiBtn.addEventListener('click', () => {
+    if (!lastCoordState) return;
+    const { deviceEntries, result, maxFaultA, margin } = lastCoordState;
+    const rows = buildCTIRows(deviceEntries, result, maxFaultA, margin);
+    downloadCSV(CTI_HEADERS, rows, 'coordination-cti-report.csv');
+  });
+}
 if (printPlotBtn) {
   printPlotBtn.addEventListener('click', handlePrintPlot);
 }
@@ -7488,6 +7502,8 @@ function autoCoordinate() {
 
   const margin = parseFloat(coordMarginInput?.value) || 0.3;
   const result = greedyCoordinate(deviceEntries, maxFaultA, { margin, sampleCount: 50 });
+  lastCoordState = { deviceEntries, result, maxFaultA, margin };
+  exportCtiBtn?.classList.remove('hidden');
 
   // Apply suggested time dials back to each device's mutable overrides
   result.results.forEach((r, i) => {

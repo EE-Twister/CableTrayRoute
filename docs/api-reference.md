@@ -373,6 +373,56 @@ curl -X PUT http://localhost:3000/api/v1/projects/myproject/cables \
 
 ---
 
+## CTI Report Export
+
+After running Auto-Coordinate on `tcc.html`, the "Export CTI Report" button downloads a CSV file (`coordination-cti-report.csv`) containing the standard Coordination Time Interval (CTI) table required for submission to utilities, AHJs, and clients.
+
+### `buildCTIRows(deviceEntries, coordResult, faultCurrentA, margin?)`
+
+**Module:** `reports/coordinationReport.mjs`
+
+Produces one row per adjacent device pair × test-current level from a `greedyCoordinate()` result.
+
+**Parameters:**
+
+| Parameter | Type | Description |
+|-----------|------|-------------|
+| `deviceEntries` | `Array<{id, device, overrides}>` | Ordered load→source — same array passed to `greedyCoordinate()` |
+| `coordResult` | `object` | Return value of `greedyCoordinate()` |
+| `faultCurrentA` | `number` | Maximum bolted fault current [A] |
+| `margin` | `number` (optional) | Required CTI [s]. Default: `0.3` |
+
+**Returns:** `Array<Object>` — one row per (device pair × test-current level). Returns `[]` for fewer than 2 devices or invalid inputs.
+
+**Standard test-current levels:** 100%, 60%, 25%, 10%, 5% of `faultCurrentA` — covering the full operating range from bolted fault to near-FLA.
+
+**Column headers** (exported as `CTI_HEADERS`):
+
+| Column | Description |
+|--------|-------------|
+| `Upstream Device` | Name of the upstream (source-side) protective device |
+| `Downstream Device` | Name of the downstream (load-side) protective device |
+| `Test Current (A)` | Fault current level for this row |
+| `Upstream Time (s)` | Upstream device trip time at this current |
+| `Downstream Time (s)` | Downstream device trip time at this current |
+| `Margin (s)` | Upstream time − Downstream time |
+| `Required CTI (s)` | Minimum required margin (from `margin` argument) |
+| `Pass/Fail` | `PASS` if Margin ≥ Required CTI, else `FAIL` |
+
+**Usage with `downloadCSV`:**
+
+```js
+import { buildCTIRows, CTI_HEADERS } from './reports/coordinationReport.mjs';
+import { downloadCSV } from './reports/reporting.mjs';
+
+const rows = buildCTIRows(deviceEntries, coordResult, maxFaultA, 0.3);
+downloadCSV(CTI_HEADERS, rows, 'coordination-cti-report.csv');
+```
+
+This is called automatically by the "Export CTI Report" button in `tcc.html` after Auto-Coordinate completes.
+
+---
+
 ## Error Responses
 
 | Status | Meaning |
