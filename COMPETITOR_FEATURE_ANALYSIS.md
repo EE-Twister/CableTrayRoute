@@ -220,7 +220,7 @@ Benchmarked against: **ETAP 2024/2025** (composite networks, protection zone ove
 |---|---|---|
 | **Download TCC log-log chart as SVG or high-resolution PNG** | ETAP, EasyPower, SKM PTW, DIgSILENT PowerFactory | Professional TCC tools export the coordination chart as a standalone vector graphic (SVG or EMF) or high-resolution raster (PNG ≥ 300 dpi) for inclusion in engineering study reports submitted to utilities, AHJs, and clients. CableTrayRoute's `tcc.html` has a "Print Plot" button that triggers `window.print()` — this works for paper printing but produces no standalone downloadable file. The SVG is rendered inline in the DOM; it could be serialized and offered as a download, but this is not currently implemented. All professional tools treat chart export as a primary workflow step. |
 
-**Status:** New gap identified 2026-04-06. Not yet implemented.
+**Status:** ✅ **Implemented 2026-04-06.** `analysis/tcc.js` `handleExportSVG()` / `handleExportPNG()` + "Export SVG" and "Export PNG" buttons in `tcc.html`. Pure utilities (inline styles constant, scale factor, markup builder, canvas dimension calculator) extracted to `analysis/chartExportUtils.mjs`. Tests: `tests/tcc/chartExport.test.mjs`.
 
 ---
 
@@ -885,7 +885,7 @@ All originally high- and medium-priority feasible items have been implemented:
 
 3. **Arc Flash Incident Energy Overlay on TCC** (Gap #54) — High-visibility safety feature. Recommended: after arc flash study is run, read `studies.arcFlash` results in `analysis/tcc.js` and render a dashed limit curve on the log-log chart at the incident energy threshold the user selects (8 / 25 / 40 cal/cm²).
 
-4. **SVG / Vector Chart Export** (Gap #57) — Standard workflow step for all study report submissions. Recommended: serialize the `#tcc-chart` SVG element, prepend XML declaration, and offer as a Blob download via `<a>` element click in `tcc.html`.
+4. ~~**SVG / Vector Chart Export** (Gap #57)~~ — ✅ **Implemented.** `analysis/tcc.js` `handleExportSVG()` / `handleExportPNG()` + "Export SVG" / "Export PNG" buttons in `tcc.html`. Utilities in `analysis/chartExportUtils.mjs`. Tests: `tests/tcc/chartExport.test.mjs`.
 
 **Medium Priority — TCC:**
 

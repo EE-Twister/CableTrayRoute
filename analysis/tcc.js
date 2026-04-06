@@ -14,6 +14,14 @@ import { scaleCurve, checkDuty, sanitizeCurve } from './tccUtils.js';
 import { checkCoordination, greedyCoordinate, generateFaultCurrents } from './tccAutoCoord.mjs';
 import { buildCTIRows, CTI_HEADERS } from '../reports/coordinationReport.mjs';
 import { downloadCSV } from '../reports/reporting.mjs';
+import {
+  EXPORT_INLINE_STYLES,
+  EXPORT_SCALE,
+  SVG_DOWNLOAD_FILENAME,
+  PNG_DOWNLOAD_FILENAME,
+  buildSvgDownloadMarkup,
+  computeCanvasDimensions,
+} from './chartExportUtils.mjs';
 import { openModal, showAlertModal } from '../src/components/modal.js';
 import conductorProperties from '../conductorPropertiesData.mjs';
 import componentLibrary from '../componentLibrary.json' with { type: 'json' };
@@ -273,6 +281,8 @@ const openBtn = document.getElementById('open-btn');
 const componentModalBtn = document.getElementById('component-modal-btn');
 const violationDiv = document.getElementById('violation');
 const printPlotBtn = document.getElementById('print-plot-btn');
+const exportSvgBtn = document.getElementById('export-svg-btn');
+const exportPngBtn = document.getElementById('export-png-btn');
 const annotationBtn = document.getElementById('add-annotation-btn');
 const autoCoordBtn = document.getElementById('auto-coord-btn');
 const exportCtiBtn = document.getElementById('export-cti-btn');
@@ -1103,6 +1113,12 @@ function setPlotAvailability(available) {
   if (printPlotBtn) {
     printPlotBtn.disabled = !available;
   }
+  if (exportSvgBtn) {
+    exportSvgBtn.disabled = !available;
+  }
+  if (exportPngBtn) {
+    exportPngBtn.disabled = !available;
+  }
   if (annotationBtn) {
     annotationBtn.disabled = !available;
     if (!available) {
@@ -1684,6 +1700,67 @@ async function handlePrintPlot() {
   win.document.open();
   win.document.write(html);
   win.document.close();
+}
+
+function buildExportSvgNode() {
+  if (!chart || !chart.node()) return null;
+  const svgNode = chart.node().cloneNode(true);
+  if (!svgNode.getAttribute('xmlns')) {
+    svgNode.setAttribute('xmlns', 'http://www.w3.org/2000/svg');
+  }
+  // Strip interactive-only crosshair elements — meaningless in a static export.
+  svgNode.querySelectorAll('.tcc-crosshair').forEach(el => el.remove());
+  // Inline annotation styles so the SVG is self-contained.
+  const styleEl = document.createElementNS('http://www.w3.org/2000/svg', 'style');
+  styleEl.textContent = EXPORT_INLINE_STYLES;
+  svgNode.insertBefore(styleEl, svgNode.firstChild);
+  return svgNode;
+}
+
+function handleExportSVG() {
+  if (!exportSvgBtn || exportSvgBtn.disabled) return;
+  const svgNode = buildExportSvgNode();
+  if (!svgNode) return;
+  const serializer = new XMLSerializer();
+  const markup = buildSvgDownloadMarkup(serializer.serializeToString(svgNode));
+  const blob = new Blob([markup], { type: 'image/svg+xml;charset=utf-8' });
+  const a = document.createElement('a');
+  a.href = URL.createObjectURL(blob);
+  a.download = SVG_DOWNLOAD_FILENAME;
+  a.click();
+  setTimeout(() => URL.revokeObjectURL(a.href), 0);
+}
+
+function handleExportPNG() {
+  if (!exportPngBtn || exportPngBtn.disabled) return;
+  const svgNode = buildExportSvgNode();
+  if (!svgNode) return;
+  const svgWidth = parseInt(svgNode.getAttribute('width') || '800', 10);
+  const svgHeight = parseInt(svgNode.getAttribute('height') || '600', 10);
+  const { canvasWidth, canvasHeight } = computeCanvasDimensions(svgWidth, svgHeight);
+  const serializer = new XMLSerializer();
+  const svgMarkup = serializer.serializeToString(svgNode);
+  const svgBlob = new Blob([svgMarkup], { type: 'image/svg+xml;charset=utf-8' });
+  const svgUrl = URL.createObjectURL(svgBlob);
+  const img = new Image();
+  img.onload = () => {
+    URL.revokeObjectURL(svgUrl);
+    const canvas = document.createElement('canvas');
+    canvas.width = canvasWidth;
+    canvas.height = canvasHeight;
+    const ctx = canvas.getContext('2d');
+    ctx.scale(EXPORT_SCALE, EXPORT_SCALE);
+    ctx.drawImage(img, 0, 0);
+    canvas.toBlob((pngBlob) => {
+      const a = document.createElement('a');
+      a.href = URL.createObjectURL(pngBlob);
+      a.download = PNG_DOWNLOAD_FILENAME;
+      a.click();
+      setTimeout(() => URL.revokeObjectURL(a.href), 0);
+    }, 'image/png');
+  };
+  img.onerror = () => URL.revokeObjectURL(svgUrl);
+  img.src = svgUrl;
 }
 
 function formatOptionLabel(value) {
@@ -3972,6 +4049,12 @@ if (exportCtiBtn) {
 }
 if (printPlotBtn) {
   printPlotBtn.addEventListener('click', handlePrintPlot);
+}
+if (exportSvgBtn) {
+  exportSvgBtn.addEventListener('click', handleExportSVG);
+}
+if (exportPngBtn) {
+  exportPngBtn.addEventListener('click', handleExportPNG);
 }
 if (annotationBtn) {
   annotationBtn.setAttribute('aria-pressed', 'false');
