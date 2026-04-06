@@ -1,6 +1,6 @@
 # Competitor Feature Gap Analysis
 
-## Date: 2026-04-05 (updated from 2026-04-04; original 2026-03-16; usability/calculation pass added 2026-03-24; all gaps resolved 2026-04-04; one-line diagram UI pass added 2026-04-05)
+## Date: 2026-04-06 (updated from 2026-04-05; one-line diagram & TCC deep dive added 2026-04-06; original 2026-03-16; usability/calculation pass added 2026-03-24; all gaps resolved 2026-04-04; one-line diagram UI pass added 2026-04-05)
 
 This document identifies features commonly found in major competitor platforms that are currently missing from CableTrayRoute.
 
@@ -18,7 +18,9 @@ A **second pass on 2026-03-24** examined the application through two additional 
 
 A **2026-04-05 pass** focused specifically on the **one-line diagram editor UI**, benchmarked against ETAP 2024/2025, EasyPower 2025, SKM PowerTools, PowerWorld Simulator, and NEPLAN 360 (web-native). This revealed **14 new UI interaction gaps** (Gaps #34–#47). **All 14 have now been implemented.** See "One-Line Diagram UI Gaps (2026-04-05)" below.
 
-**Current status: 45 of 48 total identified gaps implemented. 3 deferred (BIM/CAD plugin, live pricing, digital twin).**
+A **2026-04-06 pass** performed a focused deep dive on **one-line diagram connectivity features** and the **TCC (Time-Current Curve) engine**, benchmarked against ETAP 2024/2025, EasyPower 2025, SKM PTW 9, PowerWorld Simulator 23, and DIgSILENT PowerFactory 2024. This revealed **10 new gaps** (Gaps #48–#57) across two areas: (1) multi-sheet diagramming and diagram annotation capabilities missing from the one-line editor and (2) advanced TCC curve types, arc flash integration, ground fault protection, and reporting absent from the coordination study tool. See "One-Line Diagram & TCC Deep Dive (2026-04-06)" below.
+
+**Current status: 45 of 58 total identified gaps implemented. 3 deferred (BIM/CAD plugin, live pricing, digital twin). 10 newly identified (Gaps #48–#57, status: open).**
 
 ---
 
@@ -112,6 +114,112 @@ The following features were identified by benchmarking the one-line diagram edit
 | 45 | Animated power-flow indicators | `oneline.js` — `renderFlowAnimations()`; SVG `<animateMotion>` | Active when Load Flow overlays are shown | — |
 | 46 | Customizable per-type datablocks | `oneline.js` — `openDatablocksModal()`, `diagramDatablockConfig` | Views button → per-type field checkbox grid | — |
 | 47 | Orthogonal (Manhattan) connection routing toggle | `oneline.js` — `orthogonalRouting` state; Grid toolbar toggle | `#orthogonal-routing-toggle` | — |
+
+---
+
+## One-Line Diagram & TCC Deep Dive (2026-04-06 Pass)
+
+Benchmarked against: **ETAP 2024/2025** (composite networks, protection zone overlays, arc flash label generation), **EasyPower 2025** (multi-sheet cross-references, arc flash boundary on TCC, CTI reports), **SKM PTW 9** (layer management, IEC relay curve library, SVG chart export), **PowerWorld Simulator 23** (animated geographic one-line, GIS background), and **DIgSILENT PowerFactory 2024** (IEC 60255 formula curves, ground fault protection TCC, flexible study result annotations).
+
+---
+
+### Gap #48 – Cross-Sheet Off-Page Connectors
+
+| Missing Feature | Competitor(s) | Description |
+|---|---|---|
+| **Off-page / cross-sheet reference connector symbols** | ETAP, EasyPower, SKM PTW, DIgSILENT PowerFactory | All professional SLD tools support "off-page connector" or "inter-sheet link" symbols: a flag-shaped terminal that marks where a bus or feeder continues on another sheet, displaying the target sheet number and bus name. When clicked, the diagram navigates to the matching connector on the referenced sheet. Without this, any diagram requiring more than one sheet must represent complete isolated subsystems — cross-area feeders, transformer secondaries feeding loads on a different sheet, or utility tie connections cannot be cleanly represented across sheets. CableTrayRoute already has multi-sheet support (`sheets[]`, sheet tabs, `addSheet()`) but has no cross-sheet connector symbol type in `componentLibrary.json`. |
+
+**Status:** New gap identified 2026-04-06. Not yet implemented.
+
+---
+
+### Gap #49 – Arc Flash Warning Label Generation on One-Line
+
+| Missing Feature | Competitor(s) | Description |
+|---|---|---|
+| **NFPA 70E–compliant arc flash label overlay on diagram** | ETAP 2024/2025 (arc flash label printing from one-line), EasyPower 2025 (arc flash annotation blocks) | After running the arc flash study, ETAP and EasyPower generate NFPA 70E–compliant warning label text blocks directly on the one-line at each analyzed bus: incident energy (cal/cm²), PPE category, arc flash boundary (mm), working distance, and glove class. These can be printed as stand-alone label sheets for field installation on switchgear. CableTrayRoute already stores arc flash results per component (`arcFlash.incidentEnergy`, `arcFlash.boundary`, `arcFlash.ppeCategory`, `arcFlash.clearingTime`) and exposes them in datablocks and the study approval panel, but has no dedicated arc flash label layout mode that formats NFPA 70E–standard warning label geometry for printing. |
+
+**Status:** New gap identified 2026-04-06. Not yet implemented.
+
+---
+
+### Gap #50 – Protection / Coordination Zone Overlay
+
+| Missing Feature | Competitor(s) | Description |
+|---|---|---|
+| **Color-coded protection zone regions on the one-line** | ETAP 2024/2025 (protection zone coloring), SKM PTW 9 (zone overlay), DIgSILENT PowerFactory (protection group shading) | Professional SLD tools allow engineers to define protection zones — each bounded by its upstream and downstream protective devices — and render each zone as a translucent colored region on the one-line. This makes it immediately clear which devices form a coordination group and which equipment falls within each protection zone. It is especially valuable for large diagrams with multiple voltage levels, where verifying selectivity by inspection is difficult. CableTrayRoute has no concept of protection zones in `oneline.js`; there is topology-based energized-state coloring (Gap #36, implemented) but no user-defined protection zone grouping or shading overlay. |
+
+**Status:** New gap identified 2026-04-06. Not yet implemented.
+
+---
+
+### Gap #51 – Named Layer Management
+
+| Missing Feature | Competitor(s) | Description |
+|---|---|---|
+| **Named show/hide diagram layers** | ETAP, EasyPower, SKM PTW, NEPLAN 360 | All major SLD editors support a layer system: named layers (e.g., "Protection Devices", "Loads", "Generation", "Annotations", "Voltage Labels") each with independent visibility and lock state. Toggling a layer hides all its member components without deleting them, allowing engineers to produce clean presentation diagrams (loads hidden, only protection shown) from the same single-line model. CableTrayRoute has component grouping (Gap #40, implemented) but groups are ad-hoc collections without named layer semantics; there is no layer panel, no layer visibility toggle, and no layer assignment for newly placed components. |
+
+**Status:** New gap identified 2026-04-06. Not yet implemented.
+
+---
+
+### Gap #52 – Background Image / Site Plan Underlay
+
+| Missing Feature | Competitor(s) | Description |
+|---|---|---|
+| **Raster image import as diagram background** | PowerWorld Simulator 23 (GIS geographic background), ETAP (site plan underlay for plant one-lines), EasyPower (background image import) | Importing a JPEG/PNG floor plan, site map, or geographic raster image as a diagram background layer lets engineers verify that the electrical diagram's equipment positions correspond to physical locations. This is common in industrial plant diagrams (overlay on building floor plan) and utility distribution planning (overlay on aerial map). CableTrayRoute's canvas is a plain SVG with no background import capability. |
+
+**Status:** New gap identified 2026-04-06. Not yet implemented.
+
+---
+
+### Gap #53 – IEC 60255 Formula-Based Relay Curve Family
+
+| Missing Feature | Competitor(s) | Description |
+|---|---|---|
+| **Mathematical IEC inverse-time relay curves (NI / VI / EI / LTI)** | ETAP, EasyPower, SKM PTW, DIgSILENT PowerFactory | IEC 60255-151 defines four standard inverse-time relay curve families computed from the formula **t = TMS × k / [(I/Is)^α − 1]**: Normal Inverse (k = 0.14, α = 0.02), Very Inverse (k = 13.5, α = 1), Extremely Inverse (k = 80, α = 2), and Long-Time Inverse (k = 120, α = 1). These are the dominant relay characteristic types used in IEC-jurisdiction utilities and international projects. All professional TCC tools generate these curves parametrically from user-entered Time Multiplier Setting (TMS) and pickup current (Is). CableTrayRoute's `analysis/tcc.js` device library uses only sampled point-based curves; it contains no IEC 60255 curve formula engine and no TMS/Is parameter inputs for IEC relay types. This is a critical gap for any coordination study in a non-ANSI jurisdiction. |
+
+**Status:** New gap identified 2026-04-06. Not yet implemented.
+
+---
+
+### Gap #54 – Arc Flash Incident Energy Overlay on TCC Chart
+
+| Missing Feature | Competitor(s) | Description |
+|---|---|---|
+| **Cal/cm² incident energy curve overlaid on TCC log-log chart** | ETAP 2024/2025, EasyPower 2025 | After running an arc flash study, ETAP and EasyPower overlay a "constant incident energy" curve on the TCC chart. This curve shows, for a given fault current, the maximum allowable clearing time to remain below a target incident energy threshold (e.g., 8 cal/cm² for PPE Category 2 or 40 cal/cm² for PPE Category 4). Engineers can visually verify that the upstream protective device's TCC is entirely to the left of / below the incident energy limit curve — if any part of the device curve intersects or exceeds it, an arc flash hazard exists at that current level. This is one of the most actionable displays in a coordination study. CableTrayRoute's `analysis/tcc.js` has no arc flash overlay; `analysis/arcFlash.mjs` results (incident energy, clearing time) are not surfaced on the TCC chart in any form. |
+
+**Status:** New gap identified 2026-04-06. Not yet implemented.
+
+---
+
+### Gap #55 – Ground Fault / Residual Overcurrent Protection Curves
+
+| Missing Feature | Competitor(s) | Description |
+|---|---|---|
+| **Separate TCC for ground fault relays (residual and zero-sequence)** | ETAP, EasyPower, SKM PTW | Phase overcurrent coordination (A-, B-, C-phase) is the primary TCC use case, but ground fault protection is equally mandatory: NEC 230.95 requires ground fault protection on service equipment ≥ 1000 A at 150 V–600 V line-to-ground; OSHA 29 CFR 1910.304 mandates GFP on solidly-grounded systems. Ground fault relays (residual overcurrent = Ia+Ib+Ic or zero-sequence CT) have their own time-current characteristics and must coordinate with downstream ground fault devices. Professional TCC tools plot residual and zero-sequence relay curves as a separate "ground fault plane" alongside the phase curves. CableTrayRoute's `PROTECTIVE_TYPES` set includes `'relay'` and `'breaker'`, but there is no ground fault relay curve type, no GFP element property on breaker/relay components, and no separate ground-fault TCC plot mode. |
+
+**Status:** New gap identified 2026-04-06. Not yet implemented.
+
+---
+
+### Gap #56 – Coordination Time Interval (CTI) Tabular Report
+
+| Missing Feature | Competitor(s) | Description |
+|---|---|---|
+| **Tabular selectivity report with device-pair CTI margins** | ETAP, EasyPower, SKM PTW | The standard deliverable for a protective device coordination study is a CTI (Coordination Time Interval) table: for each upstream–downstream device pair, the report lists the operating time of each device at key fault current levels (maximum bolted fault, minimum fault, 200 % FLA, motor starting current) and the margin between them. For electromechanical relays, the required CTI is ≥ 0.2 s; for digital/static relays ≥ 0.1 s; for fuse-breaker combinations ≥ 0.1 s. CableTrayRoute's `greedyCoordinate()` in `analysis/tccAutoCoord.mjs` computes margin values and the `#coordination-panel` shows pass/fail per device pair, but produces no tabular CTI report — no downloadable table listing device names, settings, test current levels, individual operating times, and margin columns. Without this, the coordination study has no formal documentation artifact. |
+
+**Status:** New gap identified 2026-04-06. Not yet implemented.
+
+---
+
+### Gap #57 – Vector (SVG) Chart Export for TCC Study Reports
+
+| Missing Feature | Competitor(s) | Description |
+|---|---|---|
+| **Download TCC log-log chart as SVG or high-resolution PNG** | ETAP, EasyPower, SKM PTW, DIgSILENT PowerFactory | Professional TCC tools export the coordination chart as a standalone vector graphic (SVG or EMF) or high-resolution raster (PNG ≥ 300 dpi) for inclusion in engineering study reports submitted to utilities, AHJs, and clients. CableTrayRoute's `tcc.html` has a "Print Plot" button that triggers `window.print()` — this works for paper printing but produces no standalone downloadable file. The SVG is rendered inline in the DOM; it could be serialized and offered as a download, but this is not currently implemented. All professional tools treat chart export as a primary workflow step. |
+
+**Status:** New gap identified 2026-04-06. Not yet implemented.
 
 ---
 
@@ -702,8 +810,18 @@ Benchmarked against: **ETAP 2024/2025** (Electric Copilot™, composite networks
 | **Calc: Unbalanced per-phase harmonics** | **Yes** ✓ | Yes | Yes | — | — | — | — | — | — | — |
 | **Calc: Combined seismic + wind load scenario** | **Yes** ✓ | — | — | Yes | — | — | — | — | — | — |
 | **Calc: Post-contingency transient stability check** | **Yes** ✓ | Yes | Yes | — | — | — | — | — | — | — |
+| **SLD: Cross-sheet off-page connectors** | **No** | Yes | Yes | — | — | — | Yes | — | — | — |
+| **SLD: Arc flash warning label generation** | **No** | Yes | Yes | — | — | — | — | — | — | — |
+| **SLD: Protection zone overlay / coloring** | **No** | Yes | — | — | — | — | — | — | — | — |
+| **SLD: Named layer management** | **No** | Yes | Yes | — | — | — | — | — | Yes | — |
+| **SLD: Background image / site plan underlay** | **No** | Yes | Yes | — | — | — | — | — | — | — |
+| **TCC: IEC 60255 formula-based relay curves** | **No** | Yes | Yes | — | — | — | — | — | — | — |
+| **TCC: Arc flash incident energy overlay** | **No** | Yes | Yes | — | — | — | — | — | — | — |
+| **TCC: Ground fault / residual protection curves** | **No** | Yes | Yes | — | — | — | — | — | — | — |
+| **TCC: CTI tabular coordination report** | **No** | Yes | Yes | — | — | — | — | — | — | — |
+| **TCC: SVG / vector chart export** | **No** | Yes | Yes | — | — | — | — | — | — | — |
 
-*(✓ = implemented since initial 2026-03-16 analysis; new rows = gaps identified in 2026-03-24 refresh; **Usability** rows = UX pattern gaps; **Calc** rows = calculation completeness gaps; all ✓ rows implemented as of 2026-04-04)*
+*(✓ = implemented since initial 2026-03-16 analysis; new rows = gaps identified in 2026-03-24 refresh; **Usability** rows = UX pattern gaps; **Calc** rows = calculation completeness gaps; **SLD** rows = one-line diagram gaps; **TCC** rows = TCC engine gaps; all ✓ rows implemented as of 2026-04-05; **SLD/TCC** rows = newly identified 2026-04-06, not yet implemented)*
 
 ---
 
@@ -753,6 +871,40 @@ All originally high- and medium-priority feasible items have been implemented:
 13. **BIM Object Library** — Requires manufacturer data partnerships for Revit RFA / IFC families.
 14. **Live Manufacturer Pricing** — Requires commercial pricing data licenses (RS Means, Eaton/Harrison, Legrand).
 15. ~~**Real-Time Multi-User Collaboration**~~ → Implemented via WebSocket presence bar and `src/collaborationServer.mjs`.
+
+---
+
+### New Gaps — One-Line Diagram & TCC Deep Dive (2026-04-06)
+
+**High Priority — TCC (high engineering value, directly affects study deliverables):**
+
+1. **IEC 60255 Formula-Based Relay Curves** (Gap #53) — Critical for any international or IEC-jurisdiction project. Formula engine for Normal Inverse / Very Inverse / Extremely Inverse / Long-Time Inverse curves from TMS and Is inputs. Recommended implementation: add a `computeIECCurve(curveType, TMS, Is, currentRange)` function in `analysis/tccUtils.js` and a new "IEC Relay" device type in `tcc.html`'s device modal.
+
+2. **CTI Tabular Coordination Report** (Gap #56) — Without a downloadable report, the coordination study cannot be submitted to a utility or AHJ. Recommended: extend `greedyCoordinate()` output in `analysis/tccAutoCoord.mjs` to include a full per-pair CTI matrix at configurable test current levels, and add a "Download Report (CSV/PDF)" button to `tcc.html`.
+
+3. **Arc Flash Incident Energy Overlay on TCC** (Gap #54) — High-visibility safety feature. Recommended: after arc flash study is run, read `studies.arcFlash` results in `analysis/tcc.js` and render a dashed limit curve on the log-log chart at the incident energy threshold the user selects (8 / 25 / 40 cal/cm²).
+
+4. **SVG / Vector Chart Export** (Gap #57) — Standard workflow step for all study report submissions. Recommended: serialize the `#tcc-chart` SVG element, prepend XML declaration, and offer as a Blob download via `<a>` element click in `tcc.html`.
+
+**Medium Priority — TCC:**
+
+5. **Ground Fault / Residual Protection Curves** (Gap #55) — Required for NEC 230.95 GFP compliance documentation. Recommended: add a `groundFault` element type to protective device components with pickup (A) and time-delay settings; plot ground-fault relay curves as a separate series in `tcc.html`.
+
+**High Priority — One-Line Diagram:**
+
+6. **Cross-Sheet Off-Page Connectors** (Gap #48) — Foundational for representing real plant electrical systems that span multiple drawing sheets. Recommended: add `offPageConnector` component subtype to `componentLibrary.json`; store a `targetSheet` and `targetBusId` property; render as a flag symbol; clicking navigates to the referenced sheet and highlights the paired connector.
+
+**Medium Priority — One-Line Diagram:**
+
+7. **Arc Flash Warning Label Generation** (Gap #49) — Directly supports NFPA 70E field labeling compliance. Recommended: add a "Generate Arc Flash Labels" action to `oneline.html` that renders NFPA 70E–format label blocks from `arcFlash.*` study result fields on each analyzed bus component.
+
+8. **Named Layer Management** (Gap #51) — Significant UX improvement for large diagrams. Recommended: add a `layer` string property to every component; add a layer panel in `oneline.html` with per-layer visibility and lock toggles; components on hidden layers are excluded from `render()`.
+
+**Lower Priority — One-Line Diagram:**
+
+9. **Protection / Coordination Zone Overlay** (Gap #50) — Recommended: allow users to define named protection zones by selecting a set of components; render each zone as a translucent colored `<rect>` underneath the component layer in `render()`.
+
+10. **Background Image / Site Plan Underlay** (Gap #52) — Recommended: add a file input for JPEG/PNG; store as a base64 data URL in `sheets[activeSheet].backgroundImage`; render as an `<image>` element at z-index 0 in the SVG canvas.
 
 ---
 
