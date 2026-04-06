@@ -337,6 +337,42 @@ curl http://localhost:3000/api/v1/library/shared/abc123...
 
 ---
 
+## TCC Device Library — IEC 60255-151 Relay Types
+
+The protective device library (`data/protectiveDevices.json`) includes four IEC 60255-151 formula-based relay types. These relay curves are computed mathematically from the formula **t = TMS × k / [(I/Is)^α − 1]** rather than using sampled point arrays, so they accept `tms` and `pickup` as their primary settings.
+
+| Device ID | Curve Family | k | α |
+|---|---|---|---|
+| `iec_ni_relay` | Normal Inverse (NI) | 0.14 | 0.02 |
+| `iec_vi_relay` | Very Inverse (VI) | 13.5 | 1.0 |
+| `iec_ei_relay` | Extremely Inverse (EI) | 80.0 | 2.0 |
+| `iec_lti_relay` | Long-Time Inverse (LTI) | 120.0 | 1.0 |
+
+**Settings fields:**
+
+| Field | Description | Default | Range |
+|---|---|---|---|
+| `tms` | Time Multiplier Setting | 0.5 | 0.05 – 1.5 |
+| `pickup` | Pickup current Is (A) | 100 | 50 – 1600 |
+
+**Tolerance:** ±5% on operating time per IEC 60255-151 Class E1 (minCurve = 95%, maxCurve = 105% of nominal time).
+
+These relay types are fully supported by the Auto-Coordinate algorithm (`greedyCoordinate`), which searches for the minimum TMS value that achieves selective coordination with the downstream device.
+
+**Example — use NI relay in a TCC study via the REST API:**
+
+```bash
+# Save project settings that include an IEC NI relay device override
+curl -X PUT http://localhost:3000/api/v1/projects/myproject/cables \
+  -H "Authorization: Bearer $TOKEN" \
+  -H "Content-Type: application/json" \
+  -d '{"deviceOverrides": {"iec_ni_relay": {"tms": 0.3, "pickup": 200}}}'
+```
+
+**Internal implementation:** `analysis/iecRelayCurves.mjs` — `computeIecCurvePoints(familyKey, tms, pickupAmps)`. Integrated into the main curve engine via `analysis/tccUtils.js` (`scaleCurve`).
+
+---
+
 ## Error Responses
 
 | Status | Meaning |

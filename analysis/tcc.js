@@ -999,9 +999,10 @@ function renderSelectedSummary() {
 
 function formatSettingLabel(field = '') {
   const known = {
-    pickup: 'Pickup',
+    pickup: 'Pickup (A)',
     time: 'Delay',
     delay: 'Delay',
+    tms: 'TMS (Time Multiplier)',
     instantaneous: 'Instantaneous Pickup',
     instantaneousDelay: 'Instantaneous Delay',
     instantaneousMax: 'Instantaneous Max',

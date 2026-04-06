@@ -1,8 +1,13 @@
+import { computeIecCurvePoints } from './iecRelayCurves.mjs';
+
 const MIN_TIME = 1e-4;
 const DEFAULT_TOLERANCE = {
   timeLower: 0.8,
   timeUpper: 1.2
 };
+
+/** IEC 60255-151 Class E1 tolerance: ±5% on operating time. */
+const IEC_TOLERANCE = { timeLower: 0.95, timeUpper: 1.05 };
 const CURVE_ROLE_VALUES = new Set(['melting', 'clearing', 'symmetrical_rms_peak']);
 
 export function sanitizeCurve(points = []) {
@@ -237,6 +242,38 @@ export function scaleCurve(device = {}, overrides = {}) {
     combinedBase.instantaneousMax,
     device.instantaneousMax
   );
+
+  // ── IEC 60255-151 formula-based relay: early return ──────────────────────
+  if (device.iec60255 === true && device.curveFamily) {
+    const tms = Number(firstDefined(overrides.tms, combinedBase.tms, baseSettings.tms, 0.5));
+    const is = Number(firstDefined(overrides.pickup, combinedBase.pickup, baseSettings.pickup, 100));
+    const safeTms = Number.isFinite(tms) && tms > 0 ? tms : 0.5;
+    const safeIs  = Number.isFinite(is)  && is  > 0 ? is  : 100;
+    const pts    = computeIecCurvePoints(device.curveFamily, safeTms, safeIs);
+    const minPts = pts.map(p => ({ current: p.current, time: Math.max(p.time * IEC_TOLERANCE.timeLower, MIN_TIME) }));
+    const maxPts = pts.map(p => ({ current: p.current, time: Math.max(p.time * IEC_TOLERANCE.timeUpper, MIN_TIME) }));
+    return {
+      ...device,
+      curve: pts,
+      minCurve: minPts,
+      maxCurve: maxPts,
+      envelope: buildEnvelopeFromCurves(minPts, maxPts),
+      peakCurve: null,
+      settings: {
+        tms: safeTms,
+        pickup: safeIs,
+        longTimePickup: safeIs,
+        instantaneous: 0,
+        instantaneousPickup: 0,
+        instantaneousDelay: instDelay,
+        instantaneousMax: null,
+        shortTimePickup: null,
+        shortTimeDelay: null
+      },
+      tolerance: IEC_TOLERANCE
+    };
+  }
+  // ─────────────────────────────────────────────────────────────────────────
 
   const basePickup = firstDefined(
     combinedBase.pickup,
