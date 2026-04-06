@@ -23,6 +23,7 @@ import {
   computeCanvasDimensions,
 } from './chartExportUtils.mjs';
 import { openModal, showAlertModal } from '../src/components/modal.js';
+import { incidentEnergyLimitCurve } from './arcFlash.mjs';
 import conductorProperties from '../conductorPropertiesData.mjs';
 import componentLibrary from '../componentLibrary.json' with { type: 'json' };
 
@@ -291,6 +292,8 @@ const coordResultsDiv = document.getElementById('coord-results');
 const coordOrderList = document.getElementById('coord-order-list');
 const coordMarginInput = document.getElementById('coord-margin');
 const viewMenuBtn = document.getElementById('tcc-view-menu-btn');
+const arcFlashOverlayControls = document.getElementById('arc-flash-overlay-controls');
+const afThresholdSelect = document.getElementById('af-threshold-select');
 const chart = d3.select('#tcc-chart');
 const onelinePreviewSvgEl = document.getElementById('oneline-preview');
 const onelinePreviewSvg = onelinePreviewSvgEl ? d3.select(onelinePreviewSvgEl) : null;
@@ -324,7 +327,8 @@ const TCC_VIEW_OPTIONS = [
   { id: 'instantaneousPickup', label: 'Instantaneous Pickup (INST)', field: 'instantaneousPickup', unit: 'A', shortLabel: 'INST', description: 'Display the instantaneous pickup current.' },
   { id: 'instantaneousDelay', label: 'Instantaneous Delay', field: 'instantaneousDelay', unit: 's', shortLabel: 'INST Delay', description: 'Display the instantaneous delay setting.' },
   { id: 'instantaneousMax', label: 'Instantaneous Max', field: 'instantaneousMax', unit: 'A', shortLabel: 'INST Max', description: 'Display the instantaneous ceiling current.' },
-  { id: 'curveProfile', label: 'Curve Profile', field: 'curveProfileLabel', shortLabel: 'Curve', description: 'Display the selected curve profile.' }
+  { id: 'curveProfile', label: 'Curve Profile', field: 'curveProfileLabel', shortLabel: 'Curve', description: 'Display the selected curve profile.' },
+  { id: 'arcFlashOverlay', label: 'Arc Flash Limit Curve', field: null, description: 'Overlay a constant incident energy limit curve from arc flash study results.' }
 ];
 
 const viewOptionMap = new Map(TCC_VIEW_OPTIONS.map(option => [option.id, option]));
@@ -507,6 +511,8 @@ let activeComponentId = compId || null;
 let annotationMode = false;
 let annotations = [];
 let annotationContext = null;
+let arcFlashOverlayThreshold = 8; // cal/cm² — default PPE Category 2
+let arcFlashOverlayComponentId = null;
 
 function getActiveComponentId() {
   if (!activeComponentId) return null;
@@ -4056,6 +4062,15 @@ if (exportSvgBtn) {
 if (exportPngBtn) {
   exportPngBtn.addEventListener('click', handleExportPNG);
 }
+if (afThresholdSelect) {
+  afThresholdSelect.addEventListener('change', () => {
+    const val = Number(afThresholdSelect.value);
+    if (val > 0) {
+      arcFlashOverlayThreshold = val;
+      plot();
+    }
+  });
+}
 if (annotationBtn) {
   annotationBtn.setAttribute('aria-pressed', 'false');
   annotationBtn.addEventListener('click', () => {
@@ -6709,6 +6724,46 @@ function plot() {
     allCurrents.push(fault * 1000);
   }
 
+  // Arc flash incident energy limit curve overlay (Gap #54)
+  if (activeViewOptions.has('arcFlashOverlay')) {
+    const afResults = studies?.arcFlash;
+    const afEntry = arcFlashOverlayComponentId
+      ? afResults?.[arcFlashOverlayComponentId]
+      : (afResults ? Object.values(afResults)[0] : null);
+    if (afEntry?.calculationInputs) {
+      const ci = afEntry.calculationInputs;
+      const enclosure = ci.enclosureType || 'box';
+      const Cf = enclosure === 'open' ? 1 : 1.5;
+      const sizeFactor = Number.isFinite(ci.enclosureSizeFactor) && ci.enclosureSizeFactor > 0
+        ? ci.enclosureSizeFactor : 1;
+      const gap = Number.isFinite(ci.gapMM) && ci.gapMM > 0 ? ci.gapMM : 25;
+      const dist = Number.isFinite(ci.workingDistanceMM) && ci.workingDistanceMM > 0 ? ci.workingDistanceMM : 455;
+      const V = Number.isFinite(ci.voltageKVUsed) && ci.voltageKVUsed > 0 ? ci.voltageKVUsed : 0.48;
+      const cfg = ci.electrodeConfiguration || 'VCB';
+      // Sweep 200 points log-spaced across the current domain
+      const domainMinKA = (d3.min(allCurrents) || 100) / 1000 / 2;
+      const domainMaxKA = (d3.max(allCurrents) || 10000) / 1000 * 2;
+      const nPts = 200;
+      const logMin = Math.log10(Math.max(domainMinKA, 0.001));
+      const logMax = Math.log10(Math.max(domainMaxKA, domainMinKA * 10));
+      const currentRangeKA = Array.from({ length: nPts }, (_, i) =>
+        Math.pow(10, logMin + (logMax - logMin) * i / (nPts - 1)));
+      const limitPoints = incidentEnergyLimitCurve(
+        { Cf, sizeFactor, gap, dist, V, cfg, enclosure },
+        arcFlashOverlayThreshold,
+        currentRangeKA
+      );
+      if (limitPoints.length > 1) {
+        const label = `${arcFlashOverlayThreshold} cal/cm² – ${afEntry.equipmentTag || 'Arc Flash Limit'}`;
+        overlays.push({ kind: 'arcFlashLimit', label, curve: limitPoints });
+        limitPoints.forEach(p => {
+          allCurrents.push(p.current);
+          allTimes.push(p.time);
+        });
+      }
+    }
+  }
+
   const BASE_MARGIN = { top: 24, right: 90, bottom: 70, left: 70 };
   const baseWidth = +chart.attr('width') - BASE_MARGIN.left - BASE_MARGIN.right;
   const color = d3.scaleOrdinal(d3.schemeCategory10);
@@ -6861,6 +6916,15 @@ function plot() {
         .attr('stroke', entry.color)
         .attr('stroke-width', 2)
         .attr('stroke-dasharray', '4,1,1,1');
+    } else if (entry.kind === 'arcFlashLimit') {
+      legendItem.append('line')
+        .attr('x1', 0)
+        .attr('x2', 16)
+        .attr('y1', 8)
+        .attr('y2', 8)
+        .attr('stroke', entry.color)
+        .attr('stroke-width', 2.5)
+        .attr('stroke-dasharray', '10,5');
     } else {
       legendItem.append('rect')
         .attr('width', 16)
@@ -7034,6 +7098,16 @@ function plot() {
       .attr('stroke-width', 2)
       .attr('stroke-dasharray', '2,2')
       .attr('d', curve.length ? line(curve) : null);
+  });
+
+  overlays.filter(entry => entry.kind === 'arcFlashLimit').forEach(entry => {
+    overlayLayer.append('path')
+      .datum(entry.curve)
+      .attr('fill', 'none')
+      .attr('stroke', entry.color)
+      .attr('stroke-width', 2.5)
+      .attr('stroke-dasharray', '10,5')
+      .attr('d', entry.curve.length ? line(entry.curve) : null);
   });
 
   const plotted = devicePlots.map(plotEntry => {
@@ -7486,6 +7560,15 @@ function plot() {
 
   const annotationLayer = g.append('g').attr('class', 'annotation-layer');
   annotationContext = { g, x, y, width, height, layer: annotationLayer };
+
+  // Show arc flash overlay controls only when arc flash results are available
+  if (arcFlashOverlayControls) {
+    const afResultsAvailable = Boolean(
+      studies?.arcFlash && Object.keys(studies.arcFlash).length > 0
+    );
+    arcFlashOverlayControls.classList.toggle('hidden', !afResultsAvailable);
+  }
+
   setPlotAvailability(true);
   renderAnnotations();
 
