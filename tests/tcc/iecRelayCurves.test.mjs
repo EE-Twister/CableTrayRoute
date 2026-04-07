@@ -320,3 +320,80 @@ describe('scaleCurve integration with IEC relay devices', () => {
     );
   });
 });
+
+// ─── curveFamily override (IEC Parametric Relay) ──────────────────────────────
+describe('scaleCurve curveFamily override', () => {
+  const parametricDevice = {
+    id: 'iec_parametric_relay',
+    type: 'relay',
+    vendor: 'IEC 60255-151',
+    name: 'IEC Parametric Relay',
+    iec60255: true,
+    curveFamily: 'NI',
+    settings: { curveFamily: 'NI', tms: 0.5, pickup: 100 },
+    settingOptions: {
+      curveFamily: ['NI', 'VI', 'EI', 'LTI'],
+      tms: [0.05, 0.1, 0.2, 0.3, 0.5, 0.7, 1.0, 1.5, 2.0],
+      pickup: [50, 100, 200, 400, 800, 1600]
+    },
+    interruptRating: 50,
+    curve: []
+  };
+
+  it('uses overrides.curveFamily when provided, changing the curve shape', () => {
+    const ni = scaleCurve(parametricDevice, {});
+    const vi = scaleCurve(parametricDevice, { curveFamily: 'VI' });
+    // At high multiples (≥10× pickup = 1000 A), NI is much slower than VI.
+    // NI (α=0.02) barely drops with current; VI (α=1.0) drops sharply — so NI > VI at high current.
+    const niHighTime = ni.curve.find(p => p.current >= 1000)?.time;
+    const viHighTime = vi.curve.find(p => p.current >= 1000)?.time;
+    assert.ok(Number.isFinite(niHighTime), 'NI should produce finite time at 10× pickup');
+    assert.ok(Number.isFinite(viHighTime), 'VI should produce finite time at 10× pickup');
+    assert.ok(niHighTime > viHighTime * 2,
+      `NI time (${niHighTime?.toFixed(3)}) should be >2× VI time (${viHighTime?.toFixed(3)}) at 10× pickup — NI is much slower at high fault currents`);
+  });
+
+  it('reports effectiveFamily in returned settings when overridden', () => {
+    const result = scaleCurve(parametricDevice, { curveFamily: 'EI' });
+    assert.strictEqual(result.settings.curveFamily, 'EI',
+      `settings.curveFamily should reflect override; got '${result.settings.curveFamily}'`);
+  });
+
+  it('reports base curveFamily when no override is given', () => {
+    const result = scaleCurve(parametricDevice, {});
+    assert.strictEqual(result.settings.curveFamily, 'NI',
+      `settings.curveFamily should be base 'NI'; got '${result.settings.curveFamily}'`);
+  });
+
+  it('all four families produce valid curves via override', () => {
+    for (const family of ['NI', 'VI', 'EI', 'LTI']) {
+      const result = scaleCurve(parametricDevice, { curveFamily: family });
+      assert.ok(result.curve.length >= 2,
+        `${family}: expected >= 2 curve points, got ${result.curve.length}`);
+      assert.strictEqual(result.settings.curveFamily, family,
+        `${family}: settings.curveFamily mismatch`);
+    }
+  });
+
+  it('EI and LTI overrides produce curves distinct from NI', () => {
+    const ni  = scaleCurve(parametricDevice, { curveFamily: 'NI' });
+    const ei  = scaleCurve(parametricDevice, { curveFamily: 'EI' });
+    const lti = scaleCurve(parametricDevice, { curveFamily: 'LTI' });
+    const idx = Math.floor(ni.curve.length / 2);
+    assert.ok(Math.abs(ei.curve[idx].time - ni.curve[idx].time) > 0.001,
+      'EI and NI curves should differ at mid-range');
+    assert.ok(Math.abs(lti.curve[idx].time - ni.curve[idx].time) > 0.001,
+      'LTI and NI curves should differ at mid-range');
+  });
+
+  it('tms and pickup overrides still work alongside curveFamily override', () => {
+    const r = scaleCurve(parametricDevice, { curveFamily: 'VI', tms: 1.0, pickup: 200 });
+    assert.strictEqual(r.settings.curveFamily, 'VI');
+    assert.strictEqual(r.settings.tms, 1.0);
+    assert.strictEqual(r.settings.pickup, 200);
+    // All currents should be >= 200 (pickup)
+    for (const p of r.curve) {
+      assert.ok(p.current > 200, `current ${p.current} should exceed pickup 200`);
+    }
+  });
+});

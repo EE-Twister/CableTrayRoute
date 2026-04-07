@@ -244,12 +244,13 @@ export function scaleCurve(device = {}, overrides = {}) {
   );
 
   // ── IEC 60255-151 formula-based relay: early return ──────────────────────
-  if (device.iec60255 === true && device.curveFamily) {
+  if (device.iec60255 === true && (device.curveFamily || overrides.curveFamily)) {
     const tms = Number(firstDefined(overrides.tms, combinedBase.tms, baseSettings.tms, 0.5));
     const is = Number(firstDefined(overrides.pickup, combinedBase.pickup, baseSettings.pickup, 100));
     const safeTms = Number.isFinite(tms) && tms > 0 ? tms : 0.5;
     const safeIs  = Number.isFinite(is)  && is  > 0 ? is  : 100;
-    const pts    = computeIecCurvePoints(device.curveFamily, safeTms, safeIs);
+    const effectiveFamily = firstDefined(overrides.curveFamily, device.curveFamily);
+    const pts    = computeIecCurvePoints(effectiveFamily, safeTms, safeIs);
     const minPts = pts.map(p => ({ current: p.current, time: Math.max(p.time * IEC_TOLERANCE.timeLower, MIN_TIME) }));
     const maxPts = pts.map(p => ({ current: p.current, time: Math.max(p.time * IEC_TOLERANCE.timeUpper, MIN_TIME) }));
     return {
@@ -260,6 +261,7 @@ export function scaleCurve(device = {}, overrides = {}) {
       envelope: buildEnvelopeFromCurves(minPts, maxPts),
       peakCurve: null,
       settings: {
+        curveFamily: effectiveFamily,
         tms: safeTms,
         pickup: safeIs,
         longTimePickup: safeIs,
