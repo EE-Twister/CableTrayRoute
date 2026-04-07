@@ -83,7 +83,7 @@ import { runArcFlash } from './analysis/arcFlash.mjs';
 import { runHarmonics } from './analysis/harmonics.js';
 import { runMotorStart } from './analysis/motorStart.js';
 import { runReliability } from './analysis/reliability.js';
-import { generateArcFlashReport } from './reports/arcFlashReport.mjs';
+import { generateArcFlashReport, openLabelPrintWindow } from './reports/arcFlashReport.mjs';
 import { exportAllReports } from './reports/exportAll.mjs';
 import { sizeConductor } from './sizing.js';
 import { runValidation } from './validation/rules.js';
@@ -1848,6 +1848,9 @@ let titleBlockFields = {};         // Gap #38
 let minimapVisible = false;        // Gap #39
 // Gap #46 – per-subtype datablock config: { [subtype]: string[] }
 let diagramDatablockConfig = {};
+// Gap #49 – Arc Flash Label Overlays on one-line diagram
+let arcFlashLabelMode = false;
+
 // Gap #51 – Named Layer Management
 let layers = [];             // layer definitions for the active sheet: [{id,name,visible,locked}]
 let layersHistory = [];      // parallel snapshot array to history[], each entry is deep copy of layers
@@ -1891,6 +1894,8 @@ if (studiesPanel && hasStoredStudiesWidth) {
 const runLFBtn = document.getElementById('run-loadflow-btn');
 const runSCBtn = document.getElementById('run-shortcircuit-btn');
 const runAFBtn = document.getElementById('run-arcflash-btn');
+const printAFLabelsBtn = document.getElementById('print-arcflash-labels-btn');
+const afLabelModeToggle = document.getElementById('toggle-arcflash-label-mode');
 const runHBtn = document.getElementById('run-harmonics-btn');
 const runMSBtn = document.getElementById('run-motorstart-btn');
 const runRelBtn = document.getElementById('run-reliability-btn');
@@ -2658,7 +2663,16 @@ if (runAFBtn) runAFBtn.addEventListener('click', async () => {
   studies.arcFlash = af;
   setStudies(studies);
   generateArcFlashReport(af);
+  if (printAFLabelsBtn) printAFLabelsBtn.disabled = false;
   renderStudyResults();
+  render();
+});
+if (printAFLabelsBtn) printAFLabelsBtn.addEventListener('click', () => {
+  const af = getStudies()?.arcFlash || {};
+  openLabelPrintWindow(af);
+});
+if (afLabelModeToggle) afLabelModeToggle.addEventListener('change', () => {
+  arcFlashLabelMode = afLabelModeToggle.checked;
   render();
 });
 if (runHBtn) runHBtn.addEventListener('click', () => {
@@ -6671,6 +6685,9 @@ function render() {
   // Gap #39 – Minimap
   renderMinimap();
 
+  // Gap #49 – Arc Flash label badge overlays
+  if (arcFlashLabelMode) renderArcFlashLabelOverlays(svg);
+
   if (lengthsChanged && !syncing) {
     syncing = true;
     syncSchedules(false);
@@ -6822,6 +6839,84 @@ function renderMinimap() {
     vpRect.classList.add('minimap-viewport');
     minimapSvg.appendChild(vpRect);
   }
+}
+
+// ----------------------------------------------------------------
+// Gap #49 – Arc Flash label badge overlays on one-line diagram
+// ----------------------------------------------------------------
+function renderArcFlashLabelOverlays(svg) {
+  svg.querySelectorAll('.af-label-badge').forEach(el => el.remove());
+  const afResults = cachedStudyResults?.arcFlash;
+  if (!afResults || typeof afResults !== 'object') return;
+
+  const BADGE_W = 90;
+  const BANNER_H = 18;
+  const BODY_H = 28;
+  const BADGE_H = BANNER_H + BODY_H;
+  const FONT = 'Helvetica, Arial, sans-serif';
+
+  components.forEach(comp => {
+    const af = afResults[comp.id];
+    if (!af || !Number.isFinite(af.incidentEnergy)) return;
+
+    const bounds = componentBounds(comp);
+    const cx = (bounds.left + bounds.right) / 2;
+    const cy = bounds.top;
+
+    const ie = af.incidentEnergy;
+    const isDanger = ie >= 40;
+    const bannerColor = isDanger ? '#d32f2f' : '#f57c00';
+    const signalWord = isDanger ? 'DANGER' : 'WARNING';
+    const ppeText = `PPE Cat: ${Number.isFinite(af.ppeCategory) ? af.ppeCategory : 'N/A'}`;
+    const ieText = `IE: ${ie.toFixed(2)} cal/cm²`;
+
+    const g = document.createElementNS(svgNS, 'g');
+    g.setAttribute('class', 'af-label-badge');
+    g.setAttribute('transform', `translate(${cx - BADGE_W / 2},${cy - BADGE_H - 4})`);
+    g.setAttribute('pointer-events', 'none');
+
+    // Outer border
+    const border = document.createElementNS(svgNS, 'rect');
+    border.setAttribute('x', 0); border.setAttribute('y', 0);
+    border.setAttribute('width', BADGE_W); border.setAttribute('height', BADGE_H);
+    border.setAttribute('fill', '#fff'); border.setAttribute('stroke', '#000');
+    border.setAttribute('stroke-width', '1');
+    g.appendChild(border);
+
+    // Colored signal banner
+    const banner = document.createElementNS(svgNS, 'rect');
+    banner.setAttribute('x', 0); banner.setAttribute('y', 0);
+    banner.setAttribute('width', BADGE_W); banner.setAttribute('height', BANNER_H);
+    banner.setAttribute('fill', bannerColor);
+    g.appendChild(banner);
+
+    // Signal word text
+    const sigText = document.createElementNS(svgNS, 'text');
+    sigText.setAttribute('x', BADGE_W / 2); sigText.setAttribute('y', BANNER_H - 4);
+    sigText.setAttribute('text-anchor', 'middle');
+    sigText.setAttribute('font-size', '11'); sigText.setAttribute('font-weight', 'bold');
+    sigText.setAttribute('fill', '#fff'); sigText.setAttribute('font-family', FONT);
+    sigText.textContent = signalWord;
+    g.appendChild(sigText);
+
+    // PPE Category line
+    const ppeLine = document.createElementNS(svgNS, 'text');
+    ppeLine.setAttribute('x', 4); ppeLine.setAttribute('y', BANNER_H + 11);
+    ppeLine.setAttribute('font-size', '9'); ppeLine.setAttribute('fill', '#000');
+    ppeLine.setAttribute('font-family', FONT);
+    ppeLine.textContent = ppeText;
+    g.appendChild(ppeLine);
+
+    // Incident energy line
+    const ieLine = document.createElementNS(svgNS, 'text');
+    ieLine.setAttribute('x', 4); ieLine.setAttribute('y', BANNER_H + 23);
+    ieLine.setAttribute('font-size', '9'); ieLine.setAttribute('fill', '#000');
+    ieLine.setAttribute('font-family', FONT);
+    ieLine.textContent = ieText;
+    g.appendChild(ieLine);
+
+    svg.appendChild(g);
+  });
 }
 
 // ----------------------------------------------------------------
