@@ -364,5 +364,21 @@
     },
     "interruptRating": 50,
     "curve": []
+  },
+  {
+    "id": "iec_parametric_relay",
+    "type": "relay",
+    "vendor": "IEC 60255-151",
+    "name": "IEC Parametric Relay",
+    "iec60255": true,
+    "curveFamily": "NI",
+    "settings": { "curveFamily": "NI", "tms": 0.5, "pickup": 100 },
+    "settingOptions": {
+      "curveFamily": ["NI", "VI", "EI", "LTI"],
+      "tms": [0.05, 0.1, 0.2, 0.3, 0.5, 0.7, 1.0, 1.5, 2.0],
+      "pickup": [50, 100, 200, 400, 800, 1600]
+    },
+    "interruptRating": 50,
+    "curve": []
   }
 ]

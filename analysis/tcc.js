@@ -1029,6 +1029,7 @@ function formatSettingLabel(field = '') {
     instantaneousDelay: 'Instantaneous Delay',
     instantaneousMax: 'Instantaneous Max',
     instantaneousPickup: 'Instantaneous Pickup',
+    curveFamily: 'Curve Family (IEC 60255-151)',
     curveProfile: 'Curve Profile',
     longTimePickup: 'Long Time Pickup',
     longTimeDelay: 'Long Time Delay',
