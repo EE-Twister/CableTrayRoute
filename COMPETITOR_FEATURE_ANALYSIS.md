@@ -20,7 +20,7 @@ A **2026-04-05 pass** focused specifically on the **one-line diagram editor UI**
 
 A **2026-04-06 pass** performed a focused deep dive on **one-line diagram connectivity features** and the **TCC (Time-Current Curve) engine**, benchmarked against ETAP 2024/2025, EasyPower 2025, SKM PTW 9, PowerWorld Simulator 23, and DIgSILENT PowerFactory 2024. This revealed **10 new gaps** (Gaps #48–#57) across two areas: (1) multi-sheet diagramming and diagram annotation capabilities missing from the one-line editor and (2) advanced TCC curve types, arc flash integration, ground fault protection, and reporting absent from the coordination study tool. See "One-Line Diagram & TCC Deep Dive (2026-04-06)" below.
 
-**Current status: 49 of 58 total identified gaps implemented. 3 deferred (BIM/CAD plugin, live pricing, digital twin). 6 open (Gaps #48–#50, #52, #55, #57).**
+**Current status: 50 of 58 total identified gaps implemented. 3 deferred (BIM/CAD plugin, live pricing, digital twin). 5 open (Gaps #48, #50, #52, #55, #57).**
 
 ---
 
@@ -136,11 +136,17 @@ Benchmarked against: **ETAP 2024/2025** (composite networks, protection zone ove
 
 ### Gap #49 – Arc Flash Warning Label Generation on One-Line
 
-| Missing Feature | Competitor(s) | Description |
+| Implemented Feature | Competitor(s) | Description |
 |---|---|---|
 | **NFPA 70E–compliant arc flash label overlay on diagram** | ETAP 2024/2025 (arc flash label printing from one-line), EasyPower 2025 (arc flash annotation blocks) | After running the arc flash study, ETAP and EasyPower generate NFPA 70E–compliant warning label text blocks directly on the one-line at each analyzed bus: incident energy (cal/cm²), PPE category, arc flash boundary (mm), working distance, and glove class. These can be printed as stand-alone label sheets for field installation on switchgear. CableTrayRoute already stores arc flash results per component (`arcFlash.incidentEnergy`, `arcFlash.boundary`, `arcFlash.ppeCategory`, `arcFlash.clearingTime`) and exposes them in datablocks and the study approval panel, but has no dedicated arc flash label layout mode that formats NFPA 70E–standard warning label geometry for printing. |
 
-**Status:** New gap identified 2026-04-06. Not yet implemented.
+**Status:** ✅ **Implemented 2026-04-07.** Two complementary deliverables:
+
+1. **Print Label Sheet** — `reports/arcFlashReport.mjs` exports `buildLabelSheetHtml(results, projectName)` which generates a complete print-ready HTML document with all NFPA 70E labels arranged in a 2-column × 6 in × 4 in grid (landscape, ½ in margins). `openLabelPrintWindow(results)` opens the sheet in a new browser window with a "Print All Labels" button. The "Print Labels" button in `oneline.html` Studies panel becomes enabled after each arc flash run and calls `openLabelPrintWindow(getStudies().arcFlash)`.
+
+2. **One-Line Diagram Overlay** — `renderArcFlashLabelOverlays(svg)` in `oneline.js` renders compact signal-color SVG badge overlays above each analyzed bus component: colored banner (orange WARNING / red DANGER per ANSI Z535), PPE category, and incident energy. Controlled by the "Show Label Overlays" checkbox in the Studies panel (`#toggle-arcflash-label-mode`); state held in `arcFlashLabelMode` flag, re-rendered on each `render()` call when active.
+
+Signal word thresholds per ANSI Z535: **DANGER** (≥ 40 cal/cm², `#d32f2f`) / **WARNING** (< 40 cal/cm², `#f57c00`). Label template at `reports/labels.mjs` (`generateArcFlashLabel()`); customisable via `reports/templates/arcflashLabel.svg`. Tests: `tests/arcFlashLabels.test.mjs` (17 assertions covering signal word selection, color mapping, voltage formatting, HTML structure, template token substitution). Docs: `docs/arc-flash-labels.md`.
 
 ---
 
@@ -897,7 +903,7 @@ All originally high- and medium-priority feasible items have been implemented:
 
 **Medium Priority — One-Line Diagram:**
 
-7. **Arc Flash Warning Label Generation** (Gap #49) — Directly supports NFPA 70E field labeling compliance. Recommended: add a "Generate Arc Flash Labels" action to `oneline.html` that renders NFPA 70E–format label blocks from `arcFlash.*` study result fields on each analyzed bus component.
+7. ~~**Arc Flash Warning Label Generation** (Gap #49)~~ — ✅ **Implemented 2026-04-07.** `reports/arcFlashReport.mjs` `buildLabelSheetHtml()` / `openLabelPrintWindow()` + "Print Labels" button in `oneline.html` Studies panel + `renderArcFlashLabelOverlays()` overlay badges in `oneline.js`. Tests: `tests/arcFlashLabels.test.mjs`. Docs: `docs/arc-flash-labels.md`.
 
 8. **Named Layer Management** (Gap #51) — ✅ Implemented 2026-04-06. See `docs/layer-management.md`.
 

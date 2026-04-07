@@ -1,6 +1,22 @@
 import { downloadCSV, downloadPDF } from './reporting.mjs';
 import { generateArcFlashLabel } from './labels.mjs';
 
+const LABEL_SHEET_STYLE = `
+  body { margin: 0; padding: 16px; font-family: Helvetica, Arial, sans-serif; background: #f5f5f5; }
+  h1 { font-size: 18px; margin: 0 0 4px; }
+  .meta { font-size: 13px; color: #555; margin: 0 0 12px; }
+  .no-print { display: inline-block; margin-bottom: 16px; padding: 8px 20px; font-size: 14px; background: #1565c0; color: #fff; border: none; border-radius: 4px; cursor: pointer; }
+  .label-grid { display: grid; grid-template-columns: repeat(2, 6in); gap: 0.25in; }
+  .label-cell { break-inside: avoid; background: #fff; }
+  .label-cell svg { display: block; width: 6in; height: 4in; }
+  @media print {
+    body { background: #fff; padding: 0; }
+    h1, .meta, .no-print { display: none; }
+    .label-grid { grid-template-columns: repeat(2, 6in); gap: 0; }
+    @page { margin: 0.5in; size: landscape; }
+  }
+`;
+
 const MM_PER_INCH = 25.4;
 
 function round(value, decimals = 0) {
@@ -114,6 +130,58 @@ export function buildArcFlashLabelData(id, info = {}) {
     ppeCategory: formatPpeCategory(info.ppeCategory),
     workingDistance: workingDistanceVerbose
   };
+}
+
+/**
+ * Build a print-ready HTML document containing all NFPA 70E arc flash labels
+ * arranged in a 2-column grid suitable for printing on label stock (6"×4" per label).
+ * @param {Object<string, object>} results - Arc flash results keyed by component ID
+ * @param {string} [projectName] - Optional project name shown in the page heading
+ * @returns {string} Full HTML document string
+ */
+export function buildLabelSheetHtml(results = {}, projectName = '') {
+  const entries = safeEntries(results);
+  const date = new Date().toISOString().split('T')[0];
+  const heading = projectName ? `Arc Flash Warning Labels — ${projectName}` : 'Arc Flash Warning Labels';
+
+  const labelCells = entries.map(([id, info]) => {
+    const data = buildArcFlashLabelData(id, info);
+    const svg = generateArcFlashLabel(data);
+    return `<div class="label-cell">${svg}</div>`;
+  }).join('\n');
+
+  return `<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Arc Flash Labels</title>
+<style>${LABEL_SHEET_STYLE}</style>
+</head>
+<body>
+<h1>${heading}</h1>
+<p class="meta">Generated: ${date} &nbsp;|&nbsp; ${entries.length} label(s)</p>
+<button class="no-print" onclick="window.print()">Print All Labels</button>
+<div class="label-grid">
+${labelCells}
+</div>
+</body>
+</html>`;
+}
+
+/**
+ * Open a new browser window containing a print-ready NFPA 70E label sheet.
+ * @param {Object<string, object>} results - Arc flash results keyed by component ID
+ * @param {string} [projectName] - Optional project name for the page heading
+ * @returns {Window|null} The opened window, or null if blocked
+ */
+export function openLabelPrintWindow(results = {}, projectName = '') {
+  const html = buildLabelSheetHtml(results, projectName);
+  const win = window.open('', '_blank');
+  if (!win) return null;
+  win.document.open();
+  win.document.write(html);
+  win.document.close();
+  return win;
 }
 
 /**
