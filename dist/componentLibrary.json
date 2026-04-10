@@ -1657,7 +1657,7 @@
       ],
       "props": {
         "link_id": "",
-        "target_sheet": "",
+        "linked_sheet": "",
         "notes": ""
       }
     },
@@ -1674,7 +1674,7 @@
       ],
       "props": {
         "link_id": "",
-        "from_sheet": "",
+        "linked_sheet": "",
         "notes": ""
       }
     },

@@ -57,6 +57,18 @@ the recommended end-to-end workflow:
 Each tool can be used independently, but the homepage lets you access the
 entire sequence from one place.
 
+## New Feature: Cross-Sheet Off-Page Connectors
+
+The one-line diagram editor now supports **off-page connectors** (cross-sheet reference symbols), closing the gap with ETAP, EasyPower, and SKM PTW.
+
+- Drag **Sheet Link Out** or **Sheet Link In** from the **Links** palette category onto the canvas.
+- Set `link_id` (e.g. `FEEDER-MCC1`) to the same value on both connectors, and set `linked_sheet` on each to the partner sheet's name.
+- A blue arrow badge (`→ Sheet 2` / `← Sheet 1`) renders below each connector icon.
+- **Double-click** any connector to navigate instantly to the partner sheet; the paired connector is highlighted with an orange pulse for 3 seconds.
+- The **Validate** button reports connectors with missing `link_id`, missing `linked_sheet`, or no matching partner on any sheet.
+
+See [`docs/off-page-connectors.md`](docs/off-page-connectors.md) for full details.
+
 ## New Feature: Cloud-Synchronized Component Library
 
 The **Library Manager** (`library.html`) now persists your one-line diagram component library to the server, keeping it synchronized across all your devices and sessions — closing the gap with Bentley Raceway's Components Center.
