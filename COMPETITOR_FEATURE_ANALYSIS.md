@@ -20,7 +20,7 @@ A **2026-04-05 pass** focused specifically on the **one-line diagram editor UI**
 
 A **2026-04-06 pass** performed a focused deep dive on **one-line diagram connectivity features** and the **TCC (Time-Current Curve) engine**, benchmarked against ETAP 2024/2025, EasyPower 2025, SKM PTW 9, PowerWorld Simulator 23, and DIgSILENT PowerFactory 2024. This revealed **10 new gaps** (Gaps #48–#57) across two areas: (1) multi-sheet diagramming and diagram annotation capabilities missing from the one-line editor and (2) advanced TCC curve types, arc flash integration, ground fault protection, and reporting absent from the coordination study tool. See "One-Line Diagram & TCC Deep Dive (2026-04-06)" below.
 
-**Current status: 50 of 58 total identified gaps implemented. 3 deferred (BIM/CAD plugin, live pricing, digital twin). 5 open (Gaps #48, #50, #52, #55, #57).**
+**Current status: 51 of 58 total identified gaps implemented. 3 deferred (BIM/CAD plugin, live pricing, digital twin). 4 open (Gaps #50, #52, #55, #57).**
 
 ---
 
@@ -130,7 +130,7 @@ Benchmarked against: **ETAP 2024/2025** (composite networks, protection zone ove
 |---|---|---|
 | **Off-page / cross-sheet reference connector symbols** | ETAP, EasyPower, SKM PTW, DIgSILENT PowerFactory | All professional SLD tools support "off-page connector" or "inter-sheet link" symbols: a flag-shaped terminal that marks where a bus or feeder continues on another sheet, displaying the target sheet number and bus name. When clicked, the diagram navigates to the matching connector on the referenced sheet. Without this, any diagram requiring more than one sheet must represent complete isolated subsystems — cross-area feeders, transformer secondaries feeding loads on a different sheet, or utility tie connections cannot be cleanly represented across sheets. CableTrayRoute already has multi-sheet support (`sheets[]`, sheet tabs, `addSheet()`) but has no cross-sheet connector symbol type in `componentLibrary.json`. |
 
-**Status:** New gap identified 2026-04-06. Not yet implemented.
+**Status:** ✅ **Implemented 2026-04-10.** The pre-existing `link_source` (Sheet Link Out) and `link_target` (Sheet Link In) stubs in `componentLibrary.json` are now fully functional. Both props were normalized to a single `linked_sheet` key (replacing the asymmetric `target_sheet`/`from_sheet`). `oneline.js` gains four pure helper functions — `resolveLinkedSheetIndex()`, `findPairedConnector()`, `validateSheetLinks()`, `getSheetLinkBadgeText()` — and a `navigateToLinkedSheet()` action function. Double-clicking any sheet link connector calls `loadSheet()` to switch sheets and then selects and pulse-highlights the paired connector via the `findHighlightId` mechanism for 3 seconds. A blue arrow badge (`→ Sheet 2` / `← Sheet 1`) renders below the connector icon via the `sheet-link-badge` SVG text element. Both `dblclick` listeners in `render()` (on the `<g>` and the inner `<image>`) dispatch to navigation for sheet_link types. `validateDiagram()` checks `link_id` presence, `linked_sheet` presence, and cross-sheet pairing; sheet links are excluded from the "Unconnected component" warning. `DIAGRAM_VERSION` bumped from `3` to `4`; the `migrateDiagram()` v4 block renames legacy `target_sheet`/`from_sheet` props. Tests: `tests/onelineOffPageConnectors.test.mjs` (17 assertions). Docs: `docs/off-page-connectors.md`.
 
 ---
 
@@ -899,7 +899,7 @@ All originally high- and medium-priority feasible items have been implemented:
 
 **High Priority — One-Line Diagram:**
 
-6. **Cross-Sheet Off-Page Connectors** (Gap #48) — Foundational for representing real plant electrical systems that span multiple drawing sheets. Recommended: add `offPageConnector` component subtype to `componentLibrary.json`; store a `targetSheet` and `targetBusId` property; render as a flag symbol; clicking navigates to the referenced sheet and highlights the paired connector.
+6. ~~**Cross-Sheet Off-Page Connectors** (Gap #48)~~ — ✅ **Implemented 2026-04-10.** `link_source`/`link_target` stubs activated with `linked_sheet` prop, badge rendering, double-click navigation, and cross-sheet validation. See `docs/off-page-connectors.md`.
 
 **Medium Priority — One-Line Diagram:**
 

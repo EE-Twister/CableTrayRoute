@@ -1834,7 +1834,7 @@ const MAX_HISTORY_EVENTS = 200;
 let validationIssues = [];
 const marqueeThreshold = 4;
 let templates = [];
-const DIAGRAM_VERSION = 3; // bumped for Gap #51 layers field
+const DIAGRAM_VERSION = 4; // bumped for Gap #48 sheet link prop normalization (linked_sheet)
 let cursorPos = { x: 20, y: 20 };
 let cursorPosValid = false;
 let needsInitialViewportCenter = true;
@@ -6286,12 +6286,21 @@ function render() {
     g.addEventListener('dblclick', e => {
       e.stopPropagation();
       cancelPendingClickSelection();
+      // Gap #48 – Off-page connector: navigate on double-click
+      if (c.type === 'sheet_link') { navigateToLinkedSheet(c); return; }
       selectComponent(c);
     });
     const tooltipParts = [];
     if (c.label) tooltipParts.push(`Label: ${c.label}`);
     if (c.voltage) tooltipParts.push(`Voltage: ${c.voltage}`);
     if (c.rating) tooltipParts.push(`Rating: ${c.rating}`);
+    // Gap #48 – Off-page connector tooltip
+    if (c.type === 'sheet_link') {
+      const badge = getSheetLinkBadgeText(c, sheets);
+      if (badge) tooltipParts.push(`Navigate: ${badge} (double-click)`);
+      const lid = (c.props?.link_id ?? '').trim();
+      if (lid) tooltipParts.push(`Link ID: ${lid}`);
+    }
     if (tooltipParts.length) g.setAttribute('data-tooltip', tooltipParts.join('\n'));
     g.addEventListener('mouseenter', showTooltip);
     g.addEventListener('mousemove', moveTooltip);
@@ -6484,6 +6493,8 @@ function render() {
       img.addEventListener('dblclick', e => {
         e.stopPropagation();
         cancelPendingClickSelection();
+        // Gap #48 – Off-page connector: navigate on double-click
+        if (c.type === 'sheet_link') { navigateToLinkedSheet(c); return; }
         selectComponent(c);
       });
       g.appendChild(img);
@@ -6498,6 +6509,24 @@ function render() {
           letter.setAttribute('transform', `rotate(${-c.rotation}, ${cx}, ${cy})`);
         }
         g.appendChild(letter);
+      }
+      // Gap #48 – Off-page connector sheet badge
+      if (c.type === 'sheet_link') {
+        const badgeText = getSheetLinkBadgeText(c, sheets);
+        if (badgeText) {
+          const badge = document.createElementNS(svgNS, 'text');
+          badge.setAttribute('x', cx);
+          badge.setAttribute('y', c.y + h + 12);
+          badge.setAttribute('text-anchor', 'middle');
+          badge.setAttribute('font-size', '9');
+          badge.setAttribute('font-family', 'Helvetica, Arial, sans-serif');
+          badge.setAttribute('fill', '#0055aa');
+          badge.setAttribute('class', 'sheet-link-badge');
+          badge.style.pointerEvents = 'none';
+          badge.textContent = badgeText;
+          g.appendChild(badge);
+        }
+        g.style.cursor = 'pointer';
       }
     }
     if (selection.includes(c)) {
@@ -7092,6 +7121,117 @@ function addSheet(name) {
   sheets.push({ name: sheetName, components: [], connections: [], layers: [] });
   loadSheet(sheets.length - 1);
   save();
+}
+
+// ============================================================
+// Gap #48 – Cross-Sheet Off-Page Connector helpers (pure, testable)
+// ============================================================
+
+/**
+ * Resolve the sheet index for a sheet_link component from its linked_sheet prop.
+ * Returns -1 if the name is blank or no sheet with that name exists.
+ */
+function resolveLinkedSheetIndex(comp, sheetsArr) {
+  const name = (comp.props?.linked_sheet ?? comp.linked_sheet ?? '').trim();
+  if (!name) return -1;
+  return sheetsArr.findIndex(s => s.name === name);
+}
+
+/**
+ * Search all sheets for the partner sheet_link component (opposite subtype,
+ * same link_id). Returns { sheetIndex, component } or null.
+ */
+function findPairedConnector(linkId, subtype, sheetsArr) {
+  if (!linkId) return null;
+  const partnerSubtype = subtype === 'link_source' ? 'link_target' : 'link_source';
+  for (let i = 0; i < sheetsArr.length; i++) {
+    const found = (sheetsArr[i].components || []).find(
+      c => c.type === 'sheet_link' &&
+           c.subtype === partnerSubtype &&
+           (c.props?.link_id ?? c.link_id ?? '') === linkId
+    );
+    if (found) return { sheetIndex: i, component: found };
+  }
+  return null;
+}
+
+/**
+ * Validate all sheet_link components across all sheets.
+ * Returns an array of { component: id, sheetIndex, message } objects.
+ */
+function validateSheetLinks(sheetsArr) {
+  const issues = [];
+  sheetsArr.forEach((sheet, idx) => {
+    (sheet.components || []).forEach(c => {
+      if (c.type !== 'sheet_link') return;
+      const linkId = (c.props?.link_id ?? c.link_id ?? '').trim();
+      const linkedSheet = (c.props?.linked_sheet ?? c.linked_sheet ?? '').trim();
+      if (!linkId) {
+        issues.push({ component: c.id, sheetIndex: idx, message: 'Sheet link has no link_id' });
+      }
+      if (!linkedSheet) {
+        issues.push({ component: c.id, sheetIndex: idx, message: 'Sheet link has no target sheet set' });
+      }
+      if (linkId) {
+        const partner = findPairedConnector(linkId, c.subtype, sheetsArr);
+        if (!partner) {
+          issues.push({ component: c.id, sheetIndex: idx, message: `No matching paired connector for link_id "${linkId}"` });
+        }
+      }
+    });
+  });
+  return issues;
+}
+
+/**
+ * Returns the directional badge string for a sheet_link component,
+ * e.g. '→ Sheet 2' (source) or '← Sheet 1' (target). Empty string if unconfigured.
+ */
+function getSheetLinkBadgeText(comp, sheetsArr) {
+  const name = (comp.props?.linked_sheet ?? comp.linked_sheet ?? '').trim();
+  if (!name) return '';
+  const arrow = comp.subtype === 'link_source' ? '→' : '←';
+  return `${arrow} ${name}`;
+}
+
+/**
+ * Navigate to the sheet paired with a sheet_link component and highlight the
+ * partner connector. Called on double-click of any sheet_link component.
+ */
+function navigateToLinkedSheet(comp) {
+  const linkId = (comp.props?.link_id ?? comp.link_id ?? '').trim();
+  let targetIdx = resolveLinkedSheetIndex(comp, sheets);
+  let pairedComp = null;
+  if (linkId) {
+    const result = findPairedConnector(linkId, comp.subtype, sheets);
+    if (result) {
+      if (targetIdx === -1) targetIdx = result.sheetIndex;
+      pairedComp = result.component;
+    }
+  }
+  if (targetIdx === -1) {
+    const name = (comp.props?.linked_sheet ?? comp.linked_sheet ?? '').trim();
+    showToast(`Sheet link target "${name || '(unset)'}" not found`);
+    return;
+  }
+  if (targetIdx === activeSheet) {
+    showToast('Sheet link points to current sheet');
+    return;
+  }
+  loadSheet(targetIdx);
+  if (pairedComp) {
+    selection = [pairedComp];
+    selected = pairedComp;
+    selectedConnection = null;
+    findHighlightId = pairedComp.id;
+    if (findHighlightTimer) clearTimeout(findHighlightTimer);
+    findHighlightTimer = window.setTimeout(() => {
+      findHighlightId = null;
+      findHighlightTimer = null;
+      render();
+    }, 3000);
+    render();
+  }
 }
 
 function renameSheet(id, newName) {
@@ -12242,7 +12382,8 @@ function validateDiagram() {
   });
 
   components.forEach(c => {
-    if (c.type === 'dimension' || c.type === 'annotation') return;
+    // Gap #48: sheet_link components are intentional terminators; exclude from unconnected check
+    if (c.type === 'dimension' || c.type === 'annotation' || c.type === 'sheet_link') return;
     if ((c.connections || []).length + (inbound.get(c.id) || 0) === 0) {
       validationIssues.push({ component: c.id, message: 'Unconnected component' });
     }
@@ -12264,6 +12405,13 @@ function validateDiagram() {
       components.filter(c => c.id === id).forEach(c => {
         validationIssues.push({ component: c.id, message: `Duplicate ID "${id}"` });
       });
+    }
+  });
+
+  // Gap #48 – Cross-sheet connector pairing validation (active sheet only)
+  validateSheetLinks(sheets).forEach(issue => {
+    if (issue.sheetIndex === activeSheet) {
+      validationIssues.push({ component: issue.component, message: issue.message });
     }
   });
 
@@ -12743,6 +12891,25 @@ function migrateDiagram(data) {
     migrated.sheets = (migrated.sheets || []).map(s => ({
       ...s,
       layers: Array.isArray(s.layers) ? s.layers : []
+    }));
+  }
+  if (version < 4) {
+    // Gap #48: normalize target_sheet/from_sheet → linked_sheet on sheet_link components
+    migrated.sheets = (migrated.sheets || []).map(s => ({
+      ...s,
+      components: (s.components || []).map(c => {
+        if (c.type !== 'sheet_link') return c;
+        const nc = { ...c, props: { ...(c.props || {}) } };
+        if ('target_sheet' in nc.props && !('linked_sheet' in nc.props)) {
+          nc.props.linked_sheet = nc.props.target_sheet;
+          delete nc.props.target_sheet;
+        }
+        if ('from_sheet' in nc.props && !('linked_sheet' in nc.props)) {
+          nc.props.linked_sheet = nc.props.from_sheet;
+          delete nc.props.from_sheet;
+        }
+        return nc;
+      })
     }));
   }
   migrated.version = DIAGRAM_VERSION;

@@ -1778,6 +1778,14 @@ g.component.scenario-diff > * {
 }
 
 /* ============================================================
+   Gap #48 – Off-page connector (sheet link) badge
+   ============================================================ */
+.sheet-link-badge {
+  pointer-events: none;
+  user-select: none;
+}
+
+/* ============================================================
    Gap #34 – Rubber-band / marquee selection (already existing,
    colours retained for reference)
    ============================================================ */
