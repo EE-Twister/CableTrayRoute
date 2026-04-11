@@ -20,7 +20,7 @@ A **2026-04-05 pass** focused specifically on the **one-line diagram editor UI**
 
 A **2026-04-06 pass** performed a focused deep dive on **one-line diagram connectivity features** and the **TCC (Time-Current Curve) engine**, benchmarked against ETAP 2024/2025, EasyPower 2025, SKM PTW 9, PowerWorld Simulator 23, and DIgSILENT PowerFactory 2024. This revealed **10 new gaps** (Gaps #48–#57) across two areas: (1) multi-sheet diagramming and diagram annotation capabilities missing from the one-line editor and (2) advanced TCC curve types, arc flash integration, ground fault protection, and reporting absent from the coordination study tool. See "One-Line Diagram & TCC Deep Dive (2026-04-06)" below.
 
-**Current status: 52 of 58 total identified gaps implemented. 3 deferred (BIM/CAD plugin, live pricing, digital twin). 3 open (Gaps #50, #52, #57).**
+**Current status: 53 of 58 total identified gaps implemented. 3 deferred (BIM/CAD plugin, live pricing, digital twin). 2 open (Gaps #50, #57).**
 
 ---
 
@@ -177,7 +177,7 @@ Signal word thresholds per ANSI Z535: **DANGER** (≥ 40 cal/cm², `#d32f2f`) / 
 |---|---|---|
 | **Raster image import as diagram background** | PowerWorld Simulator 23 (GIS geographic background), ETAP (site plan underlay for plant one-lines), EasyPower (background image import) | Importing a JPEG/PNG floor plan, site map, or geographic raster image as a diagram background layer lets engineers verify that the electrical diagram's equipment positions correspond to physical locations. This is common in industrial plant diagrams (overlay on building floor plan) and utility distribution planning (overlay on aerial map). CableTrayRoute's canvas is a plain SVG with no background import capability. |
 
-**Status:** New gap identified 2026-04-06. Not yet implemented.
+**Status:** ✅ Implemented 2026-04-11. `oneline.js` gains `uploadBackground(file)`, `clearBackground()`, and `renderBgPanel()` functions. A hidden `<input type="file">` is triggered by the **Background** toolbar button (View group). The selected image is read as a base64 data URI via `FileReader` and stored in `sheets[activeSheet].backgroundImage = { url, opacity: 0.4, visible: true }`. `render()` creates an `<image id="bg-underlay">` element inserted after `<rect id="grid-bg">` so it renders above the grid but below all components. `applyDiagramZoom()` sizes the underlay to the full viewport (`x/y/width/height` matching the grid background). A sidebar panel (`#bg-image-panel`) provides an opacity slider (0–100), Hide/Show toggle, and Remove Image button. Each diagram sheet stores its own independent `backgroundImage`. The field round-trips through `save()`, `getOneLine()` (dataStore.mjs), and `importDiagram()` automatically. JPEG, PNG, GIF, and SVG files are supported. Tests: `tests/onelineBackgroundImage.test.mjs` (20 tests). Docs: `docs/background-image-underlay.md`.
 
 ---
 
