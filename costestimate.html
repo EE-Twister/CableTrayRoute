@@ -115,6 +115,13 @@
                  aria-describedby="contingency-hint">
           <p id="contingency-hint" class="field-hint">Added to the grand total as a percentage allowance.</p>
         </div>
+        <div class="form-row" style="margin-top:1rem; gap:0.5rem; flex-wrap:wrap;">
+          <button type="button" id="import-pricing-btn">Import Pricing CSV</button>
+          <input type="file" id="pricing-csv-input" accept=".csv" class="hidden" title="Select a pricing CSV file">
+          <button type="button" id="export-pricing-btn">Export Current Pricing</button>
+          <button type="button" id="reset-pricing-btn">Reset to Default (RS Means)</button>
+        </div>
+        <div id="pricing-basis" class="field-hint" aria-live="polite" style="margin-top:0.25rem"></div>
       </details>
 
       <!-- Actions -->

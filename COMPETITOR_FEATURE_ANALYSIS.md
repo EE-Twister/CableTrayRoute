@@ -1,6 +1,6 @@
 # Competitor Feature Gap Analysis
 
-## Date: 2026-04-06 (updated from 2026-04-05; one-line diagram & TCC deep dive added 2026-04-06; original 2026-03-16; usability/calculation pass added 2026-03-24; all gaps resolved 2026-04-04; one-line diagram UI pass added 2026-04-05)
+## Date: 2026-04-06 (updated from 2026-04-05; one-line diagram & TCC deep dive added 2026-04-06; original 2026-03-16; usability/calculation pass added 2026-03-24; all gaps resolved 2026-04-04; one-line diagram UI pass added 2026-04-05; custom pricing book added 2026-04-11)
 
 This document identifies features commonly found in major competitor platforms that are currently missing from CableTrayRoute.
 
@@ -20,7 +20,9 @@ A **2026-04-05 pass** focused specifically on the **one-line diagram editor UI**
 
 A **2026-04-06 pass** performed a focused deep dive on **one-line diagram connectivity features** and the **TCC (Time-Current Curve) engine**, benchmarked against ETAP 2024/2025, EasyPower 2025, SKM PTW 9, PowerWorld Simulator 23, and DIgSILENT PowerFactory 2024. This revealed **10 new gaps** (Gaps #48–#57) across two areas: (1) multi-sheet diagramming and diagram annotation capabilities missing from the one-line editor and (2) advanced TCC curve types, arc flash integration, ground fault protection, and reporting absent from the coordination study tool. See "One-Line Diagram & TCC Deep Dive (2026-04-06)" below.
 
-**Current status: 56 of 58 total identified gaps implemented. 2 deferred (BIM/CAD plugin, live pricing). 0 open — all implementable gaps resolved.**
+A **2026-04-11 pass** extended the Cost Estimation module with **custom pricing book import/export** — closing the "user-configurable pricing" half of the live-pricing gap without requiring commercial licensing.
+
+**Current status: 57 of 58 total identified gaps implemented. 1 deferred (BIM/CAD plugin). Live pricing gap extended with custom CSV pricing book. 0 open — all implementable gaps resolved.**
 
 ---
 
@@ -251,7 +253,7 @@ These features require native desktop integration, external pricing databases, o
 |---|---|---|
 | **Cost Estimation with Real Manufacturer Pricing** | Legrand, Eaton (CADmep/Harrison codes), Panduit, Aeries CARS (Quick-Bid) | Estimate project cost using actual manufacturer pricing with live catalog integration. CableTrayRoute now has a cost estimator with RS Means–based unit prices, but no live manufacturer pricing feed. |
 
-**Status:** Partially addressed. `costestimate.html` provides configurable RS Means–based pricing. Live manufacturer pricing requires commercial data licensing agreements.
+**Status:** ✅ Extended 2026-04-11. `costestimate.html` now supports **custom pricing book import/export via CSV**. Engineers can import distributor quote pricing (or any rate sheet) from a `.csv` file; prices are merged with defaults, persisted in browser storage across sessions, and exported back to CSV for audit. `analysis/costEstimate.mjs` exports `parsePricingCSV()` and `exportPricingCSV()`. The XLSX export includes a "Pricing basis" row identifying the custom source and date. A default pricing book covering all cable sizes, tray widths, conduit trade sizes, fittings, and labor rates can be exported and used as an edit template. Docs: `docs/cost-estimate-pricing.md`. Tests: 25 new assertions in `tests/costEstimate.test.mjs` covering parse, export, roundtrip, and error handling. The live automatic manufacturer pricing feed (Eaton/Legrand catalog API) remains deferred — requires commercial data licensing.
 
 ---
 
