@@ -418,7 +418,9 @@ export const getOneLine = (scenario = getCurrentScenarioNameState()) => {
         connections: Array.isArray(s.connections) ? s.connections : [],
         layers: Array.isArray(s.layers) ? s.layers : [],
         // Gap #52: preserve background image underlay per sheet
-        ...(s.backgroundImage ? { backgroundImage: s.backgroundImage } : {})
+        ...(s.backgroundImage ? { backgroundImage: s.backgroundImage } : {}),
+        // Gap #50: preserve protection zone definitions per sheet
+        ...(Array.isArray(s.protectionZones) ? { protectionZones: s.protectionZones } : {})
       }))
     };
   }

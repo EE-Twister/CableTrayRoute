@@ -1841,6 +1841,8 @@ let needsInitialViewportCenter = true;
 let pendingInitialCenter = null;
 let showOverlays = true;
 let showEnergizedState = false;    // Gap #36
+let showProtectionZones = false;   // Gap #50
+let activeZoneId = null;           // Gap #50 – zone currently in component-assignment mode
 let orthogonalRouting = false;     // Gap #47
 let symbolStandard = 'ANSI';       // Gap #37 – 'ANSI' or 'IEC'
 let showTitleBlock = false;        // Gap #38
@@ -6783,6 +6785,9 @@ function render() {
   updateLegend(usedVoltageRanges);
   updateStatusBar();
 
+  // Gap #50 – Protection zone overlay (rendered first, beneath all other overlays)
+  if (showProtectionZones) renderProtectionZones(svg);
+
   // Gap #36 – Energized / de-energized operating-state overlay
   renderEnergizedState(svg);
 
@@ -6836,6 +6841,273 @@ function renderEnergizedState(svg) {
     } else {
       g.classList.remove('de-energized');
     }
+  });
+}
+
+// ----------------------------------------------------------------
+// Gap #50 – Protection zone translucent region overlays
+// ----------------------------------------------------------------
+function renderProtectionZones(svg) {
+  svg.querySelectorAll('.protection-zone-overlay, .protection-zone-label').forEach(el => el.remove());
+  const zones = (sheets[activeSheet] || {}).protectionZones || [];
+  zones.forEach(zone => {
+    if (!zone.visible || !zone.componentIds?.length) return;
+    let minX = Infinity, minY = Infinity, maxX = -Infinity, maxY = -Infinity;
+    zone.componentIds.forEach(id => {
+      const comp = components.find(c => c.id === id);
+      if (!comp) return;
+      const b = componentBounds(comp);
+      minX = Math.min(minX, b.left);
+      minY = Math.min(minY, b.top);
+      maxX = Math.max(maxX, b.right);
+      maxY = Math.max(maxY, b.bottom);
+    });
+    if (!Number.isFinite(minX)) return;
+    const pad = 12;
+    const rx = minX - pad, ry = minY - pad;
+    const rw = maxX - minX + pad * 2, rh = maxY - minY + pad * 2;
+
+    // Translucent zone rectangle — inserted before first connection so it renders beneath cables
+    const rect = document.createElementNS(svgNS, 'rect');
+    rect.setAttribute('x', rx);
+    rect.setAttribute('y', ry);
+    rect.setAttribute('width', rw);
+    rect.setAttribute('height', rh);
+    rect.setAttribute('fill', zone.color);
+    rect.setAttribute('stroke', zone.color);
+    rect.setAttribute('stroke-width', '1.5');
+    rect.classList.add('protection-zone-overlay');
+    const firstConn = svg.querySelector('polyline');
+    if (firstConn) svg.insertBefore(rect, firstConn);
+    else svg.appendChild(rect);
+
+    // Zone name label above the rectangle
+    const label = document.createElementNS(svgNS, 'text');
+    label.setAttribute('x', rx + rw / 2);
+    label.setAttribute('y', ry - 4);
+    label.setAttribute('fill', zone.color);
+    label.classList.add('protection-zone-label');
+    label.textContent = zone.name;
+    svg.appendChild(label);
+
+    // In assignment mode: draw a small colored dot badge on each assigned component
+    if (activeZoneId === zone.id) {
+      zone.componentIds.forEach(id => {
+        const comp = components.find(c => c.id === id);
+        if (!comp) return;
+        const b = componentBounds(comp);
+        const dot = document.createElementNS(svgNS, 'circle');
+        dot.setAttribute('cx', b.right - 4);
+        dot.setAttribute('cy', b.top + 4);
+        dot.setAttribute('r', '5');
+        dot.setAttribute('fill', zone.color);
+        dot.setAttribute('stroke', '#fff');
+        dot.setAttribute('stroke-width', '1');
+        dot.classList.add('protection-zone-overlay', 'zone-assign-dot');
+        svg.appendChild(dot);
+      });
+    }
+  });
+}
+
+/**
+ * Return the protectionZones array for the active sheet, initialising it if absent.
+ */
+function getProtectionZones() {
+  if (!sheets[activeSheet].protectionZones) sheets[activeSheet].protectionZones = [];
+  return sheets[activeSheet].protectionZones;
+}
+
+function createProtectionZone(name) {
+  const COLORS = ['#e74c3c', '#1abc9c', '#3498db', '#2ecc71', '#f39c12', '#9b59b6', '#16a085', '#e67e22'];
+  const zones = getProtectionZones();
+  const color = COLORS[zones.length % COLORS.length];
+  const zone = {
+    id: 'zone_' + Date.now(),
+    name: name || `Zone ${zones.length + 1}`,
+    color,
+    componentIds: [],
+    visible: true
+  };
+  zones.push(zone);
+  markDirty();
+  renderProtectionZonesPanel();
+  render();
+  return zone;
+}
+
+function deleteProtectionZone(zoneId) {
+  const zones = getProtectionZones();
+  const idx = zones.findIndex(z => z.id === zoneId);
+  if (idx === -1) return;
+  zones.splice(idx, 1);
+  if (activeZoneId === zoneId) activeZoneId = null;
+  markDirty();
+  renderProtectionZonesPanel();
+  render();
+}
+
+function renameProtectionZone(zoneId, newName) {
+  const zone = getProtectionZones().find(z => z.id === zoneId);
+  if (!zone || !newName.trim()) return;
+  zone.name = newName.trim();
+  markDirty();
+  render();
+}
+
+function setZoneVisibility(zoneId, visible) {
+  const zone = getProtectionZones().find(z => z.id === zoneId);
+  if (!zone) return;
+  zone.visible = visible;
+  markDirty();
+  render();
+}
+
+function setZoneColor(zoneId, color) {
+  const zone = getProtectionZones().find(z => z.id === zoneId);
+  if (!zone) return;
+  zone.color = color;
+  markDirty();
+  renderProtectionZonesPanel();
+  render();
+}
+
+function toggleComponentInZone(zoneId, compId) {
+  const zone = getProtectionZones().find(z => z.id === zoneId);
+  if (!zone) return;
+  const idx = zone.componentIds.indexOf(compId);
+  if (idx === -1) zone.componentIds.push(compId);
+  else zone.componentIds.splice(idx, 1);
+  markDirty();
+  renderProtectionZonesPanel();
+  render();
+}
+
+function enterZoneAssignMode(zoneId) {
+  activeZoneId = zoneId;
+  const banner = document.getElementById('zone-assign-mode-banner');
+  if (banner) banner.classList.remove('hidden');
+  renderProtectionZonesPanel();
+  render();
+}
+
+function exitZoneAssignMode() {
+  activeZoneId = null;
+  const banner = document.getElementById('zone-assign-mode-banner');
+  if (banner) banner.classList.add('hidden');
+  renderProtectionZonesPanel();
+  render();
+}
+
+/**
+ * Build the protection zones panel list.
+ */
+function renderProtectionZonesPanel() {
+  const list = document.getElementById('protection-zone-list');
+  if (!list) return;
+  list.innerHTML = '';
+  const zones = getProtectionZones();
+
+  if (zones.length === 0) {
+    const empty = document.createElement('li');
+    empty.className = 'layer-row';
+    empty.style.color = 'var(--color-muted, #888)';
+    empty.style.fontStyle = 'italic';
+    empty.textContent = 'No zones — click + Add Zone';
+    list.appendChild(empty);
+    return;
+  }
+
+  zones.forEach(zone => {
+    const count = zone.componentIds.length;
+    const li = document.createElement('li');
+    li.className = 'layer-row' + (activeZoneId === zone.id ? ' active-layer' : '');
+    li.dataset.zoneId = zone.id;
+
+    // Color swatch / picker
+    const colorInput = document.createElement('input');
+    colorInput.type = 'color';
+    colorInput.value = zone.color;
+    colorInput.className = 'zone-color-swatch';
+    colorInput.title = 'Change zone color';
+    colorInput.setAttribute('aria-label', 'Zone color');
+    colorInput.addEventListener('input', e => {
+      e.stopPropagation();
+      setZoneColor(zone.id, e.target.value);
+    });
+
+    // Visibility toggle
+    const visBtn = document.createElement('button');
+    visBtn.className = 'layer-vis-btn';
+    visBtn.title = zone.visible ? 'Hide zone' : 'Show zone';
+    visBtn.setAttribute('aria-label', zone.visible ? 'Hide zone' : 'Show zone');
+    visBtn.textContent = zone.visible ? '👁' : '🚫';
+    visBtn.addEventListener('click', e => {
+      e.stopPropagation();
+      setZoneVisibility(zone.id, !zone.visible);
+    });
+
+    // Zone name (double-click to rename)
+    const nameSpan = document.createElement('span');
+    nameSpan.className = 'layer-row-name';
+    nameSpan.textContent = zone.name;
+    nameSpan.title = 'Double-click to rename';
+    nameSpan.addEventListener('dblclick', e => {
+      e.stopPropagation();
+      const input = document.createElement('input');
+      input.type = 'text';
+      input.value = zone.name;
+      input.className = 'layer-rename-input';
+      nameSpan.replaceWith(input);
+      input.focus();
+      input.select();
+      const commit = () => {
+        const newName = input.value.trim();
+        if (newName && newName !== zone.name) renameProtectionZone(zone.id, newName);
+        else renderProtectionZonesPanel();
+      };
+      input.addEventListener('blur', commit);
+      input.addEventListener('keydown', e2 => {
+        if (e2.key === 'Enter') commit();
+        if (e2.key === 'Escape') renderProtectionZonesPanel();
+      });
+    });
+
+    // Component count badge
+    const countSpan = document.createElement('span');
+    countSpan.className = 'layer-row-count';
+    countSpan.textContent = count;
+
+    // Assign button
+    const assignBtn = document.createElement('button');
+    assignBtn.className = 'layer-vis-btn';
+    assignBtn.title = activeZoneId === zone.id ? 'Exit assignment mode' : 'Click components on canvas to assign/unassign';
+    assignBtn.setAttribute('aria-label', 'Assign components');
+    assignBtn.textContent = activeZoneId === zone.id ? '✔' : '±';
+    assignBtn.addEventListener('click', e => {
+      e.stopPropagation();
+      if (activeZoneId === zone.id) exitZoneAssignMode();
+      else enterZoneAssignMode(zone.id);
+    });
+
+    // Delete button
+    const delBtn = document.createElement('button');
+    delBtn.className = 'layer-del-btn';
+    delBtn.title = 'Delete zone';
+    delBtn.setAttribute('aria-label', 'Delete zone');
+    delBtn.textContent = '✕';
+    delBtn.addEventListener('click', e => {
+      e.stopPropagation();
+      deleteProtectionZone(zone.id);
+    });
+
+    li.appendChild(colorInput);
+    li.appendChild(visBtn);
+    li.appendChild(nameSpan);
+    li.appendChild(countSpan);
+    li.appendChild(assignBtn);
+    li.appendChild(delBtn);
+    list.appendChild(li);
   });
 }
 
@@ -7188,6 +7460,9 @@ function loadSheet(idx) {
   renderSheetTabs();
   renderLayerPanel();
   renderBgPanel();
+  // Gap #50: reset zone assignment mode and refresh panel on sheet switch
+  activeZoneId = null;
+  renderProtectionZonesPanel();
   needsInitialViewportCenter = true;
   pendingInitialCenter = null;
   render();
@@ -10754,6 +11029,43 @@ async function init() {
     });
   }
 
+  // Gap #50: wire up protection zones panel
+  const pzToggleBtn = document.getElementById('protection-zones-panel-toggle');
+  const pzPanel = document.getElementById('protection-zones-panel');
+  const pzCloseBtn = document.getElementById('protection-zones-close-btn');
+  const addZoneBtn = document.getElementById('add-protection-zone-btn');
+  const pzOverlayToggle = document.getElementById('toggle-protection-zones');
+  const pzAssignDoneBtn = document.getElementById('zone-assign-done-btn');
+
+  if (pzToggleBtn && pzPanel) {
+    pzPanel.classList.add('hidden');
+    pzToggleBtn.setAttribute('aria-expanded', 'false');
+    pzToggleBtn.addEventListener('click', () => {
+      const nowHidden = pzPanel.classList.toggle('hidden');
+      pzToggleBtn.setAttribute('aria-expanded', String(!nowHidden));
+      if (!nowHidden) renderProtectionZonesPanel();
+    });
+  }
+  if (pzCloseBtn && pzPanel) {
+    pzCloseBtn.addEventListener('click', () => {
+      pzPanel.classList.add('hidden');
+      if (pzToggleBtn) pzToggleBtn.setAttribute('aria-expanded', 'false');
+      exitZoneAssignMode();
+    });
+  }
+  if (addZoneBtn) {
+    addZoneBtn.addEventListener('click', () => createProtectionZone(''));
+  }
+  if (pzOverlayToggle) {
+    pzOverlayToggle.addEventListener('change', () => {
+      showProtectionZones = pzOverlayToggle.checked;
+      render();
+    });
+  }
+  if (pzAssignDoneBtn) {
+    pzAssignDoneBtn.addEventListener('click', () => exitZoneAssignMode());
+  }
+
   // Gap #52: wire up background image controls
   const bgImageBtn = document.getElementById('bg-image-btn');
   const bgImageInput = document.getElementById('bg-image-input');
@@ -11532,6 +11844,15 @@ async function init() {
       lastPointerUp = { id: compId, time: now };
     });
   svg.addEventListener('click', e => {
+    // Gap #50 – In zone assignment mode, clicks toggle component membership
+    if (activeZoneId) {
+      const compEl = e.target.closest('.component');
+      const compId = compEl?.dataset.id;
+      if (compId) {
+        toggleComponentInZone(activeZoneId, compId);
+        return;
+      }
+    }
     if (marqueeSelectionMade) {
       marqueeSelectionMade = false;
       pointerDownComponentId = null;
