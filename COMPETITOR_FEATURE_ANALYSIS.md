@@ -20,7 +20,7 @@ A **2026-04-05 pass** focused specifically on the **one-line diagram editor UI**
 
 A **2026-04-06 pass** performed a focused deep dive on **one-line diagram connectivity features** and the **TCC (Time-Current Curve) engine**, benchmarked against ETAP 2024/2025, EasyPower 2025, SKM PTW 9, PowerWorld Simulator 23, and DIgSILENT PowerFactory 2024. This revealed **10 new gaps** (Gaps #48–#57) across two areas: (1) multi-sheet diagramming and diagram annotation capabilities missing from the one-line editor and (2) advanced TCC curve types, arc flash integration, ground fault protection, and reporting absent from the coordination study tool. See "One-Line Diagram & TCC Deep Dive (2026-04-06)" below.
 
-**Current status: 55 of 58 total identified gaps implemented. 3 deferred (BIM/CAD plugin, live pricing, digital twin). 0 open — all implementable gaps resolved.**
+**Current status: 56 of 58 total identified gaps implemented. 2 deferred (BIM/CAD plugin, live pricing). 0 open — all implementable gaps resolved.**
 
 ---
 
@@ -308,7 +308,7 @@ The following gaps were discovered by reviewing competitor release notes and pro
 | **Electrical Digital Twin with Real-Time Simulation** | ETAP + NVIDIA Omniverse (2025) | ETAP introduced the world's first Electrical Digital Twin integrating with NVIDIA Omniverse for AI factory power simulation (Grid-to-Chip level). While CableTrayRoute has GPU-accelerated thermal analysis and 3D visualization, it has no integration with external 3D/simulation platforms (Omniverse, Navisworks, Unreal Engine) for live power–mechanical co-simulation. |
 | **Navisworks / 3D BIM Viewer Export** | MagiCAD 2026, Bentley Raceway 2024 | Both MagiCAD and Bentley Raceway export cable tray geometry and fill data to Navisworks NWC/NWD for federated 3D model reviews. CableTrayRoute's built-in 3D viewer is standalone; it cannot feed data into external BIM coordination platforms. |
 
-**Status:** Partially deferred. Full Omniverse integration is out of scope for a web app. NWC/Navisworks export and IFC-based coordination are feasible interim steps.
+**Status:** ✅ Implemented (glTF 2.0 export — 2026-04-11). `src/exporters/gltf2.mjs` `exportToGLTF2()` produces a binary `.glb` file containing solid rectangular-prism meshes for all cable tray segments and GL_LINES polylines for cable routes. Fill heat-map coloring is encoded as three PBR materials (grey/yellow/red). Per-node `extras` carry `tray_id`, `fill_pct`, `width_in`, `height_in` — accessible in Navisworks Properties panel. "Export 3D Model (.glb)" button added to the 3D view in `optimalRoute.html`. Full Omniverse / live power–mechanical co-simulation remains out of scope for a web app. Docs: `docs/gltf-export.md`. Tests: `tests/gltfExport.test.mjs`.
 
 ---
 
@@ -873,7 +873,7 @@ All originally high- and medium-priority feasible items have been implemented:
 ### New Low-Priority / Deferred (2026-03-24)
 
 9. **Cloud-Based Component Library** — Shared organization-wide product library synchronized via the existing collaboration backend. Aligns with Bentley's Components Center model.
-10. **Electrical Digital Twin / Navisworks Export** — Navisworks NWC/NWD export and external 3D platform integration. Full Omniverse integration deferred; IFC export covers most of the use case.
+10. ~~**Electrical Digital Twin / Navisworks Export**~~ — ✅ **Implemented 2026-04-11** — `src/exporters/gltf2.mjs` `exportToGLTF2()` exports cable tray solid mesh geometry and cable route polylines as a glTF 2.0 binary (`.glb`) for Navisworks / BIM 360 import. Docs: `docs/gltf-export.md`. Tests: `tests/gltfExport.test.mjs`.
 11. **Revit Plugin / BIM Sync** — Requires Revit SDK (Windows-native C#/.NET). IFC export is the recommended interim step.
 12. **AutoCAD / AVEVA Plugin** — Requires commercial CAD SDK licensing.
 13. **BIM Object Library** — Requires manufacturer data partnerships for Revit RFA / IFC families.
