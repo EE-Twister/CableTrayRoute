@@ -98,6 +98,7 @@ import './site.js';
 import { getProjectState, setProjectState } from './projectStorage.js';
 import { calculateVoltageDrop } from './src/voltageDrop.js';
 import { exportRoutesDXF } from './bimExport.mjs';
+import { exportToGLTF2 } from './src/exporters/gltf2.mjs';
 
 // Filename: app.mjs
 // (This is an improved version that adds route segment consolidation)
@@ -251,6 +252,7 @@ async function initializeApp() {
         resetViewBtn: document.getElementById('reset-view-btn'),
         viewToggleBtn: document.getElementById('view-toggle-btn'),
         exportPngBtn: document.getElementById('export-png-btn'),
+        exportGltfBtn: document.getElementById('export-gltf-btn'),
         ductbankToggle: document.getElementById('ductbank-toggle'),
         heatmapToggle: document.getElementById('heatmap-toggle'),
         updatedUtilizationContainer: document.getElementById('updated-utilization-container'),
@@ -2882,6 +2884,42 @@ const renderBatchResults = (results) => {
         }
     };
 
+    const exportGLTF = () => {
+        const trays  = (state.finalTrays.length ? state.finalTrays : state.trayData) || [];
+        const cables = (state.latestRouteData || []).map(r => ({
+            label:    r.cable,
+            cable_id: r.cable,
+            from_tag: r.from_tag  || '',
+            to_tag:   r.to_tag    || '',
+            start_x:  r.startPoint?.[0] ?? (r.route_segments?.[0]?.start?.[0] ?? 0),
+            start_y:  r.startPoint?.[1] ?? (r.route_segments?.[0]?.start?.[1] ?? 0),
+            start_z:  r.startPoint?.[2] ?? (r.route_segments?.[0]?.start?.[2] ?? 0),
+            end_x:    r.endPoint?.[0]   ?? (r.route_segments?.at(-1)?.end?.[0] ?? 0),
+            end_y:    r.endPoint?.[1]   ?? (r.route_segments?.at(-1)?.end?.[1] ?? 0),
+            end_z:    r.endPoint?.[2]   ?? (r.route_segments?.at(-1)?.end?.[2] ?? 0),
+        }));
+        if (trays.length === 0) {
+            showAlertModal('Export Error', 'No tray geometry to export. Add trays and run routing first.');
+            return;
+        }
+        const projectName = state.projectName || 'CableTrayRoute Export';
+        try {
+            const glb = exportToGLTF2({ trays, cables, projectName });
+            const blob = new Blob([glb], { type: 'model/gltf-binary' });
+            const url  = URL.createObjectURL(blob);
+            const a    = document.createElement('a');
+            a.href     = url;
+            a.download = `${projectName.replace(/[^a-z0-9_\-]/gi, '_')}.glb`;
+            document.body.appendChild(a);
+            a.click();
+            document.body.removeChild(a);
+            URL.revokeObjectURL(url);
+        } catch (err) {
+            console.error('glTF export failed', err);
+            showAlertModal('Export Error', `3D model export failed: ${err.message}`);
+        }
+    };
+
     const exportRouteXLSX = () => {
         if (!state.latestRouteData || state.latestRouteData.length === 0) {
             showAlertModal('Export Error', 'No route data to export.');
@@ -4181,6 +4219,9 @@ Plotly.newPlot(document.getElementById('plot'), data, layout, {responsive: true}
     }
     if (elements.exportPngBtn) {
         elements.exportPngBtn.addEventListener('click', exportCurrentPlotPNG);
+    }
+    if (elements.exportGltfBtn) {
+        elements.exportGltfBtn.addEventListener('click', exportGLTF);
     }
     elements.cancelRoutingBtn.addEventListener('click', cancelCurrentRouting);
     if (elements.deleteDataBtn) {
