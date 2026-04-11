@@ -12220,10 +12220,8 @@ async function init() {
   // ----------------------------------------------------------------
   // Gap #46 – Datablock config: hook into the existing Views button
   // ----------------------------------------------------------------
-  const viewMenuBtn = document.getElementById('view-menu-btn');
   if (viewMenuBtn) {
     diagramDatablockConfig = getItem('diagramDatablockConfig') || {};
-    const originalClickHandler = viewMenuBtn._clickHandler;
     viewMenuBtn.addEventListener('click', () => {
       openDatablocksModal();
     });

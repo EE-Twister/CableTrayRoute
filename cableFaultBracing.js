@@ -3,7 +3,7 @@ import {
   calcPeakFactor,
 } from './analysis/cableFaultBracing.mjs';
 import { getCables } from './dataStore.mjs';
-import cableSizes from './data/cableSizes.json' assert { type: 'json' };
+import cableSizes from './data/cableSizes.json' with { type: 'json' };
 
 document.addEventListener('DOMContentLoaded', () => {
   initSettings();
