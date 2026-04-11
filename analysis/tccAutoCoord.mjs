@@ -245,3 +245,34 @@ export function greedyCoordinate(deviceEntries, faultCurrentA, options = {}) {
 
   return { results, allCoordinated };
 }
+
+/**
+ * Ground Fault Protection coordination pass.
+ *
+ * Identical algorithm to greedyCoordinate() but validates that every entry
+ * carries a device with groundFault === true. This keeps the GFP coordination
+ * path clearly named at the call-site and independently testable.
+ *
+ * NEC 230.95 does not specify a separate CTI value for GFP; engineering
+ * practice follows the standard 0.3 s default used for phase relays.
+ *
+ * @param {Array<{id: string, device: object, overrides?: object}>} deviceEntries
+ *   Ordered downstream-first, same shape as greedyCoordinate().
+ *   All entries must have device.groundFault === true.
+ * @param {number} faultCurrentA - Maximum ground fault current [A].
+ * @param {object} [options={}] - Same options as greedyCoordinate().
+ * @returns {{ results: Array, allCoordinated: boolean, error?: string }}
+ */
+export function greedyCoordinateGFP(deviceEntries, faultCurrentA, options = {}) {
+  const nonGfp = Array.isArray(deviceEntries)
+    ? deviceEntries.filter(e => e?.device?.groundFault !== true)
+    : [true]; // treat non-array as invalid
+  if (nonGfp.length) {
+    return {
+      results: [],
+      allCoordinated: false,
+      error: 'Non-GFP device in GFP coordination chain'
+    };
+  }
+  return greedyCoordinate(deviceEntries, faultCurrentA, options);
+}
