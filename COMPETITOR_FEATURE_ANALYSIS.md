@@ -20,7 +20,7 @@ A **2026-04-05 pass** focused specifically on the **one-line diagram editor UI**
 
 A **2026-04-06 pass** performed a focused deep dive on **one-line diagram connectivity features** and the **TCC (Time-Current Curve) engine**, benchmarked against ETAP 2024/2025, EasyPower 2025, SKM PTW 9, PowerWorld Simulator 23, and DIgSILENT PowerFactory 2024. This revealed **10 new gaps** (Gaps #48–#57) across two areas: (1) multi-sheet diagramming and diagram annotation capabilities missing from the one-line editor and (2) advanced TCC curve types, arc flash integration, ground fault protection, and reporting absent from the coordination study tool. See "One-Line Diagram & TCC Deep Dive (2026-04-06)" below.
 
-**Current status: 53 of 58 total identified gaps implemented. 3 deferred (BIM/CAD plugin, live pricing, digital twin). 2 open (Gaps #50, #57).**
+**Current status: 55 of 58 total identified gaps implemented. 3 deferred (BIM/CAD plugin, live pricing, digital twin). 0 open — all implementable gaps resolved.**
 
 ---
 
@@ -157,7 +157,7 @@ Signal word thresholds per ANSI Z535: **DANGER** (≥ 40 cal/cm², `#d32f2f`) / 
 |---|---|---|
 | **Color-coded protection zone regions on the one-line** | ETAP 2024/2025 (protection zone coloring), SKM PTW 9 (zone overlay), DIgSILENT PowerFactory (protection group shading) | Professional SLD tools allow engineers to define protection zones — each bounded by its upstream and downstream protective devices — and render each zone as a translucent colored region on the one-line. This makes it immediately clear which devices form a coordination group and which equipment falls within each protection zone. It is especially valuable for large diagrams with multiple voltage levels, where verifying selectivity by inspection is difficult. CableTrayRoute has no concept of protection zones in `oneline.js`; there is topology-based energized-state coloring (Gap #36, implemented) but no user-defined protection zone grouping or shading overlay. |
 
-**Status:** New gap identified 2026-04-06. Not yet implemented.
+**Status:** ✅ **Implemented 2026-04-11.** `oneline.js` `renderProtectionZones()` + zone management functions (`createProtectionZone()`, `deleteProtectionZone()`, `renameProtectionZone()`, `setZoneVisibility()`, `setZoneColor()`, `toggleComponentInZone()`) + panel renderer `renderProtectionZonesPanel()`. Zone data persisted as `sheet.protectionZones[]` in `dataStore.mjs`. Toolbar "Zones" toggle checkbox (`#toggle-protection-zones`) + "Zones" sidebar panel button open `#protection-zones-panel`. Canvas click is intercepted when `activeZoneId` is set (assignment mode) to toggle component membership. Overlays rendered as translucent SVG `<rect>` elements with dashed borders, inserted before connections for correct Z-order. Zone name labels rendered above each rect. Tests: `tests/onelineProtectionZones.test.mjs`. Documentation: `docs/protection-zones.md`.
 
 ---
 
@@ -910,7 +910,7 @@ All originally high- and medium-priority feasible items have been implemented:
 
 **Lower Priority — One-Line Diagram:**
 
-9. **Protection / Coordination Zone Overlay** (Gap #50) — Recommended: allow users to define named protection zones by selecting a set of components; render each zone as a translucent colored `<rect>` underneath the component layer in `render()`.
+9. **Protection / Coordination Zone Overlay** (Gap #50) — ✅ Implemented 2026-04-11. Users define named protection zones, assign components via canvas click in assignment mode; each zone renders as a translucent colored `<rect>` beneath the component layer in `render()`.
 
 10. **Background Image / Site Plan Underlay** (Gap #52) — Recommended: add a file input for JPEG/PNG; store as a base64 data URL in `sheets[activeSheet].backgroundImage`; render as an `<image>` element at z-index 0 in the SVG canvas.
 

@@ -137,6 +137,8 @@
             <button id="redo-btn" class="icon-button" title="Redo (Ctrl+Y)" aria-label="Redo"><img src="./icons/toolbar/redo.svg" alt="" loading="lazy" decoding="async"></button>
             <button id="history-sidebar-toggle" class="btn" type="button" aria-controls="history-sidebar" aria-expanded="true">History</button>
             <button id="layers-panel-toggle" class="btn" type="button" aria-controls="layers-panel" aria-expanded="false" title="Toggle named layers panel">Layers</button>
+            <!-- Gap #50: Protection zones panel toggle -->
+            <button id="protection-zones-panel-toggle" class="btn" type="button" aria-controls="protection-zones-panel" aria-expanded="false" title="Toggle protection zones panel">Zones</button>
           </div>
           <div class="toolbar-group" aria-label="Shapes">
             <span class="toolbar-group-label">Shapes</span>
@@ -210,6 +212,11 @@
                 <label class="icon-button" title="Highlight energized/de-energized state" aria-label="Toggle energized state display">
                   <input type="checkbox" id="toggle-energized" class="hidden-input">
                   Energy
+                </label>
+                <!-- Gap #50: protection zone overlay toggle -->
+                <label class="icon-button" title="Show protection zone overlays" aria-label="Toggle protection zone overlays">
+                  <input type="checkbox" id="toggle-protection-zones" class="hidden-input">
+                  Zones
                 </label>
                 <!-- Gap #52: background image underlay -->
                 <input type="file" id="bg-image-input" accept="image/jpeg,image/png,image/gif,image/svg+xml" class="hidden-input" aria-label="Select background image file">
@@ -378,6 +385,21 @@
               <button id="add-layer-btn" type="button" class="btn btn-sm">+ Add Layer</button>
             </div>
             <ul id="layer-list" class="layer-list" role="listbox" aria-label="Diagram layers"></ul>
+          </aside>
+          <!-- Gap #50: Protection Zones panel -->
+          <aside id="protection-zones-panel" class="layers-panel hidden" aria-label="Protection Zones">
+            <div class="layers-panel-header">
+              <h3>Protection Zones</h3>
+              <button id="protection-zones-close-btn" type="button" class="btn btn-icon" aria-label="Close protection zones panel" title="Close">&times;</button>
+            </div>
+            <div class="layers-panel-toolbar">
+              <button id="add-protection-zone-btn" type="button" class="btn btn-sm">+ Add Zone</button>
+              <span id="zone-assign-mode-banner" class="zone-assign-banner hidden" aria-live="polite">
+                Click components to assign/unassign &middot;
+                <button id="zone-assign-done-btn" type="button" class="btn btn-xs">Done</button>
+              </span>
+            </div>
+            <ul id="protection-zone-list" class="layer-list" role="listbox" aria-label="Protection zones"></ul>
           </aside>
           <!-- Gap #52: Background Image / Site Plan Underlay panel -->
           <aside id="bg-image-panel" class="layers-panel hidden" aria-label="Background Image">
