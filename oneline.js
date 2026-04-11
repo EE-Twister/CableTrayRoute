@@ -2209,6 +2209,14 @@ function applyDiagramZoom({ adjustScroll = false, previousZoom, focusPoint } = {
     gridBg.setAttribute('width', String(width));
     gridBg.setAttribute('height', String(height));
   }
+  // Gap #52: keep background underlay sized to the full viewport
+  const bgUnderlay = document.getElementById('bg-underlay');
+  if (bgUnderlay) {
+    bgUnderlay.setAttribute('x', String(minX));
+    bgUnderlay.setAttribute('y', String(minY));
+    bgUnderlay.setAttribute('width', String(width));
+    bgUnderlay.setAttribute('height', String(height));
+  }
   const editor = svg.parentElement;
   if (needsInitialViewportCenter && editor instanceof HTMLElement) {
     const initialFocus = pendingInitialCenter || getStaticViewportCenter();
@@ -5864,6 +5872,61 @@ function refreshLayerAssignDropdown() {
     layers.map(l => `<option value="${l.id}"${currentLayer === l.id ? ' selected' : ''}>${l.name}</option>`).join('');
 }
 
+// ============================================================
+// Gap #52 – Background Image / Site Plan Underlay
+// ============================================================
+
+/**
+ * Load a File object as a base64 data URI and store it as the current
+ * sheet's background image, then re-render and refresh the panel.
+ * @param {File} file
+ */
+function uploadBackground(file) {
+  const reader = new FileReader();
+  reader.onload = e => {
+    sheets[activeSheet].backgroundImage = {
+      url: e.target.result,
+      opacity: 0.4,
+      visible: true
+    };
+    save();
+    render();
+    renderBgPanel();
+  };
+  reader.readAsDataURL(file);
+}
+
+/**
+ * Remove the background image from the current sheet.
+ */
+function clearBackground() {
+  delete sheets[activeSheet].backgroundImage;
+  save();
+  render();
+  renderBgPanel();
+}
+
+/**
+ * Sync the background image panel UI with the current sheet's backgroundImage
+ * state. Shows the panel when an image is set, hides it otherwise.
+ */
+function renderBgPanel() {
+  const panel = document.getElementById('bg-image-panel');
+  const toggleBtn = document.getElementById('bg-toggle-btn');
+  const slider = document.getElementById('bg-opacity-slider');
+  if (!panel) return;
+
+  const bg = sheets[activeSheet]?.backgroundImage;
+  if (!bg || !bg.url) {
+    panel.classList.add('hidden');
+    return;
+  }
+
+  panel.classList.remove('hidden');
+  if (slider) slider.value = String(Math.round((bg.opacity ?? 0.4) * 100));
+  if (toggleBtn) toggleBtn.textContent = bg.visible !== false ? 'Hide' : 'Show';
+}
+
 // ─── End Gap #51 ────────────────────────────────────────────────────────────
 
 function render() {
@@ -5871,6 +5934,21 @@ function render() {
   propagateSourceVoltagesToBuses(components);
   const svg = document.getElementById('diagram');
   svg.querySelectorAll('g.component, .connection, .conn-label, .port, .bus-handle, .annotation-handle, .issue-badge, .component-label, .component-attribute, .selection-marquee, .transformer-port-label').forEach(el => el.remove());
+
+  // Gap #52: re-insert background image underlay (positioned later by applyDiagramZoom)
+  const existingBgUnderlay = svg.querySelector('#bg-underlay');
+  if (existingBgUnderlay) existingBgUnderlay.remove();
+  const bgImg = sheets[activeSheet]?.backgroundImage;
+  if (bgImg && bgImg.visible !== false && bgImg.url) {
+    const imgEl = document.createElementNS(svgNS, 'image');
+    imgEl.setAttribute('id', 'bg-underlay');
+    imgEl.setAttribute('href', bgImg.url);
+    imgEl.setAttribute('opacity', String(bgImg.opacity ?? 0.4));
+    imgEl.setAttribute('preserveAspectRatio', 'xMidYMid meet');
+    const gridBgEl = svg.querySelector('#grid-bg');
+    if (gridBgEl) gridBgEl.after(imgEl);
+    else svg.insertBefore(imgEl, svg.firstChild);
+  }
   const usedVoltageRanges = new Set();
   const boundsState = { minX: Infinity, minY: Infinity, maxX: -Infinity, maxY: -Infinity };
   const includePoint = (x, y) => {
@@ -7109,6 +7187,7 @@ function loadSheet(idx) {
   refreshAttributeOptions();
   renderSheetTabs();
   renderLayerPanel();
+  renderBgPanel();
   needsInitialViewportCenter = true;
   pendingInitialCenter = null;
   render();
@@ -7283,7 +7362,9 @@ function save(notify = true) {
       components: comps,
       connections: buildConnections(comps),
       // Gap #51: persist layers for each sheet
-      layers: i === activeSheet ? JSON.parse(JSON.stringify(layers)) : (Array.isArray(s.layers) ? s.layers : [])
+      layers: i === activeSheet ? JSON.parse(JSON.stringify(layers)) : (Array.isArray(s.layers) ? s.layers : []),
+      // Gap #52: persist background image underlay per sheet
+      ...(s.backgroundImage ? { backgroundImage: s.backgroundImage } : {})
     };
   });
   sheets = sheetData;
@@ -10515,7 +10596,10 @@ async function init() {
   sheets = storedSheets.map((s, i) => ({
     name: s.name || `Sheet ${i + 1}`,
     components: (s.components || []).map(normalizeComponent),
-    connections: Array.isArray(s.connections) ? s.connections : []
+    connections: Array.isArray(s.connections) ? s.connections : [],
+    layers: Array.isArray(s.layers) ? s.layers : [],
+    // Gap #52: preserve background image underlay per sheet
+    ...(s.backgroundImage ? { backgroundImage: s.backgroundImage } : {})
   }));
   if (!sheets.length) sheets = [{ name: 'Sheet 1', components: [], connections: [] }];
 
@@ -10594,6 +10678,7 @@ async function init() {
   renderSheetTabs();
   render();
   renderLayerPanel();
+  renderBgPanel();
   const initIssues = validateDiagram();
   if (!initIssues.length) syncSchedules(false);
 
@@ -10668,6 +10753,50 @@ async function init() {
       if (name) createLayer(name);
     });
   }
+
+  // Gap #52: wire up background image controls
+  const bgImageBtn = document.getElementById('bg-image-btn');
+  const bgImageInput = document.getElementById('bg-image-input');
+  const bgImagePanel = document.getElementById('bg-image-panel');
+  const bgImageCloseBtn = document.getElementById('bg-image-close-btn');
+  const bgOpacitySlider = document.getElementById('bg-opacity-slider');
+  const bgToggleBtn = document.getElementById('bg-toggle-btn');
+  const bgClearBtn = document.getElementById('bg-clear-btn');
+  if (bgImageBtn && bgImageInput) {
+    bgImageBtn.addEventListener('click', () => bgImageInput.click());
+    bgImageInput.addEventListener('change', e => {
+      const file = e.target.files[0];
+      if (file) uploadBackground(file);
+      e.target.value = '';
+    });
+  }
+  if (bgImageCloseBtn && bgImagePanel) {
+    bgImageCloseBtn.addEventListener('click', () => bgImagePanel.classList.add('hidden'));
+  }
+  if (bgOpacitySlider) {
+    bgOpacitySlider.addEventListener('input', e => {
+      const bg = sheets[activeSheet]?.backgroundImage;
+      if (!bg) return;
+      bg.opacity = Number(e.target.value) / 100;
+      const underlayEl = document.getElementById('bg-underlay');
+      if (underlayEl) underlayEl.setAttribute('opacity', String(bg.opacity));
+      save();
+    });
+  }
+  if (bgToggleBtn) {
+    bgToggleBtn.addEventListener('click', () => {
+      const bg = sheets[activeSheet]?.backgroundImage;
+      if (!bg) return;
+      bg.visible = bg.visible === false;
+      save();
+      render();
+      renderBgPanel();
+    });
+  }
+  if (bgClearBtn) {
+    bgClearBtn.addEventListener('click', clearBackground);
+  }
+
   document.getElementById('align-left-btn').addEventListener('click', () => alignSelection('left'));
   document.getElementById('align-right-btn').addEventListener('click', () => alignSelection('right'));
   document.getElementById('align-top-btn').addEventListener('click', () => alignSelection('top'));
@@ -12944,7 +13073,9 @@ async function importDiagram(data) {
     components: (s.components || []).map(normalizeComponent),
     connections: Array.isArray(s.connections) ? s.connections : [],
     // Gap #51: load layers from imported diagram
-    layers: Array.isArray(s.layers) ? s.layers : []
+    layers: Array.isArray(s.layers) ? s.layers : [],
+    // Gap #52: load background image from imported diagram
+    ...(s.backgroundImage ? { backgroundImage: s.backgroundImage } : {})
   }));
   if (sheets.length) {
     loadSheet(0);

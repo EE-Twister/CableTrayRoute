@@ -211,6 +211,9 @@
                   <input type="checkbox" id="toggle-energized" class="hidden-input">
                   Energy
                 </label>
+                <!-- Gap #52: background image underlay -->
+                <input type="file" id="bg-image-input" accept="image/jpeg,image/png,image/gif,image/svg+xml" class="hidden-input" aria-label="Select background image file">
+                <button id="bg-image-btn" type="button" class="btn" title="Import a site plan or floor plan as a background image underlay">Background</button>
             </div>
           </div>
           <div class="toolbar-group" aria-label="Find devices">
@@ -375,6 +378,22 @@
               <button id="add-layer-btn" type="button" class="btn btn-sm">+ Add Layer</button>
             </div>
             <ul id="layer-list" class="layer-list" role="listbox" aria-label="Diagram layers"></ul>
+          </aside>
+          <!-- Gap #52: Background Image / Site Plan Underlay panel -->
+          <aside id="bg-image-panel" class="layers-panel hidden" aria-label="Background Image">
+            <div class="layers-panel-header">
+              <h3>Background Image</h3>
+              <button id="bg-image-close-btn" type="button" class="btn btn-icon" aria-label="Close background image panel" title="Close">&times;</button>
+            </div>
+            <div class="layers-panel-toolbar">
+              <label for="bg-opacity-slider" class="bg-opacity-label">Opacity
+                <input type="range" id="bg-opacity-slider" min="0" max="100" value="40" class="bg-opacity-slider">
+              </label>
+              <div class="bg-image-actions">
+                <button id="bg-toggle-btn" type="button" class="btn btn-sm">Hide</button>
+                <button id="bg-clear-btn" type="button" class="btn btn-sm">Remove Image</button>
+              </div>
+            </div>
           </aside>
         </div>
         </section>

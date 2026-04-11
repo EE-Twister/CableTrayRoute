@@ -416,7 +416,9 @@ export const getOneLine = (scenario = getCurrentScenarioNameState()) => {
         name: s.name,
         components: Array.isArray(s.components) ? s.components : [],
         connections: Array.isArray(s.connections) ? s.connections : [],
-        layers: Array.isArray(s.layers) ? s.layers : []
+        layers: Array.isArray(s.layers) ? s.layers : [],
+        // Gap #52: preserve background image underlay per sheet
+        ...(s.backgroundImage ? { backgroundImage: s.backgroundImage } : {})
       }))
     };
   }
