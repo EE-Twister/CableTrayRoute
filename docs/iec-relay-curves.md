@@ -6,6 +6,8 @@ CableTrayRoute's TCC (Time-Current Curve) tool supports IEC 60255-151 formula-ba
 
 Four curve families are supported, matching the IEC 60255-151:2009 standard exactly.
 
+> **See also:** For ground fault relay curves (residual 3I₀ and zero-sequence I₀), including NEC 230.95 compliance requirements, see [`ground-fault-protection.md`](ground-fault-protection.md).
+
 ---
 
 ## Formula

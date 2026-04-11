@@ -20,7 +20,7 @@ A **2026-04-05 pass** focused specifically on the **one-line diagram editor UI**
 
 A **2026-04-06 pass** performed a focused deep dive on **one-line diagram connectivity features** and the **TCC (Time-Current Curve) engine**, benchmarked against ETAP 2024/2025, EasyPower 2025, SKM PTW 9, PowerWorld Simulator 23, and DIgSILENT PowerFactory 2024. This revealed **10 new gaps** (Gaps #48–#57) across two areas: (1) multi-sheet diagramming and diagram annotation capabilities missing from the one-line editor and (2) advanced TCC curve types, arc flash integration, ground fault protection, and reporting absent from the coordination study tool. See "One-Line Diagram & TCC Deep Dive (2026-04-06)" below.
 
-**Current status: 51 of 58 total identified gaps implemented. 3 deferred (BIM/CAD plugin, live pricing, digital twin). 4 open (Gaps #50, #52, #55, #57).**
+**Current status: 52 of 58 total identified gaps implemented. 3 deferred (BIM/CAD plugin, live pricing, digital twin). 3 open (Gaps #50, #52, #57).**
 
 ---
 
@@ -92,6 +92,7 @@ The following features were implemented after the 2026-03-24 competitor refresh 
 |---|---|---|---|---|
 | 12 | Cloud-Synchronized Component Library | `server.mjs` — `CloudLibraryStore`, `LibraryShareStore`; 6 REST endpoints under `/api/v1/library` | `library.html` — sync badge, Save/Load/Share to Cloud buttons; auto-sync on save; `?share=` URL param for direct link access | `tests/cloudLibrary.test.mjs` |
 | 13 | CTI Tabular Coordination Report (#56) | `reports/coordinationReport.mjs` — `buildCTIRows(deviceEntries, coordResult, faultCurrentA, margin)` + `CTI_HEADERS`; uses `interpolateTime()` from `tccAutoCoord.mjs`; 5 standard test-current levels per adjacent device pair | `tcc.html` — "Export CTI Report" button (shown after Auto-Coordinate); downloads `coordination-cti-report.csv` via `downloadCSV()` from `reports/reporting.mjs` | `tests/tcc/ctiReport.test.mjs` |
+| 14 | Ground Fault Protection Curves (#55) | `data/protectiveDevices.json` — 5 GFP entries (`gfp_ni/vi/ei/zs/parametric_relay`) with `groundFault: true`, `iec60255: true`, `sensorType`, `nec230_95: true`; `analysis/tccAutoCoord.mjs` — `greedyCoordinateGFP()`; `analysis/tcc.js` — `groundFault` view option, `GFP_COLOR_PALETTE`, `buildGFPLibraryEntries()`, dashed purple curve rendering, GFP auto-coordination dispatch | `tcc.html` — "Ground Fault Plane" in Views panel; "Ground Fault Relays (GFP)" device group; dashed purple curves on chart | `tests/tcc/groundFaultProtection.test.mjs` |
 
 ---
 
@@ -206,7 +207,7 @@ Signal word thresholds per ANSI Z535: **DANGER** (≥ 40 cal/cm², `#d32f2f`) / 
 |---|---|---|
 | **Separate TCC for ground fault relays (residual and zero-sequence)** | ETAP, EasyPower, SKM PTW | Phase overcurrent coordination (A-, B-, C-phase) is the primary TCC use case, but ground fault protection is equally mandatory: NEC 230.95 requires ground fault protection on service equipment ≥ 1000 A at 150 V–600 V line-to-ground; OSHA 29 CFR 1910.304 mandates GFP on solidly-grounded systems. Ground fault relays (residual overcurrent = Ia+Ib+Ic or zero-sequence CT) have their own time-current characteristics and must coordinate with downstream ground fault devices. Professional TCC tools plot residual and zero-sequence relay curves as a separate "ground fault plane" alongside the phase curves. CableTrayRoute's `PROTECTIVE_TYPES` set includes `'relay'` and `'breaker'`, but there is no ground fault relay curve type, no GFP element property on breaker/relay components, and no separate ground-fault TCC plot mode. |
 
-**Status:** New gap identified 2026-04-06. Not yet implemented.
+**Status:** ✅ Implemented 2026-04-11. Five IEC 60255-151 GFP relay entries (`gfp_ni_relay`, `gfp_vi_relay`, `gfp_ei_relay`, `gfp_zs_relay`, `gfp_parametric_relay`) added to `data/protectiveDevices.json` with `groundFault: true`, `iec60255: true`, `sensorType` (`residual` or `zero_sequence`), and `nec230_95: true` compliance flag. The IEC formula engine in `analysis/iecRelayCurves.mjs` and `scaleCurve()` in `analysis/tccUtils.js` required no changes — the existing IEC branch handles GFP devices generically. A new `greedyCoordinateGFP()` function was exported from `analysis/tccAutoCoord.mjs` to coordinate GFP device chains independently of phase devices. In `analysis/tcc.js`: added a `groundFault` entry to `TCC_VIEW_OPTIONS`; added `GFP_COLOR_PALETTE` (purple `#7c3aed` family); added `buildGFPLibraryEntries()` and a separate "Ground Fault Relays (GFP)" catalog group; GFP curves render as dashed purple lines (`stroke-dasharray: 8,4`); `autoCoordinate()` dispatches phase and GFP entries to their respective coordination functions. Tests in `tests/tcc/groundFaultProtection.test.mjs` cover 27 assertions across device library schema, curve generation, coordination, and NEC 230.95 metadata. Documentation: `docs/ground-fault-protection.md`.
 
 ---
 
@@ -895,7 +896,7 @@ All originally high- and medium-priority feasible items have been implemented:
 
 **Medium Priority — TCC:**
 
-5. **Ground Fault / Residual Protection Curves** (Gap #55) — Required for NEC 230.95 GFP compliance documentation. Recommended: add a `groundFault` element type to protective device components with pickup (A) and time-delay settings; plot ground-fault relay curves as a separate series in `tcc.html`.
+5. ~~**Ground Fault / Residual Protection Curves** (Gap #55)~~ — ✅ **Implemented 2026-04-11.** 5 GFP relay entries in `data/protectiveDevices.json`; `greedyCoordinateGFP()` in `analysis/tccAutoCoord.mjs`; "Ground Fault Plane" view in `analysis/tcc.js` with dashed purple curves. Docs: `docs/ground-fault-protection.md`. Tests: `tests/tcc/groundFaultProtection.test.mjs`.
 
 **High Priority — One-Line Diagram:**
 

@@ -11,7 +11,7 @@ import {
 } from '../dataStore.mjs';
 import { runShortCircuit } from './shortCircuit.mjs';
 import { scaleCurve, checkDuty, sanitizeCurve } from './tccUtils.js';
-import { checkCoordination, greedyCoordinate, generateFaultCurrents } from './tccAutoCoord.mjs';
+import { checkCoordination, greedyCoordinate, greedyCoordinateGFP, generateFaultCurrents } from './tccAutoCoord.mjs';
 import { buildCTIRows, CTI_HEADERS } from '../reports/coordinationReport.mjs';
 import { downloadCSV } from '../reports/reporting.mjs';
 import {
@@ -328,7 +328,8 @@ const TCC_VIEW_OPTIONS = [
   { id: 'instantaneousDelay', label: 'Instantaneous Delay', field: 'instantaneousDelay', unit: 's', shortLabel: 'INST Delay', description: 'Display the instantaneous delay setting.' },
   { id: 'instantaneousMax', label: 'Instantaneous Max', field: 'instantaneousMax', unit: 'A', shortLabel: 'INST Max', description: 'Display the instantaneous ceiling current.' },
   { id: 'curveProfile', label: 'Curve Profile', field: 'curveProfileLabel', shortLabel: 'Curve', description: 'Display the selected curve profile.' },
-  { id: 'arcFlashOverlay', label: 'Arc Flash Limit Curve', field: null, description: 'Overlay a constant incident energy limit curve from arc flash study results.' }
+  { id: 'arcFlashOverlay', label: 'Arc Flash Limit Curve', field: null, description: 'Overlay a constant incident energy limit curve from arc flash study results.' },
+  { id: 'groundFault', label: 'Ground Fault Plane', field: null, description: 'Plot ground fault relay curves as a separate plane with dashed purple curves (NEC 230.95 / OSHA 29 CFR 1910.304).' }
 ];
 
 const viewOptionMap = new Map(TCC_VIEW_OPTIONS.map(option => [option.id, option]));
@@ -513,6 +514,9 @@ let annotations = [];
 let annotationContext = null;
 let arcFlashOverlayThreshold = 8; // cal/cm² — default PPE Category 2
 let arcFlashOverlayComponentId = null;
+
+// Fixed purple palette for GFP curves — visually distinct from d3.schemeCategory10
+const GFP_COLOR_PALETTE = ['#7c3aed', '#6d28d9', '#5b21b6', '#4c1d95', '#a78bfa'];
 
 function getActiveComponentId() {
   if (!activeComponentId) return null;
@@ -2169,6 +2173,7 @@ function rebuildCatalog() {
   const libraryEntries = buildLibraryEntries();
   const fuseEntries = libraryEntries.filter(entry => (entry.baseDevice?.type || entry.deviceType) === 'fuse');
   const otherLibraryEntries = libraryEntries.filter(entry => (entry.baseDevice?.type || entry.deviceType) !== 'fuse');
+  const gfpEntries = buildGFPLibraryEntries();
   const overlayEntries = buildOverlayEntries();
 
   if (componentEntries.length) {
@@ -2182,6 +2187,9 @@ function rebuildCatalog() {
   }
   if (fuseEntries.length) {
     deviceGroups.push({ id: 'fuses', label: 'Fuse Library', items: fuseEntries });
+  }
+  if (gfpEntries.length) {
+    deviceGroups.push({ id: 'gfpRelays', label: 'Ground Fault Relays (GFP)', items: gfpEntries });
   }
   if (overlayEntries.length) {
     deviceGroups.push({ id: 'overlays', label: 'Connected Elements', items: overlayEntries });
@@ -2476,7 +2484,7 @@ function buildCustomCurveEntries() {
 
 function buildLibraryEntries() {
   return libraryDevices
-    .filter(dev => PROTECTIVE_TYPES.has(dev.type))
+    .filter(dev => PROTECTIVE_TYPES.has(dev.type) && !dev.groundFault)
     .map(dev => ({
       uid: dev.id,
       kind: 'library',
@@ -2485,6 +2493,22 @@ function buildLibraryEntries() {
       baseDevice: dev,
       deviceType: dev.type || '',
       deviceCategory: dev.type || '',
+      overrideSource: snapOverridesToOptions(dev, saved.settings?.[dev.id] || {})
+    }))
+    .sort((a, b) => a.name.localeCompare(b.name, undefined, { sensitivity: 'base' }));
+}
+
+function buildGFPLibraryEntries() {
+  return libraryDevices
+    .filter(dev => PROTECTIVE_TYPES.has(dev.type) && dev.groundFault === true)
+    .map(dev => ({
+      uid: dev.id,
+      kind: 'library',
+      name: dev.name || dev.id,
+      baseDeviceId: dev.id,
+      baseDevice: dev,
+      deviceType: dev.type || '',
+      deviceCategory: 'ground_fault_relay',
       overrideSource: snapOverridesToOptions(dev, saved.settings?.[dev.id] || {})
     }))
     .sort((a, b) => a.name.localeCompare(b.name, undefined, { sensitivity: 'base' }));
@@ -6769,8 +6793,15 @@ function plot() {
   const baseWidth = +chart.attr('width') - BASE_MARGIN.left - BASE_MARGIN.right;
   const color = d3.scaleOrdinal(d3.schemeCategory10);
   const plottables = [...devicePlots, ...overlays];
+  let gfpColorIndex = 0;
   plottables.forEach((entry, index) => {
-    entry.color = color(index);
+    if (entry.selection?.baseDevice?.groundFault === true) {
+      entry.color = GFP_COLOR_PALETTE[gfpColorIndex % GFP_COLOR_PALETTE.length];
+      entry.isGFP = true;
+      gfpColorIndex++;
+    } else {
+      entry.color = color(index);
+    }
   });
 
   const { layouts: legendLayouts, height: legendHeight } = computeLegendLayout(plottables, baseWidth);
@@ -7145,8 +7176,10 @@ function plot() {
     entry.path = deviceLayer.append('path')
       .datum(scaled.curve)
       .attr('fill', 'none')
-      .attr('stroke-width', 2)
+      .attr('stroke-width', entry.isGFP ? 2.5 : 2)
       .attr('stroke', entry.color)
+      .attr('stroke-dasharray', entry.isGFP ? '8,4' : null)
+      .attr('stroke-linecap', entry.isGFP ? 'round' : null)
       .style('cursor', 'move')
       .on('contextmenu', event => {
         event.preventDefault();
@@ -7668,22 +7701,54 @@ function autoCoordinate() {
   }));
 
   const margin = parseFloat(coordMarginInput?.value) || 0.3;
-  const result = greedyCoordinate(deviceEntries, maxFaultA, { margin, sampleCount: 50 });
-  lastCoordState = { deviceEntries, result, maxFaultA, margin };
-  exportCtiBtn?.classList.remove('hidden');
 
-  // Apply suggested time dials back to each device's mutable overrides
-  result.results.forEach((r, i) => {
-    if (i === 0) return; // downstream reference device is fixed
-    const entry = orderedEntries[i];
-    if (!entry || !r.found) return;
-    entry.overrides = { ...entry.overrides, time: r.timeDial };
-    if (typeof updateDeviceInputs === 'function') updateDeviceInputs(entry);
-  });
+  // Separate phase devices from GFP devices and coordinate each plane independently
+  const phaseDeviceEntries = deviceEntries.filter(e => !e.device?.groundFault);
+  const gfpDeviceEntries = deviceEntries.filter(e => e.device?.groundFault === true);
+  const phaseOrderedEntries = orderedEntries.filter(e => !e.selection?.baseDevice?.groundFault);
+  const gfpOrderedEntries = orderedEntries.filter(e => e.selection?.baseDevice?.groundFault === true);
+
+  let result = { results: [], allCoordinated: true };
+  let gfpResult = null;
+
+  if (phaseDeviceEntries.length >= 2) {
+    result = greedyCoordinate(phaseDeviceEntries, maxFaultA, { margin, sampleCount: 50 });
+    // Apply suggested time dials back to phase devices
+    result.results.forEach((r, i) => {
+      if (i === 0) return;
+      const entry = phaseOrderedEntries[i];
+      if (!entry || !r.found) return;
+      entry.overrides = { ...entry.overrides, time: r.timeDial };
+      if (typeof updateDeviceInputs === 'function') updateDeviceInputs(entry);
+    });
+  } else if (phaseDeviceEntries.length === 1) {
+    result = greedyCoordinate(phaseDeviceEntries, maxFaultA, { margin, sampleCount: 50 });
+  }
+
+  if (gfpDeviceEntries.length >= 2) {
+    gfpResult = greedyCoordinateGFP(gfpDeviceEntries, maxFaultA, { margin, sampleCount: 50 });
+    // Apply suggested time dials back to GFP devices
+    gfpResult.results.forEach((r, i) => {
+      if (i === 0) return;
+      const entry = gfpOrderedEntries[i];
+      if (!entry || !r.found) return;
+      entry.overrides = { ...entry.overrides, tms: r.timeDial };
+      if (typeof updateDeviceInputs === 'function') updateDeviceInputs(entry);
+    });
+    if (!gfpResult.allCoordinated) result.allCoordinated = false;
+  }
+
+  lastCoordState = { deviceEntries, result, gfpResult, maxFaultA, margin };
+  exportCtiBtn?.classList.remove('hidden');
 
   if (activeCurvesUpdater) activeCurvesUpdater();
   if (activeCoordMarkerDrawer) activeCoordMarkerDrawer(result.results, orderedEntries);
-  showCoordResults(result.results, result.allCoordinated);
+  const combinedCoordinated = result.allCoordinated && (gfpResult ? gfpResult.allCoordinated : true);
+  const combinedResults = [
+    ...result.results,
+    ...(gfpResult?.results || []).map(r => ({ ...r, id: `GFP: ${r.id}` }))
+  ];
+  showCoordResults(combinedResults, combinedCoordinated);
 }
 
 function showCoordResults(results, allCoordinated, message) {
