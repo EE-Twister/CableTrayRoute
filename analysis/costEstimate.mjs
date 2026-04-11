@@ -243,3 +243,163 @@ export function summarizeCosts(lineItems = []) {
 
   return { categories, grandTotal, grandMaterial, grandLabor };
 }
+
+/**
+ * Parse a pricing CSV into a prices object compatible with DEFAULT_PRICES.
+ *
+ * Expected CSV columns: category, key, unit_price, unit, source, date
+ * Lines beginning with '#' are treated as comments and ignored.
+ *
+ * Supported categories:
+ *   cable        – key = conductor size string (e.g. "4 AWG", "default")
+ *   tray         – key = nominal width in inches (e.g. "12", "default")
+ *   conduit      – key = trade size in inches (e.g. "1", "0.5", "default")
+ *   fitting      – key is ignored; sets the scalar fitting unit price
+ *   labor        – key ∈ { cableInstall, trayInstall, conduitInstall }
+ *   productivity – key ∈ { cablePullFtPerHr, trayInstallFtPerHr, conduitInstallFtPerHr }
+ *
+ * @param {string} csvText  Raw CSV text
+ * @returns {{ prices: Object, meta: { source: string, date: string, rowCount: number, warnings: string[] } }}
+ */
+export function parsePricingCSV(csvText) {
+  const prices = {};
+  const warnings = [];
+  let source = '';
+  let date = '';
+  let rowCount = 0;
+
+  const VALID_LABOR_KEYS = new Set(['cableInstall', 'trayInstall', 'conduitInstall']);
+  const VALID_PRODUCTIVITY_KEYS = new Set(['cablePullFtPerHr', 'trayInstallFtPerHr', 'conduitInstallFtPerHr']);
+  const VALID_CATEGORIES = new Set(['cable', 'tray', 'conduit', 'fitting', 'labor', 'productivity']);
+
+  const lines = csvText.split(/\r?\n/);
+  let headerParsed = false;
+  let colIndex = { category: 0, key: 1, unit_price: 2, unit: 3, source: 4, date: 5 };
+
+  for (let lineNum = 0; lineNum < lines.length; lineNum++) {
+    const raw = lines[lineNum].trim();
+    if (!raw || raw.startsWith('#')) continue;
+
+    // Parse header row
+    if (!headerParsed) {
+      const cols = raw.split(',').map(c => c.trim().toLowerCase());
+      if (cols.includes('category') && cols.includes('unit_price')) {
+        colIndex = {
+          category: cols.indexOf('category'),
+          key:      cols.indexOf('key'),
+          unit_price: cols.indexOf('unit_price'),
+          unit:     cols.indexOf('unit'),
+          source:   cols.indexOf('source'),
+          date:     cols.indexOf('date'),
+        };
+        headerParsed = true;
+        continue;
+      }
+      // If first non-comment line is not a recognizable header, skip it
+      headerParsed = true;
+      continue;
+    }
+
+    const fields = raw.split(',');
+    const get = idx => (idx >= 0 && idx < fields.length ? fields[idx].trim() : '');
+
+    const category = get(colIndex.category).toLowerCase();
+    const key      = get(colIndex.key);
+    const rawPrice = get(colIndex.unit_price);
+    const rowSource = get(colIndex.source);
+    const rowDate   = get(colIndex.date);
+
+    if (!category) continue;
+
+    const unitPrice = parseFloat(rawPrice);
+    if (!Number.isFinite(unitPrice) || unitPrice < 0) {
+      warnings.push(`Line ${lineNum + 1}: skipped — non-numeric unit_price "${rawPrice}"`);
+      continue;
+    }
+
+    if (!VALID_CATEGORIES.has(category)) {
+      warnings.push(`Line ${lineNum + 1}: unrecognized category "${category}" — skipped`);
+      continue;
+    }
+
+    // Capture source/date from first data row that provides them
+    if (!source && rowSource) source = rowSource;
+    if (!date   && rowDate)   date   = rowDate;
+
+    if (category === 'cable') {
+      if (!prices.cable) prices.cable = {};
+      prices.cable[key || 'default'] = unitPrice;
+      rowCount++;
+    } else if (category === 'tray') {
+      if (!prices.tray) prices.tray = {};
+      prices.tray[key || 'default'] = unitPrice;
+      rowCount++;
+    } else if (category === 'conduit') {
+      if (!prices.conduit) prices.conduit = {};
+      prices.conduit[key || 'default'] = unitPrice;
+      rowCount++;
+    } else if (category === 'fitting') {
+      prices.fitting = unitPrice;
+      rowCount++;
+    } else if (category === 'labor') {
+      if (!VALID_LABOR_KEYS.has(key)) {
+        warnings.push(`Line ${lineNum + 1}: unknown labor key "${key}" — skipped`);
+        continue;
+      }
+      if (!prices.labor) prices.labor = {};
+      prices.labor[key] = unitPrice;
+      rowCount++;
+    } else if (category === 'productivity') {
+      if (!VALID_PRODUCTIVITY_KEYS.has(key)) {
+        warnings.push(`Line ${lineNum + 1}: unknown productivity key "${key}" — skipped`);
+        continue;
+      }
+      if (!prices.laborProductivity) prices.laborProductivity = {};
+      prices.laborProductivity[key] = unitPrice;
+      rowCount++;
+    }
+  }
+
+  return { prices, meta: { source, date, rowCount, warnings } };
+}
+
+/**
+ * Serialize a prices object (shape of DEFAULT_PRICES) to a CSV string.
+ *
+ * @param {Object} prices   Prices object (may be partial)
+ * @param {{ source?: string, date?: string }} [meta]
+ * @returns {string} CSV text
+ */
+export function exportPricingCSV(prices = {}, meta = {}) {
+  const source = meta.source || '';
+  const date   = meta.date   || new Date().toISOString().slice(0, 10);
+  const rows   = [];
+
+  rows.push('# CableTrayRoute Pricing Book');
+  if (source) rows.push(`# Source: ${source}`);
+  rows.push(`# Date: ${date}`);
+  rows.push('# Generated: ' + new Date().toISOString());
+  rows.push('category,key,unit_price,unit,source,date');
+
+  function addRows(category, map, unit) {
+    if (!map || typeof map !== 'object') return;
+    Object.entries(map).forEach(([key, price]) => {
+      if (Number.isFinite(price)) {
+        rows.push(`${category},${key},${price},${unit},${source},${date}`);
+      }
+    });
+  }
+
+  addRows('cable',   prices.cable,   '$/ft');
+  addRows('tray',    prices.tray,    '$/ft');
+  addRows('conduit', prices.conduit, '$/ft');
+
+  if (Number.isFinite(prices.fitting)) {
+    rows.push(`fitting,,${prices.fitting},$,${source},${date}`);
+  }
+
+  addRows('labor',        prices.labor,            '$/hr');
+  addRows('productivity', prices.laborProductivity, 'units/hr');
+
+  return rows.join('\n') + '\n';
+}
