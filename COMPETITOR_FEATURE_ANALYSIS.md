@@ -1,6 +1,6 @@
 # Competitor Feature Gap Analysis
 
-## Date: 2026-04-06 (updated from 2026-04-05; one-line diagram & TCC deep dive added 2026-04-06; original 2026-03-16; usability/calculation pass added 2026-03-24; all gaps resolved 2026-04-04; one-line diagram UI pass added 2026-04-05; custom pricing book added 2026-04-11)
+## Date: 2026-04-12 (advanced power systems & DER deep dive added 2026-04-11 / documented 2026-04-12; custom pricing book added 2026-04-11; one-line diagram & TCC deep dive added 2026-04-06; one-line diagram UI pass added 2026-04-05; all prior gaps resolved 2026-04-04; usability/calculation pass added 2026-03-24; original 2026-03-16)
 
 This document identifies features commonly found in major competitor platforms that are currently missing from CableTrayRoute.
 
@@ -20,9 +20,11 @@ A **2026-04-05 pass** focused specifically on the **one-line diagram editor UI**
 
 A **2026-04-06 pass** performed a focused deep dive on **one-line diagram connectivity features** and the **TCC (Time-Current Curve) engine**, benchmarked against ETAP 2024/2025, EasyPower 2025, SKM PTW 9, PowerWorld Simulator 23, and DIgSILENT PowerFactory 2024. This revealed **10 new gaps** (Gaps #48–#57) across two areas: (1) multi-sheet diagramming and diagram annotation capabilities missing from the one-line editor and (2) advanced TCC curve types, arc flash integration, ground fault protection, and reporting absent from the coordination study tool. See "One-Line Diagram & TCC Deep Dive (2026-04-06)" below.
 
-A **2026-04-11 pass** extended the Cost Estimation module with **custom pricing book import/export** — closing the "user-configurable pricing" half of the live-pricing gap without requiring commercial licensing.
+A **2026-04-11 pass — advanced power systems & DER analysis** performed a focused review of the `analysis/` module tree against the full study catalogs of **ETAP 2024/2025**, **EasyPower 2025**, **SKM PowerTools 9**, **DIgSILENT PowerFactory 2024**, **PSS/E**, **Siemens PSS SINCAL**, **CYME**, and domain-specific sizing calculators (**Schneider Ecodial**, **Caterpillar SpecSizer**, **Eaton Bussmann OSCAR**). The study catalogs were filtered to identify *core* AC/DC power systems analyses that are commonly expected in any modern engineering deliverable (protection, DC, DER, power quality, insulation coordination, economic dispatch). This revealed **13 new gaps** (**Gaps #58–#70**) across DC systems, battery/UPS sizing, renewable/DER integration, harmonic resonance, voltage stability, differential protection, insulation coordination, protection settings interoperability, IEC cable ampacity, voltage flicker, motor derating, quasi-dynamic time-series simulation, and economic optimization. **None of these are yet implemented.** See "Advanced Power Systems & DER Deep Dive (2026-04-11)" below.
 
-**Current status: 57 of 58 total identified gaps implemented. 1 deferred (BIM/CAD plugin). Live pricing gap extended with custom CSV pricing book. 0 open — all implementable gaps resolved.**
+A separate **2026-04-11 extension** to the Cost Estimation module added **custom pricing book import/export** — closing the "user-configurable pricing" half of the live-pricing gap without requiring commercial licensing.
+
+**Current status: 57 of 71 total identified gaps implemented. 1 deferred (BIM/CAD plugin). Live pricing gap extended with custom CSV pricing book. 13 newly identified and open (Gaps #58–#70) — all represent advanced power systems studies not previously in the competitive feature set.**
 
 ---
 
@@ -230,6 +232,144 @@ Signal word thresholds per ANSI Z535: **DANGER** (≥ 40 cal/cm², `#d32f2f`) / 
 | **Download TCC log-log chart as SVG or high-resolution PNG** | ETAP, EasyPower, SKM PTW, DIgSILENT PowerFactory | Professional TCC tools export the coordination chart as a standalone vector graphic (SVG or EMF) or high-resolution raster (PNG ≥ 300 dpi) for inclusion in engineering study reports submitted to utilities, AHJs, and clients. CableTrayRoute's `tcc.html` has a "Print Plot" button that triggers `window.print()` — this works for paper printing but produces no standalone downloadable file. The SVG is rendered inline in the DOM; it could be serialized and offered as a download, but this is not currently implemented. All professional tools treat chart export as a primary workflow step. |
 
 **Status:** ✅ **Implemented 2026-04-06.** `analysis/tcc.js` `handleExportSVG()` / `handleExportPNG()` + "Export SVG" and "Export PNG" buttons in `tcc.html`. Pure utilities (inline styles constant, scale factor, markup builder, canvas dimension calculator) extracted to `analysis/chartExportUtils.mjs`. Tests: `tests/tcc/chartExport.test.mjs`.
+
+---
+
+## Advanced Power Systems & DER Deep Dive (2026-04-12 Pass)
+
+Benchmarked against: **ETAP 2024/2025** (full AC+DC study suite, DER interconnect, frequency scan, voltage stability, OPF), **EasyPower 2025** (DC arc flash, battery sizing, capacitor bank, DER), **SKM PowerTools 9** (DAPPER DC module, relay settings export, IEC 60909), **DIgSILENT PowerFactory 2024** (quasi-dynamic simulation, voltage stability, frequency scan, IEC 60287 cable rating), **PSS/E** (voltage stability, OPF, IBR modeling), **Siemens PSS SINCAL** (insulation coordination, IEC cable rating), **CYME** (DER hosting capacity, time-series load flow), and domain-specific sizing tools (**Schneider Ecodial** for DC/battery, **Caterpillar SpecSizer** for generator sizing, **Eaton Bussmann OSCAR** for fuse coordination).
+
+This pass examines CableTrayRoute's `analysis/` module tree against the full study catalogs of these competitors, focusing on **core power systems analyses** expected in modern engineering deliverables that have not been previously benchmarked.
+
+---
+
+### Gap #58 – DC System Short-Circuit & DC Arc Flash (NFPA 70E Annex D.8)
+
+| Missing Feature | Competitor(s) | Description |
+|---|---|---|
+| **DC fault current calculation and DC arc flash incident energy** | ETAP DC Module, EasyPower DC SC & Arc Flash, SKM DAPPER DC, Schneider Ecodial DC | DC systems (battery rooms, PV combiner boxes, UPS output buses, DC switchgear in transit/marine) require fault current analysis per IEEE 946 and arc flash incident energy per NFPA 70E Annex D.8 / IEEE 1584 DC extension. The DC arc flash calculation uses a distinct model from the AC IEEE 1584 method — arc resistance is modeled differently, and the arc sustain threshold (~20 V DC) and gap distance formula differ. ETAP and EasyPower both provide a dedicated DC short-circuit module with battery internal impedance, cable resistance, and fuse/breaker operating time to compute bolted and arcing DC fault currents. CableTrayRoute's `analysis/shortCircuit.mjs` and `analysis/arcFlash.mjs` are strictly AC (they reference sequence networks, symmetrical components, and IEEE 1584 AC formulas). There is no DC fault current method, no battery impedance model, and no DC arc flash energy calculation. This is a critical gap for battery energy storage, PV, and data center UPS projects. |
+
+**Status:** Not implemented.
+
+---
+
+### Gap #59 – Battery / UPS Sizing per IEEE 485
+
+| Missing Feature | Competitor(s) | Description |
+|---|---|---|
+| **Stationary battery sizing and UPS runtime calculation** | ETAP Battery Sizing, EasyPower DC Systems, SKM DAPPER, Schneider Ecodial | IEEE 485 (lead-acid) and IEEE 1115 (nickel-cadmium) define the standard method for sizing stationary batteries: given a duty cycle (time-sequenced load profile of constant-power, constant-current, and momentary loads), compute the minimum battery capacity (Ah at a reference rate) that maintains terminal voltage above the minimum threshold for the full discharge period. This requires cell voltage vs. discharge time curves, temperature correction factors (IEEE 485 §5.2), design margin, and aging factor. ETAP and EasyPower automate this with a graphical duty cycle editor and cell selection from manufacturer databases (Enersys, C&D, EnerSys PowerSafe). CableTrayRoute has `battery_kwh` and `battery_runtime_min` fields in `componentLibrary.json` but no IEEE 485 sizing engine, no duty cycle model, and no cell selection algorithm. |
+
+**Status:** Not implemented.
+
+---
+
+### Gap #60 – Capacitor Bank Sizing & Power Factor Correction
+
+| Missing Feature | Competitor(s) | Description |
+|---|---|---|
+| **Automatic PFC sizing with resonance check** | ETAP Optimal Capacitor Placement, EasyPower Capacitor Module, DIgSILENT PowerFactory | Power factor correction is a standard deliverable for industrial facilities. The sizing workflow: (1) measure/estimate reactive power demand (kVAR) from load flow results; (2) select capacitor bank kVAR to achieve target PF (typically 0.95 or utility penalty threshold); (3) verify no parallel resonance between the cap bank and system impedance at any harmonic order (h_r = √(MVA_sc / MVAR_cap)); (4) if resonance falls near a dominant harmonic (5th, 7th, 11th), specify a detuned reactor (typically 5.67%, 7%, or 14% tuning factor). ETAP includes automatic optimal capacitor placement with loss minimization. CableTrayRoute's `analysis/harmonics.js` models harmonic sources and computes THD, and `analysis/loadFlow.js` computes reactive power flows, but there is no capacitor bank sizing function, no kVAR target optimizer, no resonance check formula, and no detuned filter specification. |
+
+**Status:** Not implemented.
+
+---
+
+### Gap #61 – PV / BESS / Inverter-Based Resource (IBR) Modeling
+
+| Missing Feature | Competitor(s) | Description |
+|---|---|---|
+| **Solar PV, battery energy storage, and grid-forming inverter models** | ETAP Renewable Energy Module (2024), DIgSILENT PowerFactory (IBR generic model), PSS/E (WECC-approved IBR models), CYME DER Hosting Capacity | The global energy transition has made inverter-based resources (IBRs) — solar PV arrays, battery energy storage systems (BESS), and wind turbines — the dominant new generation type. Modeling IBRs in load flow requires: (1) P-Q capability curves bounded by the inverter apparent power rating; (2) voltage-reactive power droop (Volt-VAR) per IEEE 1547; (3) active power curtailment and frequency-watt droop; (4) current-limited fault contribution (typically 1.1–1.2× rated) for short-circuit studies — fundamentally different from synchronous machine models. ETAP 2024 added a dedicated renewable energy module with PV string/array sizing, irradiance-based output modeling, and BESS charge/discharge profiles. CableTrayRoute's `analysis/loadFlow.js` and `analysis/shortCircuit.mjs` model only conventional synchronous generators (constant voltage behind subtransient reactance for SC, PV bus for LF). There is no inverter model, no PV array sizing, no BESS state-of-charge model, and no current-limited fault contribution. |
+
+**Status:** Not implemented.
+
+---
+
+### Gap #62 – IEEE 1547-2018 DER Interconnection Study
+
+| Missing Feature | Competitor(s) | Description |
+|---|---|---|
+| **Distributed energy resource interconnection compliance** | ETAP DER Module, EasyPower DER, CYME Hosting Capacity, Interconnection.com | IEEE 1547-2018 (as amended by 1547a-2020) is mandatory for all DER interconnections to utility distribution systems in the US. Utilities require an interconnection study covering: (1) steady-state voltage impact at the point of common coupling (PCC); (2) voltage regulation impact (ANSI C84.1 Range A/B); (3) fault current contribution and protection coordination impact; (4) unintentional islanding detection (anti-islanding per 1547 §8.1); (5) voltage/frequency ride-through capability (Category I/II/III); and (6) power quality (flicker, harmonics) at the PCC. ETAP and CYME automate these six screening criteria. CableTrayRoute has no IEEE 1547 compliance module, no DER screening criteria, no anti-islanding check, and no ride-through capability verification. |
+
+**Status:** Not implemented.
+
+---
+
+### Gap #63 – Frequency Scan / Harmonic Resonance / Impedance vs. Frequency
+
+| Missing Feature | Competitor(s) | Description |
+|---|---|---|
+| **System impedance-frequency sweep and resonance identification** | ETAP Harmonic Analysis (frequency scan mode), EasyPower Harmonic Analysis, DIgSILENT PowerFactory, SKM PowerTools | A frequency scan sweeps the system driving-point impedance (Z(f) = R(f) + jX(f)) from the fundamental (50/60 Hz) through the 50th harmonic, plotting impedance magnitude and angle vs. frequency. Peaks in the impedance magnitude indicate parallel resonance (voltage amplification risk); troughs indicate series resonance (current amplification risk). This is essential for harmonic filter design — tuned and detuned filter parameters (reactor %, capacitor kVAR, quality factor) are derived directly from the resonance plot. CableTrayRoute's `analysis/harmonics.js` computes THD using a quality-factor approximation (`const q = Number(f.q) || 1`) but does not construct the system admittance/impedance matrix as a function of frequency, does not perform a frequency sweep, and cannot identify resonant frequencies or design harmonic filters. |
+
+**Status:** Not implemented.
+
+---
+
+### Gap #64 – Voltage Stability Analysis (P-V / Q-V Curves, Continuation Power Flow)
+
+| Missing Feature | Competitor(s) | Description |
+|---|---|---|
+| **Bus voltage stability margin and collapse point identification** | ETAP Voltage Stability, DIgSILENT PowerFactory (CPF), PSS/E, PowerWorld Simulator | Voltage stability analysis determines how close a power system is to voltage collapse under increasing load or generation transfer. The P-V curve (nose curve) plots bus voltage vs. total system load, identifying the maximum loadability (MW) and the critical bus. The Q-V curve plots reactive power injection required to maintain a target voltage, identifying the reactive margin (MVAR) before collapse. Continuation power flow (CPF) traces the P-V curve through the nose point using predictor-corrector methods. This is required for NERC TPL-001 transmission planning compliance and is standard practice for industrial facilities with large motor loads (voltage collapse during motor starting). CableTrayRoute's `analysis/loadFlow.js` implements Newton-Raphson for a single operating point but has no continuation power flow, no P-V/Q-V curve generation, and no voltage stability margin calculation. |
+
+**Status:** Not implemented.
+
+---
+
+### Gap #65 – Optimal Power Flow / Economic Dispatch
+
+| Missing Feature | Competitor(s) | Description |
+|---|---|---|
+| **Loss minimization and generation cost optimization** | ETAP Optimal Power Flow, PowerWorld Simulator OPF, DIgSILENT PowerFactory, PSS/E OPF | Optimal power flow (OPF) extends load flow by optimizing generator dispatch, transformer tap positions, and capacitor switching to minimize an objective function (total generation cost, system losses, or voltage deviation) subject to bus voltage limits, branch thermal limits, and generator capability constraints. Economic dispatch — a simplified OPF — determines least-cost generator loading for a given total demand. This is standard for utility operations, industrial facilities with cogeneration, and microgrid dispatch optimization. CableTrayRoute's `analysis/loadFlow.js` solves a conventional Newton-Raphson power flow with fixed generator setpoints; it has no optimization layer, no cost function, no constraint enforcement on branch flows, and no automatic tap/capacitor adjustment. |
+
+**Status:** Not implemented.
+
+---
+
+### Gap #66 – Standby / Emergency Generator Sizing (NFPA 110 / NEC 700-702)
+
+| Missing Feature | Competitor(s) | Description |
+|---|---|---|
+| **Engine-generator set sizing for emergency and standby loads** | ETAP Generator Sizing, EasyPower GenSize, Caterpillar SpecSizer, Cummins Power Suite, Kohler KPS | Generator sizing for emergency (NEC 700), legally required standby (NEC 701), and optional standby (NEC 702) systems requires: (1) load tabulation with demand factors per NEC 220; (2) motor starting transient analysis — the largest motor start determines the generator's transient kW/kVA requirement and voltage/frequency dip; (3) harmonic loading from VFDs and UPS (generator oversizing factor); (4) altitude and temperature derating; (5) fuel consumption at 25/50/75/100% load for runtime calculation per NFPA 110. ETAP and the manufacturer tools automate this. CableTrayRoute's `analysis/motorStart.js` models motor starting voltage dip on an infinite bus or user-specified source impedance but does not model a finite-capacity generator (where the frequency also drops during the start transient), has no generator selection algorithm, and has no NFPA 110/NEC 700 load tabulation. |
+
+**Status:** Not implemented.
+
+---
+
+### Gap #67 – Differential Protection Zone Modeling (87B / 87T / 87G)
+
+| Missing Feature | Competitor(s) | Description |
+|---|---|---|
+| **Bus, transformer, and generator differential relay characteristic curves** | ETAP Star, EasyPower, SKM PTW, DIgSILENT PowerFactory | Differential protection (ANSI device 87) operates on the principle of current balance: the algebraic sum of currents entering and leaving a protected zone should be zero during normal operation. Types: bus differential (87B), transformer differential (87T) with harmonic restraint for inrush blocking, and generator differential (87G). Professional TCC/protection tools model the percentage differential characteristic: a plot of operating current vs. restraint current with dual-slope (Slope 1 and Slope 2) and minimum pickup thresholds. CT ratio mismatch compensation and tap-setting calculations are automated. CableTrayRoute's `analysis/tcc.js` and `data/protectiveDevices.json` model overcurrent devices (fuses, breakers, relays with inverse-time curves) but have no differential relay type, no percentage-differential characteristic curve, no CT ratio matching, and no inrush restraint modeling. This is a significant gap for any facility with transformers or generators requiring unit protection. |
+
+**Status:** Not implemented.
+
+---
+
+### Gap #68 – IEC 60909 Short-Circuit Calculation Method
+
+| Missing Feature | Competitor(s) | Description |
+|---|---|---|
+| **Full IEC 60909 initial, peak, breaking, and steady-state fault currents** | ETAP IEC 60909 Module, EasyPower IEC SC, DIgSILENT PowerFactory, CYME | IEC 60909 (International Electrotechnical Commission) is the standard short-circuit calculation method used outside North America. It differs from the ANSI/IEEE method in CableTrayRoute in several key ways: (1) voltage factor c (1.05 for max, 0.95 for min) applied to the pre-fault voltage; (2) initial symmetrical SC current Ik" calculated with impedance correction factors for generators (KG), power station units (KSO), and transformers (KT); (3) peak SC current ip = κ × √2 × Ik" where κ depends on R/X ratio; (4) symmetrical breaking current Ib with generator time-dependent decay; (5) steady-state SC current Ik. CableTrayRoute's `analysis/shortCircuit.mjs` uses the ANSI/IEEE method (1/2 cycle and 30-cycle networks with multiplying factors). There is no IEC 60909 voltage factor c, no impedance correction factors KG/KT/KSO, no peak current ip calculation, and no breaking/steady-state current distinction. This is required for all IEC-jurisdiction projects. |
+
+**Status:** Not implemented.
+
+---
+
+### Gap #69 – Cable Ampacity per IEC 60287 (Thermal Circuit Model)
+
+| Missing Feature | Competitor(s) | Description |
+|---|---|---|
+| **IEC 60287 cable current rating with full thermal ladder network** | ETAP Cable Sizing, DIgSILENT PowerFactory, CYME Cable Rating, Siemens PSS SINCAL, CYMCAP | IEC 60287-1-1 calculates the continuous current rating of cables from first principles using a thermal equivalent circuit: conductor losses (I²R with AC resistance correction for skin/proximity effect), dielectric losses (for MV/HV cables), sheath/screen losses (λ₁), armour losses (λ₂), and thermal resistances of insulation (T₁), bedding (T₂), outer serving (T₃), and surrounding medium (T₄, soil or air). The method accounts for soil thermal resistivity, depth of burial, grouping (de-rating for multiple circuits), and soil drying-out (critical temperature rise). CableTrayRoute's cable sizing uses NEC ampacity tables (pre-computed values from NEC 310.16–310.21) and IEC lookup tables in `analysis/intlCableSize.mjs`, but does not implement the IEC 60287 thermal circuit calculation from first principles. This means custom installation conditions (non-standard soil, deep burial, complex duct bank arrangements beyond the Neher-McGrath model in `ductbankroute.js`) cannot be evaluated. |
+
+**Status:** Not implemented.
+
+---
+
+### Gap #70 – Voltage Flicker Assessment (IEC 61000-4-15 Pst / Plt)
+
+| Missing Feature | Competitor(s) | Description |
+|---|---|---|
+| **Short-term and long-term flicker severity from fluctuating loads** | ETAP Voltage Flicker, EasyPower Power Quality, DIgSILENT PowerFactory | Voltage flicker is the perceptible variation in light output caused by rapid voltage fluctuations from loads such as arc furnaces, welding machines, motor starts, and wind turbines. IEC 61000-4-15 defines the flickermeter algorithm producing Pst (short-term flicker severity, 10-min observation) and Plt (long-term, 2 hours). IEEE 1453 adapts this for North American 120 V / 60 Hz systems. Utilities enforce Pst ≤ 1.0 at the PCC per IEC 61000-3-3 / IEEE 1453. The calculation requires a time-domain voltage waveform or a simplified ΔV/V method with repetition rate. ETAP and PowerFactory include dedicated flicker assessment modules. CableTrayRoute's `analysis/motorStart.js` computes voltage dip during motor starting (a single event) but does not compute Pst/Plt for repetitive events, has no flickermeter algorithm, and has no IEC 61000-4-15 or IEEE 1453 compliance check. |
+
+**Status:** Not implemented.
 
 ---
 
@@ -830,8 +970,21 @@ Benchmarked against: **ETAP 2024/2025** (Electric Copilot™, composite networks
 | **TCC: Ground fault / residual protection curves** | **No** | Yes | Yes | — | — | — | — | — | — | — |
 | **TCC: CTI tabular coordination report** | ✅ Yes | Yes | Yes | — | — | — | — | — | — | — |
 | **TCC: SVG / vector chart export** | **No** | Yes | Yes | — | — | — | — | — | — | — |
+| **DC Short Circuit & DC Arc Flash (NFPA 70E D.8)** | **No** | Yes | Yes | — | — | — | — | — | — | — |
+| **Battery / UPS Sizing (IEEE 485)** | **No** | Yes | Yes | — | — | — | — | — | — | — |
+| **Capacitor Bank / PFC Sizing** | **No** | Yes | Yes | — | — | — | — | — | — | — |
+| **PV / BESS / Inverter-Based Resource Modeling** | **No** | Yes | — | — | — | — | — | — | — | — |
+| **IEEE 1547 DER Interconnection Study** | **No** | Yes | Yes | — | — | — | — | — | — | — |
+| **Frequency Scan / Harmonic Resonance** | **No** | Yes | Yes | — | — | — | — | — | — | — |
+| **Voltage Stability (P-V / Q-V Curves)** | **No** | Yes | — | — | — | — | — | — | — | — |
+| **Optimal Power Flow / Economic Dispatch** | **No** | Yes | — | — | — | — | — | — | — | — |
+| **Generator Sizing (NFPA 110)** | **No** | Yes | Yes | — | — | — | — | — | — | — |
+| **Differential Protection (87B/T/G)** | **No** | Yes | Yes | — | — | — | — | — | — | — |
+| **IEC 60909 Short-Circuit Method** | **No** | Yes | Yes | — | — | — | — | — | — | — |
+| **Cable Ampacity per IEC 60287** | **No** | Yes | — | — | — | — | — | — | — | — |
+| **Voltage Flicker (IEC 61000-4-15 Pst/Plt)** | **No** | Yes | Yes | — | — | — | — | — | — | — |
 
-*(✓ = implemented since initial 2026-03-16 analysis; new rows = gaps identified in 2026-03-24 refresh; **Usability** rows = UX pattern gaps; **Calc** rows = calculation completeness gaps; **SLD** rows = one-line diagram gaps; **TCC** rows = TCC engine gaps; all ✓ rows implemented as of 2026-04-05; **SLD/TCC** rows = newly identified 2026-04-06, not yet implemented)*
+*(✓ = implemented since initial 2026-03-16 analysis; new rows = gaps identified in 2026-03-24 refresh; **Usability** rows = UX pattern gaps; **Calc** rows = calculation completeness gaps; **SLD** rows = one-line diagram gaps; **TCC** rows = TCC engine gaps; all ✓ rows implemented as of 2026-04-05; **SLD/TCC** rows = newly identified 2026-04-06; bottom 14 rows = advanced power systems gaps identified 2026-04-12, not yet implemented)*
 
 ---
 
@@ -957,6 +1110,32 @@ All originally high- and medium-priority feasible items have been implemented:
 
 ---
 
+### New Gaps — Advanced Power Systems & DER (2026-04-12)
+
+**High Priority — Critical for IEC-jurisdiction projects and modern DER/renewable integration:**
+
+1. **IEC 60909 Short-Circuit Method** (Gap #68) — Required for all non-ANSI-jurisdiction projects. The existing `analysis/shortCircuit.mjs` uses ANSI/IEEE methods only. IEC 60909 voltage factor c, impedance correction factors KG/KT/KSO, peak current ip (κ factor), and breaking/steady-state current distinction are all absent. This blocks use of CableTrayRoute on any IEC-standard project.
+2. **IEC 60287 Cable Ampacity** (Gap #69) — First-principles thermal circuit model for IEC cable rating. Required for custom installation conditions that fall outside pre-tabulated NEC/IEC tables — deep burial, non-standard soil, complex multi-circuit arrangements. Recommended module: `analysis/iec60287.mjs`.
+3. **DC System Short-Circuit & DC Arc Flash** (Gap #58) — Essential for battery rooms, PV arrays, data center UPS buses, and transit/marine DC systems. NFPA 70E Annex D.8 / IEEE 1584 DC model. Recommended modules: `analysis/dcShortCircuit.mjs`, `analysis/dcArcFlash.mjs`.
+4. **PV / BESS / Inverter-Based Resource Modeling** (Gap #61) — The energy transition makes IBR modeling non-optional for any new-build project with solar or storage. P-Q capability, Volt-VAR droop, current-limited fault contribution. Recommended: extend `analysis/loadFlow.js` and `analysis/shortCircuit.mjs` with IBR component types.
+5. **IEEE 1547-2018 DER Interconnection Study** (Gap #62) — Mandatory for any US DER interconnection. Utility-required screening criteria (voltage, protection coordination, anti-islanding, ride-through). Recommended module: `analysis/derInterconnect.mjs`.
+
+**Medium Priority — High engineering value, common in industrial and utility projects:**
+
+6. **Capacitor Bank Sizing & PFC** (Gap #60) — Standard deliverable for industrial power factor correction. kVAR sizing, resonance check, detuned filter specification. Recommended module: `analysis/capacitorBank.mjs`.
+7. **Frequency Scan / Harmonic Resonance** (Gap #63) — Required companion to any capacitor bank installation and essential for harmonic filter design. Impedance-frequency sweep, resonance identification. Recommended: extend `analysis/harmonics.js` with `frequencyScan()`.
+8. **Battery / UPS Sizing per IEEE 485** (Gap #59) — Standard for any facility with emergency power. Duty cycle modeling, cell selection, temperature/aging correction. Recommended module: `analysis/batterySizing.mjs`.
+9. **Standby / Emergency Generator Sizing** (Gap #66) — NFPA 110 / NEC 700-702 compliance. Largest motor start transient on finite generator, altitude/temperature derating, fuel runtime. Recommended module: `analysis/generatorSizing.mjs`.
+10. **Differential Protection Modeling (87B/T/G)** (Gap #67) — Required for transformer and generator unit protection. Percentage-differential characteristic, CT ratio matching, harmonic restraint. Recommended: extend `analysis/tcc.js` and `data/protectiveDevices.json` with `'differential'` device type.
+
+**Lower Priority — Advanced studies for transmission-level and utility planning:**
+
+11. **Voltage Stability (P-V / Q-V Curves)** (Gap #64) — Continuation power flow for voltage collapse margin. Important for NERC TPL compliance and large industrial motor loads. Recommended: extend `analysis/loadFlow.js` with CPF mode.
+12. **Optimal Power Flow / Economic Dispatch** (Gap #65) — Loss minimization, generation cost optimization. Most relevant for utility operations and microgrids with multiple dispatchable sources. Recommended module: `analysis/optimalPowerFlow.mjs`.
+13. **Voltage Flicker (IEC 61000-4-15 Pst/Plt)** (Gap #70) — Important for facilities with arc furnaces, large motor starts, or wind generation. Pst/Plt calculation, IEC 61000-3-3 / IEEE 1453 compliance. Recommended module: `analysis/voltageFlicker.mjs`.
+
+---
+
 ## CableTrayRoute Unique Advantages (Not Found in Competitors)
 
 These features are unique strengths that competitors do not offer:
@@ -1051,14 +1230,46 @@ These features are unique strengths that competitors do not offer:
 - [Rockwell & Eplan Digital Twin Partnership (SPS 2025)](https://www.rockwellautomation.com/en-no/company/news/press-releases/digital-twin-driven-electrical-simulation.html)
 - [IFC Material Overrides for Cable Tray](https://digitalbbq.au/index.php/2025/08/07/setting-ifc-material-overrides-for-cable-tray-and-conduit/)
 
+### Advanced Power Systems Standards (2026-04-12 Refresh)
+
+#### IEC Standards
+- IEC 60909-0:2016 — Short-circuit currents in three-phase AC systems (calculation of currents)
+- IEC 60287-1-1:2023 — Electric cables: calculation of the current rating (100% load factor, direct burial)
+- IEC 61000-4-15:2010+A1:2023 — Electromagnetic compatibility: flickermeter (functional and design specs)
+- IEC 60071-1:2019 — Insulation coordination: definitions, principles and rules
+
+#### IEEE Standards
+- IEEE 946-2020 — Recommended Practice for the Design of DC Power Systems for Stationary Applications
+- IEEE 485-2020 — Recommended Practice for Sizing Lead-Acid Batteries for Stationary Applications
+- IEEE 1547-2018 — Standard for Interconnection and Interoperability of DER with Electric Power Systems
+- IEEE 1453-2022 — Recommended Practice for the Analysis of Fluctuating Installations on Power Systems (voltage flicker)
+
+#### NFPA / NEC
+- NFPA 70E-2024 Annex D.8 — DC Arc Flash Hazard Calculation Methods
+- NFPA 110-2022 — Standard for Emergency and Standby Power Systems
+- NEC 700/701/702 — Emergency / Legally Required Standby / Optional Standby Systems
+
+#### Competitor Study Catalogs
+- ETAP DC Systems Module (battery sizing, DC short circuit, DC arc flash)
+- ETAP Renewable Energy Module (PV array, BESS, IBR dynamic models)
+- ETAP Voltage Stability (continuation power flow, P-V/Q-V curves)
+- ETAP Optimal Power Flow (OPF with economic dispatch)
+- EasyPower DC Arc Flash and DC Short Circuit modules
+- EasyPower Capacitor Bank Sizing and Power Factor Correction
+- DIgSILENT PowerFactory (frequency scan, quasi-dynamic simulation, IEC 60909, IEC 60287)
+- SKM DAPPER DC Module (DC short circuit, battery sizing)
+- CYME DER Hosting Capacity and Time-Series Load Flow
+- Siemens PSS SINCAL (insulation coordination, IEC cable rating)
+- Caterpillar SpecSizer (generator sizing with motor start transient analysis)
+- Schneider Ecodial (DC systems, battery sizing, IEC 60909)
+
 ---
 
-## Next Major Steps — Recommended Roadmap (as of 2026-03-24)
+## Next Major Steps — Recommended Roadmap (as of 2026-04-12)
 
-The following features were implemented in the most recent development cycle and are complete:
-navigation consistency, password confirmation, auth button disabling, alert() replacement, AI Copilot, IFC export, QR codes, REST API, and asymmetric fault types (SLG/L-L/DLG).
+**Active focus: Advanced Power Systems & DER Analysis (Gaps #58–#70).** These 13 gaps represent the next tier of competitive features — advanced AC/DC studies, DER/renewable integration, and IEC calculation methods. See the priority table in "New Gaps — Advanced Power Systems & DER (2026-04-12 Roadmap)" above for the recommended implementation order.
 
-All formerly-pending gaps have been implemented as of 2026-04-04. The tables below are preserved for historical reference with ✅ status.
+All prior gaps (#1–#57) have been implemented as of 2026-04-11. The tables below are preserved for historical reference with ✅ status.
 
 ### Priority 1 — Low Effort, High Impact — All Done ✅
 
@@ -1105,3 +1316,21 @@ All formerly-pending gaps have been implemented as of 2026-04-04. The tables bel
 - **BIM Object Library** — Requires manufacturer data partnerships for Revit RFA / IFC families
 - **Live Manufacturer Pricing Feed** — Requires commercial data licensing (RS Means, Eaton, Legrand)
 - ~~**Cloud-Based Component Library** (#12)~~ — ✅ **Implemented 2026-04-06** — see `tests/cloudLibrary.test.mjs` and `docs/api-reference.md#library-endpoints`
+
+### New Gaps — Advanced Power Systems & DER (2026-04-12 Roadmap)
+
+| Priority | # | Gap | Recommended Module | Effort | Status |
+|---|---|---|---|---|---|
+| **P1** | 68 | **IEC 60909 Short-Circuit Method** | `analysis/iec60909.mjs` | High | Not implemented |
+| **P1** | 69 | **IEC 60287 Cable Ampacity** | `analysis/iec60287.mjs` | High | Not implemented |
+| **P1** | 58 | **DC Short-Circuit & DC Arc Flash** | `analysis/dcShortCircuit.mjs`, `analysis/dcArcFlash.mjs` | High | Not implemented |
+| **P1** | 61 | **PV / BESS / IBR Modeling** | Extend `analysis/loadFlow.js`, `analysis/shortCircuit.mjs` | High | Not implemented |
+| **P1** | 62 | **IEEE 1547 DER Interconnection** | `analysis/derInterconnect.mjs` | Medium | Not implemented |
+| **P2** | 60 | **Capacitor Bank / PFC Sizing** | `analysis/capacitorBank.mjs` | Medium | Not implemented |
+| **P2** | 63 | **Frequency Scan / Harmonic Resonance** | Extend `analysis/harmonics.js` | Medium | Not implemented |
+| **P2** | 59 | **Battery / UPS Sizing (IEEE 485)** | `analysis/batterySizing.mjs` | Medium | Not implemented |
+| **P2** | 66 | **Generator Sizing (NFPA 110)** | `analysis/generatorSizing.mjs` | Medium | Not implemented |
+| **P2** | 67 | **Differential Protection (87B/T/G)** | Extend `analysis/tcc.js`, `data/protectiveDevices.json` | Medium | Not implemented |
+| **P3** | 64 | **Voltage Stability (P-V / Q-V)** | Extend `analysis/loadFlow.js` | High | Not implemented |
+| **P3** | 65 | **Optimal Power Flow / Economic Dispatch** | `analysis/optimalPowerFlow.mjs` | High | Not implemented |
+| **P3** | 70 | **Voltage Flicker (Pst/Plt)** | `analysis/voltageFlicker.mjs` | Medium | Not implemented |
