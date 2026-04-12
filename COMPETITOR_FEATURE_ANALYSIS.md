@@ -1291,6 +1291,30 @@ These features are unique strengths that competitors do not offer:
 
 All prior gaps (#1–#57) have been implemented as of 2026-04-11. The tables below are preserved for historical reference with ✅ status.
 
+### 2026-04-12 Implementation Notes
+
+#### Gap #68 — IEC 60909 Short-Circuit Method ✅ Implemented
+
+Full IEC 60909-0:2016 equivalent voltage source method implemented in `analysis/iec60909.mjs`. The existing `analysis/shortCircuit.mjs` now delegates to this engine when `method === 'IEC'`.
+
+**Implemented:**
+- `cFactor(kV, mode, lvTolerancePct)` — Table 1 voltage factor lookup (LV/MV/HV, c_max/c_min)
+- `kappaIEC(xr)` — Correct IEC peak factor formula: κ = 1.02 + 0.98 × e^(−3/XR) (§4.3.1.1)
+- All four fault type currents: I"k3, I"k2, I"k1, I"k2E (§4.2–4.5)
+- `ip` — Peak current: κ × √2 × I"k3
+- `Ib` — Breaking current (far-from-generator: Ib = I"k3)
+- `Ith` — Thermal equivalent current: I"k3 × √(m+1), with m computed via IEC §4.8.1 analytical formula
+- `transformerCorrectionKT(xTPu, cMax)` — K_T formula exported but not yet applied in the batch runner
+- Standalone study page `iec60909.html` with c-factor mode selector, fault duration input, PDF/CSV export
+- Full unit test suite: `tests/iec60909/iec60909.test.cjs` (25 tests, all passing)
+- User documentation: `docs/iec-60909.md`
+
+**Deferred (follow-on work):**
+- K_T impedance correction automatically applied per-transformer (currently exported but not batch-applied)
+- K_G generator correction factor (synchronous machine impedance correction per §3.6)
+- Near-to-generator μ factor for Ib reduction when generators contribute to the fault
+- Integration into one-line diagram overlays (I"k3/ip overlay labels)
+
 ### Priority 1 — Low Effort, High Impact — All Done ✅
 
 | # | Gap | Files | Status |
@@ -1341,7 +1365,7 @@ All prior gaps (#1–#57) have been implemented as of 2026-04-11. The tables bel
 
 | Priority | # | Gap | Recommended Module | Effort | Status |
 |---|---|---|---|---|---|
-| **P1** | 68 | **IEC 60909 Short-Circuit Method** | `analysis/iec60909.mjs` | High | Not implemented |
+| **P1** | 68 | ~~**IEC 60909 Short-Circuit Method**~~ | `analysis/iec60909.mjs` | High | ✅ Implemented 2026-04-12 |
 | **P1** | 69 | **IEC 60287 Cable Ampacity** | `analysis/iec60287.mjs` | High | Not implemented |
 | **P1** | 58 | **DC Short-Circuit & DC Arc Flash** | `analysis/dcShortCircuit.mjs`, `analysis/dcArcFlash.mjs` | High | Not implemented |
 | **P1** | 61 | **PV / BESS / IBR Modeling** | Extend `analysis/loadFlow.js`, `analysis/shortCircuit.mjs` | High | Not implemented |

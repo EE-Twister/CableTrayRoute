@@ -2,6 +2,7 @@ import { getOneLine, getItem } from '../dataStore.mjs';
 import { scaleCurve } from './tccUtils.js';
 import protectiveDevices from '../data/protectiveDevices.mjs';
 import { calculateTransformerImpedance } from '../utils/transformerImpedance.js';
+import { computeIEC60909Bus } from './iec60909.mjs';
 
 // Basic complex math utilities
 function add(a, b) {
@@ -594,27 +595,50 @@ export function runShortCircuit(modelOrOpts = {}, maybeOpts = {}) {
 
     const prefaultKV = computePrefaultKV(comp, comps, compMap, voltageCache) || 1;
     const method = (comp.method || opts.method || (prefaultKV > 1 ? 'IEC' : 'ANSI')).toUpperCase();
-    const vFactor = method === 'IEC' ? (comp.v_factor || 1.1) : (comp.v_factor || 1.05);
-    const V = (prefaultKV * vFactor) / Math.sqrt(3); // phase voltage in kV
 
-    const I3 = V / mag(z1);
-    const ILG = (3 * V) / mag(add(add(z1, z2), z0));
-    const ILL = (Math.sqrt(3) * V) / mag(add(z1, z2));
-    const Z2Z0 = parallel(z2, z0);
-    const IDLG = (3 * V) / mag(add(z1, Z2Z0));
+    let entry;
+    if (method === 'IEC') {
+      // Delegate to the full IEC 60909-0:2016 engine
+      const iecFields = computeIEC60909Bus({
+        z1,
+        z2,
+        z0,
+        prefaultKV,
+        cMode: opts.cMode || 'max',
+        lvTolerancePct: opts.lvTolerancePct ?? 10,
+        faultDurationS: opts.faultDurationS ?? 1.0,
+        freqHz: opts.freqHz ?? 50,
+        xrOverride: Math.abs(comp.xr_ratio || 0) > 0 ? Math.abs(comp.xr_ratio) : null
+      });
+      entry = {
+        method: 'IEC',
+        prefaultKV: Number(prefaultKV.toFixed(3)),
+        ...iecFields
+      };
+    } else {
+      // ANSI/IEEE C37 calculation (unchanged)
+      const vFactor = comp.v_factor || 1.05;
+      const V = (prefaultKV * vFactor) / Math.sqrt(3); // phase voltage in kV
 
-    const xr = Math.abs(comp.xr_ratio || 0);
-    const asym = I3 * Math.SQRT2 * (1 + Math.exp(-Math.PI / Math.max(xr, 0.01)));
+      const I3 = V / mag(z1);
+      const ILG = (3 * V) / mag(add(add(z1, z2), z0));
+      const ILL = (Math.sqrt(3) * V) / mag(add(z1, z2));
+      const Z2Z0 = parallel(z2, z0);
+      const IDLG = (3 * V) / mag(add(z1, Z2Z0));
 
-    const entry = {
-      method,
-      prefaultKV: Number(prefaultKV.toFixed(3)),
-      threePhaseKA: Number(I3.toFixed(2)),
-      asymKA: Number(asym.toFixed(2)),
-      lineToGroundKA: Number(ILG.toFixed(2)),
-      lineToLineKA: Number(ILL.toFixed(2)),
-      doubleLineGroundKA: Number(IDLG.toFixed(2))
-    };
+      const xr = Math.abs(comp.xr_ratio || 0);
+      const asym = I3 * Math.SQRT2 * (1 + Math.exp(-Math.PI / Math.max(xr, 0.01)));
+
+      entry = {
+        method: 'ANSI',
+        prefaultKV: Number(prefaultKV.toFixed(3)),
+        threePhaseKA: Number(I3.toFixed(2)),
+        asymKA: Number(asym.toFixed(2)),
+        lineToGroundKA: Number(ILG.toFixed(2)),
+        lineToLineKA: Number(ILL.toFixed(2)),
+        doubleLineGroundKA: Number(IDLG.toFixed(2))
+      };
+    }
 
     const lowImpedanceWarning = defaultedLowImpedanceComponents.get(comp.id);
     if (lowImpedanceWarning) {
