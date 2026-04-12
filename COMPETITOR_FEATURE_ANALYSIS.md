@@ -20,11 +20,11 @@ A **2026-04-05 pass** focused specifically on the **one-line diagram editor UI**
 
 A **2026-04-06 pass** performed a focused deep dive on **one-line diagram connectivity features** and the **TCC (Time-Current Curve) engine**, benchmarked against ETAP 2024/2025, EasyPower 2025, SKM PTW 9, PowerWorld Simulator 23, and DIgSILENT PowerFactory 2024. This revealed **10 new gaps** (Gaps #48–#57) across two areas: (1) multi-sheet diagramming and diagram annotation capabilities missing from the one-line editor and (2) advanced TCC curve types, arc flash integration, ground fault protection, and reporting absent from the coordination study tool. See "One-Line Diagram & TCC Deep Dive (2026-04-06)" below.
 
-A **2026-04-11 pass — advanced power systems & DER analysis** performed a focused review of the `analysis/` module tree against the full study catalogs of **ETAP 2024/2025**, **EasyPower 2025**, **SKM PowerTools 9**, **DIgSILENT PowerFactory 2024**, **PSS/E**, **Siemens PSS SINCAL**, **CYME**, and domain-specific sizing calculators (**Schneider Ecodial**, **Caterpillar SpecSizer**, **Eaton Bussmann OSCAR**). The study catalogs were filtered to identify *core* AC/DC power systems analyses that are commonly expected in any modern engineering deliverable (protection, DC, DER, power quality, insulation coordination, economic dispatch). This revealed **13 new gaps** (**Gaps #58–#70**) across DC systems, battery/UPS sizing, renewable/DER integration, harmonic resonance, voltage stability, differential protection, insulation coordination, protection settings interoperability, IEC cable ampacity, voltage flicker, motor derating, quasi-dynamic time-series simulation, and economic optimization. **None of these are yet implemented.** See "Advanced Power Systems & DER Deep Dive (2026-04-11)" below.
+A **2026-04-11 pass — advanced power systems & DER analysis** performed a focused review of the `analysis/` module tree against the full study catalogs of **ETAP 2024/2025**, **EasyPower 2025**, **SKM PowerTools 9**, **DIgSILENT PowerFactory 2024**, **PSS/E**, **Siemens PSS SINCAL**, **CYME**, and domain-specific sizing calculators (**Schneider Ecodial**, **Caterpillar SpecSizer**, **Eaton Bussmann OSCAR**). The study catalogs were filtered to identify *core* AC/DC power systems analyses that are commonly expected in any modern engineering deliverable (protection, DC, DER, power quality, insulation coordination, economic dispatch). This revealed **13 new gaps** (**Gaps #58–#70**) across DC systems, battery/UPS sizing, renewable/DER integration, harmonic resonance, voltage stability, differential protection, insulation coordination, protection settings interoperability, IEC cable ampacity, voltage flicker, motor derating, quasi-dynamic time-series simulation, and economic optimization. **Gap #59 (Battery / UPS Sizing per IEEE 485) has been implemented 2026-04-12. The remaining 11 are not yet implemented.** See "Advanced Power Systems & DER Deep Dive (2026-04-11)" below.
 
 A separate **2026-04-11 extension** to the Cost Estimation module added **custom pricing book import/export** — closing the "user-configurable pricing" half of the live-pricing gap without requiring commercial licensing.
 
-**Current status: 58 of 71 total identified gaps implemented. 1 deferred (BIM/CAD plugin). Live pricing gap extended with custom CSV pricing book. 12 newly identified and open (Gaps #58–#59, #61–#70) — all represent advanced power systems studies not previously in the competitive feature set.**
+**Current status: 59 of 71 total identified gaps implemented. 1 deferred (BIM/CAD plugin). Live pricing gap extended with custom CSV pricing book. 11 newly identified and open (Gaps #58, #61–#70) — all represent advanced power systems studies not previously in the competitive feature set.**
 
 ---
 
@@ -259,7 +259,18 @@ This pass examines CableTrayRoute's `analysis/` module tree against the full stu
 |---|---|---|
 | **Stationary battery sizing and UPS runtime calculation** | ETAP Battery Sizing, EasyPower DC Systems, SKM DAPPER, Schneider Ecodial | IEEE 485 (lead-acid) and IEEE 1115 (nickel-cadmium) define the standard method for sizing stationary batteries: given a duty cycle (time-sequenced load profile of constant-power, constant-current, and momentary loads), compute the minimum battery capacity (Ah at a reference rate) that maintains terminal voltage above the minimum threshold for the full discharge period. This requires cell voltage vs. discharge time curves, temperature correction factors (IEEE 485 §5.2), design margin, and aging factor. ETAP and EasyPower automate this with a graphical duty cycle editor and cell selection from manufacturer databases (Enersys, C&D, EnerSys PowerSafe). CableTrayRoute has `battery_kwh` and `battery_runtime_min` fields in `componentLibrary.json` but no IEEE 485 sizing engine, no duty cycle model, and no cell selection algorithm. |
 
-**Status:** Not implemented.
+**Status:** ✅ **Implemented 2026-04-12.**
+
+Six pure calculation functions and a master run function implemented in `analysis/batterySizing.mjs`:
+- `temperatureFactor()` — IEEE 485 §5.2: K_temp = min(1.0, 1 + coeff × (T_amb − 25)), per-chemistry coefficients (lead-acid 0.008, Li-ion 0.003, NiCd 0.006)
+- `requiredEnergyKwh()` — net energy from multi-period duty cycle: Σ(P_i × Δt_i)
+- `designCapacityKwh()` — full five-step sizing chain: DoD + efficiency → temperature correction → aging factor → design margin
+- `standardBankSize()` — selects nearest standard kWh rating ≥ required from 20-entry table [10…1000 kWh]
+- `runtimeCurve()` — runtime at 25/50/75/100/125% load fractions for the selected bank
+- `upsKvaRequired()` — UPS kVA = P_peak / PF_UPS with nearest standard kVA selection
+- `runBatterySizingAnalysis()` — unified analysis entry point; persisted to `studies.batterySizing` via `dataStore.mjs`
+
+Study page `battery.html` / `battery.js` provides form inputs for system label, average load kW, peak load kW, runtime hours, battery chemistry (lead-acid-flooded/AGM, lithium-ion, nickel-cadmium), ambient temperature °C, design margin %, and UPS output power factor. Results show the full IEEE 485 energy chain with intermediate values, recommended standard bank size with nearby options, runtime curve table, UPS kVA recommendation, and actionable warnings (cold temperature, large bank, high peak-to-average ratio). Engineer review panel via `initStudyApprovalPanel('batterySizing')`. Navigation entry added to Studies section in `src/components/navigation.js`. Rollup bundle entry added: `battery: 'src/battery.js'`. Tests: `tests/batterySizing.test.mjs` (43 assertions). Docs: `docs/battery-sizing.md`.
 
 ---
 

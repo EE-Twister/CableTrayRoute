@@ -36,6 +36,7 @@ const entries = {
   intlCableSize: 'src/intlCableSize.js',
   groundgrid: 'src/groundgrid.js',
   capacitorbank: 'src/capacitorbank.js',
+  battery: 'src/battery.js',
   autosize: 'src/autosize.js',
   submittal: 'src/submittal.js',
   projectreport: 'src/projectreport.js',

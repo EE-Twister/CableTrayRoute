@@ -1,0 +1,317 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <meta name="description" content="Battery and UPS sizing study per IEEE 485-2010 / IEEE 1115-2000. Size a stationary battery bank for required runtime with temperature correction, aging factor, and design margin." />
+  <title>Battery / UPS Sizing — CableTrayRoute</title>
+  <link rel="icon" href="icons/favicon.svg" type="image/svg+xml">
+  <link rel="apple-touch-icon" href="icons/favicon.svg">
+  <!-- Open Graph / Social sharing -->
+  <meta property="og:type" content="website">
+  <meta property="og:title" content="Battery / UPS Sizing — CableTrayRoute">
+  <meta property="og:description" content="IEEE 485-2010 stationary battery sizing with temperature correction, aging factor, and runtime curve.">
+  <meta property="og:image" content="https://cabletrayroute.com/icons/og-preview.png">
+  <meta property="og:site_name" content="CableTrayRoute">
+  <meta property="og:url" content="battery.html">
+  <!-- Canonical URL -->
+  <link rel="canonical" href="battery.html">
+  <link rel="dns-prefetch" href="https://fonts.gstatic.com">
+  <meta name="color-scheme" content="light dark">
+  <link rel="stylesheet" href="style.css" />
+  <script type="module" src="dirtyTracker.js"></script>
+  <script type="module" src="dist/battery.js" defer></script>
+</head>
+<body class="battery-page" data-report-title="Battery / UPS Sizing">
+  <a href="#main-content" class="skip-link">Skip to main content</a>
+  <nav class="top-nav" aria-label="Primary">
+    <button id="nav-toggle" class="nav-toggle" aria-label="Toggle navigation" aria-controls="nav-links" aria-expanded="false" title="Toggle navigation">
+      <img src="icons/toolbar/grid.svg" alt="" aria-hidden="true" class="control-icon" loading="lazy" decoding="async">
+    </button>
+    <div id="nav-links" class="nav-links" role="list">
+      <!-- Populated dynamically by navigation.js -->
+    </div>
+    <button id="settings-btn" class="settings-btn" aria-label="Settings" aria-expanded="false" title="Settings">
+      <img src="icons/toolbar/validate.svg" alt="" aria-hidden="true" class="control-icon" loading="lazy" decoding="async">
+    </button>
+  </nav>
+
+  <div id="settings-menu" class="settings-menu">
+    <label for="theme-select">Theme
+      <select id="theme-select">
+        <option value="system">System</option>
+        <option value="light">Light</option>
+        <option value="dark">Dark</option>
+        <option value="high-contrast">High Contrast</option>
+      </select>
+    </label>
+    <label><input type="checkbox" id="compact-toggle" aria-label="Enable compact table mode"> Compact Mode</label>
+    <label for="unit-select">Units
+      <select id="unit-select">
+        <option value="imperial">Imperial (ft, in)</option>
+        <option value="metric">Metric (m, mm)</option>
+      </select>
+    </label>
+    <button id="help-btn" class="btn" aria-expanded="false" title="Show help">
+      <img src="icons/toolbar/validate.svg" alt="" aria-hidden="true" class="control-icon" loading="lazy" decoding="async">
+      <span>Site Help</span>
+    </button>
+    <button id="new-project-btn" title="Start a new project">
+      <img src="icons/toolbar/copy.svg" alt="" aria-hidden="true" class="control-icon" loading="lazy" decoding="async">
+      <span>New Project</span>
+    </button>
+    <button id="save-project-btn" title="Save current project">
+      <img src="icons/toolbar/export.svg" alt="" aria-hidden="true" class="control-icon" loading="lazy" decoding="async">
+      <span>Save Project</span>
+    </button>
+    <button id="load-project-btn" title="Load an existing project">
+      <img src="icons/toolbar/import.svg" alt="" aria-hidden="true" class="control-icon" loading="lazy" decoding="async">
+      <span>Load Project</span>
+    </button>
+    <button id="export-project-btn" title="Export project data">
+      <img src="icons/toolbar/export.svg" alt="" aria-hidden="true" class="control-icon" loading="lazy" decoding="async">
+      <span>Export Project</span>
+    </button>
+    <button id="import-project-btn" title="Import project data">
+      <img src="icons/toolbar/import.svg" alt="" aria-hidden="true" class="control-icon" loading="lazy" decoding="async">
+      <span>Import Project</span>
+    </button>
+    <input type="file" id="import-project-input" accept=".ctr.json" class="hidden" title="Select project file">
+  </div>
+
+  <div class="container">
+    <main id="main-content" class="main-content">
+
+      <header class="page-header">
+        <h1>Battery / UPS Sizing</h1>
+      </header>
+
+      <details class="method-panel">
+        <summary>Method &amp; Assumptions</summary>
+        <p>Battery sizing follows <strong>IEEE 485-2010</strong> (lead-acid) and
+        <strong>IEEE 1115-2000</strong> (nickel-cadmium). Five sequential de-rating factors are
+        applied to the net energy requirement.</p>
+
+        <p><strong>Step 1 — Net energy:</strong></p>
+        <pre>kWh_net = P_avg_kW &times; t_hours  &nbsp;[uniform load]
+kWh_net = &Sigma;(P_i &times; &Delta;t_i)      &nbsp;[multi-period duty cycle]</pre>
+
+        <p><strong>Step 2 — Efficiency &amp; depth of discharge:</strong></p>
+        <pre>kWh_design = kWh_net / (&eta; &times; DoD)</pre>
+
+        <p><strong>Step 3 — Temperature correction (IEEE 485 &sect;5.2):</strong></p>
+        <pre>K_temp = min(1.0,  1 + coeff &times; (T_amb &minus; 25&deg;C))
+kWh_temp = kWh_design / K_temp</pre>
+        <p>K_temp is capped at 1.0 above 25 &deg;C — IEEE 485 does not credit extra capacity
+        at elevated temperatures.</p>
+
+        <p><strong>Step 4 — Aging factor (IEEE 485 &sect;5.3):</strong></p>
+        <pre>kWh_aged = kWh_temp &times; aging_factor  &nbsp;[1.25 lead-acid, 1.20 Li-ion/NiCd]</pre>
+
+        <p><strong>Step 5 — Design margin (IEEE 485 &sect;5.4):</strong></p>
+        <pre>kWh_final = kWh_aged &times; (1 + margin%)</pre>
+
+        <p><strong>UPS kVA:</strong></p>
+        <pre>kVA_required = P_peak_kW / PF_UPS</pre>
+
+        <p>Citations: <a href="docs/battery-sizing.md">Battery / UPS Sizing Guide</a>.
+        See also: <a href="loadlist.html">Load List</a>,
+        <a href="loadFlow.html">Load Flow</a>,
+        <a href="capacitorbank.html">Capacitor Bank</a>.</p>
+      </details>
+
+      <form id="battery-form" novalidate>
+
+        <!-- System / UPS Identification (Optional) -->
+        <fieldset>
+          <legend><strong>System Identification (Optional)</strong></legend>
+
+          <div class="field-row">
+            <label for="system-label">
+              System / UPS label
+            </label>
+            <input type="text" id="system-label" placeholder="e.g. Critical Load UPS — MCC Room"
+                   aria-describedby="system-label-hint">
+            <p id="system-label-hint" class="field-hint">
+              Descriptive label for the UPS or battery system being sized.
+              Used in the results summary only.
+            </p>
+          </div>
+        </fieldset>
+
+        <!-- Load Parameters -->
+        <fieldset>
+          <legend><strong>Load Parameters</strong></legend>
+
+          <div class="field-row">
+            <label for="avg-load-kw">
+              P<sub>avg</sub> — Average continuous load (kW)
+              <button type="button" class="helpBtn" aria-label="Help — average load">?</button>
+            </label>
+            <input type="number" id="avg-load-kw" min="0.1" step="0.1" value="50"
+                   required aria-describedby="avg-load-hint">
+            <p id="avg-load-hint" class="field-hint">
+              The sustained load the battery must support for the full required runtime.
+              Obtain from the <a href="loadlist.html">Load List</a> or
+              <a href="loadFlow.html">Load Flow</a> study (P column at the UPS bus).
+              Use the running load, not motor starting peaks — motor starts are short transients.
+            </p>
+          </div>
+
+          <div class="field-row">
+            <label for="peak-load-kw">
+              P<sub>peak</sub> — Peak instantaneous load (kW)
+              <button type="button" class="helpBtn" aria-label="Help — peak load">?</button>
+            </label>
+            <input type="number" id="peak-load-kw" min="0.1" step="0.1" value="50"
+                   required aria-describedby="peak-load-hint">
+            <p id="peak-load-hint" class="field-hint">
+              Maximum instantaneous load, including motor starting transients. Used to determine
+              the minimum UPS kVA rating. Must be ≥ average load. Obtain from the
+              <a href="motorStart.html">Motor Start</a> study if large motors are present.
+            </p>
+          </div>
+
+          <div class="field-row">
+            <label for="runtime-hours">
+              t — Required runtime (hours)
+              <button type="button" class="helpBtn" aria-label="Help — runtime">?</button>
+            </label>
+            <input type="number" id="runtime-hours" min="0.01" step="0.01" value="2"
+                   required aria-describedby="runtime-hint">
+            <p id="runtime-hint" class="field-hint">
+              Duration the battery must sustain the load after utility power loss.
+              NEC 700 emergency systems require a minimum of 1.5 hours. Data centres typically
+              specify 4–8 hours to allow for generator dispatch or controlled shutdown.
+            </p>
+          </div>
+        </fieldset>
+
+        <!-- Battery Chemistry & Environment -->
+        <fieldset>
+          <legend><strong>Battery Chemistry &amp; Environment</strong></legend>
+
+          <div class="field-row">
+            <label for="chemistry">
+              Battery chemistry
+              <button type="button" class="helpBtn" aria-label="Help — battery chemistry">?</button>
+            </label>
+            <select id="chemistry" required aria-describedby="chemistry-hint">
+              <option value="lead-acid-agm">Lead-Acid (AGM) — DoD 80%, &eta; 85%</option>
+              <option value="lead-acid-flooded">Lead-Acid (Flooded) — DoD 70%, &eta; 85%</option>
+              <option value="lithium-ion">Lithium-Ion — DoD 90%, &eta; 95%</option>
+              <option value="nickel-cadmium">Nickel-Cadmium (NiCd) — DoD 80%, &eta; 80%</option>
+            </select>
+            <p id="chemistry-hint" class="field-hint">
+              Valve-regulated lead-acid (VRLA / AGM) is the most common choice for UPS applications.
+              Lithium-Ion provides higher energy density and longer cycle life at higher initial cost.
+              Flooded lead-acid offers low cost for large telecom and substation installations.
+              NiCd is preferred in extreme cold (to −40 &deg;C) and for long float service.
+            </p>
+          </div>
+
+          <div class="field-row">
+            <label for="ambient-temp-c">
+              T<sub>amb</sub> — Ambient temperature (&deg;C)
+              <button type="button" class="helpBtn" aria-label="Help — ambient temperature">?</button>
+            </label>
+            <input type="number" id="ambient-temp-c" min="-40" max="60" step="1" value="25"
+                   required aria-describedby="temp-hint">
+            <p id="temp-hint" class="field-hint">
+              Battery room or enclosure operating temperature. IEEE 485 uses 25 &deg;C as the
+              reference; capacity decreases below this temperature (see IEEE 485 &sect;5.2).
+              Use the lowest expected ambient for worst-case sizing.
+            </p>
+          </div>
+        </fieldset>
+
+        <!-- Sizing Factors -->
+        <fieldset>
+          <legend><strong>Sizing Factors</strong></legend>
+
+          <div class="field-row">
+            <label for="design-margin-pct">
+              Design margin (%)
+              <button type="button" class="helpBtn" aria-label="Help — design margin">?</button>
+            </label>
+            <input type="number" id="design-margin-pct" min="0" max="50" step="1" value="10"
+                   required aria-describedby="margin-hint">
+            <p id="margin-hint" class="field-hint">
+              IEEE 485 &sect;5.4 recommends a minimum 10% design margin for general applications.
+              Use 15–25% for life-safety, mission-critical, or high-uncertainty loads.
+              This margin is applied after the aging factor.
+            </p>
+          </div>
+
+          <div class="field-row">
+            <label for="ups-pf">
+              PF<sub>UPS</sub> — UPS output power factor
+              <button type="button" class="helpBtn" aria-label="Help — UPS power factor">?</button>
+            </label>
+            <input type="number" id="ups-pf" min="0.5" max="1.0" step="0.01" value="0.9"
+                   required aria-describedby="ups-pf-hint">
+            <p id="ups-pf-hint" class="field-hint">
+              The power factor at which the UPS inverter is rated. Modern double-conversion UPS
+              units are typically rated at 0.9 or 1.0 power factor. Check the manufacturer
+              data sheet — using an incorrect PF will result in an undersized UPS selection.
+            </p>
+          </div>
+        </fieldset>
+
+        <button type="submit" class="primary-btn">Run Analysis</button>
+
+      </form>
+
+      <div id="results" role="region" aria-live="polite" aria-label="Battery and UPS sizing results"></div>
+
+      <!-- Engineer Review / Approval Panel -->
+      <section class="card" aria-labelledby="study-review-panel-heading">
+        <div id="study-review-panel"></div>
+      </section>
+
+      <nav class="step-nav" aria-label="Workflow navigation">
+        <a href="capacitorbank.html" class="step-nav-prev">&#8592; Capacitor Bank</a>
+        <a href="groundgrid.html" class="step-nav-next">Ground Grid &#8594;</a>
+      </nav>
+
+    </main>
+  </div>
+
+  <div id="help-modal" class="modal" aria-hidden="true" role="dialog" aria-modal="true"
+       aria-labelledby="help-title">
+    <div class="modal-content">
+      <button id="close-help-btn" class="close-btn" aria-label="Close Help">&times;</button>
+      <h2 id="help-title">Battery / UPS Sizing Help</h2>
+      <p>This tool sizes a stationary battery bank and UPS per <strong>IEEE 485-2010</strong>
+      (lead-acid) and <strong>IEEE 1115-2000</strong> (nickel-cadmium).</p>
+      <h3>Workflow</h3>
+      <ol>
+        <li>Enter the average and peak load demand. The average load determines energy; the
+          peak load determines UPS kVA. Obtain from the
+          <a href="loadlist.html">Load List</a> or <a href="loadFlow.html">Load Flow</a> study.</li>
+        <li>Set the required runtime. NEC 700 emergency systems require at least 1.5 hours.</li>
+        <li>Select battery chemistry. Lead-Acid AGM is most common. Lithium-Ion offers
+          higher energy density. NiCd excels in extreme cold.</li>
+        <li>Enter the battery room ambient temperature. IEEE 485 de-rates capacity below 25 &deg;C.</li>
+        <li>Set the design margin (minimum 10% per IEEE 485 &sect;5.4) and UPS power factor.</li>
+        <li>Click <strong>Run Analysis</strong> to see the required bank size and UPS kVA.</li>
+      </ol>
+      <h3>Interpreting results</h3>
+      <ul>
+        <li><strong>Energy chain</strong> — each step showing how the net energy is de-rated
+          to the final installed bank requirement.</li>
+        <li><strong>Recommended bank size</strong> — nearest standard kWh rating that meets
+          or exceeds the final requirement.</li>
+        <li><strong>Runtime curve</strong> — available runtime at 25%, 50%, 75%, 100%, and
+          125% of the specified average load. Use this to evaluate load shedding strategies.</li>
+        <li><strong>UPS kVA</strong> — minimum UPS inverter rating based on peak load and
+          output power factor. Select the next-larger standard size from the vendor.</li>
+      </ul>
+      <p>See <a href="docs/battery-sizing.md">Battery / UPS Sizing Guide</a> for full technical
+      details and standards references.</p>
+    </div>
+  </div>
+
+  <script type="module" src="dist/projectManager.js"></script>
+</body>
+</html>
