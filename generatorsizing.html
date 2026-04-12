@@ -1,0 +1,366 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <meta name="description" content="Standby and emergency generator sizing per NFPA 110 / NEC 700–702. Size a diesel or gas generator for continuous loads with altitude and temperature derating, motor start voltage dip check, and fuel runtime calculation." />
+  <title>Generator Sizing — CableTrayRoute</title>
+  <link rel="icon" href="icons/favicon.svg" type="image/svg+xml">
+  <link rel="apple-touch-icon" href="icons/favicon.svg">
+  <!-- Open Graph / Social sharing -->
+  <meta property="og:type" content="website">
+  <meta property="og:title" content="Generator Sizing — CableTrayRoute">
+  <meta property="og:description" content="NFPA 110 / NEC 700–702 generator sizing with altitude and temperature derating, motor start voltage dip check, and fuel runtime.">
+  <meta property="og:image" content="https://cabletrayroute.com/icons/og-preview.png">
+  <meta property="og:site_name" content="CableTrayRoute">
+  <meta property="og:url" content="generatorsizing.html">
+  <!-- Canonical URL -->
+  <link rel="canonical" href="generatorsizing.html">
+  <link rel="dns-prefetch" href="https://fonts.gstatic.com">
+  <meta name="color-scheme" content="light dark">
+  <link rel="stylesheet" href="style.css" />
+  <script type="module" src="dirtyTracker.js"></script>
+  <script type="module" src="dist/generatorsizing.js" defer></script>
+</head>
+<body class="generatorsizing-page" data-report-title="Generator Sizing">
+  <a href="#main-content" class="skip-link">Skip to main content</a>
+  <nav class="top-nav" aria-label="Primary">
+    <button id="nav-toggle" class="nav-toggle" aria-label="Toggle navigation" aria-controls="nav-links" aria-expanded="false" title="Toggle navigation">
+      <img src="icons/toolbar/grid.svg" alt="" aria-hidden="true" class="control-icon" loading="lazy" decoding="async">
+    </button>
+    <div id="nav-links" class="nav-links" role="list">
+      <!-- Populated dynamically by navigation.js -->
+    </div>
+    <button id="settings-btn" class="settings-btn" aria-label="Settings" aria-expanded="false" title="Settings">
+      <img src="icons/toolbar/validate.svg" alt="" aria-hidden="true" class="control-icon" loading="lazy" decoding="async">
+    </button>
+  </nav>
+
+  <div id="settings-menu" class="settings-menu">
+    <label for="theme-select">Theme
+      <select id="theme-select">
+        <option value="system">System</option>
+        <option value="light">Light</option>
+        <option value="dark">Dark</option>
+        <option value="high-contrast">High Contrast</option>
+      </select>
+    </label>
+    <label><input type="checkbox" id="compact-toggle" aria-label="Enable compact table mode"> Compact Mode</label>
+    <label for="unit-select">Units
+      <select id="unit-select">
+        <option value="imperial">Imperial (ft, in)</option>
+        <option value="metric">Metric (m, mm)</option>
+      </select>
+    </label>
+    <button id="help-btn" class="btn" aria-expanded="false" title="Show help">
+      <img src="icons/toolbar/validate.svg" alt="" aria-hidden="true" class="control-icon" loading="lazy" decoding="async">
+      <span>Site Help</span>
+    </button>
+    <button id="new-project-btn" title="Start a new project">
+      <img src="icons/toolbar/copy.svg" alt="" aria-hidden="true" class="control-icon" loading="lazy" decoding="async">
+      <span>New Project</span>
+    </button>
+    <button id="save-project-btn" title="Save current project">
+      <img src="icons/toolbar/export.svg" alt="" aria-hidden="true" class="control-icon" loading="lazy" decoding="async">
+      <span>Save Project</span>
+    </button>
+    <button id="load-project-btn" title="Load an existing project">
+      <img src="icons/toolbar/import.svg" alt="" aria-hidden="true" class="control-icon" loading="lazy" decoding="async">
+      <span>Load Project</span>
+    </button>
+    <button id="export-project-btn" title="Export project data">
+      <img src="icons/toolbar/export.svg" alt="" aria-hidden="true" class="control-icon" loading="lazy" decoding="async">
+      <span>Export Project</span>
+    </button>
+    <button id="import-project-btn" title="Import project data">
+      <img src="icons/toolbar/import.svg" alt="" aria-hidden="true" class="control-icon" loading="lazy" decoding="async">
+      <span>Import Project</span>
+    </button>
+    <input type="file" id="import-project-input" accept=".ctr.json" class="hidden" title="Select project file">
+  </div>
+
+  <div class="container">
+    <main id="main-content" class="main-content">
+
+      <header class="page-header">
+        <h1>Generator Sizing — NFPA 110 / NEC 700–702</h1>
+      </header>
+
+      <details class="method-panel">
+        <summary>Method &amp; Assumptions</summary>
+        <p>Generator sizing follows <strong>NFPA 110-2022</strong> (Emergency and Standby Power Systems),
+        <strong>NEC Articles 700–702</strong>, and <strong>IEEE 446-1995</strong> (Recommended Practice
+        for Emergency Power Systems). Site derating uses manufacturer-published correction curves as
+        codified in NFPA 110 Annex B and ISO 8528-1.</p>
+
+        <p><strong>Altitude derating</strong> (NFPA 110 Annex B):</p>
+        <pre>altitudeFactor = 1 − 0.03 × max(0, (altitude_ft − 500) / 1000)   [naturally-aspirated]
+altitudeFactor = 1 − 0.01 × max(0, (altitude_ft − 500) / 1000)   [turbocharged]</pre>
+
+        <p><strong>Temperature derating</strong> (ISO 8528-1, standard rating point 40 °C):</p>
+        <pre>tempFactor = 1 − 0.01 × max(0, ambientC − 40)</pre>
+
+        <p><strong>Motor start step load</strong> (IEEE 446 §5.3):</p>
+        <pre>startingKVA = (HP × 0.746) / (PF × efficiency) × LRC_multiplier</pre>
+
+        <p><strong>Transient voltage dip</strong> (IEEE 446 §5.4):</p>
+        <pre>dip% = (stepLoadKVA / genKVA) × X'd%</pre>
+        <p>NFPA 110 Type 10 systems must keep voltage dip ≤ 35% during the largest motor start.</p>
+
+        <p><strong>Fuel runtime:</strong></p>
+        <pre>fuelRate (gal/hr) = loadKW × 1.341 × SFC_lb_per_hp_hr / 6.791
+runtime (hr) = tankCapacity_gal / fuelRate</pre>
+        <p>Default SFC = 0.38 lb/hp-hr (diesel, ~75% load). Diesel density = 6.791 lb/US gal at 60 °F.</p>
+
+        <p>Citations: <a href="docs/generator-sizing.md">Generator Sizing Guide</a>.
+        See also: <a href="motorStart.html">Motor Start</a>,
+        <a href="loadFlow.html">Load Flow</a>,
+        <a href="battery.html">Battery / UPS Sizing</a>.</p>
+      </details>
+
+      <form id="gen-sizing-form" novalidate>
+
+        <!-- Project Identification -->
+        <fieldset>
+          <legend><strong>Project / Location (Optional)</strong></legend>
+          <div class="field-row">
+            <label for="project-label">Project label</label>
+            <input type="text" id="project-label" placeholder="e.g. Building A Emergency Panel"
+                   aria-describedby="project-label-hint">
+            <p id="project-label-hint" class="field-hint">
+              Descriptive label for the generator location or project. Used in the results summary only.
+            </p>
+          </div>
+        </fieldset>
+
+        <!-- Continuous Load Schedule -->
+        <fieldset>
+          <legend><strong>Continuous Load Schedule</strong></legend>
+          <p class="field-hint">
+            List all loads that will be connected to the generator. Use demand factors &lt; 1.0
+            for loads that are unlikely to all operate simultaneously. Obtain load kW from the
+            <a href="loadFlow.html">Load Flow</a> study or equipment nameplates.
+          </p>
+          <table class="data-table" id="load-table" aria-label="Continuous loads">
+            <thead>
+              <tr>
+                <th>Load Description</th>
+                <th>Installed kW</th>
+                <th>Demand Factor</th>
+                <th></th>
+              </tr>
+            </thead>
+            <tbody id="load-table-body">
+              <!-- Rows populated by JS -->
+            </tbody>
+          </table>
+          <button type="button" id="add-load-btn" class="btn">+ Add Load</button>
+        </fieldset>
+
+        <!-- Site Conditions -->
+        <fieldset>
+          <legend><strong>Site Conditions</strong></legend>
+
+          <div class="field-row">
+            <label for="altitude-ft">
+              Site altitude (ft MSL)
+              <button type="button" class="helpBtn" aria-label="Help — altitude">?</button>
+            </label>
+            <input type="number" id="altitude-ft" min="0" step="100" value="0"
+                   aria-describedby="altitude-ft-hint">
+            <p id="altitude-ft-hint" class="field-hint">
+              Installation altitude above mean sea level. Derating begins above 500 ft.
+              Generator output decreases by 3% per 1,000 ft (naturally-aspirated) or 1% per 1,000 ft
+              (turbocharged) above 500 ft per NFPA 110 Annex B.
+            </p>
+          </div>
+
+          <div class="field-row">
+            <label for="ambient-c">
+              Design ambient temperature (°C)
+              <button type="button" class="helpBtn" aria-label="Help — ambient temperature">?</button>
+            </label>
+            <input type="number" id="ambient-c" step="1" value="40"
+                   required aria-describedby="ambient-c-hint">
+            <p id="ambient-c-hint" class="field-hint">
+              Maximum ambient temperature at the generator installation location.
+              Standard rating point is 40 °C (ISO 8528-1). Output is derated 1% per °C above 40 °C.
+              Use the highest expected summer temperature for conservative sizing.
+            </p>
+          </div>
+
+          <div class="field-row">
+            <label for="aspiration">Engine aspiration</label>
+            <select id="aspiration" aria-describedby="aspiration-hint">
+              <option value="naturally-aspirated">Naturally-aspirated (3%/1,000 ft derating)</option>
+              <option value="turbocharged">Turbocharged (1%/1,000 ft derating)</option>
+            </select>
+            <p id="aspiration-hint" class="field-hint">
+              Turbocharged engines maintain output better at altitude. Most modern generators
+              above 150 kW are turbocharged; smaller portable units are often naturally-aspirated.
+              Confirm with the manufacturer's data sheet.
+            </p>
+          </div>
+
+          <div class="field-row">
+            <label for="nfpa110-type">NFPA 110 system type</label>
+            <select id="nfpa110-type" aria-describedby="nfpa110-type-hint">
+              <option value="type-10">Type 10 — ≤ 10 s transfer (NEC Article 700 life safety)</option>
+              <option value="type-60">Type 60 — ≤ 60 s transfer (NEC Article 701 legally required standby)</option>
+              <option value="type-120">Type 120 — ≤ 120 s transfer (NEC Article 702 optional standby)</option>
+            </select>
+            <p id="nfpa110-type-hint" class="field-hint">
+              The NFPA 110 type determines the maximum allowable transfer time and minimum
+              runtime requirements. Type 10 is required for hospital essential electrical systems,
+              egress lighting, and fire protection. Consult the AHJ for classification.
+            </p>
+          </div>
+        </fieldset>
+
+        <!-- Largest Motor Step Load -->
+        <fieldset>
+          <legend><strong>Largest Motor Step Load (Optional)</strong></legend>
+          <p class="field-hint">
+            Enter the largest motor connected to the generator. The motor starting current creates
+            a step kVA demand that may size the generator larger than the continuous load alone.
+            Leave HP at 0 to skip this check. See the <a href="motorStart.html">Motor Start</a>
+            study for detailed starting analysis.
+          </p>
+
+          <div class="field-row">
+            <label for="motor-hp">
+              Largest motor (HP)
+              <button type="button" class="helpBtn" aria-label="Help — motor HP">?</button>
+            </label>
+            <input type="number" id="motor-hp" min="0" step="1" value="0"
+                   aria-describedby="motor-hp-hint">
+            <p id="motor-hp-hint" class="field-hint">
+              Nameplate HP of the largest motor that may start across-the-line while on generator power.
+              For soft-start or VFD-driven motors, use a lower LRC multiplier (1.0–1.5×) below.
+            </p>
+          </div>
+
+          <div class="field-row">
+            <label for="lrc-multiplier">
+              LRC multiplier (× FLA)
+              <button type="button" class="helpBtn" aria-label="Help — LRC multiplier">?</button>
+            </label>
+            <input type="number" id="lrc-multiplier" min="1" max="10" step="0.5" value="6"
+                   aria-describedby="lrc-hint">
+            <p id="lrc-hint" class="field-hint">
+              Locked-rotor current as a multiple of full-load amps. Typical values:
+              across-the-line start 5–7×; star-delta start 2–3×; soft starter 2–4×; VFD 1–1.5×.
+              Use NEMA Design B default of 6× if no nameplate data is available.
+            </p>
+          </div>
+
+          <div class="field-row">
+            <label for="motor-pf">Motor running power factor</label>
+            <input type="number" id="motor-pf" min="0.1" max="1" step="0.01" value="0.85">
+          </div>
+
+          <div class="field-row">
+            <label for="motor-eff">Motor full-load efficiency</label>
+            <input type="number" id="motor-eff" min="0.1" max="1" step="0.01" value="0.92">
+          </div>
+
+          <div class="field-row">
+            <label for="xd-prime">
+              Generator subtransient reactance X'd (%)
+              <button type="button" class="helpBtn" aria-label="Help — subtransient reactance">?</button>
+            </label>
+            <input type="number" id="xd-prime" min="5" max="50" step="1" value="25"
+                   aria-describedby="xd-hint">
+            <p id="xd-hint" class="field-hint">
+              X'd governs the initial voltage dip during a motor start or sudden step load.
+              Typical range: 20–30% for synchronous generators. A lower X'd means a stiffer
+              generator (smaller voltage dip). Obtain from the generator data sheet.
+            </p>
+          </div>
+        </fieldset>
+
+        <!-- Fuel / Runtime -->
+        <fieldset>
+          <legend><strong>Fuel &amp; Runtime</strong></legend>
+
+          <div class="field-row">
+            <label for="fuel-cap-gal">
+              Fuel tank capacity (US gallons)
+              <button type="button" class="helpBtn" aria-label="Help — fuel capacity">?</button>
+            </label>
+            <input type="number" id="fuel-cap-gal" min="0" step="10" value="0"
+                   aria-describedby="fuel-hint">
+            <p id="fuel-hint" class="field-hint">
+              Usable capacity of the base tank or day tank. Leave at 0 to skip the fuel runtime
+              calculation. NFPA 110 §8.3.1 requires a minimum of 2 hours of fuel for Type 10 systems
+              (many AHJs require 4–8 hours; mission-critical facilities often specify 24–72 hours).
+            </p>
+          </div>
+
+          <div class="field-row">
+            <label for="sfc">
+              Specific fuel consumption (lb/hp-hr)
+              <button type="button" class="helpBtn" aria-label="Help — SFC">?</button>
+            </label>
+            <input type="number" id="sfc" min="0.1" max="1.0" step="0.01" value="0.38"
+                   aria-describedby="sfc-hint">
+            <p id="sfc-hint" class="field-hint">
+              Diesel SFC at approximately 75% load. Typical range: 0.35–0.45 lb/hp-hr.
+              Use the generator data sheet value for the expected operating load.
+              Default 0.38 lb/hp-hr is a conservative estimate for modern Tier 4 diesel engines.
+            </p>
+          </div>
+        </fieldset>
+
+        <button type="submit" class="primary-btn">Run Analysis</button>
+
+      </form>
+
+      <div id="results" role="region" aria-live="polite" aria-label="Generator sizing results"></div>
+
+      <!-- Engineer Review / Approval Panel -->
+      <section class="card" aria-labelledby="study-review-panel-heading">
+        <div id="study-review-panel"></div>
+      </section>
+
+      <nav class="step-nav" aria-label="Workflow navigation">
+        <a href="battery.html" class="step-nav-prev">&#8592; Battery / UPS Sizing</a>
+        <a href="motorStart.html" class="step-nav-next">Motor Start &#8594;</a>
+      </nav>
+
+    </main>
+  </div>
+
+  <div id="help-modal" class="modal" aria-hidden="true" role="dialog" aria-modal="true"
+       aria-labelledby="help-title">
+    <div class="modal-content">
+      <button id="close-help-btn" class="close-btn" aria-label="Close Help">&times;</button>
+      <h2 id="help-title">Generator Sizing Help</h2>
+      <p>This tool sizes a standby or emergency generator per <strong>NFPA 110-2022</strong>
+      and <strong>NEC Articles 700–702</strong>.</p>
+      <h3>Workflow</h3>
+      <ol>
+        <li>Enter all loads that must be served by the generator in the <strong>Load Schedule</strong>
+          table. Obtain load kW from nameplates or the <a href="loadFlow.html">Load Flow</a> study.</li>
+        <li>Enter the site altitude and design ambient temperature. The tool applies NFPA 110
+          Annex B derating automatically.</li>
+        <li>Enter the largest motor HP and LRC multiplier to check the motor start voltage dip.
+          For VFD-driven motors, use a low LRC multiplier (1.0–1.5×).</li>
+        <li>Enter the fuel tank capacity to calculate estimated runtime.</li>
+        <li>Click <strong>Run Analysis</strong> to see the recommended generator size.</li>
+      </ol>
+      <h3>Standards</h3>
+      <ul>
+        <li><strong>NFPA 110-2022</strong> — §6 (site conditions), §8.3.1 (fuel requirements)</li>
+        <li><strong>NEC Article 700</strong> — Emergency systems (Type 10)</li>
+        <li><strong>NEC Article 701</strong> — Legally required standby (Type 60)</li>
+        <li><strong>NEC Article 702</strong> — Optional standby (Type 120)</li>
+        <li><strong>IEEE 446-1995</strong> — Motor start step load analysis</li>
+        <li><strong>ISO 8528-1</strong> — Generator rating point (40 °C, sea level)</li>
+      </ul>
+      <p>See full documentation: <a href="docs/generator-sizing.md">Generator Sizing Guide</a>.</p>
+    </div>
+  </div>
+
+</body>
+</html>

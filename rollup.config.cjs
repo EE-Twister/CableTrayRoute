@@ -37,6 +37,7 @@ const entries = {
   groundgrid: 'src/groundgrid.js',
   capacitorbank: 'src/capacitorbank.js',
   battery: 'src/battery.js',
+  generatorsizing: 'src/generatorsizing.js',
   autosize: 'src/autosize.js',
   submittal: 'src/submittal.js',
   projectreport: 'src/projectreport.js',
