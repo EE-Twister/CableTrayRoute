@@ -1,0 +1,306 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <meta name="description" content="Capacitor bank sizing and power factor correction study. Compute required kVAR, select standard bank size, and check harmonic resonance per IEEE 18-2012." />
+  <title>Capacitor Bank Sizing — CableTrayRoute</title>
+  <link rel="icon" href="icons/favicon.svg" type="image/svg+xml">
+  <link rel="apple-touch-icon" href="icons/favicon.svg">
+  <!-- Open Graph / Social sharing -->
+  <meta property="og:type" content="website">
+  <meta property="og:title" content="Capacitor Bank Sizing — CableTrayRoute">
+  <meta property="og:description" content="Power factor correction sizing with harmonic resonance check per IEEE 18-2012 and IEEE 519-2022.">
+  <meta property="og:image" content="https://cabletrayroute.com/icons/og-preview.png">
+  <meta property="og:site_name" content="CableTrayRoute">
+  <meta property="og:url" content="capacitorbank.html">
+  <!-- Canonical URL -->
+  <link rel="canonical" href="capacitorbank.html">
+  <link rel="dns-prefetch" href="https://fonts.gstatic.com">
+  <meta name="color-scheme" content="light dark">
+  <link rel="stylesheet" href="style.css" />
+  <script type="module" src="dirtyTracker.js"></script>
+  <script type="module" src="dist/capacitorbank.js" defer></script>
+</head>
+<body class="capacitorbank-page" data-report-title="Capacitor Bank Sizing">
+  <a href="#main-content" class="skip-link">Skip to main content</a>
+  <nav class="top-nav" aria-label="Primary">
+    <button id="nav-toggle" class="nav-toggle" aria-label="Toggle navigation" aria-controls="nav-links" aria-expanded="false" title="Toggle navigation">
+      <img src="icons/toolbar/grid.svg" alt="" aria-hidden="true" class="control-icon" loading="lazy" decoding="async">
+    </button>
+    <div id="nav-links" class="nav-links" role="list">
+      <!-- Populated dynamically by navigation.js -->
+    </div>
+    <button id="settings-btn" class="settings-btn" aria-label="Settings" aria-expanded="false" title="Settings">
+      <img src="icons/toolbar/validate.svg" alt="" aria-hidden="true" class="control-icon" loading="lazy" decoding="async">
+    </button>
+  </nav>
+
+  <div id="settings-menu" class="settings-menu">
+    <label for="theme-select">Theme
+      <select id="theme-select">
+        <option value="system">System</option>
+        <option value="light">Light</option>
+        <option value="dark">Dark</option>
+        <option value="high-contrast">High Contrast</option>
+      </select>
+    </label>
+    <label><input type="checkbox" id="compact-toggle" aria-label="Enable compact table mode"> Compact Mode</label>
+    <label for="unit-select">Units
+      <select id="unit-select">
+        <option value="imperial">Imperial (ft, in)</option>
+        <option value="metric">Metric (m, mm)</option>
+      </select>
+    </label>
+    <button id="help-btn" class="btn" aria-expanded="false" title="Show help">
+      <img src="icons/toolbar/validate.svg" alt="" aria-hidden="true" class="control-icon" loading="lazy" decoding="async">
+      <span>Site Help</span>
+    </button>
+    <button id="new-project-btn" title="Start a new project">
+      <img src="icons/toolbar/copy.svg" alt="" aria-hidden="true" class="control-icon" loading="lazy" decoding="async">
+      <span>New Project</span>
+    </button>
+    <button id="save-project-btn" title="Save current project">
+      <img src="icons/toolbar/export.svg" alt="" aria-hidden="true" class="control-icon" loading="lazy" decoding="async">
+      <span>Save Project</span>
+    </button>
+    <button id="load-project-btn" title="Load an existing project">
+      <img src="icons/toolbar/import.svg" alt="" aria-hidden="true" class="control-icon" loading="lazy" decoding="async">
+      <span>Load Project</span>
+    </button>
+    <button id="export-project-btn" title="Export project data">
+      <img src="icons/toolbar/export.svg" alt="" aria-hidden="true" class="control-icon" loading="lazy" decoding="async">
+      <span>Export Project</span>
+    </button>
+    <button id="import-project-btn" title="Import project data">
+      <img src="icons/toolbar/import.svg" alt="" aria-hidden="true" class="control-icon" loading="lazy" decoding="async">
+      <span>Import Project</span>
+    </button>
+    <input type="file" id="import-project-input" accept=".ctr.json" class="hidden" title="Select project file">
+  </div>
+
+  <div class="container">
+    <main id="main-content" class="main-content">
+
+      <header class="page-header">
+        <h1>Capacitor Bank Sizing &amp; Power Factor Correction</h1>
+      </header>
+
+      <details class="method-panel">
+        <summary>Method &amp; Assumptions</summary>
+        <p>Power factor correction sizing follows <strong>IEEE 18-2012</strong> (Shunt Power Capacitors)
+        and <strong>IEEE 519-2022</strong> (Harmonic Limits). The resonance check uses the standard
+        parallel resonance formula.</p>
+
+        <p><strong>Required capacitor kVAR</strong> (IEEE 18-2012 §7):</p>
+        <pre>Q_cap = P × (tan(cos⁻¹(pf_existing)) − tan(cos⁻¹(pf_target)))</pre>
+
+        <p><strong>Parallel resonance harmonic order:</strong></p>
+        <pre>h_r = √(kVA_sc / kVAR_cap)</pre>
+        <p>A system impedance peak (parallel resonance) occurs near harmonic h_r. If h_r coincides
+        with a dominant harmonic produced by non-linear loads (5th, 7th, 11th, 13th), harmonic
+        voltage amplification can damage equipment and violate IEEE 519 limits.</p>
+
+        <p><strong>Detuned reactor</strong> — a series reactor placed in the capacitor branch shifts
+        the LC resonance below the nearest harmonic. Standard detuning factors:</p>
+        <ul>
+          <li><strong>5.67%</strong> — series resonance at h = 4.30 (protects against 5th harmonic)</li>
+          <li><strong>7%</strong> — series resonance at h = 3.78 (wider margin, protects against 5th)</li>
+          <li><strong>14%</strong> — series resonance at h = 2.68 (protects against 3rd harmonic)</li>
+        </ul>
+
+        <p>Citations: <a href="docs/capacitor-bank.md">Capacitor Bank Sizing Guide</a>.
+        See also: <a href="harmonics.html">Harmonics</a>,
+        <a href="loadFlow.html">Load Flow</a>,
+        <a href="shortCircuit.html">Short Circuit</a>.</p>
+      </details>
+
+      <form id="cap-bank-form" novalidate>
+
+        <!-- Bus / Load Identification -->
+        <fieldset>
+          <legend><strong>Load Identification (Optional)</strong></legend>
+
+          <div class="field-row">
+            <label for="bus-label">
+              Bus / Node label
+            </label>
+            <input type="text" id="bus-label" placeholder="e.g. Main LV Bus 480 V"
+                   aria-describedby="bus-label-hint">
+            <p id="bus-label-hint" class="field-hint">
+              Descriptive label for the bus or point of common coupling where the capacitor bank
+              will be installed. Used in the results summary only.
+            </p>
+          </div>
+        </fieldset>
+
+        <!-- Load Parameters -->
+        <fieldset>
+          <legend><strong>Load Parameters</strong></legend>
+
+          <div class="field-row">
+            <label for="p-kw">
+              P — Real power load (kW)
+              <button type="button" class="helpBtn" aria-label="Help — real power">?</button>
+            </label>
+            <input type="number" id="p-kw" min="0.1" step="0.1" value="1000"
+                   required aria-describedby="p-kw-hint">
+            <p id="p-kw-hint" class="field-hint">
+              Total real power demand of the load group to be corrected. Obtain from the
+              <a href="loadFlow.html">Load Flow</a> study bus results (P column) or from
+              monthly utility billing kWh ÷ operating hours.
+            </p>
+          </div>
+
+          <div class="field-row">
+            <label for="pf-existing">
+              PF<sub>existing</sub> — Existing power factor (lagging)
+              <button type="button" class="helpBtn" aria-label="Help — existing power factor">?</button>
+            </label>
+            <input type="number" id="pf-existing" min="0.01" max="1.0" step="0.01" value="0.80"
+                   required aria-describedby="pf-existing-hint">
+            <p id="pf-existing-hint" class="field-hint">
+              Current power factor. Read from the utility billing statement ("demand power factor"),
+              the <a href="loadFlow.html">Load Flow</a> study, or a power quality analyzer.
+              Typical industrial value: 0.75–0.85 lagging.
+            </p>
+          </div>
+
+          <div class="field-row">
+            <label for="pf-target">
+              PF<sub>target</sub> — Target power factor
+              <button type="button" class="helpBtn" aria-label="Help — target power factor">?</button>
+            </label>
+            <input type="number" id="pf-target" min="0.01" max="1.0" step="0.01" value="0.95"
+                   required aria-describedby="pf-target-hint">
+            <p id="pf-target-hint" class="field-hint">
+              Desired corrected power factor. Most utilities levy a power factor penalty below
+              0.90 or 0.95; check your tariff. A target of 0.95 provides a safety margin below
+              the unity limit (leading PF can cause voltage rise at light load).
+            </p>
+          </div>
+
+          <div class="field-row">
+            <label for="voltage-kv">
+              V — System voltage (kV)
+            </label>
+            <input type="number" id="voltage-kv" min="0.001" step="0.001" value="0.48"
+                   aria-describedby="voltage-kv-hint">
+            <p id="voltage-kv-hint" class="field-hint">
+              Line-to-line voltage at the installation bus. Used for annotation and to help
+              select appropriate capacitor voltage rating (specify capacitors rated ≥ 110% of
+              system voltage per IEEE 18-2012 §5.2).
+            </p>
+          </div>
+        </fieldset>
+
+        <!-- Resonance Check -->
+        <fieldset>
+          <legend><strong>Harmonic Resonance Check</strong></legend>
+
+          <div class="field-row">
+            <label for="kva-sc-mva">
+              MVA<sub>sc</sub> — Short-circuit MVA at bus
+              <button type="button" class="helpBtn" aria-label="Help — short-circuit MVA">?</button>
+            </label>
+            <input type="number" id="kva-sc-mva" min="0" step="0.1" value="10"
+                   aria-describedby="kva-sc-mva-hint">
+            <p id="kva-sc-mva-hint" class="field-hint">
+              Three-phase short-circuit MVA at the bus where the capacitor bank will be installed.
+              Obtain from the <a href="shortCircuit.html">Short Circuit</a> study results
+              (MVA<sub>sc</sub> = √3 × V<sub>kV</sub> × I<sub>sc,kA</sub>).
+              Leave at 0 to skip the resonance check.
+            </p>
+          </div>
+
+          <div class="field-row">
+            <label>Dominant harmonic orders present at this bus</label>
+            <div class="checkbox-group" aria-describedby="harmonics-hint">
+              <label class="checkbox-label">
+                <input type="checkbox" class="harmonic-cb" value="3"> 3rd (triplen — transformers, single-phase loads)
+              </label>
+              <label class="checkbox-label">
+                <input type="checkbox" class="harmonic-cb" value="5" checked> 5th (six-pulse VFDs, rectifiers)
+              </label>
+              <label class="checkbox-label">
+                <input type="checkbox" class="harmonic-cb" value="7" checked> 7th (six-pulse VFDs, rectifiers)
+              </label>
+              <label class="checkbox-label">
+                <input type="checkbox" class="harmonic-cb" value="11"> 11th (twelve-pulse drives, UPS)
+              </label>
+              <label class="checkbox-label">
+                <input type="checkbox" class="harmonic-cb" value="13"> 13th (twelve-pulse drives, UPS)
+              </label>
+            </div>
+            <p id="harmonics-hint" class="field-hint">
+              Select the harmonic orders produced by non-linear loads on this bus.
+              The resonance check will flag a danger warning if the capacitor bank creates a
+              parallel resonance near any selected order. Use the
+              <a href="harmonics.html">Harmonics</a> study to identify dominant orders.
+            </p>
+          </div>
+        </fieldset>
+
+        <button type="submit" class="primary-btn">Run Analysis</button>
+
+      </form>
+
+      <div id="results" role="region" aria-live="polite" aria-label="Capacitor bank sizing results"></div>
+
+      <!-- Engineer Review / Approval Panel -->
+      <section class="card" aria-labelledby="study-review-panel-heading">
+        <div id="study-review-panel"></div>
+      </section>
+
+      <nav class="step-nav" aria-label="Workflow navigation">
+        <a href="harmonics.html" class="step-nav-prev">&#8592; Harmonics</a>
+        <a href="voltagedropstudy.html" class="step-nav-next">Voltage Drop &#8594;</a>
+      </nav>
+
+    </main>
+  </div>
+
+  <div id="help-modal" class="modal" aria-hidden="true" role="dialog" aria-modal="true"
+       aria-labelledby="help-title">
+    <div class="modal-content">
+      <button id="close-help-btn" class="close-btn" aria-label="Close Help">&times;</button>
+      <h2 id="help-title">Capacitor Bank Sizing Help</h2>
+      <p>This tool sizes a shunt capacitor bank for power factor correction (PFC) and checks
+      for harmonic resonance risk per <strong>IEEE 18-2012</strong> and <strong>IEEE 519-2022</strong>.</p>
+      <h3>Workflow</h3>
+      <ol>
+        <li>Enter the real power load (kW) and existing power factor from the
+          <a href="loadFlow.html">Load Flow</a> study or utility billing.</li>
+        <li>Set the target power factor (typically 0.95 to avoid utility penalties).</li>
+        <li>Enter the short-circuit MVA from the <a href="shortCircuit.html">Short Circuit</a>
+          study. This enables the harmonic resonance check.</li>
+        <li>Select which harmonic orders are dominant at this bus (from the
+          <a href="harmonics.html">Harmonics</a> study).</li>
+        <li>Click <strong>Run Analysis</strong> to see required kVAR, recommended bank size,
+          and resonance risk.</li>
+      </ol>
+      <h3>Interpreting results</h3>
+      <ul>
+        <li><strong>Required kVAR</strong> — capacitor reactive power to achieve the target PF.</li>
+        <li><strong>Standard bank size</strong> — nearest NEMA standard rating ≥ required kVAR.</li>
+        <li><strong>2-stage option</strong> — two equal switched stages to avoid leading PF at light load.</li>
+        <li><strong>Resonance order h<sub>r</sub></strong>:
+          <ul>
+            <li><em>Safe</em> — resonance is not near any dominant harmonic.</li>
+            <li><em>Caution</em> — resonance is within 1 harmonic order of a dominant harmonic.
+              Measure harmonic levels before energizing.</li>
+            <li><em>Danger</em> — resonance is within 0.5 of a dominant harmonic.
+              Install a detuned reactor before energizing.</li>
+          </ul>
+        </li>
+        <li><strong>Detuned reactor</strong> — series reactor in the capacitor branch that shifts
+          resonance below the nearest dominant harmonic. The detuning factor (%) is the reactor's
+          reactance as a percentage of the capacitor reactance at fundamental frequency.</li>
+      </ul>
+      <p>See <a href="docs/capacitor-bank.md">Capacitor Bank Sizing Guide</a> for full technical details.</p>
+    </div>
+  </div>
+
+  <script type="module" src="dist/projectManager.js"></script>
+</body>
+</html>

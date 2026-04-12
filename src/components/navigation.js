@@ -32,6 +32,7 @@ const NAV_ROUTES = [
   { href: 'oneline.html', label: 'One-Line', section: 'Workflow', icon: 'icons/oneline.svg' },
   { href: 'tcc.html', label: 'TCC', section: 'Studies', icon: 'icons/toolbar/validate.svg' },
   { href: 'harmonics.html', label: 'Harmonics', section: 'Studies', icon: 'icons/toolbar/grid-size.svg' },
+  { href: 'capacitorbank.html', label: 'Capacitor Bank', section: 'Studies', icon: 'icons/toolbar/grid-size.svg' },
   { href: 'motorStart.html', label: 'Motor Start', section: 'Studies', icon: 'icons/Motor.svg' },
   { href: 'loadFlow.html', label: 'Load Flow', section: 'Studies', icon: 'icons/Load.svg' },
   { href: 'shortCircuit.html', label: 'Short Circuit', section: 'Studies', icon: 'icons/components/Breaker.svg' },

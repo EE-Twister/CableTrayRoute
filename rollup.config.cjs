@@ -35,6 +35,7 @@ const entries = {
   trayhardwarebom: 'src/trayhardwarebom.js',
   intlCableSize: 'src/intlCableSize.js',
   groundgrid: 'src/groundgrid.js',
+  capacitorbank: 'src/capacitorbank.js',
   autosize: 'src/autosize.js',
   submittal: 'src/submittal.js',
   projectreport: 'src/projectreport.js',
