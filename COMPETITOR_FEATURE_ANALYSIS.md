@@ -24,7 +24,7 @@ A **2026-04-11 pass — advanced power systems & DER analysis** performed a focu
 
 A separate **2026-04-11 extension** to the Cost Estimation module added **custom pricing book import/export** — closing the "user-configurable pricing" half of the live-pricing gap without requiring commercial licensing.
 
-**Current status: 57 of 71 total identified gaps implemented. 1 deferred (BIM/CAD plugin). Live pricing gap extended with custom CSV pricing book. 13 newly identified and open (Gaps #58–#70) — all represent advanced power systems studies not previously in the competitive feature set.**
+**Current status: 58 of 71 total identified gaps implemented. 1 deferred (BIM/CAD plugin). Live pricing gap extended with custom CSV pricing book. 12 newly identified and open (Gaps #58–#59, #61–#70) — all represent advanced power systems studies not previously in the competitive feature set.**
 
 ---
 
@@ -269,7 +269,16 @@ This pass examines CableTrayRoute's `analysis/` module tree against the full stu
 |---|---|---|
 | **Automatic PFC sizing with resonance check** | ETAP Optimal Capacitor Placement, EasyPower Capacitor Module, DIgSILENT PowerFactory | Power factor correction is a standard deliverable for industrial facilities. The sizing workflow: (1) measure/estimate reactive power demand (kVAR) from load flow results; (2) select capacitor bank kVAR to achieve target PF (typically 0.95 or utility penalty threshold); (3) verify no parallel resonance between the cap bank and system impedance at any harmonic order (h_r = √(MVA_sc / MVAR_cap)); (4) if resonance falls near a dominant harmonic (5th, 7th, 11th), specify a detuned reactor (typically 5.67%, 7%, or 14% tuning factor). ETAP includes automatic optimal capacitor placement with loss minimization. CableTrayRoute's `analysis/harmonics.js` models harmonic sources and computes THD, and `analysis/loadFlow.js` computes reactive power flows, but there is no capacitor bank sizing function, no kVAR target optimizer, no resonance check formula, and no detuned filter specification. |
 
-**Status:** Not implemented.
+**Status:** ✅ **Implemented 2026-04-12.**
+
+Four pure calculation functions and a master run function implemented in `analysis/capacitorBank.mjs`:
+- `requiredKvar()` — IEEE 18-2012 §7 PFC formula: `Q_cap = P × (tan(cos⁻¹(pf_existing)) − tan(cos⁻¹(pf_target)))`
+- `resonanceOrder()` — parallel resonance harmonic order: `h_r = √(kVA_sc / kVAR_cap)` with 'safe' / 'caution' / 'danger' risk classification (bands: ±0.5 danger, ±1.0 caution relative to dominant harmonics)
+- `detuningRecommendation()` — maps resonance order to standard detuning factors: 5.67% (h_tune=4.30), 7% (h_tune=3.78), 14% (h_tune=2.68)
+- `standardBankSizes()` — selects nearest NEMA standard kVAR rating ≥ required, plus 2-stage switched option
+- `runCapacitorBankAnalysis()` — unified analysis entry point; reads optional pre-existing studies context; persisted to `studies.capacitorBank` via `dataStore.mjs`
+
+Study page `capacitorbank.html` / `capacitorbank.js` provides form inputs for bus label, P (kW), existing and target PF, system voltage, SC MVA, and dominant harmonic order checkboxes. Results show required kVAR with formula, recommended standard bank + 2-stage option, resonance risk badge (colour-coded), and detuning reactor specification card. Engineer review panel via `initStudyApprovalPanel('capacitorBank')`. Navigation entry added to Studies section in `src/components/navigation.js`. Rollup bundle entry added: `capacitorbank: 'src/capacitorbank.js'`. Tests: `tests/capacitorBank.test.mjs` (26 assertions). Docs: `docs/capacitor-bank.md`.
 
 ---
 
@@ -972,7 +981,7 @@ Benchmarked against: **ETAP 2024/2025** (Electric Copilot™, composite networks
 | **TCC: SVG / vector chart export** | **No** | Yes | Yes | — | — | — | — | — | — | — |
 | **DC Short Circuit & DC Arc Flash (NFPA 70E D.8)** | **No** | Yes | Yes | — | — | — | — | — | — | — |
 | **Battery / UPS Sizing (IEEE 485)** | **No** | Yes | Yes | — | — | — | — | — | — | — |
-| **Capacitor Bank / PFC Sizing** | **No** | Yes | Yes | — | — | — | — | — | — | — |
+| **Capacitor Bank / PFC Sizing** | **Yes ✓** | Yes | Yes | — | — | — | — | — | — | — |
 | **PV / BESS / Inverter-Based Resource Modeling** | **No** | Yes | — | — | — | — | — | — | — | — |
 | **IEEE 1547 DER Interconnection Study** | **No** | Yes | Yes | — | — | — | — | — | — | — |
 | **Frequency Scan / Harmonic Resonance** | **No** | Yes | Yes | — | — | — | — | — | — | — |
@@ -1122,7 +1131,7 @@ All originally high- and medium-priority feasible items have been implemented:
 
 **Medium Priority — High engineering value, common in industrial and utility projects:**
 
-6. **Capacitor Bank Sizing & PFC** (Gap #60) — Standard deliverable for industrial power factor correction. kVAR sizing, resonance check, detuned filter specification. Recommended module: `analysis/capacitorBank.mjs`.
+6. ~~**Capacitor Bank Sizing & PFC** (Gap #60)~~ — ✅ **Implemented 2026-04-12.** `analysis/capacitorBank.mjs`, `capacitorbank.html`, `tests/capacitorBank.test.mjs`, `docs/capacitor-bank.md`.
 7. **Frequency Scan / Harmonic Resonance** (Gap #63) — Required companion to any capacitor bank installation and essential for harmonic filter design. Impedance-frequency sweep, resonance identification. Recommended: extend `analysis/harmonics.js` with `frequencyScan()`.
 8. **Battery / UPS Sizing per IEEE 485** (Gap #59) — Standard for any facility with emergency power. Duty cycle modeling, cell selection, temperature/aging correction. Recommended module: `analysis/batterySizing.mjs`.
 9. **Standby / Emergency Generator Sizing** (Gap #66) — NFPA 110 / NEC 700-702 compliance. Largest motor start transient on finite generator, altitude/temperature derating, fuel runtime. Recommended module: `analysis/generatorSizing.mjs`.
@@ -1326,7 +1335,7 @@ All prior gaps (#1–#57) have been implemented as of 2026-04-11. The tables bel
 | **P1** | 58 | **DC Short-Circuit & DC Arc Flash** | `analysis/dcShortCircuit.mjs`, `analysis/dcArcFlash.mjs` | High | Not implemented |
 | **P1** | 61 | **PV / BESS / IBR Modeling** | Extend `analysis/loadFlow.js`, `analysis/shortCircuit.mjs` | High | Not implemented |
 | **P1** | 62 | **IEEE 1547 DER Interconnection** | `analysis/derInterconnect.mjs` | Medium | Not implemented |
-| **P2** | 60 | **Capacitor Bank / PFC Sizing** | `analysis/capacitorBank.mjs` | Medium | Not implemented |
+| **P2** | 60 | **Capacitor Bank / PFC Sizing** | `analysis/capacitorBank.mjs` | Medium | ✅ Implemented 2026-04-12 |
 | **P2** | 63 | **Frequency Scan / Harmonic Resonance** | Extend `analysis/harmonics.js` | Medium | Not implemented |
 | **P2** | 59 | **Battery / UPS Sizing (IEEE 485)** | `analysis/batterySizing.mjs` | Medium | Not implemented |
 | **P2** | 66 | **Generator Sizing (NFPA 110)** | `analysis/generatorSizing.mjs` | Medium | Not implemented |
