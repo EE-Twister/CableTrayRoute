@@ -24,16 +24,35 @@ export function runShortCircuitStudy(opts = {}) {
   const studies = getStudies();
   studies.shortCircuit = res;
   setStudies(studies);
-  const headers = ['bus', 'threePhaseKA', 'lineToGroundKA', 'lineToLineKA', 'doubleLineGroundKA'];
-  const rows = Object.entries(res).map(([id, r]) => ({
-    bus: id,
-    threePhaseKA: r.threePhaseKA,
-    lineToGroundKA: r.lineToGroundKA,
-    lineToLineKA: r.lineToLineKA,
-    doubleLineGroundKA: r.doubleLineGroundKA
-  }));
+  const isIEC = Object.values(res).some(r => r.method === 'IEC');
+  const headers = isIEC
+    ? ['bus', 'prefaultKV', 'threePhaseKA', 'lineToGroundKA', 'lineToLineKA', 'ip', 'Ib', 'Ith', 'kappa']
+    : ['bus', 'threePhaseKA', 'lineToGroundKA', 'lineToLineKA', 'doubleLineGroundKA'];
+  const rows = Object.entries(res).map(([id, r]) => {
+    if (isIEC) {
+      return {
+        bus: id,
+        prefaultKV: r.prefaultKV,
+        threePhaseKA: r.threePhaseKA,
+        lineToGroundKA: r.lineToGroundKA,
+        lineToLineKA: r.lineToLineKA,
+        ip: r.ip,
+        Ib: r.Ib,
+        Ith: r.Ith,
+        kappa: r.kappa
+      };
+    }
+    return {
+      bus: id,
+      threePhaseKA: r.threePhaseKA,
+      lineToGroundKA: r.lineToGroundKA,
+      lineToLineKA: r.lineToLineKA,
+      doubleLineGroundKA: r.doubleLineGroundKA
+    };
+  });
   if (rows.length) {
-    downloadPDF('Short Circuit Report', headers, rows, 'shortcircuit.pdf');
+    const title = isIEC ? 'IEC 60909 Short-Circuit Report' : 'Short Circuit Report';
+    downloadPDF(title, headers, rows, 'shortcircuit.pdf');
   }
   return res;
 }
