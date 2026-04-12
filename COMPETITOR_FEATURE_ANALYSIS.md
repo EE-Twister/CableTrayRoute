@@ -349,7 +349,7 @@ Study page `capacitorbank.html` / `capacitorbank.js` provides form inputs for bu
 |---|---|---|
 | **Engine-generator set sizing for emergency and standby loads** | ETAP Generator Sizing, EasyPower GenSize, Caterpillar SpecSizer, Cummins Power Suite, Kohler KPS | Generator sizing for emergency (NEC 700), legally required standby (NEC 701), and optional standby (NEC 702) systems requires: (1) load tabulation with demand factors per NEC 220; (2) motor starting transient analysis — the largest motor start determines the generator's transient kW/kVA requirement and voltage/frequency dip; (3) harmonic loading from VFDs and UPS (generator oversizing factor); (4) altitude and temperature derating; (5) fuel consumption at 25/50/75/100% load for runtime calculation per NFPA 110. ETAP and the manufacturer tools automate this. CableTrayRoute's `analysis/motorStart.js` models motor starting voltage dip on an infinite bus or user-specified source impedance but does not model a finite-capacity generator (where the frequency also drops during the start transient), has no generator selection algorithm, and has no NFPA 110/NEC 700 load tabulation. |
 
-**Status:** Not implemented.
+**Status:** ✅ **Implemented 2026-04-12.** `analysis/generatorSizing.mjs` — altitude and temperature derating (NFPA 110 Annex B / ISO 8528-1), continuous load tabulation with demand factors, largest motor step-load check (IEEE 446 §5.3), transient voltage dip check (IEEE 446 §5.4), standard generator size selection, and fuel runtime calculation. UI: `generatorsizing.html`. Tests: `tests/generatorSizing.test.mjs`. Docs: `docs/generator-sizing.md`.
 
 ---
 
@@ -1145,7 +1145,7 @@ All originally high- and medium-priority feasible items have been implemented:
 6. ~~**Capacitor Bank Sizing & PFC** (Gap #60)~~ — ✅ **Implemented 2026-04-12.** `analysis/capacitorBank.mjs`, `capacitorbank.html`, `tests/capacitorBank.test.mjs`, `docs/capacitor-bank.md`.
 7. **Frequency Scan / Harmonic Resonance** (Gap #63) — Required companion to any capacitor bank installation and essential for harmonic filter design. Impedance-frequency sweep, resonance identification. Recommended: extend `analysis/harmonics.js` with `frequencyScan()`.
 8. **Battery / UPS Sizing per IEEE 485** (Gap #59) — Standard for any facility with emergency power. Duty cycle modeling, cell selection, temperature/aging correction. Recommended module: `analysis/batterySizing.mjs`.
-9. **Standby / Emergency Generator Sizing** (Gap #66) — NFPA 110 / NEC 700-702 compliance. Largest motor start transient on finite generator, altitude/temperature derating, fuel runtime. Recommended module: `analysis/generatorSizing.mjs`.
+9. ~~**Standby / Emergency Generator Sizing** (Gap #66)~~ — ✅ **Implemented 2026-04-12.** `analysis/generatorSizing.mjs`, `generatorsizing.html`, `tests/generatorSizing.test.mjs`, `docs/generator-sizing.md`.
 10. **Differential Protection Modeling (87B/T/G)** (Gap #67) — Required for transformer and generator unit protection. Percentage-differential characteristic, CT ratio matching, harmonic restraint. Recommended: extend `analysis/tcc.js` and `data/protectiveDevices.json` with `'differential'` device type.
 
 **Lower Priority — Advanced studies for transmission-level and utility planning:**
@@ -1349,7 +1349,7 @@ All prior gaps (#1–#57) have been implemented as of 2026-04-11. The tables bel
 | **P2** | 60 | **Capacitor Bank / PFC Sizing** | `analysis/capacitorBank.mjs` | Medium | ✅ Implemented 2026-04-12 |
 | **P2** | 63 | **Frequency Scan / Harmonic Resonance** | Extend `analysis/harmonics.js` | Medium | Not implemented |
 | **P2** | 59 | **Battery / UPS Sizing (IEEE 485)** | `analysis/batterySizing.mjs` | Medium | Not implemented |
-| **P2** | 66 | **Generator Sizing (NFPA 110)** | `analysis/generatorSizing.mjs` | Medium | Not implemented |
+| **P2** | 66 | ~~**Generator Sizing (NFPA 110)**~~ | `analysis/generatorSizing.mjs` | Medium | ✅ Implemented 2026-04-12 |
 | **P2** | 67 | **Differential Protection (87B/T/G)** | Extend `analysis/tcc.js`, `data/protectiveDevices.json` | Medium | Not implemented |
 | **P3** | 64 | **Voltage Stability (P-V / Q-V)** | Extend `analysis/loadFlow.js` | High | Not implemented |
 | **P3** | 65 | **Optimal Power Flow / Economic Dispatch** | `analysis/optimalPowerFlow.mjs` | High | Not implemented |
