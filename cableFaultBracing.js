@@ -17,7 +17,6 @@ document.addEventListener('DOMContentLoaded', () => {
   const xrRatioInput       = document.getElementById('xrRatio');
   const systemTypeSel      = document.getElementById('systemType');
   const arrangementSel     = document.getElementById('arrangement');
-  const arrangementGallery = document.getElementById('arrangementGallery');
   const arrangementCards   = Array.from(document.querySelectorAll('.arrangement-card'));
   const arrangementRow     = document.getElementById('arrangementRow');
   const unitsImperialBtn   = document.getElementById('unitsImperial');
@@ -102,12 +101,19 @@ document.addEventListener('DOMContentLoaded', () => {
       const active = card.dataset.arrangement === arrangement;
       card.classList.toggle('active', active);
       card.setAttribute('aria-checked', String(active));
+      card.setAttribute('aria-pressed', String(active));
     });
   }
-  arrangementGallery.addEventListener('click', event => {
-    const card = event.target.closest('.arrangement-card');
-    if (!card) return;
-    setArrangement(card.dataset.arrangement);
+  arrangementCards.forEach(card => {
+    card.addEventListener('click', () => {
+      setArrangement(card.dataset.arrangement);
+    });
+    card.addEventListener('keydown', event => {
+      if (event.key === 'Enter' || event.key === ' ') {
+        event.preventDefault();
+        setArrangement(card.dataset.arrangement);
+      }
+    });
   });
   systemTypeSel.addEventListener('change', updateArrangementVisibility);
   setArrangement('trefoil');
@@ -240,26 +246,29 @@ document.addEventListener('DOMContentLoaded', () => {
       return;
     }
     const f = result.forcePerMeter_Nm;
+    const forceA = f.toFixed(1);
+    const forceB = (params.arrg === 'flat' ? 0 : f).toFixed(1);
+    const forceC = f.toFixed(1);
     const toLbfFt = f * 0.0685218;
-    vectorLegend.textContent = `Vector magnitude reference: ${f.toFixed(1)} N/m (${toLbfFt.toFixed(2)} lbf/ft).`;
+    vectorLegend.textContent = `Vector magnitudes shown per phase. Base force: ${f.toFixed(1)} N/m (${toLbfFt.toFixed(2)} lbf/ft).`;
     if (params.arrg === 'trefoil') {
       forceVectorSvg.innerHTML = `
       <defs><marker id="vArrow" markerWidth="8" markerHeight="8" refX="7" refY="4" orient="auto"><path d="M0,0 L8,4 L0,8 Z" fill="#2563eb"></path></marker></defs>
-      <circle cx="210" cy="60" r="24" fill="#dbeafe" stroke="#1d4ed8"></circle><circle cx="155" cy="154" r="24" fill="#dcfce7" stroke="#15803d"></circle><circle cx="265" cy="154" r="24" fill="#fee2e2" stroke="#dc2626"></circle>
-      <text x="210" y="66" text-anchor="middle" class="phase-label">A</text><text x="155" y="160" text-anchor="middle" class="phase-label">B</text><text x="265" y="160" text-anchor="middle" class="phase-label">C</text>
-      <line x1="210" y1="60" x2="210" y2="20" stroke="#2563eb" stroke-width="3" marker-end="url(#vArrow)"></line>
-      <line x1="155" y1="154" x2="118" y2="181" stroke="#2563eb" stroke-width="3" marker-end="url(#vArrow)"></line>
-      <line x1="265" y1="154" x2="302" y2="181" stroke="#2563eb" stroke-width="3" marker-end="url(#vArrow)"></line>
-      <text x="222" y="18">${f.toFixed(1)} N/m</text><text x="74" y="186">${f.toFixed(1)} N/m</text><text x="304" y="186">${f.toFixed(1)} N/m</text>`;
+      <circle cx="210" cy="70" r="26" fill="#dbeafe" stroke="#1d4ed8"></circle><circle cx="187.5" cy="109" r="26" fill="#dcfce7" stroke="#15803d"></circle><circle cx="232.5" cy="109" r="26" fill="#fee2e2" stroke="#dc2626"></circle>
+      <text x="210" y="77" text-anchor="middle" class="phase-label">A</text><text x="187.5" y="116" text-anchor="middle" class="phase-label">B</text><text x="232.5" y="116" text-anchor="middle" class="phase-label">C</text>
+      <line x1="210" y1="70" x2="210" y2="28" stroke="#2563eb" stroke-width="3" marker-end="url(#vArrow)"></line>
+      <line x1="187.5" y1="109" x2="149" y2="137" stroke="#2563eb" stroke-width="3" marker-end="url(#vArrow)"></line>
+      <line x1="232.5" y1="109" x2="271" y2="137" stroke="#2563eb" stroke-width="3" marker-end="url(#vArrow)"></line>
+      <text x="218" y="24">A ↑ ${forceA} N/m</text><text x="89" y="145">B ↙ ${forceB} N/m</text><text x="274" y="145">C ↘ ${forceC} N/m</text>`;
     } else {
       forceVectorSvg.innerHTML = `
       <defs><marker id="vArrow2" markerWidth="8" markerHeight="8" refX="7" refY="4" orient="auto"><path d="M0,0 L8,4 L0,8 Z" fill="#2563eb"></path></marker></defs>
-      <circle cx="100" cy="120" r="24" fill="#dbeafe" stroke="#1d4ed8"></circle><circle cx="210" cy="120" r="24" fill="#dcfce7" stroke="#15803d"></circle><circle cx="320" cy="120" r="24" fill="#fee2e2" stroke="#dc2626"></circle>
-      <text x="100" y="126" text-anchor="middle" class="phase-label">A</text><text x="210" y="126" text-anchor="middle" class="phase-label">B</text><text x="320" y="126" text-anchor="middle" class="phase-label">C</text>
-      <line x1="100" y1="120" x2="58" y2="120" stroke="#2563eb" stroke-width="3" marker-end="url(#vArrow2)"></line>
-      <line x1="210" y1="120" x2="210" y2="80" stroke="#2563eb" stroke-width="3" marker-end="url(#vArrow2)"></line>
-      <line x1="320" y1="120" x2="362" y2="120" stroke="#2563eb" stroke-width="3" marker-end="url(#vArrow2)"></line>
-      <text x="14" y="115">${f.toFixed(1)} N/m</text><text x="184" y="72">${(f * 0.25).toFixed(1)} N/m</text><text x="366" y="115">${f.toFixed(1)} N/m</text>`;
+      <circle cx="122" cy="120" r="24" fill="#dbeafe" stroke="#1d4ed8"></circle><circle cx="170" cy="120" r="24" fill="#dcfce7" stroke="#15803d"></circle><circle cx="218" cy="120" r="24" fill="#fee2e2" stroke="#dc2626"></circle>
+      <text x="122" y="126" text-anchor="middle" class="phase-label">A</text><text x="170" y="126" text-anchor="middle" class="phase-label">B</text><text x="218" y="126" text-anchor="middle" class="phase-label">C</text>
+      <line x1="122" y1="120" x2="78" y2="120" stroke="#2563eb" stroke-width="3" marker-end="url(#vArrow2)"></line>
+      <line x1="170" y1="120" x2="170" y2="120" stroke="#2563eb" stroke-width="0"></line>
+      <line x1="218" y1="120" x2="262" y2="120" stroke="#2563eb" stroke-width="3" marker-end="url(#vArrow2)"></line>
+      <text x="26" y="116">A ← ${forceA} N/m</text><text x="150" y="84">B net ${forceB} N/m</text><text x="268" y="116">C → ${forceC} N/m</text>`;
     }
     forceVectorsPanel.classList.remove('hidden');
   }
