@@ -4,6 +4,18 @@ import { openModal } from './components/modal.js';
 let panel = null;
 let isOpen = false;
 
+function getCopilotEndpoint() {
+  const metaEndpoint = document.querySelector('meta[name="copilot-endpoint"]')?.content?.trim();
+  if (metaEndpoint) return metaEndpoint;
+  if (typeof window !== 'undefined' && typeof window.__COPILOT_API_URL__ === 'string' && window.__COPILOT_API_URL__.trim()) {
+    return window.__COPILOT_API_URL__.trim();
+  }
+  if (window.location.hostname.endsWith('github.io')) {
+    return null;
+  }
+  return '/api/copilot';
+}
+
 function getProjectData() {
   try {
     const cables = JSON.parse(localStorage.getItem('cableSchedule') || '[]');
@@ -53,15 +65,21 @@ async function submitQuery(query) {
   document.getElementById('copilot-send').disabled = true;
 
   try {
+    const endpoint = getCopilotEndpoint();
+    if (!endpoint) {
+      appendMessage('Copilot API is not configured for this site. Set a <meta name="copilot-endpoint" content="https://your-server/api/copilot"> tag or window.__COPILOT_API_URL__.', 'error');
+      return;
+    }
     const csrfMeta = document.querySelector('meta[name="csrf-token"]');
     const csrf = csrfMeta ? csrfMeta.content : '';
-    const res = await fetch('/api/copilot', {
+    const isSameOrigin = endpoint.startsWith('/') || endpoint.startsWith(window.location.origin);
+    const res = await fetch(endpoint, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
-        'x-csrf-token': csrf
+        ...(isSameOrigin ? { 'x-csrf-token': csrf } : {})
       },
-      credentials: 'include',
+      credentials: isSameOrigin ? 'include' : 'omit',
       body: JSON.stringify({ query: query.trim(), projectData: getProjectData() })
     });
     if (!res.ok) throw new Error(`Server error ${res.status}`);

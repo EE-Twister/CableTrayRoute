@@ -523,8 +523,12 @@ async function updateProjectDisplay(snapshot){
         span.id='project-display';
         span.style.marginLeft='auto';
         span.style.marginRight='var(--space-4)';
-        nav.insertBefore(span,settingsBtn);
-        if(settingsBtn) settingsBtn.style.marginLeft='0';
+        if(settingsBtn&&settingsBtn.parentNode===nav){
+          nav.insertBefore(span,settingsBtn);
+          settingsBtn.style.marginLeft='0';
+        }else{
+          nav.appendChild(span);
+        }
       }
     }
     if(span) span.textContent=`Project: ${name} (hash: ${hash.slice(0,8)})`;
