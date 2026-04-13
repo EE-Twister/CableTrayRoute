@@ -30,6 +30,9 @@
     .phase-label { font-size: 14px; font-weight: 700; }
     .force-vectors { margin-top: 0.5rem; border: 1px solid var(--border-color, #cbd5e1); border-radius: 10px; padding: 0.75rem; background: var(--secondary-color, #f8fafc); }
     .force-vectors svg { width: 100%; max-width: 500px; height: auto; display: block; }
+    .result-configuration-diagram { margin: 1rem 0; }
+    .result-configuration-diagram figcaption { font-weight: 600; margin-bottom: 0.5rem; }
+    .result-configuration-diagram svg { width: min(100%, 540px); height: auto; border: 1px solid var(--border-color, #cbd5e1); border-radius: 8px; background: var(--secondary-color, #f8fafc); }
   </style>
   <script type="module" src="dirtyTracker.js"></script>
   <script type="module" src="dist/cableFaultBracing.js" defer></script>
@@ -204,8 +207,8 @@ Three-phase:    F = √3×10⁻⁷ × i_peak² / d  [N/m]</pre>
           <div class="arrangement-gallery" id="arrangementGallery" role="radiogroup" aria-label="Cable arrangement selector">
             <button class="arrangement-card active" id="arrangementTrefoil" type="button" data-arrangement="trefoil" role="radio" aria-checked="true">
               <svg viewBox="0 0 180 120" aria-hidden="true">
-                <circle cx="90" cy="38" r="20" fill="#dbeafe" stroke="#1d4ed8" stroke-width="1.6"></circle><circle cx="72.7" cy="68" r="20" fill="#dcfce7" stroke="#15803d" stroke-width="1.6"></circle><circle cx="107.3" cy="68" r="20" fill="#fee2e2" stroke="#dc2626" stroke-width="1.6"></circle>
-                <text x="90" y="44" text-anchor="middle" class="phase-label">A</text><text x="72.7" y="74" text-anchor="middle" class="phase-label">B</text><text x="107.3" y="74" text-anchor="middle" class="phase-label">C</text>
+                <circle cx="90" cy="34" r="20" fill="#dbeafe" stroke="#1d4ed8" stroke-width="1.6"></circle><circle cx="70" cy="68.6" r="20" fill="#dcfce7" stroke="#15803d" stroke-width="1.6"></circle><circle cx="110" cy="68.6" r="20" fill="#fee2e2" stroke="#dc2626" stroke-width="1.6"></circle>
+                <text x="90" y="40" text-anchor="middle" class="phase-label">A</text><text x="70" y="74.6" text-anchor="middle" class="phase-label">B</text><text x="110" y="74.6" text-anchor="middle" class="phase-label">C</text>
               </svg>
               <span>Trefoil (touching)</span>
             </button>
