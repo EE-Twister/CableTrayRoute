@@ -181,6 +181,24 @@
     display: block;
 }
 
+.nav-dropdown-menu .nav-dropdown-group-heading {
+    display: block;
+    padding: 0.5rem 0.75rem 0.2rem;
+    margin-top: 0.2rem;
+    border-top: 1px solid color-mix(in srgb, var(--color-border) 85%, transparent);
+    color: var(--color-text-muted, #64748b);
+    font-size: 0.72rem;
+    font-weight: 700;
+    letter-spacing: 0.03em;
+    text-transform: uppercase;
+}
+
+.nav-dropdown-menu .nav-dropdown-group-heading:first-child {
+    margin-top: 0;
+    border-top: 0;
+    padding-top: 0.35rem;
+}
+
 .nav-dropdown-menu li a {
     display: flex;
     align-items: center;

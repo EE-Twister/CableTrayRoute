@@ -1,51 +1,51 @@
 const NAV_ROUTES = [
   { href: 'index.html', label: 'Home', section: 'Home', icon: 'icons/route.svg' },
-  { href: 'workflowdashboard.html', label: 'Project Dashboard', section: 'Workflow', icon: 'icons/toolbar/grid.svg' },
-  { href: 'scenarios.html', label: 'Scenario Comparison', section: 'Workflow', icon: 'icons/toolbar/copy.svg' },
-  { href: 'equipmentlist.html', label: 'Equipment List', section: 'Workflow', icon: 'icons/equipment.svg' },
-  { href: 'loadlist.html', label: 'Load List', section: 'Workflow', icon: 'icons/load.svg' },
-  { href: 'cableschedule.html', label: 'Cable Schedule', section: 'Workflow', icon: 'icons/cable.svg' },
-  { href: 'panelschedule.html', label: 'Panel Schedule', section: 'Workflow', icon: 'icons/panel.svg' },
-  { href: 'racewayschedule.html', label: 'Raceway Schedule', section: 'Workflow', icon: 'icons/raceway.svg' },
-  { href: 'ductbankroute.html', label: 'Ductbank', section: 'Workflow', icon: 'icons/ductbank.svg' },
-  { href: 'cabletrayfill.html', label: 'Tray Fill', section: 'Workflow', icon: 'icons/tray.svg' },
-  { href: 'conduitfill.html', label: 'Conduit Fill', section: 'Workflow', icon: 'icons/conduit.svg' },
-  { href: 'supportspan.html', label: 'Support Span', section: 'Workflow', icon: 'icons/toolbar/dimension.svg' },
-  { href: 'seismicBracing.html', label: 'Seismic Bracing', section: 'Workflow', icon: 'icons/toolbar/validate.svg' },
-  { href: 'cableFaultBracing.html', label: 'Fault Cable Bracing', section: 'Workflow', icon: 'icons/toolbar/validate.svg' },
-  { href: 'trayhardwarebom.html', label: 'Tray Hardware BOM', section: 'Workflow', icon: 'icons/raceway.svg' },
-  { href: 'clashdetect.html', label: 'Clash Detection', section: 'Workflow', icon: 'icons/toolbar/validate.svg' },
-  { href: 'designrulechecker.html', label: 'Design Rule Checker', section: 'Workflow', icon: 'icons/toolbar/validate.svg' },
-  { href: 'spoolsheets.html', label: 'Spool Sheets', section: 'Workflow', icon: 'icons/toolbar/copy.svg' },
-  { href: 'windload.html', label: 'Wind Load', section: 'Workflow', icon: 'icons/toolbar/validate.svg' },
-  { href: 'structuralcombinations.html', label: 'Combined Loads', section: 'Workflow', icon: 'icons/toolbar/validate.svg' },
-  { href: 'seismicwindcombined.html', label: 'Seismic + Wind', section: 'Workflow', icon: 'icons/toolbar/validate.svg' },
-  { href: 'loadcombinations.html', label: 'Load Combinations', section: 'Workflow', icon: 'icons/toolbar/validate.svg' },
-  { href: 'optimalRoute.html', label: 'Optimal Route', section: 'Workflow', icon: 'icons/route.svg' },
-  { href: 'pullcards.html', label: 'Pull Cards', section: 'Workflow', icon: 'icons/toolbar/copy.svg' },
-  { href: 'procurementschedule.html', label: 'Procurement Schedule', section: 'Workflow', icon: 'icons/toolbar/copy.svg' },
-  { href: 'costestimate.html', label: 'Cost Estimate', section: 'Workflow', icon: 'icons/toolbar/grid-size.svg' },
-  { href: 'submittal.html', label: 'Submittal Package', section: 'Workflow', icon: 'icons/toolbar/copy.svg' },
-  { href: 'projectreport.html', label: 'Project Report', section: 'Workflow', icon: 'icons/toolbar/copy.svg' },
-  { href: 'productconfig.html', label: 'Product Configurator', section: 'Workflow', icon: 'icons/toolbar/grid-size.svg' },
-  { href: 'intlCableSize.html', label: 'Intl Cable Sizing', section: 'Studies', icon: 'icons/cable.svg' },
-  { href: 'oneline.html', label: 'One-Line', section: 'Workflow', icon: 'icons/oneline.svg' },
-  { href: 'tcc.html', label: 'TCC', section: 'Studies', icon: 'icons/toolbar/validate.svg' },
-  { href: 'harmonics.html', label: 'Harmonics', section: 'Studies', icon: 'icons/toolbar/grid-size.svg' },
-  { href: 'capacitorbank.html', label: 'Capacitor Bank', section: 'Studies', icon: 'icons/toolbar/grid-size.svg' },
-  { href: 'battery.html', label: 'Battery / UPS Sizing', section: 'Studies', icon: 'icons/components/UPS.svg' },
-  { href: 'generatorsizing.html', label: 'Generator Sizing', section: 'Studies', icon: 'icons/toolbar/validate.svg' },
-  { href: 'motorStart.html', label: 'Motor Start', section: 'Studies', icon: 'icons/Motor.svg' },
-  { href: 'loadFlow.html', label: 'Load Flow', section: 'Studies', icon: 'icons/Load.svg' },
-  { href: 'shortCircuit.html', label: 'Short Circuit', section: 'Studies', icon: 'icons/components/Breaker.svg' },
-  { href: 'arcFlash.html', label: 'Arc Flash', section: 'Studies', icon: 'icons/toolbar/connect.svg' },
-  { href: 'groundgrid.html', label: 'Ground Grid', section: 'Studies', icon: 'icons/toolbar/validate.svg' },
-  { href: 'autosize.html', label: 'Auto-Size', section: 'Studies', icon: 'icons/toolbar/grid-size.svg' },
-  { href: 'reliability.html', label: 'Reliability', section: 'Studies', icon: 'icons/toolbar/validate.svg' },
-  { href: 'emf.html', label: 'EMF Analysis', section: 'Studies', icon: 'icons/toolbar/connect.svg' },
-  { href: 'transientstability.html', label: 'Transient Stability', section: 'Studies', icon: 'icons/toolbar/validate.svg' },
-  { href: 'contingency.html', label: 'N-1 Contingency', section: 'Studies', icon: 'icons/toolbar/validate.svg' },
-  { href: 'voltagedropstudy.html', label: 'Voltage Drop', section: 'Studies', icon: 'icons/cable.svg' },
+  { href: 'workflowdashboard.html', label: 'Project Dashboard', section: 'Workflow', group: 'Planning', icon: 'icons/toolbar/grid.svg' },
+  { href: 'scenarios.html', label: 'Scenario Comparison', section: 'Workflow', group: 'Planning', icon: 'icons/toolbar/copy.svg' },
+  { href: 'equipmentlist.html', label: 'Equipment List', section: 'Workflow', group: 'Planning', icon: 'icons/equipment.svg' },
+  { href: 'loadlist.html', label: 'Load List', section: 'Workflow', group: 'Planning', icon: 'icons/load.svg' },
+  { href: 'cableschedule.html', label: 'Cable Schedule', section: 'Workflow', group: 'Cable & Raceway', icon: 'icons/cable.svg' },
+  { href: 'panelschedule.html', label: 'Panel Schedule', section: 'Workflow', group: 'Cable & Raceway', icon: 'icons/panel.svg' },
+  { href: 'racewayschedule.html', label: 'Raceway Schedule', section: 'Workflow', group: 'Cable & Raceway', icon: 'icons/raceway.svg' },
+  { href: 'ductbankroute.html', label: 'Ductbank', section: 'Workflow', group: 'Cable & Raceway', icon: 'icons/ductbank.svg' },
+  { href: 'cabletrayfill.html', label: 'Tray Fill', section: 'Workflow', group: 'Cable & Raceway', icon: 'icons/tray.svg' },
+  { href: 'conduitfill.html', label: 'Conduit Fill', section: 'Workflow', group: 'Cable & Raceway', icon: 'icons/conduit.svg' },
+  { href: 'supportspan.html', label: 'Support Span', section: 'Workflow', group: 'Mechanical', icon: 'icons/toolbar/dimension.svg' },
+  { href: 'seismicBracing.html', label: 'Seismic Bracing', section: 'Workflow', group: 'Mechanical', icon: 'icons/toolbar/validate.svg' },
+  { href: 'cableFaultBracing.html', label: 'Fault Cable Bracing', section: 'Workflow', group: 'Mechanical', icon: 'icons/toolbar/validate.svg' },
+  { href: 'trayhardwarebom.html', label: 'Tray Hardware BOM', section: 'Workflow', group: 'Mechanical', icon: 'icons/raceway.svg' },
+  { href: 'clashdetect.html', label: 'Clash Detection', section: 'Workflow', group: 'Validation', icon: 'icons/toolbar/validate.svg' },
+  { href: 'designrulechecker.html', label: 'Design Rule Checker', section: 'Workflow', group: 'Validation', icon: 'icons/toolbar/validate.svg' },
+  { href: 'spoolsheets.html', label: 'Spool Sheets', section: 'Workflow', group: 'Deliverables', icon: 'icons/toolbar/copy.svg' },
+  { href: 'windload.html', label: 'Wind Load', section: 'Workflow', group: 'Structural', icon: 'icons/toolbar/validate.svg' },
+  { href: 'structuralcombinations.html', label: 'Combined Loads', section: 'Workflow', group: 'Structural', icon: 'icons/toolbar/validate.svg' },
+  { href: 'seismicwindcombined.html', label: 'Seismic + Wind', section: 'Workflow', group: 'Structural', icon: 'icons/toolbar/validate.svg' },
+  { href: 'loadcombinations.html', label: 'Load Combinations', section: 'Workflow', group: 'Structural', icon: 'icons/toolbar/validate.svg' },
+  { href: 'optimalRoute.html', label: 'Optimal Route', section: 'Workflow', group: 'Optimization', icon: 'icons/route.svg' },
+  { href: 'pullcards.html', label: 'Pull Cards', section: 'Workflow', group: 'Deliverables', icon: 'icons/toolbar/copy.svg' },
+  { href: 'procurementschedule.html', label: 'Procurement Schedule', section: 'Workflow', group: 'Deliverables', icon: 'icons/toolbar/copy.svg' },
+  { href: 'costestimate.html', label: 'Cost Estimate', section: 'Workflow', group: 'Deliverables', icon: 'icons/toolbar/grid-size.svg' },
+  { href: 'submittal.html', label: 'Submittal Package', section: 'Workflow', group: 'Deliverables', icon: 'icons/toolbar/copy.svg' },
+  { href: 'projectreport.html', label: 'Project Report', section: 'Workflow', group: 'Deliverables', icon: 'icons/toolbar/copy.svg' },
+  { href: 'productconfig.html', label: 'Product Configurator', section: 'Workflow', group: 'Deliverables', icon: 'icons/toolbar/grid-size.svg' },
+  { href: 'intlCableSize.html', label: 'Intl Cable Sizing', section: 'Studies', group: 'Cable', icon: 'icons/cable.svg' },
+  { href: 'oneline.html', label: 'One-Line', section: 'Workflow', group: 'Planning', icon: 'icons/oneline.svg' },
+  { href: 'tcc.html', label: 'TCC', section: 'Studies', group: 'Protection', icon: 'icons/toolbar/validate.svg' },
+  { href: 'harmonics.html', label: 'Harmonics', section: 'Studies', group: 'Power Quality', icon: 'icons/toolbar/grid-size.svg' },
+  { href: 'capacitorbank.html', label: 'Capacitor Bank', section: 'Studies', group: 'Power Quality', icon: 'icons/toolbar/grid-size.svg' },
+  { href: 'battery.html', label: 'Battery / UPS Sizing', section: 'Studies', group: 'Equipment Sizing', icon: 'icons/components/UPS.svg' },
+  { href: 'generatorsizing.html', label: 'Generator Sizing', section: 'Studies', group: 'Equipment Sizing', icon: 'icons/toolbar/validate.svg' },
+  { href: 'motorStart.html', label: 'Motor Start', section: 'Studies', group: 'Motor', icon: 'icons/Motor.svg' },
+  { href: 'loadFlow.html', label: 'Load Flow', section: 'Studies', group: 'Power System', icon: 'icons/Load.svg' },
+  { href: 'shortCircuit.html', label: 'Short Circuit', section: 'Studies', group: 'Protection', icon: 'icons/components/Breaker.svg' },
+  { href: 'arcFlash.html', label: 'Arc Flash', section: 'Studies', group: 'Protection', icon: 'icons/toolbar/connect.svg' },
+  { href: 'groundgrid.html', label: 'Ground Grid', section: 'Studies', group: 'Grounding', icon: 'icons/toolbar/validate.svg' },
+  { href: 'autosize.html', label: 'Auto-Size', section: 'Studies', group: 'Cable', icon: 'icons/toolbar/grid-size.svg' },
+  { href: 'reliability.html', label: 'Reliability', section: 'Studies', group: 'Power System', icon: 'icons/toolbar/validate.svg' },
+  { href: 'emf.html', label: 'EMF Analysis', section: 'Studies', group: 'Power System', icon: 'icons/toolbar/connect.svg' },
+  { href: 'transientstability.html', label: 'Transient Stability', section: 'Studies', group: 'Power System', icon: 'icons/toolbar/validate.svg' },
+  { href: 'contingency.html', label: 'N-1 Contingency', section: 'Studies', group: 'Power System', icon: 'icons/toolbar/validate.svg' },
+  { href: 'voltagedropstudy.html', label: 'Voltage Drop', section: 'Studies', group: 'Cable', icon: 'icons/cable.svg' },
   { href: 'custom-components.html', label: 'Custom Components', section: 'Library', icon: 'icons/components/TextBox.svg' },
   { href: 'library.html', label: 'Library Manager', section: 'Library', icon: 'icons/toolbar/grid.svg' },
   { href: 'fieldview.html', label: 'Field View', section: 'Support', icon: 'icons/toolbar/copy.svg' },
@@ -106,17 +106,36 @@ function buildDropdown(section, routes, currentRoute) {
   const menu = document.createElement('ul');
   menu.className = 'nav-dropdown-menu';
   menu.setAttribute('role', 'menu');
-  if (routes.length >= 12) {
+  const groupedRoutes = routes.reduce((acc, route) => {
+    const key = route.group || 'General';
+    if (!acc[key]) {
+      acc[key] = [];
+    }
+    acc[key].push(route);
+    return acc;
+  }, {});
+  const groupNames = Object.keys(groupedRoutes);
+  const hasGroups = groupNames.length > 1;
+  if (!hasGroups && routes.length >= 12) {
     menu.dataset.cols = '2';
   }
 
-  routes.forEach(route => {
-    const item = document.createElement('li');
-    item.setAttribute('role', 'none');
-    const link = buildLink(route, currentRoute);
-    link.setAttribute('role', 'menuitem');
-    item.appendChild(link);
-    menu.appendChild(item);
+  groupNames.forEach((groupName) => {
+    if (hasGroups) {
+      const heading = document.createElement('li');
+      heading.className = 'nav-dropdown-group-heading';
+      heading.textContent = groupName;
+      heading.setAttribute('role', 'presentation');
+      menu.appendChild(heading);
+    }
+    groupedRoutes[groupName].forEach(route => {
+      const item = document.createElement('li');
+      item.setAttribute('role', 'none');
+      const link = buildLink(route, currentRoute);
+      link.setAttribute('role', 'menuitem');
+      item.appendChild(link);
+      menu.appendChild(item);
+    });
   });
 
   wrapper.appendChild(trigger);
