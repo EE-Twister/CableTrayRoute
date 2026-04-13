@@ -112,12 +112,16 @@ export const MOTOR_FLC_1PH = [
 ];
 
 // ---------------------------------------------------------------------------
-// Standard transformer kVA ratings
+// Standard transformer kVA ratings (U.S. NEMA typical preferred ratings)
+//
+// NEMA dry-type distribution transformer product ranges are typically published
+// in distinct single-phase and three-phase kVA steps. We use phase-specific
+// series so recommendations align with common U.S. catalog offerings.
 // ---------------------------------------------------------------------------
-export const STANDARD_XFMR_KVA = [
-  5, 7.5, 10, 15, 25, 37.5, 50, 75, 100, 167, 225, 300, 500,
-  750, 1000, 1500, 2000, 2500
-];
+export const STANDARD_XFMR_KVA = {
+  '1ph': [15, 25, 37.5, 50, 75, 100, 167, 250, 333, 500],
+  '3ph': [15, 30, 45, 75, 112.5, 150, 225, 300, 500, 750, 1000, 1500, 2000, 2500],
+};
 
 // ---------------------------------------------------------------------------
 // Conductor cost data — indicative $/ft per conductor
@@ -274,8 +278,9 @@ export function smallConductorMaxOcpd(size, material = 'copper') {
  * @param {number} requiredKva
  * @returns {number|null}
  */
-export function nextStandardXfmrKva(requiredKva) {
-  return STANDARD_XFMR_KVA.find(kva => kva >= requiredKva) ?? null;
+export function nextStandardXfmrKva(requiredKva, phase = '3ph') {
+  const series = STANDARD_XFMR_KVA[phase] || STANDARD_XFMR_KVA['3ph'];
+  return series.find(kva => kva >= requiredKva) ?? null;
 }
 
 /**
@@ -733,7 +738,7 @@ export function sizeTransformer(params) {
   if (loadKva <= 0) throw new Error('Load kVA must be positive');
   if (primaryVoltage <= 0 || secondaryVoltage <= 0) throw new Error('Voltages must be positive');
 
-  const xfmrKva = nextStandardXfmrKva(loadKva);
+  const xfmrKva = nextStandardXfmrKva(loadKva, phase);
   const sqrtPhase = phase === '3ph' ? Math.sqrt(3) : 1;
 
   const primaryRatedAmps = (xfmrKva * 1000) / (sqrtPhase * primaryVoltage);
@@ -767,7 +772,7 @@ export function sizeTransformer(params) {
     secondaryConductorSize: secondaryConductor ? secondaryConductor.size : null,
     secondaryConductorAmpacity: secondaryConductor ? secondaryConductor.ampacity : null,
     nec: {
-      xfmrSizing: 'Next standard kVA ≥ required load kVA',
+      xfmrSizing: 'Next NEMA standard kVA (phase-specific) ≥ required load kVA',
       primaryRule: `NEC 450.3(B), Table 450.3(B) — ${primaryOcpdFactor === 1.25 ? '125%' : '167%'} of primary rated current`,
       secondaryRule: 'NEC 450.3(B), Table 450.3(B) — 125% of secondary rated current',
       conductorRule: 'NEC 310.15(B)(16) — secondary conductor at 125% rated current',

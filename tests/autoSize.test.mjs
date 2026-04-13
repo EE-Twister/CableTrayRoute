@@ -95,16 +95,20 @@ describe('smallConductorMaxOcpd — NEC 240.4(D)', () => {
 // nextStandardXfmrKva
 // ---------------------------------------------------------------------------
 describe('nextStandardXfmrKva', () => {
-  it('rounds up 80 kVA to 100', () => {
-    assert.strictEqual(nextStandardXfmrKva(80), 100);
+  it('rounds up 80 kVA to 112.5 for 3-phase NEMA series', () => {
+    assert.strictEqual(nextStandardXfmrKva(80, '3ph'), 112.5);
   });
 
   it('returns 500 for exactly 500', () => {
-    assert.strictEqual(nextStandardXfmrKva(500), 500);
+    assert.strictEqual(nextStandardXfmrKva(500, '3ph'), 500);
   });
 
-  it('rounds up from 1 to 5', () => {
-    assert.strictEqual(nextStandardXfmrKva(1), 5);
+  it('rounds up 80 kVA to 100 for 1-phase NEMA series', () => {
+    assert.strictEqual(nextStandardXfmrKva(80, '1ph'), 100);
+  });
+
+  it('rounds up from 1 to 15 (minimum standard NEMA size)', () => {
+    assert.strictEqual(nextStandardXfmrKva(1), 15);
   });
 });
 
@@ -310,14 +314,14 @@ describe('sizeTransformer — NEC 450.3(B)', () => {
   });
 
   it('uses 167% factor for primary current ≤ 9A', () => {
-    // 5 kVA, 480V primary, 3-phase → primary = 5000/(√3×480) = 6.01A ≤ 9A → 167%
+    // 15 kVA (minimum 3-phase standard), 12470V primary → primary current ≤ 9A → 167%
     const r = sizeTransformer({
       loadKva: 3,
-      primaryVoltage: 480,
+      primaryVoltage: 12470,
       secondaryVoltage: 208,
       phase: '3ph'
     });
-    assert.strictEqual(r.xfmrKva, 5);
+    assert.strictEqual(r.xfmrKva, 15);
     assert.ok(r.primaryRatedAmps <= 9, `Expected primary ≤ 9A, got ${r.primaryRatedAmps}`);
     assert.strictEqual(r.primaryOcpdFactor, '167%');
   });
