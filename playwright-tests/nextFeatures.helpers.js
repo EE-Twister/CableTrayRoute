@@ -6,9 +6,56 @@ const root = path.join(__dirname, '..');
 
 export const pageUrl = file => `file://${path.join(root, file)}?e2e=1&e2e_reset=1`;
 
+export const COST_ESTIMATOR_FIXTURES = {
+  baselineProject: {
+    cableSchedule: [
+      { cable_tag: 'C-101', conductor_size: '4 AWG', conductors: 3, length_ft: 150 },
+    ],
+    traySchedule: [
+      { tray_id: 'T-101', tray_type: 'Ladder', inside_width: '12', length_ft: 120, fitting_count: 2 },
+    ],
+    conduitSchedule: [
+      { conduit_id: 'CD-101', conduit_type: 'EMT', trade_size: '2', length_ft: 80 },
+    ],
+    studyResults: {
+      routeResults: [{ cable: 'C-101', total_length: 150 }],
+    },
+  },
+  highContingency: {
+    contingencyPct: '35',
+  },
+  laborOverrideScenario: {
+    laborCableRate: '95',
+    laborTrayRate: '110',
+    laborConduitRate: '105',
+  },
+  emptyInvalidInputScenario: {
+    cableSchedule: [],
+    traySchedule: [],
+    conduitSchedule: [],
+    studyResults: {},
+    contingencyPct: 'not-a-number',
+    laborCableRate: '',
+    laborTrayRate: 'invalid',
+    laborConduitRate: '',
+  },
+};
+
 export async function navigateForE2E(page, file) {
   await page.goto(pageUrl(file));
   await page.waitForLoadState('networkidle');
+}
+
+export async function applyCostEstimatorFixture(page, fixture) {
+  await page.evaluate(data => {
+    const scenario = 'base';
+    localStorage.setItem('ctr_current_scenario_v1', scenario);
+    localStorage.setItem('ctr_scenarios_v1', JSON.stringify([scenario]));
+    localStorage.setItem(`${scenario}:cableSchedule`, JSON.stringify(data.cableSchedule || []));
+    localStorage.setItem(`${scenario}:traySchedule`, JSON.stringify(data.traySchedule || []));
+    localStorage.setItem(`${scenario}:conduitSchedule`, JSON.stringify(data.conduitSchedule || []));
+    localStorage.setItem(`${scenario}:studyResults`, JSON.stringify(data.studyResults || {}));
+  }, fixture);
 }
 
 export async function fillCostEstimatorForm(page, overrides = {}) {
@@ -64,6 +111,11 @@ export function parseCurrency(text) {
 export async function getCostEstimateGrandTotal(page) {
   const grandTotalText = await page.locator('.summary-grand-total td strong').innerText();
   return parseCurrency(grandTotalText);
+}
+
+export async function getCostEstimateContingencyAmount(page) {
+  const contingencyText = await page.locator('tr:has(th:has-text("Contingency")) td').last().innerText();
+  return parseCurrency(contingencyText);
 }
 
 export async function getEmfRmsMicroTesla(page) {
