@@ -6,11 +6,23 @@ import { getCables } from './dataStore.mjs';
 import cableSizes from './data/cableSizes.json' assert { type: 'json' };
 
 document.addEventListener('DOMContentLoaded', () => {
-  initSettings();
-  initDarkMode();
-  initCompactMode();
-  initHelpModal('help-btn', 'help-modal', 'close-help-btn');
-  initNavToggle();
+  if (typeof initSettings === 'function' && !document.getElementById('project-name-input')) {
+    initSettings();
+  }
+  if (typeof initDarkMode === 'function' && !document.body.dataset.themeBound) {
+    initDarkMode();
+    document.body.dataset.themeBound = 'true';
+  }
+  if (typeof initCompactMode === 'function' && !document.body.dataset.compactBound) {
+    initCompactMode();
+    document.body.dataset.compactBound = 'true';
+  }
+  if (typeof initHelpModal === 'function') {
+    initHelpModal('help-btn', 'help-modal', 'close-help-btn');
+  }
+  if (typeof initNavToggle === 'function') {
+    initNavToggle();
+  }
 
   // ── Element references ───────────────────────────────────────────────────
   const faultCurrentInput  = document.getElementById('faultCurrent');
@@ -254,11 +266,11 @@ document.addEventListener('DOMContentLoaded', () => {
     if (params.arrg === 'trefoil') {
       forceVectorSvg.innerHTML = `
       <defs><marker id="vArrow" markerWidth="8" markerHeight="8" refX="7" refY="4" orient="auto"><path d="M0,0 L8,4 L0,8 Z" fill="#2563eb"></path></marker></defs>
-      <circle cx="210" cy="70" r="26" fill="#dbeafe" stroke="#1d4ed8"></circle><circle cx="187.5" cy="109" r="26" fill="#dcfce7" stroke="#15803d"></circle><circle cx="232.5" cy="109" r="26" fill="#fee2e2" stroke="#dc2626"></circle>
-      <text x="210" y="77" text-anchor="middle" class="phase-label">A</text><text x="187.5" y="116" text-anchor="middle" class="phase-label">B</text><text x="232.5" y="116" text-anchor="middle" class="phase-label">C</text>
+      <circle cx="210" cy="70" r="26" fill="#dbeafe" stroke="#1d4ed8"></circle><circle cx="184" cy="115" r="26" fill="#dcfce7" stroke="#15803d"></circle><circle cx="236" cy="115" r="26" fill="#fee2e2" stroke="#dc2626"></circle>
+      <text x="210" y="77" text-anchor="middle" class="phase-label">A</text><text x="184" y="122" text-anchor="middle" class="phase-label">B</text><text x="236" y="122" text-anchor="middle" class="phase-label">C</text>
       <line x1="210" y1="70" x2="210" y2="28" stroke="#2563eb" stroke-width="3" marker-end="url(#vArrow)"></line>
-      <line x1="187.5" y1="109" x2="149" y2="137" stroke="#2563eb" stroke-width="3" marker-end="url(#vArrow)"></line>
-      <line x1="232.5" y1="109" x2="271" y2="137" stroke="#2563eb" stroke-width="3" marker-end="url(#vArrow)"></line>
+      <line x1="184" y1="115" x2="146" y2="143" stroke="#2563eb" stroke-width="3" marker-end="url(#vArrow)"></line>
+      <line x1="236" y1="115" x2="274" y2="143" stroke="#2563eb" stroke-width="3" marker-end="url(#vArrow)"></line>
       <text x="218" y="24">A ↑ ${forceA} N/m</text><text x="89" y="145">B ↙ ${forceB} N/m</text><text x="274" y="145">C ↘ ${forceC} N/m</text>`;
     } else {
       forceVectorSvg.innerHTML = `
@@ -302,6 +314,7 @@ document.addEventListener('DOMContentLoaded', () => {
                </td></tr>`;
 
     const cardClass = adequate === false ? 'result-fail' : 'result-ok';
+    const configurationSvg = buildResultConfigurationSvg(r, params);
 
     resultsDiv.innerHTML = `
       <div class="result-card ${cardClass}" role="status" aria-live="polite">
@@ -328,6 +341,10 @@ document.addEventListener('DOMContentLoaded', () => {
           </tbody>
         </table>
         <div class="result-recommendation">${esc(r.recommendation)}</div>
+        <figure class="result-configuration-diagram">
+          <figcaption>Selected cable configuration and force direction.</figcaption>
+          ${configurationSvg}
+        </figure>
         <details class="method-note">
           <summary>How this was calculated</summary>
           <p>IEC 60909-0 §4.3.1.1 peak factor:</p>
@@ -345,6 +362,56 @@ document.addEventListener('DOMContentLoaded', () => {
        = ${r.requiredStrength_kN.toFixed(2)} kN</pre>
         </details>
       </div>`;
+  }
+
+  function buildResultConfigurationSvg(result, params) {
+    const force = result.forcePerMeter_Nm.toFixed(1);
+    if (params.sysType !== 'three-phase') {
+      return `
+      <svg viewBox="0 0 360 220" role="img" aria-label="Single-phase force direction configuration">
+        <defs><marker id="calcArrowSingle" markerWidth="8" markerHeight="8" refX="7" refY="4" orient="auto"><path d="M0,0 L8,4 L0,8 Z" fill="#2563eb"></path></marker></defs>
+        <circle cx="130" cy="110" r="34" fill="#dbeafe" stroke="#1d4ed8" stroke-width="2"></circle>
+        <circle cx="198" cy="110" r="34" fill="#fee2e2" stroke="#dc2626" stroke-width="2"></circle>
+        <text x="130" y="118" text-anchor="middle" class="phase-label">+</text>
+        <text x="198" y="118" text-anchor="middle" class="phase-label">−</text>
+        <line x1="130" y1="110" x2="84" y2="110" stroke="#2563eb" stroke-width="4" marker-end="url(#calcArrowSingle)"></line>
+        <line x1="198" y1="110" x2="244" y2="110" stroke="#2563eb" stroke-width="4" marker-end="url(#calcArrowSingle)"></line>
+        <text x="20" y="92">Conductor 1 ← ${force} N/m</text>
+        <text x="230" y="92">Conductor 2 → ${force} N/m</text>
+      </svg>`;
+    }
+    if (params.arrg === 'flat') {
+      return `
+      <svg viewBox="0 0 420 230" role="img" aria-label="Flat cable configuration with force vectors">
+        <defs><marker id="calcArrowFlat" markerWidth="8" markerHeight="8" refX="7" refY="4" orient="auto"><path d="M0,0 L8,4 L0,8 Z" fill="#2563eb"></path></marker></defs>
+        <circle cx="132" cy="122" r="30" fill="#dbeafe" stroke="#1d4ed8" stroke-width="2"></circle>
+        <circle cx="192" cy="122" r="30" fill="#dcfce7" stroke="#15803d" stroke-width="2"></circle>
+        <circle cx="252" cy="122" r="30" fill="#fee2e2" stroke="#dc2626" stroke-width="2"></circle>
+        <text x="132" y="130" text-anchor="middle" class="phase-label">A</text>
+        <text x="192" y="130" text-anchor="middle" class="phase-label">B</text>
+        <text x="252" y="130" text-anchor="middle" class="phase-label">C</text>
+        <line x1="132" y1="122" x2="82" y2="122" stroke="#2563eb" stroke-width="4" marker-end="url(#calcArrowFlat)"></line>
+        <line x1="252" y1="122" x2="302" y2="122" stroke="#2563eb" stroke-width="4" marker-end="url(#calcArrowFlat)"></line>
+        <text x="20" y="88">A ← ${force} N/m</text>
+        <text x="328" y="88">C → ${force} N/m</text>
+      </svg>`;
+    }
+    return `
+    <svg viewBox="0 0 420 230" role="img" aria-label="Trefoil cable configuration with force vectors">
+      <defs><marker id="calcArrowTrefoil" markerWidth="8" markerHeight="8" refX="7" refY="4" orient="auto"><path d="M0,0 L8,4 L0,8 Z" fill="#2563eb"></path></marker></defs>
+      <circle cx="210" cy="68" r="30" fill="#dbeafe" stroke="#1d4ed8" stroke-width="2"></circle>
+      <circle cx="180" cy="120" r="30" fill="#dcfce7" stroke="#15803d" stroke-width="2"></circle>
+      <circle cx="240" cy="120" r="30" fill="#fee2e2" stroke="#dc2626" stroke-width="2"></circle>
+      <text x="210" y="76" text-anchor="middle" class="phase-label">A</text>
+      <text x="180" y="128" text-anchor="middle" class="phase-label">B</text>
+      <text x="240" y="128" text-anchor="middle" class="phase-label">C</text>
+      <line x1="210" y1="68" x2="210" y2="24" stroke="#2563eb" stroke-width="4" marker-end="url(#calcArrowTrefoil)"></line>
+      <line x1="180" y1="120" x2="142" y2="148" stroke="#2563eb" stroke-width="4" marker-end="url(#calcArrowTrefoil)"></line>
+      <line x1="240" y1="120" x2="278" y2="148" stroke="#2563eb" stroke-width="4" marker-end="url(#calcArrowTrefoil)"></line>
+      <text x="218" y="20">A ↑ ${force} N/m</text>
+      <text x="66" y="170">B ↙ ${force} N/m</text>
+      <text x="286" y="170">C ↘ ${force} N/m</text>
+    </svg>`;
   }
 
   // ── Schedule mode ────────────────────────────────────────────────────────
