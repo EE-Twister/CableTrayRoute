@@ -4,16 +4,16 @@ const NAV_ROUTES = [
   { href: 'scenarios.html', label: 'Scenario Comparison', section: 'Workflow', group: 'Planning', icon: 'icons/toolbar/copy.svg' },
   { href: 'equipmentlist.html', label: 'Equipment List', section: 'Workflow', group: 'Planning', icon: 'icons/equipment.svg' },
   { href: 'loadlist.html', label: 'Load List', section: 'Workflow', group: 'Planning', icon: 'icons/load.svg' },
-  { href: 'cableschedule.html', label: 'Cable Schedule', section: 'Workflow', group: 'Cable & Raceway', icon: 'icons/cable.svg' },
-  { href: 'panelschedule.html', label: 'Panel Schedule', section: 'Workflow', group: 'Cable & Raceway', icon: 'icons/panel.svg' },
-  { href: 'racewayschedule.html', label: 'Raceway Schedule', section: 'Workflow', group: 'Cable & Raceway', icon: 'icons/raceway.svg' },
-  { href: 'ductbankroute.html', label: 'Ductbank', section: 'Workflow', group: 'Cable & Raceway', icon: 'icons/ductbank.svg' },
-  { href: 'cabletrayfill.html', label: 'Tray Fill', section: 'Workflow', group: 'Cable & Raceway', icon: 'icons/tray.svg' },
-  { href: 'conduitfill.html', label: 'Conduit Fill', section: 'Workflow', group: 'Cable & Raceway', icon: 'icons/conduit.svg' },
-  { href: 'supportspan.html', label: 'Support Span', section: 'Workflow', group: 'Mechanical', icon: 'icons/toolbar/dimension.svg' },
-  { href: 'seismicBracing.html', label: 'Seismic Bracing', section: 'Workflow', group: 'Mechanical', icon: 'icons/toolbar/validate.svg' },
-  { href: 'cableFaultBracing.html', label: 'Fault Cable Bracing', section: 'Workflow', group: 'Mechanical', icon: 'icons/toolbar/validate.svg' },
-  { href: 'trayhardwarebom.html', label: 'Tray Hardware BOM', section: 'Workflow', group: 'Mechanical', icon: 'icons/raceway.svg' },
+  { href: 'cableschedule.html', label: 'Cable Schedule', section: 'Workflow', group: 'Cable', icon: 'icons/cable.svg' },
+  { href: 'panelschedule.html', label: 'Panel Schedule', section: 'Workflow', group: 'Cable', icon: 'icons/panel.svg' },
+  { href: 'racewayschedule.html', label: 'Raceway Schedule', section: 'Workflow', group: 'Raceway', icon: 'icons/raceway.svg' },
+  { href: 'ductbankroute.html', label: 'Ductbank', section: 'Workflow', group: 'Raceway', icon: 'icons/ductbank.svg' },
+  { href: 'cabletrayfill.html', label: 'Tray Fill', section: 'Workflow', group: 'Raceway', icon: 'icons/tray.svg' },
+  { href: 'conduitfill.html', label: 'Conduit Fill', section: 'Workflow', group: 'Raceway', icon: 'icons/conduit.svg' },
+  { href: 'supportspan.html', label: 'Support Span', section: 'Workflow', group: 'Raceway', icon: 'icons/toolbar/dimension.svg' },
+  { href: 'seismicBracing.html', label: 'Seismic Bracing', section: 'Workflow', group: 'Structural', icon: 'icons/toolbar/validate.svg' },
+  { href: 'cableFaultBracing.html', label: 'Fault Cable Bracing', section: 'Workflow', group: 'Cable', icon: 'icons/toolbar/validate.svg' },
+  { href: 'trayhardwarebom.html', label: 'Tray Hardware BOM', section: 'Workflow', group: 'Raceway', icon: 'icons/raceway.svg' },
   { href: 'clashdetect.html', label: 'Clash Detection', section: 'Workflow', group: 'Validation', icon: 'icons/toolbar/validate.svg' },
   { href: 'designrulechecker.html', label: 'Design Rule Checker', section: 'Workflow', group: 'Validation', icon: 'icons/toolbar/validate.svg' },
   { href: 'spoolsheets.html', label: 'Spool Sheets', section: 'Workflow', group: 'Deliverables', icon: 'icons/toolbar/copy.svg' },
@@ -115,12 +115,20 @@ function buildDropdown(section, routes, currentRoute) {
     return acc;
   }, {});
   const groupNames = Object.keys(groupedRoutes);
+  const sectionGroupOrder = {
+    Workflow: ['Planning', 'Raceway', 'Cable', 'Structural', 'Validation', 'Optimization', 'Deliverables'],
+    Studies: ['Grounding', 'Cable', 'Protection', 'Power System', 'Power Quality', 'Equipment Sizing', 'Motor']
+  };
+  const orderedGroupNames = [
+    ...(sectionGroupOrder[section] || []).filter(groupName => groupNames.includes(groupName)),
+    ...groupNames.filter(groupName => !(sectionGroupOrder[section] || []).includes(groupName))
+  ];
   const hasGroups = groupNames.length > 1;
   if (!hasGroups && routes.length >= 12) {
     menu.dataset.cols = '2';
   }
 
-  groupNames.forEach((groupName) => {
+  orderedGroupNames.forEach((groupName) => {
     if (hasGroups) {
       const heading = document.createElement('li');
       heading.className = 'nav-dropdown-group-heading';
