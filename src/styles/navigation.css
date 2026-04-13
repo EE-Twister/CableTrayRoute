@@ -183,20 +183,20 @@
 
 .nav-dropdown-menu .nav-dropdown-group-heading {
     display: block;
-    padding: 0.5rem 0.75rem 0.2rem;
-    margin-top: 0.2rem;
-    border-top: 1px solid color-mix(in srgb, var(--color-border) 85%, transparent);
-    color: var(--color-text-muted, #64748b);
-    font-size: 0.72rem;
+    padding: 0.5rem 0.75rem 0.35rem;
+    margin-top: 0.35rem;
+    border-top: 1px solid color-mix(in srgb, var(--color-border) 80%, transparent);
+    color: var(--color-primary, #2563eb);
+    font-size: 0.76rem;
     font-weight: 700;
-    letter-spacing: 0.03em;
+    letter-spacing: 0.04em;
     text-transform: uppercase;
 }
 
 .nav-dropdown-menu .nav-dropdown-group-heading:first-child {
     margin-top: 0;
     border-top: 0;
-    padding-top: 0.35rem;
+    padding-top: 0.45rem;
 }
 
 .nav-dropdown-menu li a {
