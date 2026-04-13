@@ -110,8 +110,43 @@ test.describe('next features integration: cost estimator scenarios and exports',
 });
 
 test.describe('next features integration: emf deterministic outputs', () => {
-  test('integration: emf calculation returns deterministic numeric output and compliance table', async ({ page }) => {
+  test('integration: emf calculation returns deterministic numeric output for fixed 60 Hz and 50 Hz scenarios', async ({ page }) => {
     await navigateForE2E(page, 'emf.html');
+    const fixedInputs = {
+      loadCurrent: '150',
+      nCables: '1',
+      trayWidth: '12',
+      cableOd: '1.0',
+      measDistance: '36',
+    };
+
+    for (const frequency of ['60', '50']) {
+      await fillEmfForm(page, { ...fixedInputs, frequency });
+      await page.click('#calc-btn');
+
+      await expect(page.locator('tr:has(th:has-text("Frequency")) td')).toHaveText(`${frequency} Hz`);
+
+      const rmsCell = page.locator('tr:has(th:has-text("RMS Flux Density")) td strong');
+      await expect(rmsCell).toHaveText(/^\d+\.\d{3}\sµT$/);
+      const rms = await getEmfRmsMicroTesla(page);
+      expect(rms).not.toBeNull();
+      expect(rms).toBeGreaterThan(20);
+      expect(rms).toBeLessThan(40);
+
+      const peakText = await page.locator('tr:has(th:has-text("Peak Flux Density")) td strong').innerText();
+      expect(peakText).toMatch(/^\d+\.\d{3}\sµT$/);
+      const peak = Number.parseFloat(peakText.replace(' µT', ''));
+      expect(peak).toBeGreaterThan(40);
+      expect(peak).toBeLessThan(70);
+
+      const resultText = await getResultText(page, '#results');
+      expect(resultText).toContain('ICNIRP 2010 Compliance');
+    }
+  });
+
+  test('integration: emf ICNIRP compliance status shows PASS and FAIL outcomes for supported scenarios', async ({ page }) => {
+    await navigateForE2E(page, 'emf.html');
+
     await fillEmfForm(page, {
       frequency: '60',
       loadCurrent: '150',
@@ -120,31 +155,65 @@ test.describe('next features integration: emf deterministic outputs', () => {
       cableOd: '1.0',
       measDistance: '36',
     });
-
     await page.click('#calc-btn');
+    await expect(page.locator('#results .status-badge', { hasText: 'PASS' })).toHaveCount(2);
+    await expect(page.locator('#results .status-badge', { hasText: 'FAIL' })).toHaveCount(0);
 
-    const rms = await getEmfRmsMicroTesla(page);
-    expect(rms).not.toBeNull();
-    expect(rms).toBeGreaterThan(0);
-    expect(rms).toBeLessThan(5000);
-
-    const resultText = await getResultText(page, '#results');
-    expect(resultText).toContain('ICNIRP 2010 Compliance');
-    expect(resultText).toMatch(/PASS|FAIL/);
+    await fillEmfForm(page, {
+      frequency: '60',
+      loadCurrent: '5000',
+      nCables: '20',
+      trayWidth: '48',
+      cableOd: '6',
+      measDistance: '0',
+    });
+    await page.click('#calc-btn');
+    await expect(page.locator('#results .status-badge', { hasText: 'FAIL' })).toHaveCount(2);
   });
 
-  test('integration: emf profile scenario shows chart and stable chart container state', async ({ page }) => {
+  test('integration: emf boundary and error handling uses deterministic UI messaging and defaults', async ({ page }) => {
+    await navigateForE2E(page, 'emf.html');
+
+    await fillEmfForm(page, { loadCurrent: '0' });
+    await page.click('#calc-btn');
+    const inputErrorDialog = page.getByRole('dialog');
+    await expect(inputErrorDialog).toContainText('Input Error');
+    await expect(inputErrorDialog).toContainText('Load current must be greater than zero.');
+    await inputErrorDialog.getByRole('button', { name: 'Close' }).click();
+
+    await fillEmfForm(page, { loadCurrent: '' });
+    await page.click('#calc-btn');
+    const missingValueDialog = page.getByRole('dialog');
+    await expect(missingValueDialog).toContainText('Load current must be greater than zero.');
+    await missingValueDialog.getByRole('button', { name: 'Close' }).click();
+
+    await fillEmfForm(page, {
+      loadCurrent: '150',
+      nCables: '-3',
+      measDistance: '',
+    });
+    await page.click('#calc-btn');
+    await expect(page.locator('#results .method-note')).toContainText('Configuration: 1 × 3-phase cable set(s)');
+    await expect(page.locator('tr:has(th:has-text("Measurement Distance (from tray edge)")) td')).toContainText('36.0 in');
+  });
+
+  test('integration: emf profile scenario shows deterministic profile container visibility and chart content', async ({ page }) => {
     await navigateForE2E(page, 'emf.html');
     await fillEmfForm(page);
 
+    const chartContainer = page.locator('#profile-container');
+    await expect(chartContainer).toBeHidden();
+    await expect(chartContainer).toHaveAttribute('hidden', '');
+
     await page.click('#profile-btn');
 
-    const chartContainer = page.locator('#profile-container');
     await expect(chartContainer).toBeVisible();
     await expect(chartContainer).not.toHaveAttribute('hidden');
+    await expect(chartContainer.locator('h2')).toHaveText('Field Profile vs. Distance from Tray Edge');
+    await expect(page.locator('#emf-chart')).toBeVisible();
 
     const points = await page.locator('#emf-chart polyline').getAttribute('points');
     expect(points).toBeTruthy();
-    expect(points.split(' ').length).toBeGreaterThan(100);
+    expect(points.trim().split(/\s+/).length).toBe(121);
   });
 });
