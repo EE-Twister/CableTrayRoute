@@ -24,9 +24,9 @@
     .unit-pill { border: 0; border-radius: 999px; padding: 0.4rem 0.9rem; cursor: pointer; background: transparent; color: inherit; font-weight: 600; }
     .unit-pill[aria-pressed="true"] { background: color-mix(in srgb, var(--primary-color, #2563eb) 22%, white); }
     .arrangement-gallery { display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 0.75rem; margin-top: 0.25rem; }
-    .arrangement-card { border: 1px solid var(--border-color, #cbd5e1); border-radius: 10px; padding: 0.7rem; background: var(--secondary-color, #f8fafc); cursor: pointer; text-align: left; }
-    .arrangement-card.active { border-color: var(--primary-color, #2563eb); box-shadow: 0 0 0 2px color-mix(in srgb, var(--primary-color, #2563eb) 18%, transparent); }
-    .arrangement-card svg { width: 100%; height: auto; }
+    .arrangement-card { border: 1px solid var(--border-color, #cbd5e1); border-radius: 10px; padding: 0.7rem; background: var(--secondary-color, #f8fafc); cursor: pointer; text-align: left; display: grid; justify-items: center; gap: 0.4rem; }
+    .arrangement-card.active { border-color: var(--primary-color, #2563eb); box-shadow: 0 0 0 2px color-mix(in srgb, var(--primary-color, #2563eb) 18%, transparent); background: color-mix(in srgb, var(--primary-color, #2563eb) 8%, var(--secondary-color, #f8fafc)); }
+    .arrangement-card svg { width: min(100%, 230px); height: auto; display: block; margin: 0 auto; }
     .phase-label { font-size: 14px; font-weight: 700; }
     .force-vectors { margin-top: 0.5rem; border: 1px solid var(--border-color, #cbd5e1); border-radius: 10px; padding: 0.75rem; background: var(--secondary-color, #f8fafc); }
     .force-vectors svg { width: 100%; max-width: 500px; height: auto; display: block; }
@@ -204,19 +204,15 @@ Three-phase:    F = √3×10⁻⁷ × i_peak² / d  [N/m]</pre>
           <div class="arrangement-gallery" id="arrangementGallery" role="radiogroup" aria-label="Cable arrangement selector">
             <button class="arrangement-card active" id="arrangementTrefoil" type="button" data-arrangement="trefoil" role="radio" aria-checked="true">
               <svg viewBox="0 0 180 120" aria-hidden="true">
-                <defs><marker id="arrowBlue" markerWidth="8" markerHeight="8" refX="7" refY="4" orient="auto"><path d="M0,0 L8,4 L0,8 Z" fill="#2563eb"></path></marker></defs>
-                <circle cx="90" cy="28" r="16" fill="#dbeafe" stroke="#1d4ed8"></circle><circle cx="57" cy="84" r="16" fill="#dcfce7" stroke="#15803d"></circle><circle cx="123" cy="84" r="16" fill="#fee2e2" stroke="#dc2626"></circle>
-                <text x="90" y="33" text-anchor="middle" class="phase-label">A</text><text x="57" y="89" text-anchor="middle" class="phase-label">B</text><text x="123" y="89" text-anchor="middle" class="phase-label">C</text>
-                <line x1="90" y1="28" x2="90" y2="7" stroke="#2563eb" stroke-width="2.4" marker-end="url(#arrowBlue)"></line><line x1="57" y1="84" x2="38" y2="99" stroke="#2563eb" stroke-width="2.4" marker-end="url(#arrowBlue)"></line><line x1="123" y1="84" x2="142" y2="99" stroke="#2563eb" stroke-width="2.4" marker-end="url(#arrowBlue)"></line>
+                <circle cx="90" cy="38" r="20" fill="#dbeafe" stroke="#1d4ed8" stroke-width="1.6"></circle><circle cx="72.7" cy="68" r="20" fill="#dcfce7" stroke="#15803d" stroke-width="1.6"></circle><circle cx="107.3" cy="68" r="20" fill="#fee2e2" stroke="#dc2626" stroke-width="1.6"></circle>
+                <text x="90" y="44" text-anchor="middle" class="phase-label">A</text><text x="72.7" y="74" text-anchor="middle" class="phase-label">B</text><text x="107.3" y="74" text-anchor="middle" class="phase-label">C</text>
               </svg>
-              <span>Trefoil (outward force vectors)</span>
+              <span>Trefoil (touching)</span>
             </button>
             <button class="arrangement-card" id="arrangementFlat" type="button" data-arrangement="flat" role="radio" aria-checked="false">
               <svg viewBox="0 0 180 120" aria-hidden="true">
-                <defs><marker id="arrowBlue2" markerWidth="8" markerHeight="8" refX="7" refY="4" orient="auto"><path d="M0,0 L8,4 L0,8 Z" fill="#2563eb"></path></marker></defs>
-                <circle cx="42" cy="62" r="16" fill="#dbeafe" stroke="#1d4ed8"></circle><circle cx="90" cy="62" r="16" fill="#dcfce7" stroke="#15803d"></circle><circle cx="138" cy="62" r="16" fill="#fee2e2" stroke="#dc2626"></circle>
-                <text x="42" y="67" text-anchor="middle" class="phase-label">A</text><text x="90" y="67" text-anchor="middle" class="phase-label">B</text><text x="138" y="67" text-anchor="middle" class="phase-label">C</text>
-                <line x1="42" y1="62" x2="18" y2="62" stroke="#2563eb" stroke-width="2.4" marker-end="url(#arrowBlue2)"></line><line x1="138" y1="62" x2="162" y2="62" stroke="#2563eb" stroke-width="2.4" marker-end="url(#arrowBlue2)"></line><line x1="90" y1="62" x2="90" y2="38" stroke="#2563eb" stroke-width="2.4" marker-end="url(#arrowBlue2)"></line>
+                <circle cx="52" cy="62" r="20" fill="#dbeafe" stroke="#1d4ed8" stroke-width="1.6"></circle><circle cx="92" cy="62" r="20" fill="#dcfce7" stroke="#15803d" stroke-width="1.6"></circle><circle cx="132" cy="62" r="20" fill="#fee2e2" stroke="#dc2626" stroke-width="1.6"></circle>
+                <text x="52" y="68" text-anchor="middle" class="phase-label">A</text><text x="92" y="68" text-anchor="middle" class="phase-label">B</text><text x="132" y="68" text-anchor="middle" class="phase-label">C</text>
               </svg>
               <span>Flat / single-layer</span>
             </button>
