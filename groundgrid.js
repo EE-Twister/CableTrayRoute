@@ -9,6 +9,8 @@ document.addEventListener('DOMContentLoaded', () => {
 
   const resultsDiv = document.getElementById('results');
   const form = document.getElementById('ground-grid-form');
+  const previewSvg = document.getElementById('ground-grid-preview');
+  const previewSummary = document.getElementById('grid-preview-summary');
 
   function getNum(id) { return parseFloat(document.getElementById(id).value); }
   function getInt(id) { return parseInt(document.getElementById(id).value, 10); }
@@ -34,6 +36,97 @@ document.addEventListener('DOMContentLoaded', () => {
     b.setAttribute('role', 'status');
     b.textContent = passed ? `✓ ${label} — PASS` : `✗ ${label} — FAIL`;
     return b;
+  }
+
+  function renderGridPreview() {
+    if (!previewSvg || !previewSummary) {
+      return;
+    }
+
+    const gridLxInput = getNum('grid-lx');
+    const gridLyInput = getNum('grid-ly');
+    const nxInput = getInt('nx');
+    const nyInput = getInt('ny');
+    const hasRods = document.getElementById('has-rods').checked;
+
+    const gridLx = Number.isFinite(gridLxInput) && gridLxInput > 0 ? gridLxInput : 1;
+    const gridLy = Number.isFinite(gridLyInput) && gridLyInput > 0 ? gridLyInput : 1;
+    const nx = Math.max(2, Number.isFinite(nxInput) ? nxInput : 2);
+    const ny = Math.max(2, Number.isFinite(nyInput) ? nyInput : 2);
+
+    const unit = getUnits() === 'imperial' ? 'ft' : 'm';
+    const spacingX = ny > 1 ? gridLx / (ny - 1) : 0;
+    const spacingY = nx > 1 ? gridLy / (nx - 1) : 0;
+
+    const svgWidth = 520;
+    const svgHeight = 360;
+    const margin = 52;
+    const drawableWidth = svgWidth - (margin * 2);
+    const drawableHeight = svgHeight - (margin * 2);
+    const scale = Math.min(drawableWidth / gridLx, drawableHeight / gridLy);
+    const drawWidth = gridLx * scale;
+    const drawHeight = gridLy * scale;
+    const startX = (svgWidth - drawWidth) / 2;
+    const startY = (svgHeight - drawHeight) / 2;
+    const endX = startX + drawWidth;
+    const endY = startY + drawHeight;
+
+    previewSvg.innerHTML = '';
+
+    const ns = 'http://www.w3.org/2000/svg';
+    const make = (name, attrs = {}) => {
+      const node = document.createElementNS(ns, name);
+      Object.entries(attrs).forEach(([key, value]) => node.setAttribute(key, String(value)));
+      return node;
+    };
+
+    previewSvg.appendChild(make('rect', {
+      x: startX,
+      y: startY,
+      width: drawWidth,
+      height: drawHeight,
+      class: 'grid-outline'
+    }));
+
+    const dx = ny > 1 ? drawWidth / (ny - 1) : 0;
+    const dy = nx > 1 ? drawHeight / (nx - 1) : 0;
+
+    for (let i = 0; i < ny; i += 1) {
+      const x = startX + (i * dx);
+      previewSvg.appendChild(make('line', {
+        x1: x,
+        y1: startY,
+        x2: x,
+        y2: endY,
+        class: 'grid-conductor'
+      }));
+    }
+    for (let i = 0; i < nx; i += 1) {
+      const y = startY + (i * dy);
+      previewSvg.appendChild(make('line', {
+        x1: startX,
+        y1: y,
+        x2: endX,
+        y2: y,
+        class: 'grid-conductor'
+      }));
+    }
+
+    if (hasRods) {
+      [[startX, startY], [endX, startY], [startX, endY], [endX, endY]].forEach(([x, y]) => {
+        previewSvg.appendChild(make('circle', {
+          cx: x,
+          cy: y,
+          r: 5,
+          class: 'grid-rod'
+        }));
+      });
+    }
+
+    previewSummary.textContent = `Lx: ${gridLx.toFixed(1)} ${unit} • Ly: ${gridLy.toFixed(1)} ${unit} • `
+      + `${nx} horizontal runs • ${ny} vertical runs • `
+      + `Spacing: ${spacingX.toFixed(1)} ${unit} (x), ${spacingY.toFixed(1)} ${unit} (y)`
+      + (hasRods ? ' • Corner rods enabled' : '');
   }
 
   function calculate() {
@@ -163,4 +256,17 @@ document.addEventListener('DOMContentLoaded', () => {
     e.preventDefault();
     calculate();
   });
+
+  form.addEventListener('input', () => {
+    renderGridPreview();
+  });
+
+  const unitSelect = document.getElementById('unit-select');
+  if (unitSelect) {
+    unitSelect.addEventListener('change', () => {
+      renderGridPreview();
+    });
+  }
+
+  renderGridPreview();
 });
