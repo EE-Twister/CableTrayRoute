@@ -1,3 +1,8 @@
+import {
+  getTrayHardwareCatalogCustomProducts,
+  setTrayHardwareCatalogCustomProducts
+} from '../dataStore.mjs';
+
 /**
  * Manufacturer Catalog Browser
  *
@@ -14,17 +19,38 @@ const CATALOG_URL = 'data/manufacturer_catalog.json';
 
 let catalogCache = null;
 
-/**
- * Load (or return cached) catalog data.
- * @returns {Promise<object[]>} array of product objects
- */
-export async function loadCatalog() {
+function getCustomProducts() {
+  const stored = getTrayHardwareCatalogCustomProducts();
+  return Array.isArray(stored) ? stored : [];
+}
+
+function setCustomProducts(products) {
+  setTrayHardwareCatalogCustomProducts(Array.isArray(products) ? products : []);
+}
+
+function mergeCatalogProducts(base, custom) {
+  const byId = new Map();
+  for (const product of base) byId.set(product.id, product);
+  for (const product of custom) byId.set(product.id, product);
+  return [...byId.values()];
+}
+
+async function loadBaseCatalog() {
   if (catalogCache) return catalogCache;
   const res = await fetch(CATALOG_URL);
   if (!res.ok) throw new Error(`Failed to load catalog: HTTP ${res.status}`);
   const data = await res.json();
   catalogCache = Array.isArray(data.products) ? data.products : [];
   return catalogCache;
+}
+
+/**
+ * Load (or return cached) catalog data.
+ * @returns {Promise<object[]>} array of product objects
+ */
+export async function loadCatalog() {
+  const baseProducts = await loadBaseCatalog();
+  return mergeCatalogProducts(baseProducts, getCustomProducts());
 }
 
 /**
@@ -188,9 +214,9 @@ export async function mountCatalogBrowser(container, { onSelect } = {}) {
   const filterBar = document.createElement('div');
   filterBar.className = 'catalog-filter-bar';
 
-  const categories = ['', ...[...new Set(allProducts.map(p => p.category))].sort()];
-  const manufacturers = ['', ...[...new Set(allProducts.map(p => p.manufacturer))].sort()];
-  const materials = ['', ...[...new Set(allProducts.map(p => p.material))].sort()];
+  function getDistinctOptions(field) {
+    return ['', ...[...new Set(allProducts.map(p => p[field]).filter(Boolean))].sort()];
+  }
 
   function makeSelect(labelText, options) {
     const label = document.createElement('label');
@@ -208,9 +234,9 @@ export async function mountCatalogBrowser(container, { onSelect } = {}) {
     return { label, select: sel };
   }
 
-  const catFilter = makeSelect('Category', categories);
-  const mfrFilter = makeSelect('Manufacturer', manufacturers);
-  const matFilter = makeSelect('Material', materials);
+  const catFilter = makeSelect('Category', getDistinctOptions('category'));
+  const mfrFilter = makeSelect('Manufacturer', getDistinctOptions('manufacturer'));
+  const matFilter = makeSelect('Material', getDistinctOptions('material'));
 
   const searchLabel = document.createElement('label');
   searchLabel.className = 'catalog-filter-label';
@@ -229,9 +255,56 @@ export async function mountCatalogBrowser(container, { onSelect } = {}) {
   const resultsDiv = document.createElement('div');
   resultsDiv.className = 'catalog-results';
 
+  const addSection = document.createElement('section');
+  addSection.className = 'catalog-add';
+  addSection.innerHTML = '<h3>Add Catalog Item</h3><p class="catalog-add-help">Add custom manufacturer items for this project scenario.</p>';
+
+  const addForm = document.createElement('form');
+  addForm.className = 'catalog-add-form';
+  addForm.innerHTML = `
+    <label class="catalog-filter-label">Part Number <input class="catalog-filter-input" name="id" required></label>
+    <label class="catalog-filter-label">Manufacturer <input class="catalog-filter-input" name="manufacturer" required></label>
+    <label class="catalog-filter-label">Category
+      <select class="catalog-filter-select" name="category">
+        <option value="tray">tray</option>
+        <option value="fitting">fitting</option>
+        <option value="conduit">conduit</option>
+        <option value="accessory">accessory</option>
+      </select>
+    </label>
+    <label class="catalog-filter-label">Description <input class="catalog-filter-input" name="description" required></label>
+    <label class="catalog-filter-label">Material <input class="catalog-filter-input" name="material" placeholder="steel"></label>
+    <label class="catalog-filter-label">Unit
+      <select class="catalog-filter-select" name="unit">
+        <option value="EA">EA</option>
+        <option value="FT">FT</option>
+        <option value="LF">LF</option>
+      </select>
+    </label>
+    <label class="catalog-filter-label">List Price (USD) <input class="catalog-filter-input" name="list_price_usd" type="number" min="0" step="0.01" value="0"></label>
+    <button type="submit">Add Item</button>
+  `;
+  const addStatus = document.createElement('p');
+  addStatus.className = 'catalog-add-status';
+  addSection.appendChild(addForm);
+  addSection.appendChild(addStatus);
+
   container.innerHTML = '';
+  container.appendChild(addSection);
   container.appendChild(filterBar);
   container.appendChild(resultsDiv);
+
+  function repopulateSelect(select, options) {
+    const previous = select.value;
+    select.innerHTML = '';
+    for (const opt of options) {
+      const option = document.createElement('option');
+      option.value = opt;
+      option.textContent = opt || '(all)';
+      select.appendChild(option);
+    }
+    select.value = options.includes(previous) ? previous : '';
+  }
 
   async function refresh() {
     const filtered = await filterProducts({
@@ -247,6 +320,47 @@ export async function mountCatalogBrowser(container, { onSelect } = {}) {
   mfrFilter.select.addEventListener('change', refresh);
   matFilter.select.addEventListener('change', refresh);
   searchInput.addEventListener('input', refresh);
+  addForm.addEventListener('submit', async e => {
+    e.preventDefault();
+    const formData = new FormData(addForm);
+    const productId = String(formData.get('id') || '').trim();
+    if (!productId) return;
+    const existing = await getCatalogProduct(productId);
+    if (existing) {
+      addStatus.textContent = `Part number ${productId} already exists in the catalog.`;
+      return;
+    }
+    const nextProduct = {
+      id: productId,
+      manufacturer: String(formData.get('manufacturer') || '').trim(),
+      series: 'Custom',
+      category: String(formData.get('category') || 'accessory').trim(),
+      subcategory: 'custom',
+      description: String(formData.get('description') || '').trim(),
+      width_in: null,
+      depth_in: null,
+      angle_deg: null,
+      material: String(formData.get('material') || '').trim() || 'steel',
+      finish: 'none',
+      load_class: null,
+      unit: String(formData.get('unit') || 'EA').trim() || 'EA',
+      list_price_usd: Number(formData.get('list_price_usd')) || 0,
+      weight_lb: null,
+      nec_listed: false,
+      ul_classified: false,
+      url: null,
+    };
+    const custom = getCustomProducts();
+    custom.push(nextProduct);
+    setCustomProducts(custom);
+    allProducts = await loadCatalog();
+    repopulateSelect(catFilter.select, getDistinctOptions('category'));
+    repopulateSelect(mfrFilter.select, getDistinctOptions('manufacturer'));
+    repopulateSelect(matFilter.select, getDistinctOptions('material'));
+    addStatus.textContent = `Added ${nextProduct.id} to this project catalog.`;
+    addForm.reset();
+    await refresh();
+  });
 
   await refresh();
 }

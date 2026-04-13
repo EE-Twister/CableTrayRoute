@@ -92,6 +92,7 @@ const EXTRA_KEYS = {
   cableSchedulePreset: 'cableSchedulePreset',
   cableTemplates: 'cableTemplates',
   equipmentFilterPresets: 'equipmentFilterPresets',
+  trayHardwareCatalogCustomProducts: 'trayHardwareCatalogCustomProducts',
   drcAcceptedFindings: 'drcAcceptedFindings',
   studyApprovals: 'studyApprovals',
 };
@@ -209,6 +210,9 @@ export const setCableTemplates = templates => write(EXTRA_KEYS.cableTemplates, t
 
 export const getEquipmentFilterPresets = () => read(EXTRA_KEYS.equipmentFilterPresets, []);
 export const setEquipmentFilterPresets = presets => write(EXTRA_KEYS.equipmentFilterPresets, presets);
+
+export const getTrayHardwareCatalogCustomProducts = () => read(EXTRA_KEYS.trayHardwareCatalogCustomProducts, []);
+export const setTrayHardwareCatalogCustomProducts = products => write(EXTRA_KEYS.trayHardwareCatalogCustomProducts, products);
 
 /**
  * DRC accepted findings — engineer "Accept Risk" annotations persisted per scenario.
