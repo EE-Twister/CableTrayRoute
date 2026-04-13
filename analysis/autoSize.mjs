@@ -248,6 +248,27 @@ export function nextStandardOcpd(requiredAmps) {
 }
 
 /**
+ * NEC 240.4(D) small-conductor maximum OCPD limits.
+ *
+ * Returns null when no special small-conductor cap applies for the size/material.
+ *
+ * @param {string} size
+ * @param {'copper'|'aluminum'} material
+ * @returns {number|null}
+ */
+export function smallConductorMaxOcpd(size, material = 'copper') {
+  if (material === 'copper') {
+    if (size === '#14 AWG') return 15;
+    if (size === '#12 AWG') return 20;
+    if (size === '#10 AWG') return 30;
+    return null;
+  }
+  if (size === '#12 AWG') return 15;
+  if (size === '#10 AWG') return 25;
+  return null;
+}
+
+/**
  * Find the next standard transformer kVA at or above the required kVA.
  *
  * @param {number} requiredKva
@@ -272,10 +293,11 @@ export function nextStandardXfmrKva(requiredKva) {
  * @param {number}  [options.ambientTempC=30]        Ambient temperature in °C
  * @param {number}  [options.bundledConductors=1]    Number of current-carrying conductors in raceway
  * @param {'conduit'|'tray_spaced'|'tray_touching'} [options.installationType='conduit']
+ * @param {number|null} [options.requiredOcpd]   Minimum OCPD rating that must be allowed by NEC 240.4(D)
  * @returns {{size: string, ampacity: number, deratingFactor: number, trayFactor: number}|null}
  */
 export function selectConductorSize(requiredAmps, material = 'copper', tempRating = 75, options = {}) {
-  const { ambientTempC = 30, bundledConductors = 1, installationType = 'conduit' } = options;
+  const { ambientTempC = 30, bundledConductors = 1, installationType = 'conduit', requiredOcpd = null } = options;
 
   const tempFactor = ambientTempFactor(ambientTempC, tempRating);
   const bundleFactor = bundlingFactor(bundledConductors);
@@ -293,7 +315,10 @@ export function selectConductorSize(requiredAmps, material = 'copper', tempRatin
 
   const entry = NEC_AMPACITY_TABLE.find(row => {
     const amp = row[col];
-    return amp !== null && amp >= adjustedRequired;
+    if (amp === null || amp < adjustedRequired) return false;
+    if (requiredOcpd === null) return true;
+    const maxSmallOcpd = smallConductorMaxOcpd(row.size, material);
+    return maxSmallOcpd === null || requiredOcpd <= maxSmallOcpd;
   });
   if (!entry) return null;
   return { size: entry.size, ampacity: entry[col], deratingFactor: combinedFactor, trayFactor };
@@ -523,7 +548,13 @@ export function sizeFeeder(params) {
   if (loadAmps <= 0) throw new Error('Load current must be positive');
 
   const requiredAmps = continuous ? loadAmps * 1.25 : loadAmps;
-  const conductor = selectConductorSize(requiredAmps, material, tempRating, { ambientTempC, bundledConductors, installationType });
+  const ocpd = nextStandardOcpd(requiredAmps);
+  const conductor = selectConductorSize(requiredAmps, material, tempRating, {
+    ambientTempC,
+    bundledConductors,
+    installationType,
+    requiredOcpd: ocpd,
+  });
   if (!conductor) {
     // Find the minimum parallel set count that satisfies the load (NEC 310.10(H))
     let parallelSuggestion = null;
@@ -547,7 +578,6 @@ export function sizeFeeder(params) {
     };
   }
 
-  const ocpd = nextStandardOcpd(conductor.ampacity);
   const derating = conductor.deratingFactor;
 
   return {
@@ -570,7 +600,8 @@ export function sizeFeeder(params) {
       ambientRule: ambientTempC !== 30 ? `NEC 310.15(B)(1)(a) — ambient ${ambientTempC}°C correction factor ${ambientTempFactor(ambientTempC, tempRating).toFixed(2)}` : null,
       bundlingRule: bundledConductors > 3 ? `NEC 310.15(C)(1) — ${bundledConductors} conductors bundling factor ${bundlingFactor(bundledConductors).toFixed(2)}` : null,
       trayRule: installationType === 'tray_touching' ? 'NEC 392.80(A)(1)(b) — cable tray, cables touching: 0.65× derating factor' : null,
-      ocpdRule: 'NEC 240.4(B) — next standard size above conductor ampacity',
+      ocpdRule: 'NEC 240.4(B) / 240.6(A) — standard OCPD at or above required load ampacity',
+      smallConductorRule: 'NEC 240.4(D) — #14 Cu max 15A, #12 Cu max 20A, #10 Cu max 30A; #12 Al max 15A, #10 Al max 25A',
     }
   };
 }

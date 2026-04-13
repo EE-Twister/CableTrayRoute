@@ -7,6 +7,7 @@
 import assert from 'assert';
 import {
   nextStandardOcpd,
+  smallConductorMaxOcpd,
   nextStandardXfmrKva,
   selectConductorSize,
   motorFLC3Ph,
@@ -70,6 +71,23 @@ describe('nextStandardOcpd — NEC 240.6(A)', () => {
 
   it('returns null above 6000A', () => {
     assert.strictEqual(nextStandardOcpd(6001), null);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// smallConductorMaxOcpd
+// ---------------------------------------------------------------------------
+describe('smallConductorMaxOcpd — NEC 240.4(D)', () => {
+  it('returns 20A max for #12 AWG copper', () => {
+    assert.strictEqual(smallConductorMaxOcpd('#12 AWG', 'copper'), 20);
+  });
+
+  it('returns 25A max for #10 AWG aluminum', () => {
+    assert.strictEqual(smallConductorMaxOcpd('#10 AWG', 'aluminum'), 25);
+  });
+
+  it('returns null for larger conductors', () => {
+    assert.strictEqual(smallConductorMaxOcpd('#8 AWG', 'copper'), null);
   });
 });
 
@@ -180,12 +198,12 @@ describe('sizeFeeder — NEC 210.20 / 215.3 / 240.4', () => {
   it('sizes a 60A continuous load correctly', () => {
     // Required = 60 × 1.25 = 75A → conductor must handle 75A
     // 75°C Cu: #4 AWG = 85A ≥ 75A ✓
-    // OCPD: next standard ≥ 85A → 90A
+    // OCPD: next standard ≥ required load ampacity 75A → 80A
     const r = sizeFeeder({ loadAmps: 60, continuous: true });
     assert.strictEqual(r.requiredAmps, 75);
     assert.strictEqual(r.conductorSize, '#4 AWG');
     assert.strictEqual(r.conductorAmpacity, 85);
-    assert.strictEqual(r.ocpdRating, 90);
+    assert.strictEqual(r.ocpdRating, 80);
   });
 
   it('sizes a 100A non-continuous load correctly', () => {
@@ -209,6 +227,12 @@ describe('sizeFeeder — NEC 210.20 / 215.3 / 240.4', () => {
   it('includes NEC references', () => {
     const r = sizeFeeder({ loadAmps: 30, continuous: true });
     assert.ok(r.nec && r.nec.continuousRule);
+  });
+
+  it('applies NEC 240.4(D) and avoids #12 copper on a 25A feeder', () => {
+    const r = sizeFeeder({ loadAmps: 25, continuous: false, material: 'copper' });
+    assert.strictEqual(r.ocpdRating, 25);
+    assert.strictEqual(r.conductorSize, '#10 AWG');
   });
 });
 
