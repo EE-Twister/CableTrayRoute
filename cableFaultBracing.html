@@ -19,6 +19,18 @@
   <link rel="dns-prefetch" href="https://fonts.gstatic.com">
   <meta name="color-scheme" content="light dark">
   <link rel="stylesheet" href="style.css" />
+  <style>
+    .units-toggle { display: inline-flex; gap: 0.5rem; border: 1px solid var(--border-color, #cbd5e1); border-radius: 999px; padding: 0.25rem; }
+    .unit-pill { border: 0; border-radius: 999px; padding: 0.4rem 0.9rem; cursor: pointer; background: transparent; color: inherit; font-weight: 600; }
+    .unit-pill[aria-pressed="true"] { background: color-mix(in srgb, var(--primary-color, #2563eb) 22%, white); }
+    .arrangement-gallery { display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 0.75rem; margin-top: 0.25rem; }
+    .arrangement-card { border: 1px solid var(--border-color, #cbd5e1); border-radius: 10px; padding: 0.7rem; background: var(--secondary-color, #f8fafc); cursor: pointer; text-align: left; }
+    .arrangement-card.active { border-color: var(--primary-color, #2563eb); box-shadow: 0 0 0 2px color-mix(in srgb, var(--primary-color, #2563eb) 18%, transparent); }
+    .arrangement-card svg { width: 100%; height: auto; }
+    .phase-label { font-size: 14px; font-weight: 700; }
+    .force-vectors { margin-top: 0.5rem; border: 1px solid var(--border-color, #cbd5e1); border-radius: 10px; padding: 0.75rem; background: var(--secondary-color, #f8fafc); }
+    .force-vectors svg { width: 100%; max-width: 500px; height: auto; display: block; }
+  </style>
   <script type="module" src="dirtyTracker.js"></script>
   <script type="module" src="dist/cableFaultBracing.js" defer></script>
 </head>
@@ -135,6 +147,14 @@ Three-phase:    F = √3×10⁻⁷ × i_peak² / d  [N/m]</pre>
       <!-- Fault system parameters -->
       <fieldset>
         <legend><strong>Fault System Parameters</strong></legend>
+        <div class="field-row">
+          <label>Calculator units</label>
+          <div class="units-toggle" role="group" aria-label="Calculator units toggle">
+            <button id="unitsImperial" type="button" class="unit-pill" aria-pressed="false">Imperial</button>
+            <button id="unitsMetric" type="button" class="unit-pill" aria-pressed="true">Metric</button>
+          </div>
+          <p class="field-hint">Switch spacing and cleat span entry labels between imperial and metric units.</p>
+        </div>
 
         <div class="field-row">
           <label for="faultCurrent">
@@ -179,11 +199,28 @@ Three-phase:    F = √3×10⁻⁷ × i_peak² / d  [N/m]</pre>
         </div>
 
         <div class="field-row" id="arrangementRow">
-          <label for="arrangement">Cable arrangement in raceway</label>
-          <select id="arrangement" aria-describedby="arrangementHint">
-            <option value="trefoil" selected>Trefoil (equilateral triangle)</option>
-            <option value="flat">Flat / single-layer</option>
-          </select>
+          <label>Cable arrangement in raceway</label>
+          <input type="hidden" id="arrangement" value="trefoil">
+          <div class="arrangement-gallery" id="arrangementGallery" role="radiogroup" aria-label="Cable arrangement selector">
+            <button class="arrangement-card active" id="arrangementTrefoil" type="button" data-arrangement="trefoil" role="radio" aria-checked="true">
+              <svg viewBox="0 0 180 120" aria-hidden="true">
+                <defs><marker id="arrowBlue" markerWidth="8" markerHeight="8" refX="7" refY="4" orient="auto"><path d="M0,0 L8,4 L0,8 Z" fill="#2563eb"></path></marker></defs>
+                <circle cx="90" cy="28" r="16" fill="#dbeafe" stroke="#1d4ed8"></circle><circle cx="57" cy="84" r="16" fill="#dcfce7" stroke="#15803d"></circle><circle cx="123" cy="84" r="16" fill="#fee2e2" stroke="#dc2626"></circle>
+                <text x="90" y="33" text-anchor="middle" class="phase-label">A</text><text x="57" y="89" text-anchor="middle" class="phase-label">B</text><text x="123" y="89" text-anchor="middle" class="phase-label">C</text>
+                <line x1="90" y1="28" x2="90" y2="7" stroke="#2563eb" stroke-width="2.4" marker-end="url(#arrowBlue)"></line><line x1="57" y1="84" x2="38" y2="99" stroke="#2563eb" stroke-width="2.4" marker-end="url(#arrowBlue)"></line><line x1="123" y1="84" x2="142" y2="99" stroke="#2563eb" stroke-width="2.4" marker-end="url(#arrowBlue)"></line>
+              </svg>
+              <span>Trefoil (outward force vectors)</span>
+            </button>
+            <button class="arrangement-card" id="arrangementFlat" type="button" data-arrangement="flat" role="radio" aria-checked="false">
+              <svg viewBox="0 0 180 120" aria-hidden="true">
+                <defs><marker id="arrowBlue2" markerWidth="8" markerHeight="8" refX="7" refY="4" orient="auto"><path d="M0,0 L8,4 L0,8 Z" fill="#2563eb"></path></marker></defs>
+                <circle cx="42" cy="62" r="16" fill="#dbeafe" stroke="#1d4ed8"></circle><circle cx="90" cy="62" r="16" fill="#dcfce7" stroke="#15803d"></circle><circle cx="138" cy="62" r="16" fill="#fee2e2" stroke="#dc2626"></circle>
+                <text x="42" y="67" text-anchor="middle" class="phase-label">A</text><text x="90" y="67" text-anchor="middle" class="phase-label">B</text><text x="138" y="67" text-anchor="middle" class="phase-label">C</text>
+                <line x1="42" y1="62" x2="18" y2="62" stroke="#2563eb" stroke-width="2.4" marker-end="url(#arrowBlue2)"></line><line x1="138" y1="62" x2="162" y2="62" stroke="#2563eb" stroke-width="2.4" marker-end="url(#arrowBlue2)"></line><line x1="90" y1="62" x2="90" y2="38" stroke="#2563eb" stroke-width="2.4" marker-end="url(#arrowBlue2)"></line>
+              </svg>
+              <span>Flat / single-layer</span>
+            </button>
+          </div>
           <p id="arrangementHint" class="field-hint">
             Both trefoil and flat arrangements produce the same peak force on
             the worst-case conductor for a balanced three-phase fault.
@@ -213,7 +250,7 @@ Three-phase:    F = √3×10⁻⁷ × i_peak² / d  [N/m]</pre>
 
         <div class="field-row" id="spacingDirectRow">
           <label for="spacing">
-            d — Centre-to-centre cable spacing (mm)
+            d — Centre-to-centre cable spacing (<span id="spacingUnitLabel">mm</span>)
           </label>
           <input type="number" id="spacing" min="1" max="2000" step="1"
                  value="50" aria-describedby="spacingHint" aria-required="true">
@@ -227,7 +264,7 @@ Three-phase:    F = √3×10⁻⁷ × i_peak² / d  [N/m]</pre>
 
         <div class="field-row hidden" id="spacingODRow">
           <label for="cableOD">
-            Cable outer diameter (mm)
+            Cable outer diameter (<span id="odUnitLabel">mm</span>)
           </label>
           <input type="number" id="cableOD" min="1" max="500" step="0.5"
                  value="40" aria-describedby="cableODHint">
@@ -247,7 +284,7 @@ Three-phase:    F = √3×10⁻⁷ × i_peak² / d  [N/m]</pre>
 
         <div class="field-row">
           <label for="cleatSpacing">
-            L — Cleat spacing / support interval (mm)
+            L — Cleat spacing / support interval (<span id="cleatUnitLabel">mm</span>)
             <button class="helpBtn" data-doc="docs/standards.html#cleat-spacing"
                     aria-label="Help — cleat spacing">?</button>
           </label>
@@ -305,6 +342,11 @@ Three-phase:    F = √3×10⁻⁷ × i_peak² / d  [N/m]</pre>
       </div>
 
       <div id="results" role="region" aria-live="polite" aria-label="Fault bracing results"></div>
+      <div class="force-vectors hidden" id="forceVectorsPanel">
+        <h2>Fault Force Vector Preview</h2>
+        <p class="field-hint" id="vectorLegend"></p>
+        <svg id="forceVectorSvg" viewBox="0 0 420 240" role="img" aria-label="Cable phase force vector diagram"></svg>
+      </div>
 
       <!-- Schedule mode section -->
       <section id="scheduleSection" hidden aria-label="Schedule evaluation">
