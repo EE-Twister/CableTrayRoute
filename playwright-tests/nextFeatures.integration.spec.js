@@ -1,4 +1,7 @@
 import { test, expect } from '@playwright/test';
+import fs from 'fs/promises';
+import os from 'os';
+import path from 'path';
 import {
   navigateForE2E,
   applyCostEstimatorFixture,
@@ -10,6 +13,17 @@ import {
   getCostEstimateGrandTotal,
   getEmfRmsMicroTesla,
 } from './nextFeatures.helpers.js';
+
+async function assertExportDownload(download, expectedName) {
+  const downloadName = download.suggestedFilename();
+  expect(downloadName).toBe(expectedName);
+  expect(downloadName.toLowerCase().endsWith('.xlsx')).toBeTruthy();
+
+  const tempPath = path.join(os.tmpdir(), `playwright-${Date.now()}-${downloadName}`);
+  await download.saveAs(tempPath);
+  const stats = await fs.stat(tempPath);
+  expect(stats.size).toBeGreaterThan(0);
+}
 
 test.describe('next features integration: cost estimator scenarios and exports', () => {
   test('integration: cost estimator heading and empty/invalid fixture show deterministic guidance', async ({ page }) => {
@@ -59,6 +73,19 @@ test.describe('next features integration: cost estimator scenarios and exports',
     await expect(results.locator('table[aria-label="Line item cost detail"] tbody tr')).toHaveCount(3);
   });
 
+  test('integration: cost estimator xlsx export downloads expected file', async ({ page }) => {
+    await navigateForE2E(page, 'costestimate.html');
+    await applyCostEstimatorFixture(page, COST_ESTIMATOR_FIXTURES.baselineProject);
+    await fillCostEstimatorForm(page, { contingencyPct: '10' });
+    await page.click('#estimate-btn');
+
+    const downloadPromise = page.waitForEvent('download');
+    await page.click('#export-xlsx-btn');
+    const download = await downloadPromise;
+
+    await assertExportDownload(download, 'cost_estimate.xlsx');
+  });
+
   test('integration: changing contingency and labor inputs predictably increases totals', async ({ page }) => {
     await navigateForE2E(page, 'costestimate.html');
     await applyCostEstimatorFixture(page, COST_ESTIMATOR_FIXTURES.baselineProject);
@@ -106,6 +133,20 @@ test.describe('next features integration: cost estimator scenarios and exports',
     expect(previewText).toContain('Integration Test Project');
     expect(previewText).toContain('ITP-0426');
     expect(previewText).toContain('NEC 2023');
+  });
+
+  test('integration: submittal xlsx export downloads expected file', async ({ page }) => {
+    await navigateForE2E(page, 'submittal.html');
+
+    await page.fill('#sub-project-name', 'Integration Test Project');
+    await page.fill('#sub-project-number', 'ITP-0426');
+    await page.fill('#sub-revision', '3');
+
+    const downloadPromise = page.waitForEvent('download');
+    await page.click('#export-xlsx-btn');
+    const download = await downloadPromise;
+
+    await assertExportDownload(download, 'submittal_ITP-0426_Rev3.xlsx');
   });
 });
 
