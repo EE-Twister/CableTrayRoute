@@ -22,6 +22,12 @@ Each subtype in `componentLibrary.json` may include these properties in its sche
 - Utility, generator, and inverter sources show the `thevenin_mva` field as calculated output. The value derives from the short-circuit capacity and present base voltage. Entries such as `25 kA` are normalized to MVA using the current voltage base, while raw MVA inputs are passed through directly.
 - Source base voltage fields (`baseKV`, `kV`, `kv`, and `prefault_voltage`) mirror the active source voltage automatically. Custom overrides are highlighted with the **Custom** badge so manual entries persist without being replaced by the auto-derived value.
 
+## Meter component fields
+
+- The one-line palette now includes a `meter` component subtype for revenue and power-quality instrumentation.
+- Meter fields include `tag`, `description`, `manufacturer`, `model`, `meter_class`, `ct_ratio`, `pt_ratio`, `sample_rate_hz`, and study capability flags (`supports_thd`, `supports_flicker`, `supports_waveform_capture`).
+- Validation enforces both `ct_ratio` and `pt_ratio` when any meter study capability flag is enabled so harmonics/power-quality workflows do not run with incomplete instrument transformer scaling.
+
 ## UI consistency checklist
 
 Use this checklist when shipping UI updates so layout and component styling stay aligned with shared tokens:

@@ -50,6 +50,26 @@ export function runValidation(components = [], studies = {}) {
     }
   });
 
+  // Meter ratio completeness for study-enabled metering features
+  components.forEach(c => {
+    if (c.type !== 'meter') return;
+    const props = c.props && typeof c.props === 'object' ? c.props : c;
+    const meteringEnabled = Boolean(
+      props.supports_thd
+      || props.supports_flicker
+      || props.supports_waveform_capture
+    );
+    if (!meteringEnabled) return;
+    const ctRatio = `${props.ct_ratio ?? ''}`.trim();
+    const ptRatio = `${props.pt_ratio ?? ''}`.trim();
+    if (!ctRatio || !ptRatio) {
+      issues.push({
+        component: c.id,
+        message: 'Meter requires both CT ratio and PT ratio when metering studies are enabled.'
+      });
+    }
+  });
+
   // TCC duty/coordination violations from studies
   Object.entries(studies.duty || {}).forEach(([id, msgs = []]) => {
     msgs.forEach(msg => issues.push({ component: id, message: msg }));

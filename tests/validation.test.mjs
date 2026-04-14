@@ -165,6 +165,61 @@ describe('runValidation - breaker interrupt rating', () => {
   });
 });
 
+describe('runValidation - meter CT/PT completeness', () => {
+  it('flags a meter missing CT/PT ratios when metering studies are enabled', () => {
+    const components = [
+      {
+        id: 'meter-1',
+        type: 'meter',
+        props: {
+          supports_thd: true,
+          supports_flicker: false,
+          supports_waveform_capture: false,
+          ct_ratio: '',
+          pt_ratio: ''
+        }
+      }
+    ];
+    const issues = runValidation(components, {});
+    assert.strictEqual(issues.length, 1);
+    assert.strictEqual(issues[0].component, 'meter-1');
+    assert.ok(issues[0].message.includes('CT ratio'));
+    assert.ok(issues[0].message.includes('PT ratio'));
+  });
+
+  it('does not flag a meter with both CT/PT ratios provided', () => {
+    const components = [
+      {
+        id: 'meter-2',
+        type: 'meter',
+        props: {
+          supports_thd: true,
+          ct_ratio: '1200:5',
+          pt_ratio: '4160:120'
+        }
+      }
+    ];
+    assert.deepStrictEqual(runValidation(components, {}), []);
+  });
+
+  it('does not flag a meter when metering studies are disabled', () => {
+    const components = [
+      {
+        id: 'meter-3',
+        type: 'meter',
+        props: {
+          supports_thd: false,
+          supports_flicker: false,
+          supports_waveform_capture: false,
+          ct_ratio: '',
+          pt_ratio: ''
+        }
+      }
+    ];
+    assert.deepStrictEqual(runValidation(components, {}), []);
+  });
+});
+
 describe('runValidation - TCC duty violations', () => {
   it('passes through duty violation messages from studies', () => {
     const studies = {
