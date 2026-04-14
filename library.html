@@ -39,6 +39,52 @@
       .sync-status.local   { background: #2a2a2a; color: #aaa; }
     }
     .cloud-actions { margin-top: 6px; display: flex; gap: 6px; flex-wrap: wrap; align-items: center; }
+    .library-editor {
+      border: 1px solid #d0d7de;
+      border-radius: 8px;
+      padding: 12px;
+      margin: 10px 0 14px;
+      background: #fdfdfd;
+    }
+    .library-editor h3 { margin: 8px 0; }
+    .editor-actions { margin: 8px 0; }
+    .editor-grid {
+      width: 100%;
+      border-collapse: collapse;
+      margin-bottom: 8px;
+      font-size: 0.92rem;
+    }
+    .editor-grid th,
+    .editor-grid td {
+      border: 1px solid #d0d7de;
+      padding: 6px;
+      vertical-align: top;
+    }
+    .editor-grid input,
+    .editor-grid textarea {
+      width: 100%;
+      box-sizing: border-box;
+      font-family: inherit;
+      font-size: 0.9rem;
+    }
+    .editor-grid textarea { min-height: 46px; resize: vertical; }
+    .field-hint {
+      display: block;
+      font-size: 0.78rem;
+      min-height: 1.1em;
+      color: #b42318;
+      margin-top: 2px;
+    }
+    .advanced-json summary {
+      cursor: pointer;
+      font-weight: 600;
+      margin-bottom: 4px;
+    }
+    @media (prefers-color-scheme: dark) {
+      .library-editor { background: #1f2328; border-color: #3d444d; }
+      .editor-grid th,
+      .editor-grid td { border-color: #3d444d; }
+    }
   </style>
 </head>
 <body>
@@ -60,8 +106,58 @@
       <span id="sync-badge" class="sync-status local" aria-live="polite">Local</span>
     </h2>
     <label>Version <input id="library-version" type="text" size="10"></label><br>
-    <textarea id="component-text" rows="10" cols="80"></textarea><br>
-    <textarea id="icon-text" rows="10" cols="80"></textarea><br>
+    <div class="library-editor" id="structured-library-editor">
+      <h3>Components Grid</h3>
+      <table class="editor-grid" aria-label="Components Grid">
+        <thead>
+          <tr>
+            <th>Subtype</th>
+            <th>Label</th>
+            <th>Category</th>
+            <th>Icon</th>
+            <th>Ports</th>
+            <th>Schema</th>
+            <th>Actions</th>
+          </tr>
+        </thead>
+        <tbody id="components-grid-body"></tbody>
+      </table>
+      <div class="editor-actions">
+        <button id="add-component-row" type="button">Add Component</button>
+      </div>
+      <h3>Categories Manager</h3>
+      <table class="editor-grid" aria-label="Categories Manager">
+        <thead>
+          <tr>
+            <th>Category</th>
+            <th>Actions</th>
+          </tr>
+        </thead>
+        <tbody id="categories-grid-body"></tbody>
+      </table>
+      <div class="editor-actions">
+        <button id="add-category-row" type="button">Add Category</button>
+      </div>
+      <h3>Icons Mapping</h3>
+      <table class="editor-grid" aria-label="Icons Mapping">
+        <thead>
+          <tr>
+            <th>Icon Key</th>
+            <th>Path</th>
+            <th>Actions</th>
+          </tr>
+        </thead>
+        <tbody id="icons-grid-body"></tbody>
+      </table>
+      <div class="editor-actions">
+        <button id="add-icon-row" type="button">Add Icon Mapping</button>
+      </div>
+    </div>
+    <details class="advanced-json">
+      <summary>Advanced JSON Editor (Power Users)</summary>
+      <textarea id="component-text" rows="10" cols="80"></textarea><br>
+      <textarea id="icon-text" rows="10" cols="80"></textarea><br>
+    </details>
     <input type="file" id="library-upload" accept="application/json"><br>
     <button id="component-save">Save</button>
     <button id="component-download">Download</button>
@@ -152,18 +248,211 @@
       return res.json();
     }
 
+    const structuredState = {
+      components: [],
+      categories: [],
+      icons: {},
+    };
+
+    function parseJsonSafe(value, fallback) {
+      try {
+        return JSON.parse(value);
+      } catch {
+        return fallback;
+      }
+    }
+
+    function escapeHtml(value) {
+      return String(value ?? '')
+        .replaceAll('&', '&amp;')
+        .replaceAll('<', '&lt;')
+        .replaceAll('>', '&gt;')
+        .replaceAll('"', '&quot;')
+        .replaceAll("'", '&#39;');
+    }
+
+    function syncTextareasFromStructured() {
+      const compArea = document.getElementById('component-text');
+      const iconArea = document.getElementById('icon-text');
+      compArea.value = JSON.stringify({
+        categories: structuredState.categories,
+        components: structuredState.components,
+      }, null, 2);
+      iconArea.value = JSON.stringify(structuredState.icons, null, 2);
+    }
+
+    function getStructuredPayload() {
+      return {
+        categories: [...structuredState.categories],
+        components: structuredState.components.map((component) => ({ ...component })),
+        icons: { ...structuredState.icons },
+      };
+    }
+
+    function renderCategoriesGrid() {
+      const body = document.getElementById('categories-grid-body');
+      body.innerHTML = '';
+      structuredState.categories.forEach((category, index) => {
+        const tr = document.createElement('tr');
+        const duplicate = category && structuredState.categories.filter((value) => value === category).length > 1;
+        const hint = !category ? 'Required.' : duplicate ? 'Duplicate category.' : '';
+        tr.innerHTML = `
+          <td>
+            <input data-kind="category" data-index="${index}" value="${escapeHtml(category || '')}">
+            <span class="field-hint">${escapeHtml(hint)}</span>
+          </td>
+          <td><button type="button" data-action="delete-category" data-index="${index}">Delete</button></td>
+        `;
+        body.appendChild(tr);
+      });
+    }
+
+    function renderIconsGrid() {
+      const body = document.getElementById('icons-grid-body');
+      body.innerHTML = '';
+      Object.entries(structuredState.icons).forEach(([key, path], index) => {
+        const keyHint = !key ? 'Required.' : '';
+        const pathHint = !path ? 'Required.' : '';
+        const tr = document.createElement('tr');
+        tr.innerHTML = `
+          <td>
+            <input data-kind="icon-key" data-index="${index}" value="${escapeHtml(key)}">
+            <span class="field-hint">${escapeHtml(keyHint)}</span>
+          </td>
+          <td>
+            <input data-kind="icon-path" data-index="${index}" value="${escapeHtml(path || '')}">
+            <span class="field-hint">${escapeHtml(pathHint)}</span>
+          </td>
+          <td><button type="button" data-action="delete-icon" data-index="${index}">Delete</button></td>
+        `;
+        body.appendChild(tr);
+      });
+    }
+
+    function componentHint(component, field) {
+      if (field === 'subtype' && !component.subtype) return 'Required.';
+      if (field === 'label' && !component.label) return 'Required.';
+      if (field === 'category' && !component.category) return 'Required.';
+      if (field === 'ports' && !Number.isFinite(component.ports)) return 'Must be a number.';
+      if (field === 'schema' && (typeof component.schema !== 'object' || component.schema === null || Array.isArray(component.schema))) {
+        return 'Must be a JSON object.';
+      }
+      return '';
+    }
+
+    function renderComponentsGrid() {
+      const body = document.getElementById('components-grid-body');
+      body.innerHTML = '';
+      structuredState.components.forEach((component, index) => {
+        const tr = document.createElement('tr');
+        tr.innerHTML = `
+          <td>
+            <input data-kind="component-subtype" data-index="${index}" value="${escapeHtml(component.subtype || '')}">
+            <span class="field-hint">${escapeHtml(componentHint(component, 'subtype'))}</span>
+          </td>
+          <td>
+            <input data-kind="component-label" data-index="${index}" value="${escapeHtml(component.label || '')}">
+            <span class="field-hint">${escapeHtml(componentHint(component, 'label'))}</span>
+          </td>
+          <td>
+            <input data-kind="component-category" data-index="${index}" value="${escapeHtml(component.category || '')}">
+            <span class="field-hint">${escapeHtml(componentHint(component, 'category'))}</span>
+          </td>
+          <td>
+            <input data-kind="component-icon" data-index="${index}" value="${escapeHtml(component.icon || '')}">
+            <span class="field-hint"></span>
+          </td>
+          <td>
+            <input data-kind="component-ports" data-index="${index}" value="${escapeHtml(Number.isFinite(component.ports) ? component.ports : '')}">
+            <span class="field-hint">${escapeHtml(componentHint(component, 'ports'))}</span>
+          </td>
+          <td>
+            <textarea data-kind="component-schema" data-index="${index}">${escapeHtml(JSON.stringify(component.schema ?? {}, null, 2))}</textarea>
+            <span class="field-hint">${escapeHtml(componentHint(component, 'schema'))}</span>
+          </td>
+          <td><button type="button" data-action="delete-component" data-index="${index}">Delete</button></td>
+        `;
+        body.appendChild(tr);
+      });
+    }
+
+    function updateInlineHints() {
+      document.querySelectorAll('#components-grid-body tr').forEach((row, index) => {
+        const component = structuredState.components[index] || {};
+        const hints = row.querySelectorAll('.field-hint');
+        if (hints[0]) hints[0].textContent = componentHint(component, 'subtype');
+        if (hints[1]) hints[1].textContent = componentHint(component, 'label');
+        if (hints[2]) hints[2].textContent = componentHint(component, 'category');
+        if (hints[4]) hints[4].textContent = componentHint(component, 'ports');
+        if (hints[5]) hints[5].textContent = componentHint(component, 'schema');
+      });
+      document.querySelectorAll('#categories-grid-body tr').forEach((row, index) => {
+        const category = structuredState.categories[index];
+        const duplicate = category && structuredState.categories.filter((value) => value === category).length > 1;
+        const hint = !category ? 'Required.' : duplicate ? 'Duplicate category.' : '';
+        const span = row.querySelector('.field-hint');
+        if (span) span.textContent = hint;
+      });
+      document.querySelectorAll('#icons-grid-body tr').forEach((row, index) => {
+        const [key, path] = Object.entries(structuredState.icons)[index] || ['', ''];
+        const hints = row.querySelectorAll('.field-hint');
+        if (hints[0]) hints[0].textContent = key ? '' : 'Required.';
+        if (hints[1]) hints[1].textContent = path ? '' : 'Required.';
+      });
+    }
+
+    function renderStructuredEditors() {
+      renderComponentsGrid();
+      renderCategoriesGrid();
+      renderIconsGrid();
+      updateInlineHints();
+      syncTextareasFromStructured();
+    }
+
+    function hydrateStructuredState(data, iconsValue) {
+      const parsedComponents = Array.isArray(data)
+        ? data
+        : Array.isArray(data.components)
+        ? data.components
+        : [];
+      const parsedCategories = Array.isArray(data.categories) ? data.categories : [];
+      const parsedIcons = iconsValue
+        || (data && typeof data.icons === 'object' && data.icons ? data.icons : {});
+      structuredState.components = parsedComponents.map((component) => ({
+        subtype: component?.subtype ?? '',
+        label: component?.label ?? '',
+        category: component?.category ?? '',
+        icon: component?.icon ?? '',
+        ports: Number.isFinite(Number(component?.ports)) ? Number(component.ports) : NaN,
+        schema: (component?.schema && typeof component.schema === 'object' && !Array.isArray(component.schema))
+          ? component.schema
+          : {},
+      }));
+      structuredState.categories = parsedCategories.map((value) => String(value ?? ''));
+      structuredState.icons = Object.fromEntries(
+        Object.entries(parsedIcons || {}).map(([k, v]) => [k, String(v ?? '')]),
+      );
+      renderStructuredEditors();
+    }
+
+    function syncStructuredFromTextareas() {
+      const compArea = document.getElementById('component-text');
+      const iconArea = document.getElementById('icon-text');
+      const data = parseJsonSafe(compArea.value, { categories: [], components: [] });
+      const icons = parseJsonSafe(iconArea.value, {});
+      hydrateStructuredState(data, icons);
+      updateInlineHints();
+    }
+
     // -------------------------------------------------------------------------
     // Populate textareas from a library data object
     // -------------------------------------------------------------------------
     function populateFromData(data) {
-      const compArea = document.getElementById('component-text');
-      const iconArea = document.getElementById('icon-text');
       const versionInput = document.getElementById('library-version');
-      compArea.value = JSON.stringify({
+      hydrateStructuredState({
         categories: data.categories || [],
         components: data.components || [],
-      }, null, 2);
-      iconArea.value = JSON.stringify(data.icons || {}, null, 2);
+      }, data.icons || {});
       if (data.version) versionInput.value = data.version;
     }
 
@@ -208,27 +497,23 @@
     }
 
     async function loadFromLocal() {
-      const compArea = document.getElementById('component-text');
-      const iconArea = document.getElementById('icon-text');
       const versionInput = document.getElementById('library-version');
       const currentVersion = getItem('componentLibraryVersion', '');
       versionInput.value = currentVersion || '';
       const stored = currentVersion ? getItem('componentLibrary_' + currentVersion, null) : null;
       if (stored) {
-        compArea.value = JSON.stringify({
+        hydrateStructuredState({
           categories: stored.categories || [],
           components: stored.components || [],
-        }, null, 2);
-        iconArea.value = JSON.stringify(stored.icons || {}, null, 2);
+        }, stored.icons || {});
       } else {
         try {
           const res = await fetch('componentLibrary.json');
           const data = await res.json();
-          compArea.value = JSON.stringify(data, null, 2);
+          hydrateStructuredState(data, {});
         } catch {
-          compArea.value = '[]';
+          hydrateStructuredState({ categories: [], components: [] }, {});
         }
-        iconArea.value = '{}';
       }
     }
 
@@ -236,23 +521,18 @@
     // Save locally (and auto-sync to cloud if authenticated)
     // -------------------------------------------------------------------------
     async function saveComponents() {
-      const compArea = document.getElementById('component-text');
-      const iconArea = document.getElementById('icon-text');
       const versionInput = document.getElementById('library-version');
       try {
-        const data = JSON.parse(compArea.value);
-        const icons = JSON.parse(iconArea.value);
+        syncStructuredFromTextareas();
+        const { categories, components, icons } = getStructuredPayload();
         const version = versionInput.value.trim() || 'user';
-        const components = Array.isArray(data) ? data : data.components || [];
-        const categories = Array.isArray(data.categories) ? data.categories : [];
         setItem('componentLibraryVersion', version);
         setItem('componentLibrary_' + version, { components, categories, icons });
 
         // Auto-sync to cloud if authenticated
         if (authState()) {
           setStatus('pending', '⟳ Saving…');
-          const cloudData = { categories, components, icons };
-          const saved = await cloudPut(cloudData, _cloudVersion || undefined);
+          const saved = await cloudPut({ categories, components, icons }, _cloudVersion || undefined);
           if (saved) {
             _cloudVersion = saved.version;
             setStatus('synced', '☁ Synced');
@@ -271,15 +551,11 @@
     // Download component library
     // -------------------------------------------------------------------------
     async function downloadComponents() {
-      const compArea = document.getElementById('component-text');
-      const iconArea = document.getElementById('icon-text');
       const versionInput = document.getElementById('library-version');
       try {
-        const data = JSON.parse(compArea.value);
-        const icons = JSON.parse(iconArea.value);
+        syncStructuredFromTextareas();
+        const { categories, components, icons } = getStructuredPayload();
         const version = versionInput.value.trim() || 'user';
-        const components = Array.isArray(data) ? data : data.components || [];
-        const categories = Array.isArray(data) ? [] : (Array.isArray(data.categories) ? data.categories : []);
         const blob = new Blob([
           JSON.stringify({ version, categories, components, icons }, null, 2),
         ], { type: 'application/json' });
@@ -313,11 +589,7 @@
             : [];
           const categories = Array.isArray(obj.categories) ? obj.categories : [];
           document.getElementById('library-version').value = version;
-          document.getElementById('component-text').value = JSON.stringify({
-            categories,
-            components,
-          }, null, 2);
-          document.getElementById('icon-text').value = JSON.stringify(obj.icons || {}, null, 2);
+          hydrateStructuredState({ categories, components }, obj.icons || {});
           setStatus('pending', '⟳ Unsaved');
         } catch {
           showAlertModal('Invalid File', 'Please select a valid JSON library file.');
@@ -334,13 +606,9 @@
         await showAlertModal('Not logged in', 'Please log in to save your library to the cloud.');
         return;
       }
-      const compArea = document.getElementById('component-text');
-      const iconArea = document.getElementById('icon-text');
       try {
-        const data = JSON.parse(compArea.value);
-        const icons = JSON.parse(iconArea.value);
-        const components = Array.isArray(data) ? data : data.components || [];
-        const categories = Array.isArray(data) ? [] : (Array.isArray(data.categories) ? data.categories : []);
+        syncStructuredFromTextareas();
+        const { categories, components, icons } = getStructuredPayload();
         setStatus('pending', '⟳ Saving…');
         const saved = await cloudPut({ categories, components, icons });
         if (saved) {
@@ -502,6 +770,87 @@
     document.getElementById('cloud-load-btn').addEventListener('click', handleCloudLoad);
     document.getElementById('cloud-share-btn').addEventListener('click', handleCloudShare);
     document.getElementById('cloud-import-btn').addEventListener('click', handleCloudImport);
+    document.getElementById('component-text').addEventListener('input', syncStructuredFromTextareas);
+    document.getElementById('icon-text').addEventListener('input', syncStructuredFromTextareas);
+    document.getElementById('add-component-row').addEventListener('click', () => {
+      structuredState.components.push({
+        subtype: '',
+        label: '',
+        category: '',
+        icon: '',
+        ports: NaN,
+        schema: {},
+      });
+      renderStructuredEditors();
+      setStatus('pending', '⟳ Unsaved');
+    });
+    document.getElementById('add-category-row').addEventListener('click', () => {
+      structuredState.categories.push('');
+      renderStructuredEditors();
+      setStatus('pending', '⟳ Unsaved');
+    });
+    document.getElementById('add-icon-row').addEventListener('click', () => {
+      structuredState.icons[`new-icon-${Object.keys(structuredState.icons).length + 1}`] = '';
+      renderStructuredEditors();
+      setStatus('pending', '⟳ Unsaved');
+    });
+
+    document.getElementById('structured-library-editor').addEventListener('input', (event) => {
+      const target = event.target;
+      if (!(target instanceof HTMLInputElement || target instanceof HTMLTextAreaElement)) return;
+      const index = Number(target.dataset.index);
+      const kind = target.dataset.kind;
+      if (kind === 'category') {
+        structuredState.categories[index] = target.value.trim();
+      }
+      if (kind === 'component-subtype') structuredState.components[index].subtype = target.value.trim();
+      if (kind === 'component-label') structuredState.components[index].label = target.value.trim();
+      if (kind === 'component-category') structuredState.components[index].category = target.value.trim();
+      if (kind === 'component-icon') structuredState.components[index].icon = target.value.trim();
+      if (kind === 'component-ports') {
+        const value = target.value.trim();
+        structuredState.components[index].ports = value === '' ? NaN : Number(value);
+      }
+      if (kind === 'component-schema') {
+        const parsed = parseJsonSafe(target.value, null);
+        structuredState.components[index].schema = parsed && typeof parsed === 'object' && !Array.isArray(parsed) ? parsed : null;
+      }
+      if (kind === 'icon-key' || kind === 'icon-path') {
+        const entries = Object.entries(structuredState.icons);
+        const row = entries[index];
+        if (row) {
+          const [currentKey, currentPath] = row;
+          if (kind === 'icon-key') {
+            const nextIcons = Object.fromEntries(entries);
+            delete nextIcons[currentKey];
+            nextIcons[target.value.trim()] = currentPath;
+            structuredState.icons = nextIcons;
+          } else {
+            structuredState.icons[currentKey] = target.value.trim();
+          }
+        }
+      }
+      syncTextareasFromStructured();
+      updateInlineHints();
+      setStatus('pending', '⟳ Unsaved');
+    });
+
+    document.getElementById('structured-library-editor').addEventListener('click', (event) => {
+      const target = event.target;
+      if (!(target instanceof HTMLButtonElement)) return;
+      const index = Number(target.dataset.index);
+      const action = target.dataset.action;
+      if (action === 'delete-component') structuredState.components.splice(index, 1);
+      if (action === 'delete-category') structuredState.categories.splice(index, 1);
+      if (action === 'delete-icon') {
+        const key = Object.keys(structuredState.icons)[index];
+        if (key) delete structuredState.icons[key];
+      }
+      if (action) {
+        renderStructuredEditors();
+        setStatus('pending', '⟳ Unsaved');
+      }
+    });
 
     // Initial load: check URL for share token, otherwise normal load
     const sharedLoaded = await maybeLoadShareFromUrl();
