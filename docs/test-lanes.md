@@ -34,3 +34,24 @@ To remain compatible with existing CI workflows that invoke `npm test` and `npm 
 - `npm run e2e` is retained and maps to `npm run e2e:full`
 
 This preserves current behavior while adding explicit lane names for teams that want to split pre-merge and nightly pipelines.
+
+
+## Next-features phased lane sequence
+
+For Cost Estimator + EMF acceptance hardening, run lanes in this order and gate merge at each step:
+
+1. Fixture/acceptance definition
+2. Test-structure refactor
+3. Cost Estimator deterministic integration tests
+4. EMF deterministic integration tests
+5. Export validation
+6. CI lane split and docs updates
+
+Phase-oriented commands:
+
+- `npm run e2e:next-features-integration`
+- `npm run e2e:next-features-cost`
+- `npm run e2e:next-features-emf`
+- `npm run e2e:next-features-export`
+
+Post-merge policy: monitor flaky tests for one week after each phase and tighten waits/selectors only where instability is observed.
