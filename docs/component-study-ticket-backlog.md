@@ -109,6 +109,8 @@ This ticket set translates the current component/attribute gaps into implementat
 ## CTR-COMP-006 — Normalize protective component attributes (`breaker`, `fuse`, `relay`, `recloser`)
 **Component:** Existing protection devices with incomplete common schema.
 
+**Status:** Completed on April 14, 2026.
+
 **Study impact:** TCC, short circuit, selective coordination, arc flash clearing time.
 
 **Required attributes (minimum):**

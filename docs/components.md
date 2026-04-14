@@ -40,6 +40,12 @@ Each subtype in `componentLibrary.json` may include these properties in its sche
 - Switchboard fields include `tag`, `description`, `manufacturer`, `model`, `rated_voltage_kv`, `phases`, `bus_rating_a`, `withstand_1s_ka`, `interrupting_ka`, `arc_resistant_type`, and `maintenance_mode_supported`.
 - Validation flags switchboard records missing any required short-circuit and protection metadata so study inputs are complete before execution.
 
+## Protective component normalized fields
+
+- Breakers, fuses, relays, and reclosers now share a common protection schema baseline for study ingestion.
+- Normalized fields include `tag`, `description`, `manufacturer`, `model`, `rated_voltage_kv`, `phases`, `interrupting_rating_ka`, `pickup_amps`, `time_dial_or_tms`, `curve_family`, `ground_fault_enabled`, `ground_pickup_a`, and `ground_time_delay_s`.
+- Legacy keys are retained for compatibility, and the normalized fields are pre-populated in the component defaults so existing TCC/short-circuit/arc-flash flows can consume a consistent property set.
+
 ## UI consistency checklist
 
 Use this checklist when shipping UI updates so layout and component styling stay aligned with shared tokens:
