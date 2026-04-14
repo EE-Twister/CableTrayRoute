@@ -216,6 +216,62 @@ export function runValidation(components = [], studies = {}) {
     }
   });
 
+  // Capacitor/reactor required tuning metadata completeness
+  components.forEach(c => {
+    const subtype = `${c?.subtype ?? ''}`.trim().toLowerCase();
+    const type = `${c?.type ?? ''}`.trim().toLowerCase();
+    const isCapacitorOrReactor = subtype === 'shunt_capacitor_bank'
+      || subtype === 'reactor'
+      || subtype === 'capacitorbank'
+      || type === 'shunt_capacitor_bank'
+      || type === 'reactor';
+    if (!isCapacitorOrReactor) return;
+
+    const props = c.props && typeof c.props === 'object' ? c.props : c;
+    const missing = [];
+    if (!`${props.tag ?? ''}`.trim()) missing.push('tag');
+    if (!`${props.description ?? ''}`.trim()) missing.push('description');
+    if (!`${props.manufacturer ?? ''}`.trim()) missing.push('manufacturer');
+    if (!`${props.model ?? ''}`.trim()) missing.push('model');
+
+    const ratedKvar = Number(props.rated_kvar);
+    if (!Number.isFinite(ratedKvar) || ratedKvar <= 0) missing.push('rated_kvar');
+    const ratedKv = Number(props.rated_kv);
+    if (!Number.isFinite(ratedKv) || ratedKv <= 0) missing.push('rated_kv');
+    const steps = Number(props.steps);
+    if (!Number.isFinite(steps) || steps <= 0) missing.push('steps');
+
+    const hasDetuned = typeof props.detuned === 'boolean';
+    if (!hasDetuned) {
+      missing.push('detuned');
+    }
+
+    if (!`${props.switching_transient_class ?? ''}`.trim()) missing.push('switching_transient_class');
+
+    const validatePositiveOptionalNumber = (value, key) => {
+      if (value === '' || value === null || value === undefined) return;
+      const numeric = Number(value);
+      if (!Number.isFinite(numeric) || numeric <= 0) missing.push(key);
+    };
+
+    if (props.detuned === true) {
+      const tuningHz = Number(props.tuning_hz);
+      if (!Number.isFinite(tuningHz) || tuningHz <= 0) missing.push('tuning_hz');
+      const reactorPct = Number(props.reactor_pct);
+      if (!Number.isFinite(reactorPct) || reactorPct <= 0) missing.push('reactor_pct');
+    } else {
+      validatePositiveOptionalNumber(props.tuning_hz, 'tuning_hz');
+      validatePositiveOptionalNumber(props.reactor_pct, 'reactor_pct');
+    }
+
+    if (missing.length) {
+      issues.push({
+        component: c.id,
+        message: `Capacitor/reactor missing required attributes: ${missing.join(', ')}.`
+      });
+    }
+  });
+
 
   // Differential relay (87) required field completeness
   components.forEach(c => {

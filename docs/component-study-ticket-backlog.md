@@ -212,6 +212,8 @@ This ticket set translates the current component/attribute gaps into implementat
 
 **Status:** Completed on April 14, 2026.
 
+**Completion note (April 14, 2026):** Validation now enforces required capacitor/reactor tuning metadata and checks `tuning_hz` / `reactor_pct` when `detuned` is enabled.
+
 **Study impact:** Harmonic resonance scan, PF correction, capacitor bank sizing checks.
 
 **Required attributes (minimum):**
