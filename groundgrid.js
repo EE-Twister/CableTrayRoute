@@ -1,16 +1,27 @@
 import { analyzeGroundGrid } from './analysis/groundGrid.mjs';
 
 document.addEventListener('DOMContentLoaded', () => {
-  initSettings();
-  initDarkMode();
-  initCompactMode();
-  initHelpModal('help-btn', 'help-modal', 'close-help-btn');
-  initNavToggle();
-
   const resultsDiv = document.getElementById('results');
   const form = document.getElementById('ground-grid-form');
   const previewSvg = document.getElementById('ground-grid-preview');
   const previewSummary = document.getElementById('grid-preview-summary');
+
+  let hadInitError = false;
+
+  function safeInit(name, fn) {
+    try {
+      fn();
+    } catch (err) {
+      hadInitError = true;
+      console.error(`[groundgrid] ${name} initialization failed`, err);
+    }
+  }
+
+  safeInit('initSettings', () => initSettings());
+  safeInit('initDarkMode', () => initDarkMode());
+  safeInit('initCompactMode', () => initCompactMode());
+  safeInit('initHelpModal', () => initHelpModal('help-btn', 'help-modal', 'close-help-btn'));
+  safeInit('initNavToggle', () => initNavToggle());
 
   function getNum(id) { return parseFloat(document.getElementById(id).value); }
   function getInt(id) { return parseInt(document.getElementById(id).value, 10); }
@@ -39,7 +50,7 @@ document.addEventListener('DOMContentLoaded', () => {
   }
 
   function renderGridPreview() {
-    if (!previewSvg || !previewSummary) {
+    if (!previewSvg) {
       return;
     }
 
@@ -136,10 +147,18 @@ document.addEventListener('DOMContentLoaded', () => {
       });
     }
 
-    previewSummary.textContent = `Lx: ${gridLx.toFixed(1)} ${unit} • Ly: ${gridLy.toFixed(1)} ${unit} • `
+    const summaryText = `Lx: ${gridLx.toFixed(1)} ${unit} • Ly: ${gridLy.toFixed(1)} ${unit} • `
       + `${nx} horizontal runs • ${ny} vertical runs • `
       + `Spacing: ${spacingX.toFixed(1)} ${unit} (x), ${spacingY.toFixed(1)} ${unit} (y)`
       + (hasRods ? ' • Corner rods enabled' : '');
+
+    if (previewSummary) {
+      previewSummary.textContent = hadInitError
+        ? `Some page setup features failed to initialize. Preview is still active. ${summaryText}`
+        : summaryText;
+    } else if (hadInitError) {
+      console.error('[groundgrid] #grid-preview-summary not found; preview fallback message unavailable.');
+    }
   }
 
   function calculate() {
@@ -265,14 +284,18 @@ document.addEventListener('DOMContentLoaded', () => {
     resultsDiv.appendChild(section);
   }
 
-  form.addEventListener('submit', e => {
-    e.preventDefault();
-    calculate();
-  });
+  if (form) {
+    form.addEventListener('submit', e => {
+      e.preventDefault();
+      calculate();
+    });
 
-  form.addEventListener('input', () => {
-    renderGridPreview();
-  });
+    form.addEventListener('input', () => {
+      renderGridPreview();
+    });
+  } else {
+    console.error('[groundgrid] #ground-grid-form not found; form event wiring skipped.');
+  }
 
   const unitSelect = document.getElementById('unit-select');
   if (unitSelect) {
