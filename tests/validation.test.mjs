@@ -620,6 +620,68 @@ describe('runValidation - relay_87 required attributes', () => {
   });
 });
 
+describe('runValidation - capacitor/reactor tuning attributes', () => {
+  it('flags capacitor/reactor components when required tuning metadata is missing', () => {
+    const components = [
+      {
+        id: 'cap-1',
+        type: 'shunt_capacitor_bank',
+        subtype: 'shunt_capacitor_bank',
+        props: {
+          tag: '',
+          description: '',
+          manufacturer: '',
+          model: '',
+          rated_kvar: 0,
+          rated_kv: '',
+          steps: -1,
+          detuned: true,
+          tuning_hz: '',
+          reactor_pct: -5,
+          switching_transient_class: ''
+        }
+      }
+    ];
+    const issues = runValidation(components, {});
+    const capIssue = issues.find(issue => issue.component === 'cap-1');
+    assert.ok(capIssue);
+    assert.ok(capIssue.message.includes('tag'));
+    assert.ok(capIssue.message.includes('description'));
+    assert.ok(capIssue.message.includes('manufacturer'));
+    assert.ok(capIssue.message.includes('model'));
+    assert.ok(capIssue.message.includes('rated_kvar'));
+    assert.ok(capIssue.message.includes('rated_kv'));
+    assert.ok(capIssue.message.includes('steps'));
+    assert.ok(capIssue.message.includes('tuning_hz'));
+    assert.ok(capIssue.message.includes('reactor_pct'));
+    assert.ok(capIssue.message.includes('switching_transient_class'));
+  });
+
+  it('does not flag non-detuned capacitor/reactor entries when optional tuning values are omitted', () => {
+    const components = [
+      {
+        id: 'reactor-2',
+        type: 'reactor',
+        subtype: 'reactor',
+        props: {
+          tag: 'R-201',
+          description: 'Detuning reactor block',
+          manufacturer: 'Eaton',
+          model: 'HRC-7',
+          rated_kvar: 1200,
+          rated_kv: 4.16,
+          steps: 6,
+          detuned: false,
+          tuning_hz: '',
+          reactor_pct: '',
+          switching_transient_class: 'R1'
+        }
+      }
+    ];
+    assert.deepStrictEqual(runValidation(components, {}), []);
+  });
+});
+
 describe('runValidation - TCC duty violations', () => {
   it('passes through duty violation messages from studies', () => {
     const studies = {
