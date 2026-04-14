@@ -110,6 +110,24 @@ document.addEventListener('DOMContentLoaded', () => {
         input.disabled = !hasRods;
       }
     });
+    updateRodLayoutHint();
+  }
+
+  function updateRodLayoutHint() {
+    const hint = document.getElementById('rod-layout-hint');
+    if (!hint) {
+      return;
+    }
+    const params = getPreviewParams();
+    if (!params.hasRods) {
+      hint.textContent = 'Enable “Include perimeter / corner ground rods” to activate interstitial rod spacing.';
+      return;
+    }
+    if (params.rodLayout.intermediateCount > 0) {
+      hint.textContent = `Current layout: ${params.rodLayout.count} rods total (${params.rodLayout.intermediateCount} interstitial)`;
+      return;
+    }
+    hint.textContent = `Current layout: ${params.rodLayout.count} corner/perimeter rods (set interstitial spacing above 0 ${params.unit} to add interior rods).`;
   }
 
   function clearAndPrimeSvg(svgEl, titleText) {
@@ -278,6 +296,7 @@ document.addEventListener('DOMContentLoaded', () => {
     } else if (hadInitError) {
       console.error('[groundgrid] #grid-preview-summary not found; preview fallback message unavailable.');
     }
+    updateRodLayoutHint();
   }
 
   function calculate() {
