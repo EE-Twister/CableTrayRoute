@@ -493,6 +493,67 @@ describe('runValidation - switchboard required attributes', () => {
   });
 });
 
+
+
+describe('runValidation - relay_87 required attributes', () => {
+  it('flags a relay_87 when required fields are missing', () => {
+    const components = [
+      {
+        id: 'relay-87-1',
+        type: 'relay',
+        subtype: 'relay_87',
+        props: {
+          tag: '',
+          description: '',
+          manufacturer: '',
+          model: '',
+          protected_zone_type: 'line',
+          pickup_pu: 0,
+          slope1_pct: '',
+          slope2_pct: null,
+          breakpoint_pu: -1,
+          inrush_blocking_enabled: 'yes',
+          second_harmonic_pct: -5
+        }
+      }
+    ];
+    const issues = runValidation(components, {});
+    const relayIssue = issues.find(issue => issue.component === 'relay-87-1');
+    assert.ok(relayIssue);
+    assert.ok(relayIssue.message.includes('protected_zone_type'));
+    assert.ok(relayIssue.message.includes('pickup_pu'));
+    assert.ok(relayIssue.message.includes('slope1_pct'));
+    assert.ok(relayIssue.message.includes('slope2_pct'));
+    assert.ok(relayIssue.message.includes('breakpoint_pu'));
+    assert.ok(relayIssue.message.includes('inrush_blocking_enabled'));
+    assert.ok(relayIssue.message.includes('second_harmonic_pct'));
+  });
+
+  it('does not flag a relay_87 with all required fields present', () => {
+    const components = [
+      {
+        id: 'relay-87-2',
+        type: 'relay',
+        subtype: 'relay_87',
+        props: {
+          tag: '87R-2',
+          description: 'Transformer differential relay',
+          manufacturer: 'SEL',
+          model: '487E',
+          protected_zone_type: 'transformer',
+          pickup_pu: 0.35,
+          slope1_pct: 25,
+          slope2_pct: 45,
+          breakpoint_pu: 2.0,
+          inrush_blocking_enabled: true,
+          second_harmonic_pct: 15
+        }
+      }
+    ];
+    assert.deepStrictEqual(runValidation(components, {}), []);
+  });
+});
+
 describe('runValidation - TCC duty violations', () => {
   it('passes through duty violation messages from studies', () => {
     const studies = {
