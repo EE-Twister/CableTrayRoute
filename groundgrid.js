@@ -72,6 +72,9 @@ document.addEventListener('DOMContentLoaded', () => {
     const endY = startY + drawHeight;
 
     previewSvg.innerHTML = '';
+    previewSvg.setAttribute('viewBox', `0 0 ${svgWidth} ${svgHeight}`);
+    previewSvg.setAttribute('width', String(svgWidth));
+    previewSvg.setAttribute('height', String(svgHeight));
 
     const ns = 'http://www.w3.org/2000/svg';
     const make = (name, attrs = {}) => {
@@ -85,7 +88,10 @@ document.addEventListener('DOMContentLoaded', () => {
       y: startY,
       width: drawWidth,
       height: drawHeight,
-      class: 'grid-outline'
+      class: 'grid-outline',
+      fill: 'none',
+      stroke: 'var(--border-strong, #5b6780)',
+      'stroke-width': 2
     }));
 
     const dx = ny > 1 ? drawWidth / (ny - 1) : 0;
@@ -98,7 +104,9 @@ document.addEventListener('DOMContentLoaded', () => {
         y1: startY,
         x2: x,
         y2: endY,
-        class: 'grid-conductor'
+        class: 'grid-conductor',
+        stroke: 'var(--accent, #0074d9)',
+        'stroke-width': 2
       }));
     }
     for (let i = 0; i < nx; i += 1) {
@@ -108,7 +116,9 @@ document.addEventListener('DOMContentLoaded', () => {
         y1: y,
         x2: endX,
         y2: y,
-        class: 'grid-conductor'
+        class: 'grid-conductor',
+        stroke: 'var(--accent, #0074d9)',
+        'stroke-width': 2
       }));
     }
 
@@ -118,7 +128,10 @@ document.addEventListener('DOMContentLoaded', () => {
           cx: x,
           cy: y,
           r: 5,
-          class: 'grid-rod'
+          class: 'grid-rod',
+          fill: 'var(--danger, #cf3f5c)',
+          stroke: 'var(--surface, #ffffff)',
+          'stroke-width': 1.5
         }));
       });
     }

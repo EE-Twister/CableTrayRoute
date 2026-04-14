@@ -6,6 +6,8 @@
 .ground-grid-preview {
   width: 100%;
   max-width: 520px;
+  aspect-ratio: 13 / 9;
+  min-height: 260px;
   border: 1px solid var(--border-subtle, #ccd2dd);
   border-radius: 8px;
   background: var(--surface-raised, #f7f9fd);
