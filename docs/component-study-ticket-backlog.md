@@ -202,6 +202,8 @@ This ticket set translates the current component/attribute gaps into implementat
 ## CTR-COMP-011 — Add capacitor/reactor bank tuning attributes
 **Component:** `shunt_capacitor_bank` and `reactor` subtype enhancement.
 
+**Status:** Completed on April 14, 2026.
+
 **Study impact:** Harmonic resonance scan, PF correction, capacitor bank sizing checks.
 
 **Required attributes (minimum):**
