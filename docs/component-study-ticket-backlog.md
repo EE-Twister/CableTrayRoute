@@ -186,6 +186,8 @@ This ticket set translates the current component/attribute gaps into implementat
 ## CTR-COMP-010 — Add study-ready generator model attributes (`synchronous`, `asynchronous`)
 **Component:** Existing generator components with expanded study schema.
 
+**Status:** Completed on April 14, 2026.
+
 **Study impact:** Short circuit, transient stability-lite, motor starting, dispatch.
 
 **Required attributes (minimum):**
