@@ -127,6 +127,8 @@ This ticket set translates the current component/attribute gaps into implementat
 ## CTR-COMP-007 — Add differential protection relay component (`relay_87`)
 **Component:** Bus/transformer/generator differential relay.
 
+**Status:** Completed on April 14, 2026.
+
 **Study impact:** Differential protection characteristic plotting and settings checks.
 
 **Required attributes (minimum):**

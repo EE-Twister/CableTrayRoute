@@ -2146,6 +2146,75 @@
     },
     {
       "type": "relay",
+      "subtype": "relay_87",
+      "label": "Differential Relay (87)",
+      "icon": "icons/placeholder.svg",
+      "props": {
+        "tag": "87R-1",
+        "description": "Differential protection relay",
+        "manufacturer": "",
+        "model": "",
+        "protected_zone_type": "bus",
+        "pickup_pu": 0.35,
+        "slope1_pct": 25,
+        "slope2_pct": 45,
+        "breakpoint_pu": 2.0,
+        "inrush_blocking_enabled": true,
+        "second_harmonic_pct": 15
+      },
+      "ports": [
+        {
+          "x": 20,
+          "y": 0
+        }
+      ],
+      "deviceProperties": [
+        {
+          "DeviceType": "Relay",
+          "PropertyName": "Protected Zone Type",
+          "PurposeUseCase": "Defines what differential zone is protected",
+          "NotesOrComments": "Valid values: bus, transformer, generator"
+        },
+        {
+          "DeviceType": "Relay",
+          "PropertyName": "Pickup (pu)",
+          "PurposeUseCase": "Sets minimum differential current pickup",
+          "NotesOrComments": "Used when building differential characteristic"
+        },
+        {
+          "DeviceType": "Relay",
+          "PropertyName": "Slope 1 (%)",
+          "PurposeUseCase": "Low-bias restraint slope",
+          "NotesOrComments": "First segment of dual-slope characteristic"
+        },
+        {
+          "DeviceType": "Relay",
+          "PropertyName": "Slope 2 (%)",
+          "PurposeUseCase": "High-bias restraint slope",
+          "NotesOrComments": "Second segment of dual-slope characteristic"
+        },
+        {
+          "DeviceType": "Relay",
+          "PropertyName": "Breakpoint (pu)",
+          "PurposeUseCase": "Transition bias point between slope segments",
+          "NotesOrComments": "Used for dual-slope characteristic plotting"
+        },
+        {
+          "DeviceType": "Relay",
+          "PropertyName": "Inrush Blocking Enabled",
+          "PurposeUseCase": "Blocks tripping for inrush events",
+          "NotesOrComments": "Uses second-harmonic supervision"
+        },
+        {
+          "DeviceType": "Relay",
+          "PropertyName": "Second Harmonic (%)",
+          "PurposeUseCase": "Defines harmonic threshold for inrush blocking",
+          "NotesOrComments": "Applied when inrush blocking is enabled"
+        }
+      ]
+    },
+    {
+      "type": "relay",
       "label": "Relay",
       "icon": "icons/placeholder.svg",
       "props": {

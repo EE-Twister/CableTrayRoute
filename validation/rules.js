@@ -185,6 +185,38 @@ export function runValidation(components = [], studies = {}) {
     }
   });
 
+
+  // Differential relay (87) required field completeness
+  components.forEach(c => {
+    const isRelay87 = c?.subtype === 'relay_87';
+    if (!isRelay87) return;
+    const props = c.props && typeof c.props === 'object' ? c.props : c;
+    const missing = [];
+    if (!`${props.tag ?? ''}`.trim()) missing.push('tag');
+    if (!`${props.description ?? ''}`.trim()) missing.push('description');
+    if (!`${props.manufacturer ?? ''}`.trim()) missing.push('manufacturer');
+    if (!`${props.model ?? ''}`.trim()) missing.push('model');
+    const zone = `${props.protected_zone_type ?? ''}`.trim();
+    if (!['bus', 'transformer', 'generator'].includes(zone)) missing.push('protected_zone_type');
+    const pickupPu = Number(props.pickup_pu);
+    if (!Number.isFinite(pickupPu) || pickupPu <= 0) missing.push('pickup_pu');
+    const slope1 = Number(props.slope1_pct);
+    if (!Number.isFinite(slope1) || slope1 <= 0) missing.push('slope1_pct');
+    const slope2 = Number(props.slope2_pct);
+    if (!Number.isFinite(slope2) || slope2 <= 0) missing.push('slope2_pct');
+    const breakpointPu = Number(props.breakpoint_pu);
+    if (!Number.isFinite(breakpointPu) || breakpointPu <= 0) missing.push('breakpoint_pu');
+    if (typeof props.inrush_blocking_enabled !== 'boolean') missing.push('inrush_blocking_enabled');
+    const secondHarmonic = Number(props.second_harmonic_pct);
+    if (!Number.isFinite(secondHarmonic) || secondHarmonic < 0) missing.push('second_harmonic_pct');
+    if (missing.length) {
+      issues.push({
+        component: c.id,
+        message: `Differential relay missing required attributes: ${missing.join(', ')}.`
+      });
+    }
+  });
+
   // TCC duty/coordination violations from studies
   Object.entries(studies.duty || {}).forEach(([id, msgs = []]) => {
     msgs.forEach(msg => issues.push({ component: id, message: msg }));
