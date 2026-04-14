@@ -166,6 +166,8 @@ This ticket set translates the current component/attribute gaps into implementat
 ---
 
 ## CTR-COMP-009 — Add inverter/converter detail expansion (`pv_inverter`, `bess_inverter`, `rectifier`)
+
+**Status:** Completed on April 14, 2026.
 **Component:** Power electronic conversion devices.
 
 **Study impact:** Harmonics, DER dispatch, volt-var behavior, fault current contribution.
