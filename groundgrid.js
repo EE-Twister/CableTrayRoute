@@ -100,7 +100,14 @@ document.addEventListener('DOMContentLoaded', () => {
     ['rod-spacing-x-row', 'rod-spacing-y-row'].forEach(id => {
       const row = document.getElementById(id);
       if (row) {
-        row.hidden = !hasRods;
+        row.classList.toggle('rod-spacing-field-disabled', !hasRods);
+        row.setAttribute('aria-disabled', hasRods ? 'false' : 'true');
+      }
+    });
+    ['rod-spacing-x', 'rod-spacing-y'].forEach(id => {
+      const input = document.getElementById(id);
+      if (input) {
+        input.disabled = !hasRods;
       }
     });
   }
