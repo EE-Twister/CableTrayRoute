@@ -139,6 +139,8 @@ This ticket set translates the current component/attribute gaps into implementat
 ## CTR-COMP-008 — Add DC bus component (`dc_bus`)
 **Component:** Dedicated DC distribution bus.
 
+**Status:** Completed on April 14, 2026.
+
 **Study impact:** DC short circuit, DC arc flash, BESS/UPS network studies.
 
 **Required attributes (minimum):**

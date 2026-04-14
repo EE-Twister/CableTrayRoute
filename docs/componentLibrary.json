@@ -39,6 +39,20 @@
       }
     },
     {
+      "type": "bus",
+      "subtype": "dc_bus",
+      "label": "DC Bus",
+      "icon": "icons/components/DCBus.svg",
+      "props": {
+        "tag": "",
+        "description": "",
+        "nominal_voltage_vdc": 750,
+        "grounding_scheme": "ungrounded",
+        "max_continuous_current_a": 1600,
+        "short_circuit_rating_ka": 35
+      }
+    },
+    {
       "type": "utility_source",
       "subtype": "utility",
       "label": "Utility",

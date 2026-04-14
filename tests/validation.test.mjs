@@ -220,6 +220,60 @@ describe('runValidation - meter CT/PT completeness', () => {
   });
 });
 
+describe('runValidation - dc_bus required attributes', () => {
+  it('flags a dc_bus when required fields are missing', () => {
+    const components = [
+      {
+        id: 'dc-bus-ref',
+        type: 'bus',
+        connections: [{ target: 'dc-bus-1' }]
+      },
+      {
+        id: 'dc-bus-1',
+        type: 'bus',
+        subtype: 'dc_bus',
+        connections: [{ target: 'dc-bus-ref' }],
+        props: {
+          nominal_voltage_vdc: 0,
+          grounding_scheme: '',
+          max_continuous_current_a: '',
+          short_circuit_rating_ka: null
+        }
+      }
+    ];
+    const issues = runValidation(components, {});
+    const dcIssue = issues.find(issue => issue.component === 'dc-bus-1');
+    assert.ok(dcIssue);
+    assert.ok(dcIssue.message.includes('nominal_voltage_vdc'));
+    assert.ok(dcIssue.message.includes('grounding_scheme'));
+    assert.ok(dcIssue.message.includes('max_continuous_current_a'));
+    assert.ok(dcIssue.message.includes('short_circuit_rating_ka'));
+  });
+
+  it('does not flag a dc_bus with all required fields present', () => {
+    const components = [
+      {
+        id: 'dc-bus-ref-2',
+        type: 'bus',
+        connections: [{ target: 'dc-bus-2' }]
+      },
+      {
+        id: 'dc-bus-2',
+        type: 'bus',
+        subtype: 'dc_bus',
+        connections: [{ target: 'dc-bus-ref-2' }],
+        props: {
+          nominal_voltage_vdc: 750,
+          grounding_scheme: 'resistance_grounded',
+          max_continuous_current_a: 1600,
+          short_circuit_rating_ka: 35
+        }
+      }
+    ];
+    assert.deepStrictEqual(runValidation(components, {}), []);
+  });
+});
+
 describe('runValidation - TCC duty violations', () => {
   it('passes through duty violation messages from studies', () => {
     const studies = {

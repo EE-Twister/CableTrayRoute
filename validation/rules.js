@@ -70,6 +70,27 @@ export function runValidation(components = [], studies = {}) {
     }
   });
 
+  // DC bus required field completeness for DC-focused studies
+  components.forEach(c => {
+    const isDcBus = c?.subtype === 'dc_bus';
+    if (!isDcBus) return;
+    const props = c.props && typeof c.props === 'object' ? c.props : c;
+    const missing = [];
+    const nominalVoltage = Number(props.nominal_voltage_vdc);
+    if (!Number.isFinite(nominalVoltage) || nominalVoltage <= 0) missing.push('nominal_voltage_vdc');
+    if (!`${props.grounding_scheme ?? ''}`.trim()) missing.push('grounding_scheme');
+    const maxContinuousCurrent = Number(props.max_continuous_current_a);
+    if (!Number.isFinite(maxContinuousCurrent) || maxContinuousCurrent <= 0) missing.push('max_continuous_current_a');
+    const shortCircuitRating = Number(props.short_circuit_rating_ka);
+    if (!Number.isFinite(shortCircuitRating) || shortCircuitRating <= 0) missing.push('short_circuit_rating_ka');
+    if (missing.length) {
+      issues.push({
+        component: c.id,
+        message: `DC bus missing required attributes: ${missing.join(', ')}.`
+      });
+    }
+  });
+
   // TCC duty/coordination violations from studies
   Object.entries(studies.duty || {}).forEach(([id, msgs = []]) => {
     msgs.forEach(msg => issues.push({ component: id, message: msg }));
