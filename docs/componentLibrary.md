@@ -65,6 +65,22 @@ When you click the regular **Save** button while logged in, the library is also 
 
 On page load, the Library Manager automatically fetches your cloud library (if you are logged in) and populates the editor. To reload manually at any time, click **Load from Cloud**.
 
+### Import Formats and Template Workbook
+
+Library Manager imports `.json`, `.csv`, `.xlsx`, and `.xls` files.
+
+- Use **Import mode → Replace library** to overwrite the current editor state.
+- Use **Import mode → Merge into existing** to merge categories/icons and upsert components by `subtype`.
+- Spreadsheet imports use these workbook sheets:
+  - `Components` (required for component rows)
+  - `Categories`
+  - `Icons`
+  - Optional `Ports` and `Schema` sheets for flattened data.
+
+Use **Download Template** in Library Manager to export a starter workbook containing all supported sheets and sample rows.
+
+If XLSX runtime is unavailable in the browser, spreadsheet import/export is disabled gracefully and the UI prompts you to use JSON/CSV instead.
+
 ### Sharing a Library
 
 Click **Share Library** to generate a 30-day read-only share link. Send the URL to teammates; they can paste it into **Load Shared Library** (or open it directly in their browser) without needing an account.
