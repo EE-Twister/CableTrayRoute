@@ -24,6 +24,19 @@ The one-line editor loads component definitions from `componentLibrary.json`. Ea
 - `ports` – array of connection points relative to an 80×40 component.
 - `schema` – optional property descriptors with `name`, `label`, and `type`.
 
+## Guided Editing Workflow (No JSON Required)
+
+Library Manager (`library.html`) includes a structured editor so non-technical users can maintain the component catalog without touching raw JSON:
+
+1. Open **Library Manager**.
+2. In **Components Manager**, use **Add Component** to create rows and fill subtype, label, category, icon, ports, and schema fields.
+3. In **Categories Manager**, add/remove categories used by components.
+4. In **Icons Mapping**, define icon key/path pairs.
+5. Use inline validation hints to correct required fields before save.
+6. Click **Save** to persist locally (and auto-sync to cloud when logged in), or **Save to Cloud** for explicit cloud save.
+
+Advanced users can still use **Advanced JSON Editor (Power Users)**. Both editors stay synchronized.
+
 ## Component Instance Properties
 
 At runtime each placed component also carries these standard properties on its saved JSON object:
@@ -56,16 +69,19 @@ The **Library Manager** (`library.html`) supports saving your component library 
 ### Saving to the Cloud
 
 1. Open **Library Manager** from the navigation menu.
-2. Edit or upload your component library JSON in the editor.
+2. Edit via structured tables, upload a file, or update advanced JSON.
 3. Click **Save to Cloud** — the library is sent to `PUT /api/v1/library` and a "☁ Synced" badge confirms success.
 
 When you click the regular **Save** button while logged in, the library is also auto-synced to the cloud.
 
-If the server returns **409 Version conflict**, Library Manager now fetches the latest cloud copy and opens a conflict modal with three choices:
+If the server returns **409 Version conflict**, Library Manager fetches the latest cloud copy and opens a conflict modal with three deterministic options:
 
-- **Overwrite cloud with my local edits** (retries save against the latest `baseVersion`)
-- **Reload cloud version** (loads cloud data into the editor)
-- **Merge non-conflicting changes** (merges by `component.subtype`, flags subtype collisions for manual review, then retries save with updated `baseVersion`)
+- **Overwrite cloud with local edits**
+  - Retries save against latest `baseVersion` and keeps the local payload.
+- **Reload cloud version**
+  - Replaces the editor with latest cloud data (no save attempt).
+- **Merge non-conflicting changes**
+  - Merges by `component.subtype`, unions categories/icons, flags subtype collisions for manual review, then retries save with updated `baseVersion`.
 
 ### Loading from the Cloud
 
@@ -77,11 +93,7 @@ Library Manager imports `.json`, `.csv`, `.xlsx`, and `.xls` files.
 
 - Use **Import mode → Replace library** to overwrite the current editor state.
 - Use **Import mode → Merge into existing** to merge categories/icons and upsert components by `subtype`.
-- Spreadsheet imports use these workbook sheets:
-  - `Components` (required for component rows)
-  - `Categories`
-  - `Icons`
-  - Optional `Ports` and `Schema` sheets for flattened data.
+- Spreadsheet imports use workbook sheets documented in [componentLibraryTemplateSpec.md](componentLibraryTemplateSpec.md).
 
 Use **Download Template** in Library Manager to export a starter workbook containing all supported sheets and sample rows.
 
@@ -96,3 +108,10 @@ Share tokens can be revoked at any time via `DELETE /api/v1/library/shares/:shar
 ### Fallback Behaviour
 
 If you are not logged in, or the server is unreachable, the Library Manager falls back to browser `localStorage` and the static `componentLibrary.json` file — no data is lost.
+
+## Acceptance Criteria Mapping
+
+- Non-technical users can add/edit/delete library entries using structured tables only.
+- Workbook import validates payloads and blocks save until issues are fixed.
+- Cloud sync + conflict handling produce deterministic, user-readable outcomes.
+- Advanced JSON mode remains available and backward-compatible.

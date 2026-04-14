@@ -107,7 +107,8 @@ async function runTests() {
     // -----------------------------------------------------------------------
     const libraryData = {
       categories: ['bus', 'protection'],
-      components: [{ type: 'bus', label: 'Bus' }],
+      components: [{ subtype: 'bus-main', label: 'Bus', icon: 'icons/components/Bus.svg', category: 'bus' }],
+      icons: { 'icons/components/Bus.svg': 'icons/components/Bus.svg' },
     };
 
     let savedVersion;
@@ -166,11 +167,30 @@ async function runTests() {
       const res = await fetch(`${base}/api/v1/library`, {
         method: 'PUT',
         headers: authHeaders(token, csrfToken),
-        body: JSON.stringify({ data: { categories: [] }, baseVersion: 'stale-version' }),
+        body: JSON.stringify({ data: libraryData, baseVersion: 'stale-version' }),
       });
       assert.strictEqual(res.status, 409);
       const body = await res.json();
       assert.ok(body.currentVersion, 'Should return currentVersion');
+    });
+
+    await check('PUT /api/v1/library rejects invalid payload with validation details', async () => {
+      const invalid = {
+        categories: ['equipment', 'equipment'],
+        components: [{ subtype: '', label: '', icon: '', category: '' }],
+        icons: { '': '' },
+      };
+      const res = await fetch(`${base}/api/v1/library`, {
+        method: 'PUT',
+        headers: authHeaders(token, csrfToken),
+        body: JSON.stringify({ data: invalid }),
+      });
+      assert.strictEqual(res.status, 400);
+      const body = await res.json();
+      assert.strictEqual(body.error, 'Library payload validation failed');
+      assert.ok(Array.isArray(body.details));
+      assert.ok(body.details.some((entry) => String(entry.path).includes('categories')));
+      assert.ok(body.details.some((entry) => String(entry.path).includes('components[0].subtype')));
     });
 
     // -----------------------------------------------------------------------
