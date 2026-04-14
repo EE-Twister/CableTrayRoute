@@ -234,6 +234,8 @@ This ticket set translates the current component/attribute gaps into implementat
 
 **Status:** Completed on April 14, 2026.
 
+**Completion note (April 14, 2026):** Updated `scripts/componentCoverageAudit.mjs` to canonicalize subtype aliases (e.g., `synchronous`/`asynchronous` → `generator`, inverter families, breaker/fuse aliases) and aggregate attribute coverage across all matching definitions so the generated gap analysis reflects baseline progress accurately.
+
 **Study impact:** All studies (consistency, validation, report reliability).
 
 **Required attributes (minimum):**
