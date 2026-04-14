@@ -28,6 +28,12 @@ Each subtype in `componentLibrary.json` may include these properties in its sche
 - Meter fields include `tag`, `description`, `manufacturer`, `model`, `meter_class`, `ct_ratio`, `pt_ratio`, `sample_rate_hz`, and study capability flags (`supports_thd`, `supports_flicker`, `supports_waveform_capture`).
 - Validation enforces both `ct_ratio` and `pt_ratio` when any meter study capability flag is enabled so harmonics/power-quality workflows do not run with incomplete instrument transformer scaling.
 
+## DC bus component fields
+
+- The one-line palette now includes a `dc_bus` subtype under the Bus category with a dedicated DC icon.
+- DC bus fields include `tag`, `description`, `nominal_voltage_vdc`, `grounding_scheme`, `max_continuous_current_a`, and `short_circuit_rating_ka`.
+- Validation flags DC bus records missing any of the required DC study fields so DC short-circuit and DC arc-flash workflows do not run on incomplete bus metadata.
+
 ## UI consistency checklist
 
 Use this checklist when shipping UI updates so layout and component styling stay aligned with shared tokens:
