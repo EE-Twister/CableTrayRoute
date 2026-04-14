@@ -15,13 +15,35 @@ function showStatus(formEl, message, isError) {
   statusEl.dataset.error = isError ? 'true' : 'false';
 }
 
+function validateSignupPasswords(form, showMessage = false) {
+  const passwordInput = document.getElementById('signup-pass');
+  const confirmInput = document.getElementById('signup-pass-confirm');
+  const password = passwordInput.value;
+  const confirm = confirmInput.value;
+
+  if (confirm.length > 0 && password !== confirm) {
+    confirmInput.setCustomValidity('Passwords must match.');
+    if (showMessage) {
+      showStatus(form, 'Passwords do not match.', true);
+    }
+    return false;
+  }
+
+  confirmInput.setCustomValidity('');
+  return true;
+}
+
 async function signup(e) {
   e.preventDefault();
   const form = e.currentTarget;
   const submitBtn = form.querySelector('button[type="submit"]');
   const username = document.getElementById('signup-user').value.trim();
   const password = document.getElementById('signup-pass').value;
-  const confirm = document.getElementById('signup-pass-confirm').value;
+  const passwordsMatch = validateSignupPasswords(form, true);
+
+  if (!form.reportValidity()) {
+    return;
+  }
 
   if (!/^[a-zA-Z0-9_-]{1,100}$/.test(username)) {
     showStatus(form, 'Username may only contain letters, numbers, underscores, and hyphens (1–100 characters).', true);
@@ -33,8 +55,7 @@ async function signup(e) {
     return;
   }
 
-  if (password !== confirm) {
-    showStatus(form, 'Passwords do not match.', true);
+  if (!passwordsMatch) {
     return;
   }
 
@@ -90,5 +111,17 @@ async function login(e) {
   }
 }
 
-document.getElementById('signup-form').addEventListener('submit', signup);
+const signupForm = document.getElementById('signup-form');
+const signupPasswordInput = document.getElementById('signup-pass');
+const signupConfirmInput = document.getElementById('signup-pass-confirm');
+
+signupPasswordInput.addEventListener('input', () => {
+  validateSignupPasswords(signupForm);
+});
+
+signupConfirmInput.addEventListener('input', () => {
+  validateSignupPasswords(signupForm, true);
+});
+
+signupForm.addEventListener('submit', signup);
 document.getElementById('login-form').addEventListener('submit', login);
