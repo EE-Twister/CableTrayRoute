@@ -493,6 +493,72 @@ describe('runValidation - switchboard required attributes', () => {
   });
 });
 
+describe('runValidation - cable required attributes', () => {
+  it('flags a cable when required fields are missing', () => {
+    const components = [
+      {
+        id: 'cable-1',
+        type: 'cable',
+        subtype: 'cable',
+        props: {
+          tag: '',
+          description: '',
+          manufacturer: '',
+          model: '',
+          length_ft: 0,
+          material: '',
+          insulation_type: '',
+          temp_rating_c: null,
+          size_awg_kcmil: '',
+          parallel_sets: 0,
+          r_ohm_per_kft: -1,
+          x_ohm_per_kft: NaN
+        }
+      }
+    ];
+    const issues = runValidation(components, {});
+    const cableIssue = issues.find(issue => issue.component === 'cable-1');
+    assert.ok(cableIssue);
+    assert.ok(cableIssue.message.includes('tag'));
+    assert.ok(cableIssue.message.includes('description'));
+    assert.ok(cableIssue.message.includes('manufacturer'));
+    assert.ok(cableIssue.message.includes('model'));
+    assert.ok(cableIssue.message.includes('length_ft'));
+    assert.ok(cableIssue.message.includes('material'));
+    assert.ok(cableIssue.message.includes('insulation_type'));
+    assert.ok(cableIssue.message.includes('temp_rating_c'));
+    assert.ok(cableIssue.message.includes('size_awg_kcmil'));
+    assert.ok(cableIssue.message.includes('parallel_sets'));
+    assert.ok(cableIssue.message.includes('r_ohm_per_kft'));
+    assert.ok(cableIssue.message.includes('x_ohm_per_kft'));
+  });
+
+  it('does not flag a cable with all required fields present', () => {
+    const components = [
+      {
+        id: 'cable-2',
+        type: 'cable',
+        subtype: 'cable',
+        props: {
+          tag: 'CBL-MDB-1',
+          description: 'Feeder cable to MCC-1',
+          manufacturer: 'Prysmian',
+          model: 'XHHW-2',
+          length_ft: 420,
+          material: 'copper',
+          insulation_type: 'xlpe',
+          temp_rating_c: 90,
+          size_awg_kcmil: '500 kcmil',
+          parallel_sets: 2,
+          r_ohm_per_kft: 0.0216,
+          x_ohm_per_kft: 0.015
+        }
+      }
+    ];
+    assert.deepStrictEqual(runValidation(components, {}), []);
+  });
+});
+
 
 
 describe('runValidation - relay_87 required attributes', () => {

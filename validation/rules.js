@@ -185,6 +185,37 @@ export function runValidation(components = [], studies = {}) {
     }
   });
 
+  // Cable required field completeness for feeder/path impedance studies
+  components.forEach(c => {
+    const isCable = c?.type === 'cable' || c?.subtype === 'cable';
+    if (!isCable) return;
+    const props = c.props && typeof c.props === 'object' ? c.props : c;
+    const missing = [];
+    if (!`${props.tag ?? ''}`.trim()) missing.push('tag');
+    if (!`${props.description ?? ''}`.trim()) missing.push('description');
+    if (!`${props.manufacturer ?? ''}`.trim()) missing.push('manufacturer');
+    if (!`${props.model ?? ''}`.trim()) missing.push('model');
+    const lengthFt = Number(props.length_ft);
+    if (!Number.isFinite(lengthFt) || lengthFt <= 0) missing.push('length_ft');
+    if (!`${props.material ?? ''}`.trim()) missing.push('material');
+    if (!`${props.insulation_type ?? ''}`.trim()) missing.push('insulation_type');
+    const tempRatingC = Number(props.temp_rating_c);
+    if (!Number.isFinite(tempRatingC) || tempRatingC <= 0) missing.push('temp_rating_c');
+    if (!`${props.size_awg_kcmil ?? ''}`.trim()) missing.push('size_awg_kcmil');
+    const parallelSets = Number(props.parallel_sets);
+    if (!Number.isFinite(parallelSets) || parallelSets <= 0) missing.push('parallel_sets');
+    const rOhmPerKft = Number(props.r_ohm_per_kft);
+    if (!Number.isFinite(rOhmPerKft) || rOhmPerKft < 0) missing.push('r_ohm_per_kft');
+    const xOhmPerKft = Number(props.x_ohm_per_kft);
+    if (!Number.isFinite(xOhmPerKft) || xOhmPerKft < 0) missing.push('x_ohm_per_kft');
+    if (missing.length) {
+      issues.push({
+        component: c.id,
+        message: `Cable missing required attributes: ${missing.join(', ')}.`
+      });
+    }
+  });
+
 
   // Differential relay (87) required field completeness
   components.forEach(c => {
