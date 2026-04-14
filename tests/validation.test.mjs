@@ -620,6 +620,81 @@ describe('runValidation - relay_87 required attributes', () => {
   });
 });
 
+describe('runValidation - generator required attributes', () => {
+  it('flags a generator when required fields are missing', () => {
+    const components = [
+      {
+        id: 'gen-1',
+        type: 'generator',
+        subtype: 'synchronous',
+        props: {
+          tag: '',
+          description: '',
+          manufacturer: '',
+          model: '',
+          rated_mva: 0,
+          rated_kv: 0,
+          xdpp_pu: 0,
+          xdp_pu: '',
+          xd_pu: -1,
+          h_constant_s: 0,
+          governor_mode: '',
+          avr_mode: '',
+          min_kw: -5,
+          max_kw: 0,
+          ramp_kw_per_min: 0
+        }
+      }
+    ];
+    const issues = runValidation(components, {});
+    const generatorIssue = issues.find(issue => issue.component === 'gen-1');
+    assert.ok(generatorIssue);
+    assert.ok(generatorIssue.message.includes('tag'));
+    assert.ok(generatorIssue.message.includes('description'));
+    assert.ok(generatorIssue.message.includes('manufacturer'));
+    assert.ok(generatorIssue.message.includes('model'));
+    assert.ok(generatorIssue.message.includes('rated_mva'));
+    assert.ok(generatorIssue.message.includes('rated_kv'));
+    assert.ok(generatorIssue.message.includes('xdpp_pu'));
+    assert.ok(generatorIssue.message.includes('xdp_pu'));
+    assert.ok(generatorIssue.message.includes('xd_pu'));
+    assert.ok(generatorIssue.message.includes('h_constant_s'));
+    assert.ok(generatorIssue.message.includes('governor_mode'));
+    assert.ok(generatorIssue.message.includes('avr_mode'));
+    assert.ok(generatorIssue.message.includes('min_kw'));
+    assert.ok(generatorIssue.message.includes('max_kw'));
+    assert.ok(generatorIssue.message.includes('ramp_kw_per_min'));
+  });
+
+  it('does not flag a generator with all required fields present', () => {
+    const components = [
+      {
+        id: 'gen-2',
+        type: 'generator',
+        subtype: 'asynchronous',
+        props: {
+          tag: 'GEN-2',
+          description: 'Standby generator',
+          manufacturer: 'Generac',
+          model: 'SG500',
+          rated_mva: 0.625,
+          rated_kv: 0.48,
+          xdpp_pu: 0.25,
+          xdp_pu: 0.35,
+          xd_pu: 1.9,
+          h_constant_s: 4.2,
+          governor_mode: 'droop',
+          avr_mode: 'automatic',
+          min_kw: 100,
+          max_kw: 500,
+          ramp_kw_per_min: 75
+        }
+      }
+    ];
+    assert.deepStrictEqual(runValidation(components, {}), []);
+  });
+});
+
 describe('runValidation - capacitor/reactor tuning attributes', () => {
   it('flags capacitor/reactor components when required tuning metadata is missing', () => {
     const components = [

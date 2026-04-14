@@ -1125,6 +1125,29 @@ const capacitorBankPropertyFields = [
     'Defines operation behavior. Used in network control.')
 ];
 
+const generatorStudyFieldSpecs = [
+  { name: 'rated_mva', label: 'Rated Power (MVA)', type: 'number', required: true, defaultValue: comp => {
+    const ratedKw = Number(comp?.rated_kw ?? comp?.props?.rated_kw);
+    return Number.isFinite(ratedKw) && ratedKw > 0 ? Number((ratedKw / 1000).toFixed(3)) : 1;
+  } },
+  { name: 'rated_kv', label: 'Rated Voltage (kV)', type: 'number', required: true, defaultValue: comp => {
+    const baseKv = Number(comp?.kV ?? comp?.baseKV ?? comp?.props?.kV ?? comp?.props?.baseKV);
+    return Number.isFinite(baseKv) && baseKv > 0 ? baseKv : 0.48;
+  } },
+  { name: 'xdpp_pu', label: "X''d (pu)", type: 'number', required: true, defaultValue: 0.2 },
+  { name: 'xdp_pu', label: "X'd (pu)", type: 'number', required: true, defaultValue: 0.3 },
+  { name: 'xd_pu', label: 'Xd (pu)', type: 'number', required: true, defaultValue: 1.8 },
+  { name: 'h_constant_s', label: 'Inertia Constant H (s)', type: 'number', required: true, defaultValue: 3.5 },
+  { name: 'governor_mode', label: 'Governor Mode', type: 'text', required: true, defaultValue: 'droop' },
+  { name: 'avr_mode', label: 'AVR Mode', type: 'text', required: true, defaultValue: 'automatic' },
+  { name: 'min_kw', label: 'Minimum Output (kW)', type: 'number', required: true, defaultValue: 0 },
+  { name: 'max_kw', label: 'Maximum Output (kW)', type: 'number', required: true, defaultValue: comp => {
+    const ratedKw = Number(comp?.rated_kw ?? comp?.props?.rated_kw);
+    return Number.isFinite(ratedKw) && ratedKw > 0 ? ratedKw : 1000;
+  } },
+  { name: 'ramp_kw_per_min', label: 'Ramp Rate (kW/min)', type: 'number', required: true, defaultValue: 100 }
+];
+
 const baselineComponentFieldSpecs = [
   { name: 'tag', label: 'Tag', type: 'text', required: true, defaultValue: comp => comp.ref || comp.label || comp.id || '' },
   { name: 'description', label: 'Description', type: 'text', required: true, defaultValue: comp => comp.label || '' },
@@ -1240,6 +1263,62 @@ function ensureBaselineComponentMetadata() {
         type: 'number',
         required: true
       });
+    });
+  });
+}
+
+function isGeneratorStudyComponentMeta(meta) {
+  if (!meta || typeof meta !== 'object') return false;
+  const type = `${meta.type || ''}`.trim().toLowerCase();
+  const subtype = `${meta.subtype || ''}`.trim().toLowerCase();
+  return type === 'generator' || subtype === 'generator' || subtype === 'synchronous' || subtype === 'asynchronous';
+}
+
+function ensureGeneratorStudyFieldsOnComponent(comp, meta) {
+  if (!comp || typeof comp !== 'object') return comp;
+  if (!isGeneratorStudyComponentMeta(meta || comp)) return comp;
+  if (!comp.props || typeof comp.props !== 'object') {
+    comp.props = { ...(comp.props || {}) };
+  }
+  generatorStudyFieldSpecs.forEach(spec => {
+    const hasCompValue = Object.prototype.hasOwnProperty.call(comp, spec.name) && comp[spec.name] !== '';
+    const hasPropsValue = Object.prototype.hasOwnProperty.call(comp.props, spec.name) && comp.props[spec.name] !== '';
+    if (hasCompValue || hasPropsValue) {
+      if (!hasCompValue && hasPropsValue) comp[spec.name] = comp.props[spec.name];
+      if (hasCompValue && !hasPropsValue) comp.props[spec.name] = comp[spec.name];
+      return;
+    }
+    const nextValue = typeof spec.defaultValue === 'function' ? spec.defaultValue(comp, meta) : spec.defaultValue;
+    comp[spec.name] = nextValue;
+    comp.props[spec.name] = nextValue;
+  });
+  const minKw = Number(comp.min_kw ?? comp.props.min_kw);
+  const maxKw = Number(comp.max_kw ?? comp.props.max_kw);
+  if (Number.isFinite(minKw) && Number.isFinite(maxKw) && minKw > maxKw) {
+    comp.min_kw = maxKw;
+    comp.props.min_kw = maxKw;
+  }
+  return comp;
+}
+
+function ensureGeneratorStudyMetadata() {
+  Object.entries(componentMeta).forEach(([key, meta]) => {
+    if (!isGeneratorStudyComponentMeta(meta)) return;
+    if (!meta.props || typeof meta.props !== 'object') {
+      meta.props = { ...(meta.props || {}) };
+    }
+    generatorStudyFieldSpecs.forEach(spec => {
+      if (!Object.prototype.hasOwnProperty.call(meta.props, spec.name)) {
+        const nextValue = typeof spec.defaultValue === 'function' ? spec.defaultValue(meta.props) : spec.defaultValue;
+        meta.props[spec.name] = nextValue;
+      }
+    });
+    const schemaKeys = new Set([key, meta.subtype].filter(Boolean));
+    schemaKeys.forEach(schemaKey => {
+      if (!Array.isArray(propSchemas[schemaKey])) {
+        propSchemas[schemaKey] = inferSchemaFromProps(meta.props || {});
+      }
+      generatorStudyFieldSpecs.forEach(spec => ensureBaselineFieldSchema(propSchemas[schemaKey], spec));
     });
   });
 }
@@ -1419,6 +1498,7 @@ async function loadComponentLibrary() {
   builtinComponents.forEach(def => registerDefinition(def, { allowOverride: false }));
 
   ensureCapacitorReactorPropertyMetadata();
+  ensureGeneratorStudyMetadata();
   ensureBaselineComponentMetadata();
 
   buildPalette();
@@ -5508,6 +5588,7 @@ function normalizeComponent(c) {
   }
   applyDefaults(nc);
   ensureBaselineFieldsOnComponent(nc, componentMeta[nc.subtype]);
+  ensureGeneratorStudyFieldsOnComponent(nc, componentMeta[nc.subtype]);
   return nc;
 }
 
@@ -7907,6 +7988,7 @@ function addComponent(cfg) {
   }
   applyDefaults(comp);
   ensureBaselineFieldsOnComponent(comp, meta);
+  ensureGeneratorStudyFieldsOnComponent(comp, meta);
   ensureShapeDefaults(comp);
   if (comp.type === 'transformer') {
     syncTransformerDefaults(comp, { forceBase: true });
@@ -11049,6 +11131,7 @@ async function init() {
         propSchemas[c.subtype] = inferSchemaFromProps(raw);
       }
       ensureBaselineFieldsOnComponent(c, componentMeta[c.subtype]);
+      ensureGeneratorStudyFieldsOnComponent(c, componentMeta[c.subtype]);
     });
   });
   rebuildComponentMaps();
@@ -11056,6 +11139,7 @@ async function init() {
     if (!propSchemas[sub]) propSchemas[sub] = inferSchemaFromProps(componentMeta[sub].props || {});
   });
   ensureBaselineComponentMetadata();
+  ensureGeneratorStudyMetadata();
   sheets.forEach(s => {
     s.components.forEach(c => {
       (c.connections || []).forEach(conn => {
