@@ -1721,7 +1721,20 @@
         "electrode_config": "VCB",
         "mva": 1.0,
         "thevenin_mva": 1.0,
-        "pf": 1.0
+        "pf": 1.0,
+        "tag": "",
+        "description": "",
+        "manufacturer": "",
+        "model": "",
+        "rated_kw": 1000,
+        "rated_kva": 1000,
+        "ac_voltage_kv": 0.48,
+        "dc_voltage_v": 1000,
+        "fault_current_multiple": 1.2,
+        "thd_current_pct": 3.0,
+        "control_mode": "volt_var",
+        "volt_var_enabled": true,
+        "freq_watt_enabled": false
       },
       "deviceProperties": [
         {
@@ -1784,7 +1797,52 @@
           "PurposeUseCase": "Defines reference and safety",
           "NotesOrComments": "Used for fault modeling"
         }
-      ]
+      ],
+      "subtype": "pv_inverter"
+    },
+    {
+      "type": "bess_inverter",
+      "subtype": "bess_inverter",
+      "label": "BESS Inverter",
+      "icon": "icons/components/UPS.svg",
+      "iconIEC": "icons/components/iec/IEC_Generator.svg",
+      "props": {
+        "tag": "",
+        "description": "",
+        "manufacturer": "",
+        "model": "",
+        "rated_kw": 1500,
+        "rated_kva": 1650,
+        "ac_voltage_kv": 0.48,
+        "dc_voltage_v": 1000,
+        "fault_current_multiple": 1.2,
+        "thd_current_pct": 2.5,
+        "control_mode": "grid_forming",
+        "volt_var_enabled": true,
+        "freq_watt_enabled": true
+      }
+    },
+    {
+      "type": "rectifier",
+      "subtype": "rectifier",
+      "label": "Rectifier",
+      "icon": "icons/components/UPS.svg",
+      "iconIEC": "icons/components/iec/IEC_Transformer.svg",
+      "props": {
+        "tag": "",
+        "description": "",
+        "manufacturer": "",
+        "model": "",
+        "rated_kw": 500,
+        "rated_kva": 550,
+        "ac_voltage_kv": 0.48,
+        "dc_voltage_v": 125,
+        "fault_current_multiple": 1.1,
+        "thd_current_pct": 5.0,
+        "control_mode": "constant_voltage",
+        "volt_var_enabled": false,
+        "freq_watt_enabled": false
+      }
     },
     {
       "type": "ups",
