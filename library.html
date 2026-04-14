@@ -183,7 +183,7 @@
   <script type="module">
     import './src/components/navigation.js';
     import { getItem, setItem } from './dataStore.mjs';
-    import { showAlertModal } from './src/components/modal.js';
+    import openModal, { showAlertModal } from './src/components/modal.js';
     import { getAuthContextState } from './projectStorage.js';
     import { validateLibraryPayload } from './src/validation/librarySchema.mjs';
 
@@ -234,9 +234,161 @@
           const details = await res.json().catch(() => ({}));
           return { validationErrors: details?.details || [] };
         }
+        if (res.status === 409) {
+          const details = await res.json().catch(() => ({}));
+          return {
+            conflict: true,
+            currentVersion: details?.currentVersion || null,
+          };
+        }
         return null;
       }
       return res.json();
+    }
+
+    function normalizeComponent(component) {
+      return JSON.stringify(component ?? {});
+    }
+
+    function mergeLibraryForConflict(localPayload, cloudPayload) {
+      const localComponents = Array.isArray(localPayload?.components) ? localPayload.components : [];
+      const cloudComponents = Array.isArray(cloudPayload?.components) ? cloudPayload.components : [];
+      const cloudBySubtype = new Map(
+        cloudComponents
+          .filter((component) => component && component.subtype)
+          .map((component) => [component.subtype, component]),
+      );
+      const localBySubtype = new Map(
+        localComponents
+          .filter((component) => component && component.subtype)
+          .map((component) => [component.subtype, component]),
+      );
+      const mergedComponents = [];
+      const collisions = [];
+      cloudBySubtype.forEach((cloudComponent, subtype) => {
+        const localComponent = localBySubtype.get(subtype);
+        if (!localComponent) {
+          mergedComponents.push(cloudComponent);
+          return;
+        }
+        if (normalizeComponent(localComponent) !== normalizeComponent(cloudComponent)) {
+          collisions.push(subtype);
+        }
+        mergedComponents.push(localComponent);
+        localBySubtype.delete(subtype);
+      });
+      localBySubtype.forEach((localComponent) => {
+        mergedComponents.push(localComponent);
+      });
+      const categories = [...new Set([
+        ...(Array.isArray(cloudPayload?.categories) ? cloudPayload.categories : []),
+        ...(Array.isArray(localPayload?.categories) ? localPayload.categories : []),
+      ])];
+      const icons = {
+        ...(cloudPayload?.icons && typeof cloudPayload.icons === 'object' ? cloudPayload.icons : {}),
+        ...(localPayload?.icons && typeof localPayload.icons === 'object' ? localPayload.icons : {}),
+      };
+      return {
+        payload: {
+          categories,
+          components: mergedComponents,
+          icons,
+        },
+        collisions,
+      };
+    }
+
+    async function showConflictResolutionModal(conflictSummary) {
+      const { collisions = [], currentVersion } = conflictSummary || {};
+      return openModal({
+        title: 'Cloud Version Conflict',
+        primaryText: 'Cancel',
+        secondaryText: null,
+        closeOnBackdrop: false,
+        closeOnEscape: true,
+        render(body, controller) {
+          const intro = document.createElement('p');
+          intro.textContent = `The cloud library changed since your last sync.${currentVersion ? ` Latest version: ${currentVersion}.` : ''}`;
+          body.appendChild(intro);
+
+          const detail = document.createElement('p');
+          if (collisions.length) {
+            detail.textContent = `Merge found ${collisions.length} component subtype collision(s). These entries need manual review.`;
+          } else {
+            detail.textContent = 'Merge can apply all changes without subtype collisions.';
+          }
+          body.appendChild(detail);
+
+          if (collisions.length) {
+            const collisionList = document.createElement('p');
+            collisionList.textContent = `Collisions: ${collisions.join(', ')}`;
+            body.appendChild(collisionList);
+          }
+
+          const buttonWrap = document.createElement('div');
+          buttonWrap.className = 'modal-actions';
+
+          const overwriteBtn = document.createElement('button');
+          overwriteBtn.type = 'button';
+          overwriteBtn.className = 'btn';
+          overwriteBtn.textContent = 'Overwrite cloud with local edits';
+          overwriteBtn.addEventListener('click', () => controller.close('overwrite'));
+
+          const reloadBtn = document.createElement('button');
+          reloadBtn.type = 'button';
+          reloadBtn.className = 'btn';
+          reloadBtn.textContent = 'Reload cloud version';
+          reloadBtn.addEventListener('click', () => controller.close('reload'));
+
+          const mergeBtn = document.createElement('button');
+          mergeBtn.type = 'button';
+          mergeBtn.className = 'btn primary-btn';
+          mergeBtn.textContent = 'Merge non-conflicting changes';
+          mergeBtn.addEventListener('click', () => controller.close('merge'));
+
+          buttonWrap.append(overwriteBtn, reloadBtn, mergeBtn);
+          body.appendChild(buttonWrap);
+        },
+      });
+    }
+
+    async function saveLibraryToCloudWithConflictResolution(payload, baseVersion) {
+      let effectiveBaseVersion = baseVersion || undefined;
+      let attempt = await cloudPut(payload, effectiveBaseVersion);
+      if (!attempt?.conflict) {
+        return attempt;
+      }
+      const latest = await cloudGet();
+      if (!latest || latest.notFound) {
+        return attempt;
+      }
+      const mergeResult = mergeLibraryForConflict(payload, latest.data || {});
+      const decision = await showConflictResolutionModal({
+        collisions: mergeResult.collisions,
+        currentVersion: latest.version || attempt.currentVersion || null,
+      });
+      if (!decision) {
+        return { cancelled: true };
+      }
+      if (decision === 'reload') {
+        populateFromData(latest.data);
+        _cloudVersion = latest.version || null;
+        return { reloaded: true };
+      }
+      if (decision === 'merge') {
+        attempt = await cloudPut(mergeResult.payload, latest.version || attempt.currentVersion || undefined);
+        if (attempt && !attempt.validationErrors && !attempt.conflict) {
+          hydrateStructuredState({
+            categories: mergeResult.payload.categories,
+            components: mergeResult.payload.components,
+          }, mergeResult.payload.icons);
+        }
+        return {
+          ...attempt,
+          mergeCollisions: mergeResult.collisions,
+        };
+      }
+      return cloudPut(payload, latest.version || attempt.currentVersion || undefined);
     }
 
     async function cloudShare() {
@@ -574,13 +726,26 @@
         // Auto-sync to cloud if authenticated
         if (authState()) {
           setStatus('pending', '⟳ Saving…');
-          const saved = await cloudPut({ categories, components, icons }, _cloudVersion || undefined);
-          if (saved && !saved.validationErrors) {
+          const saved = await saveLibraryToCloudWithConflictResolution({ categories, components, icons }, _cloudVersion || undefined);
+          if (saved?.reloaded) {
+            setStatus('synced', '☁ Synced');
+            await showAlertModal('Cloud Version Loaded', 'Loaded the latest cloud version. Review it, then save again if needed.');
+          } else if (saved && !saved.validationErrors && !saved.conflict && !saved.cancelled) {
             _cloudVersion = saved.version;
             setStatus('synced', '☁ Synced');
+            if (saved?.mergeCollisions?.length) {
+              await showAlertModal(
+                'Merged with Collisions',
+                `Merged updates and kept local edits for: ${saved.mergeCollisions.join(', ')}.\nPlease review these components.`
+              );
+            }
           } else if (saved?.validationErrors?.length) {
             setStatus('local', '⚠ Validation failed');
             await showAlertModal('Cloud Validation Failed', renderValidationErrors(saved.validationErrors));
+          } else if (saved?.cancelled) {
+            setStatus('local', '⚠ Save cancelled');
+          } else if (saved?.conflict) {
+            setStatus('local', '⚠ Conflict unresolved');
           } else {
             setStatus('offline', '⚠ Cloud save failed');
           }
@@ -881,14 +1046,29 @@
         const isValid = await validateLibraryForPersistence({ categories, components, icons });
         if (!isValid) return;
         setStatus('pending', '⟳ Saving…');
-        const saved = await cloudPut({ categories, components, icons });
-        if (saved && !saved.validationErrors) {
+        const saved = await saveLibraryToCloudWithConflictResolution({ categories, components, icons }, _cloudVersion || undefined);
+        if (saved?.reloaded) {
+          setStatus('synced', '☁ Synced');
+          await showAlertModal('Cloud Version Loaded', 'Loaded the latest cloud version. Review it, then save again if needed.');
+        } else if (saved && !saved.validationErrors && !saved.conflict && !saved.cancelled) {
           _cloudVersion = saved.version;
           setStatus('synced', '☁ Synced');
-          await showAlertModal('Saved to Cloud', 'Library saved to your cloud account.');
+          if (saved?.mergeCollisions?.length) {
+            await showAlertModal(
+              'Saved with Merge Collisions',
+              `Saved merged data. Manual review is still needed for: ${saved.mergeCollisions.join(', ')}.`
+            );
+          } else {
+            await showAlertModal('Saved to Cloud', 'Library saved to your cloud account.');
+          }
         } else if (saved?.validationErrors?.length) {
           setStatus('local', '⚠ Validation failed');
           await showAlertModal('Cloud Validation Failed', renderValidationErrors(saved.validationErrors));
+        } else if (saved?.cancelled) {
+          setStatus('local', '⚠ Save cancelled');
+        } else if (saved?.conflict) {
+          setStatus('local', '⚠ Conflict unresolved');
+          await showAlertModal('Conflict Unresolved', 'The cloud library changed and no resolution was applied.');
         } else {
           setStatus('offline', '⚠ Cloud save failed');
           await showAlertModal('Cloud Save Failed', 'Could not save to cloud. Check your connection or log in again.');
