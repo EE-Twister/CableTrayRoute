@@ -14,6 +14,56 @@ function isNonEmptyString(value) {
   return typeof value === 'string' && value.trim().length > 0;
 }
 
+function validateMccComponent(component, index, errors) {
+  const subtype = `${component?.subtype || ''}`.trim().toLowerCase();
+  if (subtype !== 'mcc') return;
+  if (!isPlainObject(component.props)) {
+    errors.push(buildError(`components[${index}].props`, 'mcc component props must be an object.'));
+    return;
+  }
+  const requiredStringProps = [
+    'tag',
+    'description',
+    'manufacturer',
+    'model',
+    'main_device_type',
+    'form_type'
+  ];
+  requiredStringProps.forEach((propKey) => {
+    if (!isNonEmptyString(component.props[propKey])) {
+      errors.push(buildError(
+        `components[${index}].props.${propKey}`,
+        `mcc.${propKey} is required and must be a non-empty string.`,
+      ));
+    }
+  });
+
+  const positiveNumberProps = ['rated_voltage_kv', 'bus_rating_a', 'sccr_ka', 'bucket_count'];
+  positiveNumberProps.forEach((propKey) => {
+    const value = Number(component.props[propKey]);
+    if (!Number.isFinite(value) || value <= 0) {
+      errors.push(buildError(
+        `components[${index}].props.${propKey}`,
+        `mcc.${propKey} must be a finite number greater than 0.`,
+      ));
+    }
+  });
+
+  const spareBucketCount = Number(component.props.spare_bucket_count);
+  const bucketCount = Number(component.props.bucket_count);
+  if (!Number.isFinite(spareBucketCount) || spareBucketCount < 0) {
+    errors.push(buildError(
+      `components[${index}].props.spare_bucket_count`,
+      'mcc.spare_bucket_count must be a finite number greater than or equal to 0.',
+    ));
+  } else if (Number.isFinite(bucketCount) && spareBucketCount > bucketCount) {
+    errors.push(buildError(
+      `components[${index}].props.spare_bucket_count`,
+      'mcc.spare_bucket_count cannot exceed mcc.bucket_count.',
+    ));
+  }
+}
+
 function validateComponent(component, index, categoriesSet, subtypeMap, errors) {
   if (!isPlainObject(component)) {
     errors.push(buildError(`components[${index}]`, 'Component must be an object.'));
@@ -46,6 +96,8 @@ function validateComponent(component, index, categoriesSet, subtypeMap, errors) 
       ),
     );
   }
+
+  validateMccComponent(component, index, errors);
 
   if (isNonEmptyString(component.subtype)) {
     const normalizedSubtype = component.subtype.trim();

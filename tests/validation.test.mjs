@@ -493,6 +493,82 @@ describe('runValidation - switchboard required attributes', () => {
   });
 });
 
+
+describe('runValidation - mcc required attributes', () => {
+  it('flags an mcc when required fields are missing', () => {
+    const components = [
+      {
+        id: 'mcc-ref',
+        type: 'bus',
+        connections: [{ target: 'mcc-1' }]
+      },
+      {
+        id: 'mcc-1',
+        type: 'panel',
+        subtype: 'mcc',
+        connections: [{ target: 'mcc-ref' }],
+        props: {
+          tag: '',
+          description: '',
+          manufacturer: '',
+          model: '',
+          rated_voltage_kv: 0,
+          bus_rating_a: 0,
+          main_device_type: '',
+          sccr_ka: null,
+          bucket_count: '',
+          spare_bucket_count: -1,
+          form_type: ''
+        }
+      }
+    ];
+    const issues = runValidation(components, {});
+    const mccIssue = issues.find(issue => issue.component === 'mcc-1' && issue.message.startsWith('MCC missing required attributes'));
+    assert.ok(mccIssue);
+    assert.ok(mccIssue.message.includes('tag'));
+    assert.ok(mccIssue.message.includes('description'));
+    assert.ok(mccIssue.message.includes('manufacturer'));
+    assert.ok(mccIssue.message.includes('model'));
+    assert.ok(mccIssue.message.includes('rated_voltage_kv'));
+    assert.ok(mccIssue.message.includes('bus_rating_a'));
+    assert.ok(mccIssue.message.includes('main_device_type'));
+    assert.ok(mccIssue.message.includes('sccr_ka'));
+    assert.ok(mccIssue.message.includes('bucket_count'));
+    assert.ok(mccIssue.message.includes('spare_bucket_count'));
+    assert.ok(mccIssue.message.includes('form_type'));
+  });
+
+  it('does not flag an mcc with all required fields present', () => {
+    const components = [
+      {
+        id: 'mcc-ref-2',
+        type: 'bus',
+        connections: [{ target: 'mcc-2' }]
+      },
+      {
+        id: 'mcc-2',
+        type: 'panel',
+        subtype: 'mcc',
+        connections: [{ target: 'mcc-ref-2' }],
+        props: {
+          tag: 'MCC-01',
+          description: '480 V Process MCC',
+          manufacturer: 'Rockwell',
+          model: 'CENTERLINE 2500',
+          rated_voltage_kv: 0.48,
+          bus_rating_a: 1600,
+          main_device_type: 'mccb',
+          sccr_ka: 65,
+          bucket_count: 12,
+          spare_bucket_count: 2,
+          form_type: 'form_2b'
+        }
+      }
+    ];
+    assert.deepStrictEqual(runValidation(components, {}), []);
+  });
+});
+
 describe('runValidation - cable required attributes', () => {
   it('flags a cable when required fields are missing', () => {
     const components = [

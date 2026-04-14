@@ -1971,24 +1971,23 @@
       "ports": []
     },
     {
-      "type": "mcc",
-      "label": "MCC",
+      "type": "panel",
+      "subtype": "mcc",
+      "label": "Motor Control Center",
       "icon": "icons/components/MCC.svg",
+      "iconIEC": "icons/components/iec/IEC_Switch.svg",
       "props": {
-        "volts": 480,
-        "sections": 6,
-        "baseKV": 0.48,
-        "kV": 0.48,
-        "voltage": 480,
-        "prefault_voltage": 0.48,
-        "enclosure": "box",
-        "gap": 32,
-        "working_distance": 455,
-        "electrode_config": "VCB",
-        "load": {
-          "kw": 0,
-          "kvar": 0
-        }
+        "tag": "",
+        "description": "",
+        "manufacturer": "",
+        "model": "",
+        "rated_voltage_kv": 0.48,
+        "bus_rating_a": 1600,
+        "main_device_type": "mccb",
+        "sccr_ka": 65,
+        "bucket_count": 6,
+        "spare_bucket_count": 1,
+        "form_type": "form_2b"
       }
     },
     {

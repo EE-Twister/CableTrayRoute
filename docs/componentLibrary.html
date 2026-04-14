@@ -51,6 +51,8 @@
       <li><code>schema</code> – array of property descriptors with <code>name</code>, <code>label</code>, and <code>type</code>.</li>
     </ul>
     <p>Add new components by appending objects to the JSON array and providing corresponding icons. The application reloads the file at startup, so no JavaScript changes are required.</p>
+    <h2 id="mcc-subtype">MCC subtype</h2>
+    <p>The default library now includes a <code>mcc</code> (Motor Control Center) subtype under the panel family. It uses <code>icons/components/MCC.svg</code> and includes lineup defaults such as <code>sccr_ka</code>, <code>bucket_count</code>, and <code>form_type</code> so MCC properties render in the one-line drawer with required-field badges.</p>
     <h2 id="icons">Icons</h2>
     <p>Place custom SVG files under <code>icons/components/</code> and reference them in <code>componentLibrary.json</code>. Missing icons fall back to <code>icons/placeholder.svg</code>.</p>
   </main>

@@ -46,6 +46,13 @@ Each subtype in `componentLibrary.json` may include these properties in its sche
 - Switchboard fields include `tag`, `description`, `manufacturer`, `model`, `rated_voltage_kv`, `phases`, `bus_rating_a`, `withstand_1s_ka`, `interrupting_ka`, `arc_resistant_type`, and `maintenance_mode_supported`.
 - Validation flags switchboard records missing any required short-circuit and protection metadata so study inputs are complete before execution.
 
+## MCC component fields
+
+- The one-line palette now includes an `mcc` subtype (Motor Control Center) under the Panel category with a dedicated MCC icon.
+- MCC fields include `tag`, `description`, `manufacturer`, `model`, `rated_voltage_kv`, `bus_rating_a`, `main_device_type`, `sccr_ka`, `bucket_count`, `spare_bucket_count`, and `form_type`.
+- Legacy diagrams are migrated in-memory so MCC records missing any required fields are assigned safe defaults when projects load.
+- Validation flags MCC records with missing/invalid required metadata so lineup and short-circuit workflows remain study-ready.
+
 ## Cable segment component fields
 
 - The one-line palette now includes a `cable` subtype for explicit inter-device cable segments.
