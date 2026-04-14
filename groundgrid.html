@@ -220,27 +220,31 @@
             </p>
           </div>
 
-          <div class="field-row rod-spacing-field" id="rod-spacing-x-row" hidden>
+          <div class="field-row rod-spacing-field" id="rod-spacing-x-row" aria-disabled="true">
             <label for="rod-spacing-x">
-              Intermediate rod spacing in x-direction (<span class="unit-label-ft">ft</span><span class="unit-label-m" hidden>m</span>, 0 = corners only)
+              Interstitial rod spacing in x-direction (<span class="unit-label-ft">ft</span><span class="unit-label-m" hidden>m</span>, 0 = corners only)
             </label>
-            <input type="number" id="rod-spacing-x" min="0" step="0.1"
+            <input type="number" id="rod-spacing-x" min="0" step="0.1" disabled
                    value="0" aria-describedby="rod-spacing-x-hint">
             <p id="rod-spacing-x-hint" class="field-hint">
-              Target spacing between rod columns along L<sub>x</sub>. Rods snap to nearest conductor intersections.
+              Target spacing between rod columns along L<sub>x</sub>. Rods snap to nearest conductor intersections when rods are enabled.
             </p>
           </div>
 
-          <div class="field-row rod-spacing-field" id="rod-spacing-y-row" hidden>
+          <div class="field-row rod-spacing-field" id="rod-spacing-y-row" aria-disabled="true">
             <label for="rod-spacing-y">
-              Intermediate rod spacing in y-direction (<span class="unit-label-ft">ft</span><span class="unit-label-m" hidden>m</span>, 0 = corners only)
+              Interstitial rod spacing in y-direction (<span class="unit-label-ft">ft</span><span class="unit-label-m" hidden>m</span>, 0 = corners only)
             </label>
-            <input type="number" id="rod-spacing-y" min="0" step="0.1"
+            <input type="number" id="rod-spacing-y" min="0" step="0.1" disabled
                    value="0" aria-describedby="rod-spacing-y-hint">
             <p id="rod-spacing-y-hint" class="field-hint">
               Target spacing between rod rows along L<sub>y</sub>. Set x and y spacing to place rods throughout the grid.
             </p>
           </div>
+
+          <p id="rod-layout-hint" class="field-hint">
+            Enable “Include perimeter / corner ground rods” to activate interstitial rod spacing.
+          </p>
         </fieldset>
 
         <!-- Electrical Parameters -->

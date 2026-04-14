@@ -92,3 +92,7 @@
 .grid-visual-panel {
   margin-top: 1rem;
 }
+
+.rod-spacing-field-disabled {
+  opacity: 0.66;
+}
