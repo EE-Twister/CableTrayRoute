@@ -254,4 +254,21 @@ describe('analyzeGroundGrid — integration', () => {
     const r = analyzeGroundGrid(base);
     assert.strictEqual(typeof r.gprExceedsTouch, 'boolean');
   });
+
+  it('additional rods reduce Rg by increasing effective buried length', () => {
+    const withoutRods = analyzeGroundGrid({ ...base, hasRods: false });
+    const withRods = analyzeGroundGrid({
+      ...base,
+      hasRods: true,
+      rodCount: 12,
+      rodLength: 3,
+    });
+    assert.ok(withRods.totalRodLength > 0);
+    assert.ok(withRods.effectiveLength > withoutRods.effectiveLength);
+    assert.ok(withRods.Rg < withoutRods.Rg);
+  });
+
+  it('throws for negative rod length', () => {
+    assert.throws(() => analyzeGroundGrid({ ...base, hasRods: true, rodCount: 4, rodLength: -1 }));
+  });
 });

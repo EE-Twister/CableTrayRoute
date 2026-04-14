@@ -160,7 +160,9 @@ export function tolerableStep(Cs, rhoS, tf, bw) {
  * @param {number} params.d         Conductor diameter (m)
  * @param {number} params.Ig        Maximum grid current (A)
  * @param {number} params.tf        Fault duration (s)
- * @param {boolean} [params.hasRods]  Whether corner/perimeter ground rods are present
+ * @param {boolean} [params.hasRods]  Whether ground rods are present
+ * @param {number}  [params.rodCount] Number of rods tied to the grid
+ * @param {number}  [params.rodLength] Length of each rod (m)
  * @param {number}  [params.rhoS]   Surface layer resistivity (Ω·m); 0 = no layer
  * @param {number}  [params.hs]     Surface layer thickness (m); 0 = no layer
  * @param {50|70}   [params.bw]     Body weight for tolerable limits (kg, default 70)
@@ -170,6 +172,8 @@ export function analyzeGroundGrid(params) {
   const {
     rho, gridLx, gridLy, nx, ny, h, d, Ig, tf,
     hasRods = false,
+    rodCount = hasRods ? 4 : 0,
+    rodLength = 0,
     rhoS = 0,
     hs = 0,
     bw = 70
@@ -183,11 +187,15 @@ export function analyzeGroundGrid(params) {
   if (d <= 0) throw new Error('Conductor diameter must be positive');
   if (Ig <= 0) throw new Error('Grid current must be positive');
   if (tf <= 0) throw new Error('Fault duration must be positive');
+  if (!Number.isFinite(rodCount) || rodCount < 0) throw new Error('Rod count must be non-negative');
+  if (!Number.isFinite(rodLength) || rodLength < 0) throw new Error('Rod length must be non-negative');
 
   // Grid geometry
   const A = gridLx * gridLy;                         // Grid area (m²)
   const Lp = 2 * (gridLx + gridLy);                  // Perimeter (m)
   const conductorLength = nx * gridLx + ny * gridLy;  // Total buried length (m)
+  const totalRodLength = hasRods ? rodCount * rodLength : 0;
+  const effectiveLength = conductorLength + totalRodLength;
 
   // Mesh spacing (average for non-square grids)
   const Dx = gridLx / (ny - 1);  // spacing between conductors running in x-direction
@@ -195,7 +203,7 @@ export function analyzeGroundGrid(params) {
   const D = Math.sqrt(Dx * Dy);  // geometric mean spacing
 
   // Effective n
-  const n = effectiveN(conductorLength, Lp, A);
+  const n = effectiveN(effectiveLength, Lp, A);
 
   // Km and Ks
   const Km = meshFactor(D, h, d, n, hasRods);
@@ -204,11 +212,11 @@ export function analyzeGroundGrid(params) {
 
   // Lm and Ls — effective lengths for voltage calculations (IEEE 80-2013 §16.5)
   // For grids without ground rods: Lm = Ls = L
-  const Lm = conductorLength;
-  const Ls = conductorLength;
+  const Lm = effectiveLength;
+  const Ls = effectiveLength;
 
   // Grid resistance
-  const Rg = gridResistance(rho, conductorLength, A, h);
+  const Rg = gridResistance(rho, effectiveLength, A, h);
 
   // Ground potential rise
   const GPR = Ig * Rg;
@@ -231,6 +239,10 @@ export function analyzeGroundGrid(params) {
     A,
     Lp,
     conductorLength,
+    totalRodLength,
+    effectiveLength,
+    rodCount,
+    rodLength,
     D,
     Dx,
     Dy,

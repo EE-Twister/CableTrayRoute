@@ -302,12 +302,33 @@ document.addEventListener('DOMContentLoaded', () => {
     const ny = getInt('ny');
     const Ig = getNum('grid-current');
     const tf = getNum('fault-duration');
+    const previewParams = getPreviewParams();
     const hasRods = document.getElementById('has-rods').checked;
+    const rodCount = hasRods ? previewParams.rodLayout.count : 0;
+    const rodLength = hasRods
+      ? (imperial ? ftToM(previewParams.rodLength) : previewParams.rodLength)
+      : 0;
     const bw = parseInt(document.getElementById('body-weight').value, 10);
 
     let r;
     try {
-      r = analyzeGroundGrid({ rho, gridLx, gridLy, nx, ny, h, d, Ig, tf, hasRods, rhoS, hs, bw });
+      r = analyzeGroundGrid({
+        rho,
+        gridLx,
+        gridLy,
+        nx,
+        ny,
+        h,
+        d,
+        Ig,
+        tf,
+        hasRods,
+        rodCount,
+        rodLength,
+        rhoS,
+        hs,
+        bw,
+      });
     } catch (err) {
       resultsDiv.innerHTML = `<p class="alert-error" role="alert">Error: ${err.message}</p>`;
       return;
@@ -339,6 +360,17 @@ document.addEventListener('DOMContentLoaded', () => {
 
     section.appendChild(renderResult('Grid Area (A)', areaDisplay, '', null));
     section.appendChild(renderResult('Total Conductor Length (L)', lDisplay, '', null));
+    if (r.totalRodLength > 0) {
+      const rodLengthDisplay = imperial
+        ? `${(r.totalRodLength / 0.3048).toFixed(1)} ft`
+        : `${r.totalRodLength.toFixed(1)} m`;
+      const effectiveLengthDisplay = imperial
+        ? `${(r.effectiveLength / 0.3048).toFixed(1)} ft`
+        : `${r.effectiveLength.toFixed(1)} m`;
+      section.appendChild(renderResult('Total Rod Length (ΣLr)', rodLengthDisplay, '', null));
+      section.appendChild(renderResult('Effective Buried Length (L + ΣLr)', effectiveLengthDisplay, '', null));
+      section.appendChild(renderResult('Rod Count', String(r.rodCount), '', null));
+    }
     section.appendChild(renderResult('Effective n', r.n.toFixed(2), '', null));
     section.appendChild(renderResult('Mesh Spacing Km', r.Km.toFixed(3), '', null));
     section.appendChild(renderResult('Step Factor Ks', r.Ks.toFixed(3), '', null));
