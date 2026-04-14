@@ -1,5 +1,6 @@
 import './src/components/navigation.js';
 import { getItem as getStoredItem, setItem as setStoredItem } from './dataStore.mjs';
+import { getProjectState, setProjectState } from './projectStorage.js';
 
 const STORAGE_KEY = 'customComponents';
 const STORAGE_SCENARIO = '__ctr_custom_components__';
@@ -73,6 +74,30 @@ let suppressTextControlEvents = false;
 const urlParams = new URLSearchParams(window.location.search);
 const initialEditSubtype = urlParams.get('edit');
 let editQueryHandled = false;
+
+function initializeUnitSelection() {
+  const unitSelect = document.getElementById('unit-select');
+  if (!unitSelect) return;
+  try {
+    unitSelect.value = getProjectState().settings?.units || 'imperial';
+  } catch (error) {
+    console.warn('Could not read unit setting:', error);
+    unitSelect.value = 'imperial';
+  }
+  unitSelect.addEventListener('change', (event) => {
+    try {
+      const project = getProjectState();
+      project.settings = project.settings || {};
+      project.settings.units = event.target.value === 'metric' ? 'metric' : 'imperial';
+      setProjectState(project);
+    } catch (error) {
+      console.warn('Could not save unit setting:', error);
+    }
+  });
+}
+
+initializeUnitSelection();
+
 function showToast(message, kind = 'info') {
   const toast = document.getElementById('custom-toast');
   if (!toast) return;
@@ -1673,4 +1698,3 @@ updateTable();
 setupListeners();
 handleInitialEditQuery();
 handlePalettePrefill();
-
