@@ -305,9 +305,18 @@
           Visual preview updates as you edit grid dimensions and conductor counts.
         </p>
         <div class="ground-grid-preview-wrap">
-          <svg id="ground-grid-preview" class="ground-grid-preview" viewBox="0 0 520 360"
-               role="img" aria-labelledby="grid-visual-title grid-preview-summary">
-          </svg>
+          <div class="ground-grid-preview-panel">
+            <h3>Layout / Top View</h3>
+            <svg id="ground-grid-preview-top" class="ground-grid-preview" viewBox="0 0 520 360"
+                 role="img" aria-label="Ground grid top view showing conductor matrix and spacing dimensions">
+            </svg>
+          </div>
+          <div class="ground-grid-preview-panel">
+            <h3>Section / Elevation View</h3>
+            <svg id="ground-grid-preview-elevation" class="ground-grid-preview" viewBox="0 0 520 360"
+                 role="img" aria-label="Ground grid elevation showing burial depth and layer bands">
+            </svg>
+          </div>
         </div>
       </section>
 
