@@ -39,20 +39,6 @@
       }
     },
     {
-      "type": "bus",
-      "subtype": "dc_bus",
-      "label": "DC Bus",
-      "icon": "icons/components/DCBus.svg",
-      "props": {
-        "tag": "",
-        "description": "",
-        "nominal_voltage_vdc": 750,
-        "grounding_scheme": "ungrounded",
-        "max_continuous_current_a": 1600,
-        "short_circuit_rating_ka": 35
-      }
-    },
-    {
       "type": "utility_source",
       "subtype": "utility",
       "label": "Utility",
@@ -236,7 +222,7 @@
         },
         {
           "DeviceType": "Transformer",
-          "PropertyName": "Connection Type (\u0394/Y)",
+          "PropertyName": "Connection Type (Δ/Y)",
           "PurposeUseCase": "Defines vector group and grounding",
           "NotesOrComments": "Determines phase shift"
         },
@@ -284,7 +270,7 @@
         },
         {
           "DeviceType": "Transformer",
-          "PropertyName": "Taps (\u00b1%)",
+          "PropertyName": "Taps (±%)",
           "PurposeUseCase": "For regulation modeling",
           "NotesOrComments": "Used in tap changer simulation"
         },
@@ -392,7 +378,7 @@
         },
         {
           "DeviceType": "Transformer",
-          "PropertyName": "Connection Type (\u0394/Y)",
+          "PropertyName": "Connection Type (Δ/Y)",
           "PurposeUseCase": "Defines vector group and grounding",
           "NotesOrComments": "Determines phase shift"
         },
@@ -440,7 +426,7 @@
         },
         {
           "DeviceType": "Transformer",
-          "PropertyName": "Taps (\u00b1%)",
+          "PropertyName": "Taps (±%)",
           "PurposeUseCase": "For regulation modeling",
           "NotesOrComments": "Used in tap changer simulation"
         },
@@ -547,7 +533,7 @@
         },
         {
           "DeviceType": "Transformer",
-          "PropertyName": "Connection Type (\u0394/Y)",
+          "PropertyName": "Connection Type (Δ/Y)",
           "PurposeUseCase": "Defines vector group and grounding",
           "NotesOrComments": "Determines phase shift"
         },
@@ -595,7 +581,7 @@
         },
         {
           "DeviceType": "Transformer",
-          "PropertyName": "Taps (\u00b1%)",
+          "PropertyName": "Taps (±%)",
           "PurposeUseCase": "For regulation modeling",
           "NotesOrComments": "Used in tap changer simulation"
         },
@@ -698,7 +684,7 @@
         },
         {
           "DeviceType": "Transformer",
-          "PropertyName": "Connection Type (\u0394/Y)",
+          "PropertyName": "Connection Type (Δ/Y)",
           "PurposeUseCase": "Defines vector group and grounding",
           "NotesOrComments": "Determines phase shift"
         },
@@ -746,7 +732,7 @@
         },
         {
           "DeviceType": "Transformer",
-          "PropertyName": "Taps (\u00b1%)",
+          "PropertyName": "Taps (±%)",
           "PurposeUseCase": "For regulation modeling",
           "NotesOrComments": "Used in tap changer simulation"
         },
@@ -1091,20 +1077,14 @@
         },
         {
           "DeviceType": "Fuse",
-          "PropertyName": "Let-Through I\u00b2t",
+          "PropertyName": "Let-Through I²t",
           "PurposeUseCase": "Supports incident energy calculations",
           "NotesOrComments": "Used in arc flash evaluations"
         }
       ],
       "ports": [
-        {
-          "x": 0,
-          "y": 20
-        },
-        {
-          "x": 80,
-          "y": 20
-        }
+        { "x": 0, "y": 20 },
+        { "x": 80, "y": 20 }
       ]
     },
     {
@@ -1240,7 +1220,7 @@
         },
         {
           "DeviceType": "Reactor",
-          "PropertyName": "Reactance (\u03a9 or %)",
+          "PropertyName": "Reactance (Ω or %)",
           "PurposeUseCase": "Defines impedance",
           "NotesOrComments": "Used for fault calc"
         },
@@ -1252,7 +1232,7 @@
         },
         {
           "DeviceType": "Reactor",
-          "PropertyName": "Connection Type (Y/\u0394)",
+          "PropertyName": "Connection Type (Y/Δ)",
           "PurposeUseCase": "Defines phase configuration",
           "NotesOrComments": "Grounding relevance"
         },
@@ -1334,13 +1314,13 @@
         },
         {
           "DeviceType": "Generator",
-          "PropertyName": "Transient Reactance (Xd\u2019)",
+          "PropertyName": "Transient Reactance (Xd’)",
           "PurposeUseCase": "Defines transient fault current",
           "NotesOrComments": "Key in protection"
         },
         {
           "DeviceType": "Generator",
-          "PropertyName": "Subtransient Reactance (Xd\u201d)",
+          "PropertyName": "Subtransient Reactance (Xd”)",
           "PurposeUseCase": "Defines short circuit current",
           "NotesOrComments": "Used in protection"
         },
@@ -1480,13 +1460,13 @@
         },
         {
           "DeviceType": "Generator",
-          "PropertyName": "Transient Reactance (Xd\u2019)",
+          "PropertyName": "Transient Reactance (Xd’)",
           "PurposeUseCase": "Defines transient fault current",
           "NotesOrComments": "Key in protection"
         },
         {
           "DeviceType": "Generator",
-          "PropertyName": "Subtransient Reactance (Xd\u201d)",
+          "PropertyName": "Subtransient Reactance (Xd”)",
           "PurposeUseCase": "Defines short circuit current",
           "NotesOrComments": "Used in protection"
         },
@@ -1662,25 +1642,6 @@
         "mva": 0.5,
         "thevenin_mva": 0.5,
         "battery_runtime_min": 15
-      }
-    },
-    {
-      "type": "meter",
-      "subtype": "meter",
-      "label": "Meter",
-      "icon": "icons/components/Meter.svg",
-      "props": {
-        "tag": "",
-        "description": "",
-        "manufacturer": "",
-        "model": "",
-        "meter_class": "revenue",
-        "ct_ratio": "",
-        "pt_ratio": "",
-        "sample_rate_hz": 1024,
-        "supports_thd": true,
-        "supports_flicker": false,
-        "supports_waveform_capture": false
       }
     },
     {
@@ -1887,13 +1848,13 @@
         },
         {
           "DeviceType": "Motor",
-          "PropertyName": "Transient Reactance (X\u2019d)",
+          "PropertyName": "Transient Reactance (X’d)",
           "PurposeUseCase": "Short circuit and stability studies",
           "NotesOrComments": "For dynamic machine modeling"
         },
         {
           "DeviceType": "Motor",
-          "PropertyName": "Subtransient Reactance (X\u201dd)",
+          "PropertyName": "Subtransient Reactance (X”d)",
           "PurposeUseCase": "Fault and transient current shaping",
           "NotesOrComments": "Key for symmetrical components"
         },
