@@ -1,11 +1,17 @@
 .ground-grid-preview-wrap {
   width: 100%;
-  overflow-x: auto;
+  display: grid;
+  gap: 1rem;
+  grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+}
+
+.ground-grid-preview-panel h3 {
+  margin: 0 0 0.5rem;
+  font-size: 1rem;
 }
 
 .ground-grid-preview {
   width: 100%;
-  max-width: 520px;
   aspect-ratio: 13 / 9;
   min-height: 260px;
   border: 1px solid var(--border-subtle, #ccd2dd);
@@ -29,6 +35,58 @@
   fill: var(--danger, #cf3f5c);
   stroke: var(--surface, #ffffff);
   stroke-width: 1.5;
+}
+
+.ground-grid-preview .grid-legend-box {
+  fill: color-mix(in srgb, var(--surface, #fff) 90%, transparent);
+  stroke: var(--border-subtle, #ccd2dd);
+}
+
+.ground-grid-preview .grid-legend-text,
+.ground-grid-preview .grid-dimension-text {
+  fill: var(--text-color, #1f2937);
+  font-size: 12px;
+  font-family: sans-serif;
+}
+
+.ground-grid-preview .grid-dimension-line,
+.ground-grid-preview .grid-dimension-arrow {
+  stroke: var(--text-muted, #546074);
+  stroke-width: 1.4;
+}
+
+.ground-grid-preview .grid-dimension-text {
+  text-anchor: middle;
+}
+
+.ground-grid-preview .grid-grade-line {
+  stroke: var(--border-strong, #5b6780);
+  stroke-width: 2;
+  stroke-dasharray: 5 3;
+}
+
+.ground-grid-preview .grid-layer-surface {
+  fill: color-mix(in srgb, var(--warning, #f7b84b) 28%, transparent);
+  stroke: var(--warning, #f7b84b);
+  stroke-width: 1;
+}
+
+.ground-grid-preview .grid-layer-soil {
+  fill: color-mix(in srgb, var(--surface-raised, #f7f9fd) 70%, #9db4d3 30%);
+  stroke: none;
+}
+
+.ground-grid-preview .grid-conductor-band {
+  fill: color-mix(in srgb, var(--accent, #0074d9) 35%, transparent);
+  stroke: var(--accent, #0074d9);
+  stroke-width: 1.2;
+}
+
+.ground-grid-preview .grid-trench-band {
+  fill: color-mix(in srgb, var(--accent, #0074d9) 15%, transparent);
+  stroke: color-mix(in srgb, var(--accent, #0074d9) 55%, transparent);
+  stroke-width: 1;
+  stroke-dasharray: 4 3;
 }
 
 .grid-visual-panel {
