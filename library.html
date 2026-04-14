@@ -158,9 +158,15 @@
       <textarea id="component-text" rows="10" cols="80"></textarea><br>
       <textarea id="icon-text" rows="10" cols="80"></textarea><br>
     </details>
-    <input type="file" id="library-upload" accept="application/json"><br>
+    <label for="library-import-mode">Import mode</label>
+    <select id="library-import-mode">
+      <option value="replace">Replace library</option>
+      <option value="merge">Merge into existing</option>
+    </select><br>
+    <input type="file" id="library-upload" accept=".xlsx,.xls,.csv,.json,application/json,text/csv,application/vnd.ms-excel,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"><br>
     <button id="component-save">Save</button>
     <button id="component-download">Download</button>
+    <button id="library-download-template">Download Template</button>
     <div class="cloud-actions">
       <button id="cloud-save-btn" title="Save library to your cloud account">Save to Cloud</button>
       <button id="cloud-load-btn" title="Reload library from cloud">Load from Cloud</button>
@@ -610,38 +616,255 @@
       }
     }
 
+    function parseBoolean(value) {
+      if (typeof value === 'boolean') return value;
+      if (typeof value !== 'string') return false;
+      const normalized = value.trim().toLowerCase();
+      return normalized === 'true' || normalized === 'yes' || normalized === '1';
+    }
+
+    function parseCsvLine(line) {
+      const values = [];
+      let current = '';
+      let inQuotes = false;
+      for (let i = 0; i < line.length; i += 1) {
+        const char = line[i];
+        if (char === '"') {
+          if (inQuotes && line[i + 1] === '"') {
+            current += '"';
+            i += 1;
+            continue;
+          }
+          inQuotes = !inQuotes;
+          continue;
+        }
+        if (char === ',' && !inQuotes) {
+          values.push(current);
+          current = '';
+          continue;
+        }
+        current += char;
+      }
+      values.push(current);
+      return values;
+    }
+
+    function parseCsvRows(text) {
+      const lines = text
+        .split(/\r?\n/)
+        .map((line) => line.trim())
+        .filter((line) => line.length > 0);
+      if (!lines.length) return [];
+      const headers = parseCsvLine(lines[0]).map((header) => header.trim());
+      return lines.slice(1).map((line) => {
+        const cols = parseCsvLine(line);
+        const row = {};
+        headers.forEach((header, index) => {
+          row[header] = String(cols[index] ?? '').trim();
+        });
+        return row;
+      });
+    }
+
+    function mapWorkbookRowsToLibrary(sheets) {
+      const componentsSheet = Array.isArray(sheets.Components) ? sheets.Components : [];
+      const categoriesSheet = Array.isArray(sheets.Categories) ? sheets.Categories : [];
+      const iconsSheet = Array.isArray(sheets.Icons) ? sheets.Icons : [];
+      const portsSheet = Array.isArray(sheets.Ports) ? sheets.Ports : [];
+      const schemaSheet = Array.isArray(sheets.Schema) ? sheets.Schema : [];
+
+      const portsBySubtype = {};
+      portsSheet.forEach((row) => {
+        const subtype = String(row.subtype || row.component || row.componentSubtype || '').trim();
+        if (!subtype) return;
+        const value = Number(row.ports ?? row.portCount ?? row.count ?? row.value);
+        if (Number.isFinite(value)) portsBySubtype[subtype] = value;
+      });
+
+      const schemaBySubtype = {};
+      schemaSheet.forEach((row) => {
+        const subtype = String(row.subtype || row.component || row.componentSubtype || '').trim();
+        if (!subtype) return;
+        if (row.schema) {
+          const parsed = parseJsonSafe(row.schema, null);
+          if (parsed && typeof parsed === 'object' && !Array.isArray(parsed)) {
+            schemaBySubtype[subtype] = parsed;
+            return;
+          }
+        }
+        const fieldName = String(row.field || row.name || '').trim();
+        if (!fieldName) return;
+        const target = schemaBySubtype[subtype] || {};
+        target[fieldName] = {
+          label: String(row.label || fieldName),
+          type: String(row.type || 'string'),
+          required: parseBoolean(row.required),
+        };
+        schemaBySubtype[subtype] = target;
+      });
+
+      const components = componentsSheet.map((row) => {
+        const subtype = String(row.subtype || row.id || '').trim();
+        const ports = Number(row.ports ?? row.portCount ?? portsBySubtype[subtype]);
+        const explicitSchema = parseJsonSafe(row.schema, null);
+        const schema = explicitSchema && typeof explicitSchema === 'object' && !Array.isArray(explicitSchema)
+          ? explicitSchema
+          : (schemaBySubtype[subtype] || {});
+        return {
+          subtype,
+          label: String(row.label || subtype || '').trim(),
+          category: String(row.category || '').trim(),
+          icon: String(row.icon || row.iconKey || '').trim(),
+          ports: Number.isFinite(ports) ? ports : NaN,
+          schema,
+        };
+      }).filter((component) => component.subtype);
+
+      const categories = categoriesSheet
+        .map((row) => String(row.category || row.name || row.value || '').trim())
+        .filter(Boolean);
+      if (!categories.length) {
+        components.forEach((component) => {
+          if (component.category) categories.push(component.category);
+        });
+      }
+
+      const icons = {};
+      iconsSheet.forEach((row) => {
+        const key = String(row.icon || row.key || '').trim();
+        const path = String(row.path || row.iconPath || '').trim();
+        if (key && path) icons[key] = path;
+      });
+
+      return {
+        categories: [...new Set(categories)],
+        components,
+        icons,
+      };
+    }
+
+    async function parseLibraryImportFile(file) {
+      const name = file.name.toLowerCase();
+      if (name.endsWith('.json')) {
+        const obj = parseJsonSafe(await file.text(), null);
+        if (!obj) throw new Error('Invalid JSON file.');
+        return {
+          version: obj.version || '',
+          payload: {
+            categories: Array.isArray(obj.categories) ? obj.categories : [],
+            components: Array.isArray(obj.components) ? obj.components : Array.isArray(obj) ? obj : [],
+            icons: obj && typeof obj.icons === 'object' && obj.icons ? obj.icons : {},
+          },
+        };
+      }
+      if (name.endsWith('.csv')) {
+        const rows = parseCsvRows(await file.text());
+        return {
+          version: '',
+          payload: mapWorkbookRowsToLibrary({ Components: rows }),
+        };
+      }
+      if (name.endsWith('.xlsx') || name.endsWith('.xls')) {
+        if (!globalThis.XLSX) {
+          throw new Error('Spreadsheet parser unavailable. Please import JSON or CSV instead.');
+        }
+        const data = new Uint8Array(await file.arrayBuffer());
+        const workbook = XLSX.read(data, { type: 'array' });
+        const sheets = {};
+        workbook.SheetNames.forEach((sheetName) => {
+          const sheet = workbook.Sheets[sheetName];
+          sheets[sheetName] = XLSX.utils.sheet_to_json(sheet, { defval: '' });
+        });
+        return {
+          version: '',
+          payload: mapWorkbookRowsToLibrary(sheets),
+        };
+      }
+      throw new Error('Unsupported file type. Use .xlsx, .xls, .csv, or .json.');
+    }
+
+    function mergeLibraryPayload(currentPayload, incomingPayload) {
+      const categories = [...new Set([
+        ...(Array.isArray(currentPayload.categories) ? currentPayload.categories : []),
+        ...(Array.isArray(incomingPayload.categories) ? incomingPayload.categories : []),
+      ])];
+      const componentMap = new Map();
+      (Array.isArray(currentPayload.components) ? currentPayload.components : []).forEach((component) => {
+        if (component?.subtype) componentMap.set(component.subtype, component);
+      });
+      (Array.isArray(incomingPayload.components) ? incomingPayload.components : []).forEach((component) => {
+        if (component?.subtype) componentMap.set(component.subtype, component);
+      });
+      return {
+        categories,
+        components: Array.from(componentMap.values()),
+        icons: {
+          ...(currentPayload.icons || {}),
+          ...(incomingPayload.icons || {}),
+        },
+      };
+    }
+
+    async function downloadLibraryTemplateWorkbook() {
+      if (!globalThis.XLSX) {
+        await showAlertModal(
+          'Template Export Unavailable',
+          'Spreadsheet template generation needs XLSX runtime. Use JSON or CSV import for now.'
+        );
+        return;
+      }
+      const workbook = XLSX.utils.book_new();
+      XLSX.utils.book_append_sheet(workbook, XLSX.utils.json_to_sheet([{
+        subtype: 'MCC',
+        label: 'Motor Control Center',
+        category: 'equipment',
+        icon: 'icons/components/MCC.svg',
+        ports: 2,
+        schema: '{"voltage":{"label":"Voltage","type":"number"}}',
+      }]), 'Components');
+      XLSX.utils.book_append_sheet(workbook, XLSX.utils.json_to_sheet([
+        { category: 'equipment' },
+        { category: 'panel' },
+      ]), 'Categories');
+      XLSX.utils.book_append_sheet(workbook, XLSX.utils.json_to_sheet([
+        { icon: 'icons/components/MCC.svg', path: 'icons/components/MCC.svg' },
+      ]), 'Icons');
+      XLSX.utils.book_append_sheet(workbook, XLSX.utils.json_to_sheet([
+        { subtype: 'MCC', ports: 2 },
+      ]), 'Ports');
+      XLSX.utils.book_append_sheet(workbook, XLSX.utils.json_to_sheet([
+        { subtype: 'MCC', schema: '{"voltage":{"label":"Voltage","type":"number"}}' },
+      ]), 'Schema');
+      XLSX.writeFile(workbook, 'library-template.xlsx');
+    }
+
     // -------------------------------------------------------------------------
     // File upload
     // -------------------------------------------------------------------------
-    function handleUpload(e) {
+    async function handleUpload(e) {
       const file = e.target.files[0];
       if (!file) return;
-      const reader = new FileReader();
-      reader.onload = () => {
-        try {
-          const obj = JSON.parse(reader.result);
-          const version = obj.version || '';
-          const components = Array.isArray(obj.components)
-            ? obj.components
-            : Array.isArray(obj)
-            ? obj
-            : [];
-          const categories = Array.isArray(obj.categories) ? obj.categories : [];
-          const icons = obj.icons || {};
-          const validation = validateLibraryPayload({ categories, components, icons });
-          const hasErrors = validation.errors.some((item) => item.severity !== 'warning');
-          if (hasErrors) {
-            showAlertModal('Invalid File', renderValidationErrors(validation.errors));
-            return;
-          }
-          document.getElementById('library-version').value = version;
-          hydrateStructuredState({ categories, components }, icons);
-          setStatus('pending', '⟳ Unsaved');
-        } catch {
-          showAlertModal('Invalid File', 'Please select a valid JSON library file.');
+      try {
+        const parsed = await parseLibraryImportFile(file);
+        const importMode = document.getElementById('library-import-mode').value;
+        const nextPayload = importMode === 'merge'
+          ? mergeLibraryPayload(getStructuredPayload(), parsed.payload)
+          : parsed.payload;
+        const validation = validateLibraryPayload(nextPayload);
+        const hasErrors = validation.errors.some((item) => item.severity !== 'warning');
+        if (hasErrors) {
+          await showAlertModal('Invalid File', renderValidationErrors(validation.errors));
+          return;
         }
-      };
-      reader.readAsText(file);
+        if (parsed.version) document.getElementById('library-version').value = parsed.version;
+        hydrateStructuredState({
+          categories: nextPayload.categories,
+          components: nextPayload.components,
+        }, nextPayload.icons);
+        setStatus('pending', '⟳ Unsaved');
+      } catch (error) {
+        await showAlertModal('Invalid File', error?.message || 'Please select a valid library import file.');
+      }
     }
 
     // -------------------------------------------------------------------------
@@ -814,6 +1037,7 @@
     // -------------------------------------------------------------------------
     document.getElementById('component-save').addEventListener('click', saveComponents);
     document.getElementById('component-download').addEventListener('click', downloadComponents);
+    document.getElementById('library-download-template').addEventListener('click', downloadLibraryTemplateWorkbook);
     document.getElementById('library-upload').addEventListener('change', handleUpload);
     document.getElementById('manufacturer-save').addEventListener('click', () => save('manufacturer-text', 'manufacturerDefaults'));
     document.getElementById('manufacturer-download').addEventListener('click', () => download('manufacturer-text', 'manufacturerLibrary.json'));
