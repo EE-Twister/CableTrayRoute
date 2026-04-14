@@ -70,6 +70,41 @@ export function runValidation(components = [], studies = {}) {
     }
   });
 
+  // Battery required field completeness for DC short-circuit and battery studies
+  components.forEach(c => {
+    const isBattery = c?.type === 'battery' || c?.subtype === 'battery';
+    if (!isBattery) return;
+    const props = c.props && typeof c.props === 'object' ? c.props : c;
+    const missing = [];
+    if (!`${props.tag ?? ''}`.trim()) missing.push('tag');
+    if (!`${props.description ?? ''}`.trim()) missing.push('description');
+    if (!`${props.manufacturer ?? ''}`.trim()) missing.push('manufacturer');
+    if (!`${props.model ?? ''}`.trim()) missing.push('model');
+    const nominalVoltageVdc = Number(props.nominal_voltage_vdc);
+    if (!Number.isFinite(nominalVoltageVdc) || nominalVoltageVdc <= 0) missing.push('nominal_voltage_vdc');
+    if (!`${props.cell_chemistry ?? ''}`.trim()) missing.push('cell_chemistry');
+    const cellCount = Number(props.cell_count);
+    if (!Number.isFinite(cellCount) || cellCount <= 0) missing.push('cell_count');
+    const capacityAh = Number(props.capacity_ah);
+    if (!Number.isFinite(capacityAh) || capacityAh <= 0) missing.push('capacity_ah');
+    const internalResistanceOhm = Number(props.internal_resistance_ohm);
+    if (!Number.isFinite(internalResistanceOhm) || internalResistanceOhm < 0) missing.push('internal_resistance_ohm');
+    const initialSocPct = Number(props.initial_soc_pct);
+    if (!Number.isFinite(initialSocPct) || initialSocPct < 0 || initialSocPct > 100) missing.push('initial_soc_pct');
+    const minSocPct = Number(props.min_soc_pct);
+    if (!Number.isFinite(minSocPct) || minSocPct < 0 || minSocPct > 100) missing.push('min_soc_pct');
+    const maxChargeCurrentA = Number(props.max_charge_current_a);
+    if (!Number.isFinite(maxChargeCurrentA) || maxChargeCurrentA <= 0) missing.push('max_charge_current_a');
+    const maxDischargeCurrentA = Number(props.max_discharge_current_a);
+    if (!Number.isFinite(maxDischargeCurrentA) || maxDischargeCurrentA <= 0) missing.push('max_discharge_current_a');
+    if (missing.length) {
+      issues.push({
+        component: c.id,
+        message: `Battery missing required attributes: ${missing.join(', ')}.`
+      });
+    }
+  });
+
   // DC bus required field completeness for DC-focused studies
   components.forEach(c => {
     const isDcBus = c?.subtype === 'dc_bus';

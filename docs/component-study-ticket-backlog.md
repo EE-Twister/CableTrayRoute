@@ -13,6 +13,8 @@ This ticket set translates the current component/attribute gaps into implementat
 ## CTR-COMP-001 — Add `battery` one-line component
 **Component:** Stationary battery / battery bank.
 
+**Status:** Completed on April 14, 2026.
+
 **Study impact:** DC short circuit, DC arc flash, battery / UPS sizing, time-series dispatch.
 
 **Required attributes (minimum):**

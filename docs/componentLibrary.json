@@ -1705,6 +1705,27 @@
       }
     },
     {
+      "type": "battery",
+      "subtype": "battery",
+      "label": "Battery",
+      "icon": "icons/components/UPS.svg",
+      "props": {
+        "tag": "",
+        "description": "",
+        "manufacturer": "",
+        "model": "",
+        "nominal_voltage_vdc": 480,
+        "cell_chemistry": "li_ion",
+        "cell_count": 144,
+        "capacity_ah": 200,
+        "internal_resistance_ohm": 0.05,
+        "initial_soc_pct": 50,
+        "min_soc_pct": 20,
+        "max_charge_current_a": 100,
+        "max_discharge_current_a": 100
+      }
+    },
+    {
       "type": "meter",
       "subtype": "meter",
       "label": "Meter",
