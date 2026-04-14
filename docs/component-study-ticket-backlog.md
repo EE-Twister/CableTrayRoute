@@ -67,6 +67,8 @@ This ticket set translates the current component/attribute gaps into implementat
 ## CTR-COMP-004 — Add `meter` component (PQM / energy meter)
 **Component:** Revenue or power quality meter.
 
+**Status:** Completed on April 14, 2026.
+
 **Study impact:** Harmonics, load profile calibration, energy analytics, reporting.
 
 **Required attributes (minimum):**
