@@ -156,3 +156,38 @@ Each browser profile and device maintains its own pricing book. For team use, ex
 ## XLSX Export
 
 When exporting the estimate to XLSX, the **Summary** sheet includes a "Pricing basis" row identifying whether default or custom pricing was used, along with the source name and date. This provides an audit trail in the delivered estimate document.
+
+
+---
+
+## Workflow Assumptions and Validation Expectations
+
+This section summarizes the behavior expected by integration checks and user workflows for `costestimate.html`.
+
+### Input assumptions
+
+- At least one schedule category (cable, tray, or conduit) is present in project data before generating a meaningful estimate.
+- Contingency is a numeric percent, typically in the `0` to `100` UI range.
+- Pricing source is either built-in defaults or imported CSV values, with manual labor/fitting overrides taking precedence when entered.
+
+### Expected outputs
+
+- The UI renders category subtotals, subtotal before contingency, contingency amount, and grand total.
+- Displayed currency is rounded for readability in UI tables, while internal/exported values retain full calculation precision where applicable.
+- Empty project data yields guidance text instead of broken or blank result tables.
+
+### Compliance interpretation
+
+- For Cost Estimator workflows, “compliance” means **formula and validation contract compliance** with automated checks (correct math, deterministic rounding behavior, and guardrails), not code/regulatory compliance.
+
+### Export behavior
+
+- **Export XLSX** is intentionally blocked until an estimate is generated.
+- The exported workbook is expected to align with on-screen totals for the same run and include pricing basis metadata for traceability.
+
+### Troubleshooting (common validation failures)
+
+- **No data message shown after Generate Estimate**: load/import project schedule data and rerun.
+- **Unexpected contingency result**: verify contingency is numeric and in range; malformed values can trigger fallback handling.
+- **Export blocked with warning**: run **Generate Estimate** first in the current state, then retry **Export XLSX**.
+- **Imported CSV appears partially applied**: check warning dialog for skipped rows (invalid category/key/price) and correct the CSV.
