@@ -1055,7 +1055,7 @@ const manufacturerModels = {
   Generac: ['G2000', 'Industrial']
 };
 
-function createCapacitorField(name, label, type, help) {
+function createTuningField(name, label, type, help) {
   return {
     name,
     label,
@@ -1080,6 +1080,8 @@ function createCapacitorField(name, label, type, help) {
           const parsed = parseFloat(raw);
           value = Number.isFinite(parsed) ? parsed : '';
         }
+      } else if (type === 'checkbox') {
+        value = raw === true || raw === 'true' || raw === 'on' || raw === 1;
       } else {
         value = raw ?? '';
       }
@@ -1093,21 +1095,33 @@ function createCapacitorField(name, label, type, help) {
 }
 
 const capacitorBankPropertyFields = [
-  createCapacitorField('rated_voltage_kv', 'Rated Voltage (kV)', 'number',
+  createTuningField('rated_kvar', 'Rated Reactive Power (kVAR)', 'number',
+    'Defines compensation capacity for capacitor/reactor studies.'),
+  createTuningField('rated_kv', 'Rated Voltage (kV)', 'number',
+    'Defines operating voltage for harmonic and compensation studies.'),
+  createTuningField('steps', 'Steps (#)', 'number',
+    'Defines switching granularity. Used for staged bank control.'),
+  createTuningField('detuned', 'Detuned Reactor Installed', 'checkbox',
+    'Flags whether detuned operation is enabled for resonance mitigation.'),
+  createTuningField('tuning_hz', 'Tuning Frequency (Hz)', 'number',
+    'Defines detuned tuning point used in harmonic resonance checks.'),
+  createTuningField('reactor_pct', 'Reactor Percent (%)', 'number',
+    'Defines series reactor percentage used for detuning calculations.'),
+  createTuningField('switching_transient_class', 'Switching Transient Class', 'text',
+    'Defines switching duty/transient class for capacitor bank operation.'),
+  createTuningField('rated_voltage_kv', 'Legacy Rated Voltage (kV)', 'number',
     'Defines operating voltage. Used in power factor correction.'),
-  createCapacitorField('reactive_power_kvar', 'Reactive Power (kVAR)', 'number',
+  createTuningField('reactive_power_kvar', 'Legacy Reactive Power (kVAR)', 'number',
     'Defines compensation capacity. Used in VAR support.'),
-  createCapacitorField('connection_type', 'Connection Type (Y or Δ)', 'text',
+  createTuningField('connection_type', 'Connection Type (Y or Δ)', 'text',
     'Defines grounding scheme. Used in circuit calc.'),
-  createCapacitorField('steps', 'Steps (#)', 'number',
-    'Defines switching granularity. Used for control logic.'),
-  createCapacitorField('losses', 'Losses (W or %)', 'text',
+  createTuningField('losses', 'Losses (W or %)', 'text',
     'Defines dielectric loss. Used for heat calc.'),
-  createCapacitorField('discharge_resistor_mohm', 'Discharge Resistor (MΩ)', 'number',
+  createTuningField('discharge_resistor_mohm', 'Discharge Resistor (MΩ)', 'number',
     'Defines safety discharge. Used in transient modeling.'),
-  createCapacitorField('harmonic_impedance', 'Harmonic Impedance', 'text',
+  createTuningField('harmonic_impedance', 'Harmonic Impedance', 'text',
     'Defines frequency response. Used in harmonic study.'),
-  createCapacitorField('control_mode', 'Control Mode (manual/auto)', 'text',
+  createTuningField('control_mode', 'Control Mode (manual/auto)', 'text',
     'Defines operation behavior. Used in network control.')
 ];
 
@@ -1139,8 +1153,8 @@ function resolveIconSource(iconPath, fallbackSymbol) {
 }
 
 
-function ensureCapacitorBankPropertyMetadata() {
-  const targets = new Set(['CapacitorBank', 'shunt_capacitor_bank']);
+function ensureCapacitorReactorPropertyMetadata() {
+  const targets = new Set(['CapacitorBank', 'shunt_capacitor_bank', 'reactor']);
   const ensureMetaDefaults = meta => {
     if (!meta || typeof meta !== 'object') return;
     if (!meta.props || typeof meta.props !== 'object') {
@@ -1157,22 +1171,23 @@ function ensureCapacitorBankPropertyMetadata() {
     const subtype = (meta.subtype || '').trim();
     const type = (meta.type || '').trim();
     const category = (meta.category || '').trim();
-    if (subtype === 'CapacitorBank' || subtype === 'shunt_capacitor_bank') {
+    if (subtype === 'CapacitorBank' || subtype === 'shunt_capacitor_bank' || subtype === 'reactor') {
       targets.add(subtype);
       targets.add(key);
       if (type) targets.add(compKey(type, subtype));
       if (category) targets.add(compKey(category, subtype));
       ensureMetaDefaults(meta);
     }
-    if (type === 'shunt_capacitor_bank') {
+    if (type === 'shunt_capacitor_bank' || type === 'reactor') {
       targets.add(type);
       if (subtype) targets.add(compKey(type, subtype));
       targets.add(key);
       ensureMetaDefaults(meta);
     }
   });
-  ['equipment', 'load', 'shunt_capacitor_bank'].forEach(type => {
+  ['equipment', 'load', 'shunt_capacitor_bank', 'reactor'].forEach(type => {
     targets.add(compKey(type, 'CapacitorBank'));
+    targets.add(compKey(type, 'reactor'));
   });
   targets.forEach(key => {
     if (!key) return;
@@ -1284,7 +1299,7 @@ async function loadComponentLibrary() {
 
   builtinComponents.forEach(def => registerDefinition(def, { allowOverride: false }));
 
-  ensureCapacitorBankPropertyMetadata();
+  ensureCapacitorReactorPropertyMetadata();
 
   buildPalette();
   refreshAttributeOptions();
