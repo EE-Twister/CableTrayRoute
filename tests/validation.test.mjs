@@ -349,6 +349,81 @@ describe('runValidation - panel required attributes', () => {
   });
 });
 
+describe('runValidation - switchboard required attributes', () => {
+  it('flags a switchboard when required fields are missing', () => {
+    const components = [
+      {
+        id: 'switchboard-ref',
+        type: 'bus',
+        connections: [{ target: 'swbd-1' }]
+      },
+      {
+        id: 'swbd-1',
+        type: 'switchboard',
+        subtype: 'switchboard',
+        connections: [{ target: 'switchboard-ref' }],
+        props: {
+          tag: '',
+          description: '',
+          manufacturer: '',
+          model: '',
+          rated_voltage_kv: 0,
+          phases: 0,
+          bus_rating_a: '',
+          withstand_1s_ka: '',
+          interrupting_ka: null,
+          arc_resistant_type: '',
+          maintenance_mode_supported: 'yes'
+        }
+      }
+    ];
+    const issues = runValidation(components, {});
+    const switchboardIssue = issues.find(issue => issue.component === 'swbd-1');
+    assert.ok(switchboardIssue);
+    assert.ok(switchboardIssue.message.includes('tag'));
+    assert.ok(switchboardIssue.message.includes('description'));
+    assert.ok(switchboardIssue.message.includes('manufacturer'));
+    assert.ok(switchboardIssue.message.includes('model'));
+    assert.ok(switchboardIssue.message.includes('rated_voltage_kv'));
+    assert.ok(switchboardIssue.message.includes('phases'));
+    assert.ok(switchboardIssue.message.includes('bus_rating_a'));
+    assert.ok(switchboardIssue.message.includes('withstand_1s_ka'));
+    assert.ok(switchboardIssue.message.includes('interrupting_ka'));
+    assert.ok(switchboardIssue.message.includes('arc_resistant_type'));
+    assert.ok(switchboardIssue.message.includes('maintenance_mode_supported'));
+  });
+
+  it('does not flag a switchboard with all required fields present', () => {
+    const components = [
+      {
+        id: 'switchboard-ref-2',
+        type: 'bus',
+        connections: [{ target: 'swbd-2' }]
+      },
+      {
+        id: 'swbd-2',
+        type: 'switchboard',
+        subtype: 'switchboard',
+        connections: [{ target: 'switchboard-ref-2' }],
+        props: {
+          tag: 'SWBD-MAIN',
+          description: 'Main LV switchboard',
+          manufacturer: 'Eaton',
+          model: 'Pow-R-Line',
+          rated_voltage_kv: 0.48,
+          phases: 3,
+          bus_rating_a: 4000,
+          withstand_1s_ka: 65,
+          interrupting_ka: 65,
+          arc_resistant_type: 'type_2b',
+          maintenance_mode_supported: true
+        }
+      }
+    ];
+    assert.deepStrictEqual(runValidation(components, {}), []);
+  });
+});
+
 describe('runValidation - TCC duty violations', () => {
   it('passes through duty violation messages from studies', () => {
     const studies = {
