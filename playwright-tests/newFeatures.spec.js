@@ -112,13 +112,64 @@ test.describe('International Cable Sizing', () => {
 // Ground Grid Analysis
 // -------------------------------------------------------------------------
 test.describe('Ground Grid Analysis', () => {
+  let consoleErrors = [];
+
   test.beforeEach(async ({ page }) => {
+    consoleErrors = [];
+    page.on('console', msg => {
+      if (msg.type() !== 'error') {
+        return;
+      }
+      const text = msg.text();
+      if (/NotFoundError|hash failed/i.test(text)) {
+        consoleErrors.push(text);
+      }
+    });
+
     await page.goto(pageUrl('groundgrid.html?e2e=1&e2e_reset=1'));
     await page.waitForLoadState('networkidle');
   });
 
+  test.afterEach(() => {
+    expect(consoleErrors, `Unexpected console errors: ${(consoleErrors || []).join(' | ')}`).toEqual([]);
+  });
+
   test('page loads with the correct title', async ({ page }) => {
     await expect(page.locator('h1')).toContainText('Ground Grid');
+  });
+
+  test('renders preview geometry after load and after parameter edits', async ({ page }) => {
+    const topPreview = page.locator('#ground-grid-preview-top');
+    const elevationPreview = page.locator('#ground-grid-preview-elevation');
+    const legacyPreview = page.locator('#ground-grid-preview');
+    const hasTopElevation = await topPreview.count();
+    const activePreview = hasTopElevation > 0 ? topPreview : legacyPreview;
+    const activeElevation = hasTopElevation > 0 ? elevationPreview : legacyPreview;
+
+    expect(await activePreview.locator('*').count()).toBeGreaterThan(1);
+    expect(await activeElevation.locator('*').count()).toBeGreaterThan(1);
+
+    await page.fill('#grid-lx', '180');
+    await page.fill('#grid-ly', '150');
+    await page.fill('#nx', '9');
+    await page.fill('#ny', '8');
+    await page.fill('#burial-depth', '2.2');
+    await page.fill('#surface-hs', '0.6');
+    await page.locator('#grid-lx').dispatchEvent('input');
+
+    await expect(activePreview.locator('line.grid-conductor')).toHaveCount(17);
+    await expect(activePreview.locator('rect.grid-outline')).toHaveCount(1);
+    await expect(activeElevation.locator('rect.grid-conductor-band')).toHaveCount(1);
+  });
+
+  test('shows rod markers when rods are enabled', async ({ page }) => {
+    const topPreview = page.locator('#ground-grid-preview-top');
+    await page.locator('#has-rods').check();
+    await page.locator('#has-rods').dispatchEvent('input');
+    await expect(topPreview.locator('circle.grid-rod')).toHaveCount(5);
+
+    const elevationPreview = page.locator('#ground-grid-preview-elevation');
+    await expect(elevationPreview.locator('line.grid-rod')).toHaveCount(1);
   });
 
   test('has all required input fields', async ({ page }) => {
