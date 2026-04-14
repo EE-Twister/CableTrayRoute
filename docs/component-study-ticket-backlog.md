@@ -51,6 +51,8 @@ This ticket set translates the current component/attribute gaps into implementat
 ## CTR-COMP-003 — Add `switchboard` / switchgear lineup component
 **Component:** LV/MV switchboard block.
 
+**Status:** Completed on April 14, 2026.
+
 **Study impact:** Short circuit, arc flash, protection coordination, protection zones.
 
 **Required attributes (minimum):**

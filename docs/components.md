@@ -34,6 +34,12 @@ Each subtype in `componentLibrary.json` may include these properties in its sche
 - DC bus fields include `tag`, `description`, `nominal_voltage_vdc`, `grounding_scheme`, `max_continuous_current_a`, and `short_circuit_rating_ka`.
 - Validation flags DC bus records missing any of the required DC study fields so DC short-circuit and DC arc-flash workflows do not run on incomplete bus metadata.
 
+## Switchboard component fields
+
+- The one-line palette now includes a `switchboard` subtype for LV/MV lineup modeling.
+- Switchboard fields include `tag`, `description`, `manufacturer`, `model`, `rated_voltage_kv`, `phases`, `bus_rating_a`, `withstand_1s_ka`, `interrupting_ka`, `arc_resistant_type`, and `maintenance_mode_supported`.
+- Validation flags switchboard records missing any required short-circuit and protection metadata so study inputs are complete before execution.
+
 ## UI consistency checklist
 
 Use this checklist when shipping UI updates so layout and component styling stay aligned with shared tokens:

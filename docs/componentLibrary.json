@@ -73,6 +73,26 @@
       }
     },
     {
+      "type": "switchboard",
+      "subtype": "switchboard",
+      "label": "Switchboard",
+      "icon": "icons/components/Switchboard.svg",
+      "iconIEC": "icons/components/iec/IEC_Breaker.svg",
+      "props": {
+        "tag": "",
+        "description": "",
+        "manufacturer": "",
+        "model": "",
+        "rated_voltage_kv": 0.48,
+        "phases": 3,
+        "bus_rating_a": 4000,
+        "withstand_1s_ka": 65,
+        "interrupting_ka": 65,
+        "arc_resistant_type": "none",
+        "maintenance_mode_supported": false
+      }
+    },
+    {
       "type": "utility_source",
       "subtype": "utility",
       "label": "Utility",

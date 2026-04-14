@@ -120,6 +120,36 @@ export function runValidation(components = [], studies = {}) {
     }
   });
 
+  // Switchboard required field completeness for fault/protection studies
+  components.forEach(c => {
+    const isSwitchboard = c?.type === 'switchboard' || c?.subtype === 'switchboard';
+    if (!isSwitchboard) return;
+    const props = c.props && typeof c.props === 'object' ? c.props : c;
+    const missing = [];
+    if (!`${props.tag ?? ''}`.trim()) missing.push('tag');
+    if (!`${props.description ?? ''}`.trim()) missing.push('description');
+    if (!`${props.manufacturer ?? ''}`.trim()) missing.push('manufacturer');
+    if (!`${props.model ?? ''}`.trim()) missing.push('model');
+    const ratedVoltageKv = Number(props.rated_voltage_kv);
+    if (!Number.isFinite(ratedVoltageKv) || ratedVoltageKv <= 0) missing.push('rated_voltage_kv');
+    const phases = Number(props.phases);
+    if (!Number.isFinite(phases) || phases <= 0) missing.push('phases');
+    const busRatingA = Number(props.bus_rating_a);
+    if (!Number.isFinite(busRatingA) || busRatingA <= 0) missing.push('bus_rating_a');
+    const withstand1sKa = Number(props.withstand_1s_ka);
+    if (!Number.isFinite(withstand1sKa) || withstand1sKa <= 0) missing.push('withstand_1s_ka');
+    const interruptingKa = Number(props.interrupting_ka);
+    if (!Number.isFinite(interruptingKa) || interruptingKa <= 0) missing.push('interrupting_ka');
+    if (!`${props.arc_resistant_type ?? ''}`.trim()) missing.push('arc_resistant_type');
+    if (typeof props.maintenance_mode_supported !== 'boolean') missing.push('maintenance_mode_supported');
+    if (missing.length) {
+      issues.push({
+        component: c.id,
+        message: `Switchboard missing required attributes: ${missing.join(', ')}.`
+      });
+    }
+  });
+
   // TCC duty/coordination violations from studies
   Object.entries(studies.duty || {}).forEach(([id, msgs = []]) => {
     msgs.forEach(msg => issues.push({ component: id, message: msg }));
