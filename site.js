@@ -517,15 +517,15 @@ async function updateProjectDisplay(snapshot){
     let span=document.getElementById('project-display');
     if(!span){
       const nav=document.querySelector('.top-nav .nav-links');
-      const settingsBtn=document.getElementById('settings-btn');
       if(nav){
         span=document.createElement('span');
         span.id='project-display';
         span.style.marginLeft='auto';
         span.style.marginRight='var(--space-4)';
-        if(settingsBtn&&settingsBtn.parentNode===nav){
-          nav.insertBefore(span,settingsBtn);
-          settingsBtn.style.marginLeft='0';
+        const currentSettingsBtn=document.getElementById('settings-btn');
+        if(currentSettingsBtn&&currentSettingsBtn.parentNode===nav){
+          nav.insertBefore(span,currentSettingsBtn);
+          currentSettingsBtn.style.marginLeft='0';
         }else{
           nav.appendChild(span);
         }
@@ -946,7 +946,14 @@ function initSettings(){
     nameInput.value=initialProjectName;
     nameInput.dataset.originalName=(initialProjectName||'').trim();
     nameLabel.appendChild(nameInput);
-    settingsMenu.insertBefore(nameLabel,settingsMenu.firstChild);
+    if(!document.getElementById('project-name-input')&&nameLabel.parentNode!==settingsMenu){
+      const currentFirstChild=settingsMenu.firstChild;
+      if(currentFirstChild&&currentFirstChild.parentNode===settingsMenu){
+        settingsMenu.insertBefore(nameLabel,currentFirstChild);
+      }else{
+        settingsMenu.appendChild(nameLabel);
+      }
+    }
     nameInput.addEventListener('focus',()=>{
       try{nameInput.dataset.originalName=(getProjectState().name||'').trim();}
       catch{nameInput.dataset.originalName=nameInput.value.trim();}
@@ -1157,7 +1164,15 @@ function initDarkMode(){
       <option value="high-contrast">High Contrast</option>
     `;
     wrapper.appendChild(themeSelect);
-    settingsMenu.insertBefore(wrapper,settingsMenu.firstChild);
+    const currentThemeSelect=document.getElementById('theme-select');
+    if(!currentThemeSelect&&wrapper.parentNode!==settingsMenu){
+      const currentFirstChild=settingsMenu.firstChild;
+      if(currentFirstChild&&currentFirstChild.parentNode===settingsMenu){
+        settingsMenu.insertBefore(wrapper,currentFirstChild);
+      }else{
+        settingsMenu.appendChild(wrapper);
+      }
+    }
   }
 
   const resolveTheme=theme=>{
