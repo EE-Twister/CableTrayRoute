@@ -204,10 +204,34 @@ function getTransformerImpedance(xfmr, portIndex) {
 }
 
 function getSourceImpedance(comp) {
-  const mva = parseNumeric(pickValue(comp, 'thevenin_mva') ?? pickValue(comp, 'mva'));
-  const kv = toKV(pickValue(comp, 'voltage') ?? pickValue(comp, 'volts') ?? pickValue(comp, 'baseKV'));
-  if (!mva || !kv) return { r: 0, x: 0 };
-  const zMag = (kv * kv) / mva;
+  const mva = parseNumeric(
+    pickValue(comp, 'thevenin_mva')
+    ?? pickValue(comp, 'mva')
+    ?? pickValue(comp, 'rated_mva')
+  );
+  const kva = parseNumeric(pickValue(comp, 'rated_kva') ?? pickValue(comp, 'kva'));
+  const mvaBase = mva || (kva ? kva / 1000 : null);
+  const kv = toKV(
+    pickValue(comp, 'voltage')
+    ?? pickValue(comp, 'volts')
+    ?? pickValue(comp, 'baseKV')
+    ?? pickValue(comp, 'rated_kv')
+  );
+  if (!mvaBase || !kv) return { r: 0, x: 0 };
+  let zMag = (kv * kv) / mvaBase;
+  if (comp?.type === 'generator') {
+    const xdpp = parseNumeric(
+      pickValue(comp, 'xdpp_pu')
+      ?? pickValue(comp, 'xd_double_prime_pu')
+      ?? pickValue(comp, 'reactance_pu')
+      ?? pickValue(comp, 'xdp_pu')
+      ?? pickValue(comp, 'xd_prime_pu')
+      ?? pickValue(comp, 'xd_pu')
+    );
+    if (xdpp && xdpp > 0) {
+      zMag *= xdpp;
+    }
+  }
   const xr = parseNumeric(pickValue(comp, 'xr_ratio'));
   if (xr && Math.abs(xr) > 0.01) {
     const r = zMag / Math.sqrt(1 + xr * xr);
@@ -653,4 +677,3 @@ export function runShortCircuit(modelOrOpts = {}, maybeOpts = {}) {
 
   return results;
 }
-

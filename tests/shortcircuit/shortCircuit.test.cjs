@@ -132,6 +132,32 @@ global.localStorage = {
       const ratioLimited = bus.lineToGroundKA / bus.threePhaseKA;
       assert(Math.abs(ratioBase - ratioLimited) < 0.05, 'fault components should scale consistently');
     });
+
+    it('derives generator source impedance from rated and subtransient fields', () => {
+      setOneLine({
+        activeSheet: 0,
+        sheets: [{
+          name: 'Generator Xdpp',
+          components: [
+            {
+              id: 'gen1',
+              type: 'generator',
+              subtype: 'synchronous',
+              rated_kv: 13.8,
+              rated_mva: 2.5,
+              xdpp_pu: 0.2,
+              volts: 13800,
+              connections: [{ target: 'bus1', sourcePort: 0, targetPort: 0 }]
+            },
+            { id: 'bus1', type: 'bus', subtype: 'Bus' }
+          ]
+        }]
+      });
+      const res = runShortCircuit();
+      const bus = res.bus1;
+      assert(bus, 'bus results should exist');
+      assert(bus.threePhaseKA > 0.1, 'generator-based fault current should be non-zero');
+      assert(bus.threePhaseKA < 1, 'xdpp should limit source current contribution');
+    });
   });
 })();
-
