@@ -216,6 +216,46 @@ export function runValidation(components = [], studies = {}) {
     }
   });
 
+  // Generator required field completeness for short-circuit/transient/dispatch studies
+  components.forEach(c => {
+    const subtype = `${c?.subtype ?? ''}`.trim().toLowerCase();
+    const type = `${c?.type ?? ''}`.trim().toLowerCase();
+    const isGenerator = type === 'generator' || subtype === 'generator' || subtype === 'synchronous' || subtype === 'asynchronous';
+    if (!isGenerator) return;
+    const props = c.props && typeof c.props === 'object' ? c.props : c;
+    const missing = [];
+    if (!`${props.tag ?? ''}`.trim()) missing.push('tag');
+    if (!`${props.description ?? ''}`.trim()) missing.push('description');
+    if (!`${props.manufacturer ?? ''}`.trim()) missing.push('manufacturer');
+    if (!`${props.model ?? ''}`.trim()) missing.push('model');
+    const ratedMva = Number(props.rated_mva);
+    if (!Number.isFinite(ratedMva) || ratedMva <= 0) missing.push('rated_mva');
+    const ratedKv = Number(props.rated_kv);
+    if (!Number.isFinite(ratedKv) || ratedKv <= 0) missing.push('rated_kv');
+    const xdppPu = Number(props.xdpp_pu);
+    if (!Number.isFinite(xdppPu) || xdppPu <= 0) missing.push('xdpp_pu');
+    const xdpPu = Number(props.xdp_pu);
+    if (!Number.isFinite(xdpPu) || xdpPu <= 0) missing.push('xdp_pu');
+    const xdPu = Number(props.xd_pu);
+    if (!Number.isFinite(xdPu) || xdPu <= 0) missing.push('xd_pu');
+    const hConstant = Number(props.h_constant_s);
+    if (!Number.isFinite(hConstant) || hConstant <= 0) missing.push('h_constant_s');
+    if (!`${props.governor_mode ?? ''}`.trim()) missing.push('governor_mode');
+    if (!`${props.avr_mode ?? ''}`.trim()) missing.push('avr_mode');
+    const minKw = Number(props.min_kw);
+    if (!Number.isFinite(minKw) || minKw < 0) missing.push('min_kw');
+    const maxKw = Number(props.max_kw);
+    if (!Number.isFinite(maxKw) || maxKw <= 0 || (Number.isFinite(minKw) && minKw > maxKw)) missing.push('max_kw');
+    const rampKwPerMin = Number(props.ramp_kw_per_min);
+    if (!Number.isFinite(rampKwPerMin) || rampKwPerMin <= 0) missing.push('ramp_kw_per_min');
+    if (missing.length) {
+      issues.push({
+        component: c.id,
+        message: `Generator missing required attributes: ${missing.join(', ')}.`
+      });
+    }
+  });
+
   // Capacitor/reactor required tuning metadata completeness
   components.forEach(c => {
     const subtype = `${c?.subtype ?? ''}`.trim().toLowerCase();

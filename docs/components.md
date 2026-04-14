@@ -22,6 +22,12 @@ Each subtype in `componentLibrary.json` may include these properties in its sche
 - Utility, generator, and inverter sources show the `thevenin_mva` field as calculated output. The value derives from the short-circuit capacity and present base voltage. Entries such as `25 kA` are normalized to MVA using the current voltage base, while raw MVA inputs are passed through directly.
 - Source base voltage fields (`baseKV`, `kV`, `kv`, and `prefault_voltage`) mirror the active source voltage automatically. Custom overrides are highlighted with the **Custom** badge so manual entries persist without being replaced by the auto-derived value.
 
+## Generator study model fields
+
+- Generator components now pre-populate study-ready dynamic and dispatch metadata for both `synchronous` and `asynchronous` subtypes.
+- Added fields include `rated_mva`, `rated_kv`, `xdpp_pu`, `xdp_pu`, `xd_pu`, `h_constant_s`, `governor_mode`, `avr_mode`, `min_kw`, `max_kw`, and `ramp_kw_per_min`.
+- Existing diagrams are migrated in-memory so missing generator study fields are filled with safe defaults when projects load, and generator property forms mark these fields as required.
+
 ## Meter component fields
 
 - The one-line palette now includes a `meter` component subtype for revenue and power-quality instrumentation.
