@@ -220,6 +220,75 @@ describe('runValidation - meter CT/PT completeness', () => {
   });
 });
 
+describe('runValidation - battery required attributes', () => {
+  it('flags a battery when required fields are missing', () => {
+    const components = [
+      {
+        id: 'battery-1',
+        type: 'battery',
+        subtype: 'battery',
+        props: {
+          tag: '',
+          description: '',
+          manufacturer: '',
+          model: '',
+          nominal_voltage_vdc: 0,
+          cell_chemistry: '',
+          cell_count: 0,
+          capacity_ah: '',
+          internal_resistance_ohm: -1,
+          initial_soc_pct: 120,
+          min_soc_pct: -5,
+          max_charge_current_a: null,
+          max_discharge_current_a: ''
+        }
+      }
+    ];
+    const issues = runValidation(components, {});
+    const batteryIssue = issues.find(issue => issue.component === 'battery-1');
+    assert.ok(batteryIssue);
+    assert.ok(batteryIssue.message.includes('tag'));
+    assert.ok(batteryIssue.message.includes('description'));
+    assert.ok(batteryIssue.message.includes('manufacturer'));
+    assert.ok(batteryIssue.message.includes('model'));
+    assert.ok(batteryIssue.message.includes('nominal_voltage_vdc'));
+    assert.ok(batteryIssue.message.includes('cell_chemistry'));
+    assert.ok(batteryIssue.message.includes('cell_count'));
+    assert.ok(batteryIssue.message.includes('capacity_ah'));
+    assert.ok(batteryIssue.message.includes('internal_resistance_ohm'));
+    assert.ok(batteryIssue.message.includes('initial_soc_pct'));
+    assert.ok(batteryIssue.message.includes('min_soc_pct'));
+    assert.ok(batteryIssue.message.includes('max_charge_current_a'));
+    assert.ok(batteryIssue.message.includes('max_discharge_current_a'));
+  });
+
+  it('does not flag a battery with all required fields present', () => {
+    const components = [
+      {
+        id: 'battery-2',
+        type: 'battery',
+        subtype: 'battery',
+        props: {
+          tag: 'BAT-01',
+          description: 'UPS battery bank',
+          manufacturer: 'Test Manufacturer',
+          model: 'LFP-1000',
+          nominal_voltage_vdc: 480,
+          cell_chemistry: 'li_ion',
+          cell_count: 144,
+          capacity_ah: 200,
+          internal_resistance_ohm: 0.05,
+          initial_soc_pct: 75,
+          min_soc_pct: 20,
+          max_charge_current_a: 100,
+          max_discharge_current_a: 120
+        }
+      }
+    ];
+    assert.deepStrictEqual(runValidation(components, {}), []);
+  });
+});
+
 describe('runValidation - dc_bus required attributes', () => {
   it('flags a dc_bus when required fields are missing', () => {
     const components = [
