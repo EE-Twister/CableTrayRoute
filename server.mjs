@@ -5,6 +5,7 @@ import path from 'path';
 import crypto from 'crypto';
 import { promisify } from 'util';
 import { attachCollaborationServer } from './src/collaborationServer.mjs';
+import { validateLibraryPayload } from './src/validation/librarySchema.mjs';
 
 const scrypt = promisify(crypto.scrypt);
 
@@ -1592,6 +1593,21 @@ When answering queries:
     auth,
     csrfProtection,
     asyncHandler(async (req, res) => {
+      const normalized = normalizeSaveRequest(req.body);
+      const payload = normalized.mode === 'patch'
+        ? applyMergePatch(
+          (await cloudLibraryStore.loadLatest(req.username).catch(() => ({ data: {} }))).data,
+          normalized.patch ?? {},
+        )
+        : normalized.data ?? {};
+      const validation = validateLibraryPayload(payload);
+      if (!validation.valid) {
+        res.status(400).json({
+          error: 'Library payload validation failed',
+          details: validation.errors,
+        });
+        return;
+      }
       try {
         const saved = await cloudLibraryStore.save(req.username, req.body);
         res.json({ version: saved.version, unchanged: saved.metrics.skippedWrite });

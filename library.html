@@ -179,6 +179,7 @@
     import { getItem, setItem } from './dataStore.mjs';
     import { showAlertModal } from './src/components/modal.js';
     import { getAuthContextState } from './projectStorage.js';
+    import { validateLibraryPayload } from './src/validation/librarySchema.mjs';
 
     // -------------------------------------------------------------------------
     // Sync status badge
@@ -222,7 +223,13 @@
         },
         body: JSON.stringify(body),
       });
-      if (!res.ok) return null;
+      if (!res.ok) {
+        if (res.status === 400) {
+          const details = await res.json().catch(() => ({}));
+          return { validationErrors: details?.details || [] };
+        }
+        return null;
+      }
       return res.json();
     }
 
@@ -253,6 +260,33 @@
       categories: [],
       icons: {},
     };
+
+    function renderValidationErrors(errors) {
+      const filtered = Array.isArray(errors) ? errors : [];
+      const title = filtered.some((entry) => entry.severity === 'error')
+        ? 'Library validation failed'
+        : 'Library validation warnings';
+      const list = filtered
+        .map((entry) => `• [${entry.severity || 'error'}] ${entry.path || 'root'} — ${entry.message}`)
+        .join('\n');
+      if (!list) {
+        return '';
+      }
+      return `${title}\n\n${list}`;
+    }
+
+    async function validateLibraryForPersistence(payload) {
+      const validation = validateLibraryPayload(payload);
+      if (!validation.errors.length) {
+        return true;
+      }
+      const hasError = validation.errors.some((item) => item.severity !== 'warning');
+      if (hasError) {
+        await showAlertModal('Validation Error', renderValidationErrors(validation.errors));
+        return false;
+      }
+      return true;
+    }
 
     function parseJsonSafe(value, fallback) {
       try {
@@ -525,6 +559,8 @@
       try {
         syncStructuredFromTextareas();
         const { categories, components, icons } = getStructuredPayload();
+        const isValid = await validateLibraryForPersistence({ categories, components, icons });
+        if (!isValid) return;
         const version = versionInput.value.trim() || 'user';
         setItem('componentLibraryVersion', version);
         setItem('componentLibrary_' + version, { components, categories, icons });
@@ -533,9 +569,12 @@
         if (authState()) {
           setStatus('pending', '⟳ Saving…');
           const saved = await cloudPut({ categories, components, icons }, _cloudVersion || undefined);
-          if (saved) {
+          if (saved && !saved.validationErrors) {
             _cloudVersion = saved.version;
             setStatus('synced', '☁ Synced');
+          } else if (saved?.validationErrors?.length) {
+            setStatus('local', '⚠ Validation failed');
+            await showAlertModal('Cloud Validation Failed', renderValidationErrors(saved.validationErrors));
           } else {
             setStatus('offline', '⚠ Cloud save failed');
           }
@@ -588,8 +627,15 @@
             ? obj
             : [];
           const categories = Array.isArray(obj.categories) ? obj.categories : [];
+          const icons = obj.icons || {};
+          const validation = validateLibraryPayload({ categories, components, icons });
+          const hasErrors = validation.errors.some((item) => item.severity !== 'warning');
+          if (hasErrors) {
+            showAlertModal('Invalid File', renderValidationErrors(validation.errors));
+            return;
+          }
           document.getElementById('library-version').value = version;
-          hydrateStructuredState({ categories, components }, obj.icons || {});
+          hydrateStructuredState({ categories, components }, icons);
           setStatus('pending', '⟳ Unsaved');
         } catch {
           showAlertModal('Invalid File', 'Please select a valid JSON library file.');
@@ -609,12 +655,17 @@
       try {
         syncStructuredFromTextareas();
         const { categories, components, icons } = getStructuredPayload();
+        const isValid = await validateLibraryForPersistence({ categories, components, icons });
+        if (!isValid) return;
         setStatus('pending', '⟳ Saving…');
         const saved = await cloudPut({ categories, components, icons });
-        if (saved) {
+        if (saved && !saved.validationErrors) {
           _cloudVersion = saved.version;
           setStatus('synced', '☁ Synced');
           await showAlertModal('Saved to Cloud', 'Library saved to your cloud account.');
+        } else if (saved?.validationErrors?.length) {
+          setStatus('local', '⚠ Validation failed');
+          await showAlertModal('Cloud Validation Failed', renderValidationErrors(saved.validationErrors));
         } else {
           setStatus('offline', '⚠ Cloud save failed');
           await showAlertModal('Cloud Save Failed', 'Could not save to cloud. Check your connection or log in again.');
