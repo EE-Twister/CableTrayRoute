@@ -874,7 +874,19 @@
         "enclosure": "box",
         "gap": 32,
         "working_distance": 455,
-        "electrode_config": "VCB"
+        "electrode_config": "VCB",
+        "tag": "",
+        "description": "",
+        "manufacturer": "",
+        "model": "",
+        "rated_voltage_kv": 0.48,
+        "phases": 3,
+        "interrupting_rating_ka": 65,
+        "pickup_amps": 1600,
+        "time_dial_or_tms": 0.3,
+        "curve_family": "LSIG",
+        "ground_fault_enabled": true,
+        "ground_time_delay_s": 0.3
       },
       "deviceProperties": [
         {
@@ -951,7 +963,19 @@
         "enclosure": "box",
         "gap": 102,
         "working_distance": 914,
-        "electrode_config": "VCB"
+        "electrode_config": "VCB",
+        "tag": "",
+        "description": "",
+        "manufacturer": "",
+        "model": "",
+        "rated_voltage_kv": 4.16,
+        "phases": 3,
+        "interrupting_rating_ka": 25,
+        "pickup_amps": 1200,
+        "time_dial_or_tms": 0.3,
+        "curve_family": "LSIG",
+        "ground_fault_enabled": true,
+        "ground_time_delay_s": 0.3
       },
       "deviceProperties": [
         {
@@ -1028,7 +1052,19 @@
         "enclosure": "box",
         "gap": 152,
         "working_distance": 1219,
-        "electrode_config": "VOA"
+        "electrode_config": "VOA",
+        "tag": "",
+        "description": "",
+        "manufacturer": "",
+        "model": "",
+        "rated_voltage_kv": 13.8,
+        "phases": 3,
+        "interrupting_rating_ka": 63,
+        "pickup_amps": 2000,
+        "time_dial_or_tms": 0.3,
+        "curve_family": "LSIG",
+        "ground_fault_enabled": true,
+        "ground_time_delay_s": 0.3
       },
       "deviceProperties": [
         {
@@ -1102,7 +1138,20 @@
         "working_distance": 455,
         "electrode_config": "VCB",
         "interrupt_rating_ka": 200,
-        "let_through_i2t": 150000
+        "let_through_i2t": 150000,
+        "tag": "",
+        "description": "",
+        "manufacturer": "",
+        "model": "",
+        "rated_voltage_kv": 0.48,
+        "phases": 3,
+        "interrupting_rating_ka": 200,
+        "pickup_amps": 400,
+        "time_dial_or_tms": 0.5,
+        "curve_family": "ANSI_VeryInverse",
+        "ground_fault_enabled": false,
+        "ground_pickup_a": 400,
+        "ground_time_delay_s": 0.3
       },
       "deviceProperties": [
         {
@@ -1156,7 +1205,20 @@
         "ka": 12.5,
         "curve": "ANSI_E",
         "baseKV": 15.0,
-        "kV": 15.0
+        "kV": 15.0,
+        "tag": "",
+        "description": "",
+        "manufacturer": "",
+        "model": "",
+        "rated_voltage_kv": 15,
+        "phases": 3,
+        "interrupting_rating_ka": 12.5,
+        "pickup_amps": 400,
+        "time_dial_or_tms": 0.3,
+        "curve_family": "ANSI_E",
+        "ground_fault_enabled": true,
+        "ground_pickup_a": 200,
+        "ground_time_delay_s": 0.3
       }
     },
     {
@@ -2234,7 +2296,20 @@
         "function": "50/51",
         "curve": "IEC_VeryInverse",
         "time_dial": 3.5,
-        "pickup_a": 400
+        "pickup_a": 400,
+        "tag": "",
+        "description": "",
+        "manufacturer": "",
+        "model": "",
+        "rated_voltage_kv": 15,
+        "phases": 3,
+        "interrupting_rating_ka": 25,
+        "pickup_amps": 400,
+        "time_dial_or_tms": 3.5,
+        "curve_family": "IEC_VeryInverse",
+        "ground_fault_enabled": true,
+        "ground_pickup_a": 200,
+        "ground_time_delay_s": 0.3
       }
     }
   ]
