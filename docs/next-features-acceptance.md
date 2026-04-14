@@ -304,3 +304,62 @@ This table maps each existing smoke test in the two targeted describe blocks to 
 - `AT-EMF-04`: Invalid-current modal contract
 
 These IDs should be used as traceable links from future `playwright-tests/nextFeatures.spec.js` upgrades.
+
+
+---
+
+## 7) Workflow Documentation Snapshot (Post-Integration Tests)
+
+The integration tests in `playwright-tests/nextFeatures.spec.js` now act as executable contracts. Keep user-facing docs aligned with the assumptions below so manual workflows and automated checks stay in sync.
+
+### 7.1 Cost Estimator workflow contract
+
+**Input assumptions**
+- Project schedule data exists for at least one of: cable, tray, or conduit records.
+- Contingency is treated as a percentage and expected in the UI range `0` to `100` (with fallback handling for malformed input).
+- Pricing basis is either default RS Means values or an imported pricing book, with optional labor/fitting UI overrides taking precedence.
+
+**Expected outputs**
+- Category subtotals, pre-contingency subtotal, contingency amount, and grand total render deterministically for fixed fixture data.
+- Currency displayed in the UI rounds to whole dollars while internal math/workbook values preserve cents precision.
+- Empty-data runs show guidance text instead of an empty result table.
+
+**Compliance interpretation**
+- Cost Estimator compliance is interpreted as **calculation contract compliance** (formula correctness, rounding policy, and guardrail behavior), not regulatory code compliance.
+- A passing integration test means totals and labels match fixture-derived expectations within defined tolerances.
+
+**Export behavior**
+- `Export XLSX` is blocked until an estimate has been generated (modal guardrail).
+- After a successful estimate, exported workbook totals must match the same calculation path used by the UI summary and line items.
+- Summary export includes pricing basis metadata for audit traceability.
+
+### 7.2 EMF workflow contract
+
+**Input assumptions**
+- Current must be greater than zero; invalid values (`<= 0`) are rejected before computation.
+- Frequency is selected from supported options (`50 Hz` or `60 Hz`).
+- Geometry fields (cable sets, tray width, cable OD, and measurement distance) are valid numeric values in accepted UI domains.
+
+**Expected outputs**
+- `B_rms` and `B_peak` are shown with stable values for canonical fixtures and bounded tolerance checks.
+- Compliance table always includes both rows (`ICNIRP Occupational`, `ICNIRP General Public`) and status badges constrained to `PASS`/`FAIL`.
+- Field profile renders a non-empty curve over the expected distance domain when inputs are valid.
+
+**Compliance interpretation**
+- PASS/FAIL labels represent threshold comparison against ICNIRP reference levels used by the product (`200 µT` general public and `1000 µT` occupational in the tested workflow).
+- Near-threshold validations should be interpreted with the numeric tolerance policy in Section 3.2 to account for sampling granularity.
+
+**Export behavior**
+- EMF workflow currently emphasizes on-screen analytical validation; no dedicated file export is required by the integration contract in this plan.
+- If downstream reporting captures EMF results, values should be sourced from the same computed result state validated by `AT-EMF-*` scenarios.
+
+### 7.3 Concise troubleshooting (validation-aligned)
+
+| Symptom seen by user/test | Likely cause | Recommended fix |
+|---|---|---|
+| Cost estimate shows “No project data found...” | Empty cable/tray/conduit stores | Import/load project data first, then rerun **Generate Estimate**. |
+| Contingency appears to ignore typed value | Input was nonnumeric or outside allowed handling path | Enter a numeric percent in the supported range; rerun and confirm row label reflects the chosen percent. |
+| `Export XLSX` opens a warning and no file downloads | Estimate was not generated in current session/state | Run **Generate Estimate** successfully, then export. |
+| EMF calculation opens Input Error modal | Load current is `0` or negative | Enter current `> 0` and rerun **Calculate Field** or **Field Profile**. |
+| EMF compliance badge seems unexpected near limit | Value is near threshold and within tolerance band | Re-run with the same fixture, inspect computed `B_rms`, and compare against Section 3.2 boundary tolerance guidance. |
+| Field profile area stays hidden/empty | Invalid numeric input prevented profile generation | Correct invalid fields (especially current), then run **Field Profile (0–120 in)** again. |
