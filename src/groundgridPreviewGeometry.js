@@ -5,6 +5,65 @@ export function estimateRodLength({ hasRods, burialDepth, gridLx, gridLy }) {
   return Math.max(burialDepth * 2.5, burialDepth + (Math.max(gridLx, gridLy) * 0.03));
 }
 
+function normalizeRodSpacing(value) {
+  if (!Number.isFinite(value) || value <= 0) {
+    return 0;
+  }
+  return value;
+}
+
+function buildAxisIndices(count, targetSpacing, conductorSpacing) {
+  const lastIndex = Math.max(0, count - 1);
+  if (lastIndex <= 1) {
+    return [0, lastIndex];
+  }
+  if (!Number.isFinite(targetSpacing) || targetSpacing <= 0 || conductorSpacing <= 0) {
+    return [0, lastIndex];
+  }
+  const step = Math.max(1, Math.round(targetSpacing / conductorSpacing));
+  const indices = new Set([0, lastIndex]);
+  for (let index = step; index < lastIndex; index += step) {
+    indices.add(index);
+  }
+  return [...indices].sort((a, b) => a - b);
+}
+
+export function deriveRodLayout({ hasRods, nx, ny, spacingX, spacingY, rodSpacingX, rodSpacingY }) {
+  if (!hasRods) {
+    return {
+      points: [],
+      count: 0,
+      intermediateCount: 0,
+      axisSpacingX: 0,
+      axisSpacingY: 0,
+    };
+  }
+
+  const xIndices = buildAxisIndices(ny, rodSpacingX, spacingX);
+  const yIndices = buildAxisIndices(nx, rodSpacingY, spacingY);
+  const points = [];
+  const corners = new Set([
+    '0:0',
+    `0:${nx - 1}`,
+    `${ny - 1}:0`,
+    `${ny - 1}:${nx - 1}`,
+  ]);
+
+  for (const xIndex of xIndices) {
+    for (const yIndex of yIndices) {
+      points.push({ xIndex, yIndex, isCorner: corners.has(`${xIndex}:${yIndex}`) });
+    }
+  }
+
+  return {
+    points,
+    count: points.length,
+    intermediateCount: points.filter(point => !point.isCorner).length,
+    axisSpacingX: xIndices.length > 1 ? (xIndices[1] - xIndices[0]) * spacingX : 0,
+    axisSpacingY: yIndices.length > 1 ? (yIndices[1] - yIndices[0]) * spacingY : 0,
+  };
+}
+
 export function normalizePreviewGeometry({
   gridLxInput,
   gridLyInput,
@@ -14,6 +73,8 @@ export function normalizePreviewGeometry({
   nxInput,
   nyInput,
   hasRods,
+  rodSpacingXInput,
+  rodSpacingYInput,
 }) {
   const gridLx = Number.isFinite(gridLxInput) && gridLxInput > 0 ? gridLxInput : 1;
   const gridLy = Number.isFinite(gridLyInput) && gridLyInput > 0 ? gridLyInput : 1;
@@ -25,6 +86,9 @@ export function normalizePreviewGeometry({
   const spacingX = ny > 1 ? gridLx / (ny - 1) : 0;
   const spacingY = nx > 1 ? gridLy / (nx - 1) : 0;
   const rodLength = estimateRodLength({ hasRods, burialDepth, gridLx, gridLy });
+  const rodSpacingX = normalizeRodSpacing(rodSpacingXInput);
+  const rodSpacingY = normalizeRodSpacing(rodSpacingYInput);
+  const rodLayout = deriveRodLayout({ hasRods, nx, ny, spacingX, spacingY, rodSpacingX, rodSpacingY });
 
   return {
     gridLx,
@@ -37,5 +101,8 @@ export function normalizePreviewGeometry({
     spacingX,
     spacingY,
     rodLength,
+    rodSpacingX,
+    rodSpacingY,
+    rodLayout,
   };
 }

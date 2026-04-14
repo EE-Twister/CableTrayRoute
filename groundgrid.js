@@ -75,6 +75,8 @@ document.addEventListener('DOMContentLoaded', () => {
     const nxInput = getInt('nx');
     const nyInput = getInt('ny');
     const hasRods = document.getElementById('has-rods').checked;
+    const rodSpacingXInput = getNum('rod-spacing-x');
+    const rodSpacingYInput = getNum('rod-spacing-y');
     const diameterUnit = unit === 'ft' ? 'in' : 'mm';
 
     const normalized = normalizePreviewGeometry({
@@ -86,9 +88,21 @@ document.addEventListener('DOMContentLoaded', () => {
       nxInput,
       nyInput,
       hasRods,
+      rodSpacingXInput,
+      rodSpacingYInput,
     });
 
     return { unit, diameterUnit, hasRods, ...normalized };
+  }
+
+  function setRodSpacingVisibility() {
+    const hasRods = document.getElementById('has-rods')?.checked;
+    ['rod-spacing-x-row', 'rod-spacing-y-row'].forEach(id => {
+      const row = document.getElementById(id);
+      if (row) {
+        row.hidden = !hasRods;
+      }
+    });
   }
 
   function clearAndPrimeSvg(svgEl, titleText) {
@@ -142,7 +156,9 @@ document.addEventListener('DOMContentLoaded', () => {
       svgEl.appendChild(makeSvg('line', { x1: startX, y1: y, x2: endX, y2: y, class: 'grid-conductor' }));
     }
     if (params.hasRods) {
-      [[startX, startY], [endX, startY], [startX, endY], [endX, endY]].forEach(([x, y]) => {
+      params.rodLayout.points.forEach(point => {
+        const x = startX + (point.xIndex * dx);
+        const y = startY + (point.yIndex * dy);
         svgEl.appendChild(makeSvg('circle', { cx: x, cy: y, r: 5, class: 'grid-rod' }));
       });
     }
@@ -160,7 +176,13 @@ document.addEventListener('DOMContentLoaded', () => {
     legend.appendChild(conductorText);
     legend.appendChild(makeSvg('circle', { cx: 43, cy: 56, r: 5, class: 'grid-rod' }));
     const rodText = makeSvg('text', { x: 65, y: 60, class: 'grid-legend-text' });
-    rodText.textContent = params.hasRods ? 'Perimeter/corner rod' : 'Corner rod (disabled)';
+    if (!params.hasRods) {
+      rodText.textContent = 'Corner rod (disabled)';
+    } else if (params.rodLayout.intermediateCount > 0) {
+      rodText.textContent = `Rods @ intersections (${params.rodLayout.count} total)`;
+    } else {
+      rodText.textContent = 'Perimeter/corner rods';
+    }
     legend.appendChild(rodText);
     svgEl.appendChild(legend);
   }
@@ -188,10 +210,16 @@ document.addEventListener('DOMContentLoaded', () => {
     svgEl.appendChild(makeSvg('rect', { x: left + 18, y: conductorY - 16, width: right - left - 36, height: 32, class: 'grid-trench-band' }));
 
     if (params.hasRods) {
-      const rodX = right - 52;
+      const rodCount = params.rodLayout.intermediateCount > 0 ? 3 : 1;
+      const firstRodX = right - 112;
+      const rodGap = 32;
       const rodBottom = Math.min(svgHeight - 54, gradeY + ((params.burialDepth + params.rodLength) * depthScale));
-      svgEl.appendChild(makeSvg('line', { x1: rodX, y1: conductorY, x2: rodX, y2: rodBottom, class: 'grid-rod' }));
-      drawDimension(svgEl, rodX + 18, conductorY, rodX + 18, rodBottom, `Rod = ${formatDim(params.rodLength, params.unit)}`, -10);
+      for (let rodIndex = 0; rodIndex < rodCount; rodIndex += 1) {
+        const rodX = firstRodX + (rodIndex * rodGap);
+        svgEl.appendChild(makeSvg('line', { x1: rodX, y1: conductorY, x2: rodX, y2: rodBottom, class: 'grid-rod' }));
+      }
+      const dimX = firstRodX + ((rodCount - 1) * rodGap) + 16;
+      drawDimension(svgEl, dimX, conductorY, dimX, rodBottom, `Rod = ${formatDim(params.rodLength, params.unit)}`, -10);
     }
 
     drawDimension(svgEl, left - 24, gradeY, left - 24, conductorY, `h = ${formatDim(params.burialDepth, params.unit)}`, -10);
@@ -232,7 +260,9 @@ document.addEventListener('DOMContentLoaded', () => {
       + `Spacing: ${params.spacingX.toFixed(1)} ${params.unit} (x), ${params.spacingY.toFixed(1)} ${params.unit} (y)`
       + ` • h: ${params.burialDepth.toFixed(2)} ${params.unit}`
       + (params.hs > 0 ? ` • hs: ${params.hs.toFixed(2)} ${params.unit}` : '')
-      + (params.hasRods ? ' • Corner rods enabled' : '');
+      + (params.hasRods ? ` • Ground rods: ${params.rodLayout.count} (${params.rodLayout.intermediateCount} intermediate)` : '')
+      + (params.hasRods && params.rodLayout.axisSpacingX > 0 ? ` • Rod spacing x ≈ ${params.rodLayout.axisSpacingX.toFixed(1)} ${params.unit}` : '')
+      + (params.hasRods && params.rodLayout.axisSpacingY > 0 ? ` • Rod spacing y ≈ ${params.rodLayout.axisSpacingY.toFixed(1)} ${params.unit}` : '');
 
     if (previewSummary) {
       previewSummary.textContent = hadInitError
@@ -373,6 +403,7 @@ document.addEventListener('DOMContentLoaded', () => {
     });
 
     form.addEventListener('input', () => {
+      setRodSpacingVisibility();
       renderGridPreview();
     });
   } else {
@@ -387,4 +418,5 @@ document.addEventListener('DOMContentLoaded', () => {
   }
 
   renderGridPreview();
+  setRodSpacingVisibility();
 });

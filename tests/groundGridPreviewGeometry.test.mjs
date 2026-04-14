@@ -1,5 +1,5 @@
 import assert from 'assert';
-import { estimateRodLength, normalizePreviewGeometry } from '../src/groundgridPreviewGeometry.js';
+import { deriveRodLayout, estimateRodLength, normalizePreviewGeometry } from '../src/groundgridPreviewGeometry.js';
 
 function describe(name, fn) {
   console.log(name);
@@ -39,6 +39,9 @@ describe('groundgrid preview geometry helpers', () => {
     assert.strictEqual(normalized.spacingX, 1);
     assert.strictEqual(normalized.spacingY, 1);
     assert.strictEqual(normalized.rodLength, 0);
+    assert.strictEqual(normalized.rodSpacingX, 0);
+    assert.strictEqual(normalized.rodSpacingY, 0);
+    assert.strictEqual(normalized.rodLayout.count, 0);
   });
 
   it('estimates rod length from burial depth and max grid span when enabled', () => {
@@ -61,5 +64,40 @@ describe('groundgrid preview geometry helpers', () => {
     });
 
     assert.strictEqual(rodLength, 0);
+  });
+
+  it('builds intermediate rod layout snapped to conductor intersections', () => {
+    const rodLayout = deriveRodLayout({
+      hasRods: true,
+      nx: 7,
+      ny: 7,
+      spacingX: 10,
+      spacingY: 10,
+      rodSpacingX: 20,
+      rodSpacingY: 30,
+    });
+
+    assert.strictEqual(rodLayout.count, 12);
+    assert.strictEqual(rodLayout.intermediateCount, 8);
+    assert.strictEqual(rodLayout.axisSpacingX, 20);
+    assert.strictEqual(rodLayout.axisSpacingY, 30);
+  });
+
+  it('uses corner rods only when intermediate spacing is not provided', () => {
+    const normalized = normalizePreviewGeometry({
+      gridLxInput: 120,
+      gridLyInput: 80,
+      burialDepthInput: 1.5,
+      hsInput: 0,
+      conductorInput: 0.5,
+      nxInput: 7,
+      nyInput: 5,
+      hasRods: true,
+      rodSpacingXInput: 0,
+      rodSpacingYInput: 0,
+    });
+
+    assert.strictEqual(normalized.rodLayout.count, 4);
+    assert.strictEqual(normalized.rodLayout.intermediateCount, 0);
   });
 });
