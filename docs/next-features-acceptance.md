@@ -363,3 +363,43 @@ The integration tests in `playwright-tests/nextFeatures.spec.js` now act as exec
 | EMF calculation opens Input Error modal | Load current is `0` or negative | Enter current `> 0` and rerun **Calculate Field** or **Field Profile**. |
 | EMF compliance badge seems unexpected near limit | Value is near threshold and within tolerance band | Re-run with the same fixture, inspect computed `B_rms`, and compare against Section 3.2 boundary tolerance guidance. |
 | Field profile area stays hidden/empty | Invalid numeric input prevented profile generation | Correct invalid fields (especially current), then run **Field Profile (0–120 in)** again. |
+
+
+---
+
+## 8) Phased Rollout Sequence and Merge Gates
+
+Roll out acceptance expansion in the following **strict order**:
+
+1. **Fixture/acceptance definition**
+2. **Test-structure refactor**
+3. **Cost Estimator deterministic integration tests**
+4. **EMF deterministic integration tests**
+5. **Export validation**
+6. **CI lane split and docs updates**
+
+### 8.1 Required merge gate for each phase
+
+- A phase can be merged only when the suites affected by that phase are green in CI.
+- The next phase cannot begin until the previous phase is merged and green.
+- If a phase introduces intermittent failures, pause rollout and stabilize before continuing.
+
+### 8.2 Suggested suite mapping by phase
+
+| Phase | Minimum suites that must pass before merge |
+|---|---|
+| 1. Fixture/acceptance definition | `node tests/costEstimate.test.mjs`, `node tests/emf.test.mjs`, `node tests/resultsExporter.test.cjs` |
+| 2. Test-structure refactor | `npm run e2e:next-features-integration` |
+| 3. Cost Estimator deterministic integration tests | `npm run e2e:next-features-cost` |
+| 4. EMF deterministic integration tests | `npm run e2e:next-features-emf` |
+| 5. Export validation | `npm run e2e:next-features-export` |
+| 6. CI lane split and docs updates | `npm run test:critical`, `npm run e2e:critical`, `npm test`, `npm run e2e` |
+
+### 8.3 One-week flaky-test monitoring policy
+
+After each phase merge, track flaky outcomes for **7 calendar days**.
+
+- Record failures by test id, frequency, browser/project, and failure signature.
+- Only tighten waits/selectors when instability is actually observed.
+- Do not broaden timeouts preemptively across the full suite.
+- Close each flaky item with the stabilizing change and a rerun link/evidence.

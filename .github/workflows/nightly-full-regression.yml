@@ -1,0 +1,40 @@
+name: Nightly Full Regression
+
+on:
+  schedule:
+    - cron: '0 6 * * *'
+  workflow_dispatch:
+
+concurrency:
+  group: nightly-full-regression
+  cancel-in-progress: true
+
+jobs:
+  full-regression:
+    name: Full unit + E2E regression
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Full unit test lane
+        run: npm test
+
+      - name: Build bundles
+        run: npm run build
+
+      - name: Install Playwright browsers
+        run: npx playwright install --with-deps chromium firefox
+
+      - name: Full Playwright lane
+        run: npm run e2e
+        env:
+          CI: true

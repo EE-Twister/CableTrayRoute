@@ -55,7 +55,7 @@ jobs:
         run: npm ci
 
       - name: Run unit tests
-        run: npm test
+        run: npm run test:critical
 
   # ─────────────────────────────────────────────
   # 3. Build
@@ -115,7 +115,7 @@ jobs:
         run: npx playwright install --with-deps chromium firefox
 
       - name: Run Playwright E2E tests
-        run: npm run e2e
+        run: npm run e2e:critical
         env:
           CI: true
 
