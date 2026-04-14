@@ -27,7 +27,7 @@ const COMMON_COMPONENT_TYPES = [
 ];
 
 const ATTRIBUTE_BASELINE = {
-  all: ['tag', 'description', 'manufacturer', 'model', 'volts', 'phases'],
+  all: ['tag', 'description', 'manufacturer', 'model', 'phases', 'commissioning_state', 'service_status', 'notes'],
   source: ['short_circuit_capacity', 'xr_ratio', 'frequency_hz'],
   transformer: ['kva', 'percent_z', 'primary_connection', 'secondary_connection'],
   protective: ['pickup_amps', 'time_dial', 'interrupting_rating_ka'],
@@ -35,6 +35,12 @@ const ATTRIBUTE_BASELINE = {
   load: ['kw', 'kvar', 'demand_factor'],
   cable: ['size', 'material', 'insulation', 'ampacity', 'length']
 };
+
+const DC_COMPONENT_TYPES = new Set([
+  'battery',
+  'dc_bus',
+  'rectifier'
+]);
 
 function normalizeType(value) {
   return String(value || '')
@@ -81,6 +87,10 @@ function classifyType(type) {
   return 'all';
 }
 
+function resolveVoltageBaselineKey(type) {
+  return DC_COMPONENT_TYPES.has(type) ? 'nominal_voltage_vdc' : 'rated_voltage_kv';
+}
+
 function getPropKeys(component) {
   const props = component?.props && typeof component.props === 'object' ? component.props : {};
   return Object.keys(props).map((key) => normalizeType(key));
@@ -116,6 +126,7 @@ async function main() {
       const classKey = classifyType(type);
       const expected = Array.from(new Set([
         ...ATTRIBUTE_BASELINE.all,
+        resolveVoltageBaselineKey(type),
         ...(ATTRIBUTE_BASELINE[classKey] || [])
       ])).map((item) => normalizeType(item));
       const missing = expected.filter((key) => !props.includes(key));
