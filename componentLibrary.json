@@ -53,6 +53,26 @@
       }
     },
     {
+      "type": "panel",
+      "subtype": "panel",
+      "label": "Panel",
+      "icon": "icons/components/MLO.svg",
+      "iconIEC": "icons/components/iec/IEC_Switch.svg",
+      "props": {
+        "tag": "",
+        "description": "",
+        "manufacturer": "",
+        "model": "",
+        "rated_voltage_kv": 0.48,
+        "phases": 3,
+        "bus_rating_a": 1200,
+        "main_device_type": "mcb",
+        "main_interrupting_ka": 35,
+        "grounding_type": "solidly_grounded_wye",
+        "service_type": "distribution"
+      }
+    },
+    {
       "type": "utility_source",
       "subtype": "utility",
       "label": "Utility",

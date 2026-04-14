@@ -274,6 +274,81 @@ describe('runValidation - dc_bus required attributes', () => {
   });
 });
 
+describe('runValidation - panel required attributes', () => {
+  it('flags a panel when required fields are missing', () => {
+    const components = [
+      {
+        id: 'panel-ref',
+        type: 'bus',
+        connections: [{ target: 'panel-1' }]
+      },
+      {
+        id: 'panel-1',
+        type: 'panel',
+        subtype: 'panel',
+        connections: [{ target: 'panel-ref' }],
+        props: {
+          tag: '',
+          description: '',
+          manufacturer: '',
+          model: '',
+          rated_voltage_kv: 0,
+          phases: 0,
+          bus_rating_a: '',
+          main_device_type: '',
+          main_interrupting_ka: null,
+          grounding_type: '',
+          service_type: ''
+        }
+      }
+    ];
+    const issues = runValidation(components, {});
+    const panelIssue = issues.find(issue => issue.component === 'panel-1');
+    assert.ok(panelIssue);
+    assert.ok(panelIssue.message.includes('tag'));
+    assert.ok(panelIssue.message.includes('description'));
+    assert.ok(panelIssue.message.includes('manufacturer'));
+    assert.ok(panelIssue.message.includes('model'));
+    assert.ok(panelIssue.message.includes('rated_voltage_kv'));
+    assert.ok(panelIssue.message.includes('phases'));
+    assert.ok(panelIssue.message.includes('bus_rating_a'));
+    assert.ok(panelIssue.message.includes('main_device_type'));
+    assert.ok(panelIssue.message.includes('main_interrupting_ka'));
+    assert.ok(panelIssue.message.includes('grounding_type'));
+    assert.ok(panelIssue.message.includes('service_type'));
+  });
+
+  it('does not flag a panel with all required fields present', () => {
+    const components = [
+      {
+        id: 'panel-ref-2',
+        type: 'bus',
+        connections: [{ target: 'panel-2' }]
+      },
+      {
+        id: 'panel-2',
+        type: 'panel',
+        subtype: 'panel',
+        connections: [{ target: 'panel-ref-2' }],
+        props: {
+          tag: 'PNL-1A',
+          description: 'Main lighting panel',
+          manufacturer: 'Square D',
+          model: 'NQOD',
+          rated_voltage_kv: 0.48,
+          phases: 3,
+          bus_rating_a: 1200,
+          main_device_type: 'mcb',
+          main_interrupting_ka: 35,
+          grounding_type: 'solidly_grounded_wye',
+          service_type: 'distribution'
+        }
+      }
+    ];
+    assert.deepStrictEqual(runValidation(components, {}), []);
+  });
+});
+
 describe('runValidation - TCC duty violations', () => {
   it('passes through duty violation messages from studies', () => {
     const studies = {

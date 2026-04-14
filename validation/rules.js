@@ -91,6 +91,35 @@ export function runValidation(components = [], studies = {}) {
     }
   });
 
+  // Panel required field completeness for panel studies and reports
+  components.forEach(c => {
+    const isPanel = c?.type === 'panel' || c?.subtype === 'panel' || c?.subtype === 'Panel';
+    if (!isPanel) return;
+    const props = c.props && typeof c.props === 'object' ? c.props : c;
+    const missing = [];
+    if (!`${props.tag ?? ''}`.trim()) missing.push('tag');
+    if (!`${props.description ?? ''}`.trim()) missing.push('description');
+    if (!`${props.manufacturer ?? ''}`.trim()) missing.push('manufacturer');
+    if (!`${props.model ?? ''}`.trim()) missing.push('model');
+    const ratedVoltageKv = Number(props.rated_voltage_kv);
+    if (!Number.isFinite(ratedVoltageKv) || ratedVoltageKv <= 0) missing.push('rated_voltage_kv');
+    const phases = Number(props.phases);
+    if (!Number.isFinite(phases) || phases <= 0) missing.push('phases');
+    const busRatingA = Number(props.bus_rating_a);
+    if (!Number.isFinite(busRatingA) || busRatingA <= 0) missing.push('bus_rating_a');
+    if (!`${props.main_device_type ?? ''}`.trim()) missing.push('main_device_type');
+    const mainInterruptingKa = Number(props.main_interrupting_ka);
+    if (!Number.isFinite(mainInterruptingKa) || mainInterruptingKa <= 0) missing.push('main_interrupting_ka');
+    if (!`${props.grounding_type ?? ''}`.trim()) missing.push('grounding_type');
+    if (!`${props.service_type ?? ''}`.trim()) missing.push('service_type');
+    if (missing.length) {
+      issues.push({
+        component: c.id,
+        message: `Panel missing required attributes: ${missing.join(', ')}.`
+      });
+    }
+  });
+
   // TCC duty/coordination violations from studies
   Object.entries(studies.duty || {}).forEach(([id, msgs = []]) => {
     msgs.forEach(msg => issues.push({ component: id, message: msg }));
