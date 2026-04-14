@@ -1,4 +1,5 @@
 import { analyzeGroundGrid } from './analysis/groundGrid.mjs';
+import { normalizePreviewGeometry } from './src/groundgridPreviewGeometry.js';
 
 document.addEventListener('DOMContentLoaded', () => {
   const resultsDiv = document.getElementById('results');
@@ -76,18 +77,18 @@ document.addEventListener('DOMContentLoaded', () => {
     const hasRods = document.getElementById('has-rods').checked;
     const diameterUnit = unit === 'ft' ? 'in' : 'mm';
 
-    const gridLx = Number.isFinite(gridLxInput) && gridLxInput > 0 ? gridLxInput : 1;
-    const gridLy = Number.isFinite(gridLyInput) && gridLyInput > 0 ? gridLyInput : 1;
-    const burialDepth = Number.isFinite(burialDepthInput) && burialDepthInput > 0 ? burialDepthInput : 1;
-    const hs = Number.isFinite(hsInput) && hsInput > 0 ? hsInput : 0;
-    const conductorDiameter = Number.isFinite(conductorInput) && conductorInput > 0 ? conductorInput : 0;
-    const nx = Math.max(2, Number.isFinite(nxInput) ? nxInput : 2);
-    const ny = Math.max(2, Number.isFinite(nyInput) ? nyInput : 2);
-    const spacingX = ny > 1 ? gridLx / (ny - 1) : 0;
-    const spacingY = nx > 1 ? gridLy / (nx - 1) : 0;
-    const rodLength = hasRods ? Math.max(burialDepth * 2.5, burialDepth + Math.max(gridLx, gridLy) * 0.03) : 0;
+    const normalized = normalizePreviewGeometry({
+      gridLxInput,
+      gridLyInput,
+      burialDepthInput,
+      hsInput,
+      conductorInput,
+      nxInput,
+      nyInput,
+      hasRods,
+    });
 
-    return { unit, diameterUnit, gridLx, gridLy, nx, ny, spacingX, spacingY, burialDepth, hs, conductorDiameter, hasRods, rodLength };
+    return { unit, diameterUnit, hasRods, ...normalized };
   }
 
   function clearAndPrimeSvg(svgEl, titleText) {
