@@ -61,6 +61,12 @@ The **Library Manager** (`library.html`) supports saving your component library 
 
 When you click the regular **Save** button while logged in, the library is also auto-synced to the cloud.
 
+If the server returns **409 Version conflict**, Library Manager now fetches the latest cloud copy and opens a conflict modal with three choices:
+
+- **Overwrite cloud with my local edits** (retries save against the latest `baseVersion`)
+- **Reload cloud version** (loads cloud data into the editor)
+- **Merge non-conflicting changes** (merges by `component.subtype`, flags subtype collisions for manual review, then retries save with updated `baseVersion`)
+
 ### Loading from the Cloud
 
 On page load, the Library Manager automatically fetches your cloud library (if you are logged in) and populates the editor. To reload manually at any time, click **Load from Cloud**.
