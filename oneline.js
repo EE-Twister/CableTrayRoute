@@ -1148,6 +1148,24 @@ const generatorStudyFieldSpecs = [
   { name: 'ramp_kw_per_min', label: 'Ramp Rate (kW/min)', type: 'number', required: true, defaultValue: 100 }
 ];
 
+
+const mccFieldSpecs = [
+  { name: 'tag', label: 'Tag', type: 'text', required: true, defaultValue: comp => comp.ref || comp.label || comp.id || '' },
+  { name: 'description', label: 'Description', type: 'text', required: true, defaultValue: comp => comp.label || '' },
+  { name: 'manufacturer', label: 'Manufacturer', type: 'text', required: true, defaultValue: '' },
+  { name: 'model', label: 'Model', type: 'text', required: true, defaultValue: '' },
+  { name: 'rated_voltage_kv', label: 'Rated Voltage (kV)', type: 'number', required: true, defaultValue: comp => {
+    const ratedKv = Number(comp?.rated_voltage_kv ?? comp?.props?.rated_voltage_kv ?? comp?.kV ?? comp?.baseKV);
+    return Number.isFinite(ratedKv) && ratedKv > 0 ? ratedKv : 0.48;
+  } },
+  { name: 'bus_rating_a', label: 'Bus Rating (A)', type: 'number', required: true, defaultValue: 1600 },
+  { name: 'main_device_type', label: 'Main Device Type', type: 'text', required: true, defaultValue: 'mccb' },
+  { name: 'sccr_ka', label: 'SCCR (kA)', type: 'number', required: true, defaultValue: 65 },
+  { name: 'bucket_count', label: 'Bucket Count', type: 'number', required: true, defaultValue: 6 },
+  { name: 'spare_bucket_count', label: 'Spare Bucket Count', type: 'number', required: true, defaultValue: 1 },
+  { name: 'form_type', label: 'Form Type', type: 'text', required: true, defaultValue: 'form_2b' }
+];
+
 const baselineComponentFieldSpecs = [
   { name: 'tag', label: 'Tag', type: 'text', required: true, defaultValue: comp => comp.ref || comp.label || comp.id || '' },
   { name: 'description', label: 'Description', type: 'text', required: true, defaultValue: comp => comp.label || '' },
@@ -1324,6 +1342,63 @@ function ensureGeneratorStudyMetadata() {
 }
 
 
+
+function isMccComponentMeta(meta) {
+  if (!meta || typeof meta !== 'object') return false;
+  const type = `${meta.type || ''}`.trim().toLowerCase();
+  const subtype = `${meta.subtype || ''}`.trim().toLowerCase();
+  return subtype === 'mcc' || type === 'mcc';
+}
+
+function ensureMccFieldsOnComponent(comp, meta) {
+  if (!comp || typeof comp !== 'object') return comp;
+  if (!isMccComponentMeta(meta || comp)) return comp;
+  if (!comp.props || typeof comp.props !== 'object') {
+    comp.props = { ...(comp.props || {}) };
+  }
+  mccFieldSpecs.forEach(spec => {
+    const hasCompValue = Object.prototype.hasOwnProperty.call(comp, spec.name) && comp[spec.name] !== '';
+    const hasPropsValue = Object.prototype.hasOwnProperty.call(comp.props, spec.name) && comp.props[spec.name] !== '';
+    if (hasCompValue || hasPropsValue) {
+      if (!hasCompValue && hasPropsValue) comp[spec.name] = comp.props[spec.name];
+      if (hasCompValue && !hasPropsValue) comp.props[spec.name] = comp[spec.name];
+      return;
+    }
+    const nextValue = typeof spec.defaultValue === 'function' ? spec.defaultValue(comp, meta) : spec.defaultValue;
+    comp[spec.name] = nextValue;
+    comp.props[spec.name] = nextValue;
+  });
+  const bucketCount = Number(comp.bucket_count ?? comp.props.bucket_count);
+  const spareBucketCount = Number(comp.spare_bucket_count ?? comp.props.spare_bucket_count);
+  if (Number.isFinite(bucketCount) && Number.isFinite(spareBucketCount) && spareBucketCount > bucketCount) {
+    comp.spare_bucket_count = bucketCount;
+    comp.props.spare_bucket_count = bucketCount;
+  }
+  return comp;
+}
+
+function ensureMccMetadata() {
+  Object.entries(componentMeta).forEach(([key, meta]) => {
+    if (!isMccComponentMeta(meta)) return;
+    if (!meta.props || typeof meta.props !== 'object') {
+      meta.props = { ...(meta.props || {}) };
+    }
+    mccFieldSpecs.forEach(spec => {
+      if (!Object.prototype.hasOwnProperty.call(meta.props, spec.name)) {
+        const nextValue = typeof spec.defaultValue === 'function' ? spec.defaultValue(meta.props) : spec.defaultValue;
+        meta.props[spec.name] = nextValue;
+      }
+    });
+    const schemaKeys = new Set([key, meta.subtype].filter(Boolean));
+    schemaKeys.forEach(schemaKey => {
+      if (!Array.isArray(propSchemas[schemaKey])) {
+        propSchemas[schemaKey] = inferSchemaFromProps(meta.props || {});
+      }
+      mccFieldSpecs.forEach(spec => ensureBaselineFieldSchema(propSchemas[schemaKey], spec));
+    });
+  });
+}
+
 function loadStoredCustomComponents() {
   const stored = getItem(customComponentStorageKey, [], customComponentScenarioKey);
   if (!Array.isArray(stored)) return [];
@@ -1499,6 +1574,7 @@ async function loadComponentLibrary() {
 
   ensureCapacitorReactorPropertyMetadata();
   ensureGeneratorStudyMetadata();
+  ensureMccMetadata();
   ensureBaselineComponentMetadata();
 
   buildPalette();
@@ -5589,6 +5665,7 @@ function normalizeComponent(c) {
   applyDefaults(nc);
   ensureBaselineFieldsOnComponent(nc, componentMeta[nc.subtype]);
   ensureGeneratorStudyFieldsOnComponent(nc, componentMeta[nc.subtype]);
+  ensureMccFieldsOnComponent(nc, componentMeta[nc.subtype]);
   return nc;
 }
 
@@ -7989,6 +8066,7 @@ function addComponent(cfg) {
   applyDefaults(comp);
   ensureBaselineFieldsOnComponent(comp, meta);
   ensureGeneratorStudyFieldsOnComponent(comp, meta);
+  ensureMccFieldsOnComponent(comp, meta);
   ensureShapeDefaults(comp);
   if (comp.type === 'transformer') {
     syncTransformerDefaults(comp, { forceBase: true });
@@ -11132,6 +11210,7 @@ async function init() {
       }
       ensureBaselineFieldsOnComponent(c, componentMeta[c.subtype]);
       ensureGeneratorStudyFieldsOnComponent(c, componentMeta[c.subtype]);
+      ensureMccFieldsOnComponent(c, componentMeta[c.subtype]);
     });
   });
   rebuildComponentMaps();
@@ -11140,6 +11219,7 @@ async function init() {
   });
   ensureBaselineComponentMetadata();
   ensureGeneratorStudyMetadata();
+  ensureMccMetadata();
   sheets.forEach(s => {
     s.components.forEach(c => {
       (c.connections || []).forEach(conn => {

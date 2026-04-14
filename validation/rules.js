@@ -128,7 +128,8 @@ export function runValidation(components = [], studies = {}) {
 
   // Panel required field completeness for panel studies and reports
   components.forEach(c => {
-    const isPanel = c?.type === 'panel' || c?.subtype === 'panel' || c?.subtype === 'Panel';
+    const subtype = `${c?.subtype ?? ''}`.trim().toLowerCase();
+    const isPanel = (c?.type === 'panel' || subtype === 'panel') && subtype !== 'mcc';
     if (!isPanel) return;
     const props = c.props && typeof c.props === 'object' ? c.props : c;
     const missing = [];
@@ -151,6 +152,39 @@ export function runValidation(components = [], studies = {}) {
       issues.push({
         component: c.id,
         message: `Panel missing required attributes: ${missing.join(', ')}.`
+      });
+    }
+  });
+
+
+  // MCC required field completeness for lineup and study metadata
+  components.forEach(c => {
+    const isMcc = c?.subtype === 'mcc' || c?.type === 'mcc';
+    if (!isMcc) return;
+    const props = c.props && typeof c.props === 'object' ? c.props : c;
+    const missing = [];
+    if (!`${props.tag ?? ''}`.trim()) missing.push('tag');
+    if (!`${props.description ?? ''}`.trim()) missing.push('description');
+    if (!`${props.manufacturer ?? ''}`.trim()) missing.push('manufacturer');
+    if (!`${props.model ?? ''}`.trim()) missing.push('model');
+    const ratedVoltageKv = Number(props.rated_voltage_kv);
+    if (!Number.isFinite(ratedVoltageKv) || ratedVoltageKv <= 0) missing.push('rated_voltage_kv');
+    const busRatingA = Number(props.bus_rating_a);
+    if (!Number.isFinite(busRatingA) || busRatingA <= 0) missing.push('bus_rating_a');
+    if (!`${props.main_device_type ?? ''}`.trim()) missing.push('main_device_type');
+    const sccrKa = Number(props.sccr_ka);
+    if (!Number.isFinite(sccrKa) || sccrKa <= 0) missing.push('sccr_ka');
+    const bucketCount = Number(props.bucket_count);
+    if (!Number.isFinite(bucketCount) || bucketCount <= 0) missing.push('bucket_count');
+    const spareBucketCount = Number(props.spare_bucket_count);
+    if (!Number.isFinite(spareBucketCount) || spareBucketCount < 0 || (Number.isFinite(bucketCount) && spareBucketCount > bucketCount)) {
+      missing.push('spare_bucket_count');
+    }
+    if (!`${props.form_type ?? ''}`.trim()) missing.push('form_type');
+    if (missing.length) {
+      issues.push({
+        component: c.id,
+        message: `MCC missing required attributes: ${missing.join(', ')}.`
       });
     }
   });
