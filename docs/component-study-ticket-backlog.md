@@ -228,6 +228,8 @@ This ticket set translates the current component/attribute gaps into implementat
 ## CTR-COMP-012 — Cross-cutting schema baseline for all one-line components
 **Component:** Shared attribute baseline across all subtypes.
 
+**Status:** Completed on April 14, 2026.
+
 **Study impact:** All studies (consistency, validation, report reliability).
 
 **Required attributes (minimum):**

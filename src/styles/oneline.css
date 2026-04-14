@@ -1480,6 +1480,18 @@ body.oneline-page .palette-scroll {
   border-color: rgba(108, 117, 125, 0.4);
 }
 
+.prop-field-badge-required {
+  background: rgba(220, 53, 69, 0.12);
+  color: #b02a37;
+  border-color: rgba(220, 53, 69, 0.35);
+}
+
+.prop-field-badge-optional {
+  background: rgba(40, 167, 69, 0.12);
+  color: #1f7a35;
+  border-color: rgba(40, 167, 69, 0.35);
+}
+
 .prop-modal form fieldset label input.prop-input-custom {
   background: rgba(255, 193, 7, 0.08);
   border-color: rgba(255, 193, 7, 0.55);
@@ -2159,5 +2171,4 @@ g.component.scenario-diff > * {
   background: none;
   flex-shrink: 0;
 }
-
 
