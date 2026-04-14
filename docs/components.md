@@ -40,6 +40,12 @@ Each subtype in `componentLibrary.json` may include these properties in its sche
 - Switchboard fields include `tag`, `description`, `manufacturer`, `model`, `rated_voltage_kv`, `phases`, `bus_rating_a`, `withstand_1s_ka`, `interrupting_ka`, `arc_resistant_type`, and `maintenance_mode_supported`.
 - Validation flags switchboard records missing any required short-circuit and protection metadata so study inputs are complete before execution.
 
+## Cable segment component fields
+
+- The one-line palette now includes a `cable` subtype for explicit inter-device cable segments.
+- Cable segment fields include `tag`, `description`, `manufacturer`, `model`, `length_ft`, `material`, `insulation_type`, `temp_rating_c`, `size_awg_kcmil`, `parallel_sets`, `r_ohm_per_kft`, and `x_ohm_per_kft`.
+- Validation flags cable segments missing required impedance and construction metadata so voltage-drop and short-circuit path calculations do not silently fall back to assumed values.
+
 ## Protective component normalized fields
 
 - Breakers, fuses, relays, and reclosers now share a common protection schema baseline for study ingestion.

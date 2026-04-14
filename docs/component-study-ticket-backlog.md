@@ -92,6 +92,8 @@ This ticket set translates the current component/attribute gaps into implementat
 ## CTR-COMP-005 — Add `cable` network component for explicit inter-device segments
 **Component:** Cable segment/feeder segment in one-line graph.
 
+**Status:** Completed on April 14, 2026.
+
 **Study impact:** Voltage drop, short circuit (R/X path), DC fault, ampacity validation.
 
 **Required attributes (minimum):**
