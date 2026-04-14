@@ -42,6 +42,35 @@ function normalizeType(value) {
     .toLowerCase();
 }
 
+const TYPE_ALIASES = new Map([
+  ['synchronous', 'generator'],
+  ['asynchronous', 'generator'],
+  ['pv_inverter', 'inverter'],
+  ['bess_inverter', 'inverter'],
+  ['rectifier', 'inverter'],
+  ['shunt_capacitor_bank', 'load'],
+  ['static_load', 'load'],
+  ['motor_load', 'load'],
+  ['feeder', 'load'],
+  ['link_source', 'utility'],
+  ['link_target', 'bus'],
+  ['relay_87', 'relay'],
+  ['class_rk1', 'fuse'],
+  ['lv_cb', 'breaker'],
+  ['mv_cb', 'breaker'],
+  ['hv_cb', 'breaker'],
+  ['two_winding', 'transformer'],
+  ['three_winding', 'transformer'],
+  ['auto_transformer', 'transformer'],
+  ['dc_bus', 'bus']
+]);
+
+function canonicalType(type) {
+  const normalized = normalizeType(type);
+  if (!normalized) return '';
+  return TYPE_ALIASES.get(normalized) || normalized;
+}
+
 function classifyType(type) {
   if (/utility|source|grid/.test(type)) return 'source';
   if (/transformer/.test(type)) return 'transformer';
@@ -53,7 +82,8 @@ function classifyType(type) {
 }
 
 function getPropKeys(component) {
-  return Object.keys(component?.props || {}).map((key) => normalizeType(key));
+  const props = component?.props && typeof component.props === 'object' ? component.props : {};
+  return Object.keys(props).map((key) => normalizeType(key));
 }
 
 function formatList(items) {
@@ -68,10 +98,12 @@ async function main() {
   const typeToProps = new Map();
 
   components.forEach((component) => {
-    const type = normalizeType(component?.subtype || component?.type || component?.label);
+    const type = canonicalType(component?.subtype || component?.type || component?.label);
     if (!type) return;
     discoveredTypes.add(type);
-    typeToProps.set(type, getPropKeys(component));
+    const existingProps = typeToProps.get(type) || [];
+    const mergedProps = Array.from(new Set([...existingProps, ...getPropKeys(component)]));
+    typeToProps.set(type, mergedProps);
   });
 
   const missingComponents = COMMON_COMPONENT_TYPES.filter((baselineType) => {
