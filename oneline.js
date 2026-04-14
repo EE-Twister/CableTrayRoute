@@ -1125,6 +1125,125 @@ const capacitorBankPropertyFields = [
     'Defines operation behavior. Used in network control.')
 ];
 
+const baselineComponentFieldSpecs = [
+  { name: 'tag', label: 'Tag', type: 'text', required: true, defaultValue: comp => comp.ref || comp.label || comp.id || '' },
+  { name: 'description', label: 'Description', type: 'text', required: true, defaultValue: comp => comp.label || '' },
+  { name: 'manufacturer', label: 'Manufacturer', type: 'text', required: true, defaultValue: 'Unspecified' },
+  { name: 'model', label: 'Model', type: 'text', required: true, defaultValue: 'Unspecified' },
+  { name: 'phases', label: 'Phases', type: 'number', required: true, defaultValue: 3 },
+  { name: 'commissioning_state', label: 'Commissioning State', type: 'text', required: true, defaultValue: 'existing' },
+  { name: 'service_status', label: 'Service Status', type: 'text', required: true, defaultValue: 'in_service' },
+  { name: 'notes', label: 'Notes', type: 'textarea', required: false, rows: 3, defaultValue: '' }
+];
+
+function isDiagramAssetComponentMeta(meta) {
+  if (!meta || typeof meta !== 'object') return false;
+  const category = `${meta.category || ''}`.trim().toLowerCase();
+  const type = `${meta.type || ''}`.trim().toLowerCase();
+  if (!category && !type) return false;
+  if (category === 'annotations' || type === 'annotation' || type === 'dimension') return false;
+  if (category === 'links' || type === 'sheet_link') return false;
+  return true;
+}
+
+function prefersDcVoltageBaseline(comp, meta) {
+  const type = `${comp?.type || meta?.type || ''}`.trim().toLowerCase();
+  const subtype = `${comp?.subtype || meta?.subtype || ''}`.trim().toLowerCase();
+  const hasNominal = comp && (
+    Object.prototype.hasOwnProperty.call(comp, 'nominal_voltage_vdc')
+    || (comp.props && Object.prototype.hasOwnProperty.call(comp.props, 'nominal_voltage_vdc'))
+  );
+  const metaHasNominal = meta && meta.props && Object.prototype.hasOwnProperty.call(meta.props, 'nominal_voltage_vdc');
+  if (hasNominal || metaHasNominal) return true;
+  if (type.includes('dc') || subtype.includes('dc')) return true;
+  return subtype.includes('battery') || subtype.includes('rectifier');
+}
+
+function resolveBaselineVoltageField(comp, meta) {
+  return prefersDcVoltageBaseline(comp, meta) ? 'nominal_voltage_vdc' : 'rated_voltage_kv';
+}
+
+function ensureBaselineFieldSchema(schema, fieldSpec) {
+  if (!Array.isArray(schema) || !fieldSpec?.name) return;
+  const existing = schema.find(field => field && field.name === fieldSpec.name);
+  if (existing) {
+    existing.required = Boolean(fieldSpec.required);
+    if (!existing.label) existing.label = fieldSpec.label;
+    if (!existing.type) existing.type = fieldSpec.type || 'text';
+    if (fieldSpec.rows && !existing.rows) existing.rows = fieldSpec.rows;
+    return;
+  }
+  schema.push({
+    name: fieldSpec.name,
+    label: fieldSpec.label,
+    type: fieldSpec.type || 'text',
+    required: Boolean(fieldSpec.required),
+    ...(fieldSpec.rows ? { rows: fieldSpec.rows } : {})
+  });
+}
+
+function ensureBaselineFieldsOnComponent(comp, meta) {
+  if (!comp || typeof comp !== 'object') return comp;
+  if (!isDiagramAssetComponentMeta(meta || comp)) return comp;
+  if (!comp.props || typeof comp.props !== 'object') {
+    comp.props = { ...(comp.props || {}) };
+  }
+  const ensureValue = (fieldName, defaultValue) => {
+    const hasCompValue = Object.prototype.hasOwnProperty.call(comp, fieldName) && comp[fieldName] !== '';
+    const hasPropsValue = Object.prototype.hasOwnProperty.call(comp.props, fieldName) && comp.props[fieldName] !== '';
+    if (hasCompValue || hasPropsValue) {
+      if (!hasCompValue && hasPropsValue) comp[fieldName] = comp.props[fieldName];
+      if (hasCompValue && !hasPropsValue) comp.props[fieldName] = comp[fieldName];
+      return;
+    }
+    const resolvedDefault = typeof defaultValue === 'function' ? defaultValue(comp, meta) : defaultValue;
+    comp[fieldName] = resolvedDefault;
+    comp.props[fieldName] = resolvedDefault;
+  };
+
+  baselineComponentFieldSpecs.forEach(spec => ensureValue(spec.name, spec.defaultValue));
+  const voltageFieldName = resolveBaselineVoltageField(comp, meta);
+  const voltageDefault = voltageFieldName === 'nominal_voltage_vdc'
+    ? (comp.voltage || comp.volts || '')
+    : ((Number.isFinite(Number(comp.voltage)) && Number(comp.voltage) > 100)
+      ? Number(comp.voltage) / 1000
+      : (comp.voltage || comp.kv || ''));
+  ensureValue(voltageFieldName, voltageDefault);
+  return comp;
+}
+
+function ensureBaselineComponentMetadata() {
+  Object.entries(componentMeta).forEach(([key, meta]) => {
+    if (!isDiagramAssetComponentMeta(meta)) return;
+    if (!meta.props || typeof meta.props !== 'object') {
+      meta.props = { ...(meta.props || {}) };
+    }
+    const voltageFieldName = resolveBaselineVoltageField(null, meta);
+    const schemaKeys = new Set([key, meta.subtype].filter(Boolean));
+    baselineComponentFieldSpecs.forEach(spec => {
+      if (!Object.prototype.hasOwnProperty.call(meta.props, spec.name)) {
+        const nextValue = typeof spec.defaultValue === 'function' ? spec.defaultValue({}) : spec.defaultValue;
+        meta.props[spec.name] = nextValue;
+      }
+    });
+    if (!Object.prototype.hasOwnProperty.call(meta.props, voltageFieldName)) {
+      meta.props[voltageFieldName] = '';
+    }
+    schemaKeys.forEach(schemaKey => {
+      if (!Array.isArray(propSchemas[schemaKey])) {
+        propSchemas[schemaKey] = inferSchemaFromProps(meta.props || {});
+      }
+      baselineComponentFieldSpecs.forEach(spec => ensureBaselineFieldSchema(propSchemas[schemaKey], spec));
+      ensureBaselineFieldSchema(propSchemas[schemaKey], {
+        name: voltageFieldName,
+        label: voltageFieldName === 'nominal_voltage_vdc' ? 'Nominal DC Voltage (Vdc)' : 'Rated Voltage (kV)',
+        type: 'number',
+        required: true
+      });
+    });
+  });
+}
+
 
 function loadStoredCustomComponents() {
   const stored = getItem(customComponentStorageKey, [], customComponentScenarioKey);
@@ -1300,6 +1419,7 @@ async function loadComponentLibrary() {
   builtinComponents.forEach(def => registerDefinition(def, { allowOverride: false }));
 
   ensureCapacitorReactorPropertyMetadata();
+  ensureBaselineComponentMetadata();
 
   buildPalette();
   refreshAttributeOptions();
@@ -5387,6 +5507,7 @@ function normalizeComponent(c) {
     }));
   }
   applyDefaults(nc);
+  ensureBaselineFieldsOnComponent(nc, componentMeta[nc.subtype]);
   return nc;
 }
 
@@ -7785,6 +7906,7 @@ function addComponent(cfg) {
     comp.height = comp.height || 60;
   }
   applyDefaults(comp);
+  ensureBaselineFieldsOnComponent(comp, meta);
   ensureShapeDefaults(comp);
   if (comp.type === 'transformer') {
     syncTransformerDefaults(comp, { forceBase: true });
@@ -8578,6 +8700,10 @@ function selectComponent(compOrId) {
       const labelHeader = document.createElement('span');
       labelHeader.className = 'prop-field-label';
       labelHeader.textContent = f.label;
+      const requiredBadge = document.createElement('span');
+      requiredBadge.className = `prop-field-badge ${f.required ? 'prop-field-badge-required' : 'prop-field-badge-optional'}`;
+      requiredBadge.textContent = f.required ? 'Required' : 'Optional';
+      labelHeader.appendChild(requiredBadge);
       let input;
       const defVal = manufacturerDefaults[targetComp.subtype]?.[f.name] || '';
       let curVal;
@@ -8626,6 +8752,7 @@ function selectComponent(compOrId) {
         input.value = curVal ?? '';
       }
       input.name = f.name;
+      if (f.required) input.required = true;
       if (f.placeholder) input.placeholder = f.placeholder;
       if (f.name === 'manufacturer') manufacturerInput = input;
       if (f.name === 'model') modelInput = input;
@@ -10921,12 +11048,14 @@ async function init() {
         });
         propSchemas[c.subtype] = inferSchemaFromProps(raw);
       }
+      ensureBaselineFieldsOnComponent(c, componentMeta[c.subtype]);
     });
   });
   rebuildComponentMaps();
   Object.keys(componentMeta).forEach(sub => {
     if (!propSchemas[sub]) propSchemas[sub] = inferSchemaFromProps(componentMeta[sub].props || {});
   });
+  ensureBaselineComponentMetadata();
   sheets.forEach(s => {
     s.components.forEach(c => {
       (c.connections || []).forEach(conn => {
