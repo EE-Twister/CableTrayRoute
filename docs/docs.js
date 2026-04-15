@@ -29,6 +29,7 @@ const DOC_NAV = [
       { href: "cable_fill_rules.html", title: "Cable Fill Rules" },
       { href: "routing_assumptions.html", title: "Routing Assumptions" },
       { href: "heat-trace-sizing.md", title: "Heat Trace Sizing" },
+      { href: "cathodic_protection.md", title: "Cathodic Protection Sizing" },
     ],
   },
   {
@@ -37,6 +38,7 @@ const DOC_NAV = [
       { href: "standards.html", title: "Engineering References" },
       { href: "nec_reference.html", title: "NEC Reference Tables" },
       { href: "heat-trace-sizing.md", title: "Heat Trace Sizing (IEEE 515 Context)" },
+      { href: "cathodic_protection.md", title: "Cathodic Protection Sizing (AMPP/NACE/ISO Context)" },
     ],
   },
   {
