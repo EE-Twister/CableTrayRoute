@@ -22,6 +22,7 @@ const ACTIONS = [
   { id: "settings:compact-mode", label: "Toggle Compact Mode", keywords: ["density", "table", "compact"], trigger: () => toggleCheckbox("compact-toggle") },
   { id: "settings:units", label: "Switch Units (Imperial / Metric)", keywords: ["imperial", "metric", "measurement"], trigger: () => { const sel = document.getElementById("unit-select"); if (!sel) return false; sel.value = sel.value === "imperial" ? "metric" : "imperial"; sel.dispatchEvent(new Event("change", { bubbles: true })); return true; } },
   { id: "workflow:equipment", label: "Go to Equipment List", keywords: ["navigation", "equipment"], href: "equipmentlist.html" },
+  { id: "workflow:equipment-arrangements", label: "Go to Equipment Arrangements", keywords: ["navigation", "equipment", "layout", "room", "nec", "clearance"], href: "equipmentarrangements.html" },
   { id: "workflow:load", label: "Go to Load List", keywords: ["navigation", "load"], href: "loadlist.html" },
   { id: "workflow:cable", label: "Go to Cable Schedule", keywords: ["navigation", "cables"], href: "cableschedule.html" },
   { id: "workflow:raceway", label: "Go to Raceway Schedule", keywords: ["navigation", "tray", "conduit"], href: "racewayschedule.html" },
