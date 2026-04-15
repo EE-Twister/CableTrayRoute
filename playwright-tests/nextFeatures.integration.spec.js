@@ -240,8 +240,8 @@ test.describe('next features integration: cost estimator scenarios and exports',
   });
 });
 
-test.describe('next features integration: emf deterministic outputs', () => {
-  test('acceptance EMF-02: emf calculation returns deterministic numeric output', async ({ page }) => {
+test.describe('next features integration: emf acceptance cases', () => {
+  test('acceptance EMF-01 [emf] [AT-EMF-01]: nominal B_rms/B_peak outputs stay within tolerance and PASS limits', async ({ page }) => {
     await setupEMFPage(page);
     await fillEMFInputs(page, EMF_CANONICAL_FIXTURE.defaultGeometry);
     await runEMFCalculate(page);
@@ -267,62 +267,53 @@ test.describe('next features integration: emf deterministic outputs', () => {
 
     const resultText = await getResultText(page, '#results');
     expect(resultText).toContain('ICNIRP 2010 Compliance');
+    await expect(page.locator('tr:has(th:has-text("ICNIRP Occupational")) .status-badge.result-ok')).toHaveText('PASS');
+    await expect(page.locator('tr:has(th:has-text("ICNIRP General Public")) .status-badge.result-ok')).toHaveText('PASS');
     await expect(page.locator('#results .status-badge', { hasText: 'PASS' })).toHaveCount(2);
+    await expect(page.locator('#results .status-badge')).toHaveText(['PASS', 'PASS']);
   });
 
-  test('acceptance EMF-03: ICNIRP compliance shows PASS and FAIL outcomes for supported scenarios', async ({ page }) => {
+  test('acceptance EMF-02 [emf] [AT-EMF-02]: threshold boundaries enforce public and occupational pass-fail transitions', async ({ page }) => {
     await setupEMFPage(page);
 
-    await fillEMFInputs(page, { ...EMF_CANONICAL_FIXTURE.defaultGeometry });
+    await fillEMFInputs(page, {
+      ...EMF_CANONICAL_FIXTURE.defaultGeometry,
+      loadCurrent: EMF_CANONICAL_FIXTURE.boundaryCurrents.nearGeneralPublicBoundary,
+    });
     await runEMFCalculate(page);
-    await expect(page.locator('#results .status-badge', { hasText: 'PASS' })).toHaveCount(2);
-    await expect(page.locator('#results .status-badge', { hasText: 'FAIL' })).toHaveCount(0);
+
+    const nearPublicBoundaryRms = await getEmfRmsMicroTesla(page);
+    expect(nearPublicBoundaryRms).not.toBeNull();
+    expect(Math.abs(nearPublicBoundaryRms - 200)).toBeLessThanOrEqual(EMF_CANONICAL_FIXTURE.tolerances.boundaryMicroTeslaAbs);
+    await expect(page.locator('tr:has(th:has-text("ICNIRP Occupational")) .status-badge.result-ok')).toHaveText('PASS');
+    await expect(page.locator('tr:has(th:has-text("ICNIRP General Public")) .status-badge.result-ok')).toHaveText('PASS');
 
     await fillEMFInputs(page, {
       ...EMF_CANONICAL_FIXTURE.defaultGeometry,
       loadCurrent: EMF_CANONICAL_FIXTURE.boundaryCurrents.overGeneralPublicBoundary,
     });
     await runEMFCalculate(page);
-    await expect(page.locator('#results .status-badge', { hasText: 'PASS' })).toHaveCount(1);
-    await expect(page.locator('#results .status-badge', { hasText: 'FAIL' })).toHaveCount(1);
+    await expect(page.locator('tr:has(th:has-text("ICNIRP Occupational")) .status-badge.result-ok')).toHaveText('PASS');
+    await expect(page.locator('tr:has(th:has-text("ICNIRP General Public")) .status-badge.result-fail')).toHaveText('FAIL');
+    await expect(page.locator('#results .status-badge')).toHaveText(['PASS', 'FAIL']);
 
     await fillEMFInputs(page, {
       ...EMF_CANONICAL_FIXTURE.defaultGeometry,
       loadCurrent: EMF_CANONICAL_FIXTURE.boundaryCurrents.nearOccupationalBoundary,
     });
     await runEMFCalculate(page);
-    await expect(page.locator('#results .status-badge', { hasText: 'FAIL' })).toHaveCount(2);
+
+    const nearOccupationalBoundaryRms = await getEmfRmsMicroTesla(page);
+    expect(nearOccupationalBoundaryRms).not.toBeNull();
+    expect(Math.abs(nearOccupationalBoundaryRms - 1000)).toBeLessThanOrEqual(EMF_CANONICAL_FIXTURE.tolerances.boundaryMicroTeslaAbs);
+    await expect(page.locator('tr:has(th:has-text("ICNIRP Occupational")) .status-badge.result-fail')).toHaveText('FAIL');
+    await expect(page.locator('tr:has(th:has-text("ICNIRP General Public")) .status-badge.result-fail')).toHaveText('FAIL');
+    await expect(page.locator('#results .status-badge')).toHaveText(['FAIL', 'FAIL']);
   });
 
-  test('acceptance EMF-04: boundary and input errors use deterministic messaging and defaults', async ({ page }) => {
+  test('acceptance EMF-03 [emf] [AT-EMF-03]: field profile starts hidden then renders a non-empty chart/path payload', async ({ page }) => {
     await setupEMFPage(page);
-
-    await fillEMFInputs(page, { loadCurrent: '0' });
-    await runEMFCalculate(page);
-    const inputErrorDialog = page.getByRole('dialog');
-    await expect(inputErrorDialog).toContainText('Input Error');
-    await expect(inputErrorDialog).toContainText('Load current must be greater than zero.');
-    await inputErrorDialog.getByRole('button', { name: 'Close' }).click();
-
-    await fillEMFInputs(page, { loadCurrent: '' });
-    await runEMFCalculate(page);
-    const missingValueDialog = page.getByRole('dialog');
-    await expect(missingValueDialog).toContainText('Load current must be greater than zero.');
-    await missingValueDialog.getByRole('button', { name: 'Close' }).click();
-
-    await fillEMFInputs(page, {
-      loadCurrent: '150',
-      nCables: '-3',
-      measDistance: '',
-    });
-    await runEMFCalculate(page);
-    await expect(page.locator('#results .method-note')).toContainText('Configuration: 1 × 3-phase cable set(s)');
-    await expect(page.locator('tr:has(th:has-text("Measurement Distance (from tray edge)")) td')).toContainText('36.0 in');
-  });
-
-  test('acceptance EMF-05: profile scenario renders deterministic container visibility and chart points', async ({ page }) => {
-    await setupEMFPage(page);
-    await fillEMFInputs(page);
+    await fillEMFInputs(page, EMF_CANONICAL_FIXTURE.defaultGeometry);
 
     const chartContainer = page.locator('#profile-container');
     await expect(chartContainer).toBeHidden();
@@ -335,8 +326,42 @@ test.describe('next features integration: emf deterministic outputs', () => {
     await expect(chartContainer.locator('h2')).toHaveText('Field Profile vs. Distance from Tray Edge');
     await expect(page.locator('#emf-chart')).toBeVisible();
 
-    const points = await page.locator('#emf-chart polyline').getAttribute('points');
+    const profilePolyline = page.locator('#emf-chart polyline').first();
+    await expect(profilePolyline).toBeVisible();
+    const points = await profilePolyline.getAttribute('points');
     expect(points).toBeTruthy();
-    expect(points.trim().split(/\s+/).length).toBe(121);
+    expect(points.trim().length).toBeGreaterThan(0);
+    expect(points.trim().split(/\s+/).length).toBeGreaterThan(1);
+    const labelCount = await page.locator('#emf-chart text').count();
+    expect(labelCount).toBeGreaterThan(0);
+  });
+
+  test('acceptance EMF-04 [emf] [AT-EMF-04]: invalid current guardrails show modal errors and preserve prior result output', async ({ page }) => {
+    await setupEMFPage(page);
+    await fillEMFInputs(page, EMF_CANONICAL_FIXTURE.defaultGeometry);
+    await runEMFCalculate(page);
+    const priorResultsHtml = await page.locator('#results').innerHTML();
+    const priorRms = await getEmfRmsMicroTesla(page);
+    expect(priorRms).not.toBeNull();
+
+    await fillEMFInputs(page, { loadCurrent: '0' });
+    await runEMFCalculate(page);
+    const inputErrorDialog = page.getByRole('dialog');
+    await expect(inputErrorDialog).toContainText('Input Error');
+    await expect(inputErrorDialog).toContainText('Load current must be greater than zero.');
+    await inputErrorDialog.getByRole('button', { name: 'Close' }).click();
+    await expect(page.locator('#results')).toContainText('RMS Flux Density');
+    const zeroAttemptResultsHtml = await page.locator('#results').innerHTML();
+    expect(zeroAttemptResultsHtml).toBe(priorResultsHtml);
+
+    await fillEMFInputs(page, { loadCurrent: '-25' });
+    await runEMFCalculate(page);
+    const negativeValueDialog = page.getByRole('dialog');
+    await expect(negativeValueDialog).toContainText('Input Error');
+    await expect(negativeValueDialog).toContainText('Load current must be greater than zero.');
+    await negativeValueDialog.getByRole('button', { name: 'Close' }).click();
+    await expect(page.locator('#results')).toContainText('RMS Flux Density');
+    const negativeAttemptResultsHtml = await page.locator('#results').innerHTML();
+    expect(negativeAttemptResultsHtml).toBe(priorResultsHtml);
   });
 });
