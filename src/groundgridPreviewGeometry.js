@@ -28,6 +28,15 @@ function buildAxisIndices(count, targetSpacing, conductorSpacing) {
   return [...indices].sort((a, b) => a - b);
 }
 
+function buildAllAxisIndices(count) {
+  const lastIndex = Math.max(0, count - 1);
+  const indices = [];
+  for (let index = 0; index <= lastIndex; index += 1) {
+    indices.push(index);
+  }
+  return indices;
+}
+
 export function deriveRodLayout({ hasRods, nx, ny, spacingX, spacingY, rodSpacingX, rodSpacingY }) {
   if (!hasRods) {
     return {
@@ -39,8 +48,19 @@ export function deriveRodLayout({ hasRods, nx, ny, spacingX, spacingY, rodSpacin
     };
   }
 
-  const xIndices = buildAxisIndices(ny, rodSpacingX, spacingX);
-  const yIndices = buildAxisIndices(nx, rodSpacingY, spacingY);
+  const hasInterstitialX = Number.isFinite(rodSpacingX) && rodSpacingX > 0;
+  const hasInterstitialY = Number.isFinite(rodSpacingY) && rodSpacingY > 0;
+
+  const xIndices = hasInterstitialX
+    ? buildAxisIndices(ny, rodSpacingX, spacingX)
+    : hasInterstitialY
+      ? buildAllAxisIndices(ny)
+      : buildAxisIndices(ny, rodSpacingX, spacingX);
+  const yIndices = hasInterstitialY
+    ? buildAxisIndices(nx, rodSpacingY, spacingY)
+    : hasInterstitialX
+      ? buildAllAxisIndices(nx)
+      : buildAxisIndices(nx, rodSpacingY, spacingY);
   const points = [];
   const corners = new Set([
     '0:0',
