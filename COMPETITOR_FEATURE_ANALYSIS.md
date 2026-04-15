@@ -123,6 +123,49 @@ The following features were identified by benchmarking the one-line diagram edit
 
 ---
 
+
+
+## One-Line Diagram Daily UX Quick Wins (2026-04-15)
+
+For day-to-day drafting speed (especially for power users coming from ETAP/EasyPower/SKM), the one-line editor already covers many baseline items (right-click edit/rename/duplicate/rotate/lock, select connected, select by type, grouping, zoom-to-fit, grid snap, layers, minimap). The following **simple** additions are still common in competitor tools and would likely provide immediate productivity gains:
+
+1. **Right-click align/distribute commands** (not only toolbar buttons)
+   - Why it matters: users keep their cursor on the canvas and avoid toolbar travel.
+   - Typical actions: Align Left/Right/Top/Bottom, Distribute Horizontal/Vertical.
+
+2. **Bring to Front / Send to Back (z-order) in context menu**
+   - Why it matters: annotation bubbles, zone blocks, and crossing symbols are faster to manage when stacking order is one click away.
+
+3. **Connection waypoint handles + “Add elbow here” command**
+   - Why it matters: manual cleanup of dense drawings is faster than opening full connection edit dialogs.
+
+4. **Repeat last command (hotkey) and configurable keyboard shortcuts**
+   - Why it matters: repetitive layout work (duplicate, rotate, align) is significantly faster with remembered commands.
+
+5. **Quick-add via right-click on canvas**
+   - Why it matters: “Add breaker here / Add transformer here / Add text note here” mirrors CAD-like workflows and reduces palette switching.
+
+6. **Nudge with grid-aware step sizes**
+   - Why it matters: arrow keys with Shift/Ctrl step multipliers are heavily used for precise final placement.
+
+7. **Lock position vs lock properties (separate lock modes)**
+   - Why it matters: reviewers often want to freeze geometry but still permit metadata edits.
+
+8. **Recent symbols / favorites strip**
+   - Why it matters: cuts repeated search/scroll in larger symbol libraries.
+
+9. **Inline label editing on double-click (for all symbol types)**
+   - Why it matters: avoids modal friction during annotation-heavy sessions.
+
+10. **Persistent snapping aids (guides + distance readout)**
+    - Why it matters: users can align against nearby objects without toggling full grid modes.
+
+### Suggested priority (highest everyday impact)
+
+- **P1:** Context-menu align/distribute, z-order actions, nudge step controls.
+- **P2:** Quick-add canvas menu, inline label editing coverage, repeat-last command.
+- **P3:** Favorites/recent symbols, advanced waypoint elbow editing, guide/readout polish.
+
 ## One-Line Diagram & TCC Deep Dive (2026-04-06 Pass)
 
 Benchmarked against: **ETAP 2024/2025** (composite networks, protection zone overlays, arc flash label generation), **EasyPower 2025** (multi-sheet cross-references, arc flash boundary on TCC, CTI reports), **SKM PTW 9** (layer management, IEC relay curve library, SVG chart export), **PowerWorld Simulator 23** (animated geographic one-line, GIS background), and **DIgSILENT PowerFactory 2024** (IEC 60255 formula curves, ground fault protection TCC, flexible study result annotations).
