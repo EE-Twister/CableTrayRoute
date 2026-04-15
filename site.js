@@ -312,6 +312,7 @@ function initOperationStatusHost(container){
     indicator.setAttribute('aria-live','polite');
     container.appendChild(indicator);
   }
+  updateLastSavedIndicator();
   return host;
 }
 
@@ -405,7 +406,12 @@ function updateLastSavedIndicator(){
   if(typeof document==='undefined') return;
   const el=document.getElementById('last-saved-indicator');
   if(!el) return;
-  el.textContent=formatLastSaved(lastSavedAt);
+  const savedText=formatLastSaved(lastSavedAt);
+  if(savedText){
+    el.textContent=`${savedText} • Edits auto-save in this browser.`;
+  }else{
+    el.textContent='Edits auto-save in this browser. Use Save Project for a downloadable backup.';
+  }
 }
 
 function recordSave(){
@@ -1661,36 +1667,6 @@ function initWorkflowStepNav(){
 }
 
 globalThis.document?.addEventListener('DOMContentLoaded',initWorkflowStepNav);
-
-// ─── Unsaved-Changes Navigation Warning ────────────────────────────────────
-let _projectDirty=false;
-
-function initUnsavedChangesWarning(){
-  // Track project mutations via onProjectChange; mark clean after saves
-  onProjectChange(()=>{_projectDirty=true;});
-
-  window.addEventListener('beforeunload',e=>{
-    if(!_projectDirty) return;
-    // Modern browsers show their own generic message; the return value triggers the dialog
-    e.preventDefault();
-    e.returnValue='You have unsaved changes. Leave anyway?';
-    return e.returnValue;
-  });
-
-  // Mark clean when the user explicitly saves (listen for our toast signal)
-  // We hook into the existing save infrastructure by watching for markClean calls
-  const origShowToast=globalThis.showOperationToast;
-  if(typeof origShowToast==='function'){
-    globalThis.showOperationToast=(msg,kind)=>{
-      if(kind!=='error'&&(msg.toLowerCase().includes('saved')||msg.toLowerCase().includes('save'))){
-        _projectDirty=false;
-      }
-      return origShowToast(msg,kind);
-    };
-  }
-}
-
-globalThis.document?.addEventListener('DOMContentLoaded',initUnsavedChangesWarning);
 
 function persistConduits(data){
   try{
