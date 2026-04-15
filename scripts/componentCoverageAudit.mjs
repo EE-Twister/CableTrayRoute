@@ -16,6 +16,9 @@ const COMMON_COMPONENT_TYPES = [
   'mcc',
   'switchboard',
   'ups',
+  'busway',
+  'ct',
+  'pt_vt',
   'battery',
   'pv_array',
   'inverter',
@@ -68,7 +71,14 @@ const TYPE_ALIASES = new Map([
   ['two_winding', 'transformer'],
   ['three_winding', 'transformer'],
   ['auto_transformer', 'transformer'],
-  ['dc_bus', 'bus']
+  ['dc_bus', 'bus'],
+  ['busway', 'busway'],
+  ['ct', 'ct'],
+  ['current_transformer', 'ct'],
+  ['pt_vt', 'pt_vt'],
+  ['vt', 'pt_vt'],
+  ['pt', 'pt_vt'],
+  ['ups', 'ups']
 ]);
 
 function canonicalType(type) {

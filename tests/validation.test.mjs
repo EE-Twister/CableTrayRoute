@@ -298,6 +298,61 @@ describe('runValidation - PT/VT completeness and compatibility', () => {
   });
 });
 
+
+
+describe('runValidation - CT required attributes', () => {
+  it('flags a CT with missing required fields', () => {
+    const components = [
+      {
+        id: 'ct-1',
+        subtype: 'ct',
+        type: 'ct',
+        props: {
+          tag: '',
+          ratio_primary: 0,
+          ratio_secondary: 0,
+          accuracy_class: '',
+          burden_va: 0,
+          knee_point_v: 0,
+          polarity: '',
+          location_context: ''
+        }
+      }
+    ];
+    const issues = runValidation(components, {});
+    const ctIssue = issues.find(issue => issue.component === 'ct-1' && issue.message.includes('Current transformer missing/invalid attributes'));
+    assert.ok(ctIssue);
+    assert.ok(ctIssue.message.includes('tag'));
+    assert.ok(ctIssue.message.includes('ratio_primary'));
+    assert.ok(ctIssue.message.includes('ratio_secondary'));
+    assert.ok(ctIssue.message.includes('accuracy_class'));
+    assert.ok(ctIssue.message.includes('burden_va'));
+    assert.ok(ctIssue.message.includes('knee_point_v'));
+    assert.ok(ctIssue.message.includes('polarity'));
+    assert.ok(ctIssue.message.includes('location_context'));
+  });
+
+  it('does not flag a CT with all required fields present', () => {
+    const components = [
+      {
+        id: 'ct-2',
+        subtype: 'ct',
+        type: 'ct',
+        props: {
+          tag: 'CT-2',
+          ratio_primary: 600,
+          ratio_secondary: 5,
+          accuracy_class: '0.3',
+          burden_va: 15,
+          knee_point_v: 400,
+          polarity: 'H1-X1',
+          location_context: 'protection'
+        }
+      }
+    ];
+    assert.deepStrictEqual(runValidation(components, {}), []);
+  });
+});
 describe('runValidation - battery required attributes', () => {
   it('flags a battery when required fields are missing', () => {
     const components = [
