@@ -3,11 +3,23 @@ import { initStudyApprovalPanel } from './src/components/studyApproval.js';
 
 const SQFT_TO_SQM = 0.09290304;
 const LB_TO_KG = 0.45359237;
+const IN_TO_M = 0.0254;
+const MM_TO_M = 0.001;
+const FT_TO_M = 0.3048;
+const SQM_TO_SQFT = 10.76391041671;
 
 const TABLE_CURRENT_DENSITY_MA_M2 = {
   pipe: { low: 5, moderate: 10, high: 20 },
   tank: { low: 8, moderate: 15, high: 25 },
   other: { low: 6, moderate: 12, high: 22 }
+};
+
+const PIPE_MATERIAL_FACTORS = {
+  'carbon-steel': { factor: 1.0, hint: 'Preset-based current density factor for carbon steel is applied.' },
+  'ductile-iron': { factor: 1.1, hint: 'Ductile iron often uses slightly higher current demand than coated carbon steel.' },
+  'stainless-steel': { factor: 0.6, hint: 'Stainless steel can use reduced current demand depending on grade and environment.' },
+  copper: { factor: 0.35, hint: 'Copper is typically less common for CP; verify the design basis before final sizing.' },
+  other: { factor: 1.0, hint: 'Generic metal preset is selected. Verify current density by project specification.' }
 };
 
 export const CP_STANDARD_BASIS = {
@@ -62,7 +74,7 @@ export function runCathodicProtectionAnalysis(input) {
 
   const designCurrentDensityMaM2 = input.currentDensityMethod === 'manual'
     ? input.manualCurrentDensityMaM2
-    : lookupCurrentDensity(input.assetType, input.moistureCategory, input.soilResistivityOhmM, input.soilPh);
+    : lookupCurrentDensity(input.assetType, input.moistureCategory, input.soilResistivityOhmM, input.soilPh, input.pipeMaterial);
 
   const designCurrentDensityAperM2 = designCurrentDensityMaM2 / 1000;
   const exposedAreaM2 = input.surfaceAreaM2 * input.coatingBreakdownFactor;
@@ -138,6 +150,10 @@ function validateInputs(input) {
     errors.push('assetType must be pipe, tank, or other.');
   }
 
+  if (input.assetType === 'pipe' && !Object.keys(PIPE_MATERIAL_FACTORS).includes(input.pipeMaterial)) {
+    errors.push('pipeMaterial must be a supported material option.');
+  }
+
   if (!['low', 'moderate', 'high'].includes(input.moistureCategory)) {
     errors.push('moistureCategory must be low, moderate, or high.');
   }
@@ -153,11 +169,14 @@ function validateInputs(input) {
   return errors;
 }
 
-function lookupCurrentDensity(assetType, moistureCategory, soilResistivityOhmM, soilPh) {
+function lookupCurrentDensity(assetType, moistureCategory, soilResistivityOhmM, soilPh, pipeMaterial = 'carbon-steel') {
   const base = TABLE_CURRENT_DENSITY_MA_M2[assetType]?.[moistureCategory] ?? 10;
   const resistivityFactor = soilResistivityOhmM < 50 ? 1.2 : (soilResistivityOhmM > 200 ? 0.85 : 1.0);
   const phFactor = soilPh < 5.5 || soilPh > 9 ? 1.15 : 1.0;
-  return base * resistivityFactor * phFactor;
+  const materialFactor = assetType === 'pipe'
+    ? (PIPE_MATERIAL_FACTORS[pipeMaterial]?.factor ?? 1.0)
+    : 1.0;
+  return base * resistivityFactor * phFactor * materialFactor;
 }
 
 function roundTo(value, decimals) {
@@ -181,6 +200,16 @@ if (typeof document !== 'undefined') {
   const manualRow = document.getElementById('manual-density-row');
   const tableDensityEl = document.getElementById('table-density');
   const basisPanel = document.getElementById('calculation-basis-content');
+  const assetTypeEl = document.getElementById('asset-type');
+  const pipeMaterialEl = document.getElementById('pipe-material');
+  const pipeMaterialRow = document.getElementById('pipe-material-row');
+  const pipeMaterialHint = document.getElementById('pipe-material-hint');
+  const surfaceAreaModeEl = document.getElementById('surface-area-mode');
+  const surfaceAreaEl = document.getElementById('surface-area');
+  const pipeOdRow = document.getElementById('pipe-od-row');
+  const pipeLengthRow = document.getElementById('pipe-length-row');
+  const calculatedSurfaceAreaRow = document.getElementById('calculated-surface-area-row');
+  const calculatedSurfaceAreaEl = document.getElementById('calculated-surface-area');
 
   const saved = getStudies().cathodicProtection;
   renderCalculationBasis(basisPanel, CP_STANDARD_BASIS);
@@ -191,7 +220,7 @@ if (typeof document !== 'undefined') {
   function refreshTableDensity() {
     const input = readFormInputs();
     if (!input) return;
-    const tableDensity = lookupCurrentDensity(input.assetType, input.moistureCategory, input.soilResistivityOhmM, input.soilPh);
+    const tableDensity = lookupCurrentDensity(input.assetType, input.moistureCategory, input.soilResistivityOhmM, input.soilPh, input.pipeMaterial);
     tableDensityEl.value = roundTo(tableDensity, 3);
   }
 
@@ -201,15 +230,77 @@ if (typeof document !== 'undefined') {
     tableDensityEl.closest('.field-row').hidden = manual;
   }
 
+  function refreshPipeMaterialHint() {
+    const pipeMaterial = pipeMaterialEl.value;
+    pipeMaterialHint.textContent = PIPE_MATERIAL_FACTORS[pipeMaterial]?.hint
+      ?? 'Preset-based current density factor is applied.';
+  }
+
+  function updatePipeVisibility() {
+    const isPipe = assetTypeEl.value === 'pipe';
+    pipeMaterialRow.hidden = !isPipe;
+    pipeMaterialHint.hidden = !isPipe;
+    surfaceAreaModeEl.closest('.field-row').hidden = !isPipe;
+    if (!isPipe) {
+      surfaceAreaModeEl.value = 'manual';
+    }
+  }
+
+  function calculatePipeSurfaceAreaM2() {
+    const isMetric = document.getElementById('unit-select')?.value === 'metric';
+    const outsideDiameterInput = Number.parseFloat(document.getElementById('pipe-od').value);
+    const lengthInput = Number.parseFloat(document.getElementById('pipe-length').value);
+    if (!Number.isFinite(outsideDiameterInput) || !Number.isFinite(lengthInput) || outsideDiameterInput <= 0 || lengthInput <= 0) {
+      return null;
+    }
+
+    const outsideDiameterM = isMetric ? outsideDiameterInput * MM_TO_M : outsideDiameterInput * IN_TO_M;
+    const lengthM = isMetric ? lengthInput : lengthInput * FT_TO_M;
+    return Math.PI * outsideDiameterM * lengthM;
+  }
+
+  function refreshSurfaceAreaMode() {
+    const isPipe = assetTypeEl.value === 'pipe';
+    const usePipeDimensions = isPipe && surfaceAreaModeEl.value === 'pipe-dimensions';
+    pipeOdRow.hidden = !usePipeDimensions;
+    pipeLengthRow.hidden = !usePipeDimensions;
+    calculatedSurfaceAreaRow.hidden = !usePipeDimensions;
+    surfaceAreaEl.closest('.field-row').hidden = usePipeDimensions;
+
+    if (!usePipeDimensions) {
+      calculatedSurfaceAreaEl.value = '';
+      return;
+    }
+
+    const calculatedAreaM2 = calculatePipeSurfaceAreaM2();
+    if (!Number.isFinite(calculatedAreaM2)) {
+      calculatedSurfaceAreaEl.value = '';
+      return;
+    }
+
+    const isMetric = document.getElementById('unit-select')?.value === 'metric';
+    const displayArea = isMetric ? calculatedAreaM2 : (calculatedAreaM2 * SQM_TO_SQFT);
+    calculatedSurfaceAreaEl.value = roundTo(displayArea, 3);
+  }
+
   toggleDensityMode();
+  updatePipeVisibility();
+  refreshPipeMaterialHint();
+  refreshSurfaceAreaMode();
   refreshTableDensity();
 
-  ['asset-type', 'soil-resistivity', 'soil-ph', 'moisture-category', 'density-method'].forEach(id => {
+  ['asset-type', 'soil-resistivity', 'soil-ph', 'moisture-category', 'density-method', 'pipe-material', 'surface-area-mode', 'pipe-od', 'pipe-length', 'unit-select'].forEach(id => {
     document.getElementById(id).addEventListener('input', () => {
+      updatePipeVisibility();
+      refreshPipeMaterialHint();
+      refreshSurfaceAreaMode();
       toggleDensityMode();
       refreshTableDensity();
     });
     document.getElementById(id).addEventListener('change', () => {
+      updatePipeVisibility();
+      refreshPipeMaterialHint();
+      refreshSurfaceAreaMode();
       toggleDensityMode();
       refreshTableDensity();
     });
@@ -242,18 +333,27 @@ function readFormInputs() {
   const getValue = id => document.getElementById(id).value;
   const getNumber = id => Number.parseFloat(getValue(id));
   const isMetric = document.getElementById('unit-select')?.value === 'metric';
-
-  const surfaceAreaInput = getNumber('surface-area');
+  const assetType = getValue('asset-type');
+  const surfaceAreaMode = getValue('surface-area-mode');
+  const calculatedAreaM2 = calculatePipeSurfaceAreaFromInputs(isMetric, getNumber('pipe-od'), getNumber('pipe-length'));
+  const useCalculatedArea = assetType === 'pipe' && surfaceAreaMode === 'pipe-dimensions' && Number.isFinite(calculatedAreaM2);
+  const surfaceAreaInput = useCalculatedArea
+    ? (isMetric ? calculatedAreaM2 : calculatedAreaM2 * SQM_TO_SQFT)
+    : getNumber('surface-area');
   const installedMassInput = getNumber('installed-mass');
 
   return {
-    assetType: getValue('asset-type'),
+    assetType,
+    pipeMaterial: getValue('pipe-material'),
     soilResistivityOhmM: getNumber('soil-resistivity'),
     soilPh: getNumber('soil-ph'),
     moistureCategory: getValue('moisture-category'),
     coatingBreakdownFactor: getNumber('coating-breakdown'),
     surfaceAreaM2: isMetric ? surfaceAreaInput : surfaceAreaInput * SQFT_TO_SQM,
     currentDensityMethod: getValue('density-method'),
+    surfaceAreaMode,
+    pipeOdInput: getNumber('pipe-od'),
+    pipeLengthInput: getNumber('pipe-length'),
     manualCurrentDensityMaM2: getNumber('manual-density'),
     anodeCapacityAhPerKg: getNumber('anode-capacity'),
     anodeUtilization: getNumber('anode-utilization'),
@@ -306,6 +406,7 @@ function renderResults(result, root) {
           <thead><tr><th>Parameter</th><th>Value</th></tr></thead>
           <tbody>
             <tr><td>Asset type</td><td>${escapeHtml(result.assetType)}</td></tr>
+            ${result.assetType === 'pipe' ? `<tr><td>Pipe material</td><td>${escapeHtml(result.pipeMaterial || 'carbon-steel')}</td></tr>` : ''}
             <tr><td>Soil resistivity</td><td>${result.soilResistivityOhmM} Ω·m</td></tr>
             <tr><td>Soil pH</td><td>${result.soilPh}</td></tr>
             <tr><td>Moisture / corrosivity category</td><td>${escapeHtml(result.moistureCategory)}</td></tr>
@@ -322,6 +423,15 @@ function renderResults(result, root) {
 
       <p class="field-hint result-timestamp">Analysis run: ${new Date(result.timestamp).toLocaleString()}</p>
     </section>`;
+}
+
+function calculatePipeSurfaceAreaFromInputs(isMetric, outsideDiameterInput, lengthInput) {
+  if (!Number.isFinite(outsideDiameterInput) || !Number.isFinite(lengthInput) || outsideDiameterInput <= 0 || lengthInput <= 0) {
+    return null;
+  }
+  const outsideDiameterM = isMetric ? outsideDiameterInput * MM_TO_M : outsideDiameterInput * IN_TO_M;
+  const lengthM = isMetric ? lengthInput : lengthInput * FT_TO_M;
+  return Math.PI * outsideDiameterM * lengthM;
 }
 
 function escapeHtml(text) {
