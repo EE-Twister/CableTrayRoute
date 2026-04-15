@@ -120,6 +120,17 @@ Life_years = (W_installed × Q_anode × U × F_design) / (I_req × 8760)</pre>
               <option value="high">High / aggressive</option>
             </select>
           </div>
+          <div class="field-row" id="pipe-material-row">
+            <label for="pipe-material">Pipe material</label>
+            <select id="pipe-material">
+              <option value="carbon-steel" selected>Carbon steel</option>
+              <option value="ductile-iron">Ductile iron</option>
+              <option value="stainless-steel">Stainless steel</option>
+              <option value="copper">Copper</option>
+              <option value="other">Other metal</option>
+            </select>
+          </div>
+          <p class="field-hint" id="pipe-material-hint">Preset-based current density factor for carbon steel is applied.</p>
         </fieldset>
 
         <fieldset>
@@ -127,6 +138,25 @@ Life_years = (W_installed × Q_anode × U × F_design) / (I_req × 8760)</pre>
           <div class="field-row">
             <label for="coating-breakdown">Coating breakdown factor (0–1)</label>
             <input type="number" id="coating-breakdown" min="0" max="1" step="0.01" value="0.20" required>
+          </div>
+          <div class="field-row">
+            <label for="surface-area-mode">Surface area input method</label>
+            <select id="surface-area-mode">
+              <option value="manual" selected>Enter total surface area manually</option>
+              <option value="pipe-dimensions">Calculate from pipe O.D. and length</option>
+            </select>
+          </div>
+          <div class="field-row" id="pipe-od-row" hidden>
+            <label for="pipe-od">Pipe O.D. (<span class="unit-label-ft">in</span><span class="unit-label-m" hidden>mm</span>)</label>
+            <input type="number" id="pipe-od" min="0.01" step="0.01" value="12">
+          </div>
+          <div class="field-row" id="pipe-length-row" hidden>
+            <label for="pipe-length">Pipe length (<span class="unit-label-ft">ft</span><span class="unit-label-m" hidden>m</span>)</label>
+            <input type="number" id="pipe-length" min="0.1" step="0.1" value="1000">
+          </div>
+          <div class="field-row" id="calculated-surface-area-row" hidden>
+            <label for="calculated-surface-area">Calculated total metallic surface area (<span class="unit-label-ft">ft²</span><span class="unit-label-m" hidden>m²</span>)</label>
+            <input type="number" id="calculated-surface-area" value="0" readonly>
           </div>
           <div class="field-row">
             <label for="surface-area">Total metallic surface area (<span class="unit-label-ft">ft²</span><span class="unit-label-m" hidden>m²</span>)</label>
