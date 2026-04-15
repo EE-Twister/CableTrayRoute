@@ -100,4 +100,21 @@ describe('groundgrid preview geometry helpers', () => {
     assert.strictEqual(normalized.rodLayout.count, 4);
     assert.strictEqual(normalized.rodLayout.intermediateCount, 0);
   });
+
+  it('keeps corner rods and fills the cross-axis when interstitial spacing is set on one axis', () => {
+    const rodLayout = deriveRodLayout({
+      hasRods: true,
+      nx: 6,
+      ny: 6,
+      spacingX: 10,
+      spacingY: 10,
+      rodSpacingX: 20,
+      rodSpacingY: 0,
+    });
+
+    assert.strictEqual(rodLayout.count, 24);
+    assert.strictEqual(rodLayout.intermediateCount, 20);
+    assert.ok(rodLayout.points.some(point => point.xIndex === 2 && point.yIndex === 3));
+    assert.ok(rodLayout.points.some(point => point.xIndex === 4 && point.yIndex === 1));
+  });
 });
