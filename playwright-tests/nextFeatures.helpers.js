@@ -6,21 +6,73 @@ const root = path.join(__dirname, '..');
 
 export const pageUrl = file => `file://${path.join(root, file)}?e2e=1&e2e_reset=1`;
 
-export const COST_ESTIMATOR_FIXTURES = {
-  baselineProject: {
+// README(sync): source-of-truth is docs/next-features-acceptance.md lines
+// 94-135 (CE-Normal-01 + CE-Boundary-01/02) and 210-217 (numeric policy).
+export const COST_ESTIMATOR_CANONICAL_FIXTURE = {
+  projectData: {
     cableSchedule: [
-      { cable_tag: 'C-101', conductor_size: '4 AWG', conductors: 3, length_ft: 150 },
+      { cable_tag: 'C-1', conductor_size: '4 AWG', conductors: 3, length_ft: 100 },
+      { cable_tag: 'C-2', conductor_size: '2/0', conductors: 1, length_ft: 250 },
     ],
     traySchedule: [
-      { tray_id: 'T-101', tray_type: 'Ladder', inside_width: '12', length_ft: 120, fitting_count: 2 },
+      { tray_id: 'T-1', tray_type: 'Ladder', inside_width: '12', length_ft: 80, fitting_count: 2 },
     ],
     conduitSchedule: [
-      { conduit_id: 'CD-101', conduit_type: 'EMT', trade_size: '2', length_ft: 80 },
+      { conduit_id: 'CD-1', conduit_type: 'EMT', trade_size: '2', length_ft: 120 },
     ],
     studyResults: {
-      routeResults: [{ cable: 'C-101', total_length: 150 }],
+      routeResults: [
+        { cable: 'C-1', total_length: 100 },
+        { cable: 'C-2', total_length: 250 },
+      ],
     },
   },
+  expected: {
+    cableSubtotal: 2486,
+    traySubtotal: 980,
+    conduitSubtotal: 756,
+    subtotal: 4222,
+    contingencyPct: 15,
+    contingencyAmountRounded: 633,
+    totalRounded: 4855,
+    contingencyFloorPct: 0,
+    contingencyCeilingPct: 100,
+  },
+  tolerances: {
+    internalMathAbs: 0.01,
+    uiWholeDollarsAbs: 0,
+  },
+};
+
+// README(sync): source-of-truth is docs/next-features-acceptance.md lines
+// 158-188 (EMF-Normal-01 + EMF-Boundary-01/02) and 225-233 (numeric policy).
+export const EMF_CANONICAL_FIXTURE = {
+  defaultGeometry: {
+    frequency: '60',
+    loadCurrent: '100',
+    nCables: '1',
+    trayWidth: '12',
+    cableOd: '1.0',
+    measDistance: '36',
+  },
+  boundaryCurrents: {
+    nearGeneralPublicBoundary: '10150',
+    overGeneralPublicBoundary: '10500',
+    nearOccupationalBoundary: '50750',
+  },
+  expected: {
+    normalBrmsMicroTesla: 1.97,
+    normalBpeakMicroTesla: 2.786,
+  },
+  tolerances: {
+    brmsLowCurrentAbs: 0.02,
+    bpeakLowCurrentAbs: 0.03,
+    boundaryMicroTeslaAbs: 1.0,
+  },
+};
+
+export const COST_ESTIMATOR_FIXTURES = {
+  baselineProject: COST_ESTIMATOR_CANONICAL_FIXTURE.projectData,
   highContingency: {
     contingencyPct: '35',
   },
