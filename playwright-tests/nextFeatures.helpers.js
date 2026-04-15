@@ -1,5 +1,6 @@
 import path from 'path';
 import { fileURLToPath } from 'url';
+import { expect } from '@playwright/test';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const root = path.join(__dirname, '..');
@@ -148,6 +149,87 @@ export async function fillEmfForm(page, overrides = {}) {
   await page.fill('#tray-width', values.trayWidth);
   await page.fill('#cable-od', values.cableOd);
   await page.fill('#meas-distance', values.measDistance);
+}
+
+export async function setupCEPage(page, fixture = null) {
+  await navigateForE2E(page, 'costestimate.html');
+  if (fixture) {
+    await applyCostEstimatorFixture(page, fixture);
+  }
+}
+
+export async function setupEMFPage(page) {
+  await navigateForE2E(page, 'emf.html');
+}
+
+export async function fillCEInputs(page, overrides = {}) {
+  const values = {
+    contingencyPct: '10',
+    laborCableRate: '68',
+    laborTrayRate: '61',
+    laborConduitRate: '58',
+    fittingPrice: '72',
+    ...overrides,
+  };
+
+  await page.getByLabel('Contingency (%)').fill(values.contingencyPct);
+  const details = page.locator('#price-overrides');
+  if (!(await details.evaluate(el => el.hasAttribute('open')))) {
+    await details.locator('summary').click();
+  }
+  await page.getByLabel('Labor ($/ft, cable)').fill(values.laborCableRate);
+  await page.getByLabel('Labor ($/ft, tray)').fill(values.laborTrayRate);
+  await page.getByLabel('Labor ($/ft, conduit)').fill(values.laborConduitRate);
+  await page.getByLabel('Tray fitting unit price ($)').fill(values.fittingPrice);
+}
+
+export async function runCEEstimate(page) {
+  await page.getByRole('button', { name: 'Generate Estimate' }).click();
+}
+
+export async function runCEXlsxExport(page) {
+  const downloadPromise = page.waitForEvent('download');
+  await page.getByRole('button', { name: 'Export XLSX' }).click();
+  return downloadPromise;
+}
+
+export async function assertCESmokeControls(page) {
+  await expect(page.getByRole('heading', { level: 1, name: 'Project Cost Estimator' })).toBeVisible();
+  await expect(page.getByRole('button', { name: 'Generate Estimate' })).toBeVisible();
+  await expect(page.getByRole('button', { name: 'Export XLSX' })).toBeVisible();
+}
+
+export async function fillEMFInputs(page, overrides = {}) {
+  const values = {
+    frequency: '60',
+    loadCurrent: '180',
+    nCables: '2',
+    trayWidth: '18',
+    cableOd: '1.2',
+    measDistance: '48',
+    ...overrides,
+  };
+
+  await page.getByLabel('Frequency (Hz)').selectOption(values.frequency);
+  await page.getByLabel('Load Current per Phase (A)').fill(values.loadCurrent);
+  await page.getByLabel('Number of Parallel Cable Sets').fill(values.nCables);
+  await page.getByLabel('Tray Width (in)').fill(values.trayWidth);
+  await page.getByLabel('Cable O.D. (in)').fill(values.cableOd);
+  await page.getByLabel('Measurement Distance from Tray Edge (in)').fill(values.measDistance);
+}
+
+export async function runEMFCalculate(page) {
+  await page.getByRole('button', { name: 'Calculate Field' }).click();
+}
+
+export async function runEMFProfile(page) {
+  await page.getByRole('button', { name: /Field Profile/ }).click();
+}
+
+export async function assertEMFSmokeControls(page) {
+  await expect(page.getByRole('heading', { level: 1, name: /EMF/ })).toBeVisible();
+  await expect(page.getByRole('button', { name: 'Calculate Field' })).toBeVisible();
+  await expect(page.getByRole('button', { name: /Field Profile/ })).toBeVisible();
 }
 
 export async function getResultText(page, selector = '#results') {
