@@ -1,6 +1,9 @@
 {
   "version": 2,
-  "scale": { "unitPerPx": 1, "unit": "in" },
+  "scale": {
+    "unitPerPx": 1,
+    "unit": "in"
+  },
   "templates": [],
   "sheets": [
     {
@@ -16,14 +19,25 @@
           "height": 20,
           "label": "Bus 1",
           "ref": "",
-          "labelOffset": { "x": 0, "y": 0 },
+          "labelOffset": {
+            "x": 0,
+            "y": 0
+          },
           "rotation": 0,
           "flipped": false,
-          "impedance": { "r": 0, "x": 0 },
+          "impedance": {
+            "r": 0,
+            "x": 0
+          },
           "rating": null,
           "props": {},
           "connections": [
-            { "target": "n2" }
+            {
+              "target": "n2"
+            },
+            {
+              "target": "n4"
+            }
           ]
         },
         {
@@ -34,14 +48,22 @@
           "y": 60,
           "label": "Panel 1",
           "ref": "",
-          "labelOffset": { "x": 0, "y": 0 },
+          "labelOffset": {
+            "x": 0,
+            "y": 0
+          },
           "rotation": 0,
           "flipped": false,
-          "impedance": { "r": 0, "x": 0 },
+          "impedance": {
+            "r": 0,
+            "x": 0
+          },
           "rating": null,
           "props": {},
           "connections": [
-            { "target": "n3" }
+            {
+              "target": "n3"
+            }
           ]
         },
         {
@@ -52,25 +74,97 @@
           "y": 60,
           "label": "Load 1",
           "ref": "",
-          "labelOffset": { "x": 0, "y": 0 },
+          "labelOffset": {
+            "x": 0,
+            "y": 0
+          },
           "rotation": 0,
           "flipped": false,
-          "impedance": { "r": 0, "x": 0 },
+          "impedance": {
+            "r": 0,
+            "x": 0
+          },
           "rating": null,
           "props": {
             "watts": 300000,
             "volts": 480,
-            "load": { "kw": 300, "kvar": 0 }
+            "load": {
+              "kw": 300,
+              "kvar": 0
+            }
           },
           "watts": 300000,
           "volts": 480,
-          "load": { "kw": 300, "kvar": 0 },
+          "load": {
+            "kw": 300,
+            "kvar": 0
+          },
           "connections": []
+        },
+        {
+          "id": "n4",
+          "type": "ups",
+          "subtype": "ups",
+          "x": 220,
+          "y": 180,
+          "label": "UPS-1",
+          "ref": "",
+          "labelOffset": {
+            "x": 0,
+            "y": 0
+          },
+          "rotation": 0,
+          "flipped": false,
+          "impedance": {
+            "r": 0,
+            "x": 0
+          },
+          "rating": null,
+          "props": {
+            "tag": "UPS-1",
+            "description": "Critical IT UPS",
+            "manufacturer": "ExamplePower",
+            "model": "DP-500",
+            "topology": "double_conversion",
+            "rated_kva": 500,
+            "input_voltage_kv": 0.48,
+            "output_voltage_kv": 0.48,
+            "efficiency_pct": 96.0,
+            "battery_runtime_min": 15,
+            "battery_dc_v": 480,
+            "static_bypass_supported": true,
+            "operating_mode": "battery",
+            "mode_normal_enabled": true,
+            "mode_battery_enabled": true,
+            "mode_bypass_enabled": true,
+            "runtime_normal_min": 0,
+            "runtime_battery_min": 15,
+            "runtime_bypass_min": 60
+          },
+          "connections": [
+            {
+              "target": "n3"
+            }
+          ]
         }
       ],
       "connections": [
-        { "from": "n1", "to": "n2" },
-        { "from": "n2", "to": "n3" }
+        {
+          "from": "n1",
+          "to": "n2"
+        },
+        {
+          "from": "n2",
+          "to": "n3"
+        },
+        {
+          "from": "n1",
+          "to": "n4"
+        },
+        {
+          "from": "n4",
+          "to": "n3"
+        }
       ]
     }
   ]

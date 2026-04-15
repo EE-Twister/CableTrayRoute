@@ -367,6 +367,87 @@ describe('runValidation - battery required attributes', () => {
   });
 });
 
+describe('runValidation - ups required attributes and consistency checks', () => {
+  it('flags a UPS when required fields and runtime consistency checks fail', () => {
+    const components = [
+      {
+        id: 'ups-1',
+        type: 'ups',
+        subtype: 'ups',
+        props: {
+          tag: '',
+          manufacturer: '',
+          model: '',
+          topology: '',
+          rated_kva: 0,
+          input_voltage_kv: 0,
+          output_voltage_kv: '',
+          efficiency_pct: 120,
+          battery_runtime_min: 10,
+          battery_dc_v: 0,
+          static_bypass_supported: false,
+          operating_mode: 'bypass',
+          mode_normal_enabled: false,
+          mode_battery_enabled: true,
+          mode_bypass_enabled: false,
+          runtime_normal_min: -1,
+          runtime_battery_min: 5,
+          runtime_bypass_min: -2
+        }
+      }
+    ];
+    const issues = runValidation(components, {});
+    const requiredIssue = issues.find(issue => issue.component === 'ups-1' && issue.message.includes('UPS missing/invalid attributes'));
+    const consistencyIssue = issues.find(issue => issue.component === 'ups-1' && issue.message.includes('UPS rating/runtime consistency checks failed'));
+    assert.ok(requiredIssue);
+    assert.ok(requiredIssue.message.includes('tag'));
+    assert.ok(requiredIssue.message.includes('manufacturer'));
+    assert.ok(requiredIssue.message.includes('model'));
+    assert.ok(requiredIssue.message.includes('topology'));
+    assert.ok(requiredIssue.message.includes('rated_kva'));
+    assert.ok(requiredIssue.message.includes('input_voltage_kv'));
+    assert.ok(requiredIssue.message.includes('output_voltage_kv'));
+    assert.ok(requiredIssue.message.includes('efficiency_pct'));
+    assert.ok(requiredIssue.message.includes('battery_dc_v'));
+    assert.ok(requiredIssue.message.includes('runtime_normal_min'));
+    assert.ok(requiredIssue.message.includes('runtime_bypass_min'));
+    assert.ok(consistencyIssue);
+    assert.ok(consistencyIssue.message.includes('runtime_battery_min must match battery_runtime_min'));
+    assert.ok(consistencyIssue.message.includes('operating_mode=bypass requires static_bypass_supported=true'));
+  });
+
+  it('does not flag a UPS with complete and consistent fields', () => {
+    const components = [
+      {
+        id: 'ups-2',
+        type: 'ups',
+        subtype: 'ups',
+        props: {
+          tag: 'UPS-02',
+          manufacturer: 'ExamplePower',
+          model: 'DP-500',
+          topology: 'double_conversion',
+          rated_kva: 500,
+          input_voltage_kv: 0.48,
+          output_voltage_kv: 0.48,
+          efficiency_pct: 96,
+          battery_runtime_min: 15,
+          battery_dc_v: 480,
+          static_bypass_supported: true,
+          operating_mode: 'normal',
+          mode_normal_enabled: true,
+          mode_battery_enabled: true,
+          mode_bypass_enabled: true,
+          runtime_normal_min: 0,
+          runtime_battery_min: 15,
+          runtime_bypass_min: 60
+        }
+      }
+    ];
+    assert.deepStrictEqual(runValidation(components, {}), []);
+  });
+});
+
 describe('runValidation - dc_bus required attributes', () => {
   it('flags a dc_bus when required fields are missing', () => {
     const components = [

@@ -487,7 +487,46 @@ function isGeneratorDevice(comp) {
   return type.includes('generator') || subtype.includes('generator') || type.includes('source');
 }
 
+function isUpsDevice(comp) {
+  const type = String(comp?.type || '').toLowerCase();
+  const subtype = String(comp?.subtype || '').toLowerCase();
+  return type === 'ups' || subtype === 'ups';
+}
+
+function deriveUpsOperatingProfile(comp) {
+  if (!isUpsDevice(comp)) return null;
+  const props = comp?.props && typeof comp.props === 'object' ? comp.props : {};
+  const mode = String(
+    comp?.operating_mode
+    ?? props.operating_mode
+    ?? 'normal'
+  ).trim().toLowerCase();
+  const ratedKva = toNumber(comp?.rated_kva ?? props.rated_kva ?? comp?.kva ?? props.kva);
+  const pfRaw = toNumber(comp?.pf ?? props.pf ?? comp?.power_factor ?? props.power_factor);
+  const pf = pfRaw > 0 ? Math.min(Math.abs(pfRaw), 1) : 0.9;
+  const efficiencyPct = toNumber(comp?.efficiency_pct ?? props.efficiency_pct, 1);
+  const efficiency = Math.max(0.01, efficiencyPct > 1 ? efficiencyPct / 100 : efficiencyPct);
+  const ratedKw = ratedKva > 0 ? ratedKva * pf : 0;
+  const ratedKvar = ratedKva > 0 ? Math.sqrt(Math.max(0, ratedKva * ratedKva - ratedKw * ratedKw)) : 0;
+  if (!ratedKw && !ratedKvar) return null;
+  if (mode === 'battery') {
+    return {
+      load: null,
+      generation: { kw: ratedKw, kvar: ratedKvar },
+      mode
+    };
+  }
+  const inputKw = ratedKw > 0 ? ratedKw / efficiency : 0;
+  return {
+    load: { kw: inputKw, kvar: ratedKvar },
+    generation: null,
+    mode
+  };
+}
+
 function extractLoadPQ(comp) {
+  const upsProfile = deriveUpsOperatingProfile(comp);
+  if (upsProfile?.load) return upsProfile.load;
   const rawSources = [comp?.load, comp?.props?.load, comp?.parameters?.load];
   const seenRefs = new Set();
   const seenValues = new Set();
@@ -540,6 +579,8 @@ function extractLoadPQ(comp) {
 }
 
 function extractGenerationPQ(comp) {
+  const upsProfile = deriveUpsOperatingProfile(comp);
+  if (upsProfile?.generation) return upsProfile.generation;
   const sources = [comp?.generation, comp?.props?.generation, comp?.parameters?.generation];
   let total = null;
   sources.forEach(src => {

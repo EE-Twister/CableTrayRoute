@@ -124,6 +124,7 @@ const upstreamCandidateTypes = new Set([
   'utility_source',
   'generator',
   'pv_inverter',
+  'ups',
   'mcc',
   'feeder'
 ]);
@@ -155,7 +156,63 @@ function normalizePortIndex(port) {
 }
 
 function isSourceComponent(comp) {
-  return ['utility_source', 'generator', 'pv_inverter'].includes(comp?.type);
+  return ['utility_source', 'generator', 'pv_inverter', 'ups'].includes(comp?.type);
+}
+
+function getUpsStudyMetadata(comp) {
+  if (!comp || typeof comp !== 'object') return null;
+  const type = `${comp.type || ''}`.trim().toLowerCase();
+  const subtype = `${comp.subtype || ''}`.trim().toLowerCase();
+  if (type !== 'ups' && subtype !== 'ups') return null;
+  const readNumber = (key, fallback = null) => {
+    const num = parseNumeric(pickValue(comp, key));
+    return num === null ? fallback : num;
+  };
+  const readString = key => `${pickValue(comp, key) ?? ''}`.trim();
+  return {
+    tag: readString('tag'),
+    topology: readString('topology'),
+    operating_mode: readString('operating_mode') || 'normal',
+    rated_kva: readNumber('rated_kva', readNumber('kva', 0)),
+    input_voltage_kv: readNumber('input_voltage_kv', readNumber('kV', readNumber('baseKV'))),
+    output_voltage_kv: readNumber('output_voltage_kv', readNumber('kV', readNumber('baseKV'))),
+    efficiency_pct: readNumber('efficiency_pct'),
+    battery_runtime_min: readNumber('battery_runtime_min'),
+    battery_dc_v: readNumber('battery_dc_v'),
+    static_bypass_supported: Boolean(pickValue(comp, 'static_bypass_supported')),
+    mode_normal_enabled: Boolean(pickValue(comp, 'mode_normal_enabled')),
+    mode_battery_enabled: Boolean(pickValue(comp, 'mode_battery_enabled')),
+    mode_bypass_enabled: Boolean(pickValue(comp, 'mode_bypass_enabled')),
+    runtime_normal_min: readNumber('runtime_normal_min', 0),
+    runtime_battery_min: readNumber('runtime_battery_min', readNumber('battery_runtime_min', 0)),
+    runtime_bypass_min: readNumber('runtime_bypass_min', 0)
+  };
+}
+
+function resolveUpsForComponent(component, components = [], componentMap = new Map()) {
+  if (!component) return null;
+  const direct = getUpsStudyMetadata(component);
+  if (direct) return direct;
+  const incoming = [];
+  components.forEach(source => {
+    if (!source || !Array.isArray(source.connections)) return;
+    source.connections.forEach(conn => {
+      const target = typeof conn === 'string' ? conn : conn?.target;
+      if (target === component.id) incoming.push(source);
+    });
+  });
+  for (const candidate of incoming) {
+    const metadata = getUpsStudyMetadata(candidate);
+    if (metadata) return metadata;
+  }
+  const connList = Array.isArray(component.connections) ? component.connections : [];
+  for (const conn of connList) {
+    const target = typeof conn === 'string' ? conn : conn?.target;
+    if (!target) continue;
+    const metadata = getUpsStudyMetadata(componentMap.get(target));
+    if (metadata) return metadata;
+  }
+  return null;
 }
 
 function isProtectionComponent(comp) {
@@ -730,6 +787,8 @@ export function runShortCircuit(modelOrOpts = {}, maybeOpts = {}) {
         ...(ptVt ? { pt_vt: ptVt } : {})
       };
     }
+    const ups = resolveUpsForComponent(comp, comps, compMap);
+    if (ups) entry.ups = ups;
     results[comp.id] = entry;
   });
 

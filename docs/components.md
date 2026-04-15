@@ -34,6 +34,14 @@ Each subtype in `componentLibrary.json` may include these properties in its sche
 - Meter fields include `tag`, `description`, `manufacturer`, `model`, `meter_class`, `ct_ratio`, `pt_ratio`, `sample_rate_hz`, and study capability flags (`supports_thd`, `supports_flicker`, `supports_waveform_capture`).
 - Validation enforces both `ct_ratio` and `pt_ratio` when any meter study capability flag is enabled so harmonics/power-quality workflows do not run with incomplete instrument transformer scaling.
 
+## UPS component fields
+
+- The one-line palette includes a dedicated `ups` subtype under **Equipment** with `icons/components/UPS.svg`.
+- Required UPS fields are `tag`, `manufacturer`, `model`, `topology`, `rated_kva`, `input_voltage_kv`, `output_voltage_kv`, `efficiency_pct`, `battery_runtime_min`, `battery_dc_v`, and `static_bypass_supported`.
+- Runtime and operating-mode study/report context fields include `operating_mode` (`normal`, `battery`, `bypass`), mode enable flags (`mode_normal_enabled`, `mode_battery_enabled`, `mode_bypass_enabled`), and mode runtimes (`runtime_normal_min`, `runtime_battery_min`, `runtime_bypass_min`).
+- Validation enforces rating/runtime consistency, including battery runtime coherence (`runtime_battery_min` equals `battery_runtime_min`) and bypass-mode constraints.
+- Load-flow and short-circuit adapters now consume UPS metadata directly so users can model UPS behavior without decomposing the element into separate battery/rectifier/inverter primitives.
+
 
 ## Current transformer (CT) component fields
 

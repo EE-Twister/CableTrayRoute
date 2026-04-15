@@ -61,6 +61,8 @@ describe('Published sample one-line load flow', () => {
     assert(bus.load, 'Bus n1 should aggregate downstream loads');
     assert(Math.abs(bus.load.kw - 300) < 1e-9, 'Aggregated kW should equal 300');
     assert(Math.abs(bus.load.kvar || 0) < 1e-9, 'Aggregated kvar should equal 0');
+    assert(bus.generation, 'Bus n1 should include UPS generation profile from sample UPS battery mode');
+    assert(Math.abs(bus.generation.kw - 450) < 1e-9, 'UPS battery mode generation should equal 500 kVA × 0.9 PF = 450 kW');
 
     const result = runLoadFlow(model, { baseMVA: 100, balanced: true });
     assert.strictEqual(result.buses.length, 1, 'Study should produce a single slack bus');
