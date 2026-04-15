@@ -1167,6 +1167,21 @@ const mccFieldSpecs = [
   { name: 'form_type', label: 'Form Type', type: 'text', required: true, defaultValue: 'form_2b' }
 ];
 
+const ptVtFieldSpecs = [
+  { name: 'tag', label: 'Tag', type: 'text', required: true, defaultValue: comp => comp.ref || comp.label || comp.id || '' },
+  { name: 'primary_voltage', label: 'Primary Voltage (V)', type: 'number', required: true, defaultValue: 12470 },
+  { name: 'secondary_voltage', label: 'Secondary Voltage (V)', type: 'number', required: true, defaultValue: 120 },
+  { name: 'accuracy_class', label: 'Accuracy Class', type: 'text', required: true, defaultValue: '0.3' },
+  { name: 'burden_va', label: 'Burden (VA)', type: 'number', required: true, defaultValue: 50 },
+  { name: 'connection_type', label: 'Connection Type', type: 'text', required: true, defaultValue: 'wye-grounded' },
+  { name: 'fuse_protection', label: 'Fuse Protection', type: 'text', required: true, defaultValue: 'yes' },
+  { name: 'location_context', label: 'Context', type: 'text', required: false, defaultValue: 'protection' },
+  { name: 'protected_device_id', label: 'Protected Device ID', type: 'text', required: false, defaultValue: '' },
+  { name: 'meter_id', label: 'Linked Meter ID', type: 'text', required: false, defaultValue: '' },
+  { name: 'relay_id', label: 'Linked Relay ID', type: 'text', required: false, defaultValue: '' },
+  { name: 'consumer_ids', label: 'Consumer IDs (comma-separated)', type: 'text', required: false, defaultValue: '' }
+];
+
 const baselineComponentFieldSpecs = [
   { name: 'tag', label: 'Tag', type: 'text', required: true, defaultValue: comp => comp.ref || comp.label || comp.id || '' },
   { name: 'description', label: 'Description', type: 'text', required: true, defaultValue: comp => comp.label || '' },
@@ -1400,6 +1415,56 @@ function ensureMccMetadata() {
   });
 }
 
+function isPtVtComponentMeta(meta) {
+  if (!meta || typeof meta !== 'object') return false;
+  const type = `${meta.type || ''}`.trim().toLowerCase();
+  const subtype = `${meta.subtype || ''}`.trim().toLowerCase();
+  return subtype === 'pt_vt' || subtype === 'vt' || type === 'pt_vt' || type === 'vt';
+}
+
+function ensurePtVtFieldsOnComponent(comp, meta) {
+  if (!comp || typeof comp !== 'object') return comp;
+  if (!isPtVtComponentMeta(meta || comp)) return comp;
+  if (!comp.props || typeof comp.props !== 'object') {
+    comp.props = { ...(comp.props || {}) };
+  }
+  ptVtFieldSpecs.forEach(spec => {
+    const hasCompValue = Object.prototype.hasOwnProperty.call(comp, spec.name) && comp[spec.name] !== '';
+    const hasPropsValue = Object.prototype.hasOwnProperty.call(comp.props, spec.name) && comp.props[spec.name] !== '';
+    if (hasCompValue || hasPropsValue) {
+      if (!hasCompValue && hasPropsValue) comp[spec.name] = comp.props[spec.name];
+      if (hasCompValue && !hasPropsValue) comp.props[spec.name] = comp[spec.name];
+      return;
+    }
+    const nextValue = typeof spec.defaultValue === 'function' ? spec.defaultValue(comp, meta) : spec.defaultValue;
+    comp[spec.name] = nextValue;
+    comp.props[spec.name] = nextValue;
+  });
+  return comp;
+}
+
+function ensurePtVtMetadata() {
+  Object.entries(componentMeta).forEach(([key, meta]) => {
+    if (!isPtVtComponentMeta(meta)) return;
+    if (!meta.props || typeof meta.props !== 'object') {
+      meta.props = { ...(meta.props || {}) };
+    }
+    ptVtFieldSpecs.forEach(spec => {
+      if (!Object.prototype.hasOwnProperty.call(meta.props, spec.name)) {
+        const nextValue = typeof spec.defaultValue === 'function' ? spec.defaultValue(meta.props) : spec.defaultValue;
+        meta.props[spec.name] = nextValue;
+      }
+    });
+    const schemaKeys = new Set([key, meta.subtype].filter(Boolean));
+    schemaKeys.forEach(schemaKey => {
+      if (!Array.isArray(propSchemas[schemaKey])) {
+        propSchemas[schemaKey] = inferSchemaFromProps(meta.props || {});
+      }
+      ptVtFieldSpecs.forEach(spec => ensureBaselineFieldSchema(propSchemas[schemaKey], spec));
+    });
+  });
+}
+
 function loadStoredCustomComponents() {
   const stored = getItem(customComponentStorageKey, [], customComponentScenarioKey);
   if (!Array.isArray(stored)) return [];
@@ -1576,6 +1641,7 @@ async function loadComponentLibrary() {
   ensureCapacitorReactorPropertyMetadata();
   ensureGeneratorStudyMetadata();
   ensureMccMetadata();
+  ensurePtVtMetadata();
   ensureBaselineComponentMetadata();
 
   buildPalette();
@@ -5673,6 +5739,7 @@ function normalizeComponent(c) {
   ensureBaselineFieldsOnComponent(nc, componentMeta[nc.subtype]);
   ensureGeneratorStudyFieldsOnComponent(nc, componentMeta[nc.subtype]);
   ensureMccFieldsOnComponent(nc, componentMeta[nc.subtype]);
+  ensurePtVtFieldsOnComponent(nc, componentMeta[nc.subtype]);
   return nc;
 }
 
@@ -8074,6 +8141,7 @@ function addComponent(cfg) {
   ensureBaselineFieldsOnComponent(comp, meta);
   ensureGeneratorStudyFieldsOnComponent(comp, meta);
   ensureMccFieldsOnComponent(comp, meta);
+  ensurePtVtFieldsOnComponent(comp, meta);
   ensureShapeDefaults(comp);
   if (comp.type === 'transformer') {
     syncTransformerDefaults(comp, { forceBase: true });
@@ -8641,6 +8709,20 @@ function selectComponent(compOrId) {
       protected_device_id: 'Protected Device ID',
       meter_id: 'Linked Meter ID',
       relay_id: 'Linked Relay ID'
+      ,
+      primary_voltage: 'PT/VT Primary Voltage (V)',
+      secondary_voltage: 'PT/VT Secondary Voltage (V)',
+      connection_type: {
+        label: 'PT/VT Connection Type',
+        type: 'select',
+        options: ['wye-grounded', 'wye-ungrounded', 'delta', 'open-delta']
+      },
+      fuse_protection: {
+        label: 'PT/VT Fuse Protection',
+        type: 'select',
+        options: ['yes', 'no']
+      },
+      consumer_ids: 'Linked Consumer IDs'
     };
 
     let schema = rawSchema
@@ -11236,6 +11318,7 @@ async function init() {
       ensureBaselineFieldsOnComponent(c, componentMeta[c.subtype]);
       ensureGeneratorStudyFieldsOnComponent(c, componentMeta[c.subtype]);
       ensureMccFieldsOnComponent(c, componentMeta[c.subtype]);
+      ensurePtVtFieldsOnComponent(c, componentMeta[c.subtype]);
     });
   });
   rebuildComponentMaps();
@@ -11245,6 +11328,7 @@ async function init() {
   ensureBaselineComponentMetadata();
   ensureGeneratorStudyMetadata();
   ensureMccMetadata();
+  ensurePtVtMetadata();
   sheets.forEach(s => {
     s.components.forEach(c => {
       (c.connections || []).forEach(conn => {

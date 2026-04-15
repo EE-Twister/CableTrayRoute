@@ -220,6 +220,84 @@ describe('runValidation - meter CT/PT completeness', () => {
   });
 });
 
+describe('runValidation - PT/VT completeness and compatibility', () => {
+  it('flags PT/VT with missing required fields', () => {
+    const components = [
+      {
+        id: 'pt-1',
+        subtype: 'pt_vt',
+        type: 'vt',
+        props: {
+          tag: '',
+          primary_voltage: 0,
+          secondary_voltage: '',
+          accuracy_class: '',
+          burden_va: '',
+          connection_type: '',
+          fuse_protection: ''
+        }
+      }
+    ];
+    const issues = runValidation(components, {});
+    assert.ok(issues.some(issue => issue.component === 'pt-1' && issue.message.includes('PT/VT missing/invalid')));
+  });
+
+  it('flags PT/VT with incompatible linked consumer voltage base', () => {
+    const components = [
+      {
+        id: 'meter-pt',
+        type: 'meter',
+        props: { voltage: 480 }
+      },
+      {
+        id: 'pt-2',
+        subtype: 'pt_vt',
+        type: 'vt',
+        props: {
+          tag: 'PT-2',
+          primary_voltage: 12470,
+          secondary_voltage: 120,
+          accuracy_class: '0.3',
+          burden_va: 50,
+          connection_type: 'wye-grounded',
+          fuse_protection: 'yes',
+          meter_id: 'meter-pt'
+        }
+      }
+    ];
+    const issues = runValidation(components, {});
+    assert.ok(issues.some(issue => issue.component === 'pt-2' && issue.message.includes('incompatible')));
+  });
+
+  it('does not flag PT/VT when linked consumer voltage base is compatible', () => {
+    const components = [
+      {
+        id: 'relay-1',
+        type: 'relay',
+        props: { rated_voltage_kv: 12.47 }
+      },
+      {
+        id: 'pt-3',
+        subtype: 'pt_vt',
+        type: 'vt',
+        props: {
+          tag: 'PT-3',
+          primary_voltage: 12470,
+          secondary_voltage: 120,
+          accuracy_class: '0.3',
+          burden_va: 50,
+          connection_type: 'wye-grounded',
+          fuse_protection: 'yes',
+          relay_id: 'relay-1'
+        }
+      }
+    ];
+    const issues = runValidation(components, {});
+    const ptIssues = issues.filter(issue => issue.component === 'pt-3');
+    assert.deepStrictEqual(ptIssues, []);
+  });
+});
+
 describe('runValidation - battery required attributes', () => {
   it('flags a battery when required fields are missing', () => {
     const components = [

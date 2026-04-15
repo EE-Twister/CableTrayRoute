@@ -2368,11 +2368,29 @@
       "type": "vt",
       "label": "PT",
       "icon": "icons/components/Transformer.svg",
+      "symbol": "icons/components/Transformer.svg",
       "props": {
-        "ratio": "69000V:120V",
-        "class": "0.3WZ"
+        "tag": "PT-1",
+        "primary_voltage": 12470,
+        "secondary_voltage": 120,
+        "accuracy_class": "0.3",
+        "burden_va": 50,
+        "connection_type": "wye-grounded",
+        "fuse_protection": "yes",
+        "location_context": "protection",
+        "protected_device_id": "",
+        "meter_id": "",
+        "relay_id": "",
+        "consumer_ids": ""
       },
-      "subtype": "vt"
+      "subtype": "pt_vt",
+      "category": "protection",
+      "ports": [
+        {
+          "x": 40,
+          "y": 0
+        }
+      ]
     },
     {
       "type": "relay",

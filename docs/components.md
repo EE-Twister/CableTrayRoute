@@ -43,6 +43,18 @@ Each subtype in `componentLibrary.json` may include these properties in its sche
 - Validation enforces physically valid values (positive ratios, positive burden/knee-point, and `ratio_primary >= ratio_secondary`) so study scaling inputs are not silently invalid.
 - Protection and metering study builders now receive normalized CT metadata in the study input object (`ct`) whenever a linked CT is found (explicit `ct_id`, reverse CT link fields, or direct CT connection).
 
+## Potential/voltage transformer (PT/VT) component fields
+
+- The one-line palette now includes a `pt_vt` subtype under **Protection** (type `vt`) with transformer symbol defaults.
+- Required PT/VT fields are `tag`, `primary_voltage`, `secondary_voltage`, `accuracy_class`, `burden_va`, `connection_type`, and `fuse_protection`.
+- Optional linkage fields (`protected_device_id`, `meter_id`, `relay_id`, and `consumer_ids`) model downstream metering/protection consumers using component IDs.
+- Validation enforces:
+  - required-field completeness,
+  - physically valid ratio direction (`primary_voltage >= secondary_voltage`),
+  - ratio range (`1..2000`),
+  - linked voltage-base compatibility (PT/VT primary voltage vs linked consumer voltage base).
+- Protection and metering study preprocessing now attaches normalized PT/VT metadata in study inputs as `pt_vt` (and under `instrument_transformers.pt_vt` when CT/PT are both present), including computed scaling ratio and voltage-base compatibility flags.
+
 ## DC bus component fields
 
 - The one-line palette now includes a `dc_bus` subtype under the Bus category with a dedicated DC icon.
