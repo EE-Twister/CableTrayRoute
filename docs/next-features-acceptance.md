@@ -9,6 +9,17 @@ Source smoke coverage reference: `playwright-tests/nextFeatures.spec.js` under d
 
 ---
 
+## Heat Trace Sizing — Minimum Acceptance Checklist
+
+- [ ] User can select at least **4 pipe materials**.
+- [ ] User can select at least **4 environment classes**.
+- [ ] Output includes required **W/ft** (or **W/m**), **total watts**, and a **recommended cable rating**.
+- [ ] Changing selected material or environment updates the result **deterministically** for the same inputs.
+- [ ] Results persist and reload via `studyResults.heatTraceSizing`.
+- [ ] Heat Trace Sizing appears in top navigation, command palette, and workflow dashboard summaries.
+
+---
+
 ## 1) Primary User Journeys
 
 ### 1.1 Cost Estimator (`costestimate.html`)
