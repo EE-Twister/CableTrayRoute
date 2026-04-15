@@ -1,5 +1,43 @@
 import { resolveComponentLabel } from '../utils/componentLabels.js';
 
+function coerceNumber(value) {
+  const num = Number(value);
+  return Number.isFinite(num) ? num : null;
+}
+
+function readField(component, key) {
+  if (!component || typeof component !== 'object') return undefined;
+  if (Object.prototype.hasOwnProperty.call(component, key)) return component[key];
+  if (component.props && typeof component.props === 'object' && Object.prototype.hasOwnProperty.call(component.props, key)) {
+    return component.props[key];
+  }
+  return undefined;
+}
+
+function toVolts(value, keyHint = '') {
+  const num = coerceNumber(value);
+  if (!Number.isFinite(num)) return null;
+  const key = `${keyHint || ''}`.toLowerCase();
+  if (key.includes('_kv') || key.includes('basekv') || key === 'kv') return num * 1000;
+  if (key.includes('nominal_voltage_vdc')) return num;
+  return num <= 100 ? num * 1000 : num;
+}
+
+function resolveComponentVoltageVolts(component) {
+  const keys = ['voltage_v', 'rated_voltage_kv', 'baseKV', 'kV', 'prefault_voltage', 'voltage', 'volts', 'nominal_voltage_vdc'];
+  for (const key of keys) {
+    const volts = toVolts(readField(component, key), key);
+    if (Number.isFinite(volts) && volts > 0) return volts;
+  }
+  return null;
+}
+
+function normalizeIdList(value) {
+  if (Array.isArray(value)) return value.map(v => `${v || ''}`.trim()).filter(Boolean);
+  if (typeof value !== 'string') return [];
+  return value.split(',').map(v => v.trim()).filter(Boolean);
+}
+
 export function runValidation(components = [], studies = {}) {
   const issues = [];
   const componentLookup = new Map(components.map(c => [c.id, c]));
@@ -83,6 +121,61 @@ export function runValidation(components = [], studies = {}) {
         message: `Current transformer missing/invalid attributes: ${missing.join(', ')}.`
       });
     }
+  });
+
+  // PT/VT required field completeness, ratio limits, and downstream voltage-base compatibility
+  components.forEach(c => {
+    const subtype = `${c?.subtype ?? ''}`.trim().toLowerCase();
+    const type = `${c?.type ?? ''}`.trim().toLowerCase();
+    const isPtVt = subtype === 'pt_vt' || subtype === 'vt' || type === 'pt_vt' || type === 'vt';
+    if (!isPtVt) return;
+    const props = c.props && typeof c.props === 'object' ? c.props : c;
+    const missing = [];
+    if (!`${props.tag ?? ''}`.trim()) missing.push('tag');
+    const primaryVoltage = Number(props.primary_voltage);
+    const secondaryVoltage = Number(props.secondary_voltage);
+    if (!Number.isFinite(primaryVoltage) || primaryVoltage <= 0) missing.push('primary_voltage');
+    if (!Number.isFinite(secondaryVoltage) || secondaryVoltage <= 0) missing.push('secondary_voltage');
+    if (Number.isFinite(primaryVoltage) && Number.isFinite(secondaryVoltage)) {
+      if (primaryVoltage < secondaryVoltage) missing.push('primary_voltage>=secondary_voltage');
+      const ratio = primaryVoltage / Math.max(secondaryVoltage, 1e-9);
+      if (!Number.isFinite(ratio) || ratio < 1 || ratio > 2000) missing.push('ratio_range(1..2000)');
+    }
+    if (!`${props.accuracy_class ?? ''}`.trim()) missing.push('accuracy_class');
+    const burdenVa = Number(props.burden_va);
+    if (!Number.isFinite(burdenVa) || burdenVa <= 0) missing.push('burden_va');
+    if (!`${props.connection_type ?? ''}`.trim()) missing.push('connection_type');
+    if (!`${props.fuse_protection ?? ''}`.trim()) missing.push('fuse_protection');
+    if (missing.length) {
+      issues.push({
+        component: c.id,
+        message: `PT/VT missing/invalid attributes: ${missing.join(', ')}.`
+      });
+    }
+
+    const linkedIds = new Set(
+      [
+        `${props.protected_device_id ?? ''}`.trim(),
+        `${props.meter_id ?? ''}`.trim(),
+        `${props.relay_id ?? ''}`.trim(),
+        ...normalizeIdList(props.consumer_ids),
+        ...(Array.isArray(c.connections) ? c.connections.map(conn => `${conn?.target ?? ''}`.trim()) : [])
+      ].filter(Boolean)
+    );
+    if (!linkedIds.size || !Number.isFinite(primaryVoltage) || primaryVoltage <= 0) return;
+    linkedIds.forEach(targetId => {
+      const target = componentLookup.get(targetId);
+      if (!target) return;
+      const consumerVoltage = resolveComponentVoltageVolts(target);
+      if (!Number.isFinite(consumerVoltage) || consumerVoltage <= 0) return;
+      const mismatchRatio = Math.abs(primaryVoltage - consumerVoltage) / Math.max(primaryVoltage, consumerVoltage);
+      if (mismatchRatio > 0.35) {
+        issues.push({
+          component: c.id,
+          message: `PT/VT primary_voltage (${primaryVoltage} V) is incompatible with linked component ${describe(targetId)} voltage base (${consumerVoltage.toFixed(1)} V).`
+        });
+      }
+    });
   });
 
   // Meter ratio completeness for study-enabled metering features

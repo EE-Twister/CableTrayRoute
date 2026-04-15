@@ -1,6 +1,7 @@
 import { getOneLine, getItem } from '../dataStore.mjs';
 import { scaleCurve } from './tccUtils.js';
 import { resolveCtForComponent } from './ctMetadata.mjs';
+import { resolvePtVtForComponent } from './ptVtMetadata.mjs';
 import protectiveDevices from '../data/protectiveDevices.mjs';
 import { calculateTransformerImpedance } from '../utils/transformerImpedance.js';
 import { computeIEC60909Bus } from './iec60909.mjs';
@@ -721,6 +722,14 @@ export function runShortCircuit(modelOrOpts = {}, maybeOpts = {}) {
     limitFaultByProtection(entry, comp, comps, compMap, protectiveLookupCache, scaledDeviceCache, tccSettings);
     const ct = resolveCtForComponent(comp, comps, compMap);
     if (ct) entry.ct = ct;
+    const ptVt = resolvePtVtForComponent(comp, comps, compMap);
+    if (ptVt) entry.pt_vt = ptVt;
+    if (ct || ptVt) {
+      entry.instrument_transformers = {
+        ...(ct ? { ct } : {}),
+        ...(ptVt ? { pt_vt: ptVt } : {})
+      };
+    }
     results[comp.id] = entry;
   });
 

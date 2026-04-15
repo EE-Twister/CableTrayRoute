@@ -158,3 +158,18 @@ Link resolution precedence:
 
 This makes scaling assumptions explicit and traceable when reviewing protection and metering calculations.
 
+## PT/VT metadata in study inputs
+
+Protection and metering study preprocessing now also attaches normalized PT/VT metadata when linked PT/VT components are present. The attached `pt_vt` block includes:
+
+- `tag`, `primary_voltage`, `secondary_voltage`, computed `ratio`
+- `accuracy_class`, `burden_va`, `connection_type`, `fuse_protection`
+- linkage fields (`protected_device_id`, `meter_id`, `relay_id`, `consumer_ids`)
+- optional `voltage_base` compatibility details (`primary_v`, `consumer_v`, `compatible`)
+
+PT/VT link resolution precedence:
+1. Explicit component reference (`pt_vt_id`, `vt_id`, `pt_id`, `potential_transformer_id`, `voltage_transformer_id`).
+2. Reverse PT/VT links via `protected_device_id`, `meter_id`, `relay_id`, or `consumer_ids`.
+3. Direct PT/VT-to-component connection on the one-line graph.
+
+When both CT and PT/VT are found, short-circuit/protection entries expose both under `instrument_transformers` so relay/meter post-processing can apply consistent scaling from a single payload.
