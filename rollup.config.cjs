@@ -36,6 +36,7 @@ const entries = {
   intlCableSize: 'src/intlCableSize.js',
   groundgrid: 'src/groundgrid.js',
   capacitorbank: 'src/capacitorbank.js',
+  cathodicprotection: 'src/cathodicprotection.js',
   battery: 'src/battery.js',
   generatorsizing: 'src/generatorsizing.js',
   heattracesizing: 'src/heattracesizing.js',
