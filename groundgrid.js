@@ -454,18 +454,26 @@ document.addEventListener('DOMContentLoaded', () => {
     resultsDiv.appendChild(section);
   }
 
+  function handleFormStateChange() {
+    setRodSpacingVisibility();
+    renderGridPreview();
+  }
+
   if (form) {
     form.addEventListener('submit', e => {
       e.preventDefault();
       calculate();
     });
 
-    form.addEventListener('input', () => {
-      setRodSpacingVisibility();
-      renderGridPreview();
-    });
+    form.addEventListener('input', handleFormStateChange);
+    form.addEventListener('change', handleFormStateChange);
   } else {
     console.error('[groundgrid] #ground-grid-form not found; form event wiring skipped.');
+  }
+
+  const hasRodsCheckbox = document.getElementById('has-rods');
+  if (hasRodsCheckbox) {
+    hasRodsCheckbox.addEventListener('change', handleFormStateChange);
   }
 
   const unitSelect = document.getElementById('unit-select');
