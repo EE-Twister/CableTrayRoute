@@ -40,6 +40,7 @@ const NAV_ROUTES = [
   { href: 'shortCircuit.html', label: 'Short Circuit', section: 'Studies', group: 'Protection', icon: 'icons/components/Breaker.svg' },
   { href: 'arcFlash.html', label: 'Arc Flash', section: 'Studies', group: 'Protection', icon: 'icons/toolbar/connect.svg' },
   { href: 'groundgrid.html', label: 'Ground Grid', section: 'Studies', group: 'Grounding', icon: 'icons/toolbar/validate.svg' },
+  { href: 'cathodicprotection.html', label: 'Cathodic Protection', section: 'Studies', group: 'Grounding', icon: 'icons/toolbar/validate.svg' },
   { href: 'autosize.html', label: 'Auto-Size', section: 'Studies', group: 'Cable', icon: 'icons/toolbar/grid-size.svg' },
   { href: 'heattracesizing.html', label: 'Heat Trace Sizing', section: 'Studies', group: 'Equipment Sizing', icon: 'icons/toolbar/grid-size.svg' },
   { href: 'reliability.html', label: 'Reliability', section: 'Studies', group: 'Power System', icon: 'icons/toolbar/validate.svg' },

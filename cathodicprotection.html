@@ -1,0 +1,200 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <meta name="description" content="Cathodic protection preliminary sizing for buried metallic structures. Estimate required current, anode mass, and design life." />
+  <title>Cathodic Protection Sizing — CableTrayRoute</title>
+  <link rel="icon" href="icons/favicon.svg" type="image/svg+xml">
+  <link rel="apple-touch-icon" href="icons/favicon.svg">
+  <meta property="og:type" content="website">
+  <meta property="og:title" content="Cathodic Protection Sizing — CableTrayRoute">
+  <meta property="og:description" content="Cathodic protection sizing for buried structures using current density and anode utilization methods.">
+  <meta property="og:image" content="https://cabletrayroute.com/icons/og-preview.png">
+  <meta property="og:site_name" content="CableTrayRoute">
+  <meta property="og:url" content="cathodicprotection.html">
+  <link rel="canonical" href="cathodicprotection.html">
+  <link rel="dns-prefetch" href="https://fonts.gstatic.com">
+  <meta name="color-scheme" content="light dark">
+  <link rel="stylesheet" href="style.css" />
+  <script type="module" src="dirtyTracker.js"></script>
+  <script type="module" src="dist/cathodicprotection.js" defer></script>
+</head>
+<body class="cathodicprotection-page" data-report-title="Cathodic Protection Sizing">
+  <a href="#main-content" class="skip-link">Skip to main content</a>
+  <nav class="top-nav" aria-label="Primary">
+    <button id="nav-toggle" class="nav-toggle" aria-label="Toggle navigation" aria-controls="nav-links" aria-expanded="false" title="Toggle navigation">
+      <img src="icons/toolbar/grid.svg" alt="" aria-hidden="true" class="control-icon" loading="lazy" decoding="async">
+    </button>
+    <div id="nav-links" class="nav-links" role="list"></div>
+    <button id="settings-btn" class="settings-btn" aria-label="Settings" aria-expanded="false" title="Settings">
+      <img src="icons/toolbar/validate.svg" alt="" aria-hidden="true" class="control-icon" loading="lazy" decoding="async">
+    </button>
+  </nav>
+
+  <div id="settings-menu" class="settings-menu">
+    <label for="theme-select">Theme
+      <select id="theme-select">
+        <option value="system">System</option>
+        <option value="light">Light</option>
+        <option value="dark">Dark</option>
+        <option value="high-contrast">High Contrast</option>
+      </select>
+    </label>
+    <label><input type="checkbox" id="compact-toggle" aria-label="Enable compact table mode"> Compact Mode</label>
+    <label for="unit-select">Units
+      <select id="unit-select">
+        <option value="imperial">Imperial (ft, in)</option>
+        <option value="metric">Metric (m, mm)</option>
+      </select>
+    </label>
+    <button id="help-btn" class="btn" aria-expanded="false" title="Show help">
+      <img src="icons/toolbar/validate.svg" alt="" aria-hidden="true" class="control-icon" loading="lazy" decoding="async">
+      <span>Site Help</span>
+    </button>
+    <button id="new-project-btn" title="Start a new project"><img src="icons/toolbar/copy.svg" alt="" aria-hidden="true" class="control-icon" loading="lazy" decoding="async"><span>New Project</span></button>
+    <button id="save-project-btn" title="Save current project"><img src="icons/toolbar/export.svg" alt="" aria-hidden="true" class="control-icon" loading="lazy" decoding="async"><span>Save Project</span></button>
+    <button id="load-project-btn" title="Load an existing project"><img src="icons/toolbar/import.svg" alt="" aria-hidden="true" class="control-icon" loading="lazy" decoding="async"><span>Load Project</span></button>
+    <button id="export-project-btn" title="Export project data"><img src="icons/toolbar/export.svg" alt="" aria-hidden="true" class="control-icon" loading="lazy" decoding="async"><span>Export Project</span></button>
+    <button id="import-project-btn" title="Import project data"><img src="icons/toolbar/import.svg" alt="" aria-hidden="true" class="control-icon" loading="lazy" decoding="async"><span>Import Project</span></button>
+    <input type="file" id="import-project-input" accept=".ctr.json" class="hidden" title="Select project file">
+  </div>
+
+  <div class="container">
+    <main id="main-content" class="main-content">
+      <header class="page-header">
+        <h1>Cathodic Protection (CP) Sizing</h1>
+      </header>
+
+      <details class="method-panel" open>
+        <summary>Method, Formulas, and Standards Mapping</summary>
+        <p>This page provides preliminary impressed-current or galvanic CP sizing for buried assets.
+        Inputs and formulas are aligned with common practice from <strong>NACE SP0169 / AMPP SP21424</strong>,
+        <strong>ISO 15589-1</strong>, and <strong>DNV-RP-B401</strong> style current-demand and anode-consumption methods.</p>
+        <pre>I_req = A_exposed × i_d
+W_req = (I_req × t_design_hours) / (Q_anode × U × F_design)
+Life_years = (W_installed × Q_anode × U × F_design) / (I_req × 8760)</pre>
+        <table class="data-table" aria-label="Standards reference mapping">
+          <thead><tr><th>Tool Input / Formula</th><th>Reference Guidance</th></tr></thead>
+          <tbody>
+            <tr><td>Asset type, coating condition, environment severity</td><td>NACE/AMPP CP design workflow and ISO 15589-1 design basis definition.</td></tr>
+            <tr><td>Design current density i<sub>d</sub> selection</td><td>Table-based current-density selection per environment and coating quality guidance (NACE/AMPP, DNV-RP-B401).</td></tr>
+            <tr><td>I<sub>req</sub> = A<sub>exposed</sub> × i<sub>d</sub></td><td>Standard CP current-demand relation for exposed steel area.</td></tr>
+            <tr><td>Anode capacity Q and utilization U</td><td>Anode consumption calculations per galvanic anode design standards (DNV-RP-B401 / ISO 15589-1).</td></tr>
+            <tr><td>Design factor F<sub>design</sub> and availability factor</td><td>Engineering margin and uptime allowance consistent with CP design reliability practice.</td></tr>
+            <tr><td>Life prediction from installed mass</td><td>Service-life check from available ampere-hour capacity divided by demand current.</td></tr>
+          </tbody>
+        </table>
+      </details>
+
+      <form id="cp-form" novalidate>
+        <fieldset>
+          <legend><strong>Asset &amp; Environment Inputs</strong></legend>
+          <div class="field-row">
+            <label for="asset-type">Asset type</label>
+            <select id="asset-type" required>
+              <option value="pipe">Pipe</option>
+              <option value="tank">Tank</option>
+              <option value="other">Other buried structure</option>
+            </select>
+          </div>
+          <div class="field-row">
+            <label for="soil-resistivity">Soil resistivity (Ω·m)</label>
+            <input type="number" id="soil-resistivity" min="0.1" step="0.1" value="100" required>
+          </div>
+          <div class="field-row">
+            <label for="soil-ph">Soil pH</label>
+            <input type="number" id="soil-ph" min="0" max="14" step="0.1" value="7.0" required>
+          </div>
+          <div class="field-row">
+            <label for="moisture-category">Moisture / corrosivity category</label>
+            <select id="moisture-category" required>
+              <option value="low">Low / dry</option>
+              <option value="moderate" selected>Moderate</option>
+              <option value="high">High / aggressive</option>
+            </select>
+          </div>
+        </fieldset>
+
+        <fieldset>
+          <legend><strong>Exposure &amp; Current Demand</strong></legend>
+          <div class="field-row">
+            <label for="coating-breakdown">Coating breakdown factor (0–1)</label>
+            <input type="number" id="coating-breakdown" min="0" max="1" step="0.01" value="0.20" required>
+          </div>
+          <div class="field-row">
+            <label for="surface-area">Total metallic surface area (<span class="unit-label-ft">ft²</span><span class="unit-label-m" hidden>m²</span>)</label>
+            <input type="number" id="surface-area" min="0.1" step="0.1" value="500" required>
+          </div>
+          <div class="field-row">
+            <label for="density-method">Current density selection method</label>
+            <select id="density-method" required>
+              <option value="table" selected>Standard table (recommended)</option>
+              <option value="manual">Manual entry</option>
+            </select>
+          </div>
+          <div class="field-row" id="manual-density-row" hidden>
+            <label for="manual-density">Manual design current density i<sub>d</sub> (mA/m²)</label>
+            <input type="number" id="manual-density" min="0.001" step="0.001" value="10">
+          </div>
+          <div class="field-row">
+            <label for="table-density">Table-based design current density i<sub>d</sub> (mA/m²)</label>
+            <input type="number" id="table-density" value="10" readonly>
+          </div>
+        </fieldset>
+
+        <fieldset>
+          <legend><strong>Anode &amp; Design Factors</strong></legend>
+          <div class="field-row">
+            <label for="anode-capacity">Anode capacity Q<sub>anode</sub> (Ah/kg)</label>
+            <input type="number" id="anode-capacity" min="1" step="1" value="780" required>
+          </div>
+          <div class="field-row">
+            <label for="anode-utilization">Anode utilization factor U (0–1)</label>
+            <input type="number" id="anode-utilization" min="0.01" max="1" step="0.01" value="0.85" required>
+          </div>
+          <div class="field-row">
+            <label for="design-factor">Design factor F<sub>design</sub> (&gt;0)</label>
+            <input type="number" id="design-factor" min="0.01" step="0.01" value="1.10" required>
+          </div>
+          <div class="field-row">
+            <label for="availability-factor">Availability factor (0–1)</label>
+            <input type="number" id="availability-factor" min="0.01" max="1" step="0.01" value="0.95" required>
+          </div>
+          <div class="field-row">
+            <label for="design-life-years">Target design life (years)</label>
+            <input type="number" id="design-life-years" min="0.1" step="0.1" value="20" required>
+          </div>
+          <div class="field-row">
+            <label for="installed-mass">Installed anode mass (<span class="unit-label-ft">lb</span><span class="unit-label-m" hidden>kg</span>)</label>
+            <input type="number" id="installed-mass" min="0.1" step="0.1" value="500" required>
+          </div>
+        </fieldset>
+
+        <button type="submit" class="primary-btn">Run Analysis</button>
+      </form>
+
+      <div id="cp-errors" class="alert-error" hidden role="alert"></div>
+      <div id="results" role="region" aria-live="polite" aria-label="Cathodic protection sizing results"></div>
+
+      <section class="card" aria-labelledby="study-review-panel-heading"><div id="study-review-panel"></div></section>
+
+      <nav class="step-nav" aria-label="Workflow navigation">
+        <a href="groundgrid.html" class="step-nav-prev">&#8592; Ground Grid</a>
+        <a href="battery.html" class="step-nav-next">Battery / UPS Sizing &#8594;</a>
+      </nav>
+    </main>
+  </div>
+
+  <div id="help-modal" class="modal" aria-hidden="true" role="dialog" aria-modal="true" aria-labelledby="help-title">
+    <div class="modal-content">
+      <button id="close-help-btn" class="close-btn" aria-label="Close Help">&times;</button>
+      <h2 id="help-title">Cathodic Protection Sizing Help</h2>
+      <p>Enter environment, coating, and anode design parameters. The tool calculates required CP current,
+      minimum anode mass for target life, and predicted life from installed anode mass.</p>
+    </div>
+  </div>
+
+  <script type="module" src="dist/projectManager.js"></script>
+</body>
+</html>
