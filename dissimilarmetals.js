@@ -141,9 +141,15 @@ if (typeof document !== 'undefined') {
     initStudyApprovalPanel('dissimilarMetals');
 
     const form = document.getElementById('dissimilar-metals-form');
+    const primarySelect = document.getElementById('primary-metal');
+    const secondarySelect = document.getElementById('secondary-metal');
     const resultsEl = document.getElementById('results');
     const errorsEl = document.getElementById('calc-errors');
     const saved = getStudies().dissimilarMetals;
+
+    updateAreaRoleGuidance();
+    primarySelect.addEventListener('change', updateAreaRoleGuidance);
+    secondarySelect.addEventListener('change', updateAreaRoleGuidance);
 
     if (saved) {
       renderResults(saved, resultsEl);
@@ -183,6 +189,36 @@ function readFormInput() {
     corrosionAllowanceMm: getNumber('corrosion-allowance'),
     temperatureC: getNumber('temperature-c')
   };
+}
+
+function updateAreaRoleGuidance() {
+  const primaryKey = document.getElementById('primary-metal')?.value;
+  const secondaryKey = document.getElementById('secondary-metal')?.value;
+  const primary = METAL_SERIES[primaryKey];
+  const secondary = METAL_SERIES[secondaryKey];
+
+  if (!primary || !secondary) {
+    return;
+  }
+
+  const anodicMetal = primary.potentialV <= secondary.potentialV ? primary : secondary;
+  const cathodicMetal = anodicMetal === primary ? secondary : primary;
+  const anodicRole = anodicMetal === primary ? 'Primary component' : 'Connected hardware';
+  const cathodicRole = cathodicMetal === primary ? 'Primary component' : 'Connected hardware';
+
+  const anodeLabel = document.getElementById('anode-area-label');
+  const cathodeLabel = document.getElementById('cathode-area-label');
+  const areaHint = document.getElementById('area-role-hint');
+
+  if (anodeLabel) {
+    anodeLabel.textContent = `Estimated anodic exposed area (cm²) — ${anodicMetal.label} (${anodicRole})`;
+  }
+  if (cathodeLabel) {
+    cathodeLabel.textContent = `Estimated cathodic exposed area (cm²) — ${cathodicMetal.label} (${cathodicRole})`;
+  }
+  if (areaHint) {
+    areaHint.textContent = `For this pair, ${anodicMetal.label} is anodic (corrodes first) and ${cathodicMetal.label} is cathodic. The primary component is currently ${anodicRole.toLowerCase()}.`;
+  }
 }
 
 function renderResults(result, container) {
