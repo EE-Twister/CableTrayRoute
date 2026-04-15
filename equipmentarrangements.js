@@ -99,7 +99,7 @@ function accessViolation(eq, workspace) {
     return intersects(otherRect, near) && !intersects(otherRect, workspace);
   });
 
-  if (hasNearbyBlocker && !insideRoom(mainRect)) return true;
+  if (hasNearbyBlocker) return true;
   return false;
 }
 
