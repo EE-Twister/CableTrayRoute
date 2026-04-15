@@ -50,6 +50,41 @@ export function runValidation(components = [], studies = {}) {
     }
   });
 
+
+  // Current transformer (CT) required field completeness and physical validity
+  components.forEach(c => {
+    const isCt = c?.subtype === 'ct' || c?.type === 'ct';
+    if (!isCt) return;
+    const props = c.props && typeof c.props === 'object' ? c.props : c;
+    const missing = [];
+
+    if (!`${props.tag ?? ''}`.trim()) missing.push('tag');
+    const ratioPrimary = Number(props.ratio_primary);
+    const ratioSecondary = Number(props.ratio_secondary);
+    if (!Number.isFinite(ratioPrimary) || ratioPrimary <= 0) missing.push('ratio_primary');
+    if (!Number.isFinite(ratioSecondary) || ratioSecondary <= 0) missing.push('ratio_secondary');
+    if (Number.isFinite(ratioPrimary) && Number.isFinite(ratioSecondary) && ratioPrimary < ratioSecondary) {
+      missing.push('ratio_primary>=ratio_secondary');
+    }
+
+    if (!`${props.accuracy_class ?? ''}`.trim()) missing.push('accuracy_class');
+    const burdenVa = Number(props.burden_va);
+    if (!Number.isFinite(burdenVa) || burdenVa <= 0) missing.push('burden_va');
+    const kneePointV = Number(props.knee_point_v);
+    if (!Number.isFinite(kneePointV) || kneePointV <= 0) missing.push('knee_point_v');
+    if (!`${props.polarity ?? ''}`.trim()) missing.push('polarity');
+
+    const locationContext = `${props.location_context ?? ''}`.trim().toLowerCase();
+    if (!['metering', 'protection'].includes(locationContext)) missing.push('location_context');
+
+    if (missing.length) {
+      issues.push({
+        component: c.id,
+        message: `Current transformer missing/invalid attributes: ${missing.join(', ')}.`
+      });
+    }
+  });
+
   // Meter ratio completeness for study-enabled metering features
   components.forEach(c => {
     if (c.type !== 'meter') return;

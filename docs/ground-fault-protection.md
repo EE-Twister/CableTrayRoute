@@ -146,3 +146,15 @@ The feeder GFP relay operates first for low-level ground faults (< 200 A). The m
 | GFP coordination | `analysis/tccAutoCoord.mjs` | `greedyCoordinateGFP()` — validates GFP-only chain, delegates to `greedyCoordinate()` |
 | TCC renderer | `analysis/tcc.js` | `groundFault` view option in `TCC_VIEW_OPTIONS`; `GFP_COLOR_PALETTE`; `buildGFPLibraryEntries()`; dashed purple path styling in `plot()`; GFP dispatch in `autoCoordinate()` |
 | Tests | `tests/tcc/groundFaultProtection.test.mjs` | 27 assertions covering library schema, curve generation, coordination, and NEC metadata |
+
+## CT metadata in study inputs
+
+Protection and metering study input builders now attach normalized CT metadata when a linked CT is present on the one-line model. The attached `ct` block includes `tag`, `ratio_primary`, `ratio_secondary`, computed ratio, `accuracy_class`, `burden_va`, `knee_point_v`, `polarity`, `location_context`, and optional linkage ids (`protected_device_id`, `meter_id`, `relay_id`).
+
+Link resolution precedence:
+1. Explicit component reference (`ct_id` / `current_transformer_id`).
+2. Reverse CT links via `protected_device_id`, `meter_id`, or `relay_id`.
+3. Direct CT-to-component connection on the active one-line graph.
+
+This makes scaling assumptions explicit and traceable when reviewing protection and metering calculations.
+

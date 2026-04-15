@@ -34,6 +34,15 @@ Each subtype in `componentLibrary.json` may include these properties in its sche
 - Meter fields include `tag`, `description`, `manufacturer`, `model`, `meter_class`, `ct_ratio`, `pt_ratio`, `sample_rate_hz`, and study capability flags (`supports_thd`, `supports_flicker`, `supports_waveform_capture`).
 - Validation enforces both `ct_ratio` and `pt_ratio` when any meter study capability flag is enabled so harmonics/power-quality workflows do not run with incomplete instrument transformer scaling.
 
+
+## Current transformer (CT) component fields
+
+- The one-line palette now includes a `ct` subtype under **Protection** with a dedicated CT icon and default study-ready metadata.
+- Required CT fields are `tag`, `ratio_primary`, `ratio_secondary`, `accuracy_class`, `burden_va`, `knee_point_v`, `polarity`, and `location_context` (`metering` or `protection`).
+- Optional linkage fields (`protected_device_id`, `meter_id`, `relay_id`) let each CT reference the protected asset or instrument endpoint using existing component-id conventions.
+- Validation enforces physically valid values (positive ratios, positive burden/knee-point, and `ratio_primary >= ratio_secondary`) so study scaling inputs are not silently invalid.
+- Protection and metering study builders now receive normalized CT metadata in the study input object (`ct`) whenever a linked CT is found (explicit `ct_id`, reverse CT link fields, or direct CT connection).
+
 ## DC bus component fields
 
 - The one-line palette now includes a `dc_bus` subtype under the Bus category with a dedicated DC icon.
