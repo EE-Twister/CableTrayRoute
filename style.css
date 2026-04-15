@@ -22,3 +22,30 @@
 @import "./src/styles/dashboard.css";
 @import "./src/styles/scenarioComparison.css";
 @import "./src/styles/groundgrid.css";
+
+.equipment-arrangement-layout { display:grid; grid-template-columns:minmax(280px,380px) 1fr; gap:1rem; }
+.equipment-arrangement-sidebar { display:flex; flex-direction:column; gap:.75rem; max-height:78vh; overflow:auto; padding-right:.4rem; }
+.equipment-arrangement-sidebar .grid-2 { display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); gap:.5rem; }
+.equipment-arrangement-sidebar label { display:flex; flex-direction:column; gap:.25rem; font-size:.86rem; }
+.equipment-arrangement-canvas-wrap { display:flex; flex-direction:column; gap:.5rem; }
+.equipment-canvas-toolbar { display:flex; gap:.5rem; align-items:center; flex-wrap:wrap; }
+#equipment-arrangement-canvas { width:100%; min-height:70vh; border:1px solid var(--border-color,#7d8790); border-radius:10px; background:linear-gradient(180deg,rgba(140,165,188,.15),rgba(27,32,43,.05)); }
+.equipment-room-outer { fill:rgba(33,43,58,.08); stroke:rgba(66,78,98,.95); stroke-width:2; }
+.equipment-wall-label,.equipment-room-text { font-size:12px; fill:var(--text-color,#1f2b3a); }
+.equipment-interior-wall { fill:rgba(56,63,74,.85); }
+.equipment-clearance { fill:rgba(255,213,110,.8); stroke:rgba(200,142,32,.95); stroke-dasharray:4 4; }
+.equipment-clearance-danger { fill:rgba(245,91,91,.35); stroke:rgba(213,32,32,.95); }
+.equipment-block { fill:rgba(38,122,207,.82); stroke:rgba(14,67,122,.95); stroke-width:1.5; cursor:move; }
+.equipment-block.selected { stroke:#fde047; stroke-width:2.5; }
+.equipment-block-danger { fill:rgba(218,50,50,.85); stroke:rgba(125,15,15,.95); }
+.equipment-block-label,.equipment-block-meta { font-size:11px; fill:#fff; pointer-events:none; }
+.equipment-mini-list { display:flex; flex-direction:column; gap:.4rem; font-size:.82rem; }
+.equipment-mini-list-row { display:flex; justify-content:space-between; gap:.5rem; align-items:center; }
+.equipment-legend { list-style:none; margin:0; padding:0; display:flex; flex-direction:column; gap:.3rem; font-size:.83rem; }
+.equipment-legend li { display:inline-flex; align-items:center; gap:.4rem; }
+.swatch { display:inline-block; width:14px; height:14px; border-radius:3px; }
+.swatch-equipment { background:rgba(38,122,207,.85); }
+.swatch-clearance { background:rgba(255,213,110,.85); }
+.swatch-violation { background:rgba(218,50,50,.85); }
+.equipment-summary { margin-top:.4rem; font-size:.88rem; font-weight:600; }
+@media (max-width:1100px){ .equipment-arrangement-layout{grid-template-columns:1fr;} .equipment-arrangement-sidebar{max-height:none;} #equipment-arrangement-canvas{min-height:56vh;} }

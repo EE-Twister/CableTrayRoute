@@ -1,0 +1,171 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="description" content="Graphical equipment room arrangement tool with NEC workspace checks.">
+  <title>Equipment Arrangements — CableTrayRoute</title>
+  <link rel="icon" href="icons/favicon.svg" type="image/svg+xml">
+  <link rel="apple-touch-icon" href="icons/favicon.svg">
+  <meta property="og:type" content="website">
+  <meta property="og:title" content="Equipment Arrangements — CableTrayRoute">
+  <meta property="og:description" content="Lay out equipment rooms visually, move equipment, and flag NEC working-space violations.">
+  <meta property="og:image" content="https://cabletrayroute.com/icons/og-preview.png">
+  <meta property="og:site_name" content="CableTrayRoute">
+  <meta property="og:url" content="equipmentarrangements.html">
+  <link rel="canonical" href="equipmentarrangements.html">
+  <meta name="color-scheme" content="light dark">
+  <link rel="stylesheet" href="style.css">
+  <script type="module" src="dist/equipmentarrangements.js" defer></script>
+</head>
+<body>
+  <a href="#main-content" class="skip-link">Skip to main content</a>
+  <nav class="top-nav" aria-label="Primary">
+    <button id="nav-toggle" class="nav-toggle" aria-label="Toggle navigation" aria-controls="nav-links" aria-expanded="false" title="Toggle navigation">
+      <img src="icons/toolbar/grid.svg" alt="" aria-hidden="true" class="control-icon" loading="lazy" decoding="async">
+    </button>
+    <div id="nav-links" class="nav-links" role="list"></div>
+
+    <button id="settings-btn" class="settings-btn" aria-label="Settings" aria-expanded="false" title="Settings">
+      <img src="icons/toolbar/validate.svg" alt="" aria-hidden="true" class="control-icon" loading="lazy" decoding="async">
+    </button>
+  </nav>
+
+  <div id="settings-menu" class="settings-menu">
+    <label for="theme-select">Theme
+      <select id="theme-select">
+        <option value="system">System</option>
+        <option value="light">Light</option>
+        <option value="dark">Dark</option>
+        <option value="high-contrast">High Contrast</option>
+      </select>
+    </label>
+    <label><input type="checkbox" id="compact-toggle" aria-label="Enable compact table mode"> Compact Mode</label>
+    <button id="help-btn" class="btn" aria-expanded="false" title="Show help">Site Help</button>
+    <button id="new-project-btn" class="btn" title="Start a new project">New Project</button>
+    <button id="save-project-btn" class="btn" title="Save current project">Save Project</button>
+    <button id="load-project-btn" class="btn" title="Load an existing project">Load Project</button>
+    <button id="export-project-btn" class="btn" title="Export project data">Export Project</button>
+    <button id="import-project-btn" class="btn" title="Import project data">Import Project</button>
+    <input type="file" id="import-project-input" accept=".ctr.json" class="hidden" title="Select project file">
+  </div>
+
+  <div class="container">
+    <main id="main-content" class="main-content">
+      <header class="page-header">
+        <h1>Equipment Arrangements</h1>
+        <p>Plan equipment-room layouts visually and highlight NEC working-space/access violations in red.</p>
+      </header>
+
+      <section class="card equipment-arrangement-layout">
+        <aside class="equipment-arrangement-sidebar">
+          <h2>Room Setup</h2>
+          <div class="grid-2">
+            <label>Room Width (ft)
+              <input id="room-width" type="number" min="8" max="200" step="0.5" value="30">
+            </label>
+            <label>Room Depth (ft)
+              <input id="room-depth" type="number" min="8" max="200" step="0.5" value="20">
+            </label>
+          </div>
+          <div class="grid-2">
+            <label>North Wall
+              <select id="wall-north"></select>
+            </label>
+            <label>South Wall
+              <select id="wall-south"></select>
+            </label>
+            <label>East Wall
+              <select id="wall-east"></select>
+            </label>
+            <label>West Wall
+              <select id="wall-west"></select>
+            </label>
+          </div>
+          <button id="apply-room" class="btn">Apply Room Changes</button>
+
+          <h2>Interior Walls</h2>
+          <div class="grid-2">
+            <label>Orientation
+              <select id="interior-orientation">
+                <option value="vertical">Vertical</option>
+                <option value="horizontal">Horizontal</option>
+              </select>
+            </label>
+            <label>Wall Type
+              <select id="interior-type"></select>
+            </label>
+            <label>Start X (ft)
+              <input id="interior-x" type="number" min="0" step="0.5" value="10">
+            </label>
+            <label>Start Y (ft)
+              <input id="interior-y" type="number" min="0" step="0.5" value="5">
+            </label>
+            <label>Length (ft)
+              <input id="interior-length" type="number" min="1" step="0.5" value="10">
+            </label>
+          </div>
+          <button id="add-interior-wall" class="btn">Add Interior Wall</button>
+          <div id="interior-wall-list" class="equipment-mini-list"></div>
+
+          <h2>Add Equipment</h2>
+          <div class="grid-2">
+            <label>Source
+              <select id="equipment-source">
+                <option value="equipment-list">Equipment List</option>
+                <option value="custom">Custom</option>
+              </select>
+            </label>
+            <label id="equipment-preset-wrapper">Equipment
+              <select id="equipment-preset"></select>
+            </label>
+            <label id="custom-name-wrapper" class="hidden">Custom Name
+              <input id="custom-name" type="text" placeholder="SWGR-1">
+            </label>
+            <label>Width (ft)
+              <input id="equipment-width" type="number" min="1" max="30" step="0.25" value="4">
+            </label>
+            <label>Depth (ft)
+              <input id="equipment-depth" type="number" min="1" max="30" step="0.25" value="2">
+            </label>
+            <label>Voltage
+              <select id="equipment-voltage"></select>
+            </label>
+            <label>Facing
+              <select id="equipment-facing">
+                <option value="north">North</option>
+                <option value="south" selected>South</option>
+                <option value="east">East</option>
+                <option value="west">West</option>
+              </select>
+            </label>
+          </div>
+          <button id="add-equipment" class="btn primary-btn">Add Equipment to Layout</button>
+          <p class="small-text">Drag equipment blocks inside the drawing area to reposition them.</p>
+
+          <h2>Legend</h2>
+          <ul class="equipment-legend">
+            <li><span class="swatch swatch-equipment"></span>Equipment footprint</li>
+            <li><span class="swatch swatch-clearance"></span>Required NEC workspace</li>
+            <li><span class="swatch swatch-violation"></span>Violation zone</li>
+          </ul>
+          <p id="arrangement-summary" class="equipment-summary" aria-live="polite"></p>
+        </aside>
+
+        <div class="equipment-arrangement-canvas-wrap">
+          <div class="equipment-canvas-toolbar">
+            <button id="zoom-out" class="btn" type="button">−</button>
+            <span id="zoom-label" class="small-text">Scale: 20 px/ft</span>
+            <button id="zoom-in" class="btn" type="button">+</button>
+            <button id="delete-selected-equipment" class="btn" type="button">Delete Selected Equipment</button>
+          </div>
+          <svg id="equipment-arrangement-canvas" viewBox="0 0 1000 700" role="img" aria-label="Equipment room layout canvas"></svg>
+        </div>
+      </section>
+    </main>
+  </div>
+
+  <script type="module" src="dist/index.js" defer></script>
+  <script type="module" src="dist/projectManager.js"></script>
+</body>
+</html>
