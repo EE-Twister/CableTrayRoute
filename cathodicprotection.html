@@ -158,6 +158,28 @@ Life_years = (W_installed × Q_anode × U × F_design) / (I_req × 8760)</pre>
             <label for="calculated-surface-area">Calculated total metallic surface area (<span class="unit-label-ft">ft²</span><span class="unit-label-m" hidden>m²</span>)</label>
             <input type="number" id="calculated-surface-area" value="0" readonly>
           </div>
+          <figure id="pipe-dimensions-illustration" class="cp-geometry-illustration" hidden>
+            <svg viewBox="0 0 700 210" role="img" aria-labelledby="pipe-geometry-title pipe-geometry-desc">
+              <title id="pipe-geometry-title">Pipe dimensions input diagram</title>
+              <desc id="pipe-geometry-desc">Diagram showing a pipe with outside diameter and length dimensions used in the surface area calculation.</desc>
+              <defs>
+                <marker id="cp-arrow" markerWidth="10" markerHeight="10" refX="8" refY="3" orient="auto" markerUnits="strokeWidth">
+                  <path d="M0,0 L8,3 L0,6 z" fill="currentColor"></path>
+                </marker>
+              </defs>
+              <rect x="100" y="70" width="470" height="72" rx="22" ry="22" class="cp-geometry-pipe"></rect>
+              <line x1="96" y1="52" x2="574" y2="52" class="cp-geometry-dimension" marker-start="url(#cp-arrow)" marker-end="url(#cp-arrow)"></line>
+              <line x1="100" y1="60" x2="100" y2="70" class="cp-geometry-guide"></line>
+              <line x1="570" y1="60" x2="570" y2="70" class="cp-geometry-guide"></line>
+              <text x="335" y="44" text-anchor="middle" class="cp-geometry-label">Pipe length (L)</text>
+              <line x1="72" y1="70" x2="72" y2="142" class="cp-geometry-dimension" marker-start="url(#cp-arrow)" marker-end="url(#cp-arrow)"></line>
+              <line x1="82" y1="70" x2="100" y2="70" class="cp-geometry-guide"></line>
+              <line x1="82" y1="142" x2="100" y2="142" class="cp-geometry-guide"></line>
+              <text x="64" y="108" text-anchor="end" class="cp-geometry-label">O.D.</text>
+              <text x="336" y="176" text-anchor="middle" class="cp-geometry-note">Area used: A = π × O.D. × L</text>
+            </svg>
+            <figcaption class="field-hint">Use outside diameter and centerline length for the exposed cylindrical surface estimate.</figcaption>
+          </figure>
           <div class="field-row">
             <label for="surface-area">Total metallic surface area (<span class="unit-label-ft">ft²</span><span class="unit-label-m" hidden>m²</span>)</label>
             <input type="number" id="surface-area" min="0.1" step="0.1" value="500" required>
