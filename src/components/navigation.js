@@ -41,6 +41,7 @@ const NAV_ROUTES = [
   { href: 'arcFlash.html', label: 'Arc Flash', section: 'Studies', group: 'Protection', icon: 'icons/toolbar/connect.svg' },
   { href: 'groundgrid.html', label: 'Ground Grid', section: 'Studies', group: 'Grounding', icon: 'icons/toolbar/validate.svg' },
   { href: 'autosize.html', label: 'Auto-Size', section: 'Studies', group: 'Cable', icon: 'icons/toolbar/grid-size.svg' },
+  { href: 'heattracesizing.html', label: 'Heat Trace Sizing', section: 'Studies', group: 'Equipment Sizing', icon: 'icons/toolbar/grid-size.svg' },
   { href: 'reliability.html', label: 'Reliability', section: 'Studies', group: 'Power System', icon: 'icons/toolbar/validate.svg' },
   { href: 'emf.html', label: 'EMF Analysis', section: 'Studies', group: 'Power System', icon: 'icons/toolbar/connect.svg' },
   { href: 'transientstability.html', label: 'Transient Stability', section: 'Studies', group: 'Power System', icon: 'icons/toolbar/validate.svg' },

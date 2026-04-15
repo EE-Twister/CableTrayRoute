@@ -29,6 +29,7 @@ const ACTIONS = [
   { id: "workflow:trayfill", label: "Go to Tray Fill", keywords: ["navigation", "fill", "capacity"], href: "cabletrayfill.html" },
   { id: "workflow:conduitfill", label: "Go to Conduit Fill", keywords: ["navigation", "fill", "nec"], href: "conduitfill.html" },
   { id: "workflow:route", label: "Go to Optimal Route", keywords: ["navigation", "routing", "dijkstra", "pathfinding"], href: "optimalRoute.html" },
+  { id: "workflow:heattrace", label: "Go to Heat Trace Sizing", keywords: ["navigation", "heat", "trace", "pipe"], href: "heattracesizing.html" },
   { id: "workflow:drc", label: "Go to Design Rule Checker", keywords: ["navigation", "drc", "nec", "validation", "fill", "segregation", "ampacity"], href: "designrulechecker.html" },
   { id: "workflow:oneline", label: "Go to One-Line Diagram", keywords: ["navigation", "diagram", "schematic"], href: "oneline.html" },
   { id: "workflow:panel", label: "Go to Panel Schedule", keywords: ["navigation", "panel", "branch"], href: "panelschedule.html" },
