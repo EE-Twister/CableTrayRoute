@@ -10,6 +10,38 @@ const TABLE_CURRENT_DENSITY_MA_M2 = {
   other: { low: 6, moderate: 12, high: 22 }
 };
 
+export const CP_STANDARD_BASIS = {
+  currentDensitySelection: {
+    id: 'current-density-selection',
+    label: 'Current density selection ranges',
+    standards: ['AMPP SP21424', 'NACE SP0169'],
+    summary: 'Table-range style current demand selection by structure condition and environment severity.'
+  },
+  polarizationCriteria: {
+    id: 'polarization-criteria',
+    label: 'Polarization / protection criteria assumptions',
+    standards: ['NACE SP0169', 'ISO 15589-1'],
+    summary: 'Protection assumptions align with conventional on/off potential and polarization criteria used for buried steel CP design.'
+  },
+  anodeCapacityUtilization: {
+    id: 'anode-capacity-utilization',
+    label: 'Anode capacity and utilization values',
+    standards: ['DNV-RP-B401', 'ISO 15589-1'],
+    summary: 'Galvanic anode ampere-hour capacity and utilization factors follow published anode design guidance.'
+  },
+  engineeringJudgmentAssumptions: {
+    id: 'engineering-judgment',
+    label: 'Engineering judgment assumptions',
+    standards: ['Project-specific engineering judgment'],
+    summary: 'Coating breakdown factor, design factor, and optional temperature correction require project-specific engineering validation.',
+    assumptions: [
+      'Coating breakdown factor is selected by expected coating quality, age, and defect distribution.',
+      'Design factor is selected as a reliability margin for uncertainty and lifecycle variability.',
+      'Temperature correction is not explicitly modeled in this tool and should be applied by engineering review when needed.'
+    ]
+  }
+};
+
 export function calculateRequiredCurrent(areaExposedM2, currentDensityAperM2) {
   return areaExposedM2 * currentDensityAperM2;
 }
@@ -57,6 +89,13 @@ export function runCathodicProtectionAnalysis(input) {
   return {
     ...input,
     timestamp: new Date().toISOString(),
+    standardsBasis: CP_STANDARD_BASIS,
+    outputBasis: {
+      requiredCurrentA: 'Uses exposed-area current demand relation with current density selected per current-density standards basis.',
+      minimumAnodeMassKg: 'Uses anode mass sizing equation with anode capacity/utilization values from anode-capacity standards basis.',
+      predictedLifeYears: 'Uses installed mass life relation with anode capacity/utilization basis and protection criteria assumptions.',
+      safetyMargin: 'Compares predicted life versus target design life using the same protection and anode basis assumptions.'
+    },
     designCurrentDensityMaM2: roundTo(designCurrentDensityMaM2, 3),
     exposedAreaM2: roundTo(exposedAreaM2, 3),
     requiredCurrentA: roundTo(adjustedRequiredCurrentA, 4),
@@ -141,8 +180,10 @@ if (typeof document !== 'undefined') {
   const densityMethodEl = document.getElementById('density-method');
   const manualRow = document.getElementById('manual-density-row');
   const tableDensityEl = document.getElementById('table-density');
+  const basisPanel = document.getElementById('calculation-basis-content');
 
   const saved = getStudies().cathodicProtection;
+  renderCalculationBasis(basisPanel, CP_STANDARD_BASIS);
   if (saved) {
     renderResults(saved, resultsDiv);
   }
@@ -227,6 +268,7 @@ function readFormInputs() {
 function renderResults(result, root) {
   const lifeBadgeClass = result.safetyMarginYears >= 0 ? 'result-badge--pass' : 'result-badge--fail';
   const lifeBadgeIcon = result.safetyMarginYears >= 0 ? '✓' : '✗';
+  const outputBasis = result.outputBasis || {};
 
   root.innerHTML = `
     <section class="results-panel" aria-labelledby="cp-results-heading">
@@ -238,6 +280,7 @@ function renderResults(result, root) {
           <span class="result-value">${result.requiredCurrentA} A</span>
         </div>
         <p class="field-hint result-formula">I<sub>req</sub> = A<sub>exposed</sub> × i<sub>d</sub> = ${result.exposedAreaM2} × ${(result.designCurrentDensityMaM2 / 1000).toFixed(4)} = ${result.requiredCurrentA} A</p>
+        <p class="field-hint result-basis">Basis: ${escapeHtml(outputBasis.requiredCurrentA || 'See Calculation Basis section for standards mapping.')}</p>
       </div>
 
       <div class="result-group">
@@ -245,6 +288,7 @@ function renderResults(result, root) {
           <span class="result-label">Minimum anode mass</span>
           <span class="result-value">${result.minimumAnodeMassKg} kg (${result.minimumAnodeMassLb} lb)</span>
         </div>
+        <p class="field-hint result-basis">Basis: ${escapeHtml(outputBasis.minimumAnodeMassKg || 'See Calculation Basis section for standards mapping.')}</p>
       </div>
 
       <div class="result-group">
@@ -253,6 +297,8 @@ function renderResults(result, root) {
           <span class="result-value">${result.predictedLifeYears} years</span>
         </div>
         <div class="result-badge ${lifeBadgeClass}">${lifeBadgeIcon} Safety margin: ${result.safetyMarginYears} years (${result.safetyMarginPercent}%) vs target ${result.targetLifeYears} years</div>
+        <p class="field-hint result-basis">Basis: ${escapeHtml(outputBasis.predictedLifeYears || 'See Calculation Basis section for standards mapping.')}</p>
+        <p class="field-hint result-basis">Safety margin basis: ${escapeHtml(outputBasis.safetyMargin || 'See Calculation Basis section for standards mapping.')}</p>
       </div>
 
       <div class="table-wrap">
@@ -280,4 +326,30 @@ function renderResults(result, root) {
 
 function escapeHtml(text) {
   return String(text).replace(/[&<>"']/g, (char) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[char]));
+}
+
+function renderCalculationBasis(root, basis) {
+  if (!root || !basis) return;
+
+  const sections = [
+    basis.currentDensitySelection,
+    basis.polarizationCriteria,
+    basis.anodeCapacityUtilization,
+    basis.engineeringJudgmentAssumptions
+  ].filter(Boolean);
+
+  root.innerHTML = `
+    <ul class="basis-list">
+      ${sections.map((section) => `
+        <li id="${escapeHtml(section.id)}">
+          <strong>${escapeHtml(section.label)}:</strong>
+          <span>${escapeHtml(section.summary)}</span>
+          <div class="field-hint">Standards: ${escapeHtml(section.standards.join(', '))}</div>
+          ${Array.isArray(section.assumptions) && section.assumptions.length
+            ? `<ul>${section.assumptions.map((assumption) => `<li>${escapeHtml(assumption)}</li>`).join('')}</ul>`
+            : ''}
+        </li>
+      `).join('')}
+    </ul>
+  `;
 }
