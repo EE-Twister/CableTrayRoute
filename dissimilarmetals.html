@@ -119,13 +119,14 @@ Rate ∝ Driving potential × environment severity × area ratio × temperature 
             </select>
           </div>
           <div class="field-row">
-            <label for="anode-area">Estimated anodic exposed area (cm²)</label>
+            <label for="anode-area" id="anode-area-label">Estimated anodic exposed area (cm²)</label>
             <input type="number" id="anode-area" min="1" step="1" value="120" required>
           </div>
           <div class="field-row">
-            <label for="cathode-area">Estimated cathodic exposed area (cm²)</label>
+            <label for="cathode-area" id="cathode-area-label">Estimated cathodic exposed area (cm²)</label>
             <input type="number" id="cathode-area" min="1" step="1" value="300" required>
           </div>
+          <p class="field-hint" id="area-role-hint">Enter the exposed area for whichever selected metal is anodic and cathodic. The tool auto-detects role from the selected pair.</p>
           <div class="field-row">
             <label for="temperature-c">Operating temperature (°C)</label>
             <input type="number" id="temperature-c" min="-40" max="120" step="1" value="30" required>
