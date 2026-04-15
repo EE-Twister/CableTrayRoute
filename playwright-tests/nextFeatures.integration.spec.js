@@ -6,6 +6,8 @@ import {
   navigateForE2E,
   applyCostEstimatorFixture,
   COST_ESTIMATOR_FIXTURES,
+  COST_ESTIMATOR_CANONICAL_FIXTURE,
+  EMF_CANONICAL_FIXTURE,
   fillCostEstimatorForm,
   fillEmfForm,
   getResultText,
@@ -56,7 +58,9 @@ test.describe('next features integration: cost estimator scenarios and exports',
   test('integration: baseline fixture renders detailed line items, totals, and contingency impact', async ({ page }) => {
     await navigateForE2E(page, 'costestimate.html');
     await applyCostEstimatorFixture(page, COST_ESTIMATOR_FIXTURES.baselineProject);
-    await fillCostEstimatorForm(page, { contingencyPct: '10' });
+    await fillCostEstimatorForm(page, {
+      contingencyPct: String(COST_ESTIMATOR_CANONICAL_FIXTURE.expected.contingencyPct),
+    });
 
     await page.click('#estimate-btn');
 
@@ -67,10 +71,17 @@ test.describe('next features integration: cost estimator scenarios and exports',
     await expect(results).toContainText('Cable');
     await expect(results).toContainText('Tray');
     await expect(results).toContainText('Conduit');
-    await expect(results).toContainText('Contingency (10%)');
+    await expect(results).toContainText(`Contingency (${COST_ESTIMATOR_CANONICAL_FIXTURE.expected.contingencyPct}%)`);
     await expect(results).toContainText('Grand Total (incl. contingency)');
-    await expect(results.locator('summary')).toContainText('Line Item Detail (3 items)');
-    await expect(results.locator('table[aria-label="Line item cost detail"] tbody tr')).toHaveCount(3);
+    await expect(results.locator('summary')).toContainText('Line Item Detail (4 items)');
+    await expect(results.locator('table[aria-label="Line item cost detail"] tbody tr')).toHaveCount(4);
+
+    await expect(results).toContainText(`$${COST_ESTIMATOR_CANONICAL_FIXTURE.expected.cableSubtotal.toLocaleString()}`);
+    await expect(results).toContainText(`$${COST_ESTIMATOR_CANONICAL_FIXTURE.expected.traySubtotal.toLocaleString()}`);
+    await expect(results).toContainText(`$${COST_ESTIMATOR_CANONICAL_FIXTURE.expected.conduitSubtotal.toLocaleString()}`);
+    await expect(results).toContainText(`$${COST_ESTIMATOR_CANONICAL_FIXTURE.expected.subtotal.toLocaleString()}`);
+    await expect(results).toContainText(`$${COST_ESTIMATOR_CANONICAL_FIXTURE.expected.contingencyAmountRounded.toLocaleString()}`);
+    await expect(results).toContainText(`$${COST_ESTIMATOR_CANONICAL_FIXTURE.expected.totalRounded.toLocaleString()}`);
   });
 
   test('integration: cost estimator xlsx export downloads expected file', async ({ page }) => {
@@ -153,60 +164,52 @@ test.describe('next features integration: cost estimator scenarios and exports',
 test.describe('next features integration: emf deterministic outputs', () => {
   test('integration: emf calculation returns deterministic numeric output for fixed 60 Hz and 50 Hz scenarios', async ({ page }) => {
     await navigateForE2E(page, 'emf.html');
-    const fixedInputs = {
-      loadCurrent: '150',
-      nCables: '1',
-      trayWidth: '12',
-      cableOd: '1.0',
-      measDistance: '36',
-    };
+    await fillEmfForm(page, EMF_CANONICAL_FIXTURE.defaultGeometry);
+    await page.click('#calc-btn');
 
-    for (const frequency of ['60', '50']) {
-      await fillEmfForm(page, { ...fixedInputs, frequency });
-      await page.click('#calc-btn');
+    await expect(page.locator('tr:has(th:has-text("Frequency")) td')).toHaveText(
+      `${EMF_CANONICAL_FIXTURE.defaultGeometry.frequency} Hz`,
+    );
 
-      await expect(page.locator('tr:has(th:has-text("Frequency")) td')).toHaveText(`${frequency} Hz`);
+    const rmsCell = page.locator('tr:has(th:has-text("RMS Flux Density")) td strong');
+    await expect(rmsCell).toHaveText(/^\d+\.\d{3}\sµT$/);
+    const rms = await getEmfRmsMicroTesla(page);
+    expect(rms).not.toBeNull();
+    expect(Math.abs(rms - EMF_CANONICAL_FIXTURE.expected.normalBrmsMicroTesla)).toBeLessThanOrEqual(
+      EMF_CANONICAL_FIXTURE.tolerances.brmsLowCurrentAbs,
+    );
 
-      const rmsCell = page.locator('tr:has(th:has-text("RMS Flux Density")) td strong');
-      await expect(rmsCell).toHaveText(/^\d+\.\d{3}\sµT$/);
-      const rms = await getEmfRmsMicroTesla(page);
-      expect(rms).not.toBeNull();
-      expect(rms).toBeGreaterThan(20);
-      expect(rms).toBeLessThan(40);
+    const peakText = await page.locator('tr:has(th:has-text("Peak Flux Density")) td strong').innerText();
+    expect(peakText).toMatch(/^\d+\.\d{3}\sµT$/);
+    const peak = Number.parseFloat(peakText.replace(' µT', ''));
+    expect(Math.abs(peak - EMF_CANONICAL_FIXTURE.expected.normalBpeakMicroTesla)).toBeLessThanOrEqual(
+      EMF_CANONICAL_FIXTURE.tolerances.bpeakLowCurrentAbs,
+    );
 
-      const peakText = await page.locator('tr:has(th:has-text("Peak Flux Density")) td strong').innerText();
-      expect(peakText).toMatch(/^\d+\.\d{3}\sµT$/);
-      const peak = Number.parseFloat(peakText.replace(' µT', ''));
-      expect(peak).toBeGreaterThan(40);
-      expect(peak).toBeLessThan(70);
-
-      const resultText = await getResultText(page, '#results');
-      expect(resultText).toContain('ICNIRP 2010 Compliance');
-    }
+    const resultText = await getResultText(page, '#results');
+    expect(resultText).toContain('ICNIRP 2010 Compliance');
+    await expect(page.locator('#results .status-badge', { hasText: 'PASS' })).toHaveCount(2);
   });
 
   test('integration: emf ICNIRP compliance status shows PASS and FAIL outcomes for supported scenarios', async ({ page }) => {
     await navigateForE2E(page, 'emf.html');
 
-    await fillEmfForm(page, {
-      frequency: '60',
-      loadCurrent: '150',
-      nCables: '1',
-      trayWidth: '12',
-      cableOd: '1.0',
-      measDistance: '36',
-    });
+    await fillEmfForm(page, { ...EMF_CANONICAL_FIXTURE.defaultGeometry });
     await page.click('#calc-btn');
     await expect(page.locator('#results .status-badge', { hasText: 'PASS' })).toHaveCount(2);
     await expect(page.locator('#results .status-badge', { hasText: 'FAIL' })).toHaveCount(0);
 
     await fillEmfForm(page, {
-      frequency: '60',
-      loadCurrent: '5000',
-      nCables: '20',
-      trayWidth: '48',
-      cableOd: '6',
-      measDistance: '0',
+      ...EMF_CANONICAL_FIXTURE.defaultGeometry,
+      loadCurrent: EMF_CANONICAL_FIXTURE.boundaryCurrents.overGeneralPublicBoundary,
+    });
+    await page.click('#calc-btn');
+    await expect(page.locator('#results .status-badge', { hasText: 'PASS' })).toHaveCount(1);
+    await expect(page.locator('#results .status-badge', { hasText: 'FAIL' })).toHaveCount(1);
+
+    await fillEmfForm(page, {
+      ...EMF_CANONICAL_FIXTURE.defaultGeometry,
+      loadCurrent: EMF_CANONICAL_FIXTURE.boundaryCurrents.nearOccupationalBoundary,
     });
     await page.click('#calc-btn');
     await expect(page.locator('#results .status-badge', { hasText: 'FAIL' })).toHaveCount(2);
