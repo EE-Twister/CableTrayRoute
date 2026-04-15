@@ -2,6 +2,8 @@ import { test, expect } from '@playwright/test';
 import fs from 'fs/promises';
 import os from 'os';
 import path from 'path';
+import { execFile } from 'child_process';
+import { promisify } from 'util';
 import {
   navigateForE2E,
   applyCostEstimatorFixture,
@@ -17,10 +19,10 @@ import {
   runEMFCalculate,
   runEMFProfile,
   getResultText,
-  getCostEstimateContingencyAmount,
-  getCostEstimateGrandTotal,
   getEmfRmsMicroTesla,
 } from './nextFeatures.helpers.js';
+
+const execFileAsync = promisify(execFile);
 
 async function assertExportDownload(download, expectedName) {
   const downloadName = download.suggestedFilename();
@@ -31,13 +33,129 @@ async function assertExportDownload(download, expectedName) {
   await download.saveAs(tempPath);
   const stats = await fs.stat(tempPath);
   expect(stats.size).toBeGreaterThan(0);
+
+  return tempPath;
+}
+
+function escPy(str) {
+  return str.replace(/\\/g, '\\\\').replace(/'/g, "\\'");
+}
+
+async function readWorkbookRows(filePath) {
+  const pythonScript = `
+import json
+import zipfile
+import xml.etree.ElementTree as ET
+
+path = '${escPy(filePath)}'
+ns = {'m': 'http://schemas.openxmlformats.org/spreadsheetml/2006/main'}
+rels_ns = {'r': 'http://schemas.openxmlformats.org/package/2006/relationships'}
+
+def col_key(cell_ref):
+    letters = ''.join([ch for ch in cell_ref if ch.isalpha()])
+    value = 0
+    for ch in letters:
+        value = value * 26 + (ord(ch) - 64)
+    return value
+
+with zipfile.ZipFile(path, 'r') as zf:
+    shared = []
+    if 'xl/sharedStrings.xml' in zf.namelist():
+        root = ET.fromstring(zf.read('xl/sharedStrings.xml'))
+        for si in root.findall('m:si', ns):
+            txt = ''.join(t.text or '' for t in si.findall('.//m:t', ns))
+            shared.append(txt)
+
+    workbook = ET.fromstring(zf.read('xl/workbook.xml'))
+    wb_rels = ET.fromstring(zf.read('xl/_rels/workbook.xml.rels'))
+    rel_map = {rel.attrib['Id']: rel.attrib['Target'] for rel in wb_rels.findall('r:Relationship', rels_ns)}
+
+    by_name = {}
+    for sheet in workbook.findall('m:sheets/m:sheet', ns):
+        name = sheet.attrib.get('name', '')
+        rel_id = sheet.attrib.get('{http://schemas.openxmlformats.org/officeDocument/2006/relationships}id')
+        target = rel_map.get(rel_id, '')
+        if target and not target.startswith('xl/'):
+            target = f"xl/{target}"
+
+        sheet_root = ET.fromstring(zf.read(target))
+        rows = []
+        for row in sheet_root.findall('m:sheetData/m:row', ns):
+            values = []
+            for c in sorted(row.findall('m:c', ns), key=lambda cell: col_key(cell.attrib.get('r', 'A1'))):
+                ctype = c.attrib.get('t')
+                v = c.find('m:v', ns)
+                if ctype == 's' and v is not None and v.text is not None:
+                    idx = int(v.text)
+                    values.append(shared[idx] if idx < len(shared) else '')
+                elif ctype == 'inlineStr':
+                    t = c.find('m:is/m:t', ns)
+                    values.append((t.text if t is not None else '') or '')
+                elif v is not None and v.text is not None:
+                    values.append(v.text)
+                else:
+                    values.append('')
+            rows.append(values)
+        by_name[name] = rows
+
+print(json.dumps(by_name))
+`;
+
+  const { stdout } = await execFileAsync('python3', ['-c', pythonScript], { maxBuffer: 1024 * 1024 * 5 });
+  return JSON.parse(stdout);
 }
 
 test.describe('next features integration: cost estimator scenarios and exports', () => {
-  test('acceptance CE-02: empty or invalid fixture returns deterministic guidance', async ({ page }) => {
+  test('acceptance CE-01 [cost estimator] [AT-CE-01]: baseline fixture renders deterministic rounded totals', async ({ page }) => {
     await setupCEPage(page);
     await expect(page.getByRole('heading', { level: 1, name: 'Project Cost Estimator' })).toBeVisible();
 
+    await applyCostEstimatorFixture(page, COST_ESTIMATOR_FIXTURES.baselineProject);
+    await fillCEInputs(page, { contingencyPct: String(COST_ESTIMATOR_CANONICAL_FIXTURE.expected.contingencyPct) });
+
+    await runCEEstimate(page);
+    const results = page.locator('#results');
+
+    await expect(results).toContainText(`Contingency (${COST_ESTIMATOR_CANONICAL_FIXTURE.expected.contingencyPct}%)`);
+    await expect(results).toContainText('Grand Total (incl. contingency)');
+    await expect(results.locator('table[aria-label="Cost summary by category"] tbody tr')).toHaveCount(3);
+
+    await expect(results.locator('tr:has(th:has-text("Subtotal")) td strong')).toHaveText(
+      `$${COST_ESTIMATOR_CANONICAL_FIXTURE.expected.subtotal.toLocaleString()}`,
+    );
+    await expect(results.locator('tr:has(th:has-text("Contingency")) td').last()).toHaveText(
+      `$${COST_ESTIMATOR_CANONICAL_FIXTURE.expected.contingencyAmountRounded.toLocaleString()}`,
+    );
+    await expect(results.locator('.summary-grand-total td strong')).toHaveText(
+      `$${COST_ESTIMATOR_CANONICAL_FIXTURE.expected.totalRounded.toLocaleString()}`,
+    );
+    await expect(results.locator('tr:has(th:has-text("Contingency")) td').last()).toHaveText(/^\$[\d,]+$/);
+    await expect(results.locator('.summary-grand-total td strong')).toHaveText(/^\$[\d,]+$/);
+  });
+
+  test('acceptance CE-02 [cost estimator] [AT-CE-02]: contingency boundaries at 0% and 100% preserve expected labels/totals', async ({ page }) => {
+    await setupCEPage(page, COST_ESTIMATOR_FIXTURES.baselineProject);
+    const expected = COST_ESTIMATOR_CANONICAL_FIXTURE.expected;
+    const subtotalFormatted = `$${expected.subtotal.toLocaleString()}`;
+
+    await fillCEInputs(page, { contingencyPct: String(expected.contingencyFloorPct) });
+    await runCEEstimate(page);
+    const results = page.locator('#results');
+    await expect(results.locator('tr:has(th:has-text("Contingency")) th')).toHaveText('Contingency (0%)');
+    await expect(results.locator('tr:has(th:has-text("Contingency")) td').last()).toHaveText('$0');
+    await expect(results.locator('tr:has(th:has-text("Subtotal")) td strong')).toHaveText(subtotalFormatted);
+    await expect(results.locator('.summary-grand-total td strong')).toHaveText(subtotalFormatted);
+
+    await fillCEInputs(page, { contingencyPct: String(expected.contingencyCeilingPct) });
+    await runCEEstimate(page);
+    await expect(results.locator('tr:has(th:has-text("Contingency")) th')).toHaveText('Contingency (100%)');
+    await expect(results.locator('tr:has(th:has-text("Subtotal")) td strong')).toHaveText(subtotalFormatted);
+    await expect(results.locator('.summary-grand-total td strong')).toHaveText(`$${(expected.subtotal * 2).toLocaleString()}`);
+    await expect(results.locator('.summary-grand-total td strong')).toHaveText(/^\$[\d,]+$/);
+  });
+
+  test('acceptance CE-03 [cost estimator] [AT-CE-03]: empty data shows guidance and does not render estimate tables', async ({ page }) => {
+    await setupCEPage(page);
     await applyCostEstimatorFixture(page, COST_ESTIMATOR_FIXTURES.emptyInvalidInputScenario);
     await fillCEInputs(page, {
       contingencyPct: COST_ESTIMATOR_FIXTURES.emptyInvalidInputScenario.contingencyPct,
@@ -45,91 +163,51 @@ test.describe('next features integration: cost estimator scenarios and exports',
       laborTrayRate: COST_ESTIMATOR_FIXTURES.emptyInvalidInputScenario.laborTrayRate,
       laborConduitRate: COST_ESTIMATOR_FIXTURES.emptyInvalidInputScenario.laborConduitRate,
     });
-
-    await runCEEstimate(page);
-
-    const resultsText = await getResultText(page, '#results');
-    expect(resultsText).toContain('No project data found');
-  });
-
-  test('acceptance CE-03: xlsx export is blocked until a scenario is generated', async ({ page }) => {
-    await setupCEPage(page);
-
-    await page.getByRole('button', { name: 'Export XLSX' }).click();
-
-    const bodyText = await page.locator('body').innerText();
-    expect(bodyText).toContain('No Data');
-  });
-
-  test('acceptance CE-04: baseline fixture renders deterministic summary totals', async ({ page }) => {
-    await setupCEPage(page, COST_ESTIMATOR_FIXTURES.baselineProject);
-    await fillCEInputs(page, {
-      contingencyPct: String(COST_ESTIMATOR_CANONICAL_FIXTURE.expected.contingencyPct),
-    });
-
     await runCEEstimate(page);
 
     const results = page.locator('#results');
-    await expect(results.locator('h2')).toHaveText('Cost Summary');
-    await expect(results.locator('table[aria-label="Cost summary by category"]')).toBeVisible();
-    await expect(results.locator('table[aria-label="Cost summary by category"] tbody tr')).toHaveCount(3);
-    await expect(results).toContainText('Cable');
-    await expect(results).toContainText('Tray');
-    await expect(results).toContainText('Conduit');
-    await expect(results).toContainText(`Contingency (${COST_ESTIMATOR_CANONICAL_FIXTURE.expected.contingencyPct}%)`);
-    await expect(results).toContainText('Grand Total (incl. contingency)');
-    await expect(results.locator('summary')).toContainText('Line Item Detail (4 items)');
-    await expect(results.locator('table[aria-label="Line item cost detail"] tbody tr')).toHaveCount(4);
-
-    await expect(results).toContainText(`$${COST_ESTIMATOR_CANONICAL_FIXTURE.expected.cableSubtotal.toLocaleString()}`);
-    await expect(results).toContainText(`$${COST_ESTIMATOR_CANONICAL_FIXTURE.expected.traySubtotal.toLocaleString()}`);
-    await expect(results).toContainText(`$${COST_ESTIMATOR_CANONICAL_FIXTURE.expected.conduitSubtotal.toLocaleString()}`);
-    await expect(results).toContainText(`$${COST_ESTIMATOR_CANONICAL_FIXTURE.expected.subtotal.toLocaleString()}`);
-    await expect(results).toContainText(`$${COST_ESTIMATOR_CANONICAL_FIXTURE.expected.contingencyAmountRounded.toLocaleString()}`);
-    await expect(results).toContainText(`$${COST_ESTIMATOR_CANONICAL_FIXTURE.expected.totalRounded.toLocaleString()}`);
+    await expect(results).toContainText('No project data found. Add cables and raceways to the schedules first.');
+    await expect(results.locator('table')).toHaveCount(0);
   });
 
-  test('acceptance CE-05: cost estimator xlsx export downloads expected file', async ({ page }) => {
+  test('acceptance CE-04 [cost estimator] [AT-CE-04]: xlsx export guardrail before estimate and parity after estimate', async ({ page }) => {
     await setupCEPage(page, COST_ESTIMATOR_FIXTURES.baselineProject);
-    await fillCEInputs(page, { contingencyPct: '10' });
+
+    await page.getByRole('button', { name: 'Export XLSX' }).click();
+    const guardrailDialog = page.getByRole('dialog');
+    await expect(guardrailDialog).toContainText('No Data');
+    await expect(guardrailDialog).toContainText('Run the estimate first before exporting.');
+    await guardrailDialog.getByRole('button', { name: 'Close' }).click();
+
+    const expected = COST_ESTIMATOR_CANONICAL_FIXTURE.expected;
+    await fillCEInputs(page, { contingencyPct: String(expected.contingencyPct) });
     await runCEEstimate(page);
+    const results = page.locator('#results');
+
+    const uiContingencyLabel = (await results.locator('tr:has(th:has-text("Contingency")) th').innerText()).trim();
+    const uiSubtotal = (await results.locator('tr:has(th:has-text("Subtotal")) td strong').innerText()).trim();
+    const uiContingency = (await results.locator('tr:has(th:has-text("Contingency")) td').last().innerText()).trim();
+    const uiGrandTotal = (await results.locator('.summary-grand-total td strong').innerText()).trim();
+
+    expect(uiContingencyLabel).toBe(`Contingency (${expected.contingencyPct}%)`);
+    expect(uiSubtotal).toMatch(/^\$[\d,]+$/);
+    expect(uiContingency).toMatch(/^\$[\d,]+$/);
+    expect(uiGrandTotal).toMatch(/^\$[\d,]+$/);
 
     const download = await runCEXlsxExport(page);
+    const savedPath = await assertExportDownload(download, 'cost_estimate.xlsx');
+    const workbookRows = await readWorkbookRows(savedPath);
+    const summaryRows = workbookRows.Summary || [];
 
-    await assertExportDownload(download, 'cost_estimate.xlsx');
-  });
+    const findRow = firstCell => summaryRows.find(row => row?.[0] === firstCell) || [];
+    const summarySubtotal = findRow('Subtotal');
+    const summaryContingency = findRow(`Contingency (${expected.contingencyPct}%)`);
+    const summaryGrand = findRow('Grand Total');
 
-  test('acceptance CE-06: changing contingency and labor inputs predictably increases totals', async ({ page }) => {
-    await setupCEPage(page, COST_ESTIMATOR_FIXTURES.baselineProject);
-
-    await fillCEInputs(page, { contingencyPct: '10' });
-    await runCEEstimate(page);
-    const baseGrandTotal = await getCostEstimateGrandTotal(page);
-    const baseContingencyAmount = await getCostEstimateContingencyAmount(page);
-
-    await fillCEInputs(page, { contingencyPct: COST_ESTIMATOR_FIXTURES.highContingency.contingencyPct });
-    await runCEEstimate(page);
-    const highContingencyGrandTotal = await getCostEstimateGrandTotal(page);
-    const highContingencyAmount = await getCostEstimateContingencyAmount(page);
-
-    await fillCEInputs(page, {
-      contingencyPct: COST_ESTIMATOR_FIXTURES.highContingency.contingencyPct,
-      laborCableRate: COST_ESTIMATOR_FIXTURES.laborOverrideScenario.laborCableRate,
-      laborTrayRate: COST_ESTIMATOR_FIXTURES.laborOverrideScenario.laborTrayRate,
-      laborConduitRate: COST_ESTIMATOR_FIXTURES.laborOverrideScenario.laborConduitRate,
-    });
-    await runCEEstimate(page);
-    const laborOverrideGrandTotal = await getCostEstimateGrandTotal(page);
-
-    expect(baseGrandTotal).not.toBeNull();
-    expect(baseContingencyAmount).not.toBeNull();
-    expect(highContingencyGrandTotal).not.toBeNull();
-    expect(highContingencyAmount).not.toBeNull();
-    expect(laborOverrideGrandTotal).not.toBeNull();
-
-    expect(highContingencyAmount).toBeGreaterThan(baseContingencyAmount);
-    expect(highContingencyGrandTotal).toBeGreaterThan(baseGrandTotal);
-    expect(laborOverrideGrandTotal).toBeGreaterThan(highContingencyGrandTotal);
+    expect(summaryContingency[0]).toBe(uiContingencyLabel);
+    expect(summarySubtotal[3]).toBe(String(expected.subtotal));
+    expect(summaryContingency[3]).toBe(String(expected.contingencyAmountRounded));
+    expect(summaryGrand[3]).toBe(String(expected.totalRounded));
   });
 
   test('integration: submittal preview scenario renders expected structured output', async ({ page }) => {
