@@ -2341,21 +2341,38 @@
     {
       "type": "ct",
       "label": "CT",
-      "icon": "icons/placeholder.svg",
+      "icon": "icons/components/CT.svg",
       "props": {
-        "ratio": "600:5",
+        "tag": "CT-1",
+        "ratio_primary": 600,
+        "ratio_secondary": 5,
+        "accuracy_class": "C200",
         "burden_va": 10,
-        "class": "C200"
-      }
+        "knee_point_v": 200,
+        "polarity": "H1-X1",
+        "location_context": "protection",
+        "protected_device_id": "",
+        "meter_id": "",
+        "relay_id": ""
+      },
+      "subtype": "ct",
+      "category": "protection",
+      "ports": [
+        {
+          "x": 40,
+          "y": 0
+        }
+      ]
     },
     {
       "type": "vt",
       "label": "PT",
-      "icon": "icons/placeholder.svg",
+      "icon": "icons/components/Transformer.svg",
       "props": {
         "ratio": "69000V:120V",
         "class": "0.3WZ"
-      }
+      },
+      "subtype": "vt"
     },
     {
       "type": "relay",

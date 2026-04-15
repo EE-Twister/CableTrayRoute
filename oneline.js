@@ -8622,7 +8622,25 @@ function selectComponent(compOrId) {
       short_circuit_duration_cycles: {
         label: 'Short Circuit Duration (cycles)',
         help: 'For thermal withstand calc. Time-dependent modeling.'
-      }
+      },
+      ratio_primary: 'CT Ratio Primary (A)',
+      ratio_secondary: 'CT Ratio Secondary (A)',
+      accuracy_class: 'CT Accuracy Class',
+      burden_va: 'CT Burden (VA)',
+      knee_point_v: 'CT Knee-Point Voltage (V)',
+      polarity: {
+        label: 'CT Polarity',
+        type: 'select',
+        options: ['H1-X1', 'H1-X2']
+      },
+      location_context: {
+        label: 'CT Context',
+        type: 'select',
+        options: ['protection', 'metering']
+      },
+      protected_device_id: 'Protected Device ID',
+      meter_id: 'Linked Meter ID',
+      relay_id: 'Linked Relay ID'
     };
 
     let schema = rawSchema

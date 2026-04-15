@@ -1,5 +1,6 @@
 import * as d3 from 'https://cdn.jsdelivr.net/npm/d3@7/+esm';
 import { getOneLine, getStudies, setStudies } from '../dataStore.mjs';
+import { resolveCtForComponent } from './ctMetadata.mjs';
 
 // Convert spectrum description to a map of harmonic order to percent
 export function parseSpectrum(spec) {
@@ -90,11 +91,13 @@ export function runHarmonics() {
     const ithd = I1 ? Math.sqrt(i2) / I1 * 100 : 0;
     const vthd = Math.sqrt(v2) * 100;
     const limit = limitForVoltage(V / 1000);
+    const ct = resolveCtForComponent(c, comps);
     results[c.id] = {
       ithd: Number(ithd.toFixed(2)),
       vthd: Number(vthd.toFixed(2)),
       limit,
-      warning: vthd > limit
+      warning: vthd > limit,
+      ct
     };
   });
 
@@ -214,10 +217,12 @@ export function runHarmonicsUnbalanced(phaseData = {}) {
     const limit = limitForVoltage(kv);
     const worstVthd = Math.max(phaseA.vthd, phaseB.vthd, phaseC.vthd);
 
+    const ct = resolveCtForComponent(c, comps);
     results[c.id] = {
       phaseA,
       phaseB,
       phaseC,
+      ct,
       neutral: {
         ithd_pct_of_phase: Number(neutralPct.toFixed(2)),
         rms_amps: Number(neutralRms.toFixed(2)),
