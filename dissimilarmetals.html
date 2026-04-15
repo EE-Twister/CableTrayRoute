@@ -1,0 +1,187 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <meta name="description" content="Estimate galvanic corrosion risk for dissimilar metals (e.g., aluminum tray and stainless hardware) across different environments." />
+  <title>Dissimilar Metals Corrosion Reference — CableTrayRoute</title>
+  <link rel="icon" href="icons/favicon.svg" type="image/svg+xml">
+  <link rel="apple-touch-icon" href="icons/favicon.svg">
+  <meta property="og:type" content="website">
+  <meta property="og:title" content="Dissimilar Metals Corrosion Reference — CableTrayRoute">
+  <meta property="og:description" content="Planning-level galvanic corrosion rate estimates for dissimilar material pairs by environment.">
+  <meta property="og:image" content="https://cabletrayroute.com/icons/og-preview.png">
+  <meta property="og:site_name" content="CableTrayRoute">
+  <meta property="og:url" content="dissimilarmetals.html">
+  <link rel="canonical" href="dissimilarmetals.html">
+  <meta name="color-scheme" content="light dark">
+  <link rel="stylesheet" href="style.css" />
+  <script type="module" src="dirtyTracker.js"></script>
+  <script type="module" src="dist/dissimilarmetals.js" defer></script>
+</head>
+<body class="dissimilar-metals-page" data-report-title="Dissimilar Metals Corrosion Reference">
+  <a href="#main-content" class="skip-link">Skip to main content</a>
+  <nav class="top-nav" aria-label="Primary">
+    <button id="nav-toggle" class="nav-toggle" aria-label="Toggle navigation" aria-controls="nav-links" aria-expanded="false" title="Toggle navigation">
+      <img src="icons/toolbar/grid.svg" alt="" aria-hidden="true" class="control-icon" loading="lazy" decoding="async">
+    </button>
+    <div id="nav-links" class="nav-links" role="list"></div>
+    <button id="settings-btn" class="settings-btn" aria-label="Settings" aria-expanded="false" title="Settings">
+      <img src="icons/toolbar/validate.svg" alt="" aria-hidden="true" class="control-icon" loading="lazy" decoding="async">
+    </button>
+  </nav>
+
+  <div id="settings-menu" class="settings-menu">
+    <label for="theme-select">Theme
+      <select id="theme-select">
+        <option value="system">System</option>
+        <option value="light">Light</option>
+        <option value="dark">Dark</option>
+        <option value="high-contrast">High Contrast</option>
+      </select>
+    </label>
+    <label><input type="checkbox" id="compact-toggle" aria-label="Enable compact table mode"> Compact Mode</label>
+    <label for="unit-select">Units
+      <select id="unit-select">
+        <option value="imperial">Imperial</option>
+        <option value="metric">Metric</option>
+      </select>
+    </label>
+    <button id="help-btn" class="btn" aria-expanded="false" title="Show help">
+      <img src="icons/toolbar/validate.svg" alt="" aria-hidden="true" class="control-icon" loading="lazy" decoding="async">
+      <span>Site Help</span>
+    </button>
+    <button id="new-project-btn" title="Start a new project"><img src="icons/toolbar/copy.svg" alt="" aria-hidden="true" class="control-icon" loading="lazy" decoding="async"><span>New Project</span></button>
+    <button id="save-project-btn" title="Save current project"><img src="icons/toolbar/export.svg" alt="" aria-hidden="true" class="control-icon" loading="lazy" decoding="async"><span>Save Project</span></button>
+    <button id="load-project-btn" title="Load an existing project"><img src="icons/toolbar/import.svg" alt="" aria-hidden="true" class="control-icon" loading="lazy" decoding="async"><span>Load Project</span></button>
+    <button id="export-project-btn" title="Export project data"><img src="icons/toolbar/export.svg" alt="" aria-hidden="true" class="control-icon" loading="lazy" decoding="async"><span>Export Project</span></button>
+    <button id="import-project-btn" title="Import project data"><img src="icons/toolbar/import.svg" alt="" aria-hidden="true" class="control-icon" loading="lazy" decoding="async"><span>Import Project</span></button>
+    <input type="file" id="import-project-input" accept=".ctr.json" class="hidden" title="Select project file">
+  </div>
+
+  <div class="container">
+    <main id="main-content" class="main-content">
+      <header class="page-header">
+        <h1>Dissimilar Metals Corrosion Reference</h1>
+      </header>
+
+      <details class="method-panel" open>
+        <summary>Method and Engineering Context</summary>
+        <p>This reference tool estimates galvanic corrosion severity when two different metals are electrically connected in an electrolyte.
+        It is designed for early-stage engineering checks (for example, aluminum cable tray with stainless steel hardware).
+        Outputs are planning-level estimates, not a substitute for project corrosion specifications.</p>
+        <pre>Driving potential = E(cathodic metal) - E(anodic metal)
+Rate ∝ Driving potential × environment severity × area ratio × temperature × isolation quality</pre>
+      </details>
+
+      <form id="dissimilar-metals-form" novalidate>
+        <fieldset>
+          <legend><strong>Material Pair</strong></legend>
+          <div class="field-row">
+            <label for="primary-metal">Primary component metal</label>
+            <select id="primary-metal" required>
+              <option value="aluminum" selected>Aluminum alloy</option>
+              <option value="carbonSteel">Carbon steel</option>
+              <option value="zinc">Zinc / galvanized steel</option>
+              <option value="stainless304Passive">Stainless steel 304 (passive)</option>
+              <option value="stainless316Passive">Stainless steel 316 (passive)</option>
+              <option value="copper">Copper / brass / bronze</option>
+              <option value="titanium">Titanium</option>
+            </select>
+          </div>
+          <div class="field-row">
+            <label for="secondary-metal">Connected hardware metal</label>
+            <select id="secondary-metal" required>
+              <option value="stainless304Passive" selected>Stainless steel 304 (passive)</option>
+              <option value="stainless316Passive">Stainless steel 316 (passive)</option>
+              <option value="carbonSteel">Carbon steel</option>
+              <option value="zinc">Zinc / galvanized steel</option>
+              <option value="aluminum">Aluminum alloy</option>
+              <option value="copper">Copper / brass / bronze</option>
+              <option value="titanium">Titanium</option>
+            </select>
+          </div>
+        </fieldset>
+
+        <fieldset>
+          <legend><strong>Environment &amp; Geometry</strong></legend>
+          <div class="field-row">
+            <label for="environment-type">Exposure environment</label>
+            <select id="environment-type" required>
+              <option value="indoorDry">Indoor conditioned / dry</option>
+              <option value="indoorHumid">Indoor humid / washdown</option>
+              <option value="industrialOutdoor" selected>Industrial outdoor</option>
+              <option value="coastalAtmosphere">Coastal atmosphere / salt fog</option>
+              <option value="marineSplash">Marine splash / tidal</option>
+              <option value="submergedSeawater">Submerged seawater</option>
+              <option value="freshwaterSubmerged">Freshwater submerged</option>
+            </select>
+          </div>
+          <div class="field-row">
+            <label for="anode-area">Estimated anodic exposed area (cm²)</label>
+            <input type="number" id="anode-area" min="1" step="1" value="120" required>
+          </div>
+          <div class="field-row">
+            <label for="cathode-area">Estimated cathodic exposed area (cm²)</label>
+            <input type="number" id="cathode-area" min="1" step="1" value="300" required>
+          </div>
+          <div class="field-row">
+            <label for="temperature-c">Operating temperature (°C)</label>
+            <input type="number" id="temperature-c" min="-40" max="120" step="1" value="30" required>
+          </div>
+        </fieldset>
+
+        <fieldset>
+          <legend><strong>Protection Inputs</strong></legend>
+          <div class="field-row">
+            <label for="isolation-quality">Electrical isolation quality</label>
+            <select id="isolation-quality" required>
+              <option value="none">None</option>
+              <option value="basic" selected>Basic washers/sleeves</option>
+              <option value="engineered">Engineered isolation kit + coating</option>
+            </select>
+          </div>
+          <div class="field-row">
+            <label for="corrosion-allowance">Available corrosion allowance (mm)</label>
+            <input type="number" id="corrosion-allowance" min="0.1" step="0.1" value="1.5" required>
+          </div>
+        </fieldset>
+
+        <button type="submit" class="primary-btn">Estimate Corrosion Risk</button>
+      </form>
+
+      <div id="calc-errors" class="alert-error" hidden role="alert"></div>
+      <div id="results" role="region" aria-live="polite" aria-label="Dissimilar metals assessment results"></div>
+
+      <section class="card" aria-labelledby="reference-heading">
+        <h2 id="reference-heading">Interpretation Guide</h2>
+        <table class="data-table" aria-label="Corrosion severity guide">
+          <thead>
+            <tr><th>Estimated Rate (mm/year)</th><th>Severity</th><th>Typical expectation</th></tr>
+          </thead>
+          <tbody>
+            <tr><td>&lt; 0.01</td><td>Negligible</td><td>Minimal galvanic impact in most design lives.</td></tr>
+            <tr><td>0.01 to 0.05</td><td>Low</td><td>Usually manageable with coatings and routine inspection.</td></tr>
+            <tr><td>0.05 to 0.20</td><td>Moderate</td><td>Noticeable thinning over time; plan maintenance and isolation details.</td></tr>
+            <tr><td>0.20 to 0.50</td><td>High</td><td>Aggressive corrosion risk; design mitigation is typically required.</td></tr>
+            <tr><td>&gt; 0.50</td><td>Severe</td><td>Rapid loss potential; isolate or redesign material pair before construction.</td></tr>
+          </tbody>
+        </table>
+      </section>
+
+      <section class="card" aria-labelledby="study-review-panel-heading"><div id="study-review-panel"></div></section>
+    </main>
+  </div>
+
+  <div id="help-modal" class="modal" aria-hidden="true" role="dialog" aria-modal="true" aria-labelledby="help-title">
+    <div class="modal-content">
+      <button id="close-help-btn" class="close-btn" aria-label="Close Help">&times;</button>
+      <h2 id="help-title">Dissimilar Metals Tool Help</h2>
+      <p>Use this page to estimate galvanic corrosion trends when two metals are electrically connected in wet or corrosive environments.
+      Results provide directional engineering guidance for early design and specification review.</p>
+    </div>
+  </div>
+
+  <script type="module" src="dist/projectManager.js"></script>
+</body>
+</html>

@@ -37,6 +37,7 @@ const entries = {
   groundgrid: 'src/groundgrid.js',
   capacitorbank: 'src/capacitorbank.js',
   cathodicprotection: 'src/cathodicprotection.js',
+  dissimilarmetals: 'src/dissimilarmetals.js',
   battery: 'src/battery.js',
   generatorsizing: 'src/generatorsizing.js',
   heattracesizing: 'src/heattracesizing.js',
