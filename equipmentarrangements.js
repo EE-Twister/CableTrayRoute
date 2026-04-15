@@ -15,6 +15,12 @@ const state = {
   scale: DEFAULT_SCALE,
   selectedEquipmentId: null,
   drag: null,
+  wallDraw: {
+    enabled: false,
+    snapStep: 0.5,
+    start: null,
+    current: null
+  },
   violations: new Set()
 };
 
@@ -28,6 +34,11 @@ function clamp(value, min, max) {
 function parseNumber(input, fallback) {
   const value = Number.parseFloat(input);
   return Number.isFinite(value) ? value : fallback;
+}
+
+function snapToStep(value, step = 0.5) {
+  if (!Number.isFinite(value)) return 0;
+  return Math.round(value / step) * step;
 }
 
 function clearanceDepthFt(voltageText) {
@@ -79,7 +90,6 @@ function interiorWallRect(wall) {
 }
 
 function accessViolation(eq, workspace) {
-  const mainRect = equipmentRect(eq);
   const left = workspace.x;
   const right = state.room.width - (workspace.x + workspace.w);
   const top = workspace.y;
@@ -99,7 +109,7 @@ function accessViolation(eq, workspace) {
     return intersects(otherRect, near) && !intersects(otherRect, workspace);
   });
 
-  if (hasNearbyBlocker && !insideRoom(mainRect)) return true;
+  if (hasNearbyBlocker) return true;
   return false;
 }
 
@@ -235,6 +245,59 @@ function renderRoom() {
     const element = drawRect(rect, 'equipment-interior-wall');
     element.setAttribute('data-wall-type', wall.type);
   });
+
+  if (state.wallDraw.enabled && state.wallDraw.start && state.wallDraw.current) {
+    const orientation = document.getElementById('interior-orientation')?.value || 'vertical';
+    const previewRect = wallPreviewRect(state.wallDraw.start, state.wallDraw.current, orientation);
+    if (previewRect) {
+      drawRect(previewRect, 'equipment-interior-wall', 0.55);
+    }
+  }
+}
+
+function wallPreviewRect(start, end, orientation) {
+  const snappedStartX = snapToStep(start.x, state.wallDraw.snapStep);
+  const snappedStartY = snapToStep(start.y, state.wallDraw.snapStep);
+  const snappedEndX = snapToStep(end.x, state.wallDraw.snapStep);
+  const snappedEndY = snapToStep(end.y, state.wallDraw.snapStep);
+  if (orientation === 'vertical') {
+    const y = clamp(Math.min(snappedStartY, snappedEndY), 0, state.room.depth);
+    const length = Math.max(1, Math.abs(snappedEndY - snappedStartY));
+    const safeLength = Math.min(length, Math.max(1, state.room.depth - y));
+    const x = clamp(snappedStartX, 0, state.room.width);
+    return interiorWallRect({ orientation: 'vertical', x, y, length: safeLength });
+  }
+  const x = clamp(Math.min(snappedStartX, snappedEndX), 0, state.room.width);
+  const length = Math.max(1, Math.abs(snappedEndX - snappedStartX));
+  const safeLength = Math.min(length, Math.max(1, state.room.width - x));
+  const y = clamp(snappedStartY, 0, state.room.depth);
+  return interiorWallRect({ orientation: 'horizontal', x, y, length: safeLength });
+}
+
+function addInteriorWallFromDrag(start, end) {
+  const orientation = document.getElementById('interior-orientation').value;
+  const type = document.getElementById('interior-type').value;
+  const snappedStartX = snapToStep(start.x, state.wallDraw.snapStep);
+  const snappedStartY = snapToStep(start.y, state.wallDraw.snapStep);
+  const snappedEndX = snapToStep(end.x, state.wallDraw.snapStep);
+  const snappedEndY = snapToStep(end.y, state.wallDraw.snapStep);
+
+  let x;
+  let y;
+  let length;
+  if (orientation === 'vertical') {
+    x = clamp(snappedStartX, 0, state.room.width);
+    y = clamp(Math.min(snappedStartY, snappedEndY), 0, state.room.depth);
+    length = Math.max(1, Math.abs(snappedEndY - snappedStartY));
+    length = Math.min(length, Math.max(1, state.room.depth - y));
+  } else {
+    x = clamp(Math.min(snappedStartX, snappedEndX), 0, state.room.width);
+    y = clamp(snappedStartY, 0, state.room.depth);
+    length = Math.max(1, Math.abs(snappedEndX - snappedStartX));
+    length = Math.min(length, Math.max(1, state.room.width - x));
+  }
+
+  state.room.interiorWalls.push({ orientation, type, x, y, length });
 }
 
 function renderEquipment() {
@@ -372,6 +435,14 @@ function toFeetCoordinates(event) {
 function bindCanvasInteractions() {
   canvas.addEventListener('pointerdown', event => {
     const { xFt, yFt } = toFeetCoordinates(event);
+    if (state.wallDraw.enabled) {
+      state.selectedEquipmentId = null;
+      state.wallDraw.start = { x: clamp(xFt, 0, state.room.width), y: clamp(yFt, 0, state.room.depth) };
+      state.wallDraw.current = { ...state.wallDraw.start };
+      canvas.setPointerCapture(event.pointerId);
+      render();
+      return;
+    }
     const picked = pickEquipmentAtPoint(xFt, yFt);
     state.selectedEquipmentId = picked ? picked.id : null;
     if (picked) {
@@ -386,6 +457,12 @@ function bindCanvasInteractions() {
   });
 
   canvas.addEventListener('pointermove', event => {
+    if (state.wallDraw.enabled && state.wallDraw.start) {
+      const { xFt, yFt } = toFeetCoordinates(event);
+      state.wallDraw.current = { x: clamp(xFt, 0, state.room.width), y: clamp(yFt, 0, state.room.depth) };
+      render();
+      return;
+    }
     if (!state.drag) return;
     const { xFt, yFt } = toFeetCoordinates(event);
     const eq = state.equipment.find(item => item.id === state.drag.id);
@@ -396,6 +473,13 @@ function bindCanvasInteractions() {
   });
 
   const release = () => {
+    if (state.wallDraw.enabled && state.wallDraw.start && state.wallDraw.current) {
+      addInteriorWallFromDrag(state.wallDraw.start, state.wallDraw.current);
+      state.wallDraw.start = null;
+      state.wallDraw.current = null;
+      render();
+      return;
+    }
     state.drag = null;
   };
   canvas.addEventListener('pointerup', release);
@@ -406,6 +490,14 @@ function bindUI() {
   document.getElementById('apply-room').addEventListener('click', applyRoomChanges);
   document.getElementById('add-equipment').addEventListener('click', addEquipment);
   document.getElementById('add-interior-wall').addEventListener('click', addInteriorWall);
+  document.getElementById('draw-wall-mode').addEventListener('click', event => {
+    state.wallDraw.enabled = !state.wallDraw.enabled;
+    state.wallDraw.start = null;
+    state.wallDraw.current = null;
+    event.currentTarget.setAttribute('aria-pressed', String(state.wallDraw.enabled));
+    event.currentTarget.classList.toggle('primary-btn', state.wallDraw.enabled);
+    render();
+  });
 
   document.getElementById('zoom-in').addEventListener('click', () => {
     state.scale = clamp(state.scale + 2, 8, 45);

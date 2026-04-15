@@ -46,4 +46,9 @@ describe('page navigation', () => {
     const src = fs.readFileSync(path.join(root, 'src/components/navigation.js'), 'utf8');
     assert.ok(src.includes("href: 'heattracesizing.html'"), 'navigation.js missing heattracesizing.html route');
   });
+
+  it('navigation definitions include equipment arrangements route', () => {
+    const src = fs.readFileSync(path.join(root, 'src/components/navigation.js'), 'utf8');
+    assert.ok(src.includes("href: 'equipmentarrangements.html'"), 'navigation.js missing equipmentarrangements.html route');
+  });
 });
