@@ -635,6 +635,63 @@ describe('runValidation - cable required attributes', () => {
   });
 });
 
+describe('runValidation - busway required attributes', () => {
+  it('flags a busway when required fields are missing', () => {
+    const components = [
+      {
+        id: 'busway-1',
+        type: 'busway',
+        subtype: 'busway',
+        props: {
+          length_ft: 0,
+          material: '',
+          insulation_type: '',
+          enclosure_rating: '',
+          busway_type: 'invalid',
+          ampacity_a: 0,
+          r_ohm_per_kft: 0,
+          x_ohm_per_kft: -1,
+          short_circuit_rating_ka: null
+        }
+      }
+    ];
+    const issues = runValidation(components, {});
+    const buswayIssue = issues.find(issue => issue.component === 'busway-1');
+    assert.ok(buswayIssue);
+    assert.ok(buswayIssue.message.includes('length_ft'));
+    assert.ok(buswayIssue.message.includes('material'));
+    assert.ok(buswayIssue.message.includes('insulation_type'));
+    assert.ok(buswayIssue.message.includes('enclosure_rating'));
+    assert.ok(buswayIssue.message.includes('busway_type'));
+    assert.ok(buswayIssue.message.includes('ampacity_a'));
+    assert.ok(buswayIssue.message.includes('r_ohm_per_kft'));
+    assert.ok(buswayIssue.message.includes('x_ohm_per_kft'));
+    assert.ok(buswayIssue.message.includes('short_circuit_rating_ka'));
+  });
+
+  it('does not flag a busway with all required fields present', () => {
+    const components = [
+      {
+        id: 'busway-2',
+        type: 'busway',
+        subtype: 'busway',
+        props: {
+          length_ft: 240,
+          material: 'aluminum',
+          insulation_type: 'epoxy',
+          enclosure_rating: 'NEMA 1',
+          busway_type: 'feeder',
+          ampacity_a: 1600,
+          r_ohm_per_kft: 0.015,
+          x_ohm_per_kft: 0.012,
+          short_circuit_rating_ka: 65
+        }
+      }
+    ];
+    assert.deepStrictEqual(runValidation(components, {}), []);
+  });
+});
+
 
 
 describe('runValidation - relay_87 required attributes', () => {

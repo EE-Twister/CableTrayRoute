@@ -154,6 +154,7 @@ const typeIcons = {
   load: asset('icons/load.svg'),
   bus: asset('icons/Bus.svg'),
   cable: asset('icons/oneline.svg'),
+  busway: asset('icons/components/Busway.svg'),
   sources: asset('icons/sources.svg'),
   links: asset('icons/links.svg'),
   annotations: asset('icons/annotation.svg')
@@ -3763,9 +3764,15 @@ const cableColors = {
   Signal: '#0a0'
 };
 
+function isConductorSegmentComponent(comp) {
+  const type = String(comp?.type || '').toLowerCase();
+  const subtype = String(comp?.subtype || '').toLowerCase();
+  return type === 'cable' || type === 'busway' || subtype === 'cable' || subtype === 'busway';
+}
+
 function getCableForConnection(source, target, conn) {
-  if (source?.type === 'cable') return source.cable || null;
-  if (target?.type === 'cable') return target.cable || null;
+  if (isConductorSegmentComponent(source)) return source.cable || source.props?.cable || source.props || null;
+  if (isConductorSegmentComponent(target)) return target.cable || target.props?.cable || target.props || null;
   return conn?.cable || null;
 }
 
@@ -6478,13 +6485,13 @@ function render() {
       if (dir === 'bottom') return { x: pt.x, y: pt.y + len };
       return pt;
     };
-    if (src.type === 'cable' && sDir && path.length > 1) {
+    if (isConductorSegmentComponent(src) && sDir && path.length > 1) {
       const stub = offsetPoint(path[0], sDir);
       if (!samePoint(path[0], stub) && (!path[1] || !samePoint(path[1], stub))) {
         path.splice(1, 0, stub);
       }
     }
-    if (tgt.type === 'cable' && tDir && path.length > 1) {
+    if (isConductorSegmentComponent(tgt) && tDir && path.length > 1) {
       const stub = offsetPoint(path[path.length - 1], tDir);
       const insertAt = path.length - 1;
       if (!samePoint(path[insertAt], stub) && (!path[insertAt - 1] || !samePoint(path[insertAt - 1], stub))) {
@@ -6582,7 +6589,7 @@ function render() {
       poly.addEventListener('dblclick', async e => {
         e.stopPropagation();
         cancelPendingClickSelection();
-        const cableComp = c.type === 'cable' ? c : target.type === 'cable' ? target : null;
+        const cableComp = isConductorSegmentComponent(c) ? c : isConductorSegmentComponent(target) ? target : null;
         if (cableComp) {
           await editCableComponent(cableComp);
         }
@@ -6637,7 +6644,7 @@ function render() {
       label.addEventListener('dblclick', async e => {
         e.stopPropagation();
         cancelPendingClickSelection();
-        const cableComp = c.type === 'cable' ? c : target.type === 'cable' ? target : null;
+        const cableComp = isConductorSegmentComponent(c) ? c : isConductorSegmentComponent(target) ? target : null;
         if (cableComp) {
           await editCableComponent(cableComp);
         }
@@ -6824,7 +6831,7 @@ function render() {
         g.appendChild(shape);
       }
     } else {
-      if (c.type === 'cable') {
+      if (isConductorSegmentComponent(c)) {
         const wLocal = c.width || compWidth;
         const hLocal = c.height || compHeight;
         const centerLocal = { x: wLocal / 2, y: hLocal / 2 };
@@ -8458,7 +8465,7 @@ function selectComponent(compOrId) {
       return;
     }
 
-    if (targetComp.type === 'cable' && (!targetComp.cable || typeof targetComp.cable !== 'object')) {
+    if (isConductorSegmentComponent(targetComp) && (!targetComp.cable || typeof targetComp.cable !== 'object')) {
       targetComp.cable = {};
     }
 
@@ -8676,7 +8683,7 @@ function selectComponent(compOrId) {
       return next;
     });
 
-    if (targetComp.type === 'cable') {
+    if (isConductorSegmentComponent(targetComp)) {
       schema = schema.filter(f => !['cable_cable_rating', 'cable_impedance_r', 'cable_impedance_x'].includes(f.name));
     }
 
@@ -8687,7 +8694,7 @@ function selectComponent(compOrId) {
     }
 
     let baseFields;
-    if (targetComp.type === 'cable') {
+    if (isConductorSegmentComponent(targetComp)) {
       baseFields = [
         { name: 'label', label: 'Label', type: 'text' },
         { name: 'ref', label: 'Ref ID', type: 'text' },
@@ -10063,12 +10070,12 @@ function selectComponent(compOrId) {
           edit.classList.add('btn');
           edit.addEventListener('click', async e => {
             e.stopPropagation();
-            const cableComp = targetComp.type === 'cable' ? targetComp : target?.type === 'cable' ? target : null;
+            const cableComp = isConductorSegmentComponent(targetComp) ? targetComp : isConductorSegmentComponent(target) ? target : null;
             if (cableComp) {
               await editCableComponent(cableComp);
               renderPropertiesFor(targetComp);
             } else {
-              showToast('No cable component on this connection');
+              showToast('No conductor segment on this connection');
             }
           });
           li.appendChild(edit);
@@ -10136,7 +10143,7 @@ function selectComponent(compOrId) {
       }
     }
 
-    if (targetComp.type === 'cable') {
+    if (isConductorSegmentComponent(targetComp)) {
       const generalPanel = getTabPanel('general');
       if (generalPanel) {
         const cable = targetComp.cable || {};
@@ -10178,7 +10185,7 @@ function selectComponent(compOrId) {
         cableActions.className = 'prop-tab-actions';
         const editCableBtn = document.createElement('button');
         editCableBtn.type = 'button';
-        editCableBtn.textContent = 'Edit Cable Details';
+        editCableBtn.textContent = 'Edit Segment Details';
         editCableBtn.classList.add('btn');
         editCableBtn.addEventListener('click', async () => {
           await editCableComponent(targetComp);
@@ -10449,7 +10456,7 @@ async function chooseCable(source, target, existingConn = null) {
     }
   });
   components.forEach(c => {
-    if (c.type === 'cable' && c.cable && !seen.has(c.cable.tag)) {
+    if (isConductorSegmentComponent(c) && c.cable && !seen.has(c.cable.tag)) {
       const template = {
         ...c.cable,
         phases: formatCablePhases(c.cable),
@@ -12287,11 +12294,11 @@ async function init() {
       const conn = component.connections[index];
       if (action === 'edit') {
         const target = components.find(t => t.id === conn.target);
-        const cableComp = component.type === 'cable' ? component : target?.type === 'cable' ? target : null;
+        const cableComp = isConductorSegmentComponent(component) ? component : isConductorSegmentComponent(target) ? target : null;
         if (cableComp) {
           await editCableComponent(cableComp);
         } else {
-          showToast('No cable component on this connection');
+          showToast('No conductor segment on this connection');
         }
       } else if (action === 'delete') {
         component.connections.splice(index, 1);
@@ -13278,9 +13285,9 @@ function syncSchedules(notify = true) {
     const description = c.description || c.notes || '';
     const src = all.find(s => (s.connections || []).some(conn => conn.target === c.id));
     const conn = src ? (src.connections || []).find(cc => cc.target === c.id) : null;
-    const inboundCable = src && src.type === 'cable'
+    const inboundCable = src && isConductorSegmentComponent(src)
       ? src
-      : all.find(item => item.type === 'cable' && (item.connections || []).some(cc => cc.target === c.id));
+      : all.find(item => isConductorSegmentComponent(item) && (item.connections || []).some(cc => cc.target === c.id));
     const cableInfo = inboundCable?.cable || null;
     const connPhases = hasStoredPhases(conn?.phases)
       ? formatCablePhases(conn.phases)
@@ -13350,7 +13357,7 @@ function syncSchedules(notify = true) {
   const cableSpecs = [];
   const seenTags = new Set();
   all
-    .filter(c => c.type === 'cable')
+    .filter(c => isConductorSegmentComponent(c))
     .forEach(cableComp => {
       const spec = buildCableSpecFromComponent(cableComp, all);
       if (!spec) return;
@@ -13387,9 +13394,9 @@ function serializeState() {
     const mapFields = c => {
       const src = comps.find(s => (s.connections || []).some(conn => conn.target === c.id));
       const conn = src ? (src.connections || []).find(cc => cc.target === c.id) : null;
-      const inboundCable = src && src.type === 'cable'
+      const inboundCable = src && isConductorSegmentComponent(src)
         ? src
-        : comps.find(item => item.type === 'cable' && (item.connections || []).some(cc => cc.target === c.id));
+        : comps.find(item => isConductorSegmentComponent(item) && (item.connections || []).some(cc => cc.target === c.id));
       const cableInfo = inboundCable?.cable || null;
       const connPhases = hasStoredPhases(conn?.phases)
         ? formatCablePhases(conn.phases)
@@ -13444,7 +13451,7 @@ function serializeState() {
     const cables = [];
     const seenTags = new Set();
     comps
-      .filter(c => c.type === 'cable')
+      .filter(c => isConductorSegmentComponent(c))
       .forEach(cableComp => {
         const spec = buildCableSpecFromComponent(cableComp, comps);
         if (!spec) return;

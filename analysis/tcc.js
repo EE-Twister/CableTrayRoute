@@ -8710,14 +8710,22 @@ function resolveInrushDuration(comp) {
   return DEFAULT_INRUSH_DURATION;
 }
 
+function isConductorSegmentComponent(comp) {
+  const type = String(comp?.type || '').toLowerCase();
+  const subtype = String(comp?.subtype || '').toLowerCase();
+  return type === 'cable' || type === 'busway' || subtype === 'cable' || subtype === 'busway';
+}
+
 function resolveCableInfo(source, target, conn) {
-  if (source?.type === 'cable') {
+  if (isConductorSegmentComponent(source)) {
     if (source.cable) return source.cable;
     if (source.props && source.props.cable) return source.props.cable;
+    if (source.props && typeof source.props === 'object') return source.props;
   }
-  if (target?.type === 'cable') {
+  if (isConductorSegmentComponent(target)) {
     if (target.cable) return target.cable;
     if (target.props && target.props.cable) return target.props.cable;
+    if (target.props && typeof target.props === 'object') return target.props;
   }
   if (conn?.cable) return conn.cable;
   return null;

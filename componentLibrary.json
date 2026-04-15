@@ -7,7 +7,8 @@
     "sources",
     "links",
     "annotations",
-    "cable"
+    "cable",
+    "busway"
   ],
   "components": [
     {
@@ -110,6 +111,37 @@
         "parallel_sets": 1,
         "r_ohm_per_kft": 0.0216,
         "x_ohm_per_kft": 0.015
+      }
+    },
+    {
+      "type": "busway",
+      "subtype": "busway",
+      "label": "Busway Segment",
+      "icon": "icons/components/Busway.svg",
+      "ports": [
+        {
+          "x": 0,
+          "y": 20
+        },
+        {
+          "x": 80,
+          "y": 20
+        }
+      ],
+      "props": {
+        "tag": "",
+        "description": "",
+        "manufacturer": "",
+        "model": "",
+        "length_ft": 100,
+        "material": "aluminum",
+        "insulation_type": "epoxy",
+        "enclosure_rating": "NEMA 1",
+        "busway_type": "feeder",
+        "ampacity_a": 1600,
+        "r_ohm_per_kft": 0.015,
+        "x_ohm_per_kft": 0.012,
+        "short_circuit_rating_ka": 65
       }
     },
     {

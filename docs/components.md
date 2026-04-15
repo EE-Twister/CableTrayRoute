@@ -59,6 +59,12 @@ Each subtype in `componentLibrary.json` may include these properties in its sche
 - Cable segment fields include `tag`, `description`, `manufacturer`, `model`, `length_ft`, `material`, `insulation_type`, `temp_rating_c`, `size_awg_kcmil`, `parallel_sets`, `r_ohm_per_kft`, and `x_ohm_per_kft`.
 - Validation flags cable segments missing required impedance and construction metadata so voltage-drop and short-circuit path calculations do not silently fall back to assumed values.
 
+## Busway segment component fields
+
+- The one-line palette now includes a `busway` subtype for explicit inter-device busway runs.
+- Busway segment fields include `length_ft`, `material`, `insulation_type`, `enclosure_rating`, `busway_type` (`feeder` or `plug-in`), `ampacity_a`, `r_ohm_per_kft`, `x_ohm_per_kft`, and `short_circuit_rating_ka`.
+- Validation now requires positive impedance values and complete ampacity/short-circuit ratings so study ingestion can treat busway distinctly from cable assumptions.
+
 ## Protective component normalized fields
 
 - Breakers, fuses, relays, and reclosers now share a common protection schema baseline for study ingestion.

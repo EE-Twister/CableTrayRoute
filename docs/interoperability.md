@@ -8,7 +8,7 @@ integration with other design tools.
 `reports/exportAll.mjs` can assemble a ZIP archive containing:
 
 - A consolidated PDF report generated from a Handlebars template.
-- CSV files for equipment, panel, cable schedules and study results.
+- CSV files for equipment, panel, cable schedules (including cable- and busway-segment conductor metadata), and study results.
 - Arc‑flash warning labels as individual SVG files.
 - TCC plot metadata when available.
 
