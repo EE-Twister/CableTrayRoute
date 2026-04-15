@@ -1,5 +1,12 @@
 import { test, expect } from '@playwright/test';
-import { navigateForE2E } from './nextFeatures.helpers.js';
+import {
+  navigateForE2E,
+  setupCEPage,
+  setupEMFPage,
+  assertCESmokeControls,
+  assertEMFSmokeControls,
+  runCEEstimate,
+} from './nextFeatures.helpers.js';
 
 test.describe('next features smoke: page boot and controls', () => {
   test('smoke: submittal package page loads and core controls are visible', async ({ page }) => {
@@ -18,20 +25,16 @@ test.describe('next features smoke: page boot and controls', () => {
     await expect(page.locator('body')).toBeVisible();
   });
 
-  test('smoke: cost estimator page loads and estimate flow does not crash', async ({ page }) => {
-    await navigateForE2E(page, 'costestimate.html');
-    await expect(page.locator('h1')).toContainText('Cost Estimat');
-    await expect(page.locator('#estimate-btn')).toBeVisible();
-    await expect(page.locator('#export-xlsx-btn')).toBeVisible();
-    await page.click('#estimate-btn');
+  test('smoke CE-01: cost estimator page loads and estimate flow does not crash', async ({ page }) => {
+    await setupCEPage(page);
+    await assertCESmokeControls(page);
+    await runCEEstimate(page);
     await expect(page.locator('#results')).toBeVisible();
   });
 
-  test('smoke: emf page loads and calculate/profile controls are available', async ({ page }) => {
-    await navigateForE2E(page, 'emf.html');
-    await expect(page.locator('h1')).toContainText('EMF');
-    await expect(page.locator('#calc-btn')).toBeVisible();
-    await expect(page.locator('#profile-btn')).toBeVisible();
+  test('smoke EMF-01: emf page loads and calculate/profile controls are available', async ({ page }) => {
+    await setupEMFPage(page);
+    await assertEMFSmokeControls(page);
   });
 
   test('smoke: project report page loads and generate does not crash', async ({ page }) => {

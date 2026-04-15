@@ -8,8 +8,14 @@ import {
   COST_ESTIMATOR_FIXTURES,
   COST_ESTIMATOR_CANONICAL_FIXTURE,
   EMF_CANONICAL_FIXTURE,
-  fillCostEstimatorForm,
-  fillEmfForm,
+  setupCEPage,
+  setupEMFPage,
+  fillCEInputs,
+  fillEMFInputs,
+  runCEEstimate,
+  runCEXlsxExport,
+  runEMFCalculate,
+  runEMFProfile,
   getResultText,
   getCostEstimateContingencyAmount,
   getCostEstimateGrandTotal,
@@ -28,41 +34,40 @@ async function assertExportDownload(download, expectedName) {
 }
 
 test.describe('next features integration: cost estimator scenarios and exports', () => {
-  test('integration: cost estimator heading and empty/invalid fixture show deterministic guidance', async ({ page }) => {
-    await navigateForE2E(page, 'costestimate.html');
-    await expect(page.locator('h1')).toHaveText('Project Cost Estimator');
+  test('acceptance CE-02: empty or invalid fixture returns deterministic guidance', async ({ page }) => {
+    await setupCEPage(page);
+    await expect(page.getByRole('heading', { level: 1, name: 'Project Cost Estimator' })).toBeVisible();
 
     await applyCostEstimatorFixture(page, COST_ESTIMATOR_FIXTURES.emptyInvalidInputScenario);
-    await fillCostEstimatorForm(page, {
+    await fillCEInputs(page, {
       contingencyPct: COST_ESTIMATOR_FIXTURES.emptyInvalidInputScenario.contingencyPct,
       laborCableRate: COST_ESTIMATOR_FIXTURES.emptyInvalidInputScenario.laborCableRate,
       laborTrayRate: COST_ESTIMATOR_FIXTURES.emptyInvalidInputScenario.laborTrayRate,
       laborConduitRate: COST_ESTIMATOR_FIXTURES.emptyInvalidInputScenario.laborConduitRate,
     });
 
-    await page.click('#estimate-btn');
+    await runCEEstimate(page);
 
     const resultsText = await getResultText(page, '#results');
     expect(resultsText).toContain('No project data found');
   });
 
-  test('integration: cost estimator xlsx export is blocked until a scenario is generated', async ({ page }) => {
-    await navigateForE2E(page, 'costestimate.html');
+  test('acceptance CE-03: xlsx export is blocked until a scenario is generated', async ({ page }) => {
+    await setupCEPage(page);
 
-    await page.click('#export-xlsx-btn');
+    await page.getByRole('button', { name: 'Export XLSX' }).click();
 
     const bodyText = await page.locator('body').innerText();
     expect(bodyText).toContain('No Data');
   });
 
-  test('integration: baseline fixture renders detailed line items, totals, and contingency impact', async ({ page }) => {
-    await navigateForE2E(page, 'costestimate.html');
-    await applyCostEstimatorFixture(page, COST_ESTIMATOR_FIXTURES.baselineProject);
-    await fillCostEstimatorForm(page, {
+  test('acceptance CE-04: baseline fixture renders deterministic summary totals', async ({ page }) => {
+    await setupCEPage(page, COST_ESTIMATOR_FIXTURES.baselineProject);
+    await fillCEInputs(page, {
       contingencyPct: String(COST_ESTIMATOR_CANONICAL_FIXTURE.expected.contingencyPct),
     });
 
-    await page.click('#estimate-btn');
+    await runCEEstimate(page);
 
     const results = page.locator('#results');
     await expect(results.locator('h2')).toHaveText('Cost Summary');
@@ -84,40 +89,36 @@ test.describe('next features integration: cost estimator scenarios and exports',
     await expect(results).toContainText(`$${COST_ESTIMATOR_CANONICAL_FIXTURE.expected.totalRounded.toLocaleString()}`);
   });
 
-  test('integration: cost estimator xlsx export downloads expected file', async ({ page }) => {
-    await navigateForE2E(page, 'costestimate.html');
-    await applyCostEstimatorFixture(page, COST_ESTIMATOR_FIXTURES.baselineProject);
-    await fillCostEstimatorForm(page, { contingencyPct: '10' });
-    await page.click('#estimate-btn');
+  test('acceptance CE-05: cost estimator xlsx export downloads expected file', async ({ page }) => {
+    await setupCEPage(page, COST_ESTIMATOR_FIXTURES.baselineProject);
+    await fillCEInputs(page, { contingencyPct: '10' });
+    await runCEEstimate(page);
 
-    const downloadPromise = page.waitForEvent('download');
-    await page.click('#export-xlsx-btn');
-    const download = await downloadPromise;
+    const download = await runCEXlsxExport(page);
 
     await assertExportDownload(download, 'cost_estimate.xlsx');
   });
 
-  test('integration: changing contingency and labor inputs predictably increases totals', async ({ page }) => {
-    await navigateForE2E(page, 'costestimate.html');
-    await applyCostEstimatorFixture(page, COST_ESTIMATOR_FIXTURES.baselineProject);
+  test('acceptance CE-06: changing contingency and labor inputs predictably increases totals', async ({ page }) => {
+    await setupCEPage(page, COST_ESTIMATOR_FIXTURES.baselineProject);
 
-    await fillCostEstimatorForm(page, { contingencyPct: '10' });
-    await page.click('#estimate-btn');
+    await fillCEInputs(page, { contingencyPct: '10' });
+    await runCEEstimate(page);
     const baseGrandTotal = await getCostEstimateGrandTotal(page);
     const baseContingencyAmount = await getCostEstimateContingencyAmount(page);
 
-    await fillCostEstimatorForm(page, { contingencyPct: COST_ESTIMATOR_FIXTURES.highContingency.contingencyPct });
-    await page.click('#estimate-btn');
+    await fillCEInputs(page, { contingencyPct: COST_ESTIMATOR_FIXTURES.highContingency.contingencyPct });
+    await runCEEstimate(page);
     const highContingencyGrandTotal = await getCostEstimateGrandTotal(page);
     const highContingencyAmount = await getCostEstimateContingencyAmount(page);
 
-    await fillCostEstimatorForm(page, {
+    await fillCEInputs(page, {
       contingencyPct: COST_ESTIMATOR_FIXTURES.highContingency.contingencyPct,
       laborCableRate: COST_ESTIMATOR_FIXTURES.laborOverrideScenario.laborCableRate,
       laborTrayRate: COST_ESTIMATOR_FIXTURES.laborOverrideScenario.laborTrayRate,
       laborConduitRate: COST_ESTIMATOR_FIXTURES.laborOverrideScenario.laborConduitRate,
     });
-    await page.click('#estimate-btn');
+    await runCEEstimate(page);
     const laborOverrideGrandTotal = await getCostEstimateGrandTotal(page);
 
     expect(baseGrandTotal).not.toBeNull();
@@ -162,10 +163,10 @@ test.describe('next features integration: cost estimator scenarios and exports',
 });
 
 test.describe('next features integration: emf deterministic outputs', () => {
-  test('integration: emf calculation returns deterministic numeric output for fixed 60 Hz and 50 Hz scenarios', async ({ page }) => {
-    await navigateForE2E(page, 'emf.html');
-    await fillEmfForm(page, EMF_CANONICAL_FIXTURE.defaultGeometry);
-    await page.click('#calc-btn');
+  test('acceptance EMF-02: emf calculation returns deterministic numeric output', async ({ page }) => {
+    await setupEMFPage(page);
+    await fillEMFInputs(page, EMF_CANONICAL_FIXTURE.defaultGeometry);
+    await runEMFCalculate(page);
 
     await expect(page.locator('tr:has(th:has-text("Frequency")) td')).toHaveText(
       `${EMF_CANONICAL_FIXTURE.defaultGeometry.frequency} Hz`,
@@ -191,65 +192,65 @@ test.describe('next features integration: emf deterministic outputs', () => {
     await expect(page.locator('#results .status-badge', { hasText: 'PASS' })).toHaveCount(2);
   });
 
-  test('integration: emf ICNIRP compliance status shows PASS and FAIL outcomes for supported scenarios', async ({ page }) => {
-    await navigateForE2E(page, 'emf.html');
+  test('acceptance EMF-03: ICNIRP compliance shows PASS and FAIL outcomes for supported scenarios', async ({ page }) => {
+    await setupEMFPage(page);
 
-    await fillEmfForm(page, { ...EMF_CANONICAL_FIXTURE.defaultGeometry });
-    await page.click('#calc-btn');
+    await fillEMFInputs(page, { ...EMF_CANONICAL_FIXTURE.defaultGeometry });
+    await runEMFCalculate(page);
     await expect(page.locator('#results .status-badge', { hasText: 'PASS' })).toHaveCount(2);
     await expect(page.locator('#results .status-badge', { hasText: 'FAIL' })).toHaveCount(0);
 
-    await fillEmfForm(page, {
+    await fillEMFInputs(page, {
       ...EMF_CANONICAL_FIXTURE.defaultGeometry,
       loadCurrent: EMF_CANONICAL_FIXTURE.boundaryCurrents.overGeneralPublicBoundary,
     });
-    await page.click('#calc-btn');
+    await runEMFCalculate(page);
     await expect(page.locator('#results .status-badge', { hasText: 'PASS' })).toHaveCount(1);
     await expect(page.locator('#results .status-badge', { hasText: 'FAIL' })).toHaveCount(1);
 
-    await fillEmfForm(page, {
+    await fillEMFInputs(page, {
       ...EMF_CANONICAL_FIXTURE.defaultGeometry,
       loadCurrent: EMF_CANONICAL_FIXTURE.boundaryCurrents.nearOccupationalBoundary,
     });
-    await page.click('#calc-btn');
+    await runEMFCalculate(page);
     await expect(page.locator('#results .status-badge', { hasText: 'FAIL' })).toHaveCount(2);
   });
 
-  test('integration: emf boundary and error handling uses deterministic UI messaging and defaults', async ({ page }) => {
-    await navigateForE2E(page, 'emf.html');
+  test('acceptance EMF-04: boundary and input errors use deterministic messaging and defaults', async ({ page }) => {
+    await setupEMFPage(page);
 
-    await fillEmfForm(page, { loadCurrent: '0' });
-    await page.click('#calc-btn');
+    await fillEMFInputs(page, { loadCurrent: '0' });
+    await runEMFCalculate(page);
     const inputErrorDialog = page.getByRole('dialog');
     await expect(inputErrorDialog).toContainText('Input Error');
     await expect(inputErrorDialog).toContainText('Load current must be greater than zero.');
     await inputErrorDialog.getByRole('button', { name: 'Close' }).click();
 
-    await fillEmfForm(page, { loadCurrent: '' });
-    await page.click('#calc-btn');
+    await fillEMFInputs(page, { loadCurrent: '' });
+    await runEMFCalculate(page);
     const missingValueDialog = page.getByRole('dialog');
     await expect(missingValueDialog).toContainText('Load current must be greater than zero.');
     await missingValueDialog.getByRole('button', { name: 'Close' }).click();
 
-    await fillEmfForm(page, {
+    await fillEMFInputs(page, {
       loadCurrent: '150',
       nCables: '-3',
       measDistance: '',
     });
-    await page.click('#calc-btn');
+    await runEMFCalculate(page);
     await expect(page.locator('#results .method-note')).toContainText('Configuration: 1 × 3-phase cable set(s)');
     await expect(page.locator('tr:has(th:has-text("Measurement Distance (from tray edge)")) td')).toContainText('36.0 in');
   });
 
-  test('integration: emf profile scenario shows deterministic profile container visibility and chart content', async ({ page }) => {
-    await navigateForE2E(page, 'emf.html');
-    await fillEmfForm(page);
+  test('acceptance EMF-05: profile scenario renders deterministic container visibility and chart points', async ({ page }) => {
+    await setupEMFPage(page);
+    await fillEMFInputs(page);
 
     const chartContainer = page.locator('#profile-container');
     await expect(chartContainer).toBeHidden();
     await expect(chartContainer).toHaveAttribute('hidden', '');
 
-    await page.click('#profile-btn');
+    await runEMFProfile(page);
 
     await expect(chartContainer).toBeVisible();
     await expect(chartContainer).not.toHaveAttribute('hidden');
