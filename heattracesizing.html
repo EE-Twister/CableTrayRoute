@@ -1,0 +1,252 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <meta name="description" content="Heat trace sizing for process temperature maintenance and freeze protection. Estimate required cable watts per foot from pipe geometry, insulation, environment, and electrical design constraints." />
+  <title>Heat Trace Sizing — CableTrayRoute</title>
+  <link rel="icon" href="icons/favicon.svg" type="image/svg+xml">
+  <link rel="apple-touch-icon" href="icons/favicon.svg">
+  <meta property="og:type" content="website">
+  <meta property="og:title" content="Heat Trace Sizing — CableTrayRoute">
+  <meta property="og:description" content="Heat trace cable sizing from pipe geometry, insulation, ambient conditions, and electrical design options.">
+  <meta property="og:image" content="https://cabletrayroute.com/icons/og-preview.png">
+  <meta property="og:site_name" content="CableTrayRoute">
+  <meta property="og:url" content="heattracesizing.html">
+  <link rel="canonical" href="heattracesizing.html">
+  <link rel="dns-prefetch" href="https://fonts.gstatic.com">
+  <meta name="color-scheme" content="light dark">
+  <link rel="stylesheet" href="style.css" />
+  <script type="module" src="dirtyTracker.js"></script>
+  <script type="module" src="dist/heattracesizing.js" defer></script>
+</head>
+<body class="heattracesizing-page" data-report-title="Heat Trace Sizing">
+  <a href="#main-content" class="skip-link">Skip to main content</a>
+  <nav class="top-nav" aria-label="Primary">
+    <button id="nav-toggle" class="nav-toggle" aria-label="Toggle navigation" aria-controls="nav-links" aria-expanded="false" title="Toggle navigation">
+      <img src="icons/toolbar/grid.svg" alt="" aria-hidden="true" class="control-icon" loading="lazy" decoding="async">
+    </button>
+    <div id="nav-links" class="nav-links" role="list">
+      <!-- Populated dynamically by navigation.js -->
+    </div>
+    <button id="settings-btn" class="settings-btn" aria-label="Settings" aria-expanded="false" title="Settings">
+      <img src="icons/toolbar/validate.svg" alt="" aria-hidden="true" class="control-icon" loading="lazy" decoding="async">
+    </button>
+  </nav>
+
+  <div id="settings-menu" class="settings-menu">
+    <label for="theme-select">Theme
+      <select id="theme-select">
+        <option value="system">System</option>
+        <option value="light">Light</option>
+        <option value="dark">Dark</option>
+        <option value="high-contrast">High Contrast</option>
+      </select>
+    </label>
+    <label><input type="checkbox" id="compact-toggle" aria-label="Enable compact table mode"> Compact Mode</label>
+    <label for="unit-select">Units
+      <select id="unit-select">
+        <option value="imperial">Imperial (ft, in)</option>
+        <option value="metric">Metric (m, mm)</option>
+      </select>
+    </label>
+    <button id="help-btn" class="btn" aria-expanded="false" title="Show help">
+      <img src="icons/toolbar/validate.svg" alt="" aria-hidden="true" class="control-icon" loading="lazy" decoding="async">
+      <span>Site Help</span>
+    </button>
+    <button id="new-project-btn" title="Start a new project">
+      <img src="icons/toolbar/copy.svg" alt="" aria-hidden="true" class="control-icon" loading="lazy" decoding="async">
+      <span>New Project</span>
+    </button>
+    <button id="save-project-btn" title="Save current project">
+      <img src="icons/toolbar/export.svg" alt="" aria-hidden="true" class="control-icon" loading="lazy" decoding="async">
+      <span>Save Project</span>
+    </button>
+    <button id="load-project-btn" title="Load an existing project">
+      <img src="icons/toolbar/import.svg" alt="" aria-hidden="true" class="control-icon" loading="lazy" decoding="async">
+      <span>Load Project</span>
+    </button>
+    <button id="export-project-btn" title="Export project data">
+      <img src="icons/toolbar/export.svg" alt="" aria-hidden="true" class="control-icon" loading="lazy" decoding="async">
+      <span>Export Project</span>
+    </button>
+    <button id="import-project-btn" title="Import project data">
+      <img src="icons/toolbar/import.svg" alt="" aria-hidden="true" class="control-icon" loading="lazy" decoding="async">
+      <span>Import Project</span>
+    </button>
+    <input type="file" id="import-project-input" accept=".ctr.json" class="hidden" title="Select project file">
+  </div>
+
+  <div class="container">
+    <main id="main-content" class="main-content">
+      <header class="page-header">
+        <h1>Heat Trace Sizing</h1>
+      </header>
+
+      <details class="method-panel">
+        <summary>Method &amp; Assumptions</summary>
+        <p>This page follows a simplified steady-state heat-loss method used for electric heat tracing studies.
+        Inputs are validated, cylindrical insulation resistance is calculated, and environmental film effects
+        are applied before selecting a practical cable output (W/ft).</p>
+        <pre>Q' = ΔT / (R_insulation + R_external)
+Q'final = Q' × materialFactor × (1 + designMargin)
+selectedWperFt = nearest standard cable rating ≥ required W/ft</pre>
+        <p>The model is intended for screening-level sizing. Final selections should be checked against
+        manufacturer circuit-length limits, startup requirements, and control strategy.</p>
+      </details>
+
+      <form id="heat-trace-form" novalidate>
+        <fieldset>
+          <legend><strong>Pipe + Insulation Geometry</strong></legend>
+
+          <div class="field-row">
+            <label for="pipe-nps">Pipe nominal size (NPS)</label>
+            <select id="pipe-nps" aria-describedby="pipe-nps-hint">
+              <option value="0.5">NPS 1/2</option>
+              <option value="0.75">NPS 3/4</option>
+              <option value="1" selected>NPS 1</option>
+              <option value="1.25">NPS 1-1/4</option>
+              <option value="1.5">NPS 1-1/2</option>
+              <option value="2">NPS 2</option>
+              <option value="2.5">NPS 2-1/2</option>
+              <option value="3">NPS 3</option>
+              <option value="4">NPS 4</option>
+              <option value="6">NPS 6</option>
+              <option value="8">NPS 8</option>
+              <option value="10">NPS 10</option>
+              <option value="12">NPS 12</option>
+            </select>
+            <p id="pipe-nps-hint" class="field-hint">Select a nominal pipe size. Outside diameter is mapped automatically by the sizing model.</p>
+          </div>
+
+          <div class="field-row">
+            <label for="insulation-thickness-in">
+              Insulation thickness (in)
+              <button type="button" class="helpBtn" aria-label="Help — insulation thickness">?</button>
+            </label>
+            <input type="number" id="insulation-thickness-in" min="0.25" step="0.25" value="1" required aria-describedby="insulation-thickness-hint">
+            <p id="insulation-thickness-hint" class="field-hint">Total insulation thickness around the pipe. Larger thickness lowers heat loss and required trace watt density.</p>
+          </div>
+
+          <div class="field-row">
+            <label for="line-length-ft">Circuit length (ft)</label>
+            <input type="number" id="line-length-ft" min="1" step="1" value="200" required aria-describedby="line-length-hint">
+            <p id="line-length-hint" class="field-hint">Total pipe run length for the heat trace circuit. Include equivalent allowances for valves and fittings where applicable.</p>
+          </div>
+        </fieldset>
+
+        <fieldset>
+          <legend><strong>Pipe Material</strong></legend>
+
+          <div class="field-row">
+            <label for="pipe-material">Pipe material class</label>
+            <select id="pipe-material" aria-describedby="pipe-material-hint">
+              <option value="carbonSteel" selected>Carbon Steel</option>
+              <option value="stainlessSteel">Stainless Steel</option>
+              <option value="copper">Copper</option>
+              <option value="aluminum">Aluminum</option>
+              <option value="pvc">PVC</option>
+              <option value="hdpe">HDPE</option>
+            </select>
+            <p id="pipe-material-hint" class="field-hint">Material factor adjusts hold/warm-up behavior used in the baseline sizing estimate.</p>
+          </div>
+        </fieldset>
+
+        <fieldset>
+          <legend><strong>Environment &amp; Ambient Conditions</strong></legend>
+
+          <div class="field-row">
+            <label for="environment">Installation environment</label>
+            <select id="environment" aria-describedby="environment-hint">
+              <option value="indoor-still">Indoor — Still Air</option>
+              <option value="outdoor-sheltered" selected>Outdoor — Sheltered</option>
+              <option value="outdoor-windy">Outdoor — Windy</option>
+              <option value="hazardous-area">Hazardous Area</option>
+              <option value="freezer">Freezer / Cold Room</option>
+            </select>
+            <p id="environment-hint" class="field-hint">Environment selection adjusts external-film heat transfer losses in the simplified model.</p>
+          </div>
+
+          <div class="field-row">
+            <label for="ambient-temp-c">Ambient temperature (&deg;C)</label>
+            <input type="number" id="ambient-temp-c" min="-60" max="60" step="1" value="-10" required aria-describedby="ambient-temp-hint">
+            <p id="ambient-temp-hint" class="field-hint">Use the lowest sustained ambient expected during operation for conservative sizing.</p>
+          </div>
+
+          <div class="field-row">
+            <label for="wind-speed-mph">Wind speed (mph)</label>
+            <input type="number" id="wind-speed-mph" min="0" max="100" step="1" value="5" aria-describedby="wind-speed-hint">
+            <p id="wind-speed-hint" class="field-hint">Required for exposed outdoor runs. For indoor/sheltered installations, leave at a nominal low value.</p>
+          </div>
+        </fieldset>
+
+        <fieldset>
+          <legend><strong>Maintain Temperature Target</strong></legend>
+
+          <div class="field-row">
+            <label for="maintain-temp-c">Maintain temperature (&deg;C)</label>
+            <input type="number" id="maintain-temp-c" min="-20" max="250" step="1" value="40" required aria-describedby="maintain-temp-hint">
+            <p id="maintain-temp-hint" class="field-hint">Required process hold temperature at the pipe wall. Must be greater than ambient to compute heat-loss sizing.</p>
+          </div>
+        </fieldset>
+
+        <fieldset>
+          <legend><strong>Electrical Options</strong></legend>
+
+          <div class="field-row">
+            <label for="voltage-v">Supply voltage (V)</label>
+            <select id="voltage-v" aria-describedby="voltage-hint">
+              <option value="120">120 V</option>
+              <option value="208">208 V</option>
+              <option value="240" selected>240 V</option>
+              <option value="277">277 V</option>
+              <option value="480">480 V</option>
+            </select>
+            <p id="voltage-hint" class="field-hint">Nominal circuit voltage for product selection and branch-circuit checks.</p>
+          </div>
+
+          <div class="field-row">
+            <label for="max-circuit-length-ft">Maximum allowable circuit length (ft)</label>
+            <input type="number" id="max-circuit-length-ft" min="10" step="10" value="300" aria-describedby="max-circuit-length-hint">
+            <p id="max-circuit-length-hint" class="field-hint">Project-specific circuit-length planning limit. Compare with manufacturer cable tables during final design.</p>
+          </div>
+
+          <div class="field-row">
+            <label for="design-margin-pct">
+              Design margin (%)
+              <button type="button" class="helpBtn" aria-label="Help — design margin">?</button>
+            </label>
+            <input type="number" id="design-margin-pct" min="0" max="100" step="1" value="15" required aria-describedby="design-margin-hint">
+            <p id="design-margin-hint" class="field-hint">Additional margin to account for uncertainty, aging, heat-sink effects at supports, and installation variability.</p>
+          </div>
+        </fieldset>
+
+        <button type="submit" class="primary-btn">Run Analysis</button>
+      </form>
+
+      <div id="results" role="region" aria-live="polite" aria-label="Heat trace sizing results and warnings"></div>
+
+      <section class="card" aria-labelledby="study-review-panel-heading">
+        <div id="study-review-panel"></div>
+      </section>
+    </main>
+  </div>
+
+  <div id="help-modal" class="modal" aria-hidden="true" role="dialog" aria-modal="true" aria-labelledby="help-title">
+    <div class="modal-content">
+      <button id="close-help-btn" class="close-btn" aria-label="Close Help">&times;</button>
+      <h2 id="help-title">Heat Trace Sizing Help</h2>
+      <p>Use this page to estimate heat trace watt density from geometry and temperature conditions, then review warnings for long circuits or severe environment assumptions.</p>
+      <ol>
+        <li>Enter pipe geometry and insulation thickness.</li>
+        <li>Select pipe material and installation environment.</li>
+        <li>Set ambient and maintain temperatures.</li>
+        <li>Define voltage, circuit constraints, and design margin.</li>
+        <li>Run analysis and review selected cable output and warnings.</li>
+      </ol>
+    </div>
+  </div>
+
+  <script type="module" src="dist/projectManager.js"></script>
+</body>
+</html>
