@@ -7,9 +7,11 @@ The Equipment Arrangements tool (`equipmentarrangements.html`) provides a drag-a
 - Adjustable room width and depth.
 - Exterior wall types for north/south/east/west walls.
 - Interior walls with configurable orientation, position, and length.
+- Canvas drag wall tool that creates interior walls snapped to a 0.5 ft grid.
 - Equipment placement from **Equipment List** records or a custom entry.
 - Adjustable equipment width/depth, facing direction, and voltage rating.
 - Graphical movement of equipment blocks directly in the canvas.
+- Wall type dropdowns for all exterior walls and interior walls (`Concrete`, `CMU`, `Gypsum`, `Fire Rated`, `Removable Panel`).
 
 ## NEC workspace highlighting
 

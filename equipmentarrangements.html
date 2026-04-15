@@ -105,7 +105,11 @@
               <input id="interior-length" type="number" min="1" step="0.5" value="10">
             </label>
           </div>
-          <button id="add-interior-wall" class="btn">Add Interior Wall</button>
+          <div class="grid-2">
+            <button id="add-interior-wall" class="btn" type="button">Add Interior Wall</button>
+            <button id="draw-wall-mode" class="btn" type="button" aria-pressed="false">Draw Wall on Canvas</button>
+          </div>
+          <p class="small-text">Tip: In Draw mode, drag on the canvas to create snapped walls (0.5 ft grid).</p>
           <div id="interior-wall-list" class="equipment-mini-list"></div>
 
           <h2>Add Equipment</h2>
