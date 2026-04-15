@@ -32,6 +32,52 @@ function toImpedance(value) {
   };
 }
 
+function deriveLinearSegmentImpedance(comp) {
+  if (!comp || typeof comp !== 'object') return null;
+  const containers = [comp, comp.props, comp.parameters, comp.cable].filter(v => v && typeof v === 'object');
+  let lengthFt = null;
+  let rPerKft = null;
+  let xPerKft = null;
+  for (const container of containers) {
+    if (lengthFt === null) {
+      const val = Number(container.length_ft ?? container.length);
+      if (Number.isFinite(val) && val > 0) lengthFt = val;
+    }
+    if (rPerKft === null) {
+      const val = Number(container.r_ohm_per_kft);
+      if (Number.isFinite(val) && val >= 0) rPerKft = val;
+    }
+    if (xPerKft === null) {
+      const val = Number(container.x_ohm_per_kft);
+      if (Number.isFinite(val) && val >= 0) xPerKft = val;
+    }
+  }
+  if (!Number.isFinite(lengthFt) || !Number.isFinite(rPerKft) || !Number.isFinite(xPerKft)) return null;
+  return {
+    r: (rPerKft * lengthFt) / 1000,
+    x: (xPerKft * lengthFt) / 1000
+  };
+}
+
+function extractComponentImpedance(comp) {
+  const directCandidates = [
+    comp?.impedance,
+    comp?.seriesImpedance,
+    comp?.cable?.impedance,
+    comp?.cable,
+    comp?.props?.impedance,
+    comp?.parameters?.impedance
+  ];
+  for (const candidate of directCandidates) {
+    if (!candidate || typeof candidate !== 'object') continue;
+    const normalized = toImpedance(candidate);
+    if (Math.abs(normalized.r) > 0 || Math.abs(normalized.x) > 0) return normalized;
+  }
+  const derived = deriveLinearSegmentImpedance(comp);
+  if (derived) return toImpedance(derived);
+  return toImpedance(comp?.impedance);
+}
+
 function parseNumeric(value) {
   if (value === undefined || value === null) return null;
   if (typeof value === 'number') {
@@ -66,7 +112,7 @@ const protectiveDeviceMap = new Map(protectiveDeviceLibrary.map(device => [devic
 const DEFAULT_TCC_SETTINGS = { devices: [], settings: {}, componentOverrides: {} };
 const DEFAULT_LET_THROUGH_WINDOW = 0.008;
 
-const fallbackTypes = new Set(['motor_load', 'static_load', 'load', 'panel', 'equipment', 'bus', 'cable', 'mcc']);
+const fallbackTypes = new Set(['motor_load', 'static_load', 'load', 'panel', 'equipment', 'bus', 'cable', 'busway', 'mcc']);
 const protectionTypes = new Set(['breaker', 'fuse', 'recloser', 'relay', 'contactor', 'switch', 'protective_device']);
 const upstreamCandidateTypes = new Set([
   'transformer',
@@ -425,7 +471,7 @@ function computeImpedance(comp, comps, compMap, cache, visited = new Set()) {
   if (cache.has(comp.id)) return cache.get(comp.id);
   if (visited.has(comp.id)) return { r: 0, x: 0 };
   visited.add(comp.id);
-  let total = toImpedance(comp.impedance);
+  let total = extractComponentImpedance(comp);
   if (isSourceComponent(comp)) {
     total = add(total, getSourceImpedance(comp));
   }
@@ -552,8 +598,8 @@ export function runShortCircuit(modelOrOpts = {}, maybeOpts = {}) {
   });
 
   comps.forEach(component => {
-    if (component?.type !== 'cable' || !component.id) return;
-    const base = toImpedance(component.impedance);
+    if (!['cable', 'busway'].includes(component?.type) || !component.id) return;
+    const base = extractComponentImpedance(component);
     if (Math.abs(base.r) >= 1e-9 || Math.abs(base.x) >= 1e-9) return;
     cablesMissingImpedance.add(component.id);
     (component.connections || []).forEach(conn => {
@@ -575,12 +621,12 @@ export function runShortCircuit(modelOrOpts = {}, maybeOpts = {}) {
       if (fallbackZ && (Math.abs(fallbackZ.r) >= 1e-9 || Math.abs(fallbackZ.x) >= 1e-9)) {
         return { r: fallbackZ.r, x: fallbackZ.x };
       }
-      const isCableMissing = comp?.type === 'cable' && comp?.id && cablesMissingImpedance.has(comp.id);
+      const isConductorMissing = (comp?.type === 'cable' || comp?.type === 'busway') && comp?.id && cablesMissingImpedance.has(comp.id);
       const isTargetOfMissingCable = comp?.id && cableDefaultTargets.has(comp.id);
-      if ((isCableMissing || isTargetOfMissingCable) && comp?.id) {
+      if ((isConductorMissing || isTargetOfMissingCable) && comp?.id) {
         defaultedLowImpedanceComponents.set(
           comp.id,
-          'Cable impedance incomplete; defaulted to very low resistance for fault monitoring.'
+          `${comp?.type === 'busway' ? 'Busway' : 'Cable'} impedance incomplete; defaulted to very low resistance for fault monitoring.`
         );
         return { r: 1e-6, x: 1e-6 };
       }

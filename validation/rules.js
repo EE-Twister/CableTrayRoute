@@ -250,6 +250,35 @@ export function runValidation(components = [], studies = {}) {
     }
   });
 
+  // Busway required field completeness for feeder/path impedance studies
+  components.forEach(c => {
+    const isBusway = c?.type === 'busway' || c?.subtype === 'busway';
+    if (!isBusway) return;
+    const props = c.props && typeof c.props === 'object' ? c.props : c;
+    const missing = [];
+    const lengthFt = Number(props.length_ft);
+    if (!Number.isFinite(lengthFt) || lengthFt <= 0) missing.push('length_ft');
+    if (!`${props.material ?? ''}`.trim()) missing.push('material');
+    if (!`${props.insulation_type ?? ''}`.trim()) missing.push('insulation_type');
+    if (!`${props.enclosure_rating ?? ''}`.trim()) missing.push('enclosure_rating');
+    const buswayType = `${props.busway_type ?? ''}`.trim().toLowerCase();
+    if (!['feeder', 'plug-in'].includes(buswayType)) missing.push('busway_type');
+    const ampacityA = Number(props.ampacity_a);
+    if (!Number.isFinite(ampacityA) || ampacityA <= 0) missing.push('ampacity_a');
+    const rOhmPerKft = Number(props.r_ohm_per_kft);
+    if (!Number.isFinite(rOhmPerKft) || rOhmPerKft <= 0) missing.push('r_ohm_per_kft');
+    const xOhmPerKft = Number(props.x_ohm_per_kft);
+    if (!Number.isFinite(xOhmPerKft) || xOhmPerKft <= 0) missing.push('x_ohm_per_kft');
+    const shortCircuitRatingKa = Number(props.short_circuit_rating_ka);
+    if (!Number.isFinite(shortCircuitRatingKa) || shortCircuitRatingKa <= 0) missing.push('short_circuit_rating_ka');
+    if (missing.length) {
+      issues.push({
+        component: c.id,
+        message: `Busway missing required attributes: ${missing.join(', ')}.`
+      });
+    }
+  });
+
   // Generator required field completeness for short-circuit/transient/dispatch studies
   components.forEach(c => {
     const subtype = `${c?.subtype ?? ''}`.trim().toLowerCase();

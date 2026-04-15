@@ -678,6 +678,34 @@ export function cloneData(value) {
   return value;
 }
 
+function deriveLinearSegmentImpedance(comp) {
+  if (!comp || typeof comp !== 'object') return null;
+  const containers = [comp, comp.props, comp.parameters, comp.cable].filter(v => v && typeof v === 'object');
+  let lengthFt = null;
+  let rPerKft = null;
+  let xPerKft = null;
+  for (const container of containers) {
+    if (lengthFt === null) {
+      const val = Number(container.length_ft ?? container.length);
+      if (Number.isFinite(val) && val > 0) lengthFt = val;
+    }
+    if (rPerKft === null) {
+      const val = Number(container.r_ohm_per_kft);
+      if (Number.isFinite(val) && val >= 0) rPerKft = val;
+    }
+    if (xPerKft === null) {
+      const val = Number(container.x_ohm_per_kft);
+      if (Number.isFinite(val) && val >= 0) xPerKft = val;
+    }
+  }
+  if (!Number.isFinite(lengthFt) || lengthFt <= 0) return null;
+  if (!Number.isFinite(rPerKft) || !Number.isFinite(xPerKft)) return null;
+  return normalizeImpedance({
+    r: (rPerKft * lengthFt) / 1000,
+    x: (xPerKft * lengthFt) / 1000
+  });
+}
+
 function extractImpedance(comp) {
   const candidates = [
     comp?.impedance,
@@ -693,6 +721,8 @@ function extractImpedance(comp) {
   if (typeof comp?.r === 'number' || typeof comp?.x === 'number') {
     return normalizeImpedance({ r: comp.r, x: comp.x });
   }
+  const derived = deriveLinearSegmentImpedance(comp);
+  if (derived) return derived;
   return { r: 0, x: 0 };
 }
 
