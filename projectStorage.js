@@ -39,6 +39,197 @@ function normalizeThemePreference(value) {
   return '';
 }
 
+
+
+const PHASE1_COMPONENT_DEFAULTS = {
+  baseline: {
+    tag: (component) => component.ref || component.label || component.id || '',
+    description: (component) => component.label || '',
+    manufacturer: 'Unspecified',
+    model: 'Unspecified',
+    phases: 3,
+    commissioning_state: 'existing',
+    service_status: 'in_service',
+    notes: ''
+  },
+  mcc: {
+    rated_voltage_kv: 0.48,
+    bus_rating_a: 1600,
+    main_device_type: 'mccb',
+    sccr_ka: 65,
+    bucket_count: 6,
+    spare_bucket_count: 1,
+    form_type: 'form_2b'
+  },
+  busway: {
+    tag: (component) => component.ref || component.label || component.id || '',
+    description: (component) => component.label || 'Busway segment',
+    manufacturer: 'Unspecified',
+    model: 'Unspecified',
+    length_ft: 10,
+    material: 'copper',
+    insulation_type: 'epoxy',
+    enclosure_rating: 'NEMA 1',
+    busway_type: 'feeder',
+    ampacity_a: 1200,
+    r_ohm_per_kft: 0.03,
+    x_ohm_per_kft: 0.01,
+    short_circuit_rating_ka: 65
+  },
+  ct: {
+    tag: (component) => component.ref || component.label || component.id || '',
+    ratio_primary: 600,
+    ratio_secondary: 5,
+    accuracy_class: '0.3',
+    burden_va: 15,
+    knee_point_v: 400,
+    polarity: 'H1-X1',
+    location_context: 'protection',
+    protected_device_id: '',
+    meter_id: '',
+    relay_id: ''
+  },
+  pt_vt: {
+    tag: (component) => component.ref || component.label || component.id || '',
+    primary_voltage: 12470,
+    secondary_voltage: 120,
+    accuracy_class: '0.3',
+    burden_va: 50,
+    connection_type: 'wye-grounded',
+    fuse_protection: 'yes',
+    location_context: 'protection',
+    protected_device_id: '',
+    meter_id: '',
+    relay_id: '',
+    consumer_ids: ''
+  },
+  ups: {
+    tag: (component) => component.ref || component.label || component.id || '',
+    manufacturer: 'Unspecified',
+    model: 'Unspecified',
+    topology: 'double_conversion',
+    rated_kva: 500,
+    input_voltage_kv: 0.48,
+    output_voltage_kv: 0.48,
+    efficiency_pct: 96,
+    battery_runtime_min: 15,
+    battery_dc_v: 480,
+    static_bypass_supported: true,
+    operating_mode: 'normal',
+    mode_normal_enabled: true,
+    mode_battery_enabled: true,
+    mode_bypass_enabled: true,
+    runtime_normal_min: 0,
+    runtime_battery_min: 15,
+    runtime_bypass_min: 0
+  }
+};
+
+function isMissingFieldValue(value) {
+  return value === undefined
+    || value === null
+    || (typeof value === 'string' && value.trim() === '');
+}
+
+function ensureComponentField(component, key, defaultValue) {
+  if (!component || typeof component !== 'object') return;
+  if (!component.props || typeof component.props !== 'object') {
+    component.props = { ...(component.props || {}) };
+  }
+  const hasRootValue = !isMissingFieldValue(component[key]);
+  const hasPropValue = !isMissingFieldValue(component.props[key]);
+  if (hasRootValue && !hasPropValue) {
+    component.props[key] = component[key];
+    return;
+  }
+  if (hasPropValue && !hasRootValue) {
+    component[key] = component.props[key];
+    return;
+  }
+  if (hasRootValue || hasPropValue) return;
+  const nextValue = typeof defaultValue === 'function' ? defaultValue(component) : defaultValue;
+  component[key] = nextValue;
+  component.props[key] = nextValue;
+}
+
+function applySubtypeDefaults(component, subtype) {
+  Object.entries(PHASE1_COMPONENT_DEFAULTS.baseline).forEach(([key, value]) => {
+    ensureComponentField(component, key, value);
+  });
+  const subtypeDefaults = PHASE1_COMPONENT_DEFAULTS[subtype];
+  if (!subtypeDefaults) return;
+  Object.entries(subtypeDefaults).forEach(([key, value]) => {
+    ensureComponentField(component, key, value);
+  });
+}
+
+function migrateOneLineDiagram(data) {
+  if (!data || typeof data !== 'object') return data;
+  if (!Array.isArray(data.sheets)) return data;
+  const normalized = {
+    ...data,
+    sheets: data.sheets.map((sheet) => {
+      const components = Array.isArray(sheet?.components) ? sheet.components : [];
+      return {
+        ...sheet,
+        components: components.map((component) => {
+          if (!component || typeof component !== 'object') return component;
+          const normalizedSubtype = `${component.subtype || component.type || ''}`.trim().toLowerCase();
+          if (!['mcc', 'busway', 'ct', 'pt_vt', 'ups'].includes(normalizedSubtype)) {
+            return component;
+          }
+          const hasRuntimeBatteryBefore = !isMissingFieldValue(component?.runtime_battery_min)
+            || !isMissingFieldValue(component?.props?.runtime_battery_min);
+          const hasBatteryRuntimeBefore = !isMissingFieldValue(component?.battery_runtime_min)
+            || !isMissingFieldValue(component?.props?.battery_runtime_min);
+          const next = {
+            ...component,
+            props: component.props && typeof component.props === 'object'
+              ? { ...component.props }
+              : {}
+          };
+          applySubtypeDefaults(next, normalizedSubtype);
+          if (normalizedSubtype === 'mcc') {
+            const bucketCount = Number(next.bucket_count ?? next.props.bucket_count);
+            const spareBucketCount = Number(next.spare_bucket_count ?? next.props.spare_bucket_count);
+            if (Number.isFinite(bucketCount) && Number.isFinite(spareBucketCount) && spareBucketCount > bucketCount) {
+              next.spare_bucket_count = bucketCount;
+              next.props.spare_bucket_count = bucketCount;
+            }
+          }
+          if (normalizedSubtype === 'ups') {
+            const runtimeBatteryMin = Number(next.runtime_battery_min ?? next.props.runtime_battery_min);
+            const batteryRuntimeMin = Number(next.battery_runtime_min ?? next.props.battery_runtime_min);
+            if (hasRuntimeBatteryBefore && !hasBatteryRuntimeBefore && Number.isFinite(runtimeBatteryMin)) {
+              next.battery_runtime_min = runtimeBatteryMin;
+              next.props.battery_runtime_min = runtimeBatteryMin;
+            } else if (hasBatteryRuntimeBefore && !hasRuntimeBatteryBefore && Number.isFinite(batteryRuntimeMin)) {
+              next.runtime_battery_min = batteryRuntimeMin;
+              next.props.runtime_battery_min = batteryRuntimeMin;
+            } else if (Number.isFinite(runtimeBatteryMin) && !Number.isFinite(batteryRuntimeMin)) {
+              next.battery_runtime_min = runtimeBatteryMin;
+              next.props.battery_runtime_min = runtimeBatteryMin;
+            } else if (!Number.isFinite(runtimeBatteryMin) && Number.isFinite(batteryRuntimeMin)) {
+              next.runtime_battery_min = batteryRuntimeMin;
+              next.props.runtime_battery_min = batteryRuntimeMin;
+            }
+          }
+          return next;
+        })
+      };
+    })
+  };
+  return normalized;
+}
+
+function migrateSettingsPayload(settings = {}) {
+  const next = { ...settings };
+  const oneLine = next.oneLineDiagram;
+  if (oneLine && typeof oneLine === 'object') {
+    next.oneLineDiagram = migrateOneLineDiagram(oneLine);
+  }
+  return next;
+}
 function migrateProject(old = {}) {
   const settings = old.settings || {
     session: old.session || old.ctrSession || {},
@@ -51,6 +242,7 @@ function migrateProject(old = {}) {
   settings.theme = normalizeThemePreference(settings.theme)
     || normalizeThemePreference(old.themePreference)
     || (typeof sessionDarkMode === 'boolean' ? (sessionDarkMode ? 'dark' : 'light') : 'system');
+  const migratedSettings = migrateSettingsPayload(settings);
   return {
     name: old.name || '',
     ductbanks: old.ductbanks || old.ductbankSchedule || [],
@@ -58,7 +250,7 @@ function migrateProject(old = {}) {
     trays: old.trays || old.traySchedule || [],
     cables: old.cables || old.cableSchedule || [],
     cableTypicals: old.cableTypicals || [],
-    settings
+    settings: migratedSettings
   };
 }
 

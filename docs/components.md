@@ -12,6 +12,8 @@ The one-line component library defines several common properties used by equipme
 
 Each subtype in `componentLibrary.json` may include these properties in its schema. When present, the oneline editor renders dropdowns preloaded with common kV classes and manufacturer model numbers, and the values are persisted through `setEquipment`, `setPanels`, and `setLoads` for schedule generation.
 
+For Phase 1 palette rollout and regression tracking, use the shared checklist in [`docs/phase1-component-checklist.md`](./phase1-component-checklist.md).
+
 ## Transformer calculated fields
 
 - Transformer impedance (R and X in ohms) is now displayed as a calculated, read-only field in the oneline property drawer. The values update immediately when `kVA`, `%Z`, or `X/R` inputs change so users can verify the derived impedance before applying changes.
@@ -36,6 +38,8 @@ Each subtype in `componentLibrary.json` may include these properties in its sche
 
 ## UPS component fields
 
+- **Study impact:** UPS metadata feeds load-flow and short-circuit adapters directly, including mode-dependent runtime behavior.
+- **Minimum required attributes:** `tag`, `manufacturer`, `model`, `topology`, `rated_kva`, `input_voltage_kv`, `output_voltage_kv`, `efficiency_pct`, `battery_runtime_min`, `battery_dc_v`, `static_bypass_supported`, `operating_mode`, `mode_normal_enabled`, `mode_battery_enabled`, `mode_bypass_enabled`, `runtime_normal_min`, `runtime_battery_min`, `runtime_bypass_min`.
 - The one-line palette includes a dedicated `ups` subtype under **Equipment** with `icons/components/UPS.svg`.
 - Required UPS fields are `tag`, `manufacturer`, `model`, `topology`, `rated_kva`, `input_voltage_kv`, `output_voltage_kv`, `efficiency_pct`, `battery_runtime_min`, `battery_dc_v`, and `static_bypass_supported`.
 - Runtime and operating-mode study/report context fields include `operating_mode` (`normal`, `battery`, `bypass`), mode enable flags (`mode_normal_enabled`, `mode_battery_enabled`, `mode_bypass_enabled`), and mode runtimes (`runtime_normal_min`, `runtime_battery_min`, `runtime_bypass_min`).
@@ -45,6 +49,8 @@ Each subtype in `componentLibrary.json` may include these properties in its sche
 
 ## Current transformer (CT) component fields
 
+- **Study impact:** CT metadata is normalized into protection and metering study inputs for scaling, burden checks, and linkage to meters/relays.
+- **Minimum required attributes:** `tag`, `ratio_primary`, `ratio_secondary`, `accuracy_class`, `burden_va`, `knee_point_v`, `polarity`, `location_context`.
 - The one-line palette now includes a `ct` subtype under **Protection** with a dedicated CT icon and default study-ready metadata.
 - Required CT fields are `tag`, `ratio_primary`, `ratio_secondary`, `accuracy_class`, `burden_va`, `knee_point_v`, `polarity`, and `location_context` (`metering` or `protection`).
 - Optional linkage fields (`protected_device_id`, `meter_id`, `relay_id`) let each CT reference the protected asset or instrument endpoint using existing component-id conventions.
@@ -53,6 +59,8 @@ Each subtype in `componentLibrary.json` may include these properties in its sche
 
 ## Potential/voltage transformer (PT/VT) component fields
 
+- **Study impact:** PT/VT values drive voltage scaling and compatibility checks for protection/metering consumers linked by component IDs.
+- **Minimum required attributes:** `tag`, `primary_voltage`, `secondary_voltage`, `accuracy_class`, `burden_va`, `connection_type`, `fuse_protection`.
 - The one-line palette now includes a `pt_vt` subtype under **Protection** (type `vt`) with transformer symbol defaults.
 - Required PT/VT fields are `tag`, `primary_voltage`, `secondary_voltage`, `accuracy_class`, `burden_va`, `connection_type`, and `fuse_protection`.
 - Optional linkage fields (`protected_device_id`, `meter_id`, `relay_id`, and `consumer_ids`) model downstream metering/protection consumers using component IDs.
@@ -77,6 +85,8 @@ Each subtype in `componentLibrary.json` may include these properties in its sche
 
 ## MCC component fields
 
+- **Study impact:** MCC metadata supports lineup validation, short-circuit assumptions, and panel reporting output.
+- **Minimum required attributes:** `tag`, `description`, `manufacturer`, `model`, `rated_voltage_kv`, `bus_rating_a`, `main_device_type`, `sccr_ka`, `bucket_count`, `spare_bucket_count`, `form_type`.
 - The one-line palette now includes an `mcc` subtype (Motor Control Center) under the Panel category with a dedicated MCC icon.
 - MCC fields include `tag`, `description`, `manufacturer`, `model`, `rated_voltage_kv`, `bus_rating_a`, `main_device_type`, `sccr_ka`, `bucket_count`, `spare_bucket_count`, and `form_type`.
 - Legacy diagrams are migrated in-memory so MCC records missing any required fields are assigned safe defaults when projects load.
@@ -90,6 +100,8 @@ Each subtype in `componentLibrary.json` may include these properties in its sche
 
 ## Busway segment component fields
 
+- **Study impact:** Busway segments provide explicit impedance/ampacity metadata for feeder path, voltage-drop, and short-circuit calculations.
+- **Minimum required attributes:** `length_ft`, `material`, `insulation_type`, `enclosure_rating`, `busway_type`, `ampacity_a`, `r_ohm_per_kft`, `x_ohm_per_kft`, `short_circuit_rating_ka`.
 - The one-line palette now includes a `busway` subtype for explicit inter-device busway runs.
 - Busway segment fields include `length_ft`, `material`, `insulation_type`, `enclosure_rating`, `busway_type` (`feeder` or `plug-in`), `ampacity_a`, `r_ohm_per_kft`, `x_ohm_per_kft`, and `short_circuit_rating_ka`.
 - Validation now requires positive impedance values and complete ampacity/short-circuit ratings so study ingestion can treat busway distinctly from cable assumptions.
