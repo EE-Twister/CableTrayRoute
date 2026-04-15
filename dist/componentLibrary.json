@@ -7,7 +7,8 @@
     "sources",
     "links",
     "annotations",
-    "cable"
+    "cable",
+    "busway"
   ],
   "components": [
     {
@@ -70,6 +71,77 @@
         "main_interrupting_ka": 35,
         "grounding_type": "solidly_grounded_wye",
         "service_type": "distribution"
+      }
+    },
+    {
+      "type": "switchboard",
+      "subtype": "switchboard",
+      "label": "Switchboard",
+      "icon": "icons/components/Switchboard.svg",
+      "iconIEC": "icons/components/iec/IEC_Breaker.svg",
+      "props": {
+        "tag": "",
+        "description": "",
+        "manufacturer": "",
+        "model": "",
+        "rated_voltage_kv": 0.48,
+        "phases": 3,
+        "bus_rating_a": 4000,
+        "withstand_1s_ka": 65,
+        "interrupting_ka": 65,
+        "arc_resistant_type": "none",
+        "maintenance_mode_supported": false
+      }
+    },
+    {
+      "type": "cable",
+      "subtype": "cable",
+      "label": "Cable Segment",
+      "icon": "icons/components/Feeder.svg",
+      "props": {
+        "tag": "",
+        "description": "",
+        "manufacturer": "",
+        "model": "",
+        "length_ft": 100,
+        "material": "copper",
+        "insulation_type": "xlpe",
+        "temp_rating_c": 90,
+        "size_awg_kcmil": "500 kcmil",
+        "parallel_sets": 1,
+        "r_ohm_per_kft": 0.0216,
+        "x_ohm_per_kft": 0.015
+      }
+    },
+    {
+      "type": "busway",
+      "subtype": "busway",
+      "label": "Busway Segment",
+      "icon": "icons/components/Busway.svg",
+      "ports": [
+        {
+          "x": 0,
+          "y": 20
+        },
+        {
+          "x": 80,
+          "y": 20
+        }
+      ],
+      "props": {
+        "tag": "",
+        "description": "",
+        "manufacturer": "",
+        "model": "",
+        "length_ft": 100,
+        "material": "aluminum",
+        "insulation_type": "epoxy",
+        "enclosure_rating": "NEMA 1",
+        "busway_type": "feeder",
+        "ampacity_a": 1600,
+        "r_ohm_per_kft": 0.015,
+        "x_ohm_per_kft": 0.012,
+        "short_circuit_rating_ka": 65
       }
     },
     {
@@ -854,7 +926,19 @@
         "enclosure": "box",
         "gap": 32,
         "working_distance": 455,
-        "electrode_config": "VCB"
+        "electrode_config": "VCB",
+        "tag": "",
+        "description": "",
+        "manufacturer": "",
+        "model": "",
+        "rated_voltage_kv": 0.48,
+        "phases": 3,
+        "interrupting_rating_ka": 65,
+        "pickup_amps": 1600,
+        "time_dial_or_tms": 0.3,
+        "curve_family": "LSIG",
+        "ground_fault_enabled": true,
+        "ground_time_delay_s": 0.3
       },
       "deviceProperties": [
         {
@@ -931,7 +1015,19 @@
         "enclosure": "box",
         "gap": 102,
         "working_distance": 914,
-        "electrode_config": "VCB"
+        "electrode_config": "VCB",
+        "tag": "",
+        "description": "",
+        "manufacturer": "",
+        "model": "",
+        "rated_voltage_kv": 4.16,
+        "phases": 3,
+        "interrupting_rating_ka": 25,
+        "pickup_amps": 1200,
+        "time_dial_or_tms": 0.3,
+        "curve_family": "LSIG",
+        "ground_fault_enabled": true,
+        "ground_time_delay_s": 0.3
       },
       "deviceProperties": [
         {
@@ -1008,7 +1104,19 @@
         "enclosure": "box",
         "gap": 152,
         "working_distance": 1219,
-        "electrode_config": "VOA"
+        "electrode_config": "VOA",
+        "tag": "",
+        "description": "",
+        "manufacturer": "",
+        "model": "",
+        "rated_voltage_kv": 13.8,
+        "phases": 3,
+        "interrupting_rating_ka": 63,
+        "pickup_amps": 2000,
+        "time_dial_or_tms": 0.3,
+        "curve_family": "LSIG",
+        "ground_fault_enabled": true,
+        "ground_time_delay_s": 0.3
       },
       "deviceProperties": [
         {
@@ -1082,7 +1190,20 @@
         "working_distance": 455,
         "electrode_config": "VCB",
         "interrupt_rating_ka": 200,
-        "let_through_i2t": 150000
+        "let_through_i2t": 150000,
+        "tag": "",
+        "description": "",
+        "manufacturer": "",
+        "model": "",
+        "rated_voltage_kv": 0.48,
+        "phases": 3,
+        "interrupting_rating_ka": 200,
+        "pickup_amps": 400,
+        "time_dial_or_tms": 0.5,
+        "curve_family": "ANSI_VeryInverse",
+        "ground_fault_enabled": false,
+        "ground_pickup_a": 400,
+        "ground_time_delay_s": 0.3
       },
       "deviceProperties": [
         {
@@ -1136,7 +1257,20 @@
         "ka": 12.5,
         "curve": "ANSI_E",
         "baseKV": 15.0,
-        "kV": 15.0
+        "kV": 15.0,
+        "tag": "",
+        "description": "",
+        "manufacturer": "",
+        "model": "",
+        "rated_voltage_kv": 15,
+        "phases": 3,
+        "interrupting_rating_ka": 12.5,
+        "pickup_amps": 400,
+        "time_dial_or_tms": 0.3,
+        "curve_family": "ANSI_E",
+        "ground_fault_enabled": true,
+        "ground_pickup_a": 200,
+        "ground_time_delay_s": 0.3
       }
     },
     {
@@ -1219,9 +1353,15 @@
       "label": "Shunt Cap",
       "icon": "icons/components/CapacitorBank.svg",
       "props": {
+        "rated_kv": 13.8,
+        "rated_kvar": 1800,
+        "steps": 3,
+        "detuned": true,
+        "tuning_hz": 189,
+        "reactor_pct": 7,
+        "switching_transient_class": "C2",
         "volts": 13800,
         "kvar": 1800,
-        "steps": 3,
         "detuned_hz": 189,
         "baseKV": 13.8,
         "kV": 13.8,
@@ -1236,6 +1376,13 @@
       "label": "Shunt Reactor",
       "icon": "icons/placeholder.svg",
       "props": {
+        "rated_kv": 13.8,
+        "rated_kvar": 600,
+        "steps": 1,
+        "detuned": true,
+        "tuning_hz": 189,
+        "reactor_pct": 7,
+        "switching_transient_class": "R1",
         "volts": 13800,
         "kvar_absorb": 600,
         "baseKV": 13.8,
@@ -1297,13 +1444,27 @@
         }
       ],
       "props": {
+        "tag": "GEN-SYN-001",
+        "description": "Synchronous standby generator",
+        "manufacturer": "Generic",
+        "model": "SYNC-2500",
         "kw": 2000,
         "kva": 2500,
+        "rated_mva": 2.5,
+        "rated_kv": 13.8,
         "volts": 13800,
         "pf": 0.8,
+        "xdpp_pu": 0.2,
+        "xdp_pu": 0.3,
         "xd_pu": 1.8,
         "xd_prime_pu": 0.3,
         "xd_double_prime_pu": 0.2,
+        "h_constant_s": 4,
+        "governor_mode": "isochronous",
+        "avr_mode": "automatic",
+        "min_kw": 200,
+        "max_kw": 2000,
+        "ramp_kw_per_min": 250,
         "grounding": "high_resistance",
         "baseKV": 13.8,
         "kV": 13.8,
@@ -1444,12 +1605,27 @@
         }
       ],
       "props": {
+        "tag": "GEN-ASY-001",
+        "description": "Asynchronous induction generator",
+        "manufacturer": "Generic",
+        "model": "ASYNC-1875",
         "kw": 1500,
         "kva": 1875,
+        "rated_mva": 1.875,
+        "rated_kv": 4.16,
         "volts": 4160,
         "pf": 0.85,
+        "xdpp_pu": 0.25,
+        "xdp_pu": 0.25,
+        "xd_pu": 0.25,
         "slip_percent": 2.5,
         "reactance_pu": 0.25,
+        "h_constant_s": 3,
+        "governor_mode": "fixed_speed",
+        "avr_mode": "n/a",
+        "min_kw": 150,
+        "max_kw": 1500,
+        "ramp_kw_per_min": 200,
         "grounding": "ungrounded",
         "baseKV": 4.16,
         "kV": 4.16,
@@ -1597,7 +1773,20 @@
         "electrode_config": "VCB",
         "mva": 1.0,
         "thevenin_mva": 1.0,
-        "pf": 1.0
+        "pf": 1.0,
+        "tag": "",
+        "description": "",
+        "manufacturer": "",
+        "model": "",
+        "rated_kw": 1000,
+        "rated_kva": 1000,
+        "ac_voltage_kv": 0.48,
+        "dc_voltage_v": 1000,
+        "fault_current_multiple": 1.2,
+        "thd_current_pct": 3.0,
+        "control_mode": "volt_var",
+        "volt_var_enabled": true,
+        "freq_watt_enabled": false
       },
       "deviceProperties": [
         {
@@ -1660,17 +1849,77 @@
           "PurposeUseCase": "Defines reference and safety",
           "NotesOrComments": "Used for fault modeling"
         }
-      ]
+      ],
+      "subtype": "pv_inverter"
+    },
+    {
+      "type": "bess_inverter",
+      "subtype": "bess_inverter",
+      "label": "BESS Inverter",
+      "icon": "icons/components/UPS.svg",
+      "iconIEC": "icons/components/iec/IEC_Generator.svg",
+      "props": {
+        "tag": "",
+        "description": "",
+        "manufacturer": "",
+        "model": "",
+        "rated_kw": 1500,
+        "rated_kva": 1650,
+        "ac_voltage_kv": 0.48,
+        "dc_voltage_v": 1000,
+        "fault_current_multiple": 1.2,
+        "thd_current_pct": 2.5,
+        "control_mode": "grid_forming",
+        "volt_var_enabled": true,
+        "freq_watt_enabled": true
+      }
+    },
+    {
+      "type": "rectifier",
+      "subtype": "rectifier",
+      "label": "Rectifier",
+      "icon": "icons/components/UPS.svg",
+      "iconIEC": "icons/components/iec/IEC_Transformer.svg",
+      "props": {
+        "tag": "",
+        "description": "",
+        "manufacturer": "",
+        "model": "",
+        "rated_kw": 500,
+        "rated_kva": 550,
+        "ac_voltage_kv": 0.48,
+        "dc_voltage_v": 125,
+        "fault_current_multiple": 1.1,
+        "thd_current_pct": 5.0,
+        "control_mode": "constant_voltage",
+        "volt_var_enabled": false,
+        "freq_watt_enabled": false
+      }
     },
     {
       "type": "ups",
       "label": "UPS",
       "icon": "icons/components/UPS.svg",
       "props": {
-        "kva": 500,
-        "volts": 480,
+        "tag": "",
+        "description": "",
+        "manufacturer": "",
+        "model": "",
         "topology": "double_conversion",
-        "battery_kwh": 250,
+        "rated_kva": 500,
+        "input_voltage_kv": 0.48,
+        "output_voltage_kv": 0.48,
+        "efficiency_pct": 96.0,
+        "battery_runtime_min": 15,
+        "battery_dc_v": 480,
+        "static_bypass_supported": true,
+        "operating_mode": "normal",
+        "mode_normal_enabled": true,
+        "mode_battery_enabled": true,
+        "mode_bypass_enabled": true,
+        "runtime_normal_min": 0,
+        "runtime_battery_min": 15,
+        "runtime_bypass_min": 60,
         "baseKV": 0.48,
         "kV": 0.48,
         "voltage": 480,
@@ -1681,7 +1930,39 @@
         "electrode_config": "VCB",
         "mva": 0.5,
         "thevenin_mva": 0.5,
-        "battery_runtime_min": 15
+        "pf": 0.9,
+        "load": {
+          "kw": 180,
+          "kvar": 87.178
+        },
+        "generation": {
+          "kw": 0,
+          "kvar": 0
+        }
+      },
+      "subtype": "ups",
+      "category": "equipment",
+      "iconIEC": "icons/components/iec/IEC_Generator.svg"
+    },
+    {
+      "type": "battery",
+      "subtype": "battery",
+      "label": "Battery",
+      "icon": "icons/components/UPS.svg",
+      "props": {
+        "tag": "",
+        "description": "",
+        "manufacturer": "",
+        "model": "",
+        "nominal_voltage_vdc": 480,
+        "cell_chemistry": "li_ion",
+        "cell_count": 144,
+        "capacity_ah": 200,
+        "internal_resistance_ohm": 0.05,
+        "initial_soc_pct": 50,
+        "min_soc_pct": 20,
+        "max_charge_current_a": 100,
+        "max_discharge_current_a": 100
       }
     },
     {
@@ -1748,24 +2029,23 @@
       "ports": []
     },
     {
-      "type": "mcc",
-      "label": "MCC",
+      "type": "panel",
+      "subtype": "mcc",
+      "label": "Motor Control Center",
       "icon": "icons/components/MCC.svg",
+      "iconIEC": "icons/components/iec/IEC_Switch.svg",
       "props": {
-        "volts": 480,
-        "sections": 6,
-        "baseKV": 0.48,
-        "kV": 0.48,
-        "voltage": 480,
-        "prefault_voltage": 0.48,
-        "enclosure": "box",
-        "gap": 32,
-        "working_distance": 455,
-        "electrode_config": "VCB",
-        "load": {
-          "kw": 0,
-          "kvar": 0
-        }
+        "tag": "",
+        "description": "",
+        "manufacturer": "",
+        "model": "",
+        "rated_voltage_kv": 0.48,
+        "bus_rating_a": 1600,
+        "main_device_type": "mccb",
+        "sccr_ka": 65,
+        "bucket_count": 6,
+        "spare_bucket_count": 1,
+        "form_type": "form_2b"
       }
     },
     {
@@ -2087,21 +2367,125 @@
     {
       "type": "ct",
       "label": "CT",
-      "icon": "icons/placeholder.svg",
+      "icon": "icons/components/CT.svg",
       "props": {
-        "ratio": "600:5",
+        "tag": "CT-1",
+        "ratio_primary": 600,
+        "ratio_secondary": 5,
+        "accuracy_class": "C200",
         "burden_va": 10,
-        "class": "C200"
-      }
+        "knee_point_v": 200,
+        "polarity": "H1-X1",
+        "location_context": "protection",
+        "protected_device_id": "",
+        "meter_id": "",
+        "relay_id": ""
+      },
+      "subtype": "ct",
+      "category": "protection",
+      "ports": [
+        {
+          "x": 40,
+          "y": 0
+        }
+      ]
     },
     {
       "type": "vt",
       "label": "PT",
+      "icon": "icons/components/Transformer.svg",
+      "symbol": "icons/components/Transformer.svg",
+      "props": {
+        "tag": "PT-1",
+        "primary_voltage": 12470,
+        "secondary_voltage": 120,
+        "accuracy_class": "0.3",
+        "burden_va": 50,
+        "connection_type": "wye-grounded",
+        "fuse_protection": "yes",
+        "location_context": "protection",
+        "protected_device_id": "",
+        "meter_id": "",
+        "relay_id": "",
+        "consumer_ids": ""
+      },
+      "subtype": "pt_vt",
+      "category": "protection",
+      "ports": [
+        {
+          "x": 40,
+          "y": 0
+        }
+      ]
+    },
+    {
+      "type": "relay",
+      "subtype": "relay_87",
+      "label": "Differential Relay (87)",
       "icon": "icons/placeholder.svg",
       "props": {
-        "ratio": "69000V:120V",
-        "class": "0.3WZ"
-      }
+        "tag": "87R-1",
+        "description": "Differential protection relay",
+        "manufacturer": "",
+        "model": "",
+        "protected_zone_type": "bus",
+        "pickup_pu": 0.35,
+        "slope1_pct": 25,
+        "slope2_pct": 45,
+        "breakpoint_pu": 2.0,
+        "inrush_blocking_enabled": true,
+        "second_harmonic_pct": 15
+      },
+      "ports": [
+        {
+          "x": 20,
+          "y": 0
+        }
+      ],
+      "deviceProperties": [
+        {
+          "DeviceType": "Relay",
+          "PropertyName": "Protected Zone Type",
+          "PurposeUseCase": "Defines what differential zone is protected",
+          "NotesOrComments": "Valid values: bus, transformer, generator"
+        },
+        {
+          "DeviceType": "Relay",
+          "PropertyName": "Pickup (pu)",
+          "PurposeUseCase": "Sets minimum differential current pickup",
+          "NotesOrComments": "Used when building differential characteristic"
+        },
+        {
+          "DeviceType": "Relay",
+          "PropertyName": "Slope 1 (%)",
+          "PurposeUseCase": "Low-bias restraint slope",
+          "NotesOrComments": "First segment of dual-slope characteristic"
+        },
+        {
+          "DeviceType": "Relay",
+          "PropertyName": "Slope 2 (%)",
+          "PurposeUseCase": "High-bias restraint slope",
+          "NotesOrComments": "Second segment of dual-slope characteristic"
+        },
+        {
+          "DeviceType": "Relay",
+          "PropertyName": "Breakpoint (pu)",
+          "PurposeUseCase": "Transition bias point between slope segments",
+          "NotesOrComments": "Used for dual-slope characteristic plotting"
+        },
+        {
+          "DeviceType": "Relay",
+          "PropertyName": "Inrush Blocking Enabled",
+          "PurposeUseCase": "Blocks tripping for inrush events",
+          "NotesOrComments": "Uses second-harmonic supervision"
+        },
+        {
+          "DeviceType": "Relay",
+          "PropertyName": "Second Harmonic (%)",
+          "PurposeUseCase": "Defines harmonic threshold for inrush blocking",
+          "NotesOrComments": "Applied when inrush blocking is enabled"
+        }
+      ]
     },
     {
       "type": "relay",
@@ -2111,7 +2495,20 @@
         "function": "50/51",
         "curve": "IEC_VeryInverse",
         "time_dial": 3.5,
-        "pickup_a": 400
+        "pickup_a": 400,
+        "tag": "",
+        "description": "",
+        "manufacturer": "",
+        "model": "",
+        "rated_voltage_kv": 15,
+        "phases": 3,
+        "interrupting_rating_ka": 25,
+        "pickup_amps": 400,
+        "time_dial_or_tms": 3.5,
+        "curve_family": "IEC_VeryInverse",
+        "ground_fault_enabled": true,
+        "ground_pickup_a": 200,
+        "ground_time_delay_s": 0.3
       }
     }
   ]
