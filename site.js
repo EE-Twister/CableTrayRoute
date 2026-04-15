@@ -523,9 +523,14 @@ async function updateProjectDisplay(snapshot){
         span.style.marginLeft='auto';
         span.style.marginRight='var(--space-4)';
         const currentSettingsBtn=document.getElementById('settings-btn');
-        if(currentSettingsBtn&&currentSettingsBtn.parentNode===nav){
-          nav.insertBefore(span,currentSettingsBtn);
-          currentSettingsBtn.style.marginLeft='0';
+        if(currentSettingsBtn&&currentSettingsBtn.parentElement===nav&&nav.contains(currentSettingsBtn)){
+          try{
+            nav.insertBefore(span,currentSettingsBtn);
+            currentSettingsBtn.style.marginLeft='0';
+          }catch(err){
+            console.warn('project display insert fallback',err);
+            nav.appendChild(span);
+          }
         }else{
           nav.appendChild(span);
         }
