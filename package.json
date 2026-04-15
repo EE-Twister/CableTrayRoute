@@ -12,9 +12,9 @@
     "e2e:critical": "playwright test --config playwright.config.cjs playwright-tests/workflow.spec.js playwright-tests/oneline.spec.js playwright-tests/nextFeatures.smoke.spec.js --grep \"create DB-01|dirty-state prompts|editing a source voltage|smoke:\"",
     "e2e:full": "playwright test --config playwright.config.cjs",
     "e2e:next-features-integration": "playwright test --config playwright.config.cjs playwright-tests/nextFeatures.integration.spec.js",
-    "e2e:next-features-cost": "playwright test --config playwright.config.cjs playwright-tests/nextFeatures.integration.spec.js --grep \"cost estimator\"",
-    "e2e:next-features-emf": "playwright test --config playwright.config.cjs playwright-tests/nextFeatures.integration.spec.js --grep \"emf\"",
-    "e2e:next-features-export": "playwright test --config playwright.config.cjs playwright-tests/nextFeatures.integration.spec.js --grep \"xlsx export|export downloads\"",
+    "e2e:next-features-cost": "playwright test --config playwright.config.cjs playwright-tests/nextFeatures.integration.spec.js --grep \"AT-CE-0[1-4]\"",
+    "e2e:next-features-emf": "playwright test --config playwright.config.cjs playwright-tests/nextFeatures.integration.spec.js --grep \"AT-EMF-0[1-4]\"",
+    "e2e:next-features-export": "playwright test --config playwright.config.cjs playwright-tests/nextFeatures.integration.spec.js --grep \"AT-CE-04|submittal xlsx export downloads expected file\"",
     "audit:components": "node scripts/componentCoverageAudit.mjs"
   },
   "devDependencies": {
