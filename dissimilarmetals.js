@@ -1,5 +1,6 @@
 import { getStudies, setStudies } from './dataStore.mjs';
 import { initStudyApprovalPanel } from './src/components/studyApproval.js';
+import { escapeHtml } from './src/htmlUtils.mjs';
 
 const MM_PER_YEAR_TO_MPY = 39.3701;
 
@@ -66,6 +67,8 @@ export function estimateDissimilarMetalsRisk(input) {
   return {
     input,
     timestamp: new Date().toISOString(),
+    primaryRole: anodicMetal === primary ? 'Anodic' : 'Cathodic',
+    secondaryRole: anodicMetal === secondary ? 'Anodic' : 'Cathodic',
     anodicMetal: anodicMetal.label,
     cathodicMetal: cathodicMetal.label,
     drivingPotentialV: round(drivingPotentialV, 3),
@@ -194,6 +197,8 @@ function renderResults(result, container) {
         <tbody>
           <tr><th>Anodic (corroding) member</th><td>${escapeHtml(result.anodicMetal)}</td></tr>
           <tr><th>Cathodic member</th><td>${escapeHtml(result.cathodicMetal)}</td></tr>
+          <tr><th>Primary component role</th><td>${escapeHtml(result.primaryRole)}</td></tr>
+          <tr><th>Connected hardware role</th><td>${escapeHtml(result.secondaryRole)}</td></tr>
           <tr><th>Driving potential</th><td>${result.drivingPotentialV.toFixed(3)} V</td></tr>
           <tr><th>Cathode/Anode area ratio</th><td>${result.areaRatio.toFixed(2)} : 1</td></tr>
           <tr><th>Estimated corrosion rate</th><td>${result.corrosionRateMmYear.toFixed(3)} mm/year (${result.corrosionRateMpy.toFixed(2)} mpy)</td></tr>
