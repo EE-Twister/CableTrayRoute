@@ -159,5 +159,49 @@ global.localStorage = {
       assert(bus.threePhaseKA > 0.1, 'generator-based fault current should be non-zero');
       assert(bus.threePhaseKA < 1, 'xdpp should limit source current contribution');
     });
+
+    it('includes normalized UPS metadata in short-circuit results', () => {
+      setOneLine({
+        activeSheet: 0,
+        sheets: [{
+          name: 'UPS',
+          components: [
+            {
+              id: 'ups1',
+              type: 'ups',
+              subtype: 'ups',
+              props: {
+                tag: 'UPS-1',
+                topology: 'double_conversion',
+                operating_mode: 'battery',
+                rated_kva: 500,
+                input_voltage_kv: 0.48,
+                output_voltage_kv: 0.48,
+                efficiency_pct: 96,
+                battery_runtime_min: 15,
+                battery_dc_v: 480,
+                static_bypass_supported: true,
+                mode_normal_enabled: true,
+                mode_battery_enabled: true,
+                mode_bypass_enabled: true,
+                runtime_normal_min: 0,
+                runtime_battery_min: 15,
+                runtime_bypass_min: 60
+              },
+              connections: [{ target: 'bus1', sourcePort: 0, targetPort: 0 }]
+            },
+            { id: 'bus1', type: 'bus', subtype: 'Bus' }
+          ]
+        }]
+      });
+      const res = runShortCircuit();
+      const bus = res.bus1;
+      assert(bus, 'bus results should exist');
+      assert(bus.ups, 'UPS metadata should be attached');
+      assert.strictEqual(bus.ups.tag, 'UPS-1');
+      assert.strictEqual(bus.ups.operating_mode, 'battery');
+      assert.strictEqual(bus.ups.rated_kva, 500);
+      assert.strictEqual(bus.ups.runtime_battery_min, 15);
+    });
   });
 })();

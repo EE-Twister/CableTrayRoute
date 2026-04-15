@@ -233,6 +233,80 @@ export function runValidation(components = [], studies = {}) {
     }
   });
 
+  // UPS required field completeness and rating/runtime consistency
+  components.forEach(c => {
+    const subtype = `${c?.subtype ?? ''}`.trim().toLowerCase();
+    const type = `${c?.type ?? ''}`.trim().toLowerCase();
+    const isUps = subtype === 'ups' || type === 'ups';
+    if (!isUps) return;
+    const props = c.props && typeof c.props === 'object' ? c.props : c;
+    const missing = [];
+    if (!`${props.tag ?? ''}`.trim()) missing.push('tag');
+    if (!`${props.manufacturer ?? ''}`.trim()) missing.push('manufacturer');
+    if (!`${props.model ?? ''}`.trim()) missing.push('model');
+    if (!`${props.topology ?? ''}`.trim()) missing.push('topology');
+    const ratedKva = Number(props.rated_kva);
+    if (!Number.isFinite(ratedKva) || ratedKva <= 0) missing.push('rated_kva');
+    const inputVoltageKv = Number(props.input_voltage_kv);
+    if (!Number.isFinite(inputVoltageKv) || inputVoltageKv <= 0) missing.push('input_voltage_kv');
+    const outputVoltageKv = Number(props.output_voltage_kv);
+    if (!Number.isFinite(outputVoltageKv) || outputVoltageKv <= 0) missing.push('output_voltage_kv');
+    const efficiencyPct = Number(props.efficiency_pct);
+    if (!Number.isFinite(efficiencyPct) || efficiencyPct <= 0 || efficiencyPct > 100) missing.push('efficiency_pct');
+    const batteryRuntimeMin = Number(props.battery_runtime_min);
+    if (!Number.isFinite(batteryRuntimeMin) || batteryRuntimeMin < 0) missing.push('battery_runtime_min');
+    const batteryDcV = Number(props.battery_dc_v);
+    if (!Number.isFinite(batteryDcV) || batteryDcV <= 0) missing.push('battery_dc_v');
+    if (typeof props.static_bypass_supported !== 'boolean') missing.push('static_bypass_supported');
+
+    const operatingMode = `${props.operating_mode ?? ''}`.trim().toLowerCase();
+    const allowedModes = new Set(['normal', 'battery', 'bypass']);
+    if (!allowedModes.has(operatingMode)) missing.push('operating_mode');
+    const runtimeNormalMin = Number(props.runtime_normal_min);
+    const runtimeBatteryMin = Number(props.runtime_battery_min ?? props.battery_runtime_min);
+    const runtimeBypassMin = Number(props.runtime_bypass_min);
+    if (!Number.isFinite(runtimeNormalMin) || runtimeNormalMin < 0) missing.push('runtime_normal_min');
+    if (!Number.isFinite(runtimeBatteryMin) || runtimeBatteryMin < 0) missing.push('runtime_battery_min');
+    if (!Number.isFinite(runtimeBypassMin) || runtimeBypassMin < 0) missing.push('runtime_bypass_min');
+    if (typeof props.mode_normal_enabled !== 'boolean') missing.push('mode_normal_enabled');
+    if (typeof props.mode_battery_enabled !== 'boolean') missing.push('mode_battery_enabled');
+    if (typeof props.mode_bypass_enabled !== 'boolean') missing.push('mode_bypass_enabled');
+
+    const consistency = [];
+    if (Number.isFinite(runtimeBatteryMin) && Number.isFinite(batteryRuntimeMin)
+      && Math.abs(runtimeBatteryMin - batteryRuntimeMin) > 1e-6) {
+      consistency.push('runtime_battery_min must match battery_runtime_min');
+    }
+    if (props.mode_battery_enabled === true && Number.isFinite(runtimeBatteryMin) && runtimeBatteryMin <= 0) {
+      consistency.push('mode_battery_enabled requires runtime_battery_min > 0');
+    }
+    if (operatingMode === 'bypass' && props.static_bypass_supported !== true) {
+      consistency.push('operating_mode=bypass requires static_bypass_supported=true');
+    }
+    if (operatingMode === 'normal' && props.mode_normal_enabled === false) {
+      consistency.push('operating_mode=normal requires mode_normal_enabled=true');
+    }
+    if (operatingMode === 'battery' && props.mode_battery_enabled === false) {
+      consistency.push('operating_mode=battery requires mode_battery_enabled=true');
+    }
+    if (operatingMode === 'bypass' && props.mode_bypass_enabled === false) {
+      consistency.push('operating_mode=bypass requires mode_bypass_enabled=true');
+    }
+
+    if (missing.length) {
+      issues.push({
+        component: c.id,
+        message: `UPS missing/invalid attributes: ${missing.join(', ')}.`
+      });
+    }
+    if (consistency.length) {
+      issues.push({
+        component: c.id,
+        message: `UPS rating/runtime consistency checks failed: ${consistency.join('; ')}.`
+      });
+    }
+  });
+
   // DC bus required field completeness for DC-focused studies
   components.forEach(c => {
     const isDcBus = c?.subtype === 'dc_bus';

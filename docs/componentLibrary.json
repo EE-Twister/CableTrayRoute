@@ -1901,10 +1901,25 @@
       "label": "UPS",
       "icon": "icons/components/UPS.svg",
       "props": {
-        "kva": 500,
-        "volts": 480,
+        "tag": "",
+        "description": "",
+        "manufacturer": "",
+        "model": "",
         "topology": "double_conversion",
-        "battery_kwh": 250,
+        "rated_kva": 500,
+        "input_voltage_kv": 0.48,
+        "output_voltage_kv": 0.48,
+        "efficiency_pct": 96.0,
+        "battery_runtime_min": 15,
+        "battery_dc_v": 480,
+        "static_bypass_supported": true,
+        "operating_mode": "normal",
+        "mode_normal_enabled": true,
+        "mode_battery_enabled": true,
+        "mode_bypass_enabled": true,
+        "runtime_normal_min": 0,
+        "runtime_battery_min": 15,
+        "runtime_bypass_min": 60,
         "baseKV": 0.48,
         "kV": 0.48,
         "voltage": 480,
@@ -1915,8 +1930,19 @@
         "electrode_config": "VCB",
         "mva": 0.5,
         "thevenin_mva": 0.5,
-        "battery_runtime_min": 15
-      }
+        "pf": 0.9,
+        "load": {
+          "kw": 180,
+          "kvar": 87.178
+        },
+        "generation": {
+          "kw": 0,
+          "kvar": 0
+        }
+      },
+      "subtype": "ups",
+      "category": "equipment",
+      "iconIEC": "icons/components/iec/IEC_Generator.svg"
     },
     {
       "type": "battery",
