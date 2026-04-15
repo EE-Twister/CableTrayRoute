@@ -115,8 +115,38 @@ export function runCathodicProtectionAnalysis(input) {
     minimumAnodeMassLb: roundTo(minimumAnodeMassKg / LB_TO_KG, 3),
     predictedLifeYears: roundTo(predictedLifeYears, 2),
     safetyMarginYears: roundTo(predictedLifeYears - input.targetLifeYears, 2),
-    safetyMarginPercent: roundTo(((predictedLifeYears - input.targetLifeYears) / input.targetLifeYears) * 100, 1)
+    safetyMarginPercent: roundTo(((predictedLifeYears - input.targetLifeYears) / input.targetLifeYears) * 100, 1),
+    sensitivity: buildSensitivitySummary({
+      input,
+      adjustedRequiredCurrentA,
+      minimumAnodeMassKg,
+      predictedLifeYears
+    })
   };
+}
+
+function buildSensitivitySummary({ input, adjustedRequiredCurrentA, minimumAnodeMassKg, predictedLifeYears }) {
+  const scenarios = [
+    { key: 'base', label: 'Base case', currentMultiplier: 1, requiredMassMultiplier: 1, predictedLifeMultiplier: 1 },
+    { key: 'conservative', label: 'Conservative (+20% demand)', currentMultiplier: 1.2, requiredMassMultiplier: 1.2, predictedLifeMultiplier: 1 / 1.2 },
+    { key: 'optimistic', label: 'Optimistic (-20% demand)', currentMultiplier: 0.8, requiredMassMultiplier: 0.8, predictedLifeMultiplier: 1 / 0.8 }
+  ];
+
+  return scenarios.map((scenario) => {
+    const scenarioCurrentA = adjustedRequiredCurrentA * scenario.currentMultiplier;
+    const scenarioRequiredMassKg = minimumAnodeMassKg * scenario.requiredMassMultiplier;
+    const scenarioPredictedLifeYears = predictedLifeYears * scenario.predictedLifeMultiplier;
+    const scenarioSafetyMarginYears = scenarioPredictedLifeYears - input.targetLifeYears;
+    return {
+      ...scenario,
+      requiredCurrentA: roundTo(scenarioCurrentA, 4),
+      minimumAnodeMassKg: roundTo(scenarioRequiredMassKg, 3),
+      minimumAnodeMassLb: roundTo(scenarioRequiredMassKg / LB_TO_KG, 3),
+      predictedLifeYears: roundTo(scenarioPredictedLifeYears, 2),
+      safetyMarginYears: roundTo(scenarioSafetyMarginYears, 2),
+      safetyMarginPercent: roundTo((scenarioSafetyMarginYears / input.targetLifeYears) * 100, 1)
+    };
+  });
 }
 
 function validateInputs(input) {
@@ -210,6 +240,7 @@ if (typeof document !== 'undefined') {
   const pipeLengthRow = document.getElementById('pipe-length-row');
   const calculatedSurfaceAreaRow = document.getElementById('calculated-surface-area-row');
   const calculatedSurfaceAreaEl = document.getElementById('calculated-surface-area');
+  const pipeDimensionsIllustrationEl = document.getElementById('pipe-dimensions-illustration');
 
   const saved = getStudies().cathodicProtection;
   renderCalculationBasis(basisPanel, CP_STANDARD_BASIS);
@@ -265,6 +296,7 @@ if (typeof document !== 'undefined') {
     pipeOdRow.hidden = !usePipeDimensions;
     pipeLengthRow.hidden = !usePipeDimensions;
     calculatedSurfaceAreaRow.hidden = !usePipeDimensions;
+    pipeDimensionsIllustrationEl.hidden = !usePipeDimensions;
     surfaceAreaEl.closest('.field-row').hidden = usePipeDimensions;
 
     if (!usePipeDimensions) {
@@ -369,6 +401,8 @@ function renderResults(result, root) {
   const lifeBadgeClass = result.safetyMarginYears >= 0 ? 'result-badge--pass' : 'result-badge--fail';
   const lifeBadgeIcon = result.safetyMarginYears >= 0 ? '✓' : '✗';
   const outputBasis = result.outputBasis || {};
+  const sensitivityRows = Array.isArray(result.sensitivity) ? result.sensitivity : [];
+  const advisories = buildDesignAdvisories(result, sensitivityRows);
 
   root.innerHTML = `
     <section class="results-panel" aria-labelledby="cp-results-heading">
@@ -421,8 +455,71 @@ function renderResults(result, root) {
         </table>
       </div>
 
+      ${sensitivityRows.length ? `
+      <div class="table-wrap">
+        <table class="data-table" aria-label="Cathodic protection sensitivity table">
+          <thead>
+            <tr>
+              <th>Scenario</th>
+              <th>Required current (A)</th>
+              <th>Minimum anode mass</th>
+              <th>Predicted life (years)</th>
+              <th>Safety margin</th>
+            </tr>
+          </thead>
+          <tbody>
+            ${sensitivityRows.map((scenario) => `
+              <tr>
+                <td>${escapeHtml(scenario.label)}</td>
+                <td>${scenario.requiredCurrentA}</td>
+                <td>${scenario.minimumAnodeMassKg} kg (${scenario.minimumAnodeMassLb} lb)</td>
+                <td>${scenario.predictedLifeYears}</td>
+                <td>${scenario.safetyMarginYears} years (${scenario.safetyMarginPercent}%)</td>
+              </tr>`).join('')}
+          </tbody>
+        </table>
+      </div>` : ''}
+
+      ${advisories.length ? `
+      <div class="result-group" aria-label="Design improvement advisories">
+        <h3>Design Improvement Opportunities</h3>
+        <ul>
+          ${advisories.map((advisory) => `<li>${escapeHtml(advisory)}</li>`).join('')}
+        </ul>
+      </div>` : ''}
+
       <p class="field-hint result-timestamp">Analysis run: ${new Date(result.timestamp).toLocaleString()}</p>
     </section>`;
+}
+
+function buildDesignAdvisories(result, sensitivityRows) {
+  const notes = [];
+  const conservativeScenario = sensitivityRows.find((scenario) => scenario.key === 'conservative');
+
+  if (result.safetyMarginYears < 0) {
+    notes.push('Installed anode mass is below target-life demand; increase installed mass or reduce coating breakdown assumptions.');
+  } else if (result.safetyMarginPercent < 15) {
+    notes.push('Life margin is modest; consider adding design contingency to improve resilience against coating degradation uncertainty.');
+  }
+
+  if (conservativeScenario && conservativeScenario.safetyMarginYears < 0) {
+    notes.push('The +20% demand sensitivity case fails target life; add contingency mass or plan earlier replacement intervals.');
+  }
+
+  if (result.soilResistivityOhmM < 50 || result.soilPh < 5.5 || result.soilPh > 9) {
+    notes.push('Corrosive environment indicators detected (low resistivity or extreme pH); validate with field surveys and commissioning criteria.');
+  }
+
+  if (result.requiredCurrentA > 5) {
+    notes.push('Required CP current is relatively high; evaluate segmenting protected zones to improve control and maintainability.');
+  }
+
+  if (result.coatingBreakdownFactor > 0.35) {
+    notes.push('Coating breakdown factor is high; prioritize coating condition assessment/rehabilitation to reduce long-term CP demand.');
+  }
+
+  notes.push('For the next iteration, include temperature correction and stray-current interference checks in the final detailed design package.');
+  return notes;
 }
 
 function calculatePipeSurfaceAreaFromInputs(isMetric, outsideDiameterInput, lengthInput) {

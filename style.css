@@ -49,3 +49,37 @@
 .swatch-violation { background:rgba(218,50,50,.85); }
 .equipment-summary { margin-top:.4rem; font-size:.88rem; font-weight:600; }
 @media (max-width:1100px){ .equipment-arrangement-layout{grid-template-columns:1fr;} .equipment-arrangement-sidebar{max-height:none;} #equipment-arrangement-canvas{min-height:56vh;} }
+
+.cp-geometry-illustration {
+  margin: .5rem 0 1rem;
+  padding: .75rem;
+  border: 1px solid var(--border-color, #7d8790);
+  border-radius: 10px;
+  background: color-mix(in srgb, var(--panel-bg, #f8fafc) 92%, transparent);
+}
+.cp-geometry-illustration svg {
+  width: 100%;
+  height: auto;
+  color: var(--text-color, #1f2b3a);
+}
+.cp-geometry-pipe {
+  fill: color-mix(in srgb, var(--accent-color, #2a6fd6) 38%, #ffffff);
+  stroke: color-mix(in srgb, var(--accent-color, #2a6fd6) 80%, #1f2b3a);
+  stroke-width: 2;
+}
+.cp-geometry-dimension {
+  stroke: currentColor;
+  stroke-width: 2;
+}
+.cp-geometry-guide {
+  stroke: currentColor;
+  stroke-width: 1.2;
+  opacity: .75;
+}
+.cp-geometry-label {
+  font-size: 16px;
+  font-weight: 600;
+}
+.cp-geometry-note {
+  font-size: 14px;
+}
