@@ -16,7 +16,7 @@ function it(name, fn) {
 const root = path.resolve(__dirname, '..');
 
 describe('page navigation', () => {
-  ['library.html', 'account.html'].forEach(file => {
+  ['library.html', 'account.html', 'heattracesizing.html'].forEach(file => {
     const html = fs.readFileSync(path.join(root, file), 'utf8');
     it(`${file} contains top-nav element`, () => {
       assert.ok(
@@ -40,5 +40,10 @@ describe('page navigation', () => {
   it('account.js imports navigation.js', () => {
     const src = fs.readFileSync(path.join(root, 'account.js'), 'utf8');
     assert.ok(src.includes('navigation.js'), 'account.js missing navigation.js import');
+  });
+
+  it('navigation definitions include heat trace sizing route', () => {
+    const src = fs.readFileSync(path.join(root, 'src/components/navigation.js'), 'utf8');
+    assert.ok(src.includes("href: 'heattracesizing.html'"), 'navigation.js missing heattracesizing.html route');
   });
 });
