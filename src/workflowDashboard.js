@@ -16,11 +16,35 @@ const STUDY_DEFINITIONS = [
   { key: 'contingency',  label: 'N-1 Contingency',      href: 'contingency.html' },
 ];
 
-function statusIcon(complete) {
+function getStatusMeta({ complete, label, hint, forStudy = false }) {
+  if (complete) {
+    return { text: forStudy ? 'Run' : 'Complete', icon: '✓', variant: 'success' };
+  }
+  const warning = Boolean(hint) && /(needs|require|add|over|warning)/i.test(`${label} ${hint}`);
+  if (warning) {
+    return { text: 'Warning', icon: '⚠', variant: 'warning' };
+  }
+  return { text: forStudy ? 'Pending' : 'Pending', icon: '•', variant: 'neutral' };
+}
+
+function statusBadge({ complete, label, hint, forStudy = false, extraClass = '' }) {
+  const { text, icon, variant } = getStatusMeta({ complete, label, hint, forStudy });
   const span = document.createElement('span');
-  span.className = complete ? 'dash-icon dash-icon--complete' : 'dash-icon dash-icon--incomplete';
-  span.setAttribute('aria-hidden', 'true');
-  span.textContent = complete ? '✓' : '✗';
+  span.className = `dash-badge dash-badge--${variant}${extraClass ? ` ${extraClass}` : ''}`;
+  span.setAttribute('role', 'status');
+  span.setAttribute('aria-label', `Status: ${text}`);
+
+  const iconEl = document.createElement('span');
+  iconEl.className = 'dash-badge-icon';
+  iconEl.setAttribute('aria-hidden', 'true');
+  iconEl.textContent = icon;
+
+  const textEl = document.createElement('span');
+  textEl.className = 'dash-badge-text';
+  textEl.textContent = text;
+
+  span.appendChild(iconEl);
+  span.appendChild(textEl);
   return span;
 }
 
@@ -164,18 +188,34 @@ function renderWorkflowSteps(container) {
     li.className = 'dash-step-card' + (complete ? ' dash-step-card--complete' : '');
     if (hint) li.title = hint;
 
-    const icon = statusIcon(complete);
     const nameEl = document.createElement('a');
     nameEl.href = step.href;
     nameEl.className = 'dash-step-name';
     nameEl.textContent = step.label;
 
+    const statusMeta = getStatusMeta({ complete, label, hint });
+    const statusPill = statusBadge({ complete, label, hint, extraClass: 'dash-step-status-pill' });
+
+    const statusWrap = document.createElement('span');
+    statusWrap.className = 'dash-step-status-wrap';
+    statusWrap.appendChild(statusPill);
+
+    if (hint) {
+      const hintEl = document.createElement('span');
+      hintEl.className = 'dash-step-hint-icon';
+      hintEl.setAttribute('aria-label', `Hint: ${hint}`);
+      hintEl.title = hint;
+      hintEl.textContent = 'ⓘ';
+      statusWrap.appendChild(hintEl);
+    }
+
     const labelEl = document.createElement('span');
     labelEl.className = 'dash-step-label';
     labelEl.textContent = label;
+    labelEl.setAttribute('aria-label', `${statusMeta.text}: ${label}`);
 
-    li.appendChild(icon);
     li.appendChild(nameEl);
+    li.appendChild(statusWrap);
     li.appendChild(labelEl);
     list.appendChild(li);
   });
@@ -242,18 +282,20 @@ function renderStudiesSummary(container) {
     const li = document.createElement('li');
     li.className = 'dash-study-item' + (hasResults ? ' dash-study-item--run' : '');
 
-    const icon = statusIcon(hasResults);
-
     const linkEl = document.createElement('a');
     linkEl.href = href;
     linkEl.className = 'dash-study-name';
     linkEl.textContent = label;
 
-    const statusEl = document.createElement('span');
-    statusEl.className = 'dash-study-status';
-    statusEl.textContent = hasResults ? 'Results saved' : 'Not run';
+    const statusEl = statusBadge({
+      complete: hasResults,
+      label: hasResults ? 'Results saved' : 'Not run',
+      hint: null,
+      forStudy: true,
+      extraClass: hasResults ? 'dash-badge--run' : 'dash-badge--pending'
+    });
+    statusEl.setAttribute('aria-label', hasResults ? 'Status: Run. Results saved.' : 'Status: Pending. Not run.');
 
-    li.appendChild(icon);
     li.appendChild(linkEl);
     li.appendChild(statusEl);
     list.appendChild(li);
