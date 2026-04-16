@@ -9,6 +9,7 @@ import {
 function baseInput(overrides = {}) {
   return {
     assetType: 'pipe',
+    pipeMaterial: 'carbon-steel',
     soilResistivityOhmM: 100,
     soilPh: 7,
     moistureCategory: 'moderate',

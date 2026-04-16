@@ -92,6 +92,16 @@ The in-app standards basis references:
 
 > Note: The tool uses these standards as design-basis references for equation form and parameter framing. Project-specific compliance still requires engineering sign-off against the exact edition and jurisdictional requirements.
 
+## Compliance Tracking
+
+The CP study now includes a standards profile and auditable compliance status model:
+
+- **Target references:** A machine-readable profile records the adopted standards set (AMPP/NACE/ISO/DNV references and organization-selected editions).
+- **Mandatory vs optional checks:** Required checks are explicitly keyed and rendered in the **Compliance Status** panel as `pass`, `fail`, or `not-run`.
+- **Required deliverables:** The profile flags required deliverables for design basis, calculations, commissioning checks, and monitoring plan.
+- **Audit trail:** Every run appends a compliance snapshot under study storage (`studyResults.cathodicProtection.complianceHistory`) so historical status changes can be reviewed.
+
 ## Revision Notes
 
+- **2026-04-16:** Added standards profile configuration, machine-readable required-check keys in CP basis mapping, compliance status panel, and persisted compliance history snapshots.
 - **2026-04-15:** Initial documentation page added for CP sizing inputs, equations, assumptions/limits, references, and consistency guidance between required-mass and predicted-life relations.

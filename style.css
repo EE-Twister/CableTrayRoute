@@ -83,3 +83,26 @@
 .cp-geometry-note {
   font-size: 14px;
 }
+
+.result-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: .35rem;
+  border-radius: 999px;
+  padding: .2rem .65rem;
+  font-size: .85rem;
+  font-weight: 600;
+  border: 1px solid transparent;
+}
+.result-badge--pass {
+  background: color-mix(in srgb, #22c55e 20%, transparent);
+  border-color: color-mix(in srgb, #22c55e 45%, transparent);
+}
+.result-badge--fail {
+  background: color-mix(in srgb, #ef4444 18%, transparent);
+  border-color: color-mix(in srgb, #ef4444 45%, transparent);
+}
+.result-badge--not-run {
+  background: color-mix(in srgb, #64748b 20%, transparent);
+  border-color: color-mix(in srgb, #64748b 45%, transparent);
+}
