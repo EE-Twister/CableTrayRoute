@@ -690,7 +690,7 @@ export function initCpLayoutCanvas({
         class="cp-layout-structure-line ${activeSegmentIndex === index ? 'is-hovered' : ''}"
         data-segment-index="${index}"
       />
-      <text x="${(segment.x1 + segment.x2) / 2}" y="${segment.y1 - 14}" class="cp-layout-segment-label" text-anchor="middle">${segment.label}</text>
+      <text x="${(segment.x1 + segment.x2) / 2}" y="${segment.y1 - 14}" class="cp-layout-segment-label" text-anchor="middle" data-segment-index="${index}">${segment.label}</text>
     `).join('');
 
     const anodeMarkup = anodes.map((anode, index) => `
@@ -887,7 +887,11 @@ export function initCpLayoutCanvas({
   }
 
   function selectElementFromTarget(target) {
-    const dragTarget = target.closest('[data-drag-kind]');
+    const normalizedTarget = target instanceof Element ? target : target?.parentElement;
+    if (!normalizedTarget) {
+      return false;
+    }
+    const dragTarget = normalizedTarget.closest('[data-drag-kind]');
     if (dragTarget) {
       const kind = dragTarget.dataset.dragKind;
       const index = Number.parseInt(dragTarget.dataset.index || '-1', 10);
@@ -900,7 +904,7 @@ export function initCpLayoutCanvas({
         return true;
       }
     }
-    const segment = target.closest('[data-segment-index]');
+    const segment = normalizedTarget.closest('[data-segment-index]');
     if (segment) {
       const index = Number.parseInt(segment.dataset.segmentIndex || '-1', 10);
       if (Number.isInteger(index) && index >= 0) {
@@ -909,7 +913,7 @@ export function initCpLayoutCanvas({
         return true;
       }
     }
-    const hotspot = target.closest('[data-hotspot-index]');
+    const hotspot = normalizedTarget.closest('[data-hotspot-index]');
     if (hotspot) {
       const index = Number.parseInt(hotspot.dataset.hotspotIndex || '-1', 10);
       if (Number.isInteger(index) && index >= 0) {
