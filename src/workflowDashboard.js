@@ -233,11 +233,48 @@ function renderProjectSummary(container) {
   const trayViolations = getTrayViolationsCount();
 
   const stats = [
-    { label: 'Cables', value: cables, href: 'cableschedule.html' },
-    { label: 'Trays', value: trays, href: 'racewayschedule.html' },
-    { label: 'Conduits', value: conduits, href: 'racewayschedule.html' },
-    { label: 'Ductbanks', value: ductbanks, href: 'ductbankroute.html' },
-    { label: 'Trays over 80% fill', value: trayViolations, href: 'cabletrayfill.html', warn: trayViolations > 0 },
+    {
+      label: 'Cables',
+      value: cables,
+      href: 'cableschedule.html',
+      icon: 'icons/components/Feeder.svg',
+      subtitle: 'linked to Cable Schedule',
+      state: 'linked',
+    },
+    {
+      label: 'Trays',
+      value: trays,
+      href: 'racewayschedule.html',
+      icon: 'icons/components/Busway.svg',
+      subtitle: 'linked to Raceway Schedule',
+      state: 'linked',
+    },
+    {
+      label: 'Conduits',
+      value: conduits,
+      href: 'racewayschedule.html',
+      icon: 'icons/components/Bus.svg',
+      subtitle: 'linked to Raceway Schedule',
+      state: 'linked',
+    },
+    {
+      label: 'Ductbanks',
+      value: ductbanks,
+      href: 'ductbankroute.html',
+      icon: 'icons/ductbank.svg',
+      subtitle: 'linked to Ductbank Route',
+      state: 'linked',
+    },
+    {
+      label: 'Trays over 80% fill',
+      value: trayViolations,
+      href: 'cabletrayfill.html',
+      icon: 'icons/components/Breaker.svg',
+      subtitle: trayViolations > 0
+        ? `${trayViolations} warning${trayViolations === 1 ? '' : 's'} need mitigation.`
+        : 'No active fill warnings.',
+      state: trayViolations > 0 ? 'warn' : 'neutral',
+    },
   ];
 
   container.innerHTML = '';
@@ -245,9 +282,18 @@ function renderProjectSummary(container) {
   list.className = 'dash-stat-list';
   list.setAttribute('role', 'list');
 
-  stats.forEach(({ label, value, href, warn }) => {
+  stats.forEach(({ label, value, href, icon, subtitle, state }) => {
     const li = document.createElement('li');
-    li.className = 'dash-stat-item' + (warn ? ' dash-stat-item--warn' : '');
+    li.className = 'dash-stat-item';
+    if (state) {
+      li.classList.add(`dash-stat-item--${state}`);
+    }
+
+    const iconEl = document.createElement('img');
+    iconEl.src = icon;
+    iconEl.alt = '';
+    iconEl.className = 'dash-stat-icon';
+    iconEl.setAttribute('aria-hidden', 'true');
 
     const valueEl = document.createElement('a');
     valueEl.href = href;
@@ -258,8 +304,15 @@ function renderProjectSummary(container) {
     labelEl.className = 'dash-stat-label';
     labelEl.textContent = label;
 
+    li.appendChild(iconEl);
     li.appendChild(valueEl);
     li.appendChild(labelEl);
+    if (subtitle) {
+      const subtitleEl = document.createElement('span');
+      subtitleEl.className = 'dash-stat-subtitle';
+      subtitleEl.textContent = subtitle;
+      li.appendChild(subtitleEl);
+    }
     list.appendChild(li);
   });
 

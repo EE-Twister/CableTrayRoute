@@ -193,20 +193,40 @@
   margin: 0;
   padding: 0;
   display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(8rem, 1fr));
+  grid-template-columns: 1fr;
   gap: 0.75rem;
 }
 
 .dash-stat-item {
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  gap: 0.25rem;
-  padding: 0.75rem 0.5rem;
+  display: grid;
+  grid-template-columns: 1.75rem 1fr;
+  grid-template-areas:
+    'icon value'
+    'icon label'
+    'icon subtitle';
+  align-items: start;
+  column-gap: 0.65rem;
+  row-gap: 0.15rem;
+  padding: 0.85rem 0.9rem;
   border-radius: var(--radius, 6px);
   background: var(--color-surface-alt, #f9fafb);
   border: 1px solid var(--color-border, #e5e7eb);
-  text-align: center;
+  text-align: left;
+  transition: border-color 120ms ease, box-shadow 120ms ease, transform 120ms ease;
+}
+
+.dash-stat-item:hover,
+.dash-stat-item:focus-within {
+  border-color: var(--color-border-strong, #9ca3af);
+  box-shadow: 0 0 0 2px rgba(37, 99, 235, 0.12);
+}
+
+.dash-stat-icon {
+  grid-area: icon;
+  width: 1.5rem;
+  height: 1.5rem;
+  object-fit: contain;
+  margin-top: 0.2rem;
 }
 
 .dash-stat-item--warn {
@@ -214,12 +234,25 @@
   background: var(--color-warning-bg, #fffbeb);
 }
 
+.dash-stat-item--linked .dash-stat-icon {
+  opacity: 0.9;
+}
+
+.dash-stat-item--neutral .dash-stat-icon {
+  opacity: 0.8;
+}
+
 .dash-stat-value {
+  grid-area: value;
   font-size: 1.75rem;
   font-weight: 700;
   line-height: 1;
   color: var(--color-accent, #2563eb);
   text-decoration: none;
+  min-height: 2.75rem;
+  min-width: 2.75rem;
+  display: inline-flex;
+  align-items: center;
 }
 
 .dash-stat-value:hover {
@@ -231,8 +264,26 @@
 }
 
 .dash-stat-label {
+  grid-area: label;
   font-size: 0.75rem;
   color: var(--color-text-muted, #6b7280);
+}
+
+.dash-stat-subtitle {
+  grid-area: subtitle;
+  font-size: 0.72rem;
+  line-height: 1.35;
+  color: var(--color-text-muted, #4b5563);
+}
+
+.dash-stat-item--warn .dash-stat-subtitle {
+  color: var(--color-warning, #b45309);
+}
+
+@media (min-width: 768px) {
+  .dash-stat-list {
+    grid-template-columns: repeat(auto-fit, minmax(13.5rem, 1fr));
+  }
 }
 
 /* ---- Studies list ---- */
