@@ -770,12 +770,7 @@ export function initCpLayoutCanvas({
       const dy = ((event.clientY - dragState.startY) / canvas.clientHeight) * bounds.height;
       state.viewport.x = dragState.originX + dx;
       state.viewport.y = dragState.originY + dy;
-      if (bounds.width > DEFAULT_VIEW.width) {
-        state.viewport.x = clamp(state.viewport.x, -(bounds.width - DEFAULT_VIEW.width), 0);
-      }
-      if (bounds.height > DEFAULT_VIEW.height) {
-        state.viewport.y = clamp(state.viewport.y, -(bounds.height - DEFAULT_VIEW.height), 0);
-      }
+      clampViewportToBounds();
       render();
       return;
     }
@@ -845,9 +840,30 @@ export function initCpLayoutCanvas({
   }
 
   function setZoom(nextScale) {
-    state.viewport.scale = clamp(nextScale, 0.5, 2.5);
+    const bounds = getViewBounds(state.geometry);
+    const previousScale = state.viewport.scale;
+    const normalizedScale = clamp(nextScale, 0.5, 4);
+    if (Math.abs(normalizedScale - previousScale) < 0.0001) {
+      return;
+    }
+    const focalX = bounds.width / 2;
+    const focalY = bounds.height / 2;
+    const focalWorldX = (focalX - state.viewport.x) / previousScale;
+    const focalWorldY = (focalY - state.viewport.y) / previousScale;
+    state.viewport.scale = normalizedScale;
+    state.viewport.x = focalX - (focalWorldX * normalizedScale);
+    state.viewport.y = focalY - (focalWorldY * normalizedScale);
+    clampViewportToBounds();
     render();
     notifyLayoutChanged();
+  }
+
+  function clampViewportToBounds() {
+    const bounds = getViewBounds(state.geometry);
+    const minX = Math.min(0, bounds.width * (1 - state.viewport.scale));
+    const minY = Math.min(0, bounds.height * (1 - state.viewport.scale));
+    state.viewport.x = clamp(state.viewport.x, minX, 0);
+    state.viewport.y = clamp(state.viewport.y, minY, 0);
   }
 
   function setLayerVisibility(layer, visible) {
@@ -863,6 +879,7 @@ export function initCpLayoutCanvas({
   function resetLayout() {
     state.viewport = { scale: 1, x: 0, y: 0 };
     buildGeometryFromInputs();
+    clampViewportToBounds();
     render();
     announce('Layout reset to current form values.');
     notifyLayoutChanged();
@@ -909,6 +926,7 @@ export function initCpLayoutCanvas({
       state.geometry.referenceElectrode = existing.geometry.referenceElectrode;
     }
 
+    clampViewportToBounds();
     render();
     notifyLayoutChanged();
   }
@@ -926,6 +944,7 @@ export function initCpLayoutCanvas({
 
   buildGeometryFromInputs();
   applyPersistedLayout(initialLayout);
+  clampViewportToBounds();
   setViewMode(state.viewMode);
   render();
 
@@ -959,6 +978,7 @@ export function initCpLayoutCanvas({
   zoomOutButton?.addEventListener('click', () => setZoom(state.viewport.scale - 0.15));
   fitButton?.addEventListener('click', () => {
     state.viewport = { scale: 1, x: 0, y: 0 };
+    clampViewportToBounds();
     render();
     notifyLayoutChanged();
   });

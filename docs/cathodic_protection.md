@@ -209,6 +209,7 @@ This transition is validated by the end-to-end CP workflow test in `tests/cp/com
 
 ## Revision Notes
 
+- **2026-04-16:** Fixed CP Layout Canvas zoom/pan viewport clamping so zoomed views can pan across the full drawable area without clipping lower grid/components, and increased max zoom for closer inspection.
 - **2026-04-16:** Added CP Layout Canvas panel with draggable structure/anode/measurement objects, layer toggles, zoom/pan controls, bi-directional form syncing, and persisted layout geometry (`studyResults.cathodicProtection.cpLayout`).
 - **2026-04-16:** Added commissioning-plan results section, checklist completion fields in the Study Approval panel (`who/when/evidence`), provisional compliance gating until evidence completion, and persisted report export payloads for JSON/PDF workflows.
 - **2026-04-16:** Added measurement metadata inputs (test method/context/reference location), implemented correction-aware criteria normalization, separated raw vs corrected acceptance outputs, and added metadata sufficiency warnings in results.
