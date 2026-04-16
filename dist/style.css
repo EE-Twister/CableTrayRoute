@@ -233,6 +233,7 @@
 .cp-layout-canvas {
   border: 1px solid var(--border-color, #7d8790);
   border-radius: 10px;
+  height: 420px;
   min-height: 420px;
   background: color-mix(in srgb, var(--panel-bg, #f8fafc) 94%, #b9d7ff 6%);
   overflow: hidden;
