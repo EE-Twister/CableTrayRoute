@@ -149,6 +149,28 @@ Study output now stores `studyResults.cathodicProtection.reportExport` with:
 - `verificationPlan` payload (commissioning tests, monitoring intervals, thresholds, completion state)
 - `payloads.json` and `payloads.pdf` section metadata for downstream exporters.
 
+## Layout Canvas and Persisted Geometry
+
+The CP page now includes a **Layout Canvas** panel for visual placement and review of key CP objects:
+
+- **Structure segments** are rendered as four labeled line segments.
+- **Anodes** are rendered as draggable markers with optional wiring leads.
+- **Measurement points** include draggable test points and a draggable reference electrode marker.
+- **Spacing annotations** display anode spacing dimensions directly in the canvas.
+- **Layer controls** can toggle structure, anodes, wiring, and measurement visibility.
+- **Zoom/pan controls** support interactive navigation (`Zoom +`, `Zoom -`, `Fit View`, `Reset Layout`).
+
+Bi-directional synchronization behavior:
+
+- Form values (`number-of-anodes`, `anode-spacing`, `anode-distance-to-structure`, `test-point-count`, `reference-electrode-location`) drive the initial and refreshed canvas geometry.
+- Dragging anodes updates spacing and distance form fields.
+- Dragging the reference electrode updates `reference-electrode-location`.
+
+Persistence behavior:
+
+- Layout state is stored under `studyResults.cathodicProtection.cpLayout` using the existing study storage flow.
+- Saved layouts restore viewport, layer visibility, and marker positions when reopening the CP page.
+
 
 ## QA Tolerances and Acceptance Thresholds
 
@@ -187,6 +209,7 @@ This transition is validated by the end-to-end CP workflow test in `tests/cp/com
 
 ## Revision Notes
 
+- **2026-04-16:** Added CP Layout Canvas panel with draggable structure/anode/measurement objects, layer toggles, zoom/pan controls, bi-directional form syncing, and persisted layout geometry (`studyResults.cathodicProtection.cpLayout`).
 - **2026-04-16:** Added commissioning-plan results section, checklist completion fields in the Study Approval panel (`who/when/evidence`), provisional compliance gating until evidence completion, and persisted report export payloads for JSON/PDF workflows.
 - **2026-04-16:** Added measurement metadata inputs (test method/context/reference location), implemented correction-aware criteria normalization, separated raw vs corrected acceptance outputs, and added metadata sufficiency warnings in results.
 - **2026-04-16:** Added standards profile configuration, machine-readable required-check keys in CP basis mapping, compliance status panel, and persisted compliance history snapshots.

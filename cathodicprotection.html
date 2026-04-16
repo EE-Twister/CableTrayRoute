@@ -99,6 +99,25 @@ Life_years = (W_installed × Q_anode × U × F_design) / (I_req × 8760)</pre>
         <div id="cp-compliance-status-content"></div>
       </section>
 
+      <section id="cp-layout-canvas-panel" class="card cp-layout-panel" aria-labelledby="cp-layout-heading">
+        <h2 id="cp-layout-heading">CP Layout Canvas</h2>
+        <p class="field-hint">Drag anodes, test points, or the reference electrode to adjust spacing/offset assumptions and visualize structure coverage.</p>
+        <div class="cp-layout-toolbar" role="group" aria-label="CP layout layer controls">
+          <label><input type="checkbox" id="cp-layer-structure" checked> Structure</label>
+          <label><input type="checkbox" id="cp-layer-anodes" checked> Anodes</label>
+          <label><input type="checkbox" id="cp-layer-wiring" checked> Wiring</label>
+          <label><input type="checkbox" id="cp-layer-measurement" checked> Measurement points</label>
+        </div>
+        <div class="cp-layout-toolbar" role="group" aria-label="CP layout navigation controls">
+          <button type="button" class="btn" data-cp-layout-action="zoom-in">Zoom +</button>
+          <button type="button" class="btn" data-cp-layout-action="zoom-out">Zoom −</button>
+          <button type="button" class="btn" data-cp-layout-action="fit">Fit View</button>
+          <button type="button" class="btn" data-cp-layout-action="reset">Reset Layout</button>
+        </div>
+        <div id="cp-layout-canvas" class="cp-layout-canvas" aria-live="polite"></div>
+        <p id="cp-layout-status" class="field-hint" aria-live="polite">Layout initialized from form values.</p>
+      </section>
+
       <form id="cp-form" novalidate>
         <fieldset>
           <legend><strong>Asset &amp; Environment Inputs</strong></legend>
