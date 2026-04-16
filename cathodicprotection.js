@@ -53,6 +53,11 @@ const PIPE_MATERIAL_FACTORS = {
 
 let cpLayoutCanvasController = null;
 let cpProfilesController = null;
+let cpComparisonState = {
+  baselineStudy: null,
+  hoveredSegmentIndex: null,
+  zoomScale: 1
+};
 
 function mapAcceptanceTargetToMeasurementSetup(checkKey = '') {
   if (checkKey === 'instantOffPotential') return 'instantOffPotential';
@@ -854,8 +859,130 @@ if (typeof document !== 'undefined') {
 
   resultsDiv?.addEventListener('click', (event) => {
     const trigger = event.target.closest('[data-cp-setup-target]');
-    if (!trigger) return;
-    focusMeasurementVisualization(trigger.dataset.cpSetupTarget);
+    if (trigger) {
+      focusMeasurementVisualization(trigger.dataset.cpSetupTarget);
+      return;
+    }
+    const actionButton = event.target.closest('[data-cp-action]');
+    if (actionButton) {
+      const studies = getStudies();
+      const activeStudy = normalizeSavedStudy(studies.cathodicProtection);
+      if (!activeStudy) {
+        return;
+      }
+      if (actionButton.dataset.cpAction === 'show-compare') {
+        const panel = resultsDiv.querySelector('#cp-compare-panel');
+        if (panel) {
+          panel.hidden = !panel.hidden;
+        }
+        return;
+      }
+      if (actionButton.dataset.cpAction === 'import-compare') {
+        const importInput = resultsDiv.querySelector('#cp-compare-import-input');
+        importInput?.click();
+        return;
+      }
+      if (actionButton.dataset.cpAction === 'promote-baseline') {
+        const baseline = normalizeSavedStudy(activeStudy.comparisonBaseline || cpComparisonState.baselineStudy);
+        if (!baseline) {
+          showModal('Comparison Baseline Missing', '<p>Import a comparison baseline before promoting Configuration B.</p>', 'warning');
+          return;
+        }
+        studies.cathodicProtection = {
+          ...baseline,
+          comparisonBaseline: null
+        };
+        cpComparisonState.baselineStudy = null;
+        setStudies(studies);
+        applySavedCpInputs(studies.cathodicProtection);
+        cpLayoutCanvasController?.syncFromInputs();
+        renderResults(studies.cathodicProtection, resultsDiv);
+        renderComplianceStatusPanel(
+          compliancePanelEl,
+          studies.cathodicProtection.compliance?.requiredChecks,
+          studies.cathodicProtection.compliance?.lastEvaluatedAt,
+          studies.cathodicProtection.compliance
+        );
+      }
+      return;
+    }
+    const zoomButton = event.target.closest('[data-cp-compare-zoom]');
+    if (zoomButton) {
+      if (zoomButton.dataset.cpCompareZoom === 'in') {
+        cpComparisonState.zoomScale = Math.min(2.2, cpComparisonState.zoomScale + 0.15);
+      } else if (zoomButton.dataset.cpCompareZoom === 'out') {
+        cpComparisonState.zoomScale = Math.max(0.75, cpComparisonState.zoomScale - 0.15);
+      } else {
+        cpComparisonState.zoomScale = 1;
+      }
+      const refreshedStudy = normalizeSavedStudy(getStudies().cathodicProtection);
+      if (refreshedStudy?.comparisonBaseline || cpComparisonState.baselineStudy) {
+        renderComparisonCanvases(resultsDiv, refreshedStudy, refreshedStudy.comparisonBaseline || cpComparisonState.baselineStudy);
+      }
+      return;
+    }
+  });
+
+  resultsDiv?.addEventListener('change', async (event) => {
+    const input = event.target.closest('#cp-compare-import-input');
+    if (!input?.files?.length) {
+      return;
+    }
+    try {
+      const file = input.files[0];
+      const rawText = await file.text();
+      const baselineStudy = parseComparisonStudyFromImport(rawText);
+      if (!baselineStudy) {
+        throw new Error('No cathodicProtection study payload found in imported file.');
+      }
+      const studies = getStudies();
+      const activeStudy = normalizeSavedStudy(studies.cathodicProtection);
+      if (!activeStudy) {
+        throw new Error('Run a CP analysis before importing a comparison baseline.');
+      }
+      studies.cathodicProtection = {
+        ...activeStudy,
+        comparisonBaseline: baselineStudy
+      };
+      cpComparisonState.baselineStudy = baselineStudy;
+      setStudies(studies);
+      renderResults(studies.cathodicProtection, resultsDiv);
+      const comparePanel = resultsDiv.querySelector('#cp-compare-panel');
+      if (comparePanel) {
+        comparePanel.hidden = false;
+      }
+    } catch (error) {
+      const message = error instanceof Error ? error.message : 'Unable to import comparison baseline.';
+      showModal('Import Comparison Failed', `<p>${escapeHtml(message)}</p>`, 'error');
+    } finally {
+      input.value = '';
+    }
+  });
+
+  resultsDiv?.addEventListener('mousemove', (event) => {
+    const segmentEl = event.target.closest('[data-cp-compare-segment]');
+    const segmentIndex = segmentEl ? Number.parseInt(segmentEl.dataset.cpCompareSegment || '-1', 10) : null;
+    const normalizedIndex = Number.isInteger(segmentIndex) && segmentIndex >= 0 ? segmentIndex : null;
+    if (normalizedIndex === cpComparisonState.hoveredSegmentIndex) {
+      return;
+    }
+    cpComparisonState.hoveredSegmentIndex = normalizedIndex;
+    const activeStudy = normalizeSavedStudy(getStudies().cathodicProtection);
+    const baseline = activeStudy?.comparisonBaseline || cpComparisonState.baselineStudy;
+    if (activeStudy && baseline) {
+      renderComparisonCanvases(resultsDiv, activeStudy, baseline);
+    }
+  });
+  resultsDiv?.addEventListener('mouseleave', () => {
+    if (cpComparisonState.hoveredSegmentIndex === null) {
+      return;
+    }
+    cpComparisonState.hoveredSegmentIndex = null;
+    const activeStudy = normalizeSavedStudy(getStudies().cathodicProtection);
+    const baseline = activeStudy?.comparisonBaseline || cpComparisonState.baselineStudy;
+    if (activeStudy && baseline) {
+      renderComparisonCanvases(resultsDiv, activeStudy, baseline);
+    }
   });
 
   compliancePanelEl?.addEventListener('click', (event) => {
@@ -1023,11 +1150,24 @@ function renderResults(result, root) {
     : (complianceState === 'provisional'
       ? 'Compliance status: Provisional (commissioning evidence pending)'
       : 'Compliance status: Not compliant');
+  const comparisonBaseline = normalizeSavedStudy(result.comparisonBaseline || cpComparisonState.baselineStudy);
+  cpComparisonState.baselineStudy = comparisonBaseline || null;
+  const hasComparisonBaseline = Boolean(comparisonBaseline);
+  const comparisonMarkup = hasComparisonBaseline
+    ? buildComparisonPanelMarkup(result, comparisonBaseline)
+    : `
+      <div class="result-group">
+        <h3>Compare configurations</h3>
+        <p class="field-hint">Import an older saved CP study to compare Configuration A (active) versus Configuration B (baseline).</p>
+        <button type="button" class="btn" data-cp-action="show-compare">Compare configurations</button>
+      </div>
+    `;
 
   root.innerHTML = `
     <section class="results-panel" aria-labelledby="cp-results-heading">
       <h2 id="cp-results-heading">Cathodic Protection Sizing Results</h2>
       <div class="result-badge ${complianceBadgeClass}">${complianceBadgeText}</div>
+      ${comparisonMarkup}
 
       <div class="result-group">
         <div class="result-row">
@@ -1262,6 +1402,188 @@ function renderResults(result, root) {
       }
     });
   }
+  if (hasComparisonBaseline) {
+    renderComparisonCanvases(root, result, comparisonBaseline);
+  }
+}
+
+function countCriteriaPasses(result) {
+  const rows = Array.isArray(result?.criteriaCheckEvidence?.criteriaResults) ? result.criteriaCheckEvidence.criteriaResults : [];
+  return rows.filter((row) => row?.status === 'pass').length;
+}
+
+function formatDelta(value, unit = '') {
+  if (!Number.isFinite(value)) {
+    return 'n/a';
+  }
+  const sign = value > 0 ? '+' : '';
+  return `${sign}${roundTo(value, 2)}${unit ? ` ${unit}` : ''}`;
+}
+
+function buildComparisonPanelMarkup(activeStudy, baselineStudy) {
+  const activeCriteriaPasses = countCriteriaPasses(activeStudy);
+  const baselineCriteriaPasses = countCriteriaPasses(baselineStudy);
+  const requiredCurrentDelta = activeStudy.requiredCurrentA - baselineStudy.requiredCurrentA;
+  const lifeDelta = activeStudy.predictedLifeYears - baselineStudy.predictedLifeYears;
+  const riskDelta = (activeStudy.interferenceAssessment?.score || 0) - (baselineStudy.interferenceAssessment?.score || 0);
+  const criteriaPassDelta = activeCriteriaPasses - baselineCriteriaPasses;
+  const baselineTime = baselineStudy.timestamp ? new Date(baselineStudy.timestamp).toLocaleString() : 'Unknown';
+
+  return `
+    <div class="result-group cp-compare-group">
+      <h3>Compare configurations</h3>
+      <p class="field-hint">Configuration A = active design result. Configuration B = imported baseline saved on ${escapeHtml(baselineTime)}.</p>
+      <div class="cp-compare-actions">
+        <button type="button" class="btn" data-cp-action="show-compare">Compare configurations</button>
+        <button type="button" class="btn" data-cp-action="import-compare">Import older saved CP study</button>
+        <button type="button" class="btn" data-cp-action="promote-baseline">Promote B to active design</button>
+      </div>
+      <input type="file" id="cp-compare-import-input" class="hidden" accept=".ctr.json,.json,application/json" title="Import comparison baseline">
+      <div id="cp-compare-panel" class="cp-compare-panel" hidden>
+        <div class="cp-delta-card-grid">
+          <article class="cp-delta-card">
+            <h4>Required current Δ</h4>
+            <p>${formatDelta(requiredCurrentDelta, 'A')}</p>
+            <small>A: ${activeStudy.requiredCurrentA} A · B: ${baselineStudy.requiredCurrentA} A</small>
+          </article>
+          <article class="cp-delta-card">
+            <h4>Predicted life Δ</h4>
+            <p>${formatDelta(lifeDelta, 'years')}</p>
+            <small>A: ${activeStudy.predictedLifeYears} y · B: ${baselineStudy.predictedLifeYears} y</small>
+          </article>
+          <article class="cp-delta-card">
+            <h4>Risk score Δ</h4>
+            <p>${formatDelta(riskDelta)}</p>
+            <small>A: ${activeStudy.interferenceAssessment?.score || 0} · B: ${baselineStudy.interferenceAssessment?.score || 0}</small>
+          </article>
+          <article class="cp-delta-card">
+            <h4>Criteria pass count Δ</h4>
+            <p>${formatDelta(criteriaPassDelta)}</p>
+            <small>A: ${activeCriteriaPasses} · B: ${baselineCriteriaPasses}</small>
+          </article>
+        </div>
+        <div class="cp-compare-canvas-toolbar" role="group" aria-label="Comparison canvas zoom controls">
+          <button type="button" class="btn" data-cp-compare-zoom="in">Zoom +</button>
+          <button type="button" class="btn" data-cp-compare-zoom="out">Zoom −</button>
+          <button type="button" class="btn" data-cp-compare-zoom="fit">Fit</button>
+        </div>
+        <div class="cp-compare-canvas-grid">
+          <div>
+            <h4>Configuration A (Active design)</h4>
+            <div class="cp-compare-canvas" id="cp-compare-canvas-a"></div>
+          </div>
+          <div>
+            <h4>Configuration B (Imported baseline)</h4>
+            <div class="cp-compare-canvas" id="cp-compare-canvas-b"></div>
+          </div>
+        </div>
+      </div>
+    </div>
+  `;
+}
+
+function renderComparisonCanvases(root, activeStudy, baselineStudy) {
+  const canvasA = root.querySelector('#cp-compare-canvas-a');
+  const canvasB = root.querySelector('#cp-compare-canvas-b');
+  if (!canvasA || !canvasB) return;
+
+  const activeLayout = resolveLayoutGeometry(activeStudy);
+  const baselineLayout = resolveLayoutGeometry(baselineStudy);
+
+  const renderCanvas = (container, currentLayout, otherLayout, label) => {
+    const zoom = cpComparisonState.zoomScale;
+    const groupTransform = `translate(90 40) scale(${zoom})`;
+    const segmentMarkup = currentLayout.structureSegments.map((segment, index) => {
+      const colorClass = resolveSegmentDiffClass(segment, otherLayout.structureSegments[index]);
+      const hoverClass = cpComparisonState.hoveredSegmentIndex === index ? 'is-hovered' : '';
+      return `
+        <line x1="${segment.x1}" y1="${segment.y1}" x2="${segment.x2}" y2="${segment.y2}" class="cp-layout-structure-line ${colorClass} ${hoverClass}" data-cp-compare-segment="${index}"></line>
+      `;
+    }).join('');
+    const anodeMarkup = currentLayout.anodes.map((anode, index) => {
+      const other = otherLayout.anodes[index];
+      const changed = !other || Math.abs(anode.x - other.x) > 8 || Math.abs(anode.y - other.y) > 8;
+      return `<circle cx="${anode.x}" cy="${anode.y}" r="8" class="cp-layout-anode-node ${changed ? 'cp-compare-diff-node' : ''}"></circle>`;
+    }).join('');
+    const testMarkup = currentLayout.testPoints.map((point, index) => {
+      const other = otherLayout.testPoints[index];
+      const changed = !other || Math.abs(point.x - other.x) > 8 || Math.abs(point.y - other.y) > 8;
+      return `<rect x="${point.x - 6}" y="${point.y - 6}" width="12" height="12" class="cp-layout-test-node ${changed ? 'cp-compare-diff-node' : ''}"></rect>`;
+    }).join('');
+    const refChanged = !otherLayout.referenceElectrode
+      || Math.abs(currentLayout.referenceElectrode.x - otherLayout.referenceElectrode.x) > 8
+      || Math.abs(currentLayout.referenceElectrode.y - otherLayout.referenceElectrode.y) > 8;
+    container.innerHTML = `
+      <svg viewBox="0 0 1200 500" role="img" aria-label="${escapeHtml(label)} comparison canvas">
+        <g transform="${groupTransform}">
+          <rect x="0" y="0" width="980" height="380" class="cp-layout-background"></rect>
+          ${segmentMarkup}
+          ${anodeMarkup}
+          ${testMarkup}
+          <circle cx="${currentLayout.referenceElectrode.x}" cy="${currentLayout.referenceElectrode.y}" r="9" class="cp-layout-reference-node ${refChanged ? 'cp-compare-diff-node' : ''}"></circle>
+        </g>
+      </svg>
+    `;
+  };
+
+  renderCanvas(canvasA, activeLayout, baselineLayout, 'Configuration A');
+  renderCanvas(canvasB, baselineLayout, activeLayout, 'Configuration B');
+}
+
+function resolveSegmentDiffClass(segment, otherSegment) {
+  if (!otherSegment) {
+    return 'cp-compare-diff-segment';
+  }
+  const distanceCurrent = Math.abs(segment.x2 - segment.x1);
+  const distanceOther = Math.abs(otherSegment.x2 - otherSegment.x1);
+  return Math.abs(distanceCurrent - distanceOther) > 16 ? 'cp-compare-diff-segment' : '';
+}
+
+function resolveLayoutGeometry(study) {
+  if (study?.cpLayout?.geometry) {
+    return study.cpLayout.geometry;
+  }
+  const numberOfAnodes = Math.max(1, Math.round(study?.numberOfAnodes || 1));
+  const anodeSpacingM = Math.max(0.1, Number(study?.anodeSpacingM || 1));
+  const anodeDistanceM = Math.max(0.1, Number(study?.anodeDistanceToStructureM || 1));
+  const testPointCount = Math.max(1, Math.round(study?.testPointCount || 1));
+  const structureLengthM = Math.max(60, (numberOfAnodes - 1) * anodeSpacingM + 80);
+  const pxPerMeter = 9.5;
+  const structureStartX = 80;
+  const structureStartY = 210;
+  const structureLengthPx = structureLengthM * pxPerMeter;
+  const segmentLengthPx = structureLengthPx / 4;
+  const structureSegments = Array.from({ length: 4 }, (_, index) => ({
+    x1: structureStartX + segmentLengthPx * index,
+    y1: structureStartY,
+    x2: structureStartX + segmentLengthPx * (index + 1),
+    y2: structureStartY
+  }));
+  const anodes = Array.from({ length: numberOfAnodes }, (_, index) => ({
+    x: structureStartX + 20 + (index * anodeSpacingM * pxPerMeter),
+    y: structureStartY - (anodeDistanceM * pxPerMeter)
+  }));
+  const spacing = testPointCount > 1 ? (structureLengthPx - 40) / (testPointCount - 1) : 0;
+  const testPoints = Array.from({ length: testPointCount }, (_, index) => ({
+    x: structureStartX + 20 + spacing * index,
+    y: structureStartY + 46
+  }));
+  const referenceElectrode = { x: structureStartX + 180, y: structureStartY + 70 };
+  return { structureSegments, anodes, testPoints, referenceElectrode };
+}
+
+function parseComparisonStudyFromImport(rawText) {
+  const parsed = JSON.parse(rawText);
+  if (parsed?.studyResults?.cathodicProtection) {
+    return normalizeSavedStudy(parsed.studyResults.cathodicProtection);
+  }
+  if (parsed?.cathodicProtection) {
+    return normalizeSavedStudy(parsed.cathodicProtection);
+  }
+  if (parsed?.requiredCurrentA && parsed?.predictedLifeYears) {
+    return normalizeSavedStudy(parsed);
+  }
+  return null;
 }
 
 function buildDesignAdvisories(result, sensitivityRows) {
