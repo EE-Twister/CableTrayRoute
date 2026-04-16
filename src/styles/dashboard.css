@@ -77,27 +77,47 @@
   }
 }
 
-/* ---- Shared icon ---- */
-.dash-icon {
+/* ---- Semantic badges ---- */
+.dash-badge {
   display: inline-flex;
   align-items: center;
-  justify-content: center;
-  width: 1.5rem;
-  height: 1.5rem;
-  border-radius: 50%;
-  font-size: 0.8rem;
+  gap: 0.35rem;
+  font-size: 0.75rem;
+  line-height: 1;
   font-weight: 700;
-  flex-shrink: 0;
+  padding: 0.3rem 0.55rem;
+  border: 1px solid transparent;
+  border-radius: 999px;
+  white-space: nowrap;
 }
 
-.dash-icon--complete {
-  background: var(--color-success, #16a34a);
-  color: #fff;
+.dash-badge-icon {
+  font-size: 0.8rem;
 }
 
-.dash-icon--incomplete {
-  background: var(--color-border, #d1d5db);
-  color: var(--color-text-muted, #6b7280);
+.dash-badge--success {
+  background: #dcfce7;
+  color: #14532d;
+  border-color: #86efac;
+}
+
+.dash-badge--warning {
+  background: #fef3c7;
+  color: #7c2d12;
+  border-color: #fbbf24;
+}
+
+.dash-badge--neutral,
+.dash-badge--pending {
+  background: #e5e7eb;
+  color: #111827;
+  border-color: #9ca3af;
+}
+
+.dash-badge--run {
+  background: #dcfce7;
+  color: #14532d;
+  border-color: #86efac;
 }
 
 /* ---- Workflow steps list ---- */
@@ -107,14 +127,15 @@
   padding: 0;
   display: flex;
   flex-direction: column;
-  gap: 0.5rem;
+  gap: 0.625rem;
 }
 
 .dash-step-card {
   display: flex;
-  align-items: center;
+  align-items: flex-start;
+  flex-wrap: wrap;
   gap: 0.75rem;
-  padding: 0.5rem 0.75rem;
+  padding: 0.7rem 0.85rem;
   border-radius: var(--radius, 6px);
   background: var(--color-surface-alt, #f9fafb);
   border: 1px solid var(--color-border, #e5e7eb);
@@ -126,7 +147,8 @@
 
 .dash-step-name {
   font-weight: 600;
-  flex: 1;
+  flex: 1 1 auto;
+  min-width: 11rem;
   text-decoration: none;
   color: var(--color-text, inherit);
 }
@@ -135,7 +157,32 @@
   text-decoration: underline;
 }
 
+.dash-step-status-wrap {
+  margin-left: auto;
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+}
+
+.dash-step-status-pill {
+  align-self: center;
+}
+
+.dash-step-hint-icon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 1.1rem;
+  height: 1.1rem;
+  border-radius: 999px;
+  font-size: 0.72rem;
+  color: var(--color-accent, #2563eb);
+  border: 1px solid currentColor;
+}
+
 .dash-step-label {
+  width: 100%;
+  padding-left: 0.05rem;
   font-size: 0.8rem;
   color: var(--color-text-muted, #6b7280);
 }
@@ -195,14 +242,14 @@
   padding: 0;
   display: flex;
   flex-direction: column;
-  gap: 0.5rem;
+  gap: 0.625rem;
 }
 
 .dash-study-item {
   display: flex;
   align-items: center;
   gap: 0.75rem;
-  padding: 0.4rem 0.75rem;
+  padding: 0.7rem 0.85rem;
   border-radius: var(--radius, 6px);
   background: var(--color-surface-alt, #f9fafb);
   border: 1px solid var(--color-border, #e5e7eb);
@@ -223,8 +270,18 @@
   color: var(--color-text-muted, #6b7280);
 }
 
-.dash-study-item--run .dash-study-status {
-  color: var(--color-success, #16a34a);
+.dash-study-item .dash-badge {
+  margin-left: auto;
+}
+
+.dash-kpi-value:focus-visible,
+.dash-step-name:focus-visible,
+.dash-stat-value:focus-visible,
+.dash-study-name:focus-visible,
+.dash-badge:focus-visible {
+  outline: 2px solid var(--color-accent, #2563eb);
+  outline-offset: 2px;
+  border-radius: 6px;
 }
 
 /* ---- Dark mode overrides ---- */
@@ -263,9 +320,28 @@ body.dark-mode .dash-study-name {
   color: var(--color-text, #e2e8f0);
 }
 
-body.dark-mode .dash-icon--incomplete {
-  background: var(--color-border, #334155);
-  color: var(--color-text-muted, #94a3b8);
+body.dark-mode .dash-badge--success,
+body.dark-mode .dash-badge--run {
+  background: #14532d;
+  color: #dcfce7;
+  border-color: #22c55e;
+}
+
+body.dark-mode .dash-badge--warning {
+  background: #7c2d12;
+  color: #ffedd5;
+  border-color: #f59e0b;
+}
+
+body.dark-mode .dash-badge--neutral,
+body.dark-mode .dash-badge--pending {
+  background: #334155;
+  color: #f8fafc;
+  border-color: #64748b;
+}
+
+body.dark-mode .dash-step-hint-icon {
+  color: #93c5fd;
 }
 
 body.theme-high-contrast .dash-kpi-card {
