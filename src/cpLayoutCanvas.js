@@ -26,6 +26,9 @@ const HEATMAP_PALETTE = [
   { stop: 0.72, color: '#e69f00' },
   { stop: 1, color: '#d55e00' }
 ];
+const GRID_MINOR_SPACING = 55;
+const GRID_MAJOR_SPACING = 110;
+const PX_PER_METER = 11;
 
 const MEASUREMENT_SETUPS = [
   {
@@ -192,7 +195,7 @@ export function initCpLayoutCanvas({
   };
 
   function getInput(id) {
-    return form.querySelector(`#${id}`);
+    return form.querySelector(`#${id}`) || document.getElementById(id);
   }
 
   function getInputValues() {
@@ -212,7 +215,7 @@ export function initCpLayoutCanvas({
 
   function buildGeometryFromInputs() {
     const values = getInputValues();
-    const pxPerMeter = 11;
+    const pxPerMeter = PX_PER_METER;
     const unitFactor = metersPerInputUnit(values.isMetric);
     const structureLengthM = Math.max(60, (values.numberOfAnodes - 1) * values.anodeSpacing * unitFactor + 80);
     const structureStartX = 110;
@@ -436,12 +439,28 @@ export function initCpLayoutCanvas({
     const potentialRisk = clamp01((potentialMv + 900) / 110);
     const interferenceRisk = clamp01(interferenceScore / 20);
     const safetyRisk = lowSafetyMargin ? clamp01((15 - Math.max(safetyMarginPercent, -25)) / 40) : 0;
+    const segment = state.geometry.structureSegments[index];
+    const segmentMid = segment
+      ? { x: (segment.x1 + segment.x2) / 2, y: (segment.y1 + segment.y2) / 2 }
+      : null;
+    const nearestAnodeDistance = segmentMid && state.geometry.anodes.length
+      ? state.geometry.anodes.reduce((minDistance, anode) => {
+        const dx = anode.x - segmentMid.x;
+        const dy = anode.y - segmentMid.y;
+        const distance = Math.sqrt((dx ** 2) + (dy ** 2));
+        return Math.min(minDistance, distance);
+      }, Number.POSITIVE_INFINITY)
+      : 0;
+    const geometricCoverageRisk = nearestAnodeDistance
+      ? clamp01((nearestAnodeDistance - 120) / 260)
+      : 0;
 
     const rawSeverity = (demandRisk * 0.3)
       + (attenuationRisk * 0.26)
       + (potentialRisk * 0.2)
       + (interferenceRisk * 0.16)
       + (safetyRisk * 0.08)
+      + (geometricCoverageRisk * 0.12)
       + (failedCriteria ? 0.08 : 0);
     const severityScore = clamp01(rawSeverity);
     const severityBand = severityScore >= HEATMAP_THRESHOLDS.high
@@ -519,6 +538,27 @@ export function initCpLayoutCanvas({
     const selectedSegmentAssessment = Number.isInteger(state.selectedHotspotIndex)
       ? buildSegmentAssessment(state.selectedHotspotIndex)
       : null;
+    const values = getInputValues();
+    const displayDistanceUnit = values.isMetric ? 'm' : 'ft';
+    const distanceScale = values.isMetric ? 1 : (1 / 0.3048);
+    const gridMinorLines = [];
+    const gridMajorLines = [];
+    for (let xPos = 0; xPos <= DEFAULT_VIEW.width; xPos += GRID_MINOR_SPACING) {
+      gridMinorLines.push(`<line x1="${xPos}" y1="0" x2="${xPos}" y2="${DEFAULT_VIEW.height}" class="cp-layout-grid-minor"></line>`);
+    }
+    for (let yPos = 0; yPos <= DEFAULT_VIEW.height; yPos += GRID_MINOR_SPACING) {
+      gridMinorLines.push(`<line x1="0" y1="${yPos}" x2="${DEFAULT_VIEW.width}" y2="${yPos}" class="cp-layout-grid-minor"></line>`);
+    }
+    for (let xPos = 0; xPos <= DEFAULT_VIEW.width; xPos += GRID_MAJOR_SPACING) {
+      const labelValue = roundTo((xPos / PX_PER_METER) * distanceScale, 0);
+      gridMajorLines.push(`<line x1="${xPos}" y1="0" x2="${xPos}" y2="${DEFAULT_VIEW.height}" class="cp-layout-grid-major"></line>`);
+      if (xPos > 0) {
+        gridMajorLines.push(`<text x="${xPos + 4}" y="18" class="cp-layout-grid-label">${labelValue} ${displayDistanceUnit}</text>`);
+      }
+    }
+    for (let yPos = 0; yPos <= DEFAULT_VIEW.height; yPos += GRID_MAJOR_SPACING) {
+      gridMajorLines.push(`<line x1="0" y1="${yPos}" x2="${DEFAULT_VIEW.width}" y2="${yPos}" class="cp-layout-grid-major"></line>`);
+    }
     const heatmapMarkup = state.heatmapEnabled
       ? structureSegments.map((segment, index) => {
         const segmentAssessment = buildSegmentAssessment(index);
@@ -583,9 +623,12 @@ export function initCpLayoutCanvas({
     `).join('');
 
     const firstTwoAnodes = anodes.length >= 2 ? { a: anodes[0], b: anodes[1] } : null;
+    const spacingValue = firstTwoAnodes
+      ? roundTo((Math.abs(firstTwoAnodes.b.x - firstTwoAnodes.a.x) / PX_PER_METER) * distanceScale, 2)
+      : null;
     const spacingMarkup = firstTwoAnodes ? `
       <line x1="${firstTwoAnodes.a.x}" y1="${firstTwoAnodes.a.y - 24}" x2="${firstTwoAnodes.b.x}" y2="${firstTwoAnodes.b.y - 24}" class="cp-layout-dimension"></line>
-      <text x="${(firstTwoAnodes.a.x + firstTwoAnodes.b.x) / 2}" y="${firstTwoAnodes.a.y - 34}" text-anchor="middle" class="cp-layout-dimension-label">Anode spacing</text>
+      <text x="${(firstTwoAnodes.a.x + firstTwoAnodes.b.x) / 2}" y="${firstTwoAnodes.a.y - 34}" text-anchor="middle" class="cp-layout-dimension-label">Anode spacing ≈ ${spacingValue} ${displayDistanceUnit}</text>
     ` : '';
 
     const activeSetup = MEASUREMENT_SETUPS.find((setup) => setup.key === state.activeMeasurementSetup) || MEASUREMENT_SETUPS[0];
@@ -604,6 +647,8 @@ export function initCpLayoutCanvas({
       <svg viewBox="0 0 ${DEFAULT_VIEW.width} ${DEFAULT_VIEW.height}" aria-label="Cathodic protection layout canvas" role="img">
         <g transform="translate(${x} ${y}) scale(${scale})">
           <rect x="0" y="0" width="${DEFAULT_VIEW.width}" height="${DEFAULT_VIEW.height}" class="cp-layout-background"></rect>
+          ${gridMinorLines.join('')}
+          ${gridMajorLines.join('')}
           ${heatmapMarkup}
           <g ${structureVisible}>${segmentMarkup}</g>
           <g ${wiringVisible}>${wiringMarkup}${spacingMarkup}</g>
@@ -694,6 +739,7 @@ export function initCpLayoutCanvas({
       const nextY = clamp(dragState.originY + dy, 70, DEFAULT_VIEW.height - 40);
       state.geometry.anodes[dragState.itemIndex].x = nextX;
       state.geometry.anodes[dragState.itemIndex].y = nextY;
+      syncInputsFromGeometry();
       render();
       announce('Anode marker moved.');
     }
@@ -709,6 +755,7 @@ export function initCpLayoutCanvas({
       const nextX = clamp(dragState.originX + dx, 40, DEFAULT_VIEW.width - 40);
       const nextY = clamp(dragState.originY + dy, 40, DEFAULT_VIEW.height - 40);
       state.geometry.referenceElectrode = { x: nextX, y: nextY };
+      syncInputsFromGeometry();
       render();
       announce('Reference electrode marker moved.');
     }
