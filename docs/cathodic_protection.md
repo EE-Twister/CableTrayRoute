@@ -149,6 +149,42 @@ Study output now stores `studyResults.cathodicProtection.reportExport` with:
 - `verificationPlan` payload (commissioning tests, monitoring intervals, thresholds, completion state)
 - `payloads.json` and `payloads.pdf` section metadata for downstream exporters.
 
+
+## QA Tolerances and Acceptance Thresholds
+
+To keep QA and engineering evaluations consistent, CP automated checks use the following deterministic tolerances and acceptance thresholds:
+
+### Numeric tolerances (fixture regression)
+
+- Design current density: ±0.001 mA/m²
+- Required current: ±0.0001 A
+- Minimum anode mass: ±0.001 kg
+- Predicted life: ±0.01 years
+- Distribution attenuation/effectiveness factors: ±0.001
+
+These tolerances are validated using deterministic fixtures under `tests/cp/fixtures/`:
+
+- `baseline-sizing.fixture.json`
+- `high-resistivity-soil.fixture.json`
+- `high-interference-risk.fixture.json`
+- `geometry-attenuation-edge.fixture.json`
+
+### Criteria acceptance thresholds
+
+- Corrected instant-off potential passes when `≤ -850 mV (CSE)`.
+- Corrected polarization shift passes when `≥ 100 mV`.
+- Test-point coverage passes only when `passingTestPointCount === testPointCount`.
+
+### Compliance matrix transition expectations
+
+The CP workflow compliance matrix should transition as follows:
+
+1. **Before analysis**: all required checks are `not-run`.
+2. **Passing study run**: all required checks become `pass`.
+3. **Failing study run**: one or more required checks become `fail` while independent checks can remain `pass`.
+
+This transition is validated by the end-to-end CP workflow test in `tests/cp/complianceWorkflow.e2e.test.mjs`.
+
 ## Revision Notes
 
 - **2026-04-16:** Added commissioning-plan results section, checklist completion fields in the Study Approval panel (`who/when/evidence`), provisional compliance gating until evidence completion, and persisted report export payloads for JSON/PDF workflows.
