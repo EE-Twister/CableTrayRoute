@@ -339,11 +339,18 @@ export function initCpLayoutCanvas({
   function worldFromClient(clientX, clientY) {
     const bounds = getViewBounds(state.geometry);
     const rect = canvas.getBoundingClientRect();
-    const localX = ((clientX - rect.left) / rect.width) * bounds.width;
-    const localY = ((clientY - rect.top) / rect.height) * bounds.height;
+    const safeWidth = Math.max(rect.width, 1);
+    const safeHeight = Math.max(rect.height, 1);
+    const scaleToFit = Math.min(safeWidth / bounds.width, safeHeight / bounds.height);
+    const renderedWidth = Math.max(1, bounds.width * scaleToFit);
+    const renderedHeight = Math.max(1, bounds.height * scaleToFit);
+    const offsetX = (safeWidth - renderedWidth) / 2;
+    const offsetY = (safeHeight - renderedHeight) / 2;
+    const localX = ((clientX - rect.left - offsetX) / renderedWidth) * bounds.width;
+    const localY = ((clientY - rect.top - offsetY) / renderedHeight) * bounds.height;
     return {
-      x: (localX - state.viewport.x) / state.viewport.scale,
-      y: (localY - state.viewport.y) / state.viewport.scale
+      x: (clamp(localX, 0, bounds.width) - state.viewport.x) / state.viewport.scale,
+      y: (clamp(localY, 0, bounds.height) - state.viewport.y) / state.viewport.scale
     };
   }
 
@@ -737,7 +744,7 @@ export function initCpLayoutCanvas({
     ` : '';
 
     canvas.innerHTML = `
-      <svg viewBox="0 0 ${bounds.width} ${bounds.height}" preserveAspectRatio="none" aria-label="Cathodic protection layout canvas" role="img">
+      <svg viewBox="0 0 ${bounds.width} ${bounds.height}" preserveAspectRatio="xMidYMid meet" aria-label="Cathodic protection layout canvas" role="img">
         <g transform="translate(${x} ${y}) scale(${scale})">
           <rect x="0" y="0" width="${bounds.width}" height="${bounds.height}" class="cp-layout-background"></rect>
           ${gridMinorLines.join('')}
@@ -827,8 +834,14 @@ export function initCpLayoutCanvas({
 
     if (dragState.mode === 'pan') {
       const bounds = getViewBounds(state.geometry);
-      const dx = ((event.clientX - dragState.startX) / canvas.clientWidth) * bounds.width;
-      const dy = ((event.clientY - dragState.startY) / canvas.clientHeight) * bounds.height;
+      const rect = canvas.getBoundingClientRect();
+      const safeWidth = Math.max(rect.width, 1);
+      const safeHeight = Math.max(rect.height, 1);
+      const scaleToFit = Math.min(safeWidth / bounds.width, safeHeight / bounds.height);
+      const renderedWidth = Math.max(1, bounds.width * scaleToFit);
+      const renderedHeight = Math.max(1, bounds.height * scaleToFit);
+      const dx = ((event.clientX - dragState.startX) / renderedWidth) * bounds.width;
+      const dy = ((event.clientY - dragState.startY) / renderedHeight) * bounds.height;
       state.viewport.x = dragState.originX + dx;
       state.viewport.y = dragState.originY + dy;
       clampViewportToBounds();
@@ -1062,7 +1075,10 @@ export function initCpLayoutCanvas({
   canvas.addEventListener('pointerup', onPointerUp);
   canvas.addEventListener('pointercancel', onPointerUp);
   canvas.addEventListener('mousemove', onCanvasHover);
-  canvas.addEventListener('dblclick', (event) => {
+  canvas.addEventListener('click', (event) => {
+    if (event.detail < 2) {
+      return;
+    }
     if (!selectElementFromTarget(event.target)) {
       return;
     }
