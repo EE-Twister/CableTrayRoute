@@ -282,6 +282,53 @@ Life_years = (W_installed × Q_anode × U × F_design) / (I_req × 8760)</pre>
           </div>
         </fieldset>
 
+        <fieldset>
+          <legend><strong>Interference Assessment</strong></legend>
+          <div class="field-row">
+            <label for="nearby-foreign-structures">Nearby foreign structures</label>
+            <select id="nearby-foreign-structures" required>
+              <option value="none" selected>None identified</option>
+              <option value="isolated">Isolated crossings / adjacent assets</option>
+              <option value="multiple">Multiple nearby structures</option>
+              <option value="sharedCorridor">Shared corridor / parallel alignment</option>
+            </select>
+          </div>
+          <div class="field-row">
+            <label for="dc-traction-system">DC traction systems</label>
+            <select id="dc-traction-system" required>
+              <option value="none" selected>No known DC traction</option>
+              <option value="regional">Regional traction network</option>
+              <option value="nearby">Nearby traction substation/line</option>
+              <option value="parallelReturn">Parallel return path proximity</option>
+            </select>
+          </div>
+          <div class="field-row">
+            <label for="known-interference-sources">Known interference sources</label>
+            <select id="known-interference-sources" required>
+              <option value="none" selected>No known stray-current issues</option>
+              <option value="possible">Possible historical interference</option>
+              <option value="confirmed">Confirmed interference sources</option>
+              <option value="severe">Severe/active interference records</option>
+            </select>
+          </div>
+          <div class="field-row">
+            <label for="mitigation-profile">Mitigation profile</label>
+            <select id="mitigation-profile" required>
+              <option value="baseline" selected>Baseline</option>
+              <option value="enhanced">Enhanced</option>
+              <option value="critical">Critical</option>
+            </select>
+          </div>
+          <div class="field-row">
+            <label for="mitigation-actions">Mitigation actions (comma/newline separated)</label>
+            <textarea id="mitigation-actions" rows="3" placeholder="e.g., baseline survey, test station checks, bonding review"></textarea>
+          </div>
+          <div class="field-row">
+            <label for="verification-test-date">Verification test date</label>
+            <input type="date" id="verification-test-date">
+          </div>
+        </fieldset>
+
         <button type="submit" class="primary-btn">Run Analysis</button>
       </form>
 

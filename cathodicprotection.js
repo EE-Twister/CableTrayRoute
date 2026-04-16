@@ -8,6 +8,7 @@ import {
 } from './src/studies/cp/standardsProfile.js';
 import { computeDistributionBySegment, parseZoneResistivityValues } from './src/studies/cp/distributionModel.js';
 import { evaluateCriteriaChecks } from './src/studies/cp/criteriaChecks.js';
+import { evaluateInterferenceAssessment, parseMitigationActions } from './src/studies/cp/interferenceAssessment.js';
 
 const SQFT_TO_SQM = 0.09290304;
 const LB_TO_KG = 0.45359237;
@@ -74,6 +75,13 @@ export const CP_STANDARD_BASIS = {
       'Design factor is selected as a reliability margin for uncertainty and lifecycle variability.',
       'Temperature correction is not explicitly modeled in this tool and should be applied by engineering review when needed.'
     ]
+  },
+  interferenceAssessment: {
+    id: 'interference-assessment',
+    label: 'Interference risk assessment and mitigation profile',
+    standards: ['AMPP SP21424', 'NACE SP0169'],
+    requiredChecks: ['interferenceAssessment'],
+    summary: 'Scored risk screening for foreign structures, DC traction systems, and known stray-current sources with profile-specific mitigations.'
   }
 };
 
@@ -131,6 +139,7 @@ export function runCathodicProtectionAnalysis(input) {
     adjustedRequiredCurrentA
   );
   const criteriaCheckEvidence = evaluateCriteriaChecks(input, CP_STANDARDS_PROFILE);
+  const interferenceAssessment = evaluateInterferenceAssessment(input);
 
   return {
     ...input,
@@ -154,6 +163,7 @@ export function runCathodicProtectionAnalysis(input) {
     safetyMarginYears: roundTo(predictedLifeYears - input.targetLifeYears, 2),
     safetyMarginPercent: roundTo(((predictedLifeYears - input.targetLifeYears) / input.targetLifeYears) * 100, 1),
     criteriaCheckEvidence,
+    interferenceAssessment,
     sensitivity: buildSensitivitySummary({
       input,
       adjustedRequiredCurrentA,
@@ -270,6 +280,22 @@ function validateInputs(input) {
 
   if (!Number.isInteger(input.passingTestPointCount) || input.passingTestPointCount < 0 || input.passingTestPointCount > input.testPointCount) {
     errors.push('passingTestPointCount must be an integer between 0 and testPointCount.');
+  }
+
+  if (!['none', 'isolated', 'multiple', 'sharedCorridor'].includes(input.nearbyForeignStructures)) {
+    errors.push('nearbyForeignStructures must be a supported risk value.');
+  }
+
+  if (!['none', 'regional', 'nearby', 'parallelReturn'].includes(input.dcTractionSystem)) {
+    errors.push('dcTractionSystem must be a supported risk value.');
+  }
+
+  if (!['none', 'possible', 'confirmed', 'severe'].includes(input.knownInterferenceSources)) {
+    errors.push('knownInterferenceSources must be a supported risk value.');
+  }
+
+  if (!['baseline', 'enhanced', 'critical'].includes(input.mitigationProfile)) {
+    errors.push('mitigationProfile must be baseline, enhanced, or critical.');
   }
 
   return errors;
@@ -522,6 +548,7 @@ function readFormInputs() {
   const anodeBurialDepthInput = getNumber('anode-burial-depth');
   const zoneResistivityRaw = getValue('zone-resistivity-values');
   const parsedZoneResistivityValues = parseZoneResistivityValues(zoneResistivityRaw);
+  const mitigationActions = parseMitigationActions(getValue('mitigation-actions'));
   const zoneResistivityTokens = String(zoneResistivityRaw ?? '')
     .split(',')
     .map((token) => token.trim())
@@ -558,6 +585,13 @@ function readFormInputs() {
     simulatedPolarizationShiftMv: getNumber('simulated-polarization-shift'),
     testPointCount: Math.round(getNumber('test-point-count')),
     passingTestPointCount: Math.round(getNumber('test-point-pass-count')),
+    nearbyForeignStructures: getValue('nearby-foreign-structures'),
+    dcTractionSystem: getValue('dc-traction-system'),
+    knownInterferenceSources: getValue('known-interference-sources'),
+    mitigationProfile: getValue('mitigation-profile'),
+    mitigationActions,
+    mitigationActionsText: getValue('mitigation-actions'),
+    verificationTestDate: getValue('verification-test-date'),
     units: isMetric ? 'metric' : 'imperial'
   };
 }
@@ -571,6 +605,12 @@ function renderResults(result, root) {
   const criteriaEvidence = result.criteriaCheckEvidence || {};
   const criteriaSet = criteriaEvidence.selectedCriteriaSet;
   const criteriaRows = Array.isArray(criteriaEvidence.criteriaResults) ? criteriaEvidence.criteriaResults : [];
+  const interference = result.interferenceAssessment || {};
+  const riskFactorRows = Array.isArray(interference.riskFactorScores) ? interference.riskFactorScores : [];
+  const riskBadgeClass = interference.riskLevel === 'high'
+    ? 'result-badge--fail'
+    : (interference.riskLevel === 'medium' ? 'result-badge--not-run' : 'result-badge--pass');
+  const unresolvedHighRisk = interference.unresolvedHighRisk === true;
   const criteriaStatusLabel = criteriaEvidence.overallStatus === 'pass'
     ? 'Pass'
     : (criteriaEvidence.overallStatus === 'fail' ? 'Fail' : 'Not run');
@@ -637,6 +677,8 @@ function renderResults(result, root) {
             <tr><td>Measured instant-off potential</td><td>${result.measuredInstantOffPotentialMv} mV</td></tr>
             <tr><td>Simulated polarization shift</td><td>${result.simulatedPolarizationShiftMv} mV</td></tr>
             <tr><td>Test points passing</td><td>${result.passingTestPointCount} / ${result.testPointCount}</td></tr>
+            <tr><td>Interference mitigation actions</td><td>${escapeHtml(result.mitigationActionsText || 'Not provided')}</td></tr>
+            <tr><td>Verification test date</td><td>${escapeHtml(result.verificationTestDate || 'Not scheduled')}</td></tr>
           </tbody>
         </table>
       </div>
@@ -661,6 +703,35 @@ function renderResults(result, root) {
             </tbody>
           </table>
         </div>
+      </div>
+
+      <div class="result-group" aria-label="Interference assessment results">
+        <h3>Interference Assessment</h3>
+        <div class="result-badge ${riskBadgeClass}">
+          ${escapeHtml(String(interference.riskLevel || 'low').toUpperCase())} risk (score: ${Number.isFinite(interference.score) ? interference.score : 0})
+        </div>
+        <p class="field-hint">Mitigation profile: ${escapeHtml(interference.profile?.label || 'Baseline mitigation profile')}</p>
+        <p class="field-hint">Verification test date: ${escapeHtml(interference.verificationTestDate || 'Not scheduled')}</p>
+        ${unresolvedHighRisk ? '<p class="field-hint"><strong>High-risk case remains unresolved and blocks compliant status until missing mitigations and verification are completed.</strong></p>' : ''}
+        <div class="table-wrap">
+          <table class="data-table" aria-label="Interference risk factors">
+            <thead><tr><th>Factor</th><th>Input</th><th>Score</th></tr></thead>
+            <tbody>
+              ${riskFactorRows.map((factor) => `
+                <tr>
+                  <td>${escapeHtml(factor.label)}</td>
+                  <td>${escapeHtml(factor.value)}</td>
+                  <td>${escapeHtml(String(factor.score))}</td>
+                </tr>
+              `).join('')}
+            </tbody>
+          </table>
+        </div>
+        <p class="field-hint">Required mitigations: ${escapeHtml((interference.requiredMitigations || []).join(', ') || 'None')}</p>
+        <p class="field-hint">Implemented mitigations: ${escapeHtml((interference.mitigationActions || []).join(', ') || 'None')}</p>
+        ${(interference.missingMitigations || []).length
+          ? `<p class="field-hint">Missing mitigations: ${escapeHtml(interference.missingMitigations.join(', '))}</p>`
+          : '<p class="field-hint">No missing mitigations for selected profile.</p>'}
       </div>
 
       ${sensitivityRows.length ? `
@@ -774,7 +845,8 @@ function renderCalculationBasis(root, basis) {
     basis.currentDensitySelection,
     basis.polarizationCriteria,
     basis.anodeCapacityUtilization,
-    basis.engineeringJudgmentAssumptions
+    basis.engineeringJudgmentAssumptions,
+    basis.interferenceAssessment
   ].filter(Boolean);
 
   root.innerHTML = `
@@ -817,8 +889,12 @@ function renderComplianceStatusPanel(root, requiredChecks = {}, lastEvaluatedAt 
     fail: 'Fail',
     'not-run': 'Not run'
   };
+  const overallCompliant = rows.every((row) => row.status === 'pass');
+  const overallBadgeClass = overallCompliant ? 'result-badge--pass' : 'result-badge--fail';
+  const overallBadgeText = overallCompliant ? 'Compliant' : 'Not compliant';
 
   root.innerHTML = `
+    <div class="result-badge ${overallBadgeClass}">${overallBadgeText}</div>
     <div class="table-wrap">
       <table class="data-table" aria-label="Cathodic protection required compliance checks">
         <thead><tr><th>Required check</th><th>Status</th></tr></thead>
