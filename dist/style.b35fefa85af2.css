@@ -121,6 +121,17 @@
   gap: .25rem;
   font-size: .88rem;
 }
+.cp-layout-toolbar--filters {
+  border: 1px solid var(--border-color, #7d8790);
+  border-radius: 10px;
+  padding: .4rem .55rem;
+  background: color-mix(in srgb, var(--panel-bg, #f8fafc) 94%, #eef4ff 6%);
+}
+.cp-toolbar-label {
+  font-size: .82rem;
+  font-weight: 700;
+  letter-spacing: .01em;
+}
 .cp-layout-canvas {
   border: 1px solid var(--border-color, #7d8790);
   border-radius: 10px;
@@ -281,6 +292,92 @@
   fill: color-mix(in srgb, var(--text-color, #1f2b3a) 85%, #ffffff);
   font-size: 12px;
   font-weight: 600;
+}
+.cp-layout-heat-zone {
+  stroke-linecap: round;
+  opacity: .78;
+}
+.cp-layout-heat-zone.is-filtered {
+  opacity: .14;
+}
+.cp-layout-heat-zone.is-selected {
+  stroke-width: 28;
+  opacity: .95;
+}
+.cp-layout-heat-contour {
+  fill: none;
+  stroke: color-mix(in srgb, var(--text-color, #1f2b3a) 76%, #020617);
+  stroke-linecap: round;
+}
+.cp-layout-heat-contour--medium {
+  stroke-width: 2.4;
+  stroke-dasharray: 7 6;
+}
+.cp-layout-heat-contour--high {
+  stroke-width: 3;
+  stroke-dasharray: 2 5;
+}
+.cp-layout-hotspot {
+  cursor: pointer;
+}
+.cp-layout-hotspot-marker {
+  fill: #ffffff;
+  stroke: color-mix(in srgb, #1f2937 80%, #ffffff);
+  stroke-width: 1.6;
+}
+.cp-layout-hotspot.is-selected .cp-layout-hotspot-marker {
+  fill: color-mix(in srgb, #e6f4ff 65%, #ffffff);
+  stroke-width: 2.2;
+}
+.cp-layout-hotspot-text {
+  fill: #111827;
+  font-size: 11px;
+  font-weight: 700;
+}
+.cp-heatmap-legend,
+.cp-hotspot-inspector {
+  border: 1px solid var(--border-color, #7d8790);
+  border-radius: 10px;
+  padding: .55rem .75rem;
+  background: color-mix(in srgb, var(--panel-bg, #f8fafc) 95%, #f0f7ff 5%);
+}
+.cp-heatmap-legend h3,
+.cp-hotspot-inspector h3 {
+  margin: 0 0 .35rem;
+  font-size: .98rem;
+}
+.cp-heatmap-scale {
+  height: 18px;
+  border-radius: 999px;
+  border: 1px solid color-mix(in srgb, var(--border-color, #7d8790) 85%, #111827);
+  background: linear-gradient(90deg, #0072b2 0%, #56b4e9 45%, #e69f00 72%, #d55e00 100%);
+}
+.cp-heatmap-contours {
+  list-style: none;
+  margin: .5rem 0 .25rem;
+  padding: 0;
+  display: grid;
+  gap: .3rem;
+}
+.cp-heatmap-contours li {
+  display: inline-flex;
+  align-items: center;
+  gap: .45rem;
+  font-size: .84rem;
+}
+.cp-heatmap-contour {
+  width: 30px;
+  border-top: 3px solid #1f2937;
+}
+.cp-heatmap-contour--medium {
+  border-top-style: dashed;
+}
+.cp-heatmap-contour--high {
+  border-top-style: dotted;
+}
+.cp-hotspot-inspector ul {
+  margin: .35rem 0 0;
+  padding-left: 1rem;
 }
 .cp-profile-header {
   display: flex;

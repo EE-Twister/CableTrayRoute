@@ -15,6 +15,18 @@ const VIEW_MODES = {
   measurement: 'measurement'
 };
 
+const HEATMAP_THRESHOLDS = {
+  medium: 0.4,
+  high: 0.7
+};
+
+const HEATMAP_PALETTE = [
+  { stop: 0, color: '#0072b2' },
+  { stop: 0.45, color: '#56b4e9' },
+  { stop: 0.72, color: '#e69f00' },
+  { stop: 1, color: '#d55e00' }
+];
+
 const MEASUREMENT_SETUPS = [
   {
     key: 'instantOffPotential',
@@ -52,6 +64,50 @@ function clonePoints(points = []) {
   return points.map((point) => ({ ...point }));
 }
 
+function clamp01(value) {
+  return clamp(value, 0, 1);
+}
+
+function roundTo(value, decimals = 2) {
+  const p = 10 ** decimals;
+  return Math.round((Number(value) || 0) * p) / p;
+}
+
+function hexToRgb(color) {
+  const safeColor = String(color || '').replace('#', '');
+  const full = safeColor.length === 3
+    ? safeColor.split('').map((char) => `${char}${char}`).join('')
+    : safeColor.padStart(6, '0').slice(0, 6);
+  const num = Number.parseInt(full, 16);
+  return {
+    r: (num >> 16) & 255,
+    g: (num >> 8) & 255,
+    b: num & 255
+  };
+}
+
+function interpolateColor(colorA, colorB, amount) {
+  const a = hexToRgb(colorA);
+  const b = hexToRgb(colorB);
+  const t = clamp01(amount);
+  const toHex = (value) => Math.round(value).toString(16).padStart(2, '0');
+  return `#${toHex(a.r + (b.r - a.r) * t)}${toHex(a.g + (b.g - a.g) * t)}${toHex(a.b + (b.b - a.b) * t)}`;
+}
+
+function getHeatColor(score) {
+  const normalized = clamp01(score);
+  for (let i = 1; i < HEATMAP_PALETTE.length; i += 1) {
+    const current = HEATMAP_PALETTE[i];
+    const previous = HEATMAP_PALETTE[i - 1];
+    if (normalized <= current.stop) {
+      const localRange = Math.max(0.0001, current.stop - previous.stop);
+      const t = (normalized - previous.stop) / localRange;
+      return interpolateColor(previous.color, current.color, t);
+    }
+  }
+  return HEATMAP_PALETTE[HEATMAP_PALETTE.length - 1].color;
+}
+
 export function initCpLayoutCanvas({
   panelId = 'cp-layout-canvas-panel',
   formId = 'cp-form',
@@ -74,12 +130,20 @@ export function initCpLayoutCanvas({
   const modeButtons = Array.from(panel.querySelectorAll('[data-cp-mode]'));
   const measurementPanel = panel.querySelector('#cp-measurement-side-panel');
   const measurementStateList = panel.querySelector('#cp-measurement-state-list');
+  const hotspotInspector = panel.querySelector('#cp-hotspot-inspector');
 
   const layerToggles = {
     [LAYERS.structure]: panel.querySelector('#cp-layer-structure'),
     [LAYERS.anodes]: panel.querySelector('#cp-layer-anodes'),
     [LAYERS.wiring]: panel.querySelector('#cp-layer-wiring'),
-    [LAYERS.measurement]: panel.querySelector('#cp-layer-measurement')
+    [LAYERS.measurement]: panel.querySelector('#cp-layer-measurement'),
+    heatmap: panel.querySelector('#cp-layer-heatmap')
+  };
+
+  const heatmapFilters = {
+    highRiskOnly: panel.querySelector('#cp-heat-filter-high-risk'),
+    failedCriteriaOnly: panel.querySelector('#cp-heat-filter-failed-criteria'),
+    lowMarginOnly: panel.querySelector('#cp-heat-filter-low-margin')
   };
 
   const state = {
@@ -104,7 +168,15 @@ export function initCpLayoutCanvas({
     activeMeasurementSetup: MEASUREMENT_SETUPS[0].key,
     animationTick: 0,
     hoveredSegmentIndex: null,
-    externalHoveredSegmentIndex: null
+    externalHoveredSegmentIndex: null,
+    heatmapEnabled: true,
+    heatmapFilters: {
+      highRiskOnly: false,
+      failedCriteriaOnly: false,
+      lowMarginOnly: false
+    },
+    assessmentData: null,
+    selectedHotspotIndex: null
   };
 
   let animationFrameId = null;
@@ -196,6 +268,15 @@ export function initCpLayoutCanvas({
       ...state.layers,
       ...(layout.layers || {})
     };
+    if (typeof layout.heatmapEnabled === 'boolean') {
+      state.heatmapEnabled = layout.heatmapEnabled;
+    }
+    if (layout.heatmapFilters && typeof layout.heatmapFilters === 'object') {
+      state.heatmapFilters = {
+        ...state.heatmapFilters,
+        ...layout.heatmapFilters
+      };
+    }
     if (layout.viewMode) {
       state.viewMode = layout.viewMode;
     }
@@ -275,6 +356,8 @@ export function initCpLayoutCanvas({
     return {
       viewport: { ...state.viewport },
       layers: { ...state.layers },
+      heatmapEnabled: state.heatmapEnabled,
+      heatmapFilters: { ...state.heatmapFilters },
       viewMode: state.viewMode,
       activeMeasurementSetup: state.activeMeasurementSetup,
       geometry: {
@@ -321,6 +404,106 @@ export function initCpLayoutCanvas({
     `).join('');
   }
 
+  function buildSegmentAssessment(index) {
+    const assessment = state.assessmentData || {};
+    const profileData = assessment.profileData || {};
+    const conservativeScenario = profileData?.scenarios?.conservative || {};
+    const conservativeDemand = Array.isArray(conservativeScenario.currentDemand) ? conservativeScenario.currentDemand : [];
+    const conservativePotential = Array.isArray(conservativeScenario.potential) ? conservativeScenario.potential : [];
+    const attenuationRows = Array.isArray(profileData.attenuation) ? profileData.attenuation : [];
+    const thresholdBands = profileData.thresholdBands || {};
+    const distributionSegments = Array.isArray(assessment.distributionModel?.segments) ? assessment.distributionModel.segments : [];
+    const interferenceScore = toNumber(assessment.interferenceAssessment?.score, 0);
+    const safetyMarginPercent = toNumber(assessment.safetyMarginPercent, 0);
+    const safetyMarginYears = toNumber(assessment.safetyMarginYears, 0);
+    const lowSafetyMargin = safetyMarginYears < 0 || safetyMarginPercent < 15;
+
+    const attenuationValue = toNumber(attenuationRows[index]?.value ?? distributionSegments[index]?.attenuationFactor, 1);
+    const demandRatio = toNumber(conservativeDemand[index]?.passMetricValue, 1);
+    const potentialMv = toNumber(conservativePotential[index]?.value, toNumber(assessment.measuredInstantOffPotentialMv, -850));
+
+    const attenuationLimit = toNumber(thresholdBands?.attenuation?.passWhenGreaterThanOrEqual, 0.75);
+    const demandLimit = toNumber(thresholdBands?.currentDemandRatio?.passWhenLessThanOrEqual, 1);
+    const potentialLimit = toNumber(thresholdBands?.potentialMv?.passWhenLessThanOrEqual, -850);
+
+    const attenuationFail = attenuationValue < attenuationLimit;
+    const demandFail = demandRatio > demandLimit;
+    const potentialFail = potentialMv > potentialLimit;
+    const failedCriteria = attenuationFail || demandFail || potentialFail;
+
+    const attenuationRisk = clamp01((attenuationLimit + 0.18 - attenuationValue) / 0.33);
+    const demandRisk = clamp01((demandRatio - 0.82) / 0.55);
+    const potentialRisk = clamp01((potentialMv + 900) / 110);
+    const interferenceRisk = clamp01(interferenceScore / 20);
+    const safetyRisk = lowSafetyMargin ? clamp01((15 - Math.max(safetyMarginPercent, -25)) / 40) : 0;
+
+    const rawSeverity = (demandRisk * 0.3)
+      + (attenuationRisk * 0.26)
+      + (potentialRisk * 0.2)
+      + (interferenceRisk * 0.16)
+      + (safetyRisk * 0.08)
+      + (failedCriteria ? 0.08 : 0);
+    const severityScore = clamp01(rawSeverity);
+    const severityBand = severityScore >= HEATMAP_THRESHOLDS.high
+      ? 'high'
+      : (severityScore >= HEATMAP_THRESHOLDS.medium ? 'medium' : 'low');
+
+    return {
+      segmentIndex: index,
+      severityScore,
+      severityBand,
+      failedCriteria,
+      lowSafetyMargin,
+      demandRatio: roundTo(demandRatio, 3),
+      attenuationValue: roundTo(attenuationValue, 3),
+      potentialMv: roundTo(potentialMv, 1),
+      interferenceScore: roundTo(interferenceScore, 2),
+      assumptions: {
+        thresholdDemandRatio: demandLimit,
+        thresholdAttenuation: attenuationLimit,
+        thresholdPotentialMv: potentialLimit,
+        targetLifeYears: assessment.targetLifeYears
+      }
+    };
+  }
+
+  function passesFilters(segmentAssessment) {
+    if (!segmentAssessment) return false;
+    if (state.heatmapFilters.highRiskOnly && segmentAssessment.severityBand !== 'high') {
+      return false;
+    }
+    if (state.heatmapFilters.failedCriteriaOnly && !segmentAssessment.failedCriteria) {
+      return false;
+    }
+    if (state.heatmapFilters.lowMarginOnly && !segmentAssessment.lowSafetyMargin) {
+      return false;
+    }
+    return true;
+  }
+
+  function renderHotspotInspector(segmentAssessment) {
+    if (!hotspotInspector) return;
+    if (!segmentAssessment) {
+      hotspotInspector.innerHTML = `
+        <h3>Hotspot inspector</h3>
+        <p class="field-hint">Click a hotspot on the layout canvas to inspect assumptions and contributing factors.</p>
+      `;
+      return;
+    }
+    hotspotInspector.innerHTML = `
+      <h3>Hotspot inspector · Segment ${segmentAssessment.segmentIndex + 1}</h3>
+      <p class="field-hint">Severity: <strong>${segmentAssessment.severityBand.toUpperCase()}</strong> (${segmentAssessment.severityScore.toFixed(2)}).</p>
+      <ul>
+        <li>Demand ratio: ${segmentAssessment.demandRatio} (limit ≤ ${segmentAssessment.assumptions.thresholdDemandRatio}).</li>
+        <li>Attenuation factor: ${segmentAssessment.attenuationValue} (limit ≥ ${segmentAssessment.assumptions.thresholdAttenuation}).</li>
+        <li>Estimated instant-off potential: ${segmentAssessment.potentialMv} mV (limit ≤ ${segmentAssessment.assumptions.thresholdPotentialMv} mV).</li>
+        <li>Interference score contribution: ${segmentAssessment.interferenceScore} / 20.</li>
+        <li>Safety margin status: ${segmentAssessment.lowSafetyMargin ? 'Low safety margin flagged.' : 'Safety margin within preferred range.'}</li>
+      </ul>
+      <p class="field-hint">Contributing factors are drawn from distribution attenuation, profile demand/potential traces, and saved CP criteria assumptions.</p>
+    `;
+  }
+
   function render() {
     const { structureSegments, anodes, testPoints, referenceElectrode } = state.geometry;
     const { x, y, scale } = state.viewport;
@@ -333,6 +516,38 @@ export function initCpLayoutCanvas({
     const activeSegmentIndex = Number.isInteger(state.externalHoveredSegmentIndex)
       ? state.externalHoveredSegmentIndex
       : state.hoveredSegmentIndex;
+    const selectedSegmentAssessment = Number.isInteger(state.selectedHotspotIndex)
+      ? buildSegmentAssessment(state.selectedHotspotIndex)
+      : null;
+    const heatmapMarkup = state.heatmapEnabled
+      ? structureSegments.map((segment, index) => {
+        const segmentAssessment = buildSegmentAssessment(index);
+        const visible = passesFilters(segmentAssessment);
+        const severity = segmentAssessment.severityScore;
+        const heatColor = getHeatColor(severity);
+        const midX = (segment.x1 + segment.x2) / 2;
+        const midY = (segment.y1 + segment.y2) / 2;
+        const isSelected = state.selectedHotspotIndex === index;
+        const mediumContour = severity >= HEATMAP_THRESHOLDS.medium
+          ? `<line x1="${segment.x1}" y1="${segment.y1}" x2="${segment.x2}" y2="${segment.y2}" class="cp-layout-heat-contour cp-layout-heat-contour--medium"></line>`
+          : '';
+        const highContour = severity >= HEATMAP_THRESHOLDS.high
+          ? `<line x1="${segment.x1}" y1="${segment.y1}" x2="${segment.x2}" y2="${segment.y2}" class="cp-layout-heat-contour cp-layout-heat-contour--high"></line>`
+          : '';
+        const zoneAria = `Hotspot segment ${index + 1}. Severity ${segmentAssessment.severityBand}, score ${segmentAssessment.severityScore.toFixed(2)}. Demand ratio ${segmentAssessment.demandRatio}.`;
+        return `
+          <g class="cp-layout-heat-zone-group ${isSelected ? 'is-selected' : ''}" ${visible ? '' : 'aria-hidden="true"'}>
+            <line x1="${segment.x1}" y1="${segment.y1}" x2="${segment.x2}" y2="${segment.y2}" class="cp-layout-heat-zone ${visible ? '' : 'is-filtered'} ${isSelected ? 'is-selected' : ''}" stroke="${heatColor}" stroke-width="22"></line>
+            ${visible ? mediumContour : ''}
+            ${visible ? highContour : ''}
+            <g class="cp-layout-hotspot ${isSelected ? 'is-selected' : ''}" data-hotspot-index="${index}" role="button" tabindex="0" aria-label="${zoneAria}">
+              <circle cx="${midX}" cy="${midY - 24}" r="13" class="cp-layout-hotspot-marker"></circle>
+              <text x="${midX}" y="${midY - 20}" text-anchor="middle" class="cp-layout-hotspot-text">S${index + 1}</text>
+            </g>
+          </g>
+        `;
+      }).join('')
+      : '';
     const segmentMarkup = structureSegments.map((segment, index) => `
       <line
         x1="${segment.x1}"
@@ -389,6 +604,7 @@ export function initCpLayoutCanvas({
       <svg viewBox="0 0 ${DEFAULT_VIEW.width} ${DEFAULT_VIEW.height}" aria-label="Cathodic protection layout canvas" role="img">
         <g transform="translate(${x} ${y}) scale(${scale})">
           <rect x="0" y="0" width="${DEFAULT_VIEW.width}" height="${DEFAULT_VIEW.height}" class="cp-layout-background"></rect>
+          ${heatmapMarkup}
           <g ${structureVisible}>${segmentMarkup}</g>
           <g ${wiringVisible}>${wiringMarkup}${spacingMarkup}</g>
           <g ${anodesVisible}>${anodeMarkup}</g>
@@ -406,9 +622,20 @@ export function initCpLayoutCanvas({
       </svg>
     `;
     renderMeasurementStateList();
+    renderHotspotInspector(selectedSegmentAssessment);
   }
 
   function onPointerDown(event) {
+    const hotspot = event.target.closest('[data-hotspot-index]');
+    if (hotspot) {
+      const hotspotIndex = Number.parseInt(hotspot.dataset.hotspotIndex || '-1', 10);
+      if (Number.isInteger(hotspotIndex) && hotspotIndex >= 0) {
+        state.selectedHotspotIndex = hotspotIndex;
+        announce(`Hotspot selected: Segment ${hotspotIndex + 1}.`);
+        render();
+      }
+      return;
+    }
     const target = event.target.closest('[data-drag-kind]');
     if (!target) {
       dragState.mode = 'pan';
@@ -524,7 +751,11 @@ export function initCpLayoutCanvas({
   }
 
   function setLayerVisibility(layer, visible) {
-    state.layers[layer] = visible;
+    if (layer === 'heatmap') {
+      state.heatmapEnabled = visible;
+    } else {
+      state.layers[layer] = visible;
+    }
     render();
     notifyLayoutChanged();
   }
@@ -580,6 +811,17 @@ export function initCpLayoutCanvas({
 
     render();
     notifyLayoutChanged();
+  }
+
+  function setAssessmentData(nextAssessment) {
+    state.assessmentData = nextAssessment && typeof nextAssessment === 'object' ? nextAssessment : null;
+    const hasSegments = Array.isArray(state.geometry.structureSegments) && state.geometry.structureSegments.length > 0;
+    if (hasSegments && Number.isInteger(state.selectedHotspotIndex)) {
+      state.selectedHotspotIndex = clamp(state.selectedHotspotIndex, 0, state.geometry.structureSegments.length - 1);
+    } else if (!Number.isInteger(state.selectedHotspotIndex)) {
+      state.selectedHotspotIndex = 0;
+    }
+    render();
   }
 
   buildGeometryFromInputs();
@@ -639,16 +881,45 @@ export function initCpLayoutCanvas({
 
   Object.entries(layerToggles).forEach(([layer, checkbox]) => {
     if (!checkbox) return;
-    checkbox.checked = Boolean(state.layers[layer]);
+    checkbox.checked = layer === 'heatmap' ? Boolean(state.heatmapEnabled) : Boolean(state.layers[layer]);
     checkbox.addEventListener('change', () => {
       setLayerVisibility(layer, checkbox.checked);
     });
+  });
+
+  Object.entries(heatmapFilters).forEach(([filterKey, checkbox]) => {
+    if (!checkbox) return;
+    checkbox.checked = Boolean(state.heatmapFilters[filterKey]);
+    checkbox.addEventListener('change', () => {
+      state.heatmapFilters[filterKey] = checkbox.checked;
+      render();
+      announce('Heatmap filter updated.');
+    });
+  });
+
+  canvas.addEventListener('keydown', (event) => {
+    if (event.key !== 'Enter' && event.key !== ' ') {
+      return;
+    }
+    const hotspot = event.target.closest('[data-hotspot-index]');
+    if (!hotspot) {
+      return;
+    }
+    event.preventDefault();
+    const hotspotIndex = Number.parseInt(hotspot.dataset.hotspotIndex || '-1', 10);
+    if (!Number.isInteger(hotspotIndex) || hotspotIndex < 0) {
+      return;
+    }
+    state.selectedHotspotIndex = hotspotIndex;
+    render();
+    announce(`Hotspot selected: Segment ${hotspotIndex + 1}.`);
   });
 
   return {
     syncFromInputs,
     resetLayout,
     getState: serializeLayout,
+    setAssessmentData,
     setExternalHoverSegment: (segmentIndex) => {
       const normalizedIndex = Number.isInteger(segmentIndex) && segmentIndex >= 0 ? segmentIndex : null;
       if (state.externalHoveredSegmentIndex === normalizedIndex) {
