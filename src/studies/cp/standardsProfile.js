@@ -1,12 +1,37 @@
 export const CP_STANDARDS_PROFILE = {
   profileId: 'cp-design-basis-2026',
   organization: 'CableTrayRoute default profile',
+  selectedProtectionCriteriaSetId: 'buried-steel-default',
   targetReferences: [
     { code: 'AMPP SP21424', edition: 'Adopted organizational edition' },
     { code: 'NACE SP0169', edition: 'Latest organization-approved edition' },
     { code: 'ISO 15589-1', edition: 'Latest organization-approved edition' },
     { code: 'DNV-RP-B401', edition: 'Latest organization-approved edition' }
   ],
+  protectionCriteriaSets: {
+    'buried-steel-default': {
+      id: 'buried-steel-default',
+      label: 'Buried steel default criteria',
+      reference: 'NACE SP0169 / ISO 15589-1',
+      criteria: [
+        {
+          key: 'instantOffPotential',
+          label: 'Instant-off potential criterion',
+          requirement: 'Measured instant-off potential ≤ -850 mV (CSE).'
+        },
+        {
+          key: 'polarizationShift',
+          label: 'Polarization criterion',
+          requirement: 'Measured/simulated polarization shift ≥ 100 mV.'
+        },
+        {
+          key: 'testPointCoverage',
+          label: 'Test-point coverage criterion',
+          requirement: 'All reported test points satisfy selected protection criteria.'
+        }
+      ]
+    }
+  },
   checks: {
     currentDensitySelection: {
       key: 'currentDensitySelection',
@@ -77,6 +102,11 @@ export function getRequiredComplianceChecks() {
 
 export function buildInitialComplianceStatus() {
   return Object.fromEntries(getRequiredComplianceChecks().map((checkKey) => [checkKey, 'not-run']));
+}
+
+export function getSelectedProtectionCriteriaSet(profile = CP_STANDARDS_PROFILE) {
+  const selectedId = profile.selectedProtectionCriteriaSetId;
+  return profile.protectionCriteriaSets?.[selectedId] || null;
 }
 
 export function evaluateComplianceChecks(result) {

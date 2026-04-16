@@ -7,6 +7,7 @@ import {
   buildInitialComplianceStatus
 } from './src/studies/cp/standardsProfile.js';
 import { computeDistributionBySegment, parseZoneResistivityValues } from './src/studies/cp/distributionModel.js';
+import { evaluateCriteriaChecks } from './src/studies/cp/criteriaChecks.js';
 
 const SQFT_TO_SQM = 0.09290304;
 const LB_TO_KG = 0.45359237;
@@ -35,6 +36,7 @@ export const CP_STANDARD_BASIS = {
     label: 'Adopted standards profile',
     summary: 'Defines target standards references, required deliverables, and mandatory/optional compliance checks.',
     standards: CP_STANDARDS_PROFILE.targetReferences.map((reference) => `${reference.code} (${reference.edition})`),
+    selectedProtectionCriteriaSetId: CP_STANDARDS_PROFILE.selectedProtectionCriteriaSetId,
     requiredChecks: getRequiredComplianceChecks(),
     deliverables: Object.values(CP_STANDARDS_PROFILE.deliverables)
       .filter((deliverable) => deliverable.required)
@@ -128,6 +130,7 @@ export function runCathodicProtectionAnalysis(input) {
     input.designFactor,
     adjustedRequiredCurrentA
   );
+  const criteriaCheckEvidence = evaluateCriteriaChecks(input, CP_STANDARDS_PROFILE);
 
   return {
     ...input,
@@ -150,6 +153,7 @@ export function runCathodicProtectionAnalysis(input) {
     predictedLifeYears: roundTo(predictedLifeYears, 2),
     safetyMarginYears: roundTo(predictedLifeYears - input.targetLifeYears, 2),
     safetyMarginPercent: roundTo(((predictedLifeYears - input.targetLifeYears) / input.targetLifeYears) * 100, 1),
+    criteriaCheckEvidence,
     sensitivity: buildSensitivitySummary({
       input,
       adjustedRequiredCurrentA,
@@ -250,6 +254,22 @@ function validateInputs(input) {
 
   if (input.zoneResistivityInputValid === false) {
     errors.push('zoneResistivityOhmM input must be a comma-separated list of positive numbers.');
+  }
+
+  if (!Number.isFinite(input.measuredInstantOffPotentialMv)) {
+    errors.push('measuredInstantOffPotentialMv must be a finite number.');
+  }
+
+  if (!Number.isFinite(input.simulatedPolarizationShiftMv) || input.simulatedPolarizationShiftMv < 0) {
+    errors.push('simulatedPolarizationShiftMv must be zero or greater.');
+  }
+
+  if (!Number.isInteger(input.testPointCount) || input.testPointCount <= 0) {
+    errors.push('testPointCount must be a positive integer.');
+  }
+
+  if (!Number.isInteger(input.passingTestPointCount) || input.passingTestPointCount < 0 || input.passingTestPointCount > input.testPointCount) {
+    errors.push('passingTestPointCount must be an integer between 0 and testPointCount.');
   }
 
   return errors;
@@ -534,6 +554,10 @@ function readFormInputs() {
     anodeBurialDepthM: isMetric ? anodeBurialDepthInput : anodeBurialDepthInput * FT_TO_M,
     zoneResistivityOhmM: parsedZoneResistivityValues,
     zoneResistivityInputValid,
+    measuredInstantOffPotentialMv: getNumber('measured-off-potential'),
+    simulatedPolarizationShiftMv: getNumber('simulated-polarization-shift'),
+    testPointCount: Math.round(getNumber('test-point-count')),
+    passingTestPointCount: Math.round(getNumber('test-point-pass-count')),
     units: isMetric ? 'metric' : 'imperial'
   };
 }
@@ -544,6 +568,15 @@ function renderResults(result, root) {
   const outputBasis = result.outputBasis || {};
   const sensitivityRows = Array.isArray(result.sensitivity) ? result.sensitivity : [];
   const advisories = buildDesignAdvisories(result, sensitivityRows);
+  const criteriaEvidence = result.criteriaCheckEvidence || {};
+  const criteriaSet = criteriaEvidence.selectedCriteriaSet;
+  const criteriaRows = Array.isArray(criteriaEvidence.criteriaResults) ? criteriaEvidence.criteriaResults : [];
+  const criteriaStatusLabel = criteriaEvidence.overallStatus === 'pass'
+    ? 'Pass'
+    : (criteriaEvidence.overallStatus === 'fail' ? 'Fail' : 'Not run');
+  const criteriaStatusClass = criteriaEvidence.overallStatus === 'pass'
+    ? 'result-badge--pass'
+    : (criteriaEvidence.overallStatus === 'fail' ? 'result-badge--fail' : '');
 
   root.innerHTML = `
     <section class="results-panel" aria-labelledby="cp-results-heading">
@@ -601,8 +634,33 @@ function renderResults(result, root) {
             <tr><td>Anode utilization factor U</td><td>${result.anodeUtilization}</td></tr>
             <tr><td>Design factor F<sub>design</sub></td><td>${result.designFactor}</td></tr>
             <tr><td>Availability factor</td><td>${result.availabilityFactor}</td></tr>
+            <tr><td>Measured instant-off potential</td><td>${result.measuredInstantOffPotentialMv} mV</td></tr>
+            <tr><td>Simulated polarization shift</td><td>${result.simulatedPolarizationShiftMv} mV</td></tr>
+            <tr><td>Test points passing</td><td>${result.passingTestPointCount} / ${result.testPointCount}</td></tr>
           </tbody>
         </table>
+      </div>
+
+      <div class="result-group" aria-label="Protection criteria check evidence">
+        <h3>Protection Criteria Check Evidence</h3>
+        <p class="field-hint">Criteria selected: ${escapeHtml(criteriaSet?.label || 'Not configured')} (${escapeHtml(criteriaSet?.reference || 'No reference')})</p>
+        <p class="field-hint">Data used: instant-off ${result.measuredInstantOffPotentialMv} mV, polarization shift ${result.simulatedPolarizationShiftMv} mV, test points ${result.passingTestPointCount}/${result.testPointCount} passing.</p>
+        <div class="result-badge ${criteriaStatusClass}">${criteriaStatusLabel}: criteria set evaluation</div>
+        <div class="table-wrap">
+          <table class="data-table" aria-label="Protection criteria pass fail table">
+            <thead><tr><th>Criterion</th><th>Requirement</th><th>Observed data</th><th>Status</th></tr></thead>
+            <tbody>
+              ${criteriaRows.map((criterion) => `
+                <tr>
+                  <td>${escapeHtml(criterion.label)}</td>
+                  <td>${escapeHtml(criterion.requirement)}</td>
+                  <td>${escapeHtml(criterion.observedValue)}</td>
+                  <td>${criterion.status === 'pass' ? 'Pass' : 'Fail'}</td>
+                </tr>
+              `).join('')}
+            </tbody>
+          </table>
+        </div>
       </div>
 
       ${sensitivityRows.length ? `

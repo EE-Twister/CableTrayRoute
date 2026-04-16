@@ -262,6 +262,26 @@ Life_years = (W_installed × Q_anode × U × F_design) / (I_req × 8760)</pre>
           </div>
         </fieldset>
 
+        <fieldset>
+          <legend><strong>Protection Criteria Evidence Inputs</strong></legend>
+          <div class="field-row">
+            <label for="measured-off-potential">Measured instant-off potential (mV vs CSE)</label>
+            <input type="number" id="measured-off-potential" step="1" value="-900" required>
+          </div>
+          <div class="field-row">
+            <label for="simulated-polarization-shift">Measured/simulated polarization shift (mV)</label>
+            <input type="number" id="simulated-polarization-shift" min="0" step="1" value="120" required>
+          </div>
+          <div class="field-row">
+            <label for="test-point-count">Total test points reviewed</label>
+            <input type="number" id="test-point-count" min="1" step="1" value="8" required>
+          </div>
+          <div class="field-row">
+            <label for="test-point-pass-count">Test points meeting criteria</label>
+            <input type="number" id="test-point-pass-count" min="0" step="1" value="8" required>
+          </div>
+        </fieldset>
+
         <button type="submit" class="primary-btn">Run Analysis</button>
       </form>
 
