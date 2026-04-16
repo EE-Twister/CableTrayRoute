@@ -24,6 +24,13 @@ This guide documents the engineering basis used by the Cathodic Protection sizin
 | Target design life | L<sub>target</sub> | years | Converted internally to hours (`years × 8760`). |
 | Installed anode mass | M<sub>inst</sub> | kg | Used for predicted-life calculation. |
 
+| Test method | — | categorical | `instant-off`, `on-potential`, or `coupon`; defines correction path for acceptance checks. |
+| Measurement context | — | categorical | Captures environment at test location (`native-soil`, `casing`, `foreign-interference`, etc.). |
+| Reference electrode location | — | categorical | Records whether reference placement is local, remote, coupon lead, or unknown. |
+| IR-drop compensation method | — | categorical | Documents compensation source (`instant-off`, `coupon`, `calculated`, `none`, `unknown`). |
+| Measured IR-drop magnitude | ΔV<sub>IR</sub> | mV | Used to normalize ON-potential readings when provided. |
+| Coupon depolarization shift | ΔV<sub>coupon</sub> | mV | Used for coupon-based normalization and polarization substitution when needed. |
+
 ## Equations Used
 
 ### 1) Current density selection
@@ -72,6 +79,17 @@ L<sub>pred</sub> = (M<sub>inst</sub> × C<sub>a</sub> × u × F<sub>d</sub>) / (
 - Safety margin (years) = `L_pred − L_target`
 - Safety margin (%) = `(L_pred − L_target) / L_target × 100`
 
+
+### 7) Measurement correction and criteria normalization
+
+Acceptance checks now evaluate **corrected** values and retain raw values in output:
+
+- For `on-potential` tests with supplied IR drop: `V_corrected = V_raw + |ΔV_IR|`
+- For `coupon` tests with supplied depolarization: `V_corrected = V_raw + |ΔV_coupon|`
+- For coupon workflows with missing explicit polarization shift, the shift defaults to `|ΔV_coupon|`
+
+When required metadata is missing (unknown context/location, no compensation value for ON/coupon methods, or compensation explicitly set to `none`), the study reports validation warnings so acceptance decisions can be reviewed with caution.
+
 ## Assumptions and Limits
 
 - Intended for preliminary CP sizing and scoping studies, not detailed final design.
@@ -103,5 +121,6 @@ The CP study now includes a standards profile and auditable compliance status mo
 
 ## Revision Notes
 
+- **2026-04-16:** Added measurement metadata inputs (test method/context/reference location), implemented correction-aware criteria normalization, separated raw vs corrected acceptance outputs, and added metadata sufficiency warnings in results.
 - **2026-04-16:** Added standards profile configuration, machine-readable required-check keys in CP basis mapping, compliance status panel, and persisted compliance history snapshots.
 - **2026-04-15:** Initial documentation page added for CP sizing inputs, equations, assumptions/limits, references, and consistency guidance between required-mass and predicted-life relations.

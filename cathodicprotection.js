@@ -140,6 +140,9 @@ export function runCathodicProtectionAnalysis(input) {
   );
   const criteriaCheckEvidence = evaluateCriteriaChecks(input, CP_STANDARDS_PROFILE);
   const interferenceAssessment = evaluateInterferenceAssessment(input);
+  const measurementMetadataWarnings = Array.isArray(criteriaCheckEvidence?.measurementCorrections?.warnings)
+    ? criteriaCheckEvidence.measurementCorrections.warnings
+    : [];
 
   return {
     ...input,
@@ -163,6 +166,7 @@ export function runCathodicProtectionAnalysis(input) {
     safetyMarginYears: roundTo(predictedLifeYears - input.targetLifeYears, 2),
     safetyMarginPercent: roundTo(((predictedLifeYears - input.targetLifeYears) / input.targetLifeYears) * 100, 1),
     criteriaCheckEvidence,
+    measurementMetadataWarnings,
     interferenceAssessment,
     sensitivity: buildSensitivitySummary({
       input,
@@ -296,6 +300,30 @@ function validateInputs(input) {
 
   if (!['baseline', 'enhanced', 'critical'].includes(input.mitigationProfile)) {
     errors.push('mitigationProfile must be baseline, enhanced, or critical.');
+  }
+
+  if (!['instant-off', 'on-potential', 'coupon'].includes(input.testMethod)) {
+    errors.push('testMethod must be instant-off, on-potential, or coupon.');
+  }
+
+  if (!['native-soil', 'casing', 'foreign-interference', 'test-station', 'unknown'].includes(input.measurementContext)) {
+    errors.push('measurementContext must be a supported option.');
+  }
+
+  if (!['local', 'remote', 'coupon-lead', 'unknown'].includes(input.referenceElectrodeLocation)) {
+    errors.push('referenceElectrodeLocation must be a supported option.');
+  }
+
+  if (!['instant-off', 'coupon', 'calculated', 'none', 'unknown'].includes(input.irDropCompensationMethod)) {
+    errors.push('irDropCompensationMethod must be a supported option.');
+  }
+
+  if (Number.isFinite(input.measuredIrDropMv) && input.measuredIrDropMv < 0) {
+    errors.push('measuredIrDropMv cannot be negative.');
+  }
+
+  if (Number.isFinite(input.couponDepolarizationMv) && input.couponDepolarizationMv < 0) {
+    errors.push('couponDepolarizationMv cannot be negative.');
   }
 
   return errors;
@@ -581,6 +609,12 @@ function readFormInputs() {
     anodeBurialDepthM: isMetric ? anodeBurialDepthInput : anodeBurialDepthInput * FT_TO_M,
     zoneResistivityOhmM: parsedZoneResistivityValues,
     zoneResistivityInputValid,
+    testMethod: getValue('test-method'),
+    measurementContext: getValue('measurement-context'),
+    referenceElectrodeLocation: getValue('reference-electrode-location'),
+    irDropCompensationMethod: getValue('ir-drop-compensation-method'),
+    measuredIrDropMv: getNumber('measured-ir-drop'),
+    couponDepolarizationMv: getNumber('coupon-depolarization'),
     measuredInstantOffPotentialMv: getNumber('measured-off-potential'),
     simulatedPolarizationShiftMv: getNumber('simulated-polarization-shift'),
     testPointCount: Math.round(getNumber('test-point-count')),
@@ -605,6 +639,8 @@ function renderResults(result, root) {
   const criteriaEvidence = result.criteriaCheckEvidence || {};
   const criteriaSet = criteriaEvidence.selectedCriteriaSet;
   const criteriaRows = Array.isArray(criteriaEvidence.criteriaResults) ? criteriaEvidence.criteriaResults : [];
+  const measurementCorrections = criteriaEvidence.measurementCorrections || {};
+  const measurementWarnings = Array.isArray(result.measurementMetadataWarnings) ? result.measurementMetadataWarnings : [];
   const interference = result.interferenceAssessment || {};
   const riskFactorRows = Array.isArray(interference.riskFactorScores) ? interference.riskFactorScores : [];
   const riskBadgeClass = interference.riskLevel === 'high'
@@ -674,8 +710,14 @@ function renderResults(result, root) {
             <tr><td>Anode utilization factor U</td><td>${result.anodeUtilization}</td></tr>
             <tr><td>Design factor F<sub>design</sub></td><td>${result.designFactor}</td></tr>
             <tr><td>Availability factor</td><td>${result.availabilityFactor}</td></tr>
-            <tr><td>Measured instant-off potential</td><td>${result.measuredInstantOffPotentialMv} mV</td></tr>
-            <tr><td>Simulated polarization shift</td><td>${result.simulatedPolarizationShiftMv} mV</td></tr>
+            <tr><td>Test method</td><td>${escapeHtml(result.testMethod || 'instant-off')}</td></tr>
+            <tr><td>Measurement context</td><td>${escapeHtml(result.measurementContext || 'unknown')}</td></tr>
+            <tr><td>Reference electrode location</td><td>${escapeHtml(result.referenceElectrodeLocation || 'unknown')}</td></tr>
+            <tr><td>IR-drop compensation method</td><td>${escapeHtml(result.irDropCompensationMethod || 'unknown')}</td></tr>
+            <tr><td>Measured IR-drop</td><td>${Number.isFinite(result.measuredIrDropMv) ? `${result.measuredIrDropMv} mV` : 'Not provided'}</td></tr>
+            <tr><td>Coupon depolarization</td><td>${Number.isFinite(result.couponDepolarizationMv) ? `${result.couponDepolarizationMv} mV` : 'Not provided'}</td></tr>
+            <tr><td>Measured structure potential</td><td>${result.measuredInstantOffPotentialMv} mV</td></tr>
+            <tr><td>Measured/simulated polarization shift</td><td>${result.simulatedPolarizationShiftMv} mV</td></tr>
             <tr><td>Test points passing</td><td>${result.passingTestPointCount} / ${result.testPointCount}</td></tr>
             <tr><td>Interference mitigation actions</td><td>${escapeHtml(result.mitigationActionsText || 'Not provided')}</td></tr>
             <tr><td>Verification test date</td><td>${escapeHtml(result.verificationTestDate || 'Not scheduled')}</td></tr>
@@ -686,18 +728,21 @@ function renderResults(result, root) {
       <div class="result-group" aria-label="Protection criteria check evidence">
         <h3>Protection Criteria Check Evidence</h3>
         <p class="field-hint">Criteria selected: ${escapeHtml(criteriaSet?.label || 'Not configured')} (${escapeHtml(criteriaSet?.reference || 'No reference')})</p>
-        <p class="field-hint">Data used: instant-off ${result.measuredInstantOffPotentialMv} mV, polarization shift ${result.simulatedPolarizationShiftMv} mV, test points ${result.passingTestPointCount}/${result.testPointCount} passing.</p>
+        <p class="field-hint">Measurement basis: method ${escapeHtml(measurementCorrections.metadata?.testMethod || result.testMethod || 'instant-off')}, context ${escapeHtml(measurementCorrections.metadata?.measurementContext || result.measurementContext || 'unknown')}, reference ${escapeHtml(measurementCorrections.metadata?.referenceElectrodeLocation || result.referenceElectrodeLocation || 'unknown')}.</p>
+        <p class="field-hint">Correction summary: ${escapeHtml(measurementCorrections.correctionSummary || 'No correction summary provided.')}</p>
         <div class="result-badge ${criteriaStatusClass}">${criteriaStatusLabel}: criteria set evaluation</div>
+        ${measurementWarnings.length ? `<p class="field-hint"><strong>Validation warnings:</strong> ${escapeHtml(measurementWarnings.join(' | '))}</p>` : '<p class="field-hint">Validation warnings: none.</p>'}
         <div class="table-wrap">
           <table class="data-table" aria-label="Protection criteria pass fail table">
-            <thead><tr><th>Criterion</th><th>Requirement</th><th>Observed data</th><th>Status</th></tr></thead>
+            <thead><tr><th>Criterion</th><th>Requirement</th><th>Raw value</th><th>Corrected value</th><th>Acceptance decision</th></tr></thead>
             <tbody>
               ${criteriaRows.map((criterion) => `
                 <tr>
                   <td>${escapeHtml(criterion.label)}</td>
                   <td>${escapeHtml(criterion.requirement)}</td>
-                  <td>${escapeHtml(criterion.observedValue)}</td>
-                  <td>${criterion.status === 'pass' ? 'Pass' : 'Fail'}</td>
+                  <td>${escapeHtml(criterion.rawValue || criterion.observedValue || 'n/a')}</td>
+                  <td>${escapeHtml(criterion.correctedValue || criterion.observedValue || 'n/a')}</td>
+                  <td>${escapeHtml(criterion.decision || (criterion.status === 'pass' ? 'Pass' : 'Fail'))}</td>
                 </tr>
               `).join('')}
             </tbody>
