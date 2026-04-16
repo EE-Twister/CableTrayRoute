@@ -291,6 +291,10 @@ body.dark-mode .quick-launch-meta {
     background: linear-gradient(165deg, color-mix(in srgb, #7c3aed 16%, #ffffff) 0%, var(--color-surface-strong) 72%);
 }
 
+.tool-graphic-card--fieldview {
+    background: linear-gradient(165deg, color-mix(in srgb, #0f766e 18%, #ffffff) 0%, var(--color-surface-strong) 72%);
+}
+
 body.dark-mode .tool-graphic-card {
     border-color: #3a3f46;
     background: #1e2124;
@@ -303,7 +307,8 @@ body.dark-mode .tool-graphic-card img {
 body.dark-mode .tool-graphic-card--schedules,
 body.dark-mode .tool-graphic-card--fill,
 body.dark-mode .tool-graphic-card--routing,
-body.dark-mode .tool-graphic-card--studies {
+body.dark-mode .tool-graphic-card--studies,
+body.dark-mode .tool-graphic-card--fieldview {
     background: linear-gradient(170deg, rgba(37, 99, 235, 0.18) 0%, #1e2124 76%);
 }
 
