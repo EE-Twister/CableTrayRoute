@@ -1,5 +1,11 @@
 import { getStudies, setStudies } from './dataStore.mjs';
 import { initStudyApprovalPanel } from './src/components/studyApproval.js';
+import {
+  CP_STANDARDS_PROFILE,
+  evaluateComplianceChecks,
+  getRequiredComplianceChecks,
+  buildInitialComplianceStatus
+} from './src/studies/cp/standardsProfile.js';
 
 const SQFT_TO_SQM = 0.09290304;
 const LB_TO_KG = 0.45359237;
@@ -23,28 +29,42 @@ const PIPE_MATERIAL_FACTORS = {
 };
 
 export const CP_STANDARD_BASIS = {
+  standardsProfile: {
+    id: 'cp-standards-profile',
+    label: 'Adopted standards profile',
+    summary: 'Defines target standards references, required deliverables, and mandatory/optional compliance checks.',
+    standards: CP_STANDARDS_PROFILE.targetReferences.map((reference) => `${reference.code} (${reference.edition})`),
+    requiredChecks: getRequiredComplianceChecks(),
+    deliverables: Object.values(CP_STANDARDS_PROFILE.deliverables)
+      .filter((deliverable) => deliverable.required)
+      .map((deliverable) => deliverable.key)
+  },
   currentDensitySelection: {
     id: 'current-density-selection',
     label: 'Current density selection ranges',
     standards: ['AMPP SP21424', 'NACE SP0169'],
+    requiredChecks: ['currentDensitySelection'],
     summary: 'Table-range style current demand selection by structure condition and environment severity.'
   },
   polarizationCriteria: {
     id: 'polarization-criteria',
     label: 'Polarization / protection criteria assumptions',
     standards: ['NACE SP0169', 'ISO 15589-1'],
+    requiredChecks: ['commissioningChecksDefined', 'monitoringPlanDefined'],
     summary: 'Protection assumptions align with conventional on/off potential and polarization criteria used for buried steel CP design.'
   },
   anodeCapacityUtilization: {
     id: 'anode-capacity-utilization',
     label: 'Anode capacity and utilization values',
     standards: ['DNV-RP-B401', 'ISO 15589-1'],
+    requiredChecks: ['anodeMassSizing', 'targetLifeVerification'],
     summary: 'Galvanic anode ampere-hour capacity and utilization factors follow published anode design guidance.'
   },
   engineeringJudgmentAssumptions: {
     id: 'engineering-judgment',
     label: 'Engineering judgment assumptions',
     standards: ['Project-specific engineering judgment'],
+    requiredChecks: ['commissioningChecksDefined', 'monitoringPlanDefined'],
     summary: 'Coating breakdown factor, design factor, and optional temperature correction require project-specific engineering validation.',
     assumptions: [
       'Coating breakdown factor is selected by expected coating quality, age, and defect distribution.',
@@ -214,6 +234,61 @@ function roundTo(value, decimals) {
   return Math.round(value * p) / p;
 }
 
+function normalizeSavedStudy(saved) {
+  if (!saved || typeof saved !== 'object') {
+    return null;
+  }
+
+  const compliance = saved.compliance && typeof saved.compliance === 'object'
+    ? saved.compliance
+    : {
+      profileId: CP_STANDARDS_PROFILE.profileId,
+      requiredChecks: buildInitialComplianceStatus(),
+      optionalChecks: {},
+      lastEvaluatedAt: null
+    };
+
+  const existingHistory = Array.isArray(saved.complianceHistory)
+    ? saved.complianceHistory
+    : [];
+
+  return {
+    ...saved,
+    compliance,
+    complianceHistory: existingHistory
+  };
+}
+
+function createComplianceRecord(result, previousStudy = null) {
+  const requiredChecks = evaluateComplianceChecks(result);
+  const previousRequiredChecks = previousStudy?.compliance?.requiredChecks || {};
+  const mergedRequiredChecks = {
+    ...buildInitialComplianceStatus(),
+    ...previousRequiredChecks,
+    ...requiredChecks
+  };
+  const evaluatedAt = result.timestamp;
+
+  const compliance = {
+    profileId: CP_STANDARDS_PROFILE.profileId,
+    requiredChecks: mergedRequiredChecks,
+    optionalChecks: previousStudy?.compliance?.optionalChecks || {},
+    lastEvaluatedAt: evaluatedAt
+  };
+
+  const historyEntry = {
+    evaluatedAt,
+    requiredChecks: mergedRequiredChecks
+  };
+
+  const complianceHistory = [
+    ...(Array.isArray(previousStudy?.complianceHistory) ? previousStudy.complianceHistory : []),
+    historyEntry
+  ];
+
+  return { compliance, complianceHistory };
+}
+
 if (typeof document !== 'undefined') {
   document.addEventListener('DOMContentLoaded', () => {
   initSettings();
@@ -241,9 +316,11 @@ if (typeof document !== 'undefined') {
   const calculatedSurfaceAreaRow = document.getElementById('calculated-surface-area-row');
   const calculatedSurfaceAreaEl = document.getElementById('calculated-surface-area');
   const pipeDimensionsIllustrationEl = document.getElementById('pipe-dimensions-illustration');
+  const compliancePanelEl = document.getElementById('cp-compliance-status-content');
 
-  const saved = getStudies().cathodicProtection;
+  const saved = normalizeSavedStudy(getStudies().cathodicProtection);
   renderCalculationBasis(basisPanel, CP_STANDARD_BASIS);
+  renderComplianceStatusPanel(compliancePanelEl, saved?.compliance?.requiredChecks, saved?.compliance?.lastEvaluatedAt);
   if (saved) {
     renderResults(saved, resultsDiv);
   }
@@ -348,9 +425,20 @@ if (typeof document !== 'undefined') {
       errorsDiv.hidden = true;
       errorsDiv.textContent = '';
       const studies = getStudies();
-      studies.cathodicProtection = result;
+      const previousStudy = normalizeSavedStudy(studies.cathodicProtection);
+      const complianceRecord = createComplianceRecord(result, previousStudy);
+      studies.cathodicProtection = {
+        ...result,
+        compliance: complianceRecord.compliance,
+        complianceHistory: complianceRecord.complianceHistory
+      };
       setStudies(studies);
-      renderResults(result, resultsDiv);
+      renderResults(studies.cathodicProtection, resultsDiv);
+      renderComplianceStatusPanel(
+        compliancePanelEl,
+        studies.cathodicProtection.compliance.requiredChecks,
+        studies.cathodicProtection.compliance.lastEvaluatedAt
+      );
     } catch (error) {
       const message = error instanceof Error ? error.message : 'Invalid cathodic protection inputs.';
       errorsDiv.hidden = false;
@@ -539,6 +627,7 @@ function renderCalculationBasis(root, basis) {
   if (!root || !basis) return;
 
   const sections = [
+    basis.standardsProfile,
     basis.currentDensitySelection,
     basis.polarizationCriteria,
     basis.anodeCapacityUtilization,
@@ -552,11 +641,54 @@ function renderCalculationBasis(root, basis) {
           <strong>${escapeHtml(section.label)}:</strong>
           <span>${escapeHtml(section.summary)}</span>
           <div class="field-hint">Standards: ${escapeHtml(section.standards.join(', '))}</div>
+          ${Array.isArray(section.requiredChecks) && section.requiredChecks.length
+            ? `<div class="field-hint">Required checks: ${escapeHtml(section.requiredChecks.join(', '))}</div>`
+            : ''}
+          ${Array.isArray(section.deliverables) && section.deliverables.length
+            ? `<div class="field-hint">Required deliverables: ${escapeHtml(section.deliverables.join(', '))}</div>`
+            : ''}
           ${Array.isArray(section.assumptions) && section.assumptions.length
             ? `<ul>${section.assumptions.map((assumption) => `<li>${escapeHtml(assumption)}</li>`).join('')}</ul>`
             : ''}
         </li>
       `).join('')}
     </ul>
+  `;
+}
+
+function renderComplianceStatusPanel(root, requiredChecks = {}, lastEvaluatedAt = null) {
+  if (!root) return;
+
+  const rows = getRequiredComplianceChecks().map((checkKey) => {
+    const check = CP_STANDARDS_PROFILE.checks[checkKey];
+    const status = requiredChecks[checkKey] || 'not-run';
+    return {
+      key: checkKey,
+      label: check?.label || checkKey,
+      status
+    };
+  });
+
+  const statusLabels = {
+    pass: 'Pass',
+    fail: 'Fail',
+    'not-run': 'Not run'
+  };
+
+  root.innerHTML = `
+    <div class="table-wrap">
+      <table class="data-table" aria-label="Cathodic protection required compliance checks">
+        <thead><tr><th>Required check</th><th>Status</th></tr></thead>
+        <tbody>
+          ${rows.map((row) => `
+            <tr>
+              <td>${escapeHtml(row.label)} <span class="field-hint">(${escapeHtml(row.key)})</span></td>
+              <td><span class="result-badge result-badge--${escapeHtml(row.status)}">${escapeHtml(statusLabels[row.status] || 'Not run')}</span></td>
+            </tr>
+          `).join('')}
+        </tbody>
+      </table>
+    </div>
+    <p class="field-hint">Last evaluated: ${lastEvaluatedAt ? escapeHtml(new Date(lastEvaluatedAt).toLocaleString()) : 'Not run yet'}</p>
   `;
 }
