@@ -6,15 +6,26 @@ const MM_PER_YEAR_TO_MPY = 39.3701;
 
 const METAL_SERIES = {
   magnesium: { label: 'Magnesium alloy', potentialV: -1.6, family: 'active' },
-  zinc: { label: 'Zinc / galvanized steel', potentialV: -1.03, family: 'active' },
+  zinc: { label: 'Zinc / galvanized steel (hot-dip)', potentialV: -1.03, family: 'active' },
+  zincElectroplate: { label: 'Zinc electroplate (clear/yellow chromate)', potentialV: -0.98, family: 'active' },
   aluminum: { label: 'Aluminum alloy', potentialV: -0.8, family: 'active' },
+  aluminumMetallized: { label: 'Aluminum metallized coating', potentialV: -0.78, family: 'active' },
   carbonSteel: { label: 'Carbon steel', potentialV: -0.6, family: 'active' },
   castIron: { label: 'Cast iron', potentialV: -0.61, family: 'active' },
+  cadmium: { label: 'Cadmium-plated steel', potentialV: -0.75, family: 'active' },
   lead: { label: 'Lead', potentialV: -0.5, family: 'intermediate' },
-  copper: { label: 'Copper / brass / bronze', potentialV: -0.34, family: 'noble' },
+  tin: { label: 'Tin / tin-plated copper', potentialV: -0.49, family: 'intermediate' },
+  stainless410Active: { label: 'Stainless steel 410/430 (active)', potentialV: -0.56, family: 'active' },
   stainlessActive: { label: 'Stainless steel (active)', potentialV: -0.5, family: 'intermediate' },
+  copper: { label: 'Copper', potentialV: -0.34, family: 'noble' },
+  brass: { label: 'Brass', potentialV: -0.36, family: 'noble' },
+  bronze: { label: 'Bronze / silicon bronze', potentialV: -0.33, family: 'noble' },
+  copperNickel: { label: 'Copper-nickel alloy', potentialV: -0.3, family: 'noble' },
+  nickelPlatedCopper: { label: 'Nickel-plated copper lug/barrel', potentialV: -0.22, family: 'noble' },
   stainless304Passive: { label: 'Stainless steel 304 (passive)', potentialV: -0.1, family: 'noble' },
   stainless316Passive: { label: 'Stainless steel 316 (passive)', potentialV: -0.05, family: 'noble' },
+  stainlessDuplexPassive: { label: 'Stainless steel duplex (passive)', potentialV: -0.04, family: 'noble' },
+  nickel200: { label: 'Nickel alloy (Ni 200)', potentialV: -0.18, family: 'noble' },
   titanium: { label: 'Titanium', potentialV: -0.03, family: 'noble' }
 };
 
@@ -147,6 +158,7 @@ if (typeof document !== 'undefined') {
     const errorsEl = document.getElementById('calc-errors');
     const saved = getStudies().dissimilarMetals;
 
+    populateMetalSelects(primarySelect, secondarySelect);
     updateAreaRoleGuidance();
     primarySelect.addEventListener('change', updateAreaRoleGuidance);
     secondarySelect.addEventListener('change', updateAreaRoleGuidance);
@@ -173,6 +185,28 @@ if (typeof document !== 'undefined') {
       }
     });
   });
+}
+
+function populateMetalSelects(primarySelect, secondarySelect) {
+  if (!primarySelect || !secondarySelect) {
+    return;
+  }
+
+  const defaultPrimary = primarySelect.dataset.defaultValue || 'aluminum';
+  const defaultSecondary = secondarySelect.dataset.defaultValue || 'stainless304Passive';
+  const metalEntries = Object.entries(METAL_SERIES)
+    .sort(([, a], [, b]) => a.potentialV - b.potentialV);
+
+  const buildOptions = (selectedValue) => metalEntries.map(([key, metal]) => {
+    const selected = key === selectedValue ? ' selected' : '';
+    return `<option value="${key}"${selected}>${metal.label}</option>`;
+  }).join('');
+
+  const selectedPrimary = METAL_SERIES[primarySelect.value] ? primarySelect.value : defaultPrimary;
+  const selectedSecondary = METAL_SERIES[secondarySelect.value] ? secondarySelect.value : defaultSecondary;
+
+  primarySelect.innerHTML = buildOptions(selectedPrimary);
+  secondarySelect.innerHTML = buildOptions(selectedSecondary);
 }
 
 function readFormInput() {
