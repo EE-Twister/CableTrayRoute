@@ -11,6 +11,7 @@ import { evaluateCriteriaChecks } from './src/studies/cp/criteriaChecks.js';
 import { evaluateInterferenceAssessment, parseMitigationActions } from './src/studies/cp/interferenceAssessment.js';
 import { COATING_MODEL_TYPES, parseConditionFactorValues, resolveCoatingModel } from './src/studies/cp/coatingModel.js';
 import { initCpLayoutCanvas } from './src/cpLayoutCanvas.js';
+import { initCpProfiles } from './src/cpProfiles.js';
 
 const SQFT_TO_SQM = 0.09290304;
 const LB_TO_KG = 0.45359237;
@@ -51,6 +52,7 @@ const PIPE_MATERIAL_FACTORS = {
 };
 
 let cpLayoutCanvasController = null;
+let cpProfilesController = null;
 
 function mapAcceptanceTargetToMeasurementSetup(checkKey = '') {
   if (checkKey === 'instantOffPotential') return 'instantOffPotential';
@@ -181,6 +183,13 @@ export function runCathodicProtectionAnalysis(input) {
   const measurementMetadataWarnings = Array.isArray(criteriaCheckEvidence?.measurementCorrections?.warnings)
     ? criteriaCheckEvidence.measurementCorrections.warnings
     : [];
+  const profileData = buildCpProfileData({
+    input,
+    adjustedRequiredCurrentA,
+    distributionModel,
+    measuredInstantOffPotentialMv: input.measuredInstantOffPotentialMv,
+    baseCoatingFactor: coatingModel.effectiveFactor
+  });
 
   return {
     ...input,
@@ -208,6 +217,7 @@ export function runCathodicProtectionAnalysis(input) {
     criteriaCheckEvidence,
     measurementMetadataWarnings,
     interferenceAssessment,
+    profileData,
     sensitivity: buildSensitivitySummary({
       input,
       adjustedRequiredCurrentA,
@@ -216,6 +226,68 @@ export function runCathodicProtectionAnalysis(input) {
       coatingModel,
       distributionModel
     })
+  };
+}
+
+function buildCpProfileData({ input, adjustedRequiredCurrentA, distributionModel, measuredInstantOffPotentialMv, baseCoatingFactor }) {
+  const segments = Array.isArray(distributionModel?.segments) && distributionModel.segments.length
+    ? distributionModel.segments
+    : [{ segment: 1, attenuationFactor: 1, zoneResistivityOhmM: input.soilResistivityOhmM }];
+  const totalDistanceM = Math.max(input.anodeSpacingM * Math.max(input.numberOfAnodes - 1, 1), 1);
+  const stepDistanceM = totalDistanceM / segments.length;
+  const globalAttenuation = distributionModel?.globalAttenuationFactor || 1;
+  const scenarioScale = {
+    base: 1,
+    conservative: 1.25,
+    optimized: 0.85
+  };
+
+  const attenuation = segments.map((segment, index) => ({
+    segmentIndex: index,
+    distanceM: roundTo((index + 1) * stepDistanceM, 3),
+    value: roundTo(segment.attenuationFactor ?? 1, 4),
+    passMetricValue: roundTo(segment.attenuationFactor ?? 1, 4),
+    zoneResistivityOhmM: segment.zoneResistivityOhmM
+  }));
+
+  const buildScenarioRows = (multiplier) => {
+    const potential = segments.map((segment, index) => {
+      const attenuationFactor = segment.attenuationFactor ?? 1;
+      const distanceM = roundTo((index + 1) * stepDistanceM, 3);
+      const potentialMv = measuredInstantOffPotentialMv - ((1 - attenuationFactor) * 220 * multiplier) - ((baseCoatingFactor || 0.2) * 40 * (multiplier - 1));
+      return {
+        segmentIndex: index,
+        distanceM,
+        value: roundTo(potentialMv, 1),
+        passMetricValue: roundTo(potentialMv, 1)
+      };
+    });
+    const currentDemand = segments.map((segment, index) => {
+      const attenuationFactor = segment.attenuationFactor ?? 1;
+      const demandA = adjustedRequiredCurrentA * (attenuationFactor / globalAttenuation) * multiplier;
+      return {
+        segmentIndex: index,
+        distanceM: roundTo((index + 1) * stepDistanceM, 3),
+        value: roundTo(demandA, 4),
+        passMetricValue: roundTo(demandA / adjustedRequiredCurrentA, 4)
+      };
+    });
+    return { potential, currentDemand };
+  };
+
+  return {
+    generatedAt: new Date().toISOString(),
+    thresholdBands: {
+      potentialMv: { passWhenLessThanOrEqual: -850 },
+      currentDemandRatio: { passWhenLessThanOrEqual: 1 },
+      attenuation: { passWhenGreaterThanOrEqual: 0.75 }
+    },
+    attenuation,
+    scenarios: {
+      base: buildScenarioRows(scenarioScale.base),
+      conservative: buildScenarioRows(scenarioScale.conservative),
+      optimized: buildScenarioRows(scenarioScale.optimized)
+    }
   };
 }
 
@@ -665,6 +737,9 @@ if (typeof document !== 'undefined') {
         cpLayout: nextLayout
       };
       setStudies(studies);
+    },
+    onSegmentHover: (segmentIndex) => {
+      cpProfilesController?.setExternalHoverSegment(segmentIndex);
     }
   });
 
@@ -907,6 +982,13 @@ function readFormInputs() {
 }
 
 function renderResults(result, root) {
+  const profileData = result.profileData || buildCpProfileData({
+    input: result,
+    adjustedRequiredCurrentA: result.requiredCurrentA,
+    distributionModel: result.distributionModel,
+    measuredInstantOffPotentialMv: result.measuredInstantOffPotentialMv,
+    baseCoatingFactor: result.coatingBreakdownFactor
+  });
   const lifeBadgeClass = result.safetyMarginYears >= 0 ? 'result-badge--pass' : 'result-badge--fail';
   const lifeBadgeIcon = result.safetyMarginYears >= 0 ? '✓' : '✗';
   const outputBasis = result.outputBasis || {};
@@ -1153,6 +1235,11 @@ function renderResults(result, root) {
         </table>
       </div>` : ''}
 
+      <div class="result-group" aria-label="CP profile chart overlays">
+        <p class="field-hint">Profile overlays include base, conservative, and optimized scenarios with threshold-band pass/fail markers.</p>
+        <div id="cp-profile-chart-root"></div>
+      </div>
+
       ${advisories.length ? `
       <div class="result-group" aria-label="Design improvement advisories">
         <h3>Design Improvement Opportunities</h3>
@@ -1164,6 +1251,17 @@ function renderResults(result, root) {
       <p class="field-hint result-timestamp">Analysis run: ${new Date(result.timestamp).toLocaleString()}</p>
       <p class="field-hint">Report export package includes JSON and PDF payload sections for design basis and verification plan.</p>
     </section>`;
+
+  const profileRoot = root.querySelector('#cp-profile-chart-root');
+  if (profileRoot) {
+    cpProfilesController = initCpProfiles({
+      root: profileRoot,
+      profileData,
+      onSegmentHover: (segmentIndex) => {
+        cpLayoutCanvasController?.setExternalHoverSegment(segmentIndex);
+      }
+    });
+  }
 }
 
 function buildDesignAdvisories(result, sensitivityRows) {
@@ -1342,6 +1440,13 @@ function buildVerificationPlan(result, approval = null) {
 
 function buildReportExportData(result, approval = null) {
   const verificationPlan = buildVerificationPlan(result, approval);
+  const profileData = result.profileData || buildCpProfileData({
+    input: result,
+    adjustedRequiredCurrentA: result.requiredCurrentA,
+    distributionModel: result.distributionModel,
+    measuredInstantOffPotentialMv: result.measuredInstantOffPotentialMv,
+    baseCoatingFactor: result.coatingBreakdownFactor
+  });
   return {
     version: 'cp-report-export-v1',
     generatedAt: new Date().toISOString(),
@@ -1358,6 +1463,7 @@ function buildReportExportData(result, approval = null) {
         data: {
           designBasis: result.standardsBasis || CP_STANDARD_BASIS,
           verificationPlan,
+          chartData: profileData,
           resultsSummary: {
             requiredCurrentA: result.requiredCurrentA,
             minimumAnodeMassKg: result.minimumAnodeMassKg,

@@ -52,7 +52,13 @@ function clonePoints(points = []) {
   return points.map((point) => ({ ...point }));
 }
 
-export function initCpLayoutCanvas({ panelId = 'cp-layout-canvas-panel', formId = 'cp-form', initialLayout = null, onLayoutChange = null } = {}) {
+export function initCpLayoutCanvas({
+  panelId = 'cp-layout-canvas-panel',
+  formId = 'cp-form',
+  initialLayout = null,
+  onLayoutChange = null,
+  onSegmentHover = null
+} = {}) {
   const panel = document.getElementById(panelId);
   const form = document.getElementById(formId);
   if (!panel || !form) {
@@ -96,7 +102,9 @@ export function initCpLayoutCanvas({ panelId = 'cp-layout-canvas-panel', formId 
     },
     viewMode: VIEW_MODES.design,
     activeMeasurementSetup: MEASUREMENT_SETUPS[0].key,
-    animationTick: 0
+    animationTick: 0,
+    hoveredSegmentIndex: null,
+    externalHoveredSegmentIndex: null
   };
 
   let animationFrameId = null;
@@ -322,8 +330,18 @@ export function initCpLayoutCanvas({ panelId = 'cp-layout-canvas-panel', formId 
     const wiringVisible = state.layers[LAYERS.wiring] ? '' : 'display="none"';
     const measurementVisible = state.layers[LAYERS.measurement] ? '' : 'display="none"';
 
-    const segmentMarkup = structureSegments.map((segment) => `
-      <line x1="${segment.x1}" y1="${segment.y1}" x2="${segment.x2}" y2="${segment.y2}" class="cp-layout-structure-line" />
+    const activeSegmentIndex = Number.isInteger(state.externalHoveredSegmentIndex)
+      ? state.externalHoveredSegmentIndex
+      : state.hoveredSegmentIndex;
+    const segmentMarkup = structureSegments.map((segment, index) => `
+      <line
+        x1="${segment.x1}"
+        y1="${segment.y1}"
+        x2="${segment.x2}"
+        y2="${segment.y2}"
+        class="cp-layout-structure-line ${activeSegmentIndex === index ? 'is-hovered' : ''}"
+        data-segment-index="${index}"
+      />
       <text x="${(segment.x1 + segment.x2) / 2}" y="${segment.y1 - 14}" class="cp-layout-segment-label" text-anchor="middle">${segment.label}</text>
     `).join('');
 
@@ -485,6 +503,20 @@ export function initCpLayoutCanvas({ panelId = 'cp-layout-canvas-panel', formId 
     canvas.releasePointerCapture(event.pointerId);
   }
 
+  function onCanvasHover(event) {
+    const segmentEl = event.target.closest('[data-segment-index]');
+    const nextIndex = segmentEl ? Number.parseInt(segmentEl.dataset.segmentIndex || '-1', 10) : null;
+    const normalizedIndex = Number.isInteger(nextIndex) && nextIndex >= 0 ? nextIndex : null;
+    if (state.hoveredSegmentIndex === normalizedIndex) {
+      return;
+    }
+    state.hoveredSegmentIndex = normalizedIndex;
+    if (typeof onSegmentHover === 'function') {
+      onSegmentHover(normalizedIndex);
+    }
+    render();
+  }
+
   function setZoom(nextScale) {
     state.viewport.scale = clamp(nextScale, 0.5, 2.5);
     render();
@@ -568,6 +600,17 @@ export function initCpLayoutCanvas({ panelId = 'cp-layout-canvas-panel', formId 
   canvas.addEventListener('pointermove', onPointerMove);
   canvas.addEventListener('pointerup', onPointerUp);
   canvas.addEventListener('pointercancel', onPointerUp);
+  canvas.addEventListener('mousemove', onCanvasHover);
+  canvas.addEventListener('mouseleave', () => {
+    if (state.hoveredSegmentIndex === null) {
+      return;
+    }
+    state.hoveredSegmentIndex = null;
+    if (typeof onSegmentHover === 'function') {
+      onSegmentHover(null);
+    }
+    render();
+  });
 
   resetButton?.addEventListener('click', resetLayout);
   zoomInButton?.addEventListener('click', () => setZoom(state.viewport.scale + 0.15));
@@ -606,6 +649,14 @@ export function initCpLayoutCanvas({ panelId = 'cp-layout-canvas-panel', formId 
     syncFromInputs,
     resetLayout,
     getState: serializeLayout,
+    setExternalHoverSegment: (segmentIndex) => {
+      const normalizedIndex = Number.isInteger(segmentIndex) && segmentIndex >= 0 ? segmentIndex : null;
+      if (state.externalHoveredSegmentIndex === normalizedIndex) {
+        return;
+      }
+      state.externalHoveredSegmentIndex = normalizedIndex;
+      render();
+    },
     setMeasurementSetup: (setupKey) => setMeasurementSetup(setupKey, { forceMeasurementView: true }),
     destroy: () => {
       if (animationFrameId) {

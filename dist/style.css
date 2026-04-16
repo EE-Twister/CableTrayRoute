@@ -212,6 +212,10 @@
   stroke-width: 7;
   stroke-linecap: round;
 }
+.cp-layout-structure-line.is-hovered {
+  stroke: color-mix(in srgb, #ef4444 78%, #7f1d1d);
+  stroke-width: 10;
+}
 .cp-layout-segment-label {
   fill: var(--text-color, #1f2b3a);
   font-size: 14px;
@@ -277,6 +281,81 @@
   fill: color-mix(in srgb, var(--text-color, #1f2b3a) 85%, #ffffff);
   font-size: 12px;
   font-weight: 600;
+}
+.cp-profile-header {
+  display: flex;
+  gap: .75rem;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+}
+.cp-profile-toggle-row {
+  display: inline-flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: .65rem;
+}
+.cp-profile-toggle {
+  display: inline-flex;
+  gap: .25rem;
+  align-items: center;
+  font-size: .86rem;
+}
+.cp-profile-grid {
+  display: grid;
+  gap: .65rem;
+}
+.cp-profile-chart {
+  border: 1px solid var(--border-color, #7d8790);
+  border-radius: 10px;
+  padding: .6rem;
+}
+.cp-profile-chart h4 {
+  margin: 0 0 .35rem;
+  font-size: .95rem;
+}
+.cp-profile-chart svg {
+  width: 100%;
+  height: auto;
+  display: block;
+}
+.cp-plot-frame {
+  fill: color-mix(in srgb, var(--panel-bg, #f8fafc) 94%, #dbeafe 6%);
+  stroke: color-mix(in srgb, var(--border-color, #7d8790) 75%, transparent);
+}
+.cp-band-pass { fill: color-mix(in srgb, #22c55e 16%, transparent); }
+.cp-band-fail { fill: color-mix(in srgb, #ef4444 14%, transparent); }
+.cp-threshold-line {
+  stroke: color-mix(in srgb, #f59e0b 78%, #78350f);
+  stroke-width: 1.5;
+  stroke-dasharray: 5 4;
+}
+.cp-profile-line {
+  fill: none;
+  stroke-width: 2.2;
+}
+.cp-profile-line--base { stroke: #1d4ed8; }
+.cp-profile-line--conservative { stroke: #b45309; }
+.cp-profile-line--optimized { stroke: #059669; }
+.cp-profile-point {
+  stroke-width: 1.4;
+}
+.cp-profile-point--pass {
+  fill: color-mix(in srgb, #22c55e 78%, #ffffff);
+  stroke: color-mix(in srgb, #15803d 85%, #052e16);
+}
+.cp-profile-point--fail {
+  fill: color-mix(in srgb, #ef4444 82%, #ffffff);
+  stroke: color-mix(in srgb, #b91c1c 88%, #450a0a);
+}
+.cp-crosshair {
+  stroke: color-mix(in srgb, #7c3aed 82%, #2e1065);
+  stroke-width: 1.8;
+  stroke-dasharray: 4 4;
+}
+.cp-axis-label {
+  fill: var(--text-color, #1f2b3a);
+  font-size: 12px;
 }
 @media (max-width: 1080px) {
   .cp-layout-workspace {
