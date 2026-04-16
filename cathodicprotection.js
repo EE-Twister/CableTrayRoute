@@ -50,6 +50,24 @@ const PIPE_MATERIAL_FACTORS = {
   other: { factor: 1.0, hint: 'Generic metal preset is selected. Verify current density by project specification.' }
 };
 
+let cpLayoutCanvasController = null;
+
+function mapAcceptanceTargetToMeasurementSetup(checkKey = '') {
+  if (checkKey === 'instantOffPotential') return 'instantOffPotential';
+  if (checkKey === 'polarizationShift') return 'polarizationShift';
+  if (checkKey === 'testPointCoverage') return 'testPointCoverage';
+  if (checkKey === 'commissioningChecksDefined') return 'instantOffPotential';
+  if (checkKey === 'monitoringPlanDefined') return 'testPointCoverage';
+  return 'polarizationShift';
+}
+
+function focusMeasurementVisualization(checkKey = '') {
+  const setupKey = mapAcceptanceTargetToMeasurementSetup(checkKey);
+  cpLayoutCanvasController?.setMeasurementSetup?.(setupKey);
+  const layoutPanel = document.getElementById('cp-layout-canvas-panel');
+  layoutPanel?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+}
+
 export const CP_STANDARD_BASIS = {
   standardsProfile: {
     id: 'cp-standards-profile',
@@ -631,7 +649,7 @@ if (typeof document !== 'undefined') {
     renderResults(saved, resultsDiv);
   }
 
-  const cpLayoutCanvas = initCpLayoutCanvas({
+  cpLayoutCanvasController = initCpLayoutCanvas({
     panelId: 'cp-layout-canvas-panel',
     formId: 'cp-form',
     initialLayout: cpLayoutState,
@@ -755,8 +773,20 @@ if (typeof document !== 'undefined') {
   ['number-of-anodes', 'anode-spacing', 'anode-distance-to-structure', 'test-point-count', 'reference-electrode-location', 'unit-select'].forEach((id) => {
     const field = document.getElementById(id);
     if (!field) return;
-    field.addEventListener('input', () => cpLayoutCanvas?.syncFromInputs());
-    field.addEventListener('change', () => cpLayoutCanvas?.syncFromInputs());
+    field.addEventListener('input', () => cpLayoutCanvasController?.syncFromInputs());
+    field.addEventListener('change', () => cpLayoutCanvasController?.syncFromInputs());
+  });
+
+  resultsDiv?.addEventListener('click', (event) => {
+    const trigger = event.target.closest('[data-cp-setup-target]');
+    if (!trigger) return;
+    focusMeasurementVisualization(trigger.dataset.cpSetupTarget);
+  });
+
+  compliancePanelEl?.addEventListener('click', (event) => {
+    const trigger = event.target.closest('[data-cp-setup-target]');
+    if (!trigger) return;
+    focusMeasurementVisualization(trigger.dataset.cpSetupTarget);
   });
 
   form.addEventListener('submit', (event) => {
@@ -775,7 +805,7 @@ if (typeof document !== 'undefined') {
       studies.cathodicProtection = {
         ...result,
         reportExport: buildReportExportData(result, approval),
-        cpLayout: cpLayoutCanvas?.getState() || cpLayoutState,
+        cpLayout: cpLayoutCanvasController?.getState() || cpLayoutState,
         compliance: complianceRecord.compliance,
         complianceHistory: complianceRecord.complianceHistory
       };
@@ -1003,7 +1033,12 @@ function renderResults(result, root) {
                   <td>${escapeHtml(criterion.requirement)}</td>
                   <td>${escapeHtml(criterion.rawValue || criterion.observedValue || 'n/a')}</td>
                   <td>${escapeHtml(criterion.correctedValue || criterion.observedValue || 'n/a')}</td>
-                  <td>${escapeHtml(criterion.decision || (criterion.status === 'pass' ? 'Pass' : 'Fail'))}</td>
+                  <td>
+                    ${escapeHtml(criterion.decision || (criterion.status === 'pass' ? 'Pass' : 'Fail'))}
+                    ${criterion.status === 'fail'
+    ? `<button type="button" class="btn" data-cp-setup-target="${escapeHtml(criterion.key)}">Show measurement visual</button>`
+    : ''}
+                  </td>
                 </tr>
               `).join('')}
             </tbody>
@@ -1246,7 +1281,12 @@ function renderComplianceStatusPanel(root, requiredChecks = {}, lastEvaluatedAt 
           ${rows.map((row) => `
             <tr>
               <td>${escapeHtml(row.label)} <span class="field-hint">(${escapeHtml(row.key)})</span></td>
-              <td><span class="result-badge result-badge--${escapeHtml(row.status)}">${escapeHtml(statusLabels[row.status] || 'Not run')}</span></td>
+              <td>
+                <span class="result-badge result-badge--${escapeHtml(row.status)}">${escapeHtml(statusLabels[row.status] || 'Not run')}</span>
+                ${row.status === 'fail'
+    ? `<button type="button" class="btn" data-cp-setup-target="${escapeHtml(row.key)}">Jump to measurement view</button>`
+    : ''}
+              </td>
             </tr>
           `).join('')}
         </tbody>
