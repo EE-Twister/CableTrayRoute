@@ -213,6 +213,10 @@
   grid-template-columns: minmax(0, 1fr) minmax(260px, 320px);
   align-items: start;
 }
+.cp-layout-sidebar {
+  display: grid;
+  gap: .75rem;
+}
 .cp-layout-toolbar label {
   display: inline-flex;
   align-items: center;
@@ -251,6 +255,28 @@
   background: color-mix(in srgb, var(--panel-bg, #f8fafc) 94%, #f3f6ff 6%);
   max-height: 420px;
   overflow: auto;
+}
+.cp-properties-panel {
+  border: 1px solid var(--border-color, #7d8790);
+  border-radius: 10px;
+  padding: .75rem;
+  background: color-mix(in srgb, var(--panel-bg, #f8fafc) 95%, #eef7ff 5%);
+}
+.cp-properties-panel h3,
+.cp-properties-panel h4 {
+  margin-top: 0;
+}
+.cp-properties-form {
+  display: grid;
+  gap: .45rem;
+}
+.cp-properties-form label {
+  display: grid;
+  gap: .2rem;
+  font-size: .84rem;
+}
+.cp-properties-form input {
+  width: 100%;
 }
 .cp-measurement-panel h3 {
   margin-top: 0;
@@ -568,6 +594,9 @@
 }
 @media (max-width: 1080px) {
   .cp-layout-workspace {
+    grid-template-columns: 1fr;
+  }
+  .cp-layout-sidebar {
     grid-template-columns: 1fr;
   }
   .cp-measurement-panel {
