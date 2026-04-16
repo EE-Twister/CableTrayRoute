@@ -6,6 +6,7 @@ import {
   getRequiredComplianceChecks,
   buildInitialComplianceStatus
 } from './src/studies/cp/standardsProfile.js';
+import { computeDistributionBySegment, parseZoneResistivityValues } from './src/studies/cp/distributionModel.js';
 
 const SQFT_TO_SQM = 0.09290304;
 const LB_TO_KG = 0.45359237;
@@ -98,8 +99,18 @@ export function runCathodicProtectionAnalysis(input) {
 
   const designCurrentDensityAperM2 = designCurrentDensityMaM2 / 1000;
   const exposedAreaM2 = input.surfaceAreaM2 * input.coatingBreakdownFactor;
-  const requiredCurrentA = calculateRequiredCurrent(exposedAreaM2, designCurrentDensityAperM2);
-  const adjustedRequiredCurrentA = requiredCurrentA / input.availabilityFactor;
+  const areaBasedRequiredCurrentA = calculateRequiredCurrent(exposedAreaM2, designCurrentDensityAperM2);
+  const distributionModel = computeDistributionBySegment({
+    anodeTypeSystem: input.anodeTypeSystem,
+    numberOfAnodes: input.numberOfAnodes,
+    anodeSpacingM: input.anodeSpacingM,
+    anodeDistanceToStructureM: input.anodeDistanceToStructureM,
+    anodeBurialDepthM: input.anodeBurialDepthM,
+    soilResistivityOhmM: input.soilResistivityOhmM,
+    zoneResistivityOhmM: input.zoneResistivityOhmM
+  });
+  const distributionAdjustedCurrentA = areaBasedRequiredCurrentA * distributionModel.globalAttenuationFactor;
+  const adjustedRequiredCurrentA = distributionAdjustedCurrentA / input.availabilityFactor;
   const designHours = input.targetLifeYears * 8760;
 
   const minimumAnodeMassKg = calculateRequiredAnodeMass(
@@ -123,13 +134,16 @@ export function runCathodicProtectionAnalysis(input) {
     timestamp: new Date().toISOString(),
     standardsBasis: CP_STANDARD_BASIS,
     outputBasis: {
-      requiredCurrentA: 'Uses exposed-area current demand relation with current density selected per current-density standards basis.',
+      requiredCurrentA: 'Uses exposed-area current demand relation adjusted with per-segment distribution attenuation/effectiveness factors.',
       minimumAnodeMassKg: 'Uses anode mass sizing equation with anode capacity/utilization values from anode-capacity standards basis.',
       predictedLifeYears: 'Uses installed mass life relation with anode capacity/utilization basis and protection criteria assumptions.',
       safetyMargin: 'Compares predicted life versus target design life using the same protection and anode basis assumptions.'
     },
     designCurrentDensityMaM2: roundTo(designCurrentDensityMaM2, 3),
     exposedAreaM2: roundTo(exposedAreaM2, 3),
+    areaBasedRequiredCurrentA: roundTo(areaBasedRequiredCurrentA, 4),
+    distributionAdjustedCurrentA: roundTo(distributionAdjustedCurrentA, 4),
+    distributionModel,
     requiredCurrentA: roundTo(adjustedRequiredCurrentA, 4),
     minimumAnodeMassKg: roundTo(minimumAnodeMassKg, 3),
     minimumAnodeMassLb: roundTo(minimumAnodeMassKg / LB_TO_KG, 3),
@@ -214,6 +228,28 @@ function validateInputs(input) {
 
   if (input.currentDensityMethod === 'manual' && (!Number.isFinite(input.manualCurrentDensityMaM2) || input.manualCurrentDensityMaM2 <= 0)) {
     errors.push('manualCurrentDensityMaM2 must be greater than zero when manual mode is selected.');
+  }
+
+  if (!['galvanic', 'iccp'].includes(input.anodeTypeSystem)) {
+    errors.push('anodeTypeSystem must be galvanic or iccp.');
+  }
+
+  if (!Number.isInteger(input.numberOfAnodes) || input.numberOfAnodes <= 0) {
+    errors.push('numberOfAnodes must be a positive integer.');
+  }
+
+  ['anodeSpacingM', 'anodeDistanceToStructureM', 'anodeBurialDepthM'].forEach((fieldName) => {
+    if (!Number.isFinite(input[fieldName]) || input[fieldName] <= 0) {
+      errors.push(`${fieldName} must be greater than zero.`);
+    }
+  });
+
+  if (!Array.isArray(input.zoneResistivityOhmM) || input.zoneResistivityOhmM.some((value) => !Number.isFinite(value) || value <= 0)) {
+    errors.push('zoneResistivityOhmM values must be positive numbers when provided.');
+  }
+
+  if (input.zoneResistivityInputValid === false) {
+    errors.push('zoneResistivityOhmM input must be a comma-separated list of positive numbers.');
   }
 
   return errors;
@@ -461,6 +497,16 @@ function readFormInputs() {
     ? (isMetric ? calculatedAreaM2 : calculatedAreaM2 * SQM_TO_SQFT)
     : getNumber('surface-area');
   const installedMassInput = getNumber('installed-mass');
+  const anodeSpacingInput = getNumber('anode-spacing');
+  const anodeDistanceInput = getNumber('anode-distance-to-structure');
+  const anodeBurialDepthInput = getNumber('anode-burial-depth');
+  const zoneResistivityRaw = getValue('zone-resistivity-values');
+  const parsedZoneResistivityValues = parseZoneResistivityValues(zoneResistivityRaw);
+  const zoneResistivityTokens = String(zoneResistivityRaw ?? '')
+    .split(',')
+    .map((token) => token.trim())
+    .filter((token) => token.length > 0);
+  const zoneResistivityInputValid = zoneResistivityTokens.length === parsedZoneResistivityValues.length;
 
   return {
     assetType,
@@ -481,6 +527,13 @@ function readFormInputs() {
     availabilityFactor: getNumber('availability-factor'),
     targetLifeYears: getNumber('design-life-years'),
     installedMassKg: isMetric ? installedMassInput : installedMassInput * LB_TO_KG,
+    anodeTypeSystem: getValue('anode-system-type'),
+    numberOfAnodes: Math.round(getNumber('number-of-anodes')),
+    anodeSpacingM: isMetric ? anodeSpacingInput : anodeSpacingInput * FT_TO_M,
+    anodeDistanceToStructureM: isMetric ? anodeDistanceInput : anodeDistanceInput * FT_TO_M,
+    anodeBurialDepthM: isMetric ? anodeBurialDepthInput : anodeBurialDepthInput * FT_TO_M,
+    zoneResistivityOhmM: parsedZoneResistivityValues,
+    zoneResistivityInputValid,
     units: isMetric ? 'metric' : 'imperial'
   };
 }
@@ -501,7 +554,9 @@ function renderResults(result, root) {
           <span class="result-label">Required CP current</span>
           <span class="result-value">${result.requiredCurrentA} A</span>
         </div>
-        <p class="field-hint result-formula">I<sub>req</sub> = A<sub>exposed</sub> × i<sub>d</sub> = ${result.exposedAreaM2} × ${(result.designCurrentDensityMaM2 / 1000).toFixed(4)} = ${result.requiredCurrentA} A</p>
+        <p class="field-hint result-formula">I<sub>area</sub> = A<sub>exposed</sub> × i<sub>d</sub> = ${result.exposedAreaM2} × ${(result.designCurrentDensityMaM2 / 1000).toFixed(4)} = ${result.areaBasedRequiredCurrentA} A</p>
+        <p class="field-hint result-formula">I<sub>distribution</sub> = I<sub>area</sub> × attenuation factor (${result.distributionModel?.globalAttenuationFactor ?? 1}) = ${result.distributionAdjustedCurrentA} A</p>
+        <p class="field-hint result-formula">I<sub>required</sub> = I<sub>distribution</sub> / availability (${result.availabilityFactor}) = ${result.requiredCurrentA} A</p>
         <p class="field-hint result-basis">Basis: ${escapeHtml(outputBasis.requiredCurrentA || 'See Calculation Basis section for standards mapping.')}</p>
       </div>
 
@@ -536,6 +591,13 @@ function renderResults(result, root) {
             <tr><td>Coating breakdown factor</td><td>${result.coatingBreakdownFactor}</td></tr>
             <tr><td>Exposed area</td><td>${result.exposedAreaM2} m²</td></tr>
             <tr><td>Anode capacity</td><td>${result.anodeCapacityAhPerKg} Ah/kg</td></tr>
+            <tr><td>Anode system type</td><td>${escapeHtml(result.anodeTypeSystem)}</td></tr>
+            <tr><td>Number of anodes</td><td>${result.numberOfAnodes}</td></tr>
+            <tr><td>Anode spacing</td><td>${roundTo(result.anodeSpacingM, 3)} m</td></tr>
+            <tr><td>Anode distance to structure</td><td>${roundTo(result.anodeDistanceToStructureM, 3)} m</td></tr>
+            <tr><td>Anode burial depth</td><td>${roundTo(result.anodeBurialDepthM, 3)} m</td></tr>
+            <tr><td>Distribution effectiveness (average)</td><td>${result.distributionModel?.averageEffectivenessFactor ?? 'n/a'}</td></tr>
+            <tr><td>Distribution attenuation factor</td><td>${result.distributionModel?.globalAttenuationFactor ?? 'n/a'}</td></tr>
             <tr><td>Anode utilization factor U</td><td>${result.anodeUtilization}</td></tr>
             <tr><td>Design factor F<sub>design</sub></td><td>${result.designFactor}</td></tr>
             <tr><td>Availability factor</td><td>${result.availabilityFactor}</td></tr>
@@ -563,6 +625,29 @@ function renderResults(result, root) {
                 <td>${scenario.minimumAnodeMassKg} kg (${scenario.minimumAnodeMassLb} lb)</td>
                 <td>${scenario.predictedLifeYears}</td>
                 <td>${scenario.safetyMarginYears} years (${scenario.safetyMarginPercent}%)</td>
+              </tr>`).join('')}
+          </tbody>
+        </table>
+      </div>` : ''}
+
+      ${Array.isArray(result.distributionModel?.segments) && result.distributionModel.segments.length ? `
+      <div class="table-wrap">
+        <table class="data-table" aria-label="Current distribution by segment">
+          <thead>
+            <tr>
+              <th>Segment</th>
+              <th>Zone resistivity (Ω·m)</th>
+              <th>Effectiveness factor</th>
+              <th>Attenuation factor</th>
+            </tr>
+          </thead>
+          <tbody>
+            ${result.distributionModel.segments.map((segment) => `
+              <tr>
+                <td>${segment.segment}</td>
+                <td>${segment.zoneResistivityOhmM}</td>
+                <td>${segment.effectivenessFactor}</td>
+                <td>${segment.attenuationFactor}</td>
               </tr>`).join('')}
           </tbody>
         </table>
