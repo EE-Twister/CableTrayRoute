@@ -59,6 +59,21 @@ let cpComparisonState = {
   zoomScale: 1
 };
 
+function buildLayoutAssessmentPayload(study) {
+  if (!study || typeof study !== 'object') {
+    return null;
+  }
+  return {
+    profileData: study.profileData || null,
+    distributionModel: study.distributionModel || null,
+    interferenceAssessment: study.interferenceAssessment || null,
+    safetyMarginYears: study.safetyMarginYears,
+    safetyMarginPercent: study.safetyMarginPercent,
+    measuredInstantOffPotentialMv: study.measuredInstantOffPotentialMv,
+    targetLifeYears: study.targetLifeYears
+  };
+}
+
 function mapAcceptanceTargetToMeasurementSetup(checkKey = '') {
   if (checkKey === 'instantOffPotential') return 'instantOffPotential';
   if (checkKey === 'polarizationShift') return 'polarizationShift';
@@ -655,6 +670,7 @@ if (typeof document !== 'undefined') {
       };
       setStudies(studies);
       renderResults(studies.cathodicProtection, resultsDiv);
+      cpLayoutCanvasController?.setAssessmentData(buildLayoutAssessmentPayload(studies.cathodicProtection));
       renderComplianceStatusPanel(
         compliancePanelEl,
         studies.cathodicProtection.compliance.requiredChecks,
@@ -675,6 +691,7 @@ if (typeof document !== 'undefined') {
       };
       setStudies(studies);
       renderResults(studies.cathodicProtection, resultsDiv);
+      cpLayoutCanvasController?.setAssessmentData(buildLayoutAssessmentPayload(studies.cathodicProtection));
       renderComplianceStatusPanel(
         compliancePanelEl,
         studies.cathodicProtection.compliance.requiredChecks,
@@ -747,6 +764,7 @@ if (typeof document !== 'undefined') {
       cpProfilesController?.setExternalHoverSegment(segmentIndex);
     }
   });
+  cpLayoutCanvasController?.setAssessmentData(buildLayoutAssessmentPayload(saved));
 
   function refreshTableDensity() {
     const input = readFormInputs();
@@ -897,6 +915,7 @@ if (typeof document !== 'undefined') {
         applySavedCpInputs(studies.cathodicProtection);
         cpLayoutCanvasController?.syncFromInputs();
         renderResults(studies.cathodicProtection, resultsDiv);
+        cpLayoutCanvasController?.setAssessmentData(buildLayoutAssessmentPayload(studies.cathodicProtection));
         renderComplianceStatusPanel(
           compliancePanelEl,
           studies.cathodicProtection.compliance?.requiredChecks,
@@ -947,6 +966,7 @@ if (typeof document !== 'undefined') {
       cpComparisonState.baselineStudy = baselineStudy;
       setStudies(studies);
       renderResults(studies.cathodicProtection, resultsDiv);
+      cpLayoutCanvasController?.setAssessmentData(buildLayoutAssessmentPayload(studies.cathodicProtection));
       const comparePanel = resultsDiv.querySelector('#cp-compare-panel');
       if (comparePanel) {
         comparePanel.hidden = false;
@@ -1013,6 +1033,7 @@ if (typeof document !== 'undefined') {
       };
       setStudies(studies);
       renderResults(studies.cathodicProtection, resultsDiv);
+      cpLayoutCanvasController?.setAssessmentData(buildLayoutAssessmentPayload(studies.cathodicProtection));
       renderComplianceStatusPanel(
         compliancePanelEl,
         studies.cathodicProtection.compliance.requiredChecks,

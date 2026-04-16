@@ -112,6 +112,13 @@ Life_years = (W_installed × Q_anode × U × F_design) / (I_req × 8760)</pre>
           <label><input type="checkbox" id="cp-layer-anodes" checked> Anodes</label>
           <label><input type="checkbox" id="cp-layer-wiring" checked> Wiring</label>
           <label><input type="checkbox" id="cp-layer-measurement" checked> Measurement points</label>
+          <label><input type="checkbox" id="cp-layer-heatmap" checked> Risk heatmap</label>
+        </div>
+        <div class="cp-layout-toolbar cp-layout-toolbar--filters" role="group" aria-label="Heatmap quick filters">
+          <span class="cp-toolbar-label">Quick filters</span>
+          <label><input type="checkbox" id="cp-heat-filter-high-risk"> Show only high-risk hotspots</label>
+          <label><input type="checkbox" id="cp-heat-filter-failed-criteria"> Show only failed criteria zones</label>
+          <label><input type="checkbox" id="cp-heat-filter-low-margin"> Show only low safety margin zones</label>
         </div>
         <div class="cp-layout-toolbar" role="group" aria-label="CP layout navigation controls">
           <button type="button" class="btn" data-cp-layout-action="zoom-in">Zoom +</button>
@@ -137,6 +144,20 @@ Life_years = (W_installed × Q_anode × U × F_design) / (I_req × 8760)</pre>
             <li><span class="cp-legend-dot cp-legend-dot--target" aria-hidden="true"></span>Active criterion focus</li>
           </ul>
         </div>
+        <section class="cp-heatmap-legend" aria-labelledby="cp-heatmap-legend-heading">
+          <h3 id="cp-heatmap-legend-heading">Severity heatmap legend</h3>
+          <p class="field-hint">Color scale uses a colorblind-safe blue → amber → vermillion gradient with contour outlines to indicate boundaries.</p>
+          <div class="cp-heatmap-scale" role="img" aria-label="Heatmap scale from low severity at blue to high severity at vermillion"></div>
+          <ul class="cp-heatmap-contours">
+            <li><span class="cp-heatmap-contour cp-heatmap-contour--medium" aria-hidden="true"></span>Medium contour: score ≥ 0.40</li>
+            <li><span class="cp-heatmap-contour cp-heatmap-contour--high" aria-hidden="true"></span>High contour: score ≥ 0.70</li>
+          </ul>
+          <p class="field-hint" id="cp-heatmap-text-alt">Text alternatives are available through hotspot labels and the hotspot inspector panel.</p>
+        </section>
+        <section id="cp-hotspot-inspector" class="cp-hotspot-inspector" aria-live="polite" aria-label="Hotspot inspector">
+          <h3>Hotspot inspector</h3>
+          <p class="field-hint">Click a hotspot on the layout canvas to inspect assumptions and contributing factors.</p>
+        </section>
         <p id="cp-layout-status" class="field-hint" aria-live="polite">Layout initialized from form values.</p>
       </section>
 
