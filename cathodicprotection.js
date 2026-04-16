@@ -10,6 +10,7 @@ import { computeDistributionBySegment, parseZoneResistivityValues } from './src/
 import { evaluateCriteriaChecks } from './src/studies/cp/criteriaChecks.js';
 import { evaluateInterferenceAssessment, parseMitigationActions } from './src/studies/cp/interferenceAssessment.js';
 import { COATING_MODEL_TYPES, parseConditionFactorValues, resolveCoatingModel } from './src/studies/cp/coatingModel.js';
+import { initCpLayoutCanvas } from './src/cpLayoutCanvas.js';
 
 const SQFT_TO_SQM = 0.09290304;
 const LB_TO_KG = 0.45359237;
@@ -461,6 +462,41 @@ function normalizeSavedStudy(saved) {
   };
 }
 
+function applySavedCpInputs(study) {
+  if (!study || typeof study !== 'object') {
+    return;
+  }
+
+  const valueMap = {
+    'number-of-anodes': study.numberOfAnodes,
+    'anode-spacing': study.units === 'metric' ? study.anodeSpacingM : (study.anodeSpacingM / FT_TO_M),
+    'anode-distance-to-structure': study.units === 'metric' ? study.anodeDistanceToStructureM : (study.anodeDistanceToStructureM / FT_TO_M),
+    'anode-burial-depth': study.units === 'metric' ? study.anodeBurialDepthM : (study.anodeBurialDepthM / FT_TO_M),
+    'test-point-count': study.testPointCount,
+    'test-point-pass-count': study.passingTestPointCount,
+    'reference-electrode-location': study.referenceElectrodeLocation
+  };
+
+  Object.entries(valueMap).forEach(([id, value]) => {
+    if (value === null || value === undefined) {
+      return;
+    }
+    const field = document.getElementById(id);
+    if (!field) {
+      return;
+    }
+    if (field.tagName === 'SELECT') {
+      field.value = String(value);
+      return;
+    }
+    if (typeof value === 'number' && Number.isFinite(value)) {
+      field.value = String(roundTo(value, 3));
+      return;
+    }
+    field.value = String(value);
+  });
+}
+
 function createComplianceRecord(result, previousStudy = null, approval = null) {
   const requiredChecks = evaluateComplianceChecks(result);
   const previousRequiredChecks = previousStudy?.compliance?.requiredChecks || {};
@@ -579,6 +615,8 @@ if (typeof document !== 'undefined') {
 
   const saved = normalizeSavedStudy(getStudies().cathodicProtection);
   const savedApproval = getStudyApprovals().cathodicProtection || null;
+  let cpLayoutState = saved?.cpLayout || null;
+  applySavedCpInputs(saved);
   renderCalculationBasis(basisPanel, CP_STANDARD_BASIS);
   renderComplianceStatusPanel(compliancePanelEl, saved?.compliance?.requiredChecks, saved?.compliance?.lastEvaluatedAt, saved?.compliance);
   if (saved) {
@@ -592,6 +630,25 @@ if (typeof document !== 'undefined') {
     }
     renderResults(saved, resultsDiv);
   }
+
+  const cpLayoutCanvas = initCpLayoutCanvas({
+    panelId: 'cp-layout-canvas-panel',
+    formId: 'cp-form',
+    initialLayout: cpLayoutState,
+    onLayoutChange: (nextLayout) => {
+      cpLayoutState = nextLayout;
+      const studies = getStudies();
+      const existingStudy = normalizeSavedStudy(studies.cathodicProtection);
+      if (!existingStudy) {
+        return;
+      }
+      studies.cathodicProtection = {
+        ...existingStudy,
+        cpLayout: nextLayout
+      };
+      setStudies(studies);
+    }
+  });
 
   function refreshTableDensity() {
     const input = readFormInputs();
@@ -695,6 +752,13 @@ if (typeof document !== 'undefined') {
     });
   });
 
+  ['number-of-anodes', 'anode-spacing', 'anode-distance-to-structure', 'test-point-count', 'reference-electrode-location', 'unit-select'].forEach((id) => {
+    const field = document.getElementById(id);
+    if (!field) return;
+    field.addEventListener('input', () => cpLayoutCanvas?.syncFromInputs());
+    field.addEventListener('change', () => cpLayoutCanvas?.syncFromInputs());
+  });
+
   form.addEventListener('submit', (event) => {
     event.preventDefault();
     const input = readFormInputs();
@@ -711,6 +775,7 @@ if (typeof document !== 'undefined') {
       studies.cathodicProtection = {
         ...result,
         reportExport: buildReportExportData(result, approval),
+        cpLayout: cpLayoutCanvas?.getState() || cpLayoutState,
         compliance: complianceRecord.compliance,
         complianceHistory: complianceRecord.complianceHistory
       };
