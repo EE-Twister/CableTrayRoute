@@ -58,6 +58,55 @@ let cpComparisonState = {
   hoveredSegmentIndex: null,
   zoomScale: 1
 };
+const TIMELINE_STEP_SEQUENCE = ['inputs', 'geometry', 'distribution', 'criteriaChecks', 'compliance'];
+const DEFAULT_TIMELINE_STATE = Object.freeze({
+  collapsed: false,
+  activeStep: 'inputs'
+});
+const TIMELINE_STEP_DEFINITIONS = [
+  {
+    key: 'inputs',
+    title: 'Inputs',
+    navTargetId: 'cp-form',
+    navLabel: 'Jump to CP inputs form',
+    whyThisMatters: 'NACE/AMPP design workflows require a defensible input basis (asset condition, environment severity, and assumptions) before sizing outputs are considered valid.',
+    checkpoints: ['currentDensitySelection']
+  },
+  {
+    key: 'geometry',
+    title: 'Geometry',
+    navTargetId: 'cp-layout-canvas-panel',
+    navLabel: 'Jump to CP layout canvas',
+    whyThisMatters: 'AMPP guidance ties anode spacing and reference electrode placement to field verifiability; geometry governs where under-protected zones can appear.',
+    checkpoints: ['testPointCoverage']
+  },
+  {
+    key: 'distribution',
+    title: 'Distribution',
+    navTargetId: 'cp-profile-chart-root',
+    navFallbackId: 'results',
+    navLabel: 'Jump to distribution profile chart',
+    whyThisMatters: 'Distribution attenuation and segment effectiveness demonstrate whether current reaches all zones, a key AMPP/NACE risk-screening expectation.',
+    checkpoints: ['anodeMassSizing', 'targetLifeVerification']
+  },
+  {
+    key: 'criteriaChecks',
+    title: 'Criteria Checks',
+    navTargetId: 'cp-criteria-results',
+    navFallbackId: 'results',
+    navLabel: 'Jump to criteria evidence table',
+    whyThisMatters: 'NACE/AMPP acceptance criteria (instant-off, polarization shift, test-point coverage) need traceable pass/fail evidence before declaring readiness.',
+    checkpoints: ['instantOffPotential', 'polarizationShift', 'testPointCoverage']
+  },
+  {
+    key: 'compliance',
+    title: 'Compliance',
+    navTargetId: 'cp-compliance-status-heading',
+    navLabel: 'Jump to compliance status panel',
+    whyThisMatters: 'Compliance status consolidates required checks and commissioning evidence so reviewers can confirm readiness against AMPP/NACE governance gates.',
+    checkpoints: ['commissioningChecksDefined', 'monitoringPlanDefined', 'interferenceAssessment']
+  }
+];
 
 function buildLayoutAssessmentPayload(study) {
   if (!study || typeof study !== 'object') {
@@ -567,8 +616,18 @@ function normalizeSavedStudy(saved) {
 
   return {
     ...saved,
+    timelineState: normalizeTimelineState(saved.timelineState),
     compliance,
     complianceHistory: existingHistory
+  };
+}
+
+function normalizeTimelineState(state) {
+  const nextState = state && typeof state === 'object' ? state : {};
+  const activeStep = TIMELINE_STEP_SEQUENCE.includes(nextState.activeStep) ? nextState.activeStep : DEFAULT_TIMELINE_STATE.activeStep;
+  return {
+    collapsed: Boolean(nextState.collapsed),
+    activeStep
   };
 }
 
@@ -605,6 +664,93 @@ function applySavedCpInputs(study) {
     }
     field.value = String(value);
   });
+}
+
+function buildTimelineStepSnapshot(stepKey, result) {
+  if (!result || typeof result !== 'object') {
+    return `<svg viewBox="0 0 120 64" role="img" aria-label="No study yet snapshot"><rect x="6" y="10" width="108" height="44" rx="8" fill="color-mix(in srgb, var(--panel-bg, #f8fafc) 85%, #dbeafe 15%)"></rect><text x="60" y="38" text-anchor="middle" font-size="11" fill="currentColor">Run analysis</text></svg>`;
+  }
+  if (stepKey === 'inputs') {
+    const severity = escapeHtml(result.moistureCategory || 'moderate');
+    return `<svg viewBox="0 0 120 64" role="img" aria-label="Input snapshot"><rect x="8" y="12" width="104" height="12" rx="4" fill="#1d4ed8"></rect><rect x="8" y="30" width="72" height="10" rx="4" fill="#0ea5e9"></rect><rect x="8" y="44" width="52" height="8" rx="4" fill="#94a3b8"></rect><text x="111" y="52" text-anchor="end" font-size="10" fill="currentColor">${severity}</text></svg>`;
+  }
+  if (stepKey === 'geometry') {
+    return `<svg viewBox="0 0 120 64" role="img" aria-label="Geometry snapshot"><line x1="16" y1="34" x2="104" y2="34" stroke="#334155" stroke-width="5" stroke-linecap="round"></line><circle cx="28" cy="22" r="5" fill="#2563eb"></circle><circle cx="56" cy="22" r="5" fill="#2563eb"></circle><circle cx="84" cy="22" r="5" fill="#2563eb"></circle><rect x="94" y="30" width="12" height="12" rx="2" fill="#16a34a"></rect></svg>`;
+  }
+  if (stepKey === 'distribution') {
+    const attenuation = Number.isFinite(result.distributionModel?.globalAttenuationFactor) ? result.distributionModel.globalAttenuationFactor : 1;
+    const barWidth = Math.max(10, Math.min(96, Math.round(attenuation * 96)));
+    return `<svg viewBox="0 0 120 64" role="img" aria-label="Distribution snapshot"><rect x="12" y="18" width="96" height="28" rx="6" fill="none" stroke="#475569" stroke-width="1.5"></rect><rect x="12" y="18" width="${barWidth}" height="28" rx="6" fill="#f59e0b"></rect><text x="60" y="56" text-anchor="middle" font-size="10" fill="currentColor">attn ${roundTo(attenuation, 2)}</text></svg>`;
+  }
+  if (stepKey === 'criteriaChecks') {
+    const totalChecks = Array.isArray(result.criteriaCheckEvidence?.criteriaResults) ? result.criteriaCheckEvidence.criteriaResults.length : 0;
+    const passCount = countCriteriaPasses(result);
+    return `<svg viewBox="0 0 120 64" role="img" aria-label="Criteria snapshot"><circle cx="32" cy="32" r="16" fill="#16a34a"></circle><text x="32" y="36" text-anchor="middle" font-size="12" fill="#fff">${passCount}</text><circle cx="78" cy="32" r="16" fill="#ef4444"></circle><text x="78" y="36" text-anchor="middle" font-size="12" fill="#fff">${Math.max(totalChecks - passCount, 0)}</text><text x="108" y="56" text-anchor="end" font-size="10" fill="currentColor">P/F</text></svg>`;
+  }
+  const complianceState = result.compliance?.complianceState || 'provisional';
+  const badgeColor = complianceState === 'compliant' ? '#16a34a' : (complianceState === 'not-compliant' ? '#ef4444' : '#f59e0b');
+  return `<svg viewBox="0 0 120 64" role="img" aria-label="Compliance snapshot"><rect x="20" y="12" width="80" height="40" rx="8" fill="${badgeColor}"></rect><text x="60" y="37" text-anchor="middle" font-size="11" fill="#fff">${escapeHtml(complianceState)}</text></svg>`;
+}
+
+function summarizeTimelineStep(stepKey, result) {
+  if (!result || typeof result !== 'object') {
+    return 'No CP run saved yet. Run a study to capture a replayable design decision at this step.';
+  }
+  if (stepKey === 'inputs') {
+    return `Inputs established asset ${result.assetType}, soil ${result.soilResistivityOhmM} Ω·m, and design density ${result.designCurrentDensityMaM2} mA/m².`;
+  }
+  if (stepKey === 'geometry') {
+    return `Geometry set ${result.numberOfAnodes} anodes at ${roundTo(result.anodeSpacingM, 2)} m spacing with ${roundTo(result.anodeDistanceToStructureM, 2)} m offset.`;
+  }
+  if (stepKey === 'distribution') {
+    return `Distribution reduced area demand ${result.areaBasedRequiredCurrentA} A to effective ${result.distributionAdjustedCurrentA} A using attenuation ${result.distributionModel?.globalAttenuationFactor ?? 'n/a'}.`;
+  }
+  if (stepKey === 'criteriaChecks') {
+    const criteriaStatus = result.criteriaCheckEvidence?.overallStatus || 'not-run';
+    return `Criteria evaluation is ${criteriaStatus}; ${countCriteriaPasses(result)} criteria currently pass with correction context ${result.measurementContext || 'unknown'}.`;
+  }
+  const label = result.compliance?.complianceState || 'provisional';
+  return `Compliance gate resolved as ${label}; unresolved checks: ${(result.compliance?.failedCheckKeys || []).join(', ') || 'none'}.`;
+}
+
+function resolveTimelineCheckpoints(stepDefinition, result) {
+  const requiredChecks = result?.compliance?.requiredChecks || {};
+  return stepDefinition.checkpoints.map((checkKey) => {
+    const status = requiredChecks[checkKey] || 'not-run';
+    return `${checkKey}: ${status}`;
+  });
+}
+
+function renderTimelinePanel(root, result, timelineState) {
+  if (!root) return;
+  const state = normalizeTimelineState(timelineState);
+  const timelineItems = TIMELINE_STEP_DEFINITIONS.map((step) => {
+    const isActive = step.key === state.activeStep;
+    const checkpoints = resolveTimelineCheckpoints(step, result);
+    return `
+      <li class="cp-timeline-step ${isActive ? 'is-active' : ''}">
+        <button type="button" class="cp-timeline-step__header" data-cp-timeline-step="${step.key}" aria-pressed="${isActive ? 'true' : 'false'}">
+          <span class="cp-timeline-step__title">${step.title}</span>
+          <span class="cp-timeline-step__index">${TIMELINE_STEP_SEQUENCE.indexOf(step.key) + 1}/5</span>
+        </button>
+        <div class="cp-timeline-step__content">
+          <div class="cp-timeline-step__snapshot">${buildTimelineStepSnapshot(step.key, result)}</div>
+          <p>${escapeHtml(summarizeTimelineStep(step.key, result))}</p>
+          <p class="cp-timeline-step__why"><strong>Why this matters (NACE/AMPP):</strong> ${escapeHtml(step.whyThisMatters)}</p>
+          <p class="cp-timeline-step__checkpoints"><strong>Checkpoint status:</strong> ${escapeHtml(checkpoints.join(' | '))}</p>
+          <button type="button" class="btn" data-cp-nav-target="${step.navTargetId}" data-cp-nav-fallback="${step.navFallbackId || ''}">${step.navLabel}</button>
+        </div>
+      </li>
+    `;
+  }).join('');
+
+  root.innerHTML = `
+    <details id="cp-timeline-details" class="cp-timeline-panel"${state.collapsed ? '' : ' open'}>
+      <summary>Design Decision Timeline (Inputs → Geometry → Distribution → Criteria Checks → Compliance)</summary>
+      <p class="field-hint">This timeline is saved with the project so reviewers can replay how compliance decisions evolved.</p>
+      <ol class="cp-timeline-list">${timelineItems}</ol>
+    </details>
+  `;
 }
 
 function createComplianceRecord(result, previousStudy = null, approval = null) {
@@ -670,6 +816,7 @@ if (typeof document !== 'undefined') {
       };
       setStudies(studies);
       renderResults(studies.cathodicProtection, resultsDiv);
+      renderTimelinePanel(timelinePanelEl, studies.cathodicProtection, cpTimelineState);
       cpLayoutCanvasController?.setAssessmentData(buildLayoutAssessmentPayload(studies.cathodicProtection));
       renderComplianceStatusPanel(
         compliancePanelEl,
@@ -691,6 +838,7 @@ if (typeof document !== 'undefined') {
       };
       setStudies(studies);
       renderResults(studies.cathodicProtection, resultsDiv);
+      renderTimelinePanel(timelinePanelEl, studies.cathodicProtection, cpTimelineState);
       cpLayoutCanvasController?.setAssessmentData(buildLayoutAssessmentPayload(studies.cathodicProtection));
       renderComplianceStatusPanel(
         compliancePanelEl,
@@ -724,13 +872,16 @@ if (typeof document !== 'undefined') {
   const coatingFixedRow = document.getElementById('coating-fixed-row');
   const coatingCurveRows = document.querySelectorAll('[data-coating-curve-row]');
   const coatingSegmentRow = document.getElementById('coating-segment-row');
+  const timelinePanelEl = document.getElementById('cp-decision-timeline-content');
 
   const saved = normalizeSavedStudy(getStudies().cathodicProtection);
   const savedApproval = getStudyApprovals().cathodicProtection || null;
   let cpLayoutState = saved?.cpLayout || null;
+  let cpTimelineState = normalizeTimelineState(saved?.timelineState);
   applySavedCpInputs(saved);
   renderCalculationBasis(basisPanel, CP_STANDARD_BASIS);
   renderComplianceStatusPanel(compliancePanelEl, saved?.compliance?.requiredChecks, saved?.compliance?.lastEvaluatedAt, saved?.compliance);
+  renderTimelinePanel(timelinePanelEl, saved, cpTimelineState);
   if (saved) {
     if (!saved.reportExport) {
       const studies = getStudies();
@@ -741,6 +892,7 @@ if (typeof document !== 'undefined') {
       setStudies(studies);
     }
     renderResults(saved, resultsDiv);
+    renderTimelinePanel(timelinePanelEl, saved, cpTimelineState);
   }
 
   cpLayoutCanvasController = initCpLayoutCanvas({
@@ -765,6 +917,18 @@ if (typeof document !== 'undefined') {
     }
   });
   cpLayoutCanvasController?.setAssessmentData(buildLayoutAssessmentPayload(saved));
+
+  function persistTimelineState(nextTimelineState) {
+    cpTimelineState = normalizeTimelineState(nextTimelineState);
+    const studies = getStudies();
+    const existingStudy = normalizeSavedStudy(studies.cathodicProtection);
+    if (!existingStudy) return;
+    studies.cathodicProtection = {
+      ...existingStudy,
+      timelineState: cpTimelineState
+    };
+    setStudies(studies);
+  }
 
   function refreshTableDensity() {
     const input = readFormInputs();
@@ -908,13 +1072,15 @@ if (typeof document !== 'undefined') {
         }
         studies.cathodicProtection = {
           ...baseline,
-          comparisonBaseline: null
+          comparisonBaseline: null,
+          timelineState: cpTimelineState
         };
         cpComparisonState.baselineStudy = null;
         setStudies(studies);
         applySavedCpInputs(studies.cathodicProtection);
         cpLayoutCanvasController?.syncFromInputs();
         renderResults(studies.cathodicProtection, resultsDiv);
+        renderTimelinePanel(timelinePanelEl, studies.cathodicProtection, cpTimelineState);
         cpLayoutCanvasController?.setAssessmentData(buildLayoutAssessmentPayload(studies.cathodicProtection));
         renderComplianceStatusPanel(
           compliancePanelEl,
@@ -961,11 +1127,13 @@ if (typeof document !== 'undefined') {
       }
       studies.cathodicProtection = {
         ...activeStudy,
-        comparisonBaseline: baselineStudy
+        comparisonBaseline: baselineStudy,
+        timelineState: cpTimelineState
       };
       cpComparisonState.baselineStudy = baselineStudy;
       setStudies(studies);
       renderResults(studies.cathodicProtection, resultsDiv);
+      renderTimelinePanel(timelinePanelEl, studies.cathodicProtection, cpTimelineState);
       cpLayoutCanvasController?.setAssessmentData(buildLayoutAssessmentPayload(studies.cathodicProtection));
       const comparePanel = resultsDiv.querySelector('#cp-compare-panel');
       if (comparePanel) {
@@ -1011,6 +1179,38 @@ if (typeof document !== 'undefined') {
     focusMeasurementVisualization(trigger.dataset.cpSetupTarget);
   });
 
+  timelinePanelEl?.addEventListener('click', (event) => {
+    const stepButton = event.target.closest('[data-cp-timeline-step]');
+    if (stepButton) {
+      const nextStep = stepButton.dataset.cpTimelineStep;
+      if (TIMELINE_STEP_SEQUENCE.includes(nextStep)) {
+        persistTimelineState({
+          ...cpTimelineState,
+          activeStep: nextStep
+        });
+        renderTimelinePanel(timelinePanelEl, normalizeSavedStudy(getStudies().cathodicProtection), cpTimelineState);
+      }
+      return;
+    }
+
+    const navButton = event.target.closest('[data-cp-nav-target]');
+    if (navButton) {
+      const primaryId = navButton.dataset.cpNavTarget;
+      const fallbackId = navButton.dataset.cpNavFallback;
+      const target = document.getElementById(primaryId) || (fallbackId ? document.getElementById(fallbackId) : null);
+      target?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    }
+  });
+
+  timelinePanelEl?.addEventListener('toggle', (event) => {
+    const details = event.target.closest('#cp-timeline-details');
+    if (!details) return;
+    persistTimelineState({
+      ...cpTimelineState,
+      collapsed: !details.open
+    });
+  }, true);
+
   form.addEventListener('submit', (event) => {
     event.preventDefault();
     const input = readFormInputs();
@@ -1028,6 +1228,7 @@ if (typeof document !== 'undefined') {
         ...result,
         reportExport: buildReportExportData(result, approval),
         cpLayout: cpLayoutCanvasController?.getState() || cpLayoutState,
+        timelineState: cpTimelineState,
         compliance: complianceRecord.compliance,
         complianceHistory: complianceRecord.complianceHistory
       };
@@ -1040,6 +1241,7 @@ if (typeof document !== 'undefined') {
         studies.cathodicProtection.compliance.lastEvaluatedAt,
         studies.cathodicProtection.compliance
       );
+      renderTimelinePanel(timelinePanelEl, studies.cathodicProtection, cpTimelineState);
     } catch (error) {
       const message = error instanceof Error ? error.message : 'Invalid cathodic protection inputs.';
       errorsDiv.hidden = false;
@@ -1259,7 +1461,7 @@ function renderResults(result, root) {
         </table>
       </div>
 
-      <div class="result-group" aria-label="Protection criteria check evidence">
+      <div id="cp-criteria-results" class="result-group" aria-label="Protection criteria check evidence">
         <h3>Protection Criteria Check Evidence</h3>
         <p class="field-hint">Criteria selected: ${escapeHtml(criteriaSet?.label || 'Not configured')} (${escapeHtml(criteriaSet?.reference || 'No reference')})</p>
         <p class="field-hint">Measurement basis: method ${escapeHtml(measurementCorrections.metadata?.testMethod || result.testMethod || 'instant-off')}, context ${escapeHtml(measurementCorrections.metadata?.measurementContext || result.measurementContext || 'unknown')}, reference ${escapeHtml(measurementCorrections.metadata?.referenceElectrodeLocation || result.referenceElectrodeLocation || 'unknown')}.</p>
