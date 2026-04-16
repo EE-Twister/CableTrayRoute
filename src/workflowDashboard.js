@@ -24,34 +24,127 @@ function statusIcon(complete) {
   return span;
 }
 
-function renderWorkflowSteps(container) {
+function studyHasResults(studyResult) {
+  if (!studyResult) return false;
+  if (Array.isArray(studyResult)) return studyResult.length > 0;
+  if (typeof studyResult === 'object') return Object.keys(studyResult).length > 0;
+  return true;
+}
+
+function getWorkflowMetrics() {
   const steps = workflowOrder.map(step => {
     const { complete, label, hint } = getStepStatus(step.key);
     return { step, complete, label, hint };
   });
+  const completedCount = steps.filter(({ complete }) => complete).length;
+  const workflowCompletionPct = workflowOrder.length
+    ? Math.round((completedCount / workflowOrder.length) * 100)
+    : 0;
+  const nextRequiredStep = steps.find(({ complete }) => !complete) || null;
 
-  const completeCount = steps.filter(s => s.complete).length;
+  return { steps, completedCount, workflowCompletionPct, nextRequiredStep };
+}
+
+function getTrayViolationsCount() {
+  return getTrays().filter(tray => {
+    const pct = trayFillPercent(tray);
+    return pct !== null && pct > 80;
+  }).length;
+}
+
+function getStudiesCompletedCount() {
+  const studies = getStudies();
+  return STUDY_DEFINITIONS.filter(({ key }) => studyHasResults(studies[key])).length;
+}
+
+function renderKpiStrip(container) {
+  if (!container) return;
+
+  const { workflowCompletionPct, nextRequiredStep } = getWorkflowMetrics();
+  const trayViolations = getTrayViolationsCount();
+  const studiesCompletedCount = getStudiesCompletedCount();
+  const totalStudies = STUDY_DEFINITIONS.length;
+
+  const kpis = [
+    {
+      label: 'Workflow complete',
+      value: `${workflowCompletionPct}%`,
+      helper: `${workflowOrder.length} total workflow steps tracked.`,
+      href: '#workflow-progress-text',
+    },
+    {
+      label: 'Next required step',
+      value: nextRequiredStep ? nextRequiredStep.step.label : 'Done',
+      helper: nextRequiredStep ? 'Recommended next action in the workflow.' : 'All required workflow steps are complete.',
+      href: nextRequiredStep ? nextRequiredStep.step.href : 'reporting.html',
+    },
+    {
+      label: 'Tray fill warnings',
+      value: trayViolations,
+      helper: trayViolations > 0 ? 'Trays currently over 80% fill.' : 'No tray fill warnings above 80%.',
+      href: 'cabletrayfill.html',
+      warn: trayViolations > 0,
+    },
+    {
+      label: 'Studies completed',
+      value: studiesCompletedCount,
+      helper: `${studiesCompletedCount} of ${totalStudies} studies have saved results.`,
+      href: 'studiesdashboard.html',
+    },
+  ];
+
+  container.innerHTML = '';
+  const list = document.createElement('ul');
+  list.className = 'dash-kpi-grid';
+  list.setAttribute('role', 'list');
+
+  kpis.forEach(({ label, value, helper, href, warn }) => {
+    const li = document.createElement('li');
+    li.className = 'dash-kpi-card' + (warn ? ' dash-kpi-card--warn' : '');
+
+    const labelEl = document.createElement('span');
+    labelEl.className = 'dash-kpi-label';
+    labelEl.textContent = label;
+
+    const valueEl = document.createElement('a');
+    valueEl.href = href;
+    valueEl.className = 'dash-kpi-value';
+    valueEl.textContent = value;
+
+    const helperEl = document.createElement('span');
+    helperEl.className = 'dash-kpi-helper';
+    helperEl.textContent = helper;
+
+    li.appendChild(labelEl);
+    li.appendChild(valueEl);
+    li.appendChild(helperEl);
+    list.appendChild(li);
+  });
+
+  container.appendChild(list);
+}
+
+function renderWorkflowSteps(container) {
+  const { steps, completedCount, workflowCompletionPct, nextRequiredStep } = getWorkflowMetrics();
 
   // Progress bar
   const progressText = document.getElementById('workflow-progress-text');
   if (progressText) {
-    progressText.textContent = `${completeCount} of ${workflowOrder.length} workflow steps complete.`;
+    progressText.textContent = `${completedCount} of ${workflowOrder.length} workflow steps complete.`;
   }
   const progressTrack = document.getElementById('workflow-progress-bar-track');
   const progressFill = document.getElementById('workflow-progress-fill');
   if (progressTrack && progressFill) {
-    const pct = Math.round((completeCount / workflowOrder.length) * 100);
-    progressFill.style.width = `${pct}%`;
-    progressTrack.setAttribute('aria-valuenow', completeCount);
+    progressFill.style.width = `${workflowCompletionPct}%`;
+    progressTrack.setAttribute('aria-valuenow', completedCount);
   }
   const nextStepEl = document.getElementById('workflow-next-step');
   if (nextStepEl) {
-    const next = steps.find(s => !s.complete);
-    if (next) {
+    if (nextRequiredStep) {
       nextStepEl.textContent = 'Next recommended step: ';
       const link = document.createElement('a');
-      link.href = next.step.href;
-      link.textContent = next.step.label;
+      link.href = nextRequiredStep.step.href;
+      link.textContent = nextRequiredStep.step.label;
       nextStepEl.appendChild(link);
     } else {
       nextStepEl.textContent = 'All workflow steps are complete. You are ready to generate reports.';
@@ -97,10 +190,7 @@ function renderProjectSummary(container) {
   const trays = getTrays().length;
   const conduits = getConduits().length;
   const ductbanks = getDuctbanks().length;
-  const trayViolations = getTrays().filter(t => {
-    const pct = trayFillPercent(t);
-    return pct !== null && pct > 80;
-  }).length;
+  const trayViolations = getTrayViolationsCount();
 
   const stats = [
     { label: 'Cables', value: cables, href: 'cableschedule.html' },
@@ -147,11 +237,7 @@ function renderStudiesSummary(container) {
   list.setAttribute('role', 'list');
 
   STUDY_DEFINITIONS.forEach(({ key, label, href }) => {
-    const hasResults = !!(studies[key] && (
-      Array.isArray(studies[key]) ? studies[key].length > 0
-        : typeof studies[key] === 'object' ? Object.keys(studies[key]).length > 0
-        : true
-    ));
+    const hasResults = studyHasResults(studies[key]);
 
     const li = document.createElement('li');
     li.className = 'dash-study-item' + (hasResults ? ' dash-study-item--run' : '');
@@ -177,6 +263,7 @@ function renderStudiesSummary(container) {
 }
 
 window.addEventListener('DOMContentLoaded', () => {
+  renderKpiStrip(document.getElementById('dashboard-kpi-strip'));
   renderWorkflowSteps(document.getElementById('workflow-step-grid'));
   renderProjectSummary(document.getElementById('project-summary'));
   renderStudiesSummary(document.getElementById('studies-summary'));
