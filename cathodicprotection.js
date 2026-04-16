@@ -19,23 +19,7 @@ const IN_TO_M = 0.0254;
 const MM_TO_M = 0.001;
 const FT_TO_M = 0.3048;
 const SQM_TO_SQFT = 10.76391041671;
-const COMMISSIONING_CHECKLIST_ITEMS = [
-  {
-    key: 'requiredCommissioningTests',
-    label: 'Required commissioning tests',
-    description: 'Record who completed acceptance criteria tests and where evidence is stored.'
-  },
-  {
-    key: 'monitoringIntervals',
-    label: 'Monitoring intervals',
-    description: 'Record who approved monitoring cadence and reference the schedule evidence.'
-  },
-  {
-    key: 'correctiveActionThresholds',
-    label: 'Trigger thresholds for corrective action',
-    description: 'Record who approved action trigger thresholds and supporting evidence.'
-  }
-];
+const COMMISSIONING_CHECKLIST_ITEMS = [];
 
 const TABLE_CURRENT_DENSITY_MA_M2 = {
   pipe: { low: 5, moderate: 10, high: 20 },

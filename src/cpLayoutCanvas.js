@@ -54,6 +54,37 @@ const MEASUREMENT_SETUPS = [
   }
 ];
 
+function getViewBounds(geometry) {
+  const points = [];
+  const structureSegments = Array.isArray(geometry?.structureSegments) ? geometry.structureSegments : [];
+  const anodes = Array.isArray(geometry?.anodes) ? geometry.anodes : [];
+  const testPoints = Array.isArray(geometry?.testPoints) ? geometry.testPoints : [];
+  const referenceElectrode = geometry?.referenceElectrode;
+
+  structureSegments.forEach((segment) => {
+    points.push({ x: segment.x1, y: segment.y1 });
+    points.push({ x: segment.x2, y: segment.y2 });
+  });
+  anodes.forEach((point) => points.push(point));
+  testPoints.forEach((point) => points.push(point));
+  if (referenceElectrode && Number.isFinite(referenceElectrode.x) && Number.isFinite(referenceElectrode.y)) {
+    points.push(referenceElectrode);
+  }
+
+  const padding = 80;
+  const maxX = points.length
+    ? points.reduce((max, point) => Math.max(max, point.x || 0), 0)
+    : DEFAULT_VIEW.width;
+  const maxY = points.length
+    ? points.reduce((max, point) => Math.max(max, point.y || 0), 0)
+    : DEFAULT_VIEW.height;
+
+  return {
+    width: Math.max(DEFAULT_VIEW.width, Math.ceil(maxX + padding)),
+    height: Math.max(DEFAULT_VIEW.height, Math.ceil(maxY + padding))
+  };
+}
+
 function clamp(value, min, max) {
   return Math.min(max, Math.max(min, value));
 }
@@ -304,9 +335,10 @@ export function initCpLayoutCanvas({
   }
 
   function worldFromClient(clientX, clientY) {
+    const bounds = getViewBounds(state.geometry);
     const rect = canvas.getBoundingClientRect();
-    const localX = ((clientX - rect.left) / rect.width) * DEFAULT_VIEW.width;
-    const localY = ((clientY - rect.top) / rect.height) * DEFAULT_VIEW.height;
+    const localX = ((clientX - rect.left) / rect.width) * bounds.width;
+    const localY = ((clientY - rect.top) / rect.height) * bounds.height;
     return {
       x: (localX - state.viewport.x) / state.viewport.scale,
       y: (localY - state.viewport.y) / state.viewport.scale
@@ -526,6 +558,7 @@ export function initCpLayoutCanvas({
   function render() {
     const { structureSegments, anodes, testPoints, referenceElectrode } = state.geometry;
     const { x, y, scale } = state.viewport;
+    const bounds = getViewBounds(state.geometry);
 
     const structureVisible = state.layers[LAYERS.structure] ? '' : 'display="none"';
     const anodesVisible = state.layers[LAYERS.anodes] ? '' : 'display="none"';
@@ -543,21 +576,21 @@ export function initCpLayoutCanvas({
     const distanceScale = values.isMetric ? 1 : (1 / 0.3048);
     const gridMinorLines = [];
     const gridMajorLines = [];
-    for (let xPos = 0; xPos <= DEFAULT_VIEW.width; xPos += GRID_MINOR_SPACING) {
-      gridMinorLines.push(`<line x1="${xPos}" y1="0" x2="${xPos}" y2="${DEFAULT_VIEW.height}" class="cp-layout-grid-minor"></line>`);
+    for (let xPos = 0; xPos <= bounds.width; xPos += GRID_MINOR_SPACING) {
+      gridMinorLines.push(`<line x1="${xPos}" y1="0" x2="${xPos}" y2="${bounds.height}" class="cp-layout-grid-minor"></line>`);
     }
-    for (let yPos = 0; yPos <= DEFAULT_VIEW.height; yPos += GRID_MINOR_SPACING) {
-      gridMinorLines.push(`<line x1="0" y1="${yPos}" x2="${DEFAULT_VIEW.width}" y2="${yPos}" class="cp-layout-grid-minor"></line>`);
+    for (let yPos = 0; yPos <= bounds.height; yPos += GRID_MINOR_SPACING) {
+      gridMinorLines.push(`<line x1="0" y1="${yPos}" x2="${bounds.width}" y2="${yPos}" class="cp-layout-grid-minor"></line>`);
     }
-    for (let xPos = 0; xPos <= DEFAULT_VIEW.width; xPos += GRID_MAJOR_SPACING) {
+    for (let xPos = 0; xPos <= bounds.width; xPos += GRID_MAJOR_SPACING) {
       const labelValue = roundTo((xPos / PX_PER_METER) * distanceScale, 0);
-      gridMajorLines.push(`<line x1="${xPos}" y1="0" x2="${xPos}" y2="${DEFAULT_VIEW.height}" class="cp-layout-grid-major"></line>`);
+      gridMajorLines.push(`<line x1="${xPos}" y1="0" x2="${xPos}" y2="${bounds.height}" class="cp-layout-grid-major"></line>`);
       if (xPos > 0) {
         gridMajorLines.push(`<text x="${xPos + 4}" y="18" class="cp-layout-grid-label">${labelValue} ${displayDistanceUnit}</text>`);
       }
     }
-    for (let yPos = 0; yPos <= DEFAULT_VIEW.height; yPos += GRID_MAJOR_SPACING) {
-      gridMajorLines.push(`<line x1="0" y1="${yPos}" x2="${DEFAULT_VIEW.width}" y2="${yPos}" class="cp-layout-grid-major"></line>`);
+    for (let yPos = 0; yPos <= bounds.height; yPos += GRID_MAJOR_SPACING) {
+      gridMajorLines.push(`<line x1="0" y1="${yPos}" x2="${bounds.width}" y2="${yPos}" class="cp-layout-grid-major"></line>`);
     }
     const heatmapMarkup = state.heatmapEnabled
       ? structureSegments.map((segment, index) => {
@@ -577,7 +610,7 @@ export function initCpLayoutCanvas({
         const zoneAria = `Hotspot segment ${index + 1}. Severity ${segmentAssessment.severityBand}, score ${segmentAssessment.severityScore.toFixed(2)}. Demand ratio ${segmentAssessment.demandRatio}.`;
         return `
           <g class="cp-layout-heat-zone-group ${isSelected ? 'is-selected' : ''}" ${visible ? '' : 'aria-hidden="true"'}>
-            <line x1="${segment.x1}" y1="${segment.y1}" x2="${segment.x2}" y2="${segment.y2}" class="cp-layout-heat-zone ${visible ? '' : 'is-filtered'} ${isSelected ? 'is-selected' : ''}" stroke="${heatColor}" stroke-width="22"></line>
+            <line x1="${segment.x1}" y1="${segment.y1}" x2="${segment.x2}" y2="${segment.y2}" class="cp-layout-heat-zone ${visible ? '' : 'is-filtered'} ${isSelected ? 'is-selected' : ''}" stroke="${heatColor}" stroke-width="22" data-segment-index="${index}"></line>
             ${visible ? mediumContour : ''}
             ${visible ? highContour : ''}
             <g class="cp-layout-hotspot ${isSelected ? 'is-selected' : ''}" data-hotspot-index="${index}" role="button" tabindex="0" aria-label="${zoneAria}">
@@ -644,9 +677,9 @@ export function initCpLayoutCanvas({
     ` : '';
 
     canvas.innerHTML = `
-      <svg viewBox="0 0 ${DEFAULT_VIEW.width} ${DEFAULT_VIEW.height}" aria-label="Cathodic protection layout canvas" role="img">
+      <svg viewBox="0 0 ${bounds.width} ${bounds.height}" aria-label="Cathodic protection layout canvas" role="img">
         <g transform="translate(${x} ${y}) scale(${scale})">
-          <rect x="0" y="0" width="${DEFAULT_VIEW.width}" height="${DEFAULT_VIEW.height}" class="cp-layout-background"></rect>
+          <rect x="0" y="0" width="${bounds.width}" height="${bounds.height}" class="cp-layout-background"></rect>
           ${gridMinorLines.join('')}
           ${gridMajorLines.join('')}
           ${heatmapMarkup}
@@ -677,6 +710,16 @@ export function initCpLayoutCanvas({
       if (Number.isInteger(hotspotIndex) && hotspotIndex >= 0) {
         state.selectedHotspotIndex = hotspotIndex;
         announce(`Hotspot selected: Segment ${hotspotIndex + 1}.`);
+        render();
+      }
+      return;
+    }
+    const segment = event.target.closest('[data-segment-index]');
+    if (segment) {
+      const segmentIndex = Number.parseInt(segment.dataset.segmentIndex || '-1', 10);
+      if (Number.isInteger(segmentIndex) && segmentIndex >= 0) {
+        state.selectedHotspotIndex = segmentIndex;
+        announce(`Segment selected: Segment ${segmentIndex + 1}.`);
         render();
       }
       return;
@@ -722,10 +765,17 @@ export function initCpLayoutCanvas({
     }
 
     if (dragState.mode === 'pan') {
-      const dx = ((event.clientX - dragState.startX) / canvas.clientWidth) * DEFAULT_VIEW.width;
-      const dy = ((event.clientY - dragState.startY) / canvas.clientHeight) * DEFAULT_VIEW.height;
+      const bounds = getViewBounds(state.geometry);
+      const dx = ((event.clientX - dragState.startX) / canvas.clientWidth) * bounds.width;
+      const dy = ((event.clientY - dragState.startY) / canvas.clientHeight) * bounds.height;
       state.viewport.x = dragState.originX + dx;
       state.viewport.y = dragState.originY + dy;
+      if (bounds.width > DEFAULT_VIEW.width) {
+        state.viewport.x = clamp(state.viewport.x, -(bounds.width - DEFAULT_VIEW.width), 0);
+      }
+      if (bounds.height > DEFAULT_VIEW.height) {
+        state.viewport.y = clamp(state.viewport.y, -(bounds.height - DEFAULT_VIEW.height), 0);
+      }
       render();
       return;
     }
@@ -735,8 +785,9 @@ export function initCpLayoutCanvas({
     const dy = world.y - dragState.startY;
 
     if (dragState.mode === 'anode' && state.geometry.anodes[dragState.itemIndex]) {
-      const nextX = clamp(dragState.originX + dx, 40, DEFAULT_VIEW.width - 40);
-      const nextY = clamp(dragState.originY + dy, 70, DEFAULT_VIEW.height - 40);
+      const bounds = getViewBounds(state.geometry);
+      const nextX = clamp(dragState.originX + dx, 40, bounds.width - 40);
+      const nextY = clamp(dragState.originY + dy, 70, bounds.height - 40);
       state.geometry.anodes[dragState.itemIndex].x = nextX;
       state.geometry.anodes[dragState.itemIndex].y = nextY;
       syncInputsFromGeometry();
@@ -745,15 +796,17 @@ export function initCpLayoutCanvas({
     }
 
     if (dragState.mode === 'test-point' && state.geometry.testPoints[dragState.itemIndex]) {
-      const nextX = clamp(dragState.originX + dx, 40, DEFAULT_VIEW.width - 40);
+      const bounds = getViewBounds(state.geometry);
+      const nextX = clamp(dragState.originX + dx, 40, bounds.width - 40);
       state.geometry.testPoints[dragState.itemIndex].x = nextX;
       render();
       announce('Test point marker moved.');
     }
 
     if (dragState.mode === 'reference') {
-      const nextX = clamp(dragState.originX + dx, 40, DEFAULT_VIEW.width - 40);
-      const nextY = clamp(dragState.originY + dy, 40, DEFAULT_VIEW.height - 40);
+      const bounds = getViewBounds(state.geometry);
+      const nextX = clamp(dragState.originX + dx, 40, bounds.width - 40);
+      const nextY = clamp(dragState.originY + dy, 40, bounds.height - 40);
       state.geometry.referenceElectrode = { x: nextX, y: nextY };
       syncInputsFromGeometry();
       render();
