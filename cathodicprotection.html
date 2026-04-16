@@ -265,7 +265,52 @@ Life_years = (W_installed × Q_anode × U × F_design) / (I_req × 8760)</pre>
         <fieldset>
           <legend><strong>Protection Criteria Evidence Inputs</strong></legend>
           <div class="field-row">
-            <label for="measured-off-potential">Measured instant-off potential (mV vs CSE)</label>
+            <label for="test-method">Test method</label>
+            <select id="test-method" required>
+              <option value="instant-off" selected>Instant-off interrupter</option>
+              <option value="on-potential">On-potential with IR correction</option>
+              <option value="coupon">Coupon depolarization</option>
+            </select>
+          </div>
+          <div class="field-row">
+            <label for="measurement-context">Measurement context</label>
+            <select id="measurement-context" required>
+              <option value="native-soil" selected>Native soil (typical route)</option>
+              <option value="casing">Cased crossing / shielding concern</option>
+              <option value="foreign-interference">Foreign structure / interference zone</option>
+              <option value="test-station">Dedicated test station</option>
+              <option value="unknown">Unknown / not documented</option>
+            </select>
+          </div>
+          <div class="field-row">
+            <label for="reference-electrode-location">Reference electrode location</label>
+            <select id="reference-electrode-location" required>
+              <option value="local" selected>Local over structure (close-coupled)</option>
+              <option value="remote">Remote / gradient-influenced</option>
+              <option value="coupon-lead">Coupon lead reference</option>
+              <option value="unknown">Unknown / not documented</option>
+            </select>
+          </div>
+          <div class="field-row">
+            <label for="ir-drop-compensation-method">IR-drop compensation method</label>
+            <select id="ir-drop-compensation-method" required>
+              <option value="instant-off" selected>Instant-off interruption</option>
+              <option value="coupon">Coupon depolarization</option>
+              <option value="calculated">Calculated from current/resistance</option>
+              <option value="none">None</option>
+              <option value="unknown">Unknown</option>
+            </select>
+          </div>
+          <div class="field-row">
+            <label for="measured-ir-drop">Measured/estimated IR-drop magnitude (mV)</label>
+            <input type="number" id="measured-ir-drop" min="0" step="1" value="0">
+          </div>
+          <div class="field-row">
+            <label for="coupon-depolarization">Coupon depolarization shift (mV)</label>
+            <input type="number" id="coupon-depolarization" min="0" step="1" value="0">
+          </div>
+          <div class="field-row">
+            <label for="measured-off-potential">Measured structure potential (mV vs CSE)</label>
             <input type="number" id="measured-off-potential" step="1" value="-900" required>
           </div>
           <div class="field-row">

@@ -1,7 +1,12 @@
 import { getSelectedProtectionCriteriaSet } from './standardsProfile.js';
+import { applyMeasurementCorrections } from './measurementCorrections.js';
 
 function toCheckStatus(isPassing) {
   return isPassing ? 'pass' : 'fail';
+}
+
+function toDecisionLabel(status) {
+  return status === 'pass' ? 'Pass' : 'Fail';
 }
 
 export function evaluateCriteriaChecks(input, standardsProfile) {
@@ -9,21 +14,31 @@ export function evaluateCriteriaChecks(input, standardsProfile) {
   if (!selectedCriteriaSet) {
     return {
       selectedCriteriaSet: null,
+      measurementCorrections: null,
       dataUsed: {},
       criteriaResults: [],
       overallStatus: 'fail'
     };
   }
 
+  const measurementCorrections = applyMeasurementCorrections(input);
   const dataUsed = {
     measuredInstantOffPotentialMv: input.measuredInstantOffPotentialMv,
+    correctedInstantOffPotentialMv: measurementCorrections.correctedValues.instantOffPotentialMv,
     simulatedPolarizationShiftMv: input.simulatedPolarizationShiftMv,
+    correctedPolarizationShiftMv: measurementCorrections.correctedValues.polarizationShiftMv,
     testPointCount: input.testPointCount,
-    passingTestPointCount: input.passingTestPointCount
+    passingTestPointCount: input.passingTestPointCount,
+    testMethod: measurementCorrections.metadata.testMethod,
+    measurementContext: measurementCorrections.metadata.measurementContext,
+    referenceElectrodeLocation: measurementCorrections.metadata.referenceElectrodeLocation,
+    irDropCompensationMethod: measurementCorrections.metadata.irDropCompensationMethod
   };
 
-  const instantOffPass = Number.isFinite(dataUsed.measuredInstantOffPotentialMv) && dataUsed.measuredInstantOffPotentialMv <= -850;
-  const polarizationPass = Number.isFinite(dataUsed.simulatedPolarizationShiftMv) && dataUsed.simulatedPolarizationShiftMv >= 100;
+  const instantOffPass = Number.isFinite(dataUsed.correctedInstantOffPotentialMv)
+    && dataUsed.correctedInstantOffPotentialMv <= -850;
+  const polarizationPass = Number.isFinite(dataUsed.correctedPolarizationShiftMv)
+    && dataUsed.correctedPolarizationShiftMv >= 100;
   const coveragePass = Number.isInteger(dataUsed.testPointCount)
     && Number.isInteger(dataUsed.passingTestPointCount)
     && dataUsed.testPointCount > 0
@@ -33,22 +48,28 @@ export function evaluateCriteriaChecks(input, standardsProfile) {
     {
       key: 'instantOffPotential',
       label: 'Instant-off potential criterion',
-      requirement: 'Measured instant-off potential ≤ -850 mV (CSE)',
-      observedValue: `${dataUsed.measuredInstantOffPotentialMv} mV`,
+      requirement: 'Corrected instant-off potential ≤ -850 mV (CSE)',
+      rawValue: `${dataUsed.measuredInstantOffPotentialMv} mV`,
+      correctedValue: `${dataUsed.correctedInstantOffPotentialMv} mV`,
+      decision: toDecisionLabel(toCheckStatus(instantOffPass)),
       status: toCheckStatus(instantOffPass)
     },
     {
       key: 'polarizationShift',
       label: 'Polarization criterion',
-      requirement: 'Measured/simulated polarization shift ≥ 100 mV',
-      observedValue: `${dataUsed.simulatedPolarizationShiftMv} mV`,
+      requirement: 'Corrected polarization shift ≥ 100 mV',
+      rawValue: `${dataUsed.simulatedPolarizationShiftMv} mV`,
+      correctedValue: `${dataUsed.correctedPolarizationShiftMv} mV`,
+      decision: toDecisionLabel(toCheckStatus(polarizationPass)),
       status: toCheckStatus(polarizationPass)
     },
     {
       key: 'testPointCoverage',
       label: 'Test-point coverage criterion',
       requirement: 'All reported test points satisfy selected criteria',
-      observedValue: `${dataUsed.passingTestPointCount} / ${dataUsed.testPointCount} points pass`,
+      rawValue: `${dataUsed.passingTestPointCount} / ${dataUsed.testPointCount} points pass`,
+      correctedValue: `${dataUsed.passingTestPointCount} / ${dataUsed.testPointCount} points pass`,
+      decision: toDecisionLabel(toCheckStatus(coveragePass)),
       status: toCheckStatus(coveragePass)
     }
   ];
@@ -61,6 +82,7 @@ export function evaluateCriteriaChecks(input, standardsProfile) {
       label: selectedCriteriaSet.label,
       reference: selectedCriteriaSet.reference
     },
+    measurementCorrections,
     dataUsed,
     criteriaResults,
     overallStatus
