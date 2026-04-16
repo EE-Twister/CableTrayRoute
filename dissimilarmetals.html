@@ -79,29 +79,17 @@ Rate ∝ Driving potential × environment severity × area ratio × temperature 
           <legend><strong>Material Pair</strong></legend>
           <div class="field-row">
             <label for="primary-metal">Primary component metal</label>
-            <select id="primary-metal" required>
+            <select id="primary-metal" data-default-value="aluminum" required>
               <option value="aluminum" selected>Aluminum alloy</option>
-              <option value="carbonSteel">Carbon steel</option>
-              <option value="zinc">Zinc / galvanized steel</option>
-              <option value="stainless304Passive">Stainless steel 304 (passive)</option>
-              <option value="stainless316Passive">Stainless steel 316 (passive)</option>
-              <option value="copper">Copper / brass / bronze</option>
-              <option value="titanium">Titanium</option>
             </select>
           </div>
           <div class="field-row">
             <label for="secondary-metal">Connected hardware metal</label>
-            <select id="secondary-metal" required>
+            <select id="secondary-metal" data-default-value="stainless304Passive" required>
               <option value="stainless304Passive" selected>Stainless steel 304 (passive)</option>
-              <option value="stainless316Passive">Stainless steel 316 (passive)</option>
-              <option value="carbonSteel">Carbon steel</option>
-              <option value="zinc">Zinc / galvanized steel</option>
-              <option value="aluminum">Aluminum alloy</option>
-              <option value="copper">Copper / brass / bronze</option>
-              <option value="titanium">Titanium</option>
             </select>
           </div>
-          <p class="field-hint">The tool determines anodic vs cathodic automatically from galvanic potential. The primary component can be either role depending on the selected pair.</p>
+          <p class="field-hint">The tool determines anodic vs cathodic automatically from galvanic potential. The expanded list includes tray/base metals, lug and terminal platings, and common securement hardware alloys.</p>
         </fieldset>
 
         <fieldset>
