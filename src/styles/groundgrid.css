@@ -10,6 +10,24 @@
   font-size: 1rem;
 }
 
+.grid-overlay-controls {
+  display: grid;
+  gap: 0.4rem;
+  margin-bottom: 0.25rem;
+}
+
+.grid-overlay-controls label {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.45rem;
+  flex-wrap: wrap;
+  font-size: 0.86rem;
+}
+
+.grid-overlay-controls input[type="range"] {
+  width: min(220px, 62vw);
+}
+
 .ground-grid-preview {
   width: 100%;
   aspect-ratio: 13 / 9;
@@ -29,6 +47,17 @@
 .ground-grid-preview .grid-conductor {
   stroke: var(--accent, #0074d9);
   stroke-width: 2;
+}
+
+.ground-grid-preview .grid-step-overlay {
+  stroke: none;
+  pointer-events: none;
+}
+
+.ground-grid-preview .grid-step-overlay-legend {
+  fill: color-mix(in srgb, var(--warning, #f0b429) 65%, var(--danger, #cf3f5c) 35%);
+  stroke: var(--border-subtle, #ccd2dd);
+  stroke-width: 1;
 }
 
 .ground-grid-preview .grid-rod {

@@ -7,6 +7,7 @@ document.addEventListener('DOMContentLoaded', () => {
   const previewTopSvg = document.getElementById('ground-grid-preview-top');
   const previewElevationSvg = document.getElementById('ground-grid-preview-elevation');
   const previewSummary = document.getElementById('grid-preview-summary');
+  const stepOverlayHint = document.getElementById('step-overlay-hint');
 
   let hadInitError = false;
 
@@ -54,6 +55,7 @@ document.addEventListener('DOMContentLoaded', () => {
   const SVG_NS = 'http://www.w3.org/2000/svg';
   const svgWidth = 520;
   const svgHeight = 360;
+  let latestAnalysisResult = null;
 
   function makeSvg(name, attrs = {}) {
     const node = document.createElementNS(SVG_NS, name);
@@ -170,8 +172,55 @@ document.addEventListener('DOMContentLoaded', () => {
     const endY = startY + drawHeight;
     const dx = params.ny > 1 ? drawWidth / (params.ny - 1) : 0;
     const dy = params.nx > 1 ? drawHeight / (params.nx - 1) : 0;
+    const showStepOverlay = document.getElementById('show-step-overlay')?.checked ?? false;
+    const overlayOpacityInput = parseFloat(document.getElementById('step-overlay-opacity')?.value);
+    const overlayOpacity = Number.isFinite(overlayOpacityInput) ? overlayOpacityInput : 0.6;
 
     svgEl.appendChild(makeSvg('rect', { x: startX, y: startY, width: drawWidth, height: drawHeight, class: 'grid-outline' }));
+
+    if (showStepOverlay) {
+      const rows = 18;
+      const cols = 18;
+      const cellWidth = drawWidth / cols;
+      const cellHeight = drawHeight / rows;
+      const safetyRatio = latestAnalysisResult
+        ? Math.max(0, latestAnalysisResult.Es / Math.max(latestAnalysisResult.Estep, 1))
+        : 0.55;
+      const severityScale = Math.max(0.25, Math.min(1.25, safetyRatio));
+
+      for (let row = 0; row < rows; row += 1) {
+        for (let col = 0; col < cols; col += 1) {
+          const x = startX + (col * cellWidth);
+          const y = startY + (row * cellHeight);
+          const px = x + (cellWidth / 2);
+          const py = y + (cellHeight / 2);
+          const nearestVerticalDistance = dx > 0
+            ? Math.min(...Array.from({ length: params.ny }, (_, i) => Math.abs(px - (startX + (i * dx)))))
+            : 0;
+          const nearestHorizontalDistance = dy > 0
+            ? Math.min(...Array.from({ length: params.nx }, (_, i) => Math.abs(py - (startY + (i * dy)))))
+            : 0;
+          const distX = dx > 0 ? Math.min(1, nearestVerticalDistance / (dx / 2 || 1)) : 0;
+          const distY = dy > 0 ? Math.min(1, nearestHorizontalDistance / (dy / 2 || 1)) : 0;
+          const localGradient = (distX + distY) / 2;
+          const nxCenter = Math.abs(((px - startX) / drawWidth) - 0.5) * 2;
+          const nyCenter = Math.abs(((py - startY) / drawHeight) - 0.5) * 2;
+          const edgeBoost = Math.max(nxCenter, nyCenter);
+          const intensity = Math.max(0, Math.min(1, (0.18 + (0.62 * localGradient) + (0.22 * edgeBoost)) * severityScale));
+          const hue = Math.max(0, 125 - (intensity * 125));
+          const alpha = (0.08 + (intensity * 0.38)) * overlayOpacity;
+          svgEl.appendChild(makeSvg('rect', {
+            x,
+            y,
+            width: cellWidth + 0.4,
+            height: cellHeight + 0.4,
+            class: 'grid-step-overlay',
+            fill: `hsla(${hue}, 86%, 48%, ${alpha.toFixed(3)})`,
+          }));
+        }
+      }
+    }
+
     for (let i = 0; i < params.ny; i += 1) {
       const x = startX + (i * dx);
       svgEl.appendChild(makeSvg('line', { x1: x, y1: startY, x2: x, y2: endY, class: 'grid-conductor' }));
@@ -209,6 +258,12 @@ document.addEventListener('DOMContentLoaded', () => {
       rodText.textContent = 'Perimeter/corner rods';
     }
     legend.appendChild(rodText);
+    if (showStepOverlay) {
+      legend.appendChild(makeSvg('rect', { x: 28, y: 68, width: 30, height: 10, class: 'grid-step-overlay-legend' }));
+      const overlayText = makeSvg('text', { x: 65, y: 76, class: 'grid-legend-text' });
+      overlayText.textContent = 'Step-potential estimate';
+      legend.appendChild(overlayText);
+    }
     svgEl.appendChild(legend);
   }
 
@@ -288,13 +343,22 @@ document.addEventListener('DOMContentLoaded', () => {
       + (params.hasRods ? ` • Ground rods: ${params.rodLayout.count} (${params.rodLayout.intermediateCount} intermediate)` : '')
       + (params.hasRods && params.rodLayout.axisSpacingX > 0 ? ` • Rod spacing x ≈ ${params.rodLayout.axisSpacingX.toFixed(1)} ${params.unit}` : '')
       + (params.hasRods && params.rodLayout.axisSpacingY > 0 ? ` • Rod spacing y ≈ ${params.rodLayout.axisSpacingY.toFixed(1)} ${params.unit}` : '');
+    const showStepOverlay = document.getElementById('show-step-overlay')?.checked ?? false;
+    const overlaySafety = latestAnalysisResult
+      ? ` • Step overlay ratio Es/Estep = ${(latestAnalysisResult.Es / Math.max(latestAnalysisResult.Estep, 1)).toFixed(2)}`
+      : ' • Step overlay ratio uses nominal value until analysis runs';
 
     if (previewSummary) {
       previewSummary.textContent = hadInitError
-        ? `Some page setup features failed to initialize. Preview is still active. ${summaryText}`
-        : summaryText;
+        ? `Some page setup features failed to initialize. Preview is still active. ${summaryText}${showStepOverlay ? overlaySafety : ''}`
+        : `${summaryText}${showStepOverlay ? overlaySafety : ''}`;
     } else if (hadInitError) {
       console.error('[groundgrid] #grid-preview-summary not found; preview fallback message unavailable.');
+    }
+    if (stepOverlayHint) {
+      stepOverlayHint.textContent = latestAnalysisResult
+        ? `Overlay scales with latest Es (${latestAnalysisResult.Es.toFixed(1)} V) vs Estep (${latestAnalysisResult.Estep.toFixed(1)} V).`
+        : 'Overlay is estimated from conductor spacing. Run Analyze Ground Grid to scale by Es / Estep.';
     }
     updateRodLayoutHint();
   }
@@ -359,6 +423,8 @@ document.addEventListener('DOMContentLoaded', () => {
       resultsDiv.innerHTML = `<p class="alert-error" role="alert">Error: ${err.message}</p>`;
       return;
     }
+    latestAnalysisResult = r;
+    renderGridPreview();
 
     const section = document.createElement('section');
     section.className = 'results-panel';
@@ -482,6 +548,14 @@ document.addEventListener('DOMContentLoaded', () => {
       renderGridPreview();
     });
   }
+
+  ['show-step-overlay', 'step-overlay-opacity'].forEach(id => {
+    const input = document.getElementById(id);
+    if (input) {
+      input.addEventListener('input', renderGridPreview);
+      input.addEventListener('change', renderGridPreview);
+    }
+  });
 
   renderGridPreview();
   setRodSpacingVisibility();
