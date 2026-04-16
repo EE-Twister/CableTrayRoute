@@ -334,6 +334,19 @@
         <div class="ground-grid-preview-wrap">
           <div class="ground-grid-preview-panel">
             <h3>Layout / Top View</h3>
+            <div class="grid-overlay-controls">
+              <label>
+                <input type="checkbox" id="show-step-overlay" checked>
+                Show step-potential gradient overlay
+              </label>
+              <label for="step-overlay-opacity">
+                Overlay opacity
+                <input type="range" id="step-overlay-opacity" min="0.1" max="1" step="0.1" value="0.6">
+              </label>
+            </div>
+            <p id="step-overlay-hint" class="field-hint">
+              Overlay is estimated from conductor spacing and latest Es / Estep safety ratio.
+            </p>
             <svg id="ground-grid-preview-top" class="ground-grid-preview" viewBox="0 0 520 360"
                  role="img" aria-label="Ground grid top view showing conductor matrix and spacing dimensions">
             </svg>
