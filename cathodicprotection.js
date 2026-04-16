@@ -1363,7 +1363,6 @@ function renderResults(result, root) {
     : (criteriaEvidence.overallStatus === 'fail' ? 'result-badge--fail' : '');
   const reportExport = result.reportExport || buildReportExportData(result, getStudyApprovals().cathodicProtection || null);
   const verificationPlan = reportExport.verificationPlan || {};
-  const commissioningChecklist = verificationPlan.completionChecklist || {};
   const complianceState = result.compliance?.complianceState || 'provisional';
   const complianceBadgeClass = complianceState === 'compliant'
     ? 'result-badge--pass'
@@ -1525,23 +1524,6 @@ function renderResults(result, root) {
         <p class="field-hint">Required commissioning tests: ${escapeHtml((verificationPlan.requiredCommissioningTests || []).join(' | ') || 'Not defined')}</p>
         <p class="field-hint">Monitoring intervals: ${escapeHtml((verificationPlan.monitoringIntervals || []).join(' | ') || 'Not defined')}</p>
         <p class="field-hint">Trigger thresholds for corrective action: ${escapeHtml((verificationPlan.correctiveActionThresholds || []).join(' | ') || 'Not defined')}</p>
-        <div class="table-wrap">
-          <table class="data-table" aria-label="Commissioning checklist completion status">
-            <thead><tr><th>Checklist item</th><th>Completed by</th><th>Completed on</th><th>Evidence</th></tr></thead>
-            <tbody>
-              ${COMMISSIONING_CHECKLIST_ITEMS.map((item) => {
-    const completion = commissioningChecklist[item.key] || {};
-    return `
-                <tr>
-                  <td>${escapeHtml(item.label)}</td>
-                  <td>${escapeHtml(completion.completedBy || 'Pending')}</td>
-                  <td>${escapeHtml(completion.completedAt || 'Pending')}</td>
-                  <td>${escapeHtml(completion.evidence || 'Pending')}</td>
-                </tr>`;
-  }).join('')}
-            </tbody>
-          </table>
-        </div>
       </div>
 
       ${sensitivityRows.length ? `

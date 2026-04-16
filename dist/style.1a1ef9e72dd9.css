@@ -89,6 +89,37 @@
   flex-direction: column;
   gap: .75rem;
 }
+.cathodicprotection-page .main-content,
+.cathodicprotection-page .card,
+.cathodicprotection-page .result-group,
+.cathodicprotection-page .field-hint {
+  line-height: 1.45;
+}
+.cp-collapsible-card details {
+  display: grid;
+  gap: .45rem;
+}
+.cp-collapsible-card summary {
+  cursor: pointer;
+  list-style: none;
+}
+.cp-collapsible-card summary::-webkit-details-marker {
+  display: none;
+}
+.cp-collapsible-card summary h2 {
+  margin: 0;
+  display: inline-flex;
+  align-items: center;
+  gap: .45rem;
+}
+.cp-collapsible-card summary h2::before {
+  content: '▾';
+  font-size: .9em;
+  transform-origin: center;
+}
+.cp-collapsible-card details:not([open]) summary h2::before {
+  content: '▸';
+}
 .cp-timeline-panel {
   border: 1px solid var(--border-color, #7d8790);
   border-radius: 10px;
@@ -284,6 +315,19 @@
 .cp-legend-dot--target { background: #ef4444; border-color: #991b1b; }
 .cp-layout-background {
   fill: color-mix(in srgb, var(--panel-bg, #f8fafc) 96%, #9eb8d4 4%);
+}
+.cp-layout-grid-minor {
+  stroke: color-mix(in srgb, var(--text-color, #1f2b3a) 14%, transparent);
+  stroke-width: 1;
+}
+.cp-layout-grid-major {
+  stroke: color-mix(in srgb, var(--text-color, #1f2b3a) 30%, transparent);
+  stroke-width: 1.2;
+}
+.cp-layout-grid-label {
+  fill: color-mix(in srgb, var(--text-color, #1f2b3a) 75%, #ffffff);
+  font-size: 11px;
+  font-weight: 600;
 }
 .cp-layout-structure-line {
   stroke: color-mix(in srgb, var(--text-color, #1f2b3a) 75%, #0f172a);
