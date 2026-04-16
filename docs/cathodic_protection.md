@@ -129,9 +129,29 @@ The CP study now includes a standards profile and auditable compliance status mo
 - **Mandatory vs optional checks:** Required checks are explicitly keyed and rendered in the **Compliance Status** panel as `pass`, `fail`, or `not-run`.
 - **Required deliverables:** The profile flags required deliverables for design basis, calculations, commissioning checks, and monitoring plan.
 - **Audit trail:** Every run appends a compliance snapshot under study storage (`studyResults.cathodicProtection.complianceHistory`) so historical status changes can be reviewed.
+- **Provisional state handling:** Compliance is marked **provisional** until commissioning checklist evidence is complete for required tests, monitoring intervals, and corrective-action trigger thresholds.
+
+## Verification Plan and Report Export Structure
+
+The results output now includes a dedicated **Verification and Commissioning Plan** section and a persisted export payload:
+
+- **Required commissioning tests:** Derived from the selected protection criteria requirements.
+- **Monitoring intervals:** Derived from verification date scheduling and mitigation profile details.
+- **Corrective-action thresholds:** Explicit trigger statements for failed criteria, unresolved interference risk, or life-margin shortfall.
+- **Completion checklist fields:** Captured through the Study Approval panel with `completedBy`, `completedAt`, and `evidence` for:
+  - required commissioning tests
+  - monitoring intervals
+  - corrective-action trigger thresholds
+
+Study output now stores `studyResults.cathodicProtection.reportExport` with:
+
+- `designBasis` payload (standards profile + calculation basis mapping)
+- `verificationPlan` payload (commissioning tests, monitoring intervals, thresholds, completion state)
+- `payloads.json` and `payloads.pdf` section metadata for downstream exporters.
 
 ## Revision Notes
 
+- **2026-04-16:** Added commissioning-plan results section, checklist completion fields in the Study Approval panel (`who/when/evidence`), provisional compliance gating until evidence completion, and persisted report export payloads for JSON/PDF workflows.
 - **2026-04-16:** Added measurement metadata inputs (test method/context/reference location), implemented correction-aware criteria normalization, separated raw vs corrected acceptance outputs, and added metadata sufficiency warnings in results.
 - **2026-04-16:** Added standards profile configuration, machine-readable required-check keys in CP basis mapping, compliance status panel, and persisted compliance history snapshots.
 - **2026-04-16:** Replaced single coating factor with selectable coating models (fixed / degradation curve / segment condition), added coating uncertainty sensitivity bands, and surfaced design-review scenario comparison with worst-case segment demand.

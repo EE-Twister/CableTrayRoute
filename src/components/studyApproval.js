@@ -68,11 +68,12 @@ export function getApprovalBadgeHTML(approval) {
  * @param {string} studyKey   Storage key for this study (e.g. 'arcFlash').
  * @param {string} [containerId='study-review-panel']  ID of the host element.
  */
-export function initStudyApprovalPanel(studyKey, containerId = 'study-review-panel') {
+export function initStudyApprovalPanel(studyKey, containerId = 'study-review-panel', options = {}) {
   if (typeof document === 'undefined') return;
 
   const container = document.getElementById(containerId);
   if (!container) return;
+  const checklistItems = Array.isArray(options.checklistItems) ? options.checklistItems : [];
 
   // ── Build the panel DOM ───────────────────────────────────────────────────
 
@@ -82,6 +83,28 @@ export function initStudyApprovalPanel(studyKey, containerId = 'study-review-pan
   const dateId    = `${containerId}-date`;
   const noteId    = `${containerId}-note`;
   const badgeId   = `${containerId}-badge`;
+  const checklistHtml = checklistItems.map((item) => {
+    const key = esc(item.key);
+    const label = esc(item.label || item.key);
+    const description = esc(item.description || '');
+    return `
+      <fieldset class="study-review-panel__checklist-item">
+        <legend>${label}</legend>
+        ${description ? `<p class="field-hint">${description}</p>` : ''}
+        <div class="auth-field">
+          <label for="${containerId}-check-${key}-who">Completed by</label>
+          <input id="${containerId}-check-${key}-who" data-check-key="${key}" data-check-field="completedBy" type="text" placeholder="Name or initials">
+        </div>
+        <div class="auth-field">
+          <label for="${containerId}-check-${key}-when">Completed on</label>
+          <input id="${containerId}-check-${key}-when" data-check-key="${key}" data-check-field="completedAt" type="date">
+        </div>
+        <div class="auth-field">
+          <label for="${containerId}-check-${key}-evidence">Evidence reference</label>
+          <input id="${containerId}-check-${key}-evidence" data-check-key="${key}" data-check-field="evidence" type="text" placeholder="Report, photo, ticket, or file ID">
+        </div>
+      </fieldset>`;
+  }).join('');
 
   container.innerHTML = `
     <div class="study-review-panel">
@@ -131,6 +154,12 @@ export function initStudyApprovalPanel(studyKey, containerId = 'study-review-pan
           </span>
         </div>
 
+        ${checklistItems.length ? `
+        <section class="study-review-panel__checklist" aria-label="Commissioning completion checklist">
+          <h3>Commissioning Completion Checklist</h3>
+          ${checklistHtml}
+        </section>` : ''}
+
         <div class="study-review-panel__actions">
           <button type="submit" class="primary-btn">Save Review</button>
           <button type="button" id="${containerId}-clear-btn" class="btn">Clear</button>
@@ -147,6 +176,7 @@ export function initStudyApprovalPanel(studyKey, containerId = 'study-review-pan
   const noteTA     = container.querySelector(`#${noteId}`);
   const badgeEl    = container.querySelector(`#${badgeId}`);
   const clearBtn   = container.querySelector(`#${containerId}-clear-btn`);
+  const checklistInputs = Array.from(container.querySelectorAll('[data-check-key][data-check-field]'));
 
   // ── Helpers ───────────────────────────────────────────────────────────────
 
@@ -160,6 +190,9 @@ export function initStudyApprovalPanel(studyKey, containerId = 'study-review-pan
       byInput.value    = '';
       dateInput.value  = TODAY;
       noteTA.value     = '';
+      checklistInputs.forEach((inputEl) => {
+        inputEl.value = '';
+      });
       renderBadge(null);
       return;
     }
@@ -167,6 +200,13 @@ export function initStudyApprovalPanel(studyKey, containerId = 'study-review-pan
     byInput.value   = approval.reviewedBy ?? '';
     dateInput.value = approval.approvedAt ?? TODAY;
     noteTA.value    = approval.note       ?? '';
+    const checklist = approval.checklist && typeof approval.checklist === 'object' ? approval.checklist : {};
+    checklistInputs.forEach((inputEl) => {
+      const checkKey = inputEl.dataset.checkKey;
+      const checkField = inputEl.dataset.checkField;
+      const value = checklist?.[checkKey]?.[checkField] ?? '';
+      inputEl.value = value;
+    });
     renderBadge(approval);
   }
 
@@ -179,18 +219,33 @@ export function initStudyApprovalPanel(studyKey, containerId = 'study-review-pan
 
   form.addEventListener('submit', ev => {
     ev.preventDefault();
+    const checklist = checklistItems.reduce((acc, item) => {
+      const key = item.key;
+      const completedBy = (container.querySelector(`[data-check-key="${key}"][data-check-field="completedBy"]`)?.value || '').trim();
+      const completedAt = (container.querySelector(`[data-check-key="${key}"][data-check-field="completedAt"]`)?.value || '').trim();
+      const evidence = (container.querySelector(`[data-check-key="${key}"][data-check-field="evidence"]`)?.value || '').trim();
+      acc[key] = { completedBy, completedAt, evidence };
+      return acc;
+    }, {});
     const approval = {
       status:     statusSel.value  || 'pending',
       reviewedBy: byInput.value.trim(),
       approvedAt: dateInput.value  || TODAY,
       note:       noteTA.value.trim(),
+      checklist,
     };
     setStudyApproval(studyKey, approval);
     renderBadge(approval);
+    if (typeof options.onSave === 'function') {
+      options.onSave(approval);
+    }
   });
 
   clearBtn.addEventListener('click', () => {
     clearStudyApproval(studyKey);
     populateForm(null);
+    if (typeof options.onClear === 'function') {
+      options.onClear();
+    }
   });
 }

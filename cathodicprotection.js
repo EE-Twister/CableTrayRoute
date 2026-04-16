@@ -1,4 +1,4 @@
-import { getStudies, setStudies } from './dataStore.mjs';
+import { getStudies, getStudyApprovals, setStudies } from './dataStore.mjs';
 import { initStudyApprovalPanel } from './src/components/studyApproval.js';
 import {
   CP_STANDARDS_PROFILE,
@@ -17,6 +17,23 @@ const IN_TO_M = 0.0254;
 const MM_TO_M = 0.001;
 const FT_TO_M = 0.3048;
 const SQM_TO_SQFT = 10.76391041671;
+const COMMISSIONING_CHECKLIST_ITEMS = [
+  {
+    key: 'requiredCommissioningTests',
+    label: 'Required commissioning tests',
+    description: 'Record who completed acceptance criteria tests and where evidence is stored.'
+  },
+  {
+    key: 'monitoringIntervals',
+    label: 'Monitoring intervals',
+    description: 'Record who approved monitoring cadence and reference the schedule evidence.'
+  },
+  {
+    key: 'correctiveActionThresholds',
+    label: 'Trigger thresholds for corrective action',
+    description: 'Record who approved action trigger thresholds and supporting evidence.'
+  }
+];
 
 const TABLE_CURRENT_DENSITY_MA_M2 = {
   pipe: { low: 5, moderate: 10, high: 20 },
@@ -444,21 +461,32 @@ function normalizeSavedStudy(saved) {
   };
 }
 
-function createComplianceRecord(result, previousStudy = null) {
+function createComplianceRecord(result, previousStudy = null, approval = null) {
   const requiredChecks = evaluateComplianceChecks(result);
   const previousRequiredChecks = previousStudy?.compliance?.requiredChecks || {};
+  const commissioningChecklistComplete = isCommissioningChecklistComplete(approval);
   const mergedRequiredChecks = {
     ...buildInitialComplianceStatus(),
     ...previousRequiredChecks,
-    ...requiredChecks
+    ...requiredChecks,
+    commissioningChecksDefined: commissioningChecklistComplete && requiredChecks.commissioningChecksDefined === 'pass'
+      ? 'pass'
+      : 'fail'
   };
   const evaluatedAt = result.timestamp;
+  const failedCheckKeys = Object.keys(mergedRequiredChecks).filter((checkKey) => mergedRequiredChecks[checkKey] !== 'pass');
+  const complianceState = failedCheckKeys.length
+    ? (commissioningChecklistComplete ? 'not-compliant' : 'provisional')
+    : 'compliant';
 
   const compliance = {
     profileId: CP_STANDARDS_PROFILE.profileId,
     requiredChecks: mergedRequiredChecks,
     optionalChecks: previousStudy?.compliance?.optionalChecks || {},
-    lastEvaluatedAt: evaluatedAt
+    lastEvaluatedAt: evaluatedAt,
+    commissioningChecklistComplete,
+    complianceState,
+    failedCheckKeys
   };
 
   const historyEntry = {
@@ -481,7 +509,49 @@ if (typeof document !== 'undefined') {
   initCompactMode();
   initHelpModal('help-btn', 'help-modal', 'close-help-btn');
   initNavToggle();
-  initStudyApprovalPanel('cathodicProtection');
+  initStudyApprovalPanel('cathodicProtection', 'study-review-panel', {
+    checklistItems: COMMISSIONING_CHECKLIST_ITEMS,
+    onSave: (approval) => {
+      const studies = getStudies();
+      const existingStudy = normalizeSavedStudy(studies.cathodicProtection);
+      if (!existingStudy) return;
+      const complianceRecord = createComplianceRecord(existingStudy, existingStudy, approval);
+      studies.cathodicProtection = {
+        ...existingStudy,
+        reportExport: buildReportExportData(existingStudy, approval),
+        compliance: complianceRecord.compliance,
+        complianceHistory: complianceRecord.complianceHistory
+      };
+      setStudies(studies);
+      renderResults(studies.cathodicProtection, resultsDiv);
+      renderComplianceStatusPanel(
+        compliancePanelEl,
+        studies.cathodicProtection.compliance.requiredChecks,
+        studies.cathodicProtection.compliance.lastEvaluatedAt,
+        studies.cathodicProtection.compliance
+      );
+    },
+    onClear: () => {
+      const studies = getStudies();
+      const existingStudy = normalizeSavedStudy(studies.cathodicProtection);
+      if (!existingStudy) return;
+      const complianceRecord = createComplianceRecord(existingStudy, existingStudy, null);
+      studies.cathodicProtection = {
+        ...existingStudy,
+        reportExport: buildReportExportData(existingStudy, null),
+        compliance: complianceRecord.compliance,
+        complianceHistory: complianceRecord.complianceHistory
+      };
+      setStudies(studies);
+      renderResults(studies.cathodicProtection, resultsDiv);
+      renderComplianceStatusPanel(
+        compliancePanelEl,
+        studies.cathodicProtection.compliance.requiredChecks,
+        studies.cathodicProtection.compliance.lastEvaluatedAt,
+        studies.cathodicProtection.compliance
+      );
+    }
+  });
 
   const form = document.getElementById('cp-form');
   const resultsDiv = document.getElementById('results');
@@ -508,9 +578,18 @@ if (typeof document !== 'undefined') {
   const coatingSegmentRow = document.getElementById('coating-segment-row');
 
   const saved = normalizeSavedStudy(getStudies().cathodicProtection);
+  const savedApproval = getStudyApprovals().cathodicProtection || null;
   renderCalculationBasis(basisPanel, CP_STANDARD_BASIS);
-  renderComplianceStatusPanel(compliancePanelEl, saved?.compliance?.requiredChecks, saved?.compliance?.lastEvaluatedAt);
+  renderComplianceStatusPanel(compliancePanelEl, saved?.compliance?.requiredChecks, saved?.compliance?.lastEvaluatedAt, saved?.compliance);
   if (saved) {
+    if (!saved.reportExport) {
+      const studies = getStudies();
+      studies.cathodicProtection = {
+        ...saved,
+        reportExport: buildReportExportData(saved, savedApproval)
+      };
+      setStudies(studies);
+    }
     renderResults(saved, resultsDiv);
   }
 
@@ -627,9 +706,11 @@ if (typeof document !== 'undefined') {
       errorsDiv.textContent = '';
       const studies = getStudies();
       const previousStudy = normalizeSavedStudy(studies.cathodicProtection);
-      const complianceRecord = createComplianceRecord(result, previousStudy);
+      const approval = getStudyApprovals().cathodicProtection || null;
+      const complianceRecord = createComplianceRecord(result, previousStudy, approval);
       studies.cathodicProtection = {
         ...result,
+        reportExport: buildReportExportData(result, approval),
         compliance: complianceRecord.compliance,
         complianceHistory: complianceRecord.complianceHistory
       };
@@ -638,7 +719,8 @@ if (typeof document !== 'undefined') {
       renderComplianceStatusPanel(
         compliancePanelEl,
         studies.cathodicProtection.compliance.requiredChecks,
-        studies.cathodicProtection.compliance.lastEvaluatedAt
+        studies.cathodicProtection.compliance.lastEvaluatedAt,
+        studies.cathodicProtection.compliance
       );
     } catch (error) {
       const message = error instanceof Error ? error.message : 'Invalid cathodic protection inputs.';
@@ -752,10 +834,23 @@ function renderResults(result, root) {
   const criteriaStatusClass = criteriaEvidence.overallStatus === 'pass'
     ? 'result-badge--pass'
     : (criteriaEvidence.overallStatus === 'fail' ? 'result-badge--fail' : '');
+  const reportExport = result.reportExport || buildReportExportData(result, getStudyApprovals().cathodicProtection || null);
+  const verificationPlan = reportExport.verificationPlan || {};
+  const commissioningChecklist = verificationPlan.completionChecklist || {};
+  const complianceState = result.compliance?.complianceState || 'provisional';
+  const complianceBadgeClass = complianceState === 'compliant'
+    ? 'result-badge--pass'
+    : (complianceState === 'provisional' ? 'result-badge--not-run' : 'result-badge--fail');
+  const complianceBadgeText = complianceState === 'compliant'
+    ? 'Compliance status: Compliant'
+    : (complianceState === 'provisional'
+      ? 'Compliance status: Provisional (commissioning evidence pending)'
+      : 'Compliance status: Not compliant');
 
   root.innerHTML = `
     <section class="results-panel" aria-labelledby="cp-results-heading">
       <h2 id="cp-results-heading">Cathodic Protection Sizing Results</h2>
+      <div class="result-badge ${complianceBadgeClass}">${complianceBadgeText}</div>
 
       <div class="result-group">
         <div class="result-row">
@@ -880,6 +975,30 @@ function renderResults(result, root) {
           : '<p class="field-hint">No missing mitigations for selected profile.</p>'}
       </div>
 
+      <div class="result-group" aria-label="Verification and commissioning plan">
+        <h3>Verification and Commissioning Plan</h3>
+        <p class="field-hint">Required commissioning tests: ${escapeHtml((verificationPlan.requiredCommissioningTests || []).join(' | ') || 'Not defined')}</p>
+        <p class="field-hint">Monitoring intervals: ${escapeHtml((verificationPlan.monitoringIntervals || []).join(' | ') || 'Not defined')}</p>
+        <p class="field-hint">Trigger thresholds for corrective action: ${escapeHtml((verificationPlan.correctiveActionThresholds || []).join(' | ') || 'Not defined')}</p>
+        <div class="table-wrap">
+          <table class="data-table" aria-label="Commissioning checklist completion status">
+            <thead><tr><th>Checklist item</th><th>Completed by</th><th>Completed on</th><th>Evidence</th></tr></thead>
+            <tbody>
+              ${COMMISSIONING_CHECKLIST_ITEMS.map((item) => {
+    const completion = commissioningChecklist[item.key] || {};
+    return `
+                <tr>
+                  <td>${escapeHtml(item.label)}</td>
+                  <td>${escapeHtml(completion.completedBy || 'Pending')}</td>
+                  <td>${escapeHtml(completion.completedAt || 'Pending')}</td>
+                  <td>${escapeHtml(completion.evidence || 'Pending')}</td>
+                </tr>`;
+  }).join('')}
+            </tbody>
+          </table>
+        </div>
+      </div>
+
       ${sensitivityRows.length ? `
       <div class="table-wrap">
         <table class="data-table" aria-label="Cathodic protection sensitivity table">
@@ -943,6 +1062,7 @@ function renderResults(result, root) {
       </div>` : ''}
 
       <p class="field-hint result-timestamp">Analysis run: ${new Date(result.timestamp).toLocaleString()}</p>
+      <p class="field-hint">Report export package includes JSON and PDF payload sections for design basis and verification plan.</p>
     </section>`;
 }
 
@@ -1023,7 +1143,7 @@ function renderCalculationBasis(root, basis) {
   `;
 }
 
-function renderComplianceStatusPanel(root, requiredChecks = {}, lastEvaluatedAt = null) {
+function renderComplianceStatusPanel(root, requiredChecks = {}, lastEvaluatedAt = null, compliance = {}) {
   if (!root) return;
 
   const rows = getRequiredComplianceChecks().map((checkKey) => {
@@ -1042,8 +1162,15 @@ function renderComplianceStatusPanel(root, requiredChecks = {}, lastEvaluatedAt 
     'not-run': 'Not run'
   };
   const overallCompliant = rows.every((row) => row.status === 'pass');
-  const overallBadgeClass = overallCompliant ? 'result-badge--pass' : 'result-badge--fail';
-  const overallBadgeText = overallCompliant ? 'Compliant' : 'Not compliant';
+  const complianceState = compliance?.complianceState || (overallCompliant ? 'compliant' : 'not-compliant');
+  const overallBadgeClass = complianceState === 'compliant'
+    ? 'result-badge--pass'
+    : (complianceState === 'provisional' ? 'result-badge--not-run' : 'result-badge--fail');
+  const overallBadgeText = complianceState === 'compliant'
+    ? 'Compliant'
+    : (complianceState === 'provisional'
+      ? 'Provisional — awaiting commissioning evidence'
+      : 'Not compliant');
 
   root.innerHTML = `
     <div class="result-badge ${overallBadgeClass}">${overallBadgeText}</div>
@@ -1062,4 +1189,86 @@ function renderComplianceStatusPanel(root, requiredChecks = {}, lastEvaluatedAt 
     </div>
     <p class="field-hint">Last evaluated: ${lastEvaluatedAt ? escapeHtml(new Date(lastEvaluatedAt).toLocaleString()) : 'Not run yet'}</p>
   `;
+}
+
+function normalizeChecklistEntry(entry) {
+  const completedBy = String(entry?.completedBy || '').trim();
+  const completedAt = String(entry?.completedAt || '').trim();
+  const evidence = String(entry?.evidence || '').trim();
+  return { completedBy, completedAt, evidence };
+}
+
+function getCommissioningChecklist(approval = null) {
+  const approvalChecklist = approval?.checklist && typeof approval.checklist === 'object' ? approval.checklist : {};
+  return COMMISSIONING_CHECKLIST_ITEMS.reduce((acc, item) => {
+    acc[item.key] = normalizeChecklistEntry(approvalChecklist[item.key]);
+    return acc;
+  }, {});
+}
+
+function isCommissioningChecklistComplete(approval = null) {
+  const checklist = getCommissioningChecklist(approval);
+  return COMMISSIONING_CHECKLIST_ITEMS.every((item) => {
+    const completion = checklist[item.key];
+    return Boolean(completion.completedBy && completion.completedAt && completion.evidence);
+  });
+}
+
+function buildVerificationPlan(result, approval = null) {
+  const criteriaRows = Array.isArray(result.criteriaCheckEvidence?.criteriaResults)
+    ? result.criteriaCheckEvidence.criteriaResults
+    : [];
+  const interference = result.interferenceAssessment || {};
+  return {
+    requiredCommissioningTests: criteriaRows.map((criterion) => `${criterion.label}: ${criterion.requirement}`),
+    monitoringIntervals: [
+      `Verification test date: ${interference.verificationTestDate || result.verificationTestDate || 'Not scheduled'}`,
+      `Mitigation profile: ${interference.profile?.label || 'Baseline mitigation profile'}`
+    ],
+    correctiveActionThresholds: [
+      'Any failed protection criterion requires corrective action and re-test before final compliance.',
+      'Unresolved high interference risk requires mitigation completion before compliance closure.',
+      'Negative life safety margin requires design update or contingency mass increase.'
+    ],
+    completionChecklist: getCommissioningChecklist(approval),
+    completionStatus: isCommissioningChecklistComplete(approval) ? 'complete' : 'incomplete'
+  };
+}
+
+function buildReportExportData(result, approval = null) {
+  const verificationPlan = buildVerificationPlan(result, approval);
+  return {
+    version: 'cp-report-export-v1',
+    generatedAt: new Date().toISOString(),
+    format: ['json', 'pdf'],
+    designBasis: {
+      standardsProfile: CP_STANDARD_BASIS.standardsProfile,
+      calculationBasis: result.standardsBasis || CP_STANDARD_BASIS,
+      outputBasis: result.outputBasis || {}
+    },
+    verificationPlan,
+    payloads: {
+      json: {
+        sectionOrder: ['designBasis', 'verificationPlan', 'resultsSummary'],
+        data: {
+          designBasis: result.standardsBasis || CP_STANDARD_BASIS,
+          verificationPlan,
+          resultsSummary: {
+            requiredCurrentA: result.requiredCurrentA,
+            minimumAnodeMassKg: result.minimumAnodeMassKg,
+            predictedLifeYears: result.predictedLifeYears,
+            safetyMarginYears: result.safetyMarginYears
+          }
+        }
+      },
+      pdf: {
+        title: 'Cathodic Protection Design Basis + Verification Plan',
+        sections: [
+          { heading: 'Design Basis', contentKey: 'designBasis' },
+          { heading: 'Verification Plan', contentKey: 'verificationPlan' },
+          { heading: 'Sizing Results Summary', contentKey: 'resultsSummary' }
+        ]
+      }
+    }
+  };
 }
