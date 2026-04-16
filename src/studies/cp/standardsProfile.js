@@ -66,8 +66,8 @@ export const CP_STANDARDS_PROFILE = {
     interferenceAssessment: {
       key: 'interferenceAssessment',
       label: 'Interference assessment',
-      required: false,
-      description: 'Optional review for stray-current and foreign structure interference.'
+      required: true,
+      description: 'Stray-current and foreign structure interference risk is assessed and unresolved high-risk cases are mitigated.'
     }
   },
   deliverables: {
@@ -110,13 +110,23 @@ export function getSelectedProtectionCriteriaSet(profile = CP_STANDARDS_PROFILE)
 }
 
 export function evaluateComplianceChecks(result) {
+  const criteriaStatus = result.criteriaCheckEvidence?.overallStatus || 'fail';
+  const interferenceAssessment = result.interferenceAssessment || {};
+  const hasVerificationDate = Boolean(interferenceAssessment.verificationTestDate);
+  const hasMitigationActions = Array.isArray(interferenceAssessment.mitigationActions)
+    && interferenceAssessment.mitigationActions.length > 0;
+  const unresolvedHighRisk = interferenceAssessment.unresolvedHighRisk === true;
+
   const checks = {
     ...buildInitialComplianceStatus(),
     currentDensitySelection: Number.isFinite(result.designCurrentDensityMaM2) && result.designCurrentDensityMaM2 > 0 ? 'pass' : 'fail',
     anodeMassSizing: Number.isFinite(result.minimumAnodeMassKg) && result.minimumAnodeMassKg > 0 ? 'pass' : 'fail',
     targetLifeVerification: Number.isFinite(result.safetyMarginYears)
       ? (result.safetyMarginYears >= 0 ? 'pass' : 'fail')
-      : 'fail'
+      : 'fail',
+    commissioningChecksDefined: criteriaStatus === 'pass' && hasVerificationDate ? 'pass' : 'fail',
+    monitoringPlanDefined: hasMitigationActions ? 'pass' : 'fail',
+    interferenceAssessment: unresolvedHighRisk ? 'fail' : 'pass'
   };
 
   return checks;
