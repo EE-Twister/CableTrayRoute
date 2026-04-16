@@ -10,6 +10,35 @@ const LAYERS = {
   measurement: 'measurement'
 };
 
+const VIEW_MODES = {
+  design: 'design',
+  measurement: 'measurement'
+};
+
+const MEASUREMENT_SETUPS = [
+  {
+    key: 'instantOffPotential',
+    title: 'Instant-off potential',
+    measured: 'Structure-to-electrolyte potential at the selected test point.',
+    where: 'Reference electrode near the selected test point while interruption captures instant-off potential.',
+    why: 'Confirms the structure meets the ≤ -850 mV (CSE) criterion.'
+  },
+  {
+    key: 'polarizationShift',
+    title: 'Polarization shift',
+    measured: 'Difference between depolarized and polarized structure potential.',
+    where: 'Reference electrode and test lead at a repeatable test station location.',
+    why: 'Validates at least 100 mV of polarization shift for adequate protection.'
+  },
+  {
+    key: 'testPointCoverage',
+    title: 'Coverage sweep',
+    measured: 'Pass/fail state across all defined test points.',
+    where: 'Lead and reference electrode are moved station-by-station along the structure.',
+    why: 'Ensures every monitored point satisfies acceptance criteria.'
+  }
+];
+
 function clamp(value, min, max) {
   return Math.min(max, Math.max(min, value));
 }
@@ -36,6 +65,9 @@ export function initCpLayoutCanvas({ panelId = 'cp-layout-canvas-panel', formId 
   const zoomInButton = panel.querySelector('[data-cp-layout-action="zoom-in"]');
   const zoomOutButton = panel.querySelector('[data-cp-layout-action="zoom-out"]');
   const fitButton = panel.querySelector('[data-cp-layout-action="fit"]');
+  const modeButtons = Array.from(panel.querySelectorAll('[data-cp-mode]'));
+  const measurementPanel = panel.querySelector('#cp-measurement-side-panel');
+  const measurementStateList = panel.querySelector('#cp-measurement-state-list');
 
   const layerToggles = {
     [LAYERS.structure]: panel.querySelector('#cp-layer-structure'),
@@ -61,8 +93,13 @@ export function initCpLayoutCanvas({ panelId = 'cp-layout-canvas-panel', formId 
       anodes: [],
       testPoints: [],
       referenceElectrode: { x: 260, y: 280 }
-    }
+    },
+    viewMode: VIEW_MODES.design,
+    activeMeasurementSetup: MEASUREMENT_SETUPS[0].key,
+    animationTick: 0
   };
+
+  let animationFrameId = null;
 
   const dragState = {
     mode: null,
@@ -151,6 +188,12 @@ export function initCpLayoutCanvas({ panelId = 'cp-layout-canvas-panel', formId 
       ...state.layers,
       ...(layout.layers || {})
     };
+    if (layout.viewMode) {
+      state.viewMode = layout.viewMode;
+    }
+    if (layout.activeMeasurementSetup) {
+      state.activeMeasurementSetup = layout.activeMeasurementSetup;
+    }
 
     if (layout.geometry && typeof layout.geometry === 'object') {
       if (Array.isArray(layout.geometry.anodes) && layout.geometry.anodes.length) {
@@ -224,6 +267,8 @@ export function initCpLayoutCanvas({ panelId = 'cp-layout-canvas-panel', formId 
     return {
       viewport: { ...state.viewport },
       layers: { ...state.layers },
+      viewMode: state.viewMode,
+      activeMeasurementSetup: state.activeMeasurementSetup,
       geometry: {
         structureSegments: clonePoints(state.geometry.structureSegments),
         anodes: clonePoints(state.geometry.anodes),
@@ -237,6 +282,35 @@ export function initCpLayoutCanvas({ panelId = 'cp-layout-canvas-panel', formId 
     if (typeof onLayoutChange === 'function') {
       onLayoutChange(serializeLayout());
     }
+  }
+
+  function getMeasurementTargetPoint(setupKey) {
+    const points = state.geometry.testPoints;
+    if (!Array.isArray(points) || !points.length) {
+      return null;
+    }
+    if (setupKey === 'polarizationShift') {
+      return points[Math.floor(points.length / 2)];
+    }
+    if (setupKey === 'testPointCoverage') {
+      const index = Math.floor((state.animationTick / 45) % points.length);
+      return points[index];
+    }
+    return points[0];
+  }
+
+  function renderMeasurementStateList() {
+    if (!measurementStateList) return;
+    measurementStateList.innerHTML = MEASUREMENT_SETUPS.map((setup) => `
+      <article class="cp-measurement-state ${setup.key === state.activeMeasurementSetup ? 'is-active' : ''}">
+        <button type="button" data-measurement-setup="${setup.key}" aria-pressed="${setup.key === state.activeMeasurementSetup}">
+          <strong>${setup.title}</strong>
+          <p class="field-hint">Measured: ${setup.measured}</p>
+          <p class="field-hint">Where: ${setup.where}</p>
+          <p class="field-hint">Why: ${setup.why}</p>
+        </button>
+      </article>
+    `).join('');
   }
 
   function render() {
@@ -255,7 +329,9 @@ export function initCpLayoutCanvas({ panelId = 'cp-layout-canvas-panel', formId 
 
     const anodeMarkup = anodes.map((anode, index) => `
       <g class="cp-layout-anode" data-drag-kind="anode" data-index="${index}">
-        <circle cx="${anode.x}" cy="${anode.y}" r="9" class="cp-layout-anode-node"></circle>
+        <circle cx="${anode.x}" cy="${anode.y}" r="9" class="cp-layout-anode-node">
+          <title>${anode.label}: anode bed position used for current distribution.</title>
+        </circle>
         <text x="${anode.x}" y="${anode.y - 14}" text-anchor="middle" class="cp-layout-anode-label">${anode.label}</text>
       </g>
     `).join('');
@@ -266,7 +342,9 @@ export function initCpLayoutCanvas({ panelId = 'cp-layout-canvas-panel', formId 
 
     const measurementMarkup = testPoints.map((point, index) => `
       <g class="cp-layout-test-point" data-drag-kind="test-point" data-index="${index}">
-        <rect x="${point.x - 7}" y="${point.y - 7}" width="14" height="14" rx="2" class="cp-layout-test-node"></rect>
+        <rect x="${point.x - 7}" y="${point.y - 7}" width="14" height="14" rx="2" class="cp-layout-test-node">
+          <title>${point.label}: test point for structure potential verification.</title>
+        </rect>
         <text x="${point.x}" y="${point.y + 22}" text-anchor="middle" class="cp-layout-test-label">${point.label}</text>
       </g>
     `).join('');
@@ -275,6 +353,18 @@ export function initCpLayoutCanvas({ panelId = 'cp-layout-canvas-panel', formId 
     const spacingMarkup = firstTwoAnodes ? `
       <line x1="${firstTwoAnodes.a.x}" y1="${firstTwoAnodes.a.y - 24}" x2="${firstTwoAnodes.b.x}" y2="${firstTwoAnodes.b.y - 24}" class="cp-layout-dimension"></line>
       <text x="${(firstTwoAnodes.a.x + firstTwoAnodes.b.x) / 2}" y="${firstTwoAnodes.a.y - 34}" text-anchor="middle" class="cp-layout-dimension-label">Anode spacing</text>
+    ` : '';
+
+    const activeSetup = MEASUREMENT_SETUPS.find((setup) => setup.key === state.activeMeasurementSetup) || MEASUREMENT_SETUPS[0];
+    const activeTargetPoint = getMeasurementTargetPoint(activeSetup.key);
+    const measurementModeEnabled = state.viewMode === VIEW_MODES.measurement;
+    const leadPulse = 8 + Math.abs(Math.sin(state.animationTick / 18)) * 10;
+    const leadMarkup = measurementModeEnabled && activeTargetPoint ? `
+      <line x1="${referenceElectrode.x}" y1="${referenceElectrode.y}" x2="${activeTargetPoint.x}" y2="${activeTargetPoint.y}" class="cp-layout-test-lead">
+        <title>Animated test lead from reference electrode to active test point.</title>
+      </line>
+      <circle cx="${activeTargetPoint.x}" cy="${activeTargetPoint.y}" r="${leadPulse.toFixed(2)}" class="cp-layout-target-ring"></circle>
+      <text x="${activeTargetPoint.x + 14}" y="${activeTargetPoint.y - 10}" class="cp-layout-focus-label">${activeSetup.title}</text>
     ` : '';
 
     canvas.innerHTML = `
@@ -287,13 +377,17 @@ export function initCpLayoutCanvas({ panelId = 'cp-layout-canvas-panel', formId 
           <g ${measurementVisible}>
             ${measurementMarkup}
             <g class="cp-layout-reference-electrode" data-drag-kind="reference" data-index="0">
-              <circle cx="${referenceElectrode.x}" cy="${referenceElectrode.y}" r="10" class="cp-layout-reference-node"></circle>
+              <circle cx="${referenceElectrode.x}" cy="${referenceElectrode.y}" r="10" class="cp-layout-reference-node">
+                <title>Reference electrode symbol used for potential measurements.</title>
+              </circle>
               <text x="${referenceElectrode.x + 16}" y="${referenceElectrode.y + 4}" class="cp-layout-reference-label">Reference electrode</text>
             </g>
+            ${leadMarkup}
           </g>
         </g>
       </svg>
     `;
+    renderMeasurementStateList();
   }
 
   function onPointerDown(event) {
@@ -411,6 +505,33 @@ export function initCpLayoutCanvas({ panelId = 'cp-layout-canvas-panel', formId 
     notifyLayoutChanged();
   }
 
+  function setViewMode(nextMode) {
+    state.viewMode = nextMode === VIEW_MODES.measurement ? VIEW_MODES.measurement : VIEW_MODES.design;
+    modeButtons.forEach((button) => {
+      const isActive = button.dataset.cpMode === state.viewMode;
+      button.classList.toggle('is-active', isActive);
+      button.setAttribute('aria-pressed', isActive ? 'true' : 'false');
+    });
+    if (measurementPanel) {
+      measurementPanel.hidden = state.viewMode !== VIEW_MODES.measurement;
+    }
+    render();
+    notifyLayoutChanged();
+  }
+
+  function setMeasurementSetup(setupKey, options = {}) {
+    if (!MEASUREMENT_SETUPS.some((setup) => setup.key === setupKey)) {
+      return;
+    }
+    state.activeMeasurementSetup = setupKey;
+    if (options.forceMeasurementView) {
+      setViewMode(VIEW_MODES.measurement);
+    } else {
+      render();
+      notifyLayoutChanged();
+    }
+  }
+
   function syncFromInputs() {
     const existing = serializeLayout();
     buildGeometryFromInputs();
@@ -431,7 +552,17 @@ export function initCpLayoutCanvas({ panelId = 'cp-layout-canvas-panel', formId 
 
   buildGeometryFromInputs();
   applyPersistedLayout(initialLayout);
+  setViewMode(state.viewMode);
   render();
+
+  function animateMeasurement() {
+    state.animationTick += 1;
+    if (state.viewMode === VIEW_MODES.measurement) {
+      render();
+    }
+    animationFrameId = window.requestAnimationFrame(animateMeasurement);
+  }
+  animationFrameId = window.requestAnimationFrame(animateMeasurement);
 
   canvas.addEventListener('pointerdown', onPointerDown);
   canvas.addEventListener('pointermove', onPointerMove);
@@ -447,6 +578,22 @@ export function initCpLayoutCanvas({ panelId = 'cp-layout-canvas-panel', formId 
     notifyLayoutChanged();
   });
 
+  modeButtons.forEach((button) => {
+    button.addEventListener('click', () => {
+      setViewMode(button.dataset.cpMode);
+      announce(state.viewMode === VIEW_MODES.measurement ? 'Measurement view enabled.' : 'Design view enabled.');
+    });
+  });
+
+  measurementStateList?.addEventListener('click', (event) => {
+    const button = event.target.closest('[data-measurement-setup]');
+    if (!button) {
+      return;
+    }
+    setMeasurementSetup(button.dataset.measurementSetup);
+    announce(`Measurement setup focused: ${button.textContent.trim()}.`);
+  });
+
   Object.entries(layerToggles).forEach(([layer, checkbox]) => {
     if (!checkbox) return;
     checkbox.checked = Boolean(state.layers[layer]);
@@ -458,6 +605,12 @@ export function initCpLayoutCanvas({ panelId = 'cp-layout-canvas-panel', formId 
   return {
     syncFromInputs,
     resetLayout,
-    getState: serializeLayout
+    getState: serializeLayout,
+    setMeasurementSetup: (setupKey) => setMeasurementSetup(setupKey, { forceMeasurementView: true }),
+    destroy: () => {
+      if (animationFrameId) {
+        window.cancelAnimationFrame(animationFrameId);
+      }
+    }
   };
 }

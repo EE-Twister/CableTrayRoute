@@ -102,6 +102,11 @@ Life_years = (W_installed × Q_anode × U × F_design) / (I_req × 8760)</pre>
       <section id="cp-layout-canvas-panel" class="card cp-layout-panel" aria-labelledby="cp-layout-heading">
         <h2 id="cp-layout-heading">CP Layout Canvas</h2>
         <p class="field-hint">Drag anodes, test points, or the reference electrode to adjust spacing/offset assumptions and visualize structure coverage.</p>
+        <div class="cp-mode-switch" role="radiogroup" aria-label="CP layout mode">
+          <span class="cp-mode-switch__label">View mode</span>
+          <button type="button" class="btn cp-mode-switch__button is-active" data-cp-mode="design" aria-pressed="true">Design view</button>
+          <button type="button" class="btn cp-mode-switch__button" data-cp-mode="measurement" aria-pressed="false">Measurement view</button>
+        </div>
         <div class="cp-layout-toolbar" role="group" aria-label="CP layout layer controls">
           <label><input type="checkbox" id="cp-layer-structure" checked> Structure</label>
           <label><input type="checkbox" id="cp-layer-anodes" checked> Anodes</label>
@@ -114,7 +119,24 @@ Life_years = (W_installed × Q_anode × U × F_design) / (I_req × 8760)</pre>
           <button type="button" class="btn" data-cp-layout-action="fit">Fit View</button>
           <button type="button" class="btn" data-cp-layout-action="reset">Reset Layout</button>
         </div>
-        <div id="cp-layout-canvas" class="cp-layout-canvas" aria-live="polite"></div>
+        <div class="cp-layout-workspace">
+          <div id="cp-layout-canvas" class="cp-layout-canvas" aria-live="polite"></div>
+          <aside id="cp-measurement-side-panel" class="cp-measurement-panel" aria-live="polite">
+            <h3>Measurement setup guide</h3>
+            <p class="field-hint">Select a setup state to preview what is measured, where to place the lead/reference electrode, and why the check matters.</p>
+            <div id="cp-measurement-state-list" class="cp-measurement-state-list"></div>
+          </aside>
+        </div>
+        <div class="cp-layout-legend" aria-label="Measurement legend">
+          <strong>Measurement legend</strong>
+          <ul>
+            <li><span class="cp-legend-dot cp-legend-dot--anode" aria-hidden="true"></span>Anode bed node</li>
+            <li><span class="cp-legend-dot cp-legend-dot--test" aria-hidden="true"></span>Test point</li>
+            <li><span class="cp-legend-dot cp-legend-dot--reference" aria-hidden="true"></span>Reference electrode</li>
+            <li><span class="cp-legend-dot cp-legend-dot--lead" aria-hidden="true"></span>Animated test lead</li>
+            <li><span class="cp-legend-dot cp-legend-dot--target" aria-hidden="true"></span>Active criterion focus</li>
+          </ul>
+        </div>
         <p id="cp-layout-status" class="field-hint" aria-live="polite">Layout initialized from form values.</p>
       </section>
 
