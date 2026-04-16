@@ -165,6 +165,7 @@ export function initCpLayoutCanvas({
   const measurementPanel = panel.querySelector('#cp-measurement-side-panel');
   const measurementStateList = panel.querySelector('#cp-measurement-state-list');
   const hotspotInspector = panel.querySelector('#cp-hotspot-inspector');
+  const propertiesPanelContent = panel.querySelector('#cp-element-properties-content');
 
   const layerToggles = {
     [LAYERS.structure]: panel.querySelector('#cp-layer-structure'),
@@ -210,7 +211,8 @@ export function initCpLayoutCanvas({
       lowMarginOnly: false
     },
     assessmentData: null,
-    selectedHotspotIndex: null
+    selectedHotspotIndex: null,
+    selectedElement: null
   };
 
   let animationFrameId = null;
@@ -555,6 +557,64 @@ export function initCpLayoutCanvas({
     `;
   }
 
+  function getElementBySelection(selection) {
+    if (!selection || typeof selection !== 'object') return null;
+    if (selection.kind === 'anode') {
+      return state.geometry.anodes[selection.index] || null;
+    }
+    if (selection.kind === 'test-point') {
+      return state.geometry.testPoints[selection.index] || null;
+    }
+    if (selection.kind === 'reference') {
+      return selection.index === 0 ? state.geometry.referenceElectrode : null;
+    }
+    if (selection.kind === 'segment') {
+      return state.geometry.structureSegments[selection.index] || null;
+    }
+    return null;
+  }
+
+  function renderPropertiesPanel() {
+    if (!propertiesPanelContent) return;
+    const selected = state.selectedElement;
+    const selectedItem = getElementBySelection(selected);
+    if (!selected || !selectedItem) {
+      propertiesPanelContent.innerHTML = `
+        <p class="field-hint">No element selected.</p>
+        <p class="field-hint">Double click an anode, test point, structure segment, or the reference electrode to edit properties.</p>
+      `;
+      return;
+    }
+    const titleByKind = {
+      anode: 'Anode',
+      'test-point': 'Test point',
+      reference: 'Reference electrode',
+      segment: 'Structure segment'
+    };
+    const title = titleByKind[selected.kind] || 'Element';
+    const indexLabel = selected.kind === 'reference' ? '' : ` ${selected.index + 1}`;
+    const fields = selected.kind === 'segment'
+      ? `
+          <label>X1 <input type="number" step="1" data-cp-prop-key="x1" value="${roundTo(selectedItem.x1, 2)}"></label>
+          <label>Y1 <input type="number" step="1" data-cp-prop-key="y1" value="${roundTo(selectedItem.y1, 2)}"></label>
+          <label>X2 <input type="number" step="1" data-cp-prop-key="x2" value="${roundTo(selectedItem.x2, 2)}"></label>
+          <label>Y2 <input type="number" step="1" data-cp-prop-key="y2" value="${roundTo(selectedItem.y2, 2)}"></label>
+          <label>Label <input type="text" data-cp-prop-key="label" value="${selectedItem.label || ''}"></label>
+        `
+      : `
+          <label>X <input type="number" step="1" data-cp-prop-key="x" value="${roundTo(selectedItem.x, 2)}"></label>
+          <label>Y <input type="number" step="1" data-cp-prop-key="y" value="${roundTo(selectedItem.y, 2)}"></label>
+          <label>Label <input type="text" data-cp-prop-key="label" value="${selectedItem.label || ''}" ${selected.kind === 'reference' ? 'disabled' : ''}></label>
+        `;
+    propertiesPanelContent.innerHTML = `
+      <h4>${title}${indexLabel}</h4>
+      <form class="cp-properties-form" id="cp-properties-form">
+        ${fields}
+      </form>
+      <p class="field-hint">Changes are applied immediately and persisted with the layout.</p>
+    `;
+  }
+
   function render() {
     const { structureSegments, anodes, testPoints, referenceElectrode } = state.geometry;
     const { x, y, scale } = state.viewport;
@@ -677,7 +737,7 @@ export function initCpLayoutCanvas({
     ` : '';
 
     canvas.innerHTML = `
-      <svg viewBox="0 0 ${bounds.width} ${bounds.height}" aria-label="Cathodic protection layout canvas" role="img">
+      <svg viewBox="0 0 ${bounds.width} ${bounds.height}" preserveAspectRatio="none" aria-label="Cathodic protection layout canvas" role="img">
         <g transform="translate(${x} ${y}) scale(${scale})">
           <rect x="0" y="0" width="${bounds.width}" height="${bounds.height}" class="cp-layout-background"></rect>
           ${gridMinorLines.join('')}
@@ -701,6 +761,7 @@ export function initCpLayoutCanvas({
     `;
     renderMeasurementStateList();
     renderHotspotInspector(selectedSegmentAssessment);
+    renderPropertiesPanel();
   }
 
   function onPointerDown(event) {
@@ -823,6 +884,41 @@ export function initCpLayoutCanvas({
     dragState.pointerId = null;
     dragState.itemIndex = -1;
     canvas.releasePointerCapture(event.pointerId);
+  }
+
+  function selectElementFromTarget(target) {
+    const dragTarget = target.closest('[data-drag-kind]');
+    if (dragTarget) {
+      const kind = dragTarget.dataset.dragKind;
+      const index = Number.parseInt(dragTarget.dataset.index || '-1', 10);
+      if (kind === 'reference') {
+        state.selectedElement = { kind: 'reference', index: 0 };
+        return true;
+      }
+      if (Number.isInteger(index) && index >= 0) {
+        state.selectedElement = { kind, index };
+        return true;
+      }
+    }
+    const segment = target.closest('[data-segment-index]');
+    if (segment) {
+      const index = Number.parseInt(segment.dataset.segmentIndex || '-1', 10);
+      if (Number.isInteger(index) && index >= 0) {
+        state.selectedElement = { kind: 'segment', index };
+        state.selectedHotspotIndex = index;
+        return true;
+      }
+    }
+    const hotspot = target.closest('[data-hotspot-index]');
+    if (hotspot) {
+      const index = Number.parseInt(hotspot.dataset.hotspotIndex || '-1', 10);
+      if (Number.isInteger(index) && index >= 0) {
+        state.selectedElement = { kind: 'segment', index };
+        state.selectedHotspotIndex = index;
+        return true;
+      }
+    }
+    return false;
   }
 
   function onCanvasHover(event) {
@@ -962,6 +1058,13 @@ export function initCpLayoutCanvas({
   canvas.addEventListener('pointerup', onPointerUp);
   canvas.addEventListener('pointercancel', onPointerUp);
   canvas.addEventListener('mousemove', onCanvasHover);
+  canvas.addEventListener('dblclick', (event) => {
+    if (!selectElementFromTarget(event.target)) {
+      return;
+    }
+    render();
+    announce('Element selected for property editing.');
+  });
   canvas.addEventListener('mouseleave', () => {
     if (state.hoveredSegmentIndex === null) {
       return;
@@ -1033,6 +1136,38 @@ export function initCpLayoutCanvas({
     state.selectedHotspotIndex = hotspotIndex;
     render();
     announce(`Hotspot selected: Segment ${hotspotIndex + 1}.`);
+  });
+
+  propertiesPanelContent?.addEventListener('input', (event) => {
+    const input = event.target;
+    if (!(input instanceof HTMLInputElement)) {
+      return;
+    }
+    const key = input.dataset.cpPropKey;
+    if (!key || !state.selectedElement) {
+      return;
+    }
+    const selected = getElementBySelection(state.selectedElement);
+    if (!selected) {
+      return;
+    }
+
+    if (key === 'label') {
+      selected.label = input.value;
+    } else {
+      const parsed = Number.parseFloat(input.value);
+      if (!Number.isFinite(parsed)) {
+        return;
+      }
+      selected[key] = parsed;
+    }
+
+    if (state.selectedElement.kind === 'anode' || state.selectedElement.kind === 'reference') {
+      syncInputsFromGeometry();
+    }
+    clampViewportToBounds();
+    render();
+    notifyLayoutChanged();
   });
 
   return {

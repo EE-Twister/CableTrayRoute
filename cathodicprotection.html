@@ -146,11 +146,18 @@ Life_years = (W_installed × Q_anode × U × F_design) / (I_req × 8760)</pre>
         </div>
         <div class="cp-layout-workspace">
           <div id="cp-layout-canvas" class="cp-layout-canvas" aria-live="polite"></div>
-          <aside id="cp-measurement-side-panel" class="cp-measurement-panel" aria-live="polite">
-            <h3>Measurement setup guide</h3>
-            <p class="field-hint">Select a setup state to preview what is measured, where to place the lead/reference electrode, and why the check matters.</p>
-            <div id="cp-measurement-state-list" class="cp-measurement-state-list"></div>
-          </aside>
+          <div class="cp-layout-sidebar">
+            <aside id="cp-element-properties-panel" class="cp-properties-panel" aria-live="polite">
+              <h3>Element properties</h3>
+              <p class="field-hint">Double click an element in the canvas to edit its coordinates and metadata.</p>
+              <div id="cp-element-properties-content"></div>
+            </aside>
+            <aside id="cp-measurement-side-panel" class="cp-measurement-panel" aria-live="polite">
+              <h3>Measurement setup guide</h3>
+              <p class="field-hint">Select a setup state to preview what is measured, where to place the lead/reference electrode, and why the check matters.</p>
+              <div id="cp-measurement-state-list" class="cp-measurement-state-list"></div>
+            </aside>
+          </div>
         </div>
         <div class="cp-layout-legend" aria-label="Measurement legend">
           <strong>Measurement legend</strong>
