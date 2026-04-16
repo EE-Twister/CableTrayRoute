@@ -210,6 +210,33 @@ Life_years = (W_installed × Q_anode × U × F_design) / (I_req × 8760)</pre>
         <fieldset>
           <legend><strong>Anode &amp; Design Factors</strong></legend>
           <div class="field-row">
+            <label for="anode-system-type">Anode type / system</label>
+            <select id="anode-system-type" required>
+              <option value="galvanic" selected>Galvanic</option>
+              <option value="iccp">ICCP (Impressed Current)</option>
+            </select>
+          </div>
+          <div class="field-row">
+            <label for="number-of-anodes">Number of anodes</label>
+            <input type="number" id="number-of-anodes" min="1" step="1" value="10" required>
+          </div>
+          <div class="field-row">
+            <label for="anode-spacing">Anode spacing (<span class="unit-label-ft">ft</span><span class="unit-label-m" hidden>m</span>)</label>
+            <input type="number" id="anode-spacing" min="0.1" step="0.1" value="100" required>
+          </div>
+          <div class="field-row">
+            <label for="anode-distance-to-structure">Anode distance to structure (<span class="unit-label-ft">ft</span><span class="unit-label-m" hidden>m</span>)</label>
+            <input type="number" id="anode-distance-to-structure" min="0.1" step="0.1" value="10" required>
+          </div>
+          <div class="field-row">
+            <label for="anode-burial-depth">Anode burial depth (<span class="unit-label-ft">ft</span><span class="unit-label-m" hidden>m</span>)</label>
+            <input type="number" id="anode-burial-depth" min="0.1" step="0.1" value="6" required>
+          </div>
+          <div class="field-row">
+            <label for="zone-resistivity-values">Zone resistivity values (Ω·m, comma separated)</label>
+            <input type="text" id="zone-resistivity-values" value="" placeholder="e.g., 40, 65, 90">
+          </div>
+          <div class="field-row">
             <label for="anode-capacity">Anode capacity Q<sub>anode</sub> (Ah/kg)</label>
             <input type="number" id="anode-capacity" min="1" step="1" value="780" required>
           </div>
