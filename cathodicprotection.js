@@ -9,6 +9,7 @@ import {
 import { computeDistributionBySegment, parseZoneResistivityValues } from './src/studies/cp/distributionModel.js';
 import { evaluateCriteriaChecks } from './src/studies/cp/criteriaChecks.js';
 import { evaluateInterferenceAssessment, parseMitigationActions } from './src/studies/cp/interferenceAssessment.js';
+import { COATING_MODEL_TYPES, parseConditionFactorValues, resolveCoatingModel } from './src/studies/cp/coatingModel.js';
 
 const SQFT_TO_SQM = 0.09290304;
 const LB_TO_KG = 0.45359237;
@@ -71,7 +72,7 @@ export const CP_STANDARD_BASIS = {
     requiredChecks: ['commissioningChecksDefined', 'monitoringPlanDefined'],
     summary: 'Coating breakdown factor, design factor, and optional temperature correction require project-specific engineering validation.',
     assumptions: [
-      'Coating breakdown factor is selected by expected coating quality, age, and defect distribution.',
+      'Coating demand model is selected by fixed factor, degradation curve, or segment-based condition factors.',
       'Design factor is selected as a reliability margin for uncertainty and lifecycle variability.',
       'Temperature correction is not explicitly modeled in this tool and should be applied by engineering review when needed.'
     ]
@@ -108,8 +109,6 @@ export function runCathodicProtectionAnalysis(input) {
     : lookupCurrentDensity(input.assetType, input.moistureCategory, input.soilResistivityOhmM, input.soilPh, input.pipeMaterial);
 
   const designCurrentDensityAperM2 = designCurrentDensityMaM2 / 1000;
-  const exposedAreaM2 = input.surfaceAreaM2 * input.coatingBreakdownFactor;
-  const areaBasedRequiredCurrentA = calculateRequiredCurrent(exposedAreaM2, designCurrentDensityAperM2);
   const distributionModel = computeDistributionBySegment({
     anodeTypeSystem: input.anodeTypeSystem,
     numberOfAnodes: input.numberOfAnodes,
@@ -119,6 +118,9 @@ export function runCathodicProtectionAnalysis(input) {
     soilResistivityOhmM: input.soilResistivityOhmM,
     zoneResistivityOhmM: input.zoneResistivityOhmM
   });
+  const coatingModel = resolveCoatingModel(input, { segmentCount: distributionModel.segments.length });
+  const exposedAreaM2 = input.surfaceAreaM2 * coatingModel.effectiveFactor;
+  const areaBasedRequiredCurrentA = calculateRequiredCurrent(exposedAreaM2, designCurrentDensityAperM2);
   const distributionAdjustedCurrentA = areaBasedRequiredCurrentA * distributionModel.globalAttenuationFactor;
   const adjustedRequiredCurrentA = distributionAdjustedCurrentA / input.availabilityFactor;
   const designHours = input.targetLifeYears * 8760;
@@ -155,6 +157,8 @@ export function runCathodicProtectionAnalysis(input) {
       safetyMargin: 'Compares predicted life versus target design life using the same protection and anode basis assumptions.'
     },
     designCurrentDensityMaM2: roundTo(designCurrentDensityMaM2, 3),
+    coatingModel,
+    coatingBreakdownFactor: roundTo(coatingModel.effectiveFactor, 4),
     exposedAreaM2: roundTo(exposedAreaM2, 3),
     areaBasedRequiredCurrentA: roundTo(areaBasedRequiredCurrentA, 4),
     distributionAdjustedCurrentA: roundTo(distributionAdjustedCurrentA, 4),
@@ -172,33 +176,80 @@ export function runCathodicProtectionAnalysis(input) {
       input,
       adjustedRequiredCurrentA,
       minimumAnodeMassKg,
-      predictedLifeYears
+      predictedLifeYears,
+      coatingModel,
+      distributionModel
     })
   };
 }
 
-function buildSensitivitySummary({ input, adjustedRequiredCurrentA, minimumAnodeMassKg, predictedLifeYears }) {
+function buildSensitivitySummary({ input, adjustedRequiredCurrentA, minimumAnodeMassKg, predictedLifeYears, coatingModel, distributionModel }) {
+  const uncertainty = coatingModel?.uncertaintyBand || { lowFactor: input.coatingBreakdownFactor, baseFactor: input.coatingBreakdownFactor, highFactor: input.coatingBreakdownFactor };
+  const baseFactor = uncertainty.baseFactor || input.coatingBreakdownFactor;
   const scenarios = [
-    { key: 'base', label: 'Base case', currentMultiplier: 1, requiredMassMultiplier: 1, predictedLifeMultiplier: 1 },
-    { key: 'conservative', label: 'Conservative (+20% demand)', currentMultiplier: 1.2, requiredMassMultiplier: 1.2, predictedLifeMultiplier: 1 / 1.2 },
-    { key: 'optimistic', label: 'Optimistic (-20% demand)', currentMultiplier: 0.8, requiredMassMultiplier: 0.8, predictedLifeMultiplier: 1 / 0.8 }
+    { key: 'low-coating', label: 'Low coating demand band', factor: uncertainty.lowFactor },
+    { key: 'base', label: 'Base case', factor: uncertainty.baseFactor },
+    { key: 'high-coating', label: 'High coating demand band', factor: uncertainty.highFactor }
   ];
+  const segmentDemands = computeWorstCaseSegmentDemand({
+    distributionModel,
+    coatingModel,
+    adjustedRequiredCurrentA,
+    baseFactor
+  });
 
   return scenarios.map((scenario) => {
-    const scenarioCurrentA = adjustedRequiredCurrentA * scenario.currentMultiplier;
-    const scenarioRequiredMassKg = minimumAnodeMassKg * scenario.requiredMassMultiplier;
-    const scenarioPredictedLifeYears = predictedLifeYears * scenario.predictedLifeMultiplier;
+    const currentMultiplier = baseFactor > 0 ? scenario.factor / baseFactor : 1;
+    const scenarioCurrentA = adjustedRequiredCurrentA * currentMultiplier;
+    const scenarioRequiredMassKg = minimumAnodeMassKg * currentMultiplier;
+    const scenarioPredictedLifeYears = predictedLifeYears / currentMultiplier;
     const scenarioSafetyMarginYears = scenarioPredictedLifeYears - input.targetLifeYears;
+    const scenarioWorstCaseSegmentDemandA = segmentDemands.worstCaseSegmentDemandA * currentMultiplier;
+    const approvalStatus = scenarioSafetyMarginYears >= 0 ? 'Approved' : 'Review required';
     return {
       ...scenario,
+      approvalStatus,
+      coatingFactor: roundTo(scenario.factor, 4),
       requiredCurrentA: roundTo(scenarioCurrentA, 4),
       minimumAnodeMassKg: roundTo(scenarioRequiredMassKg, 3),
       minimumAnodeMassLb: roundTo(scenarioRequiredMassKg / LB_TO_KG, 3),
       predictedLifeYears: roundTo(scenarioPredictedLifeYears, 2),
+      worstCaseSegmentDemandA: roundTo(scenarioWorstCaseSegmentDemandA, 4),
+      worstCaseSegmentLabel: segmentDemands.worstCaseSegmentLabel,
       safetyMarginYears: roundTo(scenarioSafetyMarginYears, 2),
       safetyMarginPercent: roundTo((scenarioSafetyMarginYears / input.targetLifeYears) * 100, 1)
     };
   });
+}
+
+function computeWorstCaseSegmentDemand({ distributionModel, coatingModel, adjustedRequiredCurrentA, baseFactor }) {
+  const segments = Array.isArray(distributionModel?.segments) ? distributionModel.segments : [];
+  if (!segments.length) {
+    return { worstCaseSegmentDemandA: adjustedRequiredCurrentA, worstCaseSegmentLabel: 'Segment 1' };
+  }
+
+  const segmentFactors = Array.isArray(coatingModel?.segmentFactors) && coatingModel.segmentFactors.length
+    ? coatingModel.segmentFactors
+    : new Array(segments.length).fill(baseFactor);
+  const averageSegmentFactor = segmentFactors.reduce((sum, factor) => sum + factor, 0) / segmentFactors.length;
+  const worstSegment = segments.reduce((worst, segment, index) => {
+    const factor = segmentFactors[index] ?? averageSegmentFactor;
+    const localDemand = (segment.attenuationFactor ?? 1) * factor;
+    if (!worst || localDemand > worst.localDemand) {
+      return {
+        localDemand,
+        label: `Segment ${segment.segment ?? index + 1}`
+      };
+    }
+    return worst;
+  }, null);
+  const worstCaseSegmentDemandA = averageSegmentFactor > 0
+    ? adjustedRequiredCurrentA * (worstSegment.localDemand / averageSegmentFactor)
+    : adjustedRequiredCurrentA;
+  return {
+    worstCaseSegmentDemandA,
+    worstCaseSegmentLabel: worstSegment?.label || 'Segment 1'
+  };
 }
 
 function validateInputs(input) {
@@ -222,6 +273,30 @@ function validateInputs(input) {
 
   if (!Number.isFinite(input.coatingBreakdownFactor) || input.coatingBreakdownFactor <= 0 || input.coatingBreakdownFactor > 1) {
     errors.push('coatingBreakdownFactor must be between 0 and 1, exclusive of zero.');
+  }
+
+  if (!Object.values(COATING_MODEL_TYPES).includes(input.coatingModelType)) {
+    errors.push('coatingModelType must be fixed, degradation-curve, or segment-condition.');
+  }
+
+  if (input.coatingModelType === COATING_MODEL_TYPES.degradationCurve) {
+    if (!Number.isFinite(input.coatingInitialBreakdownFactor) || input.coatingInitialBreakdownFactor <= 0 || input.coatingInitialBreakdownFactor > 1) {
+      errors.push('coatingInitialBreakdownFactor must be between 0 and 1 for degradation-curve mode.');
+    }
+    if (!Number.isFinite(input.coatingEndOfLifeBreakdownFactor) || input.coatingEndOfLifeBreakdownFactor <= 0 || input.coatingEndOfLifeBreakdownFactor > 1) {
+      errors.push('coatingEndOfLifeBreakdownFactor must be between 0 and 1 for degradation-curve mode.');
+    }
+    if (!Number.isFinite(input.coatingDegradationExponent) || input.coatingDegradationExponent <= 0) {
+      errors.push('coatingDegradationExponent must be greater than zero for degradation-curve mode.');
+    }
+  }
+
+  if (input.coatingModelType === COATING_MODEL_TYPES.segmentCondition) {
+    if (!Array.isArray(input.segmentConditionFactors) || !input.segmentConditionFactors.length) {
+      errors.push('segmentConditionFactors must include at least one factor for segment-condition mode.');
+    } else if (input.segmentConditionFactors.some((value) => !Number.isFinite(value) || value <= 0 || value > 1)) {
+      errors.push('segmentConditionFactors values must be between 0 and 1 for segment-condition mode.');
+    }
   }
 
   if (!Number.isFinite(input.soilPh) || input.soilPh < 0 || input.soilPh > 14) {
@@ -427,6 +502,10 @@ if (typeof document !== 'undefined') {
   const calculatedSurfaceAreaEl = document.getElementById('calculated-surface-area');
   const pipeDimensionsIllustrationEl = document.getElementById('pipe-dimensions-illustration');
   const compliancePanelEl = document.getElementById('cp-compliance-status-content');
+  const coatingModelTypeEl = document.getElementById('coating-model-type');
+  const coatingFixedRow = document.getElementById('coating-fixed-row');
+  const coatingCurveRows = document.querySelectorAll('[data-coating-curve-row]');
+  const coatingSegmentRow = document.getElementById('coating-segment-row');
 
   const saved = normalizeSavedStudy(getStudies().cathodicProtection);
   renderCalculationBasis(basisPanel, CP_STANDARD_BASIS);
@@ -440,6 +519,15 @@ if (typeof document !== 'undefined') {
     if (!input) return;
     const tableDensity = lookupCurrentDensity(input.assetType, input.moistureCategory, input.soilResistivityOhmM, input.soilPh, input.pipeMaterial);
     tableDensityEl.value = roundTo(tableDensity, 3);
+  }
+
+  function refreshCoatingModelInputs() {
+    const modelType = coatingModelTypeEl.value;
+    coatingFixedRow.hidden = modelType !== COATING_MODEL_TYPES.fixed;
+    coatingCurveRows.forEach((row) => {
+      row.hidden = modelType !== COATING_MODEL_TYPES.degradationCurve;
+    });
+    coatingSegmentRow.hidden = modelType !== COATING_MODEL_TYPES.segmentCondition;
   }
 
   function toggleDensityMode() {
@@ -503,13 +591,15 @@ if (typeof document !== 'undefined') {
   }
 
   toggleDensityMode();
+  refreshCoatingModelInputs();
   updatePipeVisibility();
   refreshPipeMaterialHint();
   refreshSurfaceAreaMode();
   refreshTableDensity();
 
-  ['asset-type', 'soil-resistivity', 'soil-ph', 'moisture-category', 'density-method', 'pipe-material', 'surface-area-mode', 'pipe-od', 'pipe-length', 'unit-select'].forEach(id => {
+  ['asset-type', 'soil-resistivity', 'soil-ph', 'moisture-category', 'density-method', 'pipe-material', 'surface-area-mode', 'pipe-od', 'pipe-length', 'unit-select', 'coating-model-type'].forEach(id => {
     document.getElementById(id).addEventListener('input', () => {
+      refreshCoatingModelInputs();
       updatePipeVisibility();
       refreshPipeMaterialHint();
       refreshSurfaceAreaMode();
@@ -517,6 +607,7 @@ if (typeof document !== 'undefined') {
       refreshTableDensity();
     });
     document.getElementById(id).addEventListener('change', () => {
+      refreshCoatingModelInputs();
       updatePipeVisibility();
       refreshPipeMaterialHint();
       refreshSurfaceAreaMode();
@@ -575,7 +666,9 @@ function readFormInputs() {
   const anodeDistanceInput = getNumber('anode-distance-to-structure');
   const anodeBurialDepthInput = getNumber('anode-burial-depth');
   const zoneResistivityRaw = getValue('zone-resistivity-values');
+  const segmentConditionFactorsRaw = getValue('segment-condition-factors');
   const parsedZoneResistivityValues = parseZoneResistivityValues(zoneResistivityRaw);
+  const parsedSegmentConditionFactors = parseConditionFactorValues(segmentConditionFactorsRaw);
   const mitigationActions = parseMitigationActions(getValue('mitigation-actions'));
   const zoneResistivityTokens = String(zoneResistivityRaw ?? '')
     .split(',')
@@ -589,7 +682,13 @@ function readFormInputs() {
     soilResistivityOhmM: getNumber('soil-resistivity'),
     soilPh: getNumber('soil-ph'),
     moistureCategory: getValue('moisture-category'),
+    coatingModelType: getValue('coating-model-type'),
     coatingBreakdownFactor: getNumber('coating-breakdown'),
+    coatingInitialBreakdownFactor: getNumber('coating-initial-breakdown'),
+    coatingEndOfLifeBreakdownFactor: getNumber('coating-eol-breakdown'),
+    coatingDegradationExponent: getNumber('coating-degradation-exponent'),
+    segmentConditionFactors: parsedSegmentConditionFactors,
+    segmentConditionFactorsText: segmentConditionFactorsRaw,
     surfaceAreaM2: isMetric ? surfaceAreaInput : surfaceAreaInput * SQFT_TO_SQM,
     currentDensityMethod: getValue('density-method'),
     surfaceAreaMode,
@@ -697,7 +796,9 @@ function renderResults(result, root) {
             <tr><td>Soil pH</td><td>${result.soilPh}</td></tr>
             <tr><td>Moisture / corrosivity category</td><td>${escapeHtml(result.moistureCategory)}</td></tr>
             <tr><td>Design current density i<sub>d</sub></td><td>${result.designCurrentDensityMaM2} mA/m²</td></tr>
-            <tr><td>Coating breakdown factor</td><td>${result.coatingBreakdownFactor}</td></tr>
+            <tr><td>Coating demand model</td><td>${escapeHtml(result.coatingModel?.label || 'Fixed factor')}</td></tr>
+            <tr><td>Effective coating factor</td><td>${result.coatingBreakdownFactor}</td></tr>
+            <tr><td>Coating uncertainty band</td><td>${roundTo(result.coatingModel?.uncertaintyBand?.lowFactor ?? result.coatingBreakdownFactor, 4)} to ${roundTo(result.coatingModel?.uncertaintyBand?.highFactor ?? result.coatingBreakdownFactor, 4)}</td></tr>
             <tr><td>Exposed area</td><td>${result.exposedAreaM2} m²</td></tr>
             <tr><td>Anode capacity</td><td>${result.anodeCapacityAhPerKg} Ah/kg</td></tr>
             <tr><td>Anode system type</td><td>${escapeHtml(result.anodeTypeSystem)}</td></tr>
@@ -785,7 +886,10 @@ function renderResults(result, root) {
           <thead>
             <tr>
               <th>Scenario</th>
+              <th>Design review</th>
+              <th>Coating factor</th>
               <th>Required current (A)</th>
+              <th>Worst-case segment demand (A)</th>
               <th>Minimum anode mass</th>
               <th>Predicted life (years)</th>
               <th>Safety margin</th>
@@ -795,7 +899,10 @@ function renderResults(result, root) {
             ${sensitivityRows.map((scenario) => `
               <tr>
                 <td>${escapeHtml(scenario.label)}</td>
+                <td>${escapeHtml(scenario.approvalStatus || 'Review required')}</td>
+                <td>${scenario.coatingFactor}</td>
                 <td>${scenario.requiredCurrentA}</td>
+                <td>${scenario.worstCaseSegmentDemandA} (${escapeHtml(scenario.worstCaseSegmentLabel || 'Segment 1')})</td>
                 <td>${scenario.minimumAnodeMassKg} kg (${scenario.minimumAnodeMassLb} lb)</td>
                 <td>${scenario.predictedLifeYears}</td>
                 <td>${scenario.safetyMarginYears} years (${scenario.safetyMarginPercent}%)</td>
@@ -841,7 +948,7 @@ function renderResults(result, root) {
 
 function buildDesignAdvisories(result, sensitivityRows) {
   const notes = [];
-  const conservativeScenario = sensitivityRows.find((scenario) => scenario.key === 'conservative');
+  const conservativeScenario = sensitivityRows.find((scenario) => scenario.key === 'high-coating');
 
   if (result.safetyMarginYears < 0) {
     notes.push('Installed anode mass is below target-life demand; increase installed mass or reduce coating breakdown assumptions.');
@@ -850,7 +957,7 @@ function buildDesignAdvisories(result, sensitivityRows) {
   }
 
   if (conservativeScenario && conservativeScenario.safetyMarginYears < 0) {
-    notes.push('The +20% demand sensitivity case fails target life; add contingency mass or plan earlier replacement intervals.');
+    notes.push('The high coating uncertainty band fails target life; add contingency mass or plan earlier replacement intervals.');
   }
 
   if (result.soilResistivityOhmM < 50 || result.soilPh < 5.5 || result.soilPh > 9) {
@@ -862,7 +969,7 @@ function buildDesignAdvisories(result, sensitivityRows) {
   }
 
   if (result.coatingBreakdownFactor > 0.35) {
-    notes.push('Coating breakdown factor is high; prioritize coating condition assessment/rehabilitation to reduce long-term CP demand.');
+    notes.push('Effective coating demand is high; prioritize coating condition assessment/rehabilitation to reduce long-term CP demand.');
   }
 
   notes.push('For the next iteration, include temperature correction and stray-current interference checks in the final detailed design package.');

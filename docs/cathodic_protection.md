@@ -13,7 +13,10 @@ This guide documents the engineering basis used by the Cathodic Protection sizin
 | Soil resistivity | ρ | Ω·m | Used for current-density adjustment (`< 50`, `50–200`, `> 200` Ω·m bands). |
 | Soil pH | pH | — | Used to apply an acidic/alkaline adjustment outside nominal neutral range. |
 | Moisture category | — | categorical | `low`, `moderate`, or `high`; selects base current-density table column. |
-| Coating breakdown factor | f<sub>cb</sub> | fraction | `0 < f_cb ≤ 1`; represents exposed steel area fraction. |
+| Coating demand model | — | categorical | `fixed`, `degradation-curve`, or `segment-condition`; selects exposed-area treatment. |
+| Fixed coating factor | f<sub>cb</sub> | fraction | Used in `fixed` mode. |
+| Degradation initial/end factors | f<sub>0</sub>, f<sub>EOL</sub> | fraction | Used in `degradation-curve` mode with exponent shape. |
+| Segment condition factors | f<sub>seg,i</sub> | fraction list | Used in `segment-condition` mode for localized condition variation. |
 | Surface area | A<sub>surf</sub> | m² | Total structure surface area used for CP demand calculation. |
 | Current density mode | — | categorical | `table` (auto-selected) or `manual`. |
 | Manual current density | i<sub>manual</sub> | mA/m² | Used only when mode=`manual`. |
@@ -48,9 +51,11 @@ Then convert mA/m² to A/m²:
 
 i<sub>design,A</sub> = i<sub>design</sub> / 1000
 
-### 2) Exposed area
+### 2) Exposed area (coating models)
 
-A<sub>exposed</sub> = A<sub>surf</sub> × f<sub>cb</sub>
+- **Fixed factor:** `A_exposed = A_surf × f_cb`
+- **Degradation curve:** computes life-averaged factor from `f0`, `fEOL`, and exponent `k`, then applies `A_exposed = A_surf × f_effective`.
+- **Segment condition:** computes segment factors `f_seg,i`, averages to `f_effective`, then applies `A_exposed = A_surf × f_effective`.
 
 ### 3) Required current
 
@@ -79,8 +84,14 @@ L<sub>pred</sub> = (M<sub>inst</sub> × C<sub>a</sub> × u × F<sub>d</sub>) / (
 - Safety margin (years) = `L_pred − L_target`
 - Safety margin (%) = `(L_pred − L_target) / L_target × 100`
 
+### 7) Sensitivity and design-review scenarios
 
-### 7) Measurement correction and criteria normalization
+- Sensitivity now uses coating uncertainty bands (`low`, `base`, `high`) derived from the selected coating model.
+- Scenario table includes per-scenario design-review status (`Approved` or `Review required`) from safety margin outcome.
+- Worst-case segment demand is reported using local segment attenuation and condition factor weighting to expose localized current peaks.
+
+
+### 8) Measurement correction and criteria normalization
 
 Acceptance checks now evaluate **corrected** values and retain raw values in output:
 
@@ -97,7 +108,7 @@ When required metadata is missing (unknown context/location, no compensation val
 - Coating breakdown factor is a dominant uncertainty; select conservatively for life-cycle projections.
 - Temperature correction, current-distribution nonuniformity, shielding, stray-current effects, and attenuation modeling are not explicitly solved in this simplified workflow.
 - pH and resistivity effects are represented via bounded multipliers, not full electrochemical kinetics.
-- Validation requires positive numeric values for major scalar inputs and enforces `0 < coatingBreakdownFactor ≤ 1`, `0 ≤ pH ≤ 14`.
+- Validation requires positive numeric values for major scalar inputs and enforces `0 < coating factor ≤ 1`, `0 ≤ pH ≤ 14`.
 
 ## Standards References
 
@@ -123,4 +134,5 @@ The CP study now includes a standards profile and auditable compliance status mo
 
 - **2026-04-16:** Added measurement metadata inputs (test method/context/reference location), implemented correction-aware criteria normalization, separated raw vs corrected acceptance outputs, and added metadata sufficiency warnings in results.
 - **2026-04-16:** Added standards profile configuration, machine-readable required-check keys in CP basis mapping, compliance status panel, and persisted compliance history snapshots.
+- **2026-04-16:** Replaced single coating factor with selectable coating models (fixed / degradation curve / segment condition), added coating uncertainty sensitivity bands, and surfaced design-review scenario comparison with worst-case segment demand.
 - **2026-04-15:** Initial documentation page added for CP sizing inputs, equations, assumptions/limits, references, and consistency guidance between required-mass and predicted-life relations.

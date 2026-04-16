@@ -142,8 +142,32 @@ Life_years = (W_installed × Q_anode × U × F_design) / (I_req × 8760)</pre>
         <fieldset>
           <legend><strong>Exposure &amp; Current Demand</strong></legend>
           <div class="field-row">
-            <label for="coating-breakdown">Coating breakdown factor (0–1)</label>
+            <label for="coating-model-type">Coating demand model</label>
+            <select id="coating-model-type">
+              <option value="fixed" selected>Fixed factor</option>
+              <option value="degradation-curve">Time-varying degradation curve</option>
+              <option value="segment-condition">Segment-based condition factors</option>
+            </select>
+          </div>
+          <div class="field-row" id="coating-fixed-row">
+            <label for="coating-breakdown">Fixed coating breakdown factor (0–1)</label>
             <input type="number" id="coating-breakdown" min="0" max="1" step="0.01" value="0.20" required>
+          </div>
+          <div class="field-row" data-coating-curve-row hidden>
+            <label for="coating-initial-breakdown">Initial coating breakdown factor (0–1)</label>
+            <input type="number" id="coating-initial-breakdown" min="0" max="1" step="0.01" value="0.12">
+          </div>
+          <div class="field-row" data-coating-curve-row hidden>
+            <label for="coating-eol-breakdown">End-of-life coating breakdown factor (0–1)</label>
+            <input type="number" id="coating-eol-breakdown" min="0" max="1" step="0.01" value="0.35">
+          </div>
+          <div class="field-row" data-coating-curve-row hidden>
+            <label for="coating-degradation-exponent">Degradation curve exponent (&gt;0)</label>
+            <input type="number" id="coating-degradation-exponent" min="0.1" step="0.1" value="1.2">
+          </div>
+          <div class="field-row" id="coating-segment-row" hidden>
+            <label for="segment-condition-factors">Segment condition factors (0–1, comma separated)</label>
+            <input type="text" id="segment-condition-factors" value="0.10, 0.18, 0.32" placeholder="e.g., 0.10, 0.18, 0.32">
           </div>
           <div class="field-row">
             <label for="surface-area-mode">Surface area input method</label>
