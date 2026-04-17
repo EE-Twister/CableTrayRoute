@@ -30,6 +30,7 @@ const NAV_ROUTES = [
   { href: 'projectreport.html', label: 'Project Report', section: 'Workflow', group: 'Deliverables', icon: 'icons/toolbar/copy.svg' },
   { href: 'productconfig.html', label: 'Product Configurator', section: 'Workflow', group: 'Deliverables', icon: 'icons/toolbar/grid-size.svg' },
   { href: 'intlCableSize.html', label: 'Intl Cable Sizing', section: 'Studies', group: 'Cable', icon: 'icons/cable.svg' },
+  { href: 'iec60287.html', label: 'IEC 60287 Ampacity', section: 'Studies', group: 'Cable', icon: 'icons/cable.svg' },
   { href: 'oneline.html', label: 'One-Line', section: 'Workflow', group: 'Planning', icon: 'icons/oneline.svg' },
   { href: 'tcc.html', label: 'TCC', section: 'Studies', group: 'Protection', icon: 'icons/toolbar/validate.svg' },
   { href: 'harmonics.html', label: 'Harmonics', section: 'Studies', group: 'Power Quality', icon: 'icons/toolbar/grid-size.svg' },
