@@ -1,0 +1,510 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <meta name="description" content="IEEE 1547-2018 DER Interconnection Study — six mandatory screening criteria for distributed energy resource interconnection: PCC voltage impact, fault current contribution, anti-islanding, ride-through, and harmonic compliance." />
+  <title>DER Interconnection Study — CableTrayRoute</title>
+  <link rel="icon" href="icons/favicon.svg" type="image/svg+xml">
+  <link rel="apple-touch-icon" href="icons/favicon.svg">
+  <!-- Open Graph -->
+  <meta property="og:type" content="website">
+  <meta property="og:title" content="DER Interconnection Study — CableTrayRoute">
+  <meta property="og:description" content="IEEE 1547-2018 DER Interconnection Study — mandatory screening criteria for US DER interconnection approval.">
+  <meta property="og:image" content="https://cabletrayroute.com/icons/og-preview.png">
+  <meta property="og:site_name" content="CableTrayRoute">
+  <meta property="og:url" content="derinterconnect.html">
+  <link rel="canonical" href="derinterconnect.html">
+  <link rel="dns-prefetch" href="https://fonts.gstatic.com">
+  <meta name="color-scheme" content="light dark">
+  <link rel="stylesheet" href="style.css" />
+  <script type="module" src="dirtyTracker.js"></script>
+  <script type="module" src="dist/derinterconnect.js" defer></script>
+</head>
+<body class="derinterconnect-page" data-report-title="DER Interconnection Study">
+  <a href="#main-content" class="skip-link">Skip to main content</a>
+  <nav class="top-nav" aria-label="Primary">
+    <button id="nav-toggle" class="nav-toggle" aria-label="Toggle navigation" aria-controls="nav-links" aria-expanded="false" title="Toggle navigation">
+      <img src="icons/toolbar/grid.svg" alt="" aria-hidden="true" class="control-icon" loading="lazy" decoding="async">
+    </button>
+    <div id="nav-links" class="nav-links" role="list">
+      <!-- Populated dynamically by navigation.js -->
+    </div>
+    <button id="settings-btn" class="settings-btn" aria-label="Settings" aria-expanded="false" title="Settings">
+      <img src="icons/toolbar/validate.svg" alt="" aria-hidden="true" class="control-icon" loading="lazy" decoding="async">
+    </button>
+  </nav>
+
+  <div id="settings-menu" class="settings-menu">
+    <label for="theme-select">Theme
+      <select id="theme-select">
+        <option value="system">System</option>
+        <option value="light">Light</option>
+        <option value="dark">Dark</option>
+        <option value="high-contrast">High Contrast</option>
+      </select>
+    </label>
+    <label><input type="checkbox" id="compact-toggle" aria-label="Enable compact table mode"> Compact Mode</label>
+    <label for="unit-select">Units
+      <select id="unit-select">
+        <option value="imperial">Imperial (ft, in)</option>
+        <option value="metric">Metric (m, mm)</option>
+      </select>
+    </label>
+    <button id="help-btn" class="btn" aria-expanded="false" title="Show help">
+      <img src="icons/toolbar/validate.svg" alt="" aria-hidden="true" class="control-icon" loading="lazy" decoding="async">
+      <span>Site Help</span>
+    </button>
+    <button id="new-project-btn" title="Start a new project">
+      <img src="icons/toolbar/copy.svg" alt="" aria-hidden="true" class="control-icon" loading="lazy" decoding="async">
+      <span>New Project</span>
+    </button>
+    <button id="save-project-btn" title="Save current project">
+      <img src="icons/toolbar/export.svg" alt="" aria-hidden="true" class="control-icon" loading="lazy" decoding="async">
+      <span>Save Project</span>
+    </button>
+    <button id="load-project-btn" title="Load an existing project">
+      <img src="icons/toolbar/import.svg" alt="" aria-hidden="true" class="control-icon" loading="lazy" decoding="async">
+      <span>Load Project</span>
+    </button>
+    <button id="export-project-btn" title="Export project data">
+      <img src="icons/toolbar/export.svg" alt="" aria-hidden="true" class="control-icon" loading="lazy" decoding="async">
+      <span>Export Project</span>
+    </button>
+    <button id="import-project-btn" title="Import project data">
+      <img src="icons/toolbar/import.svg" alt="" aria-hidden="true" class="control-icon" loading="lazy" decoding="async">
+      <span>Import Project</span>
+    </button>
+    <input type="file" id="import-project-input" accept=".ctr.json" class="hidden" title="Select project file">
+  </div>
+
+  <div class="container">
+    <main id="main-content" class="main-content">
+
+      <header class="page-header">
+        <h1>IEEE 1547-2018 DER Interconnection Study</h1>
+      </header>
+
+      <details class="method-panel">
+        <summary>Method &amp; Standards</summary>
+        <p>This tool implements the six mandatory screening criteria required by
+        <strong>IEEE 1547-2018</strong> (as amended by <strong>IEEE 1547a-2020</strong>) for US utility
+        distribution interconnection of distributed energy resources (DER). Utilities require these
+        criteria to be satisfied before issuing an interconnection agreement.</p>
+
+        <p><strong>1. PCC Voltage Impact (ANSI C84.1-2020):</strong></p>
+        <pre>&Delta;V &asymp; (P&middot;R + Q&middot;X) / V&sup2;   [pu]
+Range A: 0.95 &le; V &le; 1.05 pu (normal sustained)
+Range B: 0.917 &le; V &le; 1.083 pu (infrequent)</pre>
+
+        <p><strong>2. Fault Current Contribution (IEEE 1547-2018 §6.4):</strong></p>
+        <pre>I<sub>rated</sub> = S<sub>rated</sub> / (&radic;3 &times; V<sub>LL</sub>)
+I<sub>IBR,fault</sub> = k<sub>limit</sub> &times; I<sub>rated</sub>   (k<sub>limit</sub> = 1.05&ndash;1.2)
+I<sub>total</sub> = I<sub>grid</sub> + I<sub>IBR,fault</sub>   &le; device interrupting rating</pre>
+
+        <p><strong>3. Anti-Islanding (IEEE 1547-2018 §8.1):</strong></p>
+        <pre>Category A: trip within 2.0 s
+Category B: trip within 1.0 s
+Category C: trip within 0.16 s</pre>
+
+        <p><strong>4. Voltage / Frequency Ride-Through (IEEE 1547-2018 Tables 3 &amp; 5):</strong></p>
+        <pre>Category I:   V: 0.70&ndash;1.10 pu, f: 58.5&ndash;61.5 Hz (60 Hz system)
+Category II:  V: 0.65&ndash;1.10 pu, f: 57.0&ndash;62.0 Hz
+Category III: V: 0.50&ndash;1.20 pu, f: 56.5&ndash;63.0 Hz</pre>
+
+        <p><strong>5. Harmonic Compliance (IEEE 1547-2018 Table 2):</strong></p>
+        <pre>THD &le; 5% of rated current
+Odd harmonics (3rd&ndash;9th): 0.5&ndash;3.0% individually</pre>
+
+        <p>References: <a href="docs/der-interconnection.md">DER Interconnection Guide</a>.
+        See also: <a href="ibr.html">IBR Modeling (PV/BESS)</a>,
+        <a href="loadFlow.html">Load Flow</a>,
+        <a href="shortCircuit.html">Short Circuit</a>,
+        <a href="harmonics.html">Harmonics</a>.</p>
+      </details>
+
+      <!-- ================================================================
+           Main Study Form
+      ================================================================ -->
+      <form id="der-study-form" novalidate>
+
+        <!-- 1. DER Configuration -->
+        <fieldset>
+          <legend><strong>1. DER Configuration</strong></legend>
+
+          <div class="field-row">
+            <label for="der-label">Study label (optional)</label>
+            <input type="text" id="der-label" placeholder="e.g. 500 kW Rooftop PV — Building C">
+          </div>
+
+          <div class="field-row">
+            <label for="der-type">Resource type</label>
+            <select id="der-type">
+              <option value="pv">PV (Photovoltaic)</option>
+              <option value="bess">BESS (Battery Energy Storage)</option>
+              <option value="wind">Wind Turbine</option>
+              <option value="combined">PV + BESS Combined</option>
+            </select>
+          </div>
+
+          <div class="field-row">
+            <label for="der-kw">P<sub>rated</sub> — Rated active power (kW)
+              <button type="button" class="helpBtn" aria-label="Help — DER rated power">?</button>
+            </label>
+            <input type="number" id="der-kw" min="1" step="10" value="500" required
+                   aria-describedby="der-kw-hint">
+            <p id="der-kw-hint" class="field-hint">
+              Nameplate rated active power output at the point of common coupling (PCC).
+            </p>
+          </div>
+
+          <div class="field-row">
+            <label for="der-kva">S<sub>rated</sub> — Inverter apparent power (kVA)
+              <button type="button" class="helpBtn" aria-label="Help — inverter rating">?</button>
+            </label>
+            <input type="number" id="der-kva" min="1" step="10" value="500" required
+                   aria-describedby="der-kva-hint">
+            <p id="der-kva-hint" class="field-hint">
+              Inverter AC apparent power rating. Used to calculate rated current and fault contribution.
+            </p>
+          </div>
+
+          <div class="field-row">
+            <label for="der-kvar">Q<sub>rated</sub> — Reactive power injection (kVAR, + = capacitive)</label>
+            <input type="number" id="der-kvar" step="10" value="0"
+                   aria-describedby="der-kvar-hint">
+            <p id="der-kvar-hint" class="field-hint">
+              Reactive power at rated conditions. Positive = capacitive injection (raises voltage).
+              Leave 0 for unity power factor operation.
+            </p>
+          </div>
+
+          <div class="field-row">
+            <label for="der-1547-category">IEEE 1547 category
+              <button type="button" class="helpBtn" aria-label="Help — 1547 category">?</button>
+            </label>
+            <select id="der-1547-category" aria-describedby="der-cat-hint">
+              <option value="A">Category A — most DER; broader trip-time tolerance</option>
+              <option value="B" selected>Category B — DER &gt; 500 kW or critical; tighter tolerance</option>
+              <option value="C">Category C — high fault current contribution; strictest (0.16 s)</option>
+            </select>
+            <p id="der-cat-hint" class="field-hint">
+              IEEE 1547-2018 §1.4 categories. Category B applies to resources &gt; 500 kW or utility-specified.
+              Category C is for DER with synchronous machine-level fault contribution.
+            </p>
+          </div>
+
+          <div class="field-row">
+            <label for="der-rt-category">IEEE 1547 ride-through category
+              <button type="button" class="helpBtn" aria-label="Help — ride-through category">?</button>
+            </label>
+            <select id="der-rt-category" aria-describedby="der-rt-cat-hint">
+              <option value="I" selected>Category I — most distribution-connected DER</option>
+              <option value="II">Category II — enhanced ride-through (utility may require)</option>
+              <option value="III">Category III — transmission-connected; widest window</option>
+            </select>
+            <p id="der-rt-cat-hint" class="field-hint">
+              Ride-through capability category per IEEE 1547-2018 §6.5. Category I is the default
+              for rooftop and distribution-connected resources.
+            </p>
+          </div>
+        </fieldset>
+
+        <!-- 2. System Data -->
+        <fieldset>
+          <legend><strong>2. System Data at PCC</strong></legend>
+
+          <div class="field-row">
+            <label for="pcc-kv">V<sub>LL</sub> — PCC line-to-line voltage (kV)
+              <button type="button" class="helpBtn" aria-label="Help — PCC voltage">?</button>
+            </label>
+            <input type="number" id="pcc-kv" min="0.1" step="0.1" value="12.47" required
+                   aria-describedby="pcc-kv-hint">
+            <p id="pcc-kv-hint" class="field-hint">
+              Line-to-line voltage at the point of common coupling. Common: 0.48 kV, 4.16 kV,
+              12.47 kV, 25 kV, 34.5 kV.
+            </p>
+          </div>
+
+          <div class="field-row">
+            <label for="pcc-v-pu">V<sub>pre</sub> — Pre-DER PCC voltage (pu)
+              <button type="button" class="helpBtn" aria-label="Help — pre-DER voltage">?</button>
+            </label>
+            <input type="number" id="pcc-v-pu" min="0.9" max="1.1" step="0.001" value="1.0"
+                   aria-describedby="pcc-v-pu-hint">
+            <p id="pcc-v-pu-hint" class="field-hint">
+              Steady-state voltage at the PCC before connecting the DER. From a load flow study
+              or field measurement. Typical: 0.97–1.03 pu.
+            </p>
+          </div>
+
+          <div class="field-row">
+            <label for="sc-mva">S<sub>SC</sub> — Short-circuit MVA at PCC
+              <button type="button" class="helpBtn" aria-label="Help — short-circuit MVA">?</button>
+            </label>
+            <input type="number" id="sc-mva" min="0.1" step="1" value="100" required
+                   aria-describedby="sc-mva-hint">
+            <p id="sc-mva-hint" class="field-hint">
+              Three-phase fault MVA at the PCC (grid stiffness indicator). Obtained from the
+              utility interconnection data or short-circuit study. Typical distribution: 50–500 MVA.
+            </p>
+          </div>
+
+          <div class="field-row">
+            <label for="line-r">R<sub>th</sub> — Thevenin source resistance (pu on 1 MVA base)
+              <button type="button" class="helpBtn" aria-label="Help — source resistance">?</button>
+            </label>
+            <input type="number" id="line-r" min="0" step="0.0001" value="0.01"
+                   aria-describedby="line-r-hint">
+            <p id="line-r-hint" class="field-hint">
+              Source resistance looking from the PCC toward the utility. Determines voltage
+              sensitivity to active power injection. Approximate from feeder impedance data.
+            </p>
+          </div>
+
+          <div class="field-row">
+            <label for="line-x">X<sub>th</sub> — Thevenin source reactance (pu on 1 MVA base)
+              <button type="button" class="helpBtn" aria-label="Help — source reactance">?</button>
+            </label>
+            <input type="number" id="line-x" min="0" step="0.0001" value="0.05"
+                   aria-describedby="line-x-hint">
+            <p id="line-x-hint" class="field-hint">
+              Source reactance looking from the PCC toward the utility. Determines voltage
+              sensitivity to reactive power injection (Volt-VAR support). Typical X/R ratio: 3–10.
+            </p>
+          </div>
+
+          <div class="field-row">
+            <label for="device-int-ka">I<sub>int</sub> — Device interrupting rating (kA sym.)
+              <button type="button" class="helpBtn" aria-label="Help — interrupting rating">?</button>
+            </label>
+            <input type="number" id="device-int-ka" min="0.1" step="1" value="16" required
+                   aria-describedby="device-int-ka-hint">
+            <p id="device-int-ka-hint" class="field-hint">
+              Symmetrical interrupting rating of the most limiting protective device at or near the PCC
+              (breaker, fuse, recloser). Typical distribution: 8–40 kA.
+            </p>
+          </div>
+
+          <div class="field-row">
+            <label for="existing-fault-ka">I<sub>SC,pre</sub> — Existing fault current at PCC (kA sym.)
+              <button type="button" class="helpBtn" aria-label="Help — existing fault current">?</button>
+            </label>
+            <input type="number" id="existing-fault-ka" min="0.01" step="0.1" value="5.0" required
+                   aria-describedby="existing-fault-ka-hint">
+            <p id="existing-fault-ka-hint" class="field-hint">
+              Three-phase symmetric fault current at the PCC without the DER. From a short-circuit study
+              or utility interconnection data.
+            </p>
+          </div>
+
+          <div class="field-row">
+            <label for="k-limit">k<sub>limit</sub> — IBR fault current limit factor (pu)
+              <button type="button" class="helpBtn" aria-label="Help — fault current limit factor">?</button>
+            </label>
+            <input type="number" id="k-limit" min="1.0" max="1.5" step="0.05" value="1.1"
+                   aria-describedby="k-limit-hint">
+            <p id="k-limit-hint" class="field-hint">
+              Ratio of inverter fault current to rated current. IEEE 1547-2018 §6.4: default 1.1 (1.05–1.2).
+              IEEE 2800-2022 (transmission IBR): up to 1.2. Synchronous machine equivalent: up to 1.5.
+            </p>
+          </div>
+
+          <div class="field-row">
+            <label for="system-freq">Nominal system frequency (Hz)</label>
+            <select id="system-freq">
+              <option value="60" selected>60 Hz (North America)</option>
+              <option value="50">50 Hz (IEC regions)</option>
+            </select>
+          </div>
+        </fieldset>
+
+        <!-- 3. Anti-Islanding -->
+        <fieldset>
+          <legend><strong>3. Anti-Islanding Protection</strong></legend>
+
+          <div class="field-row">
+            <label for="ai-trip-time">Configured island detection trip time (s)
+              <button type="button" class="helpBtn" aria-label="Help — trip time">?</button>
+            </label>
+            <input type="number" id="ai-trip-time" min="0" step="0.01" value="2.0" required
+                   aria-describedby="ai-trip-hint">
+            <p id="ai-trip-hint" class="field-hint">
+              Time from islanding detection to DER trip. Must be &le; 2.0 s (Cat A), &le; 1.0 s (Cat B),
+              or &le; 0.16 s (Cat C) per IEEE 1547-2018 §8.1.
+            </p>
+          </div>
+
+          <div class="field-row">
+            <label for="ai-method">Island detection method
+              <button type="button" class="helpBtn" aria-label="Help — detection method">?</button>
+            </label>
+            <select id="ai-method" aria-describedby="ai-method-hint">
+              <option value="active" selected>Active (frequency shift, impedance measurement)</option>
+              <option value="passive">Passive (under/over voltage or frequency relay)</option>
+              <option value="none">None (no islanding detection)</option>
+            </select>
+            <p id="ai-method-hint" class="field-hint">
+              Active methods provide non-detection-zone (NDZ) elimination per IEEE 1547 §8.1.3.
+              Passive methods are acceptable but may have a non-detection zone.
+              "None" is non-compliant.
+            </p>
+          </div>
+        </fieldset>
+
+        <!-- 4. Ride-Through Settings -->
+        <fieldset>
+          <legend><strong>4. Voltage / Frequency Ride-Through Settings</strong></legend>
+
+          <p class="field-hint">
+            Enter the DER's configured trip thresholds. Compliance is verified against
+            IEEE 1547-2018 Tables 3 &amp; 5 for the selected ride-through category.
+            Settings may be pre-populated from an <a href="ibr.html">IBR Modeling</a> study.
+          </p>
+
+          <div class="field-row">
+            <label for="v-rt-lo">V<sub>RT,lo</sub> — Low-voltage ride-through limit (pu)</label>
+            <input type="number" id="v-rt-lo" min="0.4" max="1.0" step="0.01" value="0.70" required>
+          </div>
+
+          <div class="field-row">
+            <label for="v-rt-hi">V<sub>RT,hi</sub> — High-voltage ride-through limit (pu)</label>
+            <input type="number" id="v-rt-hi" min="1.0" max="1.3" step="0.01" value="1.10" required>
+          </div>
+
+          <div class="field-row">
+            <label for="f-rt-lo">f<sub>RT,lo</sub> — Low-frequency ride-through limit (Hz)</label>
+            <input type="number" id="f-rt-lo" min="45" max="60" step="0.1" value="58.5" required>
+          </div>
+
+          <div class="field-row">
+            <label for="f-rt-hi">f<sub>RT,hi</sub> — High-frequency ride-through limit (Hz)</label>
+            <input type="number" id="f-rt-hi" min="60" max="70" step="0.1" value="61.5" required>
+          </div>
+        </fieldset>
+
+        <!-- 5. Power Quality / Harmonics -->
+        <fieldset>
+          <legend><strong>5. Harmonic Current Compliance</strong></legend>
+
+          <div class="field-row">
+            <label for="harm-thd">Total Harmonic Distortion (% of fundamental current)
+              <button type="button" class="helpBtn" aria-label="Help — THD">?</button>
+            </label>
+            <input type="number" id="harm-thd" min="0" max="100" step="0.1" value="3.0" required
+                   aria-describedby="harm-thd-hint">
+            <p id="harm-thd-hint" class="field-hint">
+              Measured or manufacturer-specified total harmonic distortion at rated output.
+              IEEE 1547-2018 Table 2 limit: 5%. Modern grid-tied inverters: 1–4%.
+            </p>
+          </div>
+
+          <div class="field-row">
+            <label>Individual harmonics (optional — % of rated current)</label>
+            <table class="harm-table" aria-label="Individual harmonic distortion inputs">
+              <thead>
+                <tr>
+                  <th scope="col">Order</th>
+                  <th scope="col">Actual (%)</th>
+                  <th scope="col">Limit (%)</th>
+                </tr>
+              </thead>
+              <tbody id="harm-tbody">
+                <tr>
+                  <td>3rd</td>
+                  <td><input type="number" class="harm-input" data-order="3" min="0" step="0.1" value="0.5" aria-label="3rd harmonic"></td>
+                  <td class="harm-limit" data-order="3">3.0</td>
+                </tr>
+                <tr>
+                  <td>5th</td>
+                  <td><input type="number" class="harm-input" data-order="5" min="0" step="0.1" value="1.0" aria-label="5th harmonic"></td>
+                  <td class="harm-limit" data-order="5">3.0</td>
+                </tr>
+                <tr>
+                  <td>7th</td>
+                  <td><input type="number" class="harm-input" data-order="7" min="0" step="0.1" value="1.0" aria-label="7th harmonic"></td>
+                  <td class="harm-limit" data-order="7">3.0</td>
+                </tr>
+                <tr>
+                  <td>11th</td>
+                  <td><input type="number" class="harm-input" data-order="11" min="0" step="0.1" value="0.5" aria-label="11th harmonic"></td>
+                  <td class="harm-limit" data-order="11">1.0</td>
+                </tr>
+                <tr>
+                  <td>13th</td>
+                  <td><input type="number" class="harm-input" data-order="13" min="0" step="0.1" value="0.5" aria-label="13th harmonic"></td>
+                  <td class="harm-limit" data-order="13">1.0</td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+        </fieldset>
+
+        <div class="btn-row">
+          <button type="submit" class="btn btn-primary" id="run-study-btn">Run DER Interconnection Study</button>
+          <button type="button" class="btn" id="reset-form-btn">Reset</button>
+          <button type="button" class="btn" id="import-ibr-btn" title="Import ride-through settings from saved IBR study">
+            Import from IBR Study
+          </button>
+        </div>
+      </form>
+
+      <!-- ================================================================
+           Results
+      ================================================================ -->
+      <section id="study-results" class="results-panel hidden" aria-live="polite">
+        <h2>Interconnection Study Results</h2>
+
+        <!-- Overall compliance badge -->
+        <div id="overall-badge" class="compliance-badge" role="status"></div>
+
+        <!-- Summary table -->
+        <table class="results-table" aria-label="DER interconnection screening criteria summary">
+          <thead>
+            <tr>
+              <th scope="col">Criterion</th>
+              <th scope="col">Standard</th>
+              <th scope="col">Limit / Requirement</th>
+              <th scope="col">Calculated / Configured</th>
+              <th scope="col">Status</th>
+            </tr>
+          </thead>
+          <tbody id="summary-tbody"></tbody>
+        </table>
+
+        <!-- Detailed results by criterion -->
+        <div id="detail-cards" class="result-cards"></div>
+
+        <div class="btn-row export-row" style="margin-top: 1.5rem;">
+          <button type="button" class="btn" id="export-csv-btn">
+            <img src="icons/toolbar/export.svg" alt="" aria-hidden="true" class="control-icon" loading="lazy" decoding="async">
+            Export CSV
+          </button>
+        </div>
+      </section>
+
+      <div id="study-approval-container"></div>
+
+    </main>
+  </div>
+
+  <!-- Help modal -->
+  <div id="help-modal" class="modal hidden" role="dialog" aria-modal="true" aria-labelledby="help-modal-title">
+    <div class="modal-content">
+      <h2 id="help-modal-title">DER Interconnection Study Help</h2>
+      <p>This tool evaluates the six mandatory IEEE 1547-2018 screening criteria for DER interconnection:</p>
+      <ol>
+        <li><strong>PCC Voltage Impact</strong> — ANSI C84.1 Range A/B compliance for steady-state voltage rise.</li>
+        <li><strong>Fault Current Contribution</strong> — Total fault current vs. device interrupting capacity.</li>
+        <li><strong>Anti-Islanding</strong> — Trip time and detection method per IEEE 1547-2018 §8.1.</li>
+        <li><strong>Ride-Through</strong> — Voltage and frequency ride-through settings vs. Table 3 / Table 5.</li>
+        <li><strong>Harmonic Compliance</strong> — THD and individual harmonic current limits (Table 2).</li>
+      </ol>
+      <p>Use <strong>Import from IBR Study</strong> to pre-populate ride-through settings from a saved IBR study.</p>
+      <p>See <a href="docs/der-interconnection.md">DER Interconnection Guide</a> for full methodology.</p>
+      <button id="close-help-btn" class="btn">Close</button>
+    </div>
+  </div>
+
+</body>
+</html>
