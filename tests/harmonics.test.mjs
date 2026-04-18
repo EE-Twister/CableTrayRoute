@@ -318,6 +318,213 @@ describe('neutral triplen current — unbalanced harmonic model', () => {
 });
 
 // ---------------------------------------------------------------------------
+// frequencyScan helpers extracted from analysis/harmonics.js
+// (analysis/harmonics.js imports d3 from a CDN URL not resolvable in Node,
+//  so the pure calculation logic is duplicated here for unit-testing.)
+// ---------------------------------------------------------------------------
+
+function frequencyScan({
+  busVoltageKv = 13.8,
+  scMVA = 100,
+  capacitorBanks = [],
+  hMax = 25,
+  qSystem = 20,
+  step = 0.1
+} = {}) {
+  const kv   = Number(busVoltageKv) || 1;
+  const sc   = Number(scMVA)        || 1;
+  const Qsys = Number(qSystem)      || 20;
+  const ySrc1 = sc / (kv * kv);
+
+  const banks = (capacitorBanks || []).map(b => {
+    const bKv = Number(b.kv) || kv;
+    return {
+      b1: Number(b.mvar) / (bKv * bKv),
+      ht: Number(b.tuneOrder) || 0,
+      q:  Number(b.qFactor)  || 30
+    };
+  }).filter(b => b.b1 > 0);
+
+  function admittance(h) {
+    const gSrc = ySrc1 / (h * Qsys);
+    const bSrc = ySrc1 / h;
+    let gCap = 0, bCap = 0;
+    banks.forEach(({ b1, ht, q }) => {
+      if (ht > 0) {
+        const xC1  = 1 / b1;
+        const xL_h = h * xC1 / (ht * ht);
+        const xC_h = xC1 / h;
+        const R    = xC1 / (q * ht);
+        const xNet = xL_h - xC_h;
+        const dSq  = R * R + xNet * xNet;
+        gCap += R    / dSq;
+        bCap += -xNet / dSq;
+      } else {
+        bCap += b1 * h;
+      }
+    });
+    return { g: gSrc + gCap, b: -bSrc + bCap };
+  }
+
+  const sweep = [];
+  const hEnd = Math.round(hMax * 10);
+  for (let hi = 10; hi <= hEnd; hi++) {
+    const h = hi / 10;
+    const { g, b } = admittance(h);
+    const yMag = Math.sqrt(g * g + b * b);
+    const zPu  = yMag > 0 ? Math.round((ySrc1 / yMag) * 10000) / 10000 : 1e6;
+    sweep.push({ h, zPu });
+  }
+
+  const resonances = [];
+  for (let i = 1; i < sweep.length - 1; i++) {
+    const prev = sweep[i - 1].zPu;
+    const curr = sweep[i].zPu;
+    const next = sweep[i + 1].zPu;
+    const h    = sweep[i].h;
+    if (banks.length > 0 && curr > prev && curr > next && curr > 1.0) {
+      const nearestHarmonic = Math.round(h);
+      const dist = Math.abs(h - nearestHarmonic);
+      const risk = dist <= 0.3 ? 'danger' : 'caution';
+      let rec = null;
+      if (risk === 'danger') {
+        rec = `Parallel resonance at h\u2248${h.toFixed(1)} coincides with the ${nearestHarmonic}th harmonic. Add a detuning reactor to shift the resonant frequency away from this order.`;
+      } else {
+        rec = `Resonance at h\u2248${h.toFixed(1)} is near the ${nearestHarmonic}th harmonic. Monitor harmonic injection levels; consider detuning if injection is significant.`;
+      }
+      resonances.push({ hOrder: h, zPu: curr, type: 'parallel', risk, nearestHarmonic, detuneRecommendation: rec });
+    }
+    if (curr < prev && curr < next && banks.some(b => b.ht > 0)) {
+      resonances.push({ hOrder: h, zPu: curr, type: 'series', risk: 'safe', nearestHarmonic: Math.round(h), detuneRecommendation: null });
+    }
+  }
+  return { sweep, resonances };
+}
+
+// HS-01: No capacitors — purely inductive source, no resonances
+describe('HS-01 frequencyScan — no capacitors', () => {
+  const { sweep, resonances } = frequencyScan({ busVoltageKv: 13.8, scMVA: 100, capacitorBanks: [] });
+
+  it('sweep spans h=1.0 to h=25.0', () => {
+    assert.strictEqual(sweep[0].h, 1.0);
+    assert.strictEqual(sweep[sweep.length - 1].h, 25.0);
+  });
+
+  it('impedance is monotonically increasing (source is inductive)', () => {
+    for (let i = 1; i < sweep.length; i++) {
+      assert.ok(sweep[i].zPu >= sweep[i - 1].zPu,
+        `Z decreased at h=${sweep[i].h}: ${sweep[i].zPu} < ${sweep[i - 1].zPu}`);
+    }
+  });
+
+  it('no resonances detected', () => {
+    assert.strictEqual(resonances.length, 0);
+  });
+});
+
+// HS-02: Single untuned capacitor — resonance near h≈4.47
+// h_res = sqrt(scMVA / capMVAR) = sqrt(100/5) = sqrt(20) ≈ 4.47
+// nearestHarmonic = round(4.47) = 4, dist = 0.47 → caution
+describe('HS-02 frequencyScan — untuned capacitor, resonance near h≈4.47', () => {
+  const { sweep, resonances } = frequencyScan({
+    busVoltageKv: 13.8, scMVA: 100,
+    capacitorBanks: [{ mvar: 5, kv: 13.8 }]
+  });
+
+  it('exactly one parallel resonance detected', () => {
+    const parallel = resonances.filter(r => r.type === 'parallel');
+    assert.strictEqual(parallel.length, 1);
+  });
+
+  it('resonance is near h≈4.47 (within ±0.3 tolerance)', () => {
+    const expected = Math.sqrt(100 / 5);  // ≈ 4.47
+    const r = resonances.find(r => r.type === 'parallel');
+    assert.ok(r, 'No parallel resonance found');
+    assert.ok(Math.abs(r.hOrder - expected) <= 0.3,
+      `Resonance at h=${r.hOrder}, expected ≈${expected.toFixed(2)}`);
+  });
+
+  it('risk is caution (sweep peak at h=4.5, dist=0.5 from h=5)', () => {
+    // h_res ≈ 4.47; closest sweep step (0.1) is h=4.5; Math.round(4.5)=5 in JS
+    const r = resonances.find(r => r.type === 'parallel');
+    assert.strictEqual(r.risk, 'caution');
+    assert.strictEqual(r.nearestHarmonic, 5);
+  });
+
+  it('impedance peak is higher than source-only impedance at same order', () => {
+    const noCap = frequencyScan({ busVoltageKv: 13.8, scMVA: 100, capacitorBanks: [] });
+    const r = resonances.find(r => r.type === 'parallel');
+    const zNoCap = noCap.sweep.find(p => p.h === r.hOrder)?.zPu ?? 0;
+    assert.ok(r.zPu > zNoCap, `Peak Z=${r.zPu} should exceed no-cap Z=${zNoCap}`);
+  });
+});
+
+// HS-03: Tuned filter at h_t=4.7, Q=30 — series resonance null near h=4.7
+describe('HS-03 frequencyScan — tuned filter at h=4.7', () => {
+  const { resonances } = frequencyScan({
+    busVoltageKv: 13.8, scMVA: 100,
+    capacitorBanks: [{ mvar: 5, kv: 13.8, tuneOrder: 4.7, qFactor: 30 }]
+  });
+
+  it('series resonance detected near filter tuning order h=4.7', () => {
+    const series = resonances.filter(r => r.type === 'series');
+    assert.ok(series.length >= 1, 'Expected at least one series resonance');
+    const nearFilter = series.find(r => Math.abs(r.hOrder - 4.7) <= 0.3);
+    assert.ok(nearFilter, `No series resonance near h=4.7; found: ${series.map(r => r.hOrder).join(',')}`);
+  });
+
+  it('series resonance is classified as safe', () => {
+    const series = resonances.filter(r => r.type === 'series');
+    series.forEach(r => assert.strictEqual(r.risk, 'safe'));
+  });
+});
+
+// HS-04: Resonance exactly at h=5 — should be classified as danger
+// h_res = 5 exactly → capMVAR = scMVA/25 = 100/25 = 4
+describe('HS-04 frequencyScan — resonance at integer h=5 → danger', () => {
+  const { resonances } = frequencyScan({
+    busVoltageKv: 13.8, scMVA: 100,
+    capacitorBanks: [{ mvar: 4, kv: 13.8 }]   // h_res = sqrt(100/4) = 5.0
+  });
+
+  it('parallel resonance detected near h=5', () => {
+    const r = resonances.find(r => r.type === 'parallel' && Math.abs(r.hOrder - 5) <= 0.3);
+    assert.ok(r, `No resonance near h=5; found at: ${resonances.map(r => r.hOrder).join(',')}`);
+  });
+
+  it('risk is danger', () => {
+    const r = resonances.find(r => r.type === 'parallel' && Math.abs(r.hOrder - 5) <= 0.3);
+    assert.strictEqual(r.risk, 'danger');
+  });
+
+  it('detuneRecommendation mentions the 5th harmonic', () => {
+    const r = resonances.find(r => r.type === 'parallel' && Math.abs(r.hOrder - 5) <= 0.3);
+    assert.ok(r.detuneRecommendation?.includes('5'), `Recommendation should mention "5": ${r.detuneRecommendation}`);
+  });
+});
+
+// HS-05: Resonance at h≈4.6 (nearestHarmonic=5, dist=0.4) → caution
+// h_res = 4.6 → capMVAR = scMVA/4.6² ≈ 4.73 MVAR
+describe('HS-05 frequencyScan — resonance at h≈4.6 → caution', () => {
+  const capMvar = 100 / (4.6 * 4.6);  // ≈ 4.73
+  const { resonances } = frequencyScan({
+    busVoltageKv: 13.8, scMVA: 100,
+    capacitorBanks: [{ mvar: capMvar, kv: 13.8 }]
+  });
+
+  it('parallel resonance detected near h=4.6', () => {
+    const r = resonances.find(r => r.type === 'parallel' && Math.abs(r.hOrder - 4.6) <= 0.3);
+    assert.ok(r, `No resonance near h=4.6; found at: ${resonances.map(r => r.hOrder).join(',')}`);
+  });
+
+  it('risk is caution (dist≈0.4 from nearest integer h=5)', () => {
+    const r = resonances.find(r => r.type === 'parallel' && Math.abs(r.hOrder - 4.6) <= 0.3);
+    assert.strictEqual(r.risk, 'caution');
+    assert.strictEqual(r.nearestHarmonic, 5);
+  });
+});
+
+// ---------------------------------------------------------------------------
 describe('combined harmonic flow — illustrative scenario', () => {
   it('VFD-typical spectrum produces THD within expected range', () => {
     // 6-pulse VFD: dominant harmonics 5th (20%), 7th (14%), 11th (9%), 13th (7%)

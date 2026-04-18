@@ -138,6 +138,83 @@
           </div>
         </div>
       </section>
+      <section class="card" id="freq-scan-section">
+        <h2>Frequency Scan <small style="font-weight:normal;font-size:0.8em;">(harmonic resonance)</small></h2>
+        <p>Sweep system impedance Z(h) vs. harmonic order to identify parallel resonance peaks.
+           A peak near an integer harmonic order means that harmonic current is amplified — a
+           common hazard when adding capacitor banks for power factor correction.</p>
+
+        <div style="display:flex;flex-wrap:wrap;gap:1rem;margin-bottom:1rem;align-items:flex-end;">
+          <label>Bus Voltage (kV)
+            <input type="number" id="fs-bus-kv" value="13.8" min="0.1" step="0.1"
+                   style="display:block;width:7rem" aria-label="Bus voltage in kV">
+          </label>
+          <label>Short-Circuit MVA
+            <input type="number" id="fs-sc-mva" value="100" min="1" step="1"
+                   style="display:block;width:7rem" aria-label="Short-circuit MVA">
+          </label>
+          <label>Fundamental Frequency
+            <select id="fs-fbase" style="display:block;" aria-label="Fundamental frequency">
+              <option value="60" selected>60 Hz</option>
+              <option value="50">50 Hz</option>
+            </select>
+          </label>
+          <label>Max Harmonic Order
+            <input type="number" id="fs-hmax" value="25" min="5" max="50" step="1"
+                   style="display:block;width:5rem" aria-label="Maximum harmonic order">
+          </label>
+        </div>
+
+        <h3 style="font-size:1rem;margin-bottom:0.5rem;">Capacitor / Filter Banks</h3>
+        <div style="overflow-x:auto;margin-bottom:0.75rem;">
+          <table class="data-table" id="fs-banks-table" aria-label="Capacitor and filter banks for frequency scan">
+            <thead>
+              <tr>
+                <th scope="col">#</th>
+                <th scope="col">MVAR</th>
+                <th scope="col">kV</th>
+                <th scope="col">Tune Order <small>(0&nbsp;=&nbsp;untuned)</small></th>
+                <th scope="col">Q Factor</th>
+                <th scope="col"></th>
+              </tr>
+            </thead>
+            <tbody id="fs-banks-tbody">
+              <!-- rows added by JS -->
+            </tbody>
+          </table>
+        </div>
+        <div style="display:flex;gap:0.5rem;margin-bottom:1.25rem;">
+          <button id="fs-add-bank-btn" class="btn">+ Add Bank</button>
+          <button id="fs-run-btn" class="btn btn-primary">Run Frequency Scan</button>
+        </div>
+
+        <svg id="freq-scan-chart" width="800" height="350"
+             xmlns="http://www.w3.org/2000/svg" aria-label="Impedance vs harmonic order chart"
+             style="max-width:100%;height:auto;"></svg>
+
+        <div id="fs-results" hidden style="margin-top:1rem;">
+          <div id="fs-danger-banner" hidden role="alert"
+               style="background:var(--color-danger-bg,#fef2f2);border:1px solid var(--color-danger,crimson);border-radius:4px;padding:0.75rem 1rem;margin-bottom:1rem;color:var(--color-danger,crimson);font-weight:600;">
+            &#x26A0; Dangerous resonance detected — parallel resonance coincides with a harmonic injection order.
+            Amplified currents may violate IEEE 519 limits. See recommendations below.
+          </div>
+          <div style="overflow-x:auto;">
+            <table class="data-table" id="fs-results-table" aria-label="Frequency scan resonance results">
+              <thead>
+                <tr>
+                  <th scope="col">Harmonic Order</th>
+                  <th scope="col">Z (pu)</th>
+                  <th scope="col">Type</th>
+                  <th scope="col">Risk</th>
+                  <th scope="col">Recommendation</th>
+                </tr>
+              </thead>
+              <tbody id="fs-results-tbody"></tbody>
+            </table>
+          </div>
+        </div>
+      </section>
+
       <section class="card" aria-labelledby="study-review-panel-heading">
         <div id="study-review-panel"></div>
       </section>
@@ -276,6 +353,204 @@
       imbalanceBanner.hidden = !anyImbalance;
       resultsDiv.hidden = false;
     });
+  </script>
+  <script type="module">
+    import * as d3 from 'https://cdn.jsdelivr.net/npm/d3@7/+esm';
+    import { getStudies, setStudies } from './dataStore.mjs';
+    import { frequencyScan } from './analysis/harmonics.js';
+
+    const banksBody  = document.getElementById('fs-banks-tbody');
+    const addBtn     = document.getElementById('fs-add-bank-btn');
+    const runBtn     = document.getElementById('fs-run-btn');
+    const resultsDiv = document.getElementById('fs-results');
+    const resultsTbody = document.getElementById('fs-results-tbody');
+    const dangerBanner = document.getElementById('fs-danger-banner');
+    const chartEl    = document.getElementById('freq-scan-chart');
+
+    let rowCount = 0;
+
+    function addRow(mvar = 5, kv = 13.8, tune = 0, qf = 30) {
+      rowCount++;
+      const tr = document.createElement('tr');
+      tr.dataset.row = rowCount;
+      tr.innerHTML = `
+        <td>${rowCount}</td>
+        <td><input type="number" class="fs-mvar" value="${mvar}" min="0" step="0.5"
+             style="width:5rem" aria-label="MVAR for bank ${rowCount}"></td>
+        <td><input type="number" class="fs-kv" value="${kv}" min="0.1" step="0.1"
+             style="width:5rem" aria-label="kV for bank ${rowCount}"></td>
+        <td><input type="number" class="fs-tune" value="${tune}" min="0" max="50" step="0.1"
+             style="width:5rem" aria-label="Tune order for bank ${rowCount}"></td>
+        <td><input type="number" class="fs-q" value="${qf}" min="1" max="500" step="1"
+             style="width:5rem" aria-label="Q factor for bank ${rowCount}"></td>
+        <td><button class="btn fs-remove-btn" aria-label="Remove bank ${rowCount}"
+             style="padding:0.2rem 0.5rem;">&#x2715;</button></td>`;
+      banksBody.appendChild(tr);
+      tr.querySelector('.fs-remove-btn').addEventListener('click', () => tr.remove());
+    }
+
+    // Seed one default row
+    addRow();
+
+    addBtn.addEventListener('click', () => addRow(5, Number(document.getElementById('fs-bus-kv').value) || 13.8));
+
+    function collectBanks() {
+      return Array.from(banksBody.querySelectorAll('tr')).map(tr => ({
+        mvar:      Number(tr.querySelector('.fs-mvar').value)  || 0,
+        kv:        Number(tr.querySelector('.fs-kv').value)    || 13.8,
+        tuneOrder: Number(tr.querySelector('.fs-tune').value)  || 0,
+        qFactor:   Number(tr.querySelector('.fs-q').value)     || 30
+      }));
+    }
+
+    function riskColor(risk) {
+      if (risk === 'danger')  return 'crimson';
+      if (risk === 'caution') return 'darkorange';
+      return 'steelblue';
+    }
+
+    function renderFreqChart(sweep, resonances, hMax) {
+      const width  = Number(chartEl.getAttribute('width'))  || 800;
+      const height = Number(chartEl.getAttribute('height')) || 350;
+      const m = { top: 20, right: 20, bottom: 50, left: 60 };
+      const svg = d3.select(chartEl);
+      svg.selectAll('*').remove();
+
+      if (!sweep.length) return;
+
+      const xScale = d3.scaleLinear()
+        .domain([1, hMax])
+        .range([m.left, width - m.right]);
+
+      const zMax  = Math.min(d3.max(sweep, d => d.zPu) || 1, 50);
+      const yScale = d3.scaleLinear()
+        .domain([0, zMax * 1.1])
+        .nice()
+        .range([height - m.bottom, m.top]);
+
+      // Axis
+      svg.append('g')
+        .attr('transform', `translate(0,${height - m.bottom})`)
+        .call(d3.axisBottom(xScale).ticks(Math.min(hMax, 25)).tickFormat(d => `h${d}`))
+        .selectAll('text').attr('font-size', '11px');
+
+      svg.append('g')
+        .attr('transform', `translate(${m.left},0)`)
+        .call(d3.axisLeft(yScale).ticks(6).tickFormat(d => `${d}`));
+
+      svg.append('text')
+        .attr('x', m.left + (width - m.left - m.right) / 2)
+        .attr('y', height - 8)
+        .attr('text-anchor', 'middle').attr('fill', '#555').attr('font-size', '12px')
+        .text('Harmonic Order');
+
+      svg.append('text')
+        .attr('transform', 'rotate(-90)')
+        .attr('x', -(m.top + (height - m.top - m.bottom) / 2))
+        .attr('y', 16)
+        .attr('text-anchor', 'middle').attr('fill', '#555').attr('font-size', '12px')
+        .text('Impedance Z (pu)');
+
+      // Danger zone bands (±0.3 around each integer harmonic)
+      for (let h = 2; h <= hMax; h++) {
+        svg.append('rect')
+          .attr('x', xScale(h - 0.3))
+          .attr('width', xScale(h + 0.3) - xScale(h - 0.3))
+          .attr('y', m.top)
+          .attr('height', height - m.top - m.bottom)
+          .attr('fill', 'rgba(220,53,69,0.08)');
+        svg.append('line')
+          .attr('x1', xScale(h)).attr('x2', xScale(h))
+          .attr('y1', m.top).attr('y2', height - m.bottom)
+          .attr('stroke', '#ccc').attr('stroke-dasharray', '3,3');
+      }
+
+      // Impedance curve
+      const line = d3.line()
+        .x(d => xScale(d.h))
+        .y(d => yScale(Math.min(d.zPu, zMax)))
+        .curve(d3.curveMonotoneX);
+
+      svg.append('path')
+        .datum(sweep)
+        .attr('fill', 'none')
+        .attr('stroke', 'steelblue')
+        .attr('stroke-width', 2)
+        .attr('d', line);
+
+      // Resonance peak markers
+      resonances.forEach(r => {
+        const cx = xScale(r.hOrder);
+        const cy = yScale(Math.min(r.zPu, zMax));
+        svg.append('circle')
+          .attr('cx', cx).attr('cy', cy).attr('r', 6)
+          .attr('fill', riskColor(r.risk))
+          .attr('stroke', '#fff').attr('stroke-width', 1.5);
+        svg.append('text')
+          .attr('x', cx).attr('y', cy - 10)
+          .attr('text-anchor', 'middle')
+          .attr('fill', riskColor(r.risk))
+          .attr('font-size', '11px')
+          .attr('font-weight', '600')
+          .text(`h=${r.hOrder.toFixed(1)}`);
+      });
+
+      // Legend
+      const legend = svg.append('g').attr('transform', `translate(${m.left + 10},${m.top + 10})`);
+      [['danger', 'crimson'], ['caution', 'darkorange'], ['series min', 'steelblue']].forEach(([label, color], i) => {
+        legend.append('circle').attr('cx', 0).attr('cy', i * 18).attr('r', 5).attr('fill', color);
+        legend.append('text').attr('x', 10).attr('y', i * 18 + 4).attr('font-size', '11px').attr('fill', '#444').text(label);
+      });
+    }
+
+    function saveResults(params, results) {
+      const studies = getStudies() || {};
+      studies.freqScan = { params, results, timestamp: Date.now() };
+      setStudies(studies);
+    }
+
+    runBtn.addEventListener('click', () => {
+      const params = {
+        busVoltageKv:   Number(document.getElementById('fs-bus-kv').value) || 13.8,
+        scMVA:          Number(document.getElementById('fs-sc-mva').value) || 100,
+        fBase:          Number(document.getElementById('fs-fbase').value)  || 60,
+        hMax:           Number(document.getElementById('fs-hmax').value)   || 25,
+        capacitorBanks: collectBanks()
+      };
+
+      const { sweep, resonances } = frequencyScan(params);
+      saveResults(params, { sweep, resonances });
+
+      renderFreqChart(sweep, resonances, params.hMax);
+
+      // Populate results table
+      resultsTbody.innerHTML = '';
+      if (!resonances.length) {
+        resultsTbody.innerHTML = `<tr><td colspan="5" style="text-align:center;color:var(--text-muted,#666);">
+          No resonance peaks detected in the sweep range.</td></tr>`;
+      } else {
+        resonances.forEach(r => {
+          const riskStyle = `color:${riskColor(r.risk)};font-weight:600`;
+          const tr = document.createElement('tr');
+          tr.innerHTML = `
+            <td>${r.hOrder.toFixed(1)}</td>
+            <td>${r.zPu.toFixed(3)}</td>
+            <td>${r.type}</td>
+            <td style="${riskStyle}">${r.risk.toUpperCase()}</td>
+            <td style="max-width:30rem;">${r.detuneRecommendation || '—'}</td>`;
+          resultsTbody.appendChild(tr);
+        });
+      }
+
+      dangerBanner.hidden = !resonances.some(r => r.risk === 'danger');
+      resultsDiv.hidden = false;
+    });
+
+    // Restore persisted results if available
+    const saved = getStudies()?.freqScan;
+    if (saved?.results?.sweep?.length) {
+      renderFreqChart(saved.results.sweep, saved.results.resonances || [], saved.params?.hMax || 25);
+    }
   </script>
   <script type="module">
     import { initStudyApprovalPanel } from './src/components/studyApproval.js';
