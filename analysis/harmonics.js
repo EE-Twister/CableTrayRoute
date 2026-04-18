@@ -239,6 +239,127 @@ export function runHarmonicsUnbalanced(phaseData = {}) {
   return results;
 }
 
+/**
+ * Frequency sweep — system impedance Z(h) vs harmonic order h.
+ *
+ * Models the Thevenin source (inductive, from scMVA) in parallel with
+ * capacitor banks (untuned) or series-tuned LC filters (with quality factor Q).
+ * Identifies parallel resonance peaks (impedance maxima) and series resonance
+ * nulls (impedance minima from tuned filters), then classifies each by its
+ * proximity to integer harmonic orders per IEEE 519 injection risk.
+ *
+ * Normalization: Z_pu = Z_abs × ySrc1, so Z_pu = 1 at h=1 with no capacitors
+ * (source inductor base). Peak Z_pu ≈ h_res × Q_system at parallel resonance.
+ *
+ * @param {object}  params
+ * @param {number}  params.busVoltageKv    - Bus voltage (kV)
+ * @param {number}  params.scMVA           - Short-circuit MVA at bus
+ * @param {{mvar:number, kv?:number, tuneOrder?:number, qFactor?:number}[]} [params.capacitorBanks=[]]
+ * @param {number}  [params.hMax=25]       - Maximum harmonic order to sweep
+ * @param {number}  [params.qSystem=20]    - System quality factor (source damping)
+ * @param {number}  [params.step=0.1]      - Sweep step size
+ * @returns {{ sweep: {h:number,zPu:number}[], resonances: {hOrder:number,zPu:number,type:string,risk:string,nearestHarmonic:number,detuneRecommendation:string|null}[] }}
+ */
+export function frequencyScan({
+  busVoltageKv = 13.8,
+  scMVA = 100,
+  capacitorBanks = [],
+  hMax = 25,
+  qSystem = 20,
+  step = 0.1
+} = {}) {
+  const kv    = Number(busVoltageKv) || 1;
+  const sc    = Number(scMVA)        || 1;
+  const Qsys  = Number(qSystem)      || 20;
+
+  // Source short-circuit admittance at fundamental (MVAR/kV²)
+  const ySrc1 = sc / (kv * kv);
+
+  const banks = (capacitorBanks || []).map(b => {
+    const bKv = Number(b.kv) || kv;
+    return {
+      b1: Number(b.mvar) / (bKv * bKv),   // fundamental cap susceptance (MVAR/kV²)
+      ht: Number(b.tuneOrder) || 0,         // tuning order (0 = untuned)
+      q:  Number(b.qFactor)  || 30          // filter quality factor
+    };
+  }).filter(b => b.b1 > 0);
+
+  const hasCapacitors = banks.length > 0;
+
+  // Compute complex admittance at harmonic order h; return { gTotal, bTotal }
+  function admittance(h) {
+    // Inductive source: Y_src = G_src - j·B_src
+    const gSrc = ySrc1 / (h * Qsys);  // conductance (system losses)
+    const bSrc = ySrc1 / h;            // inductive susceptance magnitude
+
+    let gCap = 0;
+    let bCap = 0;
+
+    banks.forEach(({ b1, ht, q }) => {
+      if (ht > 0) {
+        // Series-tuned filter: Z = R + j(X_L - X_C) per harmonic h
+        // where X_C1 = 1/b1, X_L1 = X_C1/ht², R = ht·X_L1/q = X_C1/(q·ht)
+        const xC1  = 1 / b1;
+        const xL_h = h * xC1 / (ht * ht);
+        const xC_h = xC1 / h;
+        const R    = xC1 / (q * ht);
+        const xNet = xL_h - xC_h;
+        const dSq  = R * R + xNet * xNet;
+        gCap += R    / dSq;   // real part of Y_filter
+        bCap += -xNet / dSq;  // imaginary part (positive = capacitive below ht)
+      } else {
+        bCap += b1 * h;       // untuned capacitor: purely capacitive
+      }
+    });
+
+    // Total admittance: Y = (gSrc + gCap) + j(-bSrc + bCap)
+    return { g: gSrc + gCap, b: -bSrc + bCap };
+  }
+
+  // Build sweep: Z_pu = ySrc1 / |Y_total|
+  const sweep = [];
+  const hEnd = Math.round(hMax * 10);
+  for (let hi = 10; hi <= hEnd; hi++) {
+    const h = hi / 10;
+    const { g, b } = admittance(h);
+    const yMag = Math.sqrt(g * g + b * b);
+    const zPu  = yMag > 0 ? Math.round((ySrc1 / yMag) * 10000) / 10000 : 1e6;
+    sweep.push({ h, zPu });
+  }
+
+  // Find local extrema → resonances
+  const resonances = [];
+  for (let i = 1; i < sweep.length - 1; i++) {
+    const prev = sweep[i - 1].zPu;
+    const curr = sweep[i].zPu;
+    const next = sweep[i + 1].zPu;
+    const h    = sweep[i].h;
+
+    if (hasCapacitors && curr > prev && curr > next && curr > 1.0) {
+      // Parallel resonance (impedance peak)
+      const nearestHarmonic = Math.round(h);
+      const dist = Math.abs(h - nearestHarmonic);
+      const risk = dist <= 0.3 ? 'danger' : 'caution';
+
+      let rec = null;
+      if (risk === 'danger') {
+        rec = `Parallel resonance at h\u2248${h.toFixed(1)} coincides with the ${nearestHarmonic}th harmonic. Add a detuning reactor to shift the resonant frequency away from this order.`;
+      } else {
+        rec = `Resonance at h\u2248${h.toFixed(1)} is near the ${nearestHarmonic}th harmonic. Monitor harmonic injection levels; consider detuning if injection is significant.`;
+      }
+
+      resonances.push({ hOrder: h, zPu: curr, type: 'parallel', risk, nearestHarmonic, detuneRecommendation: rec });
+    }
+
+    if (curr < prev && curr < next && banks.some(b => b.ht > 0)) {
+      // Series resonance null (from tuned filter)
+      resonances.push({ hOrder: h, zPu: curr, type: 'series', risk: 'safe', nearestHarmonic: Math.round(h), detuneRecommendation: null });
+    }
+  }
+
+  return { sweep, resonances };
+}
+
 function ensureHarmonicResults() {
   const studies = getStudies();
   if (studies?.harmonics && Object.keys(studies.harmonics).length) {
