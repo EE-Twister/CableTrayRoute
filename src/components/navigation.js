@@ -37,6 +37,7 @@ const NAV_ROUTES = [
   { href: 'capacitorbank.html', label: 'Capacitor Bank', section: 'Studies', group: 'Power Quality', icon: 'icons/toolbar/grid-size.svg' },
   { href: 'battery.html', label: 'Battery / UPS Sizing', section: 'Studies', group: 'Equipment Sizing', icon: 'icons/components/UPS.svg' },
   { href: 'generatorsizing.html', label: 'Generator Sizing', section: 'Studies', group: 'Equipment Sizing', icon: 'icons/toolbar/validate.svg' },
+  { href: 'ibr.html', label: 'IBR Modeling (PV/BESS)', section: 'Studies', group: 'Renewable', icon: 'icons/toolbar/validate.svg' },
   { href: 'motorStart.html', label: 'Motor Start', section: 'Studies', group: 'Motor', icon: 'icons/Motor.svg' },
   { href: 'loadFlow.html', label: 'Load Flow', section: 'Studies', group: 'Power System', icon: 'icons/Load.svg' },
   { href: 'shortCircuit.html', label: 'Short Circuit', section: 'Studies', group: 'Protection', icon: 'icons/components/Breaker.svg' },
@@ -123,7 +124,7 @@ function buildDropdown(section, routes, currentRoute) {
   const groupNames = Object.keys(groupedRoutes);
   const sectionGroupOrder = {
     Workflow: ['Planning', 'Raceway', 'Cable', 'Structural', 'Validation', 'Optimization', 'Deliverables'],
-    Studies: ['Grounding', 'Corrosion Control', 'Cable', 'Protection', 'Power System', 'Power Quality', 'Equipment Sizing', 'Motor']
+    Studies: ['Grounding', 'Corrosion Control', 'Cable', 'Protection', 'Power System', 'Power Quality', 'Equipment Sizing', 'Motor', 'Renewable']
   };
   const orderedGroupNames = [
     ...(sectionGroupOrder[section] || []).filter(groupName => groupNames.includes(groupName)),

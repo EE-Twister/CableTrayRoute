@@ -5,6 +5,7 @@ import { resolvePtVtForComponent } from './ptVtMetadata.mjs';
 import protectiveDevices from '../data/protectiveDevices.mjs';
 import { calculateTransformerImpedance } from '../utils/transformerImpedance.js';
 import { computeIEC60909Bus } from './iec60909.mjs';
+import { ibrFaultContribution, IBR_DEFAULTS } from './ibrModeling.mjs';
 
 // Basic complex math utilities
 function add(a, b) {
@@ -210,6 +211,64 @@ function resolveUpsForComponent(component, components = [], componentMap = new M
     const target = typeof conn === 'string' ? conn : conn?.target;
     if (!target) continue;
     const metadata = getUpsStudyMetadata(componentMap.get(target));
+    if (metadata) return metadata;
+  }
+  return null;
+}
+
+function getIBRStudyMetadata(comp) {
+  if (!comp || typeof comp !== 'object') return null;
+  const type = String(comp.type || '').toLowerCase();
+  const subtype = String(comp.subtype || '').toLowerCase();
+  const isIBR = (
+    type === 'pv_inverter' || subtype === 'pv_inverter' ||
+    type === 'solar' || subtype === 'solar' ||
+    type === 'bess' || subtype === 'bess' ||
+    type === 'pv' || subtype === 'pv' ||
+    type === 'ibr' || subtype === 'ibr'
+  );
+  if (!isIBR) return null;
+  const read = (...keys) => {
+    for (const k of keys) {
+      const v = parseNumeric(pickValue(comp, k));
+      if (v !== null && v > 0) return v;
+    }
+    return null;
+  };
+  const sRated_kVA = read('rated_kva', 'kva', 'kVA', 's_rated_kva') || 0;
+  const vLL_kV = read('voltage', 'volts', 'rated_kv', 'baseKV') || 0;
+  const limitFactor = read('fault_limit_factor') || IBR_DEFAULTS.faultCurrentLimitFactor;
+  const rideThrough = comp.ride_through !== false && comp.rideThrough !== false;
+  if (!sRated_kVA || !vLL_kV) return null;
+  try {
+    const result = ibrFaultContribution({ sRated_kVA, vLL_kV, limitFactor, rideThrough });
+    return { sRated_kVA, vLL_kV, limitFactor, rideThrough, ...result };
+  } catch (_) {
+    return null;
+  }
+}
+
+function resolveIBRForComponent(component, components = [], componentMap = new Map()) {
+  if (!component) return null;
+  const direct = getIBRStudyMetadata(component);
+  if (direct) return direct;
+  const incoming = [];
+  components.forEach(source => {
+    if (!source || !Array.isArray(source.connections)) return;
+    source.connections.forEach(conn => {
+      const target = typeof conn === 'string' ? conn : conn?.target;
+      if (target === component.id) incoming.push(source);
+    });
+  });
+  for (const candidate of incoming) {
+    const metadata = getIBRStudyMetadata(candidate);
+    if (metadata) return metadata;
+  }
+  const connList = Array.isArray(component.connections) ? component.connections : [];
+  for (const conn of connList) {
+    const target = typeof conn === 'string' ? conn : conn?.target;
+    if (!target) continue;
+    const metadata = getIBRStudyMetadata(componentMap.get(target));
     if (metadata) return metadata;
   }
   return null;
@@ -789,6 +848,8 @@ export function runShortCircuit(modelOrOpts = {}, maybeOpts = {}) {
     }
     const ups = resolveUpsForComponent(comp, comps, compMap);
     if (ups) entry.ups = ups;
+    const ibr = resolveIBRForComponent(comp, comps, compMap);
+    if (ibr) entry.ibr = ibr;
     results[comp.id] = entry;
   });
 

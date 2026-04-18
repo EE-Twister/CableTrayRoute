@@ -1,5 +1,6 @@
 import { getOneLine } from '../dataStore.mjs';
-import { buildLoadFlowModel, cloneData, isBusComponent } from './loadFlowModel.js';
+import { buildLoadFlowModel, cloneData, isBusComponent, isIBRDevice, deriveIBRProfile } from './loadFlowModel.js';
+import { ibrPQCapability } from './ibrModeling.mjs';
 
 const IGNORED_TYPES = new Set(['annotation', 'dimension']);
 const MIN_COMPLEX_MAG = 1e-12;
@@ -306,6 +307,26 @@ function solvePhase(buses, baseMVA, options = {}) {
     for (let idx = 0; idx < PQ.length; idx++) {
       Vm[PQ[idx]] += dx[nonSlack.length + idx];
     }
+
+    // IBR Volt-VAR Q update: recompute Qspec for IBR PQ buses based on new bus voltage
+    for (let i = 0; i < working.length; i++) {
+      const ibr = working[i].ibrProfile;
+      if (!ibr || working[i].type === 'slack') continue;
+      if (!ibr.voltVarEnabled || !ibr.sRated_kVA) continue;
+      try {
+        const cap = ibrPQCapability({
+          sRated_kVA: ibr.sRated_kVA,
+          pOutput_kW: ibr.pGen_kW || 0,
+          vBus_pu: Vm[i],
+          voltVarEnabled: true,
+          voltVarCategory: ibr.voltVarCategory || 'B',
+        });
+        Qspec[i] = (toMW(ibr.pGen_kW || 0) + cap.qDroop_kvar / 1000 - toMW(working[i].Qd || 0)) / baseMVA;
+      } catch (_) {
+        // ignore IBR Q update errors; fall back to previous Qspec
+      }
+    }
+
     iterations = iter + 1;
   }
 
@@ -926,6 +947,7 @@ export function runLoadFlow(modelOrOpts = {}, maybeOpts = {}) {
       const name = normalizeIdentifier(c.name);
       const label = normalizeIdentifier(c.label);
       const ref = normalizeIdentifier(c.ref);
+      const ibrProfile = isIBRDevice(c) ? deriveIBRProfile(c) : null;
       return {
         id: c.id,
         name,
@@ -939,6 +961,7 @@ export function runLoadFlow(modelOrOpts = {}, maybeOpts = {}) {
         Qd: loadPQ.kvar,
         Pg: genPQ.kw,
         Qg: genPQ.kvar,
+        ibrProfile,
         shunt,
         connections: (c.connections || []).filter(conn => {
           if (!busIds.includes(conn.target)) return false;

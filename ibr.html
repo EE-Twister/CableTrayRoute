@@ -1,0 +1,471 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <meta name="description" content="PV / BESS / Inverter-Based Resource (IBR) modeling per IEEE 1547-2018 and IEEE 2800-2022. P-Q capability curves, Volt-VAR droop, current-limited fault contribution, and BESS dispatch analysis." />
+  <title>IBR Modeling — CableTrayRoute</title>
+  <link rel="icon" href="icons/favicon.svg" type="image/svg+xml">
+  <link rel="apple-touch-icon" href="icons/favicon.svg">
+  <!-- Open Graph -->
+  <meta property="og:type" content="website">
+  <meta property="og:title" content="IBR Modeling — CableTrayRoute">
+  <meta property="og:description" content="PV / BESS / Inverter-Based Resource modeling per IEEE 1547-2018 and IEEE 2800-2022.">
+  <meta property="og:image" content="https://cabletrayroute.com/icons/og-preview.png">
+  <meta property="og:site_name" content="CableTrayRoute">
+  <meta property="og:url" content="ibr.html">
+  <link rel="canonical" href="ibr.html">
+  <link rel="dns-prefetch" href="https://fonts.gstatic.com">
+  <meta name="color-scheme" content="light dark">
+  <link rel="stylesheet" href="style.css" />
+  <script type="module" src="dirtyTracker.js"></script>
+  <script type="module" src="dist/ibr.js" defer></script>
+</head>
+<body class="ibr-page" data-report-title="IBR Modeling">
+  <a href="#main-content" class="skip-link">Skip to main content</a>
+  <nav class="top-nav" aria-label="Primary">
+    <button id="nav-toggle" class="nav-toggle" aria-label="Toggle navigation" aria-controls="nav-links" aria-expanded="false" title="Toggle navigation">
+      <img src="icons/toolbar/grid.svg" alt="" aria-hidden="true" class="control-icon" loading="lazy" decoding="async">
+    </button>
+    <div id="nav-links" class="nav-links" role="list">
+      <!-- Populated dynamically by navigation.js -->
+    </div>
+    <button id="settings-btn" class="settings-btn" aria-label="Settings" aria-expanded="false" title="Settings">
+      <img src="icons/toolbar/validate.svg" alt="" aria-hidden="true" class="control-icon" loading="lazy" decoding="async">
+    </button>
+  </nav>
+
+  <div id="settings-menu" class="settings-menu">
+    <label for="theme-select">Theme
+      <select id="theme-select">
+        <option value="system">System</option>
+        <option value="light">Light</option>
+        <option value="dark">Dark</option>
+        <option value="high-contrast">High Contrast</option>
+      </select>
+    </label>
+    <label><input type="checkbox" id="compact-toggle" aria-label="Enable compact table mode"> Compact Mode</label>
+    <label for="unit-select">Units
+      <select id="unit-select">
+        <option value="imperial">Imperial (ft, in)</option>
+        <option value="metric">Metric (m, mm)</option>
+      </select>
+    </label>
+    <button id="help-btn" class="btn" aria-expanded="false" title="Show help">
+      <img src="icons/toolbar/validate.svg" alt="" aria-hidden="true" class="control-icon" loading="lazy" decoding="async">
+      <span>Site Help</span>
+    </button>
+    <button id="new-project-btn" title="Start a new project">
+      <img src="icons/toolbar/copy.svg" alt="" aria-hidden="true" class="control-icon" loading="lazy" decoding="async">
+      <span>New Project</span>
+    </button>
+    <button id="save-project-btn" title="Save current project">
+      <img src="icons/toolbar/export.svg" alt="" aria-hidden="true" class="control-icon" loading="lazy" decoding="async">
+      <span>Save Project</span>
+    </button>
+    <button id="load-project-btn" title="Load an existing project">
+      <img src="icons/toolbar/import.svg" alt="" aria-hidden="true" class="control-icon" loading="lazy" decoding="async">
+      <span>Load Project</span>
+    </button>
+    <button id="export-project-btn" title="Export project data">
+      <img src="icons/toolbar/export.svg" alt="" aria-hidden="true" class="control-icon" loading="lazy" decoding="async">
+      <span>Export Project</span>
+    </button>
+    <button id="import-project-btn" title="Import project data">
+      <img src="icons/toolbar/import.svg" alt="" aria-hidden="true" class="control-icon" loading="lazy" decoding="async">
+      <span>Import Project</span>
+    </button>
+    <input type="file" id="import-project-input" accept=".ctr.json" class="hidden" title="Select project file">
+  </div>
+
+  <div class="container">
+    <main id="main-content" class="main-content">
+
+      <header class="page-header">
+        <h1>PV / BESS / Inverter-Based Resource (IBR) Modeling</h1>
+      </header>
+
+      <details class="method-panel">
+        <summary>Method &amp; Standards</summary>
+        <p>This tool implements inverter-based resource (IBR) modeling per
+        <strong>IEEE 1547-2018</strong> (Interconnection and Interoperability of Distributed Energy
+        Resources) and <strong>IEEE 2800-2022</strong> (IBR Interconnection with Transmission
+        Systems). Calculations cover:</p>
+
+        <p><strong>1. PV Array Output (IEC 61727 / IEC 60891):</strong></p>
+        <pre>P<sub>DC</sub> = P<sub>STC</sub> &times; (G / G<sub>STC</sub>) &times; [1 + &gamma;<sub>P</sub> &times; (T &minus; 25)]
+P<sub>AC</sub> = P<sub>DC</sub> &times; &eta;<sub>inv</sub>   (clamped to S<sub>rated</sub> if curtailed)</pre>
+        <p>where G<sub>STC</sub> = 1000 W/m², T is cell temperature (°C), &gamma;<sub>P</sub> is the
+        power temperature coefficient (%/°C), and &eta;<sub>inv</sub> is inverter efficiency.</p>
+
+        <p><strong>2. P-Q Capability &amp; Volt-VAR Droop (IEEE 1547-2018 Table 8):</strong></p>
+        <pre>Q<sub>max</sub> = &radic;(S<sub>rated</sub>&sup2; &minus; P<sub>out</sub>&sup2;)   [kvar]
+Q<sub>droop</sub> = interp(V<sub>bus</sub>, Volt&ndash;VAR curve, category A or B)</pre>
+
+        <p><strong>3. Current-Limited Fault Contribution (IEEE 1547-2018 §6.4 / IEEE 2800-2022 §6.7.1):</strong></p>
+        <pre>I<sub>rated</sub> = S<sub>rated</sub> / (&radic;3 &times; V<sub>LL</sub>)
+I<sub>fault</sub> = k<sub>limit</sub> &times; I<sub>rated</sub>   (k<sub>limit</sub> = 1.05–1.2, default 1.1)</pre>
+        <p>Inverters do not contribute synchronous machine-level fault currents; the fault current
+        is limited by the inverter control loop to a small multiple of rated current.</p>
+
+        <p><strong>4. BESS Dispatch:</strong></p>
+        <pre>P<sub>AC,discharge</sub> = P<sub>setpoint</sub> &times; &eta;<sub>rt</sub>   (blocked if SOC &le; SOC<sub>min</sub>)
+P<sub>AC,charge</sub> = &minus;P<sub>setpoint</sub> / &eta;<sub>rt</sub>   (blocked if SOC &ge; SOC<sub>max</sub>)</pre>
+
+        <p><strong>5. Frequency-Watt Response (IEEE 1547-2018 §5.3.1):</strong></p>
+        <pre>f<sub>dev</sub> = f &minus; f<sub>deadband,high</sub>   (when f &gt; f<sub>db,high</sub>)
+curtail = min(1, droop% &times; f<sub>dev</sub>)
+P<sub>dispatch</sub> = P<sub>max</sub> &times; (1 &minus; curtail)</pre>
+
+        <p>References: <a href="docs/ibr-modeling.md">IBR Modeling Guide</a>.
+        See also: <a href="loadFlow.html">Load Flow</a>,
+        <a href="shortCircuit.html">Short Circuit</a>,
+        <a href="battery.html">Battery / UPS Sizing</a>.</p>
+      </details>
+
+      <!-- Tab navigation -->
+      <div class="tab-bar" role="tablist" aria-label="IBR study sections">
+        <button class="tab-btn active" role="tab" aria-selected="true" aria-controls="tab-pv" id="btn-pv" data-tab="pv">PV Array</button>
+        <button class="tab-btn" role="tab" aria-selected="false" aria-controls="tab-bess" id="btn-bess" data-tab="bess">BESS</button>
+        <button class="tab-btn" role="tab" aria-selected="false" aria-controls="tab-fault" id="btn-fault" data-tab="fault">Fault Contribution</button>
+        <button class="tab-btn" role="tab" aria-selected="false" aria-controls="tab-voltvar" id="btn-voltvar" data-tab="voltvar">Volt-VAR</button>
+      </div>
+
+      <!-- === PV Array Tab === -->
+      <section id="tab-pv" role="tabpanel" aria-labelledby="btn-pv">
+        <form id="pv-form" novalidate>
+          <fieldset>
+            <legend><strong>Study Identification (Optional)</strong></legend>
+            <div class="field-row">
+              <label for="pv-label">Study label</label>
+              <input type="text" id="pv-label" placeholder="e.g. Roof Array — Building A">
+            </div>
+          </fieldset>
+
+          <fieldset>
+            <legend><strong>PV Array Parameters</strong></legend>
+            <div class="field-row">
+              <label for="pv-pstc">P<sub>STC</sub> — Array DC rating at STC (kW)
+                <button type="button" class="helpBtn" aria-label="Help — array rating">?</button>
+              </label>
+              <input type="number" id="pv-pstc" min="0.1" step="1" value="100" required
+                     aria-describedby="pv-pstc-hint">
+              <p id="pv-pstc-hint" class="field-hint">
+                Nameplate DC power rating of the array at Standard Test Conditions (1000 W/m², 25 °C).
+                Sum of all module ratings in kW.
+              </p>
+            </div>
+
+            <div class="field-row">
+              <label for="pv-irradiance">G — Plane-of-array irradiance (W/m²)
+                <button type="button" class="helpBtn" aria-label="Help — irradiance">?</button>
+              </label>
+              <input type="number" id="pv-irradiance" min="0" max="1400" step="10" value="1000" required
+                     aria-describedby="pv-irr-hint">
+              <p id="pv-irr-hint" class="field-hint">
+                Irradiance on the module surface. STC = 1000 W/m². Typical peak = 900–1100 W/m².
+                Annual average varies by location (450–700 W/m² for US sites).
+              </p>
+            </div>
+
+            <div class="field-row">
+              <label for="pv-temp">T — Cell temperature (°C)
+                <button type="button" class="helpBtn" aria-label="Help — cell temperature">?</button>
+              </label>
+              <input type="number" id="pv-temp" min="-40" max="90" step="1" value="25" required
+                     aria-describedby="pv-temp-hint">
+              <p id="pv-temp-hint" class="field-hint">
+                Module cell temperature (not ambient). Estimated as T<sub>amb</sub> + (G / 800) × (NOCT − 20).
+                Typical NOCT = 44 °C. STC = 25 °C.
+              </p>
+            </div>
+
+            <div class="field-row">
+              <label for="pv-tempcoeff">&gamma;<sub>P</sub> — Temperature coefficient (%/°C)
+                <button type="button" class="helpBtn" aria-label="Help — temperature coefficient">?</button>
+              </label>
+              <input type="number" id="pv-tempcoeff" min="-1" max="0" step="0.01" value="-0.35"
+                     aria-describedby="pv-tc-hint">
+              <p id="pv-tc-hint" class="field-hint">
+                Power loss per °C above STC (25 °C). Typical mono-Si: −0.35 to −0.40 %/°C.
+                Thin-film (CdTe): −0.19 to −0.25 %/°C.
+              </p>
+            </div>
+
+            <div class="field-row">
+              <label for="pv-inveff">&eta;<sub>inv</sub> — Inverter efficiency (%)
+                <button type="button" class="helpBtn" aria-label="Help — inverter efficiency">?</button>
+              </label>
+              <input type="number" id="pv-inveff" min="50" max="100" step="0.1" value="97"
+                     aria-describedby="pv-inveff-hint">
+              <p id="pv-inveff-hint" class="field-hint">
+                CEC-weighted or peak efficiency. Modern string inverters: 96–98.5 %.
+                Central inverters: 97–98 %. Microinverters: 95–96.5 %.
+              </p>
+            </div>
+
+            <div class="field-row">
+              <label for="pv-srated">S<sub>rated</sub> — Inverter AC rating (kVA)
+                <button type="button" class="helpBtn" aria-label="Help — inverter rating">?</button>
+              </label>
+              <input type="number" id="pv-srated" min="0.1" step="1" value="100"
+                     aria-describedby="pv-srated-hint">
+              <p id="pv-srated-hint" class="field-hint">
+                Inverter apparent power limit. DC:AC ratio = P<sub>STC</sub> / S<sub>rated</sub>.
+                Typical ratio: 1.0–1.3. When P<sub>AC</sub> exceeds this limit, output is curtailed (clipped).
+              </p>
+            </div>
+          </fieldset>
+
+          <div class="btn-row">
+            <button type="submit" class="btn btn-primary" id="pv-run-btn">Calculate PV Output</button>
+            <button type="button" class="btn" id="pv-reset-btn">Reset</button>
+          </div>
+        </form>
+
+        <div id="pv-results" class="results-panel hidden" aria-live="polite">
+          <h2>PV Array Results</h2>
+          <div class="result-cards" id="pv-result-cards"></div>
+        </div>
+      </section>
+
+      <!-- === BESS Tab === -->
+      <section id="tab-bess" role="tabpanel" aria-labelledby="btn-bess" hidden>
+        <form id="bess-form" novalidate>
+          <fieldset>
+            <legend><strong>BESS Parameters</strong></legend>
+            <div class="field-row">
+              <label for="bess-kw">P<sub>rated</sub> — Rated active power (kW)
+                <button type="button" class="helpBtn" aria-label="Help — rated power">?</button>
+              </label>
+              <input type="number" id="bess-kw" min="1" step="10" value="1000" required
+                     aria-describedby="bess-kw-hint">
+              <p id="bess-kw-hint" class="field-hint">
+                Continuous rated charge/discharge power in kW.
+              </p>
+            </div>
+
+            <div class="field-row">
+              <label for="bess-kva">S<sub>rated</sub> — Inverter apparent power (kVA)
+                <button type="button" class="helpBtn" aria-label="Help — kVA rating">?</button>
+              </label>
+              <input type="number" id="bess-kva" min="1" step="10" value="1000" required
+                     aria-describedby="bess-kva-hint">
+              <p id="bess-kva-hint" class="field-hint">
+                Apparent power limit of the BESS inverter. Determines reactive power capability.
+              </p>
+            </div>
+
+            <div class="field-row">
+              <label for="bess-soc">SOC — State of Charge (%)
+                <button type="button" class="helpBtn" aria-label="Help — SOC">?</button>
+              </label>
+              <input type="number" id="bess-soc" min="0" max="100" step="1" value="80" required
+                     aria-describedby="bess-soc-hint">
+              <p id="bess-soc-hint" class="field-hint">
+                Current battery state of charge. Dispatch is blocked when SOC ≤ SOC<sub>min</sub>
+                (discharge) or SOC ≥ SOC<sub>max</sub> (charge).
+              </p>
+            </div>
+
+            <div class="field-row">
+              <label for="bess-mode">Operating mode
+                <button type="button" class="helpBtn" aria-label="Help — operating mode">?</button>
+              </label>
+              <select id="bess-mode" aria-describedby="bess-mode-hint">
+                <option value="discharge">Discharge — inject active power to grid</option>
+                <option value="charge">Charge — absorb active power from grid</option>
+                <option value="standby">Standby — no active or reactive power</option>
+                <option value="volt_var">Volt-VAR — reactive power only (no active)</option>
+              </select>
+              <p id="bess-mode-hint" class="field-hint">
+                Operating mode determines the active and reactive power injection.
+                Volt-VAR mode only dispatches reactive power per IEEE 1547 Table 8.
+              </p>
+            </div>
+
+            <div class="field-row">
+              <label for="bess-eff">Round-trip efficiency (%)</label>
+              <input type="number" id="bess-eff" min="50" max="100" step="0.5" value="92"
+                     aria-describedby="bess-eff-hint">
+              <p id="bess-eff-hint" class="field-hint">
+                AC-AC round-trip efficiency. Li-Ion: 88–96 %. Lead-acid: 75–85 %.
+                Flow batteries: 70–80 %.
+              </p>
+            </div>
+
+            <div class="field-row">
+              <label for="bess-vbus">V<sub>bus</sub> — Bus voltage (pu) for Volt-VAR</label>
+              <input type="number" id="bess-vbus" min="0.8" max="1.2" step="0.01" value="1.0">
+            </div>
+          </fieldset>
+
+          <div class="btn-row">
+            <button type="submit" class="btn btn-primary" id="bess-run-btn">Calculate BESS Dispatch</button>
+            <button type="button" class="btn" id="bess-reset-btn">Reset</button>
+          </div>
+        </form>
+
+        <div id="bess-results" class="results-panel hidden" aria-live="polite">
+          <h2>BESS Dispatch Results</h2>
+          <div class="result-cards" id="bess-result-cards"></div>
+        </div>
+      </section>
+
+      <!-- === Fault Contribution Tab === -->
+      <section id="tab-fault" role="tabpanel" aria-labelledby="btn-fault" hidden>
+        <form id="fault-form" novalidate>
+          <fieldset>
+            <legend><strong>IBR Fault Contribution Parameters</strong></legend>
+            <div class="field-row">
+              <label for="fault-srated">S<sub>rated</sub> — Inverter apparent power (kVA)
+                <button type="button" class="helpBtn" aria-label="Help — inverter rating">?</button>
+              </label>
+              <input type="number" id="fault-srated" min="1" step="100" value="1000" required
+                     aria-describedby="fault-srated-hint">
+              <p id="fault-srated-hint" class="field-hint">
+                Total inverter apparent power at the point of common coupling.
+              </p>
+            </div>
+
+            <div class="field-row">
+              <label for="fault-vll">V<sub>LL</sub> — Bus line-to-line voltage (kV)
+                <button type="button" class="helpBtn" aria-label="Help — bus voltage">?</button>
+              </label>
+              <input type="number" id="fault-vll" min="0.1" step="0.1" value="34.5" required
+                     aria-describedby="fault-vll-hint">
+              <p id="fault-vll-hint" class="field-hint">
+                Line-to-line voltage at the inverter terminals. Common: 0.48 kV, 4.16 kV, 12.47 kV, 34.5 kV.
+              </p>
+            </div>
+
+            <div class="field-row">
+              <label for="fault-vbus">V<sub>pre</sub> — Pre-fault bus voltage (pu)</label>
+              <input type="number" id="fault-vbus" min="0.8" max="1.1" step="0.01" value="1.0">
+            </div>
+
+            <div class="field-row">
+              <label for="fault-limit">k<sub>limit</sub> — Current limit factor (pu)
+                <button type="button" class="helpBtn" aria-label="Help — limit factor">?</button>
+              </label>
+              <input type="number" id="fault-limit" min="1.0" max="1.5" step="0.05" value="1.1"
+                     aria-describedby="fault-limit-hint">
+              <p id="fault-limit-hint" class="field-hint">
+                Ratio of fault current to rated current. IEEE 1547-2018 §6.4 default: 1.05–1.2.
+                IEEE 2800-2022 (transmission): up to 1.2. Grid-forming inverters may reach 1.5.
+              </p>
+            </div>
+
+            <div class="field-row">
+              <label for="fault-ridethrough">
+                <input type="checkbox" id="fault-ridethrough" checked>
+                Ride-through enabled (inverter contributes fault current)
+              </label>
+              <p class="field-hint">
+                When unchecked, the inverter trips off immediately and contributes zero fault current
+                (default IEEE 1547-2018 Category I behavior).
+              </p>
+            </div>
+          </fieldset>
+
+          <div class="btn-row">
+            <button type="submit" class="btn btn-primary" id="fault-run-btn">Calculate Fault Contribution</button>
+            <button type="button" class="btn" id="fault-reset-btn">Reset</button>
+          </div>
+        </form>
+
+        <div id="fault-results" class="results-panel hidden" aria-live="polite">
+          <h2>Fault Contribution Results</h2>
+          <div class="result-cards" id="fault-result-cards"></div>
+        </div>
+      </section>
+
+      <!-- === Volt-VAR Tab === -->
+      <section id="tab-voltvar" role="tabpanel" aria-labelledby="btn-voltvar" hidden>
+        <form id="voltvar-form" novalidate>
+          <fieldset>
+            <legend><strong>Volt-VAR Parameters</strong></legend>
+            <div class="field-row">
+              <label for="vv-srated">S<sub>rated</sub> — Inverter apparent power (kVA)
+                <button type="button" class="helpBtn" aria-label="Help — inverter rating">?</button>
+              </label>
+              <input type="number" id="vv-srated" min="1" step="100" value="1000" required>
+            </div>
+
+            <div class="field-row">
+              <label for="vv-pout">P<sub>out</sub> — Active power output (kW)
+                <button type="button" class="helpBtn" aria-label="Help — active power">?</button>
+              </label>
+              <input type="number" id="vv-pout" min="0" step="10" value="800" required>
+            </div>
+
+            <div class="field-row">
+              <label for="vv-vbus">V<sub>bus</sub> — Bus voltage (pu)
+                <button type="button" class="helpBtn" aria-label="Help — bus voltage">?</button>
+              </label>
+              <input type="number" id="vv-vbus" min="0.85" max="1.15" step="0.01" value="1.0" required>
+            </div>
+
+            <div class="field-row">
+              <label for="vv-category">IEEE 1547 Volt-VAR category
+                <button type="button" class="helpBtn" aria-label="Help — VV category">?</button>
+              </label>
+              <select id="vv-category" aria-describedby="vv-category-hint">
+                <option value="B" selected>Category B (default — broader deadband: 0.98–1.02 pu)</option>
+                <option value="A">Category A (tighter deadband: 0.98–1.02 pu, wider voltage range)</option>
+              </select>
+              <p id="vv-category-hint" class="field-hint">
+                IEEE 1547-2018 Table 8 defines two default Volt-VAR curves. Category B is the default
+                for most distributed resources. Category A applies to larger utility-interactive resources.
+              </p>
+            </div>
+          </fieldset>
+
+          <div class="btn-row">
+            <button type="submit" class="btn btn-primary" id="vv-run-btn">Calculate Volt-VAR</button>
+            <button type="button" class="btn" id="vv-reset-btn">Reset</button>
+          </div>
+        </form>
+
+        <div id="voltvar-results" class="results-panel hidden" aria-live="polite">
+          <h2>Volt-VAR Results</h2>
+          <div class="result-cards" id="vv-result-cards"></div>
+          <canvas id="vv-chart" width="600" height="300" aria-label="P-Q capability diagram" role="img"
+                  style="display:none; max-width:100%; margin-top:1rem;"></canvas>
+        </div>
+      </section>
+
+      <div class="btn-row export-row" style="margin-top:2rem;">
+        <button type="button" class="btn" id="export-csv-btn">
+          <img src="icons/toolbar/export.svg" alt="" aria-hidden="true" class="control-icon" loading="lazy" decoding="async">
+          Export CSV
+        </button>
+        <button type="button" class="btn" id="export-pdf-btn">
+          <img src="icons/toolbar/export.svg" alt="" aria-hidden="true" class="control-icon" loading="lazy" decoding="async">
+          Export PDF
+        </button>
+      </div>
+
+    </main>
+  </div>
+
+  <!-- Help modal -->
+  <div id="help-modal" class="modal hidden" role="dialog" aria-modal="true" aria-labelledby="help-modal-title">
+    <div class="modal-content">
+      <h2 id="help-modal-title">IBR Modeling Help</h2>
+      <p>This tool models inverter-based resources per IEEE 1547-2018 and IEEE 2800-2022.</p>
+      <ul>
+        <li><strong>PV Array</strong> — STC-corrected AC output from irradiance and temperature.</li>
+        <li><strong>BESS</strong> — Charge/discharge dispatch with SOC limits and round-trip efficiency.</li>
+        <li><strong>Fault Contribution</strong> — Current-limited fault current (1.05–1.2× rated).</li>
+        <li><strong>Volt-VAR</strong> — P-Q capability envelope with IEEE 1547 droop curves.</li>
+      </ul>
+      <p>See <a href="docs/ibr-modeling.md">IBR Modeling Guide</a> for full equations and examples.</p>
+      <button id="close-help-btn" class="btn">Close</button>
+    </div>
+  </div>
+
+  <div id="study-approval-container"></div>
+
+</body>
+</html>
