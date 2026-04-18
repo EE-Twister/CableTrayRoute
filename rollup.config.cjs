@@ -40,6 +40,7 @@ const entries = {
   dissimilarmetals: 'src/dissimilarmetals.js',
   battery: 'src/battery.js',
   generatorsizing: 'src/generatorsizing.js',
+  dcshortcircuit: 'src/dcshortcircuit.js',
   heattracesizing: 'src/heattracesizing.js',
   iec60287: 'src/iec60287.js',
   autosize: 'src/autosize.js',

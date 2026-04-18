@@ -1,0 +1,405 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <meta name="description" content="DC system short-circuit and arc flash analysis per IEEE 946, IEC 61660-1, and NFPA 70E Annex D.8. Calculate bolted fault current and incident energy for battery rooms, PV combiner boxes, and UPS systems." />
+  <title>DC Short-Circuit &amp; Arc Flash — CableTrayRoute</title>
+  <link rel="icon" href="icons/favicon.svg" type="image/svg+xml">
+  <link rel="apple-touch-icon" href="icons/favicon.svg">
+  <!-- Open Graph / Social sharing -->
+  <meta property="og:type" content="website">
+  <meta property="og:title" content="DC Short-Circuit &amp; Arc Flash — CableTrayRoute">
+  <meta property="og:description" content="IEEE 946 / IEC 61660-1 DC fault current and NFPA 70E Annex D.8.1 arc flash analysis for battery rooms, PV, and UPS systems.">
+  <meta property="og:image" content="https://cabletrayroute.com/icons/og-preview.png">
+  <meta property="og:site_name" content="CableTrayRoute">
+  <meta property="og:url" content="dcshortcircuit.html">
+  <!-- Canonical URL -->
+  <link rel="canonical" href="dcshortcircuit.html">
+  <link rel="dns-prefetch" href="https://fonts.gstatic.com">
+  <meta name="color-scheme" content="light dark">
+  <link rel="stylesheet" href="style.css" />
+  <script type="module" src="dirtyTracker.js"></script>
+  <script type="module" src="dist/dcshortcircuit.js" defer></script>
+</head>
+<body class="dcshortcircuit-page" data-report-title="DC Short-Circuit &amp; Arc Flash">
+  <a href="#main-content" class="skip-link">Skip to main content</a>
+  <nav class="top-nav" aria-label="Primary">
+    <button id="nav-toggle" class="nav-toggle" aria-label="Toggle navigation" aria-controls="nav-links" aria-expanded="false" title="Toggle navigation">
+      <img src="icons/toolbar/grid.svg" alt="" aria-hidden="true" class="control-icon" loading="lazy" decoding="async">
+    </button>
+    <div id="nav-links" class="nav-links" role="list">
+      <!-- Populated dynamically by navigation.js -->
+    </div>
+    <button id="settings-btn" class="settings-btn" aria-label="Settings" aria-expanded="false" title="Settings">
+      <img src="icons/toolbar/validate.svg" alt="" aria-hidden="true" class="control-icon" loading="lazy" decoding="async">
+    </button>
+  </nav>
+
+  <div id="settings-menu" class="settings-menu">
+    <label for="theme-select">Theme
+      <select id="theme-select">
+        <option value="system">System</option>
+        <option value="light">Light</option>
+        <option value="dark">Dark</option>
+        <option value="high-contrast">High Contrast</option>
+      </select>
+    </label>
+    <label><input type="checkbox" id="compact-toggle" aria-label="Enable compact table mode"> Compact Mode</label>
+    <label for="unit-select">Units
+      <select id="unit-select">
+        <option value="imperial">Imperial (ft, in)</option>
+        <option value="metric">Metric (m, mm)</option>
+      </select>
+    </label>
+    <button id="help-btn" class="btn" aria-expanded="false" title="Show help">
+      <img src="icons/toolbar/validate.svg" alt="" aria-hidden="true" class="control-icon" loading="lazy" decoding="async">
+      <span>Site Help</span>
+    </button>
+    <button id="new-project-btn" title="Start a new project">
+      <img src="icons/toolbar/copy.svg" alt="" aria-hidden="true" class="control-icon" loading="lazy" decoding="async">
+      <span>New Project</span>
+    </button>
+    <button id="save-project-btn" title="Save current project">
+      <img src="icons/toolbar/export.svg" alt="" aria-hidden="true" class="control-icon" loading="lazy" decoding="async">
+      <span>Save Project</span>
+    </button>
+    <button id="load-project-btn" title="Load an existing project">
+      <img src="icons/toolbar/import.svg" alt="" aria-hidden="true" class="control-icon" loading="lazy" decoding="async">
+      <span>Load Project</span>
+    </button>
+    <button id="export-project-btn" title="Export project data">
+      <img src="icons/toolbar/export.svg" alt="" aria-hidden="true" class="control-icon" loading="lazy" decoding="async">
+      <span>Export Project</span>
+    </button>
+    <button id="import-project-btn" title="Import project data">
+      <img src="icons/toolbar/import.svg" alt="" aria-hidden="true" class="control-icon" loading="lazy" decoding="async">
+      <span>Import Project</span>
+    </button>
+    <input type="file" id="import-project-input" accept=".ctr.json" class="hidden" title="Select project file">
+  </div>
+
+  <div class="container">
+    <main id="main-content" class="main-content">
+
+      <header class="page-header">
+        <h1>DC Short-Circuit &amp; Arc Flash</h1>
+      </header>
+
+      <details class="method-panel">
+        <summary>Method &amp; Assumptions</summary>
+        <p>DC fault current follows <strong>IEEE 946-2004</strong> (Recommended Practice for the Design of
+        DC Auxiliary Power Systems for Generating Stations) and <strong>IEC 61660-1:1997</strong>
+        (Short-circuit currents in DC auxiliary installations). The arc flash calculation uses the
+        <strong>Ammerman &amp; Wilkins (2010)</strong> method referenced in
+        <strong>NFPA 70E-2024 Annex D.8.1</strong>.</p>
+
+        <p><strong>Bolted DC fault current (IEEE 946):</strong></p>
+        <pre>I<sub>bf</sub> = V<sub>oc</sub> / R<sub>total</sub>   where  R<sub>total</sub> = R<sub>battery</sub> + R<sub>cable</sub> + R<sub>bus</sub></pre>
+
+        <p><strong>L/R time constant:</strong></p>
+        <pre>&tau; (ms) = L<sub>total</sub> (mH) / R<sub>total</sub> (&Omega;)</pre>
+        <p>For most DC distribution systems, L is negligible and &tau; ≈ 0. Provide circuit inductance
+        only when it is known from the equipment data sheets.</p>
+
+        <p><strong>DC arcing current (Stokes–Oppenlander arc voltage model):</strong></p>
+        <pre>V<sub>arc</sub> = 20 + 0.534 &times; g (mm) &times; I<sub>arc</sub><sup>0.12</sup>
+I<sub>arc</sub> = (V<sub>oc</sub> &minus; V<sub>arc</sub>) / R<sub>total</sub>   [solved iteratively]</pre>
+        <p>Reference: Stokes &amp; Oppenlander, "Electric Arcs in Open Air,"
+        <em>J. Phys. D: Appl. Phys.</em> 24 (1991) 26–35; Ammerman et al.,
+        "DC Arc Models and Incident Energy Calculations,"
+        <em>IEEE Trans. Ind. Appl.</em> 46(5), 2010.</p>
+
+        <p><strong>Incident energy (NFPA 70E Annex D.8.1 — Lee/Ammerman method):</strong></p>
+        <pre>E = (4.184 &times; C<sub>f</sub> &times; P<sub>arc</sub> &times; t<sub>arc</sub>) / (2&pi; &times; D<sub>cm</sub><sup>2</sup>)   [cal/cm&sup2;]</pre>
+        <p>where P<sub>arc</sub> = V<sub>arc</sub> &times; I<sub>arc</sub> (W),
+        C<sub>f</sub> = 1.0 (open air) or 2.0 (enclosed box), and D is the working distance in cm.</p>
+
+        <p><strong>Arc flash boundary</strong> (onset of second-degree burn, 1.2 cal/cm&sup2;):</p>
+        <pre>D<sub>af</sub> = &radic;((4.184 &times; C<sub>f</sub> &times; P<sub>arc</sub> &times; t<sub>arc</sub>) / (2&pi; &times; 1.2))   [cm &rarr; mm]</pre>
+
+        <p>Citations: <a href="docs/dc-short-circuit.md">DC Short-Circuit &amp; Arc Flash Guide</a>.
+        See also: <a href="battery.html">Battery / UPS Sizing</a>,
+        <a href="shortCircuit.html">AC Short Circuit</a>,
+        <a href="arcFlash.html">AC Arc Flash</a>.</p>
+      </details>
+
+      <form id="dc-sc-form" novalidate>
+
+        <!-- Study Identification -->
+        <fieldset>
+          <legend><strong>Study Identification (Optional)</strong></legend>
+          <div class="field-row">
+            <label for="study-label">Study label</label>
+            <input type="text" id="study-label" placeholder="e.g. Battery Room — Building A"
+                   aria-describedby="study-label-hint">
+            <p id="study-label-hint" class="field-hint">
+              Descriptive label for this DC system location. Used in the results summary only.
+            </p>
+          </div>
+        </fieldset>
+
+        <!-- DC Source Parameters -->
+        <fieldset>
+          <legend><strong>DC Source Parameters</strong></legend>
+
+          <div class="field-row">
+            <label for="chemistry">
+              Battery chemistry
+              <button type="button" class="helpBtn" aria-label="Help — chemistry">?</button>
+            </label>
+            <select id="chemistry" aria-describedby="chemistry-hint">
+              <option value="lead-acid">Lead-Acid (2.0 V/cell)</option>
+              <option value="lead-acid-agm">Lead-Acid AGM (2.0 V/cell)</option>
+              <option value="nickel-cadmium">Nickel-Cadmium (1.2 V/cell)</option>
+              <option value="lithium-ion">Lithium-Ion (3.6 V/cell)</option>
+              <option value="lithium-iron-phosphate">LiFePO4 (3.2 V/cell)</option>
+            </select>
+            <p id="chemistry-hint" class="field-hint">
+              Battery chemistry determines the open-circuit voltage per cell.
+              Lead-acid is standard for DC station batteries (ANSI/IEEE 485).
+            </p>
+          </div>
+
+          <div class="field-row">
+            <label for="cell-count">
+              Number of cells in series
+              <button type="button" class="helpBtn" aria-label="Help — cell count">?</button>
+            </label>
+            <input type="number" id="cell-count" min="1" step="1" value="24"
+                   aria-describedby="cell-count-hint">
+            <p id="cell-count-hint" class="field-hint">
+              The number of cells connected in series determines the string voltage.
+              A 48 V lead-acid string uses 24 cells (24 × 2.0 V = 48 V).
+              A 125 V string uses 60 cells; a 250 V string uses 120 cells.
+            </p>
+          </div>
+
+          <div class="field-row">
+            <label for="battery-voltage">
+              V<sub>oc</sub> — DC bus voltage (V)
+              <button type="button" class="helpBtn" aria-label="Help — DC voltage">?</button>
+            </label>
+            <input type="number" id="battery-voltage" min="1" step="1" value="48" required
+                   aria-describedby="voltage-hint">
+            <p id="voltage-hint" class="field-hint">
+              Open-circuit (no-load) voltage of the DC source. Auto-populated when you enter the
+              cell count and chemistry above. Common values: 24 V, 48 V, 125 V, 250 V.
+              Use the nameplate voltage for PV combiner boxes or rectifier outputs.
+            </p>
+          </div>
+
+          <div class="field-row">
+            <label for="battery-resistance">
+              R<sub>battery</sub> — Battery internal resistance (m&Omega;)
+              <button type="button" class="helpBtn" aria-label="Help — battery resistance">?</button>
+            </label>
+            <input type="number" id="battery-resistance" min="0.001" step="0.1" value="10" required
+                   aria-describedby="batt-res-hint">
+            <p id="batt-res-hint" class="field-hint">
+              Total DC internal resistance of the battery string in milliohms (mΩ).
+              For lead-acid cells: typically 0.2–2 mΩ/cell; multiply by cell count for the string.
+              Obtain from the manufacturer's data sheet (the IEEE 485 short-circuit model uses
+              the published internal resistance at the fully charged state).
+            </p>
+          </div>
+        </fieldset>
+
+        <!-- Circuit Impedance -->
+        <fieldset>
+          <legend><strong>Circuit Impedance</strong></legend>
+
+          <div class="field-row">
+            <label for="cable-resistance">
+              R<sub>cable</sub> — DC cable resistance (m&Omega;)
+              <button type="button" class="helpBtn" aria-label="Help — cable resistance">?</button>
+            </label>
+            <input type="number" id="cable-resistance" min="0" step="0.1" value="5"
+                   aria-describedby="cable-res-hint">
+            <p id="cable-res-hint" class="field-hint">
+              One-way resistance of the cable from the battery to the fault point in milliohms.
+              Use the <a href="autosize.html">Auto-Size</a> tool to calculate cable resistance
+              from conductor size and length. For NEC §240.21, the fault point is typically at the
+              overcurrent device or load terminals.
+            </p>
+          </div>
+
+          <div class="field-row">
+            <label for="bus-resistance">
+              R<sub>bus</sub> — Busbar resistance (m&Omega;)
+              <button type="button" class="helpBtn" aria-label="Help — bus resistance">?</button>
+            </label>
+            <input type="number" id="bus-resistance" min="0" step="0.1" value="1"
+                   aria-describedby="bus-res-hint">
+            <p id="bus-res-hint" class="field-hint">
+              Resistance of busbars, connections, and terminations in milliohms.
+              Typically 0.5–5 mΩ for short copper bus runs. Leave at 0 for conservative
+              (maximum fault current) analysis.
+            </p>
+          </div>
+
+          <div class="field-row">
+            <label for="inductance">
+              L — Circuit inductance (mH)
+              <button type="button" class="helpBtn" aria-label="Help — inductance">?</button>
+            </label>
+            <input type="number" id="inductance" min="0" step="0.1" value="0"
+                   aria-describedby="inductance-hint">
+            <p id="inductance-hint" class="field-hint">
+              Total loop inductance of the DC circuit in millihenries. Used only to compute the
+              L/R time constant &tau;. In most low-voltage DC distribution systems, inductance is
+              negligible (&lt; 0.1 mH) and can be left at 0. Inductance matters for fault
+              current calculations in large DC switchgear or long cable runs.
+            </p>
+          </div>
+        </fieldset>
+
+        <!-- Arc Flash (optional) -->
+        <fieldset>
+          <legend>
+            <strong>DC Arc Flash Analysis</strong>
+            <label class="toggle-label">
+              <input type="checkbox" id="run-arc-flash" aria-controls="arc-flash-section">
+              Enable (NFPA 70E Annex D.8.1)
+            </label>
+          </legend>
+
+          <div id="arc-flash-section" hidden>
+
+            <div class="field-row">
+              <label for="arc-duration">
+                t<sub>arc</sub> — Arc / clearing time (ms)
+                <button type="button" class="helpBtn" aria-label="Help — arc duration">?</button>
+              </label>
+              <input type="number" id="arc-duration" min="1" step="1" value="50"
+                     aria-describedby="arc-dur-hint">
+              <p id="arc-dur-hint" class="field-hint">
+                Time from arc initiation to clearing (ms). Use the upstream fuse or breaker clearing
+                time at the available fault current from the time-current characteristic.
+                Current-limiting fuses typically clear in &lt; 8 ms.
+                Molded-case circuit breakers may take 50–200 ms.
+              </p>
+            </div>
+
+            <div class="field-row">
+              <label for="gap-mm">
+                g — Electrode gap (mm)
+                <button type="button" class="helpBtn" aria-label="Help — electrode gap">?</button>
+              </label>
+              <input type="number" id="gap-mm" min="1" step="1" value="25"
+                     aria-describedby="gap-hint">
+              <p id="gap-hint" class="field-hint">
+                Distance between electrodes (conductors) in mm. Typical values per NFPA 70E:
+                13 mm (MCC / switchboard buswork), 25 mm (panel / switchboard terminals),
+                50 mm (open busbars). Larger gaps generally reduce arcing current.
+              </p>
+            </div>
+
+            <div class="field-row">
+              <label for="working-distance">
+                D — Working distance (mm)
+                <button type="button" class="helpBtn" aria-label="Help — working distance">?</button>
+              </label>
+              <input type="number" id="working-distance" min="100" step="25" value="455"
+                     aria-describedby="wd-hint">
+              <p id="wd-hint" class="field-hint">
+                Distance from the arc source to the worker's face/chest in mm.
+                Default 455 mm (18 in) per NFPA 70E for 240 V panels.
+                Use 610 mm (24 in) for MCC / switchgear; 900 mm (36 in) for switchyard work.
+                Document the actual working distance for the arc flash label.
+              </p>
+            </div>
+
+            <div class="field-row">
+              <label for="enclosure-type">Enclosure type</label>
+              <select id="enclosure-type" aria-describedby="enclosure-hint">
+                <option value="open_air">Open air / open busbars</option>
+                <option value="enclosed_box">Enclosed box (panel, switchgear)</option>
+              </select>
+              <p id="enclosure-hint" class="field-hint">
+                Enclosed equipment concentrates arc energy (correction factor C<sub>f</sub> = 2.0).
+                Open buswork or outdoor equipment uses C<sub>f</sub> = 1.0.
+              </p>
+            </div>
+
+          </div>
+        </fieldset>
+
+        <!-- Protection Devices -->
+        <fieldset>
+          <legend><strong>Protection Devices (Optional)</strong></legend>
+          <p class="field-hint">
+            Enter the overcurrent protection devices in this DC circuit to verify that their
+            interrupt ratings are adequate for the available fault current.
+            Fuses must be rated for DC service (AC-rated fuses have lower DC interrupt ratings).
+          </p>
+          <table class="data-table" id="device-table" aria-label="Protection devices">
+            <thead>
+              <tr>
+                <th>Tag</th>
+                <th>Type</th>
+                <th>Rated Current (A)</th>
+                <th>Interrupt Rating (A)</th>
+                <th>Clearing Time (ms)</th>
+                <th></th>
+              </tr>
+            </thead>
+            <tbody id="device-table-body">
+              <!-- Rows populated by JS -->
+            </tbody>
+          </table>
+          <button type="button" id="add-device-btn" class="btn">+ Add Device</button>
+        </fieldset>
+
+        <button type="submit" class="primary-btn">Run Analysis</button>
+
+      </form>
+
+      <div id="results" role="region" aria-live="polite" aria-label="DC short-circuit results"></div>
+
+      <!-- Engineer Review / Approval Panel -->
+      <section class="card" aria-labelledby="study-review-panel-heading">
+        <div id="study-review-panel"></div>
+      </section>
+
+      <nav class="step-nav" aria-label="Workflow navigation">
+        <a href="battery.html" class="step-nav-prev">&#8592; Battery / UPS Sizing</a>
+        <a href="shortCircuit.html" class="step-nav-next">AC Short Circuit &#8594;</a>
+      </nav>
+
+    </main>
+  </div>
+
+  <div id="help-modal" class="modal" aria-hidden="true" role="dialog" aria-modal="true"
+       aria-labelledby="help-title">
+    <div class="modal-content">
+      <button id="close-help-btn" class="close-btn" aria-label="Close Help">&times;</button>
+      <h2 id="help-title">DC Short-Circuit &amp; Arc Flash Help</h2>
+      <p>This tool calculates DC fault currents and arc flash incident energy for battery rooms,
+      PV combiner boxes, UPS systems, and DC switchgear per
+      <strong>IEEE 946-2004</strong>, <strong>IEC 61660-1</strong>, and
+      <strong>NFPA 70E-2024 Annex D.8.1</strong>.</p>
+      <h3>Workflow</h3>
+      <ol>
+        <li>Enter the battery chemistry and number of cells (or a direct DC bus voltage).</li>
+        <li>Enter the total battery internal resistance from the manufacturer's data sheet.</li>
+        <li>Enter the cable and busbar resistance from the source to the fault point.</li>
+        <li>Enable <strong>DC Arc Flash Analysis</strong> and enter the protection clearing time,
+          electrode gap, and working distance.</li>
+        <li>Optionally add protection devices to check interrupt ratings.</li>
+        <li>Click <strong>Run Analysis</strong> to see the results.</li>
+      </ol>
+      <h3>Standards</h3>
+      <ul>
+        <li><strong>IEEE 946-2004</strong> — Design of DC Auxiliary Power Systems</li>
+        <li><strong>IEC 61660-1:1997</strong> — Short-circuit currents in DC auxiliary installations</li>
+        <li><strong>NFPA 70E-2024 Annex D.8</strong> — DC arc flash</li>
+        <li><strong>Ammerman et al. (2010)</strong> — DC Arc Models and Incident Energy Calculations
+          (<em>IEEE Trans. Ind. Appl.</em> 46(5))</li>
+      </ul>
+      <p>See full documentation: <a href="docs/dc-short-circuit.md">DC Short-Circuit &amp; Arc Flash Guide</a>.</p>
+    </div>
+  </div>
+
+</body>
+</html>
