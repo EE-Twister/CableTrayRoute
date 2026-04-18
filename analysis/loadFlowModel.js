@@ -484,13 +484,60 @@ function isLoadDevice(comp) {
 function isGeneratorDevice(comp) {
   const type = String(comp?.type || '').toLowerCase();
   const subtype = String(comp?.subtype || '').toLowerCase();
-  return type.includes('generator') || subtype.includes('generator') || type.includes('source');
+  return (
+    type.includes('generator') || subtype.includes('generator') ||
+    type.includes('source') ||
+    isIBRDevice(comp)
+  );
 }
 
 function isUpsDevice(comp) {
   const type = String(comp?.type || '').toLowerCase();
   const subtype = String(comp?.subtype || '').toLowerCase();
   return type === 'ups' || subtype === 'ups';
+}
+
+export function isIBRDevice(comp) {
+  const type = String(comp?.type || '').toLowerCase();
+  const subtype = String(comp?.subtype || '').toLowerCase();
+  return (
+    type === 'pv_inverter' || subtype === 'pv_inverter' ||
+    type === 'solar' || subtype === 'solar' ||
+    type === 'bess' || subtype === 'bess' ||
+    type === 'pv' || subtype === 'pv' ||
+    type === 'ibr' || subtype === 'ibr'
+  );
+}
+
+/**
+ * Extract IBR operating parameters from a component for use in load flow.
+ * Returns null if the component is not an IBR device.
+ */
+export function deriveIBRProfile(comp) {
+  if (!isIBRDevice(comp)) return null;
+  const props = comp?.props && typeof comp.props === 'object' ? comp.props : {};
+  const get = (...keys) => {
+    for (const k of keys) {
+      const v = toNumber(comp?.[k] ?? props[k]);
+      if (v > 0) return v;
+    }
+    return 0;
+  };
+  const sRated_kVA = get('rated_kva', 'kva', 'kVA', 's_rated_kva', 'sRated_kva');
+  const pGen_kW = get('pstc_kw', 'rated_kw', 'kw', 'kW', 'p_gen_kw', 'output_kw');
+  const vBus_pu = toNumber(comp?.v_pu ?? comp?.v_setpoint ?? props.v_pu ?? 1.0) || 1.0;
+  const voltVarEnabled = comp?.volt_var_enabled ?? props.volt_var_enabled ?? true;
+  const voltVarCategory = comp?.volt_var_category ?? props.volt_var_category ?? 'B';
+  const limitFactor = toNumber(comp?.fault_limit_factor ?? props.fault_limit_factor) || 1.1;
+  return {
+    sRated_kVA,
+    pGen_kW: pGen_kW || sRated_kVA,
+    vBus_pu,
+    voltVarEnabled: Boolean(voltVarEnabled),
+    voltVarCategory: String(voltVarCategory),
+    limitFactor,
+    busType: vBus_pu > 0 ? 'PQ' : 'PQ',
+  };
 }
 
 function deriveUpsOperatingProfile(comp) {

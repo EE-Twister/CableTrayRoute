@@ -41,6 +41,7 @@ const entries = {
   battery: 'src/battery.js',
   generatorsizing: 'src/generatorsizing.js',
   dcshortcircuit: 'src/dcshortcircuit.js',
+  ibr: 'src/ibr.js',
   heattracesizing: 'src/heattracesizing.js',
   iec60287: 'src/iec60287.js',
   autosize: 'src/autosize.js',
