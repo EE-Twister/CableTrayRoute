@@ -422,7 +422,7 @@ Study page `capacitorbank.html` / `capacitorbank.js` provides form inputs for bu
 |---|---|---|
 | **IEC 60287 cable current rating with full thermal ladder network** | ETAP Cable Sizing, DIgSILENT PowerFactory, CYME Cable Rating, Siemens PSS SINCAL, CYMCAP | IEC 60287-1-1 calculates the continuous current rating of cables from first principles using a thermal equivalent circuit: conductor losses (I²R with AC resistance correction for skin/proximity effect), dielectric losses (for MV/HV cables), sheath/screen losses (λ₁), armour losses (λ₂), and thermal resistances of insulation (T₁), bedding (T₂), outer serving (T₃), and surrounding medium (T₄, soil or air). The method accounts for soil thermal resistivity, depth of burial, grouping (de-rating for multiple circuits), and soil drying-out (critical temperature rise). CableTrayRoute's cable sizing uses NEC ampacity tables (pre-computed values from NEC 310.16–310.21) and IEC lookup tables in `analysis/intlCableSize.mjs`, but does not implement the IEC 60287 thermal circuit calculation from first principles. This means custom installation conditions (non-standard soil, deep burial, complex duct bank arrangements beyond the Neher-McGrath model in `ductbankroute.js`) cannot be evaluated. |
 
-**Status:** Not implemented.
+**Status:** ✅ **Implemented 2026-04-17.** `analysis/iec60287.mjs` — full IEC 60287-1-1:2023 thermal circuit model. Exports: `calcAmpacity()` (main entry, returns rated current and full thermal breakdown), `thermalResistances()` (T1–T4 component analysis), `groupDerating()` (IEC 60287-2-1 Table 1 grouping factors), `conductorAcResistance()` (R_ac with skin/proximity corrections), `ambientTempCorrection()`, `defaultInsulThickMm()` (IEC 60502-1/-2 lookup). Supports all installation methods: direct burial (Kennelly formula), conduit/duct, cable tray, and free air. Conductor resistance database: IEC 60228 Class 2 values for Cu and Al, 1.5–1000 mm². Insulation types: XLPE, EPR, PVC, LSZH, XLPE-HT, Paper (MV/HV). Grouping derating for flat, flat-touching, and trefoil arrangements. Dielectric losses W_d for cables >18 kV. UI: `iec60287.html`. Tests: `tests/iec60287.test.mjs`. Docs: `docs/iec60287.md`.
 
 ---
 
@@ -1178,7 +1178,7 @@ All originally high- and medium-priority feasible items have been implemented:
 **High Priority — Critical for IEC-jurisdiction projects and modern DER/renewable integration:**
 
 1. **IEC 60909 Short-Circuit Method** (Gap #68) — Required for all non-ANSI-jurisdiction projects. The existing `analysis/shortCircuit.mjs` uses ANSI/IEEE methods only. IEC 60909 voltage factor c, impedance correction factors KG/KT/KSO, peak current ip (κ factor), and breaking/steady-state current distinction are all absent. This blocks use of CableTrayRoute on any IEC-standard project.
-2. **IEC 60287 Cable Ampacity** (Gap #69) — First-principles thermal circuit model for IEC cable rating. Required for custom installation conditions that fall outside pre-tabulated NEC/IEC tables — deep burial, non-standard soil, complex multi-circuit arrangements. Recommended module: `analysis/iec60287.mjs`.
+2. ~~**IEC 60287 Cable Ampacity** (Gap #69)~~ — ✅ **Implemented 2026-04-17.** `analysis/iec60287.mjs`, `iec60287.html`, `tests/iec60287.test.mjs`, `docs/iec60287.md`.
 3. **DC System Short-Circuit & DC Arc Flash** (Gap #58) — Essential for battery rooms, PV arrays, data center UPS buses, and transit/marine DC systems. NFPA 70E Annex D.8 / IEEE 1584 DC model. Recommended modules: `analysis/dcShortCircuit.mjs`, `analysis/dcArcFlash.mjs`.
 4. **PV / BESS / Inverter-Based Resource Modeling** (Gap #61) — The energy transition makes IBR modeling non-optional for any new-build project with solar or storage. P-Q capability, Volt-VAR droop, current-limited fault contribution. Recommended: extend `analysis/loadFlow.js` and `analysis/shortCircuit.mjs` with IBR component types.
 5. **IEEE 1547-2018 DER Interconnection Study** (Gap #62) — Mandatory for any US DER interconnection. Utility-required screening criteria (voltage, protection coordination, anti-islanding, ride-through). Recommended module: `analysis/derInterconnect.mjs`.
@@ -1409,7 +1409,7 @@ Full IEC 60909-0:2016 equivalent voltage source method implemented in `analysis/
 | Priority | # | Gap | Recommended Module | Effort | Status |
 |---|---|---|---|---|---|
 | **P1** | 68 | ~~**IEC 60909 Short-Circuit Method**~~ | `analysis/iec60909.mjs` | High | ✅ Implemented 2026-04-12 |
-| **P1** | 69 | **IEC 60287 Cable Ampacity** | `analysis/iec60287.mjs` | High | Not implemented |
+| **P1** | 69 | ~~**IEC 60287 Cable Ampacity**~~ | `analysis/iec60287.mjs` | High | ✅ Implemented 2026-04-17 |
 | **P1** | 58 | **DC Short-Circuit & DC Arc Flash** | `analysis/dcShortCircuit.mjs`, `analysis/dcArcFlash.mjs` | High | Not implemented |
 | **P1** | 61 | **PV / BESS / IBR Modeling** | Extend `analysis/loadFlow.js`, `analysis/shortCircuit.mjs` | High | Not implemented |
 | **P1** | 62 | **IEEE 1547 DER Interconnection** | `analysis/derInterconnect.mjs` | Medium | Not implemented |

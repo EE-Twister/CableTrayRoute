@@ -1,0 +1,477 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <meta name="description" content="IEC 60287 cable ampacity calculator — first-principles thermal circuit model for current rating of power cables in direct burial, conduit, cable tray, and free air installations." />
+  <title>IEC 60287 Cable Ampacity — CableTrayRoute</title>
+  <link rel="icon" href="icons/favicon.svg" type="image/svg+xml">
+  <link rel="apple-touch-icon" href="icons/favicon.svg">
+  <meta property="og:type" content="website">
+  <meta property="og:title" content="IEC 60287 Cable Ampacity — CableTrayRoute">
+  <meta property="og:description" content="IEC 60287-1-1 thermal circuit model for cable current rating in any installation condition.">
+  <meta property="og:image" content="https://cabletrayroute.com/icons/og-preview.png">
+  <meta property="og:site_name" content="CableTrayRoute">
+  <meta property="og:url" content="iec60287.html">
+  <link rel="canonical" href="iec60287.html">
+  <link rel="dns-prefetch" href="https://fonts.gstatic.com">
+  <meta name="color-scheme" content="light dark">
+  <link rel="stylesheet" href="style.css" />
+  <script type="module" src="dirtyTracker.js"></script>
+  <script type="module" src="dist/iec60287.js" defer></script>
+</head>
+<body class="iec60287-page" data-report-title="IEC 60287 Cable Ampacity">
+  <a href="#main-content" class="skip-link">Skip to main content</a>
+  <nav class="top-nav" aria-label="Primary">
+    <button id="nav-toggle" class="nav-toggle" aria-label="Toggle navigation" aria-controls="nav-links" aria-expanded="false" title="Toggle navigation">
+      <img src="icons/toolbar/grid.svg" alt="" aria-hidden="true" class="control-icon" loading="lazy" decoding="async">
+    </button>
+    <div id="nav-links" class="nav-links" role="list">
+      <!-- Populated dynamically by navigation.js -->
+    </div>
+    <button id="settings-btn" class="settings-btn" aria-label="Settings" aria-expanded="false" title="Settings">
+      <img src="icons/toolbar/validate.svg" alt="" aria-hidden="true" class="control-icon" loading="lazy" decoding="async">
+    </button>
+  </nav>
+
+  <div id="settings-menu" class="settings-menu">
+    <label for="theme-select">Theme
+      <select id="theme-select">
+        <option value="system">System</option>
+        <option value="light">Light</option>
+        <option value="dark">Dark</option>
+        <option value="high-contrast">High Contrast</option>
+      </select>
+    </label>
+    <label><input type="checkbox" id="compact-toggle" aria-label="Enable compact table mode"> Compact Mode</label>
+    <label for="unit-select">Units
+      <select id="unit-select">
+        <option value="imperial">Imperial (ft, in)</option>
+        <option value="metric">Metric (m, mm)</option>
+      </select>
+    </label>
+    <button id="help-btn" class="btn" aria-expanded="false" title="Show help">
+      <img src="icons/toolbar/validate.svg" alt="" aria-hidden="true" class="control-icon" loading="lazy" decoding="async">
+      <span>Site Help</span>
+    </button>
+    <button id="new-project-btn" title="Start a new project">
+      <img src="icons/toolbar/copy.svg" alt="" aria-hidden="true" class="control-icon" loading="lazy" decoding="async">
+      <span>New Project</span>
+    </button>
+    <button id="save-project-btn" title="Save current project">
+      <img src="icons/toolbar/export.svg" alt="" aria-hidden="true" class="control-icon" loading="lazy" decoding="async">
+      <span>Save Project</span>
+    </button>
+    <button id="load-project-btn" title="Load an existing project">
+      <img src="icons/toolbar/import.svg" alt="" aria-hidden="true" class="control-icon" loading="lazy" decoding="async">
+      <span>Load Project</span>
+    </button>
+    <button id="export-project-btn" title="Export project data">
+      <img src="icons/toolbar/export.svg" alt="" aria-hidden="true" class="control-icon" loading="lazy" decoding="async">
+      <span>Export Project</span>
+    </button>
+    <button id="import-project-btn" title="Import project data">
+      <img src="icons/toolbar/import.svg" alt="" aria-hidden="true" class="control-icon" loading="lazy" decoding="async">
+      <span>Import Project</span>
+    </button>
+    <input type="file" id="import-project-input" accept=".ctr.json" class="hidden" title="Select project file">
+  </div>
+
+  <div class="container">
+    <main id="main-content" class="main-content">
+
+      <header class="page-header">
+        <h1>IEC 60287 Cable Ampacity — Thermal Circuit Model</h1>
+      </header>
+
+      <details class="method-panel">
+        <summary>Method &amp; Assumptions</summary>
+        <p>Cable current rating follows the steady-state thermal circuit method of
+        <strong>IEC 60287-1-1:2023</strong> (Calculation of the current rating — current rating
+        equations for 100% load factor and calculation of losses). Applicable to three-phase AC
+        power cables in any installation condition.</p>
+
+        <p><strong>Current rating formula (IEC 60287-1-1 §3.1.1):</strong></p>
+        <pre>I = √{ [Δθ − W_d·(0.5·T1 + n·(T2+T3+T4))] / [R_ac·(T1 + n·(1+λ1)·T2 + n·(1+λ1+λ2)·(T3+T4))] }</pre>
+        <p>where Δθ = θ_max − θ_ambient (K), T1–T4 are thermal resistances (K·m/W),
+        R_ac is the AC conductor resistance at operating temperature (Ω/m),
+        n is the number of load-carrying conductors, and λ1, λ2 are sheath/armour loss factors.</p>
+
+        <p><strong>AC conductor resistance (IEC §2.1):</strong></p>
+        <pre>R_ac = R_dc_θ × (1 + y_s + y_p)
+R_dc_θ = R_20 × [1 + α·(θ − 20)]</pre>
+        <p>where y_s and y_p are skin and proximity effect coefficients per IEC §2.1.2–2.1.3.</p>
+
+        <p><strong>Soil external thermal resistance T4 — Kennelly formula (IEC 60287-2-1 §2.2.1):</strong></p>
+        <pre>T4 = (ρ_s / 2π) × ln[u + √(u² − 1)]   where u = 2L / D_e</pre>
+        <p>L = burial depth to cable centre (m), D_e = cable outer diameter (m),
+        ρ_s = soil thermal resistivity (K·m/W).</p>
+
+        <p><strong>Grouping derating (IEC 60287-2-1 Table 1):</strong> applied when multiple cables
+        share the same installation route. Mutual heating reduces individual cable ratings.</p>
+
+        <p>See full documentation: <a href="docs/iec60287.md">IEC 60287 Cable Ampacity Guide</a>.
+        See also: <a href="autosize.html">Auto-Size (NEC)</a>,
+        <a href="intlCableSize.html">International Cable Sizing</a>,
+        <a href="shortCircuit.html">Short Circuit</a>.</p>
+      </details>
+
+      <form id="iec60287-form" novalidate>
+
+        <!-- Conductor -->
+        <fieldset>
+          <legend><strong>Conductor</strong></legend>
+
+          <div class="field-row">
+            <label for="size-mm2">
+              Conductor cross-section (mm²)
+              <button type="button" class="helpBtn" aria-label="Help — conductor size">?</button>
+            </label>
+            <select id="size-mm2" aria-describedby="size-hint">
+              <optgroup label="Small (≤ 35 mm²)">
+                <option value="1.5">1.5 mm²</option>
+                <option value="2.5">2.5 mm²</option>
+                <option value="4">4 mm²</option>
+                <option value="6">6 mm²</option>
+                <option value="10">10 mm²</option>
+                <option value="16">16 mm²</option>
+                <option value="25">25 mm²</option>
+                <option value="35">35 mm²</option>
+              </optgroup>
+              <optgroup label="Medium (50–150 mm²)">
+                <option value="50">50 mm²</option>
+                <option value="70">70 mm²</option>
+                <option value="95" selected>95 mm²</option>
+                <option value="120">120 mm²</option>
+                <option value="150">150 mm²</option>
+              </optgroup>
+              <optgroup label="Large (185–1000 mm²)">
+                <option value="185">185 mm²</option>
+                <option value="240">240 mm²</option>
+                <option value="300">300 mm²</option>
+                <option value="400">400 mm²</option>
+                <option value="500">500 mm²</option>
+                <option value="630">630 mm²</option>
+                <option value="800">800 mm²</option>
+                <option value="1000">1000 mm²</option>
+              </optgroup>
+            </select>
+            <p id="size-hint" class="field-hint">
+              IEC 60228 Class 2 stranded conductor. R₂₀ values per IEC 60228 Table 1.
+            </p>
+          </div>
+
+          <div class="field-row">
+            <label for="material">Conductor material</label>
+            <select id="material" aria-describedby="material-hint">
+              <option value="Cu">Copper (Cu)</option>
+              <option value="Al">Aluminium (Al)</option>
+            </select>
+            <p id="material-hint" class="field-hint">
+              Copper: higher conductivity, smaller cross-section for same current.
+              Aluminium: lower cost and weight for distribution cables.
+            </p>
+          </div>
+
+          <div class="field-row">
+            <label for="n-cores">Number of load-carrying cores</label>
+            <select id="n-cores" aria-describedby="cores-hint">
+              <option value="1">1 (single-core)</option>
+              <option value="2">2 (single-phase)</option>
+              <option value="3" selected>3 (three-phase)</option>
+            </select>
+            <p id="cores-hint" class="field-hint">
+              Number of current-carrying conductors in the cable. For three-phase systems use 3.
+              The neutral conductor is not counted unless it carries significant current.
+            </p>
+          </div>
+        </fieldset>
+
+        <!-- Insulation -->
+        <fieldset>
+          <legend><strong>Insulation</strong></legend>
+
+          <div class="field-row">
+            <label for="insulation">Insulation type</label>
+            <select id="insulation" aria-describedby="insul-hint">
+              <option value="XLPE" selected>XLPE — 90 °C (cross-linked polyethylene)</option>
+              <option value="EPR">EPR — 90 °C (ethylene propylene rubber)</option>
+              <option value="PVC">PVC — 70 °C (polyvinyl chloride)</option>
+              <option value="LSZH">LSZH — 70 °C (low-smoke zero-halogen)</option>
+              <option value="XLPE-HT">XLPE-HT — 105 °C (high-temperature XLPE)</option>
+              <option value="Paper-MV">Paper (MV) — 80 °C (oil-impregnated paper, MV)</option>
+              <option value="Paper-HV">Paper (HV) — 65 °C (oil-impregnated paper, HV)</option>
+            </select>
+            <p id="insul-hint" class="field-hint">
+              The maximum conductor operating temperature determines the thermal budget Δθ = θ_max − θ_ambient.
+              XLPE and EPR are standard for modern distribution and transmission cables.
+            </p>
+          </div>
+
+          <div class="field-row">
+            <label for="voltage-class">
+              Voltage class (for default insulation thickness)
+              <button type="button" class="helpBtn" aria-label="Help — voltage class">?</button>
+            </label>
+            <select id="voltage-class" aria-describedby="vclass-hint">
+              <option value="0.6/1kV" selected>0.6/1 kV — LV distribution</option>
+              <option value="3.6/6kV">3.6/6 kV</option>
+              <option value="6/10kV">6/10 kV</option>
+              <option value="8.7/15kV">8.7/15 kV</option>
+              <option value="12/20kV">12/20 kV</option>
+              <option value="18/30kV">18/30 kV</option>
+            </select>
+            <p id="vclass-hint" class="field-hint">
+              Used to look up the default IEC 60502-1 nominal insulation thickness. Override the
+              thickness below if you have data-sheet values.
+            </p>
+          </div>
+
+          <div class="field-row">
+            <label for="insul-thick-mm">
+              Insulation wall thickness (mm)
+              <button type="button" class="helpBtn" aria-label="Help — insulation thickness">?</button>
+            </label>
+            <input type="number" id="insul-thick-mm" min="0.5" max="30" step="0.1" value="1.6"
+                   aria-describedby="insul-thick-hint">
+            <p id="insul-thick-hint" class="field-hint">
+              Nominal insulation wall thickness per IEC 60502-1 or cable data sheet.
+              Click <strong>Use Default</strong> to look up the IEC 60502-1 value for the selected
+              conductor size and voltage class.
+            </p>
+          </div>
+          <button type="button" id="use-default-thick-btn" class="btn">Use Default Thickness</button>
+
+          <div class="field-row">
+            <label for="outer-sheath-mm">Outer sheath thickness (mm)</label>
+            <input type="number" id="outer-sheath-mm" min="0" max="20" step="0.5" value="3"
+                   aria-describedby="sheath-hint">
+            <p id="sheath-hint" class="field-hint">
+              Outer jacket/sheath thickness. Use 0 if no outer sheath.
+              Typical values: 2–4 mm for distribution cables.
+            </p>
+          </div>
+
+          <div class="field-row">
+            <label><input type="checkbox" id="armoured"> Steel-wire armour (SWA)</label>
+            <p class="field-hint">
+              Check if the cable has steel-wire armour. Armour contributes additional losses (λ2 ≈ 0.06)
+              and adds approximately 6 mm to the cable outer diameter.
+            </p>
+          </div>
+        </fieldset>
+
+        <!-- Installation -->
+        <fieldset>
+          <legend><strong>Installation Method</strong></legend>
+
+          <div class="field-row">
+            <label for="install-method">
+              Installation method
+              <button type="button" class="helpBtn" aria-label="Help — installation method">?</button>
+            </label>
+            <select id="install-method" aria-describedby="install-hint">
+              <option value="direct-burial" selected>Direct burial (IEC 60364 method D)</option>
+              <option value="conduit">In conduit / duct (buried)</option>
+              <option value="tray">Cable tray / ladder (in air)</option>
+              <option value="air">Free air</option>
+            </select>
+            <p id="install-hint" class="field-hint">
+              Determines the external thermal resistance T4.
+              Direct burial in good soil (ρ ≤ 1.0 K·m/W) often gives higher ratings than free air
+              due to the large thermal mass of soil.
+            </p>
+          </div>
+
+          <div id="burial-fields">
+            <div class="field-row">
+              <label for="burial-depth-mm">
+                Burial depth to cable centre-line (mm)
+                <button type="button" class="helpBtn" aria-label="Help — burial depth">?</button>
+              </label>
+              <input type="number" id="burial-depth-mm" min="300" max="3000" step="50" value="800"
+                     aria-describedby="depth-hint">
+              <p id="depth-hint" class="field-hint">
+                Depth from ground surface to the cable centre-line (not top of cable).
+                IEC reference depth is 0.8 m (800 mm). Greater depth increases T4 and reduces rating.
+              </p>
+            </div>
+
+            <div class="field-row">
+              <label for="soil-resistivity">
+                Soil thermal resistivity ρ_s (K·m/W)
+                <button type="button" class="helpBtn" aria-label="Help — soil resistivity">?</button>
+              </label>
+              <input type="number" id="soil-resistivity" min="0.5" max="5.0" step="0.1" value="1.0"
+                     aria-describedby="soil-hint">
+              <p id="soil-hint" class="field-hint">
+                Thermal resistivity of the surrounding soil. The IEC reference value is 1.0 K·m/W
+                (moist loam). Typical ranges: well-irrigated/clay 0.5–0.8; average loam 1.0–1.5;
+                dry sand/gravel 2.0–3.0; rock 1.5–2.5. Measure per IEEE 442 / IEC 60287-3-2
+                for critical projects. Consider thermal backfill (ρ ≤ 0.8 K·m/W) for high-load cables.
+              </p>
+            </div>
+          </div>
+
+          <div id="conduit-fields" class="hidden">
+            <div class="field-row">
+              <label for="conduit-od-mm">Conduit outer diameter (mm)</label>
+              <input type="number" id="conduit-od-mm" min="20" max="500" step="5" value="80"
+                     aria-describedby="conduit-hint">
+              <p id="conduit-hint" class="field-hint">
+                Outside diameter of the buried conduit or duct. Used to calculate the external
+                soil thermal resistance using Kennelly's formula.
+              </p>
+            </div>
+          </div>
+
+        </fieldset>
+
+        <!-- Ambient & System -->
+        <fieldset>
+          <legend><strong>Ambient &amp; System Conditions</strong></legend>
+
+          <div class="field-row">
+            <label for="ambient-temp-c">
+              Ambient temperature (°C)
+              <button type="button" class="helpBtn" aria-label="Help — ambient temperature">?</button>
+            </label>
+            <input type="number" id="ambient-temp-c" min="-20" max="60" step="1" value="20"
+                   required aria-describedby="ambient-hint">
+            <p id="ambient-hint" class="field-hint">
+              Ground (soil) or air temperature at the installation site. IEC reference: 20 °C for
+              direct burial, 30 °C for free air. Use the maximum expected seasonal temperature for
+              conservative sizing. Must be less than the insulation maximum temperature.
+            </p>
+          </div>
+
+          <div class="field-row">
+            <label for="frequency-hz">System frequency (Hz)</label>
+            <select id="frequency-hz" aria-describedby="freq-hint">
+              <option value="50" selected>50 Hz (IEC standard)</option>
+              <option value="60">60 Hz (North America, some Asian countries)</option>
+            </select>
+            <p id="freq-hint" class="field-hint">
+              Affects skin and proximity effect coefficients. Higher frequency increases AC resistance slightly.
+            </p>
+          </div>
+
+          <div class="field-row">
+            <label for="u0-kv">
+              Phase-to-earth voltage U₀ (kV)
+              <button type="button" class="helpBtn" aria-label="Help — phase voltage">?</button>
+            </label>
+            <input type="number" id="u0-kv" min="0" max="500" step="0.1" value="0"
+                   aria-describedby="u0-hint">
+            <p id="u0-hint" class="field-hint">
+              Phase-to-earth operating voltage. Used to calculate dielectric losses W_d.
+              For cables rated ≤ 36 kV (U₀ ≤ 18 kV), dielectric losses are negligible
+              and this value has no effect. Enter 0 for LV/MV distribution cables.
+            </p>
+          </div>
+        </fieldset>
+
+        <!-- Grouping -->
+        <fieldset>
+          <legend><strong>Cable Grouping (Optional)</strong></legend>
+          <p class="field-hint">
+            Multiple cables in close proximity run hotter due to mutual heating.
+            Leave at 1 cable for a single cable or if cables are widely spaced.
+          </p>
+
+          <div class="field-row">
+            <label for="n-cables">
+              Number of cables in group
+              <button type="button" class="helpBtn" aria-label="Help — cable grouping">?</button>
+            </label>
+            <input type="number" id="n-cables" min="1" max="20" step="1" value="1"
+                   aria-describedby="ncables-hint">
+            <p id="ncables-hint" class="field-hint">
+              Total number of cables sharing the same installation route (e.g. same trench or tray).
+              Grouping factors per IEC 60287-2-1 Table 1 are applied automatically.
+            </p>
+          </div>
+
+          <div class="field-row">
+            <label for="group-arrangement">Cable arrangement in group</label>
+            <select id="group-arrangement" aria-describedby="arrange-hint">
+              <option value="flat" selected>Flat (spaced one diameter apart)</option>
+              <option value="flat-touching">Flat (touching)</option>
+              <option value="trefoil">Trefoil (touching)</option>
+            </select>
+            <p id="arrange-hint" class="field-hint">
+              Flat spaced gives the best heat dissipation. Touching cables run hotter.
+              Trefoil touching is common for three-phase single-core cable sets.
+            </p>
+          </div>
+        </fieldset>
+
+        <button type="submit" class="primary-btn">Calculate Ampacity</button>
+
+      </form>
+
+      <div id="results" role="region" aria-live="polite" aria-label="Cable ampacity results"></div>
+
+      <!-- Engineer Review / Approval Panel -->
+      <section class="card" aria-labelledby="study-review-panel-heading">
+        <div id="study-review-panel"></div>
+      </section>
+
+      <nav class="step-nav" aria-label="Workflow navigation">
+        <a href="shortCircuit.html" class="step-nav-prev">&#8592; Short Circuit</a>
+        <a href="autosize.html" class="step-nav-next">Auto-Size &#8594;</a>
+      </nav>
+
+    </main>
+  </div>
+
+  <div id="help-modal" class="modal" aria-hidden="true" role="dialog" aria-modal="true"
+       aria-labelledby="help-title">
+    <div class="modal-content">
+      <button id="close-help-btn" class="close-btn" aria-label="Close Help">&times;</button>
+      <h2 id="help-title">IEC 60287 Cable Ampacity Help</h2>
+      <p>This tool calculates the steady-state current rating of a power cable using the
+      <strong>IEC 60287-1-1:2023</strong> thermal circuit model.</p>
+
+      <h3>Workflow</h3>
+      <ol>
+        <li>Select the <strong>conductor cross-section and material</strong>. The tool looks up
+          the IEC 60228 DC resistance at 20 °C automatically.</li>
+        <li>Choose the <strong>insulation type and voltage class</strong>, then click
+          <strong>Use Default Thickness</strong> to populate the IEC 60502-1 insulation wall
+          thickness, or enter your data-sheet value manually.</li>
+        <li>Select the <strong>installation method</strong> and enter burial depth and soil thermal
+          resistivity for direct-burial or conduit installations.</li>
+        <li>Set the <strong>ambient temperature</strong> and frequency.</li>
+        <li>For cable grouping, enter the number of cables and arrangement.</li>
+        <li>Click <strong>Calculate Ampacity</strong> to see the rated current and thermal breakdown.</li>
+      </ol>
+
+      <h3>Standards</h3>
+      <ul>
+        <li><strong>IEC 60287-1-1:2023</strong> — Current rating equations and loss calculations</li>
+        <li><strong>IEC 60287-2-1:2023</strong> — Thermal resistivity and external T4 formulas</li>
+        <li><strong>IEC 60228:2023</strong> — Conductor resistance at 20 °C (Class 2 stranded)</li>
+        <li><strong>IEC 60502-1:2004+A1</strong> — Nominal insulation thicknesses for 1 kV cables</li>
+        <li><strong>IEC 60502-2:2014</strong> — Nominal insulation thicknesses for 6–30 kV cables</li>
+      </ul>
+
+      <h3>Soil Thermal Resistivity Guidance</h3>
+      <table class="data-table">
+        <thead><tr><th>Soil Type</th><th>ρ (K·m/W)</th></tr></thead>
+        <tbody>
+          <tr><td>Very moist clay, irrigation area</td><td>0.5–0.8</td></tr>
+          <tr><td>Moist loam (IEC reference)</td><td>1.0</td></tr>
+          <tr><td>Average soil</td><td>1.2–1.5</td></tr>
+          <tr><td>Dry sand / gravel</td><td>2.0–3.0</td></tr>
+          <tr><td>Rock</td><td>1.5–2.5</td></tr>
+          <tr><td>Thermal backfill</td><td>0.5–0.8</td></tr>
+        </tbody>
+      </table>
+
+      <p>See full documentation: <a href="docs/iec60287.md">IEC 60287 Cable Ampacity Guide</a>.</p>
+    </div>
+  </div>
+
+</body>
+</html>
