@@ -44,6 +44,7 @@ const NAV_ROUTES = [
   { href: 'shortCircuit.html', label: 'Short Circuit', section: 'Studies', group: 'Protection', icon: 'icons/components/Breaker.svg' },
   { href: 'arcFlash.html', label: 'Arc Flash', section: 'Studies', group: 'Protection', icon: 'icons/toolbar/connect.svg' },
   { href: 'dcshortcircuit.html', label: 'DC Short-Circuit & Arc Flash', section: 'Studies', group: 'Protection', icon: 'icons/components/Breaker.svg' },
+  { href: 'differentialprotection.html', label: 'Differential Protection (87B/T/G)', section: 'Studies', group: 'Protection', icon: 'icons/toolbar/validate.svg' },
   { href: 'groundgrid.html', label: 'Ground Grid', section: 'Studies', group: 'Grounding', icon: 'icons/toolbar/validate.svg' },
   { href: 'cathodicprotection.html', label: 'Cathodic Protection', section: 'Studies', group: 'Corrosion Control', icon: 'icons/toolbar/validate.svg' },
   { href: 'dissimilarmetals.html', label: 'Dissimilar Metals', section: 'Studies', group: 'Corrosion Control', icon: 'icons/toolbar/validate.svg' },

@@ -27,7 +27,7 @@ import { incidentEnergyLimitCurve } from './arcFlash.mjs';
 import conductorProperties from '../conductorPropertiesData.mjs';
 import componentLibrary from '../componentLibrary.json' with { type: 'json' };
 
-const PROTECTIVE_TYPES = new Set(['breaker', 'fuse', 'relay', 'recloser', 'contactor', 'switch']);
+const PROTECTIVE_TYPES = new Set(['breaker', 'fuse', 'relay', 'recloser', 'contactor', 'switch', 'differential']);
 const MOTOR_TYPES = new Set(['motor_load', 'motor', 'motor_starter', 'motor_controller']);
 const CMIL_TO_MM2 = 0.000506707478; // 1 circular mil in mm^2
 const DEFAULT_INRUSH_MULTIPLE = 12;
@@ -329,7 +329,8 @@ const TCC_VIEW_OPTIONS = [
   { id: 'instantaneousMax', label: 'Instantaneous Max', field: 'instantaneousMax', unit: 'A', shortLabel: 'INST Max', description: 'Display the instantaneous ceiling current.' },
   { id: 'curveProfile', label: 'Curve Profile', field: 'curveProfileLabel', shortLabel: 'Curve', description: 'Display the selected curve profile.' },
   { id: 'arcFlashOverlay', label: 'Arc Flash Limit Curve', field: null, description: 'Overlay a constant incident energy limit curve from arc flash study results.' },
-  { id: 'groundFault', label: 'Ground Fault Plane', field: null, description: 'Plot ground fault relay curves as a separate plane with dashed purple curves (NEC 230.95 / OSHA 29 CFR 1910.304).' }
+  { id: 'groundFault', label: 'Ground Fault Plane', field: null, description: 'Plot ground fault relay curves as a separate plane with dashed purple curves (NEC 230.95 / OSHA 29 CFR 1910.304).' },
+  { id: 'differentialProtection', label: 'Differential Protection (87B/T/G)', field: null, description: 'Show differential relay entries (87B bus, 87T transformer, 87G generator) with orange dashed curves. These operate on an operating/restraint current plane, not the standard time-current plane.' }
 ];
 
 const viewOptionMap = new Map(TCC_VIEW_OPTIONS.map(option => [option.id, option]));
@@ -517,6 +518,8 @@ let arcFlashOverlayComponentId = null;
 
 // Fixed purple palette for GFP curves — visually distinct from d3.schemeCategory10
 const GFP_COLOR_PALETTE = ['#7c3aed', '#6d28d9', '#5b21b6', '#4c1d95', '#a78bfa'];
+// Fixed orange palette for differential relay curves (87B/87T/87G)
+const DIFF_COLOR_PALETTE = ['#ea580c', '#c2410c', '#9a3412', '#f97316', '#fb923c'];
 
 function getActiveComponentId() {
   if (!activeComponentId) return null;
@@ -2174,6 +2177,7 @@ function rebuildCatalog() {
   const fuseEntries = libraryEntries.filter(entry => (entry.baseDevice?.type || entry.deviceType) === 'fuse');
   const otherLibraryEntries = libraryEntries.filter(entry => (entry.baseDevice?.type || entry.deviceType) !== 'fuse');
   const gfpEntries = buildGFPLibraryEntries();
+  const differentialEntries = buildDifferentialLibraryEntries();
   const overlayEntries = buildOverlayEntries();
 
   if (componentEntries.length) {
@@ -2190,6 +2194,9 @@ function rebuildCatalog() {
   }
   if (gfpEntries.length) {
     deviceGroups.push({ id: 'gfpRelays', label: 'Ground Fault Relays (GFP)', items: gfpEntries });
+  }
+  if (differentialEntries.length) {
+    deviceGroups.push({ id: 'differentialRelays', label: 'Differential Relays (87B/T/G)', items: differentialEntries });
   }
   if (overlayEntries.length) {
     deviceGroups.push({ id: 'overlays', label: 'Connected Elements', items: overlayEntries });
@@ -2509,6 +2516,22 @@ function buildGFPLibraryEntries() {
       baseDevice: dev,
       deviceType: dev.type || '',
       deviceCategory: 'ground_fault_relay',
+      overrideSource: snapOverridesToOptions(dev, saved.settings?.[dev.id] || {})
+    }))
+    .sort((a, b) => a.name.localeCompare(b.name, undefined, { sensitivity: 'base' }));
+}
+
+function buildDifferentialLibraryEntries() {
+  return libraryDevices
+    .filter(dev => dev.differential === true)
+    .map(dev => ({
+      uid: dev.id,
+      kind: 'library',
+      name: dev.name || dev.id,
+      baseDeviceId: dev.id,
+      baseDevice: dev,
+      deviceType: dev.type || 'relay',
+      deviceCategory: 'differential_relay',
       overrideSource: snapOverridesToOptions(dev, saved.settings?.[dev.id] || {})
     }))
     .sort((a, b) => a.name.localeCompare(b.name, undefined, { sensitivity: 'base' }));
@@ -6794,11 +6817,16 @@ function plot() {
   const color = d3.scaleOrdinal(d3.schemeCategory10);
   const plottables = [...devicePlots, ...overlays];
   let gfpColorIndex = 0;
+  let diffColorIndex = 0;
   plottables.forEach((entry, index) => {
     if (entry.selection?.baseDevice?.groundFault === true) {
       entry.color = GFP_COLOR_PALETTE[gfpColorIndex % GFP_COLOR_PALETTE.length];
       entry.isGFP = true;
       gfpColorIndex++;
+    } else if (entry.selection?.baseDevice?.differential === true) {
+      entry.color = DIFF_COLOR_PALETTE[diffColorIndex % DIFF_COLOR_PALETTE.length];
+      entry.isDifferential = true;
+      diffColorIndex++;
     } else {
       entry.color = color(index);
     }
@@ -7176,10 +7204,10 @@ function plot() {
     entry.path = deviceLayer.append('path')
       .datum(scaled.curve)
       .attr('fill', 'none')
-      .attr('stroke-width', entry.isGFP ? 2.5 : 2)
+      .attr('stroke-width', (entry.isGFP || entry.isDifferential) ? 2.5 : 2)
       .attr('stroke', entry.color)
-      .attr('stroke-dasharray', entry.isGFP ? '8,4' : null)
-      .attr('stroke-linecap', entry.isGFP ? 'round' : null)
+      .attr('stroke-dasharray', entry.isGFP ? '8,4' : entry.isDifferential ? '5,3' : null)
+      .attr('stroke-linecap', (entry.isGFP || entry.isDifferential) ? 'round' : null)
       .style('cursor', 'move')
       .on('contextmenu', event => {
         event.preventDefault();

@@ -472,5 +472,76 @@
     "interruptRating": 50,
     "nec230_95": true,
     "curve": []
+  },
+  {
+    "id": "diff_bus_87b",
+    "type": "relay",
+    "vendor": "IEEE C37.97",
+    "name": "Bus Differential (87B)",
+    "differential": true,
+    "diffType": "87B",
+    "settings": {
+      "slope1Pct": 25,
+      "slope2Pct": 50,
+      "minPickupMultiple": 0.2,
+      "breakpointMultiple": 3.0
+    },
+    "settingOptions": {
+      "slope1Pct": [15, 20, 25, 30],
+      "slope2Pct": [40, 50, 60, 70],
+      "minPickupMultiple": [0.1, 0.15, 0.2, 0.25, 0.3],
+      "breakpointMultiple": [2.0, 2.5, 3.0, 4.0]
+    },
+    "description": "High-impedance or low-impedance bus differential relay. Protects bus sections by detecting CT current imbalance. No harmonic restraint required for bus zones.",
+    "curve": []
+  },
+  {
+    "id": "diff_xfmr_87t",
+    "type": "relay",
+    "vendor": "IEEE C37.91",
+    "name": "Transformer Differential (87T)",
+    "differential": true,
+    "diffType": "87T",
+    "harmonicRestraint": true,
+    "settings": {
+      "slope1Pct": 25,
+      "slope2Pct": 50,
+      "minPickupMultiple": 0.2,
+      "breakpointMultiple": 3.0,
+      "restraint2ndPct": 20,
+      "restraint5thPct": 35
+    },
+    "settingOptions": {
+      "slope1Pct": [15, 20, 25, 30],
+      "slope2Pct": [40, 50, 60, 70],
+      "minPickupMultiple": [0.1, 0.15, 0.2, 0.25, 0.3],
+      "breakpointMultiple": [2.0, 2.5, 3.0, 4.0],
+      "restraint2ndPct": [15, 20, 25, 30],
+      "restraint5thPct": [25, 30, 35, 40]
+    },
+    "description": "Transformer differential relay with harmonic restraint. 2nd-harmonic blocking prevents false trips on magnetizing inrush; 5th-harmonic restraint prevents operation during overexcitation.",
+    "curve": []
+  },
+  {
+    "id": "diff_gen_87g",
+    "type": "relay",
+    "vendor": "IEEE C37.101",
+    "name": "Generator Differential (87G)",
+    "differential": true,
+    "diffType": "87G",
+    "settings": {
+      "slope1Pct": 10,
+      "slope2Pct": 25,
+      "minPickupMultiple": 0.1,
+      "breakpointMultiple": 3.0
+    },
+    "settingOptions": {
+      "slope1Pct": [5, 10, 15, 20],
+      "slope2Pct": [20, 25, 30, 40],
+      "minPickupMultiple": [0.05, 0.1, 0.15, 0.2],
+      "breakpointMultiple": [2.0, 2.5, 3.0, 4.0]
+    },
+    "description": "Generator stator differential relay. Lower slopes than transformer relays because generator CT matching is tighter and fast tripping is critical to limit stator winding damage.",
+    "curve": []
   }
 ]

@@ -1,0 +1,230 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <meta name="description" content="Differential protection zone modeling for 87B bus, 87T transformer, and 87G generator relays. Percentage-differential characteristic, CT mismatch, and harmonic restraint per IEEE C37.91/C37.97/C37.101." />
+  <title>Differential Protection (87B/T/G) — CableTrayRoute</title>
+  <link rel="icon" href="icons/favicon.svg" type="image/svg+xml">
+  <link rel="apple-touch-icon" href="icons/favicon.svg">
+  <meta property="og:type" content="website">
+  <meta property="og:title" content="Differential Protection (87B/T/G) — CableTrayRoute">
+  <meta property="og:description" content="Percentage-differential relay characteristic, CT mismatch analysis, and harmonic restraint for bus, transformer, and generator protection.">
+  <meta property="og:image" content="https://cabletrayroute.com/icons/og-preview.png">
+  <meta property="og:site_name" content="CableTrayRoute">
+  <meta property="og:url" content="differentialprotection.html">
+  <link rel="canonical" href="differentialprotection.html">
+  <link rel="dns-prefetch" href="https://fonts.gstatic.com">
+  <meta name="color-scheme" content="light dark">
+  <link rel="stylesheet" href="style.css" />
+  <script type="module" src="dirtyTracker.js"></script>
+  <script type="module" src="dist/differentialprotection.js" defer></script>
+</head>
+<body class="differentialprotection-page" data-report-title="Differential Protection (87B/T/G)">
+  <a href="#main-content" class="skip-link">Skip to main content</a>
+  <nav class="top-nav" aria-label="Primary">
+    <button id="nav-toggle" class="nav-toggle" aria-label="Toggle navigation" aria-controls="nav-links" aria-expanded="false" title="Toggle navigation">
+      <img src="icons/toolbar/grid.svg" alt="" aria-hidden="true" class="control-icon" loading="lazy" decoding="async">
+    </button>
+    <div id="nav-links" class="nav-links" role="list">
+      <!-- Populated dynamically by navigation.js -->
+    </div>
+    <button id="settings-btn" class="settings-btn" aria-label="Settings" aria-expanded="false" title="Settings">
+      <img src="icons/toolbar/validate.svg" alt="" aria-hidden="true" class="control-icon" loading="lazy" decoding="async">
+    </button>
+  </nav>
+
+  <div id="settings-menu" class="settings-menu">
+    <label for="theme-select">Theme
+      <select id="theme-select">
+        <option value="system">System</option>
+        <option value="light">Light</option>
+        <option value="dark">Dark</option>
+        <option value="high-contrast">High Contrast</option>
+      </select>
+    </label>
+    <label><input type="checkbox" id="compact-toggle" aria-label="Enable compact table mode"> Compact Mode</label>
+    <label for="unit-select">Units
+      <select id="unit-select">
+        <option value="imperial">Imperial (ft, in)</option>
+        <option value="metric">Metric (m, mm)</option>
+      </select>
+    </label>
+    <button id="help-btn" class="btn" aria-expanded="false" title="Show help">
+      <img src="icons/toolbar/validate.svg" alt="" aria-hidden="true" class="control-icon" loading="lazy" decoding="async">
+      <span>Site Help</span>
+    </button>
+    <button id="new-project-btn" title="Start a new project">
+      <img src="icons/toolbar/copy.svg" alt="" aria-hidden="true" class="control-icon" loading="lazy" decoding="async">
+      <span>New Project</span>
+    </button>
+    <button id="save-project-btn" title="Save current project">
+      <img src="icons/toolbar/export.svg" alt="" aria-hidden="true" class="control-icon" loading="lazy" decoding="async">
+      <span>Save Project</span>
+    </button>
+    <button id="load-project-btn" title="Load an existing project">
+      <img src="icons/toolbar/import.svg" alt="" aria-hidden="true" class="control-icon" loading="lazy" decoding="async">
+      <span>Load Project</span>
+    </button>
+    <button id="export-project-btn" title="Export project data">
+      <img src="icons/toolbar/export.svg" alt="" aria-hidden="true" class="control-icon" loading="lazy" decoding="async">
+      <span>Export Project</span>
+    </button>
+    <button id="import-project-btn" title="Import project data">
+      <img src="icons/toolbar/import.svg" alt="" aria-hidden="true" class="control-icon" loading="lazy" decoding="async">
+      <span>Import Project</span>
+    </button>
+    <input type="file" id="import-project-input" accept=".ctr.json" class="hidden" title="Select project file">
+  </div>
+
+  <div class="container">
+    <main id="main-content" class="main-content">
+
+      <header class="page-header">
+        <h1>Differential Protection Zone Modeling (87B / 87T / 87G)</h1>
+      </header>
+
+      <details class="method-panel">
+        <summary>Method &amp; Assumptions</summary>
+        <p>Percentage-differential protection operates on the principle that the algebraic sum of
+        currents entering and leaving a protected zone should be zero during normal conditions or
+        external faults. An internal fault creates an operating current <code>I_diff = |I₁ − I₂|</code>
+        that exceeds the percentage of the restraint current
+        <code>I_rest = (|I₁| + |I₂|) / 2</code>.</p>
+
+        <p><strong>Dual-slope characteristic</strong> (IEEE C37.91 / C37.97 / C37.101):</p>
+        <pre>Region 1 (I_rest ≤ I_bp): threshold = max(Slope₁ × I_rest, I_min)
+Region 2 (I_rest &gt; I_bp): threshold = threshold(I_bp) + Slope₂ × (I_rest − I_bp)</pre>
+
+        <p>Currents are expressed in per-unit of rated current. The relay <strong>OPERATEs</strong>
+        (trips) when <code>I_diff ≥ threshold</code>.</p>
+
+        <p><strong>CT ratio mismatch</strong> (IEEE C37.91 §5.3): the tap factor
+        <code>tap = (N_turns × CTsec) / CTpri</code> should be ≈ 1.0. Mismatches &gt; 10% require
+        numerical relay tap compensation or re-selection of CTs.</p>
+
+        <p><strong>Harmonic restraint (87T only)</strong> — IEEE C37.91 §6.5:</p>
+        <ul>
+          <li><strong>2nd harmonic blocking</strong>: magnetizing inrush current contains high 2nd
+          harmonic (typically 15–60% of fundamental). Block relay if I₂ₙd / I_diff ≥ threshold
+          (default 20%).</li>
+          <li><strong>5th harmonic restraint</strong>: overexcitation (transformer overfluxing)
+          produces high 5th harmonic. Restrain if I₅ₜₕ / I_diff ≥ threshold (default 35%).</li>
+        </ul>
+
+        <p>References: IEEE C37.91-2008 (transformer), IEEE C37.97-2012 (bus), IEEE C37.101-2006
+        (generator), NERC PRC-001-2.</p>
+      </details>
+
+      <section class="study-form-section">
+        <form id="diff-prot-form" novalidate>
+          <fieldset>
+            <legend>Zone Configuration</legend>
+            <div class="form-row">
+              <label for="zone-label">Zone Label
+                <input type="text" id="zone-label" placeholder="e.g. TR-1 HV Differential" autocomplete="off">
+              </label>
+              <label for="diff-type">Relay Type
+                <select id="diff-type">
+                  <option value="87T">87T — Transformer Differential</option>
+                  <option value="87B">87B — Bus Differential</option>
+                  <option value="87G">87G — Generator Differential</option>
+                </select>
+              </label>
+            </div>
+          </fieldset>
+
+          <fieldset>
+            <legend>Characteristic Settings</legend>
+            <div class="form-row">
+              <label for="slope1-pct">Slope 1 (%)
+                <input type="number" id="slope1-pct" value="25" min="5" max="60" step="1" required aria-required="true">
+              </label>
+              <label for="slope2-pct">Slope 2 (%)
+                <input type="number" id="slope2-pct" value="50" min="20" max="100" step="1" required aria-required="true">
+              </label>
+              <label for="min-pickup">Min Pickup (pu)
+                <input type="number" id="min-pickup" value="0.20" min="0.05" max="0.50" step="0.01" required aria-required="true">
+              </label>
+              <label for="breakpoint">Breakpoint (pu)
+                <input type="number" id="breakpoint" value="3.0" min="1.0" max="10.0" step="0.5" required aria-required="true">
+              </label>
+            </div>
+          </fieldset>
+
+          <fieldset>
+            <legend>CT Ratio Mismatch</legend>
+            <div class="form-row">
+              <label for="primary-ct">Primary CT Ratio (turns)
+                <input type="number" id="primary-ct" placeholder="e.g. 120 for 600/5" min="1" step="1">
+              </label>
+              <label for="secondary-ct">Secondary CT Ratio (turns)
+                <input type="number" id="secondary-ct" placeholder="e.g. 60 for 300/5" min="1" step="1">
+              </label>
+              <label for="xfmr-turns" id="xfmr-turns-label">Transformer Turns Ratio
+                <input type="number" id="xfmr-turns" value="1" min="0.001" step="0.001"
+                  aria-describedby="xfmr-turns-hint">
+                <span class="field-hint" id="xfmr-turns-hint">V_primary / V_secondary (leave 1 for 87B/87G)</span>
+              </label>
+            </div>
+          </fieldset>
+
+          <fieldset>
+            <legend>Operating Point</legend>
+            <div class="form-row">
+              <label for="i-diff">Differential Current I_diff (pu)
+                <input type="number" id="i-diff" value="0.30" min="0" step="0.01" required aria-required="true">
+              </label>
+              <label for="i-restraint">Restraint Current I_rest (pu)
+                <input type="number" id="i-restraint" value="1.00" min="0" step="0.01" required aria-required="true">
+              </label>
+            </div>
+          </fieldset>
+
+          <fieldset id="harmonic-fieldset">
+            <legend>Harmonic Restraint (87T only)</legend>
+            <div class="form-row">
+              <label for="restraint-2nd">2nd Harmonic Block Threshold (%)
+                <input type="number" id="restraint-2nd" value="20" min="10" max="40" step="1">
+              </label>
+              <label for="restraint-5th">5th Harmonic Restraint Threshold (%)
+                <input type="number" id="restraint-5th" value="35" min="20" max="60" step="1">
+              </label>
+              <label for="i-2nd">I_2nd (pu)
+                <input type="number" id="i-2nd" value="0" min="0" step="0.01">
+              </label>
+              <label for="i-5th">I_5th (pu)
+                <input type="number" id="i-5th" value="0" min="0" step="0.01">
+              </label>
+            </div>
+          </fieldset>
+
+          <div class="form-actions">
+            <button type="submit" class="btn btn-primary" id="run-btn">Run Study</button>
+            <button type="button" class="btn" id="reset-btn">Reset</button>
+          </div>
+        </form>
+      </section>
+
+      <section id="results" class="results-section" aria-live="polite" aria-atomic="true">
+        <!-- Results rendered by JS -->
+      </section>
+
+      <div id="study-approval-panel"></div>
+
+    </main>
+  </div>
+
+  <div id="help-modal" class="modal" role="dialog" aria-modal="true" aria-labelledby="help-modal-title" hidden>
+    <div class="modal-content">
+      <h2 id="help-modal-title">Differential Protection Help</h2>
+      <p>Enter the relay type, characteristic slopes, CT ratios, and the operating point
+      (differential and restraint currents in per-unit of rated current). For 87T relays,
+      enter harmonic components to check inrush blocking and overexcitation restraint.</p>
+      <p>The study returns an <strong>OPERATE</strong>, <strong>RESTRAIN</strong>, or
+      <strong>BLOCKED</strong> decision with the margin and characteristic curve data.</p>
+      <button id="close-help-btn" class="btn">Close</button>
+    </div>
+  </div>
+</body>
+</html>
