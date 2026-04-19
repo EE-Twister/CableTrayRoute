@@ -472,6 +472,84 @@ export default [
     "interruptRating": 50,
     "nec230_95": true,
     "curve": []
+  },
+  {
+    "id": "sel_487b",
+    "type": "relay",
+    "subtype": "relay_87",
+    "vendor": "SEL",
+    "name": "SEL-487B Bus Differential Relay",
+    "zoneType": "87B",
+    "settings": {
+      "slope1": 0.25,
+      "slope2": 0.65,
+      "minPickupPu": 0.20,
+      "breakpointPu": 3.0,
+      "tapSetting": 1.0
+    },
+    "settingOptions": {
+      "slope1": [0.15, 0.20, 0.25, 0.30, 0.35],
+      "slope2": [0.50, 0.60, 0.65, 0.70, 0.80],
+      "minPickupPu": [0.10, 0.15, 0.20, 0.25, 0.30],
+      "breakpointPu": [2.0, 3.0, 4.0, 5.0]
+    },
+    "harmonicRestraint": false,
+    "interruptRating": null,
+    "curve": []
+  },
+  {
+    "id": "sel_387",
+    "type": "relay",
+    "subtype": "relay_87",
+    "vendor": "SEL",
+    "name": "SEL-387 Transformer Differential Relay",
+    "zoneType": "87T",
+    "settings": {
+      "slope1": 0.25,
+      "slope2": 0.65,
+      "minPickupPu": 0.20,
+      "breakpointPu": 3.0,
+      "tapSetting": 6.0,
+      "secondHarmonicThresholdPct": 15,
+      "fifthHarmonicThresholdPct": 35
+    },
+    "settingOptions": {
+      "slope1": [0.15, 0.20, 0.25, 0.30, 0.35, 0.40],
+      "slope2": [0.50, 0.60, 0.65, 0.70, 0.80],
+      "minPickupPu": [0.10, 0.15, 0.20, 0.25, 0.30],
+      "breakpointPu": [2.0, 3.0, 4.0, 5.0],
+      "tapSetting": [1.0, 2.0, 3.0, 4.0, 5.0, 6.0, 7.0, 8.0, 9.0, 10.0, 12.0]
+    },
+    "harmonicRestraint": true,
+    "interruptRating": null,
+    "curve": []
+  },
+  {
+    "id": "ge_t60",
+    "type": "relay",
+    "subtype": "relay_87",
+    "vendor": "GE",
+    "name": "GE Multilin T60 Transformer Protection Relay",
+    "zoneType": "87T",
+    "settings": {
+      "slope1": 0.30,
+      "slope2": 0.70,
+      "minPickupPu": 0.15,
+      "breakpointPu": 4.0,
+      "tapSetting": 1.0,
+      "secondHarmonicThresholdPct": 15,
+      "fifthHarmonicThresholdPct": 35
+    },
+    "settingOptions": {
+      "slope1": [0.10, 0.15, 0.20, 0.25, 0.30, 0.35, 0.40, 0.45, 0.50],
+      "slope2": [0.50, 0.60, 0.70, 0.80, 0.90],
+      "minPickupPu": [0.05, 0.10, 0.15, 0.20, 0.25, 0.30],
+      "breakpointPu": [2.0, 3.0, 4.0, 5.0, 6.0],
+      "tapSetting": [0.5, 0.6, 0.7, 0.8, 0.9, 1.0, 1.1, 1.2, 1.5, 2.0, 3.0, 4.0, 5.0, 6.0, 7.0, 8.0, 9.0, 10.0, 12.0]
+    },
+    "harmonicRestraint": true,
+    "interruptRating": null,
+    "curve": []
   }
 ]
 ;
