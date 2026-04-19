@@ -1,0 +1,205 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <meta name="description" content="Voltage flicker assessment per IEC 61000-4-15 / IEEE 1453. Compute Pst (short-term) and Plt (long-term) flicker severity indices for arc furnaces, motor starts, welding machines, and wind turbines at the point of common coupling." />
+  <title>Voltage Flicker Assessment — CableTrayRoute</title>
+  <link rel="icon" href="icons/favicon.svg" type="image/svg+xml">
+  <link rel="apple-touch-icon" href="icons/favicon.svg">
+  <meta property="og:type" content="website">
+  <meta property="og:title" content="Voltage Flicker Assessment — CableTrayRoute">
+  <meta property="og:description" content="Compute Pst and Plt flicker severity indices per IEC 61000-4-15 for fluctuating loads at the PCC.">
+  <meta property="og:image" content="https://cabletrayroute.com/icons/og-preview.png">
+  <meta property="og:site_name" content="CableTrayRoute">
+  <meta property="og:url" content="voltageflicker.html">
+  <link rel="canonical" href="voltageflicker.html">
+  <link rel="dns-prefetch" href="https://fonts.gstatic.com">
+  <meta name="color-scheme" content="light dark">
+  <link rel="stylesheet" href="style.css" />
+  <script type="module" src="dirtyTracker.js"></script>
+  <script type="module" src="dist/voltageflicker.js" defer></script>
+</head>
+<body class="voltageflicker-page" data-report-title="Voltage Flicker Assessment">
+  <a href="#main-content" class="skip-link">Skip to main content</a>
+  <nav class="top-nav" aria-label="Primary">
+    <button id="nav-toggle" class="nav-toggle" aria-label="Toggle navigation" aria-controls="nav-links" aria-expanded="false" title="Toggle navigation">
+      <img src="icons/toolbar/grid.svg" alt="" aria-hidden="true" class="control-icon" loading="lazy" decoding="async">
+    </button>
+    <div id="nav-links" class="nav-links" role="list">
+      <!-- Populated dynamically by navigation.js -->
+    </div>
+    <button id="settings-btn" class="settings-btn" aria-label="Settings" aria-expanded="false" title="Settings">
+      <img src="icons/toolbar/validate.svg" alt="" aria-hidden="true" class="control-icon" loading="lazy" decoding="async">
+    </button>
+  </nav>
+
+  <div id="settings-menu" class="settings-menu">
+    <label for="theme-select">Theme
+      <select id="theme-select">
+        <option value="system">System</option>
+        <option value="light">Light</option>
+        <option value="dark">Dark</option>
+        <option value="high-contrast">High Contrast</option>
+      </select>
+    </label>
+    <label><input type="checkbox" id="compact-toggle" aria-label="Enable compact table mode"> Compact Mode</label>
+    <button id="help-btn" class="btn" aria-expanded="false" title="Show help">
+      <img src="icons/toolbar/validate.svg" alt="" aria-hidden="true" class="control-icon" loading="lazy" decoding="async">
+      <span>Site Help</span>
+    </button>
+    <button id="new-project-btn" title="Start a new project">
+      <img src="icons/toolbar/copy.svg" alt="" aria-hidden="true" class="control-icon" loading="lazy" decoding="async">
+      <span>New Project</span>
+    </button>
+    <button id="save-project-btn" title="Save current project">
+      <img src="icons/toolbar/export.svg" alt="" aria-hidden="true" class="control-icon" loading="lazy" decoding="async">
+      <span>Save Project</span>
+    </button>
+    <button id="load-project-btn" title="Load an existing project">
+      <img src="icons/toolbar/import.svg" alt="" aria-hidden="true" class="control-icon" loading="lazy" decoding="async">
+      <span>Load Project</span>
+    </button>
+    <button id="export-project-btn" title="Export project data">
+      <img src="icons/toolbar/export.svg" alt="" aria-hidden="true" class="control-icon" loading="lazy" decoding="async">
+      <span>Export Project</span>
+    </button>
+    <button id="import-project-btn" title="Import project data">
+      <img src="icons/toolbar/import.svg" alt="" aria-hidden="true" class="control-icon" loading="lazy" decoding="async">
+      <span>Import Project</span>
+    </button>
+    <input type="file" id="import-project-input" accept=".ctr.json" class="hidden" title="Select project file">
+  </div>
+
+  <div class="container">
+    <main id="main-content" class="main-content">
+      <header class="page-header">
+        <h1>Voltage Flicker Assessment</h1>
+      </header>
+
+      <details class="method-panel">
+        <summary>Method &amp; Assumptions</summary>
+        <p>Flicker severity is assessed using the <strong>simplified rectangular voltage-change method</strong> from IEC 61000-4-15 Annex A and IEEE 1453-2022. The method is appropriate for preliminary assessments when only the disturbance magnitude and repetition rate are known.</p>
+        <p><strong>Step 1 — Voltage dip (IEC 61000-3-3 §4):</strong></p>
+        <pre>ΔV% = (ΔP_kW / S_sc_kVA) × 100</pre>
+        <p>where S_sc_kVA is the short-circuit apparent power (kVA) at the PCC.</p>
+        <p><strong>Step 2 — Short-term flicker severity Pst:</strong> bilinear log-log interpolation on the IEC 61000-4-15 Figure A.1 iso-Pst contours for rectangular voltage changes.</p>
+        <p><strong>Step 3 — Long-term flicker severity Plt (IEC 61000-4-15 §4.7):</strong></p>
+        <pre>Plt = (1/12 × Σ Pst_i³)^(1/3)   over 12 consecutive 10-minute periods</pre>
+        <p><strong>Limits (IEC 61000-3-3 / IEEE 1453):</strong></p>
+        <ul>
+          <li>Pst ≤ 1.0 — mandatory limit at PCC</li>
+          <li>Pst ≤ 0.8 — planning level (utility allocation)</li>
+        </ul>
+        <p>This simplified model is suitable for arc furnaces, motor starts, welders, and wind turbines with known step-change magnitudes. For continuous random fluctuations, use a full IEC 61000-4-15 signal-processing flickermeter with measured voltage waveforms.</p>
+      </details>
+
+      <form id="flicker-form" novalidate>
+
+        <fieldset>
+          <legend><strong>System Data</strong></legend>
+
+          <div class="field-row">
+            <label for="system-kva">Short-circuit kVA at PCC</label>
+            <input type="number" id="system-kva" min="1" step="100" value="50000" required aria-describedby="system-kva-hint">
+            <span class="field-unit">kVA</span>
+            <p id="system-kva-hint" class="field-hint">Thevenin short-circuit apparent power at the point of common coupling. S_sc (kVA) = MVA_sc × 1000. Obtain from the Short Circuit study.</p>
+          </div>
+
+          <div class="field-row">
+            <label for="xr-ratio">Source X/R ratio</label>
+            <input type="number" id="xr-ratio" min="0.1" max="100" step="0.5" value="10" required aria-describedby="xr-ratio-hint">
+            <p id="xr-ratio-hint" class="field-hint">Source X/R ratio at the PCC. Used for display and voltage dip angle correction. Industrial systems: 5–20.</p>
+          </div>
+
+          <div class="field-row">
+            <label for="nominal-kv">Nominal voltage (kV, L-L)</label>
+            <input type="number" id="nominal-kv" min="0.1" step="0.01" value="0.48" aria-describedby="nominal-kv-hint">
+            <span class="field-unit">kV</span>
+            <p id="nominal-kv-hint" class="field-hint">System nominal voltage. Used for display only — the simplified ΔV/V formula is voltage-independent.</p>
+          </div>
+        </fieldset>
+
+        <fieldset>
+          <legend><strong>Disturbance Load Steps</strong></legend>
+          <p class="field-hint">Add one row per fluctuating load. Each row represents a distinct disturbance type at the PCC.</p>
+          <div id="load-steps-list" aria-label="Load step rows">
+            <!-- Rows added dynamically -->
+          </div>
+          <button type="button" id="add-load-step-btn" class="btn btn-sm">+ Add Load Step</button>
+        </fieldset>
+
+        <fieldset>
+          <legend><strong>Long-Term Plt (optional)</strong></legend>
+          <div class="field-row">
+            <label for="pst-series">Measured Pst series (up to 12 values)</label>
+            <textarea id="pst-series" rows="2" placeholder="e.g. 0.85, 0.92, 1.05, 0.78, 0.83, 0.91, 0.88, 0.95, 1.02, 0.79, 0.84, 0.90" aria-describedby="pst-series-hint"></textarea>
+            <p id="pst-series-hint" class="field-hint">Enter comma-separated Pst values from a power quality analyser (10-min observation each). If left blank, Plt is conservatively estimated from the worst-case Pst.</p>
+          </div>
+        </fieldset>
+
+        <div class="form-actions">
+          <button type="submit" class="btn btn-primary">Run Flicker Study</button>
+        </div>
+      </form>
+
+      <div id="calc-errors" class="result-fail" hidden aria-live="polite"></div>
+
+      <div id="results" aria-live="polite"></div>
+
+      <nav class="step-nav" aria-label="Workflow navigation">
+        <a href="frequencyscan.html" class="step-nav-prev">← Frequency Scan</a>
+        <a href="harmonics.html" class="step-nav-next">Harmonics →</a>
+      </nav>
+
+    </main>
+  </div>
+
+  <div id="help-modal" class="modal" role="dialog" aria-modal="true" aria-labelledby="help-modal-title" hidden>
+    <div class="modal-content">
+      <button id="close-help-btn" class="modal-close" aria-label="Close help">×</button>
+      <h2 id="help-modal-title">Voltage Flicker Help</h2>
+      <p>Voltage flicker is the perceptible variation in light output caused by rapid voltage fluctuations. This study computes Pst and Plt severity indices per IEC 61000-4-15 / IEEE 1453-2022.</p>
+      <h3>When to use</h3>
+      <ul>
+        <li>Assessing arc furnace, welder, or motor start impact at the PCC before connecting to the utility.</li>
+        <li>Utility interconnection studies — demonstrating compliance with Pst ≤ 1.0 at the PCC.</li>
+        <li>Screening whether a customer's fluctuating load will cause complaints from neighbouring premises.</li>
+      </ul>
+      <h3>Limits</h3>
+      <ul>
+        <li><strong>Pst ≤ 1.0</strong> — mandatory limit at the PCC (IEC 61000-3-3 / IEEE 1453)</li>
+        <li><strong>Pst ≤ 0.8</strong> — planning level; below this value no action is normally required</li>
+        <li><strong>Plt ≤ 0.8</strong> — same planning level for long-term assessment</li>
+      </ul>
+      <h3>Typical Pst values by load type</h3>
+      <ul>
+        <li><strong>Arc furnace:</strong> Pst 1–5 (requires SVC or flicker filter)</li>
+        <li><strong>Resistance welder:</strong> Pst 0.5–2 (depends on repetition rate)</li>
+        <li><strong>Motor start (DOL):</strong> Pst 0.2–0.8 (usually acceptable)</li>
+        <li><strong>Wind turbine:</strong> Pst 0.1–0.5 (varies by tower shadow, turbulence)</li>
+      </ul>
+      <h3>Mitigation options</h3>
+      <ul>
+        <li>Static Var Compensator (SVC) or STATCOM — continuous reactive power control</li>
+        <li>Series reactor to increase source impedance ratio</li>
+        <li>Load scheduling — reduce simultaneous large step changes</li>
+        <li>Dedicated supply transformer for fluctuating loads</li>
+      </ul>
+    </div>
+  </div>
+
+  <footer class="site-footer">
+    <div class="footer-left">
+      <img src="icons/route.svg" alt="CableTrayRoute logo" class="footer-logo" loading="lazy" decoding="async">
+      <span>CableTrayRoute</span>
+    </div>
+    <nav class="footer-links" aria-label="Footer">
+      <a href="docs/index.html">Docs</a>
+      <a href="docs/quickstart.html">Quick Start</a>
+      <a href="index.html">Home</a>
+    </nav>
+  </footer>
+
+</body>
+</html>
