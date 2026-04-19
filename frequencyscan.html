@@ -1,0 +1,211 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <meta name="description" content="Harmonic frequency scan — sweep system driving-point impedance from 1st to 50th harmonic to identify parallel and series resonances. Supports capacitor banks, detuned filters, and series cables." />
+  <title>Frequency Scan — CableTrayRoute</title>
+  <link rel="icon" href="icons/favicon.svg" type="image/svg+xml">
+  <link rel="apple-touch-icon" href="icons/favicon.svg">
+  <meta property="og:type" content="website">
+  <meta property="og:title" content="Frequency Scan — CableTrayRoute">
+  <meta property="og:description" content="Harmonic impedance vs. frequency sweep to identify resonances and guide filter design.">
+  <meta property="og:image" content="https://cabletrayroute.com/icons/og-preview.png">
+  <meta property="og:site_name" content="CableTrayRoute">
+  <meta property="og:url" content="frequencyscan.html">
+  <link rel="canonical" href="frequencyscan.html">
+  <link rel="dns-prefetch" href="https://fonts.gstatic.com">
+  <meta name="color-scheme" content="light dark">
+  <link rel="stylesheet" href="style.css" />
+  <script type="module" src="dirtyTracker.js"></script>
+  <script type="module" src="dist/frequencyscan.js" defer></script>
+</head>
+<body class="frequencyscan-page" data-report-title="Frequency Scan">
+  <a href="#main-content" class="skip-link">Skip to main content</a>
+  <nav class="top-nav" aria-label="Primary">
+    <button id="nav-toggle" class="nav-toggle" aria-label="Toggle navigation" aria-controls="nav-links" aria-expanded="false" title="Toggle navigation">
+      <img src="icons/toolbar/grid.svg" alt="" aria-hidden="true" class="control-icon" loading="lazy" decoding="async">
+    </button>
+    <div id="nav-links" class="nav-links" role="list">
+      <!-- Populated dynamically by navigation.js -->
+    </div>
+    <button id="settings-btn" class="settings-btn" aria-label="Settings" aria-expanded="false" title="Settings">
+      <img src="icons/toolbar/validate.svg" alt="" aria-hidden="true" class="control-icon" loading="lazy" decoding="async">
+    </button>
+  </nav>
+
+  <div id="settings-menu" class="settings-menu">
+    <label for="theme-select">Theme
+      <select id="theme-select">
+        <option value="system">System</option>
+        <option value="light">Light</option>
+        <option value="dark">Dark</option>
+        <option value="high-contrast">High Contrast</option>
+      </select>
+    </label>
+    <label><input type="checkbox" id="compact-toggle" aria-label="Enable compact table mode"> Compact Mode</label>
+    <button id="help-btn" class="btn" aria-expanded="false" title="Show help">
+      <img src="icons/toolbar/validate.svg" alt="" aria-hidden="true" class="control-icon" loading="lazy" decoding="async">
+      <span>Site Help</span>
+    </button>
+    <button id="new-project-btn" title="Start a new project">
+      <img src="icons/toolbar/copy.svg" alt="" aria-hidden="true" class="control-icon" loading="lazy" decoding="async">
+      <span>New Project</span>
+    </button>
+    <button id="save-project-btn" title="Save current project">
+      <img src="icons/toolbar/export.svg" alt="" aria-hidden="true" class="control-icon" loading="lazy" decoding="async">
+      <span>Save Project</span>
+    </button>
+    <button id="load-project-btn" title="Load an existing project">
+      <img src="icons/toolbar/import.svg" alt="" aria-hidden="true" class="control-icon" loading="lazy" decoding="async">
+      <span>Load Project</span>
+    </button>
+    <button id="export-project-btn" title="Export project data">
+      <img src="icons/toolbar/export.svg" alt="" aria-hidden="true" class="control-icon" loading="lazy" decoding="async">
+      <span>Export Project</span>
+    </button>
+    <button id="import-project-btn" title="Import project data">
+      <img src="icons/toolbar/import.svg" alt="" aria-hidden="true" class="control-icon" loading="lazy" decoding="async">
+      <span>Import Project</span>
+    </button>
+    <input type="file" id="import-project-input" accept=".ctr.json" class="hidden" title="Select project file">
+  </div>
+
+  <div class="container">
+    <main id="main-content" class="main-content">
+      <header class="page-header">
+        <h1>Harmonic Frequency Scan</h1>
+      </header>
+
+      <details class="method-panel">
+        <summary>Method &amp; Assumptions</summary>
+        <p>This study sweeps the Thevenin driving-point impedance Z(h) at the bus from the 1st to the 50th harmonic order (0.5-step increments). The single-bus model is:</p>
+        <pre>Z_dp(h) = Z_source(h) ‖ ΣZ_cap(h) ‖ ΣZ_filter(h)</pre>
+        <p>Source and cable impedances are combined in series. Capacitor banks and detuned filters are modelled as shunt elements. Reactive components scale linearly with harmonic order (X ∝ h); the source R/X ratio sets the fundamental reactance.</p>
+        <p>Parallel resonance (impedance peak) occurs where inductive and capacitive reactances cancel: h_r ≈ √(S_sc_kVA / Q_kVAR). Risk classification uses IEEE 519-2022 dominant harmonic orders (5, 7, 11, 13, …).</p>
+        <p>This model is appropriate for preliminary filter design screening and harmonic amplification assessment. Complex multi-bus systems require a full Y-bus frequency sweep.</p>
+      </details>
+
+      <form id="freq-scan-form" novalidate>
+
+        <fieldset>
+          <legend><strong>System Source Data</strong></legend>
+
+          <div class="field-row">
+            <label for="base-freq">Base frequency</label>
+            <select id="base-freq" aria-describedby="base-freq-hint">
+              <option value="60" selected>60 Hz</option>
+              <option value="50">50 Hz</option>
+            </select>
+            <p id="base-freq-hint" class="field-hint">Fundamental system frequency. Harmonic frequencies are h × base frequency.</p>
+          </div>
+
+          <div class="field-row">
+            <label for="system-kv">System voltage (kV, L-L)</label>
+            <input type="number" id="system-kv" min="0.1" step="0.01" value="4.16" required aria-describedby="system-kv-hint">
+            <p id="system-kv-hint" class="field-hint">Nominal line-to-line voltage at the bus being scanned. Used to compute ohmic impedances from per-unit values.</p>
+          </div>
+
+          <div class="field-row">
+            <label for="sc-mva">Short-circuit MVA at bus</label>
+            <input type="number" id="sc-mva" min="0.01" step="0.1" value="50" required aria-describedby="sc-mva-hint">
+            <p id="sc-mva-hint" class="field-hint">Thevenin short-circuit MVA looking back toward the utility or generator from this bus. Sets the source impedance magnitude.</p>
+          </div>
+
+          <div class="field-row">
+            <label for="xr-ratio">Source X/R ratio</label>
+            <input type="number" id="xr-ratio" min="0.1" max="100" step="0.5" value="10" required aria-describedby="xr-ratio-hint">
+            <p id="xr-ratio-hint" class="field-hint">Ratio of source reactance to resistance at fundamental. Industrial systems typically range from 5 to 20. Higher X/R produces sharper resonance peaks.</p>
+          </div>
+        </fieldset>
+
+        <fieldset>
+          <legend><strong>Capacitor Banks</strong> <span class="field-hint">(shunt, at the bus)</span></legend>
+          <div id="cap-banks-list" aria-label="Capacitor bank rows">
+            <!-- Rows added dynamically -->
+          </div>
+          <button type="button" id="add-cap-bank-btn" class="btn btn-sm">+ Add Capacitor Bank</button>
+        </fieldset>
+
+        <fieldset>
+          <legend><strong>Detuned Filters</strong> <span class="field-hint">(series L-C, shunt at bus)</span></legend>
+          <div id="filters-list" aria-label="Filter rows">
+            <!-- Rows added dynamically -->
+          </div>
+          <button type="button" id="add-filter-btn" class="btn btn-sm">+ Add Detuned Filter</button>
+        </fieldset>
+
+        <fieldset>
+          <legend><strong>Series Cables</strong> <span class="field-hint">(between source and bus)</span></legend>
+          <div id="cables-list" aria-label="Cable rows">
+            <!-- Rows added dynamically -->
+          </div>
+          <button type="button" id="add-cable-btn" class="btn btn-sm">+ Add Cable</button>
+        </fieldset>
+
+        <fieldset>
+          <legend><strong>Scan Range</strong></legend>
+          <div class="field-row">
+            <label for="h-min">Start harmonic order</label>
+            <input type="number" id="h-min" min="1" max="49" step="1" value="1" aria-describedby="h-min-hint">
+            <p id="h-min-hint" class="field-hint">Lowest harmonic order to include in the scan (minimum 1).</p>
+          </div>
+          <div class="field-row">
+            <label for="h-max">End harmonic order</label>
+            <input type="number" id="h-max" min="2" max="50" step="1" value="50" aria-describedby="h-max-hint">
+            <p id="h-max-hint" class="field-hint">Highest harmonic order to include (maximum 50).</p>
+          </div>
+        </fieldset>
+
+        <div class="form-actions">
+          <button type="submit" class="btn btn-primary">Run Frequency Scan</button>
+        </div>
+      </form>
+
+      <div id="calc-errors" class="result-fail" hidden aria-live="polite"></div>
+
+      <div id="results" aria-live="polite"></div>
+
+    </main>
+  </div>
+
+  <div id="help-modal" class="modal" role="dialog" aria-modal="true" aria-labelledby="help-modal-title" hidden>
+    <div class="modal-content">
+      <button id="close-help-btn" class="modal-close" aria-label="Close help">×</button>
+      <h2 id="help-modal-title">Frequency Scan Help</h2>
+      <p>This study sweeps the driving-point impedance at a bus from the 1st to the 50th harmonic. Peaks indicate parallel resonance (voltage amplification); troughs indicate series resonance (current amplification).</p>
+      <h3>When to use</h3>
+      <ul>
+        <li>After sizing a capacitor bank — check if the resonance order falls near a dominant harmonic (5th, 7th, 11th, 13th).</li>
+        <li>Before specifying harmonic filters — use the resonance map to choose detuning reactor % that shifts resonance below the 5th harmonic.</li>
+        <li>When investigating elevated harmonic voltage levels on a bus.</li>
+      </ul>
+      <h3>Risk classification</h3>
+      <ul>
+        <li><strong>Danger</strong> — parallel resonance within ±0.5 harmonic orders of a dominant harmonic (5, 7, 11, 13, 17, 19, 23, 25).</li>
+        <li><strong>Caution</strong> — within ±1.0 harmonic orders.</li>
+        <li><strong>Low</strong> — more than 1 harmonic order away from any dominant harmonic.</li>
+      </ul>
+      <h3>Typical detuning reactor percentages</h3>
+      <ul>
+        <li>5.67% — tunes to h ≈ 4.2 (protects 5th harmonic)</li>
+        <li>7% — tunes to h ≈ 3.8 (protects 5th harmonic, wider margin)</li>
+        <li>14% — tunes to h ≈ 2.7 (protects 3rd harmonic)</li>
+      </ul>
+    </div>
+  </div>
+
+  <footer class="site-footer">
+    <div class="footer-left">
+      <img src="icons/route.svg" alt="CableTrayRoute logo" class="footer-logo" loading="lazy" decoding="async">
+      <span>CableTrayRoute</span>
+    </div>
+    <nav class="footer-links" aria-label="Footer">
+      <a href="docs/index.html">Docs</a>
+      <a href="docs/quickstart.html">Quick Start</a>
+      <a href="index.html">Home</a>
+    </nav>
+  </footer>
+
+</body>
+</html>
