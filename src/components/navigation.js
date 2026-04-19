@@ -36,6 +36,7 @@ const NAV_ROUTES = [
   { href: 'harmonics.html', label: 'Harmonics', section: 'Studies', group: 'Power Quality', icon: 'icons/toolbar/grid-size.svg' },
   { href: 'capacitorbank.html', label: 'Capacitor Bank', section: 'Studies', group: 'Power Quality', icon: 'icons/toolbar/grid-size.svg' },
   { href: 'frequencyscan.html', label: 'Frequency Scan', section: 'Studies', group: 'Power Quality', icon: 'icons/toolbar/grid-size.svg' },
+  { href: 'voltageflicker.html', label: 'Voltage Flicker', section: 'Studies', group: 'Power Quality', icon: 'icons/toolbar/grid-size.svg' },
   { href: 'battery.html', label: 'Battery / UPS Sizing', section: 'Studies', group: 'Equipment Sizing', icon: 'icons/components/UPS.svg' },
   { href: 'generatorsizing.html', label: 'Generator Sizing', section: 'Studies', group: 'Equipment Sizing', icon: 'icons/toolbar/validate.svg' },
   { href: 'ibr.html', label: 'IBR Modeling (PV/BESS)', section: 'Studies', group: 'Renewable', icon: 'icons/toolbar/validate.svg' },
