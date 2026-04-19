@@ -27,7 +27,7 @@ import { incidentEnergyLimitCurve } from './arcFlash.mjs';
 import conductorProperties from '../conductorPropertiesData.mjs';
 import componentLibrary from '../componentLibrary.json' with { type: 'json' };
 
-const PROTECTIVE_TYPES = new Set(['breaker', 'fuse', 'relay', 'recloser', 'contactor', 'switch']);
+const PROTECTIVE_TYPES = new Set(['breaker', 'fuse', 'relay', 'relay_87', 'recloser', 'contactor', 'switch']);
 const MOTOR_TYPES = new Set(['motor_load', 'motor', 'motor_starter', 'motor_controller']);
 const CMIL_TO_MM2 = 0.000506707478; // 1 circular mil in mm^2
 const DEFAULT_INRUSH_MULTIPLE = 12;

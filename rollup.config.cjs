@@ -51,6 +51,7 @@ const entries = {
   reliability: 'src/reliability.js',
   costestimate: 'src/costestimate.js',
   emf: 'src/emf.js',
+  differentialprotection: 'src/differentialProtection.js',
   clashdetect: 'src/clashdetect.js',
   designrulechecker: 'src/designrulechecker.js',
   spoolsheets: 'src/spoolsheets.js',
