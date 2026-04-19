@@ -1,0 +1,342 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <meta name="description" content="Differential Protection Zone Modeling (ANSI 87B/87T/87G). Percentage-differential characteristic, CT ratio mismatch, dual-slope curve, harmonic restraint per IEEE C37.91." />
+  <title>Differential Protection (87B/87T/87G) — CableTrayRoute</title>
+  <link rel="icon" href="icons/favicon.svg" type="image/svg+xml">
+  <link rel="apple-touch-icon" href="icons/favicon.svg">
+  <meta property="og:type" content="website">
+  <meta property="og:title" content="Differential Protection (87B/87T/87G) — CableTrayRoute">
+  <meta property="og:description" content="IEEE C37.91 differential protection zone modeling with dual-slope characteristic, CT ratio matching, and harmonic restraint.">
+  <meta property="og:image" content="https://cabletrayroute.com/icons/og-preview.png">
+  <meta property="og:site_name" content="CableTrayRoute">
+  <meta property="og:url" content="differentialprotection.html">
+  <link rel="canonical" href="differentialprotection.html">
+  <link rel="dns-prefetch" href="https://fonts.gstatic.com">
+  <meta name="color-scheme" content="light dark">
+  <link rel="stylesheet" href="style.css" />
+  <script type="module" src="dirtyTracker.js"></script>
+  <script type="module" src="dist/differentialprotection.js" defer></script>
+</head>
+<body class="differentialprotection-page" data-report-title="Differential Protection (87B/87T/87G)">
+  <a href="#main-content" class="skip-link">Skip to main content</a>
+  <nav class="top-nav" aria-label="Primary">
+    <button id="nav-toggle" class="nav-toggle" aria-label="Toggle navigation" aria-controls="nav-links" aria-expanded="false" title="Toggle navigation">
+      <img src="icons/toolbar/grid.svg" alt="" aria-hidden="true" class="control-icon" loading="lazy" decoding="async">
+    </button>
+    <div id="nav-links" class="nav-links" role="list">
+      <!-- Populated dynamically by navigation.js -->
+    </div>
+    <button id="settings-btn" class="settings-btn" aria-label="Settings" aria-expanded="false" title="Settings">
+      <img src="icons/toolbar/validate.svg" alt="" aria-hidden="true" class="control-icon" loading="lazy" decoding="async">
+    </button>
+  </nav>
+
+  <div id="settings-menu" class="settings-menu">
+    <label for="theme-select">Theme
+      <select id="theme-select">
+        <option value="system">System</option>
+        <option value="light">Light</option>
+        <option value="dark">Dark</option>
+        <option value="high-contrast">High Contrast</option>
+      </select>
+    </label>
+    <label><input type="checkbox" id="compact-toggle" aria-label="Enable compact table mode"> Compact Mode</label>
+    <label for="unit-select">Units
+      <select id="unit-select">
+        <option value="imperial">Imperial (ft, in)</option>
+        <option value="metric">Metric (m, mm)</option>
+      </select>
+    </label>
+    <button id="help-btn" class="btn" aria-expanded="false" title="Show help">
+      <img src="icons/toolbar/validate.svg" alt="" aria-hidden="true" class="control-icon" loading="lazy" decoding="async">
+      <span>Site Help</span>
+    </button>
+    <button id="new-project-btn" title="Start a new project">
+      <img src="icons/toolbar/copy.svg" alt="" aria-hidden="true" class="control-icon" loading="lazy" decoding="async">
+      <span>New Project</span>
+    </button>
+    <button id="save-project-btn" title="Save current project">
+      <img src="icons/toolbar/export.svg" alt="" aria-hidden="true" class="control-icon" loading="lazy" decoding="async">
+      <span>Save Project</span>
+    </button>
+    <button id="load-project-btn" title="Load an existing project">
+      <img src="icons/toolbar/import.svg" alt="" aria-hidden="true" class="control-icon" loading="lazy" decoding="async">
+      <span>Load Project</span>
+    </button>
+    <button id="export-project-btn" title="Export project data">
+      <img src="icons/toolbar/export.svg" alt="" aria-hidden="true" class="control-icon" loading="lazy" decoding="async">
+      <span>Export Project</span>
+    </button>
+    <button id="import-project-btn" title="Import project data">
+      <img src="icons/toolbar/import.svg" alt="" aria-hidden="true" class="control-icon" loading="lazy" decoding="async">
+      <span>Import Project</span>
+    </button>
+    <input type="file" id="import-project-input" accept=".ctr.json" class="hidden" title="Select project file">
+  </div>
+
+  <div id="help-modal" class="modal" role="dialog" aria-modal="true" aria-labelledby="help-modal-title" hidden>
+    <div class="modal-content">
+      <h2 id="help-modal-title">Site Help</h2>
+      <p>Use the form to define the differential protection zone, enter CT ratios and relay settings,
+         then run the study. Results show the trip/no-trip determination and the dual-slope characteristic
+         curve. See <a href="docs/differential-protection.md">Differential Protection Guide</a> for
+         full methodology and worked examples.</p>
+      <button id="close-help-btn" class="btn">Close</button>
+    </div>
+  </div>
+
+  <div class="container">
+    <main id="main-content" class="main-content">
+
+      <header class="page-header">
+        <h1>Differential Protection (87B / 87T / 87G)</h1>
+      </header>
+
+      <details class="method-panel">
+        <summary>Method &amp; Assumptions</summary>
+        <p>Models the <strong>percentage-differential characteristic</strong> used by modern numerical
+        differential relays (SEL-387/487B, GE T60, ABB RET670). Based on
+        <strong>IEEE C37.91-2008</strong> (transformer), <strong>IEEE C37.102-2006</strong> (generator),
+        and <strong>IEEE C37.97-1979</strong> (bus).</p>
+
+        <p><strong>Operating and restraint currents:</strong></p>
+        <pre>I_op  = | I₁/n₁  −  I₂/n₂ |          (differential current)
+I_rst = ( |I₁/n₁| + |I₂/n₂| ) / 2    (restraint current)</pre>
+
+        <p><strong>Dual-slope trip threshold:</strong></p>
+        <pre>Slope 1 region  (I_rst &lt; I_bp):
+  threshold = max(I_min, S₁ × I_rst)
+Slope 2 region  (I_rst ≥ I_bp):
+  threshold = S₁×I_bp + S₂×(I_rst − I_bp)</pre>
+        <p>Trip if  <code>I_op &gt; threshold</code>  AND harmonic restraint is not active.</p>
+
+        <p><strong>Harmonic restraint (IEEE C37.91 §8.2):</strong></p>
+        <pre>87T: 2nd harmonic ≥ 15% → restrain (inrush blocking)
+87T/87G: 5th harmonic ≥ 35% → restrain (over-excitation blocking)</pre>
+
+        <p>Citations: <a href="docs/differential-protection.md">Differential Protection Guide</a>.
+        See also: <a href="tcc.html">TCC Coordination</a>,
+        <a href="shortCircuit.html">Short Circuit</a>,
+        <a href="arcFlash.html">Arc Flash</a>.</p>
+      </details>
+
+      <form id="diff-form" novalidate>
+
+        <!-- Zone identification -->
+        <fieldset>
+          <legend><strong>Zone Identification</strong></legend>
+
+          <div class="field-row">
+            <label for="system-label">Zone label (optional)</label>
+            <input type="text" id="system-label" placeholder="e.g. T1 — 2000 kVA, 13.8 kV / 480 V Transformer"
+                   aria-describedby="system-label-hint">
+            <p id="system-label-hint" class="field-hint">Descriptive label used in the results report only.</p>
+          </div>
+
+          <div class="field-row">
+            <label for="zone-type">
+              Zone type (ANSI device)
+              <button type="button" class="helpBtn" aria-label="Help — zone type">?</button>
+            </label>
+            <select id="zone-type" required aria-describedby="zone-type-hint">
+              <option value="87T">87T — Transformer Differential (harmonic restraint: 2nd + 5th)</option>
+              <option value="87B">87B — Bus Differential (no harmonic restraint)</option>
+              <option value="87G">87G — Generator Differential (harmonic restraint: 5th only)</option>
+            </select>
+            <p id="zone-type-hint" class="field-hint">
+              87T is the most common. 87B is used for bus protection. 87G protects generators.
+              Harmonic restraint prevents false trips during transformer inrush (2nd harmonic)
+              and over-excitation (5th harmonic).
+            </p>
+          </div>
+        </fieldset>
+
+        <!-- CT ratio inputs -->
+        <fieldset>
+          <legend><strong>Current Transformer (CT) Ratios</strong></legend>
+
+          <div class="field-row">
+            <label for="ct1-ratio">
+              CT₁ primary ratio (primary turns, e.g., 600 for 600:5)
+              <button type="button" class="helpBtn" aria-label="Help — CT1 ratio">?</button>
+            </label>
+            <input type="number" id="ct1-ratio" min="1" step="1" value="600"
+                   required aria-describedby="ct1-ratio-hint">
+            <p id="ct1-ratio-hint" class="field-hint">
+              Primary turns of CT on terminal 1 (high-voltage side of transformer, or line 1 of bus).
+              Enter the numerator of the ratio — e.g., enter 600 for a 600:5 CT.
+            </p>
+          </div>
+
+          <div class="field-row">
+            <label for="ct2-ratio">
+              CT₂ primary ratio (primary turns, e.g., 100 for 100:5)
+              <button type="button" class="helpBtn" aria-label="Help — CT2 ratio">?</button>
+            </label>
+            <input type="number" id="ct2-ratio" min="1" step="1" value="100"
+                   required aria-describedby="ct2-ratio-hint">
+            <p id="ct2-ratio-hint" class="field-hint">
+              Primary turns of CT on terminal 2 (low-voltage side of transformer, or line 2 of bus).
+            </p>
+          </div>
+
+          <div class="field-row">
+            <label for="ct-secondary">CT secondary rating (A)</label>
+            <select id="ct-secondary" required>
+              <option value="5" selected>5 A</option>
+              <option value="1">1 A</option>
+            </select>
+          </div>
+
+          <div class="field-row">
+            <label for="tap-setting">
+              Relay tap setting
+              <button type="button" class="helpBtn" aria-label="Help — tap setting">?</button>
+            </label>
+            <input type="number" id="tap-setting" min="0.01" step="0.01" value="6"
+                   required aria-describedby="tap-setting-hint">
+            <p id="tap-setting-hint" class="field-hint">
+              Dimensionless relay compensation tap. Nominal value = CT₁ / CT₂ (e.g., 600 / 100 = 6).
+              Set to the nearest available relay setting. Mismatch &gt; 5% triggers a warning
+              per IEEE C37.91.
+            </p>
+          </div>
+        </fieldset>
+
+        <!-- Relay characteristic settings -->
+        <fieldset>
+          <legend><strong>Relay Characteristic Settings</strong></legend>
+
+          <div class="field-row">
+            <label for="slope1">
+              Slope 1 (S₁, %)
+              <button type="button" class="helpBtn" aria-label="Help — slope 1">?</button>
+            </label>
+            <input type="number" id="slope1" min="5" max="50" step="1" value="25"
+                   required aria-describedby="slope1-hint">
+            <p id="slope1-hint" class="field-hint">
+              Through-fault restraint slope for low currents. Typical: 25%.
+              SEL relays commonly use 25% for Slope 1.
+            </p>
+          </div>
+
+          <div class="field-row">
+            <label for="slope2">
+              Slope 2 (S₂, %)
+              <button type="button" class="helpBtn" aria-label="Help — slope 2">?</button>
+            </label>
+            <input type="number" id="slope2" min="30" max="95" step="1" value="65"
+                   required aria-describedby="slope2-hint">
+            <p id="slope2-hint" class="field-hint">
+              High-current restraint slope (CT saturation region). Must be &gt; Slope 1. Typical: 65%.
+            </p>
+          </div>
+
+          <div class="field-row">
+            <label for="min-pickup">
+              Minimum pickup I<sub>min</sub> (pu)
+              <button type="button" class="helpBtn" aria-label="Help — minimum pickup">?</button>
+            </label>
+            <input type="number" id="min-pickup" min="0.05" max="1.0" step="0.01" value="0.20"
+                   required aria-describedby="min-pickup-hint">
+            <p id="min-pickup-hint" class="field-hint">
+              Floor of the operate region. The relay will not trip below this differential current
+              regardless of restraint. Typical: 0.20 pu. Per-unit of CT secondary / tap setting.
+            </p>
+          </div>
+
+          <div class="field-row">
+            <label for="breakpoint">
+              Breakpoint I<sub>bp</sub> (pu)
+              <button type="button" class="helpBtn" aria-label="Help — breakpoint">?</button>
+            </label>
+            <input type="number" id="breakpoint" min="0.5" max="10.0" step="0.1" value="3.0"
+                   required aria-describedby="breakpoint-hint">
+            <p id="breakpoint-hint" class="field-hint">
+              Restraint current (pu) at which the slope transitions from S₁ to S₂. Typically
+              set just above full-load through current to avoid CT saturation effects during
+              external faults. Typical: 3.0 pu.
+            </p>
+          </div>
+        </fieldset>
+
+        <!-- Operating currents -->
+        <fieldset>
+          <legend><strong>Operating Currents</strong></legend>
+
+          <div class="field-row">
+            <label for="ia-amps">
+              I<sub>A</sub> — Terminal 1 current (A primary)
+              <button type="button" class="helpBtn" aria-label="Help — terminal 1 current">?</button>
+            </label>
+            <input type="number" id="ia-amps" min="0" step="1" value="500"
+                   required aria-describedby="ia-hint">
+            <p id="ia-hint" class="field-hint">
+              Current flowing <em>into</em> the protected zone at terminal 1 (A, primary side).
+              Use the fault study or load flow result for the condition being evaluated.
+            </p>
+          </div>
+
+          <div class="field-row">
+            <label for="ib-amps">
+              I<sub>B</sub> — Terminal 2 current (A primary, negative = out-flow)
+              <button type="button" class="helpBtn" aria-label="Help — terminal 2 current">?</button>
+            </label>
+            <input type="number" id="ib-amps" step="1" value="-490"
+                   required aria-describedby="ib-hint">
+            <p id="ib-hint" class="field-hint">
+              Current flowing into the zone at terminal 2. For normal through-current,
+              this is negative (current exits the zone). For an in-zone fault, both
+              currents flow in and should have the same sign.
+            </p>
+          </div>
+        </fieldset>
+
+        <!-- Harmonic content (shown conditionally for 87T / 87G) -->
+        <fieldset id="harmonic-fieldset">
+          <legend><strong>Harmonic Content (for Restraint Check)</strong></legend>
+
+          <div class="field-row" id="second-harm-row">
+            <label for="second-harm-pct">
+              2nd harmonic content (% of fundamental)
+              <button type="button" class="helpBtn" aria-label="Help — 2nd harmonic">?</button>
+            </label>
+            <input type="number" id="second-harm-pct" min="0" max="100" step="0.1" value="0"
+                   aria-describedby="second-harm-hint">
+            <p id="second-harm-hint" class="field-hint">
+              Present during transformer inrush. If ≥ 15%, the 87T relay blocks tripping
+              (IEEE C37.91). Measure with a power quality analyser or estimate from inrush studies.
+            </p>
+          </div>
+
+          <div class="field-row" id="fifth-harm-row">
+            <label for="fifth-harm-pct">
+              5th harmonic content (% of fundamental)
+              <button type="button" class="helpBtn" aria-label="Help — 5th harmonic">?</button>
+            </label>
+            <input type="number" id="fifth-harm-pct" min="0" max="100" step="0.1" value="0"
+                   aria-describedby="fifth-harm-hint">
+            <p id="fifth-harm-hint" class="field-hint">
+              Present during transformer over-excitation. If ≥ 35%, the 87T/87G relay blocks
+              tripping (IEEE C37.91). Enter the 5th harmonic percentage of the operating current.
+            </p>
+          </div>
+        </fieldset>
+
+        <div class="form-actions">
+          <button type="submit" class="btn btn-primary" id="run-btn">Run Differential Study</button>
+          <button type="button" class="btn" id="export-btn" disabled>Export CSV</button>
+        </div>
+
+      </form>
+
+      <div id="results" aria-live="polite" aria-label="Study results"></div>
+      <div id="study-approval-panel"></div>
+
+    </main>
+  </div>
+</body>
+</html>
