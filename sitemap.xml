@@ -47,6 +47,7 @@
   <url><loc>submittal.html</loc><priority>0.7</priority></url>
   <url><loc>windload.html</loc><priority>0.7</priority></url>
   <url><loc>transientstability.html</loc><priority>0.6</priority></url>
+  <url><loc>voltagestability.html</loc><priority>0.6</priority></url>
   <url><loc>contingency.html</loc><priority>0.6</priority></url>
   <url><loc>projectreport.html</loc><priority>0.6</priority></url>
   <url><loc>voltagedropstudy.html</loc><priority>0.6</priority></url>

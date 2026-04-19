@@ -1418,6 +1418,6 @@ Full IEC 60909-0:2016 equivalent voltage source method implemented in `analysis/
 | **P2** | 59 | ~~**Battery / UPS Sizing (IEEE 485)**~~ | `analysis/batterySizing.mjs` | Medium | ✅ Implemented 2026-04-12 |
 | **P2** | 66 | ~~**Generator Sizing (NFPA 110)**~~ | `analysis/generatorSizing.mjs` | Medium | ✅ Implemented 2026-04-12 |
 | **P2** | 67 | ~~**Differential Protection (87B/T/G)**~~ | `analysis/differentialProtection.mjs`, `data/protectiveDevices.json` | Medium | ✅ Implemented 2026-04-19 |
-| **P3** | 64 | **Voltage Stability (P-V / Q-V)** | Extend `analysis/loadFlow.js` | High | Not implemented |
+| **P3** | 64 | ~~**Voltage Stability (P-V / Q-V)**~~ | `analysis/voltageStability.mjs` | High | ✅ Implemented 2026-04-19 |
 | **P3** | 65 | **Optimal Power Flow / Economic Dispatch** | `analysis/optimalPowerFlow.mjs` | High | Not implemented |
-| **P3** | 70 | **Voltage Flicker (Pst/Plt)** | `analysis/voltageFlicker.mjs` | Medium | Not implemented |
+| **P3** | 70 | ~~**Voltage Flicker (Pst/Plt)**~~ | `analysis/voltageFlicker.mjs` | Medium | ✅ Implemented 2026-04-19 |

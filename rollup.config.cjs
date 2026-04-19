@@ -46,6 +46,7 @@ const entries = {
   heattracesizing: 'src/heattracesizing.js',
   frequencyscan: 'src/frequencyscan.js',
   voltageflicker: 'src/voltageflicker.js',
+  voltagestability: 'src/voltagestability.js',
   iec60287: 'src/iec60287.js',
   autosize: 'src/autosize.js',
   submittal: 'src/submittal.js',

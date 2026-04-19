@@ -55,6 +55,7 @@ const NAV_ROUTES = [
   { href: 'reliability.html', label: 'Reliability', section: 'Studies', group: 'Power System', icon: 'icons/toolbar/validate.svg' },
   { href: 'emf.html', label: 'EMF Analysis', section: 'Studies', group: 'Power System', icon: 'icons/toolbar/connect.svg' },
   { href: 'transientstability.html', label: 'Transient Stability', section: 'Studies', group: 'Power System', icon: 'icons/toolbar/validate.svg' },
+  { href: 'voltagestability.html', label: 'Voltage Stability', section: 'Studies', group: 'Power System', icon: 'icons/toolbar/validate.svg' },
   { href: 'contingency.html', label: 'N-1 Contingency', section: 'Studies', group: 'Power System', icon: 'icons/toolbar/validate.svg' },
   { href: 'voltagedropstudy.html', label: 'Voltage Drop', section: 'Studies', group: 'Cable', icon: 'icons/cable.svg' },
   { href: 'custom-components.html', label: 'Custom Components', section: 'Library', icon: 'icons/components/TextBox.svg' },

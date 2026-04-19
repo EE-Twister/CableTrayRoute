@@ -1,0 +1,202 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <meta name="description" content="Voltage stability analysis — P-V and Q-V curves for steady-state voltage collapse margin assessment using a two-bus Thevenin equivalent model. Identifies nose-point MW loading and reactive power (Q) margin per IEEE/PES Task Force methods." />
+  <title>Voltage Stability — CableTrayRoute</title>
+  <link rel="icon" href="icons/favicon.svg" type="image/svg+xml">
+  <link rel="apple-touch-icon" href="icons/favicon.svg">
+  <meta property="og:type" content="website">
+  <meta property="og:title" content="Voltage Stability — CableTrayRoute">
+  <meta property="og:description" content="P-V and Q-V curve analysis for voltage collapse margin assessment.">
+  <meta property="og:image" content="https://cabletrayroute.com/icons/og-preview.png">
+  <meta property="og:site_name" content="CableTrayRoute">
+  <meta property="og:url" content="voltagestability.html">
+  <link rel="canonical" href="voltagestability.html">
+  <link rel="dns-prefetch" href="https://fonts.gstatic.com">
+  <meta name="color-scheme" content="light dark">
+  <link rel="stylesheet" href="style.css" />
+  <script type="module" src="dirtyTracker.js"></script>
+  <script type="module" src="dist/voltagestability.js" defer></script>
+</head>
+<body class="voltagestability-page" data-report-title="Voltage Stability">
+  <a href="#main-content" class="skip-link">Skip to main content</a>
+  <nav class="top-nav" aria-label="Primary">
+    <button id="nav-toggle" class="nav-toggle" aria-label="Toggle navigation" aria-controls="nav-links" aria-expanded="false" title="Toggle navigation">
+      <img src="icons/toolbar/grid.svg" alt="" aria-hidden="true" class="control-icon" loading="lazy" decoding="async">
+    </button>
+    <div id="nav-links" class="nav-links" role="list">
+      <!-- Populated dynamically by navigation.js -->
+    </div>
+    <button id="settings-btn" class="settings-btn" aria-label="Settings" aria-expanded="false" title="Settings">
+      <img src="icons/toolbar/validate.svg" alt="" aria-hidden="true" class="control-icon" loading="lazy" decoding="async">
+    </button>
+  </nav>
+
+  <div id="settings-menu" class="settings-menu">
+    <label for="theme-select">Theme
+      <select id="theme-select">
+        <option value="system">System</option>
+        <option value="light">Light</option>
+        <option value="dark">Dark</option>
+        <option value="high-contrast">High Contrast</option>
+      </select>
+    </label>
+    <label><input type="checkbox" id="compact-toggle" aria-label="Enable compact table mode"> Compact Mode</label>
+    <button id="help-btn" class="btn" aria-expanded="false" title="Show help">
+      <img src="icons/toolbar/validate.svg" alt="" aria-hidden="true" class="control-icon" loading="lazy" decoding="async">
+      <span>Site Help</span>
+    </button>
+    <button id="new-project-btn" title="Start a new project">
+      <img src="icons/toolbar/copy.svg" alt="" aria-hidden="true" class="control-icon" loading="lazy" decoding="async">
+      <span>New Project</span>
+    </button>
+    <button id="save-project-btn" title="Save current project">
+      <img src="icons/toolbar/export.svg" alt="" aria-hidden="true" class="control-icon" loading="lazy" decoding="async">
+      <span>Save Project</span>
+    </button>
+    <button id="load-project-btn" title="Load an existing project">
+      <img src="icons/toolbar/import.svg" alt="" aria-hidden="true" class="control-icon" loading="lazy" decoding="async">
+      <span>Load Project</span>
+    </button>
+    <button id="export-project-btn" title="Export project data">
+      <img src="icons/toolbar/export.svg" alt="" aria-hidden="true" class="control-icon" loading="lazy" decoding="async">
+      <span>Export Project</span>
+    </button>
+    <button id="import-project-btn" title="Import project data">
+      <img src="icons/toolbar/import.svg" alt="" aria-hidden="true" class="control-icon" loading="lazy" decoding="async">
+      <span>Import Project</span>
+    </button>
+    <input type="file" id="import-project-input" accept=".ctr.json" class="hidden" title="Select project file">
+  </div>
+
+  <div class="container">
+    <main id="main-content" class="main-content">
+      <header class="page-header">
+        <h1>Voltage Stability</h1>
+      </header>
+
+      <details class="method-panel">
+        <summary>Method &amp; Assumptions</summary>
+        <p>This study uses a simplified two-bus Thevenin equivalent to trace the steady-state voltage stability limit. The model couples a source bus (V<sub>s</sub> = 1.0 pu) to a load bus through a series impedance Z = R + jX (derived from the short-circuit MVA and X/R ratio).</p>
+        <pre>V⁴ + (2PR + 2QX − 1)V² + (P² + Q²)Z² = 0</pre>
+        <p><strong>P-V curve:</strong> sweeps active power loading λ from 0 to the nose point. The upper branch is the stable operating region; the lower branch is unstable. The nose (voltage collapse point) gives the maximum transferable power and the MW stability margin.</p>
+        <p><strong>Q-V curve:</strong> sweeps bus voltage from 1.10 pu to 0.30 pu at constant active load and computes the reactive compensation Q<sub>comp</sub> needed to hold each voltage level. The minimum Q<sub>comp</sub> on the upper branch defines the reactive (Q) margin — how much reactive support can be withdrawn before voltage collapse.</p>
+        <p>The Thevenin impedance Z<sub>pu</sub> = V<sub>base</sub>² / (S<sub>sc</sub> · Z<sub>base</sub>) = MVA<sub>base</sub> / MVA<sub>sc</sub>. Split by X/R: R = Z / √(1 + XR²), X = Z · XR / √(1 + XR²).</p>
+        <p>This model is appropriate for preliminary stability screening of radial feeders, industrial plant main buses, and DER interconnection points. Multi-bus systems with voltage regulators, generator reactive limits, or switched capacitors require a full continuation power flow (CPF) solver.</p>
+        <p>Reference: P. Kundur, <em>Power System Stability and Control</em>, Chapter 14; IEEE/PES Task Force, <em>Voltage Stability Assessment</em>, 2002.</p>
+      </details>
+
+      <form id="vs-form" novalidate>
+
+        <fieldset>
+          <legend><strong>System Data</strong></legend>
+
+          <div class="field-row">
+            <label for="sc-mva">Short-circuit MVA at bus</label>
+            <input type="number" id="sc-mva" min="0.1" step="1" value="100" required aria-describedby="sc-mva-hint">
+            <p id="sc-mva-hint" class="field-hint">Thevenin short-circuit MVA looking back from the load bus toward the source. Sets the equivalent impedance magnitude.</p>
+          </div>
+
+          <div class="field-row">
+            <label for="xr-ratio">Source X/R ratio</label>
+            <input type="number" id="xr-ratio" min="0.1" max="100" step="0.5" value="10" required aria-describedby="xr-ratio-hint">
+            <p id="xr-ratio-hint" class="field-hint">Reactance-to-resistance ratio of the Thevenin impedance. Transmission systems: 10–30. Distribution: 2–10.</p>
+          </div>
+
+          <div class="field-row">
+            <label for="base-mva">System base MVA</label>
+            <input type="number" id="base-mva" min="1" step="1" value="100" required aria-describedby="base-mva-hint">
+            <p id="base-mva-hint" class="field-hint">Per-unit system base MVA. Used to convert impedances to per-unit.</p>
+          </div>
+
+          <div class="field-row">
+            <label for="system-kv">System voltage (kV, L-L)</label>
+            <input type="number" id="system-kv" min="0.1" step="0.01" value="4.16" required aria-describedby="system-kv-hint">
+            <p id="system-kv-hint" class="field-hint">Nominal line-to-line voltage at the load bus. Used for display and unit conversion only.</p>
+          </div>
+        </fieldset>
+
+        <fieldset>
+          <legend><strong>Load Data</strong></legend>
+
+          <div class="field-row">
+            <label for="load-mw">Base-case active load (MW)</label>
+            <input type="number" id="load-mw" min="0.001" step="1" value="10" required aria-describedby="load-mw-hint">
+            <p id="load-mw-hint" class="field-hint">Three-phase active power consumed at the bus at normal operating conditions.</p>
+          </div>
+
+          <div class="field-row">
+            <label for="power-factor">Load power factor (lagging)</label>
+            <input type="number" id="power-factor" min="0.01" max="1" step="0.01" value="0.85" required aria-describedby="pf-hint">
+            <p id="pf-hint" class="field-hint">Lagging power factor of the aggregate load. Sets the Q/P ratio: Q = P · tan(arccos(PF)).</p>
+          </div>
+        </fieldset>
+
+        <fieldset>
+          <legend><strong>Study Options</strong></legend>
+
+          <div class="field-row">
+            <label>Curve type</label>
+            <div role="radiogroup" aria-label="Curve type">
+              <label><input type="radio" name="curve-type" value="pv" checked> P-V curve (MW margin)</label>
+              <label><input type="radio" name="curve-type" value="qv"> Q-V curve (reactive margin)</label>
+              <label><input type="radio" name="curve-type" value="both"> Both</label>
+            </div>
+          </div>
+        </fieldset>
+
+        <div class="form-actions">
+          <button type="submit" class="btn btn-primary">Run Voltage Stability</button>
+        </div>
+      </form>
+
+      <div id="calc-errors" class="result-fail" hidden aria-live="polite"></div>
+
+      <div id="results" aria-live="polite"></div>
+
+    </main>
+  </div>
+
+  <div id="help-modal" class="modal" role="dialog" aria-modal="true" aria-labelledby="help-modal-title" hidden>
+    <div class="modal-content">
+      <button id="close-help-btn" class="modal-close" aria-label="Close help">×</button>
+      <h2 id="help-modal-title">Voltage Stability Help</h2>
+      <p>This study generates P-V and Q-V curves to assess steady-state voltage stability margins for a bus represented by a Thevenin equivalent circuit.</p>
+      <h3>P-V curve interpretation</h3>
+      <ul>
+        <li><strong>Upper branch</strong> — stable operating region (normal operation).</li>
+        <li><strong>Lower branch</strong> — unstable region (below the nose; voltage regulators may not restore voltage).</li>
+        <li><strong>Nose point</strong> — maximum transferable power. Loading beyond this point causes voltage collapse.</li>
+        <li><strong>MW margin</strong> — additional load that can be served before collapse. Target: &gt; 20–25% of base case for transmission, &gt; 10% for distribution.</li>
+      </ul>
+      <h3>Q-V curve interpretation</h3>
+      <ul>
+        <li>The curve shows reactive compensation Q<sub>comp</sub> (MVAr) needed to hold each voltage level at constant active load.</li>
+        <li>The <strong>operating point</strong> (Q<sub>comp</sub> = 0) corresponds to the base-case voltage with no external reactive compensation.</li>
+        <li><strong>Q-margin</strong> — reactive support that can be lost before voltage collapse. Negative Q-margin means the system needs reactive injection to maintain stable operation.</li>
+      </ul>
+      <h3>Typical action thresholds</h3>
+      <ul>
+        <li>MW margin &lt; 15%: consider adding generation or reactive compensation.</li>
+        <li>Q-margin &lt; 0: capacitor bank or SVC required at the bus.</li>
+        <li>Nose voltage &lt; 0.70 pu: bus is heavily stressed; voltage collapse risk is high under contingency.</li>
+      </ul>
+    </div>
+  </div>
+
+  <footer class="site-footer">
+    <div class="footer-left">
+      <img src="icons/route.svg" alt="CableTrayRoute logo" class="footer-logo" loading="lazy" decoding="async">
+      <span>CableTrayRoute</span>
+    </div>
+    <nav class="footer-links" aria-label="Footer">
+      <a href="docs/index.html">Docs</a>
+      <a href="docs/quickstart.html">Quick Start</a>
+      <a href="index.html">Home</a>
+    </nav>
+  </footer>
+
+</body>
+</html>
