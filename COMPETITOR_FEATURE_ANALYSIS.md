@@ -402,7 +402,7 @@ Study page `capacitorbank.html` / `capacitorbank.js` provides form inputs for bu
 |---|---|---|
 | **Bus, transformer, and generator differential relay characteristic curves** | ETAP Star, EasyPower, SKM PTW, DIgSILENT PowerFactory | Differential protection (ANSI device 87) operates on the principle of current balance: the algebraic sum of currents entering and leaving a protected zone should be zero during normal operation. Types: bus differential (87B), transformer differential (87T) with harmonic restraint for inrush blocking, and generator differential (87G). Professional TCC/protection tools model the percentage differential characteristic: a plot of operating current vs. restraint current with dual-slope (Slope 1 and Slope 2) and minimum pickup thresholds. CT ratio mismatch compensation and tap-setting calculations are automated. CableTrayRoute's `analysis/tcc.js` and `data/protectiveDevices.json` model overcurrent devices (fuses, breakers, relays with inverse-time curves) but have no differential relay type, no percentage-differential characteristic curve, no CT ratio matching, and no inrush restraint modeling. This is a significant gap for any facility with transformers or generators requiring unit protection. |
 
-**Status:** Not implemented.
+**Status:** ✅ **Implemented 2026-04-19.** `analysis/differentialProtection.mjs` — full percentage-differential engine with dual-slope characteristic (slope 1/2, breakpoint), CT ratio matching and winding correction (Yy0/Yd1/Yd11/Dy1/Dy11/Dd0), 2nd-harmonic inrush blocking and 5th-harmonic overexcitation blocking, per-phase OPERATE/RESTRAINED/HARMONIC_BLOCKED status; `differentialprotection.html` with I_op vs I_res scatter chart; three device entries in `data/protectiveDevices.json` (`diff_87t_relay`, `diff_87b_relay`, `diff_87g_relay`); TCC integration via `buildDifferentialLibraryEntries()` and green dashed curve style in `analysis/tcc.js`; nav link under Studies → Protection; tests: `tests/differentialProtection.test.mjs`; docs: `docs/differential-protection.md`.
 
 ---
 
@@ -1042,7 +1042,7 @@ Benchmarked against: **ETAP 2024/2025** (Electric Copilot™, composite networks
 | **Voltage Stability (P-V / Q-V Curves)** | **No** | Yes | — | — | — | — | — | — | — | — |
 | **Optimal Power Flow / Economic Dispatch** | **No** | Yes | — | — | — | — | — | — | — | — |
 | **Generator Sizing (NFPA 110)** | **No** | Yes | Yes | — | — | — | — | — | — | — |
-| **Differential Protection (87B/T/G)** | **No** | Yes | Yes | — | — | — | — | — | — | — |
+| **Differential Protection (87B/T/G)** | **Yes ✓** | Yes | Yes | — | — | — | — | — | — | — |
 | **IEC 60909 Short-Circuit Method** | **No** | Yes | Yes | — | — | — | — | — | — | — |
 | **Cable Ampacity per IEC 60287** | **No** | Yes | — | — | — | — | — | — | — | — |
 | **Voltage Flicker (IEC 61000-4-15 Pst/Plt)** | **No** | Yes | Yes | — | — | — | — | — | — | — |
@@ -1189,7 +1189,7 @@ All originally high- and medium-priority feasible items have been implemented:
 7. **Frequency Scan / Harmonic Resonance** (Gap #63) — Required companion to any capacitor bank installation and essential for harmonic filter design. Impedance-frequency sweep, resonance identification. Recommended: extend `analysis/harmonics.js` with `frequencyScan()`.
 8. **Battery / UPS Sizing per IEEE 485** (Gap #59) — Standard for any facility with emergency power. Duty cycle modeling, cell selection, temperature/aging correction. Recommended module: `analysis/batterySizing.mjs`.
 9. ~~**Standby / Emergency Generator Sizing** (Gap #66)~~ — ✅ **Implemented 2026-04-12.** `analysis/generatorSizing.mjs`, `generatorsizing.html`, `tests/generatorSizing.test.mjs`, `docs/generator-sizing.md`.
-10. **Differential Protection Modeling (87B/T/G)** (Gap #67) — Required for transformer and generator unit protection. Percentage-differential characteristic, CT ratio matching, harmonic restraint. Recommended: extend `analysis/tcc.js` and `data/protectiveDevices.json` with `'differential'` device type.
+10. ~~**Differential Protection Modeling (87B/T/G)** (Gap #67)~~ — ✅ **Implemented 2026-04-19.** `analysis/differentialProtection.mjs`, `differentialprotection.html`, `tests/differentialProtection.test.mjs`, `docs/differential-protection.md`.
 
 **Lower Priority — Advanced studies for transmission-level and utility planning:**
 
@@ -1417,7 +1417,7 @@ Full IEC 60909-0:2016 equivalent voltage source method implemented in `analysis/
 | **P2** | 63 | **Frequency Scan / Harmonic Resonance** | Extend `analysis/harmonics.js` | Medium | Not implemented |
 | **P2** | 59 | **Battery / UPS Sizing (IEEE 485)** | `analysis/batterySizing.mjs` | Medium | Not implemented |
 | **P2** | 66 | ~~**Generator Sizing (NFPA 110)**~~ | `analysis/generatorSizing.mjs` | Medium | ✅ Implemented 2026-04-12 |
-| **P2** | 67 | **Differential Protection (87B/T/G)** | Extend `analysis/tcc.js`, `data/protectiveDevices.json` | Medium | Not implemented |
+| **P2** | 67 | ~~**Differential Protection (87B/T/G)**~~ | `analysis/differentialProtection.mjs`, `differentialprotection.html` | Medium | ✅ Implemented 2026-04-19 |
 | **P3** | 64 | **Voltage Stability (P-V / Q-V)** | Extend `analysis/loadFlow.js` | High | Not implemented |
 | **P3** | 65 | **Optimal Power Flow / Economic Dispatch** | `analysis/optimalPowerFlow.mjs` | High | Not implemented |
 | **P3** | 70 | **Voltage Flicker (Pst/Plt)** | `analysis/voltageFlicker.mjs` | Medium | Not implemented |

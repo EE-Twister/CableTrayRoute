@@ -43,6 +43,7 @@ const entries = {
   dcshortcircuit: 'src/dcshortcircuit.js',
   ibr: 'src/ibr.js',
   derinterconnect: 'src/derinterconnect.js',
+  differentialprotection: 'src/differentialprotection.js',
   heattracesizing: 'src/heattracesizing.js',
   iec60287: 'src/iec60287.js',
   autosize: 'src/autosize.js',

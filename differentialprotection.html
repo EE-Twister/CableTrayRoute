@@ -1,0 +1,416 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <meta name="description" content="Percentage differential protection study (87B/87T/87G). Analyse transformer, bus, and generator differential relay operation with harmonic restraint per IEEE C37.91 and IEC 60255-151." />
+  <title>Differential Protection — CableTrayRoute</title>
+  <link rel="icon" href="icons/favicon.svg" type="image/svg+xml">
+  <link rel="apple-touch-icon" href="icons/favicon.svg">
+  <meta property="og:type" content="website">
+  <meta property="og:title" content="Differential Protection — CableTrayRoute">
+  <meta property="og:description" content="87B/87T/87G percentage differential relay analysis with harmonic restraint per IEEE C37.91 and IEC 60255-151.">
+  <meta property="og:image" content="https://cabletrayroute.com/icons/og-preview.png">
+  <meta property="og:site_name" content="CableTrayRoute">
+  <meta property="og:url" content="differentialprotection.html">
+  <link rel="canonical" href="differentialprotection.html">
+  <link rel="dns-prefetch" href="https://fonts.gstatic.com">
+  <meta name="color-scheme" content="light dark">
+  <link rel="stylesheet" href="style.css" />
+  <script type="module" src="dirtyTracker.js"></script>
+  <script type="module" src="dist/differentialprotection.js" defer></script>
+</head>
+<body class="differentialprotection-page" data-report-title="Differential Protection Study">
+  <a href="#main-content" class="skip-link">Skip to main content</a>
+  <nav class="top-nav" aria-label="Primary">
+    <button id="nav-toggle" class="nav-toggle" aria-label="Toggle navigation" aria-controls="nav-links" aria-expanded="false" title="Toggle navigation">
+      <img src="icons/toolbar/grid.svg" alt="" aria-hidden="true" class="control-icon" loading="lazy" decoding="async">
+    </button>
+    <div id="nav-links" class="nav-links" role="list">
+      <!-- Populated dynamically by navigation.js -->
+    </div>
+    <button id="settings-btn" class="settings-btn" aria-label="Settings" aria-expanded="false" title="Settings">
+      <img src="icons/toolbar/validate.svg" alt="" aria-hidden="true" class="control-icon" loading="lazy" decoding="async">
+    </button>
+  </nav>
+
+  <div id="settings-menu" class="settings-menu">
+    <label for="theme-select">Theme
+      <select id="theme-select">
+        <option value="system">System</option>
+        <option value="light">Light</option>
+        <option value="dark">Dark</option>
+        <option value="high-contrast">High Contrast</option>
+      </select>
+    </label>
+    <label><input type="checkbox" id="compact-toggle" aria-label="Enable compact table mode"> Compact Mode</label>
+    <label for="unit-select">Units
+      <select id="unit-select">
+        <option value="imperial">Imperial (ft, in)</option>
+        <option value="metric">Metric (m, mm)</option>
+      </select>
+    </label>
+    <button id="help-btn" class="btn" aria-expanded="false" title="Show help">
+      <img src="icons/toolbar/validate.svg" alt="" aria-hidden="true" class="control-icon" loading="lazy" decoding="async">
+      <span>Site Help</span>
+    </button>
+    <button id="new-project-btn" title="Start a new project">
+      <img src="icons/toolbar/copy.svg" alt="" aria-hidden="true" class="control-icon" loading="lazy" decoding="async">
+      <span>New Project</span>
+    </button>
+    <button id="save-project-btn" title="Save current project">
+      <img src="icons/toolbar/export.svg" alt="" aria-hidden="true" class="control-icon" loading="lazy" decoding="async">
+      <span>Save Project</span>
+    </button>
+    <button id="load-project-btn" title="Load an existing project">
+      <img src="icons/toolbar/import.svg" alt="" aria-hidden="true" class="control-icon" loading="lazy" decoding="async">
+      <span>Load Project</span>
+    </button>
+    <button id="export-project-btn" title="Export project data">
+      <img src="icons/toolbar/export.svg" alt="" aria-hidden="true" class="control-icon" loading="lazy" decoding="async">
+      <span>Export Project</span>
+    </button>
+    <button id="import-project-btn" title="Import project data">
+      <img src="icons/toolbar/import.svg" alt="" aria-hidden="true" class="control-icon" loading="lazy" decoding="async">
+      <span>Import Project</span>
+    </button>
+    <input type="file" id="import-project-input" accept=".ctr.json" class="hidden" title="Select project file">
+  </div>
+
+  <div class="container">
+    <main id="main-content" class="main-content">
+
+      <header class="page-header">
+        <h1>Differential Protection (87B / 87T / 87G)</h1>
+      </header>
+
+      <details class="method-panel">
+        <summary>Method &amp; Assumptions</summary>
+        <p>Percentage differential protection follows <strong>IEEE C37.91-2008</strong>
+        (transformer protection), <strong>IEEE C37.102-2006</strong> (generator protection),
+        <strong>IEEE C37.97-2020</strong> (bus protection), and
+        <strong>IEC 60255-151:2009</strong>.</p>
+
+        <p><strong>Operate and restraint currents (per-unit of rated):</strong></p>
+        <pre>I_op  = |I₁_pu − I₂_pu|          (phasor difference of normalised winding currents)
+I_res = (|I₁_pu| + |I₂_pu|) / 2   (average — represents through-fault level)</pre>
+
+        <p><strong>Dual-slope trip characteristic (IEC 60255-151 §5):</strong></p>
+        <pre>Zone 1 (I_res ≤ I_res_break):  trip if I_op ≥ I_min + slope₁ × I_res
+Zone 2 (I_res  > I_res_break):  trip if I_op ≥ I_min + slope₂ × I_res</pre>
+
+        <p><strong>Harmonic restraint blocking:</strong></p>
+        <ul>
+          <li><strong>2nd harmonic (inrush)</strong> — if |I₂nd| / |I₁fund| ≥ IHR₂ threshold,
+            the relay is blocked. Typical threshold: 15–20%.</li>
+          <li><strong>5th harmonic (overexcitation)</strong> — if |I₅th| / |I₁fund| ≥ IHR₅ threshold,
+            the relay is blocked. Typical threshold: 20–35%.</li>
+        </ul>
+
+        <p><strong>Winding correction (transformer):</strong> For delta-wye (Yd/Dy) connections, the
+        secondary CT current is corrected for the 30° phase shift using a √3 magnitude factor and
+        digital phase-rotation compensation (per IEEE C37.91-2008 §5.4).</p>
+
+        <p>Citations: <a href="docs/differential-protection.md">Differential Protection Guide</a>.
+        See also: <a href="tcc.html">TCC / Protection Coordination</a>,
+        <a href="shortCircuit.html">Short Circuit</a>,
+        <a href="arcFlash.html">Arc Flash</a>.</p>
+      </details>
+
+      <form id="diffprot-form" novalidate>
+
+        <!-- Element Identification -->
+        <fieldset>
+          <legend><strong>Protected Element</strong></legend>
+
+          <div class="field-row">
+            <label for="element-label">Element label</label>
+            <input type="text" id="element-label" placeholder="e.g. T1 – 10 MVA 115/13.8 kV Yd1"
+                   aria-describedby="element-label-hint">
+            <p id="element-label-hint" class="field-hint">
+              Descriptive identifier for the protected transformer, bus, or generator.
+            </p>
+          </div>
+
+          <div class="field-row">
+            <label for="element-type">Element type</label>
+            <select id="element-type" aria-describedby="element-type-hint">
+              <option value="transformer">Transformer (87T)</option>
+              <option value="bus">Bus (87B)</option>
+              <option value="generator">Generator (87G)</option>
+            </select>
+            <p id="element-type-hint" class="field-hint">
+              Select the type of protected element. This affects winding correction
+              and CT configuration.
+            </p>
+          </div>
+        </fieldset>
+
+        <!-- Nameplate Data -->
+        <fieldset>
+          <legend><strong>Nameplate / Rating</strong></legend>
+
+          <div class="field-row">
+            <label for="rating-mva">
+              Rating (MVA)
+              <button type="button" class="helpBtn" aria-label="Help — MVA rating">?</button>
+            </label>
+            <input type="number" id="rating-mva" min="0.001" step="0.1" value="10"
+                   required aria-describedby="rating-mva-hint">
+            <p id="rating-mva-hint" class="field-hint">
+              Transformer or generator nameplate MVA rating. Used to compute rated currents.
+            </p>
+          </div>
+
+          <div class="field-row">
+            <label for="voltage-hv-kv">
+              HV voltage (kV, line-to-line)
+              <button type="button" class="helpBtn" aria-label="Help — HV voltage">?</button>
+            </label>
+            <input type="number" id="voltage-hv-kv" min="0.001" step="0.1" value="115"
+                   required aria-describedby="voltage-hv-kv-hint">
+            <p id="voltage-hv-kv-hint" class="field-hint">
+              High-voltage (primary) winding rated voltage. For bus protection, enter the bus voltage.
+            </p>
+          </div>
+
+          <div class="field-row">
+            <label for="voltage-lv-kv">
+              LV voltage (kV, line-to-line)
+              <button type="button" class="helpBtn" aria-label="Help — LV voltage">?</button>
+            </label>
+            <input type="number" id="voltage-lv-kv" min="0.001" step="0.1" value="13.8"
+                   required aria-describedby="voltage-lv-kv-hint">
+            <p id="voltage-lv-kv-hint" class="field-hint">
+              Low-voltage (secondary) winding rated voltage. For bus / generator, enter the same as HV.
+            </p>
+          </div>
+
+          <div class="field-row" id="winding-connection-row">
+            <label for="winding-connection">Winding connection (vector group)</label>
+            <select id="winding-connection" aria-describedby="winding-connection-hint">
+              <option value="Yy0">Yy0 (0°) — wye-wye, no phase shift</option>
+              <option value="Yd1" selected>Yd1 (30°) — wye-delta, standard</option>
+              <option value="Yd11">Yd11 (330°) — wye-delta, reverse</option>
+              <option value="Dy1">Dy1 (30°) — delta-wye</option>
+              <option value="Dy11">Dy11 (330°) — delta-wye, reverse</option>
+              <option value="Yy6">Yy6 (180°) — wye-wye, phase reversal</option>
+              <option value="Dd0">Dd0 (0°) — delta-delta</option>
+            </select>
+            <p id="winding-connection-hint" class="field-hint">
+              IEC vector group of the transformer. Determines the magnitude correction factor (√3)
+              and phase shift compensation applied to the secondary CT current.
+            </p>
+          </div>
+        </fieldset>
+
+        <!-- CT Ratios -->
+        <fieldset>
+          <legend><strong>Current Transformer (CT) Ratios</strong></legend>
+
+          <div class="field-row">
+            <label for="ctr1">
+              CTR₁ — Primary CT ratio (primary A / secondary A)
+              <button type="button" class="helpBtn" aria-label="Help — primary CT ratio">?</button>
+            </label>
+            <input type="number" id="ctr1" min="1" step="1" value="100"
+                   required aria-describedby="ctr1-hint">
+            <p id="ctr1-hint" class="field-hint">
+              Primary winding CT ratio. E.g. 100:5 CT → enter 20 (100/5).
+              Obtain from CT nameplate or protection relay settings sheet.
+            </p>
+          </div>
+
+          <div class="field-row">
+            <label for="ctr2">
+              CTR₂ — Secondary CT ratio (primary A / secondary A)
+              <button type="button" class="helpBtn" aria-label="Help — secondary CT ratio">?</button>
+            </label>
+            <input type="number" id="ctr2" min="1" step="1" value="600"
+                   required aria-describedby="ctr2-hint">
+            <p id="ctr2-hint" class="field-hint">
+              Secondary winding CT ratio. E.g. 600:5 CT → enter 120 (600/5).
+            </p>
+          </div>
+        </fieldset>
+
+        <!-- Relay Settings -->
+        <fieldset>
+          <legend><strong>Relay Settings</strong></legend>
+
+          <div class="field-row">
+            <label for="i-min-pu">
+              I<sub>min</sub> — Minimum differential pickup (pu of rated)
+              <button type="button" class="helpBtn" aria-label="Help — minimum pickup">?</button>
+            </label>
+            <input type="number" id="i-min-pu" min="0.05" max="0.99" step="0.01" value="0.20"
+                   required aria-describedby="i-min-pu-hint">
+            <p id="i-min-pu-hint" class="field-hint">
+              Minimum operate current in per-unit of rated. Typical range: 0.10–0.30 pu.
+              Set higher for high-impedance transformers; lower for sensitive protection.
+            </p>
+          </div>
+
+          <div class="field-row">
+            <label for="slope1">
+              Slope 1 (Zone 1, fractional — e.g. 0.25 = 25%)
+              <button type="button" class="helpBtn" aria-label="Help — slope 1">?</button>
+            </label>
+            <input type="number" id="slope1" min="0.01" max="0.99" step="0.01" value="0.25"
+                   required aria-describedby="slope1-hint">
+            <p id="slope1-hint" class="field-hint">
+              Slope of the percentage-differential characteristic in the low-restraint zone.
+              Typical value: 0.20–0.30. Protects against CT mismatch errors on light through-faults.
+            </p>
+          </div>
+
+          <div class="field-row">
+            <label for="slope2">
+              Slope 2 (Zone 2, fractional — e.g. 0.50 = 50%)
+              <button type="button" class="helpBtn" aria-label="Help — slope 2">?</button>
+            </label>
+            <input type="number" id="slope2" min="0.01" max="0.99" step="0.01" value="0.50"
+                   required aria-describedby="slope2-hint">
+            <p id="slope2-hint" class="field-hint">
+              Slope in the high-restraint zone (above the breakpoint). Typical value: 0.40–0.60.
+              Higher slope improves stability during heavy through-faults with CT saturation.
+            </p>
+          </div>
+
+          <div class="field-row">
+            <label for="i-res-break-pu">
+              I<sub>res,break</sub> — Slope breakpoint (pu restraint current)
+              <button type="button" class="helpBtn" aria-label="Help — slope breakpoint">?</button>
+            </label>
+            <input type="number" id="i-res-break-pu" min="0.5" max="10" step="0.1" value="2.0"
+                   required aria-describedby="i-res-break-pu-hint">
+            <p id="i-res-break-pu-hint" class="field-hint">
+              Restraint current at which the characteristic transitions from slope 1 to slope 2.
+              Typical value: 1.5–3.0 pu. Set to the expected heavy through-fault level.
+            </p>
+          </div>
+        </fieldset>
+
+        <!-- Harmonic Restraint -->
+        <fieldset>
+          <legend><strong>Harmonic Restraint Thresholds</strong></legend>
+
+          <div class="field-row">
+            <label for="ihr2-threshold">
+              IHR₂ — 2nd harmonic blocking threshold (fractional)
+              <button type="button" class="helpBtn" aria-label="Help — 2nd harmonic threshold">?</button>
+            </label>
+            <input type="number" id="ihr2-threshold" min="0.05" max="0.50" step="0.01" value="0.15"
+                   aria-describedby="ihr2-threshold-hint">
+            <p id="ihr2-threshold-hint" class="field-hint">
+              Block relay for inrush when 2nd harmonic content ≥ this fraction of fundamental.
+              Typical setting: 0.15 (15%). Lower values = more sensitive inrush detection.
+            </p>
+          </div>
+
+          <div class="field-row">
+            <label for="ihr5-threshold">
+              IHR₅ — 5th harmonic blocking threshold (fractional)
+              <button type="button" class="helpBtn" aria-label="Help — 5th harmonic threshold">?</button>
+            </label>
+            <input type="number" id="ihr5-threshold" min="0.05" max="0.60" step="0.01" value="0.20"
+                   aria-describedby="ihr5-threshold-hint">
+            <p id="ihr5-threshold-hint" class="field-hint">
+              Block relay for overexcitation when 5th harmonic ≥ this fraction of fundamental.
+              Typical setting: 0.20 (20%).
+            </p>
+          </div>
+        </fieldset>
+
+        <!-- Per-Phase Currents -->
+        <fieldset>
+          <legend><strong>Measured Phase Currents</strong></legend>
+          <p class="field-hint">Enter the measured primary and secondary currents for each phase
+          (from fault simulation, field measurement, or the
+          <a href="shortCircuit.html">Short Circuit</a> study).
+          Harmonic fields are optional — leave at 0 if harmonic data is not available.</p>
+
+          <table class="data-table" id="phase-table" aria-label="Per-phase current inputs">
+            <thead>
+              <tr>
+                <th scope="col">Phase</th>
+                <th scope="col">I₁ Primary (A)</th>
+                <th scope="col">I₂ Secondary (A)</th>
+                <th scope="col">I₂nd Harmonic (A)</th>
+                <th scope="col">I₅th Harmonic (A)</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr>
+                <td>A</td>
+                <td><input type="number" class="phase-i1" min="0" step="0.1" value="50.3" aria-label="Phase A primary current"></td>
+                <td><input type="number" class="phase-i2" min="0" step="0.1" value="418.7" aria-label="Phase A secondary current"></td>
+                <td><input type="number" class="phase-i2nd" min="0" step="0.01" value="0" aria-label="Phase A 2nd harmonic"></td>
+                <td><input type="number" class="phase-i5th" min="0" step="0.01" value="0" aria-label="Phase A 5th harmonic"></td>
+              </tr>
+              <tr>
+                <td>B</td>
+                <td><input type="number" class="phase-i1" min="0" step="0.1" value="50.3" aria-label="Phase B primary current"></td>
+                <td><input type="number" class="phase-i2" min="0" step="0.1" value="418.7" aria-label="Phase B secondary current"></td>
+                <td><input type="number" class="phase-i2nd" min="0" step="0.01" value="0" aria-label="Phase B 2nd harmonic"></td>
+                <td><input type="number" class="phase-i5th" min="0" step="0.01" value="0" aria-label="Phase B 5th harmonic"></td>
+              </tr>
+              <tr>
+                <td>C</td>
+                <td><input type="number" class="phase-i1" min="0" step="0.1" value="50.3" aria-label="Phase C primary current"></td>
+                <td><input type="number" class="phase-i2" min="0" step="0.1" value="418.7" aria-label="Phase C secondary current"></td>
+                <td><input type="number" class="phase-i2nd" min="0" step="0.01" value="0" aria-label="Phase C 2nd harmonic"></td>
+                <td><input type="number" class="phase-i5th" min="0" step="0.01" value="0" aria-label="Phase C 5th harmonic"></td>
+              </tr>
+            </tbody>
+          </table>
+        </fieldset>
+
+        <button type="submit" class="primary-btn">Run Analysis</button>
+
+      </form>
+
+      <div id="results" role="region" aria-live="polite" aria-label="Differential protection analysis results"></div>
+
+      <!-- Engineer Review / Approval Panel -->
+      <section class="card" aria-labelledby="study-review-panel-heading">
+        <div id="study-review-panel"></div>
+      </section>
+
+      <nav class="step-nav" aria-label="Workflow navigation">
+        <a href="tcc.html" class="step-nav-prev">&#8592; TCC</a>
+        <a href="shortCircuit.html" class="step-nav-next">Short Circuit &#8594;</a>
+      </nav>
+
+    </main>
+  </div>
+
+  <div id="help-modal" class="modal" aria-hidden="true" role="dialog" aria-modal="true"
+       aria-labelledby="help-title">
+    <div class="modal-content">
+      <button id="close-help-btn" class="close-btn" aria-label="Close Help">&times;</button>
+      <h2 id="help-title">Differential Protection Help</h2>
+      <p>This tool analyses percentage differential relay operation (87B, 87T, 87G) per
+      <strong>IEEE C37.91-2008</strong> and <strong>IEC 60255-151:2009</strong>.</p>
+      <h3>Workflow</h3>
+      <ol>
+        <li>Select the protected element type (transformer, bus, or generator).</li>
+        <li>Enter nameplate data: MVA rating and HV/LV voltages.</li>
+        <li>Enter CT ratios for each winding. Ensure CT ratings match the relay input range.</li>
+        <li>Set relay thresholds: minimum pickup (I<sub>min</sub>), slope 1, slope 2, and breakpoint.</li>
+        <li>Enter per-phase primary and secondary currents (from fault study or field measurements).</li>
+        <li>Click <strong>Run Analysis</strong> to see relay status and the I<sub>op</sub> vs I<sub>res</sub> plot.</li>
+      </ol>
+      <h3>Interpreting results</h3>
+      <ul>
+        <li><strong>RESTRAINED</strong> — operating point is below the trip threshold. Relay does not operate. Normal for load and through-fault conditions.</li>
+        <li><strong>OPERATE</strong> — differential current exceeds the percentage characteristic. Relay trips within 1–2 cycles. Indicates an internal fault.</li>
+        <li><strong>HARMONIC_BLOCKED</strong> — the relay would operate but is restrained by 2nd (inrush) or 5th (overexcitation) harmonic content.</li>
+      </ul>
+      <p>See <a href="docs/differential-protection.md">Differential Protection Guide</a> for full technical details.</p>
+    </div>
+  </div>
+
+  <script type="module" src="dist/projectManager.js"></script>
+</body>
+</html>

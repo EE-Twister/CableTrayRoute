@@ -33,6 +33,7 @@ const NAV_ROUTES = [
   { href: 'iec60287.html', label: 'IEC 60287 Ampacity', section: 'Studies', group: 'Cable', icon: 'icons/cable.svg' },
   { href: 'oneline.html', label: 'One-Line', section: 'Workflow', group: 'Planning', icon: 'icons/oneline.svg' },
   { href: 'tcc.html', label: 'TCC', section: 'Studies', group: 'Protection', icon: 'icons/toolbar/validate.svg' },
+  { href: 'differentialprotection.html', label: 'Differential Protection', section: 'Studies', group: 'Protection', icon: 'icons/toolbar/validate.svg' },
   { href: 'harmonics.html', label: 'Harmonics', section: 'Studies', group: 'Power Quality', icon: 'icons/toolbar/grid-size.svg' },
   { href: 'capacitorbank.html', label: 'Capacitor Bank', section: 'Studies', group: 'Power Quality', icon: 'icons/toolbar/grid-size.svg' },
   { href: 'battery.html', label: 'Battery / UPS Sizing', section: 'Studies', group: 'Equipment Sizing', icon: 'icons/components/UPS.svg' },

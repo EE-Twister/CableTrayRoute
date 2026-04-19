@@ -518,6 +518,9 @@ let arcFlashOverlayComponentId = null;
 // Fixed purple palette for GFP curves — visually distinct from d3.schemeCategory10
 const GFP_COLOR_PALETTE = ['#7c3aed', '#6d28d9', '#5b21b6', '#4c1d95', '#a78bfa'];
 
+// Fixed green palette for differential relay curves (87B/T/G)
+const DIFF_COLOR_PALETTE = ['#059669', '#047857', '#065f46', '#064e3b', '#10b981'];
+
 function getActiveComponentId() {
   if (!activeComponentId) return null;
   if (!componentLookup.has(activeComponentId)) return null;
@@ -2174,6 +2177,7 @@ function rebuildCatalog() {
   const fuseEntries = libraryEntries.filter(entry => (entry.baseDevice?.type || entry.deviceType) === 'fuse');
   const otherLibraryEntries = libraryEntries.filter(entry => (entry.baseDevice?.type || entry.deviceType) !== 'fuse');
   const gfpEntries = buildGFPLibraryEntries();
+  const differentialEntries = buildDifferentialLibraryEntries();
   const overlayEntries = buildOverlayEntries();
 
   if (componentEntries.length) {
@@ -2190,6 +2194,9 @@ function rebuildCatalog() {
   }
   if (gfpEntries.length) {
     deviceGroups.push({ id: 'gfpRelays', label: 'Ground Fault Relays (GFP)', items: gfpEntries });
+  }
+  if (differentialEntries.length) {
+    deviceGroups.push({ id: 'differentialRelays', label: 'Differential Relays (87B/T/G)', items: differentialEntries });
   }
   if (overlayEntries.length) {
     deviceGroups.push({ id: 'overlays', label: 'Connected Elements', items: overlayEntries });
@@ -2509,6 +2516,22 @@ function buildGFPLibraryEntries() {
       baseDevice: dev,
       deviceType: dev.type || '',
       deviceCategory: 'ground_fault_relay',
+      overrideSource: snapOverridesToOptions(dev, saved.settings?.[dev.id] || {})
+    }))
+    .sort((a, b) => a.name.localeCompare(b.name, undefined, { sensitivity: 'base' }));
+}
+
+function buildDifferentialLibraryEntries() {
+  return libraryDevices
+    .filter(dev => PROTECTIVE_TYPES.has(dev.type) && dev.differential === true)
+    .map(dev => ({
+      uid: dev.id,
+      kind: 'library',
+      name: dev.name || dev.id,
+      baseDeviceId: dev.id,
+      baseDevice: dev,
+      deviceType: dev.type || '',
+      deviceCategory: 'differential_relay',
       overrideSource: snapOverridesToOptions(dev, saved.settings?.[dev.id] || {})
     }))
     .sort((a, b) => a.name.localeCompare(b.name, undefined, { sensitivity: 'base' }));
@@ -6794,11 +6817,16 @@ function plot() {
   const color = d3.scaleOrdinal(d3.schemeCategory10);
   const plottables = [...devicePlots, ...overlays];
   let gfpColorIndex = 0;
+  let diffColorIndex = 0;
   plottables.forEach((entry, index) => {
     if (entry.selection?.baseDevice?.groundFault === true) {
       entry.color = GFP_COLOR_PALETTE[gfpColorIndex % GFP_COLOR_PALETTE.length];
       entry.isGFP = true;
       gfpColorIndex++;
+    } else if (entry.selection?.baseDevice?.differential === true) {
+      entry.color = DIFF_COLOR_PALETTE[diffColorIndex % DIFF_COLOR_PALETTE.length];
+      entry.isDifferential = true;
+      diffColorIndex++;
     } else {
       entry.color = color(index);
     }
@@ -7176,10 +7204,10 @@ function plot() {
     entry.path = deviceLayer.append('path')
       .datum(scaled.curve)
       .attr('fill', 'none')
-      .attr('stroke-width', entry.isGFP ? 2.5 : 2)
+      .attr('stroke-width', entry.isGFP || entry.isDifferential ? 2.5 : 2)
       .attr('stroke', entry.color)
-      .attr('stroke-dasharray', entry.isGFP ? '8,4' : null)
-      .attr('stroke-linecap', entry.isGFP ? 'round' : null)
+      .attr('stroke-dasharray', entry.isGFP ? '8,4' : entry.isDifferential ? '4,4' : null)
+      .attr('stroke-linecap', entry.isGFP || entry.isDifferential ? 'round' : null)
       .style('cursor', 'move')
       .on('contextmenu', event => {
         event.preventDefault();

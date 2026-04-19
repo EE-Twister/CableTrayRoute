@@ -472,5 +472,80 @@
     "interruptRating": 50,
     "nec230_95": true,
     "curve": []
+  },
+  {
+    "id": "diff_87t_relay",
+    "type": "relay",
+    "vendor": "IEEE C37.91 (87T)",
+    "name": "Transformer Differential Relay (87T)",
+    "differential": true,
+    "differentialType": "87T",
+    "settings": {
+      "iMinPu": 0.20,
+      "slope1": 0.25,
+      "slope2": 0.50,
+      "iResBreakPu": 2.0,
+      "ihr2Threshold": 0.15,
+      "ihr5Threshold": 0.20,
+      "tripTimeMs": 17
+    },
+    "settingOptions": {
+      "iMinPu": [0.10, 0.15, 0.20, 0.25, 0.30],
+      "slope1": [0.15, 0.20, 0.25, 0.30, 0.35],
+      "slope2": [0.30, 0.40, 0.50, 0.60],
+      "iResBreakPu": [1.5, 2.0, 2.5, 3.0],
+      "ihr2Threshold": [0.10, 0.15, 0.20, 0.25],
+      "ihr5Threshold": [0.15, 0.20, 0.25, 0.35]
+    },
+    "interruptRating": 50,
+    "curve": []
+  },
+  {
+    "id": "diff_87b_relay",
+    "type": "relay",
+    "vendor": "IEEE C37.97 (87B)",
+    "name": "Bus Differential Relay (87B)",
+    "differential": true,
+    "differentialType": "87B",
+    "settings": {
+      "iMinPu": 0.20,
+      "slope1": 0.25,
+      "slope2": 0.50,
+      "iResBreakPu": 2.0,
+      "tripTimeMs": 17
+    },
+    "settingOptions": {
+      "iMinPu": [0.10, 0.15, 0.20, 0.25, 0.30],
+      "slope1": [0.15, 0.20, 0.25, 0.30, 0.35],
+      "slope2": [0.30, 0.40, 0.50, 0.60],
+      "iResBreakPu": [1.5, 2.0, 2.5, 3.0]
+    },
+    "interruptRating": 50,
+    "curve": []
+  },
+  {
+    "id": "diff_87g_relay",
+    "type": "relay",
+    "vendor": "IEEE C37.102 (87G)",
+    "name": "Generator Differential Relay (87G)",
+    "differential": true,
+    "differentialType": "87G",
+    "settings": {
+      "iMinPu": 0.10,
+      "slope1": 0.20,
+      "slope2": 0.40,
+      "iResBreakPu": 1.5,
+      "ihr2Threshold": 0.15,
+      "ihr5Threshold": 0.20,
+      "tripTimeMs": 17
+    },
+    "settingOptions": {
+      "iMinPu": [0.05, 0.10, 0.15, 0.20],
+      "slope1": [0.10, 0.15, 0.20, 0.25],
+      "slope2": [0.25, 0.30, 0.40, 0.50],
+      "iResBreakPu": [1.0, 1.5, 2.0, 2.5]
+    },
+    "interruptRating": 50,
+    "curve": []
   }
 ]
