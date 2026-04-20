@@ -372,7 +372,7 @@ Study page `capacitorbank.html` / `capacitorbank.js` provides form inputs for bu
 |---|---|---|
 | **Bus voltage stability margin and collapse point identification** | ETAP Voltage Stability, DIgSILENT PowerFactory (CPF), PSS/E, PowerWorld Simulator | Voltage stability analysis determines how close a power system is to voltage collapse under increasing load or generation transfer. The P-V curve (nose curve) plots bus voltage vs. total system load, identifying the maximum loadability (MW) and the critical bus. The Q-V curve plots reactive power injection required to maintain a target voltage, identifying the reactive margin (MVAR) before collapse. Continuation power flow (CPF) traces the P-V curve through the nose point using predictor-corrector methods. This is required for NERC TPL-001 transmission planning compliance and is standard practice for industrial facilities with large motor loads (voltage collapse during motor starting). CableTrayRoute's `analysis/loadFlow.js` implements Newton-Raphson for a single operating point but has no continuation power flow, no P-V/Q-V curve generation, and no voltage stability margin calculation. |
 
-**Status:** Not implemented.
+**Status:** ✅ **Implemented 2026-04-20.** `analysis/voltageStability.mjs` — sequential Newton-Raphson continuation power flow sweeping load factor λ from base case to collapse, P-V nose curve generation, Q-V reactive margin sweep, loadability margin (MW and %), critical bus identification, and unified `runVoltageStabilityStudy()` entry point with dataStore persistence. UI: `voltagestability.html` with SVG P-V and Q-V charts, bus/branch table editor, and CSV export. Tests: `tests/voltageStability.test.mjs` (19 assertions). Docs: `docs/voltage-stability.md`.
 
 ---
 

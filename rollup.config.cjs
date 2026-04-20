@@ -62,6 +62,7 @@ const entries = {
   seismicwindcombined: 'src/seismicwindcombined.js',
   loadCombinations: 'src/loadCombinations.js',
   transientstability: 'src/transientstability.js',
+  voltagestability: 'src/voltageStability.js',
   voltagedropstudy: 'src/voltagedropstudy.js',
   productconfig: 'src/productconfig.js',
   fieldview: 'src/fieldview.js',

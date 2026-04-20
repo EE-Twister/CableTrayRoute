@@ -1,0 +1,202 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <meta name="description" content="Voltage Stability Analysis — P-V nose curves, Q-V reactive margin, and continuation power flow to identify maximum loadability and voltage collapse proximity per NERC TPL-001." />
+  <title>Voltage Stability — CableTrayRoute</title>
+  <link rel="icon" href="icons/favicon.svg" type="image/svg+xml">
+  <link rel="apple-touch-icon" href="icons/favicon.svg">
+  <meta property="og:type" content="website">
+  <meta property="og:title" content="Voltage Stability — CableTrayRoute">
+  <meta property="og:description" content="P-V / Q-V curves and loadability margin for voltage collapse screening per NERC TPL-001.">
+  <meta property="og:image" content="https://cabletrayroute.com/icons/og-preview.png">
+  <meta property="og:site_name" content="CableTrayRoute">
+  <meta property="og:url" content="voltagestability.html">
+  <link rel="canonical" href="voltagestability.html">
+  <link rel="dns-prefetch" href="https://fonts.gstatic.com">
+  <meta name="color-scheme" content="light dark">
+  <link rel="stylesheet" href="style.css" />
+  <script type="module" src="dirtyTracker.js"></script>
+  <script type="module" src="dist/voltagestability.js" defer></script>
+</head>
+<body class="voltagestability-page" data-report-title="Voltage Stability Analysis">
+  <a href="#main-content" class="skip-link">Skip to main content</a>
+  <nav class="top-nav" aria-label="Primary">
+    <button id="nav-toggle" class="nav-toggle" aria-label="Toggle navigation" aria-controls="nav-links" aria-expanded="false" title="Toggle navigation">
+      <img src="icons/toolbar/grid.svg" alt="" aria-hidden="true" class="control-icon" loading="lazy" decoding="async">
+    </button>
+    <div id="nav-links" class="nav-links" role="list">
+      <!-- Populated dynamically by navigation.js -->
+    </div>
+    <button id="settings-btn" class="settings-btn" aria-label="Settings" aria-expanded="false" title="Settings">
+      <img src="icons/toolbar/validate.svg" alt="" aria-hidden="true" class="control-icon" loading="lazy" decoding="async">
+    </button>
+  </nav>
+
+  <div id="settings-menu" class="settings-menu">
+    <label for="theme-select">Theme
+      <select id="theme-select">
+        <option value="system">System</option>
+        <option value="light">Light</option>
+        <option value="dark">Dark</option>
+        <option value="high-contrast">High Contrast</option>
+      </select>
+    </label>
+    <label><input type="checkbox" id="compact-toggle" aria-label="Enable compact table mode"> Compact Mode</label>
+    <button id="help-btn" class="btn" aria-expanded="false" title="Show help">
+      <img src="icons/toolbar/validate.svg" alt="" aria-hidden="true" class="control-icon" loading="lazy" decoding="async">
+      <span>Site Help</span>
+    </button>
+    <button id="new-project-btn" title="Start a new project">
+      <img src="icons/toolbar/copy.svg" alt="" aria-hidden="true" class="control-icon" loading="lazy" decoding="async">
+      <span>New Project</span>
+    </button>
+    <button id="save-project-btn" title="Save current project">
+      <img src="icons/toolbar/export.svg" alt="" aria-hidden="true" class="control-icon" loading="lazy" decoding="async">
+      <span>Save Project</span>
+    </button>
+    <button id="load-project-btn" title="Load an existing project">
+      <img src="icons/toolbar/import.svg" alt="" aria-hidden="true" class="control-icon" loading="lazy" decoding="async">
+      <span>Load Project</span>
+    </button>
+    <button id="export-project-btn" title="Export project data">
+      <img src="icons/toolbar/export.svg" alt="" aria-hidden="true" class="control-icon" loading="lazy" decoding="async">
+      <span>Export Project</span>
+    </button>
+    <button id="import-project-btn" title="Import project data">
+      <img src="icons/toolbar/import.svg" alt="" aria-hidden="true" class="control-icon" loading="lazy" decoding="async">
+      <span>Import Project</span>
+    </button>
+    <input type="file" id="import-project-input" accept=".ctr.json" class="hidden" title="Select project file">
+  </div>
+
+  <div class="container">
+    <main id="main-content" class="main-content">
+      <header class="page-header">
+        <h1>Voltage Stability Analysis</h1>
+      </header>
+
+      <details class="method-panel">
+        <summary>Method &amp; Standards</summary>
+        <p>This study sweeps the total system load from the operating point up to a user-specified maximum (the <em>load scaling factor</em> λ) and solves a Newton-Raphson power flow at each step. The resulting plot of bus voltage vs. system load is the <strong>P-V nose curve</strong>. The last converged load point is the <em>maximum loadability</em>; the margin from the operating point to that limit is the <strong>loadability margin</strong> (MW).</p>
+        <p>The companion <strong>Q-V curve</strong> sweeps reactive power injection on a selected bus from negative (absorbing) to positive (injecting) and records the resulting voltage. The minimum Q injection at which the system still converges defines the <em>reactive power margin</em> (MVAR).</p>
+        <p><strong>Standards:</strong> NERC TPL-001-5 (Transmission Planning Performance Requirements), IEEE Std 2800-2022 (voltage stability screening), WECC Voltage Stability Methodology.</p>
+        <p><strong>Algorithm:</strong> Sequential Newton-Raphson power flows with load parameterization. The step-size is fixed; the collapse point is identified as the first divergent step. For production-grade continuation power flow (CPF) through the nose, the arc-length parameterization in the full CPF module should be used.</p>
+        <p><strong>Bus model:</strong> Slack (swing) bus holds voltage magnitude and angle; PV buses hold voltage magnitude and active injection; PQ buses hold active and reactive load.</p>
+      </details>
+
+      <form id="vs-form" novalidate>
+
+        <fieldset>
+          <legend><strong>System Base</strong></legend>
+          <div class="field-row">
+            <label for="base-mva">System MVA base</label>
+            <input type="number" id="base-mva" min="1" step="1" value="100" required aria-describedby="base-mva-hint">
+            <p id="base-mva-hint" class="field-hint">Common values: 100 MVA (transmission), 10 MVA (industrial). All per-unit calculations use this base.</p>
+          </div>
+          <div class="field-row">
+            <label for="system-label">Study label <span class="optional">(optional)</span></label>
+            <input type="text" id="system-label" maxlength="80" placeholder="e.g., 13.8 kV industrial feeder">
+          </div>
+        </fieldset>
+
+        <fieldset>
+          <legend><strong>Buses</strong></legend>
+          <p class="field-hint">Define at least one slack bus and one PQ load bus. Base kV applies to that bus's per-unit conversion.</p>
+          <div id="bus-list" role="list" aria-label="Bus rows"></div>
+          <button type="button" id="add-bus-btn" class="btn btn-sm">+ Add Bus</button>
+        </fieldset>
+
+        <fieldset>
+          <legend><strong>Branches</strong></legend>
+          <p class="field-hint">Enter series impedance in ohms. Each branch is added once; the admittance is reflected at both endpoints automatically.</p>
+          <div id="branch-list" role="list" aria-label="Branch rows"></div>
+          <button type="button" id="add-branch-btn" class="btn btn-sm">+ Add Branch</button>
+        </fieldset>
+
+        <fieldset>
+          <legend><strong>P-V Curve Parameters</strong></legend>
+          <div class="field-row">
+            <label for="lambda-max">Maximum load factor (λ<sub>max</sub>)</label>
+            <input type="number" id="lambda-max" min="1.05" max="10" step="0.05" value="3.0" required aria-describedby="lambda-max-hint">
+            <p id="lambda-max-hint" class="field-hint">The sweep continues until the power flow diverges or λ reaches this value. A value of 3.0 means 300% of base load.</p>
+          </div>
+          <div class="field-row">
+            <label for="lambda-step">Load step size (Δλ)</label>
+            <input type="number" id="lambda-step" min="0.01" max="0.5" step="0.01" value="0.05" required aria-describedby="lambda-step-hint">
+            <p id="lambda-step-hint" class="field-hint">Smaller steps give a smoother curve and more accurate nose-point detection but increase compute time.</p>
+          </div>
+        </fieldset>
+
+        <fieldset>
+          <legend><strong>Q-V Curve Parameters</strong></legend>
+          <div class="field-row">
+            <label for="target-bus-id">Target bus ID</label>
+            <input type="text" id="target-bus-id" placeholder="e.g., B2 (leave blank for first PQ bus)" aria-describedby="target-bus-hint">
+            <p id="target-bus-hint" class="field-hint">The bus at which reactive injection is swept. Leave blank to use the first PQ bus automatically.</p>
+          </div>
+          <div class="field-row">
+            <label for="q-min">Q injection min (MVAR)</label>
+            <input type="number" id="q-min" min="-500" max="0" step="1" value="-50" required>
+          </div>
+          <div class="field-row">
+            <label for="q-max">Q injection max (MVAR)</label>
+            <input type="number" id="q-max" min="0" max="500" step="1" value="50" required>
+          </div>
+          <div class="field-row">
+            <label for="q-step">Q step size (MVAR)</label>
+            <input type="number" id="q-step" min="0.1" max="50" step="0.5" value="2" required>
+          </div>
+        </fieldset>
+
+        <div class="form-actions">
+          <button type="submit" class="btn btn-primary" id="run-btn">Run Voltage Stability Study</button>
+          <button type="button" id="export-csv-btn" class="btn" hidden>Export CSV</button>
+        </div>
+      </form>
+
+      <div id="calc-errors" class="result-fail" hidden aria-live="polite"></div>
+
+      <div id="results" aria-live="polite">
+        <!-- Results rendered dynamically -->
+      </div>
+
+    </main>
+  </div>
+
+  <div id="study-approval-panel"></div>
+
+  <div id="help-modal" class="modal" role="dialog" aria-modal="true" aria-labelledby="help-modal-title" hidden>
+    <div class="modal-content">
+      <button id="close-help-btn" class="modal-close" aria-label="Close help">×</button>
+      <h2 id="help-modal-title">Voltage Stability Help</h2>
+      <h3>P-V Curve (Nose Curve)</h3>
+      <p>The P-V curve plots the voltage at each bus as total system load is scaled from the operating point. As load increases, voltage droops. Beyond the nose point, the Newton-Raphson power flow diverges, indicating voltage collapse. The <strong>loadability margin</strong> is the MW distance from the operating point to the nose.</p>
+      <h3>Q-V Curve</h3>
+      <p>The Q-V curve shows how much reactive power must be injected at a bus to maintain a given voltage. The minimum of the Q-V curve (most negative injection still achieving convergence) defines the <strong>reactive margin</strong>. A positive reactive margin means the system can absorb more reactive load before collapse.</p>
+      <h3>NERC TPL-001 Screening</h3>
+      <p>NERC TPL-001-5 requires planning-event voltage stability analysis for Category P5–P7 contingencies. A commonly used screening threshold is a loadability margin ≥ 5% of operating load.</p>
+      <h3>Bus Types</h3>
+      <ul>
+        <li><strong>Slack:</strong> Reference bus. Voltage magnitude and angle are fixed (typically 1.0 pu, 0°). Supplies whatever power is needed to balance the system.</li>
+        <li><strong>PQ:</strong> Load bus. Active (P) and reactive (Q) load are specified; voltage floats.</li>
+        <li><strong>PV:</strong> Generator bus. Active injection (P) and voltage magnitude are specified; reactive output floats within limits.</li>
+      </ul>
+    </div>
+  </div>
+
+  <footer class="site-footer">
+    <div class="footer-left">
+      <img src="icons/route.svg" alt="CableTrayRoute logo" class="footer-logo" loading="lazy" decoding="async">
+      <span>CableTrayRoute</span>
+    </div>
+    <nav class="footer-links" aria-label="Footer">
+      <a href="docs/index.html">Docs</a>
+      <a href="docs/quickstart.html">Quick Start</a>
+      <a href="index.html">Home</a>
+    </nav>
+  </footer>
+
+</body>
+</html>
