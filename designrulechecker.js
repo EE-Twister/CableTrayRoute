@@ -145,19 +145,29 @@ document.addEventListener('DOMContentLoaded', () => {
     const trays  = getTrays()  || [];
     const cables = getCables() || [];
 
-    // Retrieve trayCableMap from localStorage cache (written by optimalRoute page)
+    // Route cache is written under a content-addressed key (route-<hash>) by app.mjs via dataStore.
+    // Scan sessionStorage first (in-session results), then localStorage for any matching entry.
     let trayCableMap = {};
     let routedCableNames = new Set();
     try {
-      const cached = JSON.parse(localStorage.getItem('routeCache') || '{}');
-      if (cached && cached.trayCableMap) {
-        trayCableMap = cached.trayCableMap;
+      let cachedEntry = null;
+      for (const storage of [sessionStorage, localStorage]) {
+        for (const key of Object.keys(storage)) {
+          if (key.includes('route-')) {
+            try {
+              const parsed = JSON.parse(storage.getItem(key));
+              if (parsed && parsed.trayCableMap) { cachedEntry = parsed; break; }
+            } catch { /* skip malformed entry */ }
+          }
+        }
+        if (cachedEntry) break;
       }
-      // Also check latestRouteData for field-routed cables
-      const latestRoutes = JSON.parse(localStorage.getItem('latestRouteData') || '[]');
-      latestRoutes.forEach(r => {
-        if (r.cable && r.status && r.status.includes('Routed')) routedCableNames.add(r.cable);
-      });
+      if (cachedEntry) {
+        trayCableMap = cachedEntry.trayCableMap || {};
+        (cachedEntry.batchResults || []).forEach(r => {
+          if (r.cable && r.status && r.status.includes('Routed')) routedCableNames.add(r.cable);
+        });
+      }
     } catch (e) {
       console.warn('DRC: could not read route cache', e);
     }

@@ -33,7 +33,7 @@ global.localStorage = {
 };
 
 (async () => {
-  const { cFactor, kappaIEC, thermalMFactor, computeIEC60909Bus } =
+  const { cFactor, kappaIEC, thermalMFactor, computeIEC60909Bus, transformerCorrectionKT, runIEC60909Batch } =
     await import('../../analysis/iec60909.mjs');
   const { setOneLine } = await import('../../dataStore.mjs');
   const { runShortCircuit } = await import('../../analysis/shortCircuit.mjs');
@@ -234,6 +234,105 @@ global.localStorage = {
       const b = res.bus480V;
       assert(Math.abs(b.threePhaseKA - 20.37) < 0.1, `Expected ≈20.37, got ${b.threePhaseKA}`);
       assert(Math.abs(b.asymKA - 45.86) < 0.1, `Expected ≈45.86, got ${b.asymKA}`);
+    });
+  });
+
+  // -----------------------------------------------------------------------
+  // transformerCorrectionKT — IEC 60909-0:2016 §3.3.3
+  // K_T = 0.95 × c_max / (1 + 0.6 × |xTPu|)
+  // -----------------------------------------------------------------------
+  describe('transformerCorrectionKT — IEC §3.3.3', () => {
+    it('6% transformer with c_max=1.10 matches formula', () => {
+      const expected = (0.95 * 1.10) / (1 + 0.6 * 0.06);
+      const kt = transformerCorrectionKT(0.06, 1.10);
+      assert(Math.abs(kt - expected) < 0.0001, `Expected ${expected.toFixed(4)}, got ${kt}`);
+    });
+
+    it('negative xTPu gives same result as positive (absolute value)', () => {
+      const pos = transformerCorrectionKT(0.06, 1.10);
+      const neg = transformerCorrectionKT(-0.06, 1.10);
+      assert.strictEqual(pos, neg, 'K_T should be symmetric in xTPu sign');
+    });
+
+    it('xTPu = 0 gives K_T = 0.95 × c_max', () => {
+      const kt = transformerCorrectionKT(0, 1.10);
+      assert(Math.abs(kt - 0.95 * 1.10) < 0.0001, `Expected ${0.95 * 1.10}, got ${kt}`);
+    });
+
+    it('higher xTPu reduces K_T (more correction for higher impedance transformers)', () => {
+      const low = transformerCorrectionKT(0.04, 1.10);
+      const high = transformerCorrectionKT(0.12, 1.10);
+      assert(low > high, `K_T for low xT (${low.toFixed(4)}) should exceed high xT (${high.toFixed(4)})`);
+    });
+  });
+
+  // -----------------------------------------------------------------------
+  // runIEC60909Batch — batch study runner
+  // -----------------------------------------------------------------------
+  describe('runIEC60909Batch — batch runner', () => {
+    const sampleBus = {
+      id: 'BUS-11kV',
+      z1: { r: 0, x: 0.5 },
+      z2: { r: 0, x: 0.5 },
+      z0: { r: 0, x: 0.5 },
+      prefaultKV: 11,
+    };
+
+    it('returns a result object keyed by bus id', () => {
+      const results = runIEC60909Batch([sampleBus]);
+      assert(results['BUS-11kV'], 'result map should contain BUS-11kV');
+    });
+
+    it('each entry has method === "IEC"', () => {
+      const results = runIEC60909Batch([sampleBus]);
+      assert.strictEqual(results['BUS-11kV'].method, 'IEC');
+    });
+
+    it('single-bus batch matches computeIEC60909Bus directly', () => {
+      const direct = computeIEC60909Bus({
+        z1: sampleBus.z1, z2: sampleBus.z2, z0: sampleBus.z0,
+        prefaultKV: sampleBus.prefaultKV, cMode: 'max', lvTolerancePct: 10,
+        faultDurationS: 1.0, freqHz: 50, xrOverride: null,
+      });
+      const batch = runIEC60909Batch([sampleBus])[sampleBus.id];
+      assert.strictEqual(batch.threePhaseKA, direct.threePhaseKA,
+        `threePhaseKA should match: batch=${batch.threePhaseKA} direct=${direct.threePhaseKA}`);
+      assert.strictEqual(batch.ip, direct.ip,
+        `ip should match: batch=${batch.ip} direct=${direct.ip}`);
+    });
+
+    it('processes multiple buses independently', () => {
+      const bus2 = {
+        id: 'BUS-0.4kV',
+        prefaultKV: 0.4,
+        z1: { r: 0.001, x: 0.01 },
+        z2: { r: 0.001, x: 0.01 },
+        z0: { r: 0.001, x: 0.01 },
+      };
+      const results = runIEC60909Batch([sampleBus, bus2]);
+      assert(results['BUS-11kV'] && results['BUS-0.4kV'], 'both buses should appear in results');
+      assert(
+        results['BUS-11kV'].threePhaseKA !== results['BUS-0.4kV'].threePhaseKA,
+        'different voltage/impedance buses should give different fault currents',
+      );
+    });
+
+    it('xr_ratio override changes kappa vs derived X/R', () => {
+      // Bus with r=0.05, x=0.5 → native X/R = 10, kappa ≈ 1.746
+      // With xr_ratio=30 override, kappa should be higher (≈1.907)
+      const busNative = { id: 'b', z1: { r: 0.05, x: 0.5 }, z2: { r: 0.05, x: 0.5 }, z0: { r: 0.05, x: 0.5 }, prefaultKV: 11 };
+      const busOverride = { ...busNative, xr_ratio: 30 };
+      const rNative = runIEC60909Batch([busNative])['b'];
+      const rOverride = runIEC60909Batch([busOverride])['b'];
+      assert(
+        rOverride.kappa !== rNative.kappa,
+        `xr_ratio override (kappa=${rOverride.kappa}) should differ from derived (kappa=${rNative.kappa})`,
+      );
+    });
+
+    it('empty bus array returns empty object', () => {
+      const results = runIEC60909Batch([]);
+      assert.deepStrictEqual(results, {});
     });
   });
 
