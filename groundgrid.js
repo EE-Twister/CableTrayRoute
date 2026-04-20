@@ -179,21 +179,25 @@ document.addEventListener('DOMContentLoaded', () => {
     svgEl.appendChild(makeSvg('rect', { x: startX, y: startY, width: drawWidth, height: drawHeight, class: 'grid-outline' }));
 
     if (showStepOverlay) {
-      const rows = 18;
-      const cols = 18;
-      const cellWidth = drawWidth / cols;
-      const cellHeight = drawHeight / rows;
+      const CELLS_PER_MESH = 8;
+      const MIN_RES = 24;
+      const MAX_RES = 120;
+      const cols = Math.max(MIN_RES, Math.min(MAX_RES, (params.ny - 1) * CELLS_PER_MESH));
+      const rows = Math.max(MIN_RES, Math.min(MAX_RES, (params.nx - 1) * CELLS_PER_MESH));
       const safetyRatio = latestAnalysisResult
         ? Math.max(0, latestAnalysisResult.Es / Math.max(latestAnalysisResult.Estep, 1))
         : 0.55;
       const severityScale = Math.max(0.25, Math.min(1.25, safetyRatio));
 
+      const canvas = document.createElement('canvas');
+      canvas.width = cols;
+      canvas.height = rows;
+      const ctx = canvas.getContext('2d');
+
       for (let row = 0; row < rows; row += 1) {
         for (let col = 0; col < cols; col += 1) {
-          const x = startX + (col * cellWidth);
-          const y = startY + (row * cellHeight);
-          const px = x + (cellWidth / 2);
-          const py = y + (cellHeight / 2);
+          const px = startX + ((col + 0.5) * drawWidth / cols);
+          const py = startY + ((row + 0.5) * drawHeight / rows);
           const nearestVerticalDistance = dx > 0
             ? Math.min(...Array.from({ length: params.ny }, (_, i) => Math.abs(px - (startX + (i * dx)))))
             : 0;
@@ -209,16 +213,20 @@ document.addEventListener('DOMContentLoaded', () => {
           const intensity = Math.max(0, Math.min(1, (0.18 + (0.62 * localGradient) + (0.22 * edgeBoost)) * severityScale));
           const hue = Math.max(0, 125 - (intensity * 125));
           const alpha = (0.08 + (intensity * 0.38)) * overlayOpacity;
-          svgEl.appendChild(makeSvg('rect', {
-            x,
-            y,
-            width: cellWidth + 0.4,
-            height: cellHeight + 0.4,
-            class: 'grid-step-overlay',
-            fill: `hsla(${hue}, 86%, 48%, ${alpha.toFixed(3)})`,
-          }));
+          ctx.fillStyle = `hsla(${hue}, 86%, 48%, ${alpha.toFixed(3)})`;
+          ctx.fillRect(col, row, 1, 1);
         }
       }
+
+      svgEl.appendChild(makeSvg('image', {
+        x: startX,
+        y: startY,
+        width: drawWidth,
+        height: drawHeight,
+        href: canvas.toDataURL(),
+        class: 'grid-step-overlay',
+        preserveAspectRatio: 'none',
+      }));
     }
 
     for (let i = 0; i < params.ny; i += 1) {
