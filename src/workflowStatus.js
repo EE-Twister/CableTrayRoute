@@ -92,6 +92,11 @@ window.addEventListener('DOMContentLoaded', () => {
     }
   });
 
+  const progressSection = document.getElementById('workflow-summary-section');
+  if (progressSection && completeCount > 0) {
+    progressSection.removeAttribute('hidden');
+  }
+
   const progressText = document.getElementById('workflow-progress-text');
   if (progressText) {
     progressText.textContent = `${completeCount} of ${workflowOrder.length} workflow steps complete.`;

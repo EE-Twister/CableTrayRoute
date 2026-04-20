@@ -85,6 +85,7 @@
   --color-debug-text: #00ff00;
   --color-progress-track: #e9ecef;
   --color-text-muted: #64748b;
+  --text-muted: var(--color-text-muted);
 }
 
 @media (prefers-color-scheme: dark) {
