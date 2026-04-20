@@ -31,7 +31,7 @@
   <meta name="color-scheme" content="light dark">
   <link rel="stylesheet" href="style.css">
   <!-- Canonical URL -->
-  <link rel="canonical" href="index.html">
+  <link rel="canonical" href="https://cabletrayroute.com/">
   <!-- JSON-LD Structured Data -->
   <script type="application/ld+json">
   {
@@ -81,7 +81,7 @@
     </div>
 
       <button id="settings-btn" class="settings-btn" aria-label="Settings" aria-expanded="false" title="Settings">
-        <img src="icons/toolbar/validate.svg" alt="" aria-hidden="true" class="control-icon" loading="lazy" decoding="async">
+        <img src="icons/toolbar/settings.svg" alt="" aria-hidden="true" class="control-icon" loading="lazy" decoding="async">
       </button>
   </nav>
   <div id="settings-menu" class="settings-menu">
@@ -122,48 +122,13 @@
   </header>
   <div class="container">
     <main id="main-content" class="main-content">
-      <section class="workflow-summary card" aria-live="polite">
-        <h2>Progress Overview</h2>
-        <p id="workflow-progress-text">0 of 7 workflow steps complete.</p>
-        <div class="workflow-progress-track" role="progressbar" aria-valuenow="0" aria-valuemin="0" aria-valuemax="7" aria-labelledby="workflow-progress-text" id="workflow-progress-bar-track">
-          <div class="workflow-progress-fill" id="workflow-progress-fill" style="width:0%"></div>
-        </div>
-        <p id="workflow-next-step">Next recommended step: <a href="cableschedule.html">1. Cable Schedule</a></p>
-        <p><a href="workflowdashboard.html">View full dashboard →</a></p>
-      </section>
-      <section class="card quick-launch" aria-label="Quick launch by design activity">
-        <h2>Quick Launch by Activity</h2>
-        <p class="quick-launch-intro">Open the most common design paths in one click and keep your workflow moving.</p>
-        <div class="quick-launch-grid">
-          <a class="quick-launch-item" href="cableschedule.html">
-            <span class="quick-launch-title">Plan Inputs</span>
-            <span class="quick-launch-meta">Equipment, load list, cable schedule</span>
-          </a>
-          <a class="quick-launch-item" href="cabletrayfill.html">
-            <span class="quick-launch-title">Check Fill</span>
-            <span class="quick-launch-meta">Tray fill, conduit fill, support span</span>
-          </a>
-          <a class="quick-launch-item" href="optimalRoute.html">
-            <span class="quick-launch-title">Route Cables</span>
-            <span class="quick-launch-meta">Optimal routing and pull-card prep</span>
-          </a>
-          <a class="quick-launch-item" href="shortCircuit.html">
-            <span class="quick-launch-title">Run Studies</span>
-            <span class="quick-launch-meta">Short circuit, arc flash, harmonics, cathodic protection</span>
-          </a>
-          <a class="quick-launch-item" href="cathodicprotection.html">
-            <span class="quick-launch-title">Corrosion Control</span>
-            <span class="quick-launch-meta">Cathodic protection sizing and anode life checks</span>
-          </a>
-        </div>
-      </section>
       <section class="about" id="about">
         <h2>Why CableTrayRoute?</h2>
         <p>CableTrayRoute streamlines electrical design by linking scheduling, analysis, and routing tools in one browser-based workflow. Engineers can define cables, assess tray and conduit capacity, and generate optimal paths without juggling spreadsheets. Automated checks against fill limits and thermal constraints reduce errors and rework. The unified interface accelerates planning and helps deliver consistent, code-compliant results on complex projects.</p>
       </section>
       <section class="card tool-graphics">
-        <h2>Visual Tool Explorer</h2>
-        <p>Jump into the right workspace with dedicated visual previews for planning, analysis, and reporting pages.</p>
+        <h2>Tools</h2>
+        <p>Open the right workspace in one click — each area links directly to the relevant pages.</p>
         <div class="tool-graphics-grid">
           <a href="cableschedule.html" class="tool-graphic-card tool-graphic-card--schedules">
             <img src="icons/graphics/schedule-visual.svg" alt="Illustration previewing cable and raceway schedules" loading="lazy" decoding="async">
@@ -194,6 +159,14 @@
       </section>
       <section class="card">
         <h2>Workflow</h2>
+        <section class="workflow-summary" aria-live="polite" hidden id="workflow-summary-section">
+          <p id="workflow-progress-text">0 of 7 workflow steps complete.</p>
+          <div class="workflow-progress-track" role="progressbar" aria-valuenow="0" aria-valuemin="0" aria-valuemax="7" aria-labelledby="workflow-progress-text" id="workflow-progress-bar-track">
+            <div class="workflow-progress-fill" id="workflow-progress-fill" style="width:0%"></div>
+          </div>
+          <p id="workflow-next-step">Next recommended step: <a href="cableschedule.html">1. Cable Schedule</a></p>
+          <p><a href="workflowdashboard.html">View full dashboard →</a></p>
+        </section>
         <div class="workflow-grid">
           <a href="cableschedule.html" class="workflow-card" data-storage-key="cableSchedule">
             <img src="icons/cable.svg" alt="Cable icon" class="workflow-icon" loading="lazy" decoding="async">
