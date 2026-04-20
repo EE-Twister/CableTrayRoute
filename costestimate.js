@@ -9,6 +9,7 @@ import {
 } from './analysis/costEstimate.mjs';
 import { getCables, getTrays, getConduits, getStudies } from './dataStore.mjs';
 
+// Intentionally unscoped — custom pricing is a user preference, not scenario-specific data.
 const STORAGE_KEY = 'ctr-custom-prices';
 
 document.addEventListener('DOMContentLoaded', () => {

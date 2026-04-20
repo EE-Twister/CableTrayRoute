@@ -1,5 +1,6 @@
 // src/copilot.js
 import { openModal } from './components/modal.js';
+import { getCables, getTrays } from '../dataStore.mjs';
 
 let panel = null;
 let isOpen = false;
@@ -18,8 +19,8 @@ function getCopilotEndpoint() {
 
 function getProjectData() {
   try {
-    const cables = JSON.parse(localStorage.getItem('cableSchedule') || '[]');
-    const trays = JSON.parse(localStorage.getItem('traySchedule') || '[]');
+    const cables = getCables();
+    const trays = getTrays();
     return { cables: cables.slice(0, 200), trays: trays.slice(0, 100) };
   } catch {
     return {};
