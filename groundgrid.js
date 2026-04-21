@@ -37,6 +37,11 @@ document.addEventListener('DOMContentLoaded', () => {
     return sel ? sel.value : 'imperial';
   }
 
+  function updateUnitLabels(imperial) {
+    document.querySelectorAll('.unit-label-ft').forEach(el => { el.hidden = !imperial; });
+    document.querySelectorAll('.unit-label-m').forEach(el => { el.hidden = imperial; });
+  }
+
   function renderResult(label, value, unit, safe) {
     const row = document.createElement('div');
     row.className = 'result-row' + (safe === true ? ' result-safe' : safe === false ? ' result-fail' : '');
@@ -68,18 +73,20 @@ document.addEventListener('DOMContentLoaded', () => {
   }
 
   function getPreviewParams() {
-    const unit = getUnits() === 'imperial' ? 'ft' : 'm';
+    const imperial = getUnits() === 'imperial';
+    const unit = imperial ? 'ft' : 'm';
     const gridLxInput = getNum('grid-lx');
     const gridLyInput = getNum('grid-ly');
     const burialDepthInput = getNum('burial-depth');
-    const hsInput = getNum('surface-hs') || 0;
+    const hsRaw = getNum('surface-hs') || 0;
+    const hsInput = imperial ? hsRaw / 12 : hsRaw; // convert in→ft so hs is same unit as burialDepth
     const conductorInput = getNum('conductor-diameter');
     const nxInput = getInt('nx');
     const nyInput = getInt('ny');
     const hasRods = document.getElementById('has-rods').checked;
     const rodSpacingXInput = getNum('rod-spacing-x');
     const rodSpacingYInput = getNum('rod-spacing-y');
-    const diameterUnit = unit === 'ft' ? 'in' : 'mm';
+    const diameterUnit = imperial ? 'in' : 'mm';
 
     const normalized = normalizePreviewGeometry({
       gridLxInput,
@@ -94,7 +101,7 @@ document.addEventListener('DOMContentLoaded', () => {
       rodSpacingYInput,
     });
 
-    return { unit, diameterUnit, hasRods, ...normalized };
+    return { unit, diameterUnit, hasRods, ...normalized, hsDisplay: hsRaw, hsDisplayUnit: imperial ? 'in' : 'm' };
   }
 
   function setRodSpacingVisibility() {
@@ -312,7 +319,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
     drawDimension(svgEl, left - 24, gradeY, left - 24, conductorY, `h = ${formatDim(params.burialDepth, params.unit)}`, -10);
     if (params.hs > 0) {
-      drawDimension(svgEl, right + 20, gradeY, right + 20, surfaceBottom, `hs = ${formatDim(params.hs, params.unit)}`, -10);
+      drawDimension(svgEl, right + 20, gradeY, right + 20, surfaceBottom, `hs = ${formatDim(params.hsDisplay, params.hsDisplayUnit)}`, -10);
     }
 
     const gradeLabel = makeSvg('text', { x: left + 4, y: gradeY - 8, class: 'grid-legend-text' });
@@ -347,7 +354,7 @@ document.addEventListener('DOMContentLoaded', () => {
       + `${params.nx} horizontal runs • ${params.ny} vertical runs • `
       + `Spacing: ${params.spacingX.toFixed(1)} ${params.unit} (x), ${params.spacingY.toFixed(1)} ${params.unit} (y)`
       + ` • h: ${params.burialDepth.toFixed(2)} ${params.unit}`
-      + (params.hs > 0 ? ` • hs: ${params.hs.toFixed(2)} ${params.unit}` : '')
+      + (params.hs > 0 ? ` • hs: ${params.hsDisplay.toFixed(2)} ${params.hsDisplayUnit}` : '')
       + (params.hasRods ? ` • Ground rods: ${params.rodLayout.count} (${params.rodLayout.intermediateCount} intermediate)` : '')
       + (params.hasRods && params.rodLayout.axisSpacingX > 0 ? ` • Rod spacing x ≈ ${params.rodLayout.axisSpacingX.toFixed(1)} ${params.unit}` : '')
       + (params.hasRods && params.rodLayout.axisSpacingY > 0 ? ` • Rod spacing y ≈ ${params.rodLayout.axisSpacingY.toFixed(1)} ${params.unit}` : '');
@@ -386,7 +393,7 @@ document.addEventListener('DOMContentLoaded', () => {
       h = ftToM(getNum('burial-depth'));
       d = inToM(getNum('conductor-diameter'));
       rhoS = getNum('surface-rho') || 0;
-      hs = ftToM(getNum('surface-hs') || 0);
+      hs = inToM(getNum('surface-hs') || 0);
     } else {
       gridLx = getNum('grid-lx');
       gridLy = getNum('grid-ly');
@@ -550,11 +557,26 @@ document.addEventListener('DOMContentLoaded', () => {
     hasRodsCheckbox.addEventListener('change', handleFormStateChange);
   }
 
+  function onUnitChange() {
+    const imperial = getUnits() === 'imperial';
+    updateUnitLabels(imperial);
+    document.querySelectorAll('[data-unit]').forEach(btn => {
+      btn.classList.toggle('is-active', btn.dataset.unit === (imperial ? 'imperial' : 'metric'));
+    });
+    renderGridPreview();
+  }
+
+  document.querySelectorAll('[data-unit]').forEach(btn => {
+    btn.addEventListener('click', () => {
+      const unitSel = document.getElementById('unit-select');
+      if (unitSel) unitSel.value = btn.dataset.unit;
+      onUnitChange();
+    });
+  });
+
   const unitSelect = document.getElementById('unit-select');
   if (unitSelect) {
-    unitSelect.addEventListener('change', () => {
-      renderGridPreview();
-    });
+    unitSelect.addEventListener('change', onUnitChange);
   }
 
   ['show-step-overlay', 'step-overlay-opacity'].forEach(id => {
@@ -567,4 +589,10 @@ document.addEventListener('DOMContentLoaded', () => {
 
   renderGridPreview();
   setRodSpacingVisibility();
+
+  const initialImperial = getUnits() === 'imperial';
+  updateUnitLabels(initialImperial);
+  document.querySelectorAll('[data-unit]').forEach(btn => {
+    btn.classList.toggle('is-active', btn.dataset.unit === (initialImperial ? 'imperial' : 'metric'));
+  });
 });
