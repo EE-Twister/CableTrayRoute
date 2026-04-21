@@ -47,6 +47,20 @@ q_{\text{req,mat}} = q_{\text{req}} \times F_{\text{mat}}
 
 If heat trace is controlled by thermostats or line-sensing controllers, verify both **minimum output at design cold** and **maximum sheath/jacket temperature** at reduced load.
 
+## Insulation type assumptions
+
+Insulation thermal conductivity is a first-order driver of line losses. The calculator supports common insulation materials with representative conductivity values:
+
+| Insulation type | Conductivity \(k\) (W/m·K) | Practical note |
+| --- | ---: | --- |
+| Closed cell foam | 0.028 | Lower heat dissipation; common for freeze protection and moisture resistance |
+| Mineral wool | 0.040 | Common process piping baseline; good high-temperature performance |
+| Fiberglass | 0.042 | Similar to mineral wool for many preliminary studies |
+| Calcium silicate | 0.060 | Higher conductivity; often used where compressive strength is needed |
+| Aerogel blanket | 0.021 | Premium low-loss insulation for constrained space/high performance |
+
+These are screening-level values. Use project or manufacturer data sheets for final design and hot-service verification.
+
 ## Environment classes and multipliers
 
 Use environment multipliers to account for exposure severity beyond nominal still-air assumptions.
@@ -59,7 +73,7 @@ Use environment multipliers to account for exposure severity beyond nominal stil
 | E4 | High wind/coastal or frequent wetting | 1.30 |
 | E5 | Severe cyclic wet/freezing service | 1.40 |
 
-Project teams may replace these with corporate or site climatology factors. Keep one documented source of truth for consistency across all line classes.
+Project teams may replace these with corporate or site climatology factors. Keep one documented source of truth for consistency across all line classes. For outdoor runs, include measured or design wind speed (including values above 20 mph) to avoid understating convective losses.
 
 ## Example hand-check calculation
 

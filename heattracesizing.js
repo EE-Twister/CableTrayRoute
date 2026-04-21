@@ -44,6 +44,7 @@ document.addEventListener('DOMContentLoaded', () => {
     return {
       pipeNps: get('pipe-nps').value,
       insulationThicknessIn: getFloat('insulation-thickness-in'),
+      insulationType: get('insulation-type').value,
       lineLengthFt: getFloat('line-length-ft'),
       pipeMaterial: get('pipe-material').value,
       environment: get('environment').value,

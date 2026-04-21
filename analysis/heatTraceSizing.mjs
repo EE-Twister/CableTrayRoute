@@ -57,6 +57,15 @@ export const STANDARD_HEAT_TRACE_RATINGS_W_PER_FT = [
 /** Default thermal conductivity for insulation (W/m-K), typical for mineral wool / foam ranges. */
 export const DEFAULT_INSULATION_K_W_PER_MK = 0.04;
 
+/** Representative insulation thermal conductivity values (W/m-K). Lower values reduce heat dissipation. */
+export const INSULATION_TYPE_K_W_PER_MK = {
+  mineralWool: 0.04,
+  closedCellFoam: 0.028,
+  fiberglass: 0.042,
+  calciumSilicate: 0.06,
+  aerogelBlanket: 0.021,
+};
+
 const INCH_TO_M = 0.0254;
 const FT_TO_M = 0.3048;
 
@@ -107,14 +116,20 @@ export function validateHeatTraceInputs(inputs) {
     safetyMarginPct = 10,
     pipeMaterial = 'carbonSteel',
     environment = 'outdoor-sheltered',
-    insulationK = DEFAULT_INSULATION_K_W_PER_MK,
+    insulationType = 'mineralWool',
+    insulationK,
   } = inputs;
 
   const resolvedPipeOdIn = resolvePipeOdIn({ pipeNps, pipeOdIn });
 
   assertFinitePositive(insulationThicknessIn, 'insulationThicknessIn');
   assertFinitePositive(lineLengthFt, 'lineLengthFt');
-  assertFinitePositive(insulationK, 'insulationK');
+  if (!Object.prototype.hasOwnProperty.call(INSULATION_TYPE_K_W_PER_MK, insulationType)) {
+    throw new Error(`Unsupported insulationType "${insulationType}"`);
+  }
+
+  const resolvedInsulationK = insulationK ?? INSULATION_TYPE_K_W_PER_MK[insulationType] ?? DEFAULT_INSULATION_K_W_PER_MK;
+  assertFinitePositive(resolvedInsulationK, 'insulationK');
 
   if (!Number.isFinite(maintainTempC) || !Number.isFinite(ambientTempC)) {
     throw new Error('maintainTempC and ambientTempC must be finite numbers');
@@ -130,11 +145,11 @@ export function validateHeatTraceInputs(inputs) {
     throw new Error('safetyMarginPct must be between 0 and 100');
   }
 
-  if (!ENVIRONMENT_MULTIPLIERS[environment]) {
+  if (!Object.prototype.hasOwnProperty.call(ENVIRONMENT_MULTIPLIERS, environment)) {
     throw new Error(`Unsupported environment "${environment}"`);
   }
 
-  if (!PIPE_MATERIAL_FACTORS[pipeMaterial]) {
+  if (!Object.prototype.hasOwnProperty.call(PIPE_MATERIAL_FACTORS, pipeMaterial)) {
     throw new Error(`Unsupported pipeMaterial "${pipeMaterial}"`);
   }
 
@@ -153,7 +168,8 @@ export function validateHeatTraceInputs(inputs) {
     safetyMarginPct,
     pipeMaterial,
     environment,
-    insulationK,
+    insulationType,
+    insulationK: resolvedInsulationK,
   };
 }
 
@@ -180,7 +196,14 @@ export function externalFilmResistance({ pipeOdIn, insulationThicknessIn, enviro
 
   const rOuterM = (pipeOdIn * INCH_TO_M) / 2 + insulationThicknessIn * INCH_TO_M;
   const baseH = 7; // W/m2-K representative natural convection + radiation
-  const windBoost = environment === 'outdoor-windy' ? 0.5 * windSpeedMph : 0;
+  let windBoost = 0;
+  if (environment === 'outdoor-windy') {
+    windBoost = 0.5 * windSpeedMph;
+  } else if (environment === 'outdoor-sheltered') {
+    windBoost = 0.2 * windSpeedMph;
+  } else if (environment === 'hazardous-area') {
+    windBoost = 0.15 * windSpeedMph;
+  }
   const hEff = Math.max(2, (baseH + windBoost) * envFactor);
 
   return 1 / (hEff * 2 * Math.PI * rOuterM);

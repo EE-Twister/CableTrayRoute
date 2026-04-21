@@ -129,6 +129,18 @@ selectedWperFt = nearest standard cable rating ≥ required W/ft</pre>
           </div>
 
           <div class="field-row">
+            <label for="insulation-type">Insulation type</label>
+            <select id="insulation-type" aria-describedby="insulation-type-hint">
+              <option value="mineralWool" selected>Mineral Wool</option>
+              <option value="closedCellFoam">Closed Cell Foam</option>
+              <option value="fiberglass">Fiberglass</option>
+              <option value="calciumSilicate">Calcium Silicate</option>
+              <option value="aerogelBlanket">Aerogel Blanket</option>
+            </select>
+            <p id="insulation-type-hint" class="field-hint">Insulation material changes thermal conductivity and heat loss. Closed cell foam usually reduces heat dissipation compared with mineral wool.</p>
+          </div>
+
+          <div class="field-row">
             <label for="line-length-ft">Circuit length (ft)</label>
             <input type="number" id="line-length-ft" min="1" step="1" value="200" required aria-describedby="line-length-hint">
             <p id="line-length-hint" class="field-hint">Total pipe run length for the heat trace circuit. Include equivalent allowances for valves and fittings where applicable.</p>
