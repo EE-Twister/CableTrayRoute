@@ -311,6 +311,16 @@ function wPerFtToWPerM(wPerFt) {
   return wPerFt / 0.3048;
 }
 
+function escHtml(str) {
+  return String(str ?? '').replace(/[&<>"']/g, ch => ({
+    '&': '&amp;',
+    '<': '&lt;',
+    '>': '&gt;',
+    '"': '&quot;',
+    "'": '&#39;',
+  }[ch]));
+}
+
 const imperialToMetric = {
   ambientTempC: fToC,
   maintainTempC: fToC,
