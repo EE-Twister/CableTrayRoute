@@ -774,8 +774,8 @@ document.addEventListener('DOMContentLoaded', async () => {
     exportRevitBtn.addEventListener('click', () => {
       const trays = dataStore.getTrays();
       const conduits = dataStore.getConduits();
-      const cables = dataStore.getCableSchedule ? dataStore.getCableSchedule() : [];
-      const projectName = dataStore.getProjectName ? dataStore.getProjectName() : 'CableTrayRoute Export';
+      const cables = dataStore.getCables();
+      const projectName = 'CableTrayRoute Export';
       downloadRevitExport({ trays, conduits, cables, projectName });
     });
   }
