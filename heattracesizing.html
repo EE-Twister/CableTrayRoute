@@ -97,6 +97,19 @@ selectedWperFt = nearest standard cable rating ≥ required W/ft</pre>
 
       <form id="heat-trace-form" novalidate>
         <fieldset>
+          <legend><strong>Unit System</strong></legend>
+
+          <div class="field-row">
+            <label for="unit-system">Preferred units</label>
+            <select id="unit-system" aria-describedby="unit-system-hint">
+              <option value="imperial" selected>Imperial (°F, ft, in, mph)</option>
+              <option value="metric">Metric (°C, m, mm, km/h)</option>
+            </select>
+            <p id="unit-system-hint" class="field-hint">Switch between imperial and metric entry values. The sizing engine normalizes units internally before calculations.</p>
+          </div>
+        </fieldset>
+
+        <fieldset>
           <legend><strong>Pipe + Insulation Geometry</strong></legend>
 
           <div class="field-row">
@@ -120,7 +133,7 @@ selectedWperFt = nearest standard cable rating ≥ required W/ft</pre>
           </div>
 
           <div class="field-row">
-            <label for="insulation-thickness-in">
+            <label id="insulation-thickness-label" for="insulation-thickness-in">
               Insulation thickness (in)
               <button type="button" class="helpBtn" aria-label="Help — insulation thickness">?</button>
             </label>
@@ -141,7 +154,7 @@ selectedWperFt = nearest standard cable rating ≥ required W/ft</pre>
           </div>
 
           <div class="field-row">
-            <label for="line-length-ft">Circuit length (ft)</label>
+            <label id="line-length-label" for="line-length-ft">Circuit length (ft)</label>
             <input type="number" id="line-length-ft" min="1" step="1" value="200" required aria-describedby="line-length-hint">
             <p id="line-length-hint" class="field-hint">Total pipe run length for the heat trace circuit. Include equivalent allowances for valves and fittings where applicable.</p>
           </div>
@@ -180,13 +193,13 @@ selectedWperFt = nearest standard cable rating ≥ required W/ft</pre>
           </div>
 
           <div class="field-row">
-            <label for="ambient-temp-c">Ambient temperature (&deg;C)</label>
+            <label id="ambient-temp-label" for="ambient-temp-c">Ambient temperature (&deg;C)</label>
             <input type="number" id="ambient-temp-c" min="-60" max="60" step="1" value="-10" required aria-describedby="ambient-temp-hint">
             <p id="ambient-temp-hint" class="field-hint">Use the lowest sustained ambient expected during operation for conservative sizing.</p>
           </div>
 
           <div class="field-row">
-            <label for="wind-speed-mph">Wind speed (mph)</label>
+            <label id="wind-speed-label" for="wind-speed-mph">Wind speed (mph)</label>
             <input type="number" id="wind-speed-mph" min="0" max="100" step="1" value="5" aria-describedby="wind-speed-hint">
             <p id="wind-speed-hint" class="field-hint">Required for exposed outdoor runs. For indoor/sheltered installations, leave at a nominal low value.</p>
           </div>
@@ -196,7 +209,7 @@ selectedWperFt = nearest standard cable rating ≥ required W/ft</pre>
           <legend><strong>Maintain Temperature Target</strong></legend>
 
           <div class="field-row">
-            <label for="maintain-temp-c">Maintain temperature (&deg;C)</label>
+            <label id="maintain-temp-label" for="maintain-temp-c">Maintain temperature (&deg;C)</label>
             <input type="number" id="maintain-temp-c" min="-20" max="250" step="1" value="40" required aria-describedby="maintain-temp-hint">
             <p id="maintain-temp-hint" class="field-hint">Required process hold temperature at the pipe wall. Must be greater than ambient to compute heat-loss sizing.</p>
           </div>
@@ -218,7 +231,7 @@ selectedWperFt = nearest standard cable rating ≥ required W/ft</pre>
           </div>
 
           <div class="field-row">
-            <label for="max-circuit-length-ft">Maximum allowable circuit length (ft)</label>
+            <label id="max-circuit-length-label" for="max-circuit-length-ft">Maximum allowable circuit length (ft)</label>
             <input type="number" id="max-circuit-length-ft" min="10" step="10" value="300" aria-describedby="max-circuit-length-hint">
             <p id="max-circuit-length-hint" class="field-hint">Project-specific circuit-length planning limit. Compare with manufacturer cable tables during final design.</p>
           </div>
