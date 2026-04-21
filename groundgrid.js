@@ -188,7 +188,7 @@ document.addEventListener('DOMContentLoaded', () => {
     if (showStepOverlay) {
       const CELLS_PER_MESH = 8;
       const MIN_RES = 24;
-      const MAX_RES = 120;
+      const MAX_RES = 600;
       const cols = Math.max(MIN_RES, Math.min(MAX_RES, (params.ny - 1) * CELLS_PER_MESH));
       const rows = Math.max(MIN_RES, Math.min(MAX_RES, (params.nx - 1) * CELLS_PER_MESH));
       const safetyRatio = latestAnalysisResult
@@ -201,21 +201,41 @@ document.addEventListener('DOMContentLoaded', () => {
       canvas.height = rows;
       const ctx = canvas.getContext('2d');
 
+      const verticalXPositions = dx > 0
+        ? Array.from({ length: params.ny }, (_, i) => startX + (i * dx))
+        : null;
+      const horizontalYPositions = dy > 0
+        ? Array.from({ length: params.nx }, (_, i) => startY + (i * dy))
+        : null;
+      const halfDx = dx / 2 || 1;
+      const halfDy = dy / 2 || 1;
+
       for (let row = 0; row < rows; row += 1) {
+        const py = startY + ((row + 0.5) * drawHeight / rows);
+        let nearestHorizontalDistance = 0;
+        if (horizontalYPositions) {
+          nearestHorizontalDistance = Infinity;
+          for (let i = 0; i < horizontalYPositions.length; i += 1) {
+            const d = Math.abs(py - horizontalYPositions[i]);
+            if (d < nearestHorizontalDistance) nearestHorizontalDistance = d;
+          }
+        }
+        const distY = dy > 0 ? Math.min(1, nearestHorizontalDistance / halfDy) : 0;
+        const nyCenter = Math.abs(((py - startY) / drawHeight) - 0.5) * 2;
+
         for (let col = 0; col < cols; col += 1) {
           const px = startX + ((col + 0.5) * drawWidth / cols);
-          const py = startY + ((row + 0.5) * drawHeight / rows);
-          const nearestVerticalDistance = dx > 0
-            ? Math.min(...Array.from({ length: params.ny }, (_, i) => Math.abs(px - (startX + (i * dx)))))
-            : 0;
-          const nearestHorizontalDistance = dy > 0
-            ? Math.min(...Array.from({ length: params.nx }, (_, i) => Math.abs(py - (startY + (i * dy)))))
-            : 0;
-          const distX = dx > 0 ? Math.min(1, nearestVerticalDistance / (dx / 2 || 1)) : 0;
-          const distY = dy > 0 ? Math.min(1, nearestHorizontalDistance / (dy / 2 || 1)) : 0;
+          let nearestVerticalDistance = 0;
+          if (verticalXPositions) {
+            nearestVerticalDistance = Infinity;
+            for (let i = 0; i < verticalXPositions.length; i += 1) {
+              const d = Math.abs(px - verticalXPositions[i]);
+              if (d < nearestVerticalDistance) nearestVerticalDistance = d;
+            }
+          }
+          const distX = dx > 0 ? Math.min(1, nearestVerticalDistance / halfDx) : 0;
           const localGradient = (distX + distY) / 2;
           const nxCenter = Math.abs(((px - startX) / drawWidth) - 0.5) * 2;
-          const nyCenter = Math.abs(((py - startY) / drawHeight) - 0.5) * 2;
           const edgeBoost = Math.max(nxCenter, nyCenter);
           const intensity = Math.max(0, Math.min(1, (0.18 + (0.62 * localGradient) + (0.22 * edgeBoost)) * severityScale));
           const hue = Math.max(0, 125 - (intensity * 125));
