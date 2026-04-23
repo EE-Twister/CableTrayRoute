@@ -68,6 +68,8 @@ export const INSULATION_TYPE_K_W_PER_MK = {
 
 const INCH_TO_M = 0.0254;
 const FT_TO_M = 0.3048;
+const DEFAULT_MAX_CIRCUIT_LENGTH_FT = 500;
+const NEAR_LIMIT_UTILIZATION_THRESHOLD = 0.85;
 
 function round(value, digits = 2) {
   const p = 10 ** digits;
@@ -78,6 +80,50 @@ function assertFinitePositive(value, label) {
   if (!Number.isFinite(value) || value <= 0) {
     throw new Error(`${label} must be a finite number greater than zero`);
   }
+}
+
+function assertFiniteComputed(value, label) {
+  if (!Number.isFinite(value)) {
+    throw new Error(`${label} must be finite`);
+  }
+}
+
+function classifyCircuitUtilization(utilizationRatio) {
+  assertFiniteComputed(utilizationRatio, 'circuitUtilizationRatio');
+  if (utilizationRatio > 1) return 'overLimit';
+  if (utilizationRatio >= NEAR_LIMIT_UTILIZATION_THRESHOLD) return 'nearLimit';
+  return 'withinLimit';
+}
+
+function generatePipeTempProfile({
+  lineLengthFt,
+  maintainTempC,
+  ambientTempC,
+  circuitUtilizationRatio,
+  points = 11,
+}) {
+  assertFinitePositive(lineLengthFt, 'lineLengthFt');
+  assertFiniteComputed(maintainTempC, 'maintainTempC');
+  assertFiniteComputed(ambientTempC, 'ambientTempC');
+  assertFiniteComputed(circuitUtilizationRatio, 'circuitUtilizationRatio');
+
+  const profile = [];
+  const stepFt = lineLengthFt / (points - 1);
+  const utilizationClamp = Math.max(0, Math.min(circuitUtilizationRatio, 1.25));
+  const expectedTailDropC = (maintainTempC - ambientTempC) * 0.15 * utilizationClamp;
+
+  for (let i = 0; i < points; i += 1) {
+    const distanceFt = stepFt * i;
+    const progress = i / (points - 1);
+    const expectedPipeTempC = maintainTempC - expectedTailDropC * progress;
+
+    profile.push({
+      distanceFt: round(distanceFt, 2),
+      expectedPipeTempC: round(expectedPipeTempC, 2),
+    });
+  }
+
+  return profile;
 }
 
 /** Resolve pipe outside diameter in inches from direct OD or NPS. */
@@ -254,6 +300,11 @@ export function runHeatTraceSizingAnalysis(inputs) {
   const rTotal = rCond + rExt;
 
   const baseLossWPerM = deltaT / rTotal;
+  const conductionLossShare = rCond / rTotal;
+  const externalFilmLossShare = rExt / rTotal;
+  const baseLossConductionComponentWPerM = baseLossWPerM * conductionLossShare;
+  const baseLossExternalFilmComponentWPerM = baseLossWPerM * externalFilmLossShare;
+
   const materialFactor = PIPE_MATERIAL_FACTORS[pipeMaterial];
   const safetyFactor = 1 + safetyMarginPct / 100;
 
@@ -276,6 +327,32 @@ export function runHeatTraceSizingAnalysis(inputs) {
     warnings.push('Required W/ft exceeds available standard ratings. Use multiple runs or engineered solution.');
   }
 
+  const maxCircuitLengthFt = DEFAULT_MAX_CIRCUIT_LENGTH_FT;
+  const circuitUtilizationRatio = lineLengthFt / maxCircuitLengthFt;
+  const circuitLimitStatus = classifyCircuitUtilization(circuitUtilizationRatio);
+  const profile = generatePipeTempProfile({
+    lineLengthFt,
+    maintainTempC,
+    ambientTempC,
+    circuitUtilizationRatio,
+  });
+
+  const baseLossConductionComponentWPerFt = baseLossConductionComponentWPerM * FT_TO_M;
+  const baseLossExternalFilmComponentWPerFt = baseLossExternalFilmComponentWPerM * FT_TO_M;
+
+  assertFiniteComputed(baseLossWPerM, 'baseLossWPerM');
+  assertFiniteComputed(requiredWPerM, 'requiredWPerM');
+  assertFiniteComputed(requiredWPerFt, 'requiredWPerFt');
+  assertFiniteComputed(totalCircuitWatts, 'totalCircuitWatts');
+  assertFiniteComputed(baseLossConductionComponentWPerM, 'baseLossConductionComponentWPerM');
+  assertFiniteComputed(baseLossExternalFilmComponentWPerM, 'baseLossExternalFilmComponentWPerM');
+  assertFiniteComputed(circuitUtilizationRatio, 'circuitUtilizationRatio');
+
+  const unitConsistencyDelta = Math.abs(requiredWPerFt - (requiredWPerM * FT_TO_M));
+  if (unitConsistencyDelta > 1e-8) {
+    throw new Error('Computed power-unit conversion mismatch between W/m and W/ft');
+  }
+
   return {
     ...normalized,
     deltaT,
@@ -289,6 +366,25 @@ export function runHeatTraceSizingAnalysis(inputs) {
       materialFactor,
       safetyFactor: round(safetyFactor, 4),
     },
+    heatLossComponents: {
+      baseLossTotalWPerM: round(baseLossWPerM, 2),
+      baseLossTotalWPerFt: round(baseLossWPerM * FT_TO_M, 2),
+      conductionComponentWPerM: round(baseLossConductionComponentWPerM, 2),
+      conductionComponentWPerFt: round(baseLossConductionComponentWPerFt, 2),
+      externalFilmComponentWPerM: round(baseLossExternalFilmComponentWPerM, 2),
+      externalFilmComponentWPerFt: round(baseLossExternalFilmComponentWPerFt, 2),
+      conductionSharePct: round(conductionLossShare * 100, 2),
+      externalFilmSharePct: round(externalFilmLossShare * 100, 2),
+    },
+    circuit: {
+      maxCircuitLengthFt,
+      utilizationRatio: round(circuitUtilizationRatio, 4),
+      status: circuitLimitStatus,
+    },
+    maxCircuitLengthFt,
+    circuitUtilizationRatio: round(circuitUtilizationRatio, 4),
+    circuitLimitStatus,
+    profile,
     requiredWPerFt: round(requiredWPerFt, 2),
     requiredWPerM: round(requiredWPerM, 2),
     totalCircuitWatts: round(totalCircuitWatts, 1),
