@@ -8,6 +8,8 @@ document.addEventListener('DOMContentLoaded', () => {
   initCompactMode();
   initHelpModal('help-btn', 'help-modal', 'close-help-btn');
   initNavToggle();
+  initAnalysisTabs();
+  initSaveAction();
 
   const form = document.getElementById('heat-trace-form');
   const resultsDiv = document.getElementById('results');
@@ -267,6 +269,57 @@ document.addEventListener('DOMContentLoaded', () => {
     });
   }
 });
+
+function initAnalysisTabs() {
+  const tabs = Array.from(document.querySelectorAll('.heattrace-tab[role="tab"]'));
+  const panels = Array.from(document.querySelectorAll('.heattrace-panel[role="tabpanel"]'));
+  if (!tabs.length || !panels.length) return;
+
+  const activateTab = nextTab => {
+    tabs.forEach(tab => {
+      const isActive = tab === nextTab;
+      tab.setAttribute('aria-selected', isActive ? 'true' : 'false');
+      tab.tabIndex = isActive ? 0 : -1;
+    });
+
+    panels.forEach(panel => {
+      const showPanel = panel.id === nextTab.getAttribute('aria-controls');
+      panel.hidden = !showPanel;
+    });
+  };
+
+  tabs.forEach((tab, index) => {
+    tab.addEventListener('click', () => activateTab(tab));
+    tab.addEventListener('keydown', event => {
+      let nextIndex = index;
+      if (event.key === 'ArrowRight') {
+        nextIndex = (index + 1) % tabs.length;
+      } else if (event.key === 'ArrowLeft') {
+        nextIndex = (index - 1 + tabs.length) % tabs.length;
+      } else if (event.key === 'Home') {
+        nextIndex = 0;
+      } else if (event.key === 'End') {
+        nextIndex = tabs.length - 1;
+      } else {
+        return;
+      }
+      event.preventDefault();
+      const nextTab = tabs[nextIndex];
+      activateTab(nextTab);
+      nextTab.focus();
+    });
+  });
+}
+
+function initSaveAction() {
+  const saveActionButton = document.getElementById('heattrace-save-action');
+  const primarySaveButton = document.getElementById('save-project-btn');
+  if (!saveActionButton || !primarySaveButton) return;
+
+  saveActionButton.addEventListener('click', () => {
+    primarySaveButton.click();
+  });
+}
 
 function roundForDisplay(value, fieldId) {
   const precisionByField = {
