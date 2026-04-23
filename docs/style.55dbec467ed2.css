@@ -806,6 +806,69 @@
 .heattracesizing-page .heattrace-overview-hint p {
   margin: .25rem 0 0;
 }
+.heattracesizing-page .heattrace-kpi-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(210px, 1fr));
+  gap: .65rem;
+}
+.heattracesizing-page .heattrace-kpi-card {
+  border: 1px solid var(--border-color, #7d8790);
+  border-radius: 10px;
+  padding: .7rem .8rem;
+  background: color-mix(in srgb, var(--panel-bg, #f8fafc) 95%, #dbeafe 5%);
+  display: grid;
+  gap: .35rem;
+}
+.heattracesizing-page .heattrace-kpi-card--alert {
+  border-color: color-mix(in srgb, #dc2626 45%, var(--border-color, #7d8790));
+  background: color-mix(in srgb, var(--panel-bg, #f8fafc) 82%, #fee2e2 18%);
+}
+.heattracesizing-page .heattrace-kpi-label {
+  margin: 0;
+  font-size: .84rem;
+  color: var(--text-muted, #64748b);
+  text-transform: uppercase;
+  letter-spacing: .02em;
+}
+.heattracesizing-page .heattrace-kpi-value {
+  margin: 0;
+  font-size: 1.4rem;
+  font-weight: 700;
+  color: var(--text-color, #1f2b3a);
+}
+.heattracesizing-page .heattrace-kpi-context {
+  margin: 0;
+  font-size: .88rem;
+}
+.heattracesizing-page .heattrace-warning-grid {
+  display: grid;
+  gap: .6rem;
+}
+.heattracesizing-page .heattrace-warning-card {
+  border-radius: 10px;
+  padding: .65rem .75rem;
+  border: 1px solid var(--border-color, #7d8790);
+  background: color-mix(in srgb, var(--panel-bg, #f8fafc) 94%, #f1f5f9 6%);
+}
+.heattracesizing-page .heattrace-warning-card--warning {
+  border-left: 4px solid #f59e0b;
+}
+.heattracesizing-page .heattrace-warning-card--error {
+  border-left: 4px solid #dc2626;
+}
+.heattracesizing-page .heattrace-warning-card--info {
+  border-left: 4px solid #3b82f6;
+}
+.heattracesizing-page .heattrace-warning-severity {
+  font-size: .76rem;
+  font-weight: 700;
+  letter-spacing: .04em;
+  color: var(--text-muted, #64748b);
+  margin-bottom: .2rem;
+}
+.heattracesizing-page .heattrace-warning-message {
+  margin: 0;
+}
 .heattracesizing-page .heattrace-action-bar {
   position: sticky;
   bottom: 0;
