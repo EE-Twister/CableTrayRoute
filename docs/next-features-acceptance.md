@@ -18,6 +18,28 @@ Source smoke coverage reference: `playwright-tests/nextFeatures.spec.js` under d
 - [ ] Results persist and reload via `studyResults.heatTraceSizing`.
 - [ ] Heat Trace Sizing appears in top navigation, command palette, and workflow dashboard summaries.
 
+### Heat Trace dashboard acceptance checks (expanded)
+
+- [ ] **Overview section** renders KPI cards for base heat loss, required heat input, recommended watt density, and circuit check.
+- [ ] **Heat Loss section** renders thermal-resistance outputs (`insulationKmPerW`, `externalKmPerW`, `totalKmPerW`) and applied multipliers.
+- [ ] **Circuit Sizing section** renders utilization/length compliance indicators and recommendation state.
+- [ ] **Temperature Profile section** renders a non-empty chart path after valid calculation inputs.
+- [ ] **Sensitivity section** renders baseline delta values, ranked insights, and Quick Apply controls.
+- [ ] Severity warnings (info/warning/error) appear for undersized cable, circuit-length exceedance, or low thermal headroom conditions.
+- [ ] Unit conversion (Imperial/Metric) keeps KPI values, chart labels, and warning thresholds numerically consistent (within conversion tolerance) when toggling units.
+
+---
+
+## Heat Trace analysis output + recommendations acceptance
+
+The following checks validate the new analysis outputs and recommendation insight workflow:
+
+- [ ] Analysis output panel includes thermal resistance terms, multipliers, and sizing diagnostics after each successful run.
+- [ ] Recommendation insights are derived from baseline one-variable perturbations and are sorted by greatest reduction in required heat input.
+- [ ] Quick Apply updates the associated input control, triggers recalculation, and refreshes KPI + chart outputs without stale values.
+- [ ] Resetting baseline updates subsequent delta computations so insight rankings match the new baseline context.
+- [ ] Documentation and UI language clearly state this tool is for screening-level design and requires final vendor verification before procurement.
+
 ---
 
 ## 1) Primary User Journeys

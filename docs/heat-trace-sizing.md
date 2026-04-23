@@ -125,29 +125,58 @@ Preliminary selection would therefore target the next available trace-circuit ca
 - When freeze protection is safety- or production-critical, use a structured margin policy (environment + uncertainty + aging) rather than a single arbitrary adder.
 - Final design should reconcile process maintain temperature, insulation specification, power availability, hazardous area constraints, and manufacturer-specific cable output curves.
 
-## Heat Trace UI result interpretation
+## Heat Trace dashboard sections and interpretation
 
-The Heat Trace Sizing page now surfaces a KPI card grid to make output review faster:
+The Heat Trace Sizing workspace is organized into five dashboard sections so reviewers can move from quick screening to traceable assumptions without leaving the page:
 
-- **Heat loss (base):** Required line loss before applying design safety margin.
-- **Required heat input:** Final demand after safety margin and material correction factors.
-- **Recommended watt density:** Selected standard cable rating with utilization against required output.
-- **Circuit check:** Length compliance against configured maximum circuit length.
+1. **Overview**
+   - High-level KPI cards: base heat loss, required heat input, recommended watt density, and circuit length check.
+   - Current assumptions snapshot for ambient, maintain, insulation, and selected multipliers.
+2. **Heat Loss**
+   - Step-by-step thermal-resistance breakdown (insulation + external film) and resulting base W/ft (or W/m).
+   - Displays which assumptions dominate the loss so users can quickly identify leverage points.
+3. **Circuit Sizing**
+   - Candidate cable density selection versus required demand.
+   - Circuit-length utilization check against configured maximum allowable circuit length.
+4. **Temperature Profile**
+   - Charted maintain-to-ambient gradient view used as a screening visualization for thermal headroom.
+   - Intended to show relative behavior across the configured range; not a transient startup model.
+5. **Sensitivity**
+   - Baseline-delta explorer for insulation thickness, ambient temperature, wind speed, maintain temperature, and safety margin.
+   - Ranks single-change recommendations and exposes quick-apply controls.
 
-The detail section below the KPI grid reports thermal resistance and multipliers used by the model:
+## New analysis outputs
 
-- `insulationKmPerW`, `externalKmPerW`, `totalKmPerW`
-- `environmentMultiplier`, `materialFactor`, `safetyFactor`
+In addition to the required W/ft calculation, the dashboard now exposes screening outputs that support design review discussions:
 
-Warnings are presented as severity-tagged cards (info/warning/error) to improve scanning during design reviews.
+- **Thermal resistance terms:** `insulationKmPerW`, `externalKmPerW`, `totalKmPerW`
+- **Applied multipliers/factors:** `environmentMultiplier`, `materialFactor`, `safetyFactor`
+- **Sizing diagnostics:** cable utilization %, available margin vs recommended cable, and circuit-length pass/fail indicators
+- **Profile context:** plotted maintain/ambient relationship to highlight low-headroom scenarios
 
-## Sensitivity explorer and quick-apply workflow
+These outputs are intentionally transparent so engineering teams can replicate the arithmetic in hand checks and quickly identify whether a change is driven by environment, insulation, or design margin assumptions.
 
-The Overview tab now includes a **Sensitivity Explorer** card for rapid what-if checks against a baseline case:
+## Recommendation insight generation logic
 
-- Sliders are provided for key drivers: insulation thickness, ambient temperature, wind speed, maintain temperature, and design margin.
-- Each slider movement runs a lightweight recalculation and shows the required output delta relative to the saved baseline case.
-- The **Insights** subsection ranks top one-step recommendations that reduce required output.
-- **Quick Apply** buttons write suggested values back into the form controls and refresh the visual workspace so users can continue from the proposed scenario.
+Recommendation insights in the Sensitivity section are generated from one-step perturbation analysis around the saved baseline:
+
+1. Hold all other inputs constant.
+2. Apply a bounded change to one driver (for example, +insulation thickness or -ambient severity).
+3. Recompute required heat input.
+4. Rank actions by absolute reduction in required output and by practical applicability.
+
+**Quick Apply** actions copy the recommended single change back into the active form controls and trigger a full recalculation so users can continue iterative screening from the suggested case.
 
 Use **Use Current Inputs as Baseline** whenever assumptions change materially and you want future deltas to compare against the new operating point.
+
+## Scope and final verification
+
+This dashboard is intended for **screening-level design** and option comparison. It does not replace final vendor engineering.
+
+Before procurement or IFC issue, perform vendor/manufacturer verification for:
+
+- cable output curves across expected operating and startup conditions,
+- maximum circuit length and breaker/control compatibility,
+- sheath/jacket temperature limits,
+- hazardous area and installation code compliance,
+- project-specific insulation and weather exposure details.
