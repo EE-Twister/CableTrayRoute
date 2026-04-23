@@ -806,6 +806,37 @@
 .heattracesizing-page .heattrace-overview-hint p {
   margin: .25rem 0 0;
 }
+.heattracesizing-page .heattrace-chart-wrap {
+  margin-top: .85rem;
+  border: 1px solid var(--border-color, #7d8790);
+  border-radius: 10px;
+  background: color-mix(in srgb, var(--panel-bg, #f8fafc) 96%, #dbeafe 4%);
+  overflow: hidden;
+}
+.heattracesizing-page .heattrace-chart-svg {
+  width: 100%;
+  min-height: 280px;
+  display: block;
+}
+.heattracesizing-page .heattrace-chart-legend {
+  margin: .75rem 0 0;
+  padding: 0;
+  list-style: none;
+  display: grid;
+  gap: .45rem;
+}
+.heattracesizing-page .heattrace-chart-legend li {
+  display: flex;
+  align-items: center;
+  gap: .5rem;
+  font-size: .92rem;
+}
+.heattracesizing-page .heattrace-chart-swatch {
+  width: 12px;
+  height: 12px;
+  border-radius: 999px;
+  flex: 0 0 auto;
+}
 .heattracesizing-page .heattrace-kpi-grid {
   display: grid;
   grid-template-columns: repeat(auto-fit, minmax(210px, 1fr));

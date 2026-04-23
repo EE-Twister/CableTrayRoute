@@ -285,7 +285,14 @@ selectedWperFt = nearest standard cable rating ≥ required W/ft</pre>
           <section id="heattrace-panel-heatloss" class="heattrace-panel" role="tabpanel" aria-labelledby="heattrace-tab-heatloss" tabindex="0" hidden>
             <div class="card">
               <h2>Heat Loss Breakdown</h2>
-              <p>After running analysis, use the overview result summary to validate thermal assumptions and warning flags for environmental losses.</p>
+              <p>After running analysis, review the contribution of insulation conduction, external film effects, and design margin to the total required heat input.</p>
+              <div class="heattrace-chart-wrap">
+                <svg id="heatloss-breakdown-chart" class="heattrace-chart-svg" role="img" aria-labelledby="heatloss-chart-title heatloss-chart-desc" viewBox="0 0 760 360">
+                  <title id="heatloss-chart-title">Heat-loss breakdown chart</title>
+                  <desc id="heatloss-chart-desc">Donut chart showing conduction, external film, and safety margin contribution.</desc>
+                </svg>
+              </div>
+              <ul id="heatloss-breakdown-legend" class="heattrace-chart-legend" aria-label="Heat-loss contribution legend"></ul>
             </div>
           </section>
 
@@ -299,7 +306,14 @@ selectedWperFt = nearest standard cable rating ≥ required W/ft</pre>
           <section id="heattrace-panel-temp" class="heattrace-panel" role="tabpanel" aria-labelledby="heattrace-tab-temp" tabindex="0" hidden>
             <div class="card">
               <h2>Temperature Profile</h2>
-              <p>Use ambient and maintain temperature inputs in the left pane to evaluate expected temperature differential and conservatism.</p>
+              <p>Use ambient and maintain temperature inputs in the left pane to compare the maintain target, predicted pipe surface trend, and ambient baseline along the circuit.</p>
+              <div class="heattrace-chart-wrap">
+                <svg id="temperature-profile-chart" class="heattrace-chart-svg" role="img" aria-labelledby="temperature-chart-title temperature-chart-desc" viewBox="0 0 760 360">
+                  <title id="temperature-chart-title">Pipe temperature profile chart</title>
+                  <desc id="temperature-chart-desc">Line chart for pipe surface, maintain target, and ambient temperature along pipe length.</desc>
+                </svg>
+              </div>
+              <ul id="temperature-profile-legend" class="heattrace-chart-legend" aria-label="Temperature profile legend"></ul>
             </div>
           </section>
 

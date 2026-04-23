@@ -15,6 +15,10 @@ document.addEventListener('DOMContentLoaded', () => {
   const resultsDiv = document.getElementById('results');
   const overviewSvg = document.getElementById('system-overview-visual');
   const overviewLegend = document.getElementById('system-overview-legend');
+  const temperatureProfileChart = document.getElementById('temperature-profile-chart');
+  const temperatureProfileLegend = document.getElementById('temperature-profile-legend');
+  const heatLossBreakdownChart = document.getElementById('heatloss-breakdown-chart');
+  const heatLossBreakdownLegend = document.getElementById('heatloss-breakdown-legend');
   const unitSystemSelect = document.getElementById('unit-system');
   let activeUnitSystem = unitSystemSelect?.value || 'imperial';
 
@@ -30,9 +34,11 @@ document.addEventListener('DOMContentLoaded', () => {
     applyUnitSystem(activeUnitSystem, { convertExistingValues: false });
     renderResults(saved);
     renderSystemOverview(saved);
+    renderWorkspaceCharts(saved);
   } else {
     applyUnitSystem(activeUnitSystem, { convertExistingValues: false });
     renderSystemOverview(null);
+    renderWorkspaceCharts(null);
   }
 
   unitSystemSelect?.addEventListener('change', () => {
@@ -41,6 +47,11 @@ document.addEventListener('DOMContentLoaded', () => {
     applyUnitSystem(nextUnitSystem, { convertExistingValues: true });
     activeUnitSystem = nextUnitSystem;
     renderSystemOverview(getStudies().heatTraceSizing || null);
+    renderWorkspaceCharts(getLiveAnalysisResult() || getStudies().heatTraceSizing || null);
+  });
+
+  form.addEventListener('input', () => {
+    renderWorkspaceCharts(getLiveAnalysisResult() || getStudies().heatTraceSizing || null);
   });
 
   form.addEventListener('submit', e => {
@@ -61,6 +72,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
     renderResults(result);
     renderSystemOverview(result);
+    renderWorkspaceCharts(result);
   });
 
   function readInputs() {
@@ -266,6 +278,212 @@ document.addEventListener('DOMContentLoaded', () => {
       <li><span class="legend-marker legend-insulation" aria-hidden="true"></span><span><strong>2.</strong> Insulation type/thickness (${escHtml(formatMaterialLabel(currentInputs.insulationType))}, ${escHtml(diameterText)})</span></li>
       <li><span class="legend-marker legend-cable" aria-hidden="true"></span><span><strong>3.</strong> Heat trace cable (${escHtml(cableRatingText)})</span></li>
       <li><span class="legend-marker legend-ambient" aria-hidden="true"></span><span><strong>4.</strong> Ambient conditions (${escHtml(ambientText)})</span></li>
+    `;
+  }
+
+  function getLiveAnalysisResult() {
+    try {
+      const liveResult = runHeatTraceSizingAnalysis(readInputs());
+      liveResult.unitSystem = activeUnitSystem;
+      return liveResult;
+    } catch (err) {
+      return null;
+    }
+  }
+
+  function renderWorkspaceCharts(result) {
+    renderTemperatureProfileChart(result);
+    renderHeatLossBreakdownChart(result);
+  }
+
+  function renderTemperatureProfileChart(result) {
+    if (!temperatureProfileChart || !temperatureProfileLegend) return;
+    if (!result) {
+      renderEmptyChart(temperatureProfileChart, 'Run analysis to render temperature profile.');
+      temperatureProfileLegend.innerHTML = '';
+      return;
+    }
+
+    const lengthUnit = result.unitSystem === 'metric' ? 'm' : 'ft';
+    const temperatureUnit = result.unitSystem === 'metric' ? '°C' : '°F';
+    const totalLength = result.unitSystem === 'metric'
+      ? imperialToMetric.lineLengthFt(result.lineLengthFt)
+      : result.lineLengthFt;
+    const maintainTemp = result.unitSystem === 'metric' ? result.maintainTempC : cToF(result.maintainTempC);
+    const ambientTemp = result.unitSystem === 'metric' ? result.ambientTempC : cToF(result.ambientTempC);
+    const temperatureSpan = Math.max(0.5, maintainTemp - ambientTemp);
+    const windFactor = Math.min(1.6, 1 + (result.windSpeedMph / 28));
+    const externalRatio = result.thermalResistance.totalKmPerW > 0
+      ? (result.thermalResistance.externalKmPerW / result.thermalResistance.totalKmPerW)
+      : 0.4;
+
+    const sampleCount = 11;
+    const surfacePoints = [];
+    const maintainPoints = [];
+    const ambientPoints = [];
+    for (let idx = 0; idx < sampleCount; idx += 1) {
+      const progress = idx / (sampleCount - 1);
+      const distance = totalLength * progress;
+      const decay = 0.08 + (0.3 * progress * windFactor * externalRatio);
+      const surfaceTemp = maintainTemp - (temperatureSpan * Math.min(0.85, decay));
+      surfacePoints.push({ x: distance, y: surfaceTemp });
+      maintainPoints.push({ x: distance, y: maintainTemp });
+      ambientPoints.push({ x: distance, y: ambientTemp });
+    }
+
+    const chartSeries = [
+      { label: `Pipe surface (${temperatureUnit})`, color: '#f97316', points: surfacePoints },
+      { label: `Maintain target (${temperatureUnit})`, color: '#2563eb', points: maintainPoints },
+      { label: `Ambient (${temperatureUnit})`, color: '#14b8a6', points: ambientPoints },
+    ];
+    renderLineChartSvg(temperatureProfileChart, {
+      series: chartSeries,
+      xLabel: `Pipe length (${lengthUnit})`,
+      yLabel: `Temperature (${temperatureUnit})`,
+    });
+    temperatureProfileLegend.innerHTML = chartSeries.map(item => (
+      `<li><span class="heattrace-chart-swatch" style="background:${item.color}" aria-hidden="true"></span><span>${escHtml(item.label)}</span></li>`
+    )).join('');
+  }
+
+  function renderHeatLossBreakdownChart(result) {
+    if (!heatLossBreakdownChart || !heatLossBreakdownLegend) return;
+    if (!result) {
+      renderEmptyChart(heatLossBreakdownChart, 'Run analysis to render heat-loss breakdown.');
+      heatLossBreakdownLegend.innerHTML = '';
+      return;
+    }
+
+    const outputUnit = result.unitSystem === 'metric' ? 'W/m' : 'W/ft';
+    const requiredOutput = result.unitSystem === 'metric' ? result.requiredWPerM : result.requiredWPerFt;
+    const preMarginOutput = requiredOutput / result.factors.safetyFactor;
+    const conductionShare = result.thermalResistance.totalKmPerW > 0
+      ? result.thermalResistance.insulationKmPerW / result.thermalResistance.totalKmPerW
+      : 0.5;
+    const filmShare = Math.max(0, 1 - conductionShare);
+    const segments = [
+      {
+        label: `Conduction (${outputUnit})`,
+        value: preMarginOutput * conductionShare,
+        color: '#2563eb',
+      },
+      {
+        label: `Convection / film (${outputUnit})`,
+        value: preMarginOutput * filmShare,
+        color: '#14b8a6',
+      },
+      {
+        label: `Margin (${outputUnit})`,
+        value: Math.max(0, requiredOutput - preMarginOutput),
+        color: '#f97316',
+      },
+    ];
+
+    renderDonutChartSvg(heatLossBreakdownChart, segments, outputUnit);
+    heatLossBreakdownLegend.innerHTML = segments.map(segment => (
+      `<li><span class="heattrace-chart-swatch" style="background:${segment.color}" aria-hidden="true"></span><span>${escHtml(segment.label)}: ${segment.value.toFixed(2)} ${outputUnit}</span></li>`
+    )).join('');
+  }
+
+  function renderEmptyChart(svg, message) {
+    svg.innerHTML = `
+      <rect x="12" y="12" width="736" height="336" rx="12" fill="color-mix(in srgb, var(--panel-bg, #f8fafc) 98%, #e2e8f0 2%)" stroke="var(--border-color, #7d8790)" />
+      <text x="380" y="185" text-anchor="middle" fill="var(--text-muted, #64748b)" font-size="15">${escHtml(message)}</text>
+    `;
+  }
+
+  function renderLineChartSvg(svg, { series, xLabel, yLabel }) {
+    const width = 760;
+    const height = 360;
+    const margin = { top: 24, right: 24, bottom: 58, left: 64 };
+    const plotWidth = width - margin.left - margin.right;
+    const plotHeight = height - margin.top - margin.bottom;
+    const allPoints = series.flatMap(item => item.points);
+    const xMax = Math.max(...allPoints.map(point => point.x), 1);
+    const yMinRaw = Math.min(...allPoints.map(point => point.y));
+    const yMaxRaw = Math.max(...allPoints.map(point => point.y));
+    const yPadding = Math.max(1, (yMaxRaw - yMinRaw) * 0.14);
+    const yMin = yMinRaw - yPadding;
+    const yMax = yMaxRaw + yPadding;
+    const xToSvg = x => margin.left + ((x / xMax) * plotWidth);
+    const yToSvg = y => margin.top + (((yMax - y) / (yMax - yMin || 1)) * plotHeight);
+    const xTicks = [0, 0.25, 0.5, 0.75, 1].map(frac => ({ value: xMax * frac, x: xToSvg(xMax * frac) }));
+    const yTicks = [0, 0.25, 0.5, 0.75, 1].map(frac => {
+      const value = yMin + ((yMax - yMin) * frac);
+      return { value, y: yToSvg(value) };
+    });
+    const paths = series.map(item => {
+      const d = item.points.map((point, idx) => `${idx === 0 ? 'M' : 'L'} ${xToSvg(point.x).toFixed(2)} ${yToSvg(point.y).toFixed(2)}`).join(' ');
+      return `<path d="${d}" fill="none" stroke="${item.color}" stroke-width="3" stroke-linejoin="round" stroke-linecap="round"></path>`;
+    }).join('');
+
+    svg.innerHTML = `
+      <rect x="12" y="12" width="736" height="336" rx="12" fill="color-mix(in srgb, var(--panel-bg, #f8fafc) 97%, #dbeafe 3%)" stroke="var(--border-color, #7d8790)" />
+      ${yTicks.map(tick => `<line x1="${margin.left}" y1="${tick.y}" x2="${width - margin.right}" y2="${tick.y}" stroke="color-mix(in srgb, var(--border-color, #7d8790) 40%, transparent)" />`).join('')}
+      ${xTicks.map(tick => `<line x1="${tick.x}" y1="${margin.top}" x2="${tick.x}" y2="${height - margin.bottom}" stroke="color-mix(in srgb, var(--border-color, #7d8790) 35%, transparent)" />`).join('')}
+      <line x1="${margin.left}" y1="${height - margin.bottom}" x2="${width - margin.right}" y2="${height - margin.bottom}" stroke="var(--text-color, #1f2b3a)" stroke-width="1.4"></line>
+      <line x1="${margin.left}" y1="${margin.top}" x2="${margin.left}" y2="${height - margin.bottom}" stroke="var(--text-color, #1f2b3a)" stroke-width="1.4"></line>
+      ${paths}
+      ${xTicks.map(tick => `<text x="${tick.x}" y="${height - margin.bottom + 20}" text-anchor="middle" fill="var(--text-muted, #64748b)" font-size="12">${tick.value.toFixed(1)}</text>`).join('')}
+      ${yTicks.map(tick => `<text x="${margin.left - 9}" y="${tick.y + 4}" text-anchor="end" fill="var(--text-muted, #64748b)" font-size="12">${tick.value.toFixed(1)}</text>`).join('')}
+      <text x="${margin.left + (plotWidth / 2)}" y="${height - 14}" text-anchor="middle" fill="var(--text-color, #1f2b3a)" font-size="13">${escHtml(xLabel)}</text>
+      <text x="18" y="${margin.top + (plotHeight / 2)}" transform="rotate(-90 18 ${margin.top + (plotHeight / 2)})" text-anchor="middle" fill="var(--text-color, #1f2b3a)" font-size="13">${escHtml(yLabel)}</text>
+    `;
+  }
+
+  function renderDonutChartSvg(svg, segments, valueUnit) {
+    const centerX = 250;
+    const centerY = 180;
+    const outerRadius = 110;
+    const innerRadius = 62;
+    const total = segments.reduce((sum, segment) => sum + segment.value, 0);
+    if (!Number.isFinite(total) || total <= 0) {
+      renderEmptyChart(svg, 'No non-zero thermal contributions to chart.');
+      return;
+    }
+
+    let currentAngle = -Math.PI / 2;
+    const arcs = segments.map(segment => {
+      const segmentAngle = (segment.value / total) * Math.PI * 2;
+      const startAngle = currentAngle;
+      const endAngle = currentAngle + segmentAngle;
+      currentAngle = endAngle;
+      return createArcPath(centerX, centerY, innerRadius, outerRadius, startAngle, endAngle, segment.color);
+    }).join('');
+
+    const annotationX = 420;
+    svg.innerHTML = `
+      <rect x="12" y="12" width="736" height="336" rx="12" fill="color-mix(in srgb, var(--panel-bg, #f8fafc) 97%, #dbeafe 3%)" stroke="var(--border-color, #7d8790)" />
+      ${arcs}
+      <circle cx="${centerX}" cy="${centerY}" r="${innerRadius - 0.5}" fill="color-mix(in srgb, var(--panel-bg, #f8fafc) 98%, #e2e8f0 2%)"></circle>
+      <text x="${centerX}" y="${centerY - 4}" text-anchor="middle" fill="var(--text-muted, #64748b)" font-size="12">Total</text>
+      <text x="${centerX}" y="${centerY + 18}" text-anchor="middle" fill="var(--text-color, #1f2b3a)" font-size="16" font-weight="700">${total.toFixed(2)} ${escHtml(valueUnit)}</text>
+      ${segments.map((segment, idx) => `
+        <text x="${annotationX}" y="${102 + (idx * 34)}" fill="${segment.color}" font-size="13">●</text>
+        <text x="${annotationX + 18}" y="${102 + (idx * 34)}" fill="var(--text-color, #1f2b3a)" font-size="13">${escHtml(segment.label)}: ${segment.value.toFixed(2)} ${escHtml(valueUnit)}</text>
+      `).join('')}
+    `;
+  }
+
+  function createArcPath(cx, cy, innerRadius, outerRadius, startAngle, endAngle, fill) {
+    const largeArcFlag = endAngle - startAngle > Math.PI ? 1 : 0;
+    const startOuterX = cx + (outerRadius * Math.cos(startAngle));
+    const startOuterY = cy + (outerRadius * Math.sin(startAngle));
+    const endOuterX = cx + (outerRadius * Math.cos(endAngle));
+    const endOuterY = cy + (outerRadius * Math.sin(endAngle));
+    const startInnerX = cx + (innerRadius * Math.cos(startAngle));
+    const startInnerY = cy + (innerRadius * Math.sin(startAngle));
+    const endInnerX = cx + (innerRadius * Math.cos(endAngle));
+    const endInnerY = cy + (innerRadius * Math.sin(endAngle));
+
+    return `
+      <path d="
+        M ${startOuterX} ${startOuterY}
+        A ${outerRadius} ${outerRadius} 0 ${largeArcFlag} 1 ${endOuterX} ${endOuterY}
+        L ${endInnerX} ${endInnerY}
+        A ${innerRadius} ${innerRadius} 0 ${largeArcFlag} 0 ${startInnerX} ${startInnerY}
+        Z
+      " fill="${fill}"></path>
     `;
   }
 
