@@ -108,35 +108,96 @@ document.addEventListener('DOMContentLoaded', () => {
     const displayDeltaT = result.unitSystem === 'metric'
       ? `${result.deltaT.toFixed(1)} &deg;C`
       : `${cToFDelta(result.deltaT).toFixed(1)} &deg;F`;
+    const displayHeatLoss = result.unitSystem === 'metric'
+      ? `${(result.requiredWPerM / result.factors.safetyFactor).toFixed(2)} W/m`
+      : `${(result.requiredWPerFt / result.factors.safetyFactor).toFixed(2)} W/ft`;
     const displayRequiredOutput = result.unitSystem === 'metric'
       ? `${result.requiredWPerM.toFixed(2)} W/m`
       : `${result.requiredWPerFt.toFixed(2)} W/ft`;
     const displaySelectedRating = result.unitSystem === 'metric'
       ? `${wPerFtToWPerM(result.recommendedCableRatingWPerFt).toFixed(2)} W/m`
       : `${result.recommendedCableRatingWPerFt} W/ft`;
+    const lineLengthValue = result.unitSystem === 'metric'
+      ? `${imperialToMetric.lineLengthFt(result.lineLengthFt).toFixed(1)} m`
+      : `${result.lineLengthFt.toFixed(0)} ft`;
+    const utilizationRatio = result.recommendedCableRatingWPerFt > 0
+      ? (result.requiredWPerFt / result.recommendedCableRatingWPerFt) * 100
+      : 0;
+    const circuitCheckPass = result.maxCircuitLengthFt <= 0 || result.lineLengthFt <= result.maxCircuitLengthFt;
+    const circuitCheckValue = result.maxCircuitLengthFt > 0
+      ? `${lineLengthValue} / ${result.unitSystem === 'metric'
+          ? `${imperialToMetric.maxCircuitLengthFt(result.maxCircuitLengthFt).toFixed(1)} m`
+          : `${result.maxCircuitLengthFt.toFixed(0)} ft`}`
+      : `${lineLengthValue} (no maximum set)`;
+    const circuitCheckHelper = circuitCheckPass
+      ? 'Circuit length is within the configured limit.'
+      : 'Circuit length exceeds the configured maximum. Split the run or reconfigure the circuit.';
 
     const warningItems = result.warnings.length
-      ? `<ul class="drc-findings">${result.warnings.map((w) =>
-          `<li class="drc-finding drc-warn"><span class="drc-msg">${escHtml(w)}</span></li>`
-        ).join('')}</ul>`
-      : '<p class="field-hint">No warnings detected for the current assumptions.</p>';
+      ? `<div class="heattrace-warning-grid" role="list">${result.warnings.map((w) => {
+          const severity = classifyHeatTraceWarningSeverity(w);
+          return `<article class="heattrace-warning-card heattrace-warning-card--${severity}" role="listitem">
+            <div class="heattrace-warning-severity">${severity.toUpperCase()}</div>
+            <p class="heattrace-warning-message">${escHtml(w)}</p>
+          </article>`;
+        }).join('')}</div>`
+      : `<article class="heattrace-warning-card heattrace-warning-card--info">
+          <div class="heattrace-warning-severity">INFO</div>
+          <p class="heattrace-warning-message">No warnings detected for the current assumptions.</p>
+        </article>`;
 
     resultsDiv.innerHTML = `
       <section class="results-panel" aria-labelledby="results-heading">
         <h2 id="results-heading">Heat Trace Sizing Results</h2>
 
+        <div class="result-group heattrace-kpi-grid" role="list" aria-label="Heat trace sizing KPI summary">
+          <article class="heattrace-kpi-card" role="listitem">
+            <p class="heattrace-kpi-label">Heat loss (base)</p>
+            <p class="heattrace-kpi-value">${displayHeatLoss}</p>
+            <p class="heattrace-kpi-context">Calculated before safety margin using ΔT of ${displayDeltaT}.</p>
+          </article>
+          <article class="heattrace-kpi-card" role="listitem">
+            <p class="heattrace-kpi-label">Required heat input</p>
+            <p class="heattrace-kpi-value">${displayRequiredOutput}</p>
+            <p class="heattrace-kpi-context">Includes ${result.safetyMarginPct.toFixed(0)}% margin (${result.factors.safetyFactor.toFixed(2)}× safety factor).</p>
+          </article>
+          <article class="heattrace-kpi-card" role="listitem">
+            <p class="heattrace-kpi-label">Recommended watt density</p>
+            <p class="heattrace-kpi-value">${displaySelectedRating}</p>
+            <p class="heattrace-kpi-context">Based on ${result.voltageV.toFixed(0)} V basis; utilization ${utilizationRatio.toFixed(1)}% of selected rating.</p>
+          </article>
+          <article class="heattrace-kpi-card${circuitCheckPass ? '' : ' heattrace-kpi-card--alert'}" role="listitem">
+            <p class="heattrace-kpi-label">Circuit check</p>
+            <p class="heattrace-kpi-value">${circuitCheckPass ? 'PASS' : 'REVIEW'}</p>
+            <p class="heattrace-kpi-context">${escHtml(circuitCheckValue)}. ${escHtml(circuitCheckHelper)}</p>
+          </article>
+        </div>
+
         <div class="result-group">
+          <h3>Thermal Detail Breakdown</h3>
           <div class="result-row">
-            <span class="result-label">Temperature differential (ΔT)</span>
-            <span class="result-value">${displayDeltaT}</span>
+            <span class="result-label">Insulation resistance (K·m/W)</span>
+            <span class="result-value">${result.thermalResistance.insulationKmPerW.toFixed(4)}</span>
           </div>
           <div class="result-row">
-            <span class="result-label">Required heat output</span>
-            <span class="result-value"><strong>${displayRequiredOutput}</strong></span>
+            <span class="result-label">External film resistance (K·m/W)</span>
+            <span class="result-value">${result.thermalResistance.externalKmPerW.toFixed(4)}</span>
           </div>
           <div class="result-row">
-            <span class="result-label">Selected standard cable rating</span>
-            <span class="result-value"><strong>${displaySelectedRating}</strong></span>
+            <span class="result-label">Total resistance (K·m/W)</span>
+            <span class="result-value"><strong>${result.thermalResistance.totalKmPerW.toFixed(4)}</strong></span>
+          </div>
+          <div class="result-row">
+            <span class="result-label">Environment multiplier</span>
+            <span class="result-value">${result.factors.environmentMultiplier.toFixed(2)}×</span>
+          </div>
+          <div class="result-row">
+            <span class="result-label">Material factor</span>
+            <span class="result-value">${result.factors.materialFactor.toFixed(2)}×</span>
+          </div>
+          <div class="result-row">
+            <span class="result-label">Safety factor</span>
+            <span class="result-value">${result.factors.safetyFactor.toFixed(2)}×</span>
           </div>
           <div class="result-row">
             <span class="result-label">Total estimated circuit load</span>
@@ -446,7 +507,7 @@ function escHtml(str) {
   }[ch]));
 }
 
-function formatMaterialLabel(value) {
+  function formatMaterialLabel(value) {
   const labels = {
     carbonSteel: 'Carbon Steel',
     stainlessSteel: 'Stainless Steel',
@@ -466,7 +527,14 @@ function formatMaterialLabel(value) {
     freezer: 'Freezer / Cold Room',
   };
   return labels[value] || String(value ?? '');
-}
+  }
+
+  function classifyHeatTraceWarningSeverity(message) {
+    const text = String(message || '').toLowerCase();
+    if (text.includes('exceeds available standard ratings') || text.includes('exceeds')) return 'error';
+    if (text.includes('very low ambient') || text.includes('high wind') || text.includes('long circuit length')) return 'warning';
+    return 'info';
+  }
 
 const imperialToMetric = {
   ambientTempC: fToC,

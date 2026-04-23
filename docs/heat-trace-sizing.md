@@ -124,3 +124,19 @@ Preliminary selection would therefore target the next available trace-circuit ca
 - Typical design margins for early sizing are often 10-25%, depending on data quality, climatic uncertainty, and criticality.
 - When freeze protection is safety- or production-critical, use a structured margin policy (environment + uncertainty + aging) rather than a single arbitrary adder.
 - Final design should reconcile process maintain temperature, insulation specification, power availability, hazardous area constraints, and manufacturer-specific cable output curves.
+
+## Heat Trace UI result interpretation
+
+The Heat Trace Sizing page now surfaces a KPI card grid to make output review faster:
+
+- **Heat loss (base):** Required line loss before applying design safety margin.
+- **Required heat input:** Final demand after safety margin and material correction factors.
+- **Recommended watt density:** Selected standard cable rating with utilization against required output.
+- **Circuit check:** Length compliance against configured maximum circuit length.
+
+The detail section below the KPI grid reports thermal resistance and multipliers used by the model:
+
+- `insulationKmPerW`, `externalKmPerW`, `totalKmPerW`
+- `environmentMultiplier`, `materialFactor`, `safetyFactor`
+
+Warnings are presented as severity-tagged cards (info/warning/error) to improve scanning during design reviews.
