@@ -265,6 +265,19 @@ selectedWperFt = nearest standard cable rating ≥ required W/ft</pre>
           <section id="heattrace-panel-overview" class="heattrace-panel" role="tabpanel" aria-labelledby="heattrace-tab-overview" tabindex="0">
             <p class="field-hint">Review your current assumptions and run analysis to populate heat-loss and circuit results.</p>
             <div id="results" role="region" aria-live="polite" aria-label="Heat trace sizing results and warnings"></div>
+            <section class="card heattrace-sensitivity-card" aria-labelledby="sensitivity-heading">
+              <h2 id="sensitivity-heading">Sensitivity Explorer</h2>
+              <p class="field-hint">Adjust major heat-loss drivers to preview the required output delta versus the baseline case.</p>
+              <div id="sensitivity-controls" class="heattrace-sensitivity-controls" aria-live="polite"></div>
+              <div class="heattrace-sensitivity-actions">
+                <button type="button" id="sensitivity-set-baseline" class="btn">Use Current Inputs as Baseline</button>
+              </div>
+              <div id="sensitivity-summary" class="heattrace-sensitivity-summary"></div>
+              <section class="heattrace-insights" aria-labelledby="sensitivity-insights-heading">
+                <h3 id="sensitivity-insights-heading">Insights</h3>
+                <ul id="sensitivity-insights-list" class="heattrace-insights-list"></ul>
+              </section>
+            </section>
             <section class="card heattrace-overview-card" aria-labelledby="system-overview-heading">
               <h2 id="system-overview-heading">System Overview</h2>
               <p class="field-hint">A simplified geometry view of the traced line based on your current input assumptions.</p>
