@@ -753,6 +753,82 @@
 .heattracesizing-page .heattrace-overview-card {
   margin-top: .9rem;
 }
+.heattracesizing-page .heattrace-sensitivity-card {
+  margin-top: .9rem;
+}
+.heattracesizing-page .heattrace-sensitivity-controls {
+  display: grid;
+  gap: .65rem;
+  margin-top: .6rem;
+}
+.heattracesizing-page .heattrace-sensitivity-row label {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  font-size: .92rem;
+  margin-bottom: .3rem;
+}
+.heattracesizing-page .heattrace-sensitivity-value {
+  font-weight: 600;
+  color: var(--text-muted, #64748b);
+}
+.heattracesizing-page .heattrace-sensitivity-slider {
+  width: 100%;
+}
+.heattracesizing-page .heattrace-sensitivity-actions {
+  margin-top: .65rem;
+  display: flex;
+  justify-content: flex-end;
+}
+.heattracesizing-page .heattrace-sensitivity-summary {
+  margin-top: .85rem;
+}
+.heattracesizing-page .heattrace-sensitivity-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+  gap: .6rem;
+}
+.heattracesizing-page .heattrace-sensitivity-result {
+  border: 1px solid var(--border-color, #7d8790);
+  border-radius: 10px;
+  padding: .65rem .75rem;
+  background: color-mix(in srgb, var(--panel-bg, #f8fafc) 94%, #dbeafe 6%);
+}
+.heattracesizing-page .heattrace-sensitivity-result--decrease {
+  border-left: 4px solid #16a34a;
+}
+.heattracesizing-page .heattrace-sensitivity-result--increase {
+  border-left: 4px solid #dc2626;
+}
+.heattracesizing-page .heattrace-sensitivity-result--neutral {
+  border-left: 4px solid #3b82f6;
+}
+.heattracesizing-page .heattrace-sensitivity-result--warning {
+  border-left: 4px solid #f59e0b;
+}
+.heattracesizing-page .heattrace-insights {
+  margin-top: .85rem;
+}
+.heattracesizing-page .heattrace-insights-list {
+  list-style: none;
+  margin: .5rem 0 0;
+  padding: 0;
+  display: grid;
+  gap: .55rem;
+}
+.heattracesizing-page .heattrace-insight-item {
+  border: 1px solid var(--border-color, #7d8790);
+  border-radius: 10px;
+  padding: .65rem .75rem;
+  display: flex;
+  justify-content: space-between;
+  gap: .75rem;
+  align-items: center;
+}
+.heattracesizing-page .heattrace-insight-item p {
+  margin: .2rem 0 0;
+  font-size: .9rem;
+}
 .heattracesizing-page .heattrace-overview-visual-wrap {
   border: 1px solid var(--border-color, #7d8790);
   border-radius: 10px;

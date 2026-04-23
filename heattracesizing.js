@@ -20,7 +20,66 @@ document.addEventListener('DOMContentLoaded', () => {
   const heatLossBreakdownChart = document.getElementById('heatloss-breakdown-chart');
   const heatLossBreakdownLegend = document.getElementById('heatloss-breakdown-legend');
   const unitSystemSelect = document.getElementById('unit-system');
+  const sensitivityControls = document.getElementById('sensitivity-controls');
+  const sensitivitySummary = document.getElementById('sensitivity-summary');
+  const sensitivityInsightsList = document.getElementById('sensitivity-insights-list');
+  const sensitivitySetBaselineButton = document.getElementById('sensitivity-set-baseline');
   let activeUnitSystem = unitSystemSelect?.value || 'imperial';
+  let sensitivityBaseline = null;
+  let sensitivityRecommendations = [];
+
+  const sensitivityDrivers = [
+    {
+      key: 'insulationThicknessIn',
+      label: 'Insulation thickness',
+      inputId: 'insulation-thickness-in',
+      stepDirection: 1,
+      unit: () => activeUnitSystem === 'metric' ? 'mm' : 'in',
+      fromInputToDisplay: value => activeUnitSystem === 'metric' ? imperialToMetric.insulationThicknessIn(value) : value,
+      fromDisplayToInput: value => activeUnitSystem === 'metric' ? metricToImperial.insulationThicknessIn(value) : value,
+      format: value => value.toFixed(activeUnitSystem === 'metric' ? 0 : 2),
+    },
+    {
+      key: 'ambientTempC',
+      label: 'Ambient temperature',
+      inputId: 'ambient-temp-c',
+      stepDirection: 1,
+      unit: () => activeUnitSystem === 'metric' ? '°C' : '°F',
+      fromInputToDisplay: value => activeUnitSystem === 'metric' ? value : cToF(value),
+      fromDisplayToInput: value => activeUnitSystem === 'metric' ? value : fToC(value),
+      format: value => value.toFixed(0),
+    },
+    {
+      key: 'windSpeedMph',
+      label: 'Wind speed',
+      inputId: 'wind-speed-mph',
+      stepDirection: -1,
+      unit: () => activeUnitSystem === 'metric' ? 'km/h' : 'mph',
+      fromInputToDisplay: value => activeUnitSystem === 'metric' ? imperialToMetric.windSpeedMph(value) : value,
+      fromDisplayToInput: value => activeUnitSystem === 'metric' ? metricToImperial.windSpeedMph(value) : value,
+      format: value => value.toFixed(0),
+    },
+    {
+      key: 'maintainTempC',
+      label: 'Maintain temperature',
+      inputId: 'maintain-temp-c',
+      stepDirection: -1,
+      unit: () => activeUnitSystem === 'metric' ? '°C' : '°F',
+      fromInputToDisplay: value => activeUnitSystem === 'metric' ? value : cToF(value),
+      fromDisplayToInput: value => activeUnitSystem === 'metric' ? value : fToC(value),
+      format: value => value.toFixed(0),
+    },
+    {
+      key: 'safetyMarginPct',
+      label: 'Design margin',
+      inputId: 'design-margin-pct',
+      stepDirection: -1,
+      unit: () => '%',
+      fromInputToDisplay: value => value,
+      fromDisplayToInput: value => value,
+      format: value => value.toFixed(0),
+    },
+  ];
 
   initStudyApprovalPanel('heatTraceSizing');
 
@@ -35,10 +94,12 @@ document.addEventListener('DOMContentLoaded', () => {
     renderResults(saved);
     renderSystemOverview(saved);
     renderWorkspaceCharts(saved);
+    captureSensitivityBaseline(saved);
   } else {
     applyUnitSystem(activeUnitSystem, { convertExistingValues: false });
     renderSystemOverview(null);
     renderWorkspaceCharts(null);
+    captureSensitivityBaseline(getLiveAnalysisResult());
   }
 
   unitSystemSelect?.addEventListener('change', () => {
@@ -48,10 +109,13 @@ document.addEventListener('DOMContentLoaded', () => {
     activeUnitSystem = nextUnitSystem;
     renderSystemOverview(getStudies().heatTraceSizing || null);
     renderWorkspaceCharts(getLiveAnalysisResult() || getStudies().heatTraceSizing || null);
+    renderSensitivityModule();
   });
 
   form.addEventListener('input', () => {
     renderWorkspaceCharts(getLiveAnalysisResult() || getStudies().heatTraceSizing || null);
+    renderSystemOverview(getLiveAnalysisResult() || getStudies().heatTraceSizing || null);
+    renderSensitivityModule();
   });
 
   form.addEventListener('submit', e => {
@@ -73,6 +137,19 @@ document.addEventListener('DOMContentLoaded', () => {
     renderResults(result);
     renderSystemOverview(result);
     renderWorkspaceCharts(result);
+    captureSensitivityBaseline(result);
+  });
+
+  sensitivitySetBaselineButton?.addEventListener('click', () => {
+    captureSensitivityBaseline(getLiveAnalysisResult() || getStudies().heatTraceSizing || null);
+  });
+
+  sensitivityInsightsList?.addEventListener('click', event => {
+    const applyButton = event.target.closest('[data-sensitivity-apply]');
+    if (!applyButton) return;
+    const driverKey = applyButton.getAttribute('data-driver-key');
+    const applyValue = parseFloat(applyButton.getAttribute('data-apply-value'));
+    applySensitivitySuggestion(driverKey, applyValue);
   });
 
   function readInputs() {
@@ -611,6 +688,218 @@ document.addEventListener('DOMContentLoaded', () => {
     });
   }
 
+  function captureSensitivityBaseline(result) {
+    if (!result) {
+      sensitivityBaseline = null;
+      sensitivityRecommendations = [];
+      renderSensitivityModule();
+      return;
+    }
+
+    sensitivityBaseline = {
+      inputs: readInputs(),
+      result,
+    };
+    renderSensitivityModule();
+  }
+
+  function renderSensitivityModule() {
+    if (!sensitivityControls || !sensitivitySummary || !sensitivityInsightsList) return;
+    if (!sensitivityBaseline || !sensitivityBaseline.result) {
+      sensitivityControls.innerHTML = '<p class="field-hint">Run analysis to initialize sensitivity sliders.</p>';
+      sensitivitySummary.innerHTML = '';
+      sensitivityInsightsList.innerHTML = '';
+      return;
+    }
+
+    const sensitivityRows = [];
+    for (const driver of sensitivityDrivers) {
+      const slider = getOrCreateSensitivitySlider(driver);
+      const displayValue = parseFloat(slider.value);
+      const scenarioInputs = {
+        ...sensitivityBaseline.inputs,
+        [driver.key]: driver.fromDisplayToInput(displayValue),
+      };
+      const scenarioResult = safeRunSensitivityCase(scenarioInputs);
+      const deltaWPerFt = scenarioResult
+        ? scenarioResult.requiredWPerFt - sensitivityBaseline.result.requiredWPerFt
+        : NaN;
+      sensitivityRows.push({
+        driver,
+        slider,
+        displayValue,
+        scenarioResult,
+        deltaWPerFt,
+      });
+    }
+
+    sensitivitySummary.innerHTML = `
+      <div class="heattrace-sensitivity-grid" role="list" aria-label="Sensitivity deltas versus baseline">
+        ${sensitivityRows.map(row => {
+          const deltaText = Number.isFinite(row.deltaWPerFt)
+            ? formatDeltaOutput(row.deltaWPerFt)
+            : 'Invalid scenario';
+          const deltaClass = !Number.isFinite(row.deltaWPerFt)
+            ? 'warning'
+            : (row.deltaWPerFt > 0 ? 'increase' : (row.deltaWPerFt < 0 ? 'decrease' : 'neutral'));
+          return `
+            <article class="heattrace-sensitivity-result heattrace-sensitivity-result--${deltaClass}" role="listitem">
+              <p class="heattrace-kpi-label">${escHtml(row.driver.label)}</p>
+              <p class="heattrace-kpi-value">${escHtml(row.driver.format(row.displayValue))} ${escHtml(row.driver.unit())}</p>
+              <p class="heattrace-kpi-context">Δ required output vs baseline: <strong>${escHtml(deltaText)}</strong></p>
+            </article>
+          `;
+        }).join('')}
+      </div>
+    `;
+
+    sensitivityRecommendations = buildSensitivityRecommendations();
+    if (!sensitivityRecommendations.length) {
+      sensitivityInsightsList.innerHTML = '<li class="field-hint">No lower-output recommendation found within one slider step from baseline.</li>';
+      return;
+    }
+    sensitivityInsightsList.innerHTML = sensitivityRecommendations.map((recommendation, index) => `
+      <li class="heattrace-insight-item">
+        <div>
+          <strong>${index + 1}. ${escHtml(recommendation.title)}</strong>
+          <p>${escHtml(recommendation.detail)}</p>
+        </div>
+        <button
+          type="button"
+          class="btn"
+          data-sensitivity-apply="true"
+          data-driver-key="${escHtml(recommendation.driverKey)}"
+          data-apply-value="${recommendation.applyValue.toFixed(4)}"
+        >Quick Apply</button>
+      </li>
+    `).join('');
+  }
+
+  function getOrCreateSensitivitySlider(driver) {
+    const existing = sensitivityControls.querySelector(`#sensitivity-${driver.inputId}`);
+    const sourceInput = document.getElementById(driver.inputId);
+    if (existing && sourceInput) {
+      existing.min = sourceInput.min || '0';
+      existing.max = sourceInput.max || '500';
+      existing.step = sourceInput.step || '1';
+      if (existing.dataset.unitSystem !== activeUnitSystem) {
+        existing.value = sourceInput.value;
+      }
+      existing.dataset.unitSystem = activeUnitSystem;
+      const existingValueTag = document.getElementById(`sensitivity-${driver.inputId}-value`);
+      if (existingValueTag) {
+        existingValueTag.textContent = `${driver.format(parseFloat(existing.value))} ${driver.unit()}`;
+      }
+      return existing;
+    }
+
+    const wrapper = document.createElement('div');
+    wrapper.className = 'heattrace-sensitivity-row';
+    wrapper.innerHTML = `
+      <label for="sensitivity-${driver.inputId}">
+        ${escHtml(driver.label)} <span class="heattrace-sensitivity-value" id="sensitivity-${driver.inputId}-value"></span>
+      </label>
+      <input type="range" id="sensitivity-${driver.inputId}" class="heattrace-sensitivity-slider">
+    `;
+    sensitivityControls.appendChild(wrapper);
+
+    const slider = wrapper.querySelector('input');
+    const valueLabel = wrapper.querySelector('.heattrace-sensitivity-value');
+    if (!sourceInput) return slider;
+
+    slider.min = sourceInput.min || '0';
+    slider.max = sourceInput.max || '500';
+    slider.step = sourceInput.step || '1';
+    slider.value = sourceInput.value;
+    slider.dataset.unitSystem = activeUnitSystem;
+
+    const updateLabel = () => {
+      valueLabel.textContent = `${driver.format(parseFloat(slider.value))} ${driver.unit()}`;
+    };
+    updateLabel();
+    slider.addEventListener('input', () => {
+      updateLabel();
+      renderSensitivityModule();
+    });
+    return slider;
+  }
+
+  function buildSensitivityRecommendations() {
+    if (!sensitivityBaseline) return [];
+    const baselineRequiredWPerFt = sensitivityBaseline.result.requiredWPerFt;
+    const recommendations = [];
+
+    for (const driver of sensitivityDrivers) {
+      const slider = sensitivityControls.querySelector(`#sensitivity-${driver.inputId}`);
+      if (!slider) continue;
+      const step = parseFloat(slider.step) || 1;
+      const currentValue = parseFloat(slider.value);
+      const min = parseFloat(slider.min);
+      const max = parseFloat(slider.max);
+      const suggestedValue = clampValue(currentValue + (driver.stepDirection * step), min, max);
+      if (!Number.isFinite(suggestedValue) || suggestedValue === currentValue) continue;
+      const scenarioInputs = {
+        ...sensitivityBaseline.inputs,
+        [driver.key]: driver.fromDisplayToInput(suggestedValue),
+      };
+      const scenarioResult = safeRunSensitivityCase(scenarioInputs);
+      if (!scenarioResult) continue;
+      const improvementWPerFt = baselineRequiredWPerFt - scenarioResult.requiredWPerFt;
+      if (improvementWPerFt <= 0) continue;
+
+      recommendations.push({
+        driverKey: driver.key,
+        applyValue: suggestedValue,
+        improvementWPerFt,
+        title: `${driver.label}: move to ${driver.format(suggestedValue)} ${driver.unit()}`,
+        detail: `Estimated reduction in required output: ${formatDeltaOutput(-improvementWPerFt)}.`,
+      });
+    }
+
+    return recommendations.sort((a, b) => b.improvementWPerFt - a.improvementWPerFt).slice(0, 3);
+  }
+
+  function applySensitivitySuggestion(driverKey, applyValue) {
+    const driver = sensitivityDrivers.find(item => item.key === driverKey);
+    if (!driver || !Number.isFinite(applyValue)) return;
+    const input = document.getElementById(driver.inputId);
+    if (!input) return;
+    input.value = roundForDisplay(applyValue, driver.inputId);
+    const slider = sensitivityControls.querySelector(`#sensitivity-${driver.inputId}`);
+    if (slider) {
+      slider.value = roundForDisplay(applyValue, driver.inputId);
+      const valueTag = document.getElementById(`sensitivity-${driver.inputId}-value`);
+      if (valueTag) valueTag.textContent = `${driver.format(parseFloat(slider.value))} ${driver.unit()}`;
+    }
+    renderSystemOverview(getLiveAnalysisResult() || getStudies().heatTraceSizing || null);
+    renderWorkspaceCharts(getLiveAnalysisResult() || getStudies().heatTraceSizing || null);
+    renderSensitivityModule();
+  }
+
+  function safeRunSensitivityCase(inputs) {
+    try {
+      return runHeatTraceSizingAnalysis(inputs);
+    } catch (err) {
+      return null;
+    }
+  }
+
+  function formatDeltaOutput(deltaWPerFt) {
+    const magnitude = Math.abs(deltaWPerFt);
+    const sign = deltaWPerFt > 0 ? '+' : (deltaWPerFt < 0 ? '−' : '±');
+    if (activeUnitSystem === 'metric') {
+      return `${sign}${wPerFtToWPerM(magnitude).toFixed(2)} W/m`;
+    }
+    return `${sign}${magnitude.toFixed(2)} W/ft`;
+  }
+
+  function clampValue(value, min, max) {
+    let nextValue = value;
+    if (Number.isFinite(min)) nextValue = Math.max(min, nextValue);
+    if (Number.isFinite(max)) nextValue = Math.min(max, nextValue);
+    return nextValue;
+  }
+
   function renderCallout(number, x, y, anchorX, anchorY, label) {
     return `
       <line x1="${x + 8}" y1="${y + 8}" x2="${anchorX}" y2="${anchorY}" stroke="var(--text-color, #1f2b3a)" stroke-width="1.5" />
@@ -680,6 +969,7 @@ function roundForDisplay(value, fieldId) {
     'wind-speed-mph': 0,
     'maintain-temp-c': 0,
     'max-circuit-length-ft': 0,
+    'design-margin-pct': 0,
   };
   const decimals = precisionByField[fieldId] ?? 2;
   return value.toFixed(decimals);

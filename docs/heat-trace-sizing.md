@@ -140,3 +140,14 @@ The detail section below the KPI grid reports thermal resistance and multipliers
 - `environmentMultiplier`, `materialFactor`, `safetyFactor`
 
 Warnings are presented as severity-tagged cards (info/warning/error) to improve scanning during design reviews.
+
+## Sensitivity explorer and quick-apply workflow
+
+The Overview tab now includes a **Sensitivity Explorer** card for rapid what-if checks against a baseline case:
+
+- Sliders are provided for key drivers: insulation thickness, ambient temperature, wind speed, maintain temperature, and design margin.
+- Each slider movement runs a lightweight recalculation and shows the required output delta relative to the saved baseline case.
+- The **Insights** subsection ranks top one-step recommendations that reduce required output.
+- **Quick Apply** buttons write suggested values back into the form controls and refresh the visual workspace so users can continue from the proposed scenario.
+
+Use **Use Current Inputs as Baseline** whenever assumptions change materially and you want future deltas to compare against the new operating point.
