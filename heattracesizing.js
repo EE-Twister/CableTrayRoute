@@ -13,6 +13,8 @@ document.addEventListener('DOMContentLoaded', () => {
 
   const form = document.getElementById('heat-trace-form');
   const resultsDiv = document.getElementById('results');
+  const overviewSvg = document.getElementById('system-overview-visual');
+  const overviewLegend = document.getElementById('system-overview-legend');
   const unitSystemSelect = document.getElementById('unit-system');
   let activeUnitSystem = unitSystemSelect?.value || 'imperial';
 
@@ -27,8 +29,10 @@ document.addEventListener('DOMContentLoaded', () => {
     }
     applyUnitSystem(activeUnitSystem, { convertExistingValues: false });
     renderResults(saved);
+    renderSystemOverview(saved);
   } else {
     applyUnitSystem(activeUnitSystem, { convertExistingValues: false });
+    renderSystemOverview(null);
   }
 
   unitSystemSelect?.addEventListener('change', () => {
@@ -36,6 +40,7 @@ document.addEventListener('DOMContentLoaded', () => {
     if (nextUnitSystem === activeUnitSystem) return;
     applyUnitSystem(nextUnitSystem, { convertExistingValues: true });
     activeUnitSystem = nextUnitSystem;
+    renderSystemOverview(getStudies().heatTraceSizing || null);
   });
 
   form.addEventListener('submit', e => {
@@ -55,6 +60,7 @@ document.addEventListener('DOMContentLoaded', () => {
     setStudies(studies);
 
     renderResults(result);
+    renderSystemOverview(result);
   });
 
   function readInputs() {
@@ -143,6 +149,63 @@ document.addEventListener('DOMContentLoaded', () => {
           ${warningItems}
         </div>
       </section>`;
+  }
+
+  function renderSystemOverview(result) {
+    if (!overviewSvg || !overviewLegend) return;
+    const currentInputs = readInputs();
+    const pipeNpsValue = parseFloat(currentInputs.pipeNps) || 1;
+    const insulationThicknessIn = Math.max(0.1, currentInputs.insulationThicknessIn || 0.1);
+    const lineLengthFt = Math.max(1, currentInputs.lineLengthFt || 1);
+    const ambientTempC = currentInputs.ambientTempC;
+    const windSpeedMph = currentInputs.windSpeedMph || 0;
+
+    const pipeOuterRadius = 18 + Math.min(28, pipeNpsValue * 3.4);
+    const insulationOuterRadius = pipeOuterRadius + Math.min(42, insulationThicknessIn * 12);
+    const lineBodyWidth = Math.max(300, Math.min(680, lineLengthFt * 1.8));
+    const startX = 70;
+    const endX = startX + lineBodyWidth;
+    const centerY = 160;
+
+    const diameterText = activeUnitSystem === 'metric'
+      ? `${imperialToMetric.insulationThicknessIn(insulationThicknessIn).toFixed(0)} mm insulation`
+      : `${insulationThicknessIn.toFixed(2)} in insulation`;
+    const lengthText = activeUnitSystem === 'metric'
+      ? `${imperialToMetric.lineLengthFt(lineLengthFt).toFixed(1)} m run`
+      : `${lineLengthFt.toFixed(0)} ft run`;
+    const ambientText = activeUnitSystem === 'metric'
+      ? `${ambientTempC.toFixed(1)} °C ambient, ${imperialToMetric.windSpeedMph(windSpeedMph).toFixed(0)} km/h wind`
+      : `${cToF(ambientTempC).toFixed(1)} °F ambient, ${windSpeedMph.toFixed(0)} mph wind`;
+    const cableRatingText = result
+      ? (activeUnitSystem === 'metric'
+          ? `${wPerFtToWPerM(result.recommendedCableRatingWPerFt).toFixed(1)} W/m selected`
+          : `${result.recommendedCableRatingWPerFt} W/ft selected`)
+      : 'Run analysis for cable rating';
+
+    overviewSvg.innerHTML = `
+      <rect x="20" y="30" width="840" height="270" rx="14" fill="color-mix(in srgb, var(--panel-bg, #f8fafc) 90%, #dbeafe 10%)" stroke="var(--border-color, #7d8790)" />
+      <line x1="${startX}" y1="${centerY}" x2="${endX}" y2="${centerY}" stroke="#0f172a" stroke-width="${insulationOuterRadius * 2}" stroke-linecap="round" opacity="0.15" />
+      <line x1="${startX}" y1="${centerY}" x2="${endX}" y2="${centerY}" stroke="#2563eb" stroke-width="${pipeOuterRadius * 2}" stroke-linecap="round" opacity="0.7" />
+      <path d="M ${startX + 15} ${centerY - pipeOuterRadius - 10} L ${endX - 15} ${centerY - pipeOuterRadius - 10}" stroke="#f97316" stroke-width="6" stroke-linecap="round" stroke-dasharray="12 10" />
+      <line x1="${startX + 85}" y1="${centerY + insulationOuterRadius + 24}" x2="${endX - 85}" y2="${centerY + insulationOuterRadius + 24}" stroke="var(--text-color, #1f2b3a)" stroke-width="2" marker-start="url(#overview-arrow)" marker-end="url(#overview-arrow)" />
+      <defs>
+        <marker id="overview-arrow" markerWidth="8" markerHeight="8" refX="4" refY="4" orient="auto">
+          <path d="M 0 0 L 8 4 L 0 8 z" fill="var(--text-color, #1f2b3a)" />
+        </marker>
+      </defs>
+      <text x="${startX + 95}" y="${centerY + insulationOuterRadius + 45}" fill="var(--text-color, #1f2b3a)" font-size="14">${escHtml(lengthText)}</text>
+      ${renderCallout(1, startX + 40, centerY - 94, startX + 120, centerY - 40, `Pipe material: ${formatMaterialLabel(currentInputs.pipeMaterial)}`)}
+      ${renderCallout(2, startX + 180, centerY - 132, startX + 220, centerY - (insulationOuterRadius + 8), `Insulation: ${formatMaterialLabel(currentInputs.insulationType)} (${diameterText})`)}
+      ${renderCallout(3, endX - 200, centerY - 118, endX - 130, centerY - pipeOuterRadius - 10, `Heat trace cable: ${cableRatingText}`)}
+      ${renderCallout(4, endX - 225, centerY + 122, endX - 60, centerY + insulationOuterRadius + 5, `Ambient: ${ambientText}`)}
+    `;
+
+    overviewLegend.innerHTML = `
+      <li><span class="legend-marker legend-pipe" aria-hidden="true"></span><span><strong>1.</strong> Pipe material (${escHtml(formatMaterialLabel(currentInputs.pipeMaterial))})</span></li>
+      <li><span class="legend-marker legend-insulation" aria-hidden="true"></span><span><strong>2.</strong> Insulation type/thickness (${escHtml(formatMaterialLabel(currentInputs.insulationType))}, ${escHtml(diameterText)})</span></li>
+      <li><span class="legend-marker legend-cable" aria-hidden="true"></span><span><strong>3.</strong> Heat trace cable (${escHtml(cableRatingText)})</span></li>
+      <li><span class="legend-marker legend-ambient" aria-hidden="true"></span><span><strong>4.</strong> Ambient conditions (${escHtml(ambientText)})</span></li>
+    `;
   }
 
   function applyUnitSystem(unitSystem, { convertExistingValues = true } = {}) {
@@ -268,6 +331,15 @@ document.addEventListener('DOMContentLoaded', () => {
       }
     });
   }
+
+  function renderCallout(number, x, y, anchorX, anchorY, label) {
+    return `
+      <line x1="${x + 8}" y1="${y + 8}" x2="${anchorX}" y2="${anchorY}" stroke="var(--text-color, #1f2b3a)" stroke-width="1.5" />
+      <circle cx="${x}" cy="${y}" r="14" fill="var(--accent-color, #2a6fd6)" />
+      <text x="${x}" y="${y + 4}" fill="#fff" font-size="12" font-weight="700" text-anchor="middle">${number}</text>
+      <text x="${x + 22}" y="${y + 5}" fill="var(--text-color, #1f2b3a)" font-size="13">${escHtml(label)}</text>
+    `;
+  }
 });
 
 function initAnalysisTabs() {
@@ -372,6 +444,28 @@ function escHtml(str) {
     '"': '&quot;',
     "'": '&#39;',
   }[ch]));
+}
+
+function formatMaterialLabel(value) {
+  const labels = {
+    carbonSteel: 'Carbon Steel',
+    stainlessSteel: 'Stainless Steel',
+    copper: 'Copper',
+    aluminum: 'Aluminum',
+    pvc: 'PVC',
+    hdpe: 'HDPE',
+    mineralWool: 'Mineral Wool',
+    closedCellFoam: 'Closed Cell Foam',
+    fiberglass: 'Fiberglass',
+    calciumSilicate: 'Calcium Silicate',
+    aerogelBlanket: 'Aerogel Blanket',
+    'indoor-still': 'Indoor — Still Air',
+    'outdoor-sheltered': 'Outdoor — Sheltered',
+    'outdoor-windy': 'Outdoor — Windy',
+    'hazardous-area': 'Hazardous Area',
+    freezer: 'Freezer / Cold Room',
+  };
+  return labels[value] || String(value ?? '');
 }
 
 const imperialToMetric = {

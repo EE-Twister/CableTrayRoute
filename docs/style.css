@@ -750,6 +750,62 @@
 .heattracesizing-page .heattrace-panel {
   padding-bottom: 5rem;
 }
+.heattracesizing-page .heattrace-overview-card {
+  margin-top: .9rem;
+}
+.heattracesizing-page .heattrace-overview-visual-wrap {
+  border: 1px solid var(--border-color, #7d8790);
+  border-radius: 10px;
+  background: color-mix(in srgb, var(--panel-bg, #f8fafc) 92%, #dbeafe 8%);
+  overflow: hidden;
+}
+.heattracesizing-page .heattrace-overview-visual {
+  width: 100%;
+  min-height: 280px;
+  display: block;
+}
+.heattracesizing-page .heattrace-overview-legend {
+  list-style: none;
+  margin: .75rem 0 0;
+  padding: 0;
+  display: grid;
+  gap: .45rem;
+}
+.heattracesizing-page .heattrace-overview-legend li {
+  display: flex;
+  align-items: center;
+  gap: .5rem;
+  font-size: .95rem;
+}
+.heattracesizing-page .heattrace-overview-legend .legend-marker {
+  width: 14px;
+  height: 14px;
+  border-radius: 999px;
+  display: inline-block;
+  flex: 0 0 auto;
+}
+.heattracesizing-page .heattrace-overview-legend .legend-pipe {
+  background: #2563eb;
+}
+.heattracesizing-page .heattrace-overview-legend .legend-insulation {
+  background: #64748b;
+}
+.heattracesizing-page .heattrace-overview-legend .legend-cable {
+  background: #f97316;
+}
+.heattracesizing-page .heattrace-overview-legend .legend-ambient {
+  background: #14b8a6;
+}
+.heattracesizing-page .heattrace-overview-hint {
+  margin-top: .8rem;
+  padding: .65rem .75rem;
+  border-left: 4px solid var(--accent-color, #2a6fd6);
+  background: color-mix(in srgb, var(--panel-bg, #f8fafc) 86%, #dbeafe 14%);
+  border-radius: 8px;
+}
+.heattracesizing-page .heattrace-overview-hint p {
+  margin: .25rem 0 0;
+}
 .heattracesizing-page .heattrace-action-bar {
   position: sticky;
   bottom: 0;

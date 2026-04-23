@@ -265,6 +265,21 @@ selectedWperFt = nearest standard cable rating ≥ required W/ft</pre>
           <section id="heattrace-panel-overview" class="heattrace-panel" role="tabpanel" aria-labelledby="heattrace-tab-overview" tabindex="0">
             <p class="field-hint">Review your current assumptions and run analysis to populate heat-loss and circuit results.</p>
             <div id="results" role="region" aria-live="polite" aria-label="Heat trace sizing results and warnings"></div>
+            <section class="card heattrace-overview-card" aria-labelledby="system-overview-heading">
+              <h2 id="system-overview-heading">System Overview</h2>
+              <p class="field-hint">A simplified geometry view of the traced line based on your current input assumptions.</p>
+              <div class="heattrace-overview-visual-wrap">
+                <svg id="system-overview-visual" class="heattrace-overview-visual" role="img" aria-labelledby="system-overview-title system-overview-desc" viewBox="0 0 880 340">
+                  <title id="system-overview-title">Heat trace system geometry overview</title>
+                  <desc id="system-overview-desc">Visual placeholder for pipe, insulation, heat trace cable, and ambient condition callouts.</desc>
+                </svg>
+              </div>
+              <ul id="system-overview-legend" class="heattrace-overview-legend" aria-label="System overview legend markers"></ul>
+              <div class="heattrace-overview-hint" role="note" aria-label="System overview interpretation help">
+                <strong>What am I seeing?</strong>
+                <p>This sketch is a planning aid only. It scales your current line geometry and labels material/environment assumptions so you can sanity-check scope before final cable selection.</p>
+              </div>
+            </section>
           </section>
 
           <section id="heattrace-panel-heatloss" class="heattrace-panel" role="tabpanel" aria-labelledby="heattrace-tab-heatloss" tabindex="0" hidden>
