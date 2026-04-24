@@ -23,8 +23,42 @@ Typical scope limits for this simplified method:
 
 - Intended for **steady-state maintain** duty, not rapid warm-up/startup transients.
 - Assumes continuous insulation, nominally dry conditions, and no major thermal bridges except where explicitly added.
-- Requires separate adder allowances for valves, supports, flanges, and instrument stubs.
+- Uses equivalent-length screening allowances for valves, supports, flanges, instrument taps, and custom heat sinks.
 - Not a substitute for project-specific code compliance, hazardous area design, or manufacturer trace-circuit limits.
+
+## Parallel trace runs and component allowances
+
+The calculator distinguishes **required heat load** from **installed connected load**:
+
+- Required heat load remains the calculated heat loss for the straight pipe run and is retained as `totalCircuitWatts` for compatibility.
+- Installed connected load is based on selected cable W/ft, parallel trace run count, and effective trace length.
+- Effective trace length equals straight pipe length plus component equivalent-length allowances.
+
+The installed-load screening formulas are:
+
+\[
+\text{installed W/ft} = \text{selected cable W/ft} \times \text{trace run count}
+\]
+
+\[
+\text{effective length} = \text{pipe length} + \sum(\text{component quantity} \times \text{equivalent ft each})
+\]
+
+\[
+\text{installed W} = \text{installed W/ft} \times \text{effective length}
+\]
+
+Built-in equivalent-length defaults are:
+
+| Component | Default equivalent length |
+| --- | ---: |
+| Valve | 5 ft each |
+| Flange pair | 2 ft each |
+| Pipe support | 1 ft each |
+| Instrument tap | 2 ft each |
+| Custom | 0 ft each |
+
+These allowances are screening assumptions. Replace them with project details, valve/flange geometry, insulation kits, manufacturer installation standards, and owner specifications before final design. Multiple runs over the same pipe are also screening inputs; final designs may split runs across circuits based on startup current, cable-family maximum length, controller limits, or installation spacing rules.
 
 ## Pipe material assumptions and correction factors
 
@@ -125,6 +159,19 @@ Preliminary selection would therefore target the next available trace-circuit ca
 - When freeze protection is safety- or production-critical, use a structured margin policy (environment + uncertainty + aging) rather than a single arbitrary adder.
 - Final design should reconcile process maintain temperature, insulation specification, power availability, hazardous area constraints, and manufacturer-specific cable output curves.
 
+## Heat trace cable type
+
+The calculator includes a **Heat trace cable type** input so the branch schedule and report clearly state the selection basis:
+
+| Cable type | Screening use | Final verification focus |
+| --- | --- | --- |
+| Self-regulating | Default for many freeze-protection and maintain-temperature applications | Temperature-dependent output curve, startup current, max circuit length |
+| Constant wattage | Fixed-output branch screening | Controller strategy, sheath temperature, over-temperature protection |
+| Power-limiting / zone | Industrial branch screening where zone-style cable is expected | Zone length, startup current, manufacturer output tables |
+| Mineral insulated | Specialty or high-temperature branch screening | Resistance design, bend radius, terminations, sheath temperature |
+
+In this release, cable type changes the recorded basis and warning language; it does not replace manufacturer-specific output curves. The selected W/ft remains a screening-level standard rating that must be reconciled with the cable family, voltage, exposure, startup behavior, and maximum circuit length during final design.
+
 ## Heat Trace dashboard sections and interpretation
 
 The Heat Trace Sizing workspace is organized into five dashboard sections so reviewers can move from quick screening to traceable assumptions without leaving the page:
@@ -132,18 +179,36 @@ The Heat Trace Sizing workspace is organized into five dashboard sections so rev
 1. **Overview**
    - High-level KPI cards: base heat loss, required heat input, recommended watt density, and circuit length check.
    - Current assumptions snapshot for ambient, maintain, insulation, and selected multipliers.
+   - The system overview image includes numbered callouts for pipe wall, insulation, heat trace cable, and ambient exposure to match the legend below the image.
 2. **Heat Loss**
    - Step-by-step thermal-resistance breakdown (insulation + external film) and resulting base W/ft (or W/m).
    - Displays which assumptions dominate the loss so users can quickly identify leverage points.
-3. **Circuit Sizing**
-   - Candidate cable density selection versus required demand.
-   - Circuit-length utilization check against configured maximum allowable circuit length.
+3. **Branch Circuit**
+   - Defines the heat-trace branch/load circuit from the controller or heat-trace panel output to the traced run.
+   - Shows cable type, selected cable density, parallel run count, installed connected watts, required heat load, branch voltage, estimated branch current, effective trace length, maximum allowable circuit length, utilization status, and warnings.
+   - Excludes upstream feeder, transformer, panel bus, and breaker coordination sizing; use the branch load outputs as inputs to those separate studies.
 4. **Temperature Profile**
    - Charted maintain-to-ambient gradient view used as a screening visualization for thermal headroom.
    - Intended to show relative behavior across the configured range; not a transient startup model.
-5. **Sensitivity**
+5. **Report**
+   - Generates a printable HTML calculation sheet and JSON report package for the active run and saved heat-trace branches.
+   - Includes active inputs, thermal resistance terms, heat-loss components, cable selection basis, branch schedule, warnings, assumptions, and engineer review status.
+6. **Sensitivity**
    - Baseline-delta explorer for insulation thickness, ambient temperature, wind speed, maintain temperature, and safety margin.
    - Ranks single-change recommendations and exposes quick-apply controls.
+
+The sidebar also includes an **Assumptions** tab for the simplified sizing method and a **Pipe / Circuit List** for building a branch schedule. Use **Add Current Branch** to store the active form values, **Edit** to load and update a saved case, **Duplicate** to copy an existing case for a similar run, and **Remove** to delete a case from the schedule. Saved branches are independent in this release; panel/source grouping is intentionally left out of scope.
+
+Saved branch cases are normalized for reporting with:
+
+- branch id and name,
+- unit system and original inputs,
+- sizing result, heat trace cable type, and selected W/ft,
+- trace run count, component equivalent-length allowances, effective length, installed connected watts, required heat load, and estimated load amps,
+- created/updated timestamps,
+- branch status and warnings.
+
+The unified Project Report also adds a **Heat Trace Branch Circuit Schedule** section whenever heat trace results or saved branches exist in the project studies.
 
 ## New analysis outputs
 
@@ -152,6 +217,7 @@ In addition to the required W/ft calculation, the dashboard now exposes screenin
 - **Thermal resistance terms:** `insulationKmPerW`, `externalKmPerW`, `totalKmPerW`
 - **Applied multipliers/factors:** `environmentMultiplier`, `materialFactor`, `safetyFactor`
 - **Sizing diagnostics:** cable utilization %, available margin vs recommended cable, and circuit-length pass/fail indicators
+- **Installed-load screening:** `traceRunCount`, `componentAllowanceLengthFt`, `effectiveTraceLengthFt`, `installedWPerFt`, `installedTotalWatts`, `installedLoadAmps`, and `coverageRatio`
 - **Profile context:** plotted maintain/ambient relationship to highlight low-headroom scenarios
 
 These outputs are intentionally transparent so engineering teams can replicate the arithmetic in hand checks and quickly identify whether a change is driven by environment, insulation, or design margin assumptions.

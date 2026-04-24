@@ -10,7 +10,7 @@
 
 import './workflowStatus.js';
 import '../site.js';
-import { getCables, getTrays, getConduits, getDuctbanks } from '../dataStore.mjs';
+import { getCables, getTrays, getConduits, getDuctbanks, getStudies, getStudyApprovals } from '../dataStore.mjs';
 import { getProjectState } from '../projectStorage.js';
 import { generateProjectReport, renderReportHTML } from '../analysis/projectReport.mjs';
 
@@ -32,9 +32,11 @@ document.addEventListener('DOMContentLoaded', () => {
     const trays     = getTrays();
     const conduits  = getConduits();
     const ductbanks = getDuctbanks();
+    const studies   = getStudies();
+    const approvals = getStudyApprovals();
     const state     = getProjectState();
     const projectName = (state && state.name) || document.getElementById('rpt-project-name')?.value?.trim() || 'Untitled Project';
-    return generateProjectReport({ cables, trays, conduits, ductbanks, projectName });
+    return generateProjectReport({ cables, trays, conduits, ductbanks, projectName, studies, approvals });
   }
 
   const tocEl = document.getElementById('report-toc');

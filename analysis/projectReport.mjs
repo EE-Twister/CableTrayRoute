@@ -19,6 +19,7 @@
  */
 
 import { detectClashes, overallSeverity } from './clashDetect.mjs';
+import { buildHeatTraceReport } from './heatTraceReport.mjs';
 import { generateSpoolSheets } from './spoolSheets.mjs';
 
 // ---------------------------------------------------------------------------
@@ -186,6 +187,29 @@ function buildValidationSection(cables, trays, conduits) {
   };
 }
 
+function buildHeatTraceSection(studies = {}, projectName = '', approval = null) {
+  const activeResult = studies.heatTraceSizing || null;
+  const circuitCases = Array.isArray(studies.heatTraceSizingCircuits) ? studies.heatTraceSizingCircuits : [];
+  if (!activeResult && circuitCases.length === 0) return null;
+
+  const report = buildHeatTraceReport({
+    activeResult,
+    activeInputs: activeResult || null,
+    circuitCases,
+    approval,
+    projectName: projectName || 'Untitled Project',
+  });
+
+  return {
+    title: 'Heat Trace Branch Circuit Schedule',
+    report,
+    summary: report.summary,
+    branchSchedule: report.branchSchedule,
+    warnings: report.warnings,
+    approval: report.approval,
+  };
+}
+
 // ---------------------------------------------------------------------------
 // Public API
 // ---------------------------------------------------------------------------
@@ -208,10 +232,19 @@ function buildValidationSection(cables, trays, conduits) {
  *   clashes:    object,
  *   spools:     object,
  *   validation: object,
+ *   heatTrace:  object | null,
  *   generatedAt: string,
  * }} ProjectReport
  */
-export function generateProjectReport({ cables = [], trays = [], conduits = [], ductbanks = [], projectName = '' } = {}) {
+export function generateProjectReport({
+  cables = [],
+  trays = [],
+  conduits = [],
+  ductbanks = [],
+  projectName = '',
+  studies = {},
+  approvals = {},
+} = {}) {
   return {
     generatedAt: new Date().toISOString(),
     summary:    buildSummarySection(cables, trays, conduits, ductbanks, projectName),
@@ -219,6 +252,7 @@ export function generateProjectReport({ cables = [], trays = [], conduits = [], 
     fill:       buildFillSection(trays, conduits, cables),
     clashes:    buildClashSection(trays),
     spools:     buildSpoolSection(trays, cables),
+    heatTrace:  buildHeatTraceSection(studies, projectName, approvals.heatTraceSizing || null),
     validation: buildValidationSection(cables, trays, conduits),
   };
 }
@@ -234,11 +268,23 @@ export function renderReportHTML(report) {
   const fmt = n => typeof n === 'number' ? n.toLocaleString() : esc(n);
 
   const statusBadge = s => {
-    const map = { ok: 'badge-ok', near: 'badge-warn', over: 'badge-error', pass: 'badge-ok', warning: 'badge-warn', fail: 'badge-error', info: 'badge-info' };
+    const map = {
+      ok: 'badge-ok',
+      near: 'badge-warn',
+      over: 'badge-error',
+      pass: 'badge-ok',
+      warning: 'badge-warn',
+      fail: 'badge-error',
+      info: 'badge-info',
+      withinLimit: 'badge-ok',
+      overLimit: 'badge-error',
+      invalid: 'badge-error',
+      notRun: 'badge-info',
+    };
     return `<span class="badge ${map[s] || ''}">${esc(s)}</span>`;
   };
 
-  const { summary, cables, fill, clashes, spools, validation } = report;
+  const { summary, cables, fill, clashes, spools, heatTrace, validation } = report;
 
   let html = `
 <header class="report-header">
@@ -331,6 +377,41 @@ export function renderReportHTML(report) {
   </table>
   </div>
 </section>
+
+${heatTrace ? `<section class="report-section" id="rpt-heat-trace">
+  <h2>Heat Trace Branch Circuit Schedule</h2>
+  <p class="report-note">This section rolls up heat-trace branch/load circuits from the controller or heat-trace panel output to each traced run. Upstream feeder, transformer, panel bus, and breaker coordination are excluded.</p>
+  <dl class="report-dl">
+    <dt>Saved Branches</dt><dd>${fmt(heatTrace.branchSchedule.summary.branchCount)}</dd>
+    <dt>Total Installed Connected Load</dt><dd>${fmt(heatTrace.branchSchedule.summary.totalConnectedKw)} kW</dd>
+    <dt>Total Required Heat Load</dt><dd>${fmt(heatTrace.branchSchedule.summary.totalRequiredKw)} kW</dd>
+    <dt>Total Branch Current</dt><dd>${fmt(heatTrace.branchSchedule.summary.totalLoadAmps)} A</dd>
+    <dt>Approval Status</dt><dd>${esc(heatTrace.approval?.status || 'pending')}</dd>
+    <dt>Branches Over Limit</dt><dd>${fmt(heatTrace.branchSchedule.summary.overLimitCount)}</dd>
+    <dt>Branches With Warnings</dt><dd>${fmt(heatTrace.branchSchedule.summary.warningCount)}</dd>
+  </dl>
+  <div class="report-scroll">
+  <table class="report-table">
+    <thead><tr><th>Branch</th><th>Status</th><th>Cable Type</th><th>Effective Length (ft)</th><th>Max (ft)</th><th>Selected W/ft x Runs</th><th>Installed W</th><th>Required W</th><th>Voltage</th><th>Amps</th><th>Warnings</th></tr></thead>
+    <tbody>${heatTrace.branchSchedule.rows.length ? heatTrace.branchSchedule.rows.map(r => `<tr>
+      <td>${esc(r.name)}</td>
+      <td>${statusBadge(r.status)}</td>
+      <td>${esc(r.heatTraceCableTypeLabel)}</td>
+      <td>${fmt(r.effectiveTraceLengthFt)}</td>
+      <td>${fmt(r.maxCircuitLengthFt)}</td>
+      <td>${fmt(r.selectedWPerFt)} x ${fmt(r.traceRunCount)}</td>
+      <td>${fmt(r.totalWatts)}</td>
+      <td>${fmt(r.requiredWatts)}</td>
+      <td>${fmt(r.voltageV)}</td>
+      <td>${fmt(r.loadAmps)}</td>
+      <td>${esc(r.warnings.join(' | ') || 'None')}</td>
+    </tr>`).join('') : '<tr><td colspan="11">No saved heat trace branches.</td></tr>'}</tbody>
+  </table>
+  </div>
+  ${heatTrace.warnings.length
+    ? `<div class="report-alert report-alert--warning"><strong>Heat trace warnings:</strong><ul>${heatTrace.warnings.map(w => `<li>${esc(w.source)}: ${esc(w.message)}</li>`).join('')}</ul></div>`
+    : '<p class="report-empty">No heat trace warnings detected.</p>'}
+</section>` : ''}
 
 <section class="report-section" id="rpt-validation">
   <h2>Validation</h2>

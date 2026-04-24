@@ -18,7 +18,7 @@
   <meta name="color-scheme" content="light dark">
   <link rel="stylesheet" href="style.css" />
   <script type="module" src="dirtyTracker.js"></script>
-  <script type="module" src="dist/heattracesizing.js" defer></script>
+  <script type="module" src="dist/heattracesizing.js?v=heat-trace-comments-2"></script>
 </head>
 <body class="heattracesizing-page" data-report-title="Heat Trace Sizing">
   <a href="#main-content" class="skip-link">Skip to main content</a>
@@ -79,13 +79,32 @@
 
   <div class="container">
     <main id="main-content" class="main-content">
-      <header class="page-header">
-        <h1>Heat Trace Sizing</h1>
+      <header class="heattrace-hero">
+        <div class="heattrace-title-lockup">
+          <div class="heattrace-title-icon" aria-hidden="true">
+            <span></span>
+            <span></span>
+            <span></span>
+          </div>
+          <div>
+            <h1>Heat Trace Sizing</h1>
+            <p>Visualize how your inputs impact performance and requirements.</p>
+          </div>
+        </div>
+        <div class="heattrace-header-actions" aria-label="Heat trace project actions">
+          <button type="button" class="btn heattrace-share-action" id="heattrace-share-action">Share Project</button>
+          <button type="button" class="btn heattrace-more-action" aria-label="More heat trace options">...</button>
+        </div>
       </header>
 
       <div class="heattrace-shell">
         <form id="heat-trace-form" class="heattrace-sidebar" novalidate>
-          <details class="heattrace-section" open>
+          <div class="heattrace-sidebar-tabs" role="tablist" aria-label="Heat trace input categories">
+            <button type="button" id="heattrace-inputs-tab" class="active" role="tab" aria-selected="true" aria-controls="heattrace-input-sections" data-sidebar-tab="inputs">Inputs</button>
+            <button type="button" id="heattrace-assumptions-tab" role="tab" aria-selected="false" aria-controls="heattrace-assumptions-section" data-sidebar-tab="assumptions">Assumptions</button>
+          </div>
+
+          <details id="heattrace-assumptions-section" class="heattrace-section heattrace-assumptions-section" open hidden>
             <summary>Method &amp; Assumptions</summary>
             <p>This page follows a simplified steady-state heat-loss method used for electric heat tracing studies.
             Inputs are validated, cylindrical insulation resistance is calculated, and environmental film effects
@@ -97,6 +116,7 @@ selectedWperFt = nearest standard cable rating ≥ required W/ft</pre>
             manufacturer circuit-length limits, startup requirements, and control strategy.</p>
           </details>
 
+          <div id="heattrace-input-sections" class="heattrace-input-sections">
           <details class="heattrace-section" open>
             <summary>Unit System</summary>
             <fieldset>
@@ -190,8 +210,9 @@ selectedWperFt = nearest standard cable rating ≥ required W/ft</pre>
                   <option value="outdoor-windy">Outdoor — Windy</option>
                   <option value="hazardous-area">Hazardous Area</option>
                   <option value="freezer">Freezer / Cold Room</option>
+                  <option value="buried">Buried / Below Grade</option>
                 </select>
-                <p id="environment-hint" class="field-hint">Environment selection adjusts external-film heat transfer losses in the simplified model.</p>
+                <p id="environment-hint" class="field-hint">Environment selection adjusts air-film or soil-conduction heat transfer losses in the simplified model.</p>
               </div>
 
               <div class="field-row">
@@ -204,6 +225,18 @@ selectedWperFt = nearest standard cable rating ≥ required W/ft</pre>
                 <label id="wind-speed-label" for="wind-speed-mph">Wind speed (mph)</label>
                 <input type="number" id="wind-speed-mph" min="0" max="100" step="1" value="5" aria-describedby="wind-speed-hint">
                 <p id="wind-speed-hint" class="field-hint">Required for exposed outdoor runs. For indoor/sheltered installations, leave at a nominal low value.</p>
+              </div>
+
+              <div class="field-row heattrace-buried-field" hidden>
+                <label for="soil-conductivity">Soil thermal conductivity (W/m-K)</label>
+                <input type="number" id="soil-conductivity" min="0.1" max="3" step="0.05" value="1.2" aria-describedby="soil-conductivity-hint">
+                <p id="soil-conductivity-hint" class="field-hint">Used only for buried runs. Lower dry-soil values insulate better; higher wet-soil values increase heat loss.</p>
+              </div>
+
+              <div class="field-row heattrace-buried-field" hidden>
+                <label id="burial-depth-label" for="burial-depth-ft">Burial depth (ft)</label>
+                <input type="number" id="burial-depth-ft" min="0.5" max="20" step="0.5" value="3" aria-describedby="burial-depth-hint">
+                <p id="burial-depth-hint" class="field-hint">Approximate distance from grade to pipe centerline used for simplified radial soil resistance.</p>
               </div>
             </fieldset>
           </details>
@@ -237,6 +270,23 @@ selectedWperFt = nearest standard cable rating ≥ required W/ft</pre>
               </div>
 
               <div class="field-row">
+                <label for="heat-trace-cable-type">Heat trace cable type</label>
+                <select id="heat-trace-cable-type" aria-describedby="heat-trace-cable-type-hint">
+                  <option value="selfRegulating" selected>Self-regulating</option>
+                  <option value="constantWattage">Constant wattage</option>
+                  <option value="powerLimiting">Power-limiting / zone</option>
+                  <option value="mineralInsulated">Mineral insulated</option>
+                </select>
+                <p id="heat-trace-cable-type-hint" class="field-hint">Defines the screening selection basis. Final manufacturer curves and circuit limits still need verification.</p>
+              </div>
+
+              <div class="field-row">
+                <label for="trace-run-count">Parallel trace runs</label>
+                <input type="number" id="trace-run-count" min="1" max="4" step="1" value="1" aria-describedby="trace-run-count-hint">
+                <p id="trace-run-count-hint" class="field-hint">Number of heat-trace cable runs installed over the same effective pipe length. More than one run requires manufacturer routing and circuit verification.</p>
+              </div>
+
+              <div class="field-row">
                 <label id="max-circuit-length-label" for="max-circuit-length-ft">Maximum allowable circuit length (ft)</label>
                 <input type="number" id="max-circuit-length-ft" min="10" step="10" value="300" aria-describedby="max-circuit-length-hint">
                 <p id="max-circuit-length-hint" class="field-hint">Project-specific circuit-length planning limit. Compare with manufacturer cable tables during final design.</p>
@@ -252,87 +302,215 @@ selectedWperFt = nearest standard cable rating ≥ required W/ft</pre>
               </div>
             </fieldset>
           </details>
+
+          <details class="heattrace-section heattrace-component-allowance-section" open>
+            <summary>Component Allowances</summary>
+            <fieldset>
+              <legend class="sr-only"><strong>Equivalent-Length Component Allowances</strong></legend>
+              <p class="field-hint heattrace-full-field">Add screening equivalent lengths for valves, flanges, supports, instrument taps, or custom heat sinks. These increase installed connected load and effective trace length.</p>
+              <div id="component-allowance-rows" class="heattrace-component-allowance-rows" aria-live="polite"></div>
+              <div class="field-row heattrace-full-field heattrace-component-actions">
+                <button type="button" id="add-component-allowance" class="btn">Add Component Allowance</button>
+                <span id="component-allowance-summary" class="field-hint">0 ft equivalent length</span>
+              </div>
+            </fieldset>
+          </details>
+
+          <details class="heattrace-section heattrace-circuit-list-section" open>
+            <summary>Pipe / Circuit List</summary>
+            <fieldset>
+              <legend class="sr-only"><strong>Multiple Pipe/Circuit Cases</strong></legend>
+              <div class="field-row heattrace-full-field">
+                <label for="circuit-case-name">Branch name</label>
+                <input type="text" id="circuit-case-name" value="HT-1" aria-describedby="circuit-case-name-hint">
+                <p id="circuit-case-name-hint" class="field-hint">Name the current heat-trace branch/run before adding it to the schedule.</p>
+              </div>
+              <div class="field-row heattrace-full-field heattrace-circuit-list-actions">
+                <button type="button" id="add-circuit-case" class="btn">Add Current Branch</button>
+                <button type="button" id="clear-circuit-cases" class="btn">Clear List</button>
+              </div>
+              <div id="circuit-case-list" class="heattrace-circuit-case-list" aria-live="polite"></div>
+            </fieldset>
+          </details>
+          </div>
         </form>
 
         <section class="heattrace-content" aria-label="Heat trace analysis workspace">
-          <div class="heattrace-tabs" role="tablist" aria-label="Heat trace analysis tabs">
-            <button id="heattrace-tab-overview" type="button" class="heattrace-tab" role="tab" aria-selected="true" aria-controls="heattrace-panel-overview" tabindex="0">Overview</button>
-            <button id="heattrace-tab-heatloss" type="button" class="heattrace-tab" role="tab" aria-selected="false" aria-controls="heattrace-panel-heatloss" tabindex="-1">Heat Loss</button>
-            <button id="heattrace-tab-circuit" type="button" class="heattrace-tab" role="tab" aria-selected="false" aria-controls="heattrace-panel-circuit" tabindex="-1">Circuit Sizing</button>
-            <button id="heattrace-tab-temp" type="button" class="heattrace-tab" role="tab" aria-selected="false" aria-controls="heattrace-panel-temp" tabindex="-1">Temperature Profile</button>
+          <div class="heattrace-workspace-toolbar">
+            <div class="heattrace-tabs" role="tablist" aria-label="Heat trace analysis tabs">
+              <button id="heattrace-tab-overview" type="button" class="heattrace-tab" role="tab" aria-selected="true" aria-controls="heattrace-panel-overview" tabindex="0">Overview</button>
+              <button id="heattrace-tab-heatloss" type="button" class="heattrace-tab" role="tab" aria-selected="false" aria-controls="heattrace-panel-heatloss" tabindex="-1">Heat Loss</button>
+              <button id="heattrace-tab-circuit" type="button" class="heattrace-tab" role="tab" aria-selected="false" aria-controls="heattrace-panel-circuit" tabindex="-1">Branch Circuit</button>
+              <button id="heattrace-tab-temp" type="button" class="heattrace-tab" role="tab" aria-selected="false" aria-controls="heattrace-panel-temp" tabindex="-1">Temperature Profile</button>
+              <button id="heattrace-tab-report" type="button" class="heattrace-tab" role="tab" aria-selected="false" aria-controls="heattrace-panel-report" tabindex="-1">Report</button>
+            </div>
+            <label class="heattrace-warning-toggle" for="heattrace-warning-only">
+              <span>Show warnings only</span>
+              <input type="checkbox" id="heattrace-warning-only">
+              <span class="heattrace-switch" aria-hidden="true"></span>
+            </label>
           </div>
 
           <section id="heattrace-panel-overview" class="heattrace-panel" role="tabpanel" aria-labelledby="heattrace-tab-overview" tabindex="0">
-            <p class="field-hint">Review your current assumptions and run analysis to populate heat-loss and circuit results.</p>
-            <div id="results" role="region" aria-live="polite" aria-label="Heat trace sizing results and warnings"></div>
-            <section class="card heattrace-sensitivity-card" aria-labelledby="sensitivity-heading">
-              <h2 id="sensitivity-heading">Sensitivity Explorer</h2>
-              <p class="field-hint">Adjust major heat-loss drivers to preview the required output delta versus the baseline case.</p>
-              <div id="sensitivity-controls" class="heattrace-sensitivity-controls" aria-live="polite"></div>
-              <div class="heattrace-sensitivity-actions">
-                <button type="button" id="sensitivity-set-baseline" class="btn">Use Current Inputs as Baseline</button>
-              </div>
-              <div id="sensitivity-summary" class="heattrace-sensitivity-summary"></div>
-              <section class="heattrace-insights" aria-labelledby="sensitivity-insights-heading">
-                <h3 id="sensitivity-insights-heading">Insights</h3>
-                <ul id="sensitivity-insights-list" class="heattrace-insights-list"></ul>
+            <div class="heattrace-overview-grid">
+              <section class="card heattrace-dashboard-card heattrace-overview-card" aria-labelledby="system-overview-heading">
+                <div class="heattrace-card-heading">
+                  <h2 id="system-overview-heading">System Overview</h2>
+                  <button type="button" class="heattrace-help-link">What am I seeing?</button>
+                </div>
+                <div class="heattrace-overview-visual-wrap">
+                  <svg id="system-overview-visual" class="heattrace-overview-visual" viewBox="0 0 900 340" role="img" aria-labelledby="system-overview-title system-overview-desc">
+                    <title id="system-overview-title">Heat trace routing schematic</title>
+                    <desc id="system-overview-desc">Representative straight pipe, insulation, trace cable paths, and ambient exposure.</desc>
+                  </svg>
+                  <div class="heattrace-image-callouts" aria-hidden="true">
+                    <span class="heattrace-image-callout heattrace-image-callout--pipe"><strong>1</strong><em>Pipe wall</em></span>
+                    <span class="heattrace-image-callout heattrace-image-callout--insulation"><strong>2</strong><em>Insulation</em></span>
+                    <span class="heattrace-image-callout heattrace-image-callout--cable"><strong>3</strong><em>Heat trace cable</em></span>
+                    <span class="heattrace-image-callout heattrace-image-callout--ambient"><strong>4</strong><em>Ambient exposure</em></span>
+                  </div>
+                </div>
+                <div class="heattrace-pipe-anatomy" aria-label="Heat trace pipe anatomy">
+                  <span><strong>1</strong> Pipe wall</span>
+                  <span><strong>2</strong> Insulation jacket</span>
+                  <span><strong>3</strong> Heat trace cable</span>
+                  <span><strong>4</strong> Ambient exposure</span>
+                </div>
+                <ul id="system-overview-legend" class="heattrace-overview-legend" aria-label="System overview legend markers"></ul>
+                <div class="heattrace-overview-hint" role="note" aria-label="System overview interpretation help">
+                  This is a simplified visual representation. Click the tabs above to explore detailed calculations and performance.
+                </div>
               </section>
-            </section>
-            <section class="card heattrace-overview-card" aria-labelledby="system-overview-heading">
-              <h2 id="system-overview-heading">System Overview</h2>
-              <p class="field-hint">A simplified geometry view of the traced line based on your current input assumptions.</p>
-              <div class="heattrace-overview-visual-wrap">
-                <svg id="system-overview-visual" class="heattrace-overview-visual" role="img" aria-labelledby="system-overview-title system-overview-desc" viewBox="0 0 880 340">
-                  <title id="system-overview-title">Heat trace system geometry overview</title>
-                  <desc id="system-overview-desc">Visual placeholder for pipe, insulation, heat trace cable, and ambient condition callouts.</desc>
-                </svg>
-              </div>
-              <ul id="system-overview-legend" class="heattrace-overview-legend" aria-label="System overview legend markers"></ul>
-              <div class="heattrace-overview-hint" role="note" aria-label="System overview interpretation help">
-                <strong>What am I seeing?</strong>
-                <p>This sketch is a planning aid only. It scales your current line geometry and labels material/environment assumptions so you can sanity-check scope before final cable selection.</p>
-              </div>
-            </section>
+
+              <section class="card heattrace-dashboard-card heattrace-results-card" aria-labelledby="results-heading">
+                <div class="heattrace-card-heading">
+                  <h2 id="results-heading">Key Results</h2>
+                  <button type="button" class="heattrace-help-link">How are these calculated?</button>
+                </div>
+                <div id="results" role="region" aria-live="polite" aria-label="Heat trace sizing results and warnings"></div>
+              </section>
+
+              <section class="card heattrace-dashboard-card heattrace-routing-card" aria-labelledby="component-routing-heading">
+                <div class="heattrace-card-heading">
+                  <h2 id="component-routing-heading">Component Routing Patterns</h2>
+                  <button type="button" class="heattrace-help-link">Construction guide</button>
+                </div>
+                <div class="heattrace-routing-visual-wrap">
+                  <svg id="component-routing-guide" class="heattrace-routing-visual" viewBox="0 0 960 520" role="img" aria-labelledby="component-routing-title component-routing-desc">
+                    <title id="component-routing-title">Representative heat trace routing patterns for components</title>
+                    <desc id="component-routing-desc">Separate representative installation patterns for routing heat trace around valves, flange pairs, pipe supports, and instrument taps.</desc>
+                  </svg>
+                </div>
+                <p class="heattrace-card-note">Representative installation patterns only. Final routing must follow manufacturer details, bend-radius limits, attachment spacing, component insulation kits, and project standards.</p>
+              </section>
+
+              <section class="card heattrace-dashboard-card heattrace-temperature-card" aria-labelledby="temperature-profile-heading">
+                <div class="heattrace-card-heading">
+                  <h2 id="temperature-profile-heading">Temperature Profile Along Pipe</h2>
+                  <button type="button" class="heattrace-help-link">What am I seeing?</button>
+                </div>
+                <ul id="temperature-profile-legend" class="heattrace-chart-legend heattrace-inline-legend" aria-label="Temperature profile legend"></ul>
+                <div class="heattrace-chart-wrap">
+                  <svg id="temperature-profile-chart" class="heattrace-chart-svg" role="img" aria-labelledby="temperature-chart-title temperature-chart-desc" viewBox="0 0 760 360">
+                    <title id="temperature-chart-title">Pipe temperature profile chart</title>
+                    <desc id="temperature-chart-desc">Line chart for pipe surface, maintain target, and ambient temperature along pipe length.</desc>
+                  </svg>
+                </div>
+                <p class="heattrace-card-note">The pipe surface temperature stays above the fluid temperature, preventing heat loss to ambient.</p>
+              </section>
+
+              <section class="card heattrace-dashboard-card heattrace-breakdown-card" aria-labelledby="heatloss-breakdown-heading">
+                <div class="heattrace-card-heading">
+                  <h2 id="heatloss-breakdown-heading">Heat Loss Breakdown</h2>
+                  <button type="button" class="heattrace-help-link">What am I seeing?</button>
+                </div>
+                <div class="heattrace-donut-layout">
+                  <div class="heattrace-chart-wrap">
+                    <svg id="heatloss-breakdown-chart" class="heattrace-chart-svg" role="img" aria-labelledby="heatloss-chart-title heatloss-chart-desc" viewBox="0 0 760 360">
+                      <title id="heatloss-chart-title">Heat-loss breakdown chart</title>
+                      <desc id="heatloss-chart-desc">Donut chart showing conduction, external film, and safety margin contribution.</desc>
+                    </svg>
+                  </div>
+                  <ul id="heatloss-breakdown-legend" class="heattrace-chart-legend" aria-label="Heat-loss contribution legend"></ul>
+                </div>
+                <p class="heattrace-card-note">Insulation performance has the biggest impact on reducing heat loss.</p>
+              </section>
+
+              <section class="card heattrace-dashboard-card heattrace-sensitivity-card" aria-labelledby="sensitivity-heading">
+                <div class="heattrace-card-heading heattrace-card-heading--stacked">
+                  <div>
+                    <h2 id="sensitivity-heading">Input Sensitivity</h2>
+                    <p>See how changes impact results</p>
+                  </div>
+                  <button type="button" id="sensitivity-set-baseline" class="btn heattrace-small-action">Set Baseline</button>
+                </div>
+                <div id="sensitivity-controls" class="heattrace-sensitivity-controls" aria-live="polite"></div>
+                <div id="sensitivity-summary" class="heattrace-sensitivity-summary"></div>
+                <section class="heattrace-insights" aria-labelledby="sensitivity-insights-heading">
+                  <h3 id="sensitivity-insights-heading">Insights</h3>
+                  <ul id="sensitivity-insights-list" class="heattrace-insights-list"></ul>
+                </section>
+                <section class="heattrace-side-warnings" aria-labelledby="heattrace-side-warnings-heading">
+                  <h3 id="heattrace-side-warnings-heading">Warnings</h3>
+                  <div id="heattrace-side-warnings-list"></div>
+                </section>
+              </section>
+            </div>
           </section>
 
           <section id="heattrace-panel-heatloss" class="heattrace-panel" role="tabpanel" aria-labelledby="heattrace-tab-heatloss" tabindex="0" hidden>
-            <div class="card">
-              <h2>Heat Loss Breakdown</h2>
-              <p>After running analysis, review the contribution of insulation conduction, external film effects, and design margin to the total required heat input.</p>
-              <div class="heattrace-chart-wrap">
-                <svg id="heatloss-breakdown-chart" class="heattrace-chart-svg" role="img" aria-labelledby="heatloss-chart-title heatloss-chart-desc" viewBox="0 0 760 360">
-                  <title id="heatloss-chart-title">Heat-loss breakdown chart</title>
-                  <desc id="heatloss-chart-desc">Donut chart showing conduction, external film, and safety margin contribution.</desc>
-                </svg>
-              </div>
-              <ul id="heatloss-breakdown-legend" class="heattrace-chart-legend" aria-label="Heat-loss contribution legend"></ul>
+            <div class="card heattrace-dashboard-card">
+              <h2>Heat Loss Detail</h2>
+              <p>Heat loss is the thermal load: how much energy leaves the pipe through insulation, external air, or buried soil. It drives the required heat-trace watt density.</p>
+              <div id="heattrace-thermal-detail" class="heattrace-detail-grid"></div>
             </div>
           </section>
 
           <section id="heattrace-panel-circuit" class="heattrace-panel" role="tabpanel" aria-labelledby="heattrace-tab-circuit" tabindex="0" hidden>
-            <section class="card" aria-labelledby="study-review-panel-heading">
-              <h2 id="study-review-panel-heading">Circuit Sizing Review</h2>
+            <section class="card heattrace-dashboard-card" aria-labelledby="study-review-panel-heading">
+              <h2 id="study-review-panel-heading">Heat Trace Branch Circuit Review</h2>
+              <p class="heattrace-explainer">This sizes the heat-trace branch circuit from the heat-trace controller or panel to the traced run. It is not the upstream facility feeder; use this load when coordinating breaker, branch wiring, and panel capacity upstream.</p>
+              <div id="heattrace-circuit-detail" class="heattrace-detail-grid"></div>
               <div id="study-review-panel"></div>
             </section>
           </section>
 
           <section id="heattrace-panel-temp" class="heattrace-panel" role="tabpanel" aria-labelledby="heattrace-tab-temp" tabindex="0" hidden>
-            <div class="card">
-              <h2>Temperature Profile</h2>
-              <p>Use ambient and maintain temperature inputs in the left pane to compare the maintain target, predicted pipe surface trend, and ambient baseline along the circuit.</p>
-              <div class="heattrace-chart-wrap">
-                <svg id="temperature-profile-chart" class="heattrace-chart-svg" role="img" aria-labelledby="temperature-chart-title temperature-chart-desc" viewBox="0 0 760 360">
-                  <title id="temperature-chart-title">Pipe temperature profile chart</title>
-                  <desc id="temperature-chart-desc">Line chart for pipe surface, maintain target, and ambient temperature along pipe length.</desc>
-                </svg>
-              </div>
-              <ul id="temperature-profile-legend" class="heattrace-chart-legend" aria-label="Temperature profile legend"></ul>
+            <div class="card heattrace-dashboard-card">
+              <h2>Temperature Profile Detail</h2>
+              <p>Temperature profile is the expected pipe temperature along the run after applying the selected heat-trace output. Heat Loss explains the load to overcome; Temperature Profile explains whether the maintained pipe temperature stays above the target along the circuit.</p>
+              <div id="heattrace-temperature-detail" class="heattrace-detail-grid"></div>
             </div>
           </section>
 
+          <section id="heattrace-panel-report" class="heattrace-panel" role="tabpanel" aria-labelledby="heattrace-tab-report" tabindex="0" hidden>
+            <section class="card heattrace-dashboard-card" aria-labelledby="heattrace-report-heading">
+              <div class="heattrace-card-heading">
+                <div>
+                  <h2 id="heattrace-report-heading">Heat Trace Calculation Sheet</h2>
+                  <p>Generate a traceable HTML calculation sheet and JSON package for the active run and saved branch schedule.</p>
+                </div>
+              </div>
+              <div class="heattrace-report-actions">
+                <button type="button" id="heattrace-generate-report" class="btn">Generate Report Preview</button>
+                <button type="button" id="heattrace-export-report-json" class="btn">Export JSON</button>
+                <button type="button" id="heattrace-print-report" class="btn">Print Report</button>
+              </div>
+              <p id="heattrace-report-status" class="field-hint" aria-live="polite">Run analysis or add branch cases, then generate the report.</p>
+              <div id="heattrace-report-preview" class="heattrace-report-preview" hidden></div>
+            </section>
+          </section>
+
           <div class="heattrace-action-bar" role="region" aria-label="Heat trace actions">
-            <button type="button" id="heattrace-save-action" class="btn">Save Analysis</button>
-            <button type="submit" class="primary-btn" form="heat-trace-form">Run Analysis</button>
+            <div class="heattrace-footer-meta">
+              <span>Project: <strong>Demo Heat Trace Project</strong></span>
+              <span>Last saved: local session</span>
+            </div>
+            <div class="heattrace-footer-actions">
+              <button type="button" id="heattrace-save-action" class="btn">Save as Scenario</button>
+              <button type="button" id="heattrace-report-action" class="btn">Calculation Sheet</button>
+              <button type="submit" class="primary-btn" form="heat-trace-form">Run Analysis</button>
+            </div>
           </div>
         </section>
       </div>

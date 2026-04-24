@@ -1115,3 +1115,1099 @@ body.compact-mode .heattracesizing-page .heattrace-tab[role="tab"] {
     position: static;
   }
 }
+
+/* Heat Trace dashboard refresh */
+body.heattracesizing-page {
+  --ht-bg: #f6f8fc;
+  --ht-card: #ffffff;
+  --ht-line: #e4e9f2;
+  --ht-line-strong: #d5ddea;
+  --ht-blue: #1268f3;
+  --ht-blue-soft: #eaf2ff;
+  --ht-text: #111827;
+  --ht-muted: #667085;
+  --ht-green: #208a55;
+  --ht-green-bg: #f0fbf5;
+  --ht-amber: #b7791f;
+  --ht-amber-bg: #fff8e7;
+  background:
+    radial-gradient(circle at 26% -10%, rgba(18, 104, 243, .09), transparent 30rem),
+    linear-gradient(180deg, #fbfcff 0%, var(--ht-bg) 52%, #f2f5fa 100%);
+  color: var(--ht-text);
+}
+.heattracesizing-page .container {
+  max-width: none;
+  padding: 0 1.35rem 1rem;
+}
+.heattracesizing-page .main-content {
+  padding-top: .9rem;
+}
+.heattracesizing-page .heattrace-hero {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+  margin: 0 0 .9rem;
+}
+.heattracesizing-page .heattrace-title-lockup {
+  display: flex;
+  align-items: center;
+  gap: .85rem;
+}
+.heattracesizing-page .heattrace-title-lockup h1 {
+  margin: 0;
+  color: var(--ht-text);
+  font-size: clamp(1.55rem, 1.7vw, 2.1rem);
+  line-height: 1.1;
+  letter-spacing: -.035em;
+}
+.heattracesizing-page .heattrace-title-lockup p {
+  margin: .25rem 0 0;
+  color: var(--ht-muted);
+  font-size: .98rem;
+}
+.heattracesizing-page .heattrace-title-icon {
+  width: 54px;
+  height: 54px;
+  border-radius: 12px;
+  background: #fff;
+  border: 1px solid var(--ht-line);
+  box-shadow: 0 8px 22px rgba(17, 24, 39, .06);
+  position: relative;
+}
+.heattracesizing-page .heattrace-title-icon::before {
+  content: "";
+  position: absolute;
+  left: 12px;
+  right: 10px;
+  bottom: 13px;
+  height: 11px;
+  border: 4px solid var(--ht-blue);
+  border-left-width: 5px;
+  border-radius: 8px 14px 14px 8px;
+}
+.heattracesizing-page .heattrace-title-icon span {
+  position: absolute;
+  top: 10px;
+  width: 6px;
+  height: 24px;
+  border-left: 3px solid var(--ht-blue);
+  border-radius: 999px;
+}
+.heattracesizing-page .heattrace-title-icon span:nth-child(1) { left: 14px; transform: skewX(-18deg); }
+.heattracesizing-page .heattrace-title-icon span:nth-child(2) { left: 24px; transform: skewX(-8deg); }
+.heattracesizing-page .heattrace-title-icon span:nth-child(3) { left: 34px; transform: skewX(10deg); }
+.heattracesizing-page .heattrace-header-actions {
+  display: flex;
+  gap: .45rem;
+  align-items: center;
+}
+.heattracesizing-page .heattrace-share-action,
+.heattracesizing-page .heattrace-more-action {
+  border-color: var(--ht-line);
+  background: #fff;
+  color: var(--ht-blue);
+  font-weight: 700;
+  box-shadow: 0 1px 2px rgba(17, 24, 39, .04);
+}
+.heattracesizing-page .heattrace-more-action {
+  width: 42px;
+  min-width: 42px;
+  padding-inline: 0;
+  color: var(--ht-muted);
+  letter-spacing: .12em;
+}
+.heattracesizing-page .heattrace-shell {
+  grid-template-columns: minmax(320px, 392px) minmax(0, 1fr);
+  gap: 0;
+  border: 1px solid var(--ht-line);
+  border-radius: 10px;
+  background: rgba(255, 255, 255, .72);
+  box-shadow: 0 18px 55px rgba(31, 41, 55, .08);
+  overflow: hidden;
+}
+.heattracesizing-page .heattrace-sidebar {
+  max-height: calc(100vh - 145px);
+  padding: 0;
+  gap: 0;
+  background: #f7f9fd;
+  border-right: 1px solid var(--ht-line);
+  scrollbar-width: thin;
+}
+.heattracesizing-page .heattrace-sidebar-tabs {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  background: #fff;
+  border-bottom: 1px solid var(--ht-line);
+  position: sticky;
+  top: 0;
+  z-index: 3;
+}
+.heattracesizing-page .heattrace-sidebar-tabs button {
+  margin: 0;
+  padding: 1rem;
+  border: 0;
+  border-radius: 0;
+  background: transparent;
+  color: #6b7280;
+  font-weight: 700;
+}
+.heattracesizing-page .heattrace-sidebar-tabs button.active {
+  color: var(--ht-blue);
+  box-shadow: inset 0 -3px 0 var(--ht-blue);
+}
+.heattracesizing-page .heattrace-input-sections[hidden],
+.heattracesizing-page .heattrace-assumptions-section[hidden] {
+  display: none;
+}
+.heattracesizing-page .heattrace-section {
+  border: 0;
+  border-bottom: 1px solid var(--ht-line);
+  border-radius: 0;
+  padding: .92rem .95rem 1rem;
+  background: transparent;
+}
+.heattracesizing-page .heattrace-assumptions-section:not([open]) {
+  display: none;
+}
+.heattracesizing-page .heattrace-section > summary {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin: 0 0 .7rem;
+  color: var(--ht-text);
+  font-size: .96rem;
+  list-style: none;
+}
+.heattracesizing-page .heattrace-section > summary::-webkit-details-marker {
+  display: none;
+}
+.heattracesizing-page .heattrace-section > summary::after {
+  content: "^";
+  color: #111827;
+  font-size: .9rem;
+}
+.heattracesizing-page .heattrace-section:not([open]) > summary::after {
+  content: "v";
+}
+.heattracesizing-page .heattrace-section fieldset {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  column-gap: .85rem;
+  row-gap: .75rem;
+}
+.heattracesizing-page .heattrace-section .field-row {
+  margin: 0;
+}
+.heattracesizing-page .heattrace-section .heattrace-full-field,
+.heattracesizing-page .heattrace-section .heattrace-buried-field {
+  grid-column: 1 / -1;
+}
+.heattracesizing-page .heattrace-buried-field[hidden] {
+  display: none;
+}
+.heattracesizing-page .heattrace-section label {
+  color: #344054;
+  font-size: .82rem;
+  font-weight: 600;
+  margin-bottom: .35rem;
+}
+.heattracesizing-page .heattrace-section input,
+.heattracesizing-page .heattrace-section select {
+  height: 38px;
+  border: 1px solid var(--ht-line-strong);
+  border-radius: 6px;
+  background: #fff;
+  color: #344054;
+  box-shadow: 0 1px 0 rgba(17, 24, 39, .02);
+}
+.heattracesizing-page .heattrace-section .field-hint {
+  display: none;
+}
+.heattracesizing-page .heattrace-content {
+  gap: 0;
+  background: #fff;
+  min-height: calc(100vh - 145px);
+}
+.heattracesizing-page .heattrace-workspace-toolbar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+  min-height: 58px;
+  padding: 0 1.1rem;
+  border-bottom: 1px solid var(--ht-line);
+  background: #fff;
+}
+.heattracesizing-page .heattrace-tabs {
+  border: 0;
+  padding: 0;
+  gap: 1.3rem;
+}
+.heattracesizing-page .heattrace-tab[role="tab"] {
+  border: 0;
+  border-radius: 0;
+  background: transparent;
+  color: #667085;
+  padding: 1.15rem .35rem 1.05rem;
+  box-shadow: none;
+}
+.heattracesizing-page .heattrace-tab[aria-selected="true"] {
+  color: var(--ht-blue);
+  background: transparent;
+  box-shadow: inset 0 -3px 0 var(--ht-blue);
+}
+.heattracesizing-page .heattrace-warning-toggle {
+  display: inline-flex;
+  align-items: center;
+  gap: .7rem;
+  color: #667085;
+  font-size: .9rem;
+  white-space: nowrap;
+}
+.heattracesizing-page .heattrace-warning-toggle input {
+  position: absolute;
+  opacity: 0;
+  pointer-events: none;
+}
+.heattracesizing-page .heattrace-switch {
+  width: 40px;
+  height: 22px;
+  border-radius: 999px;
+  background: #c6cfdd;
+  position: relative;
+  transition: background .18s ease;
+}
+.heattracesizing-page .heattrace-switch::after {
+  content: "";
+  position: absolute;
+  top: 3px;
+  left: 3px;
+  width: 16px;
+  height: 16px;
+  border-radius: 50%;
+  background: #fff;
+  box-shadow: 0 1px 4px rgba(17, 24, 39, .22);
+  transition: transform .18s ease;
+}
+.heattracesizing-page .heattrace-warning-toggle input:checked + .heattrace-switch {
+  background: var(--ht-blue);
+}
+.heattracesizing-page .heattrace-warning-toggle input:checked + .heattrace-switch::after {
+  transform: translateX(18px);
+}
+.heattracesizing-page .heattrace-panel {
+  padding: .95rem 1rem 5rem;
+}
+.heattracesizing-page .heattrace-overview-grid {
+  display: grid;
+  grid-template-columns: minmax(420px, 1.22fr) minmax(430px, 1fr) minmax(250px, .74fr);
+  grid-template-areas:
+    "overview results results"
+    "routing routing sensitivity"
+    "temperature breakdown sensitivity";
+  gap: .9rem;
+}
+.heattracesizing-page .heattrace-dashboard-card {
+  border: 1px solid var(--ht-line);
+  border-radius: 9px;
+  background: var(--ht-card);
+  box-shadow: none;
+  padding: 1rem;
+  min-width: 0;
+}
+.heattracesizing-page .heattrace-overview-card { grid-area: overview; }
+.heattracesizing-page .heattrace-results-card { grid-area: results; }
+.heattracesizing-page .heattrace-routing-card { grid-area: routing; }
+.heattracesizing-page .heattrace-temperature-card { grid-area: temperature; }
+.heattracesizing-page .heattrace-breakdown-card { grid-area: breakdown; }
+.heattracesizing-page .heattrace-sensitivity-card { grid-area: sensitivity; }
+.heattracesizing-page .heattrace-card-heading {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: .75rem;
+  margin-bottom: .85rem;
+}
+.heattracesizing-page .heattrace-card-heading h2,
+.heattracesizing-page .heattrace-dashboard-card h2 {
+  margin: 0;
+  color: var(--ht-text);
+  font-size: 1rem;
+  letter-spacing: -.015em;
+}
+.heattracesizing-page .heattrace-card-heading p {
+  margin: .18rem 0 0;
+  color: var(--ht-blue);
+  font-size: .72rem;
+}
+.heattracesizing-page .heattrace-card-heading--stacked {
+  align-items: center;
+}
+.heattracesizing-page .heattrace-help-link {
+  border: 0;
+  background: transparent;
+  color: var(--ht-blue);
+  font-weight: 700;
+  font-size: .75rem;
+  padding: 0;
+}
+.heattracesizing-page .heattrace-small-action {
+  padding: .38rem .55rem;
+  min-width: auto;
+  font-size: .72rem;
+}
+.heattracesizing-page .heattrace-overview-visual-wrap,
+.heattracesizing-page .heattrace-chart-wrap {
+  border: 0;
+  border-radius: 0;
+  background: transparent;
+  margin: 0;
+}
+.heattracesizing-page .heattrace-overview-visual-wrap {
+  position: relative;
+}
+.heattracesizing-page .heattrace-overview-visual {
+  height: clamp(290px, 25vw, 360px);
+  min-height: 290px;
+  object-fit: contain;
+  border: 1px solid #d8e3f3;
+  border-radius: 12px;
+  background: #f8fbff;
+}
+.heattracesizing-page .heattrace-routing-visual-wrap {
+  border: 1px solid #d8e3f3;
+  border-radius: 12px;
+  background: linear-gradient(180deg, #f8fbff 0%, #f1f7ff 100%);
+  overflow: hidden;
+}
+.heattracesizing-page .heattrace-routing-visual {
+  display: block;
+  width: 100%;
+  min-height: 360px;
+}
+.heattracesizing-page .heattrace-image-callouts {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+}
+.heattracesizing-page .heattrace-image-callout {
+  position: absolute;
+  display: inline-flex;
+  align-items: center;
+  gap: .35rem;
+  max-width: 150px;
+  color: #0f172a;
+  font-size: .72rem;
+  font-weight: 800;
+  line-height: 1.1;
+  text-shadow: 0 1px 0 rgba(255, 255, 255, .88);
+}
+.heattracesizing-page .heattrace-image-callout strong {
+  display: inline-grid;
+  place-items: center;
+  width: 24px;
+  height: 24px;
+  border: 2px solid #fff;
+  border-radius: 50%;
+  background: var(--ht-blue);
+  box-shadow: 0 8px 18px rgba(18, 104, 243, .28);
+  color: #fff;
+  flex: 0 0 auto;
+  font-size: .78rem;
+}
+.heattracesizing-page .heattrace-image-callout em {
+  border: 1px solid rgba(18, 104, 243, .18);
+  border-radius: 999px;
+  background: rgba(255, 255, 255, .86);
+  box-shadow: 0 7px 18px rgba(15, 23, 42, .08);
+  font-style: normal;
+  padding: .24rem .45rem;
+}
+.heattracesizing-page .heattrace-image-callout--pipe {
+  left: 10%;
+  top: 47%;
+}
+.heattracesizing-page .heattrace-image-callout--insulation {
+  left: 48%;
+  top: 34%;
+}
+.heattracesizing-page .heattrace-image-callout--cable {
+  left: 54%;
+  top: 68%;
+}
+.heattracesizing-page .heattrace-image-callout--ambient {
+  right: 7%;
+  top: 50%;
+}
+.heattracesizing-page .heattrace-chart-svg {
+  min-height: 245px;
+}
+.heattracesizing-page .heattrace-overview-legend {
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: .55rem 1rem;
+  margin: .55rem 0 0;
+}
+.heattracesizing-page .heattrace-pipe-anatomy {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: .55rem;
+  margin: .75rem 0 .55rem;
+}
+.heattracesizing-page .heattrace-pipe-anatomy span {
+  display: flex;
+  align-items: center;
+  gap: .45rem;
+  min-height: 38px;
+  border: 1px solid #d7e5f8;
+  border-radius: 8px;
+  background: linear-gradient(180deg, #ffffff, #f7faff);
+  color: #475467;
+  font-size: .78rem;
+  font-weight: 700;
+  padding: .45rem .55rem;
+}
+.heattracesizing-page .heattrace-pipe-anatomy strong {
+  display: inline-grid;
+  place-items: center;
+  width: 20px;
+  height: 20px;
+  border-radius: 50%;
+  background: var(--ht-blue);
+  color: #fff;
+  font-size: .7rem;
+  flex: 0 0 auto;
+}
+.heattracesizing-page .heattrace-overview-legend li {
+  color: #475467;
+  font-size: .82rem;
+}
+.heattracesizing-page .legend-number {
+  display: inline-grid;
+  place-items: center;
+  width: 18px;
+  height: 18px;
+  border-radius: 50%;
+  background: var(--ht-blue);
+  color: #fff;
+  font-size: .68rem;
+  font-weight: 800;
+  flex: 0 0 auto;
+}
+.heattracesizing-page .legend-component-symbol {
+  display: inline-grid;
+  place-items: center;
+  width: 18px;
+  height: 18px;
+  border: 2px solid var(--component-color, #f59e0b);
+  border-radius: 6px;
+  background: var(--component-fill, #fef3c7);
+  color: var(--component-color, #f59e0b);
+  font-size: .68rem;
+  font-weight: 900;
+  flex: 0 0 auto;
+}
+.heattracesizing-page .heattrace-overview-hint {
+  margin-top: .75rem;
+  padding: .62rem .75rem;
+  border: 1px solid #cfe0fb;
+  border-left: 0;
+  background: #f4f8ff;
+  color: #61738b;
+  font-size: .8rem;
+}
+.heattracesizing-page .heattrace-kpi-grid {
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: .8rem;
+}
+.heattracesizing-page .heattrace-kpi-card {
+  padding: .95rem .85rem;
+  border: 1px solid var(--ht-line);
+  border-radius: 8px;
+  background: #fff;
+  box-shadow: none;
+  gap: .42rem;
+}
+.heattracesizing-page .heattrace-kpi-label {
+  color: #111827;
+  text-transform: none;
+  letter-spacing: 0;
+  font-size: .78rem;
+  font-weight: 800;
+}
+.heattracesizing-page .heattrace-kpi-value {
+  color: var(--ht-blue);
+  font-size: clamp(1.35rem, 2.1vw, 2rem);
+  line-height: 1.05;
+}
+.heattracesizing-page .heattrace-kpi-context {
+  color: #667085;
+  font-size: .78rem;
+  min-height: 2.2em;
+}
+.heattracesizing-page .heattrace-kpi-card a {
+  color: var(--ht-blue);
+  font-size: .78rem;
+  font-weight: 700;
+  text-decoration: none;
+  margin-top: .45rem;
+}
+.heattracesizing-page .heattrace-kpi-card a::after {
+  content: " ->";
+}
+.heattracesizing-page .heattrace-kpi-card--alert {
+  border-color: #f7c56b;
+  background: #fffaf0;
+}
+.heattracesizing-page .heattrace-status-banner {
+  display: flex;
+  gap: .8rem;
+  align-items: center;
+  margin-top: 1.35rem;
+  border-radius: 8px;
+  padding: .95rem 1rem;
+  border: 1px solid #93d3af;
+  background: var(--ht-green-bg);
+  color: #2a6a45;
+}
+.heattracesizing-page .heattrace-status-banner p {
+  margin: .18rem 0 0;
+  color: #5c7567;
+  font-size: .84rem;
+}
+.heattracesizing-page .heattrace-status-banner--warning {
+  background: var(--ht-amber-bg);
+  border-color: #f2ce7d;
+  color: #8a5a0a;
+}
+.heattracesizing-page .heattrace-status-banner--error {
+  background: #fff1f2;
+  border-color: #f4a3ad;
+  color: #b42318;
+}
+.heattracesizing-page .heattrace-status-icon {
+  display: grid;
+  place-items: center;
+  width: 28px;
+  height: 28px;
+  border: 2px solid currentColor;
+  border-radius: 50%;
+  font-weight: 800;
+  flex: 0 0 auto;
+}
+.heattracesizing-page .heattrace-inline-legend,
+.heattracesizing-page .heattrace-chart-legend {
+  display: flex;
+  flex-wrap: wrap;
+  gap: .75rem 1.3rem;
+  margin: 0 0 .55rem;
+}
+.heattracesizing-page .heattrace-chart-legend li {
+  color: #667085;
+  font-size: .75rem;
+}
+.heattracesizing-page .heattrace-chart-swatch {
+  width: 9px;
+  height: 9px;
+}
+.heattracesizing-page .heattrace-donut-layout {
+  display: grid;
+  grid-template-columns: minmax(200px, 1.1fr) minmax(170px, .9fr);
+  align-items: center;
+  gap: .7rem;
+}
+.heattracesizing-page .heattrace-card-note {
+  border-top: 1px solid var(--ht-line);
+  color: #8a98aa;
+  font-size: .78rem;
+  margin: .7rem 0 0;
+  padding-top: .62rem;
+}
+.heattracesizing-page .heattrace-sensitivity-controls {
+  gap: .56rem;
+  margin-top: .1rem;
+}
+.heattracesizing-page .heattrace-sensitivity-row label {
+  color: #475467;
+  font-size: .75rem;
+}
+.heattracesizing-page .heattrace-sensitivity-control-line {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 78px;
+  gap: .45rem;
+  align-items: center;
+}
+.heattracesizing-page .heattrace-sensitivity-slider {
+  accent-color: var(--ht-blue);
+}
+.heattracesizing-page .heattrace-sensitivity-number {
+  height: 28px;
+  border: 1px solid var(--ht-line-strong);
+  border-radius: 6px;
+  color: #344054;
+  font-size: .78rem;
+  font-weight: 700;
+  padding: 0 .35rem;
+  text-align: right;
+}
+.heattracesizing-page .heattrace-sensitivity-grid {
+  display: none;
+}
+.heattracesizing-page .heattrace-insights,
+.heattracesizing-page .heattrace-side-warnings {
+  margin-top: .75rem;
+  border: 1px solid #cfe0fb;
+  border-radius: 7px;
+  background: #f4f8ff;
+  padding: .75rem;
+}
+.heattracesizing-page .heattrace-side-warnings {
+  border-color: #f2ce7d;
+  background: #fff8e7;
+}
+.heattracesizing-page .heattrace-insights h3,
+.heattracesizing-page .heattrace-side-warnings h3 {
+  margin: 0 0 .4rem;
+  color: var(--ht-blue);
+  font-size: .8rem;
+}
+.heattracesizing-page .heattrace-side-warnings h3 {
+  color: var(--ht-amber);
+}
+.heattracesizing-page .heattrace-insight-item,
+.heattracesizing-page .heattrace-warning-card {
+  border: 0;
+  border-radius: 0;
+  box-shadow: none;
+  background: transparent;
+  padding: 0;
+}
+.heattracesizing-page .heattrace-insight-item {
+  display: grid;
+  gap: .45rem;
+  color: #475467;
+}
+.heattracesizing-page .heattrace-insight-item .btn {
+  justify-self: start;
+  min-width: auto;
+  padding: .25rem .45rem;
+  font-size: .72rem;
+}
+.heattracesizing-page .heattrace-warning-grid {
+  gap: .55rem;
+}
+.heattracesizing-page .heattrace-warning-severity {
+  color: inherit;
+}
+.heattracesizing-page .heattrace-warning-message {
+  color: #6d4e08;
+  font-size: .78rem;
+}
+.heattracesizing-page .heattrace-detail-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+  gap: .7rem;
+  margin-top: .9rem;
+}
+.heattracesizing-page .heattrace-detail-item {
+  border: 1px solid var(--ht-line);
+  border-radius: 8px;
+  background: #fff;
+  padding: .85rem;
+}
+.heattracesizing-page .heattrace-detail-item span {
+  display: block;
+  color: #667085;
+  font-size: .78rem;
+}
+.heattracesizing-page .heattrace-detail-item strong {
+  display: block;
+  margin-top: .25rem;
+  color: var(--ht-text);
+}
+.heattracesizing-page .heattrace-explainer {
+  color: #475467;
+  max-width: 78ch;
+}
+.heattracesizing-page .heattrace-circuit-list-actions {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: .5rem;
+}
+.heattracesizing-page .heattrace-component-allowance-rows {
+  grid-column: 1 / -1;
+  display: grid;
+  gap: .65rem;
+}
+.heattracesizing-page .heattrace-component-row {
+  display: grid;
+  grid-template-columns: minmax(110px, 1fr) minmax(80px, .6fr) minmax(120px, .85fr) minmax(120px, 1fr) auto;
+  gap: .55rem;
+  align-items: end;
+  border: 1px solid var(--ht-line);
+  border-radius: 10px;
+  padding: .65rem;
+  background: #fff;
+}
+.heattracesizing-page .heattrace-component-row .field-row {
+  margin: 0;
+}
+.heattracesizing-page .heattrace-component-row label {
+  font-size: .74rem;
+}
+.heattracesizing-page .heattrace-component-remove {
+  min-width: auto;
+  padding: .48rem .65rem;
+}
+.heattracesizing-page .heattrace-component-actions {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  align-items: center;
+  gap: .6rem;
+}
+.heattracesizing-page .heattrace-circuit-case-list {
+  grid-column: 1 / -1;
+  display: grid;
+  gap: .55rem;
+}
+.heattracesizing-page .heattrace-section .heattrace-circuit-empty {
+  display: block;
+  margin: 0;
+}
+.heattracesizing-page .heattrace-circuit-case-total,
+.heattracesizing-page .heattrace-circuit-case-item {
+  border: 1px solid var(--ht-line);
+  border-radius: 8px;
+  background: #fff;
+  padding: .55rem .65rem;
+}
+.heattracesizing-page .heattrace-circuit-case-total {
+  color: #475467;
+  display: grid;
+  gap: .15rem;
+}
+.heattracesizing-page .heattrace-circuit-case-total small {
+  color: #667085;
+  font-size: .75rem;
+}
+.heattracesizing-page .heattrace-circuit-case-total strong {
+  color: var(--ht-text);
+}
+.heattracesizing-page .heattrace-circuit-case-table-wrap {
+  overflow-x: auto;
+}
+.heattracesizing-page .heattrace-circuit-case-table {
+  width: 100%;
+  border-collapse: collapse;
+  min-width: 760px;
+}
+.heattracesizing-page .heattrace-circuit-case-table th,
+.heattracesizing-page .heattrace-circuit-case-table td {
+  border-bottom: 1px solid var(--ht-line);
+  padding: .5rem;
+  text-align: left;
+  vertical-align: top;
+}
+.heattracesizing-page .heattrace-circuit-case-table th {
+  color: #475467;
+  font-size: .74rem;
+  text-transform: uppercase;
+  letter-spacing: .04em;
+}
+.heattracesizing-page .heattrace-circuit-case-row.is-editing {
+  background: #eff6ff;
+  box-shadow: inset 3px 0 0 var(--ht-blue);
+}
+.heattracesizing-page .heattrace-circuit-case-table td span {
+  display: block;
+  color: #667085;
+  font-size: .78rem;
+}
+.heattracesizing-page .heattrace-branch-status {
+  display: inline-flex;
+  border-radius: 999px;
+  padding: .2rem .45rem;
+  background: #e8f5ee;
+  color: #167447;
+  font-size: .72rem;
+  font-weight: 800;
+  white-space: nowrap;
+}
+.heattracesizing-page .heattrace-branch-status--warning {
+  background: #fff6df;
+  color: #936500;
+}
+.heattracesizing-page .heattrace-branch-status--overLimit,
+.heattracesizing-page .heattrace-branch-status--invalid {
+  background: #ffe8e8;
+  color: #b42318;
+}
+.heattracesizing-page .heattrace-circuit-case-items {
+  display: grid;
+  gap: .5rem;
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+.heattracesizing-page .heattrace-circuit-case-item {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: .5rem;
+  align-items: center;
+}
+.heattracesizing-page .heattrace-circuit-case-item.is-editing {
+  border-color: var(--ht-blue);
+  background: #eff6ff;
+  box-shadow: inset 3px 0 0 var(--ht-blue);
+}
+.heattracesizing-page .heattrace-circuit-case-item strong,
+.heattracesizing-page .heattrace-circuit-case-item span {
+  display: block;
+}
+.heattracesizing-page .heattrace-circuit-case-item span {
+  color: #667085;
+  font-size: .78rem;
+}
+.heattracesizing-page .heattrace-circuit-case-actions {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+  gap: .35rem;
+}
+.heattracesizing-page .heattrace-circuit-case-actions .btn {
+  min-width: auto;
+  padding: .32rem .5rem;
+  font-size: .75rem;
+}
+.heattracesizing-page .heattrace-circuit-update-active {
+  border-color: var(--ht-blue);
+  background: var(--ht-blue);
+  color: #fff;
+}
+.heattracesizing-page .heattrace-report-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: .5rem;
+  margin: .85rem 0;
+}
+.heattracesizing-page .heattrace-report-preview {
+  border: 1px solid var(--ht-line);
+  border-radius: 12px;
+  background: #fff;
+  padding: 1rem;
+}
+.heattracesizing-page .heattrace-report-document .report-section {
+  border-top: 1px solid var(--ht-line);
+  padding: 1rem 0;
+}
+.heattracesizing-page .heattrace-report-document .report-dl {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: .4rem .9rem;
+}
+.heattracesizing-page .heattrace-report-document .report-dl dt {
+  color: #667085;
+  font-weight: 700;
+}
+.heattracesizing-page .heattrace-report-document .report-dl dd {
+  margin: 0;
+  color: var(--ht-text);
+  font-weight: 800;
+}
+.heattracesizing-page .heattrace-report-document .report-table {
+  width: 100%;
+  border-collapse: collapse;
+}
+.heattracesizing-page .heattrace-report-document .report-table th,
+.heattracesizing-page .heattrace-report-document .report-table td {
+  border-bottom: 1px solid var(--ht-line);
+  padding: .45rem;
+  text-align: left;
+  vertical-align: top;
+}
+.heattracesizing-page .heattrace-report-document .report-scroll {
+  overflow-x: auto;
+}
+.heattracesizing-page .heattrace-report-document .report-note,
+.heattracesizing-page .heattrace-report-document .report-meta,
+.heattracesizing-page .heattrace-report-document .report-empty {
+  color: #667085;
+}
+.heattracesizing-page .heattrace-action-bar {
+  border: 1px solid var(--ht-line);
+  border-left: 0;
+  border-right: 0;
+  border-bottom: 0;
+  border-radius: 0;
+  background: rgba(255, 255, 255, .92);
+  backdrop-filter: blur(14px);
+  justify-content: space-between;
+  align-items: center;
+  padding: .7rem 1rem;
+  z-index: 4;
+}
+.heattracesizing-page .heattrace-footer-meta,
+.heattracesizing-page .heattrace-footer-actions {
+  display: flex;
+  align-items: center;
+  gap: 1rem;
+}
+.heattracesizing-page .heattrace-footer-meta {
+  color: #667085;
+  font-size: .78rem;
+}
+.heattracesizing-page .heattrace-footer-meta strong {
+  color: #344054;
+}
+.heattracesizing-page .heattrace-footer-actions {
+  gap: .55rem;
+}
+.heattracesizing-page .heattrace-action-bar .primary-btn {
+  min-width: 230px;
+  background: var(--ht-blue);
+  border-radius: 6px;
+}
+.heattracesizing-page #heattrace-save-action {
+  min-width: 230px;
+  border-color: var(--ht-line);
+  background: #fff;
+  color: var(--ht-blue);
+  font-weight: 700;
+}
+.heattracesizing-page .heattrace-warnings-only .heattrace-overview-card,
+.heattracesizing-page .heattrace-warnings-only .heattrace-routing-card,
+.heattracesizing-page .heattrace-warnings-only .heattrace-temperature-card,
+.heattracesizing-page .heattrace-warnings-only .heattrace-breakdown-card,
+.heattracesizing-page .heattrace-warnings-only .heattrace-insights {
+  display: none;
+}
+.heattracesizing-page .heattrace-warnings-only .heattrace-overview-grid {
+  grid-template-columns: minmax(0, 1fr) minmax(280px, .42fr);
+  grid-template-areas: "results sensitivity";
+}
+body.dark-mode.heattracesizing-page {
+  --ht-bg: #0f172a;
+  --ht-card: #111827;
+  --ht-line: #263449;
+  --ht-line-strong: #344258;
+  --ht-text: #f8fafc;
+  --ht-muted: #a7b0c0;
+  background: #0f172a;
+}
+body.dark-mode.heattracesizing-page .heattrace-shell,
+body.dark-mode.heattracesizing-page .heattrace-content,
+body.dark-mode.heattracesizing-page .heattrace-workspace-toolbar,
+body.dark-mode.heattracesizing-page .heattrace-sidebar-tabs,
+body.dark-mode.heattracesizing-page .heattrace-dashboard-card,
+body.dark-mode.heattracesizing-page .heattrace-kpi-card,
+body.dark-mode.heattracesizing-page .heattrace-action-bar {
+  background: #111827;
+}
+body.dark-mode.heattracesizing-page .heattrace-sidebar {
+  background: #0b1220;
+}
+body.dark-mode.heattracesizing-page .heattrace-section input,
+body.dark-mode.heattracesizing-page .heattrace-section select,
+body.dark-mode.heattracesizing-page .heattrace-sensitivity-number {
+  background: #0f172a;
+  color: #f8fafc;
+}
+body.dark-mode.heattracesizing-page .heattrace-circuit-case-total,
+body.dark-mode.heattracesizing-page .heattrace-circuit-case-item,
+body.dark-mode.heattracesizing-page .heattrace-component-row,
+body.dark-mode.heattracesizing-page .heattrace-detail-item,
+body.dark-mode.heattracesizing-page .heattrace-report-preview {
+  background: #0f172a;
+}
+body.dark-mode.heattracesizing-page .heattrace-circuit-case-row.is-editing {
+  background: #172554;
+}
+body.dark-mode.heattracesizing-page .heattrace-circuit-case-item.is-editing {
+  background: #172554;
+}
+body.dark-mode.heattracesizing-page .heattrace-image-callout {
+  color: #f8fafc;
+  text-shadow: 0 1px 0 rgba(15, 23, 42, .8);
+}
+body.dark-mode.heattracesizing-page .heattrace-image-callout em {
+  background: rgba(15, 23, 42, .86);
+  color: #f8fafc;
+}
+@media (max-width: 1280px) {
+  .heattracesizing-page .heattrace-overview-grid {
+    grid-template-columns: minmax(0, 1fr) minmax(280px, .55fr);
+    grid-template-areas:
+      "overview results"
+      "routing sensitivity"
+      "temperature sensitivity"
+      "breakdown sensitivity";
+  }
+  .heattracesizing-page .heattrace-kpi-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+@media (max-width: 980px) {
+  .heattracesizing-page .container {
+    padding: 0 .75rem .8rem;
+  }
+  .heattracesizing-page .heattrace-shell {
+    grid-template-columns: 1fr;
+  }
+  .heattracesizing-page .heattrace-sidebar {
+    border-right: 0;
+    border-bottom: 1px solid var(--ht-line);
+    max-height: none;
+  }
+  .heattracesizing-page .heattrace-overview-grid,
+  .heattracesizing-page .heattrace-warnings-only .heattrace-overview-grid {
+    grid-template-columns: 1fr;
+    grid-template-areas:
+      "overview"
+      "results"
+      "routing"
+      "temperature"
+      "breakdown"
+      "sensitivity";
+  }
+}
+@media (max-width: 720px) {
+  .heattracesizing-page .heattrace-image-callout em {
+    display: none;
+  }
+  .heattracesizing-page .heattrace-circuit-case-item {
+    grid-template-columns: 1fr;
+  }
+  .heattracesizing-page .heattrace-circuit-case-actions {
+    justify-content: flex-start;
+  }
+  .heattracesizing-page .heattrace-component-row,
+  .heattracesizing-page .heattrace-component-actions {
+    grid-template-columns: 1fr;
+  }
+  .heattracesizing-page .heattrace-hero,
+  .heattracesizing-page .heattrace-workspace-toolbar,
+  .heattracesizing-page .heattrace-action-bar,
+  .heattracesizing-page .heattrace-footer-meta,
+  .heattracesizing-page .heattrace-footer-actions {
+    align-items: stretch;
+    flex-direction: column;
+  }
+  .heattracesizing-page .heattrace-tabs {
+    width: 100%;
+    overflow-x: auto;
+    flex-wrap: nowrap;
+  }
+  .heattracesizing-page .heattrace-tab[role="tab"] {
+    flex: 0 0 auto;
+  }
+  .heattracesizing-page .heattrace-section fieldset,
+  .heattracesizing-page .heattrace-kpi-grid,
+  .heattracesizing-page .heattrace-donut-layout {
+    grid-template-columns: 1fr;
+  }
+  .heattracesizing-page .heattrace-action-bar .primary-btn,
+  .heattracesizing-page #heattrace-save-action {
+    width: 100%;
+    min-width: 0;
+  }
+}
