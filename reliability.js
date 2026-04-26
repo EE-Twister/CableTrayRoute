@@ -1,5 +1,5 @@
 import { runReliability } from './analysis/reliability.js';
-import { getOneLine } from './dataStore.mjs';
+import { getOneLine, getStudies, setStudies } from './dataStore.mjs';
 
 document.addEventListener('DOMContentLoaded', () => {
   initSettings();
@@ -47,6 +47,10 @@ document.addEventListener('DOMContentLoaded', () => {
       resultsDiv.innerHTML = `<p class="result-fail">Analysis error: ${esc(err.message)}</p>`;
       return;
     }
+
+    const studies = getStudies();
+    studies.reliability = result;
+    setStudies(studies);
 
     renderResults(result);
     renderChart(result);

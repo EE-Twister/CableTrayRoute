@@ -12,6 +12,16 @@ const TRAYFILL_TOUR_STEPS = [
   { selector: '#exportExcelBtn',       message: 'Export the fill analysis to Excel for design documentation or submittal packages.' }
 ];
 
+function escapeHtml(value) {
+  return String(value ?? '').replace(/[&<>"']/g, ch => ({
+    '&': '&amp;',
+    '<': '&lt;',
+    '>': '&gt;',
+    '"': '&quot;',
+    "'": '&#39;'
+  }[ch]));
+}
+
 checkPrereqs([{key:'traySchedule',page:'racewayschedule.html',label:'Raceway Schedule'}]);
 
     document.addEventListener("DOMContentLoaded", async function() {
@@ -1272,7 +1282,7 @@ checkPrereqs([{key:'traySchedule',page:'racewayschedule.html',label:'Raceway Sch
 
         // Tray name
         if (trayName) {
-          svg += `<text x="${(svgW/2).toFixed(2)}" y="${(nameRowPx*0.7).toFixed(2)}" font-size="14px" text-anchor="middle" fill="#000" font-family="Arial,sans-serif">${trayName}</text>`;
+          svg += `<text x="${(svgW/2).toFixed(2)}" y="${(nameRowPx*0.7).toFixed(2)}" font-size="14px" text-anchor="middle" fill="#000" font-family="Arial,sans-serif">${escapeHtml(trayName)}</text>`;
         }
 
         // Per-compartment elements
@@ -1280,7 +1290,7 @@ checkPrereqs([{key:'traySchedule',page:'racewayschedule.html',label:'Raceway Sch
           const { headerY, rectY } = compPositions[ci];
           const compW = cl.compWidth * scale;
           const compH = cl.compDepth * scale;
-          const label = cl.comp.label || `Compartment ${cl.comp.id}`;
+          const label = escapeHtml(cl.comp.label || `Compartment ${cl.comp.id}`);
           const dimLineY = headerY + 12;
 
           // Dimension line + label
@@ -1312,12 +1322,20 @@ checkPrereqs([{key:'traySchedule',page:'racewayschedule.html',label:'Raceway Sch
                 const mx = ((p.x + p.offsets[mi].x) * scale).toFixed(2);
                 const my = (rectY + (cl.compDepth - (p.y + p.offsets[mi].y)) * scale).toFixed(2);
                 const mr = ((m.OD / 2) * scale).toFixed(2);
+                m.tag = escapeHtml(m.tag);
+                m.cableType = escapeHtml(m.cableType);
+                m.count = escapeHtml(m.count);
+                m.size = escapeHtml(m.size);
                 svg += `<circle cx="${mx}" cy="${my}" r="${mr}" fill="${cableColor}" stroke="#0066aa" stroke-width="1"><title>Cable Tag: ${m.tag}\nCable Type: ${m.cableType}\nConductors: ${m.count}\nSize: ${m.size}\nOD: ${m.OD.toFixed(2)}″\nWt: ${m.weight.toFixed(2)} lbs/ft</title></circle>`;
               });
             } else {
               const cx = (p.x * scale).toFixed(2);
               const cy = (rectY + (cl.compDepth - p.y) * scale).toFixed(2);
               const r  = (p.r * scale).toFixed(2);
+              p.tag = escapeHtml(p.tag);
+              p.cableType = escapeHtml(p.cableType);
+              p.count = escapeHtml(p.count);
+              p.size = escapeHtml(p.size);
               svg += `<circle cx="${cx}" cy="${cy}" r="${r}" fill="${cableColor}" stroke="#0066aa" stroke-width="1"><title>Cable Tag: ${p.tag}\nCable Type: ${p.cableType}\nConductors: ${p.count}\nSize: ${p.size}\nOD: ${p.OD.toFixed(2)}″\nWt: ${p.weight.toFixed(2)} lbs/ft</title></circle>`;
             }
           });
@@ -1358,14 +1376,14 @@ checkPrereqs([{key:'traySchedule',page:'racewayschedule.html',label:'Raceway Sch
 
         let bigSvg = `<svg xmlns="http://www.w3.org/2000/svg" width="${svgW.toFixed(0)}" height="${svgH.toFixed(0)}" style="background:#f9f9f9;border:1px solid #333;">`;
         if (trayName) {
-          bigSvg += `<text x="${(svgW/2).toFixed(2)}" y="${(nameRowPx*0.7).toFixed(2)}" font-size="20px" text-anchor="middle" fill="#000" font-family="Arial,sans-serif">${trayName}</text>`;
+          bigSvg += `<text x="${(svgW/2).toFixed(2)}" y="${(nameRowPx*0.7).toFixed(2)}" font-size="20px" text-anchor="middle" fill="#000" font-family="Arial,sans-serif">${escapeHtml(trayName)}</text>`;
         }
 
         lastCompartmentLayouts.forEach((cl, ci) => {
           const { headerY, rectY } = compPositions[ci];
           const compW = cl.compWidth * bigScale;
           const compH = cl.compDepth * bigScale;
-          const label = cl.comp.label || `Compartment ${cl.comp.id}`;
+          const label = escapeHtml(cl.comp.label || `Compartment ${cl.comp.id}`);
           const dimLineY = headerY + 14;
 
           bigSvg += `<line x1="0" y1="${dimLineY}" x2="${compW.toFixed(2)}" y2="${dimLineY}" stroke="#000" stroke-width="2"/>`;

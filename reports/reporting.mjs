@@ -1,5 +1,4 @@
 let jsPdfPromise = null;
-
 const dynamicImport = specifier => Function('s', 'return import(s);')(specifier);
 
 function getJsPdfNamespace() {
@@ -15,11 +14,19 @@ async function ensureJsPDF() {
     return namespace.jsPDF;
   }
   if (!jsPdfPromise) {
-    jsPdfPromise = dynamicImport('https://cdn.jsdelivr.net/npm/jspdf@4.2.1/+esm')
-      .then(mod => {
-        const ctor = mod?.jsPDF || mod?.default || mod;
+    jsPdfPromise = (typeof document === 'undefined'
+      ? dynamicImport('jspdf')
+      : new Promise((resolve, reject) => {
+        const script = document.createElement('script');
+        script.src = 'dist/vendor/jspdf.umd.min.js';
+        script.onload = () => resolve(getJsPdfNamespace());
+        script.onerror = reject;
+        document.head.appendChild(script);
+      }))
+      .then(ns => {
+        const ctor = ns?.jsPDF || ns?.default || ns;
         if (!ctor) {
-          throw new Error('jsPDF module did not provide a constructor');
+          throw new Error('jsPDF library did not provide a constructor');
         }
         namespace.jsPDF = ctor;
         return ctor;

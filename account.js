@@ -1,5 +1,5 @@
 import './src/components/navigation.js';
-import { getAuthContextState, clearAuthContextState } from './projectStorage.js';
+import { getAuthContextState, setAuthContextState } from './projectStorage.js';
 
 const MIN_PASSWORD_LENGTH = 8;
 
@@ -17,7 +17,7 @@ function showStatus(formEl, message, isError) {
 }
 
 function init() {
-  const auth = getAuthContextState();
+  let auth = getAuthContextState();
   if (!auth) {
     window.location.href = 'login.html';
     return;
@@ -58,6 +58,15 @@ function init() {
       });
       const body = await res.json().catch(() => ({}));
       if (res.ok) {
+        if (body.token && body.csrfToken && body.expiresAt) {
+          auth = {
+            ...auth,
+            token: body.token,
+            csrfToken: body.csrfToken,
+            expiresAt: body.expiresAt,
+          };
+          setAuthContextState(auth);
+        }
         showStatus(form, body.message || 'Password changed successfully.', false);
         form.reset();
       } else {

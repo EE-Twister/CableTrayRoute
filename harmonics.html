@@ -19,6 +19,7 @@
   <link rel="dns-prefetch" href="https://fonts.gstatic.com">
   <meta name="color-scheme" content="light dark">
   <link rel="stylesheet" href="style.css">
+  <script src="dist/vendor/d3.min.js"></script>
   <!-- JSON-LD Breadcrumb -->
   <script type="application/ld+json">
   {
@@ -246,6 +247,16 @@
     const overloadBanner = document.getElementById('neutral-overload-banner');
     const imbalanceBanner = document.getElementById('phase-imbalance-banner');
 
+    function escapeHtml(value) {
+      return String(value ?? '').replace(/[&<>"']/g, ch => ({
+        '&': '&amp;',
+        '<': '&lt;',
+        '>': '&gt;',
+        '"': '&quot;',
+        "'": '&#39;'
+      }[ch]));
+    }
+
     // Restore saved per-phase inputs from studies store
     function savedInputs() {
       return getStudies()?.harmonicsPhaseInputs || {};
@@ -270,18 +281,22 @@
       tbody.innerHTML = '';
       comps.forEach(c => {
         const s = saved[c.id] || {};
+        const safeId = escapeHtml(c.id);
+        const safeA = escapeHtml(s.harmonicsA || '');
+        const safeB = escapeHtml(s.harmonicsB || '');
+        const safeC = escapeHtml(s.harmonicsC || '');
         const tr = document.createElement('tr');
         tr.innerHTML = `
-          <td><code>${c.id}</code></td>
-          <td><input type="text" class="phase-input" data-id="${c.id}" data-phase="A"
-               value="${s.harmonicsA || ''}" placeholder="e.g. 3:20,5:14"
-               aria-label="Phase A spectrum for ${c.id}"></td>
-          <td><input type="text" class="phase-input" data-id="${c.id}" data-phase="B"
-               value="${s.harmonicsB || ''}" placeholder="e.g. 3:20,5:14"
-               aria-label="Phase B spectrum for ${c.id}"></td>
-          <td><input type="text" class="phase-input" data-id="${c.id}" data-phase="C"
-               value="${s.harmonicsC || ''}" placeholder="e.g. 3:20,5:14"
-               aria-label="Phase C spectrum for ${c.id}"></td>`;
+          <td><code>${safeId}</code></td>
+          <td><input type="text" class="phase-input" data-id="${safeId}" data-phase="A"
+               value="${safeA}" placeholder="e.g. 3:20,5:14"
+               aria-label="Phase A spectrum for ${safeId}"></td>
+          <td><input type="text" class="phase-input" data-id="${safeId}" data-phase="B"
+               value="${safeB}" placeholder="e.g. 3:20,5:14"
+               aria-label="Phase B spectrum for ${safeId}"></td>
+          <td><input type="text" class="phase-input" data-id="${safeId}" data-phase="C"
+               value="${safeC}" placeholder="e.g. 3:20,5:14"
+               aria-label="Phase C spectrum for ${safeId}"></td>`;
         tbody.appendChild(tr);
       });
     }
@@ -337,7 +352,7 @@
 
         const tr = document.createElement('tr');
         tr.innerHTML = `
-          <td><code>${id}</code></td>
+          <td><code>${escapeHtml(id)}</code></td>
           <td>${r.phaseA.ithd}</td>
           <td>${r.phaseB.ithd}</td>
           <td>${r.phaseC.ithd}</td>
@@ -345,7 +360,7 @@
           <td>${r.limit}</td>
           <td style="${neutralStyle}">${r.neutral.ithd_pct_of_phase}</td>
           <td>${r.neutral.dominant_order || '—'}</td>
-          <td>${statusParts.join('; ')}</td>`;
+          <td>${escapeHtml(statusParts.join('; '))}</td>`;
         resultsTbody.appendChild(tr);
       });
 
@@ -355,7 +370,7 @@
     });
   </script>
   <script type="module">
-    import * as d3 from 'https://cdn.jsdelivr.net/npm/d3@7/+esm';
+  const d3 = window.d3;
     import { getStudies, setStudies } from './dataStore.mjs';
     import { frequencyScan } from './analysis/harmonics.js';
 
@@ -366,6 +381,16 @@
     const resultsTbody = document.getElementById('fs-results-tbody');
     const dangerBanner = document.getElementById('fs-danger-banner');
     const chartEl    = document.getElementById('freq-scan-chart');
+
+    function escapeHtml(value) {
+      return String(value ?? '').replace(/[&<>"']/g, ch => ({
+        '&': '&amp;',
+        '<': '&lt;',
+        '>': '&gt;',
+        '"': '&quot;',
+        "'": '&#39;'
+      }[ch]));
+    }
 
     let rowCount = 0;
 
@@ -535,8 +560,8 @@
           tr.innerHTML = `
             <td>${r.hOrder.toFixed(1)}</td>
             <td>${r.zPu.toFixed(3)}</td>
-            <td>${r.type}</td>
-            <td style="${riskStyle}">${r.risk.toUpperCase()}</td>
+            <td>${escapeHtml(r.type)}</td>
+            <td style="${riskStyle}">${escapeHtml(r.risk.toUpperCase())}</td>
             <td style="max-width:30rem;">${r.detuneRecommendation || '—'}</td>`;
           resultsTbody.appendChild(tr);
         });

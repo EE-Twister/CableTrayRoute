@@ -28,12 +28,21 @@ function getHashParam(name) {
 // Rendering helpers
 // ---------------------------------------------------------------------------
 
+function esc(value) {
+  return String(value ?? '')
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&#39;');
+}
+
 function fieldRow(label, value) {
   if (!value && value !== 0) return '';
   return `
     <div class="fv-row">
-      <span class="fv-label">${label}</span>
-      <span class="fv-value">${value}</span>
+      <span class="fv-label">${esc(label)}</span>
+      <span class="fv-value">${esc(value)}</span>
     </div>`;
 }
 
@@ -58,11 +67,14 @@ function renderCableCard(cable, trays) {
     Signal: 'fv-type-signal',
   }[cable.cable_type] || 'fv-type-power';
 
+  const cableTag = cable.tag || '-';
+  const encodedCableTag = encodeURIComponent(cableTag);
+
   return `
-    <article class="fv-card" aria-label="Cable detail: ${cable.tag}">
+    <article class="fv-card" aria-label="Cable detail: ${esc(cableTag)}">
       <header class="fv-card-header">
-        <div class="fv-tag">${cable.tag || '—'}</div>
-        ${cable.cable_type ? `<span class="fv-type-badge ${typeClass}">${cable.cable_type}</span>` : ''}
+        <div class="fv-tag">${esc(cableTag)}</div>
+        ${cable.cable_type ? `<span class="fv-type-badge ${typeClass}">${esc(cable.cable_type)}</span>` : ''}
       </header>
       <div class="fv-fields">
         ${fieldRow('From', cable.from_tag || cable.from || '')}
@@ -75,7 +87,7 @@ function renderCableCard(cable, trays) {
         ${fieldRow('Notes', cable.notes || cable.note || '')}
       </div>
       <div class="fv-actions">
-        <a href="cableschedule.html#cable=${encodeURIComponent(cable.tag)}" class="fv-btn fv-btn-secondary">
+        <a href="cableschedule.html#cable=${encodedCableTag}" class="fv-btn fv-btn-secondary">
           Open Full Schedule
         </a>
         <a href="pullcards.html" class="fv-btn fv-btn-secondary">
@@ -89,11 +101,12 @@ function renderCableCard(cable, trays) {
 }
 
 function renderTrayCard(tray) {
+  const trayTag = tray.tray_id || tray.id || '-';
   return `
-    <article class="fv-card" aria-label="Tray detail: ${tray.tray_id || tray.id}">
+    <article class="fv-card" aria-label="Tray detail: ${esc(trayTag)}">
       <header class="fv-card-header">
-        <div class="fv-tag">${tray.tray_id || tray.id || '—'}</div>
-        ${tray.label ? `<span class="fv-tray-label">${tray.label}</span>` : ''}
+        <div class="fv-tag">${esc(trayTag)}</div>
+        ${tray.label ? `<span class="fv-tray-label">${esc(tray.label)}</span>` : ''}
       </header>
       <div class="fv-fields">
         ${fieldRow('Type', tray.type)}
@@ -124,7 +137,7 @@ function renderNotFound(kind, id) {
     <div class="fv-message fv-message-warn" role="alert">
       <div class="fv-message-icon" aria-hidden="true">&#9888;</div>
       <h2>${kind === 'tray' ? 'Tray' : 'Cable'} Not Found</h2>
-      <p><strong>${id}</strong> was not found in the loaded project.</p>
+      <p><strong>${esc(id)}</strong> was not found in the loaded project.</p>
       <p>Make sure the correct project is loaded on this device, then try again.</p>
       <a href="${kind === 'tray' ? 'racewayschedule.html' : 'cableschedule.html'}" class="fv-btn fv-btn-secondary">
         Open ${kind === 'tray' ? 'Raceway Schedule' : 'Cable Schedule'}

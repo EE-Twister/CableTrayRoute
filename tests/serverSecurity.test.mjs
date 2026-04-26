@@ -448,6 +448,99 @@ async function sessionRefreshScenario() {
   }
 }
 
+async function passwordChangeScenario() {
+  console.log('server security - password changes');
+  const tmpDir = await fs.mkdtemp(path.join(os.tmpdir(), 'ctr-password-change-'));
+  const { server, port } = await startServer({
+    dataDir: tmpDir,
+    tokenTtlMs: 5000,
+    rateLimit: { windowMs: 60000, max: 100 },
+    enforceHttps: false
+  });
+  const baseUrl = `http://127.0.0.1:${port}`;
+
+  try {
+    const username = 'erin';
+    const password = 'ChangeMe!123';
+    const newPassword = 'Changed!456';
+
+    await fetch(`${baseUrl}/signup`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ username, password })
+    });
+    const loginRes = await fetch(`${baseUrl}/login`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ username, password })
+    });
+    const session = await loginRes.json();
+
+    const rotated = await check('rotates token and csrfToken after password change', async () => {
+      const res = await fetch(`${baseUrl}/account/change-password`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${session.token}`,
+          'X-CSRF-Token': session.csrfToken
+        },
+        body: JSON.stringify({ currentPassword: password, newPassword })
+      });
+      assert.strictEqual(res.status, 200);
+      const payload = await res.json();
+      assert(payload.token, 'new token missing');
+      assert(payload.csrfToken, 'new csrfToken missing');
+      assert.notStrictEqual(payload.token, session.token, 'new token should differ from old');
+      assert.notStrictEqual(payload.csrfToken, session.csrfToken, 'new csrfToken should differ from old');
+      return payload;
+    });
+
+    await check('rejects the pre-change token after password change', async () => {
+      const res = await fetch(`${baseUrl}/projects/demo`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${session.token}`,
+          'X-CSRF-Token': session.csrfToken
+        },
+        body: JSON.stringify({ data: { stale: true } })
+      });
+      assert.strictEqual(res.status, 401);
+    });
+
+    await check('accepts the rotated token after password change', async () => {
+      const res = await fetch(`${baseUrl}/projects/demo`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${rotated.token}`,
+          'X-CSRF-Token': rotated.csrfToken
+        },
+        body: JSON.stringify({ data: { fresh: true } })
+      });
+      assert.strictEqual(res.status, 200);
+    });
+
+    await check('allows login with the new password only', async () => {
+      const oldLogin = await fetch(`${baseUrl}/login`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ username, password })
+      });
+      assert.strictEqual(oldLogin.status, 401);
+
+      const newLogin = await fetch(`${baseUrl}/login`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ username, password: newPassword })
+      });
+      assert.strictEqual(newLogin.status, 200);
+    });
+  } finally {
+    await closeServer(server);
+  }
+}
+
 async function httpsRedirectScenario() {
   console.log('server security - HTTPS redirect');
   const tmpDir = await fs.mkdtemp(path.join(os.tmpdir(), 'ctr-https-'));
@@ -491,6 +584,7 @@ async function httpsRedirectScenario() {
   await authScenario();
   await rateLimitScenario();
   await sessionRefreshScenario();
+  await passwordChangeScenario();
   await httpsRedirectScenario();
 })();
 

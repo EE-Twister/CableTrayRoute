@@ -873,7 +873,7 @@ async function generateTechnicalReport(format='pdf'){
 
   if(format==='pdf'){
     if(!window.jspdf){
-      await loadScript('https://cdn.jsdelivr.net/npm/jspdf@2.5.1/dist/jspdf.umd.min.js');
+    await loadScript('dist/vendor/jspdf.umd.min.js');
     }
     const { jsPDF } = window.jspdf;
     const doc=new jsPDF();
@@ -886,7 +886,7 @@ async function generateTechnicalReport(format='pdf'){
     doc.save('technical_report.pdf');
   }else{
     if(!window.docx){
-      await loadScript('https://cdn.jsdelivr.net/npm/docx@8.4.0/build/index.min.js');
+    await loadScript('dist/vendor/docx.umd.js');
     }
     const { Document, Packer, Paragraph } = window.docx;
     const paragraphs=[new Paragraph('Technical Report'),new Paragraph('Inputs:')];

@@ -4,6 +4,16 @@ import { createFillGauge } from './src/components/fillGauge.js';
 
 checkPrereqs([{key:'conduitSchedule',page:'racewayschedule.html',label:'Raceway Schedule'}]);
 
+    function escapeHtml(value) {
+      return String(value ?? '').replace(/[&<>"']/g, ch => ({
+        '&': '&amp;',
+        '<': '&lt;',
+        '>': '&gt;',
+        '"': '&quot;',
+        "'": '&#39;'
+      }[ch]));
+    }
+
     const CONDUIT_SPECS = {
       "EMT": {"1/2":0.304,"3/4":0.533,"1":0.864,"1-1/4":1.496,"1-1/2":2.036,"2":3.356,"2-1/2":5.858,"3":8.846,"3-1/2":11.545,"4":14.753},
       "ENT": {"1/2":0.285,"3/4":0.508,"1":0.832,"1-1/4":1.453,"1-1/2":1.986,"2":3.291},
@@ -222,7 +232,7 @@ checkPrereqs([{key:'conduitSchedule',page:'racewayschedule.html',label:'Raceway 
             fs = Math.min(fs, p.r * SCALE * 0.9);
             const cx = center + p.x*SCALE;
             const cy = center + p.y*SCALE;
-            svg += `<text x="${cx}" y="${cy}" font-size="${fs}" text-anchor="middle" dominant-baseline="middle">${p.tag}</text>`;
+            svg += `<text x="${cx}" y="${cy}" font-size="${fs}" text-anchor="middle" dominant-baseline="middle">${escapeHtml(p.tag)}</text>`;
             svg += `<text x="${cx}" y="${cy + fs*0.8}" font-size="${Math.max(6,fs*0.7)}" text-anchor="middle" dominant-baseline="hanging">${(2*p.r).toFixed(2)}\"</text>`;
           }
         });
@@ -255,7 +265,7 @@ checkPrereqs([{key:'conduitSchedule',page:'racewayschedule.html',label:'Raceway 
         const fillPct = (sumArea / area) * 100;
         conduitGauge.update(fillPct);
         const allowed = cables.length===1?53:(cables.length===2?31:40);
-        let results = `<p><strong>Conduit:</strong> ${type} ${size}" (ID ${(2*R).toFixed(2)}")</p>`;
+        let results = `<p><strong>Conduit:</strong> ${escapeHtml(type)} ${escapeHtml(size)}" (ID ${(2*R).toFixed(2)}")</p>`;
         results += `<p><strong>Fill:</strong> ${fillPct.toFixed(1)} % (Allowed ${allowed}% )</p>`;
         if(fillPct > allowed){
           results += `<p class="warning">WARNING: Fill exceeds allowable limit.</p>`;
@@ -295,7 +305,7 @@ checkPrereqs([{key:'conduitSchedule',page:'racewayschedule.html',label:'Raceway 
             const fs = calcFont(p.tag, p.r, SCALE, 16);
             const cx = center + p.x*SCALE;
             const cy = center + p.y*SCALE;
-            svg += `<text x="${cx}" y="${cy}" font-size="${fs}" text-anchor="middle" dominant-baseline="middle">${p.tag}</text>`;
+            svg += `<text x="${cx}" y="${cy}" font-size="${fs}" text-anchor="middle" dominant-baseline="middle">${escapeHtml(p.tag)}</text>`;
             svg += `<text x="${cx}" y="${cy + fs*0.9}" font-size="${Math.max(8,fs*0.8)}" text-anchor="middle" dominant-baseline="hanging">${(2*p.r).toFixed(2)}\"</text>`;
           }
         });

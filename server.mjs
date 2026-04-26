@@ -662,6 +662,18 @@ class FileSessionStore {
     return { token, csrfToken, expiresAt };
   }
 
+  async revokeUserSessions(username) {
+    await this.#pruneExpired();
+    let changed = false;
+    for (const [token, session] of this.sessions.entries()) {
+      if (session.username === username) {
+        this.sessions.delete(token);
+        changed = true;
+      }
+    }
+    if (changed) await this.#persist();
+  }
+
   async get(token) {
     await this.#pruneExpired();
     const session = this.sessions.get(token);
@@ -840,13 +852,13 @@ export async function createApp(options = {}) {
     // styles because the existing codebase relies on inline handlers; this
     // still blocks external script injection, javascript: URIs, data: scripts,
     // and loading resources from untrusted origins.
-    // CDN sources (xlsx, plotly, papaparse, gpu.js, docx, handlebars) are
-    // explicitly allowed so the browser does not silently block them.
+    // Remaining external script sources are limited to pages that still use
+    // Plotly/PapaParse from CDNs; core study/runtime libraries are local.
     res.setHeader(
       'Content-Security-Policy',
       [
         "default-src 'self'",
-        "script-src 'self' 'unsafe-inline' https://cdn.plot.ly https://cdnjs.cloudflare.com https://cdn.jsdelivr.net https://unpkg.com",
+        "script-src 'self' 'unsafe-inline' https://cdn.plot.ly https://cdnjs.cloudflare.com",
         "style-src 'self' 'unsafe-inline'",
         "img-src 'self' data: blob:",
         "connect-src 'self'",
@@ -1153,7 +1165,7 @@ export async function createApp(options = {}) {
       users[username].password = await hashPassword(newPassword);
       await saveUsers();
       // Invalidate any active sessions for this user
-      await sessionStore.createSession(username); // replaces existing session, then drop it
+      await sessionStore.revokeUserSessions(username);
       res.json({ message: 'Password reset successfully. You may now sign in.' });
     })
   );
@@ -1188,7 +1200,8 @@ export async function createApp(options = {}) {
       }
       users[req.username].password = await hashPassword(newPassword);
       await saveUsers();
-      res.json({ message: 'Password changed successfully.' });
+      const session = await sessionStore.createSession(req.username);
+      res.json({ message: 'Password changed successfully.', ...session });
     })
   );
 

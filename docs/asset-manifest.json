@@ -1,5 +1,13 @@
 {
-  "docs.js": "docs.402900d29faa.js",
-  "style.css": "style.552e6aa548ad.css",
-  "dist/vendor/fast-json-patch.mjs": "fast-json-patch.361648778823.mjs"
+  "docs.js": "docs.c750f2b9c62e.js",
+  "style.css": "style.f0ef8e2e21ee.css",
+  "dist/vendor/d3.min.js": "d3.min.f2094bbf6141.js",
+  "dist/vendor/docx.umd.js": "docx.umd.02d568d203c0.js",
+  "dist/vendor/fast-json-patch.mjs": "fast-json-patch.361648778823.mjs",
+  "dist/vendor/handlebars.min.js": "handlebars.min.0e5416f145e7.js",
+  "dist/vendor/jspdf.umd.min.js": "jspdf.umd.min.e6551fcdc32f.js",
+  "dist/vendor/pdf.min.js": "pdf.min.9592010e3fa7.js",
+  "dist/vendor/pdf.worker.min.js": "pdf.worker.min.1a617fff6f9f.js",
+  "dist/vendor/svg2pdf.es.min.js": "svg2pdf.es.min.28bfe76d3ee5.js",
+  "dist/vendor/xlsx.full.min.js": "xlsx.full.min.c9506197caf8.js"
 }

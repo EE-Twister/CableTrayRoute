@@ -1,9 +1,30 @@
-const { jsPDF } = window.jspdf || await import('https://cdn.jsdelivr.net/npm/jspdf@4.2.1/+esm');
-// Use ESM build of svg2pdf from jsDelivr. Previous URL pointed to a
-// non-existent file and caused a 404 in the browser. The `+esm` suffix
-// ensures the module entry in the package is used, which serves
-// `dist/svg2pdf.es.min.js` for version 2.5.0.
-const svg2pdfModule = await import('https://cdn.jsdelivr.net/npm/svg2pdf.js@2.5.0/+esm');
+async function loadScript(url) {
+  await new Promise((resolve, reject) => {
+    const existing = document.querySelector(`script[src="${url}"]`);
+    if (existing) {
+      existing.addEventListener('load', resolve, { once: true });
+      existing.addEventListener('error', reject, { once: true });
+      if (window.jspdf?.jsPDF) resolve();
+      return;
+    }
+    const script = document.createElement('script');
+    script.src = url;
+    script.onload = resolve;
+    script.onerror = reject;
+    document.head.appendChild(script);
+  });
+}
+
+if (!window.jspdf?.jsPDF) {
+  await loadScript('dist/vendor/jspdf.umd.min.js');
+}
+const { jsPDF } = window.jspdf || {};
+if (typeof jsPDF !== 'function') {
+  throw new Error('jsPDF library is not loaded');
+}
+
+const svg2pdfUrl = new URL('dist/vendor/svg2pdf.es.min.js', document.baseURI).href;
+const svg2pdfModule = await import(svg2pdfUrl);
 const svg2pdf = svg2pdfModule?.default || svg2pdfModule?.svg2pdf;
 if (typeof svg2pdf !== 'function') {
   throw new Error('svg2pdf module failed to load');

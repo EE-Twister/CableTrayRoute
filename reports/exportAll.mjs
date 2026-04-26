@@ -1,8 +1,54 @@
-const { jsPDF } = window.jspdf || await import('https://cdn.jsdelivr.net/npm/jspdf@4.2.1/+esm');
 import { toCSV } from './reporting.mjs';
 import { generateArcFlashLabel } from './labels.mjs';
 import { buildArcFlashLabelData, getArcFlashLabelBaseName } from './arcFlashReport.mjs';
 import * as dataStore from '../dataStore.mjs';
+
+let jsPDF = null;
+const loadScriptPromises = new Map();
+
+async function loadScript(url, globalTest) {
+  if (globalTest()) return;
+  if (!loadScriptPromises.has(url)) {
+    loadScriptPromises.set(url, new Promise((resolve, reject) => {
+      const script = document.createElement('script');
+      script.src = url;
+      script.onload = resolve;
+      script.onerror = reject;
+      document.head.appendChild(script);
+    }));
+  }
+  await loadScriptPromises.get(url);
+}
+
+async function ensureJsPDF() {
+  if (jsPDF) return jsPDF;
+  await loadScript('dist/vendor/jspdf.umd.min.js', () => Boolean(window.jspdf?.jsPDF));
+  jsPDF = window.jspdf?.jsPDF;
+  if (typeof jsPDF !== 'function') {
+    throw new Error('jsPDF library is not loaded');
+  }
+  return jsPDF;
+}
+
+function getJsPDFConstructor() {
+  if (jsPDF) return jsPDF;
+  const globalScope = typeof window !== 'undefined' ? window : globalThis;
+  const ctor = globalScope.jspdf?.jsPDF;
+  if (typeof ctor !== 'function') {
+    throw new Error('jsPDF library is not loaded');
+  }
+  jsPDF = ctor;
+  return jsPDF;
+}
+
+async function ensureHandlebars() {
+  if (window.Handlebars) return window.Handlebars;
+  await loadScript('dist/vendor/handlebars.min.js', () => Boolean(window.Handlebars));
+  if (!window.Handlebars) {
+    throw new Error('Handlebars library is not loaded');
+  }
+  return window.Handlebars;
+}
 
 let branding = { title: 'Project Report', logo: null, company: '' };
 // Default template builder
@@ -36,7 +82,7 @@ export async function setReportTemplate(tpl) {
   }
   if (typeof tpl === 'string') {
     try {
-      const Handlebars = (await import('https://cdn.jsdelivr.net/npm/handlebars@latest/dist/handlebars.esm.js')).default;
+      const Handlebars = await ensureHandlebars();
       const compiled = Handlebars.compile(tpl);
       pdfTemplate = ctx => compiled(ctx);
     } catch {
@@ -174,11 +220,12 @@ class SimpleZip {
  * Build a zip file containing consolidated PDF, CSVs, and arc-flash labels.
  */
 export function buildReportZip(data = {}) {
+  const JsPDF = getJsPDFConstructor();
   const sections = buildSections(data);
   const zip = new SimpleZip();
 
   // Build PDF content
-  const doc = new jsPDF();
+  const doc = new JsPDF();
   let y = 10;
   if (branding.logo) {
     try { doc.addImage(branding.logo, 'PNG', 10, 10, 30, 15); } catch {}
@@ -228,6 +275,7 @@ export function buildReportZip(data = {}) {
  * Gather data from the data store and trigger download of all reports as zip.
  */
 export async function exportAllReports() {
+  await ensureJsPDF();
   const data = {
     equipment: dataStore.getEquipment(),
     panels: dataStore.getPanels ? dataStore.getPanels() : [],

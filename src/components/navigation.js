@@ -42,7 +42,7 @@ const NAV_ROUTES = [
   { href: 'ibr.html', label: 'IBR Modeling (PV/BESS)', section: 'Studies', group: 'Renewable', icon: 'icons/toolbar/validate.svg' },
   { href: 'derinterconnect.html', label: 'DER Interconnection', section: 'Studies', group: 'Renewable', icon: 'icons/toolbar/validate.svg' },
   { href: 'motorStart.html', label: 'Motor Start', section: 'Studies', group: 'Motor', icon: 'icons/Motor.svg' },
-  { href: 'loadFlow.html', label: 'Load Flow', section: 'Studies', group: 'Power System', icon: 'icons/Load.svg' },
+  { href: 'loadFlow.html', label: 'Load Flow', section: 'Studies', group: 'Power System', icon: 'icons/load.svg' },
   { href: 'voltagestability.html', label: 'Voltage Stability', section: 'Studies', group: 'Power System', icon: 'icons/toolbar/validate.svg' },
   { href: 'shortCircuit.html', label: 'Short Circuit', section: 'Studies', group: 'Protection', icon: 'icons/components/Breaker.svg' },
   { href: 'arcFlash.html', label: 'Arc Flash', section: 'Studies', group: 'Protection', icon: 'icons/toolbar/connect.svg' },

@@ -27,11 +27,10 @@ const PRECACHE_URLS = [
   '/icons/conduit.svg',
   '/icons/oneline.svg',
   '/icons/equipment.svg',
-  '/icons/load.svg',
   '/icons/panel.svg',
   // Studies section icons
   '/icons/Motor.svg',
-  '/icons/Load.svg',
+  '/icons/load.svg',
   '/icons/components/Breaker.svg',
   '/icons/components/TextBox.svg',
   // Toolbar icons used in navigation and settings

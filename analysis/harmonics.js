@@ -1,4 +1,4 @@
-import * as d3 from 'https://cdn.jsdelivr.net/npm/d3@7/+esm';
+const d3 = globalThis.d3;
 import { getOneLine, getStudies, setStudies } from '../dataStore.mjs';
 import { resolveCtForComponent } from './ctMetadata.mjs';
 

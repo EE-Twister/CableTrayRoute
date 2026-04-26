@@ -1,5 +1,9 @@
 import { analyzeGroundGrid } from './analysis/groundGrid.mjs';
 import { normalizePreviewGeometry } from './src/groundgridPreviewGeometry.js';
+import {
+  buildGroundGridRecommendations,
+  getGroundGridSafetyMetrics,
+} from './src/groundgridSafetyPresentation.js';
 
 document.addEventListener('DOMContentLoaded', () => {
   const resultsDiv = document.getElementById('results');
@@ -8,6 +12,9 @@ document.addEventListener('DOMContentLoaded', () => {
   const previewElevationSvg = document.getElementById('ground-grid-preview-elevation');
   const previewSummary = document.getElementById('grid-preview-summary');
   const stepOverlayHint = document.getElementById('step-overlay-hint');
+  const statusBanner = document.getElementById('ground-grid-status');
+  const kpiGrid = document.getElementById('ground-grid-kpis');
+  const designCoach = document.getElementById('ground-grid-design-coach');
 
   let hadInitError = false;
 
@@ -72,6 +79,60 @@ document.addEventListener('DOMContentLoaded', () => {
     return `${value.toFixed(value < 10 ? 2 : 1)} ${unit}`;
   }
 
+  function escapeHtml(value) {
+    return String(value ?? '').replace(/[&<>"']/g, ch => ({
+      '&': '&amp;',
+      '<': '&lt;',
+      '>': '&gt;',
+      '"': '&quot;',
+      "'": '&#39;',
+    }[ch]));
+  }
+
+  function formatVolts(value) {
+    if (!Number.isFinite(value)) return '--';
+    return `${value.toFixed(value >= 1000 ? 0 : 1)} V`;
+  }
+
+  function formatOhms(value) {
+    if (!Number.isFinite(value)) return '--';
+    return `${value.toFixed(4)} ohm`;
+  }
+
+  function formatRatio(ratio) {
+    if (!Number.isFinite(ratio)) return '--';
+    return `${(ratio * 100).toFixed(0)}%`;
+  }
+
+  function formatMargin(marginPct) {
+    if (!Number.isFinite(marginPct)) return 'No analysis';
+    return marginPct >= 0
+      ? `${marginPct.toFixed(0)}% below limit`
+      : `${Math.abs(marginPct).toFixed(0)}% over limit`;
+  }
+
+  function getStatusLabel(status) {
+    return {
+      pending: 'Awaiting Analysis',
+      pass: 'Within Limits',
+      review: 'Engineering Review',
+      fail: 'Action Required',
+    }[status] || 'Review';
+  }
+
+  function getStatusDetail(status) {
+    return {
+      pending: 'Run analysis to calculate IEEE 80 safety margins.',
+      pass: 'Touch and step voltage are within tolerable limits for the current assumptions.',
+      review: 'One or more checks are close to limit or GPR requires transferred-voltage review.',
+      fail: 'Touch or step voltage exceeds the IEEE 80 tolerable limit.',
+    }[status] || 'Review the entered assumptions and calculated limits.';
+  }
+
+  function getKpiClass(status) {
+    return `groundgrid-kpi-card groundgrid-kpi-card--${status}`;
+  }
+
   function getPreviewParams() {
     const imperial = getUnits() === 'imperial';
     const unit = imperial ? 'ft' : 'm';
@@ -102,6 +163,94 @@ document.addEventListener('DOMContentLoaded', () => {
     });
 
     return { unit, diameterUnit, hasRods, ...normalized, hsDisplay: hsRaw, hsDisplayUnit: imperial ? 'in' : 'm' };
+  }
+
+  function hasSurfaceLayerInput() {
+    return (getNum('surface-rho') || 0) > 0 && (getNum('surface-hs') || 0) > 0;
+  }
+
+  function renderSafetyDashboard(result = null) {
+    const metrics = getGroundGridSafetyMetrics(result);
+    if (statusBanner) {
+      statusBanner.className = `groundgrid-hero-status groundgrid-hero-status--${metrics.designStatus}`;
+      statusBanner.innerHTML = `
+        <span class="groundgrid-status-dot groundgrid-status-dot--${metrics.designStatus}" aria-hidden="true"></span>
+        <div>
+          <strong>${escapeHtml(getStatusLabel(metrics.designStatus))}</strong>
+          <span>${escapeHtml(getStatusDetail(metrics.designStatus))}</span>
+        </div>
+      `;
+    }
+
+    if (kpiGrid) {
+      const lengthDisplay = getUnits() === 'imperial'
+        ? formatDim(result?.effectiveLength / 0.3048 || 0, 'ft')
+        : formatDim(result?.effectiveLength || 0, 'm');
+      kpiGrid.innerHTML = metrics.hasAnalysis ? `
+        <article class="${getKpiClass(metrics.touchStatus)}">
+          <span>Touch Voltage</span>
+          <strong>${escapeHtml(formatVolts(result.Em))}</strong>
+          <small>${escapeHtml(formatRatio(metrics.touchRatio))} of ${escapeHtml(formatVolts(result.Etouch))} limit - ${escapeHtml(formatMargin(metrics.touchMarginPct))}</small>
+        </article>
+        <article class="${getKpiClass(metrics.stepStatus)}">
+          <span>Step Voltage</span>
+          <strong>${escapeHtml(formatVolts(result.Es))}</strong>
+          <small>${escapeHtml(formatRatio(metrics.stepRatio))} of ${escapeHtml(formatVolts(result.Estep))} limit - ${escapeHtml(formatMargin(metrics.stepMarginPct))}</small>
+        </article>
+        <article class="${getKpiClass(metrics.gprStatus)}">
+          <span>GPR</span>
+          <strong>${escapeHtml(formatVolts(result.GPR))}</strong>
+          <small>${escapeHtml(formatRatio(metrics.gprRatio))} of touch limit - transferred voltage ${metrics.gprStatus === 'fail' ? 'review required' : 'screen OK'}</small>
+        </article>
+        <article class="groundgrid-kpi-card groundgrid-kpi-card--info">
+          <span>Grid Resistance</span>
+          <strong>${escapeHtml(formatOhms(result.Rg))}</strong>
+          <small>${escapeHtml(lengthDisplay)} effective buried length</small>
+        </article>
+      ` : `
+        <article class="groundgrid-kpi-card groundgrid-kpi-card--pending">
+          <span>Touch Voltage</span>
+          <strong>--</strong>
+          <small>Run analysis for Em / Etouch</small>
+        </article>
+        <article class="groundgrid-kpi-card groundgrid-kpi-card--pending">
+          <span>Step Voltage</span>
+          <strong>--</strong>
+          <small>Run analysis for Es / Estep</small>
+        </article>
+        <article class="groundgrid-kpi-card groundgrid-kpi-card--pending">
+          <span>GPR</span>
+          <strong>--</strong>
+          <small>Transferred-voltage review appears here</small>
+        </article>
+        <article class="groundgrid-kpi-card groundgrid-kpi-card--pending">
+          <span>Grid Resistance</span>
+          <strong>--</strong>
+          <small>Calculated from grid area and buried length</small>
+        </article>
+      `;
+    }
+
+    renderDesignCoach(result, metrics);
+  }
+
+  function renderDesignCoach(result = null, metrics = getGroundGridSafetyMetrics(result)) {
+    if (!designCoach) return;
+    const recommendations = buildGroundGridRecommendations({
+      result,
+      metrics,
+      hasRods: document.getElementById('has-rods')?.checked ?? false,
+      hasSurfaceLayer: hasSurfaceLayerInput(),
+    });
+    designCoach.innerHTML = recommendations.map((item, index) => `
+      <article class="groundgrid-coach-item groundgrid-coach-item--${escapeHtml(item.tone)}">
+        <span class="groundgrid-coach-rank">${index + 1}</span>
+        <div>
+          <strong>${escapeHtml(item.title)}</strong>
+          <p>${escapeHtml(item.detail)}</p>
+        </div>
+      </article>
+    `).join('');
   }
 
   function setRodSpacingVisibility() {
@@ -162,24 +311,137 @@ document.addEventListener('DOMContentLoaded', () => {
     svgEl.appendChild(g);
   }
 
+  function drawStepPotentialScale(svgEl, showStepOverlay) {
+    if (!showStepOverlay) return;
+
+    const scaleWidth = 194;
+    const scaleHeight = 116;
+    const scaleX = svgWidth - scaleWidth - 16;
+    const scaleY = 14;
+    const barX = scaleX + 16;
+    const barY = scaleY + 42;
+    const barWidth = scaleWidth - 32;
+    const barHeight = 12;
+    const metrics = getGroundGridSafetyMetrics(latestAnalysisResult);
+    const rawRatio = metrics.hasAnalysis
+      ? latestAnalysisResult.Es / Math.max(latestAnalysisResult.Estep, 1)
+      : 0.55;
+    const maxScaleVoltage = metrics.hasAnalysis
+      ? Math.max(latestAnalysisResult.Estep, latestAnalysisResult.Es) * 1.1
+      : Math.max(1, Number(getNum('grid-current')) * 0.18);
+    const minScaleVoltage = 0;
+    const midScaleVoltage = maxScaleVoltage / 2;
+    const gradientId = 'grid-step-potential-scale-gradient';
+    const defs = makeSvg('defs');
+    const gradient = makeSvg('linearGradient', {
+      id: gradientId,
+      x1: '0%',
+      y1: '0%',
+      x2: '100%',
+      y2: '0%',
+    });
+    [
+      ['0%', '#38b87c'],
+      ['48%', '#f8c14a'],
+      ['76%', '#f2853f'],
+      ['100%', '#d93d4e'],
+    ].forEach(([offset, color]) => {
+      gradient.appendChild(makeSvg('stop', { offset, 'stop-color': color }));
+    });
+    defs.appendChild(gradient);
+    svgEl.appendChild(defs);
+
+    const g = makeSvg('g', { class: 'grid-step-scale' });
+    g.appendChild(makeSvg('rect', {
+      x: scaleX,
+      y: scaleY,
+      width: scaleWidth,
+      height: scaleHeight,
+      rx: 8,
+      class: 'grid-step-scale-box',
+    }));
+
+    const title = makeSvg('text', { x: scaleX + 16, y: scaleY + 24, class: 'grid-step-scale-title' });
+    title.textContent = 'Step-potential scale';
+    g.appendChild(title);
+    g.appendChild(makeSvg('rect', {
+      x: barX,
+      y: barY,
+      width: barWidth,
+      height: barHeight,
+      rx: 6,
+      fill: `url(#${gradientId})`,
+      class: 'grid-step-scale-bar',
+    }));
+
+    const lowLabel = makeSvg('text', { x: barX, y: barY + 30, class: 'grid-step-scale-label' });
+    const midLabel = makeSvg('text', { x: barX + (barWidth / 2), y: barY + 30, class: 'grid-step-scale-label grid-step-scale-label--middle' });
+    const highLabel = makeSvg('text', { x: barX + barWidth, y: barY + 30, class: 'grid-step-scale-label grid-step-scale-label--end' });
+    lowLabel.textContent = `${minScaleVoltage.toFixed(0)} V`;
+    midLabel.textContent = `${midScaleVoltage.toFixed(0)} V`;
+    highLabel.textContent = `${maxScaleVoltage.toFixed(0)} V`;
+
+    if (metrics.hasAnalysis) {
+      const markerRatio = Math.max(0, Math.min(1, latestAnalysisResult.Es / Math.max(maxScaleVoltage, 1)));
+      const markerX = barX + (barWidth * markerRatio);
+      g.appendChild(makeSvg('line', {
+        x1: markerX,
+        y1: barY - 5,
+        x2: markerX,
+        y2: barY + barHeight + 5,
+        class: 'grid-step-scale-marker',
+      }));
+      const calcLabel = makeSvg('text', { x: scaleX + 16, y: scaleY + 86, class: 'grid-step-scale-limit' });
+      calcLabel.textContent = `Calculated Es: ${latestAnalysisResult.Es.toFixed(0)} V`;
+      g.appendChild(calcLabel);
+      const limitLabel = makeSvg('text', { x: scaleX + 16, y: scaleY + 104, class: 'grid-step-scale-limit grid-step-scale-limit--muted' });
+      limitLabel.textContent = `IEEE limit: ${latestAnalysisResult.Estep.toFixed(0)} V`;
+      g.appendChild(limitLabel);
+    } else {
+      const estimatedMarkerRatio = Math.max(0, Math.min(1, rawRatio));
+      const markerX = barX + (barWidth * estimatedMarkerRatio);
+      g.appendChild(makeSvg('line', {
+        x1: markerX,
+        y1: barY - 5,
+        x2: markerX,
+        y2: barY + barHeight + 5,
+        class: 'grid-step-scale-marker grid-step-scale-marker--estimated',
+      }));
+      const pendingLabel = makeSvg('text', { x: scaleX + 16, y: scaleY + 86, class: 'grid-step-scale-limit' });
+      pendingLabel.textContent = 'Estimated pre-analysis range';
+      g.appendChild(pendingLabel);
+      const basisLabel = makeSvg('text', { x: scaleX + 16, y: scaleY + 104, class: 'grid-step-scale-limit grid-step-scale-limit--muted' });
+      basisLabel.textContent = 'Max based on grid current';
+      g.appendChild(basisLabel);
+    }
+
+    g.appendChild(lowLabel);
+    g.appendChild(midLabel);
+    g.appendChild(highLabel);
+    svgEl.appendChild(g);
+  }
+
   function renderTopView(params, svgEl) {
     if (!svgEl) {
       return;
     }
     clearAndPrimeSvg(svgEl, 'Ground grid top view with conductor matrix and spacing dimensions');
-    const margin = 62;
-    const drawableWidth = svgWidth - (margin * 2);
-    const drawableHeight = svgHeight - (margin * 2) - 24;
+    const showStepOverlay = document.getElementById('show-step-overlay')?.checked ?? false;
+    const topReserved = showStepOverlay ? 132 : 62;
+    const leftReserved = 76;
+    const rightReserved = 44;
+    const bottomReserved = 46;
+    const drawableWidth = svgWidth - leftReserved - rightReserved;
+    const drawableHeight = svgHeight - topReserved - bottomReserved;
     const scale = Math.min(drawableWidth / params.gridLx, drawableHeight / params.gridLy);
     const drawWidth = params.gridLx * scale;
     const drawHeight = params.gridLy * scale;
-    const startX = (svgWidth - drawWidth) / 2;
-    const startY = (svgHeight - drawHeight) / 2 + 10;
+    const startX = leftReserved + ((drawableWidth - drawWidth) / 2);
+    const startY = topReserved + ((drawableHeight - drawHeight) / 2);
     const endX = startX + drawWidth;
     const endY = startY + drawHeight;
     const dx = params.ny > 1 ? drawWidth / (params.ny - 1) : 0;
     const dy = params.nx > 1 ? drawHeight / (params.nx - 1) : 0;
-    const showStepOverlay = document.getElementById('show-step-overlay')?.checked ?? false;
     const overlayOpacityInput = parseFloat(document.getElementById('step-overlay-opacity')?.value);
     const overlayOpacity = Number.isFinite(overlayOpacityInput) ? overlayOpacityInput : 0.6;
 
@@ -191,8 +453,9 @@ document.addEventListener('DOMContentLoaded', () => {
       const MAX_RES = 600;
       const cols = Math.max(MIN_RES, Math.min(MAX_RES, (params.ny - 1) * CELLS_PER_MESH));
       const rows = Math.max(MIN_RES, Math.min(MAX_RES, (params.nx - 1) * CELLS_PER_MESH));
-      const safetyRatio = latestAnalysisResult
-        ? Math.max(0, latestAnalysisResult.Es / Math.max(latestAnalysisResult.Estep, 1))
+      const latestMetrics = getGroundGridSafetyMetrics(latestAnalysisResult);
+      const safetyRatio = latestMetrics.hasAnalysis
+        ? Math.max(latestMetrics.touchRatio, latestMetrics.stepRatio, 0)
         : 0.55;
       const severityScale = Math.max(0.25, Math.min(1.25, safetyRatio));
 
@@ -238,7 +501,9 @@ document.addEventListener('DOMContentLoaded', () => {
           const nxCenter = Math.abs(((px - startX) / drawWidth) - 0.5) * 2;
           const edgeBoost = Math.max(nxCenter, nyCenter);
           const intensity = Math.max(0, Math.min(1, (0.18 + (0.62 * localGradient) + (0.22 * edgeBoost)) * severityScale));
-          const hue = Math.max(0, 125 - (intensity * 125));
+          const hue = latestMetrics.hasAnalysis
+            ? Math.max(0, 130 - (intensity * 130))
+            : Math.max(35, 210 - (intensity * 85));
           const alpha = (0.08 + (intensity * 0.38)) * overlayOpacity;
           ctx.fillStyle = `hsla(${hue}, 86%, 48%, ${alpha.toFixed(3)})`;
           ctx.fillRect(col, row, 1, 1);
@@ -300,6 +565,7 @@ document.addEventListener('DOMContentLoaded', () => {
       legend.appendChild(overlayText);
     }
     svgEl.appendChild(legend);
+    drawStepPotentialScale(svgEl, showStepOverlay);
   }
 
   function renderElevationView(params, svgEl) {
@@ -379,9 +645,10 @@ document.addEventListener('DOMContentLoaded', () => {
       + (params.hasRods && params.rodLayout.axisSpacingX > 0 ? ` • Rod spacing x ≈ ${params.rodLayout.axisSpacingX.toFixed(1)} ${params.unit}` : '')
       + (params.hasRods && params.rodLayout.axisSpacingY > 0 ? ` • Rod spacing y ≈ ${params.rodLayout.axisSpacingY.toFixed(1)} ${params.unit}` : '');
     const showStepOverlay = document.getElementById('show-step-overlay')?.checked ?? false;
-    const overlaySafety = latestAnalysisResult
-      ? ` • Step overlay ratio Es/Estep = ${(latestAnalysisResult.Es / Math.max(latestAnalysisResult.Estep, 1)).toFixed(2)}`
-      : ' • Step overlay ratio uses nominal value until analysis runs';
+    const metrics = getGroundGridSafetyMetrics(latestAnalysisResult);
+    const overlaySafety = metrics.hasAnalysis
+      ? ` - overlay ratio max(Em/Etouch, Es/Estep) = ${Math.max(metrics.touchRatio, metrics.stepRatio).toFixed(2)}`
+      : ' - overlay uses geometry estimate until analysis runs';
 
     if (previewSummary) {
       previewSummary.textContent = hadInitError
@@ -391,9 +658,9 @@ document.addEventListener('DOMContentLoaded', () => {
       console.error('[groundgrid] #grid-preview-summary not found; preview fallback message unavailable.');
     }
     if (stepOverlayHint) {
-      stepOverlayHint.textContent = latestAnalysisResult
-        ? `Overlay scales with latest Es (${latestAnalysisResult.Es.toFixed(1)} V) vs Estep (${latestAnalysisResult.Estep.toFixed(1)} V).`
-        : 'Overlay is estimated from conductor spacing. Run Analyze Ground Grid to scale by Es / Estep.';
+      stepOverlayHint.textContent = metrics.hasAnalysis
+        ? `Overlay scales with worst safety ratio: touch ${formatRatio(metrics.touchRatio)}, step ${formatRatio(metrics.stepRatio)}.`
+        : 'Overlay is estimated from conductor spacing. Run Analyze Ground Grid to scale by IEEE 80 results.';
     }
     updateRodLayoutHint();
   }
@@ -459,15 +726,22 @@ document.addEventListener('DOMContentLoaded', () => {
       return;
     }
     latestAnalysisResult = r;
+    renderSafetyDashboard(r);
     renderGridPreview();
 
     const section = document.createElement('section');
-    section.className = 'results-panel';
+    section.className = 'results-panel groundgrid-results-detail';
     section.setAttribute('aria-label', 'Ground grid analysis results');
 
     const h2 = document.createElement('h2');
-    h2.textContent = 'Analysis Results';
+    h2.textContent = 'Calculation Detail';
     section.appendChild(h2);
+
+    const metrics = getGroundGridSafetyMetrics(r);
+    const status = document.createElement('p');
+    status.className = `groundgrid-results-summary groundgrid-results-summary--${metrics.designStatus}`;
+    status.textContent = `${getStatusLabel(metrics.designStatus)}: ${getStatusDetail(metrics.designStatus)}`;
+    section.appendChild(status);
 
     // Safety badges
     section.appendChild(renderBadge('Touch Voltage', r.touchSafe));
@@ -544,6 +818,15 @@ document.addEventListener('DOMContentLoaded', () => {
     `;
     section.appendChild(tbl);
 
+    const notes = document.createElement('div');
+    notes.className = 'groundgrid-result-notes';
+    notes.innerHTML = `
+      <p><strong>Mesh voltage</strong> is used as the touch-voltage proxy for grounded equipment inside the grid.</p>
+      <p><strong>Step voltage</strong> compares surface voltage gradient against the selected body-weight tolerable limit.</p>
+      <p><strong>GPR</strong> is grid current times resistance and should be reviewed for transferred-voltage exposure when elevated.</p>
+    `;
+    section.appendChild(notes);
+
     if (r.gprExceedsTouch) {
       const warn = document.createElement('p');
       warn.className = 'alert-warning';
@@ -556,6 +839,11 @@ document.addEventListener('DOMContentLoaded', () => {
   }
 
   function handleFormStateChange() {
+    latestAnalysisResult = null;
+    if (resultsDiv) {
+      resultsDiv.innerHTML = '';
+    }
+    renderSafetyDashboard(null);
     setRodSpacingVisibility();
     renderGridPreview();
   }
@@ -578,6 +866,11 @@ document.addEventListener('DOMContentLoaded', () => {
   }
 
   function onUnitChange() {
+    latestAnalysisResult = null;
+    if (resultsDiv) {
+      resultsDiv.innerHTML = '';
+    }
+    renderSafetyDashboard(null);
     const imperial = getUnits() === 'imperial';
     updateUnitLabels(imperial);
     document.querySelectorAll('[data-unit]').forEach(btn => {
@@ -607,6 +900,7 @@ document.addEventListener('DOMContentLoaded', () => {
     }
   });
 
+  renderSafetyDashboard(null);
   renderGridPreview();
   setRodSpacingVisibility();
 

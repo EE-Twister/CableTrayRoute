@@ -1,4 +1,4 @@
-import * as d3 from 'https://cdn.jsdelivr.net/npm/d3@7/+esm';
+const d3 = globalThis.d3;
 import {
   getItem,
   setItem,
@@ -257,17 +257,18 @@ let pdfJsLibPromise = null;
 
 function ensurePdfJs() {
   if (pdfJsLibPromise) return pdfJsLibPromise;
-  pdfJsLibPromise = import('https://cdn.jsdelivr.net/npm/pdfjs-dist@3.7.107/build/pdf.min.mjs')
-    .then(module => {
-      if (module?.GlobalWorkerOptions) {
-        module.GlobalWorkerOptions.workerSrc = 'https://cdn.jsdelivr.net/npm/pdfjs-dist@3.7.107/build/pdf.worker.min.js';
-      }
-      return module;
-    })
-    .catch(err => {
-      pdfJsLibPromise = null;
-      throw err;
-    });
+  pdfJsLibPromise = Promise.resolve(globalThis.pdfjsLib).then(module => {
+    if (!module) {
+      throw new Error('PDF.js library is not loaded.');
+    }
+    if (module.GlobalWorkerOptions) {
+      module.GlobalWorkerOptions.workerSrc = 'dist/vendor/pdf.worker.min.js';
+    }
+    return module;
+  }).catch(err => {
+    pdfJsLibPromise = null;
+    throw err;
+  });
   return pdfJsLibPromise;
 }
 
