@@ -1,0 +1,144 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="description" content="Validation evidence, supported standards, calculation basis, and benchmark cases for CableTrayRoute electrical engineering tools.">
+  <title>Validation &amp; Standards — CableTrayRoute</title>
+  <link rel="icon" href="icons/favicon.svg" type="image/svg+xml">
+  <link rel="apple-touch-icon" href="icons/favicon.svg">
+  <!-- Open Graph / Social sharing -->
+  <meta property="og:type" content="website">
+  <meta property="og:title" content="Validation &amp; Standards — CableTrayRoute">
+  <meta property="og:description" content="Supported calculation standards, benchmark cases, and test coverage evidence for CableTrayRoute.">
+  <meta property="og:image" content="https://cabletrayroute.com/icons/og-preview.png">
+  <meta property="og:site_name" content="CableTrayRoute">
+  <meta property="og:url" content="validation.html">
+  <!-- Canonical URL -->
+  <link rel="canonical" href="validation.html">
+  <meta name="color-scheme" content="light dark">
+  <link rel="stylesheet" href="style.css">
+  <!-- JSON-LD Breadcrumb -->
+  <script type="application/ld+json">
+  {
+    "@context": "https://schema.org",
+    "@type": "BreadcrumbList",
+    "itemListElement": [
+      { "@type": "ListItem", "position": 1, "name": "Home", "item": "index.html" },
+      { "@type": "ListItem", "position": 2, "name": "Validation & Standards", "item": "validation.html" }
+    ]
+  }
+  </script>
+  <script type="module" src="dist/validation.js" defer></script>
+</head>
+<body>
+  <a href="#main-content" class="skip-link">Skip to main content</a>
+  <nav class="top-nav" aria-label="Primary">
+    <button id="nav-toggle" class="nav-toggle" aria-label="Toggle navigation" aria-controls="nav-links" aria-expanded="false" title="Toggle navigation">
+      <img src="icons/toolbar/grid.svg" alt="" aria-hidden="true" class="control-icon" loading="lazy" decoding="async">
+    </button>
+    <div id="nav-links" class="nav-links" role="list">
+      <!-- Populated dynamically by navigation.js -->
+    </div>
+    <button id="settings-btn" class="settings-btn" aria-label="Settings" aria-expanded="false" title="Settings">
+      <img src="icons/toolbar/validate.svg" alt="" aria-hidden="true" class="control-icon" loading="lazy" decoding="async">
+    </button>
+  </nav>
+  <div id="settings-menu" class="settings-menu">
+    <label for="theme-select">Theme
+      <select id="theme-select">
+        <option value="system">System</option>
+        <option value="light">Light</option>
+        <option value="dark">Dark</option>
+        <option value="high-contrast">High Contrast</option>
+      </select>
+    </label>
+    <label><input type="checkbox" id="compact-toggle" aria-label="Enable compact table mode"> Compact Mode</label>
+    <button id="help-btn" class="btn" aria-expanded="false" title="Show help">Site Help</button>
+  </div>
+
+  <div class="container">
+    <main id="main-content" class="main-content">
+
+      <header class="page-header">
+        <h1>Validation &amp; Standards</h1>
+        <p>Calculation basis, supported standards, benchmark cases, and test coverage evidence.</p>
+      </header>
+
+      <!-- Trust summary banner -->
+      <section class="card" aria-labelledby="trust-summary-heading">
+        <h2 id="trust-summary-heading">At a Glance</h2>
+        <div id="trust-kpi-row" class="kpi-row" aria-live="polite">
+          <div class="kpi-card">
+            <span class="kpi-value" id="kpi-standards">—</span>
+            <span class="kpi-label">Supported Standards</span>
+          </div>
+          <div class="kpi-card">
+            <span class="kpi-value" id="kpi-benchmarks">—</span>
+            <span class="kpi-label">Benchmark Cases</span>
+          </div>
+          <div class="kpi-card">
+            <span class="kpi-value" id="kpi-suites">—</span>
+            <span class="kpi-label">Test Suites</span>
+          </div>
+          <div class="kpi-card">
+            <span class="kpi-value" id="kpi-assertions">—</span>
+            <span class="kpi-label">Automated Assertions</span>
+          </div>
+        </div>
+        <p class="field-hint" id="manifest-timestamp"></p>
+      </section>
+
+      <!-- Supported standards -->
+      <section class="card" aria-labelledby="standards-heading">
+        <h2 id="standards-heading">Supported Standards</h2>
+        <p>Each standard listed below is implemented in the corresponding study module. Click a standard to view its study page, or expand the row to read scope, assumptions, and known limitations.</p>
+        <div id="standards-list" aria-live="polite">
+          <p class="field-hint">Loading standards…</p>
+        </div>
+      </section>
+
+      <!-- Benchmark cases -->
+      <section class="card" aria-labelledby="benchmarks-heading">
+        <h2 id="benchmarks-heading">Benchmark Cases</h2>
+        <p>Canonical example problems with known reference outputs. Use these to verify calculation correctness, compare results against textbook examples, or load the fixture project to explore the tool.</p>
+        <div id="benchmarks-list" aria-live="polite">
+          <p class="field-hint">Loading benchmarks…</p>
+        </div>
+      </section>
+
+      <!-- Test suite evidence -->
+      <section class="card" aria-labelledby="tests-heading">
+        <h2 id="tests-heading">Automated Test Coverage</h2>
+        <p>The following test suites run on every build. Passing evidence is captured in <code>dist/validationManifest.json</code> at build time so that the counts below reflect the actual last-passing state, not hand-maintained claims.</p>
+        <div id="test-suites-list" aria-live="polite">
+          <p class="field-hint">Loading test suite index…</p>
+        </div>
+      </section>
+
+      <!-- Methodology note -->
+      <section class="card" aria-labelledby="methodology-heading">
+        <h2 id="methodology-heading">Methodology &amp; Disclaimer</h2>
+        <div class="study-basis__section">
+          <p>CableTrayRoute calculations implement published engineering standards and are intended for screening-level and detailed design analysis. All outputs should be reviewed by a licensed Professional Engineer before use in construction documents or safety-critical decisions.</p>
+          <ul class="study-basis__list">
+            <li>Each study page shows a <strong>Calculation Basis</strong> panel listing the governing standard, key formulas, and known limitations.</li>
+            <li>Benchmark cases on this page reproduce published example problems with tolerance-band assertions verified by automated tests.</li>
+            <li>Where gaps exist between the implemented method and the full standard (e.g., near-to-generator correction factors), these are documented in the relevant study's Calculation Basis panel and in the limitations table below.</li>
+            <li>This tool is a browser-native engineering aid, not a replacement for dedicated power-system analysis platforms such as ETAP, EasyPower, or SKM for projects requiring full dynamic simulation, three-phase unbalanced analysis, or regulatory filing.</li>
+          </ul>
+        </div>
+      </section>
+
+    </main>
+  </div>
+
+  <div id="help-modal" class="modal" role="dialog" aria-modal="true" aria-labelledby="help-modal-title" hidden>
+    <div class="modal-content">
+      <h2 id="help-modal-title">Help</h2>
+      <button id="close-help-btn" class="btn" aria-label="Close help">Close</button>
+      <p>This page lists calculation standards, benchmark cases, and automated test evidence for CableTrayRoute study modules.</p>
+    </div>
+  </div>
+</body>
+</html>

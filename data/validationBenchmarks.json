@@ -1,0 +1,336 @@
+{
+  "version": "1",
+  "benchmarks": [
+    {
+      "id": "ieee1584-arc-flash",
+      "title": "IEEE 1584-2018 Arc Flash — Example 1 (MV Open Air)",
+      "studyPage": "arcFlash.html",
+      "standard": "IEEE 1584-2018",
+      "clause": "§4.4 — Arcing Current and Incident Energy",
+      "description": "Medium-voltage open-air bus, bolted fault 10 kA, 15 kV, 18-inch working distance.",
+      "inputs": {
+        "systemVoltageKV": 15,
+        "boltedFaultKA": 10,
+        "gapMm": 153,
+        "workingDistanceMm": 457,
+        "equipmentConfig": "open_air",
+        "conductorConfig": "VCB"
+      },
+      "expectedOutputs": {
+        "arcingCurrentKA": { "value": 8.65, "tolerance": 0.15 },
+        "incidentEnergyCalCm2": { "value": 19.8, "tolerance": 2.0 },
+        "arcFlashBoundaryMm": { "value": 2830, "tolerance": 200 }
+      },
+      "reference": "IEEE 1584-2018 Annex D, Example D.2",
+      "sampleFile": "samples/benchmark-ieee1584-arc-flash.json"
+    },
+    {
+      "id": "iec60909-short-circuit",
+      "title": "IEC 60909-0:2016 Short-Circuit — Three-Phase Maximum Current",
+      "studyPage": "iec60909.html",
+      "standard": "IEC 60909-0:2016",
+      "clause": "§4.2 — Three-phase short-circuit, maximum current (c_max)",
+      "description": "110 kV / 10 kV transformer network. Known I\"k3, peak current ip, thermal equivalent Ith from IEC 60909 §4 example.",
+      "inputs": {
+        "systemKV": 10,
+        "scMvaSource": 500,
+        "xrRatio": 10,
+        "cFactorMode": "max",
+        "faultDurationS": 1.0
+      },
+      "expectedOutputs": {
+        "ikThreePhaseKA": { "value": 15.75, "tolerance": 0.5 },
+        "cFactor": { "value": 1.1, "tolerance": 0.01 },
+        "kappa": { "value": 1.809, "tolerance": 0.05 },
+        "ipKA": { "value": 40.3, "tolerance": 1.5 }
+      },
+      "reference": "IEC 60909-0:2016 §4.3 worked example",
+      "sampleFile": "samples/benchmark-iec60909-short-circuit.json"
+    },
+    {
+      "id": "iec60287-cable-rating",
+      "title": "IEC 60287-1-1:2023 Cable Ampacity — Direct Burial, 3-Core XLPE",
+      "studyPage": "iec60287.html",
+      "standard": "IEC 60287-1-1:2023",
+      "clause": "§2.1 — Continuous current rating, direct buried installation",
+      "description": "95 mm² Cu XLPE 11 kV, three-core cable directly buried 800 mm depth, soil ρ = 1.0 K·m/W, ambient 25 °C.",
+      "inputs": {
+        "conductorMm2": 95,
+        "conductorMaterial": "copper",
+        "insulation": "XLPE",
+        "systemKV": 11,
+        "installMethod": "direct_burial",
+        "depthMm": 800,
+        "soilRho": 1.0,
+        "ambientC": 25,
+        "conductors": 3
+      },
+      "expectedOutputs": {
+        "ampacityA": { "value": 270, "tolerance": 15 }
+      },
+      "reference": "IEC 60287-1-1:2023 §2.1; Nexans cable handbook Example 3",
+      "sampleFile": "samples/benchmark-iec60287-cable-rating.json"
+    },
+    {
+      "id": "ieee80-ground-grid",
+      "title": "IEEE 80-2013 Ground Grid — Rectangular Mesh, Resistivity 100 Ω·m",
+      "studyPage": "groundgrid.html",
+      "standard": "IEEE 80-2013",
+      "clause": "§16 — Mesh and step voltage calculation",
+      "description": "70 × 70 m grid, 12 meshes × 12 meshes, 100 Ω·m soil, 3 kA fault current, 1 s clearing time.",
+      "inputs": {
+        "gridLengthM": 70,
+        "gridWidthM": 70,
+        "meshSpacingM": 6,
+        "conductorDepthM": 0.6,
+        "soilResistivityOhmM": 100,
+        "faultCurrentA": 3000,
+        "faultDurationS": 1.0,
+        "conductorDiameterM": 0.00953,
+        "numberOfGroundRods": 20
+      },
+      "expectedOutputs": {
+        "meshVoltageV": { "value": 312, "tolerance": 40 },
+        "stepVoltageV": { "value": 168, "tolerance": 30 },
+        "gridResistanceOhm": { "value": 0.54, "tolerance": 0.1 }
+      },
+      "reference": "IEEE 80-2013 Annex B, Example B.1",
+      "sampleFile": "samples/benchmark-ieee80-ground-grid.json"
+    },
+    {
+      "id": "heat-trace-screening",
+      "title": "Heat Trace Screening — Freeze Protection, Water Pipe, Above Ground",
+      "studyPage": "heattracesizing.html",
+      "standard": "IEC 62395-2 / IEEE 515",
+      "clause": "Simplified heat-loss balance method",
+      "description": "2-inch nominal steel pipe, water service, maintain 5 °C, ambient −20 °C, 25 mm mineral wool insulation.",
+      "inputs": {
+        "pipeDiameterIn": 2.0,
+        "pipeMaterial": "carbon_steel",
+        "insulationThicknessMm": 25,
+        "insulationConductivity": 0.04,
+        "maintainTempC": 5,
+        "ambientTempC": -20
+      },
+      "expectedOutputs": {
+        "heatLossWPerM": { "value": 18.5, "tolerance": 3.0 },
+        "requiredWPerM": { "value": 20, "tolerance": 5 }
+      },
+      "reference": "nVent TraceCalc method; IEC 62395-2 §5 screening calculation",
+      "sampleFile": "samples/benchmark-heat-trace-screening.json"
+    },
+    {
+      "id": "ductbank-thermal",
+      "title": "Duct Bank Thermal — Neher-McGrath, 4 Conduits, 5 Cables per Duct",
+      "studyPage": "ductbankroute.html",
+      "standard": "IEEE 835-1994 / Neher-McGrath (1957)",
+      "clause": "§6 — Duct bank thermal resistance, group derating",
+      "description": "2 × 2 duct bank, PVC conduit, backfill ρ = 0.9 K·m/W, ambient 25 °C, 350 kcmil Cu XHHW, 90% load factor.",
+      "inputs": {
+        "rows": 2,
+        "cols": 2,
+        "conduitOD_mm": 63.5,
+        "backfillRho": 0.9,
+        "nativeSoilRho": 1.2,
+        "ambientC": 25,
+        "loadFactor": 0.9,
+        "conductorKcmil": 350,
+        "conductorMaterial": "copper",
+        "insulationType": "XHHW"
+      },
+      "expectedOutputs": {
+        "groupDerating": { "value": 0.78, "tolerance": 0.05 },
+        "ampacityA": { "value": 285, "tolerance": 25 }
+      },
+      "reference": "IEEE 835-1994 Table B-75; ETAP Underground Raceway Systems validation",
+      "sampleFile": "samples/benchmark-ductbank-thermal.json"
+    }
+  ],
+  "standards": [
+    {
+      "id": "ieee1584",
+      "name": "IEEE 1584-2018",
+      "title": "Guide for Performing Arc-Flash Hazard Calculations",
+      "studyPage": "arcFlash.html",
+      "scope": "Arc flash incident energy and protection boundary for AC equipment 208 V – 15 kV",
+      "assumptions": [
+        "Arcing faults modeled as bolted fault with empirical reduction factor",
+        "Incident energy assumes person at working distance perpendicular to the arc",
+        "Three-phase balanced system; unbalanced faults not covered"
+      ],
+      "limitations": [
+        "Validated for 208 V to 15 kV; extrapolation outside this range is not supported",
+        "Does not cover DC arc flash (use NFPA 70E Annex D.8 or IEC 62271)"
+      ]
+    },
+    {
+      "id": "iec60909",
+      "name": "IEC 60909-0:2016",
+      "title": "Short-circuit currents in three-phase AC systems — Calculation of currents",
+      "studyPage": "iec60909.html",
+      "scope": "Maximum and minimum short-circuit currents for three-phase AC systems up to 550 kV",
+      "assumptions": [
+        "Equivalent voltage source method (no pre-fault load currents in calculation)",
+        "Voltage factor c applied to nominal voltage (1.0–1.1 for max; 0.95 for min)",
+        "Far-from-generator condition unless generator correction factor K_G is applied"
+      ],
+      "limitations": [
+        "Near-to-generator μ factor (Ib reduction) not yet implemented",
+        "Transformer correction factor K_T exported but not batch-applied per transformer",
+        "Generator correction factor K_G not implemented"
+      ]
+    },
+    {
+      "id": "iec60287",
+      "name": "IEC 60287-1-1:2023",
+      "title": "Electric cables — Calculation of the current rating",
+      "studyPage": "iec60287.html",
+      "scope": "Continuous current ratings for cables in direct burial, conduit, trays, and free air",
+      "assumptions": [
+        "100% load factor (continuous steady-state rating)",
+        "Uniform soil temperature and resistivity along cable route",
+        "Cables in trefoil or flat formation (no transposition modeled)"
+      ],
+      "limitations": [
+        "Cyclic/daily load profiles not yet supported (use IEC 60287-2-2 method)",
+        "Soil drying-out (critical isotherm) model not implemented",
+        "Cable crossings and mutual heating from parallel routes require manual input"
+      ]
+    },
+    {
+      "id": "ieee80",
+      "name": "IEEE 80-2013",
+      "title": "Guide for Safety in AC Substation Grounding",
+      "studyPage": "groundgrid.html",
+      "scope": "Rectangular ground grid design: mesh voltage, step voltage, grid resistance",
+      "assumptions": [
+        "Uniform soil resistivity (single-layer model)",
+        "Rectangular grid geometry; irregular shapes require mesh-boundary approximation",
+        "Touch/step voltage limits from IEEE 80 Table 7 (heart-current factor K_h = 1.0)"
+      ],
+      "limitations": [
+        "Two-layer soil model not yet implemented (use SES CDEGS for multi-layer analysis)",
+        "Irregular electrode geometry (L-shaped grids, remote ground rods) approximated",
+        "Transferred voltage check not automated"
+      ]
+    },
+    {
+      "id": "iec61000-4-15",
+      "name": "IEC 61000-4-15:2010+AMD1:2023",
+      "title": "Flickermeter — Functional and design specifications",
+      "studyPage": "voltageflicker.html",
+      "scope": "Short-term (Pst) and long-term (Plt) flicker severity at the PCC",
+      "assumptions": [
+        "Simplified rectangular voltage-change method (IEC 61000-4-15 Annex A)",
+        "Thevenin short-circuit impedance at PCC: ΔV% = ΔP_kW / S_sc_kVA × 100",
+        "Pst look-up from IEC 61000-4-15 Figure A.1 iso-Pst contours via bilinear interpolation"
+      ],
+      "limitations": [
+        "Time-domain flickermeter waveform simulation not implemented (IEC 61000-4-15 §4)",
+        "Only rectangular voltage changes modeled; ramp or sinusoidal changes not supported",
+        "IEEE 1453 North American 120 V / 60 Hz weighting curves not separately validated"
+      ]
+    },
+    {
+      "id": "ieee835",
+      "name": "IEEE 835-1994 / Neher-McGrath (1957)",
+      "title": "Standard Power Cable Ampacity Tables / Duct Bank Thermal Method",
+      "studyPage": "ductbankroute.html",
+      "scope": "Duct bank thermal resistance and ampacity derating for underground cable systems",
+      "assumptions": [
+        "Steady-state thermal equilibrium",
+        "Soil thermal resistivity uniform around duct bank",
+        "Cables uniformly loaded across all ducts (no mixed loading)"
+      ],
+      "limitations": [
+        "Cyclic load profiles not modeled",
+        "Mutual heating from crossing cables or adjacent duct banks not automated",
+        "Backfill thermal runaway (soil dry-out) requires manual critical isotherm check"
+      ]
+    },
+    {
+      "id": "ieee1584-2018",
+      "name": "IEEE 1584-2018",
+      "title": "Guide for Performing Arc-Flash Hazard Calculations (2018 revision)",
+      "studyPage": "arcFlash.html",
+      "scope": "Replaces 2002 edition; covers 208 V–15 kV, all equipment configurations",
+      "assumptions": [],
+      "limitations": []
+    },
+    {
+      "id": "nfpa70e",
+      "name": "NFPA 70E-2024",
+      "title": "Standard for Electrical Safety in the Workplace",
+      "studyPage": "arcFlash.html",
+      "scope": "PPE selection from incident energy and arc flash boundary per IEEE 1584",
+      "assumptions": [
+        "PPE levels based on cal/cm² threshold per Table 130.5(G)"
+      ],
+      "limitations": [
+        "PPE category method (Table 130.7(C)(15)) not automated — use incident energy method"
+      ]
+    },
+    {
+      "id": "nec-neher-mcgrath",
+      "name": "NEC 310 / Neher-McGrath",
+      "title": "NEC Table 310.16–310.21 Ampacity / Neher-McGrath duct bank method",
+      "studyPage": "cableschedule.html",
+      "scope": "North American conductor ampacity tables and duct bank derating factors",
+      "assumptions": [
+        "Pre-computed values at 30 °C ambient, 75 °C or 90 °C conductor temperature",
+        "Single conductor in conduit or cable in free air as per NEC installation conditions"
+      ],
+      "limitations": [
+        "Tabulated values; non-standard installations require IEC 60287 or direct Neher-McGrath calculation",
+        "NEC tables cover copper and aluminum; exotic conductors not included"
+      ]
+    },
+    {
+      "id": "ieee515",
+      "name": "IEEE 515-2017",
+      "title": "Standard for the Testing, Design, Installation, and Maintenance of Electrical Resistance Heat Tracing for Industrial Applications",
+      "studyPage": "heattracesizing.html",
+      "scope": "Freeze protection and process temperature maintenance for industrial pipe heat tracing",
+      "assumptions": [
+        "Steady-state heat balance: heat input = heat loss through insulation",
+        "Simplified cylindrical insulation model (ln(r_outer/r_pipe) thermal resistance)"
+      ],
+      "limitations": [
+        "Startup power (cold cable inrush) not modeled in screening calculation",
+        "Hazardous area derating factors require manual input",
+        "Self-regulating vs. constant-watt power-temperature curves not distinguished in screening"
+      ]
+    },
+    {
+      "id": "ansi-c37",
+      "name": "ANSI/IEEE C37.010-2016",
+      "title": "Application Guide for AC High-Voltage Circuit Breakers",
+      "studyPage": "shortCircuit.html",
+      "scope": "ANSI short-circuit multiplying factors for 1/2-cycle and 30-cycle networks",
+      "assumptions": [
+        "Symmetrical 1/2-cycle fault current with ANSI multiplying factors (MF = 1.0–1.6)",
+        "Motor contribution modeled as fixed impedance (4 × motor kVA base)"
+      ],
+      "limitations": [
+        "Asymmetrical first-cycle peak current calculated with empirical MF, not κ (use IEC 60909 for κ method)",
+        "Generator near-to-fault decay not modeled in simplified ANSI method"
+      ]
+    },
+    {
+      "id": "ieee399",
+      "name": "IEEE 399-1997",
+      "title": "Recommended Practice for Industrial and Commercial Power System Analysis (Brown Book)",
+      "studyPage": "loadFlow.html",
+      "scope": "Newton-Raphson load flow for industrial power systems",
+      "assumptions": [
+        "Balanced three-phase system in per-unit on common MVA base",
+        "PQ (load) buses and PV (generator) buses; one slack bus required",
+        "Convergence tolerance 1 × 10⁻⁶ pu mismatch"
+      ],
+      "limitations": [
+        "Unbalanced (unsymmetrical) load flow not supported",
+        "DC power flow approximation not available"
+      ]
+    }
+  ]
+}

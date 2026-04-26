@@ -51,6 +51,7 @@
   <url><loc>projectreport.html</loc><priority>0.6</priority></url>
   <url><loc>voltagedropstudy.html</loc><priority>0.6</priority></url>
   <url><loc>productconfig.html</loc><priority>0.8</priority></url>
+  <url><loc>validation.html</loc><priority>0.8</priority></url>
   <url><loc>account.html</loc><priority>0.3</priority></url>
   <url><loc>forgot-password.html</loc><priority>0.2</priority></url>
   <url><loc>reset-password.html</loc><priority>0.2</priority></url>

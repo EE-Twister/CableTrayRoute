@@ -5,6 +5,7 @@ import {
 } from './analysis/iec60287.mjs';
 import { getStudies, setStudies } from './dataStore.mjs';
 import { initStudyApprovalPanel } from './src/components/studyApproval.js';
+import { initStudyBasisPanel } from './src/components/studyBasis.js';
 
 document.addEventListener('DOMContentLoaded', () => {
   initSettings();
@@ -23,6 +24,26 @@ document.addEventListener('DOMContentLoaded', () => {
   const sizeMm2Sel = document.getElementById('size-mm2');
   const insulThickInput = document.getElementById('insul-thick-mm');
 
+  initStudyBasisPanel('iec60287', {
+    standard: 'IEC 60287-1-1:2023',
+    clause: '§2.1 — Continuous current rating, 100% load factor',
+    formulas: [
+      'I = √(ΔT_max / (R_ac (T1 + n(T2 + T3 + T4)))) — rated current',
+      'R_ac = R_dc (1 + ys + yp) — AC resistance with skin/proximity correction',
+      'T4 = ρ_soil / (2π) × ln(4L/d_e) — soil thermal resistance (Kennelly formula)',
+    ],
+    assumptions: [
+      '100% load factor (continuous steady-state; no cyclic loading)',
+      'Uniform soil temperature and resistivity along the cable route',
+      'Trefoil or flat cable formation (no transposition effects modeled)',
+    ],
+    limitations: [
+      'Cyclic/daily load profiles not yet supported (IEC 60287-2-2 method)',
+      'Soil drying-out (critical isotherm) not implemented',
+      'Cable crossings and mutual heating from adjacent routes require manual input',
+    ],
+    benchmarkId: 'iec60287-cable-rating',
+  });
   initStudyApprovalPanel('iec60287');
 
   // --- Restore previous results ---
