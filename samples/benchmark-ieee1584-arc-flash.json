@@ -1,0 +1,27 @@
+{
+  "meta": { "version": 1, "benchmark": "ieee1584-arc-flash", "scenario": "default", "scenarios": [] },
+  "ductbanks": [],
+  "conduits": [],
+  "trays": [],
+  "cables": [],
+  "cableTypicals": [],
+  "panels": [],
+  "equipment": [],
+  "loads": [],
+  "oneLine": { "components": [], "connections": [], "revision": 0 },
+  "settings": {
+    "studyResults": {
+      "arcFlash": {
+        "inputs": {
+          "systemVoltageKV": 15,
+          "boltedFaultKA": 10,
+          "gapMm": 153,
+          "workingDistanceMm": 457,
+          "equipmentConfig": "open_air",
+          "conductorConfig": "VCB"
+        },
+        "_benchmark": "IEEE 1584-2018 Annex D Example D.2 — MV open-air bus. Expected: I_af ≈ 8.65 kA, E ≈ 19.8 cal/cm²."
+      }
+    }
+  }
+}

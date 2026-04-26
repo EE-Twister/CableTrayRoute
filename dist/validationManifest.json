@@ -1,0 +1,1572 @@
+{
+  "generatedAt": "2026-04-26T23:31:07.739Z",
+  "summary": {
+    "testSuiteCount": 122,
+    "totalAssertions": 3901,
+    "benchmarkCount": 6,
+    "standardCount": 12
+  },
+  "testSuites": [
+    {
+      "file": "tests/ampacity.test.mjs",
+      "groups": [
+        "core thermal functions",
+        "ampacity calibration"
+      ],
+      "assertionCount": 10
+    },
+    {
+      "file": "tests/analysis.test.cjs",
+      "groups": [
+        "analysis benchmarks",
+        "reliability labeling"
+      ],
+      "assertionCount": 17
+    },
+    {
+      "file": "tests/arcFlashLabels.test.mjs",
+      "groups": [
+        "buildArcFlashLabelData",
+        "buildLabelSheetHtml",
+        "generateArcFlashLabel"
+      ],
+      "assertionCount": 21
+    },
+    {
+      "file": "tests/arcflash/arcFlashExample.test.cjs",
+      "groups": [
+        "arc flash analysis"
+      ],
+      "assertionCount": 11
+    },
+    {
+      "file": "tests/autoSaveScheduler.test.mjs",
+      "groups": [],
+      "assertionCount": 13
+    },
+    {
+      "file": "tests/autoSize.test.mjs",
+      "groups": [
+        "nextStandardOcpd — NEC 240.6(A)",
+        "smallConductorMaxOcpd — NEC 240.4(D)",
+        "nextStandardXfmrKva",
+        "selectConductorSize — NEC Table 310.15(B)(16)",
+        "motorFLC3Ph — NEC Table 430.250",
+        "motorFLC1Ph — NEC Table 430.248",
+        "sizeFeeder — NEC 210.20 / 215.3 / 240.4",
+        "sizeMotorBranch — NEC 430",
+        "sizeTransformer — NEC 450.3(B)",
+        "sizeFeederFromKw — convenience wrapper",
+        "trayFillFactor — NEC 392.80(A)",
+        "selectConductorSize — tray installation",
+        "sizeFeeder — installation conditions",
+        "sizeMotorBranch — installation conditions",
+        "conductorCostPerFt",
+        "meetsParallelRequirement — NEC 310.10(H)",
+        "evaluateConductorOption",
+        "minimizeCostConductors"
+      ],
+      "assertionCount": 143
+    },
+    {
+      "file": "tests/batterySizing.test.mjs",
+      "groups": [
+        "temperatureFactor()",
+        "requiredEnergyKwh()",
+        "designCapacityKwh()",
+        "standardBankSize()",
+        "runtimeCurve()",
+        "upsKvaRequired()",
+        "runBatterySizingAnalysis()",
+        "STANDARD_BANK_KWH array"
+      ],
+      "assertionCount": 43
+    },
+    {
+      "file": "tests/cableFaultBracing.test.mjs",
+      "groups": [
+        "calcPeakFactor — IEC 60909-0 §4.3.1.1",
+        "calcPeakCurrent",
+        "calcEmfForcePerMeter — force law coefficients",
+        "calcCleatLoad",
+        "nmToLbfFt",
+        "calcCableFaultBracing — three-phase trefoil, hand-calculated reference",
+        "calcCableFaultBracing — single-phase",
+        "calcCableFaultBracing — sensitivity checks",
+        "calcCableFaultBracing — error handling"
+      ],
+      "assertionCount": 44
+    },
+    {
+      "file": "tests/cablePhasesPersistence.test.mjs",
+      "groups": [],
+      "assertionCount": 2
+    },
+    {
+      "file": "tests/cableProcurement.test.mjs",
+      "groups": [
+        "calculateProcurement — edge cases",
+        "calculateProcurement — spec grouping",
+        "calculateProcurement — tolerance and lengths",
+        "calculateProcurement — reel assignment",
+        "calculateProcurement — summary",
+        "exportProcurementCSV",
+        "STANDARD_REEL_SIZES"
+      ],
+      "assertionCount": 56
+    },
+    {
+      "file": "tests/capacitorBank.test.mjs",
+      "groups": [
+        "requiredKvar — PFC sizing formula",
+        "resonanceOrder — parallel resonance harmonic order",
+        "detuningRecommendation — reactor specification",
+        "standardBankSizes — standard kVAR selection",
+        "runCapacitorBankAnalysis — integration"
+      ],
+      "assertionCount": 48
+    },
+    {
+      "file": "tests/cathodicProtection.test.mjs",
+      "groups": [],
+      "assertionCount": 22
+    },
+    {
+      "file": "tests/clashDetect.test.mjs",
+      "groups": [
+        "detectClashes — empty / no input",
+        "detectClashes — hard clash",
+        "detectClashes — soft clash",
+        "detectClashes — no clash",
+        "overallSeverity"
+      ],
+      "assertionCount": 14
+    },
+    {
+      "file": "tests/cloudLibrary.test.mjs",
+      "groups": [],
+      "assertionCount": 40
+    },
+    {
+      "file": "tests/collaboration.test.mjs",
+      "groups": [
+        "CollabClient — connect & join",
+        "CollabClient — presence",
+        "CollabClient — remote patch",
+        "CollabClient — sendPatch",
+        "CollabClient — disconnect",
+        "CollabClient — connected getter",
+        "renderPresenceBar",
+        "CollabClient — sequence numbers & conflict detection"
+      ],
+      "assertionCount": 30
+    },
+    {
+      "file": "tests/collaborationConflict.test.mjs",
+      "groups": [
+        "initConflictNotifications — guard",
+        "initConflictNotifications — toast creation",
+        "initConflictNotifications — message content",
+        "initConflictNotifications — auto-dismiss",
+        "initConflictNotifications — dismiss button"
+      ],
+      "assertionCount": 17
+    },
+    {
+      "file": "tests/collaborationServer.test.mjs",
+      "groups": [
+        "attachCollaborationServer — upgrade routing",
+        "attachCollaborationServer — ping/pong",
+        "attachCollaborationServer — join",
+        "attachCollaborationServer — patch broadcast",
+        "attachCollaborationServer — leave",
+        "attachCollaborationServer — close event",
+        "attachCollaborationServer — invalid JSON"
+      ],
+      "assertionCount": 25
+    },
+    {
+      "file": "tests/conduitCount.test.cjs",
+      "groups": [
+        "displayConduitCount",
+        "rebuildTrayData integration"
+      ],
+      "assertionCount": 3
+    },
+    {
+      "file": "tests/contingency.test.mjs",
+      "groups": [
+        "runContingency — result structure",
+        "runContingency — branch enumeration",
+        "runContingency — bus-connection branch fallback",
+        "runContingency — custom voltage limits",
+        "runContingency — summary counts",
+        "runContingency — transient stability coupling"
+      ],
+      "assertionCount": 42
+    },
+    {
+      "file": "tests/costEstimate.test.mjs",
+      "groups": [
+        "DEFAULT_PRICES",
+        "estimateCableCosts",
+        "estimateTrayCosts",
+        "estimateConduitCosts",
+        "summarizeCosts",
+        "parsePricingCSV — valid full CSV",
+        "parsePricingCSV — partial CSV (cable only)",
+        "parsePricingCSV — malformed input",
+        "exportPricingCSV — roundtrip"
+      ],
+      "assertionCount": 74
+    },
+    {
+      "file": "tests/cp/coatingModel.test.mjs",
+      "groups": [],
+      "assertionCount": 11
+    },
+    {
+      "file": "tests/cp/complianceWorkflow.e2e.test.mjs",
+      "groups": [],
+      "assertionCount": 8
+    },
+    {
+      "file": "tests/cp/criteriaChecks.test.mjs",
+      "groups": [],
+      "assertionCount": 5
+    },
+    {
+      "file": "tests/cp/distributionModel.test.mjs",
+      "groups": [],
+      "assertionCount": 7
+    },
+    {
+      "file": "tests/cp/fixtures.test.mjs",
+      "groups": [],
+      "assertionCount": 9
+    },
+    {
+      "file": "tests/cp/interferenceAssessment.test.mjs",
+      "groups": [],
+      "assertionCount": 5
+    },
+    {
+      "file": "tests/cp/measurementCorrections.test.mjs",
+      "groups": [],
+      "assertionCount": 6
+    },
+    {
+      "file": "tests/dcShortCircuit.test.mjs",
+      "groups": [
+        "totalCircuitResistance",
+        "openCircuitVoltage",
+        "ppeCategoryForEnergy",
+        "calcDcFaultCurrent",
+        "calcDcArcingCurrent",
+        "calcDcArcFlash",
+        "selectDcProtection",
+        "runDcShortCircuitStudy"
+      ],
+      "assertionCount": 65
+    },
+    {
+      "file": "tests/derInterconnect.test.mjs",
+      "groups": [
+        "Constants",
+        "checkPCCVoltage()",
+        "checkFaultImpact()",
+        "checkAntiIslanding()",
+        "checkRideThrough()",
+        "checkHarmonicsCompliance()",
+        "runDERInterconnectStudy()"
+      ],
+      "assertionCount": 89
+    },
+    {
+      "file": "tests/designRuleChecker.test.mjs",
+      "groups": [
+        "trayFillPercent()",
+        "DRC-01 Tray Fill",
+        "DRC-02 Voltage Segregation",
+        "DRC-03 Ampacity Derating",
+        "DRC-04 Grounding",
+        "DRC-05 Unrouted Cables",
+        "Summary",
+        "formatDrcReport()",
+        "Remediation guidance",
+        "runDRC — accepted findings",
+        "traySlotFillPercent()",
+        "DRC-01 Per-Slot Fill",
+        "DRC-02 Multi-Slot Tray Suppression",
+        "formatDrcReport() — accepted risk section",
+        "DRC-06 — Structured cabling EMI segregation"
+      ],
+      "assertionCount": 83
+    },
+    {
+      "file": "tests/differentialProtection.test.mjs",
+      "groups": [
+        "HARMONIC_RESTRAINT constants",
+        "ZONE_TYPES",
+        "ctRatioMismatch()",
+        "dualSlopeCharacteristic()",
+        "calcOperatingRestraintCurrents()",
+        "checkHarmonicRestraint()",
+        "evalTrip()",
+        "buildDifferentialCurve()",
+        "runDifferentialStudy() — 87T transformer zone",
+        "runDifferentialStudy() — 87B bus zone",
+        "runDifferentialStudy() — 87G generator zone",
+        "runDifferentialStudy() — input validation"
+      ],
+      "assertionCount": 80
+    },
+    {
+      "file": "tests/dirtyTracker.test.mjs",
+      "groups": [
+        "dirty state tracker"
+      ],
+      "assertionCount": 8
+    },
+    {
+      "file": "tests/dissimilarMetals.test.mjs",
+      "groups": [
+        "estimateDissimilarMetalsRisk"
+      ],
+      "assertionCount": 6
+    },
+    {
+      "file": "tests/ductbankSolver.test.cjs",
+      "groups": [
+        "ductbank solver"
+      ],
+      "assertionCount": 1
+    },
+    {
+      "file": "tests/emf.test.mjs",
+      "groups": [
+        "ICNIRP_LIMITS",
+        "fieldFromSingleConductor",
+        "buildThreePhaseConductors",
+        "fieldFromConductorArray",
+        "fieldProfile",
+        "checkCompliance"
+      ],
+      "assertionCount": 32
+    },
+    {
+      "file": "tests/equipmentArrangementsPage.test.cjs",
+      "groups": [
+        "equipment arrangements page"
+      ],
+      "assertionCount": 14
+    },
+    {
+      "file": "tests/equipmentColumns.test.cjs",
+      "groups": [],
+      "assertionCount": 2
+    },
+    {
+      "file": "tests/equipmentPersistence.test.cjs",
+      "groups": [],
+      "assertionCount": 2
+    },
+    {
+      "file": "tests/exportAllReports.test.cjs",
+      "groups": [
+        "exportAll reports"
+      ],
+      "assertionCount": 4
+    },
+    {
+      "file": "tests/frequencyScan.test.mjs",
+      "groups": [],
+      "assertionCount": 48
+    },
+    {
+      "file": "tests/generatorSizing.test.mjs",
+      "groups": [
+        "derateForAltitude — NFPA 110 Annex B altitude derating",
+        "derateForTemperature — ISO 8528-1 temperature derating",
+        "largestMotorStepLoad — IEEE 446 §5.3 motor starting demand",
+        "estimateVoltageDip — IEEE 446 §5.4 transient dip model",
+        "continuousLoad — load schedule summation",
+        "fuelRuntime — diesel consumption and runtime calculation",
+        "selectStandardSize — standard generator kW selection",
+        "NFPA110_TYPES — type classification table",
+        "runGeneratorSizingAnalysis — full integration"
+      ],
+      "assertionCount": 65
+    },
+    {
+      "file": "tests/gltfExport.test.mjs",
+      "groups": [
+        "exportToGLTF2 — binary structure",
+        "exportToGLTF2 — JSON content",
+        "exportToGLTF2 — tray geometry",
+        "exportToGLTF2 — fill heat-map materials",
+        "exportToGLTF2 — per-node extras metadata",
+        "exportToGLTF2 — cable route geometry",
+        "exportToGLTF2 — large project",
+        "packGLB"
+      ],
+      "assertionCount": 52
+    },
+    {
+      "file": "tests/groundGrid.test.mjs",
+      "groups": [
+        "surfaceLayerFactor — IEEE 80-2013 Eq. 27",
+        "gridResistance — IEEE 80-2013 Eq. 57 (Sverak)",
+        "effectiveN — IEEE 80-2013 Eq. 85",
+        "irregularityFactor — IEEE 80-2013 Eq. 89",
+        "tolerableTouch — IEEE 80-2013 Eq. 32/33",
+        "tolerableStep — IEEE 80-2013 Eq. 29/30",
+        "analyzeGroundGrid — integration"
+      ],
+      "assertionCount": 36
+    },
+    {
+      "file": "tests/groundGridPreviewGeometry.test.mjs",
+      "groups": [
+        "groundgrid preview geometry helpers"
+      ],
+      "assertionCount": 25
+    },
+    {
+      "file": "tests/groundGridSafetyPresentation.test.mjs",
+      "groups": [
+        "ground grid safety presentation helpers"
+      ],
+      "assertionCount": 19
+    },
+    {
+      "file": "tests/harmonics.test.mjs",
+      "groups": [
+        "limitForVoltage — IEEE 519",
+        "parseSpectrum — array format",
+        "parseSpectrum — string format",
+        "currentTHD",
+        "singleHarmonicVTHD",
+        "neutral triplen current — unbalanced harmonic model",
+        "HS-01 frequencyScan — no capacitors",
+        "HS-02 frequencyScan — untuned capacitor, resonance near h≈4.47",
+        "HS-03 frequencyScan — tuned filter at h=4.7",
+        "HS-04 frequencyScan — resonance at integer h=5 → danger",
+        "HS-05 frequencyScan — resonance at h≈4.6 → caution",
+        "combined harmonic flow — illustrative scenario"
+      ],
+      "assertionCount": 70
+    },
+    {
+      "file": "tests/heatTraceReport.test.mjs",
+      "groups": [
+        "heat trace branch schedule",
+        "heat trace report payload",
+        "project report integration"
+      ],
+      "assertionCount": 42
+    },
+    {
+      "file": "tests/heatTraceSizing.test.mjs",
+      "groups": [
+        "heat trace sizing representative W/ft cases",
+        "material/environment multipliers influence output directionally",
+        "standard cable rating selection",
+        "heat trace cable type selection basis",
+        "parallel runs and component allowances",
+        "input validation"
+      ],
+      "assertionCount": 36
+    },
+    {
+      "file": "tests/ibrModeling.test.mjs",
+      "groups": [
+        "pvArrayOutput()",
+        "interpolateVoltVar()",
+        "ibrPQCapability()",
+        "ibrFaultContribution()",
+        "bessDispatch()",
+        "freqWattResponse()",
+        "runIBRStudy() — PV resource",
+        "runIBRStudy() — BESS resource",
+        "runIBRStudy() — fault contribution"
+      ],
+      "assertionCount": 43
+    },
+    {
+      "file": "tests/iec60287.test.mjs",
+      "groups": [
+        "conductorAcResistance — AC resistance at temperature",
+        "thermalResistances — T1–T4 components",
+        "groupDerating — IEC 60287-2-1 grouping factors",
+        "ambientTempCorrection",
+        "defaultInsulThickMm — IEC 60502 reference thicknesses",
+        "calcAmpacity — canonical fixture: 95 mm² Cu XLPE direct buried",
+        "calcAmpacity — grouping derating",
+        "calcAmpacity — installation method comparison",
+        "calcAmpacity — aluminium conductor",
+        "calcAmpacity — ambient temperature effect",
+        "calcAmpacity — 240 mm² Cu XLPE direct buried",
+        "calcAmpacity — PVC insulation (70 °C max)",
+        "calcAmpacity — input validation",
+        "R20 resistance tables"
+      ],
+      "assertionCount": 51
+    },
+    {
+      "file": "tests/iec60909/iec60909.test.cjs",
+      "groups": [
+        "cFactor — IEC 60909-0:2016 Table 1",
+        "kappaIEC — peak factor",
+        "thermalMFactor — DC heating factor m",
+        "computeIEC60909Bus — individual bus",
+        "runShortCircuit() — IEC delegation",
+        "transformerCorrectionKT — IEC §3.3.3",
+        "runIEC60909Batch — batch runner"
+      ],
+      "assertionCount": 45
+    },
+    {
+      "file": "tests/ieee835.test.mjs",
+      "groups": [
+        "IEEE 835 underground benchmarks"
+      ],
+      "assertionCount": 3
+    },
+    {
+      "file": "tests/intlCableSize.test.mjs",
+      "groups": [
+        "STANDARDS — metadata sanity",
+        "INSTALLATION_METHODS — metadata sanity",
+        "CABLE_SIZES_MM2 — sanity",
+        "lookupAmpacity — IEC_60364 spot checks",
+        "lookupAmpacity — BS_7671 (same tables as IEC)",
+        "lookupAmpacity — AS_NZS_3008 (different tables)",
+        "lookupAmpacity — error handling",
+        "getTempCorrectionFactor — IEC/BS exact table values",
+        "getTempCorrectionFactor — interpolation",
+        "getTempCorrectionFactor — AS/NZS (40 °C reference)",
+        "getTempCorrectionFactor — error handling",
+        "getGroupingFactor — enclosed (Method B2)",
+        "getGroupingFactor — open (Methods C, E, F)",
+        "getGroupingFactor — between-table interpolation",
+        "getGroupingFactor — error handling",
+        "sizeCable — IEC_60364 basic sizing (no derating)",
+        "sizeCable — temperature derating",
+        "sizeCable — grouping derating",
+        "sizeCable — aluminium conductors",
+        "sizeCable — AS/NZS_3008",
+        "sizeCable — error handling",
+        "checkCableAdequacy — passing cases",
+        "checkCableAdequacy — failing cases",
+        "checkCableAdequacy — with derating",
+        "checkCableAdequacy — error handling",
+        "Combined temperature and grouping derating — hand calculation",
+        "sizeCable — skippedSizes field present in result"
+      ],
+      "assertionCount": 104
+    },
+    {
+      "file": "tests/loadCombinations.test.mjs",
+      "groups": [
+        "calcLoadCombinations — wind only (E=0, S=0)",
+        "calcLoadCombinations — seismic only (W=0, S=0)",
+        "calcLoadCombinations — combined (D=12, W=9, E_lat=5, E_v=2.4, S=3)",
+        "findControllingCombination — envelope selection",
+        "evaluateLoadCombinations — convenience wrapper",
+        "calcLoadCombinations — error handling",
+        "calcLoadCombinations — combination severity",
+        "calcLoadCombinations — citation structure"
+      ],
+      "assertionCount": 39
+    },
+    {
+      "file": "tests/loadflow/cablePerKmImpedance.test.mjs",
+      "groups": [
+        "Cable per-km impedance handling"
+      ],
+      "assertionCount": 9
+    },
+    {
+      "file": "tests/loadflow/ieeeCases.test.cjs",
+      "groups": [
+        "IEEE load flow benchmarks"
+      ],
+      "assertionCount": 14
+    },
+    {
+      "file": "tests/loadflow/loadFlowBusLabelRender.test.mjs",
+      "groups": [
+        "Load flow results renderer"
+      ],
+      "assertionCount": 4
+    },
+    {
+      "file": "tests/loadflow/nonConvergenceDiagnostics.test.mjs",
+      "groups": [
+        "Load flow diagnostics rendering"
+      ],
+      "assertionCount": 6
+    },
+    {
+      "file": "tests/loadflow/sampleOnelineLoadFlow.test.mjs",
+      "groups": [
+        "Published sample one-line load flow",
+        "Simple feeder load flow"
+      ],
+      "assertionCount": 30
+    },
+    {
+      "file": "tests/loadflow/transformerOrientation.test.mjs",
+      "groups": [
+        "Transformer orientation handling"
+      ],
+      "assertionCount": 9
+    },
+    {
+      "file": "tests/loadflow/zeroImpedanceBreakerRegression.test.mjs",
+      "groups": [
+        "Zero-impedance breaker regression"
+      ],
+      "assertionCount": 8
+    },
+    {
+      "file": "tests/loadflow/zeroImpedanceWarning.test.mjs",
+      "groups": [
+        "Zero-impedance branch handling"
+      ],
+      "assertionCount": 4
+    },
+    {
+      "file": "tests/loadlistPersistence.test.cjs",
+      "groups": [],
+      "assertionCount": 1
+    },
+    {
+      "file": "tests/motorStart.test.mjs",
+      "groups": [
+        "fullLoadCurrent",
+        "lockedRotorCurrent",
+        "voltageSagPct",
+        "syncOmega",
+        "baseTorque",
+        "theveninImpedance",
+        "motorTorque",
+        "getStarterProfile — VFD",
+        "getStarterProfile — Soft Starter",
+        "getStarterProfile — Wye-Delta",
+        "getStarterProfile — Autotransformer"
+      ],
+      "assertionCount": 31
+    },
+    {
+      "file": "tests/multiSlotRouting.test.mjs",
+      "groups": [
+        "addTraySegment() — slot_groups parsing",
+        "_findSlotForCable() — slot selection",
+        "updateTrayFill() — per-slot accounting",
+        "_trayHasCapacityForCable() — slot fill and capacity",
+        "Backward compatibility (num_slots=1)"
+      ],
+      "assertionCount": 39
+    },
+    {
+      "file": "tests/onelineBackgroundImage.test.mjs",
+      "groups": [],
+      "assertionCount": 37
+    },
+    {
+      "file": "tests/onelineLayerManagement.test.mjs",
+      "groups": [],
+      "assertionCount": 45
+    },
+    {
+      "file": "tests/onelineOffPageConnectors.test.mjs",
+      "groups": [],
+      "assertionCount": 25
+    },
+    {
+      "file": "tests/onelineProtectionZones.test.mjs",
+      "groups": [
+        "Protection Zone – CRUD operations",
+        "Protection Zone – Bounding Box Computation",
+        "Protection Zone – Data Persistence"
+      ],
+      "assertionCount": 54
+    },
+    {
+      "file": "tests/onelineRevisions.test.cjs",
+      "groups": [],
+      "assertionCount": 5
+    },
+    {
+      "file": "tests/onelineUIFeatures.test.mjs",
+      "groups": [],
+      "assertionCount": 49
+    },
+    {
+      "file": "tests/pageNavigation.test.cjs",
+      "groups": [
+        "page navigation"
+      ],
+      "assertionCount": 6
+    },
+    {
+      "file": "tests/parallelCables.test.mjs",
+      "groups": [
+        "DRC-03 — Parallel sets aggregate ampacity",
+        "DRC-07 — Parallel conductor NEC 310.10(H) requirements",
+        "buildPullCard() — parallel_count multiplies area and weight",
+        "sizeFeeder() — parallelSuggestion for oversized loads"
+      ],
+      "assertionCount": 30
+    },
+    {
+      "file": "tests/productConfig.test.mjs",
+      "groups": [
+        "NEMA_LOAD_CLASSES",
+        "requiredRatedLoad",
+        "selectLoadClass",
+        "selectMinWidth",
+        "recommendMaterials",
+        "recommendTrayTypes",
+        "configure — basic integration",
+        "configure — corrosive environment",
+        "configure — heavy load at long span",
+        "configure — input validation"
+      ],
+      "assertionCount": 47
+    },
+    {
+      "file": "tests/projectDisplayScheduler.test.mjs",
+      "groups": [],
+      "assertionCount": 8
+    },
+    {
+      "file": "tests/projectStorageMigration.test.mjs",
+      "groups": [],
+      "assertionCount": 13
+    },
+    {
+      "file": "tests/ptVtMetadata.test.mjs",
+      "groups": [
+        "ptVtMetadata"
+      ],
+      "assertionCount": 7
+    },
+    {
+      "file": "tests/pullCalc.test.mjs",
+      "groups": [],
+      "assertionCount": 25
+    },
+    {
+      "file": "tests/pullCards.test.mjs",
+      "groups": [
+        "groupCablesIntoPulls",
+        "buildPullCard",
+        "buildPullTable",
+        "cableQRPayload",
+        "edge cases"
+      ],
+      "assertionCount": 49
+    },
+    {
+      "file": "tests/racewayRoute.test.cjs",
+      "groups": [
+        "_racewayRoute"
+      ],
+      "assertionCount": 40
+    },
+    {
+      "file": "tests/racewaySampleMapper.test.cjs",
+      "groups": [],
+      "assertionCount": 5
+    },
+    {
+      "file": "tests/rebuildTrayData.test.cjs",
+      "groups": [
+        "rebuildTrayData"
+      ],
+      "assertionCount": 12
+    },
+    {
+      "file": "tests/reliability.test.mjs",
+      "groups": [
+        "runReliability — empty input",
+        "runReliability — visual components excluded",
+        "runReliability — connector components excluded",
+        "runReliability — component with MTBF/MTTR",
+        "runReliability — components without MTBF skip gracefully",
+        "runReliability — multiple components"
+      ],
+      "assertionCount": 19
+    },
+    {
+      "file": "tests/reliabilityAnalysis.test.mjs",
+      "groups": [
+        "runReliability - component filtering",
+        "runReliability - availability calculation",
+        "runReliability - expectedOutage",
+        "runReliability - result structure"
+      ],
+      "assertionCount": 23
+    },
+    {
+      "file": "tests/reporting.test.cjs",
+      "groups": [
+        "reporting engine",
+        "label templates"
+      ],
+      "assertionCount": 9
+    },
+    {
+      "file": "tests/restApi.test.mjs",
+      "groups": [],
+      "assertionCount": 22
+    },
+    {
+      "file": "tests/resultsExporter.test.cjs",
+      "groups": [
+        "buildSegmentRows",
+        "buildSummaryRows",
+        "buildBOM"
+      ],
+      "assertionCount": 13
+    },
+    {
+      "file": "tests/revitImporter.test.mjs",
+      "groups": [
+        "parseRevit - JSON object input",
+        "parseRevit - JSON string input",
+        "parseRevit - tray coordinate normalization",
+        "parseRevit - conduit normalization",
+        "parseRevit - IFC STEP input",
+        "exportToIFC4 — output content",
+        "IFC4 round-trip: export → parseRevit"
+      ],
+      "assertionCount": 113
+    },
+    {
+      "file": "tests/sampleLinks.test.cjs",
+      "groups": [
+        "sample links"
+      ],
+      "assertionCount": 4
+    },
+    {
+      "file": "tests/scenarios.test.mjs",
+      "groups": [
+        "buildCableComparison — identical scenarios",
+        "buildCableComparison — added cable",
+        "buildCableComparison — removed cable",
+        "buildCableComparison — changed cable",
+        "buildCableComparison — mixed changes",
+        "buildCableComparison — edge cases",
+        "buildCableComparison — summary badge data",
+        "buildCableComparison — study data shape contract"
+      ],
+      "assertionCount": 43
+    },
+    {
+      "file": "tests/seismicBracing.test.mjs",
+      "groups": [
+        "sdcFromSds — ASCE 7-22 Table 11.6-1",
+        "sdcFromSd1 — ASCE 7-22 Table 11.6-2",
+        "calcSeismicDesignCategory",
+        "maxBraceSpacing",
+        "calcComponentForceFactor — hand-calculated reference",
+        "calcComponentForceFactor — error handling",
+        "calcBraceForces — SDC A/B (no bracing required)",
+        "calcBraceForces — SDC D (bracing required)",
+        "calcBraceForces — Ip=1.5 increases forces",
+        "evaluateTraysBracing"
+      ],
+      "assertionCount": 53
+    },
+    {
+      "file": "tests/seismicWindCombined.test.mjs",
+      "groups": [
+        "calcSeismicWindCombined — return shape",
+        "loadCombinationInputs passthrough",
+        "seismic-dominant scenario (SDS=2.0, SD1=1.0, V=50 mph)",
+        "wind-dominant scenario (SDC A, V=150 mph, Exposure D)",
+        "wind speed = 0 (indoor/sheltered)",
+        "snow load propagation",
+        "Ip=1.5 importance factor",
+        "nec citation structure",
+        "evaluateTraysCombined — batch evaluation",
+        "input validation — error handling",
+        "monotonic response to dead load (wp_lbs_ft)"
+      ],
+      "assertionCount": 90
+    },
+    {
+      "file": "tests/selfCheckRestore.test.cjs",
+      "groups": [],
+      "assertionCount": 6
+    },
+    {
+      "file": "tests/serverSecurity.test.mjs",
+      "groups": [],
+      "assertionCount": 79
+    },
+    {
+      "file": "tests/sessionExpiry.test.mjs",
+      "groups": [],
+      "assertionCount": 10
+    },
+    {
+      "file": "tests/shortcircuit/cablePerKmImpedance.test.mjs",
+      "groups": [
+        "Short-circuit per-km cable impedance"
+      ],
+      "assertionCount": 4
+    },
+    {
+      "file": "tests/shortcircuit/shortCircuit.test.cjs",
+      "groups": [
+        "short circuit engine"
+      ],
+      "assertionCount": 31
+    },
+    {
+      "file": "tests/spoolSheets.test.mjs",
+      "groups": [
+        "generateSpoolSheets — empty input",
+        "generateSpoolSheets — single tray",
+        "generateSpoolSheets — cable assignment",
+        "generateSpoolSheets — grouping",
+        "generateSpoolSheets — summary totals"
+      ],
+      "assertionCount": 16
+    },
+    {
+      "file": "tests/structuralLoadCombinations.test.mjs",
+      "groups": [
+        "calcStructuralCombinations — return shape",
+        "Gravity-only case (W≈0, E=0)",
+        "LRFD combination values",
+        "Governing lateral combination",
+        "ASD design method",
+        "Capacity check",
+        "Input validation"
+      ],
+      "assertionCount": 50
+    },
+    {
+      "file": "tests/studyApproval.test.mjs",
+      "groups": [
+        "getStudyApprovals",
+        "setStudyApproval",
+        "clearStudyApproval",
+        "getApprovalBadgeHTML"
+      ],
+      "assertionCount": 26
+    },
+    {
+      "file": "tests/studyBasis.test.mjs",
+      "groups": [
+        "initStudyBasisPanel — basic rendering"
+      ],
+      "assertionCount": 21
+    },
+    {
+      "file": "tests/supportSpan.test.mjs",
+      "groups": [
+        "NEMA_LOAD_CLASSES",
+        "calcMaxSpan — rated-load identity",
+        "calcMaxSpan — hand-calculated reference values (Class 16A)",
+        "calcMaxSpan — utilizationRatio",
+        "calcMaxSpan — error handling",
+        "calcMaxSpan — return shape",
+        "CABLE_WEIGHT_LB_FT",
+        "sumCableWeights",
+        "evaluateTrays"
+      ],
+      "assertionCount": 42
+    },
+    {
+      "file": "tests/tableUtilsNavigation.test.cjs",
+      "groups": [
+        "tableUtils arrow navigation"
+      ],
+      "assertionCount": 16
+    },
+    {
+      "file": "tests/tcc/arcFlashOverlay.test.mjs",
+      "groups": [
+        "incidentEnergyLimitCurve – return type and shape",
+        "incidentEnergyLimitCurve – monotonicity",
+        "incidentEnergyLimitCurve – threshold scaling",
+        "incidentEnergyLimitCurve – enclosure effect",
+        "incidentEnergyLimitCurve – edge cases",
+        "incidentEnergyLimitCurve – IEEE 1584 spot-check"
+      ],
+      "assertionCount": 28
+    },
+    {
+      "file": "tests/tcc/chartExport.test.mjs",
+      "groups": [
+        "EXPORT_INLINE_STYLES",
+        "EXPORT_SCALE",
+        "SVG_DOWNLOAD_FILENAME / PNG_DOWNLOAD_FILENAME",
+        "buildSvgDownloadMarkup",
+        "computeCanvasDimensions"
+      ],
+      "assertionCount": 23
+    },
+    {
+      "file": "tests/tcc/ctiReport.test.mjs",
+      "groups": [
+        "CTI_HEADERS",
+        "buildCTIRows — basic two-device scenario",
+        "buildCTIRows — three-device scenario",
+        "buildCTIRows — FAIL rows when upstream is too fast",
+        "buildCTIRows — edge cases / invalid inputs"
+      ],
+      "assertionCount": 34
+    },
+    {
+      "file": "tests/tcc/groundFaultProtection.test.mjs",
+      "groups": [
+        "GFP device library",
+        "scaleCurve() with GFP devices",
+        "greedyCoordinateGFP()",
+        "NEC 230.95 compliance metadata"
+      ],
+      "assertionCount": 45
+    },
+    {
+      "file": "tests/tcc/iecRelayCurves.test.mjs",
+      "groups": [
+        "IEC_CURVE_FAMILIES",
+        "computeIecTime",
+        "computeIecCurvePoints",
+        "iecFamilyDisplayName",
+        "scaleCurve integration with IEC relay devices",
+        "scaleCurve curveFamily override"
+      ],
+      "assertionCount": 76
+    },
+    {
+      "file": "tests/tcc/tccAutoCoord.test.mjs",
+      "groups": [
+        "interpolateTime",
+        "generateFaultCurrents",
+        "checkCoordination",
+        "findCoordinatingTimeDial",
+        "greedyCoordinate"
+      ],
+      "assertionCount": 63
+    },
+    {
+      "file": "tests/tcc/tccUtils.test.cjs",
+      "groups": [
+        "tcc utilities"
+      ],
+      "assertionCount": 11
+    },
+    {
+      "file": "tests/transformerProperties.test.mjs",
+      "groups": [],
+      "assertionCount": 10
+    },
+    {
+      "file": "tests/transientStability.test.mjs",
+      "groups": [
+        "initialRotorAngle",
+        "simulateSwingEquation — stable case",
+        "simulateSwingEquation — unstable case",
+        "simulateSwingEquation — zero fault power",
+        "findCriticalClearingTime",
+        "equalAreaCriterion"
+      ],
+      "assertionCount": 28
+    },
+    {
+      "file": "tests/trayHardware.test.mjs",
+      "groups": [
+        "trayEndpoints & trayLength",
+        "angleDeg",
+        "supportBracketCount",
+        "straightSectionCount",
+        "buildJunctionMap — two collinear trays",
+        "classifyJunction",
+        "buildTrayHardwareBOM — edge cases",
+        "buildTrayHardwareBOM — L-shaped route",
+        "buildTrayHardwareBOM — straight run with splice plate",
+        "buildTrayHardwareBOM — reducer detection",
+        "buildTrayHardwareBOM — tee detection",
+        "buildTrayHardwareBOM — custom options"
+      ],
+      "assertionCount": 53
+    },
+    {
+      "file": "tests/units.test.cjs",
+      "groups": [
+        "unit conversions"
+      ],
+      "assertionCount": 2
+    },
+    {
+      "file": "tests/validation.test.mjs",
+      "groups": [
+        "runValidation - basic",
+        "runValidation - unconnected bus detection",
+        "runValidation - transformer overload",
+        "runValidation - breaker interrupt rating",
+        "runValidation - meter CT/PT completeness",
+        "runValidation - PT/VT completeness and compatibility",
+        "runValidation - CT required attributes",
+        "runValidation - battery required attributes",
+        "runValidation - ups required attributes and consistency checks",
+        "runValidation - dc_bus required attributes",
+        "runValidation - panel required attributes",
+        "runValidation - switchboard required attributes",
+        "runValidation - mcc required attributes",
+        "runValidation - cable required attributes",
+        "runValidation - busway required attributes",
+        "runValidation - relay_87 required attributes",
+        "runValidation - generator required attributes",
+        "runValidation - capacitor/reactor tuning attributes",
+        "runValidation - TCC duty violations",
+        "runValidation - multiple simultaneous violations"
+      ],
+      "assertionCount": 196
+    },
+    {
+      "file": "tests/validationManifest.test.mjs",
+      "groups": [
+        "validationBenchmarks.json — schema",
+        "generateValidationManifest.cjs — script",
+        "benchmark sample project files — structure",
+        "benchmark IDs — link integrity"
+      ],
+      "assertionCount": 30
+    },
+    {
+      "file": "tests/voltageDropStudy.test.mjs",
+      "groups": [
+        "NEC_LIMITS",
+        "classifyCircuit",
+        "evaluateCable",
+        "runVoltageDropStudy"
+      ],
+      "assertionCount": 42
+    },
+    {
+      "file": "tests/voltageFlicker.test.mjs",
+      "groups": [],
+      "assertionCount": 65
+    },
+    {
+      "file": "tests/voltageStability.test.mjs",
+      "groups": [],
+      "assertionCount": 55
+    },
+    {
+      "file": "tests/windLoad.test.mjs",
+      "groups": [
+        "calcKz — velocity pressure exposure coefficient",
+        "calcVelocityPressure — q_z",
+        "trayForceCf",
+        "calcWindForce",
+        "checkNemaCapacity",
+        "NEMA_LOAD_CLASSES"
+      ],
+      "assertionCount": 35
+    },
+    {
+      "file": "analysis/loadFlow.idealTie.test.mjs",
+      "groups": [
+        "Ideal tie handling in load flow"
+      ],
+      "assertionCount": 5
+    },
+    {
+      "file": "analysis/loadFlowModel.test.mjs",
+      "groups": [
+        "loadFlowModel voltage inheritance"
+      ],
+      "assertionCount": 8
+    }
+  ],
+  "benchmarks": [
+    {
+      "id": "ieee1584-arc-flash",
+      "title": "IEEE 1584-2018 Arc Flash — Example 1 (MV Open Air)",
+      "studyPage": "arcFlash.html",
+      "standard": "IEEE 1584-2018",
+      "clause": "§4.4 — Arcing Current and Incident Energy",
+      "description": "Medium-voltage open-air bus, bolted fault 10 kA, 15 kV, 18-inch working distance.",
+      "inputs": {
+        "systemVoltageKV": 15,
+        "boltedFaultKA": 10,
+        "gapMm": 153,
+        "workingDistanceMm": 457,
+        "equipmentConfig": "open_air",
+        "conductorConfig": "VCB"
+      },
+      "expectedOutputs": {
+        "arcingCurrentKA": {
+          "value": 8.65,
+          "tolerance": 0.15
+        },
+        "incidentEnergyCalCm2": {
+          "value": 19.8,
+          "tolerance": 2
+        },
+        "arcFlashBoundaryMm": {
+          "value": 2830,
+          "tolerance": 200
+        }
+      },
+      "reference": "IEEE 1584-2018 Annex D, Example D.2",
+      "sampleFile": "samples/benchmark-ieee1584-arc-flash.json"
+    },
+    {
+      "id": "iec60909-short-circuit",
+      "title": "IEC 60909-0:2016 Short-Circuit — Three-Phase Maximum Current",
+      "studyPage": "iec60909.html",
+      "standard": "IEC 60909-0:2016",
+      "clause": "§4.2 — Three-phase short-circuit, maximum current (c_max)",
+      "description": "110 kV / 10 kV transformer network. Known I\"k3, peak current ip, thermal equivalent Ith from IEC 60909 §4 example.",
+      "inputs": {
+        "systemKV": 10,
+        "scMvaSource": 500,
+        "xrRatio": 10,
+        "cFactorMode": "max",
+        "faultDurationS": 1
+      },
+      "expectedOutputs": {
+        "ikThreePhaseKA": {
+          "value": 15.75,
+          "tolerance": 0.5
+        },
+        "cFactor": {
+          "value": 1.1,
+          "tolerance": 0.01
+        },
+        "kappa": {
+          "value": 1.809,
+          "tolerance": 0.05
+        },
+        "ipKA": {
+          "value": 40.3,
+          "tolerance": 1.5
+        }
+      },
+      "reference": "IEC 60909-0:2016 §4.3 worked example",
+      "sampleFile": "samples/benchmark-iec60909-short-circuit.json"
+    },
+    {
+      "id": "iec60287-cable-rating",
+      "title": "IEC 60287-1-1:2023 Cable Ampacity — Direct Burial, 3-Core XLPE",
+      "studyPage": "iec60287.html",
+      "standard": "IEC 60287-1-1:2023",
+      "clause": "§2.1 — Continuous current rating, direct buried installation",
+      "description": "95 mm² Cu XLPE 11 kV, three-core cable directly buried 800 mm depth, soil ρ = 1.0 K·m/W, ambient 25 °C.",
+      "inputs": {
+        "conductorMm2": 95,
+        "conductorMaterial": "copper",
+        "insulation": "XLPE",
+        "systemKV": 11,
+        "installMethod": "direct_burial",
+        "depthMm": 800,
+        "soilRho": 1,
+        "ambientC": 25,
+        "conductors": 3
+      },
+      "expectedOutputs": {
+        "ampacityA": {
+          "value": 270,
+          "tolerance": 15
+        }
+      },
+      "reference": "IEC 60287-1-1:2023 §2.1; Nexans cable handbook Example 3",
+      "sampleFile": "samples/benchmark-iec60287-cable-rating.json"
+    },
+    {
+      "id": "ieee80-ground-grid",
+      "title": "IEEE 80-2013 Ground Grid — Rectangular Mesh, Resistivity 100 Ω·m",
+      "studyPage": "groundgrid.html",
+      "standard": "IEEE 80-2013",
+      "clause": "§16 — Mesh and step voltage calculation",
+      "description": "70 × 70 m grid, 12 meshes × 12 meshes, 100 Ω·m soil, 3 kA fault current, 1 s clearing time.",
+      "inputs": {
+        "gridLengthM": 70,
+        "gridWidthM": 70,
+        "meshSpacingM": 6,
+        "conductorDepthM": 0.6,
+        "soilResistivityOhmM": 100,
+        "faultCurrentA": 3000,
+        "faultDurationS": 1,
+        "conductorDiameterM": 0.00953,
+        "numberOfGroundRods": 20
+      },
+      "expectedOutputs": {
+        "meshVoltageV": {
+          "value": 312,
+          "tolerance": 40
+        },
+        "stepVoltageV": {
+          "value": 168,
+          "tolerance": 30
+        },
+        "gridResistanceOhm": {
+          "value": 0.54,
+          "tolerance": 0.1
+        }
+      },
+      "reference": "IEEE 80-2013 Annex B, Example B.1",
+      "sampleFile": "samples/benchmark-ieee80-ground-grid.json"
+    },
+    {
+      "id": "heat-trace-screening",
+      "title": "Heat Trace Screening — Freeze Protection, Water Pipe, Above Ground",
+      "studyPage": "heattracesizing.html",
+      "standard": "IEC 62395-2 / IEEE 515",
+      "clause": "Simplified heat-loss balance method",
+      "description": "2-inch nominal steel pipe, water service, maintain 5 °C, ambient −20 °C, 25 mm mineral wool insulation.",
+      "inputs": {
+        "pipeDiameterIn": 2,
+        "pipeMaterial": "carbon_steel",
+        "insulationThicknessMm": 25,
+        "insulationConductivity": 0.04,
+        "maintainTempC": 5,
+        "ambientTempC": -20
+      },
+      "expectedOutputs": {
+        "heatLossWPerM": {
+          "value": 18.5,
+          "tolerance": 3
+        },
+        "requiredWPerM": {
+          "value": 20,
+          "tolerance": 5
+        }
+      },
+      "reference": "nVent TraceCalc method; IEC 62395-2 §5 screening calculation",
+      "sampleFile": "samples/benchmark-heat-trace-screening.json"
+    },
+    {
+      "id": "ductbank-thermal",
+      "title": "Duct Bank Thermal — Neher-McGrath, 4 Conduits, 5 Cables per Duct",
+      "studyPage": "ductbankroute.html",
+      "standard": "IEEE 835-1994 / Neher-McGrath (1957)",
+      "clause": "§6 — Duct bank thermal resistance, group derating",
+      "description": "2 × 2 duct bank, PVC conduit, backfill ρ = 0.9 K·m/W, ambient 25 °C, 350 kcmil Cu XHHW, 90% load factor.",
+      "inputs": {
+        "rows": 2,
+        "cols": 2,
+        "conduitOD_mm": 63.5,
+        "backfillRho": 0.9,
+        "nativeSoilRho": 1.2,
+        "ambientC": 25,
+        "loadFactor": 0.9,
+        "conductorKcmil": 350,
+        "conductorMaterial": "copper",
+        "insulationType": "XHHW"
+      },
+      "expectedOutputs": {
+        "groupDerating": {
+          "value": 0.78,
+          "tolerance": 0.05
+        },
+        "ampacityA": {
+          "value": 285,
+          "tolerance": 25
+        }
+      },
+      "reference": "IEEE 835-1994 Table B-75; ETAP Underground Raceway Systems validation",
+      "sampleFile": "samples/benchmark-ductbank-thermal.json"
+    }
+  ],
+  "standards": [
+    {
+      "id": "ieee1584",
+      "name": "IEEE 1584-2018",
+      "title": "Guide for Performing Arc-Flash Hazard Calculations",
+      "studyPage": "arcFlash.html",
+      "scope": "Arc flash incident energy and protection boundary for AC equipment 208 V – 15 kV",
+      "assumptions": [
+        "Arcing faults modeled as bolted fault with empirical reduction factor",
+        "Incident energy assumes person at working distance perpendicular to the arc",
+        "Three-phase balanced system; unbalanced faults not covered"
+      ],
+      "limitations": [
+        "Validated for 208 V to 15 kV; extrapolation outside this range is not supported",
+        "Does not cover DC arc flash (use NFPA 70E Annex D.8 or IEC 62271)"
+      ]
+    },
+    {
+      "id": "iec60909",
+      "name": "IEC 60909-0:2016",
+      "title": "Short-circuit currents in three-phase AC systems — Calculation of currents",
+      "studyPage": "iec60909.html",
+      "scope": "Maximum and minimum short-circuit currents for three-phase AC systems up to 550 kV",
+      "assumptions": [
+        "Equivalent voltage source method (no pre-fault load currents in calculation)",
+        "Voltage factor c applied to nominal voltage (1.0–1.1 for max; 0.95 for min)",
+        "Far-from-generator condition unless generator correction factor K_G is applied"
+      ],
+      "limitations": [
+        "Near-to-generator μ factor (Ib reduction) not yet implemented",
+        "Transformer correction factor K_T exported but not batch-applied per transformer",
+        "Generator correction factor K_G not implemented"
+      ]
+    },
+    {
+      "id": "iec60287",
+      "name": "IEC 60287-1-1:2023",
+      "title": "Electric cables — Calculation of the current rating",
+      "studyPage": "iec60287.html",
+      "scope": "Continuous current ratings for cables in direct burial, conduit, trays, and free air",
+      "assumptions": [
+        "100% load factor (continuous steady-state rating)",
+        "Uniform soil temperature and resistivity along cable route",
+        "Cables in trefoil or flat formation (no transposition modeled)"
+      ],
+      "limitations": [
+        "Cyclic/daily load profiles not yet supported (use IEC 60287-2-2 method)",
+        "Soil drying-out (critical isotherm) model not implemented",
+        "Cable crossings and mutual heating from parallel routes require manual input"
+      ]
+    },
+    {
+      "id": "ieee80",
+      "name": "IEEE 80-2013",
+      "title": "Guide for Safety in AC Substation Grounding",
+      "studyPage": "groundgrid.html",
+      "scope": "Rectangular ground grid design: mesh voltage, step voltage, grid resistance",
+      "assumptions": [
+        "Uniform soil resistivity (single-layer model)",
+        "Rectangular grid geometry; irregular shapes require mesh-boundary approximation",
+        "Touch/step voltage limits from IEEE 80 Table 7 (heart-current factor K_h = 1.0)"
+      ],
+      "limitations": [
+        "Two-layer soil model not yet implemented (use SES CDEGS for multi-layer analysis)",
+        "Irregular electrode geometry (L-shaped grids, remote ground rods) approximated",
+        "Transferred voltage check not automated"
+      ]
+    },
+    {
+      "id": "iec61000-4-15",
+      "name": "IEC 61000-4-15:2010+AMD1:2023",
+      "title": "Flickermeter — Functional and design specifications",
+      "studyPage": "voltageflicker.html",
+      "scope": "Short-term (Pst) and long-term (Plt) flicker severity at the PCC",
+      "assumptions": [
+        "Simplified rectangular voltage-change method (IEC 61000-4-15 Annex A)",
+        "Thevenin short-circuit impedance at PCC: ΔV% = ΔP_kW / S_sc_kVA × 100",
+        "Pst look-up from IEC 61000-4-15 Figure A.1 iso-Pst contours via bilinear interpolation"
+      ],
+      "limitations": [
+        "Time-domain flickermeter waveform simulation not implemented (IEC 61000-4-15 §4)",
+        "Only rectangular voltage changes modeled; ramp or sinusoidal changes not supported",
+        "IEEE 1453 North American 120 V / 60 Hz weighting curves not separately validated"
+      ]
+    },
+    {
+      "id": "ieee835",
+      "name": "IEEE 835-1994 / Neher-McGrath (1957)",
+      "title": "Standard Power Cable Ampacity Tables / Duct Bank Thermal Method",
+      "studyPage": "ductbankroute.html",
+      "scope": "Duct bank thermal resistance and ampacity derating for underground cable systems",
+      "assumptions": [
+        "Steady-state thermal equilibrium",
+        "Soil thermal resistivity uniform around duct bank",
+        "Cables uniformly loaded across all ducts (no mixed loading)"
+      ],
+      "limitations": [
+        "Cyclic load profiles not modeled",
+        "Mutual heating from crossing cables or adjacent duct banks not automated",
+        "Backfill thermal runaway (soil dry-out) requires manual critical isotherm check"
+      ]
+    },
+    {
+      "id": "ieee1584-2018",
+      "name": "IEEE 1584-2018",
+      "title": "Guide for Performing Arc-Flash Hazard Calculations (2018 revision)",
+      "studyPage": "arcFlash.html",
+      "scope": "Replaces 2002 edition; covers 208 V–15 kV, all equipment configurations",
+      "assumptions": [],
+      "limitations": []
+    },
+    {
+      "id": "nfpa70e",
+      "name": "NFPA 70E-2024",
+      "title": "Standard for Electrical Safety in the Workplace",
+      "studyPage": "arcFlash.html",
+      "scope": "PPE selection from incident energy and arc flash boundary per IEEE 1584",
+      "assumptions": [
+        "PPE levels based on cal/cm² threshold per Table 130.5(G)"
+      ],
+      "limitations": [
+        "PPE category method (Table 130.7(C)(15)) not automated — use incident energy method"
+      ]
+    },
+    {
+      "id": "nec-neher-mcgrath",
+      "name": "NEC 310 / Neher-McGrath",
+      "title": "NEC Table 310.16–310.21 Ampacity / Neher-McGrath duct bank method",
+      "studyPage": "cableschedule.html",
+      "scope": "North American conductor ampacity tables and duct bank derating factors",
+      "assumptions": [
+        "Pre-computed values at 30 °C ambient, 75 °C or 90 °C conductor temperature",
+        "Single conductor in conduit or cable in free air as per NEC installation conditions"
+      ],
+      "limitations": [
+        "Tabulated values; non-standard installations require IEC 60287 or direct Neher-McGrath calculation",
+        "NEC tables cover copper and aluminum; exotic conductors not included"
+      ]
+    },
+    {
+      "id": "ieee515",
+      "name": "IEEE 515-2017",
+      "title": "Standard for the Testing, Design, Installation, and Maintenance of Electrical Resistance Heat Tracing for Industrial Applications",
+      "studyPage": "heattracesizing.html",
+      "scope": "Freeze protection and process temperature maintenance for industrial pipe heat tracing",
+      "assumptions": [
+        "Steady-state heat balance: heat input = heat loss through insulation",
+        "Simplified cylindrical insulation model (ln(r_outer/r_pipe) thermal resistance)"
+      ],
+      "limitations": [
+        "Startup power (cold cable inrush) not modeled in screening calculation",
+        "Hazardous area derating factors require manual input",
+        "Self-regulating vs. constant-watt power-temperature curves not distinguished in screening"
+      ]
+    },
+    {
+      "id": "ansi-c37",
+      "name": "ANSI/IEEE C37.010-2016",
+      "title": "Application Guide for AC High-Voltage Circuit Breakers",
+      "studyPage": "shortCircuit.html",
+      "scope": "ANSI short-circuit multiplying factors for 1/2-cycle and 30-cycle networks",
+      "assumptions": [
+        "Symmetrical 1/2-cycle fault current with ANSI multiplying factors (MF = 1.0–1.6)",
+        "Motor contribution modeled as fixed impedance (4 × motor kVA base)"
+      ],
+      "limitations": [
+        "Asymmetrical first-cycle peak current calculated with empirical MF, not κ (use IEC 60909 for κ method)",
+        "Generator near-to-fault decay not modeled in simplified ANSI method"
+      ]
+    },
+    {
+      "id": "ieee399",
+      "name": "IEEE 399-1997",
+      "title": "Recommended Practice for Industrial and Commercial Power System Analysis (Brown Book)",
+      "studyPage": "loadFlow.html",
+      "scope": "Newton-Raphson load flow for industrial power systems",
+      "assumptions": [
+        "Balanced three-phase system in per-unit on common MVA base",
+        "PQ (load) buses and PV (generator) buses; one slack bus required",
+        "Convergence tolerance 1 × 10⁻⁶ pu mismatch"
+      ],
+      "limitations": [
+        "Unbalanced (unsymmetrical) load flow not supported",
+        "DC power flow approximation not available"
+      ]
+    }
+  ]
+}

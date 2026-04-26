@@ -4,8 +4,29 @@ import {
   buildGroundGridRecommendations,
   getGroundGridSafetyMetrics,
 } from './src/groundgridSafetyPresentation.js';
+import { initStudyBasisPanel } from './src/components/studyBasis.js';
 
 document.addEventListener('DOMContentLoaded', () => {
+  initStudyBasisPanel('groundGrid', {
+    standard: 'IEEE 80-2013',
+    clause: '§16 — Mesh and step voltage calculations',
+    formulas: [
+      'Em = ρ If Km Ki / (Lm) — mesh voltage (V)',
+      'Es = ρ If Ks Ki / (Ls) — step voltage (V)',
+      'Rg ≈ ρ (1/Lt + 1/√(20A) (1 + 1/(1 + h √(20/A)))) — grid resistance',
+    ],
+    assumptions: [
+      'Uniform single-layer soil resistivity from Wenner measurements',
+      'Rectangular grid geometry; irregular shapes approximated at the perimeter',
+      'Touch/step voltage limits from IEEE 80 Table 7 with K_h = 1.0',
+    ],
+    limitations: [
+      'Two-layer soil model not yet supported (use SES CDEGS for multi-layer)',
+      'Irregular electrode geometry (L-shaped grids, remote rods) approximated',
+      'Transferred voltage from LV neutrals not automated',
+    ],
+    benchmarkId: 'ieee80-ground-grid',
+  });
   const resultsDiv = document.getElementById('results');
   const form = document.getElementById('ground-grid-form');
   const previewTopSvg = document.getElementById('ground-grid-preview-top');

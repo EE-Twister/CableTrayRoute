@@ -5,6 +5,7 @@ import {
 } from './analysis/voltageFlicker.mjs';
 import { getStudies, setStudies } from './dataStore.mjs';
 import { initStudyApprovalPanel } from './src/components/studyApproval.js';
+import { initStudyBasisPanel } from './src/components/studyBasis.js';
 import { escapeHtml } from './src/htmlUtils.mjs';
 
 document.addEventListener('DOMContentLoaded', () => {
@@ -14,6 +15,26 @@ document.addEventListener('DOMContentLoaded', () => {
   initHelpModal('help-btn', 'help-modal', 'close-help-btn');
   initNavToggle();
 
+  initStudyBasisPanel('voltageFlicker', {
+    standard: 'IEC 61000-4-15:2010+AMD1:2023',
+    clause: 'Annex A — Simplified rectangular voltage-change method',
+    formulas: [
+      'ΔV% = ΔP_kW / S_sc_kVA × 100 — voltage dip at PCC (IEC 61000-3-3 §4)',
+      'Pst = f(ΔV%, r) — bilinear log-log interpolation on iso-Pst contours',
+      'Plt = (1/N × Σ Pst_i³)^(1/3) — long-term flicker over N = 12 periods',
+    ],
+    assumptions: [
+      'Thevenin short-circuit equivalence at PCC: S_sc = Un² / Zsc',
+      'Rectangular voltage step model (not sinusoidal or ramp changes)',
+      'Pst look-up from IEC 61000-4-15 Figure A.1 via bilinear interpolation',
+    ],
+    limitations: [
+      'Full time-domain flickermeter waveform simulation (IEC §4) not implemented',
+      'Ramp and sinusoidal voltage change profiles not modeled',
+      'IEEE 1453 North American 120 V / 60 Hz weighting not separately validated',
+    ],
+    benchmarkId: 'iec61000-4-15',
+  });
   initStudyApprovalPanel('voltageFlicker');
 
   const form = document.getElementById('flicker-form');

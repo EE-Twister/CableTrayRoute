@@ -67,7 +67,8 @@ const entries = {
   productconfig: 'src/productconfig.js',
   fieldview: 'src/fieldview.js',
   scenariocomparison: 'src/scenarioComparison.js',
-  '404': 'src/404.js'
+  '404': 'src/404.js',
+  validation: 'src/validation.js'
 };
 
 /**

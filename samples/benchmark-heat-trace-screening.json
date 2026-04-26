@@ -1,0 +1,29 @@
+{
+  "meta": { "version": 1, "benchmark": "heat-trace-screening", "scenario": "default", "scenarios": [] },
+  "ductbanks": [],
+  "conduits": [],
+  "trays": [],
+  "cables": [],
+  "cableTypicals": [],
+  "panels": [],
+  "equipment": [],
+  "loads": [],
+  "oneLine": { "components": [], "connections": [], "revision": 0 },
+  "settings": {
+    "studyResults": {
+      "heatTraceSizing": {
+        "inputs": {
+          "pipeDiameterIn": 2.0,
+          "pipeMaterial": "carbon_steel",
+          "insulationThicknessMm": 25,
+          "insulationConductivity": 0.04,
+          "maintainTempC": 5,
+          "ambientTempC": -20,
+          "windSpeedMs": 0,
+          "locationIndoor": true
+        },
+        "_benchmark": "IEC 62395-2 / IEEE 515 freeze-protection screening — 2-in steel pipe, maintain 5 °C, ambient −20 °C, 25 mm mineral wool. Expected heat loss ≈ 18.5 W/m."
+      }
+    }
+  }
+}

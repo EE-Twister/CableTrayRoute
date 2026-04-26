@@ -1,0 +1,42 @@
+{
+  "meta": { "version": 1, "benchmark": "iec60287-cable-rating", "scenario": "default", "scenarios": [] },
+  "ductbanks": [],
+  "conduits": [],
+  "trays": [],
+  "cables": [
+    {
+      "id": "BM-IEC60287-C1",
+      "from": "Source",
+      "to": "Load",
+      "conductor_size": "95 mm²",
+      "conductor_material": "copper",
+      "insulation_type": "XLPE",
+      "voltage_rating": "11kV",
+      "length": 100,
+      "notes": "IEC 60287 benchmark cable — direct burial, 800 mm depth, soil ρ = 1.0 K·m/W"
+    }
+  ],
+  "cableTypicals": [],
+  "panels": [],
+  "equipment": [],
+  "loads": [],
+  "oneLine": { "components": [], "connections": [], "revision": 0 },
+  "settings": {
+    "studyResults": {
+      "iec60287": {
+        "inputs": {
+          "conductorMm2": 95,
+          "conductorMaterial": "copper",
+          "insulation": "XLPE",
+          "systemKV": 11,
+          "installMethod": "direct_burial",
+          "depthMm": 800,
+          "soilRho": 1.0,
+          "ambientC": 25,
+          "conductors": 3
+        },
+        "_benchmark": "IEC 60287-1-1:2023 — 95 mm² Cu XLPE 11 kV, direct burial 800 mm, ρ=1.0. Expected ampacity ≈ 270 A."
+      }
+    }
+  }
+}

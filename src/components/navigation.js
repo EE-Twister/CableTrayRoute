@@ -61,6 +61,7 @@ const NAV_ROUTES = [
   { href: 'custom-components.html', label: 'Custom Components', section: 'Library', icon: 'icons/components/TextBox.svg' },
   { href: 'library.html', label: 'Library Manager', section: 'Library', icon: 'icons/toolbar/grid.svg' },
   { href: 'fieldview.html', label: 'Field View', section: 'Support', icon: 'icons/toolbar/copy.svg' },
+  { href: 'validation.html', label: 'Validation & Standards', section: 'Support', icon: 'icons/toolbar/validate.svg' },
   { href: 'help.html', label: 'Help', section: 'Support', icon: 'icons/toolbar/validate.svg' },
   { href: 'account.html', label: 'Account', section: 'Support', icon: 'icons/toolbar/grid.svg' }
 ];

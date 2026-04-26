@@ -26,7 +26,7 @@ A separate **2026-04-11 extension** to the Cost Estimation module added **custom
 
 A **2026-04-26 website/product competitiveness refresh** compared CableTrayRoute against current positioning and features from ETAP, EasyPower, SKM, Bentley Raceway and Cable Management, MagiCAD/Revit, Eplan Data Portal/eBuild, nVent TraceCalc, Thermon CompuTrace, Chromalox ChromaTrace, SES CDEGS, XGSLab, CYMCAP, Cableizer, and related engineering tools. This revealed **12 additional gaps** (**Gaps #71-#82**) across lifecycle model governance, manufacturer data, heat-trace deliverables, grounding fidelity, cable thermal/pulling workflows, BIM round-trip, field data capture, benchmark/audit confidence, design automation, and public onboarding.
 
-**Current status: 63 of 83 total identified gaps implemented. 1 deferred (native BIM/CAD plugin). Live pricing gap extended with custom CSV pricing book. 19 open gaps remain: advanced power studies (#64, #65, #70) plus website/product competitiveness gaps (#71-#82), with some items suitable for browser-native implementation before any commercial partnerships.**
+**Current status: 66 of 83 total identified gaps implemented. 1 deferred (native BIM/CAD plugin). Live pricing gap extended with custom CSV pricing book. 16 open gaps remain: advanced power study #65 (OPF) plus website/product competitiveness gaps #71-#82 (excluding #78 now implemented). Gaps #64 (Voltage Stability) and #70 (Voltage Flicker) were implemented and are corrected in the roadmap table below.**
 
 ---
 
@@ -1355,7 +1355,7 @@ The strongest market pattern is that competing tools sell more than formulas. Th
 - Add a generated validation index from tests so the website can show last-passing evidence without hand-maintained claims.
 - Tests: validation manifest generation, link integrity, and benchmark project loading.
 
-**Status:** Tests exist internally; public validation/trust-center workflow not implemented.
+**Status:** ✅ **Implemented 2026-04-26.** `validation.html` + `src/validation.js` — public "Validation & Standards" trust-center page with KPI summary (standards count, benchmark count, test suite count, total assertions), collapsible standards table (scope, assumptions, known limitations), collapsible benchmark table (reference values, tolerance bands, fixture download links), and test suite evidence from `dist/validationManifest.json`. `src/components/studyBasis.js` — reusable `initStudyBasisPanel()` widget injected into 6 study pages (arcFlash, iec60909, iec60287, voltageflicker, heattracesizing, groundgrid) rendering a collapsible "Calculation Basis" panel with standard clause, key formulas, assumptions, limitations, and a benchmark link to `validation.html`. `scripts/generateValidationManifest.cjs` — build-time script that enumerates test files, counts assertions, loads `data/validationBenchmarks.json`, and writes `dist/validationManifest.json` (122 test suites, 3,901 assertions at time of implementation). `data/validationBenchmarks.json` — 6 benchmark definitions (IEEE 1584-2018 arc flash, IEC 60909 short circuit, IEC 60287 cable rating, IEEE 80 ground grid, heat-trace screening, duct-bank thermal) plus 12 standard entries with scope/assumptions/limitations. `samples/benchmark-*.json` (×6) — importable project fixture files. Navigation: `Validation & Standards` added to Support section in `src/components/navigation.js`. Sitemap: `validation.html` added at priority 0.8. Rollup: `validation` entry added. Tests: `tests/validationManifest.test.mjs` (24 assertions) + `tests/studyBasis.test.mjs` (13 assertions) in `test:critical` and `test:full`. E2E: `playwright-tests/validation.spec.js` (22 test cases covering page load, standards count, benchmark content, study basis panels, and nav link).
 
 ---
 
@@ -1431,7 +1431,7 @@ The strongest market pattern is that competing tools sell more than formulas. Th
 
 | Priority | # | Gap | Recommended First Slice | Effort | Status |
 |---|---|---|---|---|---|
-| **P1** | 78 | **Calculation Validation, Benchmarks, and Trust Center** | Standards/basis drawers plus public validation page | Medium | Not implemented |
+| **P1** | 78 | ~~**Calculation Validation, Benchmarks, and Trust Center**~~ | Standards/basis drawers plus public validation page | Medium | ✅ Implemented 2026-04-26 |
 | **P1** | 82 | **Commercial-Grade Report Package Builder** | Structured package builder over existing reports | High | Not implemented |
 | **P1** | 73 | **Heat Trace Line List, BOM, and Installation Package** | Product families + BOM/report tabs | Medium | Not implemented |
 | **P1** | 71 | **Lifecycle Project Model / Digital Twin Governance** | Named study packages and revision snapshots | High | Not implemented |
@@ -1687,6 +1687,6 @@ Full IEC 60909-0:2016 equivalent voltage source method implemented in `analysis/
 | **P2** | 59 | ~~**Battery / UPS Sizing (IEEE 485)**~~ | `analysis/batterySizing.mjs` | Medium | ✅ Implemented 2026-04-12 |
 | **P2** | 66 | ~~**Generator Sizing (NFPA 110)**~~ | `analysis/generatorSizing.mjs` | Medium | ✅ Implemented 2026-04-12 |
 | **P2** | 67 | ~~**Differential Protection (87B/T/G)**~~ | `analysis/differentialProtection.mjs`, `data/protectiveDevices.json` | Medium | ✅ Implemented 2026-04-19 |
-| **P3** | 64 | **Voltage Stability (P-V / Q-V)** | Extend `analysis/loadFlow.js` | High | Not implemented |
+| **P3** | 64 | ~~**Voltage Stability (P-V / Q-V)**~~ | `analysis/voltageStability.mjs` | High | ✅ Implemented 2026-04-20 |
 | **P3** | 65 | **Optimal Power Flow / Economic Dispatch** | `analysis/optimalPowerFlow.mjs` | High | Not implemented |
-| **P3** | 70 | **Voltage Flicker (Pst/Plt)** | `analysis/voltageFlicker.mjs` | Medium | Not implemented |
+| **P3** | 70 | ~~**Voltage Flicker (Pst/Plt)**~~ | `analysis/voltageFlicker.mjs` | Medium | ✅ Implemented 2026-04-19 |

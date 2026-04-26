@@ -11,6 +11,7 @@ import {
 import { getStudies, getStudyApprovals, setStudies } from './dataStore.mjs';
 import { getProjectState } from './projectStorage.js';
 import { initStudyApprovalPanel } from './src/components/studyApproval.js';
+import { initStudyBasisPanel } from './src/components/studyBasis.js';
 
 document.addEventListener('DOMContentLoaded', () => {
   initSettings();
@@ -123,6 +124,26 @@ document.addEventListener('DOMContentLoaded', () => {
     },
   ];
 
+  initStudyBasisPanel('heatTraceSizing', {
+    standard: 'IEC 62395-2 / IEEE 515-2017',
+    clause: 'Steady-state heat-balance screening method',
+    formulas: [
+      'q_loss = ΔT / R_total — heat loss per unit length (W/m)',
+      'R_ins = ln(r_o/r_i) / (2π k_ins) — cylindrical insulation thermal resistance',
+      'q_req = q_loss × SF — required watt density with safety factor',
+    ],
+    assumptions: [
+      'Steady-state thermal equilibrium (heat input = heat loss)',
+      'Cylindrical insulation geometry; simplified for non-circular cross-sections',
+      'Constant-watt or self-regulating cable selected at rated watt density',
+    ],
+    limitations: [
+      'Startup power (cold inrush current) not modeled in screening',
+      'Hazardous area (Class I Div 1/2) T-class derating requires manual adjustment',
+      'Cyclic and intermittent operation not modeled (steady-state only)',
+    ],
+    benchmarkId: 'heat-trace-screening',
+  });
   initStudyApprovalPanel('heatTraceSizing');
   initSidebarTabs();
   attachCircuitCaseHandlers();
