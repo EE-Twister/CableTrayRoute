@@ -1,6 +1,6 @@
 # Competitor Feature Gap Analysis
 
-## Date: 2026-04-12 (advanced power systems & DER deep dive added 2026-04-11 / documented 2026-04-12; custom pricing book added 2026-04-11; one-line diagram & TCC deep dive added 2026-04-06; one-line diagram UI pass added 2026-04-05; all prior gaps resolved 2026-04-04; usability/calculation pass added 2026-03-24; original 2026-03-16)
+## Date: 2026-04-26 (website/product competitiveness refresh added 2026-04-26; advanced power systems & DER deep dive added 2026-04-11 / documented 2026-04-12; custom pricing book added 2026-04-11; one-line diagram & TCC deep dive added 2026-04-06; one-line diagram UI pass added 2026-04-05; all prior gaps resolved 2026-04-04; usability/calculation pass added 2026-03-24; original 2026-03-16)
 
 This document identifies features commonly found in major competitor platforms that are currently missing from CableTrayRoute.
 
@@ -24,7 +24,9 @@ A **2026-04-11 pass — advanced power systems & DER analysis** performed a focu
 
 A separate **2026-04-11 extension** to the Cost Estimation module added **custom pricing book import/export** — closing the "user-configurable pricing" half of the live-pricing gap without requiring commercial licensing.
 
-**Current status: 63 of 71 total identified gaps implemented. 1 deferred (BIM/CAD plugin). Live pricing gap extended with custom CSV pricing book. 7 newly identified and open (Gaps #63–#70 except #63, #66, #68, #69 which are implemented) — all represent advanced power systems studies not previously in the competitive feature set.**
+A **2026-04-26 website/product competitiveness refresh** compared CableTrayRoute against current positioning and features from ETAP, EasyPower, SKM, Bentley Raceway and Cable Management, MagiCAD/Revit, Eplan Data Portal/eBuild, nVent TraceCalc, Thermon CompuTrace, Chromalox ChromaTrace, SES CDEGS, XGSLab, CYMCAP, Cableizer, and related engineering tools. This revealed **12 additional gaps** (**Gaps #71-#82**) across lifecycle model governance, manufacturer data, heat-trace deliverables, grounding fidelity, cable thermal/pulling workflows, BIM round-trip, field data capture, benchmark/audit confidence, design automation, and public onboarding.
+
+**Current status: 63 of 83 total identified gaps implemented. 1 deferred (native BIM/CAD plugin). Live pricing gap extended with custom CSV pricing book. 19 open gaps remain: advanced power studies (#64, #65, #70) plus website/product competitiveness gaps (#71-#82), with some items suitable for browser-native implementation before any commercial partnerships.**
 
 ---
 
@@ -1215,6 +1217,235 @@ These features are unique strengths that competitors do not offer:
 
 ---
 
+## Website/Product Competitiveness Refresh (2026-04-26)
+
+Benchmarked against: **ETAP** (electrical digital twin, model-based study suite, cable/grounding packages), **EasyPower** (one-line centric power studies, arc flash, coordination, report workflows), **SKM PowerTools** (PTW desktop suite, DAPPER/CAPTOR/GroundMat, data collection workflows), **Bentley Raceway and Cable Management** (3D raceway modeling, cable routing, BIM/project database), **MagiCAD/Revit** (BIM-native electrical modeling and circuit workflows), **Eplan Platform/Data Portal/eBuild** (manufacturer data, automated schematics, cloud collaboration), **nVent TraceCalc / Thermon CompuTrace / Chromalox ChromaTrace** (heat-trace line-list design, BOMs, installation deliverables), **SES CDEGS / XGSLab / GroundMat** (grounding and earthing visual analysis), and **CYMCAP / Cableizer** (high-fidelity cable ampacity, thermal environment, and pulling calculations).
+
+The strongest market pattern is that competing tools sell more than formulas. They combine traceable engineering calculations with a controlled project model, manufacturer libraries, visually reviewable risk maps, construction deliverables, and a guided workflow that helps users produce a stamped package. CableTrayRoute is competitive on breadth, offline/static deployment, and low-friction web access; the next competitive step is to turn the site into a governed engineering workspace with stronger product data, report confidence, and construction handoff.
+
+### Gap #71 - Lifecycle Project Model / Digital Twin Governance
+
+| Missing Feature | Competitor(s) | Description |
+|---|---|---|
+| **Versioned electrical model with study snapshots, assumptions, and change history** | ETAP electrical digital twin, EasyPower project database, SKM PTW project files, Bentley project database | Competitor workflows center on a governed model where studies, equipment data, assumptions, and reports are traceable to a project revision. CableTrayRoute has project persistence and scenarios, but the user cannot yet promote a model revision, lock a calculation package, compare revision-to-revision changes, or show which studies were generated from the same source model. This becomes important when the site is used for design review, peer checking, or field issue resolution. |
+
+**Implementation notes:**
+- Add `projectRevisions[]` and `studyPackages[]` to project storage, with immutable snapshots of one-line, schedules, assumptions, studies, and approvals.
+- Add a "Release Package" action on `workflowdashboard.html` that freezes current studies into a named package with revision, date, author, and status.
+- Add revision diff helpers for schedules, one-line topology, study inputs, and key result deltas.
+- Surface package lineage in `projectreport.html`, exported reports, and study approval banners.
+- Tests: package creation round-trip, immutable snapshot behavior, diff summaries, and report export using the selected package.
+
+**Status:** Not implemented.
+
+---
+
+### Gap #72 - Manufacturer Data Portal / Product-Grade Catalogs
+
+| Missing Feature | Competitor(s) | Description |
+|---|---|---|
+| **Structured manufacturer product catalog with technical attributes, drawings, BIM references, and approval metadata** | Eplan Data Portal, MagiCAD Cloud/product libraries, Bentley Components Center, Eaton/Legrand/Panduit product tools | Competitive workflows let users select real manufacturer parts rather than generic placeholders. Eplan Data Portal is especially strong because the part data includes technical, commercial, schematic, and 3D fields. CableTrayRoute has a component library and custom pricing book, but product data is not normalized enough to support manufacturer BOM confidence, submittal-ready selections, or reusable approved catalog governance. |
+
+**Implementation notes:**
+- Extend the library schema with `manufacturer`, `catalogNumber`, `standards`, `ratings`, `dimensions`, `bimRef`, `datasheetUrl`, `approved`, `source`, and `lastVerified`.
+- Add CSV/JSON import templates for trays, conduits, fittings, heat-trace components, protective devices, and cable types.
+- Add an "Approved Catalog" filter in library, routing, heat trace, TCC, and BOM workflows.
+- Add warnings when reports use generic/unapproved parts.
+- Tests: catalog import validation, duplicate catalog-number merge behavior, approved/unapproved filtering, and report warning output.
+
+**Status:** Partially implemented via custom pricing/library features; product-grade catalog governance not implemented.
+
+---
+
+### Gap #73 - Heat Trace Manufacturer-Style Line List, BOM, and Installation Package
+
+| Missing Feature | Competitor(s) | Description |
+|---|---|---|
+| **Heat-trace line-list workflow with product selection, component kits, BOM, controller schedule, and installation deliverables** | nVent TraceCalc Pro/Net, Thermon CompuTrace, Chromalox ChromaTrace | Heat-trace competitors focus on the construction package: line list, circuit schedule, cable family, power connection kits, end seals, splice/tee kits, controls, BOM, and printable installation guidance. CableTrayRoute now has heat-trace branch sizing and component installation visuals, but it does not yet select a product family, count accessories, generate a controller schedule, or produce a construction-ready heat-trace package. |
+
+**Implementation notes:**
+- Add heat-trace product families with voltage, watt density, self-regulating/constant-watt/MI type, max circuit length, exposure rating, startup-current notes, and hazardous-area metadata.
+- Extend `studyResults.heatTraceSizingCircuits` into a line-list table with pipe tag, service, area, maintain temp, run count, effective length, cable family, kits, controller, and panel/source.
+- Generate BOM rows for power connections, end seals, tees, splices, labels, thermostats/controllers, and allowances per component type.
+- Add report tabs: line list, circuit schedule, BOM, installation details, warnings, and manufacturer-verification assumptions.
+- Tests: product selection constraints, BOM counts, controller schedule totals, JSON/HTML report output, and legacy branch-case normalization.
+
+**Status:** Sizing and branch schedule partially implemented; manufacturer-style line list and BOM not implemented.
+
+---
+
+### Gap #74 - Advanced Grounding: Soil Model, Irregular Grid, and Hazard Map Fidelity
+
+| Missing Feature | Competitor(s) | Description |
+|---|---|---|
+| **Grounding analysis beyond rectangular IEEE 80 screening: soil-layer fitting, irregular geometry, danger points, and detailed contour maps** | SES CDEGS, XGSLab, SKM GroundMat, ETAP Ground Grid Systems | Specialist grounding tools compete on visualization and fidelity: Wenner/Schlumberger soil data fitting, multi-layer soil, irregular electrode geometry, 2D/3D touch-step contours, transferred voltage checks, and explicit danger point reporting. CableTrayRoute has a stronger visual ground-grid page than before, but it is still mainly a rectangular IEEE 80 screening workflow. |
+
+**Implementation notes:**
+- Add a soil-model tab for measured apparent resistivity rows and a two-layer fit result (`rho1`, `rho2`, `h`, fit error).
+- Allow polygon/perimeter grid editing plus additional rods, ground rings, and remote electrodes in the SVG map.
+- Add a risk-point table for max touch/step areas and user-added inspection points.
+- Add exported SVG/PNG hazard maps and a calculation-basis appendix that clearly separates IEEE 80 screening from advanced numerical methods.
+- Tests: soil fit deterministic cases, polygon geometry bounds, risk color classification, and report inclusion of danger points.
+
+**Status:** Rectangular IEEE 80 workflow implemented; advanced soil/irregular-grid workflow not implemented.
+
+---
+
+### Gap #75 - High-Fidelity Cable Thermal / Ampacity Environment Modeling
+
+| Missing Feature | Competitor(s) | Description |
+|---|---|---|
+| **Cable ampacity and thermal modeling for complex installation environments** | CYMCAP, Cableizer, ETAP Underground Raceway Systems, DIgSILENT cable rating workflows | Cable thermal competitors model direct-buried circuits, duct banks, troughs, tunnels, trays, backfill, mutual heating, cyclic loading, cable crossings, soil drying, and installation-specific derating. CableTrayRoute has cable sizing, duct bank, tray fill, IEC 60287, and heat maps, but the workflows are not yet unified into a single thermal environment model that can compare installations and show limiting constraints. |
+
+**Implementation notes:**
+- Create `analysis/cableThermalEnvironment.mjs` to normalize cable, conduit/duct/tray, soil/backfill, ambient, grouping, and load-profile inputs.
+- Add side-by-side installation comparisons: tray vs conduit vs duct bank vs direct burial.
+- Add derating waterfall cards explaining which factor is limiting ampacity.
+- Add conductor temperature timeline for cyclic/daily load profiles.
+- Tests: environment normalization, mutual-heating cases, derating waterfall consistency, and regression examples against existing IEC 60287 tests.
+
+**Status:** Individual calculators partially implemented; unified thermal environment not implemented.
+
+---
+
+### Gap #76 - BIM Round-Trip, Issue Markup, and Quantity Reconciliation
+
+| Missing Feature | Competitor(s) | Description |
+|---|---|---|
+| **BIM model round-trip with IDs, issue markup, and quantity reconciliation** | Bentley Raceway and Cable Management, Revit/MagiCAD, Eplan/BIM integrations, AutoCAD Plant 3D ecosystems | Competitor ecosystems live inside or beside BIM/CAD. CableTrayRoute has IFC export and routing models, but not round-trip import, stable element GUID reconciliation, issue markup, or a workflow to compare calculated quantities against a BIM model takeoff. Full native plugins remain deferred, but browser-native IFC import/BCF issue workflows would close much of the perceived gap. |
+
+**Implementation notes:**
+- Add IFC import/read-only viewer for cable trays, conduits, equipment, and support objects, preserving stable GUIDs.
+- Add a reconciliation view: CableTrayRoute route quantities vs imported BIM quantities by system, voltage class, tray type, and level/area.
+- Add BCF-style issue records with screenshot, element IDs, status, assignee, and comment thread.
+- Export resolved changes as CSV/BCF-like JSON, leaving Revit/AutoCAD native plugins as a later integration.
+- Tests: IFC object extraction fixtures, GUID mapping, quantity diff generation, and issue export/import round-trip.
+
+**Status:** IFC export partially implemented; round-trip and issue markup not implemented.
+
+---
+
+### Gap #77 - Field Data Collection / Commissioning Workflow
+
+| Missing Feature | Competitor(s) | Description |
+|---|---|---|
+| **Mobile field verification with photos, QR scans, punch items, and as-built updates** | SKM data collection/mobile workflows, ETAP cloud/mobile positioning, Eplan collaboration apps, contractor field tools | CableTrayRoute has field view and QR-oriented outputs, but field users cannot capture photos, verify installed cable/tray data, mark punch items, or feed as-built changes back into the project model. Competitors increasingly position field data capture as part of model governance and safety compliance. |
+
+**Implementation notes:**
+- Extend `fieldview.html` into a field inspection workspace with QR scan target, checklist, photo attachment, status, comments, and offline queue.
+- Add `fieldObservations[]` to project storage with element ID, study package ID, observation type, attachments, and resolution status.
+- Add dashboard cards for open field issues and as-built conflicts.
+- Add report appendix for field verification and unresolved punch items.
+- Tests: offline observation queue, attachment metadata persistence, project merge behavior, and report appendix generation.
+
+**Status:** Mobile field viewing implemented; field data collection not implemented.
+
+---
+
+### Gap #78 - Calculation Validation, Benchmarks, and Trust Center
+
+| Missing Feature | Competitor(s) | Description |
+|---|---|---|
+| **Visible validation evidence: standard clauses, benchmark examples, and calculation audit trail** | ETAP, EasyPower, SKM, CDEGS/XGSLab, CYMCAP/Cableizer | Commercial tools win trust through traceable standards, benchmark cases, calculation reports, and vendor reputation. CableTrayRoute has tests and many reports, but users do not see validation status, reference cases, standard assumptions, or calculation limitations directly in the website. This is a competitive weakness for engineering adoption even when the formulas are strong. |
+
+**Implementation notes:**
+- Add a public "Validation & Standards" page listing supported standards, assumptions, limitations, and benchmark cases.
+- Add a per-study "Basis" drawer with standard references, formulas, test-case links, and known limitations.
+- Add benchmark project files for common examples: IEEE 80 ground grid, IEEE 1584 arc flash, IEC 60909 short circuit, IEC 60287 cable rating, heat-trace screening, and duct-bank thermal.
+- Add a generated validation index from tests so the website can show last-passing evidence without hand-maintained claims.
+- Tests: validation manifest generation, link integrity, and benchmark project loading.
+
+**Status:** Tests exist internally; public validation/trust-center workflow not implemented.
+
+---
+
+### Gap #79 - Cross-Study Design Coach and Auto-Design Suggestions
+
+| Missing Feature | Competitor(s) | Description |
+|---|---|---|
+| **Action-oriented design coach that proposes specific changes across studies** | ETAP auto sizing/optimization modules, EasyPower analysis recommendations, SKM study warnings, Schneider Ecodial design workflows | CableTrayRoute has several page-specific warnings and some "how to fix" text. Competitors increasingly guide users toward corrected designs: resize cable, adjust protection, change tray fill, add ground rods, reduce clearing time, split circuits, or select a different component. A cross-study design coach would make the website easier for less-specialized users and would differentiate it from static calculators. |
+
+**Implementation notes:**
+- Add shared `analysis/designCoach.mjs` that consumes study results and emits ranked actions with scope, confidence, tradeoffs, and affected pages.
+- Add dashboard-wide action queue grouped by safety, code compliance, constructability, cost, and missing data.
+- Add "Apply suggestion" hooks only for deterministic low-risk changes; require review for engineering judgment changes.
+- Preserve an audit trail of accepted/rejected suggestions in study packages.
+- Tests: suggestion ranking, duplicate suppression, safe apply actions, and audit trail persistence.
+
+**Status:** Page-level remediation partially implemented; cross-study coach not implemented.
+
+---
+
+### Gap #80 - Electrical Equipment Evaluation and Compliance Inventory
+
+| Missing Feature | Competitor(s) | Description |
+|---|---|---|
+| **Equipment duty evaluation across interrupting rating, SCCR, withstand, enclosure, and protection requirements** | SKM Equipment Evaluation, ETAP equipment evaluation, EasyPower short-circuit/arc-flash reporting, manufacturer tools | CableTrayRoute calculates short circuit and arc flash, but the site does not yet produce a unified equipment duty report that flags breaker interrupting rating, switchgear bus bracing, transformer withstand, cable short-circuit thermal duty, SCCR, and protective-device settings against actual selected equipment. This is a common client deliverable and a major reason teams buy power-system software. |
+
+**Implementation notes:**
+- Add equipment rating fields to library/device schemas: interrupting AIC, withstand kA/cycles, SCCR, bus rating, enclosure, standard, and temperature rating.
+- Add `analysis/equipmentEvaluation.mjs` to join one-line equipment, short-circuit, arc-flash, TCC, and cable-duty outputs.
+- Add report table with pass/warn/fail, margin, missing data, and recommended next input.
+- Add dashboard badge for "equipment evaluation incomplete" when devices lack ratings.
+- Tests: rating comparison, missing-data warnings, short-circuit linkage, and report output.
+
+**Status:** Not implemented.
+
+---
+
+### Gap #81 - Public Sample Project Gallery and Guided Demo Workflows
+
+| Missing Feature | Competitor(s) | Description |
+|---|---|---|
+| **Curated sample projects and guided demos that show complete workflows** | ETAP/EasyPower/SKM demo projects, Eplan eBuild guided automation, MagiCAD/Revit example models, manufacturer web tools | Competitor websites reduce adoption friction with sample projects, guided workflows, and demo datasets. CableTrayRoute has many pages, but new users must know which inputs to try and how pages connect. A sample gallery would make the website feel more polished and make competitive features visible without requiring users to build a project from scratch. |
+
+**Implementation notes:**
+- Add `samples/` JSON projects for industrial plant, data center, substation ground grid, heat trace package, duct bank, and coordination study.
+- Add "Open Sample" actions on the landing page and workflow dashboard.
+- Add guided checklists that walk through import, one-line setup, routing, studies, reports, and field outputs.
+- Add lightweight screenshots or SVG previews for each sample.
+- Tests: sample schema validation, sample load/migration, and navigation from sample gallery to target pages.
+
+**Status:** Project templates partially implemented; public sample gallery not implemented.
+
+---
+
+### Gap #82 - Commercial-Grade Report Package Builder
+
+| Missing Feature | Competitor(s) | Description |
+|---|---|---|
+| **Configurable report package with table of contents, appendices, sealed-review workflow, and export presets** | ETAP, EasyPower, SKM, CDEGS, CYMCAP/Cableizer, heat-trace vendor tools | Individual CableTrayRoute pages can export data, but competitors produce client-facing calculation books with configurable sections, branded headers, revision history, appendices, equipment schedules, warnings, and approval status. A stronger report package builder would convert the website from "collection of tools" into "deliverable generator." |
+
+**Implementation notes:**
+- Extend `projectreport.html` into a report-package builder with section toggles, ordering, cover sheet, revision table, assumptions appendix, and generated table of contents.
+- Let users choose presets: IFC/BIM handoff, electrical studies, heat-trace package, grounding report, construction cable package, and owner turnover.
+- Add PDF/HTML/JSON export from the same structured report payload.
+- Pull report snapshots from `studyPackages[]` so results are reproducible after later project edits.
+- Tests: report schema, section ordering, escaped user data, package snapshot selection, and PDF/HTML parity.
+
+**Status:** Individual report exports partially implemented; commercial-grade report package builder not implemented.
+
+---
+
+### Recommended Roadmap from 2026-04-26 Refresh
+
+| Priority | # | Gap | Recommended First Slice | Effort | Status |
+|---|---|---|---|---|---|
+| **P1** | 78 | **Calculation Validation, Benchmarks, and Trust Center** | Standards/basis drawers plus public validation page | Medium | Not implemented |
+| **P1** | 82 | **Commercial-Grade Report Package Builder** | Structured package builder over existing reports | High | Not implemented |
+| **P1** | 73 | **Heat Trace Line List, BOM, and Installation Package** | Product families + BOM/report tabs | Medium | Not implemented |
+| **P1** | 71 | **Lifecycle Project Model / Digital Twin Governance** | Named study packages and revision snapshots | High | Not implemented |
+| **P2** | 79 | **Cross-Study Design Coach** | Shared suggestion engine and dashboard action queue | Medium | Not implemented |
+| **P2** | 81 | **Sample Project Gallery / Guided Demos** | Curated sample JSON projects and launch cards | Low | Not implemented |
+| **P2** | 80 | **Equipment Evaluation / Compliance Inventory** | Join ratings with short-circuit/arc-flash/TCC results | Medium | Not implemented |
+| **P2** | 74 | **Advanced Grounding Fidelity** | Soil data fitting and risk-point table | High | Not implemented |
+| **P3** | 75 | **Cable Thermal Environment Modeling** | Unified environment model over existing calculators | High | Not implemented |
+| **P3** | 72 | **Manufacturer Data Portal / Product Catalogs** | Approved catalog schema and imports | Medium | Partial |
+| **P3** | 77 | **Field Data Collection / Commissioning** | Field observations and offline queue | Medium | Not implemented |
+| **P4** | 76 | **BIM Round-Trip / Issue Markup** | IFC import, quantity reconciliation, BCF-like issues | High | Not implemented |
+
+---
+
 ## Sources
 
 ### Manufacturer Tools
@@ -1293,6 +1524,44 @@ These features are unique strengths that competitors do not offer:
 - [Rockwell & Eplan Digital Twin Partnership (SPS 2025)](https://www.rockwellautomation.com/en-no/company/news/press-releases/digital-twin-driven-electrical-simulation.html)
 - [IFC Material Overrides for Cable Tray](https://digitalbbq.au/index.php/2025/08/07/setting-ifc-material-overrides-for-cable-tray-and-conduit/)
 
+### Website/Product Competitiveness Refresh Sources (2026-04-26)
+
+#### Model Governance / Digital Twin
+- [ETAP Digital Twin Platform](https://etap.com/products/etap-digital-twin)
+- [ETAP System Modeling & Visualization](https://etap.com/solutions/system-modeling-visualization)
+- [EasyPower Arc Flash Solutions](https://www.easypower.com/products/arc-flash-solutions)
+- [EasyPower ShortCircuit and SmartDuty](https://www.easypower.com/products/features/shortcircuit)
+- [SKM Equipment Evaluation](https://www.skm.com/equipEvaluation.html)
+- [SKM PTW Data Collection](https://www.skm.com/DataCollection.html)
+
+#### Manufacturer Data / Automation / BIM
+- [Eplan Data Portal](https://www.eplan.com/us-en/products/eplan-data-portal.html)
+- [Eplan eBuild Automated Project Generation](https://www.eplan.com/us-en/products/eplan-ebuild)
+- [Bentley Raceway and Cable Management](https://www.bentley.com/software/bentley-raceway-and-cable-management/)
+- [MagiCAD Electrical](https://www.magicad.com/applications/magicad-electrical/)
+- [MagiCAD 2026 for Revit Electrical Changes](https://www.magicad.com/uk/updates-and-releases/magicad-2026-revit/)
+
+#### Heat Trace
+- [nVent RAYCHEM TraceCalc Pro](https://www.nvent.com/en-us/raychem/resources/design-tools/tracecalc-pro)
+- [nVent TraceCalc Pro Datasheet](https://www.nvent.com/sites/default/files/acquiadam_assets/2020-12/Raychem-DS-H57021-TraceCalcPro-EN.pdf)
+- [Thermon CompuTrace Express Quick Start](https://content.thermon.com/pdf/ca_pdf_files/CompuTrace-Express-Quick-Start.pdf)
+- [Thermon CompuTrace Design Suite Quickstart](https://content.thermon.com/software/TEP0154-CompuTrace-Quickstart_6.1.28.pdf)
+- [Chromalox ChromaTrace Project Design Software](https://www.chromalox.com/en/products-and-technologies/heat-trace/commercial-heat-trace-system-components-and-accessories/commercial-tools-and-accessories/chromatrace-project-design-software)
+
+#### Grounding / Earthing
+- [ETAP Ground Grid Systems](https://etap.com/product/ground-grid-systems-software)
+- [SKM GroundMat](https://www.skm.com/groundMat.html)
+- [SES CDEGS](https://www.sestech.com/en/Product/Package/CDEGS)
+- [XGSLab Grounding](https://www.bentley.com/software/xgslab-grounding/)
+- [XGSLab Advanced Simulation](https://xgslab.ieng.tech/)
+
+#### Cable Thermal / Ampacity
+- [Cableizer](https://www.cableizer.com/)
+- [Cableizer Features](https://www.cableizer.com/features)
+- [Eaton CYMCAP Power Cable Ampacity Software](https://www.eaton.com/us/en-us/digital/brightlayer/brightlayer-utilities-suite/power-cable-ampacity-software.html)
+- [Eaton CYMCAP 3D Modeling Module](https://www.eaton.com/content/dam/eaton/digital/brightlayer-utilities-suite/cyme/cymcap/eaton-cymcap-3d-module-sb917001en-us-en-us.pdf)
+- [CalcWare AmpCalc](https://www.calcware.com/)
+
 ### Advanced Power Systems Standards (2026-04-12 Refresh)
 
 #### IEC Standards
@@ -1328,9 +1597,9 @@ These features are unique strengths that competitors do not offer:
 
 ---
 
-## Next Major Steps — Recommended Roadmap (as of 2026-04-12)
+## Next Major Steps — Recommended Roadmap (as of 2026-04-26)
 
-**Active focus: Advanced Power Systems & DER Analysis (Gaps #58–#70).** These 13 gaps represent the next tier of competitive features — advanced AC/DC studies, DER/renewable integration, and IEC calculation methods. See the priority table in "New Gaps — Advanced Power Systems & DER (2026-04-12 Roadmap)" above for the recommended implementation order.
+**Active focus: product trust and deliverable quality (Gaps #71-#82).** The 2026-04-26 refresh shows that the fastest competitive improvement is not another isolated calculator. The strongest next slices are: public validation/trust center (#78), commercial-grade report packages (#82), heat-trace construction package (#73), and lifecycle study packages/revision snapshots (#71). Advanced power-system studies (#64, #65, #70) remain valuable, but the site will feel more competitive sooner if existing calculations become easier to trust, package, review, and hand off.
 
 All prior gaps (#1–#57) have been implemented as of 2026-04-11. The tables below are preserved for historical reference with ✅ status.
 
